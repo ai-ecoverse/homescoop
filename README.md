@@ -42,6 +42,8 @@ CI: dispatch [`.github/workflows/release.yml`](.github/workflows/release.yml)
 
 [Renovate](https://docs.renovatebot.com/) opens PRs when recipe upstreams
 release (see [`docs/renovate.md`](docs/renovate.md) / `renovate.json`).
+npm versions track the recipe (`1.3.1`, or `1.3.1-1` for packaging fixes —
+[`docs/versioning.md`](docs/versioning.md)).
 
 ## Packages (ladder set)
 

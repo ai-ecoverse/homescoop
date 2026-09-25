@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-zlib",
-  "version": "0.0.2",
-  "description": "zlib compression library (WASM / emscripten) — OIDC smoke stub; real artifacts TBD",
+  "version": "1.3.1",
+  "description": "zlib 1.3.1 for WebAssembly / emscripten (SLICC homescoop ladder)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -9,6 +9,9 @@
     "directory": "packages/zlib/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/zlib",
+  "bugs": {
+    "url": "https://github.com/ai-ecoverse/homescoop/issues"
+  },
   "keywords": [
     "wasm",
     "emscripten",
@@ -16,6 +19,10 @@
     "homescoop",
     "zlib"
   ],
+  "homescoop": {
+    "recipe": "zlib",
+    "upstream": "1.3.1"
+  },
   "files": [
     "README.md"
   ],
