@@ -41,7 +41,7 @@ jobs:
           echo "package=$PKG builder=$BUILDER npm=$NPM@$VER"
           node scripts/read-recipe.mjs "$PKG" --deps > deps.txt || : > deps.txt
           echo "deps:" && cat deps.txt || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: recipe-deps
           path: deps.txt
@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           bash scripts/host-run.sh "${{ inputs.package }}"
           ls -la .homescoop-out/package.tgz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: package-tgz
           path: .homescoop-out/package.tgz
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: recipe-deps
           path: ${{ runner.temp }}
@@ -103,7 +103,7 @@ jobs:
           join-url: ${{ steps.leader.outputs.join-url }}
           path: /tmp/homescoop/out/package.tgz
           local: ${{ runner.temp }}/package.tgz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: package-tgz
           path: ${{ runner.temp }}/package.tgz
@@ -115,7 +115,7 @@ jobs:
     if: always() && (needs.host-build.result == 'success' || needs.slicc-build.result == 'success')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: package-tgz
           path: ${{ runner.temp }}
