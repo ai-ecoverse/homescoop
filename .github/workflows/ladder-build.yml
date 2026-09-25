@@ -26,7 +26,7 @@ jobs:
       npm: ${{ steps.r.outputs.npm }}
       version: ${{ steps.r.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: r
         run: |
           set -euo pipefail
@@ -51,7 +51,7 @@ jobs:
     if: needs.resolve.outputs.builder == 'host'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -70,7 +70,7 @@ jobs:
     if: needs.resolve.outputs.builder == 'slicc'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: recipe-deps
