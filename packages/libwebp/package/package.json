@@ -2,15 +2,24 @@
   "name": "@ai-ecoverse/wasm-libwebp",
   "version": "0.0.0",
   "description": "WebP codec libraries (WASM / emscripten) — name reservation stub; real artifacts TBD",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
     "directory": "packages/libwebp/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/libwebp",
-  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "libwebp"],
-  "files": ["README.md"],
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "libwebp"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE"
+  ],
   "publishConfig": {
     "access": "public"
   }

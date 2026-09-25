@@ -1,8 +1,8 @@
 {
   "name": "@ai-ecoverse/wasm-zlib",
-  "version": "1.3.1",
+  "version": "1.3.1-1",
   "description": "zlib 1.3.1 for WebAssembly / emscripten (SLICC homescoop ladder)",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
@@ -24,7 +24,8 @@
     "upstream": "1.3.1"
   },
   "files": [
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"

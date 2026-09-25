@@ -20,5 +20,6 @@
   },
   "workspaces": [
     "packages/*/package"
-  ]
+  ],
+  "license": "Apache-2.0"
 }

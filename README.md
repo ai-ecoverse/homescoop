@@ -63,4 +63,5 @@ npm versions track the recipe (`1.3.1`, or `1.3.1-1` for packaging fixes —
 
 ## License
 
-MIT (recipe wrappers). Upstream libraries keep their own licenses inside each package.
+Apache-2.0 (recipes, tooling, and package metadata). Upstream libraries keep
+their own licenses (see each recipe / shipped artifacts).

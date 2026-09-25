@@ -27,5 +27,6 @@ with zlib 1.3.1. Depend on a later `1.3.1` / `1.3.1-N` once binaries ship.
 
 ## License
 
-Package metadata is MIT. zlib itself remains under the
-[zlib license](https://github.com/madler/zlib/blob/master/LICENSE).
+Homescoope packaging (this README, `package.json`, recipes, tooling) is
+[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0). zlib itself remains
+under the [zlib license](https://github.com/madler/zlib/blob/master/LICENSE).
