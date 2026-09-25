@@ -45,7 +45,7 @@ jobs:
           publish_one() {
             local dir="$1"
             echo "::group::npm publish packages/${dir}/package"
-            npm publish "packages/${dir}/package" --access public
+            npm publish "packages/${dir}/package" --access public --tag latest
             echo "::endgroup::"
           }
           if [ "$PACKAGE" = "all" ]; then
