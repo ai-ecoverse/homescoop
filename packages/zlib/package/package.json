@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-zlib",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "zlib compression library (WASM / emscripten) — OIDC smoke stub; real artifacts TBD",
   "license": "MIT",
   "repository": {
