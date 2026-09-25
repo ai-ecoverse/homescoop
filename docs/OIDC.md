@@ -1,35 +1,35 @@
 # OIDC / trusted publishing
 
-Token-less publishes from GitHub Actions (`ai-ecoverse/homescoop` →
-`.github/workflows/release.yml`).
+Token-less publishes from GitHub Actions on `ai-ecoverse/homescoop`.
+
+## Workflows
+
+| Workflow | Role |
+| --- | --- |
+| [`ladder-build.yml`](../.github/workflows/ladder-build.yml) | **Primary** — boots SLICC (`packages/github-workflow`), runs `build.jsh`, packs, `npm publish` with OIDC |
+| [`release.yml`](../.github/workflows/release.yml) | Metadata / stub republish without a SLICC build |
+
+Fledgling’s `"workflow"` is `ladder-build.yml`. Re-run `npm run trust` after
+changing it. To also allow `release.yml`, add a second publisher per package:
+
+```bash
+npm trust github @ai-ecoverse/wasm-<name> \
+  --repo ai-ecoverse/homescoop \
+  --file release.yml \
+  --allow-publish -y
+```
 
 ## One-time setup
 
-1. **Stubs** (done): `npm run reserve` with a publish token claimed `@ai-ecoverse/wasm-*@0.0.0`.
-2. **Login**: `npm login` with 2FA enabled. Granular tokens that *bypass* 2FA cannot run `npm trust`.
-3. **Trust** (reconcile npm to repo config):
+1. Stubs: `npm run reserve` (publish token).
+2. `npm login` with 2FA (bypass-2FA GATs cannot run `npm trust`).
+3. `npm run trust` (or `FLEDGLING_OTP_SECRET=… npm run trust`).
+4. Optional: `SLICC_CONE_CONFIG` / `SLICC_SECRETS_ENV` repo secrets for the cone.
+5. Emcc on the cone `PATH` for real builds (ladder toolchain).
 
-   ```bash
-   # optional: TOTP secret so fledgling can OTP every package without prompts
-   export FLEDGLING_OTP_SECRET=…   # or --otp <code> for a short run
-   npm run trust                   # npx fledgling sync -y --skip-publish
-   ```
+## OIDC vs secrets
 
-   Equivalent per package:
-
-   ```bash
-   npm trust github @ai-ecoverse/wasm-<name> \
-     --repo ai-ecoverse/homescoop \
-     --file release.yml \
-     --allow-publish -y
-   ```
-
-4. **Source of truth** is the root `package.json` `"fledgling"` block (`provider`, `workflow`, `repo`, `publish`). Re-run `npm run trust` after changing it or adding packages.
-
-## CI publish
-
-`release.yml` has `permissions.id-token: write` and runs `npm publish` with no
-`NODE_AUTH_TOKEN` (and without `setup-node` `registry-url`, which would inject a
-dummy token that overrides OIDC). Dispatch with `package=zlib` (or `all`).
-
-Selective versioning (changesets / Bumpy) can land later; OIDC is independent of that.
+The **npm OIDC exchange runs on the GHA runner** (`permissions.id-token: write`).
+That is required for trusted publishing. `SLICC_SECRETS_ENV` is for other
+cone secrets (API keys, etc.), not a substitute for the runner OIDC publish
+step. See [`ladder-builds.md`](ladder-builds.md).

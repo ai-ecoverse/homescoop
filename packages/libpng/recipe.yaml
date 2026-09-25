@@ -1,4 +1,4 @@
-# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+# Homebrew-shaped recipe — declarative metadata; build.jsh is the body.
 name: libpng
 # renovate: datasource=git-tags depName=pnggroup/libpng extractVersion=^v(?<version>.*)$
 version: "1.6.50"

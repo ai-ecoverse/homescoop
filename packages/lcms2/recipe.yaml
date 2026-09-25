@@ -1,4 +1,4 @@
-# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+# Homebrew-shaped recipe — declarative metadata; build.jsh is the body.
 name: lcms2
 # renovate: datasource=github-releases depName=mm2/Little-CMS extractVersion=^lcms2\.(?<version>.*)$
 version: "2.17"

@@ -1,0 +1,95 @@
+# Ladder build: SLICC boot → ipk deps → build.jsh → npm pack → OIDC publish.
+#
+# Uses ai-ecoverse/slicc packages/github-workflow composite actions.
+# OIDC trusted publishing runs on the runner (npm exchange needs the GHA
+# id-token); the cone only builds and packs. See docs/ladder-builds.md.
+name: ladder-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Recipe directory under packages/ (e.g. zlib)
+        required: true
+        default: zlib
+      duration:
+        description: Leader lifetime
+        required: false
+        default: 90m
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve recipe
+        id: recipe
+        run: |
+          set -euo pipefail
+          PKG="${{ inputs.package }}"
+          node scripts/read-recipe.mjs "$PKG" --deps > "$RUNNER_TEMP/deps.txt" || : > "$RUNNER_TEMP/deps.txt"
+          NPM=$(node scripts/read-recipe.mjs "$PKG" --field npm)
+          VER=$(node scripts/read-recipe.mjs "$PKG" --field version)
+          echo "npm=$NPM" >> "$GITHUB_OUTPUT"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "package=$PKG npm=$NPM@$VER"
+          echo "deps:" && cat "$RUNNER_TEMP/deps.txt" || true
+
+      - id: leader
+        uses: ai-ecoverse/slicc/packages/github-workflow/actions/start-leader@main
+        with:
+          duration: ${{ inputs.duration }}
+          cone-config: ${{ secrets.SLICC_CONE_CONFIG }}
+          secrets-env: ${{ secrets.SLICC_SECRETS_ENV }}
+          mounts: |
+            ${{ github.workspace }}:/mnt/homescoop
+
+      - uses: ai-ecoverse/slicc/packages/github-workflow/actions/install-cli@main
+
+      - name: Inject deps list
+        uses: ai-ecoverse/slicc/packages/github-workflow/actions/write-file@main
+        with:
+          join-url: ${{ steps.leader.outputs.join-url }}
+          path: /tmp/homescoop/deps.txt
+          local: ${{ runner.temp }}/deps.txt
+
+      - name: Ladder run (deps + build.jsh + pack)
+        uses: ai-ecoverse/slicc/packages/github-workflow/actions/exec@main
+        with:
+          join-url: ${{ steps.leader.outputs.join-url }}
+          timeout: 60m
+          command: >-
+            export HOMESCOOP_ROOT=/mnt/homescoop
+            HOMESCOOP_DEPS="$(cat /tmp/homescoop/deps.txt 2>/dev/null || true)"
+            export HOMESCOOP_DEPS
+            jsh /mnt/homescoop/scripts/ladder-run.jsh ${{ inputs.package }}
+
+      - name: Fetch tarball from VFS
+        uses: ai-ecoverse/slicc/packages/github-workflow/actions/read-file@main
+        with:
+          join-url: ${{ steps.leader.outputs.join-url }}
+          path: /tmp/homescoop/out/package.tgz
+          local: ${{ runner.temp }}/package.tgz
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Ensure npm supports OIDC
+        run: npm install -g npm@latest
+
+      - name: Publish via OIDC
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN || true
+          TGZ="${{ runner.temp }}/package.tgz"
+          ls -la "$TGZ"
+          npm publish "$TGZ" --access public --tag latest
+
+      - if: always()
+        uses: ai-ecoverse/slicc/packages/github-workflow/actions/stop-leader@main

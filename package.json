@@ -6,17 +6,18 @@
   "engines": {
     "node": ">=22"
   },
+  "fledgling": {
+    "provider": "github",
+    "workflow": "ladder-build.yml",
+    "repo": "ai-ecoverse/homescoop",
+    "publish": true
+  },
   "scripts": {
     "reserve": "node scripts/reserve-names.mjs",
     "list-packages": "node scripts/list-packages.mjs",
+    "recipe": "node scripts/read-recipe.mjs",
     "trust": "npx fledgling sync -y --skip-publish",
     "trust:dry": "npx fledgling sync --dry-run -y --skip-publish"
-  },
-  "fledgling": {
-    "provider": "github",
-    "workflow": "release.yml",
-    "repo": "ai-ecoverse/homescoop",
-    "publish": true
   },
   "workspaces": [
     "packages/*/package"

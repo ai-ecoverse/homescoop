@@ -25,7 +25,9 @@
   },
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "lib",
+    "include"
   ],
   "publishConfig": {
     "access": "public"

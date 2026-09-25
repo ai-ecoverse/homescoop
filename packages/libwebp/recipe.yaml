@@ -1,4 +1,4 @@
-# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+# Homebrew-shaped recipe — declarative metadata; build.jsh is the body.
 name: libwebp
 # renovate: datasource=git-tags depName=webmproject/libwebp extractVersion=^v(?<version>.*)$
 version: "1.5.0"

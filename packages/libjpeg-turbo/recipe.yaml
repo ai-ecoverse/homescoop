@@ -1,4 +1,4 @@
-# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+# Homebrew-shaped recipe — declarative metadata; build.jsh is the body.
 name: libjpeg-turbo
 # renovate: datasource=github-releases depName=libjpeg-turbo/libjpeg-turbo
 version: "3.1.2"
