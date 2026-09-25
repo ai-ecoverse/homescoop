@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# zlib build.sh — host ladder body for @ai-ecoverse/wasm-zlib.
+# Host body for zlib — unused while recipe.builder is slicc.
+# Flip recipe.yaml to builder: host to run this via scripts/host-run.sh.
 # Mirrors ladder.sh rung_zlib: emconfigure ./configure --static && emmake make libz.a
 set -euo pipefail
 

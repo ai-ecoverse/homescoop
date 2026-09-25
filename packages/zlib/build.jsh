@@ -1,5 +1,5 @@
 #!/usr/bin/env jsh
-// zlib build.jsh — slicc variant (recipe.builder: slicc). Host builds use build.sh.
+// zlib build.jsh — primary body while recipe.builder is slicc.
 // Runs inside SLICC. Mirrors ladder.sh rung_zlib:
 //   emconfigure ./configure --static && emmake make libz.a
 const { spawn } = require('child_process');

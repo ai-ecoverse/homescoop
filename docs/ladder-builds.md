@@ -5,20 +5,21 @@ Each recipe declares **where** it builds:
 
 | `builder` | Script | Where | Emcc |
 | --- | --- | --- | --- |
-| `host` | `build.sh` | GHA runner (or a laptop) | Native toolchain (`emsdk` npm / system emcc) |
 | `slicc` | `build.jsh` | SLICC cone via `packages/github-workflow` | In-cone `/emscripten/slicc` (or future `@ai-ecoverse/emcc`) |
+| `host` | `build.sh` | GHA runner (or a laptop) | Native toolchain (`emsdk` npm / system emcc) |
 
-There is no usable in-cone `emcc` on npm yet, so the **base rungs start as
-`host`**. Move a recipe to `slicc` when the in-cone toolchain exists.
+Default is **`slicc`**. Flip a recipe to `host` when you want the runner
+path (e.g. before in-cone emcc is ready). The dual-script framework is
+always present; CI only runs the script matching `builder`.
 
 ## Flow (`ladder-build.yml`)
 
 ```text
 workflow_dispatch(package)
   └─ read recipe.builder
-       ├─ host  → npm i emsdk → build.sh → npm pack → OIDC publish
-       └─ slicc → start-leader → ipk deps → build.jsh → pack →
-                  fetch tgz → OIDC publish
+       ├─ slicc → start-leader → ipk deps → build.jsh → pack →
+       │          fetch tgz → OIDC publish
+       └─ host  → npm i emsdk → build.sh → npm pack → OIDC publish
 ```
 
 OIDC publish always runs **on the runner** (`id-token: write`). One workflow
@@ -28,7 +29,7 @@ file keeps a single `npm trust` target.
 
 ```yaml
 name: zlib
-builder: host          # host | slicc
+builder: slicc         # slicc | host
 version: "1.3.1"
 npm: "@ai-ecoverse/wasm-zlib"
 source:
@@ -48,28 +49,28 @@ dependencies:
 ## Commands
 
 ```bash
-node scripts/read-recipe.mjs zlib --field builder   # host | slicc
+node scripts/read-recipe.mjs zlib --field builder   # slicc | host
 node scripts/read-recipe.mjs zlib --deps
 
-# Host path (local or CI)
-bash scripts/host-run.sh zlib
-
-# Slicc path — CI only (or a live cone with HOMESCOOP_ROOT mounted)
+# Slicc path — CI (or a live cone with HOMESCOOP_ROOT mounted)
 jsh scripts/ladder-run.jsh zlib
+
+# Host path (local or CI) — after flipping recipe.builder to host
+bash scripts/host-run.sh zlib
 ```
 
 ## Layout
 
 ```text
 packages/<name>/
-  recipe.yaml      # includes builder: host|slicc
+  recipe.yaml      # includes builder: slicc|host
+  build.jsh        # slicc body
   build.sh         # host body (emconfigure / emmake on the runner)
-  build.jsh        # slicc body (same ladder steps in-cone)
   package/         # npm package root
 scripts/
   read-recipe.mjs
-  host-run.sh      # deps → build.sh → npm pack
   ladder-run.jsh   # ipk deps → build.jsh → npm pack
+  host-run.sh      # deps → build.sh → npm pack
 .github/workflows/
   ladder-build.yml # branches on recipe.builder; OIDC publish
   release.yml      # metadata-only
