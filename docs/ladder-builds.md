@@ -1,67 +1,82 @@
 # Ladder builds
 
-Homescoope publishes `@ai-ecoverse/wasm-*` by building **inside SLICC**, using
-the same delegate order as the ImageMagick ladder (`ladder.sh` / WASMaxxing).
+Homescoope publishes `@ai-ecoverse/wasm-*` in the ImageMagick delegate order.
+Each recipe declares **where** it builds:
 
-## Flow
+| `builder` | Script | Where | Emcc |
+| --- | --- | --- | --- |
+| `host` | `build.sh` | GHA runner (or a laptop) | Native toolchain (`emsdk` npm / system emcc) |
+| `slicc` | `build.jsh` | SLICC cone via `packages/github-workflow` | In-cone `/emscripten/slicc` (or future `@ai-ecoverse/emcc`) |
+
+There is no usable in-cone `emcc` on npm yet, so the **base rungs start as
+`host`**. Move a recipe to `slicc` when the in-cone toolchain exists.
+
+## Flow (`ladder-build.yml`)
 
 ```text
-GitHub Actions (homescoop)
-  └─ packages/github-workflow (ai-ecoverse/slicc)
-       ├─ start-leader   (hosted cone on the runner)
-       ├─ mount / inject homescoop → /mnt/homescoop
-       ├─ exec: ipk-install recipe deps
-       ├─ exec: packages/<name>/build.jsh
-       ├─ exec: pack → /tmp/homescoop/<pkg>.tgz
-       ├─ read-file     (tarball back to the runner)
-       └─ npm publish   (OIDC on the runner — trusted release.yml workflow file)
+workflow_dispatch(package)
+  └─ read recipe.builder
+       ├─ host  → npm i emsdk → build.sh → npm pack → OIDC publish
+       └─ slicc → start-leader → ipk deps → build.jsh → pack →
+                  fetch tgz → OIDC publish
 ```
 
-1. **Recipe** (`packages/<name>/recipe.yaml`) — upstream version, source
-   URL/sha256, and dependencies. Deps are other `@ai-ecoverse/wasm-*`
-   packages (or plain npm names) installed with `ipk` before the build.
-2. **`build.jsh`** — runs in the leader’s virtual shell (JS shell). Fetches
-   source, runs `emconfigure` / `emmake` like the ladder, stages artifacts
-   into `package/`.
-3. **Pack** — `npm pack` from `package/` inside SLICC.
-4. **Publish** — the runner publishes the `.tgz` with
-   `permissions.id-token: write`. npm trusted publishing is bound to this
-   repo’s workflow file; the OIDC exchange happens on the runner (not inside
-   the browser cone). Build-time secrets for the cone still go through
-   `SLICC_SECRETS_ENV` when needed.
+OIDC publish always runs **on the runner** (`id-token: write`). One workflow
+file keeps a single `npm trust` target.
 
-Higher rungs **pull lower rungs from npm** (`ipk add -g @ai-ecoverse/wasm-zlib@…`)
-so only the library under build is compiled. Start with **zlib** (no wasm-*
-deps); the ladder thread can open PRs or dispatch this workflow for jpeg,
-png, ….
+## Recipe shape
+
+```yaml
+name: zlib
+builder: host          # host | slicc
+version: "1.3.1"
+npm: "@ai-ecoverse/wasm-zlib"
+source:
+  url: "https://zlib.net/zlib-1.3.1.tar.gz"
+  sha256: "…"
+dependencies:
+  build: []            # ipk specs (slicc) or npm packs extracted under $PREFIX (host)
+  host: []
+  run: []
+```
+
+- **`build.jsh`** — required when `builder: slicc`.
+- **`build.sh`** — required when `builder: host`.
+- A package may keep both scripts while migrating; CI only runs the one
+  matching `builder`.
 
 ## Commands
 
 ```bash
-# Local: print deps for a recipe (Node, no SLICC required)
+node scripts/read-recipe.mjs zlib --field builder   # host | slicc
 node scripts/read-recipe.mjs zlib --deps
 
-# CI: workflow_dispatch ladder-build.yml with package=zlib
+# Host path (local or CI)
+bash scripts/host-run.sh zlib
+
+# Slicc path — CI only (or a live cone with HOMESCOOP_ROOT mounted)
+jsh scripts/ladder-run.jsh zlib
 ```
 
 ## Layout
 
 ```text
 packages/<name>/
-  recipe.yaml    # version, source, dependencies.{build,host,run}
-  build.jsh      # in-SLICC build (ladder body)
-  package/       # npm package root (published)
+  recipe.yaml      # includes builder: host|slicc
+  build.sh         # host body (emconfigure / emmake on the runner)
+  build.jsh        # slicc body (same ladder steps in-cone)
+  package/         # npm package root
 scripts/
   read-recipe.mjs
-  ladder-run.jsh   # install deps → build.jsh → npm pack
+  host-run.sh      # deps → build.sh → npm pack
+  ladder-run.jsh   # ipk deps → build.jsh → npm pack
 .github/workflows/
-  ladder-build.yml # SLICC boot + OIDC publish
-  release.yml      # stub/metadata-only publish (no build)
+  ladder-build.yml # branches on recipe.builder; OIDC publish
+  release.yml      # metadata-only
 ```
 
-## Emcc
+## Higher rungs
 
-`build.jsh` expects `emconfigure` / `emmake` on `PATH` (same as the ladder’s
-`/emscripten/slicc` prefix). Until the cone image ships that toolchain,
-builds fail with a clear missing-emcc error — wire the toolchain via mount
-or a follow-up skill/ipk, not by reintroducing host-only `build.sh`.
+Deps listed under `dependencies.*` are `@ai-ecoverse/wasm-*` (or other npm)
+specs. Host builds unpack them into `$PREFIX`; slicc builds `ipk add -g` them.
+Only the library under build is compiled.

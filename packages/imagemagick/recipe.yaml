@@ -1,5 +1,6 @@
-# Homebrew-shaped recipe — declarative metadata; build.jsh is the body.
+# Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: imagemagick
+builder: slicc
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
 version: "7.1.2-31"
 npm: "@ai-ecoverse/wasm-imagemagick"

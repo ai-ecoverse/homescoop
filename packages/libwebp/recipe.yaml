@@ -1,5 +1,6 @@
-# Homebrew-shaped recipe — declarative metadata; build.jsh is the body.
+# Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: libwebp
+builder: slicc
 # renovate: datasource=git-tags depName=webmproject/libwebp extractVersion=^v(?<version>.*)$
 version: "1.5.0"
 npm: "@ai-ecoverse/wasm-libwebp"

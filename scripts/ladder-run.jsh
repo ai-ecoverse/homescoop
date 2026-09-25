@@ -37,10 +37,23 @@ function sh(cmd, args, opts = {}) {
 async function main() {
   await sh('mkdir', ['-p', OUT]);
 
+  // Refuse to run a host recipe inside the cone by accident.
+  try {
+    const b = (
+      await sh('node', [`${ROOT}/scripts/read-recipe.mjs`, name, '--field', 'builder'])
+    ).trim();
+    if (b && b !== 'slicc') {
+      throw new Error(
+        `recipe builder is '${b}' — use scripts/host-run.sh on the runner, not ladder-run.jsh`
+      );
+    }
+  } catch (e) {
+    if (String(e).includes('recipe builder')) throw e;
+  }
+
   // Deps: runner can also pass HOMESCOOP_DEPS as newline-separated ipk specs.
   let deps = (process.env.HOMESCOOP_DEPS || '').split('\n').map((s) => s.trim()).filter(Boolean);
   if (deps.length === 0) {
-    // Best-effort: ask host-side read-recipe if node is available on PATH
     try {
       const raw = await sh('node', [
         `${ROOT}/scripts/read-recipe.mjs`,
@@ -75,7 +88,6 @@ async function main() {
   if (!tgz) throw new Error('npm pack produced no tarball name');
   const abs = tgz.startsWith('/') ? tgz : `${OUT}/${tgz}`;
   console.log(`== ladder-run: packed ${abs}`);
-  // Stable path for the GHA read-file step
   await sh('cp', [abs, `${OUT}/package.tgz`]);
   console.log(`== ladder-run: ${OUT}/package.tgz`);
 }

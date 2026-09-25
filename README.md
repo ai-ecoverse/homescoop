@@ -1,77 +1,70 @@
 # homescoop
 
-Homebrew-shaped recipes for **emscripten / WASM** libraries built **inside
-[SLICC](https://github.com/ai-ecoverse/slicc)** and published as
-`@ai-ecoverse/wasm-*` on npm.
+Homebrew-shaped recipes for **emscripten / WASM** libraries published as
+`@ai-ecoverse/wasm-*` for [SLICC](https://github.com/ai-ecoverse/slicc).
 
-Companion to the ImageMagick delegate ladder (WASMaxxing `ladder.sh`) and to
-SLICC’s `ipk mamba` path. Homescoope owns **npm distribution**; each rung is
-a small `recipe.yaml` + `build.jsh`. Higher rungs install lower ones with
-`ipk add -g @ai-ecoverse/wasm-…` so only the library under build is compiled.
+Two build kinds (see [`docs/ladder-builds.md`](docs/ladder-builds.md)):
+
+| `builder` | Script | Runs |
+| --- | --- | --- |
+| `host` | `build.sh` | GHA runner / laptop — native `emsdk` / emcc |
+| `slicc` | `build.jsh` | Inside a SLICC cone (`packages/github-workflow`) |
+
+Base rungs start as **`host`** until an in-cone emcc exists. Higher rungs
+`ipk add -g` / unpack lower `@ai-ecoverse/wasm-*` packages so only the
+library under build is compiled.
 
 ## Layout
 
 ```text
 packages/<name>/
-  recipe.yaml     # version, source, deps (ipk specs), npm id
-  build.jsh       # in-SLICC ladder body (emconfigure / emmake)
-  package/        # npm package root (@ai-ecoverse/wasm-<name>)
-scripts/
-  ladder-run.jsh  # ipk deps → build.jsh → npm pack
-  read-recipe.mjs
+  recipe.yaml     # builder: host|slicc, version, source, deps, npm id
+  build.sh        # host body
+  build.jsh       # slicc body
+  package/        # npm package root
 ```
 
-Build pipeline: [`docs/ladder-builds.md`](docs/ladder-builds.md).
+## CI
 
-## Ladder CI
+Dispatch **ladder-build** with `package=zlib`. The workflow reads
+`recipe.builder` and runs the matching path, then OIDC-publishes
+(`ladder-build.yml` is the trusted publisher).
 
 ```bash
-# Dispatch: boots SLICC via packages/github-workflow, builds, OIDC-publishes
-# Actions → ladder-build → package=zlib
+bash scripts/host-run.sh zlib          # local host build + pack
+node scripts/read-recipe.mjs zlib --field builder
 ```
 
-Requires repo secrets `SLICC_CONE_CONFIG` / `SLICC_SECRETS_ENV` when the cone
-needs accounts; the build itself uses `exec` (no model). Emcc must be on the
-cone `PATH` (ladder toolchain). npm OIDC publish runs on the GHA runner
-(`id-token: write`), bound to `ladder-build.yml` via `npm run trust`.
-
-## Reserve names / trust
+## Reserve / trust
 
 ```bash
-export NPM_TOKEN=…   # or source .env.npm — stubs only
-npm run reserve
-npm login            # 2FA; bypass-2FA tokens cannot configure trust
-npm run trust        # fledgling → npm trust for ladder-build.yml
+npm run reserve   # 0.0.0 stubs (NPM_TOKEN)
+npm login && npm run trust   # fledgling → ladder-build.yml
 ```
 
-Metadata-only republish without a SLICC build:
-[`.github/workflows/release.yml`](.github/workflows/release.yml) (also needs
-a matching `npm trust` entry if you use it).
+## Upstream bumps
 
-## Upstream version bumps
-
-[Renovate](https://docs.renovatebot.com/) opens PRs when recipe upstreams
-release ([`docs/renovate.md`](docs/renovate.md)). After merge, dispatch
-`ladder-build` for that package. Version scheme:
-[`docs/versioning.md`](docs/versioning.md).
+[Renovate](docs/renovate.md) opens PRs on recipe versions. After merge,
+dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 
 ## Packages (ladder order)
 
-| npm | upstream | deps |
+| npm | builder | notes |
 | --- | --- | --- |
-| `@ai-ecoverse/wasm-zlib` | zlib | — |
-| `@ai-ecoverse/wasm-libjpeg-turbo` | libjpeg-turbo | — |
-| `@ai-ecoverse/wasm-libpng` | libpng | zlib |
-| `@ai-ecoverse/wasm-lcms2` | lcms2 | — |
-| `@ai-ecoverse/wasm-libtiff` | libtiff | zlib, jpeg |
-| `@ai-ecoverse/wasm-libwebp` | libwebp | — |
-| `@ai-ecoverse/wasm-openjpeg` | openjpeg | — |
-| `@ai-ecoverse/wasm-freetype` | freetype | — |
-| `@ai-ecoverse/wasm-libxml2` | libxml2 | — |
-| `@ai-ecoverse/wasm-pkgconf` | pkgconf | — |
-| `@ai-ecoverse/wasm-imagemagick` | ImageMagick | delegates |
+| `@ai-ecoverse/wasm-zlib` | host | first rung |
+| `@ai-ecoverse/wasm-libjpeg-turbo` | slicc* | stub until ported |
+| `@ai-ecoverse/wasm-libpng` | slicc* | needs zlib |
+| `@ai-ecoverse/wasm-lcms2` | slicc* | |
+| `@ai-ecoverse/wasm-libtiff` | slicc* | zlib, jpeg |
+| `@ai-ecoverse/wasm-libwebp` | slicc* | |
+| `@ai-ecoverse/wasm-openjpeg` | slicc* | |
+| `@ai-ecoverse/wasm-freetype` | slicc* | |
+| `@ai-ecoverse/wasm-libxml2` | slicc* | |
+| `@ai-ecoverse/wasm-pkgconf` | slicc* | |
+| `@ai-ecoverse/wasm-imagemagick` | slicc* | delegates |
+
+\* stub `build.jsh` / may flip to `host` when porting.
 
 ## License
 
-Apache-2.0 (recipes, tooling, and package metadata). Upstream libraries keep
-their own licenses (see each recipe / shipped artifacts).
+Apache-2.0 (recipes and tooling). Upstream libraries keep their own licenses.

@@ -6,3 +6,4 @@ dist/
 out/
 .DS_Store
 *.tgz
+.homescoop-out/

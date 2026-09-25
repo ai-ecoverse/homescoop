@@ -1,5 +1,6 @@
-# Homebrew-shaped recipe — declarative metadata; build.jsh is the body.
+# Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: freetype
+builder: slicc
 # Upstream tags are VER-MAJOR-MINOR-PATCH (freetype/freetype2); Renovate mapping TBD.
 version: "2.13.3"
 npm: "@ai-ecoverse/wasm-freetype"
