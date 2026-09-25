@@ -1,7 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; build.sh is the body.
 name: openjpeg
 # renovate: datasource=github-releases depName=uclouvain/openjpeg extractVersion=^v(?<version>.*)$
-version: "2.5.3"
+version: "2.5.4"
 npm: "@ai-ecoverse/wasm-openjpeg"
 summary: "OpenJPEG JPEG 2000 codec"
 source:
