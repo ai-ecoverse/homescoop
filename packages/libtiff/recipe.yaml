@@ -1,0 +1,15 @@
+# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+name: libtiff
+version: "4.7.0"
+npm: "@ai-ecoverse/wasm-libtiff"
+summary: "TIFF library"
+source:
+  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
+  url: null
+  sha256: null
+dependencies:
+  build: []
+  host: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libtiff
+  license: SEE_UPSTREAM

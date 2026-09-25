@@ -1,0 +1,15 @@
+# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+name: pkgconf
+version: "2.3.0"
+npm: "@ai-ecoverse/wasm-pkgconf"
+summary: "pkgconf / pkg-config for wasm"
+source:
+  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
+  url: null
+  sha256: null
+dependencies:
+  build: []
+  host: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/pkgconf
+  license: SEE_UPSTREAM

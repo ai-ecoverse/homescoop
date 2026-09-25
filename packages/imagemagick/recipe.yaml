@@ -1,0 +1,15 @@
+# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+name: imagemagick
+version: "7.1.2-31"
+npm: "@ai-ecoverse/wasm-imagemagick"
+summary: "ImageMagick (slicc ladder utilities/magick)"
+source:
+  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
+  url: null
+  sha256: null
+dependencies:
+  build: []
+  host: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick
+  license: SEE_UPSTREAM

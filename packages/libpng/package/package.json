@@ -1,0 +1,17 @@
+{
+  "name": "@ai-ecoverse/wasm-libpng",
+  "version": "0.0.0",
+  "description": "libpng PNG library (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/libpng/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/libpng",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "libpng"],
+  "files": ["README.md"],
+  "publishConfig": {
+    "access": "public"
+  }
+}

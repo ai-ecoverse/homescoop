@@ -1,0 +1,16 @@
+{
+  "name": "homescoop",
+  "private": true,
+  "description": "Homebrew-shaped recipes for @ai-ecoverse/wasm-* packages",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "reserve": "node scripts/reserve-names.mjs",
+    "list-packages": "node scripts/list-packages.mjs"
+  },
+  "fledgling": {
+    "provider": "github",
+    "workflow": "release.yml",
+    "permissions": "publish"
+  }
+}

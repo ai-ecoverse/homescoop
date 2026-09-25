@@ -1,0 +1,17 @@
+{
+  "name": "@ai-ecoverse/wasm-imagemagick",
+  "version": "0.0.0",
+  "description": "ImageMagick (slicc ladder utilities/magick) (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/imagemagick/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "imagemagick"],
+  "files": ["README.md"],
+  "publishConfig": {
+    "access": "public"
+  }
+}

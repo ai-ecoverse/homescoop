@@ -1,0 +1,15 @@
+# Homebrew-shaped recipe — declarative metadata; build.sh is the body.
+name: libxml2
+version: "2.13.8"
+npm: "@ai-ecoverse/wasm-libxml2"
+summary: "libxml2 XML parser"
+source:
+  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
+  url: null
+  sha256: null
+dependencies:
+  build: []
+  host: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libxml2
+  license: SEE_UPSTREAM

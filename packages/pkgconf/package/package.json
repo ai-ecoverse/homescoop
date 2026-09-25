@@ -1,0 +1,17 @@
+{
+  "name": "@ai-ecoverse/wasm-pkgconf",
+  "version": "0.0.0",
+  "description": "pkgconf / pkg-config for wasm (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/pkgconf/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/pkgconf",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "pkgconf"],
+  "files": ["README.md"],
+  "publishConfig": {
+    "access": "public"
+  }
+}

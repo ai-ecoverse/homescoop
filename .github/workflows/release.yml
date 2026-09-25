@@ -1,0 +1,18 @@
+# Placeholder for OIDC trusted publishing (npm trust → this workflow).
+# Real selective release (changesets) lands after first stubs exist.
+name: release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  reserve-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - run: node scripts/list-packages.mjs

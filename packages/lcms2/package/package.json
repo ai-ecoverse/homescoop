@@ -1,0 +1,17 @@
+{
+  "name": "@ai-ecoverse/wasm-lcms2",
+  "version": "0.0.0",
+  "description": "Little CMS 2 color management (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/lcms2/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/lcms2",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "lcms2"],
+  "files": ["README.md"],
+  "publishConfig": {
+    "access": "public"
+  }
+}
