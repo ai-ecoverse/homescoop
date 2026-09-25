@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Publish 0.0.0 stubs for every packages/*/package that is not yet on npm.
+ * Publish 0.0.0 stubs for every packages/<name>/package that is not yet on npm.
  * Requires NPM_TOKEN (or an existing `npm whoami` session).
  *
  *   NPM_TOKEN=npm_… node scripts/reserve-names.mjs
