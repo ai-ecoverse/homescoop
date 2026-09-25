@@ -1,5 +1,6 @@
 # Homebrew-shaped recipe — declarative metadata; build.sh is the body.
 name: pkgconf
+# renovate: datasource=github-releases depName=pkgconf/pkgconf extractVersion=^pkgconf-(?<version>.*)$
 version: "2.3.0"
 npm: "@ai-ecoverse/wasm-pkgconf"
 summary: "pkgconf / pkg-config for wasm"

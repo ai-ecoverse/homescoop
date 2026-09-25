@@ -1,5 +1,6 @@
 # Homebrew-shaped recipe — declarative metadata; build.sh is the body.
 name: libxml2
+# renovate: datasource=git-tags depName=GNOME/libxml2 extractVersion=^v(?<version>.*)$
 version: "2.13.8"
 npm: "@ai-ecoverse/wasm-libxml2"
 summary: "libxml2 XML parser"

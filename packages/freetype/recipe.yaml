@@ -1,5 +1,6 @@
 # Homebrew-shaped recipe — declarative metadata; build.sh is the body.
 name: freetype
+# Upstream tags are VER-MAJOR-MINOR-PATCH (freetype/freetype2); Renovate mapping TBD.
 version: "2.13.3"
 npm: "@ai-ecoverse/wasm-freetype"
 summary: "FreeType font engine"

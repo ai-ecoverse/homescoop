@@ -1,5 +1,6 @@
 # Homebrew-shaped recipe — declarative metadata; build.sh is the body.
 name: libjpeg-turbo
+# renovate: datasource=github-releases depName=libjpeg-turbo/libjpeg-turbo
 version: "3.1.2"
 npm: "@ai-ecoverse/wasm-libjpeg-turbo"
 summary: "libjpeg-turbo JPEG codec"

@@ -38,6 +38,11 @@ npm run trust             # fledgling sync → npm trust for every workspace pac
 CI: dispatch [`.github/workflows/release.yml`](.github/workflows/release.yml)
 (`id-token: write`, no `NPM_TOKEN`). Details: [`docs/OIDC.md`](docs/OIDC.md).
 
+## Upstream version bumps
+
+[Renovate](https://docs.renovatebot.com/) opens PRs when recipe upstreams
+release (see [`docs/renovate.md`](docs/renovate.md) / `renovate.json`).
+
 ## Packages (ladder set)
 
 | npm | upstream |
