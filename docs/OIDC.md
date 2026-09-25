@@ -28,6 +28,8 @@ Token-less publishes from GitHub Actions (`ai-ecoverse/homescoop` →
 
 ## CI publish
 
-`release.yml` has `permissions.id-token: write` and runs `npm publish` with no `NODE_AUTH_TOKEN`. Dispatch the workflow with `package=zlib` (or `all`) after trust is configured.
+`release.yml` has `permissions.id-token: write` and runs `npm publish` with no
+`NODE_AUTH_TOKEN` (and without `setup-node` `registry-url`, which would inject a
+dummy token that overrides OIDC). Dispatch with `package=zlib` (or `all`).
 
 Selective versioning (changesets / Bumpy) can land later; OIDC is independent of that.

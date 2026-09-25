@@ -1,6 +1,9 @@
 # OIDC trusted publishing for @ai-ecoverse/wasm-* packages.
 # Trust must be configured first: `npm run trust` (needs `npm login` + 2FA).
-# No NPM_TOKEN — GitHub Issues an OIDC token that npm accepts for publish.
+# No NPM_TOKEN — GitHub issues an OIDC token that npm accepts for publish.
+#
+# Do NOT pass registry-url to setup-node: it writes a dummy NODE_AUTH_TOKEN
+# that takes precedence over OIDC and makes publish look like an anon 404.
 name: release
 
 on:
@@ -25,7 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs a recent npm (OIDC exchange).
+      - name: Ensure npm supports OIDC
+        run: npm install -g npm@latest
 
       - name: List packages
         run: node scripts/list-packages.mjs
@@ -35,6 +41,7 @@ jobs:
           PACKAGE: ${{ inputs.package }}
         run: |
           set -euo pipefail
+          unset NODE_AUTH_TOKEN || true
           publish_one() {
             local dir="$1"
             echo "::group::npm publish packages/${dir}/package"
