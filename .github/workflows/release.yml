@@ -1,18 +1,50 @@
-# Placeholder for OIDC trusted publishing (npm trust → this workflow).
-# Real selective release (changesets) lands after first stubs exist.
+# OIDC trusted publishing for @ai-ecoverse/wasm-* packages.
+# Trust must be configured first: `npm run trust` (needs `npm login` + 2FA).
+# No NPM_TOKEN — GitHub Issues an OIDC token that npm accepts for publish.
 name: release
+
 on:
   workflow_dispatch:
+    inputs:
+      package:
+        description: >-
+          Recipe dir under packages/ (e.g. zlib), or "all" for every wasm-* package
+        required: true
+        default: zlib
+
 permissions:
   contents: read
   id-token: write
+
 jobs:
-  reserve-check:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           registry-url: https://registry.npmjs.org
-      - run: node scripts/list-packages.mjs
+
+      - name: List packages
+        run: node scripts/list-packages.mjs
+
+      - name: Publish via OIDC
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          set -euo pipefail
+          publish_one() {
+            local dir="$1"
+            echo "::group::npm publish packages/${dir}/package"
+            npm publish "packages/${dir}/package" --access public
+            echo "::endgroup::"
+          }
+          if [ "$PACKAGE" = "all" ]; then
+            for dir in packages/*/package; do
+              publish_one "$(basename "$(dirname "$dir")")"
+            done
+          else
+            publish_one "$PACKAGE"
+          fi

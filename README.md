@@ -25,11 +25,18 @@ packages/<name>/
 ```bash
 # one-time: claim 0.0.0 stubs on npm (needs NPM_TOKEN)
 export NPM_TOKEN=…   # or source .env.npm
-node scripts/reserve-names.mjs
+npm run reserve
 ```
 
-Real builds and OIDC trusted publishing come later (`fledgling` / `npm trust`
-against `.github/workflows/release.yml`).
+## OIDC trusted publishing
+
+```bash
+npm login                 # 2FA required (bypass-2FA tokens cannot configure trust)
+npm run trust             # fledgling sync → npm trust for every workspace package
+```
+
+CI: dispatch [`.github/workflows/release.yml`](.github/workflows/release.yml)
+(`id-token: write`, no `NPM_TOKEN`). Details: [`docs/OIDC.md`](docs/OIDC.md).
 
 ## Packages (ladder set)
 

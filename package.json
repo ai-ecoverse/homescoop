@@ -3,14 +3,22 @@
   "private": true,
   "description": "Homebrew-shaped recipes for @ai-ecoverse/wasm-* packages",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "reserve": "node scripts/reserve-names.mjs",
-    "list-packages": "node scripts/list-packages.mjs"
+    "list-packages": "node scripts/list-packages.mjs",
+    "trust": "npx fledgling sync -y --skip-publish",
+    "trust:dry": "npx fledgling sync --dry-run -y --skip-publish"
   },
   "fledgling": {
     "provider": "github",
     "workflow": "release.yml",
-    "permissions": "publish"
-  }
+    "repo": "ai-ecoverse/homescoop",
+    "publish": true
+  },
+  "workspaces": [
+    "packages/*/package"
+  ]
 }
