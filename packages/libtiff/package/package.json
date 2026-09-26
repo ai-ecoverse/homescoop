@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-libtiff",
-  "version": "0.0.0",
-  "description": "TIFF library (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "version": "4.7.0",
+  "description": "TIFF library (WASM / emscripten, SLICC homescoop ladder)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -18,9 +18,15 @@
   ],
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "lib",
+    "include"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "homescoop": {
+    "recipe": "libtiff",
+    "upstream": "4.7.0"
   }
 }

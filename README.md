@@ -62,7 +62,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-libpng` | host | **1.6.50** published; dep `@ai-ecoverse/wasm-zlib` |
 | `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2** published (emcmake, no SIMD) |
 | `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** published (emcmake, codec off) |
-| `@ai-ecoverse/wasm-libtiff` | host* | stub (deps: zlib + jpeg on npm) |
+| `@ai-ecoverse/wasm-libtiff` | host | **4.7.0** published; deps zlib + jpeg |
 | `@ai-ecoverse/wasm-imagemagick` | slicc* | stub |
 | `@ai-ecoverse/wasm-gmake` | slicc* | stub (ladder `rung_gmake`) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
