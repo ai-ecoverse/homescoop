@@ -1,19 +1,19 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: libtiff
-builder: slicc
+builder: host
 # renovate: datasource=git-tags depName=libsdl-org/libtiff extractVersion=^v(?<version>.*)$
 version: "4.7.0"
 npm: "@ai-ecoverse/wasm-libtiff"
 summary: "TIFF library"
 source:
-  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
   url: null
   sha256: null
 dependencies:
   build:
-    - zlib
-    - libjpeg-turbo
+    - "@ai-ecoverse/wasm-zlib@1.3.1-2"
+    - "@ai-ecoverse/wasm-libjpeg-turbo@3.1.2"
   host: []
+  run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libtiff
   license: SEE_UPSTREAM

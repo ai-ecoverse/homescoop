@@ -1,0 +1,19 @@
+# Homebrew-shaped recipe — CMake as a wasm tool (ladder rung_cmake / build-wasm-cmake.sh).
+name: cmake
+builder: slicc
+version: "4.4.3"
+npm: "@ai-ecoverse/wasm-cmake"
+summary: "CMake built for slicc (wasm tool)"
+source:
+  url: null  # slicc uses cmake-4.4.3-slicc.tar.gz (patched + Tests dropped)
+  sha256: null
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake
+  license: SEE_UPSTREAM
+  notes: |
+    Port from slicc-emscripten harness/ladder.sh rung_cmake and
+    build-wasm-cmake.sh (cmlibuv + pipefs patches, slicc_spawn.o).

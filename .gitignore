@@ -11,3 +11,4 @@ out/
 packages/*/package/bin/
 packages/*/package/include/
 packages/*/package/lib/
+.env.fledgling

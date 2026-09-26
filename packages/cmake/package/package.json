@@ -1,0 +1,15 @@
+{
+  "name": "@ai-ecoverse/wasm-cmake",
+  "version": "0.0.0",
+  "description": "CMake (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/cmake/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "cmake"],
+  "files": ["README.md", "LICENSE"],
+  "publishConfig": { "access": "public" }
+}

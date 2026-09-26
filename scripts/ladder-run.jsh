@@ -101,9 +101,10 @@ async function main() {
     console.log(`== ladder-run: stage ${nm} → ${CONDA_PREFIX}`);
     await sh('sh', [
       '-c',
-      `mkdir -p "${CONDA_PREFIX}/lib" "${CONDA_PREFIX}/include" && ` +
+      `mkdir -p "${CONDA_PREFIX}/lib" "${CONDA_PREFIX}/include" "${CONDA_PREFIX}/lib/pkgconfig" && ` +
         `if [ -d "${nm}/lib" ]; then cp -R "${nm}/lib/." "${CONDA_PREFIX}/lib/"; fi && ` +
-        `if [ -d "${nm}/include" ]; then cp -R "${nm}/include/." "${CONDA_PREFIX}/include/"; fi`,
+        `if [ -d "${nm}/include" ]; then cp -R "${nm}/include/." "${CONDA_PREFIX}/include/"; fi && ` +
+        `if [ -d "${nm}/lib/pkgconfig" ]; then cp -R "${nm}/lib/pkgconfig/." "${CONDA_PREFIX}/lib/pkgconfig/"; fi`,
     ]);
   }
 

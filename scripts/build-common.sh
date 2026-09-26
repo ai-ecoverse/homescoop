@@ -74,3 +74,31 @@ homescoop_require_lib_size() {
   fi
   echo "$sz"
 }
+
+# Write a relocatable .pc into package/lib/pkgconfig and PREFIX.
+# Uses ${pcfiledir} so consumers can stage the package tree anywhere.
+# homescoop_write_pc <pc-name> <version> <libs> [requires] [extra-cflags]
+#   libs e.g. "-ljpeg" or "-lpng16 -lz"
+homescoop_write_pc() {
+  local name="$1" version="$2" libs="$3" requires="${4:-}" extra_cflags="${5:-}"
+  local dest_pkg="$HOMESCOOP_PKG/package/lib/pkgconfig"
+  local dest_pfx="$PREFIX/lib/pkgconfig"
+  mkdir -p "$dest_pkg" "$dest_pfx"
+  local body
+  body=$(cat <<EOF
+prefix=\${pcfiledir}/../..
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: ${name}
+Description: ${name} (homescoop wasm / emscripten)
+Version: ${version}
+Requires: ${requires}
+Cflags: -I\${includedir}${extra_cflags:+ }${extra_cflags}
+Libs: -L\${libdir} ${libs}
+EOF
+)
+  printf '%s\n' "$body" >"$dest_pkg/${name}.pc"
+  printf '%s\n' "$body" >"$dest_pfx/${name}.pc"
+}

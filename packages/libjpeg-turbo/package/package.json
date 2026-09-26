@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-libjpeg-turbo",
-  "version": "0.0.0",
-  "description": "libjpeg-turbo JPEG codec (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "version": "3.1.2",
+  "description": "libjpeg-turbo JPEG codec (WASM / emscripten, SLICC homescoop ladder)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -18,9 +18,15 @@
   ],
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "lib",
+    "include"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "homescoop": {
+    "recipe": "libjpeg-turbo",
+    "upstream": "3.1.2"
   }
 }

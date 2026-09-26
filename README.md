@@ -60,12 +60,15 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-freetype` | host | **2.13.3-1** published |
 | `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-1** published |
 | `@ai-ecoverse/wasm-libpng` | host | **1.6.50** published; dep `@ai-ecoverse/wasm-zlib` |
-| `@ai-ecoverse/wasm-libjpeg-turbo` | slicc* | stub (needs cmake) |
-| `@ai-ecoverse/wasm-libtiff` | slicc* | stub (needs jpeg) |
-| `@ai-ecoverse/wasm-openjpeg` | slicc* | stub (needs cmake) |
+| `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2** published (emcmake, no SIMD) |
+| `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** published (emcmake, codec off) |
+| `@ai-ecoverse/wasm-libtiff` | host* | stub (deps: zlib + jpeg on npm) |
 | `@ai-ecoverse/wasm-imagemagick` | slicc* | stub |
+| `@ai-ecoverse/wasm-gmake` | slicc* | stub (ladder `rung_gmake`) |
+| `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
+| `@ai-ecoverse/wasm-magick-native` | slicc* | stub (Magick.Native Q8) |
 
-\* stub until ported. Leaf `configure`/`make` rungs ship as `builder: host`.
+\* stub until ported. Published libs ship relocatable `lib/pkgconfig/*.pc`.
 
 ## License
 

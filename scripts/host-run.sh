@@ -72,6 +72,15 @@ while IFS= read -r spec; do
     if [[ -d package/include ]]; then cp -R package/include/. "$PREFIX/include/"; fi
     if [[ -d package/package/lib ]]; then cp -R package/package/lib/. "$PREFIX/lib/"; fi
     if [[ -d package/package/include ]]; then cp -R package/package/include/. "$PREFIX/include/"; fi
+    # pkg-config metadata (homescoop_write_pc → lib/pkgconfig/*.pc)
+    if [[ -d package/lib/pkgconfig ]]; then
+      mkdir -p "$PREFIX/lib/pkgconfig"
+      cp -R package/lib/pkgconfig/. "$PREFIX/lib/pkgconfig/"
+    fi
+    if [[ -d package/package/lib/pkgconfig ]]; then
+      mkdir -p "$PREFIX/lib/pkgconfig"
+      cp -R package/package/lib/pkgconfig/. "$PREFIX/lib/pkgconfig/"
+    fi
   )
   rm -rf "$tmp"
 done < <(node "$ROOT/scripts/read-recipe.mjs" "$name" --deps || true)
