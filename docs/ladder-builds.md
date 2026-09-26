@@ -24,7 +24,19 @@ workflow_dispatch(package)
 ```
 
 OIDC publish always runs **on the runner** (`id-token: write`). One workflow
-file keeps a single `npm trust` target.
+file (`ladder-build.yml`) keeps a single `npm trust` target.
+
+## PR and merge automation
+
+| Workflow | When | What |
+| --- | --- | --- |
+| `ladder-pr.yml` | pull_request touching `packages/**` | Host-build each touched package (no publish) |
+| `ladder-merge.yml` | push to `main` under `packages/**` | Matrix-call `ladder-build` → build + OIDC publish |
+| `ladder-build.yml` | `workflow_dispatch` / `workflow_call` | Single-package build + publish |
+
+`scripts/list-touched-packages.mjs` maps changed paths → recipe names.
+`scripts/sync-package-version.mjs` sets `package.json` version from the
+recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
 
 ## Recipe shape
 

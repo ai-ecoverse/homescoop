@@ -1,5 +1,9 @@
 # Ladder build: branch on recipe.builder (host | slicc), then OIDC publish.
 # See docs/ladder-builds.md. Trusted publishing is bound to this workflow file.
+#
+# Triggers:
+#   workflow_dispatch — manual
+#   workflow_call     — ladder-merge matrix after push to main
 name: ladder-build
 
 on:
@@ -9,10 +13,23 @@ on:
         description: Recipe directory under packages/ (e.g. zlib)
         required: true
         default: zlib
+        type: string
       duration:
         description: Leader lifetime (slicc builder only)
         required: false
         default: 90m
+        type: string
+  workflow_call:
+    inputs:
+      package:
+        description: Recipe directory under packages/
+        required: true
+        type: string
+      duration:
+        description: Leader lifetime (slicc builder only)
+        required: false
+        default: 90m
+        type: string
 
 permissions:
   contents: read
@@ -25,6 +42,7 @@ jobs:
       builder: ${{ steps.r.outputs.builder }}
       npm: ${{ steps.r.outputs.npm }}
       version: ${{ steps.r.outputs.version }}
+      package: ${{ steps.r.outputs.package }}
     steps:
       - uses: actions/checkout@v7
       - id: r
@@ -34,16 +52,18 @@ jobs:
           BUILDER=$(node scripts/read-recipe.mjs "$PKG" --field builder)
           BUILDER=${BUILDER:-slicc}
           NPM=$(node scripts/read-recipe.mjs "$PKG" --field npm)
-          VER=$(node scripts/read-recipe.mjs "$PKG" --field version)
+          # Align reported version with recipe (no write — checkout is ephemeral here).
+          VER=$(node scripts/sync-package-version.mjs "$PKG")
           echo "builder=$BUILDER" >> "$GITHUB_OUTPUT"
           echo "npm=$NPM" >> "$GITHUB_OUTPUT"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "package=$PKG" >> "$GITHUB_OUTPUT"
           echo "package=$PKG builder=$BUILDER npm=$NPM@$VER"
           node scripts/read-recipe.mjs "$PKG" --deps > deps.txt || : > deps.txt
           echo "deps:" && cat deps.txt || true
       - uses: actions/upload-artifact@v7
         with:
-          name: recipe-deps
+          name: recipe-deps-${{ inputs.package }}
           path: deps.txt
 
   host-build:
@@ -55,6 +75,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Sync npm version from recipe
+        run: node scripts/sync-package-version.mjs "${{ inputs.package }}" --write
       - name: Host ladder run
         run: |
           set -euo pipefail
@@ -62,7 +84,7 @@ jobs:
           ls -la .homescoop-out/package.tgz
       - uses: actions/upload-artifact@v7
         with:
-          name: package-tgz
+          name: package-tgz-${{ inputs.package }}
           path: .homescoop-out/package.tgz
 
   slicc-build:
@@ -71,9 +93,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Sync npm version from recipe
+        run: node scripts/sync-package-version.mjs "${{ inputs.package }}" --write
       - uses: actions/download-artifact@v8
         with:
-          name: recipe-deps
+          name: recipe-deps-${{ inputs.package }}
           path: ${{ runner.temp }}
       - id: leader
         uses: ai-ecoverse/slicc/packages/github-workflow/actions/start-leader@main
@@ -105,7 +129,7 @@ jobs:
           local: ${{ runner.temp }}/package.tgz
       - uses: actions/upload-artifact@v7
         with:
-          name: package-tgz
+          name: package-tgz-${{ inputs.package }}
           path: ${{ runner.temp }}/package.tgz
       - if: always()
         uses: ai-ecoverse/slicc/packages/github-workflow/actions/stop-leader@main
@@ -117,7 +141,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: package-tgz
+          name: package-tgz-${{ inputs.package }}
           path: ${{ runner.temp }}
       - uses: actions/setup-node@v7
         with:

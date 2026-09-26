@@ -1,0 +1,73 @@
+# PR check: host-build each touched packages/<name> (no publish).
+# Catches broken recipe/source/sha bumps before merge. Slicc builders are
+# reported and skipped (cone not available on PR runners).
+name: ladder-pr
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'scripts/host-run.sh'
+      - 'scripts/build-common.sh'
+      - 'scripts/ladder-run.jsh'
+      - 'scripts/read-recipe.mjs'
+      - 'scripts/list-touched-packages.mjs'
+      - 'scripts/sync-package-version.mjs'
+      - '.github/workflows/ladder-pr.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      host: ${{ steps.d.outputs.host }}
+      slicc: ${{ steps.d.outputs.slicc }}
+      any: ${{ steps.d.outputs.any }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: d
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          CLASS=$(node scripts/classify-touched-packages.mjs --base "$BASE" --head "$HEAD")
+          echo "$CLASS"
+          HOST=$(node -e 'const j=JSON.parse(process.argv[1]); console.log(JSON.stringify(j.host))' "$CLASS")
+          SLICC=$(node -e 'const j=JSON.parse(process.argv[1]); console.log(JSON.stringify(j.slicc))' "$CLASS")
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "slicc=$SLICC" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "$HOST" != '[]' ] || [ "$SLICC" != '[]' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  host-build:
+    needs: detect
+    if: needs.detect.outputs.host != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect.outputs.host) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Sync npm version from recipe (Renovate bumps)
+        run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
+      - name: Host build (no publish)
+        run: |
+          set -euo pipefail
+          bash scripts/host-run.sh "${{ matrix.package }}"
+          ls -la .homescoop-out/package.tgz
+
+  slicc-note:
+    needs: detect
+    if: needs.detect.outputs.slicc != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slicc packages skipped on PR
+        run: |
+          echo "::notice::slicc builder package(s) ${{ needs.detect.outputs.slicc }} — PR host check skipped; merge still dispatches ladder-build (needs SLICC secrets)."

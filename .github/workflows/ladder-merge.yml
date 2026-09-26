@@ -1,0 +1,51 @@
+# After merge to main: OIDC-publish each touched packages/<name> via ladder-build.
+name: ladder-merge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+
+permissions:
+  contents: read
+  actions: write
+  id-token: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.d.outputs.packages }}
+      any: ${{ steps.d.outputs.any }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: d
+        run: |
+          set -euo pipefail
+          # Push event: compare before…after
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+          if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+            # first push / shallow — fall back to parent
+            BEFORE=$(git rev-parse HEAD^ 2>/dev/null || echo HEAD)
+          fi
+          PKGS=$(node scripts/list-touched-packages.mjs --base "$BEFORE" --head "$AFTER" --json)
+          echo "packages=$PKGS" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "$PKGS" != '[]' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "touched=$PKGS"
+
+  release:
+    needs: detect
+    if: needs.detect.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        package: ${{ fromJson(needs.detect.outputs.packages) }}
+    uses: ./.github/workflows/ladder-build.yml
+    with:
+      package: ${{ matrix.package }}
+    secrets: inherit

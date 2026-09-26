@@ -9,9 +9,15 @@ version: "1.3.1"
 ```
 
 When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
-(no automerge). After merge: rebuild, set `package/package.json` version to
-the recipe version (or `X-N` for a packaging revision — see
-[`versioning.md`](versioning.md)), and dispatch `.github/workflows/ladder-build.yml`.
+(no automerge). CI:
+
+1. **`ladder-pr`** — host-builds each touched `packages/<name>` on the PR
+   (no publish). Slicc builders are noted and skipped.
+2. **`ladder-merge`** — after merge to `main`, calls `ladder-build` for each
+   touched package (build + OIDC publish). `sync-package-version.mjs` aligns
+   `package.json` with the new recipe version before packing.
+
+Manual: `gh workflow run ladder-build.yml -f package=zlib`.
 
 ## Coverage
 

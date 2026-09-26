@@ -27,12 +27,13 @@ packages/<name>/
 
 ## CI
 
-Dispatch **ladder-build** with `package=zlib`. The workflow reads
-`recipe.builder` and runs the matching path, then OIDC-publishes
-(`ladder-build.yml` is the trusted publisher).
+Dispatch **ladder-build** with `package=zlib`, or merge a PR that touches
+`packages/<name>` (`ladder-merge` auto-dispatches). PRs get **ladder-pr**
+host builds (no publish) for touched packages.
 
 ```bash
 node scripts/read-recipe.mjs zlib --field builder
+node scripts/list-touched-packages.mjs --base origin/main --head HEAD
 jsh scripts/ladder-run.jsh zlib        # slicc path (in-cone)
 bash scripts/host-run.sh zlib          # only after flipping builder: host
 ```
