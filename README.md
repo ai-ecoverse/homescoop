@@ -54,11 +54,11 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | npm | builder | notes |
 | --- | --- | --- |
 | `@ai-ecoverse/wasm-zlib` | host | **1.3.1-2** published (libz.a + headers) |
-| `@ai-ecoverse/wasm-lcms2` | host | **2.17.0** published; dep `@ai-ecoverse/wasm-zlib` |
-| `@ai-ecoverse/wasm-libwebp` | host | **1.5.0** published |
-| `@ai-ecoverse/wasm-libxml2` | host | **2.13.8** published |
-| `@ai-ecoverse/wasm-freetype` | host | **2.13.3** published |
-| `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0** published |
+| `@ai-ecoverse/wasm-lcms2` | host | **2.17.0-1** published; dep `@ai-ecoverse/wasm-zlib` |
+| `@ai-ecoverse/wasm-libwebp` | host | **1.5.0-1** published |
+| `@ai-ecoverse/wasm-libxml2` | host | **2.13.8-1** published |
+| `@ai-ecoverse/wasm-freetype` | host | **2.13.3-1** published |
+| `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-1** published |
 | `@ai-ecoverse/wasm-libpng` | host | **1.6.50** published; dep `@ai-ecoverse/wasm-zlib` |
 | `@ai-ecoverse/wasm-libjpeg-turbo` | slicc* | stub (needs cmake) |
 | `@ai-ecoverse/wasm-libtiff` | slicc* | stub (needs jpeg) |
