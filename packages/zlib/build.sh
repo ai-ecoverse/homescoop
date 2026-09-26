@@ -1,49 +1,31 @@
 #!/usr/bin/env bash
-# Host body for zlib — unused while recipe.builder is slicc.
-# Flip recipe.yaml to builder: host to run this via scripts/host-run.sh.
-# Mirrors ladder.sh rung_zlib: emconfigure ./configure --static && emmake make libz.a
+# zlib build.sh — host ladder body (ladder.sh rung_zlib).
 set -euo pipefail
-
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
-PKG="$ROOT/packages/zlib"
+# shellcheck source=../../scripts/build-common.sh
+source "$ROOT/scripts/build-common.sh"
+HOMESCOOP_PKG="$ROOT/packages/zlib"
 VERSION=1.3.1
-SRC_URL=https://zlib.net/zlib-1.3.1.tar.gz
-SRC_SHA=cc0b4e42510d49c6decd464123ecf3b14ae9b47f9b4ed2ee64893e2d6520a264
-WORK="${HOMESCOOP_WORK:-${TMPDIR:-/tmp}/homescoop-work}"
-PREFIX="${PREFIX:-${TMPDIR:-/tmp}/homescoop-prefix}"
+SRC_URL=https://zlib.net/fossils/zlib-1.3.1.tar.gz
+SRC_SHA=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
 SRC_DIR="$WORK/zlib-$VERSION"
 TARBALL="$WORK/zlib-$VERSION.tar.gz"
 
-mkdir -p "$WORK" "$PREFIX/lib" "$PREFIX/include"
-
-if [[ ! -f "$TARBALL" ]]; then
-  echo "== zlib: fetch $SRC_URL"
-  curl -fsSL "$SRC_URL" -o "$TARBALL"
-fi
-echo "$SRC_SHA  $TARBALL" | shasum -a 256 -c -
-
-if [[ ! -f "$SRC_DIR/configure" || -n "${FORCE:-}" ]]; then
-  rm -rf "$SRC_DIR"
-  tar xzf "$TARBALL" -C "$WORK"
-fi
+homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
+if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
+homescoop_extract "$TARBALL" "$SRC_DIR"
 
 if [[ ! -f "$SRC_DIR/libz.a" || -n "${FORCE:-}" ]]; then
   echo "== zlib: emconfigure + emmake"
   (
     cd "$SRC_DIR"
     emconfigure ./configure --static
+    homescoop_fix_darwin_ar Makefile
     emmake make libz.a
   )
 fi
 test -f "$SRC_DIR/libz.a"
-
-dest_lib="$PKG/package/lib"
-dest_inc="$PKG/package/include"
-mkdir -p "$dest_lib" "$dest_inc"
-cp "$SRC_DIR/libz.a" "$dest_lib/libz.a"
-cp "$SRC_DIR/zlib.h" "$dest_inc/zlib.h"
-cp "$SRC_DIR/zconf.h" "$dest_inc/zconf.h"
-cp "$SRC_DIR/libz.a" "$PREFIX/lib/libz.a"
-cp "$SRC_DIR/zlib.h" "$PREFIX/include/zlib.h"
-cp "$SRC_DIR/zconf.h" "$PREFIX/include/zconf.h"
-echo "== zlib: staged → $PKG/package/{lib,include} and $PREFIX"
+sz=$(homescoop_require_lib_size "$SRC_DIR/libz.a")
+homescoop_stage_lib "$SRC_DIR/libz.a" libz.a
+homescoop_stage_headers "$SRC_DIR/zlib.h" "$SRC_DIR/zconf.h"
+echo "== zlib: staged ($sz bytes)"

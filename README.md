@@ -53,19 +53,19 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 
 | npm | builder | notes |
 | --- | --- | --- |
-| `@ai-ecoverse/wasm-zlib` | slicc | first rung; host `build.sh` ready to flip |
-| `@ai-ecoverse/wasm-libjpeg-turbo` | slicc* | stub |
-| `@ai-ecoverse/wasm-libpng` | slicc* | mamba: zlib |
-| `@ai-ecoverse/wasm-lcms2` | slicc* | |
-| `@ai-ecoverse/wasm-libtiff` | slicc* | mamba: zlib, libjpeg-turbo |
-| `@ai-ecoverse/wasm-libwebp` | slicc* | |
-| `@ai-ecoverse/wasm-openjpeg` | slicc* | |
-| `@ai-ecoverse/wasm-freetype` | slicc* | mamba: zlib, libpng |
-| `@ai-ecoverse/wasm-libxml2` | slicc* | mamba: zlib |
-| `@ai-ecoverse/wasm-pkgconf` | slicc* | |
-| `@ai-ecoverse/wasm-imagemagick` | slicc* | mamba: all delegates |
+| `@ai-ecoverse/wasm-zlib` | host | **1.3.1-2** published (libz.a + headers) |
+| `@ai-ecoverse/wasm-lcms2` | host | **2.17.0** published; dep `@ai-ecoverse/wasm-zlib` |
+| `@ai-ecoverse/wasm-libwebp` | host | **1.5.0** published |
+| `@ai-ecoverse/wasm-libxml2` | host | **2.13.8** published |
+| `@ai-ecoverse/wasm-freetype` | host | **2.13.3** published |
+| `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0** published |
+| `@ai-ecoverse/wasm-libpng` | host | **1.6.50** published; dep `@ai-ecoverse/wasm-zlib` |
+| `@ai-ecoverse/wasm-libjpeg-turbo` | slicc* | stub (needs cmake) |
+| `@ai-ecoverse/wasm-libtiff` | slicc* | stub (needs jpeg) |
+| `@ai-ecoverse/wasm-openjpeg` | slicc* | stub (needs cmake) |
+| `@ai-ecoverse/wasm-imagemagick` | slicc* | stub |
 
-\* stub `build.jsh` / may flip to `host` when porting.
+\* stub until ported. Leaf `configure`/`make` rungs ship as `builder: host`.
 
 ## License
 

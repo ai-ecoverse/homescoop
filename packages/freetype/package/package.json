@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-freetype",
-  "version": "0.0.0",
-  "description": "FreeType font engine (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "version": "2.13.3",
+  "description": "FreeType font engine (WASM / emscripten, SLICC homescoop ladder)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -18,9 +18,15 @@
   ],
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "lib",
+    "include"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "homescoop": {
+    "recipe": "freetype",
+    "upstream": "2.13.3"
   }
 }

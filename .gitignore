@@ -1,9 +1,13 @@
-node_modules/
+!.env.example
+# Built ladder artifacts (publish via npm; rebuild with host-run.sh)
+*.tgz
+.DS_Store
 .env
 .env.*
-!.env.example
-dist/
-out/
-.DS_Store
-*.tgz
 .homescoop-out/
+dist/
+node_modules/
+out/
+packages/*/package/bin/
+packages/*/package/include/
+packages/*/package/lib/

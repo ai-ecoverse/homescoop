@@ -1,19 +1,16 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: freetype
-builder: slicc
-# Upstream tags are VER-MAJOR-MINOR-PATCH (freetype/freetype2); Renovate mapping TBD.
+builder: host
 version: "2.13.3"
 npm: "@ai-ecoverse/wasm-freetype"
 summary: "FreeType font engine"
 source:
-  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
-  url: null
-  sha256: null
+  url: "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.gz"
+  sha256: "5c3a8e78f7b24c20b25b54ee575d6daa40007a5f4eea2845861c3409b3021747"
 dependencies:
-  build:
-    - zlib
-    - libpng
+  build: []
   host: []
+  run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/freetype
   license: SEE_UPSTREAM

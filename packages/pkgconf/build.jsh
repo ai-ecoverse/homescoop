@@ -1,4 +1,11 @@
 #!/usr/bin/env jsh
-// TODO: port ladder rung for pkgconf — see packages/zlib/build.jsh
-console.error('homescoop: packages/pkgconf/build.jsh not implemented yet');
-process.exit(1);
+// pkgconf build.jsh — delegates to build.sh (shared body for host + slicc).
+const { spawn } = require('child_process');
+const ROOT = process.env.HOMESCOOP_ROOT || '/mnt/homescoop';
+const script = `${ROOT}/packages/pkgconf/build.sh`;
+const child = spawn('bash', [script], {
+  stdio: 'inherit',
+  env: process.env,
+});
+child.on('error', (e) => { console.error(String(e)); process.exit(1); });
+child.on('close', (code) => process.exit(code || 0));

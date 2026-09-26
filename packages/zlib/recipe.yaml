@@ -1,15 +1,14 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: zlib
-# Stays slicc until in-cone emcc is wired; flip to host to use build.sh + emsdk on the runner.
-builder: slicc
+# Ship on host until in-cone emcc exists; build.jsh kept as slicc flip target.
+builder: host
 # renovate: datasource=github-releases depName=madler/zlib extractVersion=^v(?<version>.*)$
 version: "1.3.1"
 npm: "@ai-ecoverse/wasm-zlib"
 summary: "zlib compression library"
 source:
-  url: "https://zlib.net/zlib-1.3.1.tar.gz"
-  sha256: "cc0b4e42510d49c6decd464123ecf3b14ae9b47f9b4ed2ee64893e2d6520a264"
-# Lower-ladder @ai-ecoverse/wasm-* (and other npm specs). zlib is the base rung.
+  url: "https://zlib.net/fossils/zlib-1.3.1.tar.gz"
+  sha256: "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
 dependencies:
   build: []
   host: []

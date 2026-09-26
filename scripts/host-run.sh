@@ -26,6 +26,8 @@ mkdir -p "$OUT" "$PREFIX/lib" "$PREFIX/include" "$WORK"
 
 # Optional: unpack npm deps into PREFIX (headers + libs from prior rungs).
 # Forge/mamba specs (name or name=ver) are slicc-only — skip on the host path.
+# Prefer a local packages/*/package tree when the npm version is not on the
+# registry yet (same-repo ladder builds).
 is_npm_spec() {
   local s="$1"
   [[ "$s" == @* ]] && return 0
@@ -33,39 +35,78 @@ is_npm_spec() {
   [[ "$s" == *@latest ]] && return 0
   return 1
 }
+
+# Resolve @ai-ecoverse/wasm-foo@1.2.3 → packages/foo/package when present.
+local_wasm_pkg_dir() {
+  local spec="$1"
+  local name ver dir
+  if [[ "$spec" =~ ^@ai-ecoverse/wasm-([a-z0-9-]+)(@(.+))?$ ]]; then
+    name="${BASH_REMATCH[1]}"
+    dir="$ROOT/packages/$name/package"
+    if [[ -d "$dir" && -f "$dir/package.json" ]]; then
+      echo "$dir"
+      return 0
+    fi
+  fi
+  return 1
+}
+
 while IFS= read -r spec; do
   [[ -z "$spec" ]] && continue
   if ! is_npm_spec "$spec"; then
     echo "== host-run: skip mamba/forge dep '$spec' (use slicc builder / ipk mamba)"
     continue
   fi
-  echo "== host-run: npm pack $spec → $PREFIX"
   tmp="$(mktemp -d)"
   (
     cd "$tmp"
-    npm pack "$spec" --silent
+    if local_dir="$(local_wasm_pkg_dir "$spec")"; then
+      echo "== host-run: local pack $local_dir → $PREFIX"
+      npm pack "$local_dir" --silent
+    else
+      echo "== host-run: npm pack $spec → $PREFIX"
+      npm pack "$spec" --silent
+    fi
     tar xzf ./*.tgz
-    # Prefer package/lib + package/include layout from homescoop publishes
     if [[ -d package/lib ]]; then cp -R package/lib/. "$PREFIX/lib/"; fi
     if [[ -d package/include ]]; then cp -R package/include/. "$PREFIX/include/"; fi
-    # Some tarballs nest under package/
     if [[ -d package/package/lib ]]; then cp -R package/package/lib/. "$PREFIX/lib/"; fi
     if [[ -d package/package/include ]]; then cp -R package/package/include/. "$PREFIX/include/"; fi
   )
   rm -rf "$tmp"
 done < <(node "$ROOT/scripts/read-recipe.mjs" "$name" --deps || true)
 
-# Ensure emcc: prefer PATH, else activate emsdk from node_modules / npx cache.
+
+# Ensure emcc: prefer PATH, else activate emsdk npm package (caches under
+# ~/Library/Caches/emsdk). Optional override: HOMESCOOP_EMSDK_ROOT + EM_CONFIG.
 if ! command -v emconfigure >/dev/null 2>&1; then
-  echo "== host-run: installing emsdk (native toolchain)"
-  if [[ ! -d "$ROOT/node_modules/emsdk" ]]; then
-    (cd "$ROOT" && npm install --no-save --no-package-lock emsdk@4.0.23)
+  if [[ -n "${HOMESCOOP_EMSDK_ROOT:-}" && -x "$HOMESCOOP_EMSDK_ROOT/emcc" ]]; then
+    export PATH="$HOMESCOOP_EMSDK_ROOT:$PATH"
+  else
+    echo "== host-run: installing emsdk (npm)"
+    if [[ ! -d "$ROOT/node_modules/emsdk" ]]; then
+      (cd "$ROOT" && npm install --no-save --no-package-lock emsdk@0.4.0)
+    fi
+    # shellcheck disable=SC1091
+    eval "$(node -e 'const e=require("emsdk"); const env=e.env(); for (const [k,v] of Object.entries(env)) console.log(`export ${k}=${JSON.stringify(String(v))}`)')"
   fi
-  # shellcheck disable=SC1091
-  eval "$(node -e 'const e=require("emsdk"); const env=e.env(); for (const [k,v] of Object.entries(env)) console.log(`export ${k}=${JSON.stringify(v)}`)')"
 fi
 command -v emconfigure >/dev/null
 command -v emmake >/dev/null
+command -v emcc >/dev/null
+emcc --version | head -1
+
+# Prefer GNU make (Homebrew `make` formula → gmake). BSD make breaks
+# autoconf dependency-tracking and FreeType.
+if command -v gmake >/dev/null 2>&1; then
+  export MAKE=gmake
+elif [[ -x /opt/homebrew/opt/make/bin/gmake ]]; then
+  export MAKE=/opt/homebrew/opt/make/bin/gmake
+  export PATH="/opt/homebrew/opt/make/bin:$PATH"
+fi
+if [[ -n "${MAKE:-}" ]]; then
+  echo "== host-run: MAKE=$MAKE"
+fi
 
 echo "== host-run: build.sh ($name)"
 bash "$PKG/build.sh"

@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-zlib",
-  "version": "1.3.1-1",
-  "description": "zlib 1.3.1 for WebAssembly / emscripten (SLICC homescoop ladder)",
+  "version": "1.3.1-2",
+  "description": "zlib 1.3.1 static library for WebAssembly / emscripten (SLICC homescoop ladder)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

@@ -1,17 +1,16 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: pkgconf
-builder: slicc
-# renovate: datasource=github-releases depName=pkgconf/pkgconf extractVersion=^pkgconf-(?<version>.*)$
+builder: host
 version: "2.3.0"
 npm: "@ai-ecoverse/wasm-pkgconf"
 summary: "pkgconf / pkg-config for wasm"
 source:
-  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
-  url: null
-  sha256: null
+  url: "https://distfiles.ariadne.space/pkgconf/pkgconf-2.3.0.tar.gz"
+  sha256: "a2df680578e85f609f2fa67bd3d0fc0dc71b4bf084fc49119de84cd6ed28e723"
 dependencies:
   build: []
   host: []
+  run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/pkgconf
   license: SEE_UPSTREAM

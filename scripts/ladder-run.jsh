@@ -92,6 +92,19 @@ async function main() {
   for (const spec of npm) {
     console.log(`== ladder-run: ipk add -g ${spec}`);
     await sh('ipk', ['add', '-g', spec]);
+    // Stage headers/libs into PREFIX for emconfigure (package ships lib/ + include/).
+    const bare = spec.replace(/@[^@\/]+$/, '').replace(/^@/, '');
+    // @ai-ecoverse/wasm-zlib@1.3.1-2 → @ai-ecoverse/wasm-zlib
+    const m = spec.match(/^(@?[^@]+)/);
+    const pkgName = m ? m[1] : spec;
+    const nm = `/shared/lib/node_modules/${pkgName}`;
+    console.log(`== ladder-run: stage ${nm} → ${CONDA_PREFIX}`);
+    await sh('sh', [
+      '-c',
+      `mkdir -p "${CONDA_PREFIX}/lib" "${CONDA_PREFIX}/include" && ` +
+        `if [ -d "${nm}/lib" ]; then cp -R "${nm}/lib/." "${CONDA_PREFIX}/lib/"; fi && ` +
+        `if [ -d "${nm}/include" ]; then cp -R "${nm}/include/." "${CONDA_PREFIX}/include/"; fi`,
+    ]);
   }
 
   console.log(`== ladder-run: build.jsh (${name})`);

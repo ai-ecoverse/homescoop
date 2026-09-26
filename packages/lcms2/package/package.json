@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-lcms2",
-  "version": "0.0.0",
-  "description": "Little CMS 2 color management (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "version": "2.17.0",
+  "description": "Little CMS 2 color management (WASM / emscripten, SLICC homescoop ladder)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -18,9 +18,15 @@
   ],
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "lib",
+    "include"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "homescoop": {
+    "recipe": "lcms2",
+    "upstream": "2.17"
   }
 }

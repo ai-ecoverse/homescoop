@@ -1,5 +1,5 @@
 #!/usr/bin/env jsh
-// zlib build.jsh — primary body while recipe.builder is slicc.
+// zlib build.jsh — slicc flip target; CI ships via build.sh (builder: host).
 // Runs inside SLICC. Mirrors ladder.sh rung_zlib:
 //   emconfigure ./configure --static && emmake make libz.a
 const { spawn } = require('child_process');
@@ -7,9 +7,9 @@ const { spawn } = require('child_process');
 const ROOT = process.env.HOMESCOOP_ROOT || '/mnt/homescoop';
 const PKG = `${ROOT}/packages/zlib`;
 const VERSION = '1.3.1';
-const SRC_URL = 'https://zlib.net/zlib-1.3.1.tar.gz';
+const SRC_URL = 'https://zlib.net/fossils/zlib-1.3.1.tar.gz';
 const SRC_SHA =
-  'cc0b4e42510d49c6decd464123ecf3b14ae9b47f9b4ed2ee64893e2d6520a264';
+  '9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23';
 const WORK = process.env.HOMESCOOP_WORK || '/tmp/homescoop/work';
 const PREFIX = process.env.PREFIX || '/tmp/homescoop/prefix';
 const SRC_DIR = `${WORK}/zlib-${VERSION}`;
@@ -90,7 +90,7 @@ async function build() {
   }
   console.log('== zlib: emconfigure + emmake');
   await sh('emconfigure', ['./configure', '--static'], { cwd: SRC_DIR });
-  await sh('emmake', ['make', 'libz.a'], { cwd: SRC_DIR });
+  await sh('emmake', ['make', 'libz.a', `AR=`, `RANLIB=`], { cwd: SRC_DIR });
   if (!(await existsFile(libz))) throw new Error('libz.a not produced');
 }
 

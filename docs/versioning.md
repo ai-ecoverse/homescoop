@@ -15,3 +15,7 @@ so packaging revisions still become the default install target.
 Keep `package/package.json` `"version"` and optional `"homescoop.upstream"`
 in sync when releasing. Recipe bumps from Renovate do not publish by
 themselves — bump the npm version and dispatch `release.yml`.
+
+If upstream is two-component (e.g. lcms2 `2.17`) and npm rejects it as
+invalid semver, publish as `X.Y.0` and keep `homescoop.upstream` as the
+true upstream string.

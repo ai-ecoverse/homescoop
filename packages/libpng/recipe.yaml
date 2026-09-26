@@ -1,18 +1,17 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: libpng
-builder: slicc
-# renovate: datasource=git-tags depName=pnggroup/libpng extractVersion=^v(?<version>.*)$
+builder: host
 version: "1.6.50"
 npm: "@ai-ecoverse/wasm-libpng"
 summary: "libpng PNG library"
 source:
-  # Filled when packaging real ladder artifacts; stubs reserve the npm name only.
-  url: null
-  sha256: null
+  url: "https://downloads.sourceforge.net/project/libpng/libpng16/1.6.50/libpng-1.6.50.tar.gz"
+  sha256: "71158e53cfdf2877bc99bcab33641d78df3f48e6e0daad030afe9cb8c031aa46"
 dependencies:
   build:
-    - zlib
+    - @ai-ecoverse/wasm-zlib@1.3.1-2
   host: []
+  run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libpng
   license: SEE_UPSTREAM

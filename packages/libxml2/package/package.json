@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-libxml2",
-  "version": "0.0.0",
-  "description": "libxml2 XML parser (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "version": "2.13.8",
+  "description": "libxml2 XML parser (WASM / emscripten, SLICC homescoop ladder)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -18,9 +18,15 @@
   ],
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "lib",
+    "include"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "homescoop": {
+    "recipe": "libxml2",
+    "upstream": "2.13.8"
   }
 }
