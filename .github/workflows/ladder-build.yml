@@ -2,8 +2,10 @@
 # See docs/ladder-builds.md. Trusted publishing is bound to this workflow file.
 #
 # Triggers:
-#   workflow_dispatch — manual
-#   workflow_call     — ladder-merge matrix after push to main
+#   workflow_dispatch — manual, and ladder-merge (via createWorkflowDispatch)
+#
+# Do not add workflow_call for publish: npm OIDC trusts this filename only when
+# it is the *calling* workflow (see docs.npmjs.com/trusted-publishers).
 name: ladder-build
 
 on:
@@ -13,17 +15,6 @@ on:
         description: Recipe directory under packages/ (e.g. zlib)
         required: true
         default: zlib
-        type: string
-      duration:
-        description: Leader lifetime (slicc builder only)
-        required: false
-        default: 90m
-        type: string
-  workflow_call:
-    inputs:
-      package:
-        description: Recipe directory under packages/
-        required: true
         type: string
       duration:
         description: Leader lifetime (slicc builder only)

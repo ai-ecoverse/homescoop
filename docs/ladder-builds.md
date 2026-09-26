@@ -31,8 +31,13 @@ file (`ladder-build.yml`) keeps a single `npm trust` target.
 | Workflow | When | What |
 | --- | --- | --- |
 | `ladder-pr.yml` | pull_request touching `packages/**` | Host-build each touched package (no publish) |
-| `ladder-merge.yml` | push to `main` under `packages/**` | Matrix-call `ladder-build` → build + OIDC publish |
-| `ladder-build.yml` | `workflow_dispatch` / `workflow_call` | Single-package build + publish |
+| `ladder-merge.yml` | push to `main` under `packages/**` | `workflow_dispatch` each touched package on `ladder-build.yml` |
+| `ladder-build.yml` | `workflow_dispatch` only | Single-package build + OIDC publish |
+
+`ladder-merge` must **not** `uses:` `ladder-build` as a reusable workflow: npm
+OIDC validates the *calling* workflow filename, and fledgling trusts only
+`ladder-build.yml`. Merge therefore calls `createWorkflowDispatch` so each
+publish runs as a real `ladder-build` workflow.
 
 `scripts/list-touched-packages.mjs` maps changed paths → recipe names.
 `scripts/sync-package-version.mjs` sets `package.json` version from the

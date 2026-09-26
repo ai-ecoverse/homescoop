@@ -13,9 +13,11 @@ When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
 
 1. **`ladder-pr`** — host-builds each touched `packages/<name>` on the PR
    (no publish). Slicc builders are noted and skipped.
-2. **`ladder-merge`** — after merge to `main`, calls `ladder-build` for each
-   touched package (build + OIDC publish). `sync-package-version.mjs` aligns
-   `package.json` with the new recipe version before packing.
+2. **`ladder-merge`** — after merge to `main`, dispatches `ladder-build` for
+   each touched package (`createWorkflowDispatch`, not a reusable
+   `workflow_call` — npm OIDC trusts the calling workflow filename).
+   `sync-package-version.mjs` aligns `package.json` with the new recipe
+   version before packing.
 
 Manual: `gh workflow run ladder-build.yml -f package=zlib`.
 
