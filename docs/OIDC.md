@@ -2,22 +2,17 @@
 
 Token-less publishes from GitHub Actions on `ai-ecoverse/homescoop`.
 
-## Workflows
+## Workflow
 
 | Workflow | Role |
 | --- | --- |
-| [`ladder-build.yml`](../.github/workflows/ladder-build.yml) | **Primary** — boots SLICC (`packages/github-workflow`), runs `build.jsh`, packs, `npm publish` with OIDC |
-| [`release.yml`](../.github/workflows/release.yml) | Metadata / stub republish without a SLICC build |
+| [`ladder-build.yml`](../.github/workflows/ladder-build.yml) | Sole publisher — host or SLICC build, pack, `npm publish` with OIDC |
 
 Fledgling’s `"workflow"` is `ladder-build.yml`. Re-run `npm run trust` after
-changing it. To also allow `release.yml`, add a second publisher per package:
+changing it.
 
-```bash
-npm trust github @ai-ecoverse/wasm-<name> \
-  --repo ai-ecoverse/homescoop \
-  --file release.yml \
-  --allow-publish -y
-```
+A former `release.yml` (metadata-only republish) was retired; use
+`ladder-build` (or local `npm publish` with 2FA) instead.
 
 ## One-time setup
 

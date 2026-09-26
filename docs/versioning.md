@@ -9,12 +9,13 @@ Each `@ai-ecoverse/wasm-*` package version tracks the matching
 | Packaging / rebuild fix, same upstream | `X-N` (e.g. `1.3.1-1`, `1.3.1-2`) |
 | New upstream | new `X` from the recipe (Renovate PR) |
 
-`X-N` is a semver prerelease form; `release.yml` publishes with `--tag latest`
-so packaging revisions still become the default install target.
+`X-N` is a semver prerelease form; `ladder-build.yml` publishes with
+`--tag latest` so packaging revisions still become the default install
+target.
 
 Keep `package/package.json` `"version"` and optional `"homescoop.upstream"`
 in sync when releasing. Recipe bumps from Renovate do not publish by
-themselves — bump the npm version and dispatch `release.yml`.
+themselves — bump the npm version and dispatch `ladder-build`.
 
 If upstream is two-component (e.g. lcms2 `2.17`) and npm rejects it as
 invalid semver, publish as `X.Y.0` and keep `homescoop.upstream` as the

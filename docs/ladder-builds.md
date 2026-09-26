@@ -88,7 +88,6 @@ scripts/
   host-run.sh      # npm deps → build.sh → npm pack
 .github/workflows/
   ladder-build.yml # branches on recipe.builder; OIDC publish
-  release.yml      # metadata-only
 ```
 
 ## Higher rungs
