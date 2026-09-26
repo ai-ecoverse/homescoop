@@ -1,6 +1,10 @@
 #!/usr/bin/env jsh
 // ladder-run.jsh <package> — install recipe deps, run build.jsh, npm pack.
 // Expected to run inside SLICC with HOMESCOOP_ROOT mounted (default /mnt/homescoop).
+//
+// Dep specs (from recipe dependencies.* or HOMESCOOP_DEPS):
+//   zlib / zlib=1.3.1     → ipk mamba install  (emscripten-forge → /shared/lib/conda)
+//   @scope/pkg / pkg@1.0  → ipk add -g         (npm → /shared/lib/node_modules)
 const { spawn } = require('child_process');
 
 const ROOT = process.env.HOMESCOOP_ROOT || '/mnt/homescoop';
@@ -12,6 +16,8 @@ if (!name) {
 
 const PKG = `${ROOT}/packages/${name}`;
 const OUT = process.env.HOMESCOOP_OUT || '/tmp/homescoop/out';
+/** Forge/conda prefix used by `ipk mamba` (also the default link PREFIX). */
+const CONDA_PREFIX = process.env.PREFIX || '/shared/lib/conda';
 
 function sh(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -34,6 +40,13 @@ function sh(cmd, args, opts = {}) {
   });
 }
 
+/** npm specs use @version or @scope/; conda/mamba specs use name or name=version. */
+function isNpmSpec(spec) {
+  if (spec.startsWith('@')) return true;
+  // bare-name@version (npm), but not name=version (conda)
+  return /@[0-9]/.test(spec) || /@latest$/.test(spec) || /@\^/.test(spec);
+}
+
 async function main() {
   await sh('mkdir', ['-p', OUT]);
 
@@ -51,7 +64,6 @@ async function main() {
     if (String(e).includes('recipe builder')) throw e;
   }
 
-  // Deps: runner can also pass HOMESCOOP_DEPS as newline-separated ipk specs.
   let deps = (process.env.HOMESCOOP_DEPS || '').split('\n').map((s) => s.trim()).filter(Boolean);
   if (deps.length === 0) {
     try {
@@ -66,14 +78,28 @@ async function main() {
     }
   }
 
+  const mamba = [];
+  const npm = [];
   for (const spec of deps) {
+    if (isNpmSpec(spec)) npm.push(spec);
+    else mamba.push(spec);
+  }
+
+  if (mamba.length > 0) {
+    console.log(`== ladder-run: ipk mamba install ${mamba.join(' ')}`);
+    await sh('ipk', ['mamba', 'install', ...mamba]);
+  }
+  for (const spec of npm) {
     console.log(`== ladder-run: ipk add -g ${spec}`);
     await sh('ipk', ['add', '-g', spec]);
   }
 
   console.log(`== ladder-run: build.jsh (${name})`);
   await sh('jsh', [`${PKG}/build.jsh`], {
-    env: { HOMESCOOP_ROOT: ROOT },
+    env: {
+      HOMESCOOP_ROOT: ROOT,
+      PREFIX: CONDA_PREFIX,
+    },
   });
 
   console.log(`== ladder-run: npm pack`);

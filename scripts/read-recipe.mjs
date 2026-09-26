@@ -4,6 +4,8 @@
  *
  *   node scripts/read-recipe.mjs zlib --json
  *   node scripts/read-recipe.mjs zlib --deps
+ *   node scripts/read-recipe.mjs zlib --deps-mamba
+ *   node scripts/read-recipe.mjs zlib --deps-npm
  *   node scripts/read-recipe.mjs zlib --field version
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -16,7 +18,9 @@ const mode = process.argv[3] || '--json';
 const field = process.argv[4];
 
 if (!name || name.startsWith('-')) {
-  console.error('usage: read-recipe.mjs <package> [--json|--deps|--field <key>]');
+  console.error(
+    'usage: read-recipe.mjs <package> [--json|--deps|--deps-mamba|--deps-npm|--field <key>]'
+  );
   process.exit(2);
 }
 
@@ -58,6 +62,31 @@ function parseSimpleYaml(text) {
     const top = stack[stack.length - 1];
 
     if (line.startsWith('- ')) {
+      if (!Array.isArray(top.container)) {
+        // Promote an empty map created by `key:` into a list when the first
+        // `- item` appears (Homebrew-style nested dependency lists).
+        const emptyMap =
+          top.container &&
+          typeof top.container === 'object' &&
+          !Array.isArray(top.container) &&
+          Object.keys(top.container).length === 0;
+        if (emptyMap && stack.length > 1) {
+          const parentFrame = stack[stack.length - 2];
+          const parent = parentFrame.container;
+          if (parent && typeof parent === 'object' && !Array.isArray(parent)) {
+            // Find which key points at this empty map and replace with [].
+            const map = /** @type {Record<string, unknown>} */ (parent);
+            for (const [k, v] of Object.entries(map)) {
+              if (v === top.container) {
+                const list = [];
+                map[k] = list;
+                top.container = list;
+                break;
+              }
+            }
+          }
+        }
+      }
       if (!Array.isArray(top.container)) {
         console.error(`list item under non-list at indent ${indent}: ${line}`);
         process.exit(1);
@@ -123,13 +152,24 @@ if (mode === '--field') {
   process.exit(0);
 }
 
-if (mode === '--deps') {
+if (mode === '--deps' || mode === '--deps-mamba' || mode === '--deps-npm') {
   const deps = /** @type {Record<string, unknown>} */ (recipe.dependencies || {});
-  for (const k of ['build', 'host', 'run']) {
+  /** @param {string} s */
+  const isNpm = (s) =>
+    s.startsWith('@') || /@[0-9]/.test(s) || /@latest$/.test(s) || /@\^/.test(s);
+  for (const k of ['build', 'host', 'run', 'mamba', 'npm']) {
     const arr = deps[k];
     if (!Array.isArray(arr)) continue;
     for (const s of arr) {
-      if (typeof s === 'string' && s.trim()) console.log(s.trim());
+      if (typeof s !== 'string' || !s.trim()) continue;
+      const spec = s.trim();
+      if (mode === '--deps-mamba' && (k === 'npm' || isNpm(spec))) continue;
+      if (mode === '--deps-npm' && (k === 'mamba' || !isNpm(spec))) continue;
+      // Explicit keys win: dependencies.mamba / .npm always emit in --deps
+      if (mode === '--deps' && k === 'mamba' && isNpm(spec)) {
+        // still emit; classifier is for untyped build/host/run lists
+      }
+      console.log(spec);
     }
   }
   process.exit(0);

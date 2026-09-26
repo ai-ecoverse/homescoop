@@ -10,7 +10,16 @@ source:
   url: null
   sha256: null
 dependencies:
-  build: []
+  build:
+    - zlib
+    - libjpeg-turbo
+    - libpng
+    - lcms2
+    - libtiff
+    - libwebp
+    - openjpeg
+    - freetype
+    - libxml2
   host: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick

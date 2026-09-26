@@ -11,9 +11,9 @@ Two build kinds (see [`docs/ladder-builds.md`](docs/ladder-builds.md)):
 | `host` | `build.sh` | GHA runner / laptop — native `emsdk` / emcc |
 
 Recipes stay **`slicc`** by default until an in-cone emcc exists. Flip a
-package to `host` when you want the runner path. Higher rungs
-`ipk add -g` / unpack lower `@ai-ecoverse/wasm-*` packages so only the
-library under build is compiled.
+package to `host` when you want the runner path. Higher rungs install forge
+deps with `ipk mamba install` (into `/shared/lib/conda`) so only the library
+under build is compiled; npm `@ai-ecoverse/wasm-*` specs still use `ipk add -g`.
 
 ## Layout
 
@@ -55,15 +55,15 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | --- | --- | --- |
 | `@ai-ecoverse/wasm-zlib` | slicc | first rung; host `build.sh` ready to flip |
 | `@ai-ecoverse/wasm-libjpeg-turbo` | slicc* | stub |
-| `@ai-ecoverse/wasm-libpng` | slicc* | needs zlib |
+| `@ai-ecoverse/wasm-libpng` | slicc* | mamba: zlib |
 | `@ai-ecoverse/wasm-lcms2` | slicc* | |
-| `@ai-ecoverse/wasm-libtiff` | slicc* | zlib, jpeg |
+| `@ai-ecoverse/wasm-libtiff` | slicc* | mamba: zlib, libjpeg-turbo |
 | `@ai-ecoverse/wasm-libwebp` | slicc* | |
 | `@ai-ecoverse/wasm-openjpeg` | slicc* | |
-| `@ai-ecoverse/wasm-freetype` | slicc* | |
-| `@ai-ecoverse/wasm-libxml2` | slicc* | |
+| `@ai-ecoverse/wasm-freetype` | slicc* | mamba: zlib, libpng |
+| `@ai-ecoverse/wasm-libxml2` | slicc* | mamba: zlib |
 | `@ai-ecoverse/wasm-pkgconf` | slicc* | |
-| `@ai-ecoverse/wasm-imagemagick` | slicc* | delegates |
+| `@ai-ecoverse/wasm-imagemagick` | slicc* | mamba: all delegates |
 
 \* stub `build.jsh` / may flip to `host` when porting.
 

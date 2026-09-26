@@ -10,7 +10,9 @@ source:
   url: null
   sha256: null
 dependencies:
-  build: []
+  build:
+    - zlib
+    - libpng
   host: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/freetype

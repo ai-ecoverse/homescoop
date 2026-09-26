@@ -25,8 +25,20 @@ fi
 mkdir -p "$OUT" "$PREFIX/lib" "$PREFIX/include" "$WORK"
 
 # Optional: unpack npm deps into PREFIX (headers + libs from prior rungs).
+# Forge/mamba specs (name or name=ver) are slicc-only — skip on the host path.
+is_npm_spec() {
+  local s="$1"
+  [[ "$s" == @* ]] && return 0
+  [[ "$s" =~ @[0-9] ]] && return 0
+  [[ "$s" == *@latest ]] && return 0
+  return 1
+}
 while IFS= read -r spec; do
   [[ -z "$spec" ]] && continue
+  if ! is_npm_spec "$spec"; then
+    echo "== host-run: skip mamba/forge dep '$spec' (use slicc builder / ipk mamba)"
+    continue
+  fi
   echo "== host-run: npm pack $spec → $PREFIX"
   tmp="$(mktemp -d)"
   (

@@ -10,7 +10,8 @@ source:
   url: null
   sha256: null
 dependencies:
-  build: []
+  build:
+    - zlib
   host: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libpng
