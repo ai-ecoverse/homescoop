@@ -1,16 +1,16 @@
 {
   "name": "@ai-ecoverse/wasm-gmake",
-  "version": "0.0.0",
-  "description": "GNU make (WASM / emscripten) — name reservation stub; real artifacts TBD",
-  "license": "Apache-2.0",
+  "version": "4.4.1",
+  "description": "GNU make 4.4.1 for wasm / slicc (emscripten)",
+  "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
     "directory": "packages/gmake/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/gmake",
-  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "gmake"],
-  "files": ["README.md", "LICENSE"],
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "gmake", "make"],
+  "files": ["README.md", "LICENSE", "bin"],
   "publishConfig": { "access": "public" },
   "homescoop": {
     "recipe": "gmake",
@@ -25,7 +25,8 @@
       },
       "gmake": {
         "glue": "bin/make",
-        "wasm": "bin/make.wasm"
+        "wasm": "bin/make.wasm",
+        "argv0": "make"
       }
     }
   }

@@ -1,12 +1,12 @@
-# Homebrew-shaped recipe — GNU make as a wasm tool (ladder rung_gmake / build-wasm-make.sh).
+# GNU make as a wasm CLI tool for slicc (host ladder).
 name: gmake
-builder: slicc
+builder: host
 version: "4.4.1"
 npm: "@ai-ecoverse/wasm-gmake"
 summary: "GNU make built for slicc (wasm tool)"
 source:
   url: "https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz"
-  sha256: null  # fill on first real build
+  sha256: "dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3"
 dependencies:
   build: []
   host: []
@@ -15,8 +15,6 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/gmake
   license: SEE_UPSTREAM
   notes: |
-    Port from slicc-emscripten harness/ladder.sh rung_gmake and
-    build-wasm-make.sh. Needs slicc_spawn.c / slicc_main_envp.c link.
-    Link CLI with homescoop_em_cli_ldflags (ENVIRONMENT=web,worker,node,
-    EXIT_RUNTIME, ALLOW_MEMORY_GROWTH). Keep package.json slicc.commands
-    paths aligned with staged bin/make{.wasm}.
+    Port of slicc-emscripten/build-wasm-make.sh. Links slicc make profile
+    (spawn + exec + main_envp + libc_gaps) via homescoop_slicc_archive.
+    package.json slicc.commands: make (+ gmake alias).

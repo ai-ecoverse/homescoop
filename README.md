@@ -23,6 +23,8 @@ packages/<name>/
   build.jsh       # slicc body
   build.sh        # host body (optional until builder: host)
   package/        # npm package root
+shims/slicc/      # vendored slicc libc shims (spawn/exec/fork/gaps)
+patches/          # upstream patches for CLI tools
 ```
 
 ## CI
@@ -59,17 +61,23 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-libwebp` | host | **1.5.0-1** published |
 | `@ai-ecoverse/wasm-libxml2` | host | **2.13.8-1** published |
 | `@ai-ecoverse/wasm-freetype` | host | **2.13.3-1** published |
-| `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-2** published (ladder-build smoke) |
+| `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-4** (slicc `libc_gaps` / `slicc_sigpipe`) |
 | `@ai-ecoverse/wasm-libpng` | host | **1.6.50** published; dep `@ai-ecoverse/wasm-zlib` |
 | `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2** published (emcmake, no SIMD) |
 | `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** published (emcmake, codec off) |
 | `@ai-ecoverse/wasm-libtiff` | host | **4.7.0** published; deps zlib + jpeg |
+| `@ai-ecoverse/wasm-gmake` | host | **4.4.1** (spawn/exec/main_envp/gaps) |
+| `@ai-ecoverse/wasm-bash` | host | **5.3** (fork + Asyncify) |
+| `@ai-ecoverse/wasm-coreutils` | host | **9.7** single-binary + argv0 manifest |
+| `@ai-ecoverse/wasm-sed` | host | **4.9** |
+| `@ai-ecoverse/wasm-grep` | host | **3.12** |
+| `@ai-ecoverse/wasm-gawk` | host | **5.3.2** (`gawk` + `awk`) |
 | `@ai-ecoverse/wasm-imagemagick` | slicc* | stub |
-| `@ai-ecoverse/wasm-gmake` | slicc* | stub (ladder `rung_gmake`) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 | `@ai-ecoverse/wasm-magick-native` | slicc* | stub (Magick.Native Q8) |
 
 \* stub until ported. Published libs ship relocatable `lib/pkgconfig/*.pc`.
+CLI tools declare `package.json` → `slicc.commands` for the wasm realm.
 
 ## License
 

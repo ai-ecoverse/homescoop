@@ -85,6 +85,89 @@ homescoop_em_cli_ldflags() {
   printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1${extra:+ ${extra}}"
 }
 
+homescoop_slicc_dir() {
+  echo "${HOMESCOOP_ROOT}/shims/slicc"
+}
+
+# Compile selected slicc shims into an archive for LDFLAGS/LIBS.
+# Every profile includes slicc_signals.c + slicc_libc_gaps.c.
+# Usage: homescoop_slicc_archive <out.a> gaps|spawn|make|fork
+homescoop_slicc_archive() {
+  local out="$1" profile="${2:-gaps}"
+  local dir odir src base
+  local -a objs=()
+  dir="$(homescoop_slicc_dir)"
+  odir="$(dirname "$out")/slicc-objs-${profile}"
+  mkdir -p "$(dirname "$out")" "$odir"
+  _homescoop_slicc_compile() {
+    src="$1"
+    base=$(basename "$src" .c)
+    echo "== slicc shim: emcc -c $(basename "$src")"
+    emcc -O2 -c "$src" -o "$odir/$base.o"
+    objs+=("$odir/$base.o")
+  }
+  case "$profile" in
+    gaps)
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      ;;
+    spawn)
+      _homescoop_slicc_compile "$dir/slicc_spawn.c"
+      _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      ;;
+    make)
+      _homescoop_slicc_compile "$dir/slicc_spawn.c"
+      _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_main_envp.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      ;;
+    fork)
+      _homescoop_slicc_compile "$dir/slicc_spawn.c"
+      _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_fork.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      ;;
+    *)
+      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork)" >&2
+      return 1
+      ;;
+  esac
+  rm -f "$out"
+  emar rcs "$out" "${objs[@]}"
+  echo "== slicc shim: $out ($profile)"
+}
+
+# Force signal exports out of the archive (wasm realm calls them from JS).
+homescoop_slicc_keep_exports() {
+  printf '%s' "-Wl,-u,slicc_raise -Wl,-u,slicc_sig_mask -Wl,-u,slicc_sigpipe"
+}
+
+# Extra link flags for the fork js-library (bash). Pair with profile fork.
+homescoop_slicc_fork_js_flags() {
+  local dir
+  dir="$(homescoop_slicc_dir)"
+  printf '%s' "--js-library ${dir}/slicc-fork.js -sASYNCIFY -sASYNCIFY_STACK_SIZE=1048576"
+}
+
+# Stage an Emscripten CLI binary pair into package/bin and PREFIX/bin.
+# homescoop_stage_cli <srcdir> <name>  — copies name, name.js, name.wasm when present
+homescoop_stage_cli() {
+  local srcdir="$1" name="$2"
+  local dest="$HOMESCOOP_PKG/package/bin"
+  mkdir -p "$dest" "$PREFIX/bin"
+  local f
+  for f in "$name" "$name.js" "$name.wasm"; do
+    if [[ -f "$srcdir/$f" ]]; then
+      cp "$srcdir/$f" "$dest/"
+      cp "$srcdir/$f" "$PREFIX/bin/"
+    fi
+  done
+}
+
 # Write a relocatable .pc into package/lib/pkgconfig and PREFIX.
 # Uses ${pcfiledir} so consumers can stage the package tree anywhere.
 # homescoop_write_pc <pc-name> <version> <libs> [requires] [extra-cflags]

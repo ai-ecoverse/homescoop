@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/wasm-sed",
+  "version": "4.9",
+  "description": "GNU sed for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/sed/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/sed",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "sed"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "sed",
+    "upstream": "4.9"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "sed": {
+        "glue": "bin/sed",
+        "wasm": "bin/sed.wasm"
+      }
+    }
+  }
+}

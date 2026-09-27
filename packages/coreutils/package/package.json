@@ -1,0 +1,565 @@
+{
+  "name": "@ai-ecoverse/wasm-coreutils",
+  "version": "9.7",
+  "description": "GNU coreutils (single-binary) for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/coreutils/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/coreutils",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "coreutils"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "coreutils",
+    "upstream": "9.7"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "coreutils": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm"
+      },
+      "chroot": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "chroot"
+      },
+      "hostid": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "hostid"
+      },
+      "nice": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "nice"
+      },
+      "who": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "who"
+      },
+      "users": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "users"
+      },
+      "pinky": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "pinky"
+      },
+      "stty": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "stty"
+      },
+      "df": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "df"
+      },
+      "[": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "["
+      },
+      "b2sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "b2sum"
+      },
+      "base64": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "base64"
+      },
+      "base32": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "base32"
+      },
+      "basenc": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "basenc"
+      },
+      "basename": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "basename"
+      },
+      "cat": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "cat"
+      },
+      "chcon": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "chcon"
+      },
+      "chgrp": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "chgrp"
+      },
+      "chmod": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "chmod"
+      },
+      "chown": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "chown"
+      },
+      "cksum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "cksum"
+      },
+      "comm": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "comm"
+      },
+      "cp": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "cp"
+      },
+      "csplit": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "csplit"
+      },
+      "cut": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "cut"
+      },
+      "date": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "date"
+      },
+      "dd": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "dd"
+      },
+      "dir": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "dir"
+      },
+      "dircolors": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "dircolors"
+      },
+      "dirname": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "dirname"
+      },
+      "du": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "du"
+      },
+      "echo": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "echo"
+      },
+      "env": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "env"
+      },
+      "expand": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "expand"
+      },
+      "expr": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "expr"
+      },
+      "factor": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "factor"
+      },
+      "false": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "false"
+      },
+      "fmt": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "fmt"
+      },
+      "fold": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "fold"
+      },
+      "install": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "ginstall"
+      },
+      "groups": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "groups"
+      },
+      "head": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "head"
+      },
+      "id": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "id"
+      },
+      "join": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "join"
+      },
+      "kill": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "kill"
+      },
+      "link": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "link"
+      },
+      "ln": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "ln"
+      },
+      "logname": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "logname"
+      },
+      "ls": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "ls"
+      },
+      "md5sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "md5sum"
+      },
+      "mkdir": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "mkdir"
+      },
+      "mkfifo": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "mkfifo"
+      },
+      "mknod": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "mknod"
+      },
+      "mktemp": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "mktemp"
+      },
+      "mv": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "mv"
+      },
+      "nl": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "nl"
+      },
+      "nproc": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "nproc"
+      },
+      "nohup": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "nohup"
+      },
+      "numfmt": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "numfmt"
+      },
+      "od": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "od"
+      },
+      "paste": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "paste"
+      },
+      "pathchk": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "pathchk"
+      },
+      "pr": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "pr"
+      },
+      "printenv": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "printenv"
+      },
+      "printf": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "printf"
+      },
+      "ptx": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "ptx"
+      },
+      "pwd": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "pwd"
+      },
+      "readlink": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "readlink"
+      },
+      "realpath": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "realpath"
+      },
+      "rm": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "rm"
+      },
+      "rmdir": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "rmdir"
+      },
+      "runcon": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "runcon"
+      },
+      "seq": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "seq"
+      },
+      "sha1sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sha1sum"
+      },
+      "sha224sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sha224sum"
+      },
+      "sha256sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sha256sum"
+      },
+      "sha384sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sha384sum"
+      },
+      "sha512sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sha512sum"
+      },
+      "shred": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "shred"
+      },
+      "shuf": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "shuf"
+      },
+      "sleep": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sleep"
+      },
+      "sort": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sort"
+      },
+      "split": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "split"
+      },
+      "stat": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "stat"
+      },
+      "sum": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sum"
+      },
+      "sync": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "sync"
+      },
+      "tac": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "tac"
+      },
+      "tail": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "tail"
+      },
+      "tee": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "tee"
+      },
+      "test": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "test"
+      },
+      "touch": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "touch"
+      },
+      "tr": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "tr"
+      },
+      "true": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "true"
+      },
+      "truncate": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "truncate"
+      },
+      "tsort": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "tsort"
+      },
+      "tty": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "tty"
+      },
+      "uname": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "uname"
+      },
+      "unexpand": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "unexpand"
+      },
+      "uniq": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "uniq"
+      },
+      "unlink": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "unlink"
+      },
+      "uptime": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "uptime"
+      },
+      "vdir": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "vdir"
+      },
+      "wc": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "wc"
+      },
+      "whoami": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "whoami"
+      },
+      "yes": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "yes"
+      },
+      "ginstall": {
+        "glue": "bin/coreutils",
+        "wasm": "bin/coreutils.wasm",
+        "argv0": "ginstall"
+      }
+    }
+  }
+}

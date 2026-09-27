@@ -113,10 +113,26 @@ Only the library under build is compiled. Lower forge packages come from
 `ipk mamba install` (or published `@ai-ecoverse/wasm-*` npm specs when you
 prefer the homescoop tarball over forge).
 
+## slicc libc shims (`shims/slicc/`)
+
+Vendored C/JS shims so CI can link spawn/exec/fork/SIGPIPE without a local
+slicc tree. See [`shims/slicc/README.md`](../shims/slicc/README.md).
+
+```bash
+homescoop_slicc_archive "$WORK/libslicc.a" gaps   # or spawn|make|fork
+LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports) $WORK/libslicc.a"
+# keep_exports: -Wl,-u,slicc_raise|slicc_sig_mask|slicc_sigpipe
+# fork profile also needs:
+#   $(homescoop_slicc_fork_js_flags)  # --js-library + ASYNCIFY
+```
+
+GNU userland recipes (coreutils, sed, grep, gawk) share
+`scripts/build-gnu-cli.sh`. Patches live in `patches/`.
+
 ## CLI tools and the slicc wasm realm
 
 Static libraries (`lib`, `include`, `.pc`) need no special link flags. **CLI
-tools** (pkgconf, gmake, cmake, imagemagick, …) must be loadable in slicc's
+tools** (pkgconf, gmake, bash, coreutils, …) must be loadable in slicc's
 plain DedicatedWorker realm ([slicc#3535](https://github.com/ai-ecoverse/slicc/issues/3535))
 and in the existing node-realm `run-tool.js` path.
 

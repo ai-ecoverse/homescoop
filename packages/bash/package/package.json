@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/wasm-bash",
+  "version": "5.3",
+  "description": "GNU bash 5.3 for wasm / slicc (fork via Asyncify)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/bash/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/bash",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "bash"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "bash",
+    "upstream": "5.3"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "bash": {
+        "glue": "bin/bash",
+        "wasm": "bin/bash.wasm"
+      }
+    }
+  }
+}

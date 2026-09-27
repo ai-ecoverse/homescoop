@@ -1,0 +1,50 @@
+{
+  "name": "@ai-ecoverse/wasm-grep",
+  "version": "3.12",
+  "description": "GNU grep for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/grep/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/grep",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "grep"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "grep",
+    "upstream": "3.12"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "grep": {
+        "glue": "bin/grep",
+        "wasm": "bin/grep.wasm"
+      },
+      "egrep": {
+        "glue": "bin/grep",
+        "wasm": "bin/grep.wasm",
+        "argv0": "egrep"
+      },
+      "fgrep": {
+        "glue": "bin/grep",
+        "wasm": "bin/grep.wasm",
+        "argv0": "fgrep"
+      }
+    }
+  }
+}

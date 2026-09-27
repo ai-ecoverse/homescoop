@@ -1,0 +1,13 @@
+--- a/shell.c
++++ b/shell.c
+@@ -386,6 +386,10 @@
+ 
+   env = environ;
+ #endif /* __OPENNT || __MVS__ */
++#if defined (__EMSCRIPTEN__)
++  /* Emscripten calls main (argc, argv) only: env is not the environment. */
++  env = environ;
++#endif
+ 
+   USE_VAR(argc);
+   USE_VAR(argv);
