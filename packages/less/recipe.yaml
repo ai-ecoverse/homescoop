@@ -1,0 +1,21 @@
+# less pager with static widec ncurses (compiled-in terminfo fallbacks).
+name: less
+builder: host
+version: "668"
+npm: "@ai-ecoverse/wasm-less"
+summary: "less 668 with ncurses 6.5 for slicc wasm realm"
+source:
+  url: "https://www.greenwoodsoftware.com/less/less-668.tar.gz"
+  sha256: "2819f55564d86d542abbecafd82ff61e819a3eec967faa36cd3e68f1596a44b8"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/less
+  license: SEE_UPSTREAM
+  notes: |
+    Port of slicc-emscripten build-wasm-less.sh. Builds host tic/infocmp from
+    the same ncurses 6.5, then wasm libncursesw with
+    --disable-database --with-fallbacks=xterm-256color,xterm,vt100,dumb.
+    Links slicc less profile (gaps + signals + jobs + select).

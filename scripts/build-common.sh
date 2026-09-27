@@ -91,7 +91,7 @@ homescoop_slicc_dir() {
 
 # Compile selected slicc shims into an archive for LDFLAGS/LIBS.
 # Every profile includes slicc_signals.c + slicc_libc_gaps.c.
-# Usage: homescoop_slicc_archive <out.a> gaps|spawn|make|fork
+# Usage: homescoop_slicc_archive <out.a> gaps|spawn|make|fork|less
 homescoop_slicc_archive() {
   local out="$1" profile="${2:-gaps}"
   local dir odir src base
@@ -137,8 +137,15 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       ;;
+    less)
+      # TUI pager: signals + gaps + jobs + pselect (no spawn).
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      _homescoop_slicc_compile "$dir/slicc_jobs.c"
+      _homescoop_slicc_compile "$dir/slicc_select.c"
+      ;;
     *)
-      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork)" >&2
+      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|less)" >&2
       return 1
       ;;
   esac

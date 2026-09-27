@@ -25,6 +25,7 @@ Every profile includes `slicc_libc_gaps.c` + `slicc_signals.c`.
 | `spawn` | spawn + exec — gnu tools (updated wait4/kill from shims) |
 | `make` | spawn + exec + main_envp + select + **jobs** — GNU make |
 | `fork` | spawn + exec + fork + **jobs** — bash job control (+ ASYNCIFY js-library) |
+| `less` | gaps + signals + jobs + select — TUI pager (no spawn) |
 
 Pull signal exports from the archive even when nothing in the tool references
 them (the realm calls them from JS):

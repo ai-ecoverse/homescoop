@@ -41,8 +41,9 @@ if (!existsSync(pkgPath)) {
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const current = String(pkg.version || '');
 
-/** Normalize two-component upstream (2.17) to npm-friendly 2.17.0 */
+/** Normalize short upstream (668, 2.17) to npm-friendly semver. */
 function npmify(v) {
+  if (/^\d+$/.test(v)) return `${v}.0.0`;
   if (/^\d+\.\d+$/.test(v)) return `${v}.0`;
   return v;
 }
@@ -53,7 +54,8 @@ const sameUpstream =
   current === targetBase ||
   current === upstream ||
   current.startsWith(`${targetBase}-`) ||
-  current.startsWith(`${upstream}-`);
+  current.startsWith(`${upstream}-`) ||
+  current.startsWith(`${upstream}.`);
 
 let next = current;
 if (!sameUpstream) {
