@@ -90,11 +90,14 @@ if [[ ! -f "$SRC_DIR/$BIN_NAME" && ! -f "$SRC_DIR/$BIN_NAME.js" && ! -f "$SRC_DI
   )
 fi
 
-# Locate binary (coreutils lives in src/)
+# Locate binary (coreutils → src/, sed → sed/, else top-level)
 STAGE_DIR="$SRC_DIR"
-if [[ -f "$SRC_DIR/src/$BIN_NAME" || -f "$SRC_DIR/src/$BIN_NAME.js" ]]; then
-  STAGE_DIR="$SRC_DIR/src"
-fi
+for d in "$SRC_DIR/src" "$SRC_DIR/$BIN_NAME" "$SRC_DIR"; do
+  if [[ -f "$d/$BIN_NAME" || -f "$d/$BIN_NAME.js" ]]; then
+    STAGE_DIR="$d"
+    break
+  fi
+done
 test -f "$STAGE_DIR/$BIN_NAME" || test -f "$STAGE_DIR/$BIN_NAME.js"
 homescoop_stage_cli "$STAGE_DIR" "$BIN_NAME"
 echo "== $NAME: staged → $HOMESCOOP_PKG/package"
