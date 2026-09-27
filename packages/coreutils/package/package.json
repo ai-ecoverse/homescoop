@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-coreutils",
-  "version": "9.7",
+  "version": "9.7.0",
   "description": "GNU coreutils (single-binary) for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-3.0-or-later",
   "repository": {
