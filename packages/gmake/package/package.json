@@ -11,5 +11,22 @@
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/gmake",
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "gmake"],
   "files": ["README.md", "LICENSE"],
-  "publishConfig": { "access": "public" }
+  "publishConfig": { "access": "public" },
+  "homescoop": {
+    "recipe": "gmake",
+    "upstream": "4.4.1"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "make": {
+        "glue": "bin/make",
+        "wasm": "bin/make.wasm"
+      },
+      "gmake": {
+        "glue": "bin/make",
+        "wasm": "bin/make.wasm"
+      }
+    }
+  }
 }

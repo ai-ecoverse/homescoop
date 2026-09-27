@@ -112,3 +112,53 @@ scripts/
 Only the library under build is compiled. Lower forge packages come from
 `ipk mamba install` (or published `@ai-ecoverse/wasm-*` npm specs when you
 prefer the homescoop tarball over forge).
+
+## CLI tools and the slicc wasm realm
+
+Static libraries (`lib`, `include`, `.pc`) need no special link flags. **CLI
+tools** (pkgconf, gmake, cmake, imagemagick, …) must be loadable in slicc's
+plain DedicatedWorker realm ([slicc#3535](https://github.com/ai-ecoverse/slicc/issues/3535))
+and in the existing node-realm `run-tool.js` path.
+
+### Link flags
+
+Use `homescoop_em_cli_ldflags` from `scripts/build-common.sh`:
+
+| Flag | Why |
+| --- | --- |
+| `-sENVIRONMENT=web,worker,node` | Glue must run without `require`/`process` in a worker; `node` keeps the node-realm path |
+| `-sEXIT_RUNTIME=1` | `main` return runs `atexit` (e.g. gnulib `close_stdout` flush) |
+| `-sALLOW_MEMORY_GROWTH=1` | Tools that grow beyond the initial heap |
+
+Optional extras via `HOMESCOOP_EM_CLI_LDFLAGS_EXTRA` (pkgconf uses
+`-sSTACK_SIZE=1MB` because `pkgconf_trace` keeps a 64 KiB stack buffer).
+
+```bash
+export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1MB"   # if needed
+emconfigure ./configure … LDFLAGS="$(homescoop_em_cli_ldflags)"
+```
+
+### `package.json` `slicc` manifest
+
+CLI packages declare command → glue/wasm pairing so the realm does not guess:
+
+```json
+"slicc": {
+  "abi": "emscripten",
+  "commands": {
+    "pkgconf": { "glue": "bin/pkgconf", "wasm": "bin/pkgconf.wasm" },
+    "pkg-config": { "glue": "bin/pkgconf", "wasm": "bin/pkgconf.wasm" },
+    "convert": {
+      "glue": "bin/magick",
+      "wasm": "bin/magick.wasm",
+      "argv0": "convert"
+    }
+  }
+}
+```
+
+- **`abi`:** `"emscripten"` now; `"wasi"` / `"wasix"` later.
+- **`argv0`:** multi-call binaries (ImageMagick utilities, GNU coreutils
+  `--enable-single-binary=symlinks`).
+- Stubs (gmake, cmake, imagemagick) already carry the planned `commands`
+  block; update paths when the real `bin/` layout lands.

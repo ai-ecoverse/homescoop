@@ -11,5 +11,18 @@
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake",
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "cmake"],
   "files": ["README.md", "LICENSE"],
-  "publishConfig": { "access": "public" }
+  "publishConfig": { "access": "public" },
+  "homescoop": {
+    "recipe": "cmake",
+    "upstream": "4.4.3"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "cmake": {
+        "glue": "bin/cmake",
+        "wasm": "bin/cmake.wasm"
+      }
+    }
+  }
 }

@@ -75,6 +75,16 @@ homescoop_require_lib_size() {
   echo "$sz"
 }
 
+# Link flags for Emscripten CLI tools consumed by slicc's wasm realm
+# (plain DedicatedWorker + node-realm run-tool.js). Libraries do not need these.
+# Optional extras via HOMESCOOP_EM_CLI_LDFLAGS_EXTRA (e.g. -sSTACK_SIZE=1MB).
+# Usage: LDFLAGS="$(homescoop_em_cli_ldflags)" emconfigure ./configure …
+homescoop_em_cli_ldflags() {
+  local extra="${HOMESCOOP_EM_CLI_LDFLAGS_EXTRA:-}"
+  # shellcheck disable=SC2086
+  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1${extra:+ ${extra}}"
+}
+
 # Write a relocatable .pc into package/lib/pkgconfig and PREFIX.
 # Uses ${pcfiledir} so consumers can stage the package tree anywhere.
 # homescoop_write_pc <pc-name> <version> <libs> [requires] [extra-cflags]

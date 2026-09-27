@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-pkgconf",
-  "version": "2.3.0-2",
+  "version": "2.3.0-3",
   "description": "pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder)",
   "license": "Apache-2.0",
   "repository": {
@@ -27,5 +27,18 @@
   "homescoop": {
     "recipe": "pkgconf",
     "upstream": "2.3.0"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "pkgconf": {
+        "glue": "bin/pkgconf",
+        "wasm": "bin/pkgconf.wasm"
+      },
+      "pkg-config": {
+        "glue": "bin/pkgconf",
+        "wasm": "bin/pkgconf.wasm"
+      }
+    }
   }
 }

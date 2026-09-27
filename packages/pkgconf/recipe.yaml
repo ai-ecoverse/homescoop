@@ -14,3 +14,7 @@ dependencies:
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/pkgconf
   license: SEE_UPSTREAM
+  notes: |
+    CLI link flags via homescoop_em_cli_ldflags (+ STACK_SIZE=1MB).
+    package.json slicc.commands maps pkgconf and pkg-config onto
+    bin/pkgconf{.wasm}.

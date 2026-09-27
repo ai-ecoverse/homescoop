@@ -22,5 +22,33 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "homescoop": {
+    "recipe": "imagemagick",
+    "upstream": "7.1.2-31"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "magick": {
+        "glue": "bin/magick",
+        "wasm": "bin/magick.wasm"
+      },
+      "convert": {
+        "glue": "bin/magick",
+        "wasm": "bin/magick.wasm",
+        "argv0": "convert"
+      },
+      "identify": {
+        "glue": "bin/magick",
+        "wasm": "bin/magick.wasm",
+        "argv0": "identify"
+      },
+      "mogrify": {
+        "glue": "bin/magick",
+        "wasm": "bin/magick.wasm",
+        "argv0": "mogrify"
+      }
+    }
   }
 }

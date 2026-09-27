@@ -18,7 +18,11 @@ if [[ ! -f "$SRC_DIR/pkgconf" || -n "${FORCE:-}" ]]; then
   echo "== pkgconf: emconfigure + emmake"
   (
     cd "$SRC_DIR"
-    emconfigure ./configure --disable-dependency-tracking --disable-shared --enable-static LDFLAGS=-sSTACK_SIZE=1MB
+    # pkgconf_trace keeps a 64 KiB buffer on the stack (Emscripten's default).
+    export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1MB"
+    emconfigure ./configure \
+      --disable-dependency-tracking --disable-shared --enable-static \
+      LDFLAGS="$(homescoop_em_cli_ldflags)"
     homescoop_fix_darwin_ar Makefile
     emmake make pkgconf
   )

@@ -25,3 +25,8 @@ dependencies:
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick
   license: SEE_UPSTREAM
+  notes: |
+    Link the magick utility with homescoop_em_cli_ldflags
+    (ENVIRONMENT=web,worker,node, EXIT_RUNTIME, ALLOW_MEMORY_GROWTH).
+    package.json slicc.commands maps magick/convert/identify/mogrify onto
+    bin/magick{.wasm} with argv0 for multi-call names.
