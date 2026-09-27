@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-gmake",
-  "version": "4.4.1",
+  "version": "4.4.1-1",
   "description": "GNU make 4.4.1 for wasm / slicc (emscripten)",
   "license": "GPL-3.0-or-later",
   "repository": {

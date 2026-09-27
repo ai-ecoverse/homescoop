@@ -118,11 +118,13 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
     make)
+      # pselect via slicc_select (jobserver / make -jN); Emscripten libc has none.
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_main_envp.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
+      _homescoop_slicc_compile "$dir/slicc_select.c"
       ;;
     fork)
       _homescoop_slicc_compile "$dir/slicc_spawn.c"

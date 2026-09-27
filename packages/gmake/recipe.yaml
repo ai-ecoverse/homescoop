@@ -16,5 +16,5 @@ about:
   license: SEE_UPSTREAM
   notes: |
     Port of slicc-emscripten/build-wasm-make.sh. Links slicc make profile
-    (spawn + exec + main_envp + libc_gaps) via homescoop_slicc_archive.
-    package.json slicc.commands: make (+ gmake alias).
+    (spawn + exec + main_envp + libc_gaps + signals + select/pselect)
+    via homescoop_slicc_archive. package.json slicc.commands: make (+ gmake).
