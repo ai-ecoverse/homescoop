@@ -59,6 +59,9 @@ let next = current;
 if (!sameUpstream) {
   // Recipe moved (Renovate): publish as the new upstream (npmified).
   next = targetBase;
+} else if (current === upstream && current !== targetBase) {
+  // Two-component upstream (5.3, 3.12) is not valid npm semver — use X.Y.0.
+  next = targetBase;
 }
 
 if (write && next !== current) {

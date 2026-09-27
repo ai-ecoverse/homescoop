@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-grep",
-  "version": "3.12",
+  "version": "3.12.0",
   "description": "GNU grep for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-3.0-or-later",
   "repository": {

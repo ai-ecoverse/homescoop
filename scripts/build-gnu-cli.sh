@@ -64,8 +64,14 @@ case "$NAME" in
   gawk) EXTRA_CFG=(--disable-extensions --disable-mpfr) ;;
 esac
 
-# Emscripten configure mode tolerates undefined symbols; force honest answers.
+# Emscripten's configure mode tolerates undefined symbols; force honest answers.
+# Stock emsdk link probes often false-negative (getcwd/sigaction "no") while the
+# symbols exist — that pulls in broken gnulib fallbacks (getwd, NSIG<=32).
 export ac_cv_func_splice=no ac_cv_func_sethostname=yes gl_cv_func_nanosleep=yes
+export ac_cv_func_getcwd=yes ac_cv_func_sigaction=yes
+export ac_cv_func_sigprocmask=yes ac_cv_func_sigemptyset=yes
+export ac_cv_func_sigaddset=yes ac_cv_func_sigdelset=yes ac_cv_func_sigfillset=yes
+export ac_cv_func_sigismember=yes
 
 if [[ ! -f "$SRC_DIR/$BIN_NAME" && ! -f "$SRC_DIR/$BIN_NAME.js" && ! -f "$SRC_DIR/src/$BIN_NAME" && ! -f "$SRC_DIR/src/$BIN_NAME.js" || -n "${FORCE:-}" ]]; then
   echo "== $NAME: emconfigure + emmake"
