@@ -35,7 +35,7 @@ EMSCRIPTEN_KEEPALIVE int slicc_sig_mask(int which) {
 // 0, or -errno. Outside the wasm realm only a process's own pid works.
 EM_JS(int, slicc_kill_js, (int pid, int sig), {
   if (Module.sliccKernel && Module.sliccKernel.kill) return Module.sliccKernel.kill(pid, sig);
-  return -63; // EPERM (WASI numbering)
+  return 1; // no kernel
 });
 
 int kill(pid_t pid, int sig) {
@@ -43,8 +43,14 @@ int kill(pid_t pid, int sig) {
     errno = EINVAL;
     return -1;
   }
-  if (pid == getpid() || pid == 0) return sig ? raise(sig) : 0;
+  if (pid == getpid()) return sig ? raise(sig) : 0;
+  // A group (0: the caller's, or -pgid) is the kernel's to signal, the caller included.
   int r = slicc_kill_js(pid, sig);
+  if (r == 1) {
+    // No kernel: the caller is its group's only process.
+    if (pid == 0 || pid == -getpid()) return sig ? raise(sig) : 0;
+    r = -EPERM;
+  }
   if (r < 0) {
     errno = -r;
     return -1;

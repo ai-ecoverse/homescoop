@@ -111,7 +111,11 @@ EM_JS(int, slicc_spawn_capture_js,
       });
 
 // Returns the reaped pid (0 for WNOHANG with none exited), or -errno (ECHILD 12).
-EM_JS(int, slicc_wait_js, (int pid, int *status, int nohang), {
+// `options`: waitpid's bits (WNOHANG 1; WUNTRACED 2 and WCONTINUED 8 report
+// stops and continues, after which the child is still there to wait for).
+EM_JS(int, slicc_wait_js, (int pid, int *status, int options), {
+  const nohang = options & 1;
+  const gone = (st) => (st & 0xff) !== 0x7f && st !== 0xffff;
   const done = Module.sliccExited;
   const kernel = Module.sliccKernel;
   if (kernel) {
@@ -129,16 +133,16 @@ EM_JS(int, slicc_wait_js, (int pid, int *status, int nohang), {
     // A forked child that exec'd stands for its kernel process.
     const aliases = Module.sliccAliases;
     if (pid > 0 && aliases?.has(pid)) {
-      const r = kernel.wait(aliases.get(pid), !!nohang);
+      const r = kernel.wait(aliases.get(pid), !!nohang, options);
       if (typeof r === 'number') return r;
-      if (r[0] > 0) aliases.delete(pid);
+      if (r[0] > 0 && gone(r[1])) aliases.delete(pid);
       return put(r[0] > 0 ? pid : 0, r[1]);
     }
-    const r = kernel.wait(pid, !!nohang);
+    const r = kernel.wait(pid, !!nohang, options);
     if (typeof r === 'number') return r;
     for (const [forkPid, kernelPid] of aliases ?? []) {
       if (kernelPid !== r[0]) continue;
-      aliases.delete(forkPid);
+      if (gone(r[1])) aliases.delete(forkPid);
       return put(forkPid, r[1]);
     }
     return put(r[0], r[1]);
@@ -220,5 +224,5 @@ int posix_spawnp(pid_t *restrict pid, const char *restrict file,
 }
 
 pid_t __syscall_wait4(pid_t pid, int *wstatus, int options, struct rusage *rusage) {
-  return slicc_wait_js(pid, wstatus, options & WNOHANG);
+  return slicc_wait_js(pid, wstatus, options);
 }

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-gawk",
-  "version": "5.3.2",
+  "version": "5.3.2-1",
   "description": "GNU awk for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-3.0-or-later",
   "repository": {

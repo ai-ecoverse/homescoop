@@ -119,19 +119,23 @@ homescoop_slicc_archive() {
       ;;
     make)
       # pselect via slicc_select (jobserver / make -jN); Emscripten libc has none.
+      # slicc_jobs is harmless here (pgid/sid/tc*pgrp for the jobserver path).
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_main_envp.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
+      _homescoop_slicc_compile "$dir/slicc_jobs.c"
       ;;
     fork)
+      # slicc_jobs: setpgid/getpgid/setsid/tcgetpgrp/tcsetpgrp for bash job control.
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
+      _homescoop_slicc_compile "$dir/slicc_jobs.c"
       ;;
     *)
       echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork)" >&2
