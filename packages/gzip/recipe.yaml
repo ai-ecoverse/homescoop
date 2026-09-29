@@ -6,7 +6,7 @@ version: "1.13"
 npm: "@ai-ecoverse/wasm-gzip"
 summary: "GNU gzip/gunzip/zcat for slicc"
 source:
-  url: "https://ftp.gnu.org/gnu/gzip/gzip-1.13.tar.gz"
+  url: "https://ftp.gnu.org/gnu/gzip/gzip-{{version}}.tar.gz"
   sha256: "20fc818aeebae87cdbf209d35141ad9d3cf312b35a5e6be61bfcfbf9eddd212a"
 dependencies:
   build: []

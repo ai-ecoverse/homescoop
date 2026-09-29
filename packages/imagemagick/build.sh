@@ -4,11 +4,8 @@ set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/imagemagick"
+homescoop_load_recipe imagemagick
 
-VER=7.1.2-32
-URL="https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${VER}.tar.gz"
-SHA=34d9cc3acddc3e3c429d23af60eda5ceaac477a8b296ddb9469f773f44a80a5f
 TB="$WORK/ImageMagick-${VER}.tar.gz"
 SRC="$WORK/ImageMagick-${VER}"
 
@@ -99,4 +96,5 @@ fi
 test -f "$CFG_DEST/colors.xml"
 
 # argv0 aliases are declared in package.json (convert/identify/mogrify → magick).
+homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
 echo "== imagemagick: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7"

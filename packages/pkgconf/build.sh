@@ -4,16 +4,14 @@ set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/pkgconf"
-VERSION=2.3.0
-SRC_URL=https://distfiles.ariadne.space/pkgconf/pkgconf-2.3.0.tar.gz
-SRC_SHA=a2df680578e85f609f2fa67bd3d0fc0dc71b4bf084fc49119de84cd6ed28e723
+homescoop_load_recipe pkgconf
 SRC_DIR="$WORK/pkgconf-2.3.0"
 TARBALL="$WORK/pkgconf-2.3.0.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
+homescoop_apply_patches "$SRC_DIR"
 
 SLICC_A="$WORK/libslicc-gaps.a"
 homescoop_slicc_archive "$SLICC_A" gaps
@@ -47,4 +45,5 @@ if [[ -f "$HOMESCOOP_PKG/package/bin/pkgconf.js" || -f "$HOMESCOOP_PKG/package/b
   printf '#!/usr/bin/env node\nrequire("./pkgconf");\n' > "$HOMESCOOP_PKG/package/bin/pkg-config"
   chmod +x "$HOMESCOOP_PKG/package/bin/pkg-config"
 fi
+homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== pkgconf: staged → $HOMESCOOP_PKG/package"

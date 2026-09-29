@@ -1,18 +1,13 @@
 #!/usr/bin/env bash
-# less 668 + static widec ncurses 6.5 — port of slicc build-wasm-less.sh.
+# less + static widec ncurses — port of slicc build-wasm-less.sh.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/less"
+homescoop_load_recipe less
+homescoop_load_recipe less --source ncurses
 
-LESS_VER=668
-NCURSES_VER=6.5
-LESS_URL=https://www.greenwoodsoftware.com/less/less-668.tar.gz
-LESS_SHA=2819f55564d86d542abbecafd82ff61e819a3eec967faa36cd3e68f1596a44b8
-NCURSES_URL=https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz
-NCURSES_SHA=136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6
-
+LESS_VER="$VERSION"
 LESS_TB="$WORK/less-$LESS_VER.tar.gz"
 NC_TB="$WORK/ncurses-$NCURSES_VER.tar.gz"
 NC_SRC="$WORK/ncurses-$NCURSES_VER"
@@ -20,7 +15,7 @@ LESS_SRC="$WORK/less-$LESS_VER"
 HOST_PREFIX="$WORK/ncurses-host"
 WASM_PREFIX="$WORK/ncurses-wasm-prefix"
 
-homescoop_fetch "$LESS_URL" "$LESS_SHA" "$LESS_TB"
+homescoop_fetch "$SRC_URL" "$SRC_SHA" "$LESS_TB"
 homescoop_fetch "$NCURSES_URL" "$NCURSES_SHA" "$NC_TB"
 
 if [[ -n "${FORCE:-}" ]]; then
@@ -111,4 +106,5 @@ if [[ ! -f "$LESS_SRC/less" && ! -f "$LESS_SRC/less.js" || -n "${FORCE:-}" ]]; t
 fi
 test -f "$LESS_SRC/less" || test -f "$LESS_SRC/less.js"
 homescoop_stage_cli "$LESS_SRC" less
+homescoop_stage_license "$LESS_SRC"/LICENSE "$LESS_SRC"/COPYING "$LESS_SRC"/LICENSE.LESS
 echo "== less: staged → $HOMESCOOP_PKG/package"

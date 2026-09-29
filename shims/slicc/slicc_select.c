@@ -6,9 +6,17 @@
  *
  * make's jobserver waits in pselect() for a token or SIGCHLD; Emscripten's
  * libc has no pselect6, so `make -jN` failed ("pselect jobs pipe").
+ *
+ * poll(2) too. Linked with ASYNCIFY, Emscripten's own poll() suspends the
+ * program through Asyncify on every call (even a zero timeout) and waits on
+ * its FS nodes' wait-queues, which kernel streams never notify: a blocking
+ * poll never woke, and the fork driver took the suspension for a fork
+ * (readline waits for a key in poll). Here a poll over kernel descriptors
+ * waits in the kernel; otherwise each stream answers at once, without waiting.
  */
 #include <emscripten.h>
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <sys/select.h>
 #include <sys/time.h>
@@ -70,5 +78,48 @@ int pselect(int n, fd_set *restrict rfds, fd_set *restrict wfds, fd_set *restric
     FD_ZERO(efds);
   }
   if (mask) sigprocmask(SIG_SETMASK, &old, NULL);
+  return r;
+}
+
+// Ready count or -errno. struct pollfd is { int fd; short events; short revents; }.
+EM_JS(int, slicc_poll_js, (struct pollfd *fds, int n, int timeout_ms), {
+  const IN = 0x001 | 0x040;  // POLLIN | POLLRDNORM
+  const OUT = 0x004 | 0x100; // POLLOUT | POLLWRNORM
+  const ERR = 0x008, HUP = 0x010, NVAL = 0x020;
+  const fdAt = (i) => HEAP32[(fds + i * 8) >> 2];
+  const eventsAt = (i) => HEAP16[(fds + i * 8 + 4) >> 1];
+  const read = [], write = [];
+  for (let i = 0; i < n; i++) {
+    if (fdAt(i) < 0) continue;
+    if (eventsAt(i) & IN) read.push(fdAt(i));
+    if (eventsAt(i) & OUT) write.push(fdAt(i));
+  }
+  const kernel = Module.sliccKernel;
+  const ready = kernel && kernel.select ? kernel.select(read, write, timeout_ms) : null;
+  if (typeof ready === 'number') return ready;
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    const fd = fdAt(i), events = eventsAt(i);
+    let revents = 0;
+    if (fd >= 0 && ready) {
+      if (ready.read.includes(fd)) revents |= events & IN;
+      if (ready.write.includes(fd)) revents |= events & OUT;
+    } else if (fd >= 0) {
+      const stream = FS.getStream(fd);
+      const flags = !stream ? NVAL : stream.stream_ops && stream.stream_ops.poll ? stream.stream_ops.poll(stream, -1) : IN | OUT;
+      revents = flags & (events | ERR | HUP | NVAL);
+    }
+    HEAP16[(fds + i * 8 + 6) >> 1] = revents;
+    if (revents) count++;
+  }
+  return count;
+});
+
+int poll(struct pollfd *fds, nfds_t n, int timeout) {
+  int r = slicc_poll_js(fds, (int)n, timeout);
+  if (r < 0) {
+    errno = -r;
+    return -1;
+  }
   return r;
 }

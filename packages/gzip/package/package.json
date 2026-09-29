@@ -1,0 +1,24 @@
+{
+  "name": "@ai-ecoverse/wasm-gzip",
+  "version": "1.13.0-2",
+  "description": "GNU gzip 1.13 for wasm / slicc (emscripten)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/gzip/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/gzip",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "gzip"],
+  "files": ["README.md", "LICENSE", "bin"],
+  "publishConfig": { "access": "public" },
+  "homescoop": { "recipe": "gzip", "upstream": "1.13" },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "gzip": { "glue": "bin/gzip", "wasm": "bin/gzip.wasm" },
+      "gunzip": { "glue": "bin/gzip", "wasm": "bin/gzip.wasm", "argv0": "gunzip" },
+      "zcat": { "glue": "bin/gzip", "wasm": "bin/gzip.wasm", "argv0": "zcat" }
+    }
+  }
+}

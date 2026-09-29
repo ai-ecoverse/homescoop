@@ -1,0 +1,24 @@
+# Info-ZIP zip 3.0 + unzip 6.0 for slicc wasm realm.
+name: zip
+builder: host
+version: "3.0.0"
+npm: "@ai-ecoverse/wasm-zip"
+summary: "Info-ZIP zip/unzip for slicc"
+source:
+  url: "https://deb.debian.org/debian/pool/main/z/zip/zip_3.0.orig.tar.gz"
+  sha256: "f0e8bb1f9b7eb0b01285495a2699df3a4b766784c1765a8f1aeedf63c0806369"
+sources:
+  unzip:
+    version: "6.0"
+    url: "https://deb.debian.org/debian/pool/main/u/unzip/unzip_6.0.orig.tar.gz"
+    sha256: "036d96991646d0449ed0aa952e4fbe21b476ce994abc276e49d30e686708bd37"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/zip
+  license: Info-ZIP
+  notes: |
+    Builds zip 3.0 and unzip 6.0 (second tarball fetched in build.sh).
+    Links slicc cli profile.

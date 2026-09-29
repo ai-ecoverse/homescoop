@@ -6,7 +6,7 @@ version: "5.3.2"
 npm: "@ai-ecoverse/wasm-gawk"
 summary: "GNU awk for slicc"
 source:
-  url: "https://ftp.gnu.org/gnu/gawk/gawk-5.3.2.tar.xz"
+  url: "https://ftp.gnu.org/gnu/gawk/gawk-{{version}}.tar.xz"
   sha256: "f8c3486509de705192138b00ef2c00bbbdd0e84c30d5c07d23fc73a9dc4cc9cc"
 dependencies:
   build: []
@@ -14,7 +14,7 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/gawk
-  license: SEE_UPSTREAM
+  license: GPL-3.0-or-later
   notes: |
     Port of slicc-emscripten/build-wasm-gnu.sh. Links slicc spawn profile
     (spawn + exec + libc_gaps) via homescoop_slicc_archive / build-gnu-cli.sh.

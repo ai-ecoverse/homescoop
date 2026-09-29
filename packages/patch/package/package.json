@@ -1,0 +1,22 @@
+{
+  "name": "@ai-ecoverse/wasm-patch",
+  "version": "2.8.0",
+  "description": "GNU patch 2.8 for wasm / slicc (emscripten)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/patch/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/patch",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "patch"],
+  "files": ["README.md", "LICENSE", "bin"],
+  "publishConfig": { "access": "public" },
+  "homescoop": { "recipe": "patch", "upstream": "2.8" },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "patch": { "glue": "bin/patch", "wasm": "bin/patch.wasm" }
+    }
+  }
+}

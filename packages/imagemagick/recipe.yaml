@@ -6,7 +6,7 @@ version: "7.1.2-32"
 npm: "@ai-ecoverse/wasm-imagemagick"
 summary: "ImageMagick magick CLI (convert/identify/mogrify argv0 aliases)"
 source:
-  url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/7.1.2-32.tar.gz"
+  url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/{{version}}.tar.gz"
   sha256: "940e349f0ef394e658fd57400b83d1d7a81b954f6e7bdbfbfad31b2718c10add"
 dependencies:
   build:
@@ -23,7 +23,7 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick
-  license: SEE_UPSTREAM
+  license: ImageMagick
   notes: |
     Port of slicc-emscripten harness/ladder.sh rung_magick. Links slicc cli
     profile. package.json slicc.commands maps magick/convert/identify/mogrify

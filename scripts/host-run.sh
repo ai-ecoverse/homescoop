@@ -13,6 +13,10 @@ export HOMESCOOP_ROOT="$ROOT" PREFIX WORK
 
 builder="$(node "$ROOT/scripts/read-recipe.mjs" "$name" --field builder || true)"
 builder="${builder:-host}"
+if [[ "$builder" == "retired" ]]; then
+  echo "host-run.sh: package '$name' is retired — refuse build/publish" >&2
+  exit 2
+fi
 if [[ "$builder" != "host" ]]; then
   echo "host-run.sh: recipe builder is '$builder' (expected host)" >&2
   exit 2
@@ -119,6 +123,12 @@ fi
 
 echo "== host-run: build.sh ($name)"
 bash "$PKG/build.sh"
+
+echo "== host-run: check package meta (license / LICENSE / files)"
+node "$ROOT/scripts/check-package-meta.mjs" "$name"
+
+echo "== host-run: assert packaging rev (refuse plain X.Y.Z)"
+node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
 
 echo "== host-run: npm pack"
 mkdir -p "$OUT"

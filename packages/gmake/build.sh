@@ -4,16 +4,14 @@ set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/gmake"
-VERSION=4.4.1
-SRC_URL=https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
-SRC_SHA=dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3
+homescoop_load_recipe gmake
 SRC_DIR="$WORK/make-$VERSION"
 TARBALL="$WORK/make-$VERSION.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
+homescoop_apply_patches "$SRC_DIR"
 
 SLICC_A="$WORK/libslicc-make.a"
 homescoop_slicc_archive "$SLICC_A" make
@@ -42,4 +40,5 @@ if [[ ! -f "$SRC_DIR/make" && ! -f "$SRC_DIR/make.js" || -n "${FORCE:-}" ]]; the
 fi
 test -f "$SRC_DIR/make" || test -f "$SRC_DIR/make.js"
 homescoop_stage_cli "$SRC_DIR" make
+homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== gmake: staged → $HOMESCOOP_PKG/package"

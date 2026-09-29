@@ -14,7 +14,7 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake
-  license: SEE_UPSTREAM
+  license: BSD-3-Clause
   notes: |
     Port from slicc-emscripten harness/ladder.sh rung_cmake and
     build-wasm-cmake.sh (cmlibuv + pipefs patches, slicc_spawn.o).

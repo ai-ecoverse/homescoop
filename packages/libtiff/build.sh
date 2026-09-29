@@ -4,16 +4,14 @@ set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/libtiff"
-VERSION=4.7.0
-SRC_URL=https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz
-SRC_SHA=67160e3457365ab96c5b3286a0903aa6e78bdc44c4bc737d2e486bcecb6ba976
+homescoop_load_recipe libtiff
 SRC_DIR="$WORK/tiff-$VERSION"
 TARBALL="$WORK/tiff-$VERSION.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
+homescoop_apply_patches "$SRC_DIR"
 
 if [[ ! -f "$SRC_DIR/libtiff/.libs/libtiff.a" || -n "${FORCE:-}" ]]; then
   echo "== libtiff: emconfigure + emmake (zlib/jpeg from PREFIX)"
@@ -46,4 +44,5 @@ homescoop_stage_headers \
   "$SRC_DIR/libtiff/tiffconf.h" \
   "$SRC_DIR/libtiff/tif_config.h"
 homescoop_write_pc libtiff-4 "$VERSION" "-ltiff" "zlib libjpeg"
+homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== libtiff: staged ($sz bytes)"

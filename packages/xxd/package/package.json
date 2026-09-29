@@ -1,0 +1,28 @@
+{
+  "name": "@ai-ecoverse/wasm-xxd",
+  "version": "9.1.1850",
+  "description": "xxd (from vim 9.1.1850) for wasm / slicc (emscripten)",
+  "license": "Vim",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/xxd/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/xxd",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "xxd", "hexdump"],
+  "files": ["README.md", "LICENSE", "bin"],
+  "publishConfig": { "access": "public" },
+  "homescoop": {
+    "recipe": "xxd",
+    "upstream": "9.1.1850"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "xxd": {
+        "glue": "bin/xxd",
+        "wasm": "bin/xxd.wasm"
+      }
+    }
+  }
+}

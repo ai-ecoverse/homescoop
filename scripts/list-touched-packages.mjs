@@ -42,7 +42,15 @@ function packagesFromPaths(paths) {
     const m = p.replace(/\\/g, '/').match(/^packages\/([^/]+)\//);
     if (!m) continue;
     const name = m[1];
-    if (existsSync(join(root, 'packages', name, 'recipe.yaml'))) set.add(name);
+    if (!existsSync(join(root, 'packages', name, 'recipe.yaml'))) continue;
+    // Retired recipes must not enter CI matrices / ladder-build.
+    const builder = spawnSync(
+      'node',
+      [join(root, 'scripts/read-recipe.mjs'), name, '--field', 'builder'],
+      { encoding: 'utf8', cwd: root }
+    );
+    if ((builder.stdout || '').trim() === 'retired') continue;
+    set.add(name);
   }
   return [...set].sort();
 }

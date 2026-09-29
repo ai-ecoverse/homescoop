@@ -1,8 +1,9 @@
 # `@ai-ecoverse/wasm-bash`
 
-GNU bash 5.3 for slicc (fork emulated / real via Asyncify + slicc shims).
+GNU bash 5.3 with readline (history, line editing, tab completion) for
+slicc's panel terminal. Fork/job control via Asyncify + slicc shims.
 
 ```bash
 ipk add -g @ai-ecoverse/wasm-bash
-bash --version
+bash -i
 ```

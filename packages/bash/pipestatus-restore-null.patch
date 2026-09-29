@@ -1,0 +1,25 @@
+# Upstream bash 5.3 bug: when PROMPT_COMMAND runs before any pipeline, the
+# parser-state restore reinstalls a NULL PIPESTATUS array and set_pipestatus_array
+# never fills it — PIPESTATUS stays empty for the session (and forks).
+# Native bash 5.3.15 shows the same; repro:
+#   PROMPT_COMMAND=: bash --norc -i
+#   false|true; echo ${PIPESTATUS[@]}
+# Do not file upstream from this repo — Lars owns outward-facing reports.
+# SLICC also works around this (slicc#3583); ship the patch so wasm-bash is fixed.
+--- a/variables.c
++++ b/variables.c
+@@ -6402,6 +6402,15 @@
+   if (v == 0 || array_p (v) == 0 || array_cell (v) == 0)
+     return;
+ 
++  /* PIPESTATUS did not exist when the state was saved (the first
++     PROMPT_COMMAND of a shell that has run no command yet): empty it rather
++     than install a NULL array, which set_pipestatus_array never fills. */
++  if (a == 0)
++    {
++      array_flush (array_cell (v));
++      return;
++    }
++
+   a2 = array_cell (v);
+   var_setarray (v, a); 

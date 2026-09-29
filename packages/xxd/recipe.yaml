@@ -6,7 +6,7 @@ version: "9.1.1850"
 npm: "@ai-ecoverse/wasm-xxd"
 summary: "xxd from vim 9.1.1850 for slicc wasm realm"
 source:
-  url: "https://raw.githubusercontent.com/vim/vim/v9.1.1850/src/xxd/xxd.c"
+  url: "https://raw.githubusercontent.com/vim/vim/v{{version}}/src/xxd/xxd.c"
   sha256: "8caa7405015c51e32e3c5fcb1bee8002f9acac86eeb8124c24830066904a52f3"
 dependencies:
   build: []

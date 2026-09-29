@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-bash",
-  "version": "5.3.0-1",
-  "description": "GNU bash 5.3 for wasm / slicc (fork via Asyncify)",
+  "version": "5.3.0-5",
+  "description": "GNU bash 5.3 with readline/history for wasm / slicc (fork via Asyncify)",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

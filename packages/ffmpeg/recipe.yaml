@@ -1,0 +1,24 @@
+# RETIRED — do not build or publish.
+#
+# SLICC ships its own `ffmpeg` (ffmpeg.wasm core + mediabunny/WebCodecs).
+# @ai-ecoverse must not distribute MPEG-family codec implementations
+# (Adobe / MPEG consortium). See docs/ladder-builds.md "Retired recipes".
+name: ffmpeg
+builder: retired
+version: "5.1.10"
+npm: "@ai-ecoverse/wasm-ffmpeg"
+summary: "RETIRED — do not publish; SLICC owns ffmpeg"
+source:
+  url: "https://ffmpeg.org/releases/ffmpeg-5.1.10.tar.xz"
+  sha256: "392306d6fc45dab0e9e0ea55381e071842e83a2fb31d320aeda40477a7766293"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/ffmpeg
+  license: LGPL-2.1-or-later
+  notes: |
+    Retired 2026-09-28. Do not rebuild or npm-publish. npm cleanup commands
+    are emitted by `node scripts/list-semver-cleanup.mjs` (codec-distribution
+    removal). Historical build.sh kept only as a no-op stub.

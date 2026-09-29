@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-less",
-  "version": "668.0.0",
+  "version": "668.0.0-1",
   "description": "less 668 with static ncurses 6.5 for wasm / slicc (emscripten)",
   "license": "GPL-3.0-or-later OR BSD-2-Clause",
   "repository": {

@@ -1,0 +1,28 @@
+{
+  "name": "@ai-ecoverse/wasm-tls-engine",
+  "version": "3.6.5-1",
+  "description": "Mbed TLS 3.6.5 server engine for SLICC's wasm-realm proxy: TLS sessions over memory buffers, externally signed leaves (ES module + wasm)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./dist/slicc-tls-engine.mjs"
+    },
+    "./slicc-tls-engine.wasm": "./dist/slicc-tls-engine.wasm"
+  },
+  "types": "./index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/tls-engine/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/tls-engine",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "mbedtls", "tls"],
+  "files": ["README.md", "LICENSE", "index.d.ts", "dist"],
+  "publishConfig": { "access": "public" },
+  "homescoop": {
+    "recipe": "tls-engine",
+    "upstream": "3.6.5"
+  }
+}

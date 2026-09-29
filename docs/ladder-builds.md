@@ -7,6 +7,7 @@ Each recipe declares **where** it builds:
 | --- | --- | --- | --- |
 | `slicc` | `build.jsh` | SLICC cone via `packages/github-workflow` | In-cone `/emscripten/slicc` (or future `@ai-ecoverse/emcc`) |
 | `host` | `build.sh` | GHA runner (or a laptop) | Native toolchain (`emsdk` npm / system emcc) |
+| `retired` | — | — | Not built or published (kept for history / cleanup) |
 
 Default is **`slicc`**. Flip a recipe to `host` when you want the runner
 path (e.g. before in-cone emcc is ready). The dual-script framework is
@@ -51,8 +52,10 @@ builder: slicc         # slicc | host
 version: "1.6.50"
 npm: "@ai-ecoverse/wasm-libpng"
 source:
-  url: "…"
+  url: "https://…/libpng-{{version}}.tar.gz"
   sha256: "…"
+about:
+  license: libpng-2.0   # SPDX; package.json must match; LICENSE shipped in pack
 dependencies:
   build:
     - zlib             # forge → ipk mamba install (slicc)
@@ -60,6 +63,11 @@ dependencies:
   host: []
   run: []
 ```
+
+Recipe is SSOT for version, URL (`{{version}}` expanded by
+`homescoop_load_recipe` / `recipe-env.mjs`), sha256, and SPDX license.
+`host-run.sh` runs `check-package-meta.mjs` before `npm pack`. Refresh
+sha after Renovate with `node scripts/refresh-recipe-sha.mjs <pkg>`.
 
 - **`build.jsh`** — required when `builder: slicc`.
 - **`build.sh`** — required when `builder: host`.
@@ -76,6 +84,18 @@ dependencies:
 `ipk mamba` landed in SLICC ([#3493](https://github.com/ai-ecoverse/slicc/pull/3493)):
 emscripten-forge / conda-forge into `/shared/lib/conda`. Builds run with
 `PREFIX=/shared/lib/conda` so higher rungs link forge headers and `.a` files.
+
+## Retired recipes
+
+`builder: retired` means the package must not be built or published.
+`list-packages`, `list-touched-packages`, `host-run`, `ladder-build`, and
+`reserve-names` all skip or refuse it. Example: `packages/ffmpeg` — SLICC
+owns `ffmpeg`; `@ai-ecoverse` must not distribute MPEG codecs. Cleanup
+commands for historical npm versions:
+
+```bash
+node scripts/list-semver-cleanup.mjs   # includes remove-codec-distribution
+```
 
 ## Commands
 

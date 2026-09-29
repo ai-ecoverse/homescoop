@@ -6,7 +6,7 @@ version: "2.13.3"
 npm: "@ai-ecoverse/wasm-freetype"
 summary: "FreeType font engine"
 source:
-  url: "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.gz"
+  url: "https://download.savannah.gnu.org/releases/freetype/freetype-{{version}}.tar.gz"
   sha256: "5c3a8e78f7b24c20b25b54ee575d6daa40007a5f4eea2845861c3409b3021747"
 dependencies:
   build: []
@@ -14,4 +14,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/freetype
-  license: SEE_UPSTREAM
+  license: FTL

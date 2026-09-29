@@ -21,9 +21,22 @@ When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
 
 Manual: `gh workflow run ladder-build.yml -f package=zlib`.
 
-Renovate only rewrites the `version:` line. When merging a recipe bump,
-also update `source.url` / `source.sha256` (and any hardcoded version in
-`build.sh`) to match, then let ladder rebuild.
+Renovate only rewrites `version:` lines. Recipe `source.url` (and
+`sources.*.url`) use `{{version}}` / `{{major}}` / `{{minor}}` placeholders
+so the tarball URL tracks the bump. After merging a Renovate PR, refresh
+checksums before the ladder rebuild:
+
+```bash
+node scripts/refresh-recipe-sha.mjs <package>
+# or: npm run refresh-sha -- <package>
+```
+
+`build.sh` loads version/URL/sha via `homescoop_load_recipe` — do not
+hardcode pins there. Secondary tarballs (ncurses, mbedtls, unzip) live under
+`sources:` in the same recipe.
+
+Patches live beside the recipe as `packages/<name>/*.patch` (applied by
+`homescoop_apply_patches`).
 
 ## Coverage
 

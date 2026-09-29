@@ -6,7 +6,7 @@ version: "2.5.3"
 npm: "@ai-ecoverse/wasm-openjpeg"
 summary: "OpenJPEG JPEG 2000 codec"
 source:
-  url: "https://github.com/uclouvain/openjpeg/archive/refs/tags/v2.5.3.tar.gz"
+  url: "https://github.com/uclouvain/openjpeg/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "368fe0468228e767433c9ebdea82ad9d801a3ad1e4234421f352c8b06e7aa707"
 dependencies:
   build: []
@@ -14,4 +14,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/openjpeg
-  license: SEE_UPSTREAM
+  license: BSD-2-Clause

@@ -6,15 +6,20 @@ version: "668"
 npm: "@ai-ecoverse/wasm-less"
 summary: "less 668 with ncurses 6.5 for slicc wasm realm"
 source:
-  url: "https://www.greenwoodsoftware.com/less/less-668.tar.gz"
+  url: "https://www.greenwoodsoftware.com/less/less-{{version}}.tar.gz"
   sha256: "2819f55564d86d542abbecafd82ff61e819a3eec967faa36cd3e68f1596a44b8"
+sources:
+  ncurses:
+    version: "6.5"
+    url: "https://ftp.gnu.org/gnu/ncurses/ncurses-{{version}}.tar.gz"
+    sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
 dependencies:
   build: []
   host: []
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/less
-  license: SEE_UPSTREAM
+  license: GPL-3.0-or-later OR BSD-2-Clause
   notes: |
     Port of slicc-emscripten build-wasm-less.sh. Builds host tic/infocmp from
     the same ncurses 6.5, then wasm libncursesw with

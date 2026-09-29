@@ -29,8 +29,12 @@ addToLibrary({
     '$exitJS',
     '$stringToUTF8OnStack',
     '$stackAlloc',
+    '$runtimeKeepalivePop',
   ],
   $SliccFork: {
+    // The runtime (the wasm realm's glue trailer) checks this: the keepalive
+    // each fork's unwind pushes is popped here (see settle).
+    balancesKeepalive: true,
     pid: 100,
     ppid: 1,
     // Asyncify's saved state when the pending fork unwound, and the stack
@@ -177,6 +181,18 @@ addToLibrary({
     settle(ret) {
       for (;;) {
         if (Asyncify.currData) {
+          // Only fork() unwinds on purpose; anything else suspending through
+          // Asyncify (a libc call Emscripten made async, such as poll) would be
+          // snapshotted as a fork and resumed on a zero stack pointer.
+          if (!SliccFork.forking) {
+            throw new Error(`${thisProgram}: unexpected Asyncify suspension (not a fork)`);
+          }
+          SliccFork.forking = false;
+          // The unwind pushed a runtime keepalive (Asyncify's maybeStopUnwind),
+          // and the rewinds below bypass doRewind, which would pop it. Left
+          // pushed, exit() skips exitRuntime after the first fork: no atexit
+          // handlers, no final stdio flush.
+          runtimeKeepalivePop();
           const pid = SliccFork.stack.length ? -1 : SliccFork.kernelFork();
           if (pid > 0) {
             ret = SliccFork.resume(pid);
@@ -247,6 +263,7 @@ addToLibrary({
   slicc_fork_js__async: true,
   slicc_fork_js: () =>
     Asyncify.handleSleep(() => {
+      SliccFork.forking = true;
       SliccFork.forkSp = _emscripten_stack_get_current();
     }),
 

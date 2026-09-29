@@ -1,0 +1,23 @@
+{
+  "name": "@ai-ecoverse/wasm-zip",
+  "version": "3.0.0-1",
+  "description": "Info-ZIP zip 3.0 + unzip 6.0 for wasm / slicc (emscripten)",
+  "license": "Info-ZIP",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/zip/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/zip",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "zip", "unzip"],
+  "files": ["README.md", "LICENSE", "bin"],
+  "publishConfig": { "access": "public" },
+  "homescoop": { "recipe": "zip", "upstream": "3.0" },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "zip": { "glue": "bin/zip", "wasm": "bin/zip.wasm" },
+      "unzip": { "glue": "bin/unzip", "wasm": "bin/unzip.wasm" }
+    }
+  }
+}

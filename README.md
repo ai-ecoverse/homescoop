@@ -9,6 +9,7 @@ Two build kinds (see [`docs/ladder-builds.md`](docs/ladder-builds.md)):
 | --- | --- | --- |
 | `slicc` | `build.jsh` | Inside a SLICC cone (`packages/github-workflow`) |
 | `host` | `build.sh` | GHA runner / laptop — native `emsdk` / emcc |
+| `retired` | — | Not built or published (e.g. ffmpeg) |
 
 Recipes stay **`slicc`** by default until an in-cone emcc exists. Flip a
 package to `host` when you want the runner path. Higher rungs install forge
@@ -19,12 +20,12 @@ under build is compiled; npm `@ai-ecoverse/wasm-*` specs still use `ipk add -g`.
 
 ```text
 packages/<name>/
-  recipe.yaml     # builder: slicc|host, version, source, deps, npm id
+  recipe.yaml     # builder, version, source.url ({{version}}), sha, SPDX license
+  *.patch         # optional upstream patches (homescoop_apply_patches)
   build.jsh       # slicc body
-  build.sh        # host body (optional until builder: host)
-  package/        # npm package root
-shims/slicc/      # vendored slicc libc shims (spawn/exec/fork/gaps)
-patches/          # upstream patches for CLI tools
+  build.sh        # host body — loads recipe via homescoop_load_recipe
+  package/        # npm package root (LICENSE required in files[])
+shims/slicc/      # vendored slicc libc shims (spawn/exec/fork/select/jobs/signals/gaps)
 ```
 
 ## CI
@@ -56,23 +57,31 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 
 | npm | builder | notes |
 | --- | --- | --- |
-| `@ai-ecoverse/wasm-zlib` | host | **1.3.1-2** published (libz.a + headers) |
-| `@ai-ecoverse/wasm-lcms2` | host | **2.17.0-1** published; dep `@ai-ecoverse/wasm-zlib` |
-| `@ai-ecoverse/wasm-libwebp` | host | **1.5.0-1** published |
-| `@ai-ecoverse/wasm-libxml2` | host | **2.13.8-1** published |
-| `@ai-ecoverse/wasm-freetype` | host | **2.13.3-1** published |
-| `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-4** (slicc `libc_gaps` / `slicc_sigpipe`) |
-| `@ai-ecoverse/wasm-libpng` | host | **1.6.50** published; dep `@ai-ecoverse/wasm-zlib` |
-| `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2** published (emcmake, no SIMD) |
-| `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** published (emcmake, codec off) |
-| `@ai-ecoverse/wasm-libtiff` | host | **4.7.0** published; deps zlib + jpeg |
-| `@ai-ecoverse/wasm-gmake` | host | **4.4.1** (spawn/exec/main_envp/gaps) |
-| `@ai-ecoverse/wasm-bash` | host | **5.3** (fork + Asyncify) |
-| `@ai-ecoverse/wasm-coreutils` | host | **9.7** single-binary + argv0 manifest |
-| `@ai-ecoverse/wasm-sed` | host | **4.9** |
-| `@ai-ecoverse/wasm-grep` | host | **3.12** |
-| `@ai-ecoverse/wasm-gawk` | host | **5.3.2** (`gawk` + `awk`) |
-| `@ai-ecoverse/wasm-imagemagick` | slicc* | stub |
+| `@ai-ecoverse/wasm-zlib` | host | **1.3.1-2** (libz.a + headers) |
+| `@ai-ecoverse/wasm-lcms2` | host | **2.17.0-1**; dep `@ai-ecoverse/wasm-zlib` |
+| `@ai-ecoverse/wasm-libwebp` | host | **1.5.0-1** |
+| `@ai-ecoverse/wasm-libxml2` | host | **2.13.8-1** |
+| `@ai-ecoverse/wasm-freetype` | host | **2.13.3-1** |
+| `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-5** (slicc `libc_gaps` / `slicc_sigpipe`) |
+| `@ai-ecoverse/wasm-libpng` | host | **1.6.50**; dep `@ai-ecoverse/wasm-zlib` |
+| `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2** (emcmake, no SIMD) |
+| `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** (emcmake, codec off) |
+| `@ai-ecoverse/wasm-libtiff` | host | **4.7.0**; deps zlib + jpeg |
+| `@ai-ecoverse/wasm-gmake` | host | **4.4.1-2** (spawn/exec/select/main_envp/gaps) |
+| `@ai-ecoverse/wasm-bash` | host | **5.3.0-4** (readline/history, fork + Asyncify, `/dev/fd` process subst, PIPESTATUS patch) |
+| `@ai-ecoverse/wasm-coreutils` | host | **9.7.0-2** single-binary + argv0 manifest (uid 1000 via gaps) |
+| `@ai-ecoverse/wasm-sed` | host | **4.9.0-1** |
+| `@ai-ecoverse/wasm-grep` | host | **3.12.0-1** |
+| `@ai-ecoverse/wasm-gawk` | host | **5.3.2-1** (`gawk` + `awk`) |
+| `@ai-ecoverse/wasm-less` | host | **668.0.0-1** (static ncursesw fallbacks) |
+| `@ai-ecoverse/wasm-sqlite3` | host | **3.53.4** (shell amalgamation) |
+| `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-31.1** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
+| `@ai-ecoverse/wasm-tar` | host | **1.35.0-2** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
+| `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
+| `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |
+| `@ai-ecoverse/wasm-diffutils` | host | **3.12.0** (`diff` / `cmp` / `diff3` / `sdiff`) |
+| `@ai-ecoverse/wasm-patch` | host | **2.8.0** |
+| `@ai-ecoverse/wasm-xxd` | host | **9.1.1850** |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 | `@ai-ecoverse/wasm-magick-native` | slicc* | stub (Magick.Native Q8) |
 

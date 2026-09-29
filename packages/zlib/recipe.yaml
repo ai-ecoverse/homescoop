@@ -7,7 +7,7 @@ version: "1.3.1"
 npm: "@ai-ecoverse/wasm-zlib"
 summary: "zlib compression library"
 source:
-  url: "https://zlib.net/fossils/zlib-1.3.1.tar.gz"
+  url: "https://zlib.net/fossils/zlib-{{version}}.tar.gz"
   sha256: "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
 dependencies:
   build: []
@@ -15,4 +15,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/zlib
-  license: SEE_UPSTREAM
+  license: Zlib

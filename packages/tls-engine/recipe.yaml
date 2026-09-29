@@ -7,7 +7,7 @@ version: "3.6.5"
 npm: "@ai-ecoverse/wasm-tls-engine"
 summary: "Mbed TLS 3.6.5 server engine (ES module + wasm) for SLICC's realm proxy"
 source:
-  url: "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.5/mbedtls-3.6.5.tar.bz2"
+  url: "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-{{version}}/mbedtls-{{version}}.tar.bz2"
   sha256: "4a11f1777bb95bf4ad96721cac945a26e04bf19f57d905f241fe77ebeddf46d8"
 dependencies:
   build: []

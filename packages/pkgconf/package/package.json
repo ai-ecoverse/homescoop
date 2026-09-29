@@ -2,7 +2,7 @@
   "name": "@ai-ecoverse/wasm-pkgconf",
   "version": "2.3.0-5",
   "description": "pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder)",
-  "license": "Apache-2.0",
+  "license": "ISC",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

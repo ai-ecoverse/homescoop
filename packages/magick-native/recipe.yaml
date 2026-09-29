@@ -22,7 +22,7 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/magick-native
-  license: SEE_UPSTREAM
+  license: Apache-2.0
   notes: |
     Port from slicc-emscripten harness/ladder.sh: rung_imq8 → rung_deps →
     rung_native → rung_pkg. Ships magick.js / magick.wasm for

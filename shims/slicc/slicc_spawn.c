@@ -12,6 +12,10 @@
  * file actions and attributes are ignored (children write to the tool's own
  * stdout/stderr). slicc_spawn_capture is the general form, for callers that
  * wire their own stdio (libuv's uv_spawn in cmake).
+ *
+ * In the wasm realm a child also inherits the tool's fds beyond 2 that are not
+ * close-on-exec, at the same numbers; posix_spawn's file actions on those fds
+ * (close, dup2, open) go along as `[target, source]` pairs (source -1 closes).
  */
 #include <emscripten.h>
 #include <fcntl.h>
@@ -23,9 +27,10 @@
 #include <sys/wait.h>
 
 // Returns the child's pid, or -errno (wasi numbering: ENOENT 44, EIO 29).
+// `actions`: `nactions` [target, source] pairs for the child's fds beyond 2.
 EM_JS(int, slicc_spawn_capture_js,
       (const char *path, char *const *argv, char *const *envp, const char *cwd, int in_fd,
-       int out_fd, int err_fd),
+       int out_fd, int err_fd, const int *actions, int nactions),
       {
         const strings = (ptr) => {
           const out = [];
@@ -48,10 +53,14 @@ EM_JS(int, slicc_spawn_capture_js,
           if (eq > 0) env[kv.slice(0, eq)] = kv.slice(eq + 1);
         }
         if (Module.sliccKernel) {
+          const pairs = [];
+          for (let i = 0; i < nactions; i++) {
+            pairs.push([HEAP32[(actions >> 2) + 2 * i], HEAP32[(actions >> 2) + 2 * i + 1]]);
+          }
           // An inherited stdin (-2) is the tool's own fd 0.
           return Module.sliccKernel.spawn(file, args, envList.length ? env : null,
                                           cwd ? UTF8ToString(cwd) : null,
-                                          [in_fd === -2 ? 0 : in_fd, out_fd, err_fd]);
+                                          [in_fd === -2 ? 0 : in_fd, out_fd, err_fd], pairs);
         }
         // stdin: whatever is readable on in_fd now (a file, or a pipe the
         // caller already filled); a terminal is left alone.
@@ -157,7 +166,7 @@ EM_JS(int, slicc_wait_js, (int pid, int *status, int options), {
 
 int slicc_spawn_capture(const char *file, char *const *argv, char *const *envp, const char *cwd,
                         int in_fd, int out_fd, int err_fd) {
-  return slicc_spawn_capture_js(file, argv, envp, cwd, in_fd, out_fd, err_fd);
+  return slicc_spawn_capture_js(file, argv, envp, cwd, in_fd, out_fd, err_fd, NULL, 0);
 }
 
 // In the wasm realm, a forked child (slicc-fork.js) that execs `pid` becomes
@@ -187,26 +196,39 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
   int stdio[3] = {-2, 1, 2};
   int opened[8];
   int nopened = 0;
+  // File actions on the child's fds beyond 2: [target, source] (source -1 closes).
+  int actions[64];
+  int nactions = 0;
   const char *cwd = NULL;
   struct slicc_fdop *op = fa ? (struct slicc_fdop *)fa->__actions : NULL;
   while (op && op->next) op = op->next;
   for (; op; op = op->prev) {
     int target = op->fd;
+    // What the child's `target` becomes: one of this tool's fds, -1 (closed),
+    // or -2 (the inherited stdin, which only stdio slots carry).
+    int src;
     if (op->cmd == SLICC_FDOP_DUP2) {
-      int src = op->srcfd <= 2 ? stdio[op->srcfd] : op->srcfd;
-      if (target <= 2) stdio[target] = src;
+      src = op->srcfd <= 2 ? stdio[op->srcfd] : op->srcfd;
     } else if (op->cmd == SLICC_FDOP_CLOSE) {
-      if (target <= 2) stdio[target] = -1;
+      src = -1;
     } else if (op->cmd == SLICC_FDOP_OPEN) {
-      int nfd = open(op->path, op->oflag, op->mode);
-      if (nfd < 0) goto fail;
-      if (nopened < 8) opened[nopened++] = nfd;
-      if (target <= 2) stdio[target] = nfd;
-    } else if (op->cmd == SLICC_FDOP_CHDIR) {
-      cwd = op->path;
+      src = open(op->path, op->oflag, op->mode);
+      if (src < 0) goto fail;
+      if (nopened < 8) opened[nopened++] = src;
+    } else {
+      if (op->cmd == SLICC_FDOP_CHDIR) cwd = op->path;
+      continue;
+    }
+    if (target <= 2) {
+      stdio[target] = src;
+    } else if (nactions < 32) {
+      actions[2 * nactions] = target;
+      actions[2 * nactions + 1] = src == -2 ? 0 : src;
+      nactions++;
     }
   }
-  int r = slicc_spawn_capture(path, argv, envp, cwd, stdio[0], stdio[1], stdio[2]);
+  int r = slicc_spawn_capture_js(path, argv, envp, cwd, stdio[0], stdio[1], stdio[2], actions,
+                                 nactions);
   for (int i = 0; i < nopened; i++) close(opened[i]);
   if (r < 0) return -r;
   if (pid) *pid = r;

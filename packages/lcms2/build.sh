@@ -4,16 +4,14 @@ set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/lcms2"
-VERSION=2.17
-SRC_URL=https://github.com/mm2/Little-CMS/releases/download/lcms2.17/lcms2-2.17.tar.gz
-SRC_SHA=d11af569e42a1baa1650d20ad61d12e41af4fead4aa7964a01f93b08b53ab074
+homescoop_load_recipe lcms2
 SRC_DIR="$WORK/lcms2-2.17"
 TARBALL="$WORK/lcms2-2.17.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
+homescoop_apply_patches "$SRC_DIR"
 if [[ ! -f "$SRC_DIR/src/.libs/liblcms2.a" || -n "${FORCE:-}" ]]; then
   echo "== lcms2: emconfigure + emmake"
   (
@@ -31,4 +29,5 @@ homescoop_stage_lib "$SRC_DIR/src/.libs/liblcms2.a" liblcms2.a
 mkdir -p "$HOMESCOOP_PKG/package/include" "$PREFIX/include"
 cp "$SRC_DIR/include/"*.h "$HOMESCOOP_PKG/package/include/"
 cp "$SRC_DIR/include/"*.h "$PREFIX/include/"
+homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== lcms2: staged → $HOMESCOOP_PKG/package"

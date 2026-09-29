@@ -6,7 +6,7 @@ version: "1.5.0"
 npm: "@ai-ecoverse/wasm-libwebp"
 summary: "WebP codec libraries"
 source:
-  url: "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz"
+  url: "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-{{version}}.tar.gz"
   sha256: "7d6fab70cf844bf6769077bd5d7a74893f8ffd4dfb42861745750c63c2a5c92c"
 dependencies:
   build: []
@@ -14,4 +14,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libwebp
-  license: SEE_UPSTREAM
+  license: BSD-3-Clause

@@ -64,6 +64,11 @@ async function main() {
     const pkgPath = join(dir, 'package.json');
     if (!existsSync(pkgPath)) continue;
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    if (pkg.private) {
+      console.log(`${pkg.name} … private/retired, skip`);
+      skipped++;
+      continue;
+    }
     process.stdout.write(`${pkg.name} … `);
     if (await existsOnNpm(pkg.name)) {
       console.log('exists, skip');

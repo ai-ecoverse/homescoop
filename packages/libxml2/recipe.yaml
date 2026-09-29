@@ -6,7 +6,7 @@ version: "2.13.8"
 npm: "@ai-ecoverse/wasm-libxml2"
 summary: "libxml2 XML parser"
 source:
-  url: "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.8.tar.xz"
+  url: "https://download.gnome.org/sources/libxml2/{{major}}.{{minor}}/libxml2-{{version}}.tar.xz"
   sha256: "277294cb33119ab71b2bc81f2f445e9bc9435b893ad15bb2cd2b0e859a0ee84a"
 dependencies:
   build: []
@@ -14,4 +14,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libxml2
-  license: SEE_UPSTREAM
+  license: MIT

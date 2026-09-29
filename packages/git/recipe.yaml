@@ -6,7 +6,7 @@ version: "2.55.0"
 npm: "@ai-ecoverse/wasm-git"
 summary: "Git 2.55 with git-remote-http(s) over homescoop libcurl"
 source:
-  url: "https://www.kernel.org/pub/software/scm/git/git-2.55.0.tar.xz"
+  url: "https://www.kernel.org/pub/software/scm/git/git-{{version}}.tar.xz"
   sha256: "457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357"
 dependencies:
   build: []

@@ -42,6 +42,10 @@ jobs:
           PKG="${{ inputs.package }}"
           BUILDER=$(node scripts/read-recipe.mjs "$PKG" --field builder)
           BUILDER=${BUILDER:-slicc}
+          if [[ "$BUILDER" == "retired" ]]; then
+            echo "::error::package '$PKG' is retired (builder: retired) — refuse build/publish"
+            exit 2
+          fi
           NPM=$(node scripts/read-recipe.mjs "$PKG" --field npm)
           # Align reported version with recipe (no write — checkout is ephemeral here).
           VER=$(node scripts/sync-package-version.mjs "$PKG")
@@ -145,4 +149,7 @@ jobs:
           unset NODE_AUTH_TOKEN || true
           TGZ="${{ runner.temp }}/package.tgz"
           ls -la "$TGZ"
+          # Refuse plain X.Y.Z — must be packaging rev X.Y.Z-N (docs/versioning.md).
+          VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
+          echo "publishing version=$VER"
           npm publish "$TGZ" --access public --tag latest

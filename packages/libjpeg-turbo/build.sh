@@ -4,10 +4,7 @@ set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/libjpeg-turbo"
-VERSION=3.1.2
-SRC_URL=https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.2/libjpeg-turbo-3.1.2.tar.gz
-SRC_SHA=8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf
+homescoop_load_recipe libjpeg-turbo
 SRC_DIR="$WORK/libjpeg-turbo-$VERSION"
 TARBALL="$WORK/libjpeg-turbo-$VERSION.tar.gz"
 BUILD="$SRC_DIR/build"
@@ -39,4 +36,5 @@ homescoop_stage_headers \
   "$SRC_DIR/src/jmorecfg.h" \
   "$BUILD/jconfig.h"
 homescoop_write_pc libjpeg "$VERSION" "-ljpeg"
+homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/README.ijg
 echo "== libjpeg-turbo: staged ($sz bytes)"

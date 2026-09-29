@@ -4,16 +4,14 @@ set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/freetype"
-VERSION=2.13.3
-SRC_URL=https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.gz
-SRC_SHA=5c3a8e78f7b24c20b25b54ee575d6daa40007a5f4eea2845861c3409b3021747
+homescoop_load_recipe freetype
 SRC_DIR="$WORK/freetype-2.13.3"
 TARBALL="$WORK/freetype-2.13.3.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
+homescoop_apply_patches "$SRC_DIR"
 if [[ ! -f "$SRC_DIR/objs/.libs/libfreetype.a" || -n "${FORCE:-}" ]]; then
   echo "== freetype: emconfigure + emmake"
   (
@@ -36,4 +34,5 @@ mkdir -p "$HOMESCOOP_PKG/package/include" "$PREFIX/include"
 # FreeType public headers live under include/
 cp -R "$SRC_DIR/include/." "$HOMESCOOP_PKG/package/include/"
 cp -R "$SRC_DIR/include/." "$PREFIX/include/"
+homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== freetype: staged → $HOMESCOOP_PKG/package"

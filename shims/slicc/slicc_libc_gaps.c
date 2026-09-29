@@ -64,3 +64,21 @@ EMSCRIPTEN_KEEPALIVE int slicc_sigpipe(void) {
   if (sa.sa_handler != SIG_IGN) raise(SIGPIPE);
   return 1;
 }
+
+// Who the program runs as: an ordinary user, never root. Emscripten answers 0
+// (real, effective and saved ids alike), so bash -- which reads them with
+// getresuid/getresgid -- showed a `#` prompt and programs took root-only paths.
+#include <unistd.h>
+#define SLICC_UID 1000
+uid_t __syscall_getuid32(void) { return SLICC_UID; }
+uid_t __syscall_geteuid32(void) { return SLICC_UID; }
+gid_t __syscall_getgid32(void) { return SLICC_UID; }
+gid_t __syscall_getegid32(void) { return SLICC_UID; }
+int __syscall_getresuid32(uid_t *ruid, uid_t *euid, uid_t *suid) {
+  *ruid = *euid = *suid = SLICC_UID;
+  return 0;
+}
+int __syscall_getresgid32(gid_t *rgid, gid_t *egid, gid_t *sgid) {
+  *rgid = *egid = *sgid = SLICC_UID;
+  return 0;
+}

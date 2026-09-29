@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared host body for GNU userland CLI tools (coreutils, sed, grep, gawk).
 # Port of slicc-emscripten/build-wasm-gnu.sh.
-# Usage: sourced from packages/<name>/build.sh after setting NAME VERSION SRC_URL SRC_SHA
+# Usage: sourced from packages/<name>/build.sh after homescoop_load_recipe
 #   or: bash scripts/build-gnu-cli.sh <name>
 set -euo pipefail
 
@@ -11,18 +11,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   export HOMESCOOP_ROOT="$ROOT"
   # shellcheck source=./build-common.sh
   source "$ROOT/scripts/build-common.sh"
-  HOMESCOOP_PKG="$ROOT/packages/$NAME"
-  case "$NAME" in
-    coreutils) VERSION=9.7; SRC_URL=https://ftp.gnu.org/gnu/coreutils/coreutils-9.7.tar.xz
-      SRC_SHA=e8bb26ad0293f9b5a1fc43fb42ba970e312c66ce92c1b0b16713d7500db251bf ;;
-    sed) VERSION=4.9; SRC_URL=https://ftp.gnu.org/gnu/sed/sed-4.9.tar.xz
-      SRC_SHA=6e226b732e1cd739464ad6862bd1a1aba42d7982922da7a53519631d24975181 ;;
-    grep) VERSION=3.12; SRC_URL=https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz
-      SRC_SHA=2649b27c0e90e632eadcd757be06c6e9a4f48d941de51e7c0f83ff76408a07b9 ;;
-    gawk) VERSION=5.3.2; SRC_URL=https://ftp.gnu.org/gnu/gawk/gawk-5.3.2.tar.xz
-      SRC_SHA=f8c3486509de705192138b00ef2c00bbbdd0e84c30d5c07d23fc73a9dc4cc9cc ;;
-    *) echo "unknown gnu cli: $NAME" >&2; exit 2 ;;
-  esac
+  homescoop_load_recipe "$NAME"
 else
   : "${NAME:?}" "${VERSION:?}" "${SRC_URL:?}" "${SRC_SHA:?}" "${HOMESCOOP_PKG:?}"
   ROOT="${HOMESCOOP_ROOT:?}"
@@ -39,17 +28,7 @@ BIN_NAME="$NAME"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
-
-# Apply patches once (marker file)
-for p in "$ROOT"/patches/"$NAME-$VERSION"-*.patch; do
-  [[ -f "$p" ]] || continue
-  marker="$SRC_DIR/.homescoop-patched-$(basename "$p")"
-  if [[ ! -f "$marker" ]]; then
-    echo "== patch $(basename "$p")"
-    patch -d "$SRC_DIR" -p1 < "$p"
-    touch "$marker"
-  fi
-done
+homescoop_apply_patches "$SRC_DIR"
 
 SLICC_A="$WORK/libslicc-spawn.a"
 homescoop_slicc_archive "$SLICC_A" spawn
@@ -102,4 +81,5 @@ for d in "$SRC_DIR/src" "$SRC_DIR/$BIN_NAME" "$SRC_DIR"; do
 done
 test -f "$STAGE_DIR/$BIN_NAME" || test -f "$STAGE_DIR/$BIN_NAME.js"
 homescoop_stage_cli "$STAGE_DIR" "$BIN_NAME"
+homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING.LIB
 echo "== $NAME: staged → $HOMESCOOP_PKG/package"

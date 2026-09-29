@@ -4,6 +4,8 @@
  * when the recipe upstream moved (Renovate). Packaging revisions (X-N) that
  * already match the recipe upstream prefix are left alone.
  *
+ * New upstreams always get X.Y.Z-1 (never plain X.Y.Z — see docs/versioning.md).
+ *
  *   node scripts/sync-package-version.mjs zlib
  *   node scripts/sync-package-version.mjs zlib --write
  *
@@ -17,10 +19,37 @@ import { spawnSync } from 'node:child_process';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const name = process.argv[2];
 const write = process.argv.includes('--write');
+const assertPublishable = process.argv.includes('--assert-publishable');
+
+/** Plain X.Y.Z (no packaging rev) — forbidden on publish; outranks every X.Y.Z-N. */
+const PLAIN = /^\d+\.\d+\.\d+$/;
+
+function refusePlain(label, version) {
+  if (!PLAIN.test(String(version || ''))) return;
+  console.error(
+    `sync-package-version: refuse plain version ${version} (${label}) — ` +
+      `publish X.Y.Z-N only (see docs/versioning.md)`
+  );
+  process.exit(2);
+}
 
 if (!name || name.startsWith('-')) {
-  console.error('usage: sync-package-version.mjs <package> [--write]');
+  console.error(
+    'usage: sync-package-version.mjs <package> [--write] [--assert-publishable]'
+  );
   process.exit(2);
+}
+
+if (assertPublishable) {
+  const pkgPath = join(root, 'packages', name, 'package', 'package.json');
+  if (!existsSync(pkgPath)) {
+    console.error(`missing ${pkgPath}`);
+    process.exit(1);
+  }
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+  refusePlain(name, pkg.version);
+  console.log(pkg.version);
+  process.exit(0);
 }
 
 const recipeVer = spawnSync(
@@ -31,6 +60,15 @@ const recipeVer = spawnSync(
 if (recipeVer.status !== 0) {
   console.error(recipeVer.stderr || 'read-recipe failed');
   process.exit(1);
+}
+const builder = spawnSync(
+  'node',
+  [join(root, 'scripts/read-recipe.mjs'), name, '--field', 'builder'],
+  { encoding: 'utf8', cwd: root }
+);
+if ((builder.stdout || '').trim() === 'retired') {
+  console.error(`sync-package-version: ${name} is retired — refuse`);
+  process.exit(2);
 }
 const upstream = recipeVer.stdout.trim();
 const pkgPath = join(root, 'packages', name, 'package', 'package.json');
@@ -59,12 +97,18 @@ const sameUpstream =
 
 let next = current;
 if (!sameUpstream) {
-  // Recipe moved (Renovate): publish as the new upstream (npmified).
-  next = targetBase;
+  // Recipe moved (Renovate): first packaging rev is always X.Y.Z-1 — never
+  // plain X.Y.Z (plain outranks every -N under semver caret ranges).
+  next = `${targetBase}-1`;
 } else if (current === upstream && current !== targetBase) {
-  // Two-component upstream (5.3, 3.12) is not valid npm semver — use X.Y.0.
-  next = targetBase;
+  // Two-component upstream (5.3, 3.12) is not valid npm semver — use X.Y.0-1.
+  next = `${targetBase}-1`;
+} else if (PLAIN.test(current)) {
+  // Local package.json still on a forbidden plain version — bump to -1.
+  next = `${targetBase}-1`;
 }
+
+refusePlain('computed', next);
 
 if (write && next !== current) {
   pkg.version = next;

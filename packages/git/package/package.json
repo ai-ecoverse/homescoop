@@ -1,0 +1,76 @@
+{
+  "name": "@ai-ecoverse/wasm-git",
+  "version": "2.55.0-4",
+  "description": "Git 2.55 with git-remote-http(s) over homescoop libcurl for wasm / slicc",
+  "license": "GPL-2.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/git/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/git",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "git"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "libexec",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "git",
+    "upstream": "2.55.0"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "env": {
+      "GIT_EXEC_PATH": "libexec/git-core",
+      "GIT_TEMPLATE_DIR": "share/git-core/templates"
+    },
+    "commands": {
+      "git": {
+        "glue": "bin/git",
+        "wasm": "bin/git.wasm",
+        "env": {
+          "GIT_EXEC_PATH": "libexec/git-core",
+          "GIT_TEMPLATE_DIR": "share/git-core/templates"
+        }
+      },
+      "git-remote-http": {
+        "glue": "bin/git-remote-http",
+        "wasm": "bin/git-remote-http.wasm"
+      },
+      "git-remote-https": {
+        "glue": "bin/git-remote-https",
+        "wasm": "bin/git-remote-https.wasm"
+      },
+      "git-upload-pack": {
+        "glue": "bin/git-upload-pack",
+        "wasm": "bin/git-upload-pack.wasm",
+        "argv0": "git-upload-pack",
+        "env": {
+          "GIT_EXEC_PATH": "libexec/git-core",
+          "GIT_TEMPLATE_DIR": "share/git-core/templates"
+        }
+      },
+      "git-receive-pack": {
+        "glue": "bin/git-receive-pack",
+        "wasm": "bin/git-receive-pack.wasm",
+        "argv0": "git-receive-pack",
+        "env": {
+          "GIT_EXEC_PATH": "libexec/git-core",
+          "GIT_TEMPLATE_DIR": "share/git-core/templates"
+        }
+      }
+    }
+  }
+}

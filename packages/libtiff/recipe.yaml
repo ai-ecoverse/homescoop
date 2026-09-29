@@ -6,7 +6,7 @@ version: "4.7.0"
 npm: "@ai-ecoverse/wasm-libtiff"
 summary: "TIFF library"
 source:
-  url: "https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz"
+  url: "https://download.osgeo.org/libtiff/tiff-{{version}}.tar.gz"
   sha256: "67160e3457365ab96c5b3286a0903aa6e78bdc44c4bc737d2e486bcecb6ba976"
 dependencies:
   build:
@@ -16,4 +16,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libtiff
-  license: SEE_UPSTREAM
+  license: libtiff

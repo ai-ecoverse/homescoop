@@ -6,7 +6,7 @@ version: "1.6.50"
 npm: "@ai-ecoverse/wasm-libpng"
 summary: "libpng PNG library"
 source:
-  url: "https://downloads.sourceforge.net/project/libpng/libpng16/1.6.50/libpng-1.6.50.tar.gz"
+  url: "https://downloads.sourceforge.net/project/libpng/libpng16/{{version}}/libpng-{{version}}.tar.gz"
   sha256: "71158e53cfdf2877bc99bcab33641d78df3f48e6e0daad030afe9cb8c031aa46"
 dependencies:
   build:
@@ -15,4 +15,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libpng
-  license: SEE_UPSTREAM
+  license: libpng-2.0

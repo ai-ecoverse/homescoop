@@ -12,3 +12,10 @@ packages/*/package/bin/
 packages/*/package/include/
 packages/*/package/lib/
 .env.fledgling
+
+# host build scratch
+**/.work/
+packages/*/package/libexec/
+packages/*/package/share/
+packages/*/package/dist/
+packages/*/package/etc/

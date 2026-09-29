@@ -6,7 +6,7 @@ version: "2.3.0"
 npm: "@ai-ecoverse/wasm-pkgconf"
 summary: "pkgconf / pkg-config for wasm"
 source:
-  url: "https://distfiles.ariadne.space/pkgconf/pkgconf-2.3.0.tar.gz"
+  url: "https://distfiles.ariadne.space/pkgconf/pkgconf-{{version}}.tar.gz"
   sha256: "a2df680578e85f609f2fa67bd3d0fc0dc71b4bf084fc49119de84cd6ed28e723"
 dependencies:
   build: []
@@ -14,7 +14,7 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/pkgconf
-  license: SEE_UPSTREAM
+  license: ISC
   notes: |
     CLI link flags via homescoop_em_cli_ldflags (+ STACK_SIZE=1MB).
     package.json slicc.commands maps pkgconf and pkg-config onto

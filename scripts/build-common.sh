@@ -8,6 +8,59 @@ WORK="${HOMESCOOP_WORK:-${TMPDIR:-/tmp}/homescoop-work}"
 PREFIX="${PREFIX:-${TMPDIR:-/tmp}/homescoop-prefix}"
 mkdir -p "$WORK" "$PREFIX/lib" "$PREFIX/include"
 
+# Load recipe.yaml into the environment (VERSION, SRC_URL, SRC_SHA, …).
+# Optional: homescoop_load_recipe <name> [--source <key>]
+homescoop_load_recipe() {
+  local name="${1:?homescoop_load_recipe <package>}"
+  shift || true
+  # shellcheck disable=SC1090
+  eval "$(node "$HOMESCOOP_ROOT/scripts/recipe-env.mjs" "$name" "$@")"
+  : "${HOMESCOOP_PKG:?}" "${VERSION:?}"
+  # Primary load must export SRC_URL/SRC_SHA; secondary loads only PREFIX_* vars.
+  if [[ "$*" != *"--source"* ]]; then
+    : "${SRC_URL:?}" "${SRC_SHA:?}"
+  fi
+}
+
+# Apply every packages/<name>/*.patch once into <srcdir>.
+homescoop_apply_patches() {
+  local srcdir="${1:?}"
+  local dir="${HOMESCOOP_PKG:?}"
+  local p marker
+  shopt -s nullglob
+  for p in "$dir"/*.patch; do
+    marker="$srcdir/.homescoop-patched-$(basename "$p")"
+    if [[ -f "$marker" ]]; then
+      continue
+    fi
+    echo "== patch $(basename "$p")"
+    patch -d "$srcdir" -p1 < "$p"
+    touch "$marker"
+  done
+  shopt -u nullglob
+}
+
+# Copy the first existing upstream license file into package/LICENSE (+ PREFIX).
+# homescoop_stage_license <candidate...>
+homescoop_stage_license() {
+  local dest="$HOMESCOOP_PKG/package/LICENSE"
+  local f
+  mkdir -p "$HOMESCOOP_PKG/package"
+  for f in "$@"; do
+    if [[ -f "$f" ]]; then
+      cp "$f" "$dest"
+      echo "== license ← $f"
+      return 0
+    fi
+  done
+  if [[ -f "$dest" ]]; then
+    echo "== license: keeping existing package/LICENSE"
+    return 0
+  fi
+  echo "homescoop_stage_license: no LICENSE/COPYING found among: $*" >&2
+  return 1
+}
+
 homescoop_fetch() {
   # homescoop_fetch <url> <sha256> <tarball-path>
   local url="$1" sha="$2" tarball="$3"
@@ -30,6 +83,7 @@ homescoop_extract() {
   case "$tarball" in
     *.tar.xz|*.txz) tar xJf "$tarball" -C "$(dirname "$srcdir")" ;;
     *.tar.bz2|*.tbz2) tar xjf "$tarball" -C "$(dirname "$srcdir")" ;;
+    *.zip) unzip -q "$tarball" -d "$(dirname "$srcdir")" ;;
     *) tar xzf "$tarball" -C "$(dirname "$srcdir")" ;;
   esac
 }
@@ -91,7 +145,7 @@ homescoop_slicc_dir() {
 
 # Compile selected slicc shims into an archive for LDFLAGS/LIBS.
 # Every profile includes slicc_signals.c + slicc_libc_gaps.c.
-# Usage: homescoop_slicc_archive <out.a> gaps|spawn|make|fork|less
+# Usage: homescoop_slicc_archive <out.a> gaps|spawn|make|fork|less|cli|net|netfork
 homescoop_slicc_archive() {
   local out="$1" profile="${2:-gaps}"
   local dir odir src base
@@ -129,13 +183,15 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       ;;
     fork)
-      # slicc_jobs: setpgid/getpgid/setsid/tcgetpgrp/tcsetpgrp for bash job control.
+      # bash job control + ASYNCIFY: fork/spawn/exec/jobs, and select/poll so
+      # readline's blocking poll goes through the kernel (not Asyncify FS waits).
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
+      _homescoop_slicc_compile "$dir/slicc_select.c"
       ;;
     less)
       # TUI pager: signals + gaps + jobs + pselect (no spawn).
@@ -144,8 +200,41 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
       ;;
+    cli)
+      # Interactive / pipeline CLIs (sqlite3, tar, …): spawn+exec+select+jobs.
+      # No fork/ASYNCIFY — that stays bash-only.
+      _homescoop_slicc_compile "$dir/slicc_spawn.c"
+      _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      _homescoop_slicc_compile "$dir/slicc_select.c"
+      _homescoop_slicc_compile "$dir/slicc_jobs.c"
+      ;;
+    net)
+      # curl / git-remote-http: BSD sockets (slicc_socket) + select/poll +
+      # spawn/exec for helpers. Link with whole-archive so socket syscalls win.
+      _homescoop_slicc_compile "$dir/slicc_socket.c"
+      _homescoop_slicc_compile "$dir/slicc_select.c"
+      _homescoop_slicc_compile "$dir/slicc_spawn.c"
+      _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      _homescoop_slicc_compile "$dir/slicc_getpass.c"
+      ;;
+    netfork)
+      # git: sockets + fork/ASYNCIFY so clone/remote helpers can fork+exec.
+      _homescoop_slicc_compile "$dir/slicc_socket.c"
+      _homescoop_slicc_compile "$dir/slicc_select.c"
+      _homescoop_slicc_compile "$dir/slicc_spawn.c"
+      _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_fork.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      _homescoop_slicc_compile "$dir/slicc_jobs.c"
+      _homescoop_slicc_compile "$dir/slicc_getpass.c"
+      ;;
     *)
-      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|less)" >&2
+      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|less|cli|net|netfork)" >&2
       return 1
       ;;
   esac
@@ -155,8 +244,26 @@ homescoop_slicc_archive() {
 }
 
 # Force signal exports out of the archive (wasm realm calls them from JS).
+# For fork/cli/spawn/make profiles, also call homescoop_slicc_keep_spawn
+# *before* the .a so wait4/execve are not left as libc ENOSYS stubs.
 homescoop_slicc_keep_exports() {
   printf '%s' "-Wl,-u,slicc_raise -Wl,-u,slicc_sig_mask -Wl,-u,slicc_sigpipe"
+}
+
+# Force spawn/exec/wait4 out of the archive (fork|cli|spawn|make profiles).
+# Must appear on the link line *before* the slicc .a. Prefer wrapping the
+# archive with homescoop_slicc_link_archive (whole-archive): -u alone is not
+# enough for execve — emscripten libstubs.a ships a weak execve stub, and
+# archive member extraction can leave that stub as the winner.
+homescoop_slicc_keep_spawn() {
+  printf '%s' "-Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture"
+}
+
+# LDFLAGS fragment: keep exports + whole-archive around a slicc .a.
+# Usage: LDFLAGS="$(homescoop_slicc_link_archive "$SLICC_A") $(homescoop_em_cli_ldflags)"
+homescoop_slicc_link_archive() {
+  local archive="$1"
+  printf '%s' "$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) -Wl,--whole-archive ${archive} -Wl,--no-whole-archive"
 }
 
 # Extra link flags for the fork js-library (bash). Pair with profile fork.
@@ -167,18 +274,24 @@ homescoop_slicc_fork_js_flags() {
 }
 
 # Stage an Emscripten CLI binary pair into package/bin and PREFIX/bin.
-# homescoop_stage_cli <srcdir> <name>  — copies name, name.js, name.wasm when present
+# Prefer bare <name> (slicc.commands glue path) over <name>.js when both exist.
 homescoop_stage_cli() {
   local srcdir="$1" name="$2"
   local dest="$HOMESCOOP_PKG/package/bin"
   mkdir -p "$dest" "$PREFIX/bin"
-  local f
-  for f in "$name" "$name.js" "$name.wasm"; do
-    if [[ -f "$srcdir/$f" ]]; then
-      cp "$srcdir/$f" "$dest/"
-      cp "$srcdir/$f" "$PREFIX/bin/"
-    fi
-  done
+  # Drop stale glue from prior builds so npm pack does not ship both forms.
+  rm -f "$dest/$name" "$dest/$name.js" "$dest/$name.wasm"
+  if [[ -f "$srcdir/$name" ]]; then
+    cp "$srcdir/$name" "$dest/$name"
+    cp "$srcdir/$name" "$PREFIX/bin/$name"
+  elif [[ -f "$srcdir/$name.js" ]]; then
+    cp "$srcdir/$name.js" "$dest/$name"
+    cp "$srcdir/$name.js" "$PREFIX/bin/$name"
+  fi
+  if [[ -f "$srcdir/$name.wasm" ]]; then
+    cp "$srcdir/$name.wasm" "$dest/$name.wasm"
+    cp "$srcdir/$name.wasm" "$PREFIX/bin/$name.wasm"
+  fi
 }
 
 # Write a relocatable .pc into package/lib/pkgconfig and PREFIX.

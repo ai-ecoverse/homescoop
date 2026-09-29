@@ -1,0 +1,27 @@
+{
+  "name": "@ai-ecoverse/wasm-ffmpeg",
+  "version": "0.0.0-retired",
+  "private": true,
+  "description": "RETIRED — do not publish. SLICC owns ffmpeg; @ai-ecoverse must not distribute MPEG codecs.",
+  "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/ffmpeg/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/ffmpeg",
+  "keywords": [
+    "wasm",
+    "homescoop",
+    "retired"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE"
+  ],
+  "homescoop": {
+    "recipe": "ffmpeg",
+    "retired": true,
+    "reason": "MPEG consortium / Adobe — codec distribution forbidden; SLICC owns ffmpeg"
+  }
+}
