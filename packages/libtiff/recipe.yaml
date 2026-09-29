@@ -2,7 +2,7 @@
 name: libtiff
 builder: host
 # renovate: datasource=github-tags depName=libsdl-org/libtiff extractVersion=^v(?<version>.*)$
-version: "4.7.0"
+version: "4.7.2"
 npm: "@ai-ecoverse/wasm-libtiff"
 summary: "TIFF library"
 source:
