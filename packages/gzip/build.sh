@@ -38,5 +38,5 @@ fi
 if [[ -f "$SRC/gzip.js" && ! -f "$SRC/gzip" ]]; then mv "$SRC/gzip.js" "$SRC/gzip"; fi
 test -f "$SRC/gzip.wasm" || test -f "$SRC/gzip"
 homescoop_stage_cli "$SRC" gzip
-homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
 echo "== gzip: staged → $HOMESCOOP_PKG/package"

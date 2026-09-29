@@ -112,7 +112,7 @@ jobs:
         with:
           join-url: ${{ steps.leader.outputs.join-url }}
           timeout: 60m
-          command: >-
+          command: |
             export HOMESCOOP_ROOT=/mnt/homescoop
             HOMESCOOP_DEPS="$(cat /tmp/homescoop/deps.txt 2>/dev/null || true)"
             export HOMESCOOP_DEPS

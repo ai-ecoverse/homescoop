@@ -40,16 +40,21 @@ is_npm_spec() {
   return 1
 }
 
-# Resolve @ai-ecoverse/wasm-foo@1.2.3 → packages/foo/package when present.
+# Resolve @ai-ecoverse/wasm-foo@1.2.3 → packages/foo/package when present
+# *and* already built (lib/, include/, or bin/). Metadata-only trees would
+# otherwise shadow the registry and leave PREFIX empty on fresh CI runners.
 local_wasm_pkg_dir() {
   local spec="$1"
-  local name ver dir
+  local name dir
   if [[ "$spec" =~ ^@ai-ecoverse/wasm-([a-z0-9-]+)(@(.+))?$ ]]; then
     name="${BASH_REMATCH[1]}"
     dir="$ROOT/packages/$name/package"
     if [[ -d "$dir" && -f "$dir/package.json" ]]; then
-      echo "$dir"
-      return 0
+      if [[ -d "$dir/lib" || -d "$dir/include" || -d "$dir/bin" || -d "$dir/dist" ]]; then
+        echo "$dir"
+        return 0
+      fi
+      echo "== host-run: skip empty local $dir (no lib/include/bin; use npm)" >&2
     fi
   fi
   return 1

@@ -47,5 +47,5 @@ for cmd in diff cmp diff3 sdiff; do
   test -f "$STAGE/$cmd" || test -f "$STAGE/$cmd.wasm"
   homescoop_stage_cli "$STAGE" "$cmd"
 done
-homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
 echo "== diffutils: staged → $HOMESCOOP_PKG/package"
