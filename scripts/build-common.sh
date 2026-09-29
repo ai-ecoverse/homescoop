@@ -321,3 +321,53 @@ EOF
   printf '%s\n' "$body" >"$dest_pkg/${name}.pc"
   printf '%s\n' "$body" >"$dest_pfx/${name}.pc"
 }
+
+# Write missing .pc files into PREFIX for staged static libs (npm deps often
+# ship lib/*.a + include/ without pkgconfig/). Used by ImageMagick configure.
+homescoop_ensure_prefix_pcs() {
+  local pfx="${PREFIX:?}"
+  local pcdir="$pfx/lib/pkgconfig"
+  mkdir -p "$pcdir"
+
+  # args: <pc-name> <archive-basename> <Libs flags> [Requires]
+  _ensure_one() {
+    local pc="$1" archive="$2" libs="$3" requires="${4:-}"
+    local dest="$pcdir/${pc}.pc"
+    if [[ -f "$dest" ]]; then
+      return 0
+    fi
+    if [[ ! -f "$pfx/lib/${archive}" ]]; then
+      return 0
+    fi
+    cat >"$dest" <<EOF
+prefix=${pfx}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: ${pc}
+Description: ${pc} (homescoop wasm / emscripten, synthesized)
+Version: 0
+Requires: ${requires}
+Cflags: -I\${includedir}
+Libs: -L\${libdir} ${libs}
+EOF
+    echo "== ensure-pc: $dest"
+  }
+
+  _ensure_one zlib libz.a "-lz"
+  _ensure_one libjpeg libjpeg.a "-ljpeg"
+  _ensure_one libpng libpng16.a "-lpng16" "zlib"
+  # unversioned alias some consumers probe
+  if [[ -f "$pfx/lib/libpng.a" && ! -f "$pcdir/libpng.pc" ]]; then
+    _ensure_one libpng libpng.a "-lpng" "zlib"
+  fi
+  _ensure_one lcms2 liblcms2.a "-llcms2"
+  _ensure_one libtiff-4 libtiff.a "-ltiff" "zlib libjpeg"
+  _ensure_one libwebp libwebp.a "-lwebp"
+  _ensure_one libwebpmux libwebpmux.a "-lwebpmux" "libwebp"
+  _ensure_one libwebpdemux libwebpdemux.a "-lwebpdemux" "libwebp"
+  _ensure_one libopenjp2 libopenjp2.a "-lopenjp2"
+  _ensure_one freetype2 libfreetype.a "-lfreetype"
+  _ensure_one libxml-2.0 libxml2.a "-lxml2"
+}

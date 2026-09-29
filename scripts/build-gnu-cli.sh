@@ -53,6 +53,7 @@ export ac_cv_func_sigaddset=yes ac_cv_func_sigdelset=yes ac_cv_func_sigfillset=y
 export ac_cv_func_sigismember=yes
 # Declared in uchar.h but emsdk link probes can false-negative → gnulib clash.
 export ac_cv_func_mbrtoc32=yes ac_cv_func_c32rtomb=yes
+export gl_cv_func_mbrtoc32=yes gl_cv_func_c32rtomb=yes
 
 if [[ ! -f "$SRC_DIR/$BIN_NAME" && ! -f "$SRC_DIR/$BIN_NAME.js" && ! -f "$SRC_DIR/src/$BIN_NAME" && ! -f "$SRC_DIR/src/$BIN_NAME.js" || -n "${FORCE:-}" ]]; then
   echo "== $NAME: emconfigure + emmake"
@@ -64,7 +65,9 @@ if [[ ! -f "$SRC_DIR/$BIN_NAME" && ! -f "$SRC_DIR/$BIN_NAME.js" && ! -f "$SRC_DI
     # Cross build: avoid running gnulib tests under node (hangs on nanosleep/alarm).
     emconfigure ./configure \
       --build=x86_64-pc-linux-gnu --host=wasm32-unknown-emscripten \
-      --disable-nls "${EXTRA_CFG[@]}"
+      --disable-nls "${EXTRA_CFG[@]}" \
+      ac_cv_func_mbrtoc32=yes ac_cv_func_c32rtomb=yes \
+      gl_cv_func_mbrtoc32=yes gl_cv_func_c32rtomb=yes
     homescoop_fix_darwin_ar Makefile
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
       LDFLAGS="$CLI_LDFLAGS"

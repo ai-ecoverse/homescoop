@@ -24,9 +24,13 @@ if [[ ! -f "$SRC/gzip" && ! -f "$SRC/gzip.js" || -n "${FORCE:-}" ]]; then
   (
     cd "$SRC"
     if [[ -f Makefile ]]; then make distclean >/dev/null 2>&1 || true; fi
+    # Clear host LDFLAGS/CFLAGS so the emconfigure probe isn't poisoned.
     # GNU_STANDARD=1 (default) ignores argv[0]; gunzip/zcat need =0 to decompress.
-    emconfigure ./configure --host=wasm32-unknown-emscripten --disable-nls \
-      CFLAGS="-O2 -DGNU_STANDARD=0"
+    env -u LDFLAGS -u CFLAGS -u CPPFLAGS \
+      emconfigure ./configure \
+        --build=x86_64-pc-linux-gnu --host=wasm32-unknown-emscripten \
+        --disable-nls \
+        CFLAGS="-O2 -DGNU_STANDARD=0"
     homescoop_fix_darwin_ar Makefile
     # shellcheck disable=SC2086
     # Full make (not just `gzip`): needs lib/libgzip.a + generated version.h first.

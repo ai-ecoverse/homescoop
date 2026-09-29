@@ -94,9 +94,12 @@ while IFS= read -r spec; do
   rm -rf "$tmp"
 done < <(node "$ROOT/scripts/read-recipe.mjs" "$name" --deps || true)
 
+# shellcheck source=./build-common.sh
+source "$ROOT/scripts/build-common.sh"
+homescoop_ensure_prefix_pcs
 
-# Ensure emcc: prefer PATH, else activate emsdk npm package (caches under
-# ~/Library/Caches/emsdk). Optional override: HOMESCOOP_EMSDK_ROOT + EM_CONFIG.
+# Cap binaryen parallelism — GHA runners can OOM wasm-opt at high -j.
+export BINARYEN_CORES="${BINARYEN_CORES:-2}"
 if ! command -v emconfigure >/dev/null 2>&1; then
   if [[ -n "${HOMESCOOP_EMSDK_ROOT:-}" && -x "$HOMESCOOP_EMSDK_ROOT/emcc" ]]; then
     export PATH="$HOMESCOOP_EMSDK_ROOT:$PATH"

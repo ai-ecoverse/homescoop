@@ -29,5 +29,6 @@ homescoop_stage_lib "$SRC_DIR/.libs/libpng16.a" libpng16.a
 cp "$SRC_DIR/.libs/libpng16.a" "$HOMESCOOP_PKG/package/lib/libpng.a"
 cp "$SRC_DIR/.libs/libpng16.a" "$PREFIX/lib/libpng.a"
 homescoop_stage_headers "$SRC_DIR/png.h" "$SRC_DIR/pngconf.h" "$SRC_DIR/pnglibconf.h"
+homescoop_write_pc libpng "$VERSION" "-lpng16" "zlib"
 homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== libpng: staged → $HOMESCOOP_PKG/package"

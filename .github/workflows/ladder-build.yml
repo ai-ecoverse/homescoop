@@ -151,5 +151,16 @@ jobs:
           ls -la "$TGZ"
           # Refuse plain X.Y.Z — must be packaging rev X.Y.Z-N (docs/versioning.md).
           VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
-          echo "publishing version=$VER"
-          npm publish "$TGZ" --access public --tag latest
+          NPM="${{ needs.resolve.outputs.npm }}"
+          echo "publishing $NPM@$VER"
+          if npm publish "$TGZ" --access public --tag latest; then
+            echo "published $NPM@$VER"
+          else
+            # Rebuilds of an unchanged packaging rev are common after CI fixes.
+            if npm view "${NPM}@${VER}" version >/dev/null 2>&1; then
+              echo "already on registry: $NPM@$VER — treating as success"
+            else
+              echo "npm publish failed and $NPM@$VER is not on the registry" >&2
+              exit 1
+            fi
+          fi
