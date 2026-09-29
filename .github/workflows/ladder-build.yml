@@ -153,14 +153,16 @@ jobs:
           VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
           NPM="${{ needs.resolve.outputs.npm }}"
           echo "publishing $NPM@$VER"
-          if npm publish "$TGZ" --access public --tag latest; then
+          set +e
+          out="$(npm publish "$TGZ" --access public --tag latest 2>&1)"
+          rc=$?
+          set -e
+          printf '%s\n' "$out"
+          if [[ $rc -eq 0 ]]; then
             echo "published $NPM@$VER"
+          elif printf '%s\n' "$out" | grep -q 'cannot publish over the previously published versions'; then
+            echo "already on registry: $NPM@$VER — treating as success"
           else
-            # Rebuilds of an unchanged packaging rev are common after CI fixes.
-            if npm view "${NPM}@${VER}" version >/dev/null 2>&1; then
-              echo "already on registry: $NPM@$VER — treating as success"
-            else
-              echo "npm publish failed and $NPM@$VER is not on the registry" >&2
-              exit 1
-            fi
+            echo "npm publish failed for $NPM@$VER (exit $rc)" >&2
+            exit "$rc"
           fi
