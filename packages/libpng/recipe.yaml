@@ -2,7 +2,7 @@
 name: libpng
 builder: host
 # renovate: datasource=github-tags depName=pnggroup/libpng extractVersion=^v(?<version>.*)$
-version: "1.6.50"
+version: "1.6.59"
 npm: "@ai-ecoverse/wasm-libpng"
 summary: "libpng PNG library"
 source:
