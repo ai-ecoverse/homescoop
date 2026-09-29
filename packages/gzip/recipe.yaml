@@ -2,7 +2,7 @@
 name: gzip
 builder: host
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/gzip.git extractVersion=^v(?<version>.*)$
-version: "1.13"
+version: "1.15"
 npm: "@ai-ecoverse/wasm-gzip"
 summary: "GNU gzip/gunzip/zcat for slicc"
 source:
