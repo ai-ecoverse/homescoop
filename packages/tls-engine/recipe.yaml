@@ -3,7 +3,7 @@
 name: tls-engine
 builder: host
 # renovate: datasource=github-releases depName=Mbed-TLS/mbedtls extractVersion=^mbedtls-(?<version>.*)$
-version: "3.6.5"
+version: "3.6.7"
 npm: "@ai-ecoverse/wasm-tls-engine"
 summary: "Mbed TLS 3.6.5 server engine (ES module + wasm) for SLICC's realm proxy"
 source:
