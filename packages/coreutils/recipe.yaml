@@ -2,7 +2,7 @@
 name: coreutils
 builder: host
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/coreutils.git extractVersion=^v(?<version>.*)$
-version: "9.7"
+version: "9.12"
 npm: "@ai-ecoverse/wasm-coreutils"
 summary: "GNU coreutils (single-binary) for slicc"
 source:
