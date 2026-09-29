@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: libwebp
 builder: host
+# renovate: datasource=github-tags depName=webmproject/libwebp extractVersion=^v(?<version>.*)$
 version: "1.5.0"
 npm: "@ai-ecoverse/wasm-libwebp"
 summary: "WebP codec libraries"

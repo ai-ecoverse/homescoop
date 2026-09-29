@@ -1,0 +1,22 @@
+# SLICC wasm-realm TLS engine: Mbed TLS server sessions over memory buffers,
+# used by SLICC's in-realm HTTP proxy to terminate CONNECT tunnels (#3571).
+name: tls-engine
+builder: host
+# renovate: datasource=github-releases depName=Mbed-TLS/mbedtls extractVersion=^mbedtls-(?<version>.*)$
+version: "3.6.5"
+npm: "@ai-ecoverse/wasm-tls-engine"
+summary: "Mbed TLS 3.6.5 server engine (ES module + wasm) for SLICC's realm proxy"
+source:
+  url: "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.5/mbedtls-3.6.5.tar.bz2"
+  sha256: "4a11f1777bb95bf4ad96721cac945a26e04bf19f57d905f241fe77ebeddf46d8"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/tls-engine
+  license: Apache-2.0
+  notes: |
+    Not a realm program: SLICC's kernel imports it (a lazy chunk plus the wasm
+    asset). src/slicc_tls_engine.c is the engine; it holds no CA key (leaves
+    are signed outside). No slicc libc shims are linked.

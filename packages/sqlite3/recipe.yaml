@@ -1,0 +1,21 @@
+# SQLite CLI (amalgamation shell.c) for slicc wasm realm.
+name: sqlite3
+builder: host
+# renovate: datasource=github-tags depName=sqlite/sqlite extractVersion=^version-(?<version>.*)$
+version: "3.53.4"
+npm: "@ai-ecoverse/wasm-sqlite3"
+summary: "sqlite3 CLI 3.53.4 for slicc wasm realm"
+source:
+  url: "https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip"
+  sha256: "1e71ddf93849c6a6ecf58b827c0692073d2dd7ee40196158068f7b29f422e87d"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/sqlite3
+  license: blessing
+  notes: |
+    Builds the official amalgamation CLI (sqlite3.c + shell.c) with emcc.
+    Links slicc cli profile (spawn + exec + gaps + signals + select + jobs).
+    Replaces the sql.js-backed just-bash sqlite3 command.

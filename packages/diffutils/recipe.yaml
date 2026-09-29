@@ -1,0 +1,18 @@
+# GNU diffutils for slicc wasm realm.
+name: diffutils
+builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/diffutils.git extractVersion=^v(?<version>.*)$
+version: "3.12"
+npm: "@ai-ecoverse/wasm-diffutils"
+summary: "GNU diff/cmp/diff3/sdiff for slicc"
+source:
+  url: "https://ftp.gnu.org/gnu/diffutils/diffutils-3.12.tar.xz"
+  sha256: "7c8b7f9fc8609141fdea9cece85249d308624391ff61dedaf528fcb337727dfd"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/diffutils
+  license: GPL-3.0-or-later
+  notes: Links slicc cli profile. Stages diff, cmp, diff3, sdiff.

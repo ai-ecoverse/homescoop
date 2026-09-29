@@ -1,8 +1,8 @@
 {
   "name": "@ai-ecoverse/wasm-imagemagick",
-  "version": "0.0.0",
-  "description": "ImageMagick (slicc ladder utilities/magick) (WASM / emscripten) — name reservation stub; real artifacts TBD",
-  "license": "Apache-2.0",
+  "version": "7.1.2-32-1",
+  "description": "ImageMagick 7.1.2-32 magick CLI for wasm / slicc (emscripten)",
+  "license": "ImageMagick",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
@@ -14,40 +14,59 @@
     "emscripten",
     "slicc",
     "homescoop",
-    "imagemagick"
+    "imagemagick",
+    "magick",
+    "convert"
   ],
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "bin",
+    "etc"
   ],
   "publishConfig": {
     "access": "public"
   },
   "homescoop": {
     "recipe": "imagemagick",
-    "upstream": "7.1.2-31"
+    "upstream": "7.1.2-32"
   },
   "slicc": {
     "abi": "emscripten",
+    "env": {
+      "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7"
+    },
     "commands": {
       "magick": {
         "glue": "bin/magick",
-        "wasm": "bin/magick.wasm"
+        "wasm": "bin/magick.wasm",
+        "env": {
+          "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7"
+        }
       },
       "convert": {
         "glue": "bin/magick",
         "wasm": "bin/magick.wasm",
-        "argv0": "convert"
+        "argv0": "convert",
+        "env": {
+          "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7"
+        }
       },
       "identify": {
         "glue": "bin/magick",
         "wasm": "bin/magick.wasm",
-        "argv0": "identify"
+        "argv0": "identify",
+        "env": {
+          "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7"
+        }
       },
       "mogrify": {
         "glue": "bin/magick",
         "wasm": "bin/magick.wasm",
-        "argv0": "mogrify"
+        "argv0": "mogrify",
+        "env": {
+          "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7"
+        }
       }
     }
   }

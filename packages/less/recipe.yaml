@@ -1,6 +1,7 @@
 # less pager with static widec ncurses (compiled-in terminfo fallbacks).
 name: less
 builder: host
+# renovate: datasource=github-releases depName=gwsw/less extractVersion=^v(?<version>\d+)$
 version: "668"
 npm: "@ai-ecoverse/wasm-less"
 summary: "less 668 with ncurses 6.5 for slicc wasm realm"
@@ -18,4 +19,5 @@ about:
     Port of slicc-emscripten build-wasm-less.sh. Builds host tic/infocmp from
     the same ncurses 6.5, then wasm libncursesw with
     --disable-database --with-fallbacks=xterm-256color,xterm,vt100,dumb.
-    Links slicc less profile (gaps + signals + jobs + select).
+    Links slicc less profile (gaps + signals + jobs + select/poll).
+    Packaging -1: slicc_select also overrides poll() for Asyncify-safe blocking.

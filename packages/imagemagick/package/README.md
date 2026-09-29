@@ -1,9 +1,15 @@
 # `@ai-ecoverse/wasm-imagemagick`
 
-**Name reservation stub** (v0.0.0). Real emscripten/WASM artifacts for
-**imagemagick 7.1.2-31** will ship from the [homescoop](https://github.com/ai-ecoverse/homescoop)
-ladder recipes.
+[ImageMagick](https://imagemagick.org/) 7.1.2-32 `magick` CLI for
+[slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm. `convert`,
+`identify`, and `mogrify` are argv0 aliases of the same binary.
 
-Upstream summary: ImageMagick (slicc ladder utilities/magick).
+Delegates: zlib, jpeg, png, tiff, webp, openjpeg, lcms2, freetype, libxml2.
+Configure XMLs ship under `etc/ImageMagick-7/`; the slicc manifest sets
+`MAGICK_CONFIGURE_PATH` so `colors.xml` / `policy.xml` resolve.
 
-Do not depend on this version for binaries yet.
+```bash
+ipk add -g @ai-ecoverse/wasm-imagemagick
+magick -version
+convert logo: out.png
+```

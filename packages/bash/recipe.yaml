@@ -1,9 +1,10 @@
 # GNU bash for slicc wasm realm (host ladder).
 name: bash
 builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/bash.git extractVersion=^bash-(?<version>\d+\.\d+)$
 version: "5.3"
 npm: "@ai-ecoverse/wasm-bash"
-summary: "GNU bash 5.3 for slicc (fork via Asyncify)"
+summary: "GNU bash 5.3 with readline for slicc (fork via Asyncify)"
 source:
   url: "https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz"
   sha256: "0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba"
@@ -15,5 +16,12 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/bash
   license: SEE_UPSTREAM
   notes: |
-    Port of slicc-emscripten/build-wasm-bash.sh. Links fork profile +
-    slicc-fork.js / ASYNCIFY. Patch: patches/bash-5.3-emscripten-environ.patch.
+    Port of slicc-emscripten/build-wasm-bash-readline.sh. Static ncursesw
+    (same fallbacks as wasm-less), --with-curses --enable-readline
+    --enable-history. Links fork profile (spawn/exec/fork/jobs/select) +
+    slicc-fork.js / ASYNCIFY. bash_cv_dev_fd=standard for /dev/fd process
+    subst. Patches:
+      patches/bash-5.3-emscripten-environ.patch
+      patches/bash-5.3-pipestatus-restore-null.patch
+        (PROMPT_COMMAND=: bash --norc -i; false|true; echo ${PIPESTATUS[@]}
+         — upstream; do not file from this repo; slicc#3583 also works around)

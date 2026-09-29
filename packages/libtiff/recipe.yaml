@@ -1,7 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: libtiff
 builder: host
-# renovate: datasource=git-tags depName=libsdl-org/libtiff extractVersion=^v(?<version>.*)$
+# renovate: datasource=github-tags depName=libsdl-org/libtiff extractVersion=^v(?<version>.*)$
 version: "4.7.0"
 npm: "@ai-ecoverse/wasm-libtiff"
 summary: "TIFF library"

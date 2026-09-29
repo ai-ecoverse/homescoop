@@ -1,6 +1,7 @@
 # GNU grep for slicc wasm realm (host ladder).
 name: grep
 builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/grep.git extractVersion=^v(?<version>.*)$
 version: "3.12"
 npm: "@ai-ecoverse/wasm-grep"
 summary: "GNU grep for slicc"

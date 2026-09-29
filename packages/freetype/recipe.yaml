@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: freetype
 builder: host
+# renovate: datasource=git-tags depName=https://gitlab.freedesktop.org/freetype/freetype.git extractVersion=^VER-(?<major>\d+)-(?<minor>\d+)-(?<patch>\d+)$
 version: "2.13.3"
 npm: "@ai-ecoverse/wasm-freetype"
 summary: "FreeType font engine"

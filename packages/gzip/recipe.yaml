@@ -1,0 +1,20 @@
+# GNU gzip for slicc wasm realm.
+name: gzip
+builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/gzip.git extractVersion=^v(?<version>.*)$
+version: "1.13"
+npm: "@ai-ecoverse/wasm-gzip"
+summary: "GNU gzip/gunzip/zcat for slicc"
+source:
+  url: "https://ftp.gnu.org/gnu/gzip/gzip-1.13.tar.gz"
+  sha256: "20fc818aeebae87cdbf209d35141ad9d3cf312b35a5e6be61bfcfbf9eddd212a"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/gzip
+  license: GPL-3.0-or-later
+  notes: |
+    Links slicc cli profile. gunzip/zcat are argv0 aliases of gzip.
+    Built with -DGNU_STANDARD=0 so argv0 selects decompress/cat modes.

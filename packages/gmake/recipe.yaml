@@ -1,6 +1,7 @@
 # GNU make as a wasm CLI tool for slicc (host ladder).
 name: gmake
 builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/make.git
 version: "4.4.1"
 npm: "@ai-ecoverse/wasm-gmake"
 summary: "GNU make built for slicc (wasm tool)"

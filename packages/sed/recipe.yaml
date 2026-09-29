@@ -1,6 +1,7 @@
 # GNU sed for slicc wasm realm (host ladder).
 name: sed
 builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/sed.git extractVersion=^v(?<version>.*)$
 version: "4.9"
 npm: "@ai-ecoverse/wasm-sed"
 summary: "GNU sed for slicc"

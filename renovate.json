@@ -33,11 +33,23 @@
       "allowedVersions": "/^1\\.6\\./"
     },
     {
+      "description": "vim tags move fast; xxd tracks a pinned patch — ignore majors.",
+      "matchDepNames": ["vim/vim"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
       "description": "Workflow action pins below a major.",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "minimumReleaseAge": "3 days",
       "automerge": true
+    },
+    {
+      "description": "github-script major bumps can break ladder-merge; review by hand.",
+      "matchPackageNames": ["actions/github-script"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
     }
   ]
 }

@@ -1,0 +1,20 @@
+# GNU tar for slicc wasm realm.
+name: tar
+builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/tar.git extractVersion=^v(?<version>.*)$
+version: "1.35"
+npm: "@ai-ecoverse/wasm-tar"
+summary: "GNU tar for slicc"
+source:
+  url: "https://ftp.gnu.org/gnu/tar/tar-1.35.tar.xz"
+  sha256: "4d62ff37342ec7aed748535323930c7cf94acf71c3591882b26a7ea50f3edc16"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/tar
+  license: GPL-3.0-or-later
+  notes: |
+    Links slicc fork profile (ASYNCIFY) so tar -z/-j/-J can fork gzip/bzip2/xz.
+    Force-links spawn/exec/wait4 (homescoop_slicc_keep_spawn) so waitpid works.
