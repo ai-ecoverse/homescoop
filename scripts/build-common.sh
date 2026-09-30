@@ -371,3 +371,49 @@ EOF
   _ensure_one freetype2 libfreetype.a "-lfreetype"
   _ensure_one libxml-2.0 libxml2.a "-lxml2"
 }
+
+# Ship .pyc next to .py (unchecked-hash) so WASIX imports skip recompile.
+# Host CPython must share wasix-python's magic (3.14.x). Last build step.
+# Usage: homescoop_compile_pyc <dir> [<dir>…]
+#   dirs = trees that contain .py (e.g. package/lib/python3.14/site-packages)
+homescoop_compile_pyc() {
+  local HOST_PY="${WASIX_PYTHON_HOST_PY:-}"
+  local root stale=0 py dir base pyc cand
+  if [[ -z "$HOST_PY" ]]; then
+    if command -v python3.14 >/dev/null 2>&1; then
+      HOST_PY=$(command -v python3.14)
+    else
+      HOST_PY=$(command -v python3)
+    fi
+  fi
+  if [[ $# -lt 1 ]]; then
+    echo "homescoop_compile_pyc: need at least one directory" >&2
+    return 1
+  fi
+  for root in "$@"; do
+    if [[ ! -d "$root" ]]; then
+      echo "homescoop_compile_pyc: not a directory: $root" >&2
+      return 1
+    fi
+    echo "== compileall (unchecked-hash): $root"
+    find "$root" -type d -name '__pycache__' -prune -exec rm -rf {} +
+    "$HOST_PY" -m compileall -q -j0 --invalidation-mode unchecked-hash -d "$root" "$root"
+  done
+  for root in "$@"; do
+    while IFS= read -r -d '' py; do
+      dir=$(dirname "$py")
+      base=$(basename "$py" .py)
+      pyc=""
+      for cand in "$dir/__pycache__/${base}".cpython-*.pyc; do
+        if [[ -f "$cand" ]]; then pyc=$cand; break; fi
+      done
+      if [[ -z "$pyc" || "$py" -nt "$pyc" ]]; then
+        echo "homescoop: stale/missing pyc for $py" >&2
+        stale=1
+      fi
+    done < <(find "$root" -name '*.py' -print0)
+  done
+  if [[ "$stale" -ne 0 ]]; then
+    return 1
+  fi
+}
