@@ -1,0 +1,45 @@
+{
+  "name": "@ai-ecoverse/py-numpy",
+  "version": "2.3.2-4",
+  "description": "NumPy 2.3.2 for slicc WASIX CPython 3.14 (OpenBLAS static into umath/linalg, zero signature_mismatch)",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-numpy/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-numpy",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "numpy"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-6"
+  },
+  "homescoop": {
+    "recipe": "py-numpy",
+    "upstream": "2.3.2"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages",
+      "requires": {
+        "abi": "cp314",
+        "platform": "wasix_wasm32"
+      }
+    }
+  }
+}
