@@ -44,6 +44,7 @@ jobs:
           git apply ../homescoop/packages/wasi-rustc/patches/0004-rust-1.98-static-llvm-lld.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0005-rust-1.98-llvm-wasi-threads-target.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0006-rust-1.98-wasi-sysroot-env.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0007-rust-1.98-llvm-wasi-endian.patch
           git diff --check
           git status --short
 
@@ -69,6 +70,26 @@ jobs:
             -lwasi-emulated-mman -Wl,--max-memory=4294967296 \
             -o wasi-sdk-probe.wasm
           test -s wasi-sdk-probe.wasm
+
+      - name: verify LLVM WASI endian headers
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          headers = [
+              "src/llvm-project/llvm/include/llvm/ADT/bit.h",
+              "src/llvm-project/orc-rt/include/orc-rt/bit.h",
+              "src/llvm-project/compiler-rt/lib/orc/endianness.h",
+          ]
+          for header in headers:
+              text = Path(header).read_text()
+              assert text.count("defined(__wasi__)") == 1, header
+              assert "#include <endian.h>" in text, header
+          PYTHON
+          printf '#include <endian.h>\n#ifndef BYTE_ORDER\n#error missing BYTE_ORDER\n#endif\n' > endian-probe.cpp
+          wasi-sdk/bin/wasm32-wasip1-threads-clang++ --target=wasm32-wasip1-threads \
+            -std=c++17 -fsyntax-only endian-probe.cpp
 
       - name: apt build dependencies
         run: |
