@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Stage a spike cut of @ai-ecoverse/wasi-rustc from known-good LLVM-in-wasm
-# artifacts (oligamiq/rust_wasm + bjorn3 lineage), PRESTAGE, pack for npm @next.
-#
-# Production builds will replace this with an in-tree x.py build on Linux
-# (compile_rustc_for_wasm16 + config.llvm.toml). See SPIKE.md.
+# Historical 1.83.0-1 spike from oligamiq release artifacts. For the patched
+# 1.83.0-2 built by x.py in CI, use stage-patched.py with the workflow artifact.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh

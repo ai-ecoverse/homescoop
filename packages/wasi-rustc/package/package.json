@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-rustc",
-  "version": "1.83.0-1",
+  "version": "1.83.0-2",
   "description": "rustc (LLVM-in-wasm) for slicc WASI — default target wasm32-wasip1",
   "license": "MIT OR Apache-2.0",
   "repository": {

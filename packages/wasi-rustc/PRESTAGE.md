@@ -11,7 +11,7 @@ RUST_MIN_STACK=16777216
 ```
 
 - `rustc --version`
-- Caller PATH set; driver unsets it before launching rustc.wasm
+- Caller PATH set; driver preserves it for rustc.wasm
 - `rustc hello.rs -o hello.wasm` (driver supplies `--sysroot` + `--target`)
 - `-O` + `std::fs` / `std::env` / `std::process::exit`
 - tarball has no symlinks/hardlinks

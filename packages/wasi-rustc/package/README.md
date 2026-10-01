@@ -3,22 +3,21 @@
 `rustc` (LLVM-in-wasm) for **slicc**. Host: `wasm32-wasip1-threads`.
 Default compile target: **wasm32-wasip1**.
 
-## Spike cut `1.83.0-1`
+## Patched cut `1.83.0-2`
 
 - Works: `rustc --version`, `rustc hello.rs` → `hello.wasm`, `-O`,
   `std::fs` / `env` / `process::exit`
 - Linker: **rust-lld** (bundled). Next: spawn `wasm-ld` from
   `@ai-ecoverse/wasm-clang` over WASIX (`-C linker=wasm-ld` in target spec).
-- The driver unsets PATH just before launching rustc.wasm to avoid a host std
-  panic in this cut. The default bundled rust-lld works without PATH; custom
-  linker commands that need PATH are unsupported until the patched rebuild.
+- PATH is passed through to the compiler. The WASI host std supports PATH
+  splitting, TMPDIR and HOME in this build. The bundled rust-lld links quietly.
 - Cargo: deferred
-- Provenance: oligamiq/rust_wasm v3.0.0 `rustc_opt.wasm` + `wasm32-wasip1`
-  sysroot (bjorn3 `compile_rustc_for_wasm` lineage). In-tree `x.py` replaces this.
+- Provenance: Rust 1.83 at the pinned compile-for-wasm fork commit, rebuilt by
+  in-tree `x.py` with the host std and quiet-link patches in homescoop.
 
 ## Layout
 
-- `bin/rustc` — shell driver (injects `--sysroot` + `--target`)
+- `bin/rustc` — shell driver (injects `--sysroot` + `--target`, preserves PATH)
 - `bin/rustc.wasm` — compiler (wasip1-threads host)
 - `lib/rustlib/wasm32-wasip1/` — std/core/alloc + self-contained crt
 

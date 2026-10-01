@@ -13,8 +13,8 @@ per compiler. wasm-clang / wasi-rustc / future `zig cc` depend on it.
 4. Link via WASIX spawn of `wasm-ld` from `@ai-ecoverse/wasm-clang`
 5. Ship `lib/rustlib/...` (no symlinks). Publish `@ai-ecoverse/wasi-rustc@next`.
 
-Cargo deferred. Shared libLLVM refactor of wasm-clang is **not** in this spike;
-keep the rustc build shaped to move onto a PIC side module later.
+Cargo follows a current-stable static rustc build; shared libLLVM comes after
+Cargo acceptance. Keep the rustc build shaped to move onto a PIC side module.
 
 ## Shared libLLVM (target architecture)
 
@@ -80,11 +80,9 @@ Staged: `slicc-emscripten/tmp-wasi/staging/wasi-rustc`.
 oligamiq also ships `llvm_opt.wasm` (93 MB) — separate LLVM **opt** tool; **not**
 required for rustc codegen in this build. Peak RSS ≫ 200 MB; module size OK.
 
-**Shape for later shared libLLVM:** next in-tree `x.py` build should prefer
-linking `rustc_llvm` against a **PIC libLLVM.wasm** (dylink side module) when
-that is not much harder than static — even if the first module is rustc’s
-LLVM 19/22, not clang’s 24. Avoid baking assumptions that LLVM lives inside
-`rustc.wasm` forever.
+**Shape for later shared libLLVM:** after static stable rustc and Cargo pass,
+link `rustc_llvm` against a **PIC libLLVM.wasm** (dylink side module). LLVM 22
+is distinct from wasm-clang's LLVM 24; keep a versioned ABI boundary.
 
 ## Linker / defaults (this cut)
 
@@ -109,8 +107,11 @@ LLVM 19/22, not clang’s 24. Avoid baking assumptions that LLVM lives inside
 - [x] LLVM major mismatch documented (24 ≠ 22 ≠ 19); second LLVM OK for cut 1
 - [x] wasm-clang LLVM size fraction measured (~50% of static archives; ~45% dup win)
 - [x] Wasi `os.rs` patch: split_paths/join_paths/temp_dir/home_dir/getpid
-- [ ] CI rebuild with patch + name section → 1.83.0-2@next (run 36874107734)
-- [ ] Prefer PIC libLLVM side module in next `x.py` build (shape only this spike)
+- [x] CI rebuild with host std patch, quiet linker, and name section (run 36876664149)
+- [x] 1.83.0-2 accepted in SLICC's real Bash driver path with PATH preserved
+- [ ] Static Rust 1.98.x with its in-tree LLVM 22 through the same acceptance
+- [ ] Cargo: offline/path and vendored registry, then realm-proxy HTTPS
+- [ ] PIC LLVM 22 side module (`dylink.0`) after Cargo acceptance
 - [ ] wasm-ld spawn wiring
 - [ ] `@ai-ecoverse/wasm-llvm` package (not this spike)
 
@@ -119,5 +120,9 @@ LLVM 19/22, not clang’s 24. Avoid baking assumptions that LLVM lives inside
 Host std in `rustc.wasm` panics at `os.rs:106` `split_paths` when `PATH` is set.
 Patch: `patches/0001-wasi-os-path-env-stubs.patch`. Host std is static → full rebuild required.
 The packaging-only 1.83.0-1 driver removes PATH before exec; the default bundled
-rust-lld needs no PATH. SLICC still sets PATH for the driver. The patched 1.83.0-2
-restores PATH in the compiler child and removes this workaround.
+rust-lld needs no PATH. The patched 1.83.0-2 restores PATH in the compiler
+child and removes this workaround. `patches/0002-quiet-bundled-lld.patch` also
+removes the fork's unconditional link-command print.
+
+The 1.83.0-2 tarball contains 162 MiB `rustc.wasm`, 71 MiB wasip1 rustlib, and
+compresses to 63.3 MB. It has a wasm `name` section and no archive links.
