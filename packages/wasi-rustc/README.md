@@ -48,3 +48,15 @@ support, and `patches/0004-*` embeds LLD and configures LLVM for the WASI host.
 The workflow emits `wasi-rustc-stable.tgz` for staging and SLICC acceptance.
 Cargo follows acceptance of this compiler; the PIC LLVM side module follows
 Cargo.
+
+## Offline Cargo groundwork
+
+`.github/workflows/wasi-cargo.yml` builds the pinned Cargo 0.84 fork for
+`wasm32-wasip1-threads` with Rust 1.83 and wasi-sdk 24. `prepare-cargo.py`
+replaces its private `extend_imports.wasm_run` runner with a generic
+`cargo/wasix-command` adapter for SLICC's `proc_spawn3`/`proc_join`. The
+first Cargo acceptance disables the fork's private HTTP import and uses `--offline`;
+registry access will be added over the realm proxy after the path dependency
+workspace builds in SLICC. The adapter captures child output through
+pre-created files under TMPDIR, preserving argv, environment, cwd, streams,
+and exit status without filling a pipe.

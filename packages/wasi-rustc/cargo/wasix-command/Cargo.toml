@@ -1,0 +1,10 @@
+[package]
+name = "wasix-command"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT OR Apache-2.0"
+description = "WASIX process adapter for a WASI std Rust program"
+
+[lib]
+path = "lib.rs"
