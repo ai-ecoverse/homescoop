@@ -68,14 +68,13 @@ cat > "$PKG/bin/rustc" <<'EOF'
 # from @ai-ecoverse/wasm-clang over WASIX spawn.
 set -eu
 SCRIPT=$0
-while [ -L "$SCRIPT" ]; do
-  link=$(ls -ld "$SCRIPT" | sed 's/.* -> //')
-  case "$link" in
-    /*) SCRIPT=$link ;;
-    *) SCRIPT=$(dirname "$SCRIPT")/$link ;;
-  esac
-done
-BINDIR=$(CDPATH= cd -- "$(dirname "$SCRIPT")" && pwd)
+# The package has no symlinks. Resolve its directory with shell builtins so
+# the driver works before coreutils has been installed into SLICC.
+case $SCRIPT in
+  */*) ;;
+  *) SCRIPT=$(command -v "$SCRIPT") ;;
+esac
+BINDIR=$(CDPATH= cd -- "${SCRIPT%/*}" && pwd)
 PKGROOT=$(CDPATH= cd -- "$BINDIR/.." && pwd)
 
 has_target=0
