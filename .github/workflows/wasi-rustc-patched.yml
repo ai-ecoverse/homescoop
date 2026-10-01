@@ -93,37 +93,47 @@ jobs:
           sed "s|wasi-sdk-24\.0-[^/\"]*|${WS_FORWARD}/rust/wasi-sdk|g" config.llvm.toml > config.llvm.toml.tmp
           mv config.llvm.toml.tmp config.llvm.toml
 
-          # Scope wasm flags to wasm targets only (never via bare RUSTFLAGS —
-          # that leaks into host bootstrap build scripts / typenum / proc-macro2).
+          # 1.83 bootstrap has no [target.*].rustflags — do not inject it.
+          # Keep wasm name section via [rust] strip = false (not debuginfo flags /
+          # --strip-all). Wasm-only rustc flags go in RUSTFLAGS_NOT_BOOTSTRAP on x.py.
           KEEP_NAMES="${{ inputs.keep_names }}" python3 - <<'PY'
           import os, re
           from pathlib import Path
           p = Path("config.llvm.toml")
           t = p.read_text()
           keep = os.environ.get("KEEP_NAMES", "true").lower() in ("true", "1", "yes")
-          flags = 'rustflags = ["-C", "debuginfo=1"]' if keep else "rustflags = []"
-
-          def add_flags(block_name: str, flags_line: str) -> None:
-              global t
-              pat = rf"(\[target\.'{re.escape(block_name)}'\]\n(?:(?!\[).+\n)*)"
-              m = re.search(pat, t)
-              if not m:
-                  t += f"\n[target.'{block_name}']\n{flags_line}\n"
-                  return
-              body = m.group(1)
-              if "rustflags" in body:
-                  body2 = re.sub(r"rustflags\s*=\s*\[[^\]]*\]\n?", flags_line + "\n", body)
-              else:
-                  body2 = body.rstrip() + "\n" + flags_line + "\n"
-              t = t[: m.start(1)] + body2 + t[m.end(1) :]
-
-          add_flags("wasm32-wasip1", flags)
-          add_flags("wasm32-wasip1-threads", flags)
+          # Drop any rustflags lines under [target.*] (invalid in 1.83 config schema).
+          t = re.sub(r"(?m)^[ \t]*rustflags\s*=\s*\[[^\]]*\]\s*\n", "", t)
+          # Ensure [rust] strip = false (+ lean debuginfo) for name-section retention.
+          rust_block = re.search(r"(?ms)^\[rust\]\n(?:(?!^\[).*\n)*", t)
+          def set_kv(block: str, key: str, value: str) -> str:
+              if re.search(rf"(?m)^{re.escape(key)}\s*=", block):
+                  return re.sub(rf"(?m)^{re.escape(key)}\s*=.*$", f"{key} = {value}", block, count=1)
+              return block.rstrip() + f"\n{key} = {value}\n"
+          if rust_block:
+              body = rust_block.group(0)
+              if keep:
+                  # 1.83: bool; keep name section by not stripping.
+                  body = set_kv(body, "strip", "false")
+                  body = set_kv(body, "debuginfo-level", "0")
+              t = t[: rust_block.start()] + body + t[rust_block.end() :]
+          else:
+              extra = "\n[rust]\nstrip = false\ndebuginfo-level = 0\n" if keep else "\n[rust]\n"
+              t += extra
           p.write_text(t)
-          print(f"homescoop: keep_names={keep} → {flags}")
-          print("=== config.llvm.toml (wasi + rustflags) ===")
+          print(f"homescoop: keep_names={keep} → [rust] strip=false, no target.rustflags")
+          print("=== config.llvm.toml ([rust] / wasi / target) ===")
           for i, line in enumerate(p.read_text().splitlines(), 1):
-              if "wasi" in line.lower() or "rustflags" in line or line.startswith("host") or line.startswith("[target"):
+              low = line.lower()
+              if (
+                  low.startswith("[rust]")
+                  or low.startswith("[target")
+                  or "wasi" in low
+                  or low.startswith("strip")
+                  or low.startswith("debuginfo")
+                  or "rustflags" in low
+                  or low.startswith("host")
+              ):
                   print(f"{i}:{line}")
           PY
 
@@ -131,10 +141,15 @@ jobs:
         working-directory: rust
         env:
           RUST_CONFIGURE_ARGS: "-W warnings"
-          # Intentionally NO RUSTFLAGS — wasm flags live in config.llvm.toml
-          # under [target.'wasm32-wasip1*'].rustflags only.
+          # Never bare RUSTFLAGS (x.py sets it; CARGO_TARGET_*_RUSTFLAGS is ignored).
+          # RUSTFLAGS_NOT_BOOTSTRAP: appended to non-bootstrap crates; with --target
+          # cargo applies it to target artifacts only (not build scripts).
+          # Name section: rely on [rust] strip = false — no -C debuginfo=1 needed.
+          RUSTFLAGS_NOT_BOOTSTRAP: ""
         run: |
           unset RUSTFLAGS || true
+          unset CARGO_TARGET_WASM32_WASIP1_RUSTFLAGS || true
+          unset CARGO_TARGET_WASM32_WASIP1_THREADS_RUSTFLAGS || true
           ./x.py install --config config.llvm.toml
 
       - name: stage artifact
