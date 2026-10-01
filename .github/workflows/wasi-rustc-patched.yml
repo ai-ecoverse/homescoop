@@ -1,0 +1,166 @@
+# Rebuild wasi-rustc with wasi os.rs PATH/env stubs patched.
+# Based on oligamiq/rust_wasm rustc_llvm_with_lld.yml (install-abort only).
+name: wasi-rustc-patched
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_names:
+        description: "Keep wasm name section for SLICC backtraces"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  install-abort:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: checkout homescoop (patches)
+        uses: actions/checkout@v4
+        with:
+          path: homescoop
+
+      - name: checkout oligamiq/rust
+        uses: actions/checkout@v4
+        with:
+          repository: oligamiq/rust
+          submodules: true
+          ref: compile_rustc_for_wasm17
+          path: rust
+
+      - name: pin commit + apply homescoop wasi os patch
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          git fetch origin compile_rustc_for_wasm16_cargo --depth 40
+          git checkout cf327c2068549194a29160499c2ecafa9061e46e
+          patch -p1 < "${{ github.workspace }}/homescoop/packages/wasi-rustc/patches/0001-wasi-os-path-env-stubs.patch"
+          echo "patched wasi os.rs:"
+          rg -n 'split_paths|temp_dir|getpid' library/std/src/sys/pal/wasi/os.rs | head -20
+
+      - name: install wasi-sdk-24
+        working-directory: rust
+        run: |
+          curl -fL -o wasi-sdk.tar.gz \
+            https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz
+          tar -xzf wasi-sdk.tar.gz
+          rm wasi-sdk.tar.gz
+          mv wasi-sdk-24.0-* wasi-sdk
+          echo "WASI_SDK_PATH=${{ github.workspace }}/rust/wasi-sdk" >> "$GITHUB_ENV"
+          echo "WASI_SYSROOT=${{ github.workspace }}/rust/wasi-sdk/share/wasi-sysroot" >> "$GITHUB_ENV"
+
+      - name: free disk
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: install rust + deps
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: apt build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libclang-dev
+
+      - name: toolchain-for-building-rustc (LLVM)
+        working-directory: rust
+        env:
+          RUST_CONFIGURE_ARGS: "-W warnings"
+          RUSTFLAGS: "-W warnings"
+        run: |
+          set -euo pipefail
+          cargo install --git https://github.com/oligamiq/toolchain-for-building-rustc
+          toolchain-for-building-rustc --tier all --os linux --os windows --os mac -f config.llvm.toml --only-llvm
+          WS_FORWARD=$(echo "${{ github.workspace }}" | tr '\\' '/')
+          sed 's|\\|/|g' config.llvm.toml > config.llvm.toml.tmp && mv config.llvm.toml.tmp config.llvm.toml
+          sed "s|wasi-root = .*|wasi-root = \"${WS_FORWARD}/rust/wasi-sdk/share/wasi-sysroot\"|g" config.llvm.toml > config.llvm.toml.tmp
+          mv config.llvm.toml.tmp config.llvm.toml
+          sed "s|wasi-sdk-24\.0-[^/\"]*|${WS_FORWARD}/rust/wasi-sdk|g" config.llvm.toml > config.llvm.toml.tmp
+          mv config.llvm.toml.tmp config.llvm.toml
+          # Keep wasm name section for SLICC backtraces when requested
+          if [ "${{ inputs.keep_names }}" = "true" ]; then
+            echo 'homescoop: requesting name section via RUSTFLAGS'
+            {
+              echo ''
+              echo '[rust]'
+              echo 'debug = true'
+            } >> config.llvm.toml || true
+          fi
+          grep -n wasi config.llvm.toml || true
+
+      - name: x.py install (abort / LLVM)
+        working-directory: rust
+        env:
+          RUST_CONFIGURE_ARGS: "-W warnings"
+          # Keep function names in the wasm for SLICC_WASM_BACKTRACE
+          RUSTFLAGS: "-C link-args=--export-table -C link-args=-z -C link-args=stack-size=8388608"
+        run: |
+          ./x.py install --config config.llvm.toml
+
+      - name: stage artifact
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          mkdir -p stage/bin stage/lib
+          # Find rustc.wasm
+          find dist build -name 'rustc.wasm' 2>/dev/null | head -20
+          RUSTC=$(find dist -name 'rustc.wasm' | head -1)
+          test -n "$RUSTC"
+          cp "$RUSTC" stage/bin/rustc.wasm
+          # Prefer wasip1 sysroot
+          if [ -d dist/lib/rustlib/wasm32-wasip1 ]; then
+            cp -R dist/lib/rustlib stage/lib/
+          else
+            cp -R dist/lib/rustlib stage/lib/ || true
+          fi
+          # Optional side llvm
+          find dist -name 'llvm*.wasm' | head -5 | while read -r f; do cp "$f" stage/lib/; done || true
+          # Separate DWARF/debug companion if present as custom sections — copy full wasm as .debug too
+          cp stage/bin/rustc.wasm stage/bin/rustc.wasm.debug
+          tar -C stage -czf "${{ github.workspace }}/wasi-rustc-patched.tgz" .
+          ls -lh "${{ github.workspace }}/wasi-rustc-patched.tgz"
+          # Smoke: name section?
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          data=Path('stage/bin/rustc.wasm').read_bytes()
+          i=8; names=False
+          while i < len(data):
+            id=data[i]; i+=1
+            size=0; shift=0
+            while True:
+              b=data[i]; i+=1
+              size |= (b&0x7f)<<shift
+              if not b&0x80: break
+              shift+=7
+            if id==0:
+              j=i; nlen=0; shift=0
+              while True:
+                b=data[j]; j+=1
+                nlen |= (b&0x7f)<<shift
+                if not b&0x80: break
+                shift+=7
+              name=data[j:j+nlen]
+              print('custom', name)
+              if name==b'name': names=True
+            i += size
+          print('has_name_section', names)
+          PY
+
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasi-rustc-patched
+          path: wasi-rustc-patched.tgz
+          if-no-files-found: error
+          retention-days: 14
