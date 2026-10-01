@@ -12,6 +12,8 @@ case $SCRIPT in
 esac
 BINDIR=$(CDPATH= cd -- "${SCRIPT%/*}" && pwd)
 PKGROOT=$(CDPATH= cd -- "$BINDIR/.." && pwd)
+RUSTC_SYSROOT=$PKGROOT
+export RUSTC_SYSROOT
 
 has_target=0
 has_sysroot=0

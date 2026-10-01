@@ -43,6 +43,7 @@ jobs:
           git apply ../homescoop/packages/wasi-rustc/patches/0003-rust-1.98-wasi-host-paths.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0004-rust-1.98-static-llvm-lld.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0005-rust-1.98-llvm-wasi-threads-target.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0006-rust-1.98-wasi-sysroot-env.patch
           git diff --check
           git status --short
 
