@@ -37,3 +37,14 @@ Download the `wasi-rustc-patched` artifact from the workflow, then run
 The script stages only the compiler and `wasm32-wasip1` rustlib, excluding
 the Linux host rustlib and duplicate debug copy. `build.sh` remains the
 historical 1.83.0-1 spike recipe.
+
+## Rust 1.98.1 static build
+
+`.github/workflows/wasi-rustc-stable.yml` builds Rust 1.98.1 from the pinned
+upstream tag with its in-tree LLVM 22. The first cut keeps LLVM and LLD in
+`rustc.wasm`. `make-stable-config.py` generates the bootstrap config from an
+absolute wasi-sdk path; `patches/0003-*` adds WASI host paths and environment
+support, and `patches/0004-*` embeds LLD and configures LLVM for the WASI host.
+The workflow emits `wasi-rustc-stable.tgz` for staging and SLICC acceptance.
+Cargo follows acceptance of this compiler; the PIC LLVM side module follows
+Cargo.
