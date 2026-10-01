@@ -1,10 +1,4 @@
 --- a/compiler/rustc_codegen_ssa/src/back/link.rs
 +++ b/compiler/rustc_codegen_ssa/src/back/link.rs
-@@ -812,7 +812,6 @@
-         }
- 
-         let cmd = cmd.command();
+@@ -815 +814,0 @@
 -        println!("Linking using {cmd:?}");
-         let mut args = cmd
-             .get_args()
-             .map(|arg| std::ffi::CString::new(arg.as_encoded_bytes()).unwrap())
