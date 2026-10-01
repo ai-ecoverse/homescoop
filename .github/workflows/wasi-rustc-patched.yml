@@ -102,9 +102,23 @@ jobs:
           p = Path("config.llvm.toml")
           t = p.read_text()
           keep = os.environ.get("KEEP_NAMES", "true").lower() in ("true", "1", "yes")
-          # Drop any rustflags lines under [target.*] (invalid in 1.83 config schema).
+          # Drop rustflags under [target.*] (invalid in 1.83 config schema).
           t = re.sub(r"(?m)^[ \t]*rustflags\s*=\s*\[[^\]]*\]\s*\n", "", t)
-          # Ensure [rust] strip = false (+ lean debuginfo) for name-section retention.
+          # toolchain-for-building-rustc may set strip = "/usr/bin/strip" under
+          # [target.*]; 1.83 Target has no strip field (unknown field → parse fail).
+          # Strip those lines; keep name section via [rust] strip = false only.
+          def scrub_target_strip(text: str) -> str:
+              out, in_target = [], False
+              for line in text.splitlines(True):
+                  if re.match(r"^\[target\.", line):
+                      in_target = True
+                  elif re.match(r"^\[", line):
+                      in_target = False
+                  if in_target and re.match(r"^[ \t]*strip\s*=", line):
+                      continue
+                  out.append(line)
+              return "".join(out)
+          t = scrub_target_strip(t)
           rust_block = re.search(r"(?ms)^\[rust\]\n(?:(?!^\[).*\n)*", t)
           def set_kv(block: str, key: str, value: str) -> str:
               if re.search(rf"(?m)^{re.escape(key)}\s*=", block):
@@ -113,7 +127,6 @@ jobs:
           if rust_block:
               body = rust_block.group(0)
               if keep:
-                  # 1.83: bool; keep name section by not stripping.
                   body = set_kv(body, "strip", "false")
                   body = set_kv(body, "debuginfo-level", "0")
               t = t[: rust_block.start()] + body + t[rust_block.end() :]
@@ -121,7 +134,7 @@ jobs:
               extra = "\n[rust]\nstrip = false\ndebuginfo-level = 0\n" if keep else "\n[rust]\n"
               t += extra
           p.write_text(t)
-          print(f"homescoop: keep_names={keep} → [rust] strip=false, no target.rustflags")
+          print(f"homescoop: keep_names={keep} → scrub target.strip; [rust] strip=false")
           print("=== config.llvm.toml ([rust] / wasi / target) ===")
           for i, line in enumerate(p.read_text().splitlines(), 1):
               low = line.lower()
