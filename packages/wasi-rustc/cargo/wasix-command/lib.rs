@@ -85,6 +85,17 @@ pub fn run(cmd: &Command, input: Option<&[u8]>, capture: bool) -> io::Result<Out
             env.remove(key);
         }
     }
+    if let Some(cwd) = cmd.get_current_dir() {
+        let cwd = if cwd.is_absolute() {
+            cwd.to_path_buf()
+        } else {
+            env.get(&OsString::from("PWD"))
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("/"))
+                .join(cwd)
+        };
+        env.insert(OsString::from("PWD"), cwd.into_os_string());
+    }
     let path = env
         .get(&OsString::from("PATH"))
         .map(|p| p.as_bytes().to_vec())

@@ -103,6 +103,40 @@ text = text[:start] + '''    #[cfg(all(target_os = "wasi", target_env = "p1"))] 
     }''' + text[end:]
 path.write_text(text)
 
+# Stock wasm32-wasip1 std reports `/` as current_dir even when the WASIX host
+# starts the process elsewhere. Bash and the spawn bridge carry the actual cwd
+# in PWD, so use that for Cargo's global context when it is a real directory.
+path = source / "src/cargo/util/context/mod.rs"
+text = path.read_text()
+old = """        let cwd =
+            env::current_dir().context("couldn't get the current directory of the process")?;"""
+if text.count(old) != 2:
+    raise RuntimeError("Cargo GlobalContext cwd spans changed")
+new = """        let cwd =
+            cargo_current_dir().context("couldn't get the current directory of the process")?;"""
+text = text.replace(old, new)
+marker = "use self::ConfigValue as CV;"
+helper = """#[cfg(all(target_os = "wasi", target_env = "p1"))]
+fn cargo_current_dir() -> std::io::Result<PathBuf> {
+    if let Some(pwd) = env::var_os("PWD") {
+        let path = PathBuf::from(pwd);
+        if path.is_absolute() && path.is_dir() {
+            return Ok(path);
+        }
+    }
+    env::current_dir()
+}
+
+#[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+fn cargo_current_dir() -> std::io::Result<PathBuf> {
+    env::current_dir()
+}
+
+"""
+if text.count(marker) != 1:
+    raise RuntimeError("Cargo GlobalContext imports changed")
+path.write_text(text.replace(marker, helper + marker))
+
 # Offline builds cannot reach this code, but an unresolved private import makes
 # the whole wasm module unloadable. Registry HTTP will get a separate proxy path.
 path = source / "crates/fetch/lib.rs"
