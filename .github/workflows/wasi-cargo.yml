@@ -56,8 +56,22 @@ jobs:
           CARGO_TARGET_WASM32_WASIP1_THREADS_LINKER: ${{ github.workspace }}/wasi-sdk/bin/wasm32-wasip1-threads-clang
         run: |
           set -euo pipefail
+          builtins=$(find "$WASI_SDK_PATH/lib/clang" -name libclang_rt.builtins-wasm32.a -print -quit)
+          test -f "$builtins"
+          export RUSTFLAGS="-C link-arg=$builtins"
           cargo build --manifest-path rust/src/tools/cargo/Cargo.toml --bin cargo --target wasm32-wasip1-threads --release
-          find rust/src/tools/cargo/target/wasm32-wasip1-threads/release -maxdepth 1 -type f -name 'cargo*' -ls
+          cargo_wasm=rust/src/tools/cargo/target/wasm32-wasip1-threads/release/cargo.wasm
+          node - "$cargo_wasm" <<'NODE'
+          const fs = require('node:fs');
+          const wasmModule = new WebAssembly.Module(fs.readFileSync(process.argv[2]));
+          const unexpected = WebAssembly.Module.imports(wasmModule).filter(
+            (entry) => entry.module === 'env' && entry.name !== 'memory'
+          );
+          if (unexpected.length > 0) {
+            throw new Error(`unexpected env imports: ${JSON.stringify(unexpected)}`);
+          }
+          NODE
+          ls -lh "$cargo_wasm"
 
       - name: stage Cargo artifact
         run: |
