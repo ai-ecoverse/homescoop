@@ -64,6 +64,8 @@ fn put_op(op: &mut [u8; FD_OP_SIZE], cmd: u8, fd: u32, path: &[u8], flags: u16, 
 /// A nonzero exit status is retained in `code` for callers to report.
 /// If `capture` is false, the child inherits stdout and stderr.
 /// `input` is handed to the child as a regular file on fd 0 when present.
+/// Captured output with no input gets `/dev/null` on fd 0, matching
+/// `Command::output`; uncaptured commands inherit stdin.
 ///
 /// WASI std does not expose a constructor for `std::process::ExitStatus`, so
 /// callers adapt `code` at their own boundary until the WASIX std migration.
@@ -161,6 +163,10 @@ pub fn run(cmd: &Command, input: Option<&[u8]>, capture: bool) -> io::Result<Out
             0,
             0,
         );
+        ops.push(op);
+    } else if capture {
+        let mut op = [0u8; FD_OP_SIZE];
+        put_op(&mut op, FD_OP_OPEN, 0, b"/dev/null", 0, 0);
         ops.push(op);
     }
     let mut pid = 0u32;

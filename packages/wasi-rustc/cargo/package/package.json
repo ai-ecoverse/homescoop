@@ -22,6 +22,7 @@
       }
     },
     "env": {
+      "CARGO": "${package}/bin/cargo",
       "CARGO_BUILD_TARGET": "wasm32-wasip1",
       "CARGO_BUILD_JOBS": "1",
       "CARGO_INCREMENTAL": "0",

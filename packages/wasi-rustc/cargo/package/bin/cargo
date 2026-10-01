@@ -7,6 +7,8 @@ case $SCRIPT in
   *) SCRIPT=$(command -v "$SCRIPT") ;;
 esac
 BINDIR=$(CDPATH= cd -- "${SCRIPT%/*}" && pwd)
+CARGO=${CARGO:-$BINDIR/cargo}
+export CARGO
 RUSTC="$BINDIR/rustc-for-cargo"
 export RUSTC
 : "${CARGO_BUILD_TARGET:=wasm32-wasip1}"

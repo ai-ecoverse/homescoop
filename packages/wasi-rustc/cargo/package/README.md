@@ -14,3 +14,7 @@ Rust 1.83's WASI-hosted `rustc -vV` prints metadata and then panics while
 looking up a native dynamic library path. `bin/rustc-for-cargo` supplies that
 metadata from `rustc --version`; it delegates every compilation call to the
 installed rustc driver. Remove it when the stable compiler handles `-vV`.
+
+The package sets `CARGO` to its installed Bash driver, which Cargo uses for
+subprocesses. Its WASIX Command bridge sends captured child stdin to
+`/dev/null`, so rustc probes do not wait on a live terminal.
