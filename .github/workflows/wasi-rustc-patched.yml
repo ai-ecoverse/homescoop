@@ -39,9 +39,11 @@ jobs:
           git fetch origin compile_rustc_for_wasm16_cargo --depth 40
           git checkout cf327c2068549194a29160499c2ecafa9061e46e
           patch -p1 < "${{ github.workspace }}/homescoop/packages/wasi-rustc/patches/0001-wasi-os-path-env-stubs.patch"
+          patch -p1 < "${{ github.workspace }}/homescoop/packages/wasi-rustc/patches/0002-quiet-bundled-lld.patch"
           echo "patched wasi os.rs:"
           grep -nE 'split_paths|temp_dir|getpid|Colon-separated' library/std/src/sys/pal/wasi/os.rs | head -20
           grep -q 'Colon-separated PATH' library/std/src/sys/pal/wasi/os.rs
+          ! grep -q 'println!("Linking using' compiler/rustc_codegen_ssa/src/back/link.rs
 
       - name: install wasi-sdk-24
         working-directory: rust
