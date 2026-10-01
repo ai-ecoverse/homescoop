@@ -67,6 +67,9 @@ jobs:
 
       - name: install rust + deps
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          # Repo root has no Cargo.toml; rust tree lives under rust/.
+          cache: false
 
       - name: apt build deps
         run: |
@@ -77,6 +80,7 @@ jobs:
         working-directory: rust
         env:
           RUST_CONFIGURE_ARGS: "-W warnings"
+          # Host-only; do NOT put wasm linker flags here.
           RUSTFLAGS: "-W warnings"
         run: |
           set -euo pipefail
@@ -88,24 +92,49 @@ jobs:
           mv config.llvm.toml.tmp config.llvm.toml
           sed "s|wasi-sdk-24\.0-[^/\"]*|${WS_FORWARD}/rust/wasi-sdk|g" config.llvm.toml > config.llvm.toml.tmp
           mv config.llvm.toml.tmp config.llvm.toml
-          # Keep wasm name section for SLICC backtraces when requested
-          if [ "${{ inputs.keep_names }}" = "true" ]; then
-            echo 'homescoop: requesting name section via RUSTFLAGS'
-            {
-              echo ''
-              echo '[rust]'
-              echo 'debug = true'
-            } >> config.llvm.toml || true
-          fi
-          grep -n wasi config.llvm.toml || true
+
+          # Scope wasm flags to wasm targets only (never via bare RUSTFLAGS —
+          # that leaks into host bootstrap build scripts / typenum / proc-macro2).
+          KEEP_NAMES="${{ inputs.keep_names }}" python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          p = Path("config.llvm.toml")
+          t = p.read_text()
+          keep = os.environ.get("KEEP_NAMES", "true").lower() in ("true", "1", "yes")
+          flags = 'rustflags = ["-C", "debuginfo=1"]' if keep else "rustflags = []"
+
+          def add_flags(block_name: str, flags_line: str) -> None:
+              global t
+              pat = rf"(\[target\.'{re.escape(block_name)}'\]\n(?:(?!\[).+\n)*)"
+              m = re.search(pat, t)
+              if not m:
+                  t += f"\n[target.'{block_name}']\n{flags_line}\n"
+                  return
+              body = m.group(1)
+              if "rustflags" in body:
+                  body2 = re.sub(r"rustflags\s*=\s*\[[^\]]*\]\n?", flags_line + "\n", body)
+              else:
+                  body2 = body.rstrip() + "\n" + flags_line + "\n"
+              t = t[: m.start(1)] + body2 + t[m.end(1) :]
+
+          add_flags("wasm32-wasip1", flags)
+          add_flags("wasm32-wasip1-threads", flags)
+          p.write_text(t)
+          print(f"homescoop: keep_names={keep} → {flags}")
+          print("=== config.llvm.toml (wasi + rustflags) ===")
+          for i, line in enumerate(p.read_text().splitlines(), 1):
+              if "wasi" in line.lower() or "rustflags" in line or line.startswith("host") or line.startswith("[target"):
+                  print(f"{i}:{line}")
+          PY
 
       - name: x.py install (abort / LLVM)
         working-directory: rust
         env:
           RUST_CONFIGURE_ARGS: "-W warnings"
-          # Keep function names in the wasm for SLICC_WASM_BACKTRACE
-          RUSTFLAGS: "-C link-args=--export-table -C link-args=-z -C link-args=stack-size=8388608"
+          # Intentionally NO RUSTFLAGS — wasm flags live in config.llvm.toml
+          # under [target.'wasm32-wasip1*'].rustflags only.
         run: |
+          unset RUSTFLAGS || true
           ./x.py install --config config.llvm.toml
 
       - name: stage artifact
