@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Apply the SLICC WASIX process bridge to the pinned Cargo 0.84 fork."""
 from pathlib import Path
+import re
 import shutil
 import sys
 
@@ -151,4 +152,21 @@ start = text.index('#[link(wasm_import_module = "extend_imports")]')
 end = text.index('#[derive(Debug, thiserror::Error)]', start)
 text = text[:start] + text[end:]
 path.write_text(text)
+# This fork contains unconditional diagnostic println! calls in core build
+# paths. They corrupt cargo metadata and --message-format=json stdout. Remove
+# only the known single-line diagnostics from the pinned source revision.
+for rel, expected in {
+    "crates/jobserver/src/wasi.rs": 27,
+    "crates/cargo-util/src/paths.rs": 17,
+    "src/cargo/ops/cargo_compile/mod.rs": 2,
+    "src/cargo/core/compiler/layout.rs": 13,
+    "src/cargo/core/compiler/build_runner/mod.rs": 35,
+    "src/cargo/util/context/mod.rs": 6,
+}.items():
+    path = source / rel
+    cleaned, count = re.subn(r"^[ \t]*println!\([^\n]*\);\n", "", path.read_text(), flags=re.MULTILINE)
+    if count != expected:
+        raise RuntimeError(f"{rel}: expected {expected} debug prints, found {count}")
+    path.write_text(cleaned)
+
 print("Prepared Cargo WASI process bridge (offline mode)")

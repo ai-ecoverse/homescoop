@@ -1,0 +1,11 @@
+#!/bin/sh
+# Rust 1.83's WASI-hosted `rustc -vV` prints metadata, then panics while
+# eagerly resolving a dynamic-library sysroot. Cargo needs only these fields.
+set -eu
+if [ "$#" -eq 1 ] && [ "$1" = '-vV' ]; then
+  version=$(rustc --version)
+  release=${version#rustc }
+  printf '%s\nbinary: rustc\ncommit-hash: unknown\ncommit-date: unknown\nhost: wasm32-wasip1-threads\nrelease: %s\n' "$version" "$release"
+  exit 0
+fi
+exec rustc "$@"

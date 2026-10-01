@@ -23,6 +23,8 @@
     },
     "env": {
       "CARGO_BUILD_TARGET": "wasm32-wasip1",
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_INCREMENTAL": "0",
       "RUST_MIN_STACK": "16777216"
     }
   }
