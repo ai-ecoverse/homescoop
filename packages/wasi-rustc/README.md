@@ -60,3 +60,5 @@ registry access will be added over the realm proxy after the path dependency
 workspace builds in SLICC. The adapter captures child output through
 pre-created files under TMPDIR, preserving argv, environment, cwd, streams,
 and exit status without filling a pipe.
+The native dependency audit and the offline exclusions are in
+[`cargo/DEPENDENCIES.md`](cargo/DEPENDENCIES.md).
