@@ -1,0 +1,25 @@
+diff --git a/src/bootstrap/src/core/build_steps/llvm.rs b/src/bootstrap/src/core/build_steps/llvm.rs
+--- a/src/bootstrap/src/core/build_steps/llvm.rs
++++ b/src/bootstrap/src/core/build_steps/llvm.rs
+@@ -812,6 +836,10 @@ fn configure_cmake(
+         cflags.push(" ");
+         cflags.push(s);
+     }
++    // Keep the wasi-sdk threads target after cc-rs's legacy wasm32-wasi flag.
++    if target == "wasm32-wasip1-threads" {
++        cflags.push(" --target=wasm32-wasip1-threads");
++    }
+     if target.contains("ohos") {
+         cflags.push(" -D_LINUX_SYSINFO_H");
+     }
+@@ -837,6 +865,10 @@ fn configure_cmake(
+         cxxflags.push(" ");
+         cxxflags.push(s);
+     }
++    // Keep the wasi-sdk threads target after cc-rs's legacy wasm32-wasi flag.
++    if target == "wasm32-wasip1-threads" {
++        cxxflags.push(" --target=wasm32-wasip1-threads");
++    }
+     if target.contains("ohos") {
+         cxxflags.push(" -D_LINUX_SYSINFO_H");
+     }
