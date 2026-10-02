@@ -136,7 +136,7 @@ homescoop_require_lib_size() {
 homescoop_em_cli_ldflags() {
   local extra="${HOMESCOOP_EM_CLI_LDFLAGS_EXTRA:-}"
   # shellcheck disable=SC2086
-  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1${extra:+ ${extra}}"
+  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1${extra:+ ${extra}}"
 }
 
 homescoop_slicc_dir() {
@@ -152,7 +152,20 @@ homescoop_slicc_archive() {
   local -a objs=()
   dir="$(homescoop_slicc_dir)"
   odir="$(dirname "$out")/slicc-objs-${profile}"
+  # Always rebuild shims — stale .o can encode the wrong sigaction stride
+  # (20 vs 140) when EM_CACHE pointed at an old sysroot.
+  rm -rf "$odir"
   mkdir -p "$(dirname "$out")" "$odir"
+  # Shim objects must see musl headers with sigset_t 128 bytes (sigaction=140).
+  # A leftover EM_CACHE with sigset_t.__bits[2] silently breaks slicc_sig_mask;
+  # slicc_signals.c _Static_assert also catches it at compile.
+  if [[ -n "${EM_CACHE:-}" && -f "${EM_CACHE}/sysroot/include/bits/alltypes.h" ]]; then
+    if grep -q '__bits\[2\]' "${EM_CACHE}/sysroot/include/bits/alltypes.h"; then
+      echo "homescoop_slicc_archive: EM_CACHE=$EM_CACHE has sigset_t __bits[2] (stride-20 trap)" >&2
+      echo "  Fix: point EM_CACHE at a sysroot with __bits[128/sizeof(long)], or unset it." >&2
+      return 1
+    fi
+  fi
   _homescoop_slicc_compile() {
     src="$1"
     base=$(basename "$src" .c)
@@ -416,4 +429,48 @@ homescoop_compile_pyc() {
   if [[ "$stale" -ne 0 ]]; then
     return 1
   fi
+}
+
+# Assert a package directory / npm tarball contains no symlinks or hardlinks.
+# npm/pacote and ipk skip symlinks; hardlinks also break on extract.
+# Usage: homescoop_assert_no_package_links <package-dir>
+#        homescoop_assert_tarball_no_links <file.tgz>
+homescoop_assert_no_package_links() {
+  local dir="${1:?homescoop_assert_no_package_links <package-dir>}"
+  local bad
+  bad=$(find "$dir" \( -type l -o \( -type f ! -links 1 \) \) 2>/dev/null | head -50 || true)
+  if [[ -n "$bad" ]]; then
+    echo "homescoop: PRESTAGE fail — package has symlinks/hardlinks:" >&2
+    echo "$bad" >&2
+    return 1
+  fi
+  echo "  PRESTAGE: no symlinks/hardlinks in $dir"
+}
+
+homescoop_assert_tarball_no_links() {
+  local tgz="${1:?homescoop_assert_tarball_no_links <tgz>}"
+  local hits
+  hits=$(tar tvzf "$tgz" | grep -E '^[lh]' || true)
+  if [[ -n "$hits" ]]; then
+    echo "homescoop: PRESTAGE fail — tarball has symlinks/hardlinks:" >&2
+    echo "$hits" >&2
+    return 1
+  fi
+  echo "  PRESTAGE: tarball has no symlinks/hardlinks ($(basename "$tgz"))"
+}
+
+# npm pack a package dir, assert no links in the .tgz, print path on stdout.
+# Usage: tgz=$(homescoop_npm_pack_no_links <package-dir> [outdir])
+homescoop_npm_pack_no_links() {
+  local pkg="${1:?}"
+  local outdir="${2:-$(pwd)}"
+  local tgz
+  (
+    cd "$pkg"
+    npm pack --pack-destination "$outdir" >/dev/null
+  )
+  tgz=$(ls -t "$outdir"/*.tgz 2>/dev/null | head -1)
+  [[ -f "$tgz" ]] || { echo "homescoop: npm pack produced no tgz" >&2; return 1; }
+  homescoop_assert_tarball_no_links "$tgz" >&2
+  printf '%s\n' "$tgz"
 }
