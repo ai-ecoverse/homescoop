@@ -1,0 +1,46 @@
+{
+  "name": "@ai-ecoverse/wasix-gnupg",
+  "version": "2.4.9-1",
+  "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent",
+  "license": "GPL-3.0-or-later",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "SOURCES.md",
+    "bin",
+    "licenses",
+    "patches"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-gnupg",
+    "upstream": "2.4.9",
+    "libraries": "libgpg-error 1.61, libgcrypt 1.12.4, libassuan 3.0.2, libksba 1.8.1, npth 1.8 (static)"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "gpg": {
+        "wasm": "bin/gpg.wasm"
+      },
+      "gpg2": {
+        "wasm": "bin/gpg.wasm",
+        "argv0": "gpg"
+      },
+      "gpgv": {
+        "wasm": "bin/gpgv.wasm"
+      },
+      "gpg-agent": {
+        "wasm": "bin/gpg-agent.wasm"
+      },
+      "gpgconf": {
+        "wasm": "bin/gpgconf.wasm"
+      },
+      "gpg-connect-agent": {
+        "wasm": "bin/gpg-connect-agent.wasm"
+      }
+    }
+  }
+}
