@@ -1,0 +1,27 @@
+{
+  "name": "@ai-ecoverse/wasm-xz",
+  "version": "5.8.1-1",
+  "description": "XZ Utils 5.8.1 (xz/lzma + liblzma) for wasm / slicc",
+  "license": "0BSD",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/xz/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/xz",
+  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "xz", "lzma"],
+  "files": ["README.md", "LICENSE", "bin", "lib", "include"],
+  "publishConfig": { "access": "public" },
+  "homescoop": { "recipe": "xz", "upstream": "5.8.1" },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "xz": { "glue": "bin/xz", "wasm": "bin/xz.wasm" },
+      "unxz": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "unxz" },
+      "xzcat": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "xzcat" },
+      "lzma": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "lzma" },
+      "unlzma": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "unlzma" },
+      "lzcat": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "lzcat" }
+    }
+  }
+}
