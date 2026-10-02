@@ -235,7 +235,7 @@ index 80cfe10c..d6fce41a 100644
          // No need to find a main function.
          return None;
 diff --git a/compiler/rustc_session/src/output.rs b/compiler/rustc_session/src/output.rs
-index 23506015..39df68b7 100644
+index 23506015..1d33d8d2 100644
 --- a/compiler/rustc_session/src/output.rs
 +++ b/compiler/rustc_session/src/output.rs
 @@ -3,6 +3,7 @@
@@ -246,12 +246,14 @@ index 23506015..39df68b7 100644
  
  use crate::Session;
  use crate::config::{CrateType, OutFileName, OutputFilenames, OutputType};
-@@ -127,6 +128,10 @@ pub fn filename_for_input(
+@@ -127,6 +128,12 @@ pub fn filename_for_input(
  
  /// Checks if target supports crate_type as output
  pub fn invalid_output_for_target(sess: &Session, crate_type: CrateType) -> bool {
-+    // On WASI a proc-macro crate is a program (`proc_macro::bridge::process`).
-+    if crate_type == CrateType::ProcMacro && sess.target.os == Os::Wasi {
++    // A WASI-hosted compiler builds a WASI proc-macro crate as a program it
++    // runs as a child (`proc_macro::bridge::process`). Other hosts keep
++    // refusing it, so bootstrap's `-Zdual-proc-macros` builds stay as they were.
++    if cfg!(target_os = "wasi") && crate_type == CrateType::ProcMacro && sess.target.os == Os::Wasi {
 +        return false;
 +    }
      if let CrateType::Cdylib | CrateType::Dylib | CrateType::ProcMacro = crate_type {

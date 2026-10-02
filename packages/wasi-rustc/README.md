@@ -84,6 +84,35 @@ same RPC as the dylib bridge, carried over a pipe:
 `cargo/make-proc-macro-fixture.sh` builds the offline acceptance workspace:
 serde/serde_json, thiserror, clap derive, and a panicking derive.
 
+Only a compiler that itself runs on WASI accepts `--crate-type proc-macro` for
+a WASI target. Other hosts refuse it, as upstream does, so bootstrap's
+`-Zdual-proc-macros` doesn't try to build rustc's own proc macros for wasm.
+
+`patches/0013-*`: on WASI, `env::current_dir` is `$PWD` when that names a
+directory. wasi-libc starts every process at `/`, while SLICC passes the real
+working directory in `PWD`. `set_current_dir` keeps `PWD` current.
+
+## Cargo 0.99 (`cargo-0.99/`)
+
+Cargo 0.99 is Rust 1.98.1's own submodule (rust-lang/cargo `797e8a9`). The
+stable workflow builds it right after rustc, with the stage1 compiler, so it
+links this recipe's wasm32-wasip1-threads std.
+
+- `prepare.sh` applies `cargo.patch` and adds the WASIX Command bridge.
+- `git2`, `home` and `filetime` come from crates.io with one small WASI patch
+  each (`[patch.crates-io]`).
+- libgit2 builds with the headers in `wasi-compat/`. Cargo uses it only for
+  local repositories, and git fetch fails with a message that names the realm.
+- Registry HTTP: on WASI, `util/network/http_async.rs` is a plain HTTP/1.1
+  client that talks to the realm proxy (`https_proxy`) with absolute-form
+  `https://` targets. The proxy does TLS, so there is no curl or TLS stack.
+  It handles chunked or sized bodies, redirects and one keep-alive
+  connection.
+- Processes go through `cargo/wasix-command`.
+- WASI has no cross-process jobserver, so the jobserver is not handed to
+  children.
+- File locks are skipped, because WASI std reports them unsupported.
+
 ## Offline Cargo groundwork
 
 `.github/workflows/wasi-cargo.yml` builds the pinned Cargo 0.84 fork for

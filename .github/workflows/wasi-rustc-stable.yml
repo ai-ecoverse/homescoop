@@ -50,6 +50,7 @@ jobs:
           git apply ../homescoop/packages/wasi-rustc/patches/0010-rust-1.98-wasi-no-dlopen.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0011-rust-1.98-wasi-output-writeable.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0012-rust-1.98-wasi-process-proc-macros.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0013-rust-1.98-wasi-cwd-from-pwd.patch
           git diff --check
           git status --short
 
@@ -177,5 +178,39 @@ jobs:
         with:
           name: wasi-rustc-stable
           path: wasi-rustc-stable.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+      # Cargo 0.99 is Rust 1.98.1's own submodule. It is built with the stage1
+      # compiler above, so it links this recipe's wasm32-wasip1-threads std
+      # (PATH splitting, cwd from $PWD: patches 0003 and 0013).
+      - name: prepare Cargo 0.99 for SLICC
+        run: |
+          set -euo pipefail
+          cargo_rev=$(git -C rust ls-tree HEAD src/tools/cargo | awk '{print $3}')
+          test "$cargo_rev" = 797e8a9bca276c1c9f9f738d2a20f484fa4eea9d
+          git init -q cargo
+          git -C cargo fetch -q --depth 1 https://github.com/rust-lang/cargo.git "$cargo_rev"
+          git -C cargo checkout -q FETCH_HEAD
+          sh homescoop/packages/wasi-rustc/cargo-0.99/prepare.sh cargo
+          ls rust/build/x86_64-unknown-linux-gnu/stage1/lib/rustlib/wasm32-wasip1-threads/lib | head -3
+
+      - name: build Cargo 0.99 for SLICC
+        run: |
+          set -euo pipefail
+          RUSTC="$PWD/rust/build/x86_64-unknown-linux-gnu/stage1/bin/rustc" \
+            sh homescoop/packages/wasi-rustc/cargo-0.99/build.sh cargo
+          cargo_wasm=cargo/target/wasm32-wasip1-threads/release/cargo.wasm
+          node homescoop/packages/wasi-rustc/cargo/check-cargo-wasm.mjs "$cargo_wasm"
+          mkdir -p cargo-stage/bin
+          cp "$cargo_wasm" cargo-stage/bin/cargo.wasm
+          tar -C cargo-stage -czf wasi-cargo.tgz .
+          ls -lh wasi-cargo.tgz
+
+      - name: upload Cargo
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasi-cargo
+          path: wasi-cargo.tgz
           if-no-files-found: error
           retention-days: 14
