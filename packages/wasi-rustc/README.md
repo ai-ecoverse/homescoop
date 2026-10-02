@@ -57,6 +57,33 @@ The workflow emits `wasi-rustc-stable.tgz` for staging and SLICC acceptance.
 Cargo follows acceptance of this compiler; the PIC LLVM side module follows
 Cargo.
 
+### Proc macros (`patches/0012-*`)
+
+WASI has no `dlopen`, so a proc-macro crate becomes a program, and the
+compiler runs each one as a child process for the whole session. It's the
+same RPC as the dylib bridge, carried over a pipe:
+
+- **Linking.** On a WASI target, `--crate-type proc-macro` links as a program
+  (`rustc_session` output check, `link_output_kind`, `entry_fn`). The
+  proc-macro harness adds `#[rustc_main] fn main()`, which calls
+  `proc_macro::bridge::process::serve(_DECLS)`. Crate metadata goes in the wasm
+  custom section, as for any wasm dylib.
+- **Loading.** On a WASI host, `dlsym_proc_macros` starts the program with
+  WASIX `fd_pipe` + `proc_spawn3` (pipes dup2'd onto its stdin and stdout) and
+  gets back one client per macro.
+- **Running.** The bridge's request and reply buffers travel as frames over
+  the pipe. The macro runs in the child, and every call it makes comes back to
+  the compiler's dispatcher. Handles stay the compiler's, so spans and hygiene
+  are exactly as with a dylib. A client is only a function pointer, so each
+  process-backed macro gets a function of its own: 256 slots per session.
+- **Panics.** A panic aborts the child (WASI has no unwinding). Its hook sends
+  the message first, and the compiler reports `proc-macro derive panicked`
+  with that message, then restarts the program on its next use.
+- **Stray output.** A macro's own stdout output is passed to stderr.
+
+`cargo/make-proc-macro-fixture.sh` builds the offline acceptance workspace:
+serde/serde_json, thiserror, clap derive, and a panicking derive.
+
 ## Offline Cargo groundwork
 
 `.github/workflows/wasi-cargo.yml` builds the pinned Cargo 0.84 fork for

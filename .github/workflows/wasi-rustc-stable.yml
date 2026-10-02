@@ -49,6 +49,7 @@ jobs:
           git apply ../homescoop/packages/wasi-rustc/patches/0009-rust-1.98-llvm-wasi-support.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0010-rust-1.98-wasi-no-dlopen.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0011-rust-1.98-wasi-output-writeable.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0012-rust-1.98-wasi-process-proc-macros.patch
           git diff --check
           git status --short
 

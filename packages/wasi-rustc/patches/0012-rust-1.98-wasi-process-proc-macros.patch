@@ -1,0 +1,561 @@
+diff --git a/compiler/rustc_builtin_macros/src/proc_macro_harness.rs b/compiler/rustc_builtin_macros/src/proc_macro_harness.rs
+index 32865f23..8f6f867d 100644
+--- a/compiler/rustc_builtin_macros/src/proc_macro_harness.rs
++++ b/compiler/rustc_builtin_macros/src/proc_macro_harness.rs
+@@ -13,6 +13,7 @@
+ use rustc_span::hygiene::AstPass;
+ use rustc_span::source_map::SourceMap;
+ use rustc_span::{DUMMY_SP, Ident, Span, kw, sym};
++use rustc_target::spec::Os;
+ use smallvec::smallvec;
+ use thin_vec::{ThinVec, thin_vec};
+ 
+@@ -86,6 +87,33 @@ pub fn inject(
+     krate.items.push(decls);
+ }
+ 
++/// `#[rustc_main] fn main() { proc_macro::bridge::process::serve(_DECLS) }`
++fn mk_process_main(cx: &ExtCtxt<'_>, span: Span, proc_macro: Ident, bridge: Ident) -> Box<ast::Item> {
++    let process = Ident::from_str_and_span("process", span);
++    let serve = Ident::from_str_and_span("serve", span);
++    let serve = cx.expr_path(cx.path(span, vec![proc_macro, bridge, process, serve]));
++    let decls = cx.expr_path(cx.path_ident(span, Ident::new(sym::_DECLS, span)));
++    let body = cx.block(span, thin_vec![cx.stmt_expr(cx.expr_call(span, serve, thin_vec![decls]))]);
++    let decl = cx.fn_decl(ThinVec::new(), ast::FnRetTy::Default(span));
++    Box::new(ast::Item {
++        attrs: thin_vec![cx.attr_word(sym::rustc_main, span)],
++        id: ast::DUMMY_NODE_ID,
++        kind: ast::ItemKind::Fn(Box::new(ast::Fn {
++            defaultness: ast::Defaultness::Implicit,
++            sig: ast::FnSig { decl, header: ast::FnHeader::default(), span },
++            ident: Ident::new(sym::main, span),
++            generics: ast::Generics::default(),
++            contract: None,
++            body: Some(body),
++            define_opaque: None,
++            eii_impls: ThinVec::new(),
++        })),
++        vis: ast::Visibility { span, kind: ast::VisibilityKind::Inherited, tokens: None },
++        span,
++        tokens: None,
++    })
++}
++
+ impl<'a> CollectProcMacros<'a> {
+     fn check_not_pub_in_root(&self, vis: &ast::Visibility, sp: Span) {
+         if self.is_proc_macro_crate && self.in_root && vis.kind.is_pub() {
+@@ -361,9 +389,13 @@ fn mk_decls(cx: &mut ExtCtxt<'_>, macros: &[ProcMacro]) -> Box<ast::Item> {
+         cx.attr_nested_word(sym::allow, sym::deprecated, span),
+     ]);
+ 
+-    let block = ast::ConstItemRhsKind::new_body(cx.expr_block(
+-        cx.block(span, thin_vec![cx.stmt_item(span, krate), cx.stmt_item(span, decls_static)]),
+-    ));
++    let mut stmts = thin_vec![cx.stmt_item(span, krate), cx.stmt_item(span, decls_static)];
++    // WASI has no dlopen: the crate is linked as a program that serves its
++    // macros to the compiler over stdin and stdout (`bridge::process`).
++    if cx.sess.target.os == Os::Wasi {
++        stmts.push(cx.stmt_item(span, mk_process_main(cx, span, proc_macro, bridge)));
++    }
++    let block = ast::ConstItemRhsKind::new_body(cx.expr_block(cx.block(span, stmts)));
+ 
+     let anon_constant = cx.item_const(
+         span,
+diff --git a/compiler/rustc_codegen_ssa/src/back/link.rs b/compiler/rustc_codegen_ssa/src/back/link.rs
+index 6cd0b3e1..ebb2a421 100644
+--- a/compiler/rustc_codegen_ssa/src/back/link.rs
++++ b/compiler/rustc_codegen_ssa/src/back/link.rs
+@@ -1983,6 +1983,10 @@ fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+ }
+ 
+ fn link_output_kind(sess: &Session, crate_type: CrateType) -> LinkOutputKind {
++    // On WASI a proc-macro crate is a program (`proc_macro::bridge::process`).
++    if crate_type == CrateType::ProcMacro && sess.target.os == Os::Wasi {
++        return LinkOutputKind::StaticNoPicExe;
++    }
+     let kind = match (crate_type, sess.crt_static(Some(crate_type)), sess.relocation_model()) {
+         (CrateType::Executable, _, _) if sess.is_wasi_reactor() => LinkOutputKind::WasiReactorExe,
+         (CrateType::Executable, false, RelocModel::Pic | RelocModel::Pie) => {
+diff --git a/compiler/rustc_metadata/src/host_dylib.rs b/compiler/rustc_metadata/src/host_dylib.rs
+index f2416aaa..c66115ba 100644
+--- a/compiler/rustc_metadata/src/host_dylib.rs
++++ b/compiler/rustc_metadata/src/host_dylib.rs
+@@ -142,6 +142,114 @@ pub unsafe fn load_symbol_from_dylib<T: Copy>(
+     Ok(*sym)
+ }
+ 
++// WASI has no dlopen: a proc-macro crate is a program, run as a child that
++// serves its macros over stdin and stdout (`proc_macro::bridge::process`).
++#[cfg(target_os = "wasi")]
++pub(crate) fn dlsym_proc_macros(
++    path: &Path,
++    _stable_crate_id: StableCrateId,
++) -> Result<&'static [ProcMacroClient], DylibError> {
++    let program = path.to_path_buf();
++    rustc_proc_macro::bridge::process::clients(Box::new(move || wasix::spawn_piped(&program)))
++        .map_err(|err| DylibError::DlOpen(path.display().to_string(), format!(": {err}")))
++}
++
++#[cfg(target_os = "wasi")]
++#[allow(unsafe_code)]
++mod wasix {
++    use std::ffi::CString;
++    use std::fs::File;
++    use std::io;
++    use std::os::fd::{AsRawFd, FromRawFd};
++    use std::os::wasi::ffi::OsStrExt;
++    use std::path::Path;
++
++    #[link(wasm_import_module = "wasix_32v1")]
++    unsafe extern "C" {
++        fn fd_pipe(read: *mut u32, write: *mut u32) -> u16;
++        fn proc_spawn3(
++            name: *const u8,
++            name_len: u32,
++            argv: *const *const u8,
++            argc: u32,
++            env: *const *const u8,
++            envc: u32,
++            ops: *const u8,
++            op_count: u32,
++            signal: u32,
++            priority: u32,
++            search: u32,
++            path: *const u8,
++            path_len: u32,
++            pid: *mut u32,
++        ) -> u16;
++    }
++
++    /// A pipe's read and write ends.
++    fn pipe() -> io::Result<(File, File)> {
++        let (mut read, mut write) = (0, 0);
++        match unsafe { fd_pipe(&mut read, &mut write) } {
++            0 => unsafe { Ok((File::from_raw_fd(read as i32), File::from_raw_fd(write as i32))) },
++            errno => Err(io::Error::from_raw_os_error(errno.into())),
++        }
++    }
++
++    /// `__wasi_proc_spawn_fd_op_t` dup2: `fd` becomes a copy of `src`.
++    fn dup2(fd: u32, src: &File) -> [u8; 56] {
++        let mut op = [0u8; 56];
++        op[0] = 1;
++        op[4..8].copy_from_slice(&fd.to_le_bytes());
++        op[8..12].copy_from_slice(&(src.as_raw_fd() as u32).to_le_bytes());
++        op
++    }
++
++    /// Starts `program` with pipes on its stdin and stdout; returns its
++    /// stdout (to read) and its stdin (to write). stderr is inherited.
++    pub(super) fn spawn_piped(program: &Path) -> io::Result<(File, File)> {
++        let name = program.as_os_str().as_bytes();
++        let argv0 = CString::new(name).map_err(io::Error::other)?;
++        let argv = [argv0.as_ptr().cast::<u8>()];
++        let env: Vec<CString> = std::env::vars_os()
++            .filter_map(|(key, value)| {
++                let mut entry = key.as_bytes().to_vec();
++                entry.push(b'=');
++                entry.extend_from_slice(value.as_bytes());
++                CString::new(entry).ok()
++            })
++            .collect();
++        let envp: Vec<*const u8> = env.iter().map(|entry| entry.as_ptr().cast()).collect();
++        let (child_in, to_child) = pipe()?;
++        let (from_child, child_out) = pipe()?;
++        let ops = [dup2(0, &child_in), dup2(1, &child_out)];
++        let mut pid = 0;
++        let errno = unsafe {
++            proc_spawn3(
++                name.as_ptr(),
++                name.len() as u32,
++                argv.as_ptr(),
++                1,
++                envp.as_ptr(),
++                envp.len() as u32,
++                ops.as_ptr().cast(),
++                ops.len() as u32,
++                0,
++                0,
++                0,
++                [].as_ptr(),
++                0,
++                &mut pid,
++            )
++        };
++        // The child has its own copies; the compiler keeps only its ends.
++        drop((child_in, child_out));
++        match errno {
++            0 => Ok((from_child, to_child)),
++            errno => Err(io::Error::from_raw_os_error(errno.into())),
++        }
++    }
++}
++
++#[cfg(not(target_os = "wasi"))]
+ pub(crate) fn dlsym_proc_macros(
+     path: &Path,
+     stable_crate_id: StableCrateId,
+diff --git a/compiler/rustc_metadata/src/locator.rs b/compiler/rustc_metadata/src/locator.rs
+index f970be08..0ce2a988 100644
+--- a/compiler/rustc_metadata/src/locator.rs
++++ b/compiler/rustc_metadata/src/locator.rs
+@@ -348,6 +348,11 @@ pub(crate) fn for_proc_macro(&mut self, sess: &'a Session, path_kind: PathKind)
+         self.is_proc_macro = true;
+         self.target = &sess.host;
+         self.tuple = TargetTuple::from_tuple(config::host_tuple());
++        // A WASI-hosted compiler runs proc macros as wasm32-wasip1 programs
++        // (`proc_macro::bridge::process`), whatever its own triple.
++        if cfg!(target_os = "wasi") {
++            self.tuple = TargetTuple::from_tuple("wasm32-wasip1");
++        }
+         self.filesearch = sess.host_filesearch();
+         self.path_kind = path_kind;
+     }
+diff --git a/compiler/rustc_passes/src/entry.rs b/compiler/rustc_passes/src/entry.rs
+index 80cfe10c..d6fce41a 100644
+--- a/compiler/rustc_passes/src/entry.rs
++++ b/compiler/rustc_passes/src/entry.rs
+@@ -6,6 +6,7 @@
+ use rustc_middle::ty::TyCtxt;
+ use rustc_session::config::{CrateType, EntryFnType, sigpipe};
+ use rustc_span::{RemapPathScopeComponents, Span};
++use rustc_target::spec::Os;
+ 
+ use crate::diagnostics::{ExternMain, MultipleRustcMain, NoMainErr};
+ 
+@@ -21,7 +22,9 @@ struct EntryContext<'tcx> {
+ }
+ 
+ fn entry_fn(tcx: TyCtxt<'_>, (): ()) -> Option<(DefId, EntryFnType)> {
+-    let any_exe = tcx.crate_types().contains(&CrateType::Executable);
++    // On WASI a proc-macro crate is a program (`proc_macro::bridge::process`).
++    let any_exe = tcx.crate_types().contains(&CrateType::Executable)
++        || (tcx.crate_types().contains(&CrateType::ProcMacro) && tcx.sess.target.os == Os::Wasi);
+     if !any_exe {
+         // No need to find a main function.
+         return None;
+diff --git a/compiler/rustc_session/src/output.rs b/compiler/rustc_session/src/output.rs
+index 23506015..39df68b7 100644
+--- a/compiler/rustc_session/src/output.rs
++++ b/compiler/rustc_session/src/output.rs
+@@ -3,6 +3,7 @@
+ use std::path::Path;
+ 
+ use rustc_span::{Span, Symbol};
++use rustc_target::spec::Os;
+ 
+ use crate::Session;
+ use crate::config::{CrateType, OutFileName, OutputFilenames, OutputType};
+@@ -127,6 +128,10 @@ pub fn filename_for_input(
+ 
+ /// Checks if target supports crate_type as output
+ pub fn invalid_output_for_target(sess: &Session, crate_type: CrateType) -> bool {
++    // On WASI a proc-macro crate is a program (`proc_macro::bridge::process`).
++    if crate_type == CrateType::ProcMacro && sess.target.os == Os::Wasi {
++        return false;
++    }
+     if let CrateType::Cdylib | CrateType::Dylib | CrateType::ProcMacro = crate_type {
+         if !sess.target.dynamic_linking {
+             return true;
+diff --git a/library/proc_macro/src/bridge/client.rs b/library/proc_macro/src/bridge/client.rs
+index 48e6245e..cbd7f2ab 100644
+--- a/library/proc_macro/src/bridge/client.rs
++++ b/library/proc_macro/src/bridge/client.rs
+@@ -222,7 +222,7 @@ pub struct Client {
+     pub(super) run: extern "C" fn(BridgeConfig<'_>) -> Buffer,
+ }
+ 
+-fn maybe_install_panic_hook(force_show_panics: bool) {
++pub(super) fn maybe_install_panic_hook(force_show_panics: bool) {
+     // Hide the default panic output within `proc_macro` expansions.
+     // NB. the server can't do this because it may use a different std.
+     static HIDE_PANICS_DURING_EXPANSION: Once = Once::new();
+diff --git a/library/proc_macro/src/bridge/mod.rs b/library/proc_macro/src/bridge/mod.rs
+index 8b60043f..15de1ca7 100644
+--- a/library/proc_macro/src/bridge/mod.rs
++++ b/library/proc_macro/src/bridge/mod.rs
+@@ -105,6 +105,9 @@ fn ts_into_trees(
+ mod selfless_reify;
+ #[forbid(unsafe_code)]
+ pub mod server;
++#[cfg(target_os = "wasi")]
++#[forbid(unsafe_code)]
++pub mod process;
+ #[allow(unsafe_code)]
+ mod symbol;
+ 
+diff --git a/library/proc_macro/src/bridge/process.rs b/library/proc_macro/src/bridge/process.rs
+new file mode 100644
+index 00000000..452c2aef
+--- /dev/null
++++ b/library/proc_macro/src/bridge/process.rs
+@@ -0,0 +1,269 @@
++//! Proc macros as separate processes, for hosts without `dlopen` (WASI).
++//!
++//! On WASI a proc-macro crate is linked as a program whose entry point is
++//! [`serve`]. The compiler starts it as a child process and relays the
++//! bridge's RPC buffers over the child's stdin and stdout: the macro runs
++//! in the child, and every call it makes into the compiler comes back over
++//! the pipe as a buffer for the compiler's dispatcher. Handles stay the
++//! compiler's, so spans and hygiene are exactly as with a dylib.
++//!
++//! Frames start with [`MAGIC`]. Bytes before it are a macro's own output
++//! to stdout and go to stderr. A panic aborts the child (WASI has no
++//! unwinding); its hook sends the message first, and the compiler reports
++//! it as the macro's panic.
++
++use std::io::{self, BufRead, BufReader, Write};
++use std::fs::File;
++use std::panic;
++use std::sync::{Arc, Mutex};
++
++use super::client::Client;
++use super::{BridgeConfig, Buffer, Encode, PanicMessage, closure};
++
++const MAGIC: [u8; 4] = *b"\0PMB";
++/// Child to compiler: the number of macros, as a `u32`.
++const HELLO: u8 = 0;
++/// Compiler to child: macro index (`u32`), force-show-panics (`u8`), input buffer.
++const EXPAND: u8 = 1;
++/// Child to compiler: a request buffer for the dispatcher.
++const CALL: u8 = 2;
++/// Compiler to child: the dispatcher's reply.
++const REPLY: u8 = 3;
++/// Child to compiler: the macro's output buffer.
++const DONE: u8 = 4;
++/// Child to compiler: a panic message, sent before the child aborts.
++const PANIC: u8 = 5;
++
++fn write_frame(w: &mut impl Write, tag: u8, body: &[u8]) -> io::Result<()> {
++    let mut frame = Vec::with_capacity(MAGIC.len() + 5 + body.len());
++    frame.extend_from_slice(&MAGIC);
++    frame.push(tag);
++    frame.extend_from_slice(&(body.len() as u32).to_le_bytes());
++    frame.extend_from_slice(body);
++    w.write_all(&frame)?;
++    w.flush()
++}
++
++/// Reads up to and including the next [`MAGIC`]; what came before it goes to `stray`.
++fn skip_to_magic(r: &mut impl BufRead, stray: &mut Vec<u8>) -> io::Result<()> {
++    let mut matched = 0;
++    while matched < MAGIC.len() {
++        let mut byte = [0u8];
++        r.read_exact(&mut byte)?;
++        if byte[0] == MAGIC[matched] {
++            matched += 1;
++        } else {
++            stray.extend_from_slice(&MAGIC[..matched]);
++            matched = usize::from(byte[0] == MAGIC[0]);
++            if matched == 0 {
++                stray.push(byte[0]);
++            }
++        }
++    }
++    Ok(())
++}
++
++fn read_frame(r: &mut impl BufRead) -> io::Result<(u8, Vec<u8>)> {
++    let mut stray = Vec::new();
++    let found = skip_to_magic(r, &mut stray);
++    if !stray.is_empty() {
++        let _ = io::stderr().write_all(&stray);
++    }
++    found?;
++    let mut head = [0u8; 5];
++    r.read_exact(&mut head)?;
++    let mut body = vec![0u8; u32::from_le_bytes([head[1], head[2], head[3], head[4]]) as usize];
++    r.read_exact(&mut body)?;
++    Ok((head[0], body))
++}
++
++/// The entry point of a proc-macro program: serves its macros on stdin and
++/// stdout until the compiler closes stdin.
++pub fn serve(clients: &[Client]) {
++    // The bridge's hook (which hides panic output during expansion) goes
++    // under this one, which reports the panic and ends the process: WASI
++    // cannot unwind, and an abort would trap.
++    super::client::maybe_install_panic_hook(false);
++    let prev = panic::take_hook();
++    panic::set_hook(Box::new(move |info| {
++        let message = info.payload_as_str().unwrap_or("Box<dyn Any>");
++        let _ = write_frame(&mut io::stdout().lock(), PANIC, message.as_bytes());
++        prev(info);
++        std::process::exit(101);
++    }));
++    let mut input = io::stdin().lock();
++    let count = clients.len() as u32;
++    if write_frame(&mut io::stdout().lock(), HELLO, &count.to_le_bytes()).is_err() {
++        return;
++    }
++    while let Ok((EXPAND, body)) = read_frame(&mut input) {
++        let Some(client) = body.get(..4).and_then(|index| {
++            clients.get(u32::from_le_bytes(index.try_into().unwrap()) as usize)
++        }) else {
++            return;
++        };
++        let force_show_panics = body.get(4) == Some(&1);
++        let mut dispatch = |request: Buffer| -> Buffer {
++            let reply = write_frame(&mut io::stdout().lock(), CALL, &request)
++                .and_then(|()| read_frame(&mut input));
++            match reply {
++                Ok((REPLY, reply)) => Buffer::from(reply),
++                _ => std::process::exit(1),
++            }
++        };
++        let output = (client.run)(BridgeConfig {
++            input: Buffer::from(body[5..].to_vec()),
++            dispatch: (&mut dispatch).into(),
++            force_show_panics,
++        });
++        if write_frame(&mut io::stdout().lock(), DONE, &output).is_err() {
++            return;
++        }
++    }
++}
++
++/// Starts a proc-macro program: returns its stdout (to read) and its stdin
++/// (to write).
++pub type Spawn = Box<dyn FnMut() -> io::Result<(File, File)> + Send>;
++
++struct Server {
++    spawn: Spawn,
++    child: Option<(BufReader<File>, File)>,
++}
++
++impl Server {
++    fn start(spawn: &mut Spawn) -> io::Result<(u32, (BufReader<File>, File))> {
++        let (stdout, stdin) = spawn()?;
++        let mut stdout = BufReader::new(stdout);
++        match read_frame(&mut stdout)? {
++            (HELLO, count) if count.len() == 4 => {
++                Ok((u32::from_le_bytes(count.try_into().unwrap()), (stdout, stdin)))
++            }
++            _ => Err(io::Error::other("not a proc-macro program")),
++        }
++    }
++
++    fn expand(
++        &mut self,
++        index: u32,
++        force_show_panics: bool,
++        input: &[u8],
++        dispatch: &mut closure::Closure<'_>,
++    ) -> Result<Buffer, String> {
++        if self.child.is_none() {
++            let (_, child) = Self::start(&mut self.spawn)
++                .map_err(|e| format!("cannot restart the proc-macro process: {e}"))?;
++            self.child = Some(child);
++        }
++        let (stdout, stdin) = self.child.as_mut().unwrap();
++        let mut body = Vec::with_capacity(5 + input.len());
++        body.extend_from_slice(&index.to_le_bytes());
++        body.push(u8::from(force_show_panics));
++        body.extend_from_slice(input);
++        let lost = |e: io::Error| format!("lost the proc-macro process: {e}");
++        write_frame(stdin, EXPAND, &body).map_err(lost)?;
++        let mut panicked = None;
++        loop {
++            match read_frame(stdout) {
++                Ok((CALL, request)) => {
++                    let reply = dispatch.call(Buffer::from(request));
++                    write_frame(stdin, REPLY, &reply).map_err(lost)?;
++                }
++                Ok((DONE, output)) => return Ok(Buffer::from(output)),
++                Ok((PANIC, message)) => {
++                    panicked = Some(String::from_utf8_lossy(&message).into_owned());
++                }
++                Ok(_) => return Err("unexpected message from the proc-macro process".into()),
++                Err(e) => return Err(panicked.unwrap_or_else(|| lost(e))),
++            }
++        }
++    }
++}
++
++struct Remote {
++    server: Arc<Mutex<Server>>,
++    index: u32,
++}
++
++static REMOTES: Mutex<Vec<Remote>> = Mutex::new(Vec::new());
++
++/// Starts a proc-macro program and returns a client for each of its macros.
++/// The program stays running for the session and is restarted after a panic.
++pub fn clients(mut spawn: Spawn) -> io::Result<&'static [Client]> {
++    let (count, child) = Server::start(&mut spawn)?;
++    let server = Arc::new(Mutex::new(Server { spawn, child: Some(child) }));
++    let mut remotes = REMOTES.lock().unwrap();
++    let first = remotes.len();
++    if first + count as usize > TRAMPOLINES.len() {
++        return Err(io::Error::other("too many proc macros in one compiler session"));
++    }
++    let clients = (0..count)
++        .map(|index| {
++            remotes.push(Remote { server: Arc::clone(&server), index });
++            Client { run: TRAMPOLINES[first + index as usize] }
++        })
++        .collect::<Vec<_>>();
++    Ok(clients.leak())
++}
++
++fn panic_buffer(message: String) -> Buffer {
++    let mut buf = Buffer::new();
++    Result::<(), PanicMessage>::Err(PanicMessage::String(message)).encode(&mut buf, &mut ());
++    buf
++}
++
++fn run_remote(slot: usize, config: BridgeConfig<'_>) -> Buffer {
++    let BridgeConfig { input, mut dispatch, force_show_panics } = config;
++    let (server, index) = {
++        let remotes = REMOTES.lock().unwrap();
++        (Arc::clone(&remotes[slot].server), remotes[slot].index)
++    };
++    let Ok(mut server) = server.try_lock() else {
++        return panic_buffer("nested expansion of a process proc macro is not supported".into());
++    };
++    server.expand(index, force_show_panics, &input, &mut dispatch).unwrap_or_else(|message| {
++        server.child = None;
++        panic_buffer(message)
++    })
++}
++
++// A client is only a function pointer, so each process-backed macro needs a
++// function of its own: one per slot.
++extern "C" fn trampoline<const SLOT: usize>(config: BridgeConfig<'_>) -> Buffer {
++    run_remote(SLOT, config)
++}
++
++static TRAMPOLINES: [extern "C" fn(BridgeConfig<'_>) -> Buffer; 256] = [
++    trampoline::<0>, trampoline::<1>, trampoline::<2>, trampoline::<3>, trampoline::<4>, trampoline::<5>, trampoline::<6>, trampoline::<7>,
++    trampoline::<8>, trampoline::<9>, trampoline::<10>, trampoline::<11>, trampoline::<12>, trampoline::<13>, trampoline::<14>, trampoline::<15>,
++    trampoline::<16>, trampoline::<17>, trampoline::<18>, trampoline::<19>, trampoline::<20>, trampoline::<21>, trampoline::<22>, trampoline::<23>,
++    trampoline::<24>, trampoline::<25>, trampoline::<26>, trampoline::<27>, trampoline::<28>, trampoline::<29>, trampoline::<30>, trampoline::<31>,
++    trampoline::<32>, trampoline::<33>, trampoline::<34>, trampoline::<35>, trampoline::<36>, trampoline::<37>, trampoline::<38>, trampoline::<39>,
++    trampoline::<40>, trampoline::<41>, trampoline::<42>, trampoline::<43>, trampoline::<44>, trampoline::<45>, trampoline::<46>, trampoline::<47>,
++    trampoline::<48>, trampoline::<49>, trampoline::<50>, trampoline::<51>, trampoline::<52>, trampoline::<53>, trampoline::<54>, trampoline::<55>,
++    trampoline::<56>, trampoline::<57>, trampoline::<58>, trampoline::<59>, trampoline::<60>, trampoline::<61>, trampoline::<62>, trampoline::<63>,
++    trampoline::<64>, trampoline::<65>, trampoline::<66>, trampoline::<67>, trampoline::<68>, trampoline::<69>, trampoline::<70>, trampoline::<71>,
++    trampoline::<72>, trampoline::<73>, trampoline::<74>, trampoline::<75>, trampoline::<76>, trampoline::<77>, trampoline::<78>, trampoline::<79>,
++    trampoline::<80>, trampoline::<81>, trampoline::<82>, trampoline::<83>, trampoline::<84>, trampoline::<85>, trampoline::<86>, trampoline::<87>,
++    trampoline::<88>, trampoline::<89>, trampoline::<90>, trampoline::<91>, trampoline::<92>, trampoline::<93>, trampoline::<94>, trampoline::<95>,
++    trampoline::<96>, trampoline::<97>, trampoline::<98>, trampoline::<99>, trampoline::<100>, trampoline::<101>, trampoline::<102>, trampoline::<103>,
++    trampoline::<104>, trampoline::<105>, trampoline::<106>, trampoline::<107>, trampoline::<108>, trampoline::<109>, trampoline::<110>, trampoline::<111>,
++    trampoline::<112>, trampoline::<113>, trampoline::<114>, trampoline::<115>, trampoline::<116>, trampoline::<117>, trampoline::<118>, trampoline::<119>,
++    trampoline::<120>, trampoline::<121>, trampoline::<122>, trampoline::<123>, trampoline::<124>, trampoline::<125>, trampoline::<126>, trampoline::<127>,
++    trampoline::<128>, trampoline::<129>, trampoline::<130>, trampoline::<131>, trampoline::<132>, trampoline::<133>, trampoline::<134>, trampoline::<135>,
++    trampoline::<136>, trampoline::<137>, trampoline::<138>, trampoline::<139>, trampoline::<140>, trampoline::<141>, trampoline::<142>, trampoline::<143>,
++    trampoline::<144>, trampoline::<145>, trampoline::<146>, trampoline::<147>, trampoline::<148>, trampoline::<149>, trampoline::<150>, trampoline::<151>,
++    trampoline::<152>, trampoline::<153>, trampoline::<154>, trampoline::<155>, trampoline::<156>, trampoline::<157>, trampoline::<158>, trampoline::<159>,
++    trampoline::<160>, trampoline::<161>, trampoline::<162>, trampoline::<163>, trampoline::<164>, trampoline::<165>, trampoline::<166>, trampoline::<167>,
++    trampoline::<168>, trampoline::<169>, trampoline::<170>, trampoline::<171>, trampoline::<172>, trampoline::<173>, trampoline::<174>, trampoline::<175>,
++    trampoline::<176>, trampoline::<177>, trampoline::<178>, trampoline::<179>, trampoline::<180>, trampoline::<181>, trampoline::<182>, trampoline::<183>,
++    trampoline::<184>, trampoline::<185>, trampoline::<186>, trampoline::<187>, trampoline::<188>, trampoline::<189>, trampoline::<190>, trampoline::<191>,
++    trampoline::<192>, trampoline::<193>, trampoline::<194>, trampoline::<195>, trampoline::<196>, trampoline::<197>, trampoline::<198>, trampoline::<199>,
++    trampoline::<200>, trampoline::<201>, trampoline::<202>, trampoline::<203>, trampoline::<204>, trampoline::<205>, trampoline::<206>, trampoline::<207>,
++    trampoline::<208>, trampoline::<209>, trampoline::<210>, trampoline::<211>, trampoline::<212>, trampoline::<213>, trampoline::<214>, trampoline::<215>,
++    trampoline::<216>, trampoline::<217>, trampoline::<218>, trampoline::<219>, trampoline::<220>, trampoline::<221>, trampoline::<222>, trampoline::<223>,
++    trampoline::<224>, trampoline::<225>, trampoline::<226>, trampoline::<227>, trampoline::<228>, trampoline::<229>, trampoline::<230>, trampoline::<231>,
++    trampoline::<232>, trampoline::<233>, trampoline::<234>, trampoline::<235>, trampoline::<236>, trampoline::<237>, trampoline::<238>, trampoline::<239>,
++    trampoline::<240>, trampoline::<241>, trampoline::<242>, trampoline::<243>, trampoline::<244>, trampoline::<245>, trampoline::<246>, trampoline::<247>,
++    trampoline::<248>, trampoline::<249>, trampoline::<250>, trampoline::<251>, trampoline::<252>, trampoline::<253>, trampoline::<254>, trampoline::<255>,
++];
