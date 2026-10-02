@@ -1,0 +1,21 @@
+# GNU Automake for slicc (Perl scripts; needs autoconf + perl + m4).
+name: wasix-automake
+builder: host
+version: "1.17"
+npm: "@ai-ecoverse/wasix-automake"
+summary: "GNU Automake scripts for slicc (needs wasix-perl + wasix-autoconf + wasix-m4)"
+source:
+  url: "https://ftp.gnu.org/gnu/automake/automake-{{version}}.tar.xz"
+  sha256: "8920c1fc411e13b90bf704ef9db6f29d540e76d232cb3b2c9f4dc4cc599bd990"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-perl
+    - wasix-autoconf
+    - wasix-m4
+about:
+  homepage: https://www.gnu.org/software/automake/
+  license: GPL-2.0-or-later
+  notes: |
+    Script package: automake/aclocal. Shebang #!/usr/bin/perl.
