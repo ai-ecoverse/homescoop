@@ -120,6 +120,12 @@ jobs:
             rust/build/x86_64-unknown-linux-gnu/llvm
             rust/build/wasm32-wasip1-threads/llvm
           key: wasi-llvm-22-rust-48a229c-sdk24-${{ hashFiles('homescoop/packages/wasi-rustc/patches/000[3-9]*', 'homescoop/packages/wasi-rustc/make-stable-config.py') }}
+          restore-keys: wasi-llvm-22-rust-48a229c-sdk24-
+
+      - name: preflight threaded rustc_llvm wrapper against cached LLVM
+        if: steps.llvm-cache-restore.outputs.cache-hit != ''
+        working-directory: rust
+        run: bash ../homescoop/packages/wasi-rustc/check-stable-llvm-wrapper.sh
 
       - name: x.py install static rustc and rustlib
         working-directory: rust
