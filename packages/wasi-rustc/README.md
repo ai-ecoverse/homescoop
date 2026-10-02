@@ -48,6 +48,8 @@ support, and `patches/0004-*` embeds LLD and configures LLVM for the WASI host.
 `patches/0005-*` through `0009-*` port LLVM 22 to the threaded WASI host.
 `patches/0010-*` replaces `libloading` with a load error on WASI, which has no
 `dlopen`: proc-macro crates, codegen-backend dylibs and libEnzyme do not load.
+`patches/0011-*` skips rustc's output-writeable check on WASI: preview1 has no
+permission bits, so std reports every existing file as read-only.
 `rustc.wasm` itself links through wasi-sdk `clang++` with
 `-Clink-self-contained=no`, libc++abi and wasi-emulated-mman, since this build
 does not ship the self-contained `rust-lld`.
