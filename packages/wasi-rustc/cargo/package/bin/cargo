@@ -9,7 +9,8 @@ esac
 BINDIR=$(CDPATH= cd -- "${SCRIPT%/*}" && pwd)
 CARGO=${CARGO:-$BINDIR/cargo}
 export CARGO
-RUSTC="$BINDIR/rustc-for-cargo"
+# The installed wasi-rustc driver; Rust 1.98 answers `rustc -vV` itself.
+RUSTC=${RUSTC:-$(command -v rustc)}
 export RUSTC
 : "${CARGO_BUILD_TARGET:=wasm32-wasip1}"
 export CARGO_BUILD_TARGET
