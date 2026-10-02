@@ -63,13 +63,15 @@ codegen-backends = ["llvm"]
 [target.'wasm32-wasip1-threads']
 wasi-root = "{sysroot}"
 # rustc.wasm links through wasi-sdk clang++ rather than the self-contained
-# rust-lld, which this build does not ship. -nodefaultlibs drops libc++abi.
+# rust-lld, which this build does not ship. -nodefaultlibs drops libc++abi;
+# libdl supplies the dlopen stubs that LLVM DynamicLibrary references.
 linker = "{host_linker}"
 rustflags = [
   "-Clink-self-contained=no",
   "-Clink-arg=--sysroot={sysroot}",
   "-Clink-arg=-pthread",
   "-Clink-arg=-lc++abi",
+  "-Clink-arg=-ldl",
   "-Clink-arg=-lwasi-emulated-mman",
   "-Clink-arg=-Wl,--max-memory=4294967296",
 ]

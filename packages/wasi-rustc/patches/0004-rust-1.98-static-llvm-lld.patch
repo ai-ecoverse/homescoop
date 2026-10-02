@@ -69,7 +69,7 @@ index 5be8bd46..8ac89eae 100644
      }
 
 +    if target.contains("wasi") {
-+        for lib in ["LLVMOption", "lldCommon", "lldELF", "lldWasm"] {
++        for lib in ["LLVMOption", "LLVMDTLTO", "lldCommon", "lldELF", "lldWasm"] {
 +            println!("cargo:rustc-link-lib=static={lib}");
 +        }
 +    }
