@@ -8,9 +8,9 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | --- | --- |
 | `slicc_spawn.c` | `posix_spawn` / `waitpid` / `__syscall_wait4`; file actions on fds > 2 |
 | `slicc_exec.c` | `execve` over spawn (resets caught handlers; kernel forwards signals) |
-| `slicc_fork.c` + `slicc-fork.js` | `fork` / `getpid` (`--js-library`, needs `-sASYNCIFY`) |
-| `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid 1000 |
-| `slicc_signals.c` | `slicc_raise` / `slicc_sig_mask` / `kill` (incl. group `kill(0)` / `kill(-pgid)`) |
+| `slicc_fork.c` + `slicc-fork.js` | `fork` / strong `getpid`/`getppid` (`--js-library`, needs `-sASYNCIFY`); adopts `Module.sliccPid` / `Module.sliccPpid` |
+| `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid getters→1000, set*id/setgroups accept only 1000, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1) |
+| `slicc_signals.c` | `slicc_raise` / `slicc_sig_mask` / `kill` (incl. group `kill(0)` / `kill(-pgid)`); `__syscall_pause` → `sliccKernel.pause` |
 | `slicc_select.c` | `pselect()` / poll via the kernel (make `-jN`, curl, sockets) |
 | `slicc_socket.c` | BSD sockets over `Module.sliccKernel.net` (loopback #3571); needs select |
 | `slicc_jobs.c` | strong `setpgid`/`getpgid`/`setsid`/`tcgetpgrp`/`tcsetpgrp` for job control |
