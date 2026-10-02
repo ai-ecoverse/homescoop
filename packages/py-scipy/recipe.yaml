@@ -1,0 +1,25 @@
+# SciPy for slicc WASIX CPython 3.14 (f2c + static OpenBLAS into extensions).
+name: py-scipy
+builder: host
+# renovate: datasource=pypi depName=scipy
+version: "1.18.0"
+npm: "@ai-ecoverse/py-scipy"
+summary: "SciPy 1.18.0 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
+source:
+  url: "https://files.pythonhosted.org/packages/source/s/scipy/scipy-{{version}}.tar.gz"
+  sha256: "67b2ad2ad54c72ca6d04975a9b2df8c3638c34ddd5b28738e94fc2b57929d378"
+dependencies:
+  build:
+    - wasix-python
+    - py-numpy
+  host: []
+  run:
+    - wasix-python
+    - py-numpy
+about:
+  homepage: https://scipy.org
+  license: BSD-3-Clause
+  notes: |
+    Cross-built with wasixcc shared-library (sysroot-ehpic) via hoodmane/f2c.
+    OpenBLAS static into scipy extensions that need BLAS/LAPACK. Zero
+    signature_mismatch; -Wl,--fatal-warnings on real extension links.
