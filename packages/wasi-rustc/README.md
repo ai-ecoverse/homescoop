@@ -48,6 +48,9 @@ support, and `patches/0004-*` embeds LLD and configures LLVM for the WASI host.
 `patches/0005-*` through `0009-*` port LLVM 22 to the threaded WASI host.
 `patches/0010-*` replaces `libloading` with a load error on WASI, which has no
 `dlopen`: proc-macro crates, codegen-backend dylibs and libEnzyme do not load.
+`rustc.wasm` itself links through wasi-sdk `clang++` with
+`-Clink-self-contained=no`, libc++abi and wasi-emulated-mman, since this build
+does not ship the self-contained `rust-lld`.
 The workflow emits `wasi-rustc-stable.tgz` for staging and SLICC acceptance.
 Cargo follows acceptance of this compiler; the PIC LLVM side module follows
 Cargo.
