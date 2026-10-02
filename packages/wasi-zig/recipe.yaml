@@ -1,0 +1,33 @@
+# Zig compiler for slicc WASI preview1 (no LLVM, self-hosted wasm backend).
+name: wasi-zig
+builder: host
+# renovate: datasource=github-releases depName=ziglang/zig
+version: "0.16.0"
+npm: "@ai-ecoverse/wasi-zig"
+summary: "Zig 0.16.0 compiler for slicc WASI (build-exe / wasm targets)"
+source:
+  url: "https://ziglang.org/download/{{version}}/zig-{{version}}.tar.xz"
+  sha256: "43186959edc87d5c7a1be7b7d2a25efffd22ce5807c7af99067f86f99641bfdf"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://ziglang.org/
+  license: MIT
+  notes: |
+    Cross-builds a no-LLVM wasm32-wasi stage3 compiler (-Denable-llvm=false).
+    Ships trimmed lib/ (std + wasi libc + prebuilt libcompiler_rt for wasm targets).
+    slicc.env: ZIG_LIB_DIR=${package}/lib, ZIG_GLOBAL_CACHE_DIR=${HOME}/.cache/zig
+    (spawn-time ${NAME} expansion; case-sensitive HOME — pairs with SLICC #3716).
+    Wasm linker: no start section for wasm32-wasi (export _start only; wasm-ld style).
+    First cut: zig build-exe / zig run / zig build on WASIX (SLICC).
+    Compiler imports wasix_32v1 (proc_spawn3/proc_join). User wasm32-wasi stays preview1.
+    -5: process.Init Args fix; Feature.Set scalar loops for stage2_wasm build_runner; ZIG_EXE=zig.
+    -6: Child.Term uses wasi.signal_t; build_runner u64→usize casts; runner compiles on wasm32.
+    -7: WASIX Child.spawn sets pipe Files via plain assigns; findBuildRoot path is "."; Ignore→/dev/null.
+    -8: Io.Threaded batchAwaitConcurrent uses poll_oneoff on WASI; MultiReader sets File.Reader.err.
+    -9: MultiReader fr.err via switch (Zig error-set narrow); PRESTAGE fails if build_runner does not compile.
+    -10: Duration.formatUnsigned uses u64 (stage2_wasm intMulOverflow u96); PRESTAGE zig build run/test.
+    -11: WebServer updateTimeReportRunTest new_len is usize; host PRESTAGE compiles build_runner for wasm32.
+    zig cc still deferred.

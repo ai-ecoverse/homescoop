@@ -1,0 +1,202 @@
+--- /dev/null
++++ b/src/wasix_process.zig
++++ b/src/wasix_process.zig
+@@ -0,0 +1,198 @@
++//! Compiler-local WASIX process helpers (linked into zig.wasm only).
++//! Layouts match wasix-libc / SLICC wasix-host.ts (`wasix_32v1`).
++
++const std = @import("std");
++const Allocator = std.mem.Allocator;
++const process = std.process;
++
++pub const errno_t = enum(u16) {
++    SUCCESS = 0,
++    ACCES = 2,
++    AGAIN = 6,
++    BADF = 8,
++    CHILD = 12,
++    INVAL = 28,
++    MFILE = 33,
++    NFILE = 35,
++    NOENT = 44,
++    NOMEM = 48,
++    PERM = 63,
++    _,
++};
++
++pub const fd_t = i32;
++pub const pid_t = i32;
++
++pub const SpawnFdOpCmd = enum(u8) {
++    close = 0,
++    dup2 = 1,
++    open = 2,
++    chdir = 3,
++    fchdir = 4,
++};
++
++pub const SpawnFdOp = extern struct {
++    cmd: u8 = 0,
++    _pad0: [3]u8 = .{ 0, 0, 0 },
++    fd: i32 = 0,
++    src_fd: i32 = 0,
++    path: [*]const u8 = @ptrFromInt(1),
++    path_len: u32 = 0,
++    dirflags: u32 = 0,
++    oflags: u16 = 0,
++    _pad1: [6]u8 = .{ 0, 0, 0, 0, 0, 0 },
++    fs_rights_base: u64 = 0,
++    fs_rights_inheriting: u64 = 0,
++    fdflags: u16 = 0,
++    fdflagsext: u16 = 0,
++    _pad2: [4]u8 = .{ 0, 0, 0, 0 },
++
++    pub fn close(fd: i32) SpawnFdOp {
++        return .{ .cmd = @intFromEnum(SpawnFdOpCmd.close), .fd = fd };
++    }
++    pub fn dup2(src_fd: i32, fd: i32) SpawnFdOp {
++        return .{ .cmd = @intFromEnum(SpawnFdOpCmd.dup2), .fd = fd, .src_fd = src_fd };
++    }
++};
++
++pub const OptionPid = extern struct {
++    tag: u8 = 0,
++    _pad: [3]u8 = .{ 0, 0, 0 },
++    pid: pid_t = 0,
++
++    pub fn some(pid: pid_t) OptionPid {
++        return .{ .tag = 1, .pid = pid };
++    }
++};
++
++pub const JoinStatus = extern struct {
++    tag: u8 = 0,
++    _pad: u8 = 0,
++    exit_code: u16 = 0,
++    signal: u8 = 0,
++    _pad2: u8 = 0,
++};
++
++pub extern "wasix_32v1" fn fd_pipe(r: *fd_t, w: *fd_t) errno_t;
++pub extern "wasix_32v1" fn proc_spawn3(
++    name: [*]const u8,
++    name_len: usize,
++    args: [*]const [*:0]const u8,
++    args_len: usize,
++    envs: ?[*]const [*:0]const u8,
++    envs_len: usize,
++    fd_ops: [*]const SpawnFdOp,
++    fd_ops_len: usize,
++    signal_dispositions: [*]const u8,
++    signal_dispositions_len: usize,
++    search_path: u8,
++    path: [*]const u8,
++    path_len: usize,
++    ret_pid: *pid_t,
++) errno_t;
++pub extern "wasix_32v1" fn proc_join(pid: *OptionPid, flags: u32, status: *JoinStatus) errno_t;
++
++pub const SpawnError = error{
++    FileNotFound,
++    AccessDenied,
++    PermissionDenied,
++    SystemResources,
++    ProcessFdQuotaExceeded,
++    InvalidExe,
++    Unexpected,
++} || Allocator.Error;
++
++pub const Term = union(enum) {
++    exited: u8,
++    unknown: u32,
++};
++
++pub fn spawnInherit(
++    gpa: Allocator,
++    argv: []const []const u8,
++    environ_map: ?*const process.Environ.Map,
++) SpawnError!pid_t {
++    if (argv.len == 0) return error.FileNotFound;
++
++    var arena_state = std.heap.ArenaAllocator.init(gpa);
++    defer arena_state.deinit();
++    const arena = arena_state.allocator();
++
++    const argv_z = try arena.alloc([*:0]const u8, argv.len);
++    for (argv, 0..) |arg, i| argv_z[i] = (try arena.dupeZ(u8, arg)).ptr;
++
++    var envs_ptr: ?[*]const [*:0]const u8 = null;
++    var envs_len: usize = 0;
++    if (environ_map) |em| {
++        const block = try em.createPosixBlock(arena, .{});
++        const arr = try arena.alloc([*:0]const u8, block.slice.len);
++        for (block.slice, 0..) |e, i| arr[i] = e.?;
++        envs_ptr = arr.ptr;
++        envs_len = arr.len;
++    }
++
++    const name = argv[0];
++    const search: u8 = if (std.mem.indexOfScalar(u8, name, '/') == null) 1 else 0;
++    var path_buf: []const u8 = "";
++    if (search == 1 and environ_map != null) {
++        path_buf = environ_map.?.get("PATH") orelse "";
++    }
++
++    var pid: pid_t = undefined;
++    const empty_sig: [0]u8 = .{};
++    var dummy_op: SpawnFdOp = .{};
++    const rc = proc_spawn3(
++        name.ptr,
++        name.len,
++        argv_z.ptr,
++        argv_z.len,
++        envs_ptr,
++        envs_len,
++        @ptrCast(&dummy_op),
++        0,
++        &empty_sig,
++        0,
++        search,
++        path_buf.ptr,
++        path_buf.len,
++        &pid,
++    );
++    return switch (rc) {
++        .SUCCESS => pid,
++        .NOENT => error.FileNotFound,
++        .ACCES => error.AccessDenied,
++        .PERM => error.PermissionDenied,
++        .NOMEM => error.SystemResources,
++        .NFILE, .MFILE => error.ProcessFdQuotaExceeded,
++        .INVAL => error.InvalidExe,
++        else => error.Unexpected,
++    };
++}
++
++pub fn join(pid: pid_t) SpawnError!Term {
++    var opt = OptionPid.some(pid);
++    var status: JoinStatus = .{};
++    while (true) {
++        switch (proc_join(&opt, 0, &status)) {
++            .SUCCESS => break,
++            .AGAIN => continue,
++            else => return error.Unexpected,
++        }
++    }
++    // Compiler binary is built against host std (posix.SIG=void on wasi) — keep Term narrow.
++    // Staged lib Child.Term + Threaded.childWaitWasix carry real .signal/.stopped for build_runner.
++    return switch (status.tag) {
++        1 => .{ .exited = @truncate(status.exit_code) },
++        else => .{ .unknown = status.signal },
++    };
++}
++
++/// Spawn with inherited stdio, wait, return term.
++pub fn runInherit(
++    gpa: Allocator,
++    argv: []const []const u8,
++    environ_map: ?*const process.Environ.Map,
++) SpawnError!Term {
++    const pid = try spawnInherit(gpa, argv, environ_map);
++    return join(pid);
++}

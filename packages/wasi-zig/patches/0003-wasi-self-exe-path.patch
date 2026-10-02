@@ -1,0 +1,253 @@
+--- a/src/main.zig
++++ b/src/main.zig
+@@ -33,6 +33,7 @@
+ const Zcu = @import("Zcu.zig");
+ const mingw = @import("libs/mingw.zig");
+ const dev = @import("dev.zig");
++const wasix_process = @import("wasix_process.zig");
+ 
+ test {
+     _ = Package;
+@@ -51,6 +52,8 @@
+     },
+ };
+ pub const std_options_cwd = if (native_os == .wasi) wasi_cwd else null;
++// homescoop: opt into wasix_32v1 process ABI for zig run / zig build (std gates on this)
++pub const homescoop_wasix = native_os == .wasi;
+ 
+ pub const panic = crash_report.panic;
+ pub const debug = crash_report.debug;
+@@ -3175,8 +3178,13 @@
+         });
+     }
+ 
+-    const self_exe_path = switch (native_os) {
+-        .wasi => {},
++    // homescoop: WASI Directories.init takes void; keep a real path for run/spawn (ZIG_EXE / argv0)
++    const self_exe_path: []const u8 = switch (native_os) {
++        .wasi => path: {
++            if (environ_map.get("ZIG_EXE")) |p| break :path try arena.dupe(u8, p);
++            if (all_args.len > 0 and all_args[0].len != 0) break :path all_args[0];
++            fatal("unable to determine zig self exe path on WASI (set ZIG_EXE)", .{});
++        },
+         else => process.executablePathAlloc(io, arena) catch |err| fatal("unable to find zig self exe path: {t}", .{err}),
+     };
+ 
+@@ -3194,7 +3202,7 @@
+             };
+         },
+         preopens,
+-        self_exe_path,
++        if (native_os == .wasi) {} else self_exe_path,
+         environ_map,
+     );
+     defer dirs.deinit(io);
+@@ -3559,10 +3567,7 @@
+     const comp = Compilation.create(gpa, arena, io, &create_diag, .{
+         .dirs = dirs,
+         .thread_limit = thread_limit,
+-        .self_exe_path = switch (native_os) {
+-            .wasi => null,
+-            else => self_exe_path,
+-        },
++        .self_exe_path = self_exe_path,
+         .config = create_module.resolved_options,
+         .root_name = root_name,
+         .sysroot = create_module.sysroot,
+@@ -4540,21 +4545,31 @@
+         try warnAboutForeignBinaries(io, arena, arg_mode, target, link_libc);
+         const cmd = try std.mem.join(arena, " ", argv.items);
+         fatal("the following command failed to execve with '{t}':\n{s}", .{ err, cmd });
+-    } else if (!process.can_spawn) {
++    } else if (!process.can_spawn and native_os != .wasi) {
+         const cmd = try std.mem.join(arena, " ", argv.items);
+         fatal("the following command cannot be executed ({t} does not support spawning a child process):\n{s}", .{
+             native_os, cmd,
+         });
+     }
+-    const term_result = (term: {
+-        // Here we release all the locks associated with the Compilation so
+-        // that whatever this child process wants to do won't deadlock.
+-        comp.destroy();
+-        comp_destroyed.* = true;
++    // Here we release all the locks associated with the Compilation so
++    // that whatever this child process wants to do won't deadlock.
++    comp.destroy();
++    comp_destroyed.* = true;
+ 
++    const term_result = (term: {
+         _ = try io.lockStderr(&.{}, .no_color);
+         defer io.unlockStderr();
+ 
++        // homescoop: host std cannot spawn on WASI — use wasix_32v1
++        if (native_os == .wasi) {
++            const t = wasix_process.runInherit(gpa, argv.items, environ_map) catch |err| break :term err;
++            // Host std Child.Term.signal is void — map non-exit to .unknown here.
++            break :term switch (t) {
++                .exited => |c| process.Child.Term{ .exited = c },
++                .unknown => |u| process.Child.Term{ .unknown = u },
++            };
++        }
++
+         var child = std.process.spawn(io, .{
+             .argv = argv.items,
+             .environ_map = environ_map,
+@@ -4582,13 +4597,13 @@
+                         process.exit(code);
+                     }
+                 },
+-                .signal => |sig| {
++                .signal => {
+                     const cmd = try std.mem.join(arena, " ", argv.items);
+-                    fatal("the following command terminated with signal {t}:\n{s}", .{ sig, cmd });
++                    fatal("the following command terminated with signal:\n{s}", .{cmd});
+                 },
+-                .stopped => |sig| {
++                .stopped => {
+                     const cmd = try std.mem.join(arena, " ", argv.items);
+-                    fatal("the following command stopped with signal {t}:\n{s}", .{ sig, cmd });
++                    fatal("the following command stopped with signal:\n{s}", .{cmd});
+                 },
+                 .unknown => {
+                     process.exit(1);
+@@ -4605,9 +4620,9 @@
+                         fatal("the following test command failed with exit code {d}:\n{s}", .{ code, cmd });
+                     }
+                 },
+-                .signal => |sig| {
++                .signal => {
+                     const cmd = try std.mem.join(arena, " ", argv.items);
+-                    fatal("the following test command terminated with signal {t}:\n{s}", .{ sig, cmd });
++                    fatal("the following test command terminated with signal:\n{s}", .{cmd});
+                 },
+                 else => {
+                     const cmd = try std.mem.join(arena, " ", argv.items);
+@@ -4987,7 +5002,15 @@
+     const argv_index_exe = child_argv.items.len;
+     _ = try child_argv.addOne(arena);
+ 
+-    const self_exe_path = try process.executablePathAlloc(io, arena);
++    // homescoop: executablePathAlloc unsupported on WASI host std
++    const self_exe_path: []const u8 = switch (native_os) {
++        .wasi => path: {
++            if (environ_map.get("ZIG_EXE")) |p| break :path try arena.dupe(u8, p);
++            if (args.len > 0 and args[0].len != 0) break :path args[0];
++            fatal("unable to determine zig self exe path on WASI (set ZIG_EXE)", .{});
++        },
++        else => try process.executablePathAlloc(io, arena),
++    };
+     try child_argv.append(arena, self_exe_path);
+ 
+     const argv_index_zig_lib_dir = child_argv.items.len;
+@@ -5236,16 +5259,20 @@
+             if (override_local_cache_dir) |d| break :path d;
+             break :path try build_root.directory.join(arena, &.{introspect.default_local_zig_cache_basename});
+         } },
+-        .empty,
+-        self_exe_path,
++        // homescoop: WASI needs /lib+/cache preopens (or ZIG_* overrides); upstream passes .empty
++        if (native_os == .wasi) preopens else .empty,
++        // homescoop: Directories.init takes void self_exe on WASI
++        if (native_os == .wasi) {} else self_exe_path,
+         environ_map,
+     );
+     defer dirs.deinit(io);
+ 
+-    child_argv.items[argv_index_zig_lib_dir] = dirs.zig_lib.path orelse cwd_path;
+-    child_argv.items[argv_index_build_file] = build_root.directory.path orelse cwd_path;
+-    child_argv.items[argv_index_global_cache_dir] = dirs.global_cache.path orelse cwd_path;
+-    child_argv.items[argv_index_cache_dir] = dirs.local_cache.path orelse cwd_path;
++    // homescoop: WASI cwd_path is "" — never pass empty build_root / cache paths to the runner
++    const wasi_dot = if (native_os == .wasi and cwd_path.len == 0) "." else cwd_path;
++    child_argv.items[argv_index_zig_lib_dir] = dirs.zig_lib.path orelse wasi_dot;
++    child_argv.items[argv_index_build_file] = build_root.directory.path orelse wasi_dot;
++    child_argv.items[argv_index_global_cache_dir] = dirs.global_cache.path orelse wasi_dot;
++    child_argv.items[argv_index_cache_dir] = dirs.local_cache.path orelse wasi_dot;
+ 
+     const thread_limit = @min(
+         @max(n_jobs orelse std.Thread.getCpuCount() catch 1, 1),
+@@ -5569,13 +5596,22 @@
+             });
+         }
+ 
+-        if (!process.can_spawn) {
++        if (!process.can_spawn and native_os != .wasi) {
+             const cmd = try std.mem.join(arena, " ", child_argv.items);
+             fatal("the following command cannot be executed ({t} does not support spawning a child process):\n{s}", .{ native_os, cmd });
+         }
+         switch (term: {
+             _ = try io.lockStderr(&.{}, .no_color);
+             defer io.unlockStderr();
++            // homescoop: spawn build runner via wasix on WASI
++            if (native_os == .wasi) {
++                const t = wasix_process.runInherit(gpa, child_argv.items, environ_map) catch |err|
++                    fatal("failed to spawn build runner {s}: {t}", .{ child_argv.items[0], err });
++                break :term switch (t) {
++                    .exited => |c| process.Child.Term{ .exited = c },
++                    .unknown => |u| process.Child.Term{ .unknown = u },
++                };
++            }
+             var child = std.process.spawn(io, .{
+                 .argv = child_argv.items,
+             }) catch |err| fatal("failed to spawn build runner {s}: {t}", .{ child_argv.items[0], err });
+@@ -5636,13 +5672,13 @@
+                 const cmd = try std.mem.join(arena, " ", child_argv.items);
+                 fatal("the following build command failed with exit code {d}:\n{s}", .{ code, cmd });
+             },
+-            .signal => |sig| {
++            .signal => {
+                 const cmd = try std.mem.join(arena, " ", child_argv.items);
+-                fatal("the following build command terminated with signal {t}:\n{s}", .{ sig, cmd });
++                fatal("the following build command terminated with signal:\n{s}", .{cmd});
+             },
+-            .stopped => |sig| {
++            .stopped => {
+                 const cmd = try std.mem.join(arena, " ", child_argv.items);
+-                fatal("the following build command stopped with signal {t}:\n{s}", .{ sig, cmd });
++                fatal("the following build command stopped with signal:\n{s}", .{cmd});
+             },
+             .unknown => {
+                 const cmd = try std.mem.join(arena, " ", child_argv.items);
+@@ -5783,7 +5819,8 @@
+         override_global_cache_dir,
+         .global,
+         preopens,
+-        self_exe_path,
++        // homescoop: jit path unused on WASI
++        if (native_os == .wasi) {} else self_exe_path,
+         environ_map,
+     );
+     defer dirs.deinit(io);
+@@ -5942,13 +5979,13 @@
+             const cmd = try std.mem.join(arena, " ", child_argv.items);
+             fatal("the following build command failed with exit code {d}:\n{s}", .{ code, cmd });
+         },
+-        .signal => |sig| {
++        .signal => {
+             const cmd = try std.mem.join(arena, " ", child_argv.items);
+-            fatal("the following build command terminated with signal {t}:\n{s}", .{ sig, cmd });
++            fatal("the following build command terminated with signal:\n{s}", .{cmd});
+         },
+-        .stopped => |sig| {
++        .stopped => {
+             const cmd = try std.mem.join(arena, " ", child_argv.items);
+-            fatal("the following build command stopped with signal {t}:\n{s}", .{ sig, cmd });
++            fatal("the following build command stopped with signal:\n{s}", .{cmd});
+         },
+         .unknown => {
+             const cmd = try std.mem.join(arena, " ", child_argv.items);
+@@ -7453,6 +7490,14 @@
+     while (true) {
+         const joined_path = try fs.path.join(arena, &[_][]const u8{ dirname, build_zig_basename });
+         if (Io.Dir.cwd().access(io, joined_path, .{})) |_| {
++            // homescoop: WASI cwd_path is "" — use "." so argv build_root is non-empty
++            if (dirname.len == 0) {
++                return .{
++                    .build_zig_basename = build_zig_basename,
++                    .directory = .{ .path = ".", .handle = Io.Dir.cwd() },
++                    .cleanup_build_dir = null,
++                };
++            }
+             const dir = Io.Dir.cwd().openDir(io, dirname, .{}) catch |err| {
+                 fatal("unable to open directory while searching for build.zig file, '{s}': {s}", .{ dirname, @errorName(err) });
+             };

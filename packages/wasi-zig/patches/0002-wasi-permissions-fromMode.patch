@@ -1,0 +1,14 @@
+--- a/src/link.zig
++++ b/src/link.zig
+@@ -1304,8 +1304,11 @@
+         // with 0o755 permissions, but it works appropriately if the system is configured
+         // more leniently. As another data point, C's fopen seems to open files with the
+         // 666 mode.
++        // homescoop: WASI Permissions has no fromMode / executable bit
+         const executable_mode: Io.File.Permissions = if (builtin.target.os.tag == .windows)
+             .default_file
++        else if (comptime !Io.File.Permissions.has_executable_bit)
++            .executable_file
+         else
+             .fromMode(0o777);
+ 

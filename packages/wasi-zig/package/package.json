@@ -1,0 +1,51 @@
+{
+  "name": "@ai-ecoverse/wasi-zig",
+  "version": "0.16.0-11",
+  "description": "Zig 0.16.0 compiler for slicc WASI (build-exe / wasm targets)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-zig/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-zig",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "zig"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "PRESTAGE.md",
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-zig",
+    "upstream": "0.16.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "zig": {
+        "wasm": "bin/zig.wasm",
+        "env": {
+          "ZIG_LIB_DIR": "${package}/lib",
+          "ZIG_GLOBAL_CACHE_DIR": "${HOME}/.cache/zig",
+          "ZIG_EXE": "zig"
+        }
+      }
+    },
+    "env": {
+      "ZIG_LIB_DIR": "${package}/lib",
+      "ZIG_GLOBAL_CACHE_DIR": "${HOME}/.cache/zig",
+      "ZIG_EXE": "zig"
+    }
+  }
+}
