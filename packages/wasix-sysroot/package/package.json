@@ -1,0 +1,42 @@
+{
+  "name": "@ai-ecoverse/wasix-sysroot",
+  "version": "2025.9.30-14",
+  "description": "WASIX sysroots: F_SETFD CLOEXEC fix (fcntl &), atomics-compatible; wasip1; clang24 exnref",
+  "license": "Apache-2.0 WITH LLVM-exception",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-sysroot/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-sysroot",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "sysroot",
+    "slicc",
+    "homescoop"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "sysroot",
+    "sysroot-eh",
+    "sysroot-ehpic",
+    "sysroot-exnref-eh",
+    "sysroot-exnref-ehpic"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-sysroot",
+    "upstream": "2025.9.30"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "env": {
+      "WASIXCC_SYSROOT_PREFIX": "${package}"
+    }
+  }
+}
