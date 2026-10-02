@@ -1,0 +1,24 @@
+# Homebrew-shaped recipe — Clang/LLD as wasm tools (slicc-emscripten llvm-wasm).
+name: wasm-clang
+builder: host
+version: "24.0.0"
+npm: "@ai-ecoverse/wasm-clang"
+summary: "Clang/LLD 24 for slicc (wasm tool, WASIX drivers)"
+source:
+  # Prebuilt by slicc-emscripten/build-wasm-llvm.sh; build.sh stages that artifact.
+  url: "https://github.com/llvm/llvm-project"
+  sha256: "skip"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-sysroot
+    - wasm-binaryen
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-clang
+  license: Apache-2.0 WITH LLVM-exception
+  notes: |
+    Stage from slicc-emscripten/build/llvm-wasm (ENVIRONMENT=web,worker,node,
+    slicc_spawn.o). Do not rebuild LLVM unless the link profile must change.
+    Drivers are #!/bin/sh wasixcc-compatible wrappers; sysroot is wasix-sysroot.
+    wasm-opt for fork Asyncify comes from @ai-ecoverse/wasm-binaryen (PATH).

@@ -1,0 +1,140 @@
+{
+  "name": "@ai-ecoverse/wasm-clang",
+  "version": "24.0.0-9",
+  "description": "Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen)",
+  "license": "Apache-2.0 WITH LLVM-exception",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasm-clang/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-clang",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "clang",
+    "llvm",
+    "wasix"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasm-clang",
+    "upstream": "24.0.0"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-sysroot": "^2025.9.30-10",
+    "@ai-ecoverse/wasm-binaryen": "132.0.0-1"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "env": {
+      "CLANG_RESOURCE_DIR": "${package}/lib/clang/24",
+      "WASIXCC_SYSROOT_PREFIX": "/shared/lib/node_modules/@ai-ecoverse/wasix-sysroot"
+    },
+    "commands": {
+      "cc": {
+        "script": "bin/cc"
+      },
+      "gcc": {
+        "script": "bin/gcc"
+      },
+      "c++": {
+        "script": "bin/c++"
+      },
+      "g++": {
+        "script": "bin/g++"
+      },
+      "wasixcc": {
+        "script": "bin/wasixcc"
+      },
+      "wasix++": {
+        "script": "bin/wasix++"
+      },
+      "clang": {
+        "glue": "bin/clang",
+        "wasm": "bin/clang.wasm",
+        "argv0": "clang"
+      },
+      "clang++": {
+        "glue": "bin/clang",
+        "wasm": "bin/clang.wasm",
+        "argv0": "clang++"
+      },
+      "lld": {
+        "glue": "bin/lld",
+        "wasm": "bin/lld.wasm",
+        "argv0": "lld"
+      },
+      "wasm-ld": {
+        "glue": "bin/lld",
+        "wasm": "bin/lld.wasm",
+        "argv0": "wasm-ld"
+      },
+      "ld.lld": {
+        "glue": "bin/lld",
+        "wasm": "bin/lld.wasm",
+        "argv0": "ld.lld"
+      },
+      "llvm-ar": {
+        "glue": "bin/llvm-ar",
+        "wasm": "bin/llvm-ar.wasm",
+        "argv0": "llvm-ar"
+      },
+      "ar": {
+        "glue": "bin/llvm-ar",
+        "wasm": "bin/llvm-ar.wasm",
+        "argv0": "llvm-ar"
+      },
+      "ranlib": {
+        "glue": "bin/llvm-ar",
+        "wasm": "bin/llvm-ar.wasm",
+        "argv0": "llvm-ranlib"
+      },
+      "llvm-ranlib": {
+        "glue": "bin/llvm-ar",
+        "wasm": "bin/llvm-ar.wasm",
+        "argv0": "llvm-ranlib"
+      },
+      "llvm-nm": {
+        "glue": "bin/llvm-nm",
+        "wasm": "bin/llvm-nm.wasm",
+        "argv0": "llvm-nm"
+      },
+      "nm": {
+        "glue": "bin/llvm-nm",
+        "wasm": "bin/llvm-nm.wasm",
+        "argv0": "llvm-nm"
+      },
+      "llvm-objcopy": {
+        "glue": "bin/llvm-objcopy",
+        "wasm": "bin/llvm-objcopy.wasm",
+        "argv0": "llvm-objcopy"
+      },
+      "llvm-strip": {
+        "glue": "bin/llvm-objcopy",
+        "wasm": "bin/llvm-objcopy.wasm",
+        "argv0": "llvm-strip"
+      },
+      "strip": {
+        "glue": "bin/llvm-objcopy",
+        "wasm": "bin/llvm-objcopy.wasm",
+        "argv0": "llvm-strip"
+      },
+      "llvm-symbolizer": {
+        "glue": "bin/llvm-symbolizer",
+        "wasm": "bin/llvm-symbolizer.wasm",
+        "argv0": "llvm-symbolizer"
+      }
+    }
+  }
+}
