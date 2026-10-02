@@ -1,0 +1,108 @@
+{
+  "name": "@ai-ecoverse/wasm-emscripten",
+  "version": "6.0.9-10",
+  "description": "Emscripten 6.0.9 for slicc (emcc via wasix-python)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasm-emscripten/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-emscripten",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "emcc"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "emscripten-config",
+    "bin",
+    "lib",
+    "emcc",
+    "em++",
+    "emar",
+    "emranlib",
+    "emcmake",
+    "emconfigure",
+    "emmake",
+    "embuilder",
+    "em-config",
+    "emscan-deps",
+    "*.py",
+    "tools",
+    "src",
+    "system",
+    "cmake",
+    "third_party",
+    "Media",
+    "ChangeLog.md",
+    "emscripten-version.txt"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasm-emscripten",
+    "upstream": "6.0.9"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-7",
+    "@ai-ecoverse/wasm-clang": "24.0.0-9",
+    "@ai-ecoverse/wasm-binaryen": "132.0.0-1",
+    "@ai-ecoverse/emscripten-cache": "6.0.9-3",
+    "esbuild-wasm": "0.28.2",
+    "typescript": "6.0.3",
+    "acorn": "^8.18.0",
+    "acorn-import-phases": "^1.0.4"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "env": {
+      "EM_PACKAGE_ROOT": "${package}",
+      "EM_CONFIG": "${package}/emscripten-config",
+      "EM_CACHE_PACKAGE": "/shared/lib/node_modules/@ai-ecoverse/emscripten-cache",
+      "EM_LLVM_PACKAGE": "/shared/lib/node_modules/@ai-ecoverse/wasm-clang",
+      "EM_BINARYEN_PACKAGE": "/shared/lib/node_modules/@ai-ecoverse/wasm-binaryen",
+      "SLICC_EM_LIBDIR": "${package}/lib/slicc"
+    },
+    "commands": {
+      "emcc": {
+        "script": "bin/emcc"
+      },
+      "em++": {
+        "script": "bin/em++"
+      },
+      "emar": {
+        "script": "bin/emar"
+      },
+      "emranlib": {
+        "script": "bin/emranlib"
+      },
+      "emcmake": {
+        "script": "bin/emcmake"
+      },
+      "emconfigure": {
+        "script": "bin/emconfigure"
+      },
+      "emmake": {
+        "script": "bin/emmake"
+      },
+      "embuilder": {
+        "script": "bin/embuilder"
+      },
+      "em-config": {
+        "script": "bin/em-config"
+      },
+      "emscan-deps": {
+        "script": "bin/emscan-deps"
+      },
+      "em-ensure-cache": {
+        "script": "bin/em-ensure-cache"
+      }
+    }
+  }
+}

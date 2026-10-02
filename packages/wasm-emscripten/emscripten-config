@@ -1,0 +1,37 @@
+# Emscripten config for SLICC — all roots from known package install paths.
+# No host developer paths. Launchers set EM_*_PACKAGE / EM_PACKAGE_ROOT.
+import os
+from pathlib import Path
+
+_pkg = Path(os.environ.get('EM_PACKAGE_ROOT', Path(__file__).resolve().parent))
+_clang = Path(os.environ.get('EM_LLVM_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/wasm-clang'))
+_binaryen = Path(os.environ.get('EM_BINARYEN_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/wasm-binaryen'))
+_cache_pkg = Path(os.environ.get('EM_CACHE_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/emscripten-cache'))
+
+LLVM_ROOT = str(_clang / 'bin')
+BINARYEN_ROOT = str(_binaryen)
+NODE_JS = 'node'
+
+# Writable user CACHE (js_output / symbol_lists / locks). sysroot is a symlink
+# into emscripten-cache created by bin/em-ensure-cache — no 100MB copy.
+if os.environ.get('EM_CACHE'):
+  CACHE = os.environ['EM_CACHE']
+elif os.environ.get('XDG_CACHE_HOME'):
+  CACHE = os.path.join(os.environ['XDG_CACHE_HOME'], 'emscripten')
+else:
+  CACHE = os.path.join(os.environ.get('HOME', '/tmp'), '.cache', 'emscripten')
+
+# Allow js_output / symbol_lists to warm. Prebuilt libs live in the symlinked
+# sysroot; --clear-cache will not delete that symlink (homescoop patch).
+FROZEN_CACHE = False
+
+# Closure is unsupported in v1 (patched out); leave unset so a mis-set path
+# cannot reach Java.
+# CLOSURE_COMPILER = None
+
+# Default links inject homescoop_em_cli_ldflags + lib/slicc/*.o (see link.py).
+# Do not set SLICC_VFS_PRE_JS here — that pre-js is node-realm only.
+os.environ.setdefault('SLICC_EM_LIBDIR', str(_pkg / 'lib' / 'slicc'))
+
+# Silence unused-import lint in some editors; keep roots discoverable.
+_HOMESCOOP_CACHE_PKG = str(_cache_pkg)
