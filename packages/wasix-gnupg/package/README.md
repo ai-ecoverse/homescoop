@@ -42,8 +42,8 @@ tarball checksums ship in `patches/` and `SOURCES.md`.
 
 - Spawns are `posix_spawn` (no fork); `gpg-agent --daemon` detaches by
   starting itself again.
-- `stubs/slicc_stat_owner.c` reports files as the realm user's (wasix-libc
-  answers uid 0 for every file while `getuid()` is 1000).
+- Built against wasix-sysroot 2025.9.30-15 or later, whose libc reports
+  files as the realm user's (GnuPG refuses a homedir it does not own).
 
 License: GPL-3.0-or-later (GnuPG); the libraries' licenses are in
 `licenses/`.

@@ -5,8 +5,8 @@
 #   socket: WASIX (real threads), not Emscripten.
 # - No Asyncify anywhere: every spawn is posix_spawn (proc_spawn3) and
 #   gpg-agent --daemon detaches by spawning itself (gnupg-*-wasi.patch).
-# - wasix-libc stat() reports uid 0 while getuid() is 1000 (slicc_identity):
-#   stubs/slicc_stat_owner.c wraps stat & co. until wasix-sysroot does it.
+# - Needs wasix-sysroot >= 2025.9.30-15: its libc reports files as the realm
+#   user's (st_uid/st_gid = getuid()), which GnuPG's homedir checks require.
 set -euo pipefail
 
 HOMESCOOP_ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -17,7 +17,7 @@ homescoop_load_recipe wasix-gnupg
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-1"
+PKG_VER="${VER}-2"
 WORK="${WASIX_GNUPG_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
@@ -44,6 +44,11 @@ export GPGRT_CONFIG="$PREFIX/bin/gpgrt-config"
 unset CFLAGS CPPFLAGS LDFLAGS CXX PKG_CONFIG_LIBDIR
 
 command -v wasixcc >/dev/null || { echo "homescoop wasix-gnupg: wasixcc not on PATH" >&2; exit 1; }
+SYSROOT_LIBC="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot/lib/wasm32-wasi/libc.a"
+llvm-ar t "$SYSROOT_LIBC" | grep -qx slicc_stat_owner.o || {
+  echo "homescoop wasix-gnupg: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-15 (no slicc_stat_owner.o)" >&2
+  exit 1
+}
 
 BUILD_TRIPLE="$(/usr/bin/uname -m)-apple-darwin"
 BUILD_TRIPLE="${BUILD_TRIPLE/arm64/aarch64}"
@@ -107,8 +112,6 @@ EXTRA=(--with-libgpg-error-prefix="$PREFIX" --disable-doc)
 build_lib libassuan 3.0.2 true
 build_lib libksba 1.8.1 true
 
-wasixcc -O2 -c "$PKG/stubs/slicc_stat_owner.c" -o "$PREFIX/lib/slicc_stat_owner.o"
-STAT_WRAP="$PREFIX/lib/slicc_stat_owner.o -Wl,--wrap=stat,--wrap=lstat,--wrap=fstat,--wrap=fstatat"
 
 GDIR="gnupg-$VER"
 unpack "$GDIR"
@@ -126,7 +129,7 @@ unpack "$GDIR"
     --disable-photo-viewers --disable-card-support --disable-dirmngr-auto-start \
     --disable-tests --disable-bzip2 --disable-zip --without-readline \
     CFLAGS="-O2" > "$BUILD/$GDIR.configure.log" 2>&1
-  make -j"$JOBS" LIBS="$STAT_WRAP" > "$BUILD/$GDIR.make.log" 2>&1
+  make -j"$JOBS" > "$BUILD/$GDIR.make.log" 2>&1
 ) || { echo "homescoop wasix-gnupg: $GDIR failed; logs in $BUILD/$GDIR.*.log" >&2; exit 1; }
 
 rm -rf "$DEST/bin" "$DEST/licenses" "$DEST/patches"
@@ -148,7 +151,7 @@ cp "$BUILD/libassuan-3.0.2/COPYING.LIB" "$DEST/licenses/libassuan-COPYING.LIB"
 cp "$BUILD/libksba-1.8.1/COPYING.LGPLv3" "$DEST/licenses/libksba-COPYING.LGPLv3"
 cp "$BUILD/libksba-1.8.1/COPYING.GPLv2" "$DEST/licenses/libksba-COPYING.GPLv2"
 cp "$BUILD/npth-1.8/COPYING.LIB" "$DEST/licenses/npth-COPYING.LIB"
-cp "$PKG"/patches/* "$PKG/stubs/slicc_stat_owner.c" "$DEST/patches/"
+cp "$PKG"/patches/* "$DEST/patches/"
 
 {
   echo "# Sources"
