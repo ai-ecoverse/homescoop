@@ -32,8 +32,8 @@ See SPIKE.md / publish report.
 
 ## Stage from CI
 
-Download the `wasi-rustc-patched` artifact from the workflow, then run
-`python3 packages/wasi-rustc/stage-patched.py <wasi-rustc-patched.tgz>`.
+Download the `wasi-rustc-patched` or `wasi-rustc-stable` artifact, then run
+`python3 packages/wasi-rustc/stage-patched.py <artifact.tgz> --expected-version <package-version>`.
 The script stages only the compiler and `wasm32-wasip1` rustlib, excluding
 the Linux host rustlib and duplicate debug copy. `build.sh` remains the
 historical 1.83.0-1 spike recipe.

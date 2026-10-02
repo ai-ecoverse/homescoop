@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage the patched 1.83 rustc CI artifact as the wasi-rustc npm package."""
+"""Stage a rustc CI artifact as the wasi-rustc npm package."""
 
 import argparse
 import json
@@ -13,10 +13,10 @@ PACKAGE = ROOT / "package"
 TARGET_PREFIX = "lib/rustlib/wasm32-wasip1/"
 
 
-def stage(artifact: Path) -> None:
+def stage(artifact: Path, expected_version: str) -> None:
     metadata = json.loads((PACKAGE / "package.json").read_text())
-    if metadata["version"] != "1.83.0-2":
-        raise ValueError("update package metadata for 1.83.0-2 before staging")
+    if metadata["version"] != expected_version:
+        raise ValueError(f"package metadata version is not {expected_version}")
 
     with tarfile.open(artifact, "r:gz") as archive:
         members = archive.getmembers()
@@ -66,4 +66,6 @@ def stage(artifact: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact", type=Path)
-    stage(parser.parse_args().artifact)
+    parser.add_argument("--expected-version", required=True)
+    args = parser.parse_args()
+    stage(args.artifact, args.expected_version)
