@@ -29,8 +29,7 @@
   },
   "homescoop": {
     "recipe": "wasi-rustc",
-    "upstream": "1.98.1",
-    "spike": true
+    "upstream": "1.98.1"
   },
   "slicc": {
     "abi": "wasi",

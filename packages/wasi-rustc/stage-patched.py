@@ -60,6 +60,15 @@ def stage(artifact: Path, expected_version: str) -> None:
     driver = PACKAGE / "bin" / "rustc"
     shutil.copyfile(ROOT / "rustc-driver.sh", driver)
     driver.chmod(0o755)
+    (PACKAGE / "bin" / "rustc.wasm").chmod(0o755)
+    # ipk installs keep tarball modes, and the driver execs rustc.wasm by path,
+    # so every command file the manifest declares must be executable.
+    for command in metadata["slicc"]["commands"].values():
+        for key in ("script", "wasm"):
+            if key in command:
+                path = PACKAGE / command[key]
+                if not path.stat().st_mode & 0o111:
+                    raise ValueError(f"command file is not executable: {command[key]}")
     print(f"staged {metadata['name']}@{metadata['version']} from {artifact}")
 
 
