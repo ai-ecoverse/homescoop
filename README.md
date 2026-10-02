@@ -82,6 +82,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-diffutils` | host | **3.12.0** (`diff` / `cmp` / `diff3` / `sdiff`) |
 | `@ai-ecoverse/wasm-patch` | host | **2.8.0** |
 | `@ai-ecoverse/wasm-xxd` | host | **9.1.1850** |
+| `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 | `@ai-ecoverse/wasm-magick-native` | slicc* | stub (Magick.Native Q8) |
 
