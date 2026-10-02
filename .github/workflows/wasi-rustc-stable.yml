@@ -102,6 +102,10 @@ jobs:
         working-directory: rust
         run: bash ../homescoop/packages/wasi-rustc/check-stable-llvm-wasi.sh
 
+      - name: compile WASI LLVM and LLD libraries before bootstrap
+        working-directory: rust
+        run: bash ../homescoop/packages/wasi-rustc/check-stable-llvm-libs.sh
+
       - name: generate and parse bootstrap config
         working-directory: rust
         run: |

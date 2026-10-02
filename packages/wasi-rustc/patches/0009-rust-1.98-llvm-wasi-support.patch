@@ -1,3 +1,31 @@
+diff --git a/src/llvm-project/llvm/lib/ExecutionEngine/Interpreter/ExternalFunctions.cpp b/src/llvm-project/llvm/lib/ExecutionEngine/Interpreter/ExternalFunctions.cpp
+index 9fe74898170a..fafb30373d9a 100644
+--- a/src/llvm-project/llvm/lib/ExecutionEngine/Interpreter/ExternalFunctions.cpp
++++ b/src/llvm-project/llvm/lib/ExecutionEngine/Interpreter/ExternalFunctions.cpp
+@@ -34,7 +34,10 @@
+ #include "llvm/Support/raw_ostream.h"
+ #include <cassert>
+ #include <cmath>
++#if !defined(__wasi__)
+ #include <csignal>
++#endif
++#include <cstdlib>
+ #include <cstdint>
+ #include <cstdio>
+ #include <cstring>
+@@ -339,7 +342,11 @@ static GenericValue lle_X_exit(FunctionType *FT, ArrayRef<GenericValue> Args) {
+ static GenericValue lle_X_abort(FunctionType *FT, ArrayRef<GenericValue> Args) {
+   //FIXME: should we report or raise here?
+   //report_fatal_error("Interpreted program raised SIGABRT");
+-  raise (SIGABRT);
++#if defined(__wasi__)
++  std::abort();
++#else
++  raise(SIGABRT);
++#endif
+   return GenericValue();
+ }
+ 
 diff --git a/src/llvm-project/llvm/lib/Support/CrashRecoveryContext.cpp b/src/llvm-project/llvm/lib/Support/CrashRecoveryContext.cpp
 index 1ba0c2383dae..9b9c0fb7e2e3 100644
 --- a/src/llvm-project/llvm/lib/Support/CrashRecoveryContext.cpp
