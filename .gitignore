@@ -19,3 +19,11 @@ packages/*/package/libexec/
 packages/*/package/share/
 packages/*/package/dist/
 packages/*/package/etc/
+.env.npm
+.npmrc
+packages/py-scipy/tools/wasix_stubs.o
+packages/*/work/
+packages/*/.out/
+packages/*/package/sysroot*/
+packages/*/package/goroot/
+*.log
