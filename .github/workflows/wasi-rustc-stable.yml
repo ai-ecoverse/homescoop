@@ -51,6 +51,7 @@ jobs:
           git apply ../homescoop/packages/wasi-rustc/patches/0011-rust-1.98-wasi-output-writeable.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0012-rust-1.98-wasi-process-proc-macros.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0013-rust-1.98-wasi-cwd-from-pwd.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0014-rust-1.98-wasi-no-permission-bits.patch
           git diff --check
           git status --short
 

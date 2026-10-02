@@ -1,5 +1,5 @@
 diff --git a/Cargo.lock b/Cargo.lock
-index c3cd706..cb3769d 100644
+index c3cd706..ad3902b 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -576,6 +576,7 @@ dependencies = [
@@ -37,7 +37,16 @@ index c3cd706..cb3769d 100644
  dependencies = [
   "windows-sys 0.61.2",
  ]
-@@ -5354,6 +5349,10 @@ dependencies = [
+@@ -4749,8 +4744,6 @@ dependencies = [
+ [[package]]
+ name = "tar"
+ version = "0.4.46"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+ dependencies = [
+  "filetime",
+  "libc",
+@@ -5354,6 +5347,10 @@ dependencies = [
   "wit-bindgen",
  ]
  
@@ -49,7 +58,7 @@ index c3cd706..cb3769d 100644
  name = "wasm-bindgen"
  version = "0.2.126"
 diff --git a/Cargo.toml b/Cargo.toml
-index c4ae20c..372c788 100644
+index c4ae20c..f28d6a3 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -51,7 +51,7 @@ filetime = "0.2.27"
@@ -100,7 +109,7 @@ index c4ae20c..372c788 100644
  [target.'cfg(unix)'.dependencies]
  libc.workspace = true
  
-@@ -302,3 +309,9 @@ http-transport-reqwest = ["gix/blocking-http-transport-reqwest"]
+@@ -302,3 +309,10 @@ http-transport-reqwest = ["gix/blocking-http-transport-reqwest"]
  
  [lints]
  workspace = true
@@ -110,6 +119,7 @@ index c4ae20c..372c788 100644
 +git2 = { path = "slicc/git2" }
 +home = { path = "slicc/home" }
 +filetime = { path = "slicc/filetime" }
++tar = { path = "slicc/tar" }
 diff --git a/crates/cargo-util-terminal/src/shell.rs b/crates/cargo-util-terminal/src/shell.rs
 index e39d231..32fd1a8 100644
 --- a/crates/cargo-util-terminal/src/shell.rs

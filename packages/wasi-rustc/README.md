@@ -92,6 +92,10 @@ a WASI target. Other hosts refuse it, as upstream does, so bootstrap's
 directory. wasi-libc starts every process at `/`, while SLICC passes the real
 working directory in `PWD`. `set_current_dir` keeps `PWD` current.
 
+`patches/0014-*`: `set_permissions` succeeds without doing anything on WASI,
+which has no permission bits (wasi-libc's chmod is ENOSYS). Cargo unpacks
+`.crate` files with modes.
+
 ## Cargo 0.99 (`cargo-0.99/`)
 
 Cargo 0.99 is Rust 1.98.1's own submodule (rust-lang/cargo `797e8a9`). The
@@ -99,8 +103,8 @@ stable workflow builds it right after rustc, with the stage1 compiler, so it
 links this recipe's wasm32-wasip1-threads std.
 
 - `prepare.sh` applies `cargo.patch` and adds the WASIX Command bridge.
-- `git2`, `home` and `filetime` come from crates.io with one small WASI patch
-  each (`[patch.crates-io]`).
+- `git2`, `home`, `filetime` and `tar` come from crates.io with one small WASI
+  patch each (`[patch.crates-io]`).
 - libgit2 builds with the headers in `wasi-compat/`. Cargo uses it only for
   local repositories, and git fetch fails with a message that names the realm.
 - Registry HTTP: on WASI, `util/network/http_async.rs` is a plain HTTP/1.1
