@@ -47,6 +47,7 @@ jobs:
           git apply ../homescoop/packages/wasi-rustc/patches/0007-rust-1.98-llvm-wasi-endian.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0008-rust-1.98-llvm-wasi-unix.patch
           git apply ../homescoop/packages/wasi-rustc/patches/0009-rust-1.98-llvm-wasi-support.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0010-rust-1.98-wasi-no-dlopen.patch
           git diff --check
           git status --short
 

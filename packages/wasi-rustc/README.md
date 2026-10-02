@@ -45,6 +45,9 @@ upstream tag with its in-tree LLVM 22. The first cut keeps LLVM and LLD in
 `rustc.wasm`. `make-stable-config.py` generates the bootstrap config from an
 absolute wasi-sdk path; `patches/0003-*` adds WASI host paths and environment
 support, and `patches/0004-*` embeds LLD and configures LLVM for the WASI host.
+`patches/0005-*` through `0009-*` port LLVM 22 to the threaded WASI host.
+`patches/0010-*` replaces `libloading` with a load error on WASI, which has no
+`dlopen`: proc-macro crates, codegen-backend dylibs and libEnzyme do not load.
 The workflow emits `wasi-rustc-stable.tgz` for staging and SLICC acceptance.
 Cargo follows acceptance of this compiler; the PIC LLVM side module follows
 Cargo.
