@@ -40,6 +40,7 @@ debuginfo-level = 0
 incremental = false
 strip = false
 llvm-bitcode-linker = false
+llvm-tools = false
 
 [llvm]
 static-libstdcpp = true
