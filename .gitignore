@@ -27,3 +27,7 @@ packages/*/.out/
 packages/*/package/sysroot*/
 packages/*/package/goroot/
 *.log
+__pycache__/
+*.pyc
+*.whl
+*.o
