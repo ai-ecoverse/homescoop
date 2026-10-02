@@ -1,0 +1,76 @@
+{
+  "name": "@ai-ecoverse/wasix-ruby",
+  "version": "3.4.11-6",
+  "description": "MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; sysroot 2025.9.30-14)",
+  "license": "Ruby",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "lib",
+    "PRESTAGE.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-ruby",
+    "upstream": "3.4.11",
+    "openssl": "linked against /tmp/wasix-openssl-prefix (OpenSSL 3.x; honours SSL_CERT_FILE). Socket C ext built with HAVE_STRUCT_MSGHDR_MSG_CONTROL / CMSG_* forced off (WASIX ancillary data incomplete).",
+    "asyncify_buf": 65536,
+    "asyncify_note": "POSTLINK: wasm-opt --asyncify only (no asyncify-ignore-imports, no restricted import list). Spill macros WASM_{SETJMP,FIBER,SCAN}_STACK_BUFFER_SIZE=65536 (upstream default 6144). No RB_WASM_ASYNCIFY symbol.",
+    "threads_note": "pthread + Asyncify trampoline (WASIX_WASM_THREAD_RT); TLS Asyncify state. Certify Thread/Mutex/Queue at real ipk path for -4+.",
+    "relocation_note": "configure --prefix=/nonexistent-ruby-prefix so baked-in load paths never match VFS. RUBYLIB lists site/vendor/api + arch (rbconfig). Certify at /shared/lib/node_modules/@ai-ecoverse/wasix-ruby with manifest env — never at /ruby.",
+    "slicc_pr_3735": "gem/bundle/rake use args: [\"${package}/bin/…\"]; needs SLICC PR #3735 (absolute args). Until merged, those commands need a harness with the PR."
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "ruby": {
+        "wasm": "bin/ruby.wasm",
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "RUBYLIB": "${package}/lib/ruby/site_ruby/3.4.0:${package}/lib/ruby/site_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/vendor_ruby/3.4.0:${package}/lib/ruby/vendor_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "gem": {
+        "wasm": "bin/ruby.wasm",
+        "args": [
+          "${package}/bin/gem"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "RUBYLIB": "${package}/lib/ruby/site_ruby/3.4.0:${package}/lib/ruby/site_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/vendor_ruby/3.4.0:${package}/lib/ruby/vendor_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "bundle": {
+        "wasm": "bin/ruby.wasm",
+        "args": [
+          "${package}/bin/bundle"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "RUBYLIB": "${package}/lib/ruby/site_ruby/3.4.0:${package}/lib/ruby/site_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/vendor_ruby/3.4.0:${package}/lib/ruby/vendor_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "rake": {
+        "wasm": "bin/ruby.wasm",
+        "args": [
+          "${package}/bin/rake"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "RUBYLIB": "${package}/lib/ruby/site_ruby/3.4.0:${package}/lib/ruby/site_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/vendor_ruby/3.4.0:${package}/lib/ruby/vendor_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      }
+    }
+  }
+}

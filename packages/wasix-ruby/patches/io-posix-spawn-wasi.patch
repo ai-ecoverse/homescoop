@@ -1,0 +1,71 @@
+--- io.c	2026-09-23 07:32:40.000000000 +0200
++++ io.c	2026-10-01 16:02:27.279087937 +0200
+@@ -7386,7 +7386,7 @@
+ static void
+ pipe_finalize(rb_io_t *fptr, int noraise)
+ {
+-#if !defined(HAVE_WORKING_FORK) && !defined(_WIN32)
++#if !defined(HAVE_WORKING_FORK) && !defined(_WIN32) && !defined(HAVE_POSIX_SPAWN)
+     int status = 0;
+     if (fptr->stdio_file) {
+         status = pclose(fptr->stdio_file);
+@@ -7457,7 +7457,7 @@
+ #define spawn(mode, cmd) rb_w32_uspawn((mode), (cmd), 0)
+ #endif
+ 
+-#if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)
++#if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV) || defined(HAVE_POSIX_SPAWN) /* WASIX_POSIX_SPAWN */
+ struct popen_arg {
+     VALUE execarg_obj;
+     struct rb_execarg *eargp;
+@@ -7591,7 +7591,7 @@
+ # endif
+ #endif
+ 
+-#if (defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)) && !defined __EMSCRIPTEN__
++#if (defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV) || defined(HAVE_POSIX_SPAWN)) && !defined __EMSCRIPTEN__
+ static VALUE
+ rb_execarg_fixup_v(VALUE execarg_obj)
+ {
+@@ -7617,8 +7617,10 @@
+ #if defined(HAVE_WORKING_FORK)
+     int status;
+     char errmsg[80] = { '\0' };
++#elif defined(HAVE_POSIX_SPAWN)
++    /* errmsg unused here; rb_spawn_process has its own buffer */
+ #endif
+-#if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)
++#if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV) || defined(HAVE_POSIX_SPAWN)
+     int state;
+     struct popen_arg arg;
+ #endif
+@@ -7653,13 +7655,13 @@
+         cmd = StringValueCStr(prog);
+ #endif
+ 
+-#if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV)
++#if defined(HAVE_WORKING_FORK) || defined(HAVE_SPAWNV) || defined(HAVE_POSIX_SPAWN)
+     arg.execarg_obj = execarg_obj;
+     arg.eargp = eargp;
+     arg.modef = fmode;
+     arg.pair[0] = arg.pair[1] = -1;
+     arg.write_pair[0] = arg.write_pair[1] = -1;
+-# if !defined(HAVE_WORKING_FORK)
++# if defined(HAVE_SPAWNV) && !defined(HAVE_WORKING_FORK)
+     if (eargp && !eargp->use_shell) {
+         args = ARGVSTR2ARGV(eargp->invoke.cmd.argv_str);
+     }
+@@ -7707,6 +7709,13 @@
+ 
+ # if defined(HAVE_WORKING_FORK)
+         pid = rb_fork_async_signal_safe(&status, popen_exec, &arg, arg.eargp->redirect_fds, errmsg, sizeof(errmsg));
++# elif defined(HAVE_POSIX_SPAWN)
++        {
++            char spawn_errmsg[80] = { '\0' };
++            pid = rb_spawn_process(eargp, spawn_errmsg, sizeof(spawn_errmsg));
++            if (pid == -1)
++                e = errno;
++        }
+ # else
+         rb_execarg_run_options(eargp, sargp, NULL, 0);
+ #   if defined(HAVE_SPAWNVE)
