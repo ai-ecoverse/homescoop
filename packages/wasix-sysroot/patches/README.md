@@ -24,3 +24,10 @@ __wasi_fdflagsext_t fd_flags =
 
 `build.sh` compiles this object (static + PIC) and replaces `fcntl.o` in
 every shipped `libc.a`. No upstream report (project rule).
+
+## `../slicc_stat_owner.c` — st_uid/st_gid = getuid()/getgid()
+
+WASI filestat has no owner. Replaces `fstat.o` + `fstatat.o` so public
+`stat`/`lstat`/`fstat`/`fstatat` (all via `__wasilibc_nocwd_fstatat` or
+`fstat`) report the slicc identity uid/gid (1000). `chown`/`fchown` stay
+upstream no-ops.

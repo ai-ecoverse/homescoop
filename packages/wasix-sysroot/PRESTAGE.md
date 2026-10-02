@@ -1,4 +1,27 @@
-# wasix-sysroot 2025.9.30-14
+# wasix-sysroot 2025.9.30-15
+
+## File ownership (st_uid / st_gid = 1000)
+
+WASI `filestat` has no owner fields, so stock wasix-libc left `st_uid` /
+`st_gid` at 0 while `slicc_identity` makes `getuid()`/`getgid()` return 1000.
+GnuPG then warns about unsafe homedir ownership; git `safe.directory`, ssh,
+and similar checks misbehave the same way.
+
+`slicc_stat_owner.c` replaces `fstat.o` + `fstatat.o` in every shipped
+`libc.a` so `stat` / `lstat` / `fstat` / `fstatat` fill uid/gid from
+`getuid()`/`getgid()`. `chown` / `fchown` stay upstream no-ops.
+
+Probe (also run by `build.sh` against the packed tarball):
+
+```c
+#include <sys/stat.h>
+#include <unistd.h>
+int main(void) {
+  struct stat st;
+  if (stat(".", &st) != 0) return 2;
+  return (st.st_uid == getuid() && st.st_gid == getgid() && getuid() == 1000) ? 0 : 3;
+}
+```
 
 ## F_SETFD CLOEXEC precedence fix
 
@@ -10,8 +33,6 @@ close-on-exec; `exec` then left the new process with no stdio.
 Patched object: `patches/fcntl.c` → replaced `fcntl.o` in every shipped
 `libc.a` (and host `~/.wasixcc/sysroot`), compiled with wasixcc atomics /
 bulk-memory features so `--shared-memory` links succeed.
-
-Note: `-12`/`-13` on npm are not this fix (or lack atomics flags). Use `-14`.
 
 PRESTAGE (on SLICC):
 

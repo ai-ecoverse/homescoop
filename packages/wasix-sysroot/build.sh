@@ -7,7 +7,7 @@ export HOMESCOOP_ROOT="$ROOT"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
 HOMESCOOP_PKG="$ROOT/packages/wasix-sysroot"
-PKG_VER="2025.9.30-14"
+PKG_VER="2025.9.30-15"
 PKG="$HOMESCOOP_PKG/package"
 SRC="${WASIX_SYSROOT:-${HOME}/.wasixcc/sysroot}"
 
@@ -136,8 +136,11 @@ install_identity() {
   [[ -f "$lib" ]] || return 0
   "$LLVM_AR" d "$lib" "${DROP[@]}" 2>/dev/null || true
   # Member must be slicc_identity.o
-  cp "$src" "$ID_TMP/slicc_identity.o"
-  "$LLVM_AR" r "$lib" "$ID_TMP/slicc_identity.o"
+  local member="$ID_TMP/slicc_identity.o"
+  if [[ "$src" != "$member" ]]; then
+    cp "$src" "$member"
+  fi
+  "$LLVM_AR" r "$lib" "$member"
 }
 for v in sysroot sysroot-eh sysroot-exnref-eh; do
   for triple in wasm32-wasip1 wasm32-wasi; do
@@ -175,6 +178,74 @@ if [[ -d "${HOME}/.wasixcc/sysroot" ]]; then
   done
 fi
 rm -rf "$ID_TMP"
+trap - EXIT
+
+# WASI filestat has no owner → wasix-libc st_uid/st_gid stay 0 while getuid()
+# is 1000 (slicc_identity). Replace fstat + __wasilibc_nocwd_fstatat (stat/
+# lstat/fstatat all go through the latter).
+echo "== wasix-sysroot: inject slicc_stat_owner into every libc.a"
+STAT_SRC="$HOMESCOOP_PKG/slicc_stat_owner.c"
+test -f "$STAT_SRC" || { echo "homescoop: missing $STAT_SRC" >&2; exit 1; }
+STAT_TMP=$(mktemp -d)
+trap 'rm -rf "$STAT_TMP"' EXIT
+compile_stat() {
+  local out=$1; shift
+  "$CLANG" --target=wasm32-wasip1 --sysroot="$PKG/sysroot" \
+    -resource-dir="${HOME}/.wasixcc/llvm/lib/clang/21" \
+    -I"$PKG/sysroot/include" \
+    -matomics -mbulk-memory -mmutable-globals -pthread \
+    -fno-trapping-math -ftls-model=local-exec \
+    -msimd128 -mrelaxed-simd -mextended-const -O2 \
+    "$@" -c "$STAT_SRC" -o "$out"
+  test -s "$out"
+}
+compile_stat "$STAT_TMP/slicc_stat_owner.o"
+compile_stat "$STAT_TMP/slicc_stat_owner.pic.o" -fPIC -fvisibility=default
+install_stat_owner() {
+  local lib=$1 src=$2
+  [[ -f "$lib" ]] || return 0
+  "$LLVM_AR" d "$lib" fstat.o fstatat.o 2>/dev/null || true
+  local member="$STAT_TMP/slicc_stat_owner.o"
+  if [[ "$src" != "$member" ]]; then
+    cp "$src" "$member"
+  fi
+  "$LLVM_AR" r "$lib" "$member"
+}
+for v in sysroot sysroot-eh sysroot-exnref-eh; do
+  for triple in wasm32-wasip1 wasm32-wasi; do
+    lib="$PKG/$v/lib/$triple/libc.a"
+    [[ -f "$lib" ]] || continue
+    install_stat_owner "$lib" "$STAT_TMP/slicc_stat_owner.o"
+    echo "  stat owner → $v/$triple"
+  done
+done
+for v in sysroot-ehpic sysroot-exnref-ehpic; do
+  for triple in wasm32-wasip1 wasm32-wasi; do
+    lib="$PKG/$v/lib/$triple/libc.a"
+    [[ -f "$lib" ]] || continue
+    install_stat_owner "$lib" "$STAT_TMP/slicc_stat_owner.pic.o"
+    echo "  stat owner (PIC) → $v/$triple"
+  done
+done
+if [[ -d "${HOME}/.wasixcc/sysroot" ]]; then
+  for v in sysroot sysroot-eh sysroot-exnref-eh; do
+    for triple in wasm32-wasip1 wasm32-wasi; do
+      hlib="${HOME}/.wasixcc/sysroot/$v/lib/$triple/libc.a"
+      [[ -f "$hlib" ]] || continue
+      install_stat_owner "$hlib" "$STAT_TMP/slicc_stat_owner.o"
+      echo "  stat owner → host $v/$triple"
+    done
+  done
+  for v in sysroot-ehpic sysroot-exnref-ehpic; do
+    for triple in wasm32-wasip1 wasm32-wasi; do
+      hlib="${HOME}/.wasixcc/sysroot/$v/lib/$triple/libc.a"
+      [[ -f "$hlib" ]] || continue
+      install_stat_owner "$hlib" "$STAT_TMP/slicc_stat_owner.pic.o"
+      echo "  stat owner (PIC) → host $v/$triple"
+    done
+  done
+fi
+rm -rf "$STAT_TMP"
 trap - EXIT
 
 # Upstream wasix-libc fcntl F_SETFD: `flags | FD_CLOEXEC ? ...` is always true
@@ -362,8 +433,10 @@ Each tree has a real `lib/wasm32-wasip1` (not a symlink — npm/ipk skip
 links). clang 24 `--target=wasm32-wasip1` resolves crt/libc there.
 `unistd.h` declares `fork` under `__wasix__` even with `-fwasm-exceptions`.
 EH `libc.a` archives get real `fork`/`_Fork` from asyncify (static trees).
-Every libc embeds SLICC identity stubs. EH trees ship libc++/libc++abi/
-libunwind rebuilt from LLVM b158b0ae6 (same as wasm-clang) with exnref flags.
+Every libc embeds SLICC identity stubs (getuid=1000) and reports
+`st_uid`/`st_gid` 1000 from `stat`/`lstat`/`fstat`/`fstatat`. EH trees ship
+libc++/libc++abi/libunwind rebuilt from LLVM b158b0ae6 (same as wasm-clang)
+with exnref flags.
 
 Data only — no commands. Set `WASIXCC_SYSROOT_PREFIX` to this package directory.
 EOF
@@ -373,7 +446,7 @@ const fs = require("fs");
 const p = process.argv[1];
 const j = JSON.parse(fs.readFileSync(p, "utf8"));
 j.version = process.argv[2];
-j.description = "WASIX sysroots: wasip1 real dirs (no symlinks), clang24 exnref EH";
+j.description = "WASIX sysroots: st_uid/st_gid=1000 (slicc identity), F_SETFD CLOEXEC fix, wasip1, clang24 exnref";
 fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
 ' "$PKG/package.json" "$PKG_VER"
 
@@ -393,7 +466,76 @@ test -f "$EXT_PKG/sysroot-exnref-eh/lib/wasm32-wasip1/crt1.o"
 test -f "$EXT_PKG/sysroot-exnref-eh/lib/wasm32-wasip1/libc.a"
 echo "  PRESTAGE: extracted tarball has real wasm32-wasip1 + crt1.o"
 
+# Ownership: stat(".") → st_uid == getuid() (== 1000).
+# Same host clang + resource-dir as the C++ PRESTAGE below: wasix clang's
+# default resource-dir looks for libclang_rt.builtins under
+# wasm32-unknown-wasip1 (missing); package only has
+# lib/wasm32-wasip1/libclang_rt.builtins-wasm32.a.
 SLICC_EM="${SLICC_EMSCRIPTEN:-$ROOT/../slicc-emscripten}"
+HOST_CLANG="${CLANG_HOST:-}"
+if [[ -z "$HOST_CLANG" ]]; then
+  for cand in \
+    "$SLICC_EM/install/bin/clang" \
+    "${HOME}/.wasixcc/llvm/bin/clang"
+  do
+    if [[ -x "$cand" ]]; then HOST_CLANG=$cand; break; fi
+  done
+fi
+if [[ -n "$HOST_CLANG" && -x "$HOST_CLANG" ]] && command -v wasmer >/dev/null; then
+  (
+    cd "$EXTRACT"
+    cat > stat_owner_probe.c <<'EOF'
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+int main(void) {
+  struct stat st;
+  if (stat(".", &st) != 0) return 2;
+  if (st.st_uid != getuid()) {
+    printf("st_uid=%u getuid=%u\n", (unsigned)st.st_uid, (unsigned)getuid());
+    return 3;
+  }
+  if (st.st_gid != getgid()) {
+    printf("st_gid=%u getgid=%u\n", (unsigned)st.st_gid, (unsigned)getgid());
+    return 4;
+  }
+  if (getuid() != 1000 || getgid() != 1000) {
+    printf("identity uid=%u gid=%u\n", (unsigned)getuid(), (unsigned)getgid());
+    return 5;
+  }
+  printf("ok uid=%u gid=%u\n", (unsigned)st.st_uid, (unsigned)st.st_gid);
+  return 0;
+}
+EOF
+    STAT_RES="$("$HOST_CLANG" -print-resource-dir)"
+    [[ -d "$ROOT/packages/wasm-clang/package/lib/clang/24" ]] \
+      && STAT_RES="$ROOT/packages/wasm-clang/package/lib/clang/24"
+    "$HOST_CLANG" --target=wasm32-wasip1 --sysroot="$EXT_PKG/sysroot" \
+      -resource-dir="$STAT_RES" \
+      -L"$EXT_PKG/sysroot/lib/wasm32-wasip1" \
+      -matomics -mbulk-memory -mmutable-globals -pthread \
+      -ftls-model=local-exec \
+      -Wl,--extra-features=atomics -Wl,--extra-features=bulk-memory \
+      -Wl,--extra-features=mutable-globals -Wl,--shared-memory \
+      -Wl,--import-memory -Wl,--export-memory \
+      -Wl,--max-memory=4294967296 \
+      -lwasi-emulated-getpid -lwasi-emulated-mman -lwasi-emulated-process-clocks \
+      -lclang_rt.builtins-wasm32 -lpthread \
+      -o stat_owner_probe.wasm stat_owner_probe.c \
+      || { echo "homescoop: PRESTAGE fail — compile stat_owner_probe" >&2; exit 1; }
+    # wasmer 7: --dir is deprecated/broken; --volume maps host cwd for stat(".").
+    out=$(wasmer run --volume "$PWD":/ stat_owner_probe.wasm 2>&1) || {
+      echo "homescoop: PRESTAGE fail — run stat_owner_probe: $out" >&2
+      exit 1
+    }
+    echo "$out" | grep -q '^ok uid=1000' \
+      || { echo "homescoop: PRESTAGE fail — stat owner: $out" >&2; exit 1; }
+    echo "  PRESTAGE: stat(\".\") st_uid == getuid() == 1000"
+  )
+else
+  echo "  PRESTAGE: skip stat-owner probe (need host clang + wasmer)"
+fi
+
 HOST_CLANGXX="${CLANGXX_HOST:-$SLICC_EM/install/bin/clang++}"
 if [[ -x "$HOST_CLANGXX" ]] && command -v node >/dev/null && command -v wasmer >/dev/null; then
   SYS="$EXT_PKG/sysroot-exnref-eh"
