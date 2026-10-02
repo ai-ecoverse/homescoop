@@ -5,7 +5,15 @@ set -euo pipefail
 : "${WASI_SDK_PATH:?}"
 : "${WASI_SYSROOT:?}"
 llvm_include=${LLVM_INCLUDE_DIR:-build/wasm32-wasip1-threads/llvm/include}
-test -f "$llvm_include/llvm/Config/config.h"
+if [[ ! -d "$llvm_include" ]]; then
+  echo "cached LLVM include directory is missing: $PWD/$llvm_include" >&2
+  find build/wasm32-wasip1-threads/llvm -maxdepth 2 -type d -print >&2 || true
+  exit 1
+fi
+if [[ ! -f "$llvm_include/llvm/Config/config.h" ]]; then
+  echo "cached LLVM config.h is missing under $PWD/$llvm_include; compiling to show the include error" >&2
+  find build/wasm32-wasip1-threads/llvm -name config.h -print >&2 || true
+fi
 
 # Mirror the rustc_llvm cc-rs flag order. llvm-config contributes the plain
 # wasm32-wasi target; the final target must select wasi-sdk's threaded libc++.

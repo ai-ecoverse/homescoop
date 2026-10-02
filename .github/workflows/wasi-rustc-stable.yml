@@ -125,7 +125,7 @@ jobs:
       - name: preflight threaded rustc_llvm wrapper against cached LLVM
         if: steps.llvm-cache-restore.outputs.cache-hit != ''
         working-directory: rust
-        run: bash ../homescoop/packages/wasi-rustc/check-stable-llvm-wrapper.sh
+        run: bash -x ../homescoop/packages/wasi-rustc/check-stable-llvm-wrapper.sh
 
       - name: x.py install static rustc and rustlib
         working-directory: rust
