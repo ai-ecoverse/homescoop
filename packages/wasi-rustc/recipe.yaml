@@ -1,14 +1,17 @@
-# Rust compiler for slicc WASI (LLVM-in-wasm host).
+# RETIRED from ladder — do not build or OIDC-publish.
+#
+# Certified @ai-ecoverse/wasi-rustc and @ai-ecoverse/wasi-cargo come only from
+# .github/workflows/wasi-rustc-stable.yml artifacts, after browser certification.
+# This tree keeps patches/stage scripts; the 1.83 oligamiq spike is provenance.
+# See docs/ladder-builds.md "Retired recipes".
 name: wasi-rustc
-builder: host
-# Spike cut tracks oligamiq/rust_wasm v3.0.0 (rustc 1.83.0-dev). Bump when
-# in-tree x.py build lands on a current stable.
+builder: retired
 # renovate: datasource=github-releases depName=rust-lang/rust
 version: "1.83.0"
 npm: "@ai-ecoverse/wasi-rustc"
-summary: "rustc (LLVM) for slicc wasm32-wasip1 — host is wasm32-wasip1-threads"
+summary: "RETIRED from ladder — rustc/cargo from wasi-rustc-stable.yml only"
 source:
-  # Spike: oligamiq release artifacts (bjorn3 compile_rustc_for_wasm lineage).
+  # Historical spike URL (unused). Real builds: rust-lang/rust 1.98.1 via CI.
   url: "https://github.com/oligamiq/rust_wasm/releases/download/v3.0.0-release/rustc_opt.wasm.tar.gz"
   sha256: "skip"
 dependencies:
@@ -20,8 +23,8 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-rustc
   license: MIT OR Apache-2.0
   notes: |
-    Path B: LLVM-in-wasm (not Weblings CLIF→wasm). Host: wasm32-wasip1-threads.
-    Start from bjorn3 compile_rustc_for_wasm* + oligamiq LLVM patches; rustc pins its LLVM.
-    Linker: spawn wasm-ld from @ai-ecoverse/wasm-clang over WASIX (default -C linker=wasm-ld).
-    Default --target wasm32-wasip1; ship lib/rustlib/... (no symlinks).
-    Cargo deferred. See SPIKE.md.
+    Retired from ladder 2026-10-03. Do not rebuild or npm-publish from
+    host-run / ladder-build (would race the certified 1.98.1-1 / cargo 0.99.0-0
+    line). Manual-only: wasi-rustc-stable workflow, then publish the staged
+    tarball after certification. wasi-cargo lives under this package dir and
+    has no separate recipe.

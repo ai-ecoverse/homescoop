@@ -35,8 +35,9 @@ See SPIKE.md / publish report.
 Download the `wasi-rustc-patched` or `wasi-rustc-stable` artifact, then run
 `python3 packages/wasi-rustc/stage-patched.py <artifact.tgz> --expected-version <package-version>`.
 The script stages only the compiler and `wasm32-wasip1` rustlib, excluding
-the Linux host rustlib and duplicate debug copy. `build.sh` remains the
-historical 1.83.0-1 spike recipe.
+the Linux host rustlib and duplicate debug copy. The recipe is
+`builder: retired` so ladder-merge does not OIDC-publish the 1.83 spike;
+`build.sh` is a refuse stub. Certified cuts come from `wasi-rustc-stable.yml`.
 
 ## Rust 1.98.1 static build
 
