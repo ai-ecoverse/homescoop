@@ -42,11 +42,17 @@ the Linux host rustlib and duplicate debug copy. The recipe is
 ## Rust 1.98.1 static build
 
 `.github/workflows/wasi-rustc-stable.yml` builds Rust 1.98.1 from the pinned
-upstream tag with its in-tree LLVM 22. The first cut keeps LLVM and LLD in
-`rustc.wasm`. `make-stable-config.py` generates the bootstrap config from an
-absolute wasi-sdk path; `patches/0003-*` adds WASI host paths and environment
-support, and `patches/0004-*` embeds LLD and configures LLVM for the WASI host.
-`patches/0005-*` through `0009-*` port LLVM 22 to the threaded WASI host.
+upstream tag. The compiler links the external LLVM 21 from `packages/wasi-llvm`
+(the `wasi-llvm` artifact of `.github/workflows/wasi-llvm.yml`, chosen by run
+id when the workflow is dispatched); the in-tree LLVM 22 is built only for the
+x86_64 build machine. `rustc.wasm` keeps LLVM and LLD inside it.
+`make-stable-config.py` generates the bootstrap config from an absolute
+wasi-sdk path and, with `--llvm-config`, points the WASI host at the external
+LLVM. `patches/0003-*` adds WASI host paths and environment support, and
+`patches/0004-*` embeds LLD (adding `LLVMDTLTO` only from LLVM 22) and
+configures an in-tree LLVM for the WASI host. `patches/0005-*` through
+`0009-*` port the in-tree LLVM 22 to the threaded WASI host; wasi-llvm carries
+the same guards for 21.
 `patches/0010-*` replaces `libloading` with a load error on WASI, which has no
 `dlopen`: proc-macro crates, codegen-backend dylibs and libEnzyme do not load.
 `patches/0011-*` skips rustc's output-writeable check on WASI: preview1 has no
