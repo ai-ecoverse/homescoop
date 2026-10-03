@@ -76,6 +76,23 @@ index 6cd0b3e1..ebb2a421 100644
      let kind = match (crate_type, sess.crt_static(Some(crate_type)), sess.relocation_model()) {
          (CrateType::Executable, _, _) if sess.is_wasi_reactor() => LinkOutputKind::WasiReactorExe,
          (CrateType::Executable, false, RelocModel::Pic | RelocModel::Pie) => {
+diff --git a/compiler/rustc_interface/src/passes.rs b/compiler/rustc_interface/src/passes.rs
+index ca6e48cb..994cc666 100644
+--- a/compiler/rustc_interface/src/passes.rs
++++ b/compiler/rustc_interface/src/passes.rs
+@@ -280,7 +280,11 @@ fn configure_and_expand(
+         feature_err(sess, sym::export_stable, DUMMY_SP, "`sdylib` crate type is unstable").emit();
+     }
+ 
+-    if is_proc_macro_crate && !sess.panic_strategy().unwinds() {
++    // A WASI-hosted compiler runs WASI proc macros as processes: a panic
++    // ends the macro's process, not the compiler.
++    let process_proc_macro =
++        cfg!(target_os = "wasi") && sess.target.os == rustc_target::spec::Os::Wasi;
++    if is_proc_macro_crate && !sess.panic_strategy().unwinds() && !process_proc_macro {
+         sess.dcx().emit_warn(diagnostics::ProcMacroCratePanicAbort);
+     }
+ 
 diff --git a/compiler/rustc_metadata/src/host_dylib.rs b/compiler/rustc_metadata/src/host_dylib.rs
 index f2416aaa..c66115ba 100644
 --- a/compiler/rustc_metadata/src/host_dylib.rs

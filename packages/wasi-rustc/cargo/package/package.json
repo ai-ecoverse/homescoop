@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-cargo",
-  "version": "0.84.0-1",
+  "version": "0.99.0-0",
   "description": "Cargo inside SLICC's WASI realm (offline path dependencies prototype)",
   "license": "MIT OR Apache-2.0",
   "repository": {

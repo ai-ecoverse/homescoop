@@ -1,9 +1,18 @@
 # @ai-ecoverse/wasi-cargo
 
-Offline Cargo 0.84 prototype for SLICC's WASI realm. It uses the installed
-`@ai-ecoverse/wasi-rustc` driver, targets `wasm32-wasip1`, and supports
-`cargo build --offline` of workspaces with path dependencies. Registry fetching
-and Git dependencies are not yet enabled.
+Cargo 0.99 (Rust 1.98.1) for SLICC's WASI realm. It uses the installed
+`@ai-ecoverse/wasi-rustc` driver and targets `wasm32-wasip1`.
+
+- **Registry access.** crates.io dependencies come through the realm's HTTP
+  proxy, the one `https_proxy` names, over the sparse index. The proxy does
+  TLS, so Cargo needs none. Without a proxy, use `--offline` with vendored or
+  path dependencies.
+- **Proc macros.** Derives such as serde, clap and thiserror need wasi-rustc
+  1.98.1-1 or later, which runs proc macros as child processes.
+- **Unsupported on WASI.** Git dependencies need a git network transport,
+  and they fail with a message that names the realm.
+- **Untested.** `cargo search`, `publish`, `login`, `owner` and `yank` use
+  the same proxy client.
 
 The package sets `CARGO_BUILD_JOBS=1` because WASI std cannot query host CPU
 parallelism. It disables incremental compilation because the realm filesystem

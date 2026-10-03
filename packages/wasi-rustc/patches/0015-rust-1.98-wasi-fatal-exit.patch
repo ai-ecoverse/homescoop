@@ -1,0 +1,70 @@
+diff --git a/compiler/rustc_interface/src/interface.rs b/compiler/rustc_interface/src/interface.rs
+index 95aeb1f7..40d9065a 100644
+--- a/compiler/rustc_interface/src/interface.rs
++++ b/compiler/rustc_interface/src/interface.rs
+@@ -493,7 +493,18 @@ pub fn run_compiler<R: Send>(config: Config, f: impl FnOnce(&Compiler) -> R + Se
+             // - Panic, e.g. triggered by `abort_if_errors` or a fatal error.
+             //
+             // We must run `finish_diagnostics` in both cases.
++            #[cfg(not(target_os = "wasi"))]
+             let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&compiler)));
++            #[cfg(target_os = "wasi")]
++            let res = {
++                let sess = &compiler.sess;
++                let finish = || {
++                    sess.finish_diagnostics();
++                    sess.dcx().flush_delayed();
++                };
++                let compiler = &compiler;
++                Ok(rustc_span::fatal_error::on_wasi_fatal_exit(&finish, || f(compiler)))
++            };
+ 
+             compiler.sess.finish_diagnostics();
+ 
+diff --git a/compiler/rustc_span/src/fatal_error.rs b/compiler/rustc_span/src/fatal_error.rs
+index 5e2d8268..c3b6ab82 100644
+--- a/compiler/rustc_span/src/fatal_error.rs
++++ b/compiler/rustc_span/src/fatal_error.rs
+@@ -13,10 +13,42 @@ impl !Send for FatalError {}
+ 
+ impl FatalError {
+     pub fn raise(self) -> ! {
++        // WASI cannot unwind (panic=abort): unwinding to the driver would trap.
++        // Finish the session's diagnostics here and exit as the driver would.
++        #[cfg(target_os = "wasi")]
++        {
++            if let Some(finish) = WASI_FINISH.with(|f| f.take()) {
++                // SAFETY: set by `on_wasi_fatal_exit`, which clears it before
++                // the closure it points to goes away.
++                unsafe { (*finish)() };
++            }
++            std::process::exit(1);
++        }
++        #[cfg(not(target_os = "wasi"))]
+         std::panic::resume_unwind(Box::new(FatalErrorMarker))
+     }
+ }
+ 
++#[cfg(target_os = "wasi")]
++thread_local! {
++    static WASI_FINISH: std::cell::Cell<Option<*const (dyn Fn() + 'static)>> =
++        const { std::cell::Cell::new(None) };
++}
++
++/// Runs `f`; a fatal error inside it calls `finish` (the session's final
++/// diagnostics) and exits with status 1. Only on WASI, which cannot unwind.
++#[cfg(target_os = "wasi")]
++pub fn on_wasi_fatal_exit<R>(finish: &dyn Fn(), f: impl FnOnce() -> R) -> R {
++    // SAFETY: the pointer is cleared below, before `finish` goes out of scope;
++    // `raise` takes it out before calling it.
++    let finish: *const (dyn Fn() + '_) = finish;
++    let finish: *const (dyn Fn() + 'static) = unsafe { std::mem::transmute(finish) };
++    let outer = WASI_FINISH.with(|f| f.replace(Some(finish)));
++    let result = f();
++    WASI_FINISH.with(|f| f.set(outer));
++    result
++}
++
+ impl std::fmt::Display for FatalError {
+     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         write!(f, "fatal error")

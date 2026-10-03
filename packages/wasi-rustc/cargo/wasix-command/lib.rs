@@ -71,7 +71,21 @@ fn put_op(op: &mut [u8; FD_OP_SIZE], cmd: u8, fd: u32, path: &[u8], flags: u16, 
 /// callers adapt `code` at their own boundary until the WASIX std migration.
 #[allow(unsafe_code)]
 pub fn run(cmd: &Command, input: Option<&[u8]>, capture: bool) -> io::Result<Output> {
-    let name = cmd.get_program().as_bytes();
+    // A program path without its `.wasm` suffix (Cargo's `build-script-build`)
+    // runs as `<path>.wasm`, as Windows resolves `.exe`.
+    let program = cmd.get_program();
+    let with_suffix;
+    let program = if program.as_bytes().contains(&b'/') && !std::path::Path::new(program).exists() {
+        with_suffix = {
+            let mut p = program.to_os_string();
+            p.push(".wasm");
+            p
+        };
+        if std::path::Path::new(&with_suffix).exists() { with_suffix.as_os_str() } else { program }
+    } else {
+        program
+    };
+    let name = program.as_bytes();
     let mut args = Vec::new();
     args.push(cstr(name)?);
     for arg in cmd.get_args() {
