@@ -28,6 +28,21 @@ no extra WASI/EH flags needed for typical builds.
 - **CMake**: `CC=cc CXX=c++ cmake …` — Clang 24 is identified; `pthread.h`
   and the sysroot resolve under SLICC.
 
+## One module for every tool
+
+`bin/llvm.wasm` holds clang, lld, llvm-ar, llvm-nm, llvm-objcopy and
+llvm-symbolizer, linked together so they share one copy of LLVM; the tool is
+chosen by its name (argv[0]), or `llvm <tool> args…`. `bin/` ships a glue
+**file** under every name emcc constructs under `LLVM_ROOT` (`clang`,
+`clang++`, `lld`, `wasm-ld`, `ld.lld`, `llvm-ar`, `llvm-ranlib`, `llvm-nm`,
+`llvm-objcopy`, `llvm-strip`, `llvm-symbolizer`): each is a byte-copy of
+`bin/llvm`, which locates `llvm.wasm` beside it. `slicc.commands` covers the
+same names plus `ar`, `ranlib`, `nm`, `strip` for PATH lookups.
+
+**Not shipped** (emcc only needs these for `-g` / split-dwarf / coverage /
+`emsize` / sourcemap demangle): `llvm-dwarfdump`, `llvm-dwp`,
+`clang-scan-deps`, `llvm-profdata`, `llvm-cov`, `llvm-size`, `llvm-cxxfilt`.
+
 ```bash
 cc hello.c -o hello
 cc -fPIC -shared sq.c -o libsq.so
@@ -37,15 +52,3 @@ c++ -O2 t.cpp -o t              # iostream + exceptions + threads
 CC=cc CXX=c++ cmake -S . -B build
 cmake --build build
 ```
-
-## LLVM tool aliases (emcc path spawn)
-
-`bin/` ships glue **file copies** for names emcc constructs under `LLVM_ROOT`:
-`clang++`, `wasm-ld`, `ld.lld`, `llvm-ranlib`, `llvm-strip`. Each is a
-byte-copy of the primary glue (`clang` / `lld` / `llvm-ar` / `llvm-objcopy`);
-the `.wasm` stays next to the primary name only (`locateFile("clang.wasm")`
-etc.). `slicc.commands` argv0 aliases still work for PATH lookups.
-
-**Not shipped** (emcc only needs these for `-g` / split-dwarf / coverage /
-`emsize` / sourcemap demangle): `llvm-dwarfdump`, `llvm-dwp`,
-`clang-scan-deps`, `llvm-profdata`, `llvm-cov`, `llvm-size`, `llvm-cxxfilt`.

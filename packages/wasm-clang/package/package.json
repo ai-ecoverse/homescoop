@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-clang",
-  "version": "24.0.0-9",
+  "version": "24.0.0-10",
   "description": "Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen)",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
@@ -61,79 +61,79 @@
         "script": "bin/wasix++"
       },
       "clang": {
-        "glue": "bin/clang",
-        "wasm": "bin/clang.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "clang"
       },
       "clang++": {
-        "glue": "bin/clang",
-        "wasm": "bin/clang.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "clang++"
       },
       "lld": {
-        "glue": "bin/lld",
-        "wasm": "bin/lld.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "lld"
       },
       "wasm-ld": {
-        "glue": "bin/lld",
-        "wasm": "bin/lld.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "wasm-ld"
       },
       "ld.lld": {
-        "glue": "bin/lld",
-        "wasm": "bin/lld.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "ld.lld"
       },
       "llvm-ar": {
-        "glue": "bin/llvm-ar",
-        "wasm": "bin/llvm-ar.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "llvm-ar"
-      },
-      "ar": {
-        "glue": "bin/llvm-ar",
-        "wasm": "bin/llvm-ar.wasm",
-        "argv0": "llvm-ar"
-      },
-      "ranlib": {
-        "glue": "bin/llvm-ar",
-        "wasm": "bin/llvm-ar.wasm",
-        "argv0": "llvm-ranlib"
       },
       "llvm-ranlib": {
-        "glue": "bin/llvm-ar",
-        "wasm": "bin/llvm-ar.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "llvm-ranlib"
       },
       "llvm-nm": {
-        "glue": "bin/llvm-nm",
-        "wasm": "bin/llvm-nm.wasm",
-        "argv0": "llvm-nm"
-      },
-      "nm": {
-        "glue": "bin/llvm-nm",
-        "wasm": "bin/llvm-nm.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "llvm-nm"
       },
       "llvm-objcopy": {
-        "glue": "bin/llvm-objcopy",
-        "wasm": "bin/llvm-objcopy.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "llvm-objcopy"
       },
       "llvm-strip": {
-        "glue": "bin/llvm-objcopy",
-        "wasm": "bin/llvm-objcopy.wasm",
-        "argv0": "llvm-strip"
-      },
-      "strip": {
-        "glue": "bin/llvm-objcopy",
-        "wasm": "bin/llvm-objcopy.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "llvm-strip"
       },
       "llvm-symbolizer": {
-        "glue": "bin/llvm-symbolizer",
-        "wasm": "bin/llvm-symbolizer.wasm",
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
         "argv0": "llvm-symbolizer"
+      },
+      "ar": {
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
+        "argv0": "llvm-ar"
+      },
+      "ranlib": {
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
+        "argv0": "llvm-ranlib"
+      },
+      "nm": {
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
+        "argv0": "llvm-nm"
+      },
+      "strip": {
+        "glue": "bin/llvm",
+        "wasm": "bin/llvm.wasm",
+        "argv0": "llvm-strip"
       }
     }
   }

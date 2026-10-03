@@ -21,4 +21,7 @@ about:
     Stage from slicc-emscripten/build/llvm-wasm (ENVIRONMENT=web,worker,node,
     slicc_spawn.o). Do not rebuild LLVM unless the link profile must change.
     Drivers are #!/bin/sh wasixcc-compatible wrappers; sysroot is wasix-sysroot.
+    -10: one multi-call module bin/llvm.wasm (clang, lld, ar, nm, objcopy,
+    symbolizer; multicall.cpp) and the signal-ABI sources recompiled against the
+    current sysroot (see PRESTAGE.md).
     wasm-opt for fork Asyncify comes from @ai-ecoverse/wasm-binaryen (PATH).
