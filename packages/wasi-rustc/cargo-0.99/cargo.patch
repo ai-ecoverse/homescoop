@@ -657,10 +657,10 @@ index a5054f0..57c5836 100644
      use std::io;
 diff --git a/src/cargo/util/network/http_async_wasi.rs b/src/cargo/util/network/http_async_wasi.rs
 new file mode 100644
-index 0000000..00ecb57
+index 0000000..d94165c
 --- /dev/null
 +++ b/src/cargo/util/network/http_async_wasi.rs
-@@ -0,0 +1,449 @@
+@@ -0,0 +1,515 @@
 +//! SLICC: Cargo's HTTP client on WASI, where there is no libcurl.
 +//!
 +//! Every request goes as plain HTTP/1.1 to the realm's proxy, the one
@@ -670,14 +670,17 @@ index 0000000..00ecb57
 +//! reached over a WASIX socket (`sock_open` + `sock_connect`); only
 +//! loopback addresses resolve in the realm.
 +//!
-+//! Requests run one at a time on one kept-alive connection. Bodies come
-+//! back chunked or with a length; redirects are followed.
++//! Requests run on a few worker threads (6 by default, or
++//! `CARGO_HTTP_MAX_CONNECTIONS`; one with `http.multiplexing = false`), each
++//! on a kept-alive connection: the realm's fetches are slow one by one, and
++//! Cargo asks for many index files and crates at once. Bodies come back
++//! chunked or with a length; redirects are followed.
 +
 +use std::fs::File;
 +use std::io::{self, BufRead, BufReader, Read, Write};
 +use std::os::fd::FromRawFd;
 +use std::str::FromStr;
-+use std::sync::Mutex;
++use std::sync::{Arc, Mutex, mpsc};
 +
 +use tracing::debug;
 +
@@ -781,9 +784,27 @@ index 0000000..00ecb57
 +    used: bool,
 +}
 +
-+pub struct Client {
++/// Connections to the realm proxy at once, unless `CARGO_HTTP_MAX_CONNECTIONS`
++/// says otherwise; `http.multiplexing = false` means one.
++const DEFAULT_CONNECTIONS: usize = 6;
++
++struct Job {
++    request: Request,
++    reply: futures::channel::oneshot::Sender<HttpResult<Response>>,
++}
++
++/// What every worker shares: the configuration and the idle kept-alive
++/// connections.
++struct Inner {
 +    handle_config: HandleConfiguration,
-+    connection: Mutex<Option<Connection>>,
++    idle: Mutex<Vec<Connection>>,
++}
++
++pub struct Client {
++    inner: Arc<Inner>,
++    /// Requests for the worker threads, each of which holds at most one
++    /// connection at a time; `None` when no worker could start.
++    jobs: Mutex<Option<mpsc::Sender<Job>>>,
 +}
 +
 +impl std::fmt::Debug for Client {
@@ -794,25 +815,72 @@ index 0000000..00ecb57
 +
 +impl Client {
 +    pub fn new(handle_config: HandleConfiguration) -> Client {
-+        Client {
++        let connections = if handle_config.multiplexing {
++            std::env::var("CARGO_HTTP_MAX_CONNECTIONS")
++                .ok()
++                .and_then(|n| n.parse::<usize>().ok())
++                .filter(|n| *n > 0)
++                .unwrap_or(DEFAULT_CONNECTIONS)
++        } else {
++            1
++        };
++        let inner = Arc::new(Inner {
 +            handle_config,
-+            connection: Mutex::new(None),
++            idle: Mutex::new(Vec::new()),
++        });
++        let (sender, receiver) = mpsc::channel::<Job>();
++        let receiver = Arc::new(Mutex::new(receiver));
++        let mut started = 0;
++        for i in 0..connections {
++            let inner = Arc::clone(&inner);
++            let receiver = Arc::clone(&receiver);
++            let worker = std::thread::Builder::new()
++                .name(format!("cargo-http-{i}"))
++                .spawn(move || {
++                    loop {
++                        let job = receiver.lock().unwrap().recv();
++                        let Ok(job) = job else { break };
++                        let _ = job.reply.send(inner.send(job.request));
++                    }
++                });
++            if worker.is_ok() {
++                started += 1;
++            }
++        }
++        debug!(target: "network", "{started} HTTP connection workers");
++        Client {
++            inner,
++            jobs: Mutex::new((started > 0).then_some(sender)),
 +        }
 +    }
 +
 +    pub fn request_blocking(&self, request: Request) -> HttpResult<Response> {
-+        self.send(request)
++        self.inner.send(request)
 +    }
 +
 +    pub async fn request(&self, request: Request) -> HttpResult<Response> {
-+        self.send(request)
++        let (reply, receiver) = futures::channel::oneshot::channel();
++        let job = Job { request, reply };
++        let queued = match self.jobs.lock().unwrap().as_ref() {
++            Some(jobs) => jobs.send(job).map_err(|e| e.0),
++            None => Err(job),
++        };
++        match queued {
++            Ok(()) => receiver
++                .await
++                .unwrap_or_else(|_| Err(Error::Io("the HTTP worker stopped".into()))),
++            // No workers: run it here, one at a time.
++            Err(job) => self.inner.send(job.request),
++        }
 +    }
 +
 +    /// Bytes still to download; requests here complete before they return.
 +    pub fn bytes_pending(&self) -> u64 {
 +        0
 +    }
++}
 +
++impl Inner {
 +    fn proxy(&self) -> HttpResult<String> {
 +        if let Some(proxy) = &self.handle_config.proxy {
 +            return Ok(proxy.clone());
@@ -915,14 +983,15 @@ index 0000000..00ecb57
 +        body: &[u8],
 +        is_head: bool,
 +    ) -> HttpResult<(http::StatusCode, http::HeaderMap, Vec<u8>)> {
-+        let mut slot = self.connection.lock().unwrap();
++        // An idle kept-alive connection, else a new one.
++        let mut slot = self.idle.lock().unwrap().pop();
 +        for attempt in 0..2 {
 +            if slot.is_none() {
 +                let stream = connect(ip, port).map_err(|e| Error::Connect {
 +                    addr: format!("{}.{}.{}.{}:{port}", ip[0], ip[1], ip[2], ip[3]),
 +                    message: e.to_string(),
 +                })?;
-+                *slot = Some(Connection {
++                slot = Some(Connection {
 +                    stream: BufReader::new(stream),
 +                    used: false,
 +                });
@@ -939,17 +1008,14 @@ index 0000000..00ecb57
 +            })();
 +            match result {
 +                Ok((status, headers, payload, keep_alive)) => {
-+                    if !keep_alive {
-+                        *slot = None;
++                    if keep_alive {
++                        self.idle.lock().unwrap().extend(slot.take());
 +                    }
 +                    return Ok((status, headers, payload));
 +                }
 +                // A kept-alive connection the proxy closed: once more, fresh.
-+                Err(ReadError::Io(_)) if reused && attempt == 0 => *slot = None,
-+                Err(e) => {
-+                    *slot = None;
-+                    return Err(e.into());
-+                }
++                Err(ReadError::Io(_)) if reused && attempt == 0 => slot = None,
++                Err(e) => return Err(e.into()),
 +            }
 +        }
 +        unreachable!()
@@ -1112,7 +1178,7 @@ index 0000000..00ecb57
 +}
 diff --git a/src/cargo/util/network/http_wasi.rs b/src/cargo/util/network/http_wasi.rs
 new file mode 100644
-index 0000000..1b56f58
+index 0000000..76789e5
 --- /dev/null
 +++ b/src/cargo/util/network/http_wasi.rs
 @@ -0,0 +1,77 @@
@@ -1163,7 +1229,7 @@ index 0000000..1b56f58
 +            useragent,
 +            timeout: HttpTimeout::new(gctx)?,
 +            verbose: http.debug == Some(true),
-+            multiplexing: false,
++            multiplexing: http.multiplexing.unwrap_or(true),
 +        })
 +    }
 +}

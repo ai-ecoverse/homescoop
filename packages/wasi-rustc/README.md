@@ -116,8 +116,13 @@ links this recipe's wasm32-wasip1-threads std.
 - Registry HTTP: on WASI, `util/network/http_async.rs` is a plain HTTP/1.1
   client that talks to the realm proxy (`https_proxy`) with absolute-form
   `https://` targets. The proxy does TLS, so there is no curl or TLS stack.
-  It handles chunked or sized bodies, redirects and one keep-alive
-  connection.
+  It handles chunked or sized bodies and redirects. Requests run on 6
+  worker threads, each with a keep-alive connection; set
+  `CARGO_HTTP_MAX_CONNECTIONS` to change that, and `http.multiplexing =
+  false` means one. With 350 ms of proxy latency per request (the browser's
+  fetch path), a cold serde + serde_json + clap 4.6 lockfile takes 4.0 s
+  instead of 10.7 s serially, and fetching 28 crates takes 5.4 s instead of
+  10.7 s.
 - Processes go through `cargo/wasix-command`.
 - WASI has no cross-process jobserver, so the jobserver is not handed to
   children.
