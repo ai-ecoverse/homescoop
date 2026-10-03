@@ -3,16 +3,20 @@
 # Linker: currently rust-lld (bundled in rustc.wasm). Next cut: -C linker=wasm-ld
 # from @ai-ecoverse/wasm-clang over WASIX spawn.
 set -eu
-SCRIPT=$0
-# The package has no symlinks. Resolve its directory with shell builtins so
-# the driver works before coreutils has been installed into SLICC.
-case $SCRIPT in
-  */*) ;;
-  *) SCRIPT=$(command -v "$SCRIPT") ;;
-esac
-BINDIR=$(CDPATH= cd -- "${SCRIPT%/*}" && pwd)
-PKGROOT=$(CDPATH= cd -- "$BINDIR/.." && pwd)
-RUSTC_SYSROOT=$PKGROOT
+# The package root, found without forking: Cargo runs this driver dozens
+# of times per build, and every $(...) is a process. The realm passes the
+# root in RUSTC_SYSROOT (the manifest's ${package}); otherwise it is the
+# parent of this script's directory. The package has no symlinks.
+if [ -z "${RUSTC_SYSROOT:-}" ]; then
+  case $0 in
+    /*) BINDIR=${0%/*} ;;
+    */*) BINDIR=$PWD/${0%/*} ;;
+    *) BINDIR=$(command -v "$0"); BINDIR=${BINDIR%/*} ;;
+  esac
+  RUSTC_SYSROOT=${BINDIR%/*}
+fi
+PKGROOT=$RUSTC_SYSROOT
+BINDIR=$PKGROOT/bin
 export RUSTC_SYSROOT
 
 has_target=0
