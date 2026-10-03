@@ -4,12 +4,17 @@
 import argparse
 import json
 import shutil
+import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE = ROOT / "package"
+# The optional names package: rustc.wasm's `name` section, for SLICC_WASM_BACKTRACE.
+NAMES_PACKAGE = ROOT / "names" / "package"
+SPLIT_NAME_SECTION = ROOT.parent.parent / "scripts" / "split-name-section.py"
 TARGET_PREFIX = "lib/rustlib/wasm32-wasip1/"
 
 
@@ -17,6 +22,9 @@ def stage(artifact: Path, expected_version: str) -> None:
     metadata = json.loads((PACKAGE / "package.json").read_text())
     if metadata["version"] != expected_version:
         raise ValueError(f"package metadata version is not {expected_version}")
+    names_metadata = json.loads((NAMES_PACKAGE / "package.json").read_text())
+    if names_metadata["version"] != expected_version:
+        raise ValueError(f"names package version is not {expected_version}")
 
     with tarfile.open(artifact, "r:gz") as archive:
         members = archive.getmembers()
@@ -57,6 +65,17 @@ def stage(artifact: Path, expected_version: str) -> None:
                         raise ValueError(f"missing rustlib bytes: {name}")
                     with source, destination.open("wb") as target:
                         shutil.copyfileobj(source, target)
+    # Ship rustc.wasm without its name section (in wasi-rustc-names) and DWARF.
+    compiler = PACKAGE / "bin" / "rustc.wasm"
+    unsplit = compiler.with_suffix(".wasm.unsplit")
+    compiler.rename(unsplit)
+    (NAMES_PACKAGE / "bin").mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [sys.executable, SPLIT_NAME_SECTION, unsplit, compiler,
+         NAMES_PACKAGE / "bin" / "rustc.wasm.names", "--strip-debug"],
+        check=True,
+    )
+    unsplit.unlink()
     driver = PACKAGE / "bin" / "rustc"
     shutil.copyfile(ROOT / "rustc-driver.sh", driver)
     driver.chmod(0o755)

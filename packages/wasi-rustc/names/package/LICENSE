@@ -1,0 +1,5 @@
+Rust is dual-licensed under MIT OR Apache-2.0.
+This package redistributes a rustc (LLVM-in-wasm) build derived from the
+bjorn3 / oligamiq rustc-in-wasm work and the Rust Project.
+
+See https://github.com/rust-lang/rust and SPIKE.md for provenance.

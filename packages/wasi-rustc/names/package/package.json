@@ -1,0 +1,19 @@
+{
+  "name": "@ai-ecoverse/wasi-rustc-names",
+  "version": "1.98.1-4",
+  "description": "Function names for @ai-ecoverse/wasi-rustc's rustc.wasm, for SLICC_WASM_BACKTRACE (optional)",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-rustc/names/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-rustc",
+  "keywords": ["wasm", "wasi", "slicc", "rustc", "rust"],
+  "files": ["README.md", "LICENSE", "bin"],
+  "publishConfig": { "access": "public" },
+  "homescoop": {
+    "recipe": "wasi-rustc",
+    "upstream": "1.98.1"
+  }
+}

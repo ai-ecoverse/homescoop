@@ -64,6 +64,17 @@ The workflow emits `wasi-rustc-stable.tgz` for staging and SLICC acceptance.
 Cargo follows acceptance of this compiler; the PIC LLVM side module follows
 Cargo.
 
+### Function names (`names/package`)
+
+`stage-patched.py` ships `rustc.wasm` without its `name` section and DWARF
+(`scripts/split-name-section.py --strip-debug`): 116.6 MB instead of
+169.7 MB to store and load. The names go to the optional
+`@ai-ecoverse/wasi-rustc-names` package of the same version, as
+`bin/rustc.wasm.names`. Nothing depends on it. With it installed and
+`SLICC_WASM_BACKTRACE=1`, SLICC names a compiler trap's frames from it;
+without it, frames stay `wasm-function[N]`. The helper checks the split
+round-trips byte for byte before staging writes anything.
+
 ### Proc macros (`patches/0012-*`)
 
 WASI has no `dlopen`, so a proc-macro crate becomes a program, and the
