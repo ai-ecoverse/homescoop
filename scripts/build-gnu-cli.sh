@@ -30,12 +30,17 @@ if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
 homescoop_apply_patches "$SRC_DIR"
 
-SLICC_A="$WORK/libslicc-spawn.a"
-homescoop_slicc_archive "$SLICC_A" spawn
+# cli = spawn+exec+select+jobs (no fork/ASYNCIFY). whole-archive is required:
+# emscripten libstubs.a ships a weak execve (ENOEXEC); a bare .a loses to it and
+# env/nice/nohup/#!/usr/bin/env all fail with "Exec format error".
+# Put the .a in LIBS (not LDFLAGS): gawk's link line carries LDFLAGS twice and
+# would duplicate whole-archive members.
+SLICC_A="$WORK/libslicc-cli.a"
+homescoop_slicc_archive "$SLICC_A" cli
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-# -u pulls signal exports out of the archive (wasm realm calls them from JS).
-CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports) $SLICC_A"
+CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags)"
+CLI_LIBS="-Wl,--whole-archive ${SLICC_A} -Wl,--no-whole-archive"
 
 EXTRA_CFG=()
 case "$NAME" in
@@ -70,7 +75,7 @@ if [[ ! -f "$SRC_DIR/$BIN_NAME" && ! -f "$SRC_DIR/$BIN_NAME.js" && ! -f "$SRC_DI
       gl_cv_func_mbrtoc32=yes gl_cv_func_c32rtomb=yes
     homescoop_fix_darwin_ar Makefile
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
-      LDFLAGS="$CLI_LDFLAGS"
+      LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
   )
 fi
 
@@ -84,5 +89,20 @@ for d in "$SRC_DIR/src" "$SRC_DIR/$BIN_NAME" "$SRC_DIR"; do
 done
 test -f "$STAGE_DIR/$BIN_NAME" || test -f "$STAGE_DIR/$BIN_NAME.js"
 homescoop_stage_cli "$STAGE_DIR" "$BIN_NAME"
+
+# Guard: slicc execve/popen must win over libstubs. Glue that lacks execWait
+# still has the ENOEXEC stub; missing popen means gawk/sed ENOSYS stubs won.
+GLUE="$HOMESCOOP_PKG/package/bin/$BIN_NAME"
+[[ -f "$GLUE" ]] || GLUE="$HOMESCOOP_PKG/package/bin/$BIN_NAME.js"
+if [[ -f "$GLUE" ]] && ! grep -q 'execWait' "$GLUE"; then
+  echo "homescoop: PRESTAGE fail — $GLUE missing execWait (libstubs execve won the link)" >&2
+  exit 1
+fi
+if [[ -f "$GLUE" ]] && ! grep -qE 'slicc_spawn_capture|posix_spawn' "$GLUE"; then
+  echo "homescoop: PRESTAGE fail — $GLUE missing spawn glue (posix_spawn not linked)" >&2
+  exit 1
+fi
+echo "  PRESTAGE: $BIN_NAME glue has execWait (slicc execve linked)"
+
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING.LIB
 echo "== $NAME: staged → $HOMESCOOP_PKG/package"

@@ -181,6 +181,7 @@ homescoop_slicc_archive() {
     spawn)
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
@@ -189,6 +190,7 @@ homescoop_slicc_archive() {
       # slicc_jobs is harmless here (pgid/sid/tc*pgrp for the jobserver path).
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_main_envp.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
@@ -200,6 +202,7 @@ homescoop_slicc_archive() {
       # readline's blocking poll goes through the kernel (not Asyncify FS waits).
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
@@ -218,6 +221,7 @@ homescoop_slicc_archive() {
       # No fork/ASYNCIFY — that stays bash-only.
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
@@ -230,6 +234,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
@@ -240,6 +245,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
@@ -269,7 +275,10 @@ homescoop_slicc_keep_exports() {
 # enough for execve — emscripten libstubs.a ships a weak execve stub, and
 # archive member extraction can leave that stub as the winner.
 homescoop_slicc_keep_spawn() {
-  printf '%s' "-Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture"
+  # posix_spawn/popen/system: without -u, wasm-ld --gc-sections drops them from
+  # the whole-archive member and emscripten's ENOSYS stubs / _emscripten_system
+  # win (gawk pipes, sed e, system()).
+  printf '%s' "-Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture -Wl,-u,posix_spawn -Wl,-u,posix_spawnp -Wl,-u,popen -Wl,-u,pclose -Wl,-u,system"
 }
 
 # LDFLAGS fragment: keep exports + whole-archive around a slicc .a.

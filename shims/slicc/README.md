@@ -7,6 +7,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | File | Role |
 | --- | --- |
 | `slicc_spawn.c` | `posix_spawn` / `waitpid` / `__syscall_wait4`; file actions on fds > 2 |
+| `slicc_popen.c` | `system` / `popen` / `pclose` via posix_spawn (beats emscripten ENOSYS stubs) |
 | `slicc_exec.c` | `execve` over spawn (resets caught handlers; kernel forwards signals) |
 | `slicc_fork.c` + `slicc-fork.js` | `fork` / strong `getpid`/`getppid` (`--js-library`, needs `-sASYNCIFY`); adopts `Module.sliccPid` / `Module.sliccPpid` |
 | `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid getters→1000, set*id/setgroups accept only 1000, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1) |
@@ -24,10 +25,11 @@ Every profile includes `slicc_libc_gaps.c` + `slicc_signals.c`.
 | Profile | Extra objects |
 | --- | --- |
 | `gaps` | gaps + signals — e.g. pkgconf |
-| `spawn` | spawn + exec — gnu tools (updated wait4/kill from shims) |
-| `make` | spawn + exec + main_envp + select + **jobs** — GNU make |
-| `fork` | spawn + exec + fork + jobs + **select** — bash job control (+ ASYNCIFY js-library); select/poll required so readline does not Asyncify-suspend on poll |
+| `spawn` | spawn + exec + **popen** — gnu tools |
+| `make` | spawn + exec + popen + main_envp + select + **jobs** — GNU make |
+| `fork` | spawn + exec + popen + fork + jobs + **select** — bash (+ ASYNCIFY) |
 | `less` | gaps + signals + jobs + select — TUI pager (no spawn) |
+| `cli` | spawn + exec + popen + select + jobs — coreutils/sed/gawk/tar |
 | `cli` | spawn + exec + gaps + signals + select + jobs — interactive CLIs (no fork) |
 | `net` | **socket** + select + spawn + exec + gaps + signals + getpass — curl / git-remote-http |
 | `netfork` | net + **fork** + jobs (+ ASYNCIFY js-library) — git (clone/helpers need fork) |
