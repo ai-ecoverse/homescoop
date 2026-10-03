@@ -123,6 +123,24 @@ zig build-obj "$ZSRC/lib/compiler_rt.zig" -target wasm32-wasi -mcpu generic+atom
 "$SDK/bin/llvm-ar" rcs "$OBJ/libzigrt.a" "$OBJ/compiler_rt.o"
 "$SDK/bin/clang" "${TARGET_FLAGS[@]}" -O2 -c "$HOMESCOOP_PKG/llvm-shims.c" -o "$OBJ/llvm-shims.o"
 
+echo "== wasi-zig (LLVM): prebuilt wasi-libc + libc++ for the native wasm32-wasi target (patch 0025)"
+# Zig builds these the same way on any host; the host zig with the patched lib
+# (the shipped sources) builds them once here, so SLICC never has to.
+PRE="$OBJ/prebuilt"
+mkdir -p "$PRE/src" "$PRE/out"
+printf 'int main(void) { return 0; }\n' > "$PRE/src/m.c"
+printf '#include <string>\nint main() { std::string s("x"); return (int)s.size() - 1; }\n' > "$PRE/src/m.cpp"
+( cd "$PRE/src"
+  common=(-target wasm32-wasi --zig-lib-dir "$ZSRC/lib" --global-cache-dir "$PRE/gc")
+  zig build-exe m.c -lc "${common[@]}" --name mc
+  zig build-exe m.c -lc -mexec-model=reactor -fno-entry "${common[@]}" --name mr
+  zig build-exe m.cpp -lc -lc++ "${common[@]}" --name mx 2> "$PRE/cxx.log" )
+for f in crt1-command.o crt1-reactor.o libc.a libc++.a libc++abi.a; do
+  src=$(find "$PRE/gc/o" -name "$f" -type f | head -1)
+  test -n "$src" || { echo "homescoop: no $f from the prebuilt build" >&2; exit 1; }
+  cp "$src" "$PRE/out/$f"
+done
+
 echo "== wasi-zig (LLVM): link zig.wasm (wasi-sdk, threads, imported shared memory)"
 # 46 MiB main stack: what zig's build.zig asks for (--stack 48234496).
 "$SDK/bin/clang++" "${TARGET_FLAGS[@]}" -O2 "$OBJ/zig-main.o" "$OBJ/llvm-shims.o" \
@@ -157,12 +175,14 @@ L="$ZSRC/lib"
 cp -a "$L/std" "$L/compiler_rt.zig" "$L/compiler_rt" "$L/ubsan_rt.zig" "$L/c.zig" "$L/c" "$L/zig.h" \
   "$L/compiler" "$L/init" "$L/include" "$L/libcxx" "$L/libcxxabi" "$L/libunwind" "$PKG/lib/"
 cp -a "$L/libc/wasi" "$L/libc/musl" "$PKG/lib/libc/"
+mkdir -p "$PKG/lib/prebuilt/wasm32-wasi"
+cp "$OBJ"/prebuilt/out/* "$PKG/lib/prebuilt/wasm32-wasi/"
 cp -a "$L/libc/include/wasm-wasi-musl" "$L/libc/include/generic-musl" "$PKG/lib/libc/include/"
 find "$PKG/lib" -type l -exec sh -c 'for l; do t=$(readlink -f "$l"); rm "$l"; cp -a "$t" "$l"; done' _ {} +
 cp "$SRC/LICENSE" "$PKG/LICENSE"
 cp "$LLVM_PREFIX/LICENSE.TXT" "$PKG/LICENSE-LLVM.TXT"
 
-NPM_VER="${HOMESCOOP_NPM_VER:-${VERSION}-13}" node - "$PKG" <<'NODE'
+NPM_VER="${HOMESCOOP_NPM_VER:-${VERSION}-14}" node - "$PKG" <<'NODE'
 const fs = require('fs');
 const [pkgDir] = process.argv.slice(2);
 const env = { ZIG_LIB_DIR: '${package}/lib', ZIG_GLOBAL_CACHE_DIR: '${HOME}/.cache/zig', ZIG_EXE: 'zig' };
