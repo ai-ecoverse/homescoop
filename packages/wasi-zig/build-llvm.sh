@@ -123,7 +123,7 @@ zig build-obj "$ZSRC/lib/compiler_rt.zig" -target wasm32-wasi -mcpu generic+atom
 "$SDK/bin/llvm-ar" rcs "$OBJ/libzigrt.a" "$OBJ/compiler_rt.o"
 "$SDK/bin/clang" "${TARGET_FLAGS[@]}" -O2 -c "$HOMESCOOP_PKG/llvm-shims.c" -o "$OBJ/llvm-shims.o"
 
-echo "== wasi-zig (LLVM): prebuilt wasi-libc + libc++ for the native wasm32-wasi target (patch 0025)"
+echo "== wasi-zig (LLVM): prebuilt wasi-libc, libc++ and Zig runtimes for the native wasm32-wasi target (0025, 0026)"
 # Zig builds these the same way on any host; the host zig with the patched lib
 # (the shipped sources) builds them once here, so SLICC never has to.
 PRE="$OBJ/prebuilt"
@@ -135,10 +135,13 @@ printf '#include <string>\nint main() { std::string s("x"); return (int)s.size()
   zig build-exe m.c -lc "${common[@]}" --name mc
   zig build-exe m.c -lc -mexec-model=reactor -fno-entry "${common[@]}" --name mr
   zig build-exe m.cpp -lc -lc++ "${common[@]}" --name mx 2> "$PRE/cxx.log" )
-for f in crt1-command.o crt1-reactor.o libc.a libc++.a libc++abi.a; do
-  src=$(find "$PRE/gc/o" -name "$f" -type f | head -1)
+for f in crt1-command.o crt1-reactor.o libc.a libc++.a libc++abi.a libcompiler_rt.a libubsan_rt.a libzigc.a; do
+  # The same file may be cached by more than one of the builds; it must be one content.
+  src=$(find "$PRE/gc/o" -name "$f" -type f)
   test -n "$src" || { echo "homescoop: no $f from the prebuilt build" >&2; exit 1; }
-  cp "$src" "$PRE/out/$f"
+  test "$(printf '%s\n' "$src" | xargs shasum -a 256 | awk '{print $1}' | sort -u | wc -l | tr -d ' ')" = 1 ||
+    { echo "homescoop: differing $f from the prebuilt build: $src" >&2; exit 1; }
+  cp "$(printf '%s\n' "$src" | head -1)" "$PRE/out/$f"
 done
 
 echo "== wasi-zig (LLVM): link zig.wasm (wasi-sdk, threads, imported shared memory)"
@@ -170,11 +173,31 @@ mkdir -p "$PKG/bin" "$PKG/lib/libc/include"
 cp "$OBJ/out/zig.wasm" "$PKG/bin/zig.wasm"
 chmod 755 "$PKG/bin/zig.wasm"
 L="$ZSRC/lib"
-# Zig's std and runtimes, clang's resource headers (zig cc), wasi-libc and the
-# musl sources it builds from, and libc++/libc++abi/libunwind for zig c++.
+# Zig's std and runtimes, clang's resource headers (zig cc), wasi-libc's
+# headers, and libc++/libc++abi/libunwind for zig c++. wasi-libc's C sources
+# (libc/wasi, libc/musl) go to the optional wasi-zig-libc-src package: the
+# baseline target links prebuilt archives, other wasm32-wasi CPUs/modes find the
+# sources beside this package (patch 0026).
 cp -a "$L/std" "$L/compiler_rt.zig" "$L/compiler_rt" "$L/ubsan_rt.zig" "$L/c.zig" "$L/c" "$L/zig.h" \
   "$L/compiler" "$L/init" "$L/include" "$L/libcxx" "$L/libcxxabi" "$L/libunwind" "$PKG/lib/"
-cp -a "$L/libc/wasi" "$L/libc/musl" "$PKG/lib/libc/"
+# compiler_rt's test vectors (11 MB): Zig loads every @import eagerly, so the
+# files stay, empty; test blocks are never analyzed outside `zig test`.
+find "$PKG/lib/compiler_rt" -name '*_test.zig' -exec sh -c \
+  'for f; do printf "// homescoop: compiler_rt test vectors are not shipped.\n" > "$f"; done' _ {} +
+# clang's resource headers for wasm only: no other architecture's intrinsics.
+( cd "$PKG/lib/include"
+  rm -rf openmp_wrappers ppc_wrappers llvm_libc_wrappers
+  for h in *.h; do
+    case "$h" in
+      wasm_simd128.h | builtins.h | float.h | inttypes.h | iso646.h | limits.h | std*.h | \
+        tgmath.h | unwind.h | varargs.h | __stdarg_* | __stddef_*) ;;
+      *) rm "$h" ;;
+    esac
+  done )
+SRCPKG="$PKG_WORK/package-libc-src"
+rm -rf "$SRCPKG"
+mkdir -p "$SRCPKG/lib/libc"
+cp -a "$L/libc/wasi" "$L/libc/musl" "$SRCPKG/lib/libc/"
 mkdir -p "$PKG/lib/prebuilt/wasm32-wasi"
 cp "$OBJ"/prebuilt/out/* "$PKG/lib/prebuilt/wasm32-wasi/"
 cp -a "$L/libc/include/wasm-wasi-musl" "$L/libc/include/generic-musl" "$PKG/lib/libc/include/"
@@ -182,7 +205,7 @@ find "$PKG/lib" -type l -exec sh -c 'for l; do t=$(readlink -f "$l"); rm "$l"; c
 cp "$SRC/LICENSE" "$PKG/LICENSE"
 cp "$LLVM_PREFIX/LICENSE.TXT" "$PKG/LICENSE-LLVM.TXT"
 
-NPM_VER="${HOMESCOOP_NPM_VER:-${VERSION}-14}" node - "$PKG" <<'NODE'
+NPM_VER="${HOMESCOOP_NPM_VER:-${VERSION}-15}" node - "$PKG" <<'NODE'
 const fs = require('fs');
 const [pkgDir] = process.argv.slice(2);
 const env = { ZIG_LIB_DIR: '${package}/lib', ZIG_GLOBAL_CACHE_DIR: '${HOME}/.cache/zig', ZIG_EXE: 'zig' };
@@ -207,17 +230,54 @@ Zig 0.16.0 for slicc, built for wasm32-wasi with LLVM 21.1.8, clang and lld.
 
 - `zig build-exe` / `run` / `test` / `build`, `-ofmt=c`, all optimize modes,
   with LLVM's optimizer for ReleaseFast / ReleaseSmall / ReleaseSafe.
-- `zig cc` / `zig c++` for wasm32-wasi (the first use builds wasi-libc /
-  libc++ into the global cache: about 100 s / 50 s once).
+- `zig cc` / `zig c++` for wasm32-wasi. wasi-libc, libc++ and Zig's runtimes
+  (compiler_rt, ubsan_rt, zigc) ship prebuilt for the baseline CPU; another
+  CPU or mode (e.g. `-mcpu=generic+simd128`) builds wasi-libc from its C
+  sources, in the optional `@ai-ecoverse/wasi-zig-libc-src` package
+  (`ipk install @ai-ecoverse/wasi-zig-libc-src`).
 - Backends: Debug builds of pure-Zig wasm32 code use Zig's self-hosted wasm
   backend (fast compiles, as in the no-LLVM package); Release modes, programs
   that link libc and C/C++ sources use LLVM. `-fllvm` / `-fno-llvm` (or
   `.use_llvm` on a compile step) override that per build.
-- Targets: wasm32 / wasm64 only (the LLVM inside has the WebAssembly target).
+- Targets: wasm32 / wasm64 only (the LLVM inside has the WebAssembly target);
+  clang's resource headers are trimmed to the ones wasm uses.
 - Runs with real threads under slicc (LLVM's thread pool, wasi-threads).
 
 LLVM is Apache-2.0 WITH LLVM-exception (LICENSE-LLVM.TXT); Zig is MIT (LICENSE).
 EOF
+cp "$SRC/LICENSE" "$SRCPKG/LICENSE"
+NPM_VER="${HOMESCOOP_NPM_VER:-${VERSION}-15}" node - "$SRCPKG" <<'NODE'
+const fs = require('fs');
+const [pkgDir] = process.argv.slice(2);
+fs.writeFileSync(`${pkgDir}/package.json`, JSON.stringify({
+  name: '@ai-ecoverse/wasi-zig-libc-src',
+  version: process.env.NPM_VER,
+  description: "wasi-libc's C sources for @ai-ecoverse/wasi-zig: zig cc for wasm32-wasi CPUs and modes beyond the prebuilt baseline",
+  license: 'MIT AND Apache-2.0 WITH LLVM-exception',
+  repository: { type: 'git', url: 'git+https://github.com/ai-ecoverse/homescoop.git', directory: 'packages/wasi-zig' },
+  homepage: 'https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-zig',
+  keywords: ['wasm', 'wasi', 'slicc', 'homescoop', 'zig', 'libc'],
+  files: ['README.md', 'LICENSE', 'lib'],
+  publishConfig: { access: 'public' },
+  homescoop: { recipe: 'wasi-zig', upstream: '0.16.0' },
+}, null, 2) + '\n');
+NODE
+cat > "$SRCPKG/README.md" <<'EOF'
+# @ai-ecoverse/wasi-zig-libc-src
+
+The C sources of Zig 0.16.0's wasi-libc (lib/libc/wasi and lib/libc/musl), for
+@ai-ecoverse/wasi-zig in slicc. Install it next to wasi-zig, at the same
+version, to link libc for a wasm32-wasi CPU or mode other than the baseline
+(for example `-mcpu=generic+simd128`, threads or PIC). The baseline target
+needs nothing from here: wasi-zig ships its libc prebuilt.
+
+    ipk install @ai-ecoverse/wasi-zig-libc-src
+
+Licenses: wasi-libc is MIT / Apache-2.0 / Apache-2.0 WITH LLVM-exception
+(lib/libc/wasi/LICENSE*); musl is MIT (lib/libc/musl/COPYRIGHT); Zig is MIT
+(LICENSE).
+EOF
 homescoop_assert_no_package_links "$PKG"
-du -sh "$PKG" "$PKG/bin/zig.wasm"
+homescoop_assert_no_package_links "$SRCPKG"
+du -sh "$PKG" "$PKG/bin/zig.wasm" "$SRCPKG"
 echo "OK wasi-zig (LLVM) $(node -p "require('$PKG/package.json').version")"
