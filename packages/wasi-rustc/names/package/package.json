@@ -2,7 +2,7 @@
   "name": "@ai-ecoverse/wasi-rustc-names",
   "version": "1.98.1-4",
   "description": "Function names for @ai-ecoverse/wasi-rustc's rustc.wasm, for SLICC_WASM_BACKTRACE (optional)",
-  "license": "MIT OR Apache-2.0",
+  "license": "(MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

@@ -2,7 +2,7 @@
   "name": "@ai-ecoverse/wasi-rustc",
   "version": "1.98.1-4",
   "description": "rustc (LLVM-in-wasm) for slicc WASI — default target wasm32-wasip1",
-  "license": "MIT OR Apache-2.0",
+  "license": "(MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

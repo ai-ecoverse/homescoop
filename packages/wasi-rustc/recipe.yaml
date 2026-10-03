@@ -21,7 +21,7 @@ dependencies:
     - wasm-clang
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-rustc
-  license: MIT OR Apache-2.0
+  license: (MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception
   notes: |
     Retired from ladder 2026-10-03. Do not rebuild or npm-publish from
     host-run / ladder-build (would race the certified 1.98.1-1 / cargo 0.99.0-0
