@@ -189,6 +189,10 @@ Zig 0.16.0 for slicc, built for wasm32-wasi with LLVM 21.1.8, clang and lld.
   with LLVM's optimizer for ReleaseFast / ReleaseSmall / ReleaseSafe.
 - `zig cc` / `zig c++` for wasm32-wasi (the first use builds wasi-libc /
   libc++ into the global cache: about 100 s / 50 s once).
+- Backends: Debug builds of pure-Zig wasm32 code use Zig's self-hosted wasm
+  backend (fast compiles, as in the no-LLVM package); Release modes, programs
+  that link libc and C/C++ sources use LLVM. `-fllvm` / `-fno-llvm` (or
+  `.use_llvm` on a compile step) override that per build.
 - Targets: wasm32 / wasm64 only (the LLVM inside has the WebAssembly target).
 - Runs with real threads under slicc (LLVM's thread pool, wasi-threads).
 
