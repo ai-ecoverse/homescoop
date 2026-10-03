@@ -45,13 +45,13 @@ index 51909719..bd6f96fd 100644
  [dependencies]
  # tidy-alphabetical-start
 diff --git a/compiler/rustc_llvm/build.rs b/compiler/rustc_llvm/build.rs
-index 5be8bd46..8ac89eae 100644
+index 5be8bd46..b1b7bd75 100644
 --- a/compiler/rustc_llvm/build.rs
 +++ b/compiler/rustc_llvm/build.rs
 @@ -304,6 +304,15 @@ fn main() {
          cfg.define("NDEBUG", None);
      }
-
+ 
 +    if target.contains("wasi") {
 +        let sdk = env::var("WASI_SDK_PATH").expect("WASI_SDK_PATH not set");
 +        cfg.compiler(format!("{sdk}/bin/{target}-clang++"));
@@ -64,12 +64,16 @@ index 5be8bd46..8ac89eae 100644
      rerun_if_changed_anything_in_dir(Path::new("llvm-wrapper"));
      cfg.file("llvm-wrapper/PassWrapper.cpp")
          .file("llvm-wrapper/RustWrapper.cpp")
-@@ -431,6 +439,12 @@ fn main() {
+@@ -431,6 +440,16 @@ fn main() {
          println!("cargo:rustc-link-lib={kind}={name}");
      }
-
+ 
 +    if target.contains("wasi") {
-+        for lib in ["LLVMOption", "LLVMDTLTO", "lldCommon", "lldELF", "lldWasm"] {
++        // lldELF links LLVMDTLTO, which is new in LLVM 22; an external LLVM 21 has none.
++        let version = output(Command::new(&llvm_config).arg("--version"));
++        let major = version.split('.').next().and_then(|m| m.trim().parse::<u32>().ok());
++        let dtlto = if major.is_some_and(|m| m >= 22) { &["LLVMDTLTO"][..] } else { &[] };
++        for lib in ["LLVMOption"].iter().chain(dtlto).chain(&["lldCommon", "lldELF", "lldWasm"]) {
 +            println!("cargo:rustc-link-lib=static={lib}");
 +        }
 +    }
@@ -77,7 +81,7 @@ index 5be8bd46..8ac89eae 100644
      // LLVM ldflags
      //
      // If we're a cross-compile of LLVM then unfortunately we can't trust these
-@@ -483,6 +497,7 @@ fn main() {
+@@ -483,6 +502,7 @@ fn main() {
          || target.contains("windows-gnullvm")
          || target.contains("aix")
          || target.contains("ohos")

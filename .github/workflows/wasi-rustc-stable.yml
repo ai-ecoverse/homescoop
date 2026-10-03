@@ -1,11 +1,18 @@
-# Static LLVM 22 baseline for @ai-ecoverse/wasi-rustc (Rust 1.98.1).
+# @ai-ecoverse/wasi-rustc (Rust 1.98.1) against the external wasi-llvm 21
+# (.github/workflows/wasi-llvm.yml). The in-tree LLVM 22 builds only for the
+# x86_64 build machine.
 name: wasi-rustc-stable
 
 on:
   workflow_dispatch:
+    inputs:
+      wasi_llvm_run_id:
+        description: "wasi-llvm.yml run whose `wasi-llvm` artifact is the host LLVM"
+        required: true
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build:
@@ -104,34 +111,65 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake pkg-config libclang-dev ninja-build
 
-      - name: verify WASI LLVM config enables Unix support
+      - name: download wasi-llvm
+        uses: actions/download-artifact@v4
+        with:
+          name: wasi-llvm
+          run-id: ${{ inputs.wasi_llvm_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: wasi-llvm-artifact
+
+      - name: unpack and check wasi-llvm
+        run: |
+          set -euo pipefail
+          tarball=$(find wasi-llvm-artifact -name 'wasi-llvm-*.tar.xz' | head -1)
+          test -n "$tarball"
+          sha256sum "$tarball" | tee -a "$GITHUB_STEP_SUMMARY"
+          mkdir wasi-llvm
+          tar -xJf "$tarball" -C wasi-llvm
+          llvm_config="$PWD/wasi-llvm/prefix/bin/llvm-config"
+          test "$("$llvm_config" --version)" = 21.1.8
+          test "$("$llvm_config" --targets-built)" = WebAssembly
+          test "$("$llvm_config" --shared-mode)" = static
+          # rustc_llvm's build script requires --help to succeed.
+          "$llvm_config" --help 2>/dev/null
+          for lib in LLVMOption lldCommon lldELF lldWasm; do
+            test -f "wasi-llvm/prefix/lib/lib$lib.a"
+          done
+          echo "WASI_LLVM_CONFIG=$llvm_config" >> "$GITHUB_ENV"
+
+      - name: preflight rustc_llvm wrapper against wasi-llvm
         working-directory: rust
-        run: bash ../homescoop/packages/wasi-rustc/check-stable-llvm-wasi.sh
+        run: |
+          set -euo pipefail
+          for f in compiler/rustc_llvm/llvm-wrapper/*.cpp; do
+            "$WASI_SDK_PATH/bin/wasm32-wasip1-threads-clang++" -O3 -fno-exceptions \
+              "--sysroot=$WASI_SYSROOT" -pthread $("$WASI_LLVM_CONFIG" --cxxflags) \
+              -D_WASI_EMULATED_MMAN -DNDEBUG -DLLVM_COMPONENT_WEBASSEMBLY \
+              --target=wasm32-wasip1-threads -fsyntax-only "$f"
+          done
 
       - name: generate and parse bootstrap config
         working-directory: rust
         run: |
           set -euo pipefail
-          python3 ../homescoop/packages/wasi-rustc/make-stable-config.py --wasi-sdk "$WASI_SDK_PATH" --output config.wasi.toml
+          python3 ../homescoop/packages/wasi-rustc/make-stable-config.py --wasi-sdk "$WASI_SDK_PATH" \
+            --llvm-config "$WASI_LLVM_CONFIG" --output config.wasi.toml
+          grep -n 'llvm-config' config.wasi.toml
           ./x.py install --dry-run --config config.wasi.toml > config-dry-run.log 2>&1 || { cat config-dry-run.log; exit 1; }
           tail -25 config-dry-run.log
 
-      # Keep both the native llvm-config and WASI LLVM install trees. Bootstrap's
-      # .llvm-stamp files ensure it reuses only a completed build.
-      - name: restore completed LLVM build
+      # The native build-machine LLVM. Bootstrap's .llvm-stamp ensures it reuses
+      # only a completed build; older caches also hold the in-tree WASI LLVM.
+      - name: restore completed native LLVM build
         id: llvm-cache-restore
         uses: actions/cache/restore@v4
         with:
-          path: |
-            rust/build/x86_64-unknown-linux-gnu/llvm
-            rust/build/wasm32-wasip1-threads/llvm
-          key: wasi-llvm-22-rust-48a229c-sdk24-${{ hashFiles('homescoop/packages/wasi-rustc/patches/000[3-9]*', 'homescoop/packages/wasi-rustc/make-stable-config.py') }}
-          restore-keys: wasi-llvm-22-rust-48a229c-sdk24-
-
-      - name: preflight threaded rustc_llvm wrapper against cached LLVM
-        if: steps.llvm-cache-restore.outputs.cache-hit != ''
-        working-directory: rust
-        run: bash -x ../homescoop/packages/wasi-rustc/check-stable-llvm-wrapper.sh
+          path: rust/build/x86_64-unknown-linux-gnu/llvm
+          key: native-llvm-22-rust-48a229c-sdk24-${{ hashFiles('homescoop/packages/wasi-rustc/patches/000[3-9]*', 'homescoop/packages/wasi-rustc/make-stable-config.py') }}
+          restore-keys: |
+            native-llvm-22-rust-48a229c-sdk24-
+            wasi-llvm-22-rust-48a229c-sdk24-
 
       - name: x.py install static rustc and rustlib
         working-directory: rust
@@ -148,19 +186,16 @@ jobs:
         id: llvm-cache-complete
         if: always()
         run: |
-          if test -s rust/build/x86_64-unknown-linux-gnu/llvm/.llvm-stamp \
-            && test -s rust/build/wasm32-wasip1-threads/llvm/.llvm-stamp; then
+          if test -s rust/build/x86_64-unknown-linux-gnu/llvm/.llvm-stamp; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: save completed LLVM build
+      - name: save completed native LLVM build
         if: always() && steps.llvm-cache-complete.outputs.ready == 'true' && steps.llvm-cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: |
-            rust/build/x86_64-unknown-linux-gnu/llvm
-            rust/build/wasm32-wasip1-threads/llvm
-          key: wasi-llvm-22-rust-48a229c-sdk24-${{ hashFiles('homescoop/packages/wasi-rustc/patches/000[3-9]*', 'homescoop/packages/wasi-rustc/make-stable-config.py') }}
+          path: rust/build/x86_64-unknown-linux-gnu/llvm
+          key: native-llvm-22-rust-48a229c-sdk24-${{ hashFiles('homescoop/packages/wasi-rustc/patches/000[3-9]*', 'homescoop/packages/wasi-rustc/make-stable-config.py') }}
 
       - name: stage minimal artifact
         working-directory: rust

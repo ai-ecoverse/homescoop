@@ -9,6 +9,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--wasi-sdk", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--llvm-config",
+        type=Path,
+        help="external LLVM for the wasm32-wasip1-threads host (wasi-llvm's bin/llvm-config)",
+    )
     args = parser.parse_args()
     sdk = args.wasi_sdk.resolve(strict=True)
     sysroot = sdk / "share/wasi-sysroot"
@@ -21,6 +26,11 @@ def main() -> None:
     for required in (sysroot, linker, host_linker, cc, cxx, ar, ranlib):
         if not required.exists():
             parser.error(f"missing wasi-sdk path: {required}")
+    # Without --llvm-config, bootstrap builds the in-tree LLVM for the WASI host too.
+    host_llvm = ""
+    if args.llvm_config:
+        llvm_config = args.llvm_config.resolve(strict=True)
+        host_llvm = f'llvm-config = "{llvm_config}"\n'
     config = f'''profile = "compiler"
 change-id = "ignore"
 
@@ -61,7 +71,7 @@ linker = "{linker}"
 codegen-backends = ["llvm"]
 
 [target.'wasm32-wasip1-threads']
-wasi-root = "{sysroot}"
+{host_llvm}wasi-root = "{sysroot}"
 # rustc.wasm links through wasi-sdk clang++ rather than the self-contained
 # rust-lld, which this build does not ship. -nodefaultlibs drops libc++abi;
 # libdl supplies the dlopen stubs that LLVM DynamicLibrary references.
