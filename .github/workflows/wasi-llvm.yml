@@ -1,0 +1,86 @@
+# LLVM 21 + clang + lld static libraries for a wasm32-wasip1-threads host
+# (packages/wasi-llvm). A build input, not a ladder package: the LLVM-enabled
+# wasi-zig and wasi-rustc-stable.yml consume the artifact. No npm publish here.
+#
+# Consumers: download the `wasi-llvm` artifact of a run (actions/download-artifact
+# with run-id), or restore the cache below with the same key (recipe hash).
+name: wasi-llvm
+
+on:
+  workflow_dispatch:
+  # workflow_dispatch needs the file on the default branch; until it lands,
+  # pushes to llvm/* branches that touch the recipe build it.
+  push:
+    branches: ['llvm/**']
+    paths:
+      - 'packages/wasi-llvm/**'
+      - '!packages/wasi-llvm/work/**'
+      - '.github/workflows/wasi-llvm.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: free disk
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build cmake xz-utils
+
+      - name: restore completed build
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/wasi-llvm/work/prefix
+            packages/wasi-llvm/work/wasi-llvm-*-wasm32-wasip1-threads.tar.xz
+          key: wasi-llvm-${{ hashFiles('packages/wasi-llvm/recipe.yaml', 'packages/wasi-llvm/build.sh', 'packages/wasi-llvm/gen-llvm-config.py', 'packages/wasi-llvm/patches/**') }}
+
+      - name: build (native tablegen, then LLVM/clang/lld for wasm32-wasip1-threads)
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          HOMESCOOP_ROOT: ${{ github.workspace }}
+        run: JOBS=$(nproc) bash packages/wasi-llvm/build.sh
+
+      - name: save completed build
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            packages/wasi-llvm/work/prefix
+            packages/wasi-llvm/work/wasi-llvm-*-wasm32-wasip1-threads.tar.xz
+          key: wasi-llvm-${{ hashFiles('packages/wasi-llvm/recipe.yaml', 'packages/wasi-llvm/build.sh', 'packages/wasi-llvm/gen-llvm-config.py', 'packages/wasi-llvm/patches/**') }}
+
+      - name: verify
+        run: |
+          set -euo pipefail
+          p=packages/wasi-llvm/work/prefix
+          "$p/bin/llvm-config" --version
+          test "$("$p/bin/llvm-config" --targets-built)" = WebAssembly
+          for lib in LLVMCore LLVMWebAssemblyCodeGen lldWasm lldELF lldCommon clangFrontendTool; do
+            test -f "$p/lib/lib$lib.a"
+          done
+          tgz=$(ls packages/wasi-llvm/work/wasi-llvm-*-wasm32-wasip1-threads.tar.xz)
+          sha256sum "$tgz" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasi-llvm
+          path: packages/wasi-llvm/work/wasi-llvm-*-wasm32-wasip1-threads.tar.xz
+          if-no-files-found: error
+          retention-days: 30
