@@ -1,0 +1,54 @@
+--- a/lib/std/start.zig
++++ b/lib/std/start.zig
+@@ -50,6 +50,13 @@
+             }
+         } else if (native_os == .uefi) {
+             if (!@hasDecl(root, "EfiMain")) @export(&EfiMain, .{ .name = "EfiMain" });
++        } else if (native_os == .wasi and @hasDecl(root, "homescoop_wasi_main_name") and
++            root.homescoop_wasi_main_name != null)
++        {
++            // homescoop: a program that links wasi-libc for its C++ parts but not for
++            // its Zig code (the LLVM-enabled zig) leaves `_start` to wasi-libc's crt1
++            // (thread pointer, constructors, preopens); its C `main` calls this.
++            @export(&homescoopWasiMain, .{ .name = root.homescoop_wasi_main_name.? });
+         } else if (native_os == .wasi) {
+             const wasm_start_sym = switch (builtin.wasi_exec_model) {
+                 .reactor => "_initialize",
+@@ -93,6 +100,10 @@
+     _ = @call(.always_inline, callMain, .{ {}, std.process.Environ.Block.global });
+ }
+ 
++fn homescoopWasiMain() callconv(.c) u8 {
++    return @call(.always_inline, callMain, .{ {}, std.process.Environ.Block.global });
++}
++
+ fn startWasi() callconv(.c) void {
+     // The function call is marked inline because for some reason LLVM in
+     // release mode fails to inline it, and we want fewer call frames in stack traces.
+--- a/src/main.zig
++++ b/src/main.zig
+@@ -186,6 +186,11 @@
+     }
+ };
+ 
++/// homescoop: the LLVM-enabled wasm32-wasi compiler links wasi-libc for LLVM's
++/// C++ while its Zig code stays libc-free; crt1 runs `main`, which calls this.
++pub const homescoop_wasi_main_name: ?[]const u8 =
++    if (native_os == .wasi and build_options.have_llvm) "__homescoop_zig_main" else null;
++
+ pub fn main(init: std.process.Init.Minimal) anyerror!void {
+     var root_allocator: RootAllocator = .init;
+     defer _ = root_allocator.deinit();
+@@ -6015,8 +6020,10 @@
+ 
+ extern fn ZigClangIsLLVMUsingSeparateLibcxx() bool;
+ 
+-extern "c" fn ZigClang_main(argc: c_int, argv: [*:null]?[*:0]u8) c_int;
+-extern "c" fn ZigLlvmAr_main(argc: c_int, argv: [*:null]?[*:0]u8) c_int;
++// homescoop: plain `extern` (not "c"): the wasm32-wasi build compiles its Zig
++// code without libc; these are the C++ entry points in libzigcpp either way.
++extern fn ZigClang_main(argc: c_int, argv: [*:null]?[*:0]u8) c_int;
++extern fn ZigLlvmAr_main(argc: c_int, argv: [*:null]?[*:0]u8) c_int;
+ 
+ fn argsCopyZ(alloc: Allocator, args: []const []const u8) ![:null]?[*:0]u8 {
+     var argv = try alloc.allocSentinel(?[*:0]u8, args.len, null);
