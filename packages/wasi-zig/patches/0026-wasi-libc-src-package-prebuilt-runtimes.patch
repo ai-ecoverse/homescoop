@@ -1,0 +1,387 @@
+--- a/src/Compilation.zig	2026-10-03 23:46:20.364674856 +0200
++++ b/src/Compilation.zig	2026-10-03 23:46:44.620485370 +0200
+@@ -230,6 +230,11 @@
+ compiler_rt_obj: ?CrtFile = null,
+ /// hack for stage2_x86_64 + coff
+ compiler_rt_dyn_lib: ?CrtFile = null,
++/// homescoop: where wasi-libc's C sources are when they are not in lib/ (the
++/// optional `<package>-libc-src` package beside the compiler's), and whether
++/// they are missing altogether. Set before wasi-libc is queued to build.
++homescoop_libc_src: ?[]const u8 = null,
++homescoop_libc_src_missing: bool = false,
+ /// Populated when we build the libfuzzer static library. A Job to build this
+ /// is indicated by setting `queued_jobs.fuzzer_lib` and resolved before
+ /// calling linker.flush().
+@@ -2615,6 +2620,7 @@
+                     if (!std.zig.target.canBuildLibC(target)) return diag.fail(.cross_libc_unavailable);
+ 
+                     if (!try comp.homescoopUsePrebuiltWasiLibc(gpa, io)) {
++                        try comp.homescoopFindLibcSrc(io);
+                         comp.queued_jobs.wasi_libc_crt_file[@intFromEnum(wasi_libc.execModelCrtFile(comp.config.wasi_exec_model))] = true;
+                         comp.queued_jobs.wasi_libc_crt_file[@intFromEnum(wasi_libc.CrtFile.libc_a)] = true;
+                     }
+@@ -2648,7 +2654,7 @@
+ 
+             switch (comp.compiler_rt_strat) {
+                 .none, .zcu => {},
+-                .lib => {
++                .lib => if (try comp.homescoopUsePrebuiltRt(gpa, io, "libcompiler_rt.a", &comp.compiler_rt_lib)) {} else {
+                     log.debug("queuing a job to build compiler_rt_lib", .{});
+                     comp.queued_jobs.compiler_rt_lib = true;
+                 },
+@@ -2665,7 +2671,7 @@
+ 
+             switch (comp.ubsan_rt_strat) {
+                 .none, .zcu => {},
+-                .lib => {
++                .lib => if (try comp.homescoopUsePrebuiltRt(gpa, io, "libubsan_rt.a", &comp.ubsan_rt_lib)) {} else {
+                     log.debug("queuing a job to build ubsan_rt_lib", .{});
+                     comp.queued_jobs.ubsan_rt_lib = true;
+                 },
+@@ -2678,7 +2684,7 @@
+ 
+             switch (comp.zigc_strat) {
+                 .none, .zcu => {},
+-                .lib => {
++                .lib => if (try comp.homescoopUsePrebuiltRt(gpa, io, "libzigc.a", &comp.zigc_static_lib)) {} else {
+                     log.debug("queuing a job to build libzigc", .{});
+                     comp.queued_jobs.zigc_lib = true;
+                 },
+@@ -7391,6 +7397,41 @@
+     return true;
+ }
+ 
++/// Zig's own runtimes (compiler_rt, ubsan_rt, zigc) ship prebuilt beside wasi-libc
++/// for the same target, in the compiler-rt optimize mode Debug / ReleaseSafe /
++/// ReleaseSmall use; ReleaseFast builds them from source.
++fn homescoopUsePrebuiltRt(comp: *Compilation, gpa: Allocator, io: Io, comptime name: []const u8, out: *?CrtFile) Allocator.Error!bool {
++    if (!comp.homescoopPrebuiltTarget()) return false;
++    if (comp.compilerRtOptMode() != target_util.defaultCompilerRtOptimizeMode(&comp.root_mod.resolved_target.result))
++        return false;
++    const dir = "prebuilt" ++ fs.path.sep_str ++ "wasm32-wasi" ++ fs.path.sep_str;
++    out.* = try comp.homescoopPrebuiltCrtFile(gpa, io, dir ++ name) orelse return false;
++    return true;
++}
++
++/// wasi-libc's C sources (lib/libc/wasi, lib/libc/musl) are an optional
++/// package on the wasm32-wasi compiler: everything the baseline target links
++/// is prebuilt. They are used from lib/ when there, else from the
++/// `<package>-libc-src` package beside the compiler's package; when neither
++/// has them, building wasi-libc fails with how to install them.
++fn homescoopFindLibcSrc(comp: *Compilation, io: Io) Allocator.Error!void {
++    if (builtin.os.tag != .wasi) return;
++    const sub = "libc" ++ fs.path.sep_str ++ "wasi";
++    if (comp.dirs.zig_lib.handle.access(io, sub, .{})) |_| return else |_| {}
++    const lib = comp.dirs.zig_lib.path orelse {
++        comp.homescoop_libc_src_missing = true;
++        return;
++    };
++    const pkg = fs.path.dirname(lib) orelse lib;
++    const src = try std.fmt.allocPrint(comp.arena, "{s}-libc-src" ++ fs.path.sep_str ++ "lib", .{pkg});
++    const probe = try fs.path.join(comp.arena, &.{ src, sub });
++    if (Io.Dir.cwd().access(io, probe, .{})) |_| {
++        comp.homescoop_libc_src = src;
++    } else |_| {
++        comp.homescoop_libc_src_missing = true;
++    }
++}
++
+ fn get_libc_crt_file(comp: *Compilation, arena: Allocator, basename: []const u8) !Cache.Path {
+     return (try crtFilePath(&comp.crt_files, basename)) orelse {
+         const lci = comp.libc_installation orelse return error.LibCInstallationNotAvailable;
+--- a/src/libs/wasi_libc.zig
++++ b/src/libs/wasi_libc.zig
+@@ -34,6 +34,12 @@
+         return error.ZigCompilerNotBuiltWithLLVMExtensions;
+     }
+ 
++    if (comp.homescoop_libc_src_missing) {
++        comp.lockAndSetMiscFailure(.wasi_libc_crt_file, "wasi-libc for this target builds from its C sources, which are not installed; " ++
++            "install them with: ipk install @ai-ecoverse/wasi-zig-libc-src", .{});
++        return error.AlreadyReported;
++    }
++
+     const gpa = comp.gpa;
+     var arena_allocator = std.heap.ArenaAllocator.init(gpa);
+     defer arena_allocator.deinit();
+@@ -47,7 +53,7 @@
+ 
+             var files = [_]Compilation.CSourceFile{
+                 .{
+-                    .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                    .src_path = try libcJoin(comp, arena, &.{
+                         "libc", try sanitize(arena, crt1_reactor_src_file),
+                     }),
+                     .extra_flags = args.items,
+@@ -64,7 +70,7 @@
+ 
+             var files = [_]Compilation.CSourceFile{
+                 .{
+-                    .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                    .src_path = try libcJoin(comp, arena, &.{
+                         "libc", try sanitize(arena, crt1_command_src_file),
+                     }),
+                     .extra_flags = args.items,
+@@ -85,7 +91,7 @@
+ 
+                 for (libc_bottom_half_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -102,7 +108,7 @@
+ 
+                 for (libc_top_half_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -117,7 +123,7 @@
+                 try addCCArgs(comp, arena, &args, .{ .want_O3 = true });
+                 try args.appendSlice(&[_][]const u8{
+                     "-I",
+-                    try comp.dirs.zig_lib.join(arena, &.{
++                    try libcJoin(comp, arena, &.{
+                         "libc",
+                         "wasi",
+                         "fts",
+@@ -126,7 +132,7 @@
+ 
+                 for (fts_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -143,7 +149,7 @@
+ 
+                 for (setjmp_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -160,7 +166,7 @@
+ 
+                 for (emulated_dl_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -176,7 +182,7 @@
+ 
+                 for (emulated_process_clocks_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -192,7 +198,7 @@
+ 
+                 for (emulated_getpid_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -208,7 +214,7 @@
+ 
+                 for (emulated_mman_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = args.items,
+@@ -224,7 +230,7 @@
+ 
+                 for (emulated_signal_bottom_half_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = bottom_args.items,
+@@ -239,7 +245,7 @@
+ 
+                 for (emulated_signal_top_half_src_files) |file_path| {
+                     try libc_sources.append(.{
+-                        .src_path = try comp.dirs.zig_lib.join(arena, &.{
++                        .src_path = try libcJoin(comp, arena, &.{
+                             "libc", try sanitize(arena, file_path),
+                         }),
+                         .extra_flags = top_args.items,
+@@ -297,7 +303,7 @@
+         "single",
+ 
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-bottom-half",
+@@ -306,9 +312,9 @@
+         }),
+ 
+         "-isystem",
+-        try comp.dirs.zig_lib.join(arena, &.{ "libc", "include", triple }),
++        try libcJoin(comp, arena, &.{ "libc", "include", triple }),
+         "-isystem",
+-        try comp.dirs.zig_lib.join(arena, &.{ "libc", "include", "generic-musl" }),
++        try libcJoin(comp, arena, &.{ "libc", "include", "generic-musl" }),
+ 
+         "-DBULK_MEMORY_THRESHOLD=32",
+     });
+@@ -325,7 +331,7 @@
+ ) error{OutOfMemory}!void {
+     try args.appendSlice(&[_][]const u8{
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-bottom-half",
+@@ -334,7 +340,7 @@
+         }),
+ 
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-bottom-half",
+@@ -344,7 +350,7 @@
+         }),
+ 
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-bottom-half",
+@@ -353,7 +359,7 @@
+         }),
+ 
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-top-half",
+@@ -362,7 +368,7 @@
+             "include",
+         }),
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "musl",
+             "src",
+@@ -370,7 +376,7 @@
+         }),
+         "-I",
+ 
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-top-half",
+@@ -379,7 +385,7 @@
+             "internal",
+         }),
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "musl",
+             "src",
+@@ -395,7 +401,7 @@
+ ) error{OutOfMemory}!void {
+     try args.appendSlice(&[_][]const u8{
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-top-half",
+@@ -404,7 +410,7 @@
+             "include",
+         }),
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "musl",
+             "src",
+@@ -412,7 +418,7 @@
+         }),
+ 
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-top-half",
+@@ -421,7 +427,7 @@
+             "internal",
+         }),
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "musl",
+             "src",
+@@ -429,7 +435,7 @@
+         }),
+ 
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-top-half",
+@@ -438,7 +444,7 @@
+             "wasm32",
+         }),
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "musl",
+             "arch",
+@@ -446,7 +452,7 @@
+         }),
+ 
+         "-I",
+-        try comp.dirs.zig_lib.join(arena, &.{
++        try libcJoin(comp, arena, &.{
+             "libc",
+             "wasi",
+             "libc-top-half",
+@@ -1130,3 +1136,16 @@
+     "musl/src/signal/psignal.c",
+     "musl/src/string/strsignal.c",
+ };
++
++/// homescoop: a path under lib/libc. The C sources (libc/wasi, libc/musl) may
++/// come from the optional `<package>-libc-src` package
++/// (`Compilation.homescoop_libc_src`); the headers in libc/include are always
++/// the compiler's.
++fn libcJoin(comp: *Compilation, arena: Allocator, paths: []const []const u8) ![]u8 {
++    const src = comp.homescoop_libc_src orelse return comp.dirs.zig_lib.join(arena, paths);
++    if (paths.len > 1 and mem.startsWith(u8, paths[1], "include")) return comp.dirs.zig_lib.join(arena, paths);
++    const parts = try arena.alloc([]const u8, paths.len + 1);
++    parts[0] = src;
++    @memcpy(parts[1..], paths);
++    return path.join(arena, parts);
++}
