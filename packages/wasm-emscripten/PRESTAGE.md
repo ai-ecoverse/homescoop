@@ -1,4 +1,10 @@
-# wasm-emscripten 6.0.9-10
+# wasm-emscripten 6.0.9-11
+
+- Pins `@ai-ecoverse/wasm-clang@24.0.0-10`: one multi-call `llvm.wasm` behind the
+  same LLVM_ROOT glue names (clang, clang++, wasm-ld, llvm-ar, llvm-nm,
+  llvm-objcopy, llvm-strip, llvm-symbolizer…). No other change from 6.0.9-10.
+
+## 6.0.9-10
 
 - Depends on `@ai-ecoverse/emscripten-cache@6.0.9-3`.
 - Weak `__syscall_getpid` / `__syscall_getppid` in default-linked

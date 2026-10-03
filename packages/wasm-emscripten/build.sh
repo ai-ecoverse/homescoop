@@ -7,7 +7,7 @@ export HOMESCOOP_ROOT="$ROOT"
 source "$ROOT/scripts/build-common.sh"
 HOMESCOOP_PKG="$ROOT/packages/wasm-emscripten"
 VERSION="6.0.9"
-PKG_VER="6.0.9-10"
+PKG_VER="6.0.9-11"
 PKG="$HOMESCOOP_PKG/package"
 SLICC_EM="${SLICC_EMSCRIPTEN:-$ROOT/../slicc-emscripten}"
 EM_SRC="$SLICC_EM/src/emscripten"
@@ -361,7 +361,7 @@ const j = {
   homescoop: { recipe: "wasm-emscripten", upstream: "6.0.9" },
   dependencies: {
     "@ai-ecoverse/wasix-python": "^3.14.2-7",
-    "@ai-ecoverse/wasm-clang": "24.0.0-9",
+    "@ai-ecoverse/wasm-clang": "24.0.0-10",
     "@ai-ecoverse/wasm-binaryen": "132.0.0-1",
     "@ai-ecoverse/emscripten-cache": "6.0.9-3",
     "esbuild-wasm": "0.28.2",
@@ -432,7 +432,7 @@ test -f "$PKG/emscripten-config"
 }
 grep -q '\^3.14.2-7' "$PKG/package.json"
 grep -q '6.0.9-3' "$PKG/package.json"
-grep -q '"@ai-ecoverse/wasm-clang": "24.0.0-9"' "$PKG/package.json"
+grep -q '"@ai-ecoverse/wasm-clang": "24.0.0-10"' "$PKG/package.json"
 grep -q '"esbuild-wasm": "0.28.2"' "$PKG/package.json"
 grep -q '"typescript": "6.0.3"' "$PKG/package.json"
 grep -q '"acorn"' "$PKG/package.json"
