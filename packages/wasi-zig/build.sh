@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Zig 0.16.0 no-LLVM compiler → wasm32-wasi for slicc.
+#
+# Ladder / host-run refuse this package (recipe builder: retired). Certified
+# @ai-ecoverse/wasi-zig@0.16.0-14 is build-llvm.sh + a wasi-llvm artifact.
+# This script remains for local no-LLVM (-11-shaped) experiments only.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh

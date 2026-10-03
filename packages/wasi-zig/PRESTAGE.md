@@ -11,3 +11,5 @@
 - `zig build run` / `zig build test` with `addRunArtifact` + `addTest` (Run step; needs WASIX; SLICC)
 - `zig.wasm` **does** import `wasix_32v1` (spawn for run/build on SLICC)
 - package.json `ZIG_GLOBAL_CACHE_DIR` is `${HOME}/.cache/zig`; `ZIG_EXE` is `zig`
+- 0.16.0-14 (LLVM 21): `zig cc` / `zig c++` compile a C project; LLVM Release
+  builds; prebuilt wasi-libc / libc++ (not a first-use compile of those)
