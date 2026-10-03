@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-cmake",
-  "version": "4.4.3-8",
+  "version": "4.4.3-9",
   "description": "CMake 4.4.3 for wasm / slicc (WASI host + slicc_poll for libuv)",
   "license": "BSD-3-Clause",
   "repository": {

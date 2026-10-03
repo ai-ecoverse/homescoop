@@ -35,6 +35,29 @@ do
   test -f "$need" || { echo "homescoop: missing $need" >&2; exit 1; }
 done
 
+export EMAR="$EMAR"
+echo "== wasm-binaryen: sigaction/sigset_t layout scan (fail if a new one appears)"
+python3 "$ROOT/scripts/slicc-sig-layout-guard.py" \
+  --ninja "$BINARYEN/build.ninja" \
+  --allowlist "$HOMESCOOP_PKG/sig-layout-sources.txt" \
+  --src-root "$SLICC_EM/src/binaryen" \
+  --archive lib/libbinaryen.a \
+  --object src/tools/CMakeFiles/wasm-opt.dir/wasm-opt.cpp.o \
+  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/fuzzing.cpp.o \
+  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/heap-types.cpp.o \
+  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/random.cpp.o \
+  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/parameters.cpp.o \
+  --object src/tools/CMakeFiles/wasm-metadce.dir/wasm-metadce.cpp.o \
+  --object src/tools/CMakeFiles/wasm-emscripten-finalize.dir/wasm-emscripten-finalize.cpp.o \
+  --object src/tools/CMakeFiles/wasm-ctor-eval.dir/wasm-ctor-eval.cpp.o \
+  --object src/tools/CMakeFiles/wasm2js.dir/wasm2js.cpp.o \
+  --object src/tools/CMakeFiles/wasm-as.dir/wasm-as.cpp.o \
+  --object src/tools/CMakeFiles/wasm-dis.dir/wasm-dis.cpp.o \
+  --object src/tools/wasm-split/CMakeFiles/wasm-split.dir/wasm-split.cpp.o \
+  --object src/tools/wasm-split/CMakeFiles/wasm-split.dir/split-options.cpp.o \
+  --object src/tools/wasm-split/CMakeFiles/wasm-split.dir/instrumenter.cpp.o \
+  --recompile
+
 echo "== wasm-binaryen: libslicc spawn archive"
 SLICC_A="$WORK/libslicc-binaryen.a"
 ODIR="$WORK/slicc-objs"
@@ -185,6 +208,9 @@ JS
 
 echo "== wasm-binaryen: sizes"
 du -sh "$PKG" "$PKG/bin"/wasm-opt.wasm
+
+echo "== wasm-binaryen: PRESTAGE smoke (not --version)"
+node "$ROOT/scripts/smoke-binaryen.mjs"
 
 echo "== wasm-binaryen: PRESTAGE pack (no links)"
 STAGE="$HOMESCOOP_PKG"

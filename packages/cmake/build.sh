@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Relink the prebuilt cmake.wasm objects from slicc-emscripten for the wasm
-# realm (ENVIRONMENT=web,worker,node + libslicc spawn profile). Applies the
-# CMAKE_ROOT env patch and recompiles cmSystemTools.cxx before the final link.
+# realm (ENVIRONMENT=web,worker,node + libslicc spawn profile). Recompiles
+# musl sigaction/sigset_t layout objects (pre-Oct-2026 .o vs today's cache),
+# applies the CMAKE_ROOT env patch, and recompiles cmSystemTools.cxx.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
@@ -9,7 +10,7 @@ export HOMESCOOP_ROOT="$ROOT"
 source "$ROOT/scripts/build-common.sh"
 HOMESCOOP_PKG="$ROOT/packages/cmake"
 VERSION="4.4.3"
-PKG_VER="4.4.3-8"
+PKG_VER="4.4.3-9"
 WORK="${HOMESCOOP_WORK:-${TMPDIR:-/tmp}/homescoop-work}"
 export HOMESCOOP_PKG VERSION WORK
 mkdir -p "$WORK"
@@ -52,6 +53,21 @@ test -d "$SRC_CMAKE/Modules" || {
   echo "homescoop: missing $SRC_CMAKE/Modules" >&2
   exit 1
 }
+
+export EMAR="$EMAR"
+echo "== cmake: recompile sigaction/sigset_t layout objects (fail if a new one appears)"
+python3 "$ROOT/scripts/slicc-sig-layout-guard.py" \
+  --ninja "$BUILD/build.ninja" \
+  --allowlist "$HOMESCOOP_PKG/sig-layout-sources.txt" \
+  --src-root "$SRC_CMAKE" \
+  --archive Source/kwsys/libcmsys.a \
+  --archive Source/libCMakeLib.a \
+  --archive Utilities/cmlibuv/libcmlibuv.a \
+  --archive Utilities/cmcurl/lib/libcmcurl.a \
+  --archive Utilities/cmliblzma/libcmliblzma.a \
+  --object Source/CMakeFiles/cmake.dir/cmakemain.cxx.o \
+  --object Source/CMakeFiles/cmake.dir/cmcmd.cxx.o \
+  --recompile
 
 # Ensure CMAKE_ROOT env patch is applied to the cmake source tree.
 if git -C "$SRC_CMAKE" apply --reverse --check "$ROOT_ENV_PATCH" >/dev/null 2>&1; then
@@ -225,3 +241,6 @@ EOF
 
 du -sh "$PKG" "$PKG/bin" "$PKG/share"
 echo "== cmake: staged → $PKG ($PKG_VER)"
+
+echo "== cmake: PRESTAGE smoke (not --version)"
+node "$ROOT/scripts/smoke-cmake.mjs"

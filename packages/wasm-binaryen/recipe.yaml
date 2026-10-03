@@ -20,4 +20,6 @@ about:
     (Module.sliccKernel spawn) with ENVIRONMENT=web,worker,node. Ships the
     Emscripten tool set only (BUILD_EMSCRIPTEN_TOOLS_ONLY): wasm-opt,
     wasm-metadce, wasm-emscripten-finalize, wasm-ctor-eval, wasm-split,
-    wasm2js, wasm-as, wasm-dis.
+    wasm2js, wasm-as, wasm-dis. PRESTAGE is scripts/smoke-binaryen.mjs
+    (wasm-opt -O, not --version). sig-layout-sources.txt is empty unless
+    wasm-rt-impl.c (or similar) enters the link.

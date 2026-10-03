@@ -61,11 +61,21 @@ function run(args) {
   const out = `${r.stdout || ''}${r.stderr || ''}`;
   console.log(out.split('\n').filter((l) => l.length < 400).join('\n').trimEnd());
   console.log(`rc=${r.status} :: cmake ${args.join(' ')}`);
+  if (badRuntime(out)) {
+    console.error('cmake smoke: ABI/runtime failure in output');
+    return 1;
+  }
   return r.status ?? 1;
 }
 
+function badRuntime(out) {
+  return /registered more than once/i.test(out) || /RuntimeError|Aborted\(/.test(out);
+}
+
 let fail = 0;
-fail += run(['--version']) !== 0;
+// --version is not a sufficient ABI smoke (passes with stride-20 sigaction).
+const echo = run(['-E', 'echo', 'hello']);
+fail += echo !== 0;
 fail += run(['-E', 'sha256sum', '/work/d.txt']) !== 0;
 fail += run(['-P', '/work/s.cmake']) !== 0;
 if (!existsSync(join(work, 'p.out')) || readFileSync(join(work, 'p.out'), 'utf8') !== '42') {
@@ -73,7 +83,15 @@ if (!existsSync(join(work, 'p.out')) || readFileSync(join(work, 'p.out'), 'utf8'
   fail++;
 }
 
-const cfg = run(['-S', '/work/proj', '-B', '/work/build', '-G', 'Unix Makefiles']);
+const cfg = run([
+  '-S',
+  '/work/proj',
+  '-B',
+  '/work/build',
+  '-G',
+  'Unix Makefiles',
+  '-DCMAKE_MAKE_PROGRAM=/usr/bin/true',
+]);
 const cache = join(work, 'build', 'CMakeCache.txt');
 if (!existsSync(cache)) {
   console.error('no CMakeCache.txt — CMAKE_ROOT env did not resolve modules');
@@ -88,7 +106,9 @@ if (!existsSync(cache)) {
     fail++;
   }
 }
-// Missing make on host is fine; we only require cache + CMAKE_ROOT.
-void cfg;
+if (cfg !== 0) {
+  console.error('cmake configure failed');
+  fail++;
+}
 
 process.exit(fail ? 1 : 0);

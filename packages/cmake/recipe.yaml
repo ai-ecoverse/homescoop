@@ -17,8 +17,7 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake
   license: BSD-3-Clause
   notes: |
-    Port from slicc-emscripten harness/ladder.sh rung_cmake and
-    build-wasm-cmake.sh (cmlibuv + pipefs patches, slicc_spawn.o).
-    Link CLI with homescoop_em_cli_ldflags (ENVIRONMENT=web,worker,node,
-    EXIT_RUNTIME, ALLOW_MEMORY_GROWTH). Keep package.json slicc.commands
-    paths aligned with staged bin/cmake{.wasm}.
+    Relink slicc-emscripten/build/cmake-wasm-build against libslicc.
+    Recompile sig-layout-sources.txt (sigaction/sigset_t) before link;
+    slicc-sig-layout-guard.py fails if a new linked source appears.
+    PRESTAGE is scripts/smoke-cmake.mjs (not --version).
