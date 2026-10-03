@@ -1,0 +1,15 @@
+--- a/lib/std/zig/LibCDirs.zig
++++ b/lib/std/zig/LibCDirs.zig
+@@ -46,7 +46,11 @@
+ 
+     // If linking system libraries and targeting the native abi, default to
+     // using the system libc installation.
+-    if (is_native_abi and !target.isMinGW()) {
++    // homescoop: not on a WASI host (SLICC): the native target is wasm32-wasi,
++    // whose libc Zig builds itself, and a `cc` on PATH there (wasm-clang's
++    // wasixcc) has headers but no crt files ("libc installation is missing crt
++    // directory"). The native target gets the bundled wasi-libc, as a cross one.
++    if (is_native_abi and !target.isMinGW() and builtin.os.tag != .wasi) {
+         const libc = try arena.create(LibCInstallation);
+         libc.* = LibCInstallation.findNative(arena, io, .{
+             .target = target,

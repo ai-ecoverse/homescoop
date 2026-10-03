@@ -162,7 +162,7 @@ find "$PKG/lib" -type l -exec sh -c 'for l; do t=$(readlink -f "$l"); rm "$l"; c
 cp "$SRC/LICENSE" "$PKG/LICENSE"
 cp "$LLVM_PREFIX/LICENSE.TXT" "$PKG/LICENSE-LLVM.TXT"
 
-NPM_VER="${HOMESCOOP_NPM_VER:-${VERSION}-12}" node - "$PKG" <<'NODE'
+NPM_VER="${HOMESCOOP_NPM_VER:-${VERSION}-13}" node - "$PKG" <<'NODE'
 const fs = require('fs');
 const [pkgDir] = process.argv.slice(2);
 const env = { ZIG_LIB_DIR: '${package}/lib', ZIG_GLOBAL_CACHE_DIR: '${HOME}/.cache/zig', ZIG_EXE: 'zig' };
