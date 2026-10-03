@@ -195,7 +195,7 @@ jobs:
           git -C cargo fetch -q --depth 1 https://github.com/rust-lang/cargo.git "$cargo_rev"
           git -C cargo checkout -q FETCH_HEAD
           sh homescoop/packages/wasi-rustc/cargo-0.99/prepare.sh cargo
-          ls rust/build/x86_64-unknown-linux-gnu/stage1/lib/rustlib/wasm32-wasip1-threads/lib | head -3
+          test -d rust/build/x86_64-unknown-linux-gnu/stage1/lib/rustlib/wasm32-wasip1-threads/lib
 
       - name: build Cargo 0.99 for SLICC
         run: |
