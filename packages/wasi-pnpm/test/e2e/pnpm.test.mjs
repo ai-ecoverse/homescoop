@@ -112,7 +112,8 @@ test('pnpm publishes with auth and --otp, streams a large body and never prints 
   }
 })
 
-test('pnpm installs a git dependency through wasm-git', { skip: lanAddress() ? false : 'no non-loopback address for the realm proxy to reach' }, async () => {
+test('pnpm installs a git dependency through wasm-git', { skip: lanAddress() || process.env.CI ? false : 'no non-loopback address for the realm proxy to reach' }, async () => {
+  assert.ok(lanAddress(), 'CI needs a non-loopback IPv4 for the git-clone test (the realm proxy refuses loopback)')
   const git = await startGitServer({ host: lanAddress() })
   const repo = git.repo('lib-git', { 'package.json': JSON.stringify({ name: 'lib-git', version: '1.0.0', main: 'index.js' }), 'index.js': 'module.exports = "git"\n' }, { tag: 'v1.0.0' })
   const kernel = await kernelWith(['wasi-pnpm', 'wasm-git', 'wasm-tls-engine'])
