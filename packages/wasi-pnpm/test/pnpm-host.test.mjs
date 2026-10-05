@@ -463,6 +463,7 @@ function gitContext () {
   ctx.traits = { crossOrigin: 'any' }
   ctx.env = { PNPM_SLICC_PACKAGE: '/node_modules/@ai-ecoverse/wasi-pnpm/', PNPM_SLICC_HTTPS_PROXY: 'http://127.0.0.1:3128', PNPM_SLICC_SSL_CERT_FILE: '/etc/ca.pem', PNPM_SLICC_NO_PROXY: '' }
   ctx.entries.set('/etc/ca.pem', { kind: 'file' })
+  ctx.entries.set('/usr/bin/git', { kind: 'file' })
   ctx.entries.set('/node_modules/@ai-ecoverse/wasm-tls-engine/package.json', { kind: 'file' })
   ctx.cwd = () => '/home/app'
   ctx.spawned = []
@@ -557,6 +558,9 @@ test('pnpm_host names a missing TLS engine or an unprepared kernel before https 
   assert.deepEqual(response(ctx, host, start(https)).error, { message: CA_MISSING, code: 'ENOTSUP' })
   ctx.entries.delete('/node_modules/@ai-ecoverse/wasm-tls-engine/package.json')
   assert.equal(response(ctx, host, start(https)).error.message, TLS_MISSING)
+  ctx.entries.delete('/usr/bin/git')
+  assert.equal(response(ctx, host, start(https)).error.message, GIT_MISSING)
+  ctx.entries.set('/usr/bin/git', { kind: 'file' })
   assert.equal(ctx.spawned.length, 0)
   assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: 'git', args: ['ls-remote', 'http://192.168.0.2/a.git'] })).value.pid, 7)
   ctx.env = { PNPM_SLICC_SSL_CERT_FILE: '' }

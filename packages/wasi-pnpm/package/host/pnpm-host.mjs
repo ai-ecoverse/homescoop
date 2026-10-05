@@ -445,6 +445,7 @@ function createHost (ctx) {
 
   function httpsProblem (request) {
     if (!(request.args ?? []).some(arg => String(arg).startsWith('https://'))) return undefined
+    if (!ctx.fs.exists('/usr/bin/git')) return GIT_MISSING
     const own = ctx.env ?? {}
     if (typeof own.PNPM_SLICC_PACKAGE === 'string' && own.PNPM_SLICC_PACKAGE !== '') {
       const scope = own.PNPM_SLICC_PACKAGE.replace(/\/+$/, '').split('/').slice(0, -1).join('/')
