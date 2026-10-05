@@ -54,7 +54,12 @@
       "PNPM_WASM_ENDIANNESS": "LE",
       "PNPM_CONFIG_NODE_LINKER": "hoisted",
       "PNPM_CONFIG_PACKAGE_IMPORT_METHOD": "copy",
-      "PNPM_CONFIG_IGNORE_SCRIPTS": "true"
+      "PNPM_CONFIG_IGNORE_SCRIPTS": "true",
+      "http_proxy": null,
+      "https_proxy": null,
+      "HTTP_PROXY": null,
+      "HTTPS_PROXY": null,
+      "SSL_CERT_FILE": null
     }
   }
 }
