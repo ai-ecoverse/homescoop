@@ -1,0 +1,27 @@
+# pnpm 12 for slicc WASI: upstream's own wasm32-wasip1-threads build of the
+# pnpm CLI (@pnpm/wasm), plus a host-import module for slicc-kernel.
+name: wasi-pnpm
+# Not built by the ladder until certified in slicc-kernel's browser harness.
+builder: retired
+# renovate: datasource=npm depName=@pnpm/wasm
+version: "12.9.1"
+npm: "@ai-ecoverse/wasi-pnpm"
+summary: "pnpm 12 for slicc WASI (commands pnpm, pn)"
+source:
+  url: "https://registry.npmjs.org/@pnpm/wasm/-/wasm-{{version}}.tgz"
+  sha256: "528079fbdcf0bbbaaf033257cf14e68601001cd46b532fd38ab7b1179e3b7b39"
+  integrity: "sha512-1vYE9piwuZufAdTVAzzDwBnh+yDm8YHdxATHYbMOSyNOH7p5WZYcFiM314XmbFYO1xxX3qCA6WrD6AIuafy+hw=="
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://pnpm.io
+  license: MIT
+  notes: |
+    build.sh fetches @pnpm/wasm from npm, checks the sha256 above and npm's
+    sha512 integrity, and stages dist/pnpm.wasm unchanged as bin/pnpm.wasm.
+    Its pnpm_host, pnpm_fs and pnpm_atomic imports come from host/pnpm-host.mjs,
+    which slicc-kernel loads through slicc.commands.<name>.imports.
+    Follow-up: rebuild pnpm.wasm reproducibly with upstream's
+    pnpm/wasm/build.mjs (nightly-2026-08-27, WASI SDK 34, WABT 1.0.42).

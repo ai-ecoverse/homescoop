@@ -1,0 +1,30 @@
+{
+  "name": "@ai-ecoverse/wasi-pnpm",
+  "version": "12.9.1-0",
+  "description": "pnpm 12 for slicc WASI (commands pnpm, pn)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-pnpm/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-pnpm",
+  "keywords": ["wasm", "wasi", "slicc", "homescoop", "pnpm"],
+  "type": "module",
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "host"],
+  "publishConfig": { "access": "public" },
+  "homescoop": { "recipe": "wasi-pnpm", "upstream": "12.9.1" },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "pnpm": { "wasm": "bin/pnpm.wasm", "imports": "host/pnpm-host.mjs" },
+      "pn": { "wasm": "bin/pnpm.wasm", "imports": "host/pnpm-host.mjs", "argv0": "pnpm" }
+    },
+    "env": {
+      "PNPM_WASM_PID": "1",
+      "PNPM_CONFIG_NODE_LINKER": "hoisted",
+      "PNPM_CONFIG_PACKAGE_IMPORT_METHOD": "copy",
+      "PNPM_CONFIG_IGNORE_SCRIPTS": "true"
+    }
+  }
+}
