@@ -177,7 +177,10 @@ function createFilesystem (ctx) {
 }
 
 export const GIT_UNSUPPORTED = 'git dependencies are not supported in slicc-kernel (no git transport); use a registry version'
-export const PUBLISH_UNSUPPORTED = 'publishing and other uploads are not supported by pnpm in slicc-kernel; publish with pnpm or npm outside SLICC'
+export const PUBLISH_UNSUPPORTED = 'publishing needs a CORS-free network transport (slicc-node, the SLICC extension or app); this page only has fetch'
+export const PUBLISH_TOO_LARGE = 'the publish request body exceeds 64 MiB, the limit for pnpm in slicc-kernel'
+export const MAX_UPLOAD = 64 * 1024 * 1024
+const PROMPT_UNSUPPORTED = 'Interactive prompts are not supported in slicc; for an npm one-time password re-run with --otp <code>'
 const SCRIPTS_UNSUPPORTED = 'Lifecycle scripts cannot run in slicc yet; install with --ignore-scripts'
 const WRITE_METHODS = new Set(['PUT', 'DELETE', 'PATCH'])
 const SYNTHETIC = 0x40000000
@@ -186,11 +189,11 @@ const SYNTHETIC_DIR = '/tmp/.wasi-pnpm'
 const UNSUPPORTED = {
   'process.spawn': SCRIPTS_UNSUPPORTED,
   'shell.spawn': SCRIPTS_UNSUPPORTED,
-  'terminal.open': 'No interactive terminal in slicc',
-  'terminal.prompt': 'No interactive terminal in slicc',
-  'terminal.confirm': 'No interactive terminal in slicc',
-  'terminal.input': 'No interactive terminal in slicc',
-  'terminal.password': 'No interactive terminal in slicc',
+  'terminal.open': PROMPT_UNSUPPORTED,
+  'terminal.prompt': PROMPT_UNSUPPORTED,
+  'terminal.confirm': PROMPT_UNSUPPORTED,
+  'terminal.input': PROMPT_UNSUPPORTED,
+  'terminal.password': PROMPT_UNSUPPORTED,
 }
 
 export function headerPairs (headers) {
@@ -250,13 +253,144 @@ function createHost (ctx) {
     return `${SYNTHETIC_DIR}/${handle}`
   }
 
-  function refusePublish (url) {
-    const handle = SYNTHETIC + Math.floor(Math.random() * 0x3fffffff)
+  function allocate () {
     try {
       ctx.fs.mkdir(SYNTHETIC_DIR)
     } catch {}
-    ctx.fs.writeFile(syntheticPath(handle), encoderBody.encode(JSON.stringify({ error: PUBLISH_UNSUPPORTED })))
-    return ctx.async.resolve({ ok: true, value: { handle, status: 405, headers: [['content-type', 'application/json']], url } })
+    return SYNTHETIC + 1 + Math.floor(Math.random() * 0x3ffffffe)
+  }
+
+  function syntheticResponse (url, status, message) {
+    const handle = allocate()
+    ctx.fs.writeFile(syntheticPath(handle), encoderBody.encode(JSON.stringify({ error: message })))
+    return ctx.async.resolve({ ok: true, value: { handle, status, headers: [['content-type', 'application/json']], url } })
+  }
+
+  let crossOrigin
+  function corsOnly () {
+    if (crossOrigin === undefined) {
+      try {
+        crossOrigin = ctx.syscall({ op: 'net-traits' })?.crossOrigin ?? 'unknown'
+      } catch {
+        crossOrigin = 'unknown'
+      }
+    }
+    return crossOrigin === 'cors'
+  }
+
+  function uploadDir (handle) {
+    return `${SYNTHETIC_DIR}/upload-${handle}`
+  }
+
+  function uploadChunks (handle) {
+    const dir = uploadDir(handle)
+    return ctx.fs.readdir(dir).map(Number).filter(Number.isInteger).sort((a, b) => a - b).map(index => `${dir}/${index}`)
+  }
+
+  function uploadCreate () {
+    const handle = allocate()
+    ctx.fs.mkdir(uploadDir(handle))
+    return ctx.async.resolve({ ok: true, value: { handle } })
+  }
+
+  function uploadWrite (request) {
+    const bytes = Array.isArray(request.bytes) ? Uint8Array.from(request.bytes) : request.bytes
+    if (!(bytes instanceof Uint8Array)) return ctx.async.resolve(errorEnvelope('HTTP upload chunks must be bytes', 'EINVAL'))
+    const chunks = uploadChunks(request.handle)
+    const size = chunks.reduce((total, path) => total + ctx.fs.stat(path).size, 0)
+    if (size + bytes.length > MAX_UPLOAD) return ctx.async.resolve(errorEnvelope(PUBLISH_TOO_LARGE, 'EFBIG'))
+    ctx.fs.writeFile(`${uploadDir(request.handle)}/${chunks.length}`, bytes)
+    return ctx.async.resolve({ ok: true, value: null })
+  }
+
+  function uploadBody (handle) {
+    const parts = uploadChunks(handle).map(path => ctx.fs.readFile(path))
+    const body = new Uint8Array(parts.reduce((total, part) => total + part.length, 0))
+    let at = 0
+    for (const part of parts) {
+      body.set(part, at)
+      at += part.length
+    }
+    return body
+  }
+
+  function uploadRemove (handle) {
+    try {
+      for (const path of uploadChunks(handle)) ctx.fs.unlink(path)
+      ctx.fs.rmdir(uploadDir(handle))
+    } catch {}
+  }
+
+  function sendNow (url, method, headers, body) {
+    if (body && body.length > MAX_UPLOAD) return syntheticHead(url.href, 413, PUBLISH_TOO_LARGE)
+    try {
+      return envelope(ctx.syscall({ op: 'net-request', url: url.href, method, headers, body }))
+    } catch (error) {
+      const code = typeof error?.code === 'string' ? error.code : 'EIO'
+      const reach = `could not reach ${url.host} (${code})`
+      return syntheticHead(url.href, 502, crossOrigin === 'any' ? reach : `${reach}; on a plain page, ${PUBLISH_UNSUPPORTED}`)
+    }
+  }
+
+  function syntheticHead (url, status, message) {
+    const handle = allocate()
+    ctx.fs.writeFile(syntheticPath(handle), encoderBody.encode(JSON.stringify({ error: message })))
+    return { ok: true, value: { handle, status, headers: [['content-type', 'application/json']], url } }
+  }
+
+  function exports () {
+    return ctx.instance()?.exports ?? {}
+  }
+
+  function deferUpload (url, request) {
+    const id = ctx.async.hold()
+    const bytes = encoderBody.encode(JSON.stringify({ id, url: url.href, method: String(request.method ?? 'GET').toUpperCase(), headers: headerPairs(request.headers) }))
+    const pointer = exports().malloc(bytes.length) >>> 0
+    if (!pointer) return ctx.async.resolve(errorEnvelope('out of memory staging the publish request', 'ENOMEM'))
+    new Uint8Array(ctx.memory().buffer, pointer, bytes.length).set(bytes)
+    ctx.fs.writeFile(`${uploadDir(request.bodyHandle)}/request`, encoderBody.encode(`${pointer} ${bytes.length}`))
+    return id
+  }
+
+  function sendDeferred (handle) {
+    const marker = `${uploadDir(handle)}/request`
+    let staged
+    try {
+      staged = new TextDecoder().decode(ctx.fs.readFile(marker))
+    } catch {
+      return
+    }
+    const [pointer, length] = staged.split(' ').map(Number)
+    const view = new Uint8Array(ctx.memory().buffer, pointer, length)
+    const request = JSON.parse(new TextDecoder().decode(Uint8Array.from(view)))
+    view.fill(0)
+    exports().free(pointer)
+    ctx.fs.unlink(marker)
+    const body = uploadBody(handle)
+    uploadRemove(handle)
+    const result = sendNow(new URL(request.url), request.method, request.headers, body)
+    ctx.fs.writeFile(resultPath(request.id), encoderBody.encode(JSON.stringify(result)))
+  }
+
+  function resultPath (id) {
+    return `${SYNTHETIC_DIR}/result-${id}`
+  }
+
+  function deferredResult (id) {
+    try {
+      const bytes = ctx.fs.readFile(resultPath(id))
+      ctx.fs.unlink(resultPath(id))
+      return bytes
+    } catch {
+      return undefined
+    }
+  }
+
+  function publishRequest (url, request) {
+    if (corsOnly()) return syntheticResponse(url.href, 405, PUBLISH_UNSUPPORTED)
+    if (request.bodyHandle != null) return deferUpload(url, request)
+    const body = Array.isArray(request.body) ? Uint8Array.from(request.body) : request.body ?? undefined
+    return ctx.async.resolve(sendNow(url, String(request.method ?? 'GET').toUpperCase(), headerPairs(request.headers), body))
   }
 
   function syntheticRead (handle) {
@@ -285,7 +419,7 @@ function createHost (ctx) {
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
       return ctx.async.resolve(errorEnvelope(`Unsupported HTTP protocol: ${url.protocol}`, 'EINVAL'))
     }
-    if (request.bodyHandle != null || WRITE_METHODS.has(String(request.method ?? 'GET').toUpperCase())) return refusePublish(url.href)
+    if (request.bodyHandle != null || WRITE_METHODS.has(String(request.method ?? 'GET').toUpperCase())) return publishRequest(url, request)
     return ctx.async.submit({
       op: 'net-request',
       url: url.href,
@@ -306,12 +440,18 @@ function createHost (ctx) {
     case 'resource.close':
       if (isSynthetic(request.handle)) {
         syntheticClose(request.handle)
+        uploadRemove(request.handle)
         return ctx.async.resolve({ ok: true, value: null })
       }
       return ctx.async.submit({ op: 'net-close', handle: request.handle })
-    case 'upload.create': return ctx.async.resolve({ ok: true, value: { handle: SYNTHETIC } })
-    case 'upload.write':
+    case 'upload.create': return uploadCreate()
+    case 'upload.write': return uploadWrite(request)
     case 'upload.end':
+      try {
+        sendDeferred(request.handle)
+      } catch {
+        return ctx.async.resolve(errorEnvelope('the publish request could not be sent', 'EIO'))
+      }
       return ctx.async.resolve({ ok: true, value: null })
     case 'process.spawn':
     case 'shell.spawn':
@@ -358,7 +498,7 @@ function createHost (ctx) {
     },
     response_len (id) {
       if (!ready.has(id)) {
-        const bytes = take(id)
+        const bytes = take(id) ?? deferredResult(id)
         if (bytes === undefined) return -1
         ready.set(id, bytes)
       }
@@ -372,6 +512,8 @@ function createHost (ctx) {
       return bytes.length
     },
     operation_cancel (id) {
+      const late = deferredResult(id)
+      if (late) ready.set(id, late)
       const unread = ready.get(id)
       ready.delete(id)
       if (unread) closeUnread(unread)
@@ -380,6 +522,7 @@ function createHost (ctx) {
     resource_close (handle) {
       if (isSynthetic(handle)) {
         syntheticClose(handle)
+        uploadRemove(handle)
         return 0
       }
       try {

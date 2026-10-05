@@ -59,7 +59,8 @@
       "https_proxy": null,
       "HTTP_PROXY": null,
       "HTTPS_PROXY": null,
-      "SSL_CERT_FILE": null
+      "SSL_CERT_FILE": null,
+      "SLICC_WASM_THREADS": "256"
     }
   }
 }

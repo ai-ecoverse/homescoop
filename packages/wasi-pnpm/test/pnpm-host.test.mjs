@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { GIT_UNSUPPORTED, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
+import { GIT_UNSUPPORTED, MAX_UPLOAD, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
@@ -21,7 +21,10 @@ function fakeContext () {
       if (!entry) throw error('ENOENT')
       return { isFile: entry.kind === 'file', isDirectory: entry.kind === 'dir', isSymbolicLink: entry.kind === 'symlink', size: 0, ...(entry.mode === undefined ? {} : { mode: entry.mode }) }
     },
-    stat (path) { return fs.lstat(path) },
+    stat (path) {
+      if (fs.files.has(path)) return { isFile: true, isDirectory: false, size: fs.files.get(path).length, mode: 0o644 }
+      return fs.lstat(path)
+    },
     exists: path => entries.has(path),
     mkdir (path) {
       if (entries.has(path)) throw error('EEXIST')
@@ -40,6 +43,14 @@ function fakeContext () {
     },
     unlink (path) {
       if (!fs.files.delete(path)) throw error('ENOENT')
+    },
+    readdir (path) {
+      const prefix = `${path}/`
+      return [...new Set([...fs.files.keys(), ...entries.keys()].filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length).split('/')[0]))]
+    },
+    rmdir (path) {
+      if (fs.readdir(path).length) throw error('ENOTEMPTY')
+      entries.delete(path)
     },
   }
   return {
@@ -72,9 +83,33 @@ function fakeContext () {
         return exclusive && fd === 13 ? errno.EWOULDBLOCK : 0
       },
     },
+    traits: undefined,
+    sent: [],
+    reply: { handle: 5, status: 201, statusText: 'Created', url: 'https://registry.example/x', headers: [['content-type', 'application/json']] },
     syscall (request) {
+      if (request.op === 'net-traits') {
+        if (this.traits === undefined) throw error('ENOSYS')
+        return this.traits
+      }
+      if (request.op === 'net-request') {
+        this.sent.push(request)
+        if (this.reply instanceof Error) throw this.reply
+        return this.reply
+      }
       syscalls.push(request)
       return 0
+    },
+    heap: 4096,
+    instance () {
+      return { exports: {
+        malloc: size => {
+          if (size > 1 << 20) return 0
+          const at = this.heap
+          this.heap += size + 8
+          return at
+        },
+        free: () => {},
+      } }
     },
     async: {
       submit (request) {
@@ -325,35 +360,100 @@ test('helpers: errno mapping, header pairs, envelopes and oversized responses', 
   assert.match(new TextDecoder().decode(new Uint8Array(ctx.memory().buffer, 8192, length).slice()), /transfer limit/)
 })
 
-test('pnpm_host refuses publishing with a readable 405 response', () => {
+test('pnpm_host refuses publishing on a CORS transport', () => {
   const ctx = fakeContext()
+  ctx.traits = { crossOrigin: 'cors' }
   const { pnpm_host: host } = createImports(ctx)
   const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
-  const upload = response(ctx, host, start({ operation: 'upload.create' }))
-  assert.equal(upload.ok, true)
-  assert.deepEqual(response(ctx, host, start({ operation: 'upload.write', handle: upload.value.handle, bytes: [1] })), { ok: true, value: null })
-  assert.deepEqual(response(ctx, host, start({ operation: 'upload.end', handle: upload.value.handle })), { ok: true, value: null })
-  for (const request of [
-    { operation: 'network.request', url: 'https://registry.npmjs.org/x', method: 'put', body: [1] },
-    { operation: 'network.request', url: 'https://registry.npmjs.org/x', method: 'POST', bodyHandle: upload.value.handle },
-  ]) {
-    const head = response(ctx, host, start(request))
-    assert.equal(head.value.status, 405)
-    assert.ok(head.value.handle >= 0x40000000)
-    const body = response(ctx, host, start({ operation: 'stream.read', handle: head.value.handle, maxBytes: 65536 }))
-    assert.deepEqual(JSON.parse(new TextDecoder().decode(Uint8Array.from(body.value.bytes))), { error: PUBLISH_UNSUPPORTED })
-    assert.deepEqual(response(ctx, host, start({ operation: 'stream.read', handle: head.value.handle })), { ok: true, value: { bytes: [], done: true } })
-    assert.deepEqual(response(ctx, host, start({ operation: 'resource.close', handle: head.value.handle })), { ok: true, value: null })
-  }
-  assert.equal(ctx.submitted.length, 0)
+  const head = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.npmjs.org/x', method: 'PUT', body: [1] }))
+  assert.equal(head.value.status, 405)
+  const body = response(ctx, host, start({ operation: 'stream.read', handle: head.value.handle }))
+  assert.deepEqual(JSON.parse(new TextDecoder().decode(Uint8Array.from(body.value.bytes))), { error: PUBLISH_UNSUPPORTED })
+  assert.deepEqual(response(ctx, host, start({ operation: 'stream.read', handle: head.value.handle })), { ok: true, value: { bytes: [], done: true } })
+  assert.deepEqual(response(ctx, host, start({ operation: 'resource.close', handle: head.value.handle })), { ok: true, value: null })
+  assert.equal(ctx.sent.length, 0)
   const unread = start({ operation: 'network.request', url: 'https://registry.npmjs.org/y', method: 'DELETE' })
   assert.ok(host.response_len(unread) > 0)
-  assert.equal(ctx.fs.files.size, 1)
   host.operation_cancel(unread)
-  assert.equal(ctx.fs.files.size, 0)
   const closed = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.npmjs.org/z', method: 'PUT' }))
   assert.equal(host.resource_close(closed.value.handle), 0)
   assert.equal(ctx.fs.files.size, 0)
-  assert.deepEqual(ctx.syscalls, [])
 })
 
+test('pnpm_host sends an inline publish and explains unreachable registries', () => {
+  const ctx = fakeContext()
+  ctx.traits = { crossOrigin: 'any' }
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const ok = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.example/x', method: 'put', headers: { authorization: 'Bearer SECRET' }, body: [1, 2, 3] }))
+  assert.deepEqual(ok, { ok: true, value: { handle: 5, status: 201, headers: [['content-type', 'application/json']], url: 'https://registry.example/x' } })
+  assert.deepEqual([...ctx.sent[0].body], [1, 2, 3])
+  assert.equal(ctx.sent[0].method, 'PUT')
+  assert.deepEqual(ctx.sent[0].headers, [['authorization', 'Bearer SECRET']])
+  ctx.reply = Object.assign(new Error('down'), { code: 'ECONNREFUSED' })
+  const down = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.example/x', method: 'PUT', headers: { authorization: 'Bearer SECRET' } }))
+  const text = new TextDecoder().decode(Uint8Array.from(response(ctx, host, start({ operation: 'stream.read', handle: down.value.handle })).value.bytes))
+  assert.equal(down.value.status, 502)
+  assert.deepEqual(JSON.parse(text), { error: 'could not reach registry.example (ECONNREFUSED)' })
+  assert.ok(!text.includes('SECRET'))
+  ctx.reply = new Error('no code')
+  const odd = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.example/x', method: 'PUT' }))
+  assert.equal(odd.value.status, 502)
+  const big = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.example/x', method: 'PUT', body: Array.from({ length: 4 }) }))
+  assert.equal(big.ok, true)
+  for (const name of [...ctx.fs.files.keys()]) assert.ok(!new TextDecoder().decode(ctx.fs.files.get(name)).includes('SECRET'))
+})
+
+test('pnpm_host hints at the CORS-free transport when traits are unknown', () => {
+  const ctx = fakeContext()
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  ctx.reply = Object.assign(new Error('blocked'), { code: 'ECONNREFUSED' })
+  const head = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.npmjs.org/x', method: 'PUT' }))
+  const text = new TextDecoder().decode(Uint8Array.from(response(ctx, host, start({ operation: 'stream.read', handle: head.value.handle })).value.bytes))
+  assert.equal(JSON.parse(text).error, `could not reach registry.npmjs.org (ECONNREFUSED); on a plain page, ${PUBLISH_UNSUPPORTED}`)
+})
+
+test('pnpm_host streams an upload and sends it after upload.end, keeping headers out of files', () => {
+  const ctx = fakeContext()
+  ctx.traits = { crossOrigin: 'any' }
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const upload = response(ctx, host, start({ operation: 'upload.create' }))
+  const id = start({ operation: 'network.request', url: 'https://registry.example/x', method: 'PUT', headers: [['authorization', 'Bearer SECRET']], bodyHandle: upload.value.handle })
+  assert.equal(host.response_len(id), -1)
+  assert.deepEqual(response(ctx, host, start({ operation: 'upload.write', handle: upload.value.handle, bytes: [1, 2] })), { ok: true, value: null })
+  assert.deepEqual(response(ctx, host, start({ operation: 'upload.write', handle: upload.value.handle, bytes: [3] })), { ok: true, value: null })
+  for (const name of [...ctx.fs.files.keys()]) assert.ok(!new TextDecoder().decode(ctx.fs.files.get(name)).includes('SECRET'))
+  assert.match(response(ctx, host, start({ operation: 'upload.write', handle: upload.value.handle, bytes: 'nope' })).error.message, /bytes/)
+  assert.deepEqual(response(ctx, host, start({ operation: 'upload.end', handle: upload.value.handle })), { ok: true, value: null })
+  assert.deepEqual([...ctx.sent[0].body], [1, 2, 3])
+  assert.deepEqual(ctx.sent[0].headers, [['authorization', 'Bearer SECRET']])
+  assert.equal(response(ctx, host, id).value.status, 201)
+  assert.deepEqual(response(ctx, host, start({ operation: 'resource.close', handle: upload.value.handle })), { ok: true, value: null })
+  assert.deepEqual([...ctx.fs.files.keys()], [])
+  const second = response(ctx, host, start({ operation: 'upload.create' }))
+  const late = start({ operation: 'network.request', url: 'https://registry.example/x', method: 'PUT', bodyHandle: second.value.handle })
+  response(ctx, host, start({ operation: 'upload.end', handle: second.value.handle }))
+  host.operation_cancel(late)
+  assert.deepEqual(ctx.syscalls.at(-1), { op: 'net-close', handle: 5 })
+  assert.deepEqual(response(ctx, host, start({ operation: 'upload.end', handle: second.value.handle })), { ok: true, value: null })
+})
+
+test('pnpm_host caps uploads and reports staging failures', () => {
+  const ctx = fakeContext()
+  ctx.traits = { crossOrigin: 'any' }
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const upload = response(ctx, host, start({ operation: 'upload.create' }))
+  ctx.fs.writeFile(`/tmp/.wasi-pnpm/upload-${upload.value.handle}/0`, { length: MAX_UPLOAD })
+  assert.deepEqual(response(ctx, host, start({ operation: 'upload.write', handle: upload.value.handle, bytes: [1] })).error, { message: PUBLISH_TOO_LARGE, code: 'EFBIG' })
+  ctx.fs.files.clear()
+  const huge = response(ctx, host, start({ operation: 'upload.create' }))
+  ctx.instance = () => ({ exports: { malloc: () => 0, free: () => {} } })
+  assert.equal(response(ctx, host, start({ operation: 'network.request', url: 'https://registry.example/x', method: 'PUT', bodyHandle: huge.value.handle })).error.code, 'ENOMEM')
+  ctx.fs.writeFile(`/tmp/.wasi-pnpm/upload-${huge.value.handle}/request`, new TextEncoder().encode('8 9999999'))
+  assert.equal(response(ctx, host, start({ operation: 'upload.end', handle: huge.value.handle })).error.code, 'EIO')
+  const prompt = response(ctx, host, start({ operation: 'terminal.password' }))
+  assert.match(prompt.error.message, /--otp/)
+})
