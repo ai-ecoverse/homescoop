@@ -1,16 +1,26 @@
-# pnpm 12 for slicc WASI: upstream's own wasm32-wasip1-threads build of the
-# pnpm CLI (@pnpm/wasm), plus a host-import module for slicc-kernel.
+# pnpm 12 for slicc WASI: pnpm.wasm built by homescoop from pnpm's own
+# source with upstream's pnpm/wasm/build.mjs plus patches/, and a
+# host-import module for slicc-kernel.
 name: wasi-pnpm
-# Not built by the ladder until certified in slicc-kernel's browser harness.
+# Not built by the ladder; .github/workflows/wasi-pnpm.yml builds and tests it.
 builder: retired
-# renovate: datasource=npm depName=@pnpm/wasm
 version: "12.9.1"
 npm: "@ai-ecoverse/wasi-pnpm"
 summary: "pnpm 12 for slicc WASI (commands pnpm, pn)"
 source:
-  url: "https://registry.npmjs.org/@pnpm/wasm/-/wasm-{{version}}.tgz"
-  sha256: "528079fbdcf0bbbaaf033257cf14e68601001cd46b532fd38ab7b1179e3b7b39"
-  integrity: "sha512-1vYE9piwuZufAdTVAzzDwBnh+yDm8YHdxATHYbMOSyNOH7p5WZYcFiM314XmbFYO1xxX3qCA6WrD6AIuafy+hw=="
+  # pnpm v12.9.1 (the release commit "chore(release): 11.28.4, pacquet 12.9.1")
+  url: "https://github.com/pnpm/pnpm/archive/5dafb0980042af99fb1aa24478d16f03b8474b50.tar.gz"
+  sha256: "5ade48506ae88ed031994ea1aab5bfc161d1a3b60f4604100f719678a42684ee"
+  commit: "5dafb0980042af99fb1aa24478d16f03b8474b50"
+toolchain:
+  # Exactly what pnpm/wasm/build.mjs at that commit requires.
+  rust: "nightly-2026-08-27"
+  wasi_sdk: "34.0"
+  wasi_sdk_sha256_linux_x64: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
+  wasi_sdk_sha256_macos_arm64: "9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9"
+  wabt: "1.0.42"
+  wabt_sha256_linux_x64: "84895407a6bbb80e918f33b16b2fb2206021c150b6bc9ff6f761263a745ab131"
+  wabt_sha256_macos_arm64: "3f654779b436c628db3ca4323c51538815f5fbc887a6d5f3bb1c18d36281e240"
 dependencies:
   build: []
   host: []
@@ -19,9 +29,11 @@ about:
   homepage: https://pnpm.io
   license: MIT
   notes: |
-    build.sh fetches @pnpm/wasm from npm, checks the sha256 above and npm's
-    sha512 integrity, and stages dist/pnpm.wasm unchanged as bin/pnpm.wasm.
-    Its pnpm_host, pnpm_fs and pnpm_atomic imports come from host/pnpm-host.mjs,
-    which slicc-kernel loads through slicc.commands.<name>.imports.
-    Follow-up: rebuild pnpm.wasm reproducibly with upstream's
-    pnpm/wasm/build.mjs (nightly-2026-08-27, WASI SDK 34, WABT 1.0.42).
+    build.sh fetches the pinned pnpm source, applies patches/ (0001: build
+    parking_lot_core with its `nightly` feature, so contended locks wait
+    with memory.atomic.wait32 instead of panicking), drops the
+    .cargo/config.toml block that points crates.io at pnpm's vendored
+    .pnpm/crates (Cargo.lock checksums still apply), and runs upstream's
+    pnpm/wasm/build.mjs with the pinned toolchain and remapped paths.
+    host/pnpm-host.mjs implements pnpm_host, pnpm_fs and pnpm_atomic on
+    slicc-kernel's per-command imports hook.

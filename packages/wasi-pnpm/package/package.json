@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-2",
-  "description": "pnpm 12 for slicc WASI (commands pnpm, pn)",
+  "version": "12.9.1-3",
+  "description": "pnpm 12 for slicc WASI (commands pnpm, pn); pnpm.wasm built by homescoop from pnpm v12.9.1 with a documented patch",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,7 +29,11 @@
   },
   "homescoop": {
     "recipe": "wasi-pnpm",
-    "upstream": "12.9.1"
+    "upstream": "12.9.1",
+    "source": "pnpm/pnpm@5dafb0980042af99fb1aa24478d16f03b8474b50",
+    "patches": [
+      "0001-parking-lot-core-nightly.patch"
+    ]
   },
   "slicc": {
     "abi": "wasi",
