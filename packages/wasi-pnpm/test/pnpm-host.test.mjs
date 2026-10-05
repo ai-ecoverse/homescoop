@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { GIT_UNSUPPORTED, MAX_UPLOAD, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
+import { GIT_MISSING, GIT_UNSUPPORTED, MAX_UPLOAD, childEnv, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
@@ -312,7 +312,7 @@ test('pnpm_host answers local and unsupported operations', () => {
   assert.match(response(ctx, host, start({ operation: 'bogus' })).error.message, /Unknown WASM host operation/)
   assert.match(response(ctx, host, start({ operation: 'network.request', url: 'not a url' })).error.message, /Invalid HTTP request URL/)
   assert.match(response(ctx, host, start({ operation: 'network.request', url: 'file:///etc/passwd' })).error.message, /Unsupported HTTP protocol/)
-  assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: '/usr/bin/git', args: ['ls-remote'] })).error.message, GIT_UNSUPPORTED)
+  assert.match(response(ctx, host, start({ operation: 'process.spawn', program: '/usr/bin/git', args: ['ls-remote'] })).error.message, /git could not start/)
   assert.equal(response(ctx, host, start({ operation: 'shell.spawn', program: 'ssh' })).error.message, GIT_UNSUPPORTED)
   assert.equal(response(ctx, host, start({ operation: 'process.spawn' })).error.code, 'ENOTSUP')
   const signal = start({ operation: 'signal.next' })
@@ -457,3 +457,92 @@ test('pnpm_host caps uploads and reports staging failures', () => {
   const prompt = response(ctx, host, start({ operation: 'terminal.password' }))
   assert.match(prompt.error.message, /--otp/)
 })
+
+function gitContext () {
+  const ctx = fakeContext()
+  ctx.traits = { crossOrigin: 'any' }
+  ctx.env = { PNPM_SLICC_HTTPS_PROXY: 'http://127.0.0.1:3128', PNPM_SLICC_SSL_CERT_FILE: '/etc/ca.pem', PNPM_SLICC_NO_PROXY: '' }
+  ctx.cwd = () => '/home/app'
+  ctx.spawned = []
+  ctx.killed = []
+  ctx.spawn = options => {
+    ctx.spawned.push(options)
+    return { pid: 7, stdin: options.stdin === 'pipe' ? 20 : undefined, stdout: 21, stderr: 22 }
+  }
+  ctx.kill = (pid, sig) => {
+    ctx.killed.push([pid, sig])
+    if (sig === 2) throw new Error('gone')
+  }
+  return ctx
+}
+
+test('pnpm_host runs git through the kernel with the proxy env restored', () => {
+  const ctx = gitContext()
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const spawned = response(ctx, host, start({ operation: 'process.spawn', program: '/usr/bin/git', args: ['ls-remote', '--', 'https://github.com/a/b'], env: { HOME: '/home', PNPM_SLICC_X: 'y' }, stdin: 'null', stdout: 'pipe', stderr: 'pipe' }))
+  assert.equal(spawned.value.pid, 7)
+  assert.deepEqual(ctx.spawned[0].argv, ['git', 'ls-remote', '--', 'https://github.com/a/b'])
+  assert.deepEqual(ctx.spawned[0].env, { HOME: '/home', https_proxy: 'http://127.0.0.1:3128', HTTPS_PROXY: 'http://127.0.0.1:3128', SSL_CERT_FILE: '/etc/ca.pem', GIT_SSL_CAINFO: '/etc/ca.pem' })
+  assert.deepEqual([ctx.spawned[0].cwd, ctx.spawned[0].stdin, ctx.spawned[0].stdout], ['/home/app', 'null', 'pipe'])
+  start({ operation: 'stream.read', handle: spawned.value.stdout, maxBytes: 999999 })
+  assert.deepEqual(ctx.submitted.at(-1).request, { op: 'fd-read', fd: 21, max: 65536 })
+  assert.match(response(ctx, host, start({ operation: 'process.write', handle: spawned.value.handle, bytes: [1] })).error.message, /not piped/)
+  assert.deepEqual(response(ctx, host, start({ operation: 'process.end', handle: spawned.value.handle })), { ok: true, value: null })
+  const wait = start({ operation: 'process.wait', handle: spawned.value.handle })
+  assert.deepEqual(ctx.submitted.at(-1).request, { op: 'proc-wait', pid: 7, nohang: false })
+  ctx.results.set(wait, [7, 256])
+  assert.deepEqual(response(ctx, host, wait), { ok: true, value: { code: 1, signal: null, signalNumber: null } })
+  const tryWait = start({ operation: 'process.tryWait', handle: spawned.value.handle })
+  ctx.results.set(tryWait, [0, 0])
+  assert.deepEqual(response(ctx, host, tryWait), { ok: true, value: null })
+  assert.deepEqual(response(ctx, host, start({ operation: 'process.kill', handle: spawned.value.handle })), { ok: true, value: null })
+  assert.deepEqual(response(ctx, host, start({ operation: 'process.kill', handle: spawned.value.handle, signal: 'SIGINT' })), { ok: true, value: null })
+  assert.deepEqual(ctx.killed, [[7, 15], [7, 2]])
+  assert.deepEqual(response(ctx, host, start({ operation: 'process.release', handle: spawned.value.handle })), { ok: true, value: null })
+  assert.deepEqual(response(ctx, host, start({ operation: 'resource.close', handle: spawned.value.stdout })), { ok: true, value: null })
+  assert.deepEqual(ctx.syscalls.at(-1), { op: 'fd-close', fd: 21 })
+  assert.equal(host.resource_close(spawned.value.handle), 0)
+  assert.deepEqual(ctx.killed.at(-1), [7, 9])
+})
+
+test('pnpm_host pipes git stdin and cleans up an unread spawn', () => {
+  const ctx = gitContext()
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const spawned = response(ctx, host, start({ operation: 'process.spawn', program: 'git', args: [], env: [['A', 'b']], stdin: 'pipe', stdout: 'ignore', stderr: 'inherit' }))
+  assert.deepEqual([ctx.spawned[0].stdout, ctx.spawned[0].stderr, ctx.spawned[0].env.A], ['null', 'inherit', 'b'])
+  start({ operation: 'process.write', handle: spawned.value.handle, bytes: [1, 2] })
+  assert.equal(ctx.submitted.at(-1).request.op, 'fd-write')
+  assert.deepEqual([...ctx.submitted.at(-1).request.body], [1, 2])
+  start({ operation: 'process.closeStdin', handle: spawned.value.handle })
+  assert.deepEqual(ctx.submitted.at(-1).request, { op: 'fd-close', fd: 20 })
+  const unread = start({ operation: 'process.spawn', program: 'git', args: ['clone'] })
+  assert.ok(host.response_len(unread) > 0)
+  host.operation_cancel(unread)
+  assert.deepEqual(ctx.syscalls.slice(-2), [{ op: 'fd-close', fd: 21 }, { op: 'fd-close', fd: 22 }])
+  assert.deepEqual(ctx.killed.at(-1), [7, 9])
+})
+
+test('pnpm_host explains a missing git and a CORS-only transport', () => {
+  const ctx = gitContext()
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  ctx.spawn = () => { throw Object.assign(new Error('nope'), { code: 'ENOENT' }) }
+  assert.deepEqual(response(ctx, host, start({ operation: 'process.spawn', program: 'git' })).error, { message: GIT_MISSING, code: 'ENOENT' })
+  ctx.spawn = () => { throw new Error('boom') }
+  assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: 'git' })).error.message, 'git could not start: boom')
+  ctx.spawn = () => { throw {} }
+  assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: 'git' })).error.code, 'EIO')
+  const cors = fakeContext()
+  cors.traits = { crossOrigin: 'cors' }
+  const corsHost = createImports(cors).pnpm_host
+  assert.equal(response(cors, corsHost, corsHost.operation_start(...put(cors, 64, JSON.stringify({ operation: 'process.spawn', program: 'git' })))).error.message, GIT_UNSUPPORTED)
+})
+
+test('helpers: wait statuses and child env', () => {
+  assert.deepEqual(waitStatus(9), { code: null, signal: 'SIGKILL', signalNumber: 9 })
+  assert.deepEqual(waitStatus(11), { code: null, signal: 'SIG11', signalNumber: 11 })
+  assert.deepEqual(childEnv(undefined, undefined), {})
+})
+

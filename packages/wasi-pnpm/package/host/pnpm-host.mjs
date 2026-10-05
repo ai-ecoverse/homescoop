@@ -176,7 +176,17 @@ function createFilesystem (ctx) {
   }
 }
 
-export const GIT_UNSUPPORTED = 'git dependencies are not supported in slicc-kernel (no git transport); use a registry version'
+export const GIT_UNSUPPORTED = 'git dependencies need a CORS-free network transport (slicc-node, the SLICC extension or app); this page only has fetch'
+export const GIT_MISSING = 'git dependencies need git: install @ai-ecoverse/wasm-git into /node_modules'
+const FD_HANDLE = 0x10000000
+const PROC_HANDLE = 0x20000000
+const SIGNALS = { SIGHUP: 1, SIGINT: 2, SIGQUIT: 3, SIGKILL: 9, SIGTERM: 15 }
+const CHILD_ENV = {
+  PNPM_SLICC_HTTP_PROXY: ['http_proxy', 'HTTP_PROXY'],
+  PNPM_SLICC_HTTPS_PROXY: ['https_proxy', 'HTTPS_PROXY'],
+  PNPM_SLICC_NO_PROXY: ['no_proxy', 'NO_PROXY'],
+  PNPM_SLICC_SSL_CERT_FILE: ['SSL_CERT_FILE', 'GIT_SSL_CAINFO'],
+}
 export const PUBLISH_UNSUPPORTED = 'publishing needs a CORS-free network transport (slicc-node, the SLICC extension or app); this page only has fetch'
 export const PUBLISH_TOO_LARGE = 'the publish request body exceeds 64 MiB, the limit for pnpm in slicc-kernel'
 export const MAX_UPLOAD = 64 * 1024 * 1024
@@ -222,6 +232,9 @@ export function envelope (result) {
     return { ok: false, error: { message: result.message ?? `errno ${result.errno}`, code: result.code ?? null } }
   }
   if (result && typeof result === 'object' && typeof result.ok === 'boolean') return result
+  if (Array.isArray(result) && result.length === 2 && result.every(Number.isInteger)) {
+    return { ok: true, value: result[0] === 0 ? null : waitStatus(result[1]) }
+  }
   if (result instanceof Uint8Array) return { ok: true, value: { bytes: Array.from(result), done: result.length === 0 } }
   if (result && typeof result === 'object' && 'status' in result && 'handle' in result) {
     return { ok: true, value: { handle: result.handle, status: result.status, headers: responseHeaders(result), url: result.url } }
@@ -233,9 +246,51 @@ function errorEnvelope (message, code = 'ENOTSUP') {
   return { ok: false, error: { message, code } }
 }
 
+export function programName (request) {
+  return String(request.program ?? '').split('/').pop()
+}
+
 export function spawnMessage (request) {
-  const program = String(request.program ?? '').split('/').pop()
+  const program = programName(request)
   return program === 'git' || program === 'ssh' ? GIT_UNSUPPORTED : SCRIPTS_UNSUPPORTED
+}
+
+export function childEnv (requested, own) {
+  const env = Array.isArray(requested) ? Object.fromEntries(requested) : { ...(requested ?? {}) }
+  for (const [source, targets] of Object.entries(CHILD_ENV)) {
+    if (typeof own?.[source] === 'string' && own[source] !== '') for (const target of targets) env[target] = own[source]
+  }
+  for (const key of Object.keys(env)) if (key.startsWith('PNPM_SLICC_')) delete env[key]
+  return env
+}
+
+export function waitStatus (status) {
+  const signalNumber = status & 0x7f
+  if (signalNumber === 0) return { code: (status >> 8) & 0xff, signal: null, signalNumber: null }
+  const signal = Object.keys(SIGNALS).find(name => SIGNALS[name] === signalNumber) ?? `SIG${signalNumber}`
+  return { code: null, signal, signalNumber }
+}
+
+function fdHandle (fd) {
+  return fd == null ? null : FD_HANDLE + fd
+}
+
+export function isFdHandle (handle) {
+  return Number.isInteger(handle) && handle >= FD_HANDLE && handle < PROC_HANDLE
+}
+
+export function isProcHandle (handle) {
+  return Number.isInteger(handle) && handle >= PROC_HANDLE && handle < SYNTHETIC
+}
+
+function procHandle (pid, stdin) {
+  return PROC_HANDLE + pid * 1024 + (stdin == null ? 0 : stdin + 1)
+}
+
+function procOf (handle) {
+  const rest = handle - PROC_HANDLE
+  const stdin = (rest % 1024) - 1
+  return { pid: Math.floor(rest / 1024), stdin: stdin < 0 ? null : stdin }
 }
 
 export function isSynthetic (handle) {
@@ -386,6 +441,47 @@ function createHost (ctx) {
     }
   }
 
+  function spawnGit (request) {
+    if (corsOnly()) return ctx.async.resolve(errorEnvelope(GIT_UNSUPPORTED))
+    const stdio = name => (request[name] === 'ignore' || request[name] === 'null' ? 'null' : request[name] === 'inherit' ? 'inherit' : 'pipe')
+    let child
+    try {
+      child = ctx.spawn({ argv: ['git', ...(request.args ?? []).map(String)], env: childEnv(request.env, ctx.env), cwd: request.cwd ?? ctx.cwd(), stdin: stdio('stdin'), stdout: stdio('stdout'), stderr: stdio('stderr') })
+    } catch (error) {
+      return ctx.async.resolve(errorEnvelope(error?.code === 'ENOENT' ? GIT_MISSING : `git could not start: ${error?.code ?? error?.message ?? 'EIO'}`, error?.code ?? 'EIO'))
+    }
+    return ctx.async.resolve({ ok: true, value: { handle: procHandle(child.pid, child.stdin), pid: child.pid, stdout: fdHandle(child.stdout), stderr: fdHandle(child.stderr) } })
+  }
+
+  function processOp (request) {
+    const { pid, stdin } = procOf(request.handle)
+    switch (request.operation) {
+    case 'process.write':
+      if (stdin == null) return ctx.async.resolve(errorEnvelope('Process stdin is not piped', 'EINVAL'))
+      return ctx.async.submit({ op: 'fd-write', fd: stdin, body: Array.isArray(request.bytes) ? Uint8Array.from(request.bytes) : request.bytes })
+    case 'process.end':
+    case 'process.closeStdin':
+    case 'process.endDetached':
+      if (stdin == null) return ctx.async.resolve({ ok: true, value: null })
+      return ctx.async.submit({ op: 'fd-close', fd: stdin })
+    case 'process.wait': return ctx.async.submit({ op: 'proc-wait', pid, nohang: false })
+    case 'process.tryWait': return ctx.async.submit({ op: 'proc-wait', pid, nohang: true })
+    case 'process.kill':
+      try {
+        ctx.kill(pid, SIGNALS[request.signal ?? 'SIGTERM'] ?? SIGNALS.SIGTERM)
+      } catch {}
+      return ctx.async.resolve({ ok: true, value: null })
+    default: return ctx.async.resolve({ ok: true, value: null })
+    }
+  }
+
+  function closeChild (handle) {
+    try {
+      if (isFdHandle(handle)) ctx.syscall({ op: 'fd-close', fd: handle - FD_HANDLE })
+      else ctx.kill(procOf(handle).pid, SIGNALS.SIGKILL)
+    } catch {}
+  }
+
   function publishRequest (url, request) {
     if (corsOnly()) return syntheticResponse(url.href, 405, PUBLISH_UNSUPPORTED)
     if (request.bodyHandle != null) return deferUpload(url, request)
@@ -436,8 +532,13 @@ function createHost (ctx) {
     case 'network.request': return networkRequest(request)
     case 'stream.read':
       if (isSynthetic(request.handle)) return ctx.async.resolve(syntheticRead(request.handle))
+      if (isFdHandle(request.handle)) return ctx.async.submit({ op: 'fd-read', fd: request.handle - FD_HANDLE, max: Math.min(request.maxBytes ?? 65536, 65536) })
       return ctx.async.submit({ op: 'net-read', handle: request.handle, max: Math.min(request.maxBytes ?? 65536, 65536) })
     case 'resource.close':
+      if (isFdHandle(request.handle) || isProcHandle(request.handle)) {
+        closeChild(request.handle)
+        return ctx.async.resolve({ ok: true, value: null })
+      }
       if (isSynthetic(request.handle)) {
         syntheticClose(request.handle)
         uploadRemove(request.handle)
@@ -455,7 +556,17 @@ function createHost (ctx) {
       return ctx.async.resolve({ ok: true, value: null })
     case 'process.spawn':
     case 'shell.spawn':
+      if (request.operation === 'process.spawn' && programName(request) === 'git') return spawnGit(request)
       return ctx.async.resolve(errorEnvelope(spawnMessage(request)))
+    case 'process.write':
+    case 'process.end':
+    case 'process.closeStdin':
+    case 'process.endDetached':
+    case 'process.wait':
+    case 'process.tryWait':
+    case 'process.kill':
+    case 'process.release':
+      return processOp(request)
     case 'signal.next': return ctx.async.hold()
     case 'terminal.status': return ctx.async.resolve({ ok: true, value: { stdin: false, stdout: false, stderr: false } })
     default:
@@ -478,7 +589,9 @@ function createHost (ctx) {
 
   function closeUnread (bytes) {
     const response = JSON.parse(decoder.decode(bytes))
-    if (response.ok && isSynthetic(response.value?.handle)) syntheticClose(response.value.handle)
+    if (response.ok && (isFdHandle(response.value?.handle) || isProcHandle(response.value?.handle))) {
+      for (const handle of [response.value.stdout, response.value.stderr, response.value.handle]) if (handle != null) closeChild(handle)
+    } else if (response.ok && isSynthetic(response.value?.handle)) syntheticClose(response.value.handle)
     else if (response.ok && Number.isInteger(response.value?.handle)) {
       try {
         ctx.syscall({ op: 'net-close', handle: response.value.handle })
@@ -520,6 +633,10 @@ function createHost (ctx) {
       ctx.async.cancel(id)
     },
     resource_close (handle) {
+      if (isFdHandle(handle) || isProcHandle(handle)) {
+        closeChild(handle)
+        return 0
+      }
       if (isSynthetic(handle)) {
         syntheticClose(handle)
         uploadRemove(handle)
