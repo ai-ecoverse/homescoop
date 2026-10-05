@@ -45,6 +45,7 @@
       }
     },
     "env": {
+      "PNPM_SLICC_PACKAGE": "${package}",
       "PNPM_WASM_PID": "1",
       "PNPM_WASM_CWD": "${cwd}",
       "PNPM_WASM_TMPDIR": "/tmp",

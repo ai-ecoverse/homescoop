@@ -177,6 +177,8 @@ function createFilesystem (ctx) {
 }
 
 export const GIT_UNSUPPORTED = 'git dependencies need a CORS-free network transport (slicc-node, the SLICC extension or app); this page only has fetch'
+export const TLS_MISSING = 'git over https needs @ai-ecoverse/wasm-tls-engine installed next to @ai-ecoverse/wasi-pnpm'
+export const CA_MISSING = 'kernel not prepared: no CA file for git over https (the embedder must run prepare())'
 export const GIT_MISSING = 'git dependencies need git: install @ai-ecoverse/wasm-git so that git is on the kernel command path (its /node_modules)'
 const FD_HANDLE = 0x10000000
 const PROC_HANDLE = 0x20000000
@@ -441,14 +443,28 @@ function createHost (ctx) {
     }
   }
 
+  function httpsProblem (request) {
+    if (!(request.args ?? []).some(arg => String(arg).startsWith('https://'))) return undefined
+    const own = ctx.env ?? {}
+    if (typeof own.PNPM_SLICC_PACKAGE === 'string' && own.PNPM_SLICC_PACKAGE !== '') {
+      const scope = own.PNPM_SLICC_PACKAGE.replace(/\/+$/, '').split('/').slice(0, -1).join('/')
+      if (!ctx.fs.exists(`${scope}/wasm-tls-engine/package.json`)) return TLS_MISSING
+    }
+    const ca = own.PNPM_SLICC_SSL_CERT_FILE
+    if (typeof ca !== 'string' || ca === '' || !ctx.fs.exists(ca)) return CA_MISSING
+    return undefined
+  }
+
   function spawnGit (request) {
     if (corsOnly()) return ctx.async.resolve(errorEnvelope(GIT_UNSUPPORTED))
+    const problem = httpsProblem(request)
+    if (problem) return ctx.async.resolve(errorEnvelope(problem))
     const stdio = name => (request[name] === 'ignore' || request[name] === 'null' ? 'null' : request[name] === 'inherit' ? 'inherit' : 'pipe')
     let child
     try {
       child = ctx.spawn({ argv: ['git', ...(request.args ?? []).map(String)], env: childEnv(request.env, ctx.env), cwd: request.cwd ?? ctx.cwd(), stdin: stdio('stdin'), stdout: stdio('stdout'), stderr: stdio('stderr') })
     } catch (error) {
-      return ctx.async.resolve(errorEnvelope(error?.code === 'ENOENT' ? GIT_MISSING : `git could not start: ${error?.code ?? error?.message ?? 'EIO'}`, error?.code ?? 'EIO'))
+      return ctx.async.resolve(errorEnvelope(error?.code === 'ENOENT' ? GIT_MISSING : `git could not start: ${error?.code ?? error?.message ?? 'EIO'}`, error?.code === 'ENOENT' ? 'ENOTSUP' : error?.code ?? 'EIO'))
     }
     return ctx.async.resolve({ ok: true, value: { handle: procHandle(child.pid, child.stdin), pid: child.pid, stdout: fdHandle(child.stdout), stderr: fdHandle(child.stderr) } })
   }

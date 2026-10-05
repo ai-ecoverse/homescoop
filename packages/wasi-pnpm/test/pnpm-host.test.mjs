@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { GIT_MISSING, GIT_UNSUPPORTED, MAX_UPLOAD, childEnv, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
+import { CA_MISSING, GIT_MISSING, GIT_UNSUPPORTED, TLS_MISSING, MAX_UPLOAD, childEnv, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
@@ -461,7 +461,9 @@ test('pnpm_host caps uploads and reports staging failures', () => {
 function gitContext () {
   const ctx = fakeContext()
   ctx.traits = { crossOrigin: 'any' }
-  ctx.env = { PNPM_SLICC_HTTPS_PROXY: 'http://127.0.0.1:3128', PNPM_SLICC_SSL_CERT_FILE: '/etc/ca.pem', PNPM_SLICC_NO_PROXY: '' }
+  ctx.env = { PNPM_SLICC_PACKAGE: '/node_modules/@ai-ecoverse/wasi-pnpm/', PNPM_SLICC_HTTPS_PROXY: 'http://127.0.0.1:3128', PNPM_SLICC_SSL_CERT_FILE: '/etc/ca.pem', PNPM_SLICC_NO_PROXY: '' }
+  ctx.entries.set('/etc/ca.pem', { kind: 'file' })
+  ctx.entries.set('/node_modules/@ai-ecoverse/wasm-tls-engine/package.json', { kind: 'file' })
   ctx.cwd = () => '/home/app'
   ctx.spawned = []
   ctx.killed = []
@@ -529,7 +531,7 @@ test('pnpm_host explains a missing git and a CORS-only transport', () => {
   const { pnpm_host: host } = createImports(ctx)
   const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
   ctx.spawn = () => { throw Object.assign(new Error('nope'), { code: 'ENOENT' }) }
-  assert.deepEqual(response(ctx, host, start({ operation: 'process.spawn', program: 'git' })).error, { message: GIT_MISSING, code: 'ENOENT' })
+  assert.deepEqual(response(ctx, host, start({ operation: 'process.spawn', program: 'git' })).error, { message: GIT_MISSING, code: 'ENOTSUP' })
   ctx.spawn = () => { throw new Error('boom') }
   assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: 'git' })).error.message, 'git could not start: boom')
   ctx.spawn = () => { throw {} }
@@ -544,5 +546,25 @@ test('helpers: wait statuses and child env', () => {
   assert.deepEqual(waitStatus(9), { code: null, signal: 'SIGKILL', signalNumber: 9 })
   assert.deepEqual(waitStatus(11), { code: null, signal: 'SIG11', signalNumber: 11 })
   assert.deepEqual(childEnv(undefined, undefined), {})
+})
+
+test('pnpm_host names a missing TLS engine or an unprepared kernel before https git', () => {
+  const ctx = gitContext()
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const https = { operation: 'process.spawn', program: 'git', args: ['ls-remote', '--', 'https://github.com/a/b'] }
+  ctx.entries.delete('/etc/ca.pem')
+  assert.deepEqual(response(ctx, host, start(https)).error, { message: CA_MISSING, code: 'ENOTSUP' })
+  ctx.entries.delete('/node_modules/@ai-ecoverse/wasm-tls-engine/package.json')
+  assert.equal(response(ctx, host, start(https)).error.message, TLS_MISSING)
+  assert.equal(ctx.spawned.length, 0)
+  assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: 'git', args: ['ls-remote', 'http://192.168.0.2/a.git'] })).value.pid, 7)
+  ctx.env = { PNPM_SLICC_SSL_CERT_FILE: '' }
+  assert.equal(response(ctx, host, start(https)).error.message, CA_MISSING)
+  ctx.env = undefined
+  assert.equal(response(ctx, host, start(https)).error.message, CA_MISSING)
+  ctx.env = { PNPM_SLICC_SSL_CERT_FILE: '/etc/ca2.pem' }
+  ctx.entries.set('/etc/ca2.pem', { kind: 'file' })
+  assert.equal(response(ctx, host, start(https)).value.pid, 7)
 })
 
