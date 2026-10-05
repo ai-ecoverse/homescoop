@@ -5,7 +5,7 @@ import { createImports, envelope, errno, errorNumber, headerPairs, responseHeade
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
-  const entries = new Map([['/', { kind: 'directory', mode: 0o755, uid: 1000 }]])
+  const entries = new Map([['/', { kind: 'dir', mode: 0o755 }]])
   const fds = new Map()
   const opened = []
   const submitted = []
@@ -19,12 +19,17 @@ function fakeContext () {
     lstat (path) {
       const entry = entries.get(path)
       if (!entry) throw error('ENOENT')
-      return { ...entry }
+      return { isFile: entry.kind === 'file', isDirectory: entry.kind === 'dir', isSymbolicLink: entry.kind === 'symlink', size: 0, ...(entry.mode === undefined ? {} : { mode: entry.mode }) }
     },
     stat (path) { return fs.lstat(path) },
-    mkdir (path, options) {
+    exists: path => entries.has(path),
+    mkdir (path) {
       if (entries.has(path)) throw error('EEXIST')
-      entries.set(path, { kind: 'directory', mode: options.mode, uid: 1000 })
+      if (path === '/racy') {
+        entries.set(path, { kind: 'dir' })
+        throw error('EEXIST')
+      }
+      entries.set(path, { kind: 'dir' })
     },
     chmod (path, mode) { entries.get(path).mode = mode },
   }
@@ -40,16 +45,17 @@ function fakeContext () {
     fds: {
       open (path, options) {
         opened.push({ path, options })
-        if ((options.flags & 0o200) && entries.has(path)) throw error('EEXIST')
-        if (!(options.flags & 0o100) && !entries.has(path)) throw error('ENOENT')
-        if (!entries.has(path)) entries.set(path, { kind: 'file', mode: options.mode ?? 0o644, uid: 1000 })
+        if (options.exclusive && entries.has(path)) throw error('EEXIST')
+        if (!options.create && !entries.has(path)) throw error('ENOENT')
+        if (!entries.has(path)) entries.set(path, { kind: 'file', mode: options.mode ?? 0o644 })
         const fd = nextFd++
         fds.set(fd, path)
         return fd
       },
       fstat (fd) {
         if (!fds.has(fd)) throw error('EBADF')
-        return fs.lstat(fds.get(fd))
+        const entry = entries.get(fds.get(fd))
+        return { kind: entry.kind, mode: entry.mode | (entry.kind === 'dir' ? 0o40000 : 0o100000), uid: entry.uid ?? 1000, gid: 1000, size: 0 }
       },
       fchmod (fd, mode) { entries.get(fds.get(fd)).mode = mode },
       tryLock (fd, exclusive) {
@@ -78,7 +84,8 @@ function fakeContext () {
         const value = results.get(id)
         results.delete(id)
         if (value instanceof Error) throw value
-        return value
+        if (typeof value === 'string' && value.startsWith('E')) return { error: value }
+        return { value }
       },
       cancel (id) { cancelled.push(id) },
       wait: () => 7,
@@ -119,7 +126,7 @@ test('pnpm_fs create_new opens exclusively with the mode and reports EEXIST', ()
   const [pointer, length] = put(ctx, 64, '/store/index.db')
   assert.equal(fs.create_new(pointer, length, 0o600, 4096), 0)
   assert.equal(u32(ctx, 4096), 10)
-  assert.deepEqual(ctx.opened[0], { path: '/store/index.db', options: { flags: 0o302, mode: 0o600, nofollow: true } })
+  assert.deepEqual(ctx.opened[0], { path: '/store/index.db', options: { read: true, write: true, create: true, exclusive: true, mode: 0o600, nofollow: true } })
   assert.equal(fs.create_new(pointer, length, 0o600, 4096), errno.EEXIST)
   assert.equal(fs.create_new(pointer, length, 0o10000, 4096), errno.EINVAL)
   const [relative, relativeLength] = put(ctx, 256, 'relative')
@@ -129,15 +136,16 @@ test('pnpm_fs create_new opens exclusively with the mode and reports EEXIST', ()
 test('pnpm_fs open_nofollow, open_lock, try_lock and modes', () => {
   const ctx = fakeContext()
   const { pnpm_fs: fs } = createImports(ctx)
-  ctx.entries.set('/lock', { kind: 'file', mode: 0o644, uid: 1000 })
+  ctx.entries.set('/lock', { kind: 'file', mode: 0o644 })
   const [pointer, length] = put(ctx, 64, '/lock')
   assert.equal(fs.open_nofollow(pointer, length, 4096), 0)
   assert.equal(fs.open_lock(pointer, length, 4100), 0)
-  assert.equal(ctx.opened[1].options.flags, 2)
+  assert.deepEqual(ctx.opened[1].options, { read: true, write: true, nofollow: true })
   assert.equal(fs.try_lock(11, 1), 0)
   assert.equal(fs.try_lock(13, 1), errno.EWOULDBLOCK)
   assert.equal(fs.try_lock(99, 0), errno.EBADF)
   assert.equal(fs.fchmod(10, 0o100600), 0)
+  assert.equal(ctx.entries.get('/lock').mode, 0o600)
   assert.equal(fs.fmode(10, 4104), 0)
   assert.equal(u32(ctx, 4104), 0o100600)
   assert.equal(fs.lmode(pointer, length, 4108), 0)
@@ -146,6 +154,13 @@ test('pnpm_fs open_nofollow, open_lock, try_lock and modes', () => {
   assert.equal(fs.check_owner(10), 0)
   ctx.entries.get('/lock').uid = 0
   assert.equal(fs.check_owner(10), errno.EACCES)
+  ctx.entries.set('/plain', { kind: 'file' })
+  ctx.entries.set('/dirmode', { kind: 'dir' })
+  ctx.entries.set('/sym', { kind: 'symlink' })
+  for (const [path, mode] of [['/plain', 0o100644], ['/dirmode', 0o40755], ['/sym', 0o120777]]) {
+    assert.equal(fs.lmode(...put(ctx, 512, path), 4112), 0)
+    assert.equal(u32(ctx, 4112), mode)
+  }
   assert.equal(fs.umask(), 0o022)
   assert.equal(fs.uid(), 1000)
   assert.equal(fs.grant_directory_mode_beneath(), errno.ENOTSUP)
@@ -170,30 +185,33 @@ test('pnpm_fs secure_directory creates a private directory once', () => {
   const { pnpm_fs: fs } = createImports(ctx)
   const [pointer, length] = put(ctx, 64, '/tmp/pnpm-locks-1000')
   assert.equal(fs.secure_directory(pointer, length), 0)
+  assert.equal(ctx.entries.get('/tmp').kind, 'dir')
   assert.equal(ctx.entries.get('/tmp/pnpm-locks-1000').mode, 0o700)
   ctx.entries.get('/tmp/pnpm-locks-1000').mode = 0o755
   assert.equal(fs.secure_directory(pointer, length), 0)
   assert.equal(ctx.entries.get('/tmp/pnpm-locks-1000').mode, 0o700)
-  ctx.entries.set('/tmp/file', { kind: 'file', mode: 0o644, uid: 1000 })
+  ctx.entries.set('/tmp/file', { kind: 'file', mode: 0o644 })
   const [file, fileLength] = put(ctx, 128, '/tmp/file')
   assert.equal(fs.secure_directory(file, fileLength), errno.ENOTDIR)
-  ctx.entries.set('/tmp/other', { kind: 'directory', mode: 0o700, uid: 0 })
-  const [other, otherLength] = put(ctx, 192, '/tmp/other')
-  assert.equal(fs.secure_directory(other, otherLength), errno.EACCES)
+  assert.equal(fs.secure_directory(...put(ctx, 192, '/racy')), 0)
+  const real = ctx.fs.mkdir
+  ctx.fs.mkdir = () => { throw Object.assign(new Error('EROFS'), { code: 'EROFS' }) }
+  assert.equal(fs.secure_directory(...put(ctx, 256, '/ro/dir')), errno.EIO)
+  ctx.fs.mkdir = real
 })
 
 test('pnpm_fs open_directory_nofollow_beneath walks below the template', () => {
   const ctx = fakeContext()
   const { pnpm_fs: fs } = createImports(ctx)
-  ctx.entries.set('/p', { kind: 'directory', mode: 0o755 })
-  ctx.entries.set('/p/a', { kind: 'directory', mode: 0o755 })
-  ctx.entries.set('/p/a/b', { kind: 'directory', mode: 0o755 })
+  ctx.entries.set('/p', { kind: 'dir', mode: 0o755 })
+  ctx.entries.set('/p/a', { kind: 'dir', mode: 0o755 })
+  ctx.entries.set('/p/a/b', { kind: 'dir', mode: 0o755 })
   ctx.entries.set('/p/link', { kind: 'symlink', mode: 0o777 })
   ctx.entries.set('/p/file', { kind: 'file', mode: 0o644 })
   const [template, templateLength] = put(ctx, 64, '/p/')
   const [inside, insideLength] = put(ctx, 128, '/p/a/b')
   assert.equal(fs.open_directory_nofollow_beneath(inside, insideLength, template, templateLength, 4096), 0)
-  assert.deepEqual(ctx.opened.at(-1), { path: '/p/a/b', options: { flags: 0o200000, nofollow: true, directory: true } })
+  assert.deepEqual(ctx.opened.at(-1), { path: '/p/a/b', options: { read: true, directory: true, nofollow: true } })
   const [link, linkLength] = put(ctx, 192, '/p/link/x')
   assert.equal(fs.open_directory_nofollow_beneath(link, linkLength, template, templateLength, 4096), errno.ELOOP)
   const [file, fileLength] = put(ctx, 256, '/p/file')
@@ -232,8 +250,11 @@ test('pnpm_host stream.read, resource.close and transport errors', () => {
   const [closePointer, closeLength] = put(ctx, 64, JSON.stringify({ operation: 'resource.close', handle: 3 }))
   const close = host.operation_start(closePointer, closeLength)
   assert.deepEqual(ctx.submitted[1].request, { op: 'net-close', handle: 3 })
-  ctx.results.set(close, Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' }))
-  assert.deepEqual(response(ctx, host, close), { ok: false, error: { message: 'connection refused', code: 'ECONNREFUSED' } })
+  ctx.results.set(close, 'ECONNREFUSED')
+  assert.deepEqual(response(ctx, host, close), { ok: false, error: { message: 'ECONNREFUSED', code: 'ECONNREFUSED' } })
+  const thrown = host.operation_start(pointer, length)
+  ctx.results.set(thrown, Object.assign(new Error('bridge down'), { code: 'EIO' }))
+  assert.deepEqual(response(ctx, host, thrown), { ok: false, error: { message: 'bridge down', code: 'EIO' } })
 })
 
 test('pnpm_host answers local and unsupported operations', () => {

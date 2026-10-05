@@ -9,8 +9,7 @@ export const errno = {
   ENOTEMPTY: 55, ENOTSUP: 58, EPERM: 63, EWOULDBLOCK: 6,
 }
 
-const O = { RDONLY: 0, RDWR: 2, CREAT: 0o100, EXCL: 0o200, DIRECTORY: 0o200000 }
-const TYPE_BITS = { file: 0o100000, directory: 0o040000, symlink: 0o120000 }
+const TYPE_BITS = { file: 0o100000, dir: 0o040000, symlink: 0o120000 }
 const UMASK = 0o022
 const DEFAULT_UID = 1000
 const MAX_RESPONSE = 1024 * 1024
@@ -43,6 +42,7 @@ function createAtomics (ctx) {
 
 export function errorNumber (error) {
   if (typeof error?.code === 'string' && error.code in errno) return errno[error.code]
+  if (typeof error?.code === 'string' && /^E[A-Z]+$/.test(error.code)) return errno.EIO
   if (Number.isInteger(error?.errno) && error.errno > 0) return error.errno
   if (error instanceof RangeError) return errno.EFAULT
   return errno.EIO
@@ -63,17 +63,16 @@ function fail (code, message = code) {
   return Object.assign(new Error(message), { code })
 }
 
+function kindOf (stat) {
+  if (stat.isSymbolicLink || stat.kind === 'symlink') return 'symlink'
+  if (stat.isDirectory || stat.kind === 'dir') return 'dir'
+  return 'file'
+}
+
 function withType (stat) {
-  const mode = stat.mode >>> 0
-  return mode >= 0o10000 ? mode : (mode | (TYPE_BITS[stat.kind] ?? 0)) >>> 0
-}
-
-function isDirectory (stat) {
-  return stat.kind === 'directory' || (withType(stat) & 0o170000) === TYPE_BITS.directory
-}
-
-function isSymlink (stat) {
-  return stat.kind === 'symlink' || (withType(stat) & 0o170000) === TYPE_BITS.symlink
+  const kind = kindOf(stat)
+  const mode = (stat.mode ?? (kind === 'dir' ? 0o755 : kind === 'symlink' ? 0o777 : 0o644)) >>> 0
+  return mode >= 0o10000 ? mode : (mode | TYPE_BITS[kind]) >>> 0
 }
 
 function createFilesystem (ctx) {
@@ -95,6 +94,18 @@ function createFilesystem (ctx) {
       return errorNumber(error)
     }
   }
+  function mkdirs (directory) {
+    let current = ''
+    for (const part of directory.split('/').filter(Boolean)) {
+      current = `${current}/${part}`
+      if (ctx.fs.exists(current)) continue
+      try {
+        ctx.fs.mkdir(current)
+      } catch (error) {
+        if (error?.code !== 'EEXIST') throw error
+      }
+    }
+  }
   function components (directory, template) {
     const prefix = template.endsWith('/') ? template : `${template}/`
     if (!directory.startsWith(prefix) || directory.length === prefix.length) {
@@ -107,13 +118,13 @@ function createFilesystem (ctx) {
   return {
     create_new (pointer, length, mode, output) {
       if (mode < 0 || mode > 0o7777) return errno.EINVAL
-      return open(pointer, length, output, { flags: O.RDWR | O.CREAT | O.EXCL, mode, nofollow: true })
+      return open(pointer, length, output, { read: true, write: true, create: true, exclusive: true, mode, nofollow: true })
     },
     open_nofollow (pointer, length, output) {
-      return open(pointer, length, output, { flags: O.RDONLY, nofollow: true })
+      return open(pointer, length, output, { read: true, nofollow: true })
     },
     open_lock (pointer, length, output) {
-      return open(pointer, length, output, { flags: O.RDWR, nofollow: true })
+      return open(pointer, length, output, { read: true, write: true, nofollow: true })
     },
     open_directory_nofollow_beneath (pointer, length, templatePointer, templateLength, output) {
       try {
@@ -121,11 +132,11 @@ function createFilesystem (ctx) {
         let current = guestPath(templatePointer, templateLength).replace(/\/+$/, '')
         for (const part of components(directory, current)) {
           current = `${current}/${part}`
-          const stat = ctx.fs.lstat(current)
-          if (isSymlink(stat)) return errno.ELOOP
-          if (!isDirectory(stat)) return errno.ENOTDIR
+          const kind = kindOf(ctx.fs.lstat(current))
+          if (kind === 'symlink') return errno.ELOOP
+          if (kind !== 'dir') return errno.ENOTDIR
         }
-        setU32(output, ctx.fds.open(directory, { flags: O.RDONLY | O.DIRECTORY, nofollow: true, directory: true }))
+        setU32(output, ctx.fds.open(directory, { read: true, directory: true, nofollow: true }))
         return 0
       } catch (error) {
         return errorNumber(error)
@@ -156,13 +167,9 @@ function createFilesystem (ctx) {
     uid: () => uid,
     secure_directory: checked((pointer, length) => {
       const directory = guestPath(pointer, length)
-      try {
-        ctx.fs.mkdir(directory, { recursive: true, mode: 0o700 })
-      } catch (error) {
-        if (error?.code !== 'EEXIST') throw error
-      }
+      mkdirs(directory)
       const stat = ctx.fs.lstat(directory)
-      if (!isDirectory(stat)) throw fail('ENOTDIR', `Lock directory is not a directory: ${directory}`)
+      if (kindOf(stat) !== 'dir') throw fail('ENOTDIR', `Lock directory is not a directory: ${directory}`)
       if ((stat.uid ?? uid) !== uid) throw fail('EACCES', 'Lock directory has a different owner')
       ctx.fs.chmod(directory, 0o700)
     }),
@@ -195,6 +202,12 @@ export function responseHeaders (head) {
   const decoded = encoding?.split(',').every(value => ['gzip', 'deflate', 'br'].includes(value.trim().toLowerCase()))
   if (!decoded) return pairs
   return pairs.filter(([name]) => !['content-encoding', 'content-length'].includes(name.toLowerCase()))
+}
+
+export function fromTaken (taken) {
+  if (taken === undefined) return undefined
+  if (typeof taken.error === 'string') return { ok: false, error: { message: taken.error, code: taken.error } }
+  return envelope(taken.value)
 }
 
 export function envelope (result) {
@@ -253,14 +266,14 @@ function createHost (ctx) {
   }
 
   function take (id) {
-    let result
+    let response
     try {
-      result = ctx.async.take(id)
+      response = fromTaken(ctx.async.take(id))
     } catch (error) {
-      result = error
+      response = envelope(error)
     }
-    if (result === undefined) return undefined
-    let bytes = encoder.encode(JSON.stringify(envelope(result)))
+    if (response === undefined) return undefined
+    let bytes = encoder.encode(JSON.stringify(response))
     if (bytes.length > MAX_RESPONSE) bytes = encoder.encode(JSON.stringify(errorEnvelope('WASM host response exceeds the transfer limit', 'EIO')))
     return bytes
   }

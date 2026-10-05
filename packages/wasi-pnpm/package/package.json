@@ -9,19 +9,49 @@
     "directory": "packages/wasi-pnpm/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-pnpm",
-  "keywords": ["wasm", "wasi", "slicc", "homescoop", "pnpm"],
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "pnpm"
+  ],
   "type": "module",
-  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "host"],
-  "publishConfig": { "access": "public" },
-  "homescoop": { "recipe": "wasi-pnpm", "upstream": "12.9.1" },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "host"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-pnpm",
+    "upstream": "12.9.1"
+  },
   "slicc": {
     "abi": "wasi",
     "commands": {
-      "pnpm": { "wasm": "bin/pnpm.wasm", "imports": "host/pnpm-host.mjs" },
-      "pn": { "wasm": "bin/pnpm.wasm", "imports": "host/pnpm-host.mjs", "argv0": "pnpm" }
+      "pnpm": {
+        "wasm": "bin/pnpm.wasm",
+        "imports": "host/pnpm-host.mjs"
+      },
+      "pn": {
+        "wasm": "bin/pnpm.wasm",
+        "imports": "host/pnpm-host.mjs",
+        "argv0": "pnpm"
+      }
     },
     "env": {
       "PNPM_WASM_PID": "1",
+      "PNPM_WASM_CWD": "${cwd}",
+      "PNPM_WASM_TMPDIR": "/tmp",
+      "PNPM_WASM_HOSTNAME": "slicc",
+      "PNPM_WASM_PLATFORM": "wasi",
+      "PNPM_WASM_ARCH": "wasm32",
+      "PNPM_WASM_ENDIANNESS": "LE",
       "PNPM_CONFIG_NODE_LINKER": "hoisted",
       "PNPM_CONFIG_PACKAGE_IMPORT_METHOD": "copy",
       "PNPM_CONFIG_IGNORE_SCRIPTS": "true"
