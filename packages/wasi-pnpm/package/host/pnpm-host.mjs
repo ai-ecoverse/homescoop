@@ -177,7 +177,7 @@ function createFilesystem (ctx) {
 }
 
 export const GIT_UNSUPPORTED = 'git dependencies need a CORS-free network transport (slicc-node, the SLICC extension or app); this page only has fetch'
-export const GIT_MISSING = 'git dependencies need git: install @ai-ecoverse/wasm-git into /node_modules'
+export const GIT_MISSING = 'git dependencies need git: install @ai-ecoverse/wasm-git so that git is on the kernel command path (its /node_modules)'
 const FD_HANDLE = 0x10000000
 const PROC_HANDLE = 0x20000000
 const SIGNALS = { SIGHUP: 1, SIGINT: 2, SIGQUIT: 3, SIGKILL: 9, SIGTERM: 15 }
