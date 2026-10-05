@@ -176,12 +176,16 @@ function createFilesystem (ctx) {
   }
 }
 
+export const GIT_UNSUPPORTED = 'git dependencies are not supported in slicc-kernel (no git transport); use a registry version'
+export const PUBLISH_UNSUPPORTED = 'publishing and other uploads are not supported by pnpm in slicc-kernel; publish with pnpm or npm outside SLICC'
+const SCRIPTS_UNSUPPORTED = 'Lifecycle scripts cannot run in slicc yet; install with --ignore-scripts'
+const WRITE_METHODS = new Set(['PUT', 'DELETE', 'PATCH'])
+const SYNTHETIC = 0x40000000
+const SYNTHETIC_DIR = '/tmp/.wasi-pnpm'
+
 const UNSUPPORTED = {
-  'upload.create': 'HTTP uploads are not supported in slicc (pnpm publish needs them)',
-  'upload.write': 'HTTP uploads are not supported in slicc',
-  'upload.end': 'HTTP uploads are not supported in slicc',
-  'process.spawn': 'Lifecycle scripts cannot run in slicc yet; install with --ignore-scripts',
-  'shell.spawn': 'Lifecycle scripts cannot run in slicc yet; install with --ignore-scripts',
+  'process.spawn': SCRIPTS_UNSUPPORTED,
+  'shell.spawn': SCRIPTS_UNSUPPORTED,
   'terminal.open': 'No interactive terminal in slicc',
   'terminal.prompt': 'No interactive terminal in slicc',
   'terminal.confirm': 'No interactive terminal in slicc',
@@ -226,10 +230,50 @@ function errorEnvelope (message, code = 'ENOTSUP') {
   return { ok: false, error: { message, code } }
 }
 
+export function spawnMessage (request) {
+  const program = String(request.program ?? '').split('/').pop()
+  return program === 'git' || program === 'ssh' ? GIT_UNSUPPORTED : SCRIPTS_UNSUPPORTED
+}
+
+export function isSynthetic (handle) {
+  return Number.isInteger(handle) && handle >= SYNTHETIC
+}
+
 function createHost (ctx) {
   const decoder = new TextDecoder('utf-8', { fatal: true })
   const encoder = new TextEncoder()
   const ready = new Map()
+
+  const encoderBody = new TextEncoder()
+
+  function syntheticPath (handle) {
+    return `${SYNTHETIC_DIR}/${handle}`
+  }
+
+  function refusePublish (url) {
+    const handle = SYNTHETIC + Math.floor(Math.random() * 0x3fffffff)
+    try {
+      ctx.fs.mkdir(SYNTHETIC_DIR)
+    } catch {}
+    ctx.fs.writeFile(syntheticPath(handle), encoderBody.encode(JSON.stringify({ error: PUBLISH_UNSUPPORTED })))
+    return ctx.async.resolve({ ok: true, value: { handle, status: 405, headers: [['content-type', 'application/json']], url } })
+  }
+
+  function syntheticRead (handle) {
+    const path = syntheticPath(handle)
+    let bytes = new Uint8Array()
+    try {
+      bytes = ctx.fs.readFile(path)
+      ctx.fs.unlink(path)
+    } catch {}
+    return { ok: true, value: { bytes: Array.from(bytes), done: bytes.length === 0 } }
+  }
+
+  function syntheticClose (handle) {
+    try {
+      ctx.fs.unlink(syntheticPath(handle))
+    } catch {}
+  }
 
   function networkRequest (request) {
     let url
@@ -241,7 +285,7 @@ function createHost (ctx) {
     if (url.protocol !== 'http:' && url.protocol !== 'https:') {
       return ctx.async.resolve(errorEnvelope(`Unsupported HTTP protocol: ${url.protocol}`, 'EINVAL'))
     }
-    if (request.bodyHandle != null) return ctx.async.resolve(errorEnvelope(UNSUPPORTED['upload.create']))
+    if (request.bodyHandle != null || WRITE_METHODS.has(String(request.method ?? 'GET').toUpperCase())) return refusePublish(url.href)
     return ctx.async.submit({
       op: 'net-request',
       url: url.href,
@@ -256,8 +300,22 @@ function createHost (ctx) {
   function start (request) {
     switch (request.operation) {
     case 'network.request': return networkRequest(request)
-    case 'stream.read': return ctx.async.submit({ op: 'net-read', handle: request.handle, max: Math.min(request.maxBytes ?? 65536, 65536) })
-    case 'resource.close': return ctx.async.submit({ op: 'net-close', handle: request.handle })
+    case 'stream.read':
+      if (isSynthetic(request.handle)) return ctx.async.resolve(syntheticRead(request.handle))
+      return ctx.async.submit({ op: 'net-read', handle: request.handle, max: Math.min(request.maxBytes ?? 65536, 65536) })
+    case 'resource.close':
+      if (isSynthetic(request.handle)) {
+        syntheticClose(request.handle)
+        return ctx.async.resolve({ ok: true, value: null })
+      }
+      return ctx.async.submit({ op: 'net-close', handle: request.handle })
+    case 'upload.create': return ctx.async.resolve({ ok: true, value: { handle: SYNTHETIC } })
+    case 'upload.write':
+    case 'upload.end':
+      return ctx.async.resolve({ ok: true, value: null })
+    case 'process.spawn':
+    case 'shell.spawn':
+      return ctx.async.resolve(errorEnvelope(spawnMessage(request)))
     case 'signal.next': return ctx.async.hold()
     case 'terminal.status': return ctx.async.resolve({ ok: true, value: { stdin: false, stdout: false, stderr: false } })
     default:
@@ -280,7 +338,8 @@ function createHost (ctx) {
 
   function closeUnread (bytes) {
     const response = JSON.parse(decoder.decode(bytes))
-    if (response.ok && Number.isInteger(response.value?.handle)) {
+    if (response.ok && isSynthetic(response.value?.handle)) syntheticClose(response.value.handle)
+    else if (response.ok && Number.isInteger(response.value?.handle)) {
       try {
         ctx.syscall({ op: 'net-close', handle: response.value.handle })
       } catch {}
@@ -319,6 +378,10 @@ function createHost (ctx) {
       ctx.async.cancel(id)
     },
     resource_close (handle) {
+      if (isSynthetic(handle)) {
+        syntheticClose(handle)
+        return 0
+      }
       try {
         ctx.syscall({ op: 'net-close', handle })
         return 0

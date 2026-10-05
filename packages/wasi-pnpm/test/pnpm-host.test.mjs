@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
+import { GIT_UNSUPPORTED, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
@@ -32,6 +32,15 @@ function fakeContext () {
       entries.set(path, { kind: 'dir' })
     },
     chmod (path, mode) { entries.get(path).mode = mode },
+    files: new Map(),
+    writeFile (path, bytes) { fs.files.set(path, bytes) },
+    readFile (path) {
+      if (!fs.files.has(path)) throw error('ENOENT')
+      return fs.files.get(path)
+    },
+    unlink (path) {
+      if (!fs.files.delete(path)) throw error('ENOENT')
+    },
   }
   return {
     entries,
@@ -268,7 +277,9 @@ test('pnpm_host answers local and unsupported operations', () => {
   assert.match(response(ctx, host, start({ operation: 'bogus' })).error.message, /Unknown WASM host operation/)
   assert.match(response(ctx, host, start({ operation: 'network.request', url: 'not a url' })).error.message, /Invalid HTTP request URL/)
   assert.match(response(ctx, host, start({ operation: 'network.request', url: 'file:///etc/passwd' })).error.message, /Unsupported HTTP protocol/)
-  assert.match(response(ctx, host, start({ operation: 'network.request', url: 'https://x.test/', bodyHandle: 1 })).error.message, /uploads/)
+  assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: '/usr/bin/git', args: ['ls-remote'] })).error.message, GIT_UNSUPPORTED)
+  assert.equal(response(ctx, host, start({ operation: 'shell.spawn', program: 'ssh' })).error.message, GIT_UNSUPPORTED)
+  assert.equal(response(ctx, host, start({ operation: 'process.spawn' })).error.code, 'ENOTSUP')
   const signal = start({ operation: 'signal.next' })
   assert.equal(host.response_len(signal), -1)
   assert.equal(host.operation_start(...put(ctx, 64, '{not json')), -2)
@@ -313,3 +324,36 @@ test('helpers: errno mapping, header pairs, envelopes and oversized responses', 
   assert.equal(host.response_read(id, 8192, length), length)
   assert.match(new TextDecoder().decode(new Uint8Array(ctx.memory().buffer, 8192, length).slice()), /transfer limit/)
 })
+
+test('pnpm_host refuses publishing with a readable 405 response', () => {
+  const ctx = fakeContext()
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const upload = response(ctx, host, start({ operation: 'upload.create' }))
+  assert.equal(upload.ok, true)
+  assert.deepEqual(response(ctx, host, start({ operation: 'upload.write', handle: upload.value.handle, bytes: [1] })), { ok: true, value: null })
+  assert.deepEqual(response(ctx, host, start({ operation: 'upload.end', handle: upload.value.handle })), { ok: true, value: null })
+  for (const request of [
+    { operation: 'network.request', url: 'https://registry.npmjs.org/x', method: 'put', body: [1] },
+    { operation: 'network.request', url: 'https://registry.npmjs.org/x', method: 'POST', bodyHandle: upload.value.handle },
+  ]) {
+    const head = response(ctx, host, start(request))
+    assert.equal(head.value.status, 405)
+    assert.ok(head.value.handle >= 0x40000000)
+    const body = response(ctx, host, start({ operation: 'stream.read', handle: head.value.handle, maxBytes: 65536 }))
+    assert.deepEqual(JSON.parse(new TextDecoder().decode(Uint8Array.from(body.value.bytes))), { error: PUBLISH_UNSUPPORTED })
+    assert.deepEqual(response(ctx, host, start({ operation: 'stream.read', handle: head.value.handle })), { ok: true, value: { bytes: [], done: true } })
+    assert.deepEqual(response(ctx, host, start({ operation: 'resource.close', handle: head.value.handle })), { ok: true, value: null })
+  }
+  assert.equal(ctx.submitted.length, 0)
+  const unread = start({ operation: 'network.request', url: 'https://registry.npmjs.org/y', method: 'DELETE' })
+  assert.ok(host.response_len(unread) > 0)
+  assert.equal(ctx.fs.files.size, 1)
+  host.operation_cancel(unread)
+  assert.equal(ctx.fs.files.size, 0)
+  const closed = response(ctx, host, start({ operation: 'network.request', url: 'https://registry.npmjs.org/z', method: 'PUT' }))
+  assert.equal(host.resource_close(closed.value.handle), 0)
+  assert.equal(ctx.fs.files.size, 0)
+  assert.deepEqual(ctx.syscalls, [])
+})
+

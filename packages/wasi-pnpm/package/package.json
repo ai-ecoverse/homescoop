@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-0",
+  "version": "12.9.1-1",
   "description": "pnpm 12 for slicc WASI (commands pnpm, pn)",
   "license": "MIT",
   "repository": {
