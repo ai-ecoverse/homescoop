@@ -1,0 +1,40 @@
+# wasi-pnpm is retired from the ladder (published only after certification),
+# so this workflow is what tests it: the host module's unit tests and the
+# end-to-end suite on slicc-kernel's headless Node entry, with a local mock
+# registry and a local git server. Nothing reaches the real registry.
+name: wasi-pnpm
+
+on:
+  push:
+    paths:
+      - packages/wasi-pnpm/**
+      - .github/workflows/wasi-pnpm.yml
+  pull_request:
+    paths:
+      - packages/wasi-pnpm/**
+      - .github/workflows/wasi-pnpm.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: stage pnpm.wasm from @pnpm/wasm (sha256 + npm integrity checked)
+        run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/wasi-pnpm/build.sh
+      - name: host module unit tests
+        working-directory: packages/wasi-pnpm
+        run: node --test 'test/*.test.mjs'
+      - name: install test dependencies
+        working-directory: packages/wasi-pnpm/test
+        run: npm ci --no-audit --no-fund
+      - name: end-to-end tests
+        working-directory: packages/wasi-pnpm/test
+        run: node --test 'e2e/*.test.mjs'
