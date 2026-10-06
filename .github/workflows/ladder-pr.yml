@@ -18,6 +18,7 @@ on:
       - 'scripts/recipe-env.mjs'
       - 'scripts/refresh-recipe-sha.mjs'
       - 'scripts/list-touched-packages.mjs'
+      - 'scripts/host-smoke.sh'
       - 'scripts/sync-package-version.mjs'
       - '.github/workflows/ladder-pr.yml'
 
@@ -112,6 +113,18 @@ jobs:
           set -euo pipefail
           bash scripts/host-run.sh "${{ matrix.package }}"
           ls -la .homescoop-out/package.tgz
+      - name: Link/run smoke.c against PREFIX
+        run: bash scripts/host-smoke.sh "${{ matrix.package }}"
+      - name: Record tarball sha256
+        run: sha256sum .homescoop-out/package.tgz | tee .homescoop-out/package.tgz.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+          path: |
+            .homescoop-out/package.tgz
+            .homescoop-out/package.tgz.sha256
+          if-no-files-found: error
+          retention-days: 14
 
   slicc-note:
     needs: detect

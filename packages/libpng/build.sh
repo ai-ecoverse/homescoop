@@ -15,7 +15,7 @@ if [[ ! -f "$SRC_DIR/.libs/libpng16.a" || -n "${FORCE:-}" ]]; then
   (
     cd "$SRC_DIR"
     emconfigure ./configure --disable-dependency-tracking --host=wasm32-unknown-emscripten --disable-shared --enable-static \
-      CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib"
+      CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" LIBS="-lm"
     homescoop_fix_darwin_ar Makefile
     emmake make libpng16.la
   )
