@@ -7,7 +7,7 @@ npm: "@ai-ecoverse/py-numpy"
 summary: "NumPy 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-{{version}}.tar.gz"
-  sha256: "ba0e7a1eaf217bb27dce8ab13450ca3e062cc917a3b84721d6874099d48922b9"
+  sha256: "df2d5874ff183595a4ba404edd04f6bd9b5505c1d7708573f6a6c17489a67563"
 dependencies:
   build:
     - wasix-python
