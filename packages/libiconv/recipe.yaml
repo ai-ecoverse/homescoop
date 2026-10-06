@@ -1,0 +1,20 @@
+# GNU libiconv for slicc wasm realm (libxml2 --with-iconv).
+name: libiconv
+builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/libiconv.git extractVersion=^v(?<version>.*)$
+version: "1.18"
+npm: "@ai-ecoverse/wasm-libiconv"
+summary: "GNU libiconv character-set conversion"
+source:
+  url: "https://mirrors.kernel.org/gnu/libiconv/libiconv-{{version}}.tar.gz"
+  sha256: "3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libiconv
+  license: LGPL-2.1-or-later
+  notes: |
+    Static libiconv.a + iconv.h for wasm. libxml2 2.15 links --with-iconv
+    against PREFIX. Do not publish uncertified.
