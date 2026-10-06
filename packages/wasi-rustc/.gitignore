@@ -1,0 +1,5 @@
+work/
+package/bin/
+package/lib/
+*.tgz
+.DS_Store

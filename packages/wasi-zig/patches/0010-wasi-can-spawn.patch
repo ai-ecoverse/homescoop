@@ -1,0 +1,14 @@
+--- a/lib/std/process.zig
++++ b/lib/std/process.zig
+@@ -257,8 +257,10 @@
+ };
+ 
+ /// Tells whether spawning child processes is supported.
++// homescoop: WASI spawn only when root.homescoop_wasix (zig.wasm / build_runner)
+ pub const can_spawn = switch (native_os) {
+-    .wasi, .ios, .tvos, .visionos, .watchos => false,
++    .wasi => (@hasDecl(@import("root"), "homescoop_wasix") and @import("root").homescoop_wasix),
++    .ios, .tvos, .visionos, .watchos => false,
+     else => true,
+ };
+ 

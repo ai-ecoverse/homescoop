@@ -1,0 +1,46 @@
+{
+  "name": "@ai-ecoverse/wasm-go-std-linux-amd64",
+  "version": "1.26.5-1",
+  "description": "Go 1.26 std export archives for linux/amd64 (slicc go cross-compile)",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasm-go-std-linux-amd64/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-go-std-linux-amd64",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "go",
+    "golang",
+    "stdlib",
+    "linux"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "goroot"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasm-go-std-linux-amd64",
+    "upstream": "1.26.5"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "go": {
+      "version": "go1.26.5",
+      "std": [
+        {
+          "target": "linux/amd64",
+          "dir": "goroot/pkg/linux_amd64"
+        }
+      ]
+    }
+  }
+}

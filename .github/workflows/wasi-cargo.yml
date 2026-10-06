@@ -1,0 +1,81 @@
+# Offline Cargo 0.84 baseline on the accepted Rust 1.83 toolchain.
+name: wasi-cargo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: checkout homescoop
+        uses: actions/checkout@v4
+        with:
+          path: homescoop
+
+      - name: checkout pinned Rust fork and Cargo
+        uses: actions/checkout@v4
+        with:
+          repository: oligamiq/rust
+          ref: 8e18c3f70def09aa0f842eb0e5168fb4ba00b4f4
+          path: rust
+          submodules: false
+      - name: checkout pinned Cargo submodule
+        working-directory: rust
+        run: |
+          git submodule update --init --depth=1 src/tools/cargo
+          test "$(git -C src/tools/cargo rev-parse HEAD)" = 90de6d200f35717cda13319a4d629c9da5a8ab5a
+
+      - name: install Rust 1.83 with WASI threads std
+        run: rustup toolchain install 1.83.0 --profile minimal --target wasm32-wasip1-threads
+
+      - name: install wasi-sdk 24
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz
+          tar -xzf wasi-sdk.tar.gz
+          rm wasi-sdk.tar.gz
+          mv wasi-sdk-24.0-* wasi-sdk
+          echo "WASI_SDK_PATH=${{ github.workspace }}/wasi-sdk" >> "$GITHUB_ENV"
+
+      - name: prepare offline Cargo process bridge
+        run: |
+          set -euo pipefail
+          python3 homescoop/packages/wasi-rustc/prepare-cargo.py rust/src/tools/cargo
+          git -C rust/src/tools/cargo diff --check
+
+      - name: build Cargo for SLICC
+        env:
+          RUSTUP_TOOLCHAIN: 1.83.0
+          CC_wasm32_wasip1_threads: ${{ github.workspace }}/wasi-sdk/bin/wasm32-wasip1-threads-clang
+          AR_wasm32_wasip1_threads: ${{ github.workspace }}/wasi-sdk/bin/ar
+          CARGO_TARGET_WASM32_WASIP1_THREADS_LINKER: ${{ github.workspace }}/wasi-sdk/bin/wasm32-wasip1-threads-clang
+        run: |
+          set -euo pipefail
+          builtins=$(find "$WASI_SDK_PATH/lib/clang" -name libclang_rt.builtins-wasm32.a -print -quit)
+          test -f "$builtins"
+          export RUSTFLAGS="-C link-arg=$builtins -C link-arg=-Wl,--max-memory=4294967296"
+          cargo build --manifest-path rust/src/tools/cargo/Cargo.toml --bin cargo --target wasm32-wasip1-threads --release
+          cargo_wasm=rust/src/tools/cargo/target/wasm32-wasip1-threads/release/cargo.wasm
+          node homescoop/packages/wasi-rustc/cargo/check-cargo-wasm.mjs "$cargo_wasm"
+          ls -lh "$cargo_wasm"
+
+      - name: stage Cargo artifact
+        run: |
+          set -euo pipefail
+          mkdir -p stage/bin
+          cp rust/src/tools/cargo/target/wasm32-wasip1-threads/release/cargo.wasm stage/bin/cargo.wasm
+          tar -C stage -czf wasi-cargo-offline.tgz .
+          ls -lh wasi-cargo-offline.tgz
+
+      - name: upload Cargo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasi-cargo-offline
+          path: wasi-cargo-offline.tgz
+          if-no-files-found: error
+          retention-days: 14

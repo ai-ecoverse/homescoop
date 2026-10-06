@@ -1,0 +1,17 @@
+--- a/src/Compilation/Config.zig
++++ b/src/Compilation/Config.zig
+@@ -370,6 +370,14 @@
+         // At this point we would prefer to use our own self-hosted backend,
+         // because the compilation speed is better than LLVM. But only do it if
+         // we are confident in the robustness of the backend.
++        // homescoop: the wasm32-wasi compiler (SLICC) builds Debug wasm32 code that
++        // links no libc and has no C sources with the self-hosted wasm backend,
++        // as the no-LLVM package does: ~2.7x faster to compile. That backend
++        // lacks inline assembly, which libc programs reach, so those keep LLVM.
++        if (comptime @import("builtin").os.tag == .wasi) {
++            if (target.cpu.arch == .wasm32 and !link_libc and !options.any_c_source_files)
++                break :b false;
++        }
+         break :b !target_util.selfHostedBackendIsAsRobustAsLlvm(target);
+     };
+     const backend = target_util.zigBackend(target, use_llvm);

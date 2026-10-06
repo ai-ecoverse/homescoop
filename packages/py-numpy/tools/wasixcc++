@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# wasixcc++ wrapper for numpy side modules (see wasixcc for OpenBLAS note).
+export WASIXCC_WASM_EXCEPTIONS=exnref
+export WASIXCC_PIC=yes
+export WASIXCC_MODULE_KIND="${WASIXCC_MODULE_KIND:-shared-library}"
+export WASIXCC_RUN_WASM_OPT=no
+args=(-fvisibility=default)
+inject_fatal=0
+for a in "$@"; do
+  case "$a" in
+    *.cpython-*-wasm32-wasix.so|*cpython-*-wasm32-wasix.so) inject_fatal=1 ;;
+  esac
+done
+for a in "$@"; do
+  case "$a" in
+    -fno-exceptions|-fno-rtti|-fvisibility=hidden|--start-group|--end-group|-Wl,--start-group|-Wl,--end-group)
+      continue
+      ;;
+    -lopenblas)
+      args+=(-Wl,--whole-archive -lopenblas -Wl,--no-whole-archive)
+      continue
+      ;;
+    *libopenblas.a|*libopenblas_*.a)
+      args+=(-Wl,--whole-archive "$a" -Wl,--no-whole-archive)
+      continue
+      ;;
+  esac
+  if [[ "$a" == -Wl,* ]]; then
+    IFS=',' read -ra parts <<< "${a#-Wl,}"
+    kept=()
+    for p in "${parts[@]}"; do
+      case "$p" in --start-group|--end-group) continue ;; esac
+      kept+=("$p")
+    done
+    if ((${#kept[@]})); then
+      out="-Wl"
+      for p in "${kept[@]}"; do out+=",$p"; done
+      args+=("$out")
+    fi
+    continue
+  fi
+  args+=("$a")
+done
+if ((inject_fatal)); then
+  args+=(-Wl,--fatal-warnings)
+fi
+exec /tmp/wasix-python-build/wasixcc-prefix/bin/wasixcc++ "${args[@]}"

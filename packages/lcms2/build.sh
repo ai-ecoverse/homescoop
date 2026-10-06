@@ -5,8 +5,6 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe lcms2
-SRC_DIR="$WORK/lcms2-2.17"
-TARBALL="$WORK/lcms2-2.17.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi

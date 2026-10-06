@@ -1,0 +1,21 @@
+# Homebrew-shaped recipe — prebuilt Emscripten sysroot for slicc.
+name: emscripten-cache
+builder: host
+version: "6.0.9"
+npm: "@ai-ecoverse/emscripten-cache"
+summary: "Prebuilt Emscripten 6.0.9 sysroot for slicc (read-only seed)"
+source:
+  # Host-built by slicc-emscripten embuilder; build.sh stages cache/sysroot.
+  url: "https://github.com/emscripten-core/emscripten"
+  sha256: "skip"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/emscripten-cache
+  license: MIT
+  notes: |
+    Ships only sysroot/ (~99MB). Runtime CACHE is a writable user dir
+    (~/.cache/emscripten) whose sysroot is a symlink into this package —
+    no 100MB copy; js_output/symbol_lists warm in the user dir.

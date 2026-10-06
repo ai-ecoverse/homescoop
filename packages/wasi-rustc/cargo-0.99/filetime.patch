@@ -1,0 +1,37 @@
+diff -ruN a/src/wasm.rs b/src/wasm.rs
+--- a/src/wasm.rs	2026-10-02 23:53:20.328858924 +0200
++++ b/src/wasm.rs	2026-10-02 23:53:20.356536879 +0200
+@@ -7,14 +7,33 @@
+     Err(io::Error::new(io::ErrorKind::Other, "Wasm not implemented"))
+ }
+ 
++// WASI has file times: std reads them from `fd_filestat_get`.
++#[cfg(target_os = "wasi")]
++pub fn from_last_modification_time(meta: &fs::Metadata) -> FileTime {
++    meta.modified().map(FileTime::from_system_time).unwrap_or_else(|_| FileTime::zero())
++}
++
++#[cfg(target_os = "wasi")]
++pub fn from_last_access_time(meta: &fs::Metadata) -> FileTime {
++    meta.accessed().map(FileTime::from_system_time).unwrap_or_else(|_| FileTime::zero())
++}
++
++#[cfg(target_os = "wasi")]
++pub fn from_creation_time(meta: &fs::Metadata) -> Option<FileTime> {
++    meta.created().ok().map(FileTime::from_system_time)
++}
++
++#[cfg(not(target_os = "wasi"))]
+ pub fn from_last_modification_time(_meta: &fs::Metadata) -> FileTime {
+     unimplemented!()
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub fn from_last_access_time(_meta: &fs::Metadata) -> FileTime {
+     unimplemented!()
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub fn from_creation_time(_meta: &fs::Metadata) -> Option<FileTime> {
+     unimplemented!()
+ }

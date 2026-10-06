@@ -1,0 +1,63 @@
+{
+  "name": "@ai-ecoverse/wasix-python",
+  "version": "3.14.2-9",
+  "description": "CPython 3.14 for slicc WASIX (fcntl F_SETFD CLOEXEC fix via wasix-sysroot 2025.9.30-14)",
+  "license": "PSF-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-python/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-python",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "cpython"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "lib",
+    "include",
+    "SOABI.assert"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-python",
+    "upstream": "3.14.2"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "python3": {
+        "wasm": "bin/python.wasm",
+        "env": {
+          "PYTHONHOME": "./",
+          "PYTHONDONTWRITEBYTECODE": "1"
+        }
+      },
+      "python": {
+        "wasm": "bin/python.wasm",
+        "env": {
+          "PYTHONHOME": "./",
+          "PYTHONDONTWRITEBYTECODE": "1"
+        }
+      }
+    },
+    "python": {
+      "version": "3.14",
+      "abi": "cp314",
+      "platform": "wasix_wasm32",
+      "soabi": "cpython-314-wasm32-wasix",
+      "stdlib": "lib/python3.14",
+      "sitePackages": "lib/python3.14/site-packages"
+    }
+  }
+}

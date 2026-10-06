@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+export WASIXCC_WASM_EXCEPTIONS=exnref
+export WASIXCC_PIC=yes
+export WASIXCC_MODULE_KIND="${WASIXCC_MODULE_KIND:-shared-library}"
+export WASIXCC_RUN_WASM_OPT=no
+args=(-fvisibility=default)
+for a in "$@"; do
+  case "$a" in
+    -fno-exceptions|-fno-rtti|-fvisibility=hidden|--start-group|--end-group|-Wl,--start-group|-Wl,--end-group) continue ;;
+  esac
+  if [[ "$a" == -Wl,* ]]; then
+    IFS=',' read -ra parts <<< "${a#-Wl,}"
+    kept=()
+    for p in "${parts[@]}"; do
+      case "$p" in --start-group|--end-group) continue ;; esac
+      kept+=("$p")
+    done
+    if ((${#kept[@]})); then
+      out="-Wl"
+      for p in "${kept[@]}"; do out+=",$p"; done
+      args+=("$out")
+    fi
+    continue
+  fi
+  args+=("$a")
+done
+exec /tmp/wasix-python-build/wasixcc-prefix/bin/wasixcc++ "${args[@]}"

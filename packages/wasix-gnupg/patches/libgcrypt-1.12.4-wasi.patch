@@ -1,0 +1,22 @@
+--- a/random/random-csprng.c
++++ b/random/random-csprng.c
+@@ -69,7 +69,7 @@
+ #endif
+ 
+ /* Check whether we can lock the seed file read write. */
+-#if defined(HAVE_FCNTL) && defined(HAVE_FTRUNCATE) && !defined(HAVE_W32_SYSTEM)
++#if defined(HAVE_FCNTL) && defined(HAVE_FTRUNCATE) && !defined(HAVE_W32_SYSTEM) && !defined(__wasi__)
+ #define LOCK_SEED_FILE 1
+ #else
+ #define LOCK_SEED_FILE 0
+--- a/src/secmem.c
++++ b/src/secmem.c
+@@ -358,7 +358,7 @@
+       not_locked = 1;
+     }
+ 
+-#elif defined ( __QNX__ )
++#elif defined ( __QNX__ ) || defined (__wasi__)
+   /* QNX does not page at all, so the whole secure memory stuff does
+    * not make much sense.  However it is still of use because it
+    * wipes out the memory on a free().

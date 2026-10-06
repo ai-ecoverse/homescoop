@@ -1,0 +1,22 @@
+[host_machine]
+system = 'wasi'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+
+[binaries]
+c = '/tmp/wasix-numpy-build/bin/wasixcc'
+cpp = '/tmp/wasix-numpy-build/bin/wasixcc++'
+ar = 'wasixar'
+pkg-config = 'pkg-config'
+
+[properties]
+needs_exe_wrapper = true
+skip_sanity_check = true
+longdouble_format = 'IEEE_QUAD_LE'
+pkg_config_libdir = '/tmp/wasix-numpy-build/python-prefix/lib/pkgconfig'
+numpy-include-dir = '/Users/trieloff/Developer/ai-ecoverse/homescoop/packages/py-numpy/package/lib/python3.14/site-packages/numpy/_core/include'
+c_args = ['-I/tmp/wasix-numpy-build/python-prefix/include/python3.14', '-I/Users/trieloff/Developer/ai-ecoverse/homescoop/packages/wasix-python/package/include/python3.14', '-I/Users/trieloff/Developer/ai-ecoverse/homescoop/packages/py-numpy/package/lib/python3.14/site-packages/numpy/_core/include', '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION']
+cpp_args = ['-I/tmp/wasix-numpy-build/python-prefix/include/python3.14', '-I/Users/trieloff/Developer/ai-ecoverse/homescoop/packages/wasix-python/package/include/python3.14', '-I/Users/trieloff/Developer/ai-ecoverse/homescoop/packages/py-numpy/package/lib/python3.14/site-packages/numpy/_core/include', '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION']
+c_link_args = ['-shared', '-nostdlib', '-Wl,--allow-undefined']
+cpp_link_args = ['-shared', '-nostdlib', '-Wl,--allow-undefined']

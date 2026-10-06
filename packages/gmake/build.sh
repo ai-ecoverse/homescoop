@@ -16,7 +16,7 @@ homescoop_apply_patches "$SRC_DIR"
 SLICC_A="$WORK/libslicc-make.a"
 homescoop_slicc_archive "$SLICC_A" make
 
-export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
+export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -lnodefs.js"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags)"
 # Archive + force signal exports (realm calls them from JS).
 MAKE_LIBS="$SLICC_A $(homescoop_slicc_keep_exports)"

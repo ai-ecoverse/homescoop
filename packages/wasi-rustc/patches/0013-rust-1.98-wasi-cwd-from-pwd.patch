@@ -1,0 +1,37 @@
+diff --git a/library/std/src/sys/paths/wasi.rs b/library/std/src/sys/paths/wasi.rs
+index 71d562cb..86c0b160 100644
+--- a/library/std/src/sys/paths/wasi.rs
++++ b/library/std/src/sys/paths/wasi.rs
+@@ -10,6 +10,15 @@
+ use crate::sys::helpers::run_path_with_cstr;
+ 
+ pub fn getcwd() -> io::Result<PathBuf> {
++    // wasi-libc starts every process at `/` and resolves relative paths
++    // through the `.` preopen. A WASIX host (SLICC) names the real working
++    // directory in `PWD`, and `chdir` below keeps it current.
++    if let Some(pwd) = crate::env::var_os("PWD") {
++        let pwd = PathBuf::from(pwd);
++        if pwd.is_absolute() && pwd.is_dir() {
++            return Ok(pwd);
++        }
++    }
+     let mut buf = Vec::with_capacity(512);
+     loop {
+         unsafe {
+@@ -36,9 +45,15 @@ pub fn getcwd() -> io::Result<PathBuf> {
+ }
+ 
+ pub fn chdir(p: &path::Path) -> io::Result<()> {
++    let target = if p.is_absolute() { p.to_path_buf() } else { getcwd()?.join(p) };
+     let result = run_path_with_cstr(p, &|p| unsafe { Ok(libc::chdir(p.as_ptr())) })?;
+     match result == (0 as libc::c_int) {
+-        true => Ok(()),
++        true => {
++            // SAFETY: as for any `set_var`: other threads must not be
++            // reading the environment at the same time.
++            unsafe { crate::env::set_var("PWD", target) };
++            Ok(())
++        }
+         false => Err(io::Error::last_os_error()),
+     }
+ }

@@ -1,0 +1,51 @@
+# Guard ctypes for wasix-python (no _ctypes). Windows-only uses stay behind the guard.
+diff --git a/tools/colored_logger.py b/tools/colored_logger.py
+--- a/tools/colored_logger.py
++++ b/tools/colored_logger.py
+@@ -8,7 +8,10 @@
+ Also, provides utility functions to use ANSI colors in the terminal.
+ """
+ 
+-import ctypes
++try:
++  import ctypes
++except ImportError:  # wasix-python has no _ctypes
++  ctypes = None
+ import logging
+ import sys
+ from functools import wraps
+@@ -59,6 +62,8 @@ def ansi_color_available():
+   if not sys.platform.startswith('win'):
+     return sys.stderr.isatty()
+ 
++  if ctypes is None:
++    return False
+   # Constants from the Windows API
+   STD_OUTPUT_HANDLE = -11
+   ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+diff --git a/tools/file_packager.py b/tools/file_packager.py
+--- a/tools/file_packager.py
++++ b/tools/file_packager.py
+@@ -67,7 +67,10 @@
+ 
+ """
+ 
+-import ctypes
++try:
++  import ctypes
++except ImportError:  # wasix-python has no _ctypes; only used on win32 below
++  ctypes = None
+ import fnmatch
+ import hashlib
+ import json
+@@ -141,6 +144,8 @@ def err(*args):
+ def has_hidden_attribute(filepath):
+   """Win32 code to test whether the given file has the hidden property set."""
+   if sys.platform != 'win32':
+     return False
+ 
++  if ctypes is None:
++    return False
+   try:
+     attrs = ctypes.windll.kernel32.GetFileAttributesW(filepath)
+     assert attrs != -1

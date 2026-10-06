@@ -1,0 +1,290 @@
+--- a/common/exechelp-posix.c
++++ b/common/exechelp-posix.c
+@@ -432,6 +432,104 @@
+ }
+ 
+ 
++
++#ifdef __wasi__
++/* WASIX: there is no cheap fork (it needs an Asyncify'd program), so
++   every spawn is a posix_spawn, which wasix-libc maps onto proc_spawn3.
++   FDS are the child's stdin/stdout/stderr (-1: /dev/null, unless FLAGS
++   keep it); every other descriptor not in EXCEPT is closed in the child,
++   as do_exec does after a fork.  ENVP, if given, adds to the environment.  */
++#include <spawn.h>
++extern char **environ;
++
++static gpg_error_t
++wasi_spawn (const char *pgmname, const char *argv[], const int fds[3],
++            int *except, unsigned int flags, const char *envp[], pid_t *r_pid)
++{
++  posix_spawn_file_actions_t fa;
++  char **arg_list, **env_list = NULL;
++  const char *base;
++  int i, j, n, rc, fd, max_fd;
++  int keep[3];
++
++  keep[0] = !!(flags & GNUPG_SPAWN_KEEP_STDIN);
++  keep[1] = !!(flags & GNUPG_SPAWN_KEEP_STDOUT);
++  keep[2] = !!(flags & GNUPG_SPAWN_KEEP_STDERR);
++
++  for (n=0; argv && argv[n]; n++)
++    ;
++  arg_list = xcalloc (n+2, sizeof *arg_list);
++  base = strrchr (pgmname, '/');
++  arg_list[0] = (char *)(base? base+1 : pgmname);
++  for (i=0; i < n; i++)
++    arg_list[i+1] = (char *)argv[i];
++
++  if (envp && envp[0])
++    {
++      int nenv, nadd;
++
++      for (nenv=0; environ && environ[nenv]; nenv++)
++        ;
++      for (nadd=0; envp[nadd]; nadd++)
++        ;
++      env_list = xcalloc (nenv+nadd+1, sizeof *env_list);
++      for (i=j=0; i < nenv; i++)
++        {
++          const char *eq = strchr (environ[i], '=');
++          size_t klen = eq? (size_t)(eq - environ[i]) : strlen (environ[i]);
++          int k, overridden = 0;
++
++          for (k=0; k < nadd && !overridden; k++)
++            if (!strncmp (envp[k], environ[i], klen) && envp[k][klen] == '=')
++              overridden = 1;
++          if (!overridden)
++            env_list[j++] = environ[i];
++        }
++      for (i=0; i < nadd; i++)
++        env_list[j++] = (char *)envp[i];
++      env_list[j] = NULL;
++    }
++
++  posix_spawn_file_actions_init (&fa);
++  for (i=0; i <= 2; i++)
++    {
++      if (keep[i])
++        continue;
++      if (fds[i] == -1)
++        posix_spawn_file_actions_addopen (&fa, i, "/dev/null",
++                                          i? O_WRONLY : O_RDONLY, 0);
++      else if (fds[i] != i)
++        posix_spawn_file_actions_adddup2 (&fa, fds[i], i);
++    }
++  /* Close what the child must not inherit (do_exec's close_all_fds).  */
++  max_fd = get_max_fds ();
++  for (fd=3; fd < max_fd; fd++)
++    {
++      int skip = 0;
++
++      if (except)
++        for (i=0; except[i] != -1; i++)
++          if (except[i] == fd)
++            skip = 1;
++      if (!skip && fcntl (fd, F_GETFD) != -1)
++        posix_spawn_file_actions_addclose (&fa, fd);
++    }
++
++  rc = posix_spawn (r_pid, pgmname, &fa, NULL, arg_list,
++                    env_list? env_list : environ);
++  posix_spawn_file_actions_destroy (&fa);
++  xfree (arg_list);
++  xfree (env_list);
++  if (rc)
++    {
++      *r_pid = (pid_t)(-1);
++      gpg_err_set_errno (rc);
++      return my_error_from_syserror ();
++    }
++  return 0;
++}
++#endif /*__wasi__*/
++
+ /* Fork and exec the PGMNAME, see exechelp.h for details.  */
+ gpg_error_t
+ gnupg_spawn_process (const char *pgmname, const char *argv[],
+@@ -505,11 +603,25 @@
+     }
+ 
+ 
++#ifdef __wasi__
++  {
++    int fds[3];
++
++    fds[0] = inpipe[0];
++    fds[1] = outpipe[1];
++    fds[2] = errpipe[1];
++    err = wasi_spawn (pgmname, argv, fds, except, flags, NULL, pid);
++  }
++  if (err)
++    {
++      log_error (_("error forking process: %s\n"), gpg_strerror (err));
++#else
+   *pid = fork ();
+   if (*pid == (pid_t)(-1))
+     {
+       err = my_error_from_syserror ();
+       log_error (_("error forking process: %s\n"), gpg_strerror (err));
++#endif
+ 
+       if (infp)
+         es_fclose (infp);
+@@ -534,6 +646,7 @@
+       return err;
+     }
+ 
++#ifndef __wasi__
+   if (!*pid)
+     {
+       /* This is the child. */
+@@ -545,6 +658,7 @@
+                except, flags);
+       /*NOTREACHED*/
+     }
++#endif
+ 
+   /* This is the parent. */
+   if (inpipe[0] != -1)
+@@ -580,6 +694,19 @@
+ {
+   gpg_error_t err;
+ 
++#ifdef __wasi__
++  {
++    int fds[3];
++
++    fds[0] = infd;
++    fds[1] = outfd;
++    fds[2] = errfd;
++    err = wasi_spawn (pgmname, argv, fds, NULL, 0, NULL, pid);
++    if (err)
++      log_error (_("error forking process: %s\n"), gpg_strerror (err));
++    return err;
++  }
++#endif
+   *pid = fork ();
+   if (*pid == (pid_t)(-1))
+     {
+@@ -864,6 +991,29 @@
+   if (getuid() != geteuid())
+     return my_error (GPG_ERR_BUG);
+ 
++#ifdef __wasi__
++  /* No session of its own (WASIX has no setsid) and nothing to reap:
++     the child outlives us as the double fork's grandchild would.  It is
++     told so through the environment, so a daemon need not fork again.  */
++  {
++    static const int fds[3] = { -1, -1, -1 };
++    const char **env;
++    gpg_error_t err;
++
++    (void)ec;
++    for (i=0; envp && envp[i]; i++)
++      ;
++    env = xcalloc (i+2, sizeof *env);
++    for (i=0; envp && envp[i]; i++)
++      env[i] = envp[i];
++    env[i] = "GNUPG_WASI_DETACHED=1";
++    err = wasi_spawn (pgmname, argv, fds, NULL, 0, env, &pid);
++    xfree (env);
++    if (err)
++      log_error (_("error forking process: %s\n"), gpg_strerror (err));
++    return err;
++  }
++#endif
+   if ((ec = gnupg_access (pgmname, X_OK)))
+     return gpg_err_make (default_errsource, ec);
+ 
+--- a/agent/gpg-agent.c
++++ b/agent/gpg-agent.c
+@@ -1615,6 +1615,27 @@
+          a client requested this using an OPTION command.  */
+       gnupg_unsetenv ("INSIDE_EMACS");
+ 
++#ifdef __wasi__
++      /* WASIX: no fork without Asyncify.  Detach by running ourselves
++       * again as a detached process (what gpg's autostart does anyway)
++       * and leave; that process, told so through the environment, is
++       * the daemon the fork's child would have been.  */
++      if (!argc && !getenv ("GNUPG_WASI_DETACHED"))
++        {
++          err = gnupg_spawn_process_detached
++            (gnupg_module_name (GNUPG_MODULE_NAME_AGENT),
++             (const char **)orig_argv + 1, NULL);
++          if (err)
++            {
++              log_error ("error running '%s': %s\n",
++                         gnupg_module_name (GNUPG_MODULE_NAME_AGENT),
++                         gpg_strerror (err));
++              exit (1);
++            }
++          exit (0);
++        }
++#endif
++
+       /* Create the sockets.  */
+       socket_name = create_socket_name (GPG_AGENT_SOCK_NAME, 1);
+       fd = create_server_socket (socket_name, 1, 0,
+@@ -1667,6 +1688,15 @@
+ 
+ #else /*!HAVE_W32_SYSTEM*/
+ 
++#ifdef __wasi__
++      /* Already detached (above): we are the child.  */
++      if (!argc && getenv ("GNUPG_WASI_DETACHED"))
++        {
++          gnupg_unsetenv ("GNUPG_WASI_DETACHED");
++          pid = 0;
++        }
++      else
++#endif
+       pid = fork ();
+       if (pid == (pid_t)-1)
+         {
+@@ -1802,7 +1832,12 @@
+                     }
+                 }
+             }
++#ifdef __wasi__
++          /* WASIX has no sessions: setsid always fails.  */
++          if (0)
++#else
+           if (setsid() == -1)
++#endif
+             {
+               log_error ("setsid() failed: %s\n", strerror(errno) );
+               cleanup ();
+--- a/tools/gpgconf-comp.c
++++ b/tools/gpgconf-comp.c
+@@ -3038,9 +3038,15 @@
+           int ngids;
+           gid_t *gids;
+ 
++#ifdef __wasi__
++          /* WASIX has no supplementary groups.  */
++          ngids = 0;
++          gids  = xcalloc (1, sizeof *gids);
++#else
+           ngids = getgroups (0, NULL);
+           gids  = xcalloc (ngids+1, sizeof *gids);
+           ngids = getgroups (ngids, gids);
++#endif
+           if (ngids < 0)
+             gc_error (1, errno, "getgroups failed for current user");
+           my_supgroups = xcalloc (ngids+1, sizeof *my_supgroups);
+--- a/g10/gpg.c
++++ b/g10/gpg.c
+@@ -2456,6 +2456,11 @@
+     gnupg_initialize_compliance (GNUPG_MODULE_NAME_GPG);
+ 
+     opt.autostart = 1;
++#ifdef __wasi__
++    /* No pinentry program: ask on the terminal (gpg-agent allows
++     * loopback by default).  --pinentry-mode overrides it.  */
++    opt.pinentry_mode = PINENTRY_MODE_LOOPBACK;
++#endif
+     opt.session_env = session_env_new ();
+     if (!opt.session_env)
+       log_fatal ("error allocating session environment block: %s\n",

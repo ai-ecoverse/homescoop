@@ -1,0 +1,15 @@
+diff -ruN a/src/wasm.rs b/src/wasm.rs
+--- a/src/wasm.rs	2026-10-03 02:37:21.513638826 +0200
++++ b/src/wasm.rs	2026-10-03 02:37:21.529402946 +0200
+@@ -101,6 +101,11 @@
+     pub fn join(self) {
+         // TODO: this is not correct if the thread is blocked in
+         // `client.acquire()`.
++        // On WASI it is: nothing can wake the helper there, so joining would
++        // hang the process at exit. Leave the thread to process exit.
++        if cfg!(target_os = "wasi") {
++            return;
++        }
+         drop(self.thread.join());
+     }
+ }

@@ -5,8 +5,6 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe libpng
-SRC_DIR="$WORK/libpng-1.6.50"
-TARBALL="$WORK/libpng-1.6.50.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi

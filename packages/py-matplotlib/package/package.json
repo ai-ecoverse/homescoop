@@ -1,0 +1,55 @@
+{
+  "name": "@ai-ecoverse/py-matplotlib",
+  "version": "3.11.2-2",
+  "description": "matplotlib Agg for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)",
+  "license": "PSF-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-matplotlib/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-matplotlib",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "matplotlib"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-5",
+    "@ai-ecoverse/py-numpy": "^2.3.2-2",
+    "@ai-ecoverse/py-contourpy": "^1.4.0-1",
+    "@ai-ecoverse/py-cycler": "^0.12.1-1",
+    "@ai-ecoverse/py-fonttools": "^4.66.1-1",
+    "@ai-ecoverse/py-kiwisolver": "^1.5.1-1",
+    "@ai-ecoverse/py-packaging": "^26.3.0-1",
+    "@ai-ecoverse/py-pillow": "^12.3.0-2",
+    "@ai-ecoverse/py-pyparsing": "^3.3.3-1",
+    "@ai-ecoverse/py-python-dateutil": "^2.9.0-post0.2"
+  },
+  "homescoop": {
+    "recipe": "py-matplotlib",
+    "upstream": "3.11.2",
+    "platform": "wasix_wasm32"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages",
+      "requires": {
+        "abi": "cp314",
+        "platform": "wasix_wasm32"
+      }
+    }
+  }
+}

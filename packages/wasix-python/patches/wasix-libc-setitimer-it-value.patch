@@ -1,0 +1,96 @@
+diff --git a/libc-bottom-half/headers/public/wasi/api_wasix.h b/libc-bottom-half/headers/public/wasi/api_wasix.h
+index e43aa20..aae5519 100644
+--- a/libc-bottom-half/headers/public/wasi/api_wasix.h
++++ b/libc-bottom-half/headers/public/wasi/api_wasix.h
+@@ -4182,6 +4182,35 @@ __wasi_errno_t __wasi_proc_raise_interval(
+      */
+     __wasi_bool_t repeat
+ ) __attribute__((__warn_unused_result__));
++/**
++ * Send a signal after an initial delay, optionally repeating.
++ * Note: Like POSIX `setitimer`, with separate initial (it_value) and
++ * interval (it_interval). Added as `proc_raise_interval2` so the legacy
++ * 3-arg `proc_raise_interval` import stays ABI-compatible with stock Wasmer.
++ *
++ * Times are `__wasi_timestamp_t` nanoseconds. Zero initial with zero
++ * interval cancels. One-shot: non-zero initial, zero interval, repeat=FALSE.
++ */
++__wasi_errno_t __wasi_proc_raise_interval2(
++    /**
++     * The signal condition to trigger.
++     */
++    __wasi_signal_t sig,
++    /**
++     * Initial delay before the first raise (it_value), in nanoseconds.
++     * Zero together with a zero interval cancels the timer.
++     */
++    __wasi_timestamp_t initial,
++    /**
++     * Repeat period (it_interval), in nanoseconds.
++     * Zero means one-shot (no further raises after the first).
++     */
++    __wasi_timestamp_t interval,
++    /**
++     * TRUE iff interval != 0.
++     */
++    __wasi_bool_t repeat
++) __attribute__((__warn_unused_result__));
+ /**
+  * Forks the current process into a new subprocess. If the function
+  * returns a zero then its the new subprocess. If it returns a positive
+diff --git a/libc-bottom-half/sources/__wasixlibc_real.c b/libc-bottom-half/sources/__wasixlibc_real.c
+index e16d1b8..1ad8e53 100644
+--- a/libc-bottom-half/sources/__wasixlibc_real.c
++++ b/libc-bottom-half/sources/__wasixlibc_real.c
+@@ -355,6 +355,22 @@ __wasi_errno_t __wasi_proc_raise_interval(
+     return (uint16_t) ret;
+ }
+ 
++int32_t __imported_wasix_32v1_proc_raise_interval2(int32_t arg0, int64_t arg1, int64_t arg2, int32_t arg3) __attribute__((
++    __import_module__("wasix_32v1"),
++    __import_name__("proc_raise_interval2")
++));
++
++__wasi_errno_t __wasi_proc_raise_interval2(
++    __wasi_signal_t sig,
++    __wasi_timestamp_t initial,
++    __wasi_timestamp_t interval,
++    __wasi_bool_t repeat
++){
++    int32_t ret = __imported_wasix_32v1_proc_raise_interval2(
++        (int32_t) sig, (int64_t) initial, (int64_t) interval, (int32_t) repeat);
++    return (uint16_t) ret;
++}
++
+ int32_t __imported_wasix_32v1_proc_fork(int32_t arg0, int32_t arg1) __attribute__((
+     __import_module__("wasix_32v1"),
+     __import_name__("proc_fork")
+diff --git a/libc-top-half/musl/src/signal/setitimer.c b/libc-top-half/musl/src/signal/setitimer.c
+index c126453..0037f8a 100644
+--- a/libc-top-half/musl/src/signal/setitimer.c
++++ b/libc-top-half/musl/src/signal/setitimer.c
+@@ -29,9 +29,22 @@ int setitimer(int which, const struct itimerval *restrict new, struct itimerval
+ 	}
+ 	return syscall(SYS_setitimer, which, new, old);
+ #else
+-	__wasi_timestamp_t ts = (new->it_interval.tv_sec * (time_t)1000000000) + (new->it_interval.tv_usec * 1000);
++	/* Homescoop: use proc_raise_interval2 so both it_value (initial) and
++	 * it_interval reach the host. Upstream proc_raise_interval only took
++	 * one timestamp (and libc passed it_interval), so one-shot alarm(N)
++	 * arrived as 0. Leave the 3-arg import untouched for stock Wasmer ABIs. */
++	(void)which;
++	(void)old;
++	__wasi_timestamp_t initial =
++		(((__wasi_timestamp_t)new->it_value.tv_sec) * 1000000000ull) +
++		(((__wasi_timestamp_t)new->it_value.tv_usec) * 1000ull);
++	__wasi_timestamp_t interval =
++		(((__wasi_timestamp_t)new->it_interval.tv_sec) * 1000000000ull) +
++		(((__wasi_timestamp_t)new->it_interval.tv_usec) * 1000ull);
++	__wasi_bool_t repeat = interval != 0 ? __WASI_BOOL_TRUE : __WASI_BOOL_FALSE;
+ 
+-	int ret = __wasi_proc_raise_interval((__wasi_signal_t)__WASI_SIGNAL_ALRM, ts, __WASI_BOOL_TRUE);
++	int ret = __wasi_proc_raise_interval2(
++		(__wasi_signal_t)__WASI_SIGNAL_ALRM, initial, interval, repeat);
+ 	if (ret != 0) {
+ 		errno = ret;
+ 		return -1;
