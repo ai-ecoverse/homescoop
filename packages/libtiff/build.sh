@@ -19,14 +19,20 @@ if [[ ! -f "$SRC_DIR/libtiff/.libs/libtiff.a" || -n "${FORCE:-}" ]]; then
   test -f "$PREFIX/include/jpeglib.h" || { echo "missing jpeg in PREFIX=$PREFIX" >&2; exit 1; }
   (
     cd "$SRC_DIR"
+    # wasm32 size_t is 4. Pin host + ac_cv so configure never runs a
+    # sizeof(size_t) probe (emconfigure can leave host=x86_64 and that
+    # check exits 77).
     emconfigure ./configure \
       --disable-dependency-tracking \
+      --host=wasm32-unknown-emscripten \
       --disable-shared --enable-static \
       --disable-tools --disable-tests --disable-contrib --disable-docs \
       --disable-webp --disable-zstd --disable-lzma --disable-jbig \
       --disable-libdeflate --disable-lerc --disable-cxx \
+      ac_cv_sizeof_size_t=4 \
       CPPFLAGS="-I$PREFIX/include" \
-      LDFLAGS="-L$PREFIX/lib"
+      LDFLAGS="-L$PREFIX/lib" \
+      LIBS="-lm"
     homescoop_fix_darwin_ar libtiff/Makefile
     homescoop_fix_darwin_ar port/Makefile 2>/dev/null || true
     emmake make -C port
