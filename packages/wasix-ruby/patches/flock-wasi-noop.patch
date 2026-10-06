@@ -1,0 +1,20 @@
+--- missing/flock.c
++++ missing/flock.c
+@@ -3,13 +3,13 @@
+ 
+ #if defined _WIN32
+ #elif defined __wasi__
+-#include <errno.h>
+-
++/* WASIX_FLOCK_NOOP: advisory locks unsupported; succeed so bundler/gem lockfiles work. */
+ int
+ flock(int fd, int operation)
+ {
+-    errno = EINVAL;
+-    return -1;
++    (void)fd;
++    (void)operation;
++    return 0;
+ }
+ #elif defined HAVE_FCNTL && defined HAVE_FCNTL_H
+ 

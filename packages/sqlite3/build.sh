@@ -53,5 +53,5 @@ if [[ -f "$OUT/sqlite3.js" && ! -f "$OUT/sqlite3" ]]; then
   mv "$OUT/sqlite3.js" "$OUT/sqlite3"
 fi
 homescoop_stage_cli "$OUT" sqlite3
-homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC"/sqlite3.h
 echo "== sqlite3: staged → $HOMESCOOP_PKG/package ($VER)"

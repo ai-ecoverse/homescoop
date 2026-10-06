@@ -1,0 +1,41 @@
+Build parking_lot_core with its `nightly` feature for the wasm build.
+
+Reason: parking_lot_core 0.9.12 picks its wasm thread parker at compile
+time. Without the `nightly` feature it uses thread_parker/wasm.rs, which
+panics ("Parking not supported on this platform") the first time a
+contended lock has to park. @pnpm/wasm 12.9.1 is built that way, so pnpm
+traps ("wasm trap … unreachable") under load in slicc-kernel. With the
+feature (and target_feature = "atomics", which wasm32-wasip1-threads
+has), it uses wasm_atomic.rs: memory.atomic.wait32/notify, which
+pnpm/wasm/build.mjs then routes through the pnpm_atomic imports.
+The dependency only enables the feature; Cargo's feature unification
+applies it to every crate that uses parking_lot_core.
+
+Upstream: not filed (Lars decides).
+removeWhen: upstream builds @pnpm/wasm with parking_lot_core/nightly, or
+parking_lot_core stops panicking on wasm without it.
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 5d2f469..8bcae11 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -4640,6 +4640,7 @@ dependencies = [
+  "node-semver",
+  "owo-colors",
+  "p256",
++ "parking_lot_core",
+  "pathdiff",
+  "pep440_rs",
+  "percent-encoding",
+diff --git a/pnpm/crates/cli/Cargo.toml b/pnpm/crates/cli/Cargo.toml
+index 4bd73ae..7d44820 100644
+--- a/pnpm/crates/cli/Cargo.toml
++++ b/pnpm/crates/cli/Cargo.toml
+@@ -168,6 +168,7 @@ reqwest = { workspace = true }
+ tokio = { workspace = true, features = ["net", "process", "signal"] }
+ 
+ [target.'cfg(target_family = "wasm")'.dependencies]
++parking_lot_core = { version = "0.9.12", features = ["nightly"] }
+ pnpm-which = { workspace = true }
+ pnpm-wasm-host = { path = "../wasm-host" }
+ libc = { workspace = true }

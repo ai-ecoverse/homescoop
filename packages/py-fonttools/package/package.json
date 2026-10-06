@@ -1,0 +1,27 @@
+{
+  "name": "@ai-ecoverse/py-fonttools",
+  "version": "4.66.1-1",
+  "description": "fonttools for slicc WASIX CPython",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-fonttools/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-fonttools",
+  "keywords": ["wasm", "wasi", "wasix", "slicc", "homescoop", "python"],
+  "files": ["README.md", "LICENSE", "lib"],
+  "publishConfig": { "access": "public" },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-5"
+  },
+  "homescoop": {
+    "recipe": "py-fonttools",
+    "upstream": "4.66.1"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages"
+    }
+  }
+}

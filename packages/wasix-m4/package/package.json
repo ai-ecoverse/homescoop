@@ -1,0 +1,31 @@
+{
+  "name": "@ai-ecoverse/wasix-m4",
+  "version": "1.4.20-2",
+  "description": "GNU m4 for slicc WASIX (fcntl F_SETFD fix via wasix-sysroot 2025.9.30-14)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-m4/package"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-m4",
+    "upstream": "1.4.20"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "m4": {
+        "wasm": "bin/m4.wasm"
+      }
+    }
+  }
+}

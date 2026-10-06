@@ -84,7 +84,7 @@ ln -sf libncursesw.a "$WASM_PREFIX/lib/libtinfo.a"
 SLICC_A="$WORK/libslicc-fork.a"
 homescoop_slicc_archive "$SLICC_A" fork
 
-export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain,sliccRunMain,sliccForkChild $(homescoop_slicc_fork_js_flags)"
+export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,ENV,callMain,sliccRunMain,sliccForkChild -lnodefs.js $(homescoop_slicc_fork_js_flags)"
 LINK="$(homescoop_slicc_link_archive "$SLICC_A") $(homescoop_em_cli_ldflags)"
 
 export bash_cv_wexitstatus_offset=8 bash_cv_dev_fd=standard bash_cv_dev_stdin=absent \

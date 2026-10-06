@@ -1,0 +1,74 @@
+{
+  "name": "@ai-ecoverse/wasix-perl",
+  "version": "5.42.0-6",
+  "description": "Perl 5.42 for slicc WASIX (fcntl CLOEXEC fix via wasix-sysroot -14; exec/stdio)",
+  "license": "Artistic-1.0-Perl OR GPL-1.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-perl/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-perl",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "perl"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-perl",
+    "upstream": "5.42.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "perl": {
+        "wasm": "bin/perl.wasm",
+        "env": {
+          "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
+        }
+      },
+      "prove": {
+        "script": "bin/prove",
+        "env": {
+          "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
+        }
+      },
+      "pod2man": {
+        "script": "bin/pod2man",
+        "env": {
+          "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
+        }
+      },
+      "cpan": {
+        "script": "bin/cpan",
+        "env": {
+          "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
+        }
+      },
+      "perldoc": {
+        "script": "bin/perldoc",
+        "env": {
+          "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
+        }
+      },
+      "pod2text": {
+        "script": "bin/pod2text",
+        "env": {
+          "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
+        }
+      }
+    }
+  }
+}

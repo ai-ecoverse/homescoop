@@ -1,0 +1,26 @@
+--- a/scipy/io/arff/_arffread.py
++++ b/scipy/io/arff/_arffread.py
+@@ -5,7 +5,10 @@ import datetime
+ import numpy as np
+ 
+ import csv
+-import ctypes
++try:
++    import ctypes
++except ImportError:
++    ctypes = None
+ 
+ """A module to read arff files."""
+ 
+@@ -482,7 +485,10 @@ def split_data_line(line, dialect=None):
+ 
+     # This can not be done in a per reader basis, and relational fields
+     # can be HUGE
+-    csv.field_size_limit(int(ctypes.c_ulong(-1).value // 2))
++    if ctypes is not None:
++        csv.field_size_limit(int(ctypes.c_ulong(-1).value // 2))
++    else:
++        csv.field_size_limit(2**31 - 1)  # wasm32 long is 32-bit
+ 
+     # Remove the line end if any
+     if line[-1] == '\n':

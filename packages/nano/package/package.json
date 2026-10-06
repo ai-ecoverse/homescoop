@@ -1,0 +1,46 @@
+{
+  "name": "@ai-ecoverse/wasm-nano",
+  "version": "8.7.1-1",
+  "description": "GNU nano with static ncurses 6.5 for wasm / slicc (emscripten)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/nano/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/nano",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "nano",
+    "editor"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "PRESTAGE.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "nano",
+    "upstream": "8.7.1",
+    "ncurses": "6.5"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "nano": {
+        "glue": "bin/nano",
+        "wasm": "bin/nano.wasm",
+        "env": {
+          "TERM": "xterm-256color"
+        }
+      }
+    }
+  }
+}

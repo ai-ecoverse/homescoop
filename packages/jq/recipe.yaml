@@ -1,0 +1,19 @@
+# jq for slicc wasm realm (with bundled oniguruma).
+name: jq
+builder: host
+# renovate: datasource=github-releases depName=jqlang/jq extractVersion=^jq-(?<version>.*)$
+version: "1.8.1"
+npm: "@ai-ecoverse/wasm-jq"
+summary: "jq JSON processor with oniguruma regex for slicc"
+source:
+  url: "https://github.com/jqlang/jq/releases/download/jq-{{version}}/jq-{{version}}.tar.gz"
+  sha256: "2be64e7129cecb11d5906290eba10af694fb9e3e7f9fc208a311dc33ca837eb0"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/jq
+  license: MIT
+  notes: |
+    --with-oniguruma=builtin (vendor/). slicc cli profile + homescoop_em_cli_ldflags.

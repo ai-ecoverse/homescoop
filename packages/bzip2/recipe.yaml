@@ -1,0 +1,20 @@
+# bzip2 for slicc wasm realm (CLI + static libbz2).
+name: bzip2
+builder: host
+# renovate: datasource=git-tags depName=https://sourceware.org/git/bzip2.git extractVersion=^bzip2-(?<version>.*)$
+version: "1.0.8"
+npm: "@ai-ecoverse/wasm-bzip2"
+summary: "bzip2 / bunzip2 / bzcat / bzip2recover for slicc"
+source:
+  url: "https://sourceware.org/pub/bzip2/bzip2-{{version}}.tar.gz"
+  sha256: "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/bzip2
+  license: bzip2-1.0.6
+  notes: |
+    Manual Makefile (no autoconf). Static libbz2.a + CLI via slicc cli profile.
+    bunzip2/bzcat are argv0 aliases. Stages bzgrep/bzdiff shell scripts.

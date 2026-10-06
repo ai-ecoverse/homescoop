@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-cmake",
-  "version": "0.0.0",
-  "description": "CMake (WASM / emscripten) — name reservation stub; real artifacts TBD",
+  "version": "4.4.3-9",
+  "description": "CMake 4.4.3 for wasm / slicc (WASI host + slicc_poll for libuv)",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -18,7 +18,9 @@
   ],
   "files": [
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "bin",
+    "share"
   ],
   "publishConfig": {
     "access": "public"
@@ -32,8 +34,14 @@
     "commands": {
       "cmake": {
         "glue": "bin/cmake",
-        "wasm": "bin/cmake.wasm"
+        "wasm": "bin/cmake.wasm",
+        "env": {
+          "CMAKE_ROOT": "${package}/share/cmake-4.4"
+        }
       }
+    },
+    "env": {
+      "CMAKE_ROOT": "${package}/share/cmake-4.4"
     }
   }
 }

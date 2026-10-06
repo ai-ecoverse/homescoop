@@ -1,0 +1,25 @@
+# Go std export archives for wasip1/wasm (pair with wasm-go tools).
+# Split from tools: one target's std is ~124 MB raw / ~30 MB gzipped (>40 MiB cap).
+name: wasm-go-std-wasip1
+builder: host
+# renovate: datasource=golang-version
+version: "1.26.5"
+npm: "@ai-ecoverse/wasm-go-std-wasip1"
+summary: "Go 1.26 std .a archives for wasip1/wasm (slicc go driver)"
+source:
+  url: "https://go.dev/dl/go{{version}}.src.tar.gz"
+  sha256: "495be4bc87176ac567392e5b4116abd98466d33d7b49d41e764ccc6976b2dc42"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://go.dev
+  license: BSD-3-Clause
+  notes: |
+    Tools-free std package: slicc.go.version + slicc.go.std only (no toolchain).
+    Stage goroot/pkg/wasip1_wasm/<import path>.a from
+    CGO_ENABLED=0 GOOS=wasip1 GOARCH=wasm go list -export -trimpath
+    -f '{{.ImportPath}} {{.Export}}' std (same Go version as wasm-go).
+    unsafe has no archive. If gzipped pack still exceeds 40 MiB, split further
+    (e.g. wasm-go-std-wasip1-core + …). Queue after wasix-python/numpy/pandas.

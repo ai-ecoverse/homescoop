@@ -10,9 +10,17 @@
  */
 #include <emscripten.h>
 #include <errno.h>
+#include <stddef.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+/* Must match Emscripten musl + libc's __sig_actions[] (emcc 4.0.x / 6.0.x).
+ * A stale EM_CACHE with sigset_t { unsigned long __bits[2]; } yields
+ * sizeof(sigaction)==20 and every disposition bit is garbage. */
+_Static_assert(sizeof(sigset_t) == 128, "sigset_t must be 128-byte musl layout");
+_Static_assert(sizeof(struct sigaction) == 140, "sigaction must be 140 bytes");
+_Static_assert(offsetof(struct sigaction, sa_flags) == 132, "sa_flags offset");
 
 extern struct sigaction __sig_actions[_NSIG];
 
@@ -57,3 +65,12 @@ int kill(pid_t pid, int sig) {
   }
   return 0;
 }
+
+// pause(2): sleep until a caught signal is delivered; -EINTR once its
+// handler is due (the runtime raises it as the call returns).
+EM_JS(int, slicc_pause_js, (void), {
+  if (Module.sliccKernel && Module.sliccKernel.pause) return Module.sliccKernel.pause();
+  return -52; // ENOSYS: no kernel
+});
+
+int __syscall_pause(void) { return slicc_pause_js(); }

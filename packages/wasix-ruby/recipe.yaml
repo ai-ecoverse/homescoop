@@ -1,0 +1,21 @@
+# MRI Ruby for slicc WASIX (wasixcc + asyncify sysroot).
+name: wasix-ruby
+builder: host
+version: "3.4.11"
+npm: "@ai-ecoverse/wasix-ruby"
+summary: "MRI Ruby 3.4 for slicc WASIX (command ruby)"
+source:
+  url: "https://cache.ruby-lang.org/pub/ruby/3.4/ruby-{{version}}.tar.gz"
+  sha256: "5c22be44524312b3d433d68739bcc530633b1da5ef8ba0afa0a37680da17d3de"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-perl # shebang helpers optional; ruby is wasm
+about:
+  homepage: https://www.ruby-lang.org/
+  license: Ruby
+  notes: |
+    WASIX MRI via wasixcc (WASIXCC_WASM_EXCEPTIONS=no, asyncify sysroot).
+    Fiber: prefer WASIX setjmp; asyncify without ignore-indirect if needed.
+    See RESEARCH.md.
