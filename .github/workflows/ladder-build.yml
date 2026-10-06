@@ -21,6 +21,11 @@ on:
         required: false
         default: 90m
         type: string
+      publish:
+        description: OIDC npm publish after a successful build. false = artifact only (cert queue).
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -35,6 +40,7 @@ jobs:
       version: ${{ steps.r.outputs.version }}
       package: ${{ steps.r.outputs.package }}
       published: ${{ steps.r.outputs.published }}
+      do_publish: ${{ steps.r.outputs.do_publish }}
     steps:
       - uses: actions/checkout@v7
       - id: r
@@ -55,12 +61,20 @@ jobs:
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "package=$PKG" >> "$GITHUB_OUTPUT"
           echo "package=$PKG builder=$BUILDER npm=$NPM@$VER"
-          if npm view "$NPM@$VER" version >/dev/null 2>&1; then
+          WANT_PUBLISH="${{ inputs.publish }}"
+          WANT_PUBLISH="${WANT_PUBLISH:-true}"
+          if [[ "$WANT_PUBLISH" == "false" ]]; then
+            echo "publish=false — build artifact, skip OIDC"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "do_publish=false" >> "$GITHUB_OUTPUT"
+          elif npm view "$NPM@$VER" version >/dev/null 2>&1; then
             echo "already published, skipping $NPM@$VER"
             echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "do_publish=false" >> "$GITHUB_OUTPUT"
           else
             echo "not on registry: $NPM@$VER — build"
             echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "do_publish=true" >> "$GITHUB_OUTPUT"
           fi
           node scripts/read-recipe.mjs "$PKG" --deps > deps.txt || : > deps.txt
           echo "deps:" && cat deps.txt || true
@@ -139,7 +153,7 @@ jobs:
 
   publish:
     needs: [resolve, host-build, slicc-build]
-    if: always() && needs.resolve.outputs.published != 'true' && (needs.host-build.result == 'success' || needs.slicc-build.result == 'success')
+    if: always() && needs.resolve.outputs.do_publish == 'true' && (needs.host-build.result == 'success' || needs.slicc-build.result == 'success')
     runs-on: ubuntu-latest
     # Job-level: setup-node / npm must see ACTIONS_ID_TOKEN_REQUEST_*.
     permissions:
