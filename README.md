@@ -32,6 +32,7 @@ shims/slicc/      # vendored slicc libc shims (spawn/exec/fork/select/jobs/signa
 
 Dispatch **ladder-build** with `package=zlib`, or merge a PR that changes
 `packages/<name>/recipe.yaml` or `package/` (`ladder-merge` auto-dispatches).
+ladder-build skips when that `pkg@version` is already on npm; bump `-N` to rebuild.
 A `build.sh`-only change does not republish. PRs get **ladder-pr** host
 builds (no publish) plus `package.tgz` artifacts for certification.
 
