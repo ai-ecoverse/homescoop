@@ -19,6 +19,11 @@ homescoop_load_recipe() {
   # Primary load must export SRC_URL/SRC_SHA; secondary loads only PREFIX_* vars.
   if [[ "$*" != *"--source"* ]]; then
     : "${SRC_URL:?}" "${SRC_SHA:?}"
+    # Dist tarball layout: <name>-<version>/ next to basename(url).
+    HOMESCOOP_TARBALL_NAME="${HOMESCOOP_TARBALL_NAME:-$(basename "${SRC_URL%%\?*}")}"
+    HOMESCOOP_SRC_DIR_NAME="${HOMESCOOP_SRC_DIR_NAME:-${NAME}-${VERSION}}"
+    TARBALL="${TARBALL:-$WORK/$HOMESCOOP_TARBALL_NAME}"
+    SRC_DIR="${SRC_DIR:-$WORK/$HOMESCOOP_SRC_DIR_NAME}"
   fi
 }
 
@@ -34,7 +39,11 @@ homescoop_apply_patches() {
       continue
     fi
     echo "== patch $(basename "$p")"
-    patch -d "$srcdir" -p1 < "$p"
+    if ! patch -d "$srcdir" -p1 < "$p"; then
+      echo "homescoop_apply_patches: $(basename "$p") does not apply to ${NAME:-?} ${VERSION:-?}" >&2
+      echo "This is a patch failure, not a checksum error. Park the bump or refresh the patch." >&2
+      return 1
+    fi
     touch "$marker"
   done
   shopt -u nullglob
@@ -66,9 +75,19 @@ homescoop_fetch() {
   local url="$1" sha="$2" tarball="$3"
   if [[ ! -f "$tarball" ]]; then
     echo "== fetch $url"
-    curl -fsSL "$url" -o "$tarball"
+    if ! curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "$url" -o "$tarball"; then
+      echo "homescoop_fetch: download failed ($url)" >&2
+      echo "Check that source.url derives from {{version}} / {{major}}.{{minor}} and that the file exists." >&2
+      return 1
+    fi
   fi
-  echo "$sha  $tarball" | shasum -a 256 -c -
+  if ! echo "$sha  $tarball" | shasum -a 256 -c -; then
+    echo "homescoop_fetch: sha256 mismatch for $tarball" >&2
+    echo "URL: $url" >&2
+    echo "recipe sha256: $sha" >&2
+    echo "Renovate only rewrites version:. Refresh checksums with: node scripts/refresh-recipe-sha.mjs ${NAME:-<package>}" >&2
+    return 1
+  fi
 }
 
 homescoop_extract() {

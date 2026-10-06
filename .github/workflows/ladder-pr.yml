@@ -1,6 +1,10 @@
 # PR check: host-build each touched packages/<name> (no publish).
 # Catches broken recipe/source/sha bumps before merge. Slicc builders are
 # reported and skipped (cone not available on PR runners).
+#
+# Renovate only rewrites version:. recipe-sha downloads the expanded
+# source.url, writes sha256, and pushes to the PR branch so host-build
+# does not fail a checksum check for a real version bump.
 name: ladder-pr
 
 on:
@@ -11,12 +15,14 @@ on:
       - 'scripts/build-common.sh'
       - 'scripts/ladder-run.jsh'
       - 'scripts/read-recipe.mjs'
+      - 'scripts/recipe-env.mjs'
+      - 'scripts/refresh-recipe-sha.mjs'
       - 'scripts/list-touched-packages.mjs'
       - 'scripts/sync-package-version.mjs'
       - '.github/workflows/ladder-pr.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   detect:
@@ -42,9 +48,51 @@ jobs:
           echo "slicc=$SLICC" >> "$GITHUB_OUTPUT"
           echo "any=$([ "$HOST" != '[]' ] || [ "$SLICC" != '[]' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-  host-build:
+  recipe-sha:
     needs: detect
     if: needs.detect.outputs.host != '[]'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.push.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Download expanded source URLs and write sha256
+        env:
+          HOST: ${{ needs.detect.outputs.host }}
+        run: |
+          set -euo pipefail
+          node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
+            node scripts/refresh-recipe-sha.mjs "$pkg"
+          done
+      - id: push
+        name: Push sha256 onto the PR branch
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- 'packages/*/recipe.yaml'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+            echo "::error::recipe sha256 is stale on a fork PR; cannot push. Run: node scripts/refresh-recipe-sha.mjs <package>"
+            git diff -- 'packages/*/recipe.yaml'
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/*/recipe.yaml
+          git commit -m "chore: refresh recipe sha256 after version bump"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  host-build:
+    needs: [detect, recipe-sha]
+    if: needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success' && needs.recipe-sha.outputs.changed != 'true'
     strategy:
       fail-fast: false
       matrix:
