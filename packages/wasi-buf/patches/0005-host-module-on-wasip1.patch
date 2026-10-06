@@ -1,0 +1,587 @@
+On wasip1, start commands, send HTTP requests and take file locks through
+wasi-buf's host module (host/buf-host.mjs on slicc-kernel's imports hook).
+
+Reason: Go's wasip1 port cannot start processes, open network connections or
+lock files. buf needs the first for local protoc plugins (buf generate) and
+git inputs, the second for the Buf Schema Registry, remote plugins and
+HTTP(S) inputs, and the third for its module cache. On wasip1:
+- private/pkg/slicchost imports buf_host.probe/call/take and exchanges JSON
+  with the host module; without it (probe != "buf1") every call returns
+  ErrUnsupported;
+- xexec.Run (vendored buf.build/go/standard) runs the command through the
+  host, and the three exec.LookPath sites ask the host whether it exists;
+- httpclient's clients and http.DefaultTransport send requests through the
+  host (the kernel's net-request, so TLS and proxies are the kernel's);
+- filelock takes advisory locks through the kernel's file locks.
+A command's non-zero exit becomes slicchost.ExitError, not *exec.ExitError,
+so callers that check exec.ExitError codes (git's 128) see a plain failure.
+Other platforms are unchanged.
+
+Upstream: not filed (Lars decides).
+removeWhen: Go's wasip1 port can start processes and dial, or buf drops the need.
+
+diff --git a/private/buf/bufprotopluginexec/bufprotopluginexec.go b/private/buf/bufprotopluginexec/bufprotopluginexec.go
+index db36448..842185e 100644
+--- a/private/buf/bufprotopluginexec/bufprotopluginexec.go
++++ b/private/buf/bufprotopluginexec/bufprotopluginexec.go
+@@ -24,9 +24,11 @@ import (
+ 	"fmt"
+ 	"log/slog"
+ 	"os/exec"
++	"runtime"
+ 
+ 	"buf.build/go/app"
+ 	"github.com/bufbuild/buf/private/bufpkg/bufconfig"
++	"github.com/bufbuild/buf/private/pkg/slicchost"
+ 	"github.com/bufbuild/buf/private/pkg/storage/storageos"
+ 	"github.com/bufbuild/protoplugin"
+ 	"google.golang.org/protobuf/types/pluginpb"
+@@ -200,6 +202,9 @@ func newHandlerOptions() *handlerOptions {
+ //
+ // https://pkg.go.dev/os/exec#hdr-Executables_in_the_current_directory
+ func unsafeLookPath(file string) (string, error) {
++	if runtime.GOOS == "wasip1" {
++		return slicchost.LookPath(file)
++	}
+ 	path, err := exec.LookPath(file)
+ 	if errors.Is(err, exec.ErrDot) {
+ 		err = nil
+diff --git a/private/bufpkg/bufconfig/generate_plugin_config.go b/private/bufpkg/bufconfig/generate_plugin_config.go
+index f3bca40..a4f9c28 100644
+--- a/private/bufpkg/bufconfig/generate_plugin_config.go
++++ b/private/bufpkg/bufconfig/generate_plugin_config.go
+@@ -19,10 +19,12 @@ import (
+ 	"fmt"
+ 	"math"
+ 	"os/exec"
++	"runtime"
+ 	"strings"
+ 
+ 	"github.com/bufbuild/buf/private/bufpkg/bufremoteplugin/bufremotepluginref"
+ 	"github.com/bufbuild/buf/private/pkg/encoding"
++	"github.com/bufbuild/buf/private/pkg/slicchost"
+ 	"github.com/bufbuild/buf/private/pkg/syserror"
+ )
+ 
+@@ -733,6 +735,9 @@ func newExternalGeneratePluginConfigV2FromPluginConfig(
+ 		binaryName := "protoc-gen-" + generatePluginConfig.Name()
+ 		// First, check if this is a binary.
+ 		_, err := exec.LookPath(binaryName)
++		if runtime.GOOS == "wasip1" {
++			_, err = slicchost.LookPath(binaryName)
++		}
+ 		if err == nil || errors.Is(err, exec.ErrDot) {
+ 			externalPluginConfigV2.Local = binaryName
+ 			break
+diff --git a/private/pkg/filelock/lock.go b/private/pkg/filelock/lock.go
+index bb212da..f8f9852 100644
+--- a/private/pkg/filelock/lock.go
++++ b/private/pkg/filelock/lock.go
+@@ -12,6 +12,8 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++//go:build !wasip1
++
+ package filelock
+ 
+ import (
+diff --git a/private/pkg/filelock/lock_wasip1.go b/private/pkg/filelock/lock_wasip1.go
+new file mode 100644
+index 0000000..d5dc0c3
+--- /dev/null
++++ b/private/pkg/filelock/lock_wasip1.go
+@@ -0,0 +1,96 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build wasip1
++
++package filelock
++
++import (
++	"context"
++	"fmt"
++	"os"
++	"path/filepath"
++	"time"
++
++	"github.com/bufbuild/buf/private/pkg/slicchost"
++)
++
++func lock(ctx context.Context, filePath string, options ...LockOption) (Unlocker, error) {
++	return lockForFunc(ctx, filePath, true, options...)
++}
++
++func rlock(ctx context.Context, filePath string, options ...LockOption) (Unlocker, error) {
++	return lockForFunc(ctx, filePath, false, options...)
++}
++
++// lockForFunc takes an advisory lock through buf's host module, which uses
++// slicc-kernel's file locks; gofrs/flock has no implementation for wasip1.
++func lockForFunc(ctx context.Context, filePath string, exclusive bool, options ...LockOption) (Unlocker, error) {
++	lockOptions := newLockOptions()
++	for _, option := range options {
++		option(lockOptions)
++	}
++	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
++		return nil, err
++	}
++	var cancel context.CancelFunc
++	if lockOptions.timeout != 0 {
++		ctx, cancel = context.WithTimeout(ctx, lockOptions.timeout)
++		defer cancel()
++	}
++	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0644)
++	if err != nil {
++		return nil, fmt.Errorf("could not get file lock %q: %w", filePath, err)
++	}
++	for {
++		locked, err := slicchost.TryLock(file.Fd(), exclusive)
++		if err != nil {
++			_ = file.Close()
++			return nil, fmt.Errorf("could not get file lock %q: %w", filePath, err)
++		}
++		if locked {
++			return &hostUnlocker{file: file}, nil
++		}
++		select {
++		case <-ctx.Done():
++			_ = file.Close()
++			return nil, fmt.Errorf("could not lock %q: %w", filePath, ctx.Err())
++		case <-time.After(lockOptions.retryDelay):
++		}
++	}
++}
++
++type hostUnlocker struct {
++	file *os.File
++}
++
++func (u *hostUnlocker) Unlock() error {
++	err := slicchost.Unlock(u.file.Fd())
++	if closeErr := u.file.Close(); err == nil {
++		err = closeErr
++	}
++	return err
++}
++
++type lockOptions struct {
++	timeout    time.Duration
++	retryDelay time.Duration
++}
++
++func newLockOptions() *lockOptions {
++	return &lockOptions{
++		timeout:    DefaultLockTimeout,
++		retryDelay: DefaultLockRetryDelay,
++	}
++}
+diff --git a/private/pkg/pluginrpcutil/wasm_runner.go b/private/pkg/pluginrpcutil/wasm_runner.go
+index 466e0e9..de76345 100644
+--- a/private/pkg/pluginrpcutil/wasm_runner.go
++++ b/private/pkg/pluginrpcutil/wasm_runner.go
+@@ -19,9 +19,11 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"os/exec"
++	"runtime"
+ 	"slices"
+ 	"sync"
+ 
++	"github.com/bufbuild/buf/private/pkg/slicchost"
+ 	"github.com/bufbuild/buf/private/pkg/wasm"
+ 	"pluginrpc.com/pluginrpc"
+ )
+@@ -101,6 +103,9 @@ func (r *wasmRunner) loadCompiledModule(ctx context.Context) (wasm.CompiledModul
+ //
+ // https://pkg.go.dev/os/exec#hdr-Executables_in_the_current_directory
+ func unsafeLookPath(file string) (string, error) {
++	if runtime.GOOS == "wasip1" {
++		return slicchost.LookPath(file)
++	}
+ 	path, err := exec.LookPath(file)
+ 	if errors.Is(err, exec.ErrDot) {
+ 		err = nil
+diff --git a/private/pkg/slicchost/slicchost.go b/private/pkg/slicchost/slicchost.go
+new file mode 100644
+index 0000000..6609fd6
+--- /dev/null
++++ b/private/pkg/slicchost/slicchost.go
+@@ -0,0 +1,41 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// Package slicchost reaches the host functions that wasi-buf's host module
++// (host/buf-host.mjs) provides on slicc-kernel's per-command imports hook:
++// starting commands and sending HTTP requests. Where the module is missing,
++// as in SLICC's wasm realm, every call returns ErrUnsupported.
++package slicchost
++
++import (
++	"errors"
++	"fmt"
++)
++
++// ErrUnsupported is returned when the runtime does not provide buf's host module.
++var ErrUnsupported = errors.New("this runtime cannot start commands or open network connections for buf (it needs slicc-kernel with @ai-ecoverse/wasi-buf's host module)")
++
++// ExitError is a command that ran and exited with a non-zero status.
++type ExitError struct {
++	Code int
++}
++
++func (e *ExitError) Error() string {
++	return fmt.Sprintf("exit status %d", e.Code)
++}
++
++// ExitCode returns the command's exit status.
++func (e *ExitError) ExitCode() int {
++	return e.Code
++}
+diff --git a/private/pkg/slicchost/slicchost_other.go b/private/pkg/slicchost/slicchost_other.go
+new file mode 100644
+index 0000000..08ea68d
+--- /dev/null
++++ b/private/pkg/slicchost/slicchost_other.go
+@@ -0,0 +1,51 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build !wasip1
++
++package slicchost
++
++import (
++	"context"
++	"io"
++	"net/http"
++)
++
++// LookPath returns ErrUnsupported outside wasip1.
++func LookPath(string) (string, error) {
++	return "", ErrUnsupported
++}
++
++// TryLock returns ErrUnsupported outside wasip1.
++func TryLock(uintptr, bool) (bool, error) {
++	return false, ErrUnsupported
++}
++
++// Unlock returns ErrUnsupported outside wasip1.
++func Unlock(uintptr) error {
++	return ErrUnsupported
++}
++
++// Run returns ErrUnsupported outside wasip1.
++func Run(context.Context, string, []string, []string, string, io.Reader, io.Writer, io.Writer) error {
++	return ErrUnsupported
++}
++
++// Transport returns ErrUnsupported outside wasip1.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(*http.Request) (*http.Response, error) {
++	return nil, ErrUnsupported
++}
+diff --git a/private/pkg/slicchost/slicchost_wasip1.go b/private/pkg/slicchost/slicchost_wasip1.go
+new file mode 100644
+index 0000000..3770fa9
+--- /dev/null
++++ b/private/pkg/slicchost/slicchost_wasip1.go
+@@ -0,0 +1,216 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build wasip1
++
++package slicchost
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"sync"
++	"unsafe"
++)
++
++const probeMagic = 0x62756631
++
++//go:wasmimport buf_host probe
++func hostProbe() uint32
++
++//go:wasmimport buf_host call
++func hostCall(request unsafe.Pointer, size uint32) uint32
++
++//go:wasmimport buf_host take
++func hostTake(response unsafe.Pointer)
++
++var available = sync.OnceValue(func() bool { return hostProbe() == probeMagic })
++
++func init() {
++	// http.Client{} without a Transport (buf's HTTP inputs) uses DefaultTransport.
++	http.DefaultTransport = Transport{}
++}
++
++type envelope struct {
++	OK    bool            `json:"ok"`
++	Error string          `json:"error"`
++	Value json.RawMessage `json:"value"`
++}
++
++func call(request any, value any) error {
++	if !available() {
++		return ErrUnsupported
++	}
++	data, err := json.Marshal(request)
++	if err != nil {
++		return err
++	}
++	size := hostCall(unsafe.Pointer(unsafe.SliceData(data)), uint32(len(data)))
++	response := make([]byte, size)
++	if size > 0 {
++		hostTake(unsafe.Pointer(unsafe.SliceData(response)))
++	}
++	var result envelope
++	if err := json.Unmarshal(response, &result); err != nil {
++		return err
++	}
++	if !result.OK {
++		return errors.New(result.Error)
++	}
++	if value == nil {
++		return nil
++	}
++	return json.Unmarshal(result.Value, value)
++}
++
++// LookPath reports name as runnable when the host can start a command by that name.
++func LookPath(name string) (string, error) {
++	var found string
++	if err := call(map[string]any{"op": "which", "name": name}, &found); err != nil {
++		return "", err
++	}
++	if found == "" {
++		return "", errors.New("executable file not found in $PATH")
++	}
++	return name, nil
++}
++
++// TryLock takes an advisory lock on fd without waiting; false means another holder has it.
++func TryLock(fd uintptr, exclusive bool) (bool, error) {
++	var locked bool
++	err := call(map[string]any{"op": "lock", "fd": fd, "exclusive": exclusive}, &locked)
++	return locked, err
++}
++
++// Unlock releases a lock that TryLock took.
++func Unlock(fd uintptr) error {
++	return call(map[string]any{"op": "unlock", "fd": fd}, nil)
++}
++
++// Run starts name with args and waits for it, like exec.Cmd.Run.
++func Run(ctx context.Context, name string, args []string, env []string, dir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
++	var input []byte
++	if stdin != nil {
++		data, err := io.ReadAll(stdin)
++		if err != nil {
++			return err
++		}
++		input = data
++	}
++	var result struct {
++		Status int    `json:"status"`
++		Stdout []byte `json:"stdout"`
++		Stderr []byte `json:"stderr"`
++	}
++	request := map[string]any{"op": "run", "argv": append([]string{name}, args...), "env": env, "dir": dir, "stdin": input}
++	if err := call(request, &result); err != nil {
++		return err
++	}
++	if stdout != nil {
++		if _, err := stdout.Write(result.Stdout); err != nil {
++			return err
++		}
++	}
++	if stderr != nil {
++		if _, err := stderr.Write(result.Stderr); err != nil {
++			return err
++		}
++	}
++	if result.Status != 0 {
++		return &ExitError{Code: result.Status}
++	}
++	return ctx.Err()
++}
++
++// Transport sends HTTP requests through the host.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(request *http.Request) (*http.Response, error) {
++	var body []byte
++	if request.Body != nil {
++		data, err := io.ReadAll(request.Body)
++		_ = request.Body.Close()
++		if err != nil {
++			return nil, err
++		}
++		body = data
++	}
++	headers := [][2]string{}
++	for name, values := range request.Header {
++		for _, value := range values {
++			headers = append(headers, [2]string{name, value})
++		}
++	}
++	var head struct {
++		Handle  int         `json:"handle"`
++		Status  int         `json:"status"`
++		Headers [][2]string `json:"headers"`
++	}
++	if err := call(map[string]any{"op": "http", "method": request.Method, "url": request.URL.String(), "headers": headers, "body": body}, &head); err != nil {
++		return nil, err
++	}
++	response := &http.Response{
++		Status:        fmt.Sprintf("%d %s", head.Status, http.StatusText(head.Status)),
++		StatusCode:    head.Status,
++		Proto:         "HTTP/1.1",
++		ProtoMajor:    1,
++		ProtoMinor:    1,
++		Header:        http.Header{},
++		Body:          &responseBody{handle: head.Handle},
++		ContentLength: -1,
++		Request:       request,
++	}
++	for _, pair := range head.Headers {
++		response.Header.Add(pair[0], pair[1])
++	}
++	return response, nil
++}
++
++type responseBody struct {
++	handle  int
++	pending bytes.Buffer
++	done    bool
++	closed  bool
++}
++
++func (b *responseBody) Read(p []byte) (int, error) {
++	for b.pending.Len() == 0 {
++		if b.done {
++			return 0, io.EOF
++		}
++		var chunk []byte
++		if err := call(map[string]any{"op": "http.read", "handle": b.handle}, &chunk); err != nil {
++			return 0, err
++		}
++		if len(chunk) == 0 {
++			b.done = true
++			continue
++		}
++		b.pending.Write(chunk)
++	}
++	return b.pending.Read(p)
++}
++
++func (b *responseBody) Close() error {
++	if b.closed {
++		return nil
++	}
++	b.closed = true
++	return call(map[string]any{"op": "http.close", "handle": b.handle}, nil)
++}
+diff --git a/private/pkg/transport/http/httpclient/client.go b/private/pkg/transport/http/httpclient/client.go
+index c214fd2..633a07e 100644
+--- a/private/pkg/transport/http/httpclient/client.go
++++ b/private/pkg/transport/http/httpclient/client.go
+@@ -17,9 +17,16 @@ package httpclient
+ import (
+ 	"crypto/tls"
+ 	"net/http"
++	"runtime"
++
++	"github.com/bufbuild/buf/private/pkg/slicchost"
+ )
+ 
+ func newClient(clientTLSConfig *tls.Config) *http.Client {
++	if runtime.GOOS == "wasip1" {
++		// wasip1 cannot open connections; buf's host module sends the requests.
++		return &http.Client{Transport: slicchost.Transport{}}
++	}
+ 	return &http.Client{
+ 		Transport: &http.Transport{
+ 			TLSClientConfig: clientTLSConfig,
+--- a/vendor/buf.build/go/standard/xos/xexec/xexec.go
++++ b/vendor/buf.build/go/standard/xos/xexec/xexec.go
+@@ -19,7 +19,10 @@
+ 	"context"
+ 	"io"
+ 	"os/exec"
++	"runtime"
+ 	"slices"
++
++	"github.com/bufbuild/buf/private/pkg/slicchost"
+ )
+ 
+ var emptyEnv = []string{"__EMPTY_ENV__=1"}
+@@ -35,6 +38,10 @@
+ 	for _, option := range options {
+ 		option.applyRun(runStartOptions)
+ 	}
++	if runtime.GOOS == "wasip1" {
++		// wasip1 cannot start processes; buf's host module starts the command.
++		return slicchost.Run(ctx, name, runStartOptions.args, runStartOptions.env, runStartOptions.dir, runStartOptions.stdin, runStartOptions.stdout, runStartOptions.stderr)
++	}
+ 	cmd := exec.CommandContext(ctx, name, runStartOptions.args...)
+ 	runStartOptions.applyCmd(cmd)
+ 	return cmd.Run()

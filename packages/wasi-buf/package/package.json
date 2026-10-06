@@ -21,7 +21,8 @@
     "README.md",
     "LICENSE",
     "THIRD-PARTY-NOTICES.md",
-    "bin"
+    "bin",
+    "host"
   ],
   "engines": {
     "slicc-kernel": ">=1.7.2"
@@ -44,7 +45,8 @@
     "abi": "wasi",
     "commands": {
       "buf": {
-        "wasm": "bin/buf.wasm"
+        "wasm": "bin/buf.wasm",
+        "imports": "host/buf-host.mjs"
       }
     }
   }

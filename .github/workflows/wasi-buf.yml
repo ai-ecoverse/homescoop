@@ -1,7 +1,8 @@
 # wasi-buf is retired from the ladder (published only after certification),
 # so this workflow builds and tests it: buf.wasm from buf's pinned source with
 # the pinned Go and patches/ (built twice; the sha256 must match), then the
-# end-to-end suite on slicc-kernel's headless Node entry.
+# host module's unit tests and the end-to-end suite on slicc-kernel's headless
+# Node entry with a local HTTP server and git server.
 name: wasi-buf
 
 on:
@@ -69,6 +70,15 @@ jobs:
         with:
           name: buf-wasm-1
           path: packages/wasi-buf/package
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.26.7
+          cache: false
+      - name: host module unit tests
+        working-directory: packages/wasi-buf
+        run: node --test 'test/*.test.mjs'
+      - name: build the protoc-gen-go test plugin
+        run: bash packages/wasi-buf/test/fixtures/protoc-gen-go/build.sh
       - name: install test dependencies
         working-directory: packages/wasi-buf/test
         run: npm ci --no-audit --no-fund

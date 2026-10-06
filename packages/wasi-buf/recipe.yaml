@@ -1,6 +1,6 @@
 # buf (bufbuild/buf, the Protocol Buffers CLI) for slicc WASI preview1:
 # buf.wasm built by homescoop from buf's source with GOOS=wasip1 and the
-# patches in patches/.
+# patches in patches/, and a host-import module for slicc-kernel.
 name: wasi-buf
 # Not built by the ladder; .github/workflows/wasi-buf.yml builds and tests it.
 builder: retired
@@ -32,6 +32,8 @@ about:
     0001 lets unix-only files build for wasip1; 0002 prints unified diffs
     in-process (buf format -d/-w ran `diff -u`); 0003 leaves the Docker
     engine client out (only `buf beta registry plugin push` uses it);
-    0004 ends the workspace walk at paths no WASI preopen covers ("/").
-    Offline commands only: no process spawning (local protoc plugins, git
-    inputs) and no network (BSR, remote plugins) on wasip1 yet.
+    0004 ends the workspace walk at paths no WASI preopen covers ("/");
+    0005 starts commands, sends HTTP requests and takes cache file locks
+    through package/host/buf-host.mjs (buf_host imports) on slicc-kernel's
+    per-command imports hook, and reports ENOSYS-backed "unsupported" where
+    the runtime has no host module.
