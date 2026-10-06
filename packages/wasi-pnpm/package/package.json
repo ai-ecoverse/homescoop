@@ -17,6 +17,9 @@
     "pnpm"
   ],
   "type": "module",
+  "engines": {
+    "slicc-kernel": ">=1.7.2"
+  },
   "files": [
     "README.md",
     "LICENSE",

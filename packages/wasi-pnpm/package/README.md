@@ -1,7 +1,8 @@
 # @ai-ecoverse/wasi-pnpm
 
-[pnpm](https://pnpm.io) 12 for SLICC's WASI runtime (`@ai-ecoverse/slicc-kernel` ≥ 1.7.0):
-commands `pnpm` and `pn`.
+[pnpm](https://pnpm.io) 12 for SLICC's WASI runtime (`@ai-ecoverse/slicc-kernel` ≥ 1.7.2):
+commands `pnpm` and `pn`. Older kernels can lose a sync filesystem answer under
+load, which makes pnpm hang or fail with os error 73.
 
 `bin/pnpm.wasm` is built by homescoop from pnpm's source (v12.9.1, commit
 `5dafb09`) with pnpm's own `pnpm/wasm/build.mjs` (Rust nightly-2026-08-27,
