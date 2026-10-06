@@ -2,7 +2,7 @@
 name: py-numpy
 builder: host
 # renovate: datasource=pypi depName=numpy
-version: "2.3.2"
+version: "2.5.3"
 npm: "@ai-ecoverse/py-numpy"
 summary: "NumPy 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
