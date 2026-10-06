@@ -2,7 +2,7 @@
 name: py-scipy
 builder: host
 # renovate: datasource=pypi depName=scipy
-version: "1.18.0"
+version: "1.18.1"
 npm: "@ai-ecoverse/py-scipy"
 summary: "SciPy 1.18.0 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
