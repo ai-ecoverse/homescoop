@@ -77,7 +77,7 @@ static const unsigned char DOC_UTF_32[] = {
 
 static int parse_expect(const char *name, const unsigned char *doc, unsigned len,
                         const char *expect) {
-  xmlDocPtr d = xmlReadMemory((const char *)doc, (int)len, name, NULL, 0);
+  xmlDocPtr d = xmlReadMemory((const char *)doc, (int)len, name, name, 0);
   if (!d) {
     fprintf(stderr, "FAIL %s: xmlReadMemory\n", name);
     return 1;
