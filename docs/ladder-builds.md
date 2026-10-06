@@ -32,13 +32,20 @@ The same `pkg@version` on the registry is never rebuilt.
 OIDC publish always runs **on the runner** (`id-token: write`). One workflow
 file (`ladder-build.yml`) keeps a single `npm trust` target.
 
+`workflow_dispatch` input `publish` (default `true`) is the cert-queue valve:
+set `publish=false` on a PR branch to produce `package-tgz-<name>` without
+writing the registry. `ladder-merge` omits the input, so main still publishes.
+`ladder-pr` host-builds also upload that artifact (no OIDC). When
+`publish=false`, skip-if-already-published is ignored so a rebuild can still
+emit a tarball for recert.
+
 ## PR and merge automation
 
 | Workflow | When | What |
 | --- | --- | --- |
 | `ladder-pr.yml` | pull_request touching `packages/**` | Host-build each touched package (no publish) |
 | `ladder-merge.yml` | push to `main` under `packages/**` | `workflow_dispatch` each touched package on `ladder-build.yml` |
-| `ladder-build.yml` | `workflow_dispatch` only | Single-package build + OIDC publish |
+| `ladder-build.yml` | `workflow_dispatch` only | Single-package build; OIDC publish unless `publish=false` |
 
 `ladder-merge` must **not** `uses:` `ladder-build` as a reusable workflow: npm
 OIDC validates the *calling* workflow filename, and fledgling trusts only

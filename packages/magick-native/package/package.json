@@ -1,15 +1,51 @@
 {
   "name": "@ai-ecoverse/wasm-magick-native",
-  "version": "0.0.0",
-  "description": "Magick.Native Q8 wasm — name reservation stub; real artifacts TBD",
+  "version": "2026.824.1923-1",
+  "description": "Magick.Native Q8 wasm for magick-wasm / slicc (emscripten)",
   "license": "Apache-2.0",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
     "directory": "packages/magick-native/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/magick-native",
-  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "magick-native"],
-  "files": ["README.md", "LICENSE"],
-  "publishConfig": { "access": "public" }
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "magick-native",
+    "imagemagick"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "magick.js",
+    "magick.wasm",
+    "x86",
+    "etc"
+  ],
+  "exports": {
+    ".": "./magick.js",
+    "./x86": "./x86/magick.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "magick-native",
+    "upstream": "2026.824.1923"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "env": {
+      "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7"
+    },
+    "module": {
+      "glue": "magick.js",
+      "wasm": "magick.wasm",
+      "exportName": "MagickNativex86"
+    }
+  }
 }

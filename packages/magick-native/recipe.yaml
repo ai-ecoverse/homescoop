@@ -1,12 +1,19 @@
-# Homebrew-shaped recipe — Magick.Native Q8 wasm (ladder rung_native / rung_pkg).
+# Magick.Native Q8 wasm (ladder.sh rung_imq8 → rung_deps → rung_native).
 name: magick-native
-builder: slicc
+builder: host
+# renovate: datasource=github-tags depName=dlemstra/Magick.Native
 version: "2026.824.1923"
 npm: "@ai-ecoverse/wasm-magick-native"
 summary: "Magick.Native Q8 wasm (magick-wasm native side)"
 source:
-  url: null  # Magick.Native-2026.824.1923.tar.gz + ImageMagick pin from ladder
-  sha256: null
+  url: "https://github.com/dlemstra/Magick.Native/archive/refs/tags/{{version}}.tar.gz"
+  sha256: "01590c1259aa6c9ec754ef71af1dcdcbd246a8ff8c100d9b55a368fc01029b84"
+sources:
+  imagemagick:
+    # Magick.Native src/ImageMagick/ImageMagick.commit
+    version: "344e9056f43764bfdf82456faf3bc2feee98a6fe"
+    url: "https://github.com/ImageMagick/ImageMagick/archive/{{version}}.tar.gz"
+    sha256: "4a2329b539ae60e66e2e1f79e7f471ce5dbf35ef8261873059125248944fb1fc"
 dependencies:
   build:
     - "@ai-ecoverse/wasm-zlib@1.3.1-2"
@@ -24,6 +31,7 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/magick-native
   license: Apache-2.0
   notes: |
-    Port from slicc-emscripten harness/ladder.sh: rung_imq8 → rung_deps →
-    rung_native → rung_pkg. Ships magick.js / magick.wasm for
-    @dlemstra/magick-native layout.
+    Host port of slicc-emscripten harness/ladder.sh rung_imq8/deps/native.
+    Ships magick.js / magick.wasm (Q8, no HDRI) for the @dlemstra/magick-native
+    x86 layout. magick-wasm loads MagickNativex86 (MODULARIZE, EXPORT_ES6).
+    Do not publish uncertified.

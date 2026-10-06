@@ -1,3 +1,3 @@
 #!/usr/bin/env jsh
-console.error('homescoop: packages/magick-native/build.jsh not implemented yet — port ladder rung_native');
+console.error('homescoop: magick-native builder is host (build.sh). slicc cone not required.');
 process.exit(1);

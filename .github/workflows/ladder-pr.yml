@@ -113,6 +113,11 @@ jobs:
           set -euo pipefail
           bash scripts/host-run.sh "${{ matrix.package }}"
           ls -la .homescoop-out/package.tgz
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-tgz-${{ matrix.package }}
+          path: .homescoop-out/package.tgz
+          retention-days: 14
       - name: Link/run smoke.c against PREFIX
         run: bash scripts/host-smoke.sh "${{ matrix.package }}"
       - name: Record tarball sha256
