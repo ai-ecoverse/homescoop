@@ -34,7 +34,7 @@ export EM_PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 
 echo "== imagemagick: pkg-config delegates"
 "$PKG_CONFIG" --modversion zlib libjpeg libpng lcms2 libtiff-4 libwebp \
-  libwebpmux libwebpdemux libopenjp2 freetype2 libxml-2.0 | tr '\n' ' '
+  libwebpmux libwebpdemux libopenjp2 freetype2 | tr '\n' ' '
 echo
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
@@ -58,8 +58,8 @@ if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "${F
         --without-flif --without-fpx --without-fontconfig --without-gslib \
         --without-gvc --without-heic --without-jbig --without-jxl --without-lqr \
         --without-lzma --without-openexr --without-pango --without-raqm \
-        --without-raw --without-rsvg --without-uhdr --without-wmf --without-zip \
-        --without-zstd \
+        --without-raw --without-rsvg --without-uhdr --without-wmf --without-xml \
+        --without-zip --without-zstd \
         CFLAGS="-g1 -O2" \
         LDFLAGS="-L$PREFIX/lib"
     homescoop_fix_darwin_ar Makefile

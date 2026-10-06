@@ -18,7 +18,6 @@ dependencies:
     - "@ai-ecoverse/wasm-libwebp@1.5.0-1"
     - "@ai-ecoverse/wasm-openjpeg@2.5.3"
     - "@ai-ecoverse/wasm-freetype@2.13.3-1"
-    - "@ai-ecoverse/wasm-libxml2@2.13.8-1"
   host: []
   run: []
 about:
@@ -28,3 +27,5 @@ about:
     Port of slicc-emscripten harness/ladder.sh rung_magick. Links slicc cli
     profile. package.json slicc.commands maps magick/convert/identify/mogrify
     onto bin/magick{.wasm} with argv0 for multi-call names.
+    7.1.2-32-2 does not link libxml2 (configure DELEGATES/LIBS have no xml);
+    --without-xml so a later rebuild cannot pick it up by accident.
