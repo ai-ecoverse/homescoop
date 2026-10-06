@@ -2,7 +2,7 @@
 name: py-pandas
 builder: host
 # renovate: datasource=pypi depName=pandas
-version: "2.3.2"
+version: "2.3.3"
 npm: "@ai-ecoverse/py-pandas"
 summary: "Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
