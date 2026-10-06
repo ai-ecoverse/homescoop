@@ -1,4 +1,5 @@
-# After merge to main: dispatch ladder-build for each touched packages/<name>.
+# After merge to main: dispatch ladder-build for packages whose recipe.yaml
+# or package/ tree changed. build.sh / patches / docs do not publish.
 #
 # Important: do NOT `uses:` ladder-build as a reusable workflow. npm OIDC
 # trusted publishing validates the *calling* workflow filename
@@ -34,7 +35,7 @@ jobs:
           if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
             BEFORE=$(git rev-parse HEAD^ 2>/dev/null || echo HEAD)
           fi
-          PKGS=$(node scripts/list-touched-packages.mjs --base "$BEFORE" --head "$AFTER" --json)
+          PKGS=$(node scripts/list-touched-packages.mjs --base "$BEFORE" --head "$AFTER" --json --publishable)
           echo "packages=$PKGS" >> "$GITHUB_OUTPUT"
           echo "any=$([ "$PKGS" != '[]' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "touched=$PKGS"
