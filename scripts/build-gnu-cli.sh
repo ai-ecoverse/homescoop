@@ -76,8 +76,8 @@ if [[ ! -f "$SRC_DIR/$BIN_NAME" && ! -f "$SRC_DIR/$BIN_NAME.js" && ! -f "$SRC_DI
     homescoop_fix_darwin_ar Makefile
     jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
     if [[ "$NAME" == sed ]]; then
-      emmake make -j"$jobs" -C lib LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
-      emmake make -j"$jobs" -C sed LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
+      # SUBDIRS is "po . gnulib-tests"; gnulib-tests #error on emscripten.
+      emmake make -j"$jobs" SUBDIRS="po ." LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
     else
       emmake make -j"$jobs" LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
     fi
