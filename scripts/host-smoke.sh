@@ -39,8 +39,8 @@ emcc -O0 "$SMOKE" \
   -I"$PREFIX/include" -L"$PREFIX/lib" \
   "${ldflags[@]}" \
   -sNODERAWFS=1 \
-  -o "$WORKDIR/smoke.js"
+  -o "$WORKDIR/smoke.cjs"
 
-echo "== host-smoke: node $WORKDIR/smoke.js"
-node "$WORKDIR/smoke.js" "$WORKDIR"
+echo "== host-smoke: node $WORKDIR/smoke.cjs"
+node "$WORKDIR/smoke.cjs" "$WORKDIR"
 echo "== host-smoke: $name OK"
