@@ -1,0 +1,38 @@
+{
+  "name": "@ai-ecoverse/py-six",
+  "version": "1.17.0-2",
+  "description": "six for slicc WASIX CPython",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-six/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-six",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {},
+  "homescoop": {
+    "recipe": "py-six",
+    "upstream": "1.17.0"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages"
+    }
+  }
+}

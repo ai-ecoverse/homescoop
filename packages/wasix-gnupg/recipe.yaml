@@ -1,0 +1,22 @@
+# GnuPG 2.4 for slicc WASIX (wasixcc): gpg, gpgv, gpg-agent, gpgconf,
+# gpg-connect-agent. Static libgpg-error / libgcrypt / libassuan / libksba /
+# npth are built from their own tarballs in build.sh (versions + sha256 there).
+name: wasix-gnupg
+builder: host
+version: "2.4.9"
+npm: "@ai-ecoverse/wasix-gnupg"
+summary: "GnuPG 2.4 for slicc WASIX (gpg, gpg-agent, gpgconf)"
+source:
+  url: "https://gnupg.org/ftp/gcrypt/gnupg/gnupg-{{version}}.tar.bz2"
+  sha256: "dd17ab2e9a04fd79d39d853f599cbc852062ddb9ab52a4ddeb4176fd8b302964"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://gnupg.org/
+  license: GPL-3.0-or-later
+  notes: |
+    WASIX (real threads for npth). No fork: spawns are posix_spawn and
+    gpg-agent --daemon detaches by running itself again (patches/).
+    Passphrases: pinentry-mode loopback by default (no pinentry program).

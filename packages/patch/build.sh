@@ -36,5 +36,5 @@ STAGE="$SRC/src"
 if [[ -f "$STAGE/patch.js" && ! -f "$STAGE/patch" ]]; then mv "$STAGE/patch.js" "$STAGE/patch"; fi
 test -f "$STAGE/patch.wasm" || test -f "$STAGE/patch"
 homescoop_stage_cli "$STAGE" patch
-homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
 echo "== patch: staged → $HOMESCOOP_PKG/package"

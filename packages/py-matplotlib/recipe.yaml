@@ -1,0 +1,23 @@
+name: py-matplotlib
+builder: host
+version: "3.11.2"
+npm: "@ai-ecoverse/py-matplotlib"
+summary: "matplotlib Agg for slicc WASIX CPython 3.14"
+dependencies:
+  build: [wasix-python, py-numpy, freetype]
+  host: []
+  run:
+    - wasix-python
+    - py-numpy
+    - py-contourpy
+    - py-cycler
+    - py-fonttools
+    - py-kiwisolver
+    - py-packaging
+    - py-pillow
+    - py-pyparsing
+    - py-python-dateutil
+about:
+  license: PSF-2.0
+  notes: |
+    Agg backend. FreeType statically linked (PIC wasixcc). No wasm-* runtime deps.

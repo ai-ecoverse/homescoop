@@ -1,0 +1,31 @@
+# Pandas for slicc WASIX CPython 3.14 (side modules, dlopen).
+name: py-pandas
+builder: host
+# renovate: datasource=pypi depName=pandas
+version: "2.3.2"
+npm: "@ai-ecoverse/py-pandas"
+summary: "Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
+source:
+  url: "https://files.pythonhosted.org/packages/source/p/pandas/pandas-{{version}}.tar.gz"
+  sha256: "fdc955b27b1400b4272c488ad74dae9260bce835c965b9d7a26703545671044e"
+dependencies:
+  build:
+    - wasix-python
+    - py-numpy
+  host: []
+  run:
+    - wasix-python
+    - py-numpy
+    - py-python-dateutil
+    - py-pytz
+    - py-tzdata
+    - py-six
+about:
+  homepage: https://pandas.pydata.org
+  license: BSD-3-Clause
+  notes: |
+    Cross-built like py-numpy: real meson cross file (host_machine wasi/wasm32),
+    wasixcc shared-library (exnref-ehpic), wasix-python + wasm py-numpy includes
+    (NPY_SIZEOF_LONG=4). Wheel tag cp314-cp314-wasix_wasm32; meson-python emits
+    *cpython-314-wasm32-wasix.so natively (no Darwin rename). Cython 3.1.3.
+    Manifest slicc.python requires abi=cp314 platform=wasix_wasm32.

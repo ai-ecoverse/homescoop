@@ -1,0 +1,31 @@
+# Go 1.26 toolchain tools for SLICC's `go` driver (GO-CONTRACT / PR #3657).
+# Queue: after wasix-python, py-numpy, py-pandas. Revision versions only.
+#
+# Package split (40 MiB npm cap):
+#   @ai-ecoverse/wasm-go              — VERSION + pkg/tool/wasip1_wasm/{compile,link,asm}
+#   @ai-ecoverse/wasm-go-std-wasip1   — std .a for wasip1/wasm (~30 MB gzipped alone)
+#   @ai-ecoverse/wasm-go-std-linux-amd64 — optional cross-compile std (optional later)
+name: wasm-go
+builder: host
+# renovate: datasource=golang-version
+version: "1.26.5"
+npm: "@ai-ecoverse/wasm-go"
+summary: "Go 1.26 wasip1 tools (compile/link/asm) for slicc go driver"
+source:
+  url: "https://go.dev/dl/go{{version}}.src.tar.gz"
+  sha256: "495be4bc87176ac567392e5b4116abd98466d33d7b49d41e764ccc6976b2dc42"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://go.dev
+  license: BSD-3-Clause
+  notes: |
+    Reference: slicc GO-CONTRACT.md / tmp-wasi/live/go/build.sh.
+    Stage goroot/VERSION + goroot/pkg/tool/wasip1_wasm/{compile,link,asm}
+    (no extension): GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 go build -trimpath
+    -ldflags='-s -w' cmd/<tool>, same host Go version as recipe.
+    Manifest slicc.go only — do NOT list go/compile/link in slicc.commands
+    (SLICC TS driver owns `go`). Std archives ship in wasm-go-std-* packages;
+    driver unions slicc.go.std by (version, target).

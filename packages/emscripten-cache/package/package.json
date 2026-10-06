@@ -1,0 +1,36 @@
+{
+  "name": "@ai-ecoverse/emscripten-cache",
+  "version": "6.0.9-3",
+  "description": "Prebuilt Emscripten 6.0.9 sysroot for slicc (read-only seed)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/emscripten-cache/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/emscripten-cache",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "sysroot"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "EMSCRIPTEN_VERSION",
+    "sysroot",
+    "stamps"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "emscripten-cache",
+    "upstream": "6.0.9"
+  },
+  "slicc": {
+    "abi": "emscripten"
+  }
+}

@@ -1,0 +1,98 @@
+--- a/src/Compilation.zig
++++ b/src/Compilation.zig
+@@ -2614,8 +2614,10 @@
+                 } else if (target.isWasiLibC()) {
+                     if (!std.zig.target.canBuildLibC(target)) return diag.fail(.cross_libc_unavailable);
+ 
+-                    comp.queued_jobs.wasi_libc_crt_file[@intFromEnum(wasi_libc.execModelCrtFile(comp.config.wasi_exec_model))] = true;
+-                    comp.queued_jobs.wasi_libc_crt_file[@intFromEnum(wasi_libc.CrtFile.libc_a)] = true;
++                    if (!try comp.homescoopUsePrebuiltWasiLibc(gpa, io)) {
++                        comp.queued_jobs.wasi_libc_crt_file[@intFromEnum(wasi_libc.execModelCrtFile(comp.config.wasi_exec_model))] = true;
++                        comp.queued_jobs.wasi_libc_crt_file[@intFromEnum(wasi_libc.CrtFile.libc_a)] = true;
++                    }
+                 } else if (target.isMinGW()) {
+                     if (!std.zig.target.canBuildLibC(target)) return diag.fail(.cross_libc_unavailable);
+ 
+@@ -2634,7 +2636,9 @@
+             if (comp.wantBuildLibUnwindFromSource()) {
+                 comp.queued_jobs.libunwind = true;
+             }
+-            if (build_options.have_llvm and is_exe_or_dyn_lib and comp.config.link_libcpp) {
++            if (build_options.have_llvm and is_exe_or_dyn_lib and comp.config.link_libcpp and
++                !try comp.homescoopUsePrebuiltLibCxx(gpa, io))
++            {
+                 comp.queued_jobs.libcxx = true;
+                 comp.queued_jobs.libcxxabi = true;
+             }
+@@ -7332,6 +7336,71 @@
+     try std.testing.expectEqual(FileExt.zig, classifyFileExt("foo.zig"));
+ }
+ 
++/// homescoop: the wasm32-wasi compiler (SLICC) ships wasi-libc and libc++ /
++/// libc++abi prebuilt for its native target, as Zig itself builds them, in
++/// lib/prebuilt/wasm32-wasi/. Building them takes minutes there (hundreds of C
++/// files) and re-validating their cache entries costs every link seconds, so a
++/// matching target links the shipped archives instead: wasm32-wasi-musl, the
++/// baseline CPU, single-threaded, static, non-PIC, linked by LLD. Anything else
++/// builds from source as usual.
++fn homescoopPrebuiltTarget(comp: *const Compilation) bool {
++    if (builtin.os.tag != .wasi) return false;
++    const target = &comp.root_mod.resolved_target.result;
++    if (target.cpu.arch != .wasm32 or target.os.tag != .wasi or target.abi != .musl) return false;
++    const baseline = std.Target.Cpu.baseline(target.cpu.arch, target.os);
++    if (target.cpu.model != baseline.model or !target.cpu.features.eql(baseline.features)) return false;
++    return !comp.config.any_non_single_threaded and !comp.config.pie and !comp.config.shared_memory and
++        comp.config.link_mode == .static and comp.config.use_lld;
++}
++
++/// A prebuilt archive or object under lib/, held open as its own "lock" (what a
++/// cache-built CrtFile holds), or null when it is not shipped.
++fn homescoopPrebuiltCrtFile(comp: *Compilation, gpa: Allocator, io: Io, sub_path: []const u8) Allocator.Error!?CrtFile {
++    const file = comp.dirs.zig_lib.handle.openFile(io, sub_path, .{}) catch return null;
++    return .{
++        .lock = .{ .manifest_file = file },
++        .full_object_path = .{ .root_dir = comp.dirs.zig_lib, .sub_path = try gpa.dupe(u8, sub_path) },
++    };
++}
++
++fn homescoopUsePrebuiltWasiLibc(comp: *Compilation, gpa: Allocator, io: Io) Allocator.Error!bool {
++    if (!comp.homescoopPrebuiltTarget()) return false;
++    const crt_name = wasi_libc.execModelCrtFileFullName(comp.config.wasi_exec_model);
++    const dir = "prebuilt" ++ fs.path.sep_str ++ "wasm32-wasi" ++ fs.path.sep_str;
++    const crt_path = try std.fmt.allocPrint(gpa, dir ++ "{s}", .{crt_name});
++    defer gpa.free(crt_path);
++    var crt = try comp.homescoopPrebuiltCrtFile(gpa, io, crt_path) orelse return false;
++    var libc = try comp.homescoopPrebuiltCrtFile(gpa, io, dir ++ "libc.a") orelse {
++        crt.deinit(gpa, io);
++        return false;
++    };
++    try comp.crt_files.ensureUnusedCapacity(gpa, 2);
++    const crt_key = gpa.dupe(u8, crt_name) catch |err| {
++        crt.deinit(gpa, io);
++        libc.deinit(gpa, io);
++        return err;
++    };
++    comp.crt_files.putAssumeCapacityNoClobber(crt_key, crt);
++    comp.crt_files.putAssumeCapacityNoClobber(try gpa.dupe(u8, "libc.a"), libc);
++    return true;
++}
++
++fn homescoopUsePrebuiltLibCxx(comp: *Compilation, gpa: Allocator, io: Io) Allocator.Error!bool {
++    if (!comp.homescoopPrebuiltTarget()) return false;
++    // Zig builds libc++ in the compiler-rt optimize mode; only Debug's default ships.
++    if (comp.compilerRtOptMode() != target_util.defaultCompilerRtOptimizeMode(&comp.root_mod.resolved_target.result))
++        return false;
++    const dir = "prebuilt" ++ fs.path.sep_str ++ "wasm32-wasi" ++ fs.path.sep_str;
++    var cxx = try comp.homescoopPrebuiltCrtFile(gpa, io, dir ++ "libc++.a") orelse return false;
++    const cxxabi = try comp.homescoopPrebuiltCrtFile(gpa, io, dir ++ "libc++abi.a") orelse {
++        cxx.deinit(gpa, io);
++        return false;
++    };
++    comp.libcxx_static_lib = cxx;
++    comp.libcxxabi_static_lib = cxxabi;
++    return true;
++}
++
+ fn get_libc_crt_file(comp: *Compilation, arena: Allocator, basename: []const u8) !Cache.Path {
+     return (try crtFilePath(&comp.crt_files, basename)) orelse {
+         const lci = comp.libc_installation orelse return error.LibCInstallationNotAvailable;

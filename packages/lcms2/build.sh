@@ -5,8 +5,6 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe lcms2
-SRC_DIR="$WORK/lcms2-2.17"
-TARBALL="$WORK/lcms2-2.17.tar.gz"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
@@ -29,5 +27,6 @@ homescoop_stage_lib "$SRC_DIR/src/.libs/liblcms2.a" liblcms2.a
 mkdir -p "$HOMESCOOP_PKG/package/include" "$PREFIX/include"
 cp "$SRC_DIR/include/"*.h "$HOMESCOOP_PKG/package/include/"
 cp "$SRC_DIR/include/"*.h "$PREFIX/include/"
+homescoop_write_pc lcms2 "$VERSION" "-llcms2"
 homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== lcms2: staged → $HOMESCOOP_PKG/package"

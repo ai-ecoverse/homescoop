@@ -19,6 +19,11 @@ homescoop_load_recipe() {
   # Primary load must export SRC_URL/SRC_SHA; secondary loads only PREFIX_* vars.
   if [[ "$*" != *"--source"* ]]; then
     : "${SRC_URL:?}" "${SRC_SHA:?}"
+    # Dist tarball layout: <name>-<version>/ next to basename(url).
+    HOMESCOOP_TARBALL_NAME="${HOMESCOOP_TARBALL_NAME:-$(basename "${SRC_URL%%\?*}")}"
+    HOMESCOOP_SRC_DIR_NAME="${HOMESCOOP_SRC_DIR_NAME:-${NAME}-${VERSION}}"
+    TARBALL="${TARBALL:-$WORK/$HOMESCOOP_TARBALL_NAME}"
+    SRC_DIR="${SRC_DIR:-$WORK/$HOMESCOOP_SRC_DIR_NAME}"
   fi
 }
 
@@ -34,7 +39,11 @@ homescoop_apply_patches() {
       continue
     fi
     echo "== patch $(basename "$p")"
-    patch -d "$srcdir" -p1 < "$p"
+    if ! patch -d "$srcdir" -p1 < "$p"; then
+      echo "homescoop_apply_patches: $(basename "$p") does not apply to ${NAME:-?} ${VERSION:-?}" >&2
+      echo "This is a patch failure, not a checksum error. Park the bump or refresh the patch." >&2
+      return 1
+    fi
     touch "$marker"
   done
   shopt -u nullglob
@@ -66,9 +75,19 @@ homescoop_fetch() {
   local url="$1" sha="$2" tarball="$3"
   if [[ ! -f "$tarball" ]]; then
     echo "== fetch $url"
-    curl -fsSL "$url" -o "$tarball"
+    if ! curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "$url" -o "$tarball"; then
+      echo "homescoop_fetch: download failed ($url)" >&2
+      echo "Check that source.url derives from {{version}} / {{major}}.{{minor}} and that the file exists." >&2
+      return 1
+    fi
   fi
-  echo "$sha  $tarball" | shasum -a 256 -c -
+  if ! echo "$sha  $tarball" | shasum -a 256 -c -; then
+    echo "homescoop_fetch: sha256 mismatch for $tarball" >&2
+    echo "URL: $url" >&2
+    echo "recipe sha256: $sha" >&2
+    echo "Renovate only rewrites version:. Refresh checksums with: node scripts/refresh-recipe-sha.mjs ${NAME:-<package>}" >&2
+    return 1
+  fi
 }
 
 homescoop_extract() {
@@ -136,7 +155,7 @@ homescoop_require_lib_size() {
 homescoop_em_cli_ldflags() {
   local extra="${HOMESCOOP_EM_CLI_LDFLAGS_EXTRA:-}"
   # shellcheck disable=SC2086
-  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1${extra:+ ${extra}}"
+  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1${extra:+ ${extra}}"
 }
 
 homescoop_slicc_dir() {
@@ -152,7 +171,20 @@ homescoop_slicc_archive() {
   local -a objs=()
   dir="$(homescoop_slicc_dir)"
   odir="$(dirname "$out")/slicc-objs-${profile}"
+  # Always rebuild shims — stale .o can encode the wrong sigaction stride
+  # (20 vs 140) when EM_CACHE pointed at an old sysroot.
+  rm -rf "$odir"
   mkdir -p "$(dirname "$out")" "$odir"
+  # Shim objects must see musl headers with sigset_t 128 bytes (sigaction=140).
+  # A leftover EM_CACHE with sigset_t.__bits[2] silently breaks slicc_sig_mask;
+  # slicc_signals.c _Static_assert also catches it at compile.
+  if [[ -n "${EM_CACHE:-}" && -f "${EM_CACHE}/sysroot/include/bits/alltypes.h" ]]; then
+    if grep -q '__bits\[2\]' "${EM_CACHE}/sysroot/include/bits/alltypes.h"; then
+      echo "homescoop_slicc_archive: EM_CACHE=$EM_CACHE has sigset_t __bits[2] (stride-20 trap)" >&2
+      echo "  Fix: point EM_CACHE at a sysroot with __bits[128/sizeof(long)], or unset it." >&2
+      return 1
+    fi
+  fi
   _homescoop_slicc_compile() {
     src="$1"
     base=$(basename "$src" .c)
@@ -168,6 +200,7 @@ homescoop_slicc_archive() {
     spawn)
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
@@ -176,6 +209,7 @@ homescoop_slicc_archive() {
       # slicc_jobs is harmless here (pgid/sid/tc*pgrp for the jobserver path).
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_main_envp.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
@@ -187,6 +221,7 @@ homescoop_slicc_archive() {
       # readline's blocking poll goes through the kernel (not Asyncify FS waits).
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
@@ -205,6 +240,7 @@ homescoop_slicc_archive() {
       # No fork/ASYNCIFY — that stays bash-only.
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
@@ -217,6 +253,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
@@ -227,6 +264,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_spawn.c"
       _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
@@ -256,7 +294,10 @@ homescoop_slicc_keep_exports() {
 # enough for execve — emscripten libstubs.a ships a weak execve stub, and
 # archive member extraction can leave that stub as the winner.
 homescoop_slicc_keep_spawn() {
-  printf '%s' "-Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture"
+  # posix_spawn/popen/system: without -u, wasm-ld --gc-sections drops them from
+  # the whole-archive member and emscripten's ENOSYS stubs / _emscripten_system
+  # win (gawk pipes, sed e, system()).
+  printf '%s' "-Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture -Wl,-u,posix_spawn -Wl,-u,posix_spawnp -Wl,-u,popen -Wl,-u,pclose -Wl,-u,system"
 }
 
 # LDFLAGS fragment: keep exports + whole-archive around a slicc .a.
@@ -320,4 +361,144 @@ EOF
 )
   printf '%s\n' "$body" >"$dest_pkg/${name}.pc"
   printf '%s\n' "$body" >"$dest_pfx/${name}.pc"
+}
+
+# Write missing .pc files into PREFIX for staged static libs (npm deps often
+# ship lib/*.a + include/ without pkgconfig/). Used by ImageMagick configure.
+homescoop_ensure_prefix_pcs() {
+  local pfx="${PREFIX:?}"
+  local pcdir="$pfx/lib/pkgconfig"
+  mkdir -p "$pcdir"
+
+  # args: <pc-name> <archive-basename> <Libs flags> [Requires]
+  _ensure_one() {
+    local pc="$1" archive="$2" libs="$3" requires="${4:-}"
+    local dest="$pcdir/${pc}.pc"
+    if [[ -f "$dest" ]]; then
+      return 0
+    fi
+    if [[ ! -f "$pfx/lib/${archive}" ]]; then
+      return 0
+    fi
+    cat >"$dest" <<EOF
+prefix=${pfx}
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: ${pc}
+Description: ${pc} (homescoop wasm / emscripten, synthesized)
+Version: 0
+Requires: ${requires}
+Cflags: -I\${includedir}
+Libs: -L\${libdir} ${libs}
+EOF
+    echo "== ensure-pc: $dest"
+  }
+
+  _ensure_one zlib libz.a "-lz"
+  _ensure_one libjpeg libjpeg.a "-ljpeg"
+  _ensure_one libpng libpng16.a "-lpng16" "zlib"
+  # unversioned alias some consumers probe
+  if [[ -f "$pfx/lib/libpng.a" && ! -f "$pcdir/libpng.pc" ]]; then
+    _ensure_one libpng libpng.a "-lpng" "zlib"
+  fi
+  _ensure_one lcms2 liblcms2.a "-llcms2"
+  _ensure_one libtiff-4 libtiff.a "-ltiff" "zlib libjpeg"
+  _ensure_one libwebp libwebp.a "-lwebp"
+  _ensure_one libwebpmux libwebpmux.a "-lwebpmux" "libwebp"
+  _ensure_one libwebpdemux libwebpdemux.a "-lwebpdemux" "libwebp"
+  _ensure_one libopenjp2 libopenjp2.a "-lopenjp2"
+  _ensure_one freetype2 libfreetype.a "-lfreetype"
+  _ensure_one libxml-2.0 libxml2.a "-lxml2"
+}
+
+# Ship .pyc next to .py (unchecked-hash) so WASIX imports skip recompile.
+# Host CPython must share wasix-python's magic (3.14.x). Last build step.
+# Usage: homescoop_compile_pyc <dir> [<dir>…]
+#   dirs = trees that contain .py (e.g. package/lib/python3.14/site-packages)
+homescoop_compile_pyc() {
+  local HOST_PY="${WASIX_PYTHON_HOST_PY:-}"
+  local root stale=0 py dir base pyc cand
+  if [[ -z "$HOST_PY" ]]; then
+    if command -v python3.14 >/dev/null 2>&1; then
+      HOST_PY=$(command -v python3.14)
+    else
+      HOST_PY=$(command -v python3)
+    fi
+  fi
+  if [[ $# -lt 1 ]]; then
+    echo "homescoop_compile_pyc: need at least one directory" >&2
+    return 1
+  fi
+  for root in "$@"; do
+    if [[ ! -d "$root" ]]; then
+      echo "homescoop_compile_pyc: not a directory: $root" >&2
+      return 1
+    fi
+    echo "== compileall (unchecked-hash): $root"
+    find "$root" -type d -name '__pycache__' -prune -exec rm -rf {} +
+    "$HOST_PY" -m compileall -q -j0 --invalidation-mode unchecked-hash -d "$root" "$root"
+  done
+  for root in "$@"; do
+    while IFS= read -r -d '' py; do
+      dir=$(dirname "$py")
+      base=$(basename "$py" .py)
+      pyc=""
+      for cand in "$dir/__pycache__/${base}".cpython-*.pyc; do
+        if [[ -f "$cand" ]]; then pyc=$cand; break; fi
+      done
+      if [[ -z "$pyc" || "$py" -nt "$pyc" ]]; then
+        echo "homescoop: stale/missing pyc for $py" >&2
+        stale=1
+      fi
+    done < <(find "$root" -name '*.py' -print0)
+  done
+  if [[ "$stale" -ne 0 ]]; then
+    return 1
+  fi
+}
+
+# Assert a package directory / npm tarball contains no symlinks or hardlinks.
+# npm/pacote and ipk skip symlinks; hardlinks also break on extract.
+# Usage: homescoop_assert_no_package_links <package-dir>
+#        homescoop_assert_tarball_no_links <file.tgz>
+homescoop_assert_no_package_links() {
+  local dir="${1:?homescoop_assert_no_package_links <package-dir>}"
+  local bad
+  bad=$(find "$dir" \( -type l -o \( -type f ! -links 1 \) \) 2>/dev/null | head -50 || true)
+  if [[ -n "$bad" ]]; then
+    echo "homescoop: PRESTAGE fail — package has symlinks/hardlinks:" >&2
+    echo "$bad" >&2
+    return 1
+  fi
+  echo "  PRESTAGE: no symlinks/hardlinks in $dir"
+}
+
+homescoop_assert_tarball_no_links() {
+  local tgz="${1:?homescoop_assert_tarball_no_links <tgz>}"
+  local hits
+  hits=$(tar tvzf "$tgz" | grep -E '^[lh]' || true)
+  if [[ -n "$hits" ]]; then
+    echo "homescoop: PRESTAGE fail — tarball has symlinks/hardlinks:" >&2
+    echo "$hits" >&2
+    return 1
+  fi
+  echo "  PRESTAGE: tarball has no symlinks/hardlinks ($(basename "$tgz"))"
+}
+
+# npm pack a package dir, assert no links in the .tgz, print path on stdout.
+# Usage: tgz=$(homescoop_npm_pack_no_links <package-dir> [outdir])
+homescoop_npm_pack_no_links() {
+  local pkg="${1:?}"
+  local outdir="${2:-$(pwd)}"
+  local tgz
+  (
+    cd "$pkg"
+    npm pack --pack-destination "$outdir" >/dev/null
+  )
+  tgz=$(ls -t "$outdir"/*.tgz 2>/dev/null | head -1)
+  [[ -f "$tgz" ]] || { echo "homescoop: npm pack produced no tgz" >&2; return 1; }
+  homescoop_assert_tarball_no_links "$tgz" >&2
+  printf '%s\n' "$tgz"
 }

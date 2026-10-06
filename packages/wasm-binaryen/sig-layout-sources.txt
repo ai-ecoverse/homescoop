@@ -1,0 +1,3 @@
+# Linked wasm-binaryen CLI objects currently have no sigaction/sigset_t layout.
+# third_party/wabt/wasm2c/wasm-rt-impl.c would be listed here if it entered
+# libbinaryen.a or a tool .o; slicc-sig-layout-guard.py fails the build then.
