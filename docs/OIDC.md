@@ -6,7 +6,7 @@ Token-less publishes from GitHub Actions on `ai-ecoverse/homescoop`.
 
 | Workflow | Role |
 | --- | --- |
-| [`ladder-build.yml`](../.github/workflows/ladder-build.yml) | Sole publisher — host or SLICC build, pack, `npm publish` with OIDC |
+| [`ladder-build.yml`](../.github/workflows/ladder-build.yml) | Sole CI publisher — host or SLICC build, pack, `npm publish` with OIDC. First publish of a version still happens from a laptop (certified tarball); CI may OIDC-publish an unpublished version only when `certified=<sha256>` matches the built tarball. |
 
 Fledgling’s `"workflow"` is `ladder-build.yml`. Re-run `npm run trust` after
 changing it.

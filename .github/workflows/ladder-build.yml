@@ -26,6 +26,11 @@ on:
         required: false
         default: true
         type: boolean
+      certified:
+        description: sha256 of the certified tarball. Required to OIDC-publish a version that is not already on npm; must match the built package.tgz.
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -160,6 +165,7 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: package-tgz-${{ inputs.package }}
@@ -194,6 +200,17 @@ jobs:
           done
           VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
           NPM="${{ needs.resolve.outputs.npm }}"
+          set +e
+          node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
+          gate=$?
+          set -e
+          if [[ "$gate" -eq 10 ]]; then
+            echo "already on registry: $NPM@$VER — skip OIDC publish"
+            exit 0
+          fi
+          if [[ "$gate" -ne 0 ]]; then
+            exit "$gate"
+          fi
           echo "publishing $NPM@$VER"
           attempt=1
           max=4
