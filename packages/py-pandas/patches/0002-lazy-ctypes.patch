@@ -1,0 +1,47 @@
+From: homescoop <homescoop@ai-ecoverse>
+Subject: [PATCH] Lazy-import ctypes (errors + interchange)
+
+Defer ctypes imports so import pandas works without _ctypes/libffi.
+Clipboard module may keep its top-level import (not on import path).
+
+--- a/pandas/errors/__init__.py	2026-09-30 11:31:06.313147715 +0200
++++ b/pandas/errors/__init__.py	2026-09-30 11:31:06.271474771 +0200
+@@ -3,8 +3,6 @@
+ """
+ from __future__ import annotations
+ 
+-import ctypes
+-
+ from pandas._config.config import OptionError
+ 
+ from pandas._libs.tslibs import (
+@@ -633,7 +631,10 @@
+     """
+ 
+     def __init__(self, message: str) -> None:
++        # Lazy: ctypes/_ctypes is optional (e.g. WASIX has no libffi).
+         # attr only exists on Windows, so typing fails on other platforms
++        import ctypes
++
+         message += f" ({ctypes.WinError()})"  # type: ignore[attr-defined]
+         super().__init__(message)
+ 
+--- a/pandas/core/interchange/from_dataframe.py	2026-09-30 11:31:06.313324049 +0200
++++ b/pandas/core/interchange/from_dataframe.py	2026-09-30 11:31:06.278152921 +0200
+@@ -1,6 +1,5 @@
+ from __future__ import annotations
+ 
+-import ctypes
+ import re
+ from typing import Any
+ 
+@@ -470,6 +469,9 @@
+     # TODO: No DLPack yet, so need to construct a new ndarray from the data pointer
+     # and size in the buffer plus the dtype on the column. Use DLPack as NumPy supports
+     # it since https://github.com/numpy/numpy/pull/19083
++    # Lazy: ctypes/_ctypes is optional (e.g. WASIX has no libffi).
++    import ctypes
++
+     ctypes_type = np.ctypeslib.as_ctypes_type(column_dtype)
+ 
+     if bit_width == 1:

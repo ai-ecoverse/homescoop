@@ -1,0 +1,14 @@
+name: py-python-dateutil
+builder: host
+version: "2.9.0.post0"
+npm: "@ai-ecoverse/py-python-dateutil"
+summary: "python-dateutil for slicc WASIX CPython"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  license: Apache-2.0
+  notes: |
+    Pure-Python wheel staged into lib/python3.14/site-packages.
+    slicc.python.sitePackages only (no abi/platform requires).

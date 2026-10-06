@@ -1,0 +1,14 @@
+name: py-pytz
+builder: host
+version: "2026.4"
+npm: "@ai-ecoverse/py-pytz"
+summary: "pytz for slicc WASIX CPython"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  license: MIT
+  notes: |
+    Pure-Python wheel staged into lib/python3.14/site-packages.
+    slicc.python.sitePackages only (no abi/platform requires).

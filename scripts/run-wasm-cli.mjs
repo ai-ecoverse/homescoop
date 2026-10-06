@@ -14,7 +14,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import http from 'node:http';
 import net from 'node:net';
 import fs from 'node:fs';
-import { execSync, spawnSync } from 'node:child_process';
+import { execSync, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -32,6 +32,7 @@ fs.mkdirSync(work, { recursive: true });
 const pkgRoot = dirname(dirname(glue));
 const execPath = join(pkgRoot, 'libexec', 'git-core');
 const binPath = join(pkgRoot, 'bin');
+const templatePath = join(pkgRoot, 'share', 'git-core', 'templates');
 
 let httpServer = null;
 let httpPort = 0;
@@ -46,24 +47,42 @@ function spin(ms) {
   }
 }
 
+const bashGlue = process.env.SMOKE_BASH
+  || join(resolve(pkgRoot, '..', '..', 'bash', 'package', 'bin'), 'bash');
+
+function isShellScript(path) {
+  try {
+    const fd = fs.openSync(path, 'r');
+    const buf = Buffer.alloc(2);
+    fs.readSync(fd, buf, 0, 2, 0);
+    fs.closeSync(fd);
+    return buf.toString('utf8') === '#!';
+  } catch {
+    return false;
+  }
+}
+
 function resolveHelperGlue(file) {
   const base = basename(file);
+  // Prefer bin/ (upload/receive-pack glue+wasm) over libexec.
   for (const dir of [binPath, execPath, dirname(glue)]) {
     const cand = join(dir, base);
     if (fs.existsSync(cand)) return cand;
   }
-  // argv0 builtin: fall back to main git glue (looks up git.wasm)
+  // argv0 builtin: multi-call via main git glue.
   if (base.startsWith('git-') && fs.existsSync(join(binPath, 'git'))) {
     return join(binPath, 'git');
   }
   return null;
 }
 
-function makeSpawnKernel() {
+function makeSpawnKernel(getFS) {
   return {
-    spawn(file, args, env, cwd) {
+    // stdio: [child_stdin_fd, child_stdout_fd, child_stderr_fd] in the parent FS.
+    spawn(file, args, env, cwd, stdio = [0, 1, 2], _pairs = []) {
       let helper = resolveHelperGlue(file);
       let mainArgs = args.slice(1);
+      let argv0Hint = basename(file);
       // git often runs: /bin/sh -c "git-upload-pack 'path'"
       if (
         (file === '/bin/sh' || file === '/bin/bash' || basename(file) === 'sh') &&
@@ -75,13 +94,63 @@ function makeSpawnKernel() {
         if (m) {
           helper = resolveHelperGlue(m[1]);
           mainArgs = [m[2]];
+          argv0Hint = m[1];
         }
       }
+      if (process.env.SMOKE_DEBUG) {
+        console.error(`[smoke-spawn] file=${file} helper=${helper} argv0=${argv0Hint} args=${JSON.stringify(mainArgs)} stdio=${stdio}`);
+      }
       if (!helper) return -44; // ENOENT
-      const pid = nextPid++;
-      const r = spawnSync(
+      let spawnGlue = helper;
+      let spawnArgs = mainArgs;
+      if (isShellScript(helper)) {
+        if (!fs.existsSync(bashGlue)) {
+          console.error(`[smoke-spawn] shell script ${helper} but no bash at ${bashGlue}`);
+          return -44;
+        }
+        spawnGlue = bashGlue;
+        spawnArgs = [helper, ...mainArgs];
+      } else if (
+        basename(helper) === 'git' &&
+        /^git-/.test(argv0Hint) &&
+        argv0Hint !== 'git'
+      ) {
+        spawnArgs = [argv0Hint, ...mainArgs];
+      }
+
+      const [cin, cout, cerr] = stdio;
+      // Shared stdio with parent (0/1/2): run to completion — no protocol pipes.
+      const shared = (cin === 0 || cin < 0) && (cout === 1 || cout < 0);
+      if (shared || process.env.SMOKE_NESTED === '1') {
+        const r = spawnSync(
+          process.execPath,
+          [selfPath, spawnGlue, '--', ...spawnArgs],
+          {
+            cwd: cwd || work,
+            env: {
+              ...process.env,
+              ...(env || {}),
+              SMOKE_WORKDIR: work,
+              SMOKE_NESTED: '1',
+              SMOKE_THISPROGRAM: basename(spawnGlue),
+            },
+            encoding: 'utf8',
+            maxBuffer: 64 * 1024 * 1024,
+          }
+        );
+        if (r.error) return r.error.code === 'ENOENT' ? -44 : -29;
+        if (r.stdout) process.stdout.write(r.stdout);
+        if (r.stderr) process.stderr.write(r.stderr);
+        const status = r.status ?? (r.signal ? 128 : 1);
+        const pid = nextPid++;
+        childStatus.set(pid, status << 8);
+        return pid;
+      }
+
+      // Bidirectional pipes (local clone → upload-pack): async child + pump.
+      const child = spawn(
         process.execPath,
-        [selfPath, helper, '--', ...mainArgs],
+        [selfPath, spawnGlue, '--', ...spawnArgs],
         {
           cwd: cwd || work,
           env: {
@@ -89,23 +158,101 @@ function makeSpawnKernel() {
             ...(env || {}),
             SMOKE_WORKDIR: work,
             SMOKE_NESTED: '1',
+            SMOKE_THISPROGRAM: basename(spawnGlue),
           },
-          encoding: 'utf8',
-          maxBuffer: 64 * 1024 * 1024,
+          stdio: ['pipe', 'pipe', 'pipe'],
         }
       );
-      if (r.error) return r.error.code === 'ENOENT' ? -44 : -29;
-      if (r.stdout) process.stdout.write(r.stdout);
-      if (r.stderr) process.stderr.write(r.stderr);
-      const status = r.status ?? (r.signal ? 128 : 1);
-      childStatus.set(pid, status << 8);
+      // Prefer raw fd I/O so pumping works without the libuv event loop.
+      try {
+        child.stdin?.cork?.();
+        child.stdout?.pause?.();
+      } catch {
+        /* ignore */
+      }
+      const pid = nextPid++;
+      const rec = {
+        child,
+        cin,
+        cout,
+        cerr,
+        code: null,
+        stderr: Buffer.alloc(0),
+        outBuf: Buffer.alloc(0),
+      };
+      child.on('exit', (code, signal) => {
+        rec.code = code ?? (signal ? 128 : 1);
+      });
+      child.stderr.on('data', (chunk) => {
+        rec.stderr = Buffer.concat([rec.stderr, chunk]);
+      });
+      child.stdout.on('data', (chunk) => {
+        rec.outBuf = Buffer.concat([rec.outBuf, chunk]);
+      });
+      childStatus.set(pid, rec);
       return pid;
     },
-    execWait(pid) {
-      if (!childStatus.has(pid)) return -1;
-      const st = childStatus.get(pid);
+    // slicc_spawn.c calls kernel.wait; older smoke callers used execWait.
+    wait(pid, nohang = false, _options = 0) {
+      return this.execWait(pid, nohang);
+    },
+    execWait(pid, nohang = false) {
+      const rec = childStatus.get(pid);
+      if (rec == null) return -1;
+      if (typeof rec === 'number') {
+        if (nohang) return rec;
+        childStatus.delete(pid);
+        return rec;
+      }
+      if (nohang && rec.code === null) return 0;
+      const FS = getFS();
+      const pump = () => {
+        try {
+          const stIn = FS.getStream(rec.cin);
+          if (stIn && rec.child.stdin && !rec.child.stdin.destroyed) {
+            const buf = new Uint8Array(65536);
+            let n;
+            try {
+              n = FS.read(stIn, buf, 0, buf.length);
+            } catch (e) {
+              n = e?.errno === 6 ? 0 : -1;
+            }
+            if (n > 0) rec.child.stdin.write(Buffer.from(buf.subarray(0, n)));
+          }
+        } catch {
+          /* ignore */
+        }
+        try {
+          if (rec.outBuf?.length) {
+            const stOut = FS.getStream(rec.cout);
+            if (stOut) {
+              const n = Math.min(rec.outBuf.length, 65536);
+              FS.write(stOut, rec.outBuf, 0, n);
+              rec.outBuf = rec.outBuf.subarray(n);
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      };
+      const t0 = Date.now();
+      while (rec.code === null && Date.now() - t0 < 120000) {
+        pump();
+        spin(5);
+      }
+      if (rec.stderr.length) process.stderr.write(rec.stderr);
+      try {
+        rec.child.stdin?.end?.();
+      } catch {
+        /* ignore */
+      }
+      for (let i = 0; i < 20 && rec.code === null; i++) {
+        pump();
+        spin(10);
+      }
+      const status = (rec.code ?? 1) << 8;
       childStatus.delete(pid);
-      return st;
+      return status;
     },
   };
 }
@@ -231,7 +378,40 @@ async function main() {
     progArgs = progArgs.map((a) => a.replaceAll('__PORT__', String(httpPort)));
   }
 
-  const spawnPart = makeSpawnKernel();
+  const runtime = { FS: null };
+  const spawnPart = makeSpawnKernel(() => runtime.FS);
+  // Keep shuttling pipe bytes while the parent runs (before waitpid).
+  const pumpAll = () => {
+    for (const [, rec] of childStatus) {
+      if (!rec || typeof rec === 'number' || !rec.child) continue;
+      try {
+        const FS = runtime.FS;
+        if (!FS) continue;
+        const stIn = FS.getStream(rec.cin);
+        if (stIn && rec.child.stdin && !rec.child.stdin.destroyed) {
+          const buf = new Uint8Array(65536);
+          let n = 0;
+          try {
+            n = FS.read(stIn, buf, 0, buf.length);
+          } catch (e) {
+            if (e?.errno !== 6) n = -1;
+          }
+          if (n > 0) rec.child.stdin.write(Buffer.from(buf.subarray(0, n)));
+        }
+        if (rec.outBuf?.length) {
+          const stOut = FS.getStream(rec.cout);
+          if (stOut) {
+            const n = Math.min(rec.outBuf.length, 65536);
+            FS.write(stOut, rec.outBuf, 0, n);
+            rec.outBuf = rec.outBuf.subarray(n);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+  const pumpTimer = setInterval(pumpAll, 5);
   const Module = {
     noInitialRun: true,
     locateFile: (p) => {
@@ -245,7 +425,7 @@ async function main() {
         Module.ENV = Module.ENV || {};
         Module.ENV.PATH = `/git-core:/usr/bin:/bin`;
         Module.ENV.GIT_EXEC_PATH = '/git-core';
-        Module.ENV.GIT_TEMPLATE_DIR = '';
+        Module.ENV.GIT_TEMPLATE_DIR = '/git-templates';
       },
     ],
     onRuntimeInitialized() {
@@ -255,14 +435,53 @@ async function main() {
   };
 
   global.Module = Module;
-  const M = require(glue);
-  // Glue's `var Module` shadows global; put kernel on the exported object EM_JS closes over.
+  // Avoid Node's `Module` constructor colliding with Emscripten's `var Module=…`.
+  // Fake argv so glue's thisProgram is the multi-call name (git-upload-pack, …),
+  // not run-wasm-cli.mjs — git dispatches builtins from argv0.
+  const thisProgram =
+    process.env.SMOKE_THISPROGRAM || basename(glue);
+  Module.thisProgram = thisProgram;
+  const savedArgv = process.argv;
+  process.argv = [savedArgv[0], thisProgram, ...progArgs];
+  let M;
+  try {
+    const glueSource = fs.readFileSync(glue, 'utf8');
+    const loader = new Function(
+      'Module',
+      'require',
+      '__dirname',
+      '__filename',
+      'process',
+      'Buffer',
+      `${glueSource}\nreturn Module;`
+    );
+    M = loader(Module, require, dirname(glue), glue, process, Buffer);
+  } finally {
+    process.argv = savedArgv;
+  }
   M.sliccKernel = Module.sliccKernel;
   M.ENV = Object.assign(M.ENV || {}, Module.ENV || {});
   for (let i = 0; i < 400 && !Module.__ready && !M.calledRun; i++) {
     await new Promise((r) => setTimeout(r, 25));
   }
+  for (let i = 0; i < 400 && typeof (M.sliccRunMain || M.callMain) !== 'function'; i++) {
+    await new Promise((r) => setTimeout(r, 25));
+  }
   const FS = M.FS;
+  runtime.FS = FS;
+  // Shuttle on every VFS write so local-clone pipe traffic reaches the child
+  // before the parent blocks on read (setInterval alone may not run in sync wasm).
+  const origWrite = FS.write.bind(FS);
+  FS.write = (stream, buffer, offset, length, position, canOwn) => {
+    const n = origWrite(stream, buffer, offset, length, position, canOwn);
+    pumpAll();
+    return n;
+  };
+  const origRead = FS.read.bind(FS);
+  FS.read = (stream, buffer, offset, length, position) => {
+    pumpAll();
+    return origRead(stream, buffer, offset, length, position);
+  };
   if (process.env.SMOKE_HTTP === '1') {
     const net = makeNetKernel(FS);
     M.sliccKernel.net = net;
@@ -300,7 +519,32 @@ async function main() {
     }
   };
   ensureMount('/work', work);
-  if (fs.existsSync(execPath)) ensureMount('/git-core', execPath);
+  if (fs.existsSync(execPath)) {
+    ensureMount('/git-core', execPath);
+    // Fixed-prefix builds look under /usr/libexec/git-core when GIT_EXEC_PATH
+    // is unset; mirror the package tree there for smoke.
+    try { FS.mkdir('/usr'); } catch { /* */ }
+    try { FS.mkdir('/usr/libexec'); } catch { /* */ }
+    ensureMount('/usr/libexec/git-core', execPath);
+  }
+  if (fs.existsSync(templatePath)) {
+    ensureMount('/git-templates', templatePath);
+    try { FS.mkdir('/usr/share'); } catch { /* */ }
+    try { FS.mkdir('/usr/share/git-core'); } catch { /* */ }
+    ensureMount('/usr/share/git-core/templates', templatePath);
+  }
+  // Apply package env after FS is up but before main — ENV must be on the
+  // Module instance the glue closed over.
+  M.ENV = M.ENV || {};
+  Object.assign(M.ENV, {
+    PATH: '/git-core:/usr/bin:/bin',
+    GIT_EXEC_PATH: '/git-core',
+    GIT_TEMPLATE_DIR: '/git-templates',
+  });
+  for (const pair of (process.env.SMOKE_ENV || '').split(',').map((s) => s.trim()).filter(Boolean)) {
+    const eq = pair.indexOf('=');
+    if (eq > 0) M.ENV[pair.slice(0, eq)] = pair.slice(eq + 1);
+  }
   try { FS.chdir('/work'); } catch (e) { console.error('chdir', e?.errno || e); }
 
   const mainFn =
@@ -313,6 +557,7 @@ async function main() {
     else throw e;
   }
   if (httpServer) await new Promise((r) => httpServer.close(r));
+  clearInterval(pumpTimer);
   process.exit(status);
 }
 

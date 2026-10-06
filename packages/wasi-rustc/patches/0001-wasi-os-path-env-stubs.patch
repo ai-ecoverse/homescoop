@@ -1,0 +1,112 @@
+--- a/library/std/src/sys/pal/wasi/os.rs
++++ b/library/std/src/sys/pal/wasi/os.rs
+@@ -4,7 +4,6 @@
+ 
+ use crate::error::Error as StdError;
+ use crate::ffi::{CStr, OsStr, OsString};
+-use crate::marker::PhantomData;
+ use crate::ops::Drop;
+ use crate::os::wasi::prelude::*;
+ use crate::path::{self, PathBuf};
+@@ -100,40 +99,68 @@
+     }
+ }
+ 
+-pub struct SplitPaths<'a>(!, PhantomData<&'a ()>);
+-
+-pub fn split_paths(_unparsed: &OsStr) -> SplitPaths<'_> {
+-    panic!("unsupported")
++// Colon-separated PATH like unix. rustc looks up linkers via PATH (SLICC sets it).
++pub struct SplitPaths<'a> {
++    iter: crate::iter::Map<crate::slice::Split<'a, u8, fn(&u8) -> bool>, fn(&[u8]) -> PathBuf>,
++}
++
++pub fn split_paths(unparsed: &OsStr) -> SplitPaths<'_> {
++    fn bytes_to_path(b: &[u8]) -> PathBuf {
++        PathBuf::from(<OsStr as OsStrExt>::from_bytes(b))
++    }
++    fn is_separator(b: &u8) -> bool {
++        *b == b':'
++    }
++    let unparsed = unparsed.as_bytes();
++    SplitPaths {
++        iter: unparsed
++            .split(is_separator as fn(&u8) -> bool)
++            .map(bytes_to_path as fn(&[u8]) -> PathBuf),
++    }
+ }
+ 
+ impl<'a> Iterator for SplitPaths<'a> {
+     type Item = PathBuf;
+     fn next(&mut self) -> Option<PathBuf> {
+-        self.0
++        self.iter.next()
++    }
++    fn size_hint(&self) -> (usize, Option<usize>) {
++        self.iter.size_hint()
+     }
+ }
+ 
+ #[derive(Debug)]
+ pub struct JoinPathsError;
+ 
+-pub fn join_paths<I, T>(_paths: I) -> Result<OsString, JoinPathsError>
++pub fn join_paths<I, T>(paths: I) -> Result<OsString, JoinPathsError>
+ where
+     I: Iterator<Item = T>,
+     T: AsRef<OsStr>,
+ {
+-    Err(JoinPathsError)
++    let mut joined = Vec::new();
++    for (i, path) in paths.enumerate() {
++        let path = path.as_ref().as_bytes();
++        if i > 0 {
++            joined.push(b':');
++        }
++        if path.contains(&b':') {
++            return Err(JoinPathsError);
++        }
++        joined.extend_from_slice(path);
++    }
++    Ok(OsStringExt::from_vec(joined))
+ }
+ 
+ impl fmt::Display for JoinPathsError {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+-        "not supported on wasm yet".fmt(f)
++        "path segment contains separator `:`".fmt(f)
+     }
+ }
+ 
+ impl StdError for JoinPathsError {
+     #[allow(deprecated)]
+     fn description(&self) -> &str {
+-        "not supported on wasm yet"
++        "failed to join paths"
+     }
+ }
+ 
+@@ -264,11 +291,11 @@
+ }
+ 
+ pub fn temp_dir() -> PathBuf {
+-    panic!("no filesystem on wasm")
++    crate::env::var_os("TMPDIR").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/tmp"))
+ }
+ 
+ pub fn home_dir() -> Option<PathBuf> {
+-    None
++    crate::env::var_os("HOME").map(PathBuf::from)
+ }
+ 
+ pub fn exit(code: i32) -> ! {
+@@ -276,7 +303,8 @@
+ }
+ 
+ pub fn getpid() -> u32 {
+-    panic!("unsupported");
++    // WASI libc has no getpid; return a stable non-zero pid for callers that only need uniqueness.
++    1
+ }
+ 
+ #[doc(hidden)]

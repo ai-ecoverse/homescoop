@@ -1,0 +1,12 @@
+--- a/src/introspect.zig
++++ b/src/introspect.zig
+@@ -104,7 +104,8 @@
+     const app_name = "zig";
+ 
+     switch (builtin.os.tag) {
+-        .wasi => @compileError("on WASI the global cache dir must be resolved with preopens"),
++        // homescoop: compile for wasm32-wasi host; require ZIG_GLOBAL_CACHE_DIR (or /cache preopen via Directories.init) at runtime
++        .wasi => return error.AppDataDirUnavailable,
+         .windows => {
+             const local_app_data_dir = std.zig.EnvVar.LOCALAPPDATA.get(environ_map) orelse
+                 return error.AppDataDirUnavailable;

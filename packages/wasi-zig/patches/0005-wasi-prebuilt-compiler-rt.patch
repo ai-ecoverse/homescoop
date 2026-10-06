@@ -1,0 +1,131 @@
+--- a/src/Compilation.zig
++++ b/src/Compilation.zig
+@@ -4565,37 +4565,100 @@
+         // compiler-rt due to LLD bugs as well, e.g.:
+         //
+         // https://github.com/llvm/llvm-project/issues/43698#issuecomment-2542660611
+-        prelink_group.async(io, buildRt, .{
+-            comp,
+-            "compiler_rt.zig",
+-            "compiler_rt",
+-            .Lib,
+-            .static,
+-            .compiler_rt,
+-            main_progress_node,
+-            RtOptions{
+-                .checks_valgrind = true,
+-                .allow_lto = false,
+-            },
+-            &comp.compiler_rt_lib,
+-        });
++        if (comptime !build_options.have_llvm) {
++            // homescoop: no-LLVM wasm host cannot build compiler_rt; use prebuilt archive
++            const target = &comp.root_mod.resolved_target.result;
++            if (target.cpu.arch.isWasm()) {
++                const sub_path = std.fmt.allocPrint(
++                    comp.arena,
++                    "prebuilt" ++ std.fs.path.sep_str ++ "libcompiler_rt-{s}-{s}.a",
++                    .{ @tagName(target.cpu.arch), @tagName(target.os.tag) },
++                ) catch @panic("OOM");
++                const path: Cache.Path = .{ .root_dir = comp.dirs.zig_lib, .sub_path = sub_path };
++                comp.queuePrelinkTasks(&.{.{ .load_archive = path }}) catch |err| switch (err) {
++                    error.Canceled => unreachable,
++                };
++                comp.queued_jobs.compiler_rt_lib = false;
++            } else {
++                prelink_group.async(io, buildRt, .{
++                    comp,
++                    "compiler_rt.zig",
++                    "compiler_rt",
++                    .Lib,
++                    .static,
++                    .compiler_rt,
++                    main_progress_node,
++                    RtOptions{
++                        .checks_valgrind = true,
++                        .allow_lto = false,
++                    },
++                    &comp.compiler_rt_lib,
++                });
++            }
++        } else {
++            prelink_group.async(io, buildRt, .{
++                comp,
++                "compiler_rt.zig",
++                "compiler_rt",
++                .Lib,
++                .static,
++                .compiler_rt,
++                main_progress_node,
++                RtOptions{
++                    .checks_valgrind = true,
++                    .allow_lto = false,
++                },
++                &comp.compiler_rt_lib,
++            });
++        }
+     }
+ 
+     if (comp.queued_jobs.compiler_rt_obj and comp.compiler_rt_obj == null) {
+-        prelink_group.async(io, buildRt, .{
+-            comp,
+-            "compiler_rt.zig",
+-            "compiler_rt",
+-            .Obj,
+-            .static,
+-            .compiler_rt,
+-            main_progress_node,
+-            RtOptions{
+-                .checks_valgrind = true,
+-                .allow_lto = false,
+-            },
+-            &comp.compiler_rt_obj,
+-        });
++        if (comptime !build_options.have_llvm) {
++            const target = &comp.root_mod.resolved_target.result;
++            if (target.cpu.arch.isWasm()) {
++                const sub_path = std.fmt.allocPrint(
++                    comp.arena,
++                    "prebuilt" ++ std.fs.path.sep_str ++ "libcompiler_rt-{s}-{s}.a",
++                    .{ @tagName(target.cpu.arch), @tagName(target.os.tag) },
++                ) catch @panic("OOM");
++                const path: Cache.Path = .{ .root_dir = comp.dirs.zig_lib, .sub_path = sub_path };
++                comp.queuePrelinkTasks(&.{.{ .load_archive = path }}) catch |err| switch (err) {
++                    error.Canceled => unreachable,
++                };
++                comp.queued_jobs.compiler_rt_obj = false;
++            } else {
++                prelink_group.async(io, buildRt, .{
++                    comp,
++                    "compiler_rt.zig",
++                    "compiler_rt",
++                    .Obj,
++                    .static,
++                    .compiler_rt,
++                    main_progress_node,
++                    RtOptions{
++                        .checks_valgrind = true,
++                        .allow_lto = false,
++                    },
++                    &comp.compiler_rt_obj,
++                });
++            }
++        } else {
++            prelink_group.async(io, buildRt, .{
++                comp,
++                "compiler_rt.zig",
++                "compiler_rt",
++                .Obj,
++                .static,
++                .compiler_rt,
++                main_progress_node,
++                RtOptions{
++                    .checks_valgrind = true,
++                    .allow_lto = false,
++                },
++                &comp.compiler_rt_obj,
++            });
++        }
+     }
+ 
+     // hack for stage2_x86_64 + coff

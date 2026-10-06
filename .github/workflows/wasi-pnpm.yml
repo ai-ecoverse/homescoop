@@ -1,0 +1,81 @@
+# wasi-pnpm is retired from the ladder (published only after certification),
+# so this workflow builds and tests it: pnpm.wasm from pnpm's pinned source
+# with upstream's build.mjs and patches/ (built twice; the sha256 must match),
+# then the host module's unit tests and the end-to-end suite on slicc-kernel's
+# headless Node entry with a local mock registry and git server.
+name: wasi-pnpm
+
+on:
+  push:
+    paths:
+      - packages/wasi-pnpm/**
+      - .github/workflows/wasi-pnpm.yml
+  pull_request:
+    paths:
+      - packages/wasi-pnpm/**
+      - .github/workflows/wasi-pnpm.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        attempt: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: build pnpm.wasm from source
+        run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/wasi-pnpm/build.sh
+      - name: record sha256
+        run: sha256sum packages/wasi-pnpm/package/bin/pnpm.wasm | tee "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-wasm-${{ matrix.attempt }}
+          path: |
+            packages/wasi-pnpm/package/bin/pnpm.wasm
+            packages/wasi-pnpm/package/LICENSE
+            packages/wasi-pnpm/package/THIRD-PARTY-NOTICES.md
+          if-no-files-found: error
+          retention-days: 14
+
+  reproducible:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pnpm-wasm-*
+      - name: both builds are byte-identical
+        run: |
+          sha256sum pnpm-wasm-*/bin/pnpm.wasm | tee "$GITHUB_STEP_SUMMARY"
+          test "$(sha256sum pnpm-wasm-1/bin/pnpm.wasm | cut -d' ' -f1)" = "$(sha256sum pnpm-wasm-2/bin/pnpm.wasm | cut -d' ' -f1)"
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: pnpm-wasm-1
+          path: packages/wasi-pnpm/package
+      - name: host module unit tests
+        working-directory: packages/wasi-pnpm
+        run: node --test 'test/*.test.mjs'
+      - name: install test dependencies
+        working-directory: packages/wasi-pnpm/test
+        run: npm ci --no-audit --no-fund
+      - name: end-to-end tests
+        working-directory: packages/wasi-pnpm/test
+        run: node --test 'e2e/*.test.mjs'

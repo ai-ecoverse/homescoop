@@ -1,0 +1,451 @@
+--- a/lib/std/Io/Threaded.zig
++++ b/lib/std/Io/Threaded.zig
+@@ -176,6 +176,18 @@
+             return .{ .value = args.vector[0] };
+         }
+     },
++    // homescoop: keep argv0 slot for executablePath, but WASI Args.Vector is
++    // void (no libc) — do not index args.vector (breaks process.Init for users).
++    .wasi => struct {
++        value: ?[*:0]const u8,
++
++        pub const empty: Argv0 = .{ .value = null };
++
++        pub fn init(args: process.Args) Argv0 {
++            _ = args;
++            return .{ .value = null };
++        }
++    },
+     else => struct {
+         pub const empty: Argv0 = .{};
+ 
+@@ -2708,6 +2720,143 @@
+     b.submitted = .{ .head = .none, .tail = .none };
+ }
+ 
++fn batchAwaitConcurrentWasi(t: *Threaded, b: *Io.Batch, timeout: Io.Timeout) Io.Batch.AwaitConcurrentError!void {
++    const wasi = std.os.wasi;
++    // userdata = batch OptionalIndex as u32; CLOCK uses maxInt(u32) sentinel
++    const clock_ud: u64 = std.math.maxInt(u32);
++    var subs: [poll_buffer_len + 1]wasi.subscription_t = undefined;
++    var events: [poll_buffer_len + 1]wasi.event_t = undefined;
++    var n: u32 = 0;
++    {
++        var index = b.submitted.head;
++        while (index != .none and n < poll_buffer_len) {
++            const submission = &b.storage[index.toIndex()].submission;
++            switch (submission.operation) {
++                .file_read_streaming => |o| {
++                    subs[n] = .{
++                        .userdata = @intFromEnum(index),
++                        .u = .{ .tag = .FD_READ, .u = .{ .fd_read = .{ .fd = o.file.handle } } },
++                    };
++                    n += 1;
++                },
++                .file_write_streaming => |o| {
++                    subs[n] = .{
++                        .userdata = @intFromEnum(index),
++                        .u = .{ .tag = .FD_WRITE, .u = .{ .fd_write = .{ .fd = o.file.handle } } },
++                    };
++                    n += 1;
++                },
++                .device_io_control, .net_receive => {},
++            }
++            index = submission.node.next;
++        }
++    }
++    // No pollable fds (or only unsupported ops): blocking operate on everything.
++    if (n == 0) {
++        var tail_index = b.completed.tail;
++        defer b.completed.tail = tail_index;
++        var index = b.submitted.head;
++        while (index != .none) {
++            const storage = &b.storage[index.toIndex()];
++            const next_index = storage.submission.node.next;
++            const result = try operate(t, storage.submission.operation);
++            switch (tail_index) {
++                .none => b.completed.head = index,
++                else => |ti| b.storage[ti.toIndex()].completion.node.next = index,
++            }
++            storage.* = .{ .completion = .{ .node = .{ .next = .none }, .result = result } };
++            tail_index = index;
++            index = next_index;
++        }
++        b.submitted = .{ .head = .none, .tail = .none };
++        return;
++    }
++    // Single ready path with no timeout: blocking read (no poll needed).
++    if (n == 1 and timeout == .none and b.completed.head == .none) {
++        const index = b.submitted.head;
++        const storage = &b.storage[index.toIndex()];
++        const result = try operate(t, storage.submission.operation);
++        b.submitted = .{ .head = .none, .tail = .none };
++        switch (b.completed.tail) {
++            .none => b.completed.head = index,
++            else => |ti| b.storage[ti.toIndex()].completion.node.next = index,
++        }
++        storage.* = .{ .completion = .{ .node = .{ .next = .none }, .result = result } };
++        b.completed.tail = index;
++        return;
++    }
++    const t_io = io(t);
++    const deadline = timeout.toTimestamp(t_io);
++    while (true) {
++        var nsubs = n;
++        if (deadline) |d| {
++            const duration = d.durationFromNow(t_io);
++            const ns: u64 = if (duration.raw.toNanoseconds() <= 0) 0 else std.math.lossyCast(u64, duration.raw.toNanoseconds());
++            subs[nsubs] = .{
++                .userdata = clock_ud,
++                .u = .{
++                    .tag = .CLOCK,
++                    .u = .{ .clock = .{
++                        .id = clockToWasi(d.clock),
++                        .timeout = ns,
++                        .precision = 0,
++                        .flags = 0,
++                    } },
++                },
++            };
++            nsubs += 1;
++        }
++        var nevents: usize = undefined;
++        const syscall = try Syscall.start();
++        const rc = wasi.poll_oneoff(&subs[0], &events[0], nsubs, &nevents);
++        syscall.finish();
++        switch (rc) {
++            .SUCCESS => {
++                if (nevents == 0) {
++                    if (deadline != null) return error.Timeout;
++                    continue;
++                }
++                var any = false;
++                for (events[0..nevents]) |ev| {
++                    if (ev.userdata == clock_ud) {
++                        if (!any and b.completed.head == .none) return error.Timeout;
++                        continue;
++                    }
++                    const index: Io.Operation.OptionalIndex = @enumFromInt(@as(u32, @intCast(ev.userdata)));
++                    // Unlink from submitted list
++                    var prev: Io.Operation.OptionalIndex = .none;
++                    var cur = b.submitted.head;
++                    while (cur != .none) {
++                        const next = b.storage[cur.toIndex()].submission.node.next;
++                        if (cur == index) {
++                            switch (prev) {
++                                .none => b.submitted.head = next,
++                                else => |p| b.storage[p.toIndex()].submission.node.next = next,
++                            }
++                            if (next == .none) b.submitted.tail = prev;
++                            break;
++                        }
++                        prev = cur;
++                        cur = next;
++                    } else continue; // already completed
++                    const storage = &b.storage[index.toIndex()];
++                    const result = try operate(t, storage.submission.operation);
++                    switch (b.completed.tail) {
++                        .none => b.completed.head = index,
++                        else => |ti| b.storage[ti.toIndex()].completion.node.next = index,
++                    }
++                    storage.* = .{ .completion = .{ .node = .{ .next = .none }, .result = result } };
++                    b.completed.tail = index;
++                    any = true;
++                }
++                if (any or b.completed.head != .none) return;
++            },
++            .INTR => continue,
++            else => return error.ConcurrencyUnavailable,
++        }
++    }
++}
++
+ fn batchAwaitConcurrent(userdata: ?*anyopaque, b: *Io.Batch, timeout: Io.Timeout) Io.Batch.AwaitConcurrentError!void {
+     const t: *Threaded = @ptrCast(@alignCast(userdata));
+     if (is_windows) {
+@@ -2734,8 +2883,8 @@
+         return;
+     }
+     if (native_os == .wasi) {
+-        // TODO call poll_oneoff
+-        return error.ConcurrencyUnavailable;
++        // homescoop: poll_oneoff over pipe fds (MultiReader / zigProcessUpdate)
++        return batchAwaitConcurrentWasi(t, b, timeout);
+     }
+     if (!have_poll) return error.ConcurrencyUnavailable;
+     var poll_buffer: [poll_buffer_len]posix.pollfd = undefined;
+@@ -10410,6 +10559,13 @@
+             }
+             return error.FileNotFound;
+         },
++        .wasi => {
++            // homescoop: argv[0] / no /proc/self/exe
++            const argv0 = std.mem.span(t.argv0.value orelse return error.OperationUnsupported);
++            if (argv0.len > out_buffer.len) return error.NameTooLong;
++            @memcpy(out_buffer[0..argv0.len], argv0);
++            return argv0.len;
++        },
+         .windows => {
+             // If ImagePathName is a symlink, then it will contain the path of the
+             // symlink, not the path that the symlink points to. We want the path
+@@ -14849,7 +15005,9 @@
+ }
+ 
+ const processSpawn = switch (native_os) {
+-    .wasi, .emscripten, .ios, .tvos, .visionos, .watchos => processSpawnUnsupported,
++    // homescoop: wasix_32v1 only when root.homescoop_wasix
++    .wasi => if ((@hasDecl(@import("root"), "homescoop_wasix") and @import("root").homescoop_wasix)) processSpawnWasix else processSpawnUnsupported,
++    .emscripten, .ios, .tvos, .visionos, .watchos => processSpawnUnsupported,
+     .windows => processSpawnWindows,
+     else => processSpawnPosix,
+ };
+@@ -14860,6 +15018,206 @@
+     return error.OperationUnsupported;
+ }
+ 
++// homescoop: WASIX spawn (wasix_32v1) — used by zig run / zig build on SLICC
++fn processSpawnWasix(userdata: ?*anyopaque, options: process.SpawnOptions) process.SpawnError!process.Child {
++    const t: *Threaded = @ptrCast(@alignCast(userdata));
++    const wasix = std.os.wasix;
++    if (options.argv.len == 0) return error.FileNotFound;
++
++    // Create pipes before the arena so errdefers are independent of it.
++    const stdin_pipe: [2]posix.fd_t = switch (options.stdin) {
++        .pipe => try pipe2(.{}),
++        else => .{ -1, -1 },
++    };
++    errdefer if (options.stdin == .pipe) destroyPipe(stdin_pipe);
++    const stdout_pipe: [2]posix.fd_t = switch (options.stdout) {
++        .pipe => try pipe2(.{}),
++        else => .{ -1, -1 },
++    };
++    errdefer if (options.stdout == .pipe) destroyPipe(stdout_pipe);
++    const stderr_pipe: [2]posix.fd_t = switch (options.stderr) {
++        .pipe => try pipe2(.{}),
++        else => .{ -1, -1 },
++    };
++    errdefer if (options.stderr == .pipe) destroyPipe(stderr_pipe);
++
++    var arena_allocator = std.heap.ArenaAllocator.init(t.allocator);
++    defer arena_allocator.deinit();
++    const arena = arena_allocator.allocator();
++
++    const argv_z = try arena.alloc([*:0]const u8, options.argv.len);
++    for (options.argv, 0..) |arg, i| argv_z[i] = (try arena.dupeZ(u8, arg)).ptr;
++
++    var envs_ptr: ?[*]const [*:0]const u8 = null;
++    var envs_len: usize = 0;
++    if (options.environ_map) |environ_map| {
++        const block = try environ_map.createPosixBlock(arena, .{});
++        const slice = block.slice;
++        const arr = try arena.alloc([*:0]const u8, slice.len);
++        for (slice, 0..) |e, i| arr[i] = e.?;
++        envs_ptr = arr.ptr;
++        envs_len = arr.len;
++    }
++
++    const dev_null = "/dev/null";
++    // rights_t as u64 for SpawnFdOp.fs_rights_base (SLICC only checks WRITE bit)
++    const null_rights: u64 = @bitCast(std.os.wasi.rights_t{ .FD_READ = true, .FD_WRITE = true });
++
++    var ops: std.ArrayList(wasix.SpawnFdOp) = .empty;
++    defer ops.deinit(arena);
++
++    // Child fd table: pipe ends /dev/null / inherited → 0/1/2.
++    // Parent keeps the opposite pipe ends as Child.stdin/stdout/stderr.
++    switch (options.stdin) {
++        .pipe => {
++            try ops.append(arena, .close(stdin_pipe[1]));
++            try ops.append(arena, .dup2(stdin_pipe[0], 0));
++            if (stdin_pipe[0] != 0) try ops.append(arena, .close(stdin_pipe[0]));
++        },
++        .ignore => try ops.append(arena, .{
++            .cmd = @intFromEnum(wasix.SpawnFdOpCmd.open),
++            .fd = 0,
++            .path = dev_null.ptr,
++            .path_len = dev_null.len,
++            .fs_rights_base = null_rights,
++        }),
++        .close => try ops.append(arena, .close(0)),
++        .file => |f| try ops.append(arena, .dup2(f.handle, 0)),
++        .inherit => {},
++    }
++    switch (options.stdout) {
++        .pipe => {
++            try ops.append(arena, .close(stdout_pipe[0]));
++            try ops.append(arena, .dup2(stdout_pipe[1], 1));
++            if (stdout_pipe[1] != 1) try ops.append(arena, .close(stdout_pipe[1]));
++        },
++        .ignore => try ops.append(arena, .{
++            .cmd = @intFromEnum(wasix.SpawnFdOpCmd.open),
++            .fd = 1,
++            .path = dev_null.ptr,
++            .path_len = dev_null.len,
++            .fs_rights_base = null_rights,
++        }),
++        .close => try ops.append(arena, .close(1)),
++        .file => |f| try ops.append(arena, .dup2(f.handle, 1)),
++        .inherit => {},
++    }
++    switch (options.stderr) {
++        .pipe => {
++            try ops.append(arena, .close(stderr_pipe[0]));
++            try ops.append(arena, .dup2(stderr_pipe[1], 2));
++            if (stderr_pipe[1] != 2) try ops.append(arena, .close(stderr_pipe[1]));
++        },
++        .ignore => try ops.append(arena, .{
++            .cmd = @intFromEnum(wasix.SpawnFdOpCmd.open),
++            .fd = 2,
++            .path = dev_null.ptr,
++            .path_len = dev_null.len,
++            .fs_rights_base = null_rights,
++        }),
++        .close => try ops.append(arena, .close(2)),
++        .file => |f| try ops.append(arena, .dup2(f.handle, 2)),
++        .inherit => {},
++    }
++
++    const name = options.argv[0];
++    const search: u8 = if (std.mem.indexOfScalar(u8, name, '/') == null) 1 else 0;
++    var path_buf: []const u8 = "";
++    if (search == 1) {
++        path_buf = t.environ.process_environ.getAlloc(arena, "PATH") catch "";
++    }
++
++    var pid: wasix.pid_t = undefined;
++    const empty_sig: [0]u8 = .{};
++    var dummy_op: wasix.SpawnFdOp = .{};
++    const ops_ptr: [*]const wasix.SpawnFdOp = if (ops.items.len > 0) ops.items.ptr else @ptrCast(&dummy_op);
++    const rc = wasix.proc_spawn3(
++        name.ptr,
++        name.len,
++        argv_z.ptr,
++        argv_z.len,
++        envs_ptr,
++        envs_len,
++        ops_ptr,
++        ops.items.len,
++        &empty_sig,
++        0,
++        search,
++        path_buf.ptr,
++        path_buf.len,
++        &pid,
++    );
++    switch (rc) {
++        .SUCCESS => {},
++        .NOENT => return error.FileNotFound,
++        .ACCES => return error.AccessDenied,
++        .PERM => return error.PermissionDenied,
++        .NOMEM => return error.SystemResources,
++        .NFILE, .MFILE => return error.ProcessFdQuotaExceeded,
++        .INVAL => return error.InvalidExe,
++        else => return error.Unexpected,
++    }
++
++    // Parent closes child-side ends.
++    if (options.stdin == .pipe) closeFd(stdin_pipe[0]);
++    if (options.stdout == .pipe) closeFd(stdout_pipe[1]);
++    if (options.stderr == .pipe) closeFd(stderr_pipe[1]);
++
++    // Assign Files with plain statements — wasm backend has mishandled
++    // optional aggregate `if` exprs inside struct init (stdin stayed null).
++    var child: process.Child = .{
++        .id = pid,
++        .thread_handle = {},
++        .stdin = null,
++        .stdout = null,
++        .stderr = null,
++        .request_resource_usage_statistics = options.request_resource_usage_statistics,
++    };
++    switch (options.stdin) {
++        .pipe => child.stdin = .{ .handle = stdin_pipe[1], .flags = .{ .nonblocking = false } },
++        else => {},
++    }
++    switch (options.stdout) {
++        .pipe => child.stdout = .{ .handle = stdout_pipe[0], .flags = .{ .nonblocking = false } },
++        else => {},
++    }
++    switch (options.stderr) {
++        .pipe => child.stderr = .{ .handle = stderr_pipe[0], .flags = .{ .nonblocking = false } },
++        else => {},
++    }
++    return child;
++}
++
++fn childWaitWasix(child: *process.Child) process.Child.WaitError!process.Child.Term {
++    defer childCleanupPosix(child);
++    const wasix = std.os.wasix;
++    var opt = wasix.OptionPid.some(child.id.?);
++    var status: wasix.JoinStatus = .{};
++    while (true) {
++        switch (wasix.proc_join(&opt, 0, &status)) {
++            .SUCCESS => break,
++            .INTR => continue,
++            .CHILD => return error.Unexpected,
++            else => |err| return posix.unexpectedErrno(err),
++        }
++    }
++    // homescoop: map proc_join to real Child.Term (signal_t, not void posix.SIG)
++    return switch (@as(wasix.JoinStatusTag, @enumFromInt(status.tag))) {
++        .nothing => .{ .unknown = 0 },
++        .exit_normal => .{ .exited = @truncate(status.exit_code) },
++        .exit_signal => .{ .signal = @enumFromInt(status.signal) },
++        .stopped => .{ .stopped = @enumFromInt(status.signal) },
++    };
++}
++
++fn childKillWasix(child: *process.Child) void {
++    const wasix = std.os.wasix;
++    const pid = child.id orelse return;
++    // WASI SIGTERM = 15
++    _ = wasix.proc_signal(pid, 15);
++    _ = childWaitWasix(child) catch {};
++}
++
+ const Spawned = struct {
+     pid: posix.pid_t,
+     err_fd: posix.fd_t,
+@@ -15125,20 +15483,23 @@
+ }
+ 
+ fn childWait(userdata: ?*anyopaque, child: *process.Child) process.Child.WaitError!process.Child.Term {
+-    if (native_os == .wasi) unreachable;
+     const t: *Threaded = @ptrCast(@alignCast(userdata));
+     _ = t;
+     switch (native_os) {
+         .windows => return childWaitWindows(child),
++        .wasi => if (comptime (@hasDecl(@import("root"), "homescoop_wasix") and @import("root").homescoop_wasix)) return childWaitWasix(child) else unreachable,
+         else => return childWaitPosix(child),
+     }
+ }
+ 
+ fn childKill(userdata: ?*anyopaque, child: *process.Child) void {
+-    if (native_os == .wasi) unreachable;
+     const t: *Threaded = @ptrCast(@alignCast(userdata));
+     if (is_windows) {
+         childKillWindows(t, child, 1) catch childCleanupWindows(child);
++    } else if (comptime native_os == .wasi and (@hasDecl(@import("root"), "homescoop_wasix") and @import("root").homescoop_wasix)) {
++        childKillWasix(child);
++    } else if (native_os == .wasi) {
++        unreachable;
+     } else {
+         childKillPosix(child) catch {};
+         childCleanupPosix(child);
+@@ -17875,6 +18236,16 @@
+ pub fn pipe2(flags: posix.O) PipeError![2]posix.fd_t {
+     var fds: [2]posix.fd_t = undefined;
+ 
++    // homescoop: WASIX pipe only when opted in (else preview1 programs stay pure)
++    if (comptime native_os == .wasi and (@hasDecl(@import("root"), "homescoop_wasix") and @import("root").homescoop_wasix)) {
++        switch (std.os.wasix.fd_pipe(&fds[0], &fds[1])) {
++            .SUCCESS => return fds,
++            .NFILE => return error.SystemFdQuotaExceeded,
++            .MFILE => return error.ProcessFdQuotaExceeded,
++            else => |err| return posix.unexpectedErrno(err),
++        }
++    }
++
+     if (@TypeOf(posix.system.pipe2) != void) {
+         switch (posix.errno(posix.system.pipe2(&fds, flags))) {
+             .SUCCESS => return fds,

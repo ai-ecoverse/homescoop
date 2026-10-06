@@ -1,0 +1,46 @@
+{
+  "name": "@ai-ecoverse/py-scipy",
+  "version": "1.18.0-5",
+  "description": "SciPy 1.18.0 for slicc WASIX CPython 3.14 (shared libscipy_openblas.so + $ORIGIN rpath)",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-scipy/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-scipy",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "scipy"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-7",
+    "@ai-ecoverse/py-numpy": "^2.3.2-4"
+  },
+  "homescoop": {
+    "recipe": "py-scipy",
+    "upstream": "1.18.0"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages",
+      "requires": {
+        "abi": "cp314",
+        "platform": "wasix_wasm32"
+      }
+    }
+  }
+}

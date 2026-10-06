@@ -1,0 +1,32 @@
+# RETIRED from ladder — built only by .github/workflows/wasi-llvm.yml (artifact
+# `wasi-llvm`, cached by recipe hash). Not published to npm yet: when the shared
+# libLLVM (P2c) ships, add a publish job to that workflow for the package below
+# and keep the ladder out of it, as for wasi-rustc.
+#
+# LLVM 21 + clang + lld as static libraries for a wasm32-wasip1-threads host
+# (built with wasi-sdk 24). The shared LLVM for SLICC's WASI toolchains: the
+# LLVM-enabled wasi-zig links it, and wasi-rustc can build against it as an
+# external LLVM (bin/llvm-config is a python3 script for the build machine).
+name: wasi-llvm
+builder: retired
+# renovate: datasource=github-releases depName=llvm/llvm-project
+version: "21.1.8"
+npm: "@ai-ecoverse/wasi-llvm"
+summary: "LLVM/clang/lld 21 static libraries for wasm32-wasip1-threads (build input)"
+source:
+  url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-{{version}}/llvm-project-{{version}}.src.tar.xz"
+  sha256: "4633a23617fa31a3ea51242586ea7fb1da7140e426bd62fc164261fe036aa142"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://llvm.org/
+  license: Apache-2.0 WITH LLVM-exception
+  notes: |
+    Not a SLICC package by itself: a build input (install prefix tarball) for
+    wasi-zig (LLVM) and wasi-rustc. Do not publish without a decision on P2c.
+    Targets: WebAssembly only. Threads on, assertions off, no PIC (static).
+    patches/0001: rustc's LLVM WASI-host guards (endian, Support/Unix POSIX
+    gaps) ported to 21. patches/0002: clang's export macros on __wasm__, and no
+    clangInterpreter on WASI (its remote JIT needs sockets).

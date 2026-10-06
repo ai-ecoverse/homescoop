@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-git",
-  "version": "2.55.0-4",
-  "description": "Git 2.55 with git-remote-http(s) over homescoop libcurl for wasm / slicc",
+  "version": "2.55.0-8",
+  "description": "Git for slicc (rebuild sweep wasix-sysroot 2025.9.30-14; emscripten ABI)",
   "license": "GPL-2.0-only",
   "repository": {
     "type": "git",
@@ -52,6 +52,14 @@
       "git-remote-https": {
         "glue": "bin/git-remote-https",
         "wasm": "bin/git-remote-https.wasm"
+      },
+      "git-shell": {
+        "glue": "bin/git-shell",
+        "wasm": "bin/git-shell.wasm"
+      },
+      "scalar": {
+        "glue": "bin/scalar",
+        "wasm": "bin/scalar.wasm"
       },
       "git-upload-pack": {
         "glue": "bin/git-upload-pack",

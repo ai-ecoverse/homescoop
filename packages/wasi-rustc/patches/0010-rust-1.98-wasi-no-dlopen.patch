@@ -1,0 +1,117 @@
+diff --git a/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs b/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs
+index 195e050a..8a9ae16e 100644
+--- a/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs
++++ b/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs
+@@ -143,12 +143,14 @@ pub(crate) struct EnzymeWrapper {
+         EnzymeSetCLBool: EnzymeSetCLBoolFn,
+         EnzymeSetCLString: EnzymeSetCLStringFn,
+         pub registerEnzymeAndPassPipeline: *const c_void,
++        #[cfg(not(target_os = "wasi"))]
+         lib: libloading::Library,
+     }
+ 
+     unsafe impl Sync for EnzymeWrapper {}
+     unsafe impl Send for EnzymeWrapper {}
+ 
++    #[cfg(not(target_os = "wasi"))]
+     fn load_ptr_by_symbol_mut_void(
+         lib: &libloading::Library,
+         bytes: &[u8],
+@@ -166,6 +168,7 @@ fn load_ptr_by_symbol_mut_void(
+     // =>
+     // let ABC = load_ptr_mut_void(&lib, b"ABC")?;
+     // let XYZ = load_ptr_mut_void(&lib, b"XYZ")?;
++    #[cfg(not(target_os = "wasi"))]
+     macro_rules! load_ptrs_by_symbols_mut_void {
+         ($lib:expr, $($name:ident),* $(,)?) => {
+             $(
+@@ -180,6 +183,7 @@ macro_rules! load_ptrs_by_symbols_mut_void {
+     // =>
+     // let ABC: libloading::Symbol<'_, ABCFn> = unsafe { lib.get(b"ABC")? };
+     // let XYZ: libloading::Symbol<'_, XYZFn> = unsafe { lib.get(b"XYZ")? };
++    #[cfg(not(target_os = "wasi"))]
+     macro_rules! load_ptrs_by_symbols_fn {
+         ($lib:expr, $($name:ident : $ty:ty),* $(,)?) => {
+             $(
+@@ -197,6 +201,7 @@ pub(crate) enum EnzymeLibraryError {
+         LoadFailed { err: String },
+     }
+ 
++    #[cfg(not(target_os = "wasi"))]
+     impl From<libloading::Error> for EnzymeLibraryError {
+         fn from(err: libloading::Error) -> Self {
+             Self::LoadFailed { err: format!("{err:?}") }
+@@ -359,6 +364,17 @@ pub(crate) fn set_rust_rules(&mut self, val: bool) {
+             }
+         }
+ 
++        // WASI has no dlopen, so libEnzyme cannot be loaded.
++        #[cfg(target_os = "wasi")]
++        fn call_dynamic(
++            _sysroot: &rustc_session::config::Sysroot,
++        ) -> Result<Self, EnzymeLibraryError> {
++            Err(EnzymeLibraryError::LoadFailed {
++                err: "dynamic libraries are not supported on WASI".to_string(),
++            })
++        }
++
++        #[cfg(not(target_os = "wasi"))]
+         #[allow(non_snake_case)]
+         fn call_dynamic(
+             sysroot: &rustc_session::config::Sysroot,
+diff --git a/compiler/rustc_metadata/src/host_dylib.rs b/compiler/rustc_metadata/src/host_dylib.rs
+index 9bd2a57f..f2416aaa 100644
+--- a/compiler/rustc_metadata/src/host_dylib.rs
++++ b/compiler/rustc_metadata/src/host_dylib.rs
+@@ -1,7 +1,10 @@
++#[cfg(not(target_os = "wasi"))]
+ use std::error::Error;
+ use std::path::Path;
++#[cfg(not(target_os = "wasi"))]
+ use std::time::Duration;
+ 
++#[cfg(not(target_os = "wasi"))]
+ use rustc_fs_util::try_canonicalize;
+ use rustc_proc_macro::bridge::client::Client as ProcMacroClient;
+ use rustc_session::StableCrateId;
+@@ -9,10 +12,12 @@
+ 
+ use crate::locator::CrateError;
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn format_dlopen_err(e: &(dyn std::error::Error + 'static)) -> String {
+     e.sources().map(|e| format!(": {e}")).collect()
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn attempt_load_dylib(path: &Path) -> Result<libloading::Library, libloading::Error> {
+     #[cfg(target_os = "aix")]
+     if let Some(ext) = path.extension()
+@@ -40,6 +45,7 @@ fn attempt_load_dylib(path: &Path) -> Result<libloading::Library, libloading::Er
+ // proc-macro DLL with `Error::LoadLibraryExW`. It is suspected that something in the
+ // system still holds a lock on the file, so we retry a few times before calling it
+ // an error.
++#[cfg(not(target_os = "wasi"))]
+ fn load_dylib(path: &Path, max_attempts: usize) -> Result<libloading::Library, String> {
+     assert!(max_attempts > 0);
+ 
+@@ -103,6 +109,19 @@ fn from(err: DylibError) -> CrateError {
+     }
+ }
+ 
++// WASI has no dlopen, so proc-macro and codegen-backend dylibs cannot load.
++#[cfg(target_os = "wasi")]
++pub unsafe fn load_symbol_from_dylib<T: Copy>(
++    path: &Path,
++    _sym_name: &str,
++) -> Result<T, DylibError> {
++    Err(DylibError::DlOpen(
++        path.display().to_string(),
++        ": dynamic libraries are not supported on WASI".to_string(),
++    ))
++}
++
++#[cfg(not(target_os = "wasi"))]
+ pub unsafe fn load_symbol_from_dylib<T: Copy>(
+     path: &Path,
+     sym_name: &str,

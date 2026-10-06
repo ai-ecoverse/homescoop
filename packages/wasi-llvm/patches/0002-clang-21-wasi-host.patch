@@ -1,0 +1,26 @@
+--- a/clang/include/clang/Support/Compiler.h
++++ b/clang/include/clang/Support/Compiler.h
+@@ -54,7 +54,7 @@
+ #define CLANG_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+ #define CLANG_TEMPLATE_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+ #define CLANG_EXPORT_TEMPLATE
+-#elif defined(__MACH__) || defined(__WASM__) || defined(__EMSCRIPTEN__)
++#elif defined(__MACH__) || defined(__WASM__) || defined(__wasm__) || defined(__EMSCRIPTEN__)
+ #define CLANG_ABI LLVM_ATTRIBUTE_VISIBILITY_DEFAULT
+ #define CLANG_TEMPLATE_ABI
+ #define CLANG_EXPORT_TEMPLATE
+--- a/clang/lib/CMakeLists.txt
++++ b/clang/lib/CMakeLists.txt
+@@ -26,7 +26,11 @@
+ if(CLANG_INCLUDE_TESTS)
+   add_subdirectory(Testing)
+ endif()
+-add_subdirectory(Interpreter)
++# homescoop: the clang REPL's remote JIT needs sockets (netdb.h); nothing on a
++# WASI host links clangInterpreter.
++if(NOT WASI)
++  add_subdirectory(Interpreter)
++endif()
+ add_subdirectory(Support)
+ 
+ if(CLANG_ENABLE_CIR)

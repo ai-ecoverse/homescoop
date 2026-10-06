@@ -1,0 +1,45 @@
+--- a/lib/std/Io/File/MultiReader.zig
++++ b/lib/std/Io/File/MultiReader.zig
+@@ -182,13 +182,28 @@
+         error.Timeout => unreachable,
+         error.Canceled, error.ConcurrencyUnavailable => |e| {
+             context.err = e;
++            // homescoop: Step.zig / callers use fr.err.? on ReadFailed — never leave it null
++            context.fr.err = switch (e) {
++                error.Canceled => error.Canceled,
++                error.ConcurrencyUnavailable => error.Unexpected,
++            };
+             return error.ReadFailed;
+         },
+         error.EndOfStream => |e| return e,
+     };
+     if (context.err) |err| switch (err) {
+         error.EndOfStream => |e| return e,
+-        else => return error.ReadFailed,
++        else => |e| {
++            // Propagate operate()/fill errors onto File.Reader for fr.err.?
++            if (context.fr.err == null) {
++                context.fr.err = switch (e) {
++                    error.Canceled => error.Canceled,
++                    error.ConcurrencyUnavailable, error.OutOfMemory => error.Unexpected,
++                    else => |fe| fe,
++                };
++            }
++            return error.ReadFailed;
++        },
+     };
+ }
+ 
+@@ -211,6 +226,12 @@
+         const context = &contexts[operation.index];
+         const n = operation.result.file_read_streaming catch |err| {
+             context.err = err;
++            // homescoop: keep File.Reader.err in sync (zigProcessUpdate uses fr.err.?)
++            // `!= EndOfStream` does not narrow the error set — use switch.
++            switch (err) {
++                error.EndOfStream => {},
++                else => |e| context.fr.err = e,
++            }
+             continue;
+         };
+         const r = &context.fr.interface;
