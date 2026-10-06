@@ -2,7 +2,7 @@
 
 [buf](https://buf.build) 1.73, the Protocol Buffers CLI, as a WASI preview1
 command for SLICC: `buf`. Its offline commands run on `@ai-ecoverse/slicc-kernel`
-and in SLICC's wasm realm. On slicc-kernel, `host/buf-host.mjs` (loaded through
+≥ 1.8.0 and in SLICC's wasm realm. On slicc-kernel, `host/buf-host.mjs` (loaded through
 `slicc.commands.buf.imports`) also lets it start commands and send HTTP requests:
 local protoc plugins, git inputs, HTTP inputs and the Buf Schema Registry.
 

@@ -29,14 +29,20 @@ const files = {
 }
 const PET = `${APP}/proto/acme/pet/v1/pet.proto`
 
-async function kernelWithModule ({ dir = APP, packages = [], network = { transport: nodeTransport() } } = {}) {
+async function kernelWithModule ({ dir = APP, packages = [], network = { transport: nodeTransport() }, hostModule = true } = {}) {
   const kernel = await createNodeKernel({ network })
   for (const name of ['wasi-buf', ...packages]) {
     const base = PACKAGES[name]
     for (const entry of await readdir(base, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile()) continue
       const file = join(entry.parentPath, entry.name)
-      await kernel.writeFile(`/node_modules/@ai-ecoverse/${name}/${relative(base, file)}`, await readFile(file))
+      let data = await readFile(file)
+      if (name === 'wasi-buf' && !hostModule && relative(base, file) === 'package.json') {
+        const manifest = JSON.parse(data)
+        delete manifest.slicc.commands.buf.imports
+        data = JSON.stringify(manifest)
+      }
+      await kernel.writeFile(`/node_modules/@ai-ecoverse/${name}/${relative(base, file)}`, data)
     }
   }
   for (const [path, text] of Object.entries(files)) await kernel.writeFile(`${dir}/${path}`, text)
@@ -302,6 +308,26 @@ test('buf says when git is not installed', async () => {
     const result = await buf(kernel, ['breaking', '--against', 'https://example.invalid/pets.git#branch=main'])
     assert.equal(result.status, 1, output(result))
     assert.match(output(result), /exec: "git": executable file not found in \$PATH/)
+  } finally {
+    kernel.terminate()
+  }
+})
+
+test('without the host module the offline commands run and the rest says what it needs', async () => {
+  const kernel = await kernelWithModule({ hostModule: false, packages: ['test-protoc-gen-go'] })
+  try {
+    let result = await buf(kernel, ['build', '-o', 'image.binpb'])
+    assert.equal(result.status, 0, output(result))
+    result = await buf(kernel, ['lint'])
+    assert.equal(result.status, 0, output(result))
+    await kernel.writeFile(`${APP}/buf.gen.yaml`, 'version: v2\nplugins:\n  - local: protoc-gen-go\n    out: gen\n')
+    const needs = /this runtime cannot start commands or open network connections for buf \(it needs slicc-kernel with @ai-ecoverse\/wasi-buf's host module\)/
+    result = await buf(kernel, ['generate'])
+    assert.equal(result.status, 1, output(result))
+    assert.match(output(result), needs)
+    result = await buf(kernel, ['build', 'http://127.0.0.1:9/image.binpb'])
+    assert.equal(result.status, 1, output(result))
+    assert.match(output(result), needs)
   } finally {
     kernel.terminate()
   }
