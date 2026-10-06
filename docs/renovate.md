@@ -29,10 +29,11 @@ placeholders so the tarball URL tracks the bump (libxml2's GNOME path is
 versions in `build.sh` — `homescoop_load_recipe` sets them from the
 recipe.
 
-`ladder-pr` downloads the expanded URL, writes the new `sha256` into
-`recipe.yaml`, and pushes that commit to the PR branch before host-build.
-A bump whose patches no longer apply fails at `homescoop_apply_patches`
-with a patch error, not a checksum error.
+`ladder-pr` downloads the expanded URL, writes `sha256` onto the PR
+branch, and also refreshes sha256 in the host-build checkout so a
+`GITHUB_TOKEN` push does not skip the build. A bump whose patches no
+longer apply fails at `homescoop_apply_patches` with a patch error, not
+a checksum error.
 
 Manual refresh:
 

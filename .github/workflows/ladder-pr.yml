@@ -92,7 +92,7 @@ jobs:
 
   host-build:
     needs: [detect, recipe-sha]
-    if: needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success' && needs.recipe-sha.outputs.changed != 'true'
+    if: needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -103,6 +103,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Refresh source sha256 in this checkout
+        run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
       - name: Host build (no publish)
