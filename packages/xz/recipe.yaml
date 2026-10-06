@@ -2,7 +2,7 @@
 name: xz
 builder: host
 # renovate: datasource=github-releases depName=tukaani-project/xz extractVersion=^v(?<version>.*)$
-version: "5.8.1"
+version: "5.8.4"
 npm: "@ai-ecoverse/wasm-xz"
 summary: "xz / lzma tools and liblzma for slicc"
 source:
