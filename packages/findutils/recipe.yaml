@@ -2,7 +2,7 @@
 name: findutils
 builder: host
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/findutils.git extractVersion=^v(?<version>.*)$
-version: "4.10.0"
+version: "4.11.0"
 npm: "@ai-ecoverse/wasm-findutils"
 summary: "GNU find and xargs for slicc"
 source:
