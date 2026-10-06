@@ -7,7 +7,7 @@ npm: "@ai-ecoverse/wasm-coreutils"
 summary: "GNU coreutils (single-binary) for slicc"
 source:
   url: "https://mirrors.kernel.org/gnu/coreutils/coreutils-{{version}}.tar.xz"
-  sha256: "e8bb26ad0293f9b5a1fc43fb42ba970e312c66ce92c1b0b16713d7500db251bf"
+  sha256: "a480198559733e9b3da999e90543ac6f888a2caa544d8d664c5a1f17e528e210"
 dependencies:
   build: []
   host: []
