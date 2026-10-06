@@ -29,15 +29,25 @@ workflow_dispatch(package)
 A recipe change that needs a new WASM must bump the packaging revision (`X.Y.Z-N`).
 The same `pkg@version` on the registry is never rebuilt.
 
+**Publish order:** laptop `npm publish` of the exact certified tarball, verify
+sha256/shasum/tags, **then** land. `ladder-merge` must not be the first
+publisher of a version.
+
 OIDC publish always runs **on the runner** (`id-token: write`). One workflow
 file (`ladder-build.yml`) keeps a single `npm trust` target.
 
 `workflow_dispatch` input `publish` (default `true`) is the cert-queue valve:
 set `publish=false` on a PR branch to produce `package-tgz-<name>` without
-writing the registry. `ladder-merge` omits the input, so main still publishes.
+writing the registry. `ladder-merge` omits the input (and omits `certified`).
 `ladder-pr` host-builds also upload that artifact (no OIDC). When
 `publish=false`, skip-if-already-published is ignored so a rebuild can still
 emit a tarball for recert.
+
+If `pkg@version` is **not** on npm, OIDC publish is refused unless dispatch
+sets `certified=<sha256>` and that digest matches the built tarball
+(`scripts/assert-certified-publish.mjs`). Land-before-publish therefore
+cannot ship an uncertified rebuild even with a trusted-publisher binding.
+When the version document already exists, publish is skipped (success).
 
 ## PR and merge automation
 
