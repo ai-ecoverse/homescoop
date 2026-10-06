@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-libxml2",
-  "version": "2.13.8-1",
-  "description": "libxml2 XML parser (WASM / emscripten, SLICC homescoop ladder)",
+  "version": "2.15.4-1",
+  "description": "libxml2 2.15.4 XML parser with GNU libiconv (WASM / emscripten)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -27,6 +27,6 @@
   },
   "homescoop": {
     "recipe": "libxml2",
-    "upstream": "2.13.8"
+    "upstream": "2.15.4"
   }
 }
