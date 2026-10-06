@@ -1,10 +1,9 @@
 --- a/awk.h
 +++ b/awk.h
-@@ -1683,6 +1683,11 @@
+@@ -1732,6 +1732,10 @@
  extern bool is_non_fatal_redirect(const char *str, size_t len);
  extern bool non_fatal_flush_std_file(FILE *fp);
  extern size_t gawk_fwrite(const void *buf, size_t size, size_t count, FILE *fp, void *opaque);
-+/* SLICC/Emscripten: no fork — route | getline through musl popen → posix_spawn. */
 +#if defined(__EMSCRIPTEN__) && !defined(PIPES_SIMULATED)
 +#define PIPES_SIMULATED 1
 +#endif
@@ -14,7 +13,7 @@
  #endif
 --- a/builtin.c
 +++ b/builtin.c
-@@ -3332,9 +3332,9 @@
+@@ -3381,9 +3381,9 @@
  int
  gawk_system(const char *command)
  {
@@ -26,18 +25,18 @@
  	pid_t childpid;
  	int status;
  
-@@ -3349,7 +3349,7 @@
+@@ -3441,7 +3441,7 @@
  
  		return status;
  	}
--#endif /* defined(VMS) || defined(__MINGW32__) */
-+#endif /* defined(VMS) || defined(__MINGW32__) || defined(__EMSCRIPTEN__) */
+-#endif /* ! (defined(VMS) || defined(__MINGW32__)) */
++#endif /* ! (defined(VMS) || defined(__MINGW32__) || defined(__EMSCRIPTEN__)) */
  }
  
- #if 0
+ /* do_dump_node --- dump the offsets of the NODE struct */
 --- a/io.c
 +++ b/io.c
-@@ -4617,7 +4617,7 @@
+@@ -4702,7 +4702,7 @@
  static FILE *
  gawk_popen_write(const char *cmd)
  {
@@ -46,7 +45,7 @@
  	return popen(cmd, binmode("w"));
  #else
  	pid_t childpid;
-@@ -4670,7 +4670,7 @@
+@@ -4763,7 +4763,7 @@
  static int
  gawk_popen_write_close(FILE *fp)
  {
@@ -54,4 +53,4 @@
 +#if defined(VMS) || defined(__MINGW32__) || defined(__EMSCRIPTEN__)
  	return pclose(fp);
  #else
- 	int status, index;
+ 	write_pipe *wp;
