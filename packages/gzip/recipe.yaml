@@ -18,3 +18,4 @@ about:
   notes: |
     Links slicc cli profile. gunzip/zcat are argv0 aliases of gzip.
     Built with -DGNU_STANDARD=0 so argv0 selects decompress/cat modes.
+    Same npm version skips ladder-build; bump -N to rebuild.

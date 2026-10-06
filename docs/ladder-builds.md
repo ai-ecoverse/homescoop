@@ -17,12 +17,17 @@ always present; CI only runs the script matching `builder`.
 
 ```text
 workflow_dispatch(package)
-  └─ read recipe.builder
+  └─ read recipe.builder + npm version
+       ├─ npm view pkg@version exists → log "already published, skipping"
+       │                                 (no build, no publish)
        ├─ slicc → start-leader → ipk mamba / ipk add deps → build.jsh →
        │          pack → fetch tgz → OIDC publish
        └─ host  → npm i emsdk → (npm deps only) → build.sh → npm pack →
                   OIDC publish
 ```
+
+A recipe change that needs a new WASM must bump the packaging revision (`X.Y.Z-N`).
+The same `pkg@version` on the registry is never rebuilt.
 
 OIDC publish always runs **on the runner** (`id-token: write`). One workflow
 file (`ladder-build.yml`) keeps a single `npm trust` target.
