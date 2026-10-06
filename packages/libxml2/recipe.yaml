@@ -2,16 +2,20 @@
 name: libxml2
 builder: host
 # renovate: datasource=github-tags depName=GNOME/libxml2 extractVersion=^v(?<version>.*)$
-version: "2.13.8"
+version: "2.15.4"
 npm: "@ai-ecoverse/wasm-libxml2"
 summary: "libxml2 XML parser"
 source:
   url: "https://download.gnome.org/sources/libxml2/{{major}}.{{minor}}/libxml2-{{version}}.tar.xz"
-  sha256: "277294cb33119ab71b2bc81f2f445e9bc9435b893ad15bb2cd2b0e859a0ee84a"
+  sha256: "98087fd181d9070724f3fbc65c7377db03038eb92bd882374daff44940138821"
 dependencies:
-  build: []
+  build:
+    - "@ai-ecoverse/wasm-libiconv@1.18.0-1"
   host: []
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libxml2
   license: MIT
+  notes: |
+    2.15 --with-iconv against wasm-libiconv. Do not land until libiconv is
+    certified and published. Encoding smoke is packages/libxml2/smoke-iconv.c.
