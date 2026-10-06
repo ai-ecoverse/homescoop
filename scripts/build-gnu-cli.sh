@@ -74,8 +74,13 @@ if [[ ! -f "$SRC_DIR/$BIN_NAME" && ! -f "$SRC_DIR/$BIN_NAME.js" && ! -f "$SRC_DI
       ac_cv_func_mbrtoc32=yes ac_cv_func_c32rtomb=yes \
       gl_cv_func_mbrtoc32=yes gl_cv_func_c32rtomb=yes
     homescoop_fix_darwin_ar Makefile
-    emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
-      LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
+    jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
+    if [[ "$NAME" == sed ]]; then
+      # SUBDIRS is "po . gnulib-tests"; gnulib-tests #error on emscripten.
+      emmake make -j"$jobs" SUBDIRS="po ." LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
+    else
+      emmake make -j"$jobs" LDFLAGS="$CLI_LDFLAGS" LIBS="$CLI_LIBS"
+    fi
   )
 fi
 
