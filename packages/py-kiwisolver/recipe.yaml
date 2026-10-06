@@ -1,0 +1,14 @@
+name: py-kiwisolver
+builder: host
+version: "1.5.1"
+npm: "@ai-ecoverse/py-kiwisolver"
+summary: "kiwisolver for slicc WASIX CPython 3.14"
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python]
+about:
+  license: BSD-3-Clause
+  notes: |
+    Cross-built with wasixcc (setuptools + cppy). Wheel tag cp314-wasix_wasm32;
+    native *.cpython-314-wasm32-wasix.so.

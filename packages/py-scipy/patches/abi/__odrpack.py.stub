@@ -1,0 +1,4 @@
+"""WASIX stub: ODRPACK C extension is not built for SLICC wasm."""
+raise ImportError(
+    "scipy.odr is not available in this build (SLICC wasm)"
+)

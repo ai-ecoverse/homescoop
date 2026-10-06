@@ -1,0 +1,20 @@
+# XZ Utils for slicc wasm realm (xz/lzma CLIs + static liblzma).
+name: xz
+builder: host
+# renovate: datasource=github-releases depName=tukaani-project/xz extractVersion=^v(?<version>.*)$
+version: "5.8.1"
+npm: "@ai-ecoverse/wasm-xz"
+summary: "xz / lzma tools and liblzma for slicc"
+source:
+  url: "https://github.com/tukaani-project/xz/releases/download/v{{version}}/xz-{{version}}.tar.xz"
+  sha256: "0b54f79df85912504de0b14aec7971e3f964491af1812d83447005807513cd9e"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/xz
+  license: 0BSD
+  notes: |
+    --disable-shared --enable-static --disable-threads. slicc cli profile.
+    argv0 aliases: unxz xzcat lzma unlzma lzcat. Stages xzgrep/xzdiff/xzless.

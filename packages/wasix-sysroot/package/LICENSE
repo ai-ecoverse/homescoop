@@ -1,0 +1,5 @@
+Apache-2.0 WITH LLVM-exception
+
+This package redistributes wasix-libc sysroot contents (headers, libc, libc++,
+compiler-rt builtins) as built/installed by wasixcc. See
+https://github.com/wasix-org/wasix-libc for upstream terms.

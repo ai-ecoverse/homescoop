@@ -1,0 +1,22 @@
+[host_machine]
+system = 'wasi'
+cpu_family = 'wasm32'
+cpu = 'wasm32'
+endian = 'little'
+
+[binaries]
+c = '@WASIXCC@'
+cpp = '@WASIXCCXX@'
+ar = 'wasixar'
+pkg-config = 'pkg-config'
+
+[properties]
+needs_exe_wrapper = true
+skip_sanity_check = true
+longdouble_format = 'IEEE_QUAD_LE'
+pkg_config_libdir = '@PKG_CONFIG_LIBDIR@'
+numpy-include-dir = '@NUMPY_INC@'
+c_args = ['-I@PYTHON_INC@', '-I@WASIX_PYTHON_INC@', '-I@NUMPY_INC@', '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION']
+cpp_args = ['-I@PYTHON_INC@', '-I@WASIX_PYTHON_INC@', '-I@NUMPY_INC@', '-DNPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION']
+c_link_args = ['-shared', '-nostdlib', '-Wl,--allow-undefined']
+cpp_link_args = ['-shared', '-nostdlib', '-Wl,--allow-undefined']

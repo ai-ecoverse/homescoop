@@ -69,10 +69,10 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-libtiff` | host | **4.7.0**; deps zlib + jpeg |
 | `@ai-ecoverse/wasm-gmake` | host | **4.4.1-2** (spawn/exec/select/main_envp/gaps) |
 | `@ai-ecoverse/wasm-bash` | host | **5.3.0-4** (readline/history, fork + Asyncify, `/dev/fd` process subst, PIPESTATUS patch) |
-| `@ai-ecoverse/wasm-coreutils` | host | **9.7.0-2** single-binary + argv0 manifest (uid 1000 via gaps) |
-| `@ai-ecoverse/wasm-sed` | host | **4.9.0-1** |
-| `@ai-ecoverse/wasm-grep` | host | **3.12.0-1** |
-| `@ai-ecoverse/wasm-gawk` | host | **5.3.2-1** (`gawk` + `awk`) |
+| `@ai-ecoverse/wasm-coreutils` | host | **9.7.0-3** single-binary + argv0 manifest (uid 1000 via gaps) |
+| `@ai-ecoverse/wasm-sed` | host | **4.9.0-3** |
+| `@ai-ecoverse/wasm-grep` | host | **3.12.0-3** |
+| `@ai-ecoverse/wasm-gawk` | host | **5.3.2-3** (`gawk` + `awk`) |
 | `@ai-ecoverse/wasm-less` | host | **668.0.0-1** (static ncursesw fallbacks) |
 | `@ai-ecoverse/wasm-sqlite3` | host | **3.53.4** (shell amalgamation) |
 | `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-31.1** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
@@ -82,6 +82,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-diffutils` | host | **3.12.0** (`diff` / `cmp` / `diff3` / `sdiff`) |
 | `@ai-ecoverse/wasm-patch` | host | **2.8.0** |
 | `@ai-ecoverse/wasm-xxd` | host | **9.1.1850** |
+| `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 | `@ai-ecoverse/wasm-magick-native` | slicc* | stub (Magick.Native Q8) |
 

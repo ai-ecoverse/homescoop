@@ -69,6 +69,7 @@ EMSCRIPTEN_KEEPALIVE int slicc_sigpipe(void) {
 // (real, effective and saved ids alike), so bash -- which reads them with
 // getresuid/getresgid -- showed a `#` prompt and programs took root-only paths.
 #include <unistd.h>
+#include <grp.h>
 #define SLICC_UID 1000
 uid_t __syscall_getuid32(void) { return SLICC_UID; }
 uid_t __syscall_geteuid32(void) { return SLICC_UID; }
@@ -82,3 +83,75 @@ int __syscall_getresgid32(gid_t *rgid, gid_t *egid, gid_t *sgid) {
   *rgid = *egid = *sgid = SLICC_UID;
   return 0;
 }
+
+// Emscripten musl routes every set*id through __setxid_emscripten() which
+// always returns EPERM (and drops the ids). Provide strong POSIX setters for
+// an unprivileged process whose real = effective = saved id is SLICC_UID so
+// screen/bash/su-like code can "drop privileges" to itself.
+static int slicc_id_ok(int id) {
+  return id == -1 || id == (int)SLICC_UID;
+}
+
+static int slicc_set_one(int id) {
+  if (id == (int)SLICC_UID) return 0;
+  errno = EPERM;
+  return -1;
+}
+
+int setuid(uid_t uid) { return slicc_set_one((int)uid); }
+int seteuid(uid_t euid) { return slicc_set_one((int)euid); }
+int setgid(gid_t gid) { return slicc_set_one((int)gid); }
+int setegid(gid_t egid) { return slicc_set_one((int)egid); }
+
+int setreuid(uid_t ruid, uid_t euid) {
+  if (slicc_id_ok((int)ruid) && slicc_id_ok((int)euid)) return 0;
+  errno = EPERM;
+  return -1;
+}
+
+int setregid(gid_t rgid, gid_t egid) {
+  if (slicc_id_ok((int)rgid) && slicc_id_ok((int)egid)) return 0;
+  errno = EPERM;
+  return -1;
+}
+
+int setresuid(uid_t ruid, uid_t euid, uid_t suid) {
+  if (slicc_id_ok((int)ruid) && slicc_id_ok((int)euid) && slicc_id_ok((int)suid))
+    return 0;
+  errno = EPERM;
+  return -1;
+}
+
+int setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
+  if (slicc_id_ok((int)rgid) && slicc_id_ok((int)egid) && slicc_id_ok((int)sgid))
+    return 0;
+  errno = EPERM;
+  return -1;
+}
+
+int setgroups(size_t size, const gid_t *list) {
+  if (size == 0) return 0;
+  if (!list) {
+    errno = EFAULT;
+    return -1;
+  }
+  for (size_t i = 0; i < size; i++) {
+    if (list[i] != (gid_t)SLICC_UID) {
+      errno = EPERM;
+      return -1;
+    }
+  }
+  return 0;
+}
+
+// Default-linked programs need real pids from the wasm realm. Emscripten's
+// stubs answer getpid()=42 / getppid()=1. Weak so slicc_fork.c (ASYNCIFY
+// fork link) can override with its strong __syscall_getpid/getppid.
+EM_JS(int, slicc_default_getpid_js, (void), {
+  return (Module.sliccPid | 0) || 42;
+});
+EM_JS(int, slicc_default_getppid_js, (void), {
+  return (Module.sliccPpid | 0) || 1;
+});
+__attribute__((weak)) pid_t __syscall_getpid(void) { return slicc_default_getpid_js(); }
+__attribute__((weak)) pid_t __syscall_getppid(void) { return slicc_default_getppid_js(); }

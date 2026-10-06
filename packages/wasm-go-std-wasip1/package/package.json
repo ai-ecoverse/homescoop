@@ -1,0 +1,46 @@
+{
+  "name": "@ai-ecoverse/wasm-go-std-wasip1",
+  "version": "1.26.5-1",
+  "description": "Go 1.26 std export archives for wasip1/wasm (slicc go driver)",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasm-go-std-wasip1/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-go-std-wasip1",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasip1",
+    "slicc",
+    "homescoop",
+    "go",
+    "golang",
+    "stdlib"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "goroot"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasm-go-std-wasip1",
+    "upstream": "1.26.5"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "go": {
+      "version": "go1.26.5",
+      "std": [
+        {
+          "target": "wasip1/wasm",
+          "dir": "goroot/pkg/wasip1_wasm"
+        }
+      ]
+    }
+  }
+}

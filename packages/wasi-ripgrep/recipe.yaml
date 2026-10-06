@@ -1,0 +1,22 @@
+# ripgrep for slicc WASI preview1 (no Emscripten glue).
+name: wasi-ripgrep
+builder: host
+# renovate: datasource=crate depName=ripgrep
+version: "15.2.0"
+npm: "@ai-ecoverse/wasi-ripgrep"
+summary: "ripgrep 15 for slicc WASI preview1 (command rg)"
+source:
+  url: "https://static.crates.io/crates/ripgrep/ripgrep-{{version}}.crate"
+  sha256: "a30750b6d0743bfdd2656ebbaf4555aa278c43144b84bc389bcbfa399485ec71"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/BurntSushi/ripgrep
+  license: "MIT OR Unlicense"
+  notes: |
+    cargo install --target wasm32-wasip1 with release strip. Manifest abi=wasi;
+    command rg → bin/rg.wasm (no glue). Default features only (no PCRE2).
+    The .crate URL is SSOT for Renovate; build.sh uses cargo install of the
+    same version (crates.io) rather than unpacking the tarball by hand.

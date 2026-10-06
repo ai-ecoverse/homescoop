@@ -1,0 +1,16 @@
+# Sources in the slicc-emscripten cmake-wasm ninja graph that lay out
+# musl sigset_t / struct sigaction. Recompile these before relinking against
+# today's EM_CACHE (sigset_t 128 B / sigaction 140 B since 2026-10-01).
+# slicc-sig-layout-guard.py fails the build if a new linked source appears.
+Source/kwsys/ProcessUNIX.c
+Source/kwsys/SystemInformation.cxx
+Source/kwsys/SystemTools.cxx
+Utilities/cmcurl/lib/conncache.c
+Utilities/cmcurl/lib/cshutdn.c
+Utilities/cmcurl/lib/easy.c
+Utilities/cmcurl/lib/hostip.c
+Utilities/cmcurl/lib/multi.c
+Utilities/cmlibuv/src/unix/core.c
+Utilities/cmlibuv/src/unix/posix-poll.c
+Utilities/cmlibuv/src/unix/process.c
+Utilities/cmlibuv/src/unix/signal.c

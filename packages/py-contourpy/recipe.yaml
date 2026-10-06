@@ -1,0 +1,14 @@
+name: py-contourpy
+builder: host
+version: "1.4.0"
+npm: "@ai-ecoverse/py-contourpy"
+summary: "contourpy for slicc WASIX CPython 3.14"
+dependencies:
+  build: [wasix-python, py-numpy]
+  host: []
+  run: [wasix-python, py-numpy]
+about:
+  license: BSD-3-Clause
+  notes: |
+    Cross-built with wasixcc + meson-python + pybind11.
+    Wheel tag cp314-wasix_wasm32; native *.cpython-314-wasm32-wasix.so.

@@ -1,13 +1,14 @@
 # Homebrew-shaped recipe — CMake as a wasm tool (ladder rung_cmake / build-wasm-cmake.sh).
 name: cmake
-builder: slicc
+builder: host
 # renovate: datasource=github-releases depName=Kitware/CMake extractVersion=^v(?<version>.*)$
 version: "4.4.3"
 npm: "@ai-ecoverse/wasm-cmake"
 summary: "CMake built for slicc (wasm tool)"
 source:
-  url: null  # slicc uses cmake-4.4.3-slicc.tar.gz (patched + Tests dropped)
-  sha256: null
+  # Prebuilt by slicc-emscripten/build-wasm-cmake.sh; build.sh stages that artifact.
+  url: "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}.tar.gz"
+  sha256: "c46400618b4f1f2b43507f24fb22f3ae830c3416cf23b776e16e1d413aa892f0"
 dependencies:
   build: []
   host: []
@@ -16,8 +17,7 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake
   license: BSD-3-Clause
   notes: |
-    Port from slicc-emscripten harness/ladder.sh rung_cmake and
-    build-wasm-cmake.sh (cmlibuv + pipefs patches, slicc_spawn.o).
-    Link CLI with homescoop_em_cli_ldflags (ENVIRONMENT=web,worker,node,
-    EXIT_RUNTIME, ALLOW_MEMORY_GROWTH). Keep package.json slicc.commands
-    paths aligned with staged bin/cmake{.wasm}.
+    Relink slicc-emscripten/build/cmake-wasm-build against libslicc.
+    Recompile sig-layout-sources.txt (sigaction/sigset_t) before link;
+    slicc-sig-layout-guard.py fails if a new linked source appears.
+    PRESTAGE is scripts/smoke-cmake.mjs (not --version).

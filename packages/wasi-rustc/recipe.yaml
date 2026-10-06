@@ -1,0 +1,30 @@
+# RETIRED from ladder — do not build or OIDC-publish.
+#
+# Certified @ai-ecoverse/wasi-rustc and @ai-ecoverse/wasi-cargo come only from
+# .github/workflows/wasi-rustc-stable.yml artifacts, after browser certification.
+# This tree keeps patches/stage scripts; the 1.83 oligamiq spike is provenance.
+# See docs/ladder-builds.md "Retired recipes".
+name: wasi-rustc
+builder: retired
+# renovate: datasource=github-releases depName=rust-lang/rust
+version: "1.83.0"
+npm: "@ai-ecoverse/wasi-rustc"
+summary: "RETIRED from ladder — rustc/cargo from wasi-rustc-stable.yml only"
+source:
+  # Historical spike URL (unused). Real builds: rust-lang/rust 1.98.1 via CI.
+  url: "https://github.com/oligamiq/rust_wasm/releases/download/v3.0.0-release/rustc_opt.wasm.tar.gz"
+  sha256: "skip"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasm-clang
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-rustc
+  license: (MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception
+  notes: |
+    Retired from ladder 2026-10-03. Do not rebuild or npm-publish from
+    host-run / ladder-build (would race the certified 1.98.1-1 / cargo 0.99.0-0
+    line). Manual-only: wasi-rustc-stable workflow, then publish the staged
+    tarball after certification. wasi-cargo lives under this package dir and
+    has no separate recipe.

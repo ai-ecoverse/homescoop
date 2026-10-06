@@ -1,0 +1,60 @@
+{
+  "name": "@ai-ecoverse/wasix-automake",
+  "version": "1.17.0-5",
+  "description": "GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4)",
+  "license": "GPL-2.0-or-later",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-automake",
+    "upstream": "1.17"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "automake": {
+        "script": "bin/automake",
+        "env": {
+          "AUTOMAKE_LIBDIR": "${package}/share/automake-1.17",
+          "ACLOCAL_AUTOMAKE_DIR": "${package}/share/aclocal-1.17",
+          "ACLOCAL_PATH": "${package}/share/aclocal"
+        }
+      },
+      "aclocal": {
+        "script": "bin/aclocal",
+        "env": {
+          "AUTOMAKE_LIBDIR": "${package}/share/automake-1.17",
+          "ACLOCAL_AUTOMAKE_DIR": "${package}/share/aclocal-1.17",
+          "ACLOCAL_PATH": "${package}/share/aclocal"
+        }
+      },
+      "automake-1.17": {
+        "script": "bin/automake-1.17",
+        "env": {
+          "AUTOMAKE_LIBDIR": "${package}/share/automake-1.17",
+          "ACLOCAL_AUTOMAKE_DIR": "${package}/share/aclocal-1.17",
+          "ACLOCAL_PATH": "${package}/share/aclocal"
+        }
+      },
+      "aclocal-1.17": {
+        "script": "bin/aclocal-1.17",
+        "env": {
+          "AUTOMAKE_LIBDIR": "${package}/share/automake-1.17",
+          "ACLOCAL_AUTOMAKE_DIR": "${package}/share/aclocal-1.17",
+          "ACLOCAL_PATH": "${package}/share/aclocal"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-autoconf": "^2.72.0-3",
+    "@ai-ecoverse/wasix-perl": "^5.42.0-2"
+  }
+}

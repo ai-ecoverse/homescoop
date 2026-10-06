@@ -1,0 +1,22 @@
+# Optional Go std export archives for linux/amd64 (cross-compile without cgo).
+# Queue: after wasm-go + wasm-go-std-wasip1 if needed. Revision versions only.
+name: wasm-go-std-linux-amd64
+builder: host
+# renovate: datasource=golang-version
+version: "1.26.5"
+npm: "@ai-ecoverse/wasm-go-std-linux-amd64"
+summary: "Go 1.26 std .a archives for linux/amd64 (slicc go cross-compile)"
+source:
+  url: "https://go.dev/dl/go{{version}}.src.tar.gz"
+  sha256: "495be4bc87176ac567392e5b4116abd98466d33d7b49d41e764ccc6976b2dc42"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://go.dev
+  license: BSD-3-Clause
+  notes: |
+    Optional std-only package. slicc.go.std target linux/amd64 →
+    goroot/pkg/linux_amd64/. Same Go version as wasm-go. Driver unions
+    with wasip1 std. Build only if pack size allows (split if over 40 MiB).

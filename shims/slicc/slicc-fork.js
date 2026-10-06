@@ -250,6 +250,7 @@ addToLibrary({
     }
     HEAPU32[p >> 2] = 0;
     if (Module.sliccPid) SliccFork.pid = Module.sliccPid;
+    if (Module.sliccPpid) SliccFork.ppid = Module.sliccPpid;
     try {
       const ret = SliccFork.settle(_main(argc, argv));
       exitJS(ret, true);

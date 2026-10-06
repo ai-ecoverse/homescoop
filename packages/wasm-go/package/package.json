@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/wasm-go",
+  "version": "1.26.5-1",
+  "description": "Go 1.26 wasip1 compile/link/asm tools for slicc go driver (GOROOT half)",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasm-go/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-go",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasip1",
+    "slicc",
+    "homescoop",
+    "go",
+    "golang"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "goroot"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasm-go",
+    "upstream": "1.26.5"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "go": {
+      "version": "go1.26.5",
+      "goroot": "goroot"
+    }
+  }
+}

@@ -1,0 +1,87 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//
+//  Implements Wasm exception handling proposal
+//  (https://github.com/WebAssembly/exception-handling) based C++ exceptions
+//
+//===----------------------------------------------------------------------===//
+
+#include <stdbool.h>
+
+#include "config.h"
+
+#ifdef __WASM_EXCEPTIONS__
+
+#include "unwind.h"
+#include <threads.h>
+
+_LIBUNWIND_EXPORT thread_local struct _Unwind_LandingPadContext
+    __wasm_lpad_context;
+
+/// Called by __cxa_throw.
+_LIBUNWIND_EXPORT _Unwind_Reason_Code
+_Unwind_RaiseException(_Unwind_Exception *exception_object) {
+  _LIBUNWIND_TRACE_API("_Unwind_RaiseException(exception_object=%p)",
+                       (void *)exception_object);
+  // Use Wasm EH's 'throw' instruction.
+  __builtin_wasm_throw(0, exception_object);
+}
+
+/* __cpp_exception: provided by sysroot tag stubs / clang */
+
+/// Called by __cxa_end_catch.
+_LIBUNWIND_EXPORT void
+_Unwind_DeleteException(_Unwind_Exception *exception_object) {
+  _LIBUNWIND_TRACE_API("_Unwind_DeleteException(ex_obj=%p)",
+                       (void *)(exception_object));
+  if (exception_object->exception_cleanup != NULL)
+    (*exception_object->exception_cleanup)(_URC_FOREIGN_EXCEPTION_CAUGHT,
+                                           exception_object);
+}
+
+/// Called by personality handler to alter register values.
+_LIBUNWIND_EXPORT void _Unwind_SetGR(struct _Unwind_Context *context, int index,
+                                     uintptr_t value) {
+  _LIBUNWIND_TRACE_API("_Unwind_SetGR(context=%p, index=%d, value=%lu)",
+                       (void *)context, index, value);
+  // We only use this function to set __wasm_lpad_context.selector field, which
+  // is index 1 in the personality function.
+  if (index == 1)
+    ((struct _Unwind_LandingPadContext *)context)->selector = value;
+}
+
+/// Called by personality handler to get instruction pointer.
+_LIBUNWIND_EXPORT uintptr_t _Unwind_GetIP(struct _Unwind_Context *context) {
+  // The result will be used as a 1-based index after decrementing 1, so we
+  // increment 2 here
+  uintptr_t result =
+      ((struct _Unwind_LandingPadContext *)context)->lpad_index + 2;
+  _LIBUNWIND_TRACE_API("_Unwind_GetIP(context=%p) => %lu", (void *)context,
+                       result);
+  return result;
+}
+
+/// Not used in Wasm.
+_LIBUNWIND_EXPORT void _Unwind_SetIP(struct _Unwind_Context *context,
+                                     uintptr_t value) {}
+
+/// Called by personality handler to get LSDA for current frame.
+_LIBUNWIND_EXPORT uintptr_t
+_Unwind_GetLanguageSpecificData(struct _Unwind_Context *context) {
+  uintptr_t result = ((struct _Unwind_LandingPadContext *)context)->lsda;
+  _LIBUNWIND_TRACE_API("_Unwind_GetLanguageSpecificData(context=%p) => 0x%lx",
+                       (void *)context, result);
+  return result;
+}
+
+/// Not used in Wasm.
+_LIBUNWIND_EXPORT uintptr_t
+_Unwind_GetRegionStart(struct _Unwind_Context *context) {
+  return 0;
+}
+
+#endif // defined(__WASM_EXCEPTIONS__)

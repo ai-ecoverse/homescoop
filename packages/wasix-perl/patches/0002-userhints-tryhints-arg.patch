@@ -1,0 +1,11 @@
+--- /Users/trieloff/Developer/ai-ecoverse/homescoop/packages/wasix-perl/work/perl-cross-git/cnf/configure_hint.sh	2026-10-01 09:55:32.485859829 +0200
++++ /Users/trieloff/Developer/ai-ecoverse/homescoop/packages/wasix-perl/work/perl-build/cnf/configure_hint.sh	2026-10-01 10:05:58.660871212 +0200
+@@ -72,7 +72,7 @@
+ 
+ if [ -n "$userhints" ]; then
+ 	for h in `echo "$userhints" | sed -e 's/,/ /g'`; do
+-		tryhints 'hint' "$h"
++		tryhints "$h"
+ 	done
+ else
+ 	tryhints "$archname"

@@ -1,0 +1,1336 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index c3cd706..ddec4c5 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -576,6 +576,7 @@ dependencies = [
+  "tempfile",
+  "tracing",
+  "walkdir",
++ "wasix-command",
+  "windows-sys 0.61.2",
+ ]
+ 
+@@ -1346,8 +1347,6 @@ checksum = "64cd1e32ddd350061ae6edb1b082d7c54915b5c672c389143b9a63403a109f24"
+ [[package]]
+ name = "filetime"
+ version = "0.2.29"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759"
+ dependencies = [
+  "cfg-if",
+  "libc",
+@@ -1550,8 +1549,6 @@ dependencies = [
+ [[package]]
+ name = "git2"
+ version = "0.21.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "ddddbf932745a6be37109b6112d3ee09696106f848449069d3a57bba937ab82e"
+ dependencies = [
+  "bitflags 2.13.0",
+  "libc",
+@@ -2583,8 +2580,6 @@ dependencies = [
+ [[package]]
+ name = "home"
+ version = "0.5.12"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
+ dependencies = [
+  "windows-sys 0.61.2",
+ ]
+@@ -2963,8 +2958,6 @@ dependencies = [
+ [[package]]
+ name = "jobserver"
+ version = "0.1.34"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "9afb3de4395d6b3e67a780b6de64b51c978ecf11cb9a462c66be7d4ca9039d33"
+ dependencies = [
+  "getrandom 0.3.4",
+  "libc",
+@@ -4749,8 +4742,6 @@ dependencies = [
+ [[package]]
+ name = "tar"
+ version = "0.4.46"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
+ dependencies = [
+  "filetime",
+  "libc",
+@@ -5354,6 +5345,10 @@ dependencies = [
+  "wit-bindgen",
+ ]
+ 
++[[package]]
++name = "wasix-command"
++version = "0.1.0"
++
+ [[package]]
+ name = "wasm-bindgen"
+ version = "0.2.126"
+diff --git a/Cargo.toml b/Cargo.toml
+index c4ae20c..73b79b5 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -51,7 +51,7 @@ filetime = "0.2.27"
+ flate2 = { version = "1.1.9", default-features = false, features = ["zlib-rs"] }
+ futures = { version = "0.3.32", default-features = false, features = ["std", "executor", "async-await"]}
+ futures-timer = "3.0.3"
+-git2 = { version = "0.21.0", features = ["https", "ssh"] }
++git2 = { version = "0.21.0", default-features = false }
+ git2-curl = "0.22.0"
+ # When updating this, also see if `gix-transport` further down needs updating or some auth-related tests will fail.
+ gix = { version = "0.85.0", default-features = false, features = ["sha1", "progress-tree", "parallel", "dirwalk", "status"] }
+@@ -173,19 +173,15 @@ cargo-credential.workspace = true
+ cargo-platform.workspace = true
+ cargo-util-schemas.workspace = true
+ cargo-util-terminal.workspace = true
++crates-io.workspace = true
+ cargo-util.workspace = true
+ clap = { workspace = true, features = ["wrap_help"] }
+ clap_complete.workspace = true
+ color-print.workspace = true
+-crates-io.workspace = true
+-curl = { workspace = true, features = ["http2"] }
+-curl-sys.workspace = true
+ filetime.workspace = true
+ flate2.workspace = true
+ futures.workspace = true
+ futures-timer.workspace = true
+-git2.workspace = true
+-git2-curl.workspace = true
+ gix.workspace = true
+ glob.workspace = true
+ heck.workspace = true
+@@ -239,6 +235,17 @@ url.workspace = true
+ walkdir.workspace = true
+ winnow.workspace = true
+ 
++# SLICC: WASI has no libcurl or libssh2. Registry HTTP goes through the
++# realm proxy (util/network/http_async.rs), and git has no network transport.
++[target.'cfg(not(target_os = "wasi"))'.dependencies]
++curl = { workspace = true, features = ["http2"] }
++curl-sys.workspace = true
++git2 = { workspace = true, features = ["https", "ssh"] }
++git2-curl.workspace = true
++
++[target.'cfg(target_os = "wasi")'.dependencies]
++git2 = { workspace = true, features = ["cred"] }
++
+ [target.'cfg(unix)'.dependencies]
+ libc.workspace = true
+ 
+@@ -302,3 +309,11 @@ http-transport-reqwest = ["gix/blocking-http-transport-reqwest"]
+ 
+ [lints]
+ workspace = true
++
++# SLICC: git2 knows unix and windows paths; WASI paths are byte strings too.
++[patch.crates-io]
++git2 = { path = "slicc/git2" }
++home = { path = "slicc/home" }
++filetime = { path = "slicc/filetime" }
++tar = { path = "slicc/tar" }
++jobserver = { path = "slicc/jobserver" }
+diff --git a/crates/cargo-util-terminal/src/shell.rs b/crates/cargo-util-terminal/src/shell.rs
+index e39d231..32fd1a8 100644
+--- a/crates/cargo-util-terminal/src/shell.rs
++++ b/crates/cargo-util-terminal/src/shell.rs
+@@ -645,6 +645,19 @@ mod imp {
+     }
+ }
+ 
++#[cfg(target_os = "wasi")]
++mod imp {
++    use super::{Shell, TtyWidth};
++
++    pub fn stderr_width() -> TtyWidth {
++        TtyWidth::NoTty
++    }
++
++    pub fn err_erase_line(shell: &mut Shell) {
++        let _ = shell.output.stderr().write_all(b"\x1B[K");
++    }
++}
++
+ #[cfg(windows)]
+ mod imp {
+     use std::{cmp, mem, ptr};
+diff --git a/crates/cargo-util/Cargo.toml b/crates/cargo-util/Cargo.toml
+index 8e91745..c360593 100644
+--- a/crates/cargo-util/Cargo.toml
++++ b/crates/cargo-util/Cargo.toml
+@@ -24,6 +24,9 @@ walkdir.workspace = true
+ [target.'cfg(target_os = "macos")'.dependencies]
+ core-foundation.workspace = true
+ 
++[target.'cfg(target_os = "wasi")'.dependencies]
++wasix-command = { path = "../wasix-command" }
++
+ [target.'cfg(unix)'.dependencies]
+ libc.workspace = true
+ 
+diff --git a/crates/cargo-util/src/paths.rs b/crates/cargo-util/src/paths.rs
+index 28f77d6..54dee33 100644
+--- a/crates/cargo-util/src/paths.rs
++++ b/crates/cargo-util/src/paths.rs
+@@ -396,6 +396,10 @@ pub fn path2bytes(path: &Path) -> Result<&[u8]> {
+         use std::os::unix::prelude::*;
+         Ok(path.as_os_str().as_bytes())
+     }
++    #[cfg(target_os = "wasi")]
++    {
++        Ok(path.as_os_str().as_encoded_bytes())
++    }
+     #[cfg(windows)]
+     {
+         match path.as_os_str().to_str() {
+@@ -415,6 +419,14 @@ pub fn bytes2path(bytes: &[u8]) -> Result<PathBuf> {
+         use std::os::unix::prelude::*;
+         Ok(PathBuf::from(OsStr::from_bytes(bytes)))
+     }
++    #[cfg(target_os = "wasi")]
++    {
++        // WASI paths are UTF-8.
++        match std::str::from_utf8(bytes) {
++            Ok(s) => Ok(PathBuf::from(s)),
++            Err(..) => Err(anyhow::format_err!("invalid non-UTF-8 path on WASI")),
++        }
++    }
+     #[cfg(windows)]
+     {
+         use std::str;
+@@ -624,6 +636,10 @@ fn _link_or_copy(src: &Path, dst: &Path) -> Result<()> {
+     let link_result = if src.is_dir() {
+         #[cfg(unix)]
+         use std::os::unix::fs::symlink;
++        // `std::os::wasi::fs::symlink_path` is unstable; this is the same call.
++        #[cfg(target_os = "wasi")]
++        #[allow(deprecated)]
++        use std::fs::soft_link as symlink;
+         #[cfg(windows)]
+         // FIXME: This should probably panic or have a copy fallback. Symlinks
+         // are not supported in all windows environments. Currently symlinking
+diff --git a/crates/cargo-util/src/process_builder.rs b/crates/cargo-util/src/process_builder.rs
+index 2b9a735..cfa9582 100644
+--- a/crates/cargo-util/src/process_builder.rs
++++ b/crates/cargo-util/src/process_builder.rs
+@@ -241,6 +241,8 @@ impl ProcessBuilder {
+     }
+ 
+     fn _status(&self) -> io::Result<ExitStatus> {
++        #[cfg(target_os = "wasi")]
++        return wasi::status(self);
+         if !debug_force_argfile(self.retry_with_argfile) {
+             let mut cmd = self.build_command();
+             match cmd.spawn() {
+@@ -296,6 +298,8 @@ impl ProcessBuilder {
+     }
+ 
+     fn _output(&self) -> io::Result<Output> {
++        #[cfg(target_os = "wasi")]
++        return wasi::output(self);
+         if !debug_force_argfile(self.retry_with_argfile) {
+             let mut cmd = self.build_command();
+             match piped(&mut cmd, self.stdin.is_some()).spawn() {
+@@ -349,6 +353,9 @@ impl ProcessBuilder {
+         on_stderr_line: &mut dyn FnMut(&str) -> Result<()>,
+         capture_output: bool,
+     ) -> Result<Output> {
++        #[cfg(target_os = "wasi")]
++        return wasi::exec_with_streaming(self, on_stdout_line, on_stderr_line, capture_output);
++        #[allow(unreachable_code)]
+         let mut stdout = Vec::new();
+         let mut stderr = Vec::new();
+ 
+@@ -515,6 +522,8 @@ impl ProcessBuilder {
+                 }
+             }
+         }
++        // WASI has no cross-process jobserver to hand down.
++        #[cfg(not(target_os = "wasi"))]
+         if let Some(ref c) = self.jobserver {
+             c.configure(&mut command);
+         }
+@@ -620,6 +629,81 @@ mod imp {
+     }
+ }
+ 
++/// WASI std cannot spawn processes; SLICC's WASIX host can. Children run
++/// through `wasix-command` with output collected in files, and an exit code
++/// other than 0 is an error (WASI std cannot construct a failing
++/// `ExitStatus`).
++#[cfg(target_os = "wasi")]
++mod wasi {
++    use super::{ProcessBuilder, ProcessError};
++    use anyhow::{Context as _, Result, bail};
++    use std::io;
++    use std::process::{ExitStatus, Output};
++
++    fn failed(code: i32, stderr: &[u8]) -> io::Error {
++        io::Error::other(format!(
++            "child exited with status {code}: {}",
++            String::from_utf8_lossy(stderr)
++        ))
++    }
++
++    pub fn status(pb: &ProcessBuilder) -> io::Result<ExitStatus> {
++        let result = wasix_command::run(&pb.build_command(), pb.stdin.as_deref(), false)?;
++        match result.code {
++            0 => Ok(ExitStatus::default()),
++            code => Err(failed(code, &result.stderr)),
++        }
++    }
++
++    pub fn output(pb: &ProcessBuilder) -> io::Result<Output> {
++        let result = wasix_command::run(&pb.build_command(), pb.stdin.as_deref(), true)?;
++        match result.code {
++            0 => Ok(Output { status: ExitStatus::default(), stdout: result.stdout, stderr: result.stderr }),
++            code => Err(failed(code, &result.stderr)),
++        }
++    }
++
++    pub fn exec_with_streaming(
++        pb: &ProcessBuilder,
++        on_stdout_line: &mut dyn FnMut(&str) -> Result<()>,
++        on_stderr_line: &mut dyn FnMut(&str) -> Result<()>,
++        capture_output: bool,
++    ) -> Result<Output> {
++        let result = wasix_command::run(&pb.build_command(), pb.stdin.as_deref(), true)
++            .with_context(|| ProcessError::could_not_execute(pb))?;
++        for line in String::from_utf8_lossy(&result.stdout).lines() {
++            on_stdout_line(line)?;
++        }
++        for line in String::from_utf8_lossy(&result.stderr).lines() {
++            on_stderr_line(line)?;
++        }
++        if result.code != 0 {
++            bail!("process didn't exit successfully: {pb} (exit status: {})", result.code);
++        }
++        Ok(Output {
++            status: ExitStatus::default(),
++            stdout: if capture_output { result.stdout } else { Vec::new() },
++            stderr: if capture_output { result.stderr } else { Vec::new() },
++        })
++    }
++}
++
++#[cfg(target_os = "wasi")]
++mod imp {
++    use super::ProcessBuilder;
++    use anyhow::Result;
++    use std::io;
++
++    // No exec on WASI: run the process and return when it ends.
++    pub fn exec_replace(process_builder: &ProcessBuilder) -> Result<()> {
++        process_builder.exec()
++    }
++
++    pub fn command_line_too_big(_err: &io::Error) -> bool {
++        false
++    }
++}
++
+ #[cfg(windows)]
+ mod imp {
+     use super::{ProcessBuilder, ProcessError};
+diff --git a/crates/cargo-util/src/process_error.rs b/crates/cargo-util/src/process_error.rs
+index 9b4a38c..7916fe0 100644
+--- a/crates/cargo-util/src/process_error.rs
++++ b/crates/cargo-util/src/process_error.rs
+@@ -138,6 +138,11 @@ pub fn exit_status_to_string(status: ExitStatus) -> String {
+         }
+     }
+ 
++    #[cfg(target_os = "wasi")]
++    fn status_to_string(status: ExitStatus) -> String {
++        status.to_string()
++    }
++
+     #[cfg(windows)]
+     fn status_to_string(status: ExitStatus) -> String {
+         use windows_sys::Win32::Foundation::*;
+diff --git a/crates/cargo-util/src/read2.rs b/crates/cargo-util/src/read2.rs
+index 447c534..84b501f 100644
+--- a/crates/cargo-util/src/read2.rs
++++ b/crates/cargo-util/src/read2.rs
+@@ -81,6 +81,20 @@ mod imp {
+     }
+ }
+ 
++#[cfg(target_os = "wasi")]
++mod imp {
++    use std::io;
++    use std::process::{ChildStderr, ChildStdout};
++
++    pub fn read2(
++        _out_pipe: ChildStdout,
++        _err_pipe: ChildStderr,
++        _data: &mut dyn FnMut(bool, &mut Vec<u8>, bool),
++    ) -> io::Result<()> {
++        Err(io::Error::from(io::ErrorKind::Unsupported))
++    }
++}
++
+ #[cfg(windows)]
+ mod imp {
+     use std::io;
+diff --git a/credential/cargo-credential/src/stdio.rs b/credential/cargo-credential/src/stdio.rs
+index 8ca0e7d..f53553d 100644
+--- a/credential/cargo-credential/src/stdio.rs
++++ b/credential/cargo-credential/src/stdio.rs
+@@ -21,6 +21,24 @@ enum Stdio {
+     Stdout,
+ }
+ 
++// WASI has no dup/dup2: credential prompts keep the process's own stdio.
++#[cfg(target_os = "wasi")]
++mod imp {
++    use super::Stdio;
++    use std::{fs::File, io::Error};
++    pub const IN_DEVICE: &str = "/dev/tty";
++    pub const OUT_DEVICE: &str = "/dev/tty";
++    pub const NULL_DEVICE: &str = "/dev/null";
++
++    pub struct ReplacementGuard;
++
++    impl ReplacementGuard {
++        pub(super) fn new(_stdio: Stdio, _replacement: &mut File) -> Result<ReplacementGuard, Error> {
++            Ok(ReplacementGuard)
++        }
++    }
++}
++
+ #[cfg(windows)]
+ mod imp {
+     use super::Stdio;
+diff --git a/src/bin/cargo/cli.rs b/src/bin/cargo/cli.rs
+index 83eba68..5838f71 100644
+--- a/src/bin/cargo/cli.rs
++++ b/src/bin/cargo/cli.rs
+@@ -215,6 +215,7 @@ pub fn get_version_string(is_verbose: bool) -> String {
+         }
+         writeln!(version_string, "host: {}", env!("RUST_HOST_TARGET")).unwrap();
+         add_libgit2(&mut version_string);
++        #[cfg(not(target_os = "wasi"))]
+         add_curl(&mut version_string);
+         add_ssl(&mut version_string);
+         writeln!(version_string, "os: {}", os_info::get()).unwrap();
+@@ -242,6 +243,7 @@ fn add_libgit2(version_string: &mut String) {
+     .unwrap();
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn add_curl(version_string: &mut String) {
+     let curl_v = curl::Version::get();
+     let vendored = if curl_v.vendored() {
+diff --git a/src/bin/cargo/main.rs b/src/bin/cargo/main.rs
+index 41252a6..47d8151 100644
+--- a/src/bin/cargo/main.rs
++++ b/src/bin/cargo/main.rs
+@@ -1,4 +1,5 @@
+ use cargo::core::features;
++#[cfg(not(target_os = "wasi"))]
+ use cargo::util::network::http::http_handle;
+ use cargo::util::network::http::needs_custom_http_transport;
+ use cargo::util::{self, CargoResult, closest_msg, command_prelude};
+@@ -338,7 +339,8 @@ fn is_executable<P: AsRef<Path>>(path: P) -> bool {
+         .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+         .unwrap_or(false)
+ }
+-#[cfg(windows)]
++// WASI has no execute permission bits.
++#[cfg(any(windows, target_os = "wasi"))]
+ fn is_executable<P: AsRef<Path>>(path: P) -> bool {
+     path.as_ref().is_file()
+ }
+@@ -402,6 +404,11 @@ fn init_git(gctx: &GlobalContext) {
+ /// configured to use libcurl instead of the built-in networking support so
+ /// that those configuration settings can be used.
+ #[tracing::instrument(skip_all)]
++// No git HTTP transport on WASI (no libcurl).
++#[cfg(target_os = "wasi")]
++fn init_git_transports(_gctx: &GlobalContext) {}
++
++#[cfg(not(target_os = "wasi"))]
+ fn init_git_transports(gctx: &GlobalContext) {
+     match needs_custom_http_transport(gctx) {
+         Ok(true) => {}
+diff --git a/src/cargo/sources/git/oxide.rs b/src/cargo/sources/git/oxide.rs
+index 333b83c..f6889b3 100644
+--- a/src/cargo/sources/git/oxide.rs
++++ b/src/cargo/sources/git/oxide.rs
+@@ -16,6 +16,7 @@ use tracing::debug;
+ 
+ /// For the time being, `repo_path` makes it easy to instantiate a gitoxide repo just for fetching.
+ /// In future this may change to be the gitoxide repository itself.
++#[cfg(not(target_os = "wasi"))]
+ pub fn with_retry_and_progress(
+     repo_path: &std::path::Path,
+     gctx: &GlobalContext,
+@@ -63,6 +64,7 @@ pub fn with_retry_and_progress(
+     })
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn translate_progress_to_bar(
+     progress_bar: &mut Progress<'_>,
+     root: Weak<gix::progress::tree::Root>,
+@@ -179,6 +181,7 @@ fn translate_progress_to_bar(
+     Ok(())
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn amend_authentication_hints(
+     res: Result<(), crate::sources::git::fetch::Error>,
+     remote_url: &str,
+diff --git a/src/cargo/sources/git/utils.rs b/src/cargo/sources/git/utils.rs
+index 8b31e73..df57c33 100644
+--- a/src/cargo/sources/git/utils.rs
++++ b/src/cargo/sources/git/utils.rs
+@@ -1010,6 +1010,13 @@ pub fn fetch(
+     gctx: &GlobalContext,
+     remote_kind: RemoteKind,
+ ) -> CargoResult<()> {
++    #[cfg(target_os = "wasi")]
++    anyhow::bail!(
++        "cannot fetch git repository `{remote_url}`: git dependencies are not \
++         supported in the SLICC realm (no git network transport on WASI); \
++         vendor the dependency or use a path dependency"
++    );
++    #[allow(unreachable_code)]
+     if let Some(offline_flag) = gctx.offline_flag() {
+         anyhow::bail!(
+             "attempting to update a git repository, but {offline_flag} \
+@@ -1112,6 +1119,7 @@ pub fn fetch(
+ /// files atomically.
+ /// Cargo has its own lock files and doesn't need that mechanism for race protection, so a stray lock means
+ /// a signal interrupted a previous shallow fetch and doesn't mean a race is happening.
++#[cfg(not(target_os = "wasi"))]
+ fn has_shallow_lock_file(err: &crate::sources::git::fetch::Error) -> bool {
+     matches!(
+         err,
+@@ -1187,6 +1195,19 @@ fn fetch_with_cli(
+     Ok(())
+ }
+ 
++#[cfg(target_os = "wasi")]
++fn fetch_with_gitoxide(
++    _repo: &mut git2::Repository,
++    _remote_url: &str,
++    _refspecs: Vec<String>,
++    _tags: bool,
++    _shallow: gix::remote::fetch::Shallow,
++    _gctx: &GlobalContext,
++) -> CargoResult<()> {
++    unreachable!("git fetch is refused on WASI")
++}
++
++#[cfg(not(target_os = "wasi"))]
+ fn fetch_with_gitoxide(
+     repo: &mut git2::Repository,
+     remote_url: &str,
+diff --git a/src/cargo/sources/registry/remote.rs b/src/cargo/sources/registry/remote.rs
+index 6e829cb..2e2266e 100644
+--- a/src/cargo/sources/registry/remote.rs
++++ b/src/cargo/sources/registry/remote.rs
+@@ -246,6 +246,7 @@ impl<'gctx> RemoteRegistry<'gctx> {
+         //
+         // This way if there's a problem the error gets printed before we even
+         // hit the index, which may not actually read this configuration.
++        #[cfg(not(target_os = "wasi"))]
+         self.gctx.http()?;
+ 
+         self.prepare()?;
+diff --git a/src/cargo/util/context/mod.rs b/src/cargo/util/context/mod.rs
+index cfbbfd7..2f2d1b0 100644
+--- a/src/cargo/util/context/mod.rs
++++ b/src/cargo/util/context/mod.rs
+@@ -85,7 +85,9 @@ use crate::sources::CRATES_IO_REGISTRY;
+ use crate::util::OnceExt as _;
+ use crate::util::cache_lock::{CacheLock, CacheLockMode, CacheLocker};
+ use crate::util::errors::CargoResult;
+-use crate::util::network::http::{HandleConfiguration, configure_http_handle, http_handle};
++use crate::util::network::http::HandleConfiguration;
++#[cfg(not(target_os = "wasi"))]
++use crate::util::network::http::{configure_http_handle, http_handle};
+ use crate::util::network::http_async;
+ use crate::util::restricted_names::is_glob_pattern;
+ use crate::util::{CanonicalUrl, closest_msg, internal};
+@@ -97,6 +99,7 @@ use cargo_util::paths;
+ use cargo_util_schemas::manifest::RegistryName;
+ use cargo_util_terminal::report::Level;
+ use cargo_util_terminal::{Shell, Verbosity};
++#[cfg(not(target_os = "wasi"))]
+ use curl::easy::Easy;
+ use itertools::Itertools;
+ use serde::Deserialize;
+@@ -245,6 +248,7 @@ pub struct GlobalContext {
+     /// Cli flags of the form "-Z something"
+     unstable_flags_cli: Option<Vec<String>>,
+     /// A handle on curl easy mode for http calls
++    #[cfg(not(target_os = "wasi"))]
+     easy: OnceLock<Mutex<Easy>>,
+     /// Cache of the `SourceId` for crates.io
+     crates_io_source_id: OnceLock<SourceId>,
+@@ -388,6 +392,7 @@ impl GlobalContext {
+             jobserver,
+             unstable_flags: CliUnstable::default(),
+             unstable_flags_cli: None,
++            #[cfg(not(target_os = "wasi"))]
+             easy: Default::default(),
+             crates_io_source_id: Default::default(),
+             cache_rustc_info,
+@@ -1921,6 +1926,7 @@ impl GlobalContext {
+         self.jobserver
+     }
+ 
++    #[cfg(not(target_os = "wasi"))]
+     pub fn http(&self) -> CargoResult<&Mutex<Easy>> {
+         let http = self
+             .easy
+@@ -1944,8 +1950,11 @@ impl GlobalContext {
+     pub fn http_config(&self) -> CargoResult<&CargoHttpConfig> {
+         self.http_config.try_borrow_with(|| {
+             let mut http = self.get::<CargoHttpConfig>("http")?;
+-            let curl_v = curl::Version::get();
+-            disables_multiplexing_for_bad_curl(curl_v.version(), &mut http, self);
++            #[cfg(not(target_os = "wasi"))]
++            {
++                let curl_v = curl::Version::get();
++                disables_multiplexing_for_bad_curl(curl_v.version(), &mut http, self);
++            }
+             Ok(http)
+         })
+     }
+diff --git a/src/cargo/util/errors.rs b/src/cargo/util/errors.rs
+index 69c2ba6..0d74762 100644
+--- a/src/cargo/util/errors.rs
++++ b/src/cargo/util/errors.rs
+@@ -1,4 +1,5 @@
+ use anyhow::Error;
++#[cfg(not(target_os = "wasi"))]
+ use curl::easy::Easy;
+ use http::Response;
+ use std::fmt::{self, Write};
+@@ -40,6 +41,7 @@ pub struct HttpNotSuccessful {
+ }
+ 
+ impl HttpNotSuccessful {
++    #[cfg(not(target_os = "wasi"))]
+     pub fn new_from_handle(
+         handle: &mut Easy,
+         initial_url: &str,
+diff --git a/src/cargo/util/flock.rs b/src/cargo/util/flock.rs
+index 14a2fde..f139777 100644
+--- a/src/cargo/util/flock.rs
++++ b/src/cargo/util/flock.rs
+@@ -477,6 +477,11 @@ fn error_unsupported(err: &std::io::Error) -> bool {
+     }
+ }
+ 
++#[cfg(target_os = "wasi")]
++fn error_unsupported(err: &std::io::Error) -> bool {
++    err.kind() == std::io::ErrorKind::Unsupported
++}
++
+ #[cfg(windows)]
+ fn error_unsupported(err: &std::io::Error) -> bool {
+     use windows_sys::Win32::Foundation::ERROR_INVALID_FUNCTION;
+diff --git a/src/cargo/util/job.rs b/src/cargo/util/job.rs
+index a5054f0..57c5836 100644
+--- a/src/cargo/util/job.rs
++++ b/src/cargo/util/job.rs
+@@ -46,6 +46,15 @@ mod imp {
+     }
+ }
+ 
++#[cfg(target_os = "wasi")]
++mod imp {
++    pub type Setup = ();
++
++    pub unsafe fn setup() -> Option<()> {
++        Some(())
++    }
++}
++
+ #[cfg(windows)]
+ mod imp {
+     use std::io;
+diff --git a/src/cargo/util/network/http_async_wasi.rs b/src/cargo/util/network/http_async_wasi.rs
+new file mode 100644
+index 0000000..d94165c
+--- /dev/null
++++ b/src/cargo/util/network/http_async_wasi.rs
+@@ -0,0 +1,515 @@
++//! SLICC: Cargo's HTTP client on WASI, where there is no libcurl.
++//!
++//! Every request goes as plain HTTP/1.1 to the realm's proxy, the one
++//! `https_proxy` / `http_proxy` name (or `http.proxy`), in absolute form:
++//! `GET https://index.crates.io/se/rd/serde HTTP/1.1`. The proxy fetches it
++//! and does the TLS itself, so Cargo needs no TLS stack. The proxy is
++//! reached over a WASIX socket (`sock_open` + `sock_connect`); only
++//! loopback addresses resolve in the realm.
++//!
++//! Requests run on a few worker threads (6 by default, or
++//! `CARGO_HTTP_MAX_CONNECTIONS`; one with `http.multiplexing = false`), each
++//! on a kept-alive connection: the realm's fetches are slow one by one, and
++//! Cargo asks for many index files and crates at once. Bodies come back
++//! chunked or with a length; redirects are followed.
++
++use std::fs::File;
++use std::io::{self, BufRead, BufReader, Read, Write};
++use std::os::fd::FromRawFd;
++use std::str::FromStr;
++use std::sync::{Arc, Mutex, mpsc};
++
++use tracing::debug;
++
++use crate::util::network::http::HandleConfiguration;
++
++type Response = http::Response<Vec<u8>>;
++type Request = http::Request<Vec<u8>>;
++type HttpResult<T> = std::result::Result<T, Error>;
++
++const MAX_REDIRECTS: usize = 10;
++
++#[derive(Debug, Clone, thiserror::Error)]
++#[non_exhaustive]
++pub enum Error {
++    #[error(
++        "no HTTP proxy is set: in the SLICC realm, network access goes through \
++         its proxy (https_proxy / http_proxy); without it, use --offline"
++    )]
++    NoProxy,
++    #[error("the realm's HTTP proxy `{0}` must be an http:// URL on a loopback address")]
++    BadProxy(String),
++    #[error("cannot reach the realm's HTTP proxy at {addr}: {message}")]
++    Connect { addr: String, message: String },
++    #[error("lost the connection to the realm's HTTP proxy: {0}")]
++    Io(String),
++    #[error("malformed response from the realm's HTTP proxy: {0}")]
++    Protocol(String),
++    #[error("too many redirects fetching `{0}`")]
++    TooManyRedirects(String),
++    #[error("failed to convert header value of `{name}` to string: {bytes:?}")]
++    BadHeader { name: String, bytes: Vec<u8> },
++}
++
++impl Error {
++    /// A dropped or refused connection is worth a retry.
++    pub fn is_spurious(&self) -> bool {
++        matches!(self, Error::Io(_) | Error::Connect { .. })
++    }
++}
++
++fn io_error(e: io::Error) -> Error {
++    Error::Io(e.to_string())
++}
++
++mod wasix {
++    #[link(wasm_import_module = "wasix_32v1")]
++    unsafe extern "C" {
++        pub fn sock_open(af: u32, socktype: u32, proto: u32, fd: *mut u32) -> u16;
++        pub fn sock_connect(fd: u32, addr: *const u8) -> u16;
++    }
++}
++
++/// A TCP connection to `127.x.y.z:port` in the realm's loopback namespace.
++fn connect(ip: [u8; 4], port: u16) -> io::Result<File> {
++    let mut fd = 0u32;
++    // AF_INET = 1, SOCK_STREAM = 1
++    let errno = unsafe { wasix::sock_open(1, 1, 0, &mut fd) };
++    if errno != 0 {
++        return Err(io::Error::from_raw_os_error(errno.into()));
++    }
++    // SAFETY: `sock_open` returned a new descriptor that we now own.
++    let file = unsafe { File::from_raw_fd(fd as i32) };
++    // __wasi_addr_port_t: family tag, then at 2 the port (little-endian)
++    // and at 4 the IPv4 address.
++    let mut addr = [0u8; 110];
++    addr[0] = 1;
++    addr[2..4].copy_from_slice(&port.to_le_bytes());
++    addr[4..8].copy_from_slice(&ip);
++    let errno = unsafe { wasix::sock_connect(fd, addr.as_ptr()) };
++    if errno != 0 {
++        return Err(io::Error::from_raw_os_error(errno.into()));
++    }
++    Ok(file)
++}
++
++/// The proxy's address from `http://host:port[/]`.
++fn proxy_addr(proxy: &str) -> HttpResult<([u8; 4], u16)> {
++    let bad = || Error::BadProxy(proxy.to_string());
++    let rest = proxy.strip_prefix("http://").unwrap_or(proxy);
++    let authority = rest.split('/').next().unwrap_or_default();
++    let authority = authority.rsplit('@').next().unwrap_or_default();
++    let (host, port) = match authority.rsplit_once(':') {
++        Some((host, port)) => (host, port.parse::<u16>().map_err(|_| bad())?),
++        None => (authority, 80),
++    };
++    let ip = if host == "localhost" {
++        [127, 0, 0, 1]
++    } else {
++        let parts: Vec<u8> = host.split('.').filter_map(|p| p.parse().ok()).collect();
++        <[u8; 4]>::try_from(parts).map_err(|_| bad())?
++    };
++    if ip[0] != 127 {
++        return Err(bad());
++    }
++    Ok((ip, port))
++}
++
++struct Connection {
++    stream: BufReader<File>,
++    /// Whether this connection already carried a request.
++    used: bool,
++}
++
++/// Connections to the realm proxy at once, unless `CARGO_HTTP_MAX_CONNECTIONS`
++/// says otherwise; `http.multiplexing = false` means one.
++const DEFAULT_CONNECTIONS: usize = 6;
++
++struct Job {
++    request: Request,
++    reply: futures::channel::oneshot::Sender<HttpResult<Response>>,
++}
++
++/// What every worker shares: the configuration and the idle kept-alive
++/// connections.
++struct Inner {
++    handle_config: HandleConfiguration,
++    idle: Mutex<Vec<Connection>>,
++}
++
++pub struct Client {
++    inner: Arc<Inner>,
++    /// Requests for the worker threads, each of which holds at most one
++    /// connection at a time; `None` when no worker could start.
++    jobs: Mutex<Option<mpsc::Sender<Job>>>,
++}
++
++impl std::fmt::Debug for Client {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("http_async::Client").finish()
++    }
++}
++
++impl Client {
++    pub fn new(handle_config: HandleConfiguration) -> Client {
++        let connections = if handle_config.multiplexing {
++            std::env::var("CARGO_HTTP_MAX_CONNECTIONS")
++                .ok()
++                .and_then(|n| n.parse::<usize>().ok())
++                .filter(|n| *n > 0)
++                .unwrap_or(DEFAULT_CONNECTIONS)
++        } else {
++            1
++        };
++        let inner = Arc::new(Inner {
++            handle_config,
++            idle: Mutex::new(Vec::new()),
++        });
++        let (sender, receiver) = mpsc::channel::<Job>();
++        let receiver = Arc::new(Mutex::new(receiver));
++        let mut started = 0;
++        for i in 0..connections {
++            let inner = Arc::clone(&inner);
++            let receiver = Arc::clone(&receiver);
++            let worker = std::thread::Builder::new()
++                .name(format!("cargo-http-{i}"))
++                .spawn(move || {
++                    loop {
++                        let job = receiver.lock().unwrap().recv();
++                        let Ok(job) = job else { break };
++                        let _ = job.reply.send(inner.send(job.request));
++                    }
++                });
++            if worker.is_ok() {
++                started += 1;
++            }
++        }
++        debug!(target: "network", "{started} HTTP connection workers");
++        Client {
++            inner,
++            jobs: Mutex::new((started > 0).then_some(sender)),
++        }
++    }
++
++    pub fn request_blocking(&self, request: Request) -> HttpResult<Response> {
++        self.inner.send(request)
++    }
++
++    pub async fn request(&self, request: Request) -> HttpResult<Response> {
++        let (reply, receiver) = futures::channel::oneshot::channel();
++        let job = Job { request, reply };
++        let queued = match self.jobs.lock().unwrap().as_ref() {
++            Some(jobs) => jobs.send(job).map_err(|e| e.0),
++            None => Err(job),
++        };
++        match queued {
++            Ok(()) => receiver
++                .await
++                .unwrap_or_else(|_| Err(Error::Io("the HTTP worker stopped".into()))),
++            // No workers: run it here, one at a time.
++            Err(job) => self.inner.send(job.request),
++        }
++    }
++
++    /// Bytes still to download; requests here complete before they return.
++    pub fn bytes_pending(&self) -> u64 {
++        0
++    }
++}
++
++impl Inner {
++    fn proxy(&self) -> HttpResult<String> {
++        if let Some(proxy) = &self.handle_config.proxy {
++            return Ok(proxy.clone());
++        }
++        for var in ["https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY"] {
++            if let Ok(value) = std::env::var(var) {
++                if !value.is_empty() {
++                    return Ok(value);
++                }
++            }
++        }
++        Err(Error::NoProxy)
++    }
++
++    fn send(&self, request: Request) -> HttpResult<Response> {
++        let (ip, port) = proxy_addr(&self.proxy()?)?;
++        let (parts, body) = request.into_parts();
++        let mut url = parts.uri.to_string();
++        let mut method = parts.method.clone();
++        let mut body = body;
++        for _ in 0..=MAX_REDIRECTS {
++            debug!(target: "network::fetch", url);
++            let head = self.request_head(&method, &url, &parts.headers, body.len())?;
++            let response = self.exchange(ip, port, &head, &body, method == http::Method::HEAD)?;
++            let (status, headers, payload) = response;
++            if status.is_redirection() {
++                if let Some(location) = headers.get(http::header::LOCATION) {
++                    let location = location.to_str().map_err(|_| {
++                        Error::Protocol("non-UTF-8 redirect location".into())
++                    })?;
++                    url = url::Url::parse(&url)
++                        .and_then(|base| base.join(location))
++                        .map_err(|e| Error::Protocol(format!("bad redirect location: {e}")))?
++                        .to_string();
++                    if status == http::StatusCode::SEE_OTHER {
++                        method = http::Method::GET;
++                        body = Vec::new();
++                    }
++                    continue;
++                }
++            }
++            let mut response = http::Response::builder().status(status);
++            *response.headers_mut().unwrap() = headers;
++            let mut response = response
++                .body(payload)
++                .map_err(|e| Error::Protocol(e.to_string()))?;
++            response.extensions_mut().insert(Extensions {
++                client_ip: None,
++                effective_url: Some(url),
++            });
++            return Ok(response);
++        }
++        Err(Error::TooManyRedirects(parts.uri.to_string()))
++    }
++
++    fn request_head(
++        &self,
++        method: &http::Method,
++        url: &str,
++        headers: &http::HeaderMap,
++        body_len: usize,
++    ) -> HttpResult<Vec<u8>> {
++        let uri = http::Uri::from_str(url).map_err(|e| Error::Protocol(e.to_string()))?;
++        let authority = uri
++            .authority()
++            .map(|a| a.as_str().to_string())
++            .ok_or_else(|| Error::Protocol(format!("no host in `{url}`")))?;
++        let mut head = format!(
++            "{method} {url} HTTP/1.1\r\nHost: {authority}\r\nUser-Agent: {}\r\n\
++             Accept-Encoding: identity\r\nConnection: keep-alive\r\n",
++            self.handle_config.useragent
++        );
++        for (name, value) in headers {
++            if matches!(
++                name.as_str(),
++                "host" | "connection" | "user-agent" | "content-length" | "accept-encoding"
++            ) {
++                continue;
++            }
++            let value = value.to_str().map_err(|_| Error::BadHeader {
++                name: name.to_string(),
++                bytes: value.as_bytes().to_owned(),
++            })?;
++            head.push_str(&format!("{name}: {value}\r\n"));
++        }
++        if body_len > 0 || matches!(*method, http::Method::POST | http::Method::PUT) {
++            head.push_str(&format!("Content-Length: {body_len}\r\n"));
++        }
++        head.push_str("\r\n");
++        Ok(head.into_bytes())
++    }
++
++    /// Sends one request and reads its response, on the kept-alive
++    /// connection when there is one (reconnecting once if it went stale).
++    fn exchange(
++        &self,
++        ip: [u8; 4],
++        port: u16,
++        head: &[u8],
++        body: &[u8],
++        is_head: bool,
++    ) -> HttpResult<(http::StatusCode, http::HeaderMap, Vec<u8>)> {
++        // An idle kept-alive connection, else a new one.
++        let mut slot = self.idle.lock().unwrap().pop();
++        for attempt in 0..2 {
++            if slot.is_none() {
++                let stream = connect(ip, port).map_err(|e| Error::Connect {
++                    addr: format!("{}.{}.{}.{}:{port}", ip[0], ip[1], ip[2], ip[3]),
++                    message: e.to_string(),
++                })?;
++                slot = Some(Connection {
++                    stream: BufReader::new(stream),
++                    used: false,
++                });
++            }
++            let connection = slot.as_mut().unwrap();
++            let reused = connection.used;
++            connection.used = true;
++            let result = (|| {
++                let file = connection.stream.get_mut();
++                file.write_all(head)?;
++                file.write_all(body)?;
++                file.flush()?;
++                read_response(&mut connection.stream, is_head)
++            })();
++            match result {
++                Ok((status, headers, payload, keep_alive)) => {
++                    if keep_alive {
++                        self.idle.lock().unwrap().extend(slot.take());
++                    }
++                    return Ok((status, headers, payload));
++                }
++                // A kept-alive connection the proxy closed: once more, fresh.
++                Err(ReadError::Io(_)) if reused && attempt == 0 => slot = None,
++                Err(e) => return Err(e.into()),
++            }
++        }
++        unreachable!()
++    }
++}
++
++enum ReadError {
++    Io(io::Error),
++    Protocol(String),
++}
++
++impl From<io::Error> for ReadError {
++    fn from(e: io::Error) -> ReadError {
++        ReadError::Io(e)
++    }
++}
++
++impl From<ReadError> for Error {
++    fn from(e: ReadError) -> Error {
++        match e {
++            ReadError::Io(e) => io_error(e),
++            ReadError::Protocol(message) => Error::Protocol(message),
++        }
++    }
++}
++
++fn read_line(r: &mut impl BufRead) -> Result<String, ReadError> {
++    let mut line = Vec::new();
++    if r.read_until(b'\n', &mut line)? == 0 {
++        return Err(ReadError::Io(io::ErrorKind::UnexpectedEof.into()));
++    }
++    while matches!(line.last(), Some(b'\n' | b'\r')) {
++        line.pop();
++    }
++    String::from_utf8(line).map_err(|_| ReadError::Protocol("non-UTF-8 header line".into()))
++}
++
++/// Status, headers, body, and whether the connection stays open.
++fn read_response(
++    r: &mut BufReader<File>,
++    is_head: bool,
++) -> Result<(http::StatusCode, http::HeaderMap, Vec<u8>, bool), ReadError> {
++    loop {
++        let status_line = read_line(r)?;
++        let code = status_line
++            .split_whitespace()
++            .nth(1)
++            .and_then(|c| c.parse::<u16>().ok())
++            .ok_or_else(|| ReadError::Protocol(format!("bad status line `{status_line}`")))?;
++        let status = http::StatusCode::from_u16(code)
++            .map_err(|_| ReadError::Protocol(format!("bad status {code}")))?;
++        let mut headers = http::HeaderMap::new();
++        loop {
++            let line = read_line(r)?;
++            if line.is_empty() {
++                break;
++            }
++            let (name, value) = line
++                .split_once(':')
++                .ok_or_else(|| ReadError::Protocol(format!("bad header line `{line}`")))?;
++            let name = http::HeaderName::from_str(name.trim())
++                .map_err(|_| ReadError::Protocol(format!("bad header name `{name}`")))?;
++            let value = http::HeaderValue::from_str(value.trim())
++                .map_err(|_| ReadError::Protocol(format!("bad value for header `{name}`")))?;
++            headers.append(name, value);
++        }
++        // An interim response (100 Continue) precedes the real one.
++        if status.is_informational() {
++            continue;
++        }
++        let header = |name: http::header::HeaderName| {
++            headers
++                .get(name)
++                .and_then(|v| v.to_str().ok())
++                .map(|v| v.to_ascii_lowercase())
++        };
++        let keep_alive = header(http::header::CONNECTION).as_deref() != Some("close");
++        let no_body = is_head
++            || status == http::StatusCode::NO_CONTENT
++            || status == http::StatusCode::NOT_MODIFIED;
++        let body = if no_body {
++            Vec::new()
++        } else if header(http::header::TRANSFER_ENCODING).is_some_and(|te| te.contains("chunked")) {
++            read_chunked(r)?
++        } else if let Some(len) = header(http::header::CONTENT_LENGTH) {
++            let len: usize = len
++                .parse()
++                .map_err(|_| ReadError::Protocol(format!("bad content-length `{len}`")))?;
++            let mut body = vec![0u8; len];
++            r.read_exact(&mut body)?;
++            body
++        } else {
++            // Neither: the body runs to the end of the connection.
++            let mut body = Vec::new();
++            r.read_to_end(&mut body)?;
++            return Ok((status, headers, body, false));
++        };
++        return Ok((status, headers, body, keep_alive));
++    }
++}
++
++fn read_chunked(r: &mut BufReader<File>) -> Result<Vec<u8>, ReadError> {
++    let mut body = Vec::new();
++    loop {
++        let line = read_line(r)?;
++        let size = line.split(';').next().unwrap_or_default().trim();
++        let size = usize::from_str_radix(size, 16)
++            .map_err(|_| ReadError::Protocol(format!("bad chunk size `{line}`")))?;
++        if size == 0 {
++            // Trailers, up to the empty line.
++            while !read_line(r)?.is_empty() {}
++            return Ok(body);
++        }
++        let start = body.len();
++        body.resize(start + size, 0);
++        r.read_exact(&mut body[start..])?;
++        if !read_line(r)?.is_empty() {
++            return Err(ReadError::Protocol("chunk not followed by CRLF".into()));
++        }
++    }
++}
++
++#[derive(Clone)]
++struct Extensions {
++    client_ip: Option<String>,
++    effective_url: Option<String>,
++}
++
++pub trait ResponsePartsExtensions {
++    fn client_ip(&self) -> Option<&str>;
++    fn effective_url(&self) -> Option<&str>;
++}
++
++impl ResponsePartsExtensions for http::response::Parts {
++    fn client_ip(&self) -> Option<&str> {
++        self.extensions
++            .get::<Extensions>()
++            .and_then(|extensions| extensions.client_ip.as_deref())
++    }
++
++    fn effective_url(&self) -> Option<&str> {
++        self.extensions
++            .get::<Extensions>()
++            .and_then(|extensions| extensions.effective_url.as_deref())
++    }
++}
++
++impl ResponsePartsExtensions for Response {
++    fn client_ip(&self) -> Option<&str> {
++        self.extensions()
++            .get::<Extensions>()
++            .and_then(|extensions| extensions.client_ip.as_deref())
++    }
++
++    fn effective_url(&self) -> Option<&str> {
++        self.extensions()
++            .get::<Extensions>()
++            .and_then(|extensions| extensions.effective_url.as_deref())
++    }
++}
+diff --git a/src/cargo/util/network/http_wasi.rs b/src/cargo/util/network/http_wasi.rs
+new file mode 100644
+index 0000000..76789e5
+--- /dev/null
++++ b/src/cargo/util/network/http_wasi.rs
+@@ -0,0 +1,77 @@
++//! SLICC: HTTP configuration on WASI, where there is no libcurl.
++//!
++//! Requests go as plain HTTP/1.1 to the realm's proxy (see `http_async`),
++//! which does TLS itself, so the TLS settings of `[http]` do not apply.
++
++use std::time::Duration;
++
++use crate::util::context::GlobalContext;
++use crate::util::errors::CargoResult;
++use anyhow::bail;
++
++/// Whether git needs a custom HTTP transport. Git has no network transport
++/// on WASI, so never.
++pub fn needs_custom_http_transport(_gctx: &GlobalContext) -> CargoResult<bool> {
++    Ok(false)
++}
++
++pub struct HandleConfiguration {
++    /// `http.proxy` from Cargo or git configuration; otherwise the
++    /// environment's `https_proxy` / `http_proxy`.
++    pub proxy: Option<String>,
++    pub useragent: String,
++    pub timeout: HttpTimeout,
++    pub verbose: bool,
++    pub multiplexing: bool,
++}
++
++impl HandleConfiguration {
++    pub fn new(gctx: &GlobalContext) -> CargoResult<Self> {
++        if let Some(offline_flag) = gctx.offline_flag() {
++            bail!(
++                "attempting to make an HTTP request, but {offline_flag} was \
++                specified"
++            )
++        }
++
++        let http = gctx.http_config()?;
++        let useragent = if let Some(user_agent) = http.user_agent.clone() {
++            user_agent
++        } else {
++            format!("cargo/{}", crate::version())
++        };
++        Ok(HandleConfiguration {
++            proxy: super::proxy::http_proxy(http),
++            useragent,
++            timeout: HttpTimeout::new(gctx)?,
++            verbose: http.debug == Some(true),
++            multiplexing: http.multiplexing.unwrap_or(true),
++        })
++    }
++}
++
++#[must_use]
++#[derive(Clone)]
++pub struct HttpTimeout {
++    pub dur: Duration,
++    pub low_speed_limit: u32,
++}
++
++impl HttpTimeout {
++    pub fn new(gctx: &GlobalContext) -> CargoResult<HttpTimeout> {
++        let http_config = gctx.http_config()?;
++        let low_speed_limit = http_config.low_speed_limit.unwrap_or(10);
++        let seconds = http_config
++            .timeout
++            .or_else(|| {
++                gctx.get_env("HTTP_TIMEOUT")
++                    .ok()
++                    .and_then(|s| s.parse().ok())
++            })
++            .unwrap_or(30);
++        Ok(HttpTimeout {
++            dur: Duration::new(seconds, 0),
++            low_speed_limit,
++        })
++    }
++}
+diff --git a/src/cargo/util/network/mod.rs b/src/cargo/util/network/mod.rs
+index bb20ffa..9e1fb02 100644
+--- a/src/cargo/util/network/mod.rs
++++ b/src/cargo/util/network/mod.rs
+@@ -7,7 +7,9 @@ use std::net::SocketAddrV4;
+ use std::net::SocketAddrV6;
+ use std::task::Poll;
+ 
++#[cfg_attr(target_os = "wasi", path = "http_wasi.rs")]
+ pub mod http;
++#[cfg_attr(target_os = "wasi", path = "http_async_wasi.rs")]
+ pub mod http_async;
+ pub mod proxy;
+ pub mod retry;
+@@ -35,6 +37,7 @@ impl<T> PollExt<T> for Poll<T> {
+ /// When dynamically linked against libcurl, we want to ignore some failures
+ /// when using old versions that don't support certain features.
+ #[macro_export]
++#[cfg(not(target_os = "wasi"))]
+ macro_rules! try_old_curl {
+     ($e:expr, $msg:expr) => {
+         let result = $e;
+@@ -70,6 +73,7 @@ macro_rules! try_old_curl {
+ /// possible and multiplexing is possible. All in all this reduces the number
+ /// of connections down to a more manageable state.
+ #[macro_export]
++#[cfg(not(target_os = "wasi"))]
+ macro_rules! try_old_curl_http2_pipewait {
+     ($multiplexing:expr, $handle:expr) => {
+         if $multiplexing {
+diff --git a/src/cargo/util/network/retry.rs b/src/cargo/util/network/retry.rs
+index 2dfe117..353a4f5 100644
+--- a/src/cargo/util/network/retry.rs
++++ b/src/cargo/util/network/retry.rs
+@@ -186,6 +186,13 @@ impl<'a> Retry<'a> {
+ }
+ 
+ fn maybe_spurious(err: &Error) -> bool {
++    #[cfg(target_os = "wasi")]
++    if let Some(async_http_error) = err.downcast_ref::<http_async::Error>() {
++        if async_http_error.is_spurious() {
++            return true;
++        }
++    }
++    #[cfg(not(target_os = "wasi"))]
+     fn maybe_spurious_curl(curl_err: &curl::Error) -> bool {
+         curl_err.is_couldnt_connect()
+             || curl_err.is_couldnt_resolve_proxy()
+@@ -198,6 +205,7 @@ fn maybe_spurious(err: &Error) -> bool {
+             || curl_err.is_ssl_connect_error()
+             || curl_err.is_partial_file()
+     }
++    #[cfg(not(target_os = "wasi"))]
+     if let Some(async_http_error) = err.downcast_ref::<http_async::Error>() {
+         match async_http_error {
+             http_async::Error::Easy(error) => return maybe_spurious_curl(error),
+@@ -215,6 +223,7 @@ fn maybe_spurious(err: &Error) -> bool {
+             _ => (),
+         }
+     }
++    #[cfg(not(target_os = "wasi"))]
+     if let Some(curl_err) = err.downcast_ref::<curl::Error>() {
+         if maybe_spurious_curl(curl_err) {
+             return true;
+@@ -226,8 +235,10 @@ fn maybe_spurious(err: &Error) -> bool {
+         }
+     }
+ 
++    #[cfg(not(target_os = "wasi"))]
+     use gix::protocol::transport::IsSpuriousError;
+ 
++    #[cfg(not(target_os = "wasi"))]
+     if let Some(err) = err.downcast_ref::<crate::sources::git::fetch::Error>() {
+         if err.is_spurious() {
+             return true;

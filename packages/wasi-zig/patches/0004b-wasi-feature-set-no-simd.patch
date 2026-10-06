@@ -1,0 +1,38 @@
+--- a/lib/std/Target.zig
++++ b/lib/std/Target.zig
+@@ -1240,7 +1240,8 @@
+ 
+             /// Adds the specified feature set but not its dependencies.
+             pub fn addFeatureSet(set: *Set, other_set: Set) void {
+-                set.ints = @as(@Vector(usize_count, usize), set.ints) | @as(@Vector(usize_count, usize), other_set.ints);
++                // homescoop: stage2_wasm lacks vector aggregate init / bitwise ops
++                for (&set.ints, other_set.ints) |*d, s| d.* |= s;
+             }
+ 
+             /// Removes the specified feature but not its dependents.
+@@ -1252,7 +1253,8 @@
+ 
+             /// Removes the specified feature but not its dependents.
+             pub fn removeFeatureSet(set: *Set, other_set: Set) void {
+-                set.ints = @as(@Vector(usize_count, usize), set.ints) & ~@as(@Vector(usize_count, usize), other_set.ints);
++                // homescoop: stage2_wasm lacks vector aggregate init / bitwise ops
++                for (&set.ints, other_set.ints) |*d, s| d.* &= ~s;
+             }
+ 
+             pub fn populateDependencies(set: *Set, all_features_list: []const Cpu.Feature) void {
+@@ -1281,10 +1283,11 @@
+             }
+ 
+             pub fn isSuperSetOf(set: Set, other_set: Set) bool {
+-                const V = @Vector(usize_count, usize);
+-                const set_v: V = set.ints;
+-                const other_v: V = other_set.ints;
+-                return @reduce(.And, (set_v & other_v) == other_v);
++                // homescoop: stage2_wasm lacks vector ops / @reduce
++                for (set.ints, other_set.ints) |a, b| {
++                    if ((a & b) != b) return false;
++                }
++                return true;
+             }
+         };
+ 

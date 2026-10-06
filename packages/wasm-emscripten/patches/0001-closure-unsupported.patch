@@ -1,0 +1,30 @@
+# Refuse Closure Compiler in SLICC's Emscripten package (no Java / npm closure).
+diff --git a/tools/building.py b/tools/building.py
+--- a/tools/building.py
++++ b/tools/building.py
+@@ -515,6 +515,10 @@ def js_optimizer(filename, passes):
+ 
+ 
+ def get_closure_compiler():
++  # SLICC v1: Closure is explicitly unsupported — fail before Java/npm lookup.
++  shared.exit_with_error(
++      "Closure Compiler is not available in SLICC's Emscripten package")
++
+   # First check if the user configured a specific CLOSURE_COMPILER in their settings
+   if config.CLOSURE_COMPILER:
+     return config.CLOSURE_COMPILER
+diff --git a/tools/link.py b/tools/link.py
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -1266,6 +1266,11 @@ def phase_linker_setup(linker_args):  # ruff: ignore[complex-structure, too-many
+   if options.use_closure_compiler:
+     settings.USE_CLOSURE_COMPILER = 1
+ 
++  if options.use_closure_compiler or settings.USE_CLOSURE_COMPILER:
++    # SLICC v1: clear message instead of a Java/npm failure later.
++    exit_with_error(
++        "Closure Compiler is not available in SLICC's Emscripten package")
++
+   if 'CLOSURE_WARNINGS' in user_settings:
+     if settings.CLOSURE_WARNINGS not in {'quiet', 'warn', 'error'}:
+       exit_with_error('invalid option -sCLOSURE_WARNINGS=%s specified! Allowed values are "quiet", "warn" or "error".' % settings.CLOSURE_WARNINGS)

@@ -1,0 +1,14 @@
+--- a/build.zig
++++ b/build.zig
+@@ -886,6 +886,11 @@
+             .haiku => {
+                 try addCxxKnownPath(b, cfg, exe, b.fmt("libstdc++.{s}", .{lib_suffix}), null, need_cpp_includes);
+             },
++            // homescoop: the WASI host's LLVM is built with wasi-sdk; link its libc++.
++            .wasi => {
++                try addCxxKnownPath(b, cfg, exe, b.fmt("libc++.{s}", .{lib_suffix}), null, need_cpp_includes);
++                try addCxxKnownPath(b, cfg, exe, b.fmt("libc++abi.{s}", .{lib_suffix}), null, need_cpp_includes);
++            },
+             else => {},
+         }
+     }

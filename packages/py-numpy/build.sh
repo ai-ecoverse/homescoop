@@ -15,6 +15,9 @@ PKG_VER="$(node -p "require('$DEST/package.json').version")"
 REL_TAG="py-numpy-${PKG_VER}"
 REL_TGZ="ai-ecoverse-py-numpy-${PKG_VER}.tgz"
 REL_URL="${WASIX_NUMPY_RELEASE_URL:-https://github.com/ai-ecoverse/homescoop/releases/download/${REL_TAG}/${REL_TGZ}}"
+# Release tarball already ships unchecked-hash .pyc; skip host recompile there
+# (CI runners often lack matching CPython 3.14 magic).
+NEED_PYC=1
 
 have_numpy() {
   [[ -d "$1/lib/python3.14/site-packages/numpy" ]] \
@@ -23,6 +26,7 @@ have_numpy() {
 
 if have_numpy "$DEST"; then
   echo "== py-numpy: using existing $DEST"
+  NEED_PYC=0
 elif [[ -n "$WHL" && -f "$WHL" ]]; then
   echo "== py-numpy: unpacking wheel $WHL"
   rm -rf "$STAGE"
@@ -46,6 +50,7 @@ else
     [[ -f "$tmp/package/$f" && ! -f "$DEST/$f" ]] && cp "$tmp/package/$f" "$DEST/$f"
   done
   rm -rf "$tmp"
+  NEED_PYC=0
 fi
 
 if ! have_numpy "$DEST"; then
@@ -56,5 +61,7 @@ if [[ ! -f "$DEST/LICENSE" ]]; then
   echo "homescoop: missing LICENSE" >&2
   exit 1
 fi
-homescoop_compile_pyc "$DEST/lib/python3.14/site-packages"
+if [[ "$NEED_PYC" == 1 ]]; then
+  homescoop_compile_pyc "$DEST/lib/python3.14/site-packages"
+fi
 echo "== py-numpy: staged $(du -sh "$DEST" | awk '{print $1}') pkg=$PKG_VER"
