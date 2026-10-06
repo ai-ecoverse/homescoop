@@ -1,0 +1,33 @@
+{
+  "name": "@ai-ecoverse/wasm-libiconv",
+  "version": "1.18.0-1",
+  "description": "GNU libiconv 1.18 static library for WebAssembly / emscripten (SLICC homescoop)",
+  "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/libiconv/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/libiconv",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "libiconv",
+    "iconv"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib",
+    "include"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "libiconv",
+    "upstream": "1.18"
+  }
+}
