@@ -1,0 +1,30 @@
+#!/bin/sh
+# Cargo in SLICC: use the installed rustc driver and its wasm32-wasip1 rustlib.
+set -eu
+# Found without forking (every $(...) is a process): the realm passes this
+# script's path in CARGO (the manifest's ${package}/bin/cargo).
+if [ -z "${CARGO:-}" ]; then
+  case $0 in
+    /*) CARGO=$0 ;;
+    */*) CARGO=$PWD/$0 ;;
+    *) CARGO=$(command -v "$0") ;;
+  esac
+fi
+BINDIR=${CARGO%/*}
+export CARGO
+# The installed wasi-rustc driver (Rust 1.98 answers `rustc -vV` itself),
+# found on PATH with shell builtins only.
+if [ -z "${RUSTC:-}" ]; then
+  IFS=:
+  for dir in $PATH; do
+    if [ -f "$dir/rustc" ]; then
+      RUSTC=$dir/rustc
+      break
+    fi
+  done
+  unset IFS
+fi
+export RUSTC
+: "${CARGO_BUILD_TARGET:=wasm32-wasip1}"
+export CARGO_BUILD_TARGET
+exec "$BINDIR/cargo.wasm" "$@"

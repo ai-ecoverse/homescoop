@@ -1,0 +1,58 @@
+diff --git a/tools/link.py b/tools/link.py
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -848,23 +848,46 @@
+   if not shared.SKIP_SUBPROCS:
+     shared.check_llvm_version()
+ 
+-  # slicc: every program linked there may run there (configure tests, build
+-  # helpers like freetype's apinames, tools like pkgconf), in a node realm
+-  # whose fs has no file descriptors. The pre-js mounts slicc's live VFS into
+-  # the program's FS; it does nothing outside slicc.
++  # Optional node-realm VFS pre-js (explicit SLICC_VFS_PRE_JS only — do not
++  # default this; wasm-realm programs crash on process.env.SLICC_LIVE_FS).
+   slicc_pre_js = os.environ.get('SLICC_VFS_PRE_JS')
+   if slicc_pre_js and slicc_pre_js not in options.pre_js:
+     options.pre_js.append(slicc_pre_js)
+-    # The pre-js holds main until the async VFS mount is done.
+     settings.DEFAULT_LIBRARY_FUNCS_TO_INCLUDE += ['$addRunDependency', '$removeRunDependency']
+ 
++  # Default: homescoop_em_cli_ldflags + libslicc objects so linked programs run
++  # in the wasm realm. Opt out with SLICC_EMCC_PLAIN=1 (plain web glue).
++  # Skip for -c (never reaches here), -r, -shared / SIDE_MODULE.
++  plain = os.environ.get('SLICC_EMCC_PLAIN', '').lower() in ('1', 'true', 'yes')
++  if (not plain and not options.shared and not options.relocatable
++      and not settings.SIDE_MODULE):
++    default_setting('ENVIRONMENT', ['web', 'worker', 'node'])
++    default_setting('EXIT_RUNTIME', 1)
++    default_setting('ALLOW_MEMORY_GROWTH', 1)
++    # Full FS so SLICC can mount into FS.filesystems (printf-only programs
++    # otherwise get the minimal FS stub without filesystems).
++    default_setting('FORCE_FILESYSTEM', 1)
++    slicc_lib = os.environ.get('SLICC_EM_LIBDIR') or utils.path_from_root('lib', 'slicc')
++    # cli profile (not main_envp — that renames main→slicc_tool_main for make).
++    # slicc_main_envp.o / slicc_fork.o are shipped under lib/slicc/ for opt-in.
++    for obj in (
++        'slicc_spawn.o',
++        'slicc_exec.o',
++        'slicc_signals.o',
++        'slicc_select.o',
++        'slicc_libc_gaps.o',
++        'slicc_jobs.o',
++    ):
++      path = os.path.join(slicc_lib, obj)
++      if os.path.isfile(path) and path not in linker_args:
++        linker_args.append(path)
++
+   autoconf = os.environ.get('EMMAKEN_JUST_CONFIGURE') or 'conftest.c' in options.input_files or 'conftest.cpp' in options.input_files
+   if autoconf:
+     # configure tests want a more shell-like style, where we emit return codes on exit()
+     settings.EXIT_RUNTIME = 1
+-    # use node.js raw filesystem access, to behave just like a native executable
+-    # (in slicc NODERAWFS cannot work; the pre-js above mounts the VFS instead)
+-    if not slicc_pre_js:
++    # Host/plain node: NODERAWFS. Wasm-realm CLI defaults use the normal FS.
++    if not slicc_pre_js and plain:
+       settings.NODERAWFS = 1
+     # Add `#!` line to output JS and make it executable.
+     settings.EXECUTABLE = config.NODE_JS[0]

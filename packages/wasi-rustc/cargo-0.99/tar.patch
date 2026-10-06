@@ -1,0 +1,14 @@
+diff -ruN a/src/entry.rs b/src/entry.rs
+--- a/src/entry.rs	2026-10-03 00:09:22.541286027 +0200
++++ b/src/entry.rs	2026-10-03 00:09:22.594770599 +0200
+@@ -854,6 +854,10 @@
+             mask: u32,
+             _preserve: bool,
+         ) -> io::Result<()> {
++            // WASI has no permission bits: nothing to set.
++            if cfg!(target_os = "wasi") {
++                return Ok(());
++            }
+             Err(io::Error::new(io::ErrorKind::Other, "Not implemented"))
+         }
+ 

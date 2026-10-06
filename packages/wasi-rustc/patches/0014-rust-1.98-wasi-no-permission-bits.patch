@@ -1,0 +1,38 @@
+diff --git a/library/std/src/sys/fs/unix.rs b/library/std/src/sys/fs/unix.rs
+index 8fee5634..096c9637 100644
+--- a/library/std/src/sys/fs/unix.rs
++++ b/library/std/src/sys/fs/unix.rs
+@@ -1698,8 +1698,17 @@ pub fn duplicate(&self) -> io::Result<File> {
+     }
+ 
+     pub fn set_permissions(&self, perm: FilePermissions) -> io::Result<()> {
+-        cvt_r(|| unsafe { libc::fchmod(self.as_raw_fd(), perm.mode) })?;
+-        Ok(())
++        // WASI has no permission bits; wasi-libc's fchmod is ENOSYS.
++        #[cfg(target_os = "wasi")]
++        {
++            let _ = perm;
++            return Ok(());
++        }
++        #[cfg(not(target_os = "wasi"))]
++        {
++            cvt_r(|| unsafe { libc::fchmod(self.as_raw_fd(), perm.mode) })?;
++            Ok(())
++        }
+     }
+ 
+     pub fn set_times(&self, times: FileTimes) -> io::Result<()> {
+@@ -2010,6 +2019,13 @@ pub fn rename(old: &CStr, new: &CStr) -> io::Result<()> {
+ }
+ 
+ pub fn set_perm(p: &CStr, perm: FilePermissions) -> io::Result<()> {
++    // WASI has no permission bits; wasi-libc's chmod is ENOSYS.
++    #[cfg(target_os = "wasi")]
++    {
++        let _ = (p, perm);
++        return Ok(());
++    }
++    #[cfg(not(target_os = "wasi"))]
+     cvt_r(|| unsafe { libc::chmod(p.as_ptr(), perm.mode) }).map(|_| ())
+ }
+ 

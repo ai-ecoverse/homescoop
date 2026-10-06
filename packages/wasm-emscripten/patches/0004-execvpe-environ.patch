@@ -1,0 +1,14 @@
+diff --git a/tools/utils.py b/tools/utils.py
+--- a/tools/utils.py
++++ b/tools/utils.py
+@@ -67,7 +67,9 @@
+   else:
+     sys.stdout.flush()
+     sys.stderr.flush()
+-    os.execvp(cmd[0], cmd)
++    # wasix-python: execvp keeps the process's *initial* environ; execvpe with
++    # an explicit mapping passes updates from os.environ (emconfigure CC=…).
++    os.execvpe(cmd[0], cmd, os.environ)
+ 
+ 
+ def exit_with_error(msg, *args):

@@ -1,0 +1,24 @@
+# Homebrew-shaped recipe — Emscripten 6.0.9 driver for slicc.
+name: wasm-emscripten
+builder: host
+version: "6.0.9"
+npm: "@ai-ecoverse/wasm-emscripten"
+summary: "Emscripten 6.0.9 (emcc) for slicc via wasix-python"
+source:
+  url: "https://github.com/emscripten-core/emscripten"
+  sha256: "skip"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+    - wasm-clang
+    - wasm-binaryen
+    - emscripten-cache
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-emscripten
+  license: MIT
+  notes: |
+    Stages slicc-emscripten/src/emscripten (excluding test/docs) with
+    September slicc patches, Closure refuse, ac_cv_build seeding, and
+    writable EM_CACHE + sysroot symlink into emscripten-cache.

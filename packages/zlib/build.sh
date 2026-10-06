@@ -26,5 +26,6 @@ test -f "$SRC_DIR/libz.a"
 sz=$(homescoop_require_lib_size "$SRC_DIR/libz.a")
 homescoop_stage_lib "$SRC_DIR/libz.a" libz.a
 homescoop_stage_headers "$SRC_DIR/zlib.h" "$SRC_DIR/zconf.h"
+homescoop_write_pc zlib "$VERSION" "-lz"
 homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== zlib: staged ($sz bytes)"

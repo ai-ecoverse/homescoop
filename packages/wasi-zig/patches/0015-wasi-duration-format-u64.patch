@@ -1,0 +1,16 @@
+--- a/lib/std/Io.zig
++++ b/lib/std/Io.zig
+@@ -1007,10 +1007,11 @@
+     /// `[#y][#w][#d][#h][#m]#[.###][n|u|m]s`
+     pub fn format(duration: Duration, w: *Writer) Writer.Error!void {
+         if (duration.nanoseconds < 0) try w.writeByte('-');
+-        return formatUnsigned(w, @abs(duration.nanoseconds));
++        // homescoop: stage2_wasm lacks intMulOverflow(u96). Truncate to u64 (build durations fit).
++        return formatUnsigned(w, @as(u64, @truncate(@abs(duration.nanoseconds))));
+     }
+ 
+-    fn formatUnsigned(w: *Writer, ns: u96) Writer.Error!void {
++    fn formatUnsigned(w: *Writer, ns: u64) Writer.Error!void {
+         var ns_remaining = ns;
+         inline for (.{
+             .{ .ns = 365 * std.time.ns_per_day, .sep = 'y' },

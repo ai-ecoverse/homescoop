@@ -1,0 +1,60 @@
+#!/bin/sh
+# Ensure EM_CACHE is a writable user dir whose sysroot/ is a symlink into
+# @ai-ecoverse/emscripten-cache (no 100MB copy). Seed tiny stamp files as
+# real files in EM_CACHE so emcc never tries to reinstall headers through
+# the symlink into the (read-only) package.
+set -eu
+
+PKG_ROOT=${EM_PACKAGE_ROOT:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}
+CACHE_PKG=${EM_CACHE_PACKAGE:-/shared/lib/node_modules/@ai-ecoverse/emscripten-cache}
+SYSROOT_SRC=${CACHE_PKG}/sysroot
+STAMPS_SRC=${CACHE_PKG}/stamps
+
+if [ -n "${EM_CACHE:-}" ]; then
+  CACHE=$EM_CACHE
+elif [ -n "${XDG_CACHE_HOME:-}" ]; then
+  CACHE=${XDG_CACHE_HOME}/emscripten
+else
+  CACHE=${HOME:-/tmp}/.cache/emscripten
+fi
+
+# Fresh profiles have no ~/.cache — create the full path before linking.
+mkdir -p "$CACHE"
+export EM_CACHE=$CACHE
+
+if [ ! -d "$SYSROOT_SRC" ]; then
+  echo "em-ensure-cache: missing sysroot at $SYSROOT_SRC (install @ai-ecoverse/emscripten-cache)" >&2
+  exit 1
+fi
+
+# Only (re)create the symlink when missing or pointing elsewhere.
+# Never `ln -sf` onto an existing symlink (SLICC VFS rename-onto-symlink bug).
+if [ -L "$CACHE/sysroot" ]; then
+  current=$(readlink "$CACHE/sysroot" || true)
+  if [ "$current" != "$SYSROOT_SRC" ]; then
+    rm -f "$CACHE/sysroot"
+    ln -s "$SYSROOT_SRC" "$CACHE/sysroot"
+  fi
+elif [ -e "$CACHE/sysroot" ]; then
+  # Real directory left by an older layout — leave it; do not clobber user data.
+  :
+else
+  ln -s "$SYSROOT_SRC" "$CACHE/sysroot"
+fi
+
+# Seed stamps as real files in the writable CACHE (not through the symlink).
+# Without sysroot_install.stamp, emcc runs install_system_headers into sysroot/.
+if [ -d "$STAMPS_SRC" ]; then
+  for stamp in "$STAMPS_SRC"/*; do
+    [ -f "$stamp" ] || continue
+    base=$(basename "$stamp")
+    dest=$CACHE/$base
+    if [ ! -f "$dest" ]; then
+      cp "$stamp" "$dest"
+    fi
+  done
+else
+  echo "em-ensure-cache: warning: no stamps/ in $CACHE_PKG (need @ai-ecoverse/emscripten-cache >= 6.0.9-2)" >&2
+fi
+
+printf '%s\n' "$CACHE"

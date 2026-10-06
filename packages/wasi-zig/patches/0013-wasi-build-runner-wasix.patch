@@ -1,0 +1,31 @@
+--- a/lib/compiler/build_runner.zig
++++ b/lib/compiler/build_runner.zig
+@@ -22,6 +22,8 @@
+     .side_channels_mitigations = .none,
+     .http_disable_tls = true,
+ };
++// homescoop: build runner spawns the compiler over pipes (wasix_32v1)
++pub const homescoop_wasix = builtin.os.tag == .wasi;
+ 
+ pub fn main(init: process.Init.Minimal) !void {
+     // The build runner is often short-lived, but thanks to `--watch` and `--webui`, that's not
+@@ -507,7 +509,8 @@
+     var run: Run = .{
+         .gpa = gpa,
+ 
+-        .available_rss = max_rss,
++        // homescoop: wasm32 usize is 32-bit; max_rss is u64
++        .available_rss = @intCast(max_rss),
+         .max_rss_is_default = false,
+         .max_rss_mutex = .init,
+         .skip_oom_steps = skip_oom_steps,
+@@ -528,7 +531,8 @@
+     }
+ 
+     if (run.available_rss == 0) {
+-        run.available_rss = process.totalSystemMemory() catch std.math.maxInt(u64);
++        // homescoop: totalSystemMemory is u64; clamp to usize on wasm32
++        run.available_rss = std.math.cast(usize, process.totalSystemMemory() catch std.math.maxInt(u64)) orelse std.math.maxInt(usize);
+         run.max_rss_is_default = true;
+     }
+ 

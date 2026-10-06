@@ -1,0 +1,17 @@
+# Seed ac_cv_build for emconfigure so config.guess does not need a host triple
+# inside the slicc wasm realm.
+diff --git a/emconfigure.py b/emconfigure.py
+--- a/emconfigure.py
++++ b/emconfigure.py
+@@ -47,6 +47,11 @@ def run():
+     return 1
+ 
+   env = building.get_building_env()
++  # Autoconf inside slicc cannot run a useful config.guess; seed a stable
++  # build triple (same pattern as host emconfigure cross builds).
++  env.setdefault('ac_cv_build', os.environ.get('ac_cv_build', 'x86_64-pc-linux-gnu'))
++  env.setdefault('ac_cv_host', os.environ.get('ac_cv_host', env['ac_cv_build']))
++  env.setdefault('ac_cv_target', os.environ.get('ac_cv_target', 'wasm32-unknown-emscripten'))
+   env['EMMAKEN_JUST_CONFIGURE'] = '1'
+   print(f'emconfigure: {shlex.join(args)} in directory {os.getcwd()}', file=sys.stderr)
+   os.environ.update(env)

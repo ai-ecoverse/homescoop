@@ -1,0 +1,35 @@
+--- a/src/Compilation.zig
++++ b/src/Compilation.zig
+@@ -5684,6 +5684,12 @@
+     }
+ }
+ 
++/// homescoop: on a WASI host (SLICC) a C object compiles with clang in this
++/// process, as where spawning is impossible: a `zig clang` child per C file
++/// instantiates the whole LLVM-enabled compiler again (646 children for a cold
++/// wasi-libc build).
++const in_process_clang = !std.process.can_spawn or builtin.os.tag == .wasi;
++
+ fn updateCObject(comp: *Compilation, c_object: *CObject, c_obj_prog_node: std.Progress.Node) !void {
+     if (comp.config.c_frontend == .aro) {
+         return comp.failCObj(c_object, "aro does not support compiling C objects yet", .{});
+@@ -5763,6 +5769,10 @@
+         const ext = c_object.src.ext orelse classifyFileExt(c_object.src.src_path);
+ 
+         try argv.appendSlice(&[_][]const u8{ self_exe_path, "clang" });
++        // homescoop: in-process clang (below) runs every C object in this one
++        // process, so it must free each translation unit instead of leaking it
++        // at exit as clang's driver arranges for a short-lived cc1.
++        if (in_process_clang) try argv.appendSlice(&.{ "-Xclang", "-no-disable-free" });
+         // if "ext" is explicit, add "-x <lang>". Otherwise let clang do its thing.
+         if (c_object.src.ext != null or ext.clangNeedsLanguageOverride()) {
+             try argv.appendSlice(&[_][]const u8{ "-x", switch (ext) {
+@@ -5875,7 +5885,7 @@
+             error.FileNotFound => {}, // the file wasn't created due to an error we reported
+             else => log.warn("failed to delete '{s}': {s}", .{ dep_file_path, @errorName(err) }),
+         };
+-        if (std.process.can_spawn) {
++        if (!in_process_clang) {
+             if (comp.clang_passthrough_mode) {
+                 var child = std.process.spawn(io, .{
+                     .argv = argv.items,

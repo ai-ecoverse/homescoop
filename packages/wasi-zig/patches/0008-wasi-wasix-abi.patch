@@ -1,0 +1,142 @@
+--- /dev/null
++++ b/lib/std/os/wasix.zig
++++ b/lib/std/os/wasix.zig
+@@ -0,0 +1,138 @@
++//! WASIX process ABI (`wasix_32v1`) for homescoop / SLICC.
++//! Layouts match wasix-libc `api_wasix.h` (witx). Wasm imports use ptr+len
++//! for strings (preview1 style), not C `strlen` wrappers.
++//!
++//! Only referenced when spawn/pipe/wait paths are used — user `wasm32-wasi`
++//! programs that never spawn keep a pure preview1 import table.
++
++const std = @import("std");
++const wasi = std.os.wasi;
++
++pub const errno_t = wasi.errno_t;
++pub const fd_t = wasi.fd_t;
++pub const pid_t = i32;
++
++pub const SpawnFdOpCmd = enum(u8) {
++    close = 0,
++    dup2 = 1,
++    open = 2,
++    chdir = 3,
++    fchdir = 4,
++};
++
++/// `__wasi_proc_spawn_fd_op_t` — 56 bytes, align 8
++pub const SpawnFdOp = extern struct {
++    cmd: u8 = 0,
++    _pad0: [3]u8 = .{ 0, 0, 0 },
++    fd: i32 = 0,
++    src_fd: i32 = 0,
++    path: [*]const u8 = @ptrFromInt(1),
++    path_len: u32 = 0,
++    dirflags: u32 = 0,
++    oflags: u16 = 0,
++    _pad1: [6]u8 = .{ 0, 0, 0, 0, 0, 0 },
++    fs_rights_base: u64 = 0,
++    fs_rights_inheriting: u64 = 0,
++    fdflags: u16 = 0,
++    fdflagsext: u16 = 0,
++    _pad2: [4]u8 = .{ 0, 0, 0, 0 },
++
++    comptime {
++        if (@sizeOf(SpawnFdOp) != 56) @compileError("SpawnFdOp size");
++        if (@offsetOf(SpawnFdOp, "fd") != 4) @compileError("SpawnFdOp.fd");
++        if (@offsetOf(SpawnFdOp, "src_fd") != 8) @compileError("SpawnFdOp.src_fd");
++        if (@offsetOf(SpawnFdOp, "path") != 12) @compileError("SpawnFdOp.path");
++        if (@offsetOf(SpawnFdOp, "fs_rights_base") != 32) @compileError("SpawnFdOp.rights");
++        if (@offsetOf(SpawnFdOp, "fdflags") != 48) @compileError("SpawnFdOp.fdflags");
++    }
++
++    pub fn close(fd: i32) SpawnFdOp {
++        return .{ .cmd = @intFromEnum(SpawnFdOpCmd.close), .fd = fd };
++    }
++    pub fn dup2(src_fd: i32, fd: i32) SpawnFdOp {
++        return .{ .cmd = @intFromEnum(SpawnFdOpCmd.dup2), .fd = fd, .src_fd = src_fd };
++    }
++};
++
++/// `__wasi_option_pid_t` — 8 bytes, align 4
++pub const OptionPid = extern struct {
++    tag: u8 = 0,
++    _pad: [3]u8 = .{ 0, 0, 0 },
++    pid: pid_t = 0,
++
++    comptime {
++        if (@sizeOf(OptionPid) != 8) @compileError("OptionPid size");
++    }
++
++    pub fn none() OptionPid {
++        return .{};
++    }
++    pub fn some(pid: pid_t) OptionPid {
++        return .{ .tag = 1, .pid = pid };
++    }
++};
++
++pub const JoinFlags = packed struct(u32) {
++    non_blocking: bool = false,
++    wake_stopped: bool = false,
++    _reserved: u30 = 0,
++};
++
++pub const JoinStatusTag = enum(u8) {
++    nothing = 0,
++    exit_normal = 1,
++    exit_signal = 2,
++    stopped = 3,
++};
++
++/// `__wasi_join_status_t` — 6 bytes, align 2 (host writes tag + u16/@+2 or signal/@+4)
++pub const JoinStatus = extern struct {
++    tag: u8 = 0,
++    _pad: u8 = 0,
++    exit_code: u16 = 0,
++    signal: u8 = 0,
++    _pad2: u8 = 0,
++
++    comptime {
++        if (@sizeOf(JoinStatus) != 6) @compileError("JoinStatus size");
++    }
++};
++
++pub extern "wasix_32v1" fn fd_pipe(r: *fd_t, w: *fd_t) errno_t;
++
++pub extern "wasix_32v1" fn proc_spawn3(
++    name: [*]const u8,
++    name_len: usize,
++    args: [*]const [*:0]const u8,
++    args_len: usize,
++    envs: ?[*]const [*:0]const u8,
++    envs_len: usize,
++    fd_ops: [*]const SpawnFdOp,
++    fd_ops_len: usize,
++    signal_dispositions: [*]const u8,
++    signal_dispositions_len: usize,
++    search_path: u8,
++    path: [*]const u8,
++    path_len: usize,
++    ret_pid: *pid_t,
++) errno_t;
++
++pub extern "wasix_32v1" fn proc_join(
++    pid: *OptionPid,
++    flags: u32,
++    status: *JoinStatus,
++) errno_t;
++
++pub extern "wasix_32v1" fn proc_signal(pid: pid_t, sig: u8) errno_t;
++
++pub extern "wasix_32v1" fn proc_exec3(
++    name: [*]const u8,
++    name_len: usize,
++    args: [*]const u8,
++    args_len: usize,
++    envs: [*]const u8,
++    envs_len: usize,
++    search_path: u8,
++    path: [*]const u8,
++    path_len: usize,
++) errno_t;

@@ -1,0 +1,24 @@
+--- a/lib/std/process/Child.zig
++++ b/lib/std/process/Child.zig
+@@ -12,7 +12,8 @@
+ 
+ pub const Id = switch (native_os) {
+     .windows => std.os.windows.HANDLE,
+-    .wasi => void,
++    // homescoop: WASIX pid when opted in; else void (preview1-only programs)
++    .wasi => if ((@hasDecl(@import("root"), "homescoop_wasix") and @import("root").homescoop_wasix)) i32 else void,
+     else => std.posix.pid_t,
+ };
+ 
+@@ -93,8 +94,9 @@
+ 
+ pub const Term = union(enum) {
+     exited: u8,
+-    signal: std.posix.SIG,
+-    stopped: std.posix.SIG,
++    // homescoop: WASI signal numbers (std.os.wasi.signal_t); posix.SIG is void on wasi
++    signal: if (native_os == .wasi) std.os.wasi.signal_t else std.posix.SIG,
++    stopped: if (native_os == .wasi) std.os.wasi.signal_t else std.posix.SIG,
+     unknown: u32,
+ };
+ 

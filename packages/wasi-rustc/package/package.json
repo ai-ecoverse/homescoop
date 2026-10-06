@@ -1,0 +1,55 @@
+{
+  "name": "@ai-ecoverse/wasi-rustc",
+  "version": "1.98.1-4",
+  "description": "rustc (LLVM-in-wasm) for slicc WASI — default target wasm32-wasip1",
+  "license": "(MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-rustc/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-rustc",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "rustc",
+    "rust"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "PRESTAGE.md",
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-rustc",
+    "upstream": "1.98.1"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "dependencies": [
+      "@ai-ecoverse/wasm-clang"
+    ],
+    "commands": {
+      "rustc": {
+        "script": "bin/rustc"
+      },
+      "rustc.wasm": {
+        "wasm": "bin/rustc.wasm",
+        "env": {
+          "RUST_MIN_STACK": "16777216"
+        }
+      }
+    },
+    "env": {
+      "RUST_MIN_STACK": "16777216",
+      "RUSTC_SYSROOT": "${package}"
+    }
+  }
+}

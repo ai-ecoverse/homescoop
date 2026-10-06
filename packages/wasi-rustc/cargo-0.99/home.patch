@@ -1,0 +1,16 @@
+diff -ruN a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs	2026-10-02 23:53:20.252134025 +0200
++++ b/src/lib.rs	2026-10-02 23:53:20.265062001 +0200
+@@ -69,6 +69,12 @@
+ #[cfg(windows)]
+ use windows::home_dir_inner;
+ 
++// WASI has no user database; the home directory is `$HOME`.
++#[cfg(target_os = "wasi")]
++fn home_dir_inner() -> Option<PathBuf> {
++    std::env::var_os("HOME").filter(|h| !h.is_empty()).map(PathBuf::from)
++}
++
+ #[cfg(unix)]
+ fn home_dir_inner() -> Option<PathBuf> {
+     #[allow(deprecated)]

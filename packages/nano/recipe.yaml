@@ -1,0 +1,26 @@
+# GNU nano with static widec ncurses (same Emscripten path as wasm-less).
+name: nano
+builder: host
+version: "8.7.1"
+npm: "@ai-ecoverse/wasm-nano"
+summary: "GNU nano 8.7.1 with ncurses 6.5 for slicc wasm realm"
+source:
+  url: "https://www.nano-editor.org/dist/v8/nano-{{version}}.tar.gz"
+  sha256: "f56b612024beb5900905a0580260434cf74a4dcdace8241608ff28ae2f472118"
+sources:
+  ncurses:
+    version: "6.5"
+    url: "https://ftp.gnu.org/gnu/ncurses/ncurses-{{version}}.tar.gz"
+    sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.nano-editor.org/
+  license: GPL-3.0-or-later
+  notes: |
+    Emscripten ABI like @ai-ecoverse/wasm-less: static libncursesw with
+    compiled-in terminfo fallbacks (xterm-256color,xterm,vt100,dumb), slicc
+    less profile (select/poll Asyncify-safe). Full-screen editor for the
+    panel terminal; no PTY required.

@@ -1,0 +1,19 @@
+# Homebrew-shaped recipe — WASIX sysroot data (wasixcc SYSROOT_PREFIX layout).
+name: wasix-sysroot
+builder: host
+version: "2025.9.30"
+npm: "@ai-ecoverse/wasix-sysroot"
+summary: "WASIX libc/libcxx/compiler-rt sysroots for wasm32-wasi"
+source:
+  url: "https://github.com/wasix-org/wasix-libc"
+  sha256: "skip"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-sysroot
+  license: Apache-2.0 WITH LLVM-exception
+  notes: |
+    Snapshot of ~/.wasixcc/sysroot (five variants). Package root is the
+    SYSROOT_PREFIX. No commands — consumed by wasm-clang drivers / wasixcc.

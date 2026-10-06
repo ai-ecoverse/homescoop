@@ -1,0 +1,46 @@
+{
+  "name": "@ai-ecoverse/wasm-findutils",
+  "version": "4.10.0-1",
+  "description": "GNU findutils 4.10.0 (find + xargs) for wasm / slicc",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/findutils/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/findutils",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "find",
+    "xargs",
+    "findutils"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "findutils",
+    "upstream": "4.10.0"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "find": {
+        "glue": "bin/find",
+        "wasm": "bin/find.wasm"
+      },
+      "xargs": {
+        "glue": "bin/xargs",
+        "wasm": "bin/xargs.wasm"
+      }
+    }
+  }
+}

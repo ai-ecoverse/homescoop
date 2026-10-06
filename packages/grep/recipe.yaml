@@ -16,5 +16,5 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/grep
   license: GPL-3.0-or-later
   notes: |
-    Port of slicc-emscripten/build-wasm-gnu.sh. Links slicc spawn profile
-    (spawn + exec + libc_gaps) via homescoop_slicc_archive / build-gnu-cli.sh.
+    Port of slicc-emscripten/build-wasm-gnu.sh. Links slicc cli profile
+    (spawn+exec+select+jobs, whole-archive) via build-gnu-cli.sh.
