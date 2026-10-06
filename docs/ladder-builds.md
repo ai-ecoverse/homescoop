@@ -41,6 +41,10 @@ OIDC validates the *calling* workflow filename, and fledgling trusts only
 publish runs as a real `ladder-build` workflow.
 
 `scripts/list-touched-packages.mjs` maps changed paths → recipe names.
+`ladder-merge` passes `--publishable` so only `recipe.yaml` or `package/`
+dispatches a build/publish; a `build.sh`-only merge does not republish.
+`ladder-pr` host-build uploads `package.tgz` + sha256 as artifacts and runs
+`packages/<name>/smoke.c` via `scripts/host-smoke.sh` when present.
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
 

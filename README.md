@@ -30,9 +30,10 @@ shims/slicc/      # vendored slicc libc shims (spawn/exec/fork/select/jobs/signa
 
 ## CI
 
-Dispatch **ladder-build** with `package=zlib`, or merge a PR that touches
-`packages/<name>` (`ladder-merge` auto-dispatches). PRs get **ladder-pr**
-host builds (no publish) for touched packages.
+Dispatch **ladder-build** with `package=zlib`, or merge a PR that changes
+`packages/<name>/recipe.yaml` or `package/` (`ladder-merge` auto-dispatches).
+A `build.sh`-only change does not republish. PRs get **ladder-pr** host
+builds (no publish) plus `package.tgz` artifacts for certification.
 
 ```bash
 node scripts/read-recipe.mjs zlib --field builder

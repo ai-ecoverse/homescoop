@@ -3,8 +3,12 @@
  * List homescoop package names touched between two git refs (or from a file list).
  *
  *   node scripts/list-touched-packages.mjs --base origin/main --head HEAD
+ *   node scripts/list-touched-packages.mjs --base A --head B --publishable
  *   node scripts/list-touched-packages.mjs --files <(git diff --name-only …)
  *   echo 'packages/zlib/recipe.yaml' | node scripts/list-touched-packages.mjs --stdin
+ *
+ * --publishable: only recipe.yaml or package/ (not build.sh, patches, docs).
+ * ladder-merge uses that so a tooling-only change cannot dispatch publish.
  *
  * Prints one package name per line. Exits 0 even when empty (caller decides).
  */
@@ -16,8 +20,8 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
-  /** @type {{ base?: string, head?: string, files?: string, stdin: boolean, json: boolean }} */
-  const out = { stdin: false, json: false };
+  /** @type {{ base?: string, head?: string, files?: string, stdin: boolean, json: boolean, publishable: boolean }} */
+  const out = { stdin: false, json: false, publishable: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--base') out.base = argv[++i];
@@ -25,9 +29,10 @@ function parseArgs(argv) {
     else if (a === '--files') out.files = argv[++i];
     else if (a === '--stdin') out.stdin = true;
     else if (a === '--json') out.json = true;
+    else if (a === '--publishable') out.publishable = true;
     else {
       console.error(
-        'usage: list-touched-packages.mjs (--base <ref> --head <ref>) | --files <path> | --stdin [--json]'
+        'usage: list-touched-packages.mjs (--base <ref> --head <ref>) | --files <path> | --stdin [--json] [--publishable]'
       );
       process.exit(2);
     }
@@ -35,11 +40,21 @@ function parseArgs(argv) {
   return out;
 }
 
+/** recipe.yaml or the npm package tree — not build.sh / patches / PRESTAGE. */
+function isPublishTrigger(norm) {
+  return (
+    /^packages\/[^/]+\/recipe\.yaml$/.test(norm) ||
+    /^packages\/[^/]+\/package(?:\/|$)/.test(norm)
+  );
+}
+
 /** @param {string[]} paths */
-function packagesFromPaths(paths) {
+function packagesFromPaths(paths, publishable) {
   const set = new Set();
   for (const p of paths) {
-    const m = p.replace(/\\/g, '/').match(/^packages\/([^/]+)\//);
+    const norm = p.replace(/\\/g, '/');
+    if (publishable && !isPublishTrigger(norm)) continue;
+    const m = norm.match(/^packages\/([^/]+)\//);
     if (!m) continue;
     const name = m[1];
     if (!existsSync(join(root, 'packages', name, 'recipe.yaml'))) continue;
@@ -80,7 +95,7 @@ if (args.stdin) {
   process.exit(2);
 }
 
-const pkgs = packagesFromPaths(paths);
+const pkgs = packagesFromPaths(paths, args.publishable);
 if (args.json) {
   console.log(JSON.stringify(pkgs));
 } else {
