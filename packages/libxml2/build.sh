@@ -45,7 +45,7 @@ homescoop_stage_license "$SRC_DIR"/Copyright "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYI
 
 echo "== libxml2: encoding smoke (iconv)"
 SMOKE_JS="$WORK/libxml2-iconv-smoke.js"
-emcc "$HOMESCOOP_PKG/smoke-iconv.c" \
+emcc "$HOMESCOOP_PKG/smoke.c" \
   -O0 -I"$PREFIX/include" -L"$PREFIX/lib" -lxml2 -liconv \
   -sINVOKE_RUN=1 -sALLOW_MEMORY_GROWTH=1 \
   -o "$SMOKE_JS"
