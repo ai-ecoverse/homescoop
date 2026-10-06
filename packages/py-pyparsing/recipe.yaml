@@ -1,0 +1,15 @@
+name: py-pyparsing
+builder: host
+version: "3.3.3"
+npm: "@ai-ecoverse/py-pyparsing"
+summary: "pyparsing for slicc WASIX CPython"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  license: MIT
+  notes: |
+    Pure-Python wheel staged into lib/python3.14/site-packages.
+    slicc.python.sitePackages only (no abi/platform requires).

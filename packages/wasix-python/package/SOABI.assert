@@ -1,0 +1,5 @@
+# Build-time contract: _imp.extension_suffixes()[0] == sysconfig EXT_SUFFIX
+# Enforced by prestage-check.sh (static; blocks stage on failure).
+EXT_SUFFIX=.cpython-314-wasm32-wasix.so
+SOABI=cpython-314-wasm32-wasix
+MULTIARCH=wasm32-wasix

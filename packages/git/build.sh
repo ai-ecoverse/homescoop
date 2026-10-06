@@ -36,51 +36,78 @@ normalize_em_bin() {
   if [[ -f "$d/$n.js" && ! -f "$d/$n" ]]; then mv "$d/$n.js" "$d/$n"; fi
 }
 
-if [[ ! -f "$SRC/git.wasm" || ! -f "$SRC/git-remote-http.wasm" || -n "${FORCE:-}" ]]; then
-  echo "== git: emmake (git + git-remote-http/https)"
+# Standalone wasm programs installed to libexec/git-core (not argv0 of git).
+# git-http-push needs expat — skipped (NO_EXPAT). Remote ftp/ftps alias http.
+STANDALONE_PROGS=(
+  git-remote-http git-remote-https git-remote-ftp git-remote-ftps
+  git-sh-i18n--envsubst
+  git-imap-send
+  git-http-fetch
+  git-http-backend
+  git-shell
+  scalar
+)
+
+# Shared make knobs — fixed virtual prefix=/usr, no RUNTIME_PREFIX (realm has
+# no /proc/self/exe; relocatable discovery aborts in system_prefix).
+# SLICC sets GIT_EXEC_PATH / GIT_TEMPLATE_DIR via the package manifest.
+GIT_MAKE_VARS=(
+  uname_S=Emscripten
+  CC=emcc AR=emar HOSTCC=cc CURL_CONFIG=/bin/false
+  prefix=/usr
+  gitexecdir=/usr/libexec/git-core
+  template_dir=share/git-core/templates
+  NO_RUST=YesPlease NO_OPENSSL=YesPlease NO_EXPAT=YesPlease
+  NO_GETTEXT=YesPlease NO_ICONV=YesPlease NO_TCLTK=YesPlease
+  NO_PERL=YesPlease NO_PYTHON=YesPlease NO_PTHREADS=YesPlease
+  NO_UNIX_SOCKETS=YesPlease NO_MMAP=YesPlease NO_REGEX=NeedsStartEnd
+  "CURL_CFLAGS=-I$PREFIX/include"
+  "CURL_LDFLAGS=$CURL_LDFLAGS"
+  CFLAGS="-O2 -sUSE_ZLIB=1 -I$PREFIX/include"
+  "LDFLAGS=$CLI_LDFLAGS"
+  "EXTLIBS=$EXTLIBS"
+)
+
+need_build=
+for p in git "${STANDALONE_PROGS[@]}"; do
+  if [[ ! -f "$SRC/$p.wasm" || ! -f "$SRC/$p" ]]; then need_build=1; break; fi
+done
+# Aliases may be hardlinks of glue only — still require primary wasm.
+if [[ ! -f "$SRC/git-remote-http.wasm" || ! -f "$SRC/git-remote-http" ]]; then need_build=1; fi
+
+if [[ -n "$need_build" || -n "${FORCE:-}" ]]; then
+  echo "== git: emmake (git + libexec PROGRAMS + scalar)"
   (
     cd "$SRC"
-    # Fresh objects when FORCE; otherwise incremental.
     if [[ -n "${FORCE:-}" ]]; then
       make clean >/dev/null 2>&1 || true
     fi
-    # Relocatable install layout: never bake $(HOME) into the wasm. Relative
-    # gitexecdir/template_dir + RUNTIME_PREFIX; SLICC also sets GIT_* via env.
     # shellcheck disable=SC2086
-    emmake make -j"$JOBS" git git-remote-http git-remote-https \
-      uname_S=Emscripten \
-      CC=emcc AR=emar HOSTCC=cc CURL_CONFIG=/bin/false \
-      prefix=/ \
-      gitexecdir=libexec/git-core \
-      template_dir=share/git-core/templates \
-      RUNTIME_PREFIX=YesPlease \
-      NO_RUST=YesPlease NO_OPENSSL=YesPlease NO_EXPAT=YesPlease \
-      NO_GETTEXT=YesPlease NO_ICONV=YesPlease NO_TCLTK=YesPlease \
-      NO_PERL=YesPlease NO_PYTHON=YesPlease NO_PTHREADS=YesPlease \
-      NO_UNIX_SOCKETS=YesPlease NO_MMAP=YesPlease NO_REGEX=NeedsStartEnd \
-      "CURL_CFLAGS=-I$PREFIX/include" \
-      "CURL_LDFLAGS=$CURL_LDFLAGS" \
-      CFLAGS="-O2 -sUSE_ZLIB=1 -I$PREFIX/include" \
-      "LDFLAGS=$CLI_LDFLAGS" \
-      "EXTLIBS=$EXTLIBS"
+    emmake make -j"$JOBS" \
+      git "${STANDALONE_PROGS[@]}" \
+      "${GIT_MAKE_VARS[@]}"
   )
 fi
 
 normalize_em_bin "$SRC" git
-normalize_em_bin "$SRC" git-remote-http
-normalize_em_bin "$SRC" git-remote-https
-# Git's LN/CP for git-remote-https often hardlinks only the glue, not .wasm.
-if [[ ! -f "$SRC/git-remote-https.wasm" && -f "$SRC/git-remote-http.wasm" ]]; then
-  cp "$SRC/git-remote-http.wasm" "$SRC/git-remote-https.wasm"
-fi
+for p in "${STANDALONE_PROGS[@]}"; do
+  normalize_em_bin "$SRC" "$p"
+done
+# Aliases: make LN/CP often hardlinks only the glue, not .wasm.
+for alias in git-remote-https git-remote-ftp git-remote-ftps; do
+  if [[ ! -f "$SRC/$alias.wasm" && -f "$SRC/git-remote-http.wasm" ]]; then
+    cp "$SRC/git-remote-http.wasm" "$SRC/$alias.wasm"
+  fi
+  if [[ ! -f "$SRC/$alias" && -f "$SRC/git-remote-http" ]]; then
+    cp "$SRC/git-remote-http" "$SRC/$alias"
+  fi
+done
 test -f "$SRC/git.wasm"
 test -f "$SRC/git-remote-http.wasm"
-test -f "$SRC/git-remote-https.wasm"
+test -f "$SRC/git-sh-i18n--envsubst.wasm"
 
 echo "== git: stage bin + libexec helpers"
 homescoop_stage_cli "$SRC" git
-homescoop_stage_cli "$SRC" git-remote-http
-homescoop_stage_cli "$SRC" git-remote-https
 
 LIBEXEC="$HOMESCOOP_PKG/package/libexec/git-core"
 BIN="$HOMESCOOP_PKG/package/bin"
@@ -89,29 +116,57 @@ mkdir -p "$LIBEXEC" "$BIN" "$PREFIX/libexec/git-core" "$PREFIX/bin"
 # Shared wasm for argv0 builtins (glue always locateFile("git.wasm")).
 cp "$SRC/git.wasm" "$LIBEXEC/git.wasm"
 cp "$SRC/git.wasm" "$PREFIX/libexec/git-core/git.wasm"
-for helper in git-remote-http git-remote-https; do
-  cp "$SRC/$helper" "$LIBEXEC/$helper"
-  cp "$SRC/$helper.wasm" "$LIBEXEC/$helper.wasm"
-  cp "$SRC/$helper" "$PREFIX/libexec/git-core/$helper"
-  cp "$SRC/$helper.wasm" "$PREFIX/libexec/git-core/$helper.wasm"
+
+# Standalone programs: own glue + .wasm under libexec (GIT_EXEC_PATH).
+stage_standalone() {
+  local name="$1"
+  test -f "$SRC/$name" || { echo "missing $SRC/$name" >&2; exit 1; }
+  test -f "$SRC/$name.wasm" || { echo "missing $SRC/$name.wasm" >&2; exit 1; }
+  cp "$SRC/$name" "$LIBEXEC/$name"
+  cp "$SRC/$name.wasm" "$LIBEXEC/$name.wasm"
+  cp "$SRC/$name" "$PREFIX/libexec/git-core/$name"
+  cp "$SRC/$name.wasm" "$PREFIX/libexec/git-core/$name.wasm"
+  chmod 755 "$LIBEXEC/$name" "$PREFIX/libexec/git-core/$name"
+}
+for p in "${STANDALONE_PROGS[@]}"; do
+  stage_standalone "$p"
 done
 
-# Dash-command builtins: glue looks up git.wasm beside it; also ship under
-# bin/ for the slicc.commands entries (upload/receive-pack).
-for builtin in \
-  git-upload-pack git-receive-pack git-upload-archive \
-  git-pack-objects git-index-pack git-unpack-objects \
-  git-fetch-pack git-rev-list git-bundle
-do
-  cp "$SRC/git" "$LIBEXEC/$builtin"
-  cp "$SRC/git" "$PREFIX/libexec/git-core/$builtin"
+# Also expose primary remotes + shell/scalar under bin/ for slicc.commands.
+for name in git-remote-http git-remote-https git-shell scalar; do
+  homescoop_stage_cli "$SRC" "$name"
+  chmod 755 "$BIN/$name" "$PREFIX/bin/$name"
 done
+
+# Dash-command builtins are multi-call via the git binary — do NOT stage
+# module-less glue under libexec (that shadows slicc.commands and breaks
+# glue+module runtimes). Ship upload/receive-pack under bin/ with matching
+# .wasm + argv0 in the package manifest.
 for builtin in git-upload-pack git-receive-pack; do
   cp "$SRC/git" "$BIN/$builtin"
   cp "$SRC/git.wasm" "$BIN/$builtin.wasm"
   cp "$SRC/git" "$PREFIX/bin/$builtin"
   cp "$SRC/git.wasm" "$PREFIX/bin/$builtin.wasm"
+  chmod 755 "$BIN/$builtin" "$PREFIX/bin/$builtin"
 done
+# Drop stale libexec copies from prior packaging revs.
+rm -f \
+  "$LIBEXEC"/git-upload-pack "$LIBEXEC"/git-receive-pack \
+  "$LIBEXEC"/git-upload-archive "$LIBEXEC"/git-pack-objects \
+  "$LIBEXEC"/git-index-pack "$LIBEXEC"/git-unpack-objects \
+  "$LIBEXEC"/git-fetch-pack "$LIBEXEC"/git-rev-list \
+  "$LIBEXEC"/git-bundle \
+  "$PREFIX/libexec/git-core"/git-upload-pack \
+  "$PREFIX/libexec/git-core"/git-receive-pack \
+  "$PREFIX/libexec/git-core"/git-upload-archive \
+  "$PREFIX/libexec/git-core"/git-pack-objects \
+  "$PREFIX/libexec/git-core"/git-index-pack \
+  "$PREFIX/libexec/git-core"/git-unpack-objects \
+  "$PREFIX/libexec/git-core"/git-fetch-pack \
+  "$PREFIX/libexec/git-core"/git-rev-list \
+  "$PREFIX/libexec/git-core"/git-bundle
+
+chmod 755 "$BIN/git" "$PREFIX/bin/git"
 
 echo "== git: generate + stage shell-script commands (SCRIPT_SH + SCRIPT_LIB)"
 # Host make only — generate-script.sh is sed, not wasm. SHELL_PATH=/bin/sh
@@ -121,10 +176,9 @@ echo "== git: generate + stage shell-script commands (SCRIPT_SH + SCRIPT_LIB)"
   # shellcheck disable=SC2086
   make build-sh-script git-sh-setup git-sh-i18n git-mergetool--lib \
     uname_S=Emscripten \
-    prefix=/ \
-    gitexecdir=libexec/git-core \
+    prefix=/usr \
+    gitexecdir=/usr/libexec/git-core \
     template_dir=share/git-core/templates \
-    RUNTIME_PREFIX=YesPlease \
     SHELL_PATH=/bin/sh \
     NO_PERL=YesPlease NO_PYTHON=YesPlease NO_TCLTK=YesPlease \
     NO_GETTEXT=YesPlease
@@ -162,11 +216,23 @@ mkdir -p "$TEMPLATES_DST"
   cd "$SRC/templates"
   # Produce blt/ with #! rewritten to /bin/sh (realm bash).
   make clean >/dev/null 2>&1 || true
-  make SHELL_PATH=/bin/sh prefix=/ template_instdir=share/git-core/templates
+  make SHELL_PATH=/bin/sh prefix=/usr template_instdir=share/git-core/templates
   (cd blt && tar cf - .) | (cd "$TEMPLATES_DST" && tar xf -)
 )
 test -f "$TEMPLATES_DST/description"
 test -f "$TEMPLATES_DST/info/exclude"
+
+# Refuse build-machine absolute paths in the wasm (prefix=/usr is OK).
+if strings "$HOMESCOOP_PKG/package/bin/git.wasm" | grep -E '/Users/|/home/|/var/folders/|/tmp/homescoop'
+then
+  echo "homescoop: host path leaked into git.wasm" >&2
+  exit 1
+fi
+if strings "$LIBEXEC/git-sh-i18n--envsubst.wasm" | grep -E '/Users/|/home/'
+then
+  echo "homescoop: host path leaked into git-sh-i18n--envsubst.wasm" >&2
+  exit 1
+fi
 
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
 echo "== git: staged → $HOMESCOOP_PKG/package"

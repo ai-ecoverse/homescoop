@@ -1,0 +1,14 @@
+{
+  "name": "wasi-pnpm-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test '*.test.mjs'",
+    "test:e2e": "node --test 'e2e/*.test.mjs'"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.7.2",
+    "@ai-ecoverse/wasm-git": "2.55.0-8",
+    "@ai-ecoverse/wasm-tls-engine": "3.6.5-1"
+  }
+}

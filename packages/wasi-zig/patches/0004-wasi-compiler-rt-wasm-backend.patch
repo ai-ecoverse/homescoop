@@ -1,0 +1,12 @@
+--- a/src/target.zig
++++ b/src/target.zig
+@@ -410,7 +410,8 @@
+         else => {},
+     }
+     return switch (zigBackend(target, false)) {
+-        .stage2_aarch64, .stage2_x86_64 => .yes,
++        // homescoop: allow no-LLVM (wasm32-wasi) hosts to build compiler_rt for wasm targets
++        .stage2_aarch64, .stage2_x86_64, .stage2_wasm => .yes,
+         else => .llvm_only,
+     };
+ }

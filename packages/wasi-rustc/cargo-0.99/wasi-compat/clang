@@ -1,0 +1,10 @@
+#!/bin/sh
+# wasi-sdk clang ($WASI_SDK_PATH). libgit2's sources also get the WASI
+# compat headers here: Cargo uses libgit2 only for local repositories.
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+case "$*" in
+  *libgit2/*)
+    exec "$WASI_SDK_PATH/bin/clang" -I"$here" -include "$here/wasi_compat.h" \
+      -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS "$@" ;;
+  *) exec "$WASI_SDK_PATH/bin/clang" "$@" ;;
+esac

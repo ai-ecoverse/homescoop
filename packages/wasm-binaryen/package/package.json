@@ -1,0 +1,77 @@
+{
+  "name": "@ai-ecoverse/wasm-binaryen",
+  "version": "132.0.0-1",
+  "description": "Binaryen 132 wasm tools for slicc (wasm-opt and friends)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasm-binaryen/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-binaryen",
+  "keywords": [
+    "wasm",
+    "binaryen",
+    "slicc",
+    "homescoop",
+    "wasm-opt",
+    "emscripten"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasm-binaryen",
+    "upstream": "132"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "wasm-opt": {
+        "glue": "bin/wasm-opt",
+        "wasm": "bin/wasm-opt.wasm",
+        "argv0": "wasm-opt"
+      },
+      "wasm-metadce": {
+        "glue": "bin/wasm-metadce",
+        "wasm": "bin/wasm-metadce.wasm",
+        "argv0": "wasm-metadce"
+      },
+      "wasm-emscripten-finalize": {
+        "glue": "bin/wasm-emscripten-finalize",
+        "wasm": "bin/wasm-emscripten-finalize.wasm",
+        "argv0": "wasm-emscripten-finalize"
+      },
+      "wasm-ctor-eval": {
+        "glue": "bin/wasm-ctor-eval",
+        "wasm": "bin/wasm-ctor-eval.wasm",
+        "argv0": "wasm-ctor-eval"
+      },
+      "wasm-split": {
+        "glue": "bin/wasm-split",
+        "wasm": "bin/wasm-split.wasm",
+        "argv0": "wasm-split"
+      },
+      "wasm2js": {
+        "glue": "bin/wasm2js",
+        "wasm": "bin/wasm2js.wasm",
+        "argv0": "wasm2js"
+      },
+      "wasm-as": {
+        "glue": "bin/wasm-as",
+        "wasm": "bin/wasm-as.wasm",
+        "argv0": "wasm-as"
+      },
+      "wasm-dis": {
+        "glue": "bin/wasm-dis",
+        "wasm": "bin/wasm-dis.wasm",
+        "argv0": "wasm-dis"
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+--- /tmp/numpy-meson.build.orig	2026-09-30 09:36:58.694093589 +0200
++++ /tmp/wasix-numpy-build/numpy-2.3.2/numpy/_core/meson.build	2026-09-30 09:36:58.645199699 +0200
+@@ -311,10 +311,14 @@
+ endforeach
+ 
+ # Other optional functions
++# homescoop wasix: wasixcc may report backtrace() linkable but python.wasm
++# does not export it. Skip on wasi; temp-elision falls back cleanly.
+ optional_misc_funcs = [
+-  'backtrace',
+   'madvise',
+ ]
++if host_machine.system() != 'wasi'
++  optional_misc_funcs = ['backtrace'] + optional_misc_funcs
++endif
+ foreach func: optional_misc_funcs
+   if cc.has_function(func,
+       include_directories: inc_curdir,
+@@ -329,10 +333,12 @@
+   'features.h',   # for glibc version linux
+   'xlocale.h',    # removed in glibc 2.26, but may still be useful - see gh-8367
+   'dlfcn.h',      # dladdr
+-  'execinfo.h',   # backtrace
+-  'libunwind.h',  # backtrace for LLVM/Clang using libunwind
+   'sys/mman.h',   # madvise
+ ]
++# homescoop wasix: no execinfo/libunwind in the main module
++if host_machine.system() != 'wasi'
++  optional_headers += ['execinfo.h', 'libunwind.h']
++endif
+ foreach header: optional_headers
+   if cc.has_header(header)
+     cdata.set10('HAVE_' + header.to_upper().replace('.', '_').replace('/', '_'), true)

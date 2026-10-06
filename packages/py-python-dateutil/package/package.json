@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/py-python-dateutil",
+  "version": "2.9.0-post0.2",
+  "description": "python-dateutil for slicc WASIX CPython",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-python-dateutil/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-python-dateutil",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/py-six": "1.17.0-2"
+  },
+  "homescoop": {
+    "recipe": "py-python-dateutil",
+    "upstream": "2.9.0.post0"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages"
+    }
+  }
+}

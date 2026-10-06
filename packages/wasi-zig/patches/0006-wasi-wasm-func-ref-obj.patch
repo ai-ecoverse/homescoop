@@ -1,0 +1,23 @@
+--- a/src/codegen/wasm/Emit.zig
++++ b/src/codegen/wasm/Emit.zig
+@@ -81,9 +81,18 @@
+             const indirect_func_idx: Wasm.ZcuIndirectFunctionSetIndex = @enumFromInt(
+                 wasm.zcu_indirect_function_set.getIndex(datas[inst].nav_index).?,
+             );
+-            code.appendAssumeCapacity(@intFromEnum(std.wasm.Opcode.i32_const));
++            try code.ensureUnusedCapacity(gpa, 11);
++            const opcode: std.wasm.Opcode = if (is_wasm32) .i32_const else .i64_const;
++            code.appendAssumeCapacity(@intFromEnum(opcode));
+             if (is_obj) {
+-                @panic("TODO");
++                // homescoop: emit table_index reloc for object files (needed for compiler_rt)
++                try wasm.out_relocs.append(gpa, .{
++                    .offset = @intCast(code.items.len),
++                    .pointee = .{ .symbol_index = try wasm.navSymbolIndex(datas[inst].nav_index) },
++                    .tag = if (is_wasm32) .table_index_sleb else .table_index_sleb64,
++                    .addend = 0,
++                });
++                code.appendNTimesAssumeCapacity(0, if (is_wasm32) 5 else 10);
+             } else {
+                 writeSleb128(code, 1 + @intFromEnum(indirect_func_idx));
+             }

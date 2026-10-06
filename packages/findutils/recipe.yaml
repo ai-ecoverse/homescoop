@@ -1,0 +1,21 @@
+# GNU findutils for slicc wasm realm (find + xargs; no locate/updatedb).
+name: findutils
+builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/findutils.git extractVersion=^v(?<version>.*)$
+version: "4.10.0"
+npm: "@ai-ecoverse/wasm-findutils"
+summary: "GNU find and xargs for slicc"
+source:
+  url: "https://ftp.gnu.org/gnu/findutils/findutils-{{version}}.tar.xz"
+  sha256: "1387e0b67ff247d2abde998f90dfbf70c1491391a59ddfecb8ae698789f0a4f5"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/findutils
+  license: GPL-3.0-or-later
+  notes: |
+    find -exec/-execdir/-ok and xargs (incl. -P) use fork+execvp; link the
+    slicc fork profile (ASYNCIFY) so execve goes through slicc_spawn.
+    Stage find + xargs only (skip locate/updatedb).

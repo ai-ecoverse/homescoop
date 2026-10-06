@@ -1,0 +1,38 @@
+{
+  "name": "@ai-ecoverse/py-pytz",
+  "version": "2026.4.0-2",
+  "description": "pytz for slicc WASIX CPython",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-pytz/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-pytz",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {},
+  "homescoop": {
+    "recipe": "py-pytz",
+    "upstream": "2026.4"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages"
+    }
+  }
+}

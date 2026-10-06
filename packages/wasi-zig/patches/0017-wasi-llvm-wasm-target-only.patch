@@ -1,0 +1,42 @@
+--- a/src/codegen/llvm.zig
++++ b/src/codegen/llvm.zig
+@@ -1120,7 +1120,8 @@
+             });
+         }
+         if (options.time_report) |tr| {
+-            defer std.c.free(time_report_c_str);
++            // homescoop: plain extern, not std.c: the wasm32-wasi build's Zig code has no libc.
++            defer llvmFreeCString(time_report_c_str);
+             const time_report_data = std.mem.span(time_report_c_str);
+             assert(tr.llvm_pass_timings.len == 0);
+             tr.llvm_pass_timings = try comp.gpa.dupe(u8, time_report_data);
+@@ -4720,7 +4721,29 @@
+ //       https://github.com/llvm/llvm-project/issues/56585/ is fixed
+ pub const optional_layout_version = 3;
+ 
++/// LLVM's malloc'd C strings (time reports) go back to its libc's free.
++extern fn free(?*anyopaque) void;
++fn llvmFreeCString(s: [*:0]u8) void {
++    free(s);
++}
++
+ pub fn initializeLLVMTarget(arch: std.Target.Cpu.Arch) void {
++    // homescoop: the wasm32-wasi compiler's LLVM is built with the WebAssembly
++    // target only; naming any other target's init functions would leave them
++    // undefined at link time. Other architectures then fail as "no target".
++    if (comptime builtin.target.os.tag == .wasi) {
++        switch (arch) {
++            .wasm32, .wasm64 => {
++                bindings.LLVMInitializeWebAssemblyTarget();
++                bindings.LLVMInitializeWebAssemblyTargetInfo();
++                bindings.LLVMInitializeWebAssemblyTargetMC();
++                bindings.LLVMInitializeWebAssemblyAsmPrinter();
++                bindings.LLVMInitializeWebAssemblyAsmParser();
++            },
++            else => {},
++        }
++        return;
++    }
+     switch (arch) {
+         .aarch64, .aarch64_be => {
+             bindings.LLVMInitializeAArch64Target();

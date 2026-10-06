@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""gfortran → f2c → wasixcc wrapper (Pyodide pywasmcross pattern)."""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+from f2c_fixes import replay_f2c, scipy_fixes  # noqa: E402
+
+
+def _is_fortran_source(arg: str) -> bool:
+    return arg.endswith((".f", ".F", ".f90", ".F90", ".for", ".FOR"))
+
+
+def main() -> int:
+    real_gfortran = os.environ.get(
+        "REAL_GFORTRAN",
+        "/opt/homebrew/bin/gfortran"
+        if Path("/opt/homebrew/bin/gfortran").exists()
+        else "gfortran",
+    )
+    wasix_cc = os.environ.get("WASIX_CC", "wasixcc")
+    argv = sys.argv[1:]
+
+    has_src = any(_is_fortran_source(a) for a in argv)
+    # Meson linker probe: gfortran -Wl,--version … (no .f) must not hit host ld.
+    looks_like_link = any(
+        a.startswith("-Wl,")
+        or a in ("-shared", "-dynamiclib")
+        or a.endswith(".so")
+        or a.endswith(".wasm")
+        for a in argv
+    )
+    if not has_src and looks_like_link:
+        os.execvp(wasix_cc, [wasix_cc, *argv])
+
+    # Compiler identity / capability queries → real gfortran
+    if not has_src:
+        os.execv(real_gfortran, [real_gfortran, *argv])
+
+    line = ["gfortran", *argv]
+    tmp = replay_f2c(line)
+    if tmp is None:
+        os.execv(real_gfortran, [real_gfortran, *argv])
+
+    tmp[0] = wasix_cc
+    drop_exact = {
+        "-ffixed-form",
+        "-ffree-form",
+        "-fno-second-underscore",
+        "-fPIC",
+        "-fpic",
+        "-shared",
+    }
+    drop_prefix = (
+        "-fallow-",
+        "-fdefault-",
+        "-fblas-",
+        "-J",
+        "-finit-",
+        "-freal-",
+        "-fimplicit-",
+        "-fcheck",
+        "-ffpe-",
+        "-fbacktrace",
+        "-frecursive",
+        "-std=",
+        "-fmodule",
+    )
+    cleaned: list[str] = []
+    for a in tmp:
+        if a in drop_exact:
+            continue
+        if a.startswith(drop_prefix):
+            continue
+        cleaned.append(a)
+
+    f2c_inc = os.environ.get("F2C_INCLUDE", "")
+    if f2c_inc:
+        cleaned.insert(1, f"-I{f2c_inc}")
+
+    scipy_fixes(cleaned)
+    os.execvp(cleaned[0], cleaned)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

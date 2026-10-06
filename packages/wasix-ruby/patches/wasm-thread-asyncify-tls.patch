@@ -1,0 +1,151 @@
+--- wasm/asyncify.h	2026-09-23 07:32:40.000000000 +0200
++++ wasm/asyncify.h	2026-10-01 16:23:25.521687918 +0200
+@@ -4,14 +4,14 @@
+ __attribute__((import_module("asyncify"), import_name("start_unwind")))
+ void asyncify_start_unwind(void *buf);
+ #define asyncify_start_unwind(buf) do {  \
+-    extern void *rb_asyncify_unwind_buf; \
++    extern _Thread_local void *rb_asyncify_unwind_buf; \
+     rb_asyncify_unwind_buf = (buf);      \
+     asyncify_start_unwind((buf));        \
+   } while (0)
+ __attribute__((import_module("asyncify"), import_name("stop_unwind")))
+ void asyncify_stop_unwind(void);
+ #define asyncify_stop_unwind() do {      \
+-    extern void *rb_asyncify_unwind_buf; \
++    extern _Thread_local void *rb_asyncify_unwind_buf; \
+     rb_asyncify_unwind_buf = NULL;       \
+     asyncify_stop_unwind();              \
+   } while (0)
+--- wasm/setjmp.c	2026-09-23 07:32:40.000000000 +0200
++++ wasm/setjmp.c	2026-10-01 16:23:33.883947727 +0200
+@@ -70,9 +70,9 @@
+     buf->end = &buf->buffer[WASM_SETJMP_STACK_BUFFER_SIZE];
+ }
+ 
+-// Global unwinding/rewinding jmpbuf state
+-static rb_wasm_jmp_buf *_rb_wasm_active_jmpbuf;
+-void *rb_asyncify_unwind_buf;
++// Per-thread Asyncify unwind/rewind jmpbuf state (WASIX pthread + Asyncify).
++static _Thread_local rb_wasm_jmp_buf *_rb_wasm_active_jmpbuf;
++_Thread_local void *rb_asyncify_unwind_buf;
+ 
+ __attribute__((noinline))
+ int
+@@ -119,8 +119,8 @@
+     env->state = JMP_BUF_STATE_RETURNING;
+     env->payload = value;
+     // Asyncify buffer built during unwinding for longjmp will not
+-    // be used to rewind, so re-use static-variable.
+-    static struct __rb_wasm_asyncify_jmp_buf tmp_longjmp_buf;
++    // be used to rewind, so re-use a per-thread buffer.
++    static _Thread_local struct __rb_wasm_asyncify_jmp_buf tmp_longjmp_buf;
+     env->longjmp_buf_ptr = &tmp_longjmp_buf;
+     _rb_wasm_active_jmpbuf = env;
+     async_buf_init(env->longjmp_buf_ptr);
+@@ -151,8 +151,7 @@
+ void
+ rb_wasm_try_catch_loop_run(struct rb_wasm_try_catch *try_catch, rb_wasm_jmp_buf *target)
+ {
+-    extern void *rb_asyncify_unwind_buf;
+-    extern rb_wasm_jmp_buf *_rb_wasm_active_jmpbuf;
++    extern _Thread_local void *rb_asyncify_unwind_buf;
+ 
+     target->state = JMP_BUF_STATE_CAPTURED;
+ 
+--- wasm/fiber.c	2026-09-23 07:32:40.000000000 +0200
++++ wasm/fiber.c	2026-10-01 16:23:33.991256721 +0200
+@@ -31,7 +31,7 @@
+     RB_WASM_DEBUG_LOG("[%s] fcp->asyncify_buf %p\n", __func__, &fcp->asyncify_buf);
+ }
+ 
+-static rb_wasm_fiber_context *_rb_wasm_active_next_fiber;
++static _Thread_local rb_wasm_fiber_context *_rb_wasm_active_next_fiber;
+ 
+ void
+ rb_wasm_swapcontext(rb_wasm_fiber_context *ofcp, rb_wasm_fiber_context *fcp)
+--- wasm/machine.c	2026-09-23 07:32:40.000000000 +0200
++++ wasm/machine.c	2026-10-01 16:23:38.014980999 +0200
+@@ -19,13 +19,13 @@
+     buf->end = &buf->buffer[WASM_SCAN_STACK_BUFFER_SIZE];
+ }
+ 
+-static void *_rb_wasm_active_scan_buf = NULL;
++static _Thread_local void *_rb_wasm_active_scan_buf = NULL;
+ 
+ void
+ rb_wasm_scan_locals(rb_wasm_scan_func scan)
+ {
+-    static struct asyncify_buf buf;
+-    static int spilling = 0;
++    static _Thread_local struct asyncify_buf buf;
++    static _Thread_local int spilling = 0;
+     if (!spilling) {
+         spilling = 1;
+         init_asyncify_buf(&buf);
+@@ -39,7 +39,7 @@
+     }
+ }
+ 
+-static void *rb_wasm_stack_base = NULL;
++static _Thread_local void *rb_wasm_stack_base = NULL;
+ 
+ __attribute__((constructor))
+ int
+--- wasm/runtime.c	2026-09-23 07:32:40.000000000 +0200
++++ wasm/runtime.c	2026-10-01 16:23:39.458094710 +0200
+@@ -19,7 +19,7 @@
+       result = main(argc, argv);
+     }
+ 
+-    extern void *rb_asyncify_unwind_buf;
++    extern _Thread_local void *rb_asyncify_unwind_buf;
+     // Exit Asyncify loop if there is no unwound buffer, which
+     // means that main function has returned normally.
+     if (rb_asyncify_unwind_buf == NULL) {
+--- thread_pthread.c	2026-09-23 07:32:40.000000000 +0200
++++ thread_pthread.c	2026-10-01 16:23:49.912436539 +0200
+@@ -2069,6 +2069,34 @@
+ static void *
+ nt_start(void *ptr);
+ 
++#if defined(__wasm__) && !defined(__EMSCRIPTEN__)
++/* WASIX_WASM_THREAD_RT: Asyncify setjmp only rewinds inside rb_wasm_rt_start.
++ * Main runs there; without this trampoline a new pthread's EC_PUSH_TAG setjmp
++ * unwinds out of wasi_thread_start and the Ruby block never runs. */
++int rb_wasm_rt_start(int (*fn)(int argc, char **argv), int argc, char **argv);
++int rb_wasm_record_stack_base(void);
++
++static int
++nt_start_wasm_body(int argc, char **argv)
++{
++    (void)argc;
++    /* argv is the native-thread pointer (argc/argv-shaped slot for rt_start). */
++    nt_start((void *)argv);
++    return 0;
++}
++
++static void *
++nt_start_wasm_trampoline(void *ptr)
++{
++    rb_wasm_record_stack_base();
++    (void)rb_wasm_rt_start(nt_start_wasm_body, 0, (char **)ptr);
++    return NULL;
++}
++# define NT_START_ROUTINE nt_start_wasm_trampoline
++#else
++# define NT_START_ROUTINE nt_start
++#endif
++
+ static int
+ native_thread_create0(struct rb_native_thread *nt)
+ {
+@@ -2096,7 +2124,7 @@
+ # endif
+     CHECK_ERR(pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED));
+ 
+-    err = pthread_create(&nt->thread_id, &attr, nt_start, nt);
++    err = pthread_create(&nt->thread_id, &attr, NT_START_ROUTINE, nt);
+ 
+     RUBY_DEBUG_LOG("nt:%d err:%d", (int)nt->serial, err);
+ 

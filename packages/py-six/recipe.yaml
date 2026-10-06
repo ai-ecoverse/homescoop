@@ -1,0 +1,14 @@
+name: py-six
+builder: host
+version: "1.17.0"
+npm: "@ai-ecoverse/py-six"
+summary: "six for slicc WASIX CPython"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  license: MIT
+  notes: |
+    Pure-Python wheel staged into lib/python3.14/site-packages.
+    slicc.python.sitePackages only (no abi/platform requires).

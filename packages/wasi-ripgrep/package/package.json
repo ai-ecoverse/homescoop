@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/wasi-ripgrep",
+  "version": "15.2.0-2",
+  "description": "ripgrep 15 for slicc WASI preview1 (command rg)",
+  "license": "MIT OR Unlicense",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-ripgrep/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-ripgrep",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "ripgrep",
+    "rg"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-ripgrep",
+    "upstream": "15.2.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "rg": {
+        "wasm": "bin/rg.wasm"
+      }
+    }
+  }
+}

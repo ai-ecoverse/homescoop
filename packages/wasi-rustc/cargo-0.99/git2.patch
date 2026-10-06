@@ -1,0 +1,27 @@
+diff -ruN a/src/util.rs b/src/util.rs
+--- a/src/util.rs	2026-10-02 23:53:19.985835193 +0200
++++ b/src/util.rs	2026-10-02 23:53:20.085912000 +0200
+@@ -101,6 +101,11 @@
+     use std::os::unix::prelude::*;
+     Path::new(OsStr::from_bytes(b))
+ }
++#[cfg(target_os = "wasi")]
++pub fn bytes2path(b: &[u8]) -> &Path {
++    // WASI paths are UTF-8.
++    Path::new(std::str::from_utf8(b).unwrap())
++}
+ #[cfg(windows)]
+ pub fn bytes2path(b: &[u8]) -> &Path {
+     use std::str;
+@@ -167,6 +172,11 @@
+         let s: &OsStr = self.as_ref();
+         Ok(CString::new(s.as_bytes())?)
+     }
++    #[cfg(target_os = "wasi")]
++    fn into_c_string(self) -> Result<CString, Error> {
++        let s: &OsStr = self.as_ref();
++        Ok(CString::new(s.as_encoded_bytes())?)
++    }
+     #[cfg(windows)]
+     fn into_c_string(self) -> Result<CString, Error> {
+         match self.to_str() {

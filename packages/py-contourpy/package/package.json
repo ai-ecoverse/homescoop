@@ -1,0 +1,30 @@
+{
+  "name": "@ai-ecoverse/py-contourpy",
+  "version": "1.4.0-1",
+  "description": "contourpy for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-contourpy/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-contourpy",
+  "keywords": ["wasm", "wasi", "wasix", "slicc", "homescoop", "python"],
+  "files": ["README.md", "LICENSE", "lib"],
+  "publishConfig": { "access": "public" },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-5",
+    "@ai-ecoverse/py-numpy": "^2.3.2-2"
+  },
+  "homescoop": {
+    "recipe": "py-contourpy",
+    "upstream": "1.4.0",
+    "platform": "wasix_wasm32"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages",
+      "requires": { "abi": "cp314", "platform": "wasix_wasm32" }
+    }
+  }
+}

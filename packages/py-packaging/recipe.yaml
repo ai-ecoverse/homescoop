@@ -1,0 +1,15 @@
+name: py-packaging
+builder: host
+version: "26.3"
+npm: "@ai-ecoverse/py-packaging"
+summary: "packaging for slicc WASIX CPython"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  license: Apache-2.0 OR BSD-2-Clause
+  notes: |
+    Pure-Python wheel staged into lib/python3.14/site-packages.
+    slicc.python.sitePackages only (no abi/platform requires).

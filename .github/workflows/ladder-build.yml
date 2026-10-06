@@ -133,6 +133,10 @@ jobs:
     needs: [resolve, host-build, slicc-build]
     if: always() && (needs.host-build.result == 'success' || needs.slicc-build.result == 'success')
     runs-on: ubuntu-latest
+    # Job-level: setup-node / npm must see ACTIONS_ID_TOKEN_REQUEST_*.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -141,26 +145,56 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: Ensure npm supports OIDC
-        run: npm install -g npm@latest
+          # Do not set registry-url: that writes an empty _authToken and
+          # npm 11 then skips the OIDC exchange (ENEEDAUTH).
       - name: Publish via OIDC
+        env:
+          NODE_AUTH_TOKEN: ""
+          NPM_TOKEN: ""
         run: |
           set -euo pipefail
-          unset NODE_AUTH_TOKEN || true
+          unset NODE_AUTH_TOKEN NPM_TOKEN NPM_CONFIG_TOKEN || true
           TGZ="${{ runner.temp }}/package.tgz"
           ls -la "$TGZ"
-          # Refuse plain X.Y.Z — must be packaging rev X.Y.Z-N (docs/versioning.md).
+          node -v
+          npm -v
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]]; then
+            echo "ACTIONS_ID_TOKEN_REQUEST_URL unset — OIDC will not work" >&2
+            exit 1
+          fi
+          # setup-node / a global npm install can leave _authToken= which
+          # short-circuits trusted publishing.
+          for npmrc in "${NPM_CONFIG_USERCONFIG:-}" "$HOME/.npmrc"; do
+            [[ -n "$npmrc" && -f "$npmrc" ]] || continue
+            echo "== strip _authToken from $npmrc"
+            sed -i.bak '/_authToken/d' "$npmrc" || true
+            cat "$npmrc" || true
+          done
           VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
           NPM="${{ needs.resolve.outputs.npm }}"
           echo "publishing $NPM@$VER"
-          if npm publish "$TGZ" --access public --tag latest; then
-            echo "published $NPM@$VER"
-          else
-            # Rebuilds of an unchanged packaging rev are common after CI fixes.
-            if npm view "${NPM}@${VER}" version >/dev/null 2>&1; then
-              echo "already on registry: $NPM@$VER — treating as success"
-            else
-              echo "npm publish failed and $NPM@$VER is not on the registry" >&2
-              exit 1
+          attempt=1
+          max=4
+          while true; do
+            set +e
+            out="$(npm publish "$TGZ" --access public --tag latest 2>&1)"
+            rc=$?
+            set -e
+            printf '%s\n' "$out"
+            if [[ $rc -eq 0 ]]; then
+              echo "published $NPM@$VER"
+              break
             fi
-          fi
+            if printf '%s\n' "$out" | grep -q 'cannot publish over the previously published versions'; then
+              echo "already on registry: $NPM@$VER — treating as success"
+              break
+            fi
+            if printf '%s\n' "$out" | grep -Eq 'ENEEDAUTH|need auth' && [[ $attempt -lt $max ]]; then
+              echo "OIDC not ready (attempt $attempt/$max), retry in $((attempt * 15))s"
+              sleep $((attempt * 15))
+              attempt=$((attempt + 1))
+              continue
+            fi
+            echo "npm publish failed for $NPM@$VER (exit $rc)" >&2
+            exit "$rc"
+          done
