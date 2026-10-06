@@ -2,7 +2,7 @@
 name: xxd
 builder: host
 # renovate: datasource=github-tags depName=vim/vim extractVersion=^v(?<version>.*)$
-version: "9.1.1850"
+version: "9.2.1167"
 npm: "@ai-ecoverse/wasm-xxd"
 summary: "xxd from vim 9.1.1850 for slicc wasm realm"
 source:
