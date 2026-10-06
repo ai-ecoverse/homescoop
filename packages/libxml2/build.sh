@@ -18,7 +18,7 @@ if [[ ! -f "$SRC_DIR/.libs/libxml2.a" || -n "${FORCE:-}" ]]; then
     if [[ ! -f configure && -f autogen.sh ]]; then NOCONFIGURE=1 ./autogen.sh; fi
     emconfigure ./configure --disable-dependency-tracking --disable-shared --enable-static \
       --without-python --without-lzma --without-zlib --without-http \
-      --without-threads --without-modules --without-debug
+      --without-threads --without-modules --without-debug --without-iconv
     homescoop_fix_darwin_ar Makefile
     emmake make libxml2.la
   )
