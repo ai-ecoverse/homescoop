@@ -1,0 +1,77 @@
+# wasi-buf is retired from the ladder (published only after certification),
+# so this workflow builds and tests it: buf.wasm from buf's pinned source with
+# the pinned Go and patches/ (built twice; the sha256 must match), then the
+# end-to-end suite on slicc-kernel's headless Node entry.
+name: wasi-buf
+
+on:
+  push:
+    paths:
+      - packages/wasi-buf/**
+      - .github/workflows/wasi-buf.yml
+  pull_request:
+    paths:
+      - packages/wasi-buf/**
+      - .github/workflows/wasi-buf.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        attempt: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: build buf.wasm from source
+        run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/wasi-buf/build.sh
+      - name: record sha256
+        run: sha256sum packages/wasi-buf/package/bin/buf.wasm | tee "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: buf-wasm-${{ matrix.attempt }}
+          path: |
+            packages/wasi-buf/package/bin/buf.wasm
+            packages/wasi-buf/package/LICENSE
+            packages/wasi-buf/package/THIRD-PARTY-NOTICES.md
+          if-no-files-found: error
+          retention-days: 14
+
+  reproducible:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: buf-wasm-*
+      - name: both builds are byte-identical
+        run: |
+          sha256sum buf-wasm-*/bin/buf.wasm | tee "$GITHUB_STEP_SUMMARY"
+          test "$(sha256sum buf-wasm-1/bin/buf.wasm | cut -d' ' -f1)" = "$(sha256sum buf-wasm-2/bin/buf.wasm | cut -d' ' -f1)"
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: buf-wasm-1
+          path: packages/wasi-buf/package
+      - name: install test dependencies
+        working-directory: packages/wasi-buf/test
+        run: npm ci --no-audit --no-fund
+      - name: end-to-end tests
+        working-directory: packages/wasi-buf/test
+        run: node --test 'e2e/*.test.mjs'

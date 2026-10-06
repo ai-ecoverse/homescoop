@@ -1,0 +1,51 @@
+{
+  "name": "@ai-ecoverse/wasi-buf",
+  "version": "1.73.0-0",
+  "description": "buf 1.73 (Protocol Buffers CLI) for slicc WASI preview1 (command buf); buf.wasm built by homescoop from buf v1.73.0 with documented patches",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-buf/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-buf",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "buf",
+    "protobuf"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "engines": {
+    "slicc-kernel": ">=1.7.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-buf",
+    "upstream": "1.73.0",
+    "source": "bufbuild/buf@8b7368bb3e0056ff36bf9d78bf5d0b36f885e699",
+    "patches": [
+      "0001-wasip1-unix-build-tags.patch",
+      "0002-diff-without-exec-on-wasip1.patch",
+      "0003-no-docker-engine-on-wasip1.patch",
+      "0004-workspace-walk-outside-preopens.patch"
+    ]
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "buf": {
+        "wasm": "bin/buf.wasm"
+      }
+    }
+  }
+}

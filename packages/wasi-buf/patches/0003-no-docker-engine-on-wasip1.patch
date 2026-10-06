@@ -1,0 +1,137 @@
+Leave the Docker engine client out of the wasip1 build.
+
+Reason: bufremoteplugindocker's client pulls in github.com/moby/moby/client
+and docker/go-connections, whose Unix-socket code does not compile for
+wasip1 (syscall.RawSockaddrUnix, syscall.ForkLock). Only `buf beta registry
+plugin push` uses it, and that needs a local Docker daemon, which SLICC
+does not have. docker.go builds everywhere except wasip1; docker_wasip1.go
+keeps the package's types and options and returns "buf on wasip1 cannot
+reach a Docker engine" from NewClient. This also keeps moby out of buf.wasm.
+
+Upstream: not filed (Lars decides).
+removeWhen: buf compiles for wasip1 with its Docker client, or drops it.
+
+diff --git a/private/bufpkg/bufremoteplugin/bufremoteplugindocker/docker.go b/private/bufpkg/bufremoteplugin/bufremoteplugindocker/docker.go
+index 6524ddd..e69f414 100644
+--- a/private/bufpkg/bufremoteplugin/bufremoteplugindocker/docker.go
++++ b/private/bufpkg/bufremoteplugin/bufremoteplugindocker/docker.go
+@@ -12,6 +12,8 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++//go:build !wasip1
++
+ package bufremoteplugindocker
+ 
+ import (
+diff --git a/private/bufpkg/bufremoteplugin/bufremoteplugindocker/docker_wasip1.go b/private/bufpkg/bufremoteplugin/bufremoteplugindocker/docker_wasip1.go
+new file mode 100644
+index 0000000..b803b6c
+--- /dev/null
++++ b/private/bufpkg/bufremoteplugin/bufremoteplugindocker/docker_wasip1.go
+@@ -0,0 +1,105 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//go:build wasip1
++
++package bufremoteplugindocker
++
++import (
++	"context"
++	"errors"
++	"io"
++	"log/slog"
++
++	"github.com/bufbuild/buf/private/bufpkg/bufremoteplugin/bufremotepluginconfig"
++)
++
++// BufUpstreamClientUserAgentPrefix is the user-agent prefix.
++const BufUpstreamClientUserAgentPrefix = "buf-cli-"
++
++// Client is a small abstraction over a Docker API client, providing the basic APIs we need to build plugins.
++// It ensures that we pass the appropriate parameters to build images (i.e. platform 'linux/amd64').
++type Client interface {
++	// Load imports a Docker image into the local Docker Engine.
++	Load(ctx context.Context, image io.Reader) (*LoadResponse, error)
++	// Push the Docker image to the remote registry.
++	Push(ctx context.Context, image string, auth *RegistryAuthConfig) (*PushResponse, error)
++	// Delete removes the Docker image from local Docker Engine.
++	Delete(ctx context.Context, image string) (*DeleteResponse, error)
++	// Tag creates a Docker image tag from an existing image and plugin config.
++	Tag(ctx context.Context, image string, config *bufremotepluginconfig.Config) (*TagResponse, error)
++	// Inspect inspects an image and returns the image id.
++	Inspect(ctx context.Context, image string) (*InspectResponse, error)
++	// Close releases any resources used by the underlying Docker client.
++	Close() error
++}
++
++// LoadResponse returns details of a successful load image call.
++type LoadResponse struct {
++	// ImageID specifies the Docker image id in the format <hash_algorithm>:<hash>.
++	// Example: sha256:65001659f150f085e0b37b697a465a95cbfd885d9315b61960883b9ac588744e
++	ImageID string
++}
++
++// PushResponse is a placeholder for data to be returned from a successful image push call.
++type PushResponse struct {
++	// Digest specifies the Docker image digest in the format <hash_algorithm>:<hash>.
++	// The digest returned from Client.Push differs from the image id returned in Client.Build.
++	Digest string
++}
++
++// TagResponse returns details of a successful image tag call.
++type TagResponse struct {
++	// Image contains the Docker image name in the local Docker engine including the tag.
++	// It is created from the bufremotepluginconfig.Config's Name.IdentityString() and a unique id.
++	Image string
++}
++
++// DeleteResponse is a placeholder for data to be returned from a successful image delete call.
++type DeleteResponse struct{}
++
++// InspectResponse returns the image id for a given image.
++type InspectResponse struct {
++	// ImageID contains the Docker image's ID.
++	ImageID string
++}
++
++// NewClient reports that wasip1 has no Docker engine to talk to.
++func NewClient(logger *slog.Logger, cliVersion string, options ...ClientOption) (Client, error) {
++	return nil, errors.New("buf on wasip1 cannot reach a Docker engine")
++}
++
++type clientOptions struct {
++	host    string
++	version string
++}
++
++// ClientOption defines options for the NewClient call to customize the underlying Docker client.
++type ClientOption func(options *clientOptions)
++
++// WithHost allows specifying a Docker engine host to connect to (instead of the default lookup using DOCKER_HOST env var).
++// This makes it suitable for use by parallel tests.
++func WithHost(host string) ClientOption {
++	return func(options *clientOptions) {
++		options.host = host
++	}
++}
++
++// WithVersion allows specifying a Docker API client version instead of using the default version negotiation algorithm.
++// This allows tests to implement the Docker engine API using stable URLs.
++func WithVersion(version string) ClientOption {
++	return func(options *clientOptions) {
++		options.version = version
++	}
++}

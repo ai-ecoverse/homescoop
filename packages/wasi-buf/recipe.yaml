@@ -1,0 +1,37 @@
+# buf (bufbuild/buf, the Protocol Buffers CLI) for slicc WASI preview1:
+# buf.wasm built by homescoop from buf's source with GOOS=wasip1 and the
+# patches in patches/.
+name: wasi-buf
+# Not built by the ladder; .github/workflows/wasi-buf.yml builds and tests it.
+builder: retired
+version: "1.73.0"
+npm: "@ai-ecoverse/wasi-buf"
+summary: "buf 1.73 for slicc WASI preview1 (command buf)"
+source:
+  # buf v1.73.0
+  url: "https://github.com/bufbuild/buf/archive/8b7368bb3e0056ff36bf9d78bf5d0b36f885e699.tar.gz"
+  sha256: "6815239905afff714f860c7b738b1e47b1b026107be82f7126e3c4ea63de6719"
+  commit: "8b7368bb3e0056ff36bf9d78bf5d0b36f885e699"
+toolchain:
+  # buf v1.73.0's go.mod requires go 1.26.7. buf.wasm does not depend on
+  # wasm-go's Go version.
+  go: "1.26.7"
+  go_sha256_linux_x64: "ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca"
+  go_sha256_macos_arm64: "020a1e8224811be75163e920bc77e0926a1390a6aeea19bdcf23f74b9d749f6d"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://buf.build
+  license: Apache-2.0
+  notes: |
+    build.sh fetches the pinned buf source and Go toolchain, vendors the
+    modules (go.sum checked), applies patches/ and builds cmd/buf with
+    GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 -trimpath. The patches:
+    0001 lets unix-only files build for wasip1; 0002 prints unified diffs
+    in-process (buf format -d/-w ran `diff -u`); 0003 leaves the Docker
+    engine client out (only `buf beta registry plugin push` uses it);
+    0004 ends the workspace walk at paths no WASI preopen covers ("/").
+    Offline commands only: no process spawning (local protoc plugins, git
+    inputs) and no network (BSR, remote plugins) on wasip1 yet.

@@ -1,0 +1,103 @@
+On wasip1, a filesystem path that no WASI preopen covers ends buf's
+workspace walk instead of failing it.
+
+Reason: buf opens a bucket at the filesystem root and walks up from the
+input directory to "/" looking for buf.yaml and buf.work.yaml. slicc-kernel
+and SLICC's realm preopen "." and each top-level directory (/home, /tmp,
+/dev, …) but not "/" itself, so Go's wasip1 port answers stat("/") and
+stat("/buf.yaml") with EBADF, and every module command fails with
+"stat /: Bad file number". Preopening "/" in the runtimes breaks wasi-libc
+programs' relative paths, so buf works around it. On wasip1 only:
+- newBucket accepts "/" when stat fails with EBADF, ENOTCAPABLE or ENOENT;
+- validateExternalPath reports such paths as not existing, so the walk
+  finds no workspace there and stops.
+Other platforms are unchanged (outsidePreopens is false).
+
+Upstream: not filed (Lars decides).
+removeWhen: the runtimes offer an opt-in root preopen for Go programs.
+
+diff --git a/private/pkg/storage/storageos/bucket.go b/private/pkg/storage/storageos/bucket.go
+index 69a18c6..8d5893f 100644
+--- a/private/pkg/storage/storageos/bucket.go
++++ b/private/pkg/storage/storageos/bucket.go
+@@ -267,7 +267,7 @@ func (b *bucket) validateExternalPath(path string, externalPath string) error {
+ 		fileInfo, err = os.Lstat(externalPath)
+ 	}
+ 	if err != nil {
+-		if os.IsNotExist(err) {
++		if os.IsNotExist(err) || outsidePreopens(err) {
+ 			return &fs.PathError{Op: "stat", Path: path, Err: fs.ErrNotExist}
+ 		}
+ 		// The path might have a regular file in one of its
+@@ -451,6 +451,11 @@ func validateDirPathExists(dirPath string, symlinks bool) error {
+ 		fileInfo, err = os.Lstat(dirPath)
+ 	}
+ 	if err != nil {
++		if dirPath == string(filepath.Separator) && (outsidePreopens(err) || os.IsNotExist(err)) {
++			// The filesystem root that buf walks up to looking for a workspace
++			// is not a preopen on wasip1; the walk finds nothing there.
++			return nil
++		}
+ 		return err
+ 	}
+ 	if !fileInfo.IsDir() {
+diff --git a/private/pkg/storage/storageos/preopen_other.go b/private/pkg/storage/storageos/preopen_other.go
+new file mode 100644
+index 0000000..b54e277
+--- /dev/null
++++ b/private/pkg/storage/storageos/preopen_other.go
+@@ -0,0 +1,20 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++//go:build !wasip1
++
++package storageos
++
++func outsidePreopens(error) bool {
++	return false
++}
+diff --git a/private/pkg/storage/storageos/preopen_wasip1.go b/private/pkg/storage/storageos/preopen_wasip1.go
+new file mode 100644
+index 0000000..0bb6f67
+--- /dev/null
++++ b/private/pkg/storage/storageos/preopen_wasip1.go
+@@ -0,0 +1,28 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++//go:build wasip1
++
++package storageos
++
++import (
++	"errors"
++	"syscall"
++)
++
++// outsidePreopens reports whether err comes from a path that no WASI preopen
++// covers. wasip1 runtimes need not preopen "/" itself, so Go answers stat of
++// "/" or "/buf.yaml" with EBADF.
++func outsidePreopens(err error) bool {
++	return errors.Is(err, syscall.EBADF) || errors.Is(err, syscall.ENOTCAPABLE)
++}

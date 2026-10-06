@@ -1,0 +1,205 @@
+Print unified diffs in-process on wasip1 instead of running `diff -u`.
+
+Reason: buf's diff package writes both sides to temp files and runs the
+external `diff -u` binary. wasip1 cannot start processes, so `buf format -d`
+and `-w` (and config migrate, source edit) fail with `exec: "diff":
+executable file not found in $PATH` as soon as a file changes. On wasip1
+only, doDiff now prints the hunks itself (unified.go) over the edit list of
+buf's own diffmyers package, following GNU `diff -u`: 3 context lines,
+hunks merged across at most 6 lines, deletions before insertions, and
+"\ No newline at end of file". The header still goes through
+tryModifyHeader. Other platforms keep calling `diff`.
+
+Checked against GNU diff on 300 random edits: patch(1) applies every diff
+to the exact target, and 240 are byte-identical to GNU's output; the rest
+choose an equally minimal alignment among repeated lines.
+
+Upstream: not filed (Lars decides).
+removeWhen: buf prints diffs without an external binary.
+
+diff --git a/private/pkg/diff/diff.go b/private/pkg/diff/diff.go
+index 2e02d21..66a5fb2 100644
+--- a/private/pkg/diff/diff.go
++++ b/private/pkg/diff/diff.go
+@@ -91,6 +91,10 @@ func doDiff(
+ 	if bytes.Equal(b1, b2) {
+ 		return nil, nil
+ 	}
++	if runtime.GOOS == "wasip1" {
++		// wasip1 cannot run an external diff binary.
++		return myersDiff(b1, b2, filename1, filename2, suppressCommands)
++	}
+ 
+ 	f1, err := writeTempFile("", "", b1)
+ 	if err != nil {
+@@ -130,6 +134,25 @@ func doDiff(
+ 	return nil, err
+ }
+ 
++func myersDiff(
++	b1 []byte,
++	b2 []byte,
++	filename1 string,
++	filename2 string,
++	suppressCommands bool,
++) ([]byte, error) {
++	data := append([]byte("--- a\n+++ b\n"), unifiedDiff(splitLines(b1), splitLines(b2))...)
++	return tryModifyHeader(data, filename1, filename2, suppressCommands, true), nil
++}
++
++func splitLines(data []byte) [][]byte {
++	lines := bytes.SplitAfter(data, []byte{'\n'})
++	if len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
++		lines = lines[:len(lines)-1]
++	}
++	return lines
++}
++
+ func writeTempFile(dir string, prefix string, data []byte) (string, error) {
+ 	file, err := os.CreateTemp(dir, prefix)
+ 	if err != nil {
+diff --git a/private/pkg/diff/unified.go b/private/pkg/diff/unified.go
+new file mode 100644
+index 0000000..bba1202
+--- /dev/null
++++ b/private/pkg/diff/unified.go
+@@ -0,0 +1,139 @@
++// Copyright 2020-2026 Buf Technologies, Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package diff
++
++import (
++	"bytes"
++	"fmt"
++
++	"github.com/bufbuild/buf/private/pkg/diff/diffmyers"
++)
++
++const unifiedContext = 3
++
++type unifiedLine struct {
++	kind byte
++	from int
++	to   int
++}
++
++// unifiedDiff prints the hunks of a GNU-style unified diff of from and to,
++// without the --- and +++ header lines.
++func unifiedDiff(from [][]byte, to [][]byte) []byte {
++	var lines []unifiedLine
++	i, j := 0, 0
++	for _, edit := range diffmyers.Diff(from, to) {
++		switch edit.Kind {
++		case diffmyers.EditKindDelete:
++			for i < edit.FromPosition {
++				lines = append(lines, unifiedLine{kind: ' ', from: i, to: j})
++				i++
++				j++
++			}
++			lines = append(lines, unifiedLine{kind: '-', from: i, to: j})
++			i++
++		case diffmyers.EditKindInsert:
++			for j < edit.ToPosition {
++				lines = append(lines, unifiedLine{kind: ' ', from: i, to: j})
++				i++
++				j++
++			}
++			lines = append(lines, unifiedLine{kind: '+', from: i, to: j})
++			j++
++		}
++	}
++	for i < len(from) {
++		lines = append(lines, unifiedLine{kind: ' ', from: i, to: j})
++		i++
++		j++
++	}
++	// Like GNU diff, a change block lists its deletions before its insertions.
++	for begin := 0; begin < len(lines); {
++		if lines[begin].kind == ' ' {
++			begin++
++			continue
++		}
++		end := begin
++		for end < len(lines) && lines[end].kind != ' ' {
++			end++
++		}
++		block := make([]unifiedLine, 0, end-begin)
++		for _, kind := range []byte{'-', '+'} {
++			for _, line := range lines[begin:end] {
++				if line.kind == kind {
++					block = append(block, line)
++				}
++			}
++		}
++		copy(lines[begin:end], block)
++		begin = end
++	}
++	var buffer bytes.Buffer
++	for start := 0; start < len(lines); {
++		first := start
++		for first < len(lines) && lines[first].kind == ' ' {
++			first++
++		}
++		if first == len(lines) {
++			break
++		}
++		last := first
++		for next := first; next < len(lines); next++ {
++			if lines[next].kind != ' ' {
++				if next-last-1 > 2*unifiedContext {
++					break
++				}
++				last = next
++			}
++		}
++		begin := max(first-unifiedContext, start)
++		end := min(last+unifiedContext+1, len(lines))
++		hunk := lines[begin:end]
++		var fromCount, toCount int
++		for _, line := range hunk {
++			if line.kind != '+' {
++				fromCount++
++			}
++			if line.kind != '-' {
++				toCount++
++			}
++		}
++		fmt.Fprintf(&buffer, "@@ -%s +%s @@\n", unifiedRange(hunk[0].from, fromCount), unifiedRange(hunk[0].to, toCount))
++		for _, line := range hunk {
++			text := to[min(line.to, len(to)-1)]
++			if line.kind != '+' {
++				text = from[line.from]
++			}
++			buffer.WriteByte(line.kind)
++			buffer.Write(text)
++			if !bytes.HasSuffix(text, []byte{'\n'}) {
++				buffer.WriteString("\n\\ No newline at end of file\n")
++			}
++		}
++		start = end
++	}
++	return buffer.Bytes()
++}
++
++func unifiedRange(start int, count int) string {
++	switch count {
++	case 0:
++		return fmt.Sprintf("%d,0", start)
++	case 1:
++		return fmt.Sprintf("%d", start+1)
++	default:
++		return fmt.Sprintf("%d,%d", start+1, count)
++	}
++}

@@ -1,0 +1,100 @@
+Build buf for GOOS=wasip1: let the unix-only files cover wasip1 too.
+
+Reason: these files define constants and helpers for every Unix-like
+platform and already list `(js && wasm)`, but not wasip1, so the wasip1
+build fails with undefined identifiers (DevStdinFilePath, extraInterruptSignals,
+NormalizeAndValidate, netrcFilename, isOutNotAFullPath, …). Their contents
+work on wasip1 unchanged. Two of the files are in vendored modules
+(buf.build/go/app, github.com/bufbuild/protoplugin); build.sh applies this
+patch after `go mod vendor`.
+
+Upstream: not filed (Lars decides).
+removeWhen: buf and the two modules build for GOOS=wasip1 without it.
+
+diff --git a/cmd/buf/internal/command/alpha/protoc/const_unix.go b/cmd/buf/internal/command/alpha/protoc/const_unix.go
+index 7cf608d..54f8697 100644
+--- a/cmd/buf/internal/command/alpha/protoc/const_unix.go
++++ b/cmd/buf/internal/command/alpha/protoc/const_unix.go
+@@ -14,7 +14,7 @@
+ 
+ // Matching the unix-like build tags in the Golang source i.e. https://github.com/golang/go/blob/912f0750472dd4f674b69ca1616bfaf377af1805/src/os/file_unix.go#L6
+ 
+-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
++//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris || wasip1
+ 
+ package protoc
+ 
+diff --git a/cmd/buf/internal/command/alpha/protoc/flags_unix.go b/cmd/buf/internal/command/alpha/protoc/flags_unix.go
+index ff478fd..7b2d90d 100644
+--- a/cmd/buf/internal/command/alpha/protoc/flags_unix.go
++++ b/cmd/buf/internal/command/alpha/protoc/flags_unix.go
+@@ -12,7 +12,7 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
+-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
++//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris || wasip1
+ 
+ package protoc
+ 
+diff --git a/private/pkg/netrc/netrc_unix.go b/private/pkg/netrc/netrc_unix.go
+index 022d028..cbebfd9 100644
+--- a/private/pkg/netrc/netrc_unix.go
++++ b/private/pkg/netrc/netrc_unix.go
+@@ -14,7 +14,7 @@
+ 
+ // Matching the unix-like build tags in the Golang source i.e. https://github.com/golang/go/blob/912f0750472dd4f674b69ca1616bfaf377af1805/src/os/file_unix.go#L6
+ 
+-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
++//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris || wasip1
+ 
+ package netrc
+ 
+diff --git a/private/pkg/normalpath/normalpath_unix.go b/private/pkg/normalpath/normalpath_unix.go
+index 1ea4ab5..643d88f 100644
+--- a/private/pkg/normalpath/normalpath_unix.go
++++ b/private/pkg/normalpath/normalpath_unix.go
+@@ -15,7 +15,7 @@
+ // Matching the unix-like build tags in the Golang standard library based on the dependency
+ // on "path/filepath", i.e. https://cs.opensource.google/go/go/+/refs/tags/go1.17:src/path/filepath/path_unix.go;l=5-6
+ 
+-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
++//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris || wasip1
+ 
+ package normalpath
+ 
+diff --git a/private/pkg/prototesting/prototesting_unix.go b/private/pkg/prototesting/prototesting_unix.go
+index b0cd47d..ee74e06 100644
+--- a/private/pkg/prototesting/prototesting_unix.go
++++ b/private/pkg/prototesting/prototesting_unix.go
+@@ -12,7 +12,7 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
+-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
++//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris || wasip1
+ 
+ package prototesting
+ 
+--- a/vendor/buf.build/go/app/app_unix.go
++++ b/vendor/buf.build/go/app/app_unix.go
+@@ -20,7 +20,7 @@
+ // was a blocker, see https://github.com/bufbuild/buf/issues/362 and the linked discussions.
+ // We still only officially support linux and darwin for buf as a whole.
+ 
+-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
++//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris || wasip1
+ 
+ package app
+ 
+--- a/vendor/github.com/bufbuild/protoplugin/protoplugin_unix.go
++++ b/vendor/github.com/bufbuild/protoplugin/protoplugin_unix.go
+@@ -12,7 +12,7 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
+-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris
++//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || netbsd || openbsd || solaris || wasip1
+ 
+ package protoplugin
+ 
