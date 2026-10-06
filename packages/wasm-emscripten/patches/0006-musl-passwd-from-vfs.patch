@@ -1,0 +1,127 @@
+diff --git a/system/lib/libc/emscripten_libc_stubs.c b/system/lib/libc/emscripten_libc_stubs.c
+index bd0759b..368a57a 100644
+--- a/system/lib/libc/emscripten_libc_stubs.c
++++ b/system/lib/libc/emscripten_libc_stubs.c
+@@ -9,8 +9,6 @@
+  */
+ 
+ #include <errno.h>
+-#include <grp.h>
+-#include <pwd.h>
+ #include <string.h>
+ #include <time.h>
+ #include <signal.h>
+@@ -72,76 +70,6 @@ weak int clock_getcpuclockid(pid_t pid, clockid_t *clockid) {
+   return 0;
+ }
+ 
+-// ==========================================================================
+-// pwd.h
+-// ==========================================================================
+-
+-struct passwd *getpwnam(const char *name) {
+-  errno = ENOENT;
+-  return 0;
+-}
+-
+-struct passwd *getpwuid(uid_t uid) {
+-  errno = ENOENT;
+-  return 0;
+-}
+-
+-weak int getpwnam_r(const char *name, struct passwd *pwd,
+-               char *buf, size_t buflen, struct passwd **result) {
+-  return ENOENT;
+-}
+-
+-weak int getpwuid_r(uid_t uid, struct passwd *pwd,
+-                      char *buf, size_t buflen, struct passwd **result) {
+-  return ENOENT;
+-}
+-
+-weak void setpwent(void) {
+-}
+-
+-weak void endpwent(void) {
+-}
+-
+-struct passwd *getpwent(void) {
+-  errno = EIO;
+-  return NULL;
+-}
+-
+-// ==========================================================================
+-// grp.h
+-// ==========================================================================
+-
+-weak struct group *getgrnam(const char *name) {
+-  errno = ENOENT;
+-  return 0;
+-}
+-
+-weak struct group *getgrgid(gid_t gid) {
+-  errno = ENOENT;
+-  return 0;
+-}
+-
+-weak int getgrnam_r(const char *name, struct group *grp,
+-               char *buf, size_t buflen, struct group **result) {
+-  return ENOENT;
+-}
+-
+-weak int getgrgid_r(gid_t gid, struct group *grp,
+-               char *buf, size_t buflen, struct group **result) {
+-  return ENOENT;
+-}
+-
+-weak struct group *getgrent(void) {
+-  errno = EIO;
+-  return NULL;
+-}
+-
+-weak void endgrent(void) {
+-}
+-
+-weak void setgrent(void) {
+-}
+-
+ // ==========================================================================
+ // sys/file.h
+ // ==========================================================================
+diff --git a/system/lib/libc/musl/src/passwd/getgr_a.c b/system/lib/libc/musl/src/passwd/getgr_a.c
+index 8455040..1b9136b 100644
+--- a/system/lib/libc/musl/src/passwd/getgr_a.c
++++ b/system/lib/libc/musl/src/passwd/getgr_a.c
+@@ -131,13 +131,14 @@ int __getgr_a(const char *name, gid_t gid, struct group *gr, char **buf, size_t
+ 		if (groupbuf[GRMEMCNT]) {
+ 			mem[0][0] = *buf + groupbuf[GRNAMELEN] + groupbuf[GRPASSWDLEN];
+ 			for (ptr = mem[0][0], i = 0; ptr != mem[0][0]+grlist_len; ptr++)
+-				if (!*ptr)
++				if (!*ptr) {
+ 					if (i<groupbuf[GRMEMCNT]) {
+ 						mem[0][++i] = ptr+1;
+ 					} else {
+ 						rv = EIO;
+ 						goto cleanup_f;
+ 					}
++				}
+ 			mem[0][i] = 0;
+ 
+ 			if (i != groupbuf[GRMEMCNT]) {
+diff --git a/tools/system_libs.py b/tools/system_libs.py
+index 9ccda61..1c44f8b 100644
+--- a/tools/system_libs.py
++++ b/tools/system_libs.py
+@@ -1177,8 +1177,11 @@ class libc(MuslInternalLibrary,
+     musl_srcdir = utils.path_from_root('system/lib/libc/musl/src')
+ 
+     # musl modules
++    # SLICC: include musl passwd/ so getpw*/getgr* read /etc/passwd + /etc/group
++    # from the VFS (synthetic files from the shell). Keep getgrouplist/initgroups
++    # excluded below — they need syscalls Emscripten lacks.
+     ignore = [
+-        'ipc', 'passwd', 'signal', 'sched', 'time', 'linux',
++        'ipc', 'signal', 'sched', 'time', 'linux',
+         'aio', 'legacy', 'mq', 'setjmp',
+         'ldso', 'malloc',
+     ]

@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/py-packaging",
+  "version": "26.3.0-1",
+  "description": "packaging for slicc WASIX CPython",
+  "license": "Apache-2.0 OR BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-packaging/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-packaging",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-5"
+  },
+  "homescoop": {
+    "recipe": "py-packaging",
+    "upstream": "26.3"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.14/site-packages"
+    }
+  }
+}

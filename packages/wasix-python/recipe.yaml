@@ -1,0 +1,33 @@
+# CPython 3.14 for slicc WASIX (abi=wasi, no Emscripten glue).
+# Becomes `python` / `python3` in SLICC's GNU bash. Recipe: HOMESCOOP-5e.md.
+name: wasix-python
+builder: host
+# renovate: datasource=python-version
+version: "3.14.2"
+npm: "@ai-ecoverse/wasix-python"
+summary: "CPython 3.14 for slicc WASIX (commands python, python3)"
+source:
+  url: "https://www.python.org/ftp/python/{{version}}/Python-{{version}}.tgz"
+  sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.python.org
+  license: PSF-2.0
+  notes: |
+    WASIX CPython 3.14 dynamic-main (exnref-ehpic). No fork; subprocess via posix_spawn.
+    mmap enabled (override WASI n/a) with -D_WASI_EMULATED_MMAN -lwasi-emulated-mman.
+    Bundled pip/ensurepip; zlib for gzip. Side modules dlopen by absolute path.
+    wasix-libc patches (apply-wasix-libc-alarm-patch.sh):
+      - setitimer-it-value: setitimer/alarm → proc_raise_interval2 (initial+interval ns);
+        legacy 3-arg proc_raise_interval untouched (Wasmer ABI).
+      - clock-nanosleep-eintr: poll_oneoff EINTR → EINTR (not ENOTSUP); fill *rem on
+        relative sleep so time.sleep resumes after alarm (PEP 475).
+    Apply when rebuilding the wasixcc sysroot linked into this package — ship with
+    wasix-python only. Subprocess always posix_spawn (cwd via /bin/sh helper);
+    user site enabled in frozen site (patch Lib/site.py before make / regen-frozen);
+    site+sysconfig _getuserbase for wasi $HOME/.local; _ssl/_hashlib via wasix-org/openssl;
+    zlib/_bz2/_lzma static from wasix prefixes; uid stubs return 1000; Asyncify onlylist for fork/setjmp paths.
+    build.sh ends with wipe+compileall --invalidation-mode unchecked-hash.

@@ -130,11 +130,15 @@ console.log(`export ${prefix}SRC_URL=${shQuote(url)}`);
 console.log(`export ${prefix}SRC_SHA=${shQuote(sha)}`);
 // Aliases used by many build.sh scripts
 if (!sourceKey) {
+  const tarballName = url.split('?')[0].split('/').filter(Boolean).pop() || '';
+  const srcDirName = `${name}-${version}`;
   console.log(`export SRC_URL=${shQuote(url)}`);
   console.log(`export SRC_SHA=${shQuote(sha)}`);
   console.log(`export URL=${shQuote(url)}`);
   console.log(`export SHA=${shQuote(sha)}`);
   console.log(`export VER=${shQuote(srcVersion)}`);
+  console.log(`export HOMESCOOP_TARBALL_NAME=${shQuote(tarballName)}`);
+  console.log(`export HOMESCOOP_SRC_DIR_NAME=${shQuote(srcDirName)}`);
 } else {
   // Secondary: NCURSES_URL / NCURSES_SHA / NCURSES_VER / NCURSES_VERSION
   console.log(`export ${prefix}URL=${shQuote(url)}`);

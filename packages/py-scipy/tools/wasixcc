@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# wasixcc wrapper for scipy side modules (same OpenBLAS/fatal-warnings rules as numpy).
+# Set SCIPY_SHARED_OPENBLAS_SO to libscipy_openblas.so to link shared (+ $ORIGIN rpath).
+export WASIXCC_WASM_EXCEPTIONS=exnref
+export WASIXCC_PIC=yes
+export WASIXCC_MODULE_KIND="${WASIXCC_MODULE_KIND:-shared-library}"
+export WASIXCC_RUN_WASM_OPT=no
+WASIXCC_REAL="${WASIXCC_REAL:-/tmp/wasix-python-build/wasixcc-prefix/bin/wasixcc}"
+# Meson classifies compilers from --version; make it look like clang so c17/c++17 work.
+if [[ "${1:-}" == "--version" || "${1:-}" == "-v" ]]; then
+  "$WASIXCC_REAL" --version 2>&1 | sed '1s/^wasixcc .*/clang version 21.1.2/'
+  exit 0
+fi
+
+TOOLS_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scipy-openblas-link.sh
+source "$TOOLS_DIR/scipy-openblas-link.sh"
+
+# Apply scipy_fix_cfile to f2py-generated *module.c before compiling (int (*f2py_func)).
+for a in "$@"; do
+  case "$a" in
+    *module.c)
+      if [[ -f "$a" ]]; then
+        python3 -c "import sys; sys.path.insert(0, sys.argv[1]); from f2c_fixes import scipy_fix_cfile; from pathlib import Path; scipy_fix_cfile(Path(sys.argv[2]))" "$TOOLS_DIR" "$a" || true
+      fi
+      ;;
+  esac
+done
+
+args=(-fvisibility=default -DUNDERSCORE_G77)
+# Do NOT define NO_APPEND_FORTRAN — OpenBLAS exports foo_; SciPy BLAS_FUNC must match.
+# WASIX libc may lack FE_UPWARD/FE_DOWNWARD (scipy special tests)
+args+=(-DFE_UPWARD=0x400 -DFE_DOWNWARD=0x800 -DFE_TONEAREST=0x0 -DFE_TOWARDZERO=0xc00)
+# Only fatalize signature mismatches when linking a real CPython extension .so
+inject_fatal=0
+need_f2c=0
+for a in "$@"; do
+  case "$a" in
+    *.cpython-*-wasm32-wasix.so|*cpython-*-wasm32-wasix.so) inject_fatal=1 ;;
+    # odrpack f2c'd Fortran uses formatted I/O; meson omits -lf2c on that link.
+    *libodrpack.a) need_f2c=1 ;;
+  esac
+done
+
+out_so=""
+out_so="$(scipy_find_output_so "$@" || true)"
+shared_ob_args=()
+if shared_lines="$(scipy_openblas_link_args "$out_so")"; then
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && shared_ob_args+=("$line")
+  done <<< "$shared_lines"
+fi
+
+for a in "$@"; do
+  case "$a" in
+    -fno-exceptions|-fno-rtti|-fvisibility=hidden|--start-group|--end-group|-Wl,--start-group|-Wl,--end-group)
+      continue
+      ;;
+    -lgfortran|-lquadmath)
+      continue
+      ;;
+    -lopenblas)
+      if ((${#shared_ob_args[@]})); then
+        args+=("${shared_ob_args[@]}")
+      else
+        args+=(-Wl,--whole-archive -lopenblas -Wl,--no-whole-archive)
+      fi
+      continue
+      ;;
+    -lf2c)
+      args+=(-Wl,--whole-archive -lf2c -Wl,--no-whole-archive)
+      need_f2c=0
+      continue
+      ;;
+    *libopenblas.a|*libopenblas_*.a)
+      if ((${#shared_ob_args[@]})); then
+        args+=("${shared_ob_args[@]}")
+      else
+        args+=(-Wl,--whole-archive "$a" -Wl,--no-whole-archive)
+      fi
+      continue
+      ;;
+    *libf2c.a)
+      args+=(-Wl,--whole-archive "$a" -Wl,--no-whole-archive)
+      need_f2c=0
+      continue
+      ;;
+  esac
+  if [[ "$a" == -Wl,* ]]; then
+    IFS=',' read -ra parts <<< "${a#-Wl,}"
+    kept=()
+    for p in "${parts[@]}"; do
+      case "$p" in --start-group|--end-group) continue ;; esac
+      kept+=("$p")
+    done
+    if ((${#kept[@]})); then
+      out="-Wl"
+      for p in "${kept[@]}"; do out+=",$p"; done
+      args+=("$out")
+    fi
+    continue
+  fi
+  args+=("$a")
+done
+if ((inject_fatal)); then
+  if ((need_f2c)); then
+    # Regular archive link (not whole-archive) so libf2c's main.o is not pulled.
+    F2C_LIB="${F2C_LIB:-${F2C_PREFIX:-/tmp/wasix-scipy-build/libf2c-prefix}/lib/libf2c.a}"
+    if [[ -f "$F2C_LIB" ]]; then
+      args+=("$F2C_LIB")
+    fi
+  fi
+  STUBS_O="${WASIX_STUBS_O:-$TOOLS_DIR/wasix_stubs.o}"
+  if [[ -f "$STUBS_O" ]]; then
+    args+=("$STUBS_O")
+  fi
+  args+=(-Wl,--fatal-warnings)
+fi
+exec "$WASIXCC_REAL" "${args[@]}"

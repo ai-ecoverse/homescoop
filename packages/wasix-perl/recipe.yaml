@@ -1,0 +1,23 @@
+# Perl 5.42 for slicc WASIX (perl-cross + wasixcc + wasix-sysroot).
+name: wasix-perl
+builder: host
+# renovate: datasource=perl-version
+version: "5.42.0"
+npm: "@ai-ecoverse/wasix-perl"
+summary: "Perl 5.42 for slicc WASIX (commands perl, prove, pod2man, cpan)"
+source:
+  url: "https://www.cpan.org/src/5.0/perl-{{version}}.tar.xz"
+  sha256: "73cf6cc1ea2b2b1c110a18c14bbbc73a362073003893ffcedc26d22ebdbdd0c3"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.perl.org
+  license: Artistic-1.0-Perl OR GPL-1.0-or-later
+  notes: |
+    Cross-built with perl-cross (arsv) over Perl 5.42.0; wasixcc against wasix-sysroot
+    (asyncify sysroot — real fork). Core XS statically linked (usedl=undef).
+    Post-link wasm-opt --asyncify for fork/setjmp. Pure-Perl lib/ as real dirs.
+    PERL5LIB defaults under package + ~/.local/share/perl5. m4 not bundled — package
+    separately if autoconf/autoreconf needs it.

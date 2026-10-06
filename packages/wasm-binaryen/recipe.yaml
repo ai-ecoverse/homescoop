@@ -1,0 +1,25 @@
+# Homebrew-shaped recipe — Binaryen 132 tools for slicc (wasm realm).
+name: wasm-binaryen
+builder: host
+version: "132"
+npm: "@ai-ecoverse/wasm-binaryen"
+summary: "Binaryen 132 wasm tools for slicc (wasm-opt and friends)"
+source:
+  # Prebuilt objects from slicc-emscripten/build-wasm-binaryen.sh; build.sh relinks.
+  url: "https://github.com/WebAssembly/binaryen"
+  sha256: "skip"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-binaryen
+  license: Apache-2.0
+  notes: |
+    Relink slicc-emscripten/build/binaryen-wasm tools against libslicc
+    (Module.sliccKernel spawn) with ENVIRONMENT=web,worker,node. Ships the
+    Emscripten tool set only (BUILD_EMSCRIPTEN_TOOLS_ONLY): wasm-opt,
+    wasm-metadce, wasm-emscripten-finalize, wasm-ctor-eval, wasm-split,
+    wasm2js, wasm-as, wasm-dis. PRESTAGE is scripts/smoke-binaryen.mjs
+    (wasm-opt -O, not --version). sig-layout-sources.txt is empty unless
+    wasm-rt-impl.c (or similar) enters the link.

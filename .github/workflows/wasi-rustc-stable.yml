@@ -1,0 +1,253 @@
+# @ai-ecoverse/wasi-rustc (Rust 1.98.1) against the external wasi-llvm 21
+# (.github/workflows/wasi-llvm.yml). The in-tree LLVM 22 builds only for the
+# x86_64 build machine.
+name: wasi-rustc-stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      wasi_llvm_run_id:
+        description: "wasi-llvm.yml run whose `wasi-llvm` artifact is the host LLVM"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: checkout homescoop patches
+        uses: actions/checkout@v4
+        with:
+          path: homescoop
+
+      - name: free disk
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: checkout Rust 1.98.1 with in-tree LLVM 22
+        uses: actions/checkout@v4
+        with:
+          repository: rust-lang/rust
+          ref: 48a229ceaefd4985c50990b14116b6d856af0985 # Rust 1.98.1
+          submodules: recursive
+          path: rust
+
+      - name: apply WASI host and bundled LLD patches
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          git apply ../homescoop/packages/wasi-rustc/patches/0003-rust-1.98-wasi-host-paths.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0004-rust-1.98-static-llvm-lld.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0005-rust-1.98-llvm-wasi-threads-target.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0006-rust-1.98-wasi-sysroot-env.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0007-rust-1.98-llvm-wasi-endian.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0008-rust-1.98-llvm-wasi-unix.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0009-rust-1.98-llvm-wasi-support.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0010-rust-1.98-wasi-no-dlopen.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0011-rust-1.98-wasi-output-writeable.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0012-rust-1.98-wasi-process-proc-macros.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0013-rust-1.98-wasi-cwd-from-pwd.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0014-rust-1.98-wasi-no-permission-bits.patch
+          git apply ../homescoop/packages/wasi-rustc/patches/0015-rust-1.98-wasi-fatal-exit.patch
+          git diff --check
+          git status --short
+
+      - name: install wasi-sdk-24
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz
+          tar -xzf wasi-sdk.tar.gz
+          rm wasi-sdk.tar.gz
+          mv wasi-sdk-24.0-* wasi-sdk
+          echo "WASI_SDK_PATH=${{ github.workspace }}/rust/wasi-sdk" >> "$GITHUB_ENV"
+          echo "WASI_SYSROOT=${{ github.workspace }}/rust/wasi-sdk/share/wasi-sysroot" >> "$GITHUB_ENV"
+
+      - name: verify wasi-sdk shared-memory libc link
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          printf 'int main(void) { return 0; }\n' > wasi-sdk-probe.c
+          wasi-sdk/bin/wasm32-wasip1-threads-clang \
+            --target=wasm32-wasi --target=wasm32-wasip1-threads \
+            -pthread -D_WASI_EMULATED_MMAN wasi-sdk-probe.c \
+            -lwasi-emulated-mman -Wl,--max-memory=4294967296 \
+            -o wasi-sdk-probe.wasm
+          test -s wasi-sdk-probe.wasm
+
+      - name: verify LLVM WASI endian headers
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          headers = [
+              "src/llvm-project/llvm/include/llvm/ADT/bit.h",
+              "src/llvm-project/orc-rt/include/orc-rt/bit.h",
+              "src/llvm-project/compiler-rt/lib/orc/endianness.h",
+          ]
+          for header in headers:
+              text = Path(header).read_text()
+              assert text.count("defined(__wasi__)") == 1, header
+              assert "#include <endian.h>" in text, header
+          PYTHON
+          printf '#include <endian.h>\n#ifndef BYTE_ORDER\n#error missing BYTE_ORDER\n#endif\n' > endian-probe.cpp
+          wasi-sdk/bin/wasm32-wasip1-threads-clang++ --target=wasm32-wasip1-threads \
+            -std=c++17 -fsyntax-only endian-probe.cpp
+
+      - name: apt build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libclang-dev ninja-build
+
+      - name: download wasi-llvm
+        uses: actions/download-artifact@v4
+        with:
+          name: wasi-llvm
+          run-id: ${{ inputs.wasi_llvm_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: wasi-llvm-artifact
+
+      - name: unpack and check wasi-llvm
+        run: |
+          set -euo pipefail
+          tarball=$(find wasi-llvm-artifact -name 'wasi-llvm-*.tar.xz' | head -1)
+          test -n "$tarball"
+          sha256sum "$tarball" | tee -a "$GITHUB_STEP_SUMMARY"
+          mkdir wasi-llvm
+          tar -xJf "$tarball" -C wasi-llvm
+          llvm_config="$PWD/wasi-llvm/prefix/bin/llvm-config"
+          test "$("$llvm_config" --version)" = 21.1.8
+          test "$("$llvm_config" --targets-built)" = WebAssembly
+          test "$("$llvm_config" --shared-mode)" = static
+          # rustc_llvm's build script requires --help to succeed.
+          "$llvm_config" --help 2>/dev/null
+          for lib in LLVMOption lldCommon lldELF lldWasm; do
+            test -f "wasi-llvm/prefix/lib/lib$lib.a"
+          done
+          echo "WASI_LLVM_CONFIG=$llvm_config" >> "$GITHUB_ENV"
+
+      - name: preflight rustc_llvm wrapper against wasi-llvm
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          for f in compiler/rustc_llvm/llvm-wrapper/*.cpp; do
+            "$WASI_SDK_PATH/bin/wasm32-wasip1-threads-clang++" -O3 -fno-exceptions \
+              "--sysroot=$WASI_SYSROOT" -pthread $("$WASI_LLVM_CONFIG" --cxxflags) \
+              -D_WASI_EMULATED_MMAN -DNDEBUG -DLLVM_COMPONENT_WEBASSEMBLY \
+              --target=wasm32-wasip1-threads -fsyntax-only "$f"
+          done
+
+      - name: generate and parse bootstrap config
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          python3 ../homescoop/packages/wasi-rustc/make-stable-config.py --wasi-sdk "$WASI_SDK_PATH" \
+            --llvm-config "$WASI_LLVM_CONFIG" --output config.wasi.toml
+          grep -n 'llvm-config' config.wasi.toml
+          ./x.py install --dry-run --config config.wasi.toml > config-dry-run.log 2>&1 || { cat config-dry-run.log; exit 1; }
+          tail -25 config-dry-run.log
+
+      # The native build-machine LLVM. Bootstrap's .llvm-stamp ensures it reuses
+      # only a completed build; older caches also hold the in-tree WASI LLVM.
+      - name: restore completed native LLVM build
+        id: llvm-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: rust/build/x86_64-unknown-linux-gnu/llvm
+          key: native-llvm-22-rust-48a229c-sdk24-${{ hashFiles('homescoop/packages/wasi-rustc/patches/000[3-9]*', 'homescoop/packages/wasi-rustc/make-stable-config.py') }}
+          restore-keys: |
+            native-llvm-22-rust-48a229c-sdk24-
+            wasi-llvm-22-rust-48a229c-sdk24-
+
+      - name: x.py install static rustc and rustlib
+        working-directory: rust
+        env:
+          RUSTFLAGS_NOT_BOOTSTRAP: ""
+        run: |
+          set -euo pipefail
+          unset RUSTFLAGS || true
+          unset CARGO_TARGET_WASM32_WASIP1_RUSTFLAGS || true
+          unset CARGO_TARGET_WASM32_WASIP1_THREADS_RUSTFLAGS || true
+          ./x.py install --config config.wasi.toml
+
+      - name: check completed LLVM build for cache
+        id: llvm-cache-complete
+        if: always()
+        run: |
+          if test -s rust/build/x86_64-unknown-linux-gnu/llvm/.llvm-stamp; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: save completed native LLVM build
+        if: always() && steps.llvm-cache-complete.outputs.ready == 'true' && steps.llvm-cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: rust/build/x86_64-unknown-linux-gnu/llvm
+          key: native-llvm-22-rust-48a229c-sdk24-${{ hashFiles('homescoop/packages/wasi-rustc/patches/000[3-9]*', 'homescoop/packages/wasi-rustc/make-stable-config.py') }}
+
+      - name: stage minimal artifact
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          mkdir -p stage/bin stage/lib/rustlib
+          rustc_wasm=$(find dist -name rustc.wasm -type f | head -1)
+          test -n "$rustc_wasm"
+          cp "$rustc_wasm" stage/bin/rustc.wasm
+          test -d dist/lib/rustlib/wasm32-wasip1
+          cp -R dist/lib/rustlib/wasm32-wasip1 stage/lib/rustlib/
+          tar -C stage -czf "${{ github.workspace }}/wasi-rustc-stable.tgz" .
+          ls -lh "${{ github.workspace }}/wasi-rustc-stable.tgz"
+
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasi-rustc-stable
+          path: wasi-rustc-stable.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+      # Cargo 0.99 is Rust 1.98.1's own submodule. It is built with the stage1
+      # compiler above, so it links this recipe's wasm32-wasip1-threads std
+      # (PATH splitting, cwd from $PWD: patches 0003 and 0013).
+      - name: prepare Cargo 0.99 for SLICC
+        run: |
+          set -euo pipefail
+          cargo_rev=$(git -C rust ls-tree HEAD src/tools/cargo | awk '{print $3}')
+          test "$cargo_rev" = 797e8a9bca276c1c9f9f738d2a20f484fa4eea9d
+          git init -q cargo
+          git -C cargo fetch -q --depth 1 https://github.com/rust-lang/cargo.git "$cargo_rev"
+          git -C cargo checkout -q FETCH_HEAD
+          sh homescoop/packages/wasi-rustc/cargo-0.99/prepare.sh cargo
+          test -d rust/build/x86_64-unknown-linux-gnu/stage1/lib/rustlib/wasm32-wasip1-threads/lib
+
+      - name: build Cargo 0.99 for SLICC
+        run: |
+          set -euo pipefail
+          RUSTC="$PWD/rust/build/x86_64-unknown-linux-gnu/stage1/bin/rustc" \
+            sh homescoop/packages/wasi-rustc/cargo-0.99/build.sh cargo
+          cargo_wasm=cargo/target/wasm32-wasip1-threads/release/cargo.wasm
+          node homescoop/packages/wasi-rustc/cargo/check-cargo-wasm.mjs "$cargo_wasm"
+          mkdir -p cargo-stage/bin
+          cp "$cargo_wasm" cargo-stage/bin/cargo.wasm
+          tar -C cargo-stage -czf wasi-cargo.tgz .
+          ls -lh wasi-cargo.tgz
+
+      - name: upload Cargo
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasi-cargo
+          path: wasi-cargo.tgz
+          if-no-files-found: error
+          retention-days: 14

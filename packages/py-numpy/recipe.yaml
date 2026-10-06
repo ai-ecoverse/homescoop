@@ -1,0 +1,24 @@
+# NumPy for slicc WASIX CPython 3.14 (side modules, dlopen).
+name: py-numpy
+builder: host
+# renovate: datasource=pypi depName=numpy
+version: "2.3.2"
+npm: "@ai-ecoverse/py-numpy"
+summary: "NumPy 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
+source:
+  url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-{{version}}.tar.gz"
+  sha256: "ba0e7a1eaf217bb27dce8ab13450ca3e062cc917a3b84721d6874099d48922b9"
+dependencies:
+  build:
+    - wasix-python
+  host: []
+  run:
+    - wasix-python
+about:
+  homepage: https://numpy.org
+  license: BSD-3-Clause
+  notes: |
+    Cross-built with wasixcc shared-library (sysroot-ehpic): -fPIC -fvisibility=default
+    -shared -nostdlib -Wl,--allow-undefined, dylink.0 side modules named
+    *cpython-314-wasm32-wasix.so under lib/python3.14/site-packages.
+    Manifest slicc.python requires abi=cp314 platform=wasix_wasm32.

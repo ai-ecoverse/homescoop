@@ -1,0 +1,170 @@
+diff --git a/compiler/rustc_codegen_ssa/src/back/link.rs b/compiler/rustc_codegen_ssa/src/back/link.rs
+index 3d09b7aa..6cd0b3e1 100644
+--- a/compiler/rustc_codegen_ssa/src/back/link.rs
++++ b/compiler/rustc_codegen_ssa/src/back/link.rs
+@@ -1006,6 +1006,28 @@ fn link_natively(
+
+     // Invoke the system linker
+     info!("{cmd:?}");
++
++    // A WASI-hosted rustc cannot spawn rust-lld. Link through the bundled LLD
++    // entrypoint, preserving the same argv that the native path would pass.
++    #[cfg(target_os = "wasi")]
++    if matches!(flavor, LinkerFlavor::Gnu(Cc::No, Lld::Yes) | LinkerFlavor::WasmLld(Cc::No)) {
++        unsafe extern "C" {
++            fn RustRunLld(
++                argc: std::ffi::c_int,
++                argv: *const *const std::ffi::c_char,
++            ) -> std::ffi::c_int;
++        }
++        let command = cmd.command();
++        let mut args = command
++            .get_args()
++            .map(|arg| std::ffi::CString::new(arg.as_encoded_bytes()).unwrap())
++            .collect::<Vec<_>>();
++        args.insert(0, std::ffi::CString::new(command.get_program().as_encoded_bytes()).unwrap());
++        let argv = args.iter().map(|arg| arg.as_ptr()).collect::<Vec<_>>();
++        let status = unsafe { RustRunLld(args.len() as std::ffi::c_int, argv.as_ptr()) };
++        std::process::exit(status);
++    }
++
+     let unknown_arg_regex =
+         Regex::new(r"(unknown|unrecognized) (command line )?(option|argument)").unwrap();
+     let mut prog;
+diff --git a/compiler/rustc_driver/Cargo.toml b/compiler/rustc_driver/Cargo.toml
+index 51909719..bd6f96fd 100644
+--- a/compiler/rustc_driver/Cargo.toml
++++ b/compiler/rustc_driver/Cargo.toml
+@@ -4,7 +4,7 @@ version = "0.0.0"
+ edition = "2024"
+
+ [lib]
+-crate-type = ["dylib"]
++crate-type = ["lib", "dylib"]
+
+ [dependencies]
+ # tidy-alphabetical-start
+diff --git a/compiler/rustc_llvm/build.rs b/compiler/rustc_llvm/build.rs
+index 5be8bd46..b1b7bd75 100644
+--- a/compiler/rustc_llvm/build.rs
++++ b/compiler/rustc_llvm/build.rs
+@@ -304,6 +304,15 @@ fn main() {
+         cfg.define("NDEBUG", None);
+     }
+ 
++    if target.contains("wasi") {
++        let sdk = env::var("WASI_SDK_PATH").expect("WASI_SDK_PATH not set");
++        cfg.compiler(format!("{sdk}/bin/{target}-clang++"));
++        cfg.flag("-pthread");
++        cfg.flag("-D_WASI_EMULATED_MMAN");
++        cfg.flag("--target=wasm32-wasip1-threads");
++        cfg.file("llvm-wrapper/LLD.cpp");
++    }
++
+     rerun_if_changed_anything_in_dir(Path::new("llvm-wrapper"));
+     cfg.file("llvm-wrapper/PassWrapper.cpp")
+         .file("llvm-wrapper/RustWrapper.cpp")
+@@ -431,6 +440,16 @@ fn main() {
+         println!("cargo:rustc-link-lib={kind}={name}");
+     }
+ 
++    if target.contains("wasi") {
++        // lldELF links LLVMDTLTO, which is new in LLVM 22; an external LLVM 21 has none.
++        let version = output(Command::new(&llvm_config).arg("--version"));
++        let major = version.split('.').next().and_then(|m| m.trim().parse::<u32>().ok());
++        let dtlto = if major.is_some_and(|m| m >= 22) { &["LLVMDTLTO"][..] } else { &[] };
++        for lib in ["LLVMOption"].iter().chain(dtlto).chain(&["lldCommon", "lldELF", "lldWasm"]) {
++            println!("cargo:rustc-link-lib=static={lib}");
++        }
++    }
++
+     // LLVM ldflags
+     //
+     // If we're a cross-compile of LLVM then unfortunately we can't trust these
+@@ -483,6 +502,7 @@ fn main() {
+         || target.contains("windows-gnullvm")
+         || target.contains("aix")
+         || target.contains("ohos")
++        || target.contains("wasi")
+     {
+         "c++"
+     } else if target.contains("netbsd") && llvm_static_stdcpp.is_some() {
+diff --git a/compiler/rustc_llvm/llvm-wrapper/LLD.cpp b/compiler/rustc_llvm/llvm-wrapper/LLD.cpp
+new file mode 100644
+index 00000000..0bc35d79
+--- /dev/null
++++ b/compiler/rustc_llvm/llvm-wrapper/LLD.cpp
+@@ -0,0 +1,11 @@
++#include "lld/Common/Driver.h"
++
++LLD_HAS_DRIVER(elf)
++LLD_HAS_DRIVER(wasm)
++
++extern "C" int RustRunLld(int argc, const char **argv) {
++    llvm::ArrayRef<const char *> args(argv, argv + argc);
++    auto result = lld::lldMain(args, llvm::outs(), llvm::errs(),
++                               {{lld::Gnu, &lld::elf::link}, {lld::Wasm, &lld::wasm::link}});
++    return result.retCode;
++}
+diff --git a/src/bootstrap/src/core/build_steps/compile.rs b/src/bootstrap/src/core/build_steps/compile.rs
+index ffbe4f4e..098248ec 100644
+--- a/src/bootstrap/src/core/build_steps/compile.rs
++++ b/src/bootstrap/src/core/build_steps/compile.rs
+@@ -1495,7 +1495,11 @@ fn rustc_llvm_env(builder: &Builder<'_>, cargo: &mut Cargo, target: TargetSelect
+         && !target.contains("solaris")
+     {
+         let libstdcxx_name =
+-            if target.contains("windows-gnullvm") { "libc++.a" } else { "libstdc++.a" };
++            if target.contains("windows-gnullvm") || target.contains("wasi") {
++                "libc++.a"
++            } else {
++                "libstdc++.a"
++            };
+         let file = compiler_file(
+             builder,
+             &builder.cxx(target).unwrap(),
+diff --git a/src/bootstrap/src/core/build_steps/llvm.rs b/src/bootstrap/src/core/build_steps/llvm.rs
+index 087a395a..c333513d 100644
+--- a/src/bootstrap/src/core/build_steps/llvm.rs
++++ b/src/bootstrap/src/core/build_steps/llvm.rs
+@@ -539,7 +539,31 @@ fn run(self, builder: &Builder<'_>) -> LlvmResult {
+             cfg.define("LLVM_VERSION_SUFFIX", suffix);
+         }
+
+-        configure_cmake(builder, target, &mut cfg, true, ldflags, CcFlags::default(), &[]);
++        let mut ccflags = CcFlags::default();
++        if target.contains("wasi") {
++            let sysroot = env::var("WASI_SYSROOT").expect("WASI_SYSROOT not set");
++            cfg.define("WASI", "TRUE")
++                .define("CMAKE_SYSTEM_PROCESSOR", "wasm32")
++                .define("CMAKE_EXECUTABLE_SUFFIX", ".wasm")
++                .define("CMAKE_FIND_ROOT_PATH_MODE_PROGRAM", "NEVER")
++                .define("CMAKE_FIND_ROOT_PATH_MODE_LIBRARY", "ONLY")
++                .define("CMAKE_FIND_ROOT_PATH_MODE_INCLUDE", "ONLY")
++                .define("CMAKE_FIND_ROOT_PATH_MODE_PACKAGE", "ONLY")
++                .define("LLVM_ENABLE_PROJECTS", "lld")
++                .define("LLVM_BUILD_SHARED_LIBS", "OFF")
++                .define("LLVM_ENABLE_PIC", "OFF")
++                .define("LLVM_BUILD_TOOLS", "OFF")
++                .define("LLVM_TOOL_LLVM_CONFIG_BUILD", "OFF")
++                .define("LLVM_BUILD_UTILS", "OFF")
++                .define("LLVM_INCLUDE_EXAMPLES", "OFF")
++                .define("LLVM_INCLUDE_TESTS", "OFF")
++                .define("LLVM_ENABLE_ZLIB", "OFF")
++                .define("LLD_BUILD_TOOLS", "OFF");
++            ccflags.push_all(format!("--sysroot={sysroot} -pthread -D_WASI_EMULATED_MMAN"));
++            ldflags.exe.push(" -lwasi-emulated-mman -Wl,--max-memory=4294967296");
++            ldflags.exe.push(" -Wl,-z,stack-size=1048576 -Wl,--stack-first");
++        }
++        configure_cmake(builder, target, &mut cfg, true, ldflags, ccflags, &[]);
+         configure_llvm(builder, target, &mut cfg);
+
+         for (key, val) in &builder.config.llvm_build_config {
+@@ -875,6 +899,7 @@ fn configure_cmake(
+         && !target.is_msvc()
+         && !target.contains("netbsd")
+         && !target.contains("solaris")
++        && !target.contains("wasi")
+     {
+         if target.contains("apple") || target.is_windows() {
+             ldflags.push_all("-static-libstdc++");

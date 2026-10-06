@@ -1,0 +1,27 @@
+--- a/scipy/_lib/_ccallback.py
++++ b/scipy/_lib/_ccallback.py
+@@ -1,8 +1,13 @@
+ from . import _ccallback_c
+ 
+-import ctypes
+-
+-PyCFuncPtr = ctypes.CFUNCTYPE(ctypes.c_void_p).__bases__[0]
++try:
++    import ctypes
++    PyCFuncPtr = ctypes.CFUNCTYPE(ctypes.c_void_p).__bases__[0]
++except ImportError:
++    # wasix-python has no _ctypes; capsules/Cython LowLevelCallables still work
++    ctypes = None
++    PyCFuncPtr = ()
+ 
+ ffi = None
+ 
+@@ -168,7 +173,7 @@ class LowLevelCallable(tuple):
+             raise ValueError("Given input is not a callable or a "
+                              "low-level callable (pycapsule/ctypes/cffi)")
+ 
+-        if isinstance(user_data, ctypes.c_void_p):
++        if ctypes is not None and isinstance(user_data, ctypes.c_void_p):
+             context = _get_ctypes_data(user_data)
+         elif isinstance(user_data, CData):
+             context = _get_cffi_data(user_data)
