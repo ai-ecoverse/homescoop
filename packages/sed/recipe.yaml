@@ -6,7 +6,7 @@ version: "4.10"
 npm: "@ai-ecoverse/wasm-sed"
 summary: "GNU sed for slicc"
 source:
-  url: "https://ftp.gnu.org/gnu/sed/sed-{{version}}.tar.xz"
+  url: "https://mirrors.kernel.org/gnu/sed/sed-{{version}}.tar.xz"
   sha256: "6e226b732e1cd739464ad6862bd1a1aba42d7982922da7a53519631d24975181"
 dependencies:
   build: []
