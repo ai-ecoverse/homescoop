@@ -34,5 +34,6 @@ mkdir -p "$HOMESCOOP_PKG/package/include" "$PREFIX/include"
 # FreeType public headers live under include/
 cp -R "$SRC_DIR/include/." "$HOMESCOOP_PKG/package/include/"
 cp -R "$SRC_DIR/include/." "$PREFIX/include/"
+homescoop_write_pc freetype2 "$VERSION" "-lfreetype"
 homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
 echo "== freetype: staged → $HOMESCOOP_PKG/package"

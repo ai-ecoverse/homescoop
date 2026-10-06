@@ -1,0 +1,15 @@
+name: py-cycler
+builder: host
+version: "0.12.1"
+npm: "@ai-ecoverse/py-cycler"
+summary: "cycler for slicc WASIX CPython"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  license: BSD-3-Clause
+  notes: |
+    Pure-Python wheel staged into lib/python3.14/site-packages.
+    slicc.python.sitePackages only (no abi/platform requires).

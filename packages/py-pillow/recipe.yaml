@@ -1,0 +1,14 @@
+name: py-pillow
+builder: host
+version: "12.3.0"
+npm: "@ai-ecoverse/py-pillow"
+summary: "Pillow for slicc WASIX CPython 3.14"
+dependencies:
+  build: [wasix-python, zlib, libjpeg-turbo, freetype]
+  host: []
+  run: [wasix-python]
+about:
+  license: MIT-CMU
+  notes: |
+    Cross-built with wasixcc. libjpeg + FreeType statically linked (PIC).
+    zlib resolved from wasix-python. No wasm-* runtime deps.

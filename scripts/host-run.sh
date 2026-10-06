@@ -40,16 +40,21 @@ is_npm_spec() {
   return 1
 }
 
-# Resolve @ai-ecoverse/wasm-foo@1.2.3 → packages/foo/package when present.
+# Resolve @ai-ecoverse/wasm-foo@1.2.3 → packages/foo/package when present
+# *and* already built (lib/, include/, or bin/). Metadata-only trees would
+# otherwise shadow the registry and leave PREFIX empty on fresh CI runners.
 local_wasm_pkg_dir() {
   local spec="$1"
-  local name ver dir
+  local name dir
   if [[ "$spec" =~ ^@ai-ecoverse/wasm-([a-z0-9-]+)(@(.+))?$ ]]; then
     name="${BASH_REMATCH[1]}"
     dir="$ROOT/packages/$name/package"
     if [[ -d "$dir" && -f "$dir/package.json" ]]; then
-      echo "$dir"
-      return 0
+      if [[ -d "$dir/lib" || -d "$dir/include" || -d "$dir/bin" || -d "$dir/dist" ]]; then
+        echo "$dir"
+        return 0
+      fi
+      echo "== host-run: skip empty local $dir (no lib/include/bin; use npm)" >&2
     fi
   fi
   return 1
@@ -89,9 +94,12 @@ while IFS= read -r spec; do
   rm -rf "$tmp"
 done < <(node "$ROOT/scripts/read-recipe.mjs" "$name" --deps || true)
 
+# shellcheck source=./build-common.sh
+source "$ROOT/scripts/build-common.sh"
+homescoop_ensure_prefix_pcs
 
-# Ensure emcc: prefer PATH, else activate emsdk npm package (caches under
-# ~/Library/Caches/emsdk). Optional override: HOMESCOOP_EMSDK_ROOT + EM_CONFIG.
+# Cap binaryen parallelism — GHA runners can OOM wasm-opt at high -j.
+export BINARYEN_CORES="${BINARYEN_CORES:-2}"
 if ! command -v emconfigure >/dev/null 2>&1; then
   if [[ -n "${HOMESCOOP_EMSDK_ROOT:-}" && -x "$HOMESCOOP_EMSDK_ROOT/emcc" ]]; then
     export PATH="$HOMESCOOP_EMSDK_ROOT:$PATH"

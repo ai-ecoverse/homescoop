@@ -5,6 +5,7 @@
  *   node scripts/refresh-recipe-sha.mjs zlib
  *   node scripts/refresh-recipe-sha.mjs bash
  *   node scripts/refresh-recipe-sha.mjs --all
+ *   node scripts/refresh-recipe-sha.mjs zlib --check
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -16,6 +17,7 @@ import { tmpdir } from 'node:os';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const all = args.includes('--all');
+const checkOnly = args.includes('--check');
 const names = all
   ? readdirSync(join(root, 'packages')).filter((d) =>
       existsSync(join(root, 'packages', d, 'recipe.yaml'))
@@ -65,7 +67,11 @@ function fetchSha(url) {
   const dir = mkdtempSync(join(tmpdir(), 'homescoop-sha-'));
   const dest = join(dir, 'blob');
   try {
-    execFileSync('curl', ['-fsSL', '-o', dest, url], { stdio: ['ignore', 'inherit', 'inherit'] });
+    execFileSync(
+      'curl',
+      ['-fsSL', '--retry', '5', '--retry-all-errors', '--retry-delay', '2', '-o', dest, url],
+      { stdio: ['ignore', 'inherit', 'inherit'] }
+    );
     return sha256File(dest);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -146,32 +152,57 @@ function refreshOne(name) {
       continue;
     }
     console.log(`== ${name}${job.key ? ' sources.' + job.key : ''}: ${url}`);
-    const digest = fetchSha(url);
+    let digest;
+    try {
+      digest = fetchSha(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `${name}: download failed for ${url} (${msg}). ` +
+          'Make source.url derive from {{version}} / {{major}}.{{minor}}.'
+      );
+    }
+    const oldSha = String(src.sha256 || '');
+    if (oldSha === digest) {
+      console.log(`   sha256 unchanged: ${digest}`);
+      continue;
+    }
+    if (checkOnly) {
+      throw new Error(
+        `${name}: recipe sha256 ${oldSha || '(empty)'} != downloaded ${digest} for ${url}. ` +
+          'Renovate does not update checksums; wait for the recipe-sha job or run refresh-recipe-sha.mjs.'
+      );
+    }
     text = replaceSha(text, {
-      oldSha: String(src.sha256 || ''),
+      oldSha,
       newSha: digest,
       urlHint: String(src.url || ''),
     });
-    console.log(`   sha256: ${digest}`);
+    console.log(`   sha256: ${oldSha || '(none)'} → ${digest}`);
   }
 
-  writeFileSync(path, text);
+  if (!checkOnly) writeFileSync(path, text);
 }
 
 for (const name of names) {
-  const builder = spawnSync(
-    process.execPath,
-    [join(root, 'scripts/read-recipe.mjs'), name, '--field', 'builder'],
-    { encoding: 'utf8', cwd: root }
-  ).stdout.trim();
-  if (builder === 'retired') {
-    console.log(`skip ${name}: retired`);
-    continue;
+  try {
+    const builder = spawnSync(
+      process.execPath,
+      [join(root, 'scripts/read-recipe.mjs'), name, '--field', 'builder'],
+      { encoding: 'utf8', cwd: root }
+    ).stdout.trim();
+    if (builder === 'retired') {
+      console.log(`skip ${name}: retired`);
+      continue;
+    }
+    const recipe = recipeJson(name);
+    if (!recipe.source?.url || recipe.source.url === null) {
+      console.log(`skip ${name}: null source`);
+      continue;
+    }
+    refreshOne(name);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
   }
-  const recipe = recipeJson(name);
-  if (!recipe.source?.url || recipe.source.url === null) {
-    console.log(`skip ${name}: null source`);
-    continue;
-  }
-  refreshOne(name);
 }

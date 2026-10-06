@@ -1,0 +1,48 @@
+{
+  "name": "@ai-ecoverse/wasm-screen",
+  "version": "5.0.1-6",
+  "description": "GNU screen for slicc (emscripten ABI; asyncify fork; PTY via musl+SLICC #3733)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/screen/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/screen",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "screen",
+    "pty"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "PRESTAGE.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "homescoop": {
+    "recipe": "screen",
+    "upstream": "5.0.1",
+    "pty": "emscripten+SLICC#3733"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "screen": {
+        "glue": "bin/screen",
+        "wasm": "bin/screen.wasm",
+        "env": {
+          "SCREENDIR": "/tmp/screens",
+          "TERM": "xterm-256color"
+        }
+      }
+    }
+  }
+}

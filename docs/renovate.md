@@ -22,18 +22,31 @@ When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
 Manual: `gh workflow run ladder-build.yml -f package=zlib`.
 
 Renovate only rewrites `version:` lines. Recipe `source.url` (and
-`sources.*.url`) use `{{version}}` / `{{major}}` / `{{minor}}` placeholders
-so the tarball URL tracks the bump. After merging a Renovate PR, refresh
-checksums before the ladder rebuild:
+`sources.*.url`) must use `{{version}}` / `{{major}}` / `{{minor}}`
+placeholders so the tarball URL tracks the bump (libxml2's GNOME path is
+`{{major}}.{{minor}}/libxml2-{{version}}.tar.xz`; libpng stays on the
+`libpng16/{{version}}` series). Do not hardcode `SRC_DIR` / `TARBALL`
+versions in `build.sh` — `homescoop_load_recipe` sets them from the
+recipe.
+
+`ladder-pr` downloads the expanded URL, writes `sha256` onto the PR
+branch, and also refreshes sha256 in the host-build checkout so a
+`GITHUB_TOKEN` push does not skip the build. A bump whose patches no
+longer apply fails at `homescoop_apply_patches` with a patch error, not
+a checksum error.
+
+Manual refresh:
 
 ```bash
 node scripts/refresh-recipe-sha.mjs <package>
 # or: npm run refresh-sha -- <package>
+# --check: fail if the committed sha256 does not match the download
 ```
 
-`build.sh` loads version/URL/sha via `homescoop_load_recipe` — do not
-hardcode pins there. Secondary tarballs (ncurses, mbedtls, unzip) live under
-`sources:` in the same recipe.
+Recipe bumps never automerge. Merge only after a certified WASM rebuild.
+
+`build.sh` loads version/URL/sha via `homescoop_load_recipe`. Secondary
+tarballs (ncurses, mbedtls, unzip) live under `sources:` in the same recipe.
 
 Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 `homescoop_apply_patches`).

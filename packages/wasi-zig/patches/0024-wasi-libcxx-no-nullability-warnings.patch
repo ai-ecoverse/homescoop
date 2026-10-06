@@ -1,0 +1,22 @@
+--- a/src/libs/libcxx.zig
++++ b/src/libs/libcxx.zig
+@@ -226,6 +226,9 @@
+         try cflags.append("-Wno-user-defined-literals");
+         try cflags.append("-Wno-covered-switch-default");
+         try cflags.append("-Wno-suggest-override");
++        // homescoop: libc++'s headers against wasi-libc's raise ~2,000
++        // "pointer is missing a nullability type specifier" warnings per build.
++        try cflags.append("-Wno-nullability-completeness");
+ 
+         // These depend on only the zig lib directory file path, which is
+         // purposefully either in the cache or not in the cache. The decision
+@@ -425,6 +428,9 @@
+         try cflags.append("-Wno-user-defined-literals");
+         try cflags.append("-Wno-covered-switch-default");
+         try cflags.append("-Wno-suggest-override");
++        // homescoop: libc++'s headers against wasi-libc's raise ~2,000
++        // "pointer is missing a nullability type specifier" warnings per build.
++        try cflags.append("-Wno-nullability-completeness");
+ 
+         // These depend on only the zig lib directory file path, which is
+         // purposefully either in the cache or not in the cache. The decision

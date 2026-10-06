@@ -1,0 +1,89 @@
+{
+  "name": "@ai-ecoverse/wasix-autoconf",
+  "version": "2.72.0-3",
+  "description": "GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4)",
+  "license": "GPL-3.0-or-later",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-autoconf",
+    "upstream": "2.72"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "autoconf": {
+        "script": "bin/autoconf",
+        "env": {
+          "autom4te_perllibdir": "${package}/share/autoconf",
+          "AC_MACRODIR": "${package}/share/autoconf",
+          "AUTOM4TE_CFG": "${package}/share/autoconf/autom4te.cfg",
+          "M4": "m4",
+          "trailer_m4": "${package}/share/autoconf/autoconf/trailer.m4"
+        }
+      },
+      "autoheader": {
+        "script": "bin/autoheader",
+        "env": {
+          "autom4te_perllibdir": "${package}/share/autoconf",
+          "AC_MACRODIR": "${package}/share/autoconf",
+          "AUTOM4TE_CFG": "${package}/share/autoconf/autom4te.cfg",
+          "M4": "m4"
+        }
+      },
+      "autom4te": {
+        "script": "bin/autom4te",
+        "env": {
+          "autom4te_perllibdir": "${package}/share/autoconf",
+          "AC_MACRODIR": "${package}/share/autoconf",
+          "AUTOM4TE_CFG": "${package}/share/autoconf/autom4te.cfg",
+          "M4": "m4"
+        }
+      },
+      "autoreconf": {
+        "script": "bin/autoreconf",
+        "env": {
+          "autom4te_perllibdir": "${package}/share/autoconf",
+          "AC_MACRODIR": "${package}/share/autoconf",
+          "AUTOM4TE_CFG": "${package}/share/autoconf/autom4te.cfg",
+          "M4": "m4"
+        }
+      },
+      "autoscan": {
+        "script": "bin/autoscan",
+        "env": {
+          "autom4te_perllibdir": "${package}/share/autoconf",
+          "AC_MACRODIR": "${package}/share/autoconf",
+          "AUTOM4TE_CFG": "${package}/share/autoconf/autom4te.cfg",
+          "M4": "m4"
+        }
+      },
+      "autoupdate": {
+        "script": "bin/autoupdate",
+        "env": {
+          "autom4te_perllibdir": "${package}/share/autoconf",
+          "AC_MACRODIR": "${package}/share/autoconf",
+          "AUTOM4TE_CFG": "${package}/share/autoconf/autom4te.cfg",
+          "M4": "m4"
+        }
+      },
+      "ifnames": {
+        "script": "bin/ifnames",
+        "env": {
+          "autom4te_perllibdir": "${package}/share/autoconf"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-perl": "^5.42.0-2",
+    "@ai-ecoverse/wasix-m4": "^1.4.20-1"
+  }
+}

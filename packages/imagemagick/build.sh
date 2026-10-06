@@ -96,5 +96,5 @@ fi
 test -f "$CFG_DEST/colors.xml"
 
 # argv0 aliases are declared in package.json (convert/identify/mogrify → magick).
-homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
 echo "== imagemagick: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7"

@@ -1,0 +1,21 @@
+--- a/src/link/Wasm/Flush.zig
++++ b/src/link/Wasm/Flush.zig
+@@ -791,10 +791,14 @@
+     }
+ 
+     // start section
+-    if (wasm.functions.getIndex(.__wasm_init_memory)) |func_index| {
+-        try emitStartSection(gpa, binary_bytes, .fromFunctionIndex(wasm, @enumFromInt(func_index)));
+-    } else if (Wasm.OutputFunctionIndex.fromResolution(wasm, wasm.entry_resolution)) |func_index| {
+-        try emitStartSection(gpa, binary_bytes, func_index);
++    // homescoop: WASI command ABI — export `_start`, never emit a start section
++    // (matches wasm-ld; SLICC/node:wasi bind memory then call `_start`).
++    if (target.os.tag != .wasi) {
++        if (wasm.functions.getIndex(.__wasm_init_memory)) |func_index| {
++            try emitStartSection(gpa, binary_bytes, .fromFunctionIndex(wasm, @enumFromInt(func_index)));
++        } else if (Wasm.OutputFunctionIndex.fromResolution(wasm, wasm.entry_resolution)) |func_index| {
++            try emitStartSection(gpa, binary_bytes, func_index);
++        }
+     }
+ 
+     // element section
