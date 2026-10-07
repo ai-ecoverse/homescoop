@@ -1,0 +1,12 @@
+{
+  "harness": "slicc-kernel",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "checklist": [
+    "system()",
+    "getline from pipe",
+    "print | cmd"
+  ],
+  "patches": {
+    "emscripten-no-fork-popen.patch": "system / getline pipe / print|cmd in cert/checklist.mjs (PIPES_SIMULATED + musl popen)"
+  }
+}

@@ -1,4 +1,15 @@
 {
   "$comment": "Packages whose packages/<name>/cert/ covers the human checklist and has a recorded negative proof (prove-negative.mjs). Renovate may automerge non-major bumps only for these. Sync renovate.json with: node scripts/sync-ci-certified-renovate.mjs",
-  "packages": ["jq", "xz", "pkgconf", "xxd"]
+  "packages": [
+    "jq",
+    "xz",
+    "pkgconf",
+    "xxd",
+    "coreutils",
+    "gawk",
+    "sed",
+    "gzip",
+    "git",
+    "grep"
+  ]
 }

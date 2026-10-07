@@ -1,0 +1,8 @@
+{
+  "harness": "slicc-kernel",
+  "needs": ["@ai-ecoverse/wasm-bash"],
+  "checklist": [
+    "sed -i in-place edit",
+    "sed e (execute) command via popen"
+  ]
+}

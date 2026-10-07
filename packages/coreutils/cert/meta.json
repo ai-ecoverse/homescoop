@@ -1,0 +1,13 @@
+{
+  "harness": "slicc-kernel",
+  "needs": ["@ai-ecoverse/wasm-bash"],
+  "checklist": [
+    "shell pipes (bash | coreutils)",
+    "env sets variable for child",
+    "nice runs a child",
+    "nohup runs a child"
+  ],
+  "patches": {
+    "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch"
+  }
+}

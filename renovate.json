@@ -55,7 +55,13 @@
         "packages/jq/recipe.yaml",
         "packages/xz/recipe.yaml",
         "packages/pkgconf/recipe.yaml",
-        "packages/xxd/recipe.yaml"
+        "packages/xxd/recipe.yaml",
+        "packages/coreutils/recipe.yaml",
+        "packages/gawk/recipe.yaml",
+        "packages/sed/recipe.yaml",
+        "packages/gzip/recipe.yaml",
+        "packages/git/recipe.yaml",
+        "packages/grep/recipe.yaml"
       ],
       "matchUpdateTypes": [
         "minor",
