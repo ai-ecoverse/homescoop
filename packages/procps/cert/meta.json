@@ -1,0 +1,13 @@
+{
+  "harness": "slicc-kernel",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "checklist": [
+    "ps aux lists shell and background sleep",
+    "pgrep sleep finds it",
+    "pkill sleep ends it",
+    "free -h prints without error",
+    "uptime prints without error",
+    "attached-worker process visible in terminal ps (after slicc-kernel#66)"
+  ],
+  "blocked": "Needs slicc-kernel /proc from #66-era build; pin HOMESCOOP_CERT_NODE_MODULES to that prerelease until released. New package → human cert, not ci-certified.json."
+}
