@@ -44,6 +44,13 @@ export function assertRecipeBuildable(name) {
  */
 export const REMOVE_ENTIRELY = [
   {
+    npm: '@ai-ecoverse/wasm-magick-native',
+    reason: 'retired-imagemagick-alternative',
+    detail:
+      'retired: use @imagemagick/magick-wasm (JS API) or @ai-ecoverse/wasm-imagemagick (CLI); only 0.0.0 placeholder was published (deprecated)',
+    knownVersions: ['0.0.0'],
+  },
+  {
     npm: '@ai-ecoverse/wasm-ffmpeg',
     reason: 'remove-codec-distribution',
     detail:

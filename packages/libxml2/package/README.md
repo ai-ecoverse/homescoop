@@ -5,5 +5,5 @@ libxml2 **2.15.4** with `LIBXML_ICONV_ENABLED`, linked against
 Windows-1252, ISO-8859-1, UTF-8/16/32.
 
 Do not land until libiconv is certified and published, then this tarball
-is certified separately. ImageMagick / magick-native follow-up bumps wait
+is certified separately. ImageMagick follow-up bumps wait
 on that cert.

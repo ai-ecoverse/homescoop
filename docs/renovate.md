@@ -85,6 +85,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | zlib | `madler/zlib` | github-releases |
 
 Intentionally untracked: `ffmpeg` (retired), `zip` (Info-ZIP 3.0 frozen),
-`magick-native` (calendar / Magick.Native pin, not a single upstream tarball).
+`magick-native` (removed — ABI mismatch with `@imagemagick/magick-wasm`;
+npm name deprecated).
 
 The Renovate GitHub App is installed org-wide on `ai-ecoverse`.
