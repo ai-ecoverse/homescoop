@@ -20,6 +20,7 @@ on:
       - 'scripts/list-touched-packages.mjs'
       - 'scripts/host-smoke.sh'
       - 'scripts/sync-package-version.mjs'
+      - 'scripts/browser-cert/**'
       - '.github/workflows/ladder-pr.yml'
 
 permissions:
@@ -130,6 +131,33 @@ jobs:
             .homescoop-out/package.tgz.sha256
           if-no-files-found: error
           retention-days: 14
+      - name: Browser cert (slicc-kernel CDP)
+        run: |
+          set -euo pipefail
+          PROBE="${RUNNER_TEMP}/bcert-probe"
+          mkdir -p "$PROBE"
+          tar -xzf .homescoop-out/package.tgz -C "$PROBE" package/package.json
+          NEED=$(node -e '
+            const m=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+            const abi=m.slicc?.abi||"emscripten";
+            const n=Object.keys(m.slicc?.commands||{}).length;
+            process.stdout.write(abi==="emscripten"&&n>0?"1":"0");
+          ' "$PROBE/package/package.json")
+          if [[ "$NEED" != "1" ]]; then
+            echo "browser-cert: skip (no emscripten slicc.commands; host-smoke is the gate)"
+            exit 0
+          fi
+          CERT_NM="${RUNNER_TEMP}/homescoop-browser-cert-nm"
+          mkdir -p "$CERT_NM"
+          npm install --prefix "$CERT_NM" --no-fund --no-audit \
+            @ai-ecoverse/slicc-kernel@^1.8.10 \
+            @ai-ecoverse/slicc-shared-web@^1.4.1 \
+            playwright-core@1.63.0
+          npx --prefix "$CERT_NM" playwright-core install --with-deps chromium
+          export HOMESCOOP_CERT_NODE_MODULES="$CERT_NM/node_modules"
+          node scripts/browser-cert/run.mjs \
+            --package "${{ matrix.package }}" \
+            --tarball .homescoop-out/package.tgz
 
   slicc-note:
     needs: detect
