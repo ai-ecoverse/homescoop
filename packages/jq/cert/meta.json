@@ -1,0 +1,9 @@
+{
+  "harness": "slicc-kernel",
+  "checklist": [
+    "jq -n arithmetic",
+    "stdin filter",
+    "invalid JSON non-zero",
+    "--version identifies jq"
+  ]
+}

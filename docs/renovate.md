@@ -43,10 +43,14 @@ node scripts/refresh-recipe-sha.mjs <package>
 # --check: fail if the committed sha256 does not match the download
 ```
 
-Recipe bumps do **not** automerge. `ladder-pr` host-build + host-smoke +
-slicc-kernel CDP browser-cert are smoke gates; human certification remains
-required before publish. When publishing, use the exact PR artifact
-(`certified=<sha256>` / `artifact_pr`).
+Recipe bumps automerge **only** for packages in
+[`scripts/ci-certified.json`](../scripts/ci-certified.json) (full
+`packages/<name>/cert/*.mjs` checklist + recorded negative proof; sync into
+`renovate.json` via `node scripts/sync-ci-certified-renovate.mjs`). Semver
+**majors** and packages not on that list stay manual (`homescoop-major` /
+`homescoop-recipe`). See [ci-cert.md](ci-cert.md).
+
+Publish still uses the exact PR artifact (`certified=<sha256>` / `artifact_pr`).
 
 `build.sh` loads version/URL/sha via `homescoop_load_recipe`. Secondary
 tarballs (ncurses, mbedtls, unzip) live under `sources:` in the same recipe.

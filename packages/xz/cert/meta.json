@@ -1,0 +1,7 @@
+{
+  "harness": "slicc-kernel",
+  "checklist": [
+    "xz | xz -d round trip",
+    "corrupt input rejected"
+  ]
+}

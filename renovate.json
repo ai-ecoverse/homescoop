@@ -5,11 +5,11 @@
   ],
   "description": [
     "Homescoope recipes pin upstream library versions in packages/*/recipe.yaml.",
-    "A custom regex manager reads `# renovate: \u2026` comments above `version:` and opens one PR per package when upstream cuts a release.",
-    "Do not automerge recipe bumps \u2014 CI browser-cert is a smoke gate; human certification remains required before publish."
+    "A custom regex manager reads `# renovate: …` comments above `version:` and opens one PR per package when upstream cuts a release.",
+    "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof). Majors and new packages stay manual."
   ],
   "semanticCommits": "enabled",
-  "platformAutomerge": false,
+  "platformAutomerge": true,
   "dependencyDashboard": true,
   "prHourlyLimit": 4,
   "customManagers": [
@@ -26,13 +26,49 @@
   ],
   "packageRules": [
     {
-      "description": "Upstream recipe bumps need human cert + rebuild; never automerge.",
+      "description": "Default: recipe bumps do not automerge until CI-certified.",
       "matchFileNames": [
         "packages/**/recipe.yaml"
       ],
       "automerge": false,
       "addLabels": [
         "homescoop-recipe"
+      ]
+    },
+    {
+      "description": "Semver majors on recipes: always human (Lars).",
+      "matchFileNames": [
+        "packages/**/recipe.yaml"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "homescoop-recipe",
+        "homescoop-major"
+      ]
+    },
+    {
+      "description": "CI-certified packages (see scripts/ci-certified.json) — non-major only. Synced by scripts/sync-ci-certified-renovate.mjs.",
+      "matchFileNames": [
+        "packages/jq/recipe.yaml",
+        "packages/xz/recipe.yaml",
+        "packages/pkgconf/recipe.yaml",
+        "packages/xxd/recipe.yaml"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "bump"
+      ],
+      "automerge": true,
+      "platformAutomerge": true,
+      "addLabels": [
+        "homescoop-recipe",
+        "homescoop-ci-certified"
       ]
     },
     {
@@ -43,7 +79,7 @@
       "allowedVersions": "/^1\\.6\\./"
     },
     {
-      "description": "vim tags move fast; xxd tracks a pinned patch \u2014 ignore majors.",
+      "description": "vim tags move fast; xxd tracks a pinned patch — ignore majors.",
       "matchDepNames": [
         "vim/vim"
       ],

@@ -1,18 +1,26 @@
 #!/usr/bin/env node
 /**
- * Browser-cert a homescoop package tarball on slicc-kernel via CDP/Chromium
- * (@ai-ecoverse/slicc-shared-web/harness).
+ * Browser-cert / CI-cert a homescoop package tarball.
  *
  *   node scripts/browser-cert/run.mjs --package jq --tarball .homescoop-out/package.tgz
  *
- * Skips (exit 0) when the package has no emscripten slicc.commands (libs use
- * host-smoke.sh). Fails when a CLI does not meet browser-cert.json / defaults.
+ * Prefer packages/<name>/cert/*.mjs (full checklist). Fall back to
+ * browser-cert.json / --version smoke when no cert/ specs exist.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { makeContext } from './context.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -29,6 +37,30 @@ if (!pkgName) {
   process.exit(2);
 }
 
+const certDir = join(root, 'packages', pkgName, 'cert');
+const certSpecs = existsSync(certDir)
+  ? readdirSync(certDir)
+      .filter((f) => f.endsWith('.mjs'))
+      .sort()
+      .map((f) => join(certDir, f))
+  : [];
+
+const metaPath = join(certDir, 'meta.json');
+/** @type {{ harness?: string, needs?: string[] }} */
+const meta = existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, 'utf8')) : {};
+const harness = meta.harness || (certSpecs.length ? 'slicc-kernel' : 'smoke');
+
+if (harness === 'host-smoke' || harness === 'host-node') {
+  console.log(`browser-cert: ${pkgName} harness=${harness} — delegated to ladder-pr host steps`);
+  process.exit(0);
+}
+if (harness === 'slicc-realm') {
+  console.error(
+    `browser-cert: ${pkgName} requires full SLICC realm (cert/meta.json). Not wired in ladder-pr yet.`,
+  );
+  process.exit(1);
+}
+
 const work = mkdtempSync(join(tmpdir(), `homescoop-bcert-${pkgName}-`));
 const extract = join(work, 'pkg');
 mkdirSync(extract, { recursive: true });
@@ -42,7 +74,7 @@ if (untar.status !== 0) {
 const pkgRoot = join(extract, 'package');
 const manifest = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
 const npmName = manifest.name;
-const abi = manifest.slicc?.abi;
+const abi = manifest.slicc?.abi || 'emscripten';
 const commands = manifest.slicc?.commands || {};
 const cmdNames = Object.keys(commands);
 
@@ -51,33 +83,18 @@ function cleanup(code) {
   process.exit(code);
 }
 
-if (abi && abi !== 'emscripten') {
-  console.log(`browser-cert: skip ${npmName} (abi=${abi}; emscripten CDP cert only)`);
-  cleanup(0);
-}
-if (cmdNames.length === 0) {
-  console.log(`browser-cert: skip ${npmName} (no slicc.commands; lib cert is host-smoke)`);
-  cleanup(0);
-}
-
-/** @returns {{ argv: string[], status?: number, stdout?: string, stderrIncludes?: string, cwd?: string }} */
-function loadPlan() {
-  const explicit = join(root, 'packages', pkgName, 'browser-cert.json');
-  try {
-    return JSON.parse(readFileSync(explicit, 'utf8'));
-  } catch {
-    /* default */
+// Full cert specs may target wasi (python wheels, wasi-pnpm). Smoke-only path
+// still skips non-emscripten without cert/.
+if (certSpecs.length === 0) {
+  if (abi !== 'emscripten') {
+    console.log(`browser-cert: skip ${npmName} (abi=${abi}; no cert/*.mjs)`);
+    cleanup(0);
   }
-  return { argv: [cmdNames[0], '--version'], status: 0 };
+  if (cmdNames.length === 0) {
+    console.log(`browser-cert: skip ${npmName} (no slicc.commands; lib cert is host-smoke)`);
+    cleanup(0);
+  }
 }
-
-const plan = loadPlan();
-if (!Array.isArray(plan.argv) || plan.argv.length === 0) {
-  console.error('browser-cert: plan.argv required');
-  cleanup(1);
-}
-
-const installDir = `node_modules/${npmName}/`;
 
 function listFiles(dir, base = dir) {
   /** @type {string[]} */
@@ -89,12 +106,6 @@ function listFiles(dir, base = dir) {
   }
   return out;
 }
-
-const fileNames = listFiles(pkgRoot);
-writeFileSync(
-  join(work, 'plan.json'),
-  JSON.stringify({ npmName, installDir, fileNames, plan }, null, 2),
-);
 
 function resolveNodeModules() {
   const candidates = [
@@ -111,7 +122,7 @@ function resolveNodeModules() {
     }
   }
   console.error(
-    'browser-cert: @ai-ecoverse/slicc-shared-web not found. Install into scripts/browser-cert or set HOMESCOOP_CERT_NODE_MODULES.',
+    'browser-cert: @ai-ecoverse/slicc-shared-web not found. Set HOMESCOOP_CERT_NODE_MODULES.',
   );
   cleanup(1);
 }
@@ -120,7 +131,6 @@ const nodeModules = resolveNodeModules();
 const { launch } = await import(
   pathToFileURL(join(nodeModules, '@ai-ecoverse/slicc-shared-web/harness/index.mjs')).href
 );
-
 const kernelDist = join(nodeModules, '@ai-ecoverse/slicc-kernel/dist');
 try {
   readFileSync(join(kernelDist, 'index.js'));
@@ -129,12 +139,28 @@ try {
   cleanup(1);
 }
 
+const installDir = `node_modules/${npmName}/`;
+const fileNames = listFiles(pkgRoot);
+
+/** @type {[string, string][]} */
+const roots = [
+  ['/dist/', `${kernelDist}/`],
+  [`/${installDir}`, `${pkgRoot}/`],
+  ['/', `${here}/page/`],
+];
+
+// Optional peer packages from npm (e.g. wasm-bash) for shell-based certs.
+for (const need of meta.needs || []) {
+  const needRoot = join(nodeModules, need);
+  if (!existsSync(join(needRoot, 'package.json'))) {
+    console.error(`browser-cert: cert needs ${need} under HOMESCOOP_CERT_NODE_MODULES`);
+    cleanup(1);
+  }
+  roots.splice(1, 0, [`/node_modules/${need}/`, `${needRoot}/`]);
+}
+
 const chrome = await launch({
-  roots: [
-    ['/dist/', `${kernelDist}/`],
-    [`/${installDir}`, `${pkgRoot}/`],
-    ['/', `${here}/page/`],
-  ],
+  roots,
   isolated: true,
   exits: { '/dist/process-worker.js': [/WASM_PROCESS_EXIT, code/, /WASM_PROCESS_ERROR,$/] },
 });
@@ -154,33 +180,70 @@ try {
   await page.evaluate(() => window.boot());
   await page.evaluate((d, n) => window.installTree(d, n), installDir, fileNames);
 
-  const result = await page.evaluate(
-    (argv, cwd) => window.kernel.run(argv, { cwd }),
-    plan.argv,
-    plan.cwd || '/home',
-  );
+  for (const need of meta.needs || []) {
+    const needRoot = join(nodeModules, need);
+    const names = listFiles(needRoot);
+    await page.evaluate(
+      (d, n) => window.installTree(d, n),
+      `node_modules/${need}/`,
+      names,
+    );
+  }
 
-  const expectStatus = plan.status ?? 0;
-  if (result.status !== expectStatus) {
-    console.error(
-      `browser-cert: status ${result.status} != ${expectStatus}\nstdout: ${JSON.stringify(result.stdout)}\nstderr: ${JSON.stringify(result.stderr)}`,
-    );
-    process.exitCode = 1;
-  } else if (plan.stdout != null && result.stdout !== plan.stdout) {
-    console.error(
-      `browser-cert: stdout mismatch\nwant: ${JSON.stringify(plan.stdout)}\ngot:  ${JSON.stringify(result.stdout)}\nstderr: ${JSON.stringify(result.stderr)}`,
-    );
-    process.exitCode = 1;
-  } else if (plan.stderrIncludes && !result.stderr.includes(plan.stderrIncludes)) {
-    console.error(
-      `browser-cert: stderr missing ${JSON.stringify(plan.stderrIncludes)}\nstderr: ${JSON.stringify(result.stderr)}`,
-    );
-    process.exitCode = 1;
+  if (certSpecs.length > 0) {
+    const ctx = makeContext(page, { packageName: pkgName, npmName });
+    for (const specPath of certSpecs) {
+      const mod = await import(pathToFileURL(specPath).href);
+      const fn = mod.default;
+      if (typeof fn !== 'function') {
+        console.error(`browser-cert: ${specPath} must default-export async function`);
+        process.exitCode = 1;
+        continue;
+      }
+      const label = specPath.slice(root.length + 1);
+      try {
+        await fn(ctx);
+        console.log(`browser-cert: ok ${label}`);
+      } catch (err) {
+        console.error(`browser-cert: FAIL ${label}`);
+        console.error(err);
+        process.exitCode = 1;
+      }
+    }
   } else {
-    console.log(
-      `browser-cert: ok ${npmName} argv=${JSON.stringify(plan.argv)} status=${result.status}`,
+    /** @type {{ argv: string[], status?: number, stdout?: string, cwd?: string }} */
+    let plan;
+    try {
+      plan = JSON.parse(readFileSync(join(root, 'packages', pkgName, 'browser-cert.json'), 'utf8'));
+    } catch {
+      plan = { argv: [cmdNames[0], '--version'], status: 0 };
+    }
+    const result = await page.evaluate(
+      (argv, cwd) => window.kernel.run(argv, { cwd }),
+      plan.argv,
+      plan.cwd || '/home',
     );
-    if (result.stdout) console.log(`stdout: ${JSON.stringify(result.stdout)}`);
+    const expectStatus = plan.status ?? 0;
+    if (result.status !== expectStatus) {
+      console.error(
+        `browser-cert: status ${result.status} != ${expectStatus}\nstdout: ${JSON.stringify(result.stdout)}\nstderr: ${JSON.stringify(result.stderr)}`,
+      );
+      process.exitCode = 1;
+    } else if (plan.stdout != null && result.stdout !== plan.stdout) {
+      console.error(
+        `browser-cert: stdout mismatch\nwant: ${JSON.stringify(plan.stdout)}\ngot:  ${JSON.stringify(result.stdout)}`,
+      );
+      process.exitCode = 1;
+    } else {
+      console.log(
+        `browser-cert: smoke ok ${npmName} argv=${JSON.stringify(plan.argv)} (not CI-certified — add cert/*.mjs)`,
+      );
+    }
+  }
+
+  if (page.errors?.length) {
+    console.error('browser-cert: page errors', page.errors);
+    process.exitCode = 1;
   }
 
   if (typeof t._after === 'function') await t._after();
