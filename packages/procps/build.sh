@@ -55,9 +55,10 @@ if [[ "$need_build" -eq 1 ]]; then
         CFLAGS="-O2"
     homescoop_fix_darwin_ar Makefile
     jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
-    # Library only — do not pass slicc LDFLAGS or libtool swallows the .a.
+    # Library only — clear LIBS/LDFLAGS so ambient env / slicc stubs never
+    # get absorbed into libproc2.la (libtool rejects non-.lo members on Linux).
     # shellcheck disable=SC2086
-    emmake make -j"$jobs" library/libproc2.la
+    env -u LIBS -u LDFLAGS emmake make -j"$jobs" LIBS= LDFLAGS= library/libproc2.la
     # Final CLIs: slicc whole-archive + utmp/sigqueue stubs.
     # shellcheck disable=SC2086
     emmake make -j"$jobs" \
