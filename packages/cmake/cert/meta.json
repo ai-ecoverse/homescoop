@@ -1,9 +1,0 @@
-{
-  "harness": "host-node",
-  "script": "scripts/smoke-cmake.mjs",
-  "checklist": [
-    "CMAKE_ROOT + configure a tiny project (not --version alone)",
-    "sig-layout sources still linked"
-  ],
-  "blocked": "host-build needs slicc-emscripten prebuilt cmake object; PR runners lack it"
-}

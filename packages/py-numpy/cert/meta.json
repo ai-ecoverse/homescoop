@@ -1,9 +1,0 @@
-{
-  "harness": "slicc-kernel",
-  "needs": ["@ai-ecoverse/wasix-python"],
-  "checklist": [
-    "import numpy",
-    "arange reshape sum numeric check"
-  ],
-  "blocked": "ladder-pr host-build fetches a GitHub release wheel that 404s for new versions; needs wasix stage/publish first"
-}

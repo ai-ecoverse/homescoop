@@ -7,7 +7,7 @@ npm: "@ai-ecoverse/py-pandas"
 summary: "Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/p/pandas/pandas-{{version}}.tar.gz"
-  sha256: "ab7b58f8f82706890924ccdfb5f48002b83d2b5a3845976a9fb705d36c34dcdb"
+  sha256: "fdc955b27b1400b4272c488ad74dae9260bce835c965b9d7a26703545671044e"
 dependencies:
   build:
     - wasix-python

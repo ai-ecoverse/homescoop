@@ -49,6 +49,17 @@ only smoke `--version` are not enough for patched packages.
    `node scripts/sync-ci-certified-renovate.mjs`.
 4. Majors and brand-new packages stay `automerge: false` + label for human review.
 
+Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path under
+`packages/<name>/` triggers `ladder-pr` host-build for that recipe.
+
+## Not CI-certified yet (blocked)
+
+| Package | Blocker |
+| --- | --- |
+| cmake | host-build needs `slicc-emscripten` prebuilt `cmakemain.cxx.o`; use `scripts/smoke-cmake.mjs` (`harness: host-node`) once staged |
+| findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
+| py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
+
 ## Context API (`cert/*.mjs`)
 
 ```js
