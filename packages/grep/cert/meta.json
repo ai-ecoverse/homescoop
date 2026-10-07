@@ -1,0 +1,11 @@
+{
+  "harness": "slicc-kernel",
+  "checklist": [
+    "basic match",
+    "no-match exit 1",
+    "LC_ALL=C match (locale patch path)"
+  ],
+  "patches": {
+    "gnulib-emscripten-locale.patch": "LC_ALL=C grep in cert/checklist.mjs; build fails without the patch"
+  }
+}

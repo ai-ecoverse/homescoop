@@ -1,0 +1,8 @@
+{
+  "harness": "slicc-kernel",
+  "checklist": [
+    "gzip / gunzip round trip",
+    "zcat",
+    "corrupt input rejected"
+  ]
+}

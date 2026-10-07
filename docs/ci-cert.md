@@ -60,6 +60,9 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
 
+CI-certified set (automerge non-majors): see `scripts/ci-certified.json`
+(jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep).
+
 ## Context API (`cert/*.mjs`)
 
 ```js

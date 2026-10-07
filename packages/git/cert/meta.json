@@ -1,0 +1,10 @@
+{
+  "harness": "slicc-kernel",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "checklist": [
+    "local bare-repo init",
+    "clone",
+    "push",
+    "fetch"
+  ]
+}
