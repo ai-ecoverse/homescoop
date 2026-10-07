@@ -1,0 +1,12 @@
+{
+  "name": "wasi-protoc-gen-go-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node --test 'e2e/*.test.mjs'"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.8.0",
+    "@ai-ecoverse/wasi-buf": "1.73.0-1"
+  }
+}

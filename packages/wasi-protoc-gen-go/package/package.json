@@ -1,0 +1,43 @@
+{
+  "name": "@ai-ecoverse/wasi-protoc-gen-go",
+  "version": "1.36.12-0",
+  "description": "protoc-gen-go 1.36 (Go protobuf plugin) for slicc WASI preview1 (command protoc-gen-go); a local plugin for @ai-ecoverse/wasi-buf in slicc-kernel",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-protoc-gen-go/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-protoc-gen-go",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "protobuf",
+    "protoc-gen-go",
+    "buf"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-protoc-gen-go",
+    "upstream": "1.36.12",
+    "source": "protocolbuffers/protobuf-go@cdd4c5f7406e82462949c7a65defa9f3029c162d"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "protoc-gen-go": {
+        "wasm": "bin/protoc-gen-go.wasm"
+      }
+    }
+  }
+}

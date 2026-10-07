@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package acme.pet.v1;
+
+import "acme/pet/v1/kind.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "example.com/acme/pet/v1;petv1";
+
+message Pet {
+  string name = 1;
+  PetKind kind = 2;
+  int32 age = 3;
+  google.protobuf.Timestamp adopted = 4;
+  repeated string tags = 5;
+  map<string, string> labels = 6;
+  oneof owner {
+    string person = 7;
+    string shelter = 8;
+  }
+}

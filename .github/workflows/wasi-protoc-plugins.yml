@@ -1,0 +1,88 @@
+# The protoc plugins for @ai-ecoverse/wasi-buf are retired from the ladder
+# (published only after certification), so this workflow builds and tests
+# them: each package's command from its pinned source with the pinned Go
+# (scripts/build-wasip1-go-command.sh, built twice; the sha256 must match),
+# then its end-to-end suite, where the published wasi-buf runs it as a local
+# plugin on slicc-kernel's headless Node entry.
+name: wasi-protoc-plugins
+
+on:
+  push:
+    paths:
+      - packages/wasi-protoc-gen-*/**
+      - scripts/build-wasip1-go-command.sh
+      - .github/workflows/wasi-protoc-plugins.yml
+  pull_request:
+    paths:
+      - packages/wasi-protoc-gen-*/**
+      - scripts/build-wasip1-go-command.sh
+      - .github/workflows/wasi-protoc-plugins.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        package: [wasi-protoc-gen-go]
+        attempt: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: build the command from source
+        run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/${{ matrix.package }}/build.sh
+      - name: record sha256
+        run: sha256sum packages/${{ matrix.package }}/package/bin/*.wasm | tee "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}-${{ matrix.attempt }}
+          path: |
+            packages/${{ matrix.package }}/package/bin/
+            packages/${{ matrix.package }}/package/LICENSE
+            packages/${{ matrix.package }}/package/THIRD-PARTY-NOTICES.md
+          if-no-files-found: error
+          retention-days: 14
+
+  reproducible:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [wasi-protoc-gen-go]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ matrix.package }}-*
+      - name: both builds are byte-identical
+        run: |
+          sha256sum ${{ matrix.package }}-*/bin/*.wasm | tee "$GITHUB_STEP_SUMMARY"
+          test "$(cd ${{ matrix.package }}-1/bin && sha256sum *.wasm)" = "$(cd ${{ matrix.package }}-2/bin && sha256sum *.wasm)"
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        package: [wasi-protoc-gen-go]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.package }}-1
+          path: packages/${{ matrix.package }}/package
+      - name: install test dependencies
+        working-directory: packages/${{ matrix.package }}/test
+        run: npm ci --no-audit --no-fund
+      - name: end-to-end tests
+        working-directory: packages/${{ matrix.package }}/test
+        run: node --test 'e2e/*.test.mjs'

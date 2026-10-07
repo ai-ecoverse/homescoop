@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package acme.pet.v1;
+
+option go_package = "example.com/acme/pet/v1;petv1";
+
+enum PetKind {
+  PET_KIND_UNSPECIFIED = 0;
+  PET_KIND_CAT = 1;
+  PET_KIND_DOG = 2;
+}

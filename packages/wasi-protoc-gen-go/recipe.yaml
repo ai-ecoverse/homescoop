@@ -1,0 +1,33 @@
+# protoc-gen-go (google.golang.org/protobuf) for slicc WASI preview1: the Go
+# protobuf plugin as a command, so buf generate can run it as a local plugin
+# in slicc-kernel (@ai-ecoverse/wasi-buf).
+name: wasi-protoc-gen-go
+# Not built by the ladder; .github/workflows/wasi-protoc-plugins.yml builds and tests it.
+builder: retired
+version: "1.36.12"
+npm: "@ai-ecoverse/wasi-protoc-gen-go"
+summary: "protoc-gen-go 1.36 for slicc WASI preview1 (command protoc-gen-go)"
+source:
+  # protobuf-go v1.36.12, the version @ai-ecoverse/wasi-buf 1.73 links
+  url: "https://github.com/protocolbuffers/protobuf-go/archive/cdd4c5f7406e82462949c7a65defa9f3029c162d.tar.gz"
+  sha256: "e1e6a7a3ddb283d197e41b931e54afdaaec29e04b48c219d05134b42b008ec37"
+  commit: "cdd4c5f7406e82462949c7a65defa9f3029c162d"
+toolchain:
+  go: "1.26.7"
+  go_sha256_linux_x64: "ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca"
+  go_sha256_macos_arm64: "020a1e8224811be75163e920bc77e0926a1390a6aeea19bdcf23f74b9d749f6d"
+build:
+  module: "."
+  package: "./cmd/protoc-gen-go"
+  command: "protoc-gen-go"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/protocolbuffers/protobuf-go
+  license: BSD-3-Clause
+  notes: |
+    scripts/build-wasip1-go-command.sh builds cmd/protoc-gen-go from the
+    pinned source with the pinned Go (GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
+    -trimpath -buildvcs=false -ldflags='-s -w -buildid='), no patches.
