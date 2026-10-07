@@ -9,5 +9,5 @@
     "uptime prints without error",
     "attached-worker process visible in terminal ps (after slicc-kernel#66)"
   ],
-  "blocked": "Positive cert proven on slicc-kernel-procfs-ed6d6a1.tgz. CI still needs a published kernel with /proc (or ladder-pr pin of that tarball). New package → human cert, not ci-certified.json."
+  "blocked": "Hold until slicc-kernel #66 is released on npm. Then delete this blocked field so ladder-pr browser-cert runs against that kernel's /proc; human-cert + publish; land #54; only then add procps to ci-certified.json. Prerelease proof: slicc-kernel-procfs-ed6d6a1.tgz."
 }

@@ -59,7 +59,7 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | cmake | host-build needs `slicc-emscripten` prebuilt `cmakemain.cxx.o`; use `scripts/smoke-cmake.mjs` (`harness: host-node`) once staged |
 | findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
-| procps | Needs slicc-kernel /proc (#66-era). Built as `@ai-ecoverse/wasm-procps`; cert ready, human cert only (new package) |
+| procps | **#54 held** until slicc-kernel #66 releases. Cert green on procfs prerelease; clear `cert/meta.json` `blocked` so CI browser-cert runs; human cert (incl. attached-worker `ps`) → publish → land → then `ci-certified.json`. Alongside: packaging-only coreutils `9.12.0-2` drops stub `uptime`/`kill` commands. |
 
 CI-certified set (automerge non-majors): see `scripts/ci-certified.json`
 (jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep).

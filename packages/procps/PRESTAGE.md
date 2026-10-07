@@ -1,33 +1,62 @@
-# procps PRESTAGE
+# procps PRESTAGE / release gate
+
+**Hold #54 unmerged** until slicc-kernel #66 is released on npm.
+
+## Command set
+
+Ship: `ps`, `pgrep`, `pkill`, `kill`, `free`, `uptime`, `pidof`.  
+Skip `top` / `watch` (`--without-ncurses`).
 
 ## Depends on slicc-kernel /proc
 
-procps-ng reads:
-
 | Path | Used by |
 | --- | --- |
-| `/proc/<pid>/{cmdline,stat,status,comm}` | `ps`, `pgrep`, `pkill`, `pidof` |
-| `/proc/self` | usual |
-| `/proc/uptime` | `uptime` |
+| `/proc/<pid>/{cmdline,stat,status,comm}` (+ `/proc/self`) | `ps`, `pgrep`, `pkill`, `pidof` |
+| `/proc/uptime`, `/proc/loadavg` | `uptime` |
 | `/proc/meminfo` | `free` |
-| `/proc/loadavg` | `uptime` |
 | `/proc/stat` | misc |
 
-Coordinate with @thread:thr_ej75dimgf5 for a slicc-kernel#66-era prerelease
-(or `dist/` tarball) before claiming cert green.
+Proven green against `slicc-kernel-procfs-ed6d6a1.tgz` (pre-#66 attach).  
+Re-prove against the **released** kernel after #66.
+
+## Release sequence (Lars / thr_b83wwqmt4e)
+
+1. Wait for `@ai-ecoverse/slicc-kernel` release that includes #66 (+ /proc).
+2. Clear `cert/meta.json` `"blocked"` so ladder-pr browser-cert runs (kernel
+   /proc inside slicc-kernel CDP — not the runner’s /proc).
+3. `FORCE=1 bash scripts/host-run.sh procps` → tarball + `sha256sum`.
+4. Re-run cert against the **released** kernel (not the prerelease tarball):
+   ```bash
+   npm install --prefix /tmp/cert-nm @ai-ecoverse/slicc-kernel@<released> …
+   export HOMESCOOP_CERT_NODE_MODULES=/tmp/cert-nm/node_modules
+   node scripts/browser-cert/run.mjs --package procps --tarball <tgz>
+   ```
+5. Send tarball + sha256 to thr_b83wwqmt4e for browser cert (including
+   attached-worker process visible in terminal `ps`).
+6. Publish exact artifact (`certified=<sha256>`), then land #54.
+7. Add `procps` to `scripts/ci-certified.json` **only after** that first
+   manual cert (and after `blocked` is cleared).
+
+## Alongside first publish: coreutils packaging-only
+
+`wasm-coreutils` advertises useless `uptime` and `kill` multi-call stubs
+(no utmp / no applet). Prefer **one provider** for process tools → procps.
+
+Overlaps (procps ∩ coreutils `slicc.commands` on `@ai-ecoverse/wasm-coreutils@9.12.0-1`):
+
+| Command | coreutils | Action |
+| --- | --- | --- |
+| `uptime` | yes (stub) | **Remove** from coreutils `slicc.commands` |
+| `kill` | yes (stub) | **Remove** from coreutils `slicc.commands` (bash builtin `kill` unchanged) |
+| `ps` / `pgrep` / `pkill` / `free` / `pidof` | no | — |
+
+Packaging-only bump `9.12.0-1` → `9.12.0-2`: same `bin/*` bytes, only
+`package.json` differs (same file-by-file rule as wasm-git `-9`).  
+Helper: `scripts/packaging-only-coreutils-drop-procps-clashes.mjs`.  
+Publish that certified tarball in the same window as procps’s first publish.
 
 ## Build
 
 ```bash
 bash scripts/host-run.sh procps
-```
-
-`--without-ncurses`: no `top` / `watch`. Ship: `ps`, `pgrep`, `pkill`, `kill`,
-`free`, `uptime`, `pidof`.
-
-## Cert
-
-```bash
-export HOMESCOOP_CERT_NODE_MODULES=…  # must include #66-era slicc-kernel
-node scripts/browser-cert/run.mjs --package procps --tarball .homescoop-out/package.tgz
 ```
