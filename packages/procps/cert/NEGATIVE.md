@@ -18,17 +18,15 @@ AssertionError: ps aux stderr=Error, do this: mount -t proc proc /proc
 That proves the checklist is not vacuous: without Linux-shaped `/proc`, `ps`
 fails as expected.
 
-## Positive path (procfs prerelease)
+## Positive path (slicc-kernel 1.9.0)
 
-Against `slicc-kernel-procfs-ed6d6a1.tgz` (feat/attach-client, before #66 attach)
-+ local `@ai-ecoverse/wasm-procps@4.0.5-1`:
+Against `@ai-ecoverse/slicc-kernel@1.9.0` + local `@ai-ecoverse/wasm-procps@4.0.5-1`
++ packaging-only `@ai-ecoverse/wasm-coreutils@9.12.0-2`:
 
-`cert/checklist.mjs` → **ok** (`ps aux` / `pgrep` / `pkill` / `free -h` /
-absolute-path `uptime`). No /proc field layout issues observed for these tools.
+`cert/checklist.mjs` → **ok** (`ps` / `pgrep` / `env kill -TERM` / `pkill` /
+`free -h` / `uptime`). Attached-worker `ps` is human cert on 1.9.0.
 
-Note: bare `uptime` is shadowed by wasm-coreutils' empty `/usr/bin/uptime`
-multi-call stub (`coreutils: unknown program 'uptime'`) — homescoop packaging,
-not a kernel /proc bug.
+Earlier prerelease proof: `slicc-kernel-procfs-ed6d6a1.tgz`.
 
 ## Empty wasm (once a good tarball is published)
 

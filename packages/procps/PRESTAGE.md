@@ -1,6 +1,7 @@
 # procps PRESTAGE / release gate
 
-**Hold #54 unmerged** until slicc-kernel #66 is released on npm.
+**#54 held for publish** — slicc-kernel 1.9.0 is on npm (#66). Clear `blocked`,
+CI browser-cert on 1.9.0, human-cert both tarballs, then `certified=` publish + merge.
 
 ## Command set
 
@@ -21,21 +22,15 @@ Re-prove against the **released** kernel after #66.
 
 ## Release sequence (Lars / thr_b83wwqmt4e)
 
-1. Wait for `@ai-ecoverse/slicc-kernel` release that includes #66 (+ /proc).
-2. Clear `cert/meta.json` `"blocked"` so ladder-pr browser-cert runs (kernel
-   /proc inside slicc-kernel CDP — not the runner’s /proc).
-3. `FORCE=1 bash scripts/host-run.sh procps` → tarball + `sha256sum`.
-4. Re-run cert against the **released** kernel (not the prerelease tarball):
-   ```bash
-   npm install --prefix /tmp/cert-nm @ai-ecoverse/slicc-kernel@<released> …
-   export HOMESCOOP_CERT_NODE_MODULES=/tmp/cert-nm/node_modules
-   node scripts/browser-cert/run.mjs --package procps --tarball <tgz>
-   ```
-5. Send tarball + sha256 to thr_b83wwqmt4e for browser cert (including
-   attached-worker process visible in terminal `ps`).
-6. Publish exact artifact (`certified=<sha256>`), then land #54.
-7. Add `procps` to `scripts/ci-certified.json` **only after** that first
-   manual cert (and after `blocked` is cleared).
+1. ~~Wait for slicc-kernel #66~~ → **1.9.0 on npm.**
+2. Clear `cert/meta.json` `"blocked"`; pin `"kernel": "@ai-ecoverse/slicc-kernel@1.9.0"`.
+3. `FORCE=1 bash scripts/host-run.sh procps` → tarball + sha256.
+4. Packaging-only coreutils `9.12.0-2` via
+   `node scripts/packaging-only-coreutils-drop-procps-clashes.mjs`.
+5. Local + CI browser-cert on 1.9.0 (CI installs -2 via `needsTarballScripts`).
+6. Send both tarballs + sha256 to thr_b83wwqmt4e (attached-worker `ps` in browser).
+7. Publish exact artifacts (`certified=<sha256>`), then land #54.
+8. Add `procps` to `scripts/ci-certified.json` **only after** first manual cert.
 
 ## Alongside first publish: coreutils packaging-only
 
