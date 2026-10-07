@@ -30,7 +30,7 @@ Re-prove against the **released** kernel after #66.
 5. Local + CI browser-cert on 1.9.0 (CI installs -2 via `needsTarballScripts`).
 6. Send both tarballs + sha256 to thr_b83wwqmt4e (attached-worker `ps` in browser).
 7. Publish exact artifacts (`certified=<sha256>`), then land #54.
-8. Add `procps` to `scripts/ci-certified.json` **only after** first manual cert.
+8. ~~Add `procps` to `scripts/ci-certified.json`~~ done after thr_b83wwqmt4e cert + publish of 4.0.5-1.
 
 ## Alongside first publish: coreutils packaging-only
 

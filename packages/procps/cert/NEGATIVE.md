@@ -1,7 +1,7 @@
 # Negative proof (procps)
 
 **Date:** 2026-10-07  
-New package — not in `ci-certified.json` until thr_b83wwqmt4e human-certifies
+CI-certified (thr_b83wwqmt4e): `@ai-ecoverse/wasm-procps@4.0.5-1` on slicc-kernel 1.9.0; listed in `scripts/ci-certified.json`.
 after slicc-kernel /proc ships.
 
 ## Stock kernel (no /proc) — recorded

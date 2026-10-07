@@ -52,16 +52,17 @@
     {
       "description": "CI-certified packages (see scripts/ci-certified.json) — non-major only. Synced by scripts/sync-ci-certified-renovate.mjs.",
       "matchFileNames": [
-        "packages/jq/recipe.yaml",
-        "packages/xz/recipe.yaml",
-        "packages/pkgconf/recipe.yaml",
-        "packages/xxd/recipe.yaml",
         "packages/coreutils/recipe.yaml",
         "packages/gawk/recipe.yaml",
-        "packages/sed/recipe.yaml",
-        "packages/gzip/recipe.yaml",
         "packages/git/recipe.yaml",
-        "packages/grep/recipe.yaml"
+        "packages/grep/recipe.yaml",
+        "packages/gzip/recipe.yaml",
+        "packages/jq/recipe.yaml",
+        "packages/pkgconf/recipe.yaml",
+        "packages/procps/recipe.yaml",
+        "packages/sed/recipe.yaml",
+        "packages/xxd/recipe.yaml",
+        "packages/xz/recipe.yaml"
       ],
       "matchUpdateTypes": [
         "minor",

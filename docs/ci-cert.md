@@ -59,10 +59,9 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | cmake | host-build needs `slicc-emscripten` prebuilt `cmakemain.cxx.o`; use `scripts/smoke-cmake.mjs` (`harness: host-node`) once staged |
 | findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
-| procps | #54: kernel 1.9.0 — CI browser-cert on; human cert (attached-worker `ps`) → publish + coreutils `9.12.0-2` → land → then `ci-certified.json`. |
 
 CI-certified set (automerge non-majors): see `scripts/ci-certified.json`
-(jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep).
+(jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep, procps).
 
 ## Context API (`cert/*.mjs`)
 
