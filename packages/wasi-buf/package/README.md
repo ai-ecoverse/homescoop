@@ -48,6 +48,25 @@ On slicc-kernel, through the host module:
 - the Buf Schema Registry: `buf.build/...` modules, `buf dep update`,
   dependencies in `buf.yaml`
 
+Local plugins packaged as kernel commands:
+
+| plugin | package |
+| --- | --- |
+| `protoc-gen-go` | `@ai-ecoverse/wasi-protoc-gen-go` |
+| `protoc-gen-connect-go` | `@ai-ecoverse/wasi-protoc-gen-connect-go` |
+| `protoc-gen-go-grpc` | `@ai-ecoverse/wasi-protoc-gen-go-grpc` |
+
+Plugins that are Node programs, such as `protoc-gen-es`, are not wasm commands;
+use them as remote plugins, which run on the Buf Schema Registry:
+
+```yaml
+# buf.gen.yaml
+version: v2
+plugins:
+  - remote: buf.build/bufbuild/es
+    out: gen
+```
+
 `buf lint`, `buf breaking` and `buf format --exit-code` exit with 100 when they
 find something, as upstream buf does.
 
