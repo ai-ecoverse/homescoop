@@ -7,7 +7,7 @@
 name: wasi-rustc
 builder: retired
 # renovate: datasource=github-releases depName=rust-lang/rust
-version: "1.83.0"
+version: "1.99.0"
 npm: "@ai-ecoverse/wasi-rustc"
 summary: "RETIRED from ladder — rustc/cargo from wasi-rustc-stable.yml only"
 source:
