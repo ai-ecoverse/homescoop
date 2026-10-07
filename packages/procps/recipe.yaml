@@ -1,0 +1,23 @@
+# procps-ng for slicc wasm realm (ps/pgrep/pkill/free/uptime against /proc).
+name: procps
+builder: host
+# renovate: datasource=git-tags depName=https://gitlab.com/procps-ng/procps.git extractVersion=^v(?<version>.*)$
+version: "4.0.5"
+npm: "@ai-ecoverse/wasm-procps"
+summary: "procps-ng (ps, pgrep, pkill, free, uptime, …) for slicc"
+source:
+  url: "https://downloads.sourceforge.net/project/procps-ng/Production/procps-ng-{{version}}.tar.xz"
+  sha256: "c2e6d193cc78f84cd6ddb72aaf6d5c6a9162f0470e5992092057f5ff518562fa"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://gitlab.com/procps-ng/procps
+  license: GPL-2.0-or-later
+  notes: |
+    Host ladder, slicc cli profile (spawn+exec). Built --without-ncurses so
+    top/watch/slabtop are omitted (no standalone ncurses package). Needs
+    slicc-kernel /proc (per-pid + uptime/meminfo/loadavg/stat); certify against
+    a #66-era kernel prerelease until that ships. New package → human cert,
+    not Renovate automerge.

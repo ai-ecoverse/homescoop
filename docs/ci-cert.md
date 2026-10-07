@@ -61,7 +61,7 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
 
 CI-certified set (automerge non-majors): see `scripts/ci-certified.json`
-(jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep).
+(jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep, procps).
 
 ## Context API (`cert/*.mjs`)
 

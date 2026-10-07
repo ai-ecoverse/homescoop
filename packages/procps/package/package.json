@@ -1,0 +1,65 @@
+{
+  "name": "@ai-ecoverse/wasm-procps",
+  "version": "4.0.5-1",
+  "description": "procps-ng for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/procps/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/procps",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "procps",
+    "ps"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "procps",
+    "upstream": "4.0.5"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "ps": {
+        "glue": "bin/ps",
+        "wasm": "bin/ps.wasm"
+      },
+      "free": {
+        "glue": "bin/free",
+        "wasm": "bin/free.wasm"
+      },
+      "pgrep": {
+        "glue": "bin/pgrep",
+        "wasm": "bin/pgrep.wasm"
+      },
+      "pkill": {
+        "glue": "bin/pkill",
+        "wasm": "bin/pkill.wasm"
+      },
+      "kill": {
+        "glue": "bin/kill",
+        "wasm": "bin/kill.wasm"
+      },
+      "uptime": {
+        "glue": "bin/uptime",
+        "wasm": "bin/uptime.wasm"
+      },
+      "pidof": {
+        "glue": "bin/pidof",
+        "wasm": "bin/pidof.wasm"
+      }
+    }
+  }
+}

@@ -19,5 +19,5 @@ lib/getlocalename_l-unsafe.c:669:3: error: "Please port gnulib getlocalename_l-u
 gmake[2]: *** [Makefile:16266: lib/libcoreutils_a-getlocalename_l-unsafe.o] Error 1
 ```
 
-**Good tarball:** `@ai-ecoverse/wasm-coreutils@9.12.0-1` — `cert/checklist.mjs` passes
+**Good tarball:** `@ai-ecoverse/wasm-coreutils@9.12.0-2` — `cert/checklist.mjs` passes
 (pipes, env, nice, nohup, `LC_ALL=C sort`).

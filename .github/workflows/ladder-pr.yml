@@ -144,32 +144,58 @@ jobs:
             const certDir=path.join("packages", pkg, "cert");
             let specs=[];
             try { specs=fs.readdirSync(certDir).filter(f=>f.endsWith(".mjs")); } catch {}
-            let harness="smoke";
-            try { harness=JSON.parse(fs.readFileSync(path.join(certDir,"meta.json"),"utf8")).harness||harness; } catch {}
+            let meta={};
+            try { meta=JSON.parse(fs.readFileSync(path.join(certDir,"meta.json"),"utf8")); } catch {}
+            const harness=meta.harness||"smoke";
+            // blocked: checklist needs a kernel/peer not on PR runners yet
+            // (e.g. procps → /proc from unpublished slicc-kernel). Host-build
+            // still runs; human cert against the prerelease.
+            if (meta.blocked) { process.stdout.write("blocked"); process.exit(0); }
             if (harness==="host-smoke"||harness==="host-node") { process.stdout.write("0"); process.exit(0); }
             if (specs.length>0) { process.stdout.write("1"); process.exit(0); }
             const abi=m.slicc?.abi||"emscripten";
             const n=Object.keys(m.slicc?.commands||{}).length;
             process.stdout.write(abi==="emscripten"&&n>0?"1":"0");
           ' "${{ matrix.package }}" "$PROBE/package/package.json")
+          if [[ "$NEED" == "blocked" ]]; then
+            echo "::notice::browser-cert skipped — cert/meta.json blocked (needs unpublished kernel/peer); host-build still gates the PR"
+            exit 0
+          fi
           if [[ "$NEED" != "1" ]]; then
             echo "browser-cert: skip (host-smoke/host-node or no CLI/cert specs)"
             exit 0
           fi
           CERT_NM="${RUNNER_TEMP}/homescoop-browser-cert-nm"
           mkdir -p "$CERT_NM"
+          KERNEL_SPEC=$(node -e '
+            const fs=require("fs"); const path=require("path");
+            const p=path.join("packages", process.argv[1], "cert/meta.json");
+            let k="@ai-ecoverse/slicc-kernel@1.9.0";
+            try { const j=JSON.parse(fs.readFileSync(p,"utf8")); if (j.kernel) k=j.kernel; } catch {}
+            process.stdout.write(k);
+          ' "${{ matrix.package }}")
           npm install --prefix "$CERT_NM" --no-fund --no-audit \
-            @ai-ecoverse/slicc-kernel@^1.8.10 \
+            "$KERNEL_SPEC" \
             @ai-ecoverse/slicc-shared-web@^1.4.1 \
             playwright-core@1.63.0
-          # Optional peers from cert/meta.json needs[]
+          # Optional peers: needsInstall (npm specs) else needs (node_modules paths)
           if [[ -f "packages/${{ matrix.package }}/cert/meta.json" ]]; then
             node -e '
               const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
-              for (const n of j.needs||[]) console.log(n);
+              for (const n of j.needsInstall||j.needs||[]) console.log(n);
             ' "packages/${{ matrix.package }}/cert/meta.json" | while read -r dep; do
               [[ -n "$dep" ]] || continue
               npm install --prefix "$CERT_NM" --no-fund --no-audit "$dep"
+            done
+            # Packaging-only peer tarballs (e.g. coreutils 9.12.0-2 without stub kill/uptime)
+            node -e '
+              const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+              for (const s of j.needsTarballScripts||[]) console.log(s);
+            ' "packages/${{ matrix.package }}/cert/meta.json" | while read -r script; do
+              [[ -n "$script" ]] || continue
+              echo "browser-cert: needsTarballScript $script"
+              tgz=$(node "$script" | head -1)
+              npm install --prefix "$CERT_NM" --no-fund --no-audit "$tgz"
             done
           fi
           npx --prefix "$CERT_NM" playwright-core install --with-deps chromium

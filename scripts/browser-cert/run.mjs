@@ -178,8 +178,9 @@ try {
   await page.goto('/');
   await page.until(() => typeof window.boot === 'function');
   await page.evaluate(() => window.boot());
-  await page.evaluate((d, n) => window.installTree(d, n), installDir, fileNames);
-
+  // Peers first, package under test last so its slicc.commands win on name
+  // collisions (e.g. wasm-coreutils advertises uptime/kill without those
+  // multi-call applets; wasm-procps must own those names in its cert).
   for (const need of meta.needs || []) {
     const needRoot = join(nodeModules, need);
     const names = listFiles(needRoot);
@@ -189,6 +190,7 @@ try {
       names,
     );
   }
+  await page.evaluate((d, n) => window.installTree(d, n), installDir, fileNames);
 
   if (certSpecs.length > 0) {
     const ctx = makeContext(page, { packageName: pkgName, npmName });

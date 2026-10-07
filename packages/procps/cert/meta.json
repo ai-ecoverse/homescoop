@@ -1,0 +1,22 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.9.0",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-1"
+  ],
+  "needsTarballScripts": [
+    "scripts/packaging-only-coreutils-drop-procps-clashes.mjs"
+  ],
+  "checklist": [
+    "ps aux lists background sleep",
+    "pgrep sleep finds it",
+    "env kill -TERM <pid> (PATH kill binary, not bash builtin)",
+    "pkill sleep ends it",
+    "free -h prints without error",
+    "uptime prints without error (procps, not coreutils stub)",
+    "attached-worker process visible in terminal ps (human cert on 1.9.0)"
+  ],
+  "needsNote": "needsInstall pulls coreutils 9.12.0-1 then needsTarballScripts overlays packaging-only 9.12.0-2 (drops stub uptime/kill). needs[] are node_modules paths for OPFS install."
+}
