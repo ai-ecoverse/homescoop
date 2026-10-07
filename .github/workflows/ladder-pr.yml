@@ -144,14 +144,23 @@ jobs:
             const certDir=path.join("packages", pkg, "cert");
             let specs=[];
             try { specs=fs.readdirSync(certDir).filter(f=>f.endsWith(".mjs")); } catch {}
-            let harness="smoke";
-            try { harness=JSON.parse(fs.readFileSync(path.join(certDir,"meta.json"),"utf8")).harness||harness; } catch {}
+            let meta={};
+            try { meta=JSON.parse(fs.readFileSync(path.join(certDir,"meta.json"),"utf8")); } catch {}
+            const harness=meta.harness||"smoke";
+            // blocked: checklist needs a kernel/peer not on PR runners yet
+            // (e.g. procps → /proc from unpublished slicc-kernel). Host-build
+            // still runs; human cert against the prerelease.
+            if (meta.blocked) { process.stdout.write("blocked"); process.exit(0); }
             if (harness==="host-smoke"||harness==="host-node") { process.stdout.write("0"); process.exit(0); }
             if (specs.length>0) { process.stdout.write("1"); process.exit(0); }
             const abi=m.slicc?.abi||"emscripten";
             const n=Object.keys(m.slicc?.commands||{}).length;
             process.stdout.write(abi==="emscripten"&&n>0?"1":"0");
           ' "${{ matrix.package }}" "$PROBE/package/package.json")
+          if [[ "$NEED" == "blocked" ]]; then
+            echo "::notice::browser-cert skipped — cert/meta.json blocked (needs unpublished kernel/peer); host-build still gates the PR"
+            exit 0
+          fi
           if [[ "$NEED" != "1" ]]; then
             echo "browser-cert: skip (host-smoke/host-node or no CLI/cert specs)"
             exit 0
