@@ -59,9 +59,11 @@ if [[ "$need_build" -eq 1 ]]; then
     # get absorbed into libproc2.la (libtool rejects non-.lo members on Linux).
     # shellcheck disable=SC2086
     env -u LIBS -u LDFLAGS emmake make -j"$jobs" LIBS= LDFLAGS= library/libproc2.la
-    # Final CLIs: slicc whole-archive + utmp/sigqueue stubs.
+    # Final CLIs: slicc + stubs. -o libproc2.la stops make from re-entering
+    # the libtool archive rule with LIBS=stubs (which fails on Linux CI).
     # shellcheck disable=SC2086
     emmake make -j"$jobs" \
+      -o library/libproc2.la -o library/.libs/libproc2.a \
       LDFLAGS="$CLI_LDFLAGS" \
       LIBS="$CLI_LIBS $STUB_O" \
       src/ps/pscommand src/free src/pgrep src/pkill src/kill src/uptime src/pidof
