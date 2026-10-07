@@ -5,7 +5,7 @@ version: "1.4.20"
 npm: "@ai-ecoverse/wasix-m4"
 summary: "GNU m4 for slicc WASIX (command m4)"
 source:
-  url: "https://ftp.gnu.org/gnu/m4/m4-{{version}}.tar.xz"
+  url: "https://mirrors.kernel.org/gnu/m4/m4-{{version}}.tar.xz"
   sha256: "e236ea3a1ccf5f6c270b1c4bb60726f371fa49459a8eaaebc90b216b328daf2b"
 dependencies:
   build: []

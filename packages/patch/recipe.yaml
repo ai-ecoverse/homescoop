@@ -6,7 +6,7 @@ version: "2.8"
 npm: "@ai-ecoverse/wasm-patch"
 summary: "GNU patch for slicc"
 source:
-  url: "https://ftp.gnu.org/gnu/patch/patch-{{version}}.tar.xz"
+  url: "https://mirrors.kernel.org/gnu/patch/patch-{{version}}.tar.xz"
   sha256: "f87cee69eec2b4fcbf60a396b030ad6aa3415f192aa5f7ee84cad5e11f7f5ae3"
 dependencies:
   build: []

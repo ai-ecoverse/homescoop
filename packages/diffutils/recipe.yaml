@@ -6,7 +6,7 @@ version: "3.12"
 npm: "@ai-ecoverse/wasm-diffutils"
 summary: "GNU diff/cmp/diff3/sdiff for slicc"
 source:
-  url: "https://ftp.gnu.org/gnu/diffutils/diffutils-{{version}}.tar.xz"
+  url: "https://mirrors.kernel.org/gnu/diffutils/diffutils-{{version}}.tar.xz"
   sha256: "7c8b7f9fc8609141fdea9cece85249d308624391ff61dedaf528fcb337727dfd"
 dependencies:
   build: []
