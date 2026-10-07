@@ -1,0 +1,44 @@
+{
+  "name": "@ai-ecoverse/wasi-protoc-gen-go-grpc",
+  "version": "1.6.2-0",
+  "description": "protoc-gen-go-grpc 1.6.2 (the gRPC code generator for Go) for slicc WASI preview1 (command protoc-gen-go-grpc); a local plugin for @ai-ecoverse/wasi-buf in slicc-kernel",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-protoc-gen-go-grpc/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-protoc-gen-go-grpc",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "protobuf",
+    "grpc",
+    "protoc-gen-go-grpc",
+    "buf"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-protoc-gen-go-grpc",
+    "upstream": "1.6.2",
+    "source": "grpc/grpc-go@1c63fa5f5492fb6cb4cabf9847999ce469505f49"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "protoc-gen-go-grpc": {
+        "wasm": "bin/protoc-gen-go-grpc.wasm"
+      }
+    }
+  }
+}

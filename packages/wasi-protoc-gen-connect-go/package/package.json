@@ -1,0 +1,44 @@
+{
+  "name": "@ai-ecoverse/wasi-protoc-gen-connect-go",
+  "version": "1.21.0-0",
+  "description": "protoc-gen-connect-go 1.21.0 (the Connect code generator for Go) for slicc WASI preview1 (command protoc-gen-connect-go); a local plugin for @ai-ecoverse/wasi-buf in slicc-kernel",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-protoc-gen-connect-go/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-protoc-gen-connect-go",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "protobuf",
+    "connect",
+    "protoc-gen-connect-go",
+    "buf"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-protoc-gen-connect-go",
+    "upstream": "1.21.0",
+    "source": "connectrpc/connect-go@41b7f302f0d0100d715eb9e44873ee69c06afa8b"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "protoc-gen-connect-go": {
+        "wasm": "bin/protoc-gen-connect-go.wasm"
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package acme.pet.v1;
+
+option go_package = "example.com/acme/pet/v1;petv1";
+
+message GetPetRequest {
+  string name = 1;
+}
+
+message GetPetResponse {
+  string name = 1;
+  int32 age = 2;
+}
+
+message ListPetsRequest {}
+
+message ListPetsResponse {
+  string name = 1;
+}
+
+service PetService {
+  rpc GetPet(GetPetRequest) returns (GetPetResponse);
+  rpc ListPets(ListPetsRequest) returns (stream ListPetsResponse);
+}

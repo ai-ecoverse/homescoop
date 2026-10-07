@@ -1,0 +1,32 @@
+# protoc-gen-go-grpc (the gRPC code generator for Go) for slicc WASI preview1: a command, so
+# buf generate can run it as a local plugin in slicc-kernel (@ai-ecoverse/wasi-buf).
+name: wasi-protoc-gen-go-grpc
+# Not built by the ladder; .github/workflows/wasi-protoc-plugins.yml builds and tests it.
+builder: retired
+version: "1.6.2"
+npm: "@ai-ecoverse/wasi-protoc-gen-go-grpc"
+summary: "protoc-gen-go-grpc 1.6.2 for slicc WASI preview1 (command protoc-gen-go-grpc)"
+source:
+  # cmd/protoc-gen-go-grpc/v1.6.2
+  url: "https://github.com/grpc/grpc-go/archive/1c63fa5f5492fb6cb4cabf9847999ce469505f49.tar.gz"
+  sha256: "5147874a14a078aa9a87fcaa23a9522929621e51468922579eb35b35797f388d"
+  commit: "1c63fa5f5492fb6cb4cabf9847999ce469505f49"
+toolchain:
+  go: "1.26.7"
+  go_sha256_linux_x64: "ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca"
+  go_sha256_macos_arm64: "020a1e8224811be75163e920bc77e0926a1390a6aeea19bdcf23f74b9d749f6d"
+build:
+  module: "cmd/protoc-gen-go-grpc"
+  package: "."
+  command: "protoc-gen-go-grpc"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/grpc/grpc-go/tree/master/cmd/protoc-gen-go-grpc
+  license: Apache-2.0
+  notes: |
+    scripts/build-wasip1-go-command.sh builds protoc-gen-go-grpc from the pinned
+    source with the pinned Go (GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
+    -trimpath -buildvcs=false -ldflags='-s -w -buildid='), no patches.

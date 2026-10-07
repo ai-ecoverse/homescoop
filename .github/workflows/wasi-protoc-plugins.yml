@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        package: [wasi-protoc-gen-go]
+        package: [wasi-protoc-gen-go, wasi-protoc-gen-connect-go, wasi-protoc-gen-go-grpc]
         attempt: [1, 2]
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: [wasi-protoc-gen-go]
+        package: [wasi-protoc-gen-go, wasi-protoc-gen-connect-go, wasi-protoc-gen-go-grpc]
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -70,7 +70,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        package: [wasi-protoc-gen-go]
+        package: [wasi-protoc-gen-go, wasi-protoc-gen-connect-go, wasi-protoc-gen-go-grpc]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
