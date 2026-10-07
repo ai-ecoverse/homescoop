@@ -1,6 +1,10 @@
 # After merge to main: dispatch ladder-build for packages whose recipe.yaml
 # or package/ tree changed. build.sh / patches / docs do not publish.
 #
+# When the merge came from a PR with a ladder-pr certified artifact
+# (host-<pkg>-prN), pass certified=<sha256> + artifact_pr so ladder-build
+# publishes that exact tarball (no rebuild).
+#
 # Important: do NOT `uses:` ladder-build as a reusable workflow. npm OIDC
 # trusted publishing validates the *calling* workflow filename
 # (docs.npmjs.com/trusted-publishers). Fledgling trusts ladder-build.yml only,
@@ -49,17 +53,74 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.detect.outputs.packages) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: Dispatch ladder-build for ${{ matrix.package }}
         uses: actions/github-script@v9
         with:
           script: |
             const pkg = '${{ matrix.package }}';
-            console.log(`dispatch ladder-build.yml package=${pkg} ref=${context.ref}`);
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            let artifactPr = '';
+            let certified = '';
+
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+            const pr = prs.find((p) => p.merged_at) || prs[0];
+            if (pr) {
+              const name = `host-${pkg}-pr${pr.number}`;
+              const { data } = await github.rest.actions.listArtifactsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name,
+                per_page: 5,
+              });
+              const art = data.artifacts?.find((a) => !a.expired);
+              if (art) {
+                const res = await github.rest.actions.downloadArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: art.id,
+                  archive_format: 'zip',
+                });
+                const zip = `${process.env.RUNNER_TEMP}/merge-cert.zip`;
+                const dir = `${process.env.RUNNER_TEMP}/merge-cert`;
+                fs.writeFileSync(zip, Buffer.from(res.data));
+                execSync(`rm -rf "${dir}" && mkdir -p "${dir}" && unzip -qo "${zip}" -d "${dir}"`);
+                const shaFile = `${dir}/package.tgz.sha256`;
+                const tgz = `${dir}/package.tgz`;
+                if (fs.existsSync(shaFile)) {
+                  certified = fs.readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0];
+                } else if (fs.existsSync(tgz)) {
+                  certified = execSync(`sha256sum "${tgz}"`).toString().split(/\s+/)[0];
+                }
+                if (certified) {
+                  artifactPr = String(pr.number);
+                  console.log(`using certified artifact ${name} sha256=${certified}`);
+                }
+              } else {
+                console.log(`no artifact ${name}; ladder-build will rebuild (needs certified= for first publish)`);
+              }
+            } else {
+              console.log('no associated PR; ladder-build will rebuild');
+            }
+
+            const inputs = { package: pkg };
+            if (artifactPr && certified) {
+              inputs.certified = certified;
+              inputs.artifact_pr = artifactPr;
+            }
+            console.log(`dispatch ladder-build.yml`, inputs);
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'ladder-build.yml',
               ref: context.ref,
-              inputs: { package: pkg },
+              inputs,
             });

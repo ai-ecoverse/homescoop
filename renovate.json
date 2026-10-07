@@ -4,10 +4,10 @@
   "description": [
     "Homescoope recipes pin upstream library versions in packages/*/recipe.yaml.",
     "A custom regex manager reads `# renovate: …` comments above `version:` and opens one PR per package when upstream cuts a release.",
-    "Do not automerge recipe bumps — a version change means a real WASM rebuild before npm publish."
+    "Recipe bumps automerge when ladder-pr is green (host-build + slicc-kernel CDP browser-cert / host-smoke)."
   ],
   "semanticCommits": "enabled",
-  "platformAutomerge": false,
+  "platformAutomerge": true,
   "dependencyDashboard": true,
   "prHourlyLimit": 4,
   "customManagers": [
@@ -22,9 +22,11 @@
   ],
   "packageRules": [
     {
-      "description": "Upstream recipe bumps need a human + rebuild; never automerge.",
+      "description": "Upstream recipe bumps automerge when ladder-pr (build+browser-cert) is green.",
       "matchFileNames": ["packages/**/recipe.yaml"],
-      "automerge": false,
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true,
       "addLabels": ["homescoop-recipe"]
     },
     {

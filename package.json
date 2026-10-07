@@ -18,6 +18,7 @@
     "list-semver-cleanup": "node scripts/list-semver-cleanup.mjs",
     "recipe": "node scripts/read-recipe.mjs",
     "refresh-sha": "node scripts/refresh-recipe-sha.mjs",
+    "browser-cert": "node scripts/browser-cert/run.mjs",
     "check-meta": "node scripts/check-package-meta.mjs",
     "trust": "npx fledgling sync -y --skip-publish",
     "trust:dry": "npx fledgling sync --dry-run -y --skip-publish"

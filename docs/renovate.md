@@ -43,7 +43,10 @@ node scripts/refresh-recipe-sha.mjs <package>
 # --check: fail if the committed sha256 does not match the download
 ```
 
-Recipe bumps never automerge. Merge only after a certified WASM rebuild.
+Recipe bumps **automerge** when `ladder-pr` is green: host-build, `host-smoke`
+(libs), and slicc-kernel CDP **browser-cert** (emscripten CLIs). The PR artifact
+sha256 is the certified tarball; `ladder-merge` / `ladder-build` must publish
+that digest (`certified=<sha256>`), not an uncertified rebuild.
 
 `build.sh` loads version/URL/sha via `homescoop_load_recipe`. Secondary
 tarballs (ncurses, mbedtls, unzip) live under `sources:` in the same recipe.

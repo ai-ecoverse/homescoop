@@ -29,9 +29,14 @@ workflow_dispatch(package)
 A recipe change that needs a new WASM must bump the packaging revision (`X.Y.Z-N`).
 The same `pkg@version` on the registry is never rebuilt.
 
-**Publish order:** laptop `npm publish` of the exact certified tarball, verify
-sha256/shasum/tags, **then** land. `ladder-merge` must not be the first
-publisher of a version.
+**Publish order (CI-certified path):** `ladder-pr` host-builds, browser-certs
+(emscripten CLIs on slicc-kernel CDP), and uploads `host-<pkg>-prN` with
+`package.tgz` + sha256. Renovate automerges when that check is green.
+`ladder-merge` dispatches `ladder-build` with `certified=<sha256>` and
+`artifact_pr=<N>` so OIDC publishes the **exact** PR tarball (no rebuild).
+
+**Legacy / manual:** laptop `npm publish` of the exact certified tarball, then
+land, or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
 
 OIDC publish always runs **on the runner** (`id-token: write`). One workflow
 file (`ladder-build.yml`) keeps a single `npm trust` target.
@@ -65,8 +70,14 @@ publish runs as a real `ladder-build` workflow.
 `scripts/list-touched-packages.mjs` maps changed paths → recipe names.
 `ladder-merge` passes `--publishable` so only `recipe.yaml` or `package/`
 dispatches a build/publish; a `build.sh`-only merge does not republish.
-`ladder-pr` host-build uploads `package.tgz` + sha256 as artifacts and runs
-`packages/<name>/smoke.c` via `scripts/host-smoke.sh` when present.
+`ladder-pr` host-build uploads `package.tgz` + sha256 as artifacts, runs
+`packages/<name>/smoke.c` via `scripts/host-smoke.sh` when present, then
+**browser-cert** for emscripten CLIs: Chromium + `@ai-ecoverse/slicc-kernel`
+via `@ai-ecoverse/slicc-shared-web/harness` CDP
+(`scripts/browser-cert/run.mjs`). Optional
+`packages/<name>/browser-cert.json` sets `argv` / expected `stdout`; default
+is `<command> --version`. Libs without `slicc.commands` skip browser-cert
+(host-smoke is the gate). Green ladder-pr is the Renovate automerge signal.
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
 
