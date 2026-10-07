@@ -12,7 +12,9 @@ HTTP(S) inputs, and the third for its module cache. On wasip1:
   host, and the three exec.LookPath sites ask the host whether it exists;
 - httpclient's clients and http.DefaultTransport send requests through the
   host (the kernel's net-request, so TLS and proxies are the kernel's);
-- filelock takes advisory locks through the kernel's file locks.
+- filelock takes advisory locks through the kernel's file locks;
+- buf's CLI reports ErrUnsupported itself when a request to a remote fails
+  with it, instead of "the server hosted at that remote is unavailable".
 A command's non-zero exit becomes slicchost.ExitError, not *exec.ExitError,
 so callers that check exec.ExitError codes (git's 128) see a plain failure.
 Other platforms are unchanged.
@@ -20,6 +22,29 @@ Other platforms are unchanged.
 Upstream: not filed (Lars decides).
 removeWhen: Go's wasip1 port can start processes and dial, or buf drops the need.
 
+diff --git a/cmd/buf/buf.go b/cmd/buf/buf.go
+index 390d075..859b1c2 100644
+--- a/cmd/buf/buf.go
++++ b/cmd/buf/buf.go
+@@ -123,6 +123,7 @@ import (
+ 	"github.com/bufbuild/buf/private/bufpkg/bufcobra"
+ 	"github.com/bufbuild/buf/private/bufpkg/bufconnect"
+ 	"github.com/bufbuild/buf/private/bufpkg/bufmodule"
++	"github.com/bufbuild/buf/private/pkg/slicchost"
+ 	"github.com/bufbuild/buf/private/pkg/slogapp"
+ 	"github.com/bufbuild/buf/private/pkg/syserror"
+ 	"github.com/spf13/cobra"
+@@ -564,6 +565,10 @@ func wrapError(ctx context.Context, err error) error {
+ 			)
+ 		case connectCode == connect.CodeUnavailable:
+ 			msg := `Failure: the server hosted at that remote is unavailable.`
++			// On wasip1 without buf's host module there is no network at all: say so.
++			if errors.Is(err, slicchost.ErrUnsupported) {
++				return fmt.Errorf("Failure: %w", slicchost.ErrUnsupported)
++			}
+ 			// If the returned error is Unavailable, then determine if this is a DNS error.  If so,
+ 			// get the address used so that we can display a more helpful error message.
+ 			if dnsError := (&net.DNSError{}); errors.As(err, &dnsError) && dnsError.IsNotFound {
 diff --git a/private/buf/bufprotopluginexec/bufprotopluginexec.go b/private/buf/bufprotopluginexec/bufprotopluginexec.go
 index db36448..842185e 100644
 --- a/private/buf/bufprotopluginexec/bufprotopluginexec.go

@@ -328,6 +328,10 @@ test('without the host module the offline commands run and the rest says what it
     result = await buf(kernel, ['build', 'http://127.0.0.1:9/image.binpb'])
     assert.equal(result.status, 1, output(result))
     assert.match(output(result), needs)
+    result = await buf(kernel, ['build', 'buf.build/bufbuild/protovalidate'])
+    assert.equal(result.status, 1, output(result))
+    assert.match(output(result), needs)
+    assert.doesNotMatch(output(result), /the server hosted at that remote is unavailable/)
   } finally {
     kernel.terminate()
   }
