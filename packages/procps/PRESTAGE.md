@@ -47,7 +47,7 @@ Overlaps (procps ∩ coreutils `slicc.commands` on `@ai-ecoverse/wasm-coreutils@
 | Command | coreutils | Action |
 | --- | --- | --- |
 | `uptime` | yes (stub) | **Remove** from coreutils `slicc.commands` |
-| `kill` | yes (stub) | **Remove** from coreutils `slicc.commands` (bash builtin `kill` unchanged) |
+| `kill` | yes (stub) | **Remove** — procps ships `bin/kill` (+ `slicc.commands.kill`). Bash builtin covers interactive/script `kill`; `env kill` / `xargs kill` need the PATH binary from procps. Confirmed: `env kill -TERM <pid>` works with coreutils `9.12.0-2` + procps (in cert). |
 | `ps` / `pgrep` / `pkill` / `free` / `pidof` | no | — |
 
 Packaging-only bump `9.12.0-1` → `9.12.0-2`: same `bin/*` bytes, only
