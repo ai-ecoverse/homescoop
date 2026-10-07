@@ -86,9 +86,10 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-xxd` | host | **9.1.1850** |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
-| `@ai-ecoverse/wasm-magick-native` | slicc* | stub (Magick.Native Q8) |
 
 \* stub until ported. Published libs ship relocatable `lib/pkgconfig/*.pc`.
+Magick.Native packaging (`wasm-magick-native`) is retired — use
+`@imagemagick/magick-wasm` or `@ai-ecoverse/wasm-imagemagick`.
 CLI tools declare `package.json` → `slicc.commands` for the wasm realm.
 
 ## License
