@@ -1,20 +1,24 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "description": [
     "Homescoope recipes pin upstream library versions in packages/*/recipe.yaml.",
-    "A custom regex manager reads `# renovate: …` comments above `version:` and opens one PR per package when upstream cuts a release.",
-    "Recipe bumps automerge when ladder-pr is green (host-build + slicc-kernel CDP browser-cert / host-smoke)."
+    "A custom regex manager reads `# renovate: \u2026` comments above `version:` and opens one PR per package when upstream cuts a release.",
+    "Do not automerge recipe bumps \u2014 CI browser-cert is a smoke gate; human certification remains required before publish."
   ],
   "semanticCommits": "enabled",
-  "platformAutomerge": true,
+  "platformAutomerge": false,
   "dependencyDashboard": true,
   "prHourlyLimit": 4,
   "customManagers": [
     {
       "customType": "regex",
       "description": "Homebrew-shaped recipe.yaml upstream pins (see # renovate comments).",
-      "managerFilePatterns": ["/(^|/)packages/[^/]+/recipe\\.ya?ml$/"],
+      "managerFilePatterns": [
+        "/(^|/)packages/[^/]+/recipe\\.ya?ml$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>\\S+?)(?: packageName=(?<packageName>\\S+?))?(?: versioning=(?<versioning>\\S+?))?(?: extractVersion=(?<extractVersion>\\S+?))?(?: registryUrl=(?<registryUrl>\\S+?))?\\s+version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
       ]
@@ -22,35 +26,53 @@
   ],
   "packageRules": [
     {
-      "description": "Upstream recipe bumps automerge when ladder-pr (build+browser-cert) is green.",
-      "matchFileNames": ["packages/**/recipe.yaml"],
-      "automerge": true,
-      "automergeType": "pr",
-      "platformAutomerge": true,
-      "addLabels": ["homescoop-recipe"]
+      "description": "Upstream recipe bumps need human cert + rebuild; never automerge.",
+      "matchFileNames": [
+        "packages/**/recipe.yaml"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "homescoop-recipe"
+      ]
     },
     {
       "description": "libpng 1.7 is a parallel beta line; stay on the 1.6.x stable series.",
-      "matchDepNames": ["pnggroup/libpng"],
+      "matchDepNames": [
+        "pnggroup/libpng"
+      ],
       "allowedVersions": "/^1\\.6\\./"
     },
     {
-      "description": "vim tags move fast; xxd tracks a pinned patch — ignore majors.",
-      "matchDepNames": ["vim/vim"],
-      "matchUpdateTypes": ["major"],
+      "description": "vim tags move fast; xxd tracks a pinned patch \u2014 ignore majors.",
+      "matchDepNames": [
+        "vim/vim"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "enabled": false
     },
     {
       "description": "Workflow action pins below a major.",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
       "minimumReleaseAge": "3 days",
       "automerge": true
     },
     {
       "description": "github-script major bumps can break ladder-merge; review by hand.",
-      "matchPackageNames": ["actions/github-script"],
-      "matchUpdateTypes": ["major"],
+      "matchPackageNames": [
+        "actions/github-script"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false
     }
   ]
