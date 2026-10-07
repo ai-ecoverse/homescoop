@@ -252,6 +252,14 @@ export function programName (request) {
   return String(request.program ?? '').split('/').pop()
 }
 
+// A git argument that names a network remote: a URL other than file://, or
+// scp-like user@host:path. A git+file: dependency's commands name none.
+const NETWORK_REMOTE = /^(?!file:)[a-z][a-z0-9+.-]*:\/\/|^[^/@:\s]+@[^/:\s]+:/i
+
+export function networkRemote (request) {
+  return (request.args ?? []).some(arg => NETWORK_REMOTE.test(String(arg)))
+}
+
 export function spawnMessage (request) {
   const program = programName(request)
   return program === 'git' || program === 'ssh' ? GIT_UNSUPPORTED : SCRIPTS_UNSUPPORTED
@@ -457,7 +465,7 @@ function createHost (ctx) {
   }
 
   function spawnGit (request) {
-    if (corsOnly()) return ctx.async.resolve(errorEnvelope(GIT_UNSUPPORTED))
+    if (corsOnly() && networkRemote(request)) return ctx.async.resolve(errorEnvelope(GIT_UNSUPPORTED))
     const problem = httpsProblem(request)
     if (problem) return ctx.async.resolve(errorEnvelope(problem))
     const stdio = name => (request[name] === 'ignore' || request[name] === 'null' ? 'null' : request[name] === 'inherit' ? 'inherit' : 'pipe')

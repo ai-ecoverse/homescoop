@@ -29,7 +29,8 @@ What needs what:
 | installs from registry.npmjs.org | ✓ | ✓ |
 | registries with auth tokens | ✗ | ✓ |
 | `pnpm publish` (up to 64 MiB) | ✗, clear error | ✓ (auth from `.npmrc`, `--otp`) |
-| git dependencies | ✗, clear error | ✓ with `@ai-ecoverse/wasm-git` and `@ai-ecoverse/wasm-tls-engine` installed and the kernel prepared |
+| git dependencies over the network (https, ssh) | ✗, clear error | ✓ with `@ai-ecoverse/wasm-git` and `@ai-ecoverse/wasm-tls-engine` installed and the kernel prepared |
+| `git+file:` dependencies (a repository in the kernel's file system) | ✓ with `@ai-ecoverse/wasm-git` installed | ✓ with `@ai-ecoverse/wasm-git` installed |
 
 OPFS has no hard links and keeps symlinks only in slicc-kernel's metadata, so
 the package defaults to `node-linker=hoisted`, `package-import-method=copy` and

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { CA_MISSING, GIT_MISSING, GIT_UNSUPPORTED, TLS_MISSING, MAX_UPLOAD, childEnv, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
+import { CA_MISSING, GIT_MISSING, GIT_UNSUPPORTED, TLS_MISSING, MAX_UPLOAD, childEnv, networkRemote, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders } from '../package/host/pnpm-host.mjs'
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
@@ -540,7 +540,28 @@ test('pnpm_host explains a missing git and a CORS-only transport', () => {
   const cors = fakeContext()
   cors.traits = { crossOrigin: 'cors' }
   const corsHost = createImports(cors).pnpm_host
-  assert.equal(response(cors, corsHost, corsHost.operation_start(...put(cors, 64, JSON.stringify({ operation: 'process.spawn', program: 'git' })))).error.message, GIT_UNSUPPORTED)
+  const remote = { operation: 'process.spawn', program: 'git', args: ['ls-remote', '--', 'git+ssh://git@github.com/a/b.git'] }
+  assert.equal(response(cors, corsHost, corsHost.operation_start(...put(cors, 64, JSON.stringify(remote)))).error.message, GIT_UNSUPPORTED)
+})
+
+test('pnpm_host runs git on a CORS-only page when it names no network remote (git+file:)', () => {
+  const ctx = gitContext()
+  ctx.traits = { crossOrigin: 'cors' }
+  const spawned = []
+  ctx.spawn = options => { spawned.push(options.argv); return { pid: 7, stdin: 3, stdout: 4, stderr: 5 } }
+  const { pnpm_host: host } = createImports(ctx)
+  const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
+  const local = { operation: 'process.spawn', program: 'git', args: ['ls-remote', '--', 'file:///home/p/dep.git'] }
+  assert.equal(response(ctx, host, start(local)).ok, true)
+  assert.deepEqual(spawned, [['git', 'ls-remote', '--', 'file:///home/p/dep.git']])
+  assert.equal(response(ctx, host, start({ operation: 'process.spawn', program: 'git', args: ['clone', 'git@github.com:a/b.git'] })).error.message, GIT_UNSUPPORTED)
+})
+
+test('networkRemote: URLs other than file://, and scp-like remotes', () => {
+  const remote = (...args) => networkRemote({ args })
+  for (const arg of ['https://github.com/a/b', 'http://h/x', 'ssh://git@h/x', 'git://h/x', 'git+ssh://git@h/x', 'git@github.com:a/b.git']) assert.equal(remote('clone', arg), true, arg)
+  for (const arg of ['file:///home/p/dep.git', '/home/p/dep.git', '../dep.git', 'HEAD', '--depth=1', 'a1b2c3', 'refs/heads/main:refs/remotes/origin/main']) assert.equal(remote('fetch', arg), false, arg)
+  assert.equal(networkRemote({}), false)
 })
 
 test('helpers: wait statuses and child env', () => {
