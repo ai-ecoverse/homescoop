@@ -39,6 +39,27 @@ window.installTree = async (dir, names) => {
   return names.length;
 };
 
+async function file(path, create = false) {
+  const parts = path.split('/').filter(Boolean);
+  const name = parts.pop();
+  return (await walk(parts.join('/'), create)).getFileHandle(name, { create });
+}
+
+window.opfs = {
+  async read(path) {
+    try {
+      return await (await (await file(path)).getFile()).text();
+    } catch {
+      return null;
+    }
+  },
+  async write(path, text) {
+    const writable = await (await file(path, true)).createWritable();
+    await writable.write(text);
+    await writable.close();
+  },
+};
+
 window.boot = async () => {
   if (!crossOriginIsolated) {
     throw new Error('page is not cross-origin isolated (need COOP/COEP)');

@@ -1,0 +1,11 @@
+{
+  "harness": "slicc-kernel",
+  "checklist": [
+    "xz -k / xz -d small round trip",
+    "corrupt input rejected",
+    "xz -T0 and -T2 compress+decompress 4 MiB (mythread_sigmask)"
+  ],
+  "patches": {
+    "wasm-mythread-sigmask.patch": "xz -T0/-T2 over 4 MiB in cert/roundtrip.mjs (enables mythread_sigmask on wasm)"
+  }
+}

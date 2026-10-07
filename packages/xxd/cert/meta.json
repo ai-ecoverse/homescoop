@@ -1,0 +1,7 @@
+{
+  "harness": "slicc-kernel",
+  "checklist": [
+    "xxd | xxd -r round trip",
+    "--version / -v"
+  ]
+}

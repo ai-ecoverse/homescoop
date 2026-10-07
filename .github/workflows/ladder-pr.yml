@@ -138,13 +138,22 @@ jobs:
           mkdir -p "$PROBE"
           tar -xzf .homescoop-out/package.tgz -C "$PROBE" package/package.json
           NEED=$(node -e '
-            const m=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+            const fs=require("fs"); const path=require("path");
+            const pkg=process.argv[1];
+            const m=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+            const certDir=path.join("packages", pkg, "cert");
+            let specs=[];
+            try { specs=fs.readdirSync(certDir).filter(f=>f.endsWith(".mjs")); } catch {}
+            let harness="smoke";
+            try { harness=JSON.parse(fs.readFileSync(path.join(certDir,"meta.json"),"utf8")).harness||harness; } catch {}
+            if (harness==="host-smoke"||harness==="host-node") { process.stdout.write("0"); process.exit(0); }
+            if (specs.length>0) { process.stdout.write("1"); process.exit(0); }
             const abi=m.slicc?.abi||"emscripten";
             const n=Object.keys(m.slicc?.commands||{}).length;
             process.stdout.write(abi==="emscripten"&&n>0?"1":"0");
-          ' "$PROBE/package/package.json")
+          ' "${{ matrix.package }}" "$PROBE/package/package.json")
           if [[ "$NEED" != "1" ]]; then
-            echo "browser-cert: skip (no emscripten slicc.commands; host-smoke is the gate)"
+            echo "browser-cert: skip (host-smoke/host-node or no CLI/cert specs)"
             exit 0
           fi
           CERT_NM="${RUNNER_TEMP}/homescoop-browser-cert-nm"
@@ -153,6 +162,16 @@ jobs:
             @ai-ecoverse/slicc-kernel@^1.8.10 \
             @ai-ecoverse/slicc-shared-web@^1.4.1 \
             playwright-core@1.63.0
+          # Optional peers from cert/meta.json needs[]
+          if [[ -f "packages/${{ matrix.package }}/cert/meta.json" ]]; then
+            node -e '
+              const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+              for (const n of j.needs||[]) console.log(n);
+            ' "packages/${{ matrix.package }}/cert/meta.json" | while read -r dep; do
+              [[ -n "$dep" ]] || continue
+              npm install --prefix "$CERT_NM" --no-fund --no-audit "$dep"
+            done
+          fi
           npx --prefix "$CERT_NM" playwright-core install --with-deps chromium
           export HOMESCOOP_CERT_NODE_MODULES="$CERT_NM/node_modules"
           node scripts/browser-cert/run.mjs \

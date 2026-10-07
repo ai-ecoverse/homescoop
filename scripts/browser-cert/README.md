@@ -1,9 +1,6 @@
-# Browser cert (slicc-kernel CDP)
+# Browser / CI cert (slicc-kernel CDP)
 
-PR gate for emscripten CLIs: run the host-built tarball inside
-`@ai-ecoverse/slicc-kernel` in headless Chromium, driven by
-`@ai-ecoverse/slicc-shared-web/harness` (same CDP stack as slicc-kernel’s
-integration tests).
+See [docs/ci-cert.md](../../docs/ci-cert.md).
 
 ```sh
 npm install --prefix /tmp/cert-nm \
@@ -12,15 +9,10 @@ npm install --prefix /tmp/cert-nm \
   playwright-core@1.63.0
 npx --prefix /tmp/cert-nm playwright-core install chromium
 export HOMESCOOP_CERT_NODE_MODULES=/tmp/cert-nm/node_modules
-export NODE_PATH=$HOMESCOOP_CERT_NODE_MODULES
+
+# Full checklist (packages/<name>/cert/*.mjs)
 node scripts/browser-cert/run.mjs --package jq --tarball path/to/package.tgz
+
+# Negative proof (must fail)
+node scripts/browser-cert/prove-negative.mjs --package jq --tarball path/to/package.tgz
 ```
-
-Optional `packages/<name>/browser-cert.json`:
-
-```json
-{ "argv": ["jq", "-n", "1+1"], "stdout": "2\n", "status": 0 }
-```
-
-Default when missing: first `slicc.commands` entry with `--version`, status 0.
-Packages without emscripten `slicc.commands` skip (libs use `host-smoke.sh`).
