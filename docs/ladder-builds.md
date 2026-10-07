@@ -29,14 +29,15 @@ workflow_dispatch(package)
 A recipe change that needs a new WASM must bump the packaging revision (`X.Y.Z-N`).
 The same `pkg@version` on the registry is never rebuilt.
 
-**Publish order (CI-certified path):** `ladder-pr` host-builds, browser-certs
-(emscripten CLIs on slicc-kernel CDP), and uploads `host-<pkg>-prN` with
-`package.tgz` + sha256. Renovate automerges when that check is green.
-`ladder-merge` dispatches `ladder-build` with `certified=<sha256>` and
-`artifact_pr=<N>` so OIDC publishes the **exact** PR tarball (no rebuild).
+**Publish order:** human-certify the PR artifact, then publish that exact
+tarball (`certified=<sha256>`). `ladder-pr` host-build + host-smoke +
+slicc-kernel CDP browser-cert are smoke gates, not a substitute for
+certification. `ladder-merge` can dispatch `ladder-build` with
+`certified=<sha256>` + `artifact_pr=<N>` to OIDC-publish the PR tarball
+without rebuild. Renovate recipe bumps do **not** automerge.
 
-**Legacy / manual:** laptop `npm publish` of the exact certified tarball, then
-land, or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
+**Manual:** laptop `npm publish` of the exact certified tarball, then land,
+or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
 
 OIDC publish always runs **on the runner** (`id-token: write`). One workflow
 file (`ladder-build.yml`) keeps a single `npm trust` target.

@@ -43,10 +43,10 @@ node scripts/refresh-recipe-sha.mjs <package>
 # --check: fail if the committed sha256 does not match the download
 ```
 
-Recipe bumps **automerge** when `ladder-pr` is green: host-build, `host-smoke`
-(libs), and slicc-kernel CDP **browser-cert** (emscripten CLIs). The PR artifact
-sha256 is the certified tarball; `ladder-merge` / `ladder-build` must publish
-that digest (`certified=<sha256>`), not an uncertified rebuild.
+Recipe bumps do **not** automerge. `ladder-pr` host-build + host-smoke +
+slicc-kernel CDP browser-cert are smoke gates; human certification remains
+required before publish. When publishing, use the exact PR artifact
+(`certified=<sha256>` / `artifact_pr`).
 
 `build.sh` loads version/URL/sha via `homescoop_load_recipe`. Secondary
 tarballs (ncurses, mbedtls, unzip) live under `sources:` in the same recipe.
