@@ -9,5 +9,5 @@
     "uptime prints without error",
     "attached-worker process visible in terminal ps (after slicc-kernel#66)"
   ],
-  "blocked": "Needs slicc-kernel /proc from #66-era build; pin HOMESCOOP_CERT_NODE_MODULES to that prerelease until released. New package → human cert, not ci-certified.json."
+  "blocked": "Positive cert proven on slicc-kernel-procfs-ed6d6a1.tgz. CI still needs a published kernel with /proc (or ladder-pr pin of that tarball). New package → human cert, not ci-certified.json."
 }

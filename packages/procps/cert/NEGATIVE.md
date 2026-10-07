@@ -16,8 +16,19 @@ AssertionError: ps aux stderr=Error, do this: mount -t proc proc /proc
 ```
 
 That proves the checklist is not vacuous: without Linux-shaped `/proc`, `ps`
-fails as expected. Re-run against a #66-era kernel prerelease (coordinate with
-thr_ej75dimgf5) for the positive path.
+fails as expected.
+
+## Positive path (procfs prerelease)
+
+Against `slicc-kernel-procfs-ed6d6a1.tgz` (feat/attach-client, before #66 attach)
++ local `@ai-ecoverse/wasm-procps@4.0.5-1`:
+
+`cert/checklist.mjs` → **ok** (`ps aux` / `pgrep` / `pkill` / `free -h` /
+absolute-path `uptime`). No /proc field layout issues observed for these tools.
+
+Note: bare `uptime` is shadowed by wasm-coreutils' empty `/usr/bin/uptime`
+multi-call stub (`coreutils: unknown program 'uptime'`) — homescoop packaging,
+not a kernel /proc bug.
 
 ## Empty wasm (once a good tarball is published)
 
