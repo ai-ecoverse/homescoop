@@ -57,6 +57,11 @@ homescoop_stage_license() {
   mkdir -p "$HOMESCOOP_PKG/package"
   for f in "$@"; do
     if [[ -f "$f" ]]; then
+      # Same path (e.g. xxd keeps package/LICENSE): do not cp onto self.
+      if [[ "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" == "$(cd "$(dirname "$dest")" && pwd)/$(basename "$dest")" ]]; then
+        echo "== license: keeping existing package/LICENSE"
+        return 0
+      fi
       cp "$f" "$dest"
       echo "== license ← $f"
       return 0
