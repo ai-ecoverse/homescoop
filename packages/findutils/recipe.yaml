@@ -7,7 +7,7 @@ npm: "@ai-ecoverse/wasm-findutils"
 summary: "GNU find and xargs for slicc"
 source:
   url: "https://mirrors.kernel.org/gnu/findutils/findutils-{{version}}.tar.xz"
-  sha256: "1387e0b67ff247d2abde998f90dfbf70c1491391a59ddfecb8ae698789f0a4f5"
+  sha256: "bfd19cb06cc71f3352d567e90284d8cdac02ac89774bbeadf0b533b0c11432fd"
 dependencies:
   build: []
   host: []
