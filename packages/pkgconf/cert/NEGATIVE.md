@@ -1,9 +1,13 @@
 # Negative proof (pkgconf)
 
 **Date:** 2026-10-07  
-**Method:** `node scripts/browser-cert/prove-negative.mjs --package pkgconf --tarball <good.tgz>`  
-(empties `bin/*.wasm` and expects cert failure)
+No SLICC patches on this package.
 
-**Result:** FAIL as required — `WebAssembly.compile(): BufferSource argument is empty`; prove-negative exited 0.
+## Empty wasm
 
-**Good tarball used:** published npm package for this recipe (see `npm view @ai-ecoverse/wasm-pkgconf version`).
+`prove-negative.mjs --package pkgconf` → FAIL (`WebAssembly.compile(): BufferSource argument is empty`).
+
+## Wrong-output case (in-spec)
+
+`cert/pc.mjs` requires `--modversion homescoop-cert` → `9.9.9` from a staged
+`.pc`, and a missing package must exit non-zero.

@@ -1,9 +1,14 @@
 # Negative proof (jq)
 
 **Date:** 2026-10-07  
-**Method:** `node scripts/browser-cert/prove-negative.mjs --package jq --tarball <good.tgz>`  
-(empties `bin/*.wasm` and expects cert failure)
+No SLICC patches on this package.
 
-**Result:** FAIL as required — `WebAssembly.compile(): BufferSource argument is empty`; prove-negative exited 0.
+## Empty wasm
 
-**Good tarball used:** published npm package for this recipe (see `npm view @ai-ecoverse/wasm-jq version`).
+`prove-negative.mjs --package jq` → FAIL (`WebAssembly.compile(): BufferSource argument is empty`).
+
+## Wrong-output case (in-spec)
+
+`cert/basic.mjs` asserts `jq -n '1+1'` stdout is exactly `2\n` and that invalid
+JSON exits non-zero. A build that always printed `0\n` or accepted bad JSON
+would fail those asserts (covered by the positive assertions themselves).

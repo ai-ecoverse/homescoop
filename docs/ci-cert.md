@@ -31,13 +31,22 @@ packages/<name>/cert/
 | **host-node** | Special host scripts (`scripts/smoke-cmake.mjs`, `scripts/smoke-binaryen.mjs`). |
 | **Full SLICC realm** | Scoop/ipk/UI-coupled or cone-only behaviour. Rare for homescoop publishables; prefer slicc-kernel. If a checklist truly needs the cone, add a `ladder-pr` job that starts a SLICC leader (same as `ladder-build` slicc path) and run `cert/*.mjs` there — call those out in `cert/meta.json` `"harness": "slicc-realm"`. |
 
+## Patch ↔ spec mapping
+
+Every `packages/<name>/*.patch` must be named in `cert/meta.json` under
+`patches`, with a cert case that exercises the patched code path. Specs that
+only smoke `--version` are not enough for patched packages.
+
 ## Enabling automerge
 
-1. Port the checklist into `cert/`.
-2. Prove a negative once (break a patch / swap a bad binary); record in
-   `cert/NEGATIVE.md`.
-3. Add the recipe dir name to `scripts/ci-certified.json` → Renovate
-   `packageRules` (generated note in `renovate.json`).
+1. Port the checklist into `cert/` (and map every patch in `meta.json`).
+2. Negative proof in `cert/NEGATIVE.md`:
+   - **With patches:** rebuild once with the SLICC patch removed; the cert
+     case that maps to that patch (or the build) must fail. Record the log.
+   - **Without patches:** `prove-negative.mjs` (empty `.wasm`) plus an
+     in-spec wrong-output / non-zero-exit assert.
+3. Add the recipe dir name to `scripts/ci-certified.json` and run
+   `node scripts/sync-ci-certified-renovate.mjs`.
 4. Majors and brand-new packages stay `automerge: false` + label for human review.
 
 ## Context API (`cert/*.mjs`)
