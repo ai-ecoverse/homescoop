@@ -36,12 +36,14 @@ export function tarball (files) {
 export async function startRegistry ({ token } = {}) {
   const packages = new Map()
   const published = []
+  const requests = []
   const server = createServer((req, res) => {
     const chunks = []
     req.on('data', chunk => chunks.push(chunk))
     req.on('end', () => {
       const url = new URL(req.url, 'http://localhost')
       const name = decodeURIComponent(url.pathname.slice(1))
+      requests.push(`${req.method} ${url.pathname}`)
       if (req.method === 'PUT') {
         const authorized = req.headers.authorization === `Bearer ${token}`
         published.push({ name, authorized, otp: req.headers['npm-otp'] ?? null, bytes: Buffer.concat(chunks).length })
@@ -66,6 +68,7 @@ export async function startRegistry ({ token } = {}) {
   return {
     base,
     published,
+    requests,
     add (name, version, manifest = {}, files = {}) {
       const json = { name, version, ...manifest }
       const tgz = tarball({ 'package.json': JSON.stringify(json), ...files })

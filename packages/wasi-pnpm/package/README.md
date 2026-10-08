@@ -39,4 +39,8 @@ the kernel for up to 256 threads.
 
 `slicc.env` also points `PNPM_WASM_EXECUTABLE` at the package's own
 `bin/pnpm.wasm`, which `pnpm add -g` / `pnpm remove -g` need to link global
-bins. As with every package env value, a caller's own environment wins.
+bins. It sets `PNPM_CONFIG_UPDATE_NOTIFIER=false` too: pnpm's daily "Update
+available!" check is a registry request with no use in slicc, where the
+package, not pnpm itself, decides the version. As with every package env value,
+a caller's own environment wins: `PNPM_CONFIG_UPDATE_NOTIFIER=true` brings the
+check back.
