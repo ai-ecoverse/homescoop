@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-07  
 CI-certified (thr_b83wwqmt4e): `@ai-ecoverse/wasm-procps@4.0.5-1` on slicc-kernel 1.9.0; listed in `scripts/ci-certified.json`.
-Browser-cert pin now `@ai-ecoverse/slicc-kernel@1.12.0` (thr_ej75dimgf5 #77/#80): real per-process VmSize/VmRSS + meminfo used; USER/whoami fixed in 1.11.0.
+Browser-cert pin now `@ai-ecoverse/slicc-kernel@1.14.0` (pnpm global command roots). Real per-process VmSize/VmRSS + meminfo used since 1.12.0 (thr_ej75dimgf5 #77/#80); USER/whoami fixed in 1.11.0.
 
 ## Stock kernel (no /proc) — recorded
 

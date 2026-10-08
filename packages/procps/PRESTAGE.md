@@ -27,7 +27,7 @@ Re-prove against the **released** kernel after #66.
 3. `FORCE=1 bash scripts/host-run.sh procps` → tarball + sha256.
 4. Packaging-only coreutils `9.12.0-2` via
    `node scripts/packaging-only-coreutils-drop-procps-clashes.mjs`.
-5. ~~Local + CI browser-cert on 1.9.0~~ done; pin now 1.12.0 with published `wasm-coreutils@9.12.0-2` (no overlay script).
+5. ~~Local + CI browser-cert on 1.9.0~~ done; pin now 1.14.0 with published `wasm-coreutils@9.12.0-2` (no overlay script).
 6. Send both tarballs + sha256 to thr_b83wwqmt4e (attached-worker `ps` in browser).
 7. Publish exact artifacts (`certified=<sha256>`), then land #54.
 8. ~~Add `procps` to `scripts/ci-certified.json`~~ done after thr_b83wwqmt4e cert + publish of 4.0.5-1.
@@ -58,6 +58,6 @@ bash scripts/host-run.sh procps
 
 ## Post-land kernel pins
 
-- Browser-cert kernel pin: `1.12.0` (real VSZ/RSS + meminfo used; USER via 1.11.0).
+- Browser-cert kernel pin: `1.14.0` (pnpm global command roots; real VSZ/RSS + meminfo used via 1.12.0; USER via 1.11.0).
 - Published npm packages unchanged; no procps republish.
 
