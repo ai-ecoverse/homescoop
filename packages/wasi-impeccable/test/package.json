@@ -1,0 +1,11 @@
+{
+  "name": "wasi-impeccable-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node --test --test-concurrency=1 'e2e/*.test.mjs'"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.15.1"
+  }
+}

@@ -1,8 +1,11 @@
 /**
- * wasi-impeccable: detect + file-local verbs; unavailable verbs refuse clearly.
+ * wasi-impeccable: detect + file-local verbs, relative paths from a non-root
+ * cwd, and clear refusals. The HTTP verbs (install, check, generate-image,
+ * concept-seed) need a network transport this page does not give the kernel;
+ * test/e2e/http.test.mjs covers them on the Node entry.
  */
 export default async function (ctx) {
-  const { run, write, assert } = ctx;
+  const { run, write, read, assert } = ctx;
 
   const ver = await run(['impeccable', '--version'], { cwd: '/home' });
   assert.equal(ver.status, 0, `--version stderr=${ver.stderr}`);
@@ -86,6 +89,26 @@ body { font-family: Inter, Arial, sans-serif; color: #000; background: #fff; }
   assert.ok(afterIds.has('ai-color-palette'), 'ai-color-palette should remain');
   assert.ok(afterIds.has('low-contrast'), 'low-contrast should remain');
 
+  // Non-root cwd: relative paths resolve against the directory the command
+  // runs in (PWD). wasi-libc's current_dir() stays `/`, which 0.1.12-4 used.
+  const relDetect = await run(['impeccable', 'detect', '--json', 'dirty.html'], { cwd: '/home/site' });
+  assert.equal(relDetect.status, 2, `relative detect from /home/site should exit 2; stderr=${relDetect.stderr}`);
+  const relFindings = JSON.parse(relDetect.stdout);
+  const relIds = new Set(relFindings.map((f) => f.antipattern));
+  assert.ok(relIds.has('overused-font'), `relative detect findings=${[...relIds].join(',')}`);
+  // 0.1.12-4 reported these as /dirty.html.
+  const relFiles = [...new Set(relFindings.map((f) => f.file))];
+  assert.deepEqual(relFiles, ['/home/site/dirty.html'], `relative detect files=${relFiles.join(',')}`);
+  await write('home/site/sub/comps/.keep', '');
+  const fake = await run(
+    ['impeccable', 'generate-image', '--prompt', 'a calm hero', '--out', 'comps/fake.png'],
+    { cwd: '/home/site/sub', env: { IMPECCABLE_IMAGE_GEN_FAKE: '1' } },
+  );
+  assert.equal(fake.status, 0, `fake generate-image stderr=${fake.stderr}`);
+  assert.match(fake.stdout, /IMAGE: comps\/fake\.png .*no API call/, `fake stdout=${JSON.stringify(fake.stdout)}`);
+  assert.notEqual(await read('home/site/sub/comps/fake.png'), null, 'comps/fake.png not written under the cwd');
+  assert.equal(await read('comps/fake.png'), null, 'comps/fake.png written under / instead of the cwd');
+
   // --- file-local verbs (0.1.12-4) ---
   const palette = await run(['impeccable', 'palette'], { cwd: '/home' });
   assert.equal(palette.status, 0, `palette stderr=${palette.stderr}`);
@@ -167,15 +190,18 @@ body { font-family: Inter, Arial, sans-serif; color: #000; background: #fff; }
     `help=${JSON.stringify(help.stderr + help.stdout)}`,
   );
 
+  // generate-image is wired (0.1.12-5): without a key it says so.
+  const noKey = await run(['impeccable', 'generate-image'], { cwd: '/home' });
+  assert.equal(noKey.status, 1, `generate-image status=${noKey.status}`);
+  assert.match(noKey.stderr, /OPENAI_API_KEY is not set/, `generate-image stderr=${JSON.stringify(noKey.stderr)}`);
+
   // Deferred verbs: clear refusal, not Unknown command.
-  const unavailable = await run(['impeccable', 'generate-image'], { cwd: '/home' });
-  assert.equal(unavailable.status, 1, `generate-image status=${unavailable.status}`);
-  assert.match(
-    unavailable.stderr,
-    /not available in this build yet/,
-    `unavailable stderr=${JSON.stringify(unavailable.stderr)}`,
-  );
-  assert.ok(!/Unknown command/.test(unavailable.stderr), 'must not say Unknown command');
+  for (const verb of ['serve-question', 'font-match']) {
+    const unavailable = await run(['impeccable', verb], { cwd: '/home' });
+    assert.equal(unavailable.status, 1, `${verb} status=${unavailable.status}`);
+    assert.match(unavailable.stderr, /not available in this build yet/, `${verb} stderr=${JSON.stringify(unavailable.stderr)}`);
+    assert.ok(!/Unknown command/.test(unavailable.stderr), `${verb} must not say Unknown command`);
+  }
 
   const live = await run(['impeccable', 'live'], { cwd: '/home' });
   assert.equal(live.status, 1, `live status=${live.status}`);

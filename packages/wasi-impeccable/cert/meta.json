@@ -8,15 +8,17 @@
     "detect dirty.html → overused-font + ai-color-palette + low-contrast, exit 2",
     "detect clean.html → exit 0",
     "detect /home/site (dirty+clean) → findings name dirty.html only, exit 2",
+    "non-root cwd: detect dirty.html from /home/site and generate-image (IMPECCABLE_IMAGE_GEN_FAKE) --out comps/fake.png from /home/site/sub land relative to the cwd, not /",
     "missing path → exit 1 + Warning: cannot access …",
     "unknown verb → exit 1",
     "ignores add-rule overused-font → that id disappears, others remain",
     "palette / doctor / context / signals / pin / detect-csp / surface-brief / critique-storage / embed-prompt / hooks / hook / hook-before-edit / comp-spec / comp-diff / check / link --help",
-    "help (no network) and generate-image / live → not available in this build yet (not Unknown command)",
     "install with closed stdin → exit 1 + no harness selected (no hang)",
-    "detect https://example.com → URL scans need a browser; not available in this build yet (rc 1)"
+    "detect https://example.com → URL scans need a browser; not available in this build yet (rc 1)",
+    "help without network → Could not fetch command list (exit 1); generate-image without key → OPENAI_API_KEY is not set; serve-question / font-match / live → not available in this build yet",
+    "HTTP verbs (test/e2e/http.test.mjs, Node entry, mocked transport): install verifies the real signed skill-v4.5.0 bundle and installs under the cwd; tampered zip and forged signature refused; check up to date; generate-image posts to the image API with relative paths; concept-seed rolls via the API; https without a proxy → no TLS error"
   ],
   "patches": {
-    "0001-wasi-detect-only-cli.patch": "cfg(target_family=wasm) gates ureq/tiny_http/ring; file-local verbs on; unavailable verbs print clear message; process_id + no thread spawn on wasi; install EOF exits; URL detect message"
+    "0001-wasi-detect-only-cli.patch": "cfg(target_family=wasm): ureq → wasix-ureq (homescoop crates/, vendored by build.sh), ring Ed25519 → ed25519-dalek verify_strict, Io cwd from PWD; HTTP verbs on (install/update/check/help/generate-image/concept-seed); live/URL/capture/serve-question refuse clearly; process_id + no thread spawn on wasi; install EOF exits; URL detect message"
   }
 }
