@@ -1,13 +1,20 @@
 {
   "harness": "slicc-kernel",
-  "needs": ["@ai-ecoverse/wasm-bash"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.17.3",
+  "needs": [
+    "@ai-ecoverse/wasm-bash"
+  ],
   "checklist": [
     "shell pipes (bash | coreutils)",
     "env sets variable for child",
     "nice runs a child",
-    "nohup runs a child"
+    "nohup runs a child",
+    "exec keeps the pid: env/nice bash -c 'echo $PPID' is the outer bash's $$"
   ],
   "patches": {
     "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch"
-  }
+  },
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8"
+  ]
 }

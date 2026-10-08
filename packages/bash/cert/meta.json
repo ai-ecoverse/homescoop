@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.17.3",
+  "needs": [
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-coreutils@9.12.0-2"
+  ],
+  "checklist": [
+    "bash -c arithmetic",
+    "exec bash: $$ and $PPID unchanged, /proc/$$/stat shows bash",
+    "exec cat: /proc/$$/stat shows cat",
+    "exec cat /proc/self/stat: pid == $$ (slicc-kernel#108)",
+    "(exec sleep) &: child's $$ == $!, kill $! → wait 143",
+    "-O execfail: failed exec returns, USR1 trap restored",
+    "failed exec without execfail → 127"
+  ]
+}
