@@ -4,7 +4,7 @@
   "needs": [],
   "needsInstall": [],
   "checklist": [
-    "impeccable --version → 0.1.12 (engine, not npm CLI 4.0.0)",
+    "impeccable --version → 4.0.0 (upstream npm CLI_VERSION)",
     "detect dirty.html → overused-font + ai-color-palette + low-contrast, exit 2",
     "detect clean.html → exit 0",
     "detect /home/site (dirty+clean) → findings name dirty.html only, exit 2",
@@ -13,6 +13,6 @@
     "ignores add-rule overused-font → that id disappears, others remain"
   ],
   "patches": {
-    "0001-wasi-detect-only-cli.patch": "cfg(not(target_family=wasm)) keeps browser/live/skills/context/hook/comp off the WASI graph; --version prints crate/engine VERSION"
+    "0001-wasi-detect-only-cli.patch": "cfg(not(target_family=wasm)) keeps browser/live/skills/context/hook/comp off the WASI graph"
   }
 }

@@ -23,8 +23,7 @@ about:
     the patch is mechanical: move browser/live/skills/context/hook/comp (+
     base64/sha2) to [target.'cfg(not(target_family = "wasm"))'.dependencies],
     and #[cfg(not(target_family = "wasm"))] the matching verb arms, lib
-    modules, and URL/Chrome engine. Also makes --version print the crate /
-    engine VERSION (0.1.x) instead of upstream's npm CLI_VERSION (4.0.0),
-    which would mislead users of this WASI package. wasm-opt -Oz with the
-    rustc feature set (~3.4 MiB → ~3.0 MiB). Command impeccable →
-    bin/impeccable.wasm (abi=wasi). File/dir detect needs no network.
+    modules, and URL/Chrome engine. --version stays upstream's npm
+    CLI_VERSION (4.0.0). wasm-opt -Oz with the rustc feature set
+    (~3.4 MiB → ~3.0 MiB). Command impeccable → bin/impeccable.wasm
+    (abi=wasi). File/dir detect needs no network.

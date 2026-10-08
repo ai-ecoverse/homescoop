@@ -10,7 +10,7 @@
 pnpm add -g @ai-ecoverse/wasi-impeccable
 impeccable detect path/to/page.html
 impeccable detect src/
-impeccable --version   # prints the engine version (e.g. 0.1.12)
+impeccable --version
 ```
 
 It does **not** include URL or Chrome/CDP scans, live mode, or the skill
