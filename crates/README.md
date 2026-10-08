@@ -10,7 +10,7 @@ re-implement raw WASIX imports.
 | crate | what | on other targets |
 | --- | --- | --- |
 | `wasix-net` | `TcpStream`, `TcpListener`, `ToSocketAddrs`, `resolve` over WASIX sockets; `http`, a blocking HTTP/1.1 client (proxy from the environment with `no_proxy`, chunked and length bodies, redirects, keep-alive, timeouts, `json` feature) | std's sockets; the client runs over them |
-| `wasix-command` | `Command`, `Child`, `Stdio`, `ExitStatus`, `Output`: args, env, cwd, stdio inherited / piped / null / from a file, `spawn`, `output`, `status`, `wait`, `try_wait`, `kill`; a dropped `Child` keeps running | `std::process` |
+| `wasix-command` | `Command`, `Child`, `Stdio`, `ExitStatus`, `Output`: args, env, cwd, stdio inherited / piped / null / from a file, `spawn`, `output`, `status`, `wait`, `try_wait`, `kill`; a dropped `Child` keeps running. `process::{id, signal}`: this process's pid (WASIX `proc_id`) and signals to any pid, `Signal::Probe` being `kill -0` | `std::process`; `process` is std's pid and `kill(2)` on unix |
 | `wasix-ureq` | the part of ureq 2.12's API that impeccable uses, over `wasix_net::http`; its library is named `ureq` | (WASI only; use ureq) |
 | `wasix-selftest` | checks all three in the kernel (`test/kernel`) | runs over std |
 

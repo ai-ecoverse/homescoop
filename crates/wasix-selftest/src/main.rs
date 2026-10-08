@@ -11,12 +11,15 @@
 //! - `spawn`: wasix-command's API, one `ok <check>` line per check.
 //! - `detach PATH`: starts a child that writes PATH a moment later, and
 //!   exits without waiting for it.
+//! - `probe PID`: exits 0 when PID is running (wasix-command's
+//!   `process::signal`).
 //! - `child …`: what the checks run as children.
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::exit;
 use std::time::Duration;
 
+use wasix_command::process::{self, Signal};
 use wasix_command::{Command, Stdio};
 use wasix_net::http::{Agent, Error};
 use wasix_net::{TcpListener, TcpStream};
@@ -29,6 +32,7 @@ fn main() {
         Some("loopback") => loopback(),
         Some("spawn") => spawn(),
         Some("detach") => detach(&rest),
+        Some("probe") => probe(&rest),
         Some("child") => child(&rest),
         _ => {
             eprintln!("usage: wasix-selftest http|loopback|spawn|detach|child …");
@@ -490,6 +494,29 @@ fn spawn() -> i32 {
         status,
     );
 
+    let me_pid = process::id();
+    check(
+        "own pid",
+        me_pid > 0 && process::signal(me_pid, Signal::Probe).is_ok(),
+        me_pid,
+    );
+    let mut sleeper = me().args(["child", "sleep", "30000"]).spawn().unwrap();
+    let pid = sleeper.id();
+    check(
+        "probe a running child",
+        process::signal(pid, Signal::Probe).is_ok(),
+        pid,
+    );
+    process::signal(pid, Signal::Terminate).unwrap();
+    let status = sleeper.wait().unwrap();
+    check(
+        "terminate by pid",
+        !status.success() && status.code().is_none(),
+        status,
+    );
+    let gone = process::signal(pid, Signal::Probe);
+    check("probe a reaped child", gone.is_err(), gone);
+
     let missing = Command::new("wasix-selftest-no-such-command").output();
     check(
         "a missing program",
@@ -504,7 +531,7 @@ fn spawn() -> i32 {
 fn detach(args: &[&str]) -> i32 {
     let [path] = args else { return 2 };
     let child = me()
-        .args(["child", "touch-after", "500", path])
+        .args(["child", "touch-after", "1500", path])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -513,6 +540,18 @@ fn detach(args: &[&str]) -> i32 {
     println!("detached {}", child.id());
     drop(child);
     0
+}
+
+/// Exit 0 when `pid` is running, 1 when it is not.
+fn probe(args: &[&str]) -> i32 {
+    let [pid] = args else { return 2 };
+    match process::signal(pid.parse().expect("pid"), Signal::Probe) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("{e}");
+            1
+        }
+    }
 }
 
 fn child(args: &[&str]) -> i32 {
