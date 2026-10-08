@@ -36,3 +36,7 @@ OPFS has no hard links and keeps symlinks only in slicc-kernel's metadata, so
 the package defaults to `node-linker=hoisted`, `package-import-method=copy` and
 `ignore-scripts=true` (as `PNPM_CONFIG_*` variables in `slicc.env`), and asks
 the kernel for up to 256 threads.
+
+`slicc.env` also points `PNPM_WASM_EXECUTABLE` at the package's own
+`bin/pnpm.wasm`, which `pnpm add -g` / `pnpm remove -g` need to link global
+bins. As with every package env value, a caller's own environment wins.

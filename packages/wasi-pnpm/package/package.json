@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-4",
+  "version": "12.9.1-5",
   "description": "pnpm 12 for slicc WASI (commands pnpm, pn); pnpm.wasm built by homescoop from pnpm v12.9.1 with a documented patch",
   "license": "MIT",
   "repository": {
@@ -53,6 +53,7 @@
     },
     "env": {
       "PNPM_SLICC_PACKAGE": "${package}",
+      "PNPM_WASM_EXECUTABLE": "${package}/bin/pnpm.wasm",
       "PNPM_WASM_PID": "1",
       "PNPM_WASM_CWD": "${cwd}",
       "PNPM_WASM_TMPDIR": "/tmp",

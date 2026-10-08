@@ -77,6 +77,26 @@ test('pnpm installs from a registry into a hoisted node_modules', async () => {
   }
 })
 
+test('pnpm add -g and remove -g, finding its own pnpm.wasm from the package env', async () => {
+  const registry = await startRegistry({ token: TOKEN })
+  registry.add('tiny-cli', '1.0.0', { bin: { tiny: 'cli.js' } }, { 'cli.js': '#!/usr/bin/env node\nconsole.log("tiny")\n' })
+  const kernel = await kernelWith(['wasi-pnpm'])
+  const env = { HOME: '/home', PNPM_HOME: '/home/.local/share/pnpm', PATH: '/home/.local/share/pnpm/bin:/usr/bin:/bin' }
+  try {
+    const add = await kernel.run(['pnpm', 'add', '-g', 'tiny-cli', '--registry', registry.base], { cwd: '/home', env })
+    assert.equal(add.status, 0, output(add))
+    assert.doesNotMatch(output(add), /PNPM_WASM_EXECUTABLE/)
+    const list = await kernel.run(['pnpm', 'list', '-g', '--depth=0'], { cwd: '/home', env })
+    assert.match(output(list), /tiny-cli/)
+    const remove = await kernel.run(['pnpm', 'remove', '-g', 'tiny-cli'], { cwd: '/home', env })
+    assert.equal(remove.status, 0, output(remove))
+    assert.doesNotMatch(output(await kernel.run(['pnpm', 'list', '-g', '--depth=0'], { cwd: '/home', env })), /tiny-cli/)
+  } finally {
+    kernel.terminate()
+    await registry.close()
+  }
+})
+
 test('pnpm publishes with auth and --otp, streams a large body and never prints the token', async () => {
   const registry = await startRegistry({ token: TOKEN })
   const kernel = await kernelWith(['wasi-pnpm'])
