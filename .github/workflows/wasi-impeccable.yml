@@ -1,9 +1,10 @@
-# wasi-impeccable's HTTP verbs, end to end: build impeccable.wasm with the
-# recipe (wasix-ureq vendored from crates/), then run test/e2e on the
-# certified slicc-kernel's headless Node entry. The transport mocks
-# impeccable.style and the image API; the skill bundle is the real signed
-# release from GitHub, verified inside WASI. The file-local checklist
-# (cert/checklist.mjs) stays a browser cert.
+# wasi-impeccable's HTTP verbs and live mode, end to end: build
+# impeccable.wasm with the recipe (wasix crates vendored from crates/), then
+# run test/e2e on the certified slicc-kernel's headless Node entry. The
+# transport mocks impeccable.style and the image API; the skill bundle is the
+# real signed release from GitHub, verified inside WASI. Live mode runs its
+# server detached in the kernel, with curl as the page. The file-local
+# checklist (cert/checklist.mjs) stays a browser cert.
 name: wasi-impeccable
 
 on:
@@ -13,6 +14,7 @@ on:
       - packages/wasi-impeccable/**
       - crates/wasix-net/**
       - crates/wasix-ureq/**
+      - crates/wasix-command/**
       - scripts/build-common.sh
       - .github/workflows/wasi-impeccable.yml
   pull_request:
@@ -20,6 +22,7 @@ on:
       - packages/wasi-impeccable/**
       - crates/wasix-net/**
       - crates/wasix-ureq/**
+      - crates/wasix-command/**
       - scripts/build-common.sh
       - .github/workflows/wasi-impeccable.yml
   workflow_dispatch:
@@ -41,6 +44,8 @@ jobs:
       - name: install slicc-kernel (pinned to the certified version)
         working-directory: packages/wasi-impeccable/test
         run: npm ci --no-audit --no-fund
-      - name: HTTP verbs in the kernel
+      - name: HTTP verbs and live mode in the kernel
         working-directory: packages/wasi-impeccable/test
-        run: node --test --test-concurrency=1 'e2e/*.test.mjs'
+        # --test-force-exit: the kernel leaves a sleeping thread's poll timer
+        # armed after its process exits, which keeps Node alive until it fires.
+        run: node --test --test-concurrency=1 --test-force-exit 'e2e/*.test.mjs'
