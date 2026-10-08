@@ -6,8 +6,8 @@ export default async function (ctx) {
 
   const ver = await run(['impeccable', '--version'], { cwd: '/home' });
   assert.equal(ver.status, 0, `--version stderr=${ver.stderr}`);
-  // Upstream prints npm CLI_VERSION (not the engine/crate version).
-  assert.equal(ver.stdout.trim(), '4.0.0', `version=${JSON.stringify(ver.stdout)}`);
+  // Patch prints the engine/crate version (0.1.12), not upstream's npm CLI_VERSION (4.0.0).
+  assert.equal(ver.stdout.trim(), '0.1.12', `version=${JSON.stringify(ver.stdout)}`);
 
   const dirty = `<!doctype html>
 <html><head><style>

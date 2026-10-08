@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-impeccable",
-  "version": "0.1.12-2",
+  "version": "0.1.12-3",
   "description": "impeccable engine 0.1.12 for slicc WASI preview1 (command impeccable; detect-only)",
   "license": "Apache-2.0",
   "repository": {
