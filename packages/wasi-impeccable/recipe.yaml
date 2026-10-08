@@ -19,12 +19,14 @@ about:
   license: Apache-2.0
   notes: |
     cargo build -p impeccable --target wasm32-wasip1 after
-    0001-wasi-detect-only-cli.patch. Upstream has no WASI feature; the patch is
+    0001-wasi-cli.patch. Upstream has no WASI feature; the patch is
     mechanical cfg(target_family = "wasm"): ureq is replaced by wasix-ureq
     (homescoop crates/, vendored by build.sh; HTTPS goes in absolute form
-    through the kernel's proxy) and ring's Ed25519 by ed25519-dalek for skill
-    bundle signatures; Io's cwd comes from PWD (wasi-libc's current_dir()
-    stays /); avoid process::id / thread spawn panics; print clear "not
-    available in this build yet" for live/URL/capture/listening verbs.
+    through the kernel's proxy); skill-bundle signatures are verified with
+    ed25519-dalek (verify_strict) instead of ring, which does not build for
+    wasm32-wasip1, against the same compiled-in keys; Io's cwd comes from
+    PWD (wasi-libc's current_dir() stays /); avoid process::id / thread spawn
+    panics; print clear "not available in this build yet" for
+    live/URL/capture/listening verbs.
     --version prints the crate / engine VERSION (0.1.x). wasm-opt -Oz.
     Command impeccable → bin/impeccable.wasm (abi=wasi).

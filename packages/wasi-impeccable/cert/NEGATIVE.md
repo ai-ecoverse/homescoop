@@ -7,9 +7,9 @@
 `prove-negative.mjs --package wasi-impeccable` → FAIL
 (`WebAssembly.compile(): BufferSource argument is empty`).
 
-## Patch reverted (0001-wasi-detect-only-cli.patch)
+## Patch reverted (0001-wasi-cli.patch)
 
-Remove `packages/wasi-impeccable/0001-wasi-detect-only-cli.patch` and run
+Remove `packages/wasi-impeccable/0001-wasi-cli.patch` and run
 `bash scripts/host-run.sh wasi-impeccable` against engine-v0.1.12.
 
 **Result:** compile fails in the `socks` crate (pulled by `ureq` `socks-proxy`

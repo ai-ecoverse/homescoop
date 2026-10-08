@@ -22,8 +22,9 @@ impeccable --version   # prints the engine version (e.g. 0.1.12)
 `update` and `check`.
 
 **HTTP** goes through the proxy that slicc's kernel names in `https_proxy`.
-The kernel does the TLS, so this build carries no TLS stack. Skill bundles
-are still checked against the Ed25519 keys compiled into the engine. Relative
+The kernel does the TLS, so this build carries no TLS stack. Skill-bundle
+signatures are verified with `ed25519-dalek` instead of `ring` (which does not
+build for WASI), against the same Ed25519 keys compiled into the engine. Relative
 paths resolve against the directory the command runs in (`PWD`).
 
 **Not in this build:** URL / Chrome scans, live mode, `serve-question` and the
