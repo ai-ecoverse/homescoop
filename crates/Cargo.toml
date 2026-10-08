@@ -1,0 +1,10 @@
+# Shared crates for Rust packages built for slicc's kernel (WASI preview1
+# with WASIX sockets and processes). Never published: a recipe copies the
+# crates it needs into its source tree (homescoop_vendor_crates in
+# scripts/build-common.sh) and its patch adds them as path dependencies.
+[workspace]
+resolver = "2"
+members = ["wasix-net", "wasix-command", "wasix-ureq", "wasix-selftest"]
+
+[profile.release]
+opt-level = "s"

@@ -32,3 +32,6 @@ __pycache__/
 *.whl
 *.o
 artifacts/
+
+# shared Rust crates
+crates/target/

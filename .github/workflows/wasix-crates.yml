@@ -1,0 +1,87 @@
+# The shared Rust crates in crates/ (wasix-net, wasix-ureq, wasix-command):
+# host tests on the minimum and the stable toolchain, the self-test built
+# for wasm32-wasip1 and wasm32-wasip1-threads and run on slicc-kernel's
+# headless Node entry (no browser), and a consumer vendored and built the
+# way a recipe does it (scripts/build-common.sh homescoop_vendor_crates).
+name: wasix-crates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - crates/**
+      - scripts/build-common.sh
+      - .github/workflows/wasix-crates.yml
+  pull_request:
+    paths:
+      - crates/**
+      - scripts/build-common.sh
+      - .github/workflows/wasix-crates.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: crates
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ['1.83.0', stable]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install Rust ${{ matrix.toolchain }}
+        run: |
+          rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component clippy,rustfmt --target wasm32-wasip1
+          rustup override set ${{ matrix.toolchain }}
+      - name: tests
+        run: cargo test --locked
+      - name: format and lints
+        if: matrix.toolchain == 'stable'
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo clippy --locked --target wasm32-wasip1 -- -D warnings
+
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [wasm32-wasip1, wasm32-wasip1-threads]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: install the ${{ matrix.target }} target
+        run: rustup target add ${{ matrix.target }}
+      - name: build the self-test
+        run: |
+          cargo build --locked --release -p wasix-selftest --target ${{ matrix.target }}
+          ls -l target/${{ matrix.target }}/release/wasix-selftest.wasm
+      - name: install slicc-kernel (pinned to the certified version)
+        working-directory: crates/test
+        run: npm ci --no-audit --no-fund
+      - name: self-test in the kernel
+        working-directory: crates/test
+        env:
+          WASIX_SELFTEST_WASM: ${{ github.workspace }}/crates/target/${{ matrix.target }}/release/wasix-selftest.wasm
+        run: node --test --test-concurrency=1 'kernel/*.test.mjs'
+
+  consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: install the wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
+      - name: vendor, build for WASI, check both graphs
+        run: test/consumer-smoke.sh

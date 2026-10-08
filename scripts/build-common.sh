@@ -49,6 +49,46 @@ homescoop_apply_patches() {
   shopt -u nullglob
 }
 
+# Copy homescoop's shared Rust crates (crates/<name>, see crates/README.md)
+# into <srcdir>/homescoop-crates/<name>, with the crates they depend on by
+# path, so a package's patch can add them as path dependencies
+# (homescoop-crates/wasix-net) and the build sees no host path. Run it
+# before homescoop_apply_patches; a crate that changed is copied again.
+# homescoop_vendor_crates <srcdir> <crate...>
+homescoop_vendor_crates() {
+  local srcdir="${1:?homescoop_vendor_crates <srcdir> <crate...>}"
+  shift
+  local -a queue=("$@")
+  local -a done_crates=()
+  local name dep seen d
+  while ((${#queue[@]})); do
+    name="${queue[0]}"
+    queue=("${queue[@]:1}")
+    seen=0
+    for d in "${done_crates[@]+"${done_crates[@]}"}"; do
+      [[ "$d" == "$name" ]] && seen=1
+    done
+    ((seen)) && continue
+    if [[ ! -f "$HOMESCOOP_ROOT/crates/$name/Cargo.toml" ]]; then
+      echo "homescoop_vendor_crates: no crate crates/$name" >&2
+      return 1
+    fi
+    echo "== vendor crates/$name → homescoop-crates/$name"
+    rm -rf "$srcdir/homescoop-crates/$name"
+    mkdir -p "$srcdir/homescoop-crates/$name"
+    tar -C "$HOMESCOOP_ROOT/crates/$name" --exclude ./target --exclude ./tests -cf - . |
+      tar -C "$srcdir/homescoop-crates/$name" -xf -
+    # Dependencies are siblings (path = "../<crate>"); dev-dependencies
+    # (the crate itself, for tests) are left behind with the tests.
+    sed -i.bak '/^\[dev-dependencies\]/,$d' "$srcdir/homescoop-crates/$name/Cargo.toml"
+    rm -f "$srcdir/homescoop-crates/$name/Cargo.toml.bak"
+    while read -r dep; do
+      queue+=("$dep")
+    done < <(sed -n 's/.*path = "\.\.\/\([A-Za-z0-9_-]*\)".*/\1/p' "$srcdir/homescoop-crates/$name/Cargo.toml")
+    done_crates+=("$name")
+  done
+}
+
 # Copy the first existing upstream license file into package/LICENSE (+ PREFIX).
 # homescoop_stage_license <candidate...>
 homescoop_stage_license() {

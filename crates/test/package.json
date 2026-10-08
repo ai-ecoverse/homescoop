@@ -1,0 +1,12 @@
+{
+  "name": "wasix-crates-test",
+  "private": true,
+  "description": "The wasix crates' self-test on slicc-kernel's headless Node entry",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 'kernel/*.test.mjs'"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.15.1"
+  }
+}
