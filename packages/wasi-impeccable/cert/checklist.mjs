@@ -203,9 +203,13 @@ body { font-family: Inter, Arial, sans-serif; color: #000; background: #fff; }
     assert.ok(!/Unknown command/.test(unavailable.stderr), `${verb} must not say Unknown command`);
   }
 
+  // live is wired (wasm32-wasip1-threads): in a directory without project
+  // context it says what is missing instead of refusing.
   const live = await run(['impeccable', 'live'], { cwd: '/home' });
-  assert.equal(live.status, 1, `live status=${live.status}`);
-  assert.match(live.stderr, /not available in this build yet/, `live stderr=${JSON.stringify(live.stderr)}`);
+  assert.equal(live.status, 0, `live status=${live.status} stderr=${live.stderr}`);
+  const liveInfo = JSON.parse(live.stdout);
+  assert.equal(liveInfo.ok, false, `live stdout=${live.stdout}`);
+  assert.match(liveInfo.error, /context_missing|config_missing|target_selection_required/, `live stdout=${live.stdout}`);
 
   // Closed stdin must not hang: install exits non-zero within seconds.
   const installEof = await run(['impeccable', 'install'], {

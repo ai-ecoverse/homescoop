@@ -27,8 +27,16 @@ signatures are verified with `ed25519-dalek` instead of `ring` (which does not
 build for WASI), against the same Ed25519 keys compiled into the engine. Relative
 paths resolve against the directory the command runs in (`PWD`).
 
-**Not in this build:** URL / Chrome scans, live mode, `serve-question` and the
-capture verbs refuse with `not available in this build yet` instead of
+**Live mode** (`impeccable live`, `live-poll`, `live-server`, …) runs its
+server detached on the kernel's loopback; the engine is built for
+`wasm32-wasip1-threads` for it. Other kernel processes, such as the agent's
+`live-poll`, reach it. A page in slicc cannot reach it yet: that needs
+slicc-kernel's `dial` (slicc-kernel#103) and slicc-bios routing
+`localhost:<port>` to it (slicc-bios#92). Svelte live sessions need node and
+refuse.
+
+**Not in this build:** URL / Chrome scans, `serve-question` and the capture
+verbs refuse with `not available in this build yet` instead of
 `Unknown command`. Use upstream
 [`impeccable`](https://www.npmjs.com/package/impeccable) /
 [pbakaus/impeccable](https://github.com/pbakaus/impeccable) for those.
