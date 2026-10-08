@@ -77,6 +77,31 @@ test('pnpm installs from a registry into a hoisted node_modules', async () => {
   }
 })
 
+test('pnpm skips its update check, unless the caller turns it back on', async () => {
+  const registry = await startRegistry()
+  registry.add('pnpm', '99.0.0')
+  registry.add('tiny-b', '1.2.0', { main: 'index.js' }, { 'index.js': 'module.exports = "b"\n' })
+  const kernel = await kernelWith(['wasi-pnpm'])
+  const install = async (dir, env) => {
+    await writeJson(kernel, `${dir}/package.json`, { name: 'app', version: '1.0.0', dependencies: { 'tiny-b': '1.2.0' } })
+    const result = await kernel.run(['pnpm', 'install', '--registry', registry.base], { cwd: dir, env })
+    assert.equal(result.status, 0, output(result))
+    return result
+  }
+  const checks = () => registry.requests.filter(request => request === 'GET /pnpm').length
+  try {
+    const quiet = await install('/home/quiet')
+    assert.equal(checks(), 0)
+    assert.doesNotMatch(output(quiet), /Update available/)
+    const asked = await install('/home/asked', { PNPM_CONFIG_UPDATE_NOTIFIER: 'true' })
+    assert.equal(checks(), 1)
+    assert.match(output(asked), /Update available! 12\.9\.1 → 99\.0\.0/)
+  } finally {
+    kernel.terminate()
+    await registry.close()
+  }
+})
+
 test('pnpm add -g and remove -g, finding its own pnpm.wasm from the package env', async () => {
   const registry = await startRegistry({ token: TOKEN })
   registry.add('tiny-cli', '1.0.0', { bin: { tiny: 'cli.js' } }, { 'cli.js': '#!/usr/bin/env node\nconsole.log("tiny")\n' })

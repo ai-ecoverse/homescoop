@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-5",
+  "version": "12.9.1-6",
   "description": "pnpm 12 for slicc WASI (commands pnpm, pn); pnpm.wasm built by homescoop from pnpm v12.9.1 with a documented patch",
   "license": "MIT",
   "repository": {
@@ -64,6 +64,7 @@
       "PNPM_CONFIG_NODE_LINKER": "hoisted",
       "PNPM_CONFIG_PACKAGE_IMPORT_METHOD": "copy",
       "PNPM_CONFIG_IGNORE_SCRIPTS": "true",
+      "PNPM_CONFIG_UPDATE_NOTIFIER": "false",
       "PNPM_SLICC_HTTP_PROXY": "${http_proxy}",
       "PNPM_SLICC_HTTPS_PROXY": "${https_proxy}",
       "PNPM_SLICC_NO_PROXY": "${no_proxy}",
