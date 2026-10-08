@@ -90,3 +90,4 @@ done
 
 homescoop_stage_license "$SRC"/COPYING "$SRC"/COPYING.LIB "$SRC"/LICENSE
 echo "== procps: staged → $HOMESCOOP_PKG/package"
+# PROBE: emconfigure flake repeat run (do not merge)

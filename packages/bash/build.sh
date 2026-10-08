@@ -117,3 +117,4 @@ test -f "$SRC_DIR/bash" || test -f "$SRC_DIR/bash.js"
 homescoop_stage_cli "$SRC_DIR" bash
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
 echo "== bash: staged → $HOMESCOOP_PKG/package (readline)"
+# PROBE: emconfigure flake repeat run (do not merge)
