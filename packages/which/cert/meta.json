@@ -1,0 +1,15 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.12.0",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-2"
+  ],
+  "checklist": [
+    "which ls → path under /usr/bin or /bin",
+    "which -a with two PATH providers",
+    "missing command → exit 1",
+    "which which"
+  ]
+}
