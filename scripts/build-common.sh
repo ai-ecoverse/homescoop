@@ -273,6 +273,12 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
       ;;
+    mount)
+      # mount/umount: mount(2)/umount2(2) via sliccKernel (slicc-kernel#92).
+      _homescoop_slicc_compile "$dir/slicc_mount.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      ;;
     less)
       # TUI pager: signals + gaps + jobs + pselect (no spawn).
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
@@ -317,7 +323,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
       ;;
     *)
-      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|less|cli|net|netfork)" >&2
+      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|mount|less|cli|net|netfork)" >&2
       return 1
       ;;
   esac

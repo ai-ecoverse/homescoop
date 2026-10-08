@@ -1,0 +1,24 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.17.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-2"
+  ],
+  "checklist": [
+    "mount -t tmpfs none /mnt/t, write + read back, umount: listing and file gone",
+    "mount -t fsa none /mnt/f: succeeds in nomedium state; mount lists it with nomedium",
+    "ls /mnt/f → empty, rc 0; cat /mnt/f/x and ls /mnt/f/x → No medium found, rc ≠ 0",
+    "mount lists both tmpfs and fsa; mount -t fsa filters",
+    "umount -l /mnt/f detaches",
+    "mount -t nosuchfs → unknown filesystem type, rc ≠ 0",
+    "mount -o ro → write gives Read-only file system",
+    "-o maxfile=xyz → bad option (EINVAL); mount over /proc → busy; umount of a plain dir → not mounted",
+    "hostfs without a grant hook → refused (harness has no hostfs hook; hostfs connect not covered)"
+  ],
+  "needsNote": "Kernel pin 1.17.0 = first release with slicc-kernel#92 process mount/umount2 (MNT_DETACH revocation, nomedium in /proc/mounts, ro enforced at open). The harness page has no hostfs grant hook, so only the hostfs refusal is checked."
+}

@@ -1,0 +1,20 @@
+# mount / umount for slicc wasm realm (host ladder). Sources live in src/:
+# a minimal pair over mount(2)/umount2(2) from slicc-kernel#92, not
+# util-linux (see packages/mount/README.md for the comparison).
+name: mount
+builder: host
+version: "1.0.0"
+npm: "@ai-ecoverse/wasm-mount"
+summary: "mount / umount for slicc (process mounts via slicc-kernel)"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/mount
+  license: Apache-2.0
+  notes: |
+    In-tree sources (no upstream tarball), linked with the slicc `mount`
+    shim profile (slicc_mount.c + gaps + signals). Needs a slicc-kernel with
+    Module.sliccKernel.mount/umount2 (#92); older kernels answer ENOSYS.
+    New package → human cert, not Renovate automerge.

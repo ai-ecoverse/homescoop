@@ -15,6 +15,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | `slicc_select.c` | `pselect()` / poll via the kernel (make `-jN`, curl, sockets) |
 | `slicc_socket.c` | BSD sockets over `Module.sliccKernel.net` (loopback #3571); needs select |
 | `slicc_jobs.c` | strong `setpgid`/`getpgid`/`setsid`/`tcgetpgrp`/`tcsetpgrp` for job control |
+| `slicc_mount.c` | strong `mount` / `umount` / `umount2` over `Module.sliccKernel.mount` / `umount2` (slicc-kernel#92); ENOSYS on older kernels |
 | `slicc_main_envp.c` | `main` that passes `environ` (`-Dmain=slicc_tool_main`) |
 | `webcrypto-entropy.c` | `mbedtls_hardware_poll` via WebCrypto (Mbed TLS builds) |
 
@@ -28,6 +29,7 @@ Every profile includes `slicc_libc_gaps.c` + `slicc_signals.c`.
 | `spawn` | spawn + exec + **popen** — gnu tools |
 | `make` | spawn + exec + popen + main_envp + select + **jobs** — GNU make |
 | `fork` | spawn + exec + popen + fork + jobs + **select** — bash (+ ASYNCIFY) |
+| `mount` | gaps + signals + **mount** — mount/umount |
 | `less` | gaps + signals + jobs + select — TUI pager (no spawn) |
 | `cli` | spawn + exec + popen + select + jobs — coreutils/sed/gawk/tar |
 | `cli` | spawn + exec + gaps + signals + select + jobs — interactive CLIs (no fork) |
