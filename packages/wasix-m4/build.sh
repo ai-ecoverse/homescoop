@@ -82,3 +82,4 @@ fi
 
 homescoop_stage_license "$SRC/COPYING"
 echo "== wasix-m4 staged $(du -sh "$DEST/bin/m4.wasm" | awk '{print $1}')"
+# probe: baseline host-build on main (do not merge)

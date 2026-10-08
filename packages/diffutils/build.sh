@@ -53,3 +53,4 @@ for cmd in diff cmp diff3 sdiff; do
 done
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
 echo "== diffutils: staged → $HOMESCOOP_PKG/package"
+# probe: baseline host-build on main (do not merge)
