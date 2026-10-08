@@ -10,7 +10,10 @@
 //! import and keep to the API both share.
 //!
 //! A child that is spawned and dropped without `wait` keeps running
-//! (detached), as with std.
+//! (detached), as with std. [`process`] has this process's id and signals
+//! to other pids (`kill -0`, SIGTERM), which std has no portable API for.
+
+pub mod process;
 
 #[cfg(all(target_os = "wasi", target_env = "p1"))]
 mod wasix;
