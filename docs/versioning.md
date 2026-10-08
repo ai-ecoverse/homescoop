@@ -30,9 +30,15 @@ in sync when releasing. Recipe bumps from Renovate do not publish by
 themselves — bump the npm version (`sync-package-version.mjs` → `X-1`
 for a new upstream) and dispatch `ladder-build`.
 
-If upstream is two-component (e.g. lcms2 `2.17`) and needs a three-part
-npm base, use `X.Y.0-1` and keep `homescoop.upstream` as the true
-upstream string.
+If upstream is two-component (e.g. GNU which `2.23`, lcms2 `2.17`),
+`sync-package-version.mjs` **pads** to a three-part npm base (`2.23.0-1`).
+Never publish `X.Y-N` — `npm pack` may accept it, but `npm publish` rejects
+it as an invalid version (caught on which 2.23-1). Keep `homescoop.upstream`
+as the true upstream string.
+
+`host-run.sh` and `ladder-pr` validate the **packed** tarball with
+`sync-package-version.mjs --assert-tarball` so non-semver versions fail in
+CI before certification, not at publish.
 
 ## Cleaning up historical plain versions
 

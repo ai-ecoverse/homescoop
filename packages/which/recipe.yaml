@@ -1,0 +1,20 @@
+# GNU which for slicc wasm realm (host ladder).
+name: which
+builder: host
+# renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/which.git extractVersion=^v?(?<version>.*)$
+version: "2.23"
+npm: "@ai-ecoverse/wasm-which"
+summary: "GNU which for slicc wasm realm"
+source:
+  url: "https://ftp.gnu.org/gnu/which/which-{{version}}.tar.gz"
+  sha256: "a2c558226fc4d9e4ce331bd2fd3c3f17f955115d2c00e447618a4ef9978a2a73"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/which
+  license: GPL-3.0-or-later
+  notes: |
+    Small autoconf C package. Links slicc cli profile. Resolves PATH the way
+    bash does so slicc.commands under /usr/bin and /bin are found.

@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/wasm-which",
+  "version": "2.23.0-1",
+  "description": "GNU which for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/which/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/which",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "which"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "which",
+    "upstream": "2.23"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "which": {
+        "glue": "bin/which",
+        "wasm": "bin/which.wasm"
+      }
+    }
+  }
+}
