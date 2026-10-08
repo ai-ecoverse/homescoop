@@ -19,4 +19,4 @@ This shows that the shim's ENOSYS fallback works inside the real kernel, and tha
 
 ## Spec non-vacuous
 
-`cert/checklist.mjs` asserts the exact listing lines (including `nomedium` for fsa), "No medium found" from `ls` under the empty drive, that the unmounted file is gone, EROFS under `-o ro`, and an error plus rc ≠ 0 for each of: bad fstype, bad option value, `/proc` target, non-mount umount, and hostfs without a hook.
+`cert/checklist.mjs` asserts the exact listing lines (including `nomedium` for fsa), an empty listing of the nomedium root, "No medium found" below it (`cat`/`ls /mnt/f/x`), that the unmounted file is gone, EROFS under `-o ro`, and an error plus rc ≠ 0 for each of: bad fstype, bad option value, `/proc` target, non-mount umount, and hostfs without a hook.

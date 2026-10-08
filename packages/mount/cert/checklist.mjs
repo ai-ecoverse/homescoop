@@ -36,10 +36,16 @@ export default async function (ctx) {
   ok(fsaOnly, 'mount -t fsa (list)');
   assert.doesNotMatch(fsaOnly.stdout, /type tmpfs/, `-t filter:\n${fsaOnly.stdout}`);
 
-  // Below the empty drive: No medium found.
-  const ls = await run(['ls', '/mnt/f'], { cwd: '/home' });
-  assert.notEqual(ls.status, 0, `ls /mnt/f should fail, stdout=${ls.stdout}`);
-  assert.match(ls.stderr, /No medium found/, `ls /mnt/f stderr=${ls.stderr}`);
+  // The empty drive's root is a listable, empty directory; below it there is
+  // no medium yet (ENOMEDIUM from the kernel's FS layer).
+  const ls = await run(['ls', '-A', '/mnt/f'], { cwd: '/home' });
+  ok(ls, 'ls /mnt/f (nomedium root)');
+  assert.equal(ls.stdout, '', `nomedium root should be empty, got ${JSON.stringify(ls.stdout)}`);
+  for (const argv of [['cat', '/mnt/f/x'], ['ls', '/mnt/f/x']]) {
+    const r = await run(argv, { cwd: '/home' });
+    assert.notEqual(r.status, 0, `${argv.join(' ')} should fail, stdout=${r.stdout}`);
+    assert.match(r.stderr, /No medium found/, `${argv.join(' ')} stderr=${r.stderr}`);
+  }
 
   // umount the tmpfs: listing and contents are gone.
   ok(await run(['umount', '/mnt/t']), 'umount /mnt/t');

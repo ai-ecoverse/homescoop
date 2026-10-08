@@ -10,7 +10,7 @@
   "checklist": [
     "mount -t tmpfs none /mnt/t, write + read back, umount: listing and file gone",
     "mount -t fsa none /mnt/f: succeeds in nomedium state; mount lists it with nomedium",
-    "ls /mnt/f → No medium found, rc ≠ 0",
+    "ls /mnt/f → empty, rc 0; cat /mnt/f/x and ls /mnt/f/x → No medium found, rc ≠ 0",
     "mount lists both tmpfs and fsa; mount -t fsa filters",
     "umount -l /mnt/f detaches",
     "mount -t nosuchfs → unknown filesystem type, rc ≠ 0",
