@@ -1,0 +1,25 @@
+# Impeccable engine (detect CLI) for slicc WASI preview1.
+# Upstream is a design skill + Rust engine; this recipe ships the detect-focused
+# WASI binary (full CLI needs Chrome/CDP, live HTTP, ureq/socks).
+name: wasi-impeccable
+builder: host
+# renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
+version: "0.1.12"
+npm: "@ai-ecoverse/wasi-impeccable"
+summary: "impeccable engine 0.1.12 for slicc WASI preview1 (command impeccable; detect-only)"
+source:
+  url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
+  sha256: "d1996f4b48fd52354192e4aafd64e1a4b189afc41f9135c6a4cb22df3050a696"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://impeccable.style
+  license: Apache-2.0
+  notes: |
+    cargo build -p impeccable --target wasm32-wasip1 after
+    0001-wasi-detect-only-cli.patch (drops browser/live/skills/context/comp so
+    ureq/socks and CDP sockets are not linked). Command impeccable →
+    bin/impeccable.wasm (abi=wasi). File/dir detect needs no network; URL
+    scans and skill install verbs are not in this build.

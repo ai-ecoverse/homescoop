@@ -1,0 +1,16 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.15.1",
+  "needs": [],
+  "needsInstall": [],
+  "checklist": [
+    "impeccable --version / engine-probe",
+    "detect sample HTML finds anti-patterns (exit 2)",
+    "clean HTML → exit 0",
+    "unknown command → exit 1",
+    "detect missing path warns cleanly"
+  ],
+  "patches": {
+    "0001-wasi-detect-only-cli.patch": "detect/ignores build for wasm32-wasip1; full CLI fails on ureq/socks without this patch"
+  }
+}
