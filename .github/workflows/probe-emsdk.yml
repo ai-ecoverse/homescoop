@@ -1,0 +1,50 @@
+# PROBE — never merge. Does emsdk@0.4.0's postinstall leave a truncated SDK?
+name: probe-emsdk
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/probe-emsdk.yml'
+      - 'probe/**'
+jobs:
+  integrity:
+    strategy:
+      fail-fast: false
+      matrix:
+        rep: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: npm install emsdk@0.4.0 (exactly as host-run.sh)
+        run: npm install --no-save --no-package-lock emsdk@0.4.0
+      - name: Audit installed SDK against the archive manifest
+        run: |
+          python3 - "$HOME/.cache/emsdk/0.4.0" probe/emsdk-4.0.23-linux-manifest.txt <<'PY'
+          import os, sys
+          root, manifest = sys.argv[1], sys.argv[2]
+          missing, short = [], []
+          n = 0
+          for line in open(manifest):
+              size, name = line.rstrip('\n').split(' ', 1)
+              n += 1
+              p = os.path.join(root, name)
+              if not os.path.lexists(p):
+                  missing.append(name)
+              elif os.path.isfile(p) and os.path.getsize(p) != int(size):
+                  short.append(f"{name} {os.path.getsize(p)}/{size}")
+          print(f"manifest files={n} missing={len(missing)} wrong-size={len(short)}")
+          for x in short: print("  SIZE", x)
+          for x in missing[:15]: print("  MISSING", x)
+          if len(missing) > 15: print(f"  ... {len(missing)-15} more missing")
+          print("RESULT", "TRUNCATED" if (missing or short) else "COMPLETE")
+          PY
+          ls -la "$HOME/.cache/emsdk/0.4.0" || true
+      - name: emcc -O0 vs -O2 link
+        run: |
+          eval "$(node -e 'const e=require("emsdk"); const env=e.env(); for (const [k,v] of Object.entries(env)) console.log(`export ${k}=${JSON.stringify(String(v))}`)')"
+          echo 'int main(void){return 0;}' > /tmp/t.c
+          for o in -O0 -O2; do
+            if emcc $o /tmp/t.c -o /tmp/t$o.js > /tmp/emcc$o.log 2>&1; then echo "LINK $o ok"; else echo "LINK $o FAIL"; tail -5 /tmp/emcc$o.log; fi
+          done
