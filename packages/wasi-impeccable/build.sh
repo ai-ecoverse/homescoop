@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# impeccable engine for slicc — WASI preview1 detect-only CLI (no Emscripten glue).
+# impeccable engine for slicc — WASI preview1 file-local CLI (no Emscripten glue).
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh

@@ -1,14 +1,12 @@
 diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
 --- a/crates/cli/Cargo.toml	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/Cargo.toml	2026-10-08 16:03:04.909997412 +0200
-@@ -5,19 +5,25 @@
++++ b/crates/cli/Cargo.toml	2026-10-08 17:05:39.078375485 +0200
+@@ -5,19 +5,23 @@
  license.workspace = true
  publish.workspace = true
  
-+# Detect path (html/detect/core/common) builds for every target, including
-+# wasm32-wasip1. Native-only crates (browser/live/skills/context/hook/comp)
-+# pull ureq/socks, CDP sockets, and process helpers that do not compile for
-+# WASI — keep them off the wasm dependency graph via target cfg.
++# File-local verbs (detect/html/context/hook/skills/comp-verbs) build for
++# wasm32-wasip1. browser/live stay native-only (CDP sockets, process spawn).
  [dependencies]
  impeccable-common = { path = "../common" }
 -impeccable-context = { path = "../context" }
@@ -16,24 +14,24 @@ diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
  impeccable-detect = { path = "../detect" }
  impeccable-html = { path = "../html" }
 +impeccable-core = { workspace = true }
-+serde_json = { workspace = true }
-+
-+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 +impeccable-context = { path = "../context" }
-+impeccable-browser = { path = "../browser" }
  impeccable-hook = { path = "../hook" }
- impeccable-live = { path = "../live" }
+-impeccable-live = { path = "../live" }
  impeccable-skills = { path = "../skills" }
 -impeccable-core = { workspace = true }
  impeccable-comp = { workspace = true }
  impeccable-comp-verbs = { workspace = true }
--serde_json = { workspace = true }
+ serde_json = { workspace = true }
++
++[target.'cfg(not(target_family = "wasm"))'.dependencies]
++impeccable-browser = { path = "../browser" }
++impeccable-live = { path = "../live" }
  base64 = "0.22"
  sha2 = "0.10"
  
 diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
 --- a/crates/cli/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/src/lib.rs	2026-10-08 16:03:04.911603624 +0200
++++ b/crates/cli/src/lib.rs	2026-10-08 17:00:32.656746204 +0200
 @@ -1,4 +1,6 @@
  //! Native browser adapters, kept separate from the comp-verbs contract.
 +#![cfg(not(target_family = "wasm"))]
@@ -43,8 +41,8 @@ diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
  pub mod capture_snapshot;
 diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
 --- a/crates/cli/src/main.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/src/main.rs	2026-10-08 16:03:48.323824741 +0200
-@@ -11,6 +11,7 @@
++++ b/crates/cli/src/main.rs	2026-10-08 17:05:39.116186692 +0200
+@@ -11,10 +11,20 @@
  
  use impeccable_common::Io;
  
@@ -52,7 +50,20 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
  mod font_render;
  
  pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-@@ -37,7 +38,8 @@
+ 
++#[cfg(target_family = "wasm")]
++fn unavailable(io: &mut Io, verb: &str, reason: &str) -> i32 {
++    io.err(&format!(
++        "impeccable {verb}: {reason}; not available in this build yet\n"
++    ));
++    1
++}
++
++
+ fn main() {
+     let args: Vec<String> = std::env::args().skip(1).collect();
+     let mut io = Io::stdio();
+@@ -37,7 +47,8 @@
              0
          }
          "--version" | "-v" => {
@@ -62,74 +73,75 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
              0
          }
          // Launcher handshake: a cheap discriminator so the launchers can tell
-@@ -51,32 +53,52 @@
-         }
-         "detect" => impeccable_detect::run_detect(rest, io, &engines()),
+@@ -53,7 +64,7 @@
          "ignores" | "ignore" => impeccable_detect::run_ignores(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
          "skills" => impeccable_skills::run(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
          "help" | "install" | "link" | "update" | "check" => impeccable_skills::run(args, io),
-         // skill scripts
-+        #[cfg(not(target_family = "wasm"))]
+-        // skill scripts
++        // skill scripts (file-local; network/browser paths refuse cleanly on wasm)
          "context" => impeccable_context::run_context(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
          "pin" => impeccable_context::run_pin(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
          "detect-csp" => impeccable_context::run_detect_csp(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
-         "palette" => impeccable_context::run_palette(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
-         "surface-brief" => impeccable_context::run_surface_brief(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
-         "critique-storage" => impeccable_context::run_critique_storage(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
+@@ -63,20 +74,39 @@
          "embed-prompt" => impeccable_context::run_embed_prompt(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
          "signals" | "context-signals" => impeccable_context::run_signals(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
          "doctor" => impeccable_context::run_doctor(rest, io),
 +        #[cfg(not(target_family = "wasm"))]
          "concept-seed" => impeccable_context::run_concept_seed(rest, io),
++        #[cfg(target_family = "wasm")]
++        "concept-seed" => unavailable(io, "concept-seed", "needs network"),
 +        #[cfg(not(target_family = "wasm"))]
          "generate-image" => impeccable_context::run_generate_image(rest, io),
++        #[cfg(target_family = "wasm")]
++        "generate-image" => unavailable(io, "generate-image", "needs network"),
 +        #[cfg(not(target_family = "wasm"))]
          "serve-question" => impeccable_context::run_serve_question(rest, io),
++        #[cfg(target_family = "wasm")]
++        "serve-question" => unavailable(io, "serve-question", "needs a listening socket"),
 +        #[cfg(not(target_family = "wasm"))]
          "component-review" => impeccable_context::component_review::run_with_capturer(rest, io, Some(&mut impeccable::component_capture::NativeComponentCapturer)),
-         // comp-fidelity verbs (crates/comp-verbs over crates/comp)
-+        #[cfg(not(target_family = "wasm"))]
+-        // comp-fidelity verbs (crates/comp-verbs over crates/comp)
++        #[cfg(target_family = "wasm")]
++        "component-review" => unavailable(io, "component-review", "needs browser capture"),
++        // comp-fidelity verbs
          "comp-spec" => impeccable_comp_verbs::run_comp_spec(rest, io),
-+        #[cfg(not(target_family = "wasm"))]
          "comp-diff" => impeccable_comp_verbs::run_comp_diff(rest, io),
 +        #[cfg(not(target_family = "wasm"))]
          "font-match" => {
              let mut renderer = font_render::CdpFontRenderer::from_process_env();
              impeccable_comp_verbs::run_font_match(rest, io, &mut renderer)
          }
++        #[cfg(target_family = "wasm")]
++        "font-match" => unavailable(io, "font-match", "needs browser / CDP"),
 +        #[cfg(not(target_family = "wasm"))]
          "capture-server" => {
              match impeccable::capture_service::serve(rest) { Ok(()) => 0, Err(e) => { io.err(&format!("Native capture service: {e}\n")); 1 } }
          }
++        #[cfg(target_family = "wasm")]
++        "capture-server" => unavailable(io, "capture-server", "needs browser capture"),
 +        #[cfg(not(target_family = "wasm"))]
          "build-phase" => {
              // Inject the organic-clip-path CSS scanner (a rule that lives in the
              // closed `core` crate) so comp-verbs stays core-free.
-@@ -92,9 +114,13 @@
+@@ -92,11 +122,16 @@
                  Err(e) => { io.err(&format!("Native capture service: {e}\n")); 1 }
              }
          }
-+        #[cfg(not(target_family = "wasm"))]
++        #[cfg(target_family = "wasm")]
++        "build-phase" => unavailable(io, "build-phase", "needs browser capture"),
          "hook" => impeccable_hook::run_hook(rest, io, engines().html),
-+        #[cfg(not(target_family = "wasm"))]
          "hook-before-edit" => impeccable_hook::run_hook_before_edit(rest, io, engines().html),
-+        #[cfg(not(target_family = "wasm"))]
          "hooks" | "hook-admin" => impeccable_hook::run_hook_admin(rest, io),
 +        #[cfg(not(target_family = "wasm"))]
          v if v.starts_with("live") => impeccable_live::run(v, rest, io),
-         // `npx impeccable src/` shorthand: a path-shaped, flag, URL, or existing
+-        // `npx impeccable src/` shorthand: a path-shaped, flag, URL, or existing
++        #[cfg(target_family = "wasm")]
++        v if v.starts_with("live") => unavailable(io, v, "needs live mode (listen + spawn)"),
++                // `npx impeccable src/` shorthand: a path-shaped, flag, URL, or existing
          // first arg is a detect target (cli.js looksLikeDetectTarget).
-@@ -128,7 +154,10 @@
+         v if impeccable_detect::looks_like_detect_target(v, &io.cwd.to_string_lossy()) => {
+             impeccable_detect::run_detect(args, io, &engines())
+@@ -128,7 +163,10 @@
      };
      impeccable_detect::Engines {
          html: &HTML,
@@ -140,7 +152,7 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
      }
  }
  
-@@ -136,6 +165,7 @@
+@@ -136,6 +174,7 @@
  /// The URL engine, built once from the process environment (browser
  /// discovery reads `IMPECCABLE_BROWSER` / `PUPPETEER_EXECUTABLE_PATH` /
  /// `CHROME_PATH`, sandbox flags read `CI`).
@@ -148,3 +160,764 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
  fn url_engine() -> &'static impeccable_browser::BrowserEngine {
      static ENGINE: std::sync::OnceLock<impeccable_browser::BrowserEngine> =
          std::sync::OnceLock::new();
+diff -ruN a/crates/common/src/git.rs b/crates/common/src/git.rs
+--- a/crates/common/src/git.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/common/src/git.rs	2026-10-08 17:09:05.599299124 +0200
+@@ -21,7 +21,7 @@
+ 
+     #[test]
+     fn info_exclude_follows_a_linked_worktrees_commondir() {
+-        let base = std::env::temp_dir().join(format!("impeccable-common-git-{}", std::process::id()));
++        let base = std::env::temp_dir().join(format!("impeccable-common-git-{}", crate::process_id()));
+         let _ = std::fs::remove_dir_all(&base);
+         let tmp = base.to_string_lossy().into_owned();
+ 
+diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
+--- a/crates/common/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/common/src/lib.rs	2026-10-08 17:09:08.694340861 +0200
+@@ -226,3 +226,16 @@
+         assert_eq!(io.stdin(), "hello");
+     }
+ }
++
++/// `std::process::id()` panics on wasm32-wasip1 ("no pids"). Use this for
++/// temp-name entropy instead.
++pub fn process_id() -> u32 {
++    #[cfg(target_family = "wasm")]
++    {
++        1
++    }
++    #[cfg(not(target_family = "wasm"))]
++    {
++        std::process::id()
++    }
++}
+diff -ruN a/crates/common/src/proc.rs b/crates/common/src/proc.rs
+--- a/crates/common/src/proc.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/common/src/proc.rs	2026-10-08 17:09:05.598672206 +0200
+@@ -288,8 +288,8 @@
+ 
+     #[test]
+     fn own_pid_is_alive_and_bogus_pid_is_not() {
+-        assert_eq!(kill0(std::process::id() as i64), Ok(()));
+-        assert!(pid_reachable(std::process::id() as i64));
++        assert_eq!(kill0(crate::process_id() as i64), Ok(()));
++        assert!(pid_reachable(crate::process_id() as i64));
+         assert_eq!(kill0(0), Err("ESRCH"));
+         assert_eq!(kill0(-1), Err("ESRCH"));
+         assert_eq!(kill0(i64::MAX), Err("ESRCH"));
+diff -ruN a/crates/comp/src/png_io.rs b/crates/comp/src/png_io.rs
+--- a/crates/comp/src/png_io.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/comp/src/png_io.rs	2026-10-08 17:09:05.597418287 +0200
+@@ -202,7 +202,7 @@
+     fn load_raster_reads_an_edited_non_png_source() {
+         let unique = format!(
+             "impeccable-load-raster-{}-{}",
+-            std::process::id(),
++            impeccable_common::process_id(),
+             std::time::SystemTime::now()
+                 .duration_since(std::time::UNIX_EPOCH)
+                 .unwrap()
+diff -ruN a/crates/context/Cargo.toml b/crates/context/Cargo.toml
+--- a/crates/context/Cargo.toml	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/Cargo.toml	2026-10-08 17:00:58.002812665 +0200
+@@ -21,8 +21,10 @@
+ once_cell = { workspace = true }
+ sha2 = "0.10"
+ flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
++unicode-normalization = "0.1.25"
++
++[target.'cfg(not(target_family = "wasm"))'.dependencies]
+ ureq = { version = "2", default-features = false, features = ["tls", "json", "socks-proxy"] }
+ rustls-native-certs = "0.8"
+ webpki-roots = "1"
+ tiny_http = "0.12"
+-unicode-normalization = "0.1.25"
+diff -ruN a/crates/context/src/component_review/mod.rs b/crates/context/src/component_review/mod.rs
+--- a/crates/context/src/component_review/mod.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/component_review/mod.rs	2026-10-08 17:04:44.984243021 +0200
+@@ -4,6 +4,7 @@
+ mod lifecycle;
+ mod manifest;
+ pub mod plan;
++#[cfg(not(target_family = "wasm"))]
+ mod server;
+ mod store;
+ #[cfg(test)]
+@@ -136,6 +137,16 @@
+                     io.out(&format!("{}\n",json!({"carried":count})));
+                     Ok(0)
+                 } else if args[0] == "serve" {
++                    #[cfg(target_family = "wasm")]
++                    {
++                        let _ = &dir;
++                        return Err(
++                            "component-review serve needs a listening socket; not available in this build yet".into(),
++                        );
++                    }
++                    #[cfg(not(target_family = "wasm"))]
++                    {
++
+                     // Same no-browser signal as serve-question: exit 2 routes to the unattended path.
+                     let set = |k: &str| io.env(k).is_some_and(|v| !v.is_empty());
+                     let headless = set("CI") || (set("SSH_CONNECTION") && !set("DISPLAY"))
+@@ -157,7 +168,8 @@
+                     impeccable_common::proc::on_interrupt(&STOP);
+                     let limits = server::Limits { idle: std::time::Duration::from_secs(idle), grace: std::time::Duration::from_secs(5) };
+                     server::serve(&dir, port, io, limits, Some(&STOP))
+-                } else {
++                    }
++                                } else {
+                     let state = store::read(&dir.join("current.json"))?;
+                     io.out(&format!("{}\n", json!({
+                         "revision": state["packet"]["revision"],
+diff -ruN a/crates/context/src/component_review/server.rs b/crates/context/src/component_review/server.rs
+--- a/crates/context/src/component_review/server.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/component_review/server.rs	2026-10-08 17:09:05.593599945 +0200
+@@ -98,13 +98,13 @@
+         .to_ip()
+         .ok_or("listener is not TCP")?
+         .port();
+-    let service = json!({"url":format!("http://127.0.0.1:{actual}/"),"pid":std::process::id()});
++    let service = json!({"url":format!("http://127.0.0.1:{actual}/"),"pid":impeccable_common::process_id()});
+     store::write(&dir.join("service.json"), &service)?;
+     struct Registration<'a>(&'a Path);
+     impl Drop for Registration<'_> {
+         fn drop(&mut self) {
+             let path = self.0.join("service.json");
+-            if store::read(&path).is_ok_and(|s| s["pid"] == std::process::id()) {
++            if store::read(&path).is_ok_and(|s| s["pid"] == impeccable_common::process_id()) {
+                 let _ = std::fs::remove_file(path);
+             }
+         }
+diff -ruN a/crates/context/src/component_review/store.rs b/crates/context/src/component_review/store.rs
+--- a/crates/context/src/component_review/store.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/component_review/store.rs	2026-10-08 17:09:05.593279028 +0200
+@@ -19,7 +19,7 @@
+     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+     let name = path.file_name().ok_or("missing file name")?.to_string_lossy();
+-    let temp = parent.join(format!(".{name}.tmp-{}-{n}", std::process::id()));
++    let temp = parent.join(format!(".{name}.tmp-{}-{n}", impeccable_common::process_id()));
+     let result = (|| {
+         let mut f = fs::File::create(&temp)?;
+         f.write_all(bytes)?;
+diff -ruN a/crates/context/src/component_review/tests.rs b/crates/context/src/component_review/tests.rs
+--- a/crates/context/src/component_review/tests.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/component_review/tests.rs	2026-10-08 17:09:05.594358863 +0200
+@@ -141,7 +141,7 @@
+     fn new() -> Self {
+         let root = std::env::temp_dir().join(format!(
+             "impeccable-component-review-{}-{}",
+-            std::process::id(),
++            impeccable_common::process_id(),
+             NEXT.fetch_add(1, Ordering::Relaxed)
+         ));
+         let project = root.join("project");
+diff -ruN a/crates/context/src/concept_seed.rs b/crates/context/src/concept_seed.rs
+--- a/crates/context/src/concept_seed.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/concept_seed.rs	2026-10-08 17:09:05.588148183 +0200
+@@ -583,7 +583,7 @@
+ 
+ fn random_hex8() -> String {
+     let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+-    let mut x = (t as u64) ^ ((std::process::id() as u64) << 32) ^ 0x9E3779B97F4A7C15;
++    let mut x = (t as u64) ^ ((impeccable_common::process_id() as u64) << 32) ^ 0x9E3779B97F4A7C15;
+     x ^= x >> 33;
+     x = x.wrapping_mul(0xff51afd7ed558ccd);
+     x ^= x >> 33;
+@@ -662,7 +662,7 @@
+     const MODE_FILE: &str = "# Operate mode\n\nIntro the engine ignores.\n\n## Directions\n\n- Keep standard navigation.\n\n  Indented continuation.\n\n## Comps\n- Show a working state.\n### Sub heading stays\n\n";
+ 
+     fn temp_dir(name: &str) -> std::path::PathBuf {
+-        let dir = std::env::temp_dir().join(format!("impeccable-seed-{}-{}", name, std::process::id()));
++        let dir = std::env::temp_dir().join(format!("impeccable-seed-{}-{}", name, impeccable_common::process_id()));
+         let _ = std::fs::remove_dir_all(&dir);
+         std::fs::create_dir_all(&dir).unwrap();
+         dir
+diff -ruN a/crates/context/src/context_cli.rs b/crates/context/src/context_cli.rs
+--- a/crates/context/src/context_cli.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/context_cli.rs	2026-10-08 17:01:24.104472209 +0200
+@@ -175,6 +175,18 @@
+     }
+ }
+ 
++
++fn image_gen_model_name() -> &'static str {
++    #[cfg(not(target_family = "wasm"))]
++    {
++        crate::generate_image::DEFAULT_MODEL
++    }
++    #[cfg(target_family = "wasm")]
++    {
++        "gpt-image-1"
++    }
++}
++
+ fn append_image_gen_directive(parts: &mut Vec<String>, env: &Env, provider: &Provider) {
+     if !env.get("OPENAI_API_KEY").map(|v| !v.is_empty()).unwrap_or(false) {
+         return;
+@@ -182,7 +194,7 @@
+     parts.push([
+         "IMAGE_GEN_AVAILABLE: your harness-native image tool is always the first choice for generation; use it whenever one exists.".to_string(),
+         "This environment also carries an OpenAI key as the fallback for harnesses with no native tool:".to_string(),
+-        format!("`{} --prompt \"...\" --out <file>` ({}, billed to the user's key; say so before the first render, and never reach for it when a native tool exists).", provider.verb_cmd("generate-image"), crate::generate_image::DEFAULT_MODEL),
++        format!("`{} --prompt \"...\" --out <file>` ({}, billed to the user's key; say so before the first render, and never reach for it when a native tool exists).", provider.verb_cmd("generate-image"), image_gen_model_name()),
+         "Visualizing a direction before building it measurably strengthens the result.".to_string(),
+     ].join(" "));
+ }
+@@ -472,6 +484,13 @@
+ }
+ 
+ fn fetch_latest_skill_version(env: &Env) -> Option<String> {
++    #[cfg(target_family = "wasm")]
++    {
++        let _ = env;
++        return None;
++    }
++    #[cfg(not(target_family = "wasm"))]
++    {
+     let host = env
+         .get("IMPECCABLE_UPDATE_HOST")
+         .filter(|v| !v.is_empty())
+@@ -488,6 +507,7 @@
+     let text = res.into_string().ok()?;
+     let data: Value = serde_json::from_str(&text).ok()?;
+     data.get("skills").and_then(|v| v.as_str()).map(|s| s.to_string())
++    }
+ }
+ 
+ fn build_update_directive(local: &str, latest: &str) -> String {
+diff -ruN a/crates/context/src/critique_storage.rs b/crates/context/src/critique_storage.rs
+--- a/crates/context/src/critique_storage.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/critique_storage.rs	2026-10-08 17:09:05.590772564 +0200
+@@ -762,7 +762,7 @@
+     fn tmp() -> String {
+         let base = std::env::temp_dir().join(format!(
+             "impeccable-critique-{}-{}-{}",
+-            std::process::id(),
++            impeccable_common::process_id(),
+             std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+             // A per-process counter: Windows' clock is coarse enough that two
+             // parallel tests can share a nanosecond stamp and then delete each
+diff -ruN a/crates/context/src/detect_csp.rs b/crates/context/src/detect_csp.rs
+--- a/crates/context/src/detect_csp.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/detect_csp.rs	2026-10-08 17:09:05.589470561 +0200
+@@ -217,7 +217,7 @@
+             loop {
+                 let root = std::env::temp_dir().join(format!(
+                     "impeccable-csp-761-{}-{}",
+-                    std::process::id(), NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed),
++                    impeccable_common::process_id(), NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed),
+                 ));
+                 match std::fs::create_dir(&root) {
+                     Ok(()) => return Self(root),
+diff -ruN a/crates/context/src/generate_image.rs b/crates/context/src/generate_image.rs
+--- a/crates/context/src/generate_image.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/generate_image.rs	2026-10-08 17:09:05.592478109 +0200
+@@ -580,7 +580,7 @@
+         let _proxy_lock = crate::http::PROXY_ENV_LOCK.lock().unwrap();
+         let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+         let api_base = format!("http://{}", server.server_addr());
+-        let temp = std::env::temp_dir().join(format!("impeccable-image-{}-{}", std::process::id(), server.server_addr().to_ip().unwrap().port()));
++        let temp = std::env::temp_dir().join(format!("impeccable-image-{}-{}", impeccable_common::process_id(), server.server_addr().to_ip().unwrap().port()));
+         std::fs::create_dir_all(&temp).unwrap();
+         std::fs::write(temp.join("ref.png"), png_fake("reference", 16, 16)).unwrap();
+         let handle = std::thread::spawn(move || {
+@@ -684,7 +684,7 @@
+     }
+ 
+     fn temp(name: &str) -> std::path::PathBuf {
+-        let dir = std::env::temp_dir().join(format!("impeccable-image-{}-{}", name, std::process::id()));
++        let dir = std::env::temp_dir().join(format!("impeccable-image-{}-{}", name, impeccable_common::process_id()));
+         let _ = std::fs::remove_dir_all(&dir);
+         std::fs::create_dir_all(&dir).unwrap();
+         dir
+diff -ruN a/crates/context/src/lib.rs b/crates/context/src/lib.rs
+--- a/crates/context/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/lib.rs	2026-10-08 17:03:56.326369917 +0200
+@@ -5,6 +5,7 @@
+ pub mod jsp;
+ pub mod util;
+ pub mod url;
++#[cfg(not(target_family = "wasm"))]
+ pub mod http;
+ pub mod provider;
+ pub mod hook_markers;
+@@ -40,12 +41,19 @@
+ pub mod catalog;
+ pub mod roll_selection;
+ pub mod seed_text;
++#[cfg(not(target_family = "wasm"))]
+ pub mod concept_seed;
++#[cfg(not(target_family = "wasm"))]
+ pub use concept_seed::run as run_concept_seed;
++#[cfg(not(target_family = "wasm"))]
+ pub mod generate_image;
++#[cfg(not(target_family = "wasm"))]
+ pub use generate_image::run as run_generate_image;
++#[cfg(not(target_family = "wasm"))]
+ pub mod question_page;
++#[cfg(not(target_family = "wasm"))]
+ pub mod serve_question;
++#[cfg(not(target_family = "wasm"))]
+ pub use serve_question::run as run_serve_question;
+ 
+ pub mod component_review;
+diff -ruN a/crates/context/src/palette.rs b/crates/context/src/palette.rs
+--- a/crates/context/src/palette.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/palette.rs	2026-10-08 17:09:05.587794724 +0200
+@@ -14,7 +14,7 @@
+ /// JS: Math.random() substitute; only used with no key.
+ fn random_unit() -> f64 {
+     let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+-    let mut x = (t as u64) ^ (std::process::id() as u64).wrapping_mul(0x9E3779B97F4A7C15);
++    let mut x = (t as u64) ^ (impeccable_common::process_id() as u64).wrapping_mul(0x9E3779B97F4A7C15);
+     x ^= x >> 33;
+     x = x.wrapping_mul(0xff51afd7ed558ccd);
+     x ^= x >> 33;
+diff -ruN a/crates/context/src/serve_question.rs b/crates/context/src/serve_question.rs
+--- a/crates/context/src/serve_question.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/serve_question.rs	2026-10-08 17:09:05.588930935 +0200
+@@ -430,7 +430,7 @@
+         let rel = format!("{}/{}-{}.{}", WORLD_CARDS_DIR, id, kind, ext);
+         let abs = jsp::resolve(cwd, &[rel.as_str()]);
+         // Temp file then rename: a parallel session never reads half an image.
+-        let temp = format!("{}.tmp-{}", abs, std::process::id());
++        let temp = format!("{}.tmp-{}", abs, impeccable_common::process_id());
+         let written = std::fs::create_dir_all(jsp::resolve(cwd, &[WORLD_CARDS_DIR])).and_then(|_| std::fs::write(&temp, &bytes)).and_then(|_| std::fs::rename(&temp, &abs));
+         if written.is_err() {
+             let _ = std::fs::remove_file(&temp);
+@@ -588,7 +588,7 @@
+ 
+ /// Temp file beside the target, then rename: a reader never sees half a file.
+ fn write_atomic(target: &str, text: &str) -> std::io::Result<()> {
+-    let temp = format!("{}.tmp-{}", target, std::process::id());
++    let temp = format!("{}.tmp-{}", target, impeccable_common::process_id());
+     std::fs::write(&temp, text)?;
+     std::fs::rename(&temp, target).map_err(|e| {
+         let _ = std::fs::remove_file(&temp);
+@@ -659,7 +659,7 @@
+     // A per-hand id: an --update re-roll can repeat a payload, so the digest
+     // alone cannot tell one hand's generated markers from the next one's.
+     let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+-    m.insert("id".into(), Value::String(hand_digest(&json!([hand_digest(payload), nonce.to_string(), std::process::id()]))));
++    m.insert("id".into(), Value::String(hand_digest(&json!([hand_digest(payload), nonce.to_string(), impeccable_common::process_id()]))));
+     m.insert("digest".into(), Value::String(hand_digest(payload)));
+     m.insert("comps".into(), json!(comps));
+     m.insert("pre".into(), Value::Object(pre));
+@@ -1234,7 +1234,7 @@
+     if a.has("detached-serve") {
+         let _ = std::fs::create_dir_all(&qdir);
+         let key = a.arg("key").unwrap_or_default();
+-        let mut st = json!({ "pid": std::process::id(), "port": actual_port, "url": url });
++        let mut st = json!({ "pid": impeccable_common::process_id(), "port": actual_port, "url": url });
+         let comps = declared_comps(&state.lock().unwrap().payload);
+         if !comps.is_empty() {
+             st["comps"] = json!(comps);
+@@ -1597,7 +1597,7 @@
+ fn random_key() -> String {
+     // Math.random().toString(16).slice(2, 10)
+     let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+-    let mut x = (t as u64) ^ ((std::process::id() as u64) << 32) ^ 0x9E3779B97F4A7C15;
++    let mut x = (t as u64) ^ ((impeccable_common::process_id() as u64) << 32) ^ 0x9E3779B97F4A7C15;
+     x ^= x >> 33;
+     x = x.wrapping_mul(0xff51afd7ed558ccd);
+     x ^= x >> 33;
+@@ -2098,7 +2098,7 @@
+     }
+ 
+     fn temp_project(name: &str) -> std::path::PathBuf {
+-        let dir = std::env::temp_dir().join(format!("impeccable-sq-{}-{}", name, std::process::id()));
++        let dir = std::env::temp_dir().join(format!("impeccable-sq-{}-{}", name, impeccable_common::process_id()));
+         let _ = std::fs::remove_dir_all(&dir);
+         std::fs::create_dir_all(dir.join(".impeccable/questions")).unwrap();
+         std::fs::create_dir_all(dir.join(".impeccable/mocks/decision")).unwrap();
+@@ -2237,7 +2237,7 @@
+         let slot = ".impeccable/mocks/decision/a.png";
+         // The first hand's comp landed at the slot the re-roll reuses.
+         write_file(&dir.join(slot), b"first hand");
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         let reroll = json!({ "title": "Round 2", "options": [{ "id": "a", "comp": slot }] });
+         std::fs::write(dir.join("reroll.json"), reroll.to_string()).unwrap();
+         let (code, out) = run_captured(&dir, &["--update", "--key", "k1", "--payload", "reroll.json"]);
+@@ -2262,7 +2262,7 @@
+         let qdir = jsp::join(&[&cwd, ".impeccable", "questions"]);
+         let slot = ".impeccable/mocks/decision/a.png";
+         write_file(&dir.join(slot), b"first hand");
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [slot] }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [slot] }));
+         std::fs::write(dir.join("reroll.json"), json!({ "options": [{ "id": "a", "comp": slot }] }).to_string()).unwrap();
+         // The server read its state just before --update ran ...
+         let stale_read = read_state(&qdir, "k1").unwrap();
+@@ -2298,7 +2298,7 @@
+         // The previous hand generated into the slot.
+         gen(slot);
+         let before = std::fs::read(dir.join(slot)).unwrap();
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         std::fs::write(dir.join("reroll.json"), json!({ "options": [{ "id": "a", "comp": slot }] }).to_string()).unwrap();
+         let (_, out) = run_captured(&dir, &["--update", "--key", "k1", "--payload", "reroll.json"]);
+         assert!(out.contains("NEXT read "), "{out}");
+@@ -2345,7 +2345,7 @@
+         assert!(err.starts_with("serve-question: could not record the hand (") && err.contains("the page was not served"), "{err}");
+         assert!(!std::path::Path::new(&state_file(&qdir, "k1")).exists());
+ 
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         let (code, out, err) = err_of(&["--update", "--key", "k1", "--payload", "p.json"]);
+         assert_eq!(code, 1);
+         assert!(out.is_empty(), "{out}");
+@@ -2452,7 +2452,7 @@
+         assert!(!std::path::Path::new(&state_file(&qdir, "k1")).exists());
+ 
+         // --update refuses the same round with the page left on its hand.
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         let (code, out, err) = run_err(&["--update", "--key", "k1", "--payload", "p.json"]);
+         assert_eq!(code, 1, "{err}");
+         assert!(out.is_empty(), "{out}");
+@@ -2595,7 +2595,7 @@
+         assert!(roll.exists());
+ 
+         // A surface re-roll delivered by --update is gated the same way.
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         let (code, out, err) = run_err(&["--update", "--key", "k1", "--payload", "p.json"]);
+         assert_eq!(code, 1, "{err}");
+         assert!(out.is_empty(), "{out}");
+@@ -2781,7 +2781,7 @@
+ 
+     #[test]
+     fn comp_round_pick_of_the_recorded_decision_comp_is_the_approval() {
+-        let dir = std::env::temp_dir().join(format!("impeccable-sq-decision-{}-{}", std::process::id(), now_ms() as u64));
++        let dir = std::env::temp_dir().join(format!("impeccable-sq-decision-{}-{}", impeccable_common::process_id(), now_ms() as u64));
+         std::fs::create_dir_all(dir.join(".impeccable/build")).unwrap();
+         let slot = ".impeccable/mocks/decision/a.png";
+         let round: Vec<String> = vec![slot.into(), ".impeccable/mocks/comp-2.png".into(), ".impeccable/mocks/comp-3.png".into()];
+@@ -2952,7 +2952,7 @@
+         let handle = card_server(server, stop.clone());
+         let dir = temp_project("world-cards");
+         let qdir = jsp::join(&[&dir.to_string_lossy(), ".impeccable", "questions"]);
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         std::fs::write(dir.join("p.json"), direction_round(true).to_string()).unwrap();
+         let card_base = format!("{base}/cards");
+         let update = |extra: &[(&str, &str)]| run_env(&dir, &[extra, &[("IMPECCABLE_CARD_BASE", card_base.as_str())]].concat(), &["--update", "--key", "k1", "--payload", "p.json"]);
+@@ -3001,7 +3001,7 @@
+         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+         let handle = card_server(server, stop.clone());
+         let dir = temp_project("world-cards-fail");
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         std::fs::write(dir.join("p.json"), direction_round(true).to_string()).unwrap();
+         // One image 404s, one URL sits outside the card base on a loopback
+         // host (never requested), one answers 200 with a sign-in page, an
+@@ -3035,7 +3035,7 @@
+         let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+         let base = format!("http://{}", server.server_addr());
+         let dir = temp_project("world-cards-fake");
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         std::fs::write(dir.join("p.json"), direction_round(true).to_string()).unwrap();
+         // One card image an earlier round already fetched.
+         std::fs::create_dir_all(dir.join(".impeccable/mocks/worlds")).unwrap();
+@@ -3066,7 +3066,7 @@
+         assert_eq!(restart, hand);
+         assert_eq!(Value::Array(hand_worlds(Some(&restart))), worlds);
+         // The code-led round flips to comp: its NEXT line names the cards.
+-        write_state(&dir, &json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" }));
++        write_state(&dir, &json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" }));
+         std::fs::write(flip_file(&qdir, "k1"), "1").unwrap();
+         let (code, out) = run_env(&dir, &fake, &["--wait", "--key", "k1", "--poll", "2"]);
+         assert_eq!(code, 0);
+@@ -3089,7 +3089,7 @@
+     fn wait_names_landed_comps_without_a_prompt_sidecar() {
+         let dir = temp_project("wait-sidecar");
+         let comps = [".impeccable/mocks/decision/a.png", ".impeccable/mocks/decision/b.png", ".impeccable/mocks/decision/c.png"];
+-        let state = json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": comps });
++        let state = json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": comps });
+         std::fs::write(dir.join(".impeccable/questions/k1.state.json"), state.to_string()).unwrap();
+         // a landed without a sidecar, b landed with one, c has not landed yet.
+         std::fs::write(dir.join(comps[0]), b"png").unwrap();
+@@ -3144,7 +3144,7 @@
+         let qdir = jsp::join(&[&cwd, ".impeccable", "questions"]);
+         let comps = [".impeccable/mocks/decision/a.png", ".impeccable/mocks/decision/b.png"];
+         let payload = json!({ "options": comps.iter().map(|c| json!({ "comp": c })).collect::<Vec<_>>() });
+-        let state = json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": comps });
++        let state = json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": comps });
+         std::fs::write(dir.join(".impeccable/questions/k1.state.json"), state.to_string()).unwrap();
+         write_hand(&qdir, "k1", &new_hand(&cwd, &payload)).unwrap();
+         let wait = || {
+@@ -3203,7 +3203,7 @@
+         std::fs::write(dir.join(slot), b"old").unwrap();
+         std::fs::write(dir.join(format!("{}.json", slot)), r#"{"prompt":"p"}"#).unwrap();
+         let payload = json!({ "options": [{ "comp": slot }], "buildPath": { "value": "code", "toggle": true } });
+-        let state = json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [slot] });
++        let state = json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [slot] });
+         std::fs::write(dir.join(".impeccable/questions/k1.state.json"), state.to_string()).unwrap();
+         write_hand(&qdir, "k1", &new_hand(&cwd, &payload)).unwrap();
+         let (_, out) = run_captured(&dir, &["--wait", "--key", "k1", "--poll", "0"]);
+@@ -3213,7 +3213,7 @@
+         let comp = ".impeccable/mocks/comp-b.png";
+         std::fs::write(dir.join(comp), b"png").unwrap();
+         std::fs::write(dir.join(format!("{}.json", comp)), r#"{"prompt":"p"}"#).unwrap();
+-        let state = json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [comp] });
++        let state = json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [comp] });
+         std::fs::write(dir.join(".impeccable/questions/k2.state.json"), state.to_string()).unwrap();
+         write_hand(&qdir, "k2", &new_hand(&cwd, &json!({ "options": [{ "comp": comp }] }))).unwrap();
+         let (_, out) = run_captured(&dir, &["--wait", "--key", "k2", "--poll", "0"]);
+@@ -3224,7 +3224,7 @@
+     #[test]
+     fn update_prints_the_visualize_directive_only_when_comps_are_due() {
+         let dir = temp_project("update-next");
+-        let state = json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" });
++        let state = json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" });
+         std::fs::write(dir.join(".impeccable/questions/k1.state.json"), state.to_string()).unwrap();
+         std::fs::write(dir.join("comp.json"), json!({ "options": [{ "id": "a", "comp": ".impeccable/mocks/decision/a.png" }] }).to_string()).unwrap();
+         let (code, out) = run_captured(&dir, &["--update", "--key", "k1", "--payload", "comp.json"]);
+@@ -3254,7 +3254,7 @@
+     #[test]
+     fn flip_to_comp_puts_visualize_in_front_of_the_comps() {
+         let dir = temp_project("flip-next");
+-        let state = json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/" });
++        let state = json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/" });
+         std::fs::write(dir.join(".impeccable/questions/k1.state.json"), state.to_string()).unwrap();
+         std::fs::write(dir.join(".impeccable/questions/k1.flip.json"), r#"{"buildPath":"comp"}"#).unwrap();
+         let (code, out) = run_captured(&dir, &["--wait", "--key", "k1", "--poll", "2"]);
+@@ -3266,7 +3266,7 @@
+ 
+         // A flip whose recorded comps all landed owes no new prompt.
+         std::fs::write(dir.join(".impeccable/mocks/decision/a.png"), b"png").unwrap();
+-        let state = json!({ "pid": std::process::id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [".impeccable/mocks/decision/a.png"] });
++        let state = json!({ "pid": impeccable_common::process_id(), "port": 1, "url": "http://127.0.0.1:1/", "comps": [".impeccable/mocks/decision/a.png"] });
+         std::fs::write(dir.join(".impeccable/questions/k1.state.json"), state.to_string()).unwrap();
+         std::fs::write(dir.join(".impeccable/questions/k1.flip.json"), r#"{"buildPath":"comp"}"#).unwrap();
+         let (_, out) = run_captured(&dir, &["--wait", "--key", "k1", "--poll", "2"]);
+diff -ruN a/crates/context/src/signals.rs b/crates/context/src/signals.rs
+--- a/crates/context/src/signals.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/signals.rs	2026-10-08 17:11:20.958442402 +0200
+@@ -56,6 +56,13 @@
+ 
+ /// git with stdout only; None on non-zero exit / spawn failure.
+ pub fn git_run(args: &[&str], cwd: &str, trim: bool, timeout_ms: Option<u64>) -> Option<String> {
++    #[cfg(target_family = "wasm")]
++    {
++        let _ = (args, cwd, trim, timeout_ms);
++        return None;
++    }
++    #[cfg(not(target_family = "wasm"))]
++    {
+     let mut cmd = Command::new("git");
+     cmd.args(args).current_dir(cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+     impeccable_common::proc::hide_window(&mut cmd);
+@@ -98,6 +105,7 @@
+         String::from_utf8_lossy(&o.stdout).into_owned()
+     };
+     Some(if trim { js_trim(&out).to_string() } else { out })
++    }
+ }
+ 
+ fn git_signals(cwd: &str) -> Value {
+@@ -240,6 +248,15 @@
+ const COMMON_DEV_PORTS: [u16; 7] = [4321, 3000, 5173, 5174, 8080, 8000, 4200];
+ 
+ fn dev_server_signals() -> Value {
++    #[cfg(target_family = "wasm")]
++    {
++        let mut m = Map::new();
++        m.insert("running".into(), Value::Bool(false));
++        m.insert("ports".into(), Value::Array(vec![]));
++        return Value::Object(m);
++    }
++    #[cfg(not(target_family = "wasm"))]
++    {
+     let handles: Vec<_> = COMMON_DEV_PORTS
+         .iter()
+         .map(|&p| {
+@@ -260,6 +277,7 @@
+     m.insert("running".into(), Value::Bool(!open.is_empty()));
+     m.insert("ports".into(), Value::Array(open.into_iter().map(|p| Value::from(p)).collect()));
+     Value::Object(m)
++    }
+ }
+ 
+ const SCANNABLE_EXT: [&str; 11] = [".html", ".htm", ".css", ".scss", ".jsx", ".tsx", ".js", ".ts", ".vue", ".svelte", ".astro"];
+diff -ruN a/crates/context/src/staleness_deep.rs b/crates/context/src/staleness_deep.rs
+--- a/crates/context/src/staleness_deep.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/staleness_deep.rs	2026-10-08 17:09:05.587306473 +0200
+@@ -442,7 +442,7 @@
+     fn tmp() -> String {
+         let base = std::env::temp_dir().join(format!(
+             "impeccable-doctor-hook-{}-{}-{}",
+-            std::process::id(),
++            impeccable_common::process_id(),
+             std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+             // A per-process counter: Windows' clock is coarse enough that two
+             // parallel tests can share a nanosecond stamp and then delete each
+diff -ruN a/crates/context/src/surface_briefs.rs b/crates/context/src/surface_briefs.rs
+--- a/crates/context/src/surface_briefs.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/context/src/surface_briefs.rs	2026-10-08 17:09:05.590266313 +0200
+@@ -338,7 +338,7 @@
+     fn resolves_pre_hash_long_slug_briefs() {
+         let root = std::env::temp_dir().join(format!(
+             "impeccable-surface-legacy-{}-{}",
+-            std::process::id(),
++            impeccable_common::process_id(),
+             TMP_SEQ.fetch_add(1, Ordering::Relaxed)
+         ));
+         let root = root.to_string_lossy().into_owned();
+@@ -370,7 +370,7 @@
+     fn rejects_unmapped_pre_hash_slug_collisions() {
+         let root = std::env::temp_dir().join(format!(
+             "impeccable-surface-legacy-collision-{}-{}",
+-            std::process::id(),
++            impeccable_common::process_id(),
+             TMP_SEQ.fetch_add(1, Ordering::Relaxed)
+         ));
+         let root = root.to_string_lossy().into_owned();
+diff -ruN a/crates/hook/src/before_edit.rs b/crates/hook/src/before_edit.rs
+--- a/crates/hook/src/before_edit.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/hook/src/before_edit.rs	2026-10-08 17:09:05.595430991 +0200
+@@ -509,7 +509,7 @@
+     scan: &HookScanOptions,
+ ) -> Result<Vec<Finding>, String> {
+     let base = std::env::temp_dir();
+-    let stamp = format!("{}{}", std::process::id(), now_ms() as u64);
++    let stamp = format!("{}{}", impeccable_common::process_id(), now_ms() as u64);
+     let dir = base.join(format!("impeccable-pre-{stamp}"));
+     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+     let tmp = dir.join(jsp::basename(file_path));
+diff -ruN a/crates/skills/Cargo.toml b/crates/skills/Cargo.toml
+--- a/crates/skills/Cargo.toml	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/skills/Cargo.toml	2026-10-08 17:02:00.456187994 +0200
+@@ -14,8 +14,10 @@
+ regex = { workspace = true }
+ once_cell = { workspace = true }
+ sha2 = "0.10"
+-ring = "0.17.14"
+-ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+ url = "2"
+ zip = { version = "2", default-features = false, features = ["deflate"] }
++
++[target.'cfg(not(target_family = "wasm"))'.dependencies]
++ring = "0.17.14"
++ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+ libc = "0.2"
+diff -ruN a/crates/skills/src/bundle.rs b/crates/skills/src/bundle.rs
+--- a/crates/skills/src/bundle.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/skills/src/bundle.rs	2026-10-08 17:09:05.596295284 +0200
+@@ -49,6 +49,15 @@
+ /// through `download_file`, which streams to disk. Reads are capped at
+ /// [`MAX_DOWNLOAD_BYTES`]; a longer response is an error, not a truncation.
+ pub fn download(url: &str) -> Result<Vec<u8>, String> {
++    #[cfg(target_family = "wasm")]
++    {
++        let _ = url;
++        return Err(
++            "needs network; not available in this build yet".to_string(),
++        );
++    }
++    #[cfg(not(target_family = "wasm"))]
++    {
+     let agent = impeccable_context::http::agent_builder()
+         .timeout_connect(std::time::Duration::from_secs(30))
+         .build();
+@@ -67,6 +76,7 @@
+         Err(ureq::Error::Status(code, _)) => Err(format!("HTTP {code}")),
+         Err(ureq::Error::Transport(t)) => Err(t.to_string()),
+     }
++    }
+ }
+ 
+ /// What `download_file` needs from a transport hop: the status, the
+@@ -79,6 +89,13 @@
+ }
+ 
+ fn ureq_fetch(url: &str) -> Result<FetchResponse, String> {
++    #[cfg(target_family = "wasm")]
++    {
++        let _ = url;
++        Err("needs network; not available in this build yet".to_string())
++    }
++    #[cfg(not(target_family = "wasm"))]
++    {
+     let agent = impeccable_context::http::agent_builder()
+         .timeout_connect(std::time::Duration::from_secs(30))
+         .timeout(std::time::Duration::from_secs(120))
+@@ -97,6 +114,7 @@
+         }),
+         Err(ureq::Error::Transport(t)) => Err(t.to_string()),
+     }
++    }
+ }
+ 
+ /// JS: downloadFile(url, dest, { fetchImpl }) after #479 + af2e8b3a: manual
+@@ -877,7 +895,7 @@
+         static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+         let dir = std::env::temp_dir().join(format!(
+             "impeccable-bundle-{tag}-{}-{}",
+-            std::process::id(),
++            impeccable_common::process_id(),
+             SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+         ));
+         std::fs::create_dir_all(&dir).unwrap();
+diff -ruN a/crates/skills/src/bundle_signature_wasm.rs b/crates/skills/src/bundle_signature_wasm.rs
+--- a/crates/skills/src/bundle_signature_wasm.rs	1970-01-01 01:00:00.000000000 +0100
++++ b/crates/skills/src/bundle_signature_wasm.rs	2026-10-08 17:02:53.734019625 +0200
+@@ -0,0 +1,25 @@
++//! WASI stub: remote bundle signing needs `ring`, which does not link for
++//! wasm32-wasip1. Callers hit download stubs first; these APIs refuse cleanly.
++use std::collections::BTreeMap;
++use std::io::Read;
++
++pub(crate) const MAX_SIGNATURE_BYTES: u64 = 16 * 1024;
++pub(crate) const ERROR_PREFIX: &str = "Could not verify skill bundle: ";
++pub(crate) type TrustedKeys = BTreeMap<String, String>;
++
++pub(crate) fn trusted_keys() -> Result<TrustedKeys, String> {
++    Err("needs network; not available in this build yet".into())
++}
++
++pub(crate) fn release_version(_location: &str) -> Result<String, String> {
++    Err("needs network; not available in this build yet".into())
++}
++
++pub(crate) fn verify_reader(
++    _reader: &mut dyn Read,
++    _signature: &[u8],
++    _version: &str,
++    _keys: &TrustedKeys,
++) -> Result<(), String> {
++    Err("needs network; not available in this build yet".into())
++}
+diff -ruN a/crates/skills/src/lib.rs b/crates/skills/src/lib.rs
+--- a/crates/skills/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/skills/src/lib.rs	2026-10-08 17:02:53.777776953 +0200
+@@ -27,6 +27,10 @@
+ //! layout) follows the JS byte for byte.
+ 
+ pub mod bundle;
++#[cfg(not(target_family = "wasm"))]
++mod bundle_signature;
++#[cfg(target_family = "wasm")]
++#[path = "bundle_signature_wasm.rs"]
+ mod bundle_signature;
+ pub mod commands;
+ pub mod engine_binary;
+diff -ruN a/crates/skills/src/util.rs b/crates/skills/src/util.rs
+--- a/crates/skills/src/util.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/skills/src/util.rs	2026-10-08 17:03:28.315985803 +0200
+@@ -245,6 +245,11 @@
+     {
+         std::os::windows::fs::symlink_dir(target, path).map_err(|e| node_error("symlink", path, &e))
+     }
++    #[cfg(all(not(unix), not(windows)))]
++    {
++        let _ = target;
++        Err(format!("symlink not supported on this platform for '{path}'"))
++    }
+ }
+ 
+ /// `chmod +x` (no-op off unix).
