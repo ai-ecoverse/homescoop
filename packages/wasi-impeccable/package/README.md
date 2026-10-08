@@ -4,12 +4,16 @@
 [slicc](https://github.com/ai-ecoverse/slicc)'s WASI preview1 realm
 (`abi: "wasi"` — module only, no Emscripten glue).
 
-Ships the **detect-focused** CLI: scan HTML/CSS/JS files for design
-anti-patterns. Live mode, Chrome URL scans, and skill install verbs are not
-in this build (they need sockets / a browser host).
+**This package is the detector only.** It runs file and directory scans:
 
 ```bash
 pnpm add -g @ai-ecoverse/wasi-impeccable
 impeccable detect path/to/page.html
+impeccable detect src/
 impeccable --version
 ```
+
+It does **not** include URL or Chrome/CDP scans, live mode, or the skill
+installer (`install` / `link` / `update`). For those, use upstream
+[`impeccable`](https://www.npmjs.com/package/impeccable) /
+[pbakaus/impeccable](https://github.com/pbakaus/impeccable).

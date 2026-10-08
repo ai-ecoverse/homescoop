@@ -4,13 +4,15 @@
   "needs": [],
   "needsInstall": [],
   "checklist": [
-    "impeccable --version / engine-probe",
-    "detect sample HTML finds anti-patterns (exit 2)",
-    "clean HTML → exit 0",
-    "unknown command → exit 1",
-    "detect missing path warns cleanly"
+    "impeccable --version",
+    "detect sample HTML → specific rule ids + exit 2",
+    "detect clean / bare HTML → exit 0",
+    "detect directory",
+    "missing path → exit 1 + Warning",
+    "unknown verb → exit 1",
+    ".impeccable/config.json ignoreRules honoured"
   ],
   "patches": {
-    "0001-wasi-detect-only-cli.patch": "detect/ignores build for wasm32-wasip1; full CLI fails on ureq/socks without this patch"
+    "0001-wasi-detect-only-cli.patch": "cfg(not(target_family=wasm)) keeps browser/live/skills/context/hook/comp off the WASI dependency graph; without it cargo fails on ureq/socks writev/readv"
   }
 }

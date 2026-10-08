@@ -1,184 +1,140 @@
 diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
 --- a/crates/cli/Cargo.toml	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/Cargo.toml	2026-10-08 15:42:39.901804143 +0200
-@@ -5,21 +5,10 @@
++++ b/crates/cli/Cargo.toml	2026-10-08 15:53:47.572759588 +0200
+@@ -5,19 +5,25 @@
  license.workspace = true
  publish.workspace = true
  
-+# homescoop WASI: detect-only binary (no browser/live/skills/context/comp).
++# Detect path (html/detect/core/common) builds for every target, including
++# wasm32-wasip1. Native-only crates (browser/live/skills/context/hook/comp)
++# pull ureq/socks, CDP sockets, and process helpers that do not compile for
++# WASI — keep them off the wasm dependency graph via target cfg.
  [dependencies]
  impeccable-common = { path = "../common" }
 -impeccable-context = { path = "../context" }
 -impeccable-browser = { path = "../browser" }
  impeccable-detect = { path = "../detect" }
  impeccable-html = { path = "../html" }
--impeccable-hook = { path = "../hook" }
--impeccable-live = { path = "../live" }
--impeccable-skills = { path = "../skills" }
- impeccable-core = { workspace = true }
--impeccable-comp = { workspace = true }
--impeccable-comp-verbs = { workspace = true }
++impeccable-core = { workspace = true }
++serde_json = { workspace = true }
++
++[target.'cfg(not(target_family = "wasm"))'.dependencies]
++impeccable-context = { path = "../context" }
++impeccable-browser = { path = "../browser" }
+ impeccable-hook = { path = "../hook" }
+ impeccable-live = { path = "../live" }
+ impeccable-skills = { path = "../skills" }
+-impeccable-core = { workspace = true }
+ impeccable-comp = { workspace = true }
+ impeccable-comp-verbs = { workspace = true }
 -serde_json = { workspace = true }
--base64 = "0.22"
--sha2 = "0.10"
--
--[dev-dependencies]
- serde_json = { workspace = true }
+ base64 = "0.22"
+ sha2 = "0.10"
+ 
 diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
 --- a/crates/cli/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/src/lib.rs	1970-01-01 01:00:00.000000000 +0100
-@@ -1,12 +0,0 @@
--//! Native browser adapters, kept separate from the comp-verbs contract.
--pub mod asset_capture;
--
--pub mod capture_snapshot;
--
--pub mod component_capture;
--
--pub mod entry_capture;
--
--pub mod capture_service;
--
--pub mod reviewed_entry;
++++ b/crates/cli/src/lib.rs	2026-10-08 15:53:47.579146146 +0200
+@@ -1,4 +1,6 @@
+ //! Native browser adapters, kept separate from the comp-verbs contract.
++#![cfg(not(target_family = "wasm"))]
++
+ pub mod asset_capture;
+ 
+ pub mod capture_snapshot;
 diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
 --- a/crates/cli/src/main.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/src/main.rs	2026-10-08 15:42:39.910198789 +0200
-@@ -1,18 +1,13 @@
--//! `impeccable` binary: verb router.
-+//! `impeccable` binary: verb router (homescoop WASI detect-only build).
- //!
--//! Every skill script and CLI subcommand is a verb here. Verb crates expose
--//! `run(args: &[String], io: &mut Io) -> i32` (exit code) and never call
--//! `std::process::exit` themselves, so this file is the single place exit codes
--//! and stream flushing are decided (contract: docs/CLI-CONTRACT.md in the
--//! public repo). Verb names are the JS script basenames; a few carry aliases
--//! (`signals` for context-signals, `hooks` for hook-admin).
-+//! Full upstream also wires live/browser/skills/context/comp verbs. Those pull
-+//! sockets, Chrome/CDP, and ureq/socks which do not build for wasm32-wasip1.
-+//! This slim router keeps detect / ignores / help / version / engine-probe.
- 
- use std::io::Write;
++++ b/crates/cli/src/main.rs	2026-10-08 15:53:47.614419943 +0200
+@@ -11,6 +11,7 @@
  
  use impeccable_common::Io;
  
--mod font_render;
--
++#[cfg(not(target_family = "wasm"))]
+ mod font_render;
+ 
  pub const VERSION: &str = env!("CARGO_PKG_VERSION");
- 
- fn main() {
-@@ -25,7 +20,6 @@
- }
- 
- fn run(args: &[String], io: &mut Io) -> i32 {
--    // cli/bin/cli.js dispatch: help / version / detect / ignores / skills verbs
-     let Some(verb) = args.first().map(String::as_str) else {
-         io.out(impeccable_detect::ROOT_USAGE);
-         return 0;
-@@ -40,71 +34,19 @@
-             io.out(&format!("{CLI_VERSION}\n"));
-             0
-         }
--        // Launcher handshake: a cheap discriminator so the launchers can tell
--        // this engine apart from the retired 3.x npm CLI (which answers any
--        // unknown verb with `Unknown command`, exit 1) before exec'ing a
--        // candidate found on PATH or in the unversioned user cache. Kept out
--        // of --help on purpose; not part of the user-facing contract.
-         "engine-probe" => {
-             io.out(&format!("impeccable-engine {VERSION}\n"));
-             0
+@@ -51,32 +52,52 @@
          }
          "detect" => impeccable_detect::run_detect(rest, io, &engines()),
          "ignores" | "ignore" => impeccable_detect::run_ignores(rest, io),
--        "skills" => impeccable_skills::run(rest, io),
--        "help" | "install" | "link" | "update" | "check" => impeccable_skills::run(args, io),
--        // skill scripts
--        "context" => impeccable_context::run_context(rest, io),
--        "pin" => impeccable_context::run_pin(rest, io),
--        "detect-csp" => impeccable_context::run_detect_csp(rest, io),
--        "palette" => impeccable_context::run_palette(rest, io),
--        "surface-brief" => impeccable_context::run_surface_brief(rest, io),
--        "critique-storage" => impeccable_context::run_critique_storage(rest, io),
--        "embed-prompt" => impeccable_context::run_embed_prompt(rest, io),
--        "signals" | "context-signals" => impeccable_context::run_signals(rest, io),
--        "doctor" => impeccable_context::run_doctor(rest, io),
--        "concept-seed" => impeccable_context::run_concept_seed(rest, io),
--        "generate-image" => impeccable_context::run_generate_image(rest, io),
--        "serve-question" => impeccable_context::run_serve_question(rest, io),
--        "component-review" => impeccable_context::component_review::run_with_capturer(rest, io, Some(&mut impeccable::component_capture::NativeComponentCapturer)),
--        // comp-fidelity verbs (crates/comp-verbs over crates/comp)
--        "comp-spec" => impeccable_comp_verbs::run_comp_spec(rest, io),
--        "comp-diff" => impeccable_comp_verbs::run_comp_diff(rest, io),
--        "font-match" => {
--            let mut renderer = font_render::CdpFontRenderer::from_process_env();
--            impeccable_comp_verbs::run_font_match(rest, io, &mut renderer)
--        }
--        "capture-server" => {
--            match impeccable::capture_service::serve(rest) { Ok(()) => 0, Err(e) => { io.err(&format!("Native capture service: {e}\n")); 1 } }
--        }
--        "build-phase" => {
--            // Inject the organic-clip-path CSS scanner (a rule that lives in the
--            // closed `core` crate) so comp-verbs stays core-free.
--            let organic = |html: &str| -> Vec<(Option<String>, String)> {
--                impeccable_core::checks::css_scan::scan_css_text_for_organic_clip_path(html)
--                    .into_iter()
--                    .map(|f| (f.selector, f.snippet))
--                    .collect()
--            };
--            match impeccable::capture_service::RemoteEntryRenderer::from_env(&io.env) {
--                Ok(Some(renderer)) => impeccable_comp_verbs::build_phase::run_with_renderer(rest, io, &organic, Some(&renderer)),
--                Ok(None) => { let renderer=impeccable::reviewed_entry::ReviewedEntryRenderer::local(&io.cwd,io.home().as_deref()); impeccable_comp_verbs::build_phase::run_with_renderer(rest, io, &organic, Some(&renderer)) },
--                Err(e) => { io.err(&format!("Native capture service: {e}\n")); 1 }
--            }
--        }
--        "hook" => impeccable_hook::run_hook(rest, io, engines().html),
--        "hook-before-edit" => impeccable_hook::run_hook_before_edit(rest, io, engines().html),
--        "hooks" | "hook-admin" => impeccable_hook::run_hook_admin(rest, io),
--        v if v.starts_with("live") => impeccable_live::run(v, rest, io),
--        // `npx impeccable src/` shorthand: a path-shaped, flag, URL, or existing
--        // first arg is a detect target (cli.js looksLikeDetectTarget).
--        v if impeccable_detect::looks_like_detect_target(v, &io.cwd.to_string_lossy()) => {
--            impeccable_detect::run_detect(args, io, &engines())
--        }
-         "init" => {
-             io.err(impeccable_detect::INIT_MESSAGE);
-             1
++        #[cfg(not(target_family = "wasm"))]
+         "skills" => impeccable_skills::run(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "help" | "install" | "link" | "update" | "check" => impeccable_skills::run(args, io),
+         // skill scripts
++        #[cfg(not(target_family = "wasm"))]
+         "context" => impeccable_context::run_context(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "pin" => impeccable_context::run_pin(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "detect-csp" => impeccable_context::run_detect_csp(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "palette" => impeccable_context::run_palette(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "surface-brief" => impeccable_context::run_surface_brief(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "critique-storage" => impeccable_context::run_critique_storage(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "embed-prompt" => impeccable_context::run_embed_prompt(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "signals" | "context-signals" => impeccable_context::run_signals(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "doctor" => impeccable_context::run_doctor(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "concept-seed" => impeccable_context::run_concept_seed(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "generate-image" => impeccable_context::run_generate_image(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "serve-question" => impeccable_context::run_serve_question(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "component-review" => impeccable_context::component_review::run_with_capturer(rest, io, Some(&mut impeccable::component_capture::NativeComponentCapturer)),
+         // comp-fidelity verbs (crates/comp-verbs over crates/comp)
++        #[cfg(not(target_family = "wasm"))]
+         "comp-spec" => impeccable_comp_verbs::run_comp_spec(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "comp-diff" => impeccable_comp_verbs::run_comp_diff(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         "font-match" => {
+             let mut renderer = font_render::CdpFontRenderer::from_process_env();
+             impeccable_comp_verbs::run_font_match(rest, io, &mut renderer)
          }
-+        v if impeccable_detect::looks_like_detect_target(v, &io.cwd.to_string_lossy()) => {
-+            impeccable_detect::run_detect(args, io, &engines())
-+        }
-         other => {
-             io.err(&format!(
-                 "Unknown command: \"{other}\"\n\nTo see a list of supported commands, run:\n  impeccable --help\n"
-@@ -114,31 +56,14 @@
-     }
- }
- 
--/// The npm `impeccable` package version `cli.js --version` prints (its
--/// `package.json`), tracked separately from the crate version.
- pub const CLI_VERSION: &str = "4.0.0";
- 
--/// The engines wired into `impeccable detect`: the static HTML engine
--/// (crates/html). The browser engine (crates/browser) plugs in here once it
--/// lands; until then URL scans report the puppeteer message.
- fn engines() -> impeccable_detect::Engines<'static> {
-     static HTML: impeccable_html::StaticHtmlEngine = impeccable_html::StaticHtmlEngine {
--        // The shipped binary carries the built-in rules only.
-         static_rule_pack: None,
++        #[cfg(not(target_family = "wasm"))]
+         "capture-server" => {
+             match impeccable::capture_service::serve(rest) { Ok(()) => 0, Err(e) => { io.err(&format!("Native capture service: {e}\n")); 1 } }
+         }
++        #[cfg(not(target_family = "wasm"))]
+         "build-phase" => {
+             // Inject the organic-clip-path CSS scanner (a rule that lives in the
+             // closed `core` crate) so comp-verbs stays core-free.
+@@ -92,9 +113,13 @@
+                 Err(e) => { io.err(&format!("Native capture service: {e}\n")); 1 }
+             }
+         }
++        #[cfg(not(target_family = "wasm"))]
+         "hook" => impeccable_hook::run_hook(rest, io, engines().html),
++        #[cfg(not(target_family = "wasm"))]
+         "hook-before-edit" => impeccable_hook::run_hook_before_edit(rest, io, engines().html),
++        #[cfg(not(target_family = "wasm"))]
+         "hooks" | "hook-admin" => impeccable_hook::run_hook_admin(rest, io),
++        #[cfg(not(target_family = "wasm"))]
+         v if v.starts_with("live") => impeccable_live::run(v, rest, io),
+         // `npx impeccable src/` shorthand: a path-shaped, flag, URL, or existing
+         // first arg is a detect target (cli.js looksLikeDetectTarget).
+@@ -128,7 +153,10 @@
      };
      impeccable_detect::Engines {
          html: &HTML,
--        url: Some(url_engine()),
++        #[cfg(not(target_family = "wasm"))]
+         url: Some(url_engine()),
++        #[cfg(target_family = "wasm")]
 +        url: None,
      }
  }
--
--// --- browser engine (crates/browser) -------------------------------------
--/// The URL engine, built once from the process environment (browser
--/// discovery reads `IMPECCABLE_BROWSER` / `PUPPETEER_EXECUTABLE_PATH` /
--/// `CHROME_PATH`, sandbox flags read `CI`).
--fn url_engine() -> &'static impeccable_browser::BrowserEngine {
--    static ENGINE: std::sync::OnceLock<impeccable_browser::BrowserEngine> =
--        std::sync::OnceLock::new();
--    ENGINE.get_or_init(impeccable_browser::BrowserEngine::from_process_env)
--}
--// -------------------------------------------------------------------------
+ 
+@@ -136,6 +164,7 @@
+ /// The URL engine, built once from the process environment (browser
+ /// discovery reads `IMPECCABLE_BROWSER` / `PUPPETEER_EXECUTABLE_PATH` /
+ /// `CHROME_PATH`, sandbox flags read `CI`).
++#[cfg(not(target_family = "wasm"))]
+ fn url_engine() -> &'static impeccable_browser::BrowserEngine {
+     static ENGINE: std::sync::OnceLock<impeccable_browser::BrowserEngine> =
+         std::sync::OnceLock::new();
