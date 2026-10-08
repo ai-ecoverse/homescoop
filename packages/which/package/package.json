@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-which",
-  "version": "2.23-1",
+  "version": "2.23.0-1",
   "description": "GNU which for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-3.0-or-later",
   "repository": {
