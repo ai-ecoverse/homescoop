@@ -23,5 +23,5 @@ Remount, bind and move mounts, `mount -a` and fstab lookups are not supported.
 The flags are a subset of util-linux's, with the same spellings and the same
 listing format. Exit codes follow util-linux: 1 for usage, 32 for mount failure.
 
-Requires an `@ai-ecoverse/slicc-kernel` with process mounts (slicc-kernel#92);
+Requires `@ai-ecoverse/slicc-kernel` ≥ 1.17.0 (process mounts, slicc-kernel#92);
 older kernels answer "mount(2) is not available".

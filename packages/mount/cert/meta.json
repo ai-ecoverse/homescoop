@@ -1,8 +1,10 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.17.0",
-  "blocked": "needs slicc-kernel#92 (process mount/umount2); pin is the next minor after 1.16.0, update when semantic-release cuts it",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils@9.12.0-2"
@@ -17,5 +19,6 @@
     "mount -o ro → write gives Read-only file system",
     "-o maxfile=xyz → bad option (EINVAL); mount over /proc → busy; umount of a plain dir → not mounted",
     "hostfs without a grant hook → refused (harness has no hostfs hook; hostfs connect not covered)"
-  ]
+  ],
+  "needsNote": "Kernel pin 1.17.0 = first release with slicc-kernel#92 process mount/umount2 (MNT_DETACH revocation, nomedium in /proc/mounts, ro enforced at open). The harness page has no hostfs grant hook, so only the hostfs refusal is checked."
 }

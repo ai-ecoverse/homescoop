@@ -57,7 +57,6 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | Package | Blocker |
 | --- | --- |
 | cmake | host-build needs `slicc-emscripten` prebuilt `cmakemain.cxx.o`; use `scripts/smoke-cmake.mjs` (`harness: host-node`) once staged |
-| mount | needs slicc-kernel#92 (process mount/umount2) released; `cert/meta.json` `blocked` until then |
 | findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
 
