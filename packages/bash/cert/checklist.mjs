@@ -1,7 +1,8 @@
 /**
- * bash checklist: exec keeps the pid (slicc-kernel#99). Needs a kernel with
- * Module.sliccKernel.execve; older kernels give the exec'd image a pid of
- * its own, so `exec` changes $$ and these cases fail.
+ * bash checklist: exec keeps the pid (slicc-kernel#99). Needs slicc-kernel
+ * ≥ 1.17.3: Module.sliccKernel.execve, and /proc/self for exec'd images
+ * (#108). Older kernels give the exec'd image a pid of its own, so `exec`
+ * changes $$ and these cases fail.
  */
 const stat = (text) => {
   const m = /^(\d+) \((.*)\) (\S) (\d+) /.exec(text);
@@ -34,6 +35,16 @@ export default async function (ctx) {
   assert.equal(cat.status, 0, `exec cat stderr=${cat.stderr}`);
   const [pid, catLine] = cat.stdout.split('\n');
   assert.equal(stat(catLine)?.comm, 'cat', `/proc/${pid}/stat after exec cat: ${catLine}`);
+
+  // /proc/self in an exec'd image is the image under $$ (slicc-kernel#108:
+  // 1.17.1/1.17.2 answered ESRCH for execve-path processes).
+  const procSelf = await sh('echo $$; exec cat /proc/self/stat');
+  assert.equal(procSelf.status, 0, `exec cat /proc/self/stat stderr=${procSelf.stderr}`);
+  const [selfPid, selfLine] = procSelf.stdout.split('\n');
+  const selfStat = stat(selfLine);
+  assert.ok(selfStat, `no /proc/self/stat line in ${JSON.stringify(procSelf.stdout)}`);
+  assert.equal(selfStat.pid, selfPid, `/proc/self is ${selfStat.pid}, $$ was ${selfPid}`);
+  assert.equal(selfStat.comm, 'cat');
 
   // A forked child that execs is the pid fork() returned: $! reaches the
   // program, and a signal to it ends the program, not a stale image.
