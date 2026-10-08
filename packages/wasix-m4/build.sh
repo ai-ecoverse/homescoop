@@ -11,9 +11,15 @@ DEST="$PKG/package"
 VER="$VERSION"
 WORK="${WASIX_M4_WORK:-$PKG/work}"
 SRC="$WORK/m4-$VER"
-WASM_OPT="${WASM_OPT:-$HOME/.wasixcc/binaryen/bin/wasm-opt}"
 
-export PATH="${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin:/opt/homebrew/bin:$HOME/.wasixcc/binaryen/bin:$HOME/.wasixcc/llvm/bin:$PATH"
+# No wasixcc on PATH (CI runners): install the pinned toolchain.
+if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin/wasixcc" ]]; then
+  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
+fi
+WASIXCC_HOME="${WASIXCC_HOME:-$HOME/.wasixcc}"
+WASM_OPT="${WASM_OPT:-$WASIXCC_HOME/binaryen/bin/wasm-opt}"
+
+export PATH="${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin:/opt/homebrew/bin:$WASIXCC_HOME/binaryen/bin:$WASIXCC_HOME/llvm/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS="${WASIXCC_WASM_EXCEPTIONS:-no}"
 export WASIXCC_PIC=no
@@ -42,7 +48,11 @@ exec wasixcc "$@"
 WRAP
 chmod +x "$CCWRAP"
 
-SYSROOT="${WASIXCC_SYSROOT:-$HOME/.wasixcc/sysroot/sysroot}"
+SYSROOT="${WASIXCC_SYSROOT:-$WASIXCC_HOME/sysroot/sysroot}"
+case "$(uname -s)" in
+  Darwin) BUILD_TRIPLE="$(uname -m)-apple-darwin" ;;
+  *) BUILD_TRIPLE="$(uname -m)-pc-linux-gnu" ;;
+esac
 cd "$SRC"
 if [[ ! -f config.status || -n "${FORCE_CONFIGURE:-}" ]]; then
   # Seed cache for probes that hang or mis-detect under wasm cross
@@ -59,12 +69,12 @@ ac_cv_func_getprogname=${ac_cv_func_getprogname=no}
 CACHE
   ./configure \
     --host=wasm32-wasix \
-    --build="$(uname -m)-apple-darwin" \
+    --build="$BUILD_TRIPLE" \
     --prefix=/usr \
     --disable-nls \
     --cache-file=config.cache \
     CC="$CCWRAP" LD=wasixcc AR=wasixar RANLIB=wasixranlib \
-    CPP="$HOME/.wasixcc/llvm/bin/clang --target=wasm32-wasi --sysroot=$SYSROOT -E" \
+    CPP="$WASIXCC_HOME/llvm/bin/clang --target=wasm32-wasi --sysroot=$SYSROOT -E" \
     CFLAGS="-O2 -D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_MMAN" \
     LDFLAGS="-lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
 fi
