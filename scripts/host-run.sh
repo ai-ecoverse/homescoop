@@ -104,12 +104,8 @@ if ! command -v emconfigure >/dev/null 2>&1; then
   if [[ -n "${HOMESCOOP_EMSDK_ROOT:-}" && -x "$HOMESCOOP_EMSDK_ROOT/emcc" ]]; then
     export PATH="$HOMESCOOP_EMSDK_ROOT:$PATH"
   else
-    echo "== host-run: installing emsdk (npm)"
-    if [[ ! -d "$ROOT/node_modules/emsdk" ]]; then
-      (cd "$ROOT" && npm install --no-save --no-package-lock emsdk@0.4.0)
-    fi
-    # shellcheck disable=SC1091
-    eval "$(node -e 'const e=require("emsdk"); const env=e.env(); for (const [k,v] of Object.entries(env)) console.log(`export ${k}=${JSON.stringify(String(v))}`)')"
+    echo "== host-run: installing emsdk 4.0.23 (pinned)"
+    eval "$(bash "$ROOT/scripts/install-emsdk.sh")"
   fi
 fi
 command -v emconfigure >/dev/null

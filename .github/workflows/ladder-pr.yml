@@ -19,6 +19,7 @@ on:
       - 'scripts/refresh-recipe-sha.mjs'
       - 'scripts/list-touched-packages.mjs'
       - 'scripts/host-smoke.sh'
+      - 'scripts/install-emsdk.sh'
       - 'scripts/install-wasixcc.sh'
       - 'scripts/sync-package-version.mjs'
       - 'scripts/browser-cert/**'

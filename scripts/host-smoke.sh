@@ -19,11 +19,8 @@ mkdir -p "$WORKDIR"
 if ! command -v emcc >/dev/null 2>&1; then
   if [[ -n "${HOMESCOOP_EMSDK_ROOT:-}" && -x "$HOMESCOOP_EMSDK_ROOT/emcc" ]]; then
     export PATH="$HOMESCOOP_EMSDK_ROOT:$PATH"
-  elif [[ -d "$ROOT/node_modules/emsdk" ]]; then
-    eval "$(node -e 'const e=require("emsdk"); const env=e.env(); for (const [k,v] of Object.entries(env)) console.log(`export ${k}=${JSON.stringify(String(v))}`)')"
   else
-    echo "host-smoke: emcc not on PATH" >&2
-    exit 1
+    eval "$(bash "$ROOT/scripts/install-emsdk.sh")"
   fi
 fi
 command -v emcc >/dev/null
