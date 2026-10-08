@@ -1,0 +1,45 @@
+{
+  "name": "@ai-ecoverse/wasm-mount",
+  "version": "1.0.0-1",
+  "description": "mount / umount for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/mount/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/mount",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "mount",
+    "umount"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "mount",
+    "upstream": "1.0.0"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "mount": {
+        "glue": "bin/mount",
+        "wasm": "bin/mount.wasm"
+      },
+      "umount": {
+        "glue": "bin/umount",
+        "wasm": "bin/umount.wasm"
+      }
+    }
+  }
+}
