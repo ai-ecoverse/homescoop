@@ -6,7 +6,7 @@ version: "3.12"
 npm: "@ai-ecoverse/wasm-grep"
 summary: "GNU grep for slicc"
 source:
-  url: "https://ftp.gnu.org/gnu/grep/grep-{{version}}.tar.xz"
+  url: "https://mirrors.kernel.org/gnu/grep/grep-{{version}}.tar.xz"
   sha256: "2649b27c0e90e632eadcd757be06c6e9a4f48d941de51e7c0f83ff76408a07b9"
 dependencies:
   build: []

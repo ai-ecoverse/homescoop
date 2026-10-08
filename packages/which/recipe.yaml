@@ -6,7 +6,7 @@ version: "2.23"
 npm: "@ai-ecoverse/wasm-which"
 summary: "GNU which for slicc wasm realm"
 source:
-  url: "https://ftp.gnu.org/gnu/which/which-{{version}}.tar.gz"
+  url: "https://mirrors.kernel.org/gnu/which/which-{{version}}.tar.gz"
   sha256: "a2c558226fc4d9e4ce331bd2fd3c3f17f955115d2c00e447618a4ef9978a2a73"
 dependencies:
   build: []

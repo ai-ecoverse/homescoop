@@ -6,7 +6,7 @@ version: "4.4.1"
 npm: "@ai-ecoverse/wasm-gmake"
 summary: "GNU make built for slicc (wasm tool)"
 source:
-  url: "https://ftp.gnu.org/gnu/make/make-{{version}}.tar.gz"
+  url: "https://mirrors.kernel.org/gnu/make/make-{{version}}.tar.gz"
   sha256: "dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3"
 dependencies:
   build: []
