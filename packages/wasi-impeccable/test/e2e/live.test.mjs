@@ -5,6 +5,9 @@
 // POSTs a browser event, which the agent's `live-poll` receives.
 // The browser page itself cannot reach kernel loopback yet (slicc-kernel#103,
 // slicc-bios#92).
+// Run with --test-force-exit until slicc-kernel#110 ships: the server's
+// sleeping threads leave kernel timers armed after it exits, which keeps Node
+// alive (https://github.com/ai-ecoverse/slicc-kernel/issues/110).
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'

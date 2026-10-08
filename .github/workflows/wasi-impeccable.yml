@@ -46,6 +46,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: HTTP verbs and live mode in the kernel
         working-directory: packages/wasi-impeccable/test
-        # --test-force-exit: the kernel leaves a sleeping thread's poll timer
-        # armed after its process exits, which keeps Node alive until it fires.
+        # --test-force-exit until slicc-kernel#110 ships: the kernel leaves a
+        # sleeping thread's poll timer armed after its process exits, which
+        # keeps Node alive until it fires.
+        # https://github.com/ai-ecoverse/slicc-kernel/issues/110
         run: node --test --test-concurrency=1 --test-force-exit 'e2e/*.test.mjs'
