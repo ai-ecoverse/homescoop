@@ -12,9 +12,11 @@
     "unknown verb → exit 1",
     "ignores add-rule overused-font → that id disappears, others remain",
     "palette / doctor / context / signals / pin / detect-csp / surface-brief / critique-storage / embed-prompt / hooks / hook / hook-before-edit / comp-spec / comp-diff / check / link --help",
-    "help (no network) and generate-image / live → not available in this build yet (not Unknown command)"
+    "help (no network) and generate-image / live → not available in this build yet (not Unknown command)",
+    "install with closed stdin → exit 1 + no harness selected (no hang)",
+    "detect https://example.com → URL scans need a browser; not available in this build yet (rc 1)"
   ],
   "patches": {
-    "0001-wasi-detect-only-cli.patch": "cfg(target_family=wasm) gates ureq/tiny_http/ring; file-local verbs on; unavailable verbs print clear message; process_id + no thread spawn on wasi"
+    "0001-wasi-detect-only-cli.patch": "cfg(target_family=wasm) gates ureq/tiny_http/ring; file-local verbs on; unavailable verbs print clear message; process_id + no thread spawn on wasi; install EOF exits; URL detect message"
   }
 }

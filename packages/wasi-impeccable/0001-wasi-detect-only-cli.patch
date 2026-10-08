@@ -777,6 +777,25 @@ diff -ruN a/crates/context/src/surface_briefs.rs b/crates/context/src/surface_br
              TMP_SEQ.fetch_add(1, Ordering::Relaxed)
          ));
          let root = root.to_string_lossy().into_owned();
+diff -ruN a/crates/detect/src/engines.rs b/crates/detect/src/engines.rs
+--- a/crates/detect/src/engines.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/detect/src/engines.rs	2026-10-08 17:36:27.370954178 +0200
+@@ -145,7 +145,14 @@
+ impl UrlEngine for MissingUrlEngine {
+     fn detect_url(&self, _url: &str, _options: &ScanOptions) -> Result<Vec<Finding>, EngineError> {
+         Err(EngineError::new(
+-            "puppeteer is required for URL scanning. Install: npm install puppeteer",
++            #[cfg(target_family = "wasm")]
++            {
++                "URL scans need a browser; not available in this build yet"
++            },
++            #[cfg(not(target_family = "wasm"))]
++            {
++                "puppeteer is required for URL scanning. Install: npm install puppeteer"
++            },
+         ))
+     }
+ }
 diff -ruN a/crates/hook/src/before_edit.rs b/crates/hook/src/before_edit.rs
 --- a/crates/hook/src/before_edit.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/hook/src/before_edit.rs	2026-10-08 17:09:05.595430991 +0200
@@ -892,6 +911,47 @@ diff -ruN a/crates/skills/src/bundle_signature_wasm.rs b/crates/skills/src/bundl
 +) -> Result<(), String> {
 +    Err("needs network; not available in this build yet".into())
 +}
+diff -ruN a/crates/skills/src/commands.rs b/crates/skills/src/commands.rs
+--- a/crates/skills/src/commands.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/skills/src/commands.rs	2026-10-08 17:36:27.453760990 +0200
+@@ -294,14 +294,26 @@
+         if answer.is_empty() && !default_providers.is_empty() {
+             return Ok(default_providers.to_vec());
+         }
++        if answer.is_empty() {
++            err(io, "no harness selected; pass --providers=<names> or -y");
++            return Err(Flow::Exit(1));
++        }
+         let (providers, invalid) = parse_provider_list(&answer);
+         if !invalid.is_empty() {
++            if !prompt.interactive() {
++                err(io, &format!("Unknown provider(s): {}. Pass --providers=<names> or -y.", invalid.join(", ")));
++                return Err(Flow::Exit(1));
++            }
+             out(io, &format!("Unknown provider(s): {}", invalid.join(", ")));
+             continue;
+         }
+         if !providers.is_empty() {
+             return Ok(providers);
+         }
++        if !prompt.interactive() {
++            err(io, "no harness selected; pass --providers=<names> or -y");
++            return Err(Flow::Exit(1));
++        }
+         out(io, "Choose at least one provider.");
+     }
+ }
+@@ -330,6 +342,10 @@
+         if ["2", "customize", "customise", "add", "add more", "more", "a", "n", "no"].contains(&answer.as_str()) {
+             return Ok(DetectedMode::Add);
+         }
++        if !prompt.interactive() {
++            err(io, "no install target selected; pass --providers=<names> or -y");
++            return Err(Flow::Exit(1));
++        }
+         out(io, "Choose 1 for detected only, or 2 to customize.");
+     }
+ }
 diff -ruN a/crates/skills/src/lib.rs b/crates/skills/src/lib.rs
 --- a/crates/skills/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/skills/src/lib.rs	2026-10-08 17:02:53.777776953 +0200
@@ -906,6 +966,24 @@ diff -ruN a/crates/skills/src/lib.rs b/crates/skills/src/lib.rs
  mod bundle_signature;
  pub mod commands;
  pub mod engine_binary;
+diff -ruN a/crates/skills/src/prompt.rs b/crates/skills/src/prompt.rs
+--- a/crates/skills/src/prompt.rs	2026-10-08 00:33:36.000000000 +0200
++++ b/crates/skills/src/prompt.rs	2026-10-08 17:36:27.410408767 +0200
+@@ -27,7 +27,13 @@
+         let style = stdout_tty
+             && io.env("NO_COLOR").is_none()
+             && io.env("TERM") != Some("dumb");
+-        Prompt { stdin_tty: io.stdin_is_tty, stdout_tty, style, piped: None }
++        // WASI/SLICC has no interactive agent TTY; treat stdin as piped so
++        // prompts cannot block forever waiting for a human.
++        #[cfg(target_family = "wasm")]
++        let stdin_tty = false;
++        #[cfg(not(target_family = "wasm"))]
++        let stdin_tty = io.stdin_is_tty;
++        Prompt { stdin_tty, stdout_tty, style, piped: None }
+     }
+ 
+     /// JS: isInteractivePrompt()
 diff -ruN a/crates/skills/src/util.rs b/crates/skills/src/util.rs
 --- a/crates/skills/src/util.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/skills/src/util.rs	2026-10-08 17:03:28.315985803 +0200

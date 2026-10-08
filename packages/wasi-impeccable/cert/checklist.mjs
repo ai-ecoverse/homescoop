@@ -180,4 +180,26 @@ body { font-family: Inter, Arial, sans-serif; color: #000; background: #fff; }
   const live = await run(['impeccable', 'live'], { cwd: '/home' });
   assert.equal(live.status, 1, `live status=${live.status}`);
   assert.match(live.stderr, /not available in this build yet/, `live stderr=${JSON.stringify(live.stderr)}`);
+
+  // Closed stdin must not hang: install exits non-zero within seconds.
+  const installEof = await run(['impeccable', 'install'], {
+    cwd: '/home',
+    stdin: '',
+  });
+  assert.equal(installEof.status, 1, `install EOF status=${installEof.status}`);
+  assert.match(
+    installEof.stderr + installEof.stdout,
+    /no harness selected/,
+    `install EOF=${JSON.stringify(installEof.stderr + installEof.stdout)}`,
+  );
+
+  // URL detect: WASI message, not puppeteer npm advice.
+  const url = await run(['impeccable', 'detect', 'https://example.com'], { cwd: '/home' });
+  assert.equal(url.status, 1, `URL detect status=${url.status}`);
+  assert.match(
+    url.stderr,
+    /URL scans need a browser; not available in this build yet/,
+    `URL detect stderr=${JSON.stringify(url.stderr)}`,
+  );
+  assert.ok(!/puppeteer/i.test(url.stderr), 'must not mention puppeteer');
 }
