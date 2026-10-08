@@ -5,7 +5,7 @@
 scripts.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-xz
+pnpm add -g @ai-ecoverse/wasm-xz
 xz -k file.txt
 xzcat file.txt.xz
 ```

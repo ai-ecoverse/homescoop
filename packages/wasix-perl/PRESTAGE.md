@@ -34,7 +34,7 @@ that are not in libc, etc.
 
 ## SLICC acceptance
 ```sh
-ipk install -g @ai-ecoverse/wasix-perl@5.42.0-5
+pnpm add -g @ai-ecoverse/wasix-perl@5.42.0-5
 perl -e 'open my $f,">","/tmp/t"; truncate $f, 0; print "truncate ok\n"'
 perl -e 'open my $f,">","/tmp/l"; print flock($f,2) ? "locked" : "flock: $!"'
 # undef audit (should not DIE for libc-backed ops):

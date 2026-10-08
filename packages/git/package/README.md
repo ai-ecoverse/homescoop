@@ -13,6 +13,6 @@ depends on `@ai-ecoverse/wasm-bash`; without it, `git clone /path/to/repo`
 fails with `cannot exec 'git-upload-pack …'`.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-git
+pnpm add -g @ai-ecoverse/wasm-git
 git init && git add . && git commit -m ok
 ```

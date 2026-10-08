@@ -8,5 +8,4 @@ pnpm add -g @ai-ecoverse/wasm-which
 which ls
 ```
 
-Requires a slicc-kernel that installs `pnpm add -g` packages onto PATH
-(see ai-ecoverse/slicc-kernel#88).
+Requires `@ai-ecoverse/slicc-kernel` ≥ 1.14.0 (pnpm global installs on PATH).

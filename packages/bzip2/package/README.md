@@ -5,7 +5,7 @@
 shell scripts (need `wasm-bash` + grep/diff).
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-bzip2
+pnpm add -g @ai-ecoverse/wasm-bzip2
 bzip2 -k file.txt
 bunzip2 -k file.txt.bz2
 ```

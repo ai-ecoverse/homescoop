@@ -4,6 +4,6 @@
 linked for [slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-xxd
+pnpm add -g @ai-ecoverse/wasm-xxd
 printf 'hi' | xxd
 ```

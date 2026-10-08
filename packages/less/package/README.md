@@ -6,6 +6,6 @@ ncurses 6.5 and compiled-in terminfo fallbacks (`xterm-256color`, `xterm`,
 `vt100`, `dumb`). No `/usr/share/terminfo` on the VFS.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-less
+pnpm add -g @ai-ecoverse/wasm-less
 less README.md
 ```

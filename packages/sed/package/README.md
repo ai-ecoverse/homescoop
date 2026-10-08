@@ -3,5 +3,5 @@
 GNU sed for slicc.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-sed
+pnpm add -g @ai-ecoverse/wasm-sed
 ```

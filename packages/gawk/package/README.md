@@ -3,5 +3,5 @@
 GNU awk for slicc.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-gawk
+pnpm add -g @ai-ecoverse/wasm-gawk
 ```

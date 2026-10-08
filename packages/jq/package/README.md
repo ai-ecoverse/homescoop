@@ -4,6 +4,6 @@
 (`test` / `match` / `sub` / `gsub`).
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-jq
+pnpm add -g @ai-ecoverse/wasm-jq
 echo '{"a":1}' | jq '.a'
 ```
