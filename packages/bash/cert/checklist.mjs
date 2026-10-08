@@ -16,20 +16,24 @@ export default async function (ctx) {
   assert.equal(hi.status, 0, `bash -c stderr=${hi.stderr}`);
   assert.equal(hi.stdout, 'hello 42\n');
 
-  // The exec'd image (coreutils cat) has bash's pid: /proc/self is $$.
-  const cat = await sh('echo $$; exec cat /proc/self/stat');
-  assert.equal(cat.status, 0, `exec cat stderr=${cat.stderr}`);
-  const [pid, line] = cat.stdout.split('\n');
-  const st = stat(line);
-  assert.ok(st, `no /proc/self/stat line in ${JSON.stringify(cat.stdout)}`);
-  assert.equal(st.pid, pid, `exec'd cat has pid ${st.pid}, bash had ${pid}`);
-  assert.equal(st.comm, 'cat');
-
-  // A bash exec'd from bash keeps $$ (and getppid is the replaced one's).
-  const nested = await sh('echo $$ $PPID; exec bash -c "echo \\$\\$ \\$PPID"');
+  // A bash exec'd from bash keeps $$ and $PPID, and /proc agrees: the pid
+  // shows the new image. (Before #99 its getpid() was one past /proc's.)
+  const nested = await sh(
+    'echo $$ $PPID; exec bash -c "echo \\$\\$ \\$PPID; cat /proc/\\$\\$/stat; true"',
+  );
   assert.equal(nested.status, 0, `exec bash stderr=${nested.stderr}`);
-  const [outer, inner] = nested.stdout.trim().split('\n');
+  const [outer, inner, line] = nested.stdout.split('\n');
   assert.equal(inner, outer, `exec bash: $$/$PPID ${inner} != ${outer}`);
+  const st = stat(line);
+  assert.ok(st, `no /proc/<pid>/stat line in ${JSON.stringify(nested.stdout)}`);
+  assert.equal(st.pid, outer.split(' ')[0]);
+  assert.equal(st.comm, 'bash');
+
+  // An exec'd coreutils cat shows under bash's pid in /proc.
+  const cat = await sh('echo $$; exec cat /proc/$$/stat');
+  assert.equal(cat.status, 0, `exec cat stderr=${cat.stderr}`);
+  const [pid, catLine] = cat.stdout.split('\n');
+  assert.equal(stat(catLine)?.comm, 'cat', `/proc/${pid}/stat after exec cat: ${catLine}`);
 
   // A forked child that execs is the pid fork() returned: $! reaches the
   // program, and a signal to it ends the program, not a stale image.

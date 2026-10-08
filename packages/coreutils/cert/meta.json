@@ -10,7 +10,7 @@
     "env sets variable for child",
     "nice runs a child",
     "nohup runs a child",
-    "exec keeps the pid: env/nice cat /proc/self/stat has bash's $$ as ppid"
+    "exec keeps the pid: env/nice bash -c 'echo $PPID' is the outer bash's $$"
   ],
   "patches": {
     "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch"
