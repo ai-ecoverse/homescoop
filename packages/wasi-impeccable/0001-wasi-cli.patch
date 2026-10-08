@@ -170,7 +170,7 @@ diff -ruN a/crates/common/src/git.rs b/crates/common/src/git.rs
  
 diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
 --- a/crates/common/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/common/src/lib.rs	2026-10-08 22:24:05.425225574 +0200
++++ b/crates/common/src/lib.rs	2026-10-08 23:13:51.049046010 +0200
 @@ -60,7 +60,7 @@
              stdin: Some(Box::new(std::io::stdin())),
              stdin_cache: None,
@@ -204,11 +204,11 @@ diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
 +    wasix_command::process::id()
 +}
 +
-+/// homescoop: `std::thread::sleep`, except on wasm32-wasip1, where slicc's
-+/// kernel can end a clock-only `poll_oneoff` up to a millisecond early with no
-+/// event; wasi-libc then reports ENOTSUP and std's sleep panics. This sleeps
-+/// in poll rounds until the monotonic deadline instead. Remove once the
-+/// kernel reports the clock event.
++/// homescoop (wasm only): `std::thread::sleep`, except on wasm32-wasip1, where
++/// slicc's kernel can end a clock-only `poll_oneoff` up to a millisecond early
++/// with no event (slicc-kernel#105); wasi-libc then reports ENOTSUP and std's
++/// sleep panics. This sleeps in poll rounds until the monotonic deadline
++/// instead. Remove, with the call-site swap, once #105 is fixed.
 +pub fn sleep(duration: std::time::Duration) {
 +    #[cfg(target_os = "wasi")]
 +    {
@@ -1352,14 +1352,15 @@ diff -ruN a/crates/live/src/manual_edits/mod.rs b/crates/live/src/manual_edits/m
      matches!(status, Ok(s) if s.success())
 diff -ruN a/crates/live/src/paths.rs b/crates/live/src/paths.rs
 --- a/crates/live/src/paths.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/paths.rs	2026-10-08 22:24:18.200140628 +0200
-@@ -113,6 +113,13 @@
++++ b/crates/live/src/paths.rs	2026-10-08 23:13:51.049418345 +0200
+@@ -113,6 +113,14 @@
          live_server_path(cwd, env),
          legacy_live_server_path(cwd, env),
      ] {
-+        // homescoop: slicc's kernel keeps a stale "not found" for a path
-+        // another process created until its directory is read again; the
-+        // detached server writes this file. Remove once the kernel is fixed.
++        // homescoop (wasm only): slicc's kernel keeps a stale "not found" for
++        // a path another process created until its directory is read again
++        // (slicc-kernel#106); the detached server writes this file. Remove
++        // once #106 is fixed.
 +        #[cfg(target_os = "wasi")]
 +        if let Some(dir) = std::path::Path::new(&file).parent() {
 +            let _ = std::fs::read_dir(dir).map(|entries| entries.count());
