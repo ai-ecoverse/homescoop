@@ -1,7 +1,7 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.17.1",
-  "blocked": "needs the slicc-kernel release that ships #104 (Module.sliccKernel.execve, slicc-kernel#99) and wasm-bash 5.3.0-8; pin is a placeholder until it is cut",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.17.2",
+  "blocked": "needsInstall @ai-ecoverse/wasm-bash@5.3.0-8 (kernel-execve shim) is not on npm until it is certified and published; certified locally against slicc-kernel 1.17.2 with the PR tarballs — unblock once bash 5.3.0-8 is published",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
