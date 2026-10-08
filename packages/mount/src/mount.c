@@ -21,13 +21,15 @@
 static void usage(FILE *out) {
   fputs("Usage:\n"
         " mount [-l] [-t type]                 list mounted filesystems\n"
-        " mount [-rwv] [-t type] [-o options] <source> <directory>\n"
+        " mount [-frwv] [-t type] [-o options] <source> <directory>\n"
         "\n"
         "Options:\n"
         " -t, --types <type>     filesystem type (tmpfs, fsa, hostfs, ...)\n"
         " -o, --options <list>   comma-separated mount options (ro, rw, maxfile=1g, ...)\n"
         " -r, --read-only        mount read-only (same as -o ro)\n"
         " -w, --rw, --read-write mount read-write (default)\n"
+        " -f, --fake             do everything except the mount(2) call\n"
+        " -n, --no-mtab          accepted for compatibility\n"
         " -v, --verbose          say what is being done\n"
         " -l, --show-labels      accepted for compatibility\n"
         " -h, --help             display this help\n"
@@ -193,6 +195,8 @@ int main(int argc, char **argv) {
       {"rw", no_argument, NULL, 'w'},
       {"read-write", no_argument, NULL, 'w'},
       {"verbose", no_argument, NULL, 'v'},
+      {"fake", no_argument, NULL, 'f'},
+      {"no-mtab", no_argument, NULL, 'n'},
       {"show-labels", no_argument, NULL, 'l'},
       {"help", no_argument, NULL, 'h'},
       {"version", no_argument, NULL, 'V'},
@@ -201,9 +205,9 @@ int main(int argc, char **argv) {
   const char *type = NULL;
   char *data = NULL;
   unsigned long flags = 0;
-  int verbose = 0, c;
+  int verbose = 0, fake = 0, c;
 
-  while ((c = getopt_long(argc, argv, "t:o:rwvlhVn", longopts, NULL)) != -1) {
+  while ((c = getopt_long(argc, argv, "t:o:frwvlhVn", longopts, NULL)) != -1) {
     switch (c) {
     case 't':
       type = optarg;
@@ -219,6 +223,9 @@ int main(int argc, char **argv) {
       break;
     case 'v':
       verbose = 1;
+      break;
+    case 'f':
+      fake = 1;
       break;
     case 'l':
     case 'n':
@@ -251,7 +258,11 @@ int main(int argc, char **argv) {
   if (!type) {
     fprintf(stderr, "mount: %s: no filesystem type given; use -t (tmpfs, fsa, hostfs, ...).\n",
             target);
-    return MNT_EX_USAGE;
+    return MNT_EX_FAIL;
+  }
+  if (fake) {
+    if (verbose) printf("mount: %s would be mounted on %s (fake).\n", source, target);
+    return MNT_EX_SUCCESS;
   }
   if (mount(source, target, type, flags, data) != 0) return fail(target, type, flags, errno);
 

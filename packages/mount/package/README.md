@@ -15,12 +15,13 @@ umount -l /mnt/f                # detach even if busy
 ```
 
 - `mount [-l] [-t type]` lists mounted filesystems.
-- `mount [-rwv] [-t type] [-o options] <source> <directory>` mounts. `ro`/`rw`
+- `mount [-frwv] [-t type] [-o options] <source> <directory>` mounts (`-f` fakes it). `ro`/`rw`
   set read-only; other options go to the driver (`maxfile=1g`, …).
 - `umount [-lfv] <directory>|<source>...` unmounts; `-l`/`-f` detach at once.
 
 Remount, bind and move mounts, `mount -a` and fstab lookups are not supported.
-Exit codes follow util-linux (1 usage, 32 mount failure).
+The flags are a subset of util-linux's, with the same spellings and the same
+listing format. Exit codes follow util-linux: 1 for usage, 32 for mount failure.
 
 Requires an `@ai-ecoverse/slicc-kernel` with process mounts (slicc-kernel#92);
 older kernels answer "mount(2) is not available".

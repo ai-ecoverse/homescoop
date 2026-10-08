@@ -89,6 +89,7 @@ int main(int argc, char **argv) {
       {"lazy", no_argument, NULL, 'l'},
       {"force", no_argument, NULL, 'f'},
       {"verbose", no_argument, NULL, 'v'},
+      {"no-mtab", no_argument, NULL, 'n'},
       {"all", no_argument, NULL, 'a'},
       {"help", no_argument, NULL, 'h'},
       {"version", no_argument, NULL, 'V'},
