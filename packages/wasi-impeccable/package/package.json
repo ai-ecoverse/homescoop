@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/wasi-impeccable",
+  "version": "0.1.12-2",
+  "description": "impeccable engine 0.1.12 for slicc WASI preview1 (command impeccable; detect-only)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-impeccable/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-impeccable",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "impeccable",
+    "detect"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-impeccable",
+    "upstream": "0.1.12"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "impeccable": {
+        "wasm": "bin/impeccable.wasm"
+      }
+    }
+  }
+}
