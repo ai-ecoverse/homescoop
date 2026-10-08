@@ -1,6 +1,6 @@
 diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
 --- a/crates/cli/Cargo.toml	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/Cargo.toml	2026-10-08 15:53:47.572759588 +0200
++++ b/crates/cli/Cargo.toml	2026-10-08 16:03:04.909997412 +0200
 @@ -5,19 +5,25 @@
  license.workspace = true
  publish.workspace = true
@@ -33,7 +33,7 @@ diff -ruN a/crates/cli/Cargo.toml b/crates/cli/Cargo.toml
  
 diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
 --- a/crates/cli/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/src/lib.rs	2026-10-08 15:53:47.579146146 +0200
++++ b/crates/cli/src/lib.rs	2026-10-08 16:03:04.911603624 +0200
 @@ -1,4 +1,6 @@
  //! Native browser adapters, kept separate from the comp-verbs contract.
 +#![cfg(not(target_family = "wasm"))]
@@ -43,7 +43,7 @@ diff -ruN a/crates/cli/src/lib.rs b/crates/cli/src/lib.rs
  pub mod capture_snapshot;
 diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
 --- a/crates/cli/src/main.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/cli/src/main.rs	2026-10-08 15:53:47.614419943 +0200
++++ b/crates/cli/src/main.rs	2026-10-08 16:03:48.323824741 +0200
 @@ -11,6 +11,7 @@
  
  use impeccable_common::Io;
@@ -52,7 +52,17 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
  mod font_render;
  
  pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-@@ -51,32 +52,52 @@
+@@ -37,7 +38,8 @@
+             0
+         }
+         "--version" | "-v" => {
+-            io.out(&format!("{CLI_VERSION}\n"));
++            // homescoop WASI: ship the engine version, not the npm CLI constant.
++            io.out(&format!("{VERSION}\n"));
+             0
+         }
+         // Launcher handshake: a cheap discriminator so the launchers can tell
+@@ -51,32 +53,52 @@
          }
          "detect" => impeccable_detect::run_detect(rest, io, &engines()),
          "ignores" | "ignore" => impeccable_detect::run_ignores(rest, io),
@@ -105,7 +115,7 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
          "build-phase" => {
              // Inject the organic-clip-path CSS scanner (a rule that lives in the
              // closed `core` crate) so comp-verbs stays core-free.
-@@ -92,9 +113,13 @@
+@@ -92,9 +114,13 @@
                  Err(e) => { io.err(&format!("Native capture service: {e}\n")); 1 }
              }
          }
@@ -119,7 +129,7 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
          v if v.starts_with("live") => impeccable_live::run(v, rest, io),
          // `npx impeccable src/` shorthand: a path-shaped, flag, URL, or existing
          // first arg is a detect target (cli.js looksLikeDetectTarget).
-@@ -128,7 +153,10 @@
+@@ -128,7 +154,10 @@
      };
      impeccable_detect::Engines {
          html: &HTML,
@@ -130,7 +140,7 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
      }
  }
  
-@@ -136,6 +164,7 @@
+@@ -136,6 +165,7 @@
  /// The URL engine, built once from the process environment (browser
  /// discovery reads `IMPECCABLE_BROWSER` / `PUPPETEER_EXECUTABLE_PATH` /
  /// `CHROME_PATH`, sandbox flags read `CI`).

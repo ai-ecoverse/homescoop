@@ -21,5 +21,5 @@ error[E0599]: no method named `readv` found for struct `UdpSocket`
 error: could not compile `socks` (lib) due to 2 previous errors
 ```
 
-**Good tarball:** CI artifact from the wasi-impeccable PR —
+**Good tarball:** CI artifact `@ai-ecoverse/wasi-impeccable@0.1.12-3` —
 `cert/checklist.mjs` under slicc-kernel@1.15.1.

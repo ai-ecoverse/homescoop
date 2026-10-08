@@ -40,13 +40,20 @@ if [[ ! -f "$OUT/bin/impeccable.wasm" || -n "${FORCE:-}" ]]; then
 fi
 test -f "$OUT/bin/impeccable.wasm"
 
-# Optional further shrink; ignore if binaryen rejects features.
+# Shrink like other wasi- Rust recipes. rustc emits bulk-memory / multivalue /
+# reference-types / etc.; binaryen needs those features enabled or it rejects
+# the module (bulk-memory alone is not enough for this crate).
 if command -v wasm-opt >/dev/null 2>&1; then
-  echo "== wasi-impeccable: wasm-opt -Oz --strip-debug (best-effort)"
-  if wasm-opt -Oz --strip-debug --enable-bulk-memory \
+  echo "== wasi-impeccable: wasm-opt -Oz --strip-debug"
+  before=$(wc -c < "$OUT/bin/impeccable.wasm" | tr -d ' ')
+  if wasm-opt -Oz --strip-debug \
+       --enable-bulk-memory --enable-multivalue --enable-reference-types \
+       --enable-nontrapping-float-to-int --enable-sign-ext \
        "$OUT/bin/impeccable.wasm" -o "$OUT/bin/impeccable.opt.wasm" 2>/dev/null
   then
     mv "$OUT/bin/impeccable.opt.wasm" "$OUT/bin/impeccable.wasm"
+    after=$(wc -c < "$OUT/bin/impeccable.wasm" | tr -d ' ')
+    echo "== wasi-impeccable: wasm-opt $before → $after bytes"
   else
     rm -f "$OUT/bin/impeccable.opt.wasm"
     echo "== wasi-impeccable: wasm-opt skipped (validator); keeping cargo-stripped wasm"
