@@ -5,6 +5,6 @@
 wasm realm.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-sqlite3
+pnpm add -g @ai-ecoverse/wasm-sqlite3
 sqlite3 :memory: "SELECT sqlite_version();"
 ```

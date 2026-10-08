@@ -9,7 +9,7 @@ Configure XMLs ship under `etc/ImageMagick-7/`; the slicc manifest sets
 `MAGICK_CONFIGURE_PATH` so `colors.xml` / `policy.xml` resolve.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-imagemagick
+pnpm add -g @ai-ecoverse/wasm-imagemagick
 magick -version
 convert logo: out.png
 ```

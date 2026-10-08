@@ -5,6 +5,6 @@
 (`abi: "wasi"` — module only, no Emscripten glue).
 
 ```bash
-ipk add -g @ai-ecoverse/wasi-ripgrep
+pnpm add -g @ai-ecoverse/wasi-ripgrep
 rg -n TODO .
 ```

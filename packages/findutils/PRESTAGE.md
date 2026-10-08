@@ -22,6 +22,6 @@ With `@ai-ecoverse/wasm-coreutils` (or any `echo`) installed:
 
 ## Install for acceptance
 ```bash
-ipk add -g /path/to/ai-ecoverse-wasm-findutils-4.10.0-1.tgz
+pnpm add -g /path/to/ai-ecoverse-wasm-findutils-4.10.0-1.tgz
 # or from the homescoop package tree after npm pack
 ```

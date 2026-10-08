@@ -7,7 +7,7 @@ wasm realm: `find` and `xargs` only (no `locate` / `updatedb`).
 fork + `slicc_spawn` path.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-findutils
+pnpm add -g @ai-ecoverse/wasm-findutils
 find . -name '*.c' -type f
 find . -print0 | xargs -0 echo
 ```

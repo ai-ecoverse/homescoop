@@ -3,5 +3,5 @@
 GNU grep for slicc.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-grep
+pnpm add -g @ai-ecoverse/wasm-grep
 ```

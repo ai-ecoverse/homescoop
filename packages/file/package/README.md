@@ -5,7 +5,7 @@
 the package’s `share/misc/magic.mgc`.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-file
+pnpm add -g @ai-ecoverse/wasm-file
 file README.md
 file -i -z archive.tar.xz
 ```

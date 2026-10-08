@@ -15,6 +15,6 @@ Install with `@ai-ecoverse/wasm-go-std-wasip1` (and optionally
 `slicc.commands` — the TS `go` supplemental owns the driver.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-go @ai-ecoverse/wasm-go-std-wasip1
+pnpm add -g @ai-ecoverse/wasm-go @ai-ecoverse/wasm-go-std-wasip1
 go version
 ```

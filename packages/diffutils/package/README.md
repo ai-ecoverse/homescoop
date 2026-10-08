@@ -4,6 +4,6 @@
 `diff3`, `sdiff`) for slicc's wasm realm.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-diffutils
+pnpm add -g @ai-ecoverse/wasm-diffutils
 diff -u a.txt b.txt
 ```

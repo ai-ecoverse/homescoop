@@ -4,7 +4,7 @@
 slicc's wasm realm.
 
 ```bash
-ipk add -g @ai-ecoverse/wasm-zip
+pnpm add -g @ai-ecoverse/wasm-zip
 zip out.zip file.txt
 unzip -l out.zip
 ```
