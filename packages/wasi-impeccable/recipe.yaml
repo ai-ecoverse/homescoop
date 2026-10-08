@@ -1,12 +1,12 @@
-# Impeccable engine (file-local CLI) for slicc WASI preview1.
-# Upstream is a design skill + Rust engine; this recipe ships detect plus
-# FS-local verbs for wasm32-wasip1.
+# Impeccable engine CLI for slicc WASI preview1.
+# Upstream is a design skill + Rust engine; this recipe ships detect, the
+# FS-local verbs and the HTTP verbs for wasm32-wasip1.
 name: wasi-impeccable
 builder: host
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
 version: "0.1.12"
 npm: "@ai-ecoverse/wasi-impeccable"
-summary: "impeccable engine 0.1.12 for slicc WASI preview1 (command impeccable; file-local verbs)"
+summary: "impeccable engine 0.1.12 for slicc WASI preview1 (command impeccable; file-local and HTTP verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
   sha256: "d1996f4b48fd52354192e4aafd64e1a4b189afc41f9135c6a4cb22df3050a696"
@@ -19,10 +19,14 @@ about:
   license: Apache-2.0
   notes: |
     cargo build -p impeccable --target wasm32-wasip1 after
-    0001-wasi-detect-only-cli.patch. Upstream has no WASI feature; the patch is
-    mechanical cfg(target_family = "wasm"): gate ureq/tiny_http/ring off the
-    wasm graph, stub network downloads, avoid process::id / thread spawn
-    panics, enable file-local verbs, and print clear "not available in this
-    build yet" for live/URL/capture/network verbs. --version prints the crate
-    / engine VERSION (0.1.x). wasm-opt -Oz (~5.6 MiB → ~4.9 MiB). Command
-    impeccable → bin/impeccable.wasm (abi=wasi).
+    0001-wasi-cli.patch. Upstream has no WASI feature; the patch is
+    mechanical cfg(target_family = "wasm"): ureq is replaced by wasix-ureq
+    (homescoop crates/, vendored by build.sh; HTTPS goes in absolute form
+    through the kernel's proxy); skill-bundle signatures are verified with
+    ed25519-dalek (verify_strict) instead of ring, which does not build for
+    wasm32-wasip1, against the same compiled-in keys; Io's cwd comes from
+    PWD (wasi-libc's current_dir() stays /); avoid process::id / thread spawn
+    panics; print clear "not available in this build yet" for
+    live/URL/capture/listening verbs.
+    --version prints the crate / engine VERSION (0.1.x). wasm-opt -Oz.
+    Command impeccable → bin/impeccable.wasm (abi=wasi).

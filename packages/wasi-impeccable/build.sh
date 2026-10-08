@@ -13,6 +13,9 @@ TARBALL="$WORK/impeccable-engine-v${VERSION}.tar.gz"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
+# HTTP verbs use crates/wasix-ureq (ureq 2's API over the kernel's sockets and
+# proxy); the patch depends on it at homescoop-crates/.
+homescoop_vendor_crates "$SRC_DIR" wasix-ureq
 homescoop_apply_patches "$SRC_DIR"
 
 export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"

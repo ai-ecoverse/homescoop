@@ -1,0 +1,46 @@
+# wasi-impeccable's HTTP verbs, end to end: build impeccable.wasm with the
+# recipe (wasix-ureq vendored from crates/), then run test/e2e on the
+# certified slicc-kernel's headless Node entry. The transport mocks
+# impeccable.style and the image API; the skill bundle is the real signed
+# release from GitHub, verified inside WASI. The file-local checklist
+# (cert/checklist.mjs) stays a browser cert.
+name: wasi-impeccable
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/wasi-impeccable/**
+      - crates/wasix-net/**
+      - crates/wasix-ureq/**
+      - scripts/build-common.sh
+      - .github/workflows/wasi-impeccable.yml
+  pull_request:
+    paths:
+      - packages/wasi-impeccable/**
+      - crates/wasix-net/**
+      - crates/wasix-ureq/**
+      - scripts/build-common.sh
+      - .github/workflows/wasi-impeccable.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: build impeccable.wasm
+        run: HOMESCOOP_ROOT="$PWD" HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/wasi-impeccable/build.sh
+      - name: install slicc-kernel (pinned to the certified version)
+        working-directory: packages/wasi-impeccable/test
+        run: npm ci --no-audit --no-fund
+      - name: HTTP verbs in the kernel
+        working-directory: packages/wasi-impeccable/test
+        run: node --test --test-concurrency=1 'e2e/*.test.mjs'
