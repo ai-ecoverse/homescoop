@@ -52,7 +52,7 @@ if [[ "$need_build" -eq 1 ]]; then
         --without-systemd --without-elogind \
         --disable-w --disable-pidwait \
         --enable-pidof --enable-kill \
-        CFLAGS="-O2"
+        CFLAGS="-O2" || { echo "== PROBE config.log"; grep -n -A40 "checking whether the C compiler works" config.log | head -120; exit 77; }
     homescoop_fix_darwin_ar Makefile
     jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
     # Library only — clear LIBS/LDFLAGS so ambient env / slicc stubs never
@@ -90,3 +90,4 @@ done
 
 homescoop_stage_license "$SRC"/COPYING "$SRC"/COPYING.LIB "$SRC"/LICENSE
 echo "== procps: staged → $HOMESCOOP_PKG/package"
+# probe: baseline host-build on main (do not merge)
