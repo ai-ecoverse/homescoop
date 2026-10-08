@@ -61,6 +61,7 @@
         "packages/pkgconf/recipe.yaml",
         "packages/procps/recipe.yaml",
         "packages/sed/recipe.yaml",
+        "packages/which/recipe.yaml",
         "packages/xxd/recipe.yaml",
         "packages/xz/recipe.yaml"
       ],

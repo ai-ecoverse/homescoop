@@ -1,8 +1,7 @@
 # Negative proof (which)
 
 **Date:** 2026-10-08  
-New package — not in `ci-certified.json` until thr_b83wwqmt4e human-certifies
-the first `@ai-ecoverse/wasm-which` release (no automerge).
+CI-certified (thr_b83wwqmt4e): `@ai-ecoverse/wasm-which@2.23.0-1` on slicc-kernel #88 / 1.12+; listed in `scripts/ci-certified.json`.
 
 ## Empty wasm
 

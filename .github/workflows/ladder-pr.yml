@@ -114,6 +114,13 @@ jobs:
           set -euo pipefail
           bash scripts/host-run.sh "${{ matrix.package }}"
           ls -la .homescoop-out/package.tgz
+      - name: Assert packed version is npm-publishable semver
+        run: |
+          set -euo pipefail
+          # Fail in CI before browser-cert / human handoff — npm pack accepts
+          # two-part forms like 2.23-1 that npm publish rejects.
+          ver=$(node scripts/sync-package-version.mjs --assert-tarball .homescoop-out/package.tgz)
+          echo "packed version $ver (npm semver OK)"
       - uses: actions/upload-artifact@v7
         with:
           name: package-tgz-${{ matrix.package }}
