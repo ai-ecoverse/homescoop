@@ -53,3 +53,4 @@ for cmd in diff cmp diff3 sdiff; do
 done
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
 echo "== diffutils: staged → $HOMESCOOP_PKG/package"
+# PROBE: emconfigure flake repeat run (do not merge)

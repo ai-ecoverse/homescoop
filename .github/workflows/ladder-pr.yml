@@ -101,6 +101,7 @@ jobs:
       fail-fast: false
       matrix:
         package: ${{ fromJson(needs.detect.outputs.host) }}
+        rep: [1, 2, 3, 4, 5]  # PROBE: repeat each host-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -116,6 +117,13 @@ jobs:
           set -euo pipefail
           bash scripts/host-run.sh "${{ matrix.package }}"
           ls -la .homescoop-out/package.tgz
+      - name: 'PROBE: emsdk wasm-opt integrity'
+        if: always()
+        run: |
+          f="$HOME/.cache/emsdk/0.4.0/install/bin/wasm-opt"
+          ls -l "$f" || true
+          got=$(sha256sum "$f" | cut -d' ' -f1)
+          [[ "$got" == 26710fe0056e355d4e2945ee3403c1dd25091810acd268cc996a2f8853ef98bb ]] && echo "WASM_OPT INTACT" || echo "WASM_OPT CORRUPT $got"
       - name: Assert packed version is npm-publishable semver
         run: |
           set -euo pipefail
@@ -125,7 +133,7 @@ jobs:
           echo "packed version $ver (npm semver OK)"
       - uses: actions/upload-artifact@v7
         with:
-          name: package-tgz-${{ matrix.package }}
+          name: package-tgz-${{ matrix.package }}-rep${{ matrix.rep }}
           path: .homescoop-out/package.tgz
           retention-days: 14
       - name: Link/run smoke.c against PREFIX
@@ -134,7 +142,7 @@ jobs:
         run: sha256sum .homescoop-out/package.tgz | tee .homescoop-out/package.tgz.sha256
       - uses: actions/upload-artifact@v7
         with:
-          name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+          name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}-rep${{ matrix.rep }}
           path: |
             .homescoop-out/package.tgz
             .homescoop-out/package.tgz.sha256
