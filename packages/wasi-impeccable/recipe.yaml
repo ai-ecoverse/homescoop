@@ -30,10 +30,8 @@ about:
     wasm32-wasip1, against the same compiled-in keys; Io's cwd comes from
     PWD (wasi-libc's current_dir() stays /); avoid process::id / thread spawn
     panics; print clear "not available in this build yet" for
-    URL/capture/serve-question; Svelte live sessions (node) refuse. Kernel
-    workarounds (slicc-kernel 1.15.1, wasm only): a poll-loop sleep
-    (slicc-kernel#105, a clock poll can end early with no event) and
-    read_dir before reading server.json (slicc-kernel#106, stale lookups of
+    URL/capture/serve-question; Svelte live sessions (node) refuse. Live
+    needs slicc-kernel 1.17.2 or later (#105 clock polls, #106 lookups of
     files other processes create).
     --version prints the crate / engine VERSION (0.1.x). wasm-opt -Oz.
     Command impeccable → bin/impeccable.wasm (abi=wasi).

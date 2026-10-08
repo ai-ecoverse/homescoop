@@ -6,7 +6,7 @@
     "test:e2e": "node --test --test-concurrency=1 --test-force-exit 'e2e/*.test.mjs'"
   },
   "devDependencies": {
-    "@ai-ecoverse/slicc-kernel": "1.15.1",
+    "@ai-ecoverse/slicc-kernel": "1.17.2",
     "@ai-ecoverse/wasm-curl": "8.22.0-1"
   }
 }

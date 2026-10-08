@@ -170,7 +170,7 @@ diff -ruN a/crates/common/src/git.rs b/crates/common/src/git.rs
  
 diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
 --- a/crates/common/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/common/src/lib.rs	2026-10-08 23:13:51.049046010 +0200
++++ b/crates/common/src/lib.rs	2026-10-08 23:14:52.071148101 +0200
 @@ -60,7 +60,7 @@
              stdin: Some(Box::new(std::io::stdin())),
              stdin_cache: None,
@@ -180,7 +180,7 @@ diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
              stdin_is_tty: is_stdin_tty(),
          }
      }
-@@ -226,3 +226,55 @@
+@@ -226,3 +226,22 @@
          assert_eq!(io.stdin(), "hello");
      }
  }
@@ -202,39 +202,6 @@ diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
 +pub fn process_id() -> u32 {
 +    // homescoop: WASIX proc_id in slicc's kernel, std's elsewhere.
 +    wasix_command::process::id()
-+}
-+
-+/// homescoop (wasm only): `std::thread::sleep`, except on wasm32-wasip1, where
-+/// slicc's kernel can end a clock-only `poll_oneoff` up to a millisecond early
-+/// with no event (slicc-kernel#105); wasi-libc then reports ENOTSUP and std's
-+/// sleep panics. This sleeps in poll rounds until the monotonic deadline
-+/// instead. Remove, with the call-site swap, once #105 is fixed.
-+pub fn sleep(duration: std::time::Duration) {
-+    #[cfg(target_os = "wasi")]
-+    {
-+        #[link(wasm_import_module = "wasi_snapshot_preview1")]
-+        extern "C" {
-+            fn poll_oneoff(subs: *const u8, events: *mut u8, nsubs: u32, nevents: *mut u32) -> u16;
-+        }
-+        let deadline = std::time::Instant::now() + duration;
-+        loop {
-+            let now = std::time::Instant::now();
-+            if now >= deadline {
-+                return;
-+            }
-+            let nanos = u64::try_from((deadline - now).as_nanos()).unwrap_or(u64::MAX);
-+            // One relative CLOCK_MONOTONIC subscription.
-+            let mut sub = [0u8; 48];
-+            sub[16..20].copy_from_slice(&1u32.to_le_bytes());
-+            sub[24..32].copy_from_slice(&nanos.to_le_bytes());
-+            let mut event = [0u8; 32];
-+            let mut n = 0u32;
-+            // SAFETY: one subscription in, room for one event out.
-+            unsafe { poll_oneoff(sub.as_ptr(), event.as_mut_ptr(), 1, &mut n) };
-+        }
-+    }
-+    #[cfg(not(target_os = "wasi"))]
-+    std::thread::sleep(duration);
 +}
 diff -ruN a/crates/common/src/proc.rs b/crates/common/src/proc.rs
 --- a/crates/common/src/proc.rs	2026-10-08 00:33:36.000000000 +0200
@@ -416,7 +383,7 @@ diff -ruN a/crates/context/src/component_review/server.rs b/crates/context/src/c
          }
 diff -ruN a/crates/context/src/component_review/store.rs b/crates/context/src/component_review/store.rs
 --- a/crates/context/src/component_review/store.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/context/src/component_review/store.rs	2026-10-08 22:24:05.477211505 +0200
++++ b/crates/context/src/component_review/store.rs	2026-10-08 23:14:52.069918514 +0200
 @@ -19,7 +19,7 @@
      fs::create_dir_all(parent).map_err(|e| e.to_string())?;
      let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -426,15 +393,6 @@ diff -ruN a/crates/context/src/component_review/store.rs b/crates/context/src/co
      let result = (|| {
          let mut f = fs::File::create(&temp)?;
          f.write_all(bytes)?;
-@@ -47,7 +47,7 @@
-     for _ in 0..20 {
-         match f.try_lock() {
-             Ok(()) => return Ok(Lock(f)),
--            Err(fs::TryLockError::WouldBlock) => std::thread::sleep(std::time::Duration::from_millis(25)),
-+            Err(fs::TryLockError::WouldBlock) => impeccable_common::sleep(std::time::Duration::from_millis(25)),
-             Err(fs::TryLockError::Error(e)) => return Err(e.to_string()),
-         }
-     }
 diff -ruN a/crates/context/src/component_review/tests.rs b/crates/context/src/component_review/tests.rs
 --- a/crates/context/src/component_review/tests.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/context/src/component_review/tests.rs	2026-10-08 20:33:04.277201082 +0200
@@ -529,7 +487,7 @@ diff -ruN a/crates/context/src/generate_image.rs b/crates/context/src/generate_i
          dir
 diff -ruN a/crates/context/src/http.rs b/crates/context/src/http.rs
 --- a/crates/context/src/http.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/context/src/http.rs	2026-10-08 22:24:05.471808444 +0200
++++ b/crates/context/src/http.rs	2026-10-08 23:14:52.068829344 +0200
 @@ -23,24 +23,41 @@
  //! prefers `ALL_PROXY`, which is often `socks5://`. We opt in on this
  //! builder only, not globally via ureq's `proxy-from-env` feature.
@@ -589,15 +547,6 @@ diff -ruN a/crates/context/src/http.rs b/crates/context/src/http.rs
  mod tests {
      use super::*;
      use ureq::rustls::pki_types::pem::PemObject;
-@@ -160,7 +178,7 @@
-         let deadline = std::time::Instant::now() + Duration::from_secs(5);
-         while std::time::Instant::now() < deadline {
-             let Ok((mut stream, _)) = listener.accept() else {
--                std::thread::sleep(Duration::from_millis(10));
-+                impeccable_common::sleep(Duration::from_millis(10));
-                 continue;
-             };
-             let _ = stream.set_nonblocking(false);
 diff -ruN a/crates/context/src/lib.rs b/crates/context/src/lib.rs
 --- a/crates/context/src/lib.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/context/src/lib.rs	2026-10-08 20:35:57.790954973 +0200
@@ -623,7 +572,7 @@ diff -ruN a/crates/context/src/palette.rs b/crates/context/src/palette.rs
      x ^= x >> 33;
 diff -ruN a/crates/context/src/serve_question.rs b/crates/context/src/serve_question.rs
 --- a/crates/context/src/serve_question.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/context/src/serve_question.rs	2026-10-08 22:24:05.462513245 +0200
++++ b/crates/context/src/serve_question.rs	2026-10-08 23:14:52.066954755 +0200
 @@ -430,7 +430,7 @@
          let rel = format!("{}/{}-{}.{}", WORLD_CARDS_DIR, id, kind, ext);
          let abs = jsp::resolve(cwd, &[rel.as_str()]);
@@ -651,15 +600,6 @@ diff -ruN a/crates/context/src/serve_question.rs b/crates/context/src/serve_ques
      m.insert("digest".into(), Value::String(hand_digest(payload)));
      m.insert("comps".into(), json!(comps));
      m.insert("pre".into(), Value::Object(pre));
-@@ -902,7 +902,7 @@
- }
- 
- fn sleep_ms(ms: u64) {
--    std::thread::sleep(std::time::Duration::from_millis(ms));
-+    impeccable_common::sleep(std::time::Duration::from_millis(ms));
- }
- 
- fn read_json_file(p: &str) -> Result<Value, String> {
 @@ -1154,18 +1154,18 @@
              child_args.push("--no-open".into());
          }
@@ -886,7 +826,7 @@ diff -ruN a/crates/context/src/serve_question.rs b/crates/context/src/serve_ques
          let (_, out) = run_captured(&dir, &["--wait", "--key", "k1", "--poll", "2"]);
 diff -ruN a/crates/context/src/signals.rs b/crates/context/src/signals.rs
 --- a/crates/context/src/signals.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/context/src/signals.rs	2026-10-08 22:24:05.469330144 +0200
++++ b/crates/context/src/signals.rs	2026-10-08 23:14:52.068063967 +0200
 @@ -7,7 +7,7 @@
  use crate::util::{exists, js_num, js_trim, json_pretty, opt_string, Env};
  use impeccable_common::Io;
@@ -910,15 +850,6 @@ diff -ruN a/crates/context/src/signals.rs b/crates/context/src/signals.rs
      let mut cmd = Command::new("git");
      cmd.args(args).current_dir(cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
      impeccable_common::proc::hide_window(&mut cmd);
-@@ -85,7 +92,7 @@
-                         let _ = child.wait();
-                         return None;
-                     }
--                    std::thread::sleep(std::time::Duration::from_millis(5));
-+                    impeccable_common::sleep(std::time::Duration::from_millis(5));
-                 }
-                 Err(_) => return None,
-             }
 @@ -98,6 +105,7 @@
          String::from_utf8_lossy(&o.stdout).into_owned()
      };
@@ -1071,7 +1002,7 @@ diff -ruN a/crates/live/src/browser_open.rs b/crates/live/src/browser_open.rs
          let cwd = dir.to_string_lossy().into_owned();
 diff -ruN a/crates/live/src/copy_edit_agent.rs b/crates/live/src/copy_edit_agent.rs
 --- a/crates/live/src/copy_edit_agent.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/copy_edit_agent.rs	2026-10-08 22:24:05.441420171 +0200
++++ b/crates/live/src/copy_edit_agent.rs	2026-10-08 23:14:52.060503319 +0200
 @@ -11,7 +11,7 @@
  use serde_json::{json, Map, Value};
  use std::collections::HashSet;
@@ -1081,15 +1012,6 @@ diff -ruN a/crates/live/src/copy_edit_agent.rs b/crates/live/src/copy_edit_agent
  use std::sync::Mutex;
  
  const DEFAULT_TIMEOUT_MS: f64 = 60_000.0;
-@@ -127,7 +127,7 @@
-     if provider == "mock" {
-         let delay_ms = env_number(env, "IMPECCABLE_LIVE_COPY_AGENT_MOCK_DELAY_MS");
-         if delay_ms > 0.0 {
--            std::thread::sleep(std::time::Duration::from_millis(delay_ms as u64));
-+            impeccable_common::sleep(std::time::Duration::from_millis(delay_ms as u64));
-         }
-         return mock_batch_result(batch, env, cwd);
-     }
 @@ -232,7 +232,7 @@
              .duration_since(std::time::UNIX_EPOCH)
              .map(|d| d.subsec_nanos() as u64 + d.as_secs())
@@ -1098,33 +1020,6 @@ diff -ruN a/crates/live/src/copy_edit_agent.rs b/crates/live/src/copy_edit_agent
 +        let candidate = base.join(format!("{}{:x}{:x}", prefix, impeccable_common::process_id(), nanos));
          if std::fs::create_dir(&candidate).is_ok() {
              return Ok(candidate.to_string_lossy().into_owned());
-         }
-@@ -500,7 +500,7 @@
-                         }
-                     }));
-                 }
--                std::thread::sleep(std::time::Duration::from_millis(10));
-+                impeccable_common::sleep(std::time::Duration::from_millis(10));
-             }
-             Err(e) => {
-                 return Some(json!({
-@@ -1375,7 +1375,7 @@
-                     let _ = child.kill();
-                     return false;
-                 }
--                std::thread::sleep(std::time::Duration::from_millis(20));
-+                impeccable_common::sleep(std::time::Duration::from_millis(20));
-             }
-             Err(_) => return false,
-         }
-@@ -1664,7 +1664,7 @@
-                         impeccable_context::util::js_number_to_string(timeout_ms)
-                     ));
-                 }
--                std::thread::sleep(std::time::Duration::from_millis(20));
-+                impeccable_common::sleep(std::time::Duration::from_millis(20));
-             }
-             Err(e) => break Err(e.to_string()),
          }
 diff -ruN a/crates/live/src/dev_url.rs b/crates/live/src/dev_url.rs
 --- a/crates/live/src/dev_url.rs	2026-10-08 00:33:36.000000000 +0200
@@ -1180,21 +1075,9 @@ diff -ruN a/crates/live/src/live_accept.rs b/crates/live/src/live_accept.rs
          let _ = std::fs::remove_dir_all(&dir);
          std::fs::create_dir_all(dir.join("src")).unwrap();
          std::fs::create_dir_all(dir.join(".impeccable/live")).unwrap();
-diff -ruN a/crates/live/src/live_generate.rs b/crates/live/src/live_generate.rs
---- a/crates/live/src/live_generate.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/live_generate.rs	2026-10-08 22:24:05.432223139 +0200
-@@ -675,7 +675,7 @@
-                 v.insert("_instructions".into(), json!(text));
-                 return fail(io, with_boot(v));
-             }
--            std::thread::sleep(Duration::from_millis(1_000));
-+            impeccable_common::sleep(Duration::from_millis(1_000));
-         }
-     }
- 
 diff -ruN a/crates/live/src/live_http.rs b/crates/live/src/live_http.rs
 --- a/crates/live/src/live_http.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/live_http.rs	2026-10-08 22:24:05.439902041 +0200
++++ b/crates/live/src/live_http.rs	2026-10-08 23:14:52.059167107 +0200
 @@ -6,7 +6,7 @@
  
  use std::collections::HashMap;
@@ -1204,24 +1087,6 @@ diff -ruN a/crates/live/src/live_http.rs b/crates/live/src/live_http.rs
  use std::sync::atomic::{AtomicBool, Ordering};
  use std::sync::Arc;
  use std::time::Duration;
-@@ -481,7 +481,7 @@
-             if watch_done.load(Ordering::SeqCst) {
-                 return;
-             }
--            std::thread::sleep(step);
-+            impeccable_common::sleep(step);
-             waited += step;
-         }
-         if !watch_done.load(Ordering::SeqCst) {
-@@ -854,7 +854,7 @@
-                         break;
-                     }
-                     let _ = gen.flush();
--                    std::thread::sleep(Duration::from_millis(100));
-+                    impeccable_common::sleep(Duration::from_millis(100));
-                 }
-                 // Hold the connection open until the server is done reading.
-                 let mut sink = Vec::new();
 diff -ruN a/crates/live/src/live_inject.rs b/crates/live/src/live_inject.rs
 --- a/crates/live/src/live_inject.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/live/src/live_inject.rs	2026-10-08 22:07:54.620787273 +0200
@@ -1243,21 +1108,9 @@ diff -ruN a/crates/live/src/live_inject.rs b/crates/live/src/live_inject.rs
      );
      let mut out = Map::new();
      out.insert("ok".into(), json!(any_inserted));
-diff -ruN a/crates/live/src/live_poll.rs b/crates/live/src/live_poll.rs
---- a/crates/live/src/live_poll.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/live_poll.rs	2026-10-08 22:24:05.427675291 +0200
-@@ -311,7 +311,7 @@
-         if !is_event_pending(&status, event_id) {
-             return Ok(true);
-         }
--        std::thread::sleep(Duration::from_millis(poll_interval_ms));
-+        impeccable_common::sleep(Duration::from_millis(poll_interval_ms));
-     }
-     Ok(false)
- }
 diff -ruN a/crates/live/src/live_server.rs b/crates/live/src/live_server.rs
 --- a/crates/live/src/live_server.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/live_server.rs	2026-10-08 22:24:05.437553158 +0200
++++ b/crates/live/src/live_server.rs	2026-10-08 23:14:52.058117812 +0200
 @@ -34,7 +34,7 @@
  use crate::util::{exists, jsp, println, read_dir_names_raw, safe_read, Env};
  use impeccable_common::Io;
@@ -1296,40 +1149,6 @@ diff -ruN a/crates/live/src/live_server.rs b/crates/live/src/live_server.rs
                      continue;
                  }
                  active_connections.fetch_add(1, Ordering::SeqCst);
-@@ -374,10 +376,10 @@
-                 });
-             }
-             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
--                std::thread::sleep(Duration::from_millis(10));
-+                impeccable_common::sleep(Duration::from_millis(10));
-             }
-             Err(_) => {
--                std::thread::sleep(Duration::from_millis(10));
-+                impeccable_common::sleep(Duration::from_millis(10));
-             }
-         }
-     }
-@@ -527,7 +529,7 @@
-     }
-     // Give response writers a moment to flush before the process exits.
-     drop(st);
--    std::thread::sleep(Duration::from_millis(50));
-+    impeccable_common::sleep(Duration::from_millis(50));
- }
- 
- fn is_loopback_origin(origin: &str) -> bool {
-diff -ruN a/crates/live/src/manual_edits/apply.rs b/crates/live/src/manual_edits/apply.rs
---- a/crates/live/src/manual_edits/apply.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/manual_edits/apply.rs	2026-10-08 22:24:05.458011563 +0200
-@@ -1420,7 +1420,7 @@
-             1
-         };
-         std::thread::spawn(move || {
--            std::thread::sleep(Duration::from_millis(delay));
-+            impeccable_common::sleep(Duration::from_millis(delay));
-             let Some(shared) = weak.upgrade() else {
-                 return;
-             };
 diff -ruN a/crates/live/src/manual_edits/mod.rs b/crates/live/src/manual_edits/mod.rs
 --- a/crates/live/src/manual_edits/mod.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/live/src/manual_edits/mod.rs	2026-10-08 22:07:54.625410331 +0200
@@ -1350,24 +1169,6 @@ diff -ruN a/crates/live/src/manual_edits/mod.rs b/crates/live/src/manual_edits/m
      impeccable_common::proc::hide_window(&mut cmd);
      let status = cmd.status();
      matches!(status, Ok(s) if s.success())
-diff -ruN a/crates/live/src/paths.rs b/crates/live/src/paths.rs
---- a/crates/live/src/paths.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/paths.rs	2026-10-08 23:13:51.049418345 +0200
-@@ -113,6 +113,14 @@
-         live_server_path(cwd, env),
-         legacy_live_server_path(cwd, env),
-     ] {
-+        // homescoop (wasm only): slicc's kernel keeps a stale "not found" for
-+        // a path another process created until its directory is read again
-+        // (slicc-kernel#106); the detached server writes this file. Remove
-+        // once #106 is fixed.
-+        #[cfg(target_os = "wasi")]
-+        if let Some(dir) = std::path::Path::new(&file).parent() {
-+            let _ = std::fs::read_dir(dir).map(|entries| entries.count());
-+        }
-         let Some(v) = read_json(&file) else { continue };
-         let info = ServerInfo::from_value(&v);
-         if info.pid_is_number() {
 diff -ruN a/crates/live/src/project_ignores.rs b/crates/live/src/project_ignores.rs
 --- a/crates/live/src/project_ignores.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/live/src/project_ignores.rs	2026-10-08 22:07:54.610465279 +0200
@@ -1394,43 +1195,7 @@ diff -ruN a/crates/live/src/random.rs b/crates/live/src/random.rs
              x = x.wrapping_mul(0xff51afd7ed558ccd);
 diff -ruN a/crates/live/src/server_state.rs b/crates/live/src/server_state.rs
 --- a/crates/live/src/server_state.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/server_state.rs	2026-10-08 22:24:05.444527141 +0200
-@@ -419,7 +419,7 @@
-         let delay = (next - now + POLL_LEASE_EXPIRY_TIMER_GRACE_MS).max(0) as u64;
-         let weak = self.self_ref.clone();
-         std::thread::spawn(move || {
--            std::thread::sleep(Duration::from_millis(delay));
-+            impeccable_common::sleep(Duration::from_millis(delay));
-             if let Some(shared) = weak.upgrade() {
-                 let mut st = lock(&shared);
-                 if st.lease_timer_active && st.lease_timer_gen == gen {
-@@ -636,7 +636,7 @@
-         self.exit_timer_active = true;
-         let weak = self.self_ref.clone();
-         std::thread::spawn(move || {
--            std::thread::sleep(Duration::from_millis(EXIT_TIMER_MS));
-+            impeccable_common::sleep(Duration::from_millis(EXIT_TIMER_MS));
-             if let Some(shared) = weak.upgrade() {
-                 let mut st = lock(&shared);
-                 if st.exit_timer_active && st.exit_timer_gen == gen {
-@@ -846,7 +846,7 @@
-         let weak = self.self_ref.clone();
-         let id = target_id.clone();
-         std::thread::spawn(move || {
--            std::thread::sleep(Duration::from_millis(timeout_ms));
-+            impeccable_common::sleep(Duration::from_millis(timeout_ms));
-             if let Some(shared) = weak.upgrade() {
-                 let mut st = lock(&shared);
-                 let Some((_, pending)) = st
-@@ -1021,7 +1021,7 @@
-         let weak = self.self_ref.clone();
-         let id = target_id.to_string();
-         std::thread::spawn(move || {
--            std::thread::sleep(Duration::from_millis(grace_ms.max(0) as u64 + 5));
-+            impeccable_common::sleep(Duration::from_millis(grace_ms.max(0) as u64 + 5));
-             if let Some(shared) = weak.upgrade() {
-                 lock(&shared).maybe_complete_agent_target_roll_call(&id);
-             }
++++ b/crates/live/src/server_state.rs	2026-10-08 23:14:52.061851740 +0200
 @@ -1526,15 +1526,15 @@
      let exe = std::env::current_exe()
          .map(|p| p.to_string_lossy().into_owned())
@@ -1451,18 +1216,9 @@ diff -ruN a/crates/live/src/server_state.rs b/crates/live/src/server_state.rs
          .spawn()
      {
          Ok(c) => c,
-@@ -1580,7 +1580,7 @@
-                     timed_out = true;
-                     break None;
-                 }
--                std::thread::sleep(Duration::from_millis(5));
-+                impeccable_common::sleep(Duration::from_millis(5));
-             }
-             Err(_) => break None,
-         }
 diff -ruN a/crates/live/src/server.rs b/crates/live/src/server.rs
 --- a/crates/live/src/server.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/server.rs	2026-10-08 22:24:05.440154167 +0200
++++ b/crates/live/src/server.rs	2026-10-08 23:14:52.059578525 +0200
 @@ -63,19 +63,20 @@
  /// windows) with ignored stdio, then wait up to 10 s for a `server.json`
  /// written by a pid other than ours and return its record.
@@ -1490,27 +1246,9 @@ diff -ruN a/crates/live/src/server.rs b/crates/live/src/server.rs
      let deadline = Instant::now() + Duration::from_secs(10);
      let mut result: Option<Value> = None;
      while Instant::now() < deadline {
-@@ -88,7 +89,7 @@
-         // A child that already exited cannot become ready.
-         if let Ok(Some(_)) = child.try_wait() {
-             if read_live_server_info(cwd, env).is_none() {
--                std::thread::sleep(Duration::from_millis(5));
-+                impeccable_common::sleep(Duration::from_millis(5));
-                 if let Some((info, _)) = read_live_server_info(cwd, env) {
-                     if info.pid != Some(own_pid) {
-                         result = Some(info.raw);
-@@ -97,7 +98,7 @@
-                 break;
-             }
-         }
--        std::thread::sleep(Duration::from_millis(5));
-+        impeccable_common::sleep(Duration::from_millis(5));
-     }
-     // Detach: never wait on the server (JS `child.unref()`); reap it if it
-     // has already exited so no zombie lingers while we finish.
 diff -ruN a/crates/live/src/source_lock.rs b/crates/live/src/source_lock.rs
 --- a/crates/live/src/source_lock.rs	2026-10-08 00:33:36.000000000 +0200
-+++ b/crates/live/src/source_lock.rs	2026-10-08 22:24:05.451541415 +0200
++++ b/crates/live/src/source_lock.rs	2026-10-08 23:14:52.062979285 +0200
 @@ -75,7 +75,7 @@
          .duration_since(std::time::UNIX_EPOCH)
          .map(|d| d.as_nanos())
@@ -1529,15 +1267,6 @@ diff -ruN a/crates/live/src/source_lock.rs b/crates/live/src/source_lock.rs
                      "at": now_ms() as i64,
                      "file": jsp::resolve(cwd, &[file]),
                  });
-@@ -146,7 +146,7 @@
-                 }
-                 let remaining = deadline - now_ms();
-                 let sleep = retry_ms.min(remaining).max(1.0);
--                std::thread::sleep(std::time::Duration::from_millis(sleep as u64));
-+                impeccable_common::sleep(std::time::Duration::from_millis(sleep as u64));
-             }
-         }
-     }
 diff -ruN a/crates/live/src/source_search.rs b/crates/live/src/source_search.rs
 --- a/crates/live/src/source_search.rs	2026-10-08 00:33:36.000000000 +0200
 +++ b/crates/live/src/source_search.rs	2026-10-08 22:07:54.611814033 +0200
