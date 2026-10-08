@@ -1,0 +1,23 @@
+# A package the way a recipe's patch leaves it: ureq for native builds,
+# wasix-ureq for WASI, wasix-command for both, vendored by
+# homescoop_vendor_crates into homescoop-crates/. CI copies this directory,
+# vendors, and builds it for wasm32-wasip1; the native graph must still
+# resolve to the real ureq.
+[package]
+name = "wasix-consumer"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+serde_json = "1"
+# std's types natively, so no cfg anywhere.
+wasix-command = { path = "homescoop-crates/wasix-command" }
+
+[target.'cfg(not(target_os = "wasi"))'.dependencies]
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+
+[target.'cfg(target_os = "wasi")'.dependencies]
+wasix-ureq = { path = "homescoop-crates/wasix-ureq", features = ["json"] }

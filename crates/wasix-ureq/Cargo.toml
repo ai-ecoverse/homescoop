@@ -1,0 +1,30 @@
+[package]
+name = "wasix-ureq"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT OR Apache-2.0"
+description = "The part of ureq 2.12's API that impeccable uses, over wasix-net, for WASI programs in slicc's kernel"
+publish = false
+
+# Named like ureq, so `ureq::` paths reach this crate where it replaces ureq.
+[lib]
+name = "ureq"
+
+[features]
+default = []
+json = ["dep:serde", "dep:serde_json", "wasix-net/json"]
+# ureq's features, accepted so a feature list can be copied over. There
+# is no TLS here (https goes through the proxy) and no SOCKS.
+tls = []
+socks-proxy = []
+
+[dependencies]
+wasix-net = { path = "../wasix-net" }
+serde = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
+
+[dev-dependencies]
+# The tests use the json feature.
+wasix-ureq = { path = ".", features = ["json"] }
+serde_json = "1"
