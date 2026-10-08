@@ -7,7 +7,7 @@
   ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-2"
+    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
   ],
   "checklist": [
     "ps aux lists background sleep",
@@ -19,5 +19,5 @@
     "attached-worker process visible in terminal ps (human cert on 1.9.0; kernel cosmetics closed in 1.11/1.12)",
     "bash -c pgrep -f <pattern> does not match itself; exec pkill -f kills sleep, not itself (slicc-kernel#99)"
   ],
-  "needsNote": "needsInstall pulls published coreutils 9.12.0-2 (no stub kill/uptime). Kernel pin 1.14.0 (pnpm global command roots); 1.12.0: real VmSize/VmRSS + meminfo used; 1.11.0: USER/whoami = web_user. CI installs published coreutils 9.12.0-2 (same no-stub kill/uptime packaging); 9.12.0-3 ships as a pair with this procps and was cross-certified locally with it on 1.17.3."
+  "needsNote": "needsInstall pulls published coreutils 9.12.0-2 (no stub kill/uptime). Kernel pin 1.14.0 (pnpm global command roots); 1.12.0: real VmSize/VmRSS + meminfo used; 1.11.0: USER/whoami = web_user. coreutils 9.12.0-3 + procps 4.0.5-2 are the exec-pid pair (kernel-execve shim), certified together on slicc-kernel 1.17.3."
 }
