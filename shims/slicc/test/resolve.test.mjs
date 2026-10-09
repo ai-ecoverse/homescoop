@@ -44,6 +44,7 @@ const uplink = () => fakeUplink({
     'peer.tail1234.ts.net': ['100.64.1.2', '100.64.1.3', 'fd7a:115c:a1e0::2'],
     'loop.tail1234.ts.net': ['127.0.0.1'],
     'host.tail1234.ts.net': ['10.0.2.2'],
+    peer: ['100.64.1.2'],
   },
   routes: { prefixes: ['100.64.0.0/10'] },
   peers: { '100.64.1.2:8080': echo },
@@ -82,6 +83,21 @@ test('localhost, numeric IPv4 and host.slicc.internal', async () => {
   }
   const v6 = await kernel.run(['resolve-test', 'fd7a:115c:a1e0::2'])
   assert.equal(v6.status, 2, show(v6))
+})
+
+test('this machine\'s own name and localhost.localdomain stay local: no uplink queries', async () => {
+  const net = uplink()
+  const kernel = await boot(createNodeKernel, { network: { uplink: net } })
+  for (const name of ['--self', 'localhost.localdomain', 'LOCALHOST.localdomain.']) {
+    const r = await kernel.run(['resolve-test', name])
+    assert.equal(r.status, 0, `${name}: ${show(r)}`)
+    assert.equal(r.stdout, '127.0.0.1\n', name)
+  }
+  assert.deepEqual(net.asked, [], `the uplink was asked: ${JSON.stringify(net.asked)}`)
+  // A dotless name that is not ours is still the kernel's (MagicDNS short names).
+  const short = await kernel.run(['resolve-test', 'peer'])
+  assert.equal(short.stdout, '100.64.1.2\n', show(short))
+  assert.deepEqual(net.asked.map(a => a.name), ['peer'])
 })
 
 test('no uplink: other names are not found', async () => {
