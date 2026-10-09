@@ -1,0 +1,50 @@
+{
+  "name": "@ai-ecoverse/wasm-binutils",
+  "version": "2.47.0-2",
+  "description": "GNU binutils strings, size and readelf for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/binutils/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/binutils",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "binutils",
+    "strings",
+    "readelf"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "binutils",
+    "upstream": "2.47"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "strings": {
+        "glue": "bin/strings",
+        "wasm": "bin/strings.wasm"
+      },
+      "size": {
+        "glue": "bin/size",
+        "wasm": "bin/size.wasm"
+      },
+      "readelf": {
+        "glue": "bin/readelf",
+        "wasm": "bin/readelf.wasm"
+      }
+    }
+  }
+}
