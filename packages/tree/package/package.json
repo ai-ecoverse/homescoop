@@ -1,0 +1,40 @@
+{
+  "name": "@ai-ecoverse/wasm-tree",
+  "version": "2.3.2-1",
+  "description": "tree (recursive directory listing) for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/tree/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/tree",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "tree"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "tree",
+    "upstream": "2.3.2"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "tree": {
+        "glue": "bin/tree",
+        "wasm": "bin/tree.wasm"
+      }
+    }
+  }
+}

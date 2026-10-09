@@ -1,0 +1,21 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+  ],
+  "checklist": [
+    "tree in a fixture dir: UTF-8 line drawing, hidden files skipped, '3 directories, 4 files' (bytes compared)",
+    "tree DIR (path argument) prints the path as the root",
+    "tree -L 2 stops at depth 2",
+    "tree -a includes dotfiles and dot-directories",
+    "tree -d lists directories only ('3 directories', no file count)",
+    "tree -f prints the full path prefix for every entry",
+    "tree -J prints JSON that parses: directory tree + report {directories, files}",
+    "tree --help exits 0 with usage",
+    "missing directory → '[error opening dir]', rc 2",
+    "tree -L 0 → 'Invalid level', rc 1"
+  ]
+}
