@@ -1,0 +1,20 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+  ],
+  "checklist": [
+    "strings -n 8 on bash.wasm prints readable strings (GNU bash, version …), every line ≥ 8 chars",
+    "strings on a mixed binary/text file finds only the text runs (bytes compared)",
+    "strings -n 8, -t x / -t d / -t o offsets, -a (same as default whole-file scan)",
+    "strings -e s (7-bit) vs -e S (8-bit: keeps 0xe9 and 0xff 0xfe), -e l (UTF-16LE)",
+    "strings -d on an x86-64 ELF object reads only data sections (BFD)",
+    "size on x86-64 and aarch64 ELF objects: Berkeley table; size -A per-section",
+    "readelf -h (ELF64, REL, X86-64 / AArch64) and readelf -sW symbols",
+    "errors: strings missing file rc 1; size on non-object 'file format not recognized' rc≠0; readelf on non-ELF 'Not an ELF file' rc 1"
+  ],
+  "needsNote": "In slicc-kernel 1.23.0, /usr/bin/<cmd> is a synthetic 0-byte file, so `strings /usr/bin/bash` prints nothing; the spec reads bash.wasm from the installed wasm-bash package instead."
+}

@@ -1,0 +1,24 @@
+# GNU binutils strings / size / readelf for slicc wasm realm (host ladder).
+name: binutils
+builder: host
+# No renovate pin: upstream tags are binutils-2_47 (underscores), which the
+# recipe regex manager cannot map to 2.47. Bump by hand from mirrors.kernel.org.
+version: "2.47"
+npm: "@ai-ecoverse/wasm-binutils"
+summary: "GNU binutils strings, size and readelf for slicc"
+source:
+  url: "https://mirrors.kernel.org/gnu/binutils/binutils-{{version}}.tar.xz"
+  sha256: "154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/binutils
+  license: GPL-3.0-or-later
+  notes: |
+    strings, size and readelf only (homescoop#91). nm/ar/ranlib/strip come
+    from @ai-ecoverse/wasm-clang; objdump may follow with a limited BFD
+    target set. BFD targets: x86-64/i386 and aarch64 ELF plus wasm. No
+    plugins, NLS, libctf, zstd or debuginfod. Links the slicc gaps profile.
+    New package → human cert.
