@@ -21,3 +21,14 @@ gmake[2]: *** [Makefile:16266: lib/libcoreutils_a-getlocalename_l-unsafe.o] Erro
 
 **Good tarball:** `@ai-ecoverse/wasm-coreutils@9.12.0-2` — `cert/checklist.mjs` passes
 (pipes, env, nice, nohup, `LC_ALL=C sort`).
+
+## timeout-slicc.patch (9.12.0-4, homescoop#88)
+
+Without the patch, `timeout` is either not built (stock configure: the
+emsdk `sigsuspend` link probe fails, so `timeout` is not in
+`optional_bin_progs`) or, with `ac_cv_func_sigsuspend=yes`, built on
+`fork()`, which the slicc `cli` profile does not provide (Emscripten's stub
+fails), so every case in `cert/timeout-hostname.mjs` fails: the binary is
+absent from `coreutils --help` and `slicc.commands`, or `timeout` exits 125
+with "fork system call failed".
+

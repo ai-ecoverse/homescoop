@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.17.3",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
   "needs": [
     "@ai-ecoverse/wasm-bash"
   ],
@@ -9,10 +9,16 @@
     "env sets variable for child",
     "nice runs a child",
     "nohup runs a child",
-    "exec keeps the pid: env/nice bash -c 'echo $PPID' is the outer bash's $$"
+    "exec keeps the pid: env/nice bash -c 'echo $PPID' is the outer bash's $$",
+    "timeout 1 sleep 5 → 124 after ~1 s; timeout 5 true → 0; exit status passes through",
+    "timeout -s KILL 1 sleep 5 → 137; --preserve-status → 143; -k 1 on a TERM-ignoring command → 137",
+    "timeout kills the command's whole process group (background child gone)",
+    "timeout of a missing command → 127; bad duration → 125",
+    "hostname prints the same as uname -n"
   ],
   "patches": {
-    "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch"
+    "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch",
+    "timeout-slicc.patch": "timeout-hostname.mjs: every timeout case (without the patch timeout is not built: configure needs sigsuspend, and it forks)"
   },
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8"
