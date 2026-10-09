@@ -68,4 +68,11 @@ export default async function (ctx) {
   assert.equal(uname.status, 0, `uname -n stderr=${uname.stderr}`);
   assert.ok(host.stdout.trim().length > 0, 'hostname printed nothing');
   assert.equal(host.stdout, uname.stdout);
+
+  // Setting it is refused for the (non-root) realm user.
+  const set = await timed(['hostname', 'hs88-new-name']);
+  assert.notEqual(set.status, 0, 'hostname NAME should fail');
+  assert.match(set.stderr, /Operation not permitted/, `hostname NAME stderr=${set.stderr}`);
+  const after = await timed(['hostname']);
+  assert.equal(after.stdout, host.stdout, 'host name must not change');
 }

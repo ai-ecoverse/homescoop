@@ -14,7 +14,7 @@
     "timeout -s KILL 1 sleep 5 → 137; --preserve-status → 143; -k 1 on a TERM-ignoring command → 137",
     "timeout kills the command's whole process group (background child gone)",
     "timeout of a missing command → 127; bad duration → 125",
-    "hostname prints the same as uname -n"
+    "hostname prints the same as uname -n; hostname NAME → Operation not permitted"
   ],
   "patches": {
     "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch",
