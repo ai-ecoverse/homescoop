@@ -1,0 +1,20 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "needs": [],
+  "needsInstall": [],
+  "checklist": [
+    "biome --version → Version: 2.5.15",
+    "project in /home/app whose biome.json extends @ai-ecoverse/slicc-shared-web/biome (its real 1.10.1 config, fixtures/) from node_modules, with .git and .gitignore (dist/, node_modules/)",
+    "clean project: biome check . → exit 0, Checked 4 files, dist/ ignored",
+    "floating promise across files (type-aware nursery/noFloatingPromises) plus an unformatted file → check exit 1, Found 2 errors, both reported, nothing from dist/ or node_modules",
+    "biome format --write . → exit 0, Fixed 1 file, exact single-quoted/semicolon output, ignored file untouched",
+    "biome lint src → exit 1 with noFloatingPromises; after `void` the check passes",
+    "biome format --stdin-file-path=src/x.ts with stdin → formatted to stdout",
+    "biome start → exit 1 (no daemon in WASI); check --use-server → exit 1, no running server; biome upgrade → exit 1 with the WASI message",
+    "invalid biome.json → exit 1, indentWidth has an incorrect type"
+  ],
+  "patches": {
+    "0001-wasi-cli.patch": "service/wasi.rs → biome start / --use-server cases; upgrade_wasi.rs and the Cargo.toml move → biome upgrade case (and the build: with reqwest in the graph biome_cli does not compile for wasm); PWD → every case in /home/app (extends from node_modules fails with PWD=/); biome_fs temp_dir → every case, --version included (exit 134 without it)"
+  }
+}

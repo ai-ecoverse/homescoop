@@ -19,6 +19,12 @@ One patch (`0001-wasi-cli.patch` in the recipe):
 - There is no Biome daemon: it needs sockets and child processes. `start`,
   `lsp-proxy` and `--use-server` do not work.
 - `biome upgrade` is not available; upgrade the package instead.
-- The working directory comes from `PWD`, as the kernel sets it.
+- The working directory comes from `PWD`, as the kernel sets it, so
+  `extends` resolves shared configs such as
+  `@ai-ecoverse/slicc-shared-web/biome` from the project's `node_modules`.
+- The cache directory is `$TMPDIR` or `/tmp` (WASI has no temp dir).
+
+Certified: `check`, `format` (files and stdin) and `lint`, including
+type-aware rules across files, `.gitignore`, and configuration errors.
 
 MIT OR Apache-2.0; see `LICENSE`.
