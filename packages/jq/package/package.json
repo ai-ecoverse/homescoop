@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-jq",
-  "version": "1.8.1-1",
+  "version": "1.8.2-2",
   "description": "jq 1.8.1 with oniguruma for wasm / slicc",
   "license": "MIT",
   "repository": {
@@ -10,9 +10,9 @@
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/jq",
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "jq"],
-  "files": ["README.md", "LICENSE", "bin"],
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin"],
   "publishConfig": { "access": "public" },
-  "homescoop": { "recipe": "jq", "upstream": "1.8.1" },
+  "homescoop": { "recipe": "jq", "upstream": "1.8.2" },
   "slicc": {
     "abi": "emscripten",
     "commands": {
