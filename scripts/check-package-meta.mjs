@@ -67,6 +67,19 @@ if (
 ) {
   errors.push(`package/LICENSE is homescoop's Apache-2.0 text, not the ${recipeLic} upstream licence`);
 }
+// The committed file too: build.sh usually stages the upstream licence over
+// it, so the check above passes, but a packaging-only path ships the
+// committed copy (tar 1.35.0-3, diffutils 3.12.0, patch 2.8.0 did).
+if (existsSync(rootLic) && !/\bApache-2\.0\b/.test(recipeLic)) {
+  const tracked = spawnSync('git', ['-C', root, 'show', `HEAD:packages/${name}/package/LICENSE`], {
+    encoding: 'utf8',
+  });
+  if (tracked.status === 0 && tracked.stdout === readFileSync(rootLic, 'utf8')) {
+    errors.push(
+      `committed packages/${name}/package/LICENSE is homescoop's Apache-2.0 text; commit the ${recipeLic} upstream licence`,
+    );
+  }
+}
 const files = pkg.files;
 if (!Array.isArray(files) || !files.includes('LICENSE')) {
   errors.push('package.json files[] must include "LICENSE"');
