@@ -115,6 +115,25 @@ homescoop_stage_license() {
   return 1
 }
 
+# package/LICENSE from several upstream files, all required, in order
+# (e.g. freetype's LICENSE.TXT + docs/FTL.TXT + docs/GPLv2.TXT). Use it
+# when one file does not carry the whole licence; homescoop_stage_license
+# takes the first file that exists and keeps package/LICENSE otherwise.
+homescoop_stage_licenses() {
+  local dest="$HOMESCOOP_PKG/package/LICENSE" f first=1
+  mkdir -p "$HOMESCOOP_PKG/package"
+  for f in "$@"; do
+    test -s "$f" || { echo "homescoop_stage_licenses: missing $f" >&2; return 1; }
+  done
+  : >"$dest"
+  for f in "$@"; do
+    if ((first)); then first=0; else printf '\n' >>"$dest"; fi
+    if (($# > 1)); then printf '==> %s <==\n\n' "$(basename "$f")" >>"$dest"; fi
+    cat "$f" >>"$dest"
+    echo "== license ← $f"
+  done
+}
+
 homescoop_fetch() {
   # homescoop_fetch <url> <sha256> <tarball-path>
   local url="$1" sha="$2" tarball="$3"

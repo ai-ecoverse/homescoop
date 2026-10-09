@@ -36,5 +36,5 @@ homescoop_stage_headers \
   "$SRC_DIR/src/jmorecfg.h" \
   "$BUILD/jconfig.h"
 homescoop_write_pc libjpeg "$VERSION" "-ljpeg"
-homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/README.ijg
+homescoop_stage_licenses "$SRC_DIR"/LICENSE.md "$SRC_DIR"/README.ijg
 echo "== libjpeg-turbo: staged ($sz bytes)"
