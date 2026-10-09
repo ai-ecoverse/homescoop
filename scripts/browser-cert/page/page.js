@@ -80,13 +80,62 @@ const certTransport = {
   },
 };
 
-window.boot = async () => {
+// Tailnet for cert specs (cert/meta.json "uplink": true, slicc-kernel >=
+// 1.28.0): the kernel boots with an uplink routing 100.64.0.0/10, the range
+// a tailnet uses, and ctx.uplink({ names, peers }) decides what it answers.
+// Names map to address lists; a peer "ip:port" is { http: { status, body } }
+// (records the request head, answers once and closes) or { error: 'ECONNREFUSED' }.
+// Until then every name is unknown and every dial refused.
+window.certUplinkLog = { asked: [], dialled: [], requests: [] };
+async function certUplink() {
+  const { fakeUplink } = await import('/dist/testing.js');
+  let fake = fakeUplink({});
+  const httpPeer = (addr, { status = 200, body = '' }) => (conn) => {
+    void (async () => {
+      let head = '';
+      while (!head.includes('\r\n\r\n')) {
+        const piece = await conn.read();
+        if (!piece) break;
+        head += new TextDecoder().decode(piece);
+      }
+      window.certUplinkLog.requests.push({ peer: addr, head: head.split('\r\n\r\n')[0] });
+      const bytes = new TextEncoder().encode(body);
+      conn.write(new TextEncoder().encode(
+        `HTTP/1.1 ${status} X\r\nContent-Length: ${bytes.length}\r\nConnection: close\r\n\r\n`,
+      ));
+      conn.write(bytes);
+      conn.end();
+    })();
+  };
+  window.certSetUplink = (cfg) => {
+    const peers = {};
+    for (const [addr, peer] of Object.entries(cfg.peers ?? {})) {
+      peers[addr] = peer.http ? httpPeer(addr, peer.http) : peer;
+    }
+    fake = fakeUplink({ names: cfg.names ?? {}, peers });
+  };
+  return {
+    traits: { tcp: true, udp: false, ipv6: false },
+    routes: { prefixes: ['100.64.0.0/10'] },
+    resolve: (name, family, signal) => {
+      window.certUplinkLog.asked.push({ name, family });
+      return fake.resolve(name, family, signal);
+    },
+    dial: (req) => {
+      window.certUplinkLog.dialled.push({ host: req.host, port: req.port });
+      return fake.dial(req);
+    },
+  };
+}
+
+window.boot = async (opts = {}) => {
   if (!crossOriginIsolated) {
     throw new Error('page is not cross-origin isolated (need COOP/COEP)');
   }
+  const uplink = opts.uplink ? await certUplink() : undefined;
   window.kernel = await createKernel({
     root: await navigator.storage.getDirectory(),
-    network: { transport: certTransport },
+    network: { transport: certTransport, ...(uplink ? { uplink } : {}) },
   });
   document.getElementById('log').textContent = 'kernel ready';
   return true;
