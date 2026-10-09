@@ -52,4 +52,11 @@ for p in "${PROGS[@]}"; do
   homescoop_stage_cli "$dir" "$p"
 done
 homescoop_stage_license "$SRC"/LICENSE.txt "$SRC"/NOTICE.md
+homescoop_notices_begin "The qpdf, fix-qdf and zlib-flate wasm modules statically link the following."
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+homescoop_notice "libjpeg-turbo 3.1.2 (@ai-ecoverse/wasm-libjpeg-turbo)" \
+  https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.2/LICENSE.md 2189dc45a8fe96204069f8124caa53a148dfdc193f50f584c6ca7849a6072872 \
+  https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.2/README.ijg 75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6
+homescoop_notice_emscripten
 echo "== qpdf: staged → $HOMESCOOP_PKG/package ($VERSION)"
