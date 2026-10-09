@@ -1,0 +1,63 @@
+On wasip1, a directory that no WASI preopen covers reads as an empty
+directory instead of failing the build.
+
+Reason: slicc-kernel preopens "." and each top-level directory (/home,
+/tmp, /dev, …) but not "/" itself, so Go's wasip1 port answers
+readdir("/") with EBADF. esbuild's resolver reads every directory from the
+root down to the importing file, and stops with
+`Cannot read directory "../..": Bad file number` and
+`Could not resolve "./src/index.ts"`. On wasip1 only, canonicalizeError
+reports EBADF and ENOTCAPABLE as EACCES, which the resolver already treats
+as an empty directory (as for directories without the read bit). Other
+platforms are unchanged (isOutsidePreopens is false).
+
+Upstream: not filed (Lars decides).
+removeWhen: the runtimes offer an opt-in root preopen for Go programs.
+
+diff --git a/internal/fs/fs_real.go b/internal/fs/fs_real.go
+--- a/internal/fs/fs_real.go
++++ b/internal/fs/fs_real.go
+@@ -403,6 +403,14 @@
+ 		err = syscall.ENOENT
+ 	}
+ 
++	// On wasip1, a path outside every WASI preopen (such as "/" when only the
++	// top-level directories are preopened) cannot be read at all. Report it as
++	// EACCES so the resolver passes through it as an empty directory, as it
++	// does for directories without the read permission.
++	if isOutsidePreopens(err) {
++		err = syscall.EACCES
++	}
++
+ 	return err
+ }
+ 
+diff --git a/internal/fs/preopen_other.go b/internal/fs/preopen_other.go
+--- /dev/null
++++ b/internal/fs/preopen_other.go
+@@ -0,0 +1,8 @@
++//go:build !wasip1
++// +build !wasip1
++
++package fs
++
++func isOutsidePreopens(err error) bool {
++	return false
++}
+diff --git a/internal/fs/preopen_wasip1.go b/internal/fs/preopen_wasip1.go
+--- /dev/null
++++ b/internal/fs/preopen_wasip1.go
+@@ -0,0 +1,13 @@
++//go:build wasip1
++// +build wasip1
++
++package fs
++
++import "syscall"
++
++// On wasip1 a path that no WASI preopen covers (such as "/" when the runtime
++// preopens only "." and the top-level directories) fails with EBADF or
++// ENOTCAPABLE.
++func isOutsidePreopens(err error) bool {
++	return err == syscall.EBADF || err == syscall.ENOTCAPABLE
++}

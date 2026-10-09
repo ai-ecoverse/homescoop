@@ -1,0 +1,44 @@
+{
+  "name": "@ai-ecoverse/wasi-esbuild",
+  "version": "0.28.2-1",
+  "description": "esbuild 0.28 for slicc WASI preview1 (command esbuild); esbuild.wasm built by homescoop from esbuild v0.28.2 with GOOS=wasip1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-esbuild/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-esbuild",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "esbuild",
+    "bundler"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-esbuild",
+    "upstream": "0.28.2",
+    "patches": [
+      "0001-wasip1-outside-preopens.patch"
+    ]
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "esbuild": {
+        "wasm": "bin/esbuild.wasm"
+      }
+    }
+  }
+}
