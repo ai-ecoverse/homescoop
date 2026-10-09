@@ -61,7 +61,9 @@ for v in "${VARIANTS[@]}"; do
   lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
   flavour=static
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
-  "$LLVM_AR" t "$lib" | grep -qx fstat.o || { echo "homescoop: $lib has no fstat.o (not -14?)" >&2; exit 1; }
+  # List first: grep -q closing the pipe early would fail llvm-ar (pipefail).
+  before="$("$LLVM_AR" t "$lib")"
+  grep -qx fstat.o <<<"$before" || { echo "homescoop: $lib has no fstat.o (not -14?)" >&2; exit 1; }
   "$LLVM_AR" d "$lib" fstat.o fstatat.o
   "$LLVM_AR" r "$lib" "$OBJ/$flavour/slicc_stat_owner.o"
   members="$("$LLVM_AR" t "$lib")"
