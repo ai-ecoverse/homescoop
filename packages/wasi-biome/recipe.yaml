@@ -1,0 +1,28 @@
+# Biome (biomejs/biome) CLI for slicc WASI preview1: biome_cli built from
+# source for wasm32-wasip1-threads. @biomejs/wasm-web is a wasm-bindgen
+# library for a JS host, not a CLI, and Biome publishes no WASI build.
+name: wasi-biome
+builder: host
+# renovate: datasource=github-tags depName=biomejs/biome extractVersion=^@biomejs/biome@(?<version>.*)$
+version: "2.5.15"
+npm: "@ai-ecoverse/wasi-biome"
+summary: "Biome 2.5 for slicc WASI preview1 (command biome)"
+source:
+  url: "https://github.com/biomejs/biome/archive/refs/tags/@biomejs/biome@{{version}}.tar.gz"
+  sha256: "0212a8f9e351e2d47580cf8371948dd477ceb01e0fef1a65f81061a2a4a39039"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://biomejs.dev
+  license: "MIT OR Apache-2.0"
+  notes: |
+    cargo build --release --locked -p biome_cli --target
+    wasm32-wasip1-threads with the toolchain biome pins (rust-toolchain.toml),
+    BIOME_VERSION set as in upstream's release build, RUSTFLAGS
+    --cfg tokio_unstable -C codegen-units=1 -C strip=symbols and a 4 GiB
+    memory maximum. Threads, because the crawler, scanner and module graph
+    run on std threads and rayon; the kernel runs wasi thread-spawn.
+    0001-wasi-cli.patch: no daemon (sockets, child processes) and no
+    `biome upgrade` on WASI; the working directory comes from PWD.
