@@ -141,6 +141,9 @@ fi
 test -f "$SRC_DIR/screen" || test -f "$SRC_DIR/screen.js"
 homescoop_stage_cli "$SRC_DIR" screen
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_notices_begin "screen.wasm statically links the following."
+homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
+homescoop_notice_emscripten
 
 # package.json — SCREENDIR so sockets land in /tmp (AF_UNIX path-bound; -ls empty)
 PKG_JSON="$HOMESCOOP_PKG/package/package.json"
