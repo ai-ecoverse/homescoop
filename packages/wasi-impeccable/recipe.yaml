@@ -4,7 +4,7 @@
 name: wasi-impeccable
 builder: host
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
-version: "0.1.12"
+version: "0.1.13"
 npm: "@ai-ecoverse/wasi-impeccable"
 summary: "impeccable engine 0.1.12 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
