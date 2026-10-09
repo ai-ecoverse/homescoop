@@ -1,0 +1,17 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.32.0",
+  "uplink": true,
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "network": "ctx.serve() is the DoH endpoint behind the kernel's realm proxy (dig posts application/dns-message in absolute form, so no CONNECT and no wasm-tls-engine); the uplink's 100.100.100.100:53 is a raw TCP peer speaking DNS over TCP. Both answer with dnsFake, which encodes real DNS wire messages. Checked by hand against cloudflare-dns.com and 1.1.1.1:53 with the host build.",
+  "checklist": [
+    "dig -v / -h",
+    "full output: banner, ->>HEADER<<- (NOERROR, id 0 for DoH), flags qr rd ra, OPT pseudosection, QUESTION and ANSWER sections tab-aligned like dig, ;; SERVER https://cloudflare-dns.com/dns-query (HTTPS), MSG SIZE",
+    "+short for A, AAAA, MX, TXT (quoted, escaped), CNAME chain, NS, SOA, SRV, CAA, and -x PTR; bare type words in either position",
+    "+noall +answer",
+    "NXDOMAIN: rc 0, SOA in AUTHORITY, empty +short",
+    "endpoint choice: default, @https://…, +https=…, DIG_DOH_URL",
+    "DNS over TCP to @100.100.100.100 through the uplink: answer, ;; SERVER …#53(…) (TCP), the dial in the uplink log; the tailnet name is NXDOMAIN over DoH",
+    "failures: refused @server → rc 9 'communications error' + 'no servers could be reached'; DoH 503 → rc 9; non-DNS content type → rc 9; +notcp → rc 1 'no UDP'; bad type → rc 1"
+  ]
+}

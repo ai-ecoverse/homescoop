@@ -1,0 +1,28 @@
+# dig for slicc (homescoop#101): DNS lookups as a small WASI command.
+# In-tree source (src/, Cargo.toml): slicc's kernel has no UDP, so queries
+# go over DNS over HTTPS through the realm proxy or DNS over TCP.
+name: wasi-dig
+builder: host
+version: "0.1.0"
+npm: "@ai-ecoverse/wasi-dig"
+summary: "dig for slicc WASI (wasm32-wasip1): DNS over HTTPS / TCP, dig-style output"
+toolchain:
+  rust: "1.98.1"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-dig
+  license: Apache-2.0
+  notes: |
+    cargo build --locked --release --target wasm32-wasip1 (pinned Rust)
+    after vendoring crates/wasix-net (homescoop_vendor_crates). DNS wire
+    format: hickory-proto (no tokio). No @server: DNS over HTTPS (RFC 8484
+    POST, id 0) to $DIG_DOH_URL or https://cloudflare-dns.com/dns-query, in
+    absolute form through the kernel's proxy, so no TLS in the program.
+    @https://… picks another endpoint; @host is DNS over TCP to host:53
+    (a tailnet resolver through the uplink, or a loopback resolver).
+    +notcp is refused: the kernel has no UDP. THIRD-PARTY-NOTICES.md is
+    generated from cargo metadata plus Rust's std and wasi-libc licences.
+    New package → human cert.

@@ -1,0 +1,27 @@
+[package]
+name = "wasi-dig"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "Apache-2.0"
+description = "dig for slicc's kernel: DNS over HTTPS through the realm proxy, DNS over TCP to @server"
+publish = false
+
+[[bin]]
+name = "dig"
+path = "src/main.rs"
+
+# build.sh copies this crate to its work directory and vendors homescoop's
+# crates/wasix-net next to it (homescoop_vendor_crates), so the path only
+# exists there.
+[dependencies]
+wasix-net = { path = "homescoop-crates/wasix-net" }
+hickory-proto = { version = "0.25", default-features = false, features = ["std"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = 0
