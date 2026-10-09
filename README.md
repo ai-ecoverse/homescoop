@@ -91,6 +91,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-util-linux` | host | **2.42.4-1** (`rev` / `column` / `getopt` / `hexdump` / `colrm` / `look`; no mount/libmount/libblkid) |
 | `@ai-ecoverse/wasm-qpdf` | host | **12.4.2-1** (`qpdf` / `fix-qdf` / `zlib-flate`; native crypto, zlib + libjpeg-turbo; replaces pdftk) |
 | `@ai-ecoverse/wasm-poppler` | host | **26.10.0-2** (`pdftotext` / `pdftoppm` / `pdfinfo` / `pdfimages` / `pdffonts` / `pdfseparate` / `pdfunite` / `pdfdetach` / `pdfattach` / `pdftops` / `pdftohtml`, `pdftocairo` = `pdftoppm`; one multi-call wasm, Splash only, URW base-14 fonts) |
+| `@ai-ecoverse/wasm-rsync` | host | **3.4.4-1** (`rsync`; local copies, fork + Asyncify for the sender/receiver pair, `select()` waits in the kernel; no remote sync yet) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
 | `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-1** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
