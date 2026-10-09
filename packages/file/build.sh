@@ -90,4 +90,13 @@ mkdir -p "$HOMESCOOP_PKG/package/share/misc"
 cp "$MGC" "$HOMESCOOP_PKG/package/share/misc/magic.mgc"
 
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
+homescoop_notices_begin "file.wasm and lib/libmagic.a statically link the following."
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+homescoop_notice "bzip2 / libbzip2 1.0.8 (@ai-ecoverse/wasm-bzip2)" \
+  https://gitlab.com/bzip2/bzip2/-/raw/bzip2-1.0.8/LICENSE c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3
+homescoop_notice "XZ Utils / liblzma 5.8.1 (@ai-ecoverse/wasm-xz; liblzma is 0BSD)" \
+  https://raw.githubusercontent.com/tukaani-project/xz/v5.8.1/COPYING 616a3ad264ce29b8f1cb97e53037b139d406899ca8d1f799651e17bfa09830b8 \
+  https://raw.githubusercontent.com/tukaani-project/xz/v5.8.1/COPYING.0BSD 0b01625d853911cd0e2e088dcfb743261034a091bb379246cb25a14cc4c74bf1
+homescoop_notice_emscripten
 echo "== file: staged → $HOMESCOOP_PKG/package"
