@@ -12,7 +12,8 @@ VER="$VERSION"
 WORK="${WASIX_M4_WORK:-$PKG/work}"
 SRC="$WORK/m4-$VER"
 
-# No wasixcc on PATH (CI runners): install the pinned toolchain.
+# No wasixcc on PATH (CI runners): install the pinned toolchain
+# (scripts/install-wasixcc.sh: wasix-sysroot 2025.9.30-15 since #148).
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi
