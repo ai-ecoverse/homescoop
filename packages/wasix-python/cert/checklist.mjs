@@ -1,5 +1,6 @@
 /**
- * wasix-python venvs (homescoop#103). sitecustomize.py gives the base
+ * wasix-python venvs (homescoop#103, #157). _slicc_site.py (run from
+ * site-packages/slicc-executable.pth and the stdlib sitecustomize.py) gives the base
  * interpreter a sys.executable; slicc-kernel#168 passes a venv's
  * bin/python path as argv[0], so CPython finds the venv's pyvenv.cfg.
  * The cert kernel has no network: pip installs pinned wheels (sha256-
@@ -73,7 +74,27 @@ export default async function (ctx) {
   );
   assert.equal(child.stdout, '/home/v\n');
 
-  // A sitecustomize of the user's own still runs after ours.
-  await ok("echo 'import builtins; builtins.HS_SITE = 1' > v/lib/python3.14/site-packages/sitecustomize.py", '/home');
-  assert.equal((await ok("v/bin/python -c 'print(HS_SITE)'", '/home')).stdout, '1\n');
+  // A sitecustomize of the user's own still runs after ours, once, and is
+  // what `import sitecustomize` returns.
+  await ok(
+    "printf 'import builtins\\nbuiltins.HS_SITE = getattr(builtins, \"HS_SITE\", 0) + 1\\n' > v/lib/python3.14/site-packages/sitecustomize.py",
+    '/home',
+  );
+  const chained = await ok(
+    "v/bin/python -c 'import sitecustomize; print(HS_SITE, sitecustomize.__file__)'",
+    '/home',
+  );
+  assert.equal(chained.stdout, '1 /home/v/lib/python3.14/site-packages/sitecustomize.py\n');
+
+  // A sitecustomize on PYTHONPATH shadows the stdlib one, but the base
+  // site-packages .pth hook still sets sys.executable (#157 c).
+  await ok("mkdir -p /home/pp && echo 'import builtins; builtins.HS_PP = 1' > /home/pp/sitecustomize.py");
+  const pp = await sh("PYTHONPATH=/home/pp python -c 'import sys; print(sys.executable, HS_PP)'");
+  assert.equal(pp.status, 0, `PYTHONPATH sitecustomize: ${pp.stderr}`);
+  assert.equal(pp.stdout, '/usr/bin/python 1\n');
+
+  // A relative PATH entry gives an absolute sys.executable (#157 a).
+  const rel = await sh("cd /usr/bin && PATH=. python -c 'import sys; print(sys.executable)'");
+  assert.equal(rel.status, 0, `relative PATH: ${rel.stderr}`);
+  assert.equal(rel.stdout, '/usr/bin/python\n');
 }

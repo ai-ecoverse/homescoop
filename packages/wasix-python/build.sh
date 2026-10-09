@@ -42,11 +42,15 @@ if [[ -n "$PACKAGING_ONLY" ]]; then
   mkdir -p "$DEST/include"
   rsync -a --delete "$STAGE/include/" "$DEST/include/"
 fi
-# slicc additions to the stdlib (sitecustomize.py), shipped without .pyc.
+# slicc additions (shipped without .pyc): stdlib modules (sitecustomize.py,
+# _slicc_site.py) and .pth hooks in the base site-packages.
 ADDED=()
 for f in "$HOMESCOOP_PKG"/stdlib/*.py; do
   cp "$f" "$DEST/lib/python3.14/"
   ADDED+=("$DEST/lib/python3.14/$(basename "$f")")
+done
+for f in "$HOMESCOOP_PKG"/stdlib/site-packages/*.pth; do
+  cp "$f" "$DEST/lib/python3.14/site-packages/"
 done
 
 # Stdlib patches (subprocess/site/sysconfig) may land after the stage's

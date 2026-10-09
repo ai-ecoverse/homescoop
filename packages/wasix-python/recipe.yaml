@@ -37,6 +37,7 @@ about:
     site+sysconfig _getuserbase for wasi $HOME/.local; _ssl/_hashlib via wasix-org/openssl;
     zlib/_bz2/_lzma static from wasix prefixes; uid stubs return 1000; Asyncify onlylist for fork/setjmp paths.
     build.sh ends with wipe+compileall --invalidation-mode unchecked-hash.
-    3.14.2-10 is packaging-only: -9's tarball (sources.base) plus
-    stdlib/sitecustomize.py, which sets sys.executable from PATH (WASI stat
-    has no permission bits, so getpath's isxfile never finds python).
+    3.14.2-10 and -11 are packaging-only: -9's tarball (sources.base) plus
+    stdlib/ (_slicc_site.py sets sys.executable from PATH, since WASI stat
+    has no permission bits and getpath's isxfile never finds python; it runs
+    from sitecustomize.py and from site-packages/slicc-executable.pth).
