@@ -116,4 +116,7 @@ fi
 test -f "$SRC_DIR/bash" || test -f "$SRC_DIR/bash.js"
 homescoop_stage_cli "$SRC_DIR" bash
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_notices_begin "bash.wasm statically links the following. (readline and history are part of bash, under bash's own GPL-3.0-or-later.)"
+homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
+homescoop_notice_emscripten
 echo "== bash: staged → $HOMESCOOP_PKG/package (readline)"

@@ -70,7 +70,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** (emcmake, codec off) |
 | `@ai-ecoverse/wasm-libtiff` | host | **4.7.0**; deps zlib + jpeg |
 | `@ai-ecoverse/wasm-gmake` | host | **4.4.1-2** (spawn/exec/select/main_envp/gaps) |
-| `@ai-ecoverse/wasm-bash` | host | **5.3.0-8** (readline/history, fork + Asyncify, `/dev/fd` process subst, PIPESTATUS patch; `exec` keeps the pid on slicc-kernel with `execve`) |
+| `@ai-ecoverse/wasm-bash` | host | **5.3.0-9** (readline/history, fork + Asyncify, `/dev/fd` process subst, PIPESTATUS patch; `exec` keeps the pid on slicc-kernel with `execve`) |
 | `@ai-ecoverse/wasm-coreutils` | host | **9.12.0-3** single-binary + argv0 manifest (uid 1000 via gaps; exec keeps the pid) |
 | `@ai-ecoverse/wasm-sed` | host | **4.9.0-3** |
 | `@ai-ecoverse/wasm-grep` | host | **3.12.0-3** |
