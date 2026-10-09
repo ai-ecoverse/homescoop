@@ -30,6 +30,7 @@ On a hostfs folder (a folder of the user's machine mounted through
 slicc-node), the host cannot set a symlink's own time, and on a macOS host
 not its mode either. rsync still copies files, links and link targets
 correctly (targets keep their times), but it warns (`failed to set times on
-…: Not supported`, on re-runs also `failed to set permissions`) and exits 23.
+…: Not supported`) and exits 23, and a re-run itemizes those links again
+(`.L..tp`).
 
 Certified on `@ai-ecoverse/slicc-kernel` 1.30.0.
