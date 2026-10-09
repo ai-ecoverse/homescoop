@@ -1,0 +1,13 @@
+{
+  "name": "slicc-shims-test",
+  "private": true,
+  "description": "slicc shim tests on slicc-kernel's headless Node entry (build first: ./build.sh)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 '*.test.mjs'"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.28.0",
+    "slicc-kernel-1-26": "npm:@ai-ecoverse/slicc-kernel@1.26.6"
+  }
+}

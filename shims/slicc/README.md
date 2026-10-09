@@ -13,7 +13,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid getters→1000, set*id/setgroups accept only 1000, `sethostname` → EPERM, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1) |
 | `slicc_signals.c` | `slicc_raise` / `slicc_sig_mask` / `kill` (incl. group `kill(0)` / `kill(-pgid)`); `__syscall_pause` → `sliccKernel.pause` |
 | `slicc_select.c` | `pselect()` / poll via the kernel (make `-jN`, curl, sockets) |
-| `slicc_socket.c` | BSD sockets over `Module.sliccKernel.net` (loopback #3571); needs select |
+| `slicc_socket.c` | BSD sockets over `Module.sliccKernel.net` (loopback #3571); needs select. `getaddrinfo`: localhost and numeric IPv4 locally, other names via the kernel resolver `net.resolve` (slicc-kernel ≥ 1.27.0, A records only; older kernels: `EAI_NONAME`) |
 | `slicc_jobs.c` | strong `setpgid`/`getpgid`/`setsid`/`tcgetpgrp`/`tcsetpgrp` for job control |
 | `slicc_mount.c` | strong `mount` / `umount` / `umount2` over `Module.sliccKernel.mount` / `umount2` (slicc-kernel#92); ENOSYS on older kernels |
 | `slicc_main_envp.c` | `main` that passes `environ` (`-Dmain=slicc_tool_main`) |
@@ -45,3 +45,12 @@ LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports) $WORK/libsl
 
 Keep `homescoop_em_cli_ldflags` (`ENVIRONMENT=web,worker,node`, `EXIT_RUNTIME`,
 `ALLOW_MEMORY_GROWTH`) on every CLI link line.
+
+## Tests
+
+`test/` builds small programs against the shim profiles and runs them on
+slicc-kernel's headless Node entry (CI: `.github/workflows/slicc-shims.yml`):
+
+```bash
+cd shims/slicc/test && ./build.sh && npm ci && npm test
+```

@@ -16,9 +16,12 @@
  * slicc_select.c's kernel-backed poll (so link slicc_select.o as well; without
  * it the link fails instead of select() never waiting).
  *
- * AF_INET (IPv4) and AF_UNIX, SOCK_STREAM only. getaddrinfo resolves
- * localhost and numeric IPv4 without DNS; every other name is EAI_NONAME (the
- * realm has no network of its own).
+ * AF_INET (IPv4) and AF_UNIX, SOCK_STREAM only. getaddrinfo answers
+ * localhost and numeric IPv4 itself, and asks the kernel's resolver
+ * (Module.sliccKernel.net.resolve, slicc-kernel >= 1.27.0: /etc/hosts, then
+ * the page's uplink such as Tailscale MagicDNS) for every other name, A
+ * records only, since these sockets are IPv4. On older kernels other names
+ * are EAI_NONAME, as before.
  *
  * Link with --whole-archive (or as an object) so these win over libc's.
  */
@@ -340,7 +343,28 @@ int __syscall_poll(struct pollfd *fds, nfds_t n, int timeout) {
   return slicc_poll_js(fds, (int)n, timeout);
 }
 
-/* ---- name resolution: localhost and numeric IPv4, no DNS ---- */
+/* ---- name resolution: localhost and numeric IPv4 here, the rest via the kernel ---- */
+
+/* The kernel resolver's IPv4 answers as host-order addresses: the count, or a
+ * negative errno (-ENOENT: no such name). -ENOSYS on a kernel without
+ * net.resolve (< 1.27.0) or outside the wasm realm. */
+EM_JS(int, slicc_resolve_js, (const char *name, unsigned *out, int max), {
+  const net = Module.sliccKernel && Module.sliccKernel.net;
+  if (!net || typeof net.resolve !== 'function') return -52;
+  const r = net.resolve(UTF8ToString(name), 4);
+  if (typeof r === 'number') return r < 0 ? r : -52;
+  if (!Array.isArray(r)) return -52;
+  let n = 0;
+  for (const a of r) {
+    /* No regex literal here: EM_JS stringifies this code, and C would eat the backslashes. */
+    const parts = String(a).split('.');
+    if (parts.length !== 4 || n >= max) continue;
+    const q = parts.map(Number);
+    if (q.some((x, i) => String(x) !== parts[i] || x > 255)) continue;
+    HEAPU32[(out >> 2) + n++] = ((q[0] << 24) | (q[1] << 16) | (q[2] << 8) | q[3]) >>> 0;
+  }
+  return n;
+});
 
 struct slicc_ai {
   struct addrinfo ai;
@@ -374,19 +398,43 @@ static int service_port(const char *service, int flags, int *port) {
   return 0;
 }
 
-static int host_ip(const char *node, int flags, struct in_addr *ip) {
+#define SLICC_MAX_ADDRS 8
+
+/* Up to SLICC_MAX_ADDRS addresses for node in ips; *count is how many. */
+static int host_ips(const char *node, int flags, struct in_addr *ips, int *count) {
+  *count = 1;
   if (!node) {
-    ip->s_addr = htonl((flags & AI_PASSIVE) ? INADDR_ANY : INADDR_LOOPBACK);
+    ips[0].s_addr = htonl((flags & AI_PASSIVE) ? INADDR_ANY : INADDR_LOOPBACK);
     return 0;
   }
-  if (inet_aton(node, ip)) return 0;
+  if (inet_aton(node, &ips[0])) return 0;
   if (strchr(node, ':')) return EAI_FAMILY; /* an IPv6 literal: this network is IPv4 only */
   if (flags & AI_NUMERICHOST) return EAI_NONAME;
   if (is_localhost(node)) {
-    ip->s_addr = htonl(INADDR_LOOPBACK);
+    ips[0].s_addr = htonl(INADDR_LOOPBACK);
     return 0;
   }
-  return EAI_NONAME;
+  unsigned found[SLICC_MAX_ADDRS];
+  int n = slicc_resolve_js(node, found, SLICC_MAX_ADDRS);
+  if (n > 0) {
+    for (int i = 0; i < n; i++) ips[i].s_addr = htonl(found[i]);
+    *count = n;
+    return 0;
+  }
+  /* No such name (or only AAAA / refused answers): EAI_NONAME. A resolver
+   * that could not answer (no uplink yet, a timeout) is worth retrying. */
+  switch (-n) {
+    case 0:
+    case ENOENT:
+    case ENOSYS:
+    case EINVAL:
+    case ENAMETOOLONG:
+      return EAI_NONAME;
+    case ENOMEM:
+      return EAI_MEMORY;
+    default:
+      return EAI_AGAIN;
+  }
 }
 
 int getaddrinfo(const char *restrict node, const char *restrict service,
@@ -394,33 +442,42 @@ int getaddrinfo(const char *restrict node, const char *restrict service,
   int flags = hints ? hints->ai_flags : 0;
   int family = hints ? hints->ai_family : AF_UNSPEC;
   int socktype = hints && hints->ai_socktype ? hints->ai_socktype : SOCK_STREAM;
-  int port, r;
-  struct in_addr ip;
+  int port, r, count;
+  struct in_addr ips[SLICC_MAX_ADDRS];
   if (!node && !service) return EAI_NONAME;
   if (family == AF_INET6) return EAI_NONAME; /* no IPv6 addresses here */
   if (family != AF_UNSPEC && family != AF_INET) return EAI_FAMILY;
   if ((r = service_port(service, flags, &port)) != 0) return r;
-  if ((r = host_ip(node, flags, &ip)) != 0) return r;
-  struct slicc_ai *out = calloc(1, sizeof *out);
-  if (!out) return EAI_MEMORY;
-  out->sin.sin_family = AF_INET;
-  out->sin.sin_port = htons((unsigned short)port);
-  out->sin.sin_addr = ip;
-  out->ai.ai_family = AF_INET;
-  out->ai.ai_socktype = socktype;
-  out->ai.ai_protocol = hints && hints->ai_protocol ? hints->ai_protocol
-                        : socktype == SOCK_DGRAM   ? IPPROTO_UDP
-                                                   : IPPROTO_TCP;
-  out->ai.ai_addrlen = sizeof out->sin;
-  out->ai.ai_addr = (struct sockaddr *)&out->sin;
-  if (flags & AI_CANONNAME) {
-    out->ai.ai_canonname = strdup(node ? node : "localhost");
-    if (!out->ai.ai_canonname) {
-      free(out);
+  if ((r = host_ips(node, flags, ips, &count)) != 0) return r;
+  struct addrinfo *head = NULL, **tail = &head;
+  for (int i = 0; i < count; i++) {
+    struct slicc_ai *out = calloc(1, sizeof *out);
+    if (!out) {
+      freeaddrinfo(head);
       return EAI_MEMORY;
     }
+    out->sin.sin_family = AF_INET;
+    out->sin.sin_port = htons((unsigned short)port);
+    out->sin.sin_addr = ips[i];
+    out->ai.ai_family = AF_INET;
+    out->ai.ai_socktype = socktype;
+    out->ai.ai_protocol = hints && hints->ai_protocol ? hints->ai_protocol
+                          : socktype == SOCK_DGRAM   ? IPPROTO_UDP
+                                                     : IPPROTO_TCP;
+    out->ai.ai_addrlen = sizeof out->sin;
+    out->ai.ai_addr = (struct sockaddr *)&out->sin;
+    if (i == 0 && (flags & AI_CANONNAME)) {
+      out->ai.ai_canonname = strdup(node ? node : "localhost");
+      if (!out->ai.ai_canonname) {
+        free(out);
+        freeaddrinfo(head);
+        return EAI_MEMORY;
+      }
+    }
+    *tail = &out->ai;
+    tail = &out->ai.ai_next;
   }
-  *res = &out->ai;
+  *res = head;
   return 0;
 }
 
