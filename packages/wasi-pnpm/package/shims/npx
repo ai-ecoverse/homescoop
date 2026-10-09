@@ -43,4 +43,5 @@ for try in "$cmd" "$name"; do
   fi
 done
 echo "npx: '$name' is not installed; run 'npm i -g ${pkg:-$cmd}' (pnpm add -g) first" >&2
+echo "npx: pnpm skips releases less than 24 h old; pin ${pkg:-$name}@x.y.z-n to install a newer one" >&2
 exit 127

@@ -66,6 +66,14 @@ that run pnpm, so the commands agents type every day work:
 through the kernel's `sh` (`host/pnpm-host.mjs` answers pnpm's `shell.spawn`);
 install-time lifecycle scripts stay off (`ignore-scripts=true`).
 
+pnpm keeps its default `minimumReleaseAge` (one day, `@ai-ecoverse/*`
+included): an unpinned install skips releases less than 24 h old and takes
+the previous version. Pin `pkg@x.y.z-n` to install a fresh one. `npm help`,
+`npm i --help` and npx's not-installed message say so, and after an unpinned
+`npm i -g <pkg>` that did not get the registry's latest, npm prints one stderr
+line naming the version to pin (read from pnpm's own metadata cache, no extra
+request).
+
 `npm -v` and `npx -v` print pnpm's version, with a one-line note on stderr
 that this is pnpm. `npm install --no-save` is refused (pnpm has no
 equivalent), as is `npm install -g` without a package name.
