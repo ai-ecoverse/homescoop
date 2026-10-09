@@ -3,6 +3,9 @@
   "version": "0.28.2-2",
   "description": "esbuild 0.28 for slicc WASI preview1 (command esbuild); esbuild.wasm built by homescoop from esbuild v0.28.2 with GOOS=wasip1",
   "license": "MIT",
+  "engines": {
+    "slicc-kernel": ">=1.30.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

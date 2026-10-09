@@ -13,11 +13,14 @@ echo 'let x: number = 1' | esbuild --loader=ts
 `GOOS=js` build that needs Go's `wasm_exec.js` and a JavaScript host, which
 slicc-kernel does not run as a command.
 
+**0.28.2-2 requires slicc-kernel ≥ 1.30.0. On older kernels `--bundle` fails
+entirely (`Cannot read directory "../..": Bad file number`), even for files in
+the current directory; stay on 0.28.2-1 there.**
+
 Unpatched. The command sets `"preopenRoot": true`, so slicc-kernel ≥ 1.30.0
 preopens `/` and module resolution can read every directory up to the root
-(`../` imports, `node_modules` and `tsconfig.json` lookups). On older kernels
-resolution above the working directory's top-level folder fails with
-`Bad file number`; 0.28.2-1 patched that instead.
+(`../` imports, `node_modules` and `tsconfig.json` lookups). 0.28.2-1 patched
+esbuild instead and runs on older kernels.
 
 Certified: bundling and transforms, from files and from stdin. The JS plugin
 API needs a JavaScript host and is not available; `--serve` and `--watch` are
