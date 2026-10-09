@@ -60,12 +60,33 @@ window.opfs = {
   },
 };
 
+// Network for cert specs: ctx.serve(fn) installs window.certNet, a responder
+// standing in for every remote server. The kernel's proxy, TLS termination
+// and HTTP/1.1 stay real; only the far end is the spec's. Without a
+// responder every request fails with 502, as with no transport at all.
+const certTransport = {
+  traits: { manualRedirects: true, encodedBodies: true, crossOrigin: 'any' },
+  async fetch(request) {
+    if (typeof window.certNet !== 'function') {
+      throw Object.assign(new Error('browser-cert: no ctx.serve() responder'), { status: 502 });
+    }
+    const body = request.body ? new Uint8Array(await new Response(request.body).arrayBuffer()) : new Uint8Array();
+    const res = await window.certNet({ url: request.url, method: request.method, headers: request.headers, body });
+    const bytes = typeof res.body === 'string' ? new TextEncoder().encode(res.body) : (res.body ?? new Uint8Array());
+    async function* chunks() {
+      for (let i = 0; i < bytes.length; i += 16384) yield bytes.slice(i, i + 16384);
+    }
+    return { status: res.status ?? 200, statusText: res.statusText ?? '', headers: res.headers ?? [], body: chunks(), cancel: async () => {} };
+  },
+};
+
 window.boot = async () => {
   if (!crossOriginIsolated) {
     throw new Error('page is not cross-origin isolated (need COOP/COEP)');
   }
   window.kernel = await createKernel({
     root: await navigator.storage.getDirectory(),
+    network: { transport: certTransport },
   });
   document.getElementById('log').textContent = 'kernel ready';
   return true;
