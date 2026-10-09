@@ -93,6 +93,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-poppler` | host | **26.10.0-1** (`pdftotext` / `pdftoppm` / `pdfinfo` / `pdfimages` / `pdffonts` / `pdfseparate` / `pdfunite` / `pdfdetach` / `pdfattach` / `pdftops` / `pdftohtml`, `pdftocairo` = `pdftoppm`; one multi-call wasm, Splash only, URW base-14 fonts) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
+| `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-1** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 
 \* stub until ported. Published libs ship relocatable `lib/pkgconfig/*.pc`.

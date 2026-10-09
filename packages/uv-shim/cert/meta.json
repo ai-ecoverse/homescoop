@@ -1,0 +1,23 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.4",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils", "@ai-ecoverse/wasix-python"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasix-python@3.14.2-9"
+  ],
+  "checklist": [
+    "uv --version prints 'uv 0.1.0-1 (@ai-ecoverse/wasix-uv-shim)' and the stderr note that it is a shim over pip, not Astral's uv",
+    "homescoop#103 done-when: uv venv && uv pip install requests && uv run python -c 'import requests' (sys.prefix is the venv)",
+    "requests is in the venv only: base python cannot import it; uv pip list/freeze show it; uv pip uninstall removes it",
+    "uv pip with no venv: 'No virtual environment found', rc 2",
+    "uv init; uv add idna charset-normalizer writes dependencies with installed lower bounds (idna>=3.20) and syncs",
+    "uv run of a dependency's console script (normalizer --version) and of main.py",
+    "rm -rf .venv && uv sync rebuilds the environment from pyproject.toml",
+    "uv remove drops the dependency from pyproject.toml and the venv",
+    "uv add outside a project: 'No `pyproject.toml` found', rc 2",
+    "unsupported (lock, tool, python install, build, pip compile): rc 2, message names the shim"
+  ],
+  "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS. PyPI over the kernel's CONNECT proxy was checked by hand on the Node entry with a fetch transport."
+}
