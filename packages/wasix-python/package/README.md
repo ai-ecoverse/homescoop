@@ -28,27 +28,33 @@ PYTHONPATH=<dir>/lib/python3.14/site-packages python -c "import six"
 
 On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) until openssl/`_ssl` is enabled.
 
-## Virtual environments (3.14.2-10)
+## Virtual environments (slicc-kernel ≥ 1.29.0)
 
 ```text
 python -m venv v && v/bin/pip install requests && v/bin/python -c "import requests"
 ```
 
-`lib/python3.14/sitecustomize.py` sets `sys.executable` from PATH (WASI
-`stat()` has no permission bits, so CPython cannot find itself), so
-`python -m venv` works. A `sitecustomize` of your own still runs.
+**Venvs need slicc-kernel ≥ 1.29.0** (`engines` says so). On older kernels a
+venv's `bin/python` and `bin/pip` run as the base interpreter: `v/bin/pip
+install` then installs into the **base** package directory, not the venv.
 
-Whether a venv's own python sees the venv depends on the kernel:
+CPython cannot find its own executable here (WASI `stat()` has no permission
+bits, so its PATH search never matches), so `_slicc_site.py` sets
+`sys.executable` from PATH. Two hooks run it:
+`site-packages/slicc-executable.pth` for the base interpreter (a
+`sitecustomize` of yours on `PYTHONPATH` cannot switch it off) and the stdlib
+`sitecustomize.py` for venvs without system site-packages. A `sitecustomize`
+of your own still runs after ours, and `import sitecustomize` returns yours.
 
-| | slicc-kernel < 1.29.0 | slicc-kernel ≥ 1.29.0 (#168) |
+`python` and `python3` set `"argv0Path": true`, so slicc-kernel ≥ 1.29.0
+(#168) passes a venv's `bin/python` path as `argv[0]`; that is how CPython
+finds the venv's `pyvenv.cfg`:
+
+| | slicc-kernel < 1.29.0 | slicc-kernel ≥ 1.29.0 |
 | --- | --- | --- |
-| `v/bin/python`, `v/bin/pip`, venv console scripts | run as the **base** interpreter (they install into, and import from, the base) | run **in the venv** |
-| `source v/bin/activate; python …` | base interpreter (`python` on PATH is a link to the command) | in the venv |
+| `v/bin/python`, `v/bin/pip`, venv console scripts | run as the **base** interpreter (install into, and import from, the base) | run **in the venv** |
+| `source v/bin/activate; python …` | base interpreter | in the venv |
 | `uv run …` ([`@ai-ecoverse/wasix-uv-shim`](https://www.npmjs.com/package/@ai-ecoverse/wasix-uv-shim)) | in the venv | in the venv |
 
-`python` and `python3` set `"argv0Path": true`, so a kernel with
-slicc-kernel#168 passes a venv's `bin/python` path as `argv[0]`; that is
-how CPython finds the venv's `pyvenv.cfg`. Until then,
-use `uv run` or set `PYTHONEXECUTABLE=$PWD/v/bin/python`.
-
-3.14.2-10 is 3.14.2-9's files plus `sitecustomize.py`.
+3.14.2-11 is 3.14.2-9's files plus `sitecustomize.py`, `_slicc_site.py` and
+`site-packages/slicc-executable.pth`.

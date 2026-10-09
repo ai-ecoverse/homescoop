@@ -1,28 +1,13 @@
-# slicc (homescoop wasix-python): fill in sys.executable when getpath could
-# not. WASI stat() has no permission bits, so CPython's PATH search for
-# argv[0] (isxfile) never matches the kernel's /usr/bin commands and
-# sys.executable stays '' (python -m venv then refuses to run). A venv's
-# python is found from argv[0] once slicc-kernel passes the invoked path
-# (slicc-kernel#168); this only covers the base interpreter.
-#
-# Shipped in the stdlib directory, so it shadows a sitecustomize further
-# down sys.path; that one is still run, after this.
+# slicc (homescoop wasix-python): sys.executable for the interpreter, see
+# _slicc_site.py. Shipped in the stdlib directory, so it shadows a
+# sitecustomize further down sys.path; that one still runs, after this, and
+# is what `import sitecustomize` then returns.
 import os
 import sys
 
+import _slicc_site
 
-def _slicc_executable():
-    if sys.executable:
-        return
-    argv0 = sys.orig_argv[0] if sys.orig_argv else ""
-    name = os.path.basename(argv0) or "python3"
-    for d in os.environ.get("PATH", "/usr/bin:/bin").split(os.pathsep):
-        p = os.path.join(d or ".", name)
-        if os.path.isfile(p):
-            sys.executable = p
-            if not getattr(sys, "_base_executable", ""):
-                sys._base_executable = p
-            return
+_slicc_site.fix()
 
 
 def _slicc_chain():
@@ -35,12 +20,18 @@ def _slicc_chain():
     if spec is None or spec.origin == os.path.abspath(__file__):
         return
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    ours = sys.modules.get("sitecustomize")
+    sys.modules["sitecustomize"] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        if ours is not None:
+            sys.modules["sitecustomize"] = ours
+        raise
 
 
-_slicc_executable()
 try:
     _slicc_chain()
 except Exception as exc:  # as site.py does for a failing sitecustomize
     print(f"Error in sitecustomize; set PYTHONVERBOSE for traceback:\n{type(exc).__name__}: {exc}", file=sys.stderr)
-del _slicc_executable, _slicc_chain
+del _slicc_chain

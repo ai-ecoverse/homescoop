@@ -1,4 +1,4 @@
-# wasm-screen 5.0.1-5 (next)
+# wasm-screen 5.0.1
 
 Emscripten + asyncify fork. SLICC PR **#3733** (pseudo-terminals) has merged.
 libc includes musl `passwd/` (reads `/etc/passwd` + `/etc/group` from VFS).

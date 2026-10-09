@@ -1,8 +1,11 @@
 {
   "name": "@ai-ecoverse/wasix-python",
-  "version": "3.14.2-10",
-  "description": "CPython 3.14 for slicc WASIX (sys.executable set for venvs; packaging-only over 3.14.2-9)",
+  "version": "3.14.2-11",
+  "description": "CPython 3.14 for slicc WASIX (venvs on slicc-kernel >= 1.29.0; packaging-only over 3.14.2-9)",
   "license": "PSF-2.0",
+  "engines": {
+    "slicc-kernel": ">=1.29.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

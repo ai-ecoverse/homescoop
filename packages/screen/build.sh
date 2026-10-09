@@ -141,8 +141,11 @@ fi
 test -f "$SRC_DIR/screen" || test -f "$SRC_DIR/screen.js"
 homescoop_stage_cli "$SRC_DIR" screen
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_notices_begin "screen.wasm statically links the following."
+homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
+homescoop_notice_emscripten
 
-# package.json — SCREENDIR so sockets land in /tmp (AF_UNIX path-bound; -ls empty)
+# package.json — SCREENDIR so sockets land in /tmp (AF_UNIX path-bound)
 PKG_JSON="$HOMESCOOP_PKG/package/package.json"
 python3 - "$PKG_JSON" "$VERSION" <<'PY'
 import json, sys
@@ -160,7 +163,7 @@ pkg = {
     },
     "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/screen",
     "keywords": ["wasm", "emscripten", "slicc", "homescoop", "screen", "pty"],
-    "files": ["README.md", "LICENSE", "bin", "PRESTAGE.md"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "PRESTAGE.md"],
     "publishConfig": {"access": "public", "tag": "next"},
     "homescoop": {"recipe": "screen", "upstream": ver, "pty": "emscripten+SLICC#3733"},
     "slicc": {
@@ -187,19 +190,11 @@ path.write_text(json.dumps(pkg, indent=2) + "\n")
 print("package.json", pkg["version"])
 PY
 
-cat > "$HOMESCOOP_PKG/package/README.md" <<EOF
-# \`@ai-ecoverse/wasm-screen\`
-
-GNU screen ${VERSION} for slicc (Emscripten ABI). Needs SLICC PTY ioctls
-(PR #3733). Dist-tag \`next\` only until the kernel lands.
-
-Sockets: \`SCREENDIR=/tmp/screens\` (no global SOCKET_DIR). \`screen -ls\` may
-show nothing — AF_UNIX paths are not VFS-readdir visible yet.
-EOF
-cp "$HOMESCOOP_PKG/package/README.md" "$HOMESCOOP_PKG/README.md" 2>/dev/null || true
+# README: packages/screen/README.md is the source (usage and known limits).
+cp "$HOMESCOOP_PKG/README.md" "$HOMESCOOP_PKG/package/README.md"
 
 cat > "$HOMESCOOP_PKG/package/PRESTAGE.md" <<EOF
-# wasm-screen ${VERSION}-5 (next)
+# wasm-screen ${VERSION}
 
 Emscripten + asyncify fork. SLICC PR **#3733** (pseudo-terminals) has merged.
 libc includes musl \`passwd/\` (reads \`/etc/passwd\` + \`/etc/group\` from VFS).

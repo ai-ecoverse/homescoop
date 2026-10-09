@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-tar",
-  "version": "1.35.0-3",
+  "version": "1.35.0-4",
   "description": "GNU tar 1.35 for wasm / slicc (fork + Asyncify for -z/-j/-J)",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -19,6 +19,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin"
   ],
   "publishConfig": {
