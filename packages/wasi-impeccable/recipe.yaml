@@ -9,7 +9,7 @@ npm: "@ai-ecoverse/wasi-impeccable"
 summary: "impeccable engine 0.1.12 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
-  sha256: "d1996f4b48fd52354192e4aafd64e1a4b189afc41f9135c6a4cb22df3050a696"
+  sha256: "b639d26b2da80d3f61bcf5731644787e224eab18d3a91311d0a851c528b2fe41"
 dependencies:
   build: []
   host: []
