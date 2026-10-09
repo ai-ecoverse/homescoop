@@ -51,11 +51,22 @@ follows it itself, because nothing is read from the redirect.
 - LFS files are checked against their sha256. A mismatch after a resume
   downloads the file again from the start; a second mismatch fails.
 
+**Known issue, until [slicc-kernel#184](https://github.com/ai-ecoverse/slicc-kernel/issues/184) is fixed:**
+when a WASI process is killed by a signal (SIGKILL or SIGTERM), the kernel
+drops what it wrote but did not fsync. A normal exit or a trap keeps it.
+Because `hf` fsyncs `<file>.incomplete` every 4 MiB, a download that is
+killed resumes from the last 4 MiB mark instead of from the end. A dropped
+connection within one run still resumes from the last byte.
+
 **Tokens:**
 - The token comes from `HF_TOKEN` (or `HUGGING_FACE_HUB_TOKEN`), then
   `$HF_TOKEN_PATH`, then `$HF_HOME/token`, which defaults to
   `~/.cache/huggingface/token` (`/home/.cache/huggingface/token` in seven).
   That is the same order huggingface_hub uses.
+- `hf auth login` makes the token file private (mode 0600) before writing
+  the token. WASI has no chmod, so this goes through the command's host
+  import (`host/hf-host.mjs`, `ctx.fs.chmod`). A kernel without it gets a
+  warning.
 - It is sent to the Hub endpoint only. A redirect to another host (the CDN,
   whose URLs are signed) drops it.
 - `HF_ENDPOINT` points at a mirror.

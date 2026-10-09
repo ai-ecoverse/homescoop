@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::io::{self, BufRead, IsTerminal};
+use std::path::Path;
 
 use crate::hub::{self, Hub};
 
@@ -47,6 +48,11 @@ pub fn login(token: Option<String>, verify: bool) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
+    // Restrict the file before the token goes in, as huggingface_hub does.
+    fs::write(&path, b"").map_err(|e| format!("{}: {e}", path.display()))?;
+    if let Err(e) = private(&path) {
+        eprintln!("hf: warning: could not make {} private (mode 0600): {e}", path.display());
+    }
     fs::write(&path, format!("{token}\n")).map_err(|e| format!("{}: {e}", path.display()))?;
     eprintln!("hf: token saved to {}", path.display());
     if let Some((_, var)) = hub::env_token() {
@@ -78,4 +84,46 @@ pub fn show() -> Result<(), String> {
         println!("orgs: {}", orgs.join(","));
     }
     Ok(())
+}
+
+/// Mode 0600. WASI has no chmod, so in slicc's kernel this goes through the
+/// command's host import (package/host/hf-host.mjs).
+#[cfg(target_os = "wasi")]
+fn private(path: &Path) -> io::Result<()> {
+    #[link(wasm_import_module = "hf_host")]
+    extern "C" {
+        fn chmod(path: *const u8, len: usize, mode: u32) -> i32;
+    }
+    let p = path.to_string_lossy();
+    match unsafe { chmod(p.as_ptr(), p.len(), 0o600) } {
+        0 => Ok(()),
+        52 => Err(io::Error::new(io::ErrorKind::Unsupported, "no hf_host.chmod in this kernel")),
+        n => Err(io::Error::other(format!("errno {n}"))),
+    }
+}
+
+#[cfg(unix)]
+fn private(path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+}
+
+#[cfg(not(any(unix, target_os = "wasi")))]
+fn private(_path: &Path) -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    #[test]
+    fn token_file_is_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("wasi-hf-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("token");
+        std::fs::write(&file, "x").unwrap();
+        super::private(&file).unwrap();
+        assert_eq!(std::fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }
