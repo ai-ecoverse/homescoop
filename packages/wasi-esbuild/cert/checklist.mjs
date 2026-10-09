@@ -3,8 +3,9 @@
  * tsconfig "paths" alias, a node_modules package with "exports", JSON) from
  * OPFS to a file with a sourcemap; transform stdin; fail on syntax errors and
  * unresolved imports. The project lives at /home/app, so resolution reads
- * every directory from "/" down, which slicc-kernel does not preopen
- * (0001-wasip1-outside-preopens.patch).
+ * every directory from "/" down: the command sets "preopenRoot": true, so
+ * slicc-kernel >= 1.30.0 preopens "/" (0.28.2-1 patched esbuild instead).
+ * A monorepo case imports through ../ and writes above the working directory.
  */
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
@@ -56,6 +57,31 @@ export default async function (ctx) {
     '../src/index.ts',
     '../src/lib/math.ts',
   ]);
+
+  // A monorepo: ../ imports out of the package, output above the working
+  // directory, and an absolute entry point.
+  await write('home/mono/shared/util.ts', 'export const twice = (n: number): number => n * 2;\nexport const tag = "shared-util";\n');
+  await write('home/mono/packages/app/config.json', '{ "n": 21 }\n');
+  await write('home/mono/packages/app/src/main.ts', [
+    "import { twice, tag } from '../../../shared/util';",
+    "import cfg from '../config.json';",
+    'console.log(tag, twice(cfg.n));',
+    '',
+  ].join('\n'));
+  const mono = await run(
+    ['esbuild', '--bundle', 'src/main.ts', '--outfile=../../dist/app.js', '--format=esm'],
+    { cwd: '/home/mono/packages/app' },
+  );
+  assert.equal(mono.status, 0, `monorepo bundle stderr=${mono.stderr}`);
+  const app = await read('home/mono/dist/app.js');
+  assert.ok(app, '../../dist/app.js not written');
+  assert.match(app, /"shared-util"/, '../../../shared/util not bundled');
+  assert.match(app, /n \* 2/, 'twice() not bundled');
+  assert.match(app, /n: 21/, '../config.json not inlined');
+  assert.doesNotMatch(app, /^import /m, 'imports left in the monorepo bundle');
+  const abs = await run(['esbuild', '--bundle', '/home/mono/shared/util.ts', '--format=esm'], { cwd: '/home/mono/packages/app' });
+  assert.equal(abs.status, 0, `absolute entry stderr=${abs.stderr}`);
+  assert.match(abs.stdout, /"shared-util"/);
 
   const ts = await run(['esbuild', '--loader=ts'], { stdin: 'let x: number = 1\n' });
   assert.equal(ts.status, 0, `stdin transform stderr=${ts.stderr}`);
