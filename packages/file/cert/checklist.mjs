@@ -35,6 +35,14 @@ function png() {
   ]);
 }
 
+// gzipSync writes the host's OS byte (3 on Linux, 19 on macOS); pin it to
+// Unix so the description is the same on every runner.
+function gz(text) {
+  const b = gzipSync(Buffer.from(text), { mtime: 0 });
+  b[9] = 3;
+  return b;
+}
+
 function zip() {
   const name = Buffer.from('hello.txt');
   const data = Buffer.from('hello zip\n');
@@ -71,7 +79,7 @@ const FX = {
     'PDF document, version 1.4',
     'application/pdf; charset=us-ascii',
   ],
-  'data.gz': [gzipSync(Buffer.from('gzip me\n'), { mtime: 0 }), /^gzip compressed data/, 'application/gzip; charset=binary'],
+  'data.gz': [gz('gzip me\n'), /^gzip compressed data, from Unix/, 'application/gzip; charset=binary'],
   'obj.o': [
     Buffer.from(ELF_X86_64, 'base64'),
     'ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), not stripped',
@@ -140,7 +148,7 @@ export default async function (ctx) {
   assert.equal(stdin.stdout, `/dev/stdin: ${FX['img.png'][1]}\n${FX['doc.pdf'][1]}\n`);
 
   // -z looks inside: zlib, libbz2 and liblzma are linked in.
-  assert.equal((await ok(['file', '-b', '-z', 'data.gz'])).stdout, 'ASCII text (gzip compressed data)\n');
+  assert.equal((await ok(['file', '-b', '-z', 'data.gz'])).stdout, 'ASCII text (gzip compressed data, from Unix)\n');
   assert.match((await ok(['file', '-b', '-z', 'data.bz2'])).stdout, /^ASCII text \(bzip2 compressed data, block size = 900k\)$/m);
   assert.match((await ok(['file', '-b', '-z', 'data.xz'])).stdout, /^ASCII text \(XZ compressed data, checksum CRC32\)$/m);
   assert.equal((await ok(['file', '-b', 'data.xz'])).stdout, 'XZ compressed data, checksum CRC32\n');
