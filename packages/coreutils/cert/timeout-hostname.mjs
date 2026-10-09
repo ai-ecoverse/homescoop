@@ -37,8 +37,12 @@ export default async function (ctx) {
   const keep = await timed(['timeout', '--preserve-status', '1', 'sleep', '5']);
   assert.equal(keep.status, 143, `--preserve-status rc=${keep.status}`);
 
-  // -k: a command that ignores TERM gets KILL one second later.
-  const stubborn = await timed(['timeout', '-k', '1', '1', 'bash', '-c', 'trap "" TERM; sleep 5']);
+  // -k: a command that ignores TERM gets KILL one second later. The loop
+  // keeps bash itself running (a plain `sleep 5` would be exec'd, and slicc
+  // does not carry SIG_IGN across exec).
+  const stubborn = await timed([
+    'timeout', '-k', '1', '1', 'bash', '-c', 'trap "" TERM; while :; do sleep 0.1; done',
+  ]);
   assert.equal(stubborn.status, 137, `timeout -k rc=${stubborn.status} stderr=${stubborn.stderr}`);
   assert.ok(stubborn.secs >= 1.5 && stubborn.secs < 4.5, `timeout -k took ${stubborn.secs}s`);
 
