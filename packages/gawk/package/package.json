@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-gawk",
-  "version": "5.3.2-3",
+  "version": "5.4.1-2",
   "description": "GNU awk for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -19,6 +19,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin"
   ],
   "publishConfig": {
@@ -26,7 +27,7 @@
   },
   "homescoop": {
     "recipe": "gawk",
-    "upstream": "5.3.2"
+    "upstream": "5.4.1"
   },
   "slicc": {
     "abi": "emscripten",
