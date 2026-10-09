@@ -62,6 +62,10 @@ that run pnpm, so the commands agents type every day work:
 | any other `npm <verb>` | `pnpm <verb>` |
 | `npx <command> [args]` | the installed command; a command that is not installed is an error naming what to install (`npm i -g <pkg>`), nothing is downloaded on the fly |
 
+`pnpm run` (and so `npm run`, `npm test`, `npm start`) runs package scripts
+through the kernel's `sh` (`host/pnpm-host.mjs` answers pnpm's `shell.spawn`);
+install-time lifecycle scripts stay off (`ignore-scripts=true`).
+
 `npm -v` and `npx -v` print pnpm's version, with a one-line note on stderr
 that this is pnpm. `npm install --no-save` is refused (pnpm has no
 equivalent), as is `npm install -g` without a package name.

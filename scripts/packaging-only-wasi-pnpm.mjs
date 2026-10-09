@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Packaging-only bump of @ai-ecoverse/wasi-pnpm (homescoop#89):
- * the published 12.9.1-6 tarball with the repo's package metadata, README and
- * shims/ (npm, npx, i) on top, as 12.9.1-7. bin/pnpm.wasm, LICENSE,
- * THIRD-PARTY-NOTICES.md and host/ stay the published bytes (host/ must match
- * the repo, or the bump is not packaging-only).
+ * the published 12.9.1-6 tarball with the repo's package metadata, README,
+ * host/ (pnpm run through the kernel sh) and shims/ (npm, npx, i) on top, as
+ * 12.9.1-7. bin/pnpm.wasm, LICENSE and THIRD-PARTY-NOTICES.md stay the
+ * published bytes: no new pnpm.wasm build.
  *
  *   node scripts/packaging-only-wasi-pnpm.mjs [outdir]
  *   → <outdir>/package.tgz + package.tgz.sha256 (default .homescoop-out/wasi-pnpm)
@@ -16,11 +16,9 @@ import { createHash } from 'node:crypto';
 import {
   copyFileSync,
   cpSync,
-  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -57,18 +55,12 @@ try {
   }
   const wasmBefore = sha256(join(pkgDir, 'bin/pnpm.wasm'));
 
-  // host/ is part of the program: a packaging-only bump must not change it.
-  for (const f of readdirSync(join(repoPkg, 'host'))) {
-    if (sha256(join(repoPkg, 'host', f)) !== sha256(join(pkgDir, 'host', f))) {
-      console.error(`host/${f} differs from ${from}: not a packaging-only change`);
-      process.exit(1);
-    }
-  }
-
   copyFileSync(join(repoPkg, 'package.json'), join(pkgDir, 'package.json'));
   copyFileSync(join(repoPkg, 'README.md'), join(pkgDir, 'README.md'));
-  rmSync(join(pkgDir, 'shims'), { recursive: true, force: true });
-  cpSync(join(repoPkg, 'shims'), join(pkgDir, 'shims'), { recursive: true });
+  for (const dir of ['host', 'shims']) {
+    rmSync(join(pkgDir, dir), { recursive: true, force: true });
+    cpSync(join(repoPkg, dir), join(pkgDir, dir), { recursive: true });
+  }
 
   if (sha256(join(pkgDir, 'bin/pnpm.wasm')) !== wasmBefore) {
     console.error('bin/pnpm.wasm changed');

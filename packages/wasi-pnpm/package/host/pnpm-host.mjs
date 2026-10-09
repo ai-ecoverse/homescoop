@@ -179,6 +179,7 @@ function createFilesystem (ctx) {
 export const GIT_UNSUPPORTED = 'git dependencies need a CORS-free network transport (slicc-node, the SLICC extension or app); this page only has fetch'
 export const TLS_MISSING = 'git over https needs @ai-ecoverse/wasm-tls-engine installed next to @ai-ecoverse/wasi-pnpm'
 export const CA_MISSING = 'kernel not prepared: no CA file for git over https (the embedder must run prepare())'
+export const SH_MISSING = 'package scripts need /bin/sh: install @ai-ecoverse/wasm-bash'
 export const GIT_MISSING = 'git dependencies need git: install @ai-ecoverse/wasm-git so that git is on the kernel command path (its /node_modules)'
 const FD_HANDLE = 0x10000000
 const PROC_HANDLE = 0x20000000
@@ -478,6 +479,20 @@ function createHost (ctx) {
     return ctx.async.resolve({ ok: true, value: { handle: procHandle(child.pid, child.stdin), pid: child.pid, stdout: fdHandle(child.stdout), stderr: fdHandle(child.stderr) } })
   }
 
+  // pnpm run: the script runs through the kernel's sh, as pnpm's own host
+  // runs it through a shell (sh -c '<script>' sh <args>). Install-time
+  // lifecycle scripts stay off (ignore-scripts=true in slicc.env).
+  function spawnShell (request) {
+    const stdio = name => (request[name] === 'ignore' || request[name] === 'null' ? 'null' : request[name] === 'inherit' ? 'inherit' : 'pipe')
+    let child
+    try {
+      child = ctx.spawn({ argv: ['sh', '-c', request.script, 'sh', ...(request.args ?? []).map(String)], env: childEnv(request.env, ctx.env), cwd: request.cwd ?? ctx.cwd(), stdin: stdio('stdin'), stdout: stdio('stdout'), stderr: stdio('stderr') })
+    } catch (error) {
+      return ctx.async.resolve(errorEnvelope(error?.code === 'ENOENT' ? SH_MISSING : `the script could not start: ${error?.code ?? error?.message ?? 'EIO'}`, error?.code === 'ENOENT' ? 'ENOTSUP' : error?.code ?? 'EIO'))
+    }
+    return ctx.async.resolve({ ok: true, value: { handle: procHandle(child.pid, child.stdin), pid: child.pid, stdout: fdHandle(child.stdout), stderr: fdHandle(child.stderr) } })
+  }
+
   function processOp (request) {
     const { pid, stdin } = procOf(request.handle)
     switch (request.operation) {
@@ -582,6 +597,7 @@ function createHost (ctx) {
     case 'process.spawn':
     case 'shell.spawn':
       if (request.operation === 'process.spawn' && programName(request) === 'git') return spawnGit(request)
+      if (request.operation === 'shell.spawn' && typeof request.script === 'string') return spawnShell(request)
       return ctx.async.resolve(errorEnvelope(spawnMessage(request)))
     case 'process.write':
     case 'process.end':
