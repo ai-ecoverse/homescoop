@@ -81,7 +81,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-tar` | host | **1.35.0-4** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
 | `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
 | `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |
-| `@ai-ecoverse/wasm-diffutils` | host | **3.12.0** (`diff` / `cmp` / `diff3` / `sdiff`) |
+| `@ai-ecoverse/wasm-diffutils` | host | **3.12.0-1** (`diff` / `cmp` / `diff3` / `sdiff`) |
 | `@ai-ecoverse/wasm-patch` | host | **2.8.0** |
 | `@ai-ecoverse/wasm-xxd` | host | **9.1.1850** |
 | `@ai-ecoverse/wasm-binutils` | host | **2.47.0-3** (`strings` / `size` / `readelf`; BFD x86-64/aarch64 ELF + wasm; nm/ar/strip are in wasm-clang) |

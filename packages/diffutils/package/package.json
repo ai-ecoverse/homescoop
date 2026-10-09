@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-diffutils",
-  "version": "3.12.0",
+  "version": "3.12.0-1",
   "description": "GNU diffutils 3.12 (diff/cmp/diff3/sdiff) for wasm / slicc",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -10,7 +10,7 @@
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/diffutils",
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "diff", "diffutils"],
-  "files": ["README.md", "LICENSE", "bin"],
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin"],
   "publishConfig": { "access": "public" },
   "homescoop": { "recipe": "diffutils", "upstream": "3.12" },
   "slicc": {
