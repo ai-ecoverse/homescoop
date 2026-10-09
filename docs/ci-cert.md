@@ -76,7 +76,22 @@ export default async function (ctx) {
 
 `run` accepts `{ cwd, env, stdin }`.
 
-Tailnet specs: with `"uplink": true` in `cert/meta.json` (slicc-kernel ≥ 1.28.0)
+### Network: `ctx.serve(responder)`
+
+The cert page gives the kernel a network transport whose far end is
+`responder`. That's a self-contained function, which runs in the page:
+`({ url, method, headers, body }) => ({ status, statusText, headers, body })`,
+where `headers` is a list of `[name, value]` pairs and `body` is a string or a
+`Uint8Array`. Programs reach it through the kernel's realm proxy as usual, so
+http, https (CONNECT, terminated with the kernel CA), redirects (not followed
+by the transport) and encoded bodies all behave as they would against a real
+server. https also needs `@ai-ecoverse/wasm-tls-engine` in `needs`; without it
+the kernel answers CONNECT with 501. Before `serve`, every request gets a 502.
+See `packages/curl/cert/checklist.mjs`.
+
+### Tailnet: `ctx.uplink(config)`
+
+With `"uplink": true` in `cert/meta.json` (slicc-kernel ≥ 1.28.0)
 the kernel boots with an uplink that routes `100.64.0.0/10`, built on the
 kernel's `@ai-ecoverse/slicc-kernel/testing` `fakeUplink`. Until a spec sets
 it up, every name is unknown and every dial refused. Packages without the

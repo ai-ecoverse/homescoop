@@ -50,14 +50,14 @@ export function makeContext(page, meta) {
         window.certNet = new Function(`return (${src})`)();
       }, responder.toString());
     },
+    async read(path) {
+      return page.evaluate((p) => window.opfs.read(p), path.replace(/^\//, ''));
+    },
     async uplink(cfg) {
       await page.evaluate((c) => window.certSetUplink(c), cfg);
     },
     async uplinkLog() {
       return page.evaluate(() => window.certUplinkLog);
-    },
-    async read(path) {
-      return page.evaluate((p) => window.opfs.read(p), path.replace(/^\//, ''));
     },
   };
 }
