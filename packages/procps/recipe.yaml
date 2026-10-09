@@ -7,7 +7,7 @@ npm: "@ai-ecoverse/wasm-procps"
 summary: "procps-ng (ps, pgrep, pkill, free, uptime, …) for slicc"
 source:
   url: "https://downloads.sourceforge.net/project/procps-ng/Production/procps-ng-{{version}}.tar.xz"
-  sha256: "c2e6d193cc78f84cd6ddb72aaf6d5c6a9162f0470e5992092057f5ff518562fa"
+  sha256: "9d2021f47a4501c667862c9942a92d1953694b21d11bcd1702e83eb594e3d67d"
 dependencies:
   build: []
   host: []
