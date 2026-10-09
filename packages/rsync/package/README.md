@@ -14,7 +14,10 @@ A local rsync forks a receiver and a generator that talk to the sender over
 pipes; on slicc-kernel each is a real process (Emscripten + Asyncify fork).
 rsync:// works over the kernel's sockets (3.4.4-3): `rsync --daemon` on a
 kernel port, and clients to it or, with seven's tailnet, to tailnet names.
-Remote shells (`-e ssh`) need an ssh client in the realm.
+Remote shells (`-e ssh`) need an ssh client in the realm. Daemon modules with
+`auth users` need `RSYNC_PASSWORD` or `--password-file`: there is no
+interactive password prompt (rsync gets an empty password and the daemon
+refuses at once, rc 5).
 
 Built without OpenSSL, xxhash, zstd, lz4, iconv, ACLs or xattrs (bundled zlib
 and popt). Error messages print Emscripten's errno numbers (`No such file or

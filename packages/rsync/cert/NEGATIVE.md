@@ -15,6 +15,11 @@ returned. Against 3.4.4-2, slicc-kernel 1.30.0's Node entry:
 - `tailnet.mjs`: `rsync rsync://peer.tail1234.ts.net/` is killed by
   `timeout 20` (rc=124) instead of failing with "Connection refused" (rc 10).
 
+On slicc-kernel 1.31.0, 3.4.4-2 fails fast instead of hanging (cert by
+thr_hb2dpaitvt): the module list exits rc 10, and the tailnet client reports
+"Host is unreachable" to an address from Emscripten's own fake DNS
+(172.29.x), never asking the kernel resolver. Either way both specs fail.
+
 3.4.4-3 passes both.
 
 ## 3.4.4-2 on slicc-kernel 1.29.0 (before the #170 fix)
