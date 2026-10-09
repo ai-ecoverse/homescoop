@@ -25,10 +25,10 @@
 +endif()
 --- /dev/null
 +++ b/utils/poppler-multicall.cc
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,48 @@
 +// homescoop: poppler's command-line utilities in one program. The util
 +// runs by the name it was called as (argv[0]), or by the first argument
-+// when called as poppler-multicall.
++// when called as poppler-multicall. pdftocairo runs pdftoppm.
 +#include <cstdio>
 +#include <cstring>
 +
@@ -40,6 +40,17 @@
 +
 +static bool dispatch(const char *name, int argc, char *argv[], int *rc)
 +{
++    if (!strcmp(name, "pdftocairo")) {
++        // No cairo in this build, so pdftocairo is pdftoppm. Say why the
++        // vector formats fail before pdftoppm rejects them with its usage.
++        for (int i = 1; i < argc; ++i) {
++            if (!strcmp(argv[i], "-svg") || !strcmp(argv[i], "-pdf") || !strcmp(argv[i], "-ps") || !strcmp(argv[i], "-eps")) {
++                fprintf(stderr, "pdftocairo: %s needs cairo, which this build does not have; use pdftoppm -png or pdftops\n", argv[i]);
++                break;
++            }
++        }
++        name = "pdftoppm";
++    }
 +#define HS_CASE(n)                                                                                                                                   \
 +    if (!strcmp(name, #n)) {                                                                                                                         \
 +        *rc = n##_main(argc, argv);                                                                                                                  \
