@@ -1,0 +1,23 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+  ],
+  "network": "ctx.serve() fakes the Hub behind the kernel's realm proxy. hf sends https in absolute form (crates/wasix-net), so there is no CONNECT and no wasm-tls-engine. hub.test and huggingface.co answer as a manual-redirect transport delivers them (307 to /api/resolve-cache, 302 to cdn.test for LFS); follow.test answers resolve with the body itself, as a transport that follows redirects (slicc-extension, page fetch) delivers it. Checked by hand against the real Hub on the Node entry with both kinds of transport.",
+  "checklist": [
+    "hf --version → hf 0.1.0 (@ai-ecoverse/wasi-hf…); --help and download --help; hf upload → rc 2 'not in this build'; a bad repo id → rc 2",
+    "hf download cert/tiny --exclude '*.h5' → /home/models/cert/tiny (stdout), 5 files as plain files (no symlinks, no .incomplete), LFS files byte-exact by sha256, small files via the 307, LFS via the 302 to the CDN, paths percent-encoded, no Authorization without a token",
+    "a second run skips all 5 and requests no file; --force -j 1 fetches config.json again",
+    "follow-redirect transport: --include '*.onnx' --include '*.json' --to out-follow lands under the cwd (PWD), byte-exact, never leaves follow.test",
+    "resume on both transports: a 100000-byte <file>.incomplete → 'resuming at 97.7 KiB', Range bytes=100000- reaches the CDN (manual) or resolve (follow), no full re-download, result byte-exact",
+    "a wrong .incomplete prefix fails the sha256 → 'downloading it again from the start' → byte-exact",
+    "a body cut at 150000 of 300000 bytes resumes in the same run (Range bytes=150000-) → byte-exact",
+    "an LFS body that does not match its sha256 → rc 1 'failed bad.bin: sha256 mismatch', nothing left behind",
+    "--revision v1 and --revision refs/pr/1 (encoded refs%2Fpr%2F1) fetch at the pinned commit; Link-paginated tree; datasets/<repo> → /home/datasets/<repo> and --repo-type dataset; no HF_ENDPOINT → huggingface.co",
+    "errors: a file not in the repo → rc 1 'is not in'; an unknown repo → rc 1 with the Hub's 404 message",
+    "auth: whoami without a token → rc 1 'not logged in'; gated download without one → rc 1 '401 … restricted … hf auth login'; login with a bad token → rc 1 'invalid token', nothing saved; login --token → /home/.cache/huggingface/token with mode 600 (stat -c %a; via host/hf-host.mjs, since WASI has no chmod); whoami → cert-user / orgs: cert-org; HF_TOKEN takes precedence; the gated download sends the token to the Hub and never to the CDN; login from stdin with HF_HOME replaces a mode-644 $HF_HOME/token and leaves it 600; logout removes it; HF_TOKEN alone downloads the gated repo"
+  ]
+}

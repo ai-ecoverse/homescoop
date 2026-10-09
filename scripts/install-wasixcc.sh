@@ -14,9 +14,11 @@ set -euo pipefail
 WASIXCC_VERSION="0.4.7"
 LLVM_VERSION="21.1.206"
 BINARYEN_VERSION="133"
-# Same sysroot wasix-m4 1.4.20-2 links against (fcntl F_SETFD fix).
-SYSROOT_VERSION="2025.9.30-14"
-SYSROOT_SHA="1a88c9f1b12b0bffaf6502914abc4f1b40443ddccbfa84d8bbc44fc86a0e652e"
+# -15 adds st_uid/st_gid = getuid()/getgid() (slicc_stat_owner) to -14,
+# which wasix-m4 1.4.20-2 links against (fcntl F_SETFD fix); wasix-gnupg
+# needs it for its homedir ownership checks.
+SYSROOT_VERSION="2025.9.30-15"
+SYSROOT_SHA="1642c734b7709165390ef67205395ade364008c423acd9679c2fba0ddb1fc48c"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)

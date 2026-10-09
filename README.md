@@ -78,7 +78,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-less` | host | **668.0.0-2** (static ncursesw fallbacks) |
 | `@ai-ecoverse/wasm-sqlite3` | host | **3.53.4** (shell amalgamation) |
 | `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-32-3** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
-| `@ai-ecoverse/wasm-tar` | host | **1.35.0-2** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
+| `@ai-ecoverse/wasm-tar` | host | **1.35.0-4** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
 | `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
 | `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |
 | `@ai-ecoverse/wasm-diffutils` | host | **3.12.0** (`diff` / `cmp` / `diff3` / `sdiff`) |
@@ -94,6 +94,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-rsync` | host | **3.4.4-1** (`rsync`; local copies, fork + Asyncify for the sender/receiver pair, `select()` waits in the kernel; no remote sync yet) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
+| `@ai-ecoverse/wasi-hf` | host | **0.1.0-2** (`hf download` / `hf auth`, token file 0600; Rust on wasix-net, Range resume + LFS sha256, plain files under `/home/models`; not huggingface_hub's CLI, see #110) |
 | `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-1** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 

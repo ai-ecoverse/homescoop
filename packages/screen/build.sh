@@ -141,6 +141,9 @@ fi
 test -f "$SRC_DIR/screen" || test -f "$SRC_DIR/screen.js"
 homescoop_stage_cli "$SRC_DIR" screen
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_notices_begin "screen.wasm statically links the following."
+homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
+homescoop_notice_emscripten
 
 # package.json — SCREENDIR so sockets land in /tmp (AF_UNIX path-bound; -ls empty)
 PKG_JSON="$HOMESCOOP_PKG/package/package.json"
@@ -160,7 +163,7 @@ pkg = {
     },
     "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/screen",
     "keywords": ["wasm", "emscripten", "slicc", "homescoop", "screen", "pty"],
-    "files": ["README.md", "LICENSE", "bin", "PRESTAGE.md"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "PRESTAGE.md"],
     "publishConfig": {"access": "public", "tag": "next"},
     "homescoop": {"recipe": "screen", "upstream": ver, "pty": "emscripten+SLICC#3733"},
     "slicc": {

@@ -1,16 +1,15 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
   "needs": [],
   "needsInstall": [],
   "checklist": [
     "esbuild --version → 0.28.2",
     "bundle a multi-file TS project in /home/app (relative import, tsconfig paths alias, node_modules package with exports, JSON) to dist/out.js with --format=esm --minify --sourcemap; types stripped, no imports left, sourcemap lists all five sources",
+    "monorepo: from /home/mono/packages/app, bundle src/main.ts importing ../../../shared/util.ts and ../config.json, written to ../../dist/app.js (above the working directory); an absolute entry /home/mono/shared/util.ts bundles too (\"preopenRoot\": true, slicc-kernel >= 1.30.0)",
     "echo 'let x: number = 1' | esbuild --loader=ts → let x = 1;",
     "syntax error on stdin → exit 1, Unexpected \"=\"",
     "unresolved import → exit 1, Could not resolve \"./missing\", no output file"
   ],
-  "patches": {
-    "0001-wasip1-outside-preopens.patch": "every bundle case: /home/app resolution reads \"/\", which slicc-kernel does not preopen; unpatched esbuild fails with Cannot read directory \"../..\": Bad file number"
-  }
+  "preopenRoot": "The esbuild command sets \"preopenRoot\": true; slicc-kernel >= 1.30.0 then preopens / and ./ (slicc-kernel#144), which replaces 0.28.2-1's 0001-wasip1-outside-preopens.patch."
 }
