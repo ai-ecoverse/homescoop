@@ -94,6 +94,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-rsync` | host | **3.4.4-1** (`rsync`; local copies, fork + Asyncify for the sender/receiver pair, `select()` waits in the kernel; no remote sync yet) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
+| `@ai-ecoverse/wasi-hf` | host | **0.1.0-1** (`hf download` / `hf auth`; Rust on wasix-net, Range resume + LFS sha256, plain files under `/home/models`; not huggingface_hub's CLI, see #110) |
 | `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-1** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 
