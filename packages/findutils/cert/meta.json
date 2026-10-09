@@ -1,14 +1,17 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.17.4",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
     "@ai-ecoverse/wasm-coreutils@9.12.0-3"
   ],
   "checklist": [
     "find -name / -type d over a small tree",
-    "find -exec cmd {} \; (one child per file)",
+    "find -exec cmd {} ';' (one child per file)",
     "find -exec cmd {} + (one batch)",
     "-exec false: ; → rc 0, + → rc 1",
     "find -execdir pwd",
