@@ -96,4 +96,22 @@ cp "$FSRC/COPYING" "$FONTS/COPYING"
 cp "$FSRC/README" "$FONTS/README"
 
 homescoop_stage_license "$SRC"/COPYING
+homescoop_notices_begin "poppler-multicall.wasm statically links the following, and share/fonts holds the URW base-14 fonts."
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+homescoop_notice "libjpeg-turbo 3.1.2 (@ai-ecoverse/wasm-libjpeg-turbo)" \
+  https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.2/LICENSE.md 2189dc45a8fe96204069f8124caa53a148dfdc193f50f584c6ca7849a6072872 \
+  https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.2/README.ijg 75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6
+homescoop_notice "libpng 1.6.59 (@ai-ecoverse/wasm-libpng)" \
+  https://raw.githubusercontent.com/pnggroup/libpng/v1.6.59/LICENSE bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526
+homescoop_notice "Little CMS 2.19.1 (@ai-ecoverse/wasm-lcms2)" \
+  https://raw.githubusercontent.com/mm2/Little-CMS/lcms2.19.1/LICENSE 6dbd60437f8ef91d8de1f08ad75882547fd4931bfcc3566a0735f28db1484d31
+homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the FreeType License" \
+  https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/LICENSE.TXT 2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b \
+  https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1
+homescoop_notice "OpenJPEG 2.5.3 (@ai-ecoverse/wasm-openjpeg)" \
+  https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.3/LICENSE a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6
+homescoop_notice "URW base-14 Type1 fonts, gsfonts $GSFONTS_VERSION (share/fonts)" \
+  "$FSRC/README" - "$FSRC/COPYING" -
+homescoop_notice_emscripten
 echo "== poppler: staged → $HOMESCOOP_PKG/package ($VERSION, utils: ${UTILS[*]})"
