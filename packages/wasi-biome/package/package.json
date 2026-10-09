@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-biome",
-  "version": "2.5.15-1",
+  "version": "2.5.15-2",
   "description": "Biome 2.5 (formatter and linter) for slicc WASI preview1 (command biome); biome.wasm built by homescoop from biomejs/biome 2.5.15 for wasm32-wasip1-threads",
   "license": "MIT OR Apache-2.0",
   "repository": {

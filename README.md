@@ -87,6 +87,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-ncurses-utils` | host | **6.5.0-1** (`clear` / `tput` / `tset` / `reset`; terminfo db via `slicc.env` TERMINFO) |
 | `@ai-ecoverse/wasm-mount` | host | **1.0.0-1** (`mount` / `umount`; in-tree, needs slicc-kernel ≥ 1.17.0 process mounts) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
+| `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 
 \* stub until ported. Published libs ship relocatable `lib/pkgconfig/*.pc`.

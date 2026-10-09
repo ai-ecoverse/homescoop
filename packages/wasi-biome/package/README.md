@@ -28,4 +28,7 @@ One patch (`0001-wasi-cli.patch` in the recipe):
 Certified: `check`, `ci`, `format` (files and stdin) and `lint`, including
 type-aware rules across files, `.gitignore`, and configuration errors.
 
+2.5.15-1 hangs on `--watch` and `__run_server` (Ctrl-C recovers it);
+2.5.15-2 refuses them with a message.
+
 MIT OR Apache-2.0; see `LICENSE`.

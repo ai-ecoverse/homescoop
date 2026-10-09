@@ -1,6 +1,6 @@
 # Negative proof (wasi-biome)
 
-**Date:** 2026-10-09 (2.5.15-1)
+**Date:** 2026-10-09 (2.5.15-1; 2.5.15-2 the same day)
 
 ## Patch removed (0001-wasi-cli.patch)
 
@@ -41,9 +41,10 @@ biome check . → 1
   Caused by: Could not resolve @ai-ecoverse/slicc-shared-web/biome: module not found
 ```
 
-## run_server and --watch hunks
+## run_server and --watch hunks (2.5.15-2)
 
-The build before them (CI artifact 111ce5e3…, run 37942614733) on
+Published 2.5.15-1 (CI artifact 111ce5e3…, run 37942614733) does not have
+them; Ctrl-C recovers the hang. That build on
 slicc-kernel 1.23.0's Node entry: `biome __run_server` printed nothing and
 was still running when the 180 s guard stopped it (it starts the file
 watcher on a blocking thread, and dropping the tokio runtime waits for it),
