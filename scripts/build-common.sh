@@ -259,6 +259,7 @@ homescoop_slicc_archive() {
   case "$profile" in
     gaps)
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
     spawn)
@@ -266,6 +267,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
     make)
@@ -276,6 +278,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_main_envp.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
@@ -288,6 +291,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
@@ -296,11 +300,13 @@ homescoop_slicc_archive() {
       # mount/umount: mount(2)/umount2(2) via sliccKernel (slicc-kernel#92).
       _homescoop_slicc_compile "$dir/slicc_mount.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
     less)
       # TUI pager: signals + gaps + jobs + pselect (no spawn).
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
@@ -312,6 +318,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
@@ -325,6 +332,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
       ;;
@@ -337,6 +345,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
@@ -374,7 +383,13 @@ homescoop_slicc_keep_spawn() {
 # Usage: LDFLAGS="$(homescoop_slicc_link_archive "$SLICC_A") $(homescoop_em_cli_ldflags)"
 homescoop_slicc_link_archive() {
   local archive="$1"
-  printf '%s' "$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) -Wl,--whole-archive ${archive} -Wl,--no-whole-archive"
+  printf '%s' "$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_slicc_wrap_pwd) -Wl,--whole-archive ${archive} -Wl,--no-whole-archive"
+}
+
+# slicc_pwd.c: getpwuid/getpwnam/getpwent are strong in Emscripten's libc
+# stubs, so the shim defines __wrap_* and the link redirects to them.
+homescoop_slicc_wrap_pwd() {
+  printf '%s' "-Wl,--wrap=getpwuid -Wl,--wrap=getpwnam -Wl,--wrap=getpwent"
 }
 
 # Extra link flags for the fork js-library (bash). Pair with profile fork.

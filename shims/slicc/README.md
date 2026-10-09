@@ -8,6 +8,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | --- | --- |
 | `slicc_spawn.c` | `posix_spawn` / `waitpid` / `__syscall_wait4`; file actions on fds > 2 |
 | `slicc_popen.c` | `system` / `popen` / `pclose` via posix_spawn (beats emscripten ENOSYS stubs) |
+| `slicc_pwd.c` | `getpw*` / `getgr*` from the kernel's `/etc/passwd` and `/etc/group`. `getpwuid`/`getpwnam`/`getpwent` are strong in Emscripten's stubs, so they are `__wrap_*`, linked with `homescoop_slicc_wrap_pwd`. Every profile; manual whole-archive links without the wrap keep the stubs for those three. |
 | `slicc_exec.c` | `execve`: `Module.sliccKernel.execve` keeps the caller's pid (slicc-kernel#99/#176); spawn + `execWait` on older kernels (resets caught handlers; kernel forwards signals) |
 | `slicc_fork.c` + `slicc-fork.js` | `fork` / strong `getpid`/`getppid` (`--js-library`, needs `-sASYNCIFY`); adopts `Module.sliccPid` / `Module.sliccPpid` |
 | `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid getters→1000, set*id/setgroups accept only 1000, `sethostname` → EPERM, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1) |
@@ -21,7 +22,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 
 ## Link profiles (`homescoop_slicc_archive`)
 
-Every profile includes `slicc_libc_gaps.c` + `slicc_signals.c`.
+Every profile includes `slicc_libc_gaps.c` + `slicc_pwd.c` + `slicc_signals.c`.
 
 | Profile | Extra objects |
 | --- | --- |
@@ -62,3 +63,11 @@ cd shims/slicc/test && ./build.sh && npm ci && npm test
   pass) and on the current kernel. With `slicc_exec.c` from before #75
   (spawn + `execWait` only), all six cases fail: `L3 1000`, `L2 1001`,
   `L1 1002`, `L0 1003`.
+
+- `pwd.test.mjs`: getpwuid / getpwnam / the `_r` forms (ERANGE on a short
+  buffer) / getpwent / getgrgid / getgrnam read the kernel's `/etc/passwd`
+  and `/etc/group` (screen: "getpwuid() can't identify your account!").
+  `pwd-test` calls `flock()`, which pulls Emscripten's stubs object into
+  the link. Without `--wrap`, plain definitions fail to link (`duplicate
+  symbol: getpwnam`, `getpwuid`, `getpwent`), and linking the archive
+  without the wrap flags leaves those three on the stubs (`uid none`).
