@@ -32,8 +32,14 @@ about:
     0001 lets unix-only files build for wasip1; 0002 prints unified diffs
     in-process (buf format -d/-w ran `diff -u`); 0003 leaves the Docker
     engine client out (only `buf beta registry plugin push` uses it);
-    0004 ends the workspace walk at paths no WASI preopen covers ("/");
     0005 starts commands, sends HTTP requests and takes cache file locks
     through package/host/buf-host.mjs (buf_host imports) on slicc-kernel's
     per-command imports hook, and reports ENOSYS-backed "unsupported" where
     the runtime has no host module.
+    The command sets "preopenRoot": true (slicc-kernel >= 1.30.0, #144), so
+    buf's workspace walk up to "/" works; 1.73.0-1 carried
+    0004-workspace-walk-outside-preopens.patch for that.
+    Next bump (README, not in 1.73.0-2): under "What does not work", say
+    that module commands (build, lint, format, generate, ...) fail in
+    SLICC's legacy wasm realm, which does not preopen "/"; only
+    slicc-kernel >= 1.30.0 supports them.

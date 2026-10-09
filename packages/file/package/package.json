@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-file",
-  "version": "5.46.0-2",
+  "version": "5.46.0-3",
   "description": "file 5.46 + magic.mgc for wasm / slicc",
   "license": "BSD-2-Clause",
   "repository": {
@@ -10,7 +10,7 @@
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/file",
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "file", "libmagic"],
-  "files": ["README.md", "LICENSE", "bin", "lib", "include", "share"],
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "include", "share"],
   "publishConfig": { "access": "public" },
   "homescoop": { "recipe": "file", "upstream": "5.46" },
   "slicc": {

@@ -4,9 +4,10 @@ builder: host
 version: "2025.9.30"
 npm: "@ai-ecoverse/wasix-sysroot"
 summary: "WASIX libc/libcxx/compiler-rt sysroots for wasm32-wasi"
+# CI base: the published -14 (build-incremental.sh adds slicc_stat_owner).
 source:
-  url: "https://github.com/wasix-org/wasix-libc"
-  sha256: "skip"
+  url: "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-2025.9.30-14.tgz"
+  sha256: "1a88c9f1b12b0bffaf6502914abc4f1b40443ddccbfa84d8bbc44fc86a0e652e"
 dependencies:
   build: []
   host: []
@@ -15,5 +16,10 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-sysroot
   license: Apache-2.0 WITH LLVM-exception
   notes: |
-    Snapshot of ~/.wasixcc/sysroot (five variants). Package root is the
-    SYSROOT_PREFIX. No commands — consumed by wasm-clang drivers / wasixcc.
+    Package root is the SYSROOT_PREFIX (five variants). No commands —
+    consumed by wasm-clang drivers / wasixcc. CI builds 2025.9.30-15 with
+    build-incremental.sh: the published -14 tarball byte for byte plus
+    slicc_stat_owner.o in every libc.a (replacing fstat.o/fstatat.o), using
+    the pinned install-wasixcc toolchain. The full rebuild (stage a local
+    ~/.wasixcc, rebuild the libc++ runtimes) is build.sh with
+    HOMESCOOP_WASIX_SYSROOT_FULL=1.

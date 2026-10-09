@@ -1,0 +1,32 @@
+# hf for slicc: the Hugging Face Hub's `hf download` and `hf auth` as a
+# small WASI command (homescoop#110). In-tree source (src/, Cargo.toml):
+# huggingface_hub's CLI needs wasix-python and cannot fetch LFS files
+# through a transport that follows redirects (see #110).
+name: wasi-hf
+builder: host
+version: "0.1.0"
+npm: "@ai-ecoverse/wasi-hf"
+summary: "hf download / hf auth for slicc WASI (wasm32-wasip1-threads, over wasix-net)"
+toolchain:
+  rust: "1.98.1"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-hf
+  license: Apache-2.0
+  notes: |
+    cargo build --locked --release --target wasm32-wasip1-threads (pinned
+    Rust) after vendoring crates/wasix-net (homescoop_vendor_crates):
+    HTTPS goes in absolute form through the kernel's proxy, so no TLS in
+    the program and no wasm-tls-engine. Hub API: /api/<type>s/<repo>/
+    revision/<rev> pins the commit, /tree/<sha>?recursive=true lists paths,
+    sizes and LFS sha256 (Link-paginated), /<repo>/resolve/<sha>/<path>
+    fetches (307 same host, 302 to the CDN, or the body directly when the
+    transport follows redirects). Files land as plain files (no HF cache
+    symlinks) under /home/models/<owner>/<name> by default; resume is
+    <file>.incomplete + Range with fsync every 4 MiB; LFS files are
+    checked against their sha256. THIRD-PARTY-NOTICES.md is generated from
+    cargo metadata (normal dependencies only) plus Rust's std and
+    wasi-libc licences. New package → human cert.

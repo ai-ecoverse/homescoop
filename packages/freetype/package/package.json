@@ -1,8 +1,8 @@
 {
   "name": "@ai-ecoverse/wasm-freetype",
-  "version": "2.13.3-1",
+  "version": "2.13.3-2",
   "description": "FreeType font engine (WASM / emscripten, SLICC homescoop ladder)",
-  "license": "FTL",
+  "license": "FTL OR GPL-2.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

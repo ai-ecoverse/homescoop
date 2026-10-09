@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+  ],
+  "checklist": [
+    "less --version: less 668 (POSIX regular expressions)",
+    "not a tty: less copies a pipe and a file unchanged (filter mode)",
+    "missing file: 'No such file or directory', rc 0 (as upstream less 668)",
+    "pty -F -X: short file printed (103-char line wrapped at 40 cols), exits by itself, keypad mode set, no 'not fully functional'",
+    "pty -N: bold line numbers, repeated on wrapped rows",
+    "pty -S: long line chopped with reverse-video '>', q quits at (END)",
+    "pty +/needle: starts at line 42 with the match highlighted, line 41 not shown",
+    "pty secure build (--with-secure): '!' gives 'Command not available', q still quits"
+  ]
+}

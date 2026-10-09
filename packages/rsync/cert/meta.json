@@ -1,0 +1,31 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-procps"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasm-procps@4.0.5-2"
+  ],
+  "checklist": [
+    "rsync --version is 3.4.4, protocol 32",
+    "rsync -a --itemize-changes on a fresh tree: upstream's lines and order (cd+++++++++ / >f+++++++++)",
+    "-a keeps file modes, file and directory mtimes and contents (find/stat/md5sum snapshot equal)",
+    "no change → 'Number of regular files transferred: 0'; one changed file → 1, itemized >f.st...... and only that file",
+    "--delete removes extra files and dirs; -n/--dry-run lists 'deleting …' and '(DRY RUN)' and changes nothing",
+    "--exclude='*.log' --exclude=logs/ skips them, and --delete keeps excluded files in the destination",
+    "-c: same size and mtime, other bytes → skipped by the quick check, sent with -c (>fc........)",
+    "symlinks (relative, absolute into the source, to a dir, dangling) with -a, -a -J, -a --omit-link-times, -a --times: rc 0, links recreated (cL+++++++++, readlink equal), source mtimes untouched, re-run itemizes nothing",
+    "-a --no-omit-link-times, -a --no-J, -a -t --no-J, -a -J --no-omit-link-times: refused (rc 1, message names slicc-kernel#170), nothing created, source untouched",
+    "missing source dir or file: rc 23 with change_dir / link_stat messages",
+    "SIGINT mid-transfer (timeout -s INT on a --bwlimit copy): rc 20 'received SIGINT, SIGTERM, or SIGHUP', no rsync left in ps",
+    "--bwlimit throttles (select() waits in the kernel)"
+  ],
+  "patches": {
+    "slicc-omit-link-times.patch": "checklist.mjs symlink matrix: without it rsync -a exits 23 ('failed to set times') and stamps link times onto targets, source files included (slicc-kernel#170); without its refusal hunk the --no-J cases do the same"
+  }
+}

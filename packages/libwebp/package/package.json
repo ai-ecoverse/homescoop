@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-libwebp",
-  "version": "1.5.0-1",
+  "version": "1.5.0-2",
   "description": "WebP codec libraries (WASM / emscripten, SLICC homescoop ladder)",
   "license": "BSD-3-Clause",
   "repository": {

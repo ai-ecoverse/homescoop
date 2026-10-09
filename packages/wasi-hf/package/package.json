@@ -1,0 +1,41 @@
+{
+  "name": "@ai-ecoverse/wasi-hf",
+  "version": "0.1.0-1",
+  "description": "hf download and hf auth for slicc WASI: Hugging Face Hub downloads with Range resume and sha256 checks (not huggingface_hub's CLI)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-hf/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-hf",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "huggingface",
+    "hf"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-hf",
+    "upstream": "0.1.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "hf": {
+        "wasm": "bin/hf.wasm"
+      }
+    }
+  }
+}

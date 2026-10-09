@@ -1,0 +1,30 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.28.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-tls-engine"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-3",
+    "@ai-ecoverse/wasm-tls-engine@3.6.7-1"
+  ],
+  "network": "ctx.serve() responder behind the kernel's realm proxy (scripts/browser-cert/page/page.js); wasm-tls-engine lets the proxy terminate CONNECT with the kernel CA",
+  "checklist": [
+    "curl --version: 8.22.0, mbedTLS/3.6.5, zlib/1.3.1, https in Protocols",
+    "http (absolute-form through the proxy) and https (CONNECT + TLS against the kernel CA) GET",
+    "-o and -O: text file, and a 70000-byte binary compared by sha256",
+    "-I (HEAD: status line, headers, no body) over http and https; -i shows 302 + Location",
+    "-L follows a 3-hop redirect chain; -w %{http_code} %{num_redirects} %{url_effective}; --max-redirs 1 → rc 47",
+    "-d POST (form content type and body); -X PUT, -H, --data-binary, query string; User-Agent curl",
+    "--fail on 404 and 500 → rc 22, no body; without --fail the 404 body comes through, rc 0",
+    "--compressed decodes a gzip body (zlib)",
+    "TLS: --cacert with a CA that did not sign the kernel certificate → rc 60; -k accepts it; unreadable CA file → rc 77",
+    "local errors: unsupported scheme rc 1, unwritable -o path rc 23",
+    "tailnet (homescoop#139, uplink): curl --noproxy '*' http://peer.tail1234.ts.net:8080/ resolves via the kernel resolver/uplink (family 4) and reaches the peer at 100.64.1.2:8080 with the right Host; names answered with 127.0.0.1 / 10.0.2.2 and unknown names → rc 6 'Could not resolve', nothing dialled; refused peer → rc 7",
+    "curl http://$(uname -n):1/ → rc 7 (resolved locally as loopback by the shim, #149), and the uplink is never asked for the hostname"
+  ],
+  "uplink": true
+}

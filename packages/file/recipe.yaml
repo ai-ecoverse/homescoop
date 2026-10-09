@@ -21,3 +21,7 @@ about:
   notes: |
     Static libmagic with zlib/bzlib/xzlib for -z. magic.mgc compiled with
     host `file` when cross-compiling. Manifest env MAGIC=${package}/share/misc/magic.mgc.
+    magic.mgc is not byte-reproducible across builds/emsdk versions: the
+    5.46.0-3 cert saw 2,520 bytes differ at the same size with identical
+    detection results. Review a rebuild by its detections (cert), not by a
+    byte diff of magic.mgc.
