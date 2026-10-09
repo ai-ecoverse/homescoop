@@ -34,6 +34,16 @@ rsync: [generator] failed to set times on "/home/rs/ld/rel": No such file or dir
 rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1356) [sender=3.4.4]
 ```
 
+## Default -J only (no refusal), tarball d07515dd…
+
+`--no-J` turned the broken path back on. Through the absolute link it
+stamped the source file's mtime. The option matrix fails at the first
+refused case (slicc-kernel 1.26.5):
+
+```
+-a --no-omit-link-times: rc=23 stderr=rsync: [generator] failed to set times on "/home/rs/lr/dang": No such file or directory (44)
+```
+
 ## Spec non-vacuous
 
 `cert/checklist.mjs` compares the exact `--itemize-changes` lines of a fresh

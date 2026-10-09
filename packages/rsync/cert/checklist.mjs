@@ -108,9 +108,11 @@ export default async function (ctx) {
   assert.match(sum.stdout, /^>fc\.{8} f$/m);
   assert.equal((await ok('cat cd/f')).stdout, 'AAAA\n');
 
-  // Symlinks: relative, absolute, to a directory and dangling. Link times are
-  // never set (slicc-kernel#170: utimensat(AT_SYMLINK_NOFOLLOW) follows the
-  // link), so the targets keep their mtimes and a re-run has nothing to do.
+  // Symlinks: relative, absolute (into the source tree), to a directory and
+  // dangling. Link times are never set (slicc-kernel#170:
+  // utimensat(AT_SYMLINK_NOFOLLOW) follows the link, so it would stamp the
+  // targets, source files included): -J is the default, and turning it off
+  // is refused. Every option set leaves the source untouched.
   await ok(
     'mkdir -p ls/sub && echo t > ls/t.txt && echo s > ls/sub/f && ' +
       'touch -d @1577934245 ls/t.txt ls/sub/f && touch -d @1620284889 ls/sub && ' +
@@ -118,18 +120,30 @@ export default async function (ctx) {
   );
   const targets = 'stat -c "%n %Y" ls/t.txt ls/sub ls/sub/f';
   const before = (await ok(targets)).stdout;
-  const links = await ok('rsync -a -i ls/ ld/');
-  for (const line of ['cL+++++++++ abs -> /home/rs/ls/t.txt', 'cL+++++++++ dang -> nowhere', 'cL+++++++++ dl -> sub', 'cL+++++++++ rel -> t.txt']) {
-    assert.ok(lines(links.stdout).includes(line), `missing "${line}" in:\n${links.stdout}`);
+  const kept = [['-a'], ['-a', '-J'], ['-a', '--omit-link-times'], ['-a', '--times']];
+  const refused = [['-a', '--no-omit-link-times'], ['-a', '--no-J'], ['-a', '-t', '--no-J'], ['-a', '-J', '--no-omit-link-times']];
+  for (const [i, opts] of kept.entries()) {
+    const dst = `ld${i}`;
+    const r = await ok(`rsync ${opts.join(' ')} -i ls/ ${dst}/`);
+    for (const line of ['cL+++++++++ abs -> /home/rs/ls/t.txt', 'cL+++++++++ dang -> nowhere', 'cL+++++++++ dl -> sub', 'cL+++++++++ rel -> t.txt']) {
+      assert.ok(lines(r.stdout).includes(line), `${opts.join(' ')}: missing "${line}" in:\n${r.stdout}`);
+    }
+    const read = await ok(`for l in rel abs dl dang; do echo "$l $(readlink ${dst}/$l)"; done`);
+    assert.equal(read.stdout, 'rel t.txt\nabs /home/rs/ls/t.txt\ndl sub\ndang nowhere\n', opts.join(' '));
+    assert.equal((await ok(targets)).stdout, before, `${opts.join(' ')} changed the source's mtimes`);
+    assert.equal((await ok(`stat -c %Y ${dst}/t.txt ${dst}/sub`)).stdout, '1577934245\n1620284889\n');
+    assert.equal((await ok(`cat ${dst}/rel ${dst}/dl/f`)).stdout, 't\ns\n');
+    const again = await ok(`rsync ${opts.join(' ')} -i ls/ ${dst}/`);
+    assert.equal(again.stdout, '', `${opts.join(' ')} re-run itemized:\n${again.stdout}`);
   }
-  const read = await ok('for l in rel abs dl dang; do echo "$l $(readlink ld/$l)"; done');
-  assert.equal(read.stdout, 'rel t.txt\nabs /home/rs/ls/t.txt\ndl sub\ndang nowhere\n');
-  assert.equal((await ok(targets)).stdout, before, 'rsync -a changed the link targets\' mtimes');
-  assert.equal((await ok('stat -c %Y ld/t.txt ld/sub')).stdout, '1577934245\n1620284889\n');
-  assert.equal((await ok('cat ld/rel ld/dl/f')).stdout, 't\ns\n');
-  const again = await ok('rsync -a -i ls/ ld/');
-  assert.equal(again.stdout, '', `re-run itemized:\n${again.stdout}`);
-  assert.equal((await ok(targets)).stdout, before);
+  for (const opts of refused) {
+    const r = await sh(`rsync ${opts.join(' ')} -i ls/ lr/`);
+    assert.equal(r.status, 1, `${opts.join(' ')}: rc=${r.status} stderr=${r.stderr}`);
+    assert.match(r.stderr, /--no-omit-link-times\/--no-J is not supported on slicc-kernel: .*slicc-kernel#170/);
+    assert.equal(r.stdout, '', `${opts.join(' ')} transferred: ${r.stdout}`);
+    assert.equal((await sh('ls lr')).status, 2, `${opts.join(' ')} created lr/`);
+    assert.equal((await ok(targets)).stdout, before, `${opts.join(' ')} changed the source's mtimes`);
+  }
 
   // A missing source: upstream's exit code 23 and message.
   const miss = await sh('rsync -a nosuch/ out/');
