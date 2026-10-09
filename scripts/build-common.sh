@@ -365,6 +365,47 @@ homescoop_slicc_fork_js_flags() {
   printf '%s' "--js-library ${dir}/slicc-fork.js -sASYNCIFY -sASYNCIFY_STACK_SIZE=1048576"
 }
 
+# THIRD-PARTY-NOTICES.md for code a CLI links statically (deps from other
+# homescoop packages, emscripten's libc/libc++, bundled data). Their npm
+# packages do not reliably carry the upstream licence text, so each notice
+# names its own files: a pinned URL with its sha256, or a local path ("-").
+#   homescoop_notices_begin "qpdf.wasm statically links:"
+#   homescoop_notice "zlib 1.3.1" https://…/LICENSE <sha256> [<src> <sha|->…]
+#   homescoop_notice_emscripten
+homescoop_notices_begin() {
+  HOMESCOOP_NOTICES="$HOMESCOOP_PKG/package/THIRD-PARTY-NOTICES.md"
+  mkdir -p "$HOMESCOOP_PKG/package" "$WORK/notices"
+  printf '# Third-party notices\n\n%s\n' "$1" >"$HOMESCOOP_NOTICES"
+}
+
+homescoop_notice() {
+  local heading="$1" src sha file
+  shift
+  printf '\n## %s\n' "$heading" >>"$HOMESCOOP_NOTICES"
+  while (($#)); do
+    src="$1" sha="${2:?homescoop_notice: <src> needs a sha256 or -}"
+    shift 2
+    if [[ "$sha" == - ]]; then
+      file="$src"
+      test -s "$file" || { echo "homescoop_notice: missing $file" >&2; return 1; }
+    else
+      file="$WORK/notices/$sha-$(basename "$src")"
+      homescoop_fetch "$src" "$sha" "$file" >&2
+    fi
+    printf '\n```text\n%s\n```\n' "$(cat "$file")" >>"$HOMESCOOP_NOTICES"
+  done
+}
+
+# emscripten's own licence plus the musl and LLVM runtime it links in.
+homescoop_notice_emscripten() {
+  local em
+  em="$(dirname "$(command -v emcc)")"
+  homescoop_notice "Emscripten $(emcc -dumpversion | sed "s/-git$//") (runtime and system libraries)" \
+    "$em/LICENSE" - \
+    "$em/system/lib/libc/musl/COPYRIGHT" - \
+    "$em/system/lib/libcxx/LICENSE.TXT" -
+}
+
 # Stage an Emscripten CLI binary pair into package/bin and PREFIX/bin.
 # Prefer bare <name> (slicc.commands glue path) over <name>.js when both exist.
 homescoop_stage_cli() {
