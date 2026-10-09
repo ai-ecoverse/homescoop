@@ -1,11 +1,11 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.17.3",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
   "needs": [
     "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-coreutils@9.12.0-2"
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
   ],
   "checklist": [
     "bash -c arithmetic",
@@ -14,6 +14,7 @@
     "exec cat /proc/self/stat: pid == $$ (slicc-kernel#108)",
     "(exec sleep) &: child's $$ == $!, kill $! → wait 143",
     "-O execfail: failed exec returns, USR1 trap restored",
-    "failed exec without execfail → 127"
+    "failed exec without execfail → 127",
+    "slicc-kernel#176 on 1.26.6 (no #171): exec readlink /proc/self == $$; 3-level exec bash chain keeps one pid; sh -c exec in a pipeline stage and a subshell exec keep that process's pid"
   ]
 }

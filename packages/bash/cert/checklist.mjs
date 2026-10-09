@@ -3,6 +3,10 @@
  * ≥ 1.17.3: Module.sliccKernel.execve, and /proc/self for exec'd images
  * (#108). Older kernels give the exec'd image a pid of its own, so `exec`
  * changes $$ and these cases fail.
+ *
+ * slicc-kernel#176: run on 1.26.6, which has no #171 identity wait, so the
+ * pid is kept by the exec shim alone (Module.sliccKernel.execve). bash
+ * 5.3.0-7 (spawn + execWait shim) fails the chain and the nested cases.
  */
 const stat = (text) => {
   const m = /^(\d+) \((.*)\) (\S) (\d+) /.exec(text);
@@ -69,6 +73,32 @@ export default async function (ctx) {
   assert.equal(fail.status, 0, `execfail rc=${fail.status} stderr=${fail.stderr}`);
   assert.equal(fail.stdout, 'usr1-trapped\ncontinued\n');
   assert.match(fail.stderr, /nonexistent-hs99: (not found|No such file or directory)/);
+
+  // slicc-kernel#176: the image exec'd by bash reports bash's pid in /proc.
+  const rl = await sh('echo $$; exec readlink /proc/self');
+  assert.equal(rl.status, 0, `exec readlink stderr=${rl.stderr}`);
+  const [pid0, link0] = rl.stdout.trim().split('\n');
+  assert.equal(link0, pid0, `exec readlink /proc/self: ${JSON.stringify(rl.stdout)}`);
+
+  // A 3-level exec chain keeps one pid.
+  const chain = await sh(
+    'echo L1 $$; exec bash -c \'echo L2 $$; exec bash -c "echo L3 \\$\\$; exec readlink /proc/self"\'',
+  );
+  assert.equal(chain.status, 0, `exec chain stderr=${chain.stderr}`);
+  const levels = chain.stdout.trim().split('\n').map((l) => l.replace(/^L\d /, ''));
+  assert.equal(levels.length, 4, `exec chain: ${JSON.stringify(chain.stdout)}`);
+  assert.deepEqual(new Set(levels).size, 1, `exec chain changed the pid: ${JSON.stringify(chain.stdout)}`);
+
+  // Fork + exec: a pipeline stage that is `sh -c '…; exec …'` keeps the
+  // stage's pid, and a subshell's exec keeps the subshell's.
+  const piped = await sh('sh -c "echo inner=\\$\\$; exec readlink /proc/self" | cat');
+  assert.equal(piped.status, 0, `pipeline exec stderr=${piped.stderr}`);
+  const [, innerPid] = /^inner=(\d+)$/m.exec(piped.stdout) ?? [];
+  assert.match(piped.stdout, new RegExp(`^inner=${innerPid}\\n${innerPid}\\n$`), `pipeline exec: ${JSON.stringify(piped.stdout)}`);
+  const sub = await sh('( echo sub=$BASHPID; exec readlink /proc/self )');
+  assert.equal(sub.status, 0, `subshell exec stderr=${sub.stderr}`);
+  const [, subPid] = /^sub=(\d+)$/m.exec(sub.stdout) ?? [];
+  assert.equal(sub.stdout, `sub=${subPid}\n${subPid}\n`, `subshell exec: ${JSON.stringify(sub.stdout)}`);
 
   // Without execfail a failed exec ends bash with 127.
   const fatal = await sh('exec /nonexistent-hs99; echo unreachable');
