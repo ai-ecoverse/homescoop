@@ -12,6 +12,10 @@
  *   node scripts/sync-package-version.mjs which --assert-publishable
  *   node scripts/sync-package-version.mjs --assert-tarball .homescoop-out/package.tgz
  *
+ * --assert-tarball also refuses hard links and symlinks inside the tarball:
+ * `npm pack` keeps them, but the registry rejects the publish (E415 "Hard
+ * link is not allowed", seen with tic's terminfo aliases in ncurses-utils).
+ *
  * Prints the chosen npm version. With --write, updates package.json in place.
  */
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, mkdirSync } from 'node:fs';
@@ -19,6 +23,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
+import { gunzipSync } from 'node:zlib';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -68,6 +73,36 @@ function npmify(v) {
   return v;
 }
 
+/**
+ * Entries of a .tgz that are hard links (typeflag '1') or symlinks ('2'),
+ * read from the ustar headers so GNU tar and bsdtar listings don't matter.
+ * @param {string} tgz
+ */
+function linkEntries(tgz) {
+  const buf = gunzipSync(readFileSync(tgz));
+  const out = [];
+  let longName = '';
+  for (let off = 0; off + 512 <= buf.length; ) {
+    const header = buf.subarray(off, off + 512);
+    if (header.every((b) => b === 0)) break;
+    const str = (start, len) => header.subarray(start, start + len).toString('utf8').replace(/\0.*$/s, '');
+    const size = parseInt(str(124, 12).trim() || '0', 8) || 0;
+    const type = String.fromCharCode(header[156] || 48);
+    const prefix = str(345, 155);
+    const name = longName || (prefix ? `${prefix}/${str(0, 100)}` : str(0, 100));
+    const body = Math.ceil(size / 512) * 512;
+    if (type === 'L') {
+      longName = buf.subarray(off + 512, off + 512 + size).toString('utf8').replace(/\0.*$/s, '');
+    } else if (type !== 'x' && type !== 'g') {
+      longName = '';
+      if (type === '1') out.push(`hard link ${name} -> ${str(157, 100)}`);
+      if (type === '2') out.push(`symlink ${name} -> ${str(157, 100)}`);
+    }
+    off += 512 + body;
+  }
+  return out;
+}
+
 const assertTarballIdx = argv.indexOf('--assert-tarball');
 if (assertTarballIdx >= 0) {
   const tgz = argv[assertTarballIdx + 1];
@@ -87,6 +122,15 @@ if (assertTarballIdx >= 0) {
     }
     const pkg = JSON.parse(readFileSync(join(work, 'pkg/package/package.json'), 'utf8'));
     refuseUnpublishable(`tarball ${tgz}`, pkg.version);
+    const links = linkEntries(tgz);
+    if (links.length > 0) {
+      console.error(
+        `sync-package-version: ${tgz} has ${links.length} link entr${links.length === 1 ? 'y' : 'ies'}; ` +
+          'the npm registry rejects hard links and symlinks (E415). Make them regular files:',
+      );
+      for (const l of links.slice(0, 20)) console.error(`  ${l}`);
+      process.exit(1);
+    }
     console.log(pkg.version);
   } finally {
     rmSync(work, { recursive: true, force: true });

@@ -39,6 +39,8 @@ as the true upstream string.
 `host-run.sh` and `ladder-pr` validate the **packed** tarball with
 `sync-package-version.mjs --assert-tarball` so non-semver versions fail in
 CI before certification, not at publish.
+The same check refuses tarballs that contain hard links or symlinks: `npm pack`
+keeps them, but the registry rejects the publish (E415 "Hard link is not allowed").
 
 ## Cleaning up historical plain versions
 
