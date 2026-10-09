@@ -11,10 +11,75 @@
  *   Install the far end of the network: every request a program makes
  *   through the kernel's proxy (http and https alike) reaches `responder`.
  *   It runs in the page, so it must be self-contained (no closures).
+ * @property {(argv: string[], opts?: PtyOptions) => Promise<PtyResult>} pty
+ *   Run `argv` as the session leader of a real terminal (kernel.openTerminal)
+ *   and script it: each step waits for its `expect` regex in the output
+ *   since the previous match, then types `write`.
  * @property {{ errors: string[] }} page
+ */
+/**
+ * @typedef {object} PtyOptions
+ * @property {number} [cols] default 80
+ * @property {number} [rows] default 24
+ * @property {Record<string,string>} [env] TERM=xterm-256color is added by the kernel
+ * @property {string} [cwd] default /home
+ * @property {{expect?: string, flags?: string, write?: string, sleepMs?: number, timeoutMs?: number}[]} [steps]
+ * @property {number} [timeoutMs] wait for exit after the last step (default 15000), then hang up
+ */
+/**
+ * @typedef {object} PtyResult
+ * @property {number|null} status exit status, or null if it had to be hung up
+ * @property {string} out everything the terminal printed (escape sequences included)
+ * @property {object} [failedStep] the step whose `expect` never appeared
  */
 
 import assert from 'node:assert/strict';
+
+/**
+ * Drive a pty session. Self-contained: it is serialized into the page for
+ * the browser harness and called directly with a Node kernel.
+ * @param {{ openTerminal: Function }} kernel
+ * @param {string[]} argv
+ * @param {PtyOptions} [o]
+ * @returns {Promise<PtyResult>}
+ */
+export async function ptySession(kernel, argv, o = {}) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const dec = new TextDecoder();
+  let out = '';
+  let mark = 0;
+  const t = await kernel.openTerminal(argv, {
+    cols: o.cols ?? 80,
+    rows: o.rows ?? 24,
+    env: o.env ?? {},
+    cwd: o.cwd ?? '/home',
+  });
+  t.onData = (b) => {
+    out += dec.decode(b instanceof Uint8Array ? b : new Uint8Array(b), { stream: true });
+  };
+  for (const step of o.steps ?? []) {
+    if (step.expect) {
+      const re = new RegExp(step.expect, step.flags ?? '');
+      const until = Date.now() + (step.timeoutMs ?? 10000);
+      let m;
+      while (!(m = re.exec(out.slice(mark)))) {
+        if (Date.now() > until) {
+          t.close();
+          await sleep(50);
+          return { status: null, out, failedStep: step };
+        }
+        await sleep(20);
+      }
+      mark += m.index + m[0].length;
+    }
+    if (step.sleepMs) await sleep(step.sleepMs);
+    if (step.write !== undefined) t.write(step.write);
+  }
+  const status = await Promise.race([t.exited, sleep(o.timeoutMs ?? 15000).then(() => null)]);
+  if (status === null) t.close();
+  await sleep(50);
+  return { status, out };
+}
 
 /**
  * @param {object} page harness page
@@ -46,6 +111,14 @@ export function makeContext(page, meta) {
       await page.evaluate((src) => {
         window.certNet = new Function(`return (${src})`)();
       }, responder.toString());
+    },
+    async pty(argv, opts = {}) {
+      return page.evaluate(
+        (src, a, o) => new Function(`return (${src})`)()(window.kernel, a, o),
+        ptySession.toString(),
+        argv,
+        opts,
+      );
     },
     async read(path) {
       return page.evaluate((p) => window.opfs.read(p), path.replace(/^\//, ''));
