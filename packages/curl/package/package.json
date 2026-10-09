@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-curl",
-  "version": "8.22.0-3",
+  "version": "8.22.0-4",
   "description": "curl 8.22 + libcurl (Mbed TLS, zlib, HTTP/1.1) for wasm / slicc",
   "license": "curl",
   "repository": {

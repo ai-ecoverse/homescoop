@@ -43,6 +43,15 @@ export default async function (ctx) {
   const refused = await curl('http://peer.tail1234.ts.net:9090/');
   assert.equal(refused.status, 7, `refused rc=${refused.status} stderr=${refused.stderr}`);
 
+  // This machine's own name is loopback, answered by the shim without
+  // asking the uplink (#149): connection refused on :1, not a resolve error.
+  const self = (await run(['uname', '-n'])).stdout.trim();
+  assert.ok(self, 'uname -n printed nothing');
+  const own = await curl(`http://${self}:1/`);
+  assert.equal(own.status, 7, `${self}:1 rc=${own.status} stderr=${own.stderr}`);
+  assert.ok(!(await ctx.uplinkLog()).asked.some((a) => a.name.toLowerCase() === self.toLowerCase()),
+    `the uplink was asked for ${self}`);
+
   // localhost and the realm proxy path are unchanged.
   const local = await curl('http://localhost:1/');
   assert.equal(local.status, 7, `localhost:1 rc=${local.status} stderr=${local.stderr}`);
