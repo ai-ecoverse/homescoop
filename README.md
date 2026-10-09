@@ -89,6 +89,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-mount` | host | **1.0.0-1** (`mount` / `umount`; in-tree, needs slicc-kernel ≥ 1.17.0 process mounts) |
 | `@ai-ecoverse/wasm-tree` | host | **2.3.2-1** (`tree`; emcc on the plain Makefile sources) |
 | `@ai-ecoverse/wasm-util-linux` | host | **2.42.4-1** (`rev` / `column` / `getopt` / `hexdump` / `colrm` / `look`; no mount/libmount/libblkid) |
+| `@ai-ecoverse/wasm-qpdf` | host | **12.4.2-1** (`qpdf` / `fix-qdf` / `zlib-flate`; native crypto, zlib + libjpeg-turbo; replaces pdftk) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 
