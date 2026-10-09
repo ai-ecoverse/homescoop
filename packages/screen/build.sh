@@ -163,7 +163,7 @@ pkg = {
     },
     "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/screen",
     "keywords": ["wasm", "emscripten", "slicc", "homescoop", "screen", "pty"],
-    "files": ["README.md", "LICENSE", "bin", "PRESTAGE.md"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "PRESTAGE.md"],
     "publishConfig": {"access": "public", "tag": "next"},
     "homescoop": {"recipe": "screen", "upstream": ver, "pty": "emscripten+SLICC#3733"},
     "slicc": {
