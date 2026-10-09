@@ -1,0 +1,41 @@
+{
+  "name": "@ai-ecoverse/wasm-rsync",
+  "version": "3.4.4-1",
+  "description": "rsync 3.4.4 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/rsync/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/rsync",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "rsync"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "rsync",
+    "upstream": "3.4.4"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "rsync": {
+        "glue": "bin/rsync",
+        "wasm": "bin/rsync.wasm"
+      }
+    }
+  }
+}
