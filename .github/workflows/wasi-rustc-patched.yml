@@ -68,7 +68,7 @@ jobs:
           swap-storage: false
 
       - name: install rust + deps
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           # Repo root has no Cargo.toml; rust tree lives under rust/.
           cache: false
