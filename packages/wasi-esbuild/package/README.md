@@ -13,9 +13,11 @@ echo 'let x: number = 1' | esbuild --loader=ts
 `GOOS=js` build that needs Go's `wasm_exec.js` and a JavaScript host, which
 slicc-kernel does not run as a command.
 
-One patch (`0001-wasip1-outside-preopens.patch` in the recipe): slicc-kernel
-preopens the top-level directories but not `/`, so on wasip1 a directory no
-preopen covers reads as empty and module resolution walks past it.
+Unpatched. The command sets `"preopenRoot": true`, so slicc-kernel ≥ 1.30.0
+preopens `/` and module resolution can read every directory up to the root
+(`../` imports, `node_modules` and `tsconfig.json` lookups). On older kernels
+resolution above the working directory's top-level folder fails with
+`Bad file number`; 0.28.2-1 patched that instead.
 
 Certified: bundling and transforms, from files and from stdin. The JS plugin
 API needs a JavaScript host and is not available; `--serve` and `--watch` are

@@ -28,8 +28,7 @@ about:
   notes: |
     scripts/build-wasip1-go-command.sh builds cmd/esbuild from the pinned
     source with the pinned Go (GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0
-    -trimpath -buildvcs=false -ldflags='-s -w -buildid='). Patch 0001 makes
-    directories outside every WASI preopen ("/" on slicc-kernel) read as
-    empty, so module resolution walks past the root instead of failing.
-    Drop 0001 once slicc-kernel preopens "/" for WASI programs
-    (https://github.com/ai-ecoverse/slicc-kernel/issues/144).
+    -trimpath -buildvcs=false -ldflags='-s -w -buildid='), unpatched. The
+    command sets "preopenRoot": true (slicc-kernel >= 1.30.0, #144): "/" is
+    preopened, so module resolution can walk every directory up to the root.
+    (0.28.2-1 carried 0001-wasip1-outside-preopens.patch for that.)
