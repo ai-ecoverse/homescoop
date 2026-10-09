@@ -138,7 +138,7 @@ pkg = {
     },
     "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/nano",
     "keywords": ["wasm", "emscripten", "slicc", "homescoop", "nano", "editor"],
-    "files": ["README.md", "LICENSE", "bin", "PRESTAGE.md"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "PRESTAGE.md"],
     "publishConfig": {"access": "public"},
     "homescoop": {"recipe": "nano", "upstream": ver, "ncurses": "6.5"},
     "slicc": {
