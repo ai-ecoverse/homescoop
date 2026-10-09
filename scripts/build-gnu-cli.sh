@@ -35,8 +35,10 @@ homescoop_apply_patches "$SRC_DIR"
 # env/nice/nohup/#!/usr/bin/env all fail with "Exec format error".
 # Put the .a in LIBS (not LDFLAGS): gawk's link line carries LDFLAGS twice and
 # would duplicate whole-archive members.
-SLICC_A="$WORK/libslicc-cli.a"
-homescoop_slicc_archive "$SLICC_A" cli
+# HOMESCOOP_SLICC_PROFILE: clinet (cli + sockets) for gawk's /inet files.
+SLICC_PROFILE="${HOMESCOOP_SLICC_PROFILE:-cli}"
+SLICC_A="$WORK/libslicc-$SLICC_PROFILE.a"
+homescoop_slicc_archive "$SLICC_A" "$SLICC_PROFILE"
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags)"

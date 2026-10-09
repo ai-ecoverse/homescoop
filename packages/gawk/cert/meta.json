@@ -1,10 +1,20 @@
 {
   "harness": "slicc-kernel",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
+  "uplink": true,
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+  ],
   "checklist": [
     "system()",
     "getline from pipe",
-    "print | cmd"
+    "print | cmd",
+    "/inet/tcp via the socket shim (clinet): realm-proxy round trip on 127.0.0.1:3128, tailnet name via the uplink, Connection refused, Name does not resolve (cert/inet.mjs)"
   ],
   "patches": {
     "emscripten-no-fork-popen.patch": "system / getline pipe / print|cmd in cert/checklist.mjs (PIPES_SIMULATED + musl popen)"

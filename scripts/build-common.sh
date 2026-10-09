@@ -323,6 +323,18 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       ;;
+    clinet)
+      # cli + BSD sockets (slicc_socket.c): gawk's /inet special files.
+      _homescoop_slicc_compile "$dir/slicc_socket.c"
+      _homescoop_slicc_compile "$dir/slicc_spawn.c"
+      _homescoop_slicc_compile "$dir/slicc_exec.c"
+      _homescoop_slicc_compile "$dir/slicc_popen.c"
+      _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
+      _homescoop_slicc_compile "$dir/slicc_signals.c"
+      _homescoop_slicc_compile "$dir/slicc_select.c"
+      _homescoop_slicc_compile "$dir/slicc_jobs.c"
+      ;;
     net)
       # curl / git-remote-http: BSD sockets (slicc_socket) + select/poll +
       # spawn/exec for helpers. Link with whole-archive so socket syscalls win.
@@ -351,7 +363,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
       ;;
     *)
-      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|mount|less|cli|net|netfork)" >&2
+      echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|mount|less|cli|clinet|net|netfork)" >&2
       return 1
       ;;
   esac
