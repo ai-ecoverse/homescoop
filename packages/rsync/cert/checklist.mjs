@@ -108,6 +108,29 @@ export default async function (ctx) {
   assert.match(sum.stdout, /^>fc\.{8} f$/m);
   assert.equal((await ok('cat cd/f')).stdout, 'AAAA\n');
 
+  // Symlinks: relative, absolute, to a directory and dangling. Link times are
+  // never set (slicc-kernel#170: utimensat(AT_SYMLINK_NOFOLLOW) follows the
+  // link), so the targets keep their mtimes and a re-run has nothing to do.
+  await ok(
+    'mkdir -p ls/sub && echo t > ls/t.txt && echo s > ls/sub/f && ' +
+      'touch -d @1577934245 ls/t.txt ls/sub/f && touch -d @1620284889 ls/sub && ' +
+      'ln -s t.txt ls/rel && ln -s /home/rs/ls/t.txt ls/abs && ln -s sub ls/dl && ln -s nowhere ls/dang',
+  );
+  const targets = 'stat -c "%n %Y" ls/t.txt ls/sub ls/sub/f';
+  const before = (await ok(targets)).stdout;
+  const links = await ok('rsync -a -i ls/ ld/');
+  for (const line of ['cL+++++++++ abs -> /home/rs/ls/t.txt', 'cL+++++++++ dang -> nowhere', 'cL+++++++++ dl -> sub', 'cL+++++++++ rel -> t.txt']) {
+    assert.ok(lines(links.stdout).includes(line), `missing "${line}" in:\n${links.stdout}`);
+  }
+  const read = await ok('for l in rel abs dl dang; do echo "$l $(readlink ld/$l)"; done');
+  assert.equal(read.stdout, 'rel t.txt\nabs /home/rs/ls/t.txt\ndl sub\ndang nowhere\n');
+  assert.equal((await ok(targets)).stdout, before, 'rsync -a changed the link targets\' mtimes');
+  assert.equal((await ok('stat -c %Y ld/t.txt ld/sub')).stdout, '1577934245\n1620284889\n');
+  assert.equal((await ok('cat ld/rel ld/dl/f')).stdout, 't\ns\n');
+  const again = await ok('rsync -a -i ls/ ld/');
+  assert.equal(again.stdout, '', `re-run itemized:\n${again.stdout}`);
+  assert.equal((await ok(targets)).stdout, before);
+
   // A missing source: upstream's exit code 23 and message.
   const miss = await sh('rsync -a nosuch/ out/');
   assert.equal(miss.status, 23, `missing source rc=${miss.status} stderr=${miss.stderr}`);

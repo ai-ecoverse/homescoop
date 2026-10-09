@@ -21,6 +21,19 @@ so the Ctrl-C case had nothing left to interrupt (`rc=0`, not 20), and the
 `--bwlimit` case fails its ≥ 1.5 s bound. `slicc_rsync_select.c` maps
 `select()` to the shim's `pselect()`; with it both cases pass.
 
+## Without slicc-omit-link-times.patch
+
+The build without the patch (CI run 37961018566, tarball de55229b…) fails the
+symlink case on slicc-kernel 1.26.5: the kernel's
+`utimensat(AT_SYMLINK_NOFOLLOW)` follows the link (slicc-kernel#170).
+
+```
+rsync -a -i ls/ ld/: rc=23 stderr=rsync: [generator] failed to set times on "/home/rs/ld/dang": No such file or directory (44)
+rsync: [generator] failed to set times on "/home/rs/ld/dl": No such file or directory (44)
+rsync: [generator] failed to set times on "/home/rs/ld/rel": No such file or directory (44)
+rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1356) [sender=3.4.4]
+```
+
 ## Spec non-vacuous
 
 `cert/checklist.mjs` compares the exact `--itemize-changes` lines of a fresh

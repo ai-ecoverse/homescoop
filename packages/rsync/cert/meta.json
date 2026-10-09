@@ -1,7 +1,11 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.26.4",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils", "@ai-ecoverse/wasm-procps"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.5",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-procps"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
     "@ai-ecoverse/wasm-coreutils@9.12.0-4",
@@ -15,9 +19,12 @@
     "--delete removes extra files and dirs; -n/--dry-run lists 'deleting …' and '(DRY RUN)' and changes nothing",
     "--exclude='*.log' --exclude=logs/ skips them, and --delete keeps excluded files in the destination",
     "-c: same size and mtime, other bytes → skipped by the quick check, sent with -c (>fc........)",
+    "symlinks (relative, absolute, to a dir, dangling): rsync -a rc 0, links recreated (cL+++++++++, readlink equal), target mtimes untouched, re-run itemizes nothing",
     "missing source dir or file: rc 23 with change_dir / link_stat messages",
     "SIGINT mid-transfer (timeout -s INT on a --bwlimit copy): rc 20 'received SIGINT, SIGTERM, or SIGHUP', no rsync left in ps",
     "--bwlimit throttles (select() waits in the kernel)"
   ],
-  "patches": {}
+  "patches": {
+    "slicc-omit-link-times.patch": "checklist.mjs symlink case: without it rsync -a exits 23 ('failed to set times') and stamps link times onto targets (slicc-kernel#170)"
+  }
 }

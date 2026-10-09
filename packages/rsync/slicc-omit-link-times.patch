@@ -1,0 +1,27 @@
+--- a/rsync.h	2026-10-09 19:06:10.677042625 +0200
++++ b/rsync.h	2026-10-09 19:06:10.717346775 +0200
+@@ -427,7 +427,9 @@
+ #include <utime.h>
+ #endif
+ 
+-#if defined HAVE_UTIMENSAT || defined HAVE_LUTIMES || defined HAVE_SETATTRLIST
++/* slicc-kernel's utimensat(AT_SYMLINK_NOFOLLOW) follows the link
++ * (slicc-kernel#170): never set symlink times there. */
++#if (defined HAVE_UTIMENSAT || defined HAVE_LUTIMES || defined HAVE_SETATTRLIST) && !defined SLICC_OMIT_LINK_TIMES
+ #define CAN_SET_SYMLINK_TIMES 1
+ #endif
+ 
+--- a/options.c	2026-10-09 19:06:10.681450341 +0200
++++ b/options.c	2026-10-09 19:06:10.717811401 +0200
+@@ -65,7 +65,11 @@
+ int preserve_atimes = 0;
+ int preserve_crtimes = 0;
+ int omit_dir_times = 0;
++#ifdef SLICC_OMIT_LINK_TIMES
++int omit_link_times = 1; /* as if -J: see rsync.h, slicc-kernel#170 */
++#else
+ int omit_link_times = 0;
++#endif
+ int trust_sender = 0;
+ int update_only = 0;
+ int open_noatime = 0;

@@ -53,7 +53,7 @@ if [[ ! -f "$SRC/rsync.wasm" || -n "${FORCE:-}" ]]; then
       --disable-roll-simd --disable-md5-asm --disable-roll-asm
     homescoop_fix_darwin_ar Makefile
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
-      rsync CPPFLAGS="-Dselect=slicc_rsync_select" LDFLAGS="$CLI_LDFLAGS"
+      rsync CPPFLAGS="-Dselect=slicc_rsync_select -DSLICC_OMIT_LINK_TIMES" LDFLAGS="$CLI_LDFLAGS"
   )
 fi
 test -f "$SRC/rsync.wasm"
