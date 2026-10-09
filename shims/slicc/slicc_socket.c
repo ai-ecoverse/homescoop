@@ -17,11 +17,11 @@
  * it the link fails instead of select() never waiting).
  *
  * AF_INET (IPv4) and AF_UNIX, SOCK_STREAM only. getaddrinfo answers
- * localhost and numeric IPv4 itself, and asks the kernel's resolver
- * (Module.sliccKernel.net.resolve, slicc-kernel >= 1.27.0: /etc/hosts, then
- * the page's uplink such as Tailscale MagicDNS) for every other name, A
- * records only, since these sockets are IPv4. On older kernels other names
- * are EAI_NONAME, as before.
+ * localhost, the machine's own gethostname() and numeric IPv4 itself, and
+ * asks the kernel's resolver (Module.sliccKernel.net.resolve, slicc-kernel
+ * >= 1.27.0: /etc/hosts, then the page's uplink such as Tailscale MagicDNS)
+ * for every other name, A records only, since these sockets are IPv4. On
+ * older kernels other names are EAI_NONAME, as before.
  *
  * Link with --whole-archive (or as an object) so these win over libc's.
  */
@@ -38,6 +38,7 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 /* An address as it crosses to JavaScript: family 2 (inet: host-order ip, port) or 1 (unix: path). */
 struct slicc_addr {
@@ -375,8 +376,18 @@ static int is_localhost(const char *name) {
   size_t n = strlen(name);
   if (n && name[n - 1] == '.') n--; /* a fully qualified "localhost." */
   if (n == 9 && strncasecmp(name, "localhost", 9) == 0) return 1;
+  if (n == 21 && strncasecmp(name, "localhost.localdomain", 21) == 0) return 1;
   /* RFC 6761: every *.localhost name is loopback. */
-  return n > 10 && strncasecmp(name + n - 10, ".localhost", 10) == 0;
+  if (n > 10 && strncasecmp(name + n - 10, ".localhost", 10) == 0) return 1;
+  /* This machine's own name is loopback too, as /etc/hosts has it on Linux.
+   * Programs look it up for themselves (git's ident on every commit); asking
+   * the kernel would send it to the uplink (MagicDNS) and could stall. */
+  char self[256];
+  if (gethostname(self, sizeof self) != 0) return 0;
+  self[sizeof self - 1] = '\0';
+  size_t m = strlen(self);
+  if (m && self[m - 1] == '.') m--;
+  return m && m == n && strncasecmp(name, self, n) == 0;
 }
 
 static int service_port(const char *service, int flags, int *port) {

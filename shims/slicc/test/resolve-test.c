@@ -1,7 +1,7 @@
 /*
  * getaddrinfo through slicc_socket.c, as curl and git use it:
  *   resolve-test NAME [PORT [MESSAGE]]
- * prints every address, then (with PORT) connects to the first, sends
+ * (NAME --self: this machine's gethostname()) prints every address, then (with PORT) connects to the first, sends
  * MESSAGE, and prints what comes back until the peer closes.
  * Exit 2 when the name does not resolve (gai_strerror on stderr).
  */
@@ -16,6 +16,15 @@ int main(int argc, char **argv) {
   if (argc < 2) {
     fprintf(stderr, "usage: resolve-test NAME [PORT [MESSAGE]]\n");
     return 64;
+  }
+  char self[256];
+  if (strcmp(argv[1], "--self") == 0) {
+    if (gethostname(self, sizeof self) != 0) {
+      perror("resolve-test: gethostname");
+      return 3;
+    }
+    self[sizeof self - 1] = '\0';
+    argv[1] = self;
   }
   struct addrinfo hints = {.ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM}, *res, *ai;
   int r = getaddrinfo(argv[1], argc > 2 ? argv[2] : NULL, &hints, &res);
