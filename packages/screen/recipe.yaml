@@ -3,7 +3,7 @@ name: screen
 builder: host
 version: "5.0.1"
 npm: "@ai-ecoverse/wasm-screen"
-summary: "GNU screen 5.0.1 for slicc (emscripten; asyncify fork; next-only until PTY kernel lands)"
+summary: "GNU screen 5.0.1 for slicc (emscripten; asyncify fork; slicc-kernel pseudo-terminals)"
 source:
   url: "https://mirrors.kernel.org/gnu/screen/screen-{{version}}.tar.gz"
   sha256: "2dae36f4db379ffcd14b691596ba6ec18ac3a9e22bc47ac239789ab58409869d"
@@ -23,7 +23,9 @@ about:
     Emscripten only — WASIX cannot surface TIOCGPTN/TIOCSPTLCK/TIOCSCTTY.
     Uses musl posix_openpt/openpty + SLICC ioctl wrap (PR #3733).
     Default configure: --disable-socket-dir (sockets under $SCREENDIR or
-    $HOME/.screen); package sets SCREENDIR=/tmp/screens. screen -ls will
-    not list sockets via readdir until VFS shows AF_UNIX paths.
-    Publish to npm dist-tag `next` only until browser acceptance.
-    SLICC PR #3733 (pseudo-terminals) has merged — PTY ioctls available.
+    $HOME/.screen); package sets SCREENDIR=/tmp/screens; screen -ls lists
+    them. SLICC PR #3733 (pseudo-terminals) has merged — PTY ioctls available.
+    Reattach from a different terminal fails until slicc-kernel#192 (other
+    terminals' /dev/ttyN are not visible; no SCM_RIGHTS on kernel sockets);
+    cert/reattach.mjs measures it and flips to requiring the attach once the
+    attacher's tty is visible from the session.
