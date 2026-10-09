@@ -6,7 +6,7 @@ No patches. Not in `scripts/ci-certified.json`.
 ## Empty wasm
 
 With `bin/less.wasm` truncated to 0 bytes, the checklist fails at the first
-`less` (slicc-kernel 1.23.0, Node entry):
+`less` (slicc-kernel 1.23.0, Node entry; certified on 1.26.6):
 
 ```
 CompileError: WebAssembly.compile(): BufferSource argument is empty
@@ -17,7 +17,7 @@ CompileError: WebAssembly.compile(): BufferSource argument is empty
 `build.sh` with `--with-fallbacks=dumb` instead of
 `xterm-256color,xterm,vt100,dumb` (built locally, not committed): ncurses
 then has no terminfo for the kernel's `TERM=xterm-256color`, and the first
-pty case fails (slicc-kernel 1.23.0, Node entry):
+pty case fails (slicc-kernel 1.23.0, Node entry; certified on 1.26.6):
 
 ```
 -F -X status=null out="WARNING: terminal is not fully functional\r\nPress RETURN to continue "
