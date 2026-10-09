@@ -1,7 +1,10 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
     "@ai-ecoverse/wasm-coreutils@9.12.0-3"
@@ -12,7 +15,10 @@
     "getopt parses long options (--beta=x, --beta x, --alpha) and short ones; eval set -- loop in bash",
     "getopt -T → rc 4 (enhanced getopt); unknown long option → 'unrecognized option', rc 1",
     "hexdump -C prints offset, hex and |ascii|",
-    "colrm 2 3 removes columns; look PREFIX FILE finds sorted matches",
+    "colrm 2 3 removes columns; look PREFIX FILE finds sorted matches (look-read-fallback.patch: no mmap on slicc)",
     "rev / column on a missing file → 'No such file or directory', rc 1"
-  ]
+  ],
+  "patches": {
+    "look-read-fallback.patch": "look PREFIX FILE (slicc's filesystem has no mmap: ENODEV → read the file whole)"
+  }
 }

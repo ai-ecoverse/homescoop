@@ -1,0 +1,41 @@
+--- a/misc-utils/look.c
++++ b/misc-utils/look.c
+@@ -56,6 +56,7 @@
+ #include <string.h>
+ #include <ctype.h>
+ #include <getopt.h>
++#include <unistd.h>
+ 
+ #include "nls.h"
+ #include "xalloc.h"
+@@ -155,13 +156,23 @@
+ 		err(EXIT_FAILURE, "%s", file);
+ 	front = mmap(NULL, (size_t) sb.st_size, PROT_READ,
+ 		     MAP_SHARED, fd, (off_t) 0);
+-	if
+-#ifdef MAP_FAILED
+-		(front == MAP_FAILED)
+-#else
+-		((void *)(front) <= (void *)0)
+-#endif
+-			err(EXIT_FAILURE, "%s", file);
++	if (front == MAP_FAILED) {
++		/* No mmap on this filesystem (slicc: ENODEV): read it whole. */
++		size_t have = 0, want = (size_t) sb.st_size;
++		ssize_t n;
++
++		front = xmalloc(want ? want : 1);
++		while (have < want &&
++		       (n = read(fd, front + have, want - have)) != 0) {
++			if (n < 0) {
++				if (errno == EINTR)
++					continue;
++				err(EXIT_FAILURE, "%s", file);
++			}
++			have += (size_t) n;
++		}
++		sb.st_size = (off_t) have;
++	}
+ 	back = front + sb.st_size;
+ 	return look(front, back);
+ }
