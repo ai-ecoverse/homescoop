@@ -83,14 +83,14 @@ const certTransport = {
 // Tailnet for cert specs (cert/meta.json "uplink": true, slicc-kernel >=
 // 1.28.0): the kernel boots with an uplink routing 100.64.0.0/10, the range
 // a tailnet uses, and ctx.uplink({ names, peers }) decides what it answers.
-// Names map to address lists; a peer "ip:port" is { http: { status, body } }
+// Names map to address lists; a peer "ip:port" is { http: { status, headers, body } }
 // (records the request head, answers once and closes) or { error: 'ECONNREFUSED' }.
 // Until then every name is unknown and every dial refused.
 window.certUplinkLog = { asked: [], dialled: [], requests: [] };
 async function certUplink() {
   const { fakeUplink } = await import('/dist/testing.js');
   let fake = fakeUplink({});
-  const httpPeer = (addr, { status = 200, body = '' }) => (conn) => {
+  const httpPeer = (addr, { status = 200, headers = [], body = '' }) => (conn) => {
     void (async () => {
       let head = '';
       while (!head.includes('\r\n\r\n')) {
@@ -100,8 +100,9 @@ async function certUplink() {
       }
       window.certUplinkLog.requests.push({ peer: addr, head: head.split('\r\n\r\n')[0] });
       const bytes = new TextEncoder().encode(body);
+      const extra = headers.map(([k, v]) => `${k}: ${v}\r\n`).join('');
       conn.write(new TextEncoder().encode(
-        `HTTP/1.1 ${status} X\r\nContent-Length: ${bytes.length}\r\nConnection: close\r\n\r\n`,
+        `HTTP/1.1 ${status} X\r\n${extra}Content-Length: ${bytes.length}\r\nConnection: close\r\n\r\n`,
       ));
       conn.write(bytes);
       conn.end();

@@ -86,7 +86,7 @@ flag boot as before.
 await ctx.uplink({
   names: { 'peer.tail1234.ts.net': ['100.64.1.2'] },
   peers: {
-    '100.64.1.2:8080': { http: { status: 200, body: 'hi\n' } }, // one response, then close
+    '100.64.1.2:8080': { http: { status: 200, headers: [['Content-Type', 'text/plain']], body: 'hi\n' } }, // one response, then close
     '100.64.1.2:9090': { error: 'ECONNREFUSED' },
   },
 });

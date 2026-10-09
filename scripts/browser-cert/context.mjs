@@ -6,7 +6,7 @@
  * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array}) => Promise<{status:number,stdout:string,stderr:string}>} run
  * @property {(path: string, data: string|Uint8Array) => Promise<void>} write
  * @property {(path: string) => Promise<string|null>} read
- * @property {(cfg: {names?: Record<string,string[]>, peers?: Record<string, {http?: {status?: number, body?: string}, error?: string}>}) => Promise<void>} uplink
+ * @property {(cfg: {names?: Record<string,string[]>, peers?: Record<string, {http?: {status?: number, headers?: [string,string][], body?: string}, error?: string}>}) => Promise<void>} uplink
  *   (cert/meta.json "uplink": true) What the kernel's tailnet uplink answers: 100.64.0.0/10 routes to it.
  * @property {() => Promise<{asked: object[], dialled: object[], requests: object[]}>} uplinkLog
  * @property {typeof import('node:assert/strict')} assert
