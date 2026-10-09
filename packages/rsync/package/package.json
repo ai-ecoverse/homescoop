@@ -1,8 +1,11 @@
 {
   "name": "@ai-ecoverse/wasm-rsync",
-  "version": "3.4.4-1",
-  "description": "rsync 3.4.4 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair)",
+  "version": "3.4.4-2",
+  "description": "rsync 3.4.4 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair; slicc-kernel >= 1.29.2)",
   "license": "GPL-3.0-or-later",
+  "engines": {
+    "slicc-kernel": ">=1.29.2"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",

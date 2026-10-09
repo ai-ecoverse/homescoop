@@ -3,6 +3,24 @@
 **Date:** 2026-10-09
 New package, so it needs human cert first and is not in `scripts/ci-certified.json`.
 
+
+## 3.4.4-2 on slicc-kernel 1.29.0 (before the #170 fix)
+
+3.4.4-2 sets link times as upstream does. On a kernel whose
+`utimensat(AT_SYMLINK_NOFOLLOW)` still follows the link, that stamps the
+target, here the SOURCE file behind an absolute link (`ls/abs ->
+/home/ls/t.txt`), Node entry 1.29.0:
+
+```text
+rsync -a -i ls/ ld/ → rc 23
+ls/t.txt 1791584599        (was 1577934245: the source was modified)
+rsync: [generator] failed to set times on "/home/ld/rel": No such file or directory (44)
+```
+
+The checklist fails on 1.29.0 even earlier, at its `touch -h` setup. On
+1.30.0 (fix shipped in 1.29.2) every case passes. So the kernel fix is what
+makes 3.4.4-2 safe, hence `engines` `slicc-kernel >=1.29.2`.
+
 ## Empty wasm
 
 With `bin/rsync.wasm` truncated to 0 bytes, the checklist fails at the first

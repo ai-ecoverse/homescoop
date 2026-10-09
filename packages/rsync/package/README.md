@@ -18,9 +18,16 @@ Built without OpenSSL, xxhash, zstd, lz4, iconv, ACLs or xattrs (bundled zlib
 and popt). Error messages print Emscripten's errno numbers (`No such file or
 directory (44)` where Linux prints `(2)`).
 
-Symlinks are copied, but their own mtimes aren't preserved (rsync behaves as
-if `-J`/`--omit-link-times` were given) until slicc-kernel#170 is fixed:
-the kernel's `utimensat(AT_SYMLINK_NOFOLLOW)` follows the link. For the same
-reason `--no-omit-link-times`/`--no-J` is refused.
+**3.4.4-2 requires slicc-kernel ≥ 1.29.2.** `-a` preserves symlinks' own
+mtimes, as upstream rsync does, through `utimensat(AT_SYMLINK_NOFOLLOW)`.
+Older kernels followed the link there (slicc-kernel#170) and stamped the
+link's mtime onto its target, even a file in the source tree; stay on
+3.4.4-1 below 1.29.2, which never sets link times (`-J`).
 
-Certified on `@ai-ecoverse/slicc-kernel` 1.26.5.
+On a hostfs folder (a folder of the user's machine mounted through
+slicc-node), the host cannot set a symlink's own time, and on a macOS host
+not its mode either. rsync still copies files, links and link targets
+correctly (targets keep their times), but it warns (`failed to set times on
+…: Not supported`, on re-runs also `failed to set permissions`) and exits 23.
+
+Certified on `@ai-ecoverse/slicc-kernel` 1.30.0.
