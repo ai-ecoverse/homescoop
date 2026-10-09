@@ -59,6 +59,14 @@ if (!pkgLic) {
 if (!existsSync(licPath) || statSync(licPath).size < 32) {
   errors.push('package/LICENSE missing or too small (stage upstream COPYING/LICENSE)');
 }
+// homescoop's own Apache-2.0 text is not an upstream licence (#123).
+const rootLic = join(root, 'LICENSE');
+if (
+  existsSync(licPath) && existsSync(rootLic) && !/\bApache-2\.0\b/.test(recipeLic) &&
+  readFileSync(licPath, 'utf8') === readFileSync(rootLic, 'utf8')
+) {
+  errors.push(`package/LICENSE is homescoop's Apache-2.0 text, not the ${recipeLic} upstream licence`);
+}
 const files = pkg.files;
 if (!Array.isArray(files) || !files.includes('LICENSE')) {
   errors.push('package.json files[] must include "LICENSE"');

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-imagemagick",
-  "version": "7.1.2-32-2",
+  "version": "7.1.2-32-3",
   "description": "ImageMagick 7.1.2-32 magick CLI for wasm / slicc (emscripten)",
   "license": "ImageMagick",
   "repository": {
@@ -21,6 +21,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin",
     "etc"
   ],
