@@ -27,3 +27,15 @@ PYTHONPATH=<dir>/lib/python3.14/site-packages python -c "import six"
 ```
 
 On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) until openssl/`_ssl` is enabled.
+
+## Virtual environments (3.14.2-10)
+
+```text
+python -m venv v && v/bin/pip install requests && v/bin/python -c "import requests"
+```
+
+`lib/python3.14/sitecustomize.py` sets `sys.executable` from PATH (WASI
+`stat()` has no permission bits, so CPython cannot find itself), and the
+venv's `bin/python` is recognised when the kernel passes its path as
+`argv[0]` (slicc-kernel#168). A `sitecustomize` of your own still runs.
+3.14.2-10 is 3.14.2-9's files plus `sitecustomize.py`.
