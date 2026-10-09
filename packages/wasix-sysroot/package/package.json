@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-sysroot",
-  "version": "2025.9.30-15",
-  "description": "WASIX sysroots: st_uid/st_gid=1000 (slicc identity), F_SETFD CLOEXEC fix, wasip1, clang24 exnref",
+  "version": "2025.9.30-16",
+  "description": "WASIX sysroots: st_uid/st_gid=1000 (slicc identity), file modes via slicc_fs, F_SETFD CLOEXEC fix, wasip1, clang24 exnref",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
     "type": "git",

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-15 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-16 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
-# and fstatat.o), which is all -15 adds (d292a32). The full rebuild in
+# and fstatat.o; -15, d292a32) and slicc_fs file modes (-16, homescoop#169):
+# patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
+# The full rebuild in
 # build.sh (stage ~/.wasixcc, rebuild the libc++ runtimes) stays local:
 # HOMESCOOP_WASIX_SYSROOT_FULL=1.
 set -euo pipefail
@@ -72,6 +74,52 @@ for v in "${VARIANTS[@]}"; do
     echo "homescoop: $lib still has fstat.o/fstatat.o" >&2
     exit 1
   fi
+  echo "  $v ($flavour)"
+done
+
+# -16: file modes through the kernel's slicc_fs imports (slicc-kernel#197).
+# Upstream v2025-09-02.1 sources with chmod/fchmod/fchmodat/umask and
+# create modes added; see patches/README.md. Same target features as the
+# shipped posix.o (no simd), so the objects stay link-compatible.
+echo "== wasix-sysroot: compile slicc_fs posix.c / at_fdcwd.c"
+FS_OBJ="$WORK/slicc-fs"
+rm -rf "$FS_OBJ" && mkdir -p "$FS_OBJ/static" "$FS_OBJ/pic"
+compile_fs() {
+  local src=$1 out=$2; shift 2
+  "$CLANG" --target=wasm32-wasip1 --sysroot="$PKG/sysroot" -resource-dir="$RES" \
+    -I"$PKG/sysroot/include" \
+    -matomics -mbulk-memory -mmutable-globals -pthread \
+    -fno-trapping-math -ftls-model=local-exec -O2 \
+    "$@" -c "$HOMESCOOP_PKG/patches/$src.c" -o "$out"
+  test -s "$out"
+}
+for src in posix at_fdcwd; do
+  compile_fs "$src" "$FS_OBJ/static/$src.o"
+  compile_fs "$src" "$FS_OBJ/pic/$src.o" -fPIC -fvisibility=default
+done
+LLVM_NM="$WASIXCC_LLVM_LOCATION/bin/llvm-nm"
+defined() { "$LLVM_NM" --defined-only -j "$1" | sort -u; }
+
+echo "== wasix-sysroot: replace posix.o and at_fdcwd.o in every libc.a"
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$WORK/slicc-fs/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" posix.o at_fdcwd.o)
+  for src in posix at_fdcwd; do
+    # The patched file must define everything the shipped object did: a
+    # mismatch means the base libc is not v2025-09-02.1.
+    missing="$(comm -23 <(defined "$old/$src.o") <(defined "$FS_OBJ/$flavour/$src.o"))"
+    if [[ -n "$missing" ]]; then
+      echo "homescoop: $v $src.o: patched source lacks: $missing" >&2
+      exit 1
+    fi
+  done
+  "$LLVM_AR" r "$lib" "$FS_OBJ/$flavour/posix.o" "$FS_OBJ/$flavour/at_fdcwd.o"
+  undef="$("$LLVM_NM" -u "$lib" 2>/dev/null)"
+  grep -q __slicc_fs_fd_chmod <<<"$undef" || { echo "homescoop: $lib lacks slicc_fs imports" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
 

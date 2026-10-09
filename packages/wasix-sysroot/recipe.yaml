@@ -17,9 +17,10 @@ about:
   license: Apache-2.0 WITH LLVM-exception
   notes: |
     Package root is the SYSROOT_PREFIX (five variants). No commands —
-    consumed by wasm-clang drivers / wasixcc. CI builds 2025.9.30-15 with
+    consumed by wasm-clang drivers / wasixcc. CI builds 2025.9.30-16 with
     build-incremental.sh: the published -14 tarball byte for byte plus
-    slicc_stat_owner.o in every libc.a (replacing fstat.o/fstatat.o), using
-    the pinned install-wasixcc toolchain. The full rebuild (stage a local
+    slicc_stat_owner.o in every libc.a (replacing fstat.o/fstatat.o) and
+    patched posix.o/at_fdcwd.o (file modes via the kernel's slicc_fs
+    imports, homescoop#169), using the pinned install-wasixcc toolchain. The full rebuild (stage a local
     ~/.wasixcc, rebuild the libc++ runtimes) is build.sh with
     HOMESCOOP_WASIX_SYSROOT_FULL=1.
