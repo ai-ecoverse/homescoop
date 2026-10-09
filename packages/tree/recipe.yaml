@@ -1,0 +1,21 @@
+# Steve Baker's tree for slicc wasm realm (host ladder).
+name: tree
+builder: host
+# renovate: datasource=gitlab-tags depName=OldManProgrammer/unix-tree
+version: "2.3.2"
+npm: "@ai-ecoverse/wasm-tree"
+summary: "tree (recursive directory listing) for slicc"
+source:
+  url: "https://oldmanprogrammer.net/tar/tree/tree-{{version}}.tgz"
+  sha256: "6b941dd6cbecfb4d3250700e4d08d8e0c251488981dd4868b90d744234300e21"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/tree
+  license: GPL-2.0-or-later
+  notes: |
+    Plain Makefile C program; build.sh compiles the sources with emcc
+    directly and links the slicc gaps profile. Replaces slicc 6's just-bash
+    tree built-in (homescoop#92). New package → human cert.
