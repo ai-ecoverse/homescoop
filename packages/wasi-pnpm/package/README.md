@@ -44,3 +44,28 @@ available!" check is a registry request with no use in slicc, where the
 package, not pnpm itself, decides the version. As with every package env value,
 a caller's own environment wins: `PNPM_CONFIG_UPDATE_NOTIFIER=true` brings the
 check back.
+
+## `npm`, `npx` and `i`
+
+The package also provides `npm`, `npx` and `i` as small `#!/bin/sh` scripts
+(`shims/`, slicc-kernel `script` commands; `/bin/sh` is `@ai-ecoverse/wasm-bash`)
+that run pnpm, so the commands agents type every day work:
+
+| Typed | Runs |
+| --- | --- |
+| `npm install` / `npm i` / `i` | `pnpm install` |
+| `npm install <pkg…>` / `npm i <pkg…>` / `i <pkg…>` (`-g`, `-D`, `-O`, `-E`, `-P`) | `pnpm add <pkg…>` with the same flags |
+| `npm ci` | `pnpm install --frozen-lockfile` |
+| `npm uninstall` / `rm` / `remove` `<pkg…>` | `pnpm remove <pkg…>` |
+| `npm run <script> [-- args]`, `npm test` / `start` / `stop` / `restart` | `pnpm run <script> [args]` |
+| `npm update` / `ls` / `why` / `explain` | `pnpm update` / `list` / `why` |
+| any other `npm <verb>` | `pnpm <verb>` |
+| `npx <command> [args]` | the installed command; a command that is not installed is an error naming what to install (`npm i -g <pkg>`), nothing is downloaded on the fly |
+
+`pnpm run` (and so `npm run`, `npm test`, `npm start`) runs package scripts
+through the kernel's `sh` (`host/pnpm-host.mjs` answers pnpm's `shell.spawn`);
+install-time lifecycle scripts stay off (`ignore-scripts=true`).
+
+`npm -v` and `npx -v` print pnpm's version, with a one-line note on stderr
+that this is pnpm. `npm install --no-save` is refused (pnpm has no
+equivalent), as is `npm install -g` without a package name.

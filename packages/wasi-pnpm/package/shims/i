@@ -1,0 +1,3 @@
+#!/bin/sh
+# i for slicc: npm install (homescoop#89).
+exec "${0%/*}/npm" install "$@"

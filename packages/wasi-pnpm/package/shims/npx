@@ -1,0 +1,46 @@
+#!/bin/sh
+# npx for slicc (homescoop#89): runs an installed command. Nothing is
+# downloaded on the fly: a command that is not installed is an error that
+# says what to install. Only -v/--version mentions that this is pnpm.
+pkg=
+while [ $# -gt 0 ]; do
+  case $1 in
+    -v|--version)
+      echo "npx → pnpm: npx here runs installed commands for @ai-ecoverse/wasi-pnpm" >&2
+      exec pnpm --version
+      ;;
+    -y|--yes|--no-install|--no) shift ;;
+    -p|--package)
+      pkg=${2-}
+      shift 2 || shift
+      ;;
+    --package=*)
+      pkg=${1#--package=}
+      shift
+      ;;
+    -c|--call)
+      shift
+      exec sh -c "${1-}"
+      ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+if [ $# -eq 0 ]; then
+  echo "npx: name a command to run" >&2
+  exit 1
+fi
+cmd=$1
+shift
+# npx pkg@1.2.3 or npx @scope/pkg: the command is the bare name.
+name=${cmd##*/}
+case $name in
+  ?*@*) name=${name%@*} ;;
+esac
+for try in "$cmd" "$name"; do
+  if command -v "$try" >/dev/null 2>&1; then
+    exec "$try" "$@"
+  fi
+done
+echo "npx: '$name' is not installed; run 'npm i -g ${pkg:-$cmd}' (pnpm add -g) first" >&2
+exit 127

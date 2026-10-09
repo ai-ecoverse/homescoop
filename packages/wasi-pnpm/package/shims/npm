@@ -1,0 +1,82 @@
+#!/bin/sh
+# npm for slicc: npm's everyday verbs mapped onto wasi-pnpm (homescoop#89).
+# Verbs that differ are translated (npm install <pkg> is pnpm add); anything
+# else goes to pnpm unchanged. Only -v/--version mentions that this is pnpm.
+here=${0%/*}
+
+note() {
+  echo "npm → pnpm: npm here is pnpm from @ai-ecoverse/wasi-pnpm" >&2
+}
+
+# npm install [flags] [pkg...] → pnpm install (no packages) / pnpm add.
+# Flags npm has and pnpm doesn't need are dropped; the rest pass through.
+install() {
+  global=
+  pkgs=0
+  value=
+  for arg in "$@"; do
+    shift
+    if [ -n "$value" ]; then
+      value=
+      set -- "$@" "$arg"
+      continue
+    fi
+    case $arg in
+      -g|--global) global=1; set -- "$@" "$arg" ;;
+      --no-save)
+        echo "npm: --no-save has no pnpm equivalent; use pnpm add/remove explicitly" >&2
+        exit 1
+        ;;
+      -S|--save|--no-audit|--no-fund|--legacy-peer-deps|--no-package-lock) ;;
+      --production|--omit=dev) set -- "$@" --prod ;;
+      --registry|--tag|--filter|-w|--workspace|--dir|-C) value=1; set -- "$@" "$arg" ;;
+      -*) set -- "$@" "$arg" ;;
+      *) pkgs=$((pkgs + 1)); set -- "$@" "$arg" ;;
+    esac
+  done
+  if [ "$pkgs" -gt 0 ]; then
+    exec pnpm add "$@"
+  fi
+  if [ -n "$global" ]; then
+    echo "npm: npm install -g needs a package name" >&2
+    exit 1
+  fi
+  exec pnpm install "$@"
+}
+
+# Drop a leading "--" (npm run x -- args); pnpm passes arguments through.
+script() {
+  name=$1
+  shift
+  if [ "${1-}" = "--" ]; then shift; fi
+  exec pnpm run "$name" "$@"
+}
+
+if [ $# -eq 0 ]; then
+  exec pnpm --help
+fi
+verb=$1
+shift
+case $verb in
+  -v|--version) note; exec pnpm --version ;;
+  help|-h|--help|-help) exec pnpm --help ;;
+  install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add) install "$@" ;;
+  ci|clean-install|ic|install-clean|isntall-clean) exec pnpm install --frozen-lockfile "$@" ;;
+  uninstall|unlink|un|remove|rm|r) exec pnpm remove "$@" ;;
+  run|run-script|rum|urn)
+    if [ $# -eq 0 ]; then exec pnpm run; fi
+    script "$@"
+    ;;
+  test|tst|t) script test "$@" ;;
+  start) script start "$@" ;;
+  stop) script stop "$@" ;;
+  restart) script restart "$@" ;;
+  update|up|upgrade|udpate) exec pnpm update "$@" ;;
+  ls|list|la|ll) exec pnpm list "$@" ;;
+  explain|why) exec pnpm why "$@" ;;
+  exec|x)
+    if [ "${1-}" = "--" ]; then shift; fi
+    exec "$here/npx" "$@"
+    ;;
+  *) exec pnpm "$verb" "$@" ;;
+esac
