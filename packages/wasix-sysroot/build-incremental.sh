@@ -9,19 +9,19 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/wasix-sysroot"
-PKG="$HOMESCOOP_PKG/package"
 VARIANTS=(sysroot sysroot-eh sysroot-ehpic sysroot-exnref-eh sysroot-exnref-ehpic)
 PIC_VARIANTS=" sysroot-ehpic sysroot-exnref-ehpic "
 
-BASE_VER="2025.9.30-14"
-BASE_SHA="1a88c9f1b12b0bffaf6502914abc4f1b40443ddccbfa84d8bbc44fc86a0e652e"
-BASE_TGZ="$WORK/wasix-sysroot-$BASE_VER.tgz"
-homescoop_fetch "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-$BASE_VER.tgz" \
-  "$BASE_SHA" "$BASE_TGZ"
+# recipe.yaml source: the published -14 tarball, sha256-pinned.
+homescoop_load_recipe wasix-sysroot
+BASE_TGZ="$WORK/$(basename "$SRC_URL")"
+BASE_VER="$(basename "$SRC_URL" .tgz)"
+BASE_VER="${BASE_VER#wasix-sysroot-}"
+homescoop_fetch "$SRC_URL" "$SRC_SHA" "$BASE_TGZ"
 
 # Pinned WASIX toolchain (clang 21 + llvm-ar), in WORK so a developer's
 # ~/.wasixcc is neither used nor touched.
+PKG="$HOMESCOOP_PKG/package"
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
 CLANG="$WASIXCC_LLVM_LOCATION/bin/clang"
 LLVM_AR="$WASIXCC_LLVM_LOCATION/bin/llvm-ar"

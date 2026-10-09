@@ -4,9 +4,10 @@ builder: host
 version: "2025.9.30"
 npm: "@ai-ecoverse/wasix-sysroot"
 summary: "WASIX libc/libcxx/compiler-rt sysroots for wasm32-wasi"
+# CI base: the published -14 (build-incremental.sh adds slicc_stat_owner).
 source:
-  url: "https://github.com/wasix-org/wasix-libc"
-  sha256: "skip"
+  url: "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-2025.9.30-14.tgz"
+  sha256: "1a88c9f1b12b0bffaf6502914abc4f1b40443ddccbfa84d8bbc44fc86a0e652e"
 dependencies:
   build: []
   host: []
