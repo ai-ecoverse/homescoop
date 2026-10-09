@@ -2,31 +2,33 @@
 
 [buf](https://buf.build) 1.73, the Protocol Buffers CLI, as a WASI preview1
 command for SLICC: `buf`. Its offline commands run on `@ai-ecoverse/slicc-kernel`
-≥ 1.8.0 and in SLICC's wasm realm. On slicc-kernel, `host/buf-host.mjs` (loaded through
+≥ 1.30.0, which preopens `/` for it (`"preopenRoot": true`). On slicc-kernel, `host/buf-host.mjs` (loaded through
 `slicc.commands.buf.imports`) also lets it start commands and send HTTP requests:
 local protoc plugins, git inputs, HTTP inputs and the Buf Schema Registry.
 
 `bin/buf.wasm` is built by homescoop from buf's source (v1.73.0, commit
 `8b7368b`) with Go 1.26.7 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 -trimpath`)
-and five documented patches, so it is not an upstream buf release:
+and four documented patches, so it is not an upstream buf release:
 
 - `0001`: buf's and two modules' Unix-only files also build for wasip1.
 - `0002`: `buf format -d`/`-w` print unified diffs in-process; upstream runs
   the `diff` binary, and wasip1 cannot start processes.
 - `0003`: the Docker engine client is left out; only `buf beta registry plugin
   push` uses it, and it needs a Docker daemon.
-- `0004`: buf's search for a workspace (`buf.yaml`, `buf.work.yaml`) walks up
-  to `/`, which the WASI runtimes do not preopen; a path no preopen covers now
-  ends the search.
 - `0005`: starting commands, HTTP requests and buf's cache file locks go
   through the host module's `buf_host` imports. Where the host module is
   missing, those features report that this runtime cannot provide them.
+
+buf's search for a workspace (`buf.yaml`, `buf.work.yaml`) walks up to `/`.
+The `buf` command sets `"preopenRoot": true`, so slicc-kernel ≥ 1.30.0
+preopens `/` for it; 1.73.0-1 patched the walk instead (`0004`). Runtimes
+without `/` preopened fail module commands with `stat /: Bad file number`.
 
 Apache-2.0; see `LICENSE` and `THIRD-PARTY-NOTICES.md`.
 
 ## What works
 
-Everywhere (slicc-kernel and SLICC's realm), everything that only reads and
+Everywhere `/` is preopened (slicc-kernel ≥ 1.30.0), everything that only reads and
 writes local files:
 
 - `buf build` (`-o image.binpb`, `--as-file-descriptor-set`), `buf export`,

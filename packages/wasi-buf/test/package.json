@@ -6,7 +6,7 @@
     "test:e2e": "node --test 'e2e/*.test.mjs'"
   },
   "devDependencies": {
-    "@ai-ecoverse/slicc-kernel": "1.8.0",
+    "@ai-ecoverse/slicc-kernel": "1.30.0",
     "@ai-ecoverse/wasm-git": "2.55.0-8"
   }
 }
