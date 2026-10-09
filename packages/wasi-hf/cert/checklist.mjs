@@ -336,6 +336,7 @@ export default async function (ctx) {
   const login = await ok(['hf', 'auth', 'login', '--token', 'hf_good']);
   assert.match(login.stderr, /logged in as cert-user/);
   assert.equal((await ok(['cat', TOKEN])).stdout, 'hf_good\n');
+  assert.equal((await ok(['stat', '-c', '%a', TOKEN])).stdout, '600\n', 'the token file is not private');
   assert.equal((await ok(['hf', 'auth', 'whoami'])).stdout, 'cert-user\norgs: cert-org\n');
   const envWins = await go(['hf', 'auth', 'whoami'], { ...HUB, HF_TOKEN: 'hf_bad' });
   assert.equal(envWins.status, 1, `HF_TOKEN should take precedence: ${out(envWins)}`);
@@ -345,8 +346,11 @@ export default async function (ctx) {
   l = await log();
   assert.ok(l.filter((x) => x.host === 'hub.test').every((x) => x.auth === 'Bearer hf_good'), 'Hub requests without the token');
   assert.ok(l.some((x) => x.host === 'cdn.test') && l.filter((x) => x.host === 'cdn.test').every((x) => !x.auth), 'the token reached the CDN');
+  // A token file left world-readable is made private when it is replaced.
+  await sh('mkdir -p /home/hfh && echo hf_old > /home/hfh/token && chmod 644 /home/hfh/token');
   await ok(['hf', 'auth', 'login'], { ...HUB, HF_HOME: '/home/hfh' }, 'hf_good\n');
   assert.equal((await ok(['cat', '/home/hfh/token'])).stdout, 'hf_good\n');
+  assert.equal((await ok(['stat', '-c', '%a', '/home/hfh/token'])).stdout, '600\n', 'a replaced token file kept mode 644');
   await ok(['hf', 'auth', 'logout']);
   assert.equal((await go(['test', '-e', TOKEN])).status, 1, 'logout left the token');
   const viaEnv = await ok(['hf', 'download', 'cert/gated', '--to', '/home/gated-env'], { ...HUB, HF_TOKEN: 'hf_good' });

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-hf",
-  "version": "0.1.0-1",
+  "version": "0.1.0-2",
   "description": "hf download and hf auth for slicc WASI: Hugging Face Hub downloads with Range resume and sha256 checks (not huggingface_hub's CLI)",
   "license": "Apache-2.0",
   "repository": {
@@ -21,7 +21,8 @@
     "README.md",
     "LICENSE",
     "THIRD-PARTY-NOTICES.md",
-    "bin"
+    "bin",
+    "host"
   ],
   "publishConfig": {
     "access": "public"
@@ -34,7 +35,8 @@
     "abi": "wasi",
     "commands": {
       "hf": {
-        "wasm": "bin/hf.wasm"
+        "wasm": "bin/hf.wasm",
+        "imports": "host/hf-host.mjs"
       }
     }
   }

@@ -1,9 +1,9 @@
 # Negative proof (wasi-hf)
 
-**Date:** 2026-10-09 (0.1.0-1)
+**Date:** 2026-10-09 (0.1.0-1; 0.1.0-2 adds the token file mode)
 New package, so it needs human cert first and is not in `scripts/ci-certified.json`.
 
-`cert/checklist.mjs` was run on slicc-kernel 1.29.2's Node entry, with the
+`cert/checklist.mjs` was run on slicc-kernel 1.29.2's Node entry (1.30.0 for 0.1.0-2), with the
 same transport traits and 16 KiB chunks as `scripts/browser-cert/page/page.js`.
 The good build passes in about 2.5 s. Each build below was the good source with one
 change, built with the same toolchain (Rust 1.98.1, wasm32-wasip1-threads).
@@ -46,4 +46,15 @@ relative `--to` lands at the root:
 AssertionError: relative --to is not under the cwd
 + '/out-follow\n'
 - '/home/proj/out-follow\n'
+```
+
+## Token file not private (0.1.0-2)
+
+With `slicc.commands.hf.imports` removed from package.json, the kernel
+answers `hf_host.chmod` with ENOSYS. hf warns, and the file keeps the
+default mode:
+
+```text
+AssertionError: the token file is not private
+'644\n' !== '600\n'
 ```
