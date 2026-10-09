@@ -107,4 +107,7 @@ fi
 test -f "$LESS_SRC/less" || test -f "$LESS_SRC/less.js"
 homescoop_stage_cli "$LESS_SRC" less
 homescoop_stage_license "$LESS_SRC"/LICENSE "$LESS_SRC"/COPYING "$LESS_SRC"/LICENSE.LESS
+homescoop_notices_begin "less.wasm statically links the following."
+homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
+homescoop_notice_emscripten
 echo "== less: staged → $HOMESCOOP_PKG/package"
