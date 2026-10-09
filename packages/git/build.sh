@@ -235,4 +235,14 @@ then
 fi
 
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
+homescoop_notices_begin "The git wasm modules statically link the following."
+homescoop_notice "curl / libcurl 8.22.0 (@ai-ecoverse/wasm-curl)" \
+  https://raw.githubusercontent.com/curl/curl/curl-8_22_0/COPYING 82f2f4427d6545ee5aaac4f0b80428da6cc8ba41c2cf5da3a03680ec327b9681
+homescoop_notice "Mbed TLS 3.6.5 (via @ai-ecoverse/wasm-curl; with Everest and p256-m)" \
+  https://raw.githubusercontent.com/Mbed-TLS/mbedtls/mbedtls-3.6.5/LICENSE 9b405ef4c89342f5eae1dd828882f931747f71001cfba7d114801039b52ad09b \
+  https://raw.githubusercontent.com/Mbed-TLS/mbedtls/mbedtls-3.6.5/3rdparty/everest/README.md 96a16739f1453480c84b1c787f0d48ea15c1d307af0a2e9baea4d98b0f1d83f2 \
+  https://raw.githubusercontent.com/Mbed-TLS/mbedtls/mbedtls-3.6.5/3rdparty/p256-m/README.md 9708f7be7a7775254eacf8d7b3b2961e0905d203bda67c8be95e61c471664e39
+homescoop_notice "zlib 1.3.1 (emscripten port via -sUSE_ZLIB; same release as @ai-ecoverse/wasm-zlib)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+homescoop_notice_emscripten
 echo "== git: staged → $HOMESCOOP_PKG/package"
