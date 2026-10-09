@@ -11,6 +11,9 @@ not.
   (rustls, ring) are left out of the wasi dependency graph.
 - main: wasi-libc starts every program in "/"; on WASI the working
   directory is taken from PWD, which the runtime sets.
+- biome_fs: std::env::temp_dir() panics on WASI ("not supported by WASI
+  yet") and ensure_cache_dir() falls back to it, since there is no
+  platform cache directory; on WASI it takes TMPDIR, or /tmp.
 
 Built with RUSTFLAGS=--cfg tokio_unstable (tokio refuses io-std, net and
 rt-multi-thread on wasm without it). Other platforms are unchanged.
@@ -154,3 +157,42 @@ diff --git a/crates/biome_cli/src/service/wasi.rs b/crates/biome_cli/src/service
 +pub(crate) async fn run_daemon(_factory: ServerFactory) -> io::Result<Infallible> {
 +    Err(unsupported())
 +}
+diff --git a/crates/biome_fs/src/utils.rs b/crates/biome_fs/src/utils.rs
+--- a/crates/biome_fs/src/utils.rs
++++ b/crates/biome_fs/src/utils.rs
+@@ -22,7 +22,7 @@
+         // Mac: /Users/Alice/Library/Caches/dev.biomejs.biome
+         let cache_dir = proj_dirs.cache_dir().to_path_buf();
+         if let Err(err) = fs::create_dir_all(&cache_dir) {
+-            let temp_dir = env::temp_dir();
++            let temp_dir = temp_dir();
+             warn!(
+                 "Failed to create local cache directory {cache_dir:?} due to error: {err}, fallback to {temp_dir:?}"
+             );
+@@ -31,12 +31,25 @@
+             cache_dir
+         }
+     } else {
+-        env::temp_dir()
++        temp_dir()
+     };
+ 
+     Utf8PathBuf::from_path_buf(path).expect("Failed to parse cache directory path")
+ }
+ 
++/// [env::temp_dir] panics on WASI, which has no notion of one: take `TMPDIR`
++/// there, or `/tmp`.
++fn temp_dir() -> path::PathBuf {
++    #[cfg(target_os = "wasi")]
++    {
++        env::var_os("TMPDIR").map_or_else(|| path::PathBuf::from("/tmp"), path::PathBuf::from)
++    }
++    #[cfg(not(target_os = "wasi"))]
++    {
++        env::temp_dir()
++    }
++}
++
+ /// Normalizes the given `path` without requiring filesystem access.
+ ///
+ /// This only normalizes `.` and `..` entries, but does not resolve symlinks.
