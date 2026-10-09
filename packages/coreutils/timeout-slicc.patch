@@ -1,18 +1,22 @@
 --- a/src/timeout.c
 +++ b/src/timeout.c
-@@ -53,6 +53,11 @@
+@@ -53,6 +53,15 @@
  # include <sys/prctl.h>
  #endif
  #include <sys/wait.h>
 +#ifdef __EMSCRIPTEN__
 +# include <spawn.h>
 +# include <time.h>
++/* gnulib's spawn.h maps posix_spawnp to its fork-based rpl_posix_spawnp when
++   configure finds no working one (always, under emscripten); slicc's own
++   posix_spawnp spawns through the kernel.  */
++# undef posix_spawnp
 +extern char **environ;
 +#endif
  
  #include "system.h"
  #include "cl-strtod.h"
-@@ -243,11 +248,18 @@
+@@ -243,11 +252,18 @@
           newly created process group, so send to all processes in that.  */
        if (!foreground)
          {
@@ -33,7 +37,7 @@
              }
          }
      }
-@@ -260,6 +272,97 @@
+@@ -260,6 +276,97 @@
      }
  }
  
@@ -131,7 +135,7 @@
  void
  usage (int status)
  {
-@@ -568,8 +671,10 @@
+@@ -568,8 +675,10 @@
       Note we don't just put the child in a separate group as
       then we would need to worry about foreground and background groups
       and propagating signals between them.  */
@@ -142,7 +146,7 @@
  
    /* Setup handlers before fork() so that we
       handle any signals caused by child, without races.  */
-@@ -597,6 +702,16 @@
+@@ -597,6 +706,16 @@
       will return successfully and 'timeout' will have no way to determine if it
       should exit with EXIT_CANNOT_INVOKE or EXIT_ENOENT upon checking the exit
       status of the child.  */
