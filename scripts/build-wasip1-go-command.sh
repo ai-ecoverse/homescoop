@@ -5,6 +5,7 @@
 #   build.module                directory of the Go module inside the archive ("." for its root)
 #   build.package               import path or ./dir of the main package
 #   build.command               command name: package/bin/<command>.wasm
+# packages/<package>/*.patch apply to the source (homescoop_apply_patches).
 # The module's go.sum is checked as its dependencies download.
 set -euo pipefail
 NAME="${1:?usage: build-wasip1-go-command.sh <package>}"
@@ -46,6 +47,7 @@ SRC="$WORK/$NAME-src"
 rm -rf "$SRC"
 mkdir -p "$SRC"
 tar -xzf "$SRC_TGZ" -C "$SRC" --strip-components=1
+homescoop_apply_patches "$SRC"
 
 DEST="$HOMESCOOP_PKG/package"
 mkdir -p "$DEST/bin"
@@ -53,7 +55,14 @@ mkdir -p "$DEST/bin"
   go build -trimpath -buildvcs=false -ldflags='-s -w -buildid=' -o "$DEST/bin/$COMMAND.wasm" "$PACKAGE")
 chmod 755 "$DEST/bin/$COMMAND.wasm"
 
-cp "$SRC/LICENSE" "$DEST/LICENSE"
+rm -f "$DEST/LICENSE" "$DEST/NOTICE"
+for license in LICENSE LICENSE.md LICENSE.txt; do
+  if [[ -f "$SRC/$license" ]]; then cp "$SRC/$license" "$DEST/LICENSE"; break; fi
+done
+if [[ ! -f "$DEST/LICENSE" ]]; then echo "homescoop: no LICENSE in the $NAME source" >&2; exit 1; fi
+for notice in NOTICE NOTICE.txt NOTICE.md; do
+  if [[ -f "$SRC/$notice" ]]; then cp "$SRC/$notice" "$DEST/NOTICE"; break; fi
+done
 # Notices: the Go runtime, and every other module the command links.
 (cd "$SRC/$MODULE" && GOOS=wasip1 GOARCH=wasm go list -deps -f '{{with .Module}}{{.Path}} {{.Version}} {{.Dir}}{{end}}' "$PACKAGE") \
   | sort -u > "$WORK/$NAME-modules.txt"
