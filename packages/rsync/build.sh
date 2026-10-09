@@ -15,10 +15,11 @@ homescoop_extract "$TB" "$SRC"
 homescoop_apply_patches "$SRC"
 
 # A local rsync forks the receiver, which forks the generator; all three talk
-# over pipes at once. On slicc-kernel fork starts a real process (bash/tar
-# fork profile, ASYNCIFY).
-SLICC_A="$WORK/libslicc-rsync.a"
-homescoop_slicc_archive "$SLICC_A" fork
+# over pipes at once. On slicc-kernel fork starts a real process (netfork
+# profile: fork + ASYNCIFY as in bash/tar, plus the socket shim for rsync://
+# and the daemon, and slicc_pwd/getpass).
+SLICC_A="$WORK/libslicc-rsync-netfork.a"
+homescoop_slicc_archive "$SLICC_A" netfork
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain,sliccRunMain,sliccForkChild -lnodefs.js $(homescoop_slicc_fork_js_flags)"
 # select() waits in the kernel too (see slicc_rsync_select.c).
 SELECT_O="$WORK/slicc_rsync_select.o"
@@ -38,6 +39,8 @@ export rsync_cv_HAVE_C99_VSNPRINTF=yes
 export rsync_cv_HAVE_SECURE_MKSTEMP=yes
 export rsync_cv_MKNOD_CREATES_FIFOS=no
 export rsync_cv_MKNOD_CREATES_SOCKETS=no
+# netfork brings getpass (slicc_getpass.c); rsync must not build lib/getpass.o.
+export ac_cv_func_getpass=yes
 
 if [[ ! -f "$SRC/rsync.wasm" || -n "${FORCE:-}" ]]; then
   echo "== rsync: emconfigure + emmake"

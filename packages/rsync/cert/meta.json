@@ -22,6 +22,9 @@
     "symlinks (relative, absolute into the source, to a dir, dangling) with their own mtimes (touch -h): all 8 option sets (-a, -a -J, -a --omit-link-times, -a --times, -a --no-omit-link-times, -a --no-J, -a -t --no-J, -a -J --no-omit-link-times) copy with rc 0, links recreated (cL+++++++++, readlink equal), link mtimes preserved unless -J wins, source untouched, re-run quiet (slicc-kernel#170 fixed in 1.29.2)",
     "missing source dir or file: rc 23 with change_dir / link_stat messages",
     "SIGINT mid-transfer (timeout -s INT on a --bwlimit copy): rc 20 'received SIGINT, SIGTERM, or SIGHUP', no rsync left in ps",
-    "--bwlimit throttles (select() waits in the kernel)"
-  ]
+    "--bwlimit throttles (select() waits in the kernel)",
+    "daemon (3.4.4-3, netfork): rsync --daemon --no-detach on a kernel port; rsync://127.0.0.1:8730/ lists 'mod', -a push and pull (via localhost) round-trip the files, a closed port gives 'Connection refused' rc 10, the daemon log shows the access",
+    "tailnet (uplink): rsync://peer.tail1234.ts.net/ resolves via the kernel resolver/uplink and dials 100.64.1.2:873 (refused → 'Connection refused' rc 10); an unknown tailnet name → rc 10 without a dial"
+  ],
+  "uplink": true
 }

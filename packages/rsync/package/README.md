@@ -12,13 +12,15 @@ rsync -a -c --itemize-changes --stats src/ dst/
 
 A local rsync forks a receiver and a generator that talk to the sender over
 pipes; on slicc-kernel each is a real process (Emscripten + Asyncify fork).
-Remote sync over ssh or the rsync daemon waits for kernel networking.
+rsync:// works over the kernel's sockets (3.4.4-3): `rsync --daemon` on a
+kernel port, and clients to it or, with seven's tailnet, to tailnet names.
+Remote shells (`-e ssh`) need an ssh client in the realm.
 
 Built without OpenSSL, xxhash, zstd, lz4, iconv, ACLs or xattrs (bundled zlib
 and popt). Error messages print Emscripten's errno numbers (`No such file or
 directory (44)` where Linux prints `(2)`).
 
-**3.4.4-2 requires slicc-kernel ≥ 1.29.2.** `-a` preserves symlinks' own
+**From 3.4.4-2 on, rsync requires slicc-kernel ≥ 1.29.2.** `-a` preserves symlinks' own
 mtimes, as upstream rsync does, through `utimensat(AT_SYMLINK_NOFOLLOW)`.
 Older kernels followed the link there (slicc-kernel#170) and stamped the
 link's mtime onto its target, even a file in the source tree; stay on

@@ -4,6 +4,19 @@
 New package, so it needs human cert first and is not in `scripts/ci-certified.json`.
 
 
+
+## 3.4.4-2 has no socket shim (3.4.4-3, netfork)
+
+3.4.4-2 linked the `fork` shim profile, without `slicc_socket.c`. Every
+rsync:// connection went to Emscripten's own socket layer and never
+returned. Against 3.4.4-2, slicc-kernel 1.30.0's Node entry:
+
+- `daemon.mjs`: the module list never comes (`== list` with no `mod`).
+- `tailnet.mjs`: `rsync rsync://peer.tail1234.ts.net/` is killed by
+  `timeout 20` (rc=124) instead of failing with "Connection refused" (rc 10).
+
+3.4.4-3 passes both.
+
 ## 3.4.4-2 on slicc-kernel 1.29.0 (before the #170 fix)
 
 3.4.4-2 sets link times as upstream does. On a kernel whose
