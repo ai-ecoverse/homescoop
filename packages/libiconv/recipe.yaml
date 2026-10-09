@@ -2,7 +2,7 @@
 name: libiconv
 builder: host
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/libiconv.git extractVersion=^v(?<version>.*)$
-version: "1.18"
+version: "1.19"
 npm: "@ai-ecoverse/wasm-libiconv"
 summary: "GNU libiconv character-set conversion"
 source:
