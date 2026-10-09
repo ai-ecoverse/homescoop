@@ -5,7 +5,12 @@ No patches. Not in `scripts/ci-certified.json`.
 
 ## Empty wasm
 
-`prove-negative.mjs` (empty `less.wasm`) fails at the first `less`.
+With `bin/less.wasm` truncated to 0 bytes, the checklist fails at the first
+`less` (slicc-kernel 1.23.0, Node entry):
+
+```
+CompileError: WebAssembly.compile(): BufferSource argument is empty
+```
 
 ## Known-bad build: no terminal fallbacks
 
