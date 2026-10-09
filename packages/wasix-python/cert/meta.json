@@ -1,7 +1,10 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.29.0",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
     "@ai-ecoverse/wasm-coreutils@9.12.0-4"
@@ -11,7 +14,9 @@
     "python -m venv v works; v/bin/python and /home/v/bin/python3 report sys.prefix /home/v and their own path (\"argv0Path\": true, slicc-kernel#168)",
     "v/bin/pip install requests installs into v/lib/python3.14/site-packages, not the user site; base python cannot import it",
     "a venv console script (#!/home/v/bin/python) runs in the venv; subprocesses of sys.executable stay in the venv",
-    "a sitecustomize in the venv's site-packages still runs after the stdlib one"
+    "a user sitecustomize in the venv runs once after ours and is what `import sitecustomize` returns (#157 b)",
+    "a user sitecustomize on PYTHONPATH (shadowing the stdlib one) does not disable the fix: site-packages/slicc-executable.pth still sets sys.executable (#157 c)",
+    "PATH=. in /usr/bin gives sys.executable /usr/bin/python, not ./python (#157 a)"
   ],
   "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS."
 }
