@@ -1,0 +1,23 @@
+# ncurses' clear / tput / tset / reset for slicc wasm realm (host ladder).
+name: ncurses-utils
+builder: host
+version: "6.5"
+npm: "@ai-ecoverse/wasm-ncurses-utils"
+summary: "ncurses 6.5 clear, tput, tset and reset for slicc"
+source:
+  url: "https://mirrors.kernel.org/gnu/ncurses/ncurses-{{version}}.tar.gz"
+  sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/ncurses-utils
+  license: X11-distribute-modifications-variant
+  notes: |
+    Same ncurses 6.5 as less and bash. Host tic compiles a small terminfo
+    database (tic -x, so E3 for clear's \E[3J survives) into
+    package/share/terminfo; slicc.env TERMINFO points the commands at it.
+    xterm-256color, xterm, vt100 and dumb are also compiled-in fallbacks
+    (as in less/bash), so those work without the database. Links the slicc
+    gaps profile. New package → human cert.

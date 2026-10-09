@@ -1,0 +1,21 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.17.4",
+  "needs": [
+    "@ai-ecoverse/wasm-bash"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8"
+  ],
+  "checklist": [
+    "clear (TERM=xterm-256color) exits 0 and writes ESC[H ESC[2J ESC[3J (bytes compared)",
+    "bash -c 'clear && echo …' runs the second command",
+    "TERM=screen-256color clear works from the shipped database (TERMINFO via slicc.env)",
+    "TERM=dumb clear: no output, rc 1 (ncurses behaviour)",
+    "unknown TERM: clear → \"unknown terminal type\", tput → rc 3",
+    "tput setaf 1 → ESC[31m; tput sgr0; tput colors → 256",
+    "tput cols / tput lines on a 123x45 pty → 123 / 45",
+    "reset on a pty returns 0 and the shell carries on (tput cols afterwards)"
+  ],
+  "needsNote": "TERMINFO=${package}/share/terminfo comes from slicc.env; xterm-256color, xterm, vt100 and dumb are also compiled-in fallbacks (as in wasm-less / wasm-bash, which need no database)."
+}
