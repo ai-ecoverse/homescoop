@@ -2,7 +2,7 @@
 name: jq
 builder: host
 # renovate: datasource=github-releases depName=jqlang/jq extractVersion=^jq-(?<version>.*)$
-version: "1.8.1"
+version: "1.8.2"
 npm: "@ai-ecoverse/wasm-jq"
 summary: "jq JSON processor with oniguruma regex for slicc"
 source:
