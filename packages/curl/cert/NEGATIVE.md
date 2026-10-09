@@ -41,3 +41,12 @@ kernel resolver), slicc-kernel 1.28.0 with the fake uplink:
 ```
 rc=6 stderr=curl: (6) Could not resolve: peer.tail1234.ts.net:8080
 ```
+
+## Own hostname (8.22.0-4, #149)
+
+The published 8.22.0-3 (#140's shim) sends the machine's own name to the
+uplink, which does not know it:
+
+```
+emscripten:1 rc=6 stderr=curl: (6) Could not resolve: emscripten:1
+```
