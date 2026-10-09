@@ -1,0 +1,17 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+  ],
+  "checklist": [
+    "diff --version: GNU diffutils 3.12",
+    "diff exit codes: identical 0, -u/-q/-r/binary differ 1, missing file 2 (messages exact)",
+    "cmp: identical 0, differ 1 with char/line, -l byte list",
+    "sdiff -w 30 side by side; sdiff -o merge driven from stdin (sdiff runs diff as a child)",
+    "diff3 -m: adjacent edits and one overlapping line give conflict markers, rc 1; identical inputs rc 0 (diff3 forks + execs diff)",
+    "all expected bytes are GNU diffutils 3.12 on the host"
+  ]
+}
