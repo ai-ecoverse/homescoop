@@ -23,8 +23,9 @@ CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_em_cli_ldflags) -Wl,--w
 
 # --disable-all-programs also forces rev, colrm, look, getopt and column off,
 # and they have no --enable-<name> to turn them back on (UL_BUILD_INIT with
-# yes/check). Let those five ignore the all-programs default.
-perl -0pi -e 's/(enable_(rev|colrm|look|getopt|column)=\$ul_default_estate\n\s*build_\2=yes\n\s*if test "x\$ul_default_estate" = xno)(?! &&)/$1 && false/g' "$SRC/configure"
+# yes/check). Let those five ignore the all-programs default (enable=yes
+# too, or UL_REQUIRES_BUILD turns column back off).
+perl -0pi -e 's/enable_(rev|colrm|look|getopt|column)=\$ul_default_estate(\n\s*build_\1=yes\n\s*if test "x\$ul_default_estate" = xno)(?! &&)/enable_$1=yes$2 && false/g' "$SRC/configure"
 [[ "$(grep -c '= xno && false' "$SRC/configure")" == 5 ]] || {
   echo "util-linux: configure patch for rev/colrm/look/getopt/column did not apply" >&2
   exit 1
@@ -51,7 +52,7 @@ if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
         --build="$BUILD_TRIPLE" --host=wasm32-unknown-emscripten \
         --disable-shared --enable-static \
         --disable-all-programs \
-        --enable-libsmartcols --enable-column --enable-hexdump \
+        --enable-libsmartcols --enable-hexdump \
         --disable-nls --disable-asciidoc --disable-poman \
         --disable-bash-completion --disable-makeinstall-chown \
         --disable-makeinstall-setuid \
