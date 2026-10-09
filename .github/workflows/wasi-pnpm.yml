@@ -2,7 +2,10 @@
 # so this workflow builds and tests it: pnpm.wasm from pnpm's pinned source
 # with upstream's build.mjs and patches/ (built twice; the sha256 must match),
 # then the host module's unit tests and the end-to-end suite on slicc-kernel's
-# headless Node entry with a local mock registry and git server.
+# headless Node entry with a local mock registry and git server. The package
+# job packs the npm tarball twice — from this build, and as a packaging-only
+# repack of the published tarball (scripts/packaging-only-wasi-pnpm.mjs) — and
+# uploads the repack (the cert artifact) after checking the two are identical.
 name: wasi-pnpm
 
 on:
@@ -79,3 +82,51 @@ jobs:
       - name: end-to-end tests
         working-directory: packages/wasi-pnpm/test
         run: node --test 'e2e/*.test.mjs'
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: pnpm-wasm-1
+          path: packages/wasi-pnpm/package
+      - name: pack from this build
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source"
+          chmod 755 packages/wasi-pnpm/package/bin/pnpm.wasm
+          tgz=$(npm pack packages/wasi-pnpm/package --pack-destination "$RUNNER_TEMP/source" | tail -1)
+          mv "$RUNNER_TEMP/source/$tgz" "$RUNNER_TEMP/source/package.tgz"
+          node scripts/sync-package-version.mjs --assert-tarball "$RUNNER_TEMP/source/package.tgz"
+      - name: packaging-only repack of the published tarball
+        run: node scripts/packaging-only-wasi-pnpm.mjs .homescoop-out/wasi-pnpm
+      - name: the two tarballs are identical
+        run: |
+          set -euo pipefail
+          sha256sum "$RUNNER_TEMP/source/package.tgz" .homescoop-out/wasi-pnpm/package.tgz | tee -a "$GITHUB_STEP_SUMMARY"
+          a=$(sha256sum "$RUNNER_TEMP/source/package.tgz" | cut -d' ' -f1)
+          b=$(sha256sum .homescoop-out/wasi-pnpm/package.tgz | cut -d' ' -f1)
+          if [[ "$a" != "$b" ]]; then
+            mkdir -p "$RUNNER_TEMP/a" "$RUNNER_TEMP/b"
+            tar -xzf "$RUNNER_TEMP/source/package.tgz" -C "$RUNNER_TEMP/a"
+            tar -xzf .homescoop-out/wasi-pnpm/package.tgz -C "$RUNNER_TEMP/b"
+            (cd "$RUNNER_TEMP" && diff -r a b) || true
+            tar -tvzf "$RUNNER_TEMP/source/package.tgz"
+            tar -tvzf .homescoop-out/wasi-pnpm/package.tgz
+            echo "::error::from-source tarball differs from the packaging-only repack"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasi-pnpm-tgz
+          path: |
+            .homescoop-out/wasi-pnpm/package.tgz
+            .homescoop-out/wasi-pnpm/package.tgz.sha256
+          if-no-files-found: error
+          retention-days: 14
+

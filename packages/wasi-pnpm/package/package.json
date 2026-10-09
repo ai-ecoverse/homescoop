@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-6",
+  "version": "12.9.1-7",
   "description": "pnpm 12 for slicc WASI (commands pnpm, pn); pnpm.wasm built by homescoop from pnpm v12.9.1 with a documented patch",
   "license": "MIT",
   "repository": {
@@ -25,7 +25,8 @@
     "LICENSE",
     "THIRD-PARTY-NOTICES.md",
     "bin",
-    "host"
+    "host",
+    "shims"
   ],
   "publishConfig": {
     "access": "public"
@@ -49,6 +50,15 @@
         "wasm": "bin/pnpm.wasm",
         "imports": "host/pnpm-host.mjs",
         "argv0": "pnpm"
+      },
+      "npm": {
+        "script": "shims/npm"
+      },
+      "npx": {
+        "script": "shims/npx"
+      },
+      "i": {
+        "script": "shims/i"
       }
     },
     "env": {
