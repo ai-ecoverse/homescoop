@@ -8,6 +8,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | --- | --- |
 | `slicc_spawn.c` | `posix_spawn` / `waitpid` / `__syscall_wait4`; file actions on fds > 2 |
 | `slicc_popen.c` | `system` / `popen` / `pclose` via posix_spawn (beats emscripten ENOSYS stubs) |
+| `slicc_pwd.c` | `getpw*` / `getgr*` from the kernel's `/etc/passwd` and `/etc/group`. `getpwuid`/`getpwnam`/`getpwent` are strong in Emscripten's stubs, so they are `__wrap_*`, linked with `homescoop_slicc_wrap_pwd`. Every profile; manual whole-archive links without the wrap keep the stubs for those three. |
 | `slicc_exec.c` | `execve` over spawn (resets caught handlers; kernel forwards signals) |
 | `slicc_fork.c` + `slicc-fork.js` | `fork` / strong `getpid`/`getppid` (`--js-library`, needs `-sASYNCIFY`); adopts `Module.sliccPid` / `Module.sliccPpid` |
 | `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid getters→1000, set*id/setgroups accept only 1000, `sethostname` → EPERM, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1) |
@@ -54,3 +55,11 @@ slicc-kernel's headless Node entry (CI: `.github/workflows/slicc-shims.yml`):
 ```bash
 cd shims/slicc/test && ./build.sh && npm ci && npm test
 ```
+
+- `pwd.test.mjs`: getpwuid / getpwnam / the `_r` forms (ERANGE on a short
+  buffer) / getpwent / getgrgid / getgrnam read the kernel's `/etc/passwd`
+  and `/etc/group` (screen: "getpwuid() can't identify your account!").
+  `pwd-test` calls `flock()`, which pulls Emscripten's stubs object into
+  the link. Without `--wrap`, plain definitions fail to link (`duplicate
+  symbol: getpwnam`, `getpwuid`, `getpwent`), and linking the archive
+  without the wrap flags leaves those three on the stubs (`uid none`).

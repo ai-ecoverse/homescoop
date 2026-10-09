@@ -18,3 +18,13 @@ emcc -O2 -Wall -Wextra -Werror "$HERE/resolve-test.c" \
   -o "$OUT/resolve-test.js"
 mv "$OUT/resolve-test.js" "$OUT/resolve-test"
 echo "== built $OUT/resolve-test"
+
+SLICC_CLI="$WORK/libslicc-cli.a"
+homescoop_slicc_archive "$SLICC_CLI" cli
+export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/pwd-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_em_cli_ldflags) \
+  -o "$OUT/pwd-test.js"
+mv "$OUT/pwd-test.js" "$OUT/pwd-test"
+echo "== built $OUT/pwd-test"
