@@ -25,7 +25,7 @@ export default async function (ctx) {
   assert.equal(dirs.stdout, '/home/fu/a\n/home/fu/a/b\n/home/fu/c\n');
 
   // -exec … ; runs one child per file (fork + exec of coreutils cat).
-  const each = await sh("find /home/fu -name '*.txt' -exec cat {} \; | sort");
+  const each = await sh("find /home/fu -name '*.txt' -exec cat {} ';' | sort");
   ok(each, 'find -exec ;');
   assert.equal(each.stdout, 'four\none\ntwo\n');
 
@@ -35,13 +35,13 @@ export default async function (ctx) {
   assert.equal(batch.stdout.trim(), '1', `-exec + should run once: ${batch.stdout}`);
 
   // Exit status: ; ignores the command's status, + propagates failure.
-  const semi = await sh("find /home/fu -name '*.log' -exec false {} \;");
+  const semi = await sh("find /home/fu -name '*.log' -exec false {} ';'");
   assert.equal(semi.status, 0, `-exec false ; rc=${semi.status}`);
   const plus = await sh("find /home/fu -name '*.log' -exec false {} +");
   assert.equal(plus.status, 1, `-exec false + rc=${plus.status}`);
 
   // -execdir runs from the file's directory.
-  const execdir = await sh("find /home/fu -name 3.log -execdir pwd \;");
+  const execdir = await sh("find /home/fu -name 3.log -execdir pwd ';'");
   ok(execdir, 'find -execdir');
   assert.equal(execdir.stdout, '/home/fu/c\n');
 
