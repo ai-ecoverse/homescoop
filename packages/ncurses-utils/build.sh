@@ -95,9 +95,19 @@ DB="$HOMESCOOP_PKG/package/share/terminfo"
 rm -rf "$DB"
 mkdir -p "$DB"
 TERMINFO="$DB" "$HOST_PREFIX/bin/tic" -x -e "$TERMS" "$NC_SRC/misc/terminfo.src"
+# tic writes aliases (nxterm/xterm-color, vt100-am, vt200/vt220) as hard
+# links, and the npm registry rejects links in a tarball (E415): make every
+# entry its own regular file.
+find "$DB" -type l -print0 | while IFS= read -r -d '' f; do
+  cp -L "$f" "$f.tmp" && rm "$f" && mv "$f.tmp" "$f"
+done
+find "$DB" -type f -links +1 -print0 | while IFS= read -r -d '' f; do
+  cp "$f" "$f.tmp" && mv "$f.tmp" "$f"
+done
 for t in ${TERMS//,/ }; do
   test -f "$DB/${t:0:1}/$t" || { echo "ncurses-utils: missing terminfo $t" >&2; exit 1; }
 done
+homescoop_assert_no_package_links "$HOMESCOOP_PKG/package"
 
 homescoop_stage_license "$NC_SRC"/COPYING
 echo "== ncurses-utils: staged → $HOMESCOOP_PKG/package ($VERSION)"
