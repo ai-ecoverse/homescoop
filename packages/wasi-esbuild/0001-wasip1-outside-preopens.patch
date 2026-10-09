@@ -12,7 +12,7 @@ as an empty directory (as for directories without the read bit). Other
 platforms are unchanged (isOutsidePreopens is false).
 
 Upstream: not filed (Lars decides).
-removeWhen: the runtimes offer an opt-in root preopen for Go programs.
+removeWhen: slicc-kernel preopens "/" (https://github.com/ai-ecoverse/slicc-kernel/issues/144).
 
 diff --git a/internal/fs/fs_real.go b/internal/fs/fs_real.go
 --- a/internal/fs/fs_real.go

@@ -31,3 +31,5 @@ about:
     -trimpath -buildvcs=false -ldflags='-s -w -buildid='). Patch 0001 makes
     directories outside every WASI preopen ("/" on slicc-kernel) read as
     empty, so module resolution walks past the root instead of failing.
+    Drop 0001 once slicc-kernel preopens "/" for WASI programs
+    (https://github.com/ai-ecoverse/slicc-kernel/issues/144).
