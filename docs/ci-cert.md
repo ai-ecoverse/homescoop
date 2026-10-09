@@ -76,6 +76,17 @@ export default async function (ctx) {
 
 `run` accepts `{ cwd, env, stdin }`.
 
+### Terminal: `ctx.pty(argv, { cols, rows, env, cwd, steps, timeoutMs })`
+
+This runs `argv` as the session leader of a real pty (`kernel.openTerminal`; the kernel adds
+`TERM=xterm-256color`). Each step waits for its `expect` regex in the output
+since the previous match, then types `write` (`sleepMs` pauses first). It
+resolves `{ status, out }`, where `out` is the raw terminal output. If an
+`expect` never appears, it hangs up and returns `status: null` with
+`failedStep`. If the program does not exit within `timeoutMs` after the last
+step, it also hangs up and returns `status: null`. The less, nano and
+screen certs (#134, #135, #136) use it.
+
 ### Network: `ctx.serve(responder)`
 
 The cert page gives the kernel a network transport whose far end is
