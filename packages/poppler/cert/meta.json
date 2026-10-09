@@ -7,7 +7,7 @@
     "@ai-ecoverse/wasm-coreutils@9.12.0-3"
   ],
   "patches": {
-    "multicall.patch": "every command runs through the one multi-call wasm by argv0; pdfunite's -1 error exit is not mistaken for an unknown util",
+    "multicall.patch": "every command runs through the one multi-call wasm by argv0; pdfunite's -1 error exit is not mistaken for an unknown util; pdftocairo -svg/-pdf/-ps/-eps prints the no-cairo hint first, rc 99",
     "fontsdir-env.patch": "pdftoppm -gray draws the text only with POPPLER_FONTSDIR from slicc.env; POPPLER_FONTSDIR=/nonexistent gives 'No display font' and fewer dark pixels",
     "object-array-rvalue.patch": "compile fix only (libc++ C++23 incomplete type); the build fails without it"
   },
@@ -17,7 +17,7 @@
     "pdftoppm -png page 1 at 72 dpi is 200x100 and at 150 dpi 417x209 (PNG IHDR); -f 2 -l 3 writes only p-2.png and p-3.png",
     "bundled base-14 fonts: gray render has text pixels only in the text box and no font warnings; without POPPLER_FONTSDIR, 'No display font' and less ink",
     "RC4 40-bit encrypted PDF: no or wrong password gives 'Incorrect password', rc 1; -upw u and -opw o extract text; pdfinfo shows the permissions; pdftoppm -upw renders",
-    "pdftocairo (alias of pdftoppm) -png writes c-1.png 200x100",
+    "pdftocairo (pdftoppm) -png writes c-1.png 200x100; -svg/-pdf/-ps/-eps say they need cairo, rc 99 (pdftoppm itself does not)",
     "pdffonts lists Helvetica Type 1 not embedded; pdfunite + pdfseparate round trip; pdftops writes %!PS-Adobe",
     "errors: garbage PDF rc 1 (xref), missing file rc 1, pdfunite with an encrypted input fails without the multicall usage text"
   ]
