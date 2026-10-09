@@ -8,7 +8,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | --- | --- |
 | `slicc_spawn.c` | `posix_spawn` / `waitpid` / `__syscall_wait4`; file actions on fds > 2 |
 | `slicc_popen.c` | `system` / `popen` / `pclose` via posix_spawn (beats emscripten ENOSYS stubs) |
-| `slicc_exec.c` | `execve` over spawn (resets caught handlers; kernel forwards signals) |
+| `slicc_exec.c` | `execve`: `Module.sliccKernel.execve` keeps the caller's pid (slicc-kernel#99/#176); spawn + `execWait` on older kernels (resets caught handlers; kernel forwards signals) |
 | `slicc_fork.c` + `slicc-fork.js` | `fork` / strong `getpid`/`getppid` (`--js-library`, needs `-sASYNCIFY`); adopts `Module.sliccPid` / `Module.sliccPpid` |
 | `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid getters→1000, set*id/setgroups accept only 1000, `sethostname` → EPERM, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1) |
 | `slicc_signals.c` | `slicc_raise` / `slicc_sig_mask` / `kill` (incl. group `kill(0)` / `kill(-pgid)`); `__syscall_pause` → `sliccKernel.pause` |
@@ -54,3 +54,11 @@ slicc-kernel's headless Node entry (CI: `.github/workflows/slicc-shims.yml`):
 ```bash
 cd shims/slicc/test && ./build.sh && npm ci && npm test
 ```
+
+- `resolve.test.mjs`: getaddrinfo through the kernel resolver (homescoop#139).
+- `exec.test.mjs`: exec keeps the pid (slicc-kernel#176), as a 3-level exec
+  chain and fork-then-exec, built with the `cli` and `fork` profiles. It runs
+  on slicc-kernel 1.26.6 (no #171 identity wait, so only the shim can make it
+  pass) and on the current kernel. With `slicc_exec.c` from before #75
+  (spawn + `execWait` only), all six cases fail: `L3 1000`, `L2 1001`,
+  `L1 1002`, `L0 1003`.
