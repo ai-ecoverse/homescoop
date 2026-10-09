@@ -8,10 +8,57 @@ note() {
   echo "npm → pnpm: npm here is pnpm from @ai-ecoverse/wasi-pnpm" >&2
 }
 
+AGE_NOTE="Note: pnpm skips releases less than 24 h old (minimumReleaseAge); pin pkg@x.y.z-n to install a newer one."
+
+# The registry's latest version of $1, from the metadata pnpm cached while
+# installing (no extra request); empty if the cache has none.
+cached_latest() {
+  for f in "${XDG_CACHE_HOME:-$HOME/.cache}"/pnpm/v*/metadata/*/"$1".jsonl; do
+    [ -f "$f" ] || continue
+    while IFS= read -r line || [ -n "$line" ]; do
+      case $line in
+        *'"distTags":{'*'"latest":"'*)
+          rest=${line#*'"distTags":{'}
+          rest=${rest#*'"latest":"'}
+          echo "${rest%%\"*}"
+          return
+          ;;
+      esac
+    done < "$f"
+  done
+}
+
+# After an unpinned global install: say so when pnpm installed something
+# other than the registry's latest (minimumReleaseAge keeps fresh releases
+# out). Only local lookups: pnpm list and pnpm's metadata cache.
+latest_hint() {
+  value=
+  installed=
+  for arg in "$@"; do
+    if [ -n "$value" ]; then value=; continue; fi
+    case $arg in
+      --registry|--tag|--filter|-w|--workspace|--dir|-C) value=1; continue ;;
+      -*) continue ;;
+      @*/*@*|[!@]*@*) continue ;;   # pinned: name@version or tag
+      *:*|./*|../*|/*|*.tgz|[!@]*/*) continue ;;   # paths, URLs, git
+    esac
+    [ -n "$installed" ] || installed=$(pnpm list -g --depth=0 --parseable --long 2>/dev/null)
+    have=
+    for line in $installed; do
+      case $line in *":$arg@"*) have=${line##*":$arg@"} ;; esac
+    done
+    latest=$(cached_latest "$arg")
+    if [ -n "$have" ] && [ -n "$latest" ] && [ "$have" != "$latest" ]; then
+      echo "npm: installed $arg $have, not latest $latest (pnpm skips releases less than 24 h old); pin $arg@$latest to install it" >&2
+    fi
+  done
+}
+
 # npm install [flags] [pkg...] → pnpm install (no packages) / pnpm add.
 # Flags npm has and pnpm doesn't need are dropped; the rest pass through.
 install() {
   global=
+  help=
   pkgs=0
   value=
   for arg in "$@"; do
@@ -30,12 +77,26 @@ install() {
       -S|--save|--no-audit|--no-fund|--legacy-peer-deps|--no-package-lock) ;;
       --production|--omit=dev) set -- "$@" --prod ;;
       --registry|--tag|--filter|-w|--workspace|--dir|-C) value=1; set -- "$@" "$arg" ;;
+      -h|--help) help=1; set -- "$@" "$arg" ;;
       -*) set -- "$@" "$arg" ;;
       *) pkgs=$((pkgs + 1)); set -- "$@" "$arg" ;;
     esac
   done
+  if [ -n "$help" ]; then
+    pnpm add --help
+    status=$?
+    echo
+    echo "$AGE_NOTE"
+    exit $status
+  fi
   if [ "$pkgs" -gt 0 ]; then
-    exec pnpm add "$@"
+    if [ -z "$global" ]; then
+      exec pnpm add "$@"
+    fi
+    pnpm add "$@"
+    status=$?
+    if [ $status -eq 0 ]; then latest_hint "$@"; fi
+    exit $status
   fi
   if [ -n "$global" ]; then
     echo "npm: npm install -g needs a package name" >&2
@@ -52,14 +113,24 @@ script() {
   exec pnpm run "$name" "$@"
 }
 
+usage() {
+  pnpm --help
+  status=$?
+  echo
+  echo "npm here is pnpm (@ai-ecoverse/wasi-pnpm): npm install/i, ci, uninstall, run, test, update, ls and"
+  echo "any other verb run the matching pnpm command; npx runs installed commands."
+  echo "$AGE_NOTE"
+  exit $status
+}
+
 if [ $# -eq 0 ]; then
-  exec pnpm --help
+  usage
 fi
 verb=$1
 shift
 case $verb in
   -v|--version) note; exec pnpm --version ;;
-  help|-h|--help|-help) exec pnpm --help ;;
+  help|-h|--help|-help) usage ;;
   install|i|in|ins|inst|insta|instal|isnt|isnta|isntal|isntall|add) install "$@" ;;
   ci|clean-install|ic|install-clean|isntall-clean) exec pnpm install --frozen-lockfile "$@" ;;
   uninstall|unlink|un|remove|rm|r) exec pnpm remove "$@" ;;

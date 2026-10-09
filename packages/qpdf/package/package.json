@@ -1,0 +1,50 @@
+{
+  "name": "@ai-ecoverse/wasm-qpdf",
+  "version": "12.4.2-1",
+  "description": "qpdf PDF merge/split/rotate/decrypt/linearize tool for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/qpdf/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/qpdf",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "qpdf",
+    "pdf"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "qpdf",
+    "upstream": "12.4.2"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "qpdf": {
+        "glue": "bin/qpdf",
+        "wasm": "bin/qpdf.wasm"
+      },
+      "fix-qdf": {
+        "glue": "bin/fix-qdf",
+        "wasm": "bin/fix-qdf.wasm"
+      },
+      "zlib-flate": {
+        "glue": "bin/zlib-flate",
+        "wasm": "bin/zlib-flate.wasm"
+      }
+    }
+  }
+}

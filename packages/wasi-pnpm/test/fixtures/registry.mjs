@@ -51,7 +51,7 @@ export async function startRegistry ({ token } = {}) {
         if (!req.headers['npm-otp']) return json(res, 401, { error: 'OTP required' }, { 'www-authenticate': 'OTP' })
         return json(res, 200, { ok: true })
       }
-      const file = /^(.+)\/-\/[^/]+-(\d[^/]*)\.tgz$/.exec(name)
+      const file = /^(.+)\/-\/[^/]+?-(\d[^/]*)\.tgz$/.exec(name)
       if (file) {
         const entry = packages.get(file[1])?.versions[file[2]]
         if (!entry) return json(res, 404, { error: 'not found' })
@@ -69,14 +69,18 @@ export async function startRegistry ({ token } = {}) {
     base,
     published,
     requests,
-    add (name, version, manifest = {}, files = {}) {
+    // published: an optional Date for the packument's time field (release age).
+    add (name, version, manifest = {}, files = {}, { published } = {}) {
       const json = { name, version, ...manifest }
       const tgz = tarball({ 'package.json': JSON.stringify(json), ...files })
       const pkg = packages.get(name) ?? { versions: {} }
-      pkg.versions[version] = { manifest: json, tarball: tgz }
+      pkg.versions[version] = { manifest: json, tarball: tgz, published }
       pkg.packument = registry => ({
         name,
         'dist-tags': { latest: Object.keys(pkg.versions).at(-1) },
+        ...(Object.values(pkg.versions).some(e => e.published)
+          ? { time: Object.fromEntries(Object.entries(pkg.versions).filter(([, e]) => e.published).map(([v, e]) => [v, e.published.toISOString()])) }
+          : {}),
         versions: Object.fromEntries(Object.entries(pkg.versions).map(([v, e]) => [v, {
           ...e.manifest,
           dist: {

@@ -147,3 +147,63 @@ test('npm refuses --no-save and a global install without a package', async () =>
     k.terminate()
   }
 })
+
+test('release age: unpinned npm i -g says which version to pin; pinned and help', async () => {
+  const registry = await startRegistry()
+  const day = 24 * 3600 * 1000
+  registry.add('tiny-age', '1.0.0', { main: 'i.js' }, { 'i.js': '1' }, { published: new Date(Date.now() - 30 * day) })
+  registry.add('tiny-age', '1.1.0', { main: 'i.js' }, { 'i.js': '2' }, { published: new Date(Date.now() - 60 * 1000) })
+  registry.add('tiny-old', '2.0.0', { main: 'i.js' }, { 'i.js': '1' }, { published: new Date(Date.now() - 30 * day) })
+  const k = await kernel()
+  const installed = async () => output(await run(k, ['pnpm', 'list', '-g', '--depth=0']))
+  try {
+    // pnpm keeps minimumReleaseAge: the 1-minute-old 1.1.0 is skipped.
+    const fresh = await run(k, ['npm', 'i', '-g', 'tiny-age', '--registry', registry.base])
+    assert.equal(fresh.status, 0, output(fresh))
+    assert.match(await installed(), /tiny-age@1\.0\.0/)
+    assert.match(fresh.stderr, /installed tiny-age 1\.0\.0, not latest 1\.1\.0 .*pin tiny-age@1\.1\.0/)
+    // Pinned: installs it, no hint.
+    const pinned = await run(k, ['npm', 'i', '-g', 'tiny-age@1.1.0', '--registry', registry.base])
+    assert.equal(pinned.status, 0, output(pinned))
+    assert.match(await installed(), /tiny-age@1\.1\.0/)
+    assert.doesNotMatch(pinned.stderr, /not latest/)
+    // Latest is mature: no hint.
+    const old = await run(k, ['npm', 'i', '-g', 'tiny-old', '--registry', registry.base])
+    assert.equal(old.status, 0, output(old))
+    assert.doesNotMatch(old.stderr, /not latest/)
+    // Help texts and npx name the pinning tip.
+    for (const argv of [['npm', 'help'], ['npm', 'i', '--help']]) {
+      const help = await run(k, argv)
+      assert.equal(help.status, 0, `${argv.join(' ')}: ${output(help)}`)
+      assert.match(help.stdout, /less than 24 h old.*pin pkg@x\.y\.z-n/)
+    }
+    const npx = await run(k, ['npx', 'hs90-not-installed'])
+    assert.equal(npx.status, 127)
+    assert.match(npx.stderr, /less than 24 h old; pin hs90-not-installed@x\.y\.z-n/)
+    // A scoped name keeps its scope in the advice (never the bare name).
+    for (const spec of ['@scope/x-missing', '@scope/x-missing@1.2.3']) {
+      const scoped = await run(k, ['npx', spec])
+      assert.equal(scoped.status, 127, `npx ${spec}: ${output(scoped)}`)
+      assert.match(scoped.stderr, /pin @scope\/x-missing@x\.y\.z-n/, `npx ${spec}: ${scoped.stderr}`)
+    }
+  } finally {
+    k.terminate()
+    await registry.close()
+  }
+})
+
+test('an x.y.z-n version, the shape of homescoop packages, installs from the registry', async () => {
+  const registry = await startRegistry()
+  registry.add('tiny-rev', '0.1.0-1', { main: 'index.js' }, { 'index.js': 'module.exports = "rev"\n' })
+  const k = await kernel()
+  try {
+    await writeJson(k, '/home/rev/package.json', { name: 'app', version: '1.0.0' })
+    const add = await run(k, ['npm', 'i', 'tiny-rev@0.1.0-1', '--registry', registry.base], '/home/rev')
+    assert.equal(add.status, 0, output(add))
+    assert.equal(await text(k, '/home/rev/node_modules/tiny-rev/index.js'), 'module.exports = "rev"\n')
+  } finally {
+    k.terminate()
+    await registry.close()
+  }
+})
+

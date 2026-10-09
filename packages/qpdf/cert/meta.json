@@ -1,0 +1,23 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+  ],
+  "checklist": [
+    "qpdf --version is 12.4.2; --check on a generated 3-page PDF: 'No syntax or stream encoding errors'; --show-npages 3",
+    "pdftk cat: qpdf --empty --pages a.pdf b.pdf -- m.pdf has 5 pages, texts in order",
+    "page ranges: '. 5,1-2' and 'z-1' reorder pages as asked",
+    "pdftk burst: --split-pages writes page-1..5.pdf, page-4 is 'Bravo one' alone",
+    "pdftk rotate: --rotate=+90:1 sets /Rotate 90 on page 1 only (read back through --json)",
+    "pdftk dump_data: --json v2 has 5 pages, encrypt.encrypted false, pdfversion 1.4",
+    "AES-256 --encrypt (kernel random source), --is-encrypted / --requires-password exit codes, --show-encryption R = 6",
+    "no password and wrong password: 'invalid password', rc 2; user and owner passwords both decrypt, texts intact",
+    "--linearize: --check-linearization 'no linearization errors', --check 'File is linearized'; unlinearized file reported as such",
+    "fix-qdf repairs a hand-edited QDF file (longer content stream): --check clean, edited text present",
+    "zlib-flate -compress | -uncompress round trip, 78 9c header, garbage -uncompress fails",
+    "garbage PDF rc 2 (can't find PDF header), truncated PDF rc 3 (file is damaged), missing file rc 2"
+  ]
+}

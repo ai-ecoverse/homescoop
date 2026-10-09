@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Packaging-only bump of @ai-ecoverse/wasi-pnpm (homescoop#89):
- * the published 12.9.1-6 tarball with the repo's package metadata, README,
+ * the published 12.9.1-7 tarball with the repo's package metadata, README,
  * host/ (pnpm run through the kernel sh) and shims/ (npm, npx, i) on top, as
- * 12.9.1-7. bin/pnpm.wasm, LICENSE and THIRD-PARTY-NOTICES.md stay the
+ * the repo's version. bin/pnpm.wasm, LICENSE and THIRD-PARTY-NOTICES.md stay the
  * published bytes: no new pnpm.wasm build.
  *
  *   node scripts/packaging-only-wasi-pnpm.mjs [outdir]
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repoPkg = join(root, 'packages/wasi-pnpm/package');
-const from = '@ai-ecoverse/wasi-pnpm@12.9.1-6';
+const from = '@ai-ecoverse/wasi-pnpm@12.9.1-7';
 const want = JSON.parse(readFileSync(join(repoPkg, 'package.json'), 'utf8')).version;
 const outDir = resolve(process.argv[2] || join(root, '.homescoop-out/wasi-pnpm'));
 
@@ -49,7 +49,7 @@ try {
   const pkgDir = join(work, 'package');
   run('tar', ['-xzf', srcTgz, '-C', work]);
   const published = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'));
-  if (published.version !== '12.9.1-6') {
+  if (published.version !== '12.9.1-7') {
     console.error(`expected ${from}, got ${published.version}`);
     process.exit(1);
   }
