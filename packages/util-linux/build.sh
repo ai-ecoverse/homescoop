@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # util-linux text tools: rev, column (+ static libsmartcols), hexdump, colrm,
-# look, getopt. Nothing that needs a real kernel interface. rev, colrm, look
-# and getopt are always on (UL_BUILD_INIT yes); column/hexdump need --enable.
+# look, getopt. Nothing that needs a real kernel interface.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
@@ -21,6 +20,15 @@ SLICC_A="$WORK/libslicc-util-linux.a"
 homescoop_slicc_archive "$SLICC_A" gaps
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=262144 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
+
+# --disable-all-programs also forces rev, colrm, look, getopt and column off,
+# and they have no --enable-<name> to turn them back on (UL_BUILD_INIT with
+# yes/check). Let those five ignore the all-programs default.
+perl -0pi -e 's/(enable_(rev|colrm|look|getopt|column)=\$ul_default_estate\n\s*build_\2=yes\n\s*if test "x\$ul_default_estate" = xno)(?! &&)/$1 && false/g' "$SRC/configure"
+[[ "$(grep -c '= xno && false' "$SRC/configure")" == 5 ]] || {
+  echo "util-linux: configure patch for rev/colrm/look/getopt/column did not apply" >&2
+  exit 1
+}
 
 # Emscripten's <sys/syscall.h> names SYS_* (as __syscall_* functions) but
 # there is no syscall(); util-linux calls syscall(SYS_x) whenever SYS_x is
@@ -59,6 +67,13 @@ if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
     # glue); it keeps the compiler command whole, so link through CCLD.
     emmake make -j"$jobs" V=1 "${PROGS[@]}" CCLD="emcc $CLI_LDFLAGS"
   )
+  # A disabled program still has a link rule, with no objects: catch that.
+  for p in "${PROGS[@]}"; do
+    grep -q "^S\\[\"BUILD_$(echo "$p" | tr a-z A-Z)_TRUE\"\\]=\"\"" "$SRC/config.status" || {
+      echo "util-linux: $p is not enabled by configure" >&2
+      exit 1
+    }
+  done
 fi
 
 for p in "${PROGS[@]}"; do
