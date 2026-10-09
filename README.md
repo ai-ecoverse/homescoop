@@ -84,7 +84,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-diffutils` | host | **3.12.0** (`diff` / `cmp` / `diff3` / `sdiff`) |
 | `@ai-ecoverse/wasm-patch` | host | **2.8.0** |
 | `@ai-ecoverse/wasm-xxd` | host | **9.1.1850** |
-| `@ai-ecoverse/wasm-binutils` | host | **2.47.0-2** (`strings` / `size` / `readelf`; BFD x86-64/aarch64 ELF + wasm; nm/ar/strip are in wasm-clang) |
+| `@ai-ecoverse/wasm-binutils` | host | **2.47.0-3** (`strings` / `size` / `readelf`; BFD x86-64/aarch64 ELF + wasm; nm/ar/strip are in wasm-clang) |
 | `@ai-ecoverse/wasm-ncurses-utils` | host | **6.5.0-1** (`clear` / `tput` / `tset` / `reset`; terminfo db via `slicc.env` TERMINFO) |
 | `@ai-ecoverse/wasm-mount` | host | **1.0.0-1** (`mount` / `umount`; in-tree, needs slicc-kernel ≥ 1.17.0 process mounts) |
 | `@ai-ecoverse/wasm-tree` | host | **2.3.2-1** (`tree`; emcc on the plain Makefile sources) |
