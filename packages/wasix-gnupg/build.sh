@@ -22,7 +22,7 @@ WORK="${WASIX_GNUPG_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
 PREFIX="$WORK/prefix"
-JOBS="${HOMESCOOP_JOBS:-8}"
+JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
 # name version sha256 url-dir
 LIBS=(
@@ -33,6 +33,11 @@ LIBS=(
   "libksba 1.8.1 c2f84393011827219ae117131dba8e7684c2bed0961eed11b0642c2acba440b5"
 )
 
+# No wasixcc on PATH (CI runners): install the pinned toolchain, which
+# brings wasix-sysroot 2025.9.30-15 (slicc_stat_owner).
+if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
+  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
+fi
 export PATH="$PREFIX/bin:${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin:$HOME/.wasixcc/llvm/bin:$HOME/.wasmer/bin:/opt/homebrew/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS=no
@@ -50,8 +55,13 @@ llvm-ar t "$SYSROOT_LIBC" | grep -qx slicc_stat_owner.o || {
   exit 1
 }
 
-BUILD_TRIPLE="$(/usr/bin/uname -m)-apple-darwin"
-BUILD_TRIPLE="${BUILD_TRIPLE/arm64/aarch64}"
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64) BUILD_TRIPLE=aarch64-apple-darwin ;;
+  Darwin-x86_64) BUILD_TRIPLE=x86_64-apple-darwin ;;
+  Linux-x86_64) BUILD_TRIPLE=x86_64-pc-linux-gnu ;;
+  Linux-aarch64) BUILD_TRIPLE=aarch64-unknown-linux-gnu ;;
+  *) echo "homescoop wasix-gnupg: unsupported build host $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+esac
 CROSS=(--host=wasm32-unknown-wasi --build="$BUILD_TRIPLE"
   CC=wasixcc AR=llvm-ar RANLIB=llvm-ranlib STRIP=llvm-strip)
 LIBCONF=("${CROSS[@]}" --prefix="$PREFIX" --disable-shared --enable-static)
