@@ -16,7 +16,8 @@ about:
   homepage: https://github.com/BurntSushi/ripgrep
   license: "MIT OR Unlicense"
   notes: |
-    cargo install --target wasm32-wasip1 with release strip. Manifest abi=wasi;
-    command rg → bin/rg.wasm (no glue). Default features only (no PCRE2).
-    The .crate URL is SSOT for Renovate; build.sh uses cargo install of the
-    same version (crates.io) rather than unpacking the tarball by hand.
+    cargo build --locked --target wasm32-wasip1 (release, stripped) from the
+    .crate, with dependencies vendored. Manifest abi=wasi; command rg →
+    bin/rg.wasm (no glue). Default features only (no PCRE2).
+    patches/grep-cli-wasi-stdin.patch (homescoop#168) applies to the
+    vendored grep-cli: piped and redirected stdin are searched, as on Linux.

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-ripgrep",
-  "version": "15.2.0-2",
+  "version": "15.2.0-3",
   "description": "ripgrep 15 for slicc WASI preview1 (command rg)",
   "license": "MIT OR Unlicense",
   "repository": {
