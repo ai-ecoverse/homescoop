@@ -62,4 +62,6 @@ if [[ -f "$STAGE/tar.js" && ! -f "$STAGE/tar" ]]; then mv "$STAGE/tar.js" "$STAG
 test -f "$STAGE/tar.wasm" || test -f "$STAGE/tar"
 homescoop_stage_cli "$STAGE" tar
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
+homescoop_notices_begin "tar.wasm statically links the following."
+homescoop_notice_emscripten
 echo "== tar: staged → $HOMESCOOP_PKG/package"
