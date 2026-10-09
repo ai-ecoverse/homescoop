@@ -3,6 +3,7 @@
  * -f, --help) plus -J, on a fixture with a hidden file and a hidden dir.
  * Default output uses UTF-8 line drawing; tree pads the vertical bar with
  * two no-break spaces (U+00A0), so those are spelled out below.
+ * tree 2.x counts the root directory in the report line.
  */
 const BAR = '│   ';
 const TEE = '├── ';
@@ -48,7 +49,7 @@ export default async function (ctx) {
       `${BAR}${END}main.c`,
       `${END}top.txt`,
       '',
-      '3 directories, 4 files',
+      '4 directories, 4 files',
       '',
     ].join('\n'),
     `tree stdout=${JSON.stringify(plain.stdout)}`,
@@ -73,7 +74,7 @@ export default async function (ctx) {
       `${BAR}${END}main.c`,
       `${END}top.txt`,
       '',
-      '3 directories, 3 files',
+      '4 directories, 3 files',
       '',
     ].join('\n'),
     `tree -L 2 stdout=${JSON.stringify(l2.stdout)}`,
@@ -84,14 +85,14 @@ export default async function (ctx) {
   assert.equal(all.status, 0, `tree -a stderr=${all.stderr}`);
   assert.match(all.stdout, new RegExp(`^${TEE}\\.env$`, 'm'), `tree -a: ${JSON.stringify(all.stdout)}`);
   assert.match(all.stdout, new RegExp(`^${TEE}\\.hidden\\n${BAR}${END}secret$`, 'm'));
-  assert.match(all.stdout, /\n4 directories, 6 files\n$/);
+  assert.match(all.stdout, /\n5 directories, 6 files\n$/);
 
   // -d: directories only.
   const dirs = await tree(['-d']);
   assert.equal(dirs.status, 0, `tree -d stderr=${dirs.stderr}`);
   assert.equal(
     dirs.stdout,
-    ['.', `${TEE}docs`, `${END}src`, `${GAP}${END}lib`, '', '3 directories', ''].join('\n'),
+    ['.', `${TEE}docs`, `${END}src`, `${GAP}${END}lib`, '', '4 directories', ''].join('\n'),
     `tree -d stdout=${JSON.stringify(dirs.stdout)}`,
   );
 
@@ -115,7 +116,7 @@ export default async function (ctx) {
   assert.deepEqual(src.contents.map((e) => e.name), ['lib', 'main.c']);
   assert.deepEqual(src.contents[0].contents, [{ type: 'file', name: 'util.c' }]);
   assert.equal(report.type, 'report');
-  assert.equal(report.directories, 3);
+  assert.equal(report.directories, 4);
   assert.equal(report.files, 4);
 
   // --help: usage on stdout, rc 0.
