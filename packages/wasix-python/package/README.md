@@ -40,7 +40,7 @@ python -m venv v && v/bin/pip install requests && v/bin/python -c "import reques
 
 Whether a venv's own python sees the venv depends on the kernel:
 
-| | slicc-kernel without #168 | with slicc-kernel#168 |
+| | slicc-kernel < 1.29.0 | slicc-kernel ≥ 1.29.0 (#168) |
 | --- | --- | --- |
 | `v/bin/python`, `v/bin/pip`, venv console scripts | run as the **base** interpreter (they install into, and import from, the base) | run **in the venv** |
 | `source v/bin/activate; python …` | base interpreter (`python` on PATH is a link to the command) | in the venv |
