@@ -1,7 +1,11 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils", "@ai-ecoverse/wasm-tls-engine"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.28.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-tls-engine"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
     "@ai-ecoverse/wasm-coreutils@9.12.0-3",
@@ -18,6 +22,8 @@
     "--fail on 404 and 500 → rc 22, no body; without --fail the 404 body comes through, rc 0",
     "--compressed decodes a gzip body (zlib)",
     "TLS: --cacert with a CA that did not sign the kernel certificate → rc 60; -k accepts it; unreadable CA file → rc 77",
-    "local errors: unsupported scheme rc 1, unwritable -o path rc 23"
-  ]
+    "local errors: unsupported scheme rc 1, unwritable -o path rc 23",
+    "tailnet (homescoop#139, uplink): curl --noproxy '*' http://peer.tail1234.ts.net:8080/ resolves via the kernel resolver/uplink (family 4) and reaches the peer at 100.64.1.2:8080 with the right Host; names answered with 127.0.0.1 / 10.0.2.2 and unknown names → rc 6 'Could not resolve', nothing dialled; refused peer → rc 7"
+  ],
+  "uplink": true
 }
