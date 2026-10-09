@@ -38,6 +38,7 @@
     "commands": {
       "python3": {
         "wasm": "bin/python.wasm",
+        "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
           "PYTHONDONTWRITEBYTECODE": "1"
@@ -45,6 +46,7 @@
       },
       "python": {
         "wasm": "bin/python.wasm",
+        "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
           "PYTHONDONTWRITEBYTECODE": "1"

@@ -46,8 +46,9 @@ Whether a venv's own python sees the venv depends on the kernel:
 | `source v/bin/activate; python …` | base interpreter (`python` on PATH is a link to the command) | in the venv |
 | `uv run …` ([`@ai-ecoverse/wasix-uv-shim`](https://www.npmjs.com/package/@ai-ecoverse/wasix-uv-shim)) | in the venv | in the venv |
 
-The kernel change (slicc-kernel#168) passes a venv's `bin/python` path as
-`argv[0]`, which is how CPython finds the venv's `pyvenv.cfg`. Until then,
+`python` and `python3` set `"argv0Path": true`, so a kernel with
+slicc-kernel#168 passes a venv's `bin/python` path as `argv[0]`; that is
+how CPython finds the venv's `pyvenv.cfg`. Until then,
 use `uv run` or set `PYTHONEXECUTABLE=$PWD/v/bin/python`.
 
 3.14.2-10 is 3.14.2-9's files plus `sitecustomize.py`.
