@@ -51,7 +51,7 @@ export async function startRegistry ({ token } = {}) {
         if (!req.headers['npm-otp']) return json(res, 401, { error: 'OTP required' }, { 'www-authenticate': 'OTP' })
         return json(res, 200, { ok: true })
       }
-      const file = /^(.+)\/-\/[^/]+-(\d[^/]*)\.tgz$/.exec(name)
+      const file = /^(.+)\/-\/[^/]+?-(\d[^/]*)\.tgz$/.exec(name)
       if (file) {
         const entry = packages.get(file[1])?.versions[file[2]]
         if (!entry) return json(res, 404, { error: 'not found' })

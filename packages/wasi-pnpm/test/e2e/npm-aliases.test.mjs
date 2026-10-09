@@ -180,6 +180,27 @@ test('release age: unpinned npm i -g says which version to pin; pinned and help'
     const npx = await run(k, ['npx', 'hs90-not-installed'])
     assert.equal(npx.status, 127)
     assert.match(npx.stderr, /less than 24 h old; pin hs90-not-installed@x\.y\.z-n/)
+    // A scoped name keeps its scope in the advice (never the bare name).
+    for (const spec of ['@scope/x-missing', '@scope/x-missing@1.2.3']) {
+      const scoped = await run(k, ['npx', spec])
+      assert.equal(scoped.status, 127, `npx ${spec}: ${output(scoped)}`)
+      assert.match(scoped.stderr, /pin @scope\/x-missing@x\.y\.z-n/, `npx ${spec}: ${scoped.stderr}`)
+    }
+  } finally {
+    k.terminate()
+    await registry.close()
+  }
+})
+
+test('an x.y.z-n version, the shape of homescoop packages, installs from the registry', async () => {
+  const registry = await startRegistry()
+  registry.add('tiny-rev', '0.1.0-1', { main: 'index.js' }, { 'index.js': 'module.exports = "rev"\n' })
+  const k = await kernel()
+  try {
+    await writeJson(k, '/home/rev/package.json', { name: 'app', version: '1.0.0' })
+    const add = await run(k, ['npm', 'i', 'tiny-rev@0.1.0-1', '--registry', registry.base], '/home/rev')
+    assert.equal(add.status, 0, output(add))
+    assert.equal(await text(k, '/home/rev/node_modules/tiny-rev/index.js'), 'module.exports = "rev"\n')
   } finally {
     k.terminate()
     await registry.close()
