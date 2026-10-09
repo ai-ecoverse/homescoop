@@ -31,10 +31,11 @@ if [[ ! -f "$BLD/binutils/strings.wasm" || -n "${FORCE:-}" ]]; then
     cd "$BLD"
     BUILD_TRIPLE="$(cc -dumpmachine 2>/dev/null || echo x86_64-pc-linux-gnu)"
     # musl has these, but emsdk link probes say no and libiberty's own
-    # psignal/getpagesize then clash with the libc prototypes.
+    # psignal/getpagesize then clash with the libc prototypes. Exported:
+    # subdirectories are configured later, from make.
+    export ac_cv_func_psignal=yes ac_cv_func_getpagesize=yes
     env -u LDFLAGS -u CFLAGS -u CPPFLAGS -u LIBS \
       CC_FOR_BUILD=cc CXX_FOR_BUILD=c++ \
-      ac_cv_func_psignal=yes ac_cv_func_getpagesize=yes \
       emconfigure "$SRC/configure" \
         --build="$BUILD_TRIPLE" --host=wasm32-unknown-emscripten \
         --target=x86_64-pc-linux-gnu --enable-targets="$TARGETS" \
