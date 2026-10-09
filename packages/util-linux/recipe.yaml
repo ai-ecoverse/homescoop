@@ -1,0 +1,22 @@
+# util-linux text tools (rev, column, hexdump, colrm, look, getopt) for slicc.
+name: util-linux
+builder: host
+# renovate: datasource=github-tags depName=util-linux/util-linux extractVersion=^v(?<version>.*)$
+version: "2.42.4"
+npm: "@ai-ecoverse/wasm-util-linux"
+summary: "util-linux rev, column, hexdump, colrm, look and getopt for slicc"
+source:
+  url: "https://mirrors.kernel.org/pub/linux/utils/util-linux/v{{major}}.{{minor}}/util-linux-{{version}}.tar.xz"
+  sha256: "fbd62a100ab7bb8746ba0661255c3c48185b1e9021507c624da01fbc696330ec"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/util-linux
+  license: GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND MIT
+  notes: |
+    --disable-all-programs plus explicit text tools only; column links a
+    static libsmartcols. No mount/umount/libmount/libblkid: those are
+    @ai-ecoverse/wasm-mount (#62). col is left out (configure requires
+    glibc). Links the slicc gaps profile. New package → human cert.

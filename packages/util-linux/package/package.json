@@ -1,0 +1,63 @@
+{
+  "name": "@ai-ecoverse/wasm-util-linux",
+  "version": "2.42.4-1",
+  "description": "util-linux rev, column, hexdump, colrm, look and getopt for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/util-linux/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/util-linux",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "util-linux",
+    "rev",
+    "column",
+    "getopt"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "util-linux",
+    "upstream": "2.42.4"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "rev": {
+        "glue": "bin/rev",
+        "wasm": "bin/rev.wasm"
+      },
+      "column": {
+        "glue": "bin/column",
+        "wasm": "bin/column.wasm"
+      },
+      "hexdump": {
+        "glue": "bin/hexdump",
+        "wasm": "bin/hexdump.wasm"
+      },
+      "colrm": {
+        "glue": "bin/colrm",
+        "wasm": "bin/colrm.wasm"
+      },
+      "look": {
+        "glue": "bin/look",
+        "wasm": "bin/look.wasm"
+      },
+      "getopt": {
+        "glue": "bin/getopt",
+        "wasm": "bin/getopt.wasm"
+      }
+    }
+  }
+}
