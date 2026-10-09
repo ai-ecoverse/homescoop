@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # util-linux text tools: rev, column (+ static libsmartcols), hexdump, colrm,
-# look, getopt. Nothing that needs a real kernel interface.
+# look, getopt. Nothing that needs a real kernel interface. rev, colrm, look
+# and getopt are always on (UL_BUILD_INIT yes); column/hexdump need --enable.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
@@ -21,6 +22,16 @@ homescoop_slicc_archive "$SLICC_A" gaps
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=262144 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
 
+# Emscripten's <sys/syscall.h> names SYS_* (as __syscall_* functions) but
+# there is no syscall(); util-linux calls syscall(SYS_x) whenever SYS_x is
+# defined. Undefine every SYS_*/__NR_* it uses so it takes its fallbacks.
+NOSYS="$SRC/homescoop-nosyscall.h"
+{
+  echo '#include <sys/syscall.h>'
+  grep -rhoE '\b(SYS|__NR)_[a-z0-9_]+' "$SRC"/include "$SRC"/lib "$SRC"/text-utils \
+    "$SRC"/misc-utils "$SRC"/libsmartcols | sort -u | sed 's/^/#undef /'
+} > "$NOSYS"
+
 if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
   echo "== util-linux: emconfigure (text tools only)"
   (
@@ -32,9 +43,7 @@ if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
         --build="$BUILD_TRIPLE" --host=wasm32-unknown-emscripten \
         --disable-shared --enable-static \
         --disable-all-programs \
-        --enable-libsmartcols \
-        --enable-rev --enable-column --enable-hexdump \
-        --enable-colrm --enable-look --enable-getopt \
+        --enable-libsmartcols --enable-column --enable-hexdump \
         --disable-nls --disable-asciidoc --disable-poman \
         --disable-bash-completion --disable-makeinstall-chown \
         --disable-makeinstall-setuid \
@@ -43,7 +52,7 @@ if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
         --without-readline --without-libz --without-libmagic \
         --without-econf --without-cap-ng --without-btrfs --without-user \
         --without-selinux --without-audit \
-        CFLAGS="-O2"
+        CFLAGS="-O2 -include $NOSYS"
     homescoop_fix_darwin_ar Makefile
     jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
     emmake make -j"$jobs" "${PROGS[@]}" LDFLAGS="$CLI_LDFLAGS"
