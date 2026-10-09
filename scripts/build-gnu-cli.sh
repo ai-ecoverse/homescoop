@@ -44,7 +44,14 @@ CLI_LIBS="-Wl,--whole-archive ${SLICC_A} -Wl,--no-whole-archive"
 
 EXTRA_CFG=()
 case "$NAME" in
-  coreutils) EXTRA_CFG=(--enable-single-binary=symlinks --enable-no-install-program=stdbuf) ;;
+  coreutils)
+    # hostname is off by default (kill/uptime stay off: wasm-procps ships them).
+    EXTRA_CFG=(--enable-single-binary=symlinks --enable-no-install-program=stdbuf
+      --enable-install-program=hostname)
+    # timeout is only built when sigsuspend links; emsdk's probe says no.
+    # timeout-slicc.patch replaces fork/timers/sigsuspend with spawn + polling.
+    export ac_cv_func_sigsuspend=yes
+    ;;
   gawk) EXTRA_CFG=(--disable-extensions --disable-mpfr) ;;
 esac
 

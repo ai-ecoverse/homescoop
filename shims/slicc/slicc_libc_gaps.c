@@ -144,6 +144,15 @@ int setgroups(size_t size, const gid_t *list) {
   return 0;
 }
 
+// Emscripten has no sethostname. The realm user is not root, so setting the
+// host name (coreutils `hostname NAME`) is refused, as on Linux.
+int sethostname(const char *name, size_t len) {
+  (void)name;
+  (void)len;
+  errno = EPERM;
+  return -1;
+}
+
 // Default-linked programs need real pids from the wasm realm. Emscripten's
 // stubs answer getpid()=42 / getppid()=1. Weak so slicc_fork.c (ASYNCIFY
 // fork link) can override with its strong __syscall_getpid/getppid.

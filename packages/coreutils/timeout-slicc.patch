@@ -1,0 +1,165 @@
+--- a/src/timeout.c
++++ b/src/timeout.c
+@@ -53,6 +53,15 @@
+ # include <sys/prctl.h>
+ #endif
+ #include <sys/wait.h>
++#ifdef __EMSCRIPTEN__
++# include <spawn.h>
++# include <time.h>
++/* gnulib's spawn.h maps posix_spawnp to its fork-based rpl_posix_spawnp when
++   configure finds no working one (always, under emscripten); slicc's own
++   posix_spawnp spawns through the kernel.  */
++# undef posix_spawnp
++extern char **environ;
++#endif
+ 
+ #include "system.h"
+ #include "cl-strtod.h"
+@@ -243,11 +252,18 @@
+          newly created process group, so send to all processes in that.  */
+       if (!foreground)
+         {
+-          send_sig (0, sig);
++#ifdef __EMSCRIPTEN__
++          /* slicc: the command leads its own group (see slicc_timeout);
++             ours is the caller's, so never signal group 0.  */
++          int group = -monitored_pid;
++#else
++          int group = 0;
++#endif
++          send_sig (group, sig);
+           if (sig != SIGKILL && sig != SIGCONT)
+             {
+               send_sig (monitored_pid, SIGCONT);
+-              send_sig (0, SIGCONT);
++              send_sig (group, SIGCONT);
+             }
+         }
+     }
+@@ -260,6 +276,97 @@
+     }
+ }
+ 
++#ifdef __EMSCRIPTEN__
++static double
++slicc_elapsed (struct timespec const *start)
++{
++  struct timespec now;
++  clock_gettime (CLOCK_MONOTONIC, &now);
++  return (now.tv_sec - start->tv_sec) + (now.tv_nsec - start->tv_nsec) / 1e9;
++}
++
++/* slicc (wasm realm): there is no fork(), and no timer signal can interrupt
++   a blocked process.  Spawn the command through the kernel, give it its own
++   process group, and poll waitpid() with short sleeps, doing on the deadline
++   (and on --kill-after) what cleanup() does on SIGALRM.  Returns the child's
++   wait status, or -1 with *exit_status set if it could not be started.  */
++static int
++slicc_timeout (char **argv, double duration, sigset_t const *orig_set,
++               int *exit_status)
++{
++  pid_t pid;
++  int err = posix_spawnp (&pid, argv[0], NULL, NULL, argv, environ);
++  if (err != 0)
++    {
++      error (0, err, _("failed to run command %s"), quote (command));
++      *exit_status = err == ENOENT ? EXIT_ENOENT : EXIT_CANNOT_INVOKE;
++      return -1;
++    }
++  if (!foreground)
++    setpgid (pid, pid);
++  monitored_pid = pid;
++
++  struct timespec start;
++  clock_gettime (CLOCK_MONOTONIC, &start);
++  double deadline = duration;   /* 0: no timeout */
++  for (;;)
++    {
++      int status;
++      pid_t w = waitpid (pid, &status, WNOHANG);
++      if (w == pid)
++        return status;
++      if (w < 0 && errno != EINTR)
++        {
++          error (0, errno, _("error waiting for command"));
++          *exit_status = EXIT_CANCELED;
++          return -1;
++        }
++      if (0 < deadline && deadline <= slicc_elapsed (&start))
++        {
++          /* What cleanup (SIGALRM) does.  It would arm a timer for -k;
++             here -k is the next deadline, after which SIGKILL goes.  */
++          double next = kill_after ? slicc_elapsed (&start) + kill_after : 0;
++          kill_after = 0;
++          cleanup (SIGALRM);
++          if (next)
++            term_signal = SIGKILL;
++          deadline = next;
++        }
++      /* Let the cleanup signals in while we sleep, as sigsuspend() would.  */
++      sigset_t blocked;
++      sigprocmask (SIG_SETMASK, orig_set, &blocked);
++      struct timespec tick = { 0, 10 * 1000 * 1000 };
++      nanosleep (&tick, NULL);
++      sigprocmask (SIG_SETMASK, &blocked, NULL);
++    }
++}
++
++/* The exit status timeout reports for the command's wait status, as in the
++   fork path below.  */
++static int
++slicc_exit_status (int status)
++{
++  if (WIFEXITED (status))
++    status = WEXITSTATUS (status);
++  else if (WIFSIGNALED (status))
++    {
++      int sig = WTERMSIG (status);
++      /* Forcibly killed: let users tell (exit 128+9), as GNU does.  */
++      if (timed_out && sig == SIGKILL)
++        preserve_status = true;
++      status = sig + 128;
++    }
++  else
++    {
++      error (0, 0, _("unknown status from command (%d)"), status);
++      status = EXIT_FAILURE;
++    }
++  if (timed_out && !preserve_status)
++    status = EXIT_TIMEDOUT;
++  return status;
++}
++#endif
++
+ void
+ usage (int status)
+ {
+@@ -568,8 +675,10 @@
+      Note we don't just put the child in a separate group as
+      then we would need to worry about foreground and background groups
+      and propagating signals between them.  */
++#ifndef __EMSCRIPTEN__
+   if (!foreground)
+     setpgid (0, 0);
++#endif
+ 
+   /* Setup handlers before fork() so that we
+      handle any signals caused by child, without races.  */
+@@ -597,6 +706,16 @@
+      will return successfully and 'timeout' will have no way to determine if it
+      should exit with EXIT_CANNOT_INVOKE or EXIT_ENOENT upon checking the exit
+      status of the child.  */
++#ifdef __EMSCRIPTEN__
++  {
++    int spawn_exit;
++    int status = slicc_timeout (argv, timeout, &orig_set, &spawn_exit);
++    if (status < 0)
++      return spawn_exit;
++    monitored_pid = -1;   /* reaped: cleanup () must not signal it again */
++    return slicc_exit_status (status);
++  }
++#endif
+   monitored_pid = fork ();
+   if (monitored_pid == -1)
+     {
