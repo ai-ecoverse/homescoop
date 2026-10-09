@@ -43,4 +43,10 @@ for try in "$cmd" "$name"; do
   fi
 done
 echo "npx: '$name' is not installed; run 'npm i -g ${pkg:-$cmd}' (pnpm add -g) first" >&2
+# The package to pin keeps its scope (an unscoped name may be someone else's).
+spec=${pkg:-$cmd}
+case $spec in
+  @*/*@*|[!@]*@*) spec=${spec%@*} ;;
+esac
+echo "npx: pnpm skips releases less than 24 h old; pin $spec@x.y.z-n to install a newer one" >&2
 exit 127
