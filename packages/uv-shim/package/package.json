@@ -1,0 +1,43 @@
+{
+  "name": "@ai-ecoverse/wasix-uv-shim",
+  "version": "0.1.0-1",
+  "description": "uv venv / pip / run / add / sync for slicc: a shim over wasix-python's venv and pip, not Astral's uv",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/uv-shim/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/uv-shim",
+  "keywords": [
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "uv",
+    "pip"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "^3.14.2-9"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "uv-shim",
+    "upstream": "0.1.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "uv": {
+        "script": "bin/uv"
+      }
+    }
+  }
+}

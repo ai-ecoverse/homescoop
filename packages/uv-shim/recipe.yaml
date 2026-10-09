@@ -1,0 +1,20 @@
+# uv for slicc: a thin shim over python -m venv and pip (homescoop#103).
+# In-tree source (src/uv.py); Astral's uv does not build for WASI yet.
+name: uv-shim
+builder: host
+version: "0.1.0"
+npm: "@ai-ecoverse/wasix-uv-shim"
+summary: "uv venv / pip / run / add / sync for slicc, over wasix-python's pip"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/uv-shim
+  license: Apache-2.0
+  notes: |
+    A Python script command (slicc.commands.uv.script) run by wasix-python's
+    python3. Venvs are the base interpreter with PYTHONEXECUTABLE set to the
+    venv's bin/python, which site.venv() honours. Feasibility of the real uv:
+    homescoop#103. New package → human cert.
