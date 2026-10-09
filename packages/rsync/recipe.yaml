@@ -26,3 +26,6 @@ about:
     --no-J refused): slicc-kernel 1.29.2 fixed utimensat(AT_SYMLINK_NOFOLLOW)
     (slicc-kernel#170), so link times are set as upstream does; engines
     requires slicc-kernel >= 1.29.2.
+    3.4.4-3 links the netfork profile (socket shim, slicc_pwd, getpass) for
+    rsync:// and --daemon; ac_cv_func_getpass=yes keeps rsync's own
+    lib/getpass.o out.
