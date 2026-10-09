@@ -9,6 +9,12 @@ summary: "CPython 3.14 for slicc WASIX (commands python, python3)"
 source:
   url: "https://www.python.org/ftp/python/{{version}}/Python-{{version}}.tgz"
   sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+# Packaging-only builds (no WASIX_PYTHON_STAGE) repack this published
+# tarball byte for byte and add stdlib/ (build.sh).
+sources:
+  base:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-9.tgz"
+    sha256: "2b40ac613ad4849ef6435f8fe73303660e39164070774134bfdd866b2b895246"
 dependencies:
   build: []
   host: []
@@ -21,9 +27,9 @@ about:
     mmap enabled (override WASI n/a) with -D_WASI_EMULATED_MMAN -lwasi-emulated-mman.
     Bundled pip/ensurepip; zlib for gzip. Side modules dlopen by absolute path.
     wasix-libc patches (apply-wasix-libc-alarm-patch.sh):
-      - setitimer-it-value: setitimer/alarm → proc_raise_interval2 (initial+interval ns);
+      * setitimer-it-value: setitimer/alarm → proc_raise_interval2 (initial+interval ns);
         legacy 3-arg proc_raise_interval untouched (Wasmer ABI).
-      - clock-nanosleep-eintr: poll_oneoff EINTR → EINTR (not ENOTSUP); fill *rem on
+      * clock-nanosleep-eintr: poll_oneoff EINTR → EINTR (not ENOTSUP); fill *rem on
         relative sleep so time.sleep resumes after alarm (PEP 475).
     Apply when rebuilding the wasixcc sysroot linked into this package — ship with
     wasix-python only. Subprocess always posix_spawn (cwd via /bin/sh helper);
@@ -31,3 +37,6 @@ about:
     site+sysconfig _getuserbase for wasi $HOME/.local; _ssl/_hashlib via wasix-org/openssl;
     zlib/_bz2/_lzma static from wasix prefixes; uid stubs return 1000; Asyncify onlylist for fork/setjmp paths.
     build.sh ends with wipe+compileall --invalidation-mode unchecked-hash.
+    3.14.2-10 is packaging-only: -9's tarball (sources.base) plus
+    stdlib/sitecustomize.py, which sets sys.executable from PATH (WASI stat
+    has no permission bits, so getpath's isxfile never finds python).

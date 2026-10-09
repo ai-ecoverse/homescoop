@@ -47,4 +47,8 @@ if [[ -f "$SRC/jq.js" && ! -f "$SRC/jq" ]]; then mv "$SRC/jq.js" "$SRC/jq"; fi
 test -f "$SRC/jq.wasm" || test -f "$SRC/jq"
 homescoop_stage_cli "$SRC" jq
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE "$SRC"/COPYING.MIT
+homescoop_notices_begin "jq.wasm statically links the following. (decNumber and the dtoa code are covered by jq's own LICENSE.)"
+homescoop_notice "Oniguruma (vendored in jq $VERSION, --with-oniguruma=builtin)" \
+  "$SRC"/vendor/oniguruma/COPYING - "$SRC"/vendor/oniguruma/AUTHORS -
+homescoop_notice_emscripten
 echo "== jq: staged → $HOMESCOOP_PKG/package"

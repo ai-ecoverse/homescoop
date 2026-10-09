@@ -22,6 +22,9 @@ CompileError: WebAssembly.compile(): BufferSource argument is empty
 - `multicall.patch`: the first version of the dispatcher read the -1 that
   `pdfunite` returns on error as "unknown util" and printed the multi-call
   usage, rc 99. The last error case caught it, and it is now asserted.
+  The pdftocairo hint (26.10.0-2): the published 26.10.0-1, which runs
+  pdftocairo as plain pdftoppm, fails the `-svg` case, because pdftoppm's
+  usage comes first instead of the hint.
 - `object-array-rvalue.patch`: without it, `poppler/Annot.cc` and others fail
   to compile under emsdk 4.0.23 (`invalid application of 'sizeof' to an
   incomplete type 'Array'`).

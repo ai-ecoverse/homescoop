@@ -115,6 +115,25 @@ homescoop_stage_license() {
   return 1
 }
 
+# package/LICENSE from several upstream files, all required, in order
+# (e.g. freetype's LICENSE.TXT + docs/FTL.TXT + docs/GPLv2.TXT). Use it
+# when one file does not carry the whole licence; homescoop_stage_license
+# takes the first file that exists and keeps package/LICENSE otherwise.
+homescoop_stage_licenses() {
+  local dest="$HOMESCOOP_PKG/package/LICENSE" f first=1
+  mkdir -p "$HOMESCOOP_PKG/package"
+  for f in "$@"; do
+    test -s "$f" || { echo "homescoop_stage_licenses: missing $f" >&2; return 1; }
+  done
+  : >"$dest"
+  for f in "$@"; do
+    if ((first)); then first=0; else printf '\n' >>"$dest"; fi
+    if (($# > 1)); then printf '==> %s <==\n\n' "$(basename "$f")" >>"$dest"; fi
+    cat "$f" >>"$dest"
+    echo "== license ← $f"
+  done
+}
+
 homescoop_fetch() {
   # homescoop_fetch <url> <sha256> <tarball-path>
   local url="$1" sha="$2" tarball="$3"
@@ -240,6 +259,7 @@ homescoop_slicc_archive() {
   case "$profile" in
     gaps)
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
     spawn)
@@ -247,6 +267,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
     make)
@@ -257,6 +278,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_main_envp.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
@@ -269,6 +291,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
@@ -277,11 +300,13 @@ homescoop_slicc_archive() {
       # mount/umount: mount(2)/umount2(2) via sliccKernel (slicc-kernel#92).
       _homescoop_slicc_compile "$dir/slicc_mount.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       ;;
     less)
       # TUI pager: signals + gaps + jobs + pselect (no spawn).
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
@@ -293,6 +318,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
@@ -306,6 +332,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_exec.c"
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
       ;;
@@ -318,6 +345,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_popen.c"
       _homescoop_slicc_compile "$dir/slicc_fork.c"
       _homescoop_slicc_compile "$dir/slicc_libc_gaps.c"
+      _homescoop_slicc_compile "$dir/slicc_pwd.c"
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
@@ -355,7 +383,13 @@ homescoop_slicc_keep_spawn() {
 # Usage: LDFLAGS="$(homescoop_slicc_link_archive "$SLICC_A") $(homescoop_em_cli_ldflags)"
 homescoop_slicc_link_archive() {
   local archive="$1"
-  printf '%s' "$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) -Wl,--whole-archive ${archive} -Wl,--no-whole-archive"
+  printf '%s' "$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_slicc_wrap_pwd) -Wl,--whole-archive ${archive} -Wl,--no-whole-archive"
+}
+
+# slicc_pwd.c: getpwuid/getpwnam/getpwent are strong in Emscripten's libc
+# stubs, so the shim defines __wrap_* and the link redirects to them.
+homescoop_slicc_wrap_pwd() {
+  printf '%s' "-Wl,--wrap=getpwuid -Wl,--wrap=getpwnam -Wl,--wrap=getpwent"
 }
 
 # Extra link flags for the fork js-library (bash). Pair with profile fork.

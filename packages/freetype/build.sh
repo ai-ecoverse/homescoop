@@ -35,5 +35,5 @@ mkdir -p "$HOMESCOOP_PKG/package/include" "$PREFIX/include"
 cp -R "$SRC_DIR/include/." "$HOMESCOOP_PKG/package/include/"
 cp -R "$SRC_DIR/include/." "$PREFIX/include/"
 homescoop_write_pc freetype2 "$VERSION" "-lfreetype"
-homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
+homescoop_stage_licenses "$SRC_DIR"/LICENSE.TXT "$SRC_DIR"/docs/FTL.TXT "$SRC_DIR"/docs/GPLv2.TXT
 echo "== freetype: staged → $HOMESCOOP_PKG/package"

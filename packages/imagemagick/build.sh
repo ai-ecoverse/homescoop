@@ -97,4 +97,25 @@ test -f "$CFG_DEST/colors.xml"
 
 # argv0 aliases are declared in package.json (convert/identify/mogrify → magick).
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
+homescoop_notices_begin "magick.wasm statically links the following delegate libraries (no MPEG-family codec; video formats would need an external ffmpeg, which is not shipped)."
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+homescoop_notice "libjpeg-turbo 3.1.2 (@ai-ecoverse/wasm-libjpeg-turbo)" \
+  https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.2/LICENSE.md 2189dc45a8fe96204069f8124caa53a148dfdc193f50f584c6ca7849a6072872 \
+  https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.2/README.ijg 75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6
+homescoop_notice "libpng 1.6.59 (@ai-ecoverse/wasm-libpng)" \
+  https://raw.githubusercontent.com/pnggroup/libpng/v1.6.59/LICENSE bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526
+homescoop_notice "Little CMS 2.19.1 (@ai-ecoverse/wasm-lcms2)" \
+  https://raw.githubusercontent.com/mm2/Little-CMS/lcms2.19.1/LICENSE 6dbd60437f8ef91d8de1f08ad75882547fd4931bfcc3566a0735f28db1484d31
+homescoop_notice "LibTIFF 4.7.2 (@ai-ecoverse/wasm-libtiff)" \
+  https://gitlab.com/libtiff/libtiff/-/raw/v4.7.2/LICENSE.md 0e27c2382d7b8147972bbb746e04059a1152c8d0fda9d03ef1399d1a433c4ade
+homescoop_notice "libwebp 1.5.0 (@ai-ecoverse/wasm-libwebp)" \
+  https://raw.githubusercontent.com/webmproject/libwebp/v1.5.0/COPYING 5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf \
+  https://raw.githubusercontent.com/webmproject/libwebp/v1.5.0/PATENTS cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c
+homescoop_notice "OpenJPEG 2.5.3 (@ai-ecoverse/wasm-openjpeg)" \
+  https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.3/LICENSE a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6
+homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the FreeType License" \
+  https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/LICENSE.TXT 2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b \
+  https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1
+homescoop_notice_emscripten
 echo "== imagemagick: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7"

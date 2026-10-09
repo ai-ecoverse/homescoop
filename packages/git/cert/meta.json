@@ -1,10 +1,18 @@
 {
   "harness": "slicc-kernel",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.28.0",
+  "uplink": true,
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "checklist": [
     "local bare-repo init",
     "clone",
     "push",
-    "fetch"
+    "fetch",
+    "a local init / commit / clone (default ident from the hostname for the reflog) / log makes zero uplink queries (the shim answers gethostname() locally)",
+    "tailnet (homescoop#139, uplink): git ls-remote http://peer.tail1234.ts.net:8080/repo.git (no_proxy=*) resolves via the kernel resolver/uplink (family 4), dials 100.64.1.2:8080, sends GET /repo.git/info/refs?service=git-upload-pack with the right Host, and prints the advertised HEAD and refs/heads/main",
+    "a name answered with 127.0.0.1 → rc 128 'Could not resolve', nothing dialled"
   ]
 }

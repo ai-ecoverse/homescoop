@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-curl",
-  "version": "8.22.0-1",
+  "version": "8.22.0-4",
   "description": "curl 8.22 + libcurl (Mbed TLS, zlib, HTTP/1.1) for wasm / slicc",
   "license": "curl",
   "repository": {
@@ -9,14 +9,37 @@
     "directory": "packages/curl/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/curl",
-  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "curl", "libcurl", "mbedtls"],
-  "files": ["README.md", "LICENSE", "bin", "lib", "include"],
-  "publishConfig": { "access": "public" },
-  "homescoop": { "recipe": "curl", "upstream": "8.22.0" },
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "curl",
+    "libcurl",
+    "mbedtls"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "lib",
+    "include"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "curl",
+    "upstream": "8.22.0"
+  },
   "slicc": {
     "abi": "emscripten",
     "commands": {
-      "curl": { "glue": "bin/curl", "wasm": "bin/curl.wasm" }
+      "curl": {
+        "glue": "bin/curl",
+        "wasm": "bin/curl.wasm"
+      }
     }
   }
 }
