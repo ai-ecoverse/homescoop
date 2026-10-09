@@ -17,7 +17,7 @@ homescoop_load_recipe wasix-gnupg
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-2"
+PKG_VER="${VER}-3"
 WORK="${WASIX_GNUPG_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
@@ -163,6 +163,18 @@ cp "$BUILD/libksba-1.8.1/COPYING.GPLv2" "$DEST/licenses/libksba-COPYING.GPLv2"
 cp "$BUILD/npth-1.8/COPYING.LIB" "$DEST/licenses/npth-COPYING.LIB"
 cp "$PKG"/patches/* "$DEST/patches/"
 
+# The libraries' licences are in licenses/ (above). The wasix libc is linked
+# in too; its licence files are pinned by tag (the sysroot is a 2025-09-30
+# snapshot of wasix-libc, so this is the nearest earlier tag).
+homescoop_notices_begin "The gpg, gpgv, gpg-agent, gpgconf and gpg-connect-agent wasm modules statically link libgpg-error 1.61, libgcrypt 1.12.4, libassuan 3.0.2, libksba 1.8.1 and npth 1.8 (licences in licenses/, sources in SOURCES.md) and the following."
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30; files from tag v2025-09-02.1)" \
+  "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
+  "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
+  "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
+  "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
+  "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
+
 {
   echo "# Sources"
   echo
@@ -198,7 +210,7 @@ pkg = {
     "version": pkg_ver,
     "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent",
     "license": "GPL-3.0-or-later",
-    "files": ["README.md", "LICENSE", "SOURCES.md", "bin", "licenses", "patches"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses", "patches"],
     "publishConfig": {"access": "public"},
     "homescoop": {
         "recipe": "wasix-gnupg",
