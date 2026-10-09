@@ -6,7 +6,7 @@ No patches. Not in `scripts/ci-certified.json`.
 ## Empty wasm
 
 With `bin/nano.wasm` truncated to 0 bytes, the checklist fails at the first
-`nano` (slicc-kernel 1.23.0, Node entry):
+`nano` (slicc-kernel 1.23.0, Node entry; certified on 1.26.6):
 
 ```
 CompileError: WebAssembly.compile(): BufferSource argument is empty
