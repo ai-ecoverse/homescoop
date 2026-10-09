@@ -55,7 +55,9 @@ if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
         CFLAGS="-O2 -include $NOSYS"
     homescoop_fix_darwin_ar Makefile
     jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
-    emmake make -j"$jobs" "${PROGS[@]}" LDFLAGS="$CLI_LDFLAGS"
+    # libtool drops emcc's -s… link flags from LDFLAGS (no callMain in the
+    # glue); it keeps the compiler command whole, so link through CCLD.
+    emmake make -j"$jobs" V=1 "${PROGS[@]}" CCLD="emcc $CLI_LDFLAGS"
   )
 fi
 
