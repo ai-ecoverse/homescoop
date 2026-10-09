@@ -22,9 +22,9 @@ the patch the same run passes every case.
 
 ## Empty wasm
 
-`prove-negative.mjs --package wasi-esbuild` replaces `bin/esbuild.wasm` with
-an empty file; the first `run` fails (`WebAssembly.compile(): BufferSource
-argument is empty`).
+`bin/esbuild.wasm` replaced with an empty file (what `prove-negative.mjs`
+does), `cert/checklist.mjs` on slicc-kernel 1.23.0's Node entry → FAIL
+(`CompileError: WebAssembly.compile(): BufferSource argument is empty`).
 
 ## Wrong-output cases (in-spec)
 
