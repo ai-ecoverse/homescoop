@@ -597,14 +597,19 @@ test('pnpm_host runs a package script through the kernel sh (pnpm run)', () => {
   const ctx = gitContext()
   const { pnpm_host: host } = createImports(ctx)
   const start = request => host.operation_start(...put(ctx, 64, JSON.stringify(request)))
-  const spawned = response(ctx, host, start({ operation: 'shell.spawn', script: 'echo built > out.txt', args: ['a b'], env: { PATH: '/usr/bin', PNPM_SLICC_X: 'y' }, cwd: '/home/app', stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' }))
+  // What pnpm run sends: process.spawn of sh -c '<script>'.
+  const spawned = response(ctx, host, start({ operation: 'process.spawn', program: 'sh', script: null, args: ['-c', 'echo built > out.txt'], env: { PATH: '/usr/bin', PNPM_SLICC_X: 'y' }, cwd: '/home/app', stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' }))
   assert.equal(spawned.ok, true)
   assert.equal(spawned.value.pid, 7)
-  assert.deepEqual(ctx.spawned[0].argv, ['sh', '-c', 'echo built > out.txt', 'sh', 'a b'])
+  assert.deepEqual(ctx.spawned[0].argv, ['sh', '-c', 'echo built > out.txt'])
   assert.equal(ctx.spawned[0].env.PNPM_SLICC_X, undefined)
   assert.deepEqual([ctx.spawned[0].cwd, ctx.spawned[0].stdin, ctx.spawned[0].stdout], ['/home/app', 'inherit', 'inherit'])
+  // A shell.spawn with a script string runs the same way.
+  response(ctx, host, start({ operation: 'shell.spawn', script: 'echo hi', args: ['a b'] }))
+  assert.deepEqual(ctx.spawned[1].argv, ['sh', '-c', 'echo hi', 'sh', 'a b'])
+  // Other programs stay refused.
+  assert.match(response(ctx, host, start({ operation: 'process.spawn', program: 'node', args: ['x.js'] })).error.message, /--ignore-scripts/)
   ctx.spawn = () => { throw Object.assign(new Error('no sh'), { code: 'ENOENT' }) }
-  const missing = response(ctx, host, start({ operation: 'shell.spawn', script: 'true' }))
+  const missing = response(ctx, host, start({ operation: 'process.spawn', program: '/bin/sh', args: ['-c', 'true'] }))
   assert.equal(missing.error.message, SH_MISSING)
 })
-
