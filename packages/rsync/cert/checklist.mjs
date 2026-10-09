@@ -109,40 +109,47 @@ export default async function (ctx) {
   assert.equal((await ok('cat cd/f')).stdout, 'AAAA\n');
 
   // Symlinks: relative, absolute (into the source tree), to a directory and
-  // dangling. Link times are never set (slicc-kernel#170:
-  // utimensat(AT_SYMLINK_NOFOLLOW) follows the link, so it would stamp the
-  // targets, source files included): -J is the default, and turning it off
-  // is refused. Every option set leaves the source untouched.
+  // dangling, with link mtimes of their own. slicc-kernel >= 1.29.2 sets link
+  // times without following the link (slicc-kernel#170), so -a preserves
+  // them as upstream does; -J / --omit-link-times leave them alone, and the
+  // last of -J / --no-J wins. Every option set copies with rc 0, never
+  // touches the source (the absolute link points into it), and a re-run is
+  // quiet.
   await ok(
     'mkdir -p ls/sub && echo t > ls/t.txt && echo s > ls/sub/f && ' +
       'touch -d @1577934245 ls/t.txt ls/sub/f && touch -d @1620284889 ls/sub && ' +
-      'ln -s t.txt ls/rel && ln -s /home/rs/ls/t.txt ls/abs && ln -s sub ls/dl && ln -s nowhere ls/dang',
+      'ln -s t.txt ls/rel && ln -s /home/rs/ls/t.txt ls/abs && ln -s sub ls/dl && ln -s nowhere ls/dang && ' +
+      'touch -h -d @1001001001 ls/rel ls/abs ls/dl ls/dang',
   );
   const targets = 'stat -c "%n %Y" ls/t.txt ls/sub ls/sub/f';
   const before = (await ok(targets)).stdout;
-  const kept = [['-a'], ['-a', '-J'], ['-a', '--omit-link-times'], ['-a', '--times']];
-  const refused = [['-a', '--no-omit-link-times'], ['-a', '--no-J'], ['-a', '-t', '--no-J'], ['-a', '-J', '--no-omit-link-times']];
-  for (const [i, opts] of kept.entries()) {
+  const linkTimes = (dir) => ok(`stat -c "%n %Y" ${dir}/rel ${dir}/abs ${dir}/dl ${dir}/dang`);
+  assert.equal((await linkTimes('ls')).stdout, 'ls/rel 1001001001\nls/abs 1001001001\nls/dl 1001001001\nls/dang 1001001001\n',
+    'touch -h did not set the source links\' own times (kernel < 1.29.2?)');
+  assert.equal((await ok(targets)).stdout, before, 'touch -h changed the link targets');
+  const matrix = [
+    [['-a'], true], [['-a', '-J'], false], [['-a', '--omit-link-times'], false], [['-a', '--times'], true],
+    [['-a', '--no-omit-link-times'], true], [['-a', '--no-J'], true], [['-a', '-t', '--no-J'], true],
+    [['-a', '-J', '--no-omit-link-times'], true],
+  ];
+  for (const [i, [opts, keeps]] of matrix.entries()) {
     const dst = `ld${i}`;
-    const r = await ok(`rsync ${opts.join(' ')} -i ls/ ${dst}/`);
+    const name = opts.join(' ');
+    const r = await ok(`rsync ${name} -i ls/ ${dst}/`);
     for (const line of ['cL+++++++++ abs -> /home/rs/ls/t.txt', 'cL+++++++++ dang -> nowhere', 'cL+++++++++ dl -> sub', 'cL+++++++++ rel -> t.txt']) {
-      assert.ok(lines(r.stdout).includes(line), `${opts.join(' ')}: missing "${line}" in:\n${r.stdout}`);
+      assert.ok(lines(r.stdout).includes(line), `${name}: missing "${line}" in:\n${r.stdout}`);
     }
     const read = await ok(`for l in rel abs dl dang; do echo "$l $(readlink ${dst}/$l)"; done`);
-    assert.equal(read.stdout, 'rel t.txt\nabs /home/rs/ls/t.txt\ndl sub\ndang nowhere\n', opts.join(' '));
-    assert.equal((await ok(targets)).stdout, before, `${opts.join(' ')} changed the source's mtimes`);
-    assert.equal((await ok(`stat -c %Y ${dst}/t.txt ${dst}/sub`)).stdout, '1577934245\n1620284889\n');
+    assert.equal(read.stdout, 'rel t.txt\nabs /home/rs/ls/t.txt\ndl sub\ndang nowhere\n', name);
+    assert.equal((await ok(targets)).stdout, before, `${name} changed the source's mtimes`);
+    assert.equal((await ok(`stat -c %Y ${dst}/t.txt ${dst}/sub`)).stdout, '1577934245\n1620284889\n', `${name}: file/dir mtimes`);
+    const lt = (await linkTimes(dst)).stdout.split('\n').filter(Boolean).map((l) => l.split(' ')[1]);
+    if (keeps) assert.deepEqual(lt, ['1001001001', '1001001001', '1001001001', '1001001001'], `${name}: link times not preserved`);
+    else assert.ok(lt.every((t) => t !== '1001001001'), `${name}: -J set link times ${lt}`);
     assert.equal((await ok(`cat ${dst}/rel ${dst}/dl/f`)).stdout, 't\ns\n');
-    const again = await ok(`rsync ${opts.join(' ')} -i ls/ ${dst}/`);
-    assert.equal(again.stdout, '', `${opts.join(' ')} re-run itemized:\n${again.stdout}`);
-  }
-  for (const opts of refused) {
-    const r = await sh(`rsync ${opts.join(' ')} -i ls/ lr/`);
-    assert.equal(r.status, 1, `${opts.join(' ')}: rc=${r.status} stderr=${r.stderr}`);
-    assert.match(r.stderr, /--no-omit-link-times\/--no-J is not supported on slicc-kernel: .*slicc-kernel#170/);
-    assert.equal(r.stdout, '', `${opts.join(' ')} transferred: ${r.stdout}`);
-    assert.equal((await sh('ls lr')).status, 2, `${opts.join(' ')} created lr/`);
-    assert.equal((await ok(targets)).stdout, before, `${opts.join(' ')} changed the source's mtimes`);
+    const again = await ok(`rsync ${name} -i ls/ ${dst}/`);
+    assert.equal(again.stdout, '', `${name} re-run itemized:\n${again.stdout}`);
+    assert.equal((await ok(targets)).stdout, before, `${name} re-run changed the source`);
   }
 
   // A missing source: upstream's exit code 23 and message.

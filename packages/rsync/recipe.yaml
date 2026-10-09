@@ -22,3 +22,7 @@ about:
     slicc-kernel fork starts a real concurrent process. Bundled zlib and
     popt; no OpenSSL, xxhash, zstd, lz4, iconv, ACLs or xattrs. Remote
     ssh/daemon sync waits for kernel networking. New package → human cert.
+    3.4.4-2 drops 3.4.4-1's slicc-omit-link-times.patch (-J by default,
+    --no-J refused): slicc-kernel 1.29.2 fixed utimensat(AT_SYMLINK_NOFOLLOW)
+    (slicc-kernel#170), so link times are set as upstream does; engines
+    requires slicc-kernel >= 1.29.2.
