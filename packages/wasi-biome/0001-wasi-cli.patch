@@ -4,7 +4,10 @@ sockets or a child process does not.
 
 - service/wasi.rs: WASI has no domain sockets and cannot start a daemon, so
   `--use-server` finds no server and start/lsp-proxy/__run_server/
-  __print_socket report ErrorKind::Unsupported.
+  __print_socket report ErrorKind::Unsupported. __run_server refuses before
+  it starts the file watcher (the runtime would wait for it forever).
+- --watch on check/format/lint: WASI has no file system events; refuse
+  with the same Unsupported diagnostic instead of hanging.
 - `biome upgrade` replaces the binary with an HTTPS download; on WASI it
   explains that the package manager upgrades it, and reqwest/self_update
   (rustls, ring) are left out of the wasi dependency graph.
@@ -46,6 +49,53 @@ diff --git a/crates/biome_cli/Cargo.toml b/crates/biome_cli/Cargo.toml
  [target."cfg(unix)".dependencies]
  libc  = "0.2.184"
  tokio = { workspace = true, features = ["process"] }
+diff --git a/crates/biome_cli/src/commands/daemon.rs b/crates/biome_cli/src/commands/daemon.rs
+--- a/crates/biome_cli/src/commands/daemon.rs
++++ b/crates/biome_cli/src/commands/daemon.rs
+@@ -68,6 +68,14 @@
+     watcher_options: WatcherOptions,
+     log_options: LogOptions,
+ ) -> Result<(), CliDiagnostic> {
++    // WASI cannot serve the daemon socket; refuse before the file watcher
++    // starts, since the runtime would wait for it forever.
++    #[cfg(target_os = "wasi")]
++    return Err(CliDiagnostic::io_error(std::io::Error::new(
++        std::io::ErrorKind::Unsupported,
++        "the Biome daemon needs sockets and child processes, which this WASI build does not have",
++    )));
++
+     setup_daemon_subscriber(
+         log_options.log_path.clone(),
+         log_options.log_prefix_name.clone(),
+diff --git a/crates/biome_cli/src/commands/mod.rs b/crates/biome_cli/src/commands/mod.rs
+--- a/crates/biome_cli/src/commands/mod.rs
++++ b/crates/biome_cli/src/commands/mod.rs
+@@ -52,6 +52,10 @@
+ pub(crate) mod migrate;
+ pub(crate) mod rage;
+ pub(crate) mod search;
++#[cfg(not(target_os = "wasi"))]
++pub(crate) mod upgrade;
++#[cfg(target_os = "wasi")]
++#[path = "upgrade_wasi.rs"]
+ pub(crate) mod upgrade;
+ pub(crate) mod version;
+ 
+diff --git a/crates/biome_cli/src/commands/upgrade_wasi.rs b/crates/biome_cli/src/commands/upgrade_wasi.rs
+--- /dev/null
++++ b/crates/biome_cli/src/commands/upgrade_wasi.rs
+@@ -0,0 +1,11 @@
++use crate::{CliDiagnostic, CliSession};
++
++/// `biome upgrade` replaces the running binary with a release downloaded over
++/// HTTPS. A WASI build has neither, and comes from an npm package: upgrade
++/// that package instead.
++pub(crate) fn upgrade(_session: CliSession) -> Result<(), CliDiagnostic> {
++    Err(CliDiagnostic::upgrade_error(
++        "`biome upgrade` is not available in the WASI build. Upgrade Biome with the package manager you installed it with.",
++        None,
++    ))
++}
 diff --git a/crates/biome_cli/src/main.rs b/crates/biome_cli/src/main.rs
 --- a/crates/biome_cli/src/main.rs
 +++ b/crates/biome_cli/src/main.rs
@@ -63,20 +113,25 @@ diff --git a/crates/biome_cli/src/main.rs b/crates/biome_cli/src/main.rs
      let mut console = EnvConsole::default();
      let command = biome_command().fallback_to_usage().run();
  
-diff --git a/crates/biome_cli/src/commands/mod.rs b/crates/biome_cli/src/commands/mod.rs
---- a/crates/biome_cli/src/commands/mod.rs
-+++ b/crates/biome_cli/src/commands/mod.rs
-@@ -52,6 +52,10 @@
- pub(crate) mod migrate;
- pub(crate) mod rage;
- pub(crate) mod search;
-+#[cfg(not(target_os = "wasi"))]
-+pub(crate) mod upgrade;
-+#[cfg(target_os = "wasi")]
-+#[path = "upgrade_wasi.rs"]
- pub(crate) mod upgrade;
- pub(crate) mod version;
+diff --git a/crates/biome_cli/src/runner/mod.rs b/crates/biome_cli/src/runner/mod.rs
+--- a/crates/biome_cli/src/runner/mod.rs
++++ b/crates/biome_cli/src/runner/mod.rs
+@@ -273,6 +273,15 @@
+             ));
+         }
  
++        // WASI has no file system events, and the watcher never returns.
++        #[cfg(target_os = "wasi")]
++        if self.is_watch_mode() {
++            return Err(CliDiagnostic::io_error(std::io::Error::new(
++                std::io::ErrorKind::Unsupported,
++                "--watch needs file system events, which this WASI build does not have",
++            )));
++        }
++
+         let watcher_factory = session.watcher_factory.take();
+ 
+         let console = &mut *session.app.console;
 diff --git a/crates/biome_cli/src/service/mod.rs b/crates/biome_cli/src/service/mod.rs
 --- a/crates/biome_cli/src/service/mod.rs
 +++ b/crates/biome_cli/src/service/mod.rs
@@ -94,21 +149,6 @@ diff --git a/crates/biome_cli/src/service/mod.rs b/crates/biome_cli/src/service/
  /// Tries to open a connection to a running daemon instance, returning a
  /// [WorkspaceTransport] instance if the socket is currently active
  pub fn open_transport(runtime: Runtime) -> io::Result<Option<impl WorkspaceTransport>> {
-diff --git a/crates/biome_cli/src/commands/upgrade_wasi.rs b/crates/biome_cli/src/commands/upgrade_wasi.rs
---- /dev/null
-+++ b/crates/biome_cli/src/commands/upgrade_wasi.rs
-@@ -0,0 +1,11 @@
-+use crate::{CliDiagnostic, CliSession};
-+
-+/// `biome upgrade` replaces the running binary with a release downloaded over
-+/// HTTPS. A WASI build has neither, and comes from an npm package: upgrade
-+/// that package instead.
-+pub(crate) fn upgrade(_session: CliSession) -> Result<(), CliDiagnostic> {
-+    Err(CliDiagnostic::upgrade_error(
-+        "`biome upgrade` is not available in the WASI build. Upgrade Biome with the package manager you installed it with.",
-+        None,
-+    ))
-+}
 diff --git a/crates/biome_cli/src/service/wasi.rs b/crates/biome_cli/src/service/wasi.rs
 --- /dev/null
 +++ b/crates/biome_cli/src/service/wasi.rs

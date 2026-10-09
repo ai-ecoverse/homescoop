@@ -3,8 +3,9 @@
  * @ai-ecoverse/slicc-shared-web/biome (its real 1.10.1 config, from
  * fixtures/) through node_modules, with a .gitignore. check, format --write,
  * lint (including the type-aware nursery/noFloatingPromises across files),
- * stdin formatting, a bad configuration, and the daemon and upgrade
- * commands this WASI build refuses.
+ * ci, stdin formatting, a bad configuration, and what this WASI build
+ * refuses with a clear message (no panic, no hang): the daemon and LSP
+ * commands, --use-server, --watch and upgrade.
  */
 import { readFileSync } from 'node:fs';
 
@@ -34,6 +35,9 @@ export default async function (ctx) {
   const clean = await biome(['check', '.']);
   assert.equal(clean.status, 0, `clean check stdout=${clean.stdout} stderr=${clean.stderr}`);
   assert.match(clean.stdout, /^Checked 4 files in \d+(\.\d+)?m?s\. No fixes applied\.$/m);
+  const ciClean = await biome(['ci', '--colors=off', '.']);
+  assert.equal(ciClean.status, 0, `clean ci stdout=${ciClean.stdout} stderr=${ciClean.stderr}`);
+  assert.match(ciClean.stdout, /^Checked 4 files in .*\. No fixes applied\.$/m);
 
   // A floating promise (type-aware, across files) and an unformatted file.
   await write(`${A}/src/index.ts`, "import { load } from './fetch';\n\nexport function main(): void {\n  load('a');\n}\n");
@@ -44,6 +48,11 @@ export default async function (ctx) {
   assert.match(dirty.stderr, /src\/fmt\.ts format/);
   assert.match(dirty.stderr, /src\/index\.ts:4:3 lint\/nursery\/noFloatingPromises/);
   assert.doesNotMatch(dirty.stderr, /dist\/bundle\.js|node_modules/, '.gitignore not honored');
+  const ciDirty = await biome(['ci', '--colors=off', '.']);
+  assert.equal(ciDirty.status, 1, `dirty ci stdout=${ciDirty.stdout}`);
+  assert.match(ciDirty.stdout, /Checked 5 files in .*\nFound 2 errors\./);
+  assert.match(ciDirty.stderr, /src\/fmt\.ts format/);
+  assert.match(ciDirty.stderr, /src\/index\.ts:4:3 lint\/nursery\/noFloatingPromises/);
 
   const fmt = await biome(['format', '--write', '.']);
   assert.equal(fmt.status, 0, `format --write stderr=${fmt.stderr}`);
@@ -64,16 +73,30 @@ export default async function (ctx) {
   assert.equal(stdin.status, 0, `stdin format stderr=${stdin.stderr}`);
   assert.equal(stdin.stdout, "let a = 'b';\n");
 
-  // No daemon (sockets, child processes) and no self-upgrade in this build.
-  const start = await biome(['start']);
-  assert.equal(start.status, 1);
-  assert.match(start.stderr, /the Biome daemon needs sockets and child processes/);
-  const server = await biome(['check', '--use-server', '.']);
-  assert.equal(server.status, 1);
-  assert.match(server.stderr, /No running instance of the Biome daemon server was found/);
-  const upgrade = await biome(['upgrade']);
-  assert.equal(upgrade.status, 1);
-  assert.match(upgrade.stderr, /`biome upgrade` is not available in the WASI build/);
+  // Refused with a clear message, not a panic (134) or a hang: no daemon or
+  // LSP (sockets, child processes), no file system events, no self-upgrade.
+  const refuses = async (args, message) => {
+    const r = await Promise.race([
+      biome(args, { stdin: '' }),
+      new Promise((resolve) => setTimeout(() => resolve({ status: 'hung', stdout: '', stderr: '' }), 60_000)),
+    ]);
+    assert.equal(r.status, 1, `biome ${args.join(' ')} → ${r.status} stderr=${r.stderr}`);
+    assert.match(r.stderr, message, `biome ${args.join(' ')}`);
+  };
+  const daemon = /the Biome daemon needs sockets and child processes, which this WASI build does not have/;
+  await refuses(['start'], daemon);
+  await refuses(['lsp-proxy'], daemon);
+  await refuses(['__run_server'], daemon);
+  await refuses(['__print_socket'], daemon);
+  await refuses(['check', '--use-server', '.'], /No running instance of the Biome daemon server was found/);
+  const watch = /--watch needs file system events, which this WASI build does not have/;
+  await refuses(['check', '--watch', '.'], watch);
+  await refuses(['format', '--watch', '.'], watch);
+  await refuses(['lint', '--watch', 'src'], watch);
+  await refuses(['upgrade'], /`biome upgrade` is not available in the WASI build/);
+  const stop = await biome(['stop']);
+  assert.equal(stop.status, 0, `stop stderr=${stop.stderr}`);
+  assert.match(stop.stdout, /The Biome server was not running/);
 
   await write(`${A}/biome.json`, '{ "formatter": { "indentWidth": "two" } }\n');
   const badConfig = await biome(['check', '.']);

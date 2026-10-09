@@ -11,10 +11,11 @@
     "biome format --write . → exit 0, Fixed 1 file, exact single-quoted/semicolon output, ignored file untouched",
     "biome lint src → exit 1 with noFloatingPromises; after `void` the check passes",
     "biome format --stdin-file-path=src/x.ts with stdin → formatted to stdout",
-    "biome start → exit 1 (no daemon in WASI); check --use-server → exit 1, no running server; biome upgrade → exit 1 with the WASI message",
+    "biome ci . → exit 0 on the clean project, exit 1 with both errors on the dirty one",
+    "refused with a clear message (exit 1, no panic, no hang within 60 s): start, lsp-proxy, __run_server, __print_socket (daemon), check --use-server (no server), check/format/lint --watch (no file system events), upgrade; stop → exit 0, server not running",
     "invalid biome.json → exit 1, indentWidth has an incorrect type"
   ],
   "patches": {
-    "0001-wasi-cli.patch": "service/wasi.rs → biome start / --use-server cases; upgrade_wasi.rs and the Cargo.toml move → biome upgrade case (and the build: with reqwest in the graph biome_cli does not compile for wasm); PWD → every case in /home/app (extends from node_modules fails with PWD=/); biome_fs temp_dir → every case, --version included (exit 134 without it)"
+    "0001-wasi-cli.patch": "service/wasi.rs and the run_server early return → start / lsp-proxy / __run_server / __print_socket / --use-server / stop cases; the runner's --watch refusal → check/format/lint --watch cases; upgrade_wasi.rs and the Cargo.toml move → biome upgrade case (and the build: with reqwest in the graph biome_cli does not compile for wasm); PWD → every case in /home/app (extends from node_modules fails with PWD=/); biome_fs temp_dir → every case, --version included (exit 134 without it)"
   }
 }

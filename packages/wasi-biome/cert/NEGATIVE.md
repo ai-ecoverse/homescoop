@@ -41,6 +41,15 @@ biome check . → 1
   Caused by: Could not resolve @ai-ecoverse/slicc-shared-web/biome: module not found
 ```
 
+## run_server and --watch hunks
+
+The build before them (CI artifact 111ce5e3…, run 37942614733) on
+slicc-kernel 1.23.0's Node entry: `biome __run_server` printed nothing and
+was still running when the 180 s guard stopped it (it starts the file
+watcher on a blocking thread, and dropping the tokio runtime waits for it),
+and `biome check --watch .` printed nothing in 60 s, not even the first
+run. The cert's refusal cases fail on a hang after 60 s.
+
 ## Empty wasm
 
 `bin/biome.wasm` replaced with an empty file (what `prove-negative.mjs`
