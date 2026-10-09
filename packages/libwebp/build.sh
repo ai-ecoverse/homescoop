@@ -37,5 +37,5 @@ cp "$SRC_DIR/sharpyuv/sharpyuv.h" "$HOMESCOOP_PKG/package/include/" 2>/dev/null 
 homescoop_write_pc libwebp "$VERSION" "-lwebp"
 homescoop_write_pc libwebpmux "$VERSION" "-lwebpmux" "libwebp"
 homescoop_write_pc libwebpdemux "$VERSION" "-lwebpdemux" "libwebp"
-homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
+homescoop_stage_licenses "$SRC_DIR"/COPYING "$SRC_DIR"/PATENTS
 echo "== libwebp: staged → $HOMESCOOP_PKG/package"

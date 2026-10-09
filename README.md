@@ -59,14 +59,14 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 
 | npm | builder | notes |
 | --- | --- | --- |
-| `@ai-ecoverse/wasm-zlib` | host | **1.3.1-2** (libz.a + headers) |
+| `@ai-ecoverse/wasm-zlib` | host | **1.3.1-3** (libz.a + headers) |
 | `@ai-ecoverse/wasm-lcms2` | host | **2.17.0-1**; dep `@ai-ecoverse/wasm-zlib` |
-| `@ai-ecoverse/wasm-libwebp` | host | **1.5.0-1** |
+| `@ai-ecoverse/wasm-libwebp` | host | **1.5.0-2** |
 | `@ai-ecoverse/wasm-libxml2` | host | **2.13.8-1** |
-| `@ai-ecoverse/wasm-freetype` | host | **2.13.3-1** |
+| `@ai-ecoverse/wasm-freetype` | host | **2.13.3-2** |
 | `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-5** (slicc `libc_gaps` / `slicc_sigpipe`) |
 | `@ai-ecoverse/wasm-libpng` | host | **1.6.50**; dep `@ai-ecoverse/wasm-zlib` |
-| `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2** (emcmake, no SIMD) |
+| `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2-2** (emcmake, no SIMD) |
 | `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** (emcmake, codec off) |
 | `@ai-ecoverse/wasm-libtiff` | host | **4.7.0**; deps zlib + jpeg |
 | `@ai-ecoverse/wasm-gmake` | host | **4.4.1-2** (spawn/exec/select/main_envp/gaps) |
