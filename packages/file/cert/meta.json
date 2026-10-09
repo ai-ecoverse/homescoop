@@ -1,0 +1,18 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+  ],
+  "checklist": [
+    "file --version is file-5.46 with the package's share/misc/magic.mgc",
+    "ten types in one call, names padded: PNG (3 x 2 RGB), PDF 1.4, gzip, ELF x86-64 relocatable, wasm, POSIX shell script, UTF-8 text, JSON, zip (store), empty",
+    "-b for each of the ten",
+    "-i: MIME type and charset for each; --mime-type -b for each",
+    "stdin: file - and file -b -",
+    "-z looks inside gzip (zlib), bzip2 (libbz2) and xz (liblzma, CRC32)",
+    "missing file: 'cannot open' on stdout, rc 0; -E: ERROR and rc 1; mixed with a good file"
+  ]
+}

@@ -18,7 +18,8 @@ pdftotext -upw secret locked.pdf -
 
 Rendering uses the Splash backend. Cairo is not built, so `pdftocairo` is
 an alias of `pdftoppm`, as it was in slicc 6: `-png`/`-jpeg` work, but
-`-svg`, `-pdf` and `-ps` do not (use `pdftops` for PostScript).
+`-svg`, `-pdf`, `-ps` and `-eps` do not; it says so and exits 99 (use
+`pdftops` for PostScript).
 
 There is no fontconfig. The 14 standard PDF fonts (Helvetica, Times,
 Courier, Symbol, ZapfDingbats) are the URW Type1 fonts from

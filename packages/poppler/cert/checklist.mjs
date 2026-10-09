@@ -194,6 +194,17 @@ export default async function (ctx) {
   // pdftocairo is pdftoppm (no cairo in this build).
   await ok(['pdftocairo', '-png', '-r', '72', '-f', '1', '-l', '1', 'a.pdf', 'c']);
   assert.deepEqual(pngSize(await bytes('c-1.png')), [200, 100]);
+  for (const fmt of ['-svg', '-pdf', '-ps', '-eps']) {
+    const vec = await go(['pdftocairo', fmt, 'a.pdf', `out${fmt}`]);
+    assert.equal(vec.status, 99, `pdftocairo ${fmt} rc=${vec.status}`);
+    assert.equal(
+      vec.stderr.split('\n')[0],
+      `pdftocairo: ${fmt} needs cairo, which this build does not have; use pdftoppm -png or pdftops`,
+    );
+  }
+  const ppmSvg = await go(['pdftoppm', '-svg', 'a.pdf', 'x']);
+  assert.equal(ppmSvg.status, 99);
+  assert.doesNotMatch(ppmSvg.stderr, /needs cairo/, 'the hint is for pdftocairo only');
 
   // Extra utils from the same wasm.
   const fonts = await ok(['pdffonts', 'a.pdf']);

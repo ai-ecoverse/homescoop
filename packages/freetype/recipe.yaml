@@ -14,4 +14,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/freetype
-  license: FTL
+  license: "FTL OR GPL-2.0-only"

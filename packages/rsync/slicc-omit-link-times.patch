@@ -1,0 +1,45 @@
+--- a/rsync.h	2026-05-20 02:01:22.000000000 +0200
++++ b/rsync.h	2026-10-09 19:23:21.623150994 +0200
+@@ -427,7 +427,9 @@
+ #include <utime.h>
+ #endif
+ 
+-#if defined HAVE_UTIMENSAT || defined HAVE_LUTIMES || defined HAVE_SETATTRLIST
++/* slicc-kernel's utimensat(AT_SYMLINK_NOFOLLOW) follows the link
++ * (slicc-kernel#170): never set symlink times there. */
++#if (defined HAVE_UTIMENSAT || defined HAVE_LUTIMES || defined HAVE_SETATTRLIST) && !defined SLICC_OMIT_LINK_TIMES
+ #define CAN_SET_SYMLINK_TIMES 1
+ #endif
+ 
+--- a/options.c	2026-05-20 02:01:22.000000000 +0200
++++ b/options.c	2026-10-09 19:23:21.663955514 +0200
+@@ -65,7 +65,11 @@
+ int preserve_atimes = 0;
+ int preserve_crtimes = 0;
+ int omit_dir_times = 0;
++#ifdef SLICC_OMIT_LINK_TIMES
++int omit_link_times = 1; /* as if -J: see rsync.h, slicc-kernel#170 */
++#else
+ int omit_link_times = 0;
++#endif
+ int trust_sender = 0;
+ int update_only = 0;
+ int open_noatime = 0;
+@@ -2508,6 +2512,17 @@
+ 		}
+ 	}
+ 
++#ifdef SLICC_OMIT_LINK_TIMES
++	/* -J is the default here (see rsync.h); turning it off would make the
++	 * receiver set times on symlinks, which slicc-kernel applies to their
++	 * targets, up to files in the source tree (slicc-kernel#170). */
++	if (!omit_link_times) {
++		snprintf(err_buf, sizeof err_buf,
++			"--no-omit-link-times/--no-J is not supported on slicc-kernel: it would set the times of symlink targets (slicc-kernel#170)\n");
++		goto cleanup;
++	}
++#endif
++
+ 	if (trust_sender || am_server || read_batch)
+ 		trust_sender_args = trust_sender_filter = 1;
+ 	else if (old_style_args || filesfrom_host != NULL)

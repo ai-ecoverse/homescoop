@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-poppler",
-  "version": "26.10.0-1",
+  "version": "26.10.0-2",
   "description": "poppler PDF utilities (pdftotext, pdftoppm, pdfinfo, …) for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-2.0-only OR GPL-3.0-only",
   "repository": {
@@ -97,7 +97,7 @@
       "pdftocairo": {
         "glue": "bin/poppler-multicall",
         "wasm": "bin/poppler-multicall.wasm",
-        "argv0": "pdftoppm"
+        "argv0": "pdftocairo"
       }
     }
   }

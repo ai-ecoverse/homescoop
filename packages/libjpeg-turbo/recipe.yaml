@@ -14,4 +14,4 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libjpeg-turbo
-  license: IJG
+  license: "IJG AND BSD-3-Clause AND Zlib"

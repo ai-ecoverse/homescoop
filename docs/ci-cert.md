@@ -75,3 +75,16 @@ export default async function (ctx) {
 ```
 
 `run` accepts `{ cwd, env, stdin }`.
+
+### Network: `ctx.serve(responder)`
+
+The cert page gives the kernel a network transport whose far end is
+`responder`. That's a self-contained function, which runs in the page:
+`({ url, method, headers, body }) => ({ status, statusText, headers, body })`,
+where `headers` is a list of `[name, value]` pairs and `body` is a string or a
+`Uint8Array`. Programs reach it through the kernel's realm proxy as usual, so
+http, https (CONNECT, terminated with the kernel CA), redirects (not followed
+by the transport) and encoded bodies all behave as they would against a real
+server. https also needs `@ai-ecoverse/wasm-tls-engine` in `needs`; without it
+the kernel answers CONNECT with 501. Before `serve`, every request gets a 502.
+See `packages/curl/cert/checklist.mjs`.

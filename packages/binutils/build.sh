@@ -63,4 +63,11 @@ for p in "${PROGS[@]}"; do
   homescoop_stage_cli "$BLD/binutils" "$p"
 done
 homescoop_stage_license "$SRC"/COPYING3
+# --without-system-zlib: BFD links the zlib copy in the binutils tree.
+ZVER="$(sed -n 's/^#define ZLIB_VERSION "\(.*\)"$/\1/p' "$SRC/zlib/zlib.h")"
+test -n "$ZVER"
+homescoop_notices_begin "The strings, size and readelf wasm modules statically link the following."
+homescoop_notice "zlib $ZVER (bundled in binutils $VERSION)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+homescoop_notice_emscripten
 echo "== binutils: staged → $HOMESCOOP_PKG/package ($VERSION)"
