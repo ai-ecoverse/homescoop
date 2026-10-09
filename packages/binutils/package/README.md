@@ -5,11 +5,14 @@
 
 ```bash
 pnpm add -g @ai-ecoverse/wasm-binutils
-strings -n 8 /usr/bin/bash
+strings -n 8 app.wasm
 strings -t x -e S file.bin
 size prog.o
 readelf -h prog.o
 ```
+
+Point `strings` at a real file: the command names under `/usr/bin` are
+empty stubs in slicc, not the binaries.
 
 BFD knows x86-64/i386 and aarch64 ELF and wasm. `nm`, `ar`, `ranlib` and
 `strip` come with `@ai-ecoverse/wasm-clang`.
