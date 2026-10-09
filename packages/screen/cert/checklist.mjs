@@ -1,9 +1,11 @@
 /**
  * screen checklist (homescoop#123, PR #136): -v, -ls with no sessions, a
  * detached session (-dmS) that -ls lists and -X quit ends, and an
- * interactive bash inside screen on a real pty (ctx.pty). screen needs the
- * realm user from /etc/passwd (getpwuid); without it every case but -v
- * fails with "getpwuid() can't identify your account!".
+ * interactive bash inside screen on a real pty (ctx.pty), and the window's
+ * fork + exec keeping the pid (slicc-kernel#176): the program in the window
+ * is the screen server's child, under a pid the kernel knows. screen needs
+ * the realm user from /etc/passwd (slicc_pwd.c); without it every case but
+ * -v fails with "getpwuid() can't identify your account!".
  */
 export default async function (ctx) {
   const { run, pty, assert } = ctx;
@@ -32,6 +34,24 @@ export default async function (ctx) {
   const gone = await go(['screen', '-ls']);
   assert.equal(gone.status, 1);
   assert.equal(gone.stdout, 'No Sockets found in /tmp/screens.\n\r\n');
+
+  // The window: screen forks and execs the program. With exec keeping the
+  // pid, its parent is the screen server (the pid -ls shows), and its own
+  // pid is real: /proc/<pid> is the program (bash exec'd its last command,
+  // sleep, under the same pid).
+  const ids = await go(['bash', '-c', [
+    'screen -dmS w bash --norc -c "echo \\$PPID \\$\\$ > /home/screen/ids; sleep 20"',
+    'for i in 1 2 3 4 5 6 7 8 9 10; do [ -s /home/screen/ids ] && break; sleep 0.2; done',
+    'screen -ls; read ppid self < /home/screen/ids; echo "ids $ppid $self"',
+    'echo "cmd $(tr "\\0" " " < /proc/$self/cmdline)"',
+    'screen -S w -X quit',
+  ].join('; ')]);
+  assert.equal(ids.status, 0, `window ids rc=${ids.status} stderr=${ids.stderr}`);
+  const server = Number(/^\t(\d+)\.w\t/m.exec(ids.stdout)?.[1]);
+  const [, ppid, self] = /^ids (\d+) (\d+)$/m.exec(ids.stdout) ?? [];
+  assert.ok(server > 0, `no session in ${JSON.stringify(ids.stdout)}`);
+  assert.equal(Number(ppid), server, `window's parent is not the screen server: ${JSON.stringify(ids.stdout)}`);
+  assert.match(ids.stdout, /^cmd sleep 20 $/m, `/proc/${self} is not the window program: ${JSON.stringify(ids.stdout + ids.stderr)}`);
 
   // Interactive: bash inside screen on a pty, a command, exit.
   const s = await pty(['screen', 'bash', '--norc', '-i'], {
