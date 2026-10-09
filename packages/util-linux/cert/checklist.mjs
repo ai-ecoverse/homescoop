@@ -72,7 +72,8 @@ export default async function (ctx) {
   assert.equal(enhanced.status, 4, `getopt -T rc=${enhanced.status}`);
   const unknown = await run(['getopt', '-o', 'a', '--long', 'alpha', '-n', 'prog', '--', '--gamma'], { cwd: '/home/ul' });
   assert.equal(unknown.status, 1, `getopt unknown rc=${unknown.status}`);
-  assert.match(unknown.stderr, /prog: unrecognized option '--gamma'/);
+  // musl words it "unrecognized option: gamma" (glibc: "… option '--gamma'").
+  assert.match(unknown.stderr, /prog: unrecognized option(: gamma|\s'--gamma')/);
 
   // hexdump -C.
   const hex = await run(['hexdump', '-C'], { cwd: '/home/ul', stdin: 'hello\n' });
