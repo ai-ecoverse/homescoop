@@ -1,0 +1,43 @@
+# The slicc libc shims in shims/slicc/: test programs built with the pinned
+# emsdk and the shim archive profiles from scripts/build-common.sh, run on
+# slicc-kernel's headless Node entry (no browser). Today: getaddrinfo through
+# the kernel resolver with the testing fake uplink (homescoop#139).
+name: slicc-shims
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - shims/slicc/**
+      - scripts/build-common.sh
+      - scripts/install-emsdk.sh
+      - .github/workflows/slicc-shims.yml
+  pull_request:
+    paths:
+      - shims/slicc/**
+      - scripts/build-common.sh
+      - scripts/install-emsdk.sh
+      - .github/workflows/slicc-shims.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: shims/slicc/test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: build the test programs (pinned emsdk)
+        run: |
+          eval "$(bash ../../../scripts/install-emsdk.sh)"
+          ./build.sh
+      - run: npm ci
+      - run: npm test

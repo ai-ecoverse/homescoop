@@ -32,3 +32,12 @@ decoy CA is rejected while `-k` accepts it.
 
 The published 8.22.0-1 also passes the checklist, so the new build shows no
 regression on these cases.
+
+## Tailnet names (8.22.0-3, homescoop#139)
+
+`cert/tailnet.mjs` against the published 8.22.0-2 (socket shim without the
+kernel resolver), slicc-kernel 1.28.0 with the fake uplink:
+
+```
+rc=6 stderr=curl: (6) Could not resolve: peer.tail1234.ts.net:8080
+```

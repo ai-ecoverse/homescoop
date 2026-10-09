@@ -12,3 +12,9 @@ curl http://127.0.0.1:8080/
 
 Consumers (e.g. git) link `lib/libcurl.a` plus the shipped Mbed TLS
 archives and `lib/webcrypto-entropy.o`; see `lib/pkgconfig/curl.pc`.
+
+Names other than `localhost` and numeric IPv4 go to the kernel's resolver.
+Tailnet names need slicc-kernel ≥ 1.27.0 plus a page uplink (seven's
+Tailscale); then `curl --noproxy '*' http://peer.your-tailnet.ts.net/`
+resolves and connects directly (IPv4 / A records only). Without them such
+names fail with "Could not resolve", as before.
