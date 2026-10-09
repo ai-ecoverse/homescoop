@@ -77,7 +77,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-gawk` | host | **5.3.2-3** (`gawk` + `awk`) |
 | `@ai-ecoverse/wasm-less` | host | **668.0.0-1** (static ncursesw fallbacks) |
 | `@ai-ecoverse/wasm-sqlite3` | host | **3.53.4** (shell amalgamation) |
-| `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-31.1** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
+| `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-32-3** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
 | `@ai-ecoverse/wasm-tar` | host | **1.35.0-2** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
 | `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
 | `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |
