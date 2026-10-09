@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-nano",
-  "version": "8.7.1-1",
+  "version": "8.7.1-2",
   "description": "GNU nano with static ncurses 6.5 for wasm / slicc (emscripten)",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -20,6 +20,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin",
     "PRESTAGE.md"
   ],

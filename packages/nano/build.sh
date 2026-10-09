@@ -117,6 +117,9 @@ test -n "$NANO_BIN"
 # homescoop_stage_cli expects basename without path suffix; stage from dir
 homescoop_stage_cli "$(dirname "$NANO_BIN")" nano
 homescoop_stage_license "$NANO_SRC"/COPYING "$NANO_SRC"/COPYING.DOC
+homescoop_notices_begin "nano.wasm statically links the following."
+homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
+homescoop_notice_emscripten
 
 PKG_JSON="$HOMESCOOP_PKG/package/package.json"
 python3 - "$PKG_JSON" "$NANO_VER" <<'PY'
