@@ -1,0 +1,34 @@
+# TypeScript 7 (microsoft/typescript-go, the native Go compiler published as
+# typescript@7) for slicc WASI preview1: cmd/tsgo built with GOOS=wasip1 as
+# the command tsc. No node is needed.
+name: wasi-typescript
+builder: host
+# renovate: datasource=github-tags depName=microsoft/typescript-go extractVersion=^typescript/v(?<version>.*)$
+version: "7.0.2"
+npm: "@ai-ecoverse/wasi-typescript"
+summary: "TypeScript 7 for slicc WASI preview1 (command tsc)"
+source:
+  url: "https://github.com/microsoft/typescript-go/archive/refs/tags/typescript/v{{version}}.tar.gz"
+  sha256: "25cca8ec9d89e4ceec5181a677ded2c6d690fa18b81e1277846303973eb71fcf"
+toolchain:
+  # typescript-go's go.mod requires go 1.26.
+  go: "1.26.7"
+  go_sha256_linux_x64: "ffb5f8de10c62550dfddab66b36b57030721e0a44a3218e9e1181d7b59f121ca"
+  go_sha256_macos_arm64: "020a1e8224811be75163e920bc77e0926a1390a6aeea19bdcf23f74b9d749f6d"
+build:
+  module: "."
+  package: "./cmd/tsgo"
+  command: "tsc"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.typescriptlang.org
+  license: Apache-2.0
+  notes: |
+    scripts/build-wasip1-go-command.sh builds cmd/tsgo (the tsc of
+    typescript@7) from the pinned tag with the pinned Go (GOOS=wasip1
+    GOARCH=wasm CGO_ENABLED=0 -trimpath -buildvcs=false
+    -ldflags='-s -w -buildid='), no patches. The lib.*.d.ts files are
+    embedded in the binary (internal/bundled). NOTICE.txt ships as NOTICE.

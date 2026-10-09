@@ -1,0 +1,42 @@
+{
+  "name": "@ai-ecoverse/wasi-typescript",
+  "version": "7.0.2-1",
+  "description": "TypeScript 7 (the native tsc) for slicc WASI preview1 (command tsc); tsc.wasm built by homescoop from microsoft/typescript-go typescript/v7.0.2 with GOOS=wasip1",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-typescript/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-typescript",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "typescript",
+    "tsc"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-typescript",
+    "upstream": "7.0.2"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "tsc": {
+        "wasm": "bin/tsc.wasm"
+      }
+    }
+  }
+}

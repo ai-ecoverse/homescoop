@@ -1,0 +1,14 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "needs": [],
+  "needsInstall": [],
+  "checklist": [
+    "tsc --version → Version 7.0.2",
+    "tsc --noEmit -p . on a multi-file project (tsconfig.json, nested dir, @types package in node_modules) → exit 0, no output, nothing emitted",
+    "tsc -p . → exit 0; dist/*.js without types and dist/*.d.ts declarations",
+    "a return type changed in math.ts → --noEmit exits 1 with TS2322 in src/index.ts and TS2362 in src/shapes/area.ts (cross-file), none in math.ts",
+    "the same errors with emit → exit 2, output still written",
+    "tsc -p /home/nothere → exit 1, error TS5058"
+  ]
+}
