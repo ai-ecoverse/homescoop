@@ -1,11 +1,11 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.17.3",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
   "needs": [
     "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-coreutils@9.12.0-2"
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
   ],
   "checklist": [
     "bash -c arithmetic",
@@ -14,6 +14,9 @@
     "exec cat /proc/self/stat: pid == $$ (slicc-kernel#108)",
     "(exec sleep) &: child's $$ == $!, kill $! → wait 143",
     "-O execfail: failed exec returns, USR1 trap restored",
-    "failed exec without execfail → 127"
-  ]
+    "failed exec without execfail → 127",
+    "slicc-kernel#176 (shim-only proof on 1.26.6: shims/slicc/test/exec.test.mjs): exec readlink /proc/self == $$; 3-level exec bash chain keeps one pid; sh -c exec in a pipeline stage and a subshell exec keep that process's pid",
+    "/dev/tcp via the socket shim (netfork): realm-proxy round trip on 127.0.0.1:3128, $(hostname), refused port 'Connection refused', unknown host 'Name does not resolve', tailnet name dialled through the uplink (cert/net.mjs)"
+  ],
+  "uplink": true
 }

@@ -81,8 +81,12 @@ test -f "$WASM_PREFIX/lib/libncursesw.a"
 ln -sf libncursesw.a "$WASM_PREFIX/lib/libncurses.a"
 ln -sf libncursesw.a "$WASM_PREFIX/lib/libtinfo.a"
 
-SLICC_A="$WORK/libslicc-fork.a"
-homescoop_slicc_archive "$SLICC_A" fork
+# netfork = fork + slicc_socket.c (+ select, jobs): /dev/tcp and /dev/udp go
+# through the kernel's sockets and resolver (#140/#149), not Emscripten's
+# WebSocket SOCKFS ("Host is unreachable"). Whole-archive (link_archive) so
+# the socket syscalls win. slicc_getpass.c comes along; bash never calls it.
+SLICC_A="$WORK/libslicc-netfork.a"
+homescoop_slicc_archive "$SLICC_A" netfork
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,ENV,callMain,sliccRunMain,sliccForkChild -lnodefs.js $(homescoop_slicc_fork_js_flags)"
 LINK="$(homescoop_slicc_link_archive "$SLICC_A") $(homescoop_em_cli_ldflags)"
@@ -116,4 +120,7 @@ fi
 test -f "$SRC_DIR/bash" || test -f "$SRC_DIR/bash.js"
 homescoop_stage_cli "$SRC_DIR" bash
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
+homescoop_notices_begin "bash.wasm statically links the following. (readline and history are part of bash, under bash's own GPL-3.0-or-later.)"
+homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
+homescoop_notice_emscripten
 echo "== bash: staged → $HOMESCOOP_PKG/package (readline)"
