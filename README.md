@@ -90,6 +90,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-tree` | host | **2.3.2-1** (`tree`; emcc on the plain Makefile sources) |
 | `@ai-ecoverse/wasm-util-linux` | host | **2.42.4-1** (`rev` / `column` / `getopt` / `hexdump` / `colrm` / `look`; no mount/libmount/libblkid) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-2** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify) |
+| `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 
 \* stub until ported. Published libs ship relocatable `lib/pkgconfig/*.pc`.
