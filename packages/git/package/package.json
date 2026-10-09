@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-git",
-  "version": "2.55.0-9",
+  "version": "2.55.0-10",
   "description": "Git for slicc (rebuild sweep wasix-sysroot 2025.9.30-14; emscripten ABI)",
   "license": "GPL-2.0-only",
   "repository": {
@@ -19,6 +19,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin",
     "libexec",
     "share"

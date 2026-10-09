@@ -1,0 +1,24 @@
+# rsync for slicc wasm realm (host ladder).
+name: rsync
+builder: host
+# renovate: datasource=github-tags depName=RsyncProject/rsync extractVersion=^v(?<version>.*)$
+version: "3.4.4"
+npm: "@ai-ecoverse/wasm-rsync"
+summary: "rsync file synchronisation for slicc"
+source:
+  url: "https://download.samba.org/pub/rsync/src/rsync-{{version}}.tar.gz"
+  sha256: "bd88cf82fa653da32314fb229136407c5c90f80d1758d8f4b091767877d8fa96"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/rsync
+  license: GPL-3.0-or-later
+  notes: |
+    rsync (homescoop#94). Local copies only: a local rsync forks its
+    receiver (and the receiver its generator) and they talk over pipes, so
+    it links the slicc fork profile (ASYNCIFY) like bash and tar; on
+    slicc-kernel fork starts a real concurrent process. Bundled zlib and
+    popt; no OpenSSL, xxhash, zstd, lz4, iconv, ACLs or xattrs. Remote
+    ssh/daemon sync waits for kernel networking. New package → human cert.
