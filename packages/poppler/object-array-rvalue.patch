@@ -1,0 +1,15 @@
+libc++ 22 (emsdk 4.0.23) in C++23 mode instantiates ~unique_ptr<Array> for
+the by-value parameter where Array is incomplete. Take it by rvalue
+reference, as the Dict overload already does.
+
+--- a/poppler/Object.h
++++ b/poppler/Object.h
+@@ -149,7 +149,7 @@
+ 
+     explicit Object(long long int64gA) : type { objInt64 }, data { int64gA } { }
+ 
+-    explicit Object(std::unique_ptr<Array> arrayA) : type { objArray }, data { std::shared_ptr<Array>(std::move(arrayA)) } { }
++    explicit Object(std::unique_ptr<Array> &&arrayA) : type { objArray }, data { std::shared_ptr<Array>(std::move(arrayA)) } { }
+ 
+     explicit Object(std::unique_ptr<Dict> &&dictA) : type { objDict }, data { std::shared_ptr<Dict>(std::move(dictA)) } { }
+ 

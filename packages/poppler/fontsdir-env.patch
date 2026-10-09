@@ -1,0 +1,21 @@
+--- a/poppler/GlobalParams.cc
++++ b/poppler/GlobalParams.cc
+@@ -62,6 +62,7 @@
+ #include <algorithm>
+ #include <cstring>
+ #include <cstdio>
++#include <cstdlib>
+ #include <filesystem>
+ #include <utility>
+ #ifdef _WIN32
+@@ -188,7 +189,9 @@
+ #    define POPPLER_FONTSDIR get_poppler_fontsdir()
+ 
+ #else
+-#    define POPPLER_FONTSDIR nullptr
++// homescoop: no fontconfig in slicc; the package ships the base-14
++// Type1 fonts and points POPPLER_FONTSDIR at them.
++#    define POPPLER_FONTSDIR getenv("POPPLER_FONTSDIR")
+ #endif
+ 
+ //------------------------------------------------------------------------

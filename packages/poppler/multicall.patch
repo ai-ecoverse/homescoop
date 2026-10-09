@@ -1,0 +1,65 @@
+--- a/utils/CMakeLists.txt
++++ b/utils/CMakeLists.txt
+@@ -174,3 +174,22 @@
+ target_link_libraries(pdfunite ${common_libs})
+ install(TARGETS pdfunite DESTINATION bin)
+ install(FILES pdfunite.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
++
++# homescoop: every util in one wasm, dispatched on argv[0]. Statically
++# linking libpoppler into each of them would ship it eleven times.
++if(HOMESCOOP_MULTICALL)
++  set(_hs_utils pdftoppm pdftotext pdfinfo pdfimages pdffonts pdfseparate
++    pdfunite pdfdetach pdfattach pdftops pdftohtml)
++  set(_hs_srcs poppler-multicall.cc sanitychecks.cc printencodings.cc
++    ImageOutputDev.cc InMemoryFile.cc HtmlFonts.cc HtmlLinks.cc HtmlOutputDev.cc)
++  foreach(_u ${_hs_utils})
++    set_source_files_properties(${_u}.cc PROPERTIES COMPILE_DEFINITIONS "main=${_u}_main")
++    list(APPEND _hs_srcs ${_u}.cc)
++  endforeach()
++  add_executable(poppler-multicall ${_hs_srcs})
++  target_link_libraries(poppler-multicall ${common_libs})
++  if(LCMS2_FOUND)
++    target_link_libraries(poppler-multicall ${LCMS2_LIBRARIES})
++    target_include_directories(poppler-multicall SYSTEM PRIVATE ${LCMS2_INCLUDE_DIR})
++  endif()
++endif()
+--- /dev/null
++++ b/utils/poppler-multicall.cc
+@@ -0,0 +1,37 @@
++// homescoop: poppler's command-line utilities in one program. The util
++// runs by the name it was called as (argv[0]), or by the first argument
++// when called as poppler-multicall.
++#include <cstdio>
++#include <cstring>
++
++#define HS_UTILS(X)                                                                                                                                  \
++    X(pdftoppm) X(pdftotext) X(pdfinfo) X(pdfimages) X(pdffonts) X(pdfseparate) X(pdfunite) X(pdfdetach) X(pdfattach) X(pdftops) X(pdftohtml)
++
++#define HS_DECL(n) int n##_main(int argc, char *argv[]);
++HS_UTILS(HS_DECL)
++
++static bool dispatch(const char *name, int argc, char *argv[], int *rc)
++{
++#define HS_CASE(n)                                                                                                                                   \
++    if (!strcmp(name, #n)) {                                                                                                                         \
++        *rc = n##_main(argc, argv);                                                                                                                  \
++        return true;                                                                                                                                 \
++    }
++    HS_UTILS(HS_CASE)
++    return false;
++}
++
++int main(int argc, char *argv[])
++{
++    const char *name = argc > 0 ? strrchr(argv[0], '/') : nullptr;
++    name = name ? name + 1 : (argc > 0 ? argv[0] : "");
++    int rc = 0;
++    if (dispatch(name, argc, argv, &rc) || (argc > 1 && dispatch(argv[1], argc - 1, argv + 1, &rc))) {
++        return rc;
++    }
++    fprintf(stderr, "usage: poppler-multicall <util> [args...]\nutils:");
++#define HS_NAME(n) fprintf(stderr, " %s", #n);
++    HS_UTILS(HS_NAME)
++    fprintf(stderr, "\n");
++    return 99;
++}

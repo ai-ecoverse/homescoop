@@ -1,0 +1,104 @@
+{
+  "name": "@ai-ecoverse/wasm-poppler",
+  "version": "26.10.0-1",
+  "description": "poppler PDF utilities (pdftotext, pdftoppm, pdfinfo, …) for slicc (WASM / emscripten, SLICC homescoop)",
+  "license": "GPL-2.0-only OR GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/poppler/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/poppler",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "poppler",
+    "pdf",
+    "pdftotext",
+    "pdftoppm"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "poppler",
+    "upstream": "26.10.0"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "env": {
+      "POPPLER_FONTSDIR": "${package}/share/fonts"
+    },
+    "commands": {
+      "pdftotext": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdftotext"
+      },
+      "pdftoppm": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdftoppm"
+      },
+      "pdfinfo": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdfinfo"
+      },
+      "pdfimages": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdfimages"
+      },
+      "pdffonts": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdffonts"
+      },
+      "pdfseparate": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdfseparate"
+      },
+      "pdfunite": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdfunite"
+      },
+      "pdfdetach": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdfdetach"
+      },
+      "pdfattach": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdfattach"
+      },
+      "pdftops": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdftops"
+      },
+      "pdftohtml": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdftohtml"
+      },
+      "pdftocairo": {
+        "glue": "bin/poppler-multicall",
+        "wasm": "bin/poppler-multicall.wasm",
+        "argv0": "pdftoppm"
+      }
+    }
+  }
+}
