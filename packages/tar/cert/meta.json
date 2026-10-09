@@ -1,0 +1,20 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils", "@ai-ecoverse/wasm-gzip", "@ai-ecoverse/wasm-xz", "@ai-ecoverse/wasm-bzip2"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasm-gzip@1.15.0-1",
+    "@ai-ecoverse/wasm-xz@5.8.4-1",
+    "@ai-ecoverse/wasm-bzip2@1.0.8-1"
+  ],
+  "checklist": [
+    "tar --version: GNU tar 1.35",
+    "round trips (create, list, extract, sha256 compared) for plain, -z (1f 8b), -j (BZh), -J (fd 37 7a 58 5a 00)",
+    "-a picks xz/gzip from the suffix; tar -czf - | tar -tzf - on a pipe",
+    "--use-compress-program: the compressor (fork, exec sh -c, exec program) is tar's direct child under a pid /proc knows (slicc-kernel#176), rc 0, archive lists",
+    "a compressor exiting 3: 'tar: Child returned status 3', rc 2",
+    "errors: corrupt gzip (gzip message + 'Child returned status 1', rc 2), missing input file (Cannot stat, rc 2)"
+  ]
+}
