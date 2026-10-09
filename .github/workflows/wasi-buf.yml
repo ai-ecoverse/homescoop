@@ -72,7 +72,7 @@ jobs:
           path: packages/wasi-buf/package
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.26.7
+          go-version: 1.27.1
           cache: false
       - name: host module unit tests
         working-directory: packages/wasi-buf
