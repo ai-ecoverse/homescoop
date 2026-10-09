@@ -1,0 +1,20 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+  ],
+  "checklist": [
+    "patch --version: GNU patch 2.8",
+    "--dry-run -p1: 'checking file', file unchanged",
+    "-p1 apply: 'patching file', new content",
+    "--forward on an applied patch: 'Reversed (or previously applied)', hunk ignored, .rej, rc 1",
+    "-R reverse: original content",
+    "a failed hunk: 'Hunk #1 FAILED at 1.', .rej (exact) and .orig, rc 1",
+    "-b: .orig backup with the original content",
+    "missing patch file: 'Can't open patch file', rc 2",
+    "the installed package's LICENSE is the GNU GPL v3, and THIRD-PARTY-NOTICES.md is present"
+  ]
+}
