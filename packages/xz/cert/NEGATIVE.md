@@ -1,5 +1,15 @@
 # Negative proof (xz)
 
+## 5.8.4: patch absorbed upstream (2026-10-09)
+
+xz 5.8.4's `src/common/mythread.h` uses `sigprocmask()` for single-threaded
+builds when `!defined(__wasm__) || defined(__EMSCRIPTEN__)`, which is what
+`wasm-mythread-sigmask.patch` added, so the patch is gone and no longer
+listed in `cert/meta.json`. The `-T0` / `-T2` 4 MiB cases in
+`cert/roundtrip.mjs` stay as the regression check for that path; the
+empty-wasm proof below still holds. The patch-reverted proof below is the
+5.8.1 record.
+
 **Date:** 2026-10-07
 
 ## Empty wasm (spec not vacuous)
