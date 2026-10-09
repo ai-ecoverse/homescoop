@@ -178,4 +178,12 @@ homescoop_write_pc curl "$CURL_VER" \
   ""
 
 homescoop_stage_license "$CURL_SRC"/COPYING "$CURL_SRC"/LICENSE
+homescoop_notices_begin "curl.wasm and the libraries in lib/ statically link the following."
+homescoop_notice "Mbed TLS ${MBED_VER} (lib/libmbed*.a, libeverest.a, libp256m.a)" \
+  "$MBED_SRC"/LICENSE - \
+  "$MBED_SRC"/3rdparty/everest/README.md - \
+  "$MBED_SRC"/3rdparty/p256-m/README.md -
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+homescoop_notice_emscripten
 echo "== curl: staged → $HOMESCOOP_PKG/package"
