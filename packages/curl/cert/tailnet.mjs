@@ -45,8 +45,8 @@ export default async function (ctx) {
 
   // This machine's own name is loopback, answered by the shim without
   // asking the uplink (#149): connection refused on :1, not a resolve error.
-  const self = (await run(['hostname'])).stdout.trim();
-  assert.ok(self, 'hostname printed nothing');
+  const self = (await run(['uname', '-n'])).stdout.trim();
+  assert.ok(self, 'uname -n printed nothing');
   const own = await curl(`http://${self}:1/`);
   assert.equal(own.status, 7, `${self}:1 rc=${own.status} stderr=${own.stderr}`);
   assert.ok(!(await ctx.uplinkLog()).asked.some((a) => a.name.toLowerCase() === self.toLowerCase()),
