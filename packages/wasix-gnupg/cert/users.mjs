@@ -18,7 +18,7 @@ export default async function (ctx) {
       return { ...r, stdout: r.stdout + r.stderr };
     };
     const gen = await sh('gpg --batch --pinentry-mode loopback --passphrase "" --quick-gen-key "U <u@example.org>" default default never; echo "rc=$?"');
-    assert.match(gen.stdout, /rc=0\s*$/, `${user} keygen:\n${gen.stdout}`);
+    assert.match(gen.stdout, /^rc=0$/m, `${user} keygen:\n${gen.stdout}`);
     assert.doesNotMatch(gen.stdout, /unsafe (ownership|permissions)/, `${user}:\n${gen.stdout}`);
     const st = await sh('stat -c "%U %a" ~/.gnupg');
     assert.equal(st.stdout.trim(), `${user} 700`, `${user}: ${st.stdout}`);
