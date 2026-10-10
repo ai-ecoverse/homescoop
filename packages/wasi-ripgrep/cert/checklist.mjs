@@ -42,13 +42,15 @@ export default async function (ctx) {
   assert.match(t.out, /f\.txt:2:beta/);
   assert.match(t.out, /sub\/g\.txt:1:beta two/);
 
-  // No stdin: search the cwd as before. Needs the kernel to give an absent
-  // stdin as a character device (/dev/null), not an empty pipe.
-  const n = await run(['rg', '--sort=path', '--no-heading', 'beta'], { cwd });
+  // No stdin, or < /dev/null: search the cwd as before. slicc-kernel 1.34.1
+  // gives an absent stdin the null character device.
+  const n = await run(['rg', '-n', '--sort=path', '--no-heading', 'beta'], { cwd });
   assert.equal(n.status, 0, `no stdin rc=${n.status} stderr=${n.stderr}`);
   assert.equal(n.stdout, 'f.txt:2:beta\nsub/g.txt:1:beta two\n');
+  const dn = await sh('rg -n --sort=path --no-heading beta < /dev/null');
+  assert.equal(dn.stdout, 'f.txt:2:beta\nsub/g.txt:1:beta two\n', `< /dev/null rc=${dn.status} stderr=${dn.stderr}`);
 
   // Explicit paths are unaffected.
-  const e = await run(['rg', '--sort=path', '--no-heading', 'beta', '.'], { cwd });
+  const e = await run(['rg', '-n', '--sort=path', '--no-heading', 'beta', '.'], { cwd });
   assert.equal(e.stdout, './f.txt:2:beta\n./sub/g.txt:1:beta two\n', `path stderr=${e.stderr}`);
 }

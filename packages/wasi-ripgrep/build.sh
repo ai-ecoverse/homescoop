@@ -34,7 +34,9 @@ if [[ ! -f "$OUT/bin/rg.wasm" || -n "${FORCE:-}" ]]; then
   node -e 'const f=process.argv[1];const fs=require("fs");const j=JSON.parse(fs.readFileSync(f));j.files={};fs.writeFileSync(f,JSON.stringify(j))' \
     "$VENDOR/$GREP_CLI/.cargo-checksum.json"
   # Strip at link time — unstripped release is ~22 MB.
+  # Keep host paths out of the wasm (panic and log locations).
   (cd "$SRC" && CARGO_TARGET_DIR="$WORK/ripgrep-target" \
+    RUSTFLAGS="--remap-path-prefix=$VENDOR=/vendor --remap-path-prefix=$SRC=/ripgrep --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$(rustc --print sysroot)=/rustc" \
     CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_RELEASE_STRIP=true \
     cargo build --release --locked --offline --target wasm32-wasip1 \
       --config 'source.crates-io.replace-with="vendored-sources"' \

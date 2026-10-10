@@ -14,9 +14,14 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 - 'b\n'
 ```
 
-## 15.2.0-3 on kernels without an absent-stdin device
+## 15.2.0-3 on a kernel without the null-stdin device
 
-On slicc-kernel 1.32.0, and on slicc-kernel#195 (91dbe11), every case
-passes except "no stdin": an absent stdin is an empty pipe (WASI filetype
-UNKNOWN), so rg reads it and exits 1. The case needs the kernel to give
-an absent stdin as a character device.
+On slicc-kernel 1.32.0 (before slicc-kernel#209), an absent stdin is an empty
+pipe (WASI filetype UNKNOWN), so rg reads it and the "no stdin" case fails:
+
+```text
+AssertionError [ERR_ASSERTION]: no stdin rc=1 stderr=
+```
+
+On 1.34.1 an absent stdin and `< /dev/null` are the null character device
+(filetype 2), rg searches the cwd, and every case passes.
