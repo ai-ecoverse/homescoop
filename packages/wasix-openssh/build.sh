@@ -95,6 +95,8 @@ fi
 CONF_CACHE=(
   ac_cv_func_getpwnam=yes
   ac_cv_func_getpwuid=yes
+  ac_cv_func_asprintf=yes
+  ac_cv_func_vasprintf=yes
   ac_cv_func_getgrouplist=no
   ac_cv_func_setresuid=no
   ac_cv_func_setresgid=no
@@ -130,6 +132,7 @@ CONF_CACHE=(
     --without-hardening \
     --without-rpath \
     --without-sandbox \
+    --without-retpoline \
     --without-selinux \
     --without-kerberos5 \
     --without-libedit \

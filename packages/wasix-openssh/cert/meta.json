@@ -13,6 +13,9 @@
     "@ai-ecoverse/wasm-git@2.55.0-12"
   ],
   "host": "node packages/wasix-openssh/cert/run.mjs --tarball <package.tgz>: boots slicc-kernel Node entry with uplink to (1) an ephemeral host OpenSSH sshd (temp keys, loopback) and (2) a tiny host none-auth SSH test server (cert/none-auth-server.py; OpenSSH sshd cannot do none for a real account). Runs cert/*.mjs checklist.",
+  "patches": {
+    "0001-wasix-stub-getrrsetbyname.patch": "SSHFP/DNSSEC getrrsetbyname always ERRSET_FAIL (no resolv.h); ordinary DNS via kernel — exercised by ssh to sshd.cert.internal / none.cert.internal"
+  },
   "checklist": [
     "ssh -V / ssh-keygen -t ed25519: versions and key file modes 0600 under slicc_fs",
     "identity: $HOME used for ~/.ssh; default user from getpwuid (slicc_identity) or documented $USER / user@host fallback until H1",
