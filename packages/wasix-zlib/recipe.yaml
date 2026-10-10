@@ -1,0 +1,25 @@
+# zlib for slicc WASIX (homescoop#169 follow-up): a dev package (static
+# libs, headers, pkg-config) that wasix-ruby and wasix-python link against.
+name: wasix-zlib
+builder: host
+# renovate: datasource=github-releases depName=madler/zlib extractVersion=^v(?<version>.*)$
+version: "1.3.1"
+npm: "@ai-ecoverse/wasix-zlib"
+summary: "zlib for slicc WASIX: static libz.a (lib/) and PIC (lib-pic/), headers, pkg-config"
+source:
+  url: "https://zlib.net/fossils/zlib-{{version}}.tar.gz"
+  sha256: "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-zlib
+  license: Zlib
+  notes: |
+    Compiled source by source with the pinned wasixcc (scripts/install-wasixcc.sh,
+    wasix-sysroot 2025.9.30-17): lib/libz.a is static non-PIC for static-main
+    programs on the asyncify sysroot (perl, ruby); lib-pic/libz.a is -fPIC for
+    dynamic-main programs (python). Each lib dir has its own pkgconfig/zlib.pc.
+    Cert: scripts/wasix-lib-cert.mjs links test/zprobe.c against both flavours
+    and runs it on slicc-kernel's Node entry.
