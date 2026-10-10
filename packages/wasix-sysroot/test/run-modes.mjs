@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+// homescoop#169 cert for a wasix-sysroot tarball (cert/meta.json harness
+// host-node): build test/modes.c against it with the pinned wasixcc, then
+// run test/modes.mjs on slicc-kernel's Node entry at cert/meta.json's kernel.
+//
+//   node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz
+//
+// --kernel-dir <dir> uses a local slicc-kernel build (its dist/node.js)
+// instead of meta.kernel, e.g. to try one before it is released. With
+// meta "slicc_fs": true the spec requires the kernel's slicc_fs imports;
+// --allow-absent checks the degraded path on a kernel without them.
+//
+// The sysroot is 160 MB, too big to install into a browser-cert page; the
+// program under test is the small modes.wasm linked against it.
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { arg, command, here, kernel, meta, sysroot, wasixcc } from './harness.mjs';
+
+const args = process.argv.slice(2);
+if (!arg(args, '--tarball')) {
+  console.error('usage: run-modes.mjs --tarball <wasix-sysroot package.tgz> [--kernel-dir <dir>] [--allow-absent]');
+  process.exit(2);
+}
+const tarball = resolve(arg(args, '--tarball'));
+const kernelDir = arg(args, '--kernel-dir') && resolve(arg(args, '--kernel-dir'));
+const work = mkdtempSync(join(tmpdir(), 'wasix-sysroot-modes-'));
+
+try {
+  console.log(`== sysroot ${tarball}`);
+  const prefix = sysroot(tarball, join(work, 'sysroot'));
+  console.log('== modes.wasm (pinned wasixcc)');
+  const pkg = join(work, 'modes-pkg');
+  command(wasixcc(work), prefix, 'modes', pkg, 'modes');
+  const k = await kernel(work, kernelDir);
+  console.log(`== ${k.label} (Node entry)`);
+  await k.install(pkg);
+  const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run };
+  try {
+    await (await import(pathToFileURL(join(here, 'modes.mjs')).href)).default(ctx);
+    console.log('PASS test/modes.mjs');
+  } catch (e) {
+    process.exitCode = 1;
+    console.log(`FAIL test/modes.mjs\n${e.stack}`);
+  }
+  await k.kernel.terminate();
+} finally {
+  rmSync(work, { recursive: true, force: true });
+}
