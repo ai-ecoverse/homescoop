@@ -41,6 +41,12 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-22 every program linked against the sysroot carries a wasm
+custom section `slicc.libc` = `wasix-sysroot <version>` (from `crt1*.o`), so
+slicc-kernel can tell libc generations apart (`wasm-opt` and `llvm-strip` keep
+it). Side modules carry none. `getitimer` moved into `setitimer.c`, so a
+dynamic-main no longer exports the `__homescoop_itimer_real_left` helper.
+
 Since 2025.9.30-21 terminals are per descriptor (slicc-kernel's `slicc_tty`,
 slicc-kernel#289):
 - `tcgetattr`/`tcsetattr` carry the whole termios, so `cfmakeraw` is really

@@ -1,3 +1,9 @@
+# Negative proof (wasix-sysroot)
+
+## 2025.9.30-21: no libc generation marker, exported itimer helper (-22)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-21.tgz --probe r22`, default and `--variant ehpic`, 2026-10-11: both FAIL with `slicc.libc custom section: undefined`. Nothing in a -21 (or older) program tells the kernel which libc it has. And wasix-python 3.14.2-15, a dynamic-main on -21, exports `__homescoop_itimer_real_left` (next to `getitimer`, `setitimer`).
+
 # Negative proof (wasix-sysroot 2025.9.30-17)
 
 **Date:** 2026-10-10

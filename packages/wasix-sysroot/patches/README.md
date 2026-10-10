@@ -105,7 +105,7 @@ Before -19 the variants differed: `sysroot-ehpic` and `sysroot-exnref-ehpic` had
   - Out-of-range `tv_usec` is EINVAL.
   - The armed REAL timer is kept on the monotonic clock, so `old` reports the time left. That is what `alarm()` returns.
   - The import has a private C name, because `sysroot-ehpic`'s `__wasixlibc_real.o` already defines `__wasi_proc_raise_interval2`.
-- **`getitimer.c`:** `ITIMER_REAL` reports the time left until the next expiry, plus the interval. The others are -1 EINVAL. Upstream returned EINVAL as a value and left the struct alone.
+- **`getitimer()`** (in `getitimer.c` until -21, in `setitimer.c` since -22): `ITIMER_REAL` reports the time left until the next expiry, plus the interval. The others are -1 EINVAL. Upstream returned EINVAL as a value and left the struct alone.
 - **`clock_nanosleep.c`** (`nanosleep`, `usleep`): a relative sleep that a signal cuts short returns EINTR and the time left (`rem`), as on Linux.
   - Upstream answered ENOTSUP for every failure.
   - slicc-kernel ends the clock wait early but reports the clock as expired, so a relative sleep that ends more than 1 ms early counts as interrupted.
@@ -163,4 +163,13 @@ The six members change as follows:
 When that mode also carries type bits (Linux numbering, `& 0170000`), -21 maps them to WASIX's `__mode_t.h` and they replace the WASI filetype: FIFO 0o010000 becomes 0o140000, socket 0o140000 becomes 0o160000, and the rest are equal. WASI has no FIFO filetype, so a pipe can only be `S_ISFIFO` this way (ruby's popen `r+`, python's asyncio pipe transports).
 
 A mode without type bits keeps the WASI filetype, which is how every kernel before r99's `fd_mode`-on-pipes change behaves (`test/fifo.c`).
+
+## -22: libc generation marker, and the itimer helper made static
+
+- **`slicc.libc` custom section.** Every `crt1*.o` (crt1, crt1-command, crt1-reactor; 5 variants) is merged (`wasm-ld -r`) with an object holding a wasm custom section `slicc.libc` = `wasix-sysroot <version>`, here `wasix-sysroot 2025.9.30-22`. Every program links a crt1, and wasm-ld copies custom sections into the output, so every program built on -22 or later carries it; it costs nothing at run time. slicc-kernel reads it to tell libc generations apart: an interrupted `clock_nanosleep` must get ENOTSUP on -17/-18 and EINTR on -19+ (which also fixes poll/select), and nothing in a binary told them apart before (r99, slicc-kernel#263). A program without the section is -21 or older.
+  - It is a real custom section, written as top-level assembly (`.section .custom_section.slicc.libc`). `__attribute__((section(".custom_section.…")))` in C makes a data segment of that name, which wasm-ld drops.
+  - It survives everything our recipes do after linking (checked on a static and a dynamic-main program): `wasm-opt` `-O3`/`-Oz` with `--strip-debug`/`--strip-producers`, `--strip`, `--strip-dwarf`, `--asyncify`, and `llvm-strip` with and without `--strip-all`. wabt's `wasm-strip` would remove it; no recipe uses it.
+  - Side modules (`.so`) link no crt1 and carry no marker; the main program's marker is the one that counts.
+  - `test/r22.mjs` reads it from the probe it links (`ctx.wasm`).
+- **`__homescoop_itimer_real_left` is static.** `getitimer()` moved from `getitimer.c` into `setitimer.c`, so the time-left helper no longer needs external linkage; `build-incremental.sh` deletes `getitimer.o` from every `libc.a` (after checking that the new `setitimer.o` defines what it did). A dynamic-main exports hidden symbols too: wasix-python 3.14.2-15 on -21 exports `__homescoop_itimer_real_left` next to `getitimer`/`setitimer`.
 
