@@ -110,7 +110,7 @@ EOF
   cp "$YAML_PREFIX/include/config.h" "$YAML_SRC/include/config.h"
   for s in api reader scanner parser loader writer emitter dumper; do
     WASIXCC_WASM_EXCEPTIONS=no WASIXCC_PIC=no \
-      wasixcc -c -O2 -DHAVE_CONFIG_H -DYAML_DECLARE_STATIC \
+      wasixcc -c -O2 -ffile-prefix-map="$WORK=." -DHAVE_CONFIG_H -DYAML_DECLARE_STATIC \
         -I"$YAML_PREFIX/include" -I"$YAML_SRC/include" \
         -o "$WORK/yaml-objs/${s}.o" "$YAML_SRC/src/${s}.c"
   done
@@ -504,7 +504,9 @@ PY
     echo "== wasix-ruby: wasm-opt --asyncify (full base, -O1)"
     test -x "$WASM_OPT" || { echo "wasm-opt required at $WASM_OPT" >&2; exit 1; }
     PRE=$(wc -c < "$RUBY_LINKED")
-    "$WASM_OPT" --asyncify -O1 \
+    # --strip-debug: -ggdb3's DWARF is 12 MB of ruby.wasm, with the
+    # toolchain's include paths; slicc has no use for it.
+    "$WASM_OPT" --asyncify -O1 --strip-debug \
       "$RUBY_LINKED" -o "$RUBY_LINKED.async" \
       2>&1 | tee "$WORK/asyncify.log" | tail -40
     mv "$RUBY_LINKED.async" "$RUBY_LINKED"
