@@ -70,3 +70,20 @@ medians.
 objects' target features) and replaces `posix.o` and `at_fdcwd.o` in every
 `libc.a`. It first checks that each patched object defines every symbol
 the shipped one did.
+
+## -18: `pselect.c`, `chdir.c`, `__tz.c`, `socketpair.c`
+
+All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces `pselect.o`, `chdir.o`, `__tz.o` and `socketpair.o` in every `libc.a`, after checking that each patched object defines every symbol the shipped one did.
+
+- **`pselect.c`** (`select` calls it), homescoop#195:
+  - A non-empty `errorfds` is accepted and comes back empty. WASI poll has no exceptional conditions, and `POLLPRI == POLLIN` here. Upstream failed with ENOSYS, which broke `select(r, w, x)` in perl, python, ruby and C.
+  - With only `errorfds` and no timeout it waits, as POSIX does.
+  - The relative timeout is computed directly. Upstream reused `common/time.h`'s absolute-time clamp, which turns `tv_sec <= 0` into 1 ns, so every sub-second `select`/`pselect` returned at once.
+- **`chdir.c`**, homescoop#196: `chdir()` resolves the path with `realpath()` and passes the physical absolute path to both the libc cwd cache and `__wasi_chdir`. `..` and relative paths after a symlinked `cd` then start from the real directory. There is still no `fchdir`: the kernel's `/proc/self/fd` does not name directory fds.
+- **`__tz.c`**, homescoop#193: musl's TZ code, which wasix-libc compiled out in favour of a UTC-only `__secs_to_zone`, is enabled again.
+  - POSIX rule strings work, for example `EST5EDT,M3.2.0,M11.1.0`.
+  - TZif files (`TZ=:/path`, `/usr/share/zoneinfo/<name>`, `/etc/localtime`) are read into memory instead of mmap'd, since mmap would need `-lwasi-emulated-mman`.
+  - Zone names only resolve once a zoneinfo tree exists.
+  - `__secs_to_zone` keeps wasix-libc's `int *offset`.
+- **`socketpair.c`:** upstream wasix-libc 2025b44a5d, backported. `SOCK_NONBLOCK`/`SOCK_CLOEXEC` in the type are applied to both ends instead of reaching `sock_pair` as part of the type. Its fcntl half is `fcntl.c` above.
+

@@ -8,6 +8,12 @@ summary: "WASIX libc/libcxx/compiler-rt sysroots for wasm32-wasi"
 source:
   url: "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-2025.9.30-14.tgz"
   sha256: "1a88c9f1b12b0bffaf6502914abc4f1b40443ddccbfa84d8bbc44fc86a0e652e"
+sources:
+  # wasix-libc at the tag -14's libc was built from: __tz.c (-18) compiles
+  # against its private musl headers (time_impl.h, libc.h, lock.h).
+  wasix_libc:
+    url: "https://github.com/wasix-org/wasix-libc/archive/refs/tags/v2025-09-02.1.tar.gz"
+    sha256: "cfcf126e6e5246dd140ccacf956fb2447952a771723954f5c0766720ee538e9d"
 dependencies:
   build: []
   host: []
