@@ -9,8 +9,11 @@
  *   - package.json license matches the recipe
  *   - package/LICENSE exists and is non-empty
  *   - package.json files includes LICENSE
+ *   - a .wasm that imports slicc.cred_get / cred_set / groups_get / groups_set
+ *     (wasix-sysroot >= 2025.9.30-20: user ids from slicc-kernel, no fallback)
+ *     needs engines["slicc-kernel"] >= 1.44.0
  */
-import { readFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -83,6 +86,52 @@ if (existsSync(rootLic) && !/\bApache-2\.0\b/.test(recipeLic)) {
 const files = pkg.files;
 if (!Array.isArray(files) || !files.includes('LICENSE')) {
   errors.push('package.json files[] must include "LICENSE"');
+}
+
+// wasix-sysroot -20 asks slicc-kernel for user ids (slicc.cred_*), with no
+// fallback: a binary that does needs a kernel with users (K1, 1.44.0).
+const CRED = new Set(['cred_get', 'cred_set', 'groups_get', 'groups_set']);
+function wasmImports(buf) {
+  if (buf.length < 8 || buf.readUInt32LE(0) !== 0x6d736100) return [];
+  let p = 8;
+  const u32 = () => { let r = 0, s = 0, b; do { b = buf[p++]; r |= (b & 0x7f) << s; s += 7; } while (b & 0x80); return r >>> 0; };
+  const str = () => { const n = u32(); const s = buf.toString('utf8', p, p + n); p += n; return s; };
+  const limits = () => { const f = u32(); u32(); if (f & 1) u32(); };
+  const out = [];
+  while (p < buf.length) {
+    const id = buf[p++]; const size = u32(); const end = p + size;
+    if (id === 2) {
+      for (let n = u32(); n > 0; n--) {
+        const module = str(); const field = str(); const kind = buf[p++];
+        if (kind === 0) u32(); else if (kind === 1) { p++; limits(); } else if (kind === 2) limits();
+        else if (kind === 3) p += 2; else if (kind === 4) { p++; u32(); }
+        out.push([module, field]);
+      }
+      return out;
+    }
+    p = end;
+  }
+  return out;
+}
+function* wasmFiles(dir) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === 'node_modules') continue;
+    const f = join(dir, e.name);
+    if (e.isDirectory()) yield* wasmFiles(f);
+    else if (e.isFile() && (e.name.endsWith('.wasm') || /\.so$/.test(e.name))) yield f;
+  }
+}
+const credUsers = [];
+for (const f of wasmFiles(join(root, 'packages', name, 'package'))) {
+  if (wasmImports(readFileSync(f)).some(([m, n]) => m === 'slicc' && CRED.has(n))) credUsers.push(f);
+}
+if (credUsers.length) {
+  const want = [1, 44, 0];
+  const floor = /^>=\s*(\d+)\.(\d+)\.(\d+)$/.exec(String(pkg.engines?.['slicc-kernel'] ?? '').trim());
+  const ok = floor && floor.slice(1).map(Number).reduce((c, v, i) => c || (v !== want[i] ? Math.sign(v - want[i]) : 0), 0) >= 0;
+  if (!ok) {
+    errors.push(`${credUsers.length} binaries ask slicc-kernel for user ids (slicc.cred_*, wasix-sysroot >= -20, no fallback): package.json needs "engines": { "slicc-kernel": ">=1.44.0" } or later (got ${JSON.stringify(pkg.engines?.['slicc-kernel'] ?? null)})`);
+  }
 }
 
 if (errors.length) {

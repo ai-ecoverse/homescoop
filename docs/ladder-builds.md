@@ -266,3 +266,18 @@ CLI packages declare command → glue/wasm pairing so the realm does not guess:
   `--enable-single-binary=symlinks`).
 - Stubs (gmake, cmake, imagemagick) already carry the planned `commands`
   block; update paths when the real `bin/` layout lands.
+
+### `engines` and user ids (wasix-sysroot ≥ 2025.9.30-20)
+
+wasix-sysroot -20 asks slicc-kernel for user and group ids (`slicc.cred_get`
+and friends) and has no fallback: on a kernel without users (before 1.44.0),
+`getuid()` returns -1 and set\*id fails with ENOSYS. The same holds for
+Emscripten packages linked with `shims/slicc` since the H1 release
+(homescoop#207). A package built on them must declare it:
+
+```json
+"engines": { "slicc-kernel": ">=1.44.0" }
+```
+
+`scripts/check-package-meta.mjs` (run by `host-run.sh` on every build) fails
+a package whose `.wasm`/`.so` imports `slicc.cred_*` without that floor.
