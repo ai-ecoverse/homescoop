@@ -6,7 +6,8 @@
 //   node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz [--probe r18]
 //
 // --probe NAME runs test/NAME.c / test/NAME.mjs instead (default: modes);
-// r18 is -18's select / chdir / TZ / socketpair probe.
+// r18 is -18's select / chdir / TZ / socketpair probe; r19 is -19's
+// raise / alarm / setitimer / nanosleep probe.
 //
 // --kernel-dir <dir> uses a local slicc-kernel build (its dist/node.js)
 // instead of meta.kernel, e.g. to try one before it is released. With

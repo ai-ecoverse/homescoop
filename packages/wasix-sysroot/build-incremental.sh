@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-18 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-19 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -173,6 +173,46 @@ for v in "${VARIANTS[@]}"; do
   done
   "$LLVM_AR" r "$lib" "$R18_OBJ/$flavour/pselect.o" "$R18_OBJ/$flavour/chdir.o" "$R18_OBJ/$flavour/__tz.o" "$R18_OBJ/$flavour/socketpair.o" "$R18_OBJ/$flavour/sigaction.o"
   grep -q __slicc_sigaction_set <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigaction_set" >&2; exit 1; }
+  echo "  $v ($flavour)"
+done
+
+# -19: signals and timers, the same in every variant (sysroot-ehpic and
+# sysroot-exnref-ehpic had wasix-python's setitimer/EINTR patches, the others
+# upstream's): setitimer/alarm take it_value through proc_raise_interval2,
+# clock_nanosleep returns EINTR with the time left, raise() signals the
+# process (slicc-kernel does not deliver thread_signal; slicc-kernel#250).
+# See patches/README.md.
+echo "== wasix-sysroot: -19 members (setitimer, clock_nanosleep, raise)"
+R19_OBJ="$WORK/r19"
+rm -rf "$R19_OBJ" && mkdir -p "$R19_OBJ/static" "$R19_OBJ/pic"
+BOTTOM_INC=(-I"$LIBC_SRC/libc-bottom-half/headers/private" -I"$LIBC_SRC/libc-bottom-half/cloudlibc/src/include" -I"$LIBC_SRC/libc-bottom-half/cloudlibc/src" -I"$MUSL/src/include" -I"$MUSL/src/internal")
+R19=(setitimer clock_nanosleep raise)
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  compile_r18 setitimer "$R19_OBJ/$flavour/setitimer.o" "${MUSL_INC[@]}" "${extra[@]}"
+  compile_r18 raise "$R19_OBJ/$flavour/raise.o" "${MUSL_INC[@]}" "${extra[@]}"
+  compile_r18 clock_nanosleep "$R19_OBJ/$flavour/clock_nanosleep.o" "${BOTTOM_INC[@]}" "${extra[@]}"
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R19_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" setitimer.o clock_nanosleep.o raise.o)
+  for m in "${R19[@]}"; do
+    missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R19_OBJ/$flavour/$m.o"))"
+    if [[ -n "$missing" ]]; then
+      echo "homescoop: $v $m.o: patched source lacks: $missing" >&2
+      exit 1
+    fi
+  done
+  "$LLVM_AR" r "$lib" $(printf "$R19_OBJ/$flavour/%s.o " "${R19[@]}")
+  undef="$("$LLVM_NM" -u "$lib" 2>/dev/null)"
+  grep -q __homescoop_proc_raise_interval2 <<<"$undef" || { echo "homescoop: $lib setitimer lacks proc_raise_interval2" >&2; exit 1; }
+  # -17's sysroot-ehpic shipped the archives its libc patches replaced.
+  rm -f "$PKG/$v/lib/wasm32-wasip1/"libc.a.bak-*
   echo "  $v ($flavour)"
 done
 

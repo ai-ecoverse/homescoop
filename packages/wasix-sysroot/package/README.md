@@ -32,5 +32,8 @@ Since 2025.9.30-18:
 - `sigaction` honours `SA_RESETHAND` and reports each disposition to the
   kernel through `slicc.sigaction_set`. Kernels without that import answer
   ENOSYS, which is ignored.
+- `alarm`/`setitimer` fire in every variant (`proc_raise_interval2`; -19),
+  a signal ends `nanosleep`/`sleep` early with EINTR and the time left, and
+  `raise()` reaches the handler.
 
 Data only — no commands. Set `WASIXCC_SYSROOT_PREFIX` to this package directory.

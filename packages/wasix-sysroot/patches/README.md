@@ -92,3 +92,23 @@ All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces `pselec
   - `__wasm_signal` never calls through `SIG_IGN`.
   - `raise()` uses `thread_signal`, which slicc-kernel does not deliver yet, so the probe signals itself with `kill(getpid(), …)`.
 
+## -19: `setitimer.c`, `clock_nanosleep.c`, `raise.c`
+
+All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces `setitimer.o`, `clock_nanosleep.o` and `raise.o` in every `libc.a`, after the symbol check.
+
+Before -19 the variants differed: `sysroot-ehpic` and `sysroot-exnref-ehpic` had wasix-python's setitimer and EINTR libc patches, and `sysroot`, `sysroot-eh` and `sysroot-exnref-eh` had upstream's. -19 also drops the `libc.a.bak-*` archives those patches left in `sysroot-ehpic`.
+
+- **`setitimer.c`** (`alarm` calls it):
+  - It calls `wasix_32v1.proc_raise_interval2(sig, it_value ns, it_interval ns, repeat)`, so `alarm(N)` and one-shot timers fire.
+  - Upstream passed only `it_interval` to the 3-arg `proc_raise_interval`, so `alarm(N)`, whose interval is 0, cancelled the timer.
+  - The import has a private C name, because `sysroot-ehpic`'s `__wasixlibc_real.o` already defines `__wasi_proc_raise_interval2`.
+  - `old` is not reported.
+- **`clock_nanosleep.c`** (`nanosleep`, `sleep` and `usleep` call it): a relative sleep that a signal cuts short returns EINTR and the time left (`rem`), as on Linux.
+  - Upstream answered ENOTSUP for every failure.
+  - slicc-kernel ends the clock wait early but reports the clock as expired, so a relative sleep that ends more than 1 ms early counts as interrupted.
+  - An explicit EINTR from the kernel is honoured too.
+- **`raise.c`:** `raise()` signals the process through `proc_signal(getpid())`, as `kill()` does, and sets errno on failure.
+  - Upstream used `thread_signal`, which slicc-kernel does not deliver, so the handler never ran. slicc-kernel#250 will add per-thread delivery.
+  - Upstream also returned the WASI errno as `raise()`'s result.
+  - In a multithreaded process the kernel picks the thread.
+

@@ -71,3 +71,22 @@ sigaction resethand: hits=1 reset=0
 sigaction ignore: survived
 sigaction kill handler: hits=1
 ```
+
+## 2025.9.30-19 (`run-modes.mjs --probe r19`), slicc-kernel 1.41.3 Node entry
+
+The published 2025.9.30-18. The probe builds with wasixcc's default variant.
+
+```text
+raise: rc=71 hits=0
+alarm 1: fired=off count=0
+setitimer 200+100ms: ticks=3..6 after-cancel=0
+nanosleep timer: rc=0 errno=Success rem=off alrm=0
+```
+
+- **`raise`:** `thread_signal` is never delivered, and its WASI errno comes back as the result.
+- **`alarm(1)`:** has interval 0, which cancels the timer.
+- **`nanosleep`:** the same one-shot timer never fires either, so the sleep runs out and reports success.
+- **Kill from bash:** a nanosleep cut short by `kill -USR1` from bash also reported success (rc 0, slept 514 ms of 3 s).
+
+-19 passes r19 on 1.35.1, 1.41.3 and 1.42.2. With `R19_SIGSTATE=1` it also passes on slicc-kernel#260 (9ae912a), where `/proc/<pid>/status` of `r19 hold` shows `SigIgn: 0000000000000806` (INT and QUIT from bash's background job, plus USR2) and `SigCgt: 0000000000006200` (USR1, ALRM, TERM).
+
