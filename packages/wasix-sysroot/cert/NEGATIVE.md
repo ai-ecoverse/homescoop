@@ -22,7 +22,7 @@ unchanged, `stat` mode bits 000, `chmod` a no-op.
 
 An earlier draft of `patches/posix.c` restored the umask into the variable
 it returned, so every fresh create used umask 0. On a slicc_fs kernel
-(slicc-kernel main 01ffe70):
+(slicc-kernel main 01ffe70, the code released as 1.35.1):
 
 ```text
 -   grp: '640',      +   grp: '666',

@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.34.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
   "slicc_fs": true,
   "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
   "host": "node packages/wasix-sysroot/test/run-modes.mjs --tarball <package.tgz>: builds test/modes.c against the tarball with the pinned wasixcc and runs test/modes.mjs on the kernel's Node entry. The sysroot (160 MB) is too big for a browser-cert page.",
