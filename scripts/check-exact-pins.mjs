@@ -14,8 +14,9 @@
  * on npm and certified (docs/versioning.md).
  *
  * PENDING lists packages whose packaging-only re-release with exact pins is
- * still in flight. They are reported, not failed; once a package is exact it
- * must leave PENDING (the check fails on a stale entry).
+ * still in flight (empty since py-matplotlib 3.11.2-3). They are reported,
+ * not failed; once a package is exact it must leave PENDING (the check
+ * fails on a stale entry).
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -29,9 +30,7 @@ export const EXACT =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
 /** Recipes (packages/<name>) still waiting for their exact-pin re-release. */
-export const PENDING = new Set([
-  'py-matplotlib',
-]);
+export const PENDING = new Set([]);
 
 /**
  * @param {Record<string, any>} pkg parsed package.json
