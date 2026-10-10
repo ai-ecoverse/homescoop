@@ -1,7 +1,10 @@
 {
   "name": "@ai-ecoverse/wasm-git",
-  "version": "2.55.0-13",
-  "description": "Git for slicc (rebuild sweep wasix-sysroot 2025.9.30-14; emscripten ABI)",
+  "version": "2.55.0-14",
+  "description": "Git for slicc (emscripten ABI; user names and ids from slicc-kernel >= 1.47.1)",
+  "engines": {
+    "slicc-kernel": ">=1.47.1"
+  },
   "license": "GPL-2.0-only",
   "repository": {
     "type": "git",
