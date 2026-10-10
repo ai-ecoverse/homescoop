@@ -276,9 +276,13 @@ done
 
 PY_CFLAGS="-O3 -flto -fPIC -matomics -mbulk-memory -mmutable-globals -pthread -mthread-model posix $EMU -include $STUBS/fcntl_wasix_extra.h -ffile-prefix-map=$B=."
 PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-memory -Wl,--import-memory -Wl,--max-memory=4294967296 -Wl,--stack-first -z stack-size=16777216 -Wl,--initial-memory=41943040 -ldl -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
-# Cross answers configure cannot run (wasm32: little endian, no fork, no ptys).
+# Cross answers configure cannot run (wasm32: little endian, no fork, no
+# ptys), and probes that find a declaration WASIX does not back: the
+# netpacket header (no AF_PACKET), memfd_create, and lockf (links through
+# the --wrap no-op but no header declares it), all three off as on -11.
 printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words_bigendian=no \
-  ac_cv_func_fork=no ac_cv_func_vfork=no >"$B/config.site"
+  ac_cv_func_fork=no ac_cv_func_vfork=no \
+  ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no ac_cv_func_lockf=no >"$B/config.site"
 rm -rf "$CROSS" && mkdir -p "$CROSS"
 (
   cd "$CROSS"

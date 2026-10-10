@@ -4,7 +4,7 @@
   "description": "CPython 3.14 for slicc WASIX (commands python, python3; cross-built in CI on wasix-sysroot 2025.9.30-17)",
   "license": "PSF-2.0",
   "engines": {
-    "slicc-kernel": ">=1.35.1"
+    "slicc-kernel": ">=1.29.0"
   },
   "repository": {
     "type": "git",
