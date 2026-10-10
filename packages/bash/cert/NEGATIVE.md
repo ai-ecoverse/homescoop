@@ -43,3 +43,14 @@ lists of -9 and -10 differ only in `env.__syscall_umask`; of -7's
 (handled by the slicc socket shim since -9) and pipe2 (unimplemented in
 4.0.23's C stubs; musl falls back to pipe + fcntl FD_CLOEXEC; cert/pipes.mjs
 passes on -9 and -10).
+
+## 5.3.0-11 (write boundaries), slicc-kernel 1.35.1 Node entry
+
+`cert/writes.mjs` on 5.3.0-10 (emscripten 4.0.23 stock `doWritev`, one `FS.write` per iovec):
+
+```
+AssertionError [ERR_ASSERTION]: bash -c "echo one": writes ["one","\n"]
+```
+
+5.3.0-7 (an emscripten whose `doWritev` gathered the iovecs) passes the same spec.
+

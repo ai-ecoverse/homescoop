@@ -4,6 +4,7 @@
  * @property {string} packageName homescoop recipe dir
  * @property {string} npmName
  * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array}) => Promise<{status:number,stdout:string,stderr:string}>} run
+ * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array}) => Promise<{status:number,stderr:string,writes:string[]}>} runWrites stdout one chunk per write()
  * @property {(path: string, data: string|Uint8Array) => Promise<void>} write
  * @property {(path: string) => Promise<string|null>} read
  * @property {(cfg: {names?: Record<string,string[]>, peers?: Record<string, {http?: {status?: number, headers?: [string,string][], body?: string}, tcp?: string, error?: string}>}) => Promise<void>} uplink
@@ -106,6 +107,23 @@ export function makeContext(page, meta) {
           env: opts.env || {},
           stdin: opts.stdin,
         },
+      );
+    },
+    // stdout as the kernel delivered it, one entry per chunk (per write()
+    // of the program), for specs about write boundaries (wasm-bash 5.3.0-11).
+    async runWrites(argv, opts = {}) {
+      return page.evaluate(
+        async (a, o) => {
+          const writes = [];
+          const dec = new TextDecoder();
+          const r = await window.kernel.run(a, {
+            ...o,
+            onStdout: (c) => writes.push(typeof c === 'string' ? c : dec.decode(c)),
+          });
+          return { status: r.status, stderr: r.stderr, writes };
+        },
+        argv,
+        { cwd: opts.cwd || '/home', env: opts.env || {}, stdin: opts.stdin },
       );
     },
     async write(path, data) {
