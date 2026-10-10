@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.44.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
   "slicc_fs": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -23,6 +23,7 @@
     "-20 (run-modes.mjs --probe tzname, default and --variant ehpic; any kernel): strftime('%Z') with tm_zone pointing at a heap copy gives EST / EDT / UTC, and CET / CEST for the TZif zone Europe/Berlin (the host's file, written into the kernel); a heap 'XYZ', a TZif-unknown 'EDT' and NULL give ''; musl's own pointer still gives EST. -19 printed '' for every copy"
   ],
   "extra_kernels": [
-    "@ai-ecoverse/slicc-kernel@1.41.3 (r18, r19, modes; r20 shows the no-fallback failure)"
+    "@ai-ecoverse/slicc-kernel@1.44.0 (r20, r19, r18, tzname, modes)",
+    "@ai-ecoverse/slicc-kernel@1.41.3 (r18, r19, tzname, modes; r20 shows the no-fallback failure)"
   ]
 }
