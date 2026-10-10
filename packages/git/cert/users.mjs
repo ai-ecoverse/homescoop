@@ -5,9 +5,9 @@
  * the kernel's /etc/passwd for the process's uid (shims/slicc: process
  * credentials, slicc_pwd's getpwuid).
  *
- * Needs a slicc-kernel whose Emscripten stat reports the caller's euid/egid
- * as file owner (the K1 line after 1.44.0): on 1.44.0 every file is uid 1000,
- * so root's own repository is "dubious". On 2.55.0-13 (a repack of -11,
+ * Needs slicc-kernel >= 1.47.1, whose Emscripten stat reports the caller's
+ * euid/egid as file owner: on 1.44.0 every file is uid 1000, so root's own
+ * repository is "dubious". On 2.55.0-13 (a repack of -11,
  * NEGATIVE.md) the author is "Unknown", since getpwuid found nobody.
  */
 export default async function (ctx) {

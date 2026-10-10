@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.44.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
   "uplink": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -15,6 +15,5 @@
     "tailnet (homescoop#139, uplink): git ls-remote http://peer.tail1234.ts.net:8080/repo.git (no_proxy=*) resolves via the kernel resolver/uplink (family 4), dials 100.64.1.2:8080, sends GET /repo.git/info/refs?service=git-upload-pack with the right Host, and prints the advertised HEAD and refs/heads/main",
     "a name answered with 127.0.0.1 \u2192 rc 128 'Could not resolve', nothing dialled",
     "cert/users.mjs (2.55.0-14, H1 homescoop#207): as root and as kernel.users.add({name:'cone'}), git init + commit in ~ with only user.email set: no 'dubious ownership', author 'root <root@slicc.test>' / 'cone <cone@slicc.test>' (name from /etc/passwd via getpwuid), clean status, toplevel /root/repo and /home/cone/repo. A real rebuild (2.55.0-12/-13 were repacks of -11) on shims/slicc with process credentials"
-  ],
-  "kernel_note": "users.mjs needs the K1-line release with the Emscripten stat owner fix (thr_9ab5eajk3x, fix/stat-owner-euid); meta.kernel moves to it when it is on npm"
+  ]
 }

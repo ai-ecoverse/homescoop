@@ -17,9 +17,9 @@ pnpm add -g @ai-ecoverse/wasm-git
 git init && git add . && git commit -m ok
 ```
 
-## Users (2.55.0-14, slicc-kernel ≥ 1.44.0)
+## Users (2.55.0-14, slicc-kernel ≥ 1.47.1)
 
 git runs as the kernel's user. Without `user.name`, the author name comes from
 slicc-kernel's `/etc/passwd` for the process's uid: `root` by default, or a
 `kernel.users.add` user's name. Repository ownership checks (`safe.directory`)
-use the file owners the kernel reports.
+use the file owners the kernel reports (≥ 1.47.1: the calling user's ids).
