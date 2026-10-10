@@ -21,6 +21,9 @@ Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `
 Since 3.14.2-15:
 - `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.49.0 (#306 step 1:
   `call_dynamic`, `closure_allocate`/`closure_free`). `CFUNCTYPE` waits for step 2.
+  `CDLL(None)` / `PyDLL(None)`: WASIX `dlopen(NULL)` still returns handle 0 (main),
+  which POSIX treats as failure; `_slicc_site` maps `None` to `bin/python.wasm`
+  until the kernel returns a non-zero main handle.
 
 Since 3.14.2-14 (wasix-sysroot -21):
 - `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,

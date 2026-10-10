@@ -7,17 +7,19 @@
  * closures wait for #306 step 2.
  *
  * Fixture: cert/fixtures/libside-add.so (wasixcc PIC dylink side module,
- * `int side_add(int,int)`), built like the #306 handoff probes.
+ * `int side_add(int,int)`), embedded as base64 so the browser-cert write path
+ * cannot UTF-8-corrupt the wasm bytes.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const SIDE = readFileSync(join(here, 'fixtures/libside-add.so'));
+const SIDE_B64 = readFileSync(join(here, 'fixtures/libside-add.so')).toString('base64');
 
-const SCRIPT = String.raw`
-import ctypes, _ctypes, json, sys
+const SCRIPT = `
+import base64, ctypes, _ctypes, json, sys
+open("/home/libside-add.so", "wb").write(base64.b64decode(${JSON.stringify(SIDE_B64)}))
 out = {"_ctypes": _ctypes.__name__, "ctypes": ctypes.__name__}
 # Main-module libc symbols (PIE export-dynamic).
 lib = ctypes.CDLL(None)
@@ -34,7 +36,6 @@ print(json.dumps(out))
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
-  await write('/home/libside-add.so', SIDE);
   await write('/home/ctypes_check.py', SCRIPT);
   const r = await run(['python', '/home/ctypes_check.py'], { cwd: '/home' });
   assert.equal(r.status, 0, `ctypes_check.py: rc=${r.status}\n${r.stdout}\n${r.stderr}`);
