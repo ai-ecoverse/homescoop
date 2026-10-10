@@ -19,6 +19,8 @@ The next-line phase alone, 40 rounds per build and kernel (fresh pty each; `true
 
 5.3.0-14 fails `cert/sigint-line.mjs`'s next-line phase (3/20).
 
+On 1.47.1 (before slicc-kernel#303) 5.3.0-15 can still lose a line: a stray character is read before readline notices the late ^C. Measured: 2 of 120 next lines (0/40 in the table above; 1/60 over three local runs of the cert's 20-line phase; 1/20 in CI run 38085440941), and in the runs where it happens, 1 of 20. 5.3.0-13 lost 7/40 on the same kernel. The cert therefore runs on 1.48.3.
+
 ## ^C while readline echoes the accepted line: 5.3.0-13
 
 `cert/sigint-line.mjs` on 5.3.0-13, slicc-kernel 1.44.0 Node entry. 2 of 3 runs failed within the first rounds:
