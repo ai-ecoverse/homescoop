@@ -2,15 +2,20 @@
 // ECDSA P-256 and RSA-2048 verify of fixed signatures), RAND_bytes, and a
 // TLS 1.3 handshake over a memory BIO pair with an in-process self-signed
 // certificate, and BIO calls whose signatures carry long / size_t / off_t
-// (a header/library mismatch there links a trapping stub). Prints one
-// "ok <check>" line per check and "sslprobe ok".
+// (a header/library mismatch there links a trapping stub), and libcrypto
+// from 4 pthreads at once (3.5.9-3: OPENSSL_THREADS, real locks, per-thread
+// error queues, run-once under contention). Prints one "ok <check>" line per
+// check and "sslprobe ok".
 #include <openssl/bio.h>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -156,6 +161,67 @@ static void bio(void) {
   BIO_free(m);
 }
 
+// libcrypto from NTHREADS threads at once.
+#define NTHREADS 4
+#define ROUNDS 2000
+static unsigned char want_sha[32], want_hmac[32];
+static CRYPTO_RWLOCK *lock;
+static int locked_counter, atomic_counter, once_runs;
+static CRYPTO_ONCE once = CRYPTO_ONCE_STATIC_INIT;
+static void once_fn(void) { once_runs++; }
+
+static void *worker(void *arg) {
+  int id = (int)(long)arg, bad = 0;
+  static const unsigned char data[] = "wasix-openssl thread probe";
+  for (int i = 0; i < ROUNDS; i++) {
+    unsigned char md[32], mac[32], rnd[16] = {0}, zero[16] = {0};
+    unsigned int n = 0, m = 0;
+    int ret = 0;
+    if (!CRYPTO_THREAD_run_once(&once, once_fn) || !OPENSSL_init_crypto(0, NULL)) bad++;
+    if (!EVP_Digest(data, sizeof data - 1, md, &n, EVP_sha256(), NULL) || n != 32 || memcmp(md, want_sha, 32)) bad++;
+    if (!HMAC(EVP_sha256(), "key", 3, data, sizeof data - 1, mac, &m) || m != 32 || memcmp(mac, want_hmac, 32)) bad++;
+    if (RAND_bytes(rnd, sizeof rnd) != 1 || !memcmp(rnd, zero, sizeof rnd)) bad++;
+    // Error queues are per thread: our own reason code comes back.
+    ERR_raise(ERR_LIB_USER, 100 + id);
+    unsigned long e = ERR_get_error();
+    if (ERR_GET_LIB(e) != ERR_LIB_USER || ERR_GET_REASON(e) != 100 + id || ERR_peek_error() != 0) bad++;
+    if (!CRYPTO_THREAD_write_lock(lock)) bad++;
+    locked_counter++;
+    if (!CRYPTO_THREAD_unlock(lock)) bad++;
+    if (!CRYPTO_atomic_add(&atomic_counter, 1, &ret, lock)) bad++;
+  }
+  return (void *)(long)bad;
+}
+
+static void threads(void) {
+#ifdef OPENSSL_THREADS
+  CHECK(1, "OPENSSL_THREADS defined");
+#else
+  CHECK(0, "OPENSSL_THREADS defined");
+#endif
+  static const unsigned char data[] = "wasix-openssl thread probe";
+  unsigned int n = 0;
+  EVP_Digest(data, sizeof data - 1, want_sha, &n, EVP_sha256(), NULL);
+  HMAC(EVP_sha256(), "key", 3, data, sizeof data - 1, want_hmac, &n);
+  lock = CRYPTO_THREAD_lock_new();
+  CHECK(lock != NULL, "CRYPTO_THREAD_lock_new");
+  pthread_t t[NTHREADS];
+  int started = 0, bad = 0;
+  for (long i = 0; i < NTHREADS; i++) started += pthread_create(&t[i], NULL, worker, (void *)i) == 0;
+  CHECK(started == NTHREADS, "pthread_create x4");
+  for (int i = 0; i < started; i++) {
+    void *r = NULL;
+    pthread_join(t[i], &r);
+    bad += (int)(long)r;
+  }
+  printf("threads: %d bad results, locked %d, atomic %d, once %d\n", bad, locked_counter, atomic_counter, once_runs);
+  CHECK(bad == 0, "4 threads x 2000: sha256, hmac-sha256, RAND_bytes, per-thread ERR queue");
+  CHECK(locked_counter == NTHREADS * ROUNDS, "CRYPTO_THREAD_write_lock excludes");
+  CHECK(atomic_counter == NTHREADS * ROUNDS, "CRYPTO_atomic_add");
+  CHECK(once_runs == 1, "CRYPTO_THREAD_run_once ran once under contention");
+  CRYPTO_THREAD_lock_free(lock);
+}
+
 int main(void) {
   printf("%s\n", OpenSSL_version(OPENSSL_VERSION));
   printf("%s\n", OpenSSL_version(OPENSSL_BUILT_ON));
@@ -173,6 +239,7 @@ int main(void) {
   CHECK(RAND_bytes(r1, 32) == 1 && RAND_bytes(r2, 32) == 1 && memcmp(r1, zero, 32) && memcmp(r1, r2, 32), "RAND_bytes (WASI random_get)");
   bio();
   tls();
+  threads();
   if (fails) {
     printf("%d failed\n", fails);
     return 1;

@@ -31,6 +31,13 @@ export default async function (ctx) {
       'client verified the self-signed cert (probe.test)',
       'client to server application data',
       'server to client application data',
+      'OPENSSL_THREADS defined',
+      'CRYPTO_THREAD_lock_new',
+      'pthread_create x4',
+      '4 threads x 2000: sha256, hmac-sha256, RAND_bytes, per-thread ERR queue',
+      'CRYPTO_THREAD_write_lock excludes',
+      'CRYPTO_atomic_add',
+      'CRYPTO_THREAD_run_once ran once under contention',
     ]) {
       assert.ok(r.stdout.includes(`ok ${check}\n`), `${cmd}: ${check}\n${r.stdout}`);
     }
