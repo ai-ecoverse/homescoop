@@ -256,6 +256,11 @@ fi
 
 WASIXCC_WASM_EXCEPTIONS=no WASIXCC_PIC=no \
   wasixcc -c -O2 "$PKG/stubs/posix.c" -o "$WORK/ruby-wasix-stubs.o"
+# An archive: ruby's link lists LIBS twice (configure's MAINLIBS and LIBS),
+# and a plain .o given twice is a duplicate definition; archive members are
+# pulled once. (madvise and dladdr: neither is in wasix-libc.)
+rm -f "$WORK/libruby-wasix-stubs.a"
+wasixar rcs "$WORK/libruby-wasix-stubs.a" "$WORK/ruby-wasix-stubs.o"
 
 OPENSSL_FLAGS=()
 OPENSSL_NOTE="skipped (no $OPENSSL_PREFIX/lib/libssl.a)"
@@ -378,7 +383,7 @@ SITE
       CFLAGS="${RUBY_CFLAGS:--O2} -DUSE_MN_THREADS=0 -DWASM_SETJMP_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_FIBER_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_SCAN_STACK_BUFFER_SIZE=${ASYNCIFY_BUF}" \
       CPPFLAGS="$RUBY_CPPFLAGS -DWASM_SETJMP_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_FIBER_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_SCAN_STACK_BUFFER_SIZE=${ASYNCIFY_BUF}" \
       LDFLAGS="$RUBY_LDFLAGS" \
-      LIBS="$WORK/ruby-wasix-stubs.o" \
+      LIBS="$WORK/libruby-wasix-stubs.a" \
       2>&1 | tee "$WORK/configure.log"
     python3 - "$WORK/build" <<'PY'
 from pathlib import Path
@@ -481,7 +486,7 @@ PY
     fi
     echo "== wasix-ruby: ASYNCIFY spill buffers = ${ASYNCIFY_BUF}"
     make -j"${HOMESCOOP_JOBS:-4}" CCDLFLAGS= \
-      LIBS="$WORK/ruby-wasix-stubs.o" \
+      LIBS="$WORK/libruby-wasix-stubs.a" \
       WASMOPT="$WASM_OPT" \
       2>&1 | tee "$WORK/make.log"
     test -f ruby || test -f ruby.wasm
@@ -499,7 +504,7 @@ PY
     # Keep a copy — `make install` may relink without asyncify.
     cp "$RUBY_LINKED" "$WORK/ruby.asyncified.wasm"
     make DESTDIR="$STAGE" install CCDLFLAGS= \
-      LIBS="$WORK/ruby-wasix-stubs.o" \
+      LIBS="$WORK/libruby-wasix-stubs.a" \
       POSTLINK=: \
       2>&1 | tee "$WORK/install.log"
     # Restore asyncified binary into DESTDIR (install may have overwritten).
