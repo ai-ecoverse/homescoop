@@ -62,28 +62,10 @@ PY
 ok "sysconfigdata $SC"
 
 IMPORTS=$("$OBJDUMP" -x -j Import "$WASM") || fail "wasm-objdump cannot read $WASM"
-if echo "$IMPORTS" | grep -Eiq 'getuid|geteuid|getgid|getegid'; then
-  fail "getuid/geteuid/getgid/getegid still appear in Import section (bypass stub)"
-fi
-ok "uid not imported"
-
-python3 - "$OBJDUMP" "$WASM" <<'PY' || fail "__wrap_getuid export/body check failed"
-import re, subprocess, sys
-objdump, wasm = sys.argv[1:3]
-exp = subprocess.check_output([objdump, "-x", "-j", "Export", wasm], text=True, stderr=subprocess.STDOUT)
-if "__wrap_getuid" not in exp:
-    raise SystemExit("Export section missing __wrap_getuid")
-dis = subprocess.check_output([objdump, "-d", wasm], text=True, stderr=subprocess.STDOUT)
-# O3 may merge getuid/geteuid/getgid/getegid into one function
-m = re.search(r"func\[\d+\] <__wrap_get(?:uid|euid|gid|egid)>:.*?(?=func\[\d+\]|\Z)", dis, re.S)
-if not m:
-    raise SystemExit("no __wrap_getuid family in disassembly")
-body = m.group(0)[:400]
-if "i32.const 1000" not in body and "41 e8 07" not in body:
-    raise SystemExit("wrap body does not return 1000:\n" + body)
-print("wrap ok", body.splitlines()[0])
-PY
-ok "getuid wrapped → 1000 (exported __wrap_getuid)"
+# 3.14.2-13 (H1, homescoop#207): user ids come from slicc-kernel through
+# wasix-sysroot -20's libc (slicc.cred_get), not uid-1000 --wrap stubs.
+echo "$IMPORTS" | grep -q '<- slicc\.cred_get' || fail "python.wasm does not import slicc.cred_get (wasix-sysroot -20 credentials)"
+ok "uid from slicc-kernel (imports slicc.cred_get)"
 
 # Advisory-lock wraps (SLICC realm no-ops; Emscripten parity).
 # O3 may merge __wrap_flock/lockf with other return-0 stubs; resolve via Export.
