@@ -68,7 +68,10 @@ if [[ ! -x "$HOSTPY" ]]; then
   (
     cd "$B/host-src"
     unset CC CFLAGS LDFLAGS CPPFLAGS
-    ./configure --prefix="$B/host" --without-ensurepip --disable-test-modules >"$B/host-configure.log" 2>&1
+    # Only a build python (freeze, compileall): no host OpenSSL, whose
+    # pick-up varies by machine (a Homebrew 3.x mismatch fails sharedinstall).
+    ./configure --prefix="$B/host" --without-ensurepip --disable-test-modules \
+      py_cv_module__ssl=n/a py_cv_module__hashlib=n/a >"$B/host-configure.log" 2>&1
     make -j"$JOBS" >"$B/host-make.log" 2>&1
     make install >"$B/host-install.log" 2>&1
   ) || { tail -40 "$B"/host-*.log >&2; exit 1; }
