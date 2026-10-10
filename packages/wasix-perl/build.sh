@@ -135,10 +135,13 @@ PY
   # Cross-configure cannot run probes — force wasix-libc features from
   # systematic libc.a nm sweep (+ stubs for dying builtins missing from libc).
   echo "== force wasix-libc d_* in config.sh (systematic sweep)"
-  python3 - "$SRC/config.sh" "$PKG/hints/wasix" <<'PY'
+  SYSROOT_INC="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot/include"
+  test -f "$SYSROOT_INC/errno.h"
+  python3 - "$SRC/config.sh" "$PKG/hints/wasix" "$SYSROOT_INC" <<'PY'
 import re, sys
 from pathlib import Path
 cfg_path, hints_path = Path(sys.argv[1]), Path(sys.argv[2])
+sysroot_inc = sys.argv[3]
 hints = hints_path.read_text()
 # Prefer the auto sweep block in hints if present
 force_def, force_undef = set(), set()
@@ -176,6 +179,13 @@ for k in sorted(force_undef):
 # wasm exceptions, and XS Makefiles (Devel-PPPort's module2.o) add
 # $Config{cccdlflags}; an empty hint falls back to perl-cross's -fPIC.
 t = re.sub(r"^cccdlflags='[^']*'", "cccdlflags=' '", t, count=1, flags=re.M)
+# Errno_pm.PL reads $Config{usrinc}/errno.h through the target cpp: the
+# target's headers, not the build machine's /usr/include.
+for k, v in (("usrinc", sysroot_inc), ("incpth", sysroot_inc), ("locincpth", "")):
+    if re.search(rf"^{k}=", t, re.M):
+        t = re.sub(rf"^{k}='[^']*'", f"{k}='{v}'", t, count=1, flags=re.M)
+    else:
+        t += f"\n{k}='{v}'\n"
 cfg_path.write_text(t)
 print(f"forced define={len(force_def)} undef={len(force_undef)}")
 PY
