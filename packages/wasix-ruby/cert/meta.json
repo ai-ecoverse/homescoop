@@ -1,0 +1,15 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "checklist": [
+    "ruby -v 3.4.11 [wasm32-wasi]; numerics, bignum, format %d/%x/%o/%f/%e of 2**62 etc, pack q/Q",
+    "zlib (wasix-zlib 1.3.1-2): crc32/adler32 vectors, deflate/inflate, gzip file round trip (1f8b), ZLIB_VERSION",
+    "openssl (wasix-openssl 3.5.9-2): OPENSSL_LIBRARY_VERSION 3.5.9, SHA256, HMAC-SHA256 vector, AES-256-GCM (GCM spec case 16), EC P-256 sign/verify + tampered, random bytes",
+    "psych (libyaml 0.2.5) safe_load / to_yaml, json generate/parse",
+    "backticks, system, Process.spawn + wait exit status, IO.popen (posix_spawn); fork raises NotImplementedError",
+    "Fiber resume/yield, Thread value, Queue; Etc.getpwuid, uid 1000, Socket constants",
+    "gem --version; an uncaught exception exits 1 with the message",
+    "cert/modes.mjs (wasix-sysroot 2025.9.30-17 + slicc-kernel 1.35.1 slicc_fs): File.umask returns 022; umask 027 → File.write gives 640; Tempfile 600; Dir.mktmpdir 700; Dir.mkdir 0700; File.chmod 0755 and executable?; File.stat equals coreutils' stat"
+  ]
+}
