@@ -137,7 +137,8 @@ compile_id() {
 }
 compile_id "$ID_TMP/slicc_identity.o"
 compile_id "$ID_TMP/slicc_identity.pic.o" -fPIC -fvisibility=default
-DROP=(getuid.o geteuid.o getgid.o getegid.o getpwent.o getpw_r.o getgrent.o getgr_r.o)
+# -20: musl getpw*/getgr* stay (they read /etc/passwd); the set*id stubs go.
+DROP=(getuid.o geteuid.o getgid.o getegid.o setuid.o seteuid.o setgid.o setegid.o setgroups.o)
 install_identity() {
   local lib=$1 src=$2
   [[ -f "$lib" ]] || return 0

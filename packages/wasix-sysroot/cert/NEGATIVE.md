@@ -103,3 +103,33 @@ nanosleep timer: rc=0 errno=Success rem=off alrm=0
 
 The `nanosleep aliased` and `nanosleep loop 1s` lines and `--variant ehpic` cover it. On -18, `--variant ehpic` differs from the default (its libc had wasix-python's alarm patch): `alarm 1: fired=off count=2`.
 
+
+## 2025.9.30-20 (`run-modes.mjs --probe r20`), slicc-kernel 1.44.0 (K1)
+
+- **-18 and -19 don't compile the probe.** Their `unistd.h` hides `getresuid`, `getresgid`, `getgroups` and `setresuid`, and every process is uid 1000 `user` with home `/home/user`, root or not.
+- **-20 on slicc-kernel 1.42.2 (no K1)** shows the documented failure, with no fallback:
+
+```text
+ids: uid=-1 euid=-1 gid=-1 egid=-1 res=-1:-1/…
+groups: n=-1 m=-1 small=-2 errno=0
+pwuid: - - -
+grgid: -
+pwnam root: uid=-1 dir=-
+user setuid0: -1 errno=Function not implemented
+user setgroups: -1 errno=Function not implemented
+```
+
+## 2025.9.30-20 `%Z` (`run-modes.mjs --probe tzname`), slicc-kernel 1.44.0
+
+The published 2025.9.30-19. Every `tm_zone` that is not one of musl's own pointers printed `""`:
+
+```text
++   'copy EST: []',
++   'copy EDT: []',
++   'copy UTC: []',
++   'tzif jan copy: []',
++   'tzif jul copy: []',
+```
+
+That is what CPython's `time.strftime('%Z', time.localtime())` returned on wasix-python 3.14.2-13 CI round 2.
+

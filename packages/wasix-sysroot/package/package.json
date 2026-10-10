@@ -1,7 +1,8 @@
 {
   "name": "@ai-ecoverse/wasix-sysroot",
   "version": "2025.9.30-19",
-  "description": "WASIX sysroots: st_uid/st_gid=1000 (slicc identity), file modes via slicc_fs, F_SETFD CLOEXEC fix, select exceptfds, physical chdir, POSIX TZ, socketpair flags, sigaction_set, alarm/setitimer/getitimer, EINTR sleeps, raise/pthread_kill, wasip1, clang24 exnref",
+  "description": "WASIX sysroots: st_uid/st_gid = getuid()/getgid(), file modes via slicc_fs, F_SETFD CLOEXEC fix, select exceptfds, physical chdir, POSIX TZ, socketpair flags, sigaction_set, alarm/setitimer/getitimer, EINTR sleeps, raise/pthread_kill, process credentials from slicc-kernel (no fixed uid 1000), wasip1, clang24 exnref",
+  "version": "2025.9.30-20",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
     "type": "git",

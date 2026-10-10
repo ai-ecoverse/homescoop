@@ -116,3 +116,25 @@ Before -19 the variants differed: `sysroot-ehpic` and `sysroot-exnref-ehpic` had
   - Upstream used `thread_signal`, which slicc-kernel does not deliver for the main thread, so the handler never ran. slicc-kernel#250 will add per-thread delivery.
   - Upstream also returned the WASI errno as `raise()`'s result.
 - **`pthread_kill.c`:** a target with the main thread's placeholder tid (`0x3fffffff`, which the kernel does not know: ESRCH) is signalled through `proc_signal(getpid())`. Other threads keep `thread_signal`. A bad signal number is EINVAL.
+## -20: `../slicc_identity.c` — credentials from slicc-kernel (homescoop#207)
+
+Needs slicc-kernel ≥ 1.44.0 (K1, slicc-kernel#251).
+
+- **Ids come from the kernel.** `getuid`/`geteuid`/`getgid`/`getegid`, `getresuid`/`getresgid` and `getgroups` ask it through the `slicc` module's `cred_get` and `groups_get`. The set calls (`setuid`, `seteuid`, `setreuid`, `setresuid`, the gid versions and `setgroups`) go through `cred_set` and `groups_set`. Linux's rules apply:
+  - `setuid`/`setgid` set all three ids for a privileged caller and only the effective id otherwise;
+  - `setreuid`/`setregid` update the saved id as Linux does;
+  - the kernel enforces the POSIX permissions (EPERM, EINVAL).
+- **Members replaced.** `build-incremental.sh` removes cloudlibc's no-op `setuid.o`, `seteuid.o`, `setgid.o`, `setegid.o` and the ENOTSUP `setgroups.o`. The fixed uid 1000 `slicc_identity.o` is replaced.
+- **Names come from the files.** The static `user`/1000 passwd entry is gone. musl's own `getpwent.o`, `getpw_r.o`, `getgrent.o` and `getgr_r.o`, compiled from the libc tag, read the kernel's real `/etc/passwd` and `/etc/group`.
+- **Headers.** `unistd.h` declares `getgroups`, `setreuid`/`setregid` and `setresuid`/`setresgid`/`getresuid`/`getresgid`, which wasi-libc had hidden.
+- **No fallback.** On a kernel without K1 the imports answer ENOSYS:
+  - the getters return `(uid_t)-1`;
+  - `getgroups` and every setter return -1 with errno ENOSYS;
+  - `getpw*`/`getgr*` find nothing unless `/etc/passwd` exists.
+
+### -20: `__tz.c` — `%Z` for a copied `tm_zone`
+
+musl's `__tm_to_tzname` (used by `strftime("%Z")`) prints `tm_zone` only if it is one of musl's own pointers: `__tzname[0/1]`, `__utc`, or the loaded TZif abbreviations. Any other pointer prints `""`, which guards against garbage pointers in a caller's `struct tm`.
+
+CPython's `time.strftime` builds `struct tm` from a tuple, so its `tm_zone` points at a Python-owned copy and `%Z` was always empty. -20 maps a pointer whose text equals a name this tz knows (`__tzname[0/1]`, `UTC`, a TZif abbreviation) to musl's string. Anything else, NULL included, still prints `""` (`test/tzname.c`).
+
