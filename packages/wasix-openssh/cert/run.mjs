@@ -211,9 +211,8 @@ async function main() {
   ]);
   const kernelRoot = join(nm, 'node_modules/@ai-ecoverse/slicc-kernel');
   const { createNodeKernel } = await import(pathToFileURL(join(kernelRoot, 'dist/node.js')).href);
-  const { fakeUplink } = await import(
-    pathToFileURL(join(kernelRoot, 'testing/index.js')).href
-  ).catch(async () => import('@ai-ecoverse/slicc-kernel/testing'));
+  // Published package ships dist/ only; exports map "./testing" → dist/testing.js.
+  const { fakeUplink } = await import(pathToFileURL(join(kernelRoot, 'dist/testing.js')).href);
 
   const uplink = fakeUplink({
     names: {
@@ -243,7 +242,17 @@ async function main() {
   // Seed ~/.ssh with the user key for publickey tests.
   await kernel.writeFile('/home/user/.ssh/id_ed25519', readFileSync(userKey));
   await kernel.writeFile('/home/user/.ssh/id_ed25519.pub', readFileSync(`${userKey}.pub`));
-  // Modes: rely on slicc_fs when the kernel supports it; chmod via coreutils if present.
+  // writeFile defaults to 0644; OpenSSH rejects open private keys — chmod via coreutils.
+  const chmod = await kernel.run(['chmod', '700', '/home/user/.ssh'], {
+    cwd: '/home/user',
+    env: { HOME: '/home/user', USER: 'user' },
+  });
+  if (chmod.status !== 0) throw new Error(`chmod .ssh: ${chmod.stderr}`);
+  const chmodKey = await kernel.run(['chmod', '600', '/home/user/.ssh/id_ed25519'], {
+    cwd: '/home/user',
+    env: { HOME: '/home/user', USER: 'user' },
+  });
+  if (chmodKey.status !== 0) throw new Error(`chmod id_ed25519: ${chmodKey.stderr}`);
 
   // sshd authenticates a real host account; the guest must pass that name.
   const hostUser = sh('bash', ['-lc', 'id -un']).trim();
@@ -276,8 +285,12 @@ async function main() {
       console.log(`FAIL cert/${spec}\n${e.stack}`);
     }
   }
-  await kernel.terminate();
-  process.exitCode = failed;
+  try {
+    await kernel.terminate();
+  } catch {
+    /* ignore */
+  }
+  process.exit(failed);
 }
 
 main().catch((e) => {

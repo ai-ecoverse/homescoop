@@ -29,12 +29,18 @@ export default async function checklist(ctx) {
   }
 
   // --- identity: $HOME ---
+  // OpenSSH 10.6 `ssh -G` omits userconfigfile; userknownhostsfile still
+  // expands under $HOME (same path policy as ~/.ssh/config).
   {
     const r = await run(['ssh', '-G', 'sshd.cert.internal'], {
       env: { HOME: '/home/user', USER: 'user' },
     });
     assert.equal(r.status, 0, `ssh -G: ${r.stderr}`);
-    assert.match(r.stdout, /userconfigfile \/home\/user\/\.ssh\/config/i);
+    assert.match(
+      r.stdout,
+      /userknownhostsfile \/home\/user\/\.ssh\/known_hosts/i,
+      `ssh -G HOME paths: ${r.stdout.slice(0, 400)}`,
+    );
   }
 
   // --- exec + publickey via uplink ---
