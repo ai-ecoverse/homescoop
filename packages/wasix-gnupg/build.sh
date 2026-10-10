@@ -216,7 +216,10 @@ for c in cmds.values():
 pkg = {
     "name": "@ai-ecoverse/wasix-gnupg",
     "version": pkg_ver,
-    "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent",
+    "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -20: user ids from slicc-kernel)",
+    # wasix-sysroot -20 asks slicc-kernel for user ids (no fallback); the homedir
+    # owner check needs 1.47.1, which reports owners as the caller's ids.
+    "engines": {"slicc-kernel": ">=1.47.1"},
     "license": "GPL-3.0-or-later",
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses", "patches"],
     "publishConfig": {"access": "public"},
