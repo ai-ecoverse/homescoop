@@ -45,8 +45,10 @@ tarball checksums ship in `patches/` and `SOURCES.md`.
 
 - Spawns are `posix_spawn` (no fork); `gpg-agent --daemon` detaches by
   starting itself again.
-- Built against wasix-sysroot 2025.9.30-15 or later, whose libc reports
-  files as the realm user's (GnuPG refuses a homedir it does not own).
+- Built against wasix-sysroot 2025.9.30-20: user ids come from slicc-kernel's
+  process credentials, and on slicc-kernel ≥ 1.47.1 a file's owner is the
+  caller's ids, so each user's own homedir passes GnuPG's ownership check
+  (it refuses a homedir it does not own). Needs slicc-kernel ≥ 1.47.1.
 
 License: GPL-3.0-or-later (GnuPG); the libraries' licenses are in
 `licenses/`.

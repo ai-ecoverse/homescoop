@@ -10,15 +10,19 @@
 export default async function (ctx) {
   const { run, assert, addUser } = ctx;
   await addUser({ name: 'cone' });
+  const count = (text, re) => (text.match(re) ?? []).length;
   for (const user of ['root', 'cone']) {
-    const sh = (script) => run(['bash', '-c', `unset GNUPGHOME; ${script}`], { cwd: '/tmp', ...(user === 'cone' && { user }) });
-    const gen = await sh('gpg --batch --pinentry-mode loopback --passphrase "" --quick-gen-key "U <u@example.org>" default default never 2>&1; echo "rc=$?"');
-    assert.match(gen.stdout, /rc=0\s*$/, `${user} keygen:\n${gen.stdout}${gen.stderr}`);
+    const sh = (script) => run(['bash', '-c', `unset GNUPGHOME; ${script} 2>&1`], { cwd: '/tmp', ...(user === 'cone' && { user }) });
+    const gen = await sh('gpg --batch --pinentry-mode loopback --passphrase "" --quick-gen-key "U <u@example.org>" default default never; echo "rc=$?"');
+    assert.match(gen.stdout, /rc=0\s*$/, `${user} keygen:\n${gen.stdout}`);
     assert.doesNotMatch(gen.stdout, /unsafe (ownership|permissions)/, `${user}:\n${gen.stdout}`);
-    const st = await sh('stat -c "%U %a" ~/.gnupg; gpg --batch --list-keys 2>&1 | grep -c "^uid" ; gpg --batch --list-keys 2>&1 | grep -c unsafe || true');
-    assert.deepEqual(st.stdout.trim().split('\n'), [`${user} 700`, '1', '0'], `${user}:\n${st.stdout}${st.stderr}`);
+    const st = await sh('stat -c "%U %a" ~/.gnupg');
+    assert.equal(st.stdout.trim(), `${user} 700`, `${user}: ${st.stdout}`);
+    const list = await sh('gpg --batch --list-keys');
+    assert.equal(count(list.stdout, /^uid /gm), 1, `${user} list-keys:\n${list.stdout}`);
+    assert.equal(count(list.stdout, /unsafe/g), 0, `${user} list-keys:\n${list.stdout}`);
     // A group/world-readable homedir is still refused as unsafe.
-    const loose = await sh('chmod 755 ~/.gnupg && gpg --batch --list-keys 2>&1 | grep -c "unsafe permissions on homedir"; chmod 700 ~/.gnupg');
-    assert.equal(loose.stdout.trim(), '1', `${user} 755:\n${loose.stdout}${loose.stderr}`);
+    const loose = await sh('chmod 755 ~/.gnupg && gpg --batch --list-keys; chmod 700 ~/.gnupg');
+    assert.match(loose.stdout, /unsafe permissions on homedir/, `${user} 755:\n${loose.stdout}`);
   }
 }
