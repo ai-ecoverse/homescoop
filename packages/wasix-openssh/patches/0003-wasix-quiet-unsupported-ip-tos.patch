@@ -1,0 +1,38 @@
+From: homescoop
+Subject: WASIX: silence unsupported IP_TOS / IPV6_TCLASS setsockopt
+
+--- a/misc.c
++++ b/misc.c
+@@ -343,8 +343,14 @@
+ 		debug3_f("set socket %d IP_TOS 0x%02x", fd, tos);
+ 		if (setsockopt(fd, IPPROTO_IP, IP_TOS,
+ 		    &tos, sizeof(tos)) == -1) {
+-			error("setsockopt socket %d IP_TOS %d: %s",
+-			    fd, tos, strerror(errno));
++			/* WASIX / some stacks: IP_TOS unsupported — stay quiet. */
++			if (errno != ENOSYS && errno != EOPNOTSUPP &&
++			    errno != ENOPROTOOPT) {
++				error("setsockopt socket %d IP_TOS %d: %s",
++				    fd, tos, strerror(errno));
++			} else
++				debug3_f("setsockopt IP_TOS unsupported: %s",
++				    strerror(errno));
+ 		}
+ # endif /* IP_TOS */
+ 		break;
+@@ -353,8 +359,13 @@
+ 		debug3_f("set socket %d IPV6_TCLASS 0x%02x", fd, tos);
+ 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_TCLASS,
+ 		    &tos, sizeof(tos)) == -1) {
+-			error("setsockopt socket %d IPV6_TCLASS %d: %s",
+-			    fd, tos, strerror(errno));
++			if (errno != ENOSYS && errno != EOPNOTSUPP &&
++			    errno != ENOPROTOOPT) {
++				error("setsockopt socket %d IPV6_TCLASS %d: %s",
++				    fd, tos, strerror(errno));
++			} else
++				debug3_f("setsockopt IPV6_TCLASS unsupported: %s",
++				    strerror(errno));
+ 		}
+ # endif /* IPV6_TCLASS */
+ 		break;
