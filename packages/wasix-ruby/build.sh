@@ -11,7 +11,10 @@ homescoop_load_recipe wasix-ruby
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-9"
+# The npm version (upstream-N) comes from the committed package.json, read
+# before staging rewrites it, and must start with the recipe's version.
+PKG_VER="$(node -p "require('$DEST/package.json').version")"
+[[ "$PKG_VER" == "$VER-"* ]] || { echo "homescoop: package.json version $PKG_VER does not start with $VER-" >&2; exit 1; }
 # Baked-in load paths must not match any real VFS path (ipk install, /ruby, /usr).
 # Manifest RUBYLIB is authoritative; see relocatable acceptance note in PRESTAGE.md.
 RUBY_PREFIX="${RUBY_PREFIX:-/nonexistent-ruby-prefix}"
@@ -333,9 +336,10 @@ rb_cv_function_name_string=__func__
 ac_cv_func_clock_getres=yes
 ac_cv_func_gmtime_r=yes
 ac_cv_func_localtime_r=yes
-ac_cv_func_getgroups=no
-ac_cv_func_setgroups=no
-ac_cv_func_initgroups=no
+# wasix-sysroot -20 asks slicc-kernel for the groups (homescoop#207).
+ac_cv_func_getgroups=yes
+ac_cv_func_setgroups=yes
+ac_cv_func_initgroups=yes
 ac_cv_func_poll=yes
 # ruby_ppoll() over poll(), not the libc ppoll().
 ac_cv_func_ppoll=no
@@ -414,10 +418,6 @@ undef0 = [
     "HAVE_TIMERFD_CREATE",
     "HAVE_TIMERFD_GETTIME",
     "HAVE_TIMERFD_SETTIME",
-    # WASIX has no getgroups(2); SETGROUPS without GETGROUPS breaks process.c.
-    "HAVE_SETGROUPS",
-    "HAVE_INITGROUPS",
-    "HAVE_GETGROUPS",
 ]
 # Socket: compile ext/socket but strip ancillary-data / CMSG paths (WASIX incomplete).
 cmsg_undef = [
@@ -451,11 +451,10 @@ for cfg in list(root.glob(".ext/include/*/ruby/config.h")) + list(root.glob("inc
         t = t.replace(f"#define {k} 1", f"/* {k} forced off for SLICC */\n#define {k} 0")
         if f"#define {k}" not in t:
             t += f"\n#define {k} 0\n"
-    # file.c uses !defined(HAVE_GETGROUPS), so 0-valued define is not enough.
     # Fork is unsupported on WASIX+Asyncify — force undef so Kernel#fork is notimplement.
     # CMSG: ancdata.c is #if defined(HAVE_STRUCT_MSGHDR_MSG_CONTROL) — must undef, not 0.
+    # getgroups/setgroups/initgroups stay: wasix-sysroot -20 asks slicc-kernel.
     for k in (
-        "HAVE_GETGROUPS", "HAVE_SETGROUPS", "HAVE_INITGROUPS",
         "HAVE_WORKING_FORK", "HAVE_FORK",
         *cmsg_undef,
     ):
@@ -695,7 +694,7 @@ homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-17; files from tag v2025-09-02.1)" \
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-20; files from tag v2025-09-02.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -800,7 +799,9 @@ base_env = {
 pkg = {
     "name": "@ai-ecoverse/wasix-ruby",
     "version": pkg_ver,
-    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; sysroot 2025.9.30-17)",
+    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot -20: user ids and traps from slicc-kernel)",
+    # wasix-sysroot -20 asks slicc-kernel for user ids, with no fallback (homescoop#207).
+    "engines": {"slicc-kernel": ">=1.44.0"},
     "license": "Ruby",
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "PRESTAGE.md"],
     "publishConfig": {"access": "public"},
@@ -884,7 +885,7 @@ PY
 cat > "$DEST/PRESTAGE.md" <<EOF
 # wasix-ruby ${PKG_VER}
 
-Built against wasix-sysroot **2025.9.30-17**. **No epoll**: SLICC returns ENOSYS (52)
+Built against wasix-sysroot **2025.9.30-20**. **No epoll**: SLICC returns ENOSYS (52)
 for \`epoll_create\`; MRI is compiled with \`USE_MN_THREADS=0\` and
 \`HAVE_SYS_EPOLL_H=0\` (also kqueue/eventfd/timerfd off) so it uses poll()/timer-thread.
 
@@ -910,8 +911,9 @@ ${OPENSSL_NOTE}
 - \`GEM_HOME=\${HOME}/.local/share/gem/ruby/3.4.0\` (writable under SLICC HOME).
 - \`GEM_PATH=\${HOME}/.local/share/gem/ruby/3.4.0:\${package}/lib/ruby/gems/3.4.0\`.
 - \`File#flock\` / \`missing/flock.c\` \`__wasi__\`: advisory **no-op success** (was EINVAL).
-- \`getuid\`/\`geteuid\`/\`getgid\`/\`getegid\` → **1000** via wasix-sysroot \`slicc_identity\`
-  (injected into \`wasm32-wasi\` libc used by wasixcc, not only wasip1).
+- \`Process.uid\`/\`euid\`/\`gid\`/\`groups\`, \`Etc.getpwuid\` and \`Dir.home\` come from
+  slicc-kernel's process credentials (wasix-sysroot -20, slicc-kernel >= 1.44.0):
+  root is uid 0 with home /root; a \`kernel.users.add\` user gets its own ids.
 
 ## Gems / PATH / SLICC #3735
 - \`PATH=\${package}/bin:\${PATH}\`.
@@ -936,7 +938,7 @@ Fiber.new { :ok }.resume
 t = Thread.new { puts "CHILD"; 42 }; puts t.value
 require "openssl"; OpenSSL::OPENSSL_VERSION
 require "socket"
-Process.uid # => 1000
+Process.uid # => 0 (root, the kernel's default user)
 f = File.open("flock-test", "w"); f.flock(File::LOCK_EX); f.close # no Errno::EINVAL
 \`\`\`
 Plus Queue/CV/Mutex; \`bundle exec rake\` when #3735 is available.

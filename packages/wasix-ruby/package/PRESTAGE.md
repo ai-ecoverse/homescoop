@@ -1,6 +1,6 @@
 # wasix-ruby 3.4.11-6
 
-Built against wasix-sysroot **2025.9.30-14**. **No epoll**: SLICC returns ENOSYS (52)
+Built against wasix-sysroot **2025.9.30-20**. **No epoll**: SLICC returns ENOSYS (52)
 for `epoll_create`; MRI is compiled with `USE_MN_THREADS=0` and
 `HAVE_SYS_EPOLL_H=0` (also kqueue/eventfd/timerfd off) so it uses poll()/timer-thread.
 
