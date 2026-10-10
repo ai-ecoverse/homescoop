@@ -8,6 +8,10 @@ summary: "SciPy 1.18.0 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/s/scipy/scipy-{{version}}.tar.gz"
   sha256: "67b2ad2ad54c72ca6d04975a9b2df8c3638c34ddd5b28738e94fc2b57929d378"
+# 1.18.0-7 is packaging-only: 1.18.0-5's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-11, py-numpy 2.3.2-5). Drop repack: when the next release rebuilds.
+repack:
+  from: "1.18.0-5"
 dependencies:
   build:
     - wasix-python

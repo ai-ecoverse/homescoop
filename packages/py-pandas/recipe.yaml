@@ -8,6 +8,10 @@ summary: "Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/p/pandas/pandas-{{version}}.tar.gz"
   sha256: "fdc955b27b1400b4272c488ad74dae9260bce835c965b9d7a26703545671044e"
+# 2.3.2-6 is packaging-only: 2.3.2-5's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-11, py-numpy 2.3.2-5). Drop repack: when the next release rebuilds.
+repack:
+  from: "2.3.2-5"
 dependencies:
   build:
     - wasix-python
