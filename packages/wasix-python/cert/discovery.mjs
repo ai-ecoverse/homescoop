@@ -159,7 +159,9 @@ export default async function (ctx) {
     `discovery: discover() cold ${coldMs} ms, warm ${warmMs} ms; python -c pass median of 9: ` +
       `on ${med(times.on).toFixed(0)} ms, off ${med(times.off).toFixed(0)} ms, off + same PYTHONPATH ${med(times.pythonpath).toFixed(0)} ms`,
   );
-  assert.ok(warmMs < 10, `warm discover() took ${warmMs} ms`);
+  // Relative bounds: the browser kernel is several times slower per syscall
+  // than the Node entry (python -c pass ~240 ms vs ~60 ms off).
+  assert.ok(warmMs <= 0.2 * med(times.off), `warm discover() took ${warmMs} ms of a ${med(times.off).toFixed(0)} ms start`);
   assert.ok(med(times.on) <= med(times.pythonpath) * 1.1, 'discovery costs more than the same PYTHONPATH');
   }
 
