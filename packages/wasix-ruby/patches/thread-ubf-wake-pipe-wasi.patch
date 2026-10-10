@@ -1,6 +1,21 @@
 --- thread.c
 +++ thread.c
-@@ -4435,8 +4435,32 @@
+@@ -1839,6 +1839,14 @@
+     // `func` or not (as opposed to some previously set value).
+     errno = 0;
+ 
++#ifdef __wasi__
++    /* WASIX_UBF_PIPE: the wakeup pipe can interrupt a poll, not a read() or
++     * write() already blocked in the kernel. Wait for the fd first, where
++     * Thread#kill/#raise/Timeout get through, then do the call. */
++    if (events && fd >= 0) {
++        rb_thread_wait_for_single_fd(fd, events, NULL);
++    }
++#endif
+     thread_io_setup_wfd(th, fd, &waiting_fd);
+     {
+         EC_PUSH_TAG(ec);
+@@ -4435,8 +4443,32 @@
      volatile int result = 0;
  
      *lerrno = 0;

@@ -691,7 +691,7 @@ fi
 homescoop_stage_license "$SRC/COPYING" "$SRC/BSDL" 2>/dev/null || \
   homescoop_stage_license "$SRC/COPYING" "$SRC/LEGAL"
 homescoop_notices_begin "ruby.wasm statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc)."
-homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-2), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
+homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
