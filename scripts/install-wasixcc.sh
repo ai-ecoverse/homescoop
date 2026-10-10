@@ -21,11 +21,13 @@ BINARYEN_VERSION="133"
 # TZ, socketpair flags, sigaction_set; -19 alarm/setitimer/getitimer in
 # every variant, EINTR sleeps with the time left, raise()/pthread_kill(); -20
 # process credentials from slicc-kernel (>= 1.44.0, no fallback) and %Z for a
-# copied tm_zone.
+# copied tm_zone; -21 per-descriptor terminals (slicc_tty; older kernels
+# fall back) and file types from slicc_fs (S_IFIFO for pipes on kernels that
+# report it).
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-20}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-0cc2893e0360cdd0028fc7ed82334065c56a4705f925a217276e24cdbd8b29c7}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-21}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-43a43c90fd83b5c1efdcbc3f85695da47cb5a7bf83bb0cb7db2a48fe5087148f}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
