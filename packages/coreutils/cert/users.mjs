@@ -7,8 +7,8 @@
  *
  * On 9.12.0-4 (the negative, NEGATIVE.md) everyone is uid 1000 and no name
  * resolves: `id` says uid=1000 without a name, whoami "cannot find name for
- * user ID 1000". File owners are the kernel's (1.44.0 stores none: uid
- * 1000), so a file is checked only for the user who is uid 1000.
+ * user ID 1000". File owners are the kernel's: 1.47.1 reports the caller's
+ * ids (1.44.0 reported 1000 for every file).
  */
 export default async function (ctx) {
   const { run, assert, addUser } = ctx;
@@ -42,6 +42,12 @@ export default async function (ctx) {
     assert.deepEqual(r.stdout.trim().split('\n'), want[user], `${user}:\n${r.stdout}${r.stderr}`);
     assert.equal(r.stderr, '', `${user}: ${r.stderr}`);
   }
+
+  // slicc-kernel >= 1.47.1 reports a file's owner as the caller's ids: root
+  // sees root's file as root's.
+  const rf = await run(['bash', '-c', 'cd ~ && touch made && ls -l made | cut -d" " -f3,4 && stat -c "%U:%G %u:%g" made'], { cwd: '/tmp' });
+  assert.equal(rf.status, 0, `${rf.stdout}${rf.stderr}`);
+  assert.deepEqual(rf.stdout.trim().split('\n'), ['root root', 'root:root 0:0'], rf.stdout + rf.stderr);
 
   // A file the user creates in their home: ls -l and stat name its owner.
   const f = await run(['bash', '-c', 'cd ~ && touch made && ls -l made | cut -d" " -f3,4 && stat -c "%U:%G %u:%g" made && ls -ld ~ | cut -d" " -f3,4'], { cwd: '/tmp', user: 'cone' });

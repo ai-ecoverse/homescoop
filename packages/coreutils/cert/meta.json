@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.44.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
   "needs": [
     "@ai-ecoverse/wasm-bash"
   ],
