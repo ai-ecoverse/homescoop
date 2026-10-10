@@ -5,6 +5,20 @@ Patches: see `cert/meta.json`. Not in `scripts/ci-certified.json`.
 
 
 
+
+## The line after a late ^C: 5.3.0-14 (and 5.3.0-13)
+
+A ^C that slicc-kernel handed over late (readline only noticed it when more input arrived) made -14 free the *next* line: bth's 1.47.1/1.47.3 cert lost 40-45 per 500 rounds. 5.3.0-13 runs it, but with what readline held from before the ^C glued on ("techo", "0echo"), or loses it.
+
+The next-line phase alone, 40 rounds per build and kernel (fresh pty each; `true`, ^C 1..5 ms later, `echo nextN`):
+
+| bash | slicc-kernel main 749ab1e (#303) | 1.47.1 |
+| --- | --- | --- |
+| 5.3.0-13 | 3 lost | 7 lost |
+| 5.3.0-15 | 0 lost | 0 lost |
+
+5.3.0-14 fails `cert/sigint-line.mjs`'s next-line phase (3/20).
+
 ## ^C while readline echoes the accepted line: 5.3.0-13
 
 `cert/sigint-line.mjs` on 5.3.0-13, slicc-kernel 1.44.0 Node entry. 2 of 3 runs failed within the first rounds:

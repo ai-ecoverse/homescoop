@@ -1,20 +1,101 @@
+--- a/sig.c
++++ b/sig.c
+@@ -701,6 +701,20 @@
+   if (interrupt_state == 0)
+     ADDINTERRUPT;
+ 
++#if defined (__EMSCRIPTEN__)
++  /* slicc: which readline line this interrupt belongs to (parse.y). Inside
++     readline() after accept-line (rl_done), the line it is about to return;
++     while it still reads, the earlier one: readline drops its own partial
++     input, and the next complete line must run. */
++  {
++    extern int slicc_rl_line_seq, slicc_sigint_line_seq, slicc_in_readline;
++    extern int slicc_sigint_rl_end, rl_done, rl_end;
++    slicc_sigint_line_seq = slicc_rl_line_seq + (slicc_in_readline && rl_done ? 1 : 0);
++    /* Before accept-line: what readline holds so far was cut by the ^C. */
++    slicc_sigint_rl_end = slicc_in_readline && !rl_done ? rl_end : 0;
++  }
++#endif
++
+   /* We will get here in interactive shells with job control active; allow
+      an interactive wait to be interrupted.  wait_intr_flag is only set during
+      the execution of the wait builtin and when wait_intr_buf is valid. */
 --- a/parse.y
 +++ b/parse.y
-@@ -2550,6 +2550,19 @@
+@@ -1651,6 +1651,15 @@
+ char *current_readline_prompt = (char *)NULL;
+ char *current_readline_line = (char *)NULL;
+ int current_readline_line_index = 0;
++#if defined (__EMSCRIPTEN__)
++/* slicc: lines readline has returned, the one being parsed, the one SIGINT
++   belongs to (sig.c), and whether readline() is running. */
++int slicc_rl_line_seq = 0;
++int slicc_cur_line_seq = 0;
++int slicc_sigint_line_seq = -1;
++int slicc_in_readline = 0;
++int slicc_sigint_rl_end = 0;
++#endif
+ 
+ static int
+ yy_readline_get (void)
+@@ -1677,8 +1686,14 @@
+ 	}
+ 
+       sh_unset_nodelay_mode (fileno (rl_instream));	/* just in case */
++#if defined (__EMSCRIPTEN__)
++      slicc_in_readline = 1;
++#endif
+       current_readline_line = readline (current_readline_prompt ?
+       					  current_readline_prompt : "");
++#if defined (__EMSCRIPTEN__)
++      slicc_in_readline = 0;
++#endif
+ 
+       CHECK_TERMSIG;
+       if (signal_is_ignored (SIGINT) == 0)
+@@ -1696,6 +1711,9 @@
+ 	return (EOF);
+ 
+       current_readline_line_index = 0;
++#if defined (__EMSCRIPTEN__)
++      slicc_cur_line_seq = ++slicc_rl_line_seq;
++#endif
+       line_len = strlen (current_readline_line);
+ 
+       current_readline_line = (char *)xrealloc (current_readline_line, 2 + line_len);
+@@ -2550,6 +2568,36 @@
  	{
  	  c = yy_getc ();
  
 +#if defined (READLINE) && defined (__EMSCRIPTEN__)
-+	  /* slicc: a SIGINT that arrives after readline accepted the line
-+	     (while it echoes it, one write per character) throws to the top
-+	     level below with the line's first characters consumed; the next
-+	     parse would run the rest ("leep 30" for "sleep 30"). Drop the
-+	     whole pending line, as if ^C had come before Enter. */
++	  /* slicc: a SIGINT that arrives after readline accepted a line (while
++	     it echoes it, one write per character) throws to the top level below
++	     with the line's first characters consumed; the next parse would run
++	     the rest ("leep 30" for "sleep 30"). Drop that line, as if ^C had
++	     come before Enter. An interrupt recorded for an earlier line (slicc
++	     can deliver it only once more input arrives) must not cost this
++	     line: it runs whole after the jump, minus what was typed before
++	     the ^C. */
 +	  if (interrupt_state && bash_input.getter == yy_readline_get && current_readline_line)
 +	    {
-+	      free (current_readline_line);
-+	      current_readline_line = (char *)NULL;
-+	      current_readline_line_index = 0;
++	      if (slicc_sigint_line_seq == slicc_cur_line_seq)
++		{
++		  free (current_readline_line);
++		  current_readline_line = (char *)NULL;
++		  current_readline_line_index = 0;
++		}
++	      else
++		{
++		  /* The characters readline held when ^C came belong to the
++		     interrupted input; it only notices the signal once more
++		     input arrives, so they lead this line. Skip them. */
++		  int skip = slicc_sigint_rl_end;
++		  if (skip < 0 || skip > (int)strlen (current_readline_line))
++		    skip = 0;
++		  current_readline_line_index = skip;
++		  slicc_sigint_rl_end = 0;
++		}
 +	    }
 +#endif
  	  /* Allow immediate exit if interrupted during input. */
@@ -22,21 +103,79 @@
  
 --- a/y.tab.c
 +++ b/y.tab.c
-@@ -4909,6 +4909,19 @@
+@@ -4010,6 +4010,15 @@
+ char *current_readline_prompt = (char *)NULL;
+ char *current_readline_line = (char *)NULL;
+ int current_readline_line_index = 0;
++#if defined (__EMSCRIPTEN__)
++/* slicc: lines readline has returned, the one being parsed, the one SIGINT
++   belongs to (sig.c), and whether readline() is running. */
++int slicc_rl_line_seq = 0;
++int slicc_cur_line_seq = 0;
++int slicc_sigint_line_seq = -1;
++int slicc_in_readline = 0;
++int slicc_sigint_rl_end = 0;
++#endif
+ 
+ static int
+ yy_readline_get (void)
+@@ -4036,8 +4045,14 @@
+ 	}
+ 
+       sh_unset_nodelay_mode (fileno (rl_instream));	/* just in case */
++#if defined (__EMSCRIPTEN__)
++      slicc_in_readline = 1;
++#endif
+       current_readline_line = readline (current_readline_prompt ?
+       					  current_readline_prompt : "");
++#if defined (__EMSCRIPTEN__)
++      slicc_in_readline = 0;
++#endif
+ 
+       CHECK_TERMSIG;
+       if (signal_is_ignored (SIGINT) == 0)
+@@ -4055,6 +4070,9 @@
+ 	return (EOF);
+ 
+       current_readline_line_index = 0;
++#if defined (__EMSCRIPTEN__)
++      slicc_cur_line_seq = ++slicc_rl_line_seq;
++#endif
+       line_len = strlen (current_readline_line);
+ 
+       current_readline_line = (char *)xrealloc (current_readline_line, 2 + line_len);
+@@ -4909,6 +4927,36 @@
  	{
  	  c = yy_getc ();
  
 +#if defined (READLINE) && defined (__EMSCRIPTEN__)
-+	  /* slicc: a SIGINT that arrives after readline accepted the line
-+	     (while it echoes it, one write per character) throws to the top
-+	     level below with the line's first characters consumed; the next
-+	     parse would run the rest ("leep 30" for "sleep 30"). Drop the
-+	     whole pending line, as if ^C had come before Enter. */
++	  /* slicc: a SIGINT that arrives after readline accepted a line (while
++	     it echoes it, one write per character) throws to the top level below
++	     with the line's first characters consumed; the next parse would run
++	     the rest ("leep 30" for "sleep 30"). Drop that line, as if ^C had
++	     come before Enter. An interrupt recorded for an earlier line (slicc
++	     can deliver it only once more input arrives) must not cost this
++	     line: it runs whole after the jump, minus what was typed before
++	     the ^C. */
 +	  if (interrupt_state && bash_input.getter == yy_readline_get && current_readline_line)
 +	    {
-+	      free (current_readline_line);
-+	      current_readline_line = (char *)NULL;
-+	      current_readline_line_index = 0;
++	      if (slicc_sigint_line_seq == slicc_cur_line_seq)
++		{
++		  free (current_readline_line);
++		  current_readline_line = (char *)NULL;
++		  current_readline_line_index = 0;
++		}
++	      else
++		{
++		  /* The characters readline held when ^C came belong to the
++		     interrupted input; it only notices the signal once more
++		     input arrives, so they lead this line. Skip them. */
++		  int skip = slicc_sigint_rl_end;
++		  if (skip < 0 || skip > (int)strlen (current_readline_line))
++		    skip = 0;
++		  current_readline_line_index = skip;
++		  slicc_sigint_rl_end = 0;
++		}
 +	    }
 +#endif
  	  /* Allow immediate exit if interrupted during input. */

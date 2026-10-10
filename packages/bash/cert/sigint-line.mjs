@@ -36,5 +36,26 @@ export default async function (ctx) {
     if (/[^\w&]ran\d+\r\n/.test(t.out)) ran++;
     if (!/[^"]after\r\n/.test(t.out)) exited++;
   }
-  console.log(`sigint-line: ${N} rounds, ${ran} ran whole, ${N - ran} interrupted, 0 partial; ${exited} shells ended or dropped the next line (slicc-kernel)`);
+  // bth's case (5.3.0-14 cert): a ^C 1..5 ms after Enter of a short command
+  // reaches bash only with the next line; that next line must still run.
+  // 5.3.0-14 dropped it 40-45 times in 500 rounds.
+  let lost = 0;
+  const M = 20;
+  for (let i = 0; i < M; i++) {
+    const steps = [
+      { expect: '[$#] ' },
+      { write: 'true\r' },
+      { sleepMs: 1 + (i % 5) },
+      { write: '\x03' },
+      { sleepMs: 300 },
+      { write: `echo next${i}\r` },
+      { sleepMs: 400 },
+      { write: 'exit 0\r' },
+    ];
+    const t = await pty(['bash', '--norc', '-i'], { cwd: '/tmp', steps, timeoutMs: 5000 });
+    assert.ok(!t.failedStep, `next-line round ${i}: no prompt:\n${t.out}`);
+    if (!new RegExp(`[^\\w]next${i}\\r\\n`).test(t.out.replace(/echo next\d+/g, ''))) lost++;
+  }
+  assert.equal(lost, 0, `${lost} of ${M} lines typed after a late ^C did not run`);
+  console.log(`sigint-line: ${N} rounds, ${ran} ran whole, ${N - ran} interrupted, 0 partial; ${exited} shells ended or dropped the next line (slicc-kernel); next line after a late ^C: ${M} of ${M} ran`);
 }
