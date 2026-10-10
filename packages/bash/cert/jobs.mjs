@@ -6,8 +6,10 @@
  * shell's own process group and was lost: the job kept running (slicc-kernel
  * test/unit/terminal.test.mjs, #240's tests). jobs-parent-terminal.patch
  * lets the shell give the terminal to the new foreground job as well.
- * Cleanup: kill -KILL, then -CONT (slicc-kernel applies a SIGKILL to a
- * stopped job only once it runs again; the same on 5.3.0-7), then `wait`.
+ * Each stopped job then gets `kill -KILL %1` (no SIGCONT) and must be
+ * reported "Killed": jobs-notify-unqueue.patch lets notify_of_job_status reap
+ * a SIGCHLD that arrives while it prints, instead of leaving the job
+ * "Stopped" until the shell's next fork.
  */
 export default async function (ctx) {
   const { pty, assert } = ctx;
@@ -29,7 +31,9 @@ export default async function (ctx) {
       { expect: 'sleep 30\r\n' },
       { write: '\x1a' },
       { expect: 'Stopped', timeoutMs: 5000 },
-      { write: `kill -KILL %1; kill -CONT %1 2>/dev/null; wait; echo "z${i}=$((6*7))"\r` },
+      { write: 'kill -KILL %1\r' },
+      { expect: 'Killed', timeoutMs: 5000 },
+      { write: `echo "z${i}=$((6*7))"\r` },
       { expect: `z${i}=42`, timeoutMs: 5000 },
     );
   }
