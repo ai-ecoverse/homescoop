@@ -231,6 +231,30 @@ PY
       -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -O2 $EMU_CFLAGS \
       -fno-strict-aliasing -c -o locale.o locale.c
     llvm-ar r libperl.a locale.o
+    # perl-cross builds no DynaLoader with usedl=undef (upstream Configure
+    # would, with dl_none.xs). Core modules take `defined
+    # &DynaLoader::boot_DynaLoader` to mean "not miniperl" before loading
+    # their XS (re.pm: re::install; Cwd.pm: XS getcwd; Unicode::UCD), so
+    # register a no-op boot_DynaLoader; XSLoader::load then finds each static
+    # module's <Module>::bootstrap as usual.
+    python3 - perlmain.c <<'PY'
+import re, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text()
+if "homescoop_boot_DynaLoader" not in t:
+    m = re.search(r"\nstatic void\nxs_init\(pTHX\)\n\{.*?\n\}\n", t, re.S)
+    if not m:
+        sys.exit("perlmain.c: xs_init not found")
+    body = m.group(0)
+    marker = ("\n/* homescoop wasix-perl: static perl without DynaLoader, see build.sh */\n"
+              "XS(homescoop_boot_DynaLoader);\nXS(homescoop_boot_DynaLoader)\n"
+              "{\n    dXSARGS;\n    PERL_UNUSED_VAR(items);\n    XSRETURN_YES;\n}\n")
+    new_body = body[:-3] + '\n    newXS("DynaLoader::boot_DynaLoader", homescoop_boot_DynaLoader, file);\n}\n'
+    t = t.replace(body, marker + new_body, 1)
+    p.write_text(t)
+PY
+    grep -q 'newXS("DynaLoader::boot_DynaLoader"' perlmain.c
     wasixcc -DPERL_CORE -Wno-incompatible-function-pointer-types -Wno-implicit-function-declaration \
       -include "$PKG_ROOT/wasix-posix-stubs.h" -DNO_LOCALE -DNO_ENV_ARRAY_IN_MAIN \
       -Dmain=__main_argc_argv \
@@ -324,6 +348,8 @@ for f in sorted(src.rglob("*")):
     if not f.is_file() or f.suffix not in {".pm", ".pl", ".pod", ".al", ".ix"}:
         continue
     rel = f.relative_to(src)
+    if "t" in rel.parts[:-1]:  # test helpers (perl5db/t/…)
+        continue
     if (dest / rel).exists() or (dest / "wasm32-wasix" / rel).exists():
         continue
     (dest / rel).parent.mkdir(parents=True, exist_ok=True)

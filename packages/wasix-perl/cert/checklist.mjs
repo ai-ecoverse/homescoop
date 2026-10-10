@@ -29,7 +29,11 @@ export default async function (ctx) {
     '/usr/lib/perl5/site_perl/5.42.0/wasm32-wasix',
   ], inc.join('\n'));
   assert.ok(inc.includes('/usr/lib/perl5/site_perl/5.42.0'), 'site_perl in @INC');
-  assert.equal(await perl('require List::Util; print $INC{"List/Util.pm"}, "\\n"'), `${P}/List/Util.pm\n`);
+  // XS modules may sit in archlib (lib/perl5/wasm32-wasix): both are in @INC.
+  assert.match(await perl('require List::Util; print $INC{"List/Util.pm"}, "\\n"'), new RegExp(`^${P}(/wasm32-wasix)?/List/Util\\.pm\\n$`));
+  // Static perl: the "not miniperl" marker core modules test before loading XS.
+  assert.equal(await perl('print defined &DynaLoader::boot_DynaLoader ? "yes" : "no"'), 'yes');
+  assert.equal(await perl('use Cwd; print defined &Cwd::getcwd && Cwd::getcwd() eq "${cwd}" ? "ok" : "no", "\\n"'.replace('${cwd}', cwd)), 'ok\n');
   assert.equal(await perl('use Config; print "$Config{installsitelib}\\n"'), '/usr/lib/perl5/site_perl/5.42.0\n');
   // A pure-Perl module installed into the site dir loads from there.
   const site = await run(['bash', '-c', 'mkdir -p /usr/lib/perl5/site_perl/5.42.0/HSCert && printf "package HSCert::Site; sub hi { \\"site ok\\" } 1;\\n" > /usr/lib/perl5/site_perl/5.42.0/HSCert/Site.pm && perl -MHSCert::Site -e \'print HSCert::Site::hi(), " ", $INC{"HSCert/Site.pm"}, "\\n"\''], { cwd });
