@@ -176,7 +176,9 @@ cfg_path.write_text(t)
 print(f"forced define={len(force_def)} undef={len(force_undef)}")
 PY
   (cd "$SRC" && sh config_h.SH)
-  cp -f "$SRC/config.h" "$SRC/xconfig.h"
+  # xconfig.h is the host miniperl's (perl-cross: xconfig.sh), not a copy of
+  # the target config.h; regenerate it from xconfig.sh.
+  (cd "$SRC" && CONFIG_SH=xconfig.sh CONFIG_H=xconfig.h sh config_h.SH)
 
   echo "== make (host miniperl + target perl)"
   # Strip -fPIC from XS: asyncify sysroot rejects PIC objects.
