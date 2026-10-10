@@ -18,11 +18,12 @@ BINARYEN_VERSION="133"
 # which wasix-m4 1.4.20-2 links against (fcntl F_SETFD fix); wasix-gnupg
 # needs it for its homedir ownership checks. -17 adds slicc_fs modes; -18
 # (wasix-python 3.14.2-12) select exceptfds/timeouts, physical chdir, POSIX
-# TZ, socketpair flags, sigaction_set.
+# TZ, socketpair flags, sigaction_set; -19 alarm/setitimer/getitimer in
+# every variant, EINTR sleeps with the time left, raise()/pthread_kill().
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-18}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-ae55a48b143ebf0b0b7be2a2babebda76b9947316226089e03fb6ed9a2f07f2d}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-19}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-b85ae23f25bf10997625f7754753c5f51d1093f78e0ad30d7c28f4ac64ee92d1}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
