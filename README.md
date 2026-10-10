@@ -93,6 +93,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-poppler` | host | **26.10.0-2** (`pdftotext` / `pdftoppm` / `pdfinfo` / `pdfimages` / `pdffonts` / `pdfseparate` / `pdfunite` / `pdfdetach` / `pdfattach` / `pdftops` / `pdftohtml`, `pdftocairo` = `pdftoppm`; one multi-call wasm, Splash only, URW base-14 fonts) |
 | `@ai-ecoverse/wasm-rsync` | host | **3.4.4-1** (`rsync`; local copies, fork + Asyncify for the sender/receiver pair, `select()` waits in the kernel; no remote sync yet) |
 | `@ai-ecoverse/wasix-gnupg` | host | **2.4.9-4** (gpg/gpgv/gpg-agent/gpgconf/gpg-connect-agent; WASIX, no Asyncify; keys 600 / homedir 700 via wasix-sysroot -17 slicc_fs) |
+| `@ai-ecoverse/wasix-zlib` | host | **1.3.1-1** (dev package: static `lib/` + PIC `lib-pic/` libz.a, headers, pkg-config; for wasix-ruby / wasix-python) |
 | `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
 | `@ai-ecoverse/wasi-hf` | host | **0.1.0-2** (`hf download` / `hf auth`, token file 0600; Rust on wasix-net, Range resume + LFS sha256, plain files under `/home/models`; not huggingface_hub's CLI, see #110) |
 | `@ai-ecoverse/wasi-dig` | host | **0.1.0-1** (`dig`; Rust on wasix-net + hickory-proto: DNS over HTTPS through the realm proxy, DNS over TCP to `@server` via the uplink, dig-style output; no UDP, see #101) |

@@ -1,0 +1,14 @@
+{
+  "harness": "host-node",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "host": "node scripts/wasix-lib-cert.mjs wasix-zlib --tarball <package.tgz>: links test/zprobe.c against lib/ (static-main) and lib-pic/ (dynamic-main) with the pinned wasixcc and runs cert/*.mjs on the kernel's Node entry. A dev package has no commands of its own.",
+  "probes": [{ "name": "zprobe", "src": "test/zprobe.c", "libs": ["-lz"] }],
+  "checklist": [
+    "both flavours link (static-main against lib/libz.a, dynamic-main against lib-pic/libz.a) and run",
+    "crc32('123456789') = cbf43926, adler32 = 091e01de",
+    "compress2 level 9 of 64 KiB to under a quarter, uncompress byte-exact",
+    "gzopen/gzwrite/gzread round trip through a file; the .gz is real gzip (coreutils/bash see the 1f 8b magic)",
+    "zlibVersion() is 1.3.1"
+  ]
+}
