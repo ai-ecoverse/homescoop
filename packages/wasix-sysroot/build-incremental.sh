@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-19 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-20 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -219,6 +219,76 @@ for v in "${VARIANTS[@]}"; do
   # -17's sysroot-ehpic shipped the archives its libc patches replaced.
   rm -f "$PKG/$v/lib/wasm32-wasip1/"libc.a.bak-*
   echo "  $v ($flavour)"
+done
+
+# -20 (homescoop#207, needs slicc-kernel K1): user and group ids from the
+# kernel (slicc_identity.c over slicc.cred_get/cred_set/groups_get/
+# groups_set) instead of 1000; musl's own getpw*/getgr* read the kernel's
+# /etc/passwd and /etc/group; the cloudlibc set*id no-ops and the ENOTSUP
+# setgroups go. unistd.h declares the calls wasi-libc hid.
+echo "== wasix-sysroot: -20 members (slicc_identity, musl passwd)"
+R20_OBJ="$WORK/r20"
+rm -rf "$R20_OBJ" && mkdir -p "$R20_OBJ/static" "$R20_OBJ/pic"
+PASSWD=(getpwent getpw_r getgrent getgr_r)
+R20_DROP=(setuid.o seteuid.o setgid.o setegid.o setgroups.o)
+exported() { "$LLVM_NM" --defined-only --extern-only -j "$1" | sort -u; }
+compile_r20() {
+  local src=$1 out=$2; shift 2
+  "$CLANG" --target=wasm32-wasip1 --sysroot="$PKG/sysroot" -resource-dir="$RES" \
+    -isystem "$PKG/sysroot/include" \
+    -matomics -mbulk-memory -mmutable-globals -pthread \
+    -fno-trapping-math -ftls-model=local-exec -O2 -Wno-parentheses \
+    "$@" -c "$src" -o "$out"
+  test -s "$out"
+}
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  compile_r20 "$HOMESCOOP_PKG/slicc_identity.c" "$R20_OBJ/$flavour/slicc_identity.o" "${extra[@]}"
+  for m in "${PASSWD[@]}"; do
+    compile_r20 "$MUSL/src/passwd/$m.c" "$R20_OBJ/$flavour/$m.o" "${MUSL_INC[@]}" "${extra[@]}"
+  done
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R20_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" slicc_identity.o "${R20_DROP[@]}")
+  # Every global the replaced members defined is still defined.
+  missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(for m in slicc_identity "${PASSWD[@]}"; do exported "$R20_OBJ/$flavour/$m.o"; done | sort -u))"
+  if [[ -n "$missing" ]]; then
+    echo "homescoop: $v -20 members lack: $missing" >&2
+    exit 1
+  fi
+  "$LLVM_AR" d "$lib" "${R20_DROP[@]}"
+  "$LLVM_AR" r "$lib" "$R20_OBJ/$flavour/slicc_identity.o" $(printf "$R20_OBJ/$flavour/%s.o " "${PASSWD[@]}")
+  "$LLVM_AR" t "$lib" | grep -qx getpw_r.o
+  grep -q __slicc_cred_get <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.cred_get" >&2; exit 1; }
+  echo "  $v ($flavour)"
+done
+for v in "${VARIANTS[@]}"; do
+  python3 - "$PKG/$v/include/unistd.h" <<'PYHDR'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1]); t = p.read_text()
+guards = [
+    ("#ifdef __wasilibc_unmodified_upstream /* WASI has no getuid etc. */\nint getgroups(int, gid_t []);\n#endif\n",
+     "int getgroups(int, gid_t []); /* homescoop wasix-sysroot -20 */\n"),
+    ("#ifdef __wasilibc_unmodified_upstream /* WASI has no setreuid */\nint setreuid(uid_t, uid_t);\nint setregid(gid_t, gid_t);\n#endif\n",
+     "int setreuid(uid_t, uid_t); /* homescoop wasix-sysroot -20 */\nint setregid(gid_t, gid_t);\n"),
+    ("#ifdef __wasilibc_unmodified_upstream /* WASI has no get/setresuid */\nint setresuid(uid_t, uid_t, uid_t);\nint setresgid(gid_t, gid_t, gid_t);\nint getresuid(uid_t *, uid_t *, uid_t *);\nint getresgid(gid_t *, gid_t *, gid_t *);\n#endif\n",
+     "int setresuid(uid_t, uid_t, uid_t); /* homescoop wasix-sysroot -20 */\nint setresgid(gid_t, gid_t, gid_t);\nint getresuid(uid_t *, uid_t *, uid_t *);\nint getresgid(gid_t *, gid_t *, gid_t *);\n"),
+]
+for old, new in guards:
+    if new in t:
+        continue
+    if t.count(old) != 1:
+        sys.exit(f"{p}: guard not found: {old.splitlines()[0]}")
+    t = t.replace(old, new)
+p.write_text(t)
+PYHDR
 done
 
 homescoop_assert_no_package_links "$PKG"

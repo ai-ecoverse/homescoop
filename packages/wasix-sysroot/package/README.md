@@ -41,4 +41,10 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-20 user and group ids come from slicc-kernel's process
+credentials (`slicc.cred_get`/`cred_set`/`groups_get`/`groups_set`; slicc-kernel
+≥ 1.44.0, which has users), and `getpw*`/`getgr*` read its `/etc/passwd` and `/etc/group`.
+There is no fallback to uid 1000: on an older kernel `getuid()` returns -1,
+the set\*id calls fail with ENOSYS, and user lookups find nothing.
+
 Data only — no commands. Set `WASIXCC_SYSROOT_PREFIX` to this package directory.
