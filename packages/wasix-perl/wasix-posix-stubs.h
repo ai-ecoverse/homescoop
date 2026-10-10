@@ -9,6 +9,14 @@
 #include <unistd.h>
 #include <sys/file.h>
 
+/* The asyncify sysroot's setjmp.h has sigjmp_buf but no prototypes, though
+ * libc.a defines both; clang 21 rejects the implicit declaration. */
+#if !defined(__wasm_exception_handling__) && !defined(__wasilibc_unmodified_upstream)
+#include <setjmp.h>
+int sigsetjmp(sigjmp_buf, int);
+_Noreturn void siglongjmp(sigjmp_buf, int);
+#endif
+
 /* wasix bits/fenv.h only defines FE_TONEAREST */
 #ifndef FE_TOWARDZERO
 #define FE_TOWARDZERO 1
@@ -92,6 +100,16 @@ static inline char *homescoop_getlogin(void) {
   errno = EOPNOTSUPP; return (char *)0;
 }
 #define getlogin() homescoop_getlogin()
+
+/* ctermid: declared in <stdio.h>, missing from libc.a (POSIX::ctermid). */
+#include <stdio.h>
+#include <string.h>
+#undef ctermid
+static inline char *homescoop_ctermid(char *s) {
+  static char tty[] = "/dev/tty";
+  return s ? strcpy(s, tty) : tty;
+}
+#define ctermid(s) homescoop_ctermid(s)
 
 #undef getpriority
 static inline int homescoop_getpriority(int which, int who) {

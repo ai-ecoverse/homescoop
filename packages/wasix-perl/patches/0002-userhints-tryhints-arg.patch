@@ -1,5 +1,13 @@
---- /Users/trieloff/Developer/ai-ecoverse/homescoop/packages/wasix-perl/work/perl-cross-git/cnf/configure_hint.sh	2026-10-01 09:55:32.485859829 +0200
-+++ /Users/trieloff/Developer/ai-ecoverse/homescoop/packages/wasix-perl/work/perl-build/cnf/configure_hint.sh	2026-10-01 10:05:58.660871212 +0200
+perl-cross 1.6.5: --hints=<name> loads nothing
+
+cnf/configure_hint.sh calls `tryhints 'hint' "$h"` for each --hints entry,
+so it looks for cnf/hints/hint and never loads the named file. For
+wasix-perl every target size probe then runs readelf on wasm objects
+("Cannot determine sizeof(char)"). Applied by build.sh to the perl-cross
+overlay (patch -p1 in the perl source). homescoop#182.
+
+--- a/cnf/configure_hint.sh
++++ b/cnf/configure_hint.sh
 @@ -72,7 +72,7 @@
  
  if [ -n "$userhints" ]; then
