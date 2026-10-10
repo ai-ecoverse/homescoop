@@ -265,10 +265,10 @@ mkdir -p "$DEST/bin" "$DEST/lib" "$DEST/share"
 
 # Installed under DESTDIR/usr/...
 INST="$STAGE/usr"
-PERL_BIN=$(find "$INST" -type f -name 'perl' | head -1)
+PERL_BIN=$(find "$INST" -type f -name 'perl' -print -quit)
 [[ -n "$PERL_BIN" && -f "$PERL_BIN" ]] || {
   # Some builds name the wasm with .wasm already
-  PERL_BIN=$(find "$INST" -type f \( -name 'perl' -o -name 'perl.wasm' \) | head -1)
+  PERL_BIN=$(find "$INST" -type f \( -name 'perl' -o -name 'perl.wasm' \) -print -quit)
 }
 [[ -f "$PERL_BIN" ]] || { echo "no perl binary under $INST" >&2; find "$STAGE" -type f | head -40; exit 1; }
 
@@ -293,9 +293,9 @@ else
 fi
 
 # Pure-Perl lib tree — real directories, no symlinks
-LIBSRC=$(find "$INST" -type d -path '*/lib/perl5*' | head -1)
+LIBSRC=$(find "$INST" -type d -path '*/lib/perl5*' -print -quit)
 if [[ -z "$LIBSRC" ]]; then
-  LIBSRC=$(find "$INST" -type d -name 'perl5' | head -1)
+  LIBSRC=$(find "$INST" -type d -name 'perl5' -print -quit)
 fi
 [[ -d "$LIBSRC" ]] || { echo "no perl5 lib under $INST" >&2; exit 1; }
 # Prefer arch+version layout under lib/perl5
@@ -330,9 +330,9 @@ print("symlinks cleared under", root)
 PY
 
 # Core scripts that matter for build tooling
-SCRIPTS_DIR=$(find "$INST" -type d -name 'bin' | head -1)
+SCRIPTS_DIR=$(find "$INST" -type d -name 'bin' -print -quit)
 for s in prove pod2man perldoc cpan pod2text pod2html; do
-  src=$(find "$INST" -type f -name "$s" 2>/dev/null | head -1)
+  src=$(find "$INST" -type f -name "$s" -print -quit 2>/dev/null)
   if [[ -n "$src" ]]; then
     # Strip host shebang path → #!/usr/bin/env perl (slicc maps perl)
     mkdir -p "$DEST/bin"
