@@ -46,7 +46,7 @@ medians against the published -15:
 | existing 0600 | 189.6 | 218.1 (+15.1%) | 195.1 | 198.7 (+1.8%) |
 | mkdir 0700 | 164.8 | 213.8 (+29.7%) | 160.9 | 159.4 (−0.9%) |
 
-## 2025.9.30-18 (`run-modes.mjs --probe r18`), slicc-kernel 1.42.0 Node entry
+## 2025.9.30-18 (`run-modes.mjs --probe r18`), slicc-kernel 1.41.3 and 1.42.0 Node entry
 
 The published 2025.9.30-17 under `timeout 20`: ENOSYS (52) for every select with exceptfds and for the sub-second select (no wait), a lexical cwd after `chdir("..")` from the symlink, UTC for every TZ, and then a hang in `socketpair(SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC)` (killed at 20 s, rc 124):
 
@@ -64,3 +64,10 @@ tz <+0530>-5:30 2026-03: gmtoff=0 isdst=0 12:00 UTC mktime=ok
 
 On slicc-kernel 1.35.1, -18 passes everything but socketpair (that kernel has no `sock_pair`: ENOSYS).
 
+The sigaction lines, with `sockets()` skipped so -17 gets past the hang (1.41.3): `SA_RESETHAND` is ignored, so the handler is still installed after it runs.
+
+```
+sigaction resethand: hits=1 reset=0
+sigaction ignore: survived
+sigaction kill handler: hits=1
+```

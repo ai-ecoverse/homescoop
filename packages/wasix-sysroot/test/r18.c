@@ -1,10 +1,12 @@
 // wasix-sysroot 2025.9.30-18 probe: select/pselect with exceptfds (#195),
 // chdir across a symlink (#196), POSIX TZ rules (#193),
-// socketpair with SOCK_NONBLOCK|SOCK_CLOEXEC (upstream 2025b44a5d).
+// socketpair with SOCK_NONBLOCK|SOCK_CLOEXEC (upstream 2025b44a5d),
+// sigaction dispositions (SA_RESETHAND, SIG_IGN; slicc.sigaction_set).
 // One line per result; test/r18.mjs checks them.
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -127,6 +129,32 @@ static void sockets(void) {
   printf("socketpair plain: rc=%d nonblock=%d\n", r, r == 0 && (fl & O_NONBLOCK) != 0);
 }
 
+static volatile sig_atomic_t hits;
+static void on_sig(int sig) { (void)sig; hits++; }
+
+static void signals(void) {
+  struct sigaction sa, old;
+  memset(&sa, 0, sizeof sa);
+  sa.sa_handler = on_sig;
+  sa.sa_flags = SA_RESETHAND;
+  sigaction(SIGUSR1, &sa, NULL);
+  // kill(), not raise(): slicc-kernel does not deliver thread_signal yet.
+  kill(getpid(), SIGUSR1);
+  for (int i = 0; i < 50 && !hits; i++) usleep(10000);
+  sigaction(SIGUSR1, NULL, &old);
+  printf("sigaction resethand: hits=%d reset=%d\n", (int)hits, old.sa_handler == SIG_DFL);
+  signal(SIGUSR2, SIG_IGN);
+  raise(SIGUSR2);
+  kill(getpid(), SIGUSR2);
+  printf("sigaction ignore: survived\n");
+  hits = 0;
+  signal(SIGUSR1, on_sig);
+  kill(getpid(), SIGUSR1);
+  for (int i = 0; i < 50 && !hits; i++) usleep(10000);
+  printf("sigaction kill handler: hits=%d\n", (int)hits);
+  signal(SIGUSR1, SIG_DFL);
+}
+
 int main(int argc, char **argv) {
   const char *base = argc > 1 ? argv[1] : "/home/r18";
   setvbuf(stdout, NULL, _IOLBF, 0);
@@ -138,6 +166,7 @@ int main(int argc, char **argv) {
   zone("CET-1CEST,M3.5.0,M10.5.0/3", 2026, 7);
   zone("<+0530>-5:30", 2026, 3);
   sockets();
+  signals();
   printf("r18 done\n");
   return 0;
 }

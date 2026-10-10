@@ -71,9 +71,9 @@ objects' target features) and replaces `posix.o` and `at_fdcwd.o` in every
 `libc.a`. It first checks that each patched object defines every symbol
 the shipped one did.
 
-## -18: `pselect.c`, `chdir.c`, `__tz.c`, `socketpair.c`
+## -18: `pselect.c`, `chdir.c`, `__tz.c`, `socketpair.c`, `sigaction.c`
 
-All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces `pselect.o`, `chdir.o`, `__tz.o` and `socketpair.o` in every `libc.a`, after checking that each patched object defines every symbol the shipped one did.
+All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces `pselect.o`, `chdir.o`, `__tz.o`, `socketpair.o` and `sigaction.o` in every `libc.a`, after checking that each patched object defines every symbol the shipped one did.
 
 - **`pselect.c`** (`select` calls it), homescoop#195:
   - A non-empty `errorfds` is accepted and comes back empty. WASI poll has no exceptional conditions, and `POLLPRI == POLLIN` here. Upstream failed with ENOSYS, which broke `select(r, w, x)` in perl, python, ruby and C.
@@ -86,4 +86,9 @@ All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces `pselec
   - Zone names only resolve once a zoneinfo tree exists.
   - `__secs_to_zone` keeps wasix-libc's `int *offset`.
 - **`socketpair.c`:** upstream wasix-libc 2025b44a5d, backported. `SOCK_NONBLOCK`/`SOCK_CLOEXEC` in the type are applied to both ends instead of reaching `sock_pair` as part of the type. Its fcntl half is `fcntl.c` above.
+- **`sigaction.c`** (musl `src/signal/sigaction.c`), agreed with slicc-kernel:
+  - Every `sigaction()` that sets a disposition also calls the import `slicc.sigaction_set(sig, disposition, sa_flags)`. The disposition is 0 for `SIG_DFL`, 1 for `SIG_IGN` and 2 for a handler; `sa_flags` are passed raw. The kernel can then apply `SIG_DFL` itself and deliver only handled signals to `__wasm_signal`. A kernel without the import answers ENOSYS, which is ignored, so behaviour there is unchanged.
+  - `__wasm_signal` honours `SA_RESETHAND`: the disposition goes back to `SIG_DFL` (reported to the kernel as 0) before the handler runs. Upstream ignored the flag.
+  - `__wasm_signal` never calls through `SIG_IGN`.
+  - `raise()` uses `thread_signal`, which slicc-kernel does not deliver yet, so the probe signals itself with `kill(getpid(), …)`.
 

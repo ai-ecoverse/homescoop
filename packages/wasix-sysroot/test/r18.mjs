@@ -4,7 +4,9 @@
  * fails with ENOSYS (52), chdir("..") from a symlinked directory lands in
  * the symlink's parent, a 0.2 s select timeout returns at once, every TZ is
  * UTC, and
- * socketpair(SOCK_NONBLOCK|SOCK_CLOEXEC) fails.
+ * socketpair(SOCK_NONBLOCK|SOCK_CLOEXEC) fails. The sigaction lines check
+ * SA_RESETHAND and SIG_IGN in libc; the kernel side of slicc.sigaction_set
+ * is checked against slicc-kernel's branch.
  */
 export default async function (ctx) {
   const { run, assert } = ctx;
@@ -24,6 +26,9 @@ export default async function (ctx) {
     'tz <+0530>-5:30 2026-03: gmtoff=19800 isdst=0 17:30 +0530 mktime=ok',
     'socketpair flags: rc=0 nonblock=1 cloexec=1 read=-1 eagain=1',
     'socketpair plain: rc=0 nonblock=0',
+    'sigaction resethand: hits=1 reset=1',
+    'sigaction ignore: survived',
+    'sigaction kill handler: hits=1',
     'r18 done',
   ];
   assert.deepEqual(r.stdout.trim().split('\n'), want, r.stdout);

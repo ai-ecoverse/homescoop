@@ -19,4 +19,18 @@ read the permission bits back from them (slicc-kernel ≥
 libc++/libc++abi/libunwind rebuilt from LLVM b158b0ae6 (same as wasm-clang)
 with exnref flags.
 
+Since 2025.9.30-18:
+
+- `select`/`pselect` accept `exceptfds` (always returned empty) and wait for
+  sub-second timeouts.
+- `chdir` keeps the physical cwd, so `..` after a symlinked `cd` leaves the
+  real directory. There is no `fchdir`: the kernel's `/proc/self/fd` does not
+  name directory fds.
+- POSIX `TZ` rules and TZif files work, not just UTC.
+- `socketpair` honours `SOCK_NONBLOCK`/`SOCK_CLOEXEC` (slicc-kernel ≥ 1.41.0
+  for `sock_pair`).
+- `sigaction` honours `SA_RESETHAND` and reports each disposition to the
+  kernel through `slicc.sigaction_set`. Kernels without that import answer
+  ENOSYS, which is ignored.
+
 Data only — no commands. Set `WASIXCC_SYSROOT_PREFIX` to this package directory.
