@@ -121,11 +121,11 @@ for dep in wasix_zlib wasix_openssl; do
   d="$DEPS/${dep//_/-}"
   rm -rf "$d" && mkdir -p "$d"
   tar xzf "$SRC_FILE" -C "$d"
-  # Their lib-pic .pc files are relative (${pcfiledir}); link them in.
-  for pc in "$d"/package/lib-pic/pkgconfig/*.pc; do
-    ln -sf "$pc" "$DEPS/lib/pkgconfig/$(basename "$pc")"
-  done
 done
+# Their lib-pic .pc files are relative to ${pcfiledir}: search them where
+# they are (Linux pkg-config does not resolve symlinks for pcfiledir).
+export PKG_CONFIG_LIBDIR="$DEPS/wasix-zlib/package/lib-pic/pkgconfig:$DEPS/wasix-openssl/package/lib-pic/pkgconfig:$DEPS/lib/pkgconfig"
+export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"
 test -f "$DEPS/wasix-zlib/package/lib-pic/libz.a"
 test -f "$DEPS/wasix-openssl/package/lib-pic/libssl.a"
 
