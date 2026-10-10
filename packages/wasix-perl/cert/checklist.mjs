@@ -45,6 +45,9 @@ export default async function (ctx) {
   assert.equal(await perl('printf("%d|%s|%5.2f|%-4d|%04x|%vd|%u|%o\\n", 2**62, 2**62, 3.14159, 42, 255, v1.22.333, 18446744073709551615, 8)'),
     '4611686018427387904|4.61168601842739e+18| 3.14|42  |00ff|1.22.333|18446744073709551615|10\n');
   assert.equal(await perl('print sprintf("%d", 2**62), " ", sprintf("%x", 2**40), " ", 9223372036854775807, "\\n"'), '4611686018427387904 10000000000 9223372036854775807\n');
+  // I18N::Langinfo (i_langinfo: static since -8; -6 listed it disabled).
+  assert.equal(await perl('use I18N::Langinfo qw(langinfo CODESET RADIXCHAR); print langinfo(CODESET), "|", langinfo(RADIXCHAR), "\\n"'), 'ANSI_X3.4-1968|.\n');
+
   // Core warnings built with my_snprintf (wasm32: SSize_t is 32-bit, so
   // keep array indices in range of it).
   const warnUse = await run(['perl', '-we', 'my @a = (1..3); my $x = $a[10]; print defined $x ? "def" : "undef", "\n"; my $n = "12abc" + 0; print "$n\n"'], { cwd });
