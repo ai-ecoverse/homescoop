@@ -5,7 +5,7 @@
  * BIOs (self-signed P-256 cert below, valid to 2126), RAND, sqlite3
  * (3.53.4, -11's compile options), threads, subprocess (posix_spawn),
  * select on a pipe, time.tzset with POSIX TZ rules and strftime('%Z')
- * (3.14.2-13). ctypes is reported, not asserted (no _ctypes, as -11).
+ * (3.14.2-13). `_ctypes` is covered by cert/ctypes.mjs (slicc-kernel#306).
  */
 const CERT = `-----BEGIN CERTIFICATE-----
 MIIBdTCCARqgAwIBAgIUYJ691OXDq1hZBNBhaN/YMEQ7xSMwCgYIKoZIzj0EAwIw
@@ -100,11 +100,6 @@ for zone in ("EST5EDT,M3.2.0,M11.1.0", "CET-1CEST,M3.5.0,M10.5.0/3"):
     jan, jul = time.localtime(1767268800), time.localtime(1783512000)  # 2026-01-01, 2026-07-08 12:00 UTC
     tz.append([time.tzname, jan.tm_gmtoff, jul.tm_gmtoff, time.strftime("%Z", jan), time.strftime("%Z", jul)])
 out["tz"] = [hasattr(time, "tzset"), tz]
-try:
-    import ctypes
-    out["ctypes"] = "importable"
-except ImportError as e:
-    out["ctypes"] = repr(e)
 print(json.dumps(out))
 `;
 
@@ -126,7 +121,6 @@ export default async function (ctx) {
   const r = await run(['python', '/home/stdlib_check.py'], { cwd: '/home' });
   assert.equal(r.status, 0, `stdlib_check.py: rc=${r.status}\n${r.stdout}\n${r.stderr}`);
   const o = JSON.parse(r.stdout);
-  console.log(`stdlib: ctypes -> ${o.ctypes}`);
   assert.deepEqual(o.hash, [
     '900150983cd24fb0d6963f7d28e17f72',
     'a9993e364706816aba3e25717850c26c9cd0d89d',

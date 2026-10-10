@@ -4,8 +4,8 @@
 # wasm EH, PIC; side modules load by dlopen), with its stdlib.
 #
 # Steps: host CPython 3.14.2 (the build python, from the same tarball) →
-# static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline; zlib and
-# OpenSSL from the wasix-zlib / wasix-openssl dev packages) → configure +
+# static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline, libffi; zlib
+# and OpenSSL from the wasix-zlib / wasix-openssl dev packages) → configure +
 # make (modules found by configure via pkg-config) → asyncify + strip →
 # stage, prune, pip, compileall → checks.
 #
@@ -265,9 +265,50 @@ if [[ ! -f "$DEPS/lib/libreadline.a" ]]; then
   write_pc readline 8.3 "-lreadline -ltinfo"
 fi
 
+# --- deps: libffi (ctypes; wasix-org wasm32 WASIX backend) --------------------
+# Homescoop#110 / slicc-kernel#306: wasix_call_dynamic + closure_*.
+# GitHub archive has no configure; autogen needs host autoconf/automake/libtool.
+if [[ ! -f "$DEPS/lib/libffi.a" ]]; then
+  echo "== wasix-python: libffi (ctypes)"
+  fetch_src libffi
+  rm -rf "$B/libffi-src" && mkdir -p "$B/libffi-src"
+  tar xzf "$SRC_FILE" -C "$B/libffi-src" --strip-components=1
+  if [[ ! -f "$B/libffi-src/configure" ]]; then
+    # macOS Homebrew: libtoolize lives under libtool's gnubin.
+    if [[ -d /opt/homebrew/opt/libtool/libexec/gnubin ]]; then
+      export PATH="/opt/homebrew/opt/libtool/libexec/gnubin:/opt/homebrew/opt/autoconf/bin:/opt/homebrew/opt/automake/bin:$PATH"
+    fi
+    if ! command -v autoreconf >/dev/null || ! command -v libtoolize >/dev/null; then
+      if [[ -n "${CI:-}" ]] && command -v apt-get >/dev/null; then
+        sudo apt-get update -qq
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq autoconf automake libtool
+      fi
+    fi
+    command -v autoreconf >/dev/null && command -v libtoolize >/dev/null \
+      || { echo "homescoop wasix-python: need autoconf, automake, libtool (libffi autogen)" >&2; exit 1; }
+    (cd "$B/libffi-src" && ./autogen.sh) >"$B/libffi-autogen.log" 2>&1 \
+      || { tail -40 "$B/libffi-autogen.log" >&2; exit 1; }
+  fi
+  rm -rf "$B/libffi" && mkdir -p "$B/libffi"
+  (
+    cd "$B/libffi"
+    # wasix host so src/wasm32/ffi.c takes the non-Emscripten wasix_* path.
+    "$B/libffi-src/configure" --host=wasm32-unknown-wasix \
+      --build="$("$B/libffi-src/config.guess")" \
+      --prefix="$DEPS" --disable-shared --enable-static \
+      --disable-docs --disable-multi-os-directory \
+      CC=wasixcc CFLAGS="$DEP_CFLAGS" >"$B/libffi-configure.log" 2>&1
+    make -j"$JOBS" >"$B/libffi-make.log" 2>&1
+    make install >>"$B/libffi-make.log" 2>&1
+  ) || { tail -60 "$B"/libffi-*.log >&2; exit 1; }
+  rm -f "$DEPS"/lib/libffi.la
+  test -f "$DEPS/include/ffi.h"
+  write_pc libffi 3.5.1 -lffi
+fi
+
 echo "== wasix-python: deps"
 ls -la "$DEPS/lib"/*.a
-for pc in zlib openssl bzip2 liblzma sqlite3 readline; do
+for pc in zlib openssl bzip2 liblzma sqlite3 readline libffi; do
   printf '  %-9s %s | %s\n' "$pc" "$(pkg-config --modversion "$pc")" "$(pkg-config --cflags --libs --static "$pc" | sed "s#$B#\$B#g")"
 done
 if [[ "${HOMESCOOP_STOP_AFTER:-}" == deps ]]; then
@@ -328,7 +369,7 @@ rm -rf "$CROSS" && mkdir -p "$CROSS"
     --host=wasm32-unknown-wasix --build="$(sh ../../config.guess)" \
     --prefix="$PREFIX_PY" --with-build-python="$HOSTPY" \
     --disable-shared --with-ensurepip=no --disable-test-modules \
-    --enable-wasm-pthreads --with-pkg-config=yes \
+    --enable-wasm-pthreads --with-pkg-config=yes --with-system-ffi \
     CC=wasixcc AR=wasixar RANLIB=wasixranlib \
     CFLAGS="$PY_CFLAGS" LDFLAGS="$PY_LDFLAGS" \
     LIBS="$STUBS/libpython-wasix-stubs.a$WRAP" \
@@ -337,8 +378,8 @@ rm -rf "$CROSS" && mkdir -p "$CROSS"
 grep -E '^checking for stdlib extension module' "$B/configure.log" | sed 's/^checking for stdlib extension module /  module /' || true
 grep -q '^SOABI=[[:space:]]*cpython-314-wasm32-wasix$' "$CROSS/Makefile" \
   || { grep '^SOABI\|^MULTIARCH' "$CROSS/Makefile" >&2; echo "homescoop wasix-python: SOABI is not cpython-314-wasm32-wasix" >&2; exit 1; }
-# Every library-backed module of -11 must come from configure now.
-for m in _ssl _hashlib zlib _bz2 _lzma _sqlite3 readline fcntl grp pwd mmap resource termios; do
+# Every library-backed module of -11 must come from configure now, plus _ctypes.
+for m in _ssl _hashlib zlib _bz2 _lzma _sqlite3 readline fcntl grp pwd mmap resource termios _ctypes; do
   st="$(sed -n "s/^MODULE_${m^^}_STATE=//p" "$CROSS/Makefile")"
   [[ "$st" == yes ]] || { echo "homescoop wasix-python: module $m is '$st', not yes" >&2; exit 1; }
 done
@@ -416,6 +457,7 @@ echo "== wasix-python: compileall (unchecked-hash)"
   echo "| SQLite | $(pkg-config --modversion sqlite3) | public domain | sqlite.org |"
   echo "| GNU Readline | 8.3 | GPL-3.0-or-later | gnu.org/software/readline |"
   echo "| ncurses (tinfo) | 6.5 | X11 | invisible-island.net/ncurses |"
+  echo "| libffi | $(pkg-config --modversion libffi) | MIT | github.com/wasix-org/libffi |"
   echo "| wasix-libc | wasix-sysroot $(node -p "require('$WASIXCC_SYSROOT_PREFIX/package.json').version") | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
   echo "| libc++, libc++abi, libunwind | wasix-libc v2026-07-03.1 sysroot-ehpic | Apache-2.0 WITH LLVM-exception | github.com/wasix-org/wasix-libc |"
   echo
