@@ -8,10 +8,10 @@ summary: "NumPy 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-{{version}}.tar.gz"
   sha256: "ba0e7a1eaf217bb27dce8ab13450ca3e062cc917a3b84721d6874099d48922b9"
-# 2.3.2-5 is packaging-only: 2.3.2-4's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-11). Drop repack: when the next release rebuilds.
+# 2.3.2-6 is packaging-only: 2.3.2-5's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-12). Drop repack: when the next release rebuilds.
 repack:
-  from: "2.3.2-4"
+  from: "2.3.2-5"
 dependencies:
   build:
     - wasix-python
