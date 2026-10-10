@@ -9,6 +9,14 @@
 #include <unistd.h>
 #include <sys/file.h>
 
+/* The asyncify sysroot's setjmp.h has sigjmp_buf but no prototypes, though
+ * libc.a defines both; clang 21 rejects the implicit declaration. */
+#if !defined(__wasm_exception_handling__) && !defined(__wasilibc_unmodified_upstream)
+#include <setjmp.h>
+int sigsetjmp(sigjmp_buf, int);
+_Noreturn void siglongjmp(sigjmp_buf, int);
+#endif
+
 /* wasix bits/fenv.h only defines FE_TONEAREST */
 #ifndef FE_TOWARDZERO
 #define FE_TOWARDZERO 1
