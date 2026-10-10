@@ -30,12 +30,7 @@ export const EXACT =
 
 /** Recipes (packages/<name>) still waiting for their exact-pin re-release. */
 export const PENDING = new Set([
-  'py-contourpy',
   'py-matplotlib',
-  'py-pandas',
-  'py-scipy',
-  'wasix-automake',
-  'wasm-emscripten',
 ]);
 
 /**
