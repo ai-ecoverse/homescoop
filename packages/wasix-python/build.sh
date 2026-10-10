@@ -220,13 +220,15 @@ if [[ ! -f "$DEPS/lib/libreadline.a" ]]; then
   (
     cd "$B/readline"
     # Cross answers readline's configure cannot probe (Linux/glibc values).
+    # NEED_EXTERN_PC: terminal.c then only declares PC/BC/UP, which tinfo
+    # defines (else a duplicate symbol at python.wasm's link).
     export bash_cv_termcap_lib=libtinfo bash_cv_func_sigsetjmp=present \
       bash_cv_func_strcoll_broken=no bash_cv_must_reinstall_sighandlers=no \
       bash_cv_func_ctype_nonascii=no bash_cv_dup2_broken=no \
       bash_cv_getpw_declared=yes bash_cv_void_sighandler=yes
     ./configure --host="$CROSS_HOST" --build="$(sh ./support/config.guess)" --prefix="$DEPS" \
       --disable-shared --enable-static --with-curses --disable-install-examples \
-      CC=wasixcc CFLAGS="$DEP_CFLAGS" CPPFLAGS="-I$DEPS/include" LDFLAGS="-L$DEPS/lib" \
+      CC=wasixcc CFLAGS="$DEP_CFLAGS -DNEED_EXTERN_PC" CPPFLAGS="-I$DEPS/include" LDFLAGS="-L$DEPS/lib" \
       >"$B/readline-configure.log" 2>&1
     make -j"$JOBS" static >"$B/readline-make.log" 2>&1
     make install-static install-headers >>"$B/readline-make.log" 2>&1
