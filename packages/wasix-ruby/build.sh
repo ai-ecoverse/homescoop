@@ -844,7 +844,7 @@ print("RUBYLIB=", env["RUBYLIB"])
 print("GEM_HOME=", env.get("GEM_HOME"))
 print("GEM_PATH=", env.get("GEM_PATH"))
 # Absolute script args — needs SLICC PR #3735 for ${package} expansion in args.
-for cmd in ("gem", "bundle", "rake"):
+for cmd in ("gem", "bundle", "rake", "irb", "erb"):
     script = dest / "bin" / cmd
     if script.is_file():
         pkg["slicc"]["commands"][cmd] = {
