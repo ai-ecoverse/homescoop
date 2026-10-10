@@ -40,6 +40,18 @@ A homescoop remap of `dlopen(None)` → `bin/python.wasm` was tried and
   Packages in a venv without `--system-site-packages` are not added.
 - `.pth` files inside a py-* `site-packages` are not run (as with
   `PYTHONPATH`); no published py-* has one.
+- **The re-pin wave must ship with -15.** Published py-* that pin
+  wasix-python exactly (py-numpy 2.3.2-7: `3.14.2-13`) bring their own
+  nested copy; next to a 3.14.2-15 python, discovery refuses them by design
+  (browser cert run 38092730025: "skip @ai-ecoverse/py-numpy 2.3.2-7: built
+  for wasix-python 3.14.2-13, this is 3.14.2-15", and numpy was not
+  importable without PYTHONPATH). Caret-ranged older py-* resolve to the
+  top-level python and are taken. cert/discovery.mjs asserts that refusal,
+  then re-pins (fixtures/repin.mjs) for the rest of the cert.
+- 5ae7f67d's discover() shadowed its JSON scanner with `_scan()` and
+  parsed every package.json through `json.loads` after an exception (works,
+  but imports json/re at startup); its cache did not cover the pythons the
+  py-* resolved to (a moved nested copy kept a stale refusal). Both fixed.
 
 # Negative proof (wasix-python 3.14.2-10 / -11 venvs)
 

@@ -42,7 +42,9 @@ Since 3.14.2-15:
   on `PYTHONPATH`. As with `PYTHONPATH`, `.pth` files in those directories are
   not run. It runs from `site-packages/slicc-executable.pth`, so a venv sees
   py-* packages only with `--system-site-packages`; `SLICC_PYTHON_DISCOVER=0`
-  turns it off.
+  turns it off. A py-* built for another wasix-python (an exact pin with its
+  own nested copy, e.g. py-numpy 2.3.2-7 for 3.14.2-13) is refused until it is
+  re-pinned; `python -v` names it.
 
 Since 3.14.2-14 (wasix-sysroot -21):
 - `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,

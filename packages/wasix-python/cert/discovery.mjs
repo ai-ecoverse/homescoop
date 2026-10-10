@@ -16,7 +16,12 @@
  *      picked up (and -v says why);
  * and the cost: discover() cold (scan) and warm (cache), python -c pass with
  * discovery on, off, and off with the same directories on PYTHONPATH.
+ * The published py-* are built for an earlier python; those pinning it
+ * exactly must first be refused, then fixtures/repin.mjs stands in for the
+ * (packaging-only) re-pin wave.
  */
+import { repin } from './fixtures/repin.mjs';
+
 const S = '@ai-ecoverse';
 const NM = `/node_modules/${S}`;
 const G = '/usr/local/share/pnpm/global/v11';
@@ -94,8 +99,34 @@ export default async function (ctx) {
     assert.fail(`python did not move to ${want}`);
   };
 
-  // 0. The harness's flat npm layout, no PYTHONPATH.
-  let r = await py(['-c', IMPORTS]);
+  // 0. The published py-* that pin an older wasix-python exactly come with a
+  // nested copy of it; discovery must refuse them (python -v says why). Then
+  // the cert re-pins them (fixtures/repin.mjs) and they must all be found.
+  const nested = (await sh(`ls -d ${NM}/py-*/node_modules/${S}/wasix-python 2>/dev/null || true`)).split('\n').filter(Boolean);
+  const stale = [];
+  for (const dir of nested) {
+    const v = JSON.parse(await read(`${dir}/package.json`)).version;
+    if (v !== PYVER) stale.push([dir.slice(NM.length + 1).split('/')[0], v]);
+  }
+  if (stale.length) {
+    const v = await py(['-v', '-c', 'pass']);
+    const notes = v.stderr.split('\n').filter((l) => l.startsWith('slicc discover:'));
+    for (const [pkg, ver] of stale) {
+      assert.ok(notes.some((l) => l.includes(`${S}/${pkg} `) && l.includes(`built for wasix-python ${ver}, this is ${PYVER}`)), `${pkg} (python ${ver}) not refused: ${notes.join(' | ')}`);
+    }
+    console.log(`discovery: refused before re-pin: ${stale.map(([p, v]) => `${p} (wasix-python ${v})`).join(', ')}`);
+  }
+  const pins = await repin(ctx);
+  let r;
+  try {
+    await flatAndCost();
+  } catch (e) {
+    await pins.restore();
+    throw e;
+  }
+  async function flatAndCost() {
+  // The harness's flat npm layout, no PYTHONPATH.
+  r = await py(['-c', IMPORTS]);
   if (r.status !== 0) {
     // What discovery saw: sys.path, the cache, and a rescan (-v skips the cache).
     const why = await py(['-c', DIAG]);
@@ -126,6 +157,7 @@ export default async function (ctx) {
   );
   assert.ok(warmMs < 10, `warm discover() took ${warmMs} ms`);
   assert.ok(med(times.on) <= med(times.pythonpath) * 1.1, 'discovery costs more than the same PYTHONPATH');
+  }
 
   try {
     // 1. One pnpm project.
@@ -168,6 +200,7 @@ export default async function (ctx) {
   } finally {
     await restore();
     await pythonAt(`${NM}/wasix-python`);
+    await pins.restore();
   }
 }
 

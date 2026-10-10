@@ -6,8 +6,11 @@
  * Smoke: numpy linalg + fft, pandas groupby + read_csv, scipy optimize +
  * integrate, matplotlib Agg savefig PNG, PIL open/resize/save, kiwisolver,
  * contourpy; the pure-Python packages import. Since 3.14.2-15 without
- * PYTHONPATH: _slicc_site.discover() finds them in /node_modules.
+ * PYTHONPATH: _slicc_site.discover() finds them in /node_modules, with the
+ * py-* re-pinned to the python under test (fixtures/repin.mjs).
  */
+import { repin } from './fixtures/repin.mjs';
+
 const PKGS = ['py-numpy', 'py-pandas', 'py-scipy', 'py-matplotlib', 'py-contourpy', 'py-kiwisolver', 'py-pillow',
   'py-fonttools', 'py-cycler', 'py-packaging', 'py-pyparsing', 'py-python-dateutil', 'py-pytz', 'py-six', 'py-tzdata'];
 
@@ -52,9 +55,14 @@ print(json.dumps(out))
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
-  const sites = PKGS.map((p) => `/node_modules/@ai-ecoverse/${p}/lib/python3.14/site-packages`).join(':');
   await write('/home/sidemods_check.py', SCRIPT);
-  const r = await run(['python', '/home/sidemods_check.py'], { cwd: '/home', env: { PYTHONPATH: sites, MPLBACKEND: 'Agg' } });
+  const pins = await repin(ctx);
+  let r;
+  try {
+    r = await run(['python', '/home/sidemods_check.py'], { cwd: '/home', env: { MPLBACKEND: 'Agg' } });
+  } finally {
+    await pins.restore();
+  }
   assert.equal(r.status, 0, `sidemods_check.py: rc=${r.status}\n${r.stdout}\n${r.stderr}`);
   const o = JSON.parse(r.stdout);
   console.log(`sidemods: numpy ${o.numpy[0]}, pandas ${o.pandas[0]}, scipy ${o.scipy[0]}, matplotlib ${o.matplotlib[0]}`);

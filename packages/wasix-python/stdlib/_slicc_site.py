@@ -25,7 +25,8 @@ same exact version as this python: the same version is the same build, so
 native side modules never mix interpreter builds. The first package of a
 name wins; others are skipped (reported under -v).
 The result is cached in <python>/.slicc-site-cache, keyed on the package
-directories and their package.json stamps; -v always rescans.
+directories and their package.json stamps, plus the stamps of the
+wasix-python copies they resolved to; -v always rescans.
 """
 import os
 import sys
@@ -62,23 +63,23 @@ class _JsonContext:  # what _json.make_scanner reads from a JSONDecoder
     memo = None
 
 
-_scan = None
+_json_scan = None
 
 
 def _manifest(pkgdir):
     """package.json as a dict; the C scanner directly, so startup skips json/re."""
-    global _scan
+    global _json_scan
     try:
         with open(os.path.join(pkgdir, "package.json"), "rb") as f:
             text = f.read().decode("utf-8-sig")
     except (OSError, UnicodeDecodeError):
         return None
     try:
-        if _scan is None:
+        if _json_scan is None:
             import _json
 
-            _scan = _json.make_scanner(_JsonContext())
-        obj, _ = _scan(text, text.index("{"))
+            _json_scan = _json.make_scanner(_JsonContext())
+        obj, _ = _json_scan(text, text.index("{"))
     except Exception:
         try:
             import json
@@ -215,22 +216,25 @@ def discover():
     if not sys.flags.verbose:
         try:
             with open(cache, encoding="utf-8") as f:
-                head, _, dirs = f.read().partition("\n\n")
-            if head == key:
+                head, _, rest = f.read().partition("\n\n")
+            used, _, dirs = rest.partition("\n\n")
+            # The pythons the py-* resolved to decide what was skipped: their
+            # stamps must be unchanged too (a nested copy moved or replaced).
+            if head == key and all(_stamp(u.split("\t", 1)[0]) == u for u in used.split("\n") if u):
                 for d in dirs.split("\n"):
                     if d and d not in sys.path:
                         sys.path.append(d)
                 return
         except OSError:
             pass
-    dirs = _scan(real, found)
+    dirs, used = _scan(real, found)
     for d in dirs:
         if d not in sys.path:  # as PYTHONPATH would: .pth files there are not run
             sys.path.append(d)
     try:
         tmp = f"{cache}.{os.getpid()}"
         with open(tmp, "w", encoding="utf-8") as f:
-            f.write(key + "\n\n" + "\n".join(dirs))
+            f.write(key + "\n\n" + "\n".join(filter(None, map(_stamp, sorted(used)))) + "\n\n" + "\n".join(dirs))
         os.replace(tmp, cache)
     except OSError:  # read-only install: no cache, scan every start
         pass
@@ -239,13 +243,14 @@ def discover():
 def _scan(real, found):
     me = _manifest(real)
     if not me or me.get("name") != _PY_PKG:
-        return []
+        return [], set()
     version = me.get("version")
     want = (me.get("slicc") or {}).get("python") or {}
     seen_dirs = {real}
     memo = {}
     by_name = {}
     dirs = []
+    used = set()
     for pkgdir in found:
         rdir = os.path.realpath(pkgdir)
         if rdir in seen_dirs:
@@ -263,6 +268,8 @@ def _scan(real, found):
         deps = {**(m.get("peerDependencies") or {}), **(m.get("dependencies") or {})}
         if _PY_PKG in deps:
             dep = _resolve(rdir, _PY_PKG, memo)
+            if dep:
+                used.add(dep)
             got = (_manifest(dep) or {}).get("version") if dep else deps[_PY_PKG]
             if got != version:
                 _say(f"skip {name} {m.get('version')}: built for wasix-python {got}, this is {version}")
@@ -273,4 +280,4 @@ def _scan(real, found):
             continue
         by_name[name] = m.get("version")
         dirs.append(os.path.join(rdir, py["sitePackages"]))
-    return dirs
+    return dirs, used
