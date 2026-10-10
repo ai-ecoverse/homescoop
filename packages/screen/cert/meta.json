@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -15,6 +15,6 @@
     "screen -dmS hs sleep 30: rc 0; -ls lists <pid>.hs, '1 Socket'; -S hs -X quit rc 0; -ls empty again",
     "window fork + exec keeps the pid (slicc-kernel#176): the window's $PPID is the screen server from -ls, and /proc/<its pid> is the program",
     "pty: screen bash --norc -i, alternate screen, echo in-$((6*7)) → in-42, exit → '[screen is terminating]', status 0",
-    "reattach from a second terminal (homescoop#162): detach in terminal A; from terminal B, the session's view of B's /dev/ttyN decides: invisible (slicc-kernel ≤ 1.30.0, #192) → screen -r does not attach and the session stays Detached (documented limit); visible → screen -r attaches ($STY set in the window), a command runs, '[screen is terminating]'"
+    "reattach from a second terminal (homescoop#162, slicc-kernel 1.35.1 / #210): detach in terminal A; terminal B's /dev/ttyN is visible from inside the session; screen -r attaches ($STY set), the window still shows A's output, a command runs, '[screen is terminating]', no session left"
   ]
 }

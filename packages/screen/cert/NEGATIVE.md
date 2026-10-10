@@ -54,3 +54,15 @@ in the session through `-X stuff`), so the case asserts the documented limit.
   reattaches fully (window redrawn, `$STY` = `1002.ra`, `[screen is
   terminating]` on exit), on the same build and kernel. Once #192 ships, the
   case requires exactly that from any terminal.
+
+## Reattach from a second terminal, strict (5.0.1-9, slicc-kernel 1.35.1)
+
+`cert/reattach.mjs` now requires the attach. On slicc-kernel 1.34.1 (before
+#210) it fails at the visibility check:
+
+```text
+AssertionError [ERR_ASSERTION]: terminal B's device is not visible from the session: "ls: cannot access '/dev/tty2': No such file or directory\nvis-done\n"
+```
+
+On 1.35.1 it passes, with the published 5.0.1-8 binary as well: the screen
+side needed no change.

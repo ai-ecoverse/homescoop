@@ -2,14 +2,11 @@
  * screen: reattach from a different terminal (homescoop#162). The screen
  * server opens the attaching terminal's device by path (screen passes the
  * fd with SCM_RIGHTS on Linux, which slicc-kernel's sockets cannot carry).
- * slicc-kernel up to at least 1.30.0 hides other terminals' /dev/ttyN from a
- * process (slicc-kernel#192), so the attach is refused and `screen -r`
- * returns 0 with the session still Detached.
- *
- * The case measures both: whether the attaching terminal's device is
- * visible from inside the session, and whether `screen -r` attached. They
- * must agree: invisible → not attached (the documented limit), visible →
- * attached, a command runs in the window, and screen terminates cleanly.
+ * Up to 1.34.1 slicc-kernel hid other terminals' /dev/ttyN from a process
+ * (slicc-kernel#192), so the attach was refused. 1.35.1 (#210) shows every
+ * terminal under /dev: terminal B's device is visible from inside the
+ * session, `screen -r` attaches, the window still holds terminal A's
+ * output, a command runs, and screen terminates cleanly.
  */
 export default async function (ctx) {
   const { run, pty, assert } = ctx;
@@ -50,17 +47,13 @@ export default async function (ctx) {
     timeoutMs: 8000,
   });
   const vis = (await run(['cat', '/tmp/ra-vis'], { cwd })).stdout;
-  const visible = !/No such file|cannot access/.test(vis);
-  const attached = /sty=\[\d+\.ra\]/.test(b.out);
   assert.ok(!b.failedStep, `terminal B failed at ${JSON.stringify(b.failedStep)} out=${JSON.stringify(b.out.slice(-400))}`);
-  assert.equal(attached, visible,
-    `attach (${attached}) and tty visibility from the session (${visible}) disagree: vis=${JSON.stringify(vis)} out=${JSON.stringify(b.out.slice(-400))}`);
-  if (attached) {
-    assert.match(b.out, /\[screen is terminating\]/, 'reattached screen did not terminate cleanly');
-  } else {
-    // The documented limit: no attach, the session is still there, Detached.
-    const still = await run(['screen', '-ls'], { cwd });
-    assert.match(still.stdout, /\t\d+\.ra\t\(Detached\)/, `session lost: ${JSON.stringify(still.stdout)}`);
-    await run(['screen', '-S', 'ra', '-X', 'quit'], { cwd });
-  }
+  assert.doesNotMatch(vis, /No such file|cannot access/, `terminal B's device is not visible from the session: ${JSON.stringify(vis)}`);
+  assert.match(b.out, /sty=\[\d+\.ra\]/, `screen -r did not attach: ${JSON.stringify(b.out.slice(-400))}`);
+  // The redrawn window is terminal A's: its earlier output is on screen.
+  const afterAttach = b.out.slice(b.out.indexOf('screen -r ra'));
+  assert.match(afterAttach, /first-2/, `reattached window lost A's output: ${JSON.stringify(afterAttach.slice(0, 400))}`);
+  assert.match(b.out, /\[screen is terminating\]/, 'reattached screen did not terminate cleanly');
+  const gone = await run(['screen', '-ls'], { cwd });
+  assert.match(gone.stdout, /No Sockets found/, `session left behind: ${JSON.stringify(gone.stdout)}`);
 }
