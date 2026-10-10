@@ -1,3 +1,18 @@
+
+## 3.14.2-15 `_ctypes` on slicc-kernel 1.49.0 (no POSIX `dlopen(NULL)`)
+
+On 1.49.0, `wasix_32v1.dlopen` with a NULL path returns handle **0** (main).
+POSIX/`ctypes` treat that as failure, so `ctypes/__init__.py`'s
+`pythonapi = PyDLL(None)` makes **`import ctypes` itself** raise `OSError`.
+`import _ctypes` and `CDLL("/path/to/side.so")` work; `CFUNCTYPE` still hits
+`closure_prepare` ENOSYS (exit 134).
+
+A homescoop remap of `dlopen(None)` → `bin/python.wasm` was tried and
+**rejected**: the kernel's `load()` does not put the main module in `byPath`,
+so that path loads a **second** PIE CPython (`Py_IsInitialized()` would be 0).
+Fix belongs in the kernel (non-zero main handle) or a tiny `__wasi__`
+`py_dl_open` NULL→0 handling — not `_slicc_site`. Cert waits on that + step 2.
+
 # Negative proof (wasix-python 3.14.2-10 / -11 venvs)
 
 ## 3.14.2-11 (homescoop#157), slicc-kernel 1.30.0's Node entry

@@ -21,6 +21,9 @@ const SCRIPT = `
 import base64, ctypes, _ctypes, json, sys
 open("/home/libside-add.so", "wb").write(base64.b64decode(${JSON.stringify(SIDE_B64)}))
 out = {"_ctypes": _ctypes.__name__, "ctypes": ctypes.__name__}
+# Must be the *running* main (dlopen(NULL)), not a second load of python.wasm.
+ctypes.pythonapi.Py_IsInitialized.restype = ctypes.c_int
+out["Py_IsInitialized"] = ctypes.pythonapi.Py_IsInitialized()
 # Main-module libc symbols (PIE export-dynamic).
 lib = ctypes.CDLL(None)
 lib.strlen.argtypes = [ctypes.c_char_p]
@@ -42,7 +45,10 @@ export default async function (ctx) {
   const o = JSON.parse(r.stdout.trim());
   assert.equal(o._ctypes, '_ctypes');
   assert.equal(o.ctypes, 'ctypes');
+  assert.equal(o.Py_IsInitialized, 1, `pythonapi must be the running main, not a second PIE load (got ${o.Py_IsInitialized})`);
   assert.equal(o.strlen, 5);
   assert.equal(o.side_add, 7);
-  console.log(`ctypes: import ok, strlen=${o.strlen}, side_add=${o.side_add}`);
+  console.log(
+    `ctypes: import ok, Py_IsInitialized=${o.Py_IsInitialized}, strlen=${o.strlen}, side_add=${o.side_add}`,
+  );
 }
