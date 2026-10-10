@@ -21,6 +21,23 @@ export default async function (ctx) {
   assert.equal(await perl('open my $p, "-|", "echo", "piped" or die "$!"; print <$p>'), 'piped\n');
   const stdin = await run(['perl', '-ne', 'print uc'], { cwd, stdin: 'abc\n' });
   assert.equal(stdin.stdout, 'ABC\n');
+  // @INC: the same layout as 5.42.0-6 (flat lib/perl5, archlib under it).
+  const inc = (await perl('print join("\\n", @INC), "\\n"')).trim().split('\n');
+  const P = '/node_modules/@ai-ecoverse/wasix-perl/lib/perl5';
+  assert.deepEqual(inc.slice(0, 6), [
+    `${P}/wasm32-wasix`, P, `${P}/wasm32-wasix`, `${P}/site_perl`, `${P}/site_perl/wasm32-wasix`,
+    '/usr/lib/perl5/site_perl/5.42.0/wasm32-wasix',
+  ], inc.join('\n'));
+  assert.ok(inc.includes('/usr/lib/perl5/site_perl/5.42.0'), 'site_perl in @INC');
+  assert.equal(await perl('require List::Util; print $INC{"List/Util.pm"}, "\\n"'), `${P}/List/Util.pm\n`);
+  assert.equal(await perl('use Config; print "$Config{installsitelib}\\n"'), '/usr/lib/perl5/site_perl/5.42.0\n');
+  // A pure-Perl module installed into the site dir loads from there.
+  const site = await run(['bash', '-c', 'mkdir -p /usr/lib/perl5/site_perl/5.42.0/HSCert && printf "package HSCert::Site; sub hi { \\"site ok\\" } 1;\\n" > /usr/lib/perl5/site_perl/5.42.0/HSCert/Site.pm && perl -MHSCert::Site -e \'print HSCert::Site::hi(), " ", $INC{"HSCert/Site.pm"}, "\\n"\''], { cwd });
+  assert.equal(site.stdout, 'site ok /usr/lib/perl5/site_perl/5.42.0/HSCert/Site.pm\n', `site install stderr=${site.stderr}`);
+  // PERL5LIB from the caller is prepended.
+  const p5 = await run(['bash', '-c', 'mkdir -p /home/p5lib/HSCert && printf "package HSCert::Lib; 1;\\n" > /home/p5lib/HSCert/Lib.pm && PERL5LIB=/home/p5lib perl -MHSCert::Lib -e \'print $INC{"HSCert/Lib.pm"}, "\\n"\''], { cwd });
+  assert.equal(p5.stdout, '/home/p5lib/HSCert/Lib.pm\n', `PERL5LIB stderr=${p5.stderr}`);
+
   const die = await run(['perl', '-e', 'die "boom\\n"'], { cwd });
   assert.notEqual(die.status, 0);
   assert.match(die.stderr, /^boom$/m);

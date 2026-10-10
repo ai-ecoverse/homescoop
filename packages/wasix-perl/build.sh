@@ -258,6 +258,8 @@ PY
   # MakeMaker's target for the .a only; pm_to_blib (lib/List/Util.pm,
   # lib/File/Spec.pm, …) is part of pure_all. Copy their modules too.
   for ext in $(sed -n 's/^fullpath_static_ext *= *//p' Makefile.config); do
+    # The `static` run leaves a 0-byte pm_to_blib stamp without copying.
+    rm -f "$ext/pm_to_blib"
     make -C "$ext" PERL_CORE=1 LIBPERL=libperl.a LINKTYPE=static pm_to_blib \
       2>&1 | tee -a "$WORK/make-wasix.log"
   done
@@ -304,21 +306,31 @@ else
   echo "WARN: wasm-opt not found; skipping asyncify (fork will not work)" >&2
 fi
 
-# Pure-Perl lib tree — real directories, no symlinks
-LIBSRC=$(find "$INST" -type d -path '*/lib/perl5*' -print -quit)
-if [[ -z "$LIBSRC" ]]; then
-  LIBSRC=$(find "$INST" -type d -name 'perl5' -print -quit)
-fi
-[[ -d "$LIBSRC" ]] || { echo "no perl5 lib under $INST" >&2; exit 1; }
-# Prefer arch+version layout under lib/perl5
-mkdir -p "$DEST/lib"
-# Copy entire usr/lib/perl5 if present
-if [[ -d "$INST/lib/perl5" ]]; then
-  cp -a "$INST/lib/perl5" "$DEST/lib/"
-else
-  mkdir -p "$DEST/lib/perl5"
-  cp -a "$LIBSRC/." "$DEST/lib/perl5/"
-fi
+# Pure-Perl lib tree, real directories. Same flat layout as -6 (manifest
+# PERL5LIB = lib/perl5:lib/perl5/wasm32-wasix): privlib's contents go to
+# lib/perl5, so its wasm32-wasix/ (archlib) lands at lib/perl5/wasm32-wasix.
+PRIVLIB="$INST/lib/perl5/$VER"
+[[ -d "$PRIVLIB" ]] || { echo "no privlib $PRIVLIB under $INST" >&2; find "$INST" -maxdepth 4 -type d >&2; exit 1; }
+mkdir -p "$DEST/lib/perl5"
+cp -a "$PRIVLIB/." "$DEST/lib/perl5/"
+# Gap-fill from the build tree's lib/ (modules installperl left out), never
+# tests; an archlib module is filled into wasm32-wasix/ when it lives there.
+python3 - "$SRC/lib" "$DEST/lib/perl5" <<'PY'
+import shutil, sys
+from pathlib import Path
+src, dest = Path(sys.argv[1]), Path(sys.argv[2])
+filled = []
+for f in sorted(src.rglob("*")):
+    if not f.is_file() or f.suffix not in {".pm", ".pl", ".pod", ".al", ".ix"}:
+        continue
+    rel = f.relative_to(src)
+    if (dest / rel).exists() or (dest / "wasm32-wasix" / rel).exists():
+        continue
+    (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(f, dest / rel)
+    filled.append(str(rel))
+print(f"gap-filled {len(filled)} files from the build lib: {', '.join(filled[:12])}{' …' if len(filled) > 12 else ''}")
+PY
 
 # make and make install are best-effort (|| true): refuse a tree that lacks
 # modules from extensions built after the perl link.
