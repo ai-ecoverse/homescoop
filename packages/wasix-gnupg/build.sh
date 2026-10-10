@@ -19,7 +19,10 @@ homescoop_load_recipe wasix-gnupg
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-4"
+# The npm version (upstream-N) comes from the committed package.json, read
+# before staging rewrites it, and must start with the recipe's version.
+PKG_VER="$(node -p "require('$DEST/package.json').version")"
+[[ "$PKG_VER" == "$VER-"* ]] || { echo "homescoop: package.json version $PKG_VER does not start with $VER-" >&2; exit 1; }
 WORK="${WASIX_GNUPG_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
