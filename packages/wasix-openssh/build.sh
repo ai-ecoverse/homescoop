@@ -350,7 +350,12 @@ pkg = {
 print("package.json", pkg_ver, sorted(cmds))
 PY
 
-cp "$PKG/package/README.md" "$DEST/README.md"
+# README lives in package/ already (DEST); keep a copy at the recipe root in sync.
+if [[ -f "$PKG/README.md" && "$PKG/README.md" -ef "$DEST/README.md" ]]; then
+  :
+elif [[ -f "$PKG/README.md" ]]; then
+  cp "$PKG/README.md" "$DEST/README.md"
+fi
 
 echo "== wasix-openssh staged $PKG_VER"
 ls -la "$DEST/bin"
