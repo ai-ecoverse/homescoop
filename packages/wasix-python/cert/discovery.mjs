@@ -3,10 +3,11 @@
  * (_slicc_site.discover(), from site-packages/slicc-executable.pth).
  *
  * The harness installs python and the py-* flat in /node_modules (npm
- * layout); sidemods.mjs runs on that without PYTHONPATH. Here the same
- * package directories are moved (mv, so no copies) into pnpm 12 layouts
- * under slicc-kernel's PNPM_HOME, which the kernel scans for commands
- * (global/v<N>/<project>/node_modules), and moved back at the end:
+ * layout); sidemods.mjs runs on that without PYTHONPATH. Here pnpm 12
+ * layouts are built under slicc-kernel's PNPM_HOME, which the kernel scans
+ * for commands (global/v<N>/<project>/node_modules), out of package
+ * "shells" (real directories symlinking into /node_modules, nothing moved;
+ * the layout's python is the command python-g), and removed at the end:
  *   1. one project (a local `pnpm add` / one global project): python + numpy,
  *      pandas, scipy, matplotlib direct, the other py-* only in .pnpm;
  *   2. `pnpm add -g` of each: one project per package, the way pnpm 12 does
@@ -60,21 +61,22 @@ export default async function (ctx) {
     return acc;
   };
   const entry = (n, v) => `${S}+${n}@${v ?? man[n].version}`;
-  const moved = []; // [from, to] to undo
   // A pnpm project at `dir`: real dirs .pnpm/<entry>/node_modules/@s/<n>,
-  // dependency links beside them, top-level links for `direct`.
+  // dependency links beside them, top-level links for `direct`. Nothing big
+  // moves (a CDP call has 30 s; OPFS may copy a moved directory): each
+  // package dir is a "shell", a real directory whose children are symlinks
+  // into the harness's /node_modules copy, with its own package.json. The
+  // python shell's command is python-g, so /node_modules stays as it is.
   // stub: { name: version } stand-ins (package.json only).
   const project = async (dir, direct, all, stub = {}) => {
     const real = {};
     const cmds = [];
     for (const n of all) {
       real[n] = `${dir}/node_modules/.pnpm/${entry(n)}/node_modules/${S}/${n}`;
-      // One package per run: each run is one CDP call (30 s); a rename is
-      // instant, a copy (no native OPFS directory move) is not.
-      const t0 = performance.now();
-      await sh(`mkdir -p ${real[n].replace(/\/[^/]+$/, '')} && mv ${NM}/${n} ${real[n]}`);
-      moved.push([`${NM}/${n}`, real[n]]);
-      if (n === 'wasix-python') console.log(`discovery: mv wasix-python (114 MB) took ${(performance.now() - t0).toFixed(0)} ms`);
+      const m = { ...man[n] };
+      if (n === 'wasix-python') m.slicc = { ...m.slicc, commands: { 'python-g': m.slicc.commands.python } };
+      await write(`${real[n]}/package.json`, JSON.stringify(m));
+      cmds.push(`for c in $(ls -A ${NM}/${n}); do case "$c" in package.json|.slicc*) ;; *) ln -s ${NM}/${n}/$c ${real[n]}/$c ;; esac; done`);
     }
     for (const [n, v] of Object.entries(stub)) {
       real[n] = `${dir}/node_modules/.pnpm/${entry(n, v)}/node_modules/${S}/${n}`;
@@ -89,18 +91,15 @@ export default async function (ctx) {
     await write(`${dir}/package.json`, JSON.stringify({ dependencies: Object.fromEntries(direct.map((n) => [`${S}/${n}`, man[n]?.version ?? stub[n]])) }));
     await sh(cmds.join('\n'));
   };
-  const restore = async () => {
-    for (const [from, to] of moved.splice(0).reverse()) await sh(`mv ${to} ${from}`);
-    await sh(`rm -rf ${G}`);
-  };
-  // python resolves to the moved interpreter once the kernel's watcher rescans.
-  const pythonAt = async (want) => {
-    for (let i = 0; i < 50; i++) {
-      const r = await py(['-c', 'import sys; print(sys.base_prefix)']);
+  const pyg = (args) => run(['python-g', ...args], { cwd: '/home', env: {} });
+  // python-g is the shell's command once the kernel's watcher rescans PNPM_HOME.
+  const pythonGAt = async (want) => {
+    for (let i = 0; i < 100; i++) {
+      const r = await pyg(['-c', 'import sys; print(sys.base_prefix)']);
       if (r.status === 0 && r.stdout.includes(want)) return;
       await new Promise((res) => setTimeout(res, 100));
     }
-    assert.fail(`python did not move to ${want}`);
+    assert.fail(`python-g is not ${want}`);
   };
 
   // 0. The published py-* that pin an older wasix-python exactly come with a
@@ -166,20 +165,17 @@ export default async function (ctx) {
   }
 
   try {
-    // The layouts are built with mv: it must rename, not copy 370 MB across
-    // mounts (in the browser /tmp is one; PNPM_HOME must share /node_modules').
-    const dev = (await sh(`mkdir -p ${G} && stat -c %d /node_modules ${G}`)).trim().split('\n');
-    assert.equal(dev[0], dev[1], `PNPM_HOME ${G} is on another mount than /node_modules (st_dev ${dev.join(' vs ')})`);
     // 1. One pnpm project.
     const one = new Set(['wasix-python', ...TOP]);
     for (const t of TOP) closure(t, one);
     await project(`${G}/one`, ['wasix-python', ...TOP], [...one]);
-    await pythonAt(`${G}/one/`);
-    r = await py(['-c', IMPORTS]);
+    await pythonGAt(`${G}/one/`);
+    r = await pyg(['-c', IMPORTS]);
     assert.equal(r.status, 0, `one project: ${r.stderr}`);
-    console.log(`discovery: one pnpm project: ${r.stdout.trim()}`);
-    await restore();
-    await pythonAt(`${NM}/wasix-python`);
+    r = await pyg(['-c', 'import numpy, sys; print(numpy.__file__)']);
+    assert.ok(r.stdout.startsWith(`${G}/one/`), `numpy came from ${r.stdout}`);
+    console.log(`discovery: one pnpm project: numpy from ${r.stdout.trim()}`);
+    await sh(`rm -rf ${G}`);
 
     // 2. One project per `pnpm add -g` package.
     await project(`${G}/python`, ['wasix-python'], ['wasix-python']);
@@ -198,18 +194,19 @@ export default async function (ctx) {
     await write(`${old}/lib/python3.14/site-packages/oldbuild_marker.py`, 'X = 1\n');
     await write(`${old.replace(/py-oldbuild$/, 'wasix-python')}/package.json`, JSON.stringify({ name: `${S}/wasix-python`, version: '3.14.2-13' }));
     await sh(`mkdir -p ${G}/py-old/node_modules/${S} && ln -s ../.pnpm/${S}+py-oldbuild@1.0.0-1/node_modules/${S}/py-oldbuild ${G}/py-old/node_modules/${S}/py-oldbuild\nln -s python ${G}/0123abcdef`);
-    await pythonAt(`${G}/python/`);
-    r = await py(['-c', IMPORTS]);
+    await pythonGAt(`${G}/python/`);
+    r = await pyg(['-c', IMPORTS]);
     assert.equal(r.status, 0, `global projects: ${r.stderr}`);
+    r = await pyg(['-c', 'import numpy, pandas; print(numpy.__file__, pandas.__file__)']);
+    assert.ok(r.stdout.includes(`${G}/py-numpy/`) && r.stdout.includes(`${G}/py-pandas/`), `from ${r.stdout}`);
     console.log(`discovery: pnpm add -g, one project each: ${r.stdout.trim()}`);
-    r = await py(['-v', '-c', 'import importlib.util as u; print(u.find_spec("oldbuild_marker") is None)']);
+    r = await pyg(['-v', '-c', 'import importlib.util as u; print(u.find_spec("oldbuild_marker") is None)']);
     const note = r.stderr.split('\n').filter((l) => l.startsWith('slicc discover:') && l.includes('py-oldbuild'));
     assert.equal(r.stdout.trim(), 'True', 'a py-* built for wasix-python 3.14.2-13 was put on sys.path');
     assert.ok(note.length === 1 && note[0].includes('3.14.2-13'), `-v note: ${note}`);
     console.log(`discovery: other python's py-* skipped: ${note[0]}`);
   } finally {
-    await restore();
-    await pythonAt(`${NM}/wasix-python`);
+    await sh(`rm -rf ${G}`);
     await pins.restore();
   }
 }
