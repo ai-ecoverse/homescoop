@@ -1,0 +1,47 @@
+site/sysconfig: WASIX has $HOME, so the user site is ~/.local and enabled
+(no uid check). site is frozen: apply before make.
+
+--- a/Lib/site.py
++++ b/Lib/site.py
+@@ -270,6 +270,12 @@
+     if sys.flags.no_user_site:
+         return False
+ 
++    # homescoop wasix-python: WASIX often reports mismatched getuid/geteuid
++    # (or stubs). SLICC installs ipk packages via ~/.local/.../_slicc_packages.pth
++    # and requires ENABLE_USER_SITE. Skip the uid/gid setuid check on wasi.
++    if sys.platform == "wasi":
++        return True
++
+     if hasattr(os, "getuid") and hasattr(os, "geteuid"):
+         # check process uid == effective uid
+         if os.geteuid() != os.getuid():
+@@ -298,8 +304,10 @@
+     if env_base:
+         return env_base
+ 
+-    # Emscripten, iOS, tvOS, VxWorks, WASI, and watchOS have no home directories
+-    if sys.platform in {"emscripten", "ios", "tvos", "vxworks", "wasi", "watchos"}:
++    # Emscripten, iOS, tvOS, VxWorks, and watchOS have no home directories.
++    # homescoop wasix-python: WASIX/SLICC has $HOME; user site is ~/.local
++    # (ipk wires _slicc_packages.pth there). Do not treat wasi like no-home.
++    if sys.platform in {"emscripten", "ios", "tvos", "vxworks", "watchos"}:
+         return None
+ 
+     def joinuser(*args):
+--- a/Lib/sysconfig/__init__.py
++++ b/Lib/sysconfig/__init__.py
+@@ -116,10 +116,11 @@
+     if env_base:
+         return env_base
+ 
+-    # Emscripten, iOS, tvOS, VxWorks, WASI, and watchOS have no home directories.
++    # Emscripten, iOS, tvOS, VxWorks, and watchOS have no home directories.
+     # Use _PYTHON_HOST_PLATFORM to get the correct platform when cross-compiling.
++    # homescoop wasix-python: WASIX/SLICC has $HOME → ~/.local (sync with site.py).
+     system_name = os.environ.get('_PYTHON_HOST_PLATFORM', sys.platform).split('-')[0]
+-    if system_name in {"emscripten", "ios", "tvos", "vxworks", "wasi", "watchos"}:
++    if system_name in {"emscripten", "ios", "tvos", "vxworks", "watchos"}:
+         return None
+ 
+     def joinuser(*args):

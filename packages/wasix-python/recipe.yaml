@@ -37,12 +37,6 @@ sources:
   ncurses:
     url: "https://mirrors.kernel.org/gnu/ncurses/ncurses-6.5.tar.gz"
     sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
-  # wasix-libc sources for the members patches/wasix-libc-*.patch touch
-  # (setitimer, clock_nanosleep, fcntl, flock, lockf); the tag
-  # wasix-sysroot -17's libc is built from.
-  wasix_libc:
-    url: "https://github.com/wasix-org/wasix-libc/archive/refs/tags/v2025-09-02.1.tar.gz"
-    sha256: "cfcf126e6e5246dd140ccacf956fb2447952a771723954f5c0766720ee538e9d"
   base:
     url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-9.tgz"
     sha256: "2b40ac613ad4849ef6435f8fe73303660e39164070774134bfdd866b2b895246"
