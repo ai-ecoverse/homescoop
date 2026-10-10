@@ -122,6 +122,34 @@ sha after Renovate with `node scripts/refresh-recipe-sha.mjs <pkg>`.
 emscripten-forge / conda-forge into `/shared/lib/conda`. Builds run with
 `PREFIX=/shared/lib/conda` so higher rungs link forge headers and `.a` files.
 
+## Packaging-only repack
+
+A release that only changes `package.json` (e.g. moving an exact
+`@ai-ecoverse` pin) must not rebuild binaries. Set in `recipe.yaml`:
+
+```yaml
+repack:
+  from: "0.1.0-1"   # published version whose bytes are reused
+  files: []         # optional extra repo files laid over the base (README.md)
+```
+
+`host-run.sh` then skips deps, emsdk and `build.sh`, and runs
+`scripts/repack-published.mjs`: `npm pack <npm>@<from>`, lay the repo's
+`package/package.json` (plus `files`) over it, `npm pack`. The result is
+checked by `scripts/diff-published.mjs`: every other entry must be
+byte-identical (path, type, mode, content) to the base, and in
+`package.json` only `version` and `@ai-ecoverse/*` dependency versions may
+differ (exact). The report lands in `.homescoop-out/packaging-only-diff.txt`
+and the `host-<pkg>-prN` artifact. `refresh-recipe-sha.mjs` skips repack
+recipes. Drop `repack:` when the next release really rebuilds (a changed
+`homescoop.upstream` refuses to repack).
+
+Diff any tarball against a published version by hand:
+
+```bash
+node scripts/diff-published.mjs .homescoop-out/package.tgz @ai-ecoverse/wasix-uv-shim@0.1.0-1
+```
+
 ## Retired recipes
 
 `builder: retired` means the package must not be built or published.

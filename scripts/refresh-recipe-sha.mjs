@@ -196,6 +196,11 @@ for (const name of names) {
       continue;
     }
     const recipe = recipeJson(name);
+    if (recipe.repack?.from) {
+      // Packaging-only repack of a published tarball: the source is not built.
+      console.log(`skip ${name}: repack of ${recipe.repack.from}`);
+      continue;
+    }
     if (!recipe.source?.url || recipe.source.url === null) {
       console.log(`skip ${name}: null source`);
       continue;
