@@ -3,6 +3,18 @@
 **Date:** 2026-10-10
 Patches: see `cert/meta.json`. Not in `scripts/ci-certified.json`.
 
+
+## Process credentials: 5.3.0-12 (H1, homescoop#207)
+
+`cert/users.mjs` on the published 5.3.0-12, slicc-kernel 1.44.0 Node entry. Its shims answer uid 1000 for everyone, so root is uid 1000 and its prompt names whoever `/etc/passwd` lists as 1000:
+
+```text
++   'UID=1000 EUID=1000 GROUPS=1000 0 HOME=/root USER=root',
++   'prompt=cone $',
+-   'UID=0 EUID=0 GROUPS=0 HOME=/root USER=root',
+-   'prompt=root #',
+```
+
 ## /dev/tcp: the fork-profile build (5.3.0-9 as first built, and 5.3.0-8)
 
 bash linked the `fork` shim profile, which has no `slicc_socket.c`, so

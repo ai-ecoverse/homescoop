@@ -14,13 +14,13 @@
 export default async function (ctx) {
   const { pty, assert } = ctx;
   const N = 20;
-  const steps = [{ expect: '\\$ ' }];
+  const steps = [{ expect: '[$#] ' }];
   for (let i = 0; i < N; i++) {
     steps.push(
       { write: 'sleep 30\r' },
       { expect: 'sleep 30\r\n' },
       { write: '\x03' },
-      { expect: '\\$ ', timeoutMs: 5000 },
+      { expect: '[$#] ', timeoutMs: 5000 },
       { write: `echo "c${i}=$?"\r` },
       { expect: `c${i}=130`, timeoutMs: 5000 },
     );
@@ -47,7 +47,7 @@ export default async function (ctx) {
   for (let i = 0; i < 5; i++) {
     const f = await pty(['bash', '--norc', '-i'], {
       steps: [
-        { expect: '\\$ ' },
+        { expect: '[$#] ' },
         { write: 'sleep 30\r' },
         { expect: 'sleep 30\r\n' },
         { write: '\x1a' },
@@ -71,7 +71,7 @@ export default async function (ctx) {
   // "[1] Stopped sleep 1" and rs=148).
   const b = await pty(['bash', '--norc', '-i'], {
     steps: [
-      { expect: '\\$ ' },
+      { expect: '[$#] ' },
       { write: 'read x; sleep 1; echo "rs=$?"\r' },
       { expect: 'echo "rs=\\$\\?"\r\n' },
       { sleepMs: 150, write: '\x1a' },
