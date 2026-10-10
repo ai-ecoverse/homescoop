@@ -1,7 +1,10 @@
 {
   "name": "@ai-ecoverse/wasm-coreutils",
-  "version": "9.12.0-4",
-  "description": "GNU coreutils (single-binary) for slicc (WASM / emscripten, SLICC homescoop)",
+  "version": "9.12.0-5",
+  "description": "GNU coreutils (single-binary) for slicc (WASM / emscripten, SLICC homescoop; user ids from slicc-kernel >= 1.44.0)",
+  "engines": {
+    "slicc-kernel": ">=1.44.0"
+  },
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

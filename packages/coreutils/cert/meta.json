@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
   "needs": [
     "@ai-ecoverse/wasm-bash"
   ],
@@ -10,17 +10,18 @@
     "nice runs a child",
     "nohup runs a child",
     "exec keeps the pid: env/nice bash -c 'echo $PPID' is the outer bash's $$",
-    "timeout 1 sleep 5 → 124 after ~1 s; timeout 5 true → 0; exit status passes through",
-    "timeout -s KILL 1 sleep 5 → 137; --preserve-status → 143; -k 1 on a TERM-ignoring command → 137",
+    "timeout 1 sleep 5 \u2192 124 after ~1 s; timeout 5 true \u2192 0; exit status passes through",
+    "timeout -s KILL 1 sleep 5 \u2192 137; --preserve-status \u2192 143; -k 1 on a TERM-ignoring command \u2192 137",
     "timeout kills the command's whole process group (background child gone)",
-    "timeout of a missing command → 127; bad duration → 125",
-    "hostname prints the same as uname -n; hostname NAME → Operation not permitted"
+    "timeout of a missing command \u2192 127; bad duration \u2192 125",
+    "hostname prints the same as uname -n; hostname NAME \u2192 Operation not permitted",
+    "cert/users.mjs (9.12.0-5, H1 homescoop#207, slicc-kernel >= 1.44.0): as root id = 'uid=0(root) gid=0(root) groups=0(root)', id -un/whoami/logname root, id -G 0, groups root, groups cone 'cone : cone users'; as kernel.users.add({name:'cone'}) id = 'uid=1000(cone) gid=1000(cone) groups=1000(cone),100(users)', id -G '1000 100', whoami/logname cone; a file cone creates in ~ shows 'cone cone' in ls -l and stat %U:%G. Needs shims/slicc (process credentials, setgrent/getgrent) and build-gnu-cli.sh linking slicc_pwd's --wrap and ac_cv_func_getgroups_works=yes. File owners are the kernel's (1.44.0: uid 1000 for every file), so root's files are not checked"
   ],
   "patches": {
     "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch",
     "timeout-slicc.patch": "timeout-hostname.mjs: every timeout case (without the patch timeout is not built: configure needs sigsuspend, and it forks)"
   },
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8"
+    "@ai-ecoverse/wasm-bash@5.3.0-12"
   ]
 }
