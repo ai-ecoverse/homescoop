@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.48.0",
   "slicc_fs": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -24,7 +24,6 @@
     "-21 (run-modes.mjs --probe r21, needs slicc-kernel with slicc_tty, slicc-kernel#289): in a 100x30 pty, isatty 1,1 and TIOCGWINSZ 100x30; cooked termios ICANON/ECHO/ISIG/OPOST on; cfmakeraw + tcsetattr reads back ICANON/ECHO/ISIG/IEXTEN/OPOST/ICRNL off, VMIN 1; ^C then 'q' read as bytes 3 and 113 with no SIGINT; TCSAFLUSH restore brings ICANON/ECHO/ISIG/OPOST back; tcflush(TCIFLUSH) and tcdrain 0. On pipes and a file: TIOCGWINSZ, tcgetattr and isatty ENOTTY; on a closed fd EBADF. On a kernel without slicc_tty (ENOSYS) the -20 behaviour stays"
   ],
   "extra_kernels": [
-    "@ai-ecoverse/slicc-kernel@1.44.0 (r20, r19, r18, tzname, modes)",
-    "@ai-ecoverse/slicc-kernel@1.41.3 (r18, r19, tzname, modes; r20 shows the no-fallback failure)"
+    "@ai-ecoverse/slicc-kernel@1.47.1 (no slicc_tty: r18, r19, r20, tzname, modes pass; r21 falls back to the -20 behaviour)"
   ]
 }
