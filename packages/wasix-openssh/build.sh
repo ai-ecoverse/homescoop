@@ -90,6 +90,28 @@ if [[ -d "$PKG/patches" ]]; then
   shopt -u nullglob
 fi
 
+# Stub headers for wasix-libc gaps. openbsd-compat/include is already on -I.
+# resolv.h: OpenSSH only wants b64_ntop/b64_pton (also in openbsd-compat/base64).
+# util.h: BSD libutil; OpenSSH has openbsd-compat replacements (bcrypt_pbkdf, …).
+STUB_INC="$BUILD/$GDIR/openbsd-compat/include"
+mkdir -p "$STUB_INC"
+cat >"$STUB_INC/resolv.h" <<'EOF'
+/* WASIX stub (homescoop wasix-openssh): no libresolv; use openbsd-compat base64. */
+#ifndef HOMESCOOP_WASIX_RESOLV_H
+#define HOMESCOOP_WASIX_RESOLV_H
+#include <sys/types.h>
+int b64_ntop(u_char const *src, size_t srclength, char *target, size_t targsize);
+int b64_pton(char const *src, u_char *target, size_t targsize);
+#endif
+EOF
+cat >"$STUB_INC/util.h" <<'EOF'
+/* WASIX stub (homescoop wasix-openssh): no BSD libutil. */
+#ifndef HOMESCOOP_WASIX_UTIL_H
+#define HOMESCOOP_WASIX_UTIL_H
+#endif
+EOF
+echo "== stub headers in openbsd-compat/include (resolv.h, util.h)"
+
 # Configure cache overrides for WASIX (no setuid, no utmp, cross).
 # Prefer poll/ppoll (OpenSSH 10.6 clientloop) over select.
 CONF_CACHE=(

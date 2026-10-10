@@ -7,6 +7,7 @@ Each patch must be named in `cert/meta.json` under `patches` with a cert case
 that exercises the changed path (see `docs/ci-cert.md`). Prefer configure
 cache overrides and documented limitations over patches when possible.
 
-| patch | why |
+| patch / stub | why |
 | --- | --- |
-| `0001-wasix-stub-getrrsetbyname.patch` | wasix-libc has no `resolv.h`; stub SSHFP `getrrsetbyname` |
+| `0001-wasix-stub-getrrsetbyname.patch` | stub SSHFP `getrrsetbyname` (no libresolv) |
+| `openbsd-compat/include/{resolv,util}.h` (written by `build.sh`) | `sshkey.c` etc. `#include <resolv.h>` / `<util.h>` for b64_* / libutil; wasix-libc has neither |
