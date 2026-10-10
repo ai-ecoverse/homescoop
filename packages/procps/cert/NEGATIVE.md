@@ -4,6 +4,13 @@
 CI-certified (thr_b83wwqmt4e): `@ai-ecoverse/wasm-procps@4.0.5-1` on slicc-kernel 1.9.0; listed in `scripts/ci-certified.json`.
 Browser-cert pin now `@ai-ecoverse/slicc-kernel@1.14.0` (pnpm global command roots). Real per-process VmSize/VmRSS + meminfo used since 1.12.0 (thr_ej75dimgf5 #77/#80); USER/whoami fixed in 1.11.0.
 
+
+## Users: 4.0.5-2 (H1, homescoop#207)
+
+`cert/users.mjs` on the published 4.0.5-2, slicc-kernel 1.44.0 Node entry. procps linked no `--wrap`, so `getpwuid` was Emscripten's stub, which never finds a name:
+- as root, `ps -o user=,comm=` exits 1 and prints nothing;
+- as `cone`, USER is `1000`.
+
 ## Stock kernel (no /proc) — recorded
 
 Against `@ai-ecoverse/slicc-kernel@^1.8.10` and a locally built

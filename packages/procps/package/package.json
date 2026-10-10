@@ -1,7 +1,10 @@
 {
   "name": "@ai-ecoverse/wasm-procps",
-  "version": "4.0.5-2",
-  "description": "procps-ng for slicc (WASM / emscripten, SLICC homescoop)",
+  "version": "4.0.5-3",
+  "description": "procps-ng for slicc (WASM / emscripten, SLICC homescoop); user names from slicc-kernel >= 1.44.0",
+  "engines": {
+    "slicc-kernel": ">=1.44.0"
+  },
   "license": "GPL-2.0-or-later",
   "repository": {
     "type": "git",

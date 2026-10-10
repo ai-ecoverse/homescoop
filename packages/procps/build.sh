@@ -18,7 +18,9 @@ SLICC_A="$WORK/libslicc-cli.a"
 homescoop_slicc_archive "$SLICC_A" cli
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags)"
+# slicc_pwd.c answers getpwuid/getpwnam only through --wrap: without it ps
+# shows USER as a number (homescoop#207).
+CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_slicc_wrap_pwd) $(homescoop_em_cli_ldflags)"
 CLI_LIBS="-Wl,--whole-archive ${SLICC_A} -Wl,--no-whole-archive"
 
 # Honest malloc/realloc probes — avoid rpl_malloc/rpl_realloc without gnulib objs.
