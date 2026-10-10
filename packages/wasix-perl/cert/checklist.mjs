@@ -35,6 +35,12 @@ export default async function (ctx) {
   assert.equal(await perl('print defined &DynaLoader::boot_DynaLoader ? "yes" : "no"'), 'yes');
   assert.equal(await perl('use Cwd; print defined &Cwd::getcwd && Cwd::getcwd() eq "${cwd}" ? "ok" : "no", "\\n"'.replace('${cwd}', cwd)), 'ok\n');
   assert.equal(await perl('use Config; print "$Config{installsitelib}\\n"'), '/usr/lib/perl5/site_perl/5.42.0\n');
+  // DynaLoader.pm is shipped: require works, and an old-style
+  // `@ISA = ('DynaLoader'); bootstrap` resolves to the static boot.
+  assert.equal(await perl('require DynaLoader; print "dl $DynaLoader::VERSION\\n"').then((o) => o.replace(/[\d.]+/, 'N')), 'dl N\n');
+  assert.equal(await perl('package Fcntl; require DynaLoader; our @ISA = ("DynaLoader"); Fcntl->bootstrap; print Fcntl::O_CREAT() > 0 ? "fcntl ok\\n" : "no\\n"'), 'fcntl ok\n');
+  assert.equal(await perl('use Digest::SHA qw(sha1_hex); print sha1_hex("abc"), "\\n"'), 'a9993e364706816aba3e25717850c26c9cd0d89d\n');
+
   // A pure-Perl module installed into the site dir loads from there.
   const site = await run(['bash', '-c', 'mkdir -p /usr/lib/perl5/site_perl/5.42.0/HSCert && printf "package HSCert::Site; sub hi { \\"site ok\\" } 1;\\n" > /usr/lib/perl5/site_perl/5.42.0/HSCert/Site.pm && perl -MHSCert::Site -e \'print HSCert::Site::hi(), " ", $INC{"HSCert/Site.pm"}, "\\n"\''], { cwd });
   assert.equal(site.stdout, 'site ok /usr/lib/perl5/site_perl/5.42.0/HSCert/Site.pm\n', `site install stderr=${site.stderr}`);

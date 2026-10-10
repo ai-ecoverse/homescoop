@@ -96,6 +96,10 @@ PY
   if ! grep -q my_reg_add_data "$SRC/ext/re/re_top.h"; then
     patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0003-re-top-static-split-helpers.patch"
   fi
+  # Static perl without DynaLoader: see the patch header.
+  if ! grep -q homescoop_boot_DynaLoader "$SRC/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0004-miniperl-dynaloader-marker.patch"
+  fi
 
   # Errno_pm.PL picks its errno.h by $^O, the build machine's OS: on a Linux
   # host it reads /usr/include/errno.h. Key it on the target's osname, so
@@ -231,29 +235,7 @@ PY
       -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -O2 $EMU_CFLAGS \
       -fno-strict-aliasing -c -o locale.o locale.c
     llvm-ar r libperl.a locale.o
-    # perl-cross builds no DynaLoader with usedl=undef (upstream Configure
-    # would, with dl_none.xs). Core modules take `defined
-    # &DynaLoader::boot_DynaLoader` to mean "not miniperl" before loading
-    # their XS (re.pm: re::install; Cwd.pm: XS getcwd; Unicode::UCD), so
-    # register a no-op boot_DynaLoader; XSLoader::load then finds each static
-    # module's <Module>::bootstrap as usual.
-    python3 - perlmain.c <<'PY'
-import re, sys
-from pathlib import Path
-p = Path(sys.argv[1])
-t = p.read_text()
-if "homescoop_boot_DynaLoader" not in t:
-    m = re.search(r"\nstatic void\nxs_init\(pTHX\)\n\{.*?\n\}\n", t, re.S)
-    if not m:
-        sys.exit("perlmain.c: xs_init not found")
-    body = m.group(0)
-    marker = ("\n/* homescoop wasix-perl: static perl without DynaLoader, see build.sh */\n"
-              "XS(homescoop_boot_DynaLoader);\nXS(homescoop_boot_DynaLoader)\n"
-              "{\n    dXSARGS;\n    PERL_UNUSED_VAR(items);\n    XSRETURN_YES;\n}\n")
-    new_body = body[:-3] + '\n    newXS("DynaLoader::boot_DynaLoader", homescoop_boot_DynaLoader, file);\n}\n'
-    t = t.replace(body, marker + new_body, 1)
-    p.write_text(t)
-PY
+    # patches/0004: perlmain.c registers a no-op DynaLoader::boot_DynaLoader.
     grep -q 'newXS("DynaLoader::boot_DynaLoader"' perlmain.c
     wasixcc -DPERL_CORE -Wno-incompatible-function-pointer-types -Wno-implicit-function-declaration \
       -include "$PKG_ROOT/wasix-posix-stubs.h" -DNO_LOCALE -DNO_ENV_ARRAY_IN_MAIN \
@@ -357,6 +339,16 @@ for f in sorted(src.rglob("*")):
     filled.append(str(rel))
 print(f"gap-filled {len(filled)} files from the build lib: {', '.join(filled[:12])}{' …' if len(filled) > 12 else ''}")
 PY
+
+# DynaLoader.pm (perl-cross builds no DynaLoader with usedl=undef): require
+# DynaLoader and `@ISA = ('DynaLoader'); Foo->bootstrap` keep working; for a
+# static module bootstrap finds Foo::bootstrap, and boot_DynaLoader is the
+# no-op from patches/0004.
+if [[ -x "$SRC/miniperl_top" ]]; then
+  (cd "$SRC/ext/DynaLoader" && ../../miniperl_top DynaLoader_pm.PL)
+  cp "$SRC/ext/DynaLoader/DynaLoader.pm" "$DEST/lib/perl5/DynaLoader.pm"
+fi
+test -f "$DEST/lib/perl5/DynaLoader.pm"
 
 # make and make install are best-effort (|| true): refuse a tree that lacks
 # modules from extensions built after the perl link.

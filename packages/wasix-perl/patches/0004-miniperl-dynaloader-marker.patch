@@ -1,0 +1,49 @@
+ExtUtils::Miniperl: no-op DynaLoader::boot_DynaLoader in a static perl without DynaLoader
+
+perl-cross builds no DynaLoader when usedl=undef; upstream Configure
+would, with ext/DynaLoader/dl_none.xs (DynaLoader present, every dynamic
+load croaks). Core modules test `defined &DynaLoader::boot_DynaLoader` to
+tell perl from miniperl before loading their XS: re.pm (install(), so
+`use re 'debug'`), Cwd.pm (XS getcwd), Unicode::UCD. Without it, -6 died
+with "Undefined subroutine &re::install" and ran pure-Perl Cwd.
+
+writemain() now emits a no-op boot_DynaLoader XSUB and registers it in
+perlmain.c's xs_init when it is given static extensions but no
+DynaLoader. miniperlmain.c (no extensions) stays without it, so miniperl
+is still recognised as miniperl. XSLoader::load / DynaLoader::bootstrap
+then find each static module's <Module>::bootstrap as usual.
+
+The upstream-shaped fix is the real DynaLoader with dl_none.xs (follow-up
+issue). Applied by build.sh (patch -p1 in the perl source). homescoop#182.
+
+--- a/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
++++ b/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
+@@ -179,7 +179,27 @@
+ 
+ EOF!HEAD
+ 
+-    print $fh xsi_protos(@exts), <<'EOT', xsi_body(@exts), "}\n";
++    # homescoop wasix-perl: a static perl built without DynaLoader (perl-cross,
++    # usedl=undef) still gets DynaLoader::boot_DynaLoader, as a no-op: core
++    # modules test it to tell perl from miniperl before loading their XS.
++    # miniperl (no extensions) keeps not having it.
++    my $no_dl = @exts && !grep { $_ eq 'DynaLoader' } @exts;
++    my $dl_xsub = $no_dl ? <<'EOD' : '';
++
++/* homescoop wasix-perl: static perl without DynaLoader (no-op marker) */
++XS(homescoop_boot_DynaLoader);
++XS(homescoop_boot_DynaLoader)
++{
++    dXSARGS;
++    PERL_UNUSED_VAR(items);
++    XSRETURN_YES;
++}
++EOD
++    my $dl_reg = $no_dl
++        ? qq{    newXS("DynaLoader::boot_DynaLoader", homescoop_boot_DynaLoader, file);\n}
++        : '';
++
++    print $fh xsi_protos(@exts), $dl_xsub, <<'EOT', xsi_body(@exts), $dl_reg, "}\n";
+ 
+ static void
+ xs_init(pTHX)
