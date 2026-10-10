@@ -3,6 +3,10 @@ builder: host
 version: "0.12.1"
 npm: "@ai-ecoverse/py-cycler"
 summary: "cycler for slicc WASIX CPython"
+# 0.12.1-2 is packaging-only: 0.12.1-1's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-11). Drop repack: when the next release rebuilds.
+repack:
+  from: "0.12.1-1"
 dependencies:
   build: []
   host: []
