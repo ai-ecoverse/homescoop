@@ -128,8 +128,12 @@ CONF_CACHE=(
   ac_cv_func_endutent=no
   ac_cv_func_getutent=no
   ac_cv_func_openpty=yes
-  ac_cv_func_ppoll=yes
+  # Headers may declare ppoll/getifaddrs/madvise; wasix-libc does not link them.
+  ac_cv_func_ppoll=no
   ac_cv_func_poll=yes
+  ac_cv_func_getifaddrs=no
+  ac_cv_func_madvise=no
+  ac_cv_header_ifaddrs_h=no
   ac_cv_have_decl_AI_NUMERICHOST=yes
   # WASIX msghdr may list msg_control but cmsghdr/SCM_RIGHTS are incomplete
   # (same as wasix-ruby). Client does not need fd passing.
@@ -201,12 +205,19 @@ CONF_CACHE=(
     fi
   done
   # Belt-and-braces: never compile SCM_RIGHTS paths on WASIX.
-  for def in HAVE_CONTROL_IN_MSGHDR HAVE_ACCRIGHTS_IN_MSGHDR; do
-    if grep -q "^#define ${def}" config.h 2>/dev/null; then
+  for def in HAVE_CONTROL_IN_MSGHDR HAVE_ACCRIGHTS_IN_MSGHDR HAVE_PPOLL HAVE_IFADDRS_H HAVE_GETIFADDRS MADV_DONTDUMP; do
+    if grep -qE "^#define ${def}(\s|\$)" config.h 2>/dev/null; then
       sed -i.bak "s|^#define ${def}.*$|/* #undef ${def} */|" config.h
-      echo "== config.h: undef ${def} (no ancillary fd passing)"
+      echo "== config.h: undef ${def}"
     fi
   done
+
+  # Link stubs for symbols configure still enables (mmap+MADV path, etc.).
+  wasixcc -O2 -c -o "$BUILD/wasix-stubs.o" "$PKG/wasix-stubs.c"
+  # Inject into LIBS so every client link picks them up.
+  if ! grep -q wasix-stubs.o Makefile; then
+    sed -i.bak "s|^LIBS=\\(.*\\)|LIBS= $BUILD/wasix-stubs.o \\1|" Makefile
+  fi
 
   make -j"$JOBS" "${TARGETS[@]}" >"$BUILD/$GDIR.make.log" 2>&1 || {
     echo "homescoop wasix-openssh: make failed; errors:" >&2
