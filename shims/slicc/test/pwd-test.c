@@ -49,6 +49,12 @@ int main(void) {
   setpwent();
   for (struct passwd *e; (e = getpwent());) printf("ent %d %s\n", n++, e->pw_name);
   endpwent();
+  n = 0;
+  setgrent();
+  errno = 0;
+  for (struct group *g; (g = getgrent());) printf("grent %d %s\n", n++, g->gr_name);
+  printf("grent end errno %d\n", errno);
+  endgrent();
 
   show_gr("gid", getgrgid(1000));
   show_gr("rootgr", getgrnam("root"));

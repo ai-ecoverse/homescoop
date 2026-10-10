@@ -1,5 +1,5 @@
 // getpwuid / getpwnam / getpwent / getgr* through slicc_pwd.c, reading the
-// kernel's synthesized /etc/passwd and /etc/group (screen needs it:
+// kernel's synthesized /etc/passwd and /etc/group, getgrent included (screen needs it:
 // "getpwuid() can't identify your account!").
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -42,6 +42,9 @@ for (const [label, create] of [['slicc-kernel 1.26.6', createOldKernel], ['slicc
       'r-missing 0 null',
       'ent 0 root',
       'ent 1 web_user',
+      'grent 0 root',
+      'grent 1 web_user',
+      'grent end errno 0',
       'gid web_user:1000:',
       'rootgr root:0:',
       'nogr none',

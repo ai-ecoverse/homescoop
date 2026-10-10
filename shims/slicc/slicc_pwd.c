@@ -205,3 +205,34 @@ struct group *getgrgid(gid_t gid) {
   if (rc) errno = rc;
   return res;
 }
+
+// The group database in order (weak stubs in Emscripten, which answer
+// "not found" with errno EIO: gnulib's getugroups, behind `id -G USER` and
+// `groups USER`, then fails with "I/O error"). The end of the file leaves
+// errno alone, as POSIX asks.
+static FILE *gr_ent;
+
+void setgrent(void) {
+  if (gr_ent) rewind(gr_ent);
+}
+
+void endgrent(void) {
+  if (gr_ent) fclose(gr_ent);
+  gr_ent = NULL;
+}
+
+struct group *getgrent(void) {
+  if (!gr_ent && !(gr_ent = fopen("/etc/group", "re"))) return NULL;
+  char line[LINE_MAX_SLICC];
+  while (fgets(line, sizeof line, gr_ent)) {
+    char *f[4];
+    if (!split(line, f, 4)) continue;
+    int rc = fill_gr(f, &gr_static, gr_buf, sizeof gr_buf);
+    if (rc) {
+      errno = rc;
+      return NULL;
+    }
+    return &gr_static;
+  }
+  return NULL;
+}
