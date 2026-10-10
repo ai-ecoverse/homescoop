@@ -325,6 +325,14 @@ fi
 for m in List/Util.pm File/Spec.pm Cwd.pm POSIX.pm Digest/SHA.pm Fcntl.pm Errno.pm; do
   if [[ -z "$(find "$DEST/lib/perl5" -path "*/$m" -print -quit)" ]]; then
     echo "homescoop wasix-perl: staged lib lacks $m (see $WORK/make-wasix.log)" >&2
+    # Where did it go? Build tree, ext dir, install tree.
+    (
+      cd "$SRC"
+      echo "-- build lib:"; find lib -path "*/$m" 2>/dev/null | head -3
+      echo "-- Scalar-List-Utils:"; ls -la cpan/Scalar-List-Utils | head -20
+      echo "-- its PM map:"; sed -n '/^PM_TO_BLIB/,/^$/p;/^TO_INST_PM/,/^$/p' cpan/Scalar-List-Utils/Makefile | head -20
+      echo "-- install tree:"; find "$STAGE" -path "*/$m" 2>/dev/null | head -3
+    ) >&2 || true
     exit 1
   fi
 done
