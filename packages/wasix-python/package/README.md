@@ -19,12 +19,12 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
 Since 3.14.2-15:
-- `ctypes` / `_ctypes` (wasix-org/libffi). Step 1 symbols need slicc-kernel ≥ 1.49.0
-  (`call_dynamic`, `closure_allocate`/`closure_free`). Usable `import ctypes` /
-  `CDLL(None)` / `CFUNCTYPE` need the first kernel with POSIX `dlopen(NULL)` =
-  loaded main **and** #306 step 2 — that release becomes `engines` /
-  `cert/meta.json` `kernel` when it ships. Until then, on 1.49.0 `import ctypes`
-  raises `OSError` (not `ImportError`), which breaks `except ImportError` guards.
+- `ctypes` / `_ctypes` (wasix-org/libffi). **Do not publish** until `engines` /
+  `cert/meta.json` `kernel` are the first slicc-kernel with POSIX `dlopen(NULL)` =
+  loaded main **and** #306 step 2. On 1.49.0 alone, `import ctypes` raises
+  `OSError` (not `ImportError`), so **numpy fails** (`except ImportError` misses
+  it) and with it every py-* that imports numpy — worse than the hf case. See
+  `cert/NEGATIVE.md`. `cert/sidemods.mjs` on that kernel is the py-* re-pin gate.
 
 Since 3.14.2-14 (wasix-sysroot -21):
 - `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,

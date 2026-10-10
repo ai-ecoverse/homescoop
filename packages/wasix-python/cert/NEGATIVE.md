@@ -1,24 +1,27 @@
 
-## 3.14.2-15 `_ctypes` / huggingface_hub (homescoop#110)
+## 3.14.2-15 `_ctypes` / ImportError→OSError (homescoop#110)
 
-**-15 on 1.49.0:** `import ctypes` raises `OSError` (`dlopen(NULL)`); hf fails.
-**-14:** hf fails with `ModuleNotFoundError` (no `_ctypes`; huggingface_hub
-2.2.0's `_terminal.py` does a bare top-level `import ctypes`).
+**-15 on a kernel without the dlopen(NULL)=main fix (e.g. 1.49.0):**
+`import ctypes` raises OSError at ctypes/__init__.py:565
+(`pythonapi = PyDLL(None)` → "dlopen() error"). numpy/_core/_internal.py
+imports ctypes under `except ImportError`, so `import numpy` fails, and with
+it every py-* package that imports numpy (pandas, scipy, matplotlib, …).
+Measured in cert/sidemods.mjs, run 38088989164. **-14 is unaffected**
+(ImportError, caught).
 
-On 1.49.0, `wasix_32v1.dlopen` with a NULL path returns handle **0** (main).
-POSIX treats that as failure, so `ctypes/__init__.py`'s `pythonapi = PyDLL(None)`
-turns what used to be `ImportError: No module named '_ctypes'` into
-**`OSError: dlopen() error`**. Libraries that guard with `except ImportError`
-(and huggingface_hub does not — it imports ctypes unconditionally) do not
-catch that. That hazard is why `engines["slicc-kernel"]` and `cert/meta.json`
-`kernel` must be the **first** slicc-kernel release with r99's POSIX
-`dlopen(NULL)` = loaded main (and main in `byPath`) **plus** #306 step 2
-(`closure_prepare` / CFUNCTYPE). Until then, pin/docs track 1.49.0 for
-step-1 symbols only; `import ctypes` / unpatched `hf` are not green.
+**Second example — huggingface_hub / `hf`:** **-15 on 1.49.0:** `import ctypes`
+raises OSError (`dlopen(NULL)`); hf fails. **-14:** hf fails with
+`ModuleNotFoundError` (no `_ctypes`; huggingface_hub 2.2.0's `_terminal.py`
+does a bare top-level `import ctypes`).
+
+**-15 is not published** before the kernel with r99's fix + #306 step 2;
+`engines` and `cert/meta.json` `kernel` name that release. npm/pnpm treat
+`engines` as advisory, so the coordinator will have seven move python to -15
+in the catalog only in the same PR as the kernel bump.
+`cert/sidemods.mjs` passing on the fixed kernel gates the py-* re-pin wave.
 
 A homescoop remap of `dlopen(None)` → `bin/python.wasm` was tried and
-**rejected**: `load()` does not put the main module in `byPath`, so that path
-loads a second PIE CPython (`Py_IsInitialized()` would be 0). Not `_slicc_site`.
+**rejected** (second PIE load; `Py_IsInitialized` would be 0). Not `_slicc_site`.
 
 # Negative proof (wasix-python 3.14.2-10 / -11 venvs)
 
