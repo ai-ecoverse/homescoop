@@ -61,7 +61,7 @@ On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) un
 python -m venv v && v/bin/pip install requests && v/bin/python -c "import requests"
 ```
 
-**Venvs need slicc-kernel ≥ 1.29.0** (`engines` says so). On older kernels a
+**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.44.0 anyway, for the user ids). On older kernels a
 venv's `bin/python` and `bin/pip` run as the base interpreter: `v/bin/pip
 install` then installs into the **base** package directory, not the venv.
 
