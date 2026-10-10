@@ -11,7 +11,10 @@ homescoop_load_recipe wasix-ruby
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-9"
+# The npm version (upstream-N) comes from the committed package.json, read
+# before staging rewrites it, and must start with the recipe's version.
+PKG_VER="$(node -p "require('$DEST/package.json').version")"
+[[ "$PKG_VER" == "$VER-"* ]] || { echo "homescoop: package.json version $PKG_VER does not start with $VER-" >&2; exit 1; }
 # Baked-in load paths must not match any real VFS path (ipk install, /ruby, /usr).
 # Manifest RUBYLIB is authoritative; see relocatable acceptance note in PRESTAGE.md.
 RUBY_PREFIX="${RUBY_PREFIX:-/nonexistent-ruby-prefix}"
