@@ -124,7 +124,7 @@ PY
       -Dusethreads=undef \
       -Duseithreads=undef \
       -Dusemymalloc=n \
-      -Accflags="-O2 -DNO_LOCALE -DHAS_DEFINITIVE_UTF8NESS_DETERMINATION $EMU_CFLAGS -fno-strict-aliasing -include $PKG/wasix-posix-stubs.h" \
+      -Accflags="-O2 -D_GNU_SOURCE -DNO_LOCALE -DHAS_DEFINITIVE_UTF8NESS_DETERMINATION $EMU_CFLAGS -fno-strict-aliasing -include $PKG/wasix-posix-stubs.h" \
       -Aldflags="$EMU_LIBS" \
       -Alibs="$EMU_LIBS" \
       -Dman1dir=none \
