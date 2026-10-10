@@ -274,22 +274,24 @@ if [[ "${HOMESCOOP_STOP_AFTER:-}" == deps ]]; then
   exit 0
 fi
 
-# --- stubs (as 3.14.2-6..-11) ------------------------------------------------
-# uid/gid 1000, a passwd-less pwd/grp, no-op advisory locks, C++ TLS symbols:
-# an archive, since configure lists LIBS twice.
+# --- stubs ---------------------------------------------------------------------
+# No-op advisory locks and C++ TLS symbols: an archive, since configure lists
+# LIBS twice. Since 3.14.2-13 user and group ids and pwd/grp come from
+# wasix-sysroot -20's libc (slicc-kernel process credentials, /etc/passwd;
+# homescoop#207), not uid/gid-1000 stubs.
 STUBS="$B/stubs"
 rm -rf "$STUBS" && mkdir -p "$STUBS"
 cp "$PKG/fcntl_wasix_extra.h" "$STUBS/"
-for s in uid_stubs pwd_grp_stubs lock_stubs cpp_tls_stubs; do
+for s in lock_stubs cpp_tls_stubs; do
   # shellcheck disable=SC2086
   wasixcc $DEP_CFLAGS -I"$STUBS" -include "$STUBS/fcntl_wasix_extra.h" -c "$PKG/$s.c" -o "$STUBS/$s.o"
 done
 wasixar rcs "$STUBS/libpython-wasix-stubs.a" "$STUBS"/*.o
 WRAP=""
-for f in getuid geteuid getgid getegid getpwuid getpwnam getpwuid_r getpwnam_r getgrgid getgrnam getgrgid_r getgrnam_r flock fcntl lockf; do
+for f in flock fcntl lockf; do
   WRAP+=" -Wl,--wrap=$f"
 done
-for f in getuid geteuid getgid getegid flock fcntl lockf; do
+for f in flock fcntl lockf; do
   WRAP+=" -Wl,--export=__wrap_$f"
 done
 # cpp_tls_stubs.c: nothing in CPython references these, so pull them in and

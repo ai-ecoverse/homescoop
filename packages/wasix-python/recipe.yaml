@@ -54,7 +54,8 @@ about:
     fork/posix_spawn, strip. No fork; subprocess via posix_spawn.
     The sysroot's libc has the setitimer (proc_raise_interval2) and
     clock_nanosleep EINTR patches (patches/wasix-libc-*.patch); advisory
-    locks, uid/gid 1000 and passwd-less pwd/grp are --wrap stubs. The C++
+    locks are --wrap stubs; user ids and pwd/grp come from the sysroot's libc
+    (slicc-kernel process credentials, -20). The C++
     runtime side modules import (libc++/libc++abi/libunwind) is upstream
     wasix-libc v2026-07-03.1 sysroot-ehpic, as in -11 (README "Side modules").
     stdlib/ adds sys.executable from PATH (_slicc_site.py, sitecustomize.py,
