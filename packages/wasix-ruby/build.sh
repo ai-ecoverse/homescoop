@@ -11,7 +11,7 @@ homescoop_load_recipe wasix-ruby
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-8"
+PKG_VER="${VER}-9"
 # Baked-in load paths must not match any real VFS path (ipk install, /ruby, /usr).
 # Manifest RUBYLIB is authoritative; see relocatable acceptance note in PRESTAGE.md.
 RUBY_PREFIX="${RUBY_PREFIX:-/nonexistent-ruby-prefix}"
@@ -222,6 +222,9 @@ apply_wasix_patch flock-wasi-noop.patch "$SRC/missing/flock.c" WASIX_FLOCK_NOOP
 apply_wasix_patch io-wait-poll-wasi.patch "$SRC/thread.c" WASIX_POLL_WAIT
 # io/console on WASIX (termios): reline/irb require it.
 apply_wasix_patch io-console-wasix.patch "$SRC/ext/io/console/extconf.rb" WASIX_IO_CONSOLE
+# Thread#kill/#raise/Timeout on a thread blocked in poll/select: a per-thread
+# wakeup pipe instead of pthread_kill(SIGVTALRM) (slicc-kernel#246).
+apply_wasix_patch thread-ubf-wake-pipe-wasi.patch "$SRC/thread_pthread.c" WASIX_UBF_PIPE
 
 # OpenSSL 3 opaque structs: never compile the 1.0-era field-access fallbacks.
 python3 - "$SRC/ext/openssl/openssl_missing.c" <<'PY'
@@ -688,7 +691,7 @@ fi
 homescoop_stage_license "$SRC/COPYING" "$SRC/BSDL" 2>/dev/null || \
   homescoop_stage_license "$SRC/COPYING" "$SRC/LEGAL"
 homescoop_notices_begin "ruby.wasm statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc)."
-homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-2), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
+homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1

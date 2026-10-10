@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-ruby",
-  "version": "3.4.11-8",
+  "version": "3.4.11-9",
   "description": "MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; sysroot 2025.9.30-14)",
   "license": "Ruby",
   "files": [
