@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -15,6 +15,8 @@
     "gem --version; an uncaught exception exits 1 with the message",
     "cert/net.mjs (-8): IO#wait_readable / IO#wait on a pipe (data, timeout, writer thread); TCPSocket.new and Net::HTTP GET to an in-process TCPServer on loopback; blocking TLS 1.3 SSLSocket connect/accept with a self-signed cert; irb -f --noprompt from stdin with io/console",
     "cert/modes.mjs (wasix-sysroot 2025.9.30-17 + slicc-kernel 1.35.1 slicc_fs): File.umask returns 022; umask 027 \u2192 File.write gives 640; Tempfile 600; Dir.mktmpdir 700; Dir.mkdir 0700; File.chmod 0755 and executable?; File.stat equals coreutils' stat",
-    "cert/threads.mjs (-9): Thread#kill on a thread blocked in pipe gets / IO.select / wait_readable / TCPServer#accept, Thread#raise into accept, Timeout around a pipe and a socket read, Thread.main.raise into a blocked main thread: all interrupt (no exit 155, no hang); a woken wait still gets late data; sleep/Queue kills unchanged; OpenSSL from 4 threads (SHA-256, HMAC, AES-GCM round trips x300 each, a TLS handshake per thread) with no bad result"
+    "cert/threads.mjs (-9): Thread#kill on a thread blocked in pipe gets / IO.select / wait_readable / TCPServer#accept, Thread#raise into accept, Timeout around a pipe and a socket read, Thread.main.raise into a blocked main thread: all interrupt (no exit 155, no hang); a woken wait still gets late data; sleep/Queue kills unchanged; OpenSSL from 4 threads (SHA-256, HMAC, AES-GCM round trips x300 each, a TLS handshake per thread) with no bad result",
+    "cert/signals.mjs (3.4.11-10, wasix-sysroot -20's slicc.sigaction_set hook, -19's alarm/raise): trap('CHLD') reaps 3 Process.spawn children with Process.wait(-1, WNOHANG), no zombie left; trap WINCH/USR1/ALRM each run once (kill self); trap('TERM','IGNORE') survives kill TERM; an uncaught Interrupt (kill INT self) ends ruby with 130; trap('INT') runs its block and exits 0. On 3.4.11-9 slicc-kernel 1.47.1 ran neither trap('CHLD') nor trap('WINCH') and the uncaught Interrupt exited 0",
+    "cert/users.mjs (H1 homescoop#207, slicc-kernel >= 1.44.0): Process.uid/euid/gid/groups, Etc.getpwuid, Etc.getgrgid, Dir.home and a written file's owner as root '0|0|0|0|root|/root|root|/root|true' and as kernel.users.add cone '1000|1000|1000|100,1000|cone|/home/cone|cone|/home/cone|true'"
   ]
 }
