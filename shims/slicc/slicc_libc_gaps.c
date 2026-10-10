@@ -65,87 +65,155 @@ EMSCRIPTEN_KEEPALIVE int slicc_sigpipe(void) {
   return 1;
 }
 
-// Who the program runs as: an ordinary user, never root. Emscripten answers 0
-// (real, effective and saved ids alike), so bash -- which reads them with
-// getresuid/getresgid -- showed a `#` prompt and programs took root-only paths.
+// Who the program runs as: the process credentials slicc-kernel keeps
+// (homescoop#207, slicc-kernel K1): Module.sliccKernel.cred() returns
+// { ruid, euid, suid, rgid, egid, sgid, groups } and setcred(change) applies
+// the POSIX rules (EPERM, EINVAL). There is no fallback: on a kernel without
+// them the getters return -1 and the setters fail with ENOSYS. Emscripten
+// answers 0 for every id and EPERM for every set*id on its own.
 #include <unistd.h>
 #include <grp.h>
-#define SLICC_UID 1000
-uid_t __syscall_getuid32(void) { return SLICC_UID; }
-uid_t __syscall_geteuid32(void) { return SLICC_UID; }
-gid_t __syscall_getgid32(void) { return SLICC_UID; }
-gid_t __syscall_getegid32(void) { return SLICC_UID; }
+
+// out: ruid, euid, suid, rgid, egid, sgid. 0, or a negative errno.
+EM_JS(int, slicc_cred_js, (unsigned *out), {
+  const k = Module.sliccKernel;
+  if (!k || !k.cred) return -52; // ENOSYS
+  const c = k.cred();
+  if (typeof c === 'number') return c;
+  ['ruid', 'euid', 'suid', 'rgid', 'egid', 'sgid'].forEach((key, i) => { HEAPU32[(out >> 2) + i] = c[key] >>> 0; });
+  return 0;
+});
+
+// The supplementary groups into list (cap entries; cap 0 counts them).
+EM_JS(int, slicc_groups_js, (unsigned *list, int cap), {
+  const k = Module.sliccKernel;
+  if (!k || !k.cred) return -52; // ENOSYS
+  const c = k.cred();
+  if (typeof c === 'number') return c;
+  if (cap === 0) return c.groups.length;
+  if (cap < c.groups.length) return -28; // EINVAL
+  c.groups.forEach((g, i) => { HEAPU32[(list >> 2) + i] = g >>> 0; });
+  return c.groups.length;
+});
+
+// -1 keeps an id. 0, or a negative errno.
+EM_JS(int, slicc_setcred_js, (int ruid, int euid, int suid, int rgid, int egid, int sgid), {
+  const k = Module.sliccKernel;
+  if (!k || !k.setcred) return -52; // ENOSYS
+  const change = {};
+  const ids = { ruid, euid, suid, rgid, egid, sgid };
+  for (const key in ids) if (ids[key] !== -1) change[key] = ids[key] >>> 0;
+  const r = k.setcred(change);
+  return typeof r === 'number' ? r : 0;
+});
+
+EM_JS(int, slicc_setgroups_js, (const unsigned *list, int n), {
+  const k = Module.sliccKernel;
+  if (!k || !k.setcred) return -52; // ENOSYS
+  const groups = [];
+  for (let i = 0; i < n; i++) groups.push(HEAPU32[(list >> 2) + i]);
+  const r = k.setcred({ groups });
+  return typeof r === 'number' ? r : 0;
+});
+
+enum { SLICC_RUID, SLICC_EUID, SLICC_SUID, SLICC_RGID, SLICC_EGID, SLICC_SGID };
+
+static unsigned slicc_cred_one(int which) {
+  unsigned c[6];
+  return slicc_cred_js(c) == 0 ? c[which] : (unsigned)-1;
+}
+
+static int slicc_status(int r) {
+  if (r < 0) {
+    errno = -r;
+    return -1;
+  }
+  return r;
+}
+
+static int slicc_setcred(int ruid, int euid, int suid, int rgid, int egid, int sgid) {
+  return slicc_status(slicc_setcred_js(ruid, euid, suid, rgid, egid, sgid));
+}
+
+uid_t __syscall_getuid32(void) { return slicc_cred_one(SLICC_RUID); }
+uid_t __syscall_geteuid32(void) { return slicc_cred_one(SLICC_EUID); }
+gid_t __syscall_getgid32(void) { return slicc_cred_one(SLICC_RGID); }
+gid_t __syscall_getegid32(void) { return slicc_cred_one(SLICC_EGID); }
+
 int __syscall_getresuid32(uid_t *ruid, uid_t *euid, uid_t *suid) {
-  *ruid = *euid = *suid = SLICC_UID;
+  unsigned c[6];
+  int r = slicc_cred_js(c);
+  if (r < 0) return r;
+  *ruid = c[SLICC_RUID]; *euid = c[SLICC_EUID]; *suid = c[SLICC_SUID];
   return 0;
 }
+
 int __syscall_getresgid32(gid_t *rgid, gid_t *egid, gid_t *sgid) {
-  *rgid = *egid = *sgid = SLICC_UID;
+  unsigned c[6];
+  int r = slicc_cred_js(c);
+  if (r < 0) return r;
+  *rgid = c[SLICC_RGID]; *egid = c[SLICC_EGID]; *sgid = c[SLICC_SGID];
   return 0;
 }
 
-// Emscripten musl routes every set*id through __setxid_emscripten() which
-// always returns EPERM (and drops the ids). Provide strong POSIX setters for
-// an unprivileged process whose real = effective = saved id is SLICC_UID so
-// screen/bash/su-like code can "drop privileges" to itself.
-static int slicc_id_ok(int id) {
-  return id == -1 || id == (int)SLICC_UID;
+// Raw syscall convention: the count, or a negative errno.
+int __syscall_getgroups32(int size, gid_t *list) {
+  if (size < 0) return -EINVAL;
+  return slicc_groups_js((unsigned *)list, size);
 }
 
-static int slicc_set_one(int id) {
-  if (id == (int)SLICC_UID) return 0;
-  errno = EPERM;
-  return -1;
+// Emscripten musl routes every set*id through __setxid_emscripten(), which
+// always fails with EPERM: these go to the kernel instead.
+int setresuid(uid_t r, uid_t e, uid_t s) { return slicc_setcred(r, e, s, -1, -1, -1); }
+int setresgid(gid_t r, gid_t e, gid_t s) { return slicc_setcred(-1, -1, -1, r, e, s); }
+int seteuid(uid_t e) { return slicc_setcred(-1, e, -1, -1, -1, -1); }
+int setegid(gid_t e) { return slicc_setcred(-1, -1, -1, -1, e, -1); }
+
+// Linux: a privileged process sets all three ids, anyone else the effective one.
+int setuid(uid_t u) {
+  return slicc_cred_one(SLICC_EUID) == 0 ? slicc_setcred(u, u, u, -1, -1, -1)
+                                         : slicc_setcred(-1, u, -1, -1, -1, -1);
 }
 
-int setuid(uid_t uid) { return slicc_set_one((int)uid); }
-int seteuid(uid_t euid) { return slicc_set_one((int)euid); }
-int setgid(gid_t gid) { return slicc_set_one((int)gid); }
-int setegid(gid_t egid) { return slicc_set_one((int)egid); }
-
-int setreuid(uid_t ruid, uid_t euid) {
-  if (slicc_id_ok((int)ruid) && slicc_id_ok((int)euid)) return 0;
-  errno = EPERM;
-  return -1;
+int setgid(gid_t g) {
+  return slicc_cred_one(SLICC_EUID) == 0 ? slicc_setcred(-1, -1, -1, g, g, g)
+                                         : slicc_setcred(-1, -1, -1, -1, g, -1);
 }
 
-int setregid(gid_t rgid, gid_t egid) {
-  if (slicc_id_ok((int)rgid) && slicc_id_ok((int)egid)) return 0;
-  errno = EPERM;
-  return -1;
+// Linux: the saved id becomes the new effective id when the real id is set,
+// or the effective id is set to something other than the old real id.
+int setreuid(uid_t r, uid_t e) {
+  unsigned c[6];
+  int err = slicc_cred_js(c);
+  if (err < 0) return slicc_status(err);
+  int s = -1;
+  if (r != (uid_t)-1 || (e != (uid_t)-1 && e != c[SLICC_RUID])) s = e != (uid_t)-1 ? (int)e : (int)c[SLICC_EUID];
+  return slicc_setcred(r, e, s, -1, -1, -1);
 }
 
-int setresuid(uid_t ruid, uid_t euid, uid_t suid) {
-  if (slicc_id_ok((int)ruid) && slicc_id_ok((int)euid) && slicc_id_ok((int)suid))
-    return 0;
-  errno = EPERM;
-  return -1;
-}
-
-int setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
-  if (slicc_id_ok((int)rgid) && slicc_id_ok((int)egid) && slicc_id_ok((int)sgid))
-    return 0;
-  errno = EPERM;
-  return -1;
+int setregid(gid_t r, gid_t e) {
+  unsigned c[6];
+  int err = slicc_cred_js(c);
+  if (err < 0) return slicc_status(err);
+  int s = -1;
+  if (r != (gid_t)-1 || (e != (gid_t)-1 && e != c[SLICC_RGID])) s = e != (gid_t)-1 ? (int)e : (int)c[SLICC_EGID];
+  return slicc_setcred(-1, -1, -1, r, e, s);
 }
 
 int setgroups(size_t size, const gid_t *list) {
-  if (size == 0) return 0;
-  if (!list) {
+  if (size > 65536) {
+    errno = EINVAL;
+    return -1;
+  }
+  if (size && !list) {
     errno = EFAULT;
     return -1;
   }
-  for (size_t i = 0; i < size; i++) {
-    if (list[i] != (gid_t)SLICC_UID) {
-      errno = EPERM;
-      return -1;
-    }
-  }
-  return 0;
+  return slicc_status(slicc_setgroups_js((const unsigned *)list, (int)size));
 }
 
-// Emscripten has no sethostname. The realm user is not root, so setting the
-// host name (coreutils `hostname NAME`) is refused, as on Linux.
+// Emscripten has no sethostname. Setting the host name (coreutils
+// `hostname NAME`) is refused, as for a user without CAP_SYS_ADMIN.
 int sethostname(const char *name, size_t len) {
   (void)name;
   (void)len;

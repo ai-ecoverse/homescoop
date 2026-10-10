@@ -2,6 +2,7 @@
 # Build the shim test programs (Emscripten) into test/out/:
 # - resolve-test against the `net` profile, the archive curl links;
 # - pwd-test against `cli` (slicc_pwd.c, linked with --wrap);
+# - cred-test against `cli` (process credentials, slicc-kernel K1);
 # - exec-test against `cli` (most packages) and exec-test-fork against
 #   `fork` (bash, tar, findutils: fork emulation + Asyncify).
 set -euo pipefail
@@ -36,6 +37,12 @@ emcc -O2 -Wall -Wextra -Werror "$HERE/pwd-test.c" \
   -o "$OUT/pwd-test.js"
 mv "$OUT/pwd-test.js" "$OUT/pwd-test"
 echo "== built $OUT/pwd-test"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/cred-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_em_cli_ldflags) \
+  -o "$OUT/cred-test.js"
+mv "$OUT/cred-test.js" "$OUT/cred-test"
+echo "== built $OUT/cred-test"
 
 SLICC_FORK="$WORK/libslicc-fork.a"
 homescoop_slicc_archive "$SLICC_FORK" fork

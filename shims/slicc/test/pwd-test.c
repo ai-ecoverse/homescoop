@@ -33,7 +33,8 @@ static void show_gr(const char *tag, struct group *gr) {
 
 int main(void) {
   printf("flock %d\n", flock(0, LOCK_SH));
-  show_pw("uid", getpwuid(getuid()));
+  // uid 1000 by number: getuid() is the kernel's (cred-test.c).
+  show_pw("uid", getpwuid(1000));
   show_pw("root", getpwnam("root"));
   show_pw("nobody", getpwnam("no-such-user"));
   show_pw("uid4242", getpwuid(4242));
@@ -48,8 +49,14 @@ int main(void) {
   setpwent();
   for (struct passwd *e; (e = getpwent());) printf("ent %d %s\n", n++, e->pw_name);
   endpwent();
+  n = 0;
+  setgrent();
+  errno = 0;
+  for (struct group *g; (g = getgrent());) printf("grent %d %s\n", n++, g->gr_name);
+  printf("grent end errno %d\n", errno);
+  endgrent();
 
-  show_gr("gid", getgrgid(getgid()));
+  show_gr("gid", getgrgid(1000));
   show_gr("rootgr", getgrnam("root"));
   show_gr("nogr", getgrnam("no-such-group"));
   return 0;
