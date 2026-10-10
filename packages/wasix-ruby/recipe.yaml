@@ -7,6 +7,18 @@ summary: "MRI Ruby 3.4 for slicc WASIX (command ruby)"
 source:
   url: "https://cache.ruby-lang.org/pub/ruby/3.4/ruby-{{version}}.tar.gz"
   sha256: "5c22be44524312b3d433d68739bcc530633b1da5ef8ba0afa0a37680da17d3de"
+sources:
+  # Build-time WASIX dev packages (static lib/ flavour), pinned by the
+  # certified tarball sha.
+  wasix_zlib:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-zlib/-/wasix-zlib-1.3.1-2.tgz"
+    sha256: "4d0602d7fa1456f09ae668dc90b08a862f2ffeda843556beffbed17614873422"
+  wasix_openssl:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openssl/-/wasix-openssl-3.5.9-2.tgz"
+    sha256: "889fe3f8a5b578cc223a6babf755719b2c31887146bc0a0a292bb74dfe5ac5f9"
+  libyaml:
+    url: "https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz"
+    sha256: "c642ae9b75fee120b2d96c712538bd2cf283228d2337df2cf2988e3c02678ef4"
 dependencies:
   build: []
   host: []

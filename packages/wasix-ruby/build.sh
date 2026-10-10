@@ -11,7 +11,7 @@ homescoop_load_recipe wasix-ruby
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-6"
+PKG_VER="${VER}-7"
 # Baked-in load paths must not match any real VFS path (ipk install, /ruby, /usr).
 # Manifest RUBYLIB is authoritative; see relocatable acceptance note in PRESTAGE.md.
 RUBY_PREFIX="${RUBY_PREFIX:-/nonexistent-ruby-prefix}"
@@ -26,24 +26,31 @@ ASYNCIFY_BUF="${RUBY_ASYNCIFY_BUF:-65536}"
 WORK="${WASIX_RUBY_WORK:-$PKG/work}"
 SRC="$WORK/ruby-$VER"
 STAGE="$WORK/stage"
-WASM_OPT="${WASM_OPT:-$HOME/.wasixcc/binaryen/bin/wasm-opt}"
-OPENSSL_PREFIX="${WASIX_OPENSSL_PREFIX:-/tmp/wasix-openssl-prefix}"
-ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-/tmp/wasix-zlib-prefix}"
+# OpenSSL and zlib: the published wasix-openssl / wasix-zlib dev packages
+# (static lib/ flavour), pinned by sha in recipe.yaml (sources). Override with
+# WASIX_OPENSSL_PREFIX / WASIX_ZLIB_PREFIX for a local prefix.
+DEPS="$WORK/deps"
+OPENSSL_PREFIX="${WASIX_OPENSSL_PREFIX:-$DEPS/wasix-openssl/package}"
+ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 YAML_VER="0.2.5"
 YAML_SRC="$WORK/yaml-$YAML_VER"
 
-export PATH="${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin:/opt/homebrew/bin:$HOME/.wasixcc/binaryen/bin:$HOME/.wasixcc/llvm/bin:$PATH"
+# No wasixcc on PATH (CI runners): install the pinned toolchain
+# (wasix-sysroot -17 since #180), as wasix-gnupg and wasix-perl do.
+if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
+  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
+fi
+WASM_OPT="${WASM_OPT:-${WASIXCC_BINARYEN_LOCATION:-$HOME/.wasixcc/binaryen}/bin/wasm-opt}"
+export PATH="${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin:${WASIXCC_LLVM_LOCATION:-$HOME/.wasixcc/llvm}/bin:/opt/homebrew/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS="${WASIXCC_WASM_EXCEPTIONS:-no}"
 export WASIXCC_PIC=no
 export WASIXCC_MODULE_KIND="${WASIXCC_MODULE_KIND:-static-main}"
 unset FREETYPE FREETYPE_ROOT JPEG JPEG_ROOT PNG_ROOT ZLIB_ROOT VIRTUAL_ENV
 unset PKG_CONFIG_LIBDIR ZLIB CFLAGS CPPFLAGS LDFLAGS CXX
-# Do not pick up Homebrew OpenSSL via pkg-config.
-export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-if [[ -d "${OPENSSL_PREFIX}/lib/pkgconfig" ]]; then
-  export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig"
-fi
+# Only the WASIX dev packages' pkg-config files, never the host's.
+export PKG_CONFIG_PATH="${OPENSSL_PREFIX}/lib/pkgconfig:${ZLIB_PREFIX}/lib/pkgconfig"
+export PKG_CONFIG_LIBDIR="$PKG_CONFIG_PATH"
 
 command -v wasixcc >/dev/null || {
   echo "homescoop wasix-ruby: wasixcc not on PATH" >&2
@@ -54,11 +61,22 @@ mkdir -p "$WORK" "$DEST/bin" "$DEST/lib"
 TARBALL="$WORK/ruby-${VER}.tar.gz"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 
+# Dev packages and libyaml, sha-pinned (recipe.yaml sources).
+for dep in wasix_zlib wasix_openssl; do
+  homescoop_load_recipe wasix-ruby --source "$dep"
+  url_var="${dep^^}_SRC_URL"; sha_var="${dep^^}_SRC_SHA"
+  name="${dep//_/-}"
+  if [[ ( "$name" == wasix-zlib && -z "${WASIX_ZLIB_PREFIX:-}" ) || ( "$name" == wasix-openssl && -z "${WASIX_OPENSSL_PREFIX:-}" ) ]]; then
+    homescoop_fetch "${!url_var}" "${!sha_var}" "$WORK/$name.tgz"
+    rm -rf "$DEPS/$name" && mkdir -p "$DEPS/$name"
+    tar xzf "$WORK/$name.tgz" -C "$DEPS/$name"
+  fi
+done
+test -f "$OPENSSL_PREFIX/lib/libssl.a" && test -f "$OPENSSL_PREFIX/include/openssl/ssl.h"
+test -f "$ZLIB_PREFIX/lib/libz.a" && test -f "$ZLIB_PREFIX/include/zlib.h"
+homescoop_load_recipe wasix-ruby --source libyaml
 YAML_TB="$WORK/yaml-${YAML_VER}.tar.gz"
-if [[ ! -f "$YAML_TB" ]]; then
-  curl -fsSL -o "$YAML_TB" \
-    "https://github.com/yaml/libyaml/releases/download/${YAML_VER}/yaml-${YAML_VER}.tar.gz"
-fi
+homescoop_fetch "$LIBYAML_SRC_URL" "$LIBYAML_SRC_SHA" "$YAML_TB"
 if [[ ! -d "$YAML_SRC" ]]; then
   tar xzf "$YAML_TB" -C "$WORK"
 fi
@@ -228,7 +246,7 @@ BUILD_CC="${BUILD_CC:-clang}"
 TARGET_CC="wasixcc"
 
 # Satisfy -lwasi-emulated-signal (asyncify sysroot ships getpid/mman/clocks only).
-SYS_LIB="$HOME/.wasixcc/sysroot/sysroot/lib/wasm32-wasi"
+SYS_LIB="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot/lib/wasm32-wasi"
 if [[ -d "$SYS_LIB" && ! -f "$SYS_LIB/libwasi-emulated-signal.a" ]]; then
   echo "void __wasix_emulated_signal_stub(void) {}" > "$WORK/signal_stub.c"
   WASIXCC_WASM_EXCEPTIONS=no WASIXCC_PIC=no wasixcc -c -O2 "$WORK/signal_stub.c" -o "$WORK/signal_stub.o"
@@ -238,6 +256,11 @@ fi
 
 WASIXCC_WASM_EXCEPTIONS=no WASIXCC_PIC=no \
   wasixcc -c -O2 "$PKG/stubs/posix.c" -o "$WORK/ruby-wasix-stubs.o"
+# An archive: ruby's link lists LIBS twice (configure's MAINLIBS and LIBS),
+# and a plain .o given twice is a duplicate definition; archive members are
+# pulled once. (madvise and dladdr: neither is in wasix-libc.)
+rm -f "$WORK/libruby-wasix-stubs.a"
+wasixar rcs "$WORK/libruby-wasix-stubs.a" "$WORK/ruby-wasix-stubs.o"
 
 OPENSSL_FLAGS=()
 OPENSSL_NOTE="skipped (no $OPENSSL_PREFIX/lib/libssl.a)"
@@ -322,8 +345,12 @@ ac_cv_func_timerfd_gettime=no
 ac_cv_func_timerfd_settime=no
 SITE
     export CONFIG_SITE="$WORK/wasix-config.site"
-    BUILD_TRIPLE="${RUBY_BUILD_TRIPLE:-$(/usr/bin/uname -m)-apple-darwin$(/usr/bin/uname -r | cut -d. -f1)}"
-    BUILD_TRIPLE="${BUILD_TRIPLE/arm64/aarch64}"
+    # ruby's wasm tool check (tool/m4/ruby_wasm_tools.m4) requires
+    # WASI_SDK_PATH and takes defaults from it; CC/LD/AR/RANLIB are given
+    # below, OBJCOPY is <it>/bin/llvm-objcopy: the pinned wasixcc LLVM.
+    export WASI_SDK_PATH="${WASI_SDK_PATH:-${WASIXCC_LLVM_LOCATION:-$HOME/.wasixcc/llvm}}"
+    # The build machine's triple (CI: x86_64-pc-linux-gnu; a Mac: aarch64-apple-darwin…).
+    BUILD_TRIPLE="${RUBY_BUILD_TRIPLE:-$("$SRC/tool/config.guess")}"
     "$SRC/configure" \
       --prefix="$RUBY_PREFIX" \
       --host=wasm32-wasi \
@@ -356,7 +383,7 @@ SITE
       CFLAGS="${RUBY_CFLAGS:--O2} -DUSE_MN_THREADS=0 -DWASM_SETJMP_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_FIBER_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_SCAN_STACK_BUFFER_SIZE=${ASYNCIFY_BUF}" \
       CPPFLAGS="$RUBY_CPPFLAGS -DWASM_SETJMP_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_FIBER_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_SCAN_STACK_BUFFER_SIZE=${ASYNCIFY_BUF}" \
       LDFLAGS="$RUBY_LDFLAGS" \
-      LIBS="$WORK/ruby-wasix-stubs.o" \
+      LIBS="$WORK/libruby-wasix-stubs.a" \
       2>&1 | tee "$WORK/configure.log"
     python3 - "$WORK/build" <<'PY'
 from pathlib import Path
@@ -459,7 +486,7 @@ PY
     fi
     echo "== wasix-ruby: ASYNCIFY spill buffers = ${ASYNCIFY_BUF}"
     make -j"${HOMESCOOP_JOBS:-4}" CCDLFLAGS= \
-      LIBS="$WORK/ruby-wasix-stubs.o" \
+      LIBS="$WORK/libruby-wasix-stubs.a" \
       WASMOPT="$WASM_OPT" \
       2>&1 | tee "$WORK/make.log"
     test -f ruby || test -f ruby.wasm
@@ -477,7 +504,7 @@ PY
     # Keep a copy — `make install` may relink without asyncify.
     cp "$RUBY_LINKED" "$WORK/ruby.asyncified.wasm"
     make DESTDIR="$STAGE" install CCDLFLAGS= \
-      LIBS="$WORK/ruby-wasix-stubs.o" \
+      LIBS="$WORK/libruby-wasix-stubs.a" \
       POSTLINK=: \
       2>&1 | tee "$WORK/install.log"
     # Restore asyncified binary into DESTDIR (install may have overwritten).
@@ -555,10 +582,11 @@ for d in "$DEST"/lib/ruby/[0-9]*; do
   echo "== wasix-ruby: remove non-API lib tree $(basename "$d") (keeping $(basename "$API_LIB"))"
   rm -rf "$d"
 done
-# Baseruby/Homebrew can leak default gems into DESTDIR/opt/homebrew/... —
-# merge them so bundler/rake gemspecs are under GEM_HOME.
+# The baseruby's rubygems defaults can send bundled gems into DESTDIR under
+# its own gem dir (Homebrew: opt/homebrew/…; Debian/Ubuntu CI: var/lib/gems)
+# — merge them so bundler/rake gemspecs are under the package's gems.
 GEMS_DEST="$DEST/lib/ruby/gems"
-for leak in "$STAGE"/opt/homebrew/lib/ruby/gems/* "$STAGE"/usr/local/lib/ruby/gems/*; do
+for leak in "$STAGE"/opt/homebrew/lib/ruby/gems/* "$STAGE"/usr/local/lib/ruby/gems/* "$STAGE"/var/lib/gems/*; do
   [[ -d "$leak" ]] || continue
   echo "== wasix-ruby: merge leaked gems from $leak"
   mkdir -p "$GEMS_DEST"
@@ -567,11 +595,11 @@ done
 # Ensure bundler + rake gemspecs exist (bin/bundle and bin/rake activate gems)
 ensure_gemspec() {
   local name="$1" src_glob="$2"
-  if find "$GEMS_DEST" -path "*/specifications/*${name}*.gemspec" 2>/dev/null | grep -q .; then
+  if [[ -n "$(find "$GEMS_DEST" -path "*/specifications/*${name}*.gemspec" -print -quit 2>/dev/null)" ]]; then
     return 0
   fi
   local ver_dir
-  ver_dir=$(find "$GEMS_DEST" -maxdepth 1 -type d -name '*.*' | head -1)
+  ver_dir=$(find "$GEMS_DEST" -maxdepth 1 -type d -name '*.*' -print -quit)
   [[ -n "$ver_dir" ]] || { mkdir -p "$GEMS_DEST/${VER%.*}.0"; ver_dir="$GEMS_DEST/${VER%.*}.0"; }
   mkdir -p "$ver_dir/specifications/default" "$ver_dir/gems"
   local src
@@ -593,10 +621,10 @@ ensure_gemspec() {
 }
 ensure_gemspec bundler "$SRC/lib/bundler/bundler.gemspec" || true
 # rake lives as a bundled gem under gems/; copy gemspec+gem tree from clean snapshot if missing
-if ! find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' 2>/dev/null | grep -q .; then
+if [[ -z "$(find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' -print -quit 2>/dev/null)" ]]; then
   CLEAN_GEMS=/tmp/slicc-ruby-repro/package-3-clean/lib/ruby/gems/3.4.0
   if [[ -d "$CLEAN_GEMS" ]]; then
-    ver_dir=$(find "$GEMS_DEST" -maxdepth 1 -type d -name '*.*' | head -1)
+    ver_dir=$(find "$GEMS_DEST" -maxdepth 1 -type d -name '*.*' -print -quit)
     ver_dir="${ver_dir:-$GEMS_DEST/3.4.0}"
     mkdir -p "$ver_dir"
     rsync -a "$CLEAN_GEMS/specifications/" "$ver_dir/specifications/"
@@ -606,11 +634,11 @@ if ! find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' 2>/dev/null | gre
   fi
 fi
 # Host gate: refuse to stage without rake+bundler specs (acceptance needs them).
-if ! find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' 2>/dev/null | grep -q .; then
+if [[ -z "$(find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' -print -quit 2>/dev/null)" ]]; then
   echo "PRESTAGE fail: missing rake gemspec under $GEMS_DEST" >&2
   exit 1
 fi
-if ! find "$GEMS_DEST" -path '*/specifications/*bundler*.gemspec' 2>/dev/null | grep -q .; then
+if [[ -z "$(find "$GEMS_DEST" -path '*/specifications/*bundler*.gemspec' -print -quit 2>/dev/null)" ]]; then
   echo "PRESTAGE fail: missing bundler gemspec under $GEMS_DEST" >&2
   exit 1
 fi
@@ -647,6 +675,57 @@ fi
 
 homescoop_stage_license "$SRC/COPYING" "$SRC/BSDL" 2>/dev/null || \
   homescoop_stage_license "$SRC/COPYING" "$SRC/LEGAL"
+homescoop_notices_begin "ruby.wasm statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc)."
+homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-2), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
+homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-17; files from tag v2025-09-02.1)" \
+  "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
+  "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
+  "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
+  "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
+  "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
+
+# The bundled gems were installed by the build machine's ruby: refuse
+# anything host-native in the package.
+python3 - "$DEST" <<'PY'
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+bad = []
+# 1. No ELF or Mach-O binaries (host .so/.bundle) anywhere.
+magics = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce", b"\xca\xfe\xba\xbe")
+for f in root.rglob("*"):
+    if f.is_file() and not f.is_symlink():
+        with f.open("rb") as h:
+            if h.read(4) in magics:
+                bad.append(f"host binary: {f.relative_to(root)}")
+gems = root / "lib/ruby/gems"
+# 2. No native-gem platform builds: gemspecs for a host platform, or
+#    extensions/<platform> other than the wasm one.
+for spec in gems.rglob("specifications/*.gemspec"):
+    t = spec.read_text(errors="replace")
+    m = re.search(r'\.platform = "([^"]+)"', t)
+    if m and m.group(1) not in ("ruby", "wasm32-wasi"):
+        bad.append(f"platform {m.group(1)}: {spec.relative_to(root)}")
+for ext in gems.glob("*/extensions/*"):
+    if ext.is_dir() and ext.name != "wasm32-wasi":
+        bad.append(f"native extension dir: {ext.relative_to(root)}")
+# 3. No host gem/ruby paths in shipped Ruby (rbconfig.rb records the build
+#    tree, like -6's /tmp prefixes, but never the host's gem or ruby dirs).
+for f in list(root.rglob("*.rb")) + list(root.rglob("*.gemspec")):
+    # Code only: upstream doc comments use /usr/lib/ruby as an example path.
+    t = "\n".join(l for l in f.read_text(errors="replace").splitlines() if not l.lstrip().startswith("#"))
+    pats = ("/var/lib/gems", "/usr/lib/ruby") if f.name == "rbconfig.rb" else ("/var/lib/gems", "/usr/lib/ruby", "/home/runner")
+    for pat in pats:
+        if pat in t:
+            bad.append(f"{pat} in {f.relative_to(root)}")
+if bad:
+    print("homescoop wasix-ruby: host artefacts in the package:", *bad[:40], sep="\n  ")
+    sys.exit(1)
+print("host-artefact check: no ELF/Mach-O, no native gem platform/extension dirs, no host gem/ruby paths")
+PY
 
 python3 - "$DEST" "$VER" "$PKG_VER" "$OPENSSL_NOTE" "$ASYNCIFY_BUF" <<'PY'
 import json, sys
@@ -708,7 +787,7 @@ pkg = {
     "version": pkg_ver,
     "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; sysroot 2025.9.30-14)",
     "license": "Ruby",
-    "files": ["README.md", "LICENSE", "bin", "lib", "PRESTAGE.md"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "PRESTAGE.md"],
     "publishConfig": {"access": "public"},
     "homescoop": {
         "recipe": "wasix-ruby",
