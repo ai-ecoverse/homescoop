@@ -45,7 +45,6 @@ export default async function (ctx) {
     'my ($x, $rest) = extract_bracketed("(a(b)c) tail", "()"); print "$x|$rest\\n"'])).stdout, '(a(b)c)| tail\n');
   const pod = await perl(['-MPod::Simple::Text', '-e',
     'my $o = ""; my $p = Pod::Simple::Text->new; $p->output_string(\\$o); $p->parse_string_document("=head1 NAME\\n\\nX<idx>B<bold> I<it> C<code> L<perlre/Modifiers>\\n\\n=cut\\n"); print $o'], {});
-  assert.match(pod.stdout, /NAME/);
-  assert.match(pod.stdout, /bold it "code"/);
-  assert.match(pod.stdout, /"Modifiers" in perlre/);
+  // Byte-for-byte what a native perl's Pod::Simple::Text prints.
+  assert.equal(pod.stdout, 'NAME\n\n    bold it code "Modifiers" in perlre\n\n');
 }
