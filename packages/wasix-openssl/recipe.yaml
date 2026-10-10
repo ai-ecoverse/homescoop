@@ -1,0 +1,29 @@
+# OpenSSL for slicc WASIX (homescoop#169 follow-up): a dev package (static
+# libcrypto/libssl, headers, pkg-config) that wasix-ruby and wasix-python
+# link against.
+name: wasix-openssl
+builder: host
+# renovate: datasource=github-releases depName=openssl/openssl extractVersion=^openssl-(?<version>3\.5\.\d+)$
+version: "3.5.9"
+npm: "@ai-ecoverse/wasix-openssl"
+summary: "OpenSSL 3.5 for slicc WASIX: static (lib/) and PIC (lib-pic/) libcrypto/libssl, headers, pkg-config"
+source:
+  url: "https://github.com/openssl/openssl/releases/download/openssl-{{version}}/openssl-{{version}}.tar.gz"
+  sha256: "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openssl
+  license: Apache-2.0
+  notes: |
+    Configure linux-generic32 with the pinned wasixcc (scripts/install-wasixcc.sh,
+    wasix-sysroot 2025.9.30-17), flags after wasix-org/openssl's wasix.sh:
+    no-asm no-shared no-dso no-tests no-apps no-afalgeng, OPENSSL_NO_SECURE_MEMORY,
+    OPENSSL_NO_DGRAM, OPENSSL_THREADS (WASIX has pthreads). Built twice: lib/
+    (no-pic, static-main on the asyncify sysroot: ruby) and lib-pic/ (-fPIC,
+    legacy EH: python's dynamic main). Each lib dir has libcrypto.pc, libssl.pc
+    and openssl.pc. Cert: scripts/wasix-lib-cert.mjs links test/sslprobe.c
+    against both flavours (AES-256-GCM KAT, ECDSA P-256 / RSA-2048 verify,
+    RAND_bytes, a memory-BIO TLS 1.3 handshake).
