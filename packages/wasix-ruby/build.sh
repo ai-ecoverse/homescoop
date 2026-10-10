@@ -621,7 +621,7 @@ ensure_gemspec() {
 }
 ensure_gemspec bundler "$SRC/lib/bundler/bundler.gemspec" || true
 # rake lives as a bundled gem under gems/; copy gemspec+gem tree from clean snapshot if missing
-if ! find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' 2>/dev/null | grep -q .; then
+if [[ -z "$(find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' -print -quit 2>/dev/null)" ]]; then
   CLEAN_GEMS=/tmp/slicc-ruby-repro/package-3-clean/lib/ruby/gems/3.4.0
   if [[ -d "$CLEAN_GEMS" ]]; then
     ver_dir=$(find "$GEMS_DEST" -maxdepth 1 -type d -name '*.*' -print -quit)
@@ -634,11 +634,11 @@ if ! find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' 2>/dev/null | gre
   fi
 fi
 # Host gate: refuse to stage without rake+bundler specs (acceptance needs them).
-if ! find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' 2>/dev/null | grep -q .; then
+if [[ -z "$(find "$GEMS_DEST" -path '*/specifications/rake-*.gemspec' -print -quit 2>/dev/null)" ]]; then
   echo "PRESTAGE fail: missing rake gemspec under $GEMS_DEST" >&2
   exit 1
 fi
-if ! find "$GEMS_DEST" -path '*/specifications/*bundler*.gemspec' 2>/dev/null | grep -q .; then
+if [[ -z "$(find "$GEMS_DEST" -path '*/specifications/*bundler*.gemspec' -print -quit 2>/dev/null)" ]]; then
   echo "PRESTAGE fail: missing bundler gemspec under $GEMS_DEST" >&2
   exit 1
 fi
