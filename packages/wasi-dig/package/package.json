@@ -1,0 +1,41 @@
+{
+  "name": "@ai-ecoverse/wasi-dig",
+  "version": "0.1.0-1",
+  "description": "dig for slicc WASI: DNS over HTTPS through the realm proxy and DNS over TCP, with dig-style output",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-dig/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-dig",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "dns",
+    "dig"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-dig",
+    "upstream": "0.1.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "dig": {
+        "wasm": "bin/dig.wasm"
+      }
+    }
+  }
+}

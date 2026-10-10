@@ -84,7 +84,10 @@ const certTransport = {
 // 1.28.0): the kernel boots with an uplink routing 100.64.0.0/10, the range
 // a tailnet uses, and ctx.uplink({ names, peers }) decides what it answers.
 // Names map to address lists; a peer "ip:port" is { http: { status, headers, body } }
-// (records the request head, answers once and closes) or { error: 'ECONNREFUSED' }.
+// (records the request head, answers once and closes), { tcp: '<function source>' }
+// (raw bytes: the function gets { tcp: <bytes so far>, peer } after every read and
+// returns null for "need more", or the reply bytes; the peer writes them and
+// closes) or { error: 'ECONNREFUSED' }.
 // Until then every name is unknown and every dial refused.
 window.certUplinkLog = { asked: [], dialled: [], requests: [] };
 async function certUplink() {
@@ -108,10 +111,32 @@ async function certUplink() {
       conn.end();
     })();
   };
+  const tcpPeer = (addr, src) => (conn) => {
+    const fn = new Function(`return (${src})`)();
+    void (async () => {
+      let got = new Uint8Array();
+      for (;;) {
+        const piece = await conn.read();
+        if (piece) {
+          const next = new Uint8Array(got.length + piece.length);
+          next.set(got);
+          next.set(piece, got.length);
+          got = next;
+        }
+        const reply = await fn({ tcp: got, peer: addr });
+        if (reply || !piece) {
+          window.certUplinkLog.requests.push({ peer: addr, bytes: got.length });
+          if (reply) conn.write(typeof reply === 'string' ? new TextEncoder().encode(reply) : reply);
+          conn.end();
+          return;
+        }
+      }
+    })();
+  };
   window.certSetUplink = (cfg) => {
     const peers = {};
     for (const [addr, peer] of Object.entries(cfg.peers ?? {})) {
-      peers[addr] = peer.http ? httpPeer(addr, peer.http) : peer;
+      peers[addr] = peer.http ? httpPeer(addr, peer.http) : peer.tcp ? tcpPeer(addr, peer.tcp) : peer;
     }
     fake = fakeUplink({ names: cfg.names ?? {}, peers });
   };
