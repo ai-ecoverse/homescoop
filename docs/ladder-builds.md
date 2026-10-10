@@ -134,8 +134,11 @@ repack:
 ```
 
 `host-run.sh` then skips deps, emsdk and `build.sh`, and runs
-`scripts/repack-published.mjs`: `npm pack <npm>@<from>`, lay the repo's
-`package/package.json` (plus `files`) over it, `npm pack`. The result is
+`scripts/repack-published.mjs`: `npm pack <npm>@<from>`, then copy its tar
+stream entry by entry (headers too), with the repo's `package/package.json`
+(plus `files`) as the only new data. No `npm pack` of an extracted tree:
+`files` globs are case-sensitive on Linux (wasm-emscripten's `"Media"` packed
+`media/` on macOS only), so a repack could drop files. The result is
 checked by `scripts/diff-published.mjs`: every other entry must be
 byte-identical (path, type, mode, content) to the base, and in
 `package.json` only `version` and `@ai-ecoverse/*` dependency versions may
