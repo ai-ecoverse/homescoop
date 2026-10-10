@@ -1,7 +1,7 @@
 /*
  * passwd and group lookups for Emscripten programs in slicc: read the
- * kernel's /etc/passwd and /etc/group (it synthesizes both; the realm user
- * is uid/gid 1000, see slicc_libc_gaps.c). Emscripten's libc answers every
+ * kernel's /etc/passwd and /etc/group (real files on slicc-kernel with
+ * users; ids come from slicc_libc_gaps.c). Emscripten's libc answers every
  * getpw* / getgr* with "not found", so screen ("getpwuid() can't identify
  * your account!"), ~user expansion and anything that names the user fail.
  *
