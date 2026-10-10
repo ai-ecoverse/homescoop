@@ -5,10 +5,10 @@
 #   socket: WASIX (real threads), not Emscripten.
 # - No Asyncify anywhere: every spawn is posix_spawn (proc_spawn3) and
 #   gpg-agent --daemon detaches by spawning itself (gnupg-*-wasi.patch).
-# - Needs wasix-sysroot >= 2025.9.30-16: its libc reports files as the realm
+# - Needs wasix-sysroot >= 2025.9.30-17: its libc reports files as the realm
 #   user's (st_uid/st_gid = getuid()), which GnuPG's homedir checks require
 #   (-15), and sets and reads file modes through slicc-kernel's slicc_fs
-#   imports, so keys are 600 and private-keys-v1.d 700 (-16, homescoop#169).
+#   imports, so keys are 600 and private-keys-v1.d 700 (-17, homescoop#169).
 set -euo pipefail
 
 HOMESCOOP_ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -36,7 +36,7 @@ LIBS=(
 )
 
 # No wasixcc on PATH (CI runners): install the pinned toolchain, which
-# brings wasix-sysroot 2025.9.30-16 (slicc_stat_owner, slicc_fs).
+# brings wasix-sysroot 2025.9.30-17 (slicc_stat_owner, slicc_fs).
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi
@@ -59,7 +59,7 @@ llvm-ar t "$SYSROOT_LIBC" | grep -qx slicc_stat_owner.o || {
 # List first: grep -q closing the pipe early would fail llvm-nm (pipefail).
 SYSROOT_UNDEF="$(llvm-nm -u "$SYSROOT_LIBC" 2>/dev/null)"
 grep -q __slicc_fs_fd_chmod <<<"$SYSROOT_UNDEF" || {
-  echo "homescoop wasix-gnupg: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-16 (no slicc_fs imports)" >&2
+  echo "homescoop wasix-gnupg: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-17 (no slicc_fs imports)" >&2
   exit 1
 }
 

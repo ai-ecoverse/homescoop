@@ -1,6 +1,6 @@
 /**
  * wasix-gnupg file modes (homescoop#169): built on wasix-sysroot
- * 2025.9.30-16, whose libc sets and reads modes through slicc-kernel's
+ * 2025.9.30-17, whose libc sets and reads modes through slicc-kernel's
  * slicc_fs imports (1.35.1). gpg creates its default homedir 700,
  * private-keys-v1.d 700 and every secret file 600, as on Linux, and its
  * "unsafe permissions" check sees a 755 homedir.

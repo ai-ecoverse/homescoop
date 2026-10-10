@@ -32,7 +32,7 @@ same sources behaves the same.
 
 ## File modes (2.4.9-4, homescoop#169)
 
-`cert/modes.mjs` against 2.4.9-4 (wasix-sysroot 2025.9.30-16) on
+`cert/modes.mjs` against 2.4.9-4 (wasix-sysroot 2025.9.30-17) on
 slicc-kernel 1.34.1, which has no slicc_fs imports: every file keeps the
 store's default, and the spec fails.
 
