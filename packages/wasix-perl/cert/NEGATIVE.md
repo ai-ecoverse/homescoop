@@ -1,4 +1,4 @@
-# Negative proof (wasix-perl 5.42.0-7)
+# Negative proof (wasix-perl 5.42.0-8)
 
 **Date:** 2026-10-10
 
@@ -24,3 +24,17 @@ cert):
 duplicate regcomp helpers (patches/0003). A make that stopped at the perl
 link left List::Util, File::Spec and others out of the package; the staging
 check now fails on that.
+
+## 5.42.0-7: integer printf formats from the build host
+
+-7 (CI run 38025797225, sha cd123d57…) was configured on the Linux CI host.
+perl-cross's configure_pfmt.sh picked `%Ld` for 64-bit IVs there (glibc;
+-6, configured on macOS, got `%lld`). musl/wasix-libc rejects `%Ld` for
+integers. checklist.mjs against that artifact:
+
+```text
+AssertionError [ERR_ASSERTION]: perl -e use Data::Dumper; $Data::Dumper::Useperl = 0; … Dumper([1, {a => 2}, -3, 2**40]): rc=28 stderr=panic: snprintf buffer overflow
+```
+
+-8 pins ivdformat, uv{u,o,x,XU}format and sPRI{d,i,u,o,x,XU}64 to `ll` in
+hints/wasix; the checklist also asserts the Config values.

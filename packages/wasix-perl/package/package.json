@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-perl",
-  "version": "5.42.0-7",
+  "version": "5.42.0-8",
   "description": "Perl 5.42 for slicc WASIX (file modes via wasix-sysroot -17 slicc_fs; fcntl CLOEXEC fix; exec/stdio)",
   "license": "Artistic-1.0-Perl OR GPL-1.0-or-later",
   "repository": {
@@ -66,6 +66,12 @@
       },
       "pod2text": {
         "script": "bin/pod2text",
+        "env": {
+          "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
+        }
+      },
+      "pod2html": {
+        "script": "bin/pod2html",
         "env": {
           "PERL5LIB": "${package}/lib/perl5:${package}/lib/perl5/wasm32-wasix:${package}/lib/perl5/site_perl:${package}/lib/perl5/site_perl/wasm32-wasix"
         }

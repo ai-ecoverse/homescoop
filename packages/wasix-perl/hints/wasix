@@ -131,8 +131,11 @@ d_newlocale='undef'
 d_freelocale='undef'
 d_duplocale='undef'
 d_querylocale='undef'
-i_langinfo='undef'
-d_nl_langinfo='undef'
+# langinfo.h and nl_langinfo are in the sysroot, and 5.42.0-6 shipped both
+# defined (its hints never loaded: the perl-cross --hints bug, patches/0002).
+# Keep -6's behaviour (I18N::Langinfo, nl_langinfo in the C locale).
+i_langinfo='define'
+d_nl_langinfo='define'
 d_msgctl='undef'
 d_msgget='undef'
 d_msgrcv='undef'
@@ -451,3 +454,19 @@ lseektype='off_t'
 
 useposix='true'
 useopcode='true'
+
+# homescoop wasix-perl 5.42.0-8: target values perl-cross would otherwise
+# take from the build host. configure_pfmt.sh picks "Ld" for 64-bit IVs on
+# a Linux (glibc) host and "lld" on macOS; musl/wasix-libc printf rejects
+# %Ld for integers ("panic: snprintf buffer overflow" in XS Data::Dumper).
+ivdformat='"lld"'
+uvuformat='"llu"'
+uvoformat='"llo"'
+uvxformat='"llx"'
+uvXUformat='"llX"'
+sPRId64='"lld"'
+sPRIi64='"lli"'
+sPRIu64='"llu"'
+sPRIo64='"llo"'
+sPRIx64='"llx"'
+sPRIXU64='"llX"'

@@ -35,6 +35,21 @@ export default async function (ctx) {
   assert.equal(await perl('print defined &DynaLoader::boot_DynaLoader ? "yes" : "no"'), 'yes');
   assert.equal(await perl('use Cwd; print defined &Cwd::getcwd && Cwd::getcwd() eq "${cwd}" ? "ok" : "no", "\\n"'.replace('${cwd}', cwd)), 'ok\n');
   assert.equal(await perl('use Config; print "$Config{installsitelib}\\n"'), '/usr/lib/perl5/site_perl/5.42.0\n');
+  // Integer printf formats (IVs are 64-bit): XS Data::Dumper and every
+  // my_snprintf path. 5.42.0-7 (formats probed on a glibc host: %Ld)
+  // panicked with "snprintf buffer overflow" on Dumper(1).
+  assert.equal(await perl('use Data::Dumper; $Data::Dumper::Useperl = 0; $Data::Dumper::Indent = 0; print Dumper([1, {a => 2}, -3, 2**40]), "\\n"'),
+    "$VAR1 = [1,{'a' => 2},-3,'1099511627776'];\n");
+  assert.equal(await perl('use Data::Dumper; $Data::Dumper::Useperl = 0; $Data::Dumper::Indent = 0; print Dumper(1), " ", Dumper(-9223372036854775807), "\\n"'),
+    "$VAR1 = 1; $VAR1 = '-9223372036854775807';\n");
+  assert.equal(await perl('printf("%d|%s|%5.2f|%-4d|%04x|%vd|%u|%o\\n", 2**62, 2**62, 3.14159, 42, 255, v1.22.333, 18446744073709551615, 8)'),
+    '4611686018427387904|4.61168601842739e+18| 3.14|42  |00ff|1.22.333|18446744073709551615|10\n');
+  assert.equal(await perl('print sprintf("%d", 2**62), " ", sprintf("%x", 2**40), " ", 9223372036854775807, "\\n"'), '4611686018427387904 10000000000 9223372036854775807\n');
+  // Core messages built with my_snprintf.
+  const range = await run(['perl', '-we', 'my @a = (1..3); my $x = $a[2**33]; print defined $x ? "def" : "undef", "\n"'], { cwd });
+  assert.equal(range.stdout, 'undef\n', `stderr=${range.stderr}`);
+  assert.equal(await perl('use Config; print "$Config{ivdformat} $Config{uvuformat} $Config{sPRId64}\\n"'), '"lld" "llu" "lld"\n');
+
   // DynaLoader.pm is shipped: require works, and an old-style
   // `@ISA = ('DynaLoader'); bootstrap` resolves to the static boot.
   assert.equal(await perl('require DynaLoader; print "dl $DynaLoader::VERSION\\n"').then((o) => o.replace(/[\d.]+/, 'N')), 'dl N\n');
