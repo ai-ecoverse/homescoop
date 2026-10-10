@@ -5,6 +5,7 @@
   "host": "node scripts/wasix-lib-cert.mjs wasix-openssl --tarball <package.tgz>: links test/sslprobe.c against lib/ (static-main) and lib-pic/ (dynamic-main) with the pinned wasixcc and runs cert/*.mjs on the kernel's Node entry. A dev package has no commands of its own.",
   "probes": [{ "name": "sslprobe", "src": "test/sslprobe.c", "pkg": ["openssl"] }],
   "checklist": [
+    "reproducible: OpenSSL_version(OPENSSL_BUILT_ON) is the pinned SOURCE_DATE_EPOCH (the 3.5.9 release, Tue Sep 29 14:10:08 2026 UTC); build.sh also refuses a libcrypto.a without it",
     "both flavours compile with only pkg-config openssl (that flavour's .pc, the shipped opensslconf.h/configuration.h) and link with -Wl,--fatal-warnings, then run; OpenSSL_version is 3.5.9",
     "long/size_t/off_t-sensitive calls: BIO_seek/BIO_tell on a file BIO, BIO_get_mem_data (long), BIO_ctrl_pending (size_t), BIO_ctrl with a long argument",
     "sha256('abc')",

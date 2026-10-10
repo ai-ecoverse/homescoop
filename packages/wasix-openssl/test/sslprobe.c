@@ -158,6 +158,7 @@ static void bio(void) {
 
 int main(void) {
   printf("%s\n", OpenSSL_version(OPENSSL_VERSION));
+  printf("%s\n", OpenSSL_version(OPENSSL_BUILT_ON));
   unsigned char md[32], want[32];
   unsigned int mdlen = 0;
   unhex("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", want);

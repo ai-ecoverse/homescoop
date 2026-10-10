@@ -1,6 +1,6 @@
 # Negative proof (wasix-openssl)
 
-**Date:** 2026-10-10 (3.5.9-1)
+**Date:** 2026-10-10 (3.5.9-1; 3.5.9-2 pins the build date)
 New package, so it needs human cert first.
 
 `node scripts/wasix-lib-cert.mjs wasix-openssl --tarball <tgz>` on slicc-kernel
@@ -34,3 +34,13 @@ functions whose signatures carry `long`, `size_t` and file offsets
 `BIO_ctrl`), against the shipped `opensslconf.h`/`configuration.h` (one
 `include/` for both flavours; build.sh fails if the two builds generate
 different headers).
+
+## Reproducibility (3.5.9-2)
+
+Two CI builds of 3.5.9-1 from the same source (runs 38021434702 and
+38022316254) differed in one archive member out of 1009 per libcrypto.a,
+`libcrypto-lib-cversion.o`: OpenSSL's build date (`built on: Sat Oct 10
+03:42:45 2026 UTC` vs `03:58:09`). 3.5.9-2 sets `SOURCE_DATE_EPOCH` to the
+3.5.9 release (Tue Sep 29 14:10:08 2026 UTC); build.sh refuses a
+libcrypto.a without that string, and the probe asserts
+`OpenSSL_version(OPENSSL_BUILT_ON)` equals it.
