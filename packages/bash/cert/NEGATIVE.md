@@ -4,6 +4,18 @@
 Patches: see `cert/meta.json`. Not in `scripts/ci-certified.json`.
 
 
+
+## ^C while readline echoes the accepted line: 5.3.0-13
+
+`cert/sigint-line.mjs` on 5.3.0-13, slicc-kernel 1.44.0 Node entry. 2 of 3 runs failed within the first rounds:
+
+```text
+AssertionError [ERR_ASSERTION]: round 3: a partial line ran:
+bash: leep: command not found
+```
+
+`shell_getc` had taken `s` from readline's line when `QUIT` threw to the top level. readline's line and index survived, so the next parse ran the rest. On a longer line it can merge with the next one (`lecho: command not found`).
+
 ## Process credentials: 5.3.0-12 (H1, homescoop#207)
 
 `cert/users.mjs` on the published 5.3.0-12, slicc-kernel 1.44.0 Node entry. Its shims answer uid 1000 for everyone, so root is uid 1000 and its prompt names whoever `/etc/passwd` lists as 1000:

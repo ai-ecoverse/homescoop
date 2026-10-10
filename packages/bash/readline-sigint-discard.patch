@@ -1,0 +1,44 @@
+--- a/parse.y
++++ b/parse.y
+@@ -2550,6 +2550,19 @@
+ 	{
+ 	  c = yy_getc ();
+ 
++#if defined (READLINE) && defined (__EMSCRIPTEN__)
++	  /* slicc: a SIGINT that arrives after readline accepted the line
++	     (while it echoes it, one write per character) throws to the top
++	     level below with the line's first characters consumed; the next
++	     parse would run the rest ("leep 30" for "sleep 30"). Drop the
++	     whole pending line, as if ^C had come before Enter. */
++	  if (interrupt_state && bash_input.getter == yy_readline_get && current_readline_line)
++	    {
++	      free (current_readline_line);
++	      current_readline_line = (char *)NULL;
++	      current_readline_line_index = 0;
++	    }
++#endif
+ 	  /* Allow immediate exit if interrupted during input. */
+ 	  QUIT;
+ 
+--- a/y.tab.c
++++ b/y.tab.c
+@@ -4909,6 +4909,19 @@
+ 	{
+ 	  c = yy_getc ();
+ 
++#if defined (READLINE) && defined (__EMSCRIPTEN__)
++	  /* slicc: a SIGINT that arrives after readline accepted the line
++	     (while it echoes it, one write per character) throws to the top
++	     level below with the line's first characters consumed; the next
++	     parse would run the rest ("leep 30" for "sleep 30"). Drop the
++	     whole pending line, as if ^C had come before Enter. */
++	  if (interrupt_state && bash_input.getter == yy_readline_get && current_readline_line)
++	    {
++	      free (current_readline_line);
++	      current_readline_line = (char *)NULL;
++	      current_readline_line_index = 0;
++	    }
++#endif
+ 	  /* Allow immediate exit if interrupted during input. */
+ 	  QUIT;
+ 
