@@ -340,6 +340,10 @@ ac_cv_func_timerfd_gettime=no
 ac_cv_func_timerfd_settime=no
 SITE
     export CONFIG_SITE="$WORK/wasix-config.site"
+    # ruby's wasm tool check (tool/m4/ruby_wasm_tools.m4) requires
+    # WASI_SDK_PATH and takes defaults from it; CC/LD/AR/RANLIB are given
+    # below, OBJCOPY is <it>/bin/llvm-objcopy: the pinned wasixcc LLVM.
+    export WASI_SDK_PATH="${WASI_SDK_PATH:-${WASIXCC_LLVM_LOCATION:-$HOME/.wasixcc/llvm}}"
     # The build machine's triple (CI: x86_64-pc-linux-gnu; a Mac: aarch64-apple-darwin…).
     BUILD_TRIPLE="${RUBY_BUILD_TRIPLE:-$("$SRC/tool/config.guess")}"
     "$SRC/configure" \
