@@ -101,6 +101,16 @@ static inline char *homescoop_getlogin(void) {
 }
 #define getlogin() homescoop_getlogin()
 
+/* ctermid: declared in <stdio.h>, missing from libc.a (POSIX::ctermid). */
+#include <stdio.h>
+#include <string.h>
+#undef ctermid
+static inline char *homescoop_ctermid(char *s) {
+  static char tty[] = "/dev/tty";
+  return s ? strcpy(s, tty) : tty;
+}
+#define ctermid(s) homescoop_ctermid(s)
+
 #undef getpriority
 static inline int homescoop_getpriority(int which, int who) {
   (void)which; (void)who; HOMESCOOP_STUB_ERR;
