@@ -11,7 +11,7 @@ homescoop_load_recipe wasix-ruby
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-7"
+PKG_VER="${VER}-8"
 # Baked-in load paths must not match any real VFS path (ipk install, /ruby, /usr).
 # Manifest RUBYLIB is authoritative; see relocatable acceptance note in PRESTAGE.md.
 RUBY_PREFIX="${RUBY_PREFIX:-/nonexistent-ruby-prefix}"
@@ -110,7 +110,7 @@ EOF
   cp "$YAML_PREFIX/include/config.h" "$YAML_SRC/include/config.h"
   for s in api reader scanner parser loader writer emitter dumper; do
     WASIXCC_WASM_EXCEPTIONS=no WASIXCC_PIC=no \
-      wasixcc -c -O2 -DHAVE_CONFIG_H -DYAML_DECLARE_STATIC \
+      wasixcc -c -O2 -ffile-prefix-map="$WORK=." -DHAVE_CONFIG_H -DYAML_DECLARE_STATIC \
         -I"$YAML_PREFIX/include" -I"$YAML_SRC/include" \
         -o "$WORK/yaml-objs/${s}.o" "$YAML_SRC/src/${s}.c"
   done
@@ -217,6 +217,11 @@ apply_wasix_patch internal-process-posix-spawn-wasi.patch "$SRC/internal/process
 apply_wasix_patch wasm-thread-asyncify-tls.patch "$SRC/thread_pthread.c" WASIX_WASM_THREAD_RT
 # Advisory flock is ENOTSUP on WASIX; return success so File#flock / bundler.lock work.
 apply_wasix_patch flock-wasi-noop.patch "$SRC/missing/flock.c" WASIX_FLOCK_NOOP
+# Single-fd waits (IO#wait_readable, blocking connect) via poll(): WASIX's
+# select() rejects exceptfds and POLLPRI == POLLIN puts readable waits there.
+apply_wasix_patch io-wait-poll-wasi.patch "$SRC/thread.c" WASIX_POLL_WAIT
+# io/console on WASIX (termios): reline/irb require it.
+apply_wasix_patch io-console-wasix.patch "$SRC/ext/io/console/extconf.rb" WASIX_IO_CONSOLE
 
 # OpenSSL 3 opaque structs: never compile the 1.0-era field-access fallbacks.
 python3 - "$SRC/ext/openssl/openssl_missing.c" <<'PY'
@@ -329,6 +334,8 @@ ac_cv_func_getgroups=no
 ac_cv_func_setgroups=no
 ac_cv_func_initgroups=no
 ac_cv_func_poll=yes
+# ruby_ppoll() over poll(), not the libc ppoll().
+ac_cv_func_ppoll=no
 ac_cv_header_poll_h=yes
 # SLICC WASIX host: epoll_create → ENOSYS (52). Force poll()/timer-thread.
 ac_cv_header_sys_epoll_h=no
@@ -380,7 +387,7 @@ SITE
       LD="$TARGET_CC" \
       AR="${AR:-llvm-ar}" \
       RANLIB="${RANLIB:-llvm-ranlib}" \
-      CFLAGS="${RUBY_CFLAGS:--O2} -DUSE_MN_THREADS=0 -DWASM_SETJMP_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_FIBER_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_SCAN_STACK_BUFFER_SIZE=${ASYNCIFY_BUF}" \
+      CFLAGS="${RUBY_CFLAGS:--O2} -ffile-prefix-map=$WORK=. -DUSE_MN_THREADS=0 -DWASM_SETJMP_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_FIBER_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_SCAN_STACK_BUFFER_SIZE=${ASYNCIFY_BUF}" \
       CPPFLAGS="$RUBY_CPPFLAGS -DWASM_SETJMP_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_FIBER_STACK_BUFFER_SIZE=${ASYNCIFY_BUF} -DWASM_SCAN_STACK_BUFFER_SIZE=${ASYNCIFY_BUF}" \
       LDFLAGS="$RUBY_LDFLAGS" \
       LIBS="$WORK/libruby-wasix-stubs.a" \
@@ -485,8 +492,10 @@ PY
       echo 'wasmoptflags =' >> Makefile
     fi
     echo "== wasix-ruby: ASYNCIFY spill buffers = ${ASYNCIFY_BUF}"
+    # The ruby link (EXE_LDFLAGS) fails on any linker warning.
     make -j"${HOMESCOOP_JOBS:-4}" CCDLFLAGS= \
       LIBS="$WORK/libruby-wasix-stubs.a" \
+      EXE_LDFLAGS='$(LDFLAGS) -Wl,--fatal-warnings' \
       WASMOPT="$WASM_OPT" \
       2>&1 | tee "$WORK/make.log"
     test -f ruby || test -f ruby.wasm
@@ -495,7 +504,9 @@ PY
     echo "== wasix-ruby: wasm-opt --asyncify (full base, -O1)"
     test -x "$WASM_OPT" || { echo "wasm-opt required at $WASM_OPT" >&2; exit 1; }
     PRE=$(wc -c < "$RUBY_LINKED")
-    "$WASM_OPT" --asyncify -O1 \
+    # --strip-debug: -ggdb3's DWARF is 12 MB of ruby.wasm, with the
+    # toolchain's include paths; slicc has no use for it.
+    "$WASM_OPT" --asyncify -O1 --strip-debug \
       "$RUBY_LINKED" -o "$RUBY_LINKED.async" \
       2>&1 | tee "$WORK/asyncify.log" | tail -40
     mv "$RUBY_LINKED.async" "$RUBY_LINKED"
@@ -505,6 +516,7 @@ PY
     cp "$RUBY_LINKED" "$WORK/ruby.asyncified.wasm"
     make DESTDIR="$STAGE" install CCDLFLAGS= \
       LIBS="$WORK/libruby-wasix-stubs.a" \
+      EXE_LDFLAGS='$(LDFLAGS) -Wl,--fatal-warnings' \
       POSTLINK=: \
       2>&1 | tee "$WORK/install.log"
     # Restore asyncified binary into DESTDIR (install may have overwritten).
@@ -785,7 +797,7 @@ base_env = {
 pkg = {
     "name": "@ai-ecoverse/wasix-ruby",
     "version": pkg_ver,
-    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; sysroot 2025.9.30-14)",
+    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; sysroot 2025.9.30-17)",
     "license": "Ruby",
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "PRESTAGE.md"],
     "publishConfig": {"access": "public"},
@@ -834,7 +846,7 @@ print("RUBYLIB=", env["RUBYLIB"])
 print("GEM_HOME=", env.get("GEM_HOME"))
 print("GEM_PATH=", env.get("GEM_PATH"))
 # Absolute script args — needs SLICC PR #3735 for ${package} expansion in args.
-for cmd in ("gem", "bundle", "rake"):
+for cmd in ("gem", "bundle", "rake", "irb", "erb"):
     script = dest / "bin" / cmd
     if script.is_file():
         pkg["slicc"]["commands"][cmd] = {
@@ -846,6 +858,11 @@ for cmd in ("gem", "bundle", "rake"):
 (dest / "README.md").write_text(
     "# `@ai-ecoverse/wasix-ruby`\n\n"
     "MRI Ruby for slicc WASIX. No epoll (poll fallback). See PRESTAGE.md.\n\n"
+    "Since 3.4.11-8, single-fd waits (`IO#wait_readable`, blocking `TCPSocket.new`, "
+    "`Net::HTTP`, blocking `SSLSocket#connect`/`#accept`) use poll(): WASIX's select() "
+    "rejects an exception set with ENOSYS, so `IO.select` with a third array still "
+    "fails. `io/console` is built, so `irb` and reline work.\n\n"
+    "`TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).\n\n"
     "## Gem executables on PATH\n\n"
     "Command env puts user gem bins ahead of the package:\n\n"
     "```text\n"
@@ -864,7 +881,7 @@ PY
 cat > "$DEST/PRESTAGE.md" <<EOF
 # wasix-ruby ${PKG_VER}
 
-Built against wasix-sysroot **2025.9.30-14**. **No epoll**: SLICC returns ENOSYS (52)
+Built against wasix-sysroot **2025.9.30-17**. **No epoll**: SLICC returns ENOSYS (52)
 for \`epoll_create\`; MRI is compiled with \`USE_MN_THREADS=0\` and
 \`HAVE_SYS_EPOLL_H=0\` (also kqueue/eventfd/timerfd off) so it uses poll()/timer-thread.
 
