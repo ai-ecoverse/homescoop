@@ -21,6 +21,17 @@ The next-line phase alone, 40 rounds per build and kernel (fresh pty each; `true
 
 On 1.47.1 (before slicc-kernel#303) 5.3.0-15 can still lose a line: a stray character is read before readline notices the late ^C. Measured: 2 of 120 next lines (0/40 in the table above; 1/60 over three local runs of the cert's 20-line phase; 1/20 in CI run 38085440941), and in the runs where it happens, 1 of 20. 5.3.0-13 lost 7/40 on the same kernel. The cert therefore runs on 1.48.3.
 
+### Why `engines` asks for slicc-kernel ≥ 1.48.3
+
+bth's cert of 5.3.0-15 (1300 rounds on 1.47.1, 500 on 1.48.3):
+
+| slicc-kernel | 5.3.0-13 shell exits | 5.3.0-15 shell exits |
+| --- | --- | --- |
+| 1.47.1 | 72 / 1300 | 108 / 1300 |
+| 1.48.3 | | 0 / 500 (no partial command, no lost line, no exit) |
+
+On 1.47.1 every extra -15 exit is in that kernel's race-(b) window: -15 correctly drops the truncated line, and the shell then hits the kernel's EOF race and exits. 1.48.3 is the first kernel with race (b) fixed and slicc-kernel#303, and there -15 is clean. So 5.3.0-15 declares `engines.slicc-kernel` `>=1.48.3` rather than trade fewer partial commands for more shell exits on older kernels.
+
 ## ^C while readline echoes the accepted line: 5.3.0-13
 
 `cert/sigint-line.mjs` on 5.3.0-13, slicc-kernel 1.44.0 Node entry. 2 of 3 runs failed within the first rounds:

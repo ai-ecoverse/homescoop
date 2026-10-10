@@ -4,7 +4,7 @@
   "description": "GNU bash for slicc (slicc-fork.js Module.sliccPpid; ENV+sliccRunMain exports; user ids from slicc-kernel >= 1.44.0)",
   "license": "GPL-3.0-or-later",
   "engines": {
-    "slicc-kernel": ">=1.44.0"
+    "slicc-kernel": ">=1.48.3"
   },
   "repository": {
     "type": "git",
