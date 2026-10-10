@@ -176,8 +176,8 @@ if [[ ! -f "$DEPS/lib/libsqlite3.a" ]]; then
   # shellcheck disable=SC2086
   wasixcc $DEP_CFLAGS -DSQLITE_THREADSAFE=1 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_WAL \
     -DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_ENABLE_DBSTAT_VTAB -DSQLITE_ENABLE_FTS5 \
-    -DSQLITE_ENABLE_MATH_FUNCTIONS -DSQLITE_ENABLE_RTREE -DSQLITE_DEFAULT_AUTOVACUUM \
-    -DSQLITE_DEFAULT_RECURSIVE_TRIGGERS -DSQLITE_DISABLE_LFS \
+    -DSQLITE_ENABLE_MATH_FUNCTIONS -DSQLITE_ENABLE_RTREE -DSQLITE_DEFAULT_AUTOVACUUM=0 \
+    -DSQLITE_DEFAULT_RECURSIVE_TRIGGERS=0 -DSQLITE_DISABLE_LFS \
     -c "$SQ/sqlite3.c" -o "$B/sqlite/sqlite3.o"
   wasixar rcs "$DEPS/lib/libsqlite3.a" "$B/sqlite/sqlite3.o"
   cp "$SQ/sqlite3.h" "$SQ/sqlite3ext.h" "$DEPS/include/"
@@ -195,7 +195,7 @@ if [[ ! -f "$DEPS/lib/libtinfo.a" ]]; then
   tar xzf "$SRC_FILE" -C "$B/ncurses" --strip-components=1
   (
     cd "$B/ncurses"
-    ./configure --host="$CROSS_HOST" --build="$(./config.guess)" --prefix="$DEPS" \
+    ./configure --host="$CROSS_HOST" --build="$(sh ./config.guess)" --prefix="$DEPS" \
       --without-shared --with-normal --without-debug --without-profile \
       --without-cxx --without-cxx-binding --without-ada --without-progs --without-tests \
       --without-manpages --without-pkg-config --disable-db-install --disable-database \
@@ -224,7 +224,7 @@ if [[ ! -f "$DEPS/lib/libreadline.a" ]]; then
       bash_cv_func_strcoll_broken=no bash_cv_must_reinstall_sighandlers=no \
       bash_cv_func_ctype_nonascii=no bash_cv_dup2_broken=no \
       bash_cv_getpw_declared=yes bash_cv_void_sighandler=yes
-    ./configure --host="$CROSS_HOST" --build="$(./support/config.guess)" --prefix="$DEPS" \
+    ./configure --host="$CROSS_HOST" --build="$(sh ./support/config.guess)" --prefix="$DEPS" \
       --disable-shared --enable-static --with-curses --disable-install-examples \
       CC=wasixcc CFLAGS="$DEP_CFLAGS" CPPFLAGS="-I$DEPS/include" LDFLAGS="-L$DEPS/lib" \
       >"$B/readline-configure.log" 2>&1
@@ -232,7 +232,8 @@ if [[ ! -f "$DEPS/lib/libreadline.a" ]]; then
     make install-static install-headers >>"$B/readline-make.log" 2>&1
   ) || { tail -60 "$B"/readline-*.log >&2; exit 1; }
   rm -f "$DEPS"/lib/pkgconfig/readline.pc "$DEPS"/lib/pkgconfig/history.pc
-  write_pc readline 8.3 -lreadline tinfo
+  # -ltinfo in Libs: configure's link test uses pkg-config without --static.
+  write_pc readline 8.3 "-lreadline -ltinfo"
 fi
 
 echo "== wasix-python: deps"
@@ -244,5 +245,144 @@ if [[ "${HOMESCOOP_STOP_AFTER:-}" == deps ]]; then
   exit 0
 fi
 
-echo "homescoop wasix-python: cross-build steps after deps not written yet" >&2
-exit 1
+# --- stubs (as 3.14.2-6..-11) ------------------------------------------------
+# uid/gid 1000, a passwd-less pwd/grp, no-op advisory locks, C++ TLS symbols:
+# an archive, since configure lists LIBS twice.
+STUBS="$B/stubs"
+rm -rf "$STUBS" && mkdir -p "$STUBS"
+cp "$PKG/fcntl_wasix_extra.h" "$STUBS/"
+for s in uid_stubs pwd_grp_stubs lock_stubs cpp_tls_stubs; do
+  # shellcheck disable=SC2086
+  wasixcc $DEP_CFLAGS -I"$STUBS" -include "$STUBS/fcntl_wasix_extra.h" -c "$PKG/$s.c" -o "$STUBS/$s.o"
+done
+wasixar rcs "$STUBS/libpython-wasix-stubs.a" "$STUBS"/*.o
+WRAP=""
+for f in getuid geteuid getgid getegid getpwuid getpwnam getpwuid_r getpwnam_r getgrgid getgrnam getgrgid_r getgrnam_r flock fcntl lockf; do
+  WRAP+=" -Wl,--wrap=$f"
+done
+for f in getuid geteuid getgid getegid flock fcntl lockf; do
+  WRAP+=" -Wl,--export=__wrap_$f"
+done
+
+# --- CPython: patch, configure, make ------------------------------------------
+SRCDIR="$B/Python-$VER"
+echo "== wasix-python: CPython $VER source + patches"
+rm -rf "$SRCDIR" && mkdir -p "$SRCDIR"
+tar xzf "$PY_TGZ" -C "$SRCDIR" --strip-components=1
+for p in cpython-configure-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg; do
+  patch -d "$SRCDIR" -p1 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
+  echo "  applied $p.patch"
+done
+
+PY_CFLAGS="-O3 -flto -fPIC -matomics -mbulk-memory -mmutable-globals -pthread -mthread-model posix $EMU -include $STUBS/fcntl_wasix_extra.h -ffile-prefix-map=$B=."
+PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-memory -Wl,--import-memory -Wl,--max-memory=4294967296 -Wl,--stack-first -z stack-size=16777216 -Wl,--initial-memory=41943040 -ldl -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
+# Cross answers configure cannot run (wasm32: little endian, no fork, no ptys).
+printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words_bigendian=no \
+  ac_cv_func_fork=no ac_cv_func_vfork=no >"$B/config.site"
+rm -rf "$CROSS" && mkdir -p "$CROSS"
+(
+  cd "$CROSS"
+  CONFIG_SITE="$B/config.site" ../../configure \
+    --host=wasm32-unknown-wasix --build="$(sh ../../config.guess)" \
+    --prefix="$PREFIX_PY" --with-build-python="$HOSTPY" \
+    --disable-shared --with-ensurepip=no --disable-test-modules \
+    --enable-wasm-pthreads --with-pkg-config=yes \
+    CC=wasixcc AR=wasixar RANLIB=wasixranlib \
+    CFLAGS="$PY_CFLAGS" LDFLAGS="$PY_LDFLAGS" \
+    LIBS="$STUBS/libpython-wasix-stubs.a$WRAP" \
+    >"$B/configure.log" 2>&1
+) || { tail -80 "$B/configure.log" >&2; exit 1; }
+grep -E '^checking for stdlib extension module' "$B/configure.log" | sed 's/^checking for stdlib extension module /  module /' || true
+# Every library-backed module of -11 must come from configure now.
+for m in _ssl _hashlib zlib _bz2 _lzma _sqlite3 readline fcntl grp pwd mmap resource termios; do
+  st="$(sed -n "s/^MODULE_${m^^}_STATE=//p" "$CROSS/Makefile")"
+  [[ "$st" == yes ]] || { echo "homescoop wasix-python: module $m is '$st', not yes" >&2; exit 1; }
+done
+
+if [[ "${HOMESCOOP_STOP_AFTER:-}" == configure ]]; then
+  exit 0
+fi
+
+echo "== wasix-python: make (-j$JOBS)"
+make -C "$CROSS" -j"$JOBS" all >"$B/make.log" 2>&1 || { tail -80 "$B/make.log" >&2; exit 1; }
+tail -25 "$B/make.log"
+rm -rf "$PREFIX_PY"
+make -C "$CROSS" install >"$B/install.log" 2>&1 || { tail -60 "$B/install.log" >&2; exit 1; }
+test -f "$CROSS/python.wasm"
+
+# --- asyncify + strip (as -7/-9) ----------------------------------------------
+echo "== wasix-python: asyncify + strip"
+ONLYLIST="fork,_fork_internal,_Fork,__wasi_proc_fork,__fork_handler,os_fork,subprocess_fork_exec,subprocess_fork_exec_impl,do_fork_exec,PyOS_BeforeFork,PyOS_AfterFork_Parent,PyOS_AfterFork_Child,PyOS_AfterFork,run_at_forkers,posix_spawn,posix_spawnp,__posix_spawn,os_posix_spawn,py_posix_spawn,os_posix_spawnp"
+FEATS=(--enable-threads --enable-bulk-memory --enable-mutable-globals --enable-sign-ext --enable-nontrapping-float-to-int --enable-exception-handling)
+"$WASM_OPT" --asyncify -O3 \
+  --pass-arg=asyncify-imports@wasix_32v1.proc_fork,wasix_32v1.stack_checkpoint,wasix_32v1.stack_restore \
+  --pass-arg=asyncify-onlylist@"$ONLYLIST" \
+  --pass-arg=asyncify-ignore-indirect \
+  "${FEATS[@]}" "$CROSS/python.wasm" -o "$B/python-async.wasm"
+"$WASM_OPT" -O3 --strip-debug --strip-producers "${FEATS[@]}" "$B/python-async.wasm" -o "$B/python.wasm"
+
+# --- stage ---------------------------------------------------------------------
+echo "== wasix-python: stage into package/"
+rm -rf "$DEST/bin" "$DEST/lib" "$DEST/include"
+mkdir -p "$DEST/bin" "$DEST/lib"
+cp "$B/python.wasm" "$DEST/bin/python.wasm"
+chmod 755 "$DEST/bin/python.wasm"
+cp -R "$PREFIX_PY/include" "$DEST/include"
+cp "$PREFIX_PY/lib/libpython3.14.a" "$DEST/lib/"
+cp -R "$PREFIX_PY/lib/pkgconfig" "$DEST/lib/pkgconfig"
+PYLIB="$DEST/lib/python3.14"
+cp -R "$PREFIX_PY/lib/python3.14" "$PYLIB"
+# The same prune as 3.14.2-11.
+rm -rf "$PYLIB/test" "$PYLIB/idlelib/idle_test" "$PYLIB/__phello__/ham" "$PYLIB/venv/scripts/nt" \
+  "$PYLIB"/config-3.14-* "$PYLIB/site-packages"/*
+find "$PYLIB" -type d -name __pycache__ -prune -exec rm -rf {} +
+cp "$SRCDIR/LICENSE" "$PYLIB/LICENSE.txt"
+cp "$SRCDIR/LICENSE" "$DEST/LICENSE"
+# pip from the bundled ensurepip wheel, unpacked as in -11 (no INSTALLER).
+PIPWHL="$(echo "$SRCDIR"/Lib/ensurepip/_bundled/pip-*.whl)"
+test -f "$PIPWHL"
+unzip -q -o "$PIPWHL" -d "$PYLIB/site-packages"
+cp "$SRCDIR/Lib/site-packages/README.txt" "$PYLIB/site-packages/README.txt"
+# slicc additions (sys.executable from PATH): stdlib modules and .pth hooks.
+cp "$PKG"/stdlib/*.py "$PYLIB/"
+cp "$PKG"/stdlib/site-packages/*.pth "$PYLIB/site-packages/"
+
+# Bytecode: unchecked-hash .pyc (no mtimes), by the same CPython.
+echo "== wasix-python: compileall (unchecked-hash)"
+"$HOSTPY" -m compileall -q -j0 --invalidation-mode unchecked-hash "$PYLIB" >/dev/null || true
+"$HOSTPY" "$PKG/test/pyc-check.py" "$PYLIB"
+
+# --- notices -------------------------------------------------------------------
+{
+  echo "# Third-party notices: @ai-ecoverse/wasix-python"
+  echo
+  echo "bin/python.wasm statically links:"
+  echo
+  echo "| component | version | license | source |"
+  echo "| --- | --- | --- | --- |"
+  echo "| CPython (incl. mpdecimal, expat, HACL*) | $VER | PSF-2.0 (LICENSE) | python.org |"
+  echo "| OpenSSL | $(pkg-config --modversion openssl) | Apache-2.0 | @ai-ecoverse/wasix-openssl |"
+  echo "| zlib | $(pkg-config --modversion zlib) | Zlib | @ai-ecoverse/wasix-zlib |"
+  echo "| bzip2 | 1.0.8 | bzip2-1.0.6 | sourceware.org/bzip2 |"
+  echo "| xz (liblzma) | $(pkg-config --modversion liblzma) | 0BSD | tukaani.org/xz |"
+  echo "| SQLite | $(pkg-config --modversion sqlite3) | public domain | sqlite.org |"
+  echo "| GNU Readline | 8.3 | GPL-3.0-or-later | gnu.org/software/readline |"
+  echo "| ncurses (tinfo) | 6.5 | X11 | invisible-island.net/ncurses |"
+  echo "| wasix-libc | wasix-sysroot 2025.9.30-17 | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
+  echo
+  echo "lib/python3.14/site-packages/pip is pip (MIT), from CPython's ensurepip bundle."
+} >"$DEST/THIRD-PARTY-NOTICES.md"
+
+# --- checks --------------------------------------------------------------------
+bash "$PKG/prestage-check.sh" "$DEST/bin/python.wasm" "$PYLIB"
+# No host artefacts: native binaries, build-machine paths, host-platform wheels.
+python3 "$PKG/test/staging-check.py" "$DEST"
+# Every import of the published py-* side modules is exported (homescoop#181).
+node "$PKG/test/side-abi.mjs" --wasm "$DEST/bin/python.wasm" --report "$B/side-abi.md"
+
+# Config review (the perl -7 lesson): dumped for the diff against -11.
+echo "== wasix-python: pyconfig.h"
+grep -E '^#define ' "$DEST/include/python3.14/pyconfig.h" | sort | sed 's/^/  pyconfig: /'
+echo "== wasix-python: sysconfig build_time_vars"
+python3 "$PKG/test/sysconfig-dump.py" "$PYLIB"/_sysconfigdata__wasi_wasm32-wasix.py | sed 's/^/  sysconfig: /'
+echo "== wasix-python: staged $(du -sh "$DEST" | awk '{print $1}')"

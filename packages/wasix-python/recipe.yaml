@@ -9,8 +9,6 @@ summary: "CPython 3.14 for slicc WASIX (commands python, python3)"
 source:
   url: "https://www.python.org/ftp/python/{{version}}/Python-{{version}}.tgz"
   sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
-# Packaging-only builds (no WASIX_PYTHON_STAGE) repack this published
-# tarball byte for byte and add stdlib/ (build.sh).
 sources:
   # homescoop#181 cross-build inputs. Dev packages pinned by the certified
   # tarball sha; lib-pic/ is linked into the dynamic-main python.wasm.
@@ -37,9 +35,6 @@ sources:
   ncurses:
     url: "https://mirrors.kernel.org/gnu/ncurses/ncurses-6.5.tar.gz"
     sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
-  base:
-    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-9.tgz"
-    sha256: "2b40ac613ad4849ef6435f8fe73303660e39164070774134bfdd866b2b895246"
 dependencies:
   build: []
   host: []
@@ -48,21 +43,15 @@ about:
   homepage: https://www.python.org
   license: PSF-2.0
   notes: |
-    WASIX CPython 3.14 dynamic-main (exnref-ehpic). No fork; subprocess via posix_spawn.
-    mmap enabled (override WASI n/a) with -D_WASI_EMULATED_MMAN -lwasi-emulated-mman.
-    Bundled pip/ensurepip; zlib for gzip. Side modules dlopen by absolute path.
-    wasix-libc patches (apply-wasix-libc-alarm-patch.sh):
-      * setitimer-it-value: setitimer/alarm → proc_raise_interval2 (initial+interval ns);
-        legacy 3-arg proc_raise_interval untouched (Wasmer ABI).
-      * clock-nanosleep-eintr: poll_oneoff EINTR → EINTR (not ENOTSUP); fill *rem on
-        relative sleep so time.sleep resumes after alarm (PEP 475).
-    Apply when rebuilding the wasixcc sysroot linked into this package — ship with
-    wasix-python only. Subprocess always posix_spawn (cwd via /bin/sh helper);
-    user site enabled in frozen site (patch Lib/site.py before make / regen-frozen);
-    site+sysconfig _getuserbase for wasi $HOME/.local; _ssl/_hashlib via wasix-org/openssl;
-    zlib/_bz2/_lzma static from wasix prefixes; uid stubs return 1000; Asyncify onlylist for fork/setjmp paths.
-    build.sh ends with wipe+compileall --invalidation-mode unchecked-hash.
-    3.14.2-10 and -11 are packaging-only: -9's tarball (sources.base) plus
-    stdlib/ (_slicc_site.py sets sys.executable from PATH, since WASI stat
-    has no permission bits and getpath's isxfile never finds python; it runs
-    from sitecustomize.py and from site-packages/slicc-executable.pth).
+    WASIX CPython 3.14 dynamic-main on wasix-sysroot -17's sysroot-ehpic
+    (legacy wasm EH, PIC; side modules by dlopen), cross-built from source
+    in CI by build.sh (homescoop#181): host CPython from the same tarball,
+    static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline; zlib and
+    OpenSSL from wasix-zlib / wasix-openssl), modules found by configure
+    (patches/cpython-configure-wasix.patch), asyncify onlylist for
+    fork/posix_spawn, strip. No fork; subprocess via posix_spawn.
+    The sysroot's libc has the setitimer (proc_raise_interval2) and
+    clock_nanosleep EINTR patches (patches/wasix-libc-*.patch); advisory
+    locks, uid/gid 1000 and passwd-less pwd/grp are --wrap stubs.
+    stdlib/ adds sys.executable from PATH (_slicc_site.py, sitecustomize.py,
+    site-packages/slicc-executable.pth).

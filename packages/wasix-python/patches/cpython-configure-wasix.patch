@@ -14,37 +14,23 @@ library).
      echo "#define _WASI_EMULATED_SIGNAL 1" >> confdefs.h
  
      if test "x$enable_wasm_pthreads" = xyes
-@@ -31058,8 +31058,6 @@
- 
- 
-     py_cv_module__scproxy=n/a
--    py_cv_module_termios=n/a
--    py_cv_module_grp=n/a
-  ;; #(
-     Darwin) :
-      ;; #(
-@@ -31078,7 +31076,6 @@
-     py_cv_module_grp=n/a
-     py_cv_module_nis=n/a
-     py_cv_module_readline=n/a
--    py_cv_module_pwd=n/a
-     py_cv_module_spwd=n/a
-     py_cv_module_syslog=n/a
-     py_cv_module_=n/a
-@@ -31117,7 +31114,6 @@
+@@ -31143,9 +31143,6 @@
+     py_cv_module__interpreters=n/a
+     py_cv_module__interpchannels=n/a
      py_cv_module__interpqueues=n/a
-     py_cv_module_grp=n/a
-     py_cv_module_pwd=n/a
+-    py_cv_module_grp=n/a
+-    py_cv_module_pwd=n/a
 -    py_cv_module_resource=n/a
      py_cv_module_syslog=n/a
      py_cv_module_=n/a
  
-@@ -31156,8 +31152,6 @@
+@@ -31156,9 +31153,6 @@
      py_cv_module__testimportmultiple=n/a
      py_cv_module__testmultiphase=n/a
      py_cv_module__testsinglephase=n/a
 -    py_cv_module_fcntl=n/a
 -    py_cv_module_mmap=n/a
-     py_cv_module_termios=n/a
+-    py_cv_module_termios=n/a
      py_cv_module_xxlimited=n/a
      py_cv_module_xxlimited_35=n/a
+     py_cv_module_=n/a
