@@ -1,0 +1,29 @@
+--- a/jobs.c
++++ b/jobs.c
+@@ -4559,6 +4559,9 @@
+   char *dir;
+   sigset_t set, oset;
+   WAIT s;
++#if defined (__EMSCRIPTEN__)
++  int osigchld = sigchld;
++#endif
+ 
+   if (jobs == 0 || js.j_jobslots == 0)
+     return;
+@@ -4723,7 +4726,16 @@
+   if (old_ttou != 0)
+     sigprocmask (SIG_SETMASK, &oset, (sigset_t *)NULL);
+   else
++#if defined (__EMSCRIPTEN__)
++    /* slicc (homescoop wasm-bash 5.3.0-11): a child's death after `kill`
++       reaches the shell a few milliseconds late, at a kernel call made in
++       here (the notification's write). With only queue_sigchld-- that
++       SIGCHLD was counted and dropped, and the job stayed "Stopped" until
++       the next fork. Reap what arrived meanwhile, as UNQUEUE_SIGCHLD does. */
++    UNQUEUE_SIGCHLD (osigchld);
++#else
+     queue_sigchld--;
++#endif
+ }
+ 
+ /* Use this to determine when to conditionally print job notifications. We

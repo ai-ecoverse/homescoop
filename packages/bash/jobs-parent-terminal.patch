@@ -1,0 +1,206 @@
+--- a/jobs.c
++++ b/jobs.c
+@@ -325,6 +325,60 @@
+ static int sigchld;
+ static int queue_sigchld;
+ 
++#if defined (__EMSCRIPTEN__)
++/* slicc (homescoop wasm-bash): terminal signals that reach the shell while
++   it forks a new foreground job, before the job has the terminal. */
++/* Global: the slicc exec shim (shims/slicc/slicc_exec.c) checks it too. */
++volatile sig_atomic_t slicc_fork_tty_sig;
++static void
++slicc_record_tty_sig (int sig)
++{
++  slicc_fork_tty_sig = sig;
++}
++static const int slicc_tty_sigs[3] = { SIGINT, SIGQUIT, SIGTSTP };
++/* What the shell caught for a job it just forked; wait_for sends it once
++   the job is registered (stop_pipeline), so a stop makes it current. */
++static int slicc_job_pending_sig;
++static pid_t slicc_job_pending_pgrp;
++
++/* From the moment the shell has read a command until it reads the next one,
++   record a SIGTSTP (an interactive shell ignores it) so that make_child can
++   pass a ^Z typed before the job was forked on to the job. eval.c calls
++   these around execute_command. */
++static struct sigaction slicc_tstp_old;
++static int slicc_tstp_on;
++
++void
++slicc_tty_sig_begin (void)
++{
++  struct sigaction act, cur;
++
++  slicc_fork_tty_sig = 0;
++  if (slicc_tstp_on || job_control == 0)
++    return;
++  if (sigaction (SIGTSTP, NULL, &cur) == 0 && (cur.sa_flags & SA_SIGINFO) == 0 && cur.sa_handler == SIG_IGN)
++    {
++      memset (&act, 0, sizeof (act));
++      act.sa_handler = slicc_record_tty_sig;
++      sigemptyset (&act.sa_mask);
++      sigaction (SIGTSTP, &act, &slicc_tstp_old);
++      slicc_tstp_on = 1;
++    }
++}
++
++void
++slicc_tty_sig_end (void)
++{
++  if (slicc_tstp_on)
++    {
++      sigaction (SIGTSTP, &slicc_tstp_old, NULL);
++      slicc_tstp_on = 0;
++    }
++  slicc_fork_tty_sig = 0;
++  slicc_job_pending_sig = 0;
++}
++#endif
++
+ #define QUEUE_SIGCHLD(os)	(os) = sigchld, queue_sigchld++
+ 
+ /* We set queue_sigchld around the call to waitchld to protect data structures
+@@ -2301,6 +2355,36 @@
+   if (default_buffered_input != -1 && (!async_p || default_buffered_input > 0))
+     sync_buffered_stream (default_buffered_input);
+ 
++#if defined (__EMSCRIPTEN__)
++  /* slicc: a forked child is a new kernel worker that takes the terminal
++     tens of milliseconds after fork() returns here. Until then a ^C, ^\ or
++     ^Z goes to the shell, which ignores it. For the first process of a new
++     foreground job, catch them meanwhile and pass them on to the job once
++     it has the terminal (below). */
++  struct sigaction slicc_oact[3];
++  int slicc_catch = job_control && async_p == 0 && pipeline_pgrp == 0 &&
++	(flags & (FORK_NOJOB|FORK_NOTERM)) == 0 &&
++	((subshell_environment&(SUBSHELL_ASYNC|SUBSHELL_PIPE)) == 0) &&
++	running_in_background == 0;
++  if (slicc_catch)
++    {
++      struct sigaction act;
++      int i;
++      memset (&act, 0, sizeof (act));
++      act.sa_handler = slicc_record_tty_sig;
++      sigemptyset (&act.sa_mask);
++      /* A ^C that reached the shell's own handler since the command was
++	 read is the job's too. */
++      if (slicc_fork_tty_sig == 0 && interrupt_state)
++	{
++	  slicc_fork_tty_sig = SIGINT;
++	  interrupt_state = 0;
++	}
++      for (i = 0; i < 3; i++)
++	sigaction (slicc_tty_sigs[i], &act, &slicc_oact[i]);
++    }
++#endif
++
+   /* Create the child, handle severe errors.  Retry on EAGAIN. */
+   while ((pid = fork ()) < 0 && errno == EAGAIN && forksleep < FORKSLEEP_MAX)
+     {
+@@ -2347,6 +2431,12 @@
+ 	 signals to the default state for a new process. */
+       pid_t mypid;
+ 
++#if defined (__EMSCRIPTEN__)
++      /* slicc: what the shell recorded before the fork is the shell's to
++	 pass on (wait_for); the child only acts on what reaches it itself. */
++      slicc_fork_tty_sig = 0;
++      slicc_job_pending_sig = 0;
++#endif
+       subshell_environment |= SUBSHELL_IGNTRAP;
+ 
+       /* If this ends up being changed to modify or use `command' in the
+@@ -2398,6 +2488,32 @@
+ 	     pipeline, for example). */
+ 	  if ((flags & FORK_NOTERM) == 0 && async_p == 0 && pipeline_pgrp != shell_pgrp && ((subshell_environment&(SUBSHELL_ASYNC|SUBSHELL_PIPE)) == 0) && running_in_background == 0)
+ 	    give_terminal_to (pipeline_pgrp, 0);
++#if defined (__EMSCRIPTEN__)
++	  /* slicc: the child kept the shell's recorder until now; a terminal
++	     signal meant for the job that reached it meanwhile (from the
++	     terminal or passed on by the shell) is sent again to its own
++	     group, through the kernel, with the default action. */
++	  if (slicc_catch)
++	    {
++	      int i, sig = slicc_fork_tty_sig;
++	      slicc_fork_tty_sig = 0;
++	      for (i = 0; i < 3; i++)
++		{
++		  struct sigaction cur;
++		  /* Only where the recorder is still in place: the job's own
++		     settings (default_tty_job_signals) stay. */
++		  if (sigaction (slicc_tty_sigs[i], NULL, &cur) == 0 &&
++		      (cur.sa_flags & SA_SIGINFO) == 0 &&
++		      cur.sa_handler == slicc_record_tty_sig)
++		    sigaction (slicc_tty_sigs[i], &slicc_oact[i], NULL);
++		}
++	      if (sig)
++		{
++		  signal (sig, SIG_DFL);
++		  killpg (getpgrp (), sig);
++		}
++	    }
++#endif
+ 
+ #if defined (PGRP_PIPE)
+ 	  if (pipeline_pgrp == mypid)
+@@ -2453,12 +2569,37 @@
+ 	     1003.1 Rationale, section B.4.3.3, page 236). */
+ 	  if ((flags & FORK_NOJOB) == 0)
+ 	    setpgid (pid, pipeline_pgrp);
++#if defined (__EMSCRIPTEN__)
++	  /* slicc (homescoop wasm-bash 5.3.0-11): the child takes the
++	     terminal late (see above), so give it to a new foreground job here
++	     as well, under the child's own conditions; the child still does
++	     it too. Then pass on what the shell caught meanwhile. */
++	  if ((flags & FORK_NOJOB) == 0 && (flags & FORK_NOTERM) == 0 && async_p == 0 &&
++	      pipeline_pgrp == pid && pipeline_pgrp != shell_pgrp &&
++	      ((subshell_environment&(SUBSHELL_ASYNC|SUBSHELL_PIPE)) == 0) &&
++	      running_in_background == 0)
++	    give_terminal_to (pipeline_pgrp, 0);
++#endif
+ 	}
+       else
+ 	{
+ 	  if (pipeline_pgrp == 0)
+ 	    pipeline_pgrp = shell_pgrp;
+ 	}
++#if defined (__EMSCRIPTEN__)
++      if (slicc_catch)
++	{
++	  int i;
++	  for (i = 0; i < 3; i++)
++	    sigaction (slicc_tty_sigs[i], &slicc_oact[i], NULL);
++	  if (slicc_fork_tty_sig && pipeline_pgrp == pid)
++	    {
++	      slicc_job_pending_sig = slicc_fork_tty_sig;
++	      slicc_job_pending_pgrp = pipeline_pgrp;
++	    }
++	  slicc_fork_tty_sig = 0;
++	}
++#endif
+ 
+       /* Place all processes into the jobs array regardless of the
+ 	 state of job_control. */
+@@ -3074,6 +3215,21 @@
+   child = 0;
+   BLOCK_CHILD (set, oset);
+ 
++#if defined (__EMSCRIPTEN__)
++  /* slicc: a ^C, ^\ or ^Z the shell caught while forking this job
++     (make_child), now that the job exists: its stop or death goes through
++     waitchld like any other, and a stopped job becomes the current one. */
++  if (slicc_job_pending_sig)
++    {
++      int sig = slicc_job_pending_sig;
++      pid_t pgrp = slicc_job_pending_pgrp;
++      slicc_job_pending_sig = 0;
++      slicc_job_pending_pgrp = 0;
++      if (pgrp > 0 && pid != ANY_PID && find_job (pid, 0, NULL) != NO_JOB)
++	killpg (pgrp, sig);
++    }
++#endif
++
+   /* Ignore interrupts while waiting for a job run without job control
+      to finish.  We don't want the shell to exit if an interrupt is
+      received, only if one of the jobs run is killed via SIGINT.  If
