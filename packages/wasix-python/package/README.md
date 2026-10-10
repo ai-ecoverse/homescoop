@@ -18,6 +18,10 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-15:
+- `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.49.0 (#306 step 1:
+  `call_dynamic`, `closure_allocate`/`closure_free`). `CFUNCTYPE` waits for step 2.
+
 Since 3.14.2-14 (wasix-sysroot -21):
 - `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,
   `S_ISFIFO` on slicc-kernel with pipe types (#307) and a socket on
@@ -69,7 +73,7 @@ On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) un
 python -m venv v && v/bin/pip install requests && v/bin/python -c "import requests"
 ```
 
-**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.44.0 anyway, for the user ids). On older kernels a
+**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.49.0 for `_ctypes`). On older kernels a
 venv's `bin/python` and `bin/pip` run as the base interpreter: `v/bin/pip
 install` then installs into the **base** package directory, not the venv.
 
