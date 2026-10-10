@@ -3,10 +3,10 @@ builder: host
 version: "1.5.1"
 npm: "@ai-ecoverse/py-kiwisolver"
 summary: "kiwisolver for slicc WASIX CPython 3.14"
-# 1.5.1-3 is packaging-only: 1.5.1-2's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-12). Drop repack: when the next release rebuilds.
+# 1.5.1-4 is packaging-only: 1.5.1-3's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-13). Drop repack: when the next release rebuilds.
 repack:
-  from: "1.5.1-2"
+  from: "1.5.1-3"
 dependencies:
   build: [wasix-python]
   host: []

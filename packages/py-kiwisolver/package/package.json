@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-kiwisolver",
-  "version": "1.5.1-3",
+  "version": "1.5.1-4",
   "description": "kiwisolver for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)",
   "license": "BSD-3-Clause",
   "repository": {
@@ -13,7 +13,7 @@
   "files": ["README.md", "LICENSE", "lib"],
   "publishConfig": { "access": "public" },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "3.14.2-12"
+    "@ai-ecoverse/wasix-python": "3.14.2-13"
   },
   "homescoop": {
     "recipe": "py-kiwisolver",
