@@ -7,7 +7,7 @@
  * test/unit/terminal.test.mjs, #240's tests). jobs-parent-terminal.patch
  * lets the shell give the terminal to the new foreground job as well.
  * Each stopped job then gets `kill -KILL %1` (no SIGCONT) and must be
- * reported "Killed": jobs-notify-unqueue.patch lets notify_of_job_status reap
+ * reported "Killed" (5.3.0-12): jobs-notify-unqueue.patch lets notify_of_job_status reap
  * a SIGCHLD that arrives while it prints, instead of leaving the job
  * "Stopped" until the shell's next fork.
  */
