@@ -8,10 +8,11 @@
  * version. The re-pin wave is packaging-only (same side modules, exact
  * dependency on the new python), so the cert moves those nested copies aside:
  * then every py-* resolves to the python under test, as re-pinned ones will.
- * restore() puts them back.
+ * restore() puts them back. Renames stay in the same directory: in the
+ * browser /tmp is another mount, and mv there copies 114 MB per python.
  */
 const NM = '/node_modules/@ai-ecoverse';
-const AWAY = '/tmp/.repin';
+const AWAY = '.wasix-python.repin';
 
 export async function repin({ run, read }) {
   const ls = await run(['bash', '-c', `ls -d ${NM}/py-*/node_modules/@ai-ecoverse/wasix-python 2>/dev/null || true`], { cwd: '/' });
@@ -21,15 +22,16 @@ export async function repin({ run, read }) {
     const v = JSON.parse(await read(`${dir}/package.json`)).version;
     if (v === want) continue;
     const pkg = dir.slice(NM.length + 1).split('/')[0];
-    const r = await run(['bash', '-c', `mkdir -p ${AWAY}/${pkg} && mv ${dir} ${AWAY}/${pkg}/`], { cwd: '/' });
+    const away = dir.replace(/wasix-python$/, AWAY);
+    const r = await run(['bash', '-c', `rm -rf ${away} && mv ${dir} ${away}`], { cwd: '/' });
     if (r.status !== 0) throw new Error(`repin ${dir}: ${r.stderr}`);
-    moved.push({ pkg, dir, version: v });
+    moved.push({ pkg, dir, away, version: v });
   }
   return {
     moved,
     async restore() {
       for (const m of moved.splice(0)) {
-        const r = await run(['bash', '-c', `mv ${AWAY}/${m.pkg}/wasix-python ${m.dir}`], { cwd: '/' });
+        const r = await run(['bash', '-c', `mv ${m.away} ${m.dir}`], { cwd: '/' });
         if (r.status !== 0) throw new Error(`restore ${m.dir}: ${r.stderr}`);
       }
     },

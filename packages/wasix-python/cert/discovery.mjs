@@ -69,8 +69,12 @@ export default async function (ctx) {
     const cmds = [];
     for (const n of all) {
       real[n] = `${dir}/node_modules/.pnpm/${entry(n)}/node_modules/${S}/${n}`;
-      cmds.push(`mkdir -p ${real[n].replace(/\/[^/]+$/, '')} && mv ${NM}/${n} ${real[n]}`);
+      // One package per run: each run is one CDP call (30 s); a rename is
+      // instant, a copy (no native OPFS directory move) is not.
+      const t0 = performance.now();
+      await sh(`mkdir -p ${real[n].replace(/\/[^/]+$/, '')} && mv ${NM}/${n} ${real[n]}`);
       moved.push([`${NM}/${n}`, real[n]]);
+      if (n === 'wasix-python') console.log(`discovery: mv wasix-python (114 MB) took ${(performance.now() - t0).toFixed(0)} ms`);
     }
     for (const [n, v] of Object.entries(stub)) {
       real[n] = `${dir}/node_modules/.pnpm/${entry(n, v)}/node_modules/${S}/${n}`;
@@ -86,8 +90,8 @@ export default async function (ctx) {
     await sh(cmds.join('\n'));
   };
   const restore = async () => {
-    const back = moved.splice(0).reverse().map(([from, to]) => `mv ${to} ${from}`);
-    await sh([...back, `rm -rf ${G}`].join('\n'));
+    for (const [from, to] of moved.splice(0).reverse()) await sh(`mv ${to} ${from}`);
+    await sh(`rm -rf ${G}`);
   };
   // python resolves to the moved interpreter once the kernel's watcher rescans.
   const pythonAt = async (want) => {
@@ -160,6 +164,10 @@ export default async function (ctx) {
   }
 
   try {
+    // The layouts are built with mv: it must rename, not copy 370 MB across
+    // mounts (in the browser /tmp is one; PNPM_HOME must share /node_modules').
+    const dev = (await sh(`mkdir -p ${G} && stat -c %d /node_modules ${G}`)).trim().split('\n');
+    assert.equal(dev[0], dev[1], `PNPM_HOME ${G} is on another mount than /node_modules (st_dev ${dev.join(' vs ')})`);
     // 1. One pnpm project.
     const one = new Set(['wasix-python', ...TOP]);
     for (const t of TOP) closure(t, one);
