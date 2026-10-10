@@ -5,9 +5,13 @@
 //
 //   node scripts/wasix-lib-cert.mjs <package> --tarball <package.tgz> [--kernel-dir <dir>]
 //
-// meta.probes: [{ "name": "zprobe", "src": "test/zprobe.c", "libs": ["-lz"] }]
+// meta.probes: [{ "name": "zprobe", "src": "test/zprobe.c", "pkg": ["zlib"] }]
 // gives the commands `zprobe` (static-main, lib/) and `zprobe-pic`
-// (dynamic-main, lib-pic/). --kernel-dir uses a local slicc-kernel build.
+// (dynamic-main, lib-pic/). A probe is compiled with nothing but the
+// package's own pkg-config Cflags/Libs (as a consumer would) and linked with
+// --fatal-warnings, so an ABI mismatch (wasm-ld's "function signature
+// mismatch", which links a trapping stub) fails the cert. --kernel-dir uses a
+// local slicc-kernel build.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -51,7 +55,13 @@ try {
     for (const [suffix, f] of Object.entries(FLAVOURS)) {
       const cmd = `${p.name}${suffix}`;
       console.log(`== link ${cmd} (${f.env.WASIXCC_MODULE_KIND}, ${f.lib}/)`);
-      sh('wasixcc', ['-O2', join(pkgDir, p.src), `-I${join(pkg, 'include')}`, `-L${join(pkg, f.lib)}`, ...p.libs, '-o', join(probes, `bin/${cmd}.wasm`)], {
+      // Only this flavour's .pc files: no host pkg-config dirs.
+      const pc = join(pkg, f.lib, 'pkgconfig');
+      const flags = sh('pkg-config', ['--cflags', '--libs', '--static', ...p.pkg], {
+        env: { ...process.env, PKG_CONFIG_PATH: pc, PKG_CONFIG_LIBDIR: pc, PKG_CONFIG_SYSROOT_DIR: '' },
+      }).trim().split(/\s+/).filter(Boolean);
+      console.log(`   pkg-config ${p.pkg.join(' ')}: ${flags.join(' ').replaceAll(pkg, '<pkg>')}`);
+      sh('wasixcc', ['-O2', join(pkgDir, p.src), ...flags, '-Wl,--fatal-warnings', '-o', join(probes, `bin/${cmd}.wasm`)], {
         env: { ...env, ...f.env },
       });
       commands[cmd] = { wasm: `bin/${cmd}.wasm` };

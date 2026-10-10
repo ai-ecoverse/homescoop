@@ -13,6 +13,18 @@ SRC="$WORK/wasix-zlib-$VERSION"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
 rm -rf "$SRC" && mkdir -p "$SRC"
 tar xzf "$TB" -C "$SRC" --strip-components=1
+# What zlib's ./configure does to zconf.h on a system with unistd.h and
+# stdarg.h (its own sed lines): z_off_t becomes off_t (64-bit on WASI). The
+# library is compiled with this header and ships it, so consumers agree on
+# z_off_t without extra flags (crc32_combine, gzseek, gztell, …).
+for h in UNISTD STDARG; do
+  sed "/^#ifdef HAVE_${h}_H.* may be/s/def HAVE_${h}_H\(.*\) may be/ 1\1 was/" "$SRC/zconf.h" >"$SRC/zconf.temp.h"
+  mv "$SRC/zconf.temp.h" "$SRC/zconf.h"
+done
+grep -q '^#if 1    /\* was set to #if 1 by ./configure \*/' "$SRC/zconf.h" || {
+  echo "homescoop wasix-zlib: zconf.h was not configured" >&2
+  exit 1
+}
 
 # The pinned toolchain in WORK: a developer's ~/.wasixcc is neither used nor touched.
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
