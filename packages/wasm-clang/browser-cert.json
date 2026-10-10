@@ -1,0 +1,4 @@
+{
+  "argv": ["clang", "--version"],
+  "status": 0
+}
