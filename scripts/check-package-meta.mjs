@@ -9,6 +9,8 @@
  *   - package.json license matches the recipe
  *   - package/LICENSE exists and is non-empty
  *   - package.json files includes LICENSE
+ *   - the staged package.json carries the committed version (build.sh may
+ *     rewrite package.json itself)
  *   - a .wasm that imports slicc.cred_get / cred_set / groups_get / groups_set
  *     (wasix-sysroot >= 2025.9.30-20: user ids from slicc-kernel, no fallback)
  *     needs engines["slicc-kernel"] >= 1.44.0
@@ -86,6 +88,19 @@ if (existsSync(rootLic) && !/\bApache-2\.0\b/.test(recipeLic)) {
 const files = pkg.files;
 if (!Array.isArray(files) || !files.includes('LICENSE')) {
   errors.push('package.json files[] must include "LICENSE"');
+}
+
+// The staged package.json carries the committed version: build scripts that
+// write package.json themselves once shipped a stale -N (wasix-ruby 3.4.11-10
+// staged "3.4.11-9"). The recipe's version is the padded upstream one
+// (5.3 for 5.3.0-13) and may run ahead of a Renovate bump, so it is no gate.
+const committed = spawnSync('git', ['-C', root, 'show', `HEAD:packages/${name}/package/package.json`], { encoding: 'utf8' });
+if (committed.status === 0) {
+  let want;
+  try { want = JSON.parse(committed.stdout).version; } catch { want = undefined; }
+  if (want && want !== pkg.version) {
+    errors.push(`staged package.json version "${pkg.version}" != committed "${want}" (does build.sh write its own version?)`);
+  }
 }
 
 // wasix-sysroot -20 asks slicc-kernel for user ids (slicc.cred_*), with no
