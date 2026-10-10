@@ -95,3 +95,11 @@ nanosleep timer: rc=0 errno=Success rem=off alrm=0
 - **`kill -USR1` from bash:** a `nanosleep` it cut short also reported success (rc 0, slept 514 ms of 3 s), and an interrupted `sleep(3)` returned 3.
 
 -19 passes r19 on 1.35.1, 1.41.3 and 1.42.2. With `R19_SIGSTATE=1` it also passes on slicc-kernel#260 (9ae912a), where `/proc/<pid>/status` of `r19 hold` shows `SigIgn: 0000000000000806` (INT and QUIT from bash's background job, plus USR2) and `SigCgt: 0000000000006200` (USR1, ALRM, TERM).
+
+-19's second build (690c496b) zeroed `*rmtp` before reading `*rqtp` on the EINTR path, which the PIC variants take. With `rqtp == rmtp` (`sleep()`, `nanosleep(&ts, &ts)`):
+- `sleep(3)` interrupted at 0.5 s returned 0;
+- an aliased 2 s nanosleep kept rem 0;
+- the EINTR retry loop for 1 s ended after 201 ms.
+
+The `nanosleep aliased` and `nanosleep loop 1s` lines and `--variant ehpic` cover it. On -18, `--variant ehpic` differs from the default (its libc had wasix-python's alarm patch): `alarm 1: fired=off count=2`.
+

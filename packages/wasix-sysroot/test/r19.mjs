@@ -21,6 +21,8 @@ export default async function (ctx) {
     'alarm 1: fired=~1s count=1',
     'setitimer 200+100ms: ticks=3..6 after-cancel=0',
     'nanosleep timer: rc=-1 errno=EINTR rem=~1.8s alrm=1',
+    'nanosleep aliased: rc=-1 errno=EINTR rem=~1.7s',
+    'nanosleep loop 1s: took=~1s ticks=>=3',
     'r19 done',
   ], r.stdout);
 

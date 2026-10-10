@@ -144,6 +144,28 @@ int main(int argc, char **argv) {
   long left = rem.tv_sec * 1000 + rem.tv_nsec / 1000000;
   printf("nanosleep timer: rc=%d errno=%s rem=%s alrm=%d\n", n, e == EINTR ? "EINTR" : strerror(e),
          left >= 1500 && left <= 1850 ? "~1.8s" : "off", (int)alrm);
+  // rqtp == rmtp, as sleep() and retry loops pass it.
+  alrm = 0;
+  timer(300, 0);
+  struct timespec ts = {2, 0};
+  errno = 0;
+  n = nanosleep(&ts, &ts);
+  e = errno;
+  left = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+  printf("nanosleep aliased: rc=%d errno=%s rem=%s\n", n, e == EINTR ? "EINTR" : strerror(e),
+         left >= 1550 && left <= 1750 ? "~1.7s" : "off");
+
+  // The PEP 475 loop: 1 s of sleep in total, whatever the 200 ms ticks do.
+  alrm = 0;
+  timer(200, 200);
+  struct timespec lp = {1, 0};
+  long l0 = now_ms();
+  while (nanosleep(&lp, &lp) == -1 && errno == EINTR) {
+  }
+  long took = now_ms() - l0;
+  int lt = alrm;
+  timer(0, 0);
+  printf("nanosleep loop 1s: took=%s ticks=%s\n", took >= 950 && took <= 1300 ? "~1s" : "off", lt >= 3 ? ">=3" : "few");
   printf("r19 done\n");
   return 0;
 }

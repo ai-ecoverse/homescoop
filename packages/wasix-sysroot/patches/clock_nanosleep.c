@@ -35,63 +35,47 @@ int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *rqtp,
     sub.u.u.clock.timeout = 1;
 
   // homescoop: relative sleeps report the time left when a signal
-  // interrupts them (nanosleep's rem, PEP 475).
+  // interrupts them (nanosleep's rem, PEP 475). rqtp and rmtp may be the
+  // same struct (sleep() passes &ts twice): the request is copied first and
+  // *rmtp written last.
+  const struct timespec req = *rqtp;
   struct timespec start;
-  int need_rem = rmtp != NULL && (flags & TIMER_ABSTIME) == 0;
-  if ((flags & TIMER_ABSTIME) == 0 && clock_gettime(clock_id, &start) != 0)
+  int relative = (flags & TIMER_ABSTIME) == 0;
+  if (relative && clock_gettime(clock_id, &start) != 0)
     return EINVAL;
 
   // Block until polling event is triggered.
   __wasi_size_t nevents;
   __wasi_event_t ev;
   __wasi_errno_t error = __wasi_poll_oneoff(&sub, &ev, 1, &nevents);
+
+  // Nanoseconds of req not slept yet; 0 if the clock cannot tell.
+  long long left_ns = 0;
+  if (relative) {
+    struct timespec end;
+    if (clock_gettime(clock_id, &end) == 0) {
+      left_ns = ((long long)req.tv_sec - (end.tv_sec - start.tv_sec)) * 1000000000LL +
+                (req.tv_nsec - (end.tv_nsec - start.tv_nsec));
+      if (left_ns < 0) left_ns = 0;
+    }
+  }
+
   // homescoop: upstream mapped every failure, EINTR included, to ENOTSUP;
-  // slicc-kernel answers EINTR when a signal interrupts the wait.
-  if (error == __WASI_ERRNO_INTR || (error == 0 && ev.error == __WASI_ERRNO_INTR)) {
-    if (need_rem) {
-      struct timespec end;
-      rmtp->tv_sec = 0;
-      rmtp->tv_nsec = 0;
-      if (clock_gettime(clock_id, &end) == 0) {
-        time_t sec = rqtp->tv_sec - (end.tv_sec - start.tv_sec);
-        long nsec = rqtp->tv_nsec - (end.tv_nsec - start.tv_nsec);
-        if (nsec < 0) {
-          sec -= 1;
-          nsec += 1000000000L;
-        }
-        if (sec >= 0) {
-          rmtp->tv_sec = sec;
-          rmtp->tv_nsec = nsec;
-        }
-      }
-    }
-    return EINTR;
+  // slicc-kernel answers EINTR when a signal interrupts the wait (modules
+  // with fd_fdflags_set). Without it, it ends the wait early but reports the
+  // clock as expired, so a relative sleep that ended more than 1 ms early
+  // was interrupted too: EINTR and the time left, as on Linux.
+  int interrupted = error == __WASI_ERRNO_INTR || (error == 0 && ev.error == __WASI_ERRNO_INTR) ||
+                    (error == 0 && ev.error == 0 && left_ns > 1000000LL);
+  if (!interrupted && !(error == 0 && ev.error == 0))
+    return ENOTSUP;
+  if (!interrupted)
+    left_ns = 0;
+  if (rmtp && relative) {
+    rmtp->tv_sec = left_ns / 1000000000LL;
+    rmtp->tv_nsec = left_ns % 1000000000LL;
   }
-  if (error == 0 && ev.error == 0) {
-    // homescoop: slicc-kernel ends a clock wait early when a signal arrives
-    // but reports the clock as expired, so a relative sleep that ended more
-    // than 1 ms early was interrupted: EINTR and the time left, as Linux.
-    if ((flags & TIMER_ABSTIME) == 0) {
-      struct timespec end;
-      if (clock_gettime(clock_id, &end) == 0) {
-        long long left_ns = ((long long)rqtp->tv_sec - (end.tv_sec - start.tv_sec)) * 1000000000LL +
-                            (rqtp->tv_nsec - (end.tv_nsec - start.tv_nsec));
-        if (left_ns > 1000000LL) {
-          if (rmtp) {
-            rmtp->tv_sec = left_ns / 1000000000LL;
-            rmtp->tv_nsec = left_ns % 1000000000LL;
-          }
-          return EINTR;
-        }
-      }
-    }
-    if (need_rem) {
-      rmtp->tv_sec = 0;
-      rmtp->tv_nsec = 0;
-    }
-    return 0;
-  }
-  return ENOTSUP;
+  return interrupted ? EINTR : 0;
 }
 
 weak_alias(clock_nanosleep, __clock_nanosleep);

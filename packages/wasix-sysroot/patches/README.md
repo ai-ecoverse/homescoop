@@ -109,7 +109,8 @@ Before -19 the variants differed: `sysroot-ehpic` and `sysroot-exnref-ehpic` had
 - **`clock_nanosleep.c`** (`nanosleep`, `usleep`): a relative sleep that a signal cuts short returns EINTR and the time left (`rem`), as on Linux.
   - Upstream answered ENOTSUP for every failure.
   - slicc-kernel ends the clock wait early but reports the clock as expired, so a relative sleep that ends more than 1 ms early counts as interrupted.
-  - An explicit EINTR from the kernel is honoured too.
+  - An explicit EINTR from the kernel is honoured too. That is what the PIC variants see, since their modules import `fd_fdflags_set`.
+  - `rqtp` and `rmtp` may be the same struct (`sleep()`, `nanosleep(&ts, &ts)` retry loops): the request is copied first and `*rmtp` written last.
 - **`sleep.c`:** an interrupted `sleep()` returns the whole seconds left (`rem.tv_sec`), as musl does. Upstream returned all of them.
 - **`raise.c`:** `raise()` signals the process through `proc_signal(getpid())`, as `kill()` does, and sets errno on failure.
   - Upstream used `thread_signal`, which slicc-kernel does not deliver for the main thread, so the handler never ran. slicc-kernel#250 will add per-thread delivery.
