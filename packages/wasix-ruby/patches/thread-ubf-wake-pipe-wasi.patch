@@ -1,0 +1,168 @@
+--- thread.c
++++ thread.c
+@@ -4435,8 +4435,32 @@
+     volatile int result = 0;
+ 
+     *lerrno = 0;
++#ifdef __wasi__
++    /* WASIX_UBF_PIPE: poll the thread's wakeup pipe as well (see
++     * thread_pthread.c); a wakeup is EINTR. */
++    struct pollfd wfds[2];
++    int wfd = nfds == 1 ? wasix_wake_fd(th->nt) : -1;
++#endif
+     BLOCKING_REGION(th, {
+         if (!RUBY_VM_INTERRUPTED(th->ec)) {
++#ifdef __wasi__
++            if (wfd >= 0) {
++                wfds[0] = fds[0];
++                wfds[1].fd = wfd;
++                wfds[1].events = POLLIN;
++                wfds[1].revents = 0;
++                result = ppoll(wfds, 2, rb_hrtime2timespec(&ts, to), 0);
++                fds[0].revents = wfds[0].revents;
++                if (result > 0 && wfds[1].revents) {
++                    wasix_wake_drain(th->nt);
++                    if (--result == 0) {
++                        result = -1;
++                        errno = EINTR;
++                    }
++                }
++            }
++            else
++#endif
+             result = ppoll(fds, nfds, rb_hrtime2timespec(&ts, to), 0);
+             if (result < 0) *lerrno = errno;
+         }
+--- thread_pthread.c
++++ thread_pthread.c
+@@ -309,6 +309,56 @@
+ #  define USE_UBF_LIST 1
+ #endif
+ 
++#ifdef __wasi__
++/*
++ * WASIX_UBF_PIPE: Ruby interrupts a thread blocked in poll()/select()
++ * (Thread#kill, Thread#raise, Timeout) with pthread_kill(SIGVTALRM), which
++ * makes the system call fail with EINTR. slicc-kernel delivers no such
++ * signal to a thread of a WASIX process: the process gets killed instead.
++ * So each native thread has a wakeup pipe, its blocking waits poll the read
++ * end too, and the unblocking function writes a byte to it.
++ */
++static int
++wasix_wake_fd(struct rb_native_thread *nt)
++{
++    if (!nt) return -1;
++    if (!nt->wasix_wake_ok) {
++        if (pipe2(nt->wasix_wake, O_NONBLOCK | O_CLOEXEC) != 0) return -1;
++        nt->wasix_wake_ok = 1;
++    }
++    return nt->wasix_wake[0];
++}
++
++static void
++wasix_wake_drain(struct rb_native_thread *nt)
++{
++    char buf[64];
++    if (nt && nt->wasix_wake_ok) {
++        while (read(nt->wasix_wake[0], buf, sizeof buf) > 0)
++            ;
++    }
++}
++
++static void
++wasix_wake_thread(struct rb_native_thread *nt)
++{
++    if (nt && nt->wasix_wake_ok) {
++        char c = 0;
++        (void)!write(nt->wasix_wake[1], &c, 1);
++    }
++}
++
++static void
++wasix_wake_close(struct rb_native_thread *nt)
++{
++    if (nt && nt->wasix_wake_ok) {
++        close(nt->wasix_wake[0]);
++        close(nt->wasix_wake[1]);
++        nt->wasix_wake_ok = 0;
++    }
++}
++#endif
++
+ static void threadptr_trap_interrupt(rb_thread_t *);
+ 
+ #ifdef HAVE_SCHED_YIELD
+@@ -1794,6 +1844,9 @@
+         }
+ 
+         RB_ALTSTACK_FREE(nt->altstack);
++#ifdef __wasi__
++        wasix_wake_close(nt);
++#endif
+         ruby_xfree(nt->nt_context);
+         ruby_xfree(nt);
+     }
+@@ -2414,6 +2467,34 @@
+ static int
+ native_fd_select(int n, rb_fdset_t *readfds, rb_fdset_t *writefds, rb_fdset_t *exceptfds, struct timeval *timeout, rb_thread_t *th)
+ {
++#ifdef __wasi__
++    /* WASIX_UBF_PIPE: the thread's wakeup pipe is one of the read fds;
++     * a wakeup is EINTR, as a signal would make it. */
++    int wfd = wasix_wake_fd(th->nt);
++    if (wfd >= 0) {
++        rb_fdset_t own;
++        int mine = 0, r, woke;
++        if (!readfds) {
++            rb_fd_init(&own);
++            readfds = &own;
++            mine = 1;
++        }
++        rb_fd_set(wfd, readfds);
++        r = rb_fd_select(n > wfd ? n : wfd + 1, readfds, writefds, exceptfds, timeout);
++        woke = r > 0 && rb_fd_isset(wfd, readfds);
++        if (woke) {
++            wasix_wake_drain(th->nt);
++            rb_fd_clr(wfd, readfds);
++            r--;
++        }
++        if (mine) rb_fd_term(&own);
++        if (woke && r == 0) {
++            errno = EINTR;
++            return -1;
++        }
++        return r;
++    }
++#endif
+     return rb_fd_select(n, readfds, writefds, exceptfds, timeout);
+ }
+ 
+@@ -2548,7 +2629,13 @@
+ {
+     RUBY_DEBUG_LOG("th:%u thread_id:%p", rb_th_serial(th), (void *)th->nt->thread_id);
+ 
++#ifdef __wasi__
++    /* WASIX_UBF_PIPE: no SIGVTALRM reaches a thread under slicc-kernel
++     * (pthread_kill kills the process instead); wake its poll/select. */
++    wasix_wake_thread(th->nt);
++#else
+     pthread_kill(th->nt->thread_id, SIGVTALRM);
++#endif
+ }
+ 
+ static void
+--- thread_pthread.h
++++ thread_pthread.h
+@@ -105,6 +105,12 @@
+     struct coroutine_context *nt_context;
+     int dedicated;
+ 
++#ifdef __wasi__
++    /* WASIX_UBF_PIPE: see thread_pthread.c. */
++    int wasix_wake[2];
++    int wasix_wake_ok;
++#endif
++
+     size_t machine_stack_maxsize;
+ };
+ 
