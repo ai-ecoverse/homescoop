@@ -72,11 +72,23 @@ const mainExports = new Set(main.exports.map((e) => e.name));
 // Shared host imports (EH tags __cpp_exception/__c_longjmp, ...): the loader
 // gives side modules the same instance python.wasm imports.
 const mainEnvImports = new Set(main.imports.filter((i) => i.module === 'env').map((i) => i.name));
+// thread_local data that a side module takes for plain data (homescoop#192:
+// libunwind's __wasm_lpad_context became thread_local in wasix-sysroot -14's
+// runtimes). A PIE main exports a TLS symbol as its offset in the TLS block,
+// which a side module adds to __tls_base only if it was built knowing the
+// symbol is TLS; otherwise it reads and writes the wrong memory. Names with
+// Itanium TLS wrappers (_ZTH<len><name> / _ZTW<len><name>) among main's
+// imports and exports are thread_local; side-modules.json lists those the
+// side modules were built against, and any other one they import through
+// GOT.mem fails.
+const tlsName = (n) => { const m = /^_ZT[HW](\d+)(.*)$/.exec(n); return m && m[2].length === Number(m[1]) ? m[2] : null; };
+const mainTls = new Set([...main.exports.map((e) => e.name), ...main.imports.map((i) => i.name)].map(tlsName).filter(Boolean));
 const base = opt('--base') ? new Set(wasmSymbols(readFileSync(opt('--base'))).exports.map((e) => e.name)) : null;
 const manifest = JSON.parse(readFileSync(join(here, 'side-modules.json'), 'utf8'));
 const work = mkdtempSync(join(tmpdir(), 'side-abi-'));
 const lines = [];
 let missingTotal = 0;
+const tlsMem = [];
 try {
   // Unpack every pinned package; side modules may satisfy each other.
   const mods = [];
@@ -110,6 +122,9 @@ try {
       for (const i of m.imports) {
         if (i.module === 'env' && !SKIP.has(i.name)) need.add(i.name);
         else if (i.module === 'GOT.mem' || i.module === 'GOT.func') need.add(i.name);
+        if (i.module === 'GOT.mem' && mainTls.has(i.name) && !manifest.thread_local.includes(i.name)) {
+          tlsMem.push(`${m.file}: GOT.mem.${i.name}`);
+        }
       }
     }
     const fromMain = [...need].filter((s) => mainExports.has(s));
@@ -127,12 +142,17 @@ try {
   }
   const mainSsl = [...mainExports].filter((s) => OPENSSL.test(s));
   lines.push('', `python.wasm exports ${mainSsl.length} OpenSSL-named symbols.`);
+  lines.push('', `GOT.mem imports of python.wasm thread_local data: ${tlsMem.length ? tlsMem.join(', ') : 'none'}`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
 const report = lines.join('\n') + '\n';
 process.stdout.write(report);
 if (opt('--report')) writeFileSync(opt('--report'), report);
+if (tlsMem.length) {
+  console.error(`side-abi: ${tlsMem.length} side-module GOT.mem imports resolve to thread_local data of python.wasm`);
+  process.exitCode = 1;
+}
 if (missingTotal) {
   console.error(`side-abi: ${missingTotal} side-module imports unresolved`);
   process.exit(1);

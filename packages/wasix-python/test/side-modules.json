@@ -1,5 +1,9 @@
 {
   "comment": "Published py-* packages that load into wasix-python (homescoop#181): side-abi.mjs checks their native extensions' imports, the cert imports them all. Pinned by tarball sha256.",
+  "thread_local": [
+    "errno"
+  ],
+  "thread_local_comment": "C/C++ thread_local data of the python.wasm these side modules were built against (3.14.2-11; names with _ZTH/_ZTW wrappers). side-abi.mjs fails when python.wasm makes another symbol a side module imports through GOT.mem thread_local.",
   "packages": [
     {
       "name": "@ai-ecoverse/py-numpy",

@@ -88,10 +88,26 @@ fi
 "$HOSTPY" -c 'import sys; assert sys.version_info[:3] == (3, 14, 2), sys.version'
 
 # --- WASIX toolchain ---------------------------------------------------------
-# Pinned wasixcc + wasix-sysroot 2025.9.30-17. sysroot-ehpic (legacy EH, PIC)
+# Pinned wasixcc + wasix-sysroot 2025.9.30-18. sysroot-ehpic (legacy EH, PIC)
 # already has the setitimer → proc_raise_interval2 and clock_nanosleep EINTR
 # libc patches (patches/README.md); advisory locks are lock_stubs.c below.
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
+# C++ runtime ABI of the side modules (README "Side modules"): the published
+# py-* extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a
+# plain (not thread_local) __wasm_lpad_context from python.wasm, as 3.14.2-11
+# exported them. wasix-sysroot >= -14's rebuilt libc++ runtimes have none of
+# that, so python links the libc++/libc++abi/libunwind of upstream wasix-libc
+# v2026-07-03.1 sysroot-ehpic (what -11 was linked against, byte for byte).
+CXXRT_URL="https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
+CXXRT_SHA="54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
+CXXRT="$B/cxxrt"
+rm -rf "$CXXRT" && mkdir -p "$CXXRT"
+homescoop_fetch "$CXXRT_URL" "$CXXRT_SHA" "$CXXRT/sysroot-ehpic.tar.gz"
+tar xzf "$CXXRT/sysroot-ehpic.tar.gz" -C "$CXXRT"
+EHPIC_LIB="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/lib/wasm32-wasip1"
+for a in libc++.a libc++abi.a libc++experimental.a libunwind.a; do
+  cp "$CXXRT/wasix-sysroot-ehpic/sysroot/lib/wasm32-wasi/$a" "$EHPIC_LIB/$a"
+done
 WASM_OPT="$WASIXCC_BINARYEN_LOCATION/bin/wasm-opt"
 LLVM_NM="$WASIXCC_LLVM_LOCATION/bin/llvm-nm"
 export WASIXCC_RUN_WASM_OPT=no WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes
@@ -102,6 +118,8 @@ unset CXX CFLAGS CPPFLAGS LDFLAGS LIBS FREETYPE FREETYPE_ROOT JPEG JPEG_ROOT PNG
 export PKG_CONFIG_LIBDIR="$DEPS/lib/pkgconfig"
 export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"
 SYSROOT_LIBC="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/lib/wasm32-wasip1/libc.a"
+"$WASIXCC_LLVM_LOCATION/bin/llvm-nm" --defined-only -j "$EHPIC_LIB/libunwind.a" 2>/dev/null | grep -qx _Unwind_CallPersonality \
+  || { echo "homescoop wasix-python: libunwind lacks _Unwind_CallPersonality (side-module ABI)" >&2; exit 1; }
 "$LLVM_NM" --defined-only "$SYSROOT_LIBC" 2>/dev/null | grep -q ' T __wasi_proc_raise_interval2$' \
   || { echo "homescoop wasix-python: sysroot-ehpic libc lacks proc_raise_interval2 (setitimer patch)" >&2; exit 1; }
 

@@ -16,9 +16,10 @@ LLVM_VERSION="21.1.206"
 BINARYEN_VERSION="133"
 # -15 adds st_uid/st_gid = getuid()/getgid() (slicc_stat_owner) to -14,
 # which wasix-m4 1.4.20-2 links against (fcntl F_SETFD fix); wasix-gnupg
-# needs it for its homedir ownership checks.
-SYSROOT_VERSION="2025.9.30-17"
-SYSROOT_SHA="502559009a819ef15263aa5b6468e100ef813c3e6151cd4563cf04762488e4b3"
+# needs it for its homedir ownership checks. -18 (wasix-python 3.14.2-12):
+# select exceptfds/timeouts, physical chdir, POSIX TZ, socketpair flags.
+SYSROOT_VERSION="2025.9.30-18"
+SYSROOT_SHA="ae55a48b143ebf0b0b7be2a2babebda76b9947316226089e03fb6ed9a2f07f2d"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
