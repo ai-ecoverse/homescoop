@@ -12,7 +12,11 @@ export default async function (ctx) {
   await addUser({ name: 'cone' });
   const count = (text, re) => (text.match(re) ?? []).length;
   for (const user of ['root', 'cone']) {
-    const sh = (script) => run(['bash', '-c', `unset GNUPGHOME; ${script} 2>&1`], { cwd: '/tmp', ...(user === 'cone' && { user }) });
+    // stdout and stderr together: gpg warns on stderr.
+    const sh = async (script) => {
+      const r = await run(['bash', '-c', `unset GNUPGHOME; ${script}`], { cwd: '/tmp', ...(user === 'cone' && { user }) });
+      return { ...r, stdout: r.stdout + r.stderr };
+    };
     const gen = await sh('gpg --batch --pinentry-mode loopback --passphrase "" --quick-gen-key "U <u@example.org>" default default never; echo "rc=$?"');
     assert.match(gen.stdout, /rc=0\s*$/, `${user} keygen:\n${gen.stdout}`);
     assert.doesNotMatch(gen.stdout, /unsafe (ownership|permissions)/, `${user}:\n${gen.stdout}`);
