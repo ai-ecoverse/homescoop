@@ -112,7 +112,14 @@ t = p.read_text()
 n = t.count("$^O eq 'linux'")
 if n != 2:
     sys.exit(f"{p}: expected 2 linux checks, found {n}")
-p.write_text(t.replace("$^O eq 'linux'", "$Config{osname} eq 'linux'"))
+t = t.replace("$^O eq 'linux'", "$Config{osname} eq 'linux'")
+# wasixcc's preprocess-only mode (-E -P -) passes no --sysroot; add it from
+# the environment (set for make below), so Config.pm keeps no build path.
+old = 'return "$cppstdin $Config{cppflags} $Config{cppminus}";'
+if t.count(old) != 1:
+    sys.exit(f"{p}: default_cpp return not found")
+t = t.replace(old, 'return "$cppstdin $Config{cppflags}" . ($ENV{HOMESCOOP_TARGET_SYSROOT} ? " --sysroot=$ENV{HOMESCOOP_TARGET_SYSROOT}" : "") . " $Config{cppminus}";')
+p.write_text(t)
 PY
 
   EMU_CFLAGS="-D_WASI_EMULATED_PROCESS_CLOCKS -D_WASI_EMULATED_GETPID -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_MMAN"
@@ -205,6 +212,9 @@ PY
   if [[ -f Makefile.config ]]; then
     sed -i.bak -E 's/ -fPIC//g; s/-fPIC //g' Makefile.config || true
   fi
+  # Errno_pm.PL's target cpp (see above).
+  export HOMESCOOP_TARGET_SYSROOT="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot"
+  test -f "$HOMESCOOP_TARGET_SYSROOT/include/errno.h"
   make -j"${HOMESCOOP_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}" \
     2>&1 | tee "$WORK/make-wasix.log" || true
 
