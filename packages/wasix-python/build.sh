@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CPython 3.14 for slicc WASIX, cross-built from source (homescoop#181):
-# a dynamic-main python.wasm on wasix-sysroot -17's sysroot-ehpic (legacy
+# a dynamic-main python.wasm on the pinned wasix-sysroot's sysroot-ehpic (legacy
 # wasm EH, PIC; side modules load by dlopen), with its stdlib.
 #
 # Steps: host CPython 3.14.2 (the build python, from the same tarball) →
@@ -274,23 +274,31 @@ if [[ "${HOMESCOOP_STOP_AFTER:-}" == deps ]]; then
   exit 0
 fi
 
-# --- stubs (as 3.14.2-6..-11) ------------------------------------------------
-# uid/gid 1000, a passwd-less pwd/grp, no-op advisory locks, C++ TLS symbols:
-# an archive, since configure lists LIBS twice.
+# --- stubs ---------------------------------------------------------------------
+# No-op advisory locks and C++ TLS symbols: an archive, since configure lists
+# LIBS twice. Since 3.14.2-13 user and group ids and pwd/grp come from
+# wasix-sysroot -20's libc (slicc-kernel process credentials, /etc/passwd;
+# homescoop#207), not uid/gid-1000 stubs.
 STUBS="$B/stubs"
 rm -rf "$STUBS" && mkdir -p "$STUBS"
 cp "$PKG/fcntl_wasix_extra.h" "$STUBS/"
-for s in uid_stubs pwd_grp_stubs lock_stubs cpp_tls_stubs; do
+for s in lock_stubs cpp_tls_stubs; do
   # shellcheck disable=SC2086
   wasixcc $DEP_CFLAGS -I"$STUBS" -include "$STUBS/fcntl_wasix_extra.h" -c "$PKG/$s.c" -o "$STUBS/$s.o"
 done
 wasixar rcs "$STUBS/libpython-wasix-stubs.a" "$STUBS"/*.o
 WRAP=""
-for f in getuid geteuid getgid getegid getpwuid getpwnam getpwuid_r getpwnam_r getgrgid getgrnam getgrgid_r getgrnam_r flock fcntl lockf; do
+for f in flock fcntl lockf; do
   WRAP+=" -Wl,--wrap=$f"
 done
-for f in getuid geteuid getgid getegid flock fcntl lockf; do
+for f in flock fcntl lockf; do
   WRAP+=" -Wl,--export=__wrap_$f"
+done
+# cpp_tls_stubs.c: nothing in CPython references these, so pull them in and
+# export them, as -11 did (python.wasm imported env._ZTH5errno and
+# env.__cxa_thread_atexit_impl otherwise).
+for f in _ZTH5errno __cxa_thread_atexit_impl; do
+  WRAP+=" -Wl,-u,$f -Wl,--export=$f"
 done
 
 # --- CPython: patch, configure, make ------------------------------------------
@@ -311,7 +319,8 @@ PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-
 # the --wrap no-op but no header declares it), all three off as on -11.
 printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words_bigendian=no \
   ac_cv_func_fork=no ac_cv_func_vfork=no \
-  ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no ac_cv_func_lockf=no >"$B/config.site"
+  ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no ac_cv_func_lockf=no \
+  ac_cv_working_tzset=yes >"$B/config.site"
 rm -rf "$CROSS" && mkdir -p "$CROSS"
 (
   cd "$CROSS"
@@ -382,6 +391,10 @@ cp "$SRCDIR/Lib/site-packages/README.txt" "$PYLIB/site-packages/README.txt"
 cp "$PKG"/stdlib/*.py "$PYLIB/"
 cp "$PKG"/stdlib/site-packages/*.pth "$PYLIB/site-packages/"
 
+# Build-machine-only values out of the sysconfig records, before compileall
+# (unchecked-hash .pyc would keep the old _sysconfigdata).
+python3 "$PKG/sanitize-sysconfig.py" "$PYLIB" "$B"
+
 # Bytecode: unchecked-hash .pyc (no mtimes), by the same CPython.
 echo "== wasix-python: compileall (unchecked-hash)"
 "$HOSTPY" -m compileall -q -j0 --invalidation-mode unchecked-hash "$PYLIB" >/dev/null || true
@@ -403,7 +416,8 @@ echo "== wasix-python: compileall (unchecked-hash)"
   echo "| SQLite | $(pkg-config --modversion sqlite3) | public domain | sqlite.org |"
   echo "| GNU Readline | 8.3 | GPL-3.0-or-later | gnu.org/software/readline |"
   echo "| ncurses (tinfo) | 6.5 | X11 | invisible-island.net/ncurses |"
-  echo "| wasix-libc | wasix-sysroot 2025.9.30-17 | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
+  echo "| wasix-libc | wasix-sysroot $(node -p "require('$WASIXCC_SYSROOT_PREFIX/package.json').version") | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
+  echo "| libc++, libc++abi, libunwind | wasix-libc v2026-07-03.1 sysroot-ehpic | Apache-2.0 WITH LLVM-exception | github.com/wasix-org/wasix-libc |"
   echo
   echo "lib/python3.14/site-packages/pip is pip (MIT), from CPython's ensurepip bundle."
 } >"$DEST/THIRD-PARTY-NOTICES.md"

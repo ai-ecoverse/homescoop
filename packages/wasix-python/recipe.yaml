@@ -42,9 +42,10 @@ dependencies:
   run: []
 about:
   homepage: https://www.python.org
-  license: PSF-2.0
+  # GNU Readline is linked statically.
+  license: PSF-2.0 AND GPL-3.0-or-later
   notes: |
-    WASIX CPython 3.14 dynamic-main on wasix-sysroot -18's sysroot-ehpic
+    WASIX CPython 3.14 dynamic-main on the pinned wasix-sysroot's sysroot-ehpic
     (legacy wasm EH, PIC; side modules by dlopen), cross-built from source
     in CI by build.sh (homescoop#181): host CPython from the same tarball,
     static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline; zlib and
@@ -53,7 +54,8 @@ about:
     fork/posix_spawn, strip. No fork; subprocess via posix_spawn.
     The sysroot's libc has the setitimer (proc_raise_interval2) and
     clock_nanosleep EINTR patches (patches/wasix-libc-*.patch); advisory
-    locks, uid/gid 1000 and passwd-less pwd/grp are --wrap stubs. The C++
+    locks are --wrap stubs; user ids and pwd/grp come from the sysroot's libc
+    (slicc-kernel process credentials, -20). The C++
     runtime side modules import (libc++/libc++abi/libunwind) is upstream
     wasix-libc v2026-07-03.1 sysroot-ehpic, as in -11 (README "Side modules").
     stdlib/ adds sys.executable from PATH (_slicc_site.py, sitecustomize.py,

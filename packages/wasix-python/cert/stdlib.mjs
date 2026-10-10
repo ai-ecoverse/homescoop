@@ -4,7 +4,8 @@
  * round trips, a TLS 1.3 handshake between two ssl.SSLObjects over memory
  * BIOs (self-signed P-256 cert below, valid to 2126), RAND, sqlite3
  * (3.53.4, -11's compile options), threads, subprocess (posix_spawn),
- * select on a pipe. ctypes is reported, not asserted (no _ctypes, as -11).
+ * select on a pipe, time.tzset with POSIX TZ rules and strftime('%Z')
+ * (3.14.2-13). ctypes is reported, not asserted (no _ctypes, as -11).
  */
 const CERT = `-----BEGIN CERTIFICATE-----
 MIIBdTCCARqgAwIBAgIUYJ691OXDq1hZBNBhaN/YMEQ7xSMwCgYIKoZIzj0EAwIw
@@ -91,6 +92,14 @@ out["subprocess"] = [r.stdout, o.decode(), cwd, env, rc, child]
 # select on a pipe
 rfd, wfd = os.pipe(); os.write(wfd, b"x")
 out["select"] = [select.select([rfd], [], [], 1)[0] == [rfd], select.select([], [wfd], [], 1)[1] == [wfd]]
+# time.tzset and POSIX TZ rules (wasix-sysroot -18, ac_cv_working_tzset=yes in -13)
+import time
+tz = []
+for zone in ("EST5EDT,M3.2.0,M11.1.0", "CET-1CEST,M3.5.0,M10.5.0/3"):
+    os.environ["TZ"] = zone; time.tzset()
+    jan, jul = time.localtime(1767268800), time.localtime(1783512000)  # 2026-01-01, 2026-07-08 12:00 UTC
+    tz.append([time.tzname, jan.tm_gmtoff, jul.tm_gmtoff, time.strftime("%Z", jan), time.strftime("%Z", jul)])
+out["tz"] = [hasattr(time, "tzset"), tz]
 try:
     import ctypes
     out["ctypes"] = "importable"
@@ -137,4 +146,8 @@ export default async function (ctx) {
   assert.deepEqual(o.threads, [8000, 328350]);
   assert.deepEqual(o.subprocess, ['hi\n', 'through cat', '/tmp', 'envok', 3, '(3, 14)']);
   assert.deepEqual(o.select, [true, true]);
+  assert.deepEqual(o.tz, [true, [
+    [['EST', 'EDT'], -18000, -14400, 'EST', 'EDT'],
+    [['CET', 'CEST'], 3600, 7200, 'CET', 'CEST'],
+  ]], JSON.stringify(o.tz));
 }
