@@ -35,3 +35,30 @@
  	      execute_command (current_command);
  
  	    exec_done:
+--- a/execute_cmd.c
++++ b/execute_cmd.c
+@@ -74,6 +74,10 @@
+ #include "hashlib.h"
+ #include "jobs.h"
+ #include "execute_cmd.h"
++
++#if defined (__EMSCRIPTEN__)
++extern volatile sig_atomic_t slicc_fork_tty_sig;	/* jobs.c */
++#endif
+ #include "findcmd.h"
+ #include "redir.h"
+ #include "trap.h"
+@@ -5095,6 +5099,13 @@
+   executing_builtin++;
+   executing_command_builtin |= builtin == command_builtin;
+   result = ((*builtin) (words->next));
++#if defined (__EMSCRIPTEN__)
++  /* slicc (homescoop wasm-bash 5.3.0-12): a ^Z typed while a builtin ran
++     reached the shell, which ignores it; drop what jobs.c's recorder kept
++     so it is not passed on to the next job of the line. */
++  if (slicc_fork_tty_sig == SIGTSTP)
++    slicc_fork_tty_sig = 0;
++#endif
+ 
+   /* This shouldn't happen, but in case `return' comes back instead of
+      longjmp'ing, we need to unwind. */
