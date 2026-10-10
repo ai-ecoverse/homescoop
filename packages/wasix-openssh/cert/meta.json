@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.42.3",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.41.3",
   "uplink": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -15,7 +15,7 @@
   "host": "node packages/wasix-openssh/cert/run.mjs --tarball <package.tgz>: boots slicc-kernel Node entry with uplink to (1) an ephemeral host OpenSSH sshd (temp keys, loopback), (2) cert/none-auth-server.py, (3) a seeded bare git repo on the host. Runs cert/*.mjs checklist.",
   "patches": {
     "0001-wasix-stub-getrrsetbyname.patch": "SSHFP/DNSSEC getrrsetbyname always ERRSET_FAIL (no resolv.h); ordinary DNS via kernel — exercised by ssh to sshd.cert.internal / none.cert.internal",
-    "0002-wasix-scp-sftp-posix-spawn.patch": "scp/sftp spawn ssh via posix_spawnp (no fork); needs kernel sock_pair (cert pin ≥ 1.42.3)"
+    "0002-wasix-scp-sftp-posix-spawn.patch": "scp/sftp spawn ssh via posix_spawnp (no fork); needs kernel sock_pair (engines ≥1.41.0; cert pin 1.41.3)"
   },
   "checklist": [
     "ssh -V / ssh-keygen -t ed25519: versions and key file modes 0600 under slicc_fs",

@@ -42,7 +42,7 @@ about:
     ssh-add is shipped; ssh-agent is not. Without an agent, ssh-add -l exits 2.
 
     scp/sftp: posix_spawnp instead of fork (patch 0002); socketpair needs
-    slicc-kernel ≥ 1.42.3 in the host-node cert pin.
+    slicc-kernel ≥ 1.41.0 (engines); host-node cert pin 1.41.3.
 
     Cert: host-node (Node kernel + host sshd over uplink; tiny host none-auth
     server; bare git repo for GIT_SSH_COMMAND). Coordinator certifies and

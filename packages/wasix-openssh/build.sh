@@ -15,7 +15,7 @@ PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 # Upstream portable tag is 10.6p1; npm packaging base is recipe 10.6.0.
 UPSTREAM_PORTABLE="${HOMESCOOP_OPENSSH_PORTABLE:-10.6p1}"
-PKG_VER="${VERSION}-3"
+PKG_VER="${VERSION}-4"
 WORK="${WASIX_OPENSSH_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
@@ -333,6 +333,7 @@ pkg = {
     "version": pkg_ver,
     "description": f"OpenSSH {portable} client for slicc WASIX: " + ", ".join(sorted(cmds)),
     "license": "SSH-OpenSSH",
+    "engines": {"slicc-kernel": ">=1.41.0"},
     "repository": {
         "type": "git",
         "url": "git+https://github.com/ai-ecoverse/homescoop.git",

@@ -53,9 +53,9 @@ one.
 Outbound TCP uses kernel sockets (uplink-routed). Exec mode needs no fork.
 `scp` / `sftp` spawn the `ssh` helper with **`posix_spawnp`** (patch
 `0002-wasix-scp-sftp-posix-spawn.patch`) over a `socketpair`; they need a
-kernel with working `sock_pair` (cert pin **slicc-kernel ≥ 1.42.3**).
-ProxyCommand, ControlMaster, and `-f` still prefer spawn over fork; true
-daemonize and double-fork paths are unsupported.
+kernel with working `sock_pair` (`engines.slicc-kernel` **≥ 1.41.0**; cert
+pin **1.41.3**). ProxyCommand, ControlMaster, and `-f` still prefer spawn
+over fork; true daemonize and double-fork paths are unsupported.
 
 ## Sysroot
 
