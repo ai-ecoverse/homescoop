@@ -3,7 +3,7 @@
  * @typedef {object} CertContext
  * @property {string} packageName homescoop recipe dir
  * @property {string} npmName
- * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array}) => Promise<{status:number,stdout:string,stderr:string}>} run
+ * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array, user?: string|number}) => Promise<{status:number,stdout:string,stderr:string}>} run (user: slicc-kernel >= 1.44.0)
  * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array}) => Promise<{status:number,stderr:string,writes:string[]}>} runWrites stdout one chunk per write()
  * @property {(path: string, data: string|Uint8Array) => Promise<void>} write
  * @property {(path: string) => Promise<string|null>} read
@@ -59,6 +59,7 @@ export async function ptySession(kernel, argv, o = {}) {
     rows: o.rows ?? 24,
     env: o.env ?? {},
     cwd: o.cwd ?? '/home',
+    ...(o.user !== undefined && { user: o.user }),
   });
   t.onData = (b) => {
     out += dec.decode(b instanceof Uint8Array ? b : new Uint8Array(b), { stream: true });
@@ -106,6 +107,7 @@ export function makeContext(page, meta) {
           cwd: opts.cwd || '/home',
           env: opts.env || {},
           stdin: opts.stdin,
+          ...(opts.user !== undefined && { user: opts.user }),
         },
       );
     },
@@ -123,8 +125,12 @@ export function makeContext(page, meta) {
           return { status: r.status, stderr: r.stderr, writes };
         },
         argv,
-        { cwd: opts.cwd || '/home', env: opts.env || {}, stdin: opts.stdin },
+        { cwd: opts.cwd || '/home', env: opts.env || {}, stdin: opts.stdin, ...(opts.user !== undefined && { user: opts.user }) },
       );
+    },
+    // kernel.users.add (slicc-kernel >= 1.44.0): { name, uid, gid, home, shell, groups }.
+    async addUser(opts) {
+      return page.evaluate((o) => window.kernel.users.add(o), opts);
     },
     async write(path, data) {
       const text = typeof data === 'string' ? data : Buffer.from(data).toString('binary');
