@@ -5,7 +5,8 @@
  * side modules (test/side-abi.mjs checks the imports statically at build).
  * Smoke: numpy linalg + fft, pandas groupby + read_csv, scipy optimize +
  * integrate, matplotlib Agg savefig PNG, PIL open/resize/save, kiwisolver,
- * contourpy; the pure-Python packages import.
+ * contourpy; the pure-Python packages import. Since 3.14.2-15 without
+ * PYTHONPATH: _slicc_site.discover() finds them in /node_modules.
  */
 const PKGS = ['py-numpy', 'py-pandas', 'py-scipy', 'py-matplotlib', 'py-contourpy', 'py-kiwisolver', 'py-pillow',
   'py-fonttools', 'py-cycler', 'py-packaging', 'py-pyparsing', 'py-python-dateutil', 'py-pytz', 'py-six', 'py-tzdata'];

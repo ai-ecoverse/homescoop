@@ -23,6 +23,24 @@ in the catalog only in the same PR as the kernel bump.
 A homescoop remap of `dlopen(None)` → `bin/python.wasm` was tried and
 **rejected** (second PIE load; `Py_IsInitialized` would be 0). Not `_slicc_site`.
 
+## 3.14.2-15 py-* discovery (no PYTHONPATH)
+
+- **3.14.2-14** finds no py-* package by itself: `import numpy` is
+  `ModuleNotFoundError` unless `PYTHONPATH` lists every `site-packages`
+  (cert/sidemods.mjs set it until -15). With pnpm 12, even that is hard:
+  `pnpm add -g a b` makes one global project per package, and the
+  transitive py-* (py-numpy under py-pandas, …) are only in each project's
+  `.pnpm` store.
+- **Not picked up, by design** (cert/discovery.mjs checks the first):
+  a py-* whose `wasix-python` (Node's lookup from its real directory) is
+  another version, e.g. one built for 3.14.2-13 next to a 3.14.2-15 python
+  (`python -v`: "skip …: built for wasix-python 3.14.2-13, this is
+  3.14.2-15"); a py-* whose `requires` abi/platform differ; a py-* in
+  another (non-pnpm-global) project; a second copy of a name already found.
+  Packages in a venv without `--system-site-packages` are not added.
+- `.pth` files inside a py-* `site-packages` are not run (as with
+  `PYTHONPATH`); no published py-* has one.
+
 # Negative proof (wasix-python 3.14.2-10 / -11 venvs)
 
 ## 3.14.2-11 (homescoop#157), slicc-kernel 1.30.0's Node entry

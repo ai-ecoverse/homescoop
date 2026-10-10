@@ -25,6 +25,24 @@ Since 3.14.2-15:
   `OSError` (not `ImportError`), so **numpy fails** (`except ImportError` misses
   it) and with it every py-* that imports numpy — worse than the hf case. See
   `cert/NEGATIVE.md`. `cert/sidemods.mjs` on that kernel is the py-* re-pin gate.
+- **py-* packages are found without `PYTHONPATH`.** A package that declares
+  `slicc.python.sitePackages` in its `package.json` (py-numpy, py-pandas, …) is
+  put on `sys.path` when it is installed in python's own project (npm's
+  `node_modules`, or pnpm's, including its `.pnpm` store: a local `pnpm add`)
+  or, for pnpm ≥ 11 global installs (`pnpm add -g`, one project per package
+  under `$PNPM_HOME/global/v<N>/`), in a sibling global project. It is taken
+  only if its `slicc.python.requires` abi/platform match (none: pure Python),
+  and if the `wasix-python` it resolves to (Node's lookup from its real
+  directory) is this python's exact version, so side modules never mix
+  interpreter builds; the first package of a name wins. `python -v` reports
+  what was skipped and why. The scan is cached in `.slicc-site-cache` in
+  python's directory (keyed on the package directories and their
+  `package.json` stamps; `-v` always rescans); with the cache, a start costs
+  about 2 ms more than with discovery off, and less than the same directories
+  on `PYTHONPATH`. As with `PYTHONPATH`, `.pth` files in those directories are
+  not run. It runs from `site-packages/slicc-executable.pth`, so a venv sees
+  py-* packages only with `--system-site-packages`; `SLICC_PYTHON_DISCOVER=0`
+  turns it off.
 
 Since 3.14.2-14 (wasix-sysroot -21):
 - `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,
