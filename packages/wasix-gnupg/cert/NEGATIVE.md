@@ -29,3 +29,21 @@ cv25519), the PKESK packet tag and the decrypted bytes are compared exactly.
 
 The published 2.4.9-2 (built on a Mac) passes as well. The CI build of the
 same sources behaves the same.
+
+## File modes (2.4.9-4, homescoop#169)
+
+`cert/modes.mjs` against 2.4.9-4 (wasix-sysroot 2025.9.30-16) on
+slicc-kernel 1.34.1, which has no slicc_fs imports: every file keeps the
+store's default, and the spec fails.
+
+```text
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++   '.': '755',
++   'openpgp-revocs.d': '755',
++   'openpgp-revocs.d/<fpr>.rev': '644',
++   'private-keys-v1.d': '755',
++   'private-keys-v1.d/<keygrip>.key': '644',
+```
+
+On 1.35.1 it passes: 700 / 700 / 600, and a 755 homedir gets
+"WARNING: unsafe permissions on homedir".

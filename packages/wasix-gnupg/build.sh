@@ -5,8 +5,10 @@
 #   socket: WASIX (real threads), not Emscripten.
 # - No Asyncify anywhere: every spawn is posix_spawn (proc_spawn3) and
 #   gpg-agent --daemon detaches by spawning itself (gnupg-*-wasi.patch).
-# - Needs wasix-sysroot >= 2025.9.30-15: its libc reports files as the realm
-#   user's (st_uid/st_gid = getuid()), which GnuPG's homedir checks require.
+# - Needs wasix-sysroot >= 2025.9.30-16: its libc reports files as the realm
+#   user's (st_uid/st_gid = getuid()), which GnuPG's homedir checks require
+#   (-15), and sets and reads file modes through slicc-kernel's slicc_fs
+#   imports, so keys are 600 and private-keys-v1.d 700 (-16, homescoop#169).
 set -euo pipefail
 
 HOMESCOOP_ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -17,7 +19,7 @@ homescoop_load_recipe wasix-gnupg
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-3"
+PKG_VER="${VER}-4"
 WORK="${WASIX_GNUPG_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
@@ -34,7 +36,7 @@ LIBS=(
 )
 
 # No wasixcc on PATH (CI runners): install the pinned toolchain, which
-# brings wasix-sysroot 2025.9.30-15 (slicc_stat_owner).
+# brings wasix-sysroot 2025.9.30-16 (slicc_stat_owner, slicc_fs).
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi
@@ -52,6 +54,12 @@ command -v wasixcc >/dev/null || { echo "homescoop wasix-gnupg: wasixcc not on P
 SYSROOT_LIBC="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot/lib/wasm32-wasi/libc.a"
 llvm-ar t "$SYSROOT_LIBC" | grep -qx slicc_stat_owner.o || {
   echo "homescoop wasix-gnupg: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-15 (no slicc_stat_owner.o)" >&2
+  exit 1
+}
+# List first: grep -q closing the pipe early would fail llvm-nm (pipefail).
+SYSROOT_UNDEF="$(llvm-nm -u "$SYSROOT_LIBC" 2>/dev/null)"
+grep -q __slicc_fs_fd_chmod <<<"$SYSROOT_UNDEF" || {
+  echo "homescoop wasix-gnupg: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-16 (no slicc_fs imports)" >&2
   exit 1
 }
 

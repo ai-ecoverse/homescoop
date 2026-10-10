@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
   "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
@@ -14,6 +14,7 @@
     "symmetric -c: right passphrase decrypts; wrong one 'Bad session key', rc 2",
     "--clearsign + --verify: Good signature",
     "--detach-sign checked by gpgv against an exported keyring: Good; tampered file: BAD signature, rc 1",
-    "--armor --export; gpgconf --list-components; gpgconf --kill gpg-agent"
+    "--armor --export; gpgconf --list-components; gpgconf --kill gpg-agent",
+    "cert/modes.mjs (wasix-sysroot 2025.9.30-16 + slicc-kernel 1.35.1 slicc_fs): default ~/.gnupg 700, private-keys-v1.d 700, both .key 600, trustdb.gpg 600, openpgp-revocs.d 700 and its .rev 600, pubring.kbx 644 (umask, as on Linux); a 755 homedir gets gpg's 'unsafe permissions' warning"
   ]
 }
