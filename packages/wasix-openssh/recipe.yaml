@@ -6,7 +6,7 @@ builder: host
 # Renovate: manual — OpenBSD portable tags are V_X_Y_PZ, not semver.
 version: "10.6.0"
 npm: "@ai-ecoverse/wasix-openssh"
-summary: "OpenSSH 10.6p1 client for slicc WASIX (ssh, ssh-keygen)"
+summary: "OpenSSH 10.6p1 client for slicc WASIX (ssh, ssh-keygen, scp, sftp, ssh-add)"
 source:
   url: "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.6p1.tar.gz"
   sha256: "a9dc9565dffe8640f64d863cd29a32bc4a3dbdec0566a7fc44c5d6ee767d5f39"

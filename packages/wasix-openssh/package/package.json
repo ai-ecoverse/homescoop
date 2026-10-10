@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-openssh",
   "version": "10.6.0-1",
-  "description": "OpenSSH 10.6p1 client for slicc WASIX: ssh, ssh-keygen",
+  "description": "OpenSSH 10.6p1 client for slicc WASIX: ssh, ssh-keygen, scp, sftp, ssh-add",
   "license": "SSH-OpenSSH",
   "repository": {
     "type": "git",
@@ -43,6 +43,15 @@
       },
       "ssh-keygen": {
         "wasm": "bin/ssh-keygen.wasm"
+      },
+      "scp": {
+        "wasm": "bin/scp.wasm"
+      },
+      "sftp": {
+        "wasm": "bin/sftp.wasm"
+      },
+      "ssh-add": {
+        "wasm": "bin/ssh-add.wasm"
       }
     }
   }

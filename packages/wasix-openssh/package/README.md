@@ -2,7 +2,7 @@
 
 [OpenSSH](https://www.openssh.com/) portable **10.6p1** client tools for the
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
-and (when the build produces them) `scp` / `sftp` / `ssh-add`.
+`scp`, `sftp`, and `ssh-add`.
 
 Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-17**, linking
 **wasix-openssl 3.5.9-3** and **wasix-zlib 1.3.1-2** via pkg-config only
