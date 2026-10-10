@@ -687,6 +687,46 @@ homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-17; files fro
   "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
   "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
 
+# The bundled gems were installed by the build machine's ruby: refuse
+# anything host-native in the package.
+python3 - "$DEST" <<'PY'
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+bad = []
+# 1. No ELF or Mach-O binaries (host .so/.bundle) anywhere.
+magics = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce", b"\xca\xfe\xba\xbe")
+for f in root.rglob("*"):
+    if f.is_file() and not f.is_symlink():
+        with f.open("rb") as h:
+            if h.read(4) in magics:
+                bad.append(f"host binary: {f.relative_to(root)}")
+gems = root / "lib/ruby/gems"
+# 2. No native-gem platform builds: gemspecs for a host platform, or
+#    extensions/<platform> other than the wasm one.
+for spec in gems.rglob("specifications/*.gemspec"):
+    t = spec.read_text(errors="replace")
+    m = re.search(r'\.platform = "([^"]+)"', t)
+    if m and m.group(1) not in ("ruby", "wasm32-wasi"):
+        bad.append(f"platform {m.group(1)}: {spec.relative_to(root)}")
+for ext in gems.glob("*/extensions/*"):
+    if ext.is_dir() and ext.name != "wasm32-wasi":
+        bad.append(f"native extension dir: {ext.relative_to(root)}")
+# 3. No host gem/ruby paths in shipped Ruby (rbconfig.rb records the build
+#    tree, like -6's /tmp prefixes, but never the host's gem or ruby dirs).
+for f in list(root.rglob("*.rb")) + list(root.rglob("*.gemspec")):
+    # Code only: upstream doc comments use /usr/lib/ruby as an example path.
+    t = "\n".join(l for l in f.read_text(errors="replace").splitlines() if not l.lstrip().startswith("#"))
+    pats = ("/var/lib/gems", "/usr/lib/ruby") if f.name == "rbconfig.rb" else ("/var/lib/gems", "/usr/lib/ruby", "/home/runner")
+    for pat in pats:
+        if pat in t:
+            bad.append(f"{pat} in {f.relative_to(root)}")
+if bad:
+    print("homescoop wasix-ruby: host artefacts in the package:", *bad[:40], sep="\n  ")
+    sys.exit(1)
+print("host-artefact check: no ELF/Mach-O, no native gem platform/extension dirs, no host gem/ruby paths")
+PY
+
 python3 - "$DEST" "$VER" "$PKG_VER" "$OPENSSL_NOTE" "$ASYNCIFY_BUF" <<'PY'
 import json, sys
 from pathlib import Path
