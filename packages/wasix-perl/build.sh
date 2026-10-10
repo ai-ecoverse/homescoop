@@ -216,6 +216,10 @@ PY
   fi
   # Errno_pm.PL's target cpp (see above).
   export HOMESCOOP_TARGET_SYSROOT="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot"
+  # perl's link has duplicate regex symbols (libperl.a and ext/re). Without
+  # this, make stops at the perl link and never builds the extensions after
+  # it (List::Util, Cwd/File::Spec, …), which make install then lacks.
+  export WASIXCC_LINKER_FLAGS="--allow-multiple-definition"
   test -f "$HOMESCOOP_TARGET_SYSROOT/include/errno.h"
   make -j"${HOMESCOOP_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}" \
     2>&1 | tee "$WORK/make-wasix.log" || true
@@ -225,7 +229,8 @@ PY
   #   -DNO_ENV_ARRAY_IN_MAIN -Dmain=__main_argc_argv
   # Full ext/re/*.o required (my_reg*); --allow-multiple-definition vs libperl.
   # Locale: -DHAS_LOCALECONV so NO_LOCALE stub UTF8 helpers exist.
-  if [[ ! -f perl ]] || [[ "${FORCE_RELINK:-}" == 1 ]]; then
+  # Always: make's own link does not handle perl's 3-argument main.
+  if true; then
     echo "== homescoop final link (wasixcc static-main)"
     PKG_ROOT="$PKG"
     wasixcc -DPERL_CORE -Wno-incompatible-function-pointer-types -Wno-implicit-function-declaration \
@@ -307,6 +312,15 @@ else
   mkdir -p "$DEST/lib/perl5"
   cp -a "$LIBSRC/." "$DEST/lib/perl5/"
 fi
+
+# make and make install are best-effort (|| true): refuse a tree that lacks
+# modules from extensions built after the perl link.
+for m in List/Util.pm File/Spec.pm Cwd.pm POSIX.pm Digest/SHA.pm Fcntl.pm Errno.pm; do
+  if [[ -z "$(find "$DEST/lib/perl5" -path "*/$m" -print -quit)" ]]; then
+    echo "homescoop wasix-perl: staged lib lacks $m (see $WORK/make-wasix.log)" >&2
+    exit 1
+  fi
+done
 
 # Flatten any symlinks (npm/ipk skip links)
 python3 - "$DEST/lib" <<'PY'
