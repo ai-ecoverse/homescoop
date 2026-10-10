@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-fonttools",
-  "version": "4.66.1-1",
+  "version": "4.66.1-3",
   "description": "fonttools for slicc WASIX CPython",
   "license": "MIT",
   "repository": {
@@ -13,7 +13,7 @@
   "files": ["README.md", "LICENSE", "lib"],
   "publishConfig": { "access": "public" },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "^3.14.2-5"
+    "@ai-ecoverse/wasix-python": "3.14.2-12"
   },
   "homescoop": {
     "recipe": "py-fonttools",

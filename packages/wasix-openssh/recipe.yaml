@@ -1,0 +1,51 @@
+# OpenSSH portable client for slicc WASIX (wasixcc). Client-first: ssh,
+# ssh-keygen; scp/sftp/agent later if cheap. No sshd in the package.
+name: wasix-openssh
+builder: host
+# Portable tarball is openssh-10.6p1; npm base is 10.6.0 (see docs/versioning.md).
+# Renovate: manual — OpenBSD portable tags are V_X_Y_PZ, not semver.
+version: "10.6.0"
+npm: "@ai-ecoverse/wasix-openssh"
+summary: "OpenSSH 10.6p1 client for slicc WASIX (ssh, ssh-keygen, scp, sftp, ssh-add)"
+source:
+  url: "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.6p1.tar.gz"
+  sha256: "a9dc9565dffe8640f64d863cd29a32bc4a3dbdec0566a7fc44c5d6ee767d5f39"
+sources:
+  # Build-time WASIX dev packages (static lib/ flavour), pkg-config only.
+  wasix_zlib:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-zlib/-/wasix-zlib-1.3.1-2.tgz"
+    sha256: "4d0602d7fa1456f09ae668dc90b08a862f2ffeda843556beffbed17614873422"
+  wasix_openssl:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openssl/-/wasix-openssl-3.5.9-3.tgz"
+    sha256: "c7113689ea876eec536fb434afa11e98399b739cc9d0cfe61a1fb1756c5f0e61"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.openssh.com/
+  license: SSH-OpenSSH
+  notes: |
+    Built with wasixcc on wasix-sysroot 2025.9.30-18 (select/pselect
+    sub-second timeouts + socketpair flags; slicc_fs from -17). Links
+    wasix-openssl 3.5.9-3 and wasix-zlib 1.3.1-2 via pkg-config only, with
+    -Wl,--fatal-warnings. OpenSSH 10.6's client loop uses poll/ppoll.
+
+    Identity: getpwuid comes from wasix-sysroot slicc_identity; tilde paths
+    honour $HOME first (misc.c). Until H1 (sysroot -19 + kernel K1), document
+    $HOME/$USER and prefer user@host / -l when unsure.
+
+    PTY: enter_raw_mode clears ISIG/IEXTEN/OPOST via tcsetattr; WASIX
+    tty_set cannot clear those yet (slicc-kernel#247). Cert checks that local
+    ^C hits local ssh; escape ~. is the documented way out. No ssh patch.
+
+    ssh-add is shipped; ssh-agent is not. Without an agent, ssh-add -l exits 2.
+
+    scp/sftp: posix_spawnp with per-call argv copy (patch 0002); socketpair
+    needs slicc-kernel ≥ 1.41.0 (engines); host-node cert pin 1.41.3.
+    set_sock_tos quiet on ENOSYS (0003); ssh-keygen -R backup via copy (0004).
+    ProxyCommand / ProxyJump / SSH_ASKPASS still fork — unsupported (README).
+
+    Cert: host-node (Node kernel + host sshd over uplink; tiny host none-auth
+    server; bare git repo for GIT_SSH_COMMAND). Coordinator certifies and
+    publishes; workers do not.

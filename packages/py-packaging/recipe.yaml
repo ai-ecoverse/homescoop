@@ -3,6 +3,10 @@ builder: host
 version: "26.3"
 npm: "@ai-ecoverse/py-packaging"
 summary: "packaging for slicc WASIX CPython"
+# 26.3.0-3 is packaging-only: 26.3.0-2's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-12). Drop repack: when the next release rebuilds.
+repack:
+  from: "26.3.0-2"
 dependencies:
   build: []
   host: []

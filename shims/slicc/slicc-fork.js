@@ -21,6 +21,16 @@
 // does not wait for the program: it ends at once and its pid stands for the
 // kernel process from then on (Module.sliccAliases, fork pid -> kernel pid).
 addToLibrary({
+  // umask as a JS syscall import (slicc_umask.c): emscripten 4.0.23 keeps it in
+  // wasm, where slicc-kernel cannot see it. The kernel wraps this import
+  // (kernelUmask): it sets the process's umask, keeps this copy in step and
+  // returns the old value. Without a kernel the copy alone answers, 022 first.
+  __syscall_umask__sig: 'ii',
+  __syscall_umask: (mask) => {
+    var old = Module.sliccUmask ?? 0o022;
+    Module.sliccUmask = mask & 0o777;
+    return old;
+  },
   $SliccFork__deps: [
     '$Asyncify',
     '$FS',

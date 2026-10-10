@@ -219,7 +219,8 @@ homescoop_require_lib_size() {
 homescoop_em_cli_ldflags() {
   local extra="${HOMESCOOP_EM_CLI_LDFLAGS_EXTRA:-}"
   # shellcheck disable=SC2086
-  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1${extra:+ ${extra}}"
+  # slicc-writev.js: one FS.write per writev (emscripten 4.0.23 splits per iovec).
+  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 --js-library $(homescoop_slicc_dir)/slicc-writev.js${extra:+ ${extra}}"
 }
 
 homescoop_slicc_dir() {
@@ -295,6 +296,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
+      _homescoop_slicc_compile "$dir/slicc_umask.c"
       ;;
     mount)
       # mount/umount: mount(2)/umount2(2) via sliccKernel (slicc-kernel#92).
@@ -361,6 +363,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
+      _homescoop_slicc_compile "$dir/slicc_umask.c"
       ;;
     *)
       echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|mount|less|cli|clinet|net|netfork)" >&2

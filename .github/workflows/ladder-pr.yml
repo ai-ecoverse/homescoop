@@ -22,6 +22,9 @@ on:
       - 'scripts/install-emsdk.sh'
       - 'scripts/install-wasixcc.sh'
       - 'scripts/sync-package-version.mjs'
+      - 'scripts/check-exact-pins.mjs'
+      - 'scripts/repack-published.mjs'
+      - 'scripts/diff-published.mjs'
       - 'scripts/browser-cert/**'
       - '.github/workflows/ladder-pr.yml'
 
@@ -29,6 +32,17 @@ permissions:
   contents: write
 
 jobs:
+  # Every @ai-ecoverse/* dependency / peer / optional dependency of every
+  # packages/*/package/package.json is an exact version (docs/versioning.md).
+  exact-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node scripts/check-exact-pins.mjs
+
   detect:
     runs-on: ubuntu-latest
     outputs:
@@ -138,6 +152,7 @@ jobs:
           path: |
             .homescoop-out/package.tgz
             .homescoop-out/package.tgz.sha256
+            .homescoop-out/packaging-only-diff.txt
           if-no-files-found: error
           retention-days: 14
       - name: Browser cert (slicc-kernel CDP)

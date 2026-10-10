@@ -1,0 +1,262 @@
+From: homescoop
+Subject: WASIX: scp/sftp posix_spawnp with per-call argv copy
+
+--- a/scp.c
++++ b/scp.c
+@@ -111,6 +111,11 @@
+ #include "pathnames.h"
+ #include "log.h"
+ #include "misc.h"
++
++#ifdef __wasi__
++#include <spawn.h>
++extern char **environ;
++#endif
+ #include "progressmeter.h"
+ #include "utf8.h"
+ #include "sftp.h"
+@@ -224,6 +229,15 @@
+ 		fmprintf(stderr, "Executing: %s\n", cp);
+ 		free(cp);
+ 	}
++#ifdef __wasi__
++	{
++		int err = posix_spawnp(&pid, a->list[0], NULL, NULL, a->list, environ);
++		if (err != 0) {
++			errno = err;
++			fatal("do_local_cmd: posix_spawnp: %s", strerror(errno));
++		}
++	}
++#else
+ 	if ((pid = fork()) == -1)
+ 		fatal("do_local_cmd: fork: %s", strerror(errno));
+ 
+@@ -232,6 +246,7 @@
+ 		perror(a->list[0]);
+ 		exit(1);
+ 	}
++#endif
+ 
+ 	do_cmd_pid = pid;
+ 	ssh_signal(SIGTERM, killchild);
+@@ -288,6 +303,72 @@
+ 	ssh_signal(SIGTTIN, suspchild);
+ 	ssh_signal(SIGTTOU, suspchild);
+ 
++#ifdef __wasi__
++	/*
++	 * WASIX: posix_spawnp (no fork). Build this call's argv on a *copy* of
++	 * the global `args` base so later do_cmd() calls do not inherit -p/-l/-s
++	 * -- host cmd from a previous spawn (scp -3 / multi-source).
++	 */
++	{
++		arglist spawn_args = { 0 };
++		posix_spawn_file_actions_t fa;
++		u_int i;
++		int err;
++
++		for (i = 0; i < args.num; i++)
++			addargs(&spawn_args, "%s", args.list[i]);
++		replacearg(&spawn_args, 0, "%s", program);
++		if (port != -1) {
++			addargs(&spawn_args, "-p");
++			addargs(&spawn_args, "%d", port);
++		}
++		if (remuser != NULL) {
++			addargs(&spawn_args, "-l");
++			addargs(&spawn_args, "%s", remuser);
++		}
++		if (subsystem)
++			addargs(&spawn_args, "-s");
++		addargs(&spawn_args, "--");
++		addargs(&spawn_args, "%s", host);
++		addargs(&spawn_args, "%s", cmd);
++
++		posix_spawn_file_actions_init(&fa);
++#ifdef USE_PIPES
++		posix_spawn_file_actions_adddup2(&fa, pin[0], STDIN_FILENO);
++		posix_spawn_file_actions_adddup2(&fa, pout[1], STDOUT_FILENO);
++		posix_spawn_file_actions_addclose(&fa, pin[0]);
++		posix_spawn_file_actions_addclose(&fa, pin[1]);
++		posix_spawn_file_actions_addclose(&fa, pout[0]);
++		posix_spawn_file_actions_addclose(&fa, pout[1]);
++#else
++		posix_spawn_file_actions_adddup2(&fa, sv[0], STDIN_FILENO);
++		posix_spawn_file_actions_adddup2(&fa, sv[0], STDOUT_FILENO);
++		posix_spawn_file_actions_addclose(&fa, sv[0]);
++		posix_spawn_file_actions_addclose(&fa, sv[1]);
++#endif
++		err = posix_spawnp(pid, program, &fa, NULL, spawn_args.list, environ);
++		posix_spawn_file_actions_destroy(&fa);
++		freeargs(&spawn_args);
++		if (err != 0) {
++			errno = err;
++			fatal("posix_spawnp: %s", strerror(errno));
++		}
++#ifdef USE_PIPES
++		close(pin[0]);
++		close(pout[1]);
++		*fdout = pin[1];
++		*fdin = pout[0];
++#else
++		close(sv[0]);
++		*fdin = sv[1];
++		*fdout = sv[1];
++#endif
++		ssh_signal(SIGTERM, killchild);
++		ssh_signal(SIGINT, killchild);
++		ssh_signal(SIGHUP, killchild);
++		return 0;
++	}
++#else /* !__wasi__ — keep upstream: mutate args only in the child */
+ 	/* Fork a child to execute the command on the remote host using ssh. */
+ 	*pid = fork();
+ 	switch (*pid) {
+@@ -349,6 +430,7 @@
+ 		ssh_signal(SIGHUP, killchild);
+ 		return 0;
+ 	}
++#endif /* !__wasi__ */
+ }
+ 
+ /*
+@@ -372,6 +454,41 @@
+ 	if (port == -1)
+ 		port = sshport;
+ 
++#ifdef __wasi__
++	{
++		arglist spawn_args = { 0 };
++		posix_spawn_file_actions_t fa;
++		u_int i;
++		int err;
++
++		for (i = 0; i < args.num; i++)
++			addargs(&spawn_args, "%s", args.list[i]);
++		replacearg(&spawn_args, 0, "%s", ssh_program);
++		if (port != -1) {
++			addargs(&spawn_args, "-p");
++			addargs(&spawn_args, "%d", port);
++		}
++		if (remuser != NULL) {
++			addargs(&spawn_args, "-l");
++			addargs(&spawn_args, "%s", remuser);
++		}
++		addargs(&spawn_args, "-oBatchMode=yes");
++		addargs(&spawn_args, "--");
++		addargs(&spawn_args, "%s", host);
++		addargs(&spawn_args, "%s", cmd);
++
++		posix_spawn_file_actions_init(&fa);
++		posix_spawn_file_actions_adddup2(&fa, fdin, STDIN_FILENO);
++		posix_spawn_file_actions_adddup2(&fa, fdout, STDOUT_FILENO);
++		err = posix_spawnp(&pid, ssh_program, &fa, NULL, spawn_args.list, environ);
++		posix_spawn_file_actions_destroy(&fa);
++		freeargs(&spawn_args);
++		if (err != 0) {
++			errno = err;
++			fatal("posix_spawnp: %s", strerror(errno));
++		}
++	}
++#else
+ 	/* Fork a child to execute the command on the remote host using ssh. */
+ 	pid = fork();
+ 	if (pid == 0) {
+@@ -400,6 +517,7 @@
+ 	} else if (pid == -1) {
+ 		fatal("fork: %s", strerror(errno));
+ 	}
++#endif
+ 	while (waitpid(pid, &status, 0) == -1)
+ 		if (errno != EINTR)
+ 			fatal("do_cmd2: waitpid: %s", strerror(errno));
+--- a/sftp.c
++++ b/sftp.c
+@@ -51,6 +51,11 @@
+ #include "log.h"
+ #include "pathnames.h"
+ #include "misc.h"
++
++#ifdef __wasi__
++#include <spawn.h>
++extern char **environ;
++#endif
+ #include "utf8.h"
+ 
+ #include "sftp.h"
+@@ -323,6 +328,29 @@
+ 	if ((shell = getenv("SHELL")) == NULL || *shell == '\0')
+ 		shell = _PATH_BSHELL;
+ 
++#ifdef __wasi__
++	{
++		int err;
++		char *argv_shell[4];
++
++		if (args) {
++			debug3("Executing %s -c \"%s\"", shell, args);
++			argv_shell[0] = shell;
++			argv_shell[1] = "-c";
++			argv_shell[2] = (char *)args;
++			argv_shell[3] = NULL;
++		} else {
++			debug3("Executing %s", shell);
++			argv_shell[0] = shell;
++			argv_shell[1] = NULL;
++		}
++		err = posix_spawnp(&pid, shell, NULL, NULL, argv_shell, environ);
++		if (err != 0) {
++			errno = err;
++			fatal("Couldn't posix_spawnp: %s", strerror(errno));
++		}
++	}
++#else
+ 	if ((pid = fork()) == -1)
+ 		fatal("Couldn't fork: %s", strerror(errno));
+ 
+@@ -338,6 +366,7 @@
+ 		    strerror(errno));
+ 		_exit(1);
+ 	}
++#endif
+ 	while (waitpid(pid, &status, 0) == -1)
+ 		if (errno != EINTR)
+ 			fatal("Couldn't wait for child: %s", strerror(errno));
+@@ -2452,6 +2481,29 @@
+ 	FD_CLOSEONEXEC(*in);
+ 	FD_CLOSEONEXEC(*out);
+ 
++#ifdef __wasi__
++	/* WASIX: posix_spawnp instead of fork+exec for the ssh helper. */
++	{
++		posix_spawn_file_actions_t fa;
++		int err;
++
++		posix_spawn_file_actions_init(&fa);
++		posix_spawn_file_actions_adddup2(&fa, c_in, STDIN_FILENO);
++		posix_spawn_file_actions_adddup2(&fa, c_out, STDOUT_FILENO);
++		posix_spawn_file_actions_addclose(&fa, *in);
++		posix_spawn_file_actions_addclose(&fa, *out);
++		if (c_in != *in && c_in != *out)
++			posix_spawn_file_actions_addclose(&fa, c_in);
++		if (c_out != c_in && c_out != *in && c_out != *out)
++			posix_spawn_file_actions_addclose(&fa, c_out);
++		err = posix_spawnp(&sshpid, path, &fa, NULL, args, environ);
++		posix_spawn_file_actions_destroy(&fa);
++		if (err != 0) {
++			errno = err;
++			fatal("posix_spawnp: %s", strerror(errno));
++		}
++	}
++#else
+ 	if ((sshpid = fork()) == -1)
+ 		fatal("fork: %s", strerror(errno));
+ 	else if (sshpid == 0) {
+@@ -2478,6 +2530,7 @@
+ 		fprintf(stderr, "exec: %s: %s\n", path, strerror(errno));
+ 		_exit(1);
+ 	}
++#endif
+ 
+ 	ssh_signal(SIGTERM, killchild);
+ 	ssh_signal(SIGINT, killchild);

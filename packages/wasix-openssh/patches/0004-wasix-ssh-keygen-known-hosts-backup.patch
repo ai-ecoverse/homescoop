@@ -1,0 +1,61 @@
+From: homescoop
+Subject: WASIX: ssh-keygen known_hosts backup without hard links
+
+--- a/ssh-keygen.c
++++ b/ssh-keygen.c
+@@ -1359,9 +1359,52 @@
+ 		/* Backup existing file */
+ 		if (unlink(old) == -1 && errno != ENOENT)
+ 			fatal("unlink %.100s: %s", old, strerror(errno));
+-		if (link(identity_file, old) == -1)
+-			fatal("link %.100s to %.100s: %s", identity_file, old,
+-			    strerror(errno));
++		if (link(identity_file, old) == -1) {
++			/*
++			 * WASIX / OPFS: no hard links. Fall back to a copy so
++			 * -R/-H can still keep identity_file.old.
++			 */
++			if (errno == ENOTSUP || errno == EPERM ||
++			    errno == ENOSYS || errno == EOPNOTSUPP) {
++				FILE *in = NULL, *out = NULL;
++				char buf[8192];
++				size_t n;
++				int oerrno;
++
++				if ((in = fopen(identity_file, "r")) == NULL ||
++				    (out = fopen(old, "w")) == NULL) {
++					oerrno = errno;
++					if (in) fclose(in);
++					if (out) { fclose(out); unlink(old); }
++					fatal("backup %.100s to %.100s: %s",
++					    identity_file, old, strerror(oerrno));
++				}
++				while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
++					if (fwrite(buf, 1, n, out) != n) {
++						oerrno = errno;
++						fclose(in); fclose(out); unlink(old);
++						fatal("backup write %.100s: %s",
++						    old, strerror(oerrno));
++					}
++				}
++				if (ferror(in)) {
++					oerrno = errno;
++					fclose(in); fclose(out); unlink(old);
++					fatal("backup read %.100s: %s",
++					    identity_file, strerror(oerrno));
++				}
++				fclose(in);
++				if (fclose(out) != 0) {
++					oerrno = errno;
++					unlink(old);
++					fatal("backup close %.100s: %s",
++					    old, strerror(oerrno));
++				}
++			} else {
++				fatal("link %.100s to %.100s: %s", identity_file,
++				    old, strerror(errno));
++			}
++		}
+ 		/* Move new one into place */
+ 		if (rename(tmp, identity_file) == -1) {
+ 			error("rename\"%s\" to \"%s\": %s", tmp, identity_file,

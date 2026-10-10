@@ -44,3 +44,17 @@ Two CI builds of 3.5.9-1 from the same source (runs 38021434702 and
 3.5.9 release (Tue Sep 29 14:10:08 2026 UTC); build.sh refuses a
 libcrypto.a without that string, and the probe asserts
 `OpenSSL_version(OPENSSL_BUILT_ON)` equals it.
+
+## 3.5.9-3 (threads)
+
+3.5.9-2 (Configure with `-static`, so threads disabled), same probe, slicc-kernel 1.35.1's Node entry:
+
+```
+sslprobe: rc=134
+OpenSSL 3.5.9 29 Sep 2026
+sslprobe: wasm trap in thread 2: memory access out of bounds
+sslprobe: wasm trap in thread 3: memory access out of bounds
+```
+
+Its configuration.h has no `OPENSSL_THREADS`; CPython's `_ssl.c` / `_hashopenssl.c` refuse to compile against it.
+

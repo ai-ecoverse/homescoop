@@ -42,6 +42,25 @@ CI before certification, not at publish.
 The same check refuses tarballs that contain hard links or symlinks: `npm pack`
 keeps them, but the registry rejects the publish (E415 "Hard link is not allowed").
 
+## Exact `@ai-ecoverse` pins
+
+Every `@ai-ecoverse/*` entry in `dependencies`, `peerDependencies` and
+`optionalDependencies` of `packages/*/package/package.json` is an **exact**
+version: `"@ai-ecoverse/wasix-python": "3.14.2-11"`, never `^3.14.2-9`,
+`~…`, `>=…`, `*` or `latest`. A range lets `pnpm add -g` / `npm i -g` pull
+whatever is newest on the registry rather than the version this package was
+certified with, and a global add cannot override transitive versions. Pin
+the dependency version that is `latest` on npm **and** certified.
+
+`scripts/check-exact-pins.mjs` enforces it: the `exact-pins` job in
+`ladder-pr` checks every package, and `host-run.sh` checks the package it
+packs. Its `PENDING` set (empty now) is for a package whose exact-pin
+re-release is still in flight; an entry that is already exact fails.
+
+Moving a pin is a packaging-only release (`X-N+1`): set `repack.from` in
+the recipe so the published tarball is reused byte for byte
+([ladder-builds.md](ladder-builds.md#packaging-only-repack)).
+
 ## Cleaning up historical plain versions
 
 Do **not** unpublish or deprecate from an agent session (npm 2FA). Lars

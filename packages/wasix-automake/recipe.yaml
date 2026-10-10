@@ -7,6 +7,10 @@ summary: "GNU Automake scripts for slicc (needs wasix-perl + wasix-autoconf + wa
 source:
   url: "https://mirrors.kernel.org/gnu/automake/automake-{{version}}.tar.xz"
   sha256: "8920c1fc411e13b90bf704ef9db6f29d540e76d232cb3b2c9f4dc4cc599bd990"
+# 1.17.0-6 is packaging-only: 1.17.0-5's bytes with exact @ai-ecoverse pins
+# (wasix-autoconf 2.72.0-4, wasix-perl 5.42.0-8). Drop repack: when the next release rebuilds.
+repack:
+  from: "1.17.0-5"
 dependencies:
   build: []
   host: []

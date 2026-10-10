@@ -1,0 +1,5 @@
+{
+  "harness": "smoke",
+  "blocked": true,
+  "reason": "Every slicc command (emcc, em++, emar, …) is a /bin/sh launcher that runs em*.py on wasix-python, with wasm-clang, wasm-binaryen and emscripten-cache under /shared/lib/node_modules. The bare PR cert kernel has none of them, so the default `emcc --version` smoke exits 127. Human cert in a full slicc realm; packaging-only repacks (recipe repack:) are gated by diff-published.mjs."
+}

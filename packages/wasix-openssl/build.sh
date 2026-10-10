@@ -38,12 +38,24 @@ build_flavour() {
     export WASIXCC_PIC=$pic WASIXCC_WASM_EXCEPTIONS=$eh
     export CC=wasixcc AR=wasixar RANLIB=wasixranlib NM=wasixnm
     export CFLAGS="-O2 -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DUSE_TIMEGM -DOPENSSL_NO_SECURE_MEMORY -DOPENSSL_NO_DGRAM"
+    # No -static: OpenSSL's Configure takes -static as disable('static',
+    # 'pic', 'threads'), which made -1/-2 thread-unsafe (no OPENSSL_THREADS).
+    # no-shared already builds only the static archives.
     # shellcheck disable=SC2086
-    ./Configure linux-generic32 -static no-shared $picopt no-asm no-dso \
+    ./Configure linux-generic32 no-shared $picopt no-asm no-dso \
       no-tests no-apps no-docs no-afalgeng no-ui-console threads \
       --prefix=/ --libdir=lib --openssldir=/etc/ssl \
       -DUSE_TIMEGM -DOPENSSL_NO_SECURE_MEMORY -DOPENSSL_NO_DGRAM
+    perl configdata.pm -d | sed -n '/^Disabled features:/,/^Config target/p' | grep -E '^ +[a-z]' | sed 's/^/   disabled: /'
+    if perl configdata.pm -d | sed -n '/^Disabled features:/,/^Config target/p' | grep -qE '^ +threads '; then
+      echo "homescoop wasix-openssl: Configure disabled threads ($dir)" >&2
+      exit 1
+    fi
     make build_generated >/dev/null
+    grep -q '^#  define OPENSSL_THREADS$' include/openssl/configuration.h || {
+      echo "homescoop wasix-openssl: configuration.h ($dir) lacks OPENSSL_THREADS" >&2
+      exit 1
+    }
     make -j"$JOBS" libcrypto.a libssl.a >/dev/null
     wasixranlib libcrypto.a
     wasixranlib libssl.a
@@ -69,6 +81,7 @@ build_flavour() {
       echo "Version: $VERSION"
       [[ $lib == ssl ]] && echo "Requires.private: libcrypto"
       echo "Libs: -L\${libdir} -l$lib"
+      [[ $lib == crypto ]] && echo "Libs.private: -pthread"
       echo "Cflags: -I\${includedir}"
     } >"$pcs/lib$lib.pc"
   done

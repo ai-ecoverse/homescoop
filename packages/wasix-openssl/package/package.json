@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-openssl",
-  "version": "3.5.9-2",
+  "version": "3.5.9-3",
   "description": "OpenSSL 3.5.9 for slicc WASIX: static (lib/) and PIC (lib-pic/) libcrypto.a and libssl.a, headers, pkg-config",
   "license": "Apache-2.0",
   "repository": {
