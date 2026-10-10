@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-20 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-21 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -289,6 +289,41 @@ for old, new in guards:
     t = t.replace(old, new)
 p.write_text(t)
 PYHDR
+done
+
+# -21: terminals per descriptor through slicc-kernel's slicc_tty module
+# (slicc-kernel#289; homescoop #247 raw mode, #279 TIOCGWINSZ on pipes):
+# tcgetattr/tcsetattr carry the whole termios, ioctl TCGETS/TCSETS*/
+# TIOCGWINSZ and isatty answer per fd, tcflush/tcdrain check the fd. ENOSYS
+# (older kernels) keeps the tty_get/tty_set path. See patches/README.md.
+echo "== wasix-sysroot: -21 members (tcgetattr, tcsetattr, tcflush, tcdrain, ioctl, isatty)"
+R21_OBJ="$WORK/r21"
+rm -rf "$R21_OBJ" && mkdir -p "$R21_OBJ/static" "$R21_OBJ/pic"
+R21_TOP=(tcgetattr tcsetattr tcflush tcdrain)
+R21_BOTTOM=(ioctl isatty)
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  for m in "${R21_TOP[@]}"; do compile_r18 "$m" "$R21_OBJ/$flavour/$m.o" "${MUSL_INC[@]}" "${extra[@]}"; done
+  for m in "${R21_BOTTOM[@]}"; do compile_r18 "$m" "$R21_OBJ/$flavour/$m.o" "${BOTTOM_INC[@]}" "${extra[@]}"; done
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R21_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" tcgetattr.o tcsetattr.o tcflush.o tcdrain.o ioctl.o isatty.o)
+  for m in "${R21_TOP[@]}" "${R21_BOTTOM[@]}"; do
+    missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R21_OBJ/$flavour/$m.o"))"
+    if [[ -n "$missing" ]]; then
+      echo "homescoop: $v $m.o: patched source lacks: $missing" >&2
+      exit 1
+    fi
+  done
+  "$LLVM_AR" r "$lib" $(printf "$R21_OBJ/$flavour/%s.o " "${R21_TOP[@]}" "${R21_BOTTOM[@]}")
+  grep -q __slicc_tty_winsize <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_tty imports" >&2; exit 1; }
+  echo "  $v ($flavour)"
 done
 
 homescoop_assert_no_package_links "$PKG"

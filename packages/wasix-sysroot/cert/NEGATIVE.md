@@ -133,3 +133,16 @@ The published 2025.9.30-19. Every `tm_zone` that is not one of musl's own pointe
 
 That is what CPython's `time.strftime('%Z', time.localtime())` returned on wasix-python 3.14.2-13 CI round 2.
 
+## 2025.9.30-21 (`run-modes.mjs --probe r21`), slicc-kernel#289 (`fix/wasix-termios` d4be71a)
+
+The published 2025.9.30-20 on the same kernel. `cfmakeraw` stays half raw: ISIG and IEXTEN on, `VMIN` 0, OPOST already off in cooked mode. ^C raises SIGINT, and the read fails:
+
+```text
++   'cooked: ICANON=1 ECHO=1 ISIG=1 OPOST=0',
++   'raw: set=ok ICANON=0 ECHO=0 ISIG=1 IEXTEN=1 OPOST=0 ICRNL=0 VMIN=0',
++   'read: n=-1,1 bytes=0,113 sigints=1',
++   'restored: ICANON=1 ECHO=1 ISIG=1 OPOST=0',
+```
+
+On older kernels `TIOCGWINSZ` on a pipe or a file also answered 80x24 (#279; that kernel half is in #289).
+
