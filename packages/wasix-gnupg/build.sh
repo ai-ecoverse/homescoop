@@ -19,7 +19,10 @@ homescoop_load_recipe wasix-gnupg
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 VER="$VERSION"
-PKG_VER="${VER}-4"
+# The npm version (upstream-N) comes from the committed package.json, read
+# before staging rewrites it, and must start with the recipe's version.
+PKG_VER="$(node -p "require('$DEST/package.json').version")"
+[[ "$PKG_VER" == "$VER-"* ]] || { echo "homescoop: package.json version $PKG_VER does not start with $VER-" >&2; exit 1; }
 WORK="${WASIX_GNUPG_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
@@ -176,7 +179,7 @@ cp "$PKG"/patches/* "$DEST/patches/"
 # snapshot of wasix-libc, so this is the nearest earlier tag).
 homescoop_notices_begin "The gpg, gpgv, gpg-agent, gpgconf and gpg-connect-agent wasm modules statically link libgpg-error 1.61, libgcrypt 1.12.4, libassuan 3.0.2, libksba 1.8.1 and npth 1.8 (licences in licenses/, sources in SOURCES.md) and the following."
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30; files from tag v2025-09-02.1)" \
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version"); files from tag v2025-09-02.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -216,7 +219,10 @@ for c in cmds.values():
 pkg = {
     "name": "@ai-ecoverse/wasix-gnupg",
     "version": pkg_ver,
-    "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent",
+    "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -20: user ids from slicc-kernel)",
+    # wasix-sysroot -20 asks slicc-kernel for user ids (no fallback); the homedir
+    # owner check needs 1.47.1, which reports owners as the caller's ids.
+    "engines": {"slicc-kernel": ">=1.47.1"},
     "license": "GPL-3.0-or-later",
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses", "patches"],
     "publishConfig": {"access": "public"},
