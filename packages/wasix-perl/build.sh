@@ -69,20 +69,10 @@ else
   fi
 
   cp "$PKG/hints/wasix" "$SRC/cnf/hints/wasix"
-  # perl-cross 1.6.5 calls `tryhints 'hint' "$h"` for --hints=, so it looks
-  # for cnf/hints/hint and loads nothing; without our hints every target
-  # size probe runs readelf on a wasm object and fails.
-  python3 - "$SRC/cnf/configure_hint.sh" <<'PY'
-import sys
-from pathlib import Path
-p = Path(sys.argv[1])
-t = p.read_text()
-bad = "tryhints 'hint' \"$h\""
-if bad in t:
-    p.write_text(t.replace(bad, 'tryhints "$h"'))
-elif 'tryhints "$h"' not in t:
-    sys.exit(f"{p}: --hints loop not recognised")
-PY
+  # perl-cross 1.6.5's --hints loads nothing (see the patch header).
+  if grep -q "tryhints 'hint'" "$SRC/cnf/configure_hint.sh"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0002-userhints-tryhints-arg.patch"
+  fi
 
   # List::Util must stay on when usedl=undef (all-static).
   if grep -q 'extonlyif cpan/List-Util "\$usedl" !=' "$SRC/cnf/configure_mods.sh"; then
@@ -100,29 +90,12 @@ PY
 
   homescoop_apply_patches "$SRC"
 
-  # Static build (usedl=undef): ext/re (PERL_EXT_RE_BUILD + DEBUG) is linked
-  # next to the core engine. re_top.h renames the engine entry points and
-  # some helpers to my_* for exactly this (its comment: -Uusedl); perl 5.42's
-  # split regcomp helpers below are missing there, so both regcomp.o and
-  # re_comp.o define them (wasm-ld: duplicate symbol). Rename them in ext/re
-  # too, so it keeps its own (debugging) helpers instead of a mixed engine.
-  python3 - "$SRC/ext/re/re_top.h" <<'PY'
-import sys
-from pathlib import Path
-p = Path(sys.argv[1])
-t = p.read_text()
-names = ["reg_add_data", "release_RExC_state", "populate_anyof_bitmap_from_invlist",
-         "set_ANYOF_arg", "add_above_Latin1_folds", "get_ANYOFM_contents",
-         "get_ANYOFHbbm_contents"]
-anchor = "#define PERL_NO_GET_CONTEXT"
-if anchor not in t:
-    sys.exit(f"{p}: anchor missing")
-if "my_reg_add_data" not in t:
-    block = "/* homescoop wasix-perl: static -Uusedl, perl 5.42 split helpers */\n" + "".join(
-        f"#define Perl_{n:<40} my_{n}\n" for n in names) + "\n"
-    t = t.replace(anchor, block + anchor, 1)
-    p.write_text(t)
-PY
+  # Static build (usedl=undef): ext/re is linked next to the core regex
+  # engine; patches/0003 adds perl 5.42's split regcomp helpers to
+  # re_top.h's my_* renames (see the patch header).
+  if ! grep -q my_reg_add_data "$SRC/ext/re/re_top.h"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0003-re-top-static-split-helpers.patch"
+  fi
 
   # Errno_pm.PL picks its errno.h by $^O, the build machine's OS: on a Linux
   # host it reads /usr/include/errno.h. Key it on the target's osname, so
@@ -273,6 +246,14 @@ PY
       2>&1 | tee "$WORK/link-wasix.log"
   fi
   [[ -f perl ]] || { echo "homescoop: perl link failed" >&2; exit 1; }
+
+  # make's own perl link fails (perlmain.c's 3-argument main needs the
+  # -Dmain=__main_argc_argv compile above), and make stops there: the targets
+  # after the link (pm_to_blib for List::Util, File::Spec, ...) never ran.
+  # With the newer perl in place, a second make finishes them.
+  echo "== make (second pass, after the homescoop link)"
+  make -j"${HOMESCOOP_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}" \
+    2>&1 | tee -a "$WORK/make-wasix.log" || true
 
   echo "== make install DESTDIR=$STAGE (best-effort; may fall back to manual stage)"
   rm -rf "$STAGE"

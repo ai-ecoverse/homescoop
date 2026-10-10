@@ -1,0 +1,32 @@
+ext/re: rename perl 5.42's split regcomp helpers for a static (-Uusedl) build
+
+With usedl=undef, ext/re (compiled with PERL_EXT_RE_BUILD and
+PERL_EXT_RE_DEBUG, i.e. DEBUGGING) is linked statically next to the core
+regex engine. re_top.h renames the engine entry points and a few helpers
+(study_chunk, make_trie, join_exact, ...) to my_* for exactly this case
+(its comment: t/op/split.t fails with -Uusedl otherwise). perl 5.42 split
+regcomp.c into regcomp_*.c; the helpers below, defined in both regcomp.o
+and re_comp.o, are missing from that list. Without the renames the static
+link has duplicate symbols, and resolving them by link order mixes the
+non-debugging core helpers into ext/re's debugging engine.
+
+Applied by build.sh (patch -p1 in the perl source). homescoop#169 / #182.
+
+--- a/ext/re/re_top.h
++++ b/ext/re/re_top.h
+@@ -50,6 +50,15 @@
+ #define Perl_construct_ahocorasick_from_trie    my_construct_ahocorasick_from_trie
+ #define Perl_make_trie                          my_make_trie
+ 
++/* homescoop wasix-perl: static -Uusedl, perl 5.42 split helpers */
++#define Perl_reg_add_data                             my_reg_add_data
++#define Perl_release_RExC_state                       my_release_RExC_state
++#define Perl_populate_anyof_bitmap_from_invlist       my_populate_anyof_bitmap_from_invlist
++#define Perl_set_ANYOF_arg                            my_set_ANYOF_arg
++#define Perl_add_above_Latin1_folds                   my_add_above_Latin1_folds
++#define Perl_get_ANYOFM_contents                      my_get_ANYOFM_contents
++#define Perl_get_ANYOFHbbm_contents                   my_get_ANYOFHbbm_contents
++
+ #define PERL_NO_GET_CONTEXT
+ 
+ /*
