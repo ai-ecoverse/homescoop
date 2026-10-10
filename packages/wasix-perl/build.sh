@@ -241,7 +241,8 @@ PY
     (cd ext/re && llvm-ar crs ../../lib/auto/re/re.a \
       re.o re_comp.o re_comp_debug.o re_comp_invlist.o re_comp_study.o re_comp_trie.o re_exec.o)
     export WASIXCC_LINKER_FLAGS="--allow-multiple-definition"
-    mapfile -t STATARS < static.list || STATARS=($(cat static.list))
+    # static.list is one line of space-separated archives.
+    read -r -a STATARS < static.list
     # Drop -lwasi-emulated-signal (absent from asyncify sysroot).
     wasixcc -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman -lm \
       -o perl perlmain.o libperl.a "${STATARS[@]}" -lm \
