@@ -5,6 +5,7 @@ modules, platform wheels, and build-machine paths in text files.
 
     python3 staging-check.py <package dir>
 """
+import fnmatch
 import os
 import sys
 
@@ -16,6 +17,9 @@ for var in ("HOME", "GITHUB_WORKSPACE", "HOMESCOOP_ROOT", "RUNNER_TEMP"):
     v = os.environ.get(var, "")
     if len(v) > 1:
         host_paths.append(v.encode())
+# Build configuration records: they name the build tree and toolchain by
+# design (sysconfig's CC, LDFLAGS, LLVM_PROF_MERGER, ...).
+CONFIG_RECORDS = ("_sysconfigdata*.py", "_sysconfig_vars*.json")
 NATIVE = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe")
 TEXT = (".py", ".pc", ".json", ".txt", ".cfg", ".h", ".pth", ".toml")
 bad = []
@@ -33,7 +37,9 @@ for root, _dirs, files in os.walk(dest):
                 bad.append(f"foreign extension suffix: {p}")
         if f.endswith(".whl") and not f.endswith("-none-any.whl"):
             bad.append(f"platform wheel: {p}")
-        if f.endswith(TEXT):
+        config = any(fnmatch.fnmatch(f, g) for g in CONFIG_RECORDS) or (
+            f == "Makefile" and os.path.basename(root).startswith("config-"))
+        if f.endswith(TEXT) and not config:
             with open(p, "rb") as fh:
                 data = fh.read()
             for hp in host_paths:
