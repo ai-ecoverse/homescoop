@@ -6,7 +6,8 @@
 //   node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz [--probe r18]
 //
 // --probe NAME runs test/NAME.c / test/NAME.mjs instead (default: modes);
-// r18 is -18's select / chdir / TZ / socketpair probe.
+// r18 is -18's select / chdir / TZ / socketpair probe; r19 is -19's
+// raise / alarm / setitimer / nanosleep probe.
 //
 // --kernel-dir <dir> uses a local slicc-kernel build (its dist/node.js)
 // instead of meta.kernel, e.g. to try one before it is released. With
@@ -24,20 +25,25 @@ import { arg, command, here, kernel, meta, sysroot, wasixcc } from './harness.mj
 
 const args = process.argv.slice(2);
 if (!arg(args, '--tarball')) {
-  console.error('usage: run-modes.mjs --tarball <wasix-sysroot package.tgz> [--kernel-dir <dir>] [--allow-absent]');
+  console.error('usage: run-modes.mjs --tarball <wasix-sysroot package.tgz> [--probe NAME] [--variant ehpic] [--kernel-dir <dir>] [--allow-absent]');
   process.exit(2);
 }
 const tarball = resolve(arg(args, '--tarball'));
 const probe = arg(args, '--probe') ?? 'modes';
+// --variant ehpic builds the probe against sysroot-ehpic (legacy EH, PIC:
+// what wasix-python links) instead of wasixcc's default.
+const VARIANTS = { default: {}, ehpic: { WASIXCC_WASM_EXCEPTIONS: 'legacy', WASIXCC_PIC: 'yes' } };
+const variant = arg(args, '--variant') ?? 'default';
+if (!VARIANTS[variant]) throw new Error(`--variant: one of ${Object.keys(VARIANTS).join(', ')}`);
 const kernelDir = arg(args, '--kernel-dir') && resolve(arg(args, '--kernel-dir'));
 const work = mkdtempSync(join(tmpdir(), 'wasix-sysroot-modes-'));
 
 try {
   console.log(`== sysroot ${tarball}`);
   const prefix = sysroot(tarball, join(work, 'sysroot'));
-  console.log(`== ${probe}.wasm (pinned wasixcc)`);
+  console.log(`== ${probe}.wasm (pinned wasixcc, ${variant} variant)`);
   const pkg = join(work, `${probe}-pkg`);
-  command(wasixcc(work), prefix, probe, pkg, probe);
+  command({ ...wasixcc(work), ...VARIANTS[variant] }, prefix, probe, pkg, probe);
   const k = await kernel(work, kernelDir);
   console.log(`== ${k.label} (Node entry)`);
   await k.install(pkg);

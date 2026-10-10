@@ -92,3 +92,27 @@ All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces `pselec
   - `__wasm_signal` never calls through `SIG_IGN`.
   - `raise()` uses `thread_signal`, which slicc-kernel does not deliver yet, so the probe signals itself with `kill(getpid(), …)`.
 
+## -19: `setitimer.c`, `getitimer.c`, `clock_nanosleep.c`, `sleep.c`, `raise.c`, `pthread_kill.c`
+
+All from wasix-libc tag `v2025-09-02.1`. `build-incremental.sh` replaces these members in every `libc.a`, after the symbol check.
+
+Before -19 the variants differed: `sysroot-ehpic` and `sysroot-exnref-ehpic` had wasix-python's setitimer and EINTR libc patches, and `sysroot`, `sysroot-eh` and `sysroot-exnref-eh` had upstream's. -19 also drops the `libc.a.bak-*` archives those patches left in `sysroot-ehpic`.
+
+- **`setitimer.c`** (`alarm` calls it):
+  - `ITIMER_REAL` calls `wasix_32v1.proc_raise_interval2(SIGALRM, it_value ns, it_interval ns, repeat)`, so `alarm(N)` and one-shot timers fire.
+  - Upstream passed only `it_interval` to the 3-arg `proc_raise_interval`, so `alarm(N)`, whose interval is 0, cancelled the timer.
+  - `ITIMER_VIRTUAL` and `ITIMER_PROF` fail with EINVAL. WASIX has no CPU-time clocks, and a wall-clock SIGVTALRM/SIGPROF (or the SIGALRM upstream armed) would kill a program that asked for a profiling timer.
+  - Out-of-range `tv_usec` is EINVAL.
+  - The armed REAL timer is kept on the monotonic clock, so `old` reports the time left. That is what `alarm()` returns.
+  - The import has a private C name, because `sysroot-ehpic`'s `__wasixlibc_real.o` already defines `__wasi_proc_raise_interval2`.
+- **`getitimer.c`:** `ITIMER_REAL` reports the time left until the next expiry, plus the interval. The others are -1 EINVAL. Upstream returned EINVAL as a value and left the struct alone.
+- **`clock_nanosleep.c`** (`nanosleep`, `usleep`): a relative sleep that a signal cuts short returns EINTR and the time left (`rem`), as on Linux.
+  - Upstream answered ENOTSUP for every failure.
+  - slicc-kernel ends the clock wait early but reports the clock as expired, so a relative sleep that ends more than 1 ms early counts as interrupted.
+  - An explicit EINTR from the kernel is honoured too. That is what the PIC variants see, since their modules import `fd_fdflags_set`.
+  - `rqtp` and `rmtp` may be the same struct (`sleep()`, `nanosleep(&ts, &ts)` retry loops): the request is copied first and `*rmtp` written last.
+- **`sleep.c`:** an interrupted `sleep()` returns the whole seconds left (`rem.tv_sec`), as musl does. Upstream returned all of them.
+- **`raise.c`:** `raise()` signals the process through `proc_signal(getpid())`, as `kill()` does, and sets errno on failure.
+  - Upstream used `thread_signal`, which slicc-kernel does not deliver for the main thread, so the handler never ran. slicc-kernel#250 will add per-thread delivery.
+  - Upstream also returned the WASI errno as `raise()`'s result.
+- **`pthread_kill.c`:** a target with the main thread's placeholder tid (`0x3fffffff`, which the kernel does not know: ESRCH) is signalled through `proc_signal(getpid())`. Other threads keep `thread_signal`. A bad signal number is EINVAL.
