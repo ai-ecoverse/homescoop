@@ -1,10 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+    "@ai-ecoverse/wasm-bash@5.3.0-13",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5"
   ],
   "checklist": [
     "gpg --version: GnuPG 2.4.9, libgcrypt 1.12.4, EDDSA",
@@ -15,6 +18,7 @@
     "--clearsign + --verify: Good signature",
     "--detach-sign checked by gpgv against an exported keyring: Good; tampered file: BAD signature, rc 1",
     "--armor --export; gpgconf --list-components; gpgconf --kill gpg-agent",
-    "cert/modes.mjs (wasix-sysroot 2025.9.30-17 + slicc-kernel 1.35.1 slicc_fs): default ~/.gnupg 700, private-keys-v1.d 700, both .key 600, trustdb.gpg 600, openpgp-revocs.d 700 and its .rev 600, pubring.kbx 644 (umask, as on Linux); a 755 homedir gets gpg's 'unsafe permissions' warning"
+    "cert/modes.mjs (wasix-sysroot 2025.9.30-17 + slicc-kernel 1.35.1 slicc_fs): default ~/.gnupg 700, private-keys-v1.d 700, both .key 600, trustdb.gpg 600, openpgp-revocs.d 700 and its .rev 600, pubring.kbx 644 (umask, as on Linux); a 755 homedir gets gpg's 'unsafe permissions' warning",
+    "cert/users.mjs (2.4.9-5, H1 homescoop#207, wasix-sysroot -20, slicc-kernel >= 1.47.1): as root and as kernel.users.add cone, gpg creates ~/.gnupg and a key with no 'unsafe ownership/permissions' warning; ~/.gnupg is '<user> 700' (coreutils 9.12.0-5 stat names the owner); list-keys shows one uid; chmod 755 on the homedir makes gpg warn 'unsafe permissions on homedir'. engines slicc-kernel >= 1.47.1: gpg compares the homedir owner with getuid(), and only 1.47.1 reports owners as the caller's ids"
   ]
 }
