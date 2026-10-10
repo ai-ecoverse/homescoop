@@ -41,8 +41,10 @@ about:
 
     ssh-add is shipped; ssh-agent is not. Without an agent, ssh-add -l exits 2.
 
-    scp/sftp: posix_spawnp instead of fork (patch 0002); socketpair needs
-    slicc-kernel ≥ 1.41.0 (engines); host-node cert pin 1.41.3.
+    scp/sftp: posix_spawnp with per-call argv copy (patch 0002); socketpair
+    needs slicc-kernel ≥ 1.41.0 (engines); host-node cert pin 1.41.3.
+    set_sock_tos quiet on ENOSYS (0003); ssh-keygen -R backup via copy (0004).
+    ProxyCommand / ProxyJump / SSH_ASKPASS still fork — unsupported (README).
 
     Cert: host-node (Node kernel + host sshd over uplink; tiny host none-auth
     server; bare git repo for GIT_SSH_COMMAND). Coordinator certifies and

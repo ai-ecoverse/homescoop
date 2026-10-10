@@ -52,10 +52,21 @@ one.
 
 Outbound TCP uses kernel sockets (uplink-routed). Exec mode needs no fork.
 `scp` / `sftp` spawn the `ssh` helper with **`posix_spawnp`** (patch
-`0002-wasix-scp-sftp-posix-spawn.patch`) over a `socketpair`; they need a
-kernel with working `sock_pair` (`engines.slicc-kernel` **≥ 1.41.0**; cert
-pin **1.41.3**). ProxyCommand, ControlMaster, and `-f` still prefer spawn
-over fork; true daemonize and double-fork paths are unsupported.
+`0002-wasix-scp-sftp-posix-spawn.patch`) over a `socketpair`, building each
+call's argv on a **copy** of the option list so multi-source / `-3` stay
+correct. They need a kernel with working `sock_pair`
+(`engines.slicc-kernel` **≥ 1.41.0**; cert pin **1.41.3**).
+
+**Unsupported (still `fork` in upstream OpenSSH):** `ProxyCommand`,
+`ProxyJump` (`-J`), and `SSH_ASKPASS` / `ssh-askpass`. They fail with
+`fork failed: Function not implemented`. Use a direct route or inject keys
+with `-i` / `IdentityFile` instead. ControlMaster / `-f` / true daemonize
+are likewise unsupported.
+
+`set_sock_tos` ignores `ENOSYS` / `EOPNOTSUPP` / `ENOPROTOOPT` so missing
+`IP_TOS` does not pollute stderr (patch `0003`). `ssh-keygen -R` / `-H`
+backs up `known_hosts` with a copy when `link()` is unavailable (patch
+`0004`).
 
 ## Sysroot
 
@@ -65,7 +76,7 @@ socketpair flags; slicc_fs modes from -17). OpenSSH 10.6's client loop uses
 
 ## Not in v1
 
-`sshd`, PKCS#11, security keys, Kerberos, PAM, SELinux. Local forwarding
-(`-L`/`-D`) and ProxyJump are nice-to-have follow-ups.
+`sshd`, PKCS#11, security keys, Kerberos, PAM, SELinux. `ProxyCommand` /
+`ProxyJump` / `SSH_ASKPASS` (see above).
 
 Recipe: [homescoop/packages/wasix-openssh](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openssh).

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-openssh",
-  "version": "10.6.0-4",
+  "version": "10.6.0-5",
   "description": "OpenSSH 10.6p1 client for slicc WASIX: ssh, ssh-keygen, scp, sftp, ssh-add",
   "license": "SSH-OpenSSH",
   "engines": {

@@ -72,12 +72,15 @@ export default async function checklist(ctx) {
     assert.match(pipe.stdout, /pipe-x/);
   }
   {
-    // One remote-shell string so `;` and redirects survive.
-    const sep = await run(['ssh', ...sshBatch, sshTarget, 'echo out-msg; echo err-msg >&2']);
-    assert.equal(sep.status, 0, `ssh stdio split: ${sep.stderr}`);
-    assert.match(sep.stdout, /out-msg/);
-    assert.doesNotMatch(sep.stdout, /err-msg/);
-    assert.match(sep.stderr, /err-msg/);
+    // stderr must be exactly the remote bytes — no IP_TOS setsockopt noise.
+    const sep = await run(['ssh', ...sshBatch, sshTarget, 'echo x >&2']);
+    assert.equal(sep.status, 0, `ssh stderr-only: ${sep.stderr}`);
+    assert.equal(sep.stdout, '', `stdout should be empty: ${JSON.stringify(sep.stdout)}`);
+    assert.equal(
+      sep.stderr.replace(/\r/g, ''),
+      'x\n',
+      `stderr must be exactly "x\\n" (no IP_TOS spam): ${JSON.stringify(sep.stderr)}`,
+    );
   }
 
   // --- known_hosts mismatch (isolated known_hosts file) ---
@@ -233,6 +236,57 @@ export default async function checklist(ctx) {
     assert.equal(sumScp.status, 0);
     assert.equal(sumScp.stdout.trim().split(/\s+/)[0], hash, 'scp round-trip checksum');
   }
+  // Multi-source + -3: regression for do_cmd() argv pollution on global `args`.
+  {
+    const seed = await run([
+      'ssh',
+      ...sshBatch,
+      sshTarget,
+      `sh -c 'printf one > ${hostXfer}/m1; printf two > ${hostXfer}/m2'`,
+    ]);
+    assert.equal(seed.status, 0, `seed remote m1/m2: ${seed.stderr}`);
+    const mkd = await run(['mkdir', '-p', '/home/user/scpmulti', '/home/user/scpmulti-O']);
+    assert.equal(mkd.status, 0);
+
+    const multi = await run([
+      'scp',
+      ...sshBatch,
+      `${sshTarget}:${hostXfer}/m1`,
+      `${sshTarget}:${hostXfer}/m2`,
+      '/home/user/scpmulti/',
+    ]);
+    assert.equal(multi.status, 0, `scp two remotes (sftp): ${multi.stderr}\n${multi.stdout}`);
+    const c1 = await run(['cat', '/home/user/scpmulti/m1']);
+    const c2 = await run(['cat', '/home/user/scpmulti/m2']);
+    assert.equal(c1.stdout, 'one', `m1: ${JSON.stringify(c1)}`);
+    assert.equal(c2.stdout, 'two', `m2: ${JSON.stringify(c2)}`);
+
+    const multiO = await run([
+      'scp',
+      '-O',
+      ...sshBatch,
+      `${sshTarget}:${hostXfer}/m1`,
+      `${sshTarget}:${hostXfer}/m2`,
+      '/home/user/scpmulti-O/',
+    ]);
+    assert.equal(multiO.status, 0, `scp -O two remotes: ${multiO.stderr}\n${multiO.stdout}`);
+    const o1 = await run(['cat', '/home/user/scpmulti-O/m1']);
+    const o2 = await run(['cat', '/home/user/scpmulti-O/m2']);
+    assert.equal(o1.stdout, 'one');
+    assert.equal(o2.stdout, 'two');
+
+    const three = await run([
+      'scp',
+      '-3',
+      ...sshBatch,
+      `${sshTarget}:${hostXfer}/m1`,
+      `${sshTarget}:${hostXfer}/m1.copy`,
+    ]);
+    assert.equal(three.status, 0, `scp -3: ${three.stderr}\n${three.stdout}`);
+    const copy = await run(['ssh', ...sshBatch, sshTarget, 'cat', `${hostXfer}/m1.copy`]);
+    assert.equal(copy.status, 0, `read m1.copy: ${copy.stderr}`);
+    assert.equal(copy.stdout, 'one', `m1.copy: ${JSON.stringify(copy.stdout)}`);
+  }
   {
     const remoteSftp = `${hostXfer}/sftp-up.bin`;
     await writeFile(
@@ -287,6 +341,21 @@ export default async function checklist(ctx) {
     assert.equal(clone2.status, 0, `git clone2: ${clone2.stderr}`);
     const log2 = await run(['git', '-C', '/home/user/cloned2', 'log', '-1', '--format=%s']);
     assert.match(log2.stdout, /push-ok/);
+  }
+
+  // --- ssh-keygen -R (known_hosts backup without hard links) ---
+  {
+    await run(['ssh', ...sshBatch, sshTarget, 'true']);
+    const rm = await run([
+      'ssh-keygen',
+      '-R',
+      'sshd.cert.internal',
+      '-f',
+      '/home/user/.ssh/known_hosts',
+    ]);
+    assert.equal(rm.status, 0, `ssh-keygen -R: ${rm.stderr}\n${rm.stdout}`);
+    const old = await run(['test', '-f', '/home/user/.ssh/known_hosts.old']);
+    assert.equal(old.status, 0, 'known_hosts.old retained after -R');
   }
 
   // --- ssh-add without agent (ssh-agent is not shipped) ---

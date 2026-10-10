@@ -1,5 +1,5 @@
 From: homescoop
-Subject: WASIX: scp/sftp use posix_spawnp instead of fork
+Subject: WASIX: scp/sftp posix_spawnp with per-call argv copy
 
 --- a/scp.c
 +++ b/scp.c
@@ -39,30 +39,38 @@ Subject: WASIX: scp/sftp use posix_spawnp instead of fork
  
  	do_cmd_pid = pid;
  	ssh_signal(SIGTERM, killchild);
-@@ -288,6 +303,63 @@
+@@ -288,6 +303,72 @@
  	ssh_signal(SIGTTIN, suspchild);
  	ssh_signal(SIGTTOU, suspchild);
  
-+	replacearg(&args, 0, "%s", program);
-+	if (port != -1) {
-+		addargs(&args, "-p");
-+		addargs(&args, "%d", port);
-+	}
-+	if (remuser != NULL) {
-+		addargs(&args, "-l");
-+		addargs(&args, "%s", remuser);
-+	}
-+	if (subsystem)
-+		addargs(&args, "-s");
-+	addargs(&args, "--");
-+	addargs(&args, "%s", host);
-+	addargs(&args, "%s", cmd);
-+
 +#ifdef __wasi__
-+	/* WASIX: no cheap fork — posix_spawnp → proc_spawn3. */
++	/*
++	 * WASIX: posix_spawnp (no fork). Build this call's argv on a *copy* of
++	 * the global `args` base so later do_cmd() calls do not inherit -p/-l/-s
++	 * -- host cmd from a previous spawn (scp -3 / multi-source).
++	 */
 +	{
++		arglist spawn_args = { 0 };
 +		posix_spawn_file_actions_t fa;
++		u_int i;
 +		int err;
++
++		for (i = 0; i < args.num; i++)
++			addargs(&spawn_args, "%s", args.list[i]);
++		replacearg(&spawn_args, 0, "%s", program);
++		if (port != -1) {
++			addargs(&spawn_args, "-p");
++			addargs(&spawn_args, "%d", port);
++		}
++		if (remuser != NULL) {
++			addargs(&spawn_args, "-l");
++			addargs(&spawn_args, "%s", remuser);
++		}
++		if (subsystem)
++			addargs(&spawn_args, "-s");
++		addargs(&spawn_args, "--");
++		addargs(&spawn_args, "%s", host);
++		addargs(&spawn_args, "%s", cmd);
 +
 +		posix_spawn_file_actions_init(&fa);
 +#ifdef USE_PIPES
@@ -78,8 +86,9 @@ Subject: WASIX: scp/sftp use posix_spawnp instead of fork
 +		posix_spawn_file_actions_addclose(&fa, sv[0]);
 +		posix_spawn_file_actions_addclose(&fa, sv[1]);
 +#endif
-+		err = posix_spawnp(pid, program, &fa, NULL, args.list, environ);
++		err = posix_spawnp(pid, program, &fa, NULL, spawn_args.list, environ);
 +		posix_spawn_file_actions_destroy(&fa);
++		freeargs(&spawn_args);
 +		if (err != 0) {
 +			errno = err;
 +			fatal("posix_spawnp: %s", strerror(errno));
@@ -99,33 +108,11 @@ Subject: WASIX: scp/sftp use posix_spawnp instead of fork
 +		ssh_signal(SIGHUP, killchild);
 +		return 0;
 +	}
-+#else
++#else /* !__wasi__ — keep upstream: mutate args only in the child */
  	/* Fork a child to execute the command on the remote host using ssh. */
  	*pid = fork();
  	switch (*pid) {
-@@ -314,21 +386,6 @@
- 		close(sv[0]);
- 		close(sv[1]);
- #endif
--		replacearg(&args, 0, "%s", program);
--		if (port != -1) {
--			addargs(&args, "-p");
--			addargs(&args, "%d", port);
--		}
--		if (remuser != NULL) {
--			addargs(&args, "-l");
--			addargs(&args, "%s", remuser);
--		}
--		if (subsystem)
--			addargs(&args, "-s");
--		addargs(&args, "--");
--		addargs(&args, "%s", host);
--		addargs(&args, "%s", cmd);
--
- 		execvp(program, args.list);
- 		perror(program);
- 		_exit(1);
-@@ -349,6 +406,7 @@
+@@ -349,6 +430,7 @@
  		ssh_signal(SIGHUP, killchild);
  		return 0;
  	}
@@ -133,34 +120,39 @@ Subject: WASIX: scp/sftp use posix_spawnp instead of fork
  }
  
  /*
-@@ -372,6 +430,36 @@
+@@ -372,6 +454,41 @@
  	if (port == -1)
  		port = sshport;
  
-+	replacearg(&args, 0, "%s", ssh_program);
-+	if (port != -1) {
-+		addargs(&args, "-p");
-+		addargs(&args, "%d", port);
-+	}
-+	if (remuser != NULL) {
-+		addargs(&args, "-l");
-+		addargs(&args, "%s", remuser);
-+	}
-+	addargs(&args, "-oBatchMode=yes");
-+	addargs(&args, "--");
-+	addargs(&args, "%s", host);
-+	addargs(&args, "%s", cmd);
-+
 +#ifdef __wasi__
 +	{
++		arglist spawn_args = { 0 };
 +		posix_spawn_file_actions_t fa;
++		u_int i;
 +		int err;
++
++		for (i = 0; i < args.num; i++)
++			addargs(&spawn_args, "%s", args.list[i]);
++		replacearg(&spawn_args, 0, "%s", ssh_program);
++		if (port != -1) {
++			addargs(&spawn_args, "-p");
++			addargs(&spawn_args, "%d", port);
++		}
++		if (remuser != NULL) {
++			addargs(&spawn_args, "-l");
++			addargs(&spawn_args, "%s", remuser);
++		}
++		addargs(&spawn_args, "-oBatchMode=yes");
++		addargs(&spawn_args, "--");
++		addargs(&spawn_args, "%s", host);
++		addargs(&spawn_args, "%s", cmd);
 +
 +		posix_spawn_file_actions_init(&fa);
 +		posix_spawn_file_actions_adddup2(&fa, fdin, STDIN_FILENO);
 +		posix_spawn_file_actions_adddup2(&fa, fdout, STDOUT_FILENO);
-+		err = posix_spawnp(&pid, ssh_program, &fa, NULL, args.list, environ);
++		err = posix_spawnp(&pid, ssh_program, &fa, NULL, spawn_args.list, environ);
 +		posix_spawn_file_actions_destroy(&fa);
++		freeargs(&spawn_args);
 +		if (err != 0) {
 +			errno = err;
 +			fatal("posix_spawnp: %s", strerror(errno));
@@ -170,28 +162,7 @@ Subject: WASIX: scp/sftp use posix_spawnp instead of fork
  	/* Fork a child to execute the command on the remote host using ssh. */
  	pid = fork();
  	if (pid == 0) {
-@@ -379,27 +467,13 @@
- 			perror("dup2");
- 		if (dup2(fdout, 1) == -1)
- 			perror("dup2");
--
--		replacearg(&args, 0, "%s", ssh_program);
--		if (port != -1) {
--			addargs(&args, "-p");
--			addargs(&args, "%d", port);
--		}
--		if (remuser != NULL) {
--			addargs(&args, "-l");
--			addargs(&args, "%s", remuser);
--		}
--		addargs(&args, "-oBatchMode=yes");
--		addargs(&args, "--");
--		addargs(&args, "%s", host);
--		addargs(&args, "%s", cmd);
--
- 		execvp(ssh_program, args.list);
- 		perror(ssh_program);
- 		exit(1);
+@@ -400,6 +517,7 @@
  	} else if (pid == -1) {
  		fatal("fork: %s", strerror(errno));
  	}

@@ -15,17 +15,22 @@
   "host": "node packages/wasix-openssh/cert/run.mjs --tarball <package.tgz>: boots slicc-kernel Node entry with uplink to (1) an ephemeral host OpenSSH sshd (temp keys, loopback), (2) cert/none-auth-server.py, (3) a seeded bare git repo on the host. Runs cert/*.mjs checklist.",
   "patches": {
     "0001-wasix-stub-getrrsetbyname.patch": "SSHFP/DNSSEC getrrsetbyname always ERRSET_FAIL (no resolv.h); ordinary DNS via kernel — exercised by ssh to sshd.cert.internal / none.cert.internal",
-    "0002-wasix-scp-sftp-posix-spawn.patch": "scp/sftp spawn ssh via posix_spawnp (no fork); needs kernel sock_pair (engines ≥1.41.0; cert pin 1.41.3)"
+    "0002-wasix-scp-sftp-posix-spawn.patch": "scp/sftp posix_spawnp with per-call argv copy (no global args pollution; multi-source / -3)",
+    "0003-wasix-quiet-unsupported-ip-tos.patch": "set_sock_tos ignores ENOSYS/EOPNOTSUPP/ENOPROTOOPT so stderr stays clean",
+    "0004-wasix-ssh-keygen-known-hosts-backup.patch": "ssh-keygen -R/-H backup falls back to copy when link() fails"
   },
   "checklist": [
     "ssh -V / ssh-keygen -t ed25519: versions and key file modes 0600 under slicc_fs",
     "identity: $HOME used for ~/.ssh; default user from getpwuid (slicc_identity) or documented $USER / user@host fallback until H1",
-    "exec: ssh via uplink to host sshd — echo; exit 3 → 3; stdin pipe to remote cat; stderr separation",
+    "exec: ssh via uplink to host sshd — echo; exit 3 → 3; stdin pipe to remote cat",
+    "stderr: ssh host 'echo x >&2' → stderr exactly \"x\\n\" (no IP_TOS spam)",
     "publickey ed25519 against host sshd",
     "known_hosts: StrictHostKeyChecking=accept-new then mismatch refusal (isolated known_hosts file)",
+    "ssh-keygen -R hostname: updates known_hosts and keeps .old without hard links",
     "none auth against cert/none-auth-server.py (not sshd)",
     "PTY ssh -t via openTerminal: stty size matches cols/rows; type a command; exit; local ^C interrupts local ssh (slicc-kernel#247)",
     "scp + sftp -b: 256 KiB up/down with sha256 checksums",
+    "scp two remote sources (sftp mode and -O) into a local dir; scp -3 remote→remote",
     "GIT_SSH_COMMAND=ssh + wasm-git 2.55.0-13: clone and push to host bare repo over sshd",
     "ssh-add -l without agent → exit 2 (ssh-agent not shipped; see README)"
   ]
