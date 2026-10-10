@@ -178,21 +178,26 @@ done
 
 # -19: signals and timers, the same in every variant (sysroot-ehpic and
 # sysroot-exnref-ehpic had wasix-python's setitimer/EINTR patches, the others
-# upstream's): setitimer/alarm take it_value through proc_raise_interval2,
-# clock_nanosleep returns EINTR with the time left, raise() signals the
-# process (slicc-kernel does not deliver thread_signal; slicc-kernel#250).
+# upstream's): setitimer/alarm take it_value through proc_raise_interval2
+# (ITIMER_REAL only; getitimer and `old` report it), clock_nanosleep returns
+# EINTR with the time left and sleep() the seconds left, raise() signals the
+# process (slicc-kernel does not deliver thread_signal; slicc-kernel#250), and
+# so does pthread_kill() to the main thread (placeholder tid).
 # See patches/README.md.
-echo "== wasix-sysroot: -19 members (setitimer, clock_nanosleep, raise)"
+echo "== wasix-sysroot: -19 members (setitimer, getitimer, clock_nanosleep, sleep, raise, pthread_kill)"
 R19_OBJ="$WORK/r19"
 rm -rf "$R19_OBJ" && mkdir -p "$R19_OBJ/static" "$R19_OBJ/pic"
 BOTTOM_INC=(-I"$LIBC_SRC/libc-bottom-half/headers/private" -I"$LIBC_SRC/libc-bottom-half/cloudlibc/src/include" -I"$LIBC_SRC/libc-bottom-half/cloudlibc/src" -I"$MUSL/src/include" -I"$MUSL/src/internal")
-R19=(setitimer clock_nanosleep raise)
+R19=(setitimer getitimer clock_nanosleep sleep raise pthread_kill)
 for flavour in static pic; do
   extra=()
   [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
   compile_r18 setitimer "$R19_OBJ/$flavour/setitimer.o" "${MUSL_INC[@]}" "${extra[@]}"
+  compile_r18 getitimer "$R19_OBJ/$flavour/getitimer.o" "${MUSL_INC[@]}" "${extra[@]}"
   compile_r18 raise "$R19_OBJ/$flavour/raise.o" "${MUSL_INC[@]}" "${extra[@]}"
+  compile_r18 pthread_kill "$R19_OBJ/$flavour/pthread_kill.o" "${MUSL_INC[@]}" "${extra[@]}"
   compile_r18 clock_nanosleep "$R19_OBJ/$flavour/clock_nanosleep.o" "${BOTTOM_INC[@]}" "${extra[@]}"
+  compile_r18 sleep "$R19_OBJ/$flavour/sleep.o" "${BOTTOM_INC[@]}" "${extra[@]}"
 done
 for v in "${VARIANTS[@]}"; do
   lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
@@ -200,7 +205,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R19_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" setitimer.o clock_nanosleep.o raise.o)
+  (cd "$old" && "$LLVM_AR" x "$lib" setitimer.o getitimer.o clock_nanosleep.o sleep.o raise.o pthread_kill.o)
   for m in "${R19[@]}"; do
     missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R19_OBJ/$flavour/$m.o"))"
     if [[ -n "$missing" ]]; then

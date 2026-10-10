@@ -78,15 +78,20 @@ The published 2025.9.30-18. The probe builds with wasixcc's default variant.
 
 ```text
 raise: rc=71 hits=0
+pthread_kill self: rc=71 hits=0
+setitimer virtual/prof: 0 Success 0 Success vtalrm=0 prof=0 alrm=0
+getitimer: rc=28 left=off old=off after-cancel=0
+alarm returns: 0 0
 alarm 1: fired=off count=0
 setitimer 200+100ms: ticks=3..6 after-cancel=0
 nanosleep timer: rc=0 errno=Success rem=off alrm=0
 ```
 
-- **`raise`:** `thread_signal` is never delivered, and its WASI errno comes back as the result.
+- **`raise` / `pthread_kill(pthread_self())`:** use `thread_signal` with a tid the kernel does not deliver to, and return its WASI errno as the result.
+- **`setitimer(ITIMER_VIRTUAL/PROF)`:** "succeeds". On the variants with wasix-python's patch it armed a wall-clock SIGALRM, which the first -19 build did too (the cert's gate).
+- **`getitimer`:** returns EINVAL (28) as a value.
 - **`alarm(1)`:** has interval 0, which cancels the timer.
-- **`nanosleep`:** the same one-shot timer never fires either, so the sleep runs out and reports success.
-- **Kill from bash:** a nanosleep cut short by `kill -USR1` from bash also reported success (rc 0, slept 514 ms of 3 s).
+- **`nanosleep`:** the same one-shot timer never fires, so the sleep runs out and reports success.
+- **`kill -USR1` from bash:** a `nanosleep` it cut short also reported success (rc 0, slept 514 ms of 3 s), and an interrupted `sleep(3)` returned 3.
 
 -19 passes r19 on 1.35.1, 1.41.3 and 1.42.2. With `R19_SIGSTATE=1` it also passes on slicc-kernel#260 (9ae912a), where `/proc/<pid>/status` of `r19 hold` shows `SigIgn: 0000000000000806` (INT and QUIT from bash's background job, plus USR2) and `SigCgt: 0000000000006200` (USR1, ALRM, TERM).
-

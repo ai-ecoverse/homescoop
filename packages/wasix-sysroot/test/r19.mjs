@@ -14,6 +14,10 @@ export default async function (ctx) {
   assert.equal(r.status, 0, `r19 rc=${r.status} stdout=${r.stdout} stderr=${r.stderr}`);
   assert.deepEqual(r.stdout.trim().split('\n'), [
     'raise: rc=0 hits=1',
+    'pthread_kill self: rc=0 hits=1',
+    'setitimer virtual/prof: -1 EINVAL -1 EINVAL vtalrm=0 prof=0 alrm=0',
+    'getitimer: rc=0 left=~1.5s old=~1.5s after-cancel=0',
+    'alarm returns: 0 5',
     'alarm 1: fired=~1s count=1',
     'setitimer 200+100ms: ticks=3..6 after-cancel=0',
     'nanosleep timer: rc=-1 errno=EINTR rem=~1.8s alrm=1',
@@ -22,6 +26,9 @@ export default async function (ctx) {
 
   const k = await run(['bash', '-c', 'r19 sleep & sleep 0.5; kill -USR1 $!; wait'], { cwd: '/tmp' });
   assert.equal(k.stdout.trim(), 'nanosleep kill: rc=-1 errno=EINTR rem=~2.5s hits=1', `${k.stdout}${k.stderr}`);
+
+  const z = await run(['bash', '-c', 'r19 sleep3 & sleep 0.5; kill -USR1 $!; wait'], { cwd: '/tmp' });
+  assert.equal(z.stdout.trim(), 'sleep 3 killed: returns 2 hits=1', `${z.stdout}${z.stderr}`);
 
   if (process.env.R19_SIGSTATE !== '1') return;
   const s = await run(['bash', '-c', 'r19 hold & sleep 1; cat /proc/$!/status; wait'], { cwd: '/tmp' });
