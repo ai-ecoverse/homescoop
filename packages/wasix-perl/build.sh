@@ -100,6 +100,30 @@ PY
 
   homescoop_apply_patches "$SRC"
 
+  # Static build (usedl=undef): ext/re (PERL_EXT_RE_BUILD + DEBUG) is linked
+  # next to the core engine. re_top.h renames the engine entry points and
+  # some helpers to my_* for exactly this (its comment: -Uusedl); perl 5.42's
+  # split regcomp helpers below are missing there, so both regcomp.o and
+  # re_comp.o define them (wasm-ld: duplicate symbol). Rename them in ext/re
+  # too, so it keeps its own (debugging) helpers instead of a mixed engine.
+  python3 - "$SRC/ext/re/re_top.h" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text()
+names = ["reg_add_data", "release_RExC_state", "populate_anyof_bitmap_from_invlist",
+         "set_ANYOF_arg", "add_above_Latin1_folds", "get_ANYOFM_contents",
+         "get_ANYOFHbbm_contents"]
+anchor = "#define PERL_NO_GET_CONTEXT"
+if anchor not in t:
+    sys.exit(f"{p}: anchor missing")
+if "my_reg_add_data" not in t:
+    block = "/* homescoop wasix-perl: static -Uusedl, perl 5.42 split helpers */\n" + "".join(
+        f"#define Perl_{n:<40} my_{n}\n" for n in names) + "\n"
+    t = t.replace(anchor, block + anchor, 1)
+    p.write_text(t)
+PY
+
   # Errno_pm.PL picks its errno.h by $^O, the build machine's OS: on a Linux
   # host it reads /usr/include/errno.h. Key it on the target's osname, so
   # wasix takes the generic branch (the target cpp on #include <errno.h>,
@@ -216,10 +240,6 @@ PY
   fi
   # Errno_pm.PL's target cpp (see above).
   export HOMESCOOP_TARGET_SYSROOT="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot"
-  # perl's link has duplicate regex symbols (libperl.a and ext/re). Without
-  # this, make stops at the perl link and never builds the extensions after
-  # it (List::Util, Cwd/File::Spec, …), which make install then lacks.
-  export WASIXCC_LINKER_FLAGS="--allow-multiple-definition"
   test -f "$HOMESCOOP_TARGET_SYSROOT/include/errno.h"
   make -j"${HOMESCOOP_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}" \
     2>&1 | tee "$WORK/make-wasix.log" || true
@@ -227,7 +247,7 @@ PY
   # Final link: perl-cross/wasm-ld often fails on main rename + re.a dups.
   # wasixcc renames int main → __main_argc_argv; K&R/3-arg main needs:
   #   -DNO_ENV_ARRAY_IN_MAIN -Dmain=__main_argc_argv
-  # Full ext/re/*.o required (my_reg*); --allow-multiple-definition vs libperl.
+  # Full ext/re/*.o required (my_reg*; the split helpers are renamed in re_top.h).
   # Locale: -DHAS_LOCALECONV so NO_LOCALE stub UTF8 helpers exist.
   # Always: make's own link does not handle perl's 3-argument main.
   if true; then
@@ -245,7 +265,6 @@ PY
       -fno-strict-aliasing -c -o perlmain.o perlmain.c
     (cd ext/re && llvm-ar crs ../../lib/auto/re/re.a \
       re.o re_comp.o re_comp_debug.o re_comp_invlist.o re_comp_study.o re_comp_trie.o re_exec.o)
-    export WASIXCC_LINKER_FLAGS="--allow-multiple-definition"
     # static.list is one line of space-separated archives.
     read -r -a STATARS < static.list
     # Drop -lwasi-emulated-signal (absent from asyncify sysroot).

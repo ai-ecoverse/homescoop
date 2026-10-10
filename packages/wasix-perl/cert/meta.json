@@ -7,6 +7,7 @@
     "static XS: List::Util, POSIX, Digest::SHA, MIME::Base64",
     "fork (asyncify): the child's exit status reaches waitpid",
     "file write/read; open -| to a child; perl -ne on stdin; die → non-zero rc and the message",
+    "cert/regex.mjs (static ext/re next to the core engine; re_top.h renames perl 5.42's split regcomp helpers instead of --allow-multiple-definition): perl -Mre=debug prints the Compiling/Final program/Matching/Match successful/Freeing trace; use re 'eval' with (?{ }); qr// named captures, %+, re::regname/regnames; \\K; lookbehind split; /g list; the same patterns agree with and without re debug; Text::Balanced extract_bracketed; Pod::Simple::Text parse",
     "cert/modes.mjs (wasix-sysroot 2025.9.30-17 + slicc-kernel 1.35.1 slicc_fs): umask returns the kernel's 022; umask 027 → open > gives 640; File::Temp tempfile 600 and tempdir 700; mkdir 0700; chmod 0755 and -x; perl's stat equals coreutils' stat"
   ]
 }
