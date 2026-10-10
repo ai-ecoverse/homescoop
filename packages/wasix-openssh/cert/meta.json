@@ -1,0 +1,27 @@
+{
+  "harness": "host-node",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
+  "uplink": true,
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-git"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasm-git@2.55.0-12"
+  ],
+  "host": "node packages/wasix-openssh/cert/run.mjs --tarball <package.tgz>: boots slicc-kernel Node entry with uplink to (1) an ephemeral host OpenSSH sshd (temp keys, loopback) and (2) a tiny host none-auth SSH test server (cert/none-auth-server.py; OpenSSH sshd cannot do none for a real account). Runs cert/*.mjs checklist.",
+  "checklist": [
+    "ssh -V / ssh-keygen -t ed25519: versions and key file modes 0600 under slicc_fs",
+    "identity: $HOME used for ~/.ssh; default user from getpwuid (slicc_identity) or documented $USER / user@host fallback until H1",
+    "exec: ssh via uplink to host sshd — echo, exit codes, stdin/stdout pipe (≤1 MiB)",
+    "publickey ed25519 against host sshd",
+    "known_hosts: StrictHostKeyChecking=accept-new then mismatch refusal",
+    "none auth against cert/none-auth-server.py (not sshd)",
+    "PTY ssh -t: stty size; local ^C hits local ssh (slicc-kernel#247 — tty_set cannot clear ISIG); escape ~. disconnects; no ssh patch",
+    "optional: scp/sftp round-trip ≤1 MiB if binaries shipped",
+    "optional: GIT_SSH_COMMAND=ssh + wasm-git clone of a bare repo over host sshd"
+  ]
+}

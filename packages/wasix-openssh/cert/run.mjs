@@ -1,0 +1,286 @@
+#!/usr/bin/env node
+/**
+ * host-node cert for wasix-openssh.
+ *
+ *   node packages/wasix-openssh/cert/run.mjs --tarball <package.tgz>
+ *
+ * Starts (on the HOST):
+ *   1. ephemeral OpenSSH sshd (temp host/user keys, loopback)
+ *   2. cert/none-auth-server.py (paramiko; accepts auth method none)
+ * Then boots slicc-kernel's Node entry with an uplink that routes those
+ * peers, installs the package tarball, and runs cert/*.mjs specs
+ * (excluding this file).
+ *
+ * Draft: scaffold for CI iteration. Specs grow as ssh.wasm links.
+ */
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  chmodSync,
+  existsSync,
+  statSync,
+} from 'node:fs';
+import net from 'node:net';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import assert from 'node:assert/strict';
+
+/** Bridge a fakeUplink peer conn to a host TCP service (sshd / none-auth). */
+function tcpProxy(host, port) {
+  return (conn) => {
+    const sock = net.connect({ host, port });
+    const fail = (err) => {
+      try {
+        conn.end?.();
+      } catch {
+        /* ignore */
+      }
+      sock.destroy(err);
+    };
+    sock.on('error', fail);
+    sock.on('connect', () => {
+      void (async () => {
+        try {
+          for (;;) {
+            const piece = await conn.read();
+            if (!piece) break;
+            if (!sock.write(Buffer.from(piece))) await new Promise((r) => sock.once('drain', r));
+          }
+        } catch (e) {
+          fail(e);
+        } finally {
+          sock.end();
+        }
+      })();
+      sock.on('data', (buf) => {
+        try {
+          conn.write(buf);
+        } catch (e) {
+          fail(e);
+        }
+      });
+      sock.on('end', () => {
+        try {
+          conn.end?.();
+        } catch {
+          /* ignore */
+        }
+      });
+    });
+  };
+}
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = resolve(here, '../../..');
+const args = process.argv.slice(2);
+const opt = (n) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
+const tarball = opt('--tarball');
+if (!tarball) {
+  console.error('usage: run.mjs --tarball <package.tgz>');
+  process.exit(2);
+}
+
+const meta = JSON.parse(readFileSync(join(here, 'meta.json'), 'utf8'));
+const work = mkdtempSync(join(tmpdir(), 'wasix-openssh-cert-'));
+const children = [];
+
+function sh(cmd, argv, o = {}) {
+  const r = spawnSync(cmd, argv, { encoding: 'utf8', ...o });
+  if (r.status !== 0) {
+    throw new Error(`${cmd} ${argv.join(' ')} failed: ${r.stderr || r.stdout}`);
+  }
+  return r.stdout;
+}
+
+function cleanup() {
+  for (const c of children) {
+    try {
+      c.kill('SIGTERM');
+    } catch {
+      /* ignore */
+    }
+  }
+  rmSync(work, { recursive: true, force: true });
+}
+process.on('exit', cleanup);
+process.on('SIGINT', () => process.exit(130));
+
+async function main() {
+  console.log(`== wasix-openssh cert: ${resolve(tarball)}`);
+  const extract = join(work, 'pkg');
+  mkdirSync(extract, { recursive: true });
+  sh('tar', ['xzf', resolve(tarball), '-C', extract]);
+  const pkg = join(extract, 'package');
+  if (!existsSync(join(pkg, 'bin/ssh.wasm'))) {
+    throw new Error('package lacks bin/ssh.wasm — host-build must succeed first');
+  }
+
+  // --- host sshd (publickey) ---
+  const sshdDir = join(work, 'sshd');
+  mkdirSync(sshdDir, { recursive: true });
+  const hostKey = join(sshdDir, 'host_ed25519');
+  const userKey = join(sshdDir, 'id_ed25519');
+  sh('ssh-keygen', ['-t', 'ed25519', '-N', '', '-f', hostKey, '-q']);
+  sh('ssh-keygen', ['-t', 'ed25519', '-N', '', '-f', userKey, '-q']);
+  const authKeys = join(sshdDir, 'authorized_keys');
+  writeFileSync(authKeys, readFileSync(`${userKey}.pub`));
+  chmodSync(authKeys, 0o600);
+  const sshdConfig = join(sshdDir, 'sshd_config');
+  // Port 0 is not always honoured by sshd; bind a free port ourselves.
+  const probe = await import('node:net').then((m) => m.createServer());
+  const sshdPort = await new Promise((res, rej) => {
+    probe.listen(0, '127.0.0.1', () => {
+      const p = probe.address().port;
+      probe.close(() => res(p));
+    });
+    probe.on('error', rej);
+  });
+  const pidFile = join(sshdDir, 'sshd.pid');
+  writeFileSync(
+    sshdConfig,
+    [
+      `Port ${sshdPort}`,
+      'ListenAddress 127.0.0.1',
+      `HostKey ${hostKey}`,
+      `PidFile ${pidFile}`,
+      'UsePAM no',
+      'PasswordAuthentication no',
+      'KbdInteractiveAuthentication no',
+      'PubkeyAuthentication yes',
+      `AuthorizedKeysFile ${authKeys}`,
+      'StrictModes no',
+      'Subsystem sftp internal-sftp',
+      '',
+    ].join('\n'),
+  );
+  const sshdBin = sh('bash', ['-lc', 'command -v sshd || echo /usr/sbin/sshd']).trim();
+  // High port + privsep off: unprivileged sshd on CI runners (no sudo).
+  const sshd = spawn(sshdBin, ['-f', sshdConfig, '-D', '-e'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  children.push(sshd);
+  sshd.stderr.on('data', (c) => process.stderr.write(c));
+  await new Promise((r) => setTimeout(r, 400));
+  if (sshd.exitCode !== null) {
+    throw new Error(`sshd exited early with ${sshd.exitCode}`);
+  }
+
+  // --- none-auth server ---
+  const noneKey = join(work, 'none_host_rsa');
+  const none = spawn('python3', [join(here, 'none-auth-server.py'), '--host', '127.0.0.1', '--port', '0', '--host-key', noneKey], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  children.push(none);
+  const nonePort = await new Promise((resolvePort, reject) => {
+    let buf = '';
+    const t = setTimeout(() => reject(new Error('none-auth-server: no PORT=')), 10000);
+    none.stdout.on('data', (c) => {
+      buf += c;
+      const m = buf.match(/PORT=(\d+)/);
+      if (m) {
+        clearTimeout(t);
+        resolvePort(Number(m[1]));
+      }
+    });
+    none.stderr.on('data', (c) => process.stderr.write(c));
+    none.on('exit', (code) => {
+      clearTimeout(t);
+      reject(new Error(`none-auth-server exited ${code}`));
+    });
+  });
+  console.log(`== host sshd :${sshdPort}, none-auth :${nonePort}`);
+
+  // --- kernel ---
+  const nm = join(work, 'nm');
+  mkdirSync(nm);
+  sh('npm', [
+    'install',
+    '--prefix',
+    nm,
+    '--no-fund',
+    '--no-audit',
+    '--silent',
+    meta.kernel,
+    ...(meta.needsInstall || meta.needs || []),
+  ]);
+  const kernelRoot = join(nm, 'node_modules/@ai-ecoverse/slicc-kernel');
+  const { createNodeKernel } = await import(pathToFileURL(join(kernelRoot, 'dist/node.js')).href);
+  const { fakeUplink } = await import(
+    pathToFileURL(join(kernelRoot, 'testing/index.js')).href
+  ).catch(async () => import('@ai-ecoverse/slicc-kernel/testing'));
+
+  const uplink = fakeUplink({
+    names: {
+      'sshd.cert.internal': ['100.64.1.10'],
+      'none.cert.internal': ['100.64.1.11'],
+    },
+    routes: { prefixes: ['100.64.0.0/10'] },
+    peers: {
+      '100.64.1.10:22': tcpProxy('127.0.0.1', sshdPort),
+      '100.64.1.11:22': tcpProxy('127.0.0.1', nonePort),
+    },
+  });
+
+  const kernel = await createNodeKernel({ network: { uplink } });
+  const copyTree = async (src, dest) => {
+    for (const e of readdirSync(src)) {
+      const p = join(src, e);
+      if (statSync(p).isDirectory()) await copyTree(p, `${dest}/${e}`);
+      else await kernel.writeFile(`${dest}/${e}`, readFileSync(p));
+    }
+  };
+  for (const need of meta.needs || []) {
+    await copyTree(join(nm, 'node_modules', need), `/node_modules/${need}`);
+  }
+  await copyTree(pkg, '/node_modules/@ai-ecoverse/wasix-openssh');
+
+  // Seed ~/.ssh with the user key for publickey tests.
+  await kernel.writeFile('/home/user/.ssh/id_ed25519', readFileSync(userKey));
+  await kernel.writeFile('/home/user/.ssh/id_ed25519.pub', readFileSync(`${userKey}.pub`));
+  // Modes: rely on slicc_fs when the kernel supports it; chmod via coreutils if present.
+
+  // sshd authenticates a real host account; the guest must pass that name.
+  const hostUser = sh('bash', ['-lc', 'id -un']).trim();
+
+  const ctx = {
+    assert,
+    work,
+    sshdPort,
+    nonePort,
+    hostUser,
+    hostKeyPub: readFileSync(`${hostKey}.pub`, 'utf8').trim(),
+    run: (argv, o = {}) =>
+      kernel.run(argv, {
+        cwd: o.cwd || '/home/user',
+        env: { HOME: '/home/user', USER: 'user', ...(o.env || {}) },
+        stdin: o.stdin,
+      }),
+    pty: (...a) => kernel.openTerminal?.(...a) ?? Promise.reject(new Error('openTerminal unavailable')),
+  };
+
+  let failed = 0;
+  for (const spec of readdirSync(here)
+    .filter((f) => f.endsWith('.mjs') && f !== 'run.mjs')
+    .sort()) {
+    try {
+      await (await import(pathToFileURL(join(here, spec)).href)).default(ctx);
+      console.log(`PASS cert/${spec}`);
+    } catch (e) {
+      failed = 1;
+      console.log(`FAIL cert/${spec}\n${e.stack}`);
+    }
+  }
+  await kernel.terminate();
+  process.exitCode = failed;
+}
+
+main().catch((e) => {
+  console.error(e.stack || e);
+  process.exit(1);
+});

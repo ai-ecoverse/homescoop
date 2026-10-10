@@ -1,0 +1,49 @@
+{
+  "name": "@ai-ecoverse/wasix-openssh",
+  "version": "10.6.0-1",
+  "description": "OpenSSH 10.6p1 client for slicc WASIX: ssh, ssh-keygen",
+  "license": "SSH-OpenSSH",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-openssh/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openssh",
+  "keywords": [
+    "wasm",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "openssh",
+    "ssh"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "SOURCES.md",
+    "bin",
+    "licenses"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-openssh",
+    "upstream": "10.6p1",
+    "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-3",
+    "zlib": "@ai-ecoverse/wasix-zlib@1.3.1-2",
+    "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-17"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "ssh": {
+        "wasm": "bin/ssh.wasm"
+      },
+      "ssh-keygen": {
+        "wasm": "bin/ssh-keygen.wasm"
+      }
+    }
+  }
+}
