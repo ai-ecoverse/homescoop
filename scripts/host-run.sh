@@ -21,6 +21,20 @@ if [[ "$builder" != "host" ]]; then
   echo "host-run.sh: recipe builder is '$builder' (expected host)" >&2
   exit 2
 fi
+# Packaging-only release (recipe repack.from): the published tarball's bytes
+# plus the repo's package.json. No deps, no emsdk, no build.sh.
+repack_from="$(node "$ROOT/scripts/read-recipe.mjs" "$name" --field repack.from || true)"
+if [[ -n "$repack_from" ]]; then
+  echo "== host-run: packaging-only repack of $repack_from (recipe repack:)"
+  node "$ROOT/scripts/check-exact-pins.mjs" "$name"
+  node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
+  mkdir -p "$OUT"
+  node "$ROOT/scripts/repack-published.mjs" "$name" --out "$OUT"
+  node "$ROOT/scripts/sync-package-version.mjs" --assert-tarball "$OUT/package.tgz"
+  echo "== host-run: $OUT/package.tgz"
+  exit 0
+fi
+
 if [[ ! -f "$PKG/build.sh" ]]; then
   echo "missing $PKG/build.sh" >&2
   exit 1
@@ -130,6 +144,8 @@ bash "$PKG/build.sh"
 
 echo "== host-run: check package meta (license / LICENSE / files)"
 node "$ROOT/scripts/check-package-meta.mjs" "$name"
+echo "== host-run: exact @ai-ecoverse pins"
+node "$ROOT/scripts/check-exact-pins.mjs" "$name"
 
 echo "== host-run: assert packaging rev / npm semver (refuse plain X.Y.Z and X.Y-N)"
 node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable

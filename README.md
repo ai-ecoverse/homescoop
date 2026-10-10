@@ -35,6 +35,10 @@ Dispatch **ladder-build** with `package=zlib`, or merge a PR that changes
 ladder-build skips when that `pkg@version` is already on npm; bump `-N` to rebuild.
 A `build.sh`-only change does not republish. PRs get **ladder-pr** host
 builds (no publish) plus `package.tgz` artifacts for certification.
+Every `@ai-ecoverse/*` dependency in a package's `package.json` is an **exact**
+version (`scripts/check-exact-pins.mjs`, [docs/versioning.md](docs/versioning.md#exact-ai-ecoverse-pins));
+a pin-only bump is a packaging-only repack of the published tarball
+([docs/ladder-builds.md](docs/ladder-builds.md#packaging-only-repack)).
 
 ```bash
 node scripts/read-recipe.mjs zlib --field builder
@@ -98,7 +102,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
 | `@ai-ecoverse/wasi-hf` | host | **0.1.0-2** (`hf download` / `hf auth`, token file 0600; Rust on wasix-net, Range resume + LFS sha256, plain files under `/home/models`; not huggingface_hub's CLI, see #110) |
 | `@ai-ecoverse/wasi-dig` | host | **0.1.0-1** (`dig`; Rust on wasix-net + hickory-proto: DNS over HTTPS through the realm proxy, DNS over TCP to `@server` via the uplink, dig-style output; no UDP, see #101) |
-| `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-1** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
+| `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-2** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 
 \* stub until ported. Published libs ship relocatable `lib/pkgconfig/*.pc`.
