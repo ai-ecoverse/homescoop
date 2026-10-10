@@ -69,6 +69,20 @@ else
   fi
 
   cp "$PKG/hints/wasix" "$SRC/cnf/hints/wasix"
+  # perl-cross 1.6.5 calls `tryhints 'hint' "$h"` for --hints=, so it looks
+  # for cnf/hints/hint and loads nothing; without our hints every target
+  # size probe runs readelf on a wasm object and fails.
+  python3 - "$SRC/cnf/configure_hint.sh" <<'PY'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text()
+bad = "tryhints 'hint' \"$h\""
+if bad in t:
+    p.write_text(t.replace(bad, 'tryhints "$h"'))
+elif 'tryhints "$h"' not in t:
+    sys.exit(f"{p}: --hints loop not recognised")
+PY
 
   # List::Util must stay on when usedl=undef (all-static).
   if grep -q 'extonlyif cpan/List-Util "\$usedl" !=' "$SRC/cnf/configure_mods.sh"; then
