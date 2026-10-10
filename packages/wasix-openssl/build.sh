@@ -18,6 +18,12 @@ rm -rf "$DEST/lib" "$DEST/lib-pic" "$DEST/include"
 JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 unset CPPFLAGS LDFLAGS LIBRARY_PATH CPATH C_INCLUDE_PATH SDKROOT
 export WASIXCC_RUN_WASM_OPT=no
+# Reproducible libcrypto: util/mkbuildinf.pl writes OpenSSL_version(
+# OPENSSL_BUILT_ON) from SOURCE_DATE_EPOCH, else the build time. Pinned to
+# the OpenSSL 3.5.9 release (GitHub release openssl-3.5.9, published
+# 2026-09-29T14:10:08Z); change it with the version.
+export SOURCE_DATE_EPOCH=1790691008
+BUILT_ON="built on: Tue Sep 29 14:10:08 2026 UTC"
 
 build_flavour() {
   # wasixcc only builds PIC with wasm exceptions (python's ehpic tree: legacy).
@@ -42,6 +48,13 @@ build_flavour() {
     wasixranlib libcrypto.a
     wasixranlib libssl.a
   )
+  # The build date in libcrypto is the pinned one, not today's.
+  local strs
+  strs="$(strings "$bld/libcrypto.a")"
+  grep -qF "$BUILT_ON" <<<"$strs" || {
+    echo "homescoop wasix-openssl: libcrypto.a ($dir) lacks '$BUILT_ON'" >&2
+    exit 1
+  }
   mkdir -p "$DEST/$dir/pkgconfig"
   cp "$bld/libcrypto.a" "$bld/libssl.a" "$DEST/$dir/"
   local pcs="$DEST/$dir/pkgconfig" lib

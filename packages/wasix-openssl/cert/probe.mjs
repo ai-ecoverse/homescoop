@@ -7,6 +7,8 @@ export default async function (ctx) {
     const r = await run([cmd], { cwd });
     assert.equal(r.status, 0, `${cmd}: rc=${r.status}\n${r.stdout}${r.stderr}`);
     assert.match(r.stdout, /^OpenSSL 3\.5\.9 /m, cmd);
+    // Reproducible build: the build date is SOURCE_DATE_EPOCH (the 3.5.9 release).
+    assert.match(r.stdout, /^built on: Tue Sep 29 14:10:08 2026 UTC$/m, `${cmd}: build date not pinned`);
     for (const check of [
       'sha256(abc)',
       'aes-256-gcm encrypt (GCM spec test case 16)',
