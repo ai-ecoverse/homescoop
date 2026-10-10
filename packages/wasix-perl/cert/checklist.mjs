@@ -45,9 +45,11 @@ export default async function (ctx) {
   assert.equal(await perl('printf("%d|%s|%5.2f|%-4d|%04x|%vd|%u|%o\\n", 2**62, 2**62, 3.14159, 42, 255, v1.22.333, 18446744073709551615, 8)'),
     '4611686018427387904|4.61168601842739e+18| 3.14|42  |00ff|1.22.333|18446744073709551615|10\n');
   assert.equal(await perl('print sprintf("%d", 2**62), " ", sprintf("%x", 2**40), " ", 9223372036854775807, "\\n"'), '4611686018427387904 10000000000 9223372036854775807\n');
-  // Core messages built with my_snprintf.
-  const range = await run(['perl', '-we', 'my @a = (1..3); my $x = $a[2**33]; print defined $x ? "def" : "undef", "\n"'], { cwd });
-  assert.equal(range.stdout, 'undef\n', `stderr=${range.stderr}`);
+  // Core warnings built with my_snprintf (wasm32: SSize_t is 32-bit, so
+  // keep array indices in range of it).
+  const warnUse = await run(['perl', '-we', 'my @a = (1..3); my $x = $a[10]; print defined $x ? "def" : "undef", "\n"; my $n = "12abc" + 0; print "$n\n"'], { cwd });
+  assert.equal(warnUse.stdout, 'undef\n12\n', `stderr=${warnUse.stderr}`);
+  assert.match(warnUse.stderr, /Argument "12abc" isn't numeric in addition \(\+\) at -e line 1\./);
   assert.equal(await perl('use Config; print "$Config{ivdformat} $Config{uvuformat} $Config{sPRId64}\\n"'), '"lld" "llu" "lld"\n');
 
   // DynaLoader.pm is shipped: require works, and an old-style
