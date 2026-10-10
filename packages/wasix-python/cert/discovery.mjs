@@ -21,6 +21,19 @@ const S = '@ai-ecoverse';
 const NM = `/node_modules/${S}`;
 const G = '/usr/local/share/pnpm/global/v11';
 const TOP = ['py-numpy', 'py-pandas', 'py-scipy', 'py-matplotlib'];
+const DIAG = String.raw`
+import os, sys
+import _slicc_site as s
+base = os.path.abspath(sys.base_prefix); real = os.path.realpath(base)
+print("base", base, "real", real)
+print("py-* on sys.path:", [p for p in sys.path if "/py-" in p])
+c = os.path.join(real, ".slicc-site-cache")
+print("cache:", repr(open(c).read()[:4000]) if os.path.exists(c) else "none")
+found = [p for nm in [s._project_node_modules(base)] for p in s._packages(nm)]
+print("found:", found)
+print("stamps:", [s._stamp(p) for p in found][:6])
+print("scan:", s._scan(real, found))
+`;
 const IMPORTS =
   'import numpy, pandas, scipy.optimize, matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot, PIL, kiwisolver, contourpy, fontTools, cycler, packaging, pyparsing, dateutil, pytz, six, tzdata; print(numpy.__version__, pandas.__version__, scipy.__version__, matplotlib.__version__)';
 
@@ -83,7 +96,13 @@ export default async function (ctx) {
 
   // 0. The harness's flat npm layout, no PYTHONPATH.
   let r = await py(['-c', IMPORTS]);
-  assert.equal(r.status, 0, `flat: ${r.stderr}`);
+  if (r.status !== 0) {
+    // What discovery saw: sys.path, the cache, and a rescan (-v skips the cache).
+    const why = await py(['-c', DIAG]);
+    const v = await py(['-v', '-c', 'import numpy']);
+    const notes = v.stderr.split('\n').filter((l) => l.startsWith('slicc discover')).join('\n');
+    assert.fail(`flat: ${r.stderr}\n--- state:\n${why.stdout}${why.stderr}\n--- python -v -c 'import numpy': rc=${v.status}\n${notes}`);
+  }
   console.log(`discovery: flat /node_modules: ${r.stdout.trim()}`);
 
   // Cost, on the flat layout (17 py-*).
