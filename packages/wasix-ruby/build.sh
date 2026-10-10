@@ -582,10 +582,11 @@ for d in "$DEST"/lib/ruby/[0-9]*; do
   echo "== wasix-ruby: remove non-API lib tree $(basename "$d") (keeping $(basename "$API_LIB"))"
   rm -rf "$d"
 done
-# Baseruby/Homebrew can leak default gems into DESTDIR/opt/homebrew/... —
-# merge them so bundler/rake gemspecs are under GEM_HOME.
+# The baseruby's rubygems defaults can send bundled gems into DESTDIR under
+# its own gem dir (Homebrew: opt/homebrew/…; Debian/Ubuntu CI: var/lib/gems)
+# — merge them so bundler/rake gemspecs are under the package's gems.
 GEMS_DEST="$DEST/lib/ruby/gems"
-for leak in "$STAGE"/opt/homebrew/lib/ruby/gems/* "$STAGE"/usr/local/lib/ruby/gems/*; do
+for leak in "$STAGE"/opt/homebrew/lib/ruby/gems/* "$STAGE"/usr/local/lib/ruby/gems/* "$STAGE"/var/lib/gems/*; do
   [[ -d "$leak" ]] || continue
   echo "== wasix-ruby: merge leaked gems from $leak"
   mkdir -p "$GEMS_DEST"
@@ -594,7 +595,7 @@ done
 # Ensure bundler + rake gemspecs exist (bin/bundle and bin/rake activate gems)
 ensure_gemspec() {
   local name="$1" src_glob="$2"
-  if find "$GEMS_DEST" -path "*/specifications/*${name}*.gemspec" 2>/dev/null | grep -q .; then
+  if [[ -n "$(find "$GEMS_DEST" -path "*/specifications/*${name}*.gemspec" -print -quit 2>/dev/null)" ]]; then
     return 0
   fi
   local ver_dir
