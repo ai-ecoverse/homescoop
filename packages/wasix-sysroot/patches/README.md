@@ -138,3 +138,29 @@ musl's `__tm_to_tzname` (used by `strftime("%Z")`) prints `tm_zone` only if it i
 
 CPython's `time.strftime` builds `struct tm` from a tuple, so its `tm_zone` points at a Python-owned copy and `%Z` was always empty. -20 maps a pointer whose text equals a name this tz knows (`__tzname[0/1]`, `UTC`, a TZif abbreviation) to musl's string. Anything else, NULL included, still prints `""` (`test/tzname.c`).
 
+## -21: `tcgetattr.c`, `tcsetattr.c`, `tcflush.c`, `tcdrain.c`, `ioctl.c`, `isatty.c` — terminals per descriptor (`slicc_tty.h`)
+
+slicc-kernel's `slicc_tty` module (slicc-kernel#289) answers per file descriptor. All three calls return 0 or a WASI errno:
+- `tcgetattr(fd, out)` and `tcsetattr(fd, actions, in)` carry musl's 60-byte wasm32 `struct termios`.
+- `winsize(fd, out)` fills in the window size.
+- A fd that is no terminal gets ENOTTY, and a closed fd EBADF.
+
+The six members change as follows:
+
+- **`tcgetattr`/`tcsetattr`:** the whole termios goes to the kernel, so `cfmakeraw` + `tcsetattr` is really raw: ISIG, IEXTEN, OPOST, `c_iflag` and `c_cc` included (homescoop #247). Before, `tty_set` carried only echo and canonical mode, so ^C still raised SIGINT.
+- **`ioctl`:** `TCGETS`/`TCSETS`/`TCSETSW`/`TCSETSF` go through the above (Linux's request numbers, defined in `slicc_tty.h`, since wasi-libc's `sys/ioctl.h` has none).
+  - `TIOCGWINSZ` asks per fd: a pipe or a file is ENOTTY (#279), where `tty_get` answered 80x24.
+  - `TIOCSWINSZ` is a no-op on a terminal (the size is the page's) and ENOTTY elsewhere.
+- **`isatty`:** `winsize(fd) == 0`.
+- **`tcflush`:** TCIFLUSH/TCIOFLUSH re-apply the current termios with TCSAFLUSH; TCOFLUSH has nothing to drop.
+- **`tcdrain`:** succeeds on a valid fd, since output is written at once.
+- **Older kernels:** a kernel without `slicc_tty` answers ENOSYS, and every call falls back to the -20 code (`tty_get`/`tty_set`, `fd_fdstat` for `isatty`).
+
+### -21: `../slicc_stat_owner.c` — file type from `slicc_fs`
+
+`fstat` and `fstatat` (so `stat`/`lstat`) already took the permission bits from slicc-kernel's `slicc_fs` `fd_mode`/`path_mode`.
+
+When that mode also carries type bits (Linux numbering, `& 0170000`), -21 maps them to WASIX's `__mode_t.h` and they replace the WASI filetype: FIFO 0o010000 becomes 0o140000, socket 0o140000 becomes 0o160000, and the rest are equal. WASI has no FIFO filetype, so a pipe can only be `S_ISFIFO` this way (ruby's popen `r+`, python's asyncio pipe transports).
+
+A mode without type bits keeps the WASI filetype, which is how every kernel before r99's `fd_mode`-on-pipes change behaves (`test/fifo.c`).
+

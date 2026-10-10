@@ -41,6 +41,20 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-21 terminals are per descriptor (slicc-kernel's `slicc_tty`,
+slicc-kernel#289):
+- `tcgetattr`/`tcsetattr` carry the whole termios, so `cfmakeraw` is really
+  raw;
+- `ioctl(TIOCGWINSZ)`, `TCGETS`/`TCSETS*` and `isatty` answer for that fd
+  (ENOTTY on pipes and files);
+- `ioctl(TIOCSWINSZ)` returns 0 on a terminal but changes nothing: the size
+  is the page's, and slicc-kernel has no set-window-size call (ENOTTY
+  elsewhere);
+- `fstat`/`stat`/`lstat` take a file's type from slicc-kernel's `slicc_fs`
+  mode when it carries one, so a pipe is `S_ISFIFO` once the kernel reports
+  it (WASI has no FIFO filetype); otherwise the WASI filetype stays;
+- older kernels keep the previous behaviour.
+
 Since 2025.9.30-20 user and group ids come from slicc-kernel's process
 credentials (`slicc.cred_get`/`cred_set`/`groups_get`/`groups_set`; slicc-kernel
 ≥ 1.44.0, which has users), and `getpw*`/`getgr*` read its `/etc/passwd` and `/etc/group`.
@@ -48,3 +62,30 @@ There is no fallback to uid 1000: on an older kernel `getuid()` returns -1,
 the set\*id calls fail with ENOSYS, and user lookups find nothing.
 
 Data only — no commands. Set `WASIXCC_SYSROOT_PREFIX` to this package directory.
+
+## File type bits (`S_IF*`) differ from Linux
+
+WASIX libc compiles `st_mode` file types from `__mode_t.h`. The values are
+part of the ABI of every package built on this sysroot, so they stay:
+
+| | WASIX | Linux |
+| --- | --- | --- |
+| `S_IFREG`, `S_IFDIR`, `S_IFLNK`, `S_IFCHR`, `S_IFBLK` | same as Linux | 0o100000, 0o040000, 0o120000, 0o020000, 0o060000 |
+| `S_IFIFO` | **0o140000** (Linux's `S_IFSOCK`) | 0o010000 |
+| `S_IFSOCK` | **0o160000** | 0o140000 |
+| `S_IFMT` | **0o160000** (the OR of the types; Linux's FIFO bit 0o010000 is masked away) | 0o170000 |
+
+slicc-kernel's pipes are WASI sockets (filetype `SOCKET_STREAM`, since
+slicc-kernel#280). So `fstat` on any pipe gives `0o160000 | perms`, and inside
+a WASIX program `S_ISSOCK` is true and `S_ISFIFO` false, consistently.
+
+Inside one program the macros agree with each other. The hazard is a raw
+`st_mode` that crosses the wasm boundary: it carries WASIX numbers. Examples:
+- cpio `newc` headers;
+- tar entries for sockets and FIFOs;
+- JSON stat dumps read by Node or bash;
+- scripts comparing octal modes with Linux constants (a cert once saw
+  `S_ISSOCK False` this way).
+
+Decode such values with the table above, or translate them before they leave
+the program.

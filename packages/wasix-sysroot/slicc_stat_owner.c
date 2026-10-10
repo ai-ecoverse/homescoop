@@ -75,6 +75,28 @@ static void to_public_stat_owned(const __wasi_filestat_t *in, struct stat *out) 
   }
 }
 
+/* wasix-sysroot -21: slicc_fs's mode may carry the file type, in Linux
+ * numbering. WASI has no FIFO filetype, so a pipe's S_IFIFO (slicc-kernel
+ * fd_mode on a pipe) can only come from there. Map Linux's type bits to
+ * WASIX's __mode_t.h (FIFO 0o010000 -> 0o140000, socket 0o140000 ->
+ * 0o160000; the rest are equal) and let them replace the WASI filetype; a
+ * mode without type bits (older kernels) keeps the WASI one. */
+static void apply_slicc_mode(struct stat *buf, int mode) {
+  mode_t type;
+  switch (mode & 0170000) {
+  case 0010000: type = S_IFIFO; break;
+  case 0020000: type = S_IFCHR; break;
+  case 0040000: type = S_IFDIR; break;
+  case 0060000: type = S_IFBLK; break;
+  case 0100000: type = S_IFREG; break;
+  case 0120000: type = S_IFLNK; break;
+  case 0140000: type = S_IFSOCK; break;
+  default: type = 0; break;
+  }
+  if (type) buf->st_mode = type | (mode_t)(mode & 07777);
+  else buf->st_mode |= (mode_t)(mode & 07777);
+}
+
 int fstat(int fildes, struct stat *buf) {
   __wasi_filestat_t internal_stat;
   __wasi_errno_t error = __wasi_fd_filestat_get(((__wasi_fd_t)fildes), &internal_stat);
@@ -85,7 +107,7 @@ int fstat(int fildes, struct stat *buf) {
   to_public_stat_owned(&internal_stat, buf);
   int mode;
   if (__slicc_fs_fd_mode(fildes, &mode) == 0)
-    buf->st_mode |= (mode_t)(mode & 07777);
+    apply_slicc_mode(buf, mode);
   return 0;
 }
 
@@ -106,6 +128,6 @@ int __wasilibc_nocwd_fstatat(int fd, const char *restrict path,
   int mode;
   if (__slicc_fs_path_mode(fd, path, (int)strlen(path),
                            (flag & AT_SYMLINK_NOFOLLOW) ? 1 : 0, &mode) == 0)
-    buf->st_mode |= (mode_t)(mode & 07777);
+    apply_slicc_mode(buf, mode);
   return 0;
 }
