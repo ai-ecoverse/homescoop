@@ -1,13 +1,13 @@
 // Process credentials through slicc_libc_gaps.c (homescoop#207): ids from
 // slicc-kernel K1's Module.sliccKernel.cred(), set*id through setcred(), names
 // from its /etc/passwd and /etc/group. K1 (slicc-kernel#251) is released in
-// 1.44.0; SLICC_K1_KERNEL may point at another build's dist/node.js. The
+// 1.44.0 (tested on 1.47.1, which also reports file owners as the caller's ids); SLICC_K1_KERNEL may point at another build's dist/node.js. The
 // lines match wasix-sysroot's test/r20.c.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
-import { createNodeKernel as createK1 } from 'slicc-kernel-1-44/node'
+import { createNodeKernel as createK1 } from 'slicc-kernel-k1/node'
 import { createNodeKernel as createPreK1 } from '@ai-ecoverse/slicc-kernel/node'
 
 const out = new URL('./out/', import.meta.url)
@@ -42,7 +42,7 @@ const want = {
   ],
 }
 
-test(`slicc-kernel ${k1 ? k1 : '1.44.0'}: credentials from the kernel, as root and as a user`, async () => {
+test(`slicc-kernel ${k1 ? k1 : '1.47.1'}: credentials from the kernel, as root and as a user`, async () => {
   const createNodeKernel = k1 ? (await import(pathToFileURL(k1).href)).createNodeKernel : createK1
   const kernel = await createNodeKernel({})
   const manifest = {
