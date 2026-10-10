@@ -146,3 +146,12 @@ The published 2025.9.30-20 on the same kernel. `cfmakeraw` stays half raw: ISIG 
 
 On older kernels `TIOCGWINSZ` on a pipe or a file also answered 80x24 (#279; that kernel half is in #289).
 
+### -21 file types (`--probe fifo`), slicc-kernel #307 (`fix/pipe-fifo` cd2da91)
+
+The published 2025.9.30-20 on #307. -20 dropped `fd_mode`'s type bits and kept only the permissions, so a pipe stays typeless:
+
+```text
++   'stdin pipe: fifo=0 sock=0 reg=0 dir=0 lnk=0 chr=0 fmt=0',
++   'pipe(): fifo=0 sock=0 reg=0 dir=0 lnk=0 chr=0 fmt=0'
+```
+

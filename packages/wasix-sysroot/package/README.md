@@ -47,6 +47,12 @@ slicc-kernel#289):
   raw;
 - `ioctl(TIOCGWINSZ)`, `TCGETS`/`TCSETS*` and `isatty` answer for that fd
   (ENOTTY on pipes and files);
+- `ioctl(TIOCSWINSZ)` returns 0 on a terminal but changes nothing: the size
+  is the page's, and slicc-kernel has no set-window-size call (ENOTTY
+  elsewhere);
+- `fstat`/`stat`/`lstat` take a file's type from slicc-kernel's `slicc_fs`
+  mode when it carries one, so a pipe is `S_ISFIFO` once the kernel reports
+  it (WASI has no FIFO filetype); otherwise the WASI filetype stays;
 - older kernels keep the previous behaviour.
 
 Since 2025.9.30-20 user and group ids come from slicc-kernel's process

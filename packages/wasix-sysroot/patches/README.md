@@ -156,3 +156,11 @@ The six members change as follows:
 - **`tcdrain`:** succeeds on a valid fd, since output is written at once.
 - **Older kernels:** a kernel without `slicc_tty` answers ENOSYS, and every call falls back to the -20 code (`tty_get`/`tty_set`, `fd_fdstat` for `isatty`).
 
+### -21: `../slicc_stat_owner.c` — file type from `slicc_fs`
+
+`fstat` and `fstatat` (so `stat`/`lstat`) already took the permission bits from slicc-kernel's `slicc_fs` `fd_mode`/`path_mode`.
+
+When that mode also carries type bits (Linux numbering, `& 0170000`), -21 maps them to WASIX's `__mode_t.h` and they replace the WASI filetype: FIFO 0o010000 becomes 0o140000, socket 0o140000 becomes 0o160000, and the rest are equal. WASI has no FIFO filetype, so a pipe can only be `S_ISFIFO` this way (ruby's popen `r+`, python's asyncio pipe transports).
+
+A mode without type bits keeps the WASI filetype, which is how every kernel before r99's `fd_mode`-on-pipes change behaves (`test/fifo.c`).
+
