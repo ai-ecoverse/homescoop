@@ -36,13 +36,22 @@ export ZERO_AR_DATE=1
 mkdir -p "$B" "$DL" "$DEPS/lib/pkgconfig" "$DEPS/include"
 
 # --- tools -------------------------------------------------------------------
-# prestage-check.sh disassembles with wabt's wasm-objdump.
-if ! command -v wasm-objdump >/dev/null && [[ -z "${WASM_OBJDUMP:-}" ]]; then
-  if command -v apt-get >/dev/null; then
-    sudo apt-get install -y -qq wabt >/dev/null
+# prestage-check.sh disassembles with wabt's wasm-objdump: a pinned 1.0.42
+# (Ubuntu's 1.0.34 cannot read python.wasm: legacy EH + threads).
+if [[ -z "${WASM_OBJDUMP:-}" ]]; then
+  case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64) WABT_ASSET=linux-x64 WABT_SHA=84895407a6bbb80e918f33b16b2fb2206021c150b6bc9ff6f761263a745ab131 ;;
+    Darwin-arm64) WABT_ASSET=macos-arm64 WABT_SHA=3f654779b436c628db3ca4323c51538815f5fbc887a6d5f3bb1c18d36281e240 ;;
+    *) echo "homescoop wasix-python: no pinned wabt for $(uname -s)-$(uname -m); set WASM_OBJDUMP" >&2; exit 1 ;;
+  esac
+  if [[ ! -x "$B/wabt/bin/wasm-objdump" ]]; then
+    homescoop_fetch "https://github.com/WebAssembly/wabt/releases/download/1.0.42/wabt-1.0.42-$WABT_ASSET.tar.gz" "$WABT_SHA" "$DL/wabt-1.0.42.tar.gz"
+    rm -rf "$B/wabt" && mkdir -p "$B/wabt"
+    tar xzf "$DL/wabt-1.0.42.tar.gz" -C "$B/wabt" --strip-components=1
   fi
+  export WASM_OBJDUMP="$B/wabt/bin/wasm-objdump"
 fi
-command -v wasm-objdump >/dev/null || [[ -n "${WASM_OBJDUMP:-}" ]] || { echo "homescoop wasix-python: need wasm-objdump (wabt)" >&2; exit 1; }
+"$WASM_OBJDUMP" --version
 for t in pkg-config unzip make; do
   command -v "$t" >/dev/null || { echo "homescoop wasix-python: need $t" >&2; exit 1; }
 done
