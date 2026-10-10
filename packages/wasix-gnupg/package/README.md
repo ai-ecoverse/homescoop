@@ -10,7 +10,10 @@ echo hi | gpg --clearsign | gpg --verify
 git config --global gpg.program gpg && git commit -S -m signed
 ```
 
-- **Keyring**: `~/.gnupg` (or `$GNUPGHOME`) on the VFS.
+- **Keyring**: `~/.gnupg` (or `$GNUPGHOME`) on the VFS. On slicc-kernel
+  ≥ 1.35.1 the files get their usual modes (homedir and
+  `private-keys-v1.d` 700, keys and `trustdb.gpg` 600) and gpg's
+  "unsafe permissions" check works; older kernels leave them 755/644.
 - **gpg-agent** starts on first use, detached, and later commands reach it
   through `$GNUPGHOME/S.gpg-agent` on the realm's loopback namespace. It
   caches passphrases as usual (`default-cache-ttl`).

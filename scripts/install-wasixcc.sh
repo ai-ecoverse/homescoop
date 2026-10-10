@@ -17,8 +17,8 @@ BINARYEN_VERSION="133"
 # -15 adds st_uid/st_gid = getuid()/getgid() (slicc_stat_owner) to -14,
 # which wasix-m4 1.4.20-2 links against (fcntl F_SETFD fix); wasix-gnupg
 # needs it for its homedir ownership checks.
-SYSROOT_VERSION="2025.9.30-15"
-SYSROOT_SHA="1642c734b7709165390ef67205395ade364008c423acd9679c2fba0ddb1fc48c"
+SYSROOT_VERSION="2025.9.30-17"
+SYSROOT_SHA="502559009a819ef15263aa5b6468e100ef813c3e6151cd4563cf04762488e4b3"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
