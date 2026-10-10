@@ -15,7 +15,7 @@ PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 # Upstream portable tag is 10.6p1; npm packaging base is recipe 10.6.0.
 UPSTREAM_PORTABLE="${HOMESCOOP_OPENSSH_PORTABLE:-10.6p1}"
-PKG_VER="${VERSION}-2"
+PKG_VER="${VERSION}-3"
 WORK="${WASIX_OPENSSH_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"

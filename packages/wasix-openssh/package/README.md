@@ -27,9 +27,19 @@ default user must match a real account. Key files need mode **0600** (kernel
 
 `enter_raw_mode` clears `ISIG` / `IEXTEN` / `OPOST` through `tcsetattr`. WASIX
 `tty_set` cannot clear those yet ([slicc-kernel#247](https://github.com/ai-ecoverse/slicc-kernel/issues/247)),
-so a local **^C** can hit the local `ssh` instead of being forwarded. Use the
-SSH escape **`~.`** (newline, tilde, period) to disconnect until #247 lands.
-This package does **not** patch around that in OpenSSH.
+so a local **^C** can hit the local `ssh` instead of being forwarded. The
+host-node cert asserts that current behaviour (local `ssh` exits with a
+SIGINT-ish status). Use the SSH escape **`~.`** (newline, tilde, period) to
+disconnect until #247 lands. This package does **not** patch around that in
+OpenSSH.
+
+## `ssh-add` / agent
+
+This package ships **`ssh-add`** but **not `ssh-agent`**. Without an agent
+(`SSH_AUTH_SOCK` unset or dead), `ssh-add -l` exits **2** with
+`Could not open a connection to your authentication agent.` Use keys via
+`-i` / `IdentityFile`, or run an agent from another package/host if you need
+one.
 
 ## Auth
 
@@ -41,9 +51,11 @@ This package does **not** patch around that in OpenSSH.
 ## Fork / spawn
 
 Outbound TCP uses kernel sockets (uplink-routed). Exec mode needs no fork.
-ProxyCommand, ControlMaster, `-f`, and scp→ssh prefer `posix_spawn` /
-homescoop exec shims where possible; true daemonize and double-fork paths are
-unsupported — see build notes as they land.
+`scp` / `sftp` spawn the `ssh` helper with **`posix_spawnp`** (patch
+`0002-wasix-scp-sftp-posix-spawn.patch`) over a `socketpair`; they need a
+kernel with working `sock_pair` (cert pin **slicc-kernel ≥ 1.42.3**).
+ProxyCommand, ControlMaster, and `-f` still prefer spawn over fork; true
+daemonize and double-fork paths are unsupported.
 
 ## Sysroot
 

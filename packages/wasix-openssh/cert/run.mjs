@@ -7,11 +7,10 @@
  * Starts (on the HOST):
  *   1. ephemeral OpenSSH sshd (temp host/user keys, loopback)
  *   2. cert/none-auth-server.py (paramiko; accepts auth method none)
+ *   3. a seeded bare git repo under the work dir (clone/push over sshd)
  * Then boots slicc-kernel's Node entry with an uplink that routes those
  * peers, installs the package tarball, and runs cert/*.mjs specs
  * (excluding this file).
- *
- * Draft: scaffold for CI iteration. Specs grow as ssh.wasm links.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -30,6 +29,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { ptySession } from '../../../scripts/browser-cert/context.mjs';
 
 /** Bridge a fakeUplink peer conn to a host TCP service (sshd / none-auth). */
 function tcpProxy(host, port) {
@@ -194,7 +194,23 @@ async function main() {
       reject(new Error(`none-auth-server exited ${code}`));
     });
   });
-  console.log(`== host sshd :${sshdPort}, none-auth :${nonePort}`);
+
+  // --- host bare git repo (clone/push over sshd) ---
+  const xferDir = join(work, 'xfer');
+  mkdirSync(xferDir, { recursive: true });
+  const seedDir = join(work, 'seed');
+  const bareDir = join(work, 'bare.git');
+  mkdirSync(seedDir, { recursive: true });
+  sh('git', ['-c', 'init.defaultBranch=main', 'init'], { cwd: seedDir });
+  writeFileSync(join(seedDir, 'README'), 'wasix-openssh cert seed\n');
+  sh('git', ['-c', 'user.email=cert@example.com', '-c', 'user.name=cert', 'add', 'README'], {
+    cwd: seedDir,
+  });
+  sh('git', ['-c', 'user.email=cert@example.com', '-c', 'user.name=cert', 'commit', '-m', 'seed'], {
+    cwd: seedDir,
+  });
+  sh('git', ['clone', '--bare', seedDir, bareDir]);
+  console.log(`== host sshd :${sshdPort}, none-auth :${nonePort}, bare ${bareDir}`);
 
   // --- kernel ---
   const nm = join(work, 'nm');
@@ -257,20 +273,54 @@ async function main() {
   // sshd authenticates a real host account; the guest must pass that name.
   const hostUser = sh('bash', ['-lc', 'id -un']).trim();
 
+  // Guest ssh_config so scp/sftp/git share the same identity options.
+  await kernel.writeFile(
+    '/home/user/.ssh/config',
+    [
+      'Host sshd.cert.internal',
+      `  User ${hostUser}`,
+      '  IdentityFile /home/user/.ssh/id_ed25519',
+      '  IdentitiesOnly yes',
+      '  StrictHostKeyChecking accept-new',
+      '  UserKnownHostsFile /home/user/.ssh/known_hosts',
+      '',
+      'Host none.cert.internal',
+      '  User user',
+      '  StrictHostKeyChecking no',
+      '  UserKnownHostsFile /dev/null',
+      '',
+    ].join('\n'),
+  );
+  await kernel.run(['chmod', '600', '/home/user/.ssh/config'], {
+    cwd: '/home/user',
+    env: { HOME: '/home/user', USER: 'user' },
+  });
+
+  const guestEnv = { HOME: '/home/user', USER: 'user' };
   const ctx = {
     assert,
     work,
     sshdPort,
     nonePort,
     hostUser,
+    hostXfer: xferDir,
+    hostBare: bareDir,
+    // ssh://user@host/abs/path → absolute path on the sshd host.
+    gitUrl: `ssh://${hostUser}@sshd.cert.internal${bareDir}`,
     hostKeyPub: readFileSync(`${hostKey}.pub`, 'utf8').trim(),
     run: (argv, o = {}) =>
       kernel.run(argv, {
         cwd: o.cwd || '/home/user',
-        env: { HOME: '/home/user', USER: 'user', ...(o.env || {}) },
+        env: { ...guestEnv, ...(o.env || {}) },
         stdin: o.stdin,
       }),
-    pty: (...a) => kernel.openTerminal?.(...a) ?? Promise.reject(new Error('openTerminal unavailable')),
+    pty: (argv, o = {}) =>
+      ptySession(kernel, argv, {
+        ...o,
+        cwd: o.cwd || '/home/user',
+        env: { ...guestEnv, TERM: 'xterm-256color', ...(o.env || {}) },
+      }),
+    writeFile: (path, data) => kernel.writeFile(path, data),
   };
 
   let failed = 0;

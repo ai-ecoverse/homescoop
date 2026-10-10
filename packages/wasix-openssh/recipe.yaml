@@ -39,5 +39,11 @@ about:
     tty_set cannot clear those yet (slicc-kernel#247). Cert checks that local
     ^C hits local ssh; escape ~. is the documented way out. No ssh patch.
 
+    ssh-add is shipped; ssh-agent is not. Without an agent, ssh-add -l exits 2.
+
+    scp/sftp: posix_spawnp instead of fork (patch 0002); socketpair needs
+    slicc-kernel ≥ 1.42.3 in the host-node cert pin.
+
     Cert: host-node (Node kernel + host sshd over uplink; tiny host none-auth
-    server). Coordinator certifies and publishes; workers do not.
+    server; bare git repo for GIT_SSH_COMMAND). Coordinator certifies and
+    publishes; workers do not.
