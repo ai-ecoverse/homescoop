@@ -3,6 +3,15 @@
 **Date:** 2026-10-07  
 No SLICC patches on this package.
 
+
+## Users: 2.55.0-13 and slicc-kernel 1.44.0 (H1, homescoop#207)
+
+- **2.55.0-13** (a repack of -11's bytes): `git var GIT_AUTHOR_IDENT` with only `user.email` set fails with `fatal: unable to auto-detect name (got 'Unknown')` as root and as `cone`, since getpwuid found nobody.
+- **This build on slicc-kernel 1.44.0:**
+  - the author is `root` / `cone`;
+  - but root's own `~/repo` is "dubious": 1.44.0 reports every file as uid 1000 and root is uid 0, so git refuses it (`fatal: detected dubious ownership`; `git config` in it: `fatal: not in a git directory`).
+  - The kernel's fix (stat owner = the caller's euid/egid) is what `cert/users.mjs` runs on.
+
 ## Empty wasm
 
 `prove-negative.mjs --package git` → FAIL (`WebAssembly.compile(): BufferSource argument is empty`).

@@ -8,11 +8,6 @@ summary: "Git 2.55 with git-remote-http(s) over homescoop libcurl"
 source:
   url: "https://www.kernel.org/pub/software/scm/git/git-{{version}}.tar.xz"
   sha256: "457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357"
-# 2.55.0-12 and -13 are packaging-only: 2.55.0-11's bytes with exact
-# @ai-ecoverse pins (-12: wasm-bash 5.3.0-10, -13: wasm-bash 5.3.0-12,
-# repacked from -12). Drop repack: when the next release rebuilds.
-repack:
-  from: "2.55.0-12"
 dependencies:
   build: []
   host:
