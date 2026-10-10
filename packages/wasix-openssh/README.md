@@ -4,7 +4,7 @@
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
 `scp`, `sftp`, and `ssh-add`.
 
-Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-17**, linking
+Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-18**, linking
 **wasix-openssl 3.5.9-3** and **wasix-zlib 1.3.1-2** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
@@ -47,9 +47,9 @@ unsupported — see build notes as they land.
 
 ## Sysroot
 
-OpenSSH 10.6's client loop uses **poll/ppoll**, not select/pselect. Build
-against **-17** now; move to **-18** when published (select/pselect fixes are
-still useful for other code paths).
+**wasix-sysroot 2025.9.30-18** (select/pselect sub-second timeouts and
+socketpair flags; slicc_fs modes from -17). OpenSSH 10.6's client loop uses
+**poll/ppoll**.
 
 ## Not in v1
 

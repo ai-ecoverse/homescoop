@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Cross-build OpenSSH portable client tools for slicc WASIX via wasixcc.
 #
-# v1 targets: ssh, ssh-keygen. scp/sftp/ssh-add only if they link cheaply.
-# Links published wasix-openssl + wasix-zlib (pkg-config lib/ only) with
-# -Wl,--fatal-warnings. Sysroot: wasix-sysroot 2025.9.30-17 (slicc_fs modes).
+# Ships ssh, ssh-keygen, scp, sftp, ssh-add. Links published wasix-openssl +
+# wasix-zlib (pkg-config lib/ only) with -Wl,--fatal-warnings.
+# Sysroot: wasix-sysroot 2025.9.30-18 (slicc_fs; select/pselect + socketpair).
 set -euo pipefail
 
 HOMESCOOP_ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -15,7 +15,7 @@ PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 # Upstream portable tag is 10.6p1; npm packaging base is recipe 10.6.0.
 UPSTREAM_PORTABLE="${HOMESCOOP_OPENSSH_PORTABLE:-10.6p1}"
-PKG_VER="${VERSION}-1"
+PKG_VER="${VERSION}-2"
 WORK="${WASIX_OPENSSH_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
@@ -26,10 +26,11 @@ JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || 
 OPENSSL_PREFIX="${WASIX_OPENSSL_PREFIX:-$DEPS/wasix-openssl/package}"
 ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 
-if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
-  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
-fi
-export PATH="${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin:${WASIXCC_LLVM_LOCATION:-$HOME/.wasixcc/llvm}/bin:$HOME/.wasmer/bin:/opt/homebrew/bin:$PATH"
+# Isolated toolchain with certified wasix-sysroot -18 (select/pselect + socketpair).
+export HOMESCOOP_WASIX_SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-18}"
+export HOMESCOOP_WASIX_SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-ae55a48b143ebf0b0b7be2a2babebda76b9947316226089e03fb6ed9a2f07f2d}"
+eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
+export PATH="${WASIXCC_PREFIX}/bin:${WASIXCC_LLVM_LOCATION}/bin:$HOME/.wasmer/bin:/opt/homebrew/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS=no
 export WASIXCC_PIC=no
@@ -37,7 +38,7 @@ export WASIXCC_MODULE_KIND=static-main
 unset CFLAGS CPPFLAGS LDFLAGS CXX PKG_CONFIG_LIBDIR
 
 command -v wasixcc >/dev/null || { echo "homescoop wasix-openssh: wasixcc not on PATH" >&2; exit 1; }
-SYSROOT_LIBC="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot/lib/wasm32-wasi/libc.a"
+SYSROOT_LIBC="${WASIXCC_SYSROOT_PREFIX}/sysroot/lib/wasm32-wasi/libc.a"
 llvm-ar t "$SYSROOT_LIBC" | grep -qx slicc_stat_owner.o || {
   echo "homescoop wasix-openssh: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-15 (no slicc_stat_owner.o)" >&2
   exit 1
@@ -45,6 +46,10 @@ llvm-ar t "$SYSROOT_LIBC" | grep -qx slicc_stat_owner.o || {
 SYSROOT_UNDEF="$(llvm-nm -u "$SYSROOT_LIBC" 2>/dev/null)"
 grep -q __slicc_fs_fd_chmod <<<"$SYSROOT_UNDEF" || {
   echo "homescoop wasix-openssh: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-17 (no slicc_fs imports)" >&2
+  exit 1
+}
+grep -qF "sysroot=$HOMESCOOP_WASIX_SYSROOT_VERSION" "$WASIXCC_PREFIX/.homescoop-toolchain" || {
+  echo "homescoop wasix-openssh: want wasix-sysroot $HOMESCOOP_WASIX_SYSROOT_VERSION in $WASIXCC_PREFIX/.homescoop-toolchain" >&2
   exit 1
 }
 
@@ -281,7 +286,7 @@ homescoop_notices_begin "The ssh and ssh-keygen (and optional scp/sftp/ssh-add) 
 homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-17; files from tag v2025-09-02.1)" \
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-18; files from tag v2025-09-02.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -342,7 +347,7 @@ pkg = {
         "upstream": portable,
         "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-3",
         "zlib": "@ai-ecoverse/wasix-zlib@1.3.1-2",
-        "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-17",
+        "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-18",
     },
     "slicc": {"abi": "wasi", "commands": cmds},
 }

@@ -26,11 +26,10 @@ about:
   homepage: https://www.openssh.com/
   license: SSH-OpenSSH
   notes: |
-    Built with wasixcc on wasix-sysroot 2025.9.30-17 (switch to -18 when
-    published). Links wasix-openssl 3.5.9-3 and wasix-zlib 1.3.1-2 via
-    pkg-config only, with -Wl,--fatal-warnings. OpenSSH 10.6's client loop
-    uses poll/ppoll (not select/pselect), so -17's pselect sub-second bug is
-    not on the hot path; still prefer -18 once certified.
+    Built with wasixcc on wasix-sysroot 2025.9.30-18 (select/pselect
+    sub-second timeouts + socketpair flags; slicc_fs from -17). Links
+    wasix-openssl 3.5.9-3 and wasix-zlib 1.3.1-2 via pkg-config only, with
+    -Wl,--fatal-warnings. OpenSSH 10.6's client loop uses poll/ppoll.
 
     Identity: getpwuid comes from wasix-sysroot slicc_identity; tilde paths
     honour $HOME first (misc.c). Until H1 (sysroot -19 + kernel K1), document
