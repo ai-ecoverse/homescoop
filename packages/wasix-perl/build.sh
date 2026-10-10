@@ -15,11 +15,16 @@ WORK="${WASIX_PERL_WORK:-$PKG/work}"
 SRC="$WORK/perl-build"
 STAGE="${WASIX_PERL_STAGE:-$WORK/stage}"
 PREFIX_INSTALL="$STAGE"
-PERL_CROSS_URL="${PERL_CROSS_URL:-https://github.com/arsv/perl-cross.git}"
-WASM_OPT="${WASM_OPT:-$HOME/.wasixcc/binaryen/bin/wasm-opt}"
+
+# No wasixcc on PATH (CI runners): install the pinned toolchain, which
+# brings wasix-sysroot (asyncify tree "sysroot" for real fork).
+if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
+  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
+fi
+WASM_OPT="${WASM_OPT:-${WASIXCC_BINARYEN_LOCATION:-$HOME/.wasixcc/binaryen}/bin/wasm-opt}"
 
 # GNU sed required: perl-cross cnf/*.sh uses sed -r and \s (BSD sed breaks version detect).
-export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:/opt/homebrew/opt/binutils/bin:${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin:/opt/homebrew/bin:$HOME/.wasixcc/binaryen/bin:$HOME/.wasixcc/llvm/bin:$PATH"
+export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:/opt/homebrew/opt/binutils/bin:${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin:${WASIXCC_LLVM_LOCATION:-$HOME/.wasixcc/llvm}/bin:/opt/homebrew/bin:$PATH"
 
 # Asyncify sysroot (real fork). Not ehpic — PIC EH trees stub fork.
 export WASIXCC_RUN_WASM_OPT=no
@@ -51,12 +56,15 @@ else
     mkdir -p "$SRC"
     tar xJf "$TARBALL" -C "$SRC" --strip-components=1
     chmod -R u+w "$SRC"
-    if [[ ! -d "$WORK/perl-cross-git/.git" ]]; then
-      git clone --depth 1 "$PERL_CROSS_URL" "$WORK/perl-cross-git"
-    fi
+    # perl-cross, pinned in recipe.yaml (sources.perl_cross).
+    homescoop_load_recipe wasix-perl --source perl_cross
+    PC_TGZ="$WORK/$(basename "$PERL_CROSS_SRC_URL")"
+    homescoop_fetch "$PERL_CROSS_SRC_URL" "$PERL_CROSS_SRC_SHA" "$PC_TGZ"
+    rm -rf "$WORK/perl-cross"
+    mkdir -p "$WORK/perl-cross"
+    tar xzf "$PC_TGZ" -C "$WORK/perl-cross" --strip-components=1
     # Overlay without clobbering perl's LICENSE etc. where identical is fine.
-    cp -a "$WORK/perl-cross-git/." "$SRC/"
-    rm -rf "$SRC/.git"
+    cp -a "$WORK/perl-cross/." "$SRC/"
     touch "$SRC/.homescoop-perl-cross"
   fi
 
@@ -286,6 +294,14 @@ for s in prove pod2man perldoc cpan pod2text pod2html; do
 done
 
 homescoop_stage_license "$SRC/Artistic" "$SRC/Copying" "$SRC/LICENSE" "$WORK/perl-build/Artistic"
+homescoop_notices_begin "perl.wasm statically links the following."
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30; files from tag v2025-09-02.1)" \
+  "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
+  "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
+  "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
+  "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
+  "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
 
 # package.json / README written separately; refresh version stamp if present
 if [[ -f "$DEST/package.json" ]]; then
@@ -293,7 +309,7 @@ if [[ -f "$DEST/package.json" ]]; then
 const fs=require('fs');
 const p='$DEST/package.json';
 const j=JSON.parse(fs.readFileSync(p,'utf8'));
-j.version='${VER}-1';
+if (!String(j.version || '').startsWith('${VER}-')) j.version='${VER}-1';
 j.homescoop={recipe:'wasix-perl',upstream:'${VER}'};
 fs.writeFileSync(p, JSON.stringify(j,null,2)+'\n');
 "

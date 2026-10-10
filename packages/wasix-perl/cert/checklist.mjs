@@ -1,0 +1,27 @@
+/**
+ * wasix-perl checklist: version, core XS modules (static), fork through
+ * asyncify, file I/O and a pipe to a child process.
+ */
+export default async function (ctx) {
+  const { run, assert } = ctx;
+  const cwd = '/home/perl-cert';
+  assert.equal((await run(['mkdir', '-p', cwd], { cwd: '/home' })).status, 0);
+  const perl = async (code, opts = {}) => {
+    const r = await run(['perl', '-e', code], { cwd, ...opts });
+    assert.equal(r.status, 0, `perl -e ${code}: rc=${r.status} stderr=${r.stderr}`);
+    return r.stdout;
+  };
+
+  assert.equal(await perl('print "$^V\\n"'), 'v5.42.0\n');
+  assert.equal(await perl('use List::Util qw(sum max); use POSIX qw(floor); print sum(1..4), " ", max(3,9,2), " ", floor(2.7), "\\n"'), '10 9 2\n');
+  assert.equal(await perl('use Digest::SHA qw(sha256_hex); use MIME::Base64; print sha256_hex("abc"), " ", encode_base64("hi", ""), "\\n"'),
+    'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad aGk=\n');
+  assert.equal(await perl('my $p = fork; if (!$p) { print "child\\n"; exit 3 } waitpid($p, 0); print "parent ", $? >> 8, "\\n"'), 'child\nparent 3\n');
+  assert.equal(await perl('open my $f, ">", "t.txt" or die; print $f "one\\ntwo\\n"; close $f; open $f, "<", "t.txt" or die; my @l = <$f>; print scalar(@l), "\\n"'), '2\n');
+  assert.equal(await perl('open my $p, "-|", "echo", "piped" or die "$!"; print <$p>'), 'piped\n');
+  const stdin = await run(['perl', '-ne', 'print uc'], { cwd, stdin: 'abc\n' });
+  assert.equal(stdin.stdout, 'ABC\n');
+  const die = await run(['perl', '-e', 'die "boom\\n"'], { cwd });
+  assert.notEqual(die.status, 0);
+  assert.match(die.stderr, /^boom$/m);
+}

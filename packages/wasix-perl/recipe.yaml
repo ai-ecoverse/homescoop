@@ -8,6 +8,11 @@ summary: "Perl 5.42 for slicc WASIX (commands perl, prove, pod2man, cpan)"
 source:
   url: "https://www.cpan.org/src/5.0/perl-{{version}}.tar.xz"
   sha256: "73cf6cc1ea2b2b1c110a18c14bbbc73a362073003893ffcedc26d22ebdbdd0c3"
+sources:
+  # perl-cross (arsv) overlay; 1.6.5 carries the perl 5.42.0 diffs.
+  perl_cross:
+    url: "https://github.com/arsv/perl-cross/releases/download/1.6.5/perl-cross-1.6.5.tar.gz"
+    sha256: "81130cd4b8c6d9eb2a1959f37d44391a46ad6a6794fc41fed5441f74e85e3dd0"
 dependencies:
   build: []
   host: []
