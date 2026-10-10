@@ -3,7 +3,10 @@
 // host-node): build test/modes.c against it with the pinned wasixcc, then
 // run test/modes.mjs on slicc-kernel's Node entry at cert/meta.json's kernel.
 //
-//   node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz
+//   node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz [--probe r18]
+//
+// --probe NAME runs test/NAME.c / test/NAME.mjs instead (default: modes);
+// r18 is -18's select / chdir / TZ / socketpair probe.
 //
 // --kernel-dir <dir> uses a local slicc-kernel build (its dist/node.js)
 // instead of meta.kernel, e.g. to try one before it is released. With
@@ -25,25 +28,26 @@ if (!arg(args, '--tarball')) {
   process.exit(2);
 }
 const tarball = resolve(arg(args, '--tarball'));
+const probe = arg(args, '--probe') ?? 'modes';
 const kernelDir = arg(args, '--kernel-dir') && resolve(arg(args, '--kernel-dir'));
 const work = mkdtempSync(join(tmpdir(), 'wasix-sysroot-modes-'));
 
 try {
   console.log(`== sysroot ${tarball}`);
   const prefix = sysroot(tarball, join(work, 'sysroot'));
-  console.log('== modes.wasm (pinned wasixcc)');
-  const pkg = join(work, 'modes-pkg');
-  command(wasixcc(work), prefix, 'modes', pkg, 'modes');
+  console.log(`== ${probe}.wasm (pinned wasixcc)`);
+  const pkg = join(work, `${probe}-pkg`);
+  command(wasixcc(work), prefix, probe, pkg, probe);
   const k = await kernel(work, kernelDir);
   console.log(`== ${k.label} (Node entry)`);
   await k.install(pkg);
   const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run };
   try {
-    await (await import(pathToFileURL(join(here, 'modes.mjs')).href)).default(ctx);
-    console.log('PASS test/modes.mjs');
+    await (await import(pathToFileURL(join(here, `${probe}.mjs`)).href)).default(ctx);
+    console.log(`PASS test/${probe}.mjs`);
   } catch (e) {
     process.exitCode = 1;
-    console.log(`FAIL test/modes.mjs\n${e.stack}`);
+    console.log(`FAIL test/${probe}.mjs\n${e.stack}`);
   }
   await k.kernel.terminate();
 } finally {
