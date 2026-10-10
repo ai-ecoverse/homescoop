@@ -68,6 +68,10 @@ export ac_cv_func_getcwd=yes ac_cv_func_sigaction=yes
 export ac_cv_func_sigprocmask=yes ac_cv_func_sigemptyset=yes
 export ac_cv_func_sigaddset=yes ac_cv_func_sigdelset=yes ac_cv_func_sigfillset=yes
 export ac_cv_func_sigismember=yes
+# slicc_libc_gaps.c's getgroups() asks the kernel (homescoop#207); configure's
+# cross guess ("guessing no") made gnulib's replacement report only the
+# effective group.
+export ac_cv_func_getgroups_works=yes
 # Declared in uchar.h but emsdk link probes can false-negative → gnulib clash.
 export ac_cv_func_mbrtoc32=yes ac_cv_func_c32rtomb=yes
 export gl_cv_func_mbrtoc32=yes gl_cv_func_c32rtomb=yes
