@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-packaging",
-  "version": "26.3.0-3",
+  "version": "26.3.0-4",
   "description": "packaging for slicc WASIX CPython",
   "license": "Apache-2.0 OR BSD-2-Clause",
   "repository": {
@@ -26,7 +26,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "3.14.2-12"
+    "@ai-ecoverse/wasix-python": "3.14.2-13"
   },
   "homescoop": {
     "recipe": "py-packaging",
