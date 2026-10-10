@@ -9,9 +9,13 @@ import os
 import sys
 
 dest = sys.argv[1]
-host_paths = [b"/home/runner", b"/Users/", b"/opt/homebrew"]
-if os.environ.get("GITHUB_WORKSPACE"):
-    host_paths.append(os.environ["GITHUB_WORKSPACE"].encode())
+# The build machine's own roots (the fixed build root under /tmp is the
+# package's documented build prefix and may appear in sysconfig).
+host_paths = [b"/opt/homebrew"]
+for var in ("HOME", "GITHUB_WORKSPACE", "HOMESCOOP_ROOT", "RUNNER_TEMP"):
+    v = os.environ.get(var, "")
+    if len(v) > 1:
+        host_paths.append(v.encode())
 NATIVE = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe")
 TEXT = (".py", ".pc", ".json", ".txt", ".cfg", ".h", ".pth", ".toml")
 bad = []
@@ -33,8 +37,10 @@ for root, _dirs, files in os.walk(dest):
             with open(p, "rb") as fh:
                 data = fh.read()
             for hp in host_paths:
-                if hp in data:
-                    bad.append(f"host path {hp.decode()} in {p}")
+                i = data.find(hp)
+                if i >= 0:
+                    ctx = data[max(0, i - 80):i + 60].decode("utf-8", "replace").replace("\n", " ")
+                    bad.append(f"host path {hp.decode()} in {p}: ...{ctx}...")
 if bad:
     print("\n".join(bad[:50]), file=sys.stderr)
     sys.exit(f"staging-check: {len(bad)} host artefacts")
