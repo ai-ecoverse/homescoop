@@ -1,13 +1,43 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
-    "@ai-ecoverse/wasm-coreutils"
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/py-numpy",
+    "@ai-ecoverse/py-pandas",
+    "@ai-ecoverse/py-scipy",
+    "@ai-ecoverse/py-matplotlib",
+    "@ai-ecoverse/py-contourpy",
+    "@ai-ecoverse/py-kiwisolver",
+    "@ai-ecoverse/py-pillow",
+    "@ai-ecoverse/py-fonttools",
+    "@ai-ecoverse/py-cycler",
+    "@ai-ecoverse/py-packaging",
+    "@ai-ecoverse/py-pyparsing",
+    "@ai-ecoverse/py-python-dateutil",
+    "@ai-ecoverse/py-pytz",
+    "@ai-ecoverse/py-six",
+    "@ai-ecoverse/py-tzdata"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+    "@ai-ecoverse/wasm-bash@5.3.0-10",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/py-numpy@2.3.2-4",
+    "@ai-ecoverse/py-pandas@2.3.2-5",
+    "@ai-ecoverse/py-scipy@1.18.0-5",
+    "@ai-ecoverse/py-matplotlib@3.11.2-2",
+    "@ai-ecoverse/py-contourpy@1.4.0-1",
+    "@ai-ecoverse/py-kiwisolver@1.5.1-1",
+    "@ai-ecoverse/py-pillow@12.3.0-2",
+    "@ai-ecoverse/py-fonttools@4.66.1-1",
+    "@ai-ecoverse/py-cycler@0.12.1-1",
+    "@ai-ecoverse/py-packaging@26.3.0-1",
+    "@ai-ecoverse/py-pyparsing@3.3.3-1",
+    "@ai-ecoverse/py-python-dateutil@2.9.0-post0.2",
+    "@ai-ecoverse/py-pytz@2026.4.0-2",
+    "@ai-ecoverse/py-six@1.17.0-2",
+    "@ai-ecoverse/py-tzdata@2026.4.0-2"
   ],
   "checklist": [
     "base python / python3: sys.executable and sys._base_executable are /usr/bin/python(3) (sitecustomize.py)",
@@ -16,7 +46,10 @@
     "a venv console script (#!/home/v/bin/python) runs in the venv; subprocesses of sys.executable stay in the venv",
     "a user sitecustomize in the venv runs once after ours and is what `import sitecustomize` returns (#157 b)",
     "a user sitecustomize on PYTHONPATH (shadowing the stdlib one) does not disable the fix: site-packages/slicc-executable.pth still sets sys.executable (#157 c)",
-    "PATH=. in /usr/bin gives sys.executable /usr/bin/python, not ./python (#157 a)"
+    "PATH=. in /usr/bin gives sys.executable /usr/bin/python, not ./python (#157 a)",
+    "cert/modes.mjs (wasix-sysroot -17 + slicc-kernel 1.35.1 slicc_fs): umask 027 \u2192 open() 640, mkdir 750; mkstemp 600; mkdtemp 700; os.chmod 755/600 read back by os.stat and coreutils stat; a pip-installed console script (wheel built in the cert, venv) is 755 and runs",
+    "cert/stdlib.mjs: md5/sha1/sha256/sha3/blake2s/sha512_256/shake_128 + HMAC-SHA256 vectors; zlib crc32/adler32; zlib/bz2/lzma (xz + alone) round trips; TLS 1.3 handshake over memory BIOs (OpenSSL 3.5.9, TLS_AES_256_GCM_SHA384, verified self-signed P-256 cert); RAND; sqlite3 3.53.4 (transactions, FTS5, JSON, math) with -11's exact compile options; threads + ThreadPoolExecutor; subprocess (echo, cat pipe, cwd, env, exit code, sys.executable); select on a pipe; ctypes reported (absent, as -11)",
+    "cert/sidemods.mjs: every published py-* package (test/side-modules.json) imports; numpy linalg + fft, pandas read_csv + groupby, scipy optimize + integrate, matplotlib Agg PNG, PIL open/resize/save, contourpy, kiwisolver constraints (its no-arg methods trap on -11 too: #197)"
   ],
   "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS."
 }

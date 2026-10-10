@@ -61,7 +61,7 @@ print("sysconfig", v["SOABI"], v["EXT_SUFFIX"], v["MULTIARCH"])
 PY
 ok "sysconfigdata $SC"
 
-IMPORTS=$("$OBJDUMP" -x -j Import "$WASM" 2>/dev/null || true)
+IMPORTS=$("$OBJDUMP" -x -j Import "$WASM") || fail "wasm-objdump cannot read $WASM"
 if echo "$IMPORTS" | grep -Eiq 'getuid|geteuid|getgid|getegid'; then
   fail "getuid/geteuid/getgid/getegid still appear in Import section (bypass stub)"
 fi

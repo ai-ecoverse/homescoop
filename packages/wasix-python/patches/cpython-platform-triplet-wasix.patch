@@ -1,0 +1,23 @@
+Platform triplet wasm32-wasix when the sysroot is WASIX's (wasixcc defines
+no __wasix__; its wasi/api_wasix.h is the tell), so SOABI is
+cpython-314-wasm32-wasix and MULTIARCH wasm32-wasix, as in 3.14.2-11
+(and the py-* side modules' extension suffix).
+
+--- a/Misc/platform_triplet.c
++++ b/Misc/platform_triplet.c
+@@ -269,7 +269,14 @@
+ #  if defined(__EMSCRIPTEN__)
+ PLATFORM_TRIPLET=wasm32-emscripten
+ #  elif defined(__wasi__)
+-#    if defined(_REENTRANT)
++#    if defined(__has_include)
++#      if __has_include(<wasi/api_wasix.h>)
++#        define WASIX_SYSROOT 1
++#      endif
++#    endif
++#    if defined(WASIX_SYSROOT)
++PLATFORM_TRIPLET=wasm32-wasix
++#    elif defined(_REENTRANT)
+ PLATFORM_TRIPLET=wasm32-wasi-threads
+ #    else
+ PLATFORM_TRIPLET=wasm32-wasi

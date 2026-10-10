@@ -9,12 +9,33 @@ summary: "CPython 3.14 for slicc WASIX (commands python, python3)"
 source:
   url: "https://www.python.org/ftp/python/{{version}}/Python-{{version}}.tgz"
   sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
-# Packaging-only builds (no WASIX_PYTHON_STAGE) repack this published
-# tarball byte for byte and add stdlib/ (build.sh).
 sources:
-  base:
-    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-9.tgz"
-    sha256: "2b40ac613ad4849ef6435f8fe73303660e39164070774134bfdd866b2b895246"
+  # homescoop#181 cross-build inputs. Dev packages pinned by the certified
+  # tarball sha; lib-pic/ is linked into the dynamic-main python.wasm
+  # (wasix-openssl 3.5.9-3: OPENSSL_THREADS, which CPython requires).
+  wasix_zlib:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-zlib/-/wasix-zlib-1.3.1-2.tgz"
+    sha256: "4d0602d7fa1456f09ae668dc90b08a862f2ffeda843556beffbed17614873422"
+  wasix_openssl:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openssl/-/wasix-openssl-3.5.9-3.tgz"
+    sha256: "c7113689ea876eec536fb434afa11e98399b739cc9d0cfe61a1fb1756c5f0e61"
+  # Built inside this recipe as static PIC archives (no other WASIX consumer
+  # yet); same upstream pins as packages/bzip2, xz, sqlite3, ncurses-utils.
+  bzip2:
+    url: "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
+    sha256: "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+  xz:
+    url: "https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz"
+    sha256: "4ce24038fd4221e0d13bc1a2de7a4db56e90b92b3bf75321f6c14be73f65de4b"
+  sqlite:
+    url: "https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip"
+    sha256: "1e71ddf93849c6a6ecf58b827c0692073d2dd7ee40196158068f7b29f422e87d"
+  readline:
+    url: "https://ftp.gnu.org/gnu/readline/readline-8.3.tar.gz"
+    sha256: "fe5383204467828cd495ee8d1d3c037a7eba1389c22bc6a041f627976f9061cc"
+  ncurses:
+    url: "https://mirrors.kernel.org/gnu/ncurses/ncurses-6.5.tar.gz"
+    sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
 dependencies:
   build: []
   host: []
@@ -23,21 +44,17 @@ about:
   homepage: https://www.python.org
   license: PSF-2.0
   notes: |
-    WASIX CPython 3.14 dynamic-main (exnref-ehpic). No fork; subprocess via posix_spawn.
-    mmap enabled (override WASI n/a) with -D_WASI_EMULATED_MMAN -lwasi-emulated-mman.
-    Bundled pip/ensurepip; zlib for gzip. Side modules dlopen by absolute path.
-    wasix-libc patches (apply-wasix-libc-alarm-patch.sh):
-      * setitimer-it-value: setitimer/alarm → proc_raise_interval2 (initial+interval ns);
-        legacy 3-arg proc_raise_interval untouched (Wasmer ABI).
-      * clock-nanosleep-eintr: poll_oneoff EINTR → EINTR (not ENOTSUP); fill *rem on
-        relative sleep so time.sleep resumes after alarm (PEP 475).
-    Apply when rebuilding the wasixcc sysroot linked into this package — ship with
-    wasix-python only. Subprocess always posix_spawn (cwd via /bin/sh helper);
-    user site enabled in frozen site (patch Lib/site.py before make / regen-frozen);
-    site+sysconfig _getuserbase for wasi $HOME/.local; _ssl/_hashlib via wasix-org/openssl;
-    zlib/_bz2/_lzma static from wasix prefixes; uid stubs return 1000; Asyncify onlylist for fork/setjmp paths.
-    build.sh ends with wipe+compileall --invalidation-mode unchecked-hash.
-    3.14.2-10 and -11 are packaging-only: -9's tarball (sources.base) plus
-    stdlib/ (_slicc_site.py sets sys.executable from PATH, since WASI stat
-    has no permission bits and getpath's isxfile never finds python; it runs
-    from sitecustomize.py and from site-packages/slicc-executable.pth).
+    WASIX CPython 3.14 dynamic-main on wasix-sysroot -18's sysroot-ehpic
+    (legacy wasm EH, PIC; side modules by dlopen), cross-built from source
+    in CI by build.sh (homescoop#181): host CPython from the same tarball,
+    static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline; zlib and
+    OpenSSL from wasix-zlib / wasix-openssl), modules found by configure
+    (patches/cpython-configure-wasix.patch), asyncify onlylist for
+    fork/posix_spawn, strip. No fork; subprocess via posix_spawn.
+    The sysroot's libc has the setitimer (proc_raise_interval2) and
+    clock_nanosleep EINTR patches (patches/wasix-libc-*.patch); advisory
+    locks, uid/gid 1000 and passwd-less pwd/grp are --wrap stubs. The C++
+    runtime side modules import (libc++/libc++abi/libunwind) is upstream
+    wasix-libc v2026-07-03.1 sysroot-ehpic, as in -11 (README "Side modules").
+    stdlib/ adds sys.executable from PATH (_slicc_site.py, sitecustomize.py,
+    site-packages/slicc-executable.pth).
