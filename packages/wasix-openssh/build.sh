@@ -167,9 +167,19 @@ CONF_CACHE=(
   if make -n sftp >/dev/null 2>&1; then TARGETS+=(sftp); fi
   if make -n ssh-add >/dev/null 2>&1; then TARGETS+=(ssh-add); fi
 
+  # Cross-configure sometimes misses libc asprintf; wasix-musl has it.
+  for def in HAVE_ASPRINTF HAVE_VASPRINTF; do
+    if grep -q "^/\\* #undef ${def} \\*/$" config.h 2>/dev/null; then
+      sed -i.bak "s|^/\\* #undef ${def} \\*/\$|#define ${def} 1|" config.h
+      echo "== config.h: force #define ${def} 1"
+    fi
+  done
+
   make -j"$JOBS" "${TARGETS[@]}" >"$BUILD/$GDIR.make.log" 2>&1 || {
-    echo "homescoop wasix-openssh: make failed; last 80 lines:" >&2
-    tail -n 80 "$BUILD/$GDIR.make.log" >&2
+    echo "homescoop wasix-openssh: make failed; errors:" >&2
+    grep -E 'error:|fatal error|undefined reference|Error [0-9]' "$BUILD/$GDIR.make.log" | tail -n 60 >&2 || true
+    echo "homescoop wasix-openssh: make log tail:" >&2
+    tail -n 120 "$BUILD/$GDIR.make.log" >&2
     exit 1
   }
 ) || exit 1
