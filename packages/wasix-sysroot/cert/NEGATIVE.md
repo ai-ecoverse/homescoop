@@ -119,3 +119,17 @@ user setuid0: -1 errno=Function not implemented
 user setgroups: -1 errno=Function not implemented
 ```
 
+## 2025.9.30-20 `%Z` (`run-modes.mjs --probe tzname`), slicc-kernel 1.44.0
+
+The published 2025.9.30-19. Every `tm_zone` that is not one of musl's own pointers printed `""`:
+
+```text
++   'copy EST: []',
++   'copy EDT: []',
++   'copy UTC: []',
++   'tzif jan copy: []',
++   'tzif jul copy: []',
+```
+
+That is what CPython's `time.strftime('%Z', time.localtime())` returned on wasix-python 3.14.2-13 CI round 2.
+

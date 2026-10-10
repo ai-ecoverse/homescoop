@@ -132,3 +132,9 @@ Needs slicc-kernel ≥ 1.44.0 (K1, slicc-kernel#251).
   - `getgroups` and every setter return -1 with errno ENOSYS;
   - `getpw*`/`getgr*` find nothing unless `/etc/passwd` exists.
 
+### -20: `__tz.c` — `%Z` for a copied `tm_zone`
+
+musl's `__tm_to_tzname` (used by `strftime("%Z")`) prints `tm_zone` only if it is one of musl's own pointers: `__tzname[0/1]`, `__utc`, or the loaded TZif abbreviations. Any other pointer prints `""`, which guards against garbage pointers in a caller's `struct tm`.
+
+CPython's `time.strftime` builds `struct tm` from a tuple, so its `tm_zone` points at a Python-owned copy and `%Z` was always empty. -20 maps a pointer whose text equals a name this tz knows (`__tzname[0/1]`, `UTC`, a TZif abbreviation) to musl's string. Anything else, NULL included, still prints `""` (`test/tzname.c`).
+

@@ -7,8 +7,9 @@
 //
 // --probe NAME runs test/NAME.c / test/NAME.mjs instead (default: modes);
 // r18 is -18's select / chdir / TZ / socketpair probe, r19 is -19's
-// raise / alarm / setitimer / nanosleep probe, and r20 is -20's
-// credentials probe (needs slicc-kernel K1: kernel.users, run({ user })).
+// raise / alarm / setitimer / nanosleep probe, r20 is -20's credentials
+// probe (needs slicc-kernel K1: kernel.users, run({ user })), and tzname is
+// -20's strftime('%Z') probe.
 //
 // --kernel-dir <dir> uses a local slicc-kernel build (its dist/node.js)
 // instead of meta.kernel, e.g. to try one before it is released. With

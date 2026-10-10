@@ -448,6 +448,23 @@ static void __tzset()
 
 weak_alias(__tzset, tzset);
 
+/* homescoop (wasix-sysroot -20): a tm_zone that is not one of the pointers
+ * above but names a zone this tz knows maps to that name. CPython's
+ * time.strftime builds struct tm from a tuple, so tm_zone points at its own
+ * copy and %Z was always empty; anything else still prints "". */
+static const char *slicc_known_tzname(const char *p)
+{
+	if (!p) return "";
+	if (__tzname[0] && !strcmp(p, __tzname[0])) return __tzname[0];
+	if (__tzname[1] && !strcmp(p, __tzname[1])) return __tzname[1];
+	if (!strcmp(p, __utc)) return __utc;
+	if (zi) {
+		for (const unsigned char *a = abbrevs; a < abbrevs_end; a += strlen((const char *)a) + 1)
+			if (!strcmp(p, (const char *)a)) return (const char *)a;
+	}
+	return "";
+}
+
 const char *__tm_to_tzname(const struct tm *tm)
 {
 	const void *p = tm->__tm_zone;
@@ -455,7 +472,7 @@ const char *__tm_to_tzname(const struct tm *tm)
 	do_tzset();
 	if (p != __utc && p != __tzname[0] && p != __tzname[1] &&
 	    (!zi || (uintptr_t)p-(uintptr_t)abbrevs >= abbrevs_end - abbrevs))
-		p = "";
+		p = slicc_known_tzname(p);
 	UNLOCK(lock);
 	return p;
 }
