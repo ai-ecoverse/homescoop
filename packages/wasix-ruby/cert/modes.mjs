@@ -13,7 +13,7 @@ export default async function (ctx) {
     File.write("grp", "x")
     File.umask(0o022)
     tf = Tempfile.create("tf", ".") { |f| f.path }
-    t = Tempfile.new("keep", "."); tfp = File.basename(t.path); t.close
+    t = Tempfile.create("keep", "."); tfp = File.basename(t.path); t.close  # no block: kept after exit
     td = File.basename(Dir.mktmpdir("td", "."))
     Dir.mkdir("priv", 0o700)
     File.write("exe", ""); File.chmod(0o755, "exe")
