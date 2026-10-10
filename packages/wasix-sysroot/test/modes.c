@@ -1,5 +1,6 @@
-// File modes through slicc_fs (homescoop#169): run as `modes <dir>`, then
-// read the modes from outside (test/modes.mjs) — WASI stat has no mode bits.
+// File modes through slicc_fs (homescoop#169): run as `modes <dir>`; it sets
+// modes, prints what stat() reads back inside WASIX, and test/modes.mjs
+// compares that with coreutils' stat from outside.
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -49,5 +50,19 @@ int main(int argc, char **argv) {
   errno = 0;
   r = chmod("missing", 0600);
   printf("chmod missing: %s\n", r == 0 ? "ok" : strerror(errno));
+  // The read side: stat()/fstat() inside WASIX (fd_mode / path_mode).
+  const char *files[] = {"grp", "secret", "excl", "private", "private/key", "pub", "exec", "sub", "sub/inner"};
+  for (unsigned i = 0; i < sizeof(files) / sizeof(*files); i++) {
+    struct stat st;
+    CHECK(stat(files[i], &st));
+    printf("stat %s %03o\n", files[i], (unsigned)(st.st_mode & 07777));
+  }
+  struct stat st;
+  CHECK(fd = open("secret", O_RDONLY));
+  CHECK(fstat(fd, &st));
+  close(fd);
+  printf("fstat secret %03o\n", (unsigned)(st.st_mode & 07777));
+  CHECK(lstat("link", &st));
+  printf("lstat link %s\n", S_ISLNK(st.st_mode) ? "symlink" : "not a symlink");
   return 0;
 }

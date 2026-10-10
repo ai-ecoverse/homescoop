@@ -26,9 +26,9 @@ SLICC_FS(umask) int __slicc_fs_umask(int mask, int *old);
 static mode_t __slicc_local_umask = 022;
 
 mode_t __slicc_umask_value(void) {
-    int old;
+    int old, ignored;
     if (__slicc_fs_umask(0, &old) == 0) {
-        __slicc_fs_umask(old, &old);
+        __slicc_fs_umask(old, &ignored);
         return (mode_t)old;
     }
     return __slicc_local_umask;

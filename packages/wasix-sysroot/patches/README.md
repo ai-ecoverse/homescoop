@@ -39,7 +39,7 @@ tag `v2025-09-02.1` (sha256 `2415a912…` / `c0362278…`). WASI has no call
 that sets a mode, so upstream `chmod`/`fchmod`/`fchmodat` return 0,
 `umask` echoes its argument, and `open`/`mkdir` drop the mode.
 
-These copies call the kernel's `slicc_fs` imports (slicc-kernel#197):
+These copies call the kernel's `slicc_fs` imports (slicc-kernel#197, #208):
 `fd_chmod(fd, mode)`, `path_chmod(dirfd, path, len, mode, flags)`
 (flag 1 = no-follow) and `umask(mask, *old)`.
 
@@ -49,6 +49,15 @@ These copies call the kernel's `slicc_fs` imports (slicc-kernel#197):
   (`O_EXCL`, or the path was absent just before), and `mkdir`/`mkdirat`
   do the same after success. A failure there never fails the create.
 - `ENOSYS` (an older kernel) is success: behaviour stays as upstream.
+
+The read side is in `../slicc_stat_owner.c`: `fstat` and
+`__wasilibc_nocwd_fstatat` (so `stat`/`lstat`/`fstatat`) OR the bits from
+`slicc_fs.fd_mode(fd, *mode)` / `path_mode(dirfd, path, len, flags, *mode)`
+into `st_mode`. Without them `st_mode` has only the file type, as upstream.
+
+Cert: `test/run-modes.mjs --tarball <package.tgz>` (cert/meta.json, harness
+host-node) builds `test/modes.c` against the tarball and runs `test/modes.mjs`
+on the kernel's Node entry.
 
 `build-incremental.sh` compiles both files (static + PIC, the shipped
 objects' target features) and replaces `posix.o` and `at_fdcwd.o` in every

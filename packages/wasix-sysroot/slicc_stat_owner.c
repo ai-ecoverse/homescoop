@@ -7,6 +7,10 @@
  * Replaces fstat.o + fstatat.o in every libc.a. Public stat/lstat/fstatat
  * all funnel through __wasilibc_nocwd_fstatat (posix.c / at_fdcwd.c).
  * chown/fchown remain the upstream no-ops.
+ *
+ * WASI filestat has no mode either. slicc-kernel's slicc_fs imports
+ * (homescoop#169, slicc-kernel#208) report the permission bits; on a kernel
+ * without them (ENOSYS) st_mode keeps only the file type, as upstream.
  */
 #include <errno.h>
 #include <fcntl.h>
@@ -17,6 +21,10 @@
 #include <wasi/api.h>
 
 #define NSEC_PER_SEC 1000000000ull
+
+#define SLICC_FS(name) __attribute__((import_module("slicc_fs"), import_name(#name)))
+SLICC_FS(fd_mode) int __slicc_fs_fd_mode(int fd, int *mode);
+SLICC_FS(path_mode) int __slicc_fs_path_mode(int dirfd, const char *path, int path_len, int flags, int *mode);
 
 static struct timespec timestamp_to_timespec(__wasi_timestamp_t timestamp) {
   return (struct timespec){.tv_sec = (time_t)(timestamp / NSEC_PER_SEC),
@@ -75,6 +83,9 @@ int fstat(int fildes, struct stat *buf) {
     return -1;
   }
   to_public_stat_owned(&internal_stat, buf);
+  int mode;
+  if (__slicc_fs_fd_mode(fildes, &mode) == 0)
+    buf->st_mode |= (mode_t)(mode & 07777);
   return 0;
 }
 
@@ -92,5 +103,9 @@ int __wasilibc_nocwd_fstatat(int fd, const char *restrict path,
     return -1;
   }
   to_public_stat_owned(&internal_stat, buf);
+  int mode;
+  if (__slicc_fs_path_mode(fd, path, (int)strlen(path),
+                           (flag & AT_SYMLINK_NOFOLLOW) ? 1 : 0, &mode) == 0)
+    buf->st_mode |= (mode_t)(mode & 07777);
   return 0;
 }

@@ -13,8 +13,9 @@ EH `libc.a` archives get real `fork`/`_Fork` from asyncify (static trees).
 Every libc embeds SLICC identity stubs (getuid=1000) and reports
 `st_uid`/`st_gid` 1000 from `stat`/`lstat`/`fstat`/`fstatat`.
 `chmod`/`fchmod`/`fchmodat`/`umask` and the modes of fresh `open(O_CREAT)` /
-`mkdir` go to the kernel's `slicc_fs` imports; on a kernel without them they
-stay the upstream no-ops. EH trees ship
+`mkdir` go to the kernel's `slicc_fs` imports, and `stat`/`fstat`/`lstat`
+read the permission bits back from them (slicc-kernel ≥ the release with
+#208); on a kernel without them they stay the upstream no-ops. EH trees ship
 libc++/libc++abi/libunwind rebuilt from LLVM b158b0ae6 (same as wasm-clang)
 with exnref flags.
 
