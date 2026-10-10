@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-autoconf",
-  "version": "2.72.0-3",
+  "version": "2.72.0-4",
   "description": "GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4)",
   "license": "GPL-3.0-or-later",
   "files": [
@@ -83,7 +83,7 @@
     }
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-perl": "^5.42.0-2",
-    "@ai-ecoverse/wasix-m4": "^1.4.20-1"
+    "@ai-ecoverse/wasix-perl": "5.42.0-8",
+    "@ai-ecoverse/wasix-m4": "1.4.20-2"
   }
 }

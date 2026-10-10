@@ -8,6 +8,10 @@ source:
   # Prebuilt by slicc-emscripten/build-wasm-llvm.sh; build.sh stages that artifact.
   url: "https://github.com/llvm/llvm-project"
   sha256: "skip"
+# 24.0.0-11 is packaging-only: 24.0.0-10's bytes with exact @ai-ecoverse pins
+# (wasix-sysroot 2025.9.30-17). Drop repack: when the next release rebuilds.
+repack:
+  from: "24.0.0-10"
 dependencies:
   build: []
   host: []
