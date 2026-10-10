@@ -131,6 +131,10 @@ CONF_CACHE=(
   ac_cv_func_ppoll=yes
   ac_cv_func_poll=yes
   ac_cv_have_decl_AI_NUMERICHOST=yes
+  # WASIX msghdr may list msg_control but cmsghdr/SCM_RIGHTS are incomplete
+  # (same as wasix-ruby). Client does not need fd passing.
+  ac_cv_have_control_in_msghdr=no
+  ac_cv_have_accrights_in_msghdr=no
 )
 
 (
@@ -194,6 +198,13 @@ CONF_CACHE=(
     if grep -q "^/\\* #undef ${def} \\*/$" config.h 2>/dev/null; then
       sed -i.bak "s|^/\\* #undef ${def} \\*/\$|#define ${def} 1|" config.h
       echo "== config.h: force #define ${def} 1"
+    fi
+  done
+  # Belt-and-braces: never compile SCM_RIGHTS paths on WASIX.
+  for def in HAVE_CONTROL_IN_MSGHDR HAVE_ACCRIGHTS_IN_MSGHDR; do
+    if grep -q "^#define ${def}" config.h 2>/dev/null; then
+      sed -i.bak "s|^#define ${def}.*$|/* #undef ${def} */|" config.h
+      echo "== config.h: undef ${def} (no ancillary fd passing)"
     fi
   done
 
