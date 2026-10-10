@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.34.1",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "checklist": [
+    "printf | rg b → b, rc 0; | rg -c; no match rc 1",
+    "rg pat < file",
+    "ctx stdin and an explicit -",
+    "tty stdin searches the cwd (ctx.pty)",
+    "no stdin and < /dev/null search the cwd (slicc-kernel 1.34.1: absent stdin is the null character device)",
+    "explicit path"
+  ],
+  "patches": {
+    "patches/grep-cli-wasi-stdin.patch": "pipe / redirect cases in cert/checklist.mjs (the published -2 fails them)"
+  }
+}

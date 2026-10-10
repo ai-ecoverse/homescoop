@@ -1,0 +1,37 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -240,7 +240,33 @@
+         is_readable
+     }
+ 
+-    #[cfg(not(any(unix, windows)))]
++    // homescoop#168: WASI has no FIFO file type (a pipe is UNKNOWN), so keep
++    // the Unix rule by exclusion: readable unless a directory or a character
++    // device (tty, /dev/null).
++    #[cfg(target_os = "wasi")]
++    fn imp() -> bool {
++        #[link(wasm_import_module = "wasi_snapshot_preview1")]
++        unsafe extern "C" {
++            fn fd_fdstat_get(fd: u32, buf: *mut u8) -> u16;
++        }
++        // __wasi_fdstat_t: 24 bytes, fs_filetype is the first byte.
++        let mut buf = [0u64; 3];
++        let errno = unsafe { fd_fdstat_get(0, buf.as_mut_ptr().cast()) };
++        if errno != 0 {
++            log::debug!("on WASI, fd_fdstat_get(0) failed: {errno}");
++            return false;
++        }
++        let filetype = buf[0] as u8;
++        // 2 = CHARACTER_DEVICE, 3 = DIRECTORY.
++        let is_readable = filetype != 2 && filetype != 3;
++        log::debug!(
++            "on WASI, stdin filetype={filetype}, \
++             thus is_stdin_readable={is_readable}",
++        );
++        is_readable
++    }
++
++    #[cfg(not(any(unix, windows, target_os = "wasi")))]
+     fn imp() -> bool {
+         log::debug!("on non-{{Unix,Windows}}, assuming stdin is not readable");
+         false
