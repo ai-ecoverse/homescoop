@@ -448,11 +448,10 @@ for cfg in list(root.glob(".ext/include/*/ruby/config.h")) + list(root.glob("inc
         t = t.replace(f"#define {k} 1", f"/* {k} forced off for SLICC */\n#define {k} 0")
         if f"#define {k}" not in t:
             t += f"\n#define {k} 0\n"
-    # file.c uses !defined(HAVE_GETGROUPS), so 0-valued define is not enough.
     # Fork is unsupported on WASIX+Asyncify — force undef so Kernel#fork is notimplement.
     # CMSG: ancdata.c is #if defined(HAVE_STRUCT_MSGHDR_MSG_CONTROL) — must undef, not 0.
+    # getgroups/setgroups/initgroups stay: wasix-sysroot -20 asks slicc-kernel.
     for k in (
-        "HAVE_GETGROUPS", "HAVE_SETGROUPS", "HAVE_INITGROUPS",
         "HAVE_WORKING_FORK", "HAVE_FORK",
         *cmsg_undef,
     ):
