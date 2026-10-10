@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-21 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-22 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -183,17 +183,17 @@ done
 # EINTR with the time left and sleep() the seconds left, raise() signals the
 # process (slicc-kernel does not deliver thread_signal; slicc-kernel#250), and
 # so does pthread_kill() to the main thread (placeholder tid).
-# See patches/README.md.
-echo "== wasix-sysroot: -19 members (setitimer, getitimer, clock_nanosleep, sleep, raise, pthread_kill)"
+# See patches/README.md. Since -22, getitimer() is in setitimer.c (its helper
+# is static: a dynamic-main exports hidden symbols too) and getitimer.o goes.
+echo "== wasix-sysroot: -19 members (setitimer+getitimer, clock_nanosleep, sleep, raise, pthread_kill)"
 R19_OBJ="$WORK/r19"
 rm -rf "$R19_OBJ" && mkdir -p "$R19_OBJ/static" "$R19_OBJ/pic"
 BOTTOM_INC=(-I"$LIBC_SRC/libc-bottom-half/headers/private" -I"$LIBC_SRC/libc-bottom-half/cloudlibc/src/include" -I"$LIBC_SRC/libc-bottom-half/cloudlibc/src" -I"$MUSL/src/include" -I"$MUSL/src/internal")
-R19=(setitimer getitimer clock_nanosleep sleep raise pthread_kill)
+R19=(setitimer clock_nanosleep sleep raise pthread_kill)
 for flavour in static pic; do
   extra=()
   [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
   compile_r18 setitimer "$R19_OBJ/$flavour/setitimer.o" "${MUSL_INC[@]}" "${extra[@]}"
-  compile_r18 getitimer "$R19_OBJ/$flavour/getitimer.o" "${MUSL_INC[@]}" "${extra[@]}"
   compile_r18 raise "$R19_OBJ/$flavour/raise.o" "${MUSL_INC[@]}" "${extra[@]}"
   compile_r18 pthread_kill "$R19_OBJ/$flavour/pthread_kill.o" "${MUSL_INC[@]}" "${extra[@]}"
   compile_r18 clock_nanosleep "$R19_OBJ/$flavour/clock_nanosleep.o" "${BOTTOM_INC[@]}" "${extra[@]}"
@@ -213,7 +213,13 @@ for v in "${VARIANTS[@]}"; do
       exit 1
     fi
   done
+  missing="$(comm -23 <(defined "$old/getitimer.o") <(defined "$R19_OBJ/$flavour/setitimer.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v setitimer.o lacks getitimer.o's $missing" >&2; exit 1; }
+  "$LLVM_AR" d "$lib" getitimer.o
   "$LLVM_AR" r "$lib" $(printf "$R19_OBJ/$flavour/%s.o " "${R19[@]}")
+  if "$LLVM_NM" -j "$lib" 2>/dev/null | grep -qx __homescoop_itimer_real_left; then
+    echo "homescoop: $lib still has __homescoop_itimer_real_left" >&2; exit 1
+  fi
   undef="$("$LLVM_NM" -u "$lib" 2>/dev/null)"
   grep -q __homescoop_proc_raise_interval2 <<<"$undef" || { echo "homescoop: $lib setitimer lacks proc_raise_interval2" >&2; exit 1; }
   # -17's sysroot-ehpic shipped the archives its libc patches replaced.
@@ -325,6 +331,32 @@ for v in "${VARIANTS[@]}"; do
   grep -q __slicc_tty_winsize <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_tty imports" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
+
+# -22: a libc generation marker in every program. crt1*.o get a wasm custom
+# section `slicc.libc` = "wasix-sysroot <version>" (wasm-ld -r): every
+# program links a crt1, wasm-ld copies custom sections, and wasm-opt
+# (-O*, --strip-debug/--strip-producers/--strip, --asyncify) and llvm-strip
+# keep it. slicc-kernel reads it to tell libc generations apart (-18's
+# clock_nanosleep wants ENOTSUP where -19+ want EINTR). Side modules have no
+# crt1 and no marker; the main program's counts. See patches/README.md.
+VER="$(node -p "require('$PKG/package.json').version")"
+echo "== wasix-sysroot: -22 slicc.libc marker \"wasix-sysroot $VER\" in every crt1*.o"
+WASM_LD="$WASIXCC_LLVM_LOCATION/bin/wasm-ld"
+MARK="$WORK/r22"
+rm -rf "$MARK" && mkdir -p "$MARK"
+printf '__asm__(".section .custom_section.slicc.libc,\\"\\",@\\n.ascii \\"wasix-sysroot %s\\"\\n.text\\n");\n' "$VER" > "$MARK/marker.c"
+"$CLANG" --target=wasm32-wasip1 -c "$MARK/marker.c" -o "$MARK/marker.o"
+n=0
+for v in "${VARIANTS[@]}"; do
+  for crt in "$PKG/$v/lib/wasm32-wasip1/"crt1*.o; do
+    "$WASM_LD" -r "$crt" "$MARK/marker.o" -o "$crt.marked"
+    mv "$crt.marked" "$crt"
+    grep -aq "wasix-sysroot $VER" "$crt" || { echo "homescoop: $crt lacks the slicc.libc marker" >&2; exit 1; }
+    n=$((n + 1))
+  done
+done
+[[ $n -eq 15 ]] || { echo "homescoop: marked $n crt1*.o, expected 15 (5 variants x 3)" >&2; exit 1; }
+echo "  $n crt1*.o"
 
 homescoop_assert_no_package_links "$PKG"
 echo "== wasix-sysroot: staged $(node -p "require('$PKG/package.json').version") from $BASE_VER"

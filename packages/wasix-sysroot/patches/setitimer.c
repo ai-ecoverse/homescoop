@@ -1,5 +1,7 @@
 /* homescoop: wasix-libc v2025-09-02.1 libc-top-half/musl/src/signal/setitimer.c
- * (sha256 4d773840…) with it_value through proc_raise_interval2, ITIMER_REAL only (wasix-sysroot -19). */
+ * (sha256 4d773840…) with it_value through proc_raise_interval2, ITIMER_REAL only (wasix-sysroot -19).
+ * Since -22 getitimer() lives here too, so the time-left helper is static:
+ * a dynamic-main (wasix-python) exports hidden symbols as well. */
 #include <sys/time.h>
 #include <errno.h>
 #include <stdint.h>
@@ -31,8 +33,7 @@ static __wasi_timestamp_t mono_ns(void)
 
 /* The time left on ITIMER_REAL, as setitimer's `old` and getitimer() report
  * it: a repeating timer counts to its next expiry, a fired one-shot is 0. */
-__attribute__((visibility("hidden")))
-void __homescoop_itimer_real_left(struct itimerval *out)
+static void itimer_real_left(struct itimerval *out)
 {
 	__wasi_timestamp_t now = mono_ns(), left = 0, d = real_timer.deadline, i = real_timer.interval;
 	if (d) {
@@ -94,7 +95,7 @@ int setitimer(int which, const struct itimerval *restrict new, struct itimerval 
 		((__wasi_timestamp_t)new->it_interval.tv_sec * 1000000000ull) +
 		((__wasi_timestamp_t)new->it_interval.tv_usec * 1000ull);
 	if (!initial) interval = 0;
-	if (old) __homescoop_itimer_real_left(old);
+	if (old) itimer_real_left(old);
 	int ret = __homescoop_proc_raise_interval2(__WASI_SIGNAL_ALRM, initial, interval,
 	                                           interval != 0 ? __WASI_BOOL_TRUE : __WASI_BOOL_FALSE);
 	if (ret != 0) {
@@ -106,3 +107,17 @@ int setitimer(int which, const struct itimerval *restrict new, struct itimerval 
 	return 0;
 #endif
 }
+
+#ifndef __wasilibc_unmodified_upstream
+/* musl's getitimer.c (sha256 6f392c93…) for WASIX: upstream returned EINVAL
+ * as a value and left `old` alone. ITIMER_REAL is the one kept above. */
+int getitimer(int which, struct itimerval *old)
+{
+	if (which != ITIMER_REAL) {
+		errno = EINVAL;
+		return -1;
+	}
+	itimer_real_left(old);
+	return 0;
+}
+#endif
