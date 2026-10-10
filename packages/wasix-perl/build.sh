@@ -118,7 +118,9 @@ t = t.replace("$^O eq 'linux'", "$Config{osname} eq 'linux'")
 old = 'return "$cppstdin $Config{cppflags} $Config{cppminus}";'
 if t.count(old) != 1:
     sys.exit(f"{p}: default_cpp return not found")
-t = t.replace(old, 'return "$cppstdin $Config{cppflags}" . ($ENV{HOMESCOOP_TARGET_SYSROOT} ? " --sysroot=$ENV{HOMESCOOP_TARGET_SYSROOT}" : "") . " $Config{cppminus}";')
+# get_files() finds the headers from cpp's line markers, so drop the -P that
+# perl-cross's cppstdin carries (the second cpp call adds its own inhibit).
+t = t.replace(old, 'my $r = "$cppstdin $Config{cppflags} $Config{cppminus}"; if ($ENV{HOMESCOOP_TARGET_SYSROOT}) { $r =~ s/\\s-P(?=\\s|$)//g; $r =~ s/^(\\S+)/$1 --sysroot=$ENV{HOMESCOOP_TARGET_SYSROOT}/; } return $r;')
 p.write_text(t)
 PY
 
