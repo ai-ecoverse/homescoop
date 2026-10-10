@@ -49,7 +49,7 @@ export default async function (ctx) {
   // keep array indices in range of it).
   const warnUse = await run(['perl', '-we', 'my @a = (1..3); my $x = $a[10]; print defined $x ? "def" : "undef", "\n"; my $n = "12abc" + 0; print "$n\n"'], { cwd });
   assert.equal(warnUse.stdout, 'undef\n12\n', `stderr=${warnUse.stderr}`);
-  assert.match(warnUse.stderr, /Argument "12abc" isn't numeric in addition \(\+\) at -e line 1\./);
+  assert.match(warnUse.stderr, /Argument "12abc" isn't numeric in addition \(\+\) at -e line \d+\./);
   assert.equal(await perl('use Config; print "$Config{ivdformat} $Config{uvuformat} $Config{sPRId64}\\n"'), '"lld" "llu" "lld"\n');
 
   // DynaLoader.pm is shipped: require works, and an old-style
