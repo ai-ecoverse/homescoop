@@ -3,6 +3,8 @@
 **Date:** 2026-10-10
 Patches: see `cert/meta.json`. Not in `scripts/ci-certified.json`.
 
+**5.3.0-15 was never served by npm.** Its publish (sha256 7aba06d1…) was left staged (npm/cli#9889: E409 on retry, `npm stage list` empty, 404 after an hour), so the number is burned. 5.3.0-16 is that certified build re-issued with only the version changed (package.json, and the README's patch-list heading and this note). Where this file says 5.3.0-15, the measurements apply to 5.3.0-16 unchanged.
+
 
 
 

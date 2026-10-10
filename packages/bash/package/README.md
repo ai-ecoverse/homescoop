@@ -19,7 +19,10 @@ There is no fallback: on an older kernel the ids are -1 and the prompt says
 "I have no name!". File owners are the kernel's; 1.44.0 reports uid 1000 for
 every file.
 
-## Patches (5.3.0-15)
+## Patches (5.3.0-16)
+
+5.3.0-16 is the certified 5.3.0-15 build under a new number: npm never served
+5.3.0-15 (its publish was left staged, npm/cli#9889, and the number is burned).
 
 GNU bash 5.3 with these homescoop patches (GPL-3.0-or-later, like bash; the
 list with the files each one changes is in `THIRD-PARTY-NOTICES.md`):
