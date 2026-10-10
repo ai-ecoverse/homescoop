@@ -172,6 +172,10 @@ for k in sorted(force_undef):
         t = re.sub(rf"^{k}='[^']*'", f"{k}='undef'", t, count=1, flags=re.M)
     else:
         t += f"\n{k}='undef'\n"
+# All-static (usedl=undef): no PIC objects. wasixcc refuses -fPIC without
+# wasm exceptions, and XS Makefiles (Devel-PPPort's module2.o) add
+# $Config{cccdlflags}; an empty hint falls back to perl-cross's -fPIC.
+t = re.sub(r"^cccdlflags='[^']*'", "cccdlflags=' '", t, count=1, flags=re.M)
 cfg_path.write_text(t)
 print(f"forced define={len(force_def)} undef={len(force_undef)}")
 PY

@@ -20,10 +20,6 @@ useperlio='define'
 # Static core — no dlopen
 usedl='undef'
 dlsrc='none'
-# All-static (usedl=undef): no PIC objects. wasixcc refuses -fPIC without
-# wasm exceptions, and XS Makefiles (e.g. Devel-PPPort's module2.o) add
-# $Config{cccdlflags}.
-cccdlflags=''
 dlext='none'
 so='none'
 useshrplib='false'
