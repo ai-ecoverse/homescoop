@@ -1,13 +1,22 @@
 # `@ai-ecoverse/wasi-hf`
 
-`hf` for [slicc](https://github.com/ai-ecoverse/slicc): downloads models and
-datasets from the Hugging Face Hub, and `hf auth`. It is a small WASI command
-(about 260 KB, written in Rust on homescoop's `wasix-net`). **It is not
-huggingface_hub's CLI.** It implements `download` and `auth`, with the same
-flag names where they overlap. See
-[homescoop#110](https://github.com/ai-ecoverse/homescoop/issues/110) for why:
-the real CLI needs wasix-python (about 126 MB), and it cannot fetch LFS files
-through a transport that follows redirects (slicc-extension, the page's fetch).
+**Retired.** Do not build or publish this package. Per
+[homescoop#110](https://github.com/ai-ecoverse/homescoop/issues/110), we are
+not maintaining a custom `hf`: use the official `huggingface_hub` CLI on
+`@ai-ecoverse/wasix-python`, or an unmodified third-party Hub downloader.
+The recipe is `builder: retired`; source under `../src/` is kept for
+provenance only.
+
+---
+
+Historical notes (the former package): `hf` for
+[slicc](https://github.com/ai-ecoverse/slicc) as a small WASI command
+(about 260 KB, Rust on homescoop's `wasix-net`). It was **not**
+huggingface_hub's CLI. It implemented `download` and `auth`, with the same
+flag names where they overlap. The earlier #110 write-up preferred this over
+the real CLI because wasix-python was about 126 MB and LFS failed on
+follow-redirect transports (slicc-extension, the page's fetch); that path
+was reversed.
 
 ```bash
 pnpm add -g @ai-ecoverse/wasi-hf

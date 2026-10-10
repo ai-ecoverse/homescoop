@@ -157,9 +157,16 @@ node scripts/diff-published.mjs .homescoop-out/package.tgz @ai-ecoverse/wasix-uv
 
 `builder: retired` means the package must not be built or published.
 `list-packages`, `list-touched-packages`, `host-run`, `ladder-build`, and
-`reserve-names` all skip or refuse it. Example: `packages/ffmpeg` — SLICC
-owns `ffmpeg`; `@ai-ecoverse` must not distribute MPEG codecs. Cleanup
-commands for historical npm versions:
+`reserve-names` all skip or refuse it. Examples:
+
+- `packages/ffmpeg` — SLICC owns `ffmpeg`; `@ai-ecoverse` must not
+  distribute MPEG codecs.
+- `packages/wasi-hf` — custom Hub `hf` retired
+  ([homescoop#110](https://github.com/ai-ecoverse/homescoop/issues/110));
+  prefer official `huggingface_hub` on wasix-python. Source kept for
+  provenance.
+
+Cleanup commands for historical npm versions:
 
 ```bash
 node scripts/list-semver-cleanup.mjs   # includes remove-codec-distribution
