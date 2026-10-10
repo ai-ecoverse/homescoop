@@ -1,22 +1,26 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.35.1",
   "needs": [
-    "@ai-ecoverse/wasm-coreutils"
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-perl"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasix-perl@5.42.0-8"
   ],
   "checklist": [
     "bash -c arithmetic",
     "exec bash: $$ and $PPID unchanged, /proc/$$/stat shows bash",
     "exec cat: /proc/$$/stat shows cat",
     "exec cat /proc/self/stat: pid == $$ (slicc-kernel#108)",
-    "(exec sleep) &: child's $$ == $!, kill $! → wait 143",
+    "(exec sleep) &: child's $$ == $!, kill $! \u2192 wait 143",
     "-O execfail: failed exec returns, USR1 trap restored",
-    "failed exec without execfail → 127",
+    "failed exec without execfail \u2192 127",
     "slicc-kernel#176 (shim-only proof on 1.26.6: shims/slicc/test/exec.test.mjs): exec readlink /proc/self == $$; 3-level exec bash chain keeps one pid; sh -c exec in a pipeline stage and a subshell exec keep that process's pid",
-    "/dev/tcp via the socket shim (netfork): realm-proxy round trip on 127.0.0.1:3128, $(hostname), refused port 'Connection refused', unknown host 'Name does not resolve', tailnet name dialled through the uplink (cert/net.mjs)"
+    "/dev/tcp via the socket shim (netfork): realm-proxy round trip on 127.0.0.1:3128, $(hostname), refused port 'Connection refused', unknown host 'Name does not resolve', tailnet name dialled through the uplink (cert/net.mjs)",
+    "umask reaches the kernel (cert/umask.mjs, 5.3.0-10; slicc-kernel \u2265 1.35.1 kernelUmask): umask 077; : > f \u2192 600 and /proc/self/status Umask 0077; umask 077; bash -c umask \u2192 0077; umask 027 \u2192 touch 640, mkdir 750 (coreutils children); umask 077 \u2192 a WASIX child (perl open) creates 600; a subshell's umask does not leak back",
+    "pipes and close-on-exec (cert/pipes.mjs): (sleep 0.2; echo x) | cat ends; read + cat in a pipeline; a pipeline child holds 0 1 2 (+3, ls's own dirfd); exec 3>&1 \u2192 a child holds 0 1 2 3 (+4); seq 1 2000 through two cats"
   ],
   "uplink": true
 }

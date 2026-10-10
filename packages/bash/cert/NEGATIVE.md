@@ -22,3 +22,24 @@ give the round trip, "Connection refused" and "Name does not resolve".
 bash 5.3.0-7 (spawn + `execWait` shim) fails `cert/checklist.mjs` at the
 first exec case (`exec bash: $$/$PPID 1002 1001 != 1001 1`). The shim-only
 proof on 1.26.6 is `shims/slicc/test/exec.test.mjs`.
+
+## umask (5.3.0-10)
+
+Emscripten 4.0.23 implements `__syscall_umask` in wasm (a weak definition in
+`emscripten_syscall_stubs.c`), so 5.3.0-8/-9 no longer import
+`env.__syscall_umask`, the import slicc-kernel wraps (kernelUmask, #208).
+`cert/umask.mjs` against the published 5.3.0-9 on slicc-kernel 1.35.1:
+
+```text
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ '644\n0022\n'
+- '600\n0077\n'
+```
+
+(`umask 077; : > f` creates 644, and the kernel still has 0022.) 5.3.0-10
+restores the import (shims/slicc/slicc_umask.c + slicc-fork.js). The import
+lists of -9 and -10 differ only in `env.__syscall_umask`; of -7's
+`__syscall_*` imports, -10 lacks socket/connect/sendmsg/getpeername/poll
+(handled by the slicc socket shim since -9) and pipe2 (unimplemented in
+4.0.23's C stubs; musl falls back to pipe + fcntl FD_CLOEXEC; cert/pipes.mjs
+passes on -9 and -10).

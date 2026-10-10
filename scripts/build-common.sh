@@ -295,6 +295,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_select.c"
+      _homescoop_slicc_compile "$dir/slicc_umask.c"
       ;;
     mount)
       # mount/umount: mount(2)/umount2(2) via sliccKernel (slicc-kernel#92).
@@ -361,6 +362,7 @@ homescoop_slicc_archive() {
       _homescoop_slicc_compile "$dir/slicc_signals.c"
       _homescoop_slicc_compile "$dir/slicc_jobs.c"
       _homescoop_slicc_compile "$dir/slicc_getpass.c"
+      _homescoop_slicc_compile "$dir/slicc_umask.c"
       ;;
     *)
       echo "homescoop_slicc_archive: unknown profile '$profile' (gaps|spawn|make|fork|mount|less|cli|clinet|net|netfork)" >&2
