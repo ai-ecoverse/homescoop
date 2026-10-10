@@ -50,7 +50,7 @@ export default async function (ctx) {
   // Fiber, Thread, Etc, Socket constants.
   assert.equal(await rb('f = Fiber.new { |x| y = Fiber.yield(x * 2); y + 1 }; a = f.resume(5); puts a, f.resume(10); puts Thread.new { 6 * 7 }.value; q = Queue.new; t = Thread.new { q.pop * 2 }; q << 21; puts t.value'),
     '10\n11\n42\n42\n');
-  assert.equal(await rb('require "etc"; require "socket"; puts Etc.getpwuid(Process.uid)&.name.to_s.empty? ? "nopw" : "pw", Process.uid, Socket::AF_INET > 0'), 'pw\n1000\ntrue\n');
+  assert.equal(await rb('require "etc"; require "socket"; puts Etc.getpwuid(Process.uid)&.name.to_s.empty? ? "nopw" : "pw", Process.uid, Socket::AF_INET > 0'), 'pw\n0\ntrue\n'); // root, the kernel's default user (H1, 3.4.11-10)
 
   // gem / bundler run.
   assert.match((await run(['gem', '--version'], { cwd })).stdout, /^\d+\.\d+\.\d+$/m);
