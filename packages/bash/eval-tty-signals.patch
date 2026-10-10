@@ -1,0 +1,37 @@
+--- a/eval.c
++++ b/eval.c
+@@ -35,6 +35,11 @@
+ #include "bashintl.h"
+ 
+ #include "shell.h"
++
++#if defined (__EMSCRIPTEN__)
++extern void slicc_tty_sig_begin (void);
++extern void slicc_tty_sig_end (void);
++#endif
+ #include "parser.h"
+ #include "flags.h"
+ #include "trap.h"
+@@ -144,6 +149,9 @@
+       (void) alloca (0);
+ #endif
+ 
++#if defined (__EMSCRIPTEN__)
++      slicc_tty_sig_end ();	/* jobs.c */
++#endif
+       if (read_command () == 0)
+ 	{
+ 	  if (interactive_shell == 0 && read_but_dont_execute)
+@@ -180,6 +188,12 @@
+ 	      executing = 1;
+ 	      stdin_redir = 0;
+ 
++#if defined (__EMSCRIPTEN__)
++	      /* slicc (homescoop wasm-bash): a ^Z typed right after Enter, before
++		 the job is forked, is passed on to the job (jobs.c). */
++	      if (interactive)
++		slicc_tty_sig_begin ();
++#endif
+ 	      execute_command (current_command);
+ 
+ 	    exec_done:

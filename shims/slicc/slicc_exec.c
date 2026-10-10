@@ -88,7 +88,30 @@ static _Noreturn void exit_as(int status) {
   _exit(WIFSIGNALED(status) ? 128 + WTERMSIG(status) : WEXITSTATUS(status));
 }
 
+// wasm-bash's job control (jobs-parent-terminal.patch): a ^C, ^\ or ^Z
+// that reached the forked child before it could act on it -- recorded by
+// the shell's recorder, or seen by its own SIGINT handler (interrupt_state)
+// -- belongs to the program about to start. Weak: only bash defines them.
+extern volatile sig_atomic_t slicc_fork_tty_sig __attribute__((weak));
+extern volatile sig_atomic_t interrupt_state __attribute__((weak));
+
+static void pending_tty_signal(void) {
+  int sig = 0;
+  if (&slicc_fork_tty_sig && slicc_fork_tty_sig) {
+    sig = slicc_fork_tty_sig;
+    slicc_fork_tty_sig = 0;
+  } else if (&interrupt_state && interrupt_state) {
+    sig = SIGINT;
+    interrupt_state = 0;
+  }
+  if (sig) {
+    signal(sig, SIG_DFL);
+    kill(-getpgrp(), sig);  // through the kernel: its default action
+  }
+}
+
 int execve(const char *path, char *const argv[], char *const envp[]) {
+  pending_tty_signal();
   if (!slicc_in_emulated_fork()) {
     // Handlers go to their defaults before the image is replaced; a program
     // that cannot start leaves the caller as it was.

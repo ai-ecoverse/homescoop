@@ -73,3 +73,15 @@ The bisect used slicc-kernel's #240 tests (`test/unit/terminal.test.mjs`), porte
 
 With only jobs-parent-terminal.patch, `kill -KILL %1` on a job stopped before it ran left it "Stopped" until the shell's next fork (kst2: 3-6 of 8). The kernel reported the death correctly (thr_r99i6mnbaf's trace). The SIGCHLD arrived a few ms after `kill`, at a kernel call inside `notify_of_job_status`, which holds SIGCHLD with a bare `queue_sigchld++/--` and dropped it. A debug build showed the handler running with `queue_sigchld=1`. In 5.3.0-12, jobs-notify-unqueue.patch fixes that: the #240 port gives typed at once 3/3, ^Z x 8 3/3, and kst2 0 failures in 24 rounds. The 0/20/50 ms test's remaining 1/3 is the test race fixed in slicc-kernel #242's test (a queued `jobs` flushed by the next ^C). `cert/jobs.mjs` (now with `kill -KILL` and no SIGCONT, expecting "Killed") fails on the published 5.3.0-11 (58cdd390) at that step. On a ^C 0 ms after the line is read, 5.3.0-10 delivers 0/5 and 5.3.0-11 3/5; at 100 ms and later both deliver 5/5. `cert/jobs.mjs` (^C and ^Z right after the shell has echoed the line, 20 each) passes on 5.3.0-11 and on 5.3.0-7.
 
+### 5.3.0-12: the fork window
+In CI, 58cdd390's successor lost the first ^C of `cert/jobs.mjs`. A key that reaches the shell while it is still forking, or the child before it has set itself up, went to a handler that only records it: the shell's own `sigint_sighandler`, or its ignored SIGTSTP. Locally, with ^C or ^Z right after the shell echoed the line, 20 rounds per run:
+
+| build | ^C | ^Z |
+| --- | --- | --- |
+| 5.3.0-11 (published) | 19/20 | 20/20 |
+| parent hand-off and unqueue only | 18-19/20 | 19/20 |
+| 5.3.0-12 (record and pass on; exec shim acts on a pending one) | 80/80 | 80/80 |
+| 5.3.0-7 | 60/60 | 60/60 |
+
+5.3.0-12 also passes slicc-kernel's three #240 tests (ported) 3/3 each, ^C to subshell and builtin jobs 5/5, and kill-after-early-^Z with 0 failures in 48 rounds.
+
