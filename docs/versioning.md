@@ -54,8 +54,8 @@ the dependency version that is `latest` on npm **and** certified.
 
 `scripts/check-exact-pins.mjs` enforces it: the `exact-pins` job in
 `ladder-pr` checks every package, and `host-run.sh` checks the package it
-packs. Its `PENDING` set lists packages whose exact-pin re-release is still
-in flight; it shrinks to empty, and an entry that is already exact fails.
+packs. Its `PENDING` set (empty now) is for a package whose exact-pin
+re-release is still in flight; an entry that is already exact fails.
 
 Moving a pin is a packaging-only release (`X-N+1`): set `repack.from` in
 the recipe so the published tarball is reused byte for byte

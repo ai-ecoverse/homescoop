@@ -201,8 +201,8 @@ pkg = {
     "publishConfig": {"access": "public"},
     "homescoop": {"recipe": "wasix-automake", "upstream": ver},
     "dependencies": {
-        "@ai-ecoverse/wasix-autoconf": "^2.72.0-3",
-        "@ai-ecoverse/wasix-perl": "^5.42.0-2",
+        "@ai-ecoverse/wasix-autoconf": "2.72.0-4",
+        "@ai-ecoverse/wasix-perl": "5.42.0-8",
     },
     "slicc": {"abi": "wasi", "commands": commands},
 }

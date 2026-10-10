@@ -367,7 +367,7 @@ j.version = process.argv[2];
 j.description = "Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen)";
 if (j.bin) delete j.bin;
 j.dependencies = j.dependencies || {};
-j.dependencies["@ai-ecoverse/wasix-sysroot"] = "^2025.9.30-10";
+j.dependencies["@ai-ecoverse/wasix-sysroot"] = "2025.9.30-17";
 j.dependencies["@ai-ecoverse/wasm-binaryen"] = "132.0.0-1";
 j.slicc = j.slicc || { abi: "emscripten", env: {}, commands: {} };
 j.slicc.env = {
