@@ -800,7 +800,9 @@ base_env = {
 pkg = {
     "name": "@ai-ecoverse/wasix-ruby",
     "version": pkg_ver,
-    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; sysroot 2025.9.30-17)",
+    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot -20: user ids and traps from slicc-kernel)",
+    # wasix-sysroot -20 asks slicc-kernel for user ids, with no fallback (homescoop#207).
+    "engines": {"slicc-kernel": ">=1.44.0"},
     "license": "Ruby",
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "PRESTAGE.md"],
     "publishConfig": {"access": "public"},
