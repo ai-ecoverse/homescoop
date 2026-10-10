@@ -1,0 +1,36 @@
+--- thread.c
++++ thread.c
+@@ -243,6 +243,20 @@
+ #  if defined(__linux__)
+ #    define USE_POLL
+ #  endif
++/* WASIX_POLL_WAIT: WASIX's select() fails with ENOSYS for a non-empty
++ * exceptfds, and its <poll.h> defines POLLPRI as POLLIN, so the select()
++ * path below puts every readable wait into exceptfds (IO#wait_readable,
++ * blocking TCPSocket.new / SSLSocket#connect). Wait with poll(), where
++ * POLLIN|POLLPRI is just POLLIN. */
++#  if defined(__wasi__)
++#    define USE_POLL
++#    ifndef POLLRDBAND
++#      define POLLRDBAND 0
++#    endif
++#    ifndef POLLWRBAND
++#      define POLLWRBAND 0
++#    endif
++#  endif
+ #  if defined(__FreeBSD_version) && __FreeBSD_version >= 1100000
+ #    define USE_POLL
+      /* FreeBSD does not set POLLOUT when POLLHUP happens */
+--- io.c
++++ io.c
+@@ -25,6 +25,10 @@
+ # if defined(__linux__)
+ #   define USE_POLL 1
+ # endif
++/* WASIX_POLL_WAIT: see thread.c. */
++# if defined(__wasi__)
++#   define USE_POLL 1
++# endif
+ # if defined(__FreeBSD_version) && __FreeBSD_version >= 1100000
+ #  define USE_POLL 1
+ # endif
