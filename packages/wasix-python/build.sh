@@ -278,14 +278,25 @@ if [[ ! -f "$DEPS/lib/libffi.a" ]]; then
     if [[ -d /opt/homebrew/opt/libtool/libexec/gnubin ]]; then
       export PATH="/opt/homebrew/opt/libtool/libexec/gnubin:/opt/homebrew/opt/autoconf/bin:/opt/homebrew/opt/automake/bin:$PATH"
     fi
-    if ! command -v autoreconf >/dev/null || ! command -v libtoolize >/dev/null; then
-      if [[ -n "${CI:-}" ]] && command -v apt-get >/dev/null; then
-        sudo apt-get update -qq
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq autoconf automake libtool
-      fi
+    # Ubuntu's libtoolize is present without ltdl.m4 (LT_SYS_SYMBOL_USCORE);
+    # that macro lives in libltdl-dev. Install the full set whenever CI has apt,
+    # even if autoreconf/libtoolize are already on PATH.
+    if [[ -n "${CI:-}" ]] && command -v apt-get >/dev/null; then
+      sudo apt-get update -qq
+      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        autoconf automake libtool libltdl-dev
     fi
     command -v autoreconf >/dev/null && command -v libtoolize >/dev/null \
       || { echo "homescoop wasix-python: need autoconf, automake, libtool (libffi autogen)" >&2; exit 1; }
+    # Soft check: warn if ltdl.m4 is still missing (macOS Homebrew libtool has it).
+    if command -v aclocal >/dev/null; then
+      _acdir=$(aclocal --print-ac-dir 2>/dev/null || true)
+      if [[ -n "$_acdir" && ! -f "$_acdir/ltdl.m4" ]]; then
+        echo "homescoop wasix-python: missing $_acdir/ltdl.m4 (LT_SYS_SYMBOL_USCORE); install libltdl-dev" >&2
+        exit 1
+      fi
+      unset _acdir
+    fi
     (cd "$B/libffi-src" && ./autogen.sh) >"$B/libffi-autogen.log" 2>&1 \
       || { tail -40 "$B/libffi-autogen.log" >&2; exit 1; }
   fi

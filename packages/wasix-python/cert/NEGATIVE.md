@@ -1,17 +1,24 @@
 
-## 3.14.2-15 `_ctypes` on slicc-kernel 1.49.0 (no POSIX `dlopen(NULL)`)
+## 3.14.2-15 `_ctypes` / huggingface_hub (homescoop#110)
+
+**-15 on 1.49.0:** `import ctypes` raises `OSError` (`dlopen(NULL)`); hf fails.
+**-14:** hf fails with `ModuleNotFoundError` (no `_ctypes`; huggingface_hub
+2.2.0's `_terminal.py` does a bare top-level `import ctypes`).
 
 On 1.49.0, `wasix_32v1.dlopen` with a NULL path returns handle **0** (main).
-POSIX/`ctypes` treat that as failure, so `ctypes/__init__.py`'s
-`pythonapi = PyDLL(None)` makes **`import ctypes` itself** raise `OSError`.
-`import _ctypes` and `CDLL("/path/to/side.so")` work; `CFUNCTYPE` still hits
-`closure_prepare` ENOSYS (exit 134).
+POSIX treats that as failure, so `ctypes/__init__.py`'s `pythonapi = PyDLL(None)`
+turns what used to be `ImportError: No module named '_ctypes'` into
+**`OSError: dlopen() error`**. Libraries that guard with `except ImportError`
+(and huggingface_hub does not — it imports ctypes unconditionally) do not
+catch that. That hazard is why `engines["slicc-kernel"]` and `cert/meta.json`
+`kernel` must be the **first** slicc-kernel release with r99's POSIX
+`dlopen(NULL)` = loaded main (and main in `byPath`) **plus** #306 step 2
+(`closure_prepare` / CFUNCTYPE). Until then, pin/docs track 1.49.0 for
+step-1 symbols only; `import ctypes` / unpatched `hf` are not green.
 
 A homescoop remap of `dlopen(None)` → `bin/python.wasm` was tried and
-**rejected**: the kernel's `load()` does not put the main module in `byPath`,
-so that path loads a **second** PIE CPython (`Py_IsInitialized()` would be 0).
-Fix belongs in the kernel (non-zero main handle) or a tiny `__wasi__`
-`py_dl_open` NULL→0 handling — not `_slicc_site`. Cert waits on that + step 2.
+**rejected**: `load()` does not put the main module in `byPath`, so that path
+loads a second PIE CPython (`Py_IsInitialized()` would be 0). Not `_slicc_site`.
 
 # Negative proof (wasix-python 3.14.2-10 / -11 venvs)
 

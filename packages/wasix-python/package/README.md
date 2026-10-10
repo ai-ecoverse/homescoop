@@ -19,9 +19,12 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
 Since 3.14.2-15:
-- `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.49.0 (#306 step 1:
-  `call_dynamic`, `closure_allocate`/`closure_free`). `CFUNCTYPE` and a POSIX
-  `dlopen(NULL)` (non-NULL main handle) wait for #306 step 2 / kernel follow-up.
+- `ctypes` / `_ctypes` (wasix-org/libffi). Step 1 symbols need slicc-kernel ≥ 1.49.0
+  (`call_dynamic`, `closure_allocate`/`closure_free`). Usable `import ctypes` /
+  `CDLL(None)` / `CFUNCTYPE` need the first kernel with POSIX `dlopen(NULL)` =
+  loaded main **and** #306 step 2 — that release becomes `engines` /
+  `cert/meta.json` `kernel` when it ships. Until then, on 1.49.0 `import ctypes`
+  raises `OSError` (not `ImportError`), which breaks `except ImportError` guards.
 
 Since 3.14.2-14 (wasix-sysroot -21):
 - `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,
