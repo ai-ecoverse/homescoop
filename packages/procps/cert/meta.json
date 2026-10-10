@@ -1,13 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.17.3",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+    "@ai-ecoverse/wasm-bash@5.3.0-12",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
   ],
   "checklist": [
     "ps aux lists background sleep",
@@ -17,7 +17,8 @@
     "free -h prints without error",
     "uptime prints without error (procps, not coreutils stub)",
     "attached-worker process visible in terminal ps (human cert on 1.9.0; kernel cosmetics closed in 1.11/1.12)",
-    "bash -c pgrep -f <pattern> does not match itself; exec pkill -f kills sleep, not itself (slicc-kernel#99)"
+    "bash -c pgrep -f <pattern> does not match itself; exec pkill -f kills sleep, not itself (slicc-kernel#99)",
+    "cert/users.mjs (4.0.5-3, H1 homescoop#207, slicc-kernel >= 1.44.0): `ps -o user=,comm=` lists 'root ps' as root and 'cone ps' as a kernel.users.add({name:'cone'}) user; root's `ps aux` shows cone's `sleep 3` under USER cone and its own `ps aux` under root. procps now links slicc_pwd's --wrap (getpwuid/getpwnam/getpwent)"
   ],
   "needsNote": "needsInstall pulls published coreutils 9.12.0-2 (no stub kill/uptime). Kernel pin 1.14.0 (pnpm global command roots); 1.12.0: real VmSize/VmRSS + meminfo used; 1.11.0: USER/whoami = web_user. coreutils 9.12.0-3 + procps 4.0.5-2 are the exec-pid pair (kernel-execve shim), certified together on slicc-kernel 1.17.3."
 }
