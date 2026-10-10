@@ -59,12 +59,6 @@ static inline int homescoop_fchdir(int fd) {
 static inline int homescoop_pause(void) { HOMESCOOP_STUB_ERR; }
 #define pause() homescoop_pause()
 
-#undef getgroups
-static inline int homescoop_getgroups(int size, gid_t *list) {
-  (void)size; (void)list; HOMESCOOP_STUB_ERR;
-}
-#define getgroups(sz, list) homescoop_getgroups((sz), (list))
-
 #undef mkfifo
 static inline int homescoop_mkfifo(const char *path, mode_t mode) {
   (void)path; (void)mode; HOMESCOOP_STUB_ERR;

@@ -1,7 +1,10 @@
 {
   "name": "@ai-ecoverse/wasix-perl",
-  "version": "5.42.0-8",
-  "description": "Perl 5.42 for slicc WASIX (file modes via wasix-sysroot -17 slicc_fs; fcntl CLOEXEC fix; exec/stdio)",
+  "version": "5.42.0-9",
+  "description": "Perl 5.42 for slicc WASIX (wasix-sysroot -20: user ids and %SIG from slicc-kernel; file modes via slicc_fs; exec/stdio)",
+  "engines": {
+    "slicc-kernel": ">=1.44.0"
+  },
   "license": "Artistic-1.0-Perl OR GPL-1.0-or-later",
   "repository": {
     "type": "git",
