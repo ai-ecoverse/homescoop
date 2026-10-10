@@ -1,9 +1,9 @@
 /**
  * wasix-python `_ctypes` (homescoop#110, slicc-kernel#306 / PR #316).
  *
- * Needs a kernel with wasix_32v1 `call_dynamic`, `closure_{allocate,free,prepare}`,
- * and POSIX `dlopen(NULL)` = the loaded main (non-NULL handle, main in `byPath`).
- * That first release is `engines` / `cert/meta.json` `kernel`. On 1.49.0 alone,
+ * Needs slicc-kernel ≥ 1.51.0 (`engines` / `cert/meta.json` `kernel`): wasix_32v1
+ * `call_dynamic`, `closure_{allocate,free,prepare}`, POSIX `dlopen(NULL)` = the
+ * loaded main (non-NULL handle, main in `byPath`, incl. symlinks). On 1.49.0,
  * `import ctypes` raises OSError (see NEGATIVE.md).
  *
  * "No second PIE": WASIX has no /proc for VmSize; use libc `sbrk(0)` (wasm

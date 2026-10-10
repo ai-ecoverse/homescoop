@@ -19,12 +19,12 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
 Since 3.14.2-15:
-- `ctypes` / `_ctypes` (wasix-org/libffi). **Do not publish** until `engines` /
-  `cert/meta.json` `kernel` are the first slicc-kernel with POSIX `dlopen(NULL)` =
-  loaded main **and** #306 step 2. On 1.49.0 alone, `import ctypes` raises
-  `OSError` (not `ImportError`), so **numpy fails** (`except ImportError` misses
-  it) and with it every py-* that imports numpy — worse than the hf case. See
-  `cert/NEGATIVE.md`. `cert/sidemods.mjs` on that kernel is the py-* re-pin gate.
+- `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.51.0 (#306 /
+  #316: `call_dynamic`, `closure_{allocate,prepare,free}`, POSIX `dlopen(NULL)` /
+  own path / symlink = running main). On 1.49.0, `import ctypes` raises
+  `OSError` (not `ImportError`), so **numpy fails** — see `cert/NEGATIVE.md`.
+  `cert/sidemods.mjs` (no PYTHONPATH; discovery) gates the py-* re-pin wave.
+  Catalog move to -15 rides with the kernel bump (engines are advisory).
 - **py-* packages are found without `PYTHONPATH`.** A package that declares
   `slicc.python.sitePackages` in its `package.json` (py-numpy, py-pandas, …) is
   put on `sys.path` when it is installed in python's own project (npm's
@@ -95,7 +95,7 @@ On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) un
 python -m venv v && v/bin/pip install requests && v/bin/python -c "import requests"
 ```
 
-**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.49.0 for `_ctypes`). On older kernels a
+**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.51.0 for `_ctypes`). On older kernels a
 venv's `bin/python` and `bin/pip` run as the base interpreter: `v/bin/pip
 install` then installs into the **base** package directory, not the venv.
 

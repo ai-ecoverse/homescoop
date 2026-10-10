@@ -57,8 +57,9 @@ about:
     zlib and OpenSSL from wasix-zlib / wasix-openssl), modules found by
     configure (patches/cpython-configure-wasix.patch), asyncify onlylist for
     fork/posix_spawn, strip. No fork; subprocess via posix_spawn.
-    `_ctypes` is built with wasix-org/libffi (MIT); import and CDLL need
-    slicc-kernel#306 step 1 (`call_dynamic` + `closure_{allocate,free}`).
+    `_ctypes` is built with wasix-org/libffi (MIT); import / CDLL / CFUNCTYPE
+    need slicc-kernel ≥ 1.51.0 (#306/#316: call_dynamic, closure_*,
+    dlopen(NULL)/own path = main).
     The sysroot's libc has the setitimer (proc_raise_interval2) and
     clock_nanosleep EINTR patches (patches/wasix-libc-*.patch); advisory
     locks are --wrap stubs; user ids and pwd/grp come from the sysroot's libc

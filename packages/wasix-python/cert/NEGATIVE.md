@@ -14,11 +14,11 @@ raises OSError (`dlopen(NULL)`); hf fails. **-14:** hf fails with
 `ModuleNotFoundError` (no `_ctypes`; huggingface_hub 2.2.0's `_terminal.py`
 does a bare top-level `import ctypes`).
 
-**-15 is not published** before the kernel with r99's fix + #306 step 2;
-`engines` and `cert/meta.json` `kernel` name that release. npm/pnpm treat
-`engines` as advisory, so the coordinator will have seven move python to -15
-in the catalog only in the same PR as the kernel bump.
-`cert/sidemods.mjs` passing on the fixed kernel gates the py-* re-pin wave.
+**Floor:** slicc-kernel **1.51.0** (`engines` `>=1.51.0`, `cert/meta.json`
+`kernel` `@ai-ecoverse/slicc-kernel@1.51.0`) — r99's #316 (`dlopen(NULL)` /
+own path / symlink = main + `closure_prepare`). npm/pnpm treat `engines` as
+advisory, so the catalog moves python to -15 with the kernel bump.
+`cert/sidemods.mjs` on ≥1.51.0 gates the py-* re-pin wave.
 
 A homescoop remap of `dlopen(None)` → `bin/python.wasm` was tried and
 **rejected** (second PIE load; `Py_IsInitialized` would be 0). Not `_slicc_site`.
