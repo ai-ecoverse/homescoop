@@ -1,0 +1,35 @@
+{
+  "name": "@ai-ecoverse/wasix-openssl",
+  "version": "3.5.9-1",
+  "description": "OpenSSL 3.5.9 for slicc WASIX: static (lib/) and PIC (lib-pic/) libcrypto.a and libssl.a, headers, pkg-config",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-openssl/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openssl",
+  "keywords": [
+    "wasm",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "openssl",
+    "tls"
+  ],
+  "homescoop": {
+    "recipe": "wasix-openssl",
+    "upstream": "3.5.9"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "include",
+    "lib",
+    "lib-pic"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
