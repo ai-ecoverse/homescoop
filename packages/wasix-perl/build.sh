@@ -254,6 +254,13 @@ PY
   echo "== make (second pass, after the homescoop link)"
   make -j"${HOMESCOOP_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}" \
     2>&1 | tee -a "$WORK/make-wasix.log" || true
+  # perl-cross builds static extensions with `make … LINKTYPE=static static`,
+  # MakeMaker's target for the .a only; pm_to_blib (lib/List/Util.pm,
+  # lib/File/Spec.pm, …) is part of pure_all. Copy their modules too.
+  for ext in $(sed -n 's/^fullpath_static_ext *= *//p' Makefile.config); do
+    make -C "$ext" PERL_CORE=1 LIBPERL=libperl.a LINKTYPE=static pm_to_blib \
+      2>&1 | tee -a "$WORK/make-wasix.log"
+  done
 
   echo "== make install DESTDIR=$STAGE (best-effort; may fall back to manual stage)"
   rm -rf "$STAGE"
