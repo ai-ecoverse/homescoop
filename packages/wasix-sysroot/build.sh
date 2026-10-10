@@ -7,7 +7,7 @@ export HOMESCOOP_ROOT="$ROOT"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
 HOMESCOOP_PKG="$ROOT/packages/wasix-sysroot"
-# Default (CI): -16 = published -14 + slicc_stat_owner + slicc_fs modes
+# Default (CI): -17 = published -14 + slicc_stat_owner + slicc_fs modes
 # (build-incremental.sh). The full path below predates -16.
 # This full path stages a local ~/.wasixcc tree and rebuilds the libc++
 # runtimes; it only runs with HOMESCOOP_WASIX_SYSROOT_FULL=1.

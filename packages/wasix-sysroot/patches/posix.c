@@ -23,15 +23,25 @@ SLICC_FS(fd_chmod) int __slicc_fs_fd_chmod(int fd, int mode);
 SLICC_FS(path_chmod) int __slicc_fs_path_chmod(int dirfd, const char *path, int path_len, int mode, int flags);
 SLICC_FS(umask) int __slicc_fs_umask(int mask, int *old);
 
-static mode_t __slicc_local_umask = 022;
+// The process's umask, read from the kernel once and kept in step by
+// umask(). slicc_fs.umask always sets, so the first read sets 0 and puts
+// the old value back; after that no create asks the kernel. -1: not read.
+static int __slicc_umask_cache = -1;
+// The kernel answered ENOSYS: no slicc_fs, modes stay as upstream.
+static int __slicc_fs_absent;
 
 mode_t __slicc_umask_value(void) {
+    int cached = __atomic_load_n(&__slicc_umask_cache, __ATOMIC_ACQUIRE);
+    if (cached >= 0) return (mode_t)cached;
     int old, ignored;
     if (__slicc_fs_umask(0, &old) == 0) {
         __slicc_fs_umask(old, &ignored);
-        return (mode_t)old;
+    } else {
+        __slicc_fs_absent = 1;
+        old = 022;
     }
-    return __slicc_local_umask;
+    __atomic_store_n(&__slicc_umask_cache, old & 0777, __ATOMIC_RELEASE);
+    return (mode_t)(old & 0777);
 }
 
 // errno for a slicc_fs call: 0 on success or when the kernel lacks it.
@@ -48,18 +58,45 @@ int __slicc_fs_chmodat(int dirfd, const char *path, mode_t mode, int nofollow) {
                                                    nofollow ? SLICC_FS_NOFOLLOW : 0));
 }
 
-// A fresh create: apply mode & ~umask (an O_EXCL open, or a path that did not
-// exist before). Failures here never fail the create itself.
-void __slicc_fresh_fd_mode(int fd, mode_t mode) {
-    __slicc_fs_fd_chmod(fd, (int)(mode & ~__slicc_umask_value() & 07777));
+// open/openat with O_CREAT. The kernel creates files 0666 and directories
+// 0777 less the process's umask (slicc-kernel#208), so a mode that comes out
+// the same needs nothing more: one call, as upstream. Otherwise only a fresh
+// create gets fd_chmod, and freshness comes from O_EXCL itself: try the
+// exclusive create, and on EEXIST open the existing file. No stat first, and
+// no window between a check and the create.
+int __slicc_open_create(int dirfd, const char *path, int oflag, mode_t mode) {
+    mode_t mask = __slicc_umask_value();
+    mode_t want = mode & ~mask & 07777;
+    if (__slicc_fs_absent || want == (0666 & ~mask))
+        return __wasilibc_nocwd_openat_nomode(dirfd, path, oflag);
+    if (oflag & O_EXCL) {
+        int fd = __wasilibc_nocwd_openat_nomode(dirfd, path, oflag);
+        if (fd >= 0) __slicc_fs_fd_chmod(fd, (int)want);
+        return fd;
+    }
+    for (int tries = 0; tries < 4; tries++) {
+        int fd = __wasilibc_nocwd_openat_nomode(dirfd, path, oflag | O_EXCL);
+        if (fd >= 0) {
+            __slicc_fs_fd_chmod(fd, (int)want);
+            return fd;
+        }
+        if (errno != EEXIST) return -1;
+        fd = __wasilibc_nocwd_openat_nomode(dirfd, path, oflag & ~O_CREAT);
+        // Removed between the two opens: try the exclusive create again.
+        if (fd >= 0 || errno != ENOENT) return fd;
+    }
+    return __wasilibc_nocwd_openat_nomode(dirfd, path, oflag);
 }
 
-int __slicc_path_absent(int dirfd, const char *path) {
-    struct stat st;
-    int saved = errno;
-    int absent = __wasilibc_nocwd_fstatat(dirfd, path, &st, AT_SYMLINK_NOFOLLOW) != 0 && errno == ENOENT;
-    errno = saved;
-    return absent;
+// mkdir/mkdirat: path_chmod only when the mode differs from 0777 & ~umask.
+int __slicc_mkdir(int dirfd, const char *path, mode_t mode) {
+    int r = __wasilibc_nocwd_mkdirat_nomode(dirfd, path);
+    if (r == 0) {
+        mode_t mask = __slicc_umask_value();
+        mode_t want = mode & ~mask & 07777;
+        if (!__slicc_fs_absent && want != (0777 & ~mask)) __slicc_fs_chmodat(dirfd, path, want, 0);
+    }
+    return r;
 }
 
 static int find_relpath2(
@@ -108,10 +145,7 @@ int open(const char *path, int oflag, ...) {
         errno = ENOENT;
         return -1;
     }
-    int fresh = (oflag & O_EXCL) || __slicc_path_absent(dirfd, relative_path);
-    int fd = __wasilibc_nocwd_openat_nomode(dirfd, relative_path, oflag);
-    if (fd >= 0 && fresh) __slicc_fresh_fd_mode(fd, mode);
-    return fd;
+    return __slicc_open_create(dirfd, relative_path, oflag, mode);
 }
 
 // See the documentation in libc.h
@@ -288,16 +322,14 @@ int mkdir(const char *path, mode_t mode) {
         return -1;
     }
 
-    int r = __wasilibc_nocwd_mkdirat_nomode(dirfd, relative_path);
-    if (r == 0) __slicc_fs_chmodat(dirfd, relative_path, mode & ~__slicc_umask_value(), 0);
-    return r;
+    return __slicc_mkdir(dirfd, relative_path, mode);
 }
 
 mode_t umask(mode_t mode) {
+    mode_t prev = __slicc_umask_value();
     int old;
-    if (__slicc_fs_umask((int)(mode & 0777), &old) == 0) return (mode_t)old;
-    mode_t prev = __slicc_local_umask;
-    __slicc_local_umask = mode & 0777;
+    if (!__slicc_fs_absent && __slicc_fs_umask((int)(mode & 0777), &old) == 0) prev = (mode_t)(old & 0777);
+    __atomic_store_n(&__slicc_umask_cache, (int)(mode & 0777), __ATOMIC_RELEASE);
     return prev;
 }
 

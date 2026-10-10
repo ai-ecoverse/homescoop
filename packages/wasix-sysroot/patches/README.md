@@ -44,10 +44,15 @@ These copies call the kernel's `slicc_fs` imports (slicc-kernel#197, #208):
 (flag 1 = no-follow) and `umask(mask, *old)`.
 
 - `chmod`, `fchmod`, `fchmodat` call the imports.
-- `umask` asks the kernel and falls back to a process-local value (022).
-- `open`/`openat` with `O_CREAT` apply `mode & ~umask` to a fresh create
-  (`O_EXCL`, or the path was absent just before), and `mkdir`/`mkdirat`
-  do the same after success. A failure there never fails the create.
+- `umask` is read from the kernel once per process (slicc_fs.umask always
+  sets, so the first read sets 0 and restores) and cached; `umask()` updates
+  kernel and cache. Without slicc_fs it is a process-local value (022).
+- `open`/`openat` with `O_CREAT`: the kernel creates files `0666 & ~umask`
+  itself (slicc-kernel#208), so a mode that comes out the same costs nothing
+  extra. Another mode is set with one `fd_chmod` on a fresh create only;
+  freshness comes from `O_EXCL` (try the exclusive create, on `EEXIST` open
+  the existing file), never from a stat first. `mkdir`/`mkdirat` call
+  `path_chmod` only when the mode differs from `0777 & ~umask`.
 - `ENOSYS` (an older kernel) is success: behaviour stays as upstream.
 
 The read side is in `../slicc_stat_owner.c`: `fstat` and
@@ -57,7 +62,9 @@ into `st_mode`. Without them `st_mode` has only the file type, as upstream.
 
 Cert: `test/run-modes.mjs --tarball <package.tgz>` (cert/meta.json, harness
 host-node) builds `test/modes.c` against the tarball and runs `test/modes.mjs`
-on the kernel's Node entry.
+on the kernel's Node entry. `test/run-bench.mjs --tarball <package.tgz>`
+times creates (`test/bench-create.c`) against the published -15, interleaved,
+medians.
 
 `build-incremental.sh` compiles both files (static + PIC, the shipped
 objects' target features) and replaces `posix.o` and `at_fdcwd.o` in every

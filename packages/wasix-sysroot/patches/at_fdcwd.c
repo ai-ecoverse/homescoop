@@ -17,10 +17,8 @@
 #include <stdarg.h>
 
 // slicc: fresh-create modes (posix.c, slicc-kernel#197).
-mode_t __slicc_umask_value(void);
-int __slicc_fs_chmodat(int dirfd, const char *path, mode_t mode, int nofollow);
-void __slicc_fresh_fd_mode(int fd, mode_t mode);
-int __slicc_path_absent(int dirfd, const char *path);
+int __slicc_open_create(int dirfd, const char *path, int oflag, mode_t mode);
+int __slicc_mkdir(int dirfd, const char *path, mode_t mode);
 
 // If the platform doesn't define O_TMPFILE, we don't need to worry about it.
 #ifndef O_TMPFILE
@@ -39,10 +37,7 @@ int openat(int dirfd, const char *pathname, int flags, ...) {
         return open(pathname, flags, mode);
     }
     if (!(flags & O_CREAT)) return __wasilibc_nocwd_openat_nomode(dirfd, pathname, flags);
-    int fresh = (flags & O_EXCL) || __slicc_path_absent(dirfd, pathname);
-    int fd = __wasilibc_nocwd_openat_nomode(dirfd, pathname, flags);
-    if (fd >= 0 && fresh) __slicc_fresh_fd_mode(fd, mode);
-    return fd;
+    return __slicc_open_create(dirfd, pathname, flags, mode);
 }
 
 int symlinkat(const char *target, int dirfd, const char *linkpath) {
@@ -66,9 +61,7 @@ int mkdirat(int dirfd, const char *pathname, mode_t mode) {
         return mkdir(pathname, mode);
     }
 
-    int r = __wasilibc_nocwd_mkdirat_nomode(dirfd, pathname);
-    if (r == 0) __slicc_fs_chmodat(dirfd, pathname, mode & ~__slicc_umask_value(), 0);
-    return r;
+    return __slicc_mkdir(dirfd, pathname, mode);
 }
 
 DIR *opendirat(int dirfd, const char *path) {

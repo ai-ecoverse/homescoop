@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-16 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-17 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
-# and fstatat.o; -15, d292a32) and slicc_fs file modes (-16, homescoop#169):
+# and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
 # The full rebuild in
 # build.sh (stage ~/.wasixcc, rebuild the libc++ runtimes) stays local:
