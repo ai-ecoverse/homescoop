@@ -18,6 +18,11 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+The license is `PSF-2.0 AND GPL-3.0-or-later`, because GNU Readline is linked
+statically. Since 3.14.2-13, `time.tzset()` exists and honours POSIX `TZ` rules.
+The sysconfig records (`_sysconfigdata*`, `_sysconfig_vars*.json`) carry no
+build-machine paths, host compilers or private stub archives.
+
 ## Side modules: C++ runtime ABI
 
 Native extensions are `dylink.0` side modules that import the C++ runtime from

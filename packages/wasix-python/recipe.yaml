@@ -42,9 +42,9 @@ dependencies:
   run: []
 about:
   homepage: https://www.python.org
-  license: PSF-2.0
+  license: PSF-2.0 AND GPL-3.0-or-later  # GNU Readline is linked statically
   notes: |
-    WASIX CPython 3.14 dynamic-main on wasix-sysroot -18's sysroot-ehpic
+    WASIX CPython 3.14 dynamic-main on the pinned wasix-sysroot's sysroot-ehpic
     (legacy wasm EH, PIC; side modules by dlopen), cross-built from source
     in CI by build.sh (homescoop#181): host CPython from the same tarball,
     static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline; zlib and

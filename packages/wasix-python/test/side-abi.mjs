@@ -83,6 +83,12 @@ const mainEnvImports = new Set(main.imports.filter((i) => i.module === 'env').ma
 // GOT.mem fails.
 const tlsName = (n) => { const m = /^_ZT[HW](\d+)(.*)$/.exec(n); return m && m[2].length === Number(m[1]) ? m[2] : null; };
 const mainTls = new Set([...main.exports.map((e) => e.name), ...main.imports.map((i) => i.name)].map(tlsName).filter(Boolean));
+// python.wasm's own env imports: what the loader provides (memory, table,
+// bases, stack pointer, the EH tags), as 3.14.2-11 had. Anything else is a
+// symbol the link left undefined (-12 imported env._ZTH5errno and
+// env.__cxa_thread_atexit_impl: cpp_tls_stubs.c was not linked).
+const MAIN_ENV = new Set(['memory', '__indirect_function_table', '__memory_base', '__stack_pointer', '__table_base', '__c_longjmp', '__cpp_exception']);
+const unexpectedEnv = main.imports.filter((i) => i.module === 'env' && !MAIN_ENV.has(i.name)).map((i) => i.name);
 const base = opt('--base') ? new Set(wasmSymbols(readFileSync(opt('--base'))).exports.map((e) => e.name)) : null;
 const manifest = JSON.parse(readFileSync(join(here, 'side-modules.json'), 'utf8'));
 const work = mkdtempSync(join(tmpdir(), 'side-abi-'));
@@ -142,6 +148,7 @@ try {
   }
   const mainSsl = [...mainExports].filter((s) => OPENSSL.test(s));
   lines.push('', `python.wasm exports ${mainSsl.length} OpenSSL-named symbols.`);
+  lines.push('', `python.wasm env imports beyond the loader's: ${unexpectedEnv.length ? unexpectedEnv.join(' ') : 'none'}`);
   lines.push('', `GOT.mem imports of python.wasm thread_local data: ${tlsMem.length ? tlsMem.join(', ') : 'none'}`);
 } finally {
   rmSync(work, { recursive: true, force: true });
@@ -149,6 +156,10 @@ try {
 const report = lines.join('\n') + '\n';
 process.stdout.write(report);
 if (opt('--report')) writeFileSync(opt('--report'), report);
+if (unexpectedEnv.length) {
+  console.error(`side-abi: python.wasm imports unexpected env symbols: ${unexpectedEnv.join(' ')}`);
+  process.exitCode = 1;
+}
 if (tlsMem.length) {
   console.error(`side-abi: ${tlsMem.length} side-module GOT.mem imports resolve to thread_local data of python.wasm`);
   process.exitCode = 1;
