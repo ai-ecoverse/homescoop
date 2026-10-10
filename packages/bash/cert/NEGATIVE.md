@@ -54,3 +54,22 @@ AssertionError [ERR_ASSERTION]: bash -c "echo one": writes ["one","\n"]
 
 5.3.0-7 (an emscripten whose `doWritev` gathered the iovecs) passes the same spec.
 
+## 5.3.0-11 (job control), slicc-kernel 1.35.1 Node entry
+
+`cert/jobs.mjs` on 5.3.0-10 fails on the first ^C. The ^C is echoed, but `sleep 30` keeps running and the next line is typed into it:
+
+```
+AssertionError [ERR_ASSERTION]: step {"expect":"\\$ ","timeoutMs":5000}
+```
+
+The bisect used slicc-kernel's #240 tests (`test/unit/terminal.test.mjs`), ported to the published kernel, 3 runs each. Columns: typed at once / ^Z x 8 / 0-20-50 ms.
+
+| bash | typed at once | ^Z x 8 | 0/20/50 ms |
+| --- | --- | --- | --- |
+| 5.3.0-7 | 3/3 | 3/3 | 1/3 |
+| 5.3.0-8, -9, -10 | 0/3 | 0-1/3 | 0/3 |
+| 5.3.0-7's own sources rebuilt with emscripten 4.0.23 | fails like -8 | | |
+| 5.3.0-11 | 3/3 | 1/3 | 1/3 |
+
+5.3.0-11's remaining failures are `kill -KILL %1` on a job stopped before it ran: the job is reaped only after a SIGCONT, a kernel-side issue reported to the coordinator. On a ^C 0 ms after the line is read, 5.3.0-10 delivers 0/5 and 5.3.0-11 3/5; at 100 ms and later both deliver 5/5. `cert/jobs.mjs` (^C and ^Z right after the shell has echoed the line, 20 each) passes on 5.3.0-11 and on 5.3.0-7.
+

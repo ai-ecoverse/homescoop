@@ -1,0 +1,22 @@
+--- a/jobs.c
++++ b/jobs.c
+@@ -2453,6 +2453,19 @@
+ 	     1003.1 Rationale, section B.4.3.3, page 236). */
+ 	  if ((flags & FORK_NOJOB) == 0)
+ 	    setpgid (pid, pipeline_pgrp);
++#if defined (__EMSCRIPTEN__)
++	  /* slicc (homescoop wasm-bash 5.3.0-11): a forked child is a new
++	     kernel worker that starts tens of milliseconds after fork()
++	     returns here, so it takes the terminal late and a ^C or ^Z typed
++	     right after Enter went to the shell instead of the job. Give the
++	     terminal to a new foreground job here as well, under the child's
++	     own conditions; the child still does it too. */
++	  if ((flags & FORK_NOJOB) == 0 && (flags & FORK_NOTERM) == 0 && async_p == 0 &&
++	      pipeline_pgrp == pid && pipeline_pgrp != shell_pgrp &&
++	      ((subshell_environment&(SUBSHELL_ASYNC|SUBSHELL_PIPE)) == 0) &&
++	      running_in_background == 0)
++	    give_terminal_to (pipeline_pgrp, 0);
++#endif
+ 	}
+       else
+ 	{
