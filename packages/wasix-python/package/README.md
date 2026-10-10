@@ -18,6 +18,14 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-14 (wasix-sysroot -21):
+- `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,
+  `S_ISFIFO` on slicc-kernel with pipe types (#307) and a socket on
+  1.47.3-1.48.x, either of which asyncio's pipe transports accept;
+- `termios`/`tty.setraw` really switch the terminal to raw mode (^C arrives as
+  a byte), and `os.get_terminal_size` and `isatty` answer per descriptor
+  (slicc-kernel ≥ 1.48.0; older kernels keep the previous behaviour).
+
 The license is `PSF-2.0 AND GPL-3.0-or-later`, because GNU Readline is linked
 statically. Since 3.14.2-13, `time.tzset()` exists and honours POSIX `TZ` rules.
 The sysconfig records (`_sysconfigdata*`, `_sysconfig_vars*.json`) carry no
