@@ -57,7 +57,7 @@ try {
   }
   const side = build.side && env.WASIXCC_PIC === 'yes' ? join(work, `lib${build.side}.so`) : undefined;
   if (side) sideModule(env, prefix, build.side, side);
-  const k = await kernel(work, kernelDir);
+  const k = await kernel(work, kernelDir, spec.kernelOptions);
   console.log(`== ${k.label} (Node entry)`);
   await k.install(pkg);
   if (side) await k.kernel.writeFile(`/tmp/lib${build.side}.so`, readFileSync(side));

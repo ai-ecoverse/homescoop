@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-23 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-24 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -385,6 +385,34 @@ for v in $PIC_VARIANTS; do
     grep -qx "$s" <<<"$have" || { echo "homescoop: $lib lacks $s" >&2; exit 1; }
   done
   echo "  $v (pic)"
+done
+
+echo "== wasix-sysroot: -24 members (chown, fchown, lchown, fchownat through slicc_fs)"
+R24_OBJ="$WORK/r24"
+rm -rf "$R24_OBJ" && mkdir -p "$R24_OBJ/static" "$R24_OBJ/pic"
+R24_DROP=(chown.o fchown.o lchown.o fchownat.o)
+compile_r18 chown "$R24_OBJ/static/slicc_chown.o"
+compile_r18 chown "$R24_OBJ/pic/slicc_chown.o" -fPIC -fvisibility=default
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R24_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" "${R24_DROP[@]}")
+  missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(exported "$R24_OBJ/$flavour/slicc_chown.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v slicc_chown.o lacks: $missing" >&2; exit 1; }
+  "$LLVM_AR" d "$lib" "${R24_DROP[@]}"
+  "$LLVM_AR" r "$lib" "$R24_OBJ/$flavour/slicc_chown.o"
+  members="$("$LLVM_AR" t "$lib")"
+  if grep -qxE 'chown\.o|fchown\.o|lchown\.o|fchownat\.o' <<<"$members"; then
+    echo "homescoop: $lib still has upstream chown members" >&2; exit 1
+  fi
+  undef="$("$LLVM_NM" -u "$lib" 2>/dev/null)"
+  for s in __slicc_fs_path_chown __slicc_fs_fd_chown __slicc_fs_path_owner __slicc_fs_fd_owner; do
+    grep -q "$s" <<<"$undef" || { echo "homescoop: $lib lacks slicc_fs $s" >&2; exit 1; }
+  done
+  echo "  $v ($flavour)"
 done
 
 homescoop_assert_no_package_links "$PKG"
