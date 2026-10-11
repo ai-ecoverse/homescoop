@@ -6,17 +6,45 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 - PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-18's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
-- Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.53.4; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
+- Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.53.4; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - No `fork`/`vfork`; `subprocess` via `os.posix_spawn` (`proc_spawn2`/`3`)
 - `os.getuid()`/`getgid()`/`getgroups()` and `pwd`/`grp` come from slicc-kernel's process credentials and its `/etc/passwd`/`/etc/group` (3.14.2-13, wasix-sysroot -20; slicc-kernel ≥ 1.44.0, no fallback: ids are -1 on older kernels). Root is uid 0 with home `/root`.
 - Advisory file locks (`flock`, `fcntl` F_SETLK*, `lockf`) are no-ops (Emscripten parity)
 - stdout is line-buffered unless it is a regular file, so output streams and survives crashes
 - `signal.alarm`/`setitimer` and `time.sleep` resuming after a signal (the sysroot's libc patches, `patches/`)
 - Bundled `pip` 25.3; `.pyc` are unchecked-hash
-- Not built: `ctypes` (no libffi for WASIX), `_uuid`, `curses`, `dbm`, `_zstd`, `tkinter`
+- Not built: `_uuid`, `curses`, `dbm`, `_zstd`, `tkinter`
 - `TZ` POSIX rules work (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193); `zoneinfo` works with the `tzdata` package
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
+
+Since 3.14.2-15:
+- `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.51.0 (#306 /
+  #316: `call_dynamic`, `closure_{allocate,prepare,free}`, POSIX `dlopen(NULL)` /
+  own path / symlink = running main). On 1.49.0, `import ctypes` raises
+  `OSError` (not `ImportError`), so **numpy fails** — see `cert/NEGATIVE.md`.
+  `cert/sidemods.mjs` (no PYTHONPATH; discovery) gates the py-* re-pin wave.
+  Catalog move to -15 rides with the kernel bump (engines are advisory).
+- **py-* packages are found without `PYTHONPATH`.** A package that declares
+  `slicc.python.sitePackages` in its `package.json` (py-numpy, py-pandas, …) is
+  put on `sys.path` when it is installed in python's own project (npm's
+  `node_modules`, or pnpm's, including its `.pnpm` store: a local `pnpm add`)
+  or, for pnpm ≥ 11 global installs (`pnpm add -g`, one project per package
+  under `$PNPM_HOME/global/v<N>/`), in a sibling global project. It is taken
+  only if its `slicc.python.requires` abi/platform match (none: pure Python),
+  and if the `wasix-python` it resolves to (Node's lookup from its real
+  directory) is this python's exact version, so side modules never mix
+  interpreter builds; the first package of a name wins. `python -v` reports
+  what was skipped and why. The scan is cached in `.slicc-site-cache` in
+  python's directory (keyed on the package directories and their
+  `package.json` stamps; `-v` always rescans); with the cache, a start costs
+  about 2 ms more than with discovery off, and less than the same directories
+  on `PYTHONPATH`. As with `PYTHONPATH`, `.pth` files in those directories are
+  not run. It runs from `site-packages/slicc-executable.pth`, so a venv sees
+  py-* packages only with `--system-site-packages`; `SLICC_PYTHON_DISCOVER=0`
+  turns it off. A py-* built for another wasix-python (an exact pin with its
+  own nested copy, e.g. py-numpy 2.3.2-7 for 3.14.2-13) is refused until it is
+  re-pinned; `python -v` names it.
 
 Since 3.14.2-14 (wasix-sysroot -21):
 - `asyncio` subprocess pipes work: `os.fstat` gives a pipe its kernel type,
@@ -69,7 +97,7 @@ On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) un
 python -m venv v && v/bin/pip install requests && v/bin/python -c "import requests"
 ```
 
-**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.44.0 anyway, for the user ids). On older kernels a
+**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.51.0 for `_ctypes`). On older kernels a
 venv's `bin/python` and `bin/pip` run as the base interpreter: `v/bin/pip
 install` then installs into the **base** package directory, not the venv.
 

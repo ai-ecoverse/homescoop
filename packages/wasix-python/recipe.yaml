@@ -36,6 +36,11 @@ sources:
   ncurses:
     url: "https://mirrors.kernel.org/gnu/ncurses/ncurses-6.5.tar.gz"
     sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
+  # wasix-org/libffi @ 09cbf7d (wasm32 WASIX backend: wasix_call_dynamic / closures).
+  # GitHub archive has no configure; build.sh runs autogen (host autoconf).
+  libffi:
+    url: "https://github.com/wasix-org/libffi/archive/09cbf7d66d232a01dbb0c88fd5ae65fa9c15f7c7.tar.gz"
+    sha256: "7097de0f66f458c2bd44e0e021e449a2572692067f7136791bdd4788330de978"
 dependencies:
   build: []
   host: []
@@ -48,15 +53,19 @@ about:
     WASIX CPython 3.14 dynamic-main on the pinned wasix-sysroot's sysroot-ehpic
     (legacy wasm EH, PIC; side modules by dlopen), cross-built from source
     in CI by build.sh (homescoop#181): host CPython from the same tarball,
-    static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline; zlib and
-    OpenSSL from wasix-zlib / wasix-openssl), modules found by configure
-    (patches/cpython-configure-wasix.patch), asyncify onlylist for
+    static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline, libffi;
+    zlib and OpenSSL from wasix-zlib / wasix-openssl), modules found by
+    configure (patches/cpython-configure-wasix.patch), asyncify onlylist for
     fork/posix_spawn, strip. No fork; subprocess via posix_spawn.
+    `_ctypes` is built with wasix-org/libffi (MIT); import / CDLL / CFUNCTYPE
+    need slicc-kernel ≥ 1.51.0 (#306/#316: call_dynamic, closure_*,
+    dlopen(NULL)/own path = main).
     The sysroot's libc has the setitimer (proc_raise_interval2) and
     clock_nanosleep EINTR patches (patches/wasix-libc-*.patch); advisory
     locks are --wrap stubs; user ids and pwd/grp come from the sysroot's libc
     (slicc-kernel process credentials, -20). The C++
     runtime side modules import (libc++/libc++abi/libunwind) is upstream
     wasix-libc v2026-07-03.1 sysroot-ehpic, as in -11 (README "Side modules").
-    stdlib/ adds sys.executable from PATH (_slicc_site.py, sitecustomize.py,
-    site-packages/slicc-executable.pth).
+    stdlib/ adds sys.executable from PATH and puts py-* packages from python's
+    npm/pnpm project and pnpm's global projects on sys.path (_slicc_site.py,
+    sitecustomize.py, site-packages/slicc-executable.pth).

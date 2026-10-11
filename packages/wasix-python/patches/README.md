@@ -89,10 +89,11 @@ Until the sysroot is rebuilt, wasix-python links `lock_stubs.c` with
 
 ## `cpython-stdout-line-buffer-nonreg.patch` (wasix-python 3.14.2-7)
 
-WASI preview1 has no FIFO file type, so in SLICC `os.fstat(1).st_mode` on a
-pipe is **0** (unknown). CPython therefore treated pipes like non-ttys and
-block-buffered stdout in 8 KB chunks — agent/`tee` harnesses saw output only
-at exit, and a wasm trap lost the buffer.
+**Kept on purpose** (not a leftover for untyped pipes). Since wasix-sysroot
+-21, pipes report `S_IFIFO` (or `S_IFSOCK` on slicc-kernel 1.47.3–1.48.x), so
+stock CPython would block-buffer stdout on a pipe. This patch still
+line-buffers stdout whenever it is not a regular file so agent/`tee`
+harnesses stream output and a wasm trap does not lose up to 8 KB of buffer.
 
 The patch changes `create_stdio()` in `Python/pylifecycle.c`: when
 `buffered_stdio` is on, **stdout** is line-buffered if it is not a regular
