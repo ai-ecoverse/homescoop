@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-libiconv",
-  "version": "1.18.0-1",
+  "version": "1.19.0-1",
   "description": "GNU libiconv 1.19 static library for WebAssembly / emscripten (SLICC homescoop)",
   "license": "LGPL-2.1-or-later",
   "repository": {
@@ -28,6 +28,6 @@
   },
   "homescoop": {
     "recipe": "libiconv",
-    "upstream": "1.18"
+    "upstream": "1.19"
   }
 }
