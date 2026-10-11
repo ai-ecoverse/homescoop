@@ -21,7 +21,8 @@
     "**/test/**",
     "**/tests/**",
     "**/__fixtures__/**",
-    "**/fixtures/**"
+    "**/fixtures/**",
+    "crates/wasix-net/**"
   ],
   "customManagers": [
     {
