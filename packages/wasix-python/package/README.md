@@ -27,6 +27,13 @@ itimer helper):
   the **fixed** parameters (e.g. `[c_char_p]` for `printf`) and pass the rest
   as typed ctypes values (`c_int`, `c_double`, …); without `argtypes` every
   argument is taken as fixed, which is wrong for a variadic function on wasm32.
+  Pass `c_double` for `%f`: ctypes does not promote, and a variadic `c_float`
+  raises `RuntimeError: ffi_prep_cif_var failed` (libffi rejects it, as on
+  every platform).
+- Signals during blocking calls follow PEP 475 on slicc-kernel ≥ 1.53.3, which
+  answers -22-marked programs with EINTR: a signal whose handler returns does
+  not shorten `time.sleep`/`select`/`poll`, and ^C raises `KeyboardInterrupt`
+  at once (`cert/signals.mjs`).
   3.14.2-15 could not call them at all ("ffi_prep_cif_var failed").
 
 Since 3.14.2-15:
