@@ -1,0 +1,43 @@
+--- a/src/pgrep.c
++++ b/src/pgrep.c
+@@ -989,6 +989,32 @@
+     return -1;
+ }
+ 
++#ifdef __EMSCRIPTEN__
++/* homescoop (slicc): wasm has no pidfds and no raw syscall(2). pidfd_open()
++ * fails with ENOSYS, so execute_kill() signals with kill()/sigqueue() as on
++ * Linux < 5.3, and --mrelease reports that pidfd_open failed. */
++static int pidfd_open (pid_t pid, unsigned int flags)
++{
++	(void)pid; (void)flags;
++	errno = ENOSYS;
++	return -1;
++}
++
++static int pidfd_send_signal(int pidfd, int sig, siginfo_t *info,
++        unsigned int flags)
++{
++    (void)pidfd; (void)sig; (void)info; (void)flags;
++    errno = ENOSYS;
++    return -1;
++}
++
++static int process_mrelease(int pidfd, unsigned int flags)
++{
++	(void)pidfd; (void)flags;
++	errno = ENOSYS;
++	return -1;
++}
++#else /* !__EMSCRIPTEN__ */
+ #if !defined(HAVE_PIDFD_OPEN)
+ 
+ #ifndef SYS_pidfd_open
+@@ -1037,6 +1063,7 @@
+ 	return syscall(SYS_process_mrelease, pidfd, flags);
+ }
+ #endif
++#endif /* !__EMSCRIPTEN__ */
+ 
+ static void parse_opts (int argc, char **argv)
+ {
