@@ -1,5 +1,20 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-22: Linux window-size ioctl numbers are EINVAL (-23, homescoop#250)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-22.tgz --probe r23` (sha256 806fbe66…), default and `--variant ehpic`, slicc-kernel 1.48.0 Node entry, 2026-10-11: both FAIL. WASIX's 0x101/0x102 answer per fd; Linux's 0x5413/0x5414 fall through to `ioctl`'s default branch everywhere:
+
+```text
++   'tty linux: get=EINVAL 0x0 set=EINVAL',
+-   'tty linux: get=ok 100x30 set=ok',
++   'stdin pipe linux: get=EINVAL 0x0 set=EINVAL',
+-   'stdin pipe linux: get=ENOTTY 0x0 set=ENOTTY',
++   'file linux: get=EINVAL 0x0 set=EINVAL',
+-   'file linux: get=ENOTTY 0x0 set=ENOTTY',
++   'closed linux: get=EINVAL 0x0 set=EINVAL',
+-   'closed linux: get=EBADF 0x0 set=EBADF',
+```
+
 ## 2025.9.30-21: no libc generation marker, exported itimer helper (-22)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-21.tgz --probe r22`, default and `--variant ehpic`, 2026-10-11: both FAIL with `slicc.libc custom section: undefined`. Nothing in a -21 (or older) program tells the kernel which libc it has. And wasix-python 3.14.2-15, a dynamic-main on -21, exports `__homescoop_itimer_real_left` (next to `getitimer`, `setitimer`).

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-22 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-23 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -302,7 +302,7 @@ done
 # tcgetattr/tcsetattr carry the whole termios, ioctl TCGETS/TCSETS*/
 # TIOCGWINSZ and isatty answer per fd, tcflush/tcdrain check the fd. ENOSYS
 # (older kernels) keeps the tty_get/tty_set path. See patches/README.md.
-echo "== wasix-sysroot: -21 members (tcgetattr, tcsetattr, tcflush, tcdrain, ioctl, isatty)"
+echo "== wasix-sysroot: -21 members (tcgetattr, tcsetattr, tcflush, tcdrain, ioctl, isatty; -23 ioctl: Linux TIOCGWINSZ/TIOCSWINSZ)"
 R21_OBJ="$WORK/r21"
 rm -rf "$R21_OBJ" && mkdir -p "$R21_OBJ/static" "$R21_OBJ/pic"
 R21_TOP=(tcgetattr tcsetattr tcflush tcdrain)

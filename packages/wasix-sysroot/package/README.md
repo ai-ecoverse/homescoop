@@ -41,6 +41,11 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-23 `ioctl` also takes Linux's request numbers for the
+window size, `TIOCGWINSZ` 0x5413 and `TIOCSWINSZ` 0x5414, next to WASIX's
+0x101/0x102 (the headers keep those): code and ctypes snippets that hard-code
+the Linux numbers got EINVAL before (homescoop#250).
+
 Since 2025.9.30-22 every program linked against the sysroot carries a wasm
 custom section `slicc.libc` = `wasix-sysroot <version>` (from `crt1*.o`), so
 slicc-kernel can tell libc generations apart (`wasm-opt` and `llvm-strip` keep
