@@ -35,7 +35,7 @@ static void apply_owner(struct stat *buf, int e, const unsigned int *owner) {
   if (e == 0) {
     buf->st_uid = (uid_t)owner[0];
     buf->st_gid = (gid_t)owner[1];
-  } else if (e == ENOSYS) {
+  } else if (e == ENOSYS || e == ENOTSUP) {
     __atomic_store_n(&owner_absent, 1, __ATOMIC_RELAXED);
   }
 }
