@@ -1,9 +1,16 @@
 # `@ai-ecoverse/wasm-libwebp`
 
-**Name reservation stub** (v0.0.0). Real emscripten/WASM artifacts for
-**libwebp 1.5.0** will ship from the [homescoop](https://github.com/ai-ecoverse/homescoop)
-ladder recipes.
+**libwebp 1.6.0** static libraries for WebAssembly / emscripten, built by the
+[homescoop](https://github.com/ai-ecoverse/homescoop) ladder for SLICC.
 
-Upstream summary: WebP codec libraries.
+- `lib/libwebp.a`, `libwebpmux.a`, `libwebpdemux.a`, `libsharpyuv.a`
+- `include/webp/*.h`, `include/sharpyuv.h`
+- `lib/pkgconfig/libwebp.pc`, `libwebpmux.pc`, `libwebpdemux.pc`
 
-Do not depend on this version for binaries yet.
+Link with `-lwebp -lsharpyuv -lm` (plus `-lwebpmux` / `-lwebpdemux` for the
+container APIs). Built without threads and without SIMD.
+
+CI cert: `packages/libwebp/smoke.c` encodes and decodes lossless and lossy
+RGBA and checks the bitstream, the size and the pixels.
+
+License: BSD-3-Clause. `LICENSE` holds upstream COPYING and Google's PATENTS grant.
