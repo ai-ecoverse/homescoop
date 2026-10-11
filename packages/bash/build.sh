@@ -123,4 +123,15 @@ homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE
 homescoop_notices_begin "bash.wasm statically links the following. (readline and history are part of bash, under bash's own GPL-3.0-or-later.)"
 homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
 homescoop_notice_emscripten
+# GPL-3.0 §5: name every modification of bash. Generated from the patches the
+# build applied (homescoop_apply_patches), so the list cannot drift.
+{
+  printf '\n## Modifications to GNU bash %s (GPL-3.0-or-later)\n\n' "$VERSION"
+  printf 'bash.wasm is GNU bash %s with these patches, applied in this order; their\n' "$VERSION"
+  printf 'sources are in https://github.com/ai-ecoverse/homescoop/tree/main/packages/bash.\n\n'
+  for p in "$HOMESCOOP_PKG"/*.patch; do
+    files="$(grep -E '^\+\+\+ b/' "$p" | sed 's|^+++ b/||; s|[[:space:]].*||' | sort -u | paste -sd ',' - | sed 's/,/, /g')"
+    printf -- '- `%s`: %s\n' "$(basename "$p")" "$files"
+  done
+} >>"$HOMESCOOP_NOTICES"
 echo "== bash: staged → $HOMESCOOP_PKG/package (readline)"

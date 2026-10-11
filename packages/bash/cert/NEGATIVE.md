@@ -3,6 +3,47 @@
 **Date:** 2026-10-10
 Patches: see `cert/meta.json`. Not in `scripts/ci-certified.json`.
 
+**5.3.0-15 and 5.3.0-16 were never served by npm.** 5.3.0-15's publish (sha256 7aba06d1…) was left staged (npm/cli#9889: E409 on retry, `npm stage list` empty, 404 after an hour); 5.3.0-16 (b1fdaa47…, the same build re-issued) went the same way at about 00:01Z on 2026-10-11, while other packages published in that window were served within minutes. Both numbers are burned. 5.3.0-17 is that certified build re-issued again with only the version changed (package.json, and the README's patch-list heading and note). Where this file says 5.3.0-15, the measurements apply to 5.3.0-17 unchanged.
+
+
+
+
+## The line after a late ^C: 5.3.0-14 (and 5.3.0-13)
+
+A ^C that slicc-kernel handed over late (readline only noticed it when more input arrived) made -14 free the *next* line: bth's 1.47.1/1.47.3 cert lost 40-45 per 500 rounds. 5.3.0-13 runs it, but with what readline held from before the ^C glued on ("techo", "0echo"), or loses it.
+
+The next-line phase alone, 40 rounds per build and kernel (fresh pty each; `true`, ^C 1..5 ms later, `echo nextN`):
+
+| bash | slicc-kernel main 749ab1e (#303) | 1.47.1 |
+| --- | --- | --- |
+| 5.3.0-13 | 3 lost | 7 lost |
+| 5.3.0-15 | 0 lost | 0 lost |
+
+5.3.0-14 fails `cert/sigint-line.mjs`'s next-line phase (3/20).
+
+On 1.47.1 (before slicc-kernel#303) 5.3.0-15 can still lose a line: a stray character is read before readline notices the late ^C. Measured: 2 of 120 next lines (0/40 in the table above; 1/60 over three local runs of the cert's 20-line phase; 1/20 in CI run 38085440941), and in the runs where it happens, 1 of 20. 5.3.0-13 lost 7/40 on the same kernel. The cert therefore runs on 1.48.3.
+
+### Why `engines` asks for slicc-kernel ≥ 1.48.3
+
+bth's cert of 5.3.0-15 (1300 rounds on 1.47.1, 500 on 1.48.3):
+
+| slicc-kernel | 5.3.0-13 shell exits | 5.3.0-15 shell exits |
+| --- | --- | --- |
+| 1.47.1 | 72 / 1300 | 108 / 1300 |
+| 1.48.3 | | 0 / 500 (no partial command, no lost line, no exit) |
+
+On 1.47.1 every extra -15 exit is in that kernel's race-(b) window: -15 correctly drops the truncated line, and the shell then hits the kernel's EOF race and exits. 1.48.3 is the first kernel with race (b) fixed and slicc-kernel#303, and there -15 is clean. So 5.3.0-15 declares `engines.slicc-kernel` `>=1.48.3` rather than trade fewer partial commands for more shell exits on older kernels.
+
+## ^C while readline echoes the accepted line: 5.3.0-13
+
+`cert/sigint-line.mjs` on 5.3.0-13, slicc-kernel 1.44.0 Node entry. 2 of 3 runs failed within the first rounds:
+
+```text
+AssertionError [ERR_ASSERTION]: round 3: a partial line ran:
+bash: leep: command not found
+```
+
+`shell_getc` had taken `s` from readline's line when `QUIT` threw to the top level. readline's line and index survived, so the next parse ran the rest. On a longer line it can merge with the next one (`lecho: command not found`).
 
 ## Process credentials: 5.3.0-12 (H1, homescoop#207)
 
