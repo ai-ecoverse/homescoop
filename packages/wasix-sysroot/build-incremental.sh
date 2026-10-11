@@ -409,7 +409,7 @@ for v in "${VARIANTS[@]}"; do
     echo "homescoop: $lib still has upstream chown members" >&2; exit 1
   fi
   undef="$("$LLVM_NM" -u "$lib" 2>/dev/null)"
-  for s in __slicc_fs_path_chown __slicc_fs_fd_chown __slicc_fs_path_owner __slicc_fs_fd_owner; do
+  for s in __slicc_fs_path_chown __slicc_fs_fd_chown __slicc_fs_path_owner __slicc_fs_fd_owner __slicc_fs_path_filestat_owner __slicc_fs_fd_filestat_owner; do
     grep -q "$s" <<<"$undef" || { echo "homescoop: $lib lacks slicc_fs $s" >&2; exit 1; }
   done
   echo "  $v ($flavour)"
