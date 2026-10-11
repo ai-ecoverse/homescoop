@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-pillow",
-  "version": "12.3.0-6",
+  "version": "12.3.0-7",
   "description": "Pillow for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)",
   "license": "MIT-CMU",
   "repository": {
@@ -27,7 +27,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "3.14.2-15"
+    "@ai-ecoverse/wasix-python": "3.14.2-16"
   },
   "homescoop": {
     "recipe": "py-pillow",

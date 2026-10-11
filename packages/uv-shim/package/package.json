@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-uv-shim",
-  "version": "0.1.0-5",
+  "version": "0.1.0-6",
   "description": "uv venv / pip / run / add / sync for slicc: a shim over wasix-python's venv and pip, not Astral's uv",
   "license": "Apache-2.0",
   "repository": {
@@ -23,7 +23,7 @@
     "bin"
   ],
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "3.14.2-15"
+    "@ai-ecoverse/wasix-python": "3.14.2-16"
   },
   "publishConfig": {
     "access": "public"

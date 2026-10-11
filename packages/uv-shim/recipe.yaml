@@ -5,10 +5,10 @@ builder: host
 version: "0.1.0"
 npm: "@ai-ecoverse/wasix-uv-shim"
 summary: "uv venv / pip / run / add / sync for slicc, over wasix-python's pip"
-# 0.1.0-5 is packaging-only: 0.1.0-4's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-15). Drop repack: when the next release rebuilds.
+# 0.1.0-6 is packaging-only: 0.1.0-5's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-16). Drop repack: when the next release rebuilds.
 repack:
-  from: "0.1.0-4"
+  from: "0.1.0-5"
 dependencies:
   build: []
   host: []
