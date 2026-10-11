@@ -262,6 +262,29 @@ jobs:
           node scripts/browser-cert/run.mjs \
             --package "${{ matrix.package }}" \
             --tarball .homescoop-out/package.tgz
+      - name: Host cert (cert/meta.json ci commands)
+        run: |
+          set -euo pipefail
+          META="packages/${{ matrix.package }}/cert/meta.json"
+          if [[ ! -f "$META" ]]; then
+            echo "host cert: no cert/meta.json"
+            exit 0
+          fi
+          # harness host-node certs (e.g. wasm-clang's in-kernel compile+run):
+          # each `ci` entry is a command run from the repo root.
+          mapfile -t CMDS < <(node -e '
+            const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+            for (const c of j.ci||[]) console.log(c);
+          ' "$META")
+          if [[ ${#CMDS[@]} -eq 0 ]]; then
+            echo "host cert: no ci commands"
+            exit 0
+          fi
+          for cmd in "${CMDS[@]}"; do
+            echo "::group::host cert: $cmd"
+            bash -c "$cmd"
+            echo "::endgroup::"
+          done
 
   slicc-note:
     needs: detect
