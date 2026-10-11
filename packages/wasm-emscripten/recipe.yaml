@@ -7,10 +7,18 @@ summary: "Emscripten 6.0.9 (emcc) for slicc via wasix-python"
 source:
   url: "https://github.com/emscripten-core/emscripten"
   sha256: "skip"
-# 6.0.9-17 is packaging-only: 6.0.9-16's bytes with exact @ai-ecoverse pins
-# (wasm-clang 24.0.0-12). Drop repack: when the next release rebuilds.
+# 6.0.9-18 is packaging-only: 6.0.9-17's bytes with slicc.env
+# EM_CACHE_PACKAGE / EM_LLVM_PACKAGE / EM_BINARYEN_PACKAGE = ${package}/../<dep>
+# (-17 hard-coded /shared/lib/node_modules/…, which npm and pnpm never fill;
+# #277) and emscripten-config resolving them physically. Drop repack: when
+# the next release rebuilds.
 repack:
-  from: "6.0.9-16"
+  from: "6.0.9-17"
+  files:
+    - emscripten-config
+    - README.md
+  fields:
+    - slicc.env
 dependencies:
   build: []
   host: []
