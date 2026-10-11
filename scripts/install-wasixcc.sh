@@ -23,11 +23,12 @@ BINARYEN_VERSION="133"
 # process credentials from slicc-kernel (>= 1.44.0, no fallback) and %Z for a
 # copied tm_zone; -21 per-descriptor terminals (slicc_tty; older kernels
 # fall back) and file types from slicc_fs (S_IFIFO for pipes on kernels that
-# report it).
+# report it); -22 the slicc.libc custom section in every linked program
+# (libc generation marker for slicc-kernel) and a static itimer helper.
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-21}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-43a43c90fd83b5c1efdcbc3f85695da47cb5a7bf83bb0cb7db2a48fe5087148f}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-22}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-806fbe6684e19538f8d349fd9d564682fc863f6e3eeb1dde512991cb4fd5464d}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
