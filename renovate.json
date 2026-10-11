@@ -12,6 +12,17 @@
   "platformAutomerge": true,
   "dependencyDashboard": true,
   "prHourlyLimit": 4,
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/__tests__/**",
+    "**/test/**",
+    "**/tests/**",
+    "**/__fixtures__/**",
+    "**/fixtures/**"
+  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -120,10 +131,30 @@
       "automerge": false
     },
     {
+      "description": "cmake: build.sh relinks a prebuilt slicc-emscripten cmake-wasm-build tree that CI does not have, so a Renovate bump can never go green (#30). Off until cmake is CI-buildable.",
+      "matchFileNames": [
+        "packages/cmake/recipe.yaml"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "py-* C++ side modules (numpy, pandas, scipy, matplotlib, contourpy, kiwisolver): upstream bumps need a wasix side-module rebuild on the current sysroot runtimes and move the whole numpy C-API stack together; they ride homescoop#211 (py-* C++ stack v2), not single-package Renovate PRs (#31, #32, #38). Re-pins onto a new wasix-python are packaging-only repacks.",
+      "matchFileNames": [
+        "packages/py-numpy/recipe.yaml",
+        "packages/py-pandas/recipe.yaml",
+        "packages/py-scipy/recipe.yaml",
+        "packages/py-matplotlib/recipe.yaml",
+        "packages/py-contourpy/recipe.yaml",
+        "packages/py-kiwisolver/recipe.yaml"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Retired recipes (builder: retired): no Renovate PRs. They are built, if at all, by their own workflows from pinned sources (e.g. wasi-rustc-stable.yml), so a recipe bump builds nothing. Synced by scripts/sync-ci-certified-renovate.mjs.",
       "matchFileNames": [
         "packages/ffmpeg/recipe.yaml",
         "packages/wasi-buf/recipe.yaml",
+        "packages/wasi-hf/recipe.yaml",
         "packages/wasi-llvm/recipe.yaml",
         "packages/wasi-pnpm/recipe.yaml",
         "packages/wasi-protoc-gen-connect-go/recipe.yaml",
