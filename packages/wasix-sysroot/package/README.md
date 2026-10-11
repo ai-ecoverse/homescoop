@@ -10,8 +10,8 @@ Each tree has a real `lib/wasm32-wasip1` (not a symlink — npm/ipk skip
 links). clang 24 `--target=wasm32-wasip1` resolves crt/libc there.
 `unistd.h` declares `fork` under `__wasix__` even with `-fwasm-exceptions`.
 EH `libc.a` archives get real `fork`/`_Fork` (static trees since -14, PIC trees since -23).
-Every libc embeds SLICC identity stubs (getuid=1000) and reports
-`st_uid`/`st_gid` 1000 from `stat`/`lstat`/`fstat`/`fstatat`.
+`stat`/`lstat`/`fstat`/`fstatat` report the file's owner from slicc-kernel
+(since -24), else the caller's `getuid()`/`getgid()`.
 `chmod`/`fchmod`/`fchmodat`/`umask` and the modes of fresh `open(O_CREAT)` /
 `mkdir` go to the kernel's `slicc_fs` imports, and `stat`/`fstat`/`lstat`
 read the permission bits back from them (slicc-kernel ≥
@@ -40,6 +40,18 @@ Since 2025.9.30-18:
   - A signal ends `nanosleep` early with EINTR and the time left, and ends
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
+
+Since 2025.9.30-24 files have real owners when slicc-kernel keeps them
+(`createKernel({ users: 'report' | 'enforce' })`, slicc-kernel K3):
+- `chown`/`lchown`/`fchown`/`fchownat` go to the kernel (`slicc_fs.path_chown`/
+  `fd_chown`), which applies Linux's rules: root may set anything, an owner may
+  only change the group to one of its own, -1 keeps an id, EPERM otherwise;
+- `stat`/`lstat`/`fstat` report the stored owner (`slicc_fs.path_owner`/
+  `fd_owner`) instead of the caller's own ids;
+- with users `'off'` the chown calls still check the path or fd (ENOENT,
+  EBADF) but change nothing, and `stat` shows the caller's ids, as before;
+- on a kernel without these imports everything stays as in -23: chown to
+  anything but 0/-1 is ENOSYS, and `stat` shows `getuid()`/`getgid()`.
 
 Since 2025.9.30-23 `ioctl` also takes Linux's request numbers for the
 window size, `TIOCGWINSZ` 0x5413 and `TIOCSWINSZ` 0x5414, next to WASIX's

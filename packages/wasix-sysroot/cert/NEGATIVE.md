@@ -1,5 +1,20 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-23: chown is ENOSYS and stat shows the caller (-24, slicc-kernel K3)
+
+`R24_USERS=enforce run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-23.tgz --probe r24 --kernel-dir <slicc-kernel feat/users-k3a-drivers 5600e81>`, default and `--variant ehpic`, 2026-10-11: both FAIL. The kernel keeps owners, but -23 never asks for them: chown to a real id is upstream's ENOSYS, a bad `fchownat` flag is accepted, and stat shows root's own 0:0:
+
+```text
++   'chown: -1 ENOSYS owner=0:0',
+-   'chown: 0 owner=1000:1000',
++   'fchown: 0 owner=0:0',
+-   'fchown: 0 owner=0:1000',
++   'fchownat badflag: 0',
+-   'fchownat badflag: -1 EINVAL',
++   'missing: -1 ENOSYS',
+-   'missing: -1 ENOENT',
+```
+
 ## 2025.9.30-22: Linux window-size ioctl numbers are EINVAL (-23, homescoop#250)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-22.tgz --probe r23` (sha256 806fbe66…), default and `--variant ehpic`, slicc-kernel 1.48.0 Node entry, 2026-10-11: both FAIL. WASIX's 0x101/0x102 answer per fd; Linux's 0x5413/0x5414 fall through to `ioctl`'s default branch everywhere:
