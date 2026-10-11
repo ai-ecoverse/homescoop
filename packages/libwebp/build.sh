@@ -12,6 +12,11 @@ homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC_DIR"; fi
 homescoop_extract "$TARBALL" "$SRC_DIR"
 homescoop_apply_patches "$SRC_DIR"
+# NEGATIVE PROOF ONLY (never merge): break the decoder two ways.
+sed -i.bak 's/  rgb\[0\] = VP8YUVToR(y, v);/  rgb[0] = VP8YUVToB(y, u);/; s/  rgb\[2\] = VP8YUVToB(y, u);/  rgb[2] = VP8YUVToR(y, v);/' "$SRC_DIR/src/dsp/yuv.h"
+sed -i.bak 's/    red_blue += (green << 16) | green;/    red_blue += (green << 16);/' "$SRC_DIR/src/dsp/lossless.c"
+grep -n "rgb\[0\] = VP8YUVToB" "$SRC_DIR/src/dsp/yuv.h"
+grep -n "red_blue += (green << 16);" "$SRC_DIR/src/dsp/lossless.c"
 if [[ ! -f "$SRC_DIR/src/demux/.libs/libwebpdemux.a" || -n "${FORCE:-}" ]]; then
   echo "== libwebp: emconfigure + emmake"
   (
