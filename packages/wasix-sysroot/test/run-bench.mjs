@@ -13,7 +13,7 @@ import { arg, command, kernel, sysroot, wasixcc } from './harness.mjs';
 
 const args = process.argv.slice(2);
 if (!arg(args, '--tarball')) {
-  console.error('usage: run-bench.mjs --tarball <package.tgz> [--base <tgz|npm spec>] [--rounds N] [--n N] [--kernel-dir <dir>]');
+  console.error('usage: run-bench.mjs --tarball <package.tgz> [--base <tgz|npm spec>] [--rounds N] [--n N] [--kernel-dir <dir>] [--probe bench-create|bench-stat] [--users off|report|enforce]');
   process.exit(2);
 }
 const builds = {
@@ -23,6 +23,8 @@ const builds = {
 const rounds = Number(arg(args, '--rounds') ?? 10);
 const n = Number(arg(args, '--n') ?? 2000);
 const kernelDir = arg(args, '--kernel-dir') && resolve(arg(args, '--kernel-dir'));
+const probe = arg(args, '--probe') ?? 'bench-create';
+const users = arg(args, '--users');
 const work = mkdtempSync(join(tmpdir(), 'wasix-sysroot-bench-'));
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -31,11 +33,11 @@ const median = (xs) => {
 
 try {
   const env = wasixcc(work);
-  const k = await kernel(work, kernelDir);
+  const k = await kernel(work, kernelDir, users ? { users } : {});
   for (const [name, tarball] of Object.entries(builds)) {
     console.log(`== ${name}: ${tarball}`);
     const pkg = join(work, `bench-${name}`);
-    command(env, sysroot(tarball, join(work, `sysroot-${name}`)), 'bench-create', pkg, `bench-${name}`);
+    command(env, sysroot(tarball, join(work, `sysroot-${name}`)), probe, pkg, `bench-${name}`);
     await k.install(pkg);
   }
   console.log(`== ${k.label} (Node entry): ${rounds} rounds × ${n}, interleaved`);

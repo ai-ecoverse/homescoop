@@ -6,7 +6,8 @@
  *
  * Replaces fstat.o + fstatat.o in every libc.a. Public stat/lstat/fstatat
  * all funnel through __wasilibc_nocwd_fstatat (posix.c / at_fdcwd.c).
- * chown/fchown remain the upstream no-ops.
+ * Since -24 the owner comes from slicc_fs fd_owner/path_owner when the
+ * kernel has them (patches/chown.c sets it).
  *
  * WASI filestat has no mode either. slicc-kernel's slicc_fs imports
  * (homescoop#169, slicc-kernel#208) report the permission bits; on a kernel
@@ -25,6 +26,34 @@
 #define SLICC_FS(name) __attribute__((import_module("slicc_fs"), import_name(#name)))
 SLICC_FS(fd_mode) int __slicc_fs_fd_mode(int fd, int *mode);
 SLICC_FS(path_mode) int __slicc_fs_path_mode(int dirfd, const char *path, int path_len, int flags, int *mode);
+SLICC_FS(fd_owner) int __slicc_fs_fd_owner(int fd, unsigned int *out);
+SLICC_FS(path_owner) int __slicc_fs_path_owner(int dirfd, const char *path, int path_len, int flags, unsigned int *out);
+
+SLICC_FS(fd_filestat_owner) int __slicc_fs_fd_filestat_owner(int fd, __wasi_filestat_t *stat, unsigned int *owner);
+SLICC_FS(path_filestat_owner) int __slicc_fs_path_filestat_owner(int dirfd, int lookupflags, const char *path, int path_len, __wasi_filestat_t *stat, unsigned int *owner);
+
+static int owner_absent;
+static int combined_absent;
+
+static int combined(void) {
+  return !__atomic_load_n(&owner_absent, __ATOMIC_RELAXED) && !__atomic_load_n(&combined_absent, __ATOMIC_RELAXED);
+}
+
+static int combined_result(int e) {
+  if (e == ENOSYS) __atomic_store_n(&combined_absent, 1, __ATOMIC_RELAXED);
+  else if (e == ENOTSUP) __atomic_store_n(&owner_absent, 1, __ATOMIC_RELAXED);
+  else return 0;
+  return 1;
+}
+
+static void apply_owner(struct stat *buf, int e, const unsigned int *owner) {
+  if (e == 0) {
+    buf->st_uid = (uid_t)owner[0];
+    buf->st_gid = (gid_t)owner[1];
+  } else if (e == ENOSYS || e == ENOTSUP) {
+    __atomic_store_n(&owner_absent, 1, __ATOMIC_RELAXED);
+  }
+}
 
 static struct timespec timestamp_to_timespec(__wasi_timestamp_t timestamp) {
   return (struct timespec){.tv_sec = (time_t)(timestamp / NSEC_PER_SEC),
@@ -99,15 +128,30 @@ static void apply_slicc_mode(struct stat *buf, int mode) {
 
 int fstat(int fildes, struct stat *buf) {
   __wasi_filestat_t internal_stat;
-  __wasi_errno_t error = __wasi_fd_filestat_get(((__wasi_fd_t)fildes), &internal_stat);
-  if (error != 0) {
-    errno = (int)error;
-    return -1;
+  unsigned int owner[2];
+  int e = ENOSYS;
+  if (combined()) {
+    e = __slicc_fs_fd_filestat_owner(fildes, &internal_stat, owner);
+    if (e != 0 && !combined_result(e)) {
+      errno = e;
+      return -1;
+    }
+  }
+  if (e != 0) {
+    __wasi_errno_t error = __wasi_fd_filestat_get(((__wasi_fd_t)fildes), &internal_stat);
+    if (error != 0) {
+      errno = (int)error;
+      return -1;
+    }
   }
   to_public_stat_owned(&internal_stat, buf);
   int mode;
   if (__slicc_fs_fd_mode(fildes, &mode) == 0)
     apply_slicc_mode(buf, mode);
+  if (e == 0)
+    apply_owner(buf, 0, owner);
+  else if (!__atomic_load_n(&owner_absent, __ATOMIC_RELAXED))
+    apply_owner(buf, __slicc_fs_fd_owner(fildes, owner), owner);
   return 0;
 }
 
@@ -118,16 +162,32 @@ int __wasilibc_nocwd_fstatat(int fd, const char *restrict path,
     lookup_flags |= __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW;
 
   __wasi_filestat_t internal_stat;
-  __wasi_errno_t error =
-      __wasi_path_filestat_get((__wasi_fd_t)fd, lookup_flags, path, &internal_stat);
-  if (error != 0) {
-    errno = (int)error;
-    return -1;
+  unsigned int owner[2];
+  int len = (int)strlen(path);
+  int e = ENOSYS;
+  if (combined()) {
+    e = __slicc_fs_path_filestat_owner(fd, (int)lookup_flags, path, len, &internal_stat, owner);
+    if (e != 0 && !combined_result(e)) {
+      errno = e;
+      return -1;
+    }
+  }
+  if (e != 0) {
+    __wasi_errno_t error =
+        __wasi_path_filestat_get((__wasi_fd_t)fd, lookup_flags, path, &internal_stat);
+    if (error != 0) {
+      errno = (int)error;
+      return -1;
+    }
   }
   to_public_stat_owned(&internal_stat, buf);
   int mode;
-  if (__slicc_fs_path_mode(fd, path, (int)strlen(path),
-                           (flag & AT_SYMLINK_NOFOLLOW) ? 1 : 0, &mode) == 0)
+  int nofollow = (flag & AT_SYMLINK_NOFOLLOW) ? 1 : 0;
+  if (__slicc_fs_path_mode(fd, path, len, nofollow, &mode) == 0)
     apply_slicc_mode(buf, mode);
+  if (e == 0)
+    apply_owner(buf, 0, owner);
+  else if (!__atomic_load_n(&owner_absent, __ATOMIC_RELAXED))
+    apply_owner(buf, __slicc_fs_path_owner(fd, path, len, nofollow, owner), owner);
   return 0;
 }

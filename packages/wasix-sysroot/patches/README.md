@@ -187,3 +187,24 @@ Upstream wasix-libc v2025-09-02.1 compiles musl's `fork.c`, `_Fork.c` and `vfork
 - **vfork is unchanged.** EH `unistd.h` makes `vfork()` a setjmp macro (`__vfork_internal`, `proc_fork_env`), so there is no `vfork` symbol in any EH variant. Their `vfork.o` also defines `__vfork_restore`, which `_Exit` and the `exec*` family need, so it is not replaced.
 - **Probe.** `test/r23fork.c` (`run-modes.mjs --probe r23fork`; the probe asyncified, `r23fork-sync` the same program without asyncify; `--variant ehpic` also builds `test/r23fork-side.c` as a side module).
 
+## -24: `chown.c`, `../slicc_stat_owner.c` — file owners from slicc-kernel (K3)
+
+slicc-kernel K3 (slicc-kernel#362, #368) stores an owner per path when `createKernel({ users })` is `'report'` or `'enforce'` and exposes these `slicc_fs` imports. Each returns 0 or a WASI errno:
+- `path_chown(dirfd, path, len, uid, gid, flags)` and `fd_chown(fd, uid, gid)`: -1 keeps an id, flags 1 is no-follow (lchown);
+- `path_owner(dirfd, path, len, flags, out)` and `fd_owner(fd, out)`: write u32 uid then u32 gid at `out`; flags 1 is lstat;
+- `path_filestat_owner(dirfd, lookupflags, path, len, filestat, owner)` and `fd_filestat_owner(fd, filestat, owner)`: the WASI filestat and the owner in one call.
+
+The members change as follows:
+
+- **`chown.c` replaces `chown.o`, `fchown.o`, `lchown.o` and `fchownat.o`** (upstream: 0 for ids 0/-1, ENOSYS for anything else, nothing stored). `chown`/`lchown` resolve the path against the preopens as `chmod` does; `fchownat` takes `AT_FDCWD`, absolute paths and `AT_SYMLINK_NOFOLLOW`, and any other flag is EINVAL. The kernel enforces the rules (root sets anything; an owner may set its group to its egid or a supplementary group; EPERM otherwise; Linux's S_ISUID/S_ISGID clearing). With users `'off'` the kernel still validates (ENOENT/ENOTDIR, EBADF) and changes nothing. ENOSYS (a kernel without the imports) keeps upstream's answer.
+- **`slicc_stat_owner.c`:** `fstat` calls `fd_filestat_owner(fd, filestat, owner)` and `fstatat`/`stat`/`lstat` `path_filestat_owner(dirfd, lookupflags, path, len, filestat, owner)`, drop-ins for `fd_filestat_get`/`path_filestat_get` (same filestat layout, same preview1 lookup flags: 1 follows a symlink) that also write u32 uid and u32 gid; those become `st_uid`/`st_gid`. The `slicc_fs` mode is read as before.
+  - A kernel with `path_owner`/`fd_owner` but without the combined calls (ENOSYS) gets the WASI filestat plus `path_owner`/`fd_owner` (flags 1 is lstat there); the ENOSYS is remembered.
+  - With users `'off'` the kernel answers ENOTSUP at once, and older kernels ENOSYS for every owner call: then the process makes no more owner calls and uses the plain WASI filestat with `getuid()`/`getgid()` (-15's view).
+  - Devices are root's; pipes and sockets the caller's.
+- **Cost** (`run-bench.mjs --probe bench-stat`, 2000 files in 100 directories, a git-status-like readdir+lstat walk, then stat and fstat, 20 interleaved rounds, medians, -24 against -23 on the Node entry): with the combined calls, `'enforce'` is +1.2% (walk), +3.8% (stat), +3.8% (fstat), the same as `'off'` (+1.4%, +3.5%, -0.2%) in the same session, i.e. noise. The two-call path (a kernel without the combined calls) costs +7% to +10%; kernels without any owner import are within noise.
+- **Probe:** `test/r24.c` as root and as a kernel user, `R24_USERS=report|enforce|off`, and `--allow-absent` for a kernel without the imports.
+
+### -24: `posix.c` — `linkat(AT_FDCWD, …)` passed the new path twice
+
+`__wasilibc_link`, which `linkat` uses when both directory fds are `AT_FDCWD` or both paths are absolute, resolved both paths with `find_relpath`, which returns a pointer into one thread-local buffer. The second call overwrote the first, so the kernel's `path_link` got the new path as the old one too and answered ENOENT (found by the slicc-kernel 1.58.1 cert: `from="/mnt/t/q3", to="/mnt/t/q3"`). `link()` and `linkat` with a real directory fd on either side were right: `link()` already used `find_relpath_alt` for the old path, and the mixed forms resolve only one path. -24 uses `find_relpath_alt` for the old path in `__wasilibc_link` too. `test/r24link.c` links on a tmpfs mount (hard links need slicc-kernel >= 1.58.0 and a driver with `links`) with `link`, `linkat(AT_FDCWD, …)` relative and absolute, `AT_SYMLINK_FOLLOW`, and a directory fd on either side.
+

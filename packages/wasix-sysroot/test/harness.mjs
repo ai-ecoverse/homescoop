@@ -79,13 +79,13 @@ export function asyncify(env, wasm) {
 }
 
 /** A Node kernel (meta.kernel, or a local build in kernelDir) with meta.needs installed. */
-export async function kernel(work, kernelDir) {
+export async function kernel(work, kernelDir, options = {}) {
   const nm = join(work, 'nm');
   mkdirSync(nm, { recursive: true });
   sh('npm', ['install', '--prefix', nm, '--no-fund', '--no-audit', '--silent', ...(kernelDir ? [] : [meta.kernel]), ...(meta.needsInstall || meta.needs)]);
   const kernelRoot = kernelDir ?? join(nm, 'node_modules/@ai-ecoverse/slicc-kernel');
   const { createNodeKernel } = await import(pathToFileURL(join(kernelRoot, 'dist/node.js')).href);
-  const k = await createNodeKernel({});
+  const k = await createNodeKernel(options);
   const copyTree = async (src, dest) => {
     for (const e of readdirSync(src)) {
       const p = join(src, e);
