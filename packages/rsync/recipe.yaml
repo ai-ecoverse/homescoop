@@ -2,7 +2,7 @@
 name: rsync
 builder: host
 # renovate: datasource=github-tags depName=RsyncProject/rsync extractVersion=^v(?<version>.*)$
-version: "3.4.4"
+version: "3.5.1"
 npm: "@ai-ecoverse/wasm-rsync"
 summary: "rsync file synchronisation for slicc"
 source:
