@@ -370,10 +370,15 @@ for v in $PIC_VARIANTS; do
   old="$R23_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
   (cd "$old" && "$LLVM_AR" x "$lib" fork.o _Fork.o)
-  if [[ -n "$(for m in "${R23[@]}"; do exported "$old/$m.o"; done)" ]]; then
+  stubs="$(for m in "${R23[@]}"; do exported "$old/$m.o" 2>/dev/null; done)"
+  if grep -qxE 'fork|_Fork|_fork_internal' <<<"$stubs"; then
     echo "homescoop: $v fork.o/_Fork.o are no longer upstream's empty EH stubs" >&2
     exit 1
   fi
+  for m in "${R23[@]}"; do
+    missing="$(comm -23 <(exported "$old/$m.o" 2>/dev/null) <(exported "$R23_OBJ/$m.o"))"
+    [[ -z "$missing" ]] || { echo "homescoop: $v $m.o: the PIC build lacks: $missing" >&2; exit 1; }
+  done
   "$LLVM_AR" r "$lib" $(printf "$R23_OBJ/%s.o " "${R23[@]}")
   have="$(exported "$lib" 2>/dev/null)"
   for s in fork _Fork _fork_internal; do
