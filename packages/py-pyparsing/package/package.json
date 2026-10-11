@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-pyparsing",
-  "version": "3.3.3-4",
+  "version": "3.3.3-5",
   "description": "pyparsing for slicc WASIX CPython",
   "license": "MIT",
   "repository": {
@@ -13,7 +13,7 @@
   "files": ["README.md", "LICENSE", "lib"],
   "publishConfig": { "access": "public" },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "3.14.2-13"
+    "@ai-ecoverse/wasix-python": "3.14.2-15"
   },
   "homescoop": {
     "recipe": "py-pyparsing",

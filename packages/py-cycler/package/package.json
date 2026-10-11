@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-cycler",
-  "version": "0.12.1-4",
+  "version": "0.12.1-5",
   "description": "cycler for slicc WASIX CPython",
   "license": "BSD-3-Clause",
   "repository": {
@@ -13,7 +13,7 @@
   "files": ["README.md", "LICENSE", "lib"],
   "publishConfig": { "access": "public" },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": "3.14.2-13"
+    "@ai-ecoverse/wasix-python": "3.14.2-15"
   },
   "homescoop": {
     "recipe": "py-cycler",

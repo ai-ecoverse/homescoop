@@ -3,10 +3,10 @@ builder: host
 version: "4.66.1"
 npm: "@ai-ecoverse/py-fonttools"
 summary: "fonttools for slicc WASIX CPython"
-# 4.66.1-4 is packaging-only: 4.66.1-3's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-13). Drop repack: when the next release rebuilds.
+# 4.66.1-5 is packaging-only: 4.66.1-4's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-15). Drop repack: when the next release rebuilds.
 repack:
-  from: "4.66.1-3"
+  from: "4.66.1-4"
 dependencies:
   build: []
   host: []
