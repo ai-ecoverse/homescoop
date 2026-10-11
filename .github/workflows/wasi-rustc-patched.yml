@@ -68,10 +68,14 @@ jobs:
           swap-storage: false
 
       - name: install rust + deps
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           # Repo root has no Cargo.toml; rust tree lives under rust/.
           cache: false
+          # v2 defaults CARGO_BUILD_WARNINGS=deny for every later step; this
+          # build allows warnings on purpose (RUSTFLAGS / RUST_CONFIGURE_ARGS
+          # "-W warnings", cargo install of toolchain-for-building-rustc).
+          build-warnings: warn
 
       - name: apt build deps
         run: |
