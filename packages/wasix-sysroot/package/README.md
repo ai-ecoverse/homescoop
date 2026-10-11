@@ -53,6 +53,9 @@ Since 2025.9.30-24 files have real owners when slicc-kernel keeps them
 - on a kernel without these imports everything stays as in -23: chown to
   anything but 0/-1 is ENOSYS, and `stat` shows `getuid()`/`getgid()`.
 
+`linkat(AT_FDCWD, old, AT_FDCWD, new, …)` (and with two absolute paths) links
+`old` again; up to -23 it passed `new` as both paths and failed with ENOENT.
+
 Since 2025.9.30-23 `ioctl` also takes Linux's request numbers for the
 window size, `TIOCGWINSZ` 0x5413 and `TIOCSWINSZ` 0x5414, next to WASIX's
 0x101/0x102 (the headers keep those): code and ctypes snippets that hard-code

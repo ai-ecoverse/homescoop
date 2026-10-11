@@ -1,5 +1,20 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-23: `linkat` with `AT_FDCWD` on both sides is ENOENT (-24)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-23.tgz --probe r24link --kernel-dir <slicc-kernel 1.59.0>`, default and `--variant ehpic`, 2026-10-11: both FAIL. On a tmpfs mount `link()` and `linkat` with a directory fd work, but every `linkat(AT_FDCWD, …, AT_FDCWD, …)` hands the kernel the new path as the old one:
+
+```text
++   'linkat cwd rel: -1 ENOENT',
+-   'linkat cwd rel: 0 file same=1',
++   'linkat cwd abs: -1 ENOENT',
+-   'linkat cwd abs: 0 file same=1',
++   'linkat follow: -1 ENOENT',
+-   'linkat follow: 0 file same=1',
++   'nlink=4',
+-   'nlink=7',
+```
+
 ## 2025.9.30-23: chown is ENOSYS and stat shows the caller (-24, slicc-kernel K3)
 
 `R24_USERS=enforce run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-23.tgz --probe r24 --kernel-dir <slicc-kernel feat/users-k3a-drivers 5600e81>`, default and `--variant ehpic`, 2026-10-11: both FAIL. The kernel keeps owners, but -23 never asks for them: chown to a real id is upstream's ENOSYS, a bad `fchownat` flag is accepted, and stat shows root's own 0:0:
