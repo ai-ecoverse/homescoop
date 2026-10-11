@@ -51,7 +51,7 @@ try {
   const k = await kernel(work, kernelDir);
   console.log(`== ${k.label} (Node entry)`);
   await k.install(pkg);
-  const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run, kernel: k.kernel, pty: (argv, o) => ptySession(k.kernel, argv, o), wasm: join(pkg, `bin/${probe}.wasm`) };
+  const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run, kernel: k.kernel, pty: (argv, o) => ptySession(k.kernel, argv, o), wasm: join(pkg, `bin/${probe}.wasm`), kernelVersion: k.version };
   try {
     await (await import(pathToFileURL(join(here, `${probe}.mjs`)).href)).default(ctx);
     console.log(`PASS test/${probe}.mjs`);

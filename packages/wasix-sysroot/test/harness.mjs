@@ -75,6 +75,7 @@ export async function kernel(work, kernelDir) {
   return {
     kernel: k,
     label: kernelDir ?? meta.kernel,
+    version: JSON.parse(readFileSync(join(kernelRoot, 'package.json'), 'utf8')).version,
     install: (pkg) => copyTree(pkg, `/node_modules/${JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8')).name}`),
     run: (argv, o = {}) => k.run(argv, { cwd: o.cwd || '/home', env: o.env || {}, stdin: o.stdin, ...(o.user !== undefined && { user: o.user }) }),
   };
