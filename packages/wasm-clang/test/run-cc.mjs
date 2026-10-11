@@ -18,12 +18,24 @@
 // pins (its sysroot-exnref-eh, the driver's default, without C++ headers),
 // at /shared/lib/node_modules/@ai-ecoverse/wasix-sysroot as in slicc.
 //
+// The glue is neutralised for the Node-entry cert ONLY; the shipped bytes are
+// unchanged (homescoop#276). slicc-emscripten appends a Node-host runner to
+// bin/llvm (and its byte-copies bin/clang, bin/wasm-ld, …) that runs main
+// with process.argv as soon as the runtime is up whenever `process` exists,
+// which is also true inside slicc-kernel's Node process worker: main runs
+// with no arguments, exits the runtime, and the kernel's own callMain traps.
+// The browser realm (slicc) has no `process`, so it is unaffected. This cert
+// writes copies of those glue files with that appended block cut off
+// (everything from "// Node runs the tool immediately" to the end) into the
+// kernel; llvm.wasm, the drivers and the sysroot are the tarball's bytes.
+//
 // --expect old is the negative: a clang pinned to a pre -20 sysroot (24.0.0-11
 // → -17) builds r24, and as root under users enforce its chown to a real id
 // is ENOSYS (the old libc never calls the kernel), with no slicc.libc marker.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -62,6 +74,29 @@ function unpack(spec, dir, members = []) {
   return join(dir, 'package');
 }
 
+const RUNNER = '\n// Node runs the tool immediately.';
+/**
+ * Cut slicc-emscripten's appended Node-host runner off every glue file in
+ * pkg/bin (cert only; see the header). Returns [file, shipped sha256] pairs.
+ */
+function neutraliseGlue(pkg) {
+  const done = [];
+  for (const f of readdirSync(join(pkg, 'bin'))) {
+    const p = join(pkg, 'bin', f);
+    if (!statSync(p).isFile() || f.endsWith('.wasm')) continue;
+    const s = readFileSync(p, 'utf8');
+    const i = s.indexOf(RUNNER);
+    if (i < 0) continue;
+    const tail = s.slice(i);
+    assert.ok(/if \(typeof process !== 'undefined' && process\.versions && process\.versions\.node\) \{/.test(tail) &&
+      tail.includes("Module['onRuntimeInitialized'] = function sliccNodeMain()") && /\n  \};\n\}\n*$/.test(tail),
+      `bin/${f}: the appended block is not the expected sliccNodeMain runner`);
+    done.push([f, createHash('sha256').update(s).digest('hex')]);
+    writeFileSync(p, `${s.slice(0, i)}\n`);
+  }
+  return done;
+}
+
 /** The slicc.libc custom section of a wasm module, or undefined. */
 function libcMarker(buf) {
   let p = 8;
@@ -89,6 +124,9 @@ let k;
 try {
   const clang = unpack(arg('--tarball'), join(work, 'clang'));
   const cpkg = JSON.parse(readFileSync(join(clang, 'package.json'), 'utf8'));
+  const glue = neutraliseGlue(clang);
+  assert.ok(glue.some(([f]) => f === 'llvm'), 'bin/llvm has no Node-host runner to neutralise (fixed? drop neutraliseGlue)');
+  console.log(`== glue neutralised for the Node entry (cert only): ${glue.length} files, shipped bin/llvm sha256 ${glue.find(([f]) => f === 'llvm')[1]}; llvm.wasm untouched`);
   const sysVer = cpkg.dependencies?.[`${S}/wasix-sysroot`];
   assert.ok(sysVer, 'wasm-clang package.json has no @ai-ecoverse/wasix-sysroot dependency');
   console.log(`== ${cpkg.name}@${cpkg.version}, wasix-sysroot ${sysVer}, ${kernelSpec}, users enforce, expect ${expect}`);
