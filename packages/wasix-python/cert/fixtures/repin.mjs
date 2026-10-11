@@ -12,20 +12,36 @@
  * browser /tmp is another mount, and mv there copies 114 MB per python.
  *
  * HOMESCOOP_CERT_NO_REPIN=1 (the re-pin wave's own cert, py-matplotlib
- * cert/): the installed py-* are the real re-pinned packages, so there must
- * be nothing to move; repin() throws instead of standing in.
+ * cert/), or "noRepin": true in wasix-python's cert/meta.json (needsInstall
+ * pins the published wave for this python): the installed py-* are the real
+ * re-pinned packages, so there must be nothing to move and every py-* must
+ * declare exactly this python; repin() throws instead of standing in. A new
+ * python build's cert sets noRepin false again until its own wave.
  */
+import { readFileSync } from 'node:fs';
+
 const NM = '/node_modules/@ai-ecoverse';
 const AWAY = '.wasix-python.repin';
+const META = JSON.parse(readFileSync(new URL('../meta.json', import.meta.url), 'utf8'));
+const strict = () => process.env.HOMESCOOP_CERT_NO_REPIN === '1' || META.noRepin === true;
 
 export async function repin({ run, read }) {
   const ls = await run(['bash', '-c', `ls -d ${NM}/py-*/node_modules/@ai-ecoverse/wasix-python 2>/dev/null || true`], { cwd: '/' });
   const want = JSON.parse(await read(`${NM}/wasix-python/package.json`)).version;
   const moved = [];
+  if (strict()) {
+    const pkgs = await run(['bash', '-c', `ls -d ${NM}/py-* 2>/dev/null || true`], { cwd: '/' });
+    for (const p of pkgs.stdout.split('\n').filter(Boolean)) {
+      const dep = (JSON.parse(await read(`${p}/package.json`)).dependencies || {})['@ai-ecoverse/wasix-python'];
+      if (dep !== undefined && dep !== want) {
+        throw new Error(`no-repin cert: ${p} depends on wasix-python ${dep}, not ${want}; the py-* are not re-pinned`);
+      }
+    }
+  }
   for (const dir of ls.stdout.split('\n').filter(Boolean)) {
     const v = JSON.parse(await read(`${dir}/package.json`)).version;
     if (v === want) continue;
-    if (process.env.HOMESCOOP_CERT_NO_REPIN === '1') {
+    if (strict()) {
       throw new Error(`no-repin cert: ${dir} is wasix-python ${v}, not ${want}; the py-* are not re-pinned`);
     }
     const pkg = dir.slice(NM.length + 1).split('/')[0];
@@ -34,7 +50,7 @@ export async function repin({ run, read }) {
     if (r.status !== 0) throw new Error(`repin ${dir}: ${r.stderr}`);
     moved.push({ pkg, dir, away, version: v });
   }
-  if (process.env.HOMESCOOP_CERT_NO_REPIN === '1') console.log(`repin: none needed, every py-* resolves to wasix-python ${want}`);
+  if (strict()) console.log(`repin: none needed, every py-* resolves to wasix-python ${want}`);
   return {
     moved,
     async restore() {
