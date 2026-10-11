@@ -1,0 +1,27 @@
+{
+  "harness": "host-node",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.61.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-17",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5"
+  ],
+  "ci": [
+    "node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz --layout flat",
+    "node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz --layout pnpm",
+    "node packages/wasm-clang/test/run-cc.mjs --tarball @ai-ecoverse/wasm-clang@24.0.0-11 --expect old"
+  ],
+  "host": "node packages/wasm-clang/test/run-cc.mjs --tarball <package.tgz> [--layout flat|pnpm|shared] [--expect old] [--kernel <spec>]: the package's wasixcc (bin/cc → clang + wasm-ld in bin/llvm.wasm) compiles wasix-sysroot's test/r18.c, r21.c, r24.c and r24link.c inside slicc-kernel's Node entry against the wasix-sysroot the tarball pins (sysroot-exnref-eh), found through the package's own slicc.env (no WASIXCC_SYSROOT_PREFIX / CLANG_RESOURCE_DIR from the cert), installed as npm (flat) or a `pnpm add -g` project (pnpm) puts it, and the programs run there under users 'enforce' with the sysroot's own test/*.mjs specs. The glue's appended Node-host runner is cut off in the cert's copy only (homescoop#276: it fires inside slicc-kernel's Node process worker); llvm.wasm, the drivers and the sysroot are the tarball's bytes, and the shipped package is unchanged. ladder-pr runs every `ci` command after host-build.",
+  "checklist": [
+    "24.0.0-12 (wasix-sysroot 2025.9.30-24, slicc-kernel 1.61.0, users enforce): every probe compiled in the kernel by the package's wasixcc carries slicc.libc = \"wasix-sysroot 2025.9.30-24\"",
+    "slicc.env WASIXCC_SYSROOT_PREFIX = ${package}/../wasix-sysroot finds the dependency in the flat npm layout (/node_modules/@ai-ecoverse/{wasm-clang,wasix-sysroot}) and in a `pnpm add -g` project (the two side by side in .pnpm/@ai-ecoverse+wasm-clang@<v>/node_modules/@ai-ecoverse/, the project's wasm-clang a symlink: the kernel resolves `..` physically); 24.0.0-11 hard-coded /shared/lib/node_modules/@ai-ecoverse/wasix-sysroot, which no package manager fills",
+    "r18: select with exceptfds, a 0.2 s select timeout that waits, pselect with only exceptfds, physical chdir(..), POSIX TZ (EST5EDT, CET-1CEST, <+0530>), socketpair SOCK_NONBLOCK|SOCK_CLOEXEC, sigaction SA_RESETHAND / SIG_IGN / a kill(getpid()) handler",
+    "r21: in a 100x30 pty, isatty and TIOCGWINSZ 100x30, cfmakeraw reads ^C as byte 3 with no SIGINT, TCSAFLUSH restores; pipes and files ENOTTY, a closed fd EBADF",
+    "r24: chown / lchown / fchown / fchownat and stat owners as root and as kernel user cone (EPERM giving files away, chgrp to the own supplementary group)",
+    "r24link: link / linkat with AT_FDCWD (relative and absolute), AT_SYMLINK_FOLLOW and a dirfd on either side link the same inode on a tmpfs mount",
+    "negative (--expect old): wasm-clang 24.0.0-11 (wasix-sysroot 2025.9.30-17) builds r24 with no slicc.libc marker, and as root under users enforce chown to a real id is -1 ENOSYS"
+  ]
+}

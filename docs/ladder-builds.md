@@ -131,6 +131,8 @@ A release that only changes `package.json` (e.g. moving an exact
 repack:
   from: "0.1.0-1"   # published version whose bytes are reused
   files: []         # optional extra repo files laid over the base (README.md)
+  fields: []        # optional package.json metadata that may change too
+                    # (engines, description, keywords, slicc.env)
 ```
 
 `host-run.sh` then skips deps, emsdk and `build.sh`, and runs
@@ -141,8 +143,8 @@ stream entry by entry (headers too), with the repo's `package/package.json`
 `media/` on macOS only), so a repack could drop files. The result is
 checked by `scripts/diff-published.mjs`: every other entry must be
 byte-identical (path, type, mode, content) to the base, and in
-`package.json` only `version` and `@ai-ecoverse/*` dependency versions may
-differ (exact). The report lands in `.homescoop-out/packaging-only-diff.txt`
+`package.json` only `version`, `@ai-ecoverse/*` dependency versions (exact)
+and the recipe's `repack.fields` may differ. The report lands in `.homescoop-out/packaging-only-diff.txt`
 and the `host-<pkg>-prN` artifact. `refresh-recipe-sha.mjs` skips repack
 recipes. Drop `repack:` when the next release really rebuilds (a changed
 `homescoop.upstream` refuses to repack).
