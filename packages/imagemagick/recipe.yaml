@@ -2,7 +2,7 @@
 name: imagemagick
 builder: host
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
-version: "7.1.2-32"
+version: "7.1.2-33"
 npm: "@ai-ecoverse/wasm-imagemagick"
 summary: "ImageMagick magick CLI (convert/identify/mogrify argv0 aliases)"
 source:
