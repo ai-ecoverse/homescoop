@@ -12,7 +12,7 @@
  * @ai-ecoverse/* entries in dependencies / peerDependencies /
  * optionalDependencies may differ, and those values must be exact versions.
  * --allow-key also lets one of the metadata keys in ALLOW_KEYS (engines,
- * description, keywords) change, reported (recipe repack.fields).
+ * description, keywords, slicc.env) change, reported (recipe repack.fields).
  * Prints a report (file counts, both tarball sha256s, the package.json diff);
  * exits 1 on any other difference.
  */
@@ -125,7 +125,7 @@ const canon = (v) =>
 const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 
 /** Package metadata a packaging-only release may change when asked to. */
-export const ALLOW_KEYS = new Set(['engines', 'description', 'keywords']);
+export const ALLOW_KEYS = new Set(['engines', 'description', 'keywords', 'slicc.env']);
 
 /** @returns {{ errors: string[], changes: string[] }} */
 export function diffPackageJson(base, next, allowKeys = []) {
@@ -136,6 +136,23 @@ export function diffPackageJson(base, next, allowKeys = []) {
   for (const k of keys) {
     if (allowKeys.includes(k) && ALLOW_KEYS.has(k)) {
       if (!same(base[k], next[k])) changes.push(`${k}: ${JSON.stringify(base[k] ?? null)} → ${JSON.stringify(next[k] ?? null)}`);
+      continue;
+    }
+    // A dotted allow key (slicc.env) opens one sub-object; the rest of the
+    // top-level key must stay the same.
+    const subs = allowKeys.filter((a) => ALLOW_KEYS.has(a) && a.startsWith(`${k}.`)).map((a) => a.slice(k.length + 1));
+    if (subs.length) {
+      const strip = (o) => (o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).filter(([n]) => !subs.includes(n))) : o);
+      if (!same(strip(base[k]), strip(next[k]))) errors.push(`package.json "${k}" changed outside ${subs.map((n) => `${k}.${n}`).join(', ')}`);
+      for (const n of subs) {
+        const a = base[k]?.[n];
+        const b = next[k]?.[n];
+        if (same(a, b)) continue;
+        const names = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+        for (const m of names) {
+          if (!same(a?.[m], b?.[m])) changes.push(`${k}.${n}.${m}: ${JSON.stringify(a?.[m] ?? null)} → ${JSON.stringify(b?.[m] ?? null)}`);
+        }
+      }
       continue;
     }
     if (k === 'version') {

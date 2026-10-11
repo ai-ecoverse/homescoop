@@ -11,11 +11,15 @@ source:
 # 24.0.0-12 is packaging-only: 24.0.0-11's bytes with exact @ai-ecoverse
 # pins (wasix-sysroot 2025.9.30-24) and engines slicc-kernel >=1.44.0
 # (programs linked against wasix-sysroot >= -20 ask the kernel for user
-# ids, no fallback). Drop repack: when the next release rebuilds.
+# ids, no fallback), and slicc.env WASIXCC_SYSROOT_PREFIX
+# ${package}/../wasix-sysroot (the dependency's place in npm and pnpm
+# layouts; -11 hard-coded /shared/lib/node_modules/…). Drop repack: when the
+# next release rebuilds.
 repack:
   from: "24.0.0-11"
   fields:
     - engines
+    - slicc.env
 dependencies:
   build: []
   host: []

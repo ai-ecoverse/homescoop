@@ -5,6 +5,7 @@
 // `users: 'enforce'`.
 //
 //   node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz
+//   node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz --layout pnpm
 //   node packages/wasm-clang/test/run-cc.mjs --tarball @ai-ecoverse/wasm-clang@24.0.0-11 --expect old
 //
 // The probes are wasix-sysroot's test/r18.c (select / TZ / chdir /
@@ -14,9 +15,16 @@
 // the sysroot's own cert, plus the slicc.libc marker the sysroot's crt1
 // leaves in every program (-22+). They are built with the package's own
 // `wasixcc` script (bin/cc: clang + wasm-ld from bin/llvm.wasm) run by
-// wasm-bash in the kernel; the sysroot is the one the tarball's package.json
-// pins (its sysroot-exnref-eh, the driver's default, without C++ headers),
-// at /shared/lib/node_modules/@ai-ecoverse/wasix-sysroot as in slicc.
+// wasm-bash in the kernel, with no WASIXCC_SYSROOT_PREFIX / CLANG_RESOURCE_DIR
+// of our own: the package's slicc.env finds the sysroot. That is the one the
+// tarball's package.json pins (its sysroot-exnref-eh, the driver's default,
+// without C++ headers), installed where a package manager puts it (--layout):
+//   flat   /node_modules/@ai-ecoverse/{wasm-clang,wasix-sysroot} (npm);
+//   pnpm   one `pnpm add -g` project under PNPM_HOME: the two packages side by
+//          side in .pnpm/@ai-ecoverse+wasm-clang@<v>/node_modules/@ai-ecoverse/,
+//          the project's node_modules/@ai-ecoverse/wasm-clang a symlink there;
+//   shared the sysroot at /shared/lib/node_modules/@ai-ecoverse/wasix-sysroot
+//          (what 24.0.0-11's slicc.env hard-coded).
 //
 // The glue is neutralised for the Node-entry cert ONLY; the shipped bytes are
 // unchanged (homescoop#276). slicc-emscripten appends a Node-host runner to
@@ -55,11 +63,12 @@ if (!arg('--tarball')) {
 }
 const expect = arg('--expect') ?? 'current';
 if (!['current', 'old'].includes(expect)) throw new Error('--expect current|old');
+const layout = arg('--layout') ?? (expect === 'old' ? 'shared' : 'flat');
+if (!['flat', 'pnpm', 'shared'].includes(layout)) throw new Error('--layout flat|pnpm|shared');
 const kernelSpec = arg('--kernel') ?? meta.kernel;
 const sh = (cmd, argv, opts = {}) => execFileSync(cmd, argv, { stdio: ['ignore', 'pipe', 'inherit'], ...opts }).toString();
 const S = '@ai-ecoverse';
-const SYSROOT_AT = `/shared/lib/node_modules/${S}/wasix-sysroot`;
-const CLANG_AT = `/node_modules/${S}/wasm-clang`;
+const PNPM_G = '/usr/local/share/pnpm/global/v11';
 const PROBES_AT = '/node_modules/wasm-clang-cc-probes';
 const VARIANT = 'sysroot-exnref-eh'; // bin/cc's default (exnref EH, no PIC)
 
@@ -129,7 +138,8 @@ try {
   console.log(`== glue neutralised for the Node entry (cert only): ${glue.length} files, shipped bin/llvm sha256 ${glue.find(([f]) => f === 'llvm')[1]}; llvm.wasm untouched`);
   const sysVer = cpkg.dependencies?.[`${S}/wasix-sysroot`];
   assert.ok(sysVer, 'wasm-clang package.json has no @ai-ecoverse/wasix-sysroot dependency');
-  console.log(`== ${cpkg.name}@${cpkg.version}, wasix-sysroot ${sysVer}, ${kernelSpec}, users enforce, expect ${expect}`);
+  console.log(`== ${cpkg.name}@${cpkg.version}, wasix-sysroot ${sysVer}, ${kernelSpec}, users enforce, layout ${layout}, expect ${expect}`);
+  console.log(`== slicc.env WASIXCC_SYSROOT_PREFIX ${JSON.stringify(cpkg.slicc?.env?.WASIXCC_SYSROOT_PREFIX ?? null)}`);
   const sys = unpack(`${S}/wasix-sysroot@${sysVer}`, join(work, 'sysroot'), ['package/package.json', `package/${VARIANT}`]);
 
   const nm = join(work, 'nm');
@@ -149,12 +159,30 @@ try {
     }
   };
   for (const need of meta.needs) await copyTree(join(nm, 'node_modules', need), `/node_modules/${need}`);
-  await copyTree(sys, SYSROOT_AT, (p) => p.endsWith('/include/c++'));
-  await copyTree(clang, CLANG_AT);
-  console.log(`== kernel ${kver} (Node entry): ${files} files installed`);
-
   const run = (argv, o = {}) => k.run(argv, { cwd: o.cwd || '/home', env: o.env || {}, stdin: o.stdin, ...(o.user !== undefined && { user: o.user }) });
-  const ccEnv = { WASIXCC_SYSROOT_PREFIX: SYSROOT_AT, CLANG_RESOURCE_DIR: `${CLANG_AT}/lib/clang/24`, TMPDIR: '/tmp' };
+  const noCxx = (p) => p.endsWith('/include/c++');
+  if (layout === 'pnpm') {
+    const proj = `${PNPM_G}/wasm-clang`;
+    const store = `${proj}/node_modules/.pnpm/${S}+wasm-clang@${cpkg.version}/node_modules/${S}`;
+    await copyTree(clang, `${store}/wasm-clang`);
+    await copyTree(sys, `${store}/wasix-sysroot`, noCxx);
+    await k.writeFile(`${proj}/package.json`, JSON.stringify({ dependencies: { [cpkg.name]: cpkg.version } }));
+    const ln = await run(['bash', '-c', `mkdir -p ${proj}/node_modules/${S} && ln -s ../.pnpm/${S}+wasm-clang@${cpkg.version}/node_modules/${S}/wasm-clang ${proj}/node_modules/${S}/wasm-clang && ls -l ${proj}/node_modules/${S}`], { cwd: '/' });
+    assert.equal(ln.status, 0, `pnpm layout: ${ln.stderr}`);
+    console.log(`== pnpm layout: ${ln.stdout.trim().split('\n').pop()}`);
+  } else {
+    await copyTree(clang, `/node_modules/${S}/wasm-clang`);
+    await copyTree(sys, layout === 'flat' ? `/node_modules/${S}/wasix-sysroot` : `/shared/lib/node_modules/${S}/wasix-sysroot`, noCxx);
+  }
+  console.log(`== kernel ${kver} (Node entry): ${files} files installed`);
+  // The kernel picks up new packages (PNPM_HOME projects via its watcher).
+  for (let i = 0; ; i++) {
+    const r = await run(['wasixcc', '--version'], { env: { TMPDIR: '/tmp' } });
+    if (r.status === 0) break;
+    if (i >= 100) assert.fail(`wasixcc --version: rc=${r.status} ${r.stdout}${r.stderr}`);
+    await new Promise((res) => setTimeout(res, 200));
+  }
+  const ccEnv = { TMPDIR: '/tmp' };
   const names = expect === 'old' ? ['r24'] : ['r18', 'r21', 'r24', 'r24link'];
   assert.equal((await run(['mkdir', '-p', '/home/cc', `${PROBES_AT}/bin`])).status, 0);
   for (const n of names) {

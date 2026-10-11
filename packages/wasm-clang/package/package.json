@@ -42,7 +42,7 @@
     "abi": "emscripten",
     "env": {
       "CLANG_RESOURCE_DIR": "${package}/lib/clang/24",
-      "WASIXCC_SYSROOT_PREFIX": "/shared/lib/node_modules/@ai-ecoverse/wasix-sysroot"
+      "WASIXCC_SYSROOT_PREFIX": "${package}/../wasix-sysroot"
     },
     "commands": {
       "cc": {

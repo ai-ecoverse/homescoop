@@ -14,7 +14,8 @@
  *     files:               # optional; repo files laid over the base
  *       - README.md        # (package.json always is)
  *     fields:              # optional; package.json metadata that may
- *       - engines          # change too (diff-published ALLOW_KEYS)
+ *       - engines          # change too (diff-published ALLOW_KEYS:
+ *                          # engines, description, keywords, slicc.env)
  *
  * The base is `npm pack <recipe.npm>@<from>` (npm checks the registry
  * integrity). Its tar stream is copied entry by entry, headers included;

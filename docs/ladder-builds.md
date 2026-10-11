@@ -132,7 +132,7 @@ repack:
   from: "0.1.0-1"   # published version whose bytes are reused
   files: []         # optional extra repo files laid over the base (README.md)
   fields: []        # optional package.json metadata that may change too
-                    # (engines, description, keywords)
+                    # (engines, description, keywords, slicc.env)
 ```
 
 `host-run.sh` then skips deps, emsdk and `build.sh`, and runs
