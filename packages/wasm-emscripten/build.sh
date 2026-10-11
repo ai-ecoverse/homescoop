@@ -361,7 +361,7 @@ const j = {
   homescoop: { recipe: "wasm-emscripten", upstream: "6.0.9" },
   dependencies: {
     "@ai-ecoverse/wasix-python": "3.14.2-16",
-    "@ai-ecoverse/wasm-clang": "24.0.0-11",
+    "@ai-ecoverse/wasm-clang": "24.0.0-12",
     "@ai-ecoverse/wasm-binaryen": "132.0.0-1",
     "@ai-ecoverse/emscripten-cache": "6.0.9-3",
     "esbuild-wasm": "0.28.2",
