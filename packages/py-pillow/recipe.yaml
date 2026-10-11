@@ -3,10 +3,10 @@ builder: host
 version: "12.3.0"
 npm: "@ai-ecoverse/py-pillow"
 summary: "Pillow for slicc WASIX CPython 3.14"
-# 12.3.0-5 is packaging-only: 12.3.0-4's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-13). Drop repack: when the next release rebuilds.
+# 12.3.0-6 is packaging-only: 12.3.0-5's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-15). Drop repack: when the next release rebuilds.
 repack:
-  from: "12.3.0-4"
+  from: "12.3.0-5"
 dependencies:
   build: [wasix-python, zlib, libjpeg-turbo, freetype]
   host: []

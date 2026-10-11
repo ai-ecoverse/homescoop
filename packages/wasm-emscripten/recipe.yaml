@@ -7,10 +7,10 @@ summary: "Emscripten 6.0.9 (emcc) for slicc via wasix-python"
 source:
   url: "https://github.com/emscripten-core/emscripten"
   sha256: "skip"
-# 6.0.9-14 is packaging-only: 6.0.9-13's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-13). Drop repack: when the next release rebuilds.
+# 6.0.9-15 is packaging-only: 6.0.9-14's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-15). Drop repack: when the next release rebuilds.
 repack:
-  from: "6.0.9-13"
+  from: "6.0.9-14"
 dependencies:
   build: []
   host: []

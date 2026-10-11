@@ -42,7 +42,7 @@ export default async function (ctx) {
 
   // --version: the shim's own version, and a note that it is not Astral's uv.
   const ver = await ok('uv --version');
-  assert.match(ver.stdout, /^uv 0\.1\.0-4 \(@ai-ecoverse\/wasix-uv-shim\)$/m);
+  assert.match(ver.stdout, /^uv 0\.1\.0-5 \(@ai-ecoverse\/wasix-uv-shim\)$/m);
   assert.match(ver.stderr, /uv here is a shim over pip \(@ai-ecoverse\/wasix-uv-shim\), not Astral's uv/);
 
   // homescoop#103's "done when".
