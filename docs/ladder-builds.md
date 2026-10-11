@@ -130,7 +130,8 @@ A release that only changes `package.json` (e.g. moving an exact
 ```yaml
 repack:
   from: "0.1.0-1"   # published version whose bytes are reused
-  files: []         # optional extra repo files laid over the base (README.md)
+  files: []         # optional extra repo files laid over the base (README.md;
+                    # from package/<f>, else the build source packages/<n>/<f>)
   fields: []        # optional package.json metadata that may change too
                     # (engines, description, keywords, slicc.env)
 ```

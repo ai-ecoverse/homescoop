@@ -4,9 +4,19 @@ import os
 from pathlib import Path
 
 _pkg = Path(os.environ.get('EM_PACKAGE_ROOT', Path(__file__).resolve().parent))
-_clang = Path(os.environ.get('EM_LLVM_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/wasm-clang'))
-_binaryen = Path(os.environ.get('EM_BINARYEN_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/wasm-binaryen'))
-_cache_pkg = Path(os.environ.get('EM_CACHE_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/emscripten-cache'))
+
+
+def _dep(var, default):
+  # slicc.env gives ${package}/../<dep>: the dependency beside this package
+  # (npm, slicc's ipk), or beside it in pnpm's virtual store, reached through
+  # the project's symlink. resolve() takes the `..` physically; slicc-kernel
+  # looks up commands spawned by path (LLVM_ROOT/clang) lexically.
+  return Path(os.environ.get(var, default)).resolve()
+
+
+_clang = _dep('EM_LLVM_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/wasm-clang')
+_binaryen = _dep('EM_BINARYEN_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/wasm-binaryen')
+_cache_pkg = _dep('EM_CACHE_PACKAGE', '/shared/lib/node_modules/@ai-ecoverse/emscripten-cache')
 
 LLVM_ROOT = str(_clang / 'bin')
 BINARYEN_ROOT = str(_binaryen)

@@ -11,8 +11,9 @@
  *
  *   repack:
  *     from: "0.1.0-1"      # published version whose bytes are reused
- *     files:               # optional; repo files laid over the base
- *       - README.md        # (package.json always is)
+ *     files:               # optional; repo files laid over the base, from
+ *       - README.md        # packages/<name>/package/<f>, else the build
+ *                          # source packages/<name>/<f> (package.json always)
  *     fields:              # optional; package.json metadata that may
  *       - engines          # change too (diff-published ALLOW_KEYS:
  *                          # engines, description, keywords, slicc.env)
@@ -95,8 +96,11 @@ if (up(basePkg) !== up(repoPkg)) die(`homescoop.upstream ${up(basePkg)} (base) !
 /** @type {Map<string, Buffer>} */
 const replace = new Map();
 for (const f of ['package.json', ...extra]) {
-  const src = join(repoPkgDir, f);
-  if (!existsSync(src)) die(`missing ${src}`);
+  // A repo file under package/, else the build-source copy beside it that
+  // build.sh stages into the package (e.g. wasm-emscripten's emscripten-config).
+  const staged = join(repoPkgDir, f);
+  const src = existsSync(staged) || f === 'package.json' ? staged : join(root, 'packages', name, f);
+  if (!existsSync(src)) die(`missing ${staged} (or packages/${name}/${f})`);
   if (!baseEntries.has(`package/${f}`)) die(`${spec} has no package/${f} to replace`);
   replace.set(`package/${f}`, readFileSync(src));
 }

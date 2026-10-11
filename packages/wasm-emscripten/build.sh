@@ -374,9 +374,9 @@ const j = {
     env: {
       EM_PACKAGE_ROOT: "${package}",
       EM_CONFIG: "${package}/emscripten-config",
-      EM_CACHE_PACKAGE: "/shared/lib/node_modules/@ai-ecoverse/emscripten-cache",
-      EM_LLVM_PACKAGE: "/shared/lib/node_modules/@ai-ecoverse/wasm-clang",
-      EM_BINARYEN_PACKAGE: "/shared/lib/node_modules/@ai-ecoverse/wasm-binaryen",
+      EM_CACHE_PACKAGE: "${package}/../emscripten-cache",
+      EM_LLVM_PACKAGE: "${package}/../wasm-clang",
+      EM_BINARYEN_PACKAGE: "${package}/../wasm-binaryen",
       SLICC_EM_LIBDIR: "${package}/lib/slicc",
     },
     commands,
