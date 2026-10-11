@@ -4,13 +4,15 @@
  * may change package.json's "version" and the versions of its @ai-ecoverse/*
  * dependencies, nothing else.
  *
- *   node scripts/diff-published.mjs <new.tgz> <@scope/name@version | base.tgz> [--allow README.md]...
+ *   node scripts/diff-published.mjs <new.tgz> <@scope/name@version | base.tgz> [--allow README.md]... [--allow-key engines]...
  *
  * Every tarball entry other than package/package.json (and --allow'd files)
  * must be byte-identical to the base, same path, type and mode. In
  * package.json only "version" and the values (not the names) of
  * @ai-ecoverse/* entries in dependencies / peerDependencies /
  * optionalDependencies may differ, and those values must be exact versions.
+ * --allow-key also lets one of the metadata keys in ALLOW_KEYS (engines,
+ * description, keywords) change, reported (recipe repack.fields).
  * Prints a report (file counts, both tarball sha256s, the package.json diff);
  * exits 1 on any other difference.
  */
@@ -122,12 +124,20 @@ const canon = (v) =>
       : v;
 const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 
+/** Package metadata a packaging-only release may change when asked to. */
+export const ALLOW_KEYS = new Set(['engines', 'description', 'keywords']);
+
 /** @returns {{ errors: string[], changes: string[] }} */
-export function diffPackageJson(base, next) {
+export function diffPackageJson(base, next, allowKeys = []) {
   const errors = [];
   const changes = [];
+  for (const k of allowKeys) if (!ALLOW_KEYS.has(k)) errors.push(`--allow-key ${k}: only ${[...ALLOW_KEYS].join(', ')}`);
   const keys = new Set([...Object.keys(base), ...Object.keys(next)]);
   for (const k of keys) {
+    if (allowKeys.includes(k) && ALLOW_KEYS.has(k)) {
+      if (!same(base[k], next[k])) changes.push(`${k}: ${JSON.stringify(base[k] ?? null)} → ${JSON.stringify(next[k] ?? null)}`);
+      continue;
+    }
     if (k === 'version') {
       if (base.version === next.version) errors.push(`version unchanged (${base.version}); bump -N`);
       else changes.push(`version: ${base.version} → ${next.version}`);
@@ -156,7 +166,7 @@ export function diffPackageJson(base, next) {
 /**
  * @param {Buffer} nextTgz
  * @param {Buffer} baseTgz
- * @param {{ allow?: string[], baseLabel?: string }} [opts]
+ * @param {{ allow?: string[], allowKeys?: string[], baseLabel?: string }} [opts]
  */
 export function diffTarballs(nextTgz, baseTgz, opts = {}) {
   const allow = new Set(['package/package.json', ...(opts.allow || []).map((f) => `package/${f}`)]);
@@ -190,7 +200,7 @@ export function diffTarballs(nextTgz, baseTgz, opts = {}) {
   if (bp && np) {
     const a = JSON.parse(bp.data.toString('utf8'));
     const b = JSON.parse(np.data.toString('utf8'));
-    pj = diffPackageJson(a, b);
+    pj = diffPackageJson(a, b, opts.allowKeys || []);
     const dir = mkdtempSync(join(tmpdir(), 'homescoop-pjdiff-'));
     try {
       writeFileSync(join(dir, 'a'), bp.data);
@@ -217,25 +227,27 @@ export function diffTarballs(nextTgz, baseTgz, opts = {}) {
 function main() {
   const args = process.argv.slice(2);
   const allow = [];
+  const allowKeys = [];
   const pos = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--allow') allow.push(args[++i]);
+    else if (args[i] === '--allow-key') allowKeys.push(args[++i]);
     else pos.push(args[i]);
   }
   if (pos.length !== 2) {
-    console.error('usage: diff-published.mjs <new.tgz> <@scope/name@version | base.tgz> [--allow FILE]...');
+    console.error('usage: diff-published.mjs <new.tgz> <@scope/name@version | base.tgz> [--allow FILE]... [--allow-key KEY]...');
     process.exit(2);
   }
   const [nextPath, baseSpec] = pos;
   const baseTgz = baseSpec.endsWith('.tgz') ? readFileSync(baseSpec) : fetchPublished(baseSpec);
-  const res = diffTarballs(readFileSync(nextPath), baseTgz, { allow, baseLabel: baseSpec });
+  const res = diffTarballs(readFileSync(nextPath), baseTgz, { allow, allowKeys, baseLabel: baseSpec });
   console.log(res.report);
   if (!res.ok) {
     console.error('\ndiff-published: not a packaging-only change:');
     for (const e of res.errors) console.error(`  - ${e}`);
     process.exit(1);
   }
-  console.log('\ndiff-published: ok — packaging-only (package.json version and @ai-ecoverse pins)');
+  console.log(`\ndiff-published: ok — packaging-only (package.json version and @ai-ecoverse pins${allowKeys.length ? `, ${allowKeys.join(', ')}` : ''})`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main();

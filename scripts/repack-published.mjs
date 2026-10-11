@@ -13,6 +13,8 @@
  *     from: "0.1.0-1"      # published version whose bytes are reused
  *     files:               # optional; repo files laid over the base
  *       - README.md        # (package.json always is)
+ *     fields:              # optional; package.json metadata that may
+ *       - engines          # change too (diff-published ALLOW_KEYS)
  *
  * The base is `npm pack <recipe.npm>@<from>` (npm checks the registry
  * integrity). Its tar stream is copied entry by entry, headers included;
@@ -67,6 +69,7 @@ const recipe = JSON.parse(run(process.execPath, [join(root, 'scripts/read-recipe
 const from = String(recipe.repack?.from || '');
 if (!from) die('recipe has no repack.from');
 const extra = Array.isArray(recipe.repack?.files) ? recipe.repack.files.map(String) : [];
+const fields = Array.isArray(recipe.repack?.fields) ? recipe.repack.fields.map(String) : [];
 for (const f of extra) {
   if (f === 'package.json' || f.includes('..') || f.startsWith('/')) die(`bad repack.files entry ${f}`);
 }
@@ -97,7 +100,7 @@ for (const f of ['package.json', ...extra]) {
   replace.set(`package/${f}`, readFileSync(src));
 }
 const next = rewriteTarball(baseTgz, replace);
-const res = diffTarballs(next, baseTgz, { allow: extra, baseLabel: spec });
+const res = diffTarballs(next, baseTgz, { allow: extra, allowKeys: fields, baseLabel: spec });
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'packaging-only-diff.txt'), `${res.report}\n`);
 console.log(res.report);
