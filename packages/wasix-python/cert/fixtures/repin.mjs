@@ -10,6 +10,10 @@
  * then every py-* resolves to the python under test, as re-pinned ones will.
  * restore() puts them back. Renames stay in the same directory: in the
  * browser /tmp is another mount, and mv there copies 114 MB per python.
+ *
+ * HOMESCOOP_CERT_NO_REPIN=1 (the re-pin wave's own cert, py-matplotlib
+ * cert/): the installed py-* are the real re-pinned packages, so there must
+ * be nothing to move; repin() throws instead of standing in.
  */
 const NM = '/node_modules/@ai-ecoverse';
 const AWAY = '.wasix-python.repin';
@@ -21,12 +25,16 @@ export async function repin({ run, read }) {
   for (const dir of ls.stdout.split('\n').filter(Boolean)) {
     const v = JSON.parse(await read(`${dir}/package.json`)).version;
     if (v === want) continue;
+    if (process.env.HOMESCOOP_CERT_NO_REPIN === '1') {
+      throw new Error(`no-repin cert: ${dir} is wasix-python ${v}, not ${want}; the py-* are not re-pinned`);
+    }
     const pkg = dir.slice(NM.length + 1).split('/')[0];
     const away = dir.replace(/wasix-python$/, AWAY);
     const r = await run(['bash', '-c', `rm -rf ${away} && mv ${dir} ${away}`], { cwd: '/' });
     if (r.status !== 0) throw new Error(`repin ${dir}: ${r.stderr}`);
     moved.push({ pkg, dir, away, version: v });
   }
+  if (process.env.HOMESCOOP_CERT_NO_REPIN === '1') console.log(`repin: none needed, every py-* resolves to wasix-python ${want}`);
   return {
     moved,
     async restore() {
