@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-procps",
-  "version": "4.0.5-3",
+  "version": "4.0.7-1",
   "description": "procps-ng for slicc (WASM / emscripten, SLICC homescoop); user names from slicc-kernel >= 1.44.0",
   "engines": {
     "slicc-kernel": ">=1.44.0"
@@ -30,7 +30,7 @@
   },
   "homescoop": {
     "recipe": "procps",
-    "upstream": "4.0.5"
+    "upstream": "4.0.7"
   },
   "slicc": {
     "abi": "emscripten",
