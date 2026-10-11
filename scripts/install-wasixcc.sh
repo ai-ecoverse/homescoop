@@ -25,11 +25,13 @@ BINARYEN_VERSION="133"
 # fall back) and file types from slicc_fs (S_IFIFO for pipes on kernels that
 # report it); -22 the slicc.libc custom section in every linked program
 # (libc generation marker for slicc-kernel) and a static itimer helper; -23
-# Linux TIOCGWINSZ/TIOCSWINSZ numbers and fork/_Fork in the PIC variants.
+# Linux TIOCGWINSZ/TIOCSWINSZ numbers and fork/_Fork in the PIC variants; -24
+# chown and stat owners through slicc-kernel K3 (>= 1.59.0; older kernels
+# keep -23's behaviour) and linkat(AT_FDCWD, ...) fixed.
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-23}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-5122cb397769a9cc78100d7f37ef033c6ba2e037ef3e73d7db34cce234be5f8e}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-24}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-910c5e9e899f1fe3f90482c52f7354a2b959d005f614cd8911c8cd85eb5850cd}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
