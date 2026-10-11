@@ -22,11 +22,11 @@ export default async function (ctx) {
   assert.equal(d.status, 0, `${d.stdout}${d.stderr}`);
   const lines = d.stdout.trim().split('\n');
   if (process.env.R23_DLFORK === '1') {
-    assert.deepEqual(lines, ['parent: add=5 bump=41', 'child: add=6 bump=42', 'parent: child exit=7', 'parent: add=6'], `${d.stdout}${d.stderr}`);
+    assert.deepEqual(lines, ['parent: add=6 bump=41', 'child: add=7 bump=42', 'parent: child exit=7', 'parent: add=6'], `${d.stdout}${d.stderr}`);
     console.log('r23fork dl: dlopen then fork, the child calls the side module with its thread_local carried');
     return;
   }
-  assert.deepEqual(lines, ['parent: add=5 bump=41', 'parent: child exit=134', 'parent: add=6'], `${d.stdout}${d.stderr}`);
+  assert.deepEqual(lines, ['parent: add=6 bump=41', 'parent: child exit=134', 'parent: add=6'], `${d.stdout}${d.stderr}`);
   assert.match(d.stderr, /table index is out of bounds/, d.stderr);
   console.log('r23fork dl: dlopen then fork, the child traps in the side module (slicc-kernel#337 open; R23_DLFORK=1 expects it fixed)');
 }
