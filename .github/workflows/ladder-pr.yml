@@ -72,6 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.push.outputs.changed }}
+      sha: ${{ steps.push.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -88,25 +89,36 @@ jobs:
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
             node scripts/refresh-recipe-sha.mjs "$pkg"
           done
-      - id: push
-        name: Push sha256 onto the PR branch
+      # Renovate bumps only recipe.yaml; check-package-meta wants the
+      # committed package.json version to be the one the build stages.
+      - name: Sync package.json version from recipe
+        env:
+          HOST: ${{ needs.detect.outputs.host }}
         run: |
           set -euo pipefail
-          if git diff --quiet -- 'packages/*/recipe.yaml'; then
+          node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
+            node scripts/sync-package-version.mjs "$pkg" --write
+          done
+      - id: push
+        name: Push sha256 and package version onto the PR branch
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- 'packages/*/recipe.yaml' 'packages/*/package/package.json'; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
-            echo "::error::recipe sha256 is stale on a fork PR; cannot push. Run: node scripts/refresh-recipe-sha.mjs <package>"
-            git diff -- 'packages/*/recipe.yaml'
+            echo "::error::recipe sha256 / package version is stale on a fork PR; cannot push. Run: node scripts/refresh-recipe-sha.mjs <package> && node scripts/sync-package-version.mjs <package> --write"
+            git diff -- 'packages/*/recipe.yaml' 'packages/*/package/package.json'
             exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages/*/recipe.yaml
-          git commit -m "chore: refresh recipe sha256 after version bump"
+          git add -- 'packages/*/recipe.yaml' 'packages/*/package/package.json'
+          git commit -m "chore: refresh recipe sha256 and package version after version bump"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   host-build:
     needs: [detect, recipe-sha]
@@ -117,7 +129,11 @@ jobs:
         package: ${{ fromJson(needs.detect.outputs.host) }}
     runs-on: ubuntu-latest
     steps:
+      # When recipe-sha pushed a commit, build that one: check-package-meta
+      # compares the staged package.json with the committed (HEAD) one.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.recipe-sha.outputs.sha || '' }}
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
