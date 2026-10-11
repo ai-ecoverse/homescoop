@@ -3,11 +3,11 @@ builder: host
 version: "1.4.0"
 npm: "@ai-ecoverse/py-contourpy"
 summary: "contourpy for slicc WASIX CPython 3.14"
-# 1.4.0-5 is packaging-only: 1.4.0-4's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-15, py-numpy 2.3.2-8). Drop repack: when the next
+# 1.4.0-6 is packaging-only: 1.4.0-5's bytes with exact @ai-ecoverse pins
+# (wasix-python 3.14.2-16, py-numpy 2.3.2-9). Drop repack: when the next
 # release rebuilds.
 repack:
-  from: "1.4.0-4"
+  from: "1.4.0-5"
 dependencies:
   build: [wasix-python, py-numpy]
   host: []
