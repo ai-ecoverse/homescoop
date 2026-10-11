@@ -20,11 +20,11 @@
 // The sysroot is 160 MB, too big to install into a browser-cert page; the
 // program under test is the small modes.wasm linked against it.
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { arg, command, here, kernel, meta, sysroot, wasixcc } from './harness.mjs';
+import { arg, asyncify, command, here, keepSync, kernel, meta, sideModule, sysroot, wasixcc } from './harness.mjs';
 import { ptySession } from '../../../scripts/browser-cert/context.mjs';
 
 const args = process.argv.slice(2);
@@ -47,13 +47,23 @@ try {
   const prefix = sysroot(tarball, join(work, 'sysroot'));
   console.log(`== ${probe}.wasm (pinned wasixcc, ${variant} variant)`);
   const pkg = join(work, `${probe}-pkg`);
-  command({ ...wasixcc(work), ...VARIANTS[variant] }, prefix, probe, pkg, probe);
+  const spec = await import(pathToFileURL(join(here, `${probe}.mjs`)).href);
+  const build = spec.build ?? {};
+  const env = { ...wasixcc(work), ...VARIANTS[variant] };
+  command(env, prefix, probe, pkg, probe);
+  if (build.asyncify) {
+    keepSync(pkg, probe);
+    asyncify(env, join(pkg, `bin/${probe}.wasm`));
+  }
+  const side = build.side && env.WASIXCC_PIC === 'yes' ? join(work, `lib${build.side}.so`) : undefined;
+  if (side) sideModule(env, prefix, build.side, side);
   const k = await kernel(work, kernelDir);
   console.log(`== ${k.label} (Node entry)`);
   await k.install(pkg);
-  const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run, kernel: k.kernel, pty: (argv, o) => ptySession(k.kernel, argv, o), wasm: join(pkg, `bin/${probe}.wasm`), kernelVersion: k.version };
+  if (side) await k.kernel.writeFile(`/tmp/lib${build.side}.so`, readFileSync(side));
+  const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run, kernel: k.kernel, pty: (argv, o) => ptySession(k.kernel, argv, o), wasm: join(pkg, `bin/${probe}.wasm`), kernelVersion: k.version, variant, side: side && `/tmp/lib${build.side}.so` };
   try {
-    await (await import(pathToFileURL(join(here, `${probe}.mjs`)).href)).default(ctx);
+    await spec.default(ctx);
     console.log(`PASS test/${probe}.mjs`);
   } catch (e) {
     process.exitCode = 1;

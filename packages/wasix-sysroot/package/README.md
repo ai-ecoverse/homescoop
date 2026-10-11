@@ -9,7 +9,7 @@ WASIX libc/libcxx/compiler-rt sysroots, laid out as a wasixcc `SYSROOT_PREFIX`:
 Each tree has a real `lib/wasm32-wasip1` (not a symlink — npm/ipk skip
 links). clang 24 `--target=wasm32-wasip1` resolves crt/libc there.
 `unistd.h` declares `fork` under `__wasix__` even with `-fwasm-exceptions`.
-EH `libc.a` archives get real `fork`/`_Fork` from asyncify (static trees).
+EH `libc.a` archives get real `fork`/`_Fork` (static trees since -14, PIC trees since -23).
 Every libc embeds SLICC identity stubs (getuid=1000) and reports
 `st_uid`/`st_gid` 1000 from `stat`/`lstat`/`fstat`/`fstatat`.
 `chmod`/`fchmod`/`fchmodat`/`umask` and the modes of fresh `open(O_CREAT)` /
@@ -45,6 +45,11 @@ Since 2025.9.30-23 `ioctl` also takes Linux's request numbers for the
 window size, `TIOCGWINSZ` 0x5413 and `TIOCSWINSZ` 0x5414, next to WASIX's
 0x101/0x102 (the headers keep those): code and ctypes snippets that hard-code
 the Linux numbers got EINVAL before (homescoop#250).
+`sysroot-ehpic` and `sysroot-exnref-ehpic` now have `fork`/`_Fork` like the
+static trees (homescoop#253). As there, a program must be asyncified
+(`wasm-opt --asyncify --pass-arg=asyncify-imports@wasix_32v1.proc_fork`) for
+`fork()` to work, or it returns ENOSYS. A child forked after a `dlopen` cannot
+call into the side module yet (slicc-kernel#337).
 
 Since 2025.9.30-22 every program linked against the sysroot carries a wasm
 custom section `slicc.libc` = `wasix-sysroot <version>` (from `crt1*.o`), so

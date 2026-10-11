@@ -358,5 +358,29 @@ done
 [[ $n -eq 15 ]] || { echo "homescoop: marked $n crt1*.o, expected 15 (5 variants x 3)" >&2; exit 1; }
 echo "  $n crt1*.o"
 
+echo "== wasix-sysroot: -23 members (fork, _Fork in the PIC variants)"
+R23_OBJ="$WORK/r23"
+rm -rf "$R23_OBJ" && mkdir -p "$R23_OBJ"
+R23=(fork _Fork)
+for m in "${R23[@]}"; do
+  compile_r20 "$MUSL/src/process/$m.c" "$R23_OBJ/$m.o" "${MUSL_INC[@]}" -fPIC -fvisibility=default
+done
+for v in $PIC_VARIANTS; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  old="$R23_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" fork.o _Fork.o)
+  if [[ -n "$(for m in "${R23[@]}"; do exported "$old/$m.o"; done)" ]]; then
+    echo "homescoop: $v fork.o/_Fork.o are no longer upstream's empty EH stubs" >&2
+    exit 1
+  fi
+  "$LLVM_AR" r "$lib" $(printf "$R23_OBJ/%s.o " "${R23[@]}")
+  have="$(exported "$lib" 2>/dev/null)"
+  for s in fork _Fork _fork_internal; do
+    grep -qx "$s" <<<"$have" || { echo "homescoop: $lib lacks $s" >&2; exit 1; }
+  done
+  echo "  $v (pic)"
+done
+
 homescoop_assert_no_package_links "$PKG"
 echo "== wasix-sysroot: staged $(node -p "require('$PKG/package.json').version") from $BASE_VER"

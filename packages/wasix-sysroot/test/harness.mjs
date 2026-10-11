@@ -2,7 +2,7 @@
 // build a C program against it with the pinned wasixcc, and run commands on
 // slicc-kernel's Node entry.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -54,6 +54,28 @@ export function command(env, prefix, src, pkg, name) {
     join(pkg, 'package.json'),
     JSON.stringify({ name: `wasix-sysroot-${name}`, version: '0.0.0', slicc: { abi: 'wasi', commands: { [name]: { wasm: `bin/${name}.wasm` } } } }),
   );
+}
+
+export function sideModule(env, prefix, src, out) {
+  sh('wasixcc', ['-O2', join(here, `${src}.c`), '-o', out], {
+    env: { ...env, WASIXCC_SYSROOT_PREFIX: prefix, WASIXCC_MODULE_KIND: 'shared-library' },
+  });
+}
+
+export function keepSync(pkg, name) {
+  copyFileSync(join(pkg, `bin/${name}.wasm`), join(pkg, `bin/${name}-sync.wasm`));
+  const file = join(pkg, 'package.json');
+  const json = JSON.parse(readFileSync(file, 'utf8'));
+  json.slicc.commands[`${name}-sync`] = { wasm: `bin/${name}-sync.wasm` };
+  writeFileSync(file, JSON.stringify(json));
+}
+
+export function asyncify(env, wasm) {
+  const features = ['threads', 'bulk-memory', 'mutable-globals', 'sign-ext', 'nontrapping-float-to-int', 'exception-handling'];
+  sh(join(env.WASIXCC_BINARYEN_LOCATION, 'bin/wasm-opt'), [
+    '--asyncify', '-O2', '--pass-arg=asyncify-imports@wasix_32v1.proc_fork',
+    ...features.map((f) => `--enable-${f}`), wasm, '-o', wasm,
+  ]);
 }
 
 /** A Node kernel (meta.kernel, or a local build in kernelDir) with meta.needs installed. */
