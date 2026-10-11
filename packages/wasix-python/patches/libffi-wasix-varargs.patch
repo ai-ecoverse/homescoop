@@ -1,0 +1,112 @@
+--- a/src/wasm32/ffi.c
++++ b/src/wasm32/ffi.c
+@@ -1244,15 +1244,64 @@
+     return FFI_BAD_TYPEDEF;
+   return FFI_OK;
+ #else
+-  return FFI_BAD_ABI; // Varargs are not yet supported without emscripten
++  // homescoop: the wasm32 C ABI passes the variadic arguments as one extra
++  // i32 parameter, a pointer to a buffer holding them (see ffi_call).
++  if (cif->nfixedargs + 1 > MAX_ARGS)
++    return FFI_BAD_TYPEDEF;
++  return FFI_OK;
+ #endif
+ }
+ 
++#ifndef __EMSCRIPTEN__
++// homescoop: a variadic argument in clang's wasm32 C ABI (va_arg): 4-byte
++// slots, values at their natural alignment (8 for 64-bit, 16 for long
++// double), aggregates by pointer (structs that replace_type kept as structs).
++static size_t vararg_align(ffi_type *type) {
++  switch (type->type) {
++  case FFI_TYPE_UINT64:
++  case FFI_TYPE_SINT64:
++  case FFI_TYPE_DOUBLE:
++    return 8;
++  case FFI_TYPE_LONGDOUBLE:
++    return 16;
++  default:
++    return 4;
++  }
++}
++
++static size_t vararg_size(ffi_type *type) {
++  switch (type->type) {
++  case FFI_TYPE_VOID:
++    return 0;
++  case FFI_TYPE_UINT64:
++  case FFI_TYPE_SINT64:
++  case FFI_TYPE_DOUBLE:
++    return 8;
++  case FFI_TYPE_LONGDOUBLE:
++    return 16;
++  default:
++    return 4; // i32-sized scalars, pointers, structs by pointer
++  }
++}
++#endif
++
+ void ffi_call(ffi_cif *cif, void (*fn)(void), void *rvalue, void **avalue) {
+ #ifdef __EMSCRIPTEN__
+   ffi_call_js(cif, fn, rvalue, avalue);
+   return;
+ #else
++  // homescoop: with varargs only the fixed arguments are wasm parameters,
++  // followed by an i32 pointer to the buffer of the variadic ones.
++  int nfixed = (cif->flags & VARARGS_FLAG) ? (int)cif->nfixedargs : (int)cif->nargs;
++  size_t var_size = 0;
++  for (int i = nfixed; i < (int)cif->nargs; i++) {
++    size_t a = vararg_align(cif->arg_types[i]);
++    var_size = (var_size + a - 1) & ~(a - 1);
++    var_size += vararg_size(cif->arg_types[i]);
++  }
++  uint8_t var_store[var_size + 16];
++  uint8_t *var_buf = (uint8_t *)(((uintptr_t)var_store + 15) & ~(uintptr_t)15);
++
+   // Calculate the total size that we need to allocate for the arguments
+   size_t total_size = 0;
+ 
+@@ -1262,10 +1311,13 @@
+     total_size += type_size(cif->rtype);
+   }
+ 
+-  // Calculate how much space we need for all arguments
+-  for (int i = 0; i < cif->nargs; i++) {
++  // Calculate how much space we need for all (fixed) arguments
++  for (int i = 0; i < nfixed; i++) {
+     total_size += type_size(cif->arg_types[i]);
+   }
++  if (nfixed != (int)cif->nargs) {
++    total_size += 4; // the varargs buffer pointer
++  }
+ 
+   // Buffer for arguments as described in impl_call_dynamic
+   uint8_t values[total_size];
+@@ -1276,9 +1328,26 @@
+     *((void **)current_value) = rvalue;
+     current_value += 4;
+   }
+-  for (int i = 0; i < cif->nargs; i++) {
++  for (int i = 0; i < nfixed; i++) {
+     place_value(cif->arg_types[i], avalue[i], &current_value);
+   }
++  if (nfixed != (int)cif->nargs) {
++    size_t off = 0;
++    for (int i = nfixed; i < (int)cif->nargs; i++) {
++      ffi_type *t = cif->arg_types[i];
++      size_t a = vararg_align(t);
++      off = (off + a - 1) & ~(a - 1);
++      uint8_t *slot = var_buf + off;
++      if (t->type == FFI_TYPE_STRUCT) {
++        *((UINT32 *)slot) = (UINT32)avalue[i]; // aggregates by pointer
++      } else {
++        place_value(t, avalue[i], &slot);
++      }
++      off += vararg_size(t);
++    }
++    *((UINT32 *)current_value) = (UINT32)var_buf;
++    current_value += 4;
++  }
+ 
+   impl_call_dynamic(fn, values, total_size, rvalue, indirect_return ? 0 : type_size(cif->rtype));
+ #endif

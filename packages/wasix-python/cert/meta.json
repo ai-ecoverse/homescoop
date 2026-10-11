@@ -39,7 +39,7 @@
     "@ai-ecoverse/py-six@1.17.0-2",
     "@ai-ecoverse/py-tzdata@2026.4.0-2"
   ],
-  "noRepin": true,
+  "noRepin": false,
   "checklist": [
     "base python / python3: sys.executable and sys._base_executable are /usr/bin/python(3) (sitecustomize.py)",
     "python -m venv v works; v/bin/python and /home/v/bin/python3 report sys.prefix /home/v and their own path (\"argv0Path\": true, slicc-kernel#168)",
@@ -57,7 +57,8 @@
     "cert/fifo.mjs (3.14.2-14, wasix-sysroot -21, slicc-kernel #248): asyncio.create_subprocess_exec('echo', 'hi', stdout=PIPE) and a cat stdin/stdout round trip return b'hi\\n' / b'round trip\\n' with rc 0; os.fstat of a pipe is S_ISFIFO on a kernel with #307 (slicc_fs fd_mode on pipes) and S_ISSOCK on 1.47.3-1.48.x (#280). On 1.47.1 a pipe was typeless and asyncio refused it",
     "cert/tty.mjs (3.14.2-14, wasix-sysroot -21 slicc_tty, slicc-kernel >= 1.48.0): in a 100x30 pty os.get_terminal_size(0) == (100, 30) and isatty; tty.setraw clears ISIG/ICANON/OPOST, ^C is read as byte 3 (no KeyboardInterrupt), termios.tcsetattr(TCSAFLUSH, old) restores ISIG/ICANON; on pipes os.get_terminal_size raises ENOTTY and isatty(0/1) is False",
     "stdout on a pipe/socket is line-buffered (sys.stdout.line_buffering True with isatty False): intended, patches/cpython-stdout-line-buffer-nonreg.patch (since 3.14.2-7); a regular file stays block-buffered",
-    "3.14.2-15 re-pin wave gate: needsInstall pins the published wave (py-numpy 2.3.2-8, py-pandas 2.3.2-9, py-scipy 1.18.0-10, py-matplotlib 3.11.2-6, py-contourpy 1.4.0-5, py-kiwisolver 1.5.1-5, py-pillow 12.3.0-6, py-fonttools 4.66.1-5, py-cycler 0.12.1-5, py-packaging 26.3.0-5, py-pyparsing 3.3.3-5; dateutil/pytz/six/tzdata unchanged) and noRepin: true, so discovery.mjs and sidemods.mjs run on the real packages: fixtures/repin.mjs throws if any py-* declares or carries another wasix-python. The next python build sets noRepin false until its own wave"
+    "3.14.2-15 re-pin wave gate: needsInstall pins the published wave (py-numpy 2.3.2-8, py-pandas 2.3.2-9, py-scipy 1.18.0-10, py-matplotlib 3.11.2-6, py-contourpy 1.4.0-5, py-kiwisolver 1.5.1-5, py-pillow 12.3.0-6, py-fonttools 4.66.1-5, py-cycler 0.12.1-5, py-packaging 26.3.0-5, py-pyparsing 3.3.3-5; dateutil/pytz/six/tzdata unchanged) and noRepin: true, so discovery.mjs and sidemods.mjs run on the real packages: fixtures/repin.mjs throws if any py-* declares or carries another wasix-python. 3.14.2-16 sets noRepin false again: its own re-pin wave is still to come, so the -15 wave's py-* (pinned to -15) are re-pinned by the fixture for its cert",
+    "cert/ctypes-varargs.mjs (3.14.2-16, patches/libffi-wasix-varargs.patch): ctypes calls to variadic libc functions with argtypes naming the fixed parameters (ffi_prep_cif_var): snprintf int/double/long long/char*/int \u2192 29, '42|3.142|1234567890123|str|-7' (int then double: buffer padding); sscanf through byref \u2192 2, 17, 2.5; open(path, O_CREAT|O_WRONLY|O_TRUNC, 0640) under umask 022 \u2192 mode 0640; fcntl F_SETFD FD_CLOEXEC \u2192 0, F_GETFD \u2192 FD_CLOEXEC; printf through C stdio. 3.14.2-15 raised 'ffi_prep_cif_var failed' for all of them"
   ],
   "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS."
 }

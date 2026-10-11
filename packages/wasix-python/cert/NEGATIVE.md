@@ -1,4 +1,9 @@
 
+
+## 3.14.2-15: ctypes cannot call variadic functions
+
+wasix-org/libffi's WASIX backend returned `FFI_BAD_ABI` from `ffi_prep_cif_machdep_var`, so with `argtypes` naming the fixed parameters every variadic call (`printf`, `snprintf`, `sscanf`, `open(…, mode)`, `fcntl`, `ioctl`) raised `ffi_prep_cif_var failed` (hb2's cert-python-3.14.2-15 probes). Without `argtypes`, ctypes passes every argument as fixed, which on wasm32 is a different call signature than the variadic function has. 3.14.2-16 fixes the first case (`patches/libffi-wasix-varargs.patch`, `cert/ctypes-varargs.mjs`); the second stays wrong by the ABI, as on Apple arm64.
+
 ## 3.14.2-15 `_ctypes` / ImportError→OSError (homescoop#110)
 
 **-15 on a kernel without the dlopen(NULL)=main fix (e.g. 1.49.0):**
