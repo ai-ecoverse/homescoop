@@ -221,6 +221,25 @@ jobs:
               tgz=$(node "$script" | head -1)
               npm install --prefix "$CERT_NM" --no-fund --no-audit "$tgz"
             done
+            # Packaging-only peers from this checkout (re-pin waves): repack
+            # each recipe (repack-published.mjs, the bytes of its ladder-pr
+            # artifact) and install them in one npm call, so their exact pins
+            # on each other resolve before they are on the registry.
+            REPACK_TGZ=()
+            while read -r peer; do
+              [[ -n "$peer" ]] || continue
+              out="${RUNNER_TEMP}/repack/${peer}"
+              node scripts/repack-published.mjs "$peer" --out "$out" >/dev/null
+              echo "browser-cert: needsRepack $peer $(node -p "require('./packages/${peer}/package/package.json').version") sha256 $(cut -d' ' -f1 "$out/package.tgz.sha256")"
+              cp "$out/package.tgz" "${RUNNER_TEMP}/repack/${peer}.tgz"
+              REPACK_TGZ+=("${RUNNER_TEMP}/repack/${peer}.tgz")
+            done < <(node -e '
+              const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
+              for (const n of j.needsRepack||[]) console.log(n);
+            ' "packages/${{ matrix.package }}/cert/meta.json")
+            if [[ ${#REPACK_TGZ[@]} -gt 0 ]]; then
+              npm install --prefix "$CERT_NM" --no-fund --no-audit "${REPACK_TGZ[@]}"
+            fi
           fi
           npx --prefix "$CERT_NM" playwright-core install --with-deps chromium
           export HOMESCOOP_CERT_NODE_MODULES="$CERT_NM/node_modules"

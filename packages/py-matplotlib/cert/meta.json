@@ -1,0 +1,50 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.51.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-numpy",
+    "@ai-ecoverse/py-pandas",
+    "@ai-ecoverse/py-scipy",
+    "@ai-ecoverse/py-contourpy",
+    "@ai-ecoverse/py-kiwisolver",
+    "@ai-ecoverse/py-pillow",
+    "@ai-ecoverse/py-fonttools",
+    "@ai-ecoverse/py-cycler",
+    "@ai-ecoverse/py-packaging",
+    "@ai-ecoverse/py-pyparsing",
+    "@ai-ecoverse/py-python-dateutil",
+    "@ai-ecoverse/py-pytz",
+    "@ai-ecoverse/py-six",
+    "@ai-ecoverse/py-tzdata"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-13",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasix-python@3.14.2-15",
+    "@ai-ecoverse/py-python-dateutil@2.9.0-post0.2",
+    "@ai-ecoverse/py-pytz@2026.4.0-2",
+    "@ai-ecoverse/py-six@1.17.0-2",
+    "@ai-ecoverse/py-tzdata@2026.4.0-2"
+  ],
+  "needsRepack": [
+    "py-numpy",
+    "py-pandas",
+    "py-scipy",
+    "py-contourpy",
+    "py-kiwisolver",
+    "py-pillow",
+    "py-fonttools",
+    "py-cycler",
+    "py-packaging",
+    "py-pyparsing"
+  ],
+  "checklist": [
+    "wasix-python re-pin wave (3.14.2-15): wasix-python's cert/discovery.mjs and cert/sidemods.mjs on the real re-pinned packages, no repin fixture (HOMESCOOP_CERT_NO_REPIN=1: fixtures/repin.mjs throws if any py-* still resolves to another wasix-python)",
+    "py-matplotlib is the tarball under test; the other re-pinned py-* are needsRepack: repack-published.mjs of this checkout, the same bytes as their ladder-pr artifacts (the job logs each sha256); the pure py-* that do not pin wasix-python come from npm",
+    "discovery.mjs: py-* found without PYTHONPATH in the flat npm /node_modules, one pnpm project, and pnpm 12 `pnpm add -g` (one project per package); a py-* built for wasix-python 3.14.2-13 is skipped and python -v names it; discover() cost logged",
+    "sidemods.mjs: numpy linalg + fft, pandas read_csv + groupby, scipy optimize + integrate, matplotlib Agg PNG, PIL open/resize/save, contourpy, kiwisolver, the pure-Python packages import; no PYTHONPATH"
+  ]
+}
