@@ -2,11 +2,15 @@
  * the bitstream, the size and the pixels. Every check runs and reports; exit
  * status is the number of failures (0 = pass).
  *
- * Image: 64x48 RGBA with independent R (x), G (x+y) and B (y) gradients and
- * an alpha ramp (128..255, never 0: lossless may alter RGB under alpha 0).
- * Lossless must round-trip exactly; lossy (q90) within a small error, and its
- * alpha (lossless ALPH chunk) exactly. A decoder that swaps or drops a
- * channel, mis-applies a transform, or reports another size fails here.
+ * Images, 64x48 RGBA, alpha ramp 128..255 (never 0: lossless may alter RGB
+ * under alpha 0):
+ *  - lossless: a noise texture shared by all channels plus an x / y offset in
+ *    R / B, so the encoder's subtract-green transform pays and is used; must
+ *    round-trip exactly;
+ *  - lossy (q90): independent R (x), G (x+y), B (y) gradients; within a small
+ *    error, alpha (lossless ALPH chunk) exact.
+ * A decoder that swaps or drops a channel, mis-applies a transform, or
+ * reports another size fails here.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,7 +93,8 @@ static void check(const char *name, const uint8_t *data, size_t size, const uint
 }
 
 int main(void) {
-  static uint8_t src[W * H * 4];
+  static uint8_t src[W * H * 4], tex[W * H * 4];
+  uint32_t seed = 12345;
   for (int y = 0; y < H; y++) {
     for (int x = 0; x < W; x++) {
       uint8_t *p = src + (y * W + x) * 4;
@@ -97,6 +102,13 @@ int main(void) {
       p[1] = (uint8_t)((x + y) * 255 / (W + H - 2));
       p[2] = (uint8_t)(y * 255 / (H - 1));
       p[3] = (uint8_t)(128 + x * 127 / (W - 1));
+      uint8_t *t = tex + (y * W + x) * 4;
+      seed = seed * 1103515245u + 12345u;
+      int g = 32 + (int)((seed >> 16) % 160);
+      t[0] = (uint8_t)(g + x);
+      t[1] = (uint8_t)g;
+      t[2] = (uint8_t)(g + y);
+      t[3] = p[3];
     }
   }
   int enc = WebPGetEncoderVersion(), dec = WebPGetDecoderVersion();
@@ -105,11 +117,11 @@ int main(void) {
   if (enc != dec) fail("encoder and decoder versions differ");
 
   uint8_t *ll = NULL;
-  size_t ll_size = WebPEncodeLosslessRGBA(src, W, H, W * 4, &ll);
+  size_t ll_size = WebPEncodeLosslessRGBA(tex, W, H, W * 4, &ll);
   if (!ll_size) {
     fail("lossless: WebPEncodeLosslessRGBA returned 0");
   } else {
-    check("lossless", ll, ll_size, src, "VP8L", 0, 0.0);
+    check("lossless", ll, ll_size, tex, "VP8L", 0, 0.0);
     WebPFree(ll);
   }
 
