@@ -3,7 +3,8 @@
 #
 # Ships ssh, ssh-keygen, scp, sftp, ssh-add. Links published wasix-openssl +
 # wasix-zlib (pkg-config lib/ only) with -Wl,--fatal-warnings.
-# Sysroot: wasix-sysroot 2025.9.30-18 (slicc_fs; select/pselect + socketpair).
+# Sysroot: the toolchain pin (scripts/install-wasixcc.sh), at least
+# wasix-sysroot 2025.9.30-22 (slicc.libc marker in every binary).
 set -euo pipefail
 
 HOMESCOOP_ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
@@ -15,7 +16,9 @@ PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
 # Upstream portable tag is 10.6p1; npm packaging base is recipe 10.6.0.
 UPSTREAM_PORTABLE="${HOMESCOOP_OPENSSH_PORTABLE:-10.6p1}"
-PKG_VER="${VERSION}-5"
+# The packaging revision is the committed package.json's (ruby/gnupg rule).
+PKG_VER="$(node -p "require('$DEST/package.json').version")"
+[[ "$PKG_VER" == "$VERSION-"* ]] || { echo "homescoop wasix-openssh: package.json version $PKG_VER is not $VERSION-N" >&2; exit 1; }
 WORK="${WASIX_OPENSSH_WORK:-$PKG/.work}"
 SRCS="$WORK/src"
 BUILD="$WORK/build"
@@ -26,10 +29,11 @@ JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || 
 OPENSSL_PREFIX="${WASIX_OPENSSL_PREFIX:-$DEPS/wasix-openssl/package}"
 ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 
-# Isolated toolchain with certified wasix-sysroot -18 (select/pselect + socketpair).
-export HOMESCOOP_WASIX_SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-18}"
-export HOMESCOOP_WASIX_SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-ae55a48b143ebf0b0b7be2a2babebda76b9947316226089e03fb6ed9a2f07f2d}"
+# Isolated toolchain with the pinned certified wasix-sysroot (until 10.6.0-5
+# this pinned -18 here, which is why it stayed behind).
 eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
+SYSROOT_VER="$(sed -n 's/.*sysroot=\([^ ]*\).*/\1/p' "$WASIXCC_PREFIX/.homescoop-toolchain" | head -1)"
+[[ -n "$SYSROOT_VER" ]] || { echo "homescoop wasix-openssh: no sysroot= in $WASIXCC_PREFIX/.homescoop-toolchain" >&2; exit 1; }
 export PATH="${WASIXCC_PREFIX}/bin:${WASIXCC_LLVM_LOCATION}/bin:$HOME/.wasmer/bin:/opt/homebrew/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS=no
@@ -48,8 +52,9 @@ grep -q __slicc_fs_fd_chmod <<<"$SYSROOT_UNDEF" || {
   echo "homescoop wasix-openssh: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-17 (no slicc_fs imports)" >&2
   exit 1
 }
-grep -qF "sysroot=$HOMESCOOP_WASIX_SYSROOT_VERSION" "$WASIXCC_PREFIX/.homescoop-toolchain" || {
-  echo "homescoop wasix-openssh: want wasix-sysroot $HOMESCOOP_WASIX_SYSROOT_VERSION in $WASIXCC_PREFIX/.homescoop-toolchain" >&2
+# -22+: crt1.o carries the slicc.libc marker every binary inherits.
+grep -aqF "wasix-sysroot $SYSROOT_VER" "${WASIXCC_SYSROOT_PREFIX}/sysroot/lib/wasm32-wasi/crt1.o" || {
+  echo "homescoop wasix-openssh: wasix-sysroot $SYSROOT_VER predates 2025.9.30-22 (no slicc.libc marker in crt1.o)" >&2
   exit 1
 }
 
@@ -242,6 +247,9 @@ for b in ssh ssh-keygen scp sftp ssh-add; do
 done
 test -f "$DEST/bin/ssh.wasm" || { echo "homescoop wasix-openssh: ssh.wasm missing" >&2; exit 1; }
 test -f "$DEST/bin/ssh-keygen.wasm" || { echo "homescoop wasix-openssh: ssh-keygen.wasm missing" >&2; exit 1; }
+for w in "$DEST"/bin/*.wasm; do
+  grep -aqF "wasix-sysroot $SYSROOT_VER" "$w" || { echo "homescoop wasix-openssh: $w lacks the slicc.libc marker" >&2; exit 1; }
+done
 
 # Host-artefact check: no ELF/Mach-O, no host path strings in wasm.
 python3 - "$DEST" <<'PY'
@@ -286,7 +294,7 @@ homescoop_notices_begin "The ssh and ssh-keygen (and optional scp/sftp/ssh-add) 
 homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-18; files from tag v2025-09-02.1)" \
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files from tag v2025-09-02.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -319,10 +327,11 @@ print(json.dumps(cmds))
 PY
 )
 
-python3 - "$DEST" "$VERSION" "$PKG_VER" "$UPSTREAM_PORTABLE" "$CMDS_JSON" <<'PY'
+python3 - "$DEST" "$VERSION" "$PKG_VER" "$UPSTREAM_PORTABLE" "$CMDS_JSON" "$SYSROOT_VER" <<'PY'
 import json, sys
 from pathlib import Path
-dest, ver, pkg_ver, portable, cmds_json = Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+dest, ver, pkg_ver, portable, cmds_json, sysroot = Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
+engines = json.loads((dest / "package.json").read_text())["engines"]
 cmds = json.loads(cmds_json)
 assert "ssh" in cmds and "ssh-keygen" in cmds
 files = ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses"]
@@ -333,7 +342,7 @@ pkg = {
     "version": pkg_ver,
     "description": f"OpenSSH {portable} client for slicc WASIX: " + ", ".join(sorted(cmds)),
     "license": "SSH-OpenSSH",
-    "engines": {"slicc-kernel": ">=1.41.0"},
+    "engines": engines,
     "repository": {
         "type": "git",
         "url": "git+https://github.com/ai-ecoverse/homescoop.git",
@@ -348,7 +357,7 @@ pkg = {
         "upstream": portable,
         "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-3",
         "zlib": "@ai-ecoverse/wasix-zlib@1.3.1-2",
-        "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-18",
+        "sysroot": f"@ai-ecoverse/wasix-sysroot@{sysroot}",
     },
     "slicc": {"abi": "wasi", "commands": cmds},
 }

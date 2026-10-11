@@ -29,7 +29,8 @@
  * @property {number} [rows] default 24
  * @property {Record<string,string>} [env] TERM=xterm-256color is added by the kernel
  * @property {string} [cwd] default /home
- * @property {{expect?: string, flags?: string, write?: string, sleepMs?: number, timeoutMs?: number}[]} [steps]
+ * @property {{expect?: string, flags?: string, write?: string, sleepMs?: number, timeoutMs?: number, resize?: [number, number]}[]} [steps]
+ *   resize: [cols, rows] resizes the terminal (SIGWINCH to its foreground job)
  * @property {number} [timeoutMs] wait for exit after the last step (default 15000), then hang up
  */
 /**
@@ -80,6 +81,7 @@ export async function ptySession(kernel, argv, o = {}) {
       mark += m.index + m[0].length;
     }
     if (step.sleepMs) await sleep(step.sleepMs);
+    if (step.resize) t.resize(step.resize[0], step.resize[1]);
     if (step.write !== undefined) t.write(step.write);
   }
   const status = await Promise.race([t.exited, sleep(o.timeoutMs ?? 15000).then(() => null)]);

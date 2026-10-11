@@ -1,10 +1,10 @@
 {
   "name": "@ai-ecoverse/wasix-openssh",
-  "version": "10.6.0-5",
-  "description": "OpenSSH 10.6p1 client for slicc WASIX: ssh, ssh-keygen, scp, sftp, ssh-add",
+  "version": "10.6.0-6",
+  "description": "OpenSSH 10.6p1 client for slicc WASIX: scp, sftp, ssh, ssh-add, ssh-keygen",
   "license": "SSH-OpenSSH",
   "engines": {
-    "slicc-kernel": ">=1.41.0"
+    "slicc-kernel": ">=1.44.0"
   },
   "repository": {
     "type": "git",
@@ -26,7 +26,8 @@
     "THIRD-PARTY-NOTICES.md",
     "SOURCES.md",
     "bin",
-    "licenses"
+    "licenses",
+    "patches"
   ],
   "publishConfig": {
     "access": "public"
@@ -36,7 +37,7 @@
     "upstream": "10.6p1",
     "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-3",
     "zlib": "@ai-ecoverse/wasix-zlib@1.3.1-2",
-    "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-18"
+    "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-22"
   },
   "slicc": {
     "abi": "wasi",

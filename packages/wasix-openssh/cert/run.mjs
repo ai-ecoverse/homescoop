@@ -14,6 +14,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  appendFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -256,17 +257,17 @@ async function main() {
   await copyTree(pkg, '/node_modules/@ai-ecoverse/wasix-openssh');
 
   // Seed ~/.ssh with the user key for publickey tests.
-  await kernel.writeFile('/home/user/.ssh/id_ed25519', readFileSync(userKey));
-  await kernel.writeFile('/home/user/.ssh/id_ed25519.pub', readFileSync(`${userKey}.pub`));
+  await kernel.writeFile('/root/.ssh/id_ed25519', readFileSync(userKey));
+  await kernel.writeFile('/root/.ssh/id_ed25519.pub', readFileSync(`${userKey}.pub`));
   // writeFile defaults to 0644; OpenSSH rejects open private keys — chmod via coreutils.
-  const chmod = await kernel.run(['chmod', '700', '/home/user/.ssh'], {
-    cwd: '/home/user',
-    env: { HOME: '/home/user', USER: 'user' },
+  const chmod = await kernel.run(['chmod', '700', '/root/.ssh'], {
+    cwd: '/root',
+    env: {},
   });
   if (chmod.status !== 0) throw new Error(`chmod .ssh: ${chmod.stderr}`);
-  const chmodKey = await kernel.run(['chmod', '600', '/home/user/.ssh/id_ed25519'], {
-    cwd: '/home/user',
-    env: { HOME: '/home/user', USER: 'user' },
+  const chmodKey = await kernel.run(['chmod', '600', '/root/.ssh/id_ed25519'], {
+    cwd: '/root',
+    env: {},
   });
   if (chmodKey.status !== 0) throw new Error(`chmod id_ed25519: ${chmodKey.stderr}`);
 
@@ -275,14 +276,14 @@ async function main() {
 
   // Guest ssh_config so scp/sftp/git share the same identity options.
   await kernel.writeFile(
-    '/home/user/.ssh/config',
+    '/root/.ssh/config',
     [
       'Host sshd.cert.internal',
       `  User ${hostUser}`,
-      '  IdentityFile /home/user/.ssh/id_ed25519',
+      '  IdentityFile /root/.ssh/id_ed25519',
       '  IdentitiesOnly yes',
       '  StrictHostKeyChecking accept-new',
-      '  UserKnownHostsFile /home/user/.ssh/known_hosts',
+      '  UserKnownHostsFile /root/.ssh/known_hosts',
       '',
       'Host none.cert.internal',
       '  User user',
@@ -291,12 +292,14 @@ async function main() {
       '',
     ].join('\n'),
   );
-  await kernel.run(['chmod', '600', '/home/user/.ssh/config'], {
-    cwd: '/home/user',
-    env: { HOME: '/home/user', USER: 'user' },
+  await kernel.run(['chmod', '600', '/root/.ssh/config'], {
+    cwd: '/root',
+    env: {},
   });
 
-  const guestEnv = { HOME: '/home/user', USER: 'user' };
+  // Root's home from the kernel's passwd (wasix-sysroot -20+: OpenSSH's ~ is
+  // getpwuid()'s pw_dir, and HOME agrees); before -20 the cert faked /root.
+  const guestEnv = {};
   const ctx = {
     assert,
     work,
@@ -310,17 +313,23 @@ async function main() {
     hostKeyPub: readFileSync(`${hostKey}.pub`, 'utf8').trim(),
     run: (argv, o = {}) =>
       kernel.run(argv, {
-        cwd: o.cwd || '/home/user',
+        cwd: o.cwd || '/root',
         env: { ...guestEnv, ...(o.env || {}) },
         stdin: o.stdin,
       }),
     pty: (argv, o = {}) =>
       ptySession(kernel, argv, {
         ...o,
-        cwd: o.cwd || '/home/user',
+        cwd: o.cwd || '/root',
         env: { ...guestEnv, TERM: 'xterm-256color', ...(o.env || {}) },
       }),
     writeFile: (path, data) => kernel.writeFile(path, data),
+    // wasix-openssh 10.6.0-6 (wasix-sysroot -22): users, host keys, the package.
+    pkgDir: pkg,
+    addUser: (o) => kernel.users.add(o),
+    authorize: (pub) => appendFileSync(authKeys, `${pub.trim()}\n`),
+    runAs: (user, argv, o = {}) =>
+      kernel.run(argv, { cwd: o.cwd || '/', env: o.env || {}, stdin: o.stdin, ...(user !== 'root' && { user }) }),
   };
 
   let failed = 0;

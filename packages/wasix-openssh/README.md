@@ -4,7 +4,8 @@
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
 `scp`, `sftp`, and `ssh-add`.
 
-Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-18**, linking
+Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-22** (since
+10.6.0-6; -5 was on -18), linking
 **wasix-openssl 3.5.9-3** and **wasix-zlib 1.3.1-2** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
@@ -16,22 +17,21 @@ GIT_SSH_COMMAND=ssh git clone ssh://user@host/repo.git
 
 ## Identity and `~/.ssh`
 
-OpenSSH resolves `~` with `$HOME` first, then `getpwuid`. The default remote
-user name comes from `getpwuid` (wasix-sysroot `slicc_identity` → `user` /
-`/home/user` on -17). Until H1 (sysroot **-19** + kernel K1), set `$HOME` and
-`$USER` explicitly in the realm, and prefer `user@host` or `-l` when the
-default user must match a real account. Key files need mode **0600** (kernel
-≥ 1.35.1 `slicc_fs`).
+Since 10.6.0-6 the user is the kernel's (wasix-sysroot -20 credentials,
+slicc-kernel ≥ 1.44.0): the default remote user and `~` come from the
+kernel's passwd, `root` with `/root`, or an added user with its own home, and
+files ssh writes (keys, `known_hosts`) belong to that user. Key files need
+mode **0600**; a private key readable by others is refused (`UNPROTECTED
+PRIVATE KEY FILE`).
 
 ## Interactive PTY (`ssh -t`)
 
-`enter_raw_mode` clears `ISIG` / `IEXTEN` / `OPOST` through `tcsetattr`. WASIX
-`tty_set` cannot clear those yet ([slicc-kernel#247](https://github.com/ai-ecoverse/slicc-kernel/issues/247)),
-so a local **^C** can hit the local `ssh` instead of being forwarded. The
-host-node cert asserts that current behaviour (local `ssh` exits with a
-SIGINT-ish status). Use the SSH escape **`~.`** (newline, tilde, period) to
-disconnect until #247 lands. This package does **not** patch around that in
-OpenSSH.
+Since 10.6.0-6 (wasix-sysroot -21 per-descriptor termios, slicc-kernel ≥
+1.48.0) `enter_raw_mode` really clears `ISIG` / `IEXTEN` / `OPOST`, so a
+local **^C** reaches the remote, and resizing the local terminal reaches the
+remote pty (SIGWINCH → window-change). With -5, or on older kernels, ^C hit
+the local `ssh` ([slicc-kernel#247](https://github.com/ai-ecoverse/slicc-kernel/issues/247)).
+
 
 ## `ssh-add` / agent
 
@@ -70,8 +70,10 @@ backs up `known_hosts` with a copy when `link()` is unavailable (patch
 
 ## Sysroot
 
-**wasix-sysroot 2025.9.30-18** (select/pselect sub-second timeouts and
-socketpair flags; slicc_fs modes from -17). OpenSSH 10.6's client loop uses
+**wasix-sysroot 2025.9.30-22**: select/pselect timeouts and socketpair
+flags (-18), signals and EINTR (-19), the kernel's users (-20), per-fd
+terminals (-21), and the `slicc.libc` marker in every binary (-22), so
+slicc-kernel gives it EINTR semantics. OpenSSH 10.6's client loop uses
 **poll/ppoll**.
 
 ## Not in v1
