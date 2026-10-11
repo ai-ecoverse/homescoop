@@ -18,6 +18,24 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-16 (wasix-sysroot -22: the `slicc.libc` marker, no exported
+itimer helper):
+- ctypes calls variadic C functions (`printf`, `snprintf`, `sscanf`,
+  `open(path, flags, mode)`, `fcntl`, `ioctl`, …): our libffi passes the
+  variadic arguments the way the wasm32 C ABI does
+  (`patches/libffi-wasix-varargs.patch`). As on Apple arm64, set `argtypes` to
+  the **fixed** parameters (e.g. `[c_char_p]` for `printf`) and pass the rest
+  as typed ctypes values (`c_int`, `c_double`, …); without `argtypes` every
+  argument is taken as fixed, which is wrong for a variadic function on wasm32.
+  Pass `c_double` for `%f`: ctypes does not promote, and a variadic `c_float`
+  raises `RuntimeError: ffi_prep_cif_var failed` (libffi rejects it, as on
+  every platform).
+- Signals during blocking calls follow PEP 475 on slicc-kernel ≥ 1.53.3, which
+  answers -22-marked programs with EINTR: a signal whose handler returns does
+  not shorten `time.sleep`/`select`/`poll`, and ^C raises `KeyboardInterrupt`
+  at once (`cert/signals.mjs`).
+  3.14.2-15 could not call them at all ("ffi_prep_cif_var failed").
+
 Since 3.14.2-15:
 - `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.51.0 (#306 /
   #316: `call_dynamic`, `closure_{allocate,prepare,free}`, POSIX `dlopen(NULL)` /

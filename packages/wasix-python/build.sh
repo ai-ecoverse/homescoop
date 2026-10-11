@@ -273,6 +273,9 @@ if [[ ! -f "$DEPS/lib/libffi.a" ]]; then
   fetch_src libffi
   rm -rf "$B/libffi-src" && mkdir -p "$B/libffi-src"
   tar xzf "$SRC_FILE" -C "$B/libffi-src" --strip-components=1
+  # 3.14.2-16: variadic calls on the WASIX backend (ffi_prep_cif_var
+  # returned FFI_BAD_ABI): patches/libffi-wasix-varargs.patch.
+  patch -d "$B/libffi-src" -p1 --no-backup-if-mismatch -s < "$PKG/patches/libffi-wasix-varargs.patch"
   if [[ ! -f "$B/libffi-src/configure" ]]; then
     # macOS Homebrew: libtoolize lives under libtool's gnubin.
     if [[ -d /opt/homebrew/opt/libtool/libexec/gnubin ]]; then
@@ -468,7 +471,7 @@ echo "== wasix-python: compileall (unchecked-hash)"
   echo "| SQLite | $(pkg-config --modversion sqlite3) | public domain | sqlite.org |"
   echo "| GNU Readline | 8.3 | GPL-3.0-or-later | gnu.org/software/readline |"
   echo "| ncurses (tinfo) | 6.5 | X11 | invisible-island.net/ncurses |"
-  echo "| libffi | $(pkg-config --modversion libffi) | MIT | github.com/wasix-org/libffi |"
+  echo "| libffi | $(pkg-config --modversion libffi) (wasix-org 09cbf7d + patches/libffi-wasix-varargs.patch) | MIT | github.com/wasix-org/libffi |"
   echo "| wasix-libc | wasix-sysroot $(node -p "require('$WASIXCC_SYSROOT_PREFIX/package.json').version") | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
   echo "| libc++, libc++abi, libunwind | wasix-libc v2026-07-03.1 sysroot-ehpic | Apache-2.0 WITH LLVM-exception | github.com/wasix-org/wasix-libc |"
   echo

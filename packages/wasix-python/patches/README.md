@@ -103,3 +103,14 @@ failure keeps historic block-buffering.
 
 Apply against the CPython 3.14.2 tree used for wasix-python (shipped in the
 interpreter package, not as a standalone libc change).
+
+## `libffi-wasix-varargs.patch` (wasix-python 3.14.2-16)
+
+Against wasix-org/libffi 09cbf7d (`recipe.yaml` sources.libffi), `src/wasm32/ffi.c`, WASIX path (not Emscripten):
+
+- `ffi_prep_cif_machdep_var` returned `FFI_BAD_ABI` ("Varargs are not yet supported without emscripten"), so ctypes raised `ffi_prep_cif_var failed` for every variadic call (`printf`, `snprintf`, `sscanf`, `open(…, mode)`, `fcntl`, `ioctl`).
+- clang's wasm32 C ABI passes a variadic function's extra arguments as **one** trailing `i32`: a pointer to a buffer holding them, each at its natural alignment in 4-byte slots (8 for 64-bit integers and `double`, 16 for `long double`), aggregates by pointer. `ffi_call` now puts only the fixed arguments into the `wasix_call_dynamic` value buffer, lays the variadic ones out in an aligned buffer on the stack, and appends its address. `ffi_prep_cif_machdep_var` accepts the cif (one extra argument against `MAX_ARGS`).
+- libffi's generic `ffi_prep_cif_var` already rejects variadic `float` and sub-`int` types (C default promotions), so they never reach the buffer.
+- Checked with a C program through `ffi_prep_cif_var` on slicc-kernel 1.51.0 (snprintf with int/double/long long/char*/long double, sscanf, open with mode, plus a fixed call) and by `cert/ctypes-varargs.mjs`.
+- Upstream: offering it to wasix-org/libffi is Lars's call.
+
