@@ -1,5 +1,24 @@
 {
-  "harness": "smoke",
-  "blocked": true,
-  "reason": "Every slicc command (emcc, em++, emar, …) is a /bin/sh launcher that runs em*.py on wasix-python, with wasm-clang, wasm-binaryen and emscripten-cache under /shared/lib/node_modules. The bare PR cert kernel has none of them, so the default `emcc --version` smoke exits 127. Human cert in a full slicc realm; packaging-only repacks (recipe repack:) are gated by diff-published.mjs."
+  "harness": "host-node",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.61.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-17",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5"
+  ],
+  "ci": [
+    "node packages/wasm-emscripten/test/run-paths.mjs --tarball .homescoop-out/package.tgz --layout flat",
+    "node packages/wasm-emscripten/test/run-paths.mjs --tarball .homescoop-out/package.tgz --layout pnpm",
+    "node packages/wasm-emscripten/test/run-paths.mjs --tarball @ai-ecoverse/wasm-emscripten@6.0.9-17 --expect old"
+  ],
+  "host": "node packages/wasm-emscripten/test/run-paths.mjs --tarball <package.tgz> [--layout flat|pnpm] [--expect old] [--kernel <spec>]: npm install of the tarball (its exact companions), laid out flat (npm, slicc's ipk add -g) or as one `pnpm add -g` project (store copies symlinked beside wasm-emscripten), on slicc-kernel's Node entry; em-config LLVM_ROOT / BINARYEN_ROOT and em-ensure-cache's sysroot link must reach the installed wasm-clang (clang), wasm-binaryen (bin/wasm-opt) and emscripten-cache (include/stdio.h). Path resolution only: emcc does not run on slicc-kernel yet (exec of the Emscripten glue by path is ENOEXEC, and there is no node with vm for compiler.mjs), slicc-kernel#390; compiling stays a human check in slicc's webapp realm.",
+  "checklist": [
+    "6.0.9-18, npm flat layout: em-config LLVM_ROOT = /node_modules/@ai-ecoverse/wasm-clang/bin (with clang), BINARYEN_ROOT = /node_modules/@ai-ecoverse/wasm-binaryen (with bin/wasm-opt), no '..'; em-ensure-cache links ~/.cache/emscripten/sysroot into emscripten-cache and include/stdio.h reads through it",
+    "6.0.9-18, `pnpm add -g` layout: the same, with the roots the .pnpm store copies (…/.pnpm/@ai-ecoverse+wasm-clang@<v>/node_modules/@ai-ecoverse/wasm-clang/bin, …+wasm-binaryen@<v>/…): emscripten-config resolve()s ${package}/../<dep> physically",
+    "negative: 6.0.9-17 in the flat layout: em-config LLVM_ROOT = /shared/lib/node_modules/@ai-ecoverse/wasm-clang/bin, which has no clang, and em-ensure-cache fails (missing sysroot at /shared/lib/…)",
+    "not covered (slicc-kernel#390): emcc compiling or linking on slicc-kernel; human check in slicc's webapp realm"
+  ]
 }

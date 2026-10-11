@@ -4,6 +4,12 @@ Emscripten **6.0.9-git** for the SLICC wasm realm. Launchers run `emcc.py`
 (and friends) on `@ai-ecoverse/wasix-python` (`python3 -S`) with `EM_CONFIG`
 pointing at this package's config.
 
+> **emcc does not run on slicc-kernel yet** (exec of the glue by path, and no
+> `node`), see [slicc-kernel#390](https://github.com/ai-ecoverse/slicc-kernel/issues/390).
+> Since 6.0.9-18 the companions are found beside this package (npm, slicc's
+> `ipk add -g`, pnpm's virtual store) instead of only under
+> `/shared/lib/node_modules`.
+
 ## Companions
 
 | Package | Role |

@@ -16,6 +16,7 @@ repack:
   from: "6.0.9-17"
   files:
     - emscripten-config
+    - README.md
   fields:
     - slicc.env
 dependencies:
