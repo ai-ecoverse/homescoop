@@ -173,3 +173,17 @@ A mode without type bits keeps the WASI filetype, which is how every kernel befo
   - `test/r22.mjs` reads it from the probe it links (`ctx.wasm`).
 - **`__homescoop_itimer_real_left` is static.** `getitimer()` moved from `getitimer.c` into `setitimer.c`, so the time-left helper no longer needs external linkage; `build-incremental.sh` deletes `getitimer.o` from every `libc.a` (after checking that the new `setitimer.o` defines what it did). A dynamic-main exports hidden symbols too: wasix-python 3.14.2-15 on -21 exports `__homescoop_itimer_real_left` next to `getitimer`/`setitimer`.
 
+## -23: `ioctl.c` — Linux window-size request numbers (homescoop#250)
+
+WASIX numbers `TIOCGWINSZ`/`TIOCSWINSZ` 0x101/0x102 (`__header_sys_ioctl.h`); Linux uses 0x5413/0x5414. Code that hard-codes the Linux number (common in Python libraries and ctypes snippets) fell through to `ioctl`'s default branch: EINVAL. -23 accepts both numbers for both requests, with the same per-fd behaviour (`slicc_tty.winsize`: the size on a terminal, ENOTTY on pipes and files, EBADF on a closed fd). `slicc_tty.h` defines them as `SLICC_LINUX_TIOCGWINSZ`/`SLICC_LINUX_TIOCSWINSZ`, so the public headers keep WASIX's values. `TCGETS`..`TCSETSF` were already Linux-numbered (-21). `ioctl.o` is still built by the -21 section of `build-incremental.sh`; `test/r23.c` checks both numbers on a pty, pipes, a file and a closed fd.
+
+## -23: `fork.o`, `_Fork.o` in the PIC variants (homescoop#253)
+
+Upstream wasix-libc v2025-09-02.1 compiles musl's `fork.c`, `_Fork.c` and `vfork.c` to empty objects under `#if !defined(__wasm_exception_handling__)`, in all four EH variants, because a WASIX fork is an asyncify unwind and rewind. The -14 full build (`build.sh`) put the asyncify tree's `fork.o`/`_Fork.o` back into `sysroot-eh` and `sysroot-exnref-eh`, but not into the PIC trees, since those objects are not position-independent. So a PIC program calling `fork()` did not link (`undefined symbol: fork`), and the dynamic wasix-python has no `os.fork`.
+
+- **What -23 does.** `build-incremental.sh` compiles `fork.c` and `_Fork.c` from the libc tag with `-fPIC` and the musl internal headers, and replaces the empty members in `sysroot-ehpic` and `sysroot-exnref-ehpic`. It checks that the old members defined nothing, and that `fork`, `_Fork` and `_fork_internal` are defined afterwards. Nothing in them is EH-specific.
+- **Asyncify.** As in the static trees, `fork()` works only in a program that `wasm-opt --asyncify` instrumented (`asyncify-imports@wasix_32v1.proc_fork`) on every frame between the entry point and `fork()`. slicc-kernel answers `proc_fork` ENOSYS in a program without the asyncify exports, so `fork()` returns -1 ENOSYS there.
+- **Side modules.** After a `dlopen`, the child of a fork traps on its first call into the side module (`table index is out of bounds`): the kernel does not rebuild the child's dynamic-linking state yet (slicc-kernel#337). Side modules are not asyncified, so a fork with a side-module frame on the stack is not supported either.
+- **vfork is unchanged.** EH `unistd.h` makes `vfork()` a setjmp macro (`__vfork_internal`, `proc_fork_env`), so there is no `vfork` symbol in any EH variant. Their `vfork.o` also defines `__vfork_restore`, which `_Exit` and the `exec*` family need, so it is not replaced.
+- **Probe.** `test/r23fork.c` (`run-modes.mjs --probe r23fork`; the probe asyncified, `r23fork-sync` the same program without asyncify; `--variant ehpic` also builds `test/r23fork-side.c` as a side module).
+

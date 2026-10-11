@@ -24,4 +24,7 @@ SLICC_TTY(winsize) int32_t __slicc_tty_winsize(int32_t fd, struct winsize *out);
 #define TCSETSW 0x5403
 #define TCSETSF 0x5404
 #endif
+
+#define SLICC_LINUX_TIOCGWINSZ 0x5413
+#define SLICC_LINUX_TIOCSWINSZ 0x5414
 #endif

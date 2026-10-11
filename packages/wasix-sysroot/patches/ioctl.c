@@ -98,7 +98,8 @@ int ioctl(int fildes, int request, ...) {
       va_end(ap);
       return tcsetattr(fildes, request - TCSETS, tio);
     }
-    case TIOCGWINSZ: {
+    case TIOCGWINSZ:
+    case SLICC_LINUX_TIOCGWINSZ: {
       va_list ap;
       va_start(ap, request);
       struct winsize *wsz = va_arg(ap, struct winsize *);
@@ -127,7 +128,8 @@ int ioctl(int fildes, int request, ...) {
       wsz->ws_ypixel = tty.height;
       return 0;
     }
-    case TIOCSWINSZ: {
+    case TIOCSWINSZ:
+    case SLICC_LINUX_TIOCSWINSZ: {
       va_list ap;
       va_start(ap, request);
       const struct winsize *wsz = va_arg(ap, const struct winsize *);

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-22 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-23 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -302,7 +302,7 @@ done
 # tcgetattr/tcsetattr carry the whole termios, ioctl TCGETS/TCSETS*/
 # TIOCGWINSZ and isatty answer per fd, tcflush/tcdrain check the fd. ENOSYS
 # (older kernels) keeps the tty_get/tty_set path. See patches/README.md.
-echo "== wasix-sysroot: -21 members (tcgetattr, tcsetattr, tcflush, tcdrain, ioctl, isatty)"
+echo "== wasix-sysroot: -21 members (tcgetattr, tcsetattr, tcflush, tcdrain, ioctl, isatty; -23 ioctl: Linux TIOCGWINSZ/TIOCSWINSZ)"
 R21_OBJ="$WORK/r21"
 rm -rf "$R21_OBJ" && mkdir -p "$R21_OBJ/static" "$R21_OBJ/pic"
 R21_TOP=(tcgetattr tcsetattr tcflush tcdrain)
@@ -357,6 +357,35 @@ for v in "${VARIANTS[@]}"; do
 done
 [[ $n -eq 15 ]] || { echo "homescoop: marked $n crt1*.o, expected 15 (5 variants x 3)" >&2; exit 1; }
 echo "  $n crt1*.o"
+
+echo "== wasix-sysroot: -23 members (fork, _Fork in the PIC variants)"
+R23_OBJ="$WORK/r23"
+rm -rf "$R23_OBJ" && mkdir -p "$R23_OBJ"
+R23=(fork _Fork)
+for m in "${R23[@]}"; do
+  compile_r20 "$MUSL/src/process/$m.c" "$R23_OBJ/$m.o" "${MUSL_INC[@]}" -fPIC -fvisibility=default
+done
+for v in $PIC_VARIANTS; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  old="$R23_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" fork.o _Fork.o)
+  stubs="$(for m in "${R23[@]}"; do exported "$old/$m.o" 2>/dev/null; done)"
+  if grep -qxE 'fork|_Fork|_fork_internal' <<<"$stubs"; then
+    echo "homescoop: $v fork.o/_Fork.o are no longer upstream's empty EH stubs" >&2
+    exit 1
+  fi
+  for m in "${R23[@]}"; do
+    missing="$(comm -23 <(exported "$old/$m.o" 2>/dev/null) <(exported "$R23_OBJ/$m.o"))"
+    [[ -z "$missing" ]] || { echo "homescoop: $v $m.o: the PIC build lacks: $missing" >&2; exit 1; }
+  done
+  "$LLVM_AR" r "$lib" $(printf "$R23_OBJ/%s.o " "${R23[@]}")
+  have="$(exported "$lib" 2>/dev/null)"
+  for s in fork _Fork _fork_internal; do
+    grep -qx "$s" <<<"$have" || { echo "homescoop: $lib lacks $s" >&2; exit 1; }
+  done
+  echo "  $v (pic)"
+done
 
 homescoop_assert_no_package_links "$PKG"
 echo "== wasix-sysroot: staged $(node -p "require('$PKG/package.json').version") from $BASE_VER"
