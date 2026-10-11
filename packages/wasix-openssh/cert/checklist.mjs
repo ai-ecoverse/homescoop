@@ -13,11 +13,11 @@ export default async function checklist(ctx) {
     '-o',
     'StrictHostKeyChecking=accept-new',
     '-o',
-    'UserKnownHostsFile=/home/user/.ssh/known_hosts',
+    'UserKnownHostsFile=/root/.ssh/known_hosts',
     '-o',
     'IdentitiesOnly=yes',
     '-i',
-    '/home/user/.ssh/id_ed25519',
+    '/root/.ssh/id_ed25519',
   ];
 
   // --- version / keygen ---
@@ -29,25 +29,25 @@ export default async function checklist(ctx) {
   }
 
   {
-    const r = await run(['ssh-keygen', '-t', 'ed25519', '-N', '', '-f', '/home/user/.ssh/cert_ed25519']);
+    const r = await run(['ssh-keygen', '-t', 'ed25519', '-N', '', '-f', '/root/.ssh/cert_ed25519']);
     assert.equal(r.status, 0, `ssh-keygen: ${r.stderr}`);
-    const st = await run(['stat', '-c', '%a', '/home/user/.ssh/cert_ed25519']);
+    const st = await run(['stat', '-c', '%a', '/root/.ssh/cert_ed25519']);
     if (st.status === 0) {
       assert.equal(st.stdout.trim(), '600', 'private key mode 0600');
     }
   }
 
-  // --- identity: $HOME ---
-  // OpenSSH 10.6 `ssh -G` omits userconfigfile; userknownhostsfile still
-  // expands under $HOME (same path policy as ~/.ssh/config).
+  // --- identity: root's home ---
+  // OpenSSH 10.6 `ssh -G` omits userconfigfile; userknownhostsfile expands
+  // ~ to root's home (/root from the kernel's passwd since wasix-sysroot -20).
   {
     const r = await run(['ssh', '-G', 'sshd.cert.internal'], {
-      env: { HOME: '/home/user', USER: 'user' },
+      env: {},
     });
     assert.equal(r.status, 0, `ssh -G: ${r.stderr}`);
     assert.match(
       r.stdout,
-      /userknownhostsfile \/home\/user\/\.ssh\/known_hosts/i,
+      /userknownhostsfile \/root\/\.ssh\/known_hosts/i,
       `ssh -G HOME paths: ${r.stdout.slice(0, 400)}`,
     );
   }
@@ -85,7 +85,7 @@ export default async function checklist(ctx) {
 
   // --- known_hosts mismatch (isolated known_hosts file) ---
   {
-    const kh = '/home/user/.ssh/known_hosts_mismatch';
+    const kh = '/root/.ssh/known_hosts_mismatch';
     await run(['ssh', ...sshBatch, '-o', `UserKnownHostsFile=${kh}`, sshTarget, 'true']);
     const poison = await run([
       'bash',
@@ -102,7 +102,7 @@ export default async function checklist(ctx) {
       '-o',
       `UserKnownHostsFile=${kh}`,
       '-i',
-      '/home/user/.ssh/id_ed25519',
+      '/root/.ssh/id_ed25519',
       sshTarget,
       'true',
     ]);
@@ -175,32 +175,22 @@ export default async function checklist(ctx) {
     assert.match(sess.out.replace(/\r/g, ''), /typed-ok/);
   }
   {
-    // Current behaviour under slicc-kernel#247: tty_set cannot clear ISIG, so a
-    // local ^C (0x03) interrupts the local ssh rather than reaching the remote.
-    // Assert that: we do not patch OpenSSH around this; escape ~. is the out.
-    const ctrlc = await pty(['ssh', '-t', ...sshBatch, sshTarget, 'sleep', '120'], {
-      cols: 80,
-      rows: 24,
-      steps: [
-        // Wait until the session is up (sshd accepts / sleep running), then ^C.
-        { sleepMs: 800, write: '\x03' },
-      ],
-      timeoutMs: 15000,
-    });
-    // SIGINT → 128+2 = 130 is the usual shell report; kernel may surface 130 or
-    // another non-zero. null means the harness hung up after timeout (also fail).
-    assert.notEqual(
-      ctrlc.status,
-      0,
-      `local ^C should interrupt local ssh (#247); status=${ctrlc.status} out=${JSON.stringify(ctrlc.out).slice(0, 300)}`,
+    // 10.6.0-6 (wasix-sysroot -21 per-fd termios, slicc-kernel >= 1.48):
+    // enter_raw_mode really clears ISIG, so ^C goes to the remote as a byte.
+    // The remote traps INT and exits 7; ssh reports the remote's status.
+    // (Before -21, slicc-kernel#247: ^C interrupted the local ssh.)
+    const ctrlc = await pty(
+      ['ssh', '-t', ...sshBatch, sshTarget, 'trap "echo remote-int; exit 7" INT; echo armed; sleep 120 & wait'],
+      {
+        cols: 80,
+        rows: 24,
+        steps: [{ expect: 'armed' }, { sleepMs: 300, write: '\x03' }, { expect: 'remote-int', timeoutMs: 10000 }],
+        timeoutMs: 15000,
+      },
     );
-    assert.ok(
-      ctrlc.status === 130 || ctrlc.status === 255 || (ctrlc.status !== null && ctrlc.status !== 0),
-      `local ^C current behaviour (#247): local ssh exited status=${ctrlc.status} (expect SIGINT-ish, not a clean remote exit)`,
-    );
-    console.log(
-      `note: local ^C → ssh status=${ctrlc.status} (slicc-kernel#247: ISIG not cleared; ~. to disconnect)`,
-    );
+    assert.ok(!ctrlc.failedStep, `^C did not reach the remote: ${JSON.stringify(ctrlc.out).slice(0, 400)}`);
+    assert.equal(ctrlc.status, 7, `ssh should report the remote's exit 7 after ^C; status=${ctrlc.status}`);
+    console.log('note: ^C reached the remote (trap → exit 7), ssh exit 7');
   }
 
   // --- scp / sftp 256 KiB round-trips with checksums ---
@@ -208,11 +198,11 @@ export default async function checklist(ctx) {
     const mk = await run([
       'bash',
       '-c',
-      'head -c 262144 /dev/urandom > /home/user/blob.bin && wc -c /home/user/blob.bin',
+      'head -c 262144 /dev/urandom > /root/blob.bin && wc -c /root/blob.bin',
     ]);
     assert.equal(mk.status, 0, `make blob: ${mk.stderr}`);
     assert.match(mk.stdout, /262144/);
-    const sumUp = await run(['sha256sum', '/home/user/blob.bin']);
+    const sumUp = await run(['sha256sum', '/root/blob.bin']);
     assert.equal(sumUp.status, 0, `sha256sum blob: ${sumUp.stderr}`);
     const hash = sumUp.stdout.trim().split(/\s+/)[0];
     assert.match(hash, /^[0-9a-f]{64}$/);
@@ -221,7 +211,7 @@ export default async function checklist(ctx) {
     const scpUp = await run([
       'scp',
       ...sshBatch,
-      '/home/user/blob.bin',
+      '/root/blob.bin',
       `${sshTarget}:${remoteScp}`,
     ]);
     assert.equal(scpUp.status, 0, `scp up: ${scpUp.stderr}`);
@@ -229,10 +219,10 @@ export default async function checklist(ctx) {
       'scp',
       ...sshBatch,
       `${sshTarget}:${remoteScp}`,
-      '/home/user/blob-scp.bin',
+      '/root/blob-scp.bin',
     ]);
     assert.equal(scpDown.status, 0, `scp down: ${scpDown.stderr}`);
-    const sumScp = await run(['sha256sum', '/home/user/blob-scp.bin']);
+    const sumScp = await run(['sha256sum', '/root/blob-scp.bin']);
     assert.equal(sumScp.status, 0);
     assert.equal(sumScp.stdout.trim().split(/\s+/)[0], hash, 'scp round-trip checksum');
   }
@@ -245,7 +235,7 @@ export default async function checklist(ctx) {
       `sh -c 'printf one > ${hostXfer}/m1; printf two > ${hostXfer}/m2'`,
     ]);
     assert.equal(seed.status, 0, `seed remote m1/m2: ${seed.stderr}`);
-    const mkd = await run(['mkdir', '-p', '/home/user/scpmulti', '/home/user/scpmulti-O']);
+    const mkd = await run(['mkdir', '-p', '/root/scpmulti', '/root/scpmulti-O']);
     assert.equal(mkd.status, 0);
 
     const multi = await run([
@@ -253,11 +243,11 @@ export default async function checklist(ctx) {
       ...sshBatch,
       `${sshTarget}:${hostXfer}/m1`,
       `${sshTarget}:${hostXfer}/m2`,
-      '/home/user/scpmulti/',
+      '/root/scpmulti/',
     ]);
     assert.equal(multi.status, 0, `scp two remotes (sftp): ${multi.stderr}\n${multi.stdout}`);
-    const c1 = await run(['cat', '/home/user/scpmulti/m1']);
-    const c2 = await run(['cat', '/home/user/scpmulti/m2']);
+    const c1 = await run(['cat', '/root/scpmulti/m1']);
+    const c2 = await run(['cat', '/root/scpmulti/m2']);
     assert.equal(c1.stdout, 'one', `m1: ${JSON.stringify(c1)}`);
     assert.equal(c2.stdout, 'two', `m2: ${JSON.stringify(c2)}`);
 
@@ -267,11 +257,11 @@ export default async function checklist(ctx) {
       ...sshBatch,
       `${sshTarget}:${hostXfer}/m1`,
       `${sshTarget}:${hostXfer}/m2`,
-      '/home/user/scpmulti-O/',
+      '/root/scpmulti-O/',
     ]);
     assert.equal(multiO.status, 0, `scp -O two remotes: ${multiO.stderr}\n${multiO.stdout}`);
-    const o1 = await run(['cat', '/home/user/scpmulti-O/m1']);
-    const o2 = await run(['cat', '/home/user/scpmulti-O/m2']);
+    const o1 = await run(['cat', '/root/scpmulti-O/m1']);
+    const o2 = await run(['cat', '/root/scpmulti-O/m2']);
     assert.equal(o1.stdout, 'one');
     assert.equal(o2.stdout, 'two');
 
@@ -290,16 +280,16 @@ export default async function checklist(ctx) {
   {
     const remoteSftp = `${hostXfer}/sftp-up.bin`;
     await writeFile(
-      '/home/user/sftp.batch',
-      [`put /home/user/blob.bin ${remoteSftp}`, `get ${remoteSftp} /home/user/blob-sftp.bin`, 'bye', ''].join(
+      '/root/sftp.batch',
+      [`put /root/blob.bin ${remoteSftp}`, `get ${remoteSftp} /root/blob-sftp.bin`, 'bye', ''].join(
         '\n',
       ),
     );
-    const batch = await run(['sftp', ...sshBatch, '-b', '/home/user/sftp.batch', sshTarget]);
+    const batch = await run(['sftp', ...sshBatch, '-b', '/root/sftp.batch', sshTarget]);
     assert.equal(batch.status, 0, `sftp -b: ${batch.stderr}\n${batch.stdout}`);
-    const sumSftp = await run(['sha256sum', '/home/user/blob-sftp.bin']);
+    const sumSftp = await run(['sha256sum', '/root/blob-sftp.bin']);
     assert.equal(sumSftp.status, 0, `sha256sum sftp: ${sumSftp.stderr}`);
-    const sumBlob = await run(['sha256sum', '/home/user/blob.bin']);
+    const sumBlob = await run(['sha256sum', '/root/blob.bin']);
     assert.equal(
       sumSftp.stdout.trim().split(/\s+/)[0],
       sumBlob.stdout.trim().split(/\s+/)[0],
@@ -310,36 +300,36 @@ export default async function checklist(ctx) {
   // --- git over ssh (wasm-git + GIT_SSH_COMMAND) ---
   {
     const sshCmd =
-      'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/home/user/.ssh/known_hosts -o IdentitiesOnly=yes -i /home/user/.ssh/id_ed25519';
-    const clone = await run(['git', 'clone', gitUrl, '/home/user/cloned'], {
+      'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -i /root/.ssh/id_ed25519';
+    const clone = await run(['git', 'clone', gitUrl, '/root/cloned'], {
       env: { GIT_SSH_COMMAND: sshCmd },
     });
     assert.equal(clone.status, 0, `git clone: ${clone.stderr}\n${clone.stdout}`);
-    const log = await run(['git', '-C', '/home/user/cloned', 'log', '-1', '--format=%s']);
+    const log = await run(['git', '-C', '/root/cloned', 'log', '-1', '--format=%s']);
     assert.equal(log.status, 0);
     assert.match(log.stdout, /seed/);
     const prep = await run([
       'bash',
       '-c',
       [
-        'git -C /home/user/cloned config user.email cert@example.com',
-        'git -C /home/user/cloned config user.name cert',
-        'echo push-ok >> /home/user/cloned/README',
-        'git -C /home/user/cloned add README',
-        'git -C /home/user/cloned commit -m push-ok',
+        'git -C /root/cloned config user.email cert@example.com',
+        'git -C /root/cloned config user.name cert',
+        'echo push-ok >> /root/cloned/README',
+        'git -C /root/cloned add README',
+        'git -C /root/cloned commit -m push-ok',
       ].join(' && '),
     ]);
     assert.equal(prep.status, 0, `git prep: ${prep.stderr}`);
-    const push = await run(['git', '-C', '/home/user/cloned', 'push', 'origin', 'HEAD'], {
+    const push = await run(['git', '-C', '/root/cloned', 'push', 'origin', 'HEAD'], {
       env: { GIT_SSH_COMMAND: sshCmd },
     });
     assert.equal(push.status, 0, `git push: ${push.stderr}\n${push.stdout}`);
     // Prove the bare repo on the host received the commit (via another clone).
-    const clone2 = await run(['git', 'clone', gitUrl, '/home/user/cloned2'], {
+    const clone2 = await run(['git', 'clone', gitUrl, '/root/cloned2'], {
       env: { GIT_SSH_COMMAND: sshCmd },
     });
     assert.equal(clone2.status, 0, `git clone2: ${clone2.stderr}`);
-    const log2 = await run(['git', '-C', '/home/user/cloned2', 'log', '-1', '--format=%s']);
+    const log2 = await run(['git', '-C', '/root/cloned2', 'log', '-1', '--format=%s']);
     assert.match(log2.stdout, /push-ok/);
   }
 
@@ -351,10 +341,10 @@ export default async function checklist(ctx) {
       '-R',
       'sshd.cert.internal',
       '-f',
-      '/home/user/.ssh/known_hosts',
+      '/root/.ssh/known_hosts',
     ]);
     assert.equal(rm.status, 0, `ssh-keygen -R: ${rm.stderr}\n${rm.stdout}`);
-    const old = await run(['test', '-f', '/home/user/.ssh/known_hosts.old']);
+    const old = await run(['test', '-f', '/root/.ssh/known_hosts.old']);
     assert.equal(old.status, 0, 'known_hosts.old retained after -R');
   }
 

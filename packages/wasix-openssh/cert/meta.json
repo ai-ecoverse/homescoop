@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.41.3",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.51.0",
   "uplink": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -8,30 +8,33 @@
     "@ai-ecoverse/wasm-git"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
+    "@ai-ecoverse/wasm-bash@5.3.0-13",
     "@ai-ecoverse/wasm-coreutils@9.12.0-4",
-    "@ai-ecoverse/wasm-git@2.55.0-13"
+    "@ai-ecoverse/wasm-git@2.55.0-15"
   ],
   "host": "node packages/wasix-openssh/cert/run.mjs --tarball <package.tgz>: boots slicc-kernel Node entry with uplink to (1) an ephemeral host OpenSSH sshd (temp keys, loopback), (2) cert/none-auth-server.py, (3) a seeded bare git repo on the host. Runs cert/*.mjs checklist.",
   "patches": {
-    "0001-wasix-stub-getrrsetbyname.patch": "SSHFP/DNSSEC getrrsetbyname always ERRSET_FAIL (no resolv.h); ordinary DNS via kernel — exercised by ssh to sshd.cert.internal / none.cert.internal",
+    "0001-wasix-stub-getrrsetbyname.patch": "SSHFP/DNSSEC getrrsetbyname always ERRSET_FAIL (no resolv.h); ordinary DNS via kernel \u2014 exercised by ssh to sshd.cert.internal / none.cert.internal",
     "0002-wasix-scp-sftp-posix-spawn.patch": "scp/sftp posix_spawnp with per-call argv copy (no global args pollution; multi-source / -3)",
     "0003-wasix-quiet-unsupported-ip-tos.patch": "set_sock_tos ignores ENOSYS/EOPNOTSUPP/ENOPROTOOPT so stderr stays clean",
     "0004-wasix-ssh-keygen-known-hosts-backup.patch": "ssh-keygen -R/-H backup falls back to copy when link() fails"
   },
   "checklist": [
     "ssh -V / ssh-keygen -t ed25519: versions and key file modes 0600 under slicc_fs",
-    "identity: $HOME used for ~/.ssh; default user from getpwuid (slicc_identity) or documented $USER / user@host fallback until H1",
-    "exec: ssh via uplink to host sshd — echo; exit 3 → 3; stdin pipe to remote cat",
-    "stderr: ssh host 'echo x >&2' → stderr exactly \"x\\n\" (no IP_TOS spam)",
+    "identity (10.6.0-6, wasix-sysroot -20+ credentials): the cert runs as root with root's own home /root from the kernel's passwd (until 10.6.0-5 it faked HOME=/home/user)",
+    "exec: ssh via uplink to host sshd \u2014 echo; exit 3 \u2192 3; stdin pipe to remote cat",
+    "stderr: ssh host 'echo x >&2' \u2192 stderr exactly \"x\\n\" (no IP_TOS spam)",
     "publickey ed25519 against host sshd",
     "known_hosts: StrictHostKeyChecking=accept-new then mismatch refusal (isolated known_hosts file)",
     "ssh-keygen -R hostname: updates known_hosts and keeps .old without hard links",
     "none auth against cert/none-auth-server.py (not sshd)",
     "PTY ssh -t via openTerminal: stty size matches cols/rows; type a command; exit; local ^C interrupts local ssh (slicc-kernel#247)",
     "scp + sftp -b: 256 KiB up/down with sha256 checksums",
-    "scp two remote sources (sftp mode and -O) into a local dir; scp -3 remote→remote",
-    "GIT_SSH_COMMAND=ssh + wasm-git 2.55.0-13: clone and push to host bare repo over sshd",
-    "ssh-add -l without agent → exit 2 (ssh-agent not shipped; see README)"
+    "scp two remote sources (sftp mode and -O) into a local dir; scp -3 remote\u2192remote",
+    "GIT_SSH_COMMAND=ssh + wasm-git 2.55.0-15: clone and push to host bare repo over sshd",
+    "ssh-add -l without agent \u2192 exit 2 (ssh-agent not shipped; see README)",
+    "cert/users.mjs (10.6.0-6): as root and as kernel.users.add({name:'cone'}): ssh -G gives the user's name and ~ from passwd (/root, /home/cone); ssh-keygen -t ecdsa writes a 0600 key and 0644 .pub owned by that uid; ssh -i ~/.ssh/id_ecdsa (~ from pw_dir, -F /dev/null) logs in to the host sshd and accept-new writes the user's own known_hosts (owned by the user); after chmod 644 the key is refused with UNPROTECTED PRIVATE KEY FILE",
+    "cert/winsize.mjs (10.6.0-6, wasix-sysroot -21 per-fd winsize): ssh -t in an 80x24 pty, remote stty size 24 80; resize to 120x40 (SIGWINCH \u2192 window-change); remote stty size 40 120",
+    "cert/marker.mjs (10.6.0-6, wasix-sysroot -22): every bin/*.wasm carries the slicc.libc custom section \"wasix-sysroot 2025.9.30-N\", N >= 22"
   ]
 }
