@@ -423,8 +423,8 @@ from pathlib import Path
 inc = Path(sys.argv[1])
 edits = [
     (inc / "__header_fcntl.h", "#define AT_EACCESS          (0x0)\n", "#define AT_EACCESS          (0x200)\n"),
-    (inc / "unistd.h", "#ifdef __wasilibc_unmodified_upstream /* WASI has no eaccess */\nint euidaccess(const char *, int);\nint eaccess(const char *, int);\n#endif\n",
-     "int euidaccess(const char *, int);\nint eaccess(const char *, int);\n"),
+    (inc / "unistd.h", "#ifdef __wasilibc_unmodified_upstream /* WASI has no eaccess */\nint euidaccess(const char *, int);\nint eaccess(const char *, int);\n",
+     "int euidaccess(const char *, int);\nint eaccess(const char *, int);\n#ifdef __wasilibc_unmodified_upstream /* WASI has no copy_file_range, gettid */\n"),
 ]
 for path, old, new in edits:
     t = path.read_text()
@@ -455,6 +455,7 @@ for v in "${VARIANTS[@]}"; do
   done
   grep -q __slicc_fs_path_access <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_fs.path_access" >&2; exit 1; }
   grep -q "AT_EACCESS          (0x200)" "$PKG/$v/include/__header_fcntl.h"
+  grep -q "WASI has no copy_file_range, gettid" "$PKG/$v/include/unistd.h"
   echo "  $v ($flavour)"
 done
 
