@@ -8,6 +8,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+extern int eaccess(const char *, int) __attribute__((weak));
+
+static int eacc(const char *path, int mode) {
+  if (!eaccess) {
+    errno = ENOSYS;
+    return -1;
+  }
+  return eaccess(path, mode);
+}
+
 static const char *err(int r) {
   if (r >= 0) return "0";
   switch (errno) {
@@ -15,6 +25,7 @@ static const char *err(int r) {
   case ENOENT: return "ENOENT";
   case EINVAL: return "EINVAL";
   case EPERM: return "EPERM";
+  case ENOSYS: return "missing";
   default: return strerror(errno);
   }
 }
@@ -63,10 +74,12 @@ static void common(void) {
   int dfd = open("/tmp/r25", O_RDONLY | O_DIRECTORY);
   acc("dirfd priv R", faccessat(dfd, "priv", R_OK, 0));
   close(dfd);
-  acc("eaccess priv R", eaccess("/tmp/r25/priv", R_OK));
+  acc("eaccess priv R", eacc("/tmp/r25/priv", R_OK));
   acc("bad flag", faccessat(AT_FDCWD, "/tmp/r25/ro", R_OK, 0x8));
   acc("bad mode", access("/tmp/r25/ro", 0x10));
   acc("missing", access("/tmp/r25/missing", F_OK));
+  acc("linkat flag 0x1", linkat(AT_FDCWD, "/tmp/r25/ro", AT_FDCWD, "/tmp/r25/l1", 0x1));
+  acc("linkat flag 0x400", linkat(AT_FDCWD, "/tmp/r25/ro", AT_FDCWD, "/tmp/r25/l2", 0x400));
   opn("open ro RDONLY", "/tmp/r25/ro", O_RDONLY);
   opn("open rw WRONLY", "/tmp/r25/rw", O_WRONLY);
   opn("open rw RDWR", "/tmp/r25/rw", O_RDWR);
@@ -85,7 +98,7 @@ int main(int argc, char **argv) {
     int s = seteuid(1000);
     printf("seteuid 1000: %s\n", err(s));
     acc("real priv R", access("/tmp/r25/priv", R_OK));
-    acc("effective priv R", eaccess("/tmp/r25/priv", R_OK));
+    acc("effective priv R", eacc("/tmp/r25/priv", R_OK));
     acc("effective at priv R", faccessat(AT_FDCWD, "/tmp/r25/priv", R_OK, AT_EACCESS));
     seteuid(0);
   }
