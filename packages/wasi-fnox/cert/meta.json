@@ -2,7 +2,7 @@
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.64.0",
   "needs": ["@ai-ecoverse/wasm-coreutils"],
-  "source": "ai-ecoverse/fnox slicc/v1.39 @ 05ef913: the patch series is the fork's commits (SLICC.md), so there are no packages/wasi-fnox/*.patch files to map",
+  "source": "ai-ecoverse/fnox slicc/v1.39 @ 54dd99d: the patch series is the fork's commits (SLICC.md), so there are no packages/wasi-fnox/*.patch files to map",
   "certPending": [
     "KS-2: slicc-kernel /dev/sealed (seal, placeholder, list, request, status, cancel, materialize; secrets-tokens-design.md §3.7)",
     "KS-8: materialize tickets checked at exec (path, sha256 of argv, cwd, parent pid; one-shot, 30 s)",
