@@ -1,0 +1,28 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.64.0",
+  "needs": ["@ai-ecoverse/wasm-coreutils"],
+  "source": "ai-ecoverse/fnox slicc/v1.39 @ 05ef913: the patch series is the fork's commits (SLICC.md), so there are no packages/wasi-fnox/*.patch files to map",
+  "certPending": [
+    "KS-2: slicc-kernel /dev/sealed (seal, placeholder, list, request, status, cancel, materialize; secrets-tokens-design.md §3.7)",
+    "KS-8: materialize tickets checked at exec (path, sha256 of argv, cwd, parent pid; one-shot, 30 s)",
+    "a vault behind the device (or the kernel's test double) answering the §3.7 ops"
+  ],
+  "checklist": [
+    "fnox --version → fnox 1.39.0; --help lists exec/get/set/proxy and no daemon, tui, mcp",
+    "with /etc/fnox/config.toml (default_provider seven, type sealed) via FNOX_CONFIG_DIR: get, export and env print the stored placeholder; no device needed",
+    "discovery from a subdirectory of the project (cwd from PWD)",
+    "without /dev/sealed: set from a pipe, exec with a sealed secret and check --all fail with exactly `not running in seven: /dev/sealed is missing`",
+    "set NAME value (a value on the command line) is refused for a sealed secret; --key-name is refused",
+    "age: set --provider age encrypts to the recipients (ciphertext in fnox.toml, no plaintext); get fails with exactly `age secrets aren't supported in seven yet (slicc-vault#2)`",
+    "sync and reencrypt refused with `not available in seven: the value would be in a program (use a header rule)`",
+    "proxy rules --json prints the [proxy] rules; proxy run -- printenv shows each rule's env name holding the placeholder and the secret's own name unset",
+    "exec with only plain secrets: the child gets the value, stderr warns that it was passed as a plain value; exec of a missing command exits 127",
+    "PENDING (KS-2): set from a pipe → seal {name, value} → placeholder stored, value not in fnox.toml, stdout, stderr or /proc/<pid>/cmdline",
+    "PENDING (KS-2): set on a terminal → request {kind: value} → status polled → placeholder stored; ^C sends cancel and exits 130; ^C during a 10 s machine wait cancels after the reply",
+    "PENDING (KS-2): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
+    "PENDING (KS-2 + KS-8): exec -- printenv with a sealed secret → materialize {names, path, argv (argv[0] = resolved path), cwd} → SLICC_SEALED_TICKET → the child sees the value for real:true names and the placeholder for real:false ones; fnox's own stdout/stderr never carry the value",
+    "PENDING (KS-8, exposure): what the child and its environment expose: /proc/<child>/cmdline and status, the child's own children (inherited env), ps as another user, a reused or mismatched ticket (argv, cwd, path, parent) failing closed with EACCES",
+    "PENDING (K4a #405): /etc/fnox/config.toml root-owned 0644: a non-root user reads and resolves it, fnox set or edit fails with EACCES, sudo succeeds"
+  ]
+}

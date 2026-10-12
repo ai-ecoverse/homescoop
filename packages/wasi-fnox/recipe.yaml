@@ -1,0 +1,38 @@
+# fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
+# Source is the ai-ecoverse/fnox fork's slicc/v1.39 branch: upstream
+# v1.39.0 plus the slicc patch series as commits (its SLICC.md lists them),
+# so this recipe carries no *.patch files. CERT-PENDING: the cert needs
+# slicc-kernel's /dev/sealed (KS-2) and materialize tickets (KS-8).
+name: wasi-fnox
+builder: host
+version: "1.39.0"
+npm: "@ai-ecoverse/wasi-fnox"
+summary: "fnox 1.39 for slicc WASI preview1 (command fnox; seven's sealed store)"
+source:
+  url: "https://github.com/ai-ecoverse/fnox/archive/05ef9134cb4fafed97b3a34f92d06d98d86e97b5.tar.gz"
+  sha256: "ad6a262d68f8cab0a48a0f429b3023e6db4dcc49c4fce67dbf4bdbff5bb1e562"
+  commit: "05ef9134cb4fafed97b3a34f92d06d98d86e97b5"
+toolchain:
+  rust: "1.98.1"
+  binaryen: "133"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://fnox.jdx.dev
+  license: MIT
+  notes: |
+    Source: ai-ecoverse/fnox slicc/v1.39 at 05ef913 (upstream v1.39.0,
+    cc06c75, plus 11 patch commits and SLICC.md). Those commits gate
+    non-WASI dependencies and commands (cloud SDKs, keyring, TUI, mcp,
+    daemon, leases, local proxy), take cwd/HOME from the environment,
+    spawn through wasix-command, and add the sealed provider: values
+    live in seven's vault behind /dev/sealed, fnox stores placeholders,
+    `set` seals or asks the vault dialog, `exec` sends materialize and
+    spawns with SLICC_SEALED_TICKET, `proxy run` passes placeholders.
+    cargo build --locked --release --bin fnox --target wasm32-wasip1
+    with RUSTFLAGS --cfg tokio_unstable, then wasm-opt -Oz (binaryen
+    133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
+    plus Rust's std and wasi-libc licences. New package → human cert,
+    pending KS-2 and KS-8.
