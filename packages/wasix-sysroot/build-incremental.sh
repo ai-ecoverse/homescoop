@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-24 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-25 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -412,6 +412,49 @@ for v in "${VARIANTS[@]}"; do
   for s in __slicc_fs_path_chown __slicc_fs_fd_chown __slicc_fs_path_owner __slicc_fs_fd_owner __slicc_fs_path_filestat_owner __slicc_fs_fd_filestat_owner; do
     grep -q "$s" <<<"$undef" || { echo "homescoop: $lib lacks slicc_fs $s" >&2; exit 1; }
   done
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -25 members (faccessat/eaccess through slicc_fs.path_access; AT_EACCESS 0x200)"
+for v in "${VARIANTS[@]}"; do
+  python3 - "$PKG/$v/include" <<'PYHDR'
+import sys
+from pathlib import Path
+inc = Path(sys.argv[1])
+edits = [
+    (inc / "__header_fcntl.h", "#define AT_EACCESS          (0x0)\n", "#define AT_EACCESS          (0x200)\n"),
+    (inc / "unistd.h", "#ifdef __wasilibc_unmodified_upstream /* WASI has no eaccess */\nint euidaccess(const char *, int);\nint eaccess(const char *, int);\n#endif\n",
+     "int euidaccess(const char *, int);\nint eaccess(const char *, int);\n"),
+]
+for path, old, new in edits:
+    t = path.read_text()
+    if new in t:
+        continue
+    if t.count(old) != 1:
+        sys.exit(f"{path}: not found: {old.splitlines()[0]}")
+    path.write_text(t.replace(old, new))
+PYHDR
+done
+R25_OBJ="$WORK/r25"
+rm -rf "$R25_OBJ" && mkdir -p "$R25_OBJ/static" "$R25_OBJ/pic"
+compile_r18 faccessat "$R25_OBJ/static/faccessat.o"
+compile_r18 faccessat "$R25_OBJ/pic/faccessat.o" -fPIC -fvisibility=default
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R25_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" faccessat.o)
+  missing="$(comm -23 <(defined "$old/faccessat.o") <(defined "$R25_OBJ/$flavour/faccessat.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v faccessat.o: patched source lacks: $missing" >&2; exit 1; }
+  "$LLVM_AR" r "$lib" "$R25_OBJ/$flavour/faccessat.o"
+  have="$(exported "$lib" 2>/dev/null)"
+  for s in eaccess euidaccess __wasilibc_nocwd_faccessat; do
+    grep -qx "$s" <<<"$have" || { echo "homescoop: $lib lacks $s" >&2; exit 1; }
+  done
+  grep -q __slicc_fs_path_access <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_fs.path_access" >&2; exit 1; }
+  grep -q "AT_EACCESS          (0x200)" "$PKG/$v/include/__header_fcntl.h"
   echo "  $v ($flavour)"
 done
 
