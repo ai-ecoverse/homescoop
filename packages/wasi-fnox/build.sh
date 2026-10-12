@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# wasi-fnox: build fnox from the ai-ecoverse/fnox fork (slicc/v1.39) for
-# wasm32-wasip1, shrink it with wasm-opt, and stage bin/fnox.wasm with
-# LICENSE and THIRD-PARTY-NOTICES.md.
+# wasi-fnox: build fnox (jdx/fnox v1.39.0 plus packages/wasi-fnox/*.patch,
+# applied by apply.sh) for wasm32-wasip1, shrink it with wasm-opt, and stage
+# bin/fnox.wasm with LICENSE and THIRD-PARTY-NOTICES.md.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
@@ -9,16 +9,17 @@ export HOMESCOOP_ROOT="$ROOT"
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe wasi-fnox
 field() { node "$ROOT/scripts/read-recipe.mjs" wasi-fnox --field "$1"; }
-COMMIT="$(field source.commit)"
 RUST="$(field toolchain.rust)"
 BINARYEN="$(field toolchain.binaryen)"
 TARGET=wasm32-wasip1
 
-TARBALL="$WORK/fnox-$COMMIT.tar.gz"
-SRC_DIR="$WORK/fnox-$COMMIT"
+TARBALL="$WORK/fnox-v$VERSION.tar.gz"
+SRC_DIR="$WORK/fnox-$VERSION"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
+# Always from a fresh extract: apply.sh refuses a tree it has patched.
+rm -rf "$SRC_DIR"
 homescoop_extract "$TARBALL" "$SRC_DIR"
-test -f "$SRC_DIR/SLICC.md" || { echo "wasi-fnox: $SRC_URL is not the slicc fork" >&2; exit 1; }
+bash "$HOMESCOOP_PKG/apply.sh" "$SRC_DIR" "$ROOT"
 
 export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"
 if ! command -v rustup >/dev/null 2>&1; then
@@ -52,7 +53,9 @@ echo "== wasi-fnox: cargo build --bin fnox ($TARGET, Rust $RUST)"
   # tokio refuses io-std and fs on wasm without tokio_unstable. No
   # -C strip: it drops the target_features section wasm-opt reads. Panic
   # locations name source files: map the build machine's paths away.
-  RUSTFLAGS="--cfg tokio_unstable -C codegen-units=1 --remap-path-prefix=$SRC_DIR=/fnox --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo" \
+  # Cargo hands rustc the physical path of OUT_DIR (macOS: /private/var/…,
+  # /private/tmp/…), so map that spelling too.
+  RUSTFLAGS="--cfg tokio_unstable -C codegen-units=1 --remap-path-prefix=$SRC_DIR=/fnox --remap-path-prefix=$(pwd -P)=/fnox --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo" \
     "${CARGO[@]}" build --locked --release --bin fnox --target "$TARGET"
 )
 WASM="$SRC_DIR/target/$TARGET/release/fnox.wasm"
@@ -72,7 +75,7 @@ homescoop_stage_license "$SRC_DIR/LICENSE"
 
 # Every crate linked into fnox.wasm (normal dependencies, as cargo resolves
 # them for the target), then Rust's standard library and wasi-libc.
-homescoop_notices_begin "fnox.wasm (fnox, MIT, see LICENSE; its crates/wasix-command from ai-ecoverse/homescoop, MIT OR Apache-2.0) statically links these crates, Rust's standard library and wasi-libc."
+homescoop_notices_begin "fnox.wasm (fnox, MIT, see LICENSE, with homescoop's patches; homescoop's crates/wasix-command, MIT OR Apache-2.0) statically links these crates, Rust's standard library and wasi-libc."
 (cd "$SRC_DIR" && "${CARGO[@]}" metadata --locked --format-version 1 --filter-platform "$TARGET") >"$WORK/wasi-fnox-metadata.json"
 node - "$WORK/wasi-fnox-metadata.json" >>"$HOMESCOOP_NOTICES" <<'JS'
 const { readFileSync, readdirSync } = require('node:fs')
@@ -139,10 +142,10 @@ homescoop_notice "wasi-libc (wasi-sdk-31; Rust's self-contained $TARGET libc)" \
   "$WASI_LIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
   "$WASI_LIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
 
-if strings "$DEST/bin/fnox.wasm" | grep -E '/Users/|/home/runner/|/var/folders/' >/dev/null; then
+if strings "$DEST/bin/fnox.wasm" | grep -E '/Users/|/home/runner/|/var/folders/|/private/(tmp|var)/' >/dev/null; then
   echo "homescoop: host path leaked into fnox.wasm" >&2
-  strings "$DEST/bin/fnox.wasm" | grep -E '/Users/|/home/runner/|/var/folders/' | head >&2
+  strings "$DEST/bin/fnox.wasm" | grep -E '/Users/|/home/runner/|/var/folders/|/private/(tmp|var)/' | head >&2
   exit 1
 fi
 shasum -a 256 "$DEST/bin/fnox.wasm"
-echo "== wasi-fnox: staged → $DEST ($VERSION @ ${COMMIT:0:7}, $(wc -c <"$DEST/bin/fnox.wasm" | tr -d ' ') bytes)"
+echo "== wasi-fnox: staged → $DEST ($VERSION + $(ls "$HOMESCOOP_PKG"/[0-9][0-9][0-9][0-9]-*.patch | wc -l | tr -d ' ') patches, $(wc -c <"$DEST/bin/fnox.wasm" | tr -d ' ') bytes)"

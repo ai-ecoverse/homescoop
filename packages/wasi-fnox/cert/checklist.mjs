@@ -46,6 +46,9 @@ export default async function (ctx) {
   assert.equal(help.status, 0);
   for (const cmd of ['exec', 'get', 'set', 'proxy']) assert.match(help.stdout, new RegExp(`\\n  ${cmd} `));
   for (const cmd of ['daemon', 'tui', 'mcp']) assert.doesNotMatch(help.stdout, new RegExp(`\\n  ${cmd} `));
+  const add = await fnox(['provider', 'add', '--help']);
+  assert.equal(add.status, 0, `provider add --help: ${add.stderr}`);
+  assert.match(add.stdout, /\bsealed\b/, 'provider add offers sealed on WASI');
 
   const get = await fnox(['get', 'GH']);
   assert.equal(get.status, 0, `get: ${get.stderr}`);

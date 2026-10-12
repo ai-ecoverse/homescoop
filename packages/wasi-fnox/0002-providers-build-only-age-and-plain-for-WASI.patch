@@ -1,0 +1,292 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Mon, 12 Oct 2026 14:34:18 +0200
+Subject: [PATCH 02/14] providers: build only age and plain for WASI
+
+The provider generator takes an allowlist on WASI targets. Disabled
+providers keep their configuration variants, so every fnox.toml still
+parses, and fail at instantiation with "provider type '<type>' is not
+available in the WASI build of fnox". Their modules, the hardware-key
+setup paths and age plugin support are compiled out on WASI, and
+BitwardenBackend is kept as a plain enum for the configuration types.
+
+diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
+index 3b82500..f0ca60e 100644
+--- a/crates/fnox-core/build/generate_providers.rs
++++ b/crates/fnox-core/build/generate_providers.rs
+@@ -407,9 +407,15 @@ fn generate_provider_methods(
+         daemon_cache_arms.push(quote! {
+             Self::#variant { daemon_cache, .. } => daemon_cache.unwrap_or(true)
+         });
+-        env_deps_arms.push(quote! {
+-            Self::#variant { .. } => #module::env_dependencies()
+-        });
++        if wasi_enabled(&provider.module) {
++            env_deps_arms.push(quote! {
++                Self::#variant { .. } => #module::env_dependencies()
++            });
++        } else {
++            env_deps_arms.push(quote! {
++                Self::#variant { .. } => &[]
++            });
++        }
+         let interactive = provider.requires_interactive_auth;
+         interactive_auth_arms.push(quote! {
+             Self::#variant { .. } => #interactive
+@@ -421,6 +427,7 @@ fn generate_provider_methods(
+     // Build use statements for provider modules
+     let module_uses: Vec<TokenStream> = providers
+         .iter()
++        .filter(|(_name, provider)| wasi_enabled(&provider.module))
+         .map(|(_name, provider)| {
+             let module = Ident::new(&provider.module, Span::call_site());
+             quote! { use super::super::#module; }
+@@ -705,6 +712,13 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
+     }
+ }
+ 
++fn wasi_enabled(module: &str) -> bool {
++    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("wasi") {
++        return true;
++    }
++    matches!(module, "age" | "plain")
++}
++
+ fn generate_provider_instantiate(
+     providers: &[(String, ProviderToml)],
+ ) -> Result<String, Box<dyn std::error::Error>> {
+@@ -722,6 +736,18 @@ fn generate_provider_instantiate(
+             vec![]
+         };
+ 
++        if !wasi_enabled(&provider.module) {
++            let msg = format!(
++                "provider type '{}' is not available in the WASI build of fnox",
++                provider.serde_rename
++            );
++            arms.push(quote! {
++                ResolvedProviderConfig::#variant { .. } => {
++                    Err(crate::error::FnoxError::Config(#msg.to_string()))
++                }
++            });
++            continue;
++        }
+         if provider.fields.is_empty() {
+             arms.push(quote! {
+                 ResolvedProviderConfig::#variant => {
+diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
+index 4d31543..3b505a7 100644
+--- a/crates/fnox-core/src/providers/age.rs
++++ b/crates/fnox-core/src/providers/age.rs
+@@ -180,6 +180,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+ 
+         // Parse recipients - try SSH, native age, then plugin formats
+         let mut parsed_recipients: Vec<Box<dyn age::Recipient + Send + Sync>> = Vec::new();
++        #[cfg(not(target_os = "wasi"))]
+         let mut plugin_recipients: Vec<age::plugin::Recipient> = Vec::new();
+ 
+         for recipient in &self.recipients {
+@@ -195,7 +196,15 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+                 continue;
+             }
+ 
++            #[cfg(target_os = "wasi")]
++            return Err(FnoxError::AgeEncryptionFailed {
++                details: format!(
++                    "Failed to parse recipient '{}': age plugins are not available in the WASI build",
++                    recipient
++                ),
++            });
+             // Fall back to plugin recipient, e.g. age-plugin-yubikey: age1yubikey1...
++            #[cfg(not(target_os = "wasi"))]
+             match recipient.parse::<age::plugin::Recipient>() {
+                 Ok(plugin_recipient) => plugin_recipients.push(plugin_recipient),
+                 Err(e) => {
+@@ -209,10 +218,12 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+         // Build one plugin driver per distinct plugin name. RecipientPluginV1
+         // filters the recipient list by plugin name internally, so we pass the
+         // full list and spawn the matching `age-plugin-*` binary from $PATH.
++        #[cfg(not(target_os = "wasi"))]
+         let plugin_names: std::collections::BTreeSet<String> = plugin_recipients
+             .iter()
+             .map(|r| r.plugin().to_string())
+             .collect();
++        #[cfg(not(target_os = "wasi"))]
+         for plugin_name in plugin_names {
+             let plugin = age::plugin::RecipientPluginV1::new(
+                 &plugin_name,
+@@ -444,12 +455,14 @@ impl AgeEncryptionProvider {
+                     // identities (e.g. AGE-PLUGIN-YUBIKEY-1...) by driving the
+                     // matching `age-plugin-*` binary for PIN/touch prompts.
+                     cursor.set_position(0);
+-                    age::IdentityFile::from_buffer(cursor)
+-                        .map_err(|e| FnoxError::AgeIdentityParseFailed {
++                    let file = age::IdentityFile::from_buffer(cursor).map_err(|e| {
++                        FnoxError::AgeIdentityParseFailed {
+                             details: e.to_string(),
+-                        })?
+-                        .with_callbacks(age::cli_common::UiCallbacks)
+-                        .into_identities()
++                        }
++                    })?;
++                    #[cfg(not(target_os = "wasi"))]
++                    let file = file.with_callbacks(age::cli_common::UiCallbacks);
++                    file.into_identities()
+                         .map_err(|e| FnoxError::AgeIdentityParseFailed {
+                             details: e.to_string(),
+                         })?
+diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/providers/mod.rs
+index 0ddb219..bb32209 100644
+--- a/crates/fnox-core/src/providers/mod.rs
++++ b/crates/fnox-core/src/providers/mod.rs
+@@ -5,40 +5,80 @@ use std::path::PathBuf;
+ 
+ // Provider implementation modules
+ pub mod age;
++#[cfg(not(target_os = "wasi"))]
+ pub mod aws_kms;
++#[cfg(not(target_os = "wasi"))]
+ pub mod aws_ps;
++#[cfg(not(target_os = "wasi"))]
+ mod aws_shared;
++#[cfg(not(target_os = "wasi"))]
+ pub mod aws_sm;
++#[cfg(not(target_os = "wasi"))]
+ pub mod azure_ac;
++#[cfg(not(target_os = "wasi"))]
+ pub mod azure_kms;
++#[cfg(not(target_os = "wasi"))]
+ pub mod azure_sm;
++#[cfg(not(target_os = "wasi"))]
+ pub mod bitwarden;
++#[cfg(not(target_os = "wasi"))]
+ pub mod bitwarden_sm;
++#[cfg(not(target_os = "wasi"))]
+ pub mod doppler;
++#[cfg(not(target_os = "wasi"))]
+ pub mod enpass;
+-#[cfg(not(target_env = "musl"))]
++#[cfg(all(not(target_env = "musl"), not(target_os = "wasi")))]
+ pub mod fido2;
++#[cfg(not(target_os = "wasi"))]
+ pub mod foks;
++#[cfg(not(target_os = "wasi"))]
+ pub mod gcp_kms;
++#[cfg(not(target_os = "wasi"))]
+ pub mod gcp_sm;
+ pub mod hw_encrypt;
++#[cfg(not(target_os = "wasi"))]
+ pub mod infisical;
++#[cfg(not(target_os = "wasi"))]
+ pub mod keepass;
++#[cfg(not(target_os = "wasi"))]
+ pub mod keeper_sm;
++#[cfg(not(target_os = "wasi"))]
+ pub mod keychain;
++#[cfg(not(target_os = "wasi"))]
+ pub mod onepassword;
++#[cfg(not(target_os = "wasi"))]
+ pub mod password_store;
++#[cfg(not(target_os = "wasi"))]
+ pub mod passwordstate;
+ pub mod plain;
++#[cfg(not(target_os = "wasi"))]
+ pub mod proton_pass;
+ pub mod resolved;
+ pub mod resolver;
+ pub mod secret_ref;
++#[cfg(not(target_os = "wasi"))]
+ pub mod vault;
++#[cfg(not(target_os = "wasi"))]
+ pub mod yubikey;
++#[cfg(not(target_os = "wasi"))]
+ pub mod yubikey_usb;
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub use bitwarden::BitwardenBackend;
++#[cfg(target_os = "wasi")]
++mod bitwarden_backend {
++    use schemars::JsonSchema;
++    use serde::{Deserialize, Serialize};
++
++    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
++    #[serde(rename_all = "lowercase")]
++    pub enum BitwardenBackend {
++        Bw,
++        Rbw,
++    }
++}
++#[cfg(target_os = "wasi")]
++pub use bitwarden_backend::BitwardenBackend;
+ pub use resolver::resolve_provider_config;
+ pub use secret_ref::{OptionProviderSecretRef, OptionStringOrSecretRef, StringOrSecretRef};
+ 
+@@ -144,13 +184,16 @@ mod generated {
+     }
+     pub(super) mod providers_instantiate {
+         // Need to import provider modules for instantiation
+-        #[cfg(not(target_env = "musl"))]
++        #[cfg(all(not(target_env = "musl"), not(target_os = "wasi")))]
+         use super::super::fido2;
++        #[cfg(not(target_os = "wasi"))]
+         use super::super::{
+             age, aws_kms, aws_ps, aws_sm, azure_ac, azure_kms, azure_sm, bitwarden, bitwarden_sm,
+             doppler, enpass, foks, gcp_kms, gcp_sm, infisical, keepass, keeper_sm, keychain,
+             onepassword, password_store, passwordstate, plain, proton_pass, vault, yubikey,
+         };
++        #[cfg(target_os = "wasi")]
++        use super::super::{age, plain};
+         include!(concat!(
+             env!("OUT_DIR"),
+             "/generated/providers_instantiate.rs"
+diff --git a/src/child_env.rs b/src/child_env.rs
+index e53b3a3..eed1cd3 100644
+--- a/src/child_env.rs
++++ b/src/child_env.rs
+@@ -45,9 +45,15 @@ pub fn scope_purpose(scope: EnvScope) -> Purpose {
+ /// credentials with these names are still applied after the scrub.
+ pub fn ambient_scrub_keys() -> impl Iterator<Item = &'static str> {
+     ["FNOX_AGE_KEY", "FNOX_AGE_KEY_FILE"].into_iter().chain(
+-        fnox_core::providers::enpass::env_dependencies()
+-            .iter()
+-            .copied(),
++        {
++            #[cfg(not(target_os = "wasi"))]
++            let deps = fnox_core::providers::enpass::env_dependencies();
++            #[cfg(target_os = "wasi")]
++            let deps: &[&str] = &["ENPASS_PASSWORD", "FNOX_ENPASS_PASSWORD"];
++            deps
++        }
++        .iter()
++        .copied(),
+     )
+ }
+ 
+diff --git a/src/commands/provider/add.rs b/src/commands/provider/add.rs
+index 46972b3..8db3b17 100644
+--- a/src/commands/provider/add.rs
++++ b/src/commands/provider/add.rs
+@@ -201,7 +201,14 @@ impl AddCommand {
+                 auth_command: None,
+                 daemon_cache: None,
+             },
+-            #[cfg(not(target_env = "musl"))]
++            #[cfg(target_os = "wasi")]
++            ProviderType::Fido2 | ProviderType::Yubikey => {
++                return Err(FnoxError::Config(
++                    "hardware-key providers are not available in the WASI build of fnox"
++                        .to_string(),
++                ));
++            }
++            #[cfg(all(not(target_env = "musl"), not(target_os = "wasi")))]
+             ProviderType::Fido2 => {
+                 let provider_name = self.provider.clone();
+                 let (credential_id_hex, salt_hex, rp_id, _pin) =
+@@ -220,6 +227,7 @@ impl AddCommand {
+                     daemon_cache: None,
+                 }
+             }
++            #[cfg(not(target_os = "wasi"))]
+             ProviderType::Yubikey => {
+                 let provider_name = self.provider.clone();
+                 let (challenge_hex, slot_str) = tokio::task::spawn_blocking(move || {

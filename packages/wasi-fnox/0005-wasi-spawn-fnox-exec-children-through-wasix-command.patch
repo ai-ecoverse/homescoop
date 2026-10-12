@@ -1,0 +1,66 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Mon, 12 Oct 2026 14:39:51 +0200
+Subject: [PATCH 05/14] wasi: spawn `fnox exec` children through wasix-command
+
+std::process::Command is unsupported on wasm32-wasip1. On WASI, `fnox
+exec` uses wasix_command::Command, which spawns through the WASIX
+proc_spawn3/proc_join calls that slicc-kernel implements, with the
+same Command API. crates/wasix-command is not part of this patch:
+homescoop's packages/wasi-fnox/apply.sh copies ai-ecoverse/homescoop
+crates/wasix-command (MIT OR Apache-2.0) into the source tree.
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 6b9c26e..410ac62 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2377,6 +2377,7 @@ dependencies = [
+  "tracing",
+  "tracing-subscriber",
+  "usage-rs",
++ "wasix-command",
+  "which",
+ ]
+ 
+@@ -7830,6 +7831,13 @@ dependencies = [
+  "wit-bindgen",
+ ]
+ 
++[[package]]
++name = "wasix-command"
++version = "0.1.0"
++dependencies = [
++ "libc",
++]
++
+ [[package]]
+ name = "wasm-bindgen"
+ version = "0.2.129"
+diff --git a/Cargo.toml b/Cargo.toml
+index 26f6f28..8372206 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -178,6 +178,7 @@ which = { workspace = true }
+ tokio = { workspace = true, features = ["full"] }
+ 
+ [target.'cfg(target_os = "wasi")'.dependencies]
++wasix-command = { path = "crates/wasix-command" }
+ tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "io-util", "fs", "io-std"] }
+ 
+ [dev-dependencies]
+diff --git a/src/commands/exec.rs b/src/commands/exec.rs
+index 7ed42a3..0d965b1 100644
+--- a/src/commands/exec.rs
++++ b/src/commands/exec.rs
+@@ -2,8 +2,11 @@ use crate::child_env::{self, EnvScope, Roots};
+ use crate::error::{FnoxError, Result};
+ use crate::temp_file_secrets::create_ephemeral_secret_file;
+ use crate::{commands::Cli, config::Config};
++#[cfg(not(target_os = "wasi"))]
+ use std::process::Command;
+ use tempfile::NamedTempFile;
++#[cfg(target_os = "wasi")]
++use wasix_command::Command;
+ 
+ #[derive(Debug, usage_rs::Args)]
+ #[usage(alias = "x", alias_hidden = "run")]

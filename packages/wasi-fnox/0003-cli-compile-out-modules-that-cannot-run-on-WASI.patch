@@ -1,0 +1,754 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Mon, 12 Oct 2026 14:38:10 +0200
+Subject: [PATCH 03/14] cli: compile out modules that cannot run on WASI
+
+On WASI the mcp, proxy, tui and daemon commands, the lease backend
+implementations, the shared HTTP client, the keyring store, credential
+commands and the interactive prompts (init wizard, auth retry, lease
+and secret value prompts) are not built. Leases fail with "leases are
+not available in the WASI build of fnox", `fnox set` without a value
+asks for an argument or stdin, `fnox init` writes a minimal
+configuration, and the daemon is never started in the background.
+
+diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_prompt.rs
+index afc0f15..5d82beb 100644
+--- a/crates/fnox-core/src/auth_prompt.rs
++++ b/crates/fnox-core/src/auth_prompt.rs
+@@ -6,6 +6,7 @@
+ use crate::config::Config;
+ use crate::error::{FnoxError, Result};
+ use crate::providers::ProviderConfig;
++#[cfg(not(target_os = "wasi"))]
+ use demand::Confirm;
+ use std::process::Command;
+ 
+@@ -38,12 +39,19 @@ pub fn prompt_and_run_auth(
+         provider_name, error
+     );
+ 
++    #[cfg(target_os = "wasi")]
++    {
++        let _ = auth_command;
++        return Ok(false);
++    }
++    #[cfg(not(target_os = "wasi"))]
+     let user_confirmed = Confirm::new(format!("Run `{}` to authenticate?", auth_command))
+         .affirmative("Yes")
+         .negative("No")
+         .run()
+         .map_err(|e| FnoxError::Provider(format!("Failed to show prompt: {}", e)))?;
+ 
++    #[cfg(not(target_os = "wasi"))]
+     if !user_confirmed {
+         return Ok(false);
+     }
+diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
+index 2484211..67a5450 100644
+--- a/crates/fnox-core/src/http.rs
++++ b/crates/fnox-core/src/http.rs
+@@ -9,6 +9,7 @@ fn configured_timeout(value: &str) -> Option<Duration> {
+ }
+ 
+ /// Build an HTTP client with the configured timeout from settings.
++#[cfg(not(target_os = "wasi"))]
+ pub fn http_client() -> reqwest::Client {
+     let settings = crate::settings::Settings::get();
+     let user_agent = format!("fnox/{}", env!("CARGO_PKG_VERSION"));
+diff --git a/crates/fnox-core/src/lease.rs b/crates/fnox-core/src/lease.rs
+index 829fc9a..06c8380 100644
+--- a/crates/fnox-core/src/lease.rs
++++ b/crates/fnox-core/src/lease.rs
+@@ -42,6 +42,7 @@ pub struct LeaseLedger {
+ 
+ /// RAII guard for the ledger file lock. The lock is released when dropped.
+ pub struct LedgerLockGuard {
++    #[cfg(not(target_os = "wasi"))]
+     _lock: xx::fslock::LockFile,
+ }
+ 
+@@ -96,10 +97,20 @@ impl LeaseLedger {
+     pub fn lock(project_dir: &Path) -> Result<LedgerLockGuard> {
+         let ledger_path = Self::ledger_path(project_dir);
+         let lock_path = ledger_path.with_extension("lock");
+-        let lock = xx::fslock::FSLock::new(&lock_path)
+-            .lock()
+-            .map_err(|e| FnoxError::Config(format!("Failed to acquire ledger lock: {e}")))?;
+-        Ok(LedgerLockGuard { _lock: lock })
++        #[cfg(target_os = "wasi")]
++        {
++            let _ = lock_path;
++            Err(FnoxError::Config(
++                "leases are not available in the WASI build of fnox".to_string(),
++            ))
++        }
++        #[cfg(not(target_os = "wasi"))]
++        {
++            let lock = xx::fslock::FSLock::new(&lock_path)
++                .lock()
++                .map_err(|e| FnoxError::Config(format!("Failed to acquire ledger lock: {e}")))?;
++            Ok(LedgerLockGuard { _lock: lock })
++        }
+     }
+ 
+     /// Load the lease ledger from disk, creating an empty one if it doesn't exist.
+diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/src/lease_backends/aws_sts.rs
+index 58585fa..7742d79 100644
+--- a/crates/fnox-core/src/lease_backends/aws_sts.rs
++++ b/crates/fnox-core/src/lease_backends/aws_sts.rs
+@@ -1,7 +1,9 @@
+ use crate::error::{FnoxError, Result};
+ use crate::lease_backends::{Lease, LeaseBackend};
+ use async_trait::async_trait;
++#[cfg(not(target_os = "wasi"))]
+ use aws_config::BehaviorVersion;
++#[cfg(not(target_os = "wasi"))]
+ use aws_sdk_sts::Client;
+ use indexmap::IndexMap;
+ use std::time::Duration;
+@@ -54,6 +56,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+     ]
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub struct AwsStsBackend {
+     region: String,
+     profile: Option<String>,
+@@ -61,6 +64,7 @@ pub struct AwsStsBackend {
+     endpoint: Option<String>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl AwsStsBackend {
+     pub fn new(
+         region: String,
+@@ -95,6 +99,7 @@ impl AwsStsBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for AwsStsBackend {
+     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
+@@ -190,6 +195,7 @@ impl LeaseBackend for AwsStsBackend {
+ 
+ /// Sanitize a string for use as an AWS STS role session name.
+ /// Session names must be 2-64 chars, matching [\w+=,.@-]+
++#[cfg(not(target_os = "wasi"))]
+ fn sanitize_session_name(name: &str) -> String {
+     let sanitized: String = name
+         .chars()
+diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-core/src/lease_backends/azure_token.rs
+index 296a2fd..a63003e 100644
+--- a/crates/fnox-core/src/lease_backends/azure_token.rs
++++ b/crates/fnox-core/src/lease_backends/azure_token.rs
+@@ -1,6 +1,7 @@
+ use crate::error::{FnoxError, Result};
+ use crate::lease_backends::{Lease, LeaseBackend};
+ use async_trait::async_trait;
++#[cfg(not(target_os = "wasi"))]
+ use azure_core::credentials::TokenCredential;
+ use indexmap::IndexMap;
+ use std::sync::Arc;
+@@ -19,6 +20,9 @@ pub fn check_prerequisites() -> Option<String> {
+     if has_sp {
+         return None;
+     }
++    #[cfg(target_os = "wasi")]
++    let has_az = false;
++    #[cfg(not(target_os = "wasi"))]
+     let has_az = which::which("az").is_ok();
+     if has_az {
+         None
+@@ -35,11 +39,13 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+     ]
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub struct AzureTokenBackend {
+     scope: String,
+     env_var: String,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl AzureTokenBackend {
+     pub fn new(scope: String, env_var: String) -> Self {
+         Self { scope, env_var }
+@@ -81,6 +87,7 @@ impl AzureTokenBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for AzureTokenBackend {
+     async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lease_backends/cloudflare.rs b/crates/fnox-core/src/lease_backends/cloudflare.rs
+index 0430a13..bc1bd11 100644
+--- a/crates/fnox-core/src/lease_backends/cloudflare.rs
++++ b/crates/fnox-core/src/lease_backends/cloudflare.rs
+@@ -74,6 +74,7 @@ pub struct CloudflarePermissionGroup {
+     pub name: Option<String>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl CloudflareBackend {
+     pub fn new(
+         token_type: CloudflareTokenType,
+@@ -325,6 +326,7 @@ impl CloudflareBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for CloudflareBackend {
+     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lease_backends/command.rs b/crates/fnox-core/src/lease_backends/command.rs
+index 2384644..9cc671e 100644
+--- a/crates/fnox-core/src/lease_backends/command.rs
++++ b/crates/fnox-core/src/lease_backends/command.rs
+@@ -3,6 +3,7 @@ use crate::lease_backends::{Lease, LeaseBackend};
+ use async_trait::async_trait;
+ use indexmap::IndexMap;
+ use std::time::Duration;
++#[cfg(not(target_os = "wasi"))]
+ use tokio::process::Command;
+ 
+ const URL: &str = "https://fnox.jdx.dev/leases/command";
+@@ -21,12 +22,14 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+     vec![]
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub struct CommandBackend {
+     create_command: String,
+     revoke_command: Option<String>,
+     timeout: Duration,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl CommandBackend {
+     pub fn new(create_command: String, revoke_command: Option<String>, timeout: Duration) -> Self {
+         Self {
+@@ -80,6 +83,7 @@ impl CommandBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for CommandBackend {
+     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lease_backends/gcp_iam.rs b/crates/fnox-core/src/lease_backends/gcp_iam.rs
+index eddfb30..504d879 100644
+--- a/crates/fnox-core/src/lease_backends/gcp_iam.rs
++++ b/crates/fnox-core/src/lease_backends/gcp_iam.rs
+@@ -33,12 +33,14 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+     )]
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub struct GcpIamBackend {
+     service_account_email: String,
+     scopes: Vec<String>,
+     env_var: String,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl GcpIamBackend {
+     pub fn new(service_account_email: String, scopes: Vec<String>, env_var: String) -> Self {
+         Self {
+@@ -49,6 +51,7 @@ impl GcpIamBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for GcpIamBackend {
+     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lease_backends/github_app.rs b/crates/fnox-core/src/lease_backends/github_app.rs
+index 14833e4..44d194b 100644
+--- a/crates/fnox-core/src/lease_backends/github_app.rs
++++ b/crates/fnox-core/src/lease_backends/github_app.rs
+@@ -40,6 +40,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+     vec![]
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub struct GitHubAppBackend {
+     app_id: String,
+     installation_id: String,
+@@ -50,6 +51,7 @@ pub struct GitHubAppBackend {
+     api_base: Option<String>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl GitHubAppBackend {
+     pub fn new(
+         app_id: String,
+@@ -132,6 +134,7 @@ impl GitHubAppBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for GitHubAppBackend {
+     async fn create_lease(&self, _duration: Duration, _label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-core/src/lease_backends/github_oauth.rs
+index 45fd416..c6bd4cc 100644
+--- a/crates/fnox-core/src/lease_backends/github_oauth.rs
++++ b/crates/fnox-core/src/lease_backends/github_oauth.rs
+@@ -2,6 +2,7 @@ use crate::error::{FnoxError, Result};
+ use crate::lease_backends::{Lease, LeaseBackend};
+ use async_trait::async_trait;
+ use indexmap::IndexMap;
++#[cfg(not(target_os = "wasi"))]
+ use keyring_core::Entry;
+ use serde::{Deserialize, Serialize};
+ use std::time::Duration;
+@@ -23,6 +24,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+     vec![]
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[derive(Debug, Clone)]
+ pub struct GitHubOauthBackend {
+     client_id: String,
+@@ -35,6 +37,7 @@ pub struct GitHubOauthBackend {
+     api_base: String,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[derive(Debug, Clone, Deserialize)]
+ struct DeviceCodeResponse {
+     device_code: String,
+@@ -45,6 +48,7 @@ struct DeviceCodeResponse {
+     interval: u64,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[derive(Debug, Clone, Deserialize)]
+ struct TokenResponse {
+     access_token: Option<String>,
+@@ -55,12 +59,14 @@ struct TokenResponse {
+     error_description: Option<String>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[derive(Debug, Clone, Deserialize)]
+ struct UserResponse {
+     login: Option<String>,
+     message: Option<String>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ struct CachedToken {
+     access_token: String,
+@@ -73,6 +79,7 @@ struct CachedToken {
+     login: Option<String>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl GitHubOauthBackend {
+     #[allow(clippy::too_many_arguments)]
+     pub fn new(
+@@ -354,6 +361,7 @@ impl GitHubOauthBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for GitHubOauthBackend {
+     async fn create_lease(&self, _duration: Duration, _label: &str) -> Result<Lease> {
+@@ -374,10 +382,12 @@ impl LeaseBackend for GitHubOauthBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn default_poll_interval() -> u64 {
+     5
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn invalid_response(details: String) -> FnoxError {
+     FnoxError::ProviderInvalidResponse {
+         provider: PROVIDER.to_string(),
+@@ -387,6 +397,7 @@ fn invalid_response(details: String) -> FnoxError {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn api_error(details: String) -> FnoxError {
+     FnoxError::ProviderApiError {
+         provider: PROVIDER.to_string(),
+@@ -396,6 +407,7 @@ fn api_error(details: String) -> FnoxError {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn auth_failed(details: String) -> FnoxError {
+     FnoxError::ProviderAuthFailed {
+         provider: PROVIDER.to_string(),
+@@ -405,6 +417,7 @@ fn auth_failed(details: String) -> FnoxError {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn interactive_auth_required() -> FnoxError {
+     FnoxError::ProviderAuthFailed {
+         provider: PROVIDER.to_string(),
+@@ -416,12 +429,14 @@ fn interactive_auth_required() -> FnoxError {
+ 
+ /// Detach the launcher's stdio so a browser cannot write to, or hold open, the
+ /// caller's pipes (`fnox env --json` promises a pure stdout).
++#[cfg(not(target_os = "wasi"))]
+ fn silence(cmd: &mut std::process::Command) -> &mut std::process::Command {
+     cmd.stdin(std::process::Stdio::null())
+         .stdout(std::process::Stdio::null())
+         .stderr(std::process::Stdio::null())
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn open_browser(url: &str) -> std::io::Result<()> {
+     #[cfg(target_os = "macos")]
+     {
+diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/lease_backends/mod.rs
+index 8da8d03..1211d21 100644
+--- a/crates/fnox-core/src/lease_backends/mod.rs
++++ b/crates/fnox-core/src/lease_backends/mod.rs
+@@ -325,6 +325,15 @@ impl LeaseBackendConfig {
+     }
+ 
+     /// Create a lease backend instance from this configuration
++    #[cfg(target_os = "wasi")]
++    pub fn create_backend(&self) -> Result<Box<dyn LeaseBackend>> {
++        Err(crate::error::FnoxError::Config(
++            "lease backends are not available in the WASI build of fnox".to_string(),
++        ))
++    }
++
++    /// Create a lease backend instance from this configuration
++    #[cfg(not(target_os = "wasi"))]
+     pub fn create_backend(&self) -> Result<Box<dyn LeaseBackend>> {
+         match self {
+             LeaseBackendConfig::AwsSts {
+diff --git a/crates/fnox-core/src/lease_backends/vault.rs b/crates/fnox-core/src/lease_backends/vault.rs
+index 7bcf100..88f642d 100644
+--- a/crates/fnox-core/src/lease_backends/vault.rs
++++ b/crates/fnox-core/src/lease_backends/vault.rs
+@@ -64,6 +64,7 @@ pub fn required_env_vars(
+     vars
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ pub struct VaultBackend {
+     address: String,
+     token: Option<String>,
+@@ -74,6 +75,7 @@ pub struct VaultBackend {
+     method: String,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl VaultBackend {
+     pub fn new(
+         address: Option<String>,
+@@ -195,6 +197,7 @@ impl VaultBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for VaultBackend {
+     async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
+index 0f6dff8..40185d1 100644
+--- a/crates/fnox-core/src/lib.rs
++++ b/crates/fnox-core/src/lib.rs
+@@ -11,10 +11,12 @@
+ pub mod auth_prompt;
+ pub mod config;
+ pub mod config_path;
++#[cfg(not(target_os = "wasi"))]
+ pub(crate) mod credential_command;
+ pub mod env;
+ pub mod error;
+ pub mod http;
++#[cfg(not(target_os = "wasi"))]
+ pub(crate) mod keyring_store;
+ pub mod lease;
+ pub mod lease_backends;
+diff --git a/src/commands/activate.rs b/src/commands/activate.rs
+index 10d7027..c94ce9a 100644
+--- a/src/commands/activate.rs
++++ b/src/commands/activate.rs
+@@ -27,9 +27,12 @@ impl ActivateCommand {
+         let shell = shell::get_shell(Some(&shell_name))?;
+ 
+         // Get the current executable path
++        #[cfg(not(target_os = "wasi"))]
+         let exe = std::env::current_exe()
+             .or_else(|_| which::which("fnox"))
+             .unwrap_or_else(|_| std::path::PathBuf::from("fnox"));
++        #[cfg(target_os = "wasi")]
++        let exe = std::path::PathBuf::from("fnox");
+ 
+         let opts = ActivateOptions {
+             exe,
+diff --git a/src/commands/init.rs b/src/commands/init.rs
+index 3983cf4..4b5464d 100644
+--- a/src/commands/init.rs
++++ b/src/commands/init.rs
+@@ -1,8 +1,11 @@
+ use crate::commands::Cli;
+ use crate::config::{Config, ProviderConfig, SecretConfig};
+ use crate::error::{FnoxError, Result};
++#[cfg(not(target_os = "wasi"))]
+ use crate::providers::{WizardCategory, WizardInfo, get_provider_from_resolved};
++#[cfg(not(target_os = "wasi"))]
+ use demand::{Confirm, DemandOption, Input, Select};
++#[cfg(not(target_os = "wasi"))]
+ use std::collections::HashMap;
+ 
+ #[derive(Debug, usage_rs::Args)]
+@@ -56,6 +59,9 @@ impl InitCommand {
+             })?;
+         }
+ 
++        #[cfg(target_os = "wasi")]
++        let config = Config::new();
++        #[cfg(not(target_os = "wasi"))]
+         let config = if self.skip_wizard || !atty::is(atty::Stream::Stdin) {
+             // Non-interactive mode
+             Config::new()
+@@ -84,6 +90,7 @@ impl InitCommand {
+         Ok(())
+     }
+ 
++    #[cfg(not(target_os = "wasi"))]
+     async fn run_wizard(&self) -> Result<Config> {
+         println!("\n🔐 Welcome to fnox setup wizard!\n");
+         println!("This will help you configure your first secret provider.\n");
+@@ -163,6 +170,7 @@ impl InitCommand {
+     }
+ 
+     /// Select a provider category
++    #[cfg(not(target_os = "wasi"))]
+     fn select_category(&self) -> Result<WizardCategory> {
+         let mut select = Select::new("What type of provider do you want to use?")
+             .description("Choose a category based on your security and convenience needs")
+@@ -191,6 +199,7 @@ impl InitCommand {
+     }
+ 
+     /// Select a specific provider from the given list
++    #[cfg(not(target_os = "wasi"))]
+     fn select_provider(&self, providers: &[&'static WizardInfo]) -> Result<&'static WizardInfo> {
+         let mut select = Select::new("Select provider:").filterable(false);
+ 
+@@ -217,6 +226,7 @@ impl InitCommand {
+     }
+ 
+     /// Collect field values from the user
++    #[cfg(not(target_os = "wasi"))]
+     fn collect_fields(&self, info: &WizardInfo) -> Result<HashMap<String, String>> {
+         let mut fields = HashMap::new();
+ 
+@@ -240,6 +250,7 @@ impl InitCommand {
+     }
+ 
+     /// Get the provider name from the user
++    #[cfg(not(target_os = "wasi"))]
+     fn get_provider_name(&self, default: &str) -> Result<String> {
+         Input::new("Provider name:")
+             .placeholder(default)
+@@ -255,6 +266,7 @@ impl InitCommand {
+     }
+ 
+     /// Test the provider connection and print the result
++    #[cfg(not(target_os = "wasi"))]
+     async fn test_provider_connection(
+         &self,
+         provider_name: &str,
+diff --git a/src/commands/lease.rs b/src/commands/lease.rs
+index f148214..27a0fe6 100644
+--- a/src/commands/lease.rs
++++ b/src/commands/lease.rs
+@@ -254,6 +254,12 @@ impl LeaseCreateCommand {
+                 eprintln!();
+                 for (var, description) in &required_vars {
+                     if std::env::var(var).is_err() {
++                        #[cfg(target_os = "wasi")]
++                        let value: String = {
++                            let _ = description;
++                            return Err(FnoxError::Config(format!("{var} is not set")));
++                        };
++                        #[cfg(not(target_os = "wasi"))]
+                         let value = demand::Input::new(format!("{var} ({description})"))
+                             .placeholder("paste value here")
+                             .run()
+diff --git a/src/commands/mod.rs b/src/commands/mod.rs
+index 7013233..406d24e 100644
+--- a/src/commands/mod.rs
++++ b/src/commands/mod.rs
+@@ -9,6 +9,7 @@ pub mod check;
+ pub mod ci_redact;
+ pub mod completion;
+ pub mod config_files;
++#[cfg(not(target_os = "wasi"))]
+ pub mod daemon;
+ pub mod deactivate;
+ pub mod doctor;
+@@ -22,9 +23,11 @@ pub mod import;
+ pub mod init;
+ pub mod lease;
+ pub mod list;
++#[cfg(not(target_os = "wasi"))]
+ pub mod mcp;
+ pub mod profiles;
+ pub mod provider;
++#[cfg(not(target_os = "wasi"))]
+ pub mod proxy;
+ pub mod reencrypt;
+ pub mod remove;
+@@ -33,6 +36,7 @@ pub mod schema;
+ pub mod set;
+ pub mod sponsors;
+ pub mod sync;
++#[cfg(not(target_os = "wasi"))]
+ pub mod tui;
+ pub mod usage;
+ pub mod version;
+@@ -108,6 +112,7 @@ pub enum Commands {
+     ConfigFiles(config_files::ConfigFilesCommand),
+ 
+     /// Manage the per-user daemon
++    #[cfg(not(target_os = "wasi"))]
+     Daemon(daemon::DaemonCommand),
+ 
+     /// Disable fnox shell integration in the current shell session
+@@ -148,6 +153,7 @@ pub enum Commands {
+     List(list::ListCommand),
+ 
+     /// Start an MCP server that brokers secrets to AI agents
++    #[cfg(not(target_os = "wasi"))]
+     Mcp(mcp::McpCommand),
+ 
+     /// List available profiles
+@@ -157,6 +163,7 @@ pub enum Commands {
+     Provider(provider::ProviderCommand),
+ 
+     /// Broker credentials into destination-scoped HTTPS requests
++    #[cfg(not(target_os = "wasi"))]
+     Proxy(proxy::ProxyCommand),
+ 
+     /// Re-encrypt secrets with current provider configuration
+@@ -182,6 +189,7 @@ pub enum Commands {
+     Sync(sync::SyncCommand),
+ 
+     /// Interactive TUI dashboard for managing secrets
++    #[cfg(not(target_os = "wasi"))]
+     Tui(tui::TuiCommand),
+ 
+     /// Generate usage specification
+@@ -297,6 +305,7 @@ impl Commands {
+             Commands::Init(cmd) => cmd.run(cli).await,
+             Commands::Completion(cmd) => cmd.run(cli).await,
+             Commands::ConfigFiles(cmd) => cmd.run(cli).await,
++            #[cfg(not(target_os = "wasi"))]
+             Commands::Daemon(cmd) => cmd.run(cli).await,
+             Commands::Schema(cmd) => cmd.run(cli).await,
+             Commands::Sponsors(cmd) => cmd.run(cli).await,
+@@ -324,6 +333,7 @@ impl Commands {
+             Commands::Import(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Lease(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::List(cmd) => cmd.run(cli, self.load_config(cli)?).await,
++            #[cfg(not(target_os = "wasi"))]
+             Commands::Mcp(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Profiles(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Provider(cmd)
+@@ -332,6 +342,7 @@ impl Commands {
+                 cmd.run(cli, Config::new()).await
+             }
+             Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
++            #[cfg(not(target_os = "wasi"))]
+             Commands::Proxy(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Env(cmd) => cmd.run(cli).await,
+@@ -340,6 +351,7 @@ impl Commands {
+             Commands::Set(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Sync(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Scan(cmd) => cmd.run(cli, self.load_config(cli)?).await,
++            #[cfg(not(target_os = "wasi"))]
+             Commands::Tui(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+         }
+     }
+diff --git a/src/commands/set.rs b/src/commands/set.rs
+index ae11999..cac7861 100644
+--- a/src/commands/set.rs
++++ b/src/commands/set.rs
+@@ -148,12 +148,18 @@ impl SetCommand {
+                 .map_err(|source| FnoxError::StdinReadFailed { source })?;
+             Some(buffer.trim().to_string())
+         } else {
++            #[cfg(target_os = "wasi")]
++            return Err(FnoxError::Config(
++                "no value given: pass it as an argument or pipe it on stdin".to_string(),
++            ));
+             // Interactive terminal - prompt for value
++            #[cfg(not(target_os = "wasi"))]
+             let value = demand::Input::new("Enter secret value")
+                 .prompt("Secret value: ")
+                 .password(true)
+                 .run()
+                 .map_err(|e| FnoxError::Config(format!("Failed to read input: {}", e)))?;
++            #[cfg(not(target_os = "wasi"))]
+             Some(value)
+         };
+ 
+diff --git a/src/daemon.rs b/src/daemon.rs
+index abd2895..a467d7a 100644
+--- a/src/daemon.rs
++++ b/src/daemon.rs
+@@ -464,6 +464,15 @@ pub async fn start_background(cli: &Cli, config: Option<&Config>) -> Result<bool
+     start_background_for_context(&ResolveContext::from_cli(cli), config).await
+ }
+ 
++#[cfg(target_os = "wasi")]
++async fn start_background_for_context(
++    _ctx: &ResolveContext,
++    _config: Option<&Config>,
++) -> Result<bool> {
++    Ok(false)
++}
++
++#[cfg(not(target_os = "wasi"))]
+ async fn start_background_for_context(
+     ctx: &ResolveContext,
+     config: Option<&Config>,
+diff --git a/src/lib.rs b/src/lib.rs
+index c394301..2681b47 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -15,9 +15,12 @@ pub mod child_env;
+ pub mod commands;
+ pub mod daemon;
+ pub mod hook_env;
++#[cfg(not(target_os = "wasi"))]
+ pub mod mcp_server;
++#[cfg(not(target_os = "wasi"))]
+ pub mod proxy;
+ pub mod shell;
++#[cfg(not(target_os = "wasi"))]
+ pub mod tui;
+ 
+ // Re-export commonly used items
+diff --git a/src/main.rs b/src/main.rs
+index 555a249..fbc65cb 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -39,6 +39,7 @@ async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
+     }
+ 
+     // Initialize rustls crypto provider for GCP SDKs
++    #[cfg(not(target_os = "wasi"))]
+     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+ 
+     let (cli, settings_layer) = Cli::parse_with_settings();

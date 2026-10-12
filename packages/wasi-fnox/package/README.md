@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasi-fnox
 
-[fnox](https://fnox.jdx.dev) 1.39 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from the [ai-ecoverse/fnox](https://github.com/ai-ecoverse/fnox) fork's `slicc/v1.39` branch. That branch is upstream v1.39.0 plus the patch series listed in its `SLICC.md`.
+[fnox](https://fnox.jdx.dev) 1.39 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.39.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
 
 ## In seven
 

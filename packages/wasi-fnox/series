@@ -1,0 +1,17 @@
+# packages/wasi-fnox patch series, in apply order (apply.sh applies every
+# NNNN-*.patch in filename order; this file only documents the groups).
+# Both builds apply all of them.
+shared  0001-build-gate-non-WASI-dependencies-by-target.patch
+shared  0002-providers-build-only-age-and-plain-for-WASI.patch
+shared  0003-cli-compile-out-modules-that-cannot-run-on-WASI.patch
+shared  0004-wasi-take-the-working-directory-and-home-from-the-en.patch
+shared  0005-wasi-spawn-fnox-exec-children-through-wasix-command.patch
+wasi    0006-providers-add-the-sealed-provider-for-seven-s-vault.patch
+wasi    0007-set-seal-piped-values-and-ask-seven-s-vault-on-a-ter.patch
+wasi    0008-exec-let-seven-s-kernel-hand-sealed-values-to-the-co.patch
+wasi    0009-proxy-rules-json-and-proxy-run-with-placeholders-on-.patch
+wasi    0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch
+wasi    0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch
+host    0012-feat-proxy-take-rule-secrets-from-lease-credentials-.patch
+host    0013-fix-lease-run-command-leases-through-cmd-C-on-Window.patch
+host    0014-providers-offer-the-sealed-provider-only-on-WASI.patch
