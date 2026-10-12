@@ -6,6 +6,7 @@
 // path before translating it into the corresponding `__wasilibc_nocwd_*at`
 // function, which then calls the appropriate WASI function.
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -107,6 +108,10 @@ int utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 }
 
 int linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags) {
+    if (flags & ~AT_SYMLINK_FOLLOW) {
+        errno = EINVAL;
+        return -1;
+    }
     if ((olddirfd == AT_FDCWD || oldpath[0] == '/') &&
         (newdirfd == AT_FDCWD || newpath[0] == '/')) {
         return __wasilibc_link(oldpath, newpath, flags);

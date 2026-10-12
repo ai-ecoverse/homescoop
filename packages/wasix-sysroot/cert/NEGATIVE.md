@@ -1,5 +1,15 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-24: access() says yes where open() says no (-25, slicc-kernel K3(b))
+
+`R25_USERS=enforce run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-24.tgz --probe r25 --kernel-dir <slicc-kernel 1.63.0>`, 2026-10-11: FAIL. As user cone, `access(priv, R_OK)` is 0 while `open(priv, O_RDONLY)` is EACCES; `ro W`, `rw W`, `ro X` and `dirfd priv R` are all 0; `eaccess` does not exist; `AT_EACCESS` is 0, so root after `seteuid(1000)` gets 0 for the effective check; `faccessat(AT_SYMLINK_NOFOLLOW)` is EINVAL; and `linkat` passes flags 0x1 and 0x400 to the kernel (EPERM on the root file system) instead of EINVAL:
+
+```text
+cone: ro W: 0   rw W: 0   ro X: 0   priv R: 0   dirfd priv R: 0   link follow R: 0
+cone: eaccess priv R: missing   link nofollow R: EINVAL   open priv RDONLY: EACCES
+root: effective priv R: missing   effective at priv R: 0   linkat flag 0x400: EPERM
+```
+
 ## 2025.9.30-23: `linkat` with `AT_FDCWD` on both sides is ENOENT (-24)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-23.tgz --probe r24link --kernel-dir <slicc-kernel 1.59.0>`, default and `--variant ehpic`, 2026-10-11: both FAIL. On a tmpfs mount `link()` and `linkat` with a directory fd work, but every `linkat(AT_FDCWD, …, AT_FDCWD, …)` hands the kernel the new path as the old one:
