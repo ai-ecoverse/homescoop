@@ -41,13 +41,31 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-25 `access`, `faccessat`, `eaccess` and `euidaccess` ask
+slicc-kernel (`slicc_fs.path_access`, slicc-kernel >= 1.63.0, K3(b)), which
+checks the file's owner, group and mode against the real ids (`access`) or the
+effective ids (`AT_EACCESS`, `eaccess`), as Linux does, including search
+permission on every directory of the path and root needing an x bit for
+`X_OK`. With users `'off'` or `'report'` it only checks that the path exists.
+On an older kernel the -24 check stays (the path exists; WASI rights).
+- `AT_EACCESS` is now 0x200 (it was 0, so `faccessat(…, AT_EACCESS)` was
+  `access`); `faccessat` also takes `AT_SYMLINK_NOFOLLOW`, which was EINVAL.
+- `eaccess`/`euidaccess` exist (declared with `_GNU_SOURCE`, as in glibc).
+- `linkat` refuses flags other than `AT_SYMLINK_FOLLOW` (WASIX's 0x2) with
+  EINVAL, as Linux does.
+- `open` already asks only for the rights its mode needs (`O_RDONLY`: no
+  write rights), so under users `'enforce'` a read-only file opens for reading;
+  slicc-kernel counts a request for write rights as a write.
+
 Since 2025.9.30-24 files have real owners when slicc-kernel keeps them
 (`createKernel({ users: 'report' | 'enforce' })`, slicc-kernel K3):
 - `chown`/`lchown`/`fchown`/`fchownat` go to the kernel (`slicc_fs.path_chown`/
   `fd_chown`), which applies Linux's rules: root may set anything, an owner may
   only change the group to one of its own, -1 keeps an id, EPERM otherwise;
-- `stat`/`lstat`/`fstat` report the stored owner (`slicc_fs.path_owner`/
-  `fd_owner`) instead of the caller's own ids;
+- `stat`/`lstat`/`fstat` report the stored owner instead of the caller's own
+  ids: one call, `slicc_fs.path_filestat_owner`/`fd_filestat_owner` (the WASI
+  filestat and the owner together), or on a kernel without those the WASI
+  filestat plus `slicc_fs.path_owner`/`fd_owner`;
 - with users `'off'` the chown calls still check the path or fd (ENOENT,
   EBADF) but change nothing, and `stat` shows the caller's ids, as before;
 - on a kernel without these imports everything stays as in -23: chown to
