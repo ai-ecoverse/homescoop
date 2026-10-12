@@ -27,11 +27,12 @@ BINARYEN_VERSION="133"
 # (libc generation marker for slicc-kernel) and a static itimer helper; -23
 # Linux TIOCGWINSZ/TIOCSWINSZ numbers and fork/_Fork in the PIC variants; -24
 # chown and stat owners through slicc-kernel K3 (>= 1.59.0; older kernels
-# keep -23's behaviour) and linkat(AT_FDCWD, ...) fixed.
+# keep -23's behaviour) and linkat(AT_FDCWD, ...) fixed; -25 access/faccessat/
+# eaccess through slicc-kernel (>= 1.63.0), AT_EACCESS 0x200, linkat flags.
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-24}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-910c5e9e899f1fe3f90482c52f7354a2b959d005f614cd8911c8cd85eb5850cd}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-25}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-ead576efd3dcc31a4337350a34d6cae8c7bcee6da965ed13c5a05c0fbefe4593}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
