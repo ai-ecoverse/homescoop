@@ -1,0 +1,13 @@
+{
+  "name": "wasi-gh-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node --test 'e2e/*.test.mjs'"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.71.0",
+    "@ai-ecoverse/wasm-bash": "5.3.0-13",
+    "@ai-ecoverse/wasm-git": "2.55.0-15"
+  }
+}

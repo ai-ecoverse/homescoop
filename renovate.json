@@ -155,6 +155,7 @@
       "matchFileNames": [
         "packages/ffmpeg/recipe.yaml",
         "packages/wasi-buf/recipe.yaml",
+        "packages/wasi-gh/recipe.yaml",
         "packages/wasi-hf/recipe.yaml",
         "packages/wasi-llvm/recipe.yaml",
         "packages/wasi-pnpm/recipe.yaml",

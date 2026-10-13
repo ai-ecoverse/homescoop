@@ -1,0 +1,280 @@
+Open GH_BROWSER from wasip1, including when stdin is a pipe.
+
+Reason: gh auth login --web still has to open the device URL when stdin is
+not a terminal (yes | gh auth login -w). go-gh starts GH_BROWSER with
+os/exec, which cannot spawn on wasip1, and the non-interactive path only
+prints the URL. This sends the command through gh_host instead. The same
+path starts pbcopy or xclip for the clipboard. A non-zero exit is
+clipboard unavailable, and LookPath returns the path the host found so a
+script on PATH actually runs.
+
+Upstream: not filed (Lars decides).
+removeWhen: wasip1 can spawn, and gh opens GH_BROWSER without a TTY.
+
+diff --git a/internal/authflow/flow.go b/internal/authflow/flow.go
+--- a/internal/authflow/flow.go
++++ b/internal/authflow/flow.go
+@@ -68,8 +68,15 @@
+ 			}
+ 
+ 			if !isInteractive {
+-				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), authURL)
+-				return nil
++				// A pipe (yes | gh auth login -w) is not a TTY, so upstream
++				// only prints the URL. Still hand it to GH_BROWSER. The
++				// printed URL remains for when that command fails.
++				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), authURL)
++				if err := b.Browse(authURL); err != nil {
++					fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), authURL)
++					fmt.Fprintf(w, "  %s\n", err)
++				}
++				return nil
+ 			}
+ 
+ 			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), authURL)
+diff --git a/internal/browser/browser.go b/internal/browser/browser.go
+--- a/internal/browser/browser.go
++++ b/internal/browser/browser.go
+@@ -11,6 +11,9 @@
+ }
+ 
+ func New(launcher string, stdout, stderr io.Writer) Browser {
++	if b, ok := browseOnWasip1(launcher, stdout, stderr); ok {
++		return b
++	}
+ 	b := ghBrowser.New(launcher, stdout, stderr)
+ 	return b
+ }
+diff --git a/internal/browser/browser_other.go b/internal/browser/browser_other.go
+--- /dev/null
++++ b/internal/browser/browser_other.go
+@@ -0,0 +1,9 @@
++//go:build !wasip1
++
++package browser
++
++import "io"
++
++func browseOnWasip1(string, io.Writer, io.Writer) (Browser, bool) {
++	return nil, false
++}
+diff --git a/internal/browser/browser_wasip1.go b/internal/browser/browser_wasip1.go
+--- /dev/null
++++ b/internal/browser/browser_wasip1.go
+@@ -0,0 +1,54 @@
++//go:build wasip1
++
++package browser
++
++import (
++	"context"
++	"fmt"
++	"io"
++	"net/url"
++	"os"
++
++	"github.com/cli/cli/v2/internal/slicchost"
++	"github.com/google/shlex"
++)
++
++type wasiBrowser struct {
++	launcher string
++	stdout   io.Writer
++	stderr   io.Writer
++}
++
++func browseOnWasip1(launcher string, stdout, stderr io.Writer) (Browser, bool) {
++	if launcher == "" {
++		launcher = os.Getenv("GH_BROWSER")
++	}
++	if launcher == "" {
++		launcher = os.Getenv("BROWSER")
++	}
++	return &wasiBrowser{launcher: launcher, stdout: stdout, stderr: stderr}, true
++}
++
++func (b *wasiBrowser) Browse(raw string) error {
++	parsed, err := url.Parse(raw)
++	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
++		return fmt.Errorf("refusing to open %s", raw)
++	}
++	if b.launcher == "" {
++		return fmt.Errorf("GH_BROWSER is not set")
++	}
++	parts, err := shlex.Split(b.launcher)
++	if err != nil {
++		return err
++	}
++	if len(parts) == 0 {
++		return fmt.Errorf("GH_BROWSER is empty")
++	}
++	// Do not pass the process stdin through. A "yes |" pipe would otherwise
++	// be inherited by the browser command.
++	err = slicchost.Run(context.Background(), parts[0], append(parts[1:], parsed.String()), os.Environ(), "", nil, b.stdout, b.stderr)
++	if err != nil {
++		return fmt.Errorf("%s: %w", b.launcher, err)
++	}
++	return nil
++}
+
+diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/slicchost_wasip1.go
+--- a/internal/slicchost/slicchost_wasip1.go
++++ b/internal/slicchost/slicchost_wasip1.go
+@@ -12,8 +12,11 @@
+ 	"net/http"
+ 	"os"
+ 	"os/exec"
++	"strings"
+ 	"sync"
+ 	"unsafe"
++
++	"github.com/cli/go-gh/v2/pkg/config"
+ )
+ 
+ // probeMagic is the value host/gh-host.mjs returns from probe.
+@@ -34,6 +37,10 @@
+ 	// go-gh builds its client from http.DefaultTransport. wasip1 cannot dial;
+ 	// the host module sends the request.
+ 	http.DefaultTransport = Transport{}
++	// wasip1 mkdir and open do not pass modes to the host.
++	config.Restrict = func(path string, mode os.FileMode) error {
++		return Chmod(path, uint32(mode.Perm()))
++	}
+ }
+ 
+ // ErrNotFound is exec.ErrNotFound.
+@@ -85,6 +92,7 @@
+ 
+ // Run starts name with args and waits for it, like exec.Cmd.Run.
+ func Run(ctx context.Context, name string, args []string, env []string, dir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
++	env = credentialEnv(env)
+ 	// gh's git client leaves Cmd.Stdin as the process stdin. Reading it to
+ 	// EOF waits forever on a terminal, and it also consumes input gh itself
+ 	// still needs. Inherit that fd. A buffer gh passed in is finite, so it
+@@ -132,6 +140,29 @@
+ 	return ctx.Err()
+ }
+ 
++// credentialEnv drops tokens before a child starts. git, a browser command,
++// and a pager do not need GH_TOKEN; seven supplies it to gh itself.
++func credentialEnv(env []string) []string {
++	if env == nil {
++		return nil
++	}
++	kept := make([]string, 0, len(env))
++	for _, entry := range env {
++		name, _, _ := strings.Cut(entry, "=")
++		switch name {
++		case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
++			continue
++		}
++		kept = append(kept, entry)
++	}
++	return kept
++}
++
++// Chmod asks the host to set mode on path. wasip1 chmod is a no-op.
++func Chmod(path string, mode uint32) error {
++	return call(map[string]any{"op": "chmod", "path": path, "mode": mode}, nil)
++}
++
+ // Transport sends HTTP requests through the host.
+ type Transport struct{}
+ 
+diff --git a/vendor/github.com/cli/go-gh/v2/pkg/config/config.go b/vendor/github.com/cli/go-gh/v2/pkg/config/config.go
+--- a/vendor/github.com/cli/go-gh/v2/pkg/config/config.go
++++ b/vendor/github.com/cli/go-gh/v2/pkg/config/config.go
+@@ -326,10 +326,20 @@
+ 	return data, nil
+ }
+ 
++// Restrict tightens a config path after it is created. wasip1 mkdir and
++// open do not pass the mode to the host, so the wasip1 build sets this.
++var Restrict func(path string, mode os.FileMode) error
++
+ func writeFile(filename string, data []byte) (writeErr error) {
+-	if writeErr = os.MkdirAll(filepath.Dir(filename), 0771); writeErr != nil {
++	dir := filepath.Dir(filename)
++	if writeErr = os.MkdirAll(dir, 0700); writeErr != nil {
+ 		return
+ 	}
++	if Restrict != nil {
++		if writeErr = Restrict(dir, 0700); writeErr != nil {
++			return
++		}
++	}
+ 	var file *os.File
+ 	if file, writeErr = os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600); writeErr != nil {
+ 		return
+@@ -338,6 +348,9 @@
+ 		if err := file.Close(); writeErr == nil && err != nil {
+ 			writeErr = err
+ 		}
++		if writeErr == nil && Restrict != nil {
++			writeErr = Restrict(filename, 0600)
++		}
+ 	}()
+ 	_, writeErr = file.Write(data)
+ 	return
+
+diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/slicchost_wasip1.go
+--- a/internal/slicchost/slicchost_wasip1.go
++++ b/internal/slicchost/slicchost_wasip1.go
+@@ -16,6 +16,7 @@
+ 	"sync"
+ 	"unsafe"
+ 
++	"github.com/atotto/clipboard"
+ 	"github.com/cli/go-gh/v2/pkg/config"
+ )
+ 
+@@ -41,6 +42,33 @@
+ 	config.Restrict = func(path string, mode os.FileMode) error {
+ 		return Chmod(path, uint32(mode.Perm()))
+ 	}
++	// pbcopy, xclip, xsel and wl-copy are commands on PATH. The vendor
++	// clipboard package cannot import this one, so it calls back here.
++	clipboard.Command = func(name string, args []string, stdin string) (string, error) {
++		found, err := LookPath(name)
++		if err != nil {
++			return "", fmt.Errorf("%w: %s: %w", clipboard.ErrMissing, name, err)
++		}
++		var stdout, stderr bytes.Buffer
++		// An empty reader, not the process stdin: a "yes |" pipe must not
++		// be inherited by the clipboard command.
++		err = Run(context.Background(), found, args, os.Environ(), "", strings.NewReader(stdin), &stdout, &stderr)
++		if err == nil {
++			return stdout.String(), nil
++		}
++		var exit *ExitError
++		if errors.As(err, &exit) {
++			msg := strings.TrimSpace(stderr.String())
++			if msg == "" {
++				return "", errors.New("clipboard unavailable")
++			}
++			return "", fmt.Errorf("clipboard unavailable: %s", msg)
++		}
++		if commandMissing(err) {
++			return "", fmt.Errorf("%w: %s: %w", clipboard.ErrMissing, name, err)
++		}
++		return "", err
++	}
+ }
+ 
+ // ErrNotFound is exec.ErrNotFound.
+@@ -87,7 +115,14 @@
+ 	if found == "" {
+ 		return "", ErrNotFound
+ 	}
+-	return name, nil
++	// which returns a path when the command is a file on PATH, and the bare
++	// name when it is a slicc command. Spawn runs a path as that file.
++	return found, nil
++}
++
++func commandMissing(err error) bool {
++	msg := err.Error()
++	return strings.Contains(msg, "executable file not found") || strings.Contains(msg, "command not found")
+ }
+ 
+ // Run starts name with args and waits for it, like exec.Cmd.Run.
