@@ -74,6 +74,7 @@ local_wasm_pkg_dir() {
   return 1
 }
 
+rm -f "$PREFIX/lib/pkgconfig/.homescoop-archive-versions"
 while IFS= read -r spec; do
   [[ -z "$spec" ]] && continue
   if ! is_npm_spec "$spec"; then
@@ -91,6 +92,11 @@ while IFS= read -r spec; do
       npm pack "$spec" --silent
     fi
     tar xzf ./*.tgz
+    dep_ver="$(node -p 'const j = require("./package/package.json"); (j.homescoop && j.homescoop.upstream) || String(j.version).replace(/-[^-]*$/, "")')"
+    mkdir -p "$PREFIX/lib/pkgconfig"
+    for a in package/lib/*.a package/package/lib/*.a; do
+      [[ -f "$a" ]] && printf '%s %s\n' "$(basename "$a")" "$dep_ver" >>"$PREFIX/lib/pkgconfig/.homescoop-archive-versions"
+    done
     if [[ -d package/lib ]]; then cp -R package/lib/. "$PREFIX/lib/"; fi
     if [[ -d package/include ]]; then cp -R package/include/. "$PREFIX/include/"; fi
     if [[ -d package/package/lib ]]; then cp -R package/package/lib/. "$PREFIX/lib/"; fi

@@ -34,8 +34,11 @@ export EM_PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 
 echo "== imagemagick: pkg-config delegates"
 "$PKG_CONFIG" --modversion zlib libjpeg libpng lcms2 libtiff-4 libwebp \
-  libwebpmux libwebpdemux libopenjp2 freetype2 | tr '\n' ' '
+  libwebpmux libwebpdemux libopenjp2 freetype2 libxml-2.0 | tr '\n' ' '
 echo
+"$PKG_CONFIG" --atleast-version=0.4.1 libwebp
+"$PKG_CONFIG" --atleast-version=2.8.0 freetype2
+"$PKG_CONFIG" --atleast-version=2.0.0 libxml-2.0
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
@@ -58,10 +61,14 @@ if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "${F
         --without-flif --without-fpx --without-fontconfig --without-gslib \
         --without-gvc --without-heic --without-jbig --without-jxl --without-lqr \
         --without-lzma --without-openexr --without-pango --without-raqm \
-        --without-raw --without-rsvg --without-uhdr --without-wmf --without-xml \
-        --without-zip --without-zstd \
+        --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml \
+        --without-zip --without-zstd --with-webp --with-freetype \
+        XML_LIBS="-L$PREFIX/lib -lxml2" \
         CFLAGS="-g1 -O2" \
         LDFLAGS="-L$PREFIX/lib"
+    for d in WEBP FREETYPE XML; do
+      grep -q "^#define ${d}_DELEGATE 1" config/config.h || { echo "homescoop: configure left out the ${d} delegate" >&2; exit 1; }
+    done
     homescoop_fix_darwin_ar Makefile
     find . -name Makefile -print0 | while IFS= read -r -d '' mf; do
       homescoop_fix_darwin_ar "$mf"
@@ -117,5 +124,7 @@ homescoop_notice "OpenJPEG 2.5.3 (@ai-ecoverse/wasm-openjpeg)" \
 homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the FreeType License" \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/LICENSE.TXT 2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1
+homescoop_notice "libxml2 2.15.4 (@ai-ecoverse/wasm-libxml2)" \
+  https://raw.githubusercontent.com/GNOME/libxml2/v2.15.4/Copyright 5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626
 homescoop_notice_emscripten
 echo "== imagemagick: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7"
