@@ -15,6 +15,20 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
 
+## 5.42.0-10: wasix-sysroot 2025.9.30-27
+
+- `utime undef, undef, $file` (and anything that touches a file through it)
+  sets the times to now; up to 5.42.0-9 it set them to 0 (1970), from
+  wasix-sysroot's broken `utimensat(NULL)` (homescoop#294).
+- `times` reports the process CPU time slicc-kernel keeps; system and
+  children's times are 0. `$^T`/`time` are unchanged.
+- An empty path is ENOENT (`-e ""`, `open(my $f, "<", "")`), as on Linux.
+- `getcwd` after a `chdir` through a symlink is the physical directory
+  (since wasix-sysroot -18; 5.42.0-8 and older gave the logical one).
+- Files have owners on slicc-kernel ≥ 1.59.0 with users on: `chown`, `-o`,
+  `-O` and `stat`'s uid/gid are the kernel's, and `-r`/`-w`/`-x` ask it
+  (`access`, slicc-kernel ≥ 1.63.0).
+
 ## 5.42.0-9: wasix-sysroot 2025.9.30-20
 
 - `%SIG` handlers fire on slicc-kernel ≥ 1.47.1: the libc reports every
