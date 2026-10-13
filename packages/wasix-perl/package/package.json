@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-perl",
-  "version": "5.42.0-9",
+  "version": "5.42.0-10",
   "description": "Perl 5.42 for slicc WASIX (wasix-sysroot -20: user ids and %SIG from slicc-kernel; file modes via slicc_fs; exec/stdio)",
   "engines": {
     "slicc-kernel": ">=1.44.0"

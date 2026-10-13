@@ -25,6 +25,11 @@ duplicate regcomp helpers (patches/0003). A make that stopped at the perl
 link left List::Util, File::Spec and others out of the package; the staging
 check now fails on that.
 
+
+## utime undef, undef sets 1970 (published 5.42.0-9, wasix-sysroot -20)
+
+`times.mjs` (homescoop#294): 5.42.0-9's `utime undef, undef, $f` calls the libc's `utimes(path, NULL)`, which up to wasix-sysroot -26 sent explicit times 0/0, so the file's mtime becomes 0 instead of now; `times` mixed wall-clock seconds into the CPU fields.
+
 ## 5.42.0-7: integer printf formats from the build host
 
 -7 (CI run 38025797225, sha cd123d57…) was configured on the Linux CI host.
