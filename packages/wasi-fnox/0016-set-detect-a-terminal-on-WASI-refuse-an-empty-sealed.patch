@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Tue, 13 Oct 2026 02:12:28 +0200
+Subject: [PATCH] set: detect a terminal on WASI, refuse an empty sealed value
+
+atty reports no terminal on any wasm32 target, so `fnox set NAME` on a
+slicc-kernel terminal read stdin to end of file instead of asking
+seven's vault dialog. On WASI the check is std's IsTerminal, which
+slicc-kernel answers for its terminals. A sealed secret given an empty
+value on stdin (for example from /dev/null) is now refused before any
+`seal`, with a hint to pipe the value or use the vault dialog.
+
+diff --git a/src/commands/set.rs b/src/commands/set.rs
+index 7a1f1da..17ba68a 100644
+--- a/src/commands/set.rs
++++ b/src/commands/set.rs
+@@ -20,6 +20,17 @@ fn resolve_remote_key_name<'a>(
+         .unwrap_or(key)
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
++fn stdin_is_terminal() -> bool {
++    atty::is(atty::Stream::Stdin)
++}
++
++#[cfg(target_os = "wasi")]
++fn stdin_is_terminal() -> bool {
++    use std::io::IsTerminal;
++    std::io::stdin().is_terminal()
++}
++
+ /// Return whether a loaded secret came from the table this command will update.
+ fn secret_belongs_to_target(
+     secret: &config::SecretConfig,
+@@ -141,7 +152,7 @@ impl SetCommand {
+         } else if has_metadata && self.key_name.is_none() {
+             // Only metadata is being set, no secret value needed
+             None
+-        } else if !atty::is(atty::Stream::Stdin) {
++        } else if !stdin_is_terminal() {
+             // Read from stdin if piped
+             tracing::debug!("Reading secret value from stdin");
+             let mut buffer = String::new();
+@@ -203,6 +214,11 @@ impl SetCommand {
+                 "not available in seven: a value on the command line is visible to other processes; pipe it on stdin".to_string(),
+             ));
+         }
++        if sealed_provider && secret_value.as_deref() == Some("") {
++            return Err(FnoxError::Seven(
++                "seven: no value on stdin; pipe the value, or run `fnox set` on a terminal to use the vault dialog".to_string(),
++            ));
++        }
+         if sealed_provider && self.key_name.is_some() {
+             return Err(FnoxError::Seven(
+                 "not available in seven: a sealed record is named after its secret (--key-name)"

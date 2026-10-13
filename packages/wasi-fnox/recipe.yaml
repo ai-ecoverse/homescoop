@@ -53,6 +53,8 @@ about:
       0011 allow the lints that WASI-gated code leaves behind
       0015 exec --shell-grants: materialize {shellGrants} (slicc-vault#9)
            for the agent's bash hook; the child runs in the ticket's cwd
+      0016 set: std IsTerminal on WASI (atty is always false on wasm),
+           so a terminal reaches the vault dialog; empty sealed value refused
     Host (fnox-build; compiled for WASI too):
       0012 F2: proxy rules take secrets from lease credentials, renewed
            while the command runs (homescoop#284)

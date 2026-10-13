@@ -6,7 +6,7 @@
   ],
   "source": "jdx/fnox v1.39.0 + packages/wasi-fnox/NNNN-*.patch (apply.sh); each patch maps to cert cases below",
   "certPending": [
-    "KS-2: slicc-kernel /dev/sealed (seal, placeholder, list, request, status, cancel, materialize; secrets-tokens-design.md §3.7)",
+    "KS-2 is released in slicc-kernel 1.68.0 (not certified yet: next kernel delta cert); test/sealed.mjs runs against it with a vault double",
     "KS-8: materialize tickets checked at exec (path, sha256 of argv, cwd, parent pid; one-shot, 30 s)",
     "a vault behind the device (or the kernel's test double) answering the §3.7 ops"
   ],
@@ -21,9 +21,9 @@
     "proxy rules --json prints the [proxy] rules; proxy run -- printenv shows each rule's env name holding the placeholder and the secret's own name unset",
     "exec with only plain secrets: the child gets the value, stderr warns that it was passed as a plain value; exec of a missing command exits 127",
     "exec --shell-grants without /dev/sealed fails with `not running in seven: /dev/sealed is missing`",
-    "PENDING (KS-2): set from a pipe → seal {name, value} → placeholder stored, value not in fnox.toml, stdout, stderr or /proc/<pid>/cmdline",
-    "PENDING (KS-2): set on a terminal → request {kind: value} → status polled → placeholder stored; ^C sends cancel and exits 130; ^C during a 10 s machine wait cancels after the reply",
-    "PENDING (KS-2): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
+    "test/sealed.mjs (KS-2, vault double): set from a pipe → seal {name, value} → placeholder stored, value not in fnox.toml, stdout, stderr or /proc/<pid>/cmdline",
+    "test/sealed.mjs (KS-2, vault double): set on a terminal → request {kind: value} → status polled → placeholder stored; ^C sends cancel and exits 130; ^C during a 10 s machine wait cancels after the reply",
+    "test/sealed.mjs (KS-2, vault double): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
     "PENDING (KS-2 + KS-8): exec -- printenv with a sealed secret → materialize {names, path, argv (argv[0] = resolved path), cwd} → SLICC_SEALED_TICKET → the child sees the value for real:true names and the placeholder for real:false ones; fnox's own stdout/stderr never carry the value",
     "PENDING (KS-8, exposure): what the child and its environment expose: /proc/<child>/cmdline and status, the child's own children (inherited env), ps as another user, a reused or mismatched ticket (argv, cwd, path, parent) failing closed with EACCES",
     "PENDING (K4a #405): /etc/fnox/config.toml root-owned 0644: a non-root user reads and resolves it, fnox set or edit fails with EACCES, sudo succeeds",
@@ -35,15 +35,20 @@
     "0003-cli-compile-out-modules-that-cannot-run-on-WASI.patch": "--help lists no daemon, tui or mcp",
     "0004-wasi-take-the-working-directory-and-home-from-the-en.patch": "get from a subdirectory of the project (cwd from PWD)",
     "0005-wasi-spawn-fnox-exec-children-through-wasix-command.patch": "plain exec: the child runs and gets the value",
-    "0006-providers-add-the-sealed-provider-for-seven-s-vault.patch": "get/export print the stored placeholder; the missing-device error",
-    "0007-set-seal-piped-values-and-ask-seven-s-vault-on-a-ter.patch": "set refuses argv values and --key-name; set from a pipe needs the device (seal: PENDING KS-2)",
-    "0008-exec-let-seven-s-kernel-hand-sealed-values-to-the-co.patch": "exec with a sealed secret needs the device; missing command → 127; plain warning (materialize: PENDING KS-8)",
+    "0006-providers-add-the-sealed-provider-for-seven-s-vault.patch": "get/export print the stored placeholder; the missing-device error; test/sealed.mjs: seal, rotation, placeholder {name}, the caller stamp",
+    "0007-set-seal-piped-values-and-ask-seven-s-vault-on-a-ter.patch": "set refuses argv values and --key-name; test/sealed.mjs: seal from a pipe, request/status/cancel on a terminal, EAGAIN",
+    "0008-exec-let-seven-s-kernel-hand-sealed-values-to-the-co.patch": "exec with a sealed secret needs the device; missing command → 127; plain warning; test/sealed.mjs: the materialize request (values: PENDING KS-8)",
     "0009-proxy-rules-json-and-proxy-run-with-placeholders-on-.patch": "proxy rules --json; proxy run gives the placeholder and scrubs the secret's name",
-    "0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch": "sync/reencrypt refused; age get fails with slicc-vault#2; check --all needs the device",
+    "0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch": "sync/reencrypt refused; age get fails with slicc-vault#2; test/sealed.mjs: check --all on inert, removed, rotated and missing records",
     "0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch": "lint-only: the WASI build has no warnings (no runtime case)",
     "0012-feat-proxy-take-rule-secrets-from-lease-credentials-.patch": "host-only (fnox-build test/proxy_lease.bats); on WASI, proxy run still passes placeholders",
     "0013-fix-lease-run-command-leases-through-cmd-C-on-Window.patch": "host-only (Windows; fnox-build); leases are not in the WASI build",
     "0014-providers-offer-the-sealed-provider-only-on-WASI.patch": "provider add --help offers sealed on WASI",
-    "0015-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants needs the device (shellGrants materialize and the granted placeholders: PENDING KS-2 + KS-8)"
-  }
+    "0015-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs: materialize {shellGrants} with no names (values: PENDING KS-8)",
+    "0016-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal"
+  },
+  "sealedKernel": "@ai-ecoverse/slicc-kernel@1.68.0",
+  "ci": [
+    "node packages/wasi-fnox/test/sealed.mjs --tarball .homescoop-out/package.tgz"
+  ]
 }
