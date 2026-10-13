@@ -25,7 +25,8 @@
     "--bwlimit throttles (select() waits in the kernel)",
     "daemon (3.4.4-3, netfork): rsync --daemon --no-detach on a kernel port; rsync://127.0.0.1:8730/ lists 'mod', -a push and pull (via localhost) round-trip the files, a closed port gives 'Connection refused' rc 10, the daemon log shows the access",
     "tailnet (uplink): rsync://peer.tail1234.ts.net/ resolves via the kernel resolver/uplink and dials 100.64.1.2:873 (refused → 'Connection refused' rc 10); an unknown tailnet name → rc 10 without a dial",
-    "users (users enforce, 3.4.4-4): rsync links the slicc credentials, so root is root: root rsync -a of cone's tree keeps 1000:1000 and the modes (640, 4755, dirs 755); cone's rsync -a of root's 0:100 file gives 1000:100 (its own uid, a group it is in). 3.4.4-3: root's copy gives 0:1000 (owner not kept) and cone's 1000:1000 (NEGATIVE.md)"
+    "users (users enforce, 3.4.4-4): rsync links the slicc credentials, so root is root: root rsync -a of cone's tree keeps 1000:1000 and the modes (640, 4755, dirs 755); cone's rsync -a of root's 0:100 file gives 1000:100 (its own uid, a group it is in). 3.4.4-3: root's copy gives 0:1000 (owner not kept) and cone's 1000:1000 (NEGATIVE.md)",
+    "known kernel issue (slicc-kernel >= 1.36.0, not this package): the re-run after -a / -a -J itemizes '.d..t...... ./' because the destination's top directory loses its mtime; 3.4.4-3 fails the same way (NEGATIVE.md)"
   ],
   "uplink": true,
   "users": "enforce"

@@ -43,3 +43,10 @@ keeps owners and groups (`-o -g`), as on Linux; any other user keeps a group
 only if it belongs to it. 3.4.4-3 and older saw Emscripten's fixed ids, so
 root's `rsync -a` did not keep owners.
 
+Known kernel limit (slicc-kernel 1.36.0 and later, open): the destination's
+top directory does not keep the source directory's mtime after `rsync -a`
+(subdirectories and files do), so a second `rsync -a -i` itemizes
+`.d..t...... ./`. rsync sets the directory's time while its receiver process
+renames files into it, and the kernel's later directory-mtime update wins.
+3.4.4-3 behaves the same on those kernels.
+
