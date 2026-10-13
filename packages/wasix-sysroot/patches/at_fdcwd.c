@@ -17,6 +17,8 @@
 #include <wasi/libc-nocwd.h>
 #include <stdarg.h>
 
+#define HOMESCOOP_AT_EMPTY_PATH 0x1000
+
 // slicc: fresh-create modes (posix.c, slicc-kernel#197).
 int __slicc_open_create(int dirfd, const char *path, int oflag, mode_t mode);
 int __slicc_mkdir(int dirfd, const char *path, mode_t mode);
@@ -42,6 +44,10 @@ int openat(int dirfd, const char *pathname, int flags, ...) {
 }
 
 int symlinkat(const char *target, int dirfd, const char *linkpath) {
+    if (target[0] == '\0') {
+        errno = ENOENT;
+        return -1;
+    }
     if (dirfd == AT_FDCWD || linkpath[0] == '/') {
         return symlink(target, linkpath);
     }
@@ -92,6 +98,10 @@ int faccessat(int dirfd, const char *pathname, int mode, int flags) {
 }
 
 int fstatat(int dirfd, const char *__restrict pathname, struct stat *__restrict statbuf, int flags) {
+    if ((flags & HOMESCOOP_AT_EMPTY_PATH) && pathname[0] == '\0') {
+        if (dirfd == AT_FDCWD) return __wasilibc_stat(".", statbuf, flags & ~HOMESCOOP_AT_EMPTY_PATH);
+        return fstat(dirfd, statbuf);
+    }
     if (dirfd == AT_FDCWD || pathname[0] == '/') {
         return __wasilibc_stat(pathname, statbuf, flags);
     }
