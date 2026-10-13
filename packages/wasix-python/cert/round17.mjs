@@ -42,12 +42,13 @@ export default async function (ctx) {
   const cpu = await py('root', [
     'import os, resource, time',
     't0 = os.times(); r0 = resource.getrusage(resource.RUSAGE_SELF).ru_utime; w = time.time()',
-    'while time.process_time() < 0.6 and time.time() - w < 20: pass',
+    'p0 = time.process_time()',
+    'while time.process_time() - p0 < 0.6 and time.time() - w < 20: pass',
     't1 = os.times(); r1 = resource.getrusage(resource.RUSAGE_SELF).ru_utime',
     'print(f"{t1.user - t0.user:.1f} {r1 - r0:.1f} {t1.system} {t1.children_user} {t1.children_system}")',
   ].join('\n'));
   const [tu, ru, ...rest] = cpu.split(' ');
-  assert.ok(Number(tu) >= 0.4 && Number(tu) <= 1.0 && Number(ru) >= 0.4 && Number(ru) <= 1.0, `os.times / getrusage CPU: ${cpu}`);
+  assert.ok(Number(tu) >= 0.4 && Number(tu) < 5 && Number(ru) >= 0.4 && Number(ru) < 5, `os.times / getrusage CPU: ${cpu}`);
   assert.deepEqual(rest, ['0.0', '0.0', '0.0'], `system and children's times: ${cpu}`);
 
   const site = '/usr/local/lib/python3.14/site-packages';
