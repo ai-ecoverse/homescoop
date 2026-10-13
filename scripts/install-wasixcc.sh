@@ -29,11 +29,12 @@ BINARYEN_VERSION="133"
 # chown and stat owners through slicc-kernel K3 (>= 1.59.0; older kernels
 # keep -23's behaviour) and linkat(AT_FDCWD, ...) fixed; -25 access/faccessat/
 # eaccess through slicc-kernel (>= 1.63.0), AT_EACCESS 0x200, linkat flags;
-# -26 an empty path is ENOENT (fstatat AT_EMPTY_PATH is fstat).
+# -26 an empty path is ENOENT (fstatat AT_EMPTY_PATH is fstat); -27 utimensat/
+# futimens with NULL/UTIME_NOW/UTIME_OMIT, clock/times/getrusage as process CPU.
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-26}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-8d9a98822c3a7d92c7a3414745a0de24a172df43c53d377f9946a825eb7f8ae1}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-27}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-b12613a36c3c1a9f3e3da1b6b54fd5261e356e809b853ebd369f2f092709d5c8}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
