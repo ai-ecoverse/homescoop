@@ -1,0 +1,115 @@
+Open GH_BROWSER from wasip1, including when stdin is a pipe.
+
+Reason: gh auth login --web still has to open the device URL when stdin is
+not a terminal (yes | gh auth login -w). go-gh starts GH_BROWSER with
+os/exec, which cannot spawn on wasip1, and the non-interactive path only
+prints the URL. This sends the command through gh_host instead.
+
+Upstream: not filed (Lars decides).
+removeWhen: wasip1 can spawn, and gh opens GH_BROWSER without a TTY.
+
+diff --git a/internal/authflow/flow.go b/internal/authflow/flow.go
+--- a/internal/authflow/flow.go
++++ b/internal/authflow/flow.go
+@@ -68,8 +68,15 @@
+ 			}
+ 
+ 			if !isInteractive {
+-				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), authURL)
+-				return nil
++				// A pipe (yes | gh auth login -w) is not a TTY, so upstream
++				// only prints the URL. Still hand it to GH_BROWSER. The
++				// printed URL remains for when that command fails.
++				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), authURL)
++				if err := b.Browse(authURL); err != nil {
++					fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), authURL)
++					fmt.Fprintf(w, "  %s\n", err)
++				}
++				return nil
+ 			}
+ 
+ 			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), authURL)
+diff --git a/internal/browser/browser.go b/internal/browser/browser.go
+--- a/internal/browser/browser.go
++++ b/internal/browser/browser.go
+@@ -11,6 +11,9 @@
+ }
+ 
+ func New(launcher string, stdout, stderr io.Writer) Browser {
++	if b, ok := browseOnWasip1(launcher, stdout, stderr); ok {
++		return b
++	}
+ 	b := ghBrowser.New(launcher, stdout, stderr)
+ 	return b
+ }
+diff --git a/internal/browser/browser_other.go b/internal/browser/browser_other.go
+--- /dev/null
++++ b/internal/browser/browser_other.go
+@@ -0,0 +1,9 @@
++//go:build !wasip1
++
++package browser
++
++import "io"
++
++func browseOnWasip1(string, io.Writer, io.Writer) (Browser, bool) {
++	return nil, false
++}
+diff --git a/internal/browser/browser_wasip1.go b/internal/browser/browser_wasip1.go
+--- /dev/null
++++ b/internal/browser/browser_wasip1.go
+@@ -0,0 +1,54 @@
++//go:build wasip1
++
++package browser
++
++import (
++	"context"
++	"fmt"
++	"io"
++	"net/url"
++	"os"
++
++	"github.com/cli/cli/v2/internal/slicchost"
++	"github.com/google/shlex"
++)
++
++type wasiBrowser struct {
++	launcher string
++	stdout   io.Writer
++	stderr   io.Writer
++}
++
++func browseOnWasip1(launcher string, stdout, stderr io.Writer) (Browser, bool) {
++	if launcher == "" {
++		launcher = os.Getenv("GH_BROWSER")
++	}
++	if launcher == "" {
++		launcher = os.Getenv("BROWSER")
++	}
++	return &wasiBrowser{launcher: launcher, stdout: stdout, stderr: stderr}, true
++}
++
++func (b *wasiBrowser) Browse(raw string) error {
++	parsed, err := url.Parse(raw)
++	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
++		return fmt.Errorf("refusing to open %s", raw)
++	}
++	if b.launcher == "" {
++		return fmt.Errorf("GH_BROWSER is not set")
++	}
++	parts, err := shlex.Split(b.launcher)
++	if err != nil {
++		return err
++	}
++	if len(parts) == 0 {
++		return fmt.Errorf("GH_BROWSER is empty")
++	}
++	// Do not pass the process stdin through. A "yes |" pipe would otherwise
++	// be inherited by the browser command.
++	err = slicchost.Run(context.Background(), parts[0], append(parts[1:], parsed.String()), os.Environ(), "", nil, b.stdout, b.stderr)
++	if err != nil {
++		return fmt.Errorf("%s: %w", b.launcher, err)
++	}
++	return nil
++}

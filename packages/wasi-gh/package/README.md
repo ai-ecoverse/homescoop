@@ -8,7 +8,8 @@ the kernel preopens `/` and gh can walk up from a repository to find `.git`.
 
 `bin/gh.wasm` is built by homescoop from gh's source (v2.102.0, commit
 `fc4b137`) with Go 1.27.1 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 -trimpath`)
-and `patches/0001-wasip1-slicc-host.patch`, so it is not an upstream gh
+and `patches/0001-wasip1-slicc-host.patch` plus
+`patches/0002-wasip1-gh-browser.patch`, so it is not an upstream gh
 release. The patch stubs terminals, the clipboard and file locks for wasip1,
 and routes `http.DefaultTransport` (what go-gh uses) and commands started
 through gh's `internal/run` helper to the host module.
@@ -29,6 +30,10 @@ On slicc-kernel, with the host module:
 - `gh api`, including an absolute `http:` or `https:` URL. Requests go through
   the kernel's network (`net-request`), so `https://api.github.com` works when
   the kernel has a network transport and `GH_TOKEN` is set
+- `GH_BROWSER` (or `BROWSER`). `gh auth login --web` runs that command with
+  the device URL, including when stdin is a pipe (`yes | gh auth login -w`).
+  `@ai-ecoverse/slicc-cdp`'s `playwright-cli open` is the command that opens
+  a tab when the kernel has a CDP host on port 9222
 - local git operations gh performs itself (`git rev-parse`, reading remotes)
   when `git` is `@ai-ecoverse/wasm-git`. The process stdin is inherited by
   that git, so an interactive shell is not read to EOF before git starts
@@ -38,9 +43,11 @@ On slicc-kernel, with the host module:
 - In a runtime without this host module, HTTP and commands fail with
   `this runtime cannot start commands or open network connections for gh (it needs slicc-kernel with @ai-ecoverse/wasi-gh's host module)`.
 - Interactive prompts, the bubbletea and tcell screens, the clipboard, and a
-  pager. wasip1 has no terminal ioctls here.
-- `gh auth login` in a browser, device flow that has to open a URL, and the
-  OS keyring. Pass `GH_TOKEN` instead.
+  pager. wasip1 has no terminal ioctls here. `gh auth login -w -p https`
+  skips those prompts. `-c` still prints the one-time code after the
+  clipboard call fails.
+- The OS keyring. A successful `gh auth login` stores the token in plain
+  text under `GH_CONFIG_DIR`. Pass `GH_TOKEN` to skip login.
 - SSH, codespaces, `gh copilot`, and extensions that are native binaries.
 - A git credential helper that has to start `gh` again from inside
   `@ai-ecoverse/wasm-git`. Cloning a private repository over HTTPS needs git's
