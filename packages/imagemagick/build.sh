@@ -126,7 +126,7 @@ homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the F
 homescoop_notice "libxml2 2.15.4 (@ai-ecoverse/wasm-libxml2)" \
   https://raw.githubusercontent.com/GNOME/libxml2/v2.15.4/Copyright 5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626
 ICONV_TB="$WORK/libiconv-1.18.tar.gz"
-homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.18.tar.gz 88dd96a8c0464eca144fc791ae60cd31cd8ee78321e67397e25fc095c4a19aa6 "$ICONV_TB"
+homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.18.tar.gz 3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8 "$ICONV_TB"
 tar xzf "$ICONV_TB" -C "$WORK" libiconv-1.18/COPYING.LIB
 homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later" "$WORK/libiconv-1.18/COPYING.LIB" -
 homescoop_notice_emscripten
