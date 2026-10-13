@@ -28,11 +28,12 @@ BINARYEN_VERSION="133"
 # Linux TIOCGWINSZ/TIOCSWINSZ numbers and fork/_Fork in the PIC variants; -24
 # chown and stat owners through slicc-kernel K3 (>= 1.59.0; older kernels
 # keep -23's behaviour) and linkat(AT_FDCWD, ...) fixed; -25 access/faccessat/
-# eaccess through slicc-kernel (>= 1.63.0), AT_EACCESS 0x200, linkat flags.
+# eaccess through slicc-kernel (>= 1.63.0), AT_EACCESS 0x200, linkat flags;
+# -26 an empty path is ENOENT (fstatat AT_EMPTY_PATH is fstat).
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-25}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-ead576efd3dcc31a4337350a34d6cae8c7bcee6da965ed13c5a05c0fbefe4593}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-26}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-8d9a98822c3a7d92c7a3414745a0de24a172df43c53d377f9946a825eb7f8ae1}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
