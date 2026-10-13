@@ -83,6 +83,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-less` | host | **668.0.0-2** (static ncursesw fallbacks) |
 | `@ai-ecoverse/wasm-sqlite3` | host | **3.53.4** (shell amalgamation) |
 | `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-32-3** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
+| `@ai-ecoverse/wasm-imagemagick-heif` | host | **7.1.2-32-1**: wasm-imagemagick `--with-heic` linked against wasm-libheif (HEIC/HEIF/AVIF read), same commands. **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
 | `@ai-ecoverse/wasm-tar` | host | **1.35.0-4** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
 | `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
 | `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |

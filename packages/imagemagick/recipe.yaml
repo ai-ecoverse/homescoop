@@ -36,3 +36,11 @@ about:
     -2/-3 configured --without-xml. cert/checklist.mjs asserts the delegates.
     wasm-libxml2 links GNU libiconv (wasm-libiconv); libwebp's encoder needs
     libsharpyuv (the synthesized libwebp.pc requires it).
+    --without-heic on purpose (homescoop#304): HEIC needs libheif with
+    libde265, an HEVC decoder, and HEVC is patent-encumbered, so the default
+    package stays HEVC-free. A delegate cannot be added at run time, because
+    this is a static Emscripten build (--without-modules) and slicc-kernel
+    only dynamically links WASIX programs. HEIC/HEIF/AVIF reading is the
+    separate, optional @ai-ecoverse/wasm-imagemagick-heif
+    (packages/imagemagick-heif), built from this same configure with
+    --with-heic; bump the two together.
