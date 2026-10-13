@@ -104,6 +104,10 @@ See `packages/curl/cert/checklist.mjs`.
 
 `"users": "enforce"` (or `"report"`) boots the kernel with `createKernel({ users })` (slicc-kernel ≥ 1.57.0 for file owners, ≥ 1.59.0 for the WASI owner imports, the permission checks of K3(b) later): files have owners and modes are checked. A spec adds users with `ctx.addUser({ name })` and runs as them with `ctx.run(argv, { user })`. Without the field the kernel boots with users `'off'`, as before.
 
+### Time per call: `"runTimeoutMs"` in `cert/meta.json`
+
+Each page call (`ctx.run`, `ctx.write`, …) has to answer within 120 s, or the spec fails with `Runtime.evaluate: no answer in … ms`. `"runTimeoutMs"` changes that for one package. The harness's own default was 30 s, which wasix-python's venv and pnpm-layout steps outgrew on slower CI runners.
+
 ### Tailnet: `ctx.uplink(config)`
 
 With `"uplink": true` in `cert/meta.json` (slicc-kernel ≥ 1.28.0)
