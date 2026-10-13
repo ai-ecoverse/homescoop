@@ -11,7 +11,8 @@
 // The probes are wasix-sysroot's test/r18.c (select / TZ / chdir /
 // socketpair / sigaction), r21.c (per-fd termios in a pty), r24.c (chown /
 // lchown / fchown / fchownat and stat owners as root and as cone) and
-// r24link.c (linkat with AT_FDCWD), checked by the same test/*.mjs specs as
+// r24link.c (linkat with AT_FDCWD), r26.c (an empty path is ENOENT) and r27.c
+// (utimensat NULL/NOW/OMIT, CPU times), checked by the same test/*.mjs specs as
 // the sysroot's own cert, plus the slicc.libc marker the sysroot's crt1
 // leaves in every program (-22+). They are built with the package's own
 // `wasixcc` script (bin/cc: clang + wasm-ld from bin/llvm.wasm) run by
@@ -183,7 +184,7 @@ try {
     await new Promise((res) => setTimeout(res, 200));
   }
   const ccEnv = { TMPDIR: '/tmp' };
-  const names = expect === 'old' ? ['r24'] : ['r18', 'r21', 'r24', 'r24link'];
+  const names = expect === 'old' ? ['r24'] : ['r18', 'r21', 'r24', 'r24link', 'r26', 'r27'];
   assert.equal((await run(['mkdir', '-p', '/home/cc', `${PROBES_AT}/bin`])).status, 0);
   for (const n of names) {
     await k.writeFile(`/home/cc/${n}.c`, readFileSync(join(probes, `${n}.c`)));
