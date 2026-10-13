@@ -108,3 +108,6 @@ Minimal: `mkdir s && echo a > s/f && touch -d @1500000000 s && rsync -a s/ d/; s
 
 On slicc-kernel 1.73.2 and older, an Emscripten program's own `lstat` of a symlink it just created reported owner 0:0, so a user's `rsync -a` passed that uid to `lchown` (`lchown(l, 0, 1000)`) and got EPERM: rc 23, `chgrp "/home/cone/d/l" failed: Operation not permitted (63)`, the links themselves fine (cone:cone). 1.73.3 gives rc 0 (`users.mjs`).
 
+## 3.4.4-5: negative 3.4.4-4 for the self-kill
+
+3.4.4-5 is 3.4.4-4 relinked with the slicc shims' self-kill (homescoop#290). The checklist and users specs pass on both; the delta is the shim, which `scripts/check-slicc-cred.mjs` and the shim's own test cover. The README drops the top-directory mtime limit, fixed in slicc-kernel 1.73.3.
