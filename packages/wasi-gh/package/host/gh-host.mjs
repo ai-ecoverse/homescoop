@@ -152,7 +152,17 @@ export function createHost (ctx) {
     return null
   }
 
-  const ops = { which, run, http, 'http.read': httpRead, 'http.close': httpClose }
+  // wasip1 mkdir and open do not pass a mode. gh asks for one after it
+  // creates a config directory or hosts.yml. mode is the permission bits.
+  function chmod ({ path, mode }) {
+    if (typeof path !== 'string' || path === '' || !Number.isInteger(mode)) {
+      throw new Error('chmod needs a path and a mode')
+    }
+    ctx.fs.chmod(path, mode)
+    return null
+  }
+
+  const ops = { which, run, http, 'http.read': httpRead, 'http.close': httpClose, chmod }
   return request => {
     const op = ops[request?.op]
     if (!op) throw new Error(`unknown gh_host operation ${request?.op}`)

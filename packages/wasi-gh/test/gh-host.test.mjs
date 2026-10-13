@@ -112,6 +112,15 @@ test('run inherits process stdin instead of writing the pipe', () => {
   assert.deepEqual(ctx.pipes.get('received') ?? [], [])
 })
 
+test('chmod sets the mode on the kernel file', () => {
+  const modes = []
+  const ctx = fakeCtx()
+  ctx.fs.chmod = (path, mode) => modes.push([path, mode])
+  const host = createHost(ctx)
+  assert.equal(host({ op: 'chmod', path: '/home/gh/.config/gh/hosts.yml', mode: 0o600 }), null)
+  assert.deepEqual(modes, [['/home/gh/.config/gh/hosts.yml', 0o600]])
+})
+
 test('run reports a missing command', () => {
   const host = createHost(fakeCtx())
   assert.throws(() => host({ op: 'run', argv: ['git'] }), /executable file not found/)

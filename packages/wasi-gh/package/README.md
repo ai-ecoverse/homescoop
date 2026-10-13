@@ -14,8 +14,12 @@ release. The patch stubs terminals, the clipboard and file locks for wasip1,
 and routes `http.DefaultTransport` (what go-gh uses) and commands started
 through gh's `internal/run` helper to the host module.
 
-Authenticate with `GH_TOKEN` or `GITHUB_TOKEN`, or with a token in
-`hosts.yml`. The keyring is not available on wasip1. Commands that run `git`
+In seven, use `GH_TOKEN` from the vault. `gh auth login` stores a
+plain-text token under `GH_CONFIG_DIR`, which is not how seven keeps
+secrets. Outside seven, authenticate with `GH_TOKEN` or `GITHUB_TOKEN`,
+or with that token file. The keyring is not available on wasip1.
+
+Commands that run `git`
 need [`@ai-ecoverse/wasm-git`](https://www.npmjs.com/package/@ai-ecoverse/wasm-git)
 installed in the same kernel.
 

@@ -44,6 +44,17 @@ jobs:
             packages/wasi-gh/package/THIRD-PARTY-NOTICES.md
           if-no-files-found: error
           retention-days: 14
+      - name: pack the npm tarball
+        if: matrix.attempt == 1
+        working-directory: packages/wasi-gh/package
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+      - uses: actions/upload-artifact@v4
+        if: matrix.attempt == 1
+        with:
+          name: wasi-gh-2.102.0-1
+          path: ${{ runner.temp }}/ai-ecoverse-wasi-gh-2.102.0-1.tgz
+          if-no-files-found: error
+          retention-days: 14
 
   reproducible:
     needs: build
