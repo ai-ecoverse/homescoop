@@ -106,6 +106,14 @@ Recipe is SSOT for version, URL (`{{version}}` expanded by
 `host-run.sh` runs `check-package-meta.mjs` before `npm pack`. Refresh
 sha after Renovate with `node scripts/refresh-recipe-sha.mjs <pkg>`.
 
+`host-run.sh` also runs `check-slicc-cred.mjs` on the staged package: every
+`.wasm` that links the slicc shims (it exports `slicc_sig_mask`) must import
+`slicc_cred_js` and export `slicc_cred_euid`, so its `getuid()`/`geteuid()`
+are the kernel's process credentials (`shims/slicc/slicc_libc_gaps.c`, #207).
+Without them, Emscripten's libc stubs answer, and a program that acts on root
+(tar's default `--same-owner`, rsync's owners, screen's socket directory)
+behaves as if it were someone else.
+
 - **`build.jsh`** — required when `builder: slicc`.
 - **`build.sh`** — required when `builder: host`.
 - A package may keep both scripts while migrating; CI only runs the one
