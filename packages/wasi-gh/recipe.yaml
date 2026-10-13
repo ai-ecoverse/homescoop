@@ -1,0 +1,40 @@
+# gh (cli/cli, GitHub CLI) for slicc WASI preview1: gh.wasm built by homescoop
+# from gh's source with GOOS=wasip1 and patches/0001-wasip1-slicc-host.patch,
+# plus a host-import module for slicc-kernel.
+name: wasi-gh
+# Not built by the ladder; .github/workflows/wasi-gh.yml builds and tests it.
+builder: retired
+version: "2.102.0"
+npm: "@ai-ecoverse/wasi-gh"
+summary: "gh 2.102.0 for slicc WASI preview1 (command gh)"
+source:
+  # gh v2.102.0
+  url: "https://github.com/cli/cli/archive/fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd.tar.gz"
+  sha256: "78542f85b4c271bc641eba52c14257c9f388d793a114ce97d0fac2bd19035773"
+  commit: "fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd"
+toolchain:
+  # gh v2.102.0's go.mod requires go 1.27.0 and toolchains to 1.27.1.
+  go: "1.27.1"
+  go_sha256_linux_x64: "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"
+  go_sha256_macos_arm64: "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"
+build:
+  version: "v2.102.0"
+  date: "2026-09-29"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://cli.github.com
+  license: MIT
+  notes: |
+    build.sh fetches the pinned gh source and Go toolchain, vendors the
+    modules (go.sum checked), applies patches/0001-wasip1-slicc-host.patch
+    and builds cmd/gh with GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 -trimpath.
+    The patch stubs termios, clipboard, flock and tcell for wasip1, and
+    routes HTTP (http.DefaultTransport, which go-gh uses) and commands
+    started through internal/run.PrepareCmd through package/host/gh-host.mjs
+    (gh_host imports) on slicc-kernel. git is looked up the same way, so
+    @ai-ecoverse/wasm-git can be the git gh runs.
+    The command sets "preopenRoot": true (slicc-kernel >= 1.30.0) so gh can
+    walk from a repo up to /.

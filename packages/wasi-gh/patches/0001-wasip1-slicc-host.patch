@@ -1,0 +1,643 @@
+Build gh for GOOS=wasip1 and reach slicc-kernel for HTTP and commands.
+
+Reason: gh v2.102.0 does not build for wasip1. Unix-only files in gh and in
+clipboard, survey, termenv, bubbletea, tcell and in-toto omit wasip1, and
+wasip1 has no termios, flock or process spawn. The stubs let the offline
+commands compile. internal/slicchost talks to host/gh-host.mjs (gh_host
+probe/call/take): go-gh's http.DefaultTransport and run.PrepareCmd send HTTP
+and start commands there. git is resolved with slicchost.LookPath because
+os/exec.LookPath cannot see slicc commands.
+
+Upstream: not filed (Lars decides).
+removeWhen: gh and these modules build for GOOS=wasip1, and wasip1 can dial
+and spawn, without this patch.
+
+diff --git a/git/client.go b/git/client.go
+--- a/git/client.go
++++ b/git/client.go
+@@ -17,6 +17,7 @@
+ 	"sync"
+ 
+ 	"github.com/cli/cli/v2/internal/ghinstance"
++	"github.com/cli/cli/v2/internal/slicchost"
+ 	"github.com/cli/safeexec"
+ )
+ 
+@@ -957,6 +958,20 @@
+ }
+ 
+ func resolveGitPath() (string, error) {
++	if runtime.GOOS == "wasip1" {
++		// safeexec uses os/exec.LookPath, which cannot see slicc-kernel commands.
++		found, err := slicchost.LookPath("git")
++		if err != nil {
++			if errors.Is(err, exec.ErrNotFound) {
++				return "", &NotInstalled{
++					message: "unable to find git executable in PATH; please install git before retrying",
++					err:     err,
++				}
++			}
++			return "", err
++		}
++		return found, nil
++	}
+ 	path, err := safeexec.LookPath("git")
+ 	if err != nil {
+ 		if errors.Is(err, exec.ErrNotFound) {
+diff --git a/git/command.go b/git/command.go
+--- a/git/command.go
++++ b/git/command.go
+@@ -26,8 +26,9 @@
+ 	err := run.PrepareCmd(gc.Cmd).Run()
+ 	if err != nil {
+ 		ge := GitError{err: err, Stderr: stderr.String()}
+-		if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
+-			ge.ExitCode = exitError.ExitCode()
++		var coded errWithExitCode
++		if errors.As(err, &coded) {
++			ge.ExitCode = coded.ExitCode()
+ 		}
+ 		return &ge
+ 	}
+diff --git a/internal/flock/flock_unix.go b/internal/flock/flock_unix.go
+--- a/internal/flock/flock_unix.go
++++ b/internal/flock/flock_unix.go
+@@ -1,4 +1,4 @@
+-//go:build !windows
++//go:build !windows && !wasip1
+ 
+ package flock
+ 
+diff --git a/internal/flock/flock_wasip1.go b/internal/flock/flock_wasip1.go
+--- /dev/null
++++ b/internal/flock/flock_wasip1.go
+@@ -0,0 +1,15 @@
++//go:build wasip1
++
++package flock
++
++import "os"
++
++// TryLock opens the lock file without an OS flock. wasip1 has no flock, and a
++// gh process on slicc-kernel is the only writer of its config for that call.
++func TryLock(path string) (f *os.File, unlock func(), err error) {
++	f, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
++	if err != nil {
++		return nil, nil, err
++	}
++	return f, func() { _ = f.Close() }, nil
++}
+diff --git a/internal/ghcmd/cmd.go b/internal/ghcmd/cmd.go
+--- a/internal/ghcmd/cmd.go
++++ b/internal/ghcmd/cmd.go
+@@ -23,6 +23,7 @@
+ 	"github.com/cli/cli/v2/internal/config"
+ 	"github.com/cli/cli/v2/internal/gh"
+ 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
++	_ "github.com/cli/cli/v2/internal/slicchost"
+ 	"github.com/cli/cli/v2/internal/telemetry"
+ 	"github.com/cli/cli/v2/internal/update"
+ 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+diff --git a/internal/run/run.go b/internal/run/run.go
+--- a/internal/run/run.go
++++ b/internal/run/run.go
+@@ -2,14 +2,17 @@
+ 
+ import (
+ 	"bytes"
++	"context"
+ 	"errors"
+ 	"fmt"
+ 	"io"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"runtime"
+ 	"strings"
+ 
++	"github.com/cli/cli/v2/internal/slicchost"
+ 	"github.com/cli/cli/v2/utils"
+ )
+ 
+@@ -34,6 +37,9 @@
+ 	if isVerbose, _ := utils.IsDebugEnabled(); isVerbose {
+ 		_ = printArgs(os.Stderr, c.Cmd.Args)
+ 	}
++	if runtime.GOOS == "wasip1" {
++		return c.outputOnHost()
++	}
+ 	out, err := c.Cmd.Output()
+ 	if c.Cmd.Stderr != nil || err == nil {
+ 		return out, err
+@@ -51,6 +57,9 @@
+ func (c cmdWithStderr) Run() error {
+ 	if isVerbose, _ := utils.IsDebugEnabled(); isVerbose {
+ 		_ = printArgs(os.Stderr, c.Cmd.Args)
++	}
++	if runtime.GOOS == "wasip1" {
++		return c.runOnHost()
+ 	}
+ 	if c.Cmd.Stderr != nil {
+ 		return c.Cmd.Run()
+@@ -87,6 +96,54 @@
+ 	return e.Err
+ }
+ 
++func (c cmdWithStderr) outputOnHost() ([]byte, error) {
++	stdout := &bytes.Buffer{}
++	prevOut, prevErr := c.Cmd.Stdout, c.Cmd.Stderr
++	c.Cmd.Stdout = stdout
++	stderr := &bytes.Buffer{}
++	if c.Cmd.Stderr == nil {
++		c.Cmd.Stderr = stderr
++	}
++	err := runOnHost(c.Cmd)
++	c.Cmd.Stdout, c.Cmd.Stderr = prevOut, prevErr
++	if err == nil || prevErr != nil {
++		return stdout.Bytes(), err
++	}
++	return stdout.Bytes(), &CmdError{Args: c.Cmd.Args, Err: err, Stderr: stderr}
++}
++
++func (c cmdWithStderr) runOnHost() error {
++	if c.Cmd.Stderr != nil {
++		return runOnHost(c.Cmd)
++	}
++	errStream := &bytes.Buffer{}
++	c.Cmd.Stderr = errStream
++	err := runOnHost(c.Cmd)
++	c.Cmd.Stderr = nil
++	if err != nil {
++		err = &CmdError{Args: c.Cmd.Args, Err: err, Stderr: errStream}
++	}
++	return err
++}
++
++func runOnHost(cmd *exec.Cmd) error {
++	name := cmd.Path
++	args := cmd.Args
++	if len(args) > 0 {
++		if name == "" {
++			name = args[0]
++		}
++		if args[0] == name || args[0] == filepath.Base(name) {
++			args = args[1:]
++		}
++	}
++	env := cmd.Env
++	if env == nil {
++		env = os.Environ()
++	}
++	return slicchost.Run(context.Background(), name, args, env, cmd.Dir, cmd.Stdin, cmd.Stdout, cmd.Stderr)
++}
++
+ func printArgs(w io.Writer, args []string) error {
+ 	if len(args) > 0 {
+ 		// print commands, but omit the full path to an executable
+diff --git a/internal/slicchost/slicchost.go b/internal/slicchost/slicchost.go
+--- /dev/null
++++ b/internal/slicchost/slicchost.go
+@@ -0,0 +1,26 @@
++// Package slicchost reaches the host functions that wasi-gh's host module
++// (host/gh-host.mjs) provides on slicc-kernel: starting commands and sending
++// HTTP requests. Where the module is missing, every call returns ErrUnsupported.
++package slicchost
++
++import (
++	"errors"
++	"fmt"
++)
++
++// ErrUnsupported is returned when the runtime does not provide gh's host module.
++var ErrUnsupported = errors.New("this runtime cannot start commands or open network connections for gh (it needs slicc-kernel with @ai-ecoverse/wasi-gh's host module)")
++
++// ExitError is a command that ran and exited with a non-zero status.
++type ExitError struct {
++	Code int
++}
++
++func (e *ExitError) Error() string {
++	return fmt.Sprintf("exit status %d", e.Code)
++}
++
++// ExitCode returns the command's exit status.
++func (e *ExitError) ExitCode() int {
++	return e.Code
++}
+diff --git a/internal/slicchost/slicchost_other.go b/internal/slicchost/slicchost_other.go
+--- /dev/null
++++ b/internal/slicchost/slicchost_other.go
+@@ -0,0 +1,27 @@
++//go:build !wasip1
++
++package slicchost
++
++import (
++	"context"
++	"io"
++	"net/http"
++)
++
++// LookPath returns ErrUnsupported outside wasip1.
++func LookPath(string) (string, error) {
++	return "", ErrUnsupported
++}
++
++// Run returns ErrUnsupported outside wasip1.
++func Run(context.Context, string, []string, []string, string, io.Reader, io.Writer, io.Writer) error {
++	return ErrUnsupported
++}
++
++// Transport returns ErrUnsupported outside wasip1.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(*http.Request) (*http.Response, error) {
++	return nil, ErrUnsupported
++}
+diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/slicchost_wasip1.go
+--- /dev/null
++++ b/internal/slicchost/slicchost_wasip1.go
+@@ -0,0 +1,208 @@
++//go:build wasip1
++
++package slicchost
++
++import (
++	"bytes"
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"os/exec"
++	"sync"
++	"unsafe"
++)
++
++// probeMagic is the value host/gh-host.mjs returns from probe.
++const probeMagic = 0x67683131
++
++//go:wasmimport gh_host probe
++func hostProbe() uint32
++
++//go:wasmimport gh_host call
++func hostCall(request unsafe.Pointer, size uint32) uint32
++
++//go:wasmimport gh_host take
++func hostTake(response unsafe.Pointer)
++
++var available = sync.OnceValue(func() bool { return hostProbe() == probeMagic })
++
++func init() {
++	// go-gh builds its client from http.DefaultTransport. wasip1 cannot dial;
++	// the host module sends the request.
++	http.DefaultTransport = Transport{}
++}
++
++// ErrNotFound is exec.ErrNotFound.
++var ErrNotFound = exec.ErrNotFound
++
++type envelope struct {
++	OK    bool            `json:"ok"`
++	Error string          `json:"error"`
++	Value json.RawMessage `json:"value"`
++}
++
++func call(request any, value any) error {
++	if !available() {
++		return ErrUnsupported
++	}
++	data, err := json.Marshal(request)
++	if err != nil {
++		return err
++	}
++	size := hostCall(unsafe.Pointer(unsafe.SliceData(data)), uint32(len(data)))
++	response := make([]byte, size)
++	if size > 0 {
++		hostTake(unsafe.Pointer(unsafe.SliceData(response)))
++	}
++	var result envelope
++	if err := json.Unmarshal(response, &result); err != nil {
++		return err
++	}
++	if !result.OK {
++		return errors.New(result.Error)
++	}
++	if value == nil || len(result.Value) == 0 || string(result.Value) == "null" {
++		return nil
++	}
++	return json.Unmarshal(result.Value, value)
++}
++
++// LookPath reports name as runnable when the host can start a command by that name.
++func LookPath(name string) (string, error) {
++	var found string
++	if err := call(map[string]any{"op": "which", "name": name}, &found); err != nil {
++		return "", err
++	}
++	if found == "" {
++		return "", ErrNotFound
++	}
++	return name, nil
++}
++
++// Run starts name with args and waits for it, like exec.Cmd.Run.
++func Run(ctx context.Context, name string, args []string, env []string, dir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
++	var input []byte
++	if stdin != nil {
++		data, err := io.ReadAll(stdin)
++		if err != nil {
++			return err
++		}
++		input = data
++	}
++	var result struct {
++		Status int    `json:"status"`
++		Stdout []byte `json:"stdout"`
++		Stderr []byte `json:"stderr"`
++	}
++	request := map[string]any{
++		"op":    "run",
++		"argv":  append([]string{name}, args...),
++		"env":   env,
++		"dir":   dir,
++		"stdin": input,
++	}
++	if err := call(request, &result); err != nil {
++		return err
++	}
++	if stdout != nil {
++		if _, err := stdout.Write(result.Stdout); err != nil {
++			return err
++		}
++	}
++	if stderr != nil {
++		if _, err := stderr.Write(result.Stderr); err != nil {
++			return err
++		}
++	}
++	if result.Status != 0 {
++		return &ExitError{Code: result.Status}
++	}
++	return ctx.Err()
++}
++
++// Transport sends HTTP requests through the host.
++type Transport struct{}
++
++// RoundTrip implements http.RoundTripper.
++func (Transport) RoundTrip(request *http.Request) (*http.Response, error) {
++	var body []byte
++	if request.Body != nil {
++		data, err := io.ReadAll(request.Body)
++		_ = request.Body.Close()
++		if err != nil {
++			return nil, err
++		}
++		body = data
++	}
++	headers := [][2]string{}
++	for name, values := range request.Header {
++		for _, value := range values {
++			headers = append(headers, [2]string{name, value})
++		}
++	}
++	var head struct {
++		Handle  int         `json:"handle"`
++		Status  int         `json:"status"`
++		Headers [][2]string `json:"headers"`
++	}
++	if err := call(map[string]any{
++		"op":      "http",
++		"method":  request.Method,
++		"url":     request.URL.String(),
++		"headers": headers,
++		"body":    body,
++	}, &head); err != nil {
++		return nil, err
++	}
++	response := &http.Response{
++		Status:        fmt.Sprintf("%d %s", head.Status, http.StatusText(head.Status)),
++		StatusCode:    head.Status,
++		Proto:         "HTTP/1.1",
++		ProtoMajor:    1,
++		ProtoMinor:    1,
++		Header:        http.Header{},
++		Body:          &responseBody{handle: head.Handle},
++		ContentLength: -1,
++		Request:       request,
++	}
++	for _, pair := range head.Headers {
++		response.Header.Add(pair[0], pair[1])
++	}
++	return response, nil
++}
++
++type responseBody struct {
++	handle  int
++	pending bytes.Buffer
++	done    bool
++	closed  bool
++}
++
++func (b *responseBody) Read(p []byte) (int, error) {
++	for b.pending.Len() == 0 {
++		if b.done {
++			return 0, io.EOF
++		}
++		var chunk []byte
++		if err := call(map[string]any{"op": "http.read", "handle": b.handle}, &chunk); err != nil {
++			return 0, err
++		}
++		if len(chunk) == 0 {
++			b.done = true
++			continue
++		}
++		b.pending.Write(chunk)
++	}
++	return b.pending.Read(p)
++}
++
++func (b *responseBody) Close() error {
++	if b.closed {
++		return nil
++	}
++	b.closed = true
++	return call(map[string]any{"op": "http.close", "handle": b.handle}, nil)
++}
+diff --git a/internal/telemetry/detach_unix.go b/internal/telemetry/detach_unix.go
+--- a/internal/telemetry/detach_unix.go
++++ b/internal/telemetry/detach_unix.go
+@@ -1,4 +1,4 @@
+-//go:build !windows
++//go:build !windows && !wasip1
+ 
+ package telemetry
+ 
+diff --git a/internal/telemetry/detach_wasip1.go b/internal/telemetry/detach_wasip1.go
+--- /dev/null
++++ b/internal/telemetry/detach_wasip1.go
+@@ -0,0 +1,11 @@
++//go:build wasip1
++
++package telemetry
++
++import "syscall"
++
++// detachAttrs is unused in practice: wasip1 cannot start processes, and
++// SpawnSendTelemetry ignores the error from Start.
++func detachAttrs() *syscall.SysProcAttr {
++	return &syscall.SysProcAttr{}
++}
+diff --git a/vendor/github.com/atotto/clipboard/clipboard_wasip1.go b/vendor/github.com/atotto/clipboard/clipboard_wasip1.go
+--- /dev/null
++++ b/vendor/github.com/atotto/clipboard/clipboard_wasip1.go
+@@ -0,0 +1,13 @@
++//go:build wasip1
++
++package clipboard
++
++import "errors"
++
++func readAll() (string, error) {
++	return "", errors.New("clipboard is not available on wasip1")
++}
++
++func writeAll(string) error {
++	return errors.New("clipboard is not available on wasip1")
++}
+diff --git a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
+--- a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
++++ b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
+@@ -1,5 +1,5 @@
+-//go:build !windows
+-// +build !windows
++//go:build !windows && !wasip1
++// +build !windows,!wasip1
+ 
+ // The terminal mode manipulation code is derived heavily from:
+ // https://github.com/golang/crypto/blob/master/ssh/terminal/util.go:
+diff --git a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_wasip1.go b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_wasip1.go
+--- /dev/null
++++ b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_wasip1.go
+@@ -0,0 +1,35 @@
++//go:build wasip1
++
++package terminal
++
++import (
++	"bufio"
++	"bytes"
++	"errors"
++)
++
++// wasip1 has no termios. Prompts that need raw mode fail; line reads still work.
++type runeReaderState struct {
++	reader *bufio.Reader
++	buf    *bytes.Buffer
++}
++
++func newRuneReaderState(input FileReader) runeReaderState {
++	buf := new(bytes.Buffer)
++	return runeReaderState{
++		reader: bufio.NewReader(&BufferedReader{In: input, Buffer: buf}),
++		buf:    buf,
++	}
++}
++
++func (rr *RuneReader) Buffer() *bytes.Buffer { return rr.state.buf }
++
++func (rr *RuneReader) SetTermMode() error {
++	return errors.New("terminal raw mode is not available on wasip1")
++}
++
++func (rr *RuneReader) RestoreTermMode() error { return nil }
++
++func (rr *RuneReader) ReadRune() (rune, int, error) {
++	return rr.state.reader.ReadRune()
++}
+diff --git a/vendor/github.com/muesli/termenv/termenv_other.go b/vendor/github.com/muesli/termenv/termenv_other.go
+--- a/vendor/github.com/muesli/termenv/termenv_other.go
++++ b/vendor/github.com/muesli/termenv/termenv_other.go
+@@ -1,5 +1,5 @@
+-//go:build js || plan9 || aix
+-// +build js plan9 aix
++//go:build js || plan9 || aix || wasip1
++// +build js plan9 aix wasip1
+ 
+ package termenv
+ 
+diff --git a/vendor/charm.land/bubbletea/v2/tty_wasip1.go b/vendor/charm.land/bubbletea/v2/tty_wasip1.go
+--- /dev/null
++++ b/vendor/charm.land/bubbletea/v2/tty_wasip1.go
+@@ -0,0 +1,9 @@
++//go:build wasip1
++
++package tea
++
++func (p *Program) initInput() error { return nil }
++
++const suspendSupported = false
++
++func suspendProcess() {}
+diff --git a/vendor/charm.land/bubbletea/v2/signals_wasip1.go b/vendor/charm.land/bubbletea/v2/signals_wasip1.go
+--- /dev/null
++++ b/vendor/charm.land/bubbletea/v2/signals_wasip1.go
+@@ -0,0 +1,5 @@
++//go:build wasip1
++
++package tea
++
++func (p *Program) listenForResize(done chan struct{}) { close(done) }
+diff --git a/vendor/github.com/gdamore/tcell/v2/tscreen_wasip1.go b/vendor/github.com/gdamore/tcell/v2/tscreen_wasip1.go
+--- /dev/null
++++ b/vendor/github.com/gdamore/tcell/v2/tscreen_wasip1.go
+@@ -0,0 +1,9 @@
++//go:build wasip1
++
++package tcell
++
++import "errors"
++
++func (t *tScreen) initialize() error {
++	return errors.New("tcell: no terminal on wasip1")
++}
+diff --git a/vendor/github.com/in-toto/in-toto-golang/in_toto/util_unix.go b/vendor/github.com/in-toto/in-toto-golang/in_toto/util_unix.go
+--- a/vendor/github.com/in-toto/in-toto-golang/in_toto/util_unix.go
++++ b/vendor/github.com/in-toto/in-toto-golang/in_toto/util_unix.go
+@@ -1,5 +1,6 @@
+-//go:build linux || darwin || !windows
++//go:build (linux || darwin || !windows) && !wasip1
+ // +build linux darwin !windows
++// +build !wasip1
+ 
+ package in_toto
+ 
+diff --git a/vendor/github.com/in-toto/in-toto-golang/in_toto/util_wasip1.go b/vendor/github.com/in-toto/in-toto-golang/in_toto/util_wasip1.go
+--- /dev/null
++++ b/vendor/github.com/in-toto/in-toto-golang/in_toto/util_wasip1.go
+@@ -0,0 +1,22 @@
++//go:build wasip1
++
++package in_toto
++
++import (
++	"errors"
++	"os"
++)
++
++func isWritable(path string) error {
++	info, err := os.Stat(path)
++	if err != nil {
++		return err
++	}
++	if !info.IsDir() {
++		return errors.New("not a directory")
++	}
++	if info.Mode().Perm()&0o200 == 0 {
++		return errors.New("not writable")
++	}
++	return nil
++}

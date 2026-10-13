@@ -1,0 +1,51 @@
+{
+  "name": "@ai-ecoverse/wasi-gh",
+  "version": "2.102.0-1",
+  "description": "gh 2.102.0 (GitHub CLI) for slicc WASI preview1 (command gh); gh.wasm built by homescoop from gh v2.102.0 with a documented patch",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-gh/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-gh",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "gh",
+    "github"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "host"
+  ],
+  "engines": {
+    "slicc-kernel": ">=1.30.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-gh",
+    "upstream": "2.102.0",
+    "source": "cli/cli@fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd",
+    "patches": [
+      "0001-wasip1-slicc-host.patch"
+    ]
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "gh": {
+        "wasm": "bin/gh.wasm",
+        "imports": "host/gh-host.mjs",
+        "preopenRoot": true
+      }
+    }
+  }
+}
