@@ -45,7 +45,7 @@ list with the files each one changes is in `THIRD-PARTY-NOTICES.md`):
 Since 5.3.0-18 a signal bash sends itself with its default action
 (`kill -TERM $$`, `kill -9 $$`, a `timeout` script killing its own shell)
 ends bash by that signal in the kernel, so a parent's `wait` or
-`spawnSync` sees the signal and not `exit 143` (slicc-kernel#422; needs a
-slicc-kernel with its self-kill routing, older ones keep the exit status).
+`spawnSync` sees the signal and not `exit 143` (slicc-kernel#422; needs
+slicc-kernel ≥ 1.73.2, older ones keep the exit status).
 Trapped and ignored signals stay inside bash, as before.
 

@@ -3,9 +3,10 @@ import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 import { createNodeKernel as createCurrent } from 'slicc-kernel-current/node'
+import { createNodeKernel as createSelfKill } from 'slicc-kernel-selfkill/node'
 
 const out = new URL('./out/', import.meta.url)
-const signalled = process.env.SLICC_SELFKILL_KERNEL
+const other = process.env.SLICC_SELFKILL_KERNEL
 
 const probe = `export default async function (ctx) {
   const lines = [];
@@ -60,8 +61,8 @@ test('slicc-kernel 1.69.0: a self-signal with its default action asks the kernel
   }
 })
 
-test(`a kernel that applies a self-kill (${signalled ?? 'SLICC_SELFKILL_KERNEL unset'}): wait and sync.run report the signal`, { skip: !signalled }, async () => {
-  const got = await run((await import(pathToFileURL(signalled).href)).createNodeKernel)
+test(`slicc-kernel ${other ?? '1.73.2'} (#456 applies a self-kill): wait and sync.run report the signal`, async () => {
+  const got = await run(other ? (await import(pathToFileURL(other).href)).createNodeKernel : createSelfKill)
   local(got)
   for (const [mode, sig] of [['kill-term', 15], ['raise-term', 15], ['raise-kill', 9]]) {
     assert.deepEqual(got[mode].run, [null, sig], `${mode} sync.run: ${JSON.stringify(got[mode])}`)
