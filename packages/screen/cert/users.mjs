@@ -18,7 +18,7 @@ export default async function (ctx) {
   const s2 = await as('scoop-a', 'screen -ls; echo rc=$?; SCREENDIR=/home/cone/.screen screen -ls; echo rc=$?; screen -S conesess -X quit; echo rc=$?');
   assert.doesNotMatch(s2.stdout, /conesess/, `scoop-a lists cone's session: ${s2.stdout}`);
   assert.match(s2.stdout + s2.stderr, /Cannot access \/home\/cone\/\.screen: Permission denied/, `scoop-a reads cone's socket dir: ${s2.stdout}${s2.stderr}`);
-  assert.match(s2.stdout, /No screen session found\.\n(\r\n)?rc=1/, `scoop-a -X quit on cone's session: ${s2.stdout}`);
+  assert.match(s2.stdout, /No screen session found\.[\r\n]+rc=1/, `scoop-a -X quit on cone's session: ${s2.stdout}`);
 
   for (const [user, target, other] of [['scoop-a', 'conesess', 'cone'], ['cone', 'scoopsess', 'scoop-a']]) {
     const t = await pty(['screen', '-r', target], { cwd: '/tmp', user, steps: [{ expect: 'There is no screen to be resumed matching' }], timeoutMs: 8000 });
@@ -29,7 +29,7 @@ export default async function (ctx) {
 
   const c2 = await as('cone', 'screen -ls; screen -S conesess -X quit; echo rc=$?');
   assert.match(c2.stdout, /\d+\.conesess\t\(Detached\)/, `cone still has its session: ${c2.stdout}`);
-  assert.match(c2.stdout, /rc=0$/, `cone quits its own: ${c2.stdout}${c2.stderr}`);
+  assert.match(c2.stdout, /rc=0\s*$/, `cone quits its own: ${c2.stdout}${c2.stderr}`);
   const s3 = await as('scoop-a', 'screen -S scoopsess -X quit; echo rc=$?');
   assert.match(s3.stdout, /rc=0/, `scoop-a quits its own: ${s3.stdout}${s3.stderr}`);
   console.log('users: each user\'s sessions are in its own ~/.screen (700); scoop-a and cone cannot list, attach to (-r, -x) or quit each other\'s sessions; the second user to start screen still can');
