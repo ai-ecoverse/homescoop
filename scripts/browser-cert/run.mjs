@@ -162,6 +162,7 @@ for (const need of meta.needs || []) {
 const chrome = await launch({
   roots,
   isolated: true,
+  timeout: Number(meta.runTimeoutMs) || 120000,
   exits: { '/dist/process-worker.js': [/WASM_PROCESS_EXIT, code/, /WASM_PROCESS_ERROR,$/] },
 });
 
