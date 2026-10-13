@@ -65,19 +65,23 @@ export function createHost (ctx) {
     return name
   }
 
-  function run ({ argv, env, dir, stdin }) {
+  function run ({ argv, env, dir, stdin, inherit }) {
     let child
     try {
-      child = ctx.spawn({ argv, env: envObject(env), cwd: dir || ctx.cwd(), stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
+      // gh's git client sets Cmd.Stdin to the process stdin. Slurping that
+      // waits for EOF, so an interactive shell never reaches spawn. Inherit
+      // the fd instead. A reader gh supplied (a buffer) is still piped.
+      child = ctx.spawn({ argv, env: envObject(env), cwd: dir || ctx.cwd(), stdin: inherit ? 'inherit' : 'pipe', stdout: 'pipe', stderr: 'pipe' })
     } catch (error) {
       const code = error?.code ?? reason(error)
       throw new Error(code === 'ENOENT' ? `exec: "${argv[0]}": executable file not found in $PATH` : `exec: "${argv[0]}": ${code}`)
     }
     const pending = new Map()
     const output = { stdout: [], stderr: [] }
-    let input = fromBase64(stdin)
+    let input = inherit ? new Uint8Array(0) : fromBase64(stdin)
     const read = stream => pending.set(ctx.async.submit({ op: 'fd-read', fd: child[stream], max: READ_MAX }), stream)
     const write = () => {
+      if (inherit) return
       if (input.length === 0) {
         ctx.syscall({ op: 'fd-close', fd: child.stdin })
         return

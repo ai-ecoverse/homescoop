@@ -102,6 +102,16 @@ test('run spawns a command, writes stdin and returns status and output', () => {
   assert.equal(ctx.calls.find(([op]) => op === 'spawn')[1].env.GH_TOKEN, 't')
 })
 
+test('run inherits process stdin instead of writing the pipe', () => {
+  const ctx = fakeCtx({ children: { git: { status: 0, stdout: [''], stderr: [''] } } })
+  const host = createHost(ctx)
+  const value = host({ op: 'run', argv: ['git', 'status'], inherit: true, stdin: b64('kept') })
+  assert.equal(value.status, 0)
+  assert.equal(ctx.calls.find(([op]) => op === 'spawn')[1].stdin, 'inherit')
+  assert.equal(ctx.calls.some((call) => call[0] === 'submit' && call[1] === 'fd-write'), false)
+  assert.deepEqual(ctx.pipes.get('received') ?? [], [])
+})
+
 test('run reports a missing command', () => {
   const host = createHost(fakeCtx())
   assert.throws(() => host({ op: 'run', argv: ['git'] }), /executable file not found/)

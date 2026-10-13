@@ -30,7 +30,8 @@ On slicc-kernel, with the host module:
   the kernel's network (`net-request`), so `https://api.github.com` works when
   the kernel has a network transport and `GH_TOKEN` is set
 - local git operations gh performs itself (`git rev-parse`, reading remotes)
-  when `git` is `@ai-ecoverse/wasm-git`
+  when `git` is `@ai-ecoverse/wasm-git`. The process stdin is inherited by
+  that git, so an interactive shell is not read to EOF before git starts
 
 ## What does not work
 

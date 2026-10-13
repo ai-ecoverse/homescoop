@@ -258,7 +258,7 @@ diff --git a/internal/slicchost/slicchost_other.go b/internal/slicchost/slicchos
 diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/slicchost_wasip1.go
 --- /dev/null
 +++ b/internal/slicchost/slicchost_wasip1.go
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,217 @@
 +//go:build wasip1
 +
 +package slicchost
@@ -271,6 +271,7 @@ diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/sliccho
 +	"fmt"
 +	"io"
 +	"net/http"
++	"os"
 +	"os/exec"
 +	"sync"
 +	"unsafe"
@@ -345,8 +346,13 @@ diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/sliccho
 +
 +// Run starts name with args and waits for it, like exec.Cmd.Run.
 +func Run(ctx context.Context, name string, args []string, env []string, dir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
++	// gh's git client leaves Cmd.Stdin as the process stdin. Reading it to
++	// EOF waits forever on a terminal, and it also consumes input gh itself
++	// still needs. Inherit that fd. A buffer gh passed in is finite, so it
++	// is sent through the pipe.
++	inherit := stdin == os.Stdin
 +	var input []byte
-+	if stdin != nil {
++	if stdin != nil && !inherit {
 +		data, err := io.ReadAll(stdin)
 +		if err != nil {
 +			return err
@@ -364,6 +370,9 @@ diff --git a/internal/slicchost/slicchost_wasip1.go b/internal/slicchost/sliccho
 +		"env":   env,
 +		"dir":   dir,
 +		"stdin": input,
++	}
++	if inherit {
++		request["inherit"] = true
 +	}
 +	if err := call(request, &result); err != nil {
 +		return err
