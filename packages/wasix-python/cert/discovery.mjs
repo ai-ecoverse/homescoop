@@ -33,8 +33,8 @@ import _slicc_site as s
 base = os.path.abspath(sys.base_prefix); real = os.path.realpath(base)
 print("base", base, "real", real)
 print("py-* on sys.path:", [p for p in sys.path if "/py-" in p])
-c = os.path.join(real, ".slicc-site-cache")
-print("cache:", repr(open(c).read()[:4000]) if os.path.exists(c) else "none")
+c = s._cache_path(real)
+print("cache:", repr(open(c).read()[:4000]) if c and os.path.exists(c) else "none")
 found = [p for nm in [s._project_node_modules(base)] for p in s._packages(nm)]
 print("found:", found)
 print("stamps:", [s._stamp(p) for p in found][:6])
@@ -141,7 +141,7 @@ export default async function (ctx) {
 
   // Cost, on the flat layout (17 py-*).
   const pp = (await py(['-c', 'import sys; print(":".join(p for p in sys.path if "/py-" in p))'])).stdout.trim();
-  const cold = await py(['-c', 'import os, time, _slicc_site as s\nc = os.path.join(os.path.realpath(__import__("sys").base_prefix), ".slicc-site-cache")\nos.path.exists(c) and os.remove(c)\nt = time.perf_counter(); s.discover(); a = time.perf_counter() - t\nt = time.perf_counter(); s.discover(); b = time.perf_counter() - t\nprint(f"{a*1000:.1f} {b*1000:.1f}")']);
+  const cold = await py(['-c', 'import os, time, _slicc_site as s\nc = s._cache_path(os.path.realpath(__import__("sys").base_prefix))\nc and os.path.exists(c) and os.remove(c)\nt = time.perf_counter(); s.discover(); a = time.perf_counter() - t\nt = time.perf_counter(); s.discover(); b = time.perf_counter() - t\nprint(f"{a*1000:.1f} {b*1000:.1f}")']);
   assert.equal(cold.status, 0, cold.stderr);
   const [coldMs, warmMs] = cold.stdout.trim().split(' ').map(Number);
   const times = { on: [], off: [], pythonpath: [] };

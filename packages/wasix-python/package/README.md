@@ -18,6 +18,30 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-17 (wasix-sysroot -27):
+- `os.utime(path)`, `pathlib.Path.touch()` and everything else that sets a
+  file's times to "now" set them to now; up to 3.14.2-16 they set them to
+  0 (1970) (wasix-sysroot's broken `utimensat(NULL)`, homescoop#294).
+- `os.times()`, `resource.getrusage(RUSAGE_SELF)` and `time.clock`-style
+  callers report the process CPU time slicc-kernel keeps; system and
+  children's times are 0. Up to -16 they held wall-clock values.
+- An empty path is `FileNotFoundError` (`os.stat("")`, `open("")`), as on
+  Linux; files have owners on slicc-kernel ≥ 1.59.0 with users on
+  (`os.chown`, `os.stat().st_uid`), and `os.access` asks the kernel
+  (≥ 1.63.0).
+- **A system site directory every user shares:**
+  `/usr/local/lib/python3.14/site-packages` is added (with `site.addsitedir`,
+  so its `.pth` files run) after python's own site-packages and the py-*
+  packages it finds, when it exists. An embedder can drop a `.pth` there once
+  for every user. A virtual environment sees it only with
+  `--system-site-packages`, as on Linux.
+- The py-* discovery cache is per user:
+  `${XDG_CACHE_HOME:-~/.cache}/slicc-site/`, never in the package directory
+  (which other users cannot write); without a home or a writable cache
+  directory there is no cache.
+- `pip` and `pip3` are commands (`python3 -m pip`); `pip install --user`
+  installs into the user's own site-packages.
+
 Since 3.14.2-16 (wasix-sysroot -22: the `slicc.libc` marker, no exported
 itimer helper):
 - ctypes calls variadic C functions (`printf`, `snprintf`, `sscanf`,
@@ -30,11 +54,11 @@ itimer helper):
   Pass `c_double` for `%f`: ctypes does not promote, and a variadic `c_float`
   raises `RuntimeError: ffi_prep_cif_var failed` (libffi rejects it, as on
   every platform).
+  3.14.2-15 could not call them at all ("ffi_prep_cif_var failed").
 - Signals during blocking calls follow PEP 475 on slicc-kernel ≥ 1.53.3, which
   answers -22-marked programs with EINTR: a signal whose handler returns does
   not shorten `time.sleep`/`select`/`poll`, and ^C raises `KeyboardInterrupt`
   at once (`cert/signals.mjs`).
-  3.14.2-15 could not call them at all ("ffi_prep_cif_var failed").
 
 Since 3.14.2-15:
 - `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.51.0 (#306 /
@@ -53,8 +77,8 @@ Since 3.14.2-15:
   and if the `wasix-python` it resolves to (Node's lookup from its real
   directory) is this python's exact version, so side modules never mix
   interpreter builds; the first package of a name wins. `python -v` reports
-  what was skipped and why. The scan is cached in `.slicc-site-cache` in
-  python's directory (keyed on the package directories and their
+  what was skipped and why. The scan is cached per user in
+  `${XDG_CACHE_HOME:-~/.cache}/slicc-site/` (since 3.14.2-17; keyed on the package directories and their
   `package.json` stamps; `-v` always rescans); with the cache, a start costs
   about 2 ms more than with discovery off, and less than the same directories
   on `PYTHONPATH`. As with `PYTHONPATH`, `.pth` files in those directories are

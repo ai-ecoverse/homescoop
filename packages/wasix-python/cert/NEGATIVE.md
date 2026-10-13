@@ -1,5 +1,16 @@
 
 
+## 3.14.2-16: os.utime(p) and Path.touch() set 1970; os.times() is the wall clock (-17, homescoop#294)
+
+`round17.mjs` on slicc-kernel 1.71.1 (Node entry, 2026-10-13), with the published 3.14.2-16 (wasix-sysroot -22):
+
+```text
++ '1100000000 mtime=0 mtime=0'
+- '1100000000 now now'
+```
+
+`os.utime(p)` reaches the libc's `utimensat(…, NULL)`, which up to wasix-sysroot -26 sent explicit times 0/0. `os.times()` and `resource.getrusage()` mixed wall-clock seconds into the CPU fields. -16 also has no system site directory, keeps the discovery cache in the package directory (cone cannot write it: EACCES, rescanned every start) and has no `pip`/`pip3` commands. With -17's `_slicc_site.py`, `.pth` and commands on -16's interpreter, the rest of `round17.mjs` passes, so only the libc part needs the rebuild.
+
 ## 3.14.2-15: ctypes cannot call variadic functions
 
 wasix-org/libffi's WASIX backend returned `FFI_BAD_ABI` from `ffi_prep_cif_machdep_var`, so with `argtypes` naming the fixed parameters every variadic call (`printf`, `snprintf`, `sscanf`, `open(…, mode)`, `fcntl`, `ioctl`) raised `ffi_prep_cif_var failed` (hb2's cert-python-3.14.2-15 probes). Without `argtypes`, ctypes passes every argument as fixed, which on wasm32 is a different call signature than the variadic function has. 3.14.2-16 fixes the first case (`patches/libffi-wasix-varargs.patch`, `cert/ctypes-varargs.mjs`); the second stays wrong by the ABI, as on Apple arm64.
