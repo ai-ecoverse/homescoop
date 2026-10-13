@@ -26,7 +26,7 @@
     "test/sealed.mjs (KS-2, vault double): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
     "PENDING (KS-2 + KS-8): exec -- printenv with a sealed secret → materialize {names, path, argv (argv[0] = resolved path), cwd} → SLICC_SEALED_TICKET → the child sees the value for real:true names and the placeholder for real:false ones; fnox's own stdout/stderr never carry the value",
     "PENDING (KS-8, exposure): what the child and its environment expose: /proc/<child>/cmdline and status, the child's own children (inherited env), ps as another user, a reused or mismatched ticket (argv, cwd, path, parent) failing closed with EACCES",
-    "PENDING (K4a #405): /etc/fnox/config.toml root-owned 0644: a non-root user reads and resolves it, fnox set or edit fails with EACCES, sudo succeeds",
+    "PENDING (users enforce in a seven-like setup: bios K4 branch #355; sudo and tags are in slicc-kernel 1.66.0): /etc/fnox/config.toml root-owned 0644: a non-root user reads and resolves it, fnox set or edit fails with EACCES, sudo succeeds",
     "PENDING (KS-2 + KS-8): exec --shell-grants -- /bin/bash -c CMD → materialize {shellGrants: true, path, argv, cwd} (no names) → each granted name set to its placeholder (from the config or `placeholder {name}`) → the child bash sees the real value; the config's other sealed secrets keep placeholders"
   ],
   "patches": {
