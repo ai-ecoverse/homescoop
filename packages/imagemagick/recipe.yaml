@@ -19,6 +19,7 @@ dependencies:
     - "@ai-ecoverse/wasm-openjpeg@2.5.3"
     - "@ai-ecoverse/wasm-freetype@2.13.3-1"
     - "@ai-ecoverse/wasm-libxml2@2.15.4-1"
+    - "@ai-ecoverse/wasm-libiconv@1.18.0-1"
   host: []
   run: []
 about:
@@ -33,5 +34,5 @@ about:
     wasm-freetype said Version: 0, so configure's libwebp >= 0.4.1 and
     freetype2 >= 2.8.0 checks failed and those delegates were left out, and
     -2/-3 configured --without-xml. cert/checklist.mjs asserts the delegates.
-    libxml-2.0.pc names -liconv; iconv is in Emscripten's libc, so build.sh
-    stages an empty libiconv.a for the link.
+    wasm-libxml2 links GNU libiconv (wasm-libiconv); libwebp's encoder needs
+    libsharpyuv (the synthesized libwebp.pc requires it).

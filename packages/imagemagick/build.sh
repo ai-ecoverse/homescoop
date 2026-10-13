@@ -39,7 +39,6 @@ echo
 "$PKG_CONFIG" --atleast-version=0.4.1 libwebp
 "$PKG_CONFIG" --atleast-version=2.8.0 freetype2
 "$PKG_CONFIG" --atleast-version=2.0.0 libxml-2.0
-[[ -f "$PREFIX/lib/libiconv.a" ]] || printf '!<arch>\n' >"$PREFIX/lib/libiconv.a"
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
@@ -126,5 +125,9 @@ homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the F
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1
 homescoop_notice "libxml2 2.15.4 (@ai-ecoverse/wasm-libxml2)" \
   https://raw.githubusercontent.com/GNOME/libxml2/v2.15.4/Copyright 5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626
+ICONV_TB="$WORK/libiconv-1.18.tar.gz"
+homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.18.tar.gz 88dd96a8c0464eca144fc791ae60cd31cd8ee78321e67397e25fc095c4a19aa6 "$ICONV_TB"
+tar xzf "$ICONV_TB" -C "$WORK" libiconv-1.18/COPYING.LIB
+homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later" "$WORK/libiconv-1.18/COPYING.LIB" -
 homescoop_notice_emscripten
 echo "== imagemagick: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7"

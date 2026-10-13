@@ -555,7 +555,12 @@ EOF
   fi
   _ensure_one lcms2 liblcms2.a "-llcms2"
   _ensure_one libtiff-4 libtiff.a "-ltiff" "zlib libjpeg"
-  _ensure_one libwebp libwebp.a "-lwebp"
+  _ensure_one libsharpyuv libsharpyuv.a "-lsharpyuv"
+  if [[ -f "$pfx/lib/libsharpyuv.a" ]]; then
+    _ensure_one libwebp libwebp.a "-lwebp" "libsharpyuv"
+  else
+    _ensure_one libwebp libwebp.a "-lwebp"
+  fi
   _ensure_one libwebpmux libwebpmux.a "-lwebpmux" "libwebp"
   _ensure_one libwebpdemux libwebpdemux.a "-lwebpdemux" "libwebp"
   _ensure_one libopenjp2 libopenjp2.a "-lopenjp2"
