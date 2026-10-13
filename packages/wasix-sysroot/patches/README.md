@@ -210,7 +210,7 @@ The members change as follows:
 
 ## -25: `faccessat.c` — access through slicc-kernel (K3(b)), `AT_EACCESS`, `linkat` flags
 
-slicc-kernel 1.63.0 (K3(b2)) has `slicc_fs.path_access(dirfd, path, len, amode, flags)`: amode is `F_OK`/`R_OK`/`W_OK`/`X_OK`, flags 1 is no-follow and 2 is "effective ids". Under users `'enforce'` it applies Linux's permission rules (owner, group, other; search permission along the path, which `F_OK` checks too; root bypasses everything but `X_OK` on a file without any x bit). Under `'off'` and `'report'` it only resolves the path.
+slicc-kernel 1.63.0 (K3(b2)) has `slicc_fs.path_access(dirfd, path, len, amode, flags)`: amode is `F_OK`/`R_OK`/`W_OK`/`X_OK`, flags 1 is no-follow and 2 is "effective ids". Under users `'enforce'` it applies Linux's permission rules (owner, group, other; search permission along the path, which `F_OK` checks too; root bypasses everything but `X_OK` on a file without any x bit). Under `'off'` and `'report'` it resolves the path; with owners on (`'report'` included) `X_OK` on a device is EACCES.
 
 - **`faccessat.c` replaces cloudlibc's `faccessat.o`** (`__wasilibc_nocwd_faccessat`, which `access`, `faccessat` and the at-fdcwd paths all reach). It validates amode and flags (EINVAL), then asks `path_access`; ENOSYS (a kernel before 1.63.0) is remembered for the process, and the old check runs: `path_filestat_get` (now honouring `AT_SYMLINK_NOFOLLOW`) and the directory fd's WASI rights.
 - **`AT_EACCESS` is 0x200** in `__header_fcntl.h` (Linux's value). wasi-libc defined it as 0, so it could not be told from a plain `faccessat`. Programs are linked statically against the libc from their own headers, so old binaries keep passing 0 (real ids), which is what they got before. `faccessat` also accepts `AT_SYMLINK_NOFOLLOW` now (upstream: EINVAL).
@@ -218,4 +218,14 @@ slicc-kernel 1.63.0 (K3(b2)) has `slicc_fs.path_access(dirfd, path, len, amode, 
 - **`at_fdcwd.c`: `linkat`** returns EINVAL for flags other than `AT_SYMLINK_FOLLOW` (0x2 in WASIX, 0x400 on Linux), as Linux does; it passed them on, and the kernel ignored them.
 - **`open` rights:** cloudlibc's `openat` asks for base rights without `FD_WRITE` (and without the other write rights) for `O_RDONLY`, and slicc-kernel takes `FD_WRITE` as the write request, so no change is needed: under `'enforce'` a 0444 file opens `O_RDONLY` and is EACCES for `O_WRONLY`/`O_RDWR` (`test/r25.c`).
 - **Probe:** `test/r25.c` as root (with a `seteuid(1000)` to tell `access` from `eaccess`) and as a kernel user, `R25_USERS=enforce|report|off`, and `--allow-absent` on a kernel without `path_access`.
+
+## -26: an empty path is ENOENT (`chdir.c`, `posix.c`, `at_fdcwd.c`; homescoop#281)
+
+Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolution (`__wasilibc_find_relpath_alloc`, which -18's `chdir.c` defines) joined `""` to the cwd, so `open("")`, `stat("")`, `access("")`, `chmod("")`, `chown("")`, `opendir("")`, … acted on the current directory, and `mkdir("")`/`unlink("")` gave EEXIST/EISDIR. The kernel answered the `*at(dirfd, "")` forms for the directory itself until slicc-kernel 1.71.1 (slicc-kernel#404).
+
+- **`chdir.c`:** `__wasilibc_find_relpath_alloc` returns -1 with ENOENT for `""`. Every path call that resolves through the cwd and the preopens goes through it (`posix.c`, `chown.c`, `chdir`, `realpath`).
+- **`posix.c` / `at_fdcwd.c`:** `symlink("", x)` and `symlinkat("", …)` are ENOENT (an empty target), as on Linux.
+- **`at_fdcwd.c`:** `fstatat(fd, "", st, AT_EMPTY_PATH)` (Linux's 0x1000; the WASIX headers do not define it) is `fstat(fd)`, and `fstatat(AT_FDCWD, "", st, AT_EMPTY_PATH)` is `stat(".")`, since the kernel now answers an empty path with ENOENT.
+- No new archive members: `posix.o`, `at_fdcwd.o` (-16's section) and `chdir.o` (-18's) are rebuilt from the patched sources.
+- **Probe:** `test/r26.c`: 23 calls on `""` (through the cwd, and `fstatat`/`openat`/`mkdirat` on a dirfd, which need slicc-kernel ≥ 1.71.1) are ENOENT; `AT_EMPTY_PATH` is `fstat`; `"."`, `"/"` and a relative name still work.
 

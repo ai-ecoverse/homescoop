@@ -163,6 +163,10 @@ int __wasilibc_find_relpath_alloc(
     size_t *relative_buf_len,
     int can_realloc
 ) {
+    if (path[0] == '\0') {
+        errno = ENOENT;
+        return -1;
+    }
     // First, make our path absolute taking the cwd into account.
     const char *abspath = make_absolute(path);
     if (abspath == NULL) {

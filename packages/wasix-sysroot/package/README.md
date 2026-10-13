@@ -41,12 +41,20 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-26 an empty path is ENOENT, as POSIX and Linux have it:
+`open("")`, `stat("")`, `access("")`, `mkdir("")`, `chmod("")`, `symlink("", x)`
+and every other call that takes a path used to act on the current directory
+(libc made `""` relative to the cwd). With slicc-kernel ≥ 1.71.1 the
+`*at(dirfd, "")` forms are ENOENT too (slicc-kernel#404).
+`fstatat(fd, "", st, AT_EMPTY_PATH)` (0x1000) is `fstat(fd)`.
+
 Since 2025.9.30-25 `access`, `faccessat`, `eaccess` and `euidaccess` ask
 slicc-kernel (`slicc_fs.path_access`, slicc-kernel >= 1.63.0, K3(b)), which
 checks the file's owner, group and mode against the real ids (`access`) or the
 effective ids (`AT_EACCESS`, `eaccess`), as Linux does, including search
 permission on every directory of the path and root needing an x bit for
-`X_OK`. With users `'off'` or `'report'` it only checks that the path exists.
+`X_OK`. With users `'off'` or `'report'` it checks that the path exists, and
+`X_OK` on a device is EACCES whenever owners are on (`'report'` too).
 On an older kernel the -24 check stays (the path exists; WASI rights).
 - `AT_EACCESS` is now 0x200 (it was 0, so `faccessat(…, AT_EACCESS)` was
   `access`); `faccessat` also takes `AT_SYMLINK_NOFOLLOW`, which was EINVAL.
