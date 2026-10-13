@@ -39,6 +39,7 @@ echo
 "$PKG_CONFIG" --atleast-version=0.4.1 libwebp
 "$PKG_CONFIG" --atleast-version=2.8.0 freetype2
 "$PKG_CONFIG" --atleast-version=2.0.0 libxml-2.0
+[[ -f "$PREFIX/lib/libiconv.a" ]] || printf '!<arch>\n' >"$PREFIX/lib/libiconv.a"
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
@@ -63,7 +64,6 @@ if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "${F
         --without-lzma --without-openexr --without-pango --without-raqm \
         --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml \
         --without-zip --without-zstd --with-webp --with-freetype \
-        XML_LIBS="-L$PREFIX/lib -lxml2" \
         CFLAGS="-g1 -O2" \
         LDFLAGS="-L$PREFIX/lib"
     for d in WEBP FREETYPE XML; do
