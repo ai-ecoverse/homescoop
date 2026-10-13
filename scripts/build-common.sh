@@ -379,7 +379,7 @@ homescoop_slicc_archive() {
 # For fork/cli/spawn/make profiles, also call homescoop_slicc_keep_spawn
 # *before* the .a so wait4/execve are not left as libc ENOSYS stubs.
 homescoop_slicc_keep_exports() {
-  printf '%s' "-Wl,-u,slicc_raise -Wl,-u,slicc_sig_mask -Wl,-u,slicc_sigpipe"
+  printf '%s' "-Wl,-u,slicc_raise -Wl,-u,slicc_sig_mask -Wl,-u,slicc_sigpipe -Wl,-u,slicc_cred_euid"
 }
 
 # Force spawn/exec/wait4 out of the archive (fork|cli|spawn|make profiles).

@@ -162,6 +162,7 @@ window.boot = async (opts = {}) => {
   window.kernel = await createKernel({
     root: await navigator.storage.getDirectory(),
     network: { transport: certTransport, ...(uplink ? { uplink } : {}) },
+    ...(opts.users ? { users: opts.users } : {}),
   });
   document.getElementById('log').textContent = 'kernel ready';
   return true;

@@ -142,6 +142,8 @@ fi
 echo "== host-run: build.sh ($name)"
 bash "$PKG/build.sh"
 
+echo "== host-run: slicc shims carry the kernel credentials (slicc_cred_js)"
+node "$ROOT/scripts/check-slicc-cred.mjs" "$PKG/package"
 echo "== host-run: check package meta (license / LICENSE / files)"
 node "$ROOT/scripts/check-package-meta.mjs" "$name"
 echo "== host-run: exact @ai-ecoverse pins"

@@ -135,6 +135,8 @@ static int slicc_setcred(int ruid, int euid, int suid, int rgid, int egid, int s
   return slicc_status(slicc_setcred_js(ruid, euid, suid, rgid, egid, sgid));
 }
 
+EMSCRIPTEN_KEEPALIVE unsigned slicc_cred_euid(void) { return slicc_cred_one(SLICC_EUID); }
+
 uid_t __syscall_getuid32(void) { return slicc_cred_one(SLICC_RUID); }
 uid_t __syscall_geteuid32(void) { return slicc_cred_one(SLICC_EUID); }
 gid_t __syscall_getgid32(void) { return slicc_cred_one(SLICC_RGID); }

@@ -100,6 +100,10 @@ server. https also needs `@ai-ecoverse/wasm-tls-engine` in `needs`; without it
 the kernel answers CONNECT with 501. Before `serve`, every request gets a 502.
 See `packages/curl/cert/checklist.mjs`.
 
+### Users: `"users"` in `cert/meta.json`
+
+`"users": "enforce"` (or `"report"`) boots the kernel with `createKernel({ users })` (slicc-kernel ≥ 1.57.0 for file owners, ≥ 1.59.0 for the WASI owner imports, the permission checks of K3(b) later): files have owners and modes are checked. A spec adds users with `ctx.addUser({ name })` and runs as them with `ctx.run(argv, { user })`. Without the field the kernel boots with users `'off'`, as before.
+
 ### Tailnet: `ctx.uplink(config)`
 
 With `"uplink": true` in `cert/meta.json` (slicc-kernel ≥ 1.28.0)
