@@ -8,6 +8,10 @@ Patches: see `cert/meta.json`. Not in `scripts/ci-certified.json`.
 
 
 
+## Self-kill is a plain exit (published 5.3.0-17, slicc-kernel#422)
+
+`selfkill.mjs` (homescoop shim test `shims/slicc/test/selfkill.test.mjs` for the C side): 5.3.0-17's `kill(getpid(), sig)` runs the default action in the program (`exit(128 + sig)`), so the kernel reports `kill -TERM $$` as `{ status: 143 }` with no signal for `wait`, and status 143 for `sync.run` (slicc-jsh#97); it cannot be told from `exit 143`.
+
 ## The line after a late ^C: 5.3.0-14 (and 5.3.0-13)
 
 A ^C that slicc-kernel handed over late (readline only noticed it when more input arrived) made -14 free the *next* line: bth's 1.47.1/1.47.3 cert lost 40-45 per 500 rounds. 5.3.0-13 runs it, but with what readline held from before the ^C glued on ("techo", "0echo"), or loses it.
