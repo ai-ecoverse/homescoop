@@ -3,10 +3,12 @@
  *
  * The kernel keeps a caught signal pending until the program's next syscall;
  * the runtime then calls slicc_raise(), which runs the handler through libc's
- * raise() (or the default action, _Exit(128 + sig), when the program changed
- * its disposition meanwhile). slicc_sig_mask() reports the dispositions, so
- * the kernel applies SIGKILL and every default action itself, even to a busy
- * program. kill() reaches other processes through the kernel.
+ * raise(). raise() of a signal whose action is the default (and kill() of the
+ * program's own pid) goes to the kernel, which applies it, so a parent's wait
+ * sees the signal, not exit(128 + sig); caught and ignored ones stay local.
+ * slicc_sig_mask() reports the dispositions, so the kernel applies SIGKILL
+ * and every default action itself, even to a busy program. kill() reaches
+ * other processes through the kernel.
  */
 #include <emscripten.h>
 #include <errno.h>
@@ -40,11 +42,43 @@ EMSCRIPTEN_KEEPALIVE int slicc_sig_mask(int which) {
   return mask;
 }
 
-// 0, or -errno. Outside the wasm realm only a process's own pid works.
 EM_JS(int, slicc_kill_js, (int pid, int sig), {
   if (Module.sliccKernel && Module.sliccKernel.kill) return Module.sliccKernel.kill(pid, sig);
-  return 1; // no kernel
+  return 1;
 });
+
+EM_JS(int, slicc_pause_js, (void), {
+  if (Module.sliccKernel && Module.sliccKernel.pause) return Module.sliccKernel.pause();
+  return -52;
+});
+
+static int slicc_default_is_kernels(int sig) {
+  if (sig == SIGKILL || sig == SIGSTOP) return 1;
+  const struct sigaction *a = &__sig_actions[sig];
+  if ((a->sa_flags & SA_SIGINFO) || a->sa_handler != SIG_DFL) return 0;
+  return sig != SIGCHLD && sig != SIGCONT && sig != SIGURG && sig != SIGWINCH;
+}
+
+int __real_raise(int sig);
+
+static int slicc_raising;
+
+int __wrap_raise(int sig) {
+  if (slicc_raising || sig <= 0 || sig >= 32 || sig >= _NSIG || !slicc_default_is_kernels(sig)) return __real_raise(sig);
+  slicc_raising = 1;
+  int r = slicc_kill_js(getpid(), sig);
+  if (r != 0) {
+    slicc_raising = 0;
+    return __real_raise(sig);
+  }
+  if (sig == SIGSTOP || sig == SIGTSTP || sig == SIGTTIN || sig == SIGTTOU) {
+    slicc_raising = 0;
+    return 0;
+  }
+  while (slicc_pause_js() == -EINTR) {
+  }
+  _Exit(128 + sig);
+}
 
 int kill(pid_t pid, int sig) {
   if (sig < 0 || sig >= _NSIG) {
@@ -65,12 +99,5 @@ int kill(pid_t pid, int sig) {
   }
   return 0;
 }
-
-// pause(2): sleep until a caught signal is delivered; -EINTR once its
-// handler is due (the runtime raises it as the call returns).
-EM_JS(int, slicc_pause_js, (void), {
-  if (Module.sliccKernel && Module.sliccKernel.pause) return Module.sliccKernel.pause();
-  return -52; // ENOSYS: no kernel
-});
 
 int __syscall_pause(void) { return slicc_pause_js(); }
