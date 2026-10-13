@@ -5,6 +5,10 @@ New package, so it needs human cert first and is not in `scripts/ci-certified.js
 
 
 
+## No process credentials (published 3.4.4-3, users enforce)
+
+`users.mjs` on slicc-kernel 1.69.0 with users `enforce` (Node entry, 2026-10-13): 3.4.4-3 predates the cred shim (#207), so rsync does not know it is root. Root's `rsync -a` of cone's 1000:1000 tree gives `0:1000` everywhere (group kept, owner not), and cone's copy of a `0:100` file gives `1000:1000` (its supplementary group 100 is not seen). 3.4.4-4 gives `1000:1000` and `1000:100`.
+
 ## 3.4.4-2 has no socket shim (3.4.4-3, netfork)
 
 3.4.4-2 linked the `fork` shim profile, without `slicc_socket.c`. Every

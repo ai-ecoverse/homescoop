@@ -37,3 +37,9 @@ correctly (targets keep their times), but it warns (`failed to set times on
 (`.L..tp`).
 
 Certified on `@ai-ecoverse/slicc-kernel` 1.30.0.
+
+Since 3.4.4-4 rsync uses slicc-kernel's process credentials: as root, `-a`
+keeps owners and groups (`-o -g`), as on Linux; any other user keeps a group
+only if it belongs to it. 3.4.4-3 and older saw Emscripten's fixed ids, so
+root's `rsync -a` did not keep owners.
+

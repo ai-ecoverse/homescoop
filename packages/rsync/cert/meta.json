@@ -1,15 +1,15 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.69.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
     "@ai-ecoverse/wasm-procps"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
-    "@ai-ecoverse/wasm-procps@4.0.5-2"
+    "@ai-ecoverse/wasm-bash@5.3.0-17",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5",
+    "@ai-ecoverse/wasm-procps@4.0.7-1"
   ],
   "checklist": [
     "rsync --version is 3.4.4, protocol 32",
@@ -24,7 +24,9 @@
     "SIGINT mid-transfer (timeout -s INT on a --bwlimit copy): rc 20 'received SIGINT, SIGTERM, or SIGHUP', no rsync left in ps",
     "--bwlimit throttles (select() waits in the kernel)",
     "daemon (3.4.4-3, netfork): rsync --daemon --no-detach on a kernel port; rsync://127.0.0.1:8730/ lists 'mod', -a push and pull (via localhost) round-trip the files, a closed port gives 'Connection refused' rc 10, the daemon log shows the access",
-    "tailnet (uplink): rsync://peer.tail1234.ts.net/ resolves via the kernel resolver/uplink and dials 100.64.1.2:873 (refused → 'Connection refused' rc 10); an unknown tailnet name → rc 10 without a dial"
+    "tailnet (uplink): rsync://peer.tail1234.ts.net/ resolves via the kernel resolver/uplink and dials 100.64.1.2:873 (refused → 'Connection refused' rc 10); an unknown tailnet name → rc 10 without a dial",
+    "users (users enforce, 3.4.4-4): rsync links the slicc credentials, so root is root: root rsync -a of cone's tree keeps 1000:1000 and the modes (640, 4755, dirs 755); cone's rsync -a of root's 0:100 file gives 1000:100 (its own uid, a group it is in). 3.4.4-3: root's copy gives 0:1000 (owner not kept) and cone's 1000:1000 (NEGATIVE.md)"
   ],
-  "uplink": true
+  "uplink": true,
+  "users": "enforce"
 }
