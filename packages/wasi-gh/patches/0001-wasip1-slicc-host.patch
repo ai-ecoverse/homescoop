@@ -6,7 +6,9 @@ wasip1 has no termios, flock or process spawn. The stubs let the offline
 commands compile. internal/slicchost talks to host/gh-host.mjs (gh_host
 probe/call/take): go-gh's http.DefaultTransport and run.PrepareCmd send HTTP
 and start commands there. git is resolved with slicchost.LookPath because
-os/exec.LookPath cannot see slicc commands.
+os/exec.LookPath cannot see slicc commands. clipboard_wasip1.go copies and
+pastes text by trying pbcopy, xclip, xsel, then wl-copy/wl-paste. The
+utility is started from slicchost (set in the browser patch).
 
 Upstream: not filed (Lars decides).
 removeWhen: gh and these modules build for GOOS=wasip1, and wasip1 can dial
@@ -503,19 +505,75 @@ diff --git a/internal/telemetry/detach_wasip1.go b/internal/telemetry/detach_was
 diff --git a/vendor/github.com/atotto/clipboard/clipboard_wasip1.go b/vendor/github.com/atotto/clipboard/clipboard_wasip1.go
 --- /dev/null
 +++ b/vendor/github.com/atotto/clipboard/clipboard_wasip1.go
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,69 @@
 +//go:build wasip1
 +
 +package clipboard
 +
 +import "errors"
 +
++// Command runs one clipboard utility. slicchost sets it on wasip1, because
++// this package cannot import gh's internal host package.
++var Command func(name string, args []string, stdin string) (stdout string, err error)
++
++// ErrMissing is returned when that utility is not installed. A utility that
++// ran and exited non-zero is not ErrMissing, even if its stderr says
++// "command not found".
++var ErrMissing = errors.New("clipboard command not found")
++
 +func readAll() (string, error) {
-+	return "", errors.New("clipboard is not available on wasip1")
++	return transfer(pasteCommands, "")
 +}
 +
-+func writeAll(string) error {
-+	return errors.New("clipboard is not available on wasip1")
++func writeAll(text string) error {
++	_, err := transfer(copyCommands, text)
++	return err
++}
++
++type clipCmd struct {
++	name string
++	args []string
++}
++
++func copyCommands() []clipCmd {
++	return []clipCmd{
++		{"pbcopy", nil},
++		{"xclip", []string{"-in", "-selection", "clipboard"}},
++		{"xsel", []string{"--input", "--clipboard"}},
++		{"wl-copy", nil},
++	}
++}
++
++func pasteCommands() []clipCmd {
++	return []clipCmd{
++		{"pbpaste", nil},
++		{"xclip", []string{"-out", "-selection", "clipboard"}},
++		{"xsel", []string{"--output", "--clipboard"}},
++		{"wl-paste", []string{"--no-newline"}},
++	}
++}
++
++func transfer(cmds func() []clipCmd, stdin string) (string, error) {
++	if Command == nil {
++		return "", errors.New("clipboard is not available")
++	}
++	var last error
++	for _, cmd := range cmds() {
++		out, err := Command(cmd.name, cmd.args, stdin)
++		if err == nil {
++			return out, nil
++		}
++		// A missing utility is skipped. A utility that ran and failed
++		// (permission, a refused clipboard) is the answer.
++		if !errors.Is(err, ErrMissing) {
++			return "", err
++		}
++		last = err
++	}
++	if last == nil {
++		return "", errors.New("clipboard is not available")
++	}
++	return "", last
 +}
 diff --git a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go b/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
 --- a/vendor/github.com/AlecAivazis/survey/v2/terminal/runereader_posix.go
