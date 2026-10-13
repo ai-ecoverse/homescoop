@@ -1,0 +1,65 @@
+{
+  "iphone_13_pro_max.heic": {
+    "url": "https://raw.githubusercontent.com/ianare/exif-samples/5332a9cf0220e9c6c93f88a187daa90808051e10/heic/mobile/iphone_13_pro_max.HEIC",
+    "sha256": "e760c80eed310e4f27c092d5487693ca8e104e7cc01d25ba4828deb28f679676",
+    "what": "Apple iPhone 13 Pro Max still, iOS 15.2.1: 3024x4032 after irot 270 (EXIF Orientation 6), 6x8 grid of 512x512 HEVC tiles, ICC profile, thumbnail",
+    "source": "ianare/exif-samples heic/mobile/iphone_13_pro_max.HEIC (contributed in #13)",
+    "license": "CC-BY-SA-4.0 (exif-samples README: user-contributed images are released under Attribution-ShareAlike 4.0 International)"
+  },
+  "pug.heic": {
+    "url": "https://raw.githubusercontent.com/bigcat88/pillow_heif/64dc06fa7e0142e9133b98ea0d85ffe99544d82f/tests/images/heif_other/pug.heic",
+    "sha256": "1ddce96766efbfa0f6bdf634bdab26bdeff831393df8d67f4cdc7b7a7afebc67",
+    "what": "Apple iPhone 13 Pro portrait photo, iOS 16.2: 4032x3024 primary, 768x576 depth image and HDR gain map auxiliary image",
+    "source": "bigcat88/pillow_heif tests/images/heif_other/pug.heic",
+    "license": "BSD-3-Clause (pillow_heif repository licence)"
+  },
+  "example.heic": {
+    "url": "https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/examples/example.heic",
+    "sha256": "7f8b363e4936c0666a25f64f3a92fda10bd8e5453be4592530b65a55dd98f3f2",
+    "what": "two top-level 1280x854 images, each with a 320x212 thumbnail",
+    "source": "strukturag/libheif v1.23.6 examples/example.heic",
+    "license": "MIT (libheif examples/COPYING)"
+  },
+  "example.avif": {
+    "url": "https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/examples/example.avif",
+    "sha256": "54a0dc31d02b6f5d9d4b66027d4787861b7af15ffd8fab8eab963d10c5411469",
+    "what": "800x533 AVIF (AV1, decoded by dav1d)",
+    "source": "strukturag/libheif v1.23.6 examples/example.avif",
+    "license": "MIT (libheif examples/COPYING)"
+  },
+  "rainbow-451x461.heic": {
+    "file": "rainbow-451x461.heic",
+    "sha256": "4b2ce727f093944975f143ba2b39c4c64511b766d94552f8d51a755916e7f983",
+    "what": "451x461 HEVC image (width and height not multiples of 8)",
+    "source": "strukturag/libheif v1.23.6 tests/data/rainbow-451x461.heic",
+    "license": "LGPL-3.0-or-later (libheif)"
+  },
+  "badmdat.heic": {
+    "file": "badmdat.heic",
+    "sha256": "46217f0b7dcc25ee792a7b4bf38ab159f65f18686a83118cb079ef0fa44a0e47",
+    "what": "rainbow-451x461.heic with bytes 40..3999 after the mdat tag set to 0xff: valid boxes, damaged HEVC data",
+    "source": "homescoop, derived from rainbow-451x461.heic",
+    "license": "LGPL-3.0-or-later (derived from libheif test data)"
+  },
+  "1x1.heic": {
+    "file": "1x1.heic",
+    "sha256": "3b721180669867aa0c94c1dfb67383e6b83f8f7d8072679a03e94ce1ed119d8e",
+    "what": "1x1 #c83214, lossy HEVC",
+    "source": "homescoop: magick -size 1x1 xc:'#c83214' p1.png && heif-enc -q 90 p1.png -o 1x1.heic (libheif 1.23.6, x265)",
+    "license": "CC0-1.0"
+  },
+  "odd-1023x769.heic": {
+    "file": "odd-1023x769.heic",
+    "sha256": "ce5f73f9d52d19c01d8e514f35f43d184681bc977274deacddcded423f87598f",
+    "what": "1023x769 red-blue gradient, lossy HEVC",
+    "source": "homescoop: magick -size 1023x769 gradient:red-blue odd.png && heif-enc -q 80 odd.png -o odd-1023x769.heic",
+    "license": "CC0-1.0"
+  },
+  "rot90-17x9.heic": {
+    "file": "rot90-17x9.heic",
+    "sha256": "f281fed4bc214dea32c97b6085e6f70dd3bfa23a6b24ce961411775bf8add5ad",
+    "what": "17x9 blue with a red 8x4 block at the top left, lossless RGB HEVC, irot 270 (displayed rotated 90 degrees clockwise: 9x17, red block top right)",
+    "source": "homescoop: magick -size 17x9 xc:blue -fill red -draw 'rectangle 0,0 7,3' PNG24:o.png && heif-enc -L --rotate-cw 90 o.png -o rot90-17x9.heic",
+    "license": "CC0-1.0"
+  }
+}

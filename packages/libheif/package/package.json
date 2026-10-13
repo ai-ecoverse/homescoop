@@ -1,0 +1,57 @@
+{
+  "name": "@ai-ecoverse/wasm-libheif",
+  "version": "1.23.6-1",
+  "description": "libheif 1.23.6 HEIF/HEIC/AVIF decoder with heif-convert and heif-info for slicc (WASM / emscripten). Optional: contains an HEVC decoder (libde265), and HEVC is patent-encumbered. Static libs and headers included for LGPL relinking.",
+  "license": "LGPL-3.0-or-later AND MIT AND BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/libheif/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "libheif",
+    "heif",
+    "heic",
+    "avif",
+    "hevc"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "lib",
+    "include",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "libheif",
+    "upstream": "1.23.6"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "heif-convert": {
+        "glue": "bin/heif-dec",
+        "wasm": "bin/heif-dec.wasm",
+        "argv0": "heif-convert"
+      },
+      "heif-dec": {
+        "glue": "bin/heif-dec",
+        "wasm": "bin/heif-dec.wasm"
+      },
+      "heif-info": {
+        "glue": "bin/heif-info",
+        "wasm": "bin/heif-info.wasm"
+      }
+    }
+  }
+}

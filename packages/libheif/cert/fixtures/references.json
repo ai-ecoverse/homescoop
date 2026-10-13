@@ -1,0 +1,248 @@
+{
+ "host": "libheif 1.23.6 (heif-convert)",
+ "tolerance": {
+  "maxDelta": {
+   "8": 1,
+   "16": 1
+  },
+  "maxFixedFraction": 0.0001
+ },
+ "png": {
+  "iphone13.png": {
+   "width": 3024,
+   "height": 4032,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "a33d59bb9baf74704cedb6aa4b59e401a69156df1e0bae98a2bf82228f941d6d",
+   "fixes": []
+  },
+  "pug.png": {
+   "width": 4032,
+   "height": 3024,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "7f838065bfabf7a80d8bfc7a5b947d1392d8a98317c05ace9641ca8d41933931",
+   "fixes": []
+  },
+  "pug-depth.png": {
+   "width": 768,
+   "height": 576,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "2f375433929f0827f9c31d1b9f7bc5ad49e7d6daa12d771d3813c83cb6a1d541",
+   "fixes": []
+  },
+  "pug-urn_com_apple_photo_2020_aux_hdrgainmap.png": {
+   "width": 2016,
+   "height": 1512,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "c33fd144d037584ccc5d5ef1b57115c6916601684904de511599038a7efb133e",
+   "fixes": []
+  },
+  "example-1.png": {
+   "width": 1280,
+   "height": 854,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "b3411eb8165b412580ed4358ce8dc5236be6ac1a9c19e1ceb9f1764f505b55a0",
+   "fixes": [
+    [
+     110,
+     201
+    ],
+    [
+     76919,
+     201
+    ],
+    [
+     107777,
+     201
+    ],
+    [
+     115634,
+     201
+    ],
+    [
+     127022,
+     201
+    ],
+    [
+     127025,
+     201
+    ],
+    [
+     153929,
+     201
+    ],
+    [
+     188213,
+     201
+    ],
+    [
+     223256,
+     201
+    ],
+    [
+     230447,
+     201
+    ],
+    [
+     246140,
+     201
+    ],
+    [
+     257666,
+     201
+    ],
+    [
+     307739,
+     201
+    ],
+    [
+     315410,
+     201
+    ],
+    [
+     315464,
+     201
+    ],
+    [
+     526244,
+     201
+    ],
+    [
+     3210746,
+     201
+    ],
+    [
+     3211175,
+     201
+    ],
+    [
+     3226100,
+     201
+    ],
+    [
+     3226511,
+     201
+    ],
+    [
+     3233912,
+     201
+    ],
+    [
+     3234119,
+     201
+    ],
+    [
+     3234155,
+     201
+    ],
+    [
+     3234158,
+     201
+    ],
+    [
+     3234299,
+     201
+    ],
+    [
+     3234305,
+     201
+    ],
+    [
+     3234428,
+     201
+    ],
+    [
+     3234500,
+     201
+    ],
+    [
+     3237629,
+     201
+    ],
+    [
+     3237785,
+     201
+    ],
+    [
+     3241304,
+     201
+    ],
+    [
+     3241319,
+     201
+    ],
+    [
+     3241622,
+     201
+    ],
+    [
+     3245477,
+     201
+    ],
+    [
+     3261569,
+     201
+    ]
+   ]
+  },
+  "example-2.png": {
+   "width": 1280,
+   "height": 854,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "a858c5d02395d5f7654665b4b8ee24a32097ab3c6a6b8c7aa40244e9b820ad2b",
+   "fixes": []
+  },
+  "avif.png": {
+   "width": 800,
+   "height": 533,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "ad9f6900033c9391c25091ab05a788f91e22bf87dccd913f3cb91b3eb1d6a3a1",
+   "fixes": []
+  },
+  "rainbow.png": {
+   "width": 451,
+   "height": 461,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "e2856ed8a6aa99c7a53bc08a82156535286f0a8a827f5f8e4c9a7a294534e453",
+   "fixes": []
+  },
+  "one.png": {
+   "width": 1,
+   "height": 1,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "21c729f3f54c9866a718634950a9a841794cfd4245b2e591d2c16e5b159e3671",
+   "fixes": []
+  },
+  "odd.png": {
+   "width": 1023,
+   "height": 769,
+   "colorType": 2,
+   "depth": 16,
+   "sha256": "b8cdebb5877d5d4be16f27b0e7c8eba94b22d211154c4164d27060e76367f4fd",
+   "fixes": []
+  },
+  "rot90.png": {
+   "width": 9,
+   "height": 17,
+   "colorType": 2,
+   "depth": 8,
+   "sha256": "cf6c04c0151ab6c3c2e221f9aebcf7efec3a4753c0c58250095e1d3ebe5ea0f7",
+   "fixes": []
+  }
+ },
+ "info": {
+  "iphone_13_pro_max.heic": "MIME type: image/heic\nmain brand: heic\ncompatible brands: mif1, MiHE, MiPr, miaf, MiHB, heic\n\nimage: 3024x4032 (id=49), primary\n  tiles: 6x8, tile size: 512x512\n  colorspace: YCbCr, 4:2:0\n  bit depth: 8\n  thumbnail: 240x320\n  color profile: prof\n  alpha channel: no \n  depth channel: no\nmetadata:\n  Exif: 2456 bytes\ntransformations:\n  angle (ccw): 270\nregion annotations:\n  none\ntext items:\n  none\nproperties:\nnone\nMIME items:\n  52 : application/rdf+xml\n",
+  "pug.heic": "MIME type: image/heic\nmain brand: heic\ncompatible brands: mif1, MiHE, miaf, MiHB, heic\n\nimage: 4032x3024 (id=49), primary\n  tiles: 8x6, tile size: 512x512\n  colorspace: YCbCr, 4:2:0\n  bit depth: 8\n  color profile: prof\n  alpha channel: no \n  depth channel: yes\n    size: 768x576\n    bits per pixel: 8\n    z-near: undefined\n    z-far:  undefined\n    d-min:  1.498047\n    d-max:  4.382812\n    representation: uniform disparity\n    disparity_reference_view: 0\nmetadata:\n  Exif: 2628 bytes\n  XMP: 2541 bytes\ntransformations:\n  angle (ccw): 0\nregion annotations:\n  none\ntext items:\n  none\nproperties:\nnone\nMIME items:\n  51 : application/rdf+xml\n  53 : application/rdf+xml\n  55 : application/rdf+xml\n",
+  "example.heic": "MIME type: image/heif\nmain brand: mif1\ncompatible brands: mif1, heic, hevc\n\nimage: 1280x854 (id=20004), primary\n  colorspace: YCbCr, 4:2:0\n  bit depth: 8\n  thumbnail: 320x212\n  color profile: no\n  alpha channel: no \n  depth channel: no\nmetadata:\n  none\ntransformations:\n  none\nregion annotations:\n  none\ntext items:\n  none\nproperties:\nnone\n\nimage: 1280x854 (id=20006)\n  colorspace: YCbCr, 4:2:0\n  bit depth: 8\n  thumbnail: 320x212\n  color profile: no\n  alpha channel: no \n  depth channel: no\nmetadata:\n  none\ntransformations:\n  none\nregion annotations:\n  none\ntext items:\n  none\nproperties:\nnone\nMIME items:\n",
+  "example.avif": "MIME type: image/avif\nmain brand: avif\ncompatible brands: avif, mif1\n\nimage: 800x533 (id=1), primary\n  colorspace: YCbCr, 4:2:0\n  bit depth: 8\n  color profile: nclx\n    colour primaries: 2 (unspecified)\n    transfer characteristics: 2 (unspecified)\n    matrix coefficients: 6 (BT.601)\n    full range flag: 1 (full)\n  alpha channel: no \n  depth channel: no\nmetadata:\n  none\ntransformations:\n  none\nregion annotations:\n  none\ntext items:\n  none\nproperties:\nnone\nMIME items:\n",
+  "rot90-17x9.heic": "MIME type: image/heic\nmain brand: heix\ncompatible brands: mif1, heix, miaf\n\nimage: 9x17 (id=1), primary\n  colorspace: RGB\n  bit depth: 8\n  color profile: nclx\n    colour primaries: 1 (BT.709)\n    transfer characteristics: 13 (IEC 61966-2-1 (sRGB))\n    matrix coefficients: 0 (RGB/GBR)\n    full range flag: 1 (full)\n  alpha channel: no \n  depth channel: no\nmetadata:\n  none\ntransformations:\n  crop: left=0 top=0 right=47 bottom=55\n  angle (ccw): 270\nregion annotations:\n  none\ntext items:\n  none\nproperties:\nnone\nMIME items:\n"
+ }
+}

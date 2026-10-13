@@ -1,0 +1,22 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.72.0",
+  "patches": {
+    "emscripten-decode.patch": "upstream libheif turns off libde265's deblocking filter and SAO under __EMSCRIPTEN__ (faster, wrong pixels); the patch keeps the full HEVC decode, and runs dav1d with one thread. Every heif-convert PNG case must equal host libheif 1.23.6 (iPhone stills, depth and gain map, odd sizes): without it the pixel hashes differ (NEGATIVE.md)",
+    "no-embind.patch": "build fix only: heif.cc's embind JavaScript bindings are left out of the CLI and the static libheif.a (they need --bind); the link fails without it"
+  },
+  "fixtures": "fixtures/fixtures.json (sources and licences); the big iPhone and libheif example files are downloaded at a pinned commit and sha256-checked",
+  "references": "fixtures/references.json, made by lib/make-references.mjs with Homebrew libheif 1.23.6 (libde265 1.1.3, aom 3.15.2) as the host",
+  "checklist": [
+    "heif-convert / heif-dec / heif-info --version is 1.23.6, plugins disabled; --list-decoders shows libde265 1.1.3 (HEIC) and dav1d (AVIF)",
+    "heif-info output equals host heif-info 1.23.6 for the iPhone 13 Pro Max still, the iPhone portrait (depth + HDR gain map), libheif's two-image example.heic, example.avif and the rotated 17x9 file",
+    "heif-convert to PNG equals host libheif 1.23.6 sample by sample: iPhone 13 Pro Max 3024x4032 (large, irot 270), iPhone portrait primary 4032x3024 + depth 768x576 + gain map 2016x1512 (--with-aux), both images of example.heic, AVIF via dav1d, 451x461, 1x1, 1023x769 at 16 bit, 9x17. Tolerance: at most 1 per 8-bit sample on at most 0.01% of samples, every such sample listed in references.json (35 in example-1.png, none elsewhere)",
+    "orientation: irot is applied (17x9 lossless shows as 9x17 with the red block top right; the iPhone still is 3024x4032 portrait); the embedded EXIF Orientation in JPEG output is reset to 1, and --with-exif keeps the original EXIF (Orientation 6, iPhone 13 Pro Max) in the .exif sidecar",
+    "heif-convert to JPEG: each image of example.heic (-1.jpg, -2.jpg), the portrait's primary, depth and gain map; -q 30 is smaller than -q 92",
+    "corrupt input: truncated, garbage after ftyp and empty files give rc 1 and a missing file rc 10, with the same messages as host libheif, from both tools, no trap and no output file; damaged HEVC data in a valid file does not trap",
+    "relinkable (LGPL): ladder-pr runs share/libheif/relink/relink.sh from the tarball, links heif-dec and heif-info again from lib/*.a and the shipped application objects, and the relinked heif-dec decodes rainbow-451x461.heic to the host pixels"
+  ],
+  "ci": [
+    "node packages/libheif/cert/lib/relink-check.mjs"
+  ]
+}
