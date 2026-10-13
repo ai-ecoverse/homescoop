@@ -145,7 +145,7 @@ homescoop_notices_begin "screen.wasm statically links the following."
 homescoop_notice "ncurses $NCURSES_VER (built from the pinned source tarball)" "$NC_SRC"/COPYING -
 homescoop_notice_emscripten
 
-# package.json — SCREENDIR so sockets land in /tmp (AF_UNIX path-bound)
+# package.json
 PKG_JSON="$HOMESCOOP_PKG/package/package.json"
 python3 - "$PKG_JSON" "$VERSION" <<'PY'
 import json, sys
@@ -173,7 +173,6 @@ pkg = {
                 "glue": "bin/screen",
                 "wasm": "bin/screen.wasm",
                 "env": {
-                    "SCREENDIR": "/tmp/screens",
                     "TERM": "xterm-256color",
                 },
             }
@@ -198,7 +197,7 @@ cat > "$HOMESCOOP_PKG/package/PRESTAGE.md" <<EOF
 
 Emscripten + asyncify fork. SLICC PR **#3733** (pseudo-terminals) has merged.
 libc includes musl \`passwd/\` (reads \`/etc/passwd\` + \`/etc/group\` from VFS).
-\`slicc_libc_gaps\` strong set*id/setgroups: succeed for uid/gid 1000, else EPERM.
+\`slicc_libc_gaps\`: process credentials (getuid/geteuid, set*id, groups) from slicc-kernel (#207).
 Linked \`netfork\` profile: \`slicc_socket\` (AF_UNIX SOCK_STREAM) + \`slicc_select\` +
 \`__syscall_pause\` (SLICC #3740).
 \`slicc_sig_mask\` rebuilt against host emsdk musl (\`sizeof(sigaction)==140\`);
@@ -212,7 +211,7 @@ $(cat "$CONFIG_LOG" 2>/dev/null || echo "(run build to populate)")
 ## Smoke (host)
 \`\`\`sh
 SMOKE_WORKDIR=\$TMP node scripts/run-wasm-cli.mjs packages/screen/package/bin/screen -- -v
-SMOKE_ENV=SCREENDIR=/tmp/screens,HOME=/tmp,TERM=xterm-256color \\
+SMOKE_ENV=HOME=/tmp,TERM=xterm-256color \\
   SMOKE_WORKDIR=\$TMP node scripts/run-wasm-cli.mjs packages/screen/package/bin/screen -- -dmS test sleep 2
 \`\`\`
 Browser: multi-window (^A c / ^A n / ^A "); clean frontend exit on backend SIG_BYE

@@ -18,10 +18,10 @@ export default async function (ctx) {
   const a = await pty(['screen', '-S', 'ra', 'bash', '--norc', '-i'], {
     cwd,
     steps: [
-      { expect: 'bash-5\\.3\\$ ' },
+      { expect: 'bash-5\\.3[$#] ' },
       { write: 'echo first-$((1+1))\r' },
       { expect: 'first-2' },
-      { expect: 'bash-5\\.3\\$ ', write: '\x01d' },
+      { expect: 'bash-5\\.3[$#] ', write: '\x01d' },
       { expect: '\\[detached from \\d+\\.ra\\]' },
     ],
     timeoutMs: 10000,
@@ -35,10 +35,10 @@ export default async function (ctx) {
   const b = await pty(['bash', '--norc', '-i'], {
     cwd,
     steps: [
-      { expect: 'bash-5\\.3\\$ ' },
+      { expect: 'bash-5\\.3[$#] ' },
       { write: 't=$(tty); screen -S ra -X stuff "ls $t >/tmp/ra-vis 2>&1; echo vis-done >>/tmp/ra-vis"$\'\\r\'; sleep 1; cat /tmp/ra-vis\r' },
       { expect: 'vis-done' },
-      { expect: 'bash-5\\.3\\$ ', write: 'screen -r ra\r' },
+      { expect: 'bash-5\\.3[$#] ', write: 'screen -r ra\r' },
       { sleepMs: 1500, write: 'echo "sty=[$STY]"\r' },
       { expect: 'sty=\\[' },
       { sleepMs: 300, write: 'exit\r' },

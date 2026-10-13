@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-screen",
-  "version": "5.0.1-9",
+  "version": "5.0.1-10",
   "description": "GNU screen for slicc (emscripten ABI; asyncify fork; PTY via musl+SLICC #3733)",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -40,7 +40,6 @@
         "glue": "bin/screen",
         "wasm": "bin/screen.wasm",
         "env": {
-          "SCREENDIR": "/tmp/screens",
           "TERM": "xterm-256color"
         }
       }
