@@ -1,0 +1,16 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.69.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-17",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5"
+  ],
+  "checklist": [
+    "bzip2 -k / bunzip2 -c / bzcat round trip; the archive starts with BZh",
+    "bzip2recover (1.0.8-2, bzip2recover-llu.patch) on a 3-block file (250000 random bytes, bzip2 -1): rc 0, 'block N runs from A to B' for blocks 1-3, no I/O error; rec00001data.bz2..rec00003data.bz2 each pass bzip2 -t, and concatenated they decompress to the original (sha256). 1.0.8-1: 'I/O error reading data.bz2 … Invalid argument', no rec*.bz2 (NEGATIVE.md)"
+  ]
+}
