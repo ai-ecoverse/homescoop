@@ -2,10 +2,17 @@
 
 MRI Ruby for slicc WASIX. No epoll (poll fallback). See PRESTAGE.md.
 
-Built on wasix-sysroot 2025.9.30-27 (the WASIX libc and headers; see
+Built on wasix-sysroot 2025.9.30-27 or later (the WASIX libc and headers; see
 PRESTAGE.md). `Gem.ruby` and `RbConfig.ruby` are the package's own
 `bin/ruby` (`/node_modules/@ai-ecoverse/wasix-ruby/bin/ruby` in a flat
 install), the same interpreter as the `ruby` command on PATH.
+
+Since 3.4.11-8, single-fd waits (`IO#wait_readable`, blocking `TCPSocket.new`,
+`Net::HTTP`, blocking `SSLSocket#connect`/`#accept`) use poll(): WASIX's select()
+rejects an exception set with ENOSYS, so `IO.select` with a third array still
+fails. `io/console` is built, so `irb` and reline work.
+
+`TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
 ## 3.4.11-11: wasix-sysroot 2025.9.30-27
 
