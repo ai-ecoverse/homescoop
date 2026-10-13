@@ -14,8 +14,6 @@ source:
 # top of -24's owners/chown and linkat), engines slicc-kernel >=1.44.0 and
 # slicc.env WASIXCC_SYSROOT_PREFIX ${package}/../wasix-sysroot (as -12).
 # Drop repack: when the next release rebuilds.
-repack: when the
-# next release rebuilds.
 repack:
   from: "24.0.0-11"
   fields:
