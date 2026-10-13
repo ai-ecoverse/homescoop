@@ -13,6 +13,7 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
   - it refuses a value given as an argument.
 - **`fnox get`, `export`, `env`, `hook-env`:** print placeholders.
 - **`fnox exec -- cmd`:** asks the kernel to hand the command the values its policy allows (`materialize`), then runs it. fnox never sees a value.
+- **`fnox exec --shell-grants -- cmd`:** the same for the secrets the vault grants to every shell; the agent's bash hook uses it.
 - **`fnox proxy run -- cmd`:** runs the command with placeholders only. The realm proxy fills in values for the rules in `/etc/fnox/config.toml`.
 - **`fnox proxy rules --json`:** prints a project's rules as proposals.
 - **`fnox check`:** asks the vault about each sealed record.

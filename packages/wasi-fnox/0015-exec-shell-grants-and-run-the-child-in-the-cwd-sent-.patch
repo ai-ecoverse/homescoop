@@ -1,0 +1,270 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Tue, 13 Oct 2026 02:00:29 +0200
+Subject: [PATCH] exec: `--shell-grants`, and run the child in the cwd sent to
+ the vault
+
+`fnox exec --shell-grants -- cmd` sends `materialize {shellGrants: true,
+path, argv, cwd}` (slicc-vault#9) instead of naming this configuration's
+sealed secrets, which then keep their placeholders. Each name the vault
+grants is set in the child's environment to its placeholder, from the
+configuration when it holds the record and from `placeholder {name}`
+otherwise, so the kernel can swap it at exec. The plain-value warning is
+left out in this mode, which the agent's bash hook uses for every
+command.
+
+The child now also gets the cwd that went into the ticket explicitly,
+so the kernel's binding of path, argv and cwd always matches what fnox
+sent.
+
+diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
+index 9cf8473..3d85bf0 100644
+--- a/crates/fnox-core/src/sealed.rs
++++ b/crates/fnox-core/src/sealed.rs
+@@ -222,6 +222,16 @@ pub fn materialize(names: &[String], path: &str, argv: &[String], cwd: &str) ->
+     )
+ }
+ 
++pub fn materialize_shell_grants(path: &str, argv: &[String], cwd: &str) -> Result<Ticket> {
++    parse(
++        "materialize",
++        call(
++            "materialize",
++            json!({ "shellGrants": true, "path": path, "argv": argv, "cwd": cwd }),
++        )?,
++    )
++}
++
+ pub enum Wait {
+     Done(Request),
+     Ended(Request),
+@@ -431,6 +441,27 @@ mod tests {
+         set_transport(None);
+     }
+ 
++    #[test]
++    fn materialize_shell_grants_sends_no_names() {
++        let (_g, mock) = install();
++        mock.reply(
++            json!({ "v": 1, "ticket": "t2", "expiresAt": 1, "real": { "OPENAI_API_KEY": true } }),
++        );
++        let argv = vec![
++            "/bin/bash".to_string(),
++            "-c".to_string(),
++            "make".to_string(),
++        ];
++        let ticket = materialize_shell_grants("/bin/bash", &argv, "/home/demo").unwrap();
++        assert_eq!(ticket.real.get("OPENAI_API_KEY"), Some(&true));
++        let sent = mock.requests.lock().unwrap()[0].clone();
++        assert_eq!(
++            sent,
++            json!({ "v": 1, "op": "materialize", "shellGrants": true, "path": "/bin/bash", "argv": ["/bin/bash", "-c", "make"], "cwd": "/home/demo" })
++        );
++        set_transport(None);
++    }
++
+     #[test]
+     fn wait_polls_until_done() {
+         let (_g, mock) = install();
+diff --git a/src/commands/exec.rs b/src/commands/exec.rs
+index e9bcdd6..2786f05 100644
+--- a/src/commands/exec.rs
++++ b/src/commands/exec.rs
+@@ -25,6 +25,13 @@ pub struct ExecCommand {
+     #[usage(long)]
+     pub replace: bool,
+ 
++    /// Inside seven, ask the vault for the secrets it grants to every shell
++    /// (`[exec] NAME = { shell = true }`) instead of this configuration's
++    /// sealed secrets, which keep their placeholders. Used by the agent's
++    /// bash hook
++    #[usage(long)]
++    pub shell_grants: bool,
++
+     /// Command to run
+     #[usage(
+         arg,
+@@ -122,7 +129,7 @@ impl ExecCommand {
+                 .filter(|key| !sealed_names.contains(*key))
+                 .map(String::as_str)
+                 .collect();
+-            if !literal.is_empty() {
++            if !literal.is_empty() && !self.shell_grants {
+                 eprintln!(
+                     "fnox: warning: {} passed as plain values, not through seven's vault",
+                     literal.join(", ")
+@@ -130,16 +137,22 @@ impl ExecCommand {
+             }
+         }
+         let mut ticket = None;
+-        if !sealed_in_plan.is_empty() {
++        let mut granted_env: Vec<(String, String)> = Vec::new();
++        if !sealed_in_plan.is_empty() || self.shell_grants {
+             let cwd =
+                 std::env::current_dir().map_err(|source| FnoxError::CommandExecutionFailed {
+                     command: self.command.join(" "),
+                     source,
+                 })?;
+             let path_var = std::env::var_os("PATH");
++            let grants = if self.shell_grants {
++                crate::seven::Grants::Shell
++            } else {
++                crate::seven::Grants::Names(&sealed_in_plan)
++            };
+             let prepared = match crate::seven::prepare_exec(
+                 &self.command,
+-                &sealed_in_plan,
++                grants,
+                 &cwd,
+                 path_var.as_deref(),
+             ) {
+@@ -162,10 +175,20 @@ impl ExecCommand {
+                     "fnox: {name} keeps its placeholder: seven's policy does not hand it to this command"
+                 );
+             }
++            for name in &prepared.real {
++                if self.shell_grants && !sealed_in_plan.contains(name) {
++                    let placeholder = match plan.set.get(name) {
++                        Some(value) if sealed_names.contains(name) => value.clone(),
++                        _ => fnox_core::sealed::placeholder(name)?.placeholder,
++                    };
++                    granted_env.push((name.clone(), placeholder));
++                }
++            }
+             cmd = Command::new(&prepared.program);
+             if self.command.len() > 1 {
+                 cmd.args(&self.command[1..]);
+             }
++            cmd.current_dir(&cwd);
+             ticket = Some(prepared.ticket);
+         }
+ 
+@@ -191,6 +214,9 @@ impl ExecCommand {
+             _temp_files.push(temp_file);
+         }
+ 
++        for (key, placeholder) in &granted_env {
++            cmd.env(key, placeholder);
++        }
+         if let Some(ticket) = &ticket {
+             cmd.env("SLICC_SEALED_TICKET", ticket);
+         }
+diff --git a/src/seven.rs b/src/seven.rs
+index eebfb9e..b9e5b94 100644
+--- a/src/seven.rs
++++ b/src/seven.rs
+@@ -74,11 +74,17 @@ pub struct PreparedExec {
+     pub program: std::path::PathBuf,
+     pub ticket: String,
+     pub kept: Vec<String>,
++    pub real: Vec<String>,
++}
++
++pub enum Grants<'a> {
++    Names(&'a [String]),
++    Shell,
+ }
+ 
+ pub fn prepare_exec(
+     command: &[String],
+-    sealed: &[String],
++    grants: Grants<'_>,
+     cwd: &std::path::Path,
+     path_var: Option<&std::ffi::OsStr>,
+ ) -> std::result::Result<PreparedExec, PrepareError> {
+@@ -86,17 +92,34 @@ pub fn prepare_exec(
+     let program_str = program.to_string_lossy().to_string();
+     let mut argv = vec![program_str.clone()];
+     argv.extend(command[1..].iter().cloned());
+-    let granted = sealed::materialize(sealed, &program_str, &argv, &cwd.to_string_lossy())
+-        .map_err(PrepareError::Seven)?;
+-    let kept = sealed
++    let cwd_str = cwd.to_string_lossy();
++    let (granted, asked) = match grants {
++        Grants::Names(names) => (
++            sealed::materialize(names, &program_str, &argv, &cwd_str),
++            names,
++        ),
++        Grants::Shell => (
++            sealed::materialize_shell_grants(&program_str, &argv, &cwd_str),
++            &[][..],
++        ),
++    };
++    let granted = granted.map_err(PrepareError::Seven)?;
++    let kept = asked
+         .iter()
+         .filter(|name| !granted.real.get(*name).copied().unwrap_or(false))
+         .cloned()
+         .collect();
++    let real = granted
++        .real
++        .iter()
++        .filter(|(_, real)| **real)
++        .map(|(name, _)| name.clone())
++        .collect();
+     Ok(PreparedExec {
+         program,
+         ticket: granted.ticket,
+         kept,
++        real,
+     })
+ }
+ 
+@@ -265,7 +288,7 @@ mod tests {
+             "https://api.github.com".to_string(),
+         ];
+         let sealed = vec!["GH".to_string(), "NPM".to_string()];
+-        let prepared = match prepare_exec(&command, &sealed, &root, Some(&path)) {
++        let prepared = match prepare_exec(&command, Grants::Names(&sealed), &root, Some(&path)) {
+             Ok(p) => p,
+             Err(_) => panic!("prepare failed"),
+         };
+@@ -285,6 +308,25 @@ mod tests {
+         fnox_core::sealed::set_transport(None);
+     }
+ 
++    #[test]
++    fn prepare_exec_with_shell_grants_reports_the_real_names() {
++        let (_dir, root) = tool_dir();
++        let (_g, mock) = fnox_core::sealed::testing::install();
++        mock.reply(serde_json::json!({ "v": 1, "ticket": "tk", "expiresAt": 0, "real": { "OPENAI_API_KEY": true, "OTHER": false } }));
++        let path = std::env::join_paths([root.join("bin")]).unwrap();
++        let command = vec!["curl".to_string(), "-sS".to_string()];
++        let prepared = match prepare_exec(&command, Grants::Shell, &root, Some(&path)) {
++            Ok(p) => p,
++            Err(_) => panic!("prepare failed"),
++        };
++        assert_eq!(prepared.real, vec!["OPENAI_API_KEY".to_string()]);
++        assert!(prepared.kept.is_empty());
++        let sent = mock.requests.lock().unwrap()[0].clone();
++        assert_eq!(sent["shellGrants"], serde_json::json!(true));
++        assert!(sent.get("names").is_none());
++        fnox_core::sealed::set_transport(None);
++    }
++
+     #[test]
+     fn prepare_exec_does_not_ask_the_vault_for_a_missing_program() {
+         let (_dir, root) = tool_dir();
+@@ -292,7 +334,12 @@ mod tests {
+         let path = std::env::join_paths([root.join("bin")]).unwrap();
+         let command = vec!["nope".to_string()];
+         assert!(matches!(
+-            prepare_exec(&command, &["GH".to_string()], &root, Some(&path)),
++            prepare_exec(
++                &command,
++                Grants::Names(&["GH".to_string()]),
++                &root,
++                Some(&path)
++            ),
+             Err(PrepareError::Program(_))
+         ));
+         assert!(mock.ops().is_empty());
+@@ -307,7 +354,7 @@ mod tests {
+         let path = std::env::join_paths([root.join("bin")]).unwrap();
+         match prepare_exec(
+             &["curl".to_string()],
+-            &["GH".to_string()],
++            Grants::Names(&["GH".to_string()]),
+             &root,
+             Some(&path),
+         ) {

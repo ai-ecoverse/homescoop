@@ -51,6 +51,8 @@ about:
       0010 refuse sync/reencrypt, age decryption (slicc-vault#2); check
            asks the vault for each sealed record
       0011 allow the lints that WASI-gated code leaves behind
+      0015 exec --shell-grants: materialize {shellGrants} (slicc-vault#9)
+           for the agent's bash hook; the child runs in the ticket's cwd
     Host (fnox-build; compiled for WASI too):
       0012 F2: proxy rules take secrets from lease credentials, renewed
            while the command runs (homescoop#284)

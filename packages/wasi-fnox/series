@@ -15,3 +15,4 @@ wasi    0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch
 host    0012-feat-proxy-take-rule-secrets-from-lease-credentials-.patch
 host    0013-fix-lease-run-command-leases-through-cmd-C-on-Window.patch
 host    0014-providers-offer-the-sealed-provider-only-on-WASI.patch
+wasi    0015-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch

@@ -91,6 +91,10 @@ export default async function (ctx) {
   assert.notEqual(exec.status, 0);
   assert.ok(flat(exec.stderr).includes(MISSING), `exec without the device: ${exec.stderr}`);
 
+  const shell = await fnox(['exec', '--shell-grants', '--', 'printenv', 'HOME']);
+  assert.notEqual(shell.status, 0);
+  assert.ok(flat(shell.stderr).includes(MISSING), `exec --shell-grants without the device: ${shell.stderr}`);
+
   const rules = await fnox(['proxy', 'rules', '--json']);
   assert.equal(rules.status, 0, `proxy rules --json: ${rules.stderr}`);
   const parsed = JSON.parse(rules.stdout);
