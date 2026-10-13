@@ -1,3 +1,4 @@
+#define _WASI_EMULATED_PROCESS_CLOCKS
 #include <wasi/api.h>
 #include <errno.h>
 #include <string.h>

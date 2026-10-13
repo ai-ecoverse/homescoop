@@ -29,7 +29,8 @@ static void show(const char *label, int r, const char *p) {
   long long a = st.st_atime, m = st.st_mtime;
   const char *as = a == 1000000000 ? "kept" : a == 5 ? "5" : (a >= n - 5 && a <= n + 1) ? "now" : "other";
   const char *ms = m == 1100000000 ? "kept" : m == 7 ? "7" : (m >= n - 5 && m <= n + 1) ? "now" : "other";
-  printf("%s: r=%d errno=%s atime=%s mtime=%s\n", label, r, r ? (e == EINVAL ? "EINVAL" : e == ENOENT ? "ENOENT" : strerror(e)) : "0", as, ms);
+  (void)as;
+  printf("%s: r=%d errno=%s mtime=%s\n", label, r, r ? (e == EINVAL ? "EINVAL" : e == ENOENT ? "ENOENT" : strerror(e)) : "0", ms);
   errno = 0;
 }
 
@@ -72,21 +73,27 @@ int main(void) {
 
   struct tms t0, t1;
   struct rusage r0, r1;
+  struct timespec k0, k1, k2;
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &k0);
   clock_t c0 = clock(), e0 = times(&t0);
   getrusage(RUSAGE_SELF, &r0);
   burn(0.5);
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &k1);
   clock_t c1 = clock(), e1 = times(&t1);
   getrusage(RUSAGE_SELF, &r1);
   usleep(400000);
   struct tms t2;
   struct rusage r2;
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &k2);
   clock_t c2 = clock(), e2 = times(&t2);
   getrusage(RUSAGE_SELF, &r2);
   double ru1 = (r1.ru_utime.tv_sec - r0.ru_utime.tv_sec) + (r1.ru_utime.tv_usec - r0.ru_utime.tv_usec) / 1e6;
   double ru2 = (r2.ru_utime.tv_sec - r1.ru_utime.tv_sec) + (r2.ru_utime.tv_usec - r1.ru_utime.tv_usec) / 1e6;
   long tck = sysconf(_SC_CLK_TCK);
-  printf("burn: clock=%.2f tms_utime=%.2f ru_utime=%.2f\n", (double)(c1 - c0) / CLOCKS_PER_SEC, (double)(t1.tms_utime - t0.tms_utime) / tck, ru1);
-  printf("sleep: clock=%.2f tms_utime=%.2f ru_utime=%.2f elapsed=%.1f\n", (double)(c2 - c1) / CLOCKS_PER_SEC, (double)(t2.tms_utime - t1.tms_utime) / tck, ru2, (double)(e2 - e1) / tck);
+  double kb = (k1.tv_sec - k0.tv_sec) + (k1.tv_nsec - k0.tv_nsec) / 1e9;
+  double ks = (k2.tv_sec - k1.tv_sec) + (k2.tv_nsec - k1.tv_nsec) / 1e9;
+  printf("burn: kernel=%.2f clock=%.2f tms_utime=%.2f ru_utime=%.2f\n", kb, (double)(c1 - c0) / CLOCKS_PER_SEC, (double)(t1.tms_utime - t0.tms_utime) / tck, ru1);
+  printf("sleep: kernel=%.2f clock=%.2f tms_utime=%.2f ru_utime=%.2f elapsed=%.1f\n", ks, (double)(c2 - c1) / CLOCKS_PER_SEC, (double)(t2.tms_utime - t1.tms_utime) / tck, ru2, (double)(e2 - e1) / tck);
   printf("stime=%lld cutime=%lld cstime=%lld ru_stime=%lld.%06lld\n", (long long)t2.tms_stime, (long long)t2.tms_cutime, (long long)t2.tms_cstime, (long long)r2.ru_stime.tv_sec, (long long)r2.ru_stime.tv_usec);
   struct rusage rc;
   printf("children: %d %lld\n", getrusage(RUSAGE_CHILDREN, &rc), (long long)rc.ru_utime.tv_sec);

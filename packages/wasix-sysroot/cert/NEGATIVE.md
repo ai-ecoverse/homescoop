@@ -1,5 +1,20 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-26: utimensat(NULL) sets the times to 1970; CPU times are the wall clock (-27, homescoop#294)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-26.tgz --probe r27 --kernel-dir <slicc-kernel 1.71.1>`, 2026-10-13: FAIL.
+
+```text
++   'utimensat NULL: r=0 errno=0 mtime=other',          (0: 1970)
++   'utimensat NOW,NOW: r=-1 errno=Success mtime=kept',
++   'utimensat 5,OMIT: r=-1 errno=Success mtime=kept',
++   'futimens OMIT,NOW: r=-1 errno=EINVAL mtime=kept',
++   'utimes NULL: r=0 errno=0 mtime=other',
+```
+
+wasix-python 3.14.2-16: `os.utime(p)` and `pathlib.Path(p).touch()` leave mtime 0. xcuw's C probe on -26: `times=1791890215325000000 utime=325000 stime=1791890215 cutime=325000 cstime=1791890215`, `getrusage utime=1791890215.326704334000 stime=1791890215.326704334000`.
+
+
 ## 2025.9.30-25: an empty path is the current directory (-26, homescoop#281)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-25.tgz --probe r26 --kernel-dir <slicc-kernel 1.71.1>`, 2026-10-13: FAIL. The kernel's `*at(dirfd, "")` are already ENOENT, but libc turns `""` into the cwd first:

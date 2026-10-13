@@ -478,7 +478,7 @@ for v in "${VARIANTS[@]}"; do
   (cd "$old/emu" && "$LLVM_AR" x "$emu" clock.o)
   missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(for m in utimens cputime; do exported "$R27_OBJ/$flavour/$m.o"; done | sort -u))"
   [[ -z "$missing" ]] || { echo "homescoop: $v -27 members lack: $missing" >&2; exit 1; }
-  missing="$(comm -23 <(defined "$old/emu/clock.o") <(defined "$R27_OBJ/$flavour/emulated_clock.o"))"
+  missing="$(comm -23 <(exported "$old/emu/clock.o") <(exported "$R27_OBJ/$flavour/emulated_clock.o"))"
   [[ -z "$missing" ]] || { echo "homescoop: $v emulated clock.o lacks: $missing" >&2; exit 1; }
   "$LLVM_AR" d "$lib" utimensat.o futimens.o clock.o times.o getrusage.o
   "$LLVM_AR" r "$lib" "$R27_OBJ/$flavour/utimens.o" "$R27_OBJ/$flavour/cputime.o"
