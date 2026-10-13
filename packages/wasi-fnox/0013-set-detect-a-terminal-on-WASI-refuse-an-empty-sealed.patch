@@ -1,7 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Tue, 13 Oct 2026 02:12:28 +0200
-Subject: [PATCH] set: detect a terminal on WASI, refuse an empty sealed value
+Subject: [PATCH 13/13] set: detect a terminal on WASI, refuse an empty sealed
+ value
 
 atty reports no terminal on any wasm32 target, so `fnox set NAME` on a
 slicc-kernel terminal read stdin to end of file instead of asking

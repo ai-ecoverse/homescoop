@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 15:15:29 +0200
-Subject: [PATCH 09/14] proxy: `rules --json`, and `proxy run` with
+Subject: [PATCH 09/13] proxy: `rules --json`, and `proxy run` with
  placeholders on WASI
 
 `fnox proxy rules --json` prints the validated [proxy] configuration as

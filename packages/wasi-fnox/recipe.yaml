@@ -1,8 +1,8 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream v1.39.0 plus homescoop's carried patch series (NNNN-*.patch,
-# applied in filename order by apply.sh, which ai-ecoverse/fnox-build also
-# runs for the native builds). Not upstreamed, per Lars. CERT-PENDING: the
-# cert needs slicc-kernel's /dev/sealed (KS-2) and materialize tickets (KS-8).
+# Upstream is jdx/fnox v1.39.0; the patches live here (NNNN-*.patch, applied
+# in filename order by apply.sh) and are only those the WASI build or seven's
+# in-kernel integration needs. CERT-PENDING: the cert needs slicc-kernel's
+# materialize tickets (KS-8); /dev/sealed (KS-2) is in 1.68.0.
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
@@ -23,17 +23,13 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    jdx/fnox v1.39.0 plus the patch series below, applied by apply.sh
-    (git apply --check, then apply, in filename order; then a copy of
-    homescoop's crates/wasix-command, the path dependency 0005 names).
-    Both builds apply the whole series: this recipe for wasm32-wasip1,
-    and ai-ecoverse/fnox-build for the native @ai-ecoverse/fnox
-    packages, from a pinned homescoop commit (packages/wasi-fnox and
-    crates/wasix-command). Not upstreamed, per Lars; bug reports for the
-    host fixes are homescoop#284 (F2) and homescoop#285 (F3). The series
-    replaces the archived ai-ecoverse/fnox fork (slicc/v1.39 at 54dd99d
-    minus its SLICC.md commits).
-    Shared, building for WASI:
+    Upstream is jdx/fnox v1.39.0; the patches live here, are not
+    upstreamed (per Lars), and are kept only when (a) the WASI build
+    needs them or (b) seven's in-kernel integration does. Host installs
+    use upstream fnox as it is. apply.sh checks and applies the series
+    in filename order (git apply --check, then apply), then copies
+    homescoop's crates/wasix-command, the path dependency 0005 names.
+    (a) building for WASI:
       0001 gate non-WASI dependencies (cloud SDKs, reqwest, rustls,
            keyring, TUI, prompts, signals, locks, keepass) by target
       0002 build only the age and plain providers on WASI; others keep
@@ -41,7 +37,10 @@ about:
       0003 compile out mcp, proxy, tui, daemon, leases, prompts on WASI
       0004 cwd from PWD, HOME from the environment, current_thread
       0005 spawn `fnox exec` children through wasix-command
-    Seven (secrets-tokens-design.md rev 3; /dev/sealed is §3.7):
+      0011 allow the lints that WASI-gated code leaves behind
+      0013 set: std IsTerminal on WASI (atty is always false on wasm);
+           also (b): an empty sealed value is refused
+    (b) seven (secrets-tokens-design.md; /dev/sealed is §3.7):
       0006 the sealed provider and fnox_core::sealed, the device client
       0007 set: seal a piped value; on a terminal ask the vault dialog
            (request/status, cancel on ^C); refuse values in argv
@@ -50,19 +49,10 @@ about:
       0009 proxy rules --json; proxy run passes placeholders on WASI
       0010 refuse sync/reencrypt, age decryption (slicc-vault#2); check
            asks the vault for each sealed record
-      0011 allow the lints that WASI-gated code leaves behind
-      0015 exec --shell-grants: materialize {shellGrants} (slicc-vault#9)
+      0012 exec --shell-grants: materialize {shellGrants} (slicc-vault#9)
            for the agent's bash hook; the child runs in the ticket's cwd
-      0016 set: std IsTerminal on WASI (atty is always false on wasm),
-           so a terminal reaches the vault dialog; empty sealed value refused
-    Host (fnox-build; compiled for WASI too):
-      0012 F2: proxy rules take secrets from lease credentials, renewed
-           while the command runs (homescoop#284)
-      0013 F3: command leases run through cmd /C on Windows
-           (homescoop#285)
-      0014 offer the sealed provider in `provider add` only on WASI
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable, then wasm-opt -Oz (binaryen
     133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. New package → human cert,
-    pending KS-2 and KS-8.
+    pending KS-8.

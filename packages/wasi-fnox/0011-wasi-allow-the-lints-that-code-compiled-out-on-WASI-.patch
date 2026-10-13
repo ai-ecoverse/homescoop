@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 15:20:29 +0200
-Subject: [PATCH 11/14] wasi: allow the lints that code compiled out on WASI
+Subject: [PATCH 11/13] wasi: allow the lints that code compiled out on WASI
  leaves behind
 
 Gating providers, leases and the local proxy on WASI leaves imports, helpers and early returns that only the native build uses. Both crates allow dead_code, unused_imports, unused_variables, unused_mut and unreachable_code on WASI only, so the WASI build is warning-free and native lints are unchanged.

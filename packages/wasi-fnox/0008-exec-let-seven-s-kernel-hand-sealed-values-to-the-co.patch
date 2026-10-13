@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 15:09:32 +0200
-Subject: [PATCH 08/14] exec: let seven's kernel hand sealed values to the
+Subject: [PATCH 08/13] exec: let seven's kernel hand sealed values to the
  command
 
 When the environment fnox would give a command holds sealed secrets,

@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 14:34:18 +0200
-Subject: [PATCH 02/14] providers: build only age and plain for WASI
+Subject: [PATCH 02/13] providers: build only age and plain for WASI
 
 The provider generator takes an allowlist on WASI targets. Disabled
 providers keep their configuration variants, so every fnox.toml still

@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 14:39:51 +0200
-Subject: [PATCH 05/14] wasi: spawn `fnox exec` children through wasix-command
+Subject: [PATCH 05/13] wasi: spawn `fnox exec` children through wasix-command
 
 std::process::Command is unsupported on wasm32-wasip1. On WASI, `fnox
 exec` uses wasix_command::Command, which spawns through the WASIX

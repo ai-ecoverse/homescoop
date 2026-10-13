@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Tue, 13 Oct 2026 02:00:29 +0200
-Subject: [PATCH] exec: `--shell-grants`, and run the child in the cwd sent to
- the vault
+Subject: [PATCH 12/13] exec: `--shell-grants`, and run the child in the cwd
+ sent to the vault
 
 `fnox exec --shell-grants -- cmd` sends `materialize {shellGrants: true,
 path, argv, cwd}` (slicc-vault#9) instead of naming this configuration's

@@ -5,9 +5,7 @@
 # packages/wasi-fnox/NNNN-*.patch in filename order (each checked with
 # `git apply --check` first) and copies homescoop's crates/wasix-command
 # into <fnox-src-dir>/crates/wasix-command, the path dependency the patches
-# name. Both builds use it: packages/wasi-fnox/build.sh (wasm32-wasip1) and
-# ai-ecoverse/fnox-build (native), which fetches packages/wasi-fnox and
-# crates/wasix-command from a pinned homescoop commit.
+# name. build.sh runs it on a fresh extract.
 set -euo pipefail
 SRC="${1:?usage: apply.sh <fnox-src-dir> <homescoop-root>}"
 ROOT="${2:?usage: apply.sh <fnox-src-dir> <homescoop-root>}"

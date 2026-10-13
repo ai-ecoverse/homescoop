@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 14:38:10 +0200
-Subject: [PATCH 03/14] cli: compile out modules that cannot run on WASI
+Subject: [PATCH 03/13] cli: compile out modules that cannot run on WASI
 
 On WASI the mcp, proxy, tui and daemon commands, the lease backend
 implementations, the shared HTTP client, the keyring store, credential

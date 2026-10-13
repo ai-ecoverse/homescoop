@@ -36,17 +36,14 @@
     "0003-cli-compile-out-modules-that-cannot-run-on-WASI.patch": "--help lists no daemon, tui or mcp",
     "0004-wasi-take-the-working-directory-and-home-from-the-en.patch": "get from a subdirectory of the project (cwd from PWD)",
     "0005-wasi-spawn-fnox-exec-children-through-wasix-command.patch": "plain exec: the child runs and gets the value",
-    "0006-providers-add-the-sealed-provider-for-seven-s-vault.patch": "get/export print the stored placeholder; the missing-device error; test/sealed.mjs: seal, rotation, placeholder {name}, the caller stamp",
+    "0006-providers-add-the-sealed-provider-for-seven-s-vault.patch": "get/export print the stored placeholder; the missing-device error; test/sealed.mjs: seal, rotation, placeholder {name}, the caller stamp; provider add --help offers sealed",
     "0007-set-seal-piped-values-and-ask-seven-s-vault-on-a-ter.patch": "set refuses argv values and --key-name; test/sealed.mjs: seal from a pipe, request/status/cancel on a terminal, EAGAIN",
     "0008-exec-let-seven-s-kernel-hand-sealed-values-to-the-co.patch": "exec with a sealed secret needs the device; missing command → 127; plain warning; test/sealed.mjs: the materialize request (values: PENDING KS-8)",
     "0009-proxy-rules-json-and-proxy-run-with-placeholders-on-.patch": "proxy rules --json; proxy run gives the placeholder and scrubs the secret's name",
     "0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch": "sync/reencrypt refused; age get fails with slicc-vault#2; test/sealed.mjs: check --all on inert, removed, rotated and missing records",
     "0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch": "lint-only: the WASI build has no warnings (no runtime case)",
-    "0012-feat-proxy-take-rule-secrets-from-lease-credentials-.patch": "host-only (fnox-build test/proxy_lease.bats); on WASI, proxy run still passes placeholders",
-    "0013-fix-lease-run-command-leases-through-cmd-C-on-Window.patch": "host-only (Windows; fnox-build); leases are not in the WASI build",
-    "0014-providers-offer-the-sealed-provider-only-on-WASI.patch": "provider add --help offers sealed on WASI",
-    "0015-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs: materialize {shellGrants} with no names (values: PENDING KS-8)",
-    "0016-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal"
+    "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs: materialize {shellGrants} with no names (values: PENDING KS-8)",
+    "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal"
   },
   "sealedKernel": "@ai-ecoverse/slicc-kernel@1.68.0",
   "ci": [

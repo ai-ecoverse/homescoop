@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 14:38:52 +0200
-Subject: [PATCH 04/14] wasi: take the working directory and home from the
+Subject: [PATCH 04/13] wasi: take the working directory and home from the
  environment
 
 wasi-libc starts every program in "/", so fnox changes to $PWD before

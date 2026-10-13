@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 15:18:55 +0200
-Subject: [PATCH 10/14] seven: refuse what would put a value in a program,
+Subject: [PATCH 10/13] seven: refuse what would put a value in a program,
  check placeholders
 
 On WASI, `sync` and `reencrypt` fail with "not available in seven: the

@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 15:08:39 +0200
-Subject: [PATCH 07/14] set: seal piped values and ask seven's vault on a
+Subject: [PATCH 07/13] set: seal piped values and ask seven's vault on a
  terminal
 
 With a sealed provider, `fnox set NAME` seals a value read from a pipe
