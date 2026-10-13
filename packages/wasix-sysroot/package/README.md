@@ -41,6 +41,19 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-27 setting file times works for every form (homescoop#294).
+Up to -26, `utimensat(…, NULL)`, `futimens(fd, NULL)`, `utimes(p, NULL)` and
+`utime(p, NULL)`, which mean "now", set the times to 0 (1970) in static
+builds, and returned -1 without errno in PIC ones. `UTIME_NOW`/`UTIME_OMIT` in
+the second timespec returned -1 without errno too. Python's `os.utime(p)` and
+`pathlib.Path.touch()`, Perl's `utime undef, undef` and Ruby's
+`FileUtils.touch` are affected. `clock()`, `times()` and `getrusage()` now
+report the process CPU time slicc-kernel keeps (`CLOCK_PROCESS_CPUTIME_ID`):
+`clock()` in `CLOCKS_PER_SEC` units, `times()` in clock ticks (100 a second)
+with the elapsed real time as its value, and `tms_stime`, `tms_cutime`,
+`tms_cstime`, `ru_stime` and `RUSAGE_CHILDREN` 0, since the kernel has no
+system or children's times yet. Up to -26 they mixed in the wall clock.
+
 Since 2025.9.30-26 an empty path is ENOENT, as POSIX and Linux have it:
 `open("")`, `stat("")`, `access("")`, `mkdir("")`, `chmod("")`, `symlink("", x)`
 and every other call that takes a path used to act on the current directory

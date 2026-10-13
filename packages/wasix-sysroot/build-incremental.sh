@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-26 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-27 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -456,6 +456,38 @@ for v in "${VARIANTS[@]}"; do
   grep -q __slicc_fs_path_access <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_fs.path_access" >&2; exit 1; }
   grep -q "AT_EACCESS          (0x200)" "$PKG/$v/include/__header_fcntl.h"
   grep -q "WASI has no copy_file_range, gettid" "$PKG/$v/include/unistd.h"
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -27 members (utimensat/futimens, clock/times/getrusage, emulated __clock)"
+R27_OBJ="$WORK/r27"
+rm -rf "$R27_OBJ" && mkdir -p "$R27_OBJ/static" "$R27_OBJ/pic"
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  for m in utimens cputime emulated_clock; do compile_r18 "$m" "$R27_OBJ/$flavour/$m.o" "${extra[@]}"; done
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  emu="$PKG/$v/lib/wasm32-wasip1/libwasi-emulated-process-clocks.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R27_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old/emu"
+  (cd "$old" && "$LLVM_AR" x "$lib" utimensat.o futimens.o clock.o times.o getrusage.o)
+  (cd "$old/emu" && "$LLVM_AR" x "$emu" clock.o)
+  missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(for m in utimens cputime; do exported "$R27_OBJ/$flavour/$m.o"; done | sort -u))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v -27 members lack: $missing" >&2; exit 1; }
+  missing="$(comm -23 <(exported "$old/emu/clock.o") <(exported "$R27_OBJ/$flavour/emulated_clock.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v emulated clock.o lacks: $missing" >&2; exit 1; }
+  "$LLVM_AR" d "$lib" utimensat.o futimens.o clock.o times.o getrusage.o
+  "$LLVM_AR" r "$lib" "$R27_OBJ/$flavour/utimens.o" "$R27_OBJ/$flavour/cputime.o"
+  cp "$R27_OBJ/$flavour/emulated_clock.o" "$old/emu/clock.o"
+  "$LLVM_AR" r "$emu" "$old/emu/clock.o"
+  members="$("$LLVM_AR" t "$lib")"
+  if grep -qxE 'utimensat\.o|futimens\.o|clock\.o|times\.o|getrusage\.o' <<<"$members"; then
+    echo "homescoop: $lib still has the upstream time members" >&2; exit 1
+  fi
   echo "  $v ($flavour)"
 done
 
