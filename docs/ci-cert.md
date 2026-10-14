@@ -127,3 +127,166 @@ await ctx.uplink({
 const r = await ctx.run(['curl', '-sS', '--noproxy', '*', 'http://peer.tail1234.ts.net:8080/']);
 const { asked, dialled, requests } = await ctx.uplinkLog(); // requests[i].head: the HTTP request head
 ```
+
+## Kernel compatibility: `kernel-compat.yml`
+
+`ladder-pr` runs a recipe's specs on the one kernel in its `cert/meta.json`.
+[`kernel-compat.yml`](../.github/workflows/kernel-compat.yml) asks the other
+question: do the **published** packages still pass their cert specs on kernel
+X? slicc-kernel calls it on its PRs and releases; anyone can dispatch it.
+
+```yaml
+jobs:
+  compat:
+    uses: ai-ecoverse/homescoop/.github/workflows/kernel-compat.yml@main
+    with:
+      kernel: kernel-tgz
+      set: base,ci-certified
+```
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `kernel` | (required) | an npm spec (`@ai-ecoverse/slicc-kernel@1.85.1`, or a bare `1.85.1`), or the name of an artifact holding one kernel `.tgz`, uploaded earlier in the calling run |
+| `set` | `base,ci-certified` | comma-separated: `base` and `catalog` (slicc-bios's base set and optional catalog, at the versions bios pins), `ci-certified` ([`scripts/ci-certified.json`](../scripts/ci-certified.json)), `all` (every recipe with `cert/*.mjs`), or recipe / npm names, `name[@version]` |
+| `homescoop-ref` | `main` | the homescoop commit whose specs and scripts run |
+| `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
+| `runner` | `''` | `runs-on` for the shards and the sweep: `inputs.runner \|\| vars.CERT_RUNNER \|\| 'ubuntu-latest'` |
+| `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, at most 3) or `1`–`3` |
+| `fail-on-regression` | `true` | `false` reports regressions without failing |
+| `expect-regressions` | `''` | a negative proof: recipes that must regress, in their spec and in the base sweep. The report fails if one doesn't; other regressions are listed but don't fail it |
+
+Each package is the **published tarball** at the version bios pins (`base`,
+`catalog`) or at npm's `latest` (`ci-certified`, `all`, a bare name), checked
+against the lockfile's or the registry's `sha512` integrity. Recipes without
+`cert/*.mjs`, `blocked` ones and `host-smoke` / `host-node` harnesses are
+listed as skipped, as are base-set packages homescoop has no recipe for.
+
+### Jobs
+
+Hosted runners queue jobs for a long time (18–45 min a job on the org's pool
+when it is busy), while the work is minutes, so a call runs as few jobs as it
+can: one plan job, 1–3 shard jobs, and a report job only when there is more
+than one shard.
+
+1. **plan** reads bios's lockfiles at `bios-ref` (through the GitHub API, at a
+   recorded sha), resolves the candidate and the reference kernel (bios's pin
+   of `@ai-ecoverse/slicc-kernel`), lists the packages and their versions,
+   and reads the base-set tarballs' `slicc.commands` for the sweep. It packs
+   the work (each package about 10 s plus 4 s a spec, each sweep mode about
+   2.5 min) into `shards` jobs. `plan.json`, `candidate.tgz` and
+   `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
+2. **shard** (matrix, `max-parallel: 3`, on `runner`) runs its packages, then
+   its sweep modes:
+   - each package through `scripts/browser-cert/run.mjs --kernel
+     candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
+     `needs` / `needsTarballScripts` / `needsRepack` installed as `ladder-pr`
+     does. A failure is retried once (a spec that passes either time passes,
+     marked flaky); a failure no known limit covers is run again on the
+     reference kernel;
+   - the **base-set sweep**, once per users mode (`report`, `enforce`): every
+     base-set tarball but the kernel in one kernel, and
+     [`base-sweep/sweep.mjs`](../scripts/browser-cert/base-sweep/sweep.mjs)
+     run through `run.mjs` as root and as cone. Every command in their
+     `slicc.commands` (`--version`, or the invocation in
+     [`base-sweep/meta.json`](../scripts/browser-cert/base-sweep/meta.json))
+     must exit as expected, plus grep, sed, xz, jq, find/xargs, diff/cmp and
+     patch in real use. Failing commands are retried, then run on the
+     reference.
+
+   With a single shard, that job also writes the report.
+3. **report** (more than one shard) merges everything into the
+   `kernel-compat-<tag>` artifact (`compat.json`, `summary.md`, the logs) and
+   the job summary.
+
+### Verdicts
+
+- `pass`: the spec (or sweep case) passes on the candidate.
+- `known`: it fails on the candidate, and a
+  [`known-limits.json`](../scripts/browser-cert/known-limits.json) entry covers
+  it or it fails on the reference kernel too.
+- `regression`: it fails on the candidate and passes on the reference. Only
+  this fails the workflow, and so does an `error` (a shard that reported
+  nothing).
+
+A spec is the unit, so a spec file that already fails on the reference hides
+a second failure in the same file; its log is in the artifact.
+
+### `known-limits.json`
+
+```json
+{
+  "limits": [
+    {
+      "package": "@ai-ecoverse/wasm-coreutils",
+      "spec": "base-sweep",
+      "case": "chcon",
+      "kernel": "*",
+      "version": "<=9.12.0-5",
+      "rc": 1,
+      "issue": "ai-ecoverse/homescoop#326",
+      "why": "listed in slicc.commands, not built"
+    }
+  ]
+}
+```
+
+`package` is the npm name (or the recipe dir), `spec` the spec file or
+`base-sweep`, `case` the sweep's command (exact) or, for a spec, a regex the
+failure text must match. `kernel` and `version` are ranges (`>=1.36.0
+<1.73.3`, `||`, `*`); `users`, `user` and `rc` narrow it further. Every entry
+names the issue that fixes it. A matching limit makes a failure `known` even
+when the case passes on the reference, so keep each one to its case and
+kernel range.
+
+### `compat.json`
+
+```text
+{ kernel: { spec, name, version, sha256, integrity, gitHead, source },
+  reference: { spec, version, sha256, gitHead, source },
+  homescoopRef, biosRef, inputs, run: { repository, sha, event, id, url },
+  verdict: pass | regression | error,
+  summary: { pass, known, regression, skip, error, sweep: {…}, regressions },
+  results: [{ package, recipe, version, sha256, spec, users, status: pass|fail|skip,
+              verdict, durationMs, log, flaky?, error?, limit?, reference? }],
+  packages: [{ id, package, version, sha256, origin, users, status, verdict, durationMs, peers, reference }],
+  sweep: [{ users, user, command, package, recipe, version, argv, rc, expected, status, verdict, out, reference?, limit? }],
+  shards: [{ shard, packages, wallMs, runner }], sweeps: [{ mode, wallMs, runner }] }
+```
+
+### `run.mjs` flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--kernel <spec \| .tgz \| dir>` | the kernel to boot instead of `HOMESCOOP_CERT_NODE_MODULES`'s (which `ladder-pr` fills from `meta.json`'s `kernel`, still the default) |
+| `--users off\|report\|enforce` | overrides `meta.json`'s `users`; without either the kernel's default applies (`enforce` since 1.74, `off` before) |
+| `--tarball <tgz>` (repeatable) | the packages under test, installed in this order; the first is `ctx.npmName`. Specs see every manifest in `ctx.installed` |
+| `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
+| `--json <file>` | per-spec results: `{ kernel, users, tarballs, specs: [{ spec, status, durationMs, error }], pageErrors, status }` |
+
+### Runners and capacity
+
+- A reusable workflow runs **in the caller's run**: slicc-kernel's calls use
+  its runs, its `vars.CERT_RUNNER` and its minutes, not homescoop's. GitHub's
+  concurrent-job limit for hosted runners is per organization, so they still
+  share that pool with `ladder-pr`; hence the bounds below.
+- `concurrency`: one group per caller repo, PR (or ref), kernel, set and
+  bios-ref; a PR caller's newer run cancels the older one.
+- One call is at most 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
+  `base,ci-certified` call is a plan job and one shard job.
+- Set `CERT_RUNNER` to `cloud-run-bench` (the org's Cloud Run pool) to move
+  the heavy jobs off GitHub-hosted runners without a code change; plan and
+  report stay on `ubuntu-latest`. Shards are short and re-runnable ("Re-run
+  failed jobs" uploads with `overwrite`).
+- Nothing here publishes: `ladder-merge` dispatches `ladder-build` only for
+  pushes to `packages/**`, and these files live under `scripts/` and
+  `.github/workflows/`.
+
+### Proof
+
+[`kernel-compat-proof.yml`](../.github/workflows/kernel-compat-proof.yml) runs
+on PRs that touch these files. It calls the workflow twice, as slicc-kernel
+does: `@ai-ecoverse/slicc-kernel@1.81.0` on `base,ci-certified` must be green,
+and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
+must report a regression, in a spec and in the sweep, for each of them: the
+Emscripten builds without `slicc_sleep_ms` that exit 70 there
+(slicc-kernel#483, fixed by #496 in 1.81.0).

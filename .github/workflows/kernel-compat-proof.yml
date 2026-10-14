@@ -1,0 +1,33 @@
+name: kernel-compat-proof
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kernel-compat.yml'
+      - '.github/workflows/kernel-compat-proof.yml'
+      - 'scripts/browser-cert/compat.mjs'
+      - 'scripts/browser-cert/known-limits.json'
+      - 'scripts/browser-cert/base-sweep/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kernel-compat-proof-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  positive:
+    uses: ./.github/workflows/kernel-compat.yml
+    with:
+      kernel: '@ai-ecoverse/slicc-kernel@1.81.0'
+      set: 'base,ci-certified'
+      homescoop-ref: ${{ github.event.pull_request.head.sha }}
+
+  negative:
+    uses: ./.github/workflows/kernel-compat.yml
+    with:
+      kernel: '@ai-ecoverse/slicc-kernel@1.78.0'
+      set: 'base,ci-certified'
+      homescoop-ref: ${{ github.event.pull_request.head.sha }}
+      expect-regressions: 'grep,sed,xz,jq,findutils,diffutils,patch'
