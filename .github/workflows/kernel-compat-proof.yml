@@ -27,6 +27,13 @@ jobs:
       set: 'base,ci-certified'
       homescoop-ref: ${{ github.event.pull_request.head.sha }}
 
+  positive-latest:
+    uses: ./.github/workflows/kernel-compat.yml
+    with:
+      kernel: '@ai-ecoverse/slicc-kernel@1.86.0'
+      set: 'base,ci-certified'
+      homescoop-ref: ${{ github.event.pull_request.head.sha }}
+
   negative:
     uses: ./.github/workflows/kernel-compat.yml
     with:

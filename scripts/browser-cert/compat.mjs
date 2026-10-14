@@ -530,6 +530,7 @@ function shard(args) {
       result.log = cand.log;
       result.attempts = cand.attempts || [cand.log];
       result.kernelSeen = cand.kernel;
+      result.modes = cand.modes ?? null;
       const failed = failingSpecs(cand);
       const open = [];
       const verdicts = new Map();
@@ -612,7 +613,7 @@ function sweepMode(plan, kdir, mode, out, limits) {
         logName: `base-sweep-${mode}`,
         env: { HOMESCOOP_SWEEP_OUT: rowsFile, ...(only ? { HOMESCOOP_SWEEP_ONLY: JSON.stringify(only) } : {}) },
       });
-      doc.runs.push({ label, status: rep.status, durationMs: rep.durationMs, log: rep.log, error: rep.error || null });
+      doc.runs.push({ label, status: rep.status, modes: rep.modes ?? null, durationMs: rep.durationMs, log: rep.log, error: rep.error || null });
       return existsSync(rowsFile) ? readJson(rowsFile).rows : null;
     };
     const key = (r) => `${r.user} ${r.command}`;
@@ -723,7 +724,7 @@ function report(args) {
         continue;
       }
       if (r.verdict === 'error') errors.push(`${e.id}: ${String(r.error || 'error').split('\n')[0]}`);
-      packages.push({ id: r.id, package: r.package, recipe: r.recipe, version: r.version, sha256: r.sha256 ?? null, origin: r.origin, users: r.users, status: r.status, verdict: r.verdict, durationMs: r.durationMs, peers: r.peers, reference: r.reference ? { status: r.reference.status, log: r.reference.log } : null, error: r.error || null });
+      packages.push({ id: r.id, package: r.package, recipe: r.recipe, version: r.version, sha256: r.sha256 ?? null, origin: r.origin, users: r.users, modes: r.modes ?? null, status: r.status, verdict: r.verdict, durationMs: r.durationMs, peers: r.peers, reference: r.reference ? { status: r.reference.status, log: r.reference.log } : null, error: r.error || null });
       const specs = r.specs.length ? r.specs : [{ spec: null, status: r.status, verdict: r.verdict, error: r.error }];
       for (const s of specs) {
         const rs = r.reference?.specs?.find((x) => x.spec === s.spec);

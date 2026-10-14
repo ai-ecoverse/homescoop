@@ -161,6 +161,70 @@ against the lockfile's or the registry's `sha512` integrity. Recipes without
 `cert/*.mjs`, `blocked` ones and `host-smoke` / `host-node` harnesses are
 listed as skipped, as are base-set packages homescoop has no recipe for.
 
+### Calling it from another repo
+
+A PR of slicc-kernel packs its kernel, uploads it as an artifact and passes
+the artifact's name; a release passes the published version.
+
+```yaml
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: npm ci && npm run build && mkdir -p out && npm pack --pack-destination out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kernel-tgz
+          path: out/*.tgz
+
+  compat:
+    needs: pack
+    uses: ai-ecoverse/homescoop/.github/workflows/kernel-compat.yml@main
+    with:
+      kernel: kernel-tgz
+      set: base,ci-certified
+      fail-on-regression: false
+
+  release-compat:
+    needs: publish
+    uses: ai-ecoverse/homescoop/.github/workflows/kernel-compat.yml@main
+    with:
+      kernel: '@ai-ecoverse/slicc-kernel@${{ needs.publish.outputs.version }}'
+      set: all
+      shards: '3'
+```
+
+- **The artifact** holds exactly one `.tgz` at its top level. Its name must
+  not start with `@` or a digit: those are read as npm specs. It is found only
+  in the calling run.
+- **Outputs:** `needs.compat.outputs.verdict` (`pass`, `regression`, `error`),
+  `regressions` (a count) and `artifact`, the name of the artifact with
+  `compat.json`, `summary.md` and the logs. A release job downloads it with
+  `actions/download-artifact` (`name: ${{ needs.release-compat.outputs.artifact }}`)
+  and attaches `compat.json` to the GitHub release. The verdict table is also
+  the run's job summary.
+- **Non-blocking:** `fail-on-regression: false` keeps the job green and still
+  reports the verdict; drop it (or make the check required) once it is
+  stable.
+- **Where it runs:** in the caller's run, on the caller's runners and
+  minutes. `runs-on` is `inputs.runner || vars.CERT_RUNNER ||
+  'ubuntu-latest'`, with the caller's `CERT_RUNNER`. The called workflow asks
+  only for `contents: read`; homescoop and slicc-bios are public, so the
+  caller's token reads them.
+- **Concurrency:** the called workflow has its own group per caller repo,
+  PR (or ref), kernel, set and bios-ref, and a newer PR run cancels the
+  older one. Don't give the caller's own `concurrency` the same group name.
+- **Pinning:** `@main` follows homescoop's harness and limits. Pin a sha in
+  `uses:` and `homescoop-ref` for a reproducible run, and `bios-ref` for a
+  fixed base set and reference kernel.
+- **Time:** `base,ci-certified` is a plan job (about 1 min) and one shard
+  (about 8–10 min) on `ubuntu-latest`, plus the queue; `all` takes 2–3
+  shards of up to about 25 min.
+
 ### Jobs
 
 Hosted runners queue jobs for a long time (18–45 min a job on the org's pool
@@ -267,10 +331,22 @@ keep each one to its case and range.
   summary: { pass, known, regression, skip, error, sweep: {…}, regressions },
   results: [{ package, recipe, version, sha256, spec, users, status: pass|fail|skip,
               verdict, durationMs, log, flaky?, error?, limit?, reference? }],
-  packages: [{ id, package, version, sha256, origin, users, status, verdict, durationMs, peers, reference }],
+  packages: [{ id, package, version, sha256, origin, users, modes, status, verdict, durationMs, peers, reference }],
   sweep: [{ users, user, command, package, recipe, version, argv, rc, expected, status, verdict, out, reference?, limit? }],
   shards: [{ shard, packages, wallMs, runner }], sweeps: [{ mode, wallMs, runner }] }
 ```
+
+### File modes
+
+`run.mjs` writes each package straight to OPFS, as an installer does. Such
+files get the kernel's defaults: directories `0755`, files `0644`, files under
+`node_modules/*/bin/` `0755`. With slicc-kernel ≥ 1.86.0 it then gives every
+file whose tarball mode isn't `0644`, and every `bin/` file, its tarball mode
+with `kernel.chmod`, as bios's installer does with `writeMetadata`. Under
+users `enforce` a shim or helper that runs by path (wasi-pnpm's `shims/npm`,
+git's `libexec/git-core/*`) needs that x bit. Older kernels have no
+`kernel.chmod` and keep the defaults. `--json` and `compat.json` say which
+(`modes: tarball` or `kernel defaults`).
 
 ### `run.mjs` flags
 
@@ -306,8 +382,9 @@ keep each one to its case and range.
 on PRs that touch these files or the harness itself (`run.mjs`,
 `context.mjs`, `page/`): `ladder-pr` runs no package cert on a scripts-only
 PR, so this is the harness's regression test. It calls the workflow twice, as slicc-kernel
-does: `@ai-ecoverse/slicc-kernel@1.81.0` on `base,ci-certified` must be green,
-and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
+does: `@ai-ecoverse/slicc-kernel@1.81.0` and the newest certified kernel
+(`1.86.0`; bump it with each kernel cert) on `base,ci-certified` must be
+green, and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
 must report a regression, in a spec and in the sweep, for each of them: the
 Emscripten builds without `slicc_sleep_ms` that exit 70 there
 (slicc-kernel#483, fixed by #496 in 1.81.0).

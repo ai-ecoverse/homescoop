@@ -13,13 +13,13 @@
       "package": "@ai-ecoverse/wasi-pnpm",
       "spec": "base-sweep",
       "case": "i",
-      "kernel": ">=1.78.0",
+      "kernel": ">=1.78.0 <1.86.0",
       "users": [
         "enforce"
       ],
       "rc": 126,
       "issue": "ai-ecoverse/homescoop#327",
-      "why": "the harness writes the shims straight to OPFS, so they get the default 0644 instead of their tarball mode, and since 1.78.0 the x bit is checked on exec: i's exec of ${0%/*}/npm by path is refused. The kernel side is slicc-kernel#495 (kernel.chmod and writeMetadata in 1.86.0); the harness has to stamp the modes"
+      "why": "before 1.86.0 the page has no kernel.chmod, so the harness writes the shims straight to OPFS with the default 0644 instead of their tarball 0755, and since 1.78.0 the x bit is checked on exec: i's exec of ${0%/*}/npm by path is refused. From 1.86.0 run.mjs stamps the tarball modes (slicc-kernel#495 for the kernel side)"
     },
     {
       "package": "@ai-ecoverse/wasm-bash",
