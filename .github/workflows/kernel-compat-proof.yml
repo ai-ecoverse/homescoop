@@ -8,6 +8,9 @@ on:
       - 'scripts/browser-cert/compat.mjs'
       - 'scripts/browser-cert/known-limits.json'
       - 'scripts/browser-cert/base-sweep/**'
+      - 'scripts/browser-cert/run.mjs'
+      - 'scripts/browser-cert/context.mjs'
+      - 'scripts/browser-cert/page/**'
 
 permissions:
   contents: read

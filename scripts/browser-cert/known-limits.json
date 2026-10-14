@@ -3,32 +3,11 @@
     {
       "package": "@ai-ecoverse/wasm-coreutils",
       "spec": "base-sweep",
-      "case": "chcon",
-      "kernel": "*",
-      "version": "<=9.12.0-5",
-      "rc": 1,
-      "issue": "ai-ecoverse/homescoop#326",
-      "why": "listed in slicc.commands, not built: coreutils: unknown program 'chcon'"
-    },
-    {
-      "package": "@ai-ecoverse/wasm-coreutils",
-      "spec": "base-sweep",
-      "case": "runcon",
-      "kernel": "*",
-      "version": "<=9.12.0-5",
-      "rc": 1,
-      "issue": "ai-ecoverse/homescoop#326",
-      "why": "listed in slicc.commands, not built: coreutils: unknown program 'runcon'"
-    },
-    {
-      "package": "@ai-ecoverse/wasm-coreutils",
-      "spec": "base-sweep",
       "case": "[",
       "kernel": "*",
-      "version": "<=9.12.0-5",
       "rc": 127,
-      "issue": "ai-ecoverse/homescoop#326",
-      "why": "the kernel's command catalog takes only names matching [A-Za-z0-9._+-], so '[' is not found (bash's builtin covers shells)"
+      "issue": "ai-ecoverse/slicc-kernel#530",
+      "why": "the kernel's command catalog takes only names matching [A-Za-z0-9._+-], so '[' is not found (bash's builtin covers shells); close the kernel range at the release with the fix"
     },
     {
       "package": "@ai-ecoverse/wasi-pnpm",
@@ -39,8 +18,8 @@
         "enforce"
       ],
       "rc": 126,
-      "issue": "ai-ecoverse/slicc-kernel#495",
-      "why": "the shims are written without their tarball mode (0644), and 1.78.0 checks the x bit on exec, so i's exec of ${0%/*}/npm by path is refused (cert runner B3, K4 on 1.81.0)"
+      "issue": "ai-ecoverse/homescoop#327",
+      "why": "the harness writes the shims straight to OPFS, so they get the default 0644 instead of their tarball mode, and since 1.78.0 the x bit is checked on exec: i's exec of ${0%/*}/npm by path is refused. The kernel side is slicc-kernel#495 (kernel.chmod and writeMetadata in 1.86.0); the harness has to stamp the modes"
     },
     {
       "package": "@ai-ecoverse/wasm-bash",

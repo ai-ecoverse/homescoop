@@ -219,12 +219,11 @@ a second failure in the same file; its log is in the artifact.
     {
       "package": "@ai-ecoverse/wasm-coreutils",
       "spec": "base-sweep",
-      "case": "chcon",
+      "case": "[",
       "kernel": "*",
-      "version": "<=9.12.0-5",
-      "rc": 1,
-      "issue": "ai-ecoverse/homescoop#326",
-      "why": "listed in slicc.commands, not built"
+      "rc": 127,
+      "issue": "ai-ecoverse/slicc-kernel#530",
+      "why": "the kernel's command catalog drops '['"
     }
   ]
 }
@@ -233,10 +232,30 @@ a second failure in the same file; its log is in the artifact.
 `package` is the npm name (or the recipe dir), `spec` the spec file or
 `base-sweep`, `case` the sweep's command (exact) or, for a spec, a regex the
 failure text must match. `kernel` and `version` are ranges (`>=1.36.0
-<1.73.3`, `||`, `*`); `users`, `user` and `rc` narrow it further. Every entry
-names the issue that fixes it. A matching limit makes a failure `known` even
-when the case passes on the reference, so keep each one to its case and
-kernel range.
+<1.73.3`, `||`, `*`); `users`, `user` and `rc` narrow it further. A matching
+limit makes a failure `known` even when the case passes on the reference, so
+keep each one to its case and range.
+
+**Rules for entries:**
+
+- **An entry needs an issue.** Every entry names the issue (or the PR) that
+  fixes it. An entry whose range is still open (`*`, or no upper bound)
+  needs that issue to be open.
+- **When the fix ships, the entry stops matching it.** Close the range at the
+  release with the fix (`>=1.78.0 <1.86.0`, `version: <1.0.8-2`), so it never
+  covers a kernel or a build that has the fix, or remove the entry. A closed
+  range stays only while kernel-compat still runs on what it describes: a
+  package version bios pins, or a kernel the proof uses.
+- **Never green a candidate's regression with one.** A regression found on a
+  candidate kernel is a FAIL. Report it to the Kernel Coordinator (or the
+  package's owner) and leave it red. An entry for a kernel issue comes only
+  once that issue is filed, and only for the kernels already released with
+  it.
+- **Expected behaviour is not a limit.** A command that is meant to exit
+  non-zero (`false`, `bzip2recover` without arguments, `chcon` and `runcon`
+  without SELinux) gets its `rc` in `base-sweep/meta.json`'s `invocations`
+  instead.
+- **New entries and changes go to the Recipe Manager for review.**
 
 ### `compat.json`
 
@@ -284,7 +303,9 @@ kernel range.
 ### Proof
 
 [`kernel-compat-proof.yml`](../.github/workflows/kernel-compat-proof.yml) runs
-on PRs that touch these files. It calls the workflow twice, as slicc-kernel
+on PRs that touch these files or the harness itself (`run.mjs`,
+`context.mjs`, `page/`): `ladder-pr` runs no package cert on a scripts-only
+PR, so this is the harness's regression test. It calls the workflow twice, as slicc-kernel
 does: `@ai-ecoverse/slicc-kernel@1.81.0` on `base,ci-certified` must be green,
 and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
 must report a regression, in a spec and in the sweep, for each of them: the
