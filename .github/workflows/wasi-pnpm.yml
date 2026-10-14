@@ -38,7 +38,7 @@ jobs:
         run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/wasi-pnpm/build.sh
       - name: record sha256
         run: sha256sum packages/wasi-pnpm/package/bin/pnpm.wasm | tee "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pnpm-wasm-${{ matrix.attempt }}
           path: |
@@ -52,7 +52,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: pnpm-wasm-*
       - name: both builds are byte-identical
@@ -69,7 +69,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: pnpm-wasm-1
           path: packages/wasi-pnpm/package
@@ -91,7 +91,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: pnpm-wasm-1
           path: packages/wasi-pnpm/package
@@ -121,7 +121,7 @@ jobs:
             echo "::error::from-source tarball differs from the packaging-only repack"
             exit 1
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wasi-pnpm-tgz
           path: |

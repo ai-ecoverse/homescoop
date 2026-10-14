@@ -35,7 +35,7 @@ jobs:
         run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/wasi-gh/build.sh
       - name: record sha256
         run: sha256sum packages/wasi-gh/package/bin/gh.wasm | tee "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gh-wasm-${{ matrix.attempt }}
           path: |
@@ -48,7 +48,7 @@ jobs:
         if: matrix.attempt == 1
         working-directory: packages/wasi-gh/package
         run: npm pack --pack-destination "$RUNNER_TEMP"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.attempt == 1
         with:
           name: wasi-gh-2.102.0-1
@@ -60,7 +60,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: gh-wasm-*
       - name: both builds are byte-identical
@@ -77,7 +77,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: gh-wasm-1
           path: packages/wasi-gh/package

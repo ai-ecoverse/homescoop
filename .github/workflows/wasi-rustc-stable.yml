@@ -112,7 +112,7 @@ jobs:
           sudo apt-get install -y build-essential cmake pkg-config libclang-dev ninja-build
 
       - name: download wasi-llvm
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: wasi-llvm
           run-id: ${{ inputs.wasi_llvm_run_id }}
@@ -211,7 +211,7 @@ jobs:
           ls -lh "${{ github.workspace }}/wasi-rustc-stable.tgz"
 
       - name: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasi-rustc-stable
           path: wasi-rustc-stable.tgz
@@ -245,7 +245,7 @@ jobs:
           ls -lh wasi-cargo.tgz
 
       - name: upload Cargo
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasi-cargo
           path: wasi-cargo.tgz

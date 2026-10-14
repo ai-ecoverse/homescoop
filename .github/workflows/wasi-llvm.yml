@@ -78,7 +78,7 @@ jobs:
           sha256sum "$tgz" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasi-llvm
           path: packages/wasi-llvm/work/wasi-llvm-*-wasm32-wasip1-threads.tar.xz
