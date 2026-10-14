@@ -1,0 +1,216 @@
+{
+  "harness": "slicc-kernel",
+  "runTimeoutMs": 120000,
+  "commandTimeoutMs": 30000,
+  "accounts": [
+    "root",
+    "cone"
+  ],
+  "checklist": [
+    "every command in the slicc.commands of the tarballs under test (bios's base set, slicc-kernel itself left out) runs its invocation below, --version by default, as root (cwd /root) and as kernel.users.add({name:'cone'}) (cwd /home/cone), with empty stdin, and exits with the expected status (0 unless rc says otherwise) within commandTimeoutMs",
+    "a command name two packages define is run once, for the package whose name sorts first (the kernel's rule since 1.74)",
+    "real use, each in a fresh mktemp -d as both users: grep -c / -n / egrep / fgrep, sed -i and sed -n, xz -k and xz -dc, jq -c, find -type f piped to xargs, diff -u (rc 1) and cmp, patch applying a unified diff",
+    "kernel-compat runs it under users report and enforce; HOMESCOOP_SWEEP_OUT gets one row per user and command, HOMESCOOP_SWEEP_ONLY (a JSON list of command names, real:<tool> for the real-use cases) limits the run to those"
+  ],
+  "invocations": {
+    "[": {
+      "argv": [
+        "[",
+        "1",
+        "=",
+        "1",
+        "]"
+      ]
+    },
+    "bunzip2": {
+      "argv": [
+        "bunzip2",
+        "--help"
+      ]
+    },
+    "bzcat": {
+      "argv": [
+        "bzcat",
+        "--help"
+      ]
+    },
+    "bzip2recover": {
+      "argv": [
+        "bzip2recover"
+      ],
+      "rc": 1
+    },
+    "cat": {
+      "argv": [
+        "cat",
+        "/dev/null"
+      ]
+    },
+    "clear": {
+      "argv": [
+        "clear"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      }
+    },
+    "echo": {
+      "argv": [
+        "echo",
+        "x"
+      ]
+    },
+    "false": {
+      "argv": [
+        "false"
+      ],
+      "rc": 1
+    },
+    "free": {
+      "argv": [
+        "free"
+      ]
+    },
+    "hostid": {
+      "argv": [
+        "hostid"
+      ]
+    },
+    "i": {
+      "argv": [
+        "i",
+        "--help"
+      ]
+    },
+    "kill": {
+      "argv": [
+        "kill",
+        "-l"
+      ]
+    },
+    "mktemp": {
+      "argv": [
+        "mktemp",
+        "-u"
+      ]
+    },
+    "mount": {
+      "argv": [
+        "mount"
+      ]
+    },
+    "nice": {
+      "argv": [
+        "nice",
+        "true"
+      ]
+    },
+    "pgrep": {
+      "sh": "sleep 5 & p=$!; pgrep -x sleep >/dev/null; r=$?; kill $p; exit $r"
+    },
+    "pidof": {
+      "sh": "sleep 5 & p=$!; pidof sleep >/dev/null; r=$?; kill $p; exit $r"
+    },
+    "pkill": {
+      "sh": "sleep 5 & pkill -x sleep; r=$?; wait; exit $r"
+    },
+    "printf": {
+      "argv": [
+        "printf",
+        "x"
+      ]
+    },
+    "ps": {
+      "argv": [
+        "ps"
+      ]
+    },
+    "reset": {
+      "argv": [
+        "reset",
+        "-V"
+      ]
+    },
+    "sleep": {
+      "argv": [
+        "sleep",
+        "0"
+      ]
+    },
+    "test": {
+      "argv": [
+        "test",
+        "1"
+      ]
+    },
+    "tput": {
+      "argv": [
+        "tput",
+        "cols"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      }
+    },
+    "true": {
+      "argv": [
+        "true"
+      ]
+    },
+    "tset": {
+      "argv": [
+        "tset",
+        "-V"
+      ]
+    },
+    "uptime": {
+      "argv": [
+        "uptime"
+      ]
+    },
+    "users": {
+      "argv": [
+        "users"
+      ]
+    },
+    "which": {
+      "argv": [
+        "which",
+        "bash"
+      ]
+    },
+    "yes": {
+      "sh": "yes | head -1"
+    }
+  },
+  "real": {
+    "grep": {
+      "package": "@ai-ecoverse/wasm-grep",
+      "sh": "cd \"$(mktemp -d)\" && printf 'alpha\\nbeta\\ngamma\\n' > s.txt && test \"$(grep -c a s.txt)\" = 3 && test \"$(grep -n beta s.txt)\" = 2:beta && test \"$(egrep '^g' s.txt)\" = gamma && test \"$(fgrep -x beta s.txt)\" = beta"
+    },
+    "sed": {
+      "package": "@ai-ecoverse/wasm-sed",
+      "sh": "cd \"$(mktemp -d)\" && printf 'alpha\\nbeta\\n' > s.txt && sed -i s/beta/BETA/ s.txt && test \"$(sed -n 2p s.txt)\" = BETA"
+    },
+    "xz": {
+      "package": "@ai-ecoverse/wasm-xz",
+      "sh": "cd \"$(mktemp -d)\" && printf 'hello\\n' > s.txt && xz -k s.txt && test -f s.txt && test \"$(xz -dc s.txt.xz)\" = hello"
+    },
+    "jq": {
+      "package": "@ai-ecoverse/wasm-jq",
+      "sh": "test \"$(echo '{\"k\":[1,2]}' | jq -c .k)\" = '[1,2]'"
+    },
+    "find": {
+      "package": "@ai-ecoverse/wasm-findutils",
+      "sh": "cd \"$(mktemp -d)\" && mkdir -p t/u && touch t/a t/u/b && test \"$(find t -type f | sort | xargs echo)\" = 't/a t/u/b'"
+    },
+    "diff": {
+      "package": "@ai-ecoverse/wasm-diffutils",
+      "sh": "cd \"$(mktemp -d)\" && printf 'a\\n' > s.txt && printf 'a\\nb\\n' > t.txt; diff -u s.txt t.txt > d.patch; test $? = 1 && test \"$(tail -1 d.patch)\" = +b && cmp -s s.txt s.txt"
+    },
+    "patch": {
+      "package": "@ai-ecoverse/wasm-patch",
+      "sh": "cd \"$(mktemp -d)\" && printf 'a\\n' > s.txt && printf -- '--- s.txt\\n+++ s.txt\\n@@ -1 +1,2 @@\\n a\\n+b\\n' > d.patch && patch -s s.txt < d.patch && test \"$(tail -1 s.txt)\" = b"
+    }
+  }
+}
