@@ -20,6 +20,7 @@ on:
       - 'scripts/list-touched-packages.mjs'
       - 'scripts/host-smoke.sh'
       - 'scripts/install-emsdk.sh'
+      - 'scripts/emsdk-patches/**'
       - 'scripts/install-wasixcc.sh'
       - 'scripts/sync-package-version.mjs'
       - 'scripts/check-exact-pins.mjs'

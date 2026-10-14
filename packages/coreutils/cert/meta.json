@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.77.0",
   "needs": [
     "@ai-ecoverse/wasm-bash"
   ],
@@ -15,7 +15,8 @@
     "timeout kills the command's whole process group (background child gone)",
     "timeout of a missing command \u2192 127; bad duration \u2192 125",
     "hostname prints the same as uname -n; hostname NAME \u2192 Operation not permitted",
-    "cert/users.mjs (9.12.0-5, H1 homescoop#207, slicc-kernel >= 1.44.0): as root id = 'uid=0(root) gid=0(root) groups=0(root)', id -un/whoami/logname root, id -G 0, groups root, groups cone 'cone : cone users'; as kernel.users.add({name:'cone'}) id = 'uid=1000(cone) gid=1000(cone) groups=1000(cone),100(users)', id -G '1000 100', whoami/logname cone; a file cone creates in ~ shows 'cone cone' in ls -l and stat %U:%G. Needs shims/slicc (process credentials, setgrent/getgrent) and build-gnu-cli.sh linking slicc_pwd's --wrap and ac_cv_func_getgroups_works=yes. File owners are the kernel's (1.44.0: uid 1000 for every file), so root's files are not checked"
+    "cert/users.mjs (9.12.0-5, H1 homescoop#207, slicc-kernel >= 1.44.0): as root id = 'uid=0(root) gid=0(root) groups=0(root)', id -un/whoami/logname root, id -G 0, groups root, groups cone 'cone : cone users'; as kernel.users.add({name:'cone'}) id = 'uid=1000(cone) gid=1000(cone) groups=1000(cone),100(users)', id -G '1000 100', whoami/logname cone; a file cone creates in ~ shows 'cone cone' in ls -l and stat %U:%G. Needs shims/slicc (process credentials, setgrent/getgrent) and build-gnu-cli.sh linking slicc_pwd's --wrap and ac_cv_func_getgroups_works=yes. File owners are the kernel's (1.44.0: uid 1000 for every file), so root's files are not checked",
+    "rdev (9.12.0-6, scripts/emsdk-patches/statx-rdev.patch, homescoop#324): stat -c '%t:%T' on /dev/null, /dev/zero, /dev/full and /dev/tty gives the kernel's 1:3, 1:5, 1:7, 5:0; ls -l /dev/null shows '1, 3' on each of 3 runs; a regular file is 0:0. 9.12.0-5: /dev/null 0:0, ls -l majors from uninitialised stack"
   ],
   "patches": {
     "gnulib-emscripten-locale.patch": "env LC_ALL=C sort (locale name path on emscripten); build fails without the patch",

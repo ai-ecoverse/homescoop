@@ -1,0 +1,14 @@
+--- a/system/lib/libc/musl/src/linux/statx.c
++++ b/system/lib/libc/musl/src/linux/statx.c
+@@ -23,8 +23,11 @@
+ 	ret = fstatat(dirfd, path, &st, flags);
+ 	if (ret) return ret;
+ 
++	memset(stx, 0, sizeof *stx);
+ 	stx->stx_dev_major = major(st.st_dev);
+ 	stx->stx_dev_minor = minor(st.st_dev);
++	stx->stx_rdev_major = major(st.st_rdev);
++	stx->stx_rdev_minor = minor(st.st_rdev);
+ 	stx->stx_ino = st.st_ino;
+ 	stx->stx_mode = st.st_mode;
+ 	stx->stx_nlink = st.st_nlink;
