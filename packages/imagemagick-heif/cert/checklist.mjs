@@ -43,6 +43,7 @@ export default async function imagemagickHeif(ctx) {
     const v = await ok(['magick', '-version']);
     assert.match(v.stdout, /^Version: ImageMagick 7\.1\.2-32 /);
     assert.match(v.stdout, /Delegates \(built-in\):.*\bheic\b/);
+    for (const d of ['freetype', 'webp', 'xml']) assert.match(v.stdout, new RegExp(`Delegates \\(built-in\\):.*\\b${d}\\b`), `default delegate ${d} kept`);
     const f = await ok(['magick', '-list', 'format']);
     assert.match(f.stdout, /^\s+HEIC\*?\s+r--\s+High Efficiency Image Format \(1\.23\.6\)$/m);
     assert.match(f.stdout, /^\s+AVIF\*?\s+r--\s+AV1 Image File Format \(1\.23\.6\)$/m);
@@ -93,9 +94,17 @@ export default async function imagemagickHeif(ctx) {
     assert.deepEqual([half.width, half.height], [640, 427]);
     await ok(['mogrify', '-format', 'jpg', 'rainbow-451x461.heic']);
     assert.deepEqual(jpegSize(await readB64('rainbow-451x461.jpg')), { width: 451, height: 461 });
+    await ok(['magick', 'rainbow-451x461.heic', '-quality', '80', 'rainbow.webp']);
+    const webp = await readB64('rainbow.webp');
+    assert.equal(webp.subarray(0, 4).toString('latin1') + webp.subarray(8, 12).toString('latin1'), 'RIFFWEBP', 'HEIC to WebP');
     await ok(['magick', '-define', 'heic:preserve-orientation=true', 'iphone_13_pro_max.heic', '-auto-orient', '-resize', '10%', 'PNG24:auto.png']);
     const auto = await digest('auto.png', [], []);
     assert.deepEqual([auto.width, auto.height], [302, 403], 'preserve-orientation + -auto-orient gives the upright image');
+  }
+
+  {
+    const u = await ok(['bash', '-c', 'umask 027 && magick rot90-17x9.heic PNG24:umask.png && stat -c %a umask.png']);
+    assert.equal(u.stdout, '640\n', 'files magick creates honour the umask');
   }
 
   {
