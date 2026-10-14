@@ -24,7 +24,7 @@ on:
         type: string
         default: ''
       light-runner:
-        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
+        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER, else the shards runner). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
         type: string
         default: ''
       fail-on-regression:
@@ -72,7 +72,7 @@ on:
         type: string
         default: ''
       light-runner:
-        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
+        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER, else the shards runner). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
         type: string
         default: ''
       fail-on-regression:
@@ -93,7 +93,7 @@ concurrency:
 
 jobs:
   plan:
-    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#'))) && (inputs.light-runner || vars.CERT_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#'))) && (inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 20
     outputs:
       runner: ${{ steps.runners.outputs.runner }}
@@ -110,7 +110,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
           RUNNER: ${{ inputs.runner || vars.CERT_RUNNER }}
-          LIGHT: ${{ inputs.light-runner || vars.CERT_LIGHT_RUNNER }}
+          LIGHT: ${{ inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER }}
         run: |
           set -euo pipefail
           if [[ "$TRUSTED" == "true" ]]; then
@@ -191,7 +191,12 @@ jobs:
         run: |
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit playwright-core@1.63.0
-          npx --prefix "$RUNNER_TEMP/pw" playwright-core install --with-deps chromium || npx --prefix "$RUNNER_TEMP/pw" playwright-core install chromium
+          if [[ "$RUNNER_NAME" != cloud-run-* ]] && sudo -n true 2>/dev/null; then
+            npx --prefix "$RUNNER_TEMP/pw" playwright-core install --with-deps chromium
+          else
+            echo "browser-cert: no root on $RUNNER_NAME (no-new-privileges); the image brings Chromium's system libraries, installing the browser only"
+            npx --prefix "$RUNNER_TEMP/pw" playwright-core install chromium
+          fi
       - name: Cert specs and base sweep on the candidate kernel
         run: node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
       - if: always()
