@@ -20,5 +20,15 @@ export default async function (ctx) {
   assert.deepEqual(await sh('umask 077; rm -rf ~/ru-copy && rsync -a /tmp/ru-src/ ~/ru-copy/ && stat -c "%a %u:%g %n" ~/ru-copy/rf', 'cone'), [
     '644 1000:100 /home/cone/ru-copy/rf',
   ], 'cone: rsync -a gives its own uid and keeps a group it belongs to (users, 100)');
-  console.log('users: root rsync -a keeps owners and modes; cone gets its own uid and keeps its supplementary group 100');
+  const links = await run(['bash', '-c', 'cd ~ && rm -rf rs rd && mkdir -p rs/sub && echo a > rs/f && ln -s f rs/l && ln -s nowhere rs/dang && ln -s sub rs/dl && rsync -a rs/ rd/; echo "rc=$?"; stat -c "%U:%G %F %n" rd/l rd/dang rd/dl; readlink rd/l rd/dang rd/dl'], { cwd: '/home/cone', user: 'cone' });
+  assert.deepEqual(links.stdout.trim().split('\n'), [
+    'rc=0',
+    'cone:cone symbolic link rd/l',
+    'cone:cone symbolic link rd/dang',
+    'cone:cone symbolic link rd/dl',
+    'f',
+    'nowhere',
+    'sub',
+  ], `cone rsync -a of a tree with symlinks: ${links.stdout}${links.stderr}`);
+  console.log('users: root rsync -a keeps owners and modes; cone gets its own uid and keeps its supplementary group 100; cone rsync -a copies symlinks with rc 0 (slicc-kernel 1.73.3, #449)');
 }

@@ -43,10 +43,10 @@ keeps owners and groups (`-o -g`), as on Linux; any other user keeps a group
 only if it belongs to it. 3.4.4-3 and older saw Emscripten's fixed ids, so
 root's `rsync -a` did not keep owners.
 
-Known kernel limit (slicc-kernel 1.36.0 and later, open): the destination's
-top directory does not keep the source directory's mtime after `rsync -a`
-(subdirectories and files do), so a second `rsync -a -i` itemizes
-`.d..t...... ./`. rsync sets the directory's time while its receiver process
-renames files into it, and the kernel's later directory-mtime update wins.
-3.4.4-3 behaves the same on those kernels.
+Since 3.4.4-5 rsync ends by the signal it sends itself (`kill -TERM` of its
+own pid, slicc-kernel ≥ 1.73.2), as the other slicc shim packages do. On
+slicc-kernel ≥ 1.73.3 a user's `rsync -a` of symlinks exits 0 (slicc-kernel#449:
+older kernels said a just-created link was 0:0, so the chgrp failed, rc 23),
+and the destination's top directory keeps the source's mtime (1.36.0-1.73.2
+did not, so a second `rsync -a -i` itemized `.d..t...... ./`).
 
