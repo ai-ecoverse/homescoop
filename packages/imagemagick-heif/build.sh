@@ -87,13 +87,19 @@ test -f "$UTIL/magick.wasm"
 homescoop_stage_cli "$UTIL" magick
 
 CFG_DEST="$HOMESCOOP_PKG/package/etc/ImageMagick-7"
-mkdir -p "$CFG_DEST"
-if [[ -d "$SRC/config" ]]; then
-  find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_DEST/" \;
-fi
+CFG_OPEN="$HOMESCOOP_PKG/package/etc/ImageMagick-7-open"
+rm -rf "$CFG_DEST" "$CFG_OPEN"
+mkdir -p "$CFG_DEST" "$CFG_OPEN"
+find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_DEST/" \;
+find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_OPEN/" \;
 test -f "$CFG_DEST/colors.xml"
-perl -0 -i -pe 's{^\s*<delegate decode="svg" command="&apos;rsvg-convert&apos;[^\n]*\n}{}m; s{^\s*<!-- Change export-filename to export-png for inkscape[^\n]*\n}{}m; s{^\s*<delegate decode="svg:decode"[^\n]*inkscape[^\n]*\n}{}m' "$CFG_DEST/delegates.xml"
-if grep -q 'inkscape\|rsvg-convert' "$CFG_DEST/delegates.xml"; then echo "imagemagick-heif: delegates.xml still names inkscape/rsvg-convert" >&2; exit 1; fi
+cp "$HOMESCOOP_ROOT/packages/imagemagick/policy-tab.xml" "$CFG_DEST/policy.xml"
+cp "$SRC/config/policy-open.xml" "$CFG_OPEN/policy.xml"
+for d in "$CFG_DEST" "$CFG_OPEN"; do
+  perl -0 -i -pe 's{^\s*<delegate decode="svg" command="&apos;rsvg-convert&apos;[^\n]*\n}{}m; s{^\s*<!-- Change export-filename to export-png for inkscape[^\n]*\n}{}m; s{^\s*<delegate decode="svg:decode"[^\n]*inkscape[^\n]*\n}{}m' "$d/delegates.xml"
+  if grep -q 'inkscape\|rsvg-convert' "$d/delegates.xml"; then echo "homescoop: $d/delegates.xml still names inkscape/rsvg-convert" >&2; exit 1; fi
+done
+grep -q 'name="area" value="64MP"' "$CFG_DEST/policy.xml"
 
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
 homescoop_notices_begin "magick.wasm statically links the following delegate libraries, including libheif and libde265 (LGPL-3.0-or-later; libde265 is an HEVC decoder, and HEVC is patent-encumbered) from @ai-ecoverse/wasm-libheif. No MPEG-family video codec. share/imagemagick-heif/relink holds magick's objects and every other library it links, so it can be relinked against a modified libheif or libde265 (README.md, Relinking)."
@@ -145,4 +151,4 @@ cp "$SLICC_A" "$RELINK/libslicc-cli.a"
 cp "$(homescoop_slicc_dir)/slicc-writev.js" "$RELINK/js/"
 printf '%s\n' "$CLI_LDFLAGS" | sed "s#$(homescoop_slicc_dir)/#js/#g" >"$RELINK/ldflags.txt"
 cp "$HOMESCOOP_PKG/relink.sh" "$RELINK/relink.sh"
-echo "== imagemagick-heif: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7"
+echo "== imagemagick-heif: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7 (tab policy) and etc/ImageMagick-7-open"

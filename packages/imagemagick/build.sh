@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ImageMagick 7.1.2-32 utilities/magick — port of slicc-emscripten harness/ladder.sh rung_magick.
+# ImageMagick 7.1.2-33 utilities/magick — port of slicc-emscripten harness/ladder.sh rung_magick.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
@@ -95,11 +95,19 @@ homescoop_stage_cli "$UTIL" magick
 
 # Ship XML configure files; package.json sets MAGICK_CONFIGURE_PATH → etc/ImageMagick-7.
 CFG_DEST="$HOMESCOOP_PKG/package/etc/ImageMagick-7"
-mkdir -p "$CFG_DEST"
-if [[ -d "$SRC/config" ]]; then
-  find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_DEST/" \;
-fi
+CFG_OPEN="$HOMESCOOP_PKG/package/etc/ImageMagick-7-open"
+rm -rf "$CFG_DEST" "$CFG_OPEN"
+mkdir -p "$CFG_DEST" "$CFG_OPEN"
+find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_DEST/" \;
+find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_OPEN/" \;
 test -f "$CFG_DEST/colors.xml"
+cp "$HOMESCOOP_ROOT/packages/imagemagick/policy-tab.xml" "$CFG_DEST/policy.xml"
+cp "$SRC/config/policy-open.xml" "$CFG_OPEN/policy.xml"
+for d in "$CFG_DEST" "$CFG_OPEN"; do
+  perl -0 -i -pe 's{^\s*<delegate decode="svg" command="&apos;rsvg-convert&apos;[^\n]*\n}{}m; s{^\s*<!-- Change export-filename to export-png for inkscape[^\n]*\n}{}m; s{^\s*<delegate decode="svg:decode"[^\n]*inkscape[^\n]*\n}{}m' "$d/delegates.xml"
+  if grep -q 'inkscape\|rsvg-convert' "$d/delegates.xml"; then echo "homescoop: $d/delegates.xml still names inkscape/rsvg-convert" >&2; exit 1; fi
+done
+grep -q 'name="area" value="64MP"' "$CFG_DEST/policy.xml"
 
 # argv0 aliases are declared in package.json (convert/identify/mogrify → magick).
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
@@ -128,6 +136,6 @@ homescoop_notice "libxml2 2.15.4 (@ai-ecoverse/wasm-libxml2)" \
 ICONV_TB="$WORK/libiconv-1.18.tar.gz"
 homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.18.tar.gz 3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8 "$ICONV_TB"
 tar xzf "$ICONV_TB" -C "$WORK" libiconv-1.18/COPYING.LIB
-homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later" "$WORK/libiconv-1.18/COPYING.LIB" -
+homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later; source and build: homescoop packages/libiconv (recipe.yaml, build.sh), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libiconv" "$WORK/libiconv-1.18/COPYING.LIB" -
 homescoop_notice_emscripten
-echo "== imagemagick: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7"
+echo "== imagemagick: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7 (tab policy) and etc/ImageMagick-7-open"

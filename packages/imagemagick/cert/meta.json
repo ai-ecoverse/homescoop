@@ -1,13 +1,18 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.77.0",
-  "needs": ["@ai-ecoverse/wasm-poppler"],
-  "needsInstall": ["@ai-ecoverse/wasm-poppler@26.10.0-2"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.81.0",
+  "needs": [
+    "@ai-ecoverse/wasm-poppler"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-poppler@26.10.0-2"
+  ],
   "checklist": [
     "magick -version lists the built-in delegates freetype, jpeg, jp2, lcms, png, tiff, webp, xml, zlib (7.1.2-32-3: jng jp2 jpeg lcms png tiff only)",
     "-list format: WEBP rw, MSL and MSVG readable (libxml2; 7.1.2-32-3: MSL ---, MSVG -w+), TTF readable (freetype; absent in -3)",
     "logo: to WEBP and back: identify WEBP 160 120, a lossless webp converts to PNG 160 120",
     "freetype: -annotate with a Type 1 font (wasm-poppler's Nimbus Sans) draws dark pixels on a white canvas, a blank canvas none",
-    "libxml2: an SVG with a red and a blue rect renders through the internal MSVG coder (255,0,0 at 5,5, 0,0,255 at 30,10); an MSL script (magick msl:script null:) reads logo:, resizes to 64x48 and writes a PNG"
+    "libxml2: an SVG with a red and a blue rect renders through the internal MSVG coder (255,0,0 at 5,5, 0,0,255 at 30,10); an MSL script (magick msl:script null:) reads logo:, resizes to 64x48 and writes a PNG",
+    "resource policy (policy.mjs): the default etc/ImageMagick-7/policy.xml is the tab policy (width/height 16KP, area 64MP, memory 768MiB, map 512MiB, disk 512MiB, from -list resource); magick -size 30000x30000 xc:white fails within seconds, rc 1, 'width or height exceeds limit', no trap, no file; 9000x9000 (81MP) fails with 'cache resources exhausted'; -limit cannot raise a policy limit; an 8064x6048 (48MP) canvas resizes 25% to 2016x1512; magick-open and MAGICK_CONFIGURE_PATH=<package>/etc/ImageMagick-7-open lift the limits (a 17000x100 canvas works there and fails under the tab policy)"
   ]
 }

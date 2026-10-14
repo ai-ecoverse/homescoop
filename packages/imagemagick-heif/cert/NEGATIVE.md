@@ -34,3 +34,22 @@ The umask case (`umask 027` → mode 640) passes on slicc-kernel 1.81.0 and on
 gives 600), so it is not a negative for the kernel pin. The pin to 1.81.0
 (engines >= 1.78.0) follows the kernel umask fix for Emscripten-created
 files that wasm-libheif's cert ran into.
+
+## Resource policy (7.1.2-33-1)
+
+`policy.mjs` against the #315 artifact of `@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-32-1 (sha256 6317432812945b4bf93edc1846850954507b6c23165348c3be5ad79e74d42ded), which ships upstream's open policy, fails at its
+first check, before any large allocation (slicc-kernel 1.81.0, 2026-10-14):
+
+```
+browser-cert: FAIL packages/zzneg/cert/policy.mjs
+AssertionError [ERR_ASSERTION]: default limits: Resource limits:
+  Width: 8.38861MP
++   '8.38861MP',
++   '8.38861MP',
++   '8.58993GP',
++   '2GiB',
+```
+
+With that policy `magick -size 30000x30000 xc:white` would start allocating
+a 900 MP pixel cache, which is what hung the tab. On 7.1.2-33-1 the same spec
+refuses it in about 60 ms and the 81 MP canvas in about 50 ms.

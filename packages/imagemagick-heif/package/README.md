@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-imagemagick-heif`
 
-[ImageMagick](https://imagemagick.org/) 7.1.2-32 `magick` CLI for
+[ImageMagick](https://imagemagick.org/) 7.1.2-33 `magick` CLI for
 [slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm, **with HEIC /
 HEIF / AVIF reading** through [libheif](https://github.com/strukturag/libheif)
 1.23.6. It is the same build as `@ai-ecoverse/wasm-imagemagick`, with the same
@@ -34,12 +34,38 @@ photos come out upright and `%[orientation]` is `TopLeft`. To get the stored
 orientation instead, use `-define heic:preserve-orientation=true` (the stored
 pixels, plus the orientation, which `-auto-orient` then applies).
 
-The other delegates are those of `@ai-ecoverse/wasm-imagemagick` 7.1.2-32-4:
+The other delegates are those of `@ai-ecoverse/wasm-imagemagick`:
 freetype, jpeg, jp2 (openjpeg), lcms, png, tiff, webp, xml (libxml2) and zlib.
 Configure XMLs ship under `etc/ImageMagick-7/`.
 
 WebP lossless (`-define webp:lossless=true`) drops the RGB of fully transparent
 pixels, as libwebp does by default; add `-define webp:exact=true` to keep it.
+
+## Resource limits
+
+The default `etc/ImageMagick-7/policy.xml` is sized for a browser tab, where
+the wasm heap tops out at 2 GiB and a runaway allocation can freeze the tab:
+
+| Resource | Limit | Why |
+| --- | --- | --- |
+| width, height | 16000 px | a 30000x30000 request fails at once instead of allocating |
+| area | 64 MP | a 48 MP phone photo (8064x6048) fits |
+| memory | 768 MiB | a 48 MP RGB image in Q16HDRI is about 580 MiB |
+| map | 512 MiB | memory-mapped cache is wasm heap too: memory + map stays under 1.3 GiB |
+| disk | 512 MiB | pixel-cache spill goes to the browser's storage; anything bigger fails fast |
+
+Over a limit, magick exits 1 with `width or height exceeds limit` or
+`cache resources exhausted`. `-limit` can only lower these. To lift them,
+use `magick-open` (the same binary with upstream's `policy-open.xml` from
+`etc/ImageMagick-7-open`), or set `MAGICK_CONFIGURE_PATH` to that directory
+(`magick -list policy` shows where the package is installed):
+
+```bash
+magick-open -size 20000x1000 xc:white wide.png
+MAGICK_CONFIGURE_PATH=/path/to/package/etc/ImageMagick-7-open magick ...
+```
+
+The tab can still run out of memory without limits.
 
 ## Licences
 
