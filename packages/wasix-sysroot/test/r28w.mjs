@@ -35,6 +35,17 @@ export default async function (ctx) {
   const kernel = head === 'kernel sigmask_poll: yes';
   if (process.env.R28_KERNEL_MASK === '1') assert.ok(kernel, `R28_KERNEL_MASK=1 but ${head}`);
   assert.deepEqual(lines.slice(-TAIL.length), TAIL, r.stdout);
+  const windows = lines.filter((l) => l.startsWith('window'));
+  assert.equal(windows.length, 2, r.stdout);
+  for (const w of windows) assert.match(w, /arrived_before_wait handler=0; pselect .* handler=1 /, w);
+  if (process.env.R28_WINDOW === '1') {
+    assert.deepEqual(windows, [
+      'window: arrived_before_wait handler=0; pselect -1 EINTR handler=1 fast',
+      'window masked: arrived_before_wait handler=0; pselect -1 EINTR handler=1 fast',
+    ], `a signal that arrived while the thread was out of the kernel must end the next wait at once: ${windows.join(' | ')}`);
+  }
+  console.log(`r28w (${ctx.variant}) ${windows.join('; ')}`);
+  lines.splice(0, lines.length, ...lines.filter((l) => !l.startsWith('window')));
   if (kernel) {
     assert.deepEqual(lines.slice(0, -TAIL.length), KERNEL, r.stdout);
     console.log(`r28w (${ctx.variant}): slicc.sigmask_poll: pselect with a pending blocked signal is EINTR at once with the handler run; sigsuspend wakes on a signal; gpg-agent's pselect(sigmask) gets HUP and TERM and ssh's ppoll(osigset) INT at once; masks are restored; sigtimedwait/sigwaitinfo/sigwait are ENOSYS`);

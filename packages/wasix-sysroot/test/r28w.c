@@ -52,6 +52,12 @@ static void reap(pid_t p) {
   while (waitpid(p, &st, 0) < 0 && errno == EINTR) {}
 }
 
+static volatile unsigned long spin_sink;
+
+static void spin(unsigned long n) {
+  for (unsigned long i = 0; i < n; i++) spin_sink += i;
+}
+
 static int blocked(int sig) {
   sigset_t cur;
   sigemptyset(&cur);
@@ -97,7 +103,7 @@ int main(void) {
   r = sigsuspend(&none);
   h = got[SIGUSR1];
   dt = now() - t0;
-  printf("sigsuspend: %s handler=%d %s still_blocked=%d\n", err(r), h, fast(dt, 3), blocked(SIGUSR1));
+  printf("sigsuspend: %s handler=%d %s still_blocked=%d\n", err(r), h, fast(dt, 1), blocked(SIGUSR1));
   reap(p);
   sigprocmask(SIG_SETMASK, &none, NULL);
 
@@ -119,7 +125,7 @@ int main(void) {
     r = pselect(fds[0] + 1, &rd, NULL, NULL, &ten, &old);
     h = got[sig];
     dt = now() - t0;
-    printf("agent %s: %s handler=%d %s\n", k == 0 ? "HUP" : "TERM", err(r), h, fast(dt, 3));
+    printf("agent %s: %s handler=%d %s\n", k == 0 ? "HUP" : "TERM", err(r), h, fast(dt, 1));
     reap(p);
   }
 
@@ -149,12 +155,46 @@ int main(void) {
   r = ppoll(&pf, 1, &ten, &old);
   h = got[SIGINT];
   dt = now() - t0;
-  printf("ssh INT: %s handler=%d %s still_blocked=%d\n", err(r), h, fast(dt, 3), blocked(SIGINT));
+  printf("ssh INT: %s handler=%d %s still_blocked=%d\n", err(r), h, fast(dt, 1), blocked(SIGINT));
   reap(p);
   write(fds[1], "x", 1);
   r = ppoll(&pf, 1, &ten, &old);
   printf("ppoll ready: %s revents=%s\n", err(r), pf.revents & POLLIN ? "IN" : "-");
   sigprocmask(SIG_SETMASK, &none, NULL);
+
+  char drain[8];
+  read(fds[0], drain, sizeof drain);
+  double c0 = now();
+  spin(20000000);
+  double per = (now() - c0) / 20000000;
+  unsigned long n400 = per > 0 ? (unsigned long)(0.4 / per) : 20000000;
+  int wb = got[SIGUSR1];
+  p = later(SIGUSR1, 100);
+  spin(n400);
+  int before_wait = got[SIGUSR1] - wb;
+  fd_set wr;
+  FD_ZERO(&wr);
+  FD_SET(fds[0], &wr);
+  struct timespec ten2 = {10, 0};
+  t0 = now();
+  r = pselect(fds[0] + 1, &wr, NULL, NULL, &ten2, NULL);
+  h = got[SIGUSR1] - wb;
+  dt = now() - t0;
+  printf("window: arrived_before_wait handler=%d; pselect %s handler=%d %s\n", before_wait, err(r), h, fast(dt, 1));
+  reap(p);
+
+  wb = got[SIGUSR1];
+  p = later(SIGUSR1, 100);
+  spin(n400);
+  before_wait = got[SIGUSR1] - wb;
+  FD_ZERO(&wr);
+  FD_SET(fds[0], &wr);
+  t0 = now();
+  r = pselect(fds[0] + 1, &wr, NULL, NULL, &ten2, &none);
+  h = got[SIGUSR1] - wb;
+  dt = now() - t0;
+  printf("window masked: arrived_before_wait handler=%d; pselect %s handler=%d %s\n", before_wait, err(r), h, fast(dt, 1));
+  reap(p);
 
   siginfo_t si;
   struct timespec z = {0, 0};
