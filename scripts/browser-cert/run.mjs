@@ -76,6 +76,7 @@ const report = {
   tarballs: [],
   specs: [],
   pageErrors: [],
+  modes: null,
   error: null,
   status: 'fail',
 };
@@ -119,7 +120,7 @@ function cleanup(code, status = code === 0 ? 'pass' : 'fail') {
 
 function untar(tgz, into) {
   mkdirSync(into, { recursive: true });
-  const r = spawnSync('tar', ['-xzf', tgz, '-C', into], { encoding: 'utf8' });
+  const r = spawnSync('tar', ['-xpzf', tgz, '-C', into], { encoding: 'utf8' });
   if (r.status !== 0) {
     console.error(`browser-cert: tar failed: ${r.stderr || r.stdout}`);
     report.error = `tar -xzf ${tgz} failed`;
@@ -164,6 +165,15 @@ function listFiles(dir, base = dir) {
     else out.push(abs.slice(base.length + 1).split('\\').join('/'));
   }
   return out;
+}
+
+function modesOf(base, names) {
+  const modes = {};
+  for (const name of names) {
+    const mode = statSync(join(base, name)).mode & 0o7777;
+    if (mode !== 0o644 || name.startsWith('bin/')) modes[name] = mode;
+  }
+  return modes;
 }
 
 function resolveNodeModules() {
@@ -295,15 +305,20 @@ try {
   for (const need of meta.needs || []) {
     const needRoot = join(nodeModules, need);
     const names = listFiles(needRoot);
-    await page.evaluate(
-      (d, n) => window.installTree(d, n),
+    const done = await page.evaluate(
+      (d, n, m) => window.installTree(d, n, m),
       `node_modules/${need}/`,
       names,
+      modesOf(needRoot, names),
     );
+    report.modes = done.stamped === null ? 'kernel defaults' : 'tarball';
   }
   for (const p of pkgs) {
-    await page.evaluate((d, n) => window.installTree(d, n), p.installDir, listFiles(p.pkgRoot));
+    const names = listFiles(p.pkgRoot);
+    const done = await page.evaluate((d, n, m) => window.installTree(d, n, m), p.installDir, names, modesOf(p.pkgRoot, names));
+    report.modes = done.stamped === null ? 'kernel defaults' : 'tarball';
   }
+  console.log(`browser-cert: file modes: ${report.modes === 'tarball' ? 'the tarballs\' (kernel.chmod)' : 'the kernel\'s defaults (no kernel.chmod)'}`);
 
   if (certSpecs.length > 0) {
     const ctx = {

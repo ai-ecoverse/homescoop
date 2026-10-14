@@ -267,10 +267,22 @@ keep each one to its case and range.
   summary: { pass, known, regression, skip, error, sweep: {…}, regressions },
   results: [{ package, recipe, version, sha256, spec, users, status: pass|fail|skip,
               verdict, durationMs, log, flaky?, error?, limit?, reference? }],
-  packages: [{ id, package, version, sha256, origin, users, status, verdict, durationMs, peers, reference }],
+  packages: [{ id, package, version, sha256, origin, users, modes, status, verdict, durationMs, peers, reference }],
   sweep: [{ users, user, command, package, recipe, version, argv, rc, expected, status, verdict, out, reference?, limit? }],
   shards: [{ shard, packages, wallMs, runner }], sweeps: [{ mode, wallMs, runner }] }
 ```
+
+### File modes
+
+`run.mjs` writes each package straight to OPFS, as an installer does. Such
+files get the kernel's defaults: directories `0755`, files `0644`, files under
+`node_modules/*/bin/` `0755`. With slicc-kernel ≥ 1.86.0 it then gives every
+file whose tarball mode isn't `0644`, and every `bin/` file, its tarball mode
+with `kernel.chmod`, as bios's installer does with `writeMetadata`. Under
+users `enforce` a shim or helper that runs by path (wasi-pnpm's `shims/npm`,
+git's `libexec/git-core/*`) needs that x bit. Older kernels have no
+`kernel.chmod` and keep the defaults. `--json` and `compat.json` say which
+(`modes: tarball` or `kernel defaults`).
 
 ### `run.mjs` flags
 
@@ -306,8 +318,9 @@ keep each one to its case and range.
 on PRs that touch these files or the harness itself (`run.mjs`,
 `context.mjs`, `page/`): `ladder-pr` runs no package cert on a scripts-only
 PR, so this is the harness's regression test. It calls the workflow twice, as slicc-kernel
-does: `@ai-ecoverse/slicc-kernel@1.81.0` on `base,ci-certified` must be green,
-and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
+does: `@ai-ecoverse/slicc-kernel@1.81.0` and the newest certified kernel
+(`1.86.0`; bump it with each kernel cert) on `base,ci-certified` must be
+green, and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
 must report a regression, in a spec and in the sweep, for each of them: the
 Emscripten builds without `slicc_sleep_ms` that exit 70 there
 (slicc-kernel#483, fixed by #496 in 1.81.0).
