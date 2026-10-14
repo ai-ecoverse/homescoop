@@ -20,11 +20,11 @@ on:
         type: string
         default: 'main'
       runner:
-        description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a trusted run (docs/ci-cert.md), else ubuntu-latest'
+        description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a same-repo PR or a trusted run on main (docs/ci-cert.md), else ubuntu-latest'
         type: string
         default: ''
       light-runner:
-        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER). Used only for a trusted run, else ubuntu-latest'
+        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
         type: string
         default: ''
       fail-on-regression:
@@ -68,11 +68,11 @@ on:
         type: string
         default: 'main'
       runner:
-        description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a trusted run (docs/ci-cert.md), else ubuntu-latest'
+        description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a same-repo PR or a trusted run on main (docs/ci-cert.md), else ubuntu-latest'
         type: string
         default: ''
       light-runner:
-        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER). Used only for a trusted run, else ubuntu-latest'
+        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
         type: string
         default: ''
       fail-on-regression:
@@ -93,7 +93,7 @@ concurrency:
 
 jobs:
   plan:
-    runs-on: ${{ ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' || github.event_name == 'release') && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#')) && (inputs.light-runner || vars.CERT_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#'))) && (inputs.light-runner || vars.CERT_LIGHT_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 20
     outputs:
       runner: ${{ steps.runners.outputs.runner }}
@@ -106,7 +106,7 @@ jobs:
     steps:
       - id: runners
         env:
-          TRUSTED: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' || github.event_name == 'release') && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#') }}
+          TRUSTED: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#')) }}
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
           RUNNER: ${{ inputs.runner || vars.CERT_RUNNER }}
@@ -116,11 +116,11 @@ jobs:
           if [[ "$TRUSTED" == "true" ]]; then
             echo "runner=${RUNNER:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
             echo "light-runner=${LIGHT:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
-            echo "runners: trusted ($EVENT on $REF, homescoop main, bios main, a published kernel): ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}"
+            echo "runners: allowed ($EVENT on $REF: a same-repo PR, or main with homescoop main, bios main and a published kernel): ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}"
           else
             echo "runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
             echo "light-runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            echo "runners: ubuntu-latest (not a trusted run: $EVENT on $REF, or a homescoop-ref, bios-ref or kernel other than main, main and a published @ai-ecoverse/slicc-kernel)"
+            echo "runners: ubuntu-latest ($EVENT on $REF: a fork PR, another event or ref, or a dispatch whose homescoop-ref, bios-ref or kernel is not main, main and a published @ai-ecoverse/slicc-kernel)"
           fi
       - uses: actions/checkout@v7
         with:
