@@ -55,7 +55,7 @@
     "@ai-ecoverse/wasm-binaryen": "132.0.0-1",
     "@ai-ecoverse/emscripten-cache": "6.0.9-3",
     "esbuild-wasm": "0.28.2",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "acorn": "^8.18.0",
     "acorn-import-phases": "^1.0.4"
   },
