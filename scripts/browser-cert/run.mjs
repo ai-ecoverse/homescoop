@@ -22,6 +22,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { recorder } from './cases.mjs';
 import { makeContext } from './context.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -42,9 +43,10 @@ const tarballs = (flags('--tarball').length ? flags('--tarball') : ['.homescoop-
 const kernelFlag = flag('--kernel');
 const usersFlag = flag('--users');
 const jsonOut = flag('--json') ? resolve(flag('--json')) : '';
+const soft = process.argv.includes('--soft');
 if (!pkgName) {
   console.error(
-    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>]',
+    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft]',
   );
   process.exit(2);
 }
@@ -339,14 +341,34 @@ try {
       }
       const label = relative(root, specPath);
       const started = Date.now();
+      const rec = recorder(ctx.assert, { soft, roots: [join(root, 'packages'), certDir], root });
       try {
-        await fn(ctx);
-        console.log(`browser-cert: ok ${label}`);
-        report.specs.push({ spec, status: 'pass', durationMs: Date.now() - started });
+        await fn({ ...ctx, assert: rec.assert });
+        const failed = rec.cases.fail;
+        if (failed.length) {
+          console.error(`browser-cert: FAIL ${label} (${failed.length} of ${failed.length + rec.cases.pass.length} assertions)`);
+          for (const f of failed) console.error(`  ${f.id}: ${f.message}`);
+          process.exitCode = 1;
+        } else console.log(`browser-cert: ok ${label}`);
+        report.specs.push({
+          spec,
+          status: failed.length ? 'fail' : 'pass',
+          durationMs: Date.now() - started,
+          cases: rec.cases,
+          ...(failed.length ? { error: failed.map((f) => `${f.id}: ${f.message}`).join('\n') } : {}),
+        });
       } catch (err) {
-        console.error(`browser-cert: FAIL ${label}`);
+        const crash = rec.isAssertion(err) ? null : rec.crash(err);
+        console.error(`browser-cert: FAIL ${label}${crash ? ` (crash at ${crash.where || '?'})` : ''}`);
         console.error(err);
-        report.specs.push({ spec, status: 'fail', durationMs: Date.now() - started, error: errorText(err) });
+        report.specs.push({
+          spec,
+          status: 'fail',
+          durationMs: Date.now() - started,
+          error: errorText(err),
+          cases: rec.cases,
+          ...(crash ? { crash } : {}),
+        });
         process.exitCode = 1;
       }
     }

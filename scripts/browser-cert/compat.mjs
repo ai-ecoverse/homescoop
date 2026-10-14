@@ -145,6 +145,11 @@ export function satisfies(version, range) {
     );
 }
 
+function loadTimings() {
+  const file = join(here, 'timings.json');
+  return existsSync(file) ? readJson(file).seconds || {} : {};
+}
+
 function loadLimits() {
   const file = join(here, 'known-limits.json');
   return existsSync(file) ? readJson(file).limits || [] : [];
@@ -351,9 +356,10 @@ async function plan(args) {
   rmSync(tmp, { recursive: true, force: true });
 
   const list = [...entries.values()];
+  const timings = loadTimings();
   const units = [
-    ...list.map((e, i) => ({ id: e.id, entry: i, seconds: ESTIMATE.entry + ESTIMATE.spec * e.specs.length })),
-    ...(sweep ? sweep.modes.map((mode) => ({ id: `sweep-${mode}`, sweep: mode, seconds: ESTIMATE.sweep })) : []),
+    ...list.map((e, i) => ({ id: e.id, entry: i, seconds: timings[e.recipe] ?? ESTIMATE.entry + ESTIMATE.spec * e.specs.length, measured: e.recipe in timings })),
+    ...(sweep ? sweep.modes.map((mode) => ({ id: `sweep-${mode}`, sweep: mode, seconds: timings[`base-sweep:${mode}`] ?? ESTIMATE.sweep, measured: `base-sweep:${mode}` in timings })) : []),
   ];
   const total = units.reduce((s, u) => s + u.seconds, 0);
   const asked = String(args.shards || 'auto').trim();
@@ -403,7 +409,7 @@ async function plan(args) {
   writeJson(join(out, 'plan.json'), doc);
   console.log(`candidate ${candidate.name}@${candidate.version} sha256 ${candidate.sha256}`);
   console.log(`reference ${reference.name}@${reference.version} sha256 ${reference.sha256} (slicc-bios ${bios.sha})`);
-  console.log(`work: about ${Math.round(total / 60)} min in ${n} shard(s) (shards ${asked})`);
+  console.log(`work: about ${Math.round(total / 60)} min in ${n} shard(s) (shards ${asked}; ${units.filter((u) => u.measured).length} of ${units.length} items measured in timings.json)`);
   for (const [k, b] of bins.entries()) {
     console.log(`shard ${k} (~${Math.round(b.seconds / 60)} min): ${[...b.entries.map((i) => list[i].id), ...b.sweeps.map((m) => `base-sweep:${m}`)].join(' ')}`);
   }
@@ -448,7 +454,7 @@ function certRun({ label, kernelFile, recipe, cert, tarballs, users, work, logs,
   const log = join(logs, `${logName}.${label}.log`);
   const args = [join(here, 'run.mjs'), '--package', recipe, ...(cert ? ['--cert', cert] : [])];
   for (const t of tarballs) args.push('--tarball', t);
-  args.push('--kernel', kernelFile, '--users', users, '--json', json);
+  args.push('--kernel', kernelFile, '--users', users, '--json', json, '--soft');
   const started = Date.now();
   const r = sh(process.execPath, args, {
     cwd: root,
@@ -469,24 +475,52 @@ function certRun({ label, kernelFile, recipe, cert, tarballs, users, work, logs,
   return { ...rep, exit: r.status, durationMs, log: relative(dirname(logs), log) };
 }
 
-function failingSpecs(rep) {
-  const failed = rep.specs.filter((s) => s.status === 'fail').map((s) => ({ spec: s.spec, text: s.error || '' }));
-  if (!rep.specs.length && rep.status === 'fail') failed.push({ spec: '(boot)', text: rep.error || '' });
-  if (rep.pageErrors?.length) failed.push({ spec: '(page errors)', text: rep.pageErrors.join('\n') });
-  return failed;
+export function failuresOf(rep) {
+  const out = [];
+  for (const sp of rep.specs) {
+    if (sp.status !== 'fail') continue;
+    for (const c of sp.cases?.fail || []) out.push({ spec: sp.spec, key: c.id, kind: 'case', text: c.message });
+    if (sp.crash) out.push({ spec: sp.spec, key: 'crash', kind: 'crash', text: sp.crash.message, signature: sp.crash.signature, where: sp.crash.where });
+    if (!sp.cases?.fail.length && !sp.crash) out.push({ spec: sp.spec, key: '(spec)', kind: 'spec', text: sp.error || '' });
+  }
+  if (!rep.specs.length && rep.status === 'fail') out.push({ spec: '(boot)', key: '(boot)', kind: 'boot', text: rep.error || '' });
+  if (rep.pageErrors?.length) out.push({ spec: '(page errors)', key: '(page errors)', kind: 'page', text: rep.pageErrors.join('\n') });
+  return out;
 }
 
-function mergeAttempts(a, b) {
-  if (!b) return a;
-  const specs = [...new Set([...a.specs, ...b.specs].map((s) => s.spec))].map((spec) => {
-    const x = a.specs.find((s) => s.spec === spec);
-    const y = b.specs.find((s) => s.spec === spec);
-    const passed = [x, y].filter((s) => s?.status === 'pass');
-    if (passed.length) return { ...passed[0], flaky: passed.length === 1 && Boolean(x && y) };
-    return y || x;
-  });
-  const status = specs.length && specs.every((s) => s.status === 'pass') && !b.pageErrors?.length ? 'pass' : 'fail';
-  return { ...b, specs, status, error: specs.length ? null : b.error || a.error, attempts: [a.log, b.log], durationMs: a.durationMs + b.durationMs };
+function lookup(rep, f) {
+  if (f.kind === 'boot') return rep.specs.length ? 'pass' : 'fail';
+  if (f.kind === 'page') return !rep.specs.length ? 'unreached' : rep.pageErrors?.length ? 'fail' : 'pass';
+  const sp = rep.specs.find((x) => x.spec === f.spec);
+  if (!sp) return 'unreached';
+  if (f.kind === 'spec') return sp.status;
+  if (f.kind === 'crash') return sp.crash ? (sp.crash.signature === f.signature ? 'fail' : 'crash') : 'pass';
+  if (sp.cases?.pass.includes(f.key)) return 'pass';
+  if (sp.cases?.fail.some((c) => c.id === f.key)) return 'fail';
+  if (sp.status === 'pass' && !sp.cases) return 'pass';
+  return sp.crash ? 'crash' : 'unreached';
+}
+
+export function stillFails(f, again) {
+  return lookup(again, f) !== 'pass';
+}
+
+function refPasses(f, ref) {
+  return lookup(ref, f) === 'pass';
+}
+
+export function compareOnReference(f, ref) {
+  const tries = [ref, ref.other].filter(Boolean);
+  const seen = tries.map((r) => lookup(r, f));
+  if (seen.includes('pass')) return { verdict: 'regression', reference: 'pass' };
+  if (seen.includes('fail')) return { verdict: 'known', reference: 'fail', why: 'fails the same way on the reference kernel' };
+  const crash = tries.map((r) => r.specs.find((x) => x.spec === f.spec)?.crash).find(Boolean);
+  if (f.kind === 'crash') {
+    return { verdict: 'regression', reference: crash ? 'crash' : 'unreached', why: crash ? `the reference crashed otherwise: ${crash.signature}` : 'the reference did not run the spec' };
+  }
+  if (crash) return { verdict: 'known', reference: 'crash', why: `the reference crashed before this case: ${crash.signature}` };
+  if (!tries.some((r) => r.specs.some((x) => x.spec === f.spec))) return { verdict: 'known', reference: 'unreached', why: 'the reference did not run the spec' };
+  return { verdict: 'regression', reference: 'unreached', why: 'not reached on the reference' };
 }
 
 function shard(args) {
@@ -523,48 +557,77 @@ function shard(args) {
         users: e.users,
         text: f.text,
       });
-      const unexplained = (rep) => failingSpecs(rep).filter((f) => !findLimit(limits, facts(f)));
+      const limitOf = (f) => findLimit(limits, facts(f));
       let cand = certRun({ ...base, label: 'candidate', kernelFile: candidateFile });
-      if (unexplained(cand).length) cand = mergeAttempts(cand, certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile }));
-      result.status = cand.status;
+      let fails = failuresOf(cand);
+      const attempts = [cand.log];
+      if (fails.some((f) => !limitOf(f))) {
+        const again = certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile });
+        attempts.push(again.log);
+        fails = fails.map((f) => (stillFails(f, again) ? f : { ...f, flaky: true }));
+      }
+      result.status = fails.some((f) => !f.flaky) ? 'fail' : 'pass';
       result.log = cand.log;
-      result.attempts = cand.attempts || [cand.log];
+      result.attempts = attempts;
       result.kernelSeen = cand.kernel;
       result.modes = cand.modes ?? null;
-      const failed = failingSpecs(cand);
       const open = [];
-      const verdicts = new Map();
-      for (const f of failed) {
-        const limit = findLimit(limits, facts(f));
-        if (limit) verdicts.set(f.spec, { verdict: 'known', limit });
+      for (const f of fails) {
+        if (f.flaky) continue;
+        const limit = limitOf(f);
+        if (limit) Object.assign(f, { verdict: 'known', limit });
         else open.push(f);
       }
       if (open.length) {
         if (sameKernel) {
-          for (const f of open) verdicts.set(f.spec, { verdict: 'known', why: 'fails on the reference kernel (the candidate is the reference)' });
+          for (const f of open) Object.assign(f, { verdict: 'known', why: 'the candidate is the reference kernel' });
         } else {
           let ref = certRun({ ...base, label: 'reference', kernelFile: referenceFile });
-          if (ref.status !== 'pass') ref = mergeAttempts(ref, certRun({ ...base, label: 'reference-retry', kernelFile: referenceFile }));
-          result.reference = { status: ref.status, log: ref.log, attempts: ref.attempts || [ref.log], specs: ref.specs, error: ref.error };
-          for (const f of open) {
-            const booted = ref.specs.length > 0;
-            const refPassed =
-              f.spec === '(boot)'
-                ? booted
-                : f.spec === '(page errors)'
-                  ? booted && !ref.pageErrors?.length
-                  : ref.specs.find((s) => s.spec === f.spec)?.status === 'pass';
-            verdicts.set(f.spec, refPassed ? { verdict: 'regression' } : { verdict: 'known', why: 'fails on the reference kernel too' });
+          const refAttempts = [ref.log];
+          if (open.some((f) => !refPasses(f, ref))) {
+            const again = certRun({ ...base, label: 'reference-retry', kernelFile: referenceFile });
+            refAttempts.push(again.log);
+            ref = { ...ref, other: again };
           }
+          result.reference = { status: ref.status, log: ref.log, attempts: refAttempts, error: ref.error || null };
+          for (const f of open) Object.assign(f, compareOnReference(f, ref));
         }
       }
+      const bySpec = new Map();
+      for (const f of fails) bySpec.set(f.spec, [...(bySpec.get(f.spec) || []), f]);
+      const worst = (list) => {
+        const vs = list.filter((f) => !f.flaky).map((f) => f.verdict);
+        return vs.includes('regression') ? 'regression' : vs.includes('known') ? 'known' : 'pass';
+      };
+      const caseRow = (f) => ({
+        id: f.key,
+        kind: f.kind,
+        message: f.text.split('\n')[0].slice(0, 300),
+        verdict: f.flaky ? 'pass' : f.verdict,
+        ...(f.flaky ? { flaky: true } : {}),
+        ...(f.why ? { why: f.why } : {}),
+        ...(f.limit ? { limit: f.limit } : {}),
+        ...(f.reference ? { reference: f.reference } : {}),
+      });
       result.specs = [
-        ...cand.specs.map((s) => ({ ...s, ...(s.status === 'pass' ? { verdict: 'pass' } : verdicts.get(s.spec) || { verdict: 'regression' }) })),
-        ...failed
-          .filter((f) => f.spec.startsWith('('))
-          .map((f) => ({ spec: f.spec, status: 'fail', error: f.text, ...verdicts.get(f.spec) })),
+        ...cand.specs.map((sp) => {
+          const list = bySpec.get(sp.spec) || [];
+          const status = list.some((f) => !f.flaky) ? 'fail' : 'pass';
+          return {
+            spec: sp.spec,
+            status,
+            verdict: worst(list),
+            durationMs: sp.durationMs,
+            assertions: (sp.cases?.pass.length || 0) + (sp.cases?.fail.length || 0),
+            ...(list.length ? { cases: list.map(caseRow), error: sp.error } : {}),
+            ...(list.length && list.every((f) => f.flaky) ? { flaky: true } : {}),
+          };
+        }),
+        ...[...bySpec.entries()]
+          .filter(([spec]) => spec.startsWith('('))
+          .map(([spec, list]) => ({ spec, status: list.some((f) => !f.flaky) ? 'fail' : 'pass', verdict: worst(list), cases: list.map(caseRow), error: list[0].text })),
       ];
-      const vs = result.specs.map((s) => s.verdict);
+      const vs = result.specs.map((sp) => sp.verdict);
       result.verdict = vs.includes('regression') ? 'regression' : vs.includes('known') ? 'known' : 'pass';
     } catch (err) {
       result.error = String(err.stack || err).slice(0, 8000);
@@ -727,7 +790,6 @@ function report(args) {
       packages.push({ id: r.id, package: r.package, recipe: r.recipe, version: r.version, sha256: r.sha256 ?? null, origin: r.origin, users: r.users, modes: r.modes ?? null, status: r.status, verdict: r.verdict, durationMs: r.durationMs, peers: r.peers, reference: r.reference ? { status: r.reference.status, log: r.reference.log } : null, error: r.error || null });
       const specs = r.specs.length ? r.specs : [{ spec: null, status: r.status, verdict: r.verdict, error: r.error }];
       for (const s of specs) {
-        const rs = r.reference?.specs?.find((x) => x.spec === s.spec);
         results.push({
           package: r.package,
           recipe: r.recipe,
@@ -739,11 +801,18 @@ function report(args) {
           verdict: s.verdict,
           durationMs: s.durationMs ?? null,
           log: r.log ? `logs/${r.log.split('/').pop()}` : null,
+          ...(s.assertions !== undefined ? { assertions: s.assertions } : {}),
           ...(s.flaky ? { flaky: true } : {}),
           ...(s.error && s.status !== 'pass' ? { error: s.error.slice(0, 2000) } : {}),
-          ...(s.limit ? { limit: { issue: s.limit.issue, why: s.limit.why, kernel: s.limit.kernel } } : {}),
-          ...(s.why ? { why: s.why } : {}),
-          ...(r.reference ? { reference: { status: rs?.status ?? r.reference.status, log: `logs/${r.reference.log.split('/').pop()}` } } : {}),
+          ...(s.cases
+            ? {
+                cases: s.cases.map((c) => ({
+                  ...c,
+                  ...(c.limit ? { limit: { issue: c.limit.issue, why: c.limit.why, kernel: c.limit.kernel } } : {}),
+                })),
+              }
+            : {}),
+          ...(r.reference ? { reference: { status: r.reference.status, log: `logs/${r.reference.log.split('/').pop()}` } } : {}),
         });
       }
     }
@@ -837,9 +906,14 @@ function report(args) {
   for (const p of packages) {
     const specRows = results.filter((r) => r.recipe === p.recipe && r.version === p.version);
     const notes = specRows
-      .filter((r) => r.verdict !== 'pass')
-      .map((r) => `${r.spec}: ${r.verdict}${r.limit ? ` (${r.limit.issue})` : r.why ? ` (${r.why})` : ''}`)
-      .concat(specRows.filter((r) => r.flaky).map((r) => `${r.spec}: flaky`))
+      .filter((r) => r.cases?.length)
+      .map((r) => {
+        const counted = {};
+        for (const c of r.cases) counted[c.flaky ? 'flaky' : c.verdict] = (counted[c.flaky ? 'flaky' : c.verdict] || 0) + 1;
+        const issues = [...new Set(r.cases.map((c) => c.limit?.issue).filter(Boolean))];
+        const bad = r.cases.filter((c) => c.verdict === 'regression').slice(0, 2).map((c) => `${c.id}: ${c.message.slice(0, 80)}`);
+        return `${r.spec}: ${Object.entries(counted).map(([v, n]) => `${n} ${v}`).join(', ')}${issues.length ? ` (${issues.join(', ')})` : ''}${bad.length ? ` [${bad.join('; ')}]` : ''}`;
+      })
       .join('; ');
     md.push(`| ${ICON[p.verdict] || ''} | ${p.recipe} | ${p.version} | ${p.users} | ${p.status} | ${p.reference?.status ?? ''} | ${secs(p.durationMs)} | ${cell(notes || p.error || '')} |`);
   }
@@ -917,7 +991,34 @@ function report(args) {
   }
 }
 
-const commands = { plan, shard, report };
+function timings(args) {
+  const out = resolve(args.out || join(here, 'timings.json'));
+  const doc = existsSync(out) ? readJson(out) : { sources: [], seconds: {} };
+  const measured = {};
+  const sources = [];
+  for (const file of String(args.compat || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+    const c = readJson(resolve(file));
+    sources.push({ run: c.run?.url || null, kernel: c.kernel.version, set: c.inputs?.set || null });
+    for (const p of c.packages || []) {
+      if (typeof p.durationMs !== 'number') continue;
+      measured[p.recipe] = Math.max(measured[p.recipe] || 0, Math.ceil(p.durationMs / 1000));
+    }
+    for (const sw of c.sweeps || []) {
+      if (typeof sw.wallMs !== 'number') continue;
+      const key = `base-sweep:${sw.mode}`;
+      measured[key] = Math.max(measured[key] || 0, Math.ceil(sw.wallMs / 1000));
+    }
+  }
+  if (!sources.length) throw new Error('--compat <compat.json>[,<compat.json>…] is required');
+  const seconds = { ...doc.seconds, ...measured };
+  writeJson(out, {
+    sources,
+    seconds: Object.fromEntries(Object.entries(seconds).sort(([a], [b]) => a.localeCompare(b))),
+  });
+  console.log(`timings: ${Object.keys(measured).length} measured, ${Object.keys(seconds).length} in ${relative(root, out)}`);
+}
+
+const commands = { plan, shard, report, timings };
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
   const fn = commands[args._[0]];

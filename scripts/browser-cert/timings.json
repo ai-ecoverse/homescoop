@@ -1,0 +1,60 @@
+{
+  "sources": [
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38573138838",
+      "kernel": "1.86.0",
+      "set": "base,ci-certified,catalog"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38586687944",
+      "kernel": "1.86.0",
+      "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38586687944",
+      "kernel": "1.81.0",
+      "set": "base,ci-certified"
+    }
+  ],
+  "seconds": {
+    "base-sweep:enforce": 70,
+    "base-sweep:report": 79,
+    "bash": 69,
+    "bzip2": 6,
+    "coreutils": 16,
+    "curl": 8,
+    "diffutils": 9,
+    "findutils": 11,
+    "gawk": 5,
+    "git": 27,
+    "grep": 4,
+    "gzip": 6,
+    "jq": 4,
+    "less": 6,
+    "mount": 6,
+    "ncurses-utils": 5,
+    "patch": 8,
+    "pkgconf": 4,
+    "poppler": 11,
+    "procps": 10,
+    "qpdf": 10,
+    "rsync": 164,
+    "screen": 56,
+    "sed": 4,
+    "tar": 21,
+    "tree": 5,
+    "uv-shim": 111,
+    "wasi-biome": 11,
+    "wasi-dig": 5,
+    "wasi-esbuild": 7,
+    "wasi-ripgrep": 8,
+    "wasi-typescript": 14,
+    "wasix-gnupg": 18,
+    "wasix-perl": 99,
+    "wasix-python": 337,
+    "wasix-ruby": 511,
+    "which": 5,
+    "xxd": 4,
+    "xz": 5
+  }
+}

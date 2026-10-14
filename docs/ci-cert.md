@@ -236,17 +236,21 @@ than one shard.
    recorded sha), resolves the candidate and the reference kernel (bios's pin
    of `@ai-ecoverse/slicc-kernel`), lists the packages and their versions,
    and reads the base-set tarballs' `slicc.commands` for the sweep. It packs
-   the work (each package about 10 s plus 4 s a spec, each sweep mode about
-   2.5 min) into `shards` jobs. `plan.json`, `candidate.tgz` and
+   the work into `shards` jobs by the seconds each package and sweep mode
+   took in earlier runs ([`timings.json`](../scripts/browser-cert/timings.json)),
+   or an estimate for what isn't there (10 s plus 4 s a spec; 2.5 min a sweep
+   mode). Refresh it from runs' artifacts with
+   `node scripts/browser-cert/compat.mjs timings --compat a/compat.json,b/compat.json`
+   (each package keeps the longest of the runs given). `plan.json`, `candidate.tgz` and
    `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
 2. **shard** (matrix, `max-parallel: 3`, on `runner`) runs its packages, then
    its sweep modes:
    - each package through `scripts/browser-cert/run.mjs --kernel
      candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
      `needs` / `needsTarballScripts` / `needsRepack` installed as `ladder-pr`
-     does. A failure is retried once (a spec that passes either time passes,
-     marked flaky); a failure no known limit covers is run again on the
-     reference kernel;
+     does, with `--soft` (below). A failed case no known limit covers is
+     retried once (one that passes the second time passes, marked flaky),
+     then the package runs again on the reference kernel;
    - the **base-set sweep**, once per users mode (`report`, `enforce`): every
      base-set tarball but the kernel in one kernel, and
      [`base-sweep/sweep.mjs`](../scripts/browser-cert/base-sweep/sweep.mjs)
@@ -264,16 +268,34 @@ than one shard.
 
 ### Verdicts
 
-- `pass`: the spec (or sweep case) passes on the candidate.
-- `known`: it fails on the candidate, and a
-  [`known-limits.json`](../scripts/browser-cert/known-limits.json) entry covers
-  it or it fails on the reference kernel too.
-- `regression`: it fails on the candidate and passes on the reference. Only
-  this fails the workflow, and so does an `error` (a shard that reported
+The unit is a **case**: one assertion of a spec, or one sweep command.
+
+- **Cases:** under kernel-compat, `run.mjs --soft` records every `ctx.assert`
+  call and goes on after a failed one, so one failure doesn't hide the next.
+  A case is named by its call site in the spec (with the spec's helpers):
+  `packages/rsync/cert/users.mjs:41<packages/rsync/cert/users.mjs:88`, plus
+  `#n` for the nth time that line runs.
+- **Crashes:** an exception that isn't an assertion (a `TypeError`, a page
+  call that never answers) ends the spec. Its signature is where it happened
+  plus the first line of the message, with numbers and URLs blanked out.
+
+The verdicts:
+
+- `pass`: the case passes on the candidate.
+- `known`: it fails on the candidate, and either
+  - a [`known-limits.json`](../scripts/browser-cert/known-limits.json) entry
+    covers it, or
+  - it fails the same way on the reference (the same case, or a crash with
+    the same signature), or
+  - the reference crashed before reaching it.
+- `regression`: anything else. That means it passes on the reference, or
+  the reference never reached it without crashing, or the candidate crashes
+  where the reference didn't (or crashes differently). Only a regression
+  fails the workflow, and so does an `error` (a shard that reported
   nothing).
 
-A spec is the unit, so a spec file that already fails on the reference hides
-a second failure in the same file; its log is in the artifact.
+A spec's verdict is its worst case. A spec with a known failure can still
+regress in another case.
 
 ### `known-limits.json`
 
@@ -330,7 +352,9 @@ keep each one to its case and range.
   verdict: pass | regression | error,
   summary: { pass, known, regression, skip, error, sweep: {…}, regressions },
   results: [{ package, recipe, version, sha256, spec, users, status: pass|fail|skip,
-              verdict, durationMs, log, flaky?, error?, limit?, reference? }],
+              verdict, durationMs, assertions, log, flaky?, error?, reference?,
+              cases?: [{ id, kind: case|crash|spec, message, verdict, reference: pass|fail|crash|unreached,
+                         why?, limit?, flaky? }] }],
   packages: [{ id, package, version, sha256, origin, users, modes, status, verdict, durationMs, peers, reference }],
   sweep: [{ users, user, command, package, recipe, version, argv, rc, expected, status, verdict, out, reference?, limit? }],
   shards: [{ shard, packages, wallMs, runner }], sweeps: [{ mode, wallMs, runner }] }
@@ -356,7 +380,8 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
 | `--users off\|report\|enforce` | overrides `meta.json`'s `users`; without either the kernel's default applies (`enforce` since 1.74, `off` before) |
 | `--tarball <tgz>` (repeatable) | the packages under test, installed in this order; the first is `ctx.npmName`. Specs see every manifest in `ctx.installed` |
 | `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
-| `--json <file>` | per-spec results: `{ kernel, users, tarballs, specs: [{ spec, status, durationMs, error }], pageErrors, status }` |
+| `--json <file>` | per-spec results: `{ kernel, users, modes, tarballs, specs: [{ spec, status, durationMs, error, cases: { pass: [id], fail: [{ id, message }] }, crash? }], pageErrors, status }` |
+| `--soft` | a failed `ctx.assert` is recorded and the spec goes on (kernel-compat); without it the first failure ends the spec, as `ladder-pr` wants |
 
 ### Runners and capacity
 
