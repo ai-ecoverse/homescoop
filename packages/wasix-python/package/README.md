@@ -18,6 +18,14 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-18:
+- `ctypes.CDLL(None)` has no `fork` (nor `_Fork`, `__wasi_proc_fork`, …):
+  python.wasm no longer exports them (homescoop#296). In 3.14.2-17 calling
+  `ctypes.CDLL(None).fork()` crashed the interpreter (a wasm trap): fork needs
+  Asyncify on every frame between it and `main`, and ctypes' frames have none.
+  `os.fork` stays absent; `subprocess`, `os.posix_spawn` and `os.system` work
+  as before.
+
 Since 3.14.2-17 (wasix-sysroot -27):
 - `os.utime(path)`, `pathlib.Path.touch()` and everything else that sets a
   file's times to "now" set them to now; up to 3.14.2-16 they set them to

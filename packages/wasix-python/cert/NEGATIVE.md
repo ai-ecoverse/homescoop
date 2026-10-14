@@ -119,3 +119,8 @@ On a kernel with the slicc-kernel#168 prototype, the first case fails:
 Exact sys.prefix/sys.executable strings for base and venv, where pip put
 requests (venv site-packages, not the user site, not the base), a console
 script and a subprocess inside the venv, and a chained user sitecustomize.
+
+## 3.14.2-18: negative 3.14.2-17 (homescoop#296)
+
+3.14.2-17 (PR #300's artifact, sha256 53318842…) on slicc-kernel 1.77.0's Node entry, 2026-10-14: `ctypes.CDLL(None).fork()` prints `fork 0 1008` once and the process dies with `python: wasm trap: unreachable` (rc 134); `round17.mjs`'s new assertion fails with `['fork', '_Fork', '_fork_internal', '__vfork_internal', '__wasi_proc_fork', '__wasi_proc_fork_env'] False True 3`. `system()` and `popen()` through ctypes work (rc 0).
+

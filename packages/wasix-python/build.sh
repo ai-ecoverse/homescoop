@@ -419,6 +419,7 @@ FEATS=(--enable-threads --enable-bulk-memory --enable-mutable-globals --enable-s
   --pass-arg=asyncify-ignore-indirect \
   "${FEATS[@]}" "$CROSS/python.wasm" -o "$B/python-async.wasm"
 "$WASM_OPT" -O3 --strip-debug --strip-producers "${FEATS[@]}" "$B/python-async.wasm" -o "$B/python.wasm"
+node "$PKG/drop-exports.mjs" "$B/python.wasm" fork _Fork _fork_internal __vfork_internal __wasi_proc_fork __wasi_proc_fork_env
 
 # --- stage ---------------------------------------------------------------------
 echo "== wasix-python: stage into package/"

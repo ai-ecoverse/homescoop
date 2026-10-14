@@ -89,6 +89,7 @@ export default async function (ctx) {
   const venvPip = await as('cone', ['iso/bin/pip', '--version']);
   assert.match(venvPip, /\/home\/cone\/iso\/lib\/python3\.14\/site-packages\/pip /, `a venv's own bin/pip: ${venvPip}`);
 
-  const fork = await py('root', 'import ctypes, os; print(hasattr(ctypes.CDLL(None), "fork"), hasattr(os, "fork"))');
-  console.log(`round17: ${times}; cpu ${cpu}; system site ${sys1}; per-user cache; pip/pip3, --user, venv pip; ctypes CDLL(None).fork present, os.fork present: ${fork}`);
+  const fork = await py('root', 'import ctypes, os; l = ctypes.CDLL(None); print([n for n in ("fork", "_Fork", "_fork_internal", "__vfork_internal", "__wasi_proc_fork", "__wasi_proc_fork_env") if hasattr(l, n)], hasattr(os, "fork"), hasattr(l, "posix_spawn"), l.system(b"exit 3") >> 8)');
+  assert.equal(fork, '[] False True 3', `no fork entry point through ctypes (homescoop#296); posix_spawn and system stay: ${fork}`);
+  console.log(`round17: ${times}; cpu ${cpu}; system site ${sys1}; per-user cache; pip/pip3, --user, venv pip; ctypes has no fork entry point, posix_spawn/system stay: ${fork}`);
 }
