@@ -43,7 +43,7 @@ jobs:
 
       - name: restore completed build
         id: cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             packages/wasi-llvm/work/prefix
@@ -58,7 +58,7 @@ jobs:
 
       - name: save completed build
         if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             packages/wasi-llvm/work/prefix
