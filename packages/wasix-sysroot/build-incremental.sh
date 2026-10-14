@@ -491,8 +491,9 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
-echo "== wasix-sysroot: -28 members (pthread_sigmask, sigpending through slicc.sigmask_set / sigpending_get)"
+echo "== wasix-sysroot: -28 members (pthread_sigmask, sigpending, sigsuspend, sigtimedwait, sigwaitinfo, sigwait, ppoll; slicc.sigmask_set / sigpending_get / sigmask_poll)"
 R28_OBJ="$WORK/r28"
+R28_DROP=(pthread_sigmask.o sigpending.o sigsuspend.o sigtimedwait.o sigwaitinfo.o sigwait.o)
 rm -rf "$R28_OBJ" && mkdir -p "$R28_OBJ/static" "$R28_OBJ/pic"
 compile_r18 sigmask "$R28_OBJ/static/sigmask.o"
 compile_r18 sigmask "$R28_OBJ/pic/sigmask.o" -fPIC -fvisibility=default
@@ -502,15 +503,18 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R28_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" pthread_sigmask.o sigpending.o)
+  (cd "$old" && "$LLVM_AR" x "$lib" "${R28_DROP[@]}")
   missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(exported "$R28_OBJ/$flavour/sigmask.o"))"
   [[ -z "$missing" ]] || { echo "homescoop: $v sigmask.o lacks: $missing" >&2; exit 1; }
-  "$LLVM_AR" d "$lib" pthread_sigmask.o sigpending.o
+  "$LLVM_AR" d "$lib" "${R28_DROP[@]}"
   "$LLVM_AR" r "$lib" "$R28_OBJ/$flavour/sigmask.o"
-  if grep -qxE 'pthread_sigmask\.o|sigpending\.o' <<<"$("$LLVM_AR" t "$lib")"; then
-    echo "homescoop: $lib still has the upstream pthread_sigmask/sigpending" >&2; exit 1
+  if grep -qxE 'pthread_sigmask\.o|sigpending\.o|sigsuspend\.o|sigtimedwait\.o|sigwaitinfo\.o|sigwait\.o' <<<"$("$LLVM_AR" t "$lib")"; then
+    echo "homescoop: $lib still has the upstream signal-mask members" >&2; exit 1
   fi
-  grep -q __slicc_sigmask_set <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigmask_set" >&2; exit 1; }
+  for imp in __slicc_sigmask_set __slicc_sigmask_poll; do
+    grep -q "$imp" <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks $imp" >&2; exit 1; }
+  done
+  grep -q " T ppoll$" <<<"$("$LLVM_NM" "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks ppoll" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
 
