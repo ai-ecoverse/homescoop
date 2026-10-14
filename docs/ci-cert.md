@@ -150,7 +150,8 @@ jobs:
 | `set` | `base,ci-certified` | comma-separated: `base` and `catalog` (slicc-bios's base set and optional catalog, at the versions bios pins), `ci-certified` ([`scripts/ci-certified.json`](../scripts/ci-certified.json)), `all` (every recipe with `cert/*.mjs`), or recipe / npm names, `name[@version]` |
 | `homescoop-ref` | `main` | the homescoop commit whose specs and scripts run |
 | `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
-| `runner` | `''` | `runs-on` for the shards and the sweep: `inputs.runner \|\| vars.CERT_RUNNER \|\| 'ubuntu-latest'` |
+| `runner` | `''` | `runs-on` for the shards: `inputs.runner \|\| vars.CERT_RUNNER`, **only for a same-repo PR or a trusted run on main** (see [Runners](#runners-and-capacity)), else `ubuntu-latest` |
+| `light-runner` | `''` | `runs-on` for plan and report: `inputs.light-runner \|\| vars.CERT_LIGHT_RUNNER`, under the same rule, else `ubuntu-latest` |
 | `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, at most 3) or `1`–`3` |
 | `fail-on-regression` | `true` | `false` reports regressions without failing |
 | `expect-regressions` | `''` | a negative proof: recipes that must regress, in their spec and in the base sweep. The report fails if one doesn't; other regressions are listed but don't fail it |
@@ -211,10 +212,11 @@ jobs:
   reports the verdict; drop it (or make the check required) once it is
   stable.
 - **Where it runs:** in the caller's run, on the caller's runners and
-  minutes. `runs-on` is `inputs.runner || vars.CERT_RUNNER ||
-  'ubuntu-latest'`, with the caller's `CERT_RUNNER`. The called workflow asks
-  only for `contents: read`; homescoop and slicc-bios are public, so the
-  caller's token reads them.
+  minutes, with the caller's `CERT_RUNNER` / `CERT_LIGHT_RUNNER`. A pool
+  runner is used only for a same-repo PR or a trusted run on main (below);
+  a fork PR always gets `ubuntu-latest`. The called
+  workflow asks only for `contents: read`; homescoop and slicc-bios are
+  public, so the caller's token reads them.
 - **Concurrency:** the called workflow has its own group per caller repo,
   PR (or ref), kernel, set and bios-ref, and a newer PR run cancels the
   older one. Don't give the caller's own `concurrency` the same group name.
@@ -236,17 +238,21 @@ than one shard.
    recorded sha), resolves the candidate and the reference kernel (bios's pin
    of `@ai-ecoverse/slicc-kernel`), lists the packages and their versions,
    and reads the base-set tarballs' `slicc.commands` for the sweep. It packs
-   the work (each package about 10 s plus 4 s a spec, each sweep mode about
-   2.5 min) into `shards` jobs. `plan.json`, `candidate.tgz` and
+   the work into `shards` jobs by the seconds each package and sweep mode
+   took in earlier runs ([`timings.json`](../scripts/browser-cert/timings.json)),
+   or an estimate for what isn't there (10 s plus 4 s a spec; 2.5 min a sweep
+   mode). Refresh it from runs' artifacts with
+   `node scripts/browser-cert/compat.mjs timings --compat a/compat.json,b/compat.json`
+   (each package keeps the longest of the runs given). `plan.json`, `candidate.tgz` and
    `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
-2. **shard** (matrix, `max-parallel: 3`, on `runner`) runs its packages, then
+2. **shard** (matrix, `max-parallel: 3`, on `runner` where allowed) runs its packages, then
    its sweep modes:
    - each package through `scripts/browser-cert/run.mjs --kernel
      candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
      `needs` / `needsTarballScripts` / `needsRepack` installed as `ladder-pr`
-     does. A failure is retried once (a spec that passes either time passes,
-     marked flaky); a failure no known limit covers is run again on the
-     reference kernel;
+     does, with `--soft` (below). A failed case no known limit covers is
+     retried once (one that passes the second time passes, marked flaky),
+     then the package runs again on the reference kernel;
    - the **base-set sweep**, once per users mode (`report`, `enforce`): every
      base-set tarball but the kernel in one kernel, and
      [`base-sweep/sweep.mjs`](../scripts/browser-cert/base-sweep/sweep.mjs)
@@ -264,16 +270,34 @@ than one shard.
 
 ### Verdicts
 
-- `pass`: the spec (or sweep case) passes on the candidate.
-- `known`: it fails on the candidate, and a
-  [`known-limits.json`](../scripts/browser-cert/known-limits.json) entry covers
-  it or it fails on the reference kernel too.
-- `regression`: it fails on the candidate and passes on the reference. Only
-  this fails the workflow, and so does an `error` (a shard that reported
+The unit is a **case**: one assertion of a spec, or one sweep command.
+
+- **Cases:** under kernel-compat, `run.mjs --soft` records every `ctx.assert`
+  call and goes on after a failed one, so one failure doesn't hide the next.
+  A case is named by its call site in the spec (with the spec's helpers):
+  `packages/rsync/cert/users.mjs:41<packages/rsync/cert/users.mjs:88`, plus
+  `#n` for the nth time that line runs.
+- **Crashes:** an exception that isn't an assertion (a `TypeError`, a page
+  call that never answers) ends the spec. Its signature is where it happened
+  plus the first line of the message, with numbers and URLs blanked out.
+
+The verdicts:
+
+- `pass`: the case passes on the candidate.
+- `known`: it fails on the candidate, and either
+  - a [`known-limits.json`](../scripts/browser-cert/known-limits.json) entry
+    covers it, or
+  - it fails the same way on the reference (the same case, or a crash with
+    the same signature), or
+  - the reference crashed before reaching it.
+- `regression`: anything else. That means it passes on the reference, or
+  the reference never reached it without crashing, or the candidate crashes
+  where the reference didn't (or crashes differently). Only a regression
+  fails the workflow, and so does an `error` (a shard that reported
   nothing).
 
-A spec is the unit, so a spec file that already fails on the reference hides
-a second failure in the same file; its log is in the artifact.
+A spec's verdict is its worst case. A spec with a known failure can still
+regress in another case.
 
 ### `known-limits.json`
 
@@ -330,7 +354,9 @@ keep each one to its case and range.
   verdict: pass | regression | error,
   summary: { pass, known, regression, skip, error, sweep: {…}, regressions },
   results: [{ package, recipe, version, sha256, spec, users, status: pass|fail|skip,
-              verdict, durationMs, log, flaky?, error?, limit?, reference? }],
+              verdict, durationMs, assertions, log, flaky?, error?, reference?,
+              cases?: [{ id, kind: case|crash|spec, message, verdict, reference: pass|fail|crash|unreached,
+                         why?, limit?, flaky? }] }],
   packages: [{ id, package, version, sha256, origin, users, modes, status, verdict, durationMs, peers, reference }],
   sweep: [{ users, user, command, package, recipe, version, argv, rc, expected, status, verdict, out, reference?, limit? }],
   shards: [{ shard, packages, wallMs, runner }], sweeps: [{ mode, wallMs, runner }] }
@@ -356,7 +382,8 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
 | `--users off\|report\|enforce` | overrides `meta.json`'s `users`; without either the kernel's default applies (`enforce` since 1.74, `off` before) |
 | `--tarball <tgz>` (repeatable) | the packages under test, installed in this order; the first is `ctx.npmName`. Specs see every manifest in `ctx.installed` |
 | `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
-| `--json <file>` | per-spec results: `{ kernel, users, tarballs, specs: [{ spec, status, durationMs, error }], pageErrors, status }` |
+| `--json <file>` | per-spec results: `{ kernel, users, modes, tarballs, specs: [{ spec, status, durationMs, error, cases: { pass: [id], fail: [{ id, message }] }, crash? }], pageErrors, status }` |
+| `--soft` | a failed `ctx.assert` is recorded and the spec goes on (kernel-compat); without it the first failure ends the spec, as `ladder-pr` wants |
 
 ### Runners and capacity
 
@@ -368,10 +395,31 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
   bios-ref; a PR caller's newer run cancels the older one.
 - One call is at most 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
   `base,ci-certified` call is a plan job and one shard job.
-- Set `CERT_RUNNER` to `cloud-run-bench` (the org's Cloud Run pool) to move
-  the heavy jobs off GitHub-hosted runners without a code change; plan and
-  report stay on `ubuntu-latest`. Shards are short and re-runnable ("Re-run
-  failed jobs" uploads with `overwrite`).
+- **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
+  `cloud-run-bench`) can reach the GCP metadata server and the pool's
+  service-account token. `runner` / `CERT_RUNNER` (shards) and
+  `light-runner` / `CERT_LIGHT_RUNNER` (plan, report) are used only for:
+  - a `pull_request` from a branch of the calling repo (`head.repo` is
+    `github.repository`): our agents' branches and Renovate. This includes
+    this repo's proof and slicc-kernel's PR calls; or
+  - `schedule`, `workflow_dispatch`, `workflow_run` or `release` on
+    `refs/heads/main` (the caller's ref, for a call), with `homescoop-ref`
+    and `bios-ref` `main` and `kernel` a published
+    `@ai-ecoverse/slicc-kernel@<version>` (no artifact, no git or file spec).
+
+  Anything else runs on `ubuntu-latest`, whatever `runner` says: fork PRs,
+  `pull_request_target`, `merge_group`, dispatches from another ref or with
+  a branch or sha as `homescoop-ref` / `bios-ref`. The plan job logs which.
+  The org requires approval before an outside contributor's workflow runs,
+  and agents never approve one.
+  `compat.mjs plan` also takes only registry versions and dist-tags for the
+  kernel and for `name@version` in `set`, so `npm pack` never fetches a git
+  or file spec.
+  The check lives in the workflow file, so a fork PR could change it in its
+  own copy. That is why the org's approval of outside contributors' runs is
+  the backstop.
+- Shards are short and re-runnable ("Re-run failed jobs" uploads with
+  `overwrite`).
 - Nothing here publishes: `ladder-merge` dispatches `ladder-build` only for
   pushes to `packages/**`, and these files live under `scripts/` and
   `.github/workflows/`.

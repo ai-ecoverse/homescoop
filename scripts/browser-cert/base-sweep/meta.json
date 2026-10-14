@@ -113,6 +113,18 @@
         "true"
       ]
     },
+    "pbcopy": {
+      "argv": [
+        "pbcopy",
+        "--help"
+      ]
+    },
+    "pbpaste": {
+      "argv": [
+        "pbpaste",
+        "--help"
+      ]
+    },
     "pgrep": {
       "sh": "sleep 5 & p=$!; pgrep -x sleep >/dev/null; r=$?; kill $p; exit $r"
     },
@@ -193,6 +205,30 @@
       "argv": [
         "which",
         "bash"
+      ]
+    },
+    "wl-copy": {
+      "argv": [
+        "wl-copy",
+        "--help"
+      ]
+    },
+    "wl-paste": {
+      "argv": [
+        "wl-paste",
+        "--help"
+      ]
+    },
+    "xclip": {
+      "argv": [
+        "xclip",
+        "-help"
+      ]
+    },
+    "xsel": {
+      "argv": [
+        "xsel",
+        "--help"
       ]
     },
     "yes": {

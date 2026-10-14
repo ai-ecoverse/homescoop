@@ -9,6 +9,7 @@ on:
       - 'scripts/browser-cert/known-limits.json'
       - 'scripts/browser-cert/base-sweep/**'
       - 'scripts/browser-cert/run.mjs'
+      - 'scripts/browser-cert/cases.mjs'
       - 'scripts/browser-cert/context.mjs'
       - 'scripts/browser-cert/page/**'
 
