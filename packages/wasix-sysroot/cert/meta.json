@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.77.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.88.0",
   "slicc_fs": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -35,6 +35,7 @@
     "-28 waits (run-modes.mjs --probe r28w, all five variants; R28_KERNEL_MASK=1 needs slicc.sigmask_poll): pselect with a pending blocked signal is EINTR at once with the handler run and the mask restored; sigsuspend wakes on a signal; gpg-agent's pselect(sigmask) gets HUP and TERM and ssh's ppoll(osigset) INT within 3 s of a 10 s wait; ppoll reports a ready pipe; sigtimedwait/sigwaitinfo/sigwait are ENOSYS"
   ],
   "extra_kernels": [
+    "@ai-ecoverse/slicc-kernel@1.77.0 (before slicc-kernel#513: no kernel masks; r28 and r28w pass their no-mask branches, signals delivered at once as up to -27)",
     "@ai-ecoverse/slicc-kernel@1.69.0 (before slicc-kernel#404: r26 fails only its fstatat/openat/mkdirat dirfd forms, which are the kernel's)",
     "@ai-ecoverse/slicc-kernel@1.61.0 (no slicc_fs.path_access: r25 with --allow-absent gives the stat-based check, all permissive)",
     "@ai-ecoverse/slicc-kernel@1.57.0 (no slicc_fs owner imports: r24 with --allow-absent gives -23 behaviour; modes, r20, r22, r23 pass)",

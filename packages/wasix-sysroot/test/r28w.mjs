@@ -5,6 +5,7 @@ const KERNEL = [
   'sigsuspend: -1 EINTR handler=1 fast still_blocked=1',
   'agent HUP: -1 EINTR handler=1 fast',
   'agent TERM: -1 EINTR handler=1 fast',
+  'agent rounds: 8/8',
   'ssh INT: -1 EINTR handler=1 fast still_blocked=1',
   'ppoll ready: 1 revents=IN',
 ];

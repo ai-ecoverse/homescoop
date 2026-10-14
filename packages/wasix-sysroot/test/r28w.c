@@ -84,7 +84,9 @@ int main(void) {
   struct timespec sec = {1, 0};
   double t0 = now();
   int r = pselect(0, NULL, NULL, NULL, &sec, &none);
-  printf("pselect pending: %s handler=%d %s still_blocked=%d\n", err(r), got[SIGUSR2], fast(now() - t0, 0.5), blocked(SIGUSR2));
+  int h = got[SIGUSR2];
+  double dt = now() - t0;
+  printf("pselect pending: %s handler=%d %s still_blocked=%d\n", err(r), h, fast(dt, 0.5), blocked(SIGUSR2));
   sigprocmask(SIG_SETMASK, &none, NULL);
 
   sigemptyset(&one);
@@ -93,7 +95,9 @@ int main(void) {
   pid_t p = later(SIGUSR1, 200);
   t0 = now();
   r = sigsuspend(&none);
-  printf("sigsuspend: %s handler=%d %s still_blocked=%d\n", err(r), got[SIGUSR1], fast(now() - t0, 3), blocked(SIGUSR1));
+  h = got[SIGUSR1];
+  dt = now() - t0;
+  printf("sigsuspend: %s handler=%d %s still_blocked=%d\n", err(r), h, fast(dt, 3), blocked(SIGUSR1));
   reap(p);
   sigprocmask(SIG_SETMASK, &none, NULL);
 
@@ -113,16 +117,39 @@ int main(void) {
     struct timespec ten = {10, 0};
     t0 = now();
     r = pselect(fds[0] + 1, &rd, NULL, NULL, &ten, &old);
-    printf("agent %s: %s handler=%d %s\n", k == 0 ? "HUP" : "TERM", err(r), got[sig], fast(now() - t0, 3));
+    h = got[sig];
+    dt = now() - t0;
+    printf("agent %s: %s handler=%d %s\n", k == 0 ? "HUP" : "TERM", err(r), h, fast(dt, 3));
     reap(p);
   }
+
+  int delays[] = {5, 20, 50, 90, 140, 200, 260, 10};
+  int rounds = 0, ran = 0;
+  for (unsigned k = 0; k < sizeof delays / sizeof delays[0]; k++) {
+    int before = got[SIGUSR1];
+    sigaddset(&all, SIGUSR1);
+    sigprocmask(SIG_BLOCK, &all, NULL);
+    p = later(SIGUSR1, delays[k]);
+    fd_set rd;
+    FD_ZERO(&rd);
+    FD_SET(fds[0], &rd);
+    struct timespec two = {2, 0};
+    r = pselect(fds[0] + 1, &rd, NULL, NULL, &two, &old);
+    h = got[SIGUSR1];
+    rounds++;
+    if (r < 0 && errno == EINTR && h == before + 1) ran++;
+    reap(p);
+  }
+  printf("agent rounds: %d/%d\n", ran, rounds);
 
   p = later(SIGINT, 200);
   struct pollfd pf = {.fd = fds[0], .events = POLLIN};
   struct timespec ten = {10, 0};
   t0 = now();
   r = ppoll(&pf, 1, &ten, &old);
-  printf("ssh INT: %s handler=%d %s still_blocked=%d\n", err(r), got[SIGINT], fast(now() - t0, 3), blocked(SIGINT));
+  h = got[SIGINT];
+  dt = now() - t0;
+  printf("ssh INT: %s handler=%d %s still_blocked=%d\n", err(r), h, fast(dt, 3), blocked(SIGINT));
   reap(p);
   write(fds[1], "x", 1);
   r = ppoll(&pf, 1, &ten, &old);
