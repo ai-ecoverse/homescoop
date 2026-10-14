@@ -5,7 +5,9 @@
  * and materialize tickets (KS-8); see meta.json certPending.
  */
 const AGE_RECIPIENT = 'age106n8yr50p0cgudkw03ad2e92nk4fas5m8utmw0t4lm0dlc6pqg4scqmaup';
-const MISSING = 'not running in seven: /dev/sealed is missing';
+// No vault: older kernels have no /dev/sealed; from 1.68.0 the device is
+// there and answers ENOTCONN without the embedder's sealed hook.
+const NO_VAULT = /not running in seven: \/dev\/sealed is missing|ENOTCONN: no vault is connected/;
 const REFUSED = 'not available in seven: the value would be in a program (use a header rule)';
 const AGE = "age secrets aren't supported in seven yet (slicc-vault#2)";
 const flat = (s) => s.replace(/[\s│|]+/g, ' ');
@@ -60,7 +62,7 @@ export default async function (ctx) {
 
   const piped = await fnox(['set', 'NEW_TOKEN'], { stdin: 'throwaway-123\n' });
   assert.notEqual(piped.status, 0);
-  assert.ok(flat(piped.stderr).includes(MISSING), `set without the device: ${piped.stderr}`);
+  assert.match(flat(piped.stderr), NO_VAULT, `set without the device: ${piped.stderr}`);
   const argv = await fnox(['set', 'NEW_TOKEN', 'throwaway-123']);
   assert.notEqual(argv.status, 0);
   assert.match(flat(argv.stderr), /a value on the command line is visible to other processes/);
@@ -85,15 +87,15 @@ export default async function (ctx) {
 
   const check = await fnox(['check', '--all']);
   assert.notEqual(check.status, 0);
-  assert.ok(flat(check.stdout + check.stderr).includes(MISSING), `check --all: ${check.stdout}`);
+  assert.match(flat(check.stdout + check.stderr), NO_VAULT, `check --all: ${check.stdout}`);
 
   const exec = await fnox(['exec', '--', 'printenv', 'GH']);
   assert.notEqual(exec.status, 0);
-  assert.ok(flat(exec.stderr).includes(MISSING), `exec without the device: ${exec.stderr}`);
+  assert.match(flat(exec.stderr), NO_VAULT, `exec without the device: ${exec.stderr}`);
 
   const shell = await fnox(['exec', '--shell-grants', '--', 'printenv', 'HOME']);
   assert.notEqual(shell.status, 0);
-  assert.ok(flat(shell.stderr).includes(MISSING), `exec --shell-grants without the device: ${shell.stderr}`);
+  assert.match(flat(shell.stderr), NO_VAULT, `exec --shell-grants without the device: ${shell.stderr}`);
 
   const rules = await fnox(['proxy', 'rules', '--json']);
   assert.equal(rules.status, 0, `proxy rules --json: ${rules.stderr}`);
