@@ -1,8 +1,8 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
 # Upstream is jdx/fnox v1.39.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
-# in-kernel integration needs. CERT-PENDING: the cert needs slicc-kernel's
-# materialize tickets (KS-8); /dev/sealed (KS-2) is in 1.68.0.
+# in-kernel integration needs. CERT-PENDING: tested on slicc-kernel 1.83.0
+# (/dev/sealed and exec tickets); the cert waits for #503's release.
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
@@ -55,4 +55,4 @@ about:
     with RUSTFLAGS --cfg tokio_unstable, then wasm-opt -Oz (binaryen
     133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. New package → human cert,
-    pending KS-8.
+    pending slicc-kernel #503's release.

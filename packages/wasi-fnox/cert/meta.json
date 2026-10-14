@@ -1,14 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.64.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.83.0",
   "needs": [
     "@ai-ecoverse/wasm-coreutils"
   ],
   "source": "jdx/fnox v1.39.0 + packages/wasi-fnox/NNNN-*.patch (apply.sh); each patch maps to cert cases below",
   "certPending": [
-    "KS-2 is released in slicc-kernel 1.68.0 (not certified yet: next kernel delta cert); test/sealed.mjs runs against it with a vault double",
-    "KS-8: materialize tickets checked at exec (path, sha256 of argv, cwd, parent pid; one-shot, 30 s)",
-    "a vault behind the device (or the kernel's test double) answering the §3.7 ops"
+    "slicc-kernel 1.83.0 has KS-2 (/dev/sealed) and KS-8 (exec tickets); the cert waits for #503's release (protect layer 2's fix)",
+    "the root-owned /etc/fnox/config.toml + sudo case needs users 'enforce' in a seven-like setup (bios K4 branch #355)"
   ],
   "checklist": [
     "fnox --version → fnox 1.39.0; --help lists exec/get/set/proxy and no daemon, tui, mcp; provider add --help offers sealed",
@@ -24,11 +23,11 @@
     "test/sealed.mjs (KS-2, vault double): set from a pipe → seal {name, value} → placeholder stored, value not in fnox.toml, stdout, stderr or /proc/<pid>/cmdline",
     "test/sealed.mjs (KS-2, vault double): set on a terminal → request {kind: value} → status polled → placeholder stored; ^C sends cancel and exits 130; ^C during a 10 s machine wait cancels after the reply",
     "test/sealed.mjs (KS-2, vault double): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
-    "PENDING (KS-2 + KS-8): exec -- printenv with a sealed secret → materialize {names, path, argv (argv[0] = resolved path), cwd} → SLICC_SEALED_TICKET → the child sees the value for real:true names and the placeholder for real:false ones; fnox's own stdout/stderr never carry the value",
-    "PENDING (KS-8, exposure): what the child and its environment expose: /proc/<child>/cmdline and status, the child's own children (inherited env), ps as another user, a reused or mismatched ticket (argv, cwd, path, parent) failing closed with EACCES",
+    "test/sealed.mjs case 11 (KS-8): exec under an { argv } grant → materialize {names, path /usr/bin/bash, argv (argv[0] = path), cwd}, no interpreter claim → consume stamped by the child (ppid = the asker) → the child holds the value (sha256), real:false names keep placeholders, the child's echo is scrubbed back to the placeholder, no value on stdout/stderr; a file the child writes holds the value (documented residual)",
+    "test/sealed.mjs cases 12–13 (KS-8, exposure): the child's /proc cmdline has no value; no /proc/<pid>/environ; its own children inherit the value with output still scrubbed; another user (users 'enforce') can't see the process in /proc; a used or forged SLICC_SEALED_TICKET fails the exec with 126 and reveals nothing",
     "PENDING (users enforce in a seven-like setup: bios K4 branch #355; sudo and tags are in slicc-kernel 1.66.0): /etc/fnox/config.toml root-owned 0644: a non-root user reads and resolves it, fnox set or edit fails with EACCES, sudo succeeds",
-    "PENDING (KS-2 + KS-8): exec --shell-grants -- /bin/bash -c CMD → materialize {shellGrants: true, path, argv, cwd} (no names) → each granted name set to its placeholder (from the config or `placeholder {name}`) → the child bash sees the real value; the config's other sealed secrets keep placeholders",
-    "PENDING (KS-8, interpreter chain): fnox never claims `interpreter`; an npm-style `#!/usr/bin/env node` script (chain reported as the resolved node) gets real values under an `[exec] { argv }` rule when the kernel reports it trusted (root-owned, non-writable script, chain and parents), is refused when untrusted, and is refused under `[exec] = true`; `#!/usr/bin/env` with options or assignments stays refused"
+    "test/sealed.mjs case 14 (KS-8): exec --shell-grants -- /bin/bash -c CMD → materialize {shellGrants: true, path, argv, cwd} with no names → the shell = true secret's placeholder via `placeholder {name}` → real in the bash; the config's own sealed secrets keep placeholders; output scrubbed",
+    "test/sealed.mjs case 15 (KS-8, interpreter chain): fnox never claims `interpreter`; an npm-style `#!/usr/bin/env bash` script is reported as /usr/bin/bash; under an { argv } grant it gets the value when trusted (root-owned, 0755, root-owned dirs), is refused when untrusted (world-writable dir), and is refused under exec = true"
   ],
   "patches": {
     "0001-build-gate-non-WASI-dependencies-by-target.patch": "the build: wasm32-wasip1 links at all (no cloud SDKs, reqwest, keyring, TUI)",
@@ -38,15 +37,19 @@
     "0005-wasi-spawn-fnox-exec-children-through-wasix-command.patch": "plain exec: the child runs and gets the value",
     "0006-providers-add-the-sealed-provider-for-seven-s-vault.patch": "get/export print the stored placeholder; the missing-device error; test/sealed.mjs: seal, rotation, placeholder {name}, the caller stamp; provider add --help offers sealed",
     "0007-set-seal-piped-values-and-ask-seven-s-vault-on-a-ter.patch": "set refuses argv values and --key-name; test/sealed.mjs: seal from a pipe, request/status/cancel on a terminal, EAGAIN",
-    "0008-exec-let-seven-s-kernel-hand-sealed-values-to-the-co.patch": "exec with a sealed secret needs the device; missing command → 127; plain warning; test/sealed.mjs: the materialize request (values: PENDING KS-8)",
+    "0008-exec-let-seven-s-kernel-hand-sealed-values-to-the-co.patch": "exec with a sealed secret needs the device; missing command → 127; plain warning; test/sealed.mjs cases 9, 11–13, 15: materialize, the values in the child, exposure, failed tickets, interpreter chain",
     "0009-proxy-rules-json-and-proxy-run-with-placeholders-on-.patch": "proxy rules --json; proxy run gives the placeholder and scrubs the secret's name",
     "0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch": "sync/reencrypt refused; age get fails with slicc-vault#2; test/sealed.mjs: check --all on inert, removed, rotated and missing records",
     "0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch": "lint-only: the WASI build has no warnings (no runtime case)",
-    "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs: materialize {shellGrants} with no names (values: PENDING KS-8)",
-    "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal"
+    "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs cases 9 and 14 (NEGATIVE.md: without 0012, case 9 fails)",
+    "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs cases 6–8: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal (NEGATIVE.md: without 0013, case 6 fails)"
   },
-  "sealedKernel": "@ai-ecoverse/slicc-kernel@1.68.0",
+  "sealedKernel": "@ai-ecoverse/slicc-kernel@1.83.0",
   "ci": [
     "node packages/wasi-fnox/test/sealed.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "sealedNeeds": [
+    "@ai-ecoverse/wasm-bash@5.3.0-18",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5"
   ]
 }
