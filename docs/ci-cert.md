@@ -151,7 +151,7 @@ jobs:
 | `homescoop-ref` | `main` | the homescoop commit whose specs and scripts run |
 | `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
 | `runner` | `''` | `runs-on` for the shards: `inputs.runner \|\| vars.CERT_RUNNER`, **only for a same-repo PR or a trusted run on main** (see [Runners](#runners-and-capacity)), else `ubuntu-latest` |
-| `light-runner` | `''` | `runs-on` for plan and report: `inputs.light-runner \|\| vars.CERT_LIGHT_RUNNER`, under the same rule, else `ubuntu-latest` |
+| `light-runner` | `''` | `runs-on` for plan and report: `inputs.light-runner \|\| vars.CERT_LIGHT_RUNNER`, else the shards' runner, under the same rule, else `ubuntu-latest` |
 | `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, at most 3) or `1`–`3` |
 | `fail-on-regression` | `true` | `false` reports regressions without failing |
 | `expect-regressions` | `''` | a negative proof: recipes that must regress, in their spec and in the base sweep. The report fails if one doesn't; other regressions are listed but don't fail it |
@@ -374,6 +374,16 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
 `kernel.chmod` and keep the defaults. `--json` and `compat.json` say which
 (`modes: tarball` or `kernel defaults`).
 
+**The owner gap:** only modes are stamped, not owners. bios's installer
+writes its files before the first boot and stamps them with `writeMetadata`
+(`@ai-ecoverse/slicc-kernel/meta`), which can also set `uid` and `gid`. The
+harness writes after boot, so its files carry no owner record and get the
+kernel's defaults. A spec whose result depends on an installed file's owner
+under `enforce` may differ from bios; bios's integration tests and P3's
+canary are the authority there. Closing the gap means writing the packages
+before boot and stamping modes and owners with `writeMetadata`, which
+changes the boot order for every cert.
+
 ### `run.mjs` flags
 
 | Flag | Meaning |
@@ -418,6 +428,16 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
   The check lives in the workflow file, so a fork PR could change it in its
   own copy. That is why the org's approval of outside contributors' runs is
   the backstop.
+- Plan and report use `light-runner` / `CERT_LIGHT_RUNNER`, else the shards'
+  runner. On the pool a job gets a machine within about a minute, where
+  `ubuntu-latest` can queue for 15–40.
+- **No root on the pool.** Its machines run with "no new privileges", so
+  `sudo` cannot become root. The Chromium step installs the system libraries
+  (`playwright-core install --with-deps`) only where `sudo -n true` works and
+  the runner isn't `cloud-run-*`; the runner-bench image already has
+  Chrome's libraries and fonts, so there it installs the browser only.
+  Nothing else in kernel-compat needs root: users exist only inside the
+  kernel.
 - Shards are short and re-runnable ("Re-run failed jobs" uploads with
   `overwrite`).
 - Nothing here publishes: `ladder-merge` dispatches `ladder-build` only for
