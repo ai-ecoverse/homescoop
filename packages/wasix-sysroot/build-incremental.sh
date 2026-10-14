@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-27 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-28 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -488,6 +488,29 @@ for v in "${VARIANTS[@]}"; do
   if grep -qxE 'utimensat\.o|futimens\.o|clock\.o|times\.o|getrusage\.o' <<<"$members"; then
     echo "homescoop: $lib still has the upstream time members" >&2; exit 1
   fi
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -28 members (pthread_sigmask, sigpending through slicc.sigmask_set / sigpending_get)"
+R28_OBJ="$WORK/r28"
+rm -rf "$R28_OBJ" && mkdir -p "$R28_OBJ/static" "$R28_OBJ/pic"
+compile_r18 sigmask "$R28_OBJ/static/sigmask.o"
+compile_r18 sigmask "$R28_OBJ/pic/sigmask.o" -fPIC -fvisibility=default
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R28_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" pthread_sigmask.o sigpending.o)
+  missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(exported "$R28_OBJ/$flavour/sigmask.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v sigmask.o lacks: $missing" >&2; exit 1; }
+  "$LLVM_AR" d "$lib" pthread_sigmask.o sigpending.o
+  "$LLVM_AR" r "$lib" "$R28_OBJ/$flavour/sigmask.o"
+  if grep -qxE 'pthread_sigmask\.o|sigpending\.o' <<<"$("$LLVM_AR" t "$lib")"; then
+    echo "homescoop: $lib still has the upstream pthread_sigmask/sigpending" >&2; exit 1
+  fi
+  grep -q __slicc_sigmask_set <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigmask_set" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
 
