@@ -70,7 +70,7 @@ jobs:
         with:
           name: buf-wasm-1
           path: packages/wasi-buf/package
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: 1.27.1
           cache: false
