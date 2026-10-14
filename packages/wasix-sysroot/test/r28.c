@@ -20,8 +20,11 @@ static void on_usr1(int sig) {
   if (in_thread) usr1_in_thread++;
 }
 
+static char bufs[8][128];
+static unsigned next_buf;
+
 static const char *names(const sigset_t *s) {
-  static char buf[128];
+  char *buf = bufs[next_buf++ % 8];
   buf[0] = 0;
   const int sigs[] = {SIGHUP, SIGINT, SIGKILL, SIGUSR1, SIGUSR2, SIGTERM, SIGSTOP};
   const char *n[] = {"HUP", "INT", "KILL", "USR1", "USR2", "TERM", "STOP"};
@@ -35,18 +38,18 @@ static const char *names(const sigset_t *s) {
 }
 
 static const char *mask(void) {
-  static sigset_t cur;
+  sigset_t cur;
   sigemptyset(&cur);
   if (sigprocmask(SIG_BLOCK, NULL, &cur) != 0) return "error";
   return names(&cur);
 }
 
 static const char *pending(void) {
-  static sigset_t p;
+  sigset_t p;
   sigemptyset(&p);
   if (sigpending(&p) != 0) {
-    static char e[64];
-    snprintf(e, sizeof e, "-1 %s", strerror(errno));
+    char *e = bufs[next_buf++ % 8];
+    snprintf(e, 128, "-1 %s", strerror(errno));
     return e;
   }
   return names(&p);
@@ -127,7 +130,7 @@ int main(int argc, char **argv) {
   sigemptyset(&s);
   sigprocmask(SIG_SETMASK, &s, &old);
   printf("cleared: old=%s now=%s\n", names(&old), mask());
-  printf("bad how: %d\n", pthread_sigmask(7, &s, NULL));
+  printf("bad how: %s\n", strerror(pthread_sigmask(7, &s, NULL)));
 
   usr1 = 0;
   pthread_t t;

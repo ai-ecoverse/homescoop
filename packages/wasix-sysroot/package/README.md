@@ -41,6 +41,16 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-28 signal masks work. `sigprocmask` and `pthread_sigmask`
+hand the thread's mask to slicc-kernel (`slicc.sigmask_set`), which holds a
+blocked signal as pending and delivers it when it is unblocked, before the
+call returns; `sigpending` reports the pending set (`slicc.sigpending_get`).
+`SIGKILL` and `SIGSTOP` cannot be blocked. Up to -27 `pthread_sigmask` did
+nothing (it did not even fill in the old mask), so a blocked signal was
+delivered at once, and `sigpending` failed. On a slicc-kernel without these
+imports the libc keeps the mask itself: masks read back right, but a blocked
+signal is still delivered at once and nothing is ever pending.
+
 Since 2025.9.30-27 setting file times works for every form (homescoop#294).
 Up to -26, `utimensat(…, NULL)`, `futimens(fd, NULL)`, `utimes(p, NULL)` and
 `utime(p, NULL)`, which mean "now", set the times to 0 (1970) in static

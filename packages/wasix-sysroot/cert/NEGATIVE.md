@@ -1,5 +1,18 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-27: sigprocmask keeps no mask, sigpending fails (-28, slicc-kernel #460)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-27.tgz --probe r28 --kernel-dir <slicc-kernel 1.77.0>`, 2026-10-14: FAIL. WASIX's `pthread_sigmask` returned 0 without storing the mask or writing `*old`; `sigpending` returned EINVAL as its result (not -1 with errno), and the bad-`how` check was missing:
+
+```text
+start: mask=- pending=-1 Success
+blocked: usr1=1 pending=-1 Success mask=-
+kill/stop: mask=-
+old: - now=-
+bad how: Success
+child: mask=-
+```
+
 ## 2025.9.30-26: utimensat(NULL) sets the times to 1970; CPU times are the wall clock (-27, homescoop#294)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-26.tgz --probe r27 --kernel-dir <slicc-kernel 1.71.1>`, 2026-10-13: FAIL.

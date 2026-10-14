@@ -7,7 +7,7 @@ const KERNEL = [
   'kill/stop: mask=USR2',
   'old: USR2 now=USR2,TERM',
   'cleared: old=USR2,TERM now=-',
-  'bad how: 22',
+  'bad how: Invalid argument',
   'main: usr1=0 pending=-',
   'thread: blocked usr1=0 pending=USR1 mask=USR1',
   'thread: unblocked usr1=1 in_thread=1 pending=-',
@@ -24,7 +24,7 @@ const LOCAL = [
   'kill/stop: mask=USR2',
   'old: USR2 now=USR2,TERM',
   'cleared: old=USR2,TERM now=-',
-  'bad how: 22',
+  'bad how: Invalid argument',
 ];
 
 export default async function (ctx) {
