@@ -43,7 +43,7 @@ export default async function imagemagickHeif(ctx) {
     const v = await ok(['magick', '-version']);
     assert.match(v.stdout, /^Version: ImageMagick 7\.1\.2-32 /);
     assert.match(v.stdout, /Delegates \(built-in\):.*\bheic\b/);
-    for (const d of ['freetype', 'webp', 'xml']) assert.match(v.stdout, new RegExp(`Delegates \\(built-in\\):.*\\b${d}\\b`), `default delegate ${d} kept`);
+    for (const d of ['freetype', 'webp', 'xml', 'zlib']) assert.match(v.stdout, new RegExp(`Delegates \\(built-in\\):.*\\b${d}\\b`), `default delegate ${d} kept`);
     const f = await ok(['magick', '-list', 'format']);
     assert.match(f.stdout, /^\s+HEIC\*?\s+r--\s+High Efficiency Image Format \(1\.23\.6\)$/m);
     assert.match(f.stdout, /^\s+AVIF\*?\s+r--\s+AV1 Image File Format \(1\.23\.6\)$/m);

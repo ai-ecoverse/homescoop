@@ -11,7 +11,7 @@
   ],
   "fixtures": "packages/libheif/cert/fixtures (fixtures.json: sources and licences; references.json: host libheif 1.23.6 pixels)",
   "checklist": [
-    "magick -version is 7.1.2-32 with heic among the built-in delegates, and wasm-imagemagick 7.1.2-32-4's freetype, webp and xml kept; -list format has HEIC and AVIF (read only, libheif 1.23.6)",
+    "magick -version is 7.1.2-32 with heic among the built-in delegates, and wasm-imagemagick 7.1.2-32-4's freetype, webp, xml and zlib kept; -list format has HEIC and AVIF (read only, libheif 1.23.6)",
     "identify: the iPhone 13 Pro Max still is HEIC 3024x4032, orientation TopLeft (irot applied), EXIF Make/Model Apple / iPhone 13 Pro Max; with heic:preserve-orientation=true it is 4032x3024 RightTop; example.heic has two 1280x854 frames; example.avif 800x533; heic:depth-image=true adds the portrait's 768x576 depth frame",
     "magick IMG.HEIC PNG24:out.png equals host libheif 1.23.6 sample by sample (references.json of wasm-libheif) for the iPhone still, the iPhone portrait, both frames of example.heic (out-%d.png), the AVIF, 451x461, 1x1 and the rotated 9x17",
     "resize: -resize 25% to JPEG is 756x1008 with no rotating EXIF Orientation; -resize 640x640 is 480x640; convert 'example.heic[1]' -resize 50% is 640x427; mogrify -format jpg; HEIC to WebP; preserve-orientation plus -auto-orient is upright",
