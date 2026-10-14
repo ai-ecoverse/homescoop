@@ -39,7 +39,7 @@ jobs:
         run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/${{ matrix.package }}/build.sh
       - name: record sha256
         run: sha256sum packages/${{ matrix.package }}/package/bin/*.wasm | tee "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.package }}-${{ matrix.attempt }}
           path: |
@@ -56,7 +56,7 @@ jobs:
       matrix:
         package: [wasi-protoc-gen-go, wasi-protoc-gen-connect-go, wasi-protoc-gen-go-grpc]
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: ${{ matrix.package }}-[12]
       - name: both builds are byte-identical
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.package }}-1
           path: packages/${{ matrix.package }}/package
