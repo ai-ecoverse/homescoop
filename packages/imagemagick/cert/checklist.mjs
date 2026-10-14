@@ -42,7 +42,7 @@ export default async function (ctx) {
   assert.equal(svg.trim(), '40 20 255,0,0 0,0,255', `SVG through the internal (libxml2) renderer: ${svg}`);
 
   await write('/tmp/m.msl', '<?xml version="1.0"?>\n<image>\n  <read filename="logo:"/>\n  <resize geometry="64x48"/>\n  <write filename="/tmp/m.png"/>\n</image>\n');
-  await ok(['magick', 'msl:/tmp/m.msl']);
+  await ok(['magick', 'msl:/tmp/m.msl', 'null:']);
   assert.equal((await ok(['magick', 'identify', '-format', '%m %w %h', '/tmp/m.png'])).trim(), 'PNG 64 48', 'MSL (libxml2) resize script');
 
   console.log(`checklist: delegates ${builtIn.join(' ')}; webp rw (160x120, lossless back to png); freetype annotate ${text} dark px; SVG red/blue; MSL resize 64x48`);
