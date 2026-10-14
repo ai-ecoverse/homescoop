@@ -1,5 +1,17 @@
 # Negative proof (wasix-sysroot)
 
+## Fallback check: -27 and -28 with neither import (slicc-kernel 1.77.0), 2026-10-14
+
+r28w without its ppoll and sigwait cases, on the published -27 and on -28 (a674b53d…). The gpg-agent pattern gives the same result on both kernels' worth of libc; -28 only adds a working sigsuspend and a mask that reads back:
+
+```text
+-27: pselect pending: 0 handler=1 slow still_blocked=0     -28: … still_blocked=1
+-27: sigsuspend: 28 handler=0 fast still_blocked=0         -28: sigsuspend: -1 EINTR handler=1 fast still_blocked=1
+both: agent HUP: -1 EINTR handler=1 fast
+both: agent TERM: -1 EINTR handler=1 fast
+both: agent rounds: 8/8
+```
+
 ## -28 at 2f4352f7 (masks, no masked wait): blocked signals are stranded (r28w)
 
 `r28w` without its `ppoll` case, against the libc of homescoop#317 at 2f4352f7 (masks through `slicc.sigmask_set`, `pselect` ignoring its mask) on slicc-kernel `fix/wasix-sigmask` 8b52a64, 2026-10-14. gpg-agent's pattern never sees HUP or TERM (its 10 s wait times out, handler not run); `sigsuspend` returns the value EINVAL; `sigwait` "succeeds" with signal 9:

@@ -10,6 +10,16 @@ const KERNEL = [
   'ppoll ready: 1 revents=IN',
 ];
 
+const NOMASK = [
+  'pselect pending: 0 handler=1 slow still_blocked=1',
+  'sigsuspend: -1 EINTR handler=1 fast still_blocked=1',
+  'agent HUP: -1 EINTR handler=1 fast',
+  'agent TERM: -1 EINTR handler=1 fast',
+  'agent rounds: 8/8',
+  'ssh INT: -1 EINTR handler=1 fast still_blocked=1',
+  'ppoll ready: 1 revents=IN',
+];
+
 const TAIL = [
   'sigtimedwait: -1 Function not implemented',
   'sigwaitinfo: -1 Function not implemented',
@@ -35,8 +45,7 @@ export default async function (ctx) {
   } else {
     assert.equal(masks, 'kernel sigmask_set: no', r.stdout);
     assert.equal(head, 'kernel sigmask_poll: no', r.stdout);
-    assert.ok(lines.some((l) => l.startsWith('sigsuspend: -1 EINTR handler=1')), `sigsuspend still wakes on a signal: ${r.stdout}`);
-    assert.ok(lines.includes('ppoll ready: 1 revents=IN'), r.stdout);
-    console.log(`r28w (${ctx.variant}): a kernel without slicc.sigmask_poll: sigsuspend and ppoll work, signals are delivered as before; sigtimedwait/sigwaitinfo/sigwait are ENOSYS`);
+    assert.deepEqual(lines.slice(0, -TAIL.length), NOMASK, r.stdout);
+    console.log(`r28w (${ctx.variant}): a kernel with neither import: signals are delivered at once, as up to -27, so gpg-agent's pselect(sigmask) and ssh's ppoll(osigset) get HUP/TERM/INT as before (8/8 rounds) and a pending-at-call signal has already run; sigsuspend now wakes (was EINVAL); sigtimedwait/sigwaitinfo/sigwait are ENOSYS`);
   }
 }
