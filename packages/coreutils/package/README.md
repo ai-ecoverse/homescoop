@@ -6,6 +6,13 @@ GNU coreutils (single-binary) for slicc.
 pnpm add -g @ai-ecoverse/wasm-coreutils
 ```
 
+## Running by path (9.12.0-6)
+
+`bin/coreutils` (the Emscripten glue the `slicc.commands` entries name) is
+mode 0755 in the package, so it can be run by path under slicc-kernel's
+users enforce. 9.12.0-5 shipped it 0644, which gave `Permission denied`
+(126).
+
 ## Device numbers (9.12.0-6)
 
 `stat -c '%t:%T'` and `ls -l` show a device's major and minor numbers as

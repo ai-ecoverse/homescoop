@@ -53,3 +53,5 @@ with "fork system call failed".
 ## 9.12.0-6: negative 9.12.0-5 (homescoop#324)
 
 `rdev.mjs` against the published 9.12.0-5 on slicc-kernel 1.77.0's Node entry, 2026-10-14: FAIL, `stat %t:%T: /dev/null character special file 0:0` (expected 1:3). The kernel's `st_rdev` is right; Emscripten's `statx()` fallback dropped it.
+
+`glue-mode.mjs` against 9.12.0-5 on slicc-kernel 1.88.0 (users enforce), 2026-10-15: FAIL, `modes in the tarball: 644 /tmp/cu/package/bin/coreutils`. Without that check, running it by path as cone: `bash: line 1: /tmp/cu/package/bin/coreutils: Permission denied`, rc 126.
