@@ -132,8 +132,10 @@ homescoop_notice "libheif 1.23.6 (@ai-ecoverse/wasm-libheif); source and build: 
   https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/COPYING fa81ce652315b013359d6e8e4744335f31a50c7c192907176d3632f78a3b4596
 homescoop_notice "libde265 1.1.3 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" \
   https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/COPYING 02cc1585a20677992e0ba578fa692635dc193735f2691dc81de924b51c4e8020
-homescoop_notice "dav1d 1.5.4 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" \
-  https://code.videolan.org/videolan/dav1d/-/raw/1.5.4/COPYING dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5
+DAV1D_TB="$WORK/dav1d-1.5.4.tar.xz"
+homescoop_fetch https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz 686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5 "$DAV1D_TB"
+tar xJf "$DAV1D_TB" -C "$WORK" dav1d-1.5.4/COPYING
+homescoop_notice "dav1d 1.5.4 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" "$WORK/dav1d-1.5.4/COPYING" -
 homescoop_notice_emscripten
 
 RELINK="$HOMESCOOP_PKG/package/share/imagemagick-heif/relink"
