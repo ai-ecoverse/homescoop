@@ -92,6 +92,8 @@ if [[ -d "$SRC/config" ]]; then
   find "$SRC/config" -maxdepth 1 -name '*.xml' -exec cp {} "$CFG_DEST/" \;
 fi
 test -f "$CFG_DEST/colors.xml"
+perl -0 -i -pe 's{^\s*<delegate decode="svg" command="&apos;rsvg-convert&apos;[^\n]*\n}{}m; s{^\s*<!-- Change export-filename to export-png for inkscape[^\n]*\n}{}m; s{^\s*<delegate decode="svg:decode"[^\n]*inkscape[^\n]*\n}{}m' "$CFG_DEST/delegates.xml"
+if grep -q 'inkscape\|rsvg-convert' "$CFG_DEST/delegates.xml"; then echo "imagemagick-heif: delegates.xml still names inkscape/rsvg-convert" >&2; exit 1; fi
 
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
 homescoop_notices_begin "magick.wasm statically links the following delegate libraries, including libheif and libde265 (LGPL-3.0-or-later; libde265 is an HEVC decoder, and HEVC is patent-encumbered) from @ai-ecoverse/wasm-libheif. No MPEG-family video codec. share/imagemagick-heif/relink holds magick's objects and every other library it links, so it can be relinked against a modified libheif or libde265 (README.md, Relinking)."
@@ -119,12 +121,12 @@ homescoop_notice "libxml2 2.15.4 (@ai-ecoverse/wasm-libxml2)" \
 ICONV_TB="$WORK/libiconv-1.18.tar.gz"
 homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.18.tar.gz 3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8 "$ICONV_TB"
 tar xzf "$ICONV_TB" -C "$WORK" libiconv-1.18/COPYING.LIB
-homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later" "$WORK/libiconv-1.18/COPYING.LIB" -
-homescoop_notice "libheif 1.23.6 (@ai-ecoverse/wasm-libheif)" \
+homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later; source and build: homescoop packages/libiconv (recipe.yaml, build.sh), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libiconv" "$WORK/libiconv-1.18/COPYING.LIB" -
+homescoop_notice "libheif 1.23.6 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" \
   https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/COPYING fa81ce652315b013359d6e8e4744335f31a50c7c192907176d3632f78a3b4596
-homescoop_notice "libde265 1.1.3 (@ai-ecoverse/wasm-libheif)" \
+homescoop_notice "libde265 1.1.3 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" \
   https://raw.githubusercontent.com/strukturag/libde265/v1.1.3/COPYING 02cc1585a20677992e0ba578fa692635dc193735f2691dc81de924b51c4e8020
-homescoop_notice "dav1d 1.5.4 (@ai-ecoverse/wasm-libheif)" \
+homescoop_notice "dav1d 1.5.4 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" \
   https://code.videolan.org/videolan/dav1d/-/raw/1.5.4/COPYING dd92c3c2247c5651606fc23a5e2d6a1ebc5ace9a3e49cbde0e12f05ad1cb1ee5
 homescoop_notice_emscripten
 

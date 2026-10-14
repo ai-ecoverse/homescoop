@@ -94,6 +94,12 @@ export default async function imagemagickHeif(ctx) {
     assert.deepEqual([half.width, half.height], [640, 427]);
     await ok(['mogrify', '-format', 'jpg', 'rainbow-451x461.heic']);
     assert.deepEqual(jpegSize(await readB64('rainbow-451x461.jpg')), { width: 451, height: 461 });
+    await put('box.svg', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><rect width="20" height="10" fill="#c00"/></svg>'));
+    const svg = await ok(['magick', 'box.svg', 'PNG24:box.png']);
+    assert.doesNotMatch(svg.stdout + svg.stderr, /inkscape|rsvg-convert|command not found/, 'SVG reads through the internal MSVG coder, no external delegate');
+    const box = await digest('box.png', [], [[10, 5]]);
+    assert.deepEqual([box.width, box.height], [20, 10]);
+    assert.ok(box.probes[0][0] > 180 && box.probes[0][1] < 40, `SVG fill ${box.probes[0]}`);
     await ok(['magick', 'rainbow-451x461.heic', '-quality', '80', 'rainbow.webp']);
     const webp = await readB64('rainbow.webp');
     assert.equal(webp.subarray(0, 4).toString('latin1') + webp.subarray(8, 12).toString('latin1'), 'RIFFWEBP', 'HEIC to WebP');
