@@ -61,6 +61,18 @@
       "why": "the spec checks bzip2recover-llu.patch, new in 1.0.8-2; 1.0.8-1 prints 'I/O error reading data.bz2' (NEGATIVE.md)"
     },
     {
+      "package": "@ai-ecoverse/wasm-tar",
+      "spec": "users.mjs",
+      "case": "root: tar -x keeps owners and modes",
+      "kernel": "*",
+      "version": "<1.35.0-5",
+      "users": [
+        "enforce"
+      ],
+      "issue": "ai-ecoverse/homescoop#286",
+      "why": "1.35.0-4 links the slicc shims from before process credentials, so root's tar -x acts as a non-root user and drops owners and setuid/setgid; 1.35.0-5 keeps them (NEGATIVE.md)"
+    },
+    {
       "package": "@ai-ecoverse/wasm-rsync",
       "spec": "checklist.mjs",
       "case": "re-run itemized[\\s\\S]*\\.d\\.\\.t\\.{6} \\./",
