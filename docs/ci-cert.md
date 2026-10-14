@@ -222,7 +222,8 @@ jobs:
   older one. Don't give the caller's own `concurrency` the same group name.
 - **Pinning:** `@main` follows homescoop's harness and limits. Pin a sha in
   `uses:` and `homescoop-ref` for a reproducible run, and `bios-ref` for a
-  fixed base set and reference kernel.
+  fixed base set and reference kernel. A pinned sha keeps the pool for a
+  trusted event as long as it is on main (a merged commit, not a PR head).
 - **Time:** `base,ci-certified` is a plan job (about 1 min) and one shard
   (about 8–10 min) on `ubuntu-latest`, plus the queue; `all` takes 2–3
   shards of up to about 25 min.
@@ -413,13 +414,20 @@ changes the boot order for every cert.
     `github.repository`): our agents' branches and Renovate. This includes
     this repo's proof and slicc-kernel's PR calls; or
   - `schedule`, `workflow_dispatch`, `workflow_run` or `release` on
-    `refs/heads/main` (the caller's ref, for a call), with `homescoop-ref`
-    and `bios-ref` `main` and `kernel` a published
-    `@ai-ecoverse/slicc-kernel@<version>` (no artifact, no git or file spec).
+    `refs/heads/main` (the caller's ref, for a call), with:
+    - `kernel` a published `@ai-ecoverse/slicc-kernel@<version>`, or a bare
+      `<version>` (no artifact, no git or file spec);
+    - `homescoop-ref` either `main` or a full 40-hex sha that is on
+      homescoop's main, and `bios-ref` either `main` or a full sha on
+      slicc-bios's main. The plan job checks a sha with the compare API
+      (`compare/main...<sha>` is `behind` or `identical`).
 
   Anything else runs on `ubuntu-latest`, whatever `runner` says: fork PRs,
-  `pull_request_target`, `merge_group`, dispatches from another ref or with
-  a branch or sha as `homescoop-ref` / `bios-ref`. The plan job logs which.
+  `pull_request_target`, `merge_group`, dispatches from another ref, a
+  branch name, short sha or unmerged sha as `homescoop-ref` / `bios-ref`, or
+  a failed check. The plan job logs which, and why. `runs-on` can't check a
+  sha, so with a sha ref (or a bare version) plan itself stays on
+  `ubuntu-latest`; shards and report go to the pool once it has checked.
   The org requires approval before an outside contributor's workflow runs,
   and agents never approve one.
   `compat.mjs plan` also takes only registry versions and dist-tags for the
