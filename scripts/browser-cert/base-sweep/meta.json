@@ -46,6 +46,14 @@
         "/dev/null"
       ]
     },
+    "chcon": {
+      "argv": [
+        "chcon",
+        "--version"
+      ],
+      "rc": 1,
+      "why": "SELinux tools: not built without SELinux, so the multi-call binary answers unknown program, rc 1, as expected"
+    },
     "clear": {
       "argv": [
         "clear"
@@ -130,6 +138,14 @@
         "reset",
         "-V"
       ]
+    },
+    "runcon": {
+      "argv": [
+        "runcon",
+        "--version"
+      ],
+      "rc": 1,
+      "why": "SELinux tools: not built without SELinux, so the multi-call binary answers unknown program, rc 1, as expected"
     },
     "sleep": {
       "argv": [
