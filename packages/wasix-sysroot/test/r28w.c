@@ -11,6 +11,9 @@
 #include <unistd.h>
 #include <wasi/api.h>
 
+__attribute__((import_module("slicc"), import_name("sigmask_set")))
+int32_t __slicc_sigmask_set(int32_t how, uint32_t set_lo, uint32_t set_hi, int32_t old_ptr);
+
 __attribute__((import_module("slicc"), import_name("sigmask_poll")))
 int32_t __slicc_sigmask_poll(uint32_t set_lo, uint32_t set_hi, int32_t in_ptr, int32_t out_ptr, int32_t nsubscriptions, int32_t nevents_ptr);
 
@@ -61,6 +64,8 @@ int main(void) {
   __wasi_subscription_t s = {.u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = 1};
   __wasi_event_t e;
   uint32_t n = 0;
+  uint64_t m = 0;
+  printf("kernel sigmask_set: %s\n", __slicc_sigmask_set(SIG_BLOCK, 0, 0, (int32_t)(uintptr_t)&m) == ENOSYS ? "no" : "yes");
   printf("kernel sigmask_poll: %s\n", __slicc_sigmask_poll(0, 0, (int32_t)(uintptr_t)&s, (int32_t)(uintptr_t)&e, 1, (int32_t)(uintptr_t)&n) == ENOSYS ? "no" : "yes");
 
   struct sigaction sa;
