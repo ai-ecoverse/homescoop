@@ -14,34 +14,49 @@
       "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38586687944",
       "kernel": "1.81.0",
       "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38595982516",
+      "kernel": "1.86.0",
+      "set": "rsync@3.4.4-3,screen@5.0.1-9,wasix-ruby@3.4.11-10,wasix-perl@5.42.0-9"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38595997470",
+      "kernel": "1.86.0",
+      "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38595997470",
+      "kernel": "1.81.0",
+      "set": "base,ci-certified"
     }
   ],
   "seconds": {
-    "base-sweep:enforce": 70,
-    "base-sweep:report": 79,
-    "bash": 69,
-    "bzip2": 6,
-    "coreutils": 16,
-    "curl": 8,
-    "diffutils": 9,
-    "findutils": 11,
+    "base-sweep:enforce": 103,
+    "base-sweep:report": 95,
+    "bash": 263,
+    "bzip2": 21,
+    "coreutils": 19,
+    "curl": 10,
+    "diffutils": 10,
+    "findutils": 12,
     "gawk": 5,
-    "git": 27,
+    "git": 33,
     "grep": 4,
-    "gzip": 6,
+    "gzip": 7,
     "jq": 4,
     "less": 6,
     "mount": 6,
     "ncurses-utils": 5,
-    "patch": 8,
+    "patch": 9,
     "pkgconf": 4,
     "poppler": 11,
     "procps": 10,
     "qpdf": 10,
-    "rsync": 164,
-    "screen": 56,
+    "rsync": 292,
+    "screen": 194,
     "sed": 4,
-    "tar": 21,
+    "tar": 47,
     "tree": 5,
     "uv-shim": 111,
     "wasi-biome": 11,
@@ -50,11 +65,11 @@
     "wasi-ripgrep": 8,
     "wasi-typescript": 14,
     "wasix-gnupg": 18,
-    "wasix-perl": 99,
+    "wasix-perl": 104,
     "wasix-python": 337,
-    "wasix-ruby": 511,
+    "wasix-ruby": 795,
     "which": 5,
     "xxd": 4,
-    "xz": 5
+    "xz": 6
   }
 }

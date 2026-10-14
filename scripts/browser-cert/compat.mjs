@@ -1011,8 +1011,10 @@ function timings(args) {
   }
   if (!sources.length) throw new Error('--compat <compat.json>[,<compat.json>…] is required');
   const seconds = { ...doc.seconds, ...measured };
+  const key = (x) => `${x.run} ${x.kernel} ${x.set}`;
+  const known = new Set(sources.map(key));
   writeJson(out, {
-    sources,
+    sources: [...(doc.sources || []).filter((x) => !known.has(key(x))), ...sources],
     seconds: Object.fromEntries(Object.entries(seconds).sort(([a], [b]) => a.localeCompare(b))),
   });
   console.log(`timings: ${Object.keys(measured).length} measured, ${Object.keys(seconds).length} in ${relative(root, out)}`);
