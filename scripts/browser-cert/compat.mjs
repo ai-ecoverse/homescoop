@@ -253,6 +253,9 @@ async function plan(args) {
     candidate = kernelInfo(join(out, 'candidate.tgz'), { spec: `artifact:${kernelIn}`, source: 'artifact', file: tgzs[0] });
   } else {
     const spec = /^\d/.test(kernelIn) ? `${KERNEL}@${kernelIn}` : kernelIn;
+    if (!/^@[a-z0-9-]+\/[a-z0-9._-]+@[0-9A-Za-z.+-]+$/.test(spec)) {
+      throw new Error(`--kernel ${kernelIn}: an npm name@version or dist-tag from the registry, or an artifact name`);
+    }
     const view = npmView(spec);
     const t = fetchTarball(view.name, view.version, view.dist?.integrity, join(tmp, 'candidate'));
     renameSync(t.file, join(out, 'candidate.tgz'));
@@ -334,6 +337,7 @@ async function plan(args) {
       const r = m && (byDir.get(m[1]) || byNpm.get(m[1]) || byNpm.get(`@ai-ecoverse/${m[1]}`));
       if (!r) throw new Error(`set: ${token} is neither base, catalog, ci-certified, all nor a homescoop recipe`);
       if (m[2]) {
+        if (!/^[0-9A-Za-z.+-]+$/.test(m[2])) throw new Error(`set: ${token}: a version or dist-tag from the registry`);
         const v = npmView(`${r.npm}@${m[2]}`);
         add(r, v.version, v.dist?.integrity || null, token);
       } else addLatest(r, token);

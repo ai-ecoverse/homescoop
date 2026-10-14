@@ -150,7 +150,8 @@ jobs:
 | `set` | `base,ci-certified` | comma-separated: `base` and `catalog` (slicc-bios's base set and optional catalog, at the versions bios pins), `ci-certified` ([`scripts/ci-certified.json`](../scripts/ci-certified.json)), `all` (every recipe with `cert/*.mjs`), or recipe / npm names, `name[@version]` |
 | `homescoop-ref` | `main` | the homescoop commit whose specs and scripts run |
 | `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
-| `runner` | `''` | `runs-on` for the shards and the sweep: `inputs.runner \|\| vars.CERT_RUNNER \|\| 'ubuntu-latest'` |
+| `runner` | `''` | `runs-on` for the shards: `inputs.runner \|\| vars.CERT_RUNNER`, **only for a trusted run** (see [Runners](#runners-and-capacity)), else `ubuntu-latest` |
+| `light-runner` | `''` | `runs-on` for plan and report: `inputs.light-runner \|\| vars.CERT_LIGHT_RUNNER`, only for a trusted run, else `ubuntu-latest` |
 | `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, at most 3) or `1`–`3` |
 | `fail-on-regression` | `true` | `false` reports regressions without failing |
 | `expect-regressions` | `''` | a negative proof: recipes that must regress, in their spec and in the base sweep. The report fails if one doesn't; other regressions are listed but don't fail it |
@@ -211,10 +212,11 @@ jobs:
   reports the verdict; drop it (or make the check required) once it is
   stable.
 - **Where it runs:** in the caller's run, on the caller's runners and
-  minutes. `runs-on` is `inputs.runner || vars.CERT_RUNNER ||
-  'ubuntu-latest'`, with the caller's `CERT_RUNNER`. The called workflow asks
-  only for `contents: read`; homescoop and slicc-bios are public, so the
-  caller's token reads them.
+  minutes, with the caller's `CERT_RUNNER` / `CERT_LIGHT_RUNNER`. A pool
+  runner is used only for a trusted run (below); a PR caller always gets
+  `ubuntu-latest`. Pass `runner:` only from trusted events on main. The called
+  workflow asks only for `contents: read`; homescoop and slicc-bios are
+  public, so the caller's token reads them.
 - **Concurrency:** the called workflow has its own group per caller repo,
   PR (or ref), kernel, set and bios-ref, and a newer PR run cancels the
   older one. Don't give the caller's own `concurrency` the same group name.
@@ -243,7 +245,7 @@ than one shard.
    `node scripts/browser-cert/compat.mjs timings --compat a/compat.json,b/compat.json`
    (each package keeps the longest of the runs given). `plan.json`, `candidate.tgz` and
    `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
-2. **shard** (matrix, `max-parallel: 3`, on `runner`) runs its packages, then
+2. **shard** (matrix, `max-parallel: 3`, on `runner` when trusted) runs its packages, then
    its sweep modes:
    - each package through `scripts/browser-cert/run.mjs --kernel
      candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
@@ -393,10 +395,30 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
   bios-ref; a PR caller's newer run cancels the older one.
 - One call is at most 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
   `base,ci-certified` call is a plan job and one shard job.
-- Set `CERT_RUNNER` to `cloud-run-bench` (the org's Cloud Run pool) to move
-  the heavy jobs off GitHub-hosted runners without a code change; plan and
-  report stay on `ubuntu-latest`. Shards are short and re-runnable ("Re-run
-  failed jobs" uploads with `overwrite`).
+- **Pools are for trusted code only.** A job on a Cloud Run pool
+  (`cloud-run`, `cloud-run-bench`) can reach the GCP metadata server and the
+  pool's service-account token, so no PR-authored code may run there. A run
+  is trusted, and may use `runner` / `CERT_RUNNER` (shards) and
+  `light-runner` / `CERT_LIGHT_RUNNER` (plan, report), only when all of these
+  hold:
+  - the event is `schedule`, `workflow_dispatch`, `workflow_run` or
+    `release`;
+  - `github.ref` is `refs/heads/main` (the caller's, for a call);
+  - `homescoop-ref` and `bios-ref` are `main`;
+  - `kernel` is a published `@ai-ecoverse/slicc-kernel@<version>` (no
+    artifact, no git or file spec).
+
+  Anything else (`pull_request`, `merge_group`, a dispatch from another ref,
+  a branch or sha as `homescoop-ref` or `bios-ref`, a PR-packed kernel)
+  runs on `ubuntu-latest`, whatever `runner` says. The plan job logs which.
+  `compat.mjs plan` also takes only registry versions and dist-tags for the
+  kernel and for `name@version` in `set`, so `npm pack` never fetches a git
+  or file spec.
+  The check lives in the workflow file, so a caller that uses
+  `kernel-compat.yml@<branch>` runs that branch's rules. The pool's runner
+  group should also allow only `kernel-compat.yml@refs/heads/main`.
+- Shards are short and re-runnable ("Re-run failed jobs" uploads with
+  `overwrite`).
 - Nothing here publishes: `ladder-merge` dispatches `ladder-build` only for
   pushes to `packages/**`, and these files live under `scripts/` and
   `.github/workflows/`.
