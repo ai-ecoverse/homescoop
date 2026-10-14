@@ -35,10 +35,21 @@
       "spec": "base-sweep",
       "case": "i",
       "kernel": ">=1.78.0",
-      "users": ["enforce"],
+      "users": [
+        "enforce"
+      ],
       "rc": 126,
       "issue": "ai-ecoverse/slicc-kernel#495",
       "why": "the shims are written without their tarball mode (0644), and 1.78.0 checks the x bit on exec, so i's exec of ${0%/*}/npm by path is refused (cert runner B3, K4 on 1.81.0)"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-bash",
+      "spec": "selfkill.mjs",
+      "case": "kill -TERM \\$\\$; echo after: sync\\.run",
+      "kernel": "*",
+      "version": "<5.3.0-18",
+      "issue": "ai-ecoverse/homescoop#290",
+      "why": "5.3.0-17's kill(getpid(), sig) exits 128+n in the program, so the kernel sees status 143 and no signal (slicc-kernel#422); 5.3.0-18's shim sends it to the kernel (NEGATIVE.md)"
     },
     {
       "package": "@ai-ecoverse/wasm-bzip2",

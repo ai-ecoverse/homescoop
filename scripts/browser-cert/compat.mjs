@@ -514,13 +514,6 @@ function shard(args) {
       result.integrity = tgz.integrity;
       result.peers = installNeeds(e.recipe, join(work, 'nm'), work);
       const base = { recipe: e.recipe, tarballs: [tgz.file], users: e.users, work, logs, logName: slug(e.id) };
-      let cand = certRun({ ...base, label: 'candidate', kernelFile: candidateFile });
-      if (cand.status !== 'pass') cand = mergeAttempts(cand, certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile }));
-      result.status = cand.status;
-      result.log = cand.log;
-      result.attempts = cand.attempts || [cand.log];
-      result.kernelSeen = cand.kernel;
-      const failed = failingSpecs(cand);
       const facts = (f) => ({
         package: e.package,
         recipe: e.recipe,
@@ -530,6 +523,14 @@ function shard(args) {
         users: e.users,
         text: f.text,
       });
+      const unexplained = (rep) => failingSpecs(rep).filter((f) => !findLimit(limits, facts(f)));
+      let cand = certRun({ ...base, label: 'candidate', kernelFile: candidateFile });
+      if (unexplained(cand).length) cand = mergeAttempts(cand, certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile }));
+      result.status = cand.status;
+      result.log = cand.log;
+      result.attempts = cand.attempts || [cand.log];
+      result.kernelSeen = cand.kernel;
+      const failed = failingSpecs(cand);
       const open = [];
       const verdicts = new Map();
       for (const f of failed) {
@@ -619,14 +620,6 @@ function sweepMode(plan, kdir, mode, out, limits) {
     if (!rows) {
       rows = [{ user: '-', command: '(boot)', package: null, status: 'fail', rc: null, expected: 0, out: doc.runs[0].error }];
     }
-    const failedCmds = () => [...new Set(rows.filter((r) => r.status === 'fail' && r.command !== '(boot)').map((r) => r.command))];
-    if (failedCmds().length) {
-      const again = pass('candidate-retry', join(kdir, 'candidate.tgz'), failedCmds());
-      if (again) {
-        const passedAgain = new Set(again.filter((r) => r.status === 'pass').map(key));
-        rows = rows.map((r) => (passedAgain.has(key(r)) ? { ...r, status: 'pass', flaky: true } : r));
-      }
-    }
     const facts = (r) => ({
       package: r.package,
       recipe: byNpm.get(r.package) || null,
@@ -638,6 +631,14 @@ function sweepMode(plan, kdir, mode, out, limits) {
       user: r.user,
       rc: r.rc,
     });
+    const retry = [...new Set(rows.filter((r) => r.status === 'fail' && r.command !== '(boot)' && !findLimit(limits, facts(r))).map((r) => r.command))];
+    if (retry.length) {
+      const again = pass('candidate-retry', join(kdir, 'candidate.tgz'), retry);
+      if (again) {
+        const passedAgain = new Set(again.filter((r) => r.status === 'pass').map(key));
+        rows = rows.map((r) => (passedAgain.has(key(r)) ? { ...r, status: 'pass', flaky: true } : r));
+      }
+    }
     const open = [];
     for (const r of rows) {
       r.recipe = byNpm.get(r.package) || null;
