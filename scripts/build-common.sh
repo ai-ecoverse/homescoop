@@ -506,6 +506,9 @@ EOF
 
 # Write missing .pc files into PREFIX for staged static libs (npm deps often
 # ship lib/*.a + include/ without pkgconfig/). Used by ImageMagick configure.
+# Version: is the dep's upstream version, which host-run.sh records per
+# archive in lib/pkgconfig/.homescoop-archive-versions; configure checks such
+# as libwebp >= 0.4.1 and freetype2 >= 2.8.0 compare against it.
 homescoop_ensure_prefix_pcs() {
   local pfx="${PREFIX:?}"
   local pcdir="$pfx/lib/pkgconfig"
@@ -515,11 +518,17 @@ homescoop_ensure_prefix_pcs() {
   _ensure_one() {
     local pc="$1" archive="$2" libs="$3" requires="${4:-}"
     local dest="$pcdir/${pc}.pc"
-    if [[ -f "$dest" ]]; then
+    if [[ -f "$dest" ]] && ! grep -q '(homescoop wasm / emscripten, synthesized)' "$dest"; then
       return 0
     fi
     if [[ ! -f "$pfx/lib/${archive}" ]]; then
       return 0
+    fi
+    local version
+    version="$(awk -v a="$archive" '$1 == a { v = $2 } END { print v }' "$pcdir/.homescoop-archive-versions" 2>/dev/null)"
+    if [[ -z "$version" ]]; then
+      echo "homescoop: ensure-pc: no recorded version for $archive (not staged by host-run.sh); writing Version: 0" >&2
+      version=0
     fi
     cat >"$dest" <<EOF
 prefix=${pfx}
@@ -529,12 +538,12 @@ includedir=\${prefix}/include
 
 Name: ${pc}
 Description: ${pc} (homescoop wasm / emscripten, synthesized)
-Version: 0
+Version: ${version}
 Requires: ${requires}
 Cflags: -I\${includedir}
 Libs: -L\${libdir} ${libs}
 EOF
-    echo "== ensure-pc: $dest"
+    echo "== ensure-pc: $dest ($version)"
   }
 
   _ensure_one zlib libz.a "-lz"
@@ -546,7 +555,12 @@ EOF
   fi
   _ensure_one lcms2 liblcms2.a "-llcms2"
   _ensure_one libtiff-4 libtiff.a "-ltiff" "zlib libjpeg"
-  _ensure_one libwebp libwebp.a "-lwebp"
+  _ensure_one libsharpyuv libsharpyuv.a "-lsharpyuv"
+  if [[ -f "$pfx/lib/libsharpyuv.a" ]]; then
+    _ensure_one libwebp libwebp.a "-lwebp" "libsharpyuv"
+  else
+    _ensure_one libwebp libwebp.a "-lwebp"
+  fi
   _ensure_one libwebpmux libwebpmux.a "-lwebpmux" "libwebp"
   _ensure_one libwebpdemux libwebpdemux.a "-lwebpdemux" "libwebp"
   _ensure_one libopenjp2 libopenjp2.a "-lopenjp2"

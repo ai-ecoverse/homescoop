@@ -1,0 +1,13 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.77.0",
+  "needs": ["@ai-ecoverse/wasm-poppler"],
+  "needsInstall": ["@ai-ecoverse/wasm-poppler@26.10.0-2"],
+  "checklist": [
+    "magick -version lists the built-in delegates freetype, jpeg, jp2, lcms, png, tiff, webp, xml, zlib (7.1.2-32-3: jng jp2 jpeg lcms png tiff only)",
+    "-list format: WEBP rw, MSL and MSVG readable (libxml2; 7.1.2-32-3: MSL ---, MSVG -w+), TTF readable (freetype; absent in -3)",
+    "logo: to WEBP and back: identify WEBP 160 120, a lossless webp converts to PNG 160 120",
+    "freetype: -annotate with a Type 1 font (wasm-poppler's Nimbus Sans) draws dark pixels on a white canvas, a blank canvas none",
+    "libxml2: an SVG with a red and a blue rect renders through the internal MSVG coder (255,0,0 at 5,5, 0,0,255 at 30,10); an MSL script (magick msl:script null:) reads logo:, resizes to 64x48 and writes a PNG"
+  ]
+}
