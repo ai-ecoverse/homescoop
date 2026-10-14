@@ -1,5 +1,9 @@
 # Negative proof (wasix-sysroot)
 
+## Known kernel limit, not a -28 regression: the window (slicc-kernel#561)
+
+r28w's two "window" lines: a child sends SIGUSR1 while the parent busy-loops 400 ms without kernel calls, then the parent waits in `pselect` on an idle pipe for 10 s. On slicc-kernel 1.77.0, 1.88.0 and #551 @2937137 the handler runs at the start of that call (0.00 s) and the wait still sleeps 10 s: `window: arrived_before_wait handler=0; pselect 0 handler=1 slow`, the same with a mask. It's the kernel's, it affects -27 equally (-27 exposes every signal that arrives during computation, the -28 fallback only the instructions between its `sigmask_set` and `poll_oneoff`), and slicc-kernel#567 fixes it: on c0869d4 both lines are `pselect -1 EINTR handler=1 fast`, which `R28_WINDOW=1` asserts. The -28 cert runs on 1.88.0 with `R28_WINDOW` off.
+
 ## Fallback check: -27 and -28 with neither import (slicc-kernel 1.77.0), 2026-10-14
 
 r28w without its ppoll and sigwait cases, on the published -27 and on -28 (a674b53d…). The gpg-agent pattern gives the same result on both kernels' worth of libc; -28 only adds a working sigsuspend and a mask that reads back:
