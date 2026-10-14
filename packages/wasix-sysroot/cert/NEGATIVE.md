@@ -1,5 +1,19 @@
 # Negative proof (wasix-sysroot)
 
+## -28 at 2f4352f7 (masks, no masked wait): blocked signals are stranded (r28w)
+
+`r28w` without its `ppoll` case, against the libc of homescoop#317 at 2f4352f7 (masks through `slicc.sigmask_set`, `pselect` ignoring its mask) on slicc-kernel `fix/wasix-sigmask` 8b52a64, 2026-10-14. gpg-agent's pattern never sees HUP or TERM (its 10 s wait times out, handler not run); `sigsuspend` returns the value EINVAL; `sigwait` "succeeds" with signal 9:
+
+```text
+pselect pending: 0 handler=0 slow still_blocked=1
+sigsuspend: 28 handler=0 fast still_blocked=1
+agent HUP: 0 handler=0 slow
+agent TERM: 0 handler=0 slow
+sigtimedwait: 28
+sigwaitinfo: 28
+sigwait: Success sig=9
+```
+
 ## 2025.9.30-27: sigprocmask keeps no mask, sigpending fails (-28, slicc-kernel #460)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-27.tgz --probe r28 --kernel-dir <slicc-kernel 1.77.0>`, 2026-10-14: FAIL. WASIX's `pthread_sigmask` returned 0 without storing the mask or writing `*old`; `sigpending` returned EINVAL as its result (not -1 with errno), and the bad-`how` check was missing:

@@ -50,6 +50,11 @@ nothing (it did not even fill in the old mask), so a blocked signal was
 delivered at once, and `sigpending` failed. On a slicc-kernel without these
 imports the libc keeps the mask itself: masks read back right, but a blocked
 signal is still delivered at once and nothing is ever pending.
+`pselect` with a signal mask, `ppoll` (new) and `sigsuspend` install the
+mask for the wait in one kernel call (`slicc.sigmask_poll`), so a signal
+blocked everywhere else reaches its handler there, as gnupg's daemons and
+openssh expect. `sigwait`, `sigtimedwait` and `sigwaitinfo` fail with ENOSYS
+(up to -27 they reported success with a garbage signal number).
 
 Since 2025.9.30-27 setting file times works for every form (homescoop#294).
 Up to -26, `utimensat(…, NULL)`, `futimens(fd, NULL)`, `utimes(p, NULL)` and
