@@ -21,7 +21,8 @@ const root = resolve(here, '../..');
 const KERNEL = '@ai-ecoverse/slicc-kernel';
 const BIOS = 'ai-ecoverse/slicc-bios';
 const HARNESS = ['@ai-ecoverse/slicc-shared-web@^1.4.1', 'playwright-core@1.63.0'];
-const MAX_SHARDS = 6;
+const MAX_SHARDS = 3;
+const ESTIMATE = { entry: 10, spec: 4, sweep: 150, shard: 900 };
 const SWEEP_MODES = ['report', 'enforce'];
 const RUN_TIMEOUT_MS = 25 * 60 * 1000;
 
@@ -350,17 +351,25 @@ async function plan(args) {
   rmSync(tmp, { recursive: true, force: true });
 
   const list = [...entries.values()];
-  const weight = (e) => e.specs.length + 1;
-  const n = Math.min(list.length, MAX_SHARDS);
-  const bins = Array.from({ length: n }, () => ({ weight: 0, entries: [] }));
-  list
-    .map((e, i) => ({ e, i }))
-    .sort((a, b) => weight(b.e) - weight(a.e) || a.e.id.localeCompare(b.e.id))
-    .forEach(({ e, i }) => {
-      const bin = bins.reduce((lo, b) => (b.weight < lo.weight ? b : lo), bins[0]);
-      bin.weight += weight(e);
-      bin.entries.push(i);
+  const units = [
+    ...list.map((e, i) => ({ id: e.id, entry: i, seconds: ESTIMATE.entry + ESTIMATE.spec * e.specs.length })),
+    ...(sweep ? sweep.modes.map((mode) => ({ id: `sweep-${mode}`, sweep: mode, seconds: ESTIMATE.sweep })) : []),
+  ];
+  const total = units.reduce((s, u) => s + u.seconds, 0);
+  const asked = String(args.shards || 'auto').trim();
+  const wanted = asked === 'auto' ? Math.ceil(total / ESTIMATE.shard) : Number(asked);
+  if (!Number.isInteger(wanted) || wanted < 1) throw new Error(`--shards must be auto or 1..${MAX_SHARDS}, not ${asked}`);
+  const n = Math.min(units.length, MAX_SHARDS, wanted);
+  const bins = Array.from({ length: n }, () => ({ seconds: 0, entries: [], sweeps: [] }));
+  units
+    .sort((a, b) => b.seconds - a.seconds || a.id.localeCompare(b.id))
+    .forEach((u) => {
+      const bin = bins.reduce((lo, b) => (b.seconds < lo.seconds ? b : lo), bins[0]);
+      bin.seconds += u.seconds;
+      if (u.sweep) bin.sweeps.push(u.sweep);
+      else bin.entries.push(u.entry);
     });
+  for (const b of bins) b.entries.sort((x, y) => x - y);
   const tag = createHash('sha256')
     .update(JSON.stringify([kernelIn, setIn, biosRefIn, homescoopRefIn || homescoopSha]))
     .digest('hex')
@@ -388,20 +397,21 @@ async function plan(args) {
     reference,
     entries: list,
     skipped: [...skipped.values()],
-    shards: bins.map((b) => b.entries),
+    shards: bins.map((b) => ({ entries: b.entries, sweeps: b.sweeps, estimateS: b.seconds })),
     sweep,
   };
   writeJson(join(out, 'plan.json'), doc);
   console.log(`candidate ${candidate.name}@${candidate.version} sha256 ${candidate.sha256}`);
   console.log(`reference ${reference.name}@${reference.version} sha256 ${reference.sha256} (slicc-bios ${bios.sha})`);
+  console.log(`work: about ${Math.round(total / 60)} min in ${n} shard(s) (shards ${asked})`);
   for (const [k, b] of bins.entries()) {
-    console.log(`shard ${k}: ${b.entries.map((i) => list[i].id).join(' ')}`);
+    console.log(`shard ${k} (~${Math.round(b.seconds / 60)} min): ${[...b.entries.map((i) => list[i].id), ...b.sweeps.map((m) => `base-sweep:${m}`)].join(' ')}`);
   }
   for (const s of doc.skipped) console.log(`skip ${s.package}@${s.version ?? '-'} (${s.origin.join(',')}): ${s.reason}`);
   output('tag', tag);
+  output('artifact', `kernel-compat-${tag}`);
   output('shards', JSON.stringify(bins.map((_, k) => k)));
-  output('sweep', sweep ? 'true' : 'false');
-  output('modes', JSON.stringify(sweep ? SWEEP_MODES : []));
+  output('count', String(n));
   output('homescoop-sha', homescoopSha);
 }
 
@@ -493,7 +503,7 @@ function shard(args) {
   const sameKernel = plan.kernel.sha256 === plan.reference.sha256;
   const startedAt = new Date();
   const results = [];
-  for (const i of plan.shards[index] || []) {
+  for (const i of plan.shards[index]?.entries || []) {
     const e = plan.entries[i];
     const work = join(out, 'work', slug(e.id));
     const started = Date.now();
@@ -563,6 +573,7 @@ function shard(args) {
     results.push(result);
     rmSync(work, { recursive: true, force: true });
   }
+  const sweeps = (plan.shards[index]?.sweeps || []).map((mode) => sweepMode(plan, kdir, mode, out, limits));
   const finishedAt = new Date();
   writeJson(join(out, `shard-${index}.json`), {
     shard: index,
@@ -570,20 +581,13 @@ function shard(args) {
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
     wallMs: finishedAt - startedAt,
+    sweeps,
     results,
   });
 }
 
-function sweep(args) {
-  const planFile = resolve(args.plan);
-  const plan = readJson(planFile);
-  const kdir = dirname(planFile);
-  const mode = args.mode;
-  if (!SWEEP_MODES.includes(mode)) throw new Error(`--mode must be one of ${SWEEP_MODES.join(', ')}`);
-  const out = resolve(args.out);
+function sweepMode(plan, kdir, mode, out, limits) {
   const logs = join(out, 'logs');
-  mkdirSync(logs, { recursive: true });
-  const limits = loadLimits();
   const work = join(out, 'work', `sweep-${mode}`);
   const startedAt = new Date();
   const doc = { mode, runner: process.env.RUNNER_NAME || null, startedAt: startedAt.toISOString(), rows: [], error: null, runs: [] };
@@ -676,6 +680,7 @@ function sweep(args) {
   for (const r of doc.rows) counts[r.verdict] = (counts[r.verdict] || 0) + 1;
   console.log(`base sweep ${mode}: ${JSON.stringify(counts)} in ${Math.round(doc.wallMs / 1000)} s`);
   writeJson(join(out, `sweep-${mode}.json`), doc);
+  return { mode, wallMs: doc.wallMs };
 }
 
 function findFiles(dir, re) {
@@ -703,9 +708,10 @@ function report(args) {
   const packages = [];
   const errors = [];
   const shards = [];
-  plan.shards.forEach((idx, k) => {
+  plan.shards.forEach((s, k) => {
+    const idx = s.entries;
     const doc = shardDocs.get(k);
-    shards.push({ shard: k, packages: idx.map((i) => plan.entries[i].id), wallMs: doc?.wallMs ?? null, runner: doc?.runner ?? null, reported: Boolean(doc) });
+    shards.push({ shard: k, packages: idx.map((i) => plan.entries[i].id), sweeps: s.sweeps, estimateS: s.estimateS, wallMs: doc?.wallMs ?? null, runner: doc?.runner ?? null, reported: Boolean(doc) });
     for (const i of idx) {
       const e = plan.entries[i];
       const r = doc?.results.find((x) => x.id === e.id);
@@ -748,9 +754,10 @@ function report(args) {
   if (plan.sweep) {
     for (const mode of plan.sweep.modes) {
       const doc = sweepDocs.get(mode);
-      sweeps.push({ mode, wallMs: doc?.wallMs ?? null, runner: doc?.runner ?? null, reported: Boolean(doc), runs: doc?.runs || [] });
+      const shard = plan.shards.findIndex((s) => s.sweeps.includes(mode));
+      sweeps.push({ mode, shard, wallMs: doc?.wallMs ?? null, runner: doc?.runner ?? null, reported: Boolean(doc), runs: doc?.runs || [] });
       if (!doc) {
-        errors.push(`base sweep ${mode}: reported nothing`);
+        errors.push(`base sweep ${mode}: shard ${shard} reported nothing`);
         continue;
       }
       if (doc.error) errors.push(`base sweep ${mode}: ${doc.error.split('\n')[0]}`);
@@ -769,6 +776,24 @@ function report(args) {
     regressions,
   };
   const verdict = errors.length ? 'error' : regressions ? 'regression' : 'pass';
+  const expected = (args['expect-regressions'] || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const byRecipe = new Map();
+  for (const r of [...results, ...sweepOut].filter((x) => x.verdict === 'regression')) {
+    const name = r.recipe || r.package;
+    const e = byRecipe.get(name) || { specs: [], sweep: [] };
+    if (r.command) e.sweep.push(`${r.users}/${r.user} ${r.command} rc=${r.rc}`);
+    else e.specs.push(r.spec);
+    byRecipe.set(name, e);
+  }
+  const problems = [];
+  for (const name of expected) {
+    const e = byRecipe.get(name) || { specs: [], sweep: [] };
+    const planned = packages.some((p) => p.recipe === name);
+    const swept = sweepOut.some((r) => r.recipe === name);
+    if (!planned && !swept) problems.push(`${name}: neither in the set nor in the base sweep`);
+    if (planned && !e.specs.length) problems.push(`${name}: no spec regression`);
+    if (swept && !e.sweep.length) problems.push(`${name}: no base-sweep regression`);
+  }
   const compat = {
     kernel: { spec: plan.kernel.spec, name: plan.kernel.name, version: plan.kernel.version, sha256: plan.kernel.sha256, integrity: plan.kernel.integrity, gitHead: plan.kernel.gitHead, source: plan.kernel.source },
     reference: { spec: plan.reference.spec, version: plan.reference.version, sha256: plan.reference.sha256, gitHead: plan.reference.gitHead, source: plan.reference.source },
@@ -784,6 +809,7 @@ function report(args) {
     sweep: sweepOut,
     shards,
     sweeps,
+    ...(expected.length ? { expected: { regressions: expected, holds: !problems.length && !errors.length, problems } } : {}),
   };
   writeJson(join(out, 'compat.json'), compat);
 
@@ -836,18 +862,34 @@ function report(args) {
       md.push('');
       md.push('| | Users | User | Command | Package | rc | Reference rc | Notes |');
       md.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
-      for (const r of odd) {
+      for (const r of odd.slice(0, 80)) {
         md.push(`| ${ICON[r.verdict] || ''} | ${r.users} | ${r.user} | \`${cell(r.command)}\` | ${cell(r.recipe || r.package)} | ${r.rc ?? ''} | ${r.reference?.rc ?? ''} | ${cell(r.limit ? `${r.limit.issue}: ${r.limit.why}` : r.why || r.out || '').slice(0, 160)} |`);
       }
+      if (odd.length > 80) md.push(`\n${odd.length - 80} more rows in compat.json`);
     }
+  }
+  if (expected.length) {
+    md.push('');
+    md.push('### Expected regressions (negative proof)');
+    md.push('');
+    md.push('| Package | Expected | Spec regressions | Sweep regressions |');
+    md.push('| --- | --- | --- | --- |');
+    for (const name of [...new Set([...expected, ...byRecipe.keys()])].sort()) {
+      const e = byRecipe.get(name) || { specs: [], sweep: [] };
+      md.push(`| ${name} | ${expected.includes(name) ? 'yes' : 'no'} | ${cell(e.specs.join(', '))} | ${cell(e.sweep.slice(0, 4).join(', '))}${e.sweep.length > 4 ? ` (+${e.sweep.length - 4})` : ''} |`);
+    }
+    md.push('');
+    md.push(problems.length ? `**Proof fails:** ${problems.map(cell).join('; ')}` : '**Proof holds:** every expected package regresses, in its spec and in the base sweep.');
   }
   md.push('');
   md.push('### Shards');
   md.push('');
-  md.push('| Job | Packages | Wall time | Runner |');
-  md.push('| --- | --- | --- | --- |');
-  for (const s of shards) md.push(`| shard ${s.shard} | ${s.packages.join(' ')} | ${s.reported ? secs(s.wallMs) : 'no report'} | ${s.runner || ''} |`);
-  for (const s of sweeps) md.push(`| base-sweep ${s.mode} | ${plan.sweep.packages.length} tarballs, ${plan.sweep.commands.length} cases × 2 users | ${s.reported ? secs(s.wallMs) : 'no report'} | ${s.runner || ''} |`);
+  md.push('| Job | Work | Estimate | Wall time | Runner |');
+  md.push('| --- | --- | --- | --- | --- |');
+  for (const s of shards) {
+    const work = [...s.packages, ...s.sweeps.map((m) => `base-sweep:${m} (${secs(sweeps.find((x) => x.mode === m)?.wallMs)})`)].join(' ');
+    md.push(`| shard ${s.shard} | ${work} | ${secs(s.estimateS * 1000)} | ${s.reported ? secs(s.wallMs) : 'no report'} | ${s.runner || ''} |`);
+  }
   const text = `${md.join('\n')}\n`;
   writeFileSync(join(out, 'summary.md'), text);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
@@ -858,52 +900,22 @@ function report(args) {
     console.log(`::error::kernel-compat could not answer for ${errors.length} item(s): ${errors.join('; ').slice(0, 1000)}`);
     process.exit(1);
   }
+  if (expected.length) {
+    if (problems.length) {
+      console.log(`::error::negative proof fails on ${k.name}@${k.version}: ${problems.join('; ')}`);
+      process.exit(1);
+    }
+    console.log(`::notice::negative proof holds on ${k.name}@${k.version}: ${expected.join(', ')} regress; all regressions: ${[...byRecipe.keys()].join(', ')}`);
+    return;
+  }
   if (regressions) {
-    const names = [...new Set([...results, ...sweepOut].filter((r) => r.verdict === 'regression').map((r) => r.recipe || r.package))];
-    const msg = `${regressions} regression(s) on ${k.name}@${k.version} against ${plan.reference.version}: ${names.join(', ')}`;
+    const msg = `${regressions} regression(s) on ${k.name}@${k.version} against ${plan.reference.version}: ${[...byRecipe.keys()].join(', ')}`;
     console.log(failOnRegression ? `::error::${msg}` : `::warning::${msg}`);
     if (failOnRegression) process.exit(1);
   }
 }
 
-function verify(args) {
-  const positive = readJson(resolve(args.positive));
-  const negative = readJson(resolve(args.negative));
-  const expected = (args['expect-regressions'] || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const problems = [];
-  const md = ['## kernel-compat proof', ''];
-  md.push(`- positive: ${positive.kernel.name}@${positive.kernel.version} vs ${positive.reference.version}: **${positive.verdict}** (${positive.summary.regressions} regressions, ${positive.summary.error} errors)`);
-  if (positive.verdict !== 'pass') problems.push(`positive run is ${positive.verdict}, not pass`);
-  const regs = [...negative.results, ...negative.sweep].filter((r) => r.verdict === 'regression');
-  const byRecipe = new Map();
-  for (const r of regs) {
-    const name = r.recipe || r.package;
-    const e = byRecipe.get(name) || { specs: [], sweep: [] };
-    if (r.command) e.sweep.push(`${r.users}/${r.user} ${r.command} rc=${r.rc}`);
-    else e.specs.push(r.spec);
-    byRecipe.set(name, e);
-  }
-  md.push(`- negative: ${negative.kernel.name}@${negative.kernel.version} vs ${negative.reference.version}: **${negative.verdict}** (${negative.summary.regressions} regressions, ${negative.summary.error} errors)`);
-  if (negative.summary.error) problems.push(`negative run has ${negative.summary.error} errors`);
-  md.push('');
-  md.push('| Package | Expected | Spec regressions | Sweep regressions |');
-  md.push('| --- | --- | --- | --- |');
-  for (const name of [...new Set([...expected, ...byRecipe.keys()])].sort()) {
-    const e = byRecipe.get(name) || { specs: [], sweep: [] };
-    const want = expected.includes(name);
-    if (want && !e.specs.length) problems.push(`${name}: no spec regression on ${negative.kernel.version}`);
-    if (want && !e.sweep.length) problems.push(`${name}: no base-sweep regression on ${negative.kernel.version}`);
-    md.push(`| ${name} | ${want ? 'yes' : 'no'} | ${cell(e.specs.join(', '))} | ${cell(e.sweep.slice(0, 6).join(', '))}${e.sweep.length > 6 ? ` (+${e.sweep.length - 6})` : ''} |`);
-  }
-  md.push('');
-  md.push(problems.length ? `**Proof failed:**\n\n${problems.map((p) => `- ${p}`).join('\n')}` : '**Proof holds:** the positive run is green and every expected package regresses on the negative kernel.');
-  const text = `${md.join('\n')}\n`;
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
-  console.log(text);
-  if (problems.length) process.exit(1);
-}
-
-const commands = { plan, shard, sweep, report, verify };
+const commands = { plan, shard, report };
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2));
   const fn = commands[args._[0]];

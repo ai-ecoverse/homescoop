@@ -30,31 +30,4 @@ jobs:
       kernel: '@ai-ecoverse/slicc-kernel@1.78.0'
       set: 'base,ci-certified'
       homescoop-ref: ${{ github.event.pull_request.head.sha }}
-      fail-on-regression: false
-
-  verify:
-    needs: [positive, negative]
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-      - uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.positive.outputs.artifact }}
-          path: ${{ runner.temp }}/positive
-      - uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.negative.outputs.artifact }}
-          path: ${{ runner.temp }}/negative
-      - name: Positive green, negative regresses on the slicc_sleep_ms packages (slicc-kernel#483, fixed by #496 in 1.81.0)
-        run: |
-          node scripts/browser-cert/compat.mjs verify \
-            --positive "$RUNNER_TEMP/positive/compat.json" \
-            --negative "$RUNNER_TEMP/negative/compat.json" \
-            --expect-regressions grep,sed,xz,jq,findutils,diffutils,patch
+      expect-regressions: 'grep,sed,xz,jq,findutils,diffutils,patch'

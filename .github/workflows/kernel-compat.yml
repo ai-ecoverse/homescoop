@@ -27,16 +27,24 @@ on:
         description: 'Fail the report job when a package or sweep case passes on the reference kernel and fails on the candidate'
         type: boolean
         default: true
+      shards:
+        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3; the base sweep runs inside them'
+        type: string
+        default: 'auto'
+      expect-regressions:
+        description: 'Negative proof: recipes that must regress (spec and base sweep); the report fails if one does not, and other regressions do not fail it'
+        type: string
+        default: ''
     outputs:
       artifact:
         description: 'Artifact holding compat.json, summary.md and the logs'
-        value: ${{ jobs.report.outputs.artifact }}
+        value: ${{ jobs.plan.outputs.artifact }}
       verdict:
         description: 'pass, regression or error'
-        value: ${{ jobs.report.outputs.verdict }}
+        value: ${{ jobs.report.outputs.verdict || jobs.shard.outputs.verdict }}
       regressions:
         description: 'Number of regressions'
-        value: ${{ jobs.report.outputs.regressions }}
+        value: ${{ jobs.report.outputs.regressions || jobs.shard.outputs.regressions }}
   workflow_dispatch:
     inputs:
       kernel:
@@ -63,6 +71,10 @@ on:
         description: 'Fail the report job on a regression'
         type: boolean
         default: true
+      shards:
+        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3'
+        type: string
+        default: 'auto'
 
 permissions:
   contents: read
@@ -77,9 +89,9 @@ jobs:
     timeout-minutes: 20
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
+      artifact: ${{ steps.plan.outputs.artifact }}
       shards: ${{ steps.plan.outputs.shards }}
-      sweep: ${{ steps.plan.outputs.sweep }}
-      modes: ${{ steps.plan.outputs.modes }}
+      count: ${{ steps.plan.outputs.count }}
       homescoop-sha: ${{ steps.plan.outputs.homescoop-sha }}
     steps:
       - uses: actions/checkout@v7
@@ -107,28 +119,32 @@ jobs:
           SET: ${{ inputs.set || 'base,ci-certified' }}
           BIOS_REF: ${{ inputs.bios-ref || 'main' }}
           HOMESCOOP_REF: ${{ inputs.homescoop-ref }}
+          SHARDS: ${{ inputs.shards || 'auto' }}
           KERNEL_DIR: ${{ steps.kind.outputs.kind == 'artifact' && format('{0}/kernel-artifact', runner.temp) || '' }}
         run: |
           set -euo pipefail
           node scripts/browser-cert/compat.mjs plan \
-            --kernel "$KERNEL" --set "$SET" --bios-ref "$BIOS_REF" --homescoop-ref "$HOMESCOOP_REF" \
+            --kernel "$KERNEL" --set "$SET" --bios-ref "$BIOS_REF" --homescoop-ref "$HOMESCOOP_REF" --shards "$SHARDS" \
             ${KERNEL_DIR:+--kernel-dir "$KERNEL_DIR"} \
             --out "$RUNNER_TEMP/plan"
       - uses: actions/upload-artifact@v7
         with:
-          name: kernel-compat-${{ steps.plan.outputs.tag }}-plan
+          name: ${{ steps.plan.outputs.artifact }}-plan
           path: ${{ runner.temp }}/plan
           retention-days: 3
           overwrite: true
 
   shard:
     needs: plan
-    if: needs.plan.outputs.shards != '[]'
+    if: needs.plan.outputs.count != '0'
     runs-on: ${{ inputs.runner || vars.CERT_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 60
+    timeout-minutes: 75
+    outputs:
+      verdict: ${{ steps.report.outputs.verdict }}
+      regressions: ${{ steps.report.outputs.regressions }}
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 3
       matrix:
         shard: ${{ fromJson(needs.plan.outputs.shards) }}
     steps:
@@ -141,69 +157,48 @@ jobs:
           node-version: '24'
       - uses: actions/download-artifact@v8
         with:
-          name: kernel-compat-${{ needs.plan.outputs.tag }}-plan
+          name: ${{ needs.plan.outputs.artifact }}-plan
           path: ${{ runner.temp }}/plan
       - name: Chromium for playwright-core 1.63.0
         run: |
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit playwright-core@1.63.0
           npx --prefix "$RUNNER_TEMP/pw" playwright-core install --with-deps chromium || npx --prefix "$RUNNER_TEMP/pw" playwright-core install chromium
-      - name: Cert specs on the candidate kernel
+      - name: Cert specs and base sweep on the candidate kernel
         run: node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: kernel-compat-${{ needs.plan.outputs.tag }}-shard-${{ matrix.shard }}
+          name: ${{ needs.plan.outputs.artifact }}-shard-${{ matrix.shard }}
           path: ${{ runner.temp }}/out
           retention-days: 3
           overwrite: true
           if-no-files-found: ignore
-
-  base-sweep:
-    needs: plan
-    if: needs.plan.outputs.sweep == 'true'
-    runs-on: ${{ inputs.runner || vars.CERT_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        users: ${{ fromJson(needs.plan.outputs.modes) }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          repository: ai-ecoverse/homescoop
-          ref: ${{ needs.plan.outputs.homescoop-sha }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-      - uses: actions/download-artifact@v8
-        with:
-          name: kernel-compat-${{ needs.plan.outputs.tag }}-plan
-          path: ${{ runner.temp }}/plan
-      - name: Chromium for playwright-core 1.63.0
+      - id: report
+        if: ${{ !cancelled() && needs.plan.outputs.count == '1' }}
+        env:
+          FAIL_ON_REGRESSION: ${{ inputs.fail-on-regression && 'true' || 'false' }}
+          EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
         run: |
           set -euo pipefail
-          npm install --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit playwright-core@1.63.0
-          npx --prefix "$RUNNER_TEMP/pw" playwright-core install --with-deps chromium || npx --prefix "$RUNNER_TEMP/pw" playwright-core install chromium
-      - name: Base-set sweep (users ${{ matrix.users }}, root and cone)
-        run: node scripts/browser-cert/compat.mjs sweep --plan "$RUNNER_TEMP/plan/plan.json" --mode ${{ matrix.users }} --out "$RUNNER_TEMP/out"
-      - if: always()
+          node scripts/browser-cert/compat.mjs report \
+            --plan "$RUNNER_TEMP/plan/plan.json" --results "$RUNNER_TEMP/out" --out "$RUNNER_TEMP/compat" \
+            --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"
+      - if: ${{ !cancelled() && needs.plan.outputs.count == '1' }}
         uses: actions/upload-artifact@v7
         with:
-          name: kernel-compat-${{ needs.plan.outputs.tag }}-sweep-${{ matrix.users }}
-          path: ${{ runner.temp }}/out
-          retention-days: 3
+          name: ${{ needs.plan.outputs.artifact }}
+          path: ${{ runner.temp }}/compat
+          retention-days: 30
           overwrite: true
           if-no-files-found: ignore
 
   report:
-    needs: [plan, shard, base-sweep]
-    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    needs: [plan, shard]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.count != '1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
-      artifact: kernel-compat-${{ needs.plan.outputs.tag }}
       verdict: ${{ steps.report.outputs.verdict }}
       regressions: ${{ steps.report.outputs.regressions }}
     steps:
@@ -216,21 +211,22 @@ jobs:
           node-version: '24'
       - uses: actions/download-artifact@v8
         with:
-          pattern: kernel-compat-${{ needs.plan.outputs.tag }}-*
+          pattern: ${{ needs.plan.outputs.artifact }}-*
           path: ${{ runner.temp }}/results
       - id: report
         env:
           FAIL_ON_REGRESSION: ${{ inputs.fail-on-regression && 'true' || 'false' }}
+          EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
         run: |
           set -euo pipefail
           node scripts/browser-cert/compat.mjs report \
-            --plan "$RUNNER_TEMP/results/kernel-compat-${{ needs.plan.outputs.tag }}-plan/plan.json" \
+            --plan "$RUNNER_TEMP/results/${{ needs.plan.outputs.artifact }}-plan/plan.json" \
             --results "$RUNNER_TEMP/results" --out "$RUNNER_TEMP/compat" \
-            --fail-on-regression "$FAIL_ON_REGRESSION"
+            --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: kernel-compat-${{ needs.plan.outputs.tag }}
+          name: ${{ needs.plan.outputs.artifact }}
           path: ${{ runner.temp }}/compat
           retention-days: 30
           overwrite: true

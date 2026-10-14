@@ -24,5 +24,5 @@ node scripts/browser-cert/run.mjs --package jq --tarball wasm-jq-1.8.2-2.tgz \
   --kernel @ai-ecoverse/slicc-kernel@1.81.0 --users off --json /tmp/jq.json
 ```
 
-`compat.mjs` (`plan`, `shard`, `sweep`, `report`, `verify`) drives the
+`compat.mjs` (`plan`, `shard`, `report`) drives the
 kernel-compat jobs; see [docs/ci-cert.md](../../docs/ci-cert.md#kernel-compatibility-kernel-compatyml).

@@ -151,7 +151,9 @@ jobs:
 | `homescoop-ref` | `main` | the homescoop commit whose specs and scripts run |
 | `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
 | `runner` | `''` | `runs-on` for the shards and the sweep: `inputs.runner \|\| vars.CERT_RUNNER \|\| 'ubuntu-latest'` |
-| `fail-on-regression` | `true` | `false` reports regressions without failing (the proof's negative run) |
+| `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, at most 3) or `1`–`3` |
+| `fail-on-regression` | `true` | `false` reports regressions without failing |
+| `expect-regressions` | `''` | a negative proof: recipes that must regress, in their spec and in the base sweep. The report fails if one doesn't; other regressions are listed but don't fail it |
 
 Each package is the **published tarball** at the version bios pins (`base`,
 `catalog`) or at npm's `latest` (`ci-certified`, `all`, a bare name), checked
@@ -161,28 +163,40 @@ listed as skipped, as are base-set packages homescoop has no recipe for.
 
 ### Jobs
 
+Hosted runners queue jobs for a long time (18–45 min a job on the org's pool
+when it is busy), while the work is minutes, so a call runs as few jobs as it
+can: one plan job, 1–3 shard jobs, and a report job only when there is more
+than one shard.
+
 1. **plan** reads bios's lockfiles at `bios-ref` (through the GitHub API, at a
    recorded sha), resolves the candidate and the reference kernel (bios's pin
-   of `@ai-ecoverse/slicc-kernel`), lists the packages and their versions and
-   splits them into at most 6 shards. It reads the base-set tarballs'
-   `slicc.commands` for the sweep's command list. `plan.json`, `candidate.tgz`
-   and `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
-2. **shard** (matrix, `max-parallel: 4`) runs each package through
-   `scripts/browser-cert/run.mjs --kernel candidate.tgz --users <meta.json
-   users, else off>`, with `needsInstall` / `needs` / `needsTarballScripts` /
-   `needsRepack` installed as `ladder-pr` does. A failure is retried once (a
-   spec that passes either time passes, marked flaky). A failure no known
-   limit covers is run again on the reference kernel.
-3. **base-sweep** (one job per users mode, `report` and `enforce`) installs
-   every base-set tarball but the kernel in one kernel and runs
-   [`base-sweep/sweep.mjs`](../scripts/browser-cert/base-sweep/sweep.mjs)
-   through `run.mjs` as root and as cone: every command in their
-   `slicc.commands` (`--version`, or the invocation in
-   [`base-sweep/meta.json`](../scripts/browser-cert/base-sweep/meta.json))
-   must exit as expected, plus grep, sed, xz, jq, find/xargs, diff/cmp and
-   patch in real use. Failing commands are retried, then run on the reference.
-4. **report** merges everything into the `kernel-compat-<tag>` artifact
-   (`compat.json`, `summary.md`, the logs) and the job summary.
+   of `@ai-ecoverse/slicc-kernel`), lists the packages and their versions,
+   and reads the base-set tarballs' `slicc.commands` for the sweep. It packs
+   the work (each package about 10 s plus 4 s a spec, each sweep mode about
+   2.5 min) into `shards` jobs. `plan.json`, `candidate.tgz` and
+   `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
+2. **shard** (matrix, `max-parallel: 3`, on `runner`) runs its packages, then
+   its sweep modes:
+   - each package through `scripts/browser-cert/run.mjs --kernel
+     candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
+     `needs` / `needsTarballScripts` / `needsRepack` installed as `ladder-pr`
+     does. A failure is retried once (a spec that passes either time passes,
+     marked flaky); a failure no known limit covers is run again on the
+     reference kernel;
+   - the **base-set sweep**, once per users mode (`report`, `enforce`): every
+     base-set tarball but the kernel in one kernel, and
+     [`base-sweep/sweep.mjs`](../scripts/browser-cert/base-sweep/sweep.mjs)
+     run through `run.mjs` as root and as cone. Every command in their
+     `slicc.commands` (`--version`, or the invocation in
+     [`base-sweep/meta.json`](../scripts/browser-cert/base-sweep/meta.json))
+     must exit as expected, plus grep, sed, xz, jq, find/xargs, diff/cmp and
+     patch in real use. Failing commands are retried, then run on the
+     reference.
+
+   With a single shard, that job also writes the report.
+3. **report** (more than one shard) merges everything into the
+   `kernel-compat-<tag>` artifact (`compat.json`, `summary.md`, the logs) and
+   the job summary.
 
 ### Verdicts
 
@@ -208,10 +222,8 @@ a second failure in the same file; its log is in the artifact.
       "case": "chcon",
       "kernel": "*",
       "version": "<=9.12.0-5",
-      "users": ["enforce"],
-      "user": "cone",
       "rc": 1,
-      "issue": "ai-ecoverse/homescoop#000",
+      "issue": "ai-ecoverse/homescoop#326",
       "why": "listed in slicc.commands, not built"
     }
   ]
@@ -259,7 +271,8 @@ kernel range.
   share that pool with `ladder-pr`; hence the bounds below.
 - `concurrency`: one group per caller repo, PR (or ref), kernel, set and
   bios-ref; a PR caller's newer run cancels the older one.
-- At most 4 shards and 2 sweep jobs of one call run at once.
+- One call is at most 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
+  `base,ci-certified` call is a plan job and one shard job.
 - Set `CERT_RUNNER` to `cloud-run-bench` (the org's Cloud Run pool) to move
   the heavy jobs off GitHub-hosted runners without a code change; plan and
   report stay on `ubuntu-latest`. Shards are short and re-runnable ("Re-run
@@ -273,7 +286,7 @@ kernel range.
 [`kernel-compat-proof.yml`](../.github/workflows/kernel-compat-proof.yml) runs
 on PRs that touch these files. It calls the workflow twice, as slicc-kernel
 does: `@ai-ecoverse/slicc-kernel@1.81.0` on `base,ci-certified` must be green,
-and `1.78.0` (`fail-on-regression: false`) must report a regression, in a
-spec and in the sweep, for grep, sed, xz, jq, findutils, diffutils and patch:
-the Emscripten builds without `slicc_sleep_ms` that exit 70 there
-(slicc-kernel#483, fixed by #496 in 1.81.0). `compat.mjs verify` checks both.
+and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
+must report a regression, in a spec and in the sweep, for each of them: the
+Emscripten builds without `slicc_sleep_ms` that exit 70 there
+(slicc-kernel#483, fixed by #496 in 1.81.0).

@@ -1,3 +1,61 @@
 {
-  "limits": []
+  "limits": [
+    {
+      "package": "@ai-ecoverse/wasm-coreutils",
+      "spec": "base-sweep",
+      "case": "chcon",
+      "kernel": "*",
+      "version": "<=9.12.0-5",
+      "rc": 1,
+      "issue": "ai-ecoverse/homescoop#326",
+      "why": "listed in slicc.commands, not built: coreutils: unknown program 'chcon'"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-coreutils",
+      "spec": "base-sweep",
+      "case": "runcon",
+      "kernel": "*",
+      "version": "<=9.12.0-5",
+      "rc": 1,
+      "issue": "ai-ecoverse/homescoop#326",
+      "why": "listed in slicc.commands, not built: coreutils: unknown program 'runcon'"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-coreutils",
+      "spec": "base-sweep",
+      "case": "[",
+      "kernel": "*",
+      "version": "<=9.12.0-5",
+      "rc": 127,
+      "issue": "ai-ecoverse/homescoop#326",
+      "why": "the kernel's command catalog takes only names matching [A-Za-z0-9._+-], so '[' is not found (bash's builtin covers shells)"
+    },
+    {
+      "package": "@ai-ecoverse/wasi-pnpm",
+      "spec": "base-sweep",
+      "case": "i",
+      "kernel": ">=1.78.0",
+      "users": ["enforce"],
+      "rc": 126,
+      "issue": "ai-ecoverse/slicc-kernel#495",
+      "why": "the shims are written without their tarball mode (0644), and 1.78.0 checks the x bit on exec, so i's exec of ${0%/*}/npm by path is refused (cert runner B3, K4 on 1.81.0)"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-bzip2",
+      "spec": "checklist.mjs",
+      "case": "bzip2recover rc=1",
+      "kernel": "*",
+      "version": "<1.0.8-2",
+      "issue": "ai-ecoverse/homescoop#289",
+      "why": "the spec checks bzip2recover-llu.patch, new in 1.0.8-2; 1.0.8-1 prints 'I/O error reading data.bz2' (NEGATIVE.md)"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-rsync",
+      "spec": "checklist.mjs",
+      "case": "re-run itemized[\\s\\S]*\\.d\\.\\.t\\.{6} \\./",
+      "kernel": ">=1.36.0 <1.73.3",
+      "issue": "ai-ecoverse/slicc-kernel#449",
+      "why": "the destination's top directory loses its mtime after rsync -a, so the re-run itemizes '.d..t...... ./'; fixed by slicc-kernel#467 in 1.73.3"
+    }
+  ]
 }
