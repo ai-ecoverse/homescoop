@@ -55,6 +55,7 @@ pub fn rdata(data: &RData) -> String {
     match data {
         // dig quotes every character-string of a TXT record.
         RData::TXT(txt) => txt
+            .txt_data
             .iter()
             .map(|s| {
                 let mut q = String::from("\"");
@@ -76,9 +77,9 @@ pub fn rdata(data: &RData) -> String {
             .collect::<Vec<_>>()
             .join(" "),
         RData::CAA(caa) => {
-            let flags = if caa.issuer_critical() { 128 } else { 0 };
-            let value = String::from_utf8_lossy(&caa.raw_value()).into_owned();
-            format!("{flags} {} \"{}\"", caa.tag().as_str(), value.replace('"', "\\\""))
+            let flags = if caa.issuer_critical { 128 } else { 0 };
+            let value = String::from_utf8_lossy(&caa.value).into_owned();
+            format!("{flags} {} \"{}\"", caa.tag.as_str(), value.replace('"', "\\\""))
         }
         other => other.to_string(),
     }
@@ -87,11 +88,11 @@ pub fn rdata(data: &RData) -> String {
 pub fn record_line(r: &Record) -> String {
     format!(
         "{}{}\t{}\t{}\t{}",
-        pad(&r.name().to_string(), 24),
-        r.ttl(),
-        r.dns_class(),
+        pad(&r.name.to_string(), 24),
+        r.ttl,
+        r.dns_class,
         r.record_type(),
-        rdata(r.data())
+        rdata(&r.data)
     )
 }
 
@@ -127,8 +128,8 @@ fn when() -> String {
 pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
     let mut out = String::new();
     if o.short {
-        for r in msg.answers() {
-            let _ = writeln!(out, "{}", rdata(r.data()));
+        for r in &msg.answers {
+            let _ = writeln!(out, "{}", rdata(&r.data));
         }
         return out;
     }
@@ -136,47 +137,47 @@ pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
         let _ = writeln!(out, "\n; <<>> DiG {} (wasi-dig) <<>> {}", env!("CARGO_PKG_VERSION"), o.argv.join(" "));
         let _ = writeln!(out, ";; global options: +cmd");
     }
-    let edns = msg.extensions().as_ref();
-    let mut code = u16::from(msg.response_code());
+    let edns = msg.edns.as_ref();
+    let mut code = u16::from(msg.response_code);
     if let Some(e) = edns {
         code |= u16::from(e.rcode_high()) << 4;
     }
     if o.comments {
         let mut flags = vec!["qr"];
-        if msg.authoritative() {
+        if msg.authoritative {
             flags.push("aa");
         }
-        if msg.truncated() {
+        if msg.truncation {
             flags.push("tc");
         }
-        if msg.recursion_desired() {
+        if msg.recursion_desired {
             flags.push("rd");
         }
-        if msg.recursion_available() {
+        if msg.recursion_available {
             flags.push("ra");
         }
-        if msg.authentic_data() {
+        if msg.authentic_data {
             flags.push("ad");
         }
-        if msg.checking_disabled() {
+        if msg.checking_disabled {
             flags.push("cd");
         }
         let _ = writeln!(out, ";; Got answer:");
         let _ = writeln!(
             out,
             ";; ->>HEADER<<- opcode: {}, status: {}, id: {}",
-            opcode(msg.op_code()),
+            opcode(msg.op_code),
             rcode(code),
-            msg.id()
+            msg.id
         );
         let _ = writeln!(
             out,
             ";; flags: {}; QUERY: {}, ANSWER: {}, AUTHORITY: {}, ADDITIONAL: {}",
             flags.join(" "),
-            msg.queries().len(),
-            msg.answers().len(),
-            msg.name_servers().len(),
-            msg.additionals().len() + usize::from(edns.is_some())
+            msg.queries.len(),
+            msg.answers.len(),
+            msg.authorities.len(),
+            msg.additionals.len() + usize::from(edns.is_some())
         );
         out.push('\n');
         if let (true, Some(e)) = (o.additional, edns) {
@@ -189,7 +190,7 @@ pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
         if o.comments {
             let _ = writeln!(out, ";; QUESTION SECTION:");
         }
-        for q in msg.queries() {
+        for q in &msg.queries {
             let _ = writeln!(out, "{}{}\t{}", pad(&format!(";{}", q.name()), 32), q.query_class(), q.query_type());
         }
         if o.comments {
@@ -197,9 +198,9 @@ pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
         }
     }
     for (on, title, records) in [
-        (o.answer, "ANSWER", msg.answers()),
-        (o.authority, "AUTHORITY", msg.name_servers()),
-        (o.additional, "ADDITIONAL", msg.additionals()),
+        (o.answer, "ANSWER", &msg.answers),
+        (o.authority, "AUTHORITY", &msg.authorities),
+        (o.additional, "ADDITIONAL", &msg.additionals),
     ] {
         if !on || records.is_empty() {
             continue;
