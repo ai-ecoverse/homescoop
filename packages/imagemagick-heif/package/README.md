@@ -38,6 +38,9 @@ The other delegates are those of `@ai-ecoverse/wasm-imagemagick` 7.1.2-32-4:
 freetype, jpeg, jp2 (openjpeg), lcms, png, tiff, webp, xml (libxml2) and zlib.
 Configure XMLs ship under `etc/ImageMagick-7/`.
 
+WebP lossless (`-define webp:lossless=true`) drops the RGB of fully transparent
+pixels, as libwebp does by default; add `-define webp:exact=true` to keep it.
+
 ## Licences
 
 `LICENSE` is ImageMagick's. `THIRD-PARTY-NOTICES.md` has the licences of the
