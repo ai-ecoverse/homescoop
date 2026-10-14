@@ -30,8 +30,12 @@ export EM_PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 
 echo "== imagemagick: pkg-config delegates"
 "$PKG_CONFIG" --modversion zlib libjpeg libpng lcms2 libtiff-4 libwebp \
-  libwebpmux libwebpdemux libopenjp2 freetype2 libheif | tr '\n' ' '
+  libwebpmux libwebpdemux libopenjp2 freetype2 libxml-2.0 libheif | tr '\n' ' '
 echo
+"$PKG_CONFIG" --atleast-version=0.4.1 libwebp
+"$PKG_CONFIG" --atleast-version=2.8.0 freetype2
+"$PKG_CONFIG" --atleast-version=2.0.0 libxml-2.0
+"$PKG_CONFIG" --atleast-version=1.23.6 libheif
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
@@ -52,11 +56,13 @@ if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "${F
         --without-flif --without-fpx --without-fontconfig --without-gslib \
         --without-gvc --with-heic --without-jbig --without-jxl --without-lqr \
         --without-lzma --without-openexr --without-pango --without-raqm \
-        --without-raw --without-rsvg --without-uhdr --without-wmf --without-xml \
-        --without-zip --without-zstd \
+        --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml \
+        --without-zip --without-zstd --with-webp --with-freetype \
         CFLAGS="-g1 -O2" CXXFLAGS="-g1 -O2" \
         LDFLAGS="-L$PREFIX/lib -fexceptions"
-    grep -q '^#define MAGICKCORE_HEIC_DELEGATE 1' MagickCore/magick-baseconfig.h || { echo "imagemagick-heif: configure did not enable the HEIC delegate" >&2; exit 1; }
+    for d in WEBP FREETYPE XML HEIC; do
+      grep -q "^#define ${d}_DELEGATE 1" config/config.h || { echo "homescoop: configure left out the ${d} delegate" >&2; exit 1; }
+    done
     homescoop_fix_darwin_ar Makefile
     find . -name Makefile -print0 | while IFS= read -r -d '' mf; do
       homescoop_fix_darwin_ar "$mf"
@@ -108,6 +114,12 @@ homescoop_notice "OpenJPEG 2.5.3 (@ai-ecoverse/wasm-openjpeg)" \
 homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the FreeType License" \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/LICENSE.TXT 2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1
+homescoop_notice "libxml2 2.15.4 (@ai-ecoverse/wasm-libxml2)" \
+  https://raw.githubusercontent.com/GNOME/libxml2/v2.15.4/Copyright 5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626
+ICONV_TB="$WORK/libiconv-1.18.tar.gz"
+homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.18.tar.gz 3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8 "$ICONV_TB"
+tar xzf "$ICONV_TB" -C "$WORK" libiconv-1.18/COPYING.LIB
+homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later" "$WORK/libiconv-1.18/COPYING.LIB" -
 homescoop_notice "libheif 1.23.6 (@ai-ecoverse/wasm-libheif)" \
   https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/COPYING fa81ce652315b013359d6e8e4744335f31a50c7c192907176d3632f78a3b4596
 homescoop_notice "libde265 1.1.3 (@ai-ecoverse/wasm-libheif)" \
@@ -124,7 +136,7 @@ while IFS= read -r o; do MAGICK_OBJS+=("$o"); done < <(find "$SRC/utilities" -na
 test "${#MAGICK_OBJS[@]}" -gt 0
 emar rcs "$RELINK/magick.a" "${MAGICK_OBJS[@]}"
 cp "$SRC/MagickWand/.libs/libMagickWand-7.Q16HDRI.a" "$SRC/MagickCore/.libs/libMagickCore-7.Q16HDRI.a" "$RELINK/"
-for a in liblcms2.a libtiff.a libjpeg.a libpng16.a libz.a libopenjp2.a; do
+for a in liblcms2.a libtiff.a libjpeg.a libfreetype.a libpng16.a libz.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libopenjp2.a libxml2.a libiconv.a; do
   cp "$PREFIX/lib/$a" "$RELINK/$a"
 done
 cp "$SLICC_A" "$RELINK/libslicc-cli.a"

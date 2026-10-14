@@ -1,12 +1,21 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.72.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.81.0",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-18",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5"
+  ],
   "fixtures": "packages/libheif/cert/fixtures (fixtures.json: sources and licences; references.json: host libheif 1.23.6 pixels)",
   "checklist": [
-    "magick -version is 7.1.2-32 with heic among the built-in delegates; -list format has HEIC and AVIF (read only, libheif 1.23.6)",
+    "magick -version is 7.1.2-32 with heic among the built-in delegates, and wasm-imagemagick 7.1.2-32-4's freetype, webp and xml kept; -list format has HEIC and AVIF (read only, libheif 1.23.6)",
     "identify: the iPhone 13 Pro Max still is HEIC 3024x4032, orientation TopLeft (irot applied), EXIF Make/Model Apple / iPhone 13 Pro Max; with heic:preserve-orientation=true it is 4032x3024 RightTop; example.heic has two 1280x854 frames; example.avif 800x533; heic:depth-image=true adds the portrait's 768x576 depth frame",
     "magick IMG.HEIC PNG24:out.png equals host libheif 1.23.6 sample by sample (references.json of wasm-libheif) for the iPhone still, the iPhone portrait, both frames of example.heic (out-%d.png), the AVIF, 451x461, 1x1 and the rotated 9x17",
-    "resize: -resize 25% to JPEG is 756x1008 with no rotating EXIF Orientation; -resize 640x640 is 480x640; convert 'example.heic[1]' -resize 50% is 640x427; mogrify -format jpg; preserve-orientation plus -auto-orient is upright",
+    "resize: -resize 25% to JPEG is 756x1008 with no rotating EXIF Orientation; -resize 640x640 is 480x640; convert 'example.heic[1]' -resize 50% is 640x427; mogrify -format jpg; HEIC to WebP; preserve-orientation plus -auto-orient is upright",
+    "umask (slicc-kernel >= 1.78.0): under bash umask 027, the PNG magick writes is mode 640",
     "errors: truncated, empty and missing HEIC give rc 1 with a magick: message, no trap and no output; writing HEIC is refused with 'no encode delegate for this image format `HEIC'' (no encoder; ImageMagick only warns and falls back to the input format, so out.heic is not HEIF)",
     "relinkable (LGPL): ladder-pr runs share/imagemagick-heif/relink/relink.sh from the tarball against the libheif.a, libde265.a and libdav1d.a of wasm-libheif, and checks that the relinked magick.wasm validates and matches the shipped one in size"
   ],

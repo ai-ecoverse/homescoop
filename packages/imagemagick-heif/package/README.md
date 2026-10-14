@@ -34,8 +34,9 @@ photos come out upright and `%[orientation]` is `TopLeft`. To get the stored
 orientation instead, use `-define heic:preserve-orientation=true` (the stored
 pixels, plus the orientation, which `-auto-orient` then applies).
 
-The other delegates are those of `@ai-ecoverse/wasm-imagemagick`: jpeg, png,
-tiff, jp2 (openjpeg), lcms. Configure XMLs ship under `etc/ImageMagick-7/`.
+The other delegates are those of `@ai-ecoverse/wasm-imagemagick` 7.1.2-32-4:
+freetype, jpeg, jp2 (openjpeg), lcms, png, tiff, webp, xml (libxml2) and zlib.
+Configure XMLs ship under `etc/ImageMagick-7/`.
 
 ## Licences
 
@@ -52,8 +53,8 @@ The libheif, libde265 and dav1d builds are the ones in
 `share/imagemagick-heif/relink/` holds what you need to relink `magick`
 against your own libheif or libde265: magick's objects (`magick.a`,
 `libMagickCore-7.Q16HDRI.a`, `libMagickWand-7.Q16HDRI.a`), the other static
-libraries (`liblcms2.a`, `libtiff.a`, `libjpeg.a`, `libpng16.a`, `libz.a`,
-`libopenjp2.a`, `libslicc-cli.a`), the slicc link flags (`ldflags.txt`,
+libraries (lcms2, tiff, jpeg, freetype, png, zlib, webp with sharpyuv,
+openjpeg, libxml2, libiconv and `libslicc-cli.a`), the slicc link flags (`ldflags.txt`,
 `js/`) and `relink.sh`. libheif, libde265 and dav1d themselves come from
 `@ai-ecoverse/wasm-libheif` (its `lib/`) or from your own build. With
 Emscripten 4.0.23:
