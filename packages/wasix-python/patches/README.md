@@ -104,6 +104,10 @@ failure keeps historic block-buffering.
 Apply against the CPython 3.14.2 tree used for wasix-python (shipped in the
 interpreter package, not as a standalone libc change).
 
+## `cpython-ensurepip-installed-pip.patch` (wasix-python 3.14.2-17)
+
+`Lib/ensurepip/__init__.py`, `_bootstrap`: `python -m venv` (and `ensurepip` in a venv) ran pip **from the bundled wheel**, a zip without bytecode, so every venv compiled pip's ~600 modules from source before pip installed itself (and compiled its 398 files again). The package's own `site-packages/pip` is the same pip (unpacked from that wheel at build time) with unchecked-hash `.pyc`. On WASI, in a venv, without `--root`/`--user`, and when `site-packages/pip-<_PIP_VERSION>.dist-info` exists in the base, ensurepip now runs that pip (`sys.path` gets the base purelib instead of the wheel) with `--ignore-installed`, so it installs the wheel into the venv instead of finding the base's copy. The installed result is unchanged (pip from the same wheel, `INSTALLER` pip, scripts with the venv's python). `python -m venv` with pip takes about half the time (Node entry: 10-13 s vs 22-28 s on a loaded host). It was the step that ran past the browser-cert harness's 30 s per call on slower CI runners (#300).
+
 ## `libffi-wasix-varargs.patch` (wasix-python 3.14.2-16)
 
 Against wasix-org/libffi 09cbf7d (`recipe.yaml` sources.libffi), `src/wasm32/ffi.c`, WASIX path (not Emscripten):

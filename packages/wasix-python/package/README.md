@@ -41,6 +41,8 @@ Since 3.14.2-17 (wasix-sysroot -27):
   directory there is no cache.
 - `pip` and `pip3` are commands (`python3 -m pip`); `pip install --user`
   installs into the user's own site-packages.
+- `python -m venv` takes about half as long: ensurepip runs the package's own
+  compiled pip instead of pip from the zipped wheel.
 
 Since 3.14.2-16 (wasix-sysroot -22: the `slicc.libc` marker, no exported
 itimer helper):

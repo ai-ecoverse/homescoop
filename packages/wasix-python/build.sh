@@ -361,7 +361,7 @@ SRCDIR="$B/Python-$VER"
 echo "== wasix-python: CPython $VER source + patches"
 rm -rf "$SRCDIR" && mkdir -p "$SRCDIR"
 tar xzf "$PY_TGZ" -C "$SRCDIR" --strip-components=1
-for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg; do
+for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip; do
   patch -d "$SRCDIR" -p1 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
   echo "  applied $p.patch"
 done

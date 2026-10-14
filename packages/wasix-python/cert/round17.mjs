@@ -58,7 +58,7 @@ export default async function (ctx) {
   const sys1 = await py('cone', 'import sys, hs_sys; print(hs_sys.VALUE, getattr(sys, "hs_sys_pth", False), sys.path.index("/usr/local/lib/python3.14/site-packages") > max(i for i, p in enumerate(sys.path) if p.endswith("/lib/python3.14/site-packages") and not p.startswith("/usr/local")))');
   assert.equal(sys1, 'system True True', `cone sees the system site dir and its .pth, after python's own site-packages: ${sys1}`);
   await as('cone', ['python3', '-m', 'venv', 'iso']);
-  await as('cone', ['python3', '-m', 'venv', '--system-site-packages', 'withsys']);
+  await as('cone', ['python3', '-m', 'venv', '--without-pip', '--system-site-packages', 'withsys']);
   assert.equal(await as('cone', ['iso/bin/python', '-c', 'import importlib.util; print(importlib.util.find_spec("hs_sys") is None)']), 'True', 'a plain venv does not see the system site dir');
   assert.equal(await as('cone', ['withsys/bin/python', '-c', 'import hs_sys; print(hs_sys.VALUE)']), 'system', 'a --system-site-packages venv sees it');
 
