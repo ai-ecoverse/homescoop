@@ -65,8 +65,10 @@ d_dup='define'
 d_dup2='define'
 d_dup3='define'
 d_fcntl='define'
-# flock/lockf: stubs in wasix-posix-stubs.h (libc declares flock, no symbol;
-# WASI fcntl.h omits F_SETLK). Other missing dying builtins also stubbed.
+# flock/lockf: wasix-posix-stubs.h, advisory no-ops that succeed on an open fd
+# (libc declares flock, no symbol; WASI fcntl.h omits F_SETLK; slicc-kernel has
+# no advisory locks, as for wasix-python and wasix-ruby). Other missing dying
+# builtins are stubbed there too.
 d_flock='define'
 d_flockproto='define'
 d_fcntl_can_lock='undef'

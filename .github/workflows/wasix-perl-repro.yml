@@ -1,0 +1,48 @@
+name: wasix-perl-repro
+
+on:
+  pull_request:
+    paths:
+      - packages/wasix-perl/**
+      - scripts/install-wasixcc.sh
+      - .github/workflows/wasix-perl-repro.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        attempt: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: build wasix-perl
+        run: bash scripts/host-run.sh wasix-perl
+      - name: record sha256
+        run: |
+          mkdir -p out
+          tar xzf .homescoop-out/package.tgz -C out
+          sha256sum .homescoop-out/package.tgz out/package/bin/perl.wasm | tee out/sha256.txt "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasix-perl-repro-${{ matrix.attempt }}
+          path: out/sha256.txt
+
+  reproducible:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wasix-perl-repro-*
+      - name: both builds are byte-identical
+        run: |
+          cat wasix-perl-repro-*/sha256.txt | tee "$GITHUB_STEP_SUMMARY"
+          diff wasix-perl-repro-1/sha256.txt wasix-perl-repro-2/sha256.txt

@@ -43,3 +43,17 @@ AssertionError [ERR_ASSERTION]: perl -e use Data::Dumper; $Data::Dumper::Useperl
 
 -8 pins ivdformat, uv{u,o,x,XU}format and sPRI{d,i,u,o,x,XU}64 to `ll` in
 hints/wasix; the checklist also asserts the Config values.
+
+## 5.42.0-11: negative 5.42.0-10 (handles.mjs)
+
+`handles.mjs` against the published 5.42.0-10 on slicc-kernel 1.77.0's Node entry, 2026-10-14: FAIL at its first case (`utime` on a filehandle dies, rc 58). Case by case:
+
+```text
+utime(1, 2, $fh)                         fail: Not supported
+flock($fh, LOCK_EX)                      fail: Not supported
+use filetest "access"; -r "/tmp/pa"      not r: Not supported
+-r "/tmp/pa" (no pragma)                 r
+```
+
+`prove.mjs` against 5.42.0-10: `prove t/a.t` rc 1, `t/a.t (Wstat: 0 Tests: 0 Failed: 0) Parse errors: No plan found in TAP output`, `Result: FAIL`; `perl t/a.t` prints the TAP. `IO::Select->new($out, $err)->can_read(2)` on IPC::Open3 pipes: `perl: wasm trap: memory access out of bounds`, rc 134. `TAP::Parser::Iterator::Process` with `merge => 1` (no select) reads the lines.
+
