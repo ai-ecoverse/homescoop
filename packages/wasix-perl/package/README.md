@@ -15,6 +15,17 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
 
+## 5.42.0-12: wasix-sysroot 2025.9.30-28
+
+- Signal masks are real: `POSIX::sigprocmask` blocks and unblocks through
+  slicc-kernel (≥ 1.88.0). A blocked signal stays pending (`POSIX::sigpending`)
+  without running its `%SIG` handler or cutting a `select` sleep short, and the
+  handler runs once when it is unblocked. Up to 5.42.0-11 the mask was
+  ignored: the handler ran at once and nothing was ever pending. Kernels
+  before 1.88.0 take wasix-sysroot -28's ENOSYS fallback (its README).
+- `bin/perl.wasm` is mode 755 like the other command files (5.42.0-11 shipped
+  it 644).
+
 ## 5.42.0-11
 
 - `utime $atime, $mtime, $fh` (a filehandle) works: `futimes` is libc's
