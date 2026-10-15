@@ -151,11 +151,16 @@ int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout, const
 {
 	__wasi_subscription_t subs[2 * nfds + 1];
 	__wasi_size_t ns = 0;
+	int nval = 0;
 	for (nfds_t i = 0; i < nfds; i++) {
 		struct pollfd *p = &fds[i];
 		p->revents = 0;
 		if (p->fd < 0) continue;
-		if (!(p->events & (POLLRDNORM | POLLWRNORM))) { errno = ENOSYS; return -1; }
+		if (!(p->events & (POLLRDNORM | POLLWRNORM))) {
+			__wasi_fdstat_t st;
+			if (__wasi_fd_fdstat_get(p->fd, &st) == __WASI_ERRNO_BADF) { p->revents = POLLNVAL; nval++; }
+			continue;
+		}
 		if (p->events & POLLRDNORM)
 			subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_READ, .u.u.fd_read.file_descriptor = p->fd };
 		if (p->events & POLLWRNORM)
@@ -167,7 +172,11 @@ int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout, const
 		if (__builtin_mul_overflow((__wasi_timestamp_t)timeout->tv_sec, 1000000000, &t) || __builtin_add_overflow(t, (__wasi_timestamp_t)timeout->tv_nsec, &t)) t = UINT64_MAX;
 		subs[ns++] = (__wasi_subscription_t){ .u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = t ? t : 1 };
 	}
-	if (ns == 0 && !mask) { errno = ENOTSUP; return -1; }
+	if (nval) {
+		if (timeout) ns--;
+		if (ns == 0) return nval;
+		subs[ns++] = (__wasi_subscription_t){ .u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = 1 };
+	}
 	__wasi_event_t ev[ns ? ns : 1];
 	__wasi_size_t ne;
 	__wasi_errno_t err = __slicc_poll_masked(mask, subs, ev, ns, &ne);
