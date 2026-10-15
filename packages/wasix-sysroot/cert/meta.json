@@ -36,6 +36,7 @@
     "known kernel limit (slicc-kernel#561, also on -27): r28w's window lines on 1.88.0 show pselect 0 after its full timeout with the handler run at its start; R28_WINDOW=1 (a kernel with #567) requires EINTR at once. Off for this cert"
   ],
   "extra_kernels": [
+    "@ai-ecoverse/slicc-kernel@1.89.0 (slicc-kernel#551, slicc.sigmask_poll: pselect/ppoll/sigsuspend take the atomic path; r28 and r28w with R28_KERNEL_MASK=1 pass in all five variants; R28_WINDOW stays off until #567)",
     "@ai-ecoverse/slicc-kernel@1.77.0 (before slicc-kernel#513: no kernel masks; r28 and r28w pass their no-mask branches, signals delivered at once as up to -27)",
     "@ai-ecoverse/slicc-kernel@1.69.0 (before slicc-kernel#404: r26 fails only its fstatat/openat/mkdirat dirfd forms, which are the kernel's)",
     "@ai-ecoverse/slicc-kernel@1.61.0 (no slicc_fs.path_access: r25 with --allow-absent gives the stat-based check, all permissive)",
