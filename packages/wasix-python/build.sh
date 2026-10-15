@@ -373,7 +373,7 @@ PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-
 # netpacket header (no AF_PACKET), memfd_create, and lockf (links through
 # the --wrap no-op but no header declares it), all three off as on -11.
 printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words_bigendian=no \
-  ac_cv_func_fork=no ac_cv_func_vfork=no \
+  ac_cv_func_vfork=no \
   ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no ac_cv_func_lockf=no \
   ac_cv_working_tzset=yes >"$B/config.site"
 rm -rf "$CROSS" && mkdir -p "$CROSS"
@@ -415,8 +415,6 @@ ONLYLIST="fork,_fork_internal,_Fork,__wasi_proc_fork,__fork_handler,os_fork,subp
 FEATS=(--enable-threads --enable-bulk-memory --enable-mutable-globals --enable-sign-ext --enable-nontrapping-float-to-int --enable-exception-handling)
 "$WASM_OPT" --asyncify -O3 \
   --pass-arg=asyncify-imports@wasix_32v1.proc_fork,wasix_32v1.stack_checkpoint,wasix_32v1.stack_restore \
-  --pass-arg=asyncify-onlylist@"$ONLYLIST" \
-  --pass-arg=asyncify-ignore-indirect \
   "${FEATS[@]}" "$CROSS/python.wasm" -o "$B/python-async.wasm"
 "$WASM_OPT" -O3 --strip-debug --strip-producers "${FEATS[@]}" "$B/python-async.wasm" -o "$B/python.wasm"
 node "$PKG/drop-exports.mjs" "$B/python.wasm" fork _Fork _fork_internal __vfork_internal __wasi_proc_fork __wasi_proc_fork_env
