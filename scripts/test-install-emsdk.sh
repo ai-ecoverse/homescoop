@@ -25,10 +25,15 @@ for p in "${PATCHES[@]}"; do
   patch -d "$PATCHED/install/emscripten" -p1 -R --dry-run -s -f <"$p" >/dev/null || fail "$(basename "$p") not applied in $PATCHED"
   patch -d "$BARE/install/emscripten" -p1 --dry-run -s -f <"$p" >/dev/null || fail "$(basename "$p") applied in $BARE"
 done
-[[ ! -e "$PATCHED/install/emscripten/cache/sysroot/lib/wasm32-emscripten/libc.a" ]] || fail "patched install kept the prebuilt libc.a"
-[[ -f "$BARE/install/emscripten/cache/sysroot/lib/wasm32-emscripten/libc.a" ]] || fail "unpatched install lost the prebuilt libc.a"
+if [[ -z "${EMSDK_TEST_CACHE:-}" ]]; then
+  [[ ! -e "$PATCHED/install/emscripten/cache/sysroot/lib/wasm32-emscripten/libc.a" ]] || fail "patched install kept the prebuilt libc.a"
+  [[ -f "$BARE/install/emscripten/cache/sysroot/lib/wasm32-emscripten/libc.a" ]] || fail "unpatched install lost the prebuilt libc.a"
+fi
 grep -q ' patches=none$' "$BARE/.homescoop-emsdk" || fail "unpatched stamp: $(cat "$BARE/.homescoop-emsdk")"
 grep -q " patches=${PATCHED##*-}\$" "$PATCHED/.homescoop-emsdk" || fail "patched stamp: $(cat "$PATCHED/.homescoop-emsdk")"
+grep -qF -- "-ffile-prefix-map=$PATCHED/install=/emsdk" "$WORK/patched.env" || fail "no -ffile-prefix-map for $PATCHED in EMCC_CFLAGS"
+FLAGS="$(EMCC_CFLAGS=-O1 bash -c 'eval "$(cat "$1")"; eval "$(cat "$1")"; printf %s "$EMCC_CFLAGS"' _ "$WORK/patched.env")"
+[[ "$FLAGS" == "-ffile-prefix-map=$PATCHED/install=/emsdk -O1" ]] || fail "EMCC_CFLAGS after two evals: $FLAGS"
 for script in "$HERE/install-emsdk.sh" "$WORK/bare/install-emsdk.sh"; do
   EMSDK_CACHE="$CACHE" bash "$script" 2>"$WORK/again.log" >/dev/null
   grep -q 'already has' "$WORK/again.log" || fail "second run of $script reinstalled: $(cat "$WORK/again.log")"

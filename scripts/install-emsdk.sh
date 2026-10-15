@@ -87,8 +87,10 @@ if [[ ! -f "$ROOT/.emscripten" || "$(cat "$ROOT/.emscripten")" != "$CONFIG" ]]; 
   printf '%s\n' "$CONFIG" > "$ROOT/.emscripten"
 fi
 
+MAP="$(printf %q "-ffile-prefix-map=$INSTALL=/emsdk")"
 cat <<EOF
 export EMSDK=$(printf %q "$ROOT")
 export EM_CONFIG=$(printf %q "$ROOT/.emscripten")
 export PATH=$(printf %q "$INSTALL/emscripten"):$(printf %q "$INSTALL/bin"):\$PATH
+case " \${EMCC_CFLAGS-} " in *" $MAP "*) ;; *) export EMCC_CFLAGS=$MAP\${EMCC_CFLAGS:+" \$EMCC_CFLAGS"} ;; esac
 EOF

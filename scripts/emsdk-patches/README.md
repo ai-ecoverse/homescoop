@@ -4,7 +4,7 @@
 
 So a checkout with a different patch set (an older tag, another branch) gets its own install, and the same host can build both. Removing or changing a patch gives a new directory, never a stale patched one. Caches written before homescoop#358 (stamp = the bare release hash, possibly patched in place) are reinstalled once. `scripts/test-install-emsdk.sh` (in the `slicc-shims` workflow) checks that a patched and an unpatched install live side by side.
 
-The emsdk release stays the same, so a package's code changes only where it links the patched code, and only when that package is next rebuilt. The install path does show up in the wasm's debug strings (the include directories), so a package rebuilt with a patch set present carries `…/emsdk/0.4.0-<id>/…` there instead of `…/emsdk/0.4.0/…`.
+The emsdk release stays the same, so a package's code changes only where it links the patched code, and only when that package is next rebuilt. The install path would show up in the wasm's debug strings (the include directories), so `install-emsdk.sh` also exports `EMCC_CFLAGS` with `-ffile-prefix-map=<install>=/emsdk` (Emscripten's own system libraries already map to `/emsdk/emscripten`): two cache directories, or a macOS cache and CI's `~/.cache`, give the same bytes. Each Emscripten package's first rebuild after homescoop#358 changes once, from `…/emsdk/0.4.0/install/…` to `/emsdk/…`.
 
 ## `statx-rdev.patch` (homescoop#324)
 
