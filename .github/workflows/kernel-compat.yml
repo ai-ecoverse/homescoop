@@ -106,21 +106,57 @@ jobs:
     steps:
       - id: runners
         env:
-          TRUSTED: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#')) }}
+          SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          MAIN_EVENT: ${{ contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' }}
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
+          KERNEL: ${{ inputs.kernel }}
+          HOMESCOOP_REF: ${{ inputs.homescoop-ref || 'main' }}
+          BIOS_REF: ${{ inputs.bios-ref || 'main' }}
+          GITHUB_TOKEN: ${{ github.token }}
           RUNNER: ${{ inputs.runner || vars.CERT_RUNNER }}
           LIGHT: ${{ inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER }}
         run: |
           set -euo pipefail
-          if [[ "$TRUSTED" == "true" ]]; then
+          pool() {
             echo "runner=${RUNNER:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
             echo "light-runner=${LIGHT:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
-            echo "runners: allowed ($EVENT on $REF: a same-repo PR, or main with homescoop main, bios main and a published kernel): ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}"
-          else
+            echo "runners: ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}: $1"
+          }
+          hosted() {
             echo "runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
             echo "light-runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            echo "runners: ubuntu-latest ($EVENT on $REF: a fork PR, another event or ref, or a dispatch whose homescoop-ref, bios-ref or kernel is not main, main and a published @ai-ecoverse/slicc-kernel)"
+            echo "runners: ubuntu-latest: $1"
+          }
+          compare() {
+            local url="https://api.github.com/repos/$1/compare/main...$2"
+            if [[ -n "${GITHUB_TOKEN:-}" ]] && curl -fsS --retry 2 -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$url" -o "$RUNNER_TEMP/compare.json"; then
+              :
+            else
+              curl -fsS --retry 2 -H 'Accept: application/vnd.github+json' "$url" -o "$RUNNER_TEMP/compare.json" || return 1
+            fi
+            jq -r .status "$RUNNER_TEMP/compare.json"
+          }
+          on_main() {
+            local status
+            [[ "$2" == main ]] && return 0
+            [[ "$2" =~ ^[0-9a-f]{40}$ ]] || return 1
+            status=$(compare "$1" "$2") || return 1
+            echo "runners: $1 compare main...$2: $status"
+            [[ "$status" == behind || "$status" == identical ]]
+          }
+          if [[ "$SAME_REPO_PR" == true ]]; then
+            pool "a same-repo pull_request ($REF)"
+          elif [[ "$MAIN_EVENT" != true ]]; then
+            hosted "$EVENT on $REF is neither a same-repo pull_request nor schedule, workflow_dispatch, workflow_run or release on refs/heads/main"
+          elif ! [[ "$KERNEL" =~ ^@ai-ecoverse/slicc-kernel@[0-9A-Za-z.+-]+$ || "$KERNEL" =~ ^[0-9][0-9A-Za-z.+-]*$ ]]; then
+            hosted "kernel $KERNEL is not a published @ai-ecoverse/slicc-kernel version"
+          elif ! on_main ai-ecoverse/homescoop "$HOMESCOOP_REF"; then
+            hosted "homescoop-ref $HOMESCOOP_REF is neither main nor a 40-hex sha reachable from homescoop main"
+          elif ! on_main ai-ecoverse/slicc-bios "$BIOS_REF"; then
+            hosted "bios-ref $BIOS_REF is neither main nor a 40-hex sha reachable from slicc-bios main"
+          else
+            pool "$EVENT on $REF, homescoop-ref $HOMESCOOP_REF and bios-ref $BIOS_REF on main, kernel $KERNEL"
           fi
       - uses: actions/checkout@v7
         with:
