@@ -123,6 +123,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      statuses: read
     steps:
       - uses: actions/checkout@v7
         with:
