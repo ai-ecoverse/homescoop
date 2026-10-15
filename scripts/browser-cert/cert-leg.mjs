@@ -10,11 +10,20 @@ const HOST_HARNESSES = ['host-node', 'host-smoke'];
 function readMeta(dir, pkg) {
   const file = join(dir, 'packages', pkg, 'cert', 'meta.json');
   if (!existsSync(file)) return {};
+  let meta;
   try {
-    return JSON.parse(readFileSync(file, 'utf8'));
+    meta = JSON.parse(readFileSync(file, 'utf8'));
   } catch (err) {
     throw new Error(`packages/${pkg}/cert/meta.json is not readable JSON: ${err.message.split('\n')[0]}; nothing was certified`);
   }
+  if (meta.ci !== undefined && !Array.isArray(meta.ci)) {
+    throw new Error(`packages/${pkg}/cert/meta.json: ci is not a list of commands; nothing was certified`);
+  }
+  const blank = (meta.ci || []).findIndex((c) => typeof c !== 'string' || !c.trim());
+  if (blank >= 0) {
+    throw new Error(`packages/${pkg}/cert/meta.json: ci entry ${blank} is not a command; nothing was certified`);
+  }
+  return meta;
 }
 
 export function planLeg(pkg, manifest, { dir = root } = {}) {
@@ -22,7 +31,7 @@ export function planLeg(pkg, manifest, { dir = root } = {}) {
   const specs = existsSync(certDir) ? readdirSync(certDir).filter((f) => f.endsWith('.mjs')) : [];
   const meta = readMeta(dir, pkg);
   const harness = meta.harness || 'smoke';
-  const ci = Array.isArray(meta.ci) ? meta.ci : [];
+  const ci = meta.ci || [];
   let browser;
   if (meta.blocked) browser = 'blocked';
   else if (HOST_HARNESSES.includes(harness)) browser = 'skip';
@@ -85,7 +94,7 @@ function ci(pkg) {
     console.log(`::error::${err.message}`);
     return 1;
   }
-  const cmds = Array.isArray(meta.ci) ? meta.ci : [];
+  const cmds = meta.ci || [];
   if (!cmds.length) {
     console.log('host cert: no ci commands');
     return 0;

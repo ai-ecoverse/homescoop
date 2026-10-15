@@ -138,3 +138,29 @@ test('a cert/meta.json that is not JSON fails the leg, in plan and in ci', () =>
     f.done();
   }
 });
+
+test('a ci: entry that is not a command fails the leg, in plan and in ci', () => {
+  const f = fixture({
+    empty: { meta: { harness: 'host-node', ci: [''] } },
+    spaces: { meta: { harness: 'host-node', ci: ['true', '   '] } },
+    number: { meta: { harness: 'host-smoke', ci: [3] } },
+    scalar: { meta: { harness: 'host-node', ci: 'true' } },
+  });
+  try {
+    for (const [name, why] of [
+      ['empty', 'ci entry 0 is not a command'],
+      ['spaces', 'ci entry 1 is not a command'],
+      ['number', 'ci entry 0 is not a command'],
+      ['scalar', 'ci is not a list of commands'],
+    ]) {
+      const p = f.leg('plan', name);
+      assert.equal(p.status, 1, name);
+      assert.ok(p.stderr.includes(`::error::packages/${name}/cert/meta.json: ${why}; nothing was certified`), p.stderr);
+      const c = f.leg('ci', name);
+      assert.equal(c.status, 1, name);
+      assert.ok(c.stdout.includes(`::error::packages/${name}/cert/meta.json: ${why}`), c.stdout);
+    }
+  } finally {
+    f.done();
+  }
+});
