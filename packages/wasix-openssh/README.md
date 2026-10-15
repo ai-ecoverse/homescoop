@@ -78,7 +78,10 @@ slicc-kernel ≥ 1.88.0). OpenSSH 10.6's client loop blocks SIGWINCH, SIGINT,
 SIGTERM and friends and waits in **ppoll** with its unblocking mask; on -28
 that wait is atomic, so a signal that arrives while ssh is busy is handled
 at the next wait instead of waiting out its timeout (10.6.0-6 and older
-ignored the mask).
+ignored the mask). ssh keeps OpenSSH's own `ppoll` (openbsd-compat, on top of
+`pselect` with the mask, built as `homescoop_compat_ppoll`): -28's libc
+`ppoll`, like its `poll`, refuses a `pollfd` asking for no events (ENOSYS),
+which ssh's client loop passes for idle channels.
 
 ## Not in v1
 

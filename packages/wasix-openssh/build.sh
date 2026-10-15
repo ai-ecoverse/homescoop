@@ -192,7 +192,7 @@ CONF_CACHE=(
     RANLIB=llvm-ranlib \
     STRIP=llvm-strip \
     CFLAGS="-O2 $SSL_CFLAGS $Z_CFLAGS" \
-    CPPFLAGS="$SSL_CFLAGS $Z_CFLAGS" \
+    CPPFLAGS="$SSL_CFLAGS $Z_CFLAGS -Dppoll=homescoop_compat_ppoll" \
     LDFLAGS="-Wl,--fatal-warnings $SSL_LIBS $Z_LIBS" \
     LIBS="$SSL_LIBS $Z_LIBS" \
     >"$BUILD/$GDIR.configure.log" 2>&1 || {
