@@ -226,7 +226,7 @@ jobs:
   publish:
     needs: [resolve, host-build, slicc-build, fetch-certified]
     if: >-
-      always() && needs.resolve.outputs.do_publish == 'true' && (
+      always() && github.ref == 'refs/heads/main' && needs.resolve.outputs.do_publish == 'true' && (
         needs.host-build.result == 'success' ||
         needs.slicc-build.result == 'success' ||
         needs.fetch-certified.result == 'success'
