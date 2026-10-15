@@ -52,7 +52,7 @@ if [[ ! -f "$SRC/rsync.wasm" || -n "${FORCE:-}" ]]; then
       --with-included-popt --with-included-zlib \
       --disable-openssl --disable-xxhash --disable-zstd --disable-lz4 \
       --disable-md2man --disable-iconv --disable-iconv-open --disable-locale \
-      --disable-acl-support --disable-xattr-support --disable-ipv6 \
+      --disable-acl-support --disable-xattr-support --disable-ipv6 --disable-idn \
       --disable-roll-simd --disable-md5-asm --disable-roll-asm
     homescoop_fix_darwin_ar Makefile
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \

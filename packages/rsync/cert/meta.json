@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.77.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.92.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
@@ -12,7 +12,7 @@
     "@ai-ecoverse/wasm-procps@4.0.7-1"
   ],
   "checklist": [
-    "rsync --version is 3.4.4, protocol 32",
+    "rsync --version is 3.5.1, protocol 33",
     "rsync -a --itemize-changes on a fresh tree: upstream's lines and order (cd+++++++++ / >f+++++++++)",
     "-a keeps file modes, file and directory mtimes and contents (find/stat/md5sum snapshot equal)",
     "no change → 'Number of regular files transferred: 0'; one changed file → 1, itemized >f.st...... and only that file",
@@ -21,7 +21,7 @@
     "-c: same size and mtime, other bytes → skipped by the quick check, sent with -c (>fc........)",
     "symlinks (relative, absolute into the source, to a dir, dangling) with their own mtimes (touch -h): all 8 option sets (-a, -a -J, -a --omit-link-times, -a --times, -a --no-omit-link-times, -a --no-J, -a -t --no-J, -a -J --no-omit-link-times) copy with rc 0, links recreated (cL+++++++++, readlink equal), link mtimes preserved unless -J wins, source untouched, re-run quiet (slicc-kernel#170 fixed in 1.29.2)",
     "missing source dir or file: rc 23 with change_dir / link_stat messages",
-    "SIGINT mid-transfer (timeout -s INT on a --bwlimit copy): rc 20 'received SIGINT, SIGTERM, or SIGHUP', no rsync left in ps",
+    "SIGINT, SIGTERM and SIGHUP mid-transfer (timeout -s <sig> on a --bwlimit copy of a 4 MB file, 3.5.1-1): rc 20 'received SIGINT, SIGTERM, or SIGHUP (code 20)' within 10 s, no rsync left in ps, and the temp file removed (bigout/ empty); with --partial (INT) and --inplace (TERM) bigout/z is kept, shorter than the source",
     "--bwlimit throttles (select() waits in the kernel)",
     "daemon (3.4.4-3, netfork): rsync --daemon --no-detach on a kernel port; rsync://127.0.0.1:8730/ lists 'mod', -a push and pull (via localhost) round-trip the files, a closed port gives 'Connection refused' rc 10, the daemon log shows the access",
     "tailnet (uplink): rsync://peer.tail1234.ts.net/ resolves via the kernel resolver/uplink and dials 100.64.1.2:873 (refused → 'Connection refused' rc 10); an unknown tailnet name → rc 10 without a dial",
@@ -29,5 +29,8 @@
     "slicc-kernel 1.73.3 (#467: slicc-kernel#449 and the directory-mtime fix): cone's rsync -a of a tree with a symlink, a dangling one and one to a directory exits 0 with the links cone:cone (on 1.73.2 and older: rc 23, 'chgrp … failed: Operation not permitted', since a just-created symlink's own lstat said 0:0); the checklist's re-runs are quiet again, the destination's top directory keeping the source's mtime (failing on 1.36.0-1.73.2); slicc-kernel 1.75.1 (#477): a write after touch -d updates the mtime in the browser entry, which the incremental re-run needs (1.73.3's browser kept the touched time)"
   ],
   "uplink": true,
-  "users": "enforce"
+  "users": "enforce",
+  "extra_kernels": [
+    "@ai-ecoverse/slicc-kernel@1.77.0 (the previous cert kernel): checklist.mjs, users.mjs, daemon.mjs and tailnet.mjs unchanged, so 3.5.1's path-hardening (openat/O_NOFOLLOW resolver) is also seen on an older kernel"
+  ]
 }

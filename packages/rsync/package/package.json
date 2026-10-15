@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-rsync",
-  "version": "3.4.4-5",
-  "description": "rsync 3.4.4 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair; slicc-kernel >= 1.29.2)",
+  "version": "3.5.1-1",
+  "description": "rsync 3.5.1 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair; slicc-kernel >= 1.29.2)",
   "license": "GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.29.2"
@@ -30,7 +30,7 @@
   },
   "homescoop": {
     "recipe": "rsync",
-    "upstream": "3.4.4"
+    "upstream": "3.5.1"
   },
   "slicc": {
     "abi": "emscripten",
