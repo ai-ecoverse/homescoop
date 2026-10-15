@@ -241,3 +241,9 @@ int slicc_linkat_import(int olddirfd, intptr_t oldpath, int newdirfd, intptr_t n
 int __syscall_linkat(int olddirfd, intptr_t oldpath, int newdirfd, intptr_t newpath, int flags) {
   return slicc_linkat_import(olddirfd, oldpath, newdirfd, newpath, flags);
 }
+
+__attribute__((import_module("env"), import_name("__syscall_uname")))
+int slicc_uname_import(intptr_t buf);
+int __syscall_uname(intptr_t buf) {
+  return slicc_uname_import(buf);
+}
