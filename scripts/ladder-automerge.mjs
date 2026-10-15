@@ -42,6 +42,7 @@ export function mergeProblems({ repo, pr, review, ladder, files, majors }) {
     const ci = ladder.jobs.find((j) => j.name === 'ci');
     if (ci?.conclusion !== 'success') problems.push(`ladder-pr's ci on the head is ${ci ? ci.conclusion || ci.status : 'missing'}`);
   }
+  if (files.length < (pr.changed_files ?? 0)) problems.push(`the file list stops at ${files.length} of ${pr.changed_files} files`);
   const paths = files.flatMap((f) => [f.filename, f.previous_filename].filter(Boolean));
   const human = [...new Set(paths.filter((p) => HUMAN_ONLY.some((re) => re.test(p))))];
   if (human.length) problems.push(`it touches ${human.slice(0, 5).join(', ')}${human.length > 5 ? ', …' : ''}, which stay human`);
@@ -81,16 +82,24 @@ export async function decide({ repo, number, asIfOpen }, io) {
   return { pr, review, problems: mergeProblems({ repo, pr, review, ladder, files, majors }) };
 }
 
+async function mergedHere(pr, head, io) {
+  if (pr.merged_by?.login !== 'github-actions[bot]' || !pr.merge_commit_sha) return { merged: false, reason: 'already merged' };
+  const commit = await io.commit(pr.merge_commit_sha);
+  if (commit.parents?.[1]?.sha !== head) return { merged: false, reason: `already merged, but not at ${head}` };
+  return { merged: true, sha: pr.merge_commit_sha, before: commit.parents[0].sha };
+}
+
 export async function merge({ repo, number, head }, io) {
   const { pr, problems } = await decide({ repo, number }, io);
-  if (problems[0] === 'already merged') return { merged: false, reason: 'already merged' };
+  if (problems[0] === 'already merged') return mergedHere(pr, head, io);
   if (pr.head.sha !== head) throw new Error(`PR #${number} moved from ${head} to ${pr.head.sha}`);
   if (problems.length) throw new Error(`PR #${number} no longer qualifies right before the merge: ${problems.join('; ')}`);
   let sha;
   try {
     ({ sha } = await io.mergePull(number, head));
   } catch (err) {
-    if ((await io.pull(number)).merged) return { merged: false, reason: 'already merged' };
+    const after = await io.pull(number);
+    if (after.merged) return mergedHere(after, head, io);
     throw err;
   }
   const commit = await io.commit(sha);

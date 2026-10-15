@@ -91,6 +91,7 @@ describe('mergeProblems', () => {
       [{ ladder: { run: { id: 20, status: 'completed', conclusion: 'success' }, jobs: [] } }, /ci on the head is missing/],
       [{ files: files('packages/x/build.sh') }, /touches no publishable package file/],
       [{ pr: pull({ mergeable_state: 'blocked' }) }, /mergeable_state is blocked/],
+      [{ pr: pull({ changed_files: 3001 }) }, /the file list stops at 1 of 3001 files/],
     ];
     for (const [over, why] of cases) assert.match(mergeProblems({ ...ok, ...over }).join('; '), why, why.source);
   });
@@ -168,9 +169,22 @@ describe('merge', () => {
   });
 
   it('treats a PR merged elsewhere as done, and any other failure as an error', async () => {
-    const elsewhere = fakeIo({ pulls: [pull(), pull({ merged: true })], mergeFails: true });
+    const human = pull({ merged: true, merged_by: { login: 'trieloff' }, merge_commit_sha: 'd'.repeat(40) });
+    const elsewhere = fakeIo({ pulls: [pull(), human], mergeFails: true });
     assert.deepEqual(await merge({ repo: REPO, number: 384, head: HEAD }, elsewhere), { merged: false, reason: 'already merged' });
+    assert.deepEqual(await merge({ repo: REPO, number: 384, head: HEAD }, fakeIo({ pulls: [human] })), { merged: false, reason: 'already merged' });
     await assert.rejects(merge({ repo: REPO, number: 384, head: HEAD }, fakeIo({ mergeFails: true })), /returned 405/);
+  });
+
+  it('recovers its own merge when the PUT answer was lost, so the publish still runs', async () => {
+    const ours = pull({ merged: true, state: 'closed', merged_by: { login: 'github-actions[bot]' }, merge_commit_sha: 'c'.repeat(40) });
+    const lost = fakeIo({ pulls: [pull(), ours], mergeFails: true });
+    assert.deepEqual(await merge({ repo: REPO, number: 384, head: HEAD }, lost), { merged: true, sha: 'c'.repeat(40), before: BASE });
+    const earlier = fakeIo({ pulls: [ours] });
+    assert.deepEqual(await merge({ repo: REPO, number: 384, head: HEAD }, earlier), { merged: true, sha: 'c'.repeat(40), before: BASE });
+    assert.equal(earlier.calls.some(([c]) => c === 'merge'), false);
+    const otherHead = fakeIo({ pulls: [pull(), ours], mergeFails: true });
+    assert.deepEqual(await merge({ repo: REPO, number: 384, head: HEAD.replace('a', 'b') }, otherHead).catch((e) => e.message), `PR #384 moved from ${HEAD.replace('a', 'b')} to ${HEAD}`);
   });
 });
 
