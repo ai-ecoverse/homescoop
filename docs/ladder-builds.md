@@ -47,8 +47,10 @@ ladder-pr run at that PR's merged head that concluded `success`, and one of:
   PR's author can write to the repository, since GitHub can fill the merge
   message from PR text. Within the source it resolves from, another line
   naming the package at a different version fails; or
-- no line for the package, the package in `scripts/ci-certified.json`, and
-  that run's `ci` job green.
+- no line for the package, the package in `scripts/ci-certified.json`, a PR
+  by `renovate[bot]` or by a writer (a fork can't vouch for its own
+  ladder-pr run, whose workflow file it controls), and that run's `ci` job
+  green.
 
 Anything else (no line, a wrong version or malformed sha, a stale head, a
 failed run, an expired or missing artifact, a sha mismatch) fails the

@@ -388,6 +388,35 @@ describe('resolvePackage', () => {
     await assert.rejects(resolvePackage({ ...ctx, message, ciCertified: true }, noCi), /ci: missing/);
   });
 
+  it('ci-certified: counts the ci job on a PR by renovate[bot] or a writer, not by anyone else', async () => {
+    const message = 'Merge pull request #336';
+    const green = { ...staleFailed, jobs: { 20: [{ name: 'ci', conclusion: 'success' }] } };
+
+    const renovate = fakeIo({ ...green, pr: { ...PR, author: 'renovate[bot]' } });
+    const byRenovate = await resolvePackage({ ...ctx, message, ciCertified: true }, renovate);
+    assert.equal(byRenovate.inputs.artifact_id, '2');
+    assert.equal(renovate.calls.some(([c]) => c === 'canWrite'), false);
+
+    const writer = fakeIo(green);
+    const byWriter = await resolvePackage({ ...ctx, message, ciCertified: true }, writer);
+    assert.equal(byWriter.inputs.artifact_id, '2');
+    assert.deepEqual(writer.calls.filter(([c]) => c === 'canWrite'), [['canWrite', 'trieloff']]);
+
+    const fork = fakeIo({ ...green, pr: { ...PR, author: 'someone' } });
+    await assert.rejects(
+      resolvePackage({ ...ctx, message, ciCertified: true }, fork),
+      /has no certified= line that counts, and a green ci job only counts on a PR by renovate\[bot\] or by a writer: PR #336 is by someone/,
+    );
+    assert.equal(fork.calls.some(([c]) => c === 'artifacts'), false);
+
+    const forkWithLine = fakeIo({ ...green, pr: { ...PR, author: 'someone' } });
+    await assert.rejects(
+      resolvePackage({ ...ctx, ciCertified: true }, forkWithLine),
+      /a green ci job only counts on a PR by renovate\[bot\] or by a writer: PR #336 is by someone/,
+    );
+    assert.deepEqual(forkWithLine.calls.filter(([c]) => c === 'canWrite'), [['canWrite', 'someone']]);
+  });
+
   it('refuses without a merged PR or an artifact', async () => {
     await assert.rejects(resolvePackage(ctx, fakeIo({ pr: null })), /no merged PR/);
     await assert.rejects(resolvePackage(ctx, fakeIo({ artifacts: [] })), /no artifact host-wasi-impeccable-pr336/);

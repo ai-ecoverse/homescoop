@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LADDER_PR = '.github/workflows/ladder-pr.yml';
+export const RENOVATE = 'renovate[bot]';
 const SHA256 = /^[0-9a-f]{64}$/;
 
 export function parseCertLines(message) {
@@ -105,6 +106,12 @@ export async function resolvePackage(ctx, io) {
       ? `its certified= lines don't count because ${ignored}`
       : `neither the merge commit nor the PR body has a certified=<sha256> ${name} ${version} line`;
     throw new Error(`${name}@${version} is not on npm, ${why}, and ${pkg} is not in scripts/ci-certified.json`);
+  }
+  if (!certified && pr.author !== RENOVATE && (ignored || !(await io.canWrite(pr.author)))) {
+    throw new Error(
+      `${name}@${version} has no certified= line that counts, and a green ci job only counts on a PR by ` +
+        `${RENOVATE} or by a writer: PR #${pr.number} is by ${pr.author}`,
+    );
   }
   const artifactName = `host-${pkg}-pr${pr.number}`;
   const artifacts = (await io.artifacts(artifactName))
