@@ -1,5 +1,48 @@
 # Negative proof (wasix-sysroot)
 
+## Known kernel limit, not a -28 regression: the window (slicc-kernel#561)
+
+r28w's two "window" lines: a child sends SIGUSR1 while the parent busy-loops 400 ms without kernel calls, then the parent waits in `pselect` on an idle pipe for 10 s. On slicc-kernel 1.77.0, 1.88.0 and #551 @2937137 the handler runs at the start of that call (0.00 s) and the wait still sleeps 10 s: `window: arrived_before_wait handler=0; pselect 0 handler=1 slow`, the same with a mask. It's the kernel's, it affects -27 equally (-27 exposes every signal that arrives during computation, the -28 fallback only the instructions between its `sigmask_set` and `poll_oneoff`), and slicc-kernel#567 fixes it: on c0869d4 both lines are `pselect -1 EINTR handler=1 fast`, which `R28_WINDOW=1` asserts. slicc-kernel 1.91.0 ships #567; the -28 cert runs on it with `R28_WINDOW=1` (both lines `pselect -1 EINTR handler=1 fast` in all five variants, 2026-10-15).
+
+## Fallback check: -27 and -28 with neither import (slicc-kernel 1.77.0), 2026-10-14
+
+r28w without its ppoll and sigwait cases, on the published -27 and on -28 (a674b53d…). The gpg-agent pattern gives the same result on both kernels' worth of libc; -28 only adds a working sigsuspend and a mask that reads back:
+
+```text
+-27: pselect pending: 0 handler=1 slow still_blocked=0     -28: … still_blocked=1
+-27: sigsuspend: 28 handler=0 fast still_blocked=0         -28: sigsuspend: -1 EINTR handler=1 fast still_blocked=1
+both: agent HUP: -1 EINTR handler=1 fast
+both: agent TERM: -1 EINTR handler=1 fast
+both: agent rounds: 8/8
+```
+
+## -28 at 2f4352f7 (masks, no masked wait): blocked signals are stranded (r28w)
+
+`r28w` without its `ppoll` case, against the libc of homescoop#317 at 2f4352f7 (masks through `slicc.sigmask_set`, `pselect` ignoring its mask) on slicc-kernel `fix/wasix-sigmask` 8b52a64, 2026-10-14. gpg-agent's pattern never sees HUP or TERM (its 10 s wait times out, handler not run); `sigsuspend` returns the value EINVAL; `sigwait` "succeeds" with signal 9:
+
+```text
+pselect pending: 0 handler=0 slow still_blocked=1
+sigsuspend: 28 handler=0 fast still_blocked=1
+agent HUP: 0 handler=0 slow
+agent TERM: 0 handler=0 slow
+sigtimedwait: 28
+sigwaitinfo: 28
+sigwait: Success sig=9
+```
+
+## 2025.9.30-27: sigprocmask keeps no mask, sigpending fails (-28, slicc-kernel #460)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-27.tgz --probe r28 --kernel-dir <slicc-kernel 1.77.0>`, 2026-10-14: FAIL. WASIX's `pthread_sigmask` returned 0 without storing the mask or writing `*old`; `sigpending` returned EINVAL as its result (not -1 with errno), and the bad-`how` check was missing:
+
+```text
+start: mask=- pending=-1 Success
+blocked: usr1=1 pending=-1 Success mask=-
+kill/stop: mask=-
+old: - now=-
+bad how: Success
+child: mask=-
+```
+
 ## 2025.9.30-26: utimensat(NULL) sets the times to 1970; CPU times are the wall clock (-27, homescoop#294)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-26.tgz --probe r27 --kernel-dir <slicc-kernel 1.71.1>`, 2026-10-13: FAIL.

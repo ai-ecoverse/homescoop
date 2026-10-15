@@ -41,6 +41,29 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-28 signal masks work. `sigprocmask` and `pthread_sigmask`
+hand the thread's mask to slicc-kernel (`slicc.sigmask_set`), which holds a
+blocked signal as pending and delivers it when it is unblocked, before the
+call returns; `sigpending` reports the pending set (`slicc.sigpending_get`).
+`SIGKILL` and `SIGSTOP` cannot be blocked. Up to -27 `pthread_sigmask` did
+nothing (it did not even fill in the old mask), so a blocked signal was
+delivered at once, and `sigpending` failed. On a slicc-kernel without these
+imports the libc keeps the mask itself: masks read back right, but a blocked
+signal is still delivered at once and nothing is ever pending.
+`pselect` with a signal mask, `ppoll` (new) and `sigsuspend` install the
+mask for the wait in one kernel call (`slicc.sigmask_poll`), so a signal
+blocked everywhere else reaches its handler there, as gnupg's daemons and
+openssh expect. `sigwait`, `sigtimedwait` and `sigwaitinfo` fail with ENOSYS
+(up to -27 they reported success with a garbage signal number).
+On slicc-kernel before 1.91.0 (slicc-kernel#561, every wasix-sysroot
+version): a signal that reaches a thread while it runs its own code, not
+inside a kernel call, is handled at the start of the thread's next kernel
+call, and if that call is a wait it still sleeps its whole timeout. Up to -27
+this hit every signal sent during computation; -28 on 1.88.0 leaves it only
+between the mask swap and the wait inside `pselect`/`ppoll`, and
+`slicc.sigmask_poll` (1.89.0) narrows it further. slicc-kernel 1.91.0 fixes
+it: such a wait returns EINTR at once.
+
 Since 2025.9.30-27 setting file times works for every form (homescoop#294).
 Up to -26, `utimensat(…, NULL)`, `futimens(fd, NULL)`, `utimes(p, NULL)` and
 `utime(p, NULL)`, which mean "now", set the times to 0 (1970) in static

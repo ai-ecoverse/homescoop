@@ -195,11 +195,14 @@ volatile int __eintr_valid_flag;
 
 #ifdef __wasilibc_unmodified_upstream
 #else
+_Thread_local unsigned __slicc_signals_run;
+
 __attribute__((export_name("__wasm_signal")))
 void __wasm_signal(int sig) {
 	if (sig-32U < 3 || sig-1U >= _NSIG-1) {
 		return;
 	}
+	__slicc_signals_run++;
 	LOCK(__eintr_handler_lock);
 	struct k_sigaction ksa = __eintr_handler_callbacks[sig];
 	UNLOCK(__eintr_handler_lock);

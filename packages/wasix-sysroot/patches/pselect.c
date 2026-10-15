@@ -11,6 +11,9 @@
 
 #include <wasi/api.h>
 #include <errno.h>
+#include <signal.h>
+
+__wasi_errno_t __slicc_poll_masked(const sigset_t *mask, const __wasi_subscription_t *in, __wasi_event_t *out, __wasi_size_t n, __wasi_size_t *nevents);
 
 // A relative timeout in nanoseconds. homescoop: upstream used common/time.h's
 // timespec_to_timestamp_clamp, which is for absolute times and turns any
@@ -114,9 +117,13 @@ int pselect(int nfds, fd_set *restrict readfds, fd_set *restrict writefds,
 
   // Execute poll().
   __wasi_size_t nevents;
-  __wasi_event_t events[nsubscriptions];
-  __wasi_errno_t error =
-      __wasi_poll_oneoff(subscriptions, events, nsubscriptions, &nevents);
+  __wasi_event_t events[nsubscriptions ? nsubscriptions : 1];
+  __wasi_errno_t error;
+  if (sigmask != NULL) {
+    error = __slicc_poll_masked(sigmask, subscriptions, events, nsubscriptions, &nevents);
+  } else {
+    error = __wasi_poll_oneoff(subscriptions, events, nsubscriptions, &nevents);
+  }
   if (error != 0) {
     // WASI's poll requires at least one subscription, or else it returns
     // `EINVAL`. Since a `pselect` with nothing to wait for is valid in POSIX,
@@ -127,7 +134,7 @@ int pselect(int nfds, fd_set *restrict readfds, fd_set *restrict writefds,
     // to wait for, there would be no way for the poll to wake up. WASI
     // returns `EINVAL` in this case, but for users of `poll`, `ENOTSUP` is
     // more likely to be understood.
-    if (nsubscriptions == 0)
+    if (nsubscriptions == 0 && sigmask == NULL)
       errno = ENOTSUP;
     else
       errno = error;
