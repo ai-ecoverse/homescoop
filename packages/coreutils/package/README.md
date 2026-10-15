@@ -13,6 +13,14 @@ mode 0755 in the package, so it can be run by path under slicc-kernel's
 users enforce. 9.12.0-5 shipped it 0644, which gave `Permission denied`
 (126).
 
+## Hard links (9.12.0-6)
+
+`ln`, `ln -f`, `cp -l` and `link` ask slicc-kernel to make the link
+(`__syscall_linkat`, slicc-kernel#563). On slicc-kernel ≥ 1.90.0 they work in
+mounts that have hard links (tmpfs), and give `Too many links` on the OPFS
+root and `Cross-device link` across mounts. On older kernels every hard link
+is `Too many links`, as in 9.12.0-5, where the call never reached the kernel.
+
 ## Device numbers (9.12.0-6)
 
 `stat -c '%t:%T'` and `ls -l` show a device's major and minor numbers as

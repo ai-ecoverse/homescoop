@@ -55,3 +55,5 @@ with "fork system call failed".
 `rdev.mjs` against the published 9.12.0-5 on slicc-kernel 1.77.0's Node entry, 2026-10-14: FAIL, `stat %t:%T: /dev/null character special file 0:0` (expected 1:3). The kernel's `st_rdev` is right; Emscripten's `statx()` fallback dropped it.
 
 `glue-mode.mjs` against 9.12.0-5 on slicc-kernel 1.88.0 (users enforce), 2026-10-15: FAIL: `bin/coreutils` is 644 in the tarball, and running it by path as cone gives `bash: line 1: …/bin/coreutils: Permission denied`, rc 126.
+
+`linkat.mjs` against 9.12.0-5, 2026-10-15: FAIL at its first assertion, `coreutils.wasm imports env.__syscall_linkat`. -5 has no such import (Emscripten's weak C stub answers EMLINK inside the wasm), so even slicc-kernel 1.90.0 can't link for it.
