@@ -57,7 +57,10 @@ Recipe bumps automerge **only** for packages in
 **majors** and packages not on that list stay manual (`homescoop-major` /
 `homescoop-recipe`). See [ci-cert.md](ci-cert.md).
 
-Publish still uses the exact PR artifact (`certified=<sha256>` / `artifact_pr`).
+Publish still uses the exact PR artifact (`certified=<sha256>` / `artifact_pr`
+/ `artifact_id`). An automerge carries no `certified=` line, so `ladder-merge`
+publishes it only from a ladder-pr run at the merged head whose `ci` job is
+green ([ladder-builds.md](ladder-builds.md#flow-ladder-buildyml)).
 
 `build.sh` loads version/URL/sha via `homescoop_load_recipe`. Secondary
 tarballs (ncurses, mbedtls, unzip) live under `sources:` in the same recipe.
