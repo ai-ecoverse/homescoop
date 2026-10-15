@@ -16,7 +16,14 @@ const xxdPkg = (version, upstream) => `{
 }
 `;
 
-function check(recipeVersion, pkg) {
+const bare = (version, homescoop = '') => `{
+  "name": "@ai-ecoverse/wasm-xxd",
+  "version": "${version}",
+  "description": "xxd for wasm / slicc"${homescoop}
+}
+`;
+
+function check(recipeVersion, pkg, args = ['--check']) {
   const root = mkdtempSync(join(tmpdir(), 'homescoop-check-'));
   try {
     mkdirSync(join(root, 'scripts'));
@@ -27,7 +34,7 @@ function check(recipeVersion, pkg) {
     mkdirSync(join(dir, 'package'), { recursive: true });
     writeFileSync(join(dir, 'recipe.yaml'), `name: xxd\nbuilder: host\nversion: "${recipeVersion}"\nsummary: "xxd for slicc"\n`);
     writeFileSync(join(dir, 'package', 'package.json'), pkg);
-    const r = spawnSync(process.execPath, [join(root, 'scripts', 'sync-package-version.mjs'), 'xxd', '--check'], {
+    const r = spawnSync(process.execPath, [join(root, 'scripts', 'sync-package-version.mjs'), 'xxd', ...args], {
       encoding: 'utf8',
       cwd: root,
     });
@@ -68,4 +75,34 @@ test('--check reports both drifts in one line', () => {
   const r = check('9.2.1192', xxdPkg('9.2.1186-1', '9.2.1186'));
   assert.equal(r.status, 1);
   assert.match(r.stderr, /version is 9\.2\.1186-1, but recipe\.yaml 9\.2\.1192 gives 9\.2\.1192-1; homescoop\.upstream is 9\.2\.1186, but recipe\.yaml version is 9\.2\.1192\n$/);
+});
+
+test('--check counts a missing homescoop.upstream as drift, and --write adds it', () => {
+  for (const pkg of [bare('9.2.1186-1'), bare('9.2.1186-1', ',\n  "homescoop": { "recipe": "xxd" }')]) {
+    const r = check('9.2.1186', pkg);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /disagrees with recipe\.yaml: homescoop\.upstream is \(none\), but recipe\.yaml version is 9\.2\.1186\n$/);
+    const w = check('9.2.1186', pkg, ['--write']);
+    assert.equal(w.status, 0, w.stderr);
+    assert.equal(JSON.parse(w.after).homescoop.upstream, '9.2.1186');
+    assert.equal(JSON.parse(w.after).version, '9.2.1186-1');
+  }
+});
+
+test('a PEP 440 post-release maps to X.Y.Z-postN.<rev>, the shape on npm', () => {
+  const same = check('2.9.0.post0', xxdPkg('2.9.0-post0.2', '2.9.0.post0'));
+  assert.equal(same.status, 0, same.stderr);
+  assert.equal(same.stdout, '2.9.0-post0.2\n');
+
+  const moved = check('2.9.0.post1', xxdPkg('2.9.0-post0.2', '2.9.0.post0'));
+  assert.equal(moved.status, 1);
+  assert.match(moved.stderr, /version is 2\.9\.0-post0\.2, but recipe\.yaml 2\.9\.0\.post1 gives 2\.9\.0-post1\.1;/);
+  const written = check('2.9.0.post1', xxdPkg('2.9.0-post0.2', '2.9.0.post0'), ['--write']);
+  assert.equal(written.stdout, '2.9.0-post1.1\n');
+  assert.equal(JSON.parse(written.after).version, '2.9.0-post1.1');
+
+  assert.equal(check('2.9.0.post0', xxdPkg('2.9.0-1', '2.9.0')).stderr.match(/gives (\S+)/)[1], '2.9.0-post0.1;');
+  assert.equal(check('2.9.post3', xxdPkg('2.9.0-post3.4', '2.9.post3')).stdout, '2.9.0-post3.4\n');
+  assert.equal(check('2.9.0.post0', xxdPkg('2.9.0-post0.0', '2.9.0.post0')).status, 1);
+  assert.equal(check('2.9.1', xxdPkg('2.9.0-post0.2', '2.9.0.post0'), ['--write']).stdout, '2.9.1-1\n');
 });

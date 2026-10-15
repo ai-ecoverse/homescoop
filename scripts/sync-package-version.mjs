@@ -196,12 +196,15 @@ if (!existsSync(pkgPath)) {
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const current = String(pkg.version || '');
 
-const targetBase = npmify(upstream);
+const post = upstream.match(/^(\d+(?:\.\d+)*)\.post(\d+)$/);
+const targetBase = post ? `${npmify(post[1])}-post${post[2]}` : npmify(upstream);
+const revSep = post ? '.' : '-';
 // Same upstream only if current is a valid packaging rev of the npmified base
 // (or plain base we will rewrite). Do NOT treat "2.23-1" as same-upstream of
 // recipe 2.23 — that form is not npm-publishable.
-const sameUpstream =
-  isPackagingRev(current) && current.startsWith(`${targetBase}-`);
+const sameUpstream = post
+  ? /^[1-9]\d*$/.test(current.slice(`${targetBase}.`.length)) && current.startsWith(`${targetBase}.`)
+  : isPackagingRev(current) && current.startsWith(`${targetBase}-`);
 
 let next = current;
 if (!sameUpstream) {
@@ -211,7 +214,7 @@ if (!sameUpstream) {
     revMatch && (current.startsWith(`${upstream}-`) || current.startsWith(`${targetBase}-`))
       ? revMatch[1]
       : '1';
-  next = `${targetBase}-${rev}`;
+  next = `${targetBase}${revSep}${rev}`;
 } else if (PLAIN.test(current)) {
   next = `${targetBase}-1`;
 }
@@ -235,7 +238,7 @@ const allow = loadAllow();
 const hsUpstream = pkg.homescoop?.upstream;
 const previous = from ?? String(hsUpstream ?? versionBase(current));
 const rewriteText = write && !isSpelling(allow, name, upstream, previous);
-const upstreamStale = (next !== current && hsUpstream === undefined) || (hsUpstream !== undefined && !isSpelling(allow, name, upstream, hsUpstream));
+const upstreamStale = hsUpstream === undefined || !isSpelling(allow, name, upstream, hsUpstream);
 if (argv.includes('--check')) {
   const drift = [];
   if (next !== current) drift.push(`version is ${current}, but recipe.yaml ${upstream} gives ${next}`);
