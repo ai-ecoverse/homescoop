@@ -202,8 +202,6 @@ jobs:
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: .homescoop-out
-      - if: matrix.package == 'sqlite3'
-        run: printf x >> .homescoop-out/package.tgz
       - name: Check package.tgz against package.tgz.sha256
         run: |
           set -euo pipefail

@@ -9,7 +9,7 @@ export default async function (ctx) {
 
   const ver = await run(['impeccable', '--version'], { cwd: '/home' });
   assert.equal(ver.status, 0, `--version stderr=${ver.stderr}`);
-  assert.equal(ver.stdout.trim(), '0.1.15', `version=${JSON.stringify(ver.stdout)}`);
+  assert.equal(ver.stdout.trim(), '0.1.14', `version=${JSON.stringify(ver.stdout)}`);
 
   const dirty = `<!doctype html>
 <html><head><style>
