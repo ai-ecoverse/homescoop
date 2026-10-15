@@ -30,6 +30,8 @@ export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:/opt/homebrew/opt/binutils
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS="${WASIXCC_WASM_EXCEPTIONS:-no}"
 export WASIXCC_PIC=no
+export SOURCE_DATE_EPOCH=1751500800
+export ZERO_AR_DATE=1
 export WASIXCC_MODULE_KIND="${WASIXCC_MODULE_KIND:-static-main}"
 unset FREETYPE FREETYPE_ROOT JPEG JPEG_ROOT PNG_ROOT ZLIB_ROOT VIRTUAL_ENV
 unset PKG_CONFIG_LIBDIR ZLIB CFLAGS CPPFLAGS LDFLAGS CXX
@@ -99,6 +101,9 @@ PY
   # Static perl without DynaLoader: see the patch header.
   if ! grep -q homescoop_boot_DynaLoader "$SRC/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm"; then
     patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0004-miniperl-dynaloader-marker.patch"
+  fi
+  if ! grep -q wasi_ptrs "$SRC/pp_sys.c"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0005-sselect-wasi-fd-set.patch"
   fi
 
   # Errno_pm.PL picks its errno.h by $^O, the build machine's OS: on a Linux

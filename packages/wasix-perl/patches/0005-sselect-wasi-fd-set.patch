@@ -1,0 +1,48 @@
+pp_sys.c: 4-arg select() with WASI's fd_set
+
+WASI's fd_set is a struct (size_t __nfds; int __fds[FD_SETSIZE]), not a
+bit mask. pp_sselect hands perl's vec() bit strings to select() as
+fd_set pointers, so libc read __nfds from the first bytes of the bit
+string: IO::Select->can_read with two handles trapped (memory access out
+of bounds) and TAP::Parser's process iterator, which selects over the
+test's stdout and stderr, read nothing (prove: "No plan found in TAP
+output"). On __wasi__ the bit strings are converted to fd_sets with
+FD_SET before select() and back with FD_ISSET after it.
+
+--- a/pp_sys.c
++++ b/pp_sys.c
+@@ -1476,7 +1476,33 @@
+ #endif
+     }
+ 
+-#ifdef PERL_IRIX5_SELECT_TIMEVAL_VOID_CAST
++#if defined(__wasi__)
++    {
++        fd_set wasi_sets[4];
++        fd_set *wasi_ptrs[4] = { NULL, NULL, NULL, NULL };
++        const I32 nbits = maxlen * 8;
++        for (i = 1; i <= 3; i++) {
++            if (!fd_sets[i])
++                continue;
++            FD_ZERO(&wasi_sets[i]);
++            for (j = 0; j < nbits && j < FD_SETSIZE; j++)
++                if (fd_sets[i][j >> 3] & (1 << (j & 7)))
++                    FD_SET(j, &wasi_sets[i]);
++            wasi_ptrs[i] = &wasi_sets[i];
++        }
++        nfound = PerlSock_select(nbits, wasi_ptrs[1], wasi_ptrs[2], wasi_ptrs[3], tbuf);
++        for (i = 1; i <= 3; i++) {
++            if (!wasi_ptrs[i])
++                continue;
++            for (j = 0; j < nbits; j++) {
++                if (j < FD_SETSIZE && FD_ISSET(j, &wasi_sets[i]))
++                    fd_sets[i][j >> 3] |= (char)(1 << (j & 7));
++                else
++                    fd_sets[i][j >> 3] &= (char)~(1 << (j & 7));
++            }
++        }
++    }
++#elif defined(PERL_IRIX5_SELECT_TIMEVAL_VOID_CAST)
+     /* Can't make just the (void*) conditional because that would be
+      * cpp #if within cpp macro, and not all compilers like that. */
+     nfound = PerlSock_select(
