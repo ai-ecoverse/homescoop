@@ -314,6 +314,11 @@ describe('resolvePackage', () => {
     const result = await resolvePackage({ ...ctx, ciCertified: true }, io);
     assert.match(result.gate, /^ci-certified \(ladder-pr ci job\); lines ignored: PR #336 is by renovate\[bot\]/);
     assert.equal(result.inputs.certified, OTHER);
+    const noCi = fakeIo({ ...staleFailed, pr: { ...PR, author: 'renovate[bot]' } });
+    await assert.rejects(
+      resolvePackage({ ...ctx, ciCertified: true }, noCi),
+      /no usable host-wasi-impeccable-pr336 \(certified= lines ignored: PR #336 is by renovate\[bot\], who cannot write to this repository\): .*ci: missing/,
+    );
   });
 
   it('parses the PR body like the merge commit', async () => {

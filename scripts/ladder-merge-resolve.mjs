@@ -120,7 +120,8 @@ export async function resolvePackage(ctx, io) {
     if (problems.length) rejected.push(`artifact ${artifact.id}: ${problems.join('; ')}`);
     else usable.push({ artifact, run });
   }
-  if (usable.length === 0) throw new Error(`no usable ${artifactName}: ${rejected.join(' | ')}`);
+  const note = ignored ? ` (certified= lines ignored: ${ignored})` : '';
+  if (usable.length === 0) throw new Error(`no usable ${artifactName}${note}: ${rejected.join(' | ')}`);
   const mismatches = [];
   for (const { artifact, run } of certified ? usable : usable.slice(0, 1)) {
     const got = await io.download(artifact);
@@ -136,7 +137,7 @@ export async function resolvePackage(ctx, io) {
       inputs: { package: pkg, certified: got.sha, artifact_pr: String(pr.number), artifact_id: String(artifact.id) },
     };
   }
-  throw new Error(`${artifactName}: ${mismatches.join(' | ')}`);
+  throw new Error(`${artifactName}${note}: ${mismatches.join(' | ')}`);
 }
 
 function githubIo({ repo, token, sha, head, prBody }) {
