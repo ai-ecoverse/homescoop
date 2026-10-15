@@ -34,6 +34,7 @@ packages/<name>/cert/
 `ladder-pr`'s cert leg ([`scripts/browser-cert/cert-leg.mjs`](../scripts/browser-cert/cert-leg.mjs)) fails closed:
 
 - A `host-node` or `host-smoke` harness must declare `ci:` commands. Without them, the leg fails with `<pkg>: cert harness <h> declares no ci commands; nothing was certified`. `ladder-pr` does not guess commands; the recipe declares them.
+- A `cert/meta.json` that is there but is not readable JSON fails the leg, naming the file and the parse error.
 - A leg that runs nothing (no `cert/*.mjs`, no Emscripten CLI to smoke, no `ci:`, or a `blocked` meta without `ci:`) passes, with a `::warning::` and a job-summary line, `<pkg>: no cert specs; this cert leg certifies nothing`. That green is a build, not evidence.
 
 ## Patch ↔ spec mapping

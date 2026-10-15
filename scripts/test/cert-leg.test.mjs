@@ -17,7 +17,7 @@ function fixture(packages) {
     mkdirSync(join(dir, 'package'), { recursive: true });
     writeFileSync(join(dir, 'package', 'package.json'), JSON.stringify({ name: `@ai-ecoverse/${name}`, ...manifest }));
     if (meta || specs.length) mkdirSync(join(dir, 'cert'), { recursive: true });
-    if (meta) writeFileSync(join(dir, 'cert', 'meta.json'), JSON.stringify(meta));
+    if (meta) writeFileSync(join(dir, 'cert', 'meta.json'), typeof meta === 'string' ? meta : JSON.stringify(meta));
     for (const s of specs) writeFileSync(join(dir, 'cert', s), 'export default async () => {};\n');
   }
   const summary = join(root, 'summary.md');
@@ -116,6 +116,24 @@ test('specs or an Emscripten CLI run the browser cert, with no warning', () => {
       assert.doesNotMatch(r.stderr, /::warning::|::error::/);
     }
     assert.equal(f.summary(), '');
+  } finally {
+    f.done();
+  }
+});
+
+test('a cert/meta.json that is not JSON fails the leg, in plan and in ci', () => {
+  const f = fixture({ broken: { meta: '{ "harness": "host-node", "ci": ["true"], }' }, empty: { meta: ' ' } });
+  try {
+    for (const name of ['broken', 'empty']) {
+      const p = f.leg('plan', name);
+      assert.equal(p.status, 1, name);
+      assert.match(p.stderr, new RegExp(`::error::packages/${name}/cert/meta\\.json is not readable JSON: .+; nothing was certified`));
+      assert.doesNotMatch(p.stdout, /browser=/);
+      assert.match(f.summary(), new RegExp(`packages/${name}/cert/meta\\.json is not readable JSON`));
+      const c = f.leg('ci', name);
+      assert.equal(c.status, 1, name);
+      assert.match(c.stdout, new RegExp(`::error::packages/${name}/cert/meta\\.json is not readable JSON: .+`));
+    }
   } finally {
     f.done();
   }

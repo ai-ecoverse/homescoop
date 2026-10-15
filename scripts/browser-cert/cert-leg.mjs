@@ -7,18 +7,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HOST_HARNESSES = ['host-node', 'host-smoke'];
 
-function readMeta(certDir) {
+function readMeta(dir, pkg) {
+  const file = join(dir, 'packages', pkg, 'cert', 'meta.json');
+  if (!existsSync(file)) return {};
   try {
-    return JSON.parse(readFileSync(join(certDir, 'meta.json'), 'utf8'));
-  } catch {
-    return {};
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch (err) {
+    throw new Error(`packages/${pkg}/cert/meta.json is not readable JSON: ${err.message.split('\n')[0]}; nothing was certified`);
   }
 }
 
 export function planLeg(pkg, manifest, { dir = root } = {}) {
   const certDir = join(dir, 'packages', pkg, 'cert');
   const specs = existsSync(certDir) ? readdirSync(certDir).filter((f) => f.endsWith('.mjs')) : [];
-  const meta = readMeta(certDir);
+  const meta = readMeta(dir, pkg);
   const harness = meta.harness || 'smoke';
   const ci = Array.isArray(meta.ci) ? meta.ci : [];
   let browser;
@@ -48,7 +50,14 @@ function summary(line) {
 
 function plan(pkg, manifestPath) {
   const manifest = manifestPath ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {};
-  const p = planLeg(pkg, manifest);
+  let p;
+  try {
+    p = planLeg(pkg, manifest);
+  } catch (err) {
+    console.error(`::error::${err.message}`);
+    summary(err.message);
+    return 1;
+  }
   if (p.browser === 'blocked') {
     console.error('::notice::browser-cert skipped — cert/meta.json blocked (needs unpublished kernel/peer); host-build still gates the PR');
   } else if (p.browser === 'skip') {
@@ -69,7 +78,13 @@ function plan(pkg, manifestPath) {
 }
 
 function ci(pkg) {
-  const meta = readMeta(join(root, 'packages', pkg, 'cert'));
+  let meta;
+  try {
+    meta = readMeta(root, pkg);
+  } catch (err) {
+    console.log(`::error::${err.message}`);
+    return 1;
+  }
   const cmds = Array.isArray(meta.ci) ? meta.ci : [];
   if (!cmds.length) {
     console.log('host cert: no ci commands');
