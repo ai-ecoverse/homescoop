@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.77.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.92.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
@@ -29,5 +29,8 @@
     "slicc-kernel 1.73.3 (#467: slicc-kernel#449 and the directory-mtime fix): cone's rsync -a of a tree with a symlink, a dangling one and one to a directory exits 0 with the links cone:cone (on 1.73.2 and older: rc 23, 'chgrp … failed: Operation not permitted', since a just-created symlink's own lstat said 0:0); the checklist's re-runs are quiet again, the destination's top directory keeping the source's mtime (failing on 1.36.0-1.73.2); slicc-kernel 1.75.1 (#477): a write after touch -d updates the mtime in the browser entry, which the incremental re-run needs (1.73.3's browser kept the touched time)"
   ],
   "uplink": true,
-  "users": "enforce"
+  "users": "enforce",
+  "extra_kernels": [
+    "@ai-ecoverse/slicc-kernel@1.77.0 (the previous cert kernel): checklist.mjs, users.mjs, daemon.mjs and tailnet.mjs unchanged, so 3.5.1's path-hardening (openat/O_NOFOLLOW resolver) is also seen on an older kernel"
+  ]
 }
