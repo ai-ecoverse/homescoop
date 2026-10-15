@@ -32,6 +32,7 @@ jobs:
         with:
           node-version: '24'
       - run: node scripts/check-exact-pins.mjs
+      - run: node --test 'scripts/test/*.test.mjs'
 
   detect:
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
@@ -214,37 +215,18 @@ jobs:
             exit 1
           fi
           echo "$ART: package.tgz sha256 $got matches package.tgz.sha256"
-      - name: Browser cert (slicc-kernel CDP)
+      - id: plan
+        name: What this cert leg certifies
         run: |
           set -euo pipefail
           PROBE="${RUNNER_TEMP}/bcert-probe"
           mkdir -p "$PROBE"
           tar -xzf .homescoop-out/package.tgz -C "$PROBE" package/package.json
-          NEED=$(node -e '
-            const fs=require("fs"); const path=require("path");
-            const pkg=process.argv[1];
-            const m=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
-            const certDir=path.join("packages", pkg, "cert");
-            let specs=[];
-            try { specs=fs.readdirSync(certDir).filter(f=>f.endsWith(".mjs")); } catch {}
-            let meta={};
-            try { meta=JSON.parse(fs.readFileSync(path.join(certDir,"meta.json"),"utf8")); } catch {}
-            const harness=meta.harness||"smoke";
-            if (meta.blocked) { process.stdout.write("blocked"); process.exit(0); }
-            if (harness==="host-smoke"||harness==="host-node") { process.stdout.write("0"); process.exit(0); }
-            if (specs.length>0) { process.stdout.write("1"); process.exit(0); }
-            const abi=m.slicc?.abi||"emscripten";
-            const n=Object.keys(m.slicc?.commands||{}).length;
-            process.stdout.write(abi==="emscripten"&&n>0?"1":"0");
-          ' "${{ matrix.package }}" "$PROBE/package/package.json")
-          if [[ "$NEED" == "blocked" ]]; then
-            echo "::notice::browser-cert skipped — cert/meta.json blocked (needs unpublished kernel/peer); host-build still gates the PR"
-            exit 0
-          fi
-          if [[ "$NEED" != "1" ]]; then
-            echo "browser-cert: skip (host-smoke/host-node or no CLI/cert specs)"
-            exit 0
-          fi
+          node scripts/browser-cert/cert-leg.mjs plan "${{ matrix.package }}" --manifest "$PROBE/package/package.json" >> "$GITHUB_OUTPUT"
+      - name: Browser cert (slicc-kernel CDP)
+        if: steps.plan.outputs.browser == 'run'
+        run: |
+          set -euo pipefail
           CERT_NM="${RUNNER_TEMP}/homescoop-browser-cert-nm"
           mkdir -p "$CERT_NM"
           KERNEL_SPEC=$(node scripts/browser-cert/cert-kernel.mjs "${{ matrix.package }}")
@@ -299,26 +281,7 @@ jobs:
             --package "${{ matrix.package }}" \
             --tarball .homescoop-out/package.tgz
       - name: Host cert (cert/meta.json ci commands)
-        run: |
-          set -euo pipefail
-          META="packages/${{ matrix.package }}/cert/meta.json"
-          if [[ ! -f "$META" ]]; then
-            echo "host cert: no cert/meta.json"
-            exit 0
-          fi
-          mapfile -t CMDS < <(node -e '
-            const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
-            for (const c of j.ci||[]) console.log(c);
-          ' "$META")
-          if [[ ${#CMDS[@]} -eq 0 ]]; then
-            echo "host cert: no ci commands"
-            exit 0
-          fi
-          for cmd in "${CMDS[@]}"; do
-            echo "::group::host cert: $cmd"
-            bash -c "$cmd"
-            echo "::endgroup::"
-          done
+        run: node scripts/browser-cert/cert-leg.mjs ci "${{ matrix.package }}"
 
   slicc-note:
     needs: detect
