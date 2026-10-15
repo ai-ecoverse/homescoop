@@ -1,0 +1,9 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
+  "checklist": [
+    "zip -v and unzip -v: Zip 3.0 and UnZip 6.00, with LARGE_FILE_SUPPORT and ZIP64_SUPPORT and the rest of the published 3.0.0-1's special compilation options",
+    "round trip as cone (users enforce): zip -r of a tree with a nested dir and a 64 KiB file, unzip -l lists every entry, unzip -t reports no errors, unzip -p returns the bytes, unzip -d extracts identical files; a missing archive is rc 9"
+  ],
+  "users": "enforce"
+}
