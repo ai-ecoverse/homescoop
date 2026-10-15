@@ -32,3 +32,7 @@ is green on a good tarball.
    slicc-kernel clears ISIG via `tty_set`.
 
 Fill in commands and logs after the first passing CI/host-node run.
+
+## 10.6.0-7: negative 10.6.0-6 (wasix-sysroot -22 → -28)
+
+`marker.mjs` on published 10.6.0-6: every `bin/*.wasm` carries `slicc.libc` = `wasix-sysroot 2025.9.30-22`, under the new floor of 28. The -28 behaviour (ssh's ppoll with its unblocking signal mask, atomic through slicc-kernel ≥ 1.88.0) is exercised by `winsize.mjs` (SIGWINCH → window-change in `ssh -t`) and the PTY ^C row. The race it closes is the sysroot's r28w window case.

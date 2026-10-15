@@ -4,8 +4,8 @@
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
 `scp`, `sftp`, and `ssh-add`.
 
-Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-22** (since
-10.6.0-6; -5 was on -18), linking
+Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-28** (since
+10.6.0-7; -6 was on -22, -5 on -18), linking
 **wasix-openssl 3.5.9-3** and **wasix-zlib 1.3.1-2** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
@@ -70,11 +70,15 @@ backs up `known_hosts` with a copy when `link()` is unavailable (patch
 
 ## Sysroot
 
-**wasix-sysroot 2025.9.30-22**: select/pselect timeouts and socketpair
+**wasix-sysroot 2025.9.30-28**: select/pselect timeouts and socketpair
 flags (-18), signals and EINTR (-19), the kernel's users (-20), per-fd
-terminals (-21), and the `slicc.libc` marker in every binary (-22), so
-slicc-kernel gives it EINTR semantics. OpenSSH 10.6's client loop uses
-**poll/ppoll**.
+terminals (-21), the `slicc.libc` marker in every binary (-22), so
+slicc-kernel gives it EINTR semantics, and real signal masks (-28,
+slicc-kernel ≥ 1.88.0). OpenSSH 10.6's client loop blocks SIGWINCH, SIGINT,
+SIGTERM and friends and waits in **ppoll** with its unblocking mask; on -28
+that wait is atomic, so a signal that arrives while ssh is busy is handled
+at the next wait instead of waiting out its timeout (10.6.0-6 and older
+ignored the mask).
 
 ## Not in v1
 
