@@ -50,7 +50,7 @@ function fakeIo({
   jobs = {},
   tarballs = {},
   statuses = [],
-  runArtifacts = {},
+  byId = {},
   records = {},
 } = {}) {
   const calls = [];
@@ -60,9 +60,10 @@ function fakeIo({
       calls.push(['statuses', sha]);
       return statuses;
     },
-    async runArtifacts(id) {
-      calls.push(['runArtifacts', id]);
-      return runArtifacts[id] ?? [];
+    async artifact(id) {
+      calls.push(['artifact', id]);
+      if (!byId[id]) throw new Error(`GET /actions/artifacts/${id} returned 404`);
+      return byId[id];
     },
     async record(a) {
       calls.push(['record', a.id]);
@@ -450,11 +451,13 @@ describe('resolvePackage', () => {
 
 describe('the cert-review record', () => {
   const RUN = 38800000001;
-  const url = `https://github.com/ai-ecoverse/homescoop/actions/runs/${RUN}`;
+  const REC = 12000000077;
+  const url = `https://github.com/ai-ecoverse/homescoop/actions/runs/${RUN}/artifacts/${REC}`;
   const status = (extra = {}) => ({
     context: 'cert-review',
     state: 'success',
     target_url: url,
+    description: `certified: run ${RUN}, record artifact ${REC}`,
     creator: { login: 'github-actions[bot]' },
     ...extra,
   });
@@ -475,14 +478,15 @@ describe('the cert-review record', () => {
     lines: [`certified=${GOOD} ${NAME} ${VERSION} (known: #343)`],
     ...extra,
   });
-  const reviewed = ({ st = status(), rr = reviewRun(), rec = record(), name = 'cert-review-record-336', ...rest } = {}) => ({
+  const recordArtifact = (extra = {}) => ({ id: REC, name: 'cert-review-record-336', expired: false, workflow_run: { id: RUN }, ...extra });
+  const reviewed = ({ st = status(), rr = reviewRun(), rec = record(), ra = recordArtifact(), ...rest } = {}) => ({
     ...rest,
     artifacts: rest.artifacts ?? [artifact(2, 20, HEAD)],
     runs: { 20: run(20, HEAD), [RUN]: rr, ...rest.runs },
     tarballs: rest.tarballs ?? { 2: tarball(GOOD) },
     statuses: [st],
-    runArtifacts: { [RUN]: [{ id: 77, name, expired: false }] },
-    records: { 77: rec },
+    byId: { [REC]: ra },
+    records: { [REC]: rec },
   });
   const noLine = { ...ctx, message: 'Merge pull request #336' };
   const renovatePr = { ...PR, author: 'renovate[bot]' };
@@ -536,10 +540,27 @@ describe('the cert-review record', () => {
       [{ rec: record({ pr: 337 }) }, /its record is for PR #337, not #336/],
       [{ rec: record({ head: STALE }) }, /its record is for 340364dd.*, not the merged head dea953c9/],
       [{ rec: record({ cert_review_run: 1 }) }, /its record names run 1, not 38800000001/],
-      [{ name: 'cert-review-record-337' }, /has no cert-review-record-336 artifact/],
-      [{ st: status({ target_url: 'https://example.com/x' }) }, /names no run/],
+      [{ rec: null }, /artifact 12000000077 has no record\.json/],
+      [{ ra: recordArtifact({ name: 'cert-review-record-337' }) }, /is cert-review-record-337, not cert-review-record-336/],
+      [{ ra: recordArtifact({ workflow_run: { id: 5 } }) }, /artifact 12000000077 is from run 5, not 38800000001/],
+      [{ ra: recordArtifact({ expired: true }) }, /artifact 12000000077 has expired/],
     ];
     for (const [over, why] of cases) await assert.rejects(resolvePackage(noLine, fakeIo(reviewed(over))), why);
+    const notDownloaded = fakeIo(reviewed({ ra: recordArtifact({ expired: true }) }));
+    await assert.rejects(resolvePackage(noLine, notDownloaded), /expired/);
+    assert.equal(notDownloaded.calls.some(([c]) => c === 'record'), false);
+  });
+
+  it('needs the target_url and the description to name the same run and record artifact', async () => {
+    const cases = [
+      status({ target_url: `https://github.com/ai-ecoverse/homescoop/actions/runs/${RUN}` }),
+      status({ description: 'every package certified; lines in the cert-review-record-336 artifact' }),
+      status({ description: `certified: run 1, record artifact ${REC}` }),
+      status({ description: `certified: run ${RUN}, record artifact 1` }),
+    ];
+    for (const st of cases) {
+      await assert.rejects(resolvePackage(noLine, fakeIo(reviewed({ st }))), /don't name the same run and record artifact/);
+    }
   });
 
   it('ignores a status from anyone but github-actions[bot] and takes the newest', async () => {
@@ -555,7 +576,7 @@ describe('the cert-review record', () => {
     for (const state of ['failure', 'error']) {
       await assert.rejects(
         resolvePackage({ ...noLine, ciCertified: true }, fakeIo(reviewed({ ...green, st: status({ state }) }))),
-        new RegExp(`the cert-review status on ${HEAD} is ${state}, which vetoes the ci-job path: ${url}`),
+        new RegExp(`the cert-review status on ${HEAD} is ${state}, which vetoes the ci-job path: cert-review run ${RUN}, ${url}`),
       );
     }
     const pending = await resolvePackage({ ...noLine, ciCertified: true }, fakeIo(reviewed({ ...green, st: status({ state: 'pending' }) })));

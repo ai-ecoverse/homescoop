@@ -70,7 +70,7 @@ export function tarballProblem(got, { name, version, certified }) {
   return '';
 }
 
-export function certReviewProblems({ run, record, pr }) {
+function runProblems(run) {
   const problems = [];
   if (run.path !== CERT_REVIEW) problems.push(`run ${run.id} is ${run.path}, not ${CERT_REVIEW}`);
   if (run.event !== 'workflow_run' && run.event !== 'workflow_dispatch') problems.push(`run ${run.id} is a ${run.event} run`);
@@ -78,7 +78,18 @@ export function certReviewProblems({ run, record, pr }) {
   if (run.status !== 'completed' || run.conclusion !== 'success') {
     problems.push(`run ${run.id} concluded ${run.conclusion || run.status}`);
   }
-  if (!record) return [...problems, `run ${run.id} has no cert-review-record-${pr.number} artifact`];
+  return problems;
+}
+
+function recordProblems({ run, artifact, pr }, record) {
+  const problems = [];
+  if (artifact.name !== `cert-review-record-${pr.number}`) {
+    problems.push(`artifact ${artifact.id} is ${artifact.name}, not cert-review-record-${pr.number}`);
+  }
+  if (artifact.workflow_run?.id !== run.id) problems.push(`artifact ${artifact.id} is from run ${artifact.workflow_run?.id}, not ${run.id}`);
+  if (artifact.expired) problems.push(`artifact ${artifact.id} has expired`);
+  if (problems.length || record === undefined) return problems;
+  if (!record) return [`artifact ${artifact.id} has no record.json`];
   if (record.pr !== pr.number) problems.push(`its record is for PR #${record.pr}, not #${pr.number}`);
   if (record.head !== pr.head) problems.push(`its record is for ${record.head}, not the merged head ${pr.head}`);
   if (record.cert_review_run !== run.id) problems.push(`its record names run ${record.cert_review_run}, not ${run.id}`);
@@ -92,13 +103,21 @@ export async function certReview(pr, io) {
   );
   if (!status) return { state: 'absent' };
   const url = status.target_url ?? '';
-  if (status.state !== 'success') return { state: status.state, url };
-  const runId = Number(url.match(/\/actions\/runs\/(\d+)\/?$/)?.[1]);
-  if (!runId) return { state: 'invalid', url, problem: `its target_url '${url}' names no run` };
-  const run = await io.run(runId);
-  const artifact = (await io.runArtifacts(runId)).find((a) => a.name === `cert-review-record-${pr.number}` && !a.expired);
-  const record = artifact ? await io.record(artifact) : null;
-  const problems = certReviewProblems({ run, record, pr });
+  const target = url.match(/\/actions\/runs\/(\d+)\/artifacts\/(\d+)$/);
+  if (status.state !== 'success') return { state: status.state, url, runId: target ? Number(target[1]) : undefined };
+  const said = String(status.description ?? '').match(/\brun (\d+), record artifact (\d+)$/);
+  if (!target || !said || said[1] !== target[1] || said[2] !== target[2]) {
+    const problem = `its target_url '${url}' and description '${status.description}' don't name the same run and record artifact`;
+    return { state: 'invalid', url, problem };
+  }
+  const runId = Number(target[1]);
+  const found = { run: await io.run(runId), artifact: await io.artifact(Number(target[2])), pr };
+  let problems = [...runProblems(found.run), ...recordProblems(found)];
+  let record;
+  if (!problems.length) {
+    record = await io.record(found.artifact);
+    problems = recordProblems(found, record);
+  }
   if (problems.length) return { state: 'invalid', url, problem: problems.join('; ') };
   return { state: 'success', url, runId, text: record.lines.join('\n') };
 }
@@ -162,7 +181,7 @@ export async function resolvePackage(ctx, io) {
   if (!certified && (review.state === 'failure' || review.state === 'error')) {
     throw new Error(
       `${name}@${version} has no certified= line, and the cert-review status on ${pr.head} is ${review.state}, ` +
-        `which vetoes the ci-job path: ${review.url}`,
+        `which vetoes the ci-job path: cert-review run ${review.runId ?? '(none named)'}, ${review.url}`,
     );
   }
   if (!certified && pr.author !== RENOVATE && (ignored || !(await io.canWrite(pr.author)))) {
@@ -259,8 +278,8 @@ function githubIo({ repo, token, sha, head, prBody }) {
     async statuses(ref) {
       return (await api(`/commits/${ref}/statuses?per_page=100`)).json();
     },
-    async runArtifacts(id) {
-      return (await (await api(`/actions/runs/${id}/artifacts?per_page=100`)).json()).artifacts ?? [];
+    async artifact(id) {
+      return (await api(`/actions/artifacts/${id}`)).json();
     },
     async record(artifact) {
       const file = join(await unzip(artifact), 'record.json');

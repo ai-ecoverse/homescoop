@@ -47,10 +47,10 @@ ladder-pr run at that PR's merged head that concluded `success`, and one of:
   PR's author can write to the repository, since GitHub can fill the merge
   message from PR text. Third comes the CI cert review: the newest
   `cert-review` commit status on the merged head from `github-actions[bot]`,
-  if it is `success`, its run (`target_url`) is main's `cert-review.yml`
-  (`workflow_run` or `workflow_dispatch`, concluded `success`), and that
-  run's `cert-review-record-<pr>` artifact names this PR, this head and that
-  run. Its lines need no writer, since main's workflow produced them. Within
+  if it is `success`, its `target_url` and description name the same run
+  and record artifact, the run is main's `cert-review.yml` (`workflow_run`
+  or `workflow_dispatch`, concluded `success`), and that artifact is the
+  run's `cert-review-record-<pr>`, naming this PR, this head and that run. Its lines need no writer, since main's workflow produced them. Within
   the source it resolves from, another line naming the package at a
   different version fails; or
 - no line for the package, the package in `scripts/ci-certified.json`, a PR
