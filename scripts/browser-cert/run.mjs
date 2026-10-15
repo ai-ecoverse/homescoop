@@ -44,9 +44,10 @@ const kernelFlag = flag('--kernel');
 const usersFlag = flag('--users');
 const jsonOut = flag('--json') ? resolve(flag('--json')) : '';
 const soft = process.argv.includes('--soft');
+const livePort = Number(flag('--live')) || 0;
 if (!pkgName) {
   console.error(
-    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft] [--spec <file.mjs> ...]',
+    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft] [--spec <file.mjs> ...] [--live <port>]',
   );
   process.exit(2);
 }
@@ -280,6 +281,7 @@ try {
   chrome = await launch({
     roots,
     isolated: true,
+    realistic: Boolean(livePort && process.env.DISPLAY),
     timeout: Number(meta.runTimeoutMs) || 120000,
     exits: { '/dist/process-worker.js': [/WASM_PROCESS_EXIT, code/, /WASM_PROCESS_ERROR,$/] },
   });
@@ -323,6 +325,42 @@ try {
     report.modes = done.stamped === null ? 'kernel defaults' : 'tarball';
   }
   console.log(`browser-cert: file modes: ${report.modes === 'tarball' ? 'the tarballs\' (kernel.chmod)' : 'the kernel\'s defaults (no kernel.chmod)'}`);
+
+  if (livePort) {
+    const ctx = makeContext(page, { packageName: pkgName, npmName });
+    const { createServer } = await import('node:http');
+    const answer = (res, status, body) => {
+      res.writeHead(status, { 'content-type': 'application/json' });
+      res.end(`${JSON.stringify(body)}\n`);
+    };
+    const info = {
+      package: npmName,
+      versions: pkgs.map((p) => `${p.manifest.name}@${p.manifest.version}`),
+      kernel: report.kernel,
+      users: users || null,
+      modes: report.modes,
+      calls: Object.keys(ctx).filter((key) => typeof ctx[key] === 'function'),
+    };
+    createServer(async (req, res) => {
+      if (req.method === 'GET' && req.url === '/') return answer(res, 200, info);
+      const name = req.url.match(/^\/ctx\/([A-Za-z]+)$/)?.[1];
+      if (req.method !== 'POST' || typeof ctx[name] !== 'function') return answer(res, 404, { error: 'GET / or POST /ctx/<call> with a JSON array of arguments' });
+      let args = [];
+      try {
+        const text = await new Promise((done) => {
+          let body = '';
+          req.on('data', (chunk) => (body += chunk));
+          req.on('end', () => done(body));
+        });
+        args = text.trim() ? JSON.parse(text) : [];
+        if (!Array.isArray(args)) throw new Error('the body must be a JSON array of arguments');
+        answer(res, 200, (await ctx[name](...args)) ?? null);
+      } catch (err) {
+        answer(res, 500, { error: errorText(err) });
+      }
+    }).listen(livePort, '127.0.0.1', () => console.log(`browser-cert: live on http://127.0.0.1:${livePort}/ ${JSON.stringify(info)}`));
+    await new Promise(() => {});
+  }
 
   if (certSpecs.length > 0) {
     const ctx = {
