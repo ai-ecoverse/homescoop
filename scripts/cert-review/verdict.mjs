@@ -12,11 +12,16 @@ const { values } = parseArgs({
     body: { type: 'string' },
     lines: { type: 'string' },
     run: { type: 'string', default: '' },
+    'ladder-run': { type: 'string', default: '' },
+    'ladder-conclusion': { type: 'string', default: '' },
   },
 });
 
 const one = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 const problems = [];
+const ladder = values['ladder-conclusion'];
+const held = ladder !== 'success' ? `ladder-pr run ${values['ladder-run'] || '?'} concluded ${ladder || 'nothing'}` : '';
+if (held) problems.push(`${held}, so nothing is certified`);
 
 const pattern = new RegExp(`^host-(.+)-pr${values.pr}$`);
 const packages = readdirSync(values.artifacts)
@@ -61,6 +66,7 @@ const lines = packages.map((pkg) => {
   const [v] = found;
   if (v.verdict === 'certified') {
     const known = (v.known ?? []).map((k) => one(k).slice(0, 120)).filter(Boolean);
+    if (held) return { ok: false, line: `cert-ci: HELD ${pkg.name}@${pkg.version}: the reviewer certified it, but ${held}` };
     return {
       ok: true,
       line: `certified=${pkg.sha} ${pkg.name} ${pkg.version}${known.length ? ` (known: ${known.join(', ')})` : ''}`,

@@ -40,6 +40,7 @@ jobs:
       ladder_run: ${{ steps.plan.outputs.ladder_run }}
       packages: ${{ steps.plan.outputs.packages }}
       base: ${{ steps.plan.outputs.base }}
+      ladder_conclusion: ${{ steps.plan.outputs.ladder_conclusion }}
     steps:
       - name: The pull request, its ladder-pr run at the head, and the packages it built
         id: plan
@@ -93,7 +94,15 @@ jobs:
             });
             const packages = artifacts.filter((a) => !a.expired && pattern.test(a.name)).map((a) => a.name.match(pattern)[1]);
             if (!packages.length) return skip(`ladder-pr run ${run.id} built no package for #${number}`);
-            const outputs = { go: 'true', number, head, base: pr.base.sha, ladder_run: run.id, packages: JSON.stringify(packages) };
+            const outputs = {
+              go: 'true',
+              number,
+              head,
+              base: pr.base.sha,
+              ladder_run: run.id,
+              ladder_conclusion: run.conclusion,
+              packages: JSON.stringify(packages),
+            };
             for (const [key, value] of Object.entries(outputs)) {
               core.info(`${key}=${value}`);
               core.setOutput(key, String(value));
@@ -112,8 +121,7 @@ jobs:
       actions: read
       contents: read
       issues: write
-      pull-requests: write
-      statuses: write
+      pull-requests: read
     env:
       PR_NUMBER: ${{ needs.plan.outputs.number }}
       HEAD: ${{ needs.plan.outputs.head }}
@@ -235,7 +243,7 @@ jobs:
 
             WHAT'S SET UP
             - The current directory is the pull request's head (${{ env.HEAD }}), with full history: `git diff ${{ needs.plan.outputs.base }}...HEAD` is the change (the pull request's base, which also holds for a merged pull request).
-            - ladder-pr run `${{ env.LADDER_RUN }}` built the packages ${{ env.PACKAGES }} on this head, ran their `smoke.c`, and ran their `packages/<package>/cert/*.mjs` specs in slicc-kernel on the kernel `cert/meta.json` names (`cert (<package>)` jobs; `host-build (<package>)` for the build). Read it with `gh run view ${{ env.LADDER_RUN }} --json jobs`, `gh run view ${{ env.LADDER_RUN }} --log-failed` and `gh run view --job <job> --log`. Don't repeat what it already ran unless you need to.
+            - ladder-pr run `${{ env.LADDER_RUN }}` (concluded `${{ needs.plan.outputs.ladder_conclusion }}`; a run that isn't `success` is never certified, whatever you decide) built the packages ${{ env.PACKAGES }} on this head, ran their `smoke.c`, and ran their `packages/<package>/cert/*.mjs` specs in slicc-kernel on the kernel `cert/meta.json` names (`cert (<package>)` jobs; `host-build (<package>)` for the build). Read it with `gh run view ${{ env.LADDER_RUN }} --json jobs`, `gh run view ${{ env.LADDER_RUN }} --log-failed` and `gh run view --job <job> --log`. Don't repeat what it already ran unless you need to.
             - Each built tarball is `${{ runner.temp }}/artifacts/host-<package>-pr${{ env.PR_NUMBER }}/package.tgz`, with its sha256 next to it. These exact bytes are what gets published.
             - Each package has a cert harness in `${{ runner.temp }}/harness/<package>` (its kernel, `needs` and Chromium). Run its specs, on any kernel and users mode:
               `cert-run env HOMESCOOP_CERT_NODE_MODULES=${{ runner.temp }}/harness/<package>/node_modules node scripts/browser-cert/run.mjs --package <package> --tarball <package.tgz> [--kernel @ai-ecoverse/slicc-kernel@<version>] [--users enforce] [--soft] [--json <out.json>]`
@@ -261,42 +269,14 @@ jobs:
             - `comment.md`: per package, a short table (what changed, specs and kernels, checklist and patches, surface, licences, findings) and a few sentences on what a human should look at. Mention anything in this setup that got in your way.
             Don't edit, commit or push anything, and don't comment on the pull request yourself.
 
-      - name: Verdict from the artifacts (the review's tools from ${{ github.sha }})
-        id: verdict
-        if: always()
-        run: |
-          if node .cert-review-tools/scripts/cert-review/verdict.mjs \
-            --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --review "$RUNNER_TEMP/cert-review" \
-            --body "$RUNNER_TEMP/cert-review/body.md" --lines "$RUNNER_TEMP/cert-review/lines.txt" --run "$RUN_URL"; then
-            echo "conclusion=success" >> "$GITHUB_OUTPUT"
-          else
-            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
-          fi
-          jq -n --arg pr "$PR_NUMBER" --arg head "$HEAD" --arg ladder "$LADDER_RUN" --arg run "$GITHUB_RUN_ID" \
-            --rawfile lines "$RUNNER_TEMP/cert-review/lines.txt" \
-            '{pr: ($pr | tonumber), head: $head, ladder_run: ($ladder | tonumber), cert_review_run: ($run | tonumber), lines: ($lines | rtrimstr("\n") | split("\n"))}' \
-            > "$RUNNER_TEMP/cert-review/record.json"
-
       - uses: actions/upload-artifact@v7
-        if: always() && steps.verdict.outputs.conclusion != ''
+        if: always()
         with:
-          name: cert-review-record-${{ needs.plan.outputs.number }}
+          name: cert-review-verdict-${{ needs.plan.outputs.number }}
           path: |
-            ${{ runner.temp }}/cert-review/record.json
-            ${{ runner.temp }}/cert-review/lines.txt
-          if-no-files-found: error
-
-      - name: Comment and the cert-review status on the head
-        if: always() && steps.verdict.outputs.conclusion != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CONCLUSION: ${{ steps.verdict.outputs.conclusion }}
-        run: |
-          gh pr comment "$PR_NUMBER" --body-file "$RUNNER_TEMP/cert-review/body.md"
-          gh api "repos/$GH_REPO/statuses/$HEAD" \
-            -f state="$CONCLUSION" -f context=cert-review -f target_url="$RUN_URL" \
-            -f description="$([ "$CONCLUSION" = success ] && echo "every package certified; lines in the cert-review-record-$PR_NUMBER artifact" || echo "not certified; see the run")" \
-            --jq '"status \(.id) \(.state) on \(.url)"'
+            ${{ runner.temp }}/cert-review/verdict.json
+            ${{ runner.temp }}/cert-review/comment.md
+          if-no-files-found: ignore
 
       - name: Evidence
         if: always()
@@ -313,3 +293,100 @@ jobs:
           name: cert-review-${{ needs.plan.outputs.number }}
           path: ${{ runner.temp }}/evidence/
           if-no-files-found: ignore
+
+  record:
+    name: cert-review / record
+    needs: [plan, review]
+    if: always() && needs.plan.outputs.go == 'true'
+    runs-on: ${{ vars.CERT_RUNNER || 'cloud-run-bench' }}
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      statuses: write
+    env:
+      PR_NUMBER: ${{ needs.plan.outputs.number }}
+      HEAD: ${{ needs.plan.outputs.head }}
+      LADDER_RUN: ${{ needs.plan.outputs.ladder_run }}
+      PACKAGES: ${{ needs.plan.outputs.packages }}
+      LADDER_CONCLUSION: ${{ needs.plan.outputs.ladder_conclusion }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: scripts/cert-review
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: cert-review-verdict-${{ needs.plan.outputs.number }}
+          path: ${{ runner.temp }}/cert-review
+
+      - name: The ladder-pr tarballs, downloaded here, not taken from the review
+        run: |
+          case "$(uname -m)" in
+            x86_64) arch=amd64 ;;
+            aarch64 | arm64) arch=arm64 ;;
+            *) echo "::error::no gh release for $(uname -m)"; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/bin"
+          if ! command -v gh > /dev/null; then
+            v=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/cli/cli/releases/latest | jq -r '.tag_name | ltrimstr("v")')
+            (cd "$RUNNER_TEMP/bin" \
+              && curl -fsSL -O "https://github.com/cli/cli/releases/download/v$v/gh_${v}_linux_$arch.tar.gz" \
+                -O "https://github.com/cli/cli/releases/download/v$v/gh_${v}_checksums.txt" \
+              && sha256sum -c "gh_${v}_checksums.txt" --ignore-missing \
+              && tar -xzf "gh_${v}_linux_$arch.tar.gz" --strip-components=2 "gh_${v}_linux_$arch/bin/gh")
+          fi
+          export PATH="$RUNNER_TEMP/bin:$PATH"
+          for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
+            name="host-$pkg-pr$PR_NUMBER"
+            gh run download "$LADDER_RUN" -n "$name" -D "$RUNNER_TEMP/artifacts/$name"
+          done
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Verdict from the artifacts (this job's tools, from ${{ github.sha }})
+        id: verdict
+        run: |
+          mkdir -p "$RUNNER_TEMP/cert-review"
+          if node scripts/cert-review/verdict.mjs \
+            --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --review "$RUNNER_TEMP/cert-review" \
+            --body "$RUNNER_TEMP/cert-review/body.md" --lines "$RUNNER_TEMP/cert-review/lines.txt" --run "$RUN_URL" \
+            --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION"; then
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
+          fi
+          jq -n --arg pr "$PR_NUMBER" --arg head "$HEAD" --arg ladder "$LADDER_RUN" --arg run "$GITHUB_RUN_ID" \
+            --rawfile lines "$RUNNER_TEMP/cert-review/lines.txt" \
+            '{pr: ($pr | tonumber), head: $head, ladder_run: ($ladder | tonumber), cert_review_run: ($run | tonumber), lines: ($lines | rtrimstr("\n") | split("\n"))}' \
+            > "$RUNNER_TEMP/cert-review/record.json"
+
+      - uses: actions/upload-artifact@v7
+        id: record
+        with:
+          name: cert-review-record-${{ needs.plan.outputs.number }}
+          path: |
+            ${{ runner.temp }}/cert-review/record.json
+            ${{ runner.temp }}/cert-review/lines.txt
+          if-no-files-found: error
+
+      - name: Comment and the cert-review status on the head
+        env:
+          CONCLUSION: ${{ steps.verdict.outputs.conclusion }}
+          RECORD_ID: ${{ steps.record.outputs.artifact-id }}
+        run: |
+          gh pr comment "$PR_NUMBER" --body-file "$RUNNER_TEMP/cert-review/body.md"
+          gh api "repos/$GH_REPO/statuses/$HEAD" \
+            -f state="$CONCLUSION" -f context=cert-review -f target_url="$RUN_URL/artifacts/$RECORD_ID" \
+            -f description="$([ "$CONCLUSION" = success ] && echo "certified: run $GITHUB_RUN_ID, record artifact $RECORD_ID" || echo "not certified: run $GITHUB_RUN_ID, record artifact $RECORD_ID")" \
+            --jq '"status \(.id) \(.state) on \(.url)"'
