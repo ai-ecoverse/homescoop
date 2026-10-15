@@ -196,6 +196,11 @@ jobs:
           port=9300
           echo '[]' > "$RUNNER_TEMP/live/live.json"
           for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
+            harness=$(jq -r 'if .blocked then "blocked" else (.harness // "slicc-kernel") end' "packages/$pkg/cert/meta.json" 2> /dev/null || echo slicc-kernel)
+            if [ "$harness" != slicc-kernel ]; then
+              echo "$pkg: no live pair, its cert harness is $harness"
+              continue
+            fi
             head_tgz="$RUNNER_TEMP/artifacts/host-$pkg-pr$PR_NUMBER/package.tgz"
             name=$(tar -xzf "$head_tgz" -O package/package.json | jq -r .name)
             base_tgz=
@@ -208,15 +213,19 @@ jobs:
                 HOMESCOOP_CERT_NODE_MODULES="$RUNNER_TEMP/harness/$pkg/node_modules" nohup node .cert-review-tools/scripts/browser-cert/run.mjs \
                   --package "$pkg" --cert "packages/$pkg/cert" --tarball "$tgz" --users enforce --live "$port" \
                   > "$RUNNER_TEMP/live/$pkg-$side.log" 2>&1 &
-                jq --arg pkg "$pkg" --arg side "$side" --arg tgz "$tgz" --argjson port "$port" \
-                  '. + [{package: $pkg, side: $side, tarball: $tgz, url: "http://127.0.0.1:\($port)/"}]' \
+                jq --arg pkg "$pkg" --arg side "$side" --arg tgz "$tgz" --argjson port "$port" --argjson pid "$!" \
+                  '. + [{package: $pkg, side: $side, tarball: $tgz, url: "http://127.0.0.1:\($port)/", pid: $pid}]' \
                   "$RUNNER_TEMP/live/live.json" > "$RUNNER_TEMP/live/next.json" && mv "$RUNNER_TEMP/live/next.json" "$RUNNER_TEMP/live/live.json"
               fi
               port=$((port + 1))
             done
           done
-          for url in $(jq -r '.[].url' "$RUNNER_TEMP/live/live.json"); do
-            for _ in $(seq 120); do curl -fs "$url" > /dev/null && break; sleep 2; done
+          jq -r '.[] | "\(.url) \(.pid)"' "$RUNNER_TEMP/live/live.json" | while read -r url pid; do
+            for _ in $(seq 120); do
+              curl -fs "$url" > /dev/null && break
+              kill -0 "$pid" 2> /dev/null || break
+              sleep 2
+            done
             curl -fsS "$url" || echo "::warning::$url didn't come up; see its log in $RUNNER_TEMP/live"
           done
           cat "$RUNNER_TEMP/live/live.json"

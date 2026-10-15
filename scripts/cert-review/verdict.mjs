@@ -45,10 +45,25 @@ if (!packages.length) problems.push(`no host-<package>-pr${values.pr} artifacts`
 
 let verdicts = [];
 try {
-  verdicts = JSON.parse(readFileSync(join(values.review, 'verdict.json'), 'utf8')).packages ?? [];
+  const parsed = JSON.parse(readFileSync(join(values.review, 'verdict.json'), 'utf8'));
+  if (Array.isArray(parsed?.packages)) {
+    verdicts = parsed.packages.filter((v) => {
+      const valid = v && typeof v === 'object' && typeof v.package === 'string';
+      if (!valid) problems.push(`verdict.json has an entry that isn't { "package": "<name>", … }`);
+      return valid;
+    });
+  } else {
+    problems.push('verdict.json has no "packages" list');
+  }
 } catch (error) {
   problems.push(`no readable verdict.json (${one(error.message)})`);
 }
+const listOf = (value, what, pkg) => {
+  if (value === undefined || value === null) return [];
+  if (Array.isArray(value)) return value;
+  problems.push(`${pkg.name}@${pkg.version}: "${what}" isn't a list`);
+  return [value];
+};
 
 const find = (pkg) => verdicts.filter((v) => v.package === pkg.recipe || v.package === pkg.name);
 for (const v of verdicts) {
@@ -65,7 +80,7 @@ const lines = packages.map((pkg) => {
   }
   const [v] = found;
   if (v.verdict === 'certified') {
-    const known = (v.known ?? []).map((k) => one(k).slice(0, 120)).filter(Boolean);
+    const known = listOf(v.known, 'known', pkg).map((k) => one(k).slice(0, 120)).filter(Boolean);
     if (held) return { ok: false, line: `cert-ci: HELD ${pkg.name}@${pkg.version}: the reviewer certified it, but ${held}` };
     return {
       ok: true,
