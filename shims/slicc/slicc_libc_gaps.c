@@ -5,6 +5,7 @@
  */
 #include <emscripten.h>
 #include <errno.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <time.h>
@@ -135,6 +136,8 @@ static int slicc_setcred(int ruid, int euid, int suid, int rgid, int egid, int s
   return slicc_status(slicc_setcred_js(ruid, euid, suid, rgid, egid, sgid));
 }
 
+EMSCRIPTEN_KEEPALIVE unsigned slicc_cred_euid(void) { return slicc_cred_one(SLICC_EUID); }
+
 uid_t __syscall_getuid32(void) { return slicc_cred_one(SLICC_RUID); }
 uid_t __syscall_geteuid32(void) { return slicc_cred_one(SLICC_EUID); }
 gid_t __syscall_getgid32(void) { return slicc_cred_one(SLICC_RGID); }
@@ -232,3 +235,9 @@ EM_JS(int, slicc_default_getppid_js, (void), {
 });
 __attribute__((weak)) pid_t __syscall_getpid(void) { return slicc_default_getpid_js(); }
 __attribute__((weak)) pid_t __syscall_getppid(void) { return slicc_default_getppid_js(); }
+
+__attribute__((import_module("env"), import_name("__syscall_linkat")))
+int slicc_linkat_import(int olddirfd, intptr_t oldpath, int newdirfd, intptr_t newpath, int flags);
+int __syscall_linkat(int olddirfd, intptr_t oldpath, int newdirfd, intptr_t newpath, int flags) {
+  return slicc_linkat_import(olddirfd, oldpath, newdirfd, newpath, flags);
+}

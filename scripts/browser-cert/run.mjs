@@ -8,6 +8,7 @@
  * browser-cert.json / --version smoke when no cert/ specs exist.
  */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -15,11 +16,13 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { recorder } from './cases.mjs';
 import { makeContext } from './context.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -30,14 +33,29 @@ function flag(name) {
   return i >= 0 ? process.argv[i + 1] : '';
 }
 
+function flags(name) {
+  return process.argv.flatMap((arg, i) => (arg === name && i + 1 < process.argv.length ? [process.argv[i + 1]] : []));
+}
+
+const USERS = ['off', 'report', 'enforce'];
 const pkgName = flag('--package');
-const tarball = resolve(flag('--tarball') || '.homescoop-out/package.tgz');
+const tarballs = (flags('--tarball').length ? flags('--tarball') : ['.homescoop-out/package.tgz']).map((t) => resolve(t));
+const kernelFlag = flag('--kernel');
+const usersFlag = flag('--users');
+const jsonOut = flag('--json') ? resolve(flag('--json')) : '';
+const soft = process.argv.includes('--soft');
 if (!pkgName) {
-  console.error('usage: run.mjs --package <name> --tarball <package.tgz>');
+  console.error(
+    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft]',
+  );
+  process.exit(2);
+}
+if (usersFlag && !USERS.includes(usersFlag)) {
+  console.error(`browser-cert: --users must be one of ${USERS.join(', ')}`);
   process.exit(2);
 }
 
-const certDir = join(root, 'packages', pkgName, 'cert');
+const certDir = flag('--cert') ? resolve(flag('--cert')) : join(root, 'packages', pkgName, 'cert');
 const certSpecs = existsSync(certDir)
   ? readdirSync(certDir)
       .filter((f) => f.endsWith('.mjs'))
@@ -49,50 +67,94 @@ const metaPath = join(certDir, 'meta.json');
 /** @type {{ harness?: string, needs?: string[] }} */
 const meta = existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, 'utf8')) : {};
 const harness = meta.harness || (certSpecs.length ? 'slicc-kernel' : 'smoke');
+const users = usersFlag || meta.users || '';
+
+const report = {
+  package: pkgName,
+  cert: relative(root, certDir),
+  harness,
+  users: users || null,
+  kernel: null,
+  tarballs: [],
+  specs: [],
+  pageErrors: [],
+  modes: null,
+  error: null,
+  status: 'fail',
+};
+
+function writeReport(status) {
+  if (!jsonOut) return;
+  report.status = status;
+  mkdirSync(dirname(jsonOut), { recursive: true });
+  writeFileSync(jsonOut, `${JSON.stringify(report, null, 2)}\n`);
+}
+
+function errorText(err) {
+  return String(err?.stack || err).slice(0, 8000);
+}
+
+function sha256(file) {
+  return createHash('sha256').update(readFileSync(file)).digest('hex');
+}
 
 if (harness === 'host-smoke' || harness === 'host-node') {
   console.log(`browser-cert: ${pkgName} harness=${harness} — delegated to ladder-pr host steps`);
+  writeReport('skip');
   process.exit(0);
 }
 if (harness === 'slicc-realm') {
   console.error(
     `browser-cert: ${pkgName} requires full SLICC realm (cert/meta.json). Not wired in ladder-pr yet.`,
   );
+  report.error = 'harness slicc-realm is not wired';
+  writeReport('fail');
   process.exit(1);
 }
 
 const work = mkdtempSync(join(tmpdir(), `homescoop-bcert-${pkgName}-`));
-const extract = join(work, 'pkg');
-mkdirSync(extract, { recursive: true });
 
-const untar = spawnSync('tar', ['-xzf', tarball, '-C', extract], { encoding: 'utf8' });
-if (untar.status !== 0) {
-  console.error(`browser-cert: tar failed: ${untar.stderr || untar.stdout}`);
-  process.exit(1);
+function cleanup(code, status = code === 0 ? 'pass' : 'fail') {
+  writeReport(status);
+  rmSync(work, { recursive: true, force: true });
+  process.exit(code);
 }
 
-const pkgRoot = join(extract, 'package');
-const manifest = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
+function untar(tgz, into) {
+  mkdirSync(into, { recursive: true });
+  const r = spawnSync('tar', ['-xpzf', tgz, '-C', into], { encoding: 'utf8' });
+  if (r.status !== 0) {
+    console.error(`browser-cert: tar failed: ${r.stderr || r.stdout}`);
+    report.error = `tar -xzf ${tgz} failed`;
+    cleanup(1);
+  }
+  return join(into, 'package');
+}
+
+const pkgs = tarballs.map((tgz, i) => {
+  const pkgRoot = untar(tgz, join(work, `pkg${i}`));
+  const manifest = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
+  const entry = { name: manifest.name, version: manifest.version, sha256: sha256(tgz), tarball: tgz };
+  report.tarballs.push(entry);
+  return { ...entry, pkgRoot, manifest, installDir: `node_modules/${manifest.name}/` };
+});
+const [main] = pkgs;
+const { pkgRoot, manifest } = main;
 const npmName = manifest.name;
 const abi = manifest.slicc?.abi || 'emscripten';
 const commands = manifest.slicc?.commands || {};
 const cmdNames = Object.keys(commands);
-
-function cleanup(code) {
-  rmSync(work, { recursive: true, force: true });
-  process.exit(code);
-}
 
 // Full cert specs may target wasi (python wheels, wasi-pnpm). Smoke-only path
 // still skips non-emscripten without cert/.
 if (certSpecs.length === 0) {
   if (abi !== 'emscripten') {
     console.log(`browser-cert: skip ${npmName} (abi=${abi}; no cert/*.mjs)`);
-    cleanup(0);
+    cleanup(0, 'skip');
   }
   if (cmdNames.length === 0) {
     console.log(`browser-cert: skip ${npmName} (no slicc.commands; lib cert is host-smoke)`);
-    cleanup(0);
+    cleanup(0, 'skip');
   }
 }
 
@@ -105,6 +167,15 @@ function listFiles(dir, base = dir) {
     else out.push(abs.slice(base.length + 1).split('\\').join('/'));
   }
   return out;
+}
+
+function modesOf(base, names) {
+  const modes = {};
+  for (const name of names) {
+    const mode = statSync(join(base, name)).mode & 0o7777;
+    if (mode !== 0o644 || name.startsWith('bin/')) modes[name] = mode;
+  }
+  return modes;
 }
 
 function resolveNodeModules() {
@@ -124,28 +195,70 @@ function resolveNodeModules() {
   console.error(
     'browser-cert: @ai-ecoverse/slicc-shared-web not found. Set HOMESCOOP_CERT_NODE_MODULES.',
   );
+  report.error = '@ai-ecoverse/slicc-shared-web not found';
   cleanup(1);
+}
+
+function kernelFrom(spec) {
+  const dir = join(work, 'kernel');
+  mkdirSync(dir, { recursive: true });
+  const local = existsSync(spec) ? resolve(spec) : '';
+  if (local && statSync(local).isDirectory()) {
+    const m = JSON.parse(readFileSync(join(local, 'package.json'), 'utf8'));
+    return { dist: join(local, 'dist'), info: { name: m.name, version: m.version, source: local } };
+  }
+  let tgz = local;
+  if (!tgz) {
+    const r = spawnSync('npm', ['pack', spec, '--pack-destination', dir, '--json'], { encoding: 'utf8' });
+    if (r.status !== 0) {
+      console.error(`browser-cert: npm pack ${spec} failed: ${r.stderr}`);
+      report.error = `npm pack ${spec} failed`;
+      cleanup(1);
+    }
+    tgz = join(dir, JSON.parse(r.stdout)[0].filename);
+  }
+  const unpacked = untar(tgz, join(dir, 'x'));
+  const m = JSON.parse(readFileSync(join(unpacked, 'package.json'), 'utf8'));
+  return {
+    dist: join(unpacked, 'dist'),
+    info: { name: m.name, version: m.version, sha256: sha256(tgz), source: local ? basename(local) : spec },
+  };
 }
 
 const nodeModules = resolveNodeModules();
 const { launch } = await import(
   pathToFileURL(join(nodeModules, '@ai-ecoverse/slicc-shared-web/harness/index.mjs')).href
 );
-const kernelDist = join(nodeModules, '@ai-ecoverse/slicc-kernel/dist');
+let kernelDist = join(nodeModules, '@ai-ecoverse/slicc-kernel/dist');
+if (kernelFlag) {
+  const k = kernelFrom(kernelFlag);
+  kernelDist = k.dist;
+  report.kernel = k.info;
+} else {
+  try {
+    const m = JSON.parse(readFileSync(join(kernelDist, '../package.json'), 'utf8'));
+    report.kernel = { name: m.name, version: m.version, source: 'HOMESCOOP_CERT_NODE_MODULES' };
+  } catch {
+    report.kernel = null;
+  }
+}
 try {
   readFileSync(join(kernelDist, 'index.js'));
 } catch {
-  console.error('browser-cert: @ai-ecoverse/slicc-kernel/dist/index.js missing');
+  console.error(`browser-cert: ${kernelDist}/index.js missing`);
+  report.error = 'kernel dist/index.js missing';
   cleanup(1);
 }
-
-const installDir = `node_modules/${npmName}/`;
-const fileNames = listFiles(pkgRoot);
+if (report.kernel) {
+  console.log(
+    `browser-cert: kernel ${report.kernel.name}@${report.kernel.version}${report.kernel.sha256 ? ` sha256 ${report.kernel.sha256}` : ''} users ${users || 'kernel default'}`,
+  );
+}
 
 /** @type {[string, string][]} */
 const roots = [
   ['/dist/', `${kernelDist}/`],
-  [`/${installDir}`, `${pkgRoot}/`],
+  ...pkgs.map((p) => [`/${p.installDir}`, `${p.pkgRoot}/`]),
   ['/', `${here}/page/`],
 ];
 
@@ -154,16 +267,26 @@ for (const need of meta.needs || []) {
   const needRoot = join(nodeModules, need);
   if (!existsSync(join(needRoot, 'package.json'))) {
     console.error(`browser-cert: cert needs ${need} under HOMESCOOP_CERT_NODE_MODULES`);
+    report.error = `cert needs ${need}`;
     cleanup(1);
   }
   roots.splice(1, 0, [`/node_modules/${need}/`, `${needRoot}/`]);
 }
 
-const chrome = await launch({
-  roots,
-  isolated: true,
-  exits: { '/dist/process-worker.js': [/WASM_PROCESS_EXIT, code/, /WASM_PROCESS_ERROR,$/] },
-});
+let chrome;
+try {
+  chrome = await launch({
+    roots,
+    isolated: true,
+    timeout: Number(meta.runTimeoutMs) || 120000,
+    exits: { '/dist/process-worker.js': [/WASM_PROCESS_EXIT, code/, /WASM_PROCESS_ERROR,$/] },
+  });
+} catch (err) {
+  console.error('browser-cert: FAIL chrome launch');
+  console.error(err);
+  report.error = errorText(err);
+  cleanup(1);
+}
 
 const t = {
   name: `browser-cert:${pkgName}`,
@@ -177,38 +300,75 @@ try {
   const page = await chrome.page(t);
   await page.goto('/');
   await page.until(() => typeof window.boot === 'function');
-  await page.evaluate((o) => window.boot(o), { uplink: meta.uplink === true });
+  await page.evaluate((o) => window.boot(o), { uplink: meta.uplink === true, ...(users ? { users } : {}) });
   // Peers first, package under test last so its slicc.commands win on name
   // collisions (e.g. wasm-coreutils advertises uptime/kill without those
   // multi-call applets; wasm-procps must own those names in its cert).
   for (const need of meta.needs || []) {
     const needRoot = join(nodeModules, need);
     const names = listFiles(needRoot);
-    await page.evaluate(
-      (d, n) => window.installTree(d, n),
+    const done = await page.evaluate(
+      (d, n, m) => window.installTree(d, n, m),
       `node_modules/${need}/`,
       names,
+      modesOf(needRoot, names),
     );
+    report.modes = done.stamped === null ? 'kernel defaults' : 'tarball';
   }
-  await page.evaluate((d, n) => window.installTree(d, n), installDir, fileNames);
+  for (const p of pkgs) {
+    const names = listFiles(p.pkgRoot);
+    const done = await page.evaluate((d, n, m) => window.installTree(d, n, m), p.installDir, names, modesOf(p.pkgRoot, names));
+    report.modes = done.stamped === null ? 'kernel defaults' : 'tarball';
+  }
+  console.log(`browser-cert: file modes: ${report.modes === 'tarball' ? 'the tarballs\' (kernel.chmod)' : 'the kernel\'s defaults (no kernel.chmod)'}`);
 
   if (certSpecs.length > 0) {
-    const ctx = makeContext(page, { packageName: pkgName, npmName });
+    const ctx = {
+      ...makeContext(page, { packageName: pkgName, npmName }),
+      installed: pkgs.map((p) => p.manifest),
+      kernel: report.kernel,
+      users: users || null,
+    };
     for (const specPath of certSpecs) {
       const mod = await import(pathToFileURL(specPath).href);
       const fn = mod.default;
+      const spec = basename(specPath);
       if (typeof fn !== 'function') {
         console.error(`browser-cert: ${specPath} must default-export async function`);
+        report.specs.push({ spec, status: 'fail', durationMs: 0, error: 'no default export' });
         process.exitCode = 1;
         continue;
       }
-      const label = specPath.slice(root.length + 1);
+      const label = relative(root, specPath);
+      const started = Date.now();
+      const rec = recorder(ctx.assert, { soft, roots: [join(root, 'packages'), certDir], root });
       try {
-        await fn(ctx);
-        console.log(`browser-cert: ok ${label}`);
+        await fn({ ...ctx, assert: rec.assert });
+        const failed = rec.cases.fail;
+        if (failed.length) {
+          console.error(`browser-cert: FAIL ${label} (${failed.length} of ${failed.length + rec.cases.pass.length} assertions)`);
+          for (const f of failed) console.error(`  ${f.id}: ${f.message}`);
+          process.exitCode = 1;
+        } else console.log(`browser-cert: ok ${label}`);
+        report.specs.push({
+          spec,
+          status: failed.length ? 'fail' : 'pass',
+          durationMs: Date.now() - started,
+          cases: rec.cases,
+          ...(failed.length ? { error: failed.map((f) => `${f.id}: ${f.message}`).join('\n') } : {}),
+        });
       } catch (err) {
-        console.error(`browser-cert: FAIL ${label}`);
+        const crash = rec.isAssertion(err) ? null : rec.crash(err);
+        console.error(`browser-cert: FAIL ${label}${crash ? ` (crash at ${crash.where || '?'})` : ''}`);
         console.error(err);
+        report.specs.push({
+          spec,
+          status: 'fail',
+          durationMs: Date.now() - started,
+          error: errorText(err),
+          cases: rec.cases,
+          ...(crash ? { crash } : {}),
+        });
         process.exitCode = 1;
       }
     }
@@ -241,17 +401,25 @@ try {
         `browser-cert: smoke ok ${npmName} argv=${JSON.stringify(plan.argv)} (not CI-certified — add cert/*.mjs)`,
       );
     }
+    report.specs.push({ spec: 'smoke', status: process.exitCode ? 'fail' : 'pass', durationMs: 0 });
   }
 
   if (page.errors?.length) {
     console.error('browser-cert: page errors', page.errors);
+    report.pageErrors = page.errors.map((e) => String(e).slice(0, 2000));
     process.exitCode = 1;
   }
 
   if (typeof t._after === 'function') await t._after();
+} catch (err) {
+  console.error('browser-cert: FAIL boot');
+  console.error(err);
+  report.error = errorText(err);
+  process.exitCode = 1;
 } finally {
   await chrome.close();
   rmSync(work, { recursive: true, force: true });
 }
 
+writeReport(process.exitCode ? 'fail' : 'pass');
 process.exit(process.exitCode ?? 0);

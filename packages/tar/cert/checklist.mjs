@@ -48,11 +48,17 @@ export default async function (ctx) {
 
   // The compressor: tar forks, the child execs `sh -c <program>`, which
   // execs the program. It must be tar's own child under a pid /proc knows.
-  await ok('printf "#!/bin/bash\\nsleep 1\\nexec gzip\\n" > slowgz && chmod +x slowgz');
+  // slowgz waits for a go file before it execs gzip, so it is still alive
+  // (and still "bash /home/tar/slowgz") while the test reads /proc; it gives
+  // up after 20 s. A forked sleep child briefly shares that cmdline, so the
+  // scan takes the lowest matching pid, and retries until stat gives a
+  // parent pid.
+  await ok('rm -f go && printf "#!/bin/bash\\nfor ((i = 0; i < 200; i++)); do [ -e /home/tar/go ] && break; sleep 0.1; done\\nexec gzip\\n" > slowgz && chmod +x slowgz');
   const tree = await ok([
     'tar -c --use-compress-program=/home/tar/slowgz -f y.tgz -C src . & T=$!',
-    'sleep 0.4',
-    'for p in /proc/[0-9]*; do n=${p#/proc/}; c=$(tr "\\0" " " < $p/cmdline 2>/dev/null); case "$c" in "bash /home/tar/slowgz"*) echo "gz=$n ppid=$(cut -d" " -f4 $p/stat)";; esac; done',
+    'found=; best=',
+    'for i in $(seq 1 100); do for p in /proc/[0-9]*; do n=${p#/proc/}; c=$(tr "\\0" " " < $p/cmdline 2>/dev/null); case "$c" in "bash /home/tar/slowgz"*) pp=$(cut -d" " -f4 $p/stat 2>/dev/null); if [ -n "$pp" ] && { [ -z "$best" ] || [ "$n" -lt "$best" ]; }; then best=$n; found="gz=$n ppid=$pp"; fi;; esac; done; [ -n "$found" ] && break; sleep 0.1; done',
+    'echo "$found"; touch go',
     'echo tar=$T; wait $T; echo rc=$?',
   ].join('; '));
   const tarPid = /^tar=(\d+)$/m.exec(tree.stdout)?.[1];

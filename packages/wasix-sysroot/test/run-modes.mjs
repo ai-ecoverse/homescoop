@@ -36,7 +36,13 @@ const tarball = resolve(arg(args, '--tarball'));
 const probe = arg(args, '--probe') ?? 'modes';
 // --variant ehpic builds the probe against sysroot-ehpic (legacy EH, PIC:
 // what wasix-python links) instead of wasixcc's default.
-const VARIANTS = { default: {}, ehpic: { WASIXCC_WASM_EXCEPTIONS: 'legacy', WASIXCC_PIC: 'yes' } };
+const VARIANTS = {
+  default: {},
+  ehpic: { WASIXCC_WASM_EXCEPTIONS: 'legacy', WASIXCC_PIC: 'yes' },
+  exnrefpic: { WASIXCC_PIC: 'yes' },
+  eh: { WASIXCC_WASM_EXCEPTIONS: 'legacy' },
+  noeh: { WASIXCC_WASM_EXCEPTIONS: 'no' },
+};
 const variant = arg(args, '--variant') ?? 'default';
 if (!VARIANTS[variant]) throw new Error(`--variant: one of ${Object.keys(VARIANTS).join(', ')}`);
 const kernelDir = arg(args, '--kernel-dir') && resolve(arg(args, '--kernel-dir'));
@@ -53,7 +59,7 @@ try {
   command(env, prefix, probe, pkg, probe);
   if (build.asyncify) {
     keepSync(pkg, probe);
-    asyncify(env, join(pkg, `bin/${probe}.wasm`));
+    build.preAsyncified = !asyncify(env, join(pkg, `bin/${probe}.wasm`));
   }
   const side = build.side && env.WASIXCC_PIC === 'yes' ? join(work, `lib${build.side}.so`) : undefined;
   if (side) sideModule(env, prefix, build.side, side);
@@ -61,7 +67,7 @@ try {
   console.log(`== ${k.label} (Node entry)`);
   await k.install(pkg);
   if (side) await k.kernel.writeFile(`/tmp/lib${build.side}.so`, readFileSync(side));
-  const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run, kernel: k.kernel, pty: (argv, o) => ptySession(k.kernel, argv, o), wasm: join(pkg, `bin/${probe}.wasm`), kernelVersion: k.version, variant, side: side && `/tmp/lib${build.side}.so` };
+  const ctx = { assert, requireNative: meta.slicc_fs === true && !args.includes('--allow-absent'), run: k.run, kernel: k.kernel, pty: (argv, o) => ptySession(k.kernel, argv, o), wasm: join(pkg, `bin/${probe}.wasm`), kernelVersion: k.version, variant, preAsyncified: build.preAsyncified === true, side: side && `/tmp/lib${build.side}.so` };
   try {
     await spec.default(ctx);
     console.log(`PASS test/${probe}.mjs`);

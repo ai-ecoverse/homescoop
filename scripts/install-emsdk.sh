@@ -59,6 +59,17 @@ else
   echo "== install-emsdk: installed $RELEASE_HASH → $INSTALL" >&2
 fi
 
+for patch_file in "$(cd "$(dirname "$0")" && pwd)"/emsdk-patches/*.patch; do
+  [[ -f "$patch_file" ]] || continue
+  if patch -d "$INSTALL/emscripten" -p1 -R --dry-run -s -f < "$patch_file" >/dev/null 2>&1; then
+    continue
+  fi
+  patch -d "$INSTALL/emscripten" -p1 -s -f --no-backup-if-mismatch < "$patch_file" >&2
+  rm -f "$INSTALL/emscripten/cache/sysroot/lib/wasm32-emscripten"/libc.a "$INSTALL/emscripten/cache/sysroot/lib/wasm32-emscripten"/libc-*.a
+  rm -rf "$INSTALL/emscripten/cache/build"/libc "$INSTALL/emscripten/cache/build"/libc-*
+  echo "== install-emsdk: applied $(basename "$patch_file"); libc rebuilds on first use" >&2
+done
+
 # Same config emsdk@0.4.0 writes. NODE_JS follows the node on PATH, as the
 # npm postinstall's process.execPath did; only rewrite when it changes.
 CONFIG="EMSCRIPTEN_ROOT = '$INSTALL/emscripten'

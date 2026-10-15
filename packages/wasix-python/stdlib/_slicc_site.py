@@ -24,9 +24,17 @@ resolves to (Node-style lookup from its real directory), if any, has the
 same exact version as this python: the same version is the same build, so
 native side modules never mix interpreter builds. The first package of a
 name wins; others are skipped (reported under -v).
-The result is cached in <python>/.slicc-site-cache, keyed on the package
-directories and their package.json stamps, plus the stamps of the
-wasix-python copies they resolved to; -v always rescans.
+The result is cached per user in ${XDG_CACHE_HOME:-~/.cache}/slicc-site/
+(3.14.2-17; before, <python>/.slicc-site-cache, which other users could not
+write), keyed on the package directories and their package.json stamps, plus
+the stamps of the wasix-python copies they resolved to; -v always rescans.
+Without a home or a writable cache directory there is no cache.
+
+system_site() (3.14.2-17): /usr/local/lib/python3.X/site-packages, when it
+exists, goes on sys.path through site.addsitedir (so its .pth files run),
+after python's own site-packages and the py-* directories: one place an
+embedder can put a .pth for every user. Like discover(), it runs from the
+base .pth only, so a venv sees it with --system-site-packages.
 """
 import os
 import sys
@@ -212,8 +220,8 @@ def discover():
     # slicc's OPFS; directory mtimes are not). A hit costs one stat per
     # package instead of realpath + read + parse + lookup.
     key = "\n".join(filter(None, [base, _stamp(real), *map(_stamp, found)]))
-    cache = os.path.join(real, ".slicc-site-cache")
-    if not sys.flags.verbose:
+    cache = _cache_path(real)
+    if cache and not sys.flags.verbose:
         try:
             with open(cache, encoding="utf-8") as f:
                 head, _, rest = f.read().partition("\n\n")
@@ -231,13 +239,35 @@ def discover():
     for d in dirs:
         if d not in sys.path:  # as PYTHONPATH would: .pth files there are not run
             sys.path.append(d)
+    if not cache:
+        return
     try:
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
         tmp = f"{cache}.{os.getpid()}"
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(key + "\n\n" + "\n".join(filter(None, map(_stamp, sorted(used)))) + "\n\n" + "\n".join(dirs))
         os.replace(tmp, cache)
-    except OSError:  # read-only install: no cache, scan every start
+    except OSError:  # no writable cache directory: scan every start
         pass
+
+
+def _cache_path(real):
+    base = os.environ.get("XDG_CACHE_HOME")
+    if not base:
+        home = os.environ.get("HOME")
+        if not home:
+            return None
+        base = os.path.join(home, ".cache")
+    return os.path.join(base, "slicc-site", real.strip("/").replace("/", "%") or "%")
+
+
+def system_site():
+    d = f"/usr/local/lib/python{sys.version_info[0]}.{sys.version_info[1]}/site-packages"
+    if d in sys.path or not os.path.isdir(d):
+        return
+    import site
+
+    site.addsitedir(d)
 
 
 def _scan(real, found):

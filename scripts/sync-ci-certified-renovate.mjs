@@ -34,14 +34,14 @@ const retired = readdirSync(join(root, 'packages'))
     return existsSync(f) && /^builder:\s*["']?retired["']?\s*$/m.test(readFileSync(f, 'utf8'));
   })
   .sort()
-  .map((p) => `packages/${p}/recipe.yaml`);
+  .map((p) => `packages/${p}/**`);
 const RETIRED = 'Retired recipes (builder: retired)';
 renovate.packageRules = renovate.packageRules.filter(
   (r) => !String(r.description || '').startsWith(RETIRED),
 );
 if (retired.length) {
   renovate.packageRules.push({
-    description: `${RETIRED}: no Renovate PRs. They are built, if at all, by their own workflows from pinned sources (e.g. wasi-rustc-stable.yml), so a recipe bump builds nothing. Synced by scripts/sync-ci-certified-renovate.mjs.`,
+    description: `${RETIRED}: no Renovate PRs for any file in their package directory (recipe pins, Cargo.toml, go.mod). They are built, if at all, by their own workflows from pinned sources (e.g. wasi-rustc-stable.yml), so a recipe bump builds nothing. Synced by scripts/sync-ci-certified-renovate.mjs.`,
     matchFileNames: retired,
     enabled: false,
   });

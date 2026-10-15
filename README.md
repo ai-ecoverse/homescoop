@@ -73,6 +73,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2-2** (emcmake, no SIMD) |
 | `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** (emcmake, codec off) |
 | `@ai-ecoverse/wasm-libtiff` | host | **4.7.0**; deps zlib + jpeg |
+| `@ai-ecoverse/wasm-libheif` | host | **1.23.6-1** (`heif-convert` / `heif-dec` / `heif-info`; libde265 + dav1d; static libs for relinking). **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
 | `@ai-ecoverse/wasm-gmake` | host | **4.4.1-2** (spawn/exec/select/main_envp/gaps) |
 | `@ai-ecoverse/wasm-bash` | host | **5.3.0-9** (readline/history, fork + Asyncify, `/dev/fd` process subst, PIPESTATUS patch; `exec` keeps the pid on slicc-kernel with `execve`) |
 | `@ai-ecoverse/wasm-coreutils` | host | **9.12.0-3** single-binary + argv0 manifest (uid 1000 via gaps; exec keeps the pid) |
@@ -80,9 +81,9 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-grep` | host | **3.12.0-3** |
 | `@ai-ecoverse/wasm-gawk` | host | **5.3.2-3** (`gawk` + `awk`) |
 | `@ai-ecoverse/wasm-less` | host | **668.0.0-2** (static ncursesw fallbacks) |
-| `@ai-ecoverse/wasm-sqlite3` | host | **3.53.4** (shell amalgamation) |
+| `@ai-ecoverse/wasm-sqlite3` | host | **3.54.0-2** (shell amalgamation) |
 | `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-32-3** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
-| `@ai-ecoverse/wasm-tar` | host | **1.35.0-4** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
+| `@ai-ecoverse/wasm-tar` | host | **1.35.0-6** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
 | `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
 | `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |
 | `@ai-ecoverse/wasm-diffutils` | host | **3.12.0-1** (`diff` / `cmp` / `diff3` / `sdiff`) |
@@ -101,8 +102,8 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasix-openssl` | host | **3.5.9-2** (dev package: static `lib/` + PIC `lib-pic/` libcrypto.a / libssl.a, headers, pkg-config; for wasix-ruby / wasix-python) |
 | `@ai-ecoverse/wasi-biome` | host | **2.5.15-2** (`biome`; wasm32-wasip1-threads; no daemon/LSP, `--watch` or `upgrade`) |
 | `@ai-ecoverse/wasi-hf` | host | **0.1.0-2** (`hf download` / `hf auth`, token file 0600; Rust on wasix-net, Range resume + LFS sha256, plain files under `/home/models`; not huggingface_hub's CLI, see #110) |
-| `@ai-ecoverse/wasi-dig` | host | **0.1.0-1** (`dig`; Rust on wasix-net + hickory-proto: DNS over HTTPS through the realm proxy, DNS over TCP to `@server` via the uplink, dig-style output; no UDP, see #101) |
-| `@ai-ecoverse/wasi-fnox` | host | **1.39.0-1**, CERT-PENDING, unpublished (`fnox`: upstream jdx/fnox v1.39.0 + 13 patches carried here for the WASI build and seven's integration, applied by `apply.sh`; the sealed provider over slicc-kernel `/dev/sealed`, plus age and plain; tested on slicc-kernel 1.83.0, cert waits for #503) |
+| `@ai-ecoverse/wasi-dig` | host | **0.1.0-2** (`dig`; Rust on wasix-net + hickory-proto: DNS over HTTPS through the realm proxy, DNS over TCP to `@server` via the uplink, dig-style output; no UDP, see #101) |
+| `@ai-ecoverse/wasi-fnox` | host | **1.39.0-1** (`fnox`: upstream jdx/fnox v1.39.0 + 13 patches carried here for the WASI build and seven's integration, applied by `apply.sh`; the sealed provider over slicc-kernel `/dev/sealed`, plus age and plain) |
 | `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-6** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 

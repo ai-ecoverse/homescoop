@@ -393,6 +393,10 @@ int scandir(
 }
 
 int symlink(const char *target, const char *linkpath) {
+    if (target[0] == '\0') {
+        errno = ENOENT;
+        return -1;
+    }
     char *relative_path;
     int dirfd = find_relpath(linkpath, &relative_path);
 

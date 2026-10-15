@@ -6,6 +6,28 @@ GNU coreutils (single-binary) for slicc.
 pnpm add -g @ai-ecoverse/wasm-coreutils
 ```
 
+## Running by path (9.12.0-6)
+
+`bin/coreutils` (the Emscripten glue the `slicc.commands` entries name) is
+mode 0755 in the package, so it can be run by path under slicc-kernel's
+users enforce. 9.12.0-5 shipped it 0644, which gave `Permission denied`
+(126).
+
+## Hard links (9.12.0-6)
+
+`ln`, `ln -f`, `cp -l` and `link` ask slicc-kernel to make the link
+(`__syscall_linkat`, slicc-kernel#563). On slicc-kernel ≥ 1.90.0 they work in
+mounts that have hard links (tmpfs), and give `Too many links` on the OPFS
+root and `Cross-device link` across mounts. On older kernels every hard link
+is `Too many links`, as in 9.12.0-5, where the call never reached the kernel.
+
+## Device numbers (9.12.0-6)
+
+`stat -c '%t:%T'` and `ls -l` show a device's major and minor numbers as
+slicc-kernel reports them (`/dev/null` is `1, 3`). Up to 9.12.0-5 Emscripten's
+`statx()` dropped them: `stat` said `0:0` and `ls -l` printed numbers left on
+the stack (homescoop#324).
+
 ## Users (9.12.0-5, slicc-kernel ≥ 1.44.0)
 
 `id`, `whoami`, `groups`, `logname`, `ls -l` and `stat` name users and groups

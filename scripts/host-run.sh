@@ -74,6 +74,7 @@ local_wasm_pkg_dir() {
   return 1
 }
 
+rm -f "$PREFIX/lib/pkgconfig/.homescoop-archive-versions"
 while IFS= read -r spec; do
   [[ -z "$spec" ]] && continue
   if ! is_npm_spec "$spec"; then
@@ -91,6 +92,11 @@ while IFS= read -r spec; do
       npm pack "$spec" --silent
     fi
     tar xzf ./*.tgz
+    dep_ver="$(node -p 'const j = require("./package/package.json"); (j.homescoop && j.homescoop.upstream) || String(j.version).replace(/-[^-]*$/, "")')"
+    mkdir -p "$PREFIX/lib/pkgconfig"
+    for a in package/lib/*.a package/package/lib/*.a; do
+      [[ -f "$a" ]] && printf '%s %s\n' "$(basename "$a")" "$dep_ver" >>"$PREFIX/lib/pkgconfig/.homescoop-archive-versions"
+    done
     if [[ -d package/lib ]]; then cp -R package/lib/. "$PREFIX/lib/"; fi
     if [[ -d package/include ]]; then cp -R package/include/. "$PREFIX/include/"; fi
     if [[ -d package/package/lib ]]; then cp -R package/package/lib/. "$PREFIX/lib/"; fi
@@ -142,6 +148,8 @@ fi
 echo "== host-run: build.sh ($name)"
 bash "$PKG/build.sh"
 
+echo "== host-run: slicc shims carry the kernel credentials (slicc_cred_js)"
+node "$ROOT/scripts/check-slicc-cred.mjs" "$PKG/package"
 echo "== host-run: check package meta (license / LICENSE / files)"
 node "$ROOT/scripts/check-package-meta.mjs" "$name"
 echo "== host-run: exact @ai-ecoverse pins"
@@ -150,10 +158,14 @@ node "$ROOT/scripts/check-exact-pins.mjs" "$name"
 echo "== host-run: assert packaging rev / npm semver (refuse plain X.Y.Z and X.Y-N)"
 node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
 
+echo "== host-run: slicc.commands files are 0755"
+node "$ROOT/scripts/command-modes.mjs" --fix "$PKG/package"
+
 echo "== host-run: npm pack"
 mkdir -p "$OUT"
 tgz="$(npm pack "$PKG/package" --pack-destination "$OUT" | tail -1)"
 cp "$OUT/$tgz" "$OUT/package.tgz"
 echo "== host-run: assert packed tarball version is npm-publishable"
 node "$ROOT/scripts/sync-package-version.mjs" --assert-tarball "$OUT/package.tgz"
+node "$ROOT/scripts/command-modes.mjs" --check "$OUT/package.tgz"
 echo "== host-run: $OUT/package.tgz"

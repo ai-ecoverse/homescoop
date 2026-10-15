@@ -71,11 +71,14 @@ export function keepSync(pkg, name) {
 }
 
 export function asyncify(env, wasm) {
+  const exports = WebAssembly.Module.exports(new WebAssembly.Module(readFileSync(wasm))).map((e) => e.name);
+  if (exports.includes('asyncify_start_unwind')) return false;
   const features = ['threads', 'bulk-memory', 'mutable-globals', 'sign-ext', 'nontrapping-float-to-int', 'exception-handling'];
   sh(join(env.WASIXCC_BINARYEN_LOCATION, 'bin/wasm-opt'), [
     '--asyncify', '-O2', '--pass-arg=asyncify-imports@wasix_32v1.proc_fork',
     ...features.map((f) => `--enable-${f}`), wasm, '-o', wasm,
   ]);
+  return true;
 }
 
 /** A Node kernel (meta.kernel, or a local build in kernelDir) with meta.needs installed. */

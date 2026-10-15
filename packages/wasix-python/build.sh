@@ -361,7 +361,7 @@ SRCDIR="$B/Python-$VER"
 echo "== wasix-python: CPython $VER source + patches"
 rm -rf "$SRCDIR" && mkdir -p "$SRCDIR"
 tar xzf "$PY_TGZ" -C "$SRCDIR" --strip-components=1
-for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg; do
+for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip; do
   patch -d "$SRCDIR" -p1 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
   echo "  applied $p.patch"
 done
@@ -419,6 +419,7 @@ FEATS=(--enable-threads --enable-bulk-memory --enable-mutable-globals --enable-s
   --pass-arg=asyncify-ignore-indirect \
   "${FEATS[@]}" "$CROSS/python.wasm" -o "$B/python-async.wasm"
 "$WASM_OPT" -O3 --strip-debug --strip-producers "${FEATS[@]}" "$B/python-async.wasm" -o "$B/python.wasm"
+node "$PKG/drop-exports.mjs" "$B/python.wasm" fork _Fork _fork_internal __vfork_internal __wasi_proc_fork __wasi_proc_fork_env
 
 # --- stage ---------------------------------------------------------------------
 echo "== wasix-python: stage into package/"

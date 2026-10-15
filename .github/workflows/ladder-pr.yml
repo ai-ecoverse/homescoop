@@ -9,42 +9,26 @@ name: ladder-pr
 
 on:
   pull_request:
-    paths:
-      - 'packages/**'
-      - 'scripts/host-run.sh'
-      - 'scripts/build-common.sh'
-      - 'scripts/ladder-run.jsh'
-      - 'scripts/read-recipe.mjs'
-      - 'scripts/recipe-env.mjs'
-      - 'scripts/refresh-recipe-sha.mjs'
-      - 'scripts/list-touched-packages.mjs'
-      - 'scripts/host-smoke.sh'
-      - 'scripts/install-emsdk.sh'
-      - 'scripts/install-wasixcc.sh'
-      - 'scripts/sync-package-version.mjs'
-      - 'scripts/check-exact-pins.mjs'
-      - 'scripts/repack-published.mjs'
-      - 'scripts/diff-published.mjs'
-      - 'scripts/browser-cert/**'
-      - '.github/workflows/ladder-pr.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Every @ai-ecoverse/* dependency / peer / optional dependency of every
   # packages/*/package/package.json is an exact version (docs/versioning.md).
   exact-pins:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: node scripts/check-exact-pins.mjs
 
   detect:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     outputs:
       host: ${{ steps.d.outputs.host }}
       slicc: ${{ steps.d.outputs.slicc }}
@@ -53,6 +37,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
       - id: d
         run: |
           set -euo pipefail
@@ -70,6 +58,8 @@ jobs:
     needs: detect
     if: needs.detect.outputs.host != '[]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       changed: ${{ steps.push.outputs.changed }}
       sha: ${{ steps.push.outputs.sha }}
@@ -171,6 +161,53 @@ jobs:
             .homescoop-out/packaging-only-diff.txt
           if-no-files-found: error
           retention-days: 14
+
+  cert:
+    needs: [detect, recipe-sha, host-build]
+    if: ${{ !cancelled() && needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect.outputs.host) }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.recipe-sha.outputs.sha || '' }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+          path: .homescoop-out
+      - name: Check package.tgz against package.tgz.sha256
+        env:
+          ART: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          for f in package.tgz package.tgz.sha256; do
+            if [[ ! -f ".homescoop-out/$f" ]]; then
+              echo "::error::$ART has no $f; the cert fails closed"
+              exit 1
+            fi
+          done
+          line=$(cat .homescoop-out/package.tgz.sha256)
+          re='^([0-9a-f]{64}) '
+          if [[ "$line" == *$'\n'* || ! "$line" =~ $re ]]; then
+            echo "::error::$ART: package.tgz.sha256 is not one sha256sum line; the cert fails closed"
+            exit 1
+          fi
+          want=${BASH_REMATCH[1]}
+          got=$(sha256sum .homescoop-out/package.tgz | cut -d' ' -f1)
+          if [[ "$got" != "$want" ]]; then
+            echo "::error::$ART: package.tgz sha256 $got does not match package.tgz.sha256 ($want); the cert fails closed"
+            exit 1
+          fi
+          echo "$ART: package.tgz sha256 $got matches package.tgz.sha256"
       - name: Browser cert (slicc-kernel CDP)
         run: |
           set -euo pipefail
@@ -187,9 +224,6 @@ jobs:
             let meta={};
             try { meta=JSON.parse(fs.readFileSync(path.join(certDir,"meta.json"),"utf8")); } catch {}
             const harness=meta.harness||"smoke";
-            // blocked: checklist needs a kernel/peer not on PR runners yet
-            // (e.g. procps → /proc from unpublished slicc-kernel). Host-build
-            // still runs; human cert against the prerelease.
             if (meta.blocked) { process.stdout.write("blocked"); process.exit(0); }
             if (harness==="host-smoke"||harness==="host-node") { process.stdout.write("0"); process.exit(0); }
             if (specs.length>0) { process.stdout.write("1"); process.exit(0); }
@@ -218,7 +252,6 @@ jobs:
             "$KERNEL_SPEC" \
             @ai-ecoverse/slicc-shared-web@^1.4.1 \
             playwright-core@1.63.0
-          # Optional peers: needsInstall (npm specs) else needs (node_modules paths)
           if [[ -f "packages/${{ matrix.package }}/cert/meta.json" ]]; then
             node -e '
               const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
@@ -227,7 +260,6 @@ jobs:
               [[ -n "$dep" ]] || continue
               npm install --prefix "$CERT_NM" --no-fund --no-audit "$dep"
             done
-            # Packaging-only peer tarballs (e.g. coreutils 9.12.0-2 without stub kill/uptime)
             node -e '
               const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
               for (const s of j.needsTarballScripts||[]) console.log(s);
@@ -237,10 +269,6 @@ jobs:
               tgz=$(node "$script" | head -1)
               npm install --prefix "$CERT_NM" --no-fund --no-audit "$tgz"
             done
-            # Packaging-only peers from this checkout (re-pin waves): repack
-            # each recipe (repack-published.mjs, the bytes of its ladder-pr
-            # artifact) and install them in one npm call, so their exact pins
-            # on each other resolve before they are on the registry.
             REPACK_TGZ=()
             while read -r peer; do
               [[ -n "$peer" ]] || continue
@@ -257,7 +285,12 @@ jobs:
               npm install --prefix "$CERT_NM" --no-fund --no-audit "${REPACK_TGZ[@]}"
             fi
           fi
-          npx --prefix "$CERT_NM" playwright-core install --with-deps chromium
+          if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then
+            npx --prefix "$CERT_NM" playwright-core install --with-deps chromium
+          else
+            echo "browser-cert: no root on $RUNNER_NAME (uid $(id -u), no sudo); the image brings Chromium's system libraries, installing the browser only"
+            npx --prefix "$CERT_NM" playwright-core install chromium
+          fi
           export HOMESCOOP_CERT_NODE_MODULES="$CERT_NM/node_modules"
           node scripts/browser-cert/run.mjs \
             --package "${{ matrix.package }}" \
@@ -270,8 +303,6 @@ jobs:
             echo "host cert: no cert/meta.json"
             exit 0
           fi
-          # harness host-node certs (e.g. wasm-clang's in-kernel compile+run):
-          # each `ci` entry is a command run from the repo root.
           mapfile -t CMDS < <(node -e '
             const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
             for (const c of j.ci||[]) console.log(c);
@@ -289,8 +320,22 @@ jobs:
   slicc-note:
     needs: detect
     if: needs.detect.outputs.slicc != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Slicc packages skipped on PR
         run: |
           echo "::notice::slicc builder package(s) ${{ needs.detect.outputs.slicc }} — PR host check skipped; merge still dispatches ladder-build (needs SLICC secrets)."
+
+  ci:
+    needs: [exact-pins, detect, recipe-sha, host-build, cert, slicc-note]
+    if: ${{ always() }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Fail when a ladder-pr job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "::error::ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
+          exit 1
+      - name: Every ladder-pr job passed or was skipped
+        run: |
+          echo "ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"

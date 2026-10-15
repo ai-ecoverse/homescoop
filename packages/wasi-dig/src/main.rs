@@ -44,11 +44,8 @@ fn query_id(doh: bool) -> u16 {
 }
 
 fn build(o: &Opts, id: u16) -> Result<Vec<u8>, String> {
-    let mut m = Message::new();
-    m.set_id(id);
-    m.set_message_type(MessageType::Query);
-    m.set_op_code(OpCode::Query);
-    m.set_recursion_desired(o.recurse);
+    let mut m = Message::new(id, MessageType::Query, OpCode::Query);
+    m.metadata.recursion_desired = o.recurse;
     let mut q = Query::query(o.name.clone(), o.qtype);
     q.set_query_class(o.qclass);
     m.add_query(q);
@@ -73,7 +70,7 @@ fn run(o: &Opts) -> Result<String, (u8, String)> {
                 let msg = Message::from_vec(&reply.bytes).map_err(|e| {
                     (9, format!(";; Got bad packet: {e}\n{} bytes from {}", reply.bytes.len(), reply.server))
                 })?;
-                if msg.id() != id || msg.message_type() != MessageType::Response {
+                if msg.id != id || msg.message_type != MessageType::Response {
                     return Err((9, format!(";; reply from {} does not match the query", reply.server)));
                 }
                 return Ok(print::render(o, &msg, &reply));

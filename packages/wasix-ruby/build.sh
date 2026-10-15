@@ -43,6 +43,11 @@ YAML_SRC="$WORK/yaml-$YAML_VER"
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi
+SYSROOT_VER="$(sed -n 's/.*sysroot=\([^ ]*\).*/\1/p' "${WASIXCC_PREFIX:-$HOME/.wasixcc}/.homescoop-toolchain" 2>/dev/null)"
+[[ -n "$SYSROOT_VER" ]] || SYSROOT_VER="$(sed -n 's/^SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-\([^}]*\)}"$/\1/p' "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
+[[ "$SYSROOT_VER" == 2025.9.30-* ]] || { echo "homescoop: cannot tell the wasix-sysroot version ($SYSROOT_VER)" >&2; exit 1; }
+export SYSROOT_VER
+echo "== wasix-ruby: wasix-sysroot $SYSROOT_VER"
 WASM_OPT="${WASM_OPT:-${WASIXCC_BINARYEN_LOCATION:-$HOME/.wasixcc/binaryen}/bin/wasm-opt}"
 export PATH="${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin:${WASIXCC_LLVM_LOCATION:-$HOME/.wasixcc/llvm}/bin:/opt/homebrew/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
@@ -694,7 +699,7 @@ homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot 2025.9.30-20; files from tag v2025-09-02.1)" \
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files from tag v2025-09-02.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -742,7 +747,7 @@ print("host-artefact check: no ELF/Mach-O, no native gem platform/extension dirs
 PY
 
 python3 - "$DEST" "$VER" "$PKG_VER" "$OPENSSL_NOTE" "$ASYNCIFY_BUF" <<'PY'
-import json, sys
+import json, os, sys
 from pathlib import Path
 dest, ver, pkg_ver, openssl_note, asyncify_buf = (
     Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
@@ -799,7 +804,7 @@ base_env = {
 pkg = {
     "name": "@ai-ecoverse/wasix-ruby",
     "version": pkg_ver,
-    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot -20: user ids and traps from slicc-kernel)",
+    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot {os.environ['SYSROOT_VER']}: user ids, traps and times from slicc-kernel)",
     # wasix-sysroot -20 asks slicc-kernel for user ids, with no fallback (homescoop#207).
     "engines": {"slicc-kernel": ">=1.44.0"},
     "license": "Ruby",
@@ -859,33 +864,13 @@ for cmd in ("gem", "bundle", "rake", "irb", "erb"):
             "env": dict(env),
         }
 (dest / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
-(dest / "README.md").write_text(
-    "# `@ai-ecoverse/wasix-ruby`\n\n"
-    "MRI Ruby for slicc WASIX. No epoll (poll fallback). See PRESTAGE.md.\n\n"
-    "Since 3.4.11-8, single-fd waits (`IO#wait_readable`, blocking `TCPSocket.new`, "
-    "`Net::HTTP`, blocking `SSLSocket#connect`/`#accept`) use poll(): WASIX's select() "
-    "rejects an exception set with ENOSYS, so `IO.select` with a third array still "
-    "fails. `io/console` is built, so `irb` and reline work.\n\n"
-    "`TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).\n\n"
-    "## Gem executables on PATH\n\n"
-    "Command env puts user gem bins ahead of the package:\n\n"
-    "```text\n"
-    "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}\n"
-    "```\n\n"
-    "That covers Ruby child processes (`system`, `spawn`, `bundle exec`, …). "
-    "To run those gems **by name from your shell**, add the same user gem bin "
-    "directory to the host PATH, e.g. in `~/.bashrc`:\n\n"
-    "```bash\n"
-    "export PATH=\"$HOME/.local/share/gem/ruby/3.4.0/bin:$PATH\"\n"
-    "```\n"
-)
 print("package.json", pkg["version"], "commands:", sorted(pkg["slicc"]["commands"]))
 PY
 
 cat > "$DEST/PRESTAGE.md" <<EOF
 # wasix-ruby ${PKG_VER}
 
-Built against wasix-sysroot **2025.9.30-20**. **No epoll**: SLICC returns ENOSYS (52)
+Built against wasix-sysroot **${SYSROOT_VER}**. **No epoll**: SLICC returns ENOSYS (52)
 for \`epoll_create\`; MRI is compiled with \`USE_MN_THREADS=0\` and
 \`HAVE_SYS_EPOLL_H=0\` (also kqueue/eventfd/timerfd off) so it uses poll()/timer-thread.
 

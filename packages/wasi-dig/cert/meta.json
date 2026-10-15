@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.32.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.81.0",
   "uplink": true,
   "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
   "network": "ctx.serve() is the DoH endpoint behind the kernel's realm proxy (dig posts application/dns-message in absolute form, so no CONNECT and no wasm-tls-engine); the uplink's 100.100.100.100:53 is a raw TCP peer speaking DNS over TCP. Both answer with dnsFake, which encodes real DNS wire messages. Checked by hand against cloudflare-dns.com and 1.1.1.1:53 with the host build.",

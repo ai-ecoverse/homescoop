@@ -173,7 +173,7 @@ jobs:
           PY
 
       - name: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasi-rustc-patched
           path: wasi-rustc-patched.tgz

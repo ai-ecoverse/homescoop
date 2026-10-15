@@ -9,7 +9,7 @@ export default async function (ctx) {
   const sh = (s) => run(['bash', '-c', s], { cwd: '/home' });
   const setup = await sh(
     "mkdir -p /home/dsrv /home/dsrc/d && echo one > /home/dsrc/a && echo two > /home/dsrc/d/b && " +
-      "printf 'use chroot = no\\npid file = /tmp/rsyncd.pid\\nlog file = /tmp/rsyncd.log\\n[mod]\\n  path = /home/dsrv\\n  comment = test module\\n  read only = false\\n' > /tmp/rsyncd.conf",
+      "printf 'use chroot = no\\nuid = root\\ngid = root\\npid file = /tmp/rsyncd.pid\\nlog file = /tmp/rsyncd.log\\n[mod]\\n  path = /home/dsrv\\n  comment = test module\\n  read only = false\\n' > /tmp/rsyncd.conf",
   );
   assert.equal(setup.status, 0, setup.stderr);
   const r = await sh([

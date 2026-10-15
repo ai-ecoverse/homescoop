@@ -21,19 +21,19 @@ export default async function (ctx) {
   // No sessions yet: rc 1 and the socket directory.
   const none = await go(['screen', '-ls']);
   assert.equal(none.status, 1, `-ls rc=${none.status} out=${JSON.stringify(none.stdout)}`);
-  assert.equal(none.stdout, 'No Sockets found in /tmp/screens.\n\r\n');
+  assert.equal(none.stdout, 'No Sockets found in /root/.screen.\n\r\n');
 
   // Detached session: started, listed, quit by name, gone.
   const start = await go(['screen', '-dmS', 'hs', 'sleep', '30']);
   assert.equal(start.status, 0, `-dmS rc=${start.status} out=${JSON.stringify(start.stdout + start.stderr)}`);
   const one = await go(['screen', '-ls']);
   assert.equal(one.status, 0, `-ls (one) rc=${one.status}`);
-  assert.match(one.stdout, /^There is a screen on:\r\n\t\d+\.hs\t\([^)]+\)\n1 Socket in \/tmp\/screens\.\r\n$/);
+  assert.match(one.stdout, /^There is a screen on:\r\n\t\d+\.hs\t\([^)]+\)\n1 Socket in \/root\/\.screen\.\r\n$/);
   const quit = await go(['screen', '-S', 'hs', '-X', 'quit']);
   assert.equal(quit.status, 0, `-X quit rc=${quit.status} out=${JSON.stringify(quit.stdout + quit.stderr)}`);
   const gone = await go(['screen', '-ls']);
   assert.equal(gone.status, 1);
-  assert.equal(gone.stdout, 'No Sockets found in /tmp/screens.\n\r\n');
+  assert.equal(gone.stdout, 'No Sockets found in /root/.screen.\n\r\n');
 
   // The window: screen forks and execs the program. With exec keeping the
   // pid, its parent is the screen server (the pid -ls shows), and its own
@@ -57,10 +57,10 @@ export default async function (ctx) {
   const s = await pty(['screen', 'bash', '--norc', '-i'], {
     cwd,
     steps: [
-      { expect: 'bash-5\\.3\\$ ' },
+      { expect: 'bash-5\\.3[$#] ' },
       { write: 'echo in-$((6*7))\r' },
       { expect: 'in-42' },
-      { expect: 'bash-5\\.3\\$ ', write: 'exit\r' },
+      { expect: 'bash-5\\.3[$#] ', write: 'exit\r' },
     ],
     timeoutMs: 10000,
   });

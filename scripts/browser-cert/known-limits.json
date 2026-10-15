@@ -1,0 +1,63 @@
+{
+  "limits": [
+    {
+      "package": "@ai-ecoverse/wasm-coreutils",
+      "spec": "base-sweep",
+      "case": "[",
+      "kernel": "*",
+      "rc": 127,
+      "issue": "ai-ecoverse/slicc-kernel#530",
+      "why": "the kernel's command catalog takes only names matching [A-Za-z0-9._+-], so '[' is not found (bash's builtin covers shells); close the kernel range at the release with the fix"
+    },
+    {
+      "package": "@ai-ecoverse/wasi-pnpm",
+      "spec": "base-sweep",
+      "case": "i",
+      "kernel": ">=1.78.0 <1.86.0",
+      "users": [
+        "enforce"
+      ],
+      "rc": 126,
+      "issue": "ai-ecoverse/homescoop#327",
+      "why": "before 1.86.0 the page has no kernel.chmod, so the harness writes the shims straight to OPFS with the default 0644 instead of their tarball 0755, and since 1.78.0 the x bit is checked on exec: i's exec of ${0%/*}/npm by path is refused. From 1.86.0 run.mjs stamps the tarball modes (slicc-kernel#495 for the kernel side)"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-bash",
+      "spec": "selfkill.mjs",
+      "case": "kill -TERM \\$\\$; echo after: sync\\.run",
+      "kernel": "*",
+      "version": "<5.3.0-18",
+      "issue": "ai-ecoverse/homescoop#290",
+      "why": "5.3.0-17's kill(getpid(), sig) exits 128+n in the program, so the kernel sees status 143 and no signal (slicc-kernel#422); 5.3.0-18's shim sends it to the kernel (NEGATIVE.md)"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-bzip2",
+      "spec": "checklist.mjs",
+      "case": "bzip2recover rc=1",
+      "kernel": "*",
+      "version": "<1.0.8-2",
+      "issue": "ai-ecoverse/homescoop#289",
+      "why": "the spec checks bzip2recover-llu.patch, new in 1.0.8-2; 1.0.8-1 prints 'I/O error reading data.bz2' (NEGATIVE.md)"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-tar",
+      "spec": "users.mjs",
+      "case": "root: tar -x keeps owners and modes",
+      "kernel": "*",
+      "version": "<1.35.0-5",
+      "users": [
+        "enforce"
+      ],
+      "issue": "ai-ecoverse/homescoop#286",
+      "why": "1.35.0-4 links the slicc shims from before process credentials, so root's tar -x acts as a non-root user and drops owners and setuid/setgid; 1.35.0-5 keeps them (NEGATIVE.md)"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-rsync",
+      "spec": "checklist.mjs",
+      "case": "re-run itemized[\\s\\S]*\\.d\\.\\.t\\.{6} \\./",
+      "kernel": ">=1.36.0 <1.73.3",
+      "issue": "ai-ecoverse/slicc-kernel#449",
+      "why": "the destination's top directory loses its mtime after rsync -a, so the re-run itemizes '.d..t...... ./'; fixed by slicc-kernel#467 in 1.73.3"
+    }
+  ]
+}

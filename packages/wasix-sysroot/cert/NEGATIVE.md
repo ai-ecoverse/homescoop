@@ -1,5 +1,37 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-26: utimensat(NULL) sets the times to 1970; CPU times are the wall clock (-27, homescoop#294)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-26.tgz --probe r27 --kernel-dir <slicc-kernel 1.71.1>`, 2026-10-13: FAIL.
+
+```text
++   'utimensat NULL: r=0 errno=0 mtime=other',          (0: 1970)
++   'utimensat NOW,NOW: r=-1 errno=Success mtime=kept',
++   'utimensat 5,OMIT: r=-1 errno=Success mtime=kept',
++   'futimens OMIT,NOW: r=-1 errno=EINVAL mtime=kept',
++   'utimes NULL: r=0 errno=0 mtime=other',
+```
+
+wasix-python 3.14.2-16: `os.utime(p)` and `pathlib.Path(p).touch()` leave mtime 0. xcuw's C probe on -26: `times=1791890215325000000 utime=325000 stime=1791890215 cutime=325000 cstime=1791890215`, `getrusage utime=1791890215.326704334000 stime=1791890215.326704334000`.
+
+
+## 2025.9.30-25: an empty path is the current directory (-26, homescoop#281)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-25.tgz --probe r26 --kernel-dir <slicc-kernel 1.71.1>`, 2026-10-13: FAIL. The kernel's `*at(dirfd, "")` are already ENOENT, but libc turns `""` into the cwd first:
+
+```text
++   'open: 0',
++   'stat: 0',
++   'access: 0',
++   'mkdir: EEXIST',
++   'unlink: EISDIR',
++   'chmod: 0',
++   'opendir: 0',
++   'fstatat AT_EMPTY_PATH: ENOENT same=0',
+```
+
+-26 on slicc-kernel 1.69.0 (before #404) fails only the dirfd forms (`fstatat dirfd: 0`, `openat dirfd: 0`, `mkdirat dirfd: EEXIST`): those are the kernel's.
+
 ## 2025.9.30-24: access() says yes where open() says no (-25, slicc-kernel K3(b))
 
 `R25_USERS=enforce run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-24.tgz --probe r25 --kernel-dir <slicc-kernel 1.63.0>`, 2026-10-11: FAIL. As user cone, `access(priv, R_OK)` is 0 while `open(priv, O_RDONLY)` is EACCES; `ro W`, `rw W`, `ro X` and `dirfd priv R` are all 0; `eaccess` does not exist; `AT_EACCESS` is 0, so root after `seteuid(1000)` gets 0 for the effective check; `faccessat(AT_SYMLINK_NOFOLLOW)` is EINVAL; and `linkat` passes flags 0x1 and 0x400 to the kernel (EPERM on the root file system) instead of EINVAL:

@@ -19,7 +19,7 @@ async function fetchBytes(url) {
 }
 
 /** Install files listed relative to a served directory into OPFS. */
-window.installTree = async (dir, names) => {
+window.installTree = async (dir, names, modes = {}) => {
   const dirs = new Set(names.map((name) => (dir + name).split('/').slice(0, -1).join('/')));
   for (const path of [...dirs].sort()) await walk(path, true);
   let next = 0;
@@ -36,7 +36,13 @@ window.installTree = async (dir, names) => {
     }
   };
   await Promise.all(Array.from({ length: 8 }, copy));
-  return names.length;
+  if (typeof window.kernel?.chmod !== 'function') return { files: names.length, stamped: null };
+  let stamped = 0;
+  for (const [name, mode] of Object.entries(modes)) {
+    await window.kernel.chmod(`/${dir}${name}`, mode);
+    stamped += 1;
+  }
+  return { files: names.length, stamped };
 };
 
 async function file(path, create = false) {
@@ -162,6 +168,7 @@ window.boot = async (opts = {}) => {
   window.kernel = await createKernel({
     root: await navigator.storage.getDirectory(),
     network: { transport: certTransport, ...(uplink ? { uplink } : {}) },
+    ...(opts.users ? { users: opts.users } : {}),
   });
   document.getElementById('log').textContent = 'kernel ready';
   return true;

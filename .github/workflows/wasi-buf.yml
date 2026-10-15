@@ -35,7 +35,7 @@ jobs:
         run: HOMESCOOP_WORK="$RUNNER_TEMP/homescoop-work" bash packages/wasi-buf/build.sh
       - name: record sha256
         run: sha256sum packages/wasi-buf/package/bin/buf.wasm | tee "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: buf-wasm-${{ matrix.attempt }}
           path: |
@@ -49,7 +49,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: buf-wasm-*
       - name: both builds are byte-identical
@@ -66,13 +66,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: buf-wasm-1
           path: packages/wasi-buf/package
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.2
           cache: false
       - name: host module unit tests
         working-directory: packages/wasi-buf

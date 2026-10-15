@@ -6,13 +6,18 @@ slicc-kernel's pseudo-terminals.
 ```bash
 pnpm add -g @ai-ecoverse/wasm-screen
 screen -S work            # C-a d detaches
-screen -ls                # lists sessions (sockets in SCREENDIR=/tmp/screens)
+screen -ls                # lists your sessions (sockets in ~/.screen)
 screen -r work            # reattach, from any terminal
 screen -dmS job make      # detached session; screen -S job -X quit ends it
 ```
 
-Sockets live in `SCREENDIR=/tmp/screens` (set by the package); `screen -ls`
-lists them.
+Each user's sockets live in `~/.screen` (mode 700; `$SCREENDIR` overrides
+it), so one user's `screen -ls`, `-r` or `-x` never sees another's sessions.
+Since 5.0.1-10 screen also knows who it runs as (slicc-kernel's process
+credentials), as root or as any user. Up to 5.0.1-9 the package set
+`SCREENDIR=/tmp/screens` for everyone and screen saw Emscripten's fixed ids:
+the first user to start a session owned `/tmp/screens`, and every other
+user's `screen -dmS` then failed silently.
 
 ## Known limits
 

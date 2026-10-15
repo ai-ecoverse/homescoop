@@ -4,7 +4,7 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-18's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-27's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.53.4; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - No `fork`/`vfork`; `subprocess` via `os.posix_spawn` (`proc_spawn2`/`3`)
@@ -18,6 +18,40 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-18:
+- `ctypes.CDLL(None)` has no `fork` (nor `_Fork`, `__wasi_proc_fork`, …):
+  python.wasm no longer exports them (homescoop#296). In 3.14.2-17 calling
+  `ctypes.CDLL(None).fork()` crashed the interpreter (a wasm trap): fork needs
+  Asyncify on every frame between it and `main`, and ctypes' frames have none.
+  `os.fork` stays absent; `subprocess`, `os.posix_spawn` and `os.system` work
+  as before.
+
+Since 3.14.2-17 (wasix-sysroot -27):
+- `os.utime(path)`, `pathlib.Path.touch()` and everything else that sets a
+  file's times to "now" set them to now; up to 3.14.2-16 they set them to
+  0 (1970) (wasix-sysroot's broken `utimensat(NULL)`, homescoop#294).
+- `os.times()`, `resource.getrusage(RUSAGE_SELF)` and `time.clock`-style
+  callers report the process CPU time slicc-kernel keeps; system and
+  children's times are 0. Up to -16 they held wall-clock values.
+- An empty path is `FileNotFoundError` (`os.stat("")`, `open("")`), as on
+  Linux; files have owners on slicc-kernel ≥ 1.59.0 with users on
+  (`os.chown`, `os.stat().st_uid`), and `os.access` asks the kernel
+  (≥ 1.63.0).
+- **A system site directory every user shares:**
+  `/usr/local/lib/python3.14/site-packages` is added (with `site.addsitedir`,
+  so its `.pth` files run) after python's own site-packages and the py-*
+  packages it finds, when it exists. An embedder can drop a `.pth` there once
+  for every user. A virtual environment sees it only with
+  `--system-site-packages`, as on Linux.
+- The py-* discovery cache is per user:
+  `${XDG_CACHE_HOME:-~/.cache}/slicc-site/`, never in the package directory
+  (which other users cannot write); without a home or a writable cache
+  directory there is no cache.
+- `pip` and `pip3` are commands (`python3 -m pip`); `pip install --user`
+  installs into the user's own site-packages.
+- `python -m venv` takes about half as long: ensurepip runs the package's own
+  compiled pip instead of pip from the zipped wheel.
+
 Since 3.14.2-16 (wasix-sysroot -22: the `slicc.libc` marker, no exported
 itimer helper):
 - ctypes calls variadic C functions (`printf`, `snprintf`, `sscanf`,
@@ -30,11 +64,11 @@ itimer helper):
   Pass `c_double` for `%f`: ctypes does not promote, and a variadic `c_float`
   raises `RuntimeError: ffi_prep_cif_var failed` (libffi rejects it, as on
   every platform).
+  3.14.2-15 could not call them at all ("ffi_prep_cif_var failed").
 - Signals during blocking calls follow PEP 475 on slicc-kernel ≥ 1.53.3, which
   answers -22-marked programs with EINTR: a signal whose handler returns does
   not shorten `time.sleep`/`select`/`poll`, and ^C raises `KeyboardInterrupt`
   at once (`cert/signals.mjs`).
-  3.14.2-15 could not call them at all ("ffi_prep_cif_var failed").
 
 Since 3.14.2-15:
 - `ctypes` / `_ctypes` (wasix-org/libffi) — needs slicc-kernel ≥ 1.51.0 (#306 /
@@ -53,8 +87,8 @@ Since 3.14.2-15:
   and if the `wasix-python` it resolves to (Node's lookup from its real
   directory) is this python's exact version, so side modules never mix
   interpreter builds; the first package of a name wins. `python -v` reports
-  what was skipped and why. The scan is cached in `.slicc-site-cache` in
-  python's directory (keyed on the package directories and their
+  what was skipped and why. The scan is cached per user in
+  `${XDG_CACHE_HOME:-~/.cache}/slicc-site/` (since 3.14.2-17; keyed on the package directories and their
   `package.json` stamps; `-v` always rescans); with the cache, a start costs
   about 2 ms more than with discovery off, and less than the same directories
   on `PYTHONPATH`. As with `PYTHONPATH`, `.pth` files in those directories are

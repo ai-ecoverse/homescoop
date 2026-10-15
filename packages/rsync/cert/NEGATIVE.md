@@ -5,6 +5,10 @@ New package, so it needs human cert first and is not in `scripts/ci-certified.js
 
 
 
+## No process credentials (published 3.4.4-3, users enforce)
+
+`users.mjs` on slicc-kernel 1.69.0 with users `enforce` (Node entry, 2026-10-13): 3.4.4-3 predates the cred shim (#207), so rsync does not know it is root. Root's `rsync -a` of cone's 1000:1000 tree gives `0:1000` everywhere (group kept, owner not), and cone's copy of a `0:100` file gives `1000:1000` (its supplementary group 100 is not seen). 3.4.4-4 gives `1000:1000` and `1000:100`.
+
 ## 3.4.4-2 has no socket shim (3.4.4-3, netfork)
 
 3.4.4-2 linked the `fork` shim profile, without `slicc_socket.c`. Every
@@ -88,3 +92,22 @@ destination, reads `--stats` transfer counts, checks that `--dry-run` leaves
 the destination untouched, that `-c` changes the outcome of an equal
 size-and-mtime pair, exact exit codes (23 for a missing source, 20 for SIGINT)
 and that no `rsync` process survives an interrupt.
+
+## Kernel issue, fixed in slicc-kernel 1.73.3: the destination's top directory lost its mtime (1.36.0-1.73.2)
+
+Not a negative of this package: `checklist.mjs` fails on every slicc-kernel from 1.36.0 on, for the published 3.4.4-3 as well as 3.4.4-4, with users `off` too (Node entry, 2 tries each, 2026-10-13: PASS on 1.30.0, 1.32.3, 1.34.1, 1.35.0, 1.35.1; FAIL on 1.36.0, 1.37.1, 1.39.0, 1.44.0, 1.48.0, 1.61.0, 1.66.0, 1.69.0):
+
+```text
+AssertionError: -a re-run itemized:
++ '.d..t...... ./\n'
+```
+
+Minimal: `mkdir s && echo a > s/f && touch -d @1500000000 s && rsync -a s/ d/; stat -c %Y s d` gives 1500000000 for `s` and the current time for `d`. Subdirectories keep their times; shell steps (create or rename an entry, then utime the directory) keep them too. rsync's generator sets the directory's time while its receiver, another process, renames files into it. 1.36.0 added directory mtime updates on add/remove/rename (slicc-kernel af0d626, c6120b4). Fixed in slicc-kernel 1.73.3 (#467); 3.4.4-4 was certified on 1.69.0 with this failure recorded, and the checklist passes again on 1.73.3.
+
+## Kernel issue, fixed in slicc-kernel 1.73.3: a user's rsync -a of a symlink exits 23 (slicc-kernel#449)
+
+On slicc-kernel 1.73.2 and older, an Emscripten program's own `lstat` of a symlink it just created reported owner 0:0, so a user's `rsync -a` passed that uid to `lchown` (`lchown(l, 0, 1000)`) and got EPERM: rc 23, `chgrp "/home/cone/d/l" failed: Operation not permitted (63)`, the links themselves fine (cone:cone). 1.73.3 gives rc 0 (`users.mjs`).
+
+## 3.4.4-5: negative 3.4.4-4 for the self-kill
+
+3.4.4-5 is 3.4.4-4 relinked with the slicc shims' self-kill (homescoop#290). The checklist and users specs pass on both; the delta is the shim, which `scripts/check-slicc-cred.mjs` and the shim's own test cover. The README drops the top-directory mtime limit, fixed in slicc-kernel 1.73.3.

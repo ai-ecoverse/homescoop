@@ -11,12 +11,14 @@ on:
       - shims/slicc/**
       - scripts/build-common.sh
       - scripts/install-emsdk.sh
+      - scripts/emsdk-patches/**
       - .github/workflows/slicc-shims.yml
   pull_request:
     paths:
       - shims/slicc/**
       - scripts/build-common.sh
       - scripts/install-emsdk.sh
+      - scripts/emsdk-patches/**
       - .github/workflows/slicc-shims.yml
   workflow_dispatch:
 

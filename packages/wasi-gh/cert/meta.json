@@ -1,0 +1,31 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.71.0",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-git",
+    "@ai-ecoverse/wasm-tls-engine"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-13",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5",
+    "@ai-ecoverse/wasm-git@2.55.0-15",
+    "@ai-ecoverse/wasm-tls-engine@3.6.7-1"
+  ],
+  "checklist": [
+    "gh version 2.102.0",
+    "gh api sends GH_TOKEN on the wire unchanged (Authorization: token …)",
+    "a redirect to another host does not carry Authorization",
+    "gh auth login -w with stdin not a tty runs GH_BROWSER by argv and does not pass GH_TOKEN to that child",
+    "hosts.yml is 0600 in a 0700 directory",
+    "gh repo set-default --view with wasm-git",
+    "gh auth login -c treats a failing xclip as clipboard unavailable and still prints the code; a working xclip -in -selection clipboard receives the device code",
+    "without the host module, gh api reports that the runtime cannot open a connection"
+  ],
+  "patches": {
+    "0001-wasip1-slicc-host.patch": "gh api and the missing-host case in cert/checklist.mjs and cert/z-missing-host.mjs. The package does not build without this patch (cert/NEGATIVE.md). The wasip1 clipboard command list (pbcopy, then xclip, xsel, wl-copy/wl-paste) is what cert/clipboard.mjs drives.",
+    "0002-wasip1-gh-browser.patch": "GH_BROWSER argv recording in cert/checklist.mjs, hosts.yml mode 0600 in a 0700 directory, and the clipboard shell-out in cert/clipboard.mjs. Without it, a piped gh auth login -w does not start the browser, and login -c does not run xclip."
+  }
+}

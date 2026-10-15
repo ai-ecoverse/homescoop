@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.71.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
@@ -17,12 +17,15 @@
     "fork (asyncify): the child's exit status reaches waitpid",
     "@INC as in 5.42.0-6 (flat lib/perl5 and lib/perl5/wasm32-wasix from the manifest PERL5LIB, site_perl, /usr/lib/perl5/site_perl/5.42.0); List::Util loads from lib/perl5; installsitelib; a pure-Perl module written into the site dir loads from there; a caller's PERL5LIB is prepended",
     "64-bit integer formats: XS Data::Dumper (Useperl=0) of [1,{a=>2},-3,2**40], Dumper(1) and IV_MIN+1; printf/sprintf %d %u %x %o %vd of 2**62 / 2**40 / UV_MAX; $Config{ivdformat} uvuformat sPRId64 are lld/llu/lld (pinned in hints: perl-cross took Ld from a glibc host)",
-    "file write/read; open -| to a child; perl -ne on stdin; die \u2192 non-zero rc and the message",
+    "file write/read; open -| to a child; perl -ne on stdin; die → non-zero rc and the message",
     "cert/regex.mjs (static ext/re next to the core engine; re_top.h renames perl 5.42's split regcomp helpers instead of --allow-multiple-definition): perl -Mre=debug prints the Compiling/Final program/Matching/Match successful/Freeing trace; use re 'eval' with (?{ }); qr// named captures, %+, re::regname/regnames; \\K; lookbehind split; /g list; the same patterns agree with and without re debug; Text::Balanced extract_bracketed; Pod::Simple::Text parse",
     "cert/cwd.mjs (XS Cwd, new in -7): getcwd, cwd, abs_path and File::Spec->rel2abs give /tmp/cw/a/b in a plain directory and through a symlinked directory (physical path, as pwd -P), abs_path resolves the symlink and ..; the same inside a tmpfs mount (wasm-mount: mount -t tmpfs none /mnt/t), where -6's pure-Perl getcwd/cwd returned empty; getcwd is the XS one",
     "require DynaLoader; @ISA = ('DynaLoader') and Fcntl->bootstrap finds the static boot (DynaLoader.pm shipped; boot_DynaLoader is the no-op marker)",
-    "cert/modes.mjs (wasix-sysroot 2025.9.30-17 + slicc-kernel 1.35.1 slicc_fs): umask returns the kernel's 022; umask 027 \u2192 open > gives 640; File::Temp tempfile 600 and tempdir 700; mkdir 0700; chmod 0755 and -x; perl's stat equals coreutils' stat",
+    "cert/modes.mjs (wasix-sysroot 2025.9.30-17 + slicc-kernel 1.35.1 slicc_fs): umask returns the kernel's 022; umask 027 → open > gives 640; File::Temp tempfile 600 and tempdir 700; mkdir 0700; chmod 0755 and -x; perl's stat equals coreutils' stat",
     "cert/signals.mjs (5.42.0-9, wasix-sysroot -20's slicc.sigaction_set hook, -19's alarm): $SIG{CHLD} reaps 3 forked children with waitpid(-1, WNOHANG), no zombie left; WINCH, USR1, INT (kill self) and ALRM (alarm 1) handlers each run once; $SIG{TERM}='IGNORE' survives kill TERM; a handler set back to DEFAULT lets TERM end perl (rc 143). On 5.42.0-8 (sysroot -17) slicc-kernel 1.47.1 ran neither $SIG{CHLD} nor $SIG{WINCH}",
-    "cert/users.mjs (H1 homescoop#207, slicc-kernel >= 1.44.0): $< $> $( getpwuid getgrgid as root '0|0|0,0|root|/root|root' and as kernel.users.add cone '1000|1000|100,1000,1000|cone|/home/cone|cone'; the getgroups stub in wasix-posix-stubs.h is gone (sysroot -20 asks the kernel)"
+    "cert/users.mjs (H1 homescoop#207, slicc-kernel >= 1.44.0): $< $> $( getpwuid getgrgid as root '0|0|0,0|root|/root|root' and as kernel.users.add cone '1000|1000|100,1000,1000|cone|/home/cone|cone'; the getgroups stub in wasix-posix-stubs.h is gone (sysroot -20 asks the kernel)",
+    "times (5.42.0-10, wasix-sysroot 2025.9.30-27): utime 1000000000, 1100000000 then utime undef, undef sets mtime to now (within 5 s); times() user CPU reaches 0.5 s in a busy loop, system and children's times 0. 5.42.0-9 (sysroot -20): utime undef, undef sets mtime 0 (1970) (NEGATIVE.md)",
+    "handles (5.42.0-11): utime with a filehandle sets explicit times and undef, undef sets now (futimes through futimens; up to -10 a stub, EOPNOTSUPP); flock LOCK_EX, LOCK_SH|LOCK_NB and LOCK_UN succeed on an open handle (advisory no-op, as wasix-python's and wasix-ruby's) and a closed one fails with EBADF (up to -10 every flock failed with EOPNOTSUPP); use filetest 'access' makes -r/-w/-e/-x ask libc's eaccess (wasix-sysroot -25; up to -10 a stub, so -r was false)",
+    "prove (5.42.0-11, patches/0005-sselect-wasi-fd-set.patch): prove t/ with a raw-TAP and a Test::More file gives Files=2, Tests=5, Result: PASS; prove -v shows the TAP; a failing test fails prove (Failed test: 2); IO::Select->can_read over two pipes returns the ready one. 5.42.0-10: prove said 'No plan found in TAP output' and can_read trapped (memory access out of bounds)"
   ]
 }

@@ -100,6 +100,18 @@ server. https also needs `@ai-ecoverse/wasm-tls-engine` in `needs`; without it
 the kernel answers CONNECT with 501. Before `serve`, every request gets a 502.
 See `packages/curl/cert/checklist.mjs`.
 
+### Users: `"users"` in `cert/meta.json`
+
+`"users": "enforce"` (or `"report"`) boots the kernel with `createKernel({ users })` (slicc-kernel ≥ 1.57.0 for file owners, ≥ 1.59.0 for the WASI owner imports, the permission checks of K3(b) later): files have owners and modes are checked. A spec adds users with `ctx.addUser({ name })` and runs as them with `ctx.run(argv, { user })`. Without the field the kernel boots with users `'off'`, as before.
+
+### Command file modes
+
+`scripts/host-run.sh` sets every file a package's `slicc.commands` names (`glue`, `wasm`, `script`) to 0755 before `npm pack` (`scripts/command-modes.mjs --fix`), and fails if one of them is not 0755 in `package.tgz` (`--check`). Under slicc-kernel's users enforce a 0644 glue run by path is `Permission denied` (126). Packaging-only repacks keep the published tarball's modes.
+
+### Time per call: `"runTimeoutMs"` in `cert/meta.json`
+
+Each page call (`ctx.run`, `ctx.write`, …) has to answer within 120 s, or the spec fails with `Runtime.evaluate: no answer in … ms`. `"runTimeoutMs"` changes that for one package. The harness's own default was 30 s, which wasix-python's venv and pnpm-layout steps outgrew on slower CI runners.
+
 ### Tailnet: `ctx.uplink(config)`
 
 With `"uplink": true` in `cert/meta.json` (slicc-kernel ≥ 1.28.0)
@@ -119,3 +131,348 @@ await ctx.uplink({
 const r = await ctx.run(['curl', '-sS', '--noproxy', '*', 'http://peer.tail1234.ts.net:8080/']);
 const { asked, dialled, requests } = await ctx.uplinkLog(); // requests[i].head: the HTTP request head
 ```
+
+## Kernel compatibility: `kernel-compat.yml`
+
+`ladder-pr` runs a recipe's specs on the one kernel in its `cert/meta.json`.
+[`kernel-compat.yml`](../.github/workflows/kernel-compat.yml) asks the other
+question: do the **published** packages still pass their cert specs on kernel
+X? slicc-kernel calls it on its PRs and releases; anyone can dispatch it.
+
+```yaml
+jobs:
+  compat:
+    uses: ai-ecoverse/homescoop/.github/workflows/kernel-compat.yml@main
+    with:
+      kernel: kernel-tgz
+      set: base,ci-certified
+```
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `kernel` | (required) | an npm spec (`@ai-ecoverse/slicc-kernel@1.85.1`, or a bare `1.85.1`), or the name of an artifact holding one kernel `.tgz`, uploaded earlier in the calling run |
+| `set` | `base,ci-certified` | comma-separated: `base` and `catalog` (slicc-bios's base set and optional catalog, at the versions bios pins), `ci-certified` ([`scripts/ci-certified.json`](../scripts/ci-certified.json)), `all` (every recipe with `cert/*.mjs`), or recipe / npm names, `name[@version]` |
+| `homescoop-ref` | `main` | the homescoop commit whose specs and scripts run |
+| `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
+| `runner` | `''` | `runs-on` for the shards: `inputs.runner \|\| vars.CERT_RUNNER`, **only for a same-repo PR or a trusted run on main** (see [Runners](#runners-and-capacity)), else `ubuntu-latest` |
+| `light-runner` | `''` | `runs-on` for plan and report: `inputs.light-runner \|\| vars.CERT_LIGHT_RUNNER`, else the shards' runner, under the same rule, else `ubuntu-latest` |
+| `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, at most 3) or `1`–`3` |
+| `fail-on-regression` | `true` | `false` reports regressions without failing |
+| `expect-regressions` | `''` | a negative proof: recipes that must regress, in their spec and in the base sweep. The report fails if one doesn't; other regressions are listed but don't fail it |
+
+Each package is the **published tarball** at the version bios pins (`base`,
+`catalog`) or at npm's `latest` (`ci-certified`, `all`, a bare name), checked
+against the lockfile's or the registry's `sha512` integrity. Recipes without
+`cert/*.mjs`, `blocked` ones and `host-smoke` / `host-node` harnesses are
+listed as skipped, as are base-set packages homescoop has no recipe for.
+
+### Calling it from another repo
+
+A PR of slicc-kernel packs its kernel, uploads it as an artifact and passes
+the artifact's name; a release passes the published version.
+
+```yaml
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: npm ci && npm run build && mkdir -p out && npm pack --pack-destination out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kernel-tgz
+          path: out/*.tgz
+
+  compat:
+    needs: pack
+    uses: ai-ecoverse/homescoop/.github/workflows/kernel-compat.yml@main
+    with:
+      kernel: kernel-tgz
+      set: base,ci-certified
+      fail-on-regression: false
+
+  release-compat:
+    needs: publish
+    uses: ai-ecoverse/homescoop/.github/workflows/kernel-compat.yml@main
+    with:
+      kernel: '@ai-ecoverse/slicc-kernel@${{ needs.publish.outputs.version }}'
+      set: all
+      shards: '3'
+```
+
+- **The artifact** holds exactly one `.tgz` at its top level. Its name must
+  not start with `@` or a digit: those are read as npm specs. It is found only
+  in the calling run.
+- **Outputs:** `needs.compat.outputs.verdict` (`pass`, `regression`, `error`),
+  `regressions` (a count) and `artifact`, the name of the artifact with
+  `compat.json`, `summary.md` and the logs. A release job downloads it with
+  `actions/download-artifact` (`name: ${{ needs.release-compat.outputs.artifact }}`)
+  and attaches `compat.json` to the GitHub release. The verdict table is also
+  the run's job summary.
+- **Non-blocking:** `fail-on-regression: false` keeps the job green and still
+  reports the verdict; drop it (or make the check required) once it is
+  stable.
+- **Where it runs:** in the caller's run, on the caller's runners and
+  minutes, with the caller's `CERT_RUNNER` / `CERT_LIGHT_RUNNER`. A pool
+  runner is used only for a same-repo PR or a trusted run on main (below);
+  a fork PR always gets `ubuntu-latest`. The called
+  workflow asks only for `contents: read`; homescoop and slicc-bios are
+  public, so the caller's token reads them.
+- **Concurrency:** the called workflow has its own group per caller repo,
+  PR (or ref), kernel, set and bios-ref, and a newer PR run cancels the
+  older one. Don't give the caller's own `concurrency` the same group name.
+- **Pinning:** `@main` follows homescoop's harness and limits. Pin a sha in
+  `uses:` and `homescoop-ref` for a reproducible run, and `bios-ref` for a
+  fixed base set and reference kernel. A pinned sha keeps the pool for a
+  trusted event as long as it is on main (a merged commit, not a PR head).
+- **Time:** `base,ci-certified` is a plan job (about 1 min) and one shard
+  (about 8–10 min) on `ubuntu-latest`, plus the queue; `all` takes 2–3
+  shards of up to about 25 min.
+
+### Jobs
+
+Hosted runners queue jobs for a long time (18–45 min a job on the org's pool
+when it is busy), while the work is minutes, so a call runs as few jobs as it
+can: a gate job, one plan job, 1–3 shard jobs, and a report job only when
+there is more than one shard. The gate and plan take seconds; on the light
+pool each gets a machine within about a minute.
+
+0. **gate** decides where the other jobs run (see
+   [Runners](#runners-and-capacity)). It runs only the workflow file's own
+   script, a GitHub API call for each sha ref, and checks nothing out, so
+   it may run on the light pool for any event that could get the pool.
+
+1. **plan** reads bios's lockfiles at `bios-ref` (through the GitHub API, at a
+   recorded sha), resolves the candidate and the reference kernel (bios's pin
+   of `@ai-ecoverse/slicc-kernel`), lists the packages and their versions,
+   and reads the base-set tarballs' `slicc.commands` for the sweep. It packs
+   the work into `shards` jobs by the seconds each package and sweep mode
+   took in earlier runs ([`timings.json`](../scripts/browser-cert/timings.json)),
+   or an estimate for what isn't there (10 s plus 4 s a spec; 2.5 min a sweep
+   mode). Refresh it from runs' artifacts with
+   `node scripts/browser-cert/compat.mjs timings --compat a/compat.json,b/compat.json`
+   (each package keeps the longest of the runs given). `plan.json`, `candidate.tgz` and
+   `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
+2. **shard** (matrix, `max-parallel: 3`, on `runner` where allowed) runs its packages, then
+   its sweep modes:
+   - each package through `scripts/browser-cert/run.mjs --kernel
+     candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
+     `needs` / `needsTarballScripts` / `needsRepack` installed as `ladder-pr`
+     does, with `--soft` (below). A failed case no known limit covers is
+     retried once (one that passes the second time passes, marked flaky),
+     then the package runs again on the reference kernel;
+   - the **base-set sweep**, once per users mode (`report`, `enforce`): every
+     base-set tarball but the kernel in one kernel, and
+     [`base-sweep/sweep.mjs`](../scripts/browser-cert/base-sweep/sweep.mjs)
+     run through `run.mjs` as root and as cone. Every command in their
+     `slicc.commands` (`--version`, or the invocation in
+     [`base-sweep/meta.json`](../scripts/browser-cert/base-sweep/meta.json))
+     must exit as expected, plus grep, sed, xz, jq, find/xargs, diff/cmp and
+     patch in real use. Failing commands are retried, then run on the
+     reference.
+
+   With a single shard, that job also writes the report.
+3. **report** (more than one shard) merges everything into the
+   `kernel-compat-<tag>` artifact (`compat.json`, `summary.md`, the logs) and
+   the job summary.
+
+### Verdicts
+
+The unit is a **case**: one assertion of a spec, or one sweep command.
+
+- **Cases:** under kernel-compat, `run.mjs --soft` records every `ctx.assert`
+  call and goes on after a failed one, so one failure doesn't hide the next.
+  A case is named by its call site in the spec (with the spec's helpers):
+  `packages/rsync/cert/users.mjs:41<packages/rsync/cert/users.mjs:88`, plus
+  `#n` for the nth time that line runs.
+- **Crashes:** an exception that isn't an assertion (a `TypeError`, a page
+  call that never answers) ends the spec. Its signature is where it happened
+  plus the first line of the message, with numbers and URLs blanked out.
+
+The verdicts:
+
+- `pass`: the case passes on the candidate.
+- `known`: it fails on the candidate, and either
+  - a [`known-limits.json`](../scripts/browser-cert/known-limits.json) entry
+    covers it, or
+  - it fails the same way on the reference (the same case, or a crash with
+    the same signature), or
+  - the reference crashed before reaching it.
+- `regression`: anything else. That means it passes on the reference, or
+  the reference never reached it without crashing, or the candidate crashes
+  where the reference didn't (or crashes differently). Only a regression
+  fails the workflow, and so does an `error` (a shard that reported
+  nothing).
+
+A spec's verdict is its worst case. A spec with a known failure can still
+regress in another case.
+
+### `known-limits.json`
+
+```json
+{
+  "limits": [
+    {
+      "package": "@ai-ecoverse/wasm-coreutils",
+      "spec": "base-sweep",
+      "case": "[",
+      "kernel": "*",
+      "rc": 127,
+      "issue": "ai-ecoverse/slicc-kernel#530",
+      "why": "the kernel's command catalog drops '['"
+    }
+  ]
+}
+```
+
+`package` is the npm name (or the recipe dir), `spec` the spec file or
+`base-sweep`, `case` the sweep's command (exact) or, for a spec, a regex the
+failure text must match. `kernel` and `version` are ranges (`>=1.36.0
+<1.73.3`, `||`, `*`); `users`, `user` and `rc` narrow it further. A matching
+limit makes a failure `known` even when the case passes on the reference, so
+keep each one to its case and range.
+
+**Rules for entries:**
+
+- **An entry needs an issue.** Every entry names the issue (or the PR) that
+  fixes it. An entry whose range is still open (`*`, or no upper bound)
+  needs that issue to be open.
+- **When the fix ships, the entry stops matching it.** Close the range at the
+  release with the fix (`>=1.78.0 <1.86.0`, `version: <1.0.8-2`), so it never
+  covers a kernel or a build that has the fix, or remove the entry. A closed
+  range stays only while kernel-compat still runs on what it describes: a
+  package version bios pins, or a kernel the proof uses.
+- **Never green a candidate's regression with one.** A regression found on a
+  candidate kernel is a FAIL. Report it to the Kernel Coordinator (or the
+  package's owner) and leave it red. An entry for a kernel issue comes only
+  once that issue is filed, and only for the kernels already released with
+  it.
+- **Expected behaviour is not a limit.** A command that is meant to exit
+  non-zero (`false`, `bzip2recover` without arguments, `chcon` and `runcon`
+  without SELinux) gets its `rc` in `base-sweep/meta.json`'s `invocations`
+  instead.
+- **New entries and changes go to the Recipe Manager for review.**
+
+### `compat.json`
+
+```text
+{ kernel: { spec, name, version, sha256, integrity, gitHead, source },
+  reference: { spec, version, sha256, gitHead, source },
+  homescoopRef, biosRef, inputs, run: { repository, sha, event, id, url },
+  verdict: pass | regression | error,
+  summary: { pass, known, regression, skip, error, sweep: {…}, regressions },
+  results: [{ package, recipe, version, sha256, spec, users, status: pass|fail|skip,
+              verdict, durationMs, assertions, log, flaky?, error?, reference?,
+              cases?: [{ id, kind: case|crash|spec, message, verdict, reference: pass|fail|crash|unreached,
+                         why?, limit?, flaky? }] }],
+  packages: [{ id, package, version, sha256, origin, users, modes, status, verdict, durationMs, peers, reference }],
+  sweep: [{ users, user, command, package, recipe, version, argv, rc, expected, status, verdict, out, reference?, limit? }],
+  shards: [{ shard, packages, wallMs, runner }], sweeps: [{ mode, wallMs, runner }] }
+```
+
+### File modes
+
+`run.mjs` writes each package straight to OPFS, as an installer does. Such
+files get the kernel's defaults: directories `0755`, files `0644`, files under
+`node_modules/*/bin/` `0755`. With slicc-kernel ≥ 1.86.0 it then gives every
+file whose tarball mode isn't `0644`, and every `bin/` file, its tarball mode
+with `kernel.chmod`, as bios's installer does with `writeMetadata`. Under
+users `enforce` a shim or helper that runs by path (wasi-pnpm's `shims/npm`,
+git's `libexec/git-core/*`) needs that x bit. Older kernels have no
+`kernel.chmod` and keep the defaults. `--json` and `compat.json` say which
+(`modes: tarball` or `kernel defaults`).
+
+**The owner gap:** only modes are stamped, not owners. bios's installer
+writes its files before the first boot and stamps them with `writeMetadata`
+(`@ai-ecoverse/slicc-kernel/meta`), which can also set `uid` and `gid`. The
+harness writes after boot, so its files carry no owner record and get the
+kernel's defaults. A spec whose result depends on an installed file's owner
+under `enforce` may differ from bios; bios's integration tests and P3's
+canary are the authority there. Closing the gap means writing the packages
+before boot and stamping modes and owners with `writeMetadata`, which
+changes the boot order for every cert.
+
+### `run.mjs` flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--kernel <spec \| .tgz \| dir>` | the kernel to boot instead of `HOMESCOOP_CERT_NODE_MODULES`'s (which `ladder-pr` fills from `meta.json`'s `kernel`, still the default) |
+| `--users off\|report\|enforce` | overrides `meta.json`'s `users`; without either the kernel's default applies (`enforce` since 1.74, `off` before) |
+| `--tarball <tgz>` (repeatable) | the packages under test, installed in this order; the first is `ctx.npmName`. Specs see every manifest in `ctx.installed` |
+| `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
+| `--json <file>` | per-spec results: `{ kernel, users, modes, tarballs, specs: [{ spec, status, durationMs, error, cases: { pass: [id], fail: [{ id, message }] }, crash? }], pageErrors, status }` |
+| `--soft` | a failed `ctx.assert` is recorded and the spec goes on (kernel-compat); without it the first failure ends the spec, as `ladder-pr` wants |
+
+### Runners and capacity
+
+- A reusable workflow runs **in the caller's run**: slicc-kernel's calls use
+  its runs, its `vars.CERT_RUNNER` and its minutes, not homescoop's. GitHub's
+  concurrent-job limit for hosted runners is per organization, so they still
+  share that pool with `ladder-pr`; hence the bounds below.
+- `concurrency`: one group per caller repo, PR (or ref), kernel, set and
+  bios-ref; a PR caller's newer run cancels the older one.
+- One call is at most 1 + 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
+  `base,ci-certified` call is a gate, a plan and one shard job.
+- **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
+  `cloud-run-bench`) can reach the GCP metadata server and the pool's
+  service-account token. `runner` / `CERT_RUNNER` (shards) and
+  `light-runner` / `CERT_LIGHT_RUNNER` (plan, report) are used only for:
+  - a `pull_request` from a branch of the calling repo (`head.repo` is
+    `github.repository`): our agents' branches and Renovate. This includes
+    this repo's proof and slicc-kernel's PR calls; or
+  - `schedule`, `workflow_dispatch`, `workflow_run` or `release` on
+    `refs/heads/main` (the caller's ref, for a call), with:
+    - `kernel` a published `@ai-ecoverse/slicc-kernel@<version>`, or a bare
+      `<version>` (no artifact, no git or file spec);
+    - `homescoop-ref` either `main` or a full 40-hex sha that is on
+      homescoop's main, and `bios-ref` either `main` or a full sha on
+      slicc-bios's main. The gate job checks a sha with the compare API
+      (`compare/main...<sha>` is `behind` or `identical`).
+
+  Anything else runs on `ubuntu-latest`, whatever `runner` says: fork PRs,
+  `pull_request_target`, `merge_group`, dispatches from another ref, a
+  branch name, short sha or unmerged sha as `homescoop-ref` / `bios-ref`, or
+  a failed check. The gate job logs which, and why. `runs-on` can't check a
+  sha, so the gate's own `runs-on` checks only the event and ref (a
+  same-repo PR, or a trusted event on main) and it runs nothing from the
+  refs it checks; plan, shards and report run where it says.
+  The org requires approval before an outside contributor's workflow runs,
+  and agents never approve one.
+  `compat.mjs plan` also takes only registry versions and dist-tags for the
+  kernel and for `name@version` in `set`, so `npm pack` never fetches a git
+  or file spec.
+  The check lives in the workflow file, so a fork PR could change it in its
+  own copy. That is why the org's approval of outside contributors' runs is
+  the backstop.
+- Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
+  (`cloud-run`, 4 vCPU / 8 GiB), else the shards' runner. The shards use
+  `runner` / `CERT_RUNNER` (`cloud-run-bench`). On the pool a job gets a machine within about a minute, where
+  `ubuntu-latest` can queue for 15–40.
+- **No root on the pool.** Its machines run with "no new privileges", so
+  `sudo` cannot become root. The Chromium step installs the system libraries
+  (`playwright-core install --with-deps`) only where `sudo -n true` works and
+  the runner isn't `cloud-run-*`; the runner-bench image already has
+  Chrome's libraries and fonts, so there it installs the browser only.
+  Nothing else in kernel-compat needs root: users exist only inside the
+  kernel.
+- Shards are short and re-runnable ("Re-run failed jobs" uploads with
+  `overwrite`).
+- Nothing here publishes: `ladder-merge` dispatches `ladder-build` only for
+  pushes to `packages/**`, and these files live under `scripts/` and
+  `.github/workflows/`.
+
+### Proof
+
+[`kernel-compat-proof.yml`](../.github/workflows/kernel-compat-proof.yml) runs
+on PRs that touch these files or the harness itself (`run.mjs`,
+`context.mjs`, `page/`): `ladder-pr` runs no package cert on a scripts-only
+PR, so this is the harness's regression test. It calls the workflow twice, as slicc-kernel
+does: `@ai-ecoverse/slicc-kernel@1.81.0` and the newest certified kernel
+(`1.86.0`; bump it with each kernel cert) on `base,ci-certified` must be
+green, and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
+must report a regression, in a spec and in the sweep, for each of them: the
+Emscripten builds without `slicc_sleep_ms` that exit 70 there
+(slicc-kernel#483, fixed by #496 in 1.81.0).

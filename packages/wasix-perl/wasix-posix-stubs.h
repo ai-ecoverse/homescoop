@@ -8,6 +8,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <sys/file.h>
+#include <fcntl.h>
+#include <time.h>
 
 /* The asyncify sysroot's setjmp.h has sigjmp_buf but no prototypes, though
  * libc.a defines both; clang 21 rejects the implicit declaration. */
@@ -36,16 +38,21 @@ _Noreturn void siglongjmp(sigjmp_buf, int);
 #define HOMESCOOP_STUB_ERR do { errno = EOPNOTSUPP; return -1; } while (0)
 
 
-/* flock: declared in <sys/file.h>, not linked */
 #undef flock
 static inline int homescoop_flock(int fd, int operation) {
-  (void)fd; (void)operation; HOMESCOOP_STUB_ERR;
+  if (fcntl(fd, F_GETFD) < 0) return -1;
+  int op = operation & ~LOCK_NB;
+  if (op != LOCK_SH && op != LOCK_EX && op != LOCK_UN) { errno = EINVAL; return -1; }
+  return 0;
 }
 #define flock(fd, op) homescoop_flock((fd), (op))
 
 #undef lockf
 static inline int homescoop_lockf(int fd, int cmd, off_t len) {
-  (void)fd; (void)cmd; (void)len; HOMESCOOP_STUB_ERR;
+  (void)len;
+  if (fcntl(fd, F_GETFD) < 0) return -1;
+  if (cmd != F_LOCK && cmd != F_TLOCK && cmd != F_ULOCK && cmd != F_TEST) { errno = EINVAL; return -1; }
+  return 0;
 }
 #define lockf(fd, cmd, len) homescoop_lockf((fd), (cmd), (len))
 
@@ -71,15 +78,17 @@ static inline int homescoop_mknod(const char *path, mode_t mode, dev_t dev) {
 }
 #define mknod(path, mode, dev) homescoop_mknod((path), (mode), (dev))
 
-#undef eaccess
-static inline int homescoop_eaccess(const char *path, int mode) {
-  (void)path; (void)mode; HOMESCOOP_STUB_ERR;
-}
-#define eaccess(path, mode) homescoop_eaccess((path), (mode))
+int eaccess(const char *path, int mode);
 
 #undef futimes
 static inline int homescoop_futimes(int fd, const struct timeval tv[2]) {
-  (void)fd; (void)tv; HOMESCOOP_STUB_ERR;
+  if (!tv) return futimens(fd, NULL);
+  if (tv[0].tv_usec < 0 || tv[0].tv_usec >= 1000000 || tv[1].tv_usec < 0 || tv[1].tv_usec >= 1000000) { errno = EINVAL; return -1; }
+  struct timespec ts[2] = {
+    { .tv_sec = tv[0].tv_sec, .tv_nsec = tv[0].tv_usec * 1000 },
+    { .tv_sec = tv[1].tv_sec, .tv_nsec = tv[1].tv_usec * 1000 },
+  };
+  return futimens(fd, ts);
 }
 #define futimes(fd, tv) homescoop_futimes((fd), (tv))
 

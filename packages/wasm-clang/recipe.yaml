@@ -8,13 +8,12 @@ source:
   # Prebuilt by slicc-emscripten/build-wasm-llvm.sh; build.sh stages that artifact.
   url: "https://github.com/llvm/llvm-project"
   sha256: "skip"
-# 24.0.0-12 is packaging-only: 24.0.0-11's bytes with exact @ai-ecoverse
-# pins (wasix-sysroot 2025.9.30-24) and engines slicc-kernel >=1.44.0
-# (programs linked against wasix-sysroot >= -20 ask the kernel for user
-# ids, no fallback), and slicc.env WASIXCC_SYSROOT_PREFIX
-# ${package}/../wasix-sysroot (the dependency's place in npm and pnpm
-# layouts; -11 hard-coded /shared/lib/node_modules/…). Drop repack: when the
-# next release rebuilds.
+# 24.0.0-13 is packaging-only: 24.0.0-11's bytes with exact @ai-ecoverse
+# pins (wasix-sysroot 2025.9.30-27: an empty path is ENOENT, utimensat with
+# NULL/UTIME_NOW/UTIME_OMIT, clock/times/getrusage as process CPU time, on
+# top of -24's owners/chown and linkat), engines slicc-kernel >=1.44.0 and
+# slicc.env WASIXCC_SYSROOT_PREFIX ${package}/../wasix-sysroot (as -12).
+# Drop repack: when the next release rebuilds.
 repack:
   from: "24.0.0-11"
   fields:

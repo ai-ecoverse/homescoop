@@ -1,0 +1,315 @@
+name: kernel-compat
+
+on:
+  workflow_call:
+    inputs:
+      kernel:
+        description: 'Candidate kernel: an npm spec (@ai-ecoverse/slicc-kernel@1.85.1, or a bare version) or the name of a kernel .tgz artifact uploaded earlier in the calling run'
+        type: string
+        required: true
+      set:
+        description: 'base | ci-certified | catalog | all | recipe or npm names (name[@version]), comma-separated'
+        type: string
+        default: 'base,ci-certified'
+      homescoop-ref:
+        description: 'homescoop ref whose cert specs and scripts run'
+        type: string
+        default: 'main'
+      bios-ref:
+        description: 'slicc-bios ref whose lockfiles give the base set, the catalog and the reference kernel'
+        type: string
+        default: 'main'
+      runner:
+        description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a same-repo PR or a trusted run on main (docs/ci-cert.md), else ubuntu-latest'
+        type: string
+        default: ''
+      light-runner:
+        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER, else the shards runner). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
+        type: string
+        default: ''
+      fail-on-regression:
+        description: 'Fail the report job when a package or sweep case passes on the reference kernel and fails on the candidate'
+        type: boolean
+        default: true
+      shards:
+        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3; the base sweep runs inside them'
+        type: string
+        default: 'auto'
+      expect-regressions:
+        description: 'Negative proof: recipes that must regress (spec and base sweep); the report fails if one does not, and other regressions do not fail it'
+        type: string
+        default: ''
+    outputs:
+      artifact:
+        description: 'Artifact holding compat.json, summary.md and the logs'
+        value: ${{ jobs.plan.outputs.artifact }}
+      verdict:
+        description: 'pass, regression or error'
+        value: ${{ jobs.report.outputs.verdict || jobs.shard.outputs.verdict }}
+      regressions:
+        description: 'Number of regressions'
+        value: ${{ jobs.report.outputs.regressions || jobs.shard.outputs.regressions }}
+  workflow_dispatch:
+    inputs:
+      kernel:
+        description: 'Candidate kernel: an npm spec (@ai-ecoverse/slicc-kernel@1.85.1, or a bare version)'
+        type: string
+        required: true
+      set:
+        description: 'base | ci-certified | catalog | all | recipe or npm names (name[@version]), comma-separated'
+        type: string
+        default: 'base,ci-certified'
+      homescoop-ref:
+        description: 'homescoop ref whose cert specs and scripts run'
+        type: string
+        default: 'main'
+      bios-ref:
+        description: 'slicc-bios ref whose lockfiles give the base set, the catalog and the reference kernel'
+        type: string
+        default: 'main'
+      runner:
+        description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a same-repo PR or a trusted run on main (docs/ci-cert.md), else ubuntu-latest'
+        type: string
+        default: ''
+      light-runner:
+        description: 'runs-on label for plan and report (empty: vars.CERT_LIGHT_RUNNER, else the shards runner). Used only for a same-repo PR or a trusted run on main, else ubuntu-latest'
+        type: string
+        default: ''
+      fail-on-regression:
+        description: 'Fail the report job on a regression'
+        type: boolean
+        default: true
+      shards:
+        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3'
+        type: string
+        default: 'auto'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kernel-compat-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.kernel }}-${{ inputs.set }}-${{ inputs.bios-ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gate:
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main')) && (inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER) || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      runner: ${{ steps.runners.outputs.runner }}
+      light-runner: ${{ steps.runners.outputs.light-runner }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - id: runners
+        env:
+          SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+          MAIN_EVENT: ${{ contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          KERNEL: ${{ inputs.kernel }}
+          HOMESCOOP_REF: ${{ inputs.homescoop-ref || 'main' }}
+          BIOS_REF: ${{ inputs.bios-ref || 'main' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RUNNER: ${{ inputs.runner || vars.CERT_RUNNER }}
+          LIGHT: ${{ inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER }}
+          COMPARE_JS: |
+            const url = `https://api.github.com/repos/${process.argv[1]}/compare/main...${process.argv[2]}`;
+            const get = (auth) => fetch(url, { headers: { Accept: "application/vnd.github+json", "User-Agent": "homescoop-kernel-compat", ...(auth ? { Authorization: `Bearer ${auth}` } : {}) } });
+            (async () => {
+              let r = process.env.GITHUB_TOKEN ? await get(process.env.GITHUB_TOKEN) : null;
+              if (!r || !r.ok) r = await get("");
+              if (!r.ok) throw new Error(`compare ${process.argv[2]}: HTTP ${r.status}`);
+              console.log((await r.json()).status);
+            })().catch((e) => { console.error(String(e.message || e)); process.exit(1); });
+        run: |
+          set -euo pipefail
+          pool() {
+            echo "runner=${RUNNER:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
+            echo "light-runner=${LIGHT:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
+            echo "runners: ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}: $1"
+          }
+          hosted() {
+            echo "runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
+            echo "light-runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
+            echo "runners: ubuntu-latest: $1"
+          }
+          compare() {
+            node -e "$COMPARE_JS" "$1" "$2"
+          }
+          on_main() {
+            local status
+            [[ "$2" == main ]] && return 0
+            [[ "$2" =~ ^[0-9a-f]{40}$ ]] || return 1
+            status=$(compare "$1" "$2") || return 1
+            echo "runners: $1 compare main...$2: $status"
+            [[ "$status" == behind || "$status" == identical ]]
+          }
+          if [[ "$SAME_REPO_PR" == true ]]; then
+            pool "a same-repo pull_request ($REF)"
+          elif [[ "$MAIN_EVENT" != true ]]; then
+            hosted "$EVENT on $REF is neither a same-repo pull_request nor schedule, workflow_dispatch, workflow_run or release on refs/heads/main"
+          elif ! [[ "$KERNEL" =~ ^@ai-ecoverse/slicc-kernel@[0-9A-Za-z.+-]+$ || "$KERNEL" =~ ^[0-9][0-9A-Za-z.+-]*$ ]]; then
+            hosted "kernel $KERNEL is not a published @ai-ecoverse/slicc-kernel version"
+          elif ! on_main ai-ecoverse/homescoop "$HOMESCOOP_REF"; then
+            hosted "homescoop-ref $HOMESCOOP_REF is neither main nor a 40-hex sha reachable from homescoop main"
+          elif ! on_main ai-ecoverse/slicc-bios "$BIOS_REF"; then
+            hosted "bios-ref $BIOS_REF is neither main nor a 40-hex sha reachable from slicc-bios main"
+          else
+            pool "$EVENT on $REF, homescoop-ref $HOMESCOOP_REF and bios-ref $BIOS_REF on main, kernel $KERNEL"
+          fi
+
+  plan:
+    needs: gate
+    runs-on: ${{ needs.gate.outputs.light-runner }}
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      artifact: ${{ steps.plan.outputs.artifact }}
+      shards: ${{ steps.plan.outputs.shards }}
+      count: ${{ steps.plan.outputs.count }}
+      homescoop-sha: ${{ steps.plan.outputs.homescoop-sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ai-ecoverse/homescoop
+          ref: ${{ inputs.homescoop-ref || 'main' }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - id: kind
+        env:
+          KERNEL: ${{ inputs.kernel }}
+        run: |
+          set -euo pipefail
+          if [[ "$KERNEL" =~ ^(@|[0-9]) ]]; then echo "kind=npm" >> "$GITHUB_OUTPUT"; else echo "kind=artifact" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.kind.outputs.kind == 'artifact'
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.kernel }}
+          path: ${{ runner.temp }}/kernel-artifact
+      - id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KERNEL: ${{ inputs.kernel }}
+          SET: ${{ inputs.set || 'base,ci-certified' }}
+          BIOS_REF: ${{ inputs.bios-ref || 'main' }}
+          HOMESCOOP_REF: ${{ inputs.homescoop-ref }}
+          SHARDS: ${{ inputs.shards || 'auto' }}
+          KERNEL_DIR: ${{ steps.kind.outputs.kind == 'artifact' && format('{0}/kernel-artifact', runner.temp) || '' }}
+        run: |
+          set -euo pipefail
+          node scripts/browser-cert/compat.mjs plan \
+            --kernel "$KERNEL" --set "$SET" --bios-ref "$BIOS_REF" --homescoop-ref "$HOMESCOOP_REF" --shards "$SHARDS" \
+            ${KERNEL_DIR:+--kernel-dir "$KERNEL_DIR"} \
+            --out "$RUNNER_TEMP/plan"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.plan.outputs.artifact }}-plan
+          path: ${{ runner.temp }}/plan
+          retention-days: 3
+          overwrite: true
+
+  shard:
+    needs: [gate, plan]
+    if: needs.plan.outputs.count != '0'
+    runs-on: ${{ needs.gate.outputs.runner }}
+    timeout-minutes: 75
+    outputs:
+      verdict: ${{ steps.report.outputs.verdict }}
+      regressions: ${{ steps.report.outputs.regressions }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ai-ecoverse/homescoop
+          ref: ${{ needs.plan.outputs.homescoop-sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.plan.outputs.artifact }}-plan
+          path: ${{ runner.temp }}/plan
+      - name: Chromium for playwright-core 1.63.0
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit playwright-core@1.63.0
+          if [[ "$RUNNER_NAME" != cloud-run-* ]] && sudo -n true 2>/dev/null; then
+            npx --prefix "$RUNNER_TEMP/pw" playwright-core install --with-deps chromium
+          else
+            echo "browser-cert: no root on $RUNNER_NAME (no-new-privileges); the image brings Chromium's system libraries, installing the browser only"
+            npx --prefix "$RUNNER_TEMP/pw" playwright-core install chromium
+          fi
+      - name: Cert specs and base sweep on the candidate kernel
+        run: node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.plan.outputs.artifact }}-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/out
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: ignore
+      - id: report
+        if: ${{ !cancelled() && needs.plan.outputs.count == '1' }}
+        env:
+          FAIL_ON_REGRESSION: ${{ inputs.fail-on-regression && 'true' || 'false' }}
+          EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
+        run: |
+          set -euo pipefail
+          node scripts/browser-cert/compat.mjs report \
+            --plan "$RUNNER_TEMP/plan/plan.json" --results "$RUNNER_TEMP/out" --out "$RUNNER_TEMP/compat" \
+            --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"
+      - if: ${{ !cancelled() && needs.plan.outputs.count == '1' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.plan.outputs.artifact }}
+          path: ${{ runner.temp }}/compat
+          retention-days: 30
+          overwrite: true
+          if-no-files-found: ignore
+
+  report:
+    needs: [gate, plan, shard]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.count != '1' }}
+    runs-on: ${{ needs.gate.outputs.light-runner }}
+    timeout-minutes: 15
+    outputs:
+      verdict: ${{ steps.report.outputs.verdict }}
+      regressions: ${{ steps.report.outputs.regressions }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ai-ecoverse/homescoop
+          ref: ${{ needs.plan.outputs.homescoop-sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ needs.plan.outputs.artifact }}-*
+          path: ${{ runner.temp }}/results
+      - id: report
+        env:
+          FAIL_ON_REGRESSION: ${{ inputs.fail-on-regression && 'true' || 'false' }}
+          EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
+        run: |
+          set -euo pipefail
+          node scripts/browser-cert/compat.mjs report \
+            --plan "$RUNNER_TEMP/results/${{ needs.plan.outputs.artifact }}-plan/plan.json" \
+            --results "$RUNNER_TEMP/results" --out "$RUNNER_TEMP/compat" \
+            --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.plan.outputs.artifact }}
+          path: ${{ runner.temp }}/compat
+          retention-days: 30
+          overwrite: true
+          if-no-files-found: ignore

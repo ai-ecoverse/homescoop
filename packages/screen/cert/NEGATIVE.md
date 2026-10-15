@@ -4,6 +4,23 @@
 No patches. Not in `scripts/ci-certified.json`. All runs are on slicc-kernel
 1.26.6 (Node entry).
 
+## One socket directory for everyone (published 5.0.1-9, users enforce)
+
+`users.mjs` on slicc-kernel 1.69.0 with users `enforce` (Node entry, 2026-10-13). 5.0.1-9 predates the cred shim (#207) and the package sets `SCREENDIR=/tmp/screens` for every user. The first user to start screen creates `/tmp/screens` as its own, mode 700; any other user's `screen -dmS` then returns 0 but starts nothing:
+
+```text
+# scoop-a: screen -dmS scoopsess sleep 60; screen -ls
+There is a screen on:
+	1003.scoopsess	(Remote or dead)
+1 Socket in /tmp/screens.
+drwx------ 1 scoop-a scoop-a 4096 … /tmp/screens
+# cone: screen -dmS conesess sleep 60; echo rc=$?; screen -ls
+rc=0
+No Sockets found in /tmp/screens.
+```
+
+The kernel's file permissions kept the sessions apart (cone cannot read scoop-a's directory), but only one user could use screen at all. 5.0.1-10 keeps each user's sockets in `~/.screen` and knows its real ids.
+
 ## Known-bad build 1: no passwd lookups (5.0.1-7 before slicc_pwd.c)
 
 Rebuilt from this repo before #146, screen linked Emscripten's `getpwuid`

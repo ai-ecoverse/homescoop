@@ -12,10 +12,14 @@ export default async function (ctx) {
   ], r.stdout);
   console.log(`r23fork: fork and _Fork in an asyncified ${ctx.variant} program; the child sees the parent's thread_local`);
 
-  const s = await run(['r23fork-sync'], { cwd: '/tmp' });
-  assert.equal(s.status, 1, `${s.stdout}${s.stderr}`);
-  assert.equal(s.stdout.trim(), 'fork: -1 Function not implemented', s.stdout);
-  console.log('r23fork-sync: without asyncify, fork() is -1 ENOSYS');
+  if (ctx.preAsyncified) {
+    console.log(`r23fork-sync: skipped, the ${ctx.variant} variant is asyncified by wasixcc itself`);
+  } else {
+    const s = await run(['r23fork-sync'], { cwd: '/tmp' });
+    assert.equal(s.status, 1, `${s.stdout}${s.stderr}`);
+    assert.equal(s.stdout.trim(), 'fork: -1 Function not implemented', s.stdout);
+    console.log('r23fork-sync: without asyncify, fork() is -1 ENOSYS');
+  }
   if (!side) return;
 
   const d = await run(['r23fork', 'dl', side], { cwd: '/tmp' });

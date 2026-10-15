@@ -1,0 +1,90 @@
+{
+  "sources": [
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38573138838",
+      "kernel": "1.86.0",
+      "set": "base,ci-certified,catalog"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38586687944",
+      "kernel": "1.86.0",
+      "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38586687944",
+      "kernel": "1.81.0",
+      "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38595982516",
+      "kernel": "1.86.0",
+      "set": "rsync@3.4.4-3,screen@5.0.1-9,wasix-ruby@3.4.11-10,wasix-perl@5.42.0-9"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38595997470",
+      "kernel": "1.86.0",
+      "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38595997470",
+      "kernel": "1.81.0",
+      "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38631280134",
+      "kernel": "1.86.0",
+      "set": "all"
+    }
+  ],
+  "seconds": {
+    "base-sweep:enforce": 60,
+    "base-sweep:report": 113,
+    "bash": 80,
+    "binutils": 11,
+    "bzip2": 8,
+    "coreutils": 19,
+    "curl": 7,
+    "diffutils": 12,
+    "file": 17,
+    "findutils": 10,
+    "gawk": 4,
+    "git": 44,
+    "grep": 3,
+    "gzip": 5,
+    "imagemagick": 7,
+    "jq": 5,
+    "less": 6,
+    "libheif": 38,
+    "mount": 8,
+    "nano": 8,
+    "ncurses-utils": 7,
+    "patch": 12,
+    "pkgconf": 4,
+    "poppler": 13,
+    "procps": 10,
+    "py-matplotlib": 425,
+    "qpdf": 9,
+    "rsync": 100,
+    "screen": 18,
+    "sed": 3,
+    "tar": 20,
+    "tree": 4,
+    "util-linux": 7,
+    "uv-shim": 96,
+    "wasi-biome": 10,
+    "wasi-dig": 8,
+    "wasi-esbuild": 4,
+    "wasi-gh": 23,
+    "wasi-hf": 34,
+    "wasi-impeccable": 12,
+    "wasi-ripgrep": 7,
+    "wasi-typescript": 16,
+    "wasix-gnupg": 15,
+    "wasix-perl": 40,
+    "wasix-python": 275,
+    "wasix-ruby": 186,
+    "which": 5,
+    "xxd": 5,
+    "xz": 6
+  }
+}
