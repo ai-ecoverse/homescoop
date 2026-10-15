@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Mon, 12 Oct 2026 14:38:52 +0200
+Subject: [PATCH 04/13] wasi: take the working directory and home from the
+ environment
+
+wasi-libc starts every program in "/", so fnox changes to $PWD before
+anything else and reads HOME from the environment, which dirs has no
+WASI backend for. XDG-style defaults apply to WASI as on unix. The
+tokio runtime is current_thread on WASI.
+
+diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
+index d8fd5aa..5cbc184 100644
+--- a/crates/fnox-core/src/env.rs
++++ b/crates/fnox-core/src/env.rs
+@@ -40,12 +40,18 @@ pub fn remove_var<K: AsRef<OsStr>>(key: K) {
+ }
+ 
+ // Directory configuration
+-pub static HOME_DIR: LazyLock<PathBuf> = LazyLock::new(|| dirs::home_dir().unwrap_or_default());
++pub static HOME_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
++    #[cfg(target_os = "wasi")]
++    if let Some(home) = std::env::var_os("HOME").filter(|h| !h.is_empty()) {
++        return PathBuf::from(home);
++    }
++    dirs::home_dir().unwrap_or_default()
++});
+ pub static FNOX_CONFIG_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+     var_path("FNOX_CONFIG_DIR").unwrap_or_else(|| {
+         var_path("XDG_CONFIG_HOME")
+             .unwrap_or_else(|| {
+-                #[cfg(unix)]
++                #[cfg(any(unix, target_os = "wasi"))]
+                 return HOME_DIR.join(".config");
+                 #[cfg(windows)]
+                 return HOME_DIR.join("AppData").join("Local");
+@@ -58,7 +64,7 @@ pub static FNOX_STATE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+     var_path("FNOX_STATE_DIR").unwrap_or_else(|| {
+         var_path("XDG_STATE_HOME")
+             .unwrap_or_else(|| {
+-                #[cfg(unix)]
++                #[cfg(any(unix, target_os = "wasi"))]
+                 return HOME_DIR.join(".local").join("state");
+                 #[cfg(windows)]
+                 return HOME_DIR.join("AppData").join("Local");
+diff --git a/src/main.rs b/src/main.rs
+index fbc65cb..a973b03 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -3,6 +3,10 @@ use fnox::settings;
+ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+ 
+ fn main() -> miette::Result<()> {
++    #[cfg(target_os = "wasi")]
++    if let Some(pwd) = std::env::var_os("PWD") {
++        let _ = std::env::set_current_dir(pwd);
++    }
+     let argv: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+     if fnox::hook_env::can_exit_before_startup(&argv) {
+         return Ok(());
+@@ -10,7 +14,8 @@ fn main() -> miette::Result<()> {
+     run(argv)
+ }
+ 
+-#[tokio::main]
++#[cfg_attr(not(target_os = "wasi"), tokio::main)]
++#[cfg_attr(target_os = "wasi", tokio::main(flavor = "current_thread"))]
+ async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
+     // Restore the default SIGPIPE handler. Rust inherits SIG_IGN from libc,
+     // so writes to a closed pipe return EPIPE and `println!` panics — e.g.

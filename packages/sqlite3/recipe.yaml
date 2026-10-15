@@ -23,3 +23,7 @@ about:
     The amalgamation number in source.url ({{amal}}) is derived from
     version (3.54.0 -> 3540000); source.year is the release year and has to
     be moved by hand when a release lands in a new year.
+    3.54.0-2 builds with SQLITE_OMIT_WAL (homescoop#344), as wasix-python's
+    private _sqlite3 does: there is no shared memory (-shm) in the wasm
+    realm, and a database switched to WAL could no longer be opened.
+    journal_mode=WAL now answers delete and the file stays usable.

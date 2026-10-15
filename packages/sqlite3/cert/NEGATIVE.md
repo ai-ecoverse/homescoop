@@ -23,3 +23,10 @@ AssertionError [ERR_ASSERTION]: The input did not match the regular expression /
 Every other case compares exact stdout (CSV with CRLF rows, JSON, list
 mode) or exact rc and error text, so wrong output fails too. There are no
 patches.
+
+## WAL (3.54.0-2)
+
+Against the published 3.54.0-1 (built without `SQLITE_OMIT_WAL`), the WAL
+case fails: `pragma journal_mode=wal` answers `wal`, and the statements after it fail with
+`Error in 2nd command line argument: disk I/O error`, rc 1. Every later open
+of the file fails with `disk I/O error (10)` (homescoop#344).

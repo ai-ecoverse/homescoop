@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-xz`
 
-[XZ Utils](https://tukaani.org/xz/) 5.8.1 for slicc: `xz` / `unxz` / `xzcat` /
+[XZ Utils](https://tukaani.org/xz/) 5.8.4 for slicc: `xz` / `unxz` / `xzcat` /
 `lzma` / `unlzma` / `lzcat`, static `liblzma`, and `xzgrep` / `xzdiff` / `xzless`
 scripts.
 

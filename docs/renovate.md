@@ -19,6 +19,13 @@ When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
    `sync-package-version.mjs` aligns `package.json` with the new recipe
    version before packing.
 
+`ladder-pr`'s `recipe-sha` job runs `sync-package-version.mjs --write`,
+which also rewrites the old upstream version in `description`, the recipe
+`summary` and `package/README.md`, and pushes those files with the sha256.
+A Renovate PR therefore carries the new version everywhere without hand
+edits; `check-package-meta.mjs` fails the build when any text still names
+the old one (docs/versioning.md, "Upstream versions in text").
+
 Manual: `gh workflow run ladder-build.yml -f package=zlib`.
 
 Renovate only rewrites `version:` lines. Recipe `source.url` (and

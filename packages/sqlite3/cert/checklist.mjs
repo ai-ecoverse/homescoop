@@ -34,6 +34,13 @@ export default async function sqlite3(ctx) {
   assert.equal(await ok(['sqlite3', ':memory:', 'select sqrt(16), pow(2, 10);']), '4.0|1024.0\n', 'math functions');
   assert.equal(await ok(['sqlite3', ':memory:', 'select json_extract(\'{"a":[1,2,3]}\', \'$.a[2]\');']), '3\n', 'JSON');
 
+  assert.equal(await ok(['sqlite3', 'w.db', 'pragma journal_mode=wal; create table a(x); insert into a values (1), (2); select count(*) from a;']), 'delete\n2\n', 'journal_mode=WAL keeps the rollback journal (SQLITE_OMIT_WAL) and writes go through');
+  assert.equal(await ok(['sqlite3', 'w.db', 'insert into a values (3); select sum(x) from a; pragma journal_mode;']), '6\ndelete\n', 'the file reopens after the WAL request');
+  const dump = await ok(['sqlite3', 'w.db', '.dump']);
+  assert.match(dump, /CREATE TABLE a\(x\);/);
+  assert.equal(await ok(['sqlite3', 'w2.db'], { stdin: dump }), '', '.dump replays into a new database');
+  assert.equal(await ok(['sqlite3', 'w2.db', 'select group_concat(x) from a;']), '1,2,3\n', '.dump round trip');
+
   await ctx.write('/home/sq/bad.db', 'this is not an sqlite database, just text that is long enough to have a header');
   const bad = await run(['sqlite3', 'bad.db', 'select 1 from sqlite_master;']);
   assert.equal(bad.status, 1, `bad.db: rc ${bad.status}`);

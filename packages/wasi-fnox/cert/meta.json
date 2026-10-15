@@ -1,0 +1,55 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.83.0",
+  "needs": [
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "source": "jdx/fnox v1.39.0 + packages/wasi-fnox/NNNN-*.patch (apply.sh); each patch maps to cert cases below",
+  "certPending": [
+    "slicc-kernel 1.83.0 has KS-2 (/dev/sealed) and KS-8 (exec tickets); the cert waits for #503's release (protect layer 2's fix)",
+    "the root-owned /etc/fnox/config.toml + sudo case needs users 'enforce' in a seven-like setup (bios K4 branch #355)"
+  ],
+  "checklist": [
+    "fnox --version → fnox 1.39.0; --help lists exec/get/set/proxy and no daemon, tui, mcp; provider add --help offers sealed",
+    "with /etc/fnox/config.toml (default_provider seven, type sealed) via FNOX_CONFIG_DIR: get, export and env print the stored placeholder; no device needed",
+    "discovery from a subdirectory of the project (cwd from PWD)",
+    "without a vault: set from a pipe, exec with a sealed secret and check --all fail closed (`not running in seven: /dev/sealed is missing` on kernels without the device; `ENOTCONN: no vault is connected` from 1.68.0 without the sealed hook)",
+    "set NAME value (a value on the command line) is refused for a sealed secret; --key-name is refused",
+    "age: set --provider age encrypts to the recipients (ciphertext in fnox.toml, no plaintext); get fails with exactly `age secrets aren't supported in seven yet (slicc-vault#2)`",
+    "sync and reencrypt refused with `not available in seven: the value would be in a program (use a header rule)`",
+    "proxy rules --json prints the [proxy] rules; proxy run -- printenv shows each rule's env name holding the placeholder and the secret's own name unset",
+    "exec with only plain secrets: the child gets the value, stderr warns that it was passed as a plain value; exec of a missing command exits 127",
+    "exec --shell-grants without a vault fails closed (same errors)",
+    "test/sealed.mjs (KS-2, vault double): set from a pipe → seal {name, value} → placeholder stored, value not in fnox.toml, stdout, stderr or /proc/<pid>/cmdline",
+    "test/sealed.mjs (KS-2, vault double): set on a terminal → request {kind: value} → status polled → placeholder stored; ^C sends cancel and exits 130; ^C during a 10 s machine wait cancels after the reply",
+    "test/sealed.mjs (KS-2, vault double): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
+    "test/sealed.mjs case 11 (KS-8): exec under an { argv } grant → materialize {names, path /usr/bin/bash, argv (argv[0] = path), cwd}, no interpreter claim → consume stamped by the child (ppid = the asker) → the child holds the value (sha256), real:false names keep placeholders, the child's echo is scrubbed back to the placeholder, no value on stdout/stderr; a file the child writes holds the value (documented residual)",
+    "test/sealed.mjs cases 12–13 (KS-8, exposure): the child's /proc cmdline has no value; no /proc/<pid>/environ; its own children inherit the value with output still scrubbed; another user (users 'enforce') can't see the process in /proc; a used or forged SLICC_SEALED_TICKET fails the exec with 126 and reveals nothing",
+    "PENDING (users enforce in a seven-like setup: bios K4 branch #355; sudo and tags are in slicc-kernel 1.66.0): /etc/fnox/config.toml root-owned 0644: a non-root user reads and resolves it, fnox set or edit fails with EACCES, sudo succeeds",
+    "test/sealed.mjs case 14 (KS-8): exec --shell-grants -- /bin/bash -c CMD → materialize {shellGrants: true, path, argv, cwd} with no names → the shell = true secret's placeholder via `placeholder {name}` → real in the bash; the config's own sealed secrets keep placeholders; output scrubbed",
+    "test/sealed.mjs case 15 (KS-8, interpreter chain): fnox never claims `interpreter`; an npm-style `#!/usr/bin/env bash` script is reported as /usr/bin/bash; under an { argv } grant it gets the value when trusted (root-owned, 0755, root-owned dirs), is refused when untrusted (world-writable dir), and is refused under exec = true"
+  ],
+  "patches": {
+    "0001-build-gate-non-WASI-dependencies-by-target.patch": "the build: wasm32-wasip1 links at all (no cloud SDKs, reqwest, keyring, TUI)",
+    "0002-providers-build-only-age-and-plain-for-WASI.patch": "age set encrypts; provider types outside the allowlist fail when used",
+    "0003-cli-compile-out-modules-that-cannot-run-on-WASI.patch": "--help lists no daemon, tui or mcp",
+    "0004-wasi-take-the-working-directory-and-home-from-the-en.patch": "get from a subdirectory of the project (cwd from PWD)",
+    "0005-wasi-spawn-fnox-exec-children-through-wasix-command.patch": "plain exec: the child runs and gets the value",
+    "0006-providers-add-the-sealed-provider-for-seven-s-vault.patch": "get/export print the stored placeholder; the missing-device error; test/sealed.mjs: seal, rotation, placeholder {name}, the caller stamp; provider add --help offers sealed",
+    "0007-set-seal-piped-values-and-ask-seven-s-vault-on-a-ter.patch": "set refuses argv values and --key-name; test/sealed.mjs: seal from a pipe, request/status/cancel on a terminal, EAGAIN",
+    "0008-exec-let-seven-s-kernel-hand-sealed-values-to-the-co.patch": "exec with a sealed secret needs the device; missing command → 127; plain warning; test/sealed.mjs cases 9, 11–13, 15: materialize, the values in the child, exposure, failed tickets, interpreter chain",
+    "0009-proxy-rules-json-and-proxy-run-with-placeholders-on-.patch": "proxy rules --json; proxy run gives the placeholder and scrubs the secret's name",
+    "0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch": "sync/reencrypt refused; age get fails with slicc-vault#2; test/sealed.mjs: check --all on inert, removed, rotated and missing records",
+    "0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch": "lint-only: the WASI build has no warnings (no runtime case)",
+    "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs cases 9 and 14 (NEGATIVE.md: without 0012, case 9 fails)",
+    "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs cases 6–8: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal (NEGATIVE.md: without 0013, case 6 fails)"
+  },
+  "sealedKernel": "@ai-ecoverse/slicc-kernel@1.83.0",
+  "ci": [
+    "node packages/wasi-fnox/test/sealed.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "sealedNeeds": [
+    "@ai-ecoverse/wasm-bash@5.3.0-18",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-5"
+  ]
+}

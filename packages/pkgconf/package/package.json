@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-pkgconf",
-  "version": "2.3.0-5",
+  "version": "2.5.1-1",
   "description": "pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder)",
   "license": "ISC",
   "repository": {
@@ -26,7 +26,7 @@
   },
   "homescoop": {
     "recipe": "pkgconf",
-    "upstream": "2.3.0"
+    "upstream": "2.5.1"
   },
   "slicc": {
     "abi": "emscripten",
