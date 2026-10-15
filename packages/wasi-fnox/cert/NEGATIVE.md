@@ -31,3 +31,14 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
   actual: undefined,
     at …/packages/wasi-fnox/test/sealed.mjs:153:8   (sg.shellGrants === true)
 ```
+
+## 1.39.0-1 (without 0014): `fnox edit` traps
+
+`cert/checklist.mjs` fails at the `fnox edit` case. 1.39.0-1, the published package, panics in `std::env::temp_dir()` and traps (homescoop#376):
+
+```text
+Error:   × Main thread panicked.
+  ├─▶ at /rustc/48a229ce…/library/std/src/sys/paths/wasi.rs:44:5
+  ╰─▶ not supported by WASI yet
+fnox: wasm trap: unreachable          (status 134)
+```

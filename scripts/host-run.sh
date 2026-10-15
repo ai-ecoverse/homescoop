@@ -8,8 +8,14 @@ name="${1:?usage: host-run.sh <package>}"
 PKG="$ROOT/packages/$name"
 OUT="${HOMESCOOP_OUT:-$ROOT/.homescoop-out}"
 PREFIX="${PREFIX:-$OUT/prefix}"
-WORK="${HOMESCOOP_WORK:-$OUT/work}"
-export HOMESCOOP_ROOT="$ROOT" PREFIX WORK
+if [[ -n "${HOMESCOOP_WORK:-}" ]]; then
+  WORK="$HOMESCOOP_WORK"
+elif [[ -n "${CI:-}" ]]; then
+  WORK="${TMPDIR:-/tmp}/homescoop-work"
+else
+  WORK="$OUT/work"
+fi
+export HOMESCOOP_ROOT="$ROOT" PREFIX WORK HOMESCOOP_WORK="$WORK"
 
 builder="$(node "$ROOT/scripts/read-recipe.mjs" "$name" --field builder || true)"
 builder="${builder:-host}"
@@ -146,6 +152,12 @@ if [[ -n "${MAKE:-}" ]]; then
 fi
 
 echo "== host-run: build.sh ($name)"
+bc_work="$(bash -c 'source "$HOMESCOOP_ROOT/scripts/build-common.sh" && printf %s "$WORK"')"
+if [[ "$bc_work" != "$WORK" ]]; then
+  echo "host-run.sh: build-common.sh would build in $bc_work, not $WORK" >&2
+  exit 1
+fi
+echo "== host-run: WORK=$WORK"
 bash "$PKG/build.sh"
 
 echo "== host-run: slicc shims carry the kernel credentials (slicc_cred_js)"

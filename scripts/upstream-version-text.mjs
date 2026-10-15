@@ -37,7 +37,13 @@ export function spellingsFor(allow, name, upstream) {
 }
 
 function leadsFor(allow, name) {
-  return [...(allow.leads['*'] || []), ...(allow.leads[name] || [])];
+  return Object.entries(allow.leads)
+    .filter(([k]) => k === name || (k.endsWith('*') && name.startsWith(k.slice(0, -1))))
+    .flatMap(([, v]) => v);
+}
+
+export function isSpelling(allow, name, upstream, v) {
+  return v !== undefined && [String(upstream), ...spellingsFor(allow, name, String(upstream))].some((s) => sameVersion(v, s));
 }
 
 function escapeRe(s) {
@@ -91,6 +97,25 @@ export function rewriteVersion(text, from, to, { allow, name }) {
     changes.push({ line: ln.line, from: `${v}${from}`, to: `${v}${to}`, excerpt: ln.text.trim() });
     return `${v}${to}`;
   });
+  return { text: out, changes, kept };
+}
+
+export function rewriteUpstream(text, from, to, ctx) {
+  const first = rewriteVersion(text, from, to, ctx);
+  const changes = [...first.changes];
+  const kept = [...first.kept];
+  let out = first.text;
+  const f = String(from).split('.');
+  const t = String(to).split('.').length >= f.length ? String(to).split('.') : npmify(String(to)).split('.');
+  for (let n = f.length - 1; n >= 2; n--) {
+    const pf = f.slice(0, n).join('.');
+    const pt = t.slice(0, n).join('.');
+    if (pf === pt || !/^\d+(?:\.\d+)+$/.test(pf) || !/^\d+(?:\.\d+)+$/.test(pt)) continue;
+    const r = rewriteVersion(out, pf, pt, ctx);
+    out = r.text;
+    changes.push(...r.changes);
+    kept.push(...r.kept);
+  }
   return { text: out, changes, kept };
 }
 

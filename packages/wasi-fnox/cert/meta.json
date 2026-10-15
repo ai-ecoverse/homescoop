@@ -5,10 +5,6 @@
     "@ai-ecoverse/wasm-coreutils"
   ],
   "source": "jdx/fnox v1.39.0 + packages/wasi-fnox/NNNN-*.patch (apply.sh); each patch maps to cert cases below",
-  "certPending": [
-    "slicc-kernel 1.83.0 has KS-2 (/dev/sealed) and KS-8 (exec tickets); the cert waits for #503's release (protect layer 2's fix)",
-    "the root-owned /etc/fnox/config.toml + sudo case needs users 'enforce' in a seven-like setup (bios K4 branch #355)"
-  ],
   "checklist": [
     "fnox --version → fnox 1.39.0; --help lists exec/get/set/proxy and no daemon, tui, mcp; provider add --help offers sealed",
     "with /etc/fnox/config.toml (default_provider seven, type sealed) via FNOX_CONFIG_DIR: get, export and env print the stored placeholder; no device needed",
@@ -17,6 +13,7 @@
     "set NAME value (a value on the command line) is refused for a sealed secret; --key-name is refused",
     "age: set --provider age encrypts to the recipients (ciphertext in fnox.toml, no plaintext); get fails with exactly `age secrets aren't supported in seven yet (slicc-vault#2)`",
     "sync and reencrypt refused with `not available in seven: the value would be in a program (use a header rule)`",
+    "fnox edit refused cleanly: non-zero status, not 134, \"fnox edit is not available in seven: use fnox set\", no panic or trap (homescoop#376)",
     "proxy rules --json prints the [proxy] rules; proxy run -- printenv shows each rule's env name holding the placeholder and the secret's own name unset",
     "exec with only plain secrets: the child gets the value, stderr warns that it was passed as a plain value; exec of a missing command exits 127",
     "exec --shell-grants without a vault fails closed (same errors)",
@@ -25,7 +22,7 @@
     "test/sealed.mjs (KS-2, vault double): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
     "test/sealed.mjs case 11 (KS-8): exec under an { argv } grant → materialize {names, path /usr/bin/bash, argv (argv[0] = path), cwd}, no interpreter claim → consume stamped by the child (ppid = the asker) → the child holds the value (sha256), real:false names keep placeholders, the child's echo is scrubbed back to the placeholder, no value on stdout/stderr; a file the child writes holds the value (documented residual)",
     "test/sealed.mjs cases 12–13 (KS-8, exposure): the child's /proc cmdline has no value; no /proc/<pid>/environ; its own children inherit the value with output still scrubbed; another user (users 'enforce') can't see the process in /proc; a used or forged SLICC_SEALED_TICKET fails the exec with 126 and reveals nothing",
-    "PENDING (users enforce in a seven-like setup: bios K4 branch #355; sudo and tags are in slicc-kernel 1.66.0): /etc/fnox/config.toml root-owned 0644: a non-root user reads and resolves it, fnox set or edit fails with EACCES, sudo succeeds",
+    "bios real setup (B18's seven row, slicc-bios #355): /etc/fnox/config.toml root-owned: a cone reads and resolves it, its writes fail with EACCES, sudo succeeds through the approval, no secret in any cone-readable file",
     "test/sealed.mjs case 14 (KS-8): exec --shell-grants -- /bin/bash -c CMD → materialize {shellGrants: true, path, argv, cwd} with no names → the shell = true secret's placeholder via `placeholder {name}` → real in the bash; the config's own sealed secrets keep placeholders; output scrubbed",
     "test/sealed.mjs case 15 (KS-8, interpreter chain): fnox never claims `interpreter`; an npm-style `#!/usr/bin/env bash` script is reported as /usr/bin/bash; under an { argv } grant it gets the value when trusted (root-owned, 0755, root-owned dirs), is refused when untrusted (world-writable dir), and is refused under exec = true"
   ],
@@ -42,7 +39,8 @@
     "0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch": "sync/reencrypt refused; age get fails with slicc-vault#2; test/sealed.mjs: check --all on inert, removed, rotated and missing records",
     "0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch": "lint-only: the WASI build has no warnings (no runtime case)",
     "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs cases 9 and 14 (NEGATIVE.md: without 0012, case 9 fails)",
-    "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs cases 6–8: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal (NEGATIVE.md: without 0013, case 6 fails)"
+    "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs cases 6–8: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal (NEGATIVE.md: without 0013, case 6 fails)",
+    "0014-edit-refuse-fnox-edit-on-WASI-instead-of-panicking.patch": "checklist: fnox edit fails with \"fnox edit is not available in seven: use fnox set\", not the 134 trap (NEGATIVE.md: 1.39.0-1 traps)"
   },
   "sealedKernel": "@ai-ecoverse/slicc-kernel@1.83.0",
   "ci": [
@@ -51,5 +49,6 @@
   "sealedNeeds": [
     "@ai-ecoverse/wasm-bash@5.3.0-18",
     "@ai-ecoverse/wasm-coreutils@9.12.0-5"
-  ]
+  ],
+  "reproducible": "build.sh sets SOURCE_DATE_EPOCH to the v1.39.0 tag's commit time (recipe source.epoch), so rust-embed's per-file times for age's i18n files no longer carry the machine's crate-unpack time (homescoop#364); two CI runs of the same head give the same fnox.wasm and package.tgz sha256"
 }

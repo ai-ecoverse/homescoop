@@ -28,14 +28,14 @@ mkdir -p "$OUT"
 
 # Info-ZIP unix makefiles: force CC/CFLAGS and append our link line via LFLAGS2/LDFLAGS.
 build_infozip() {
-  local src="$1" target="$2" mf="$3"
+  local src="$1" target="$2" mf="$3" extra="${4:-}"
   echo "== zip: emmake $target ($src)"
   (
     cd "$src"
     # shellcheck disable=SC2086
     emmake make -f "$mf" "$target" \
       CC=emcc BIND=emcc AS=emcc \
-      CFLAGS="-O2 -DUNIX -DNO_LCHMOD -DNO_LCHOWN" \
+      CFLAGS="-O2 -I. -DUNIX -DNO_LCHMOD -DNO_LCHOWN${extra:+ $extra}" \
       LFLAGS1= LFLAGS2="$SLICC_A $CLI_LDFLAGS" \
       LDFLAGS="$SLICC_A $CLI_LDFLAGS" \
       -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
@@ -43,7 +43,7 @@ build_infozip() {
 }
 
 if [[ ! -f "$OUT/zip.wasm" || -n "${FORCE:-}" ]]; then
-  build_infozip "$ZIP_SRC" zip unix/Makefile
+  build_infozip "$ZIP_SRC" zip unix/Makefile "-DLARGE_FILE_SUPPORT -DZIP64_SUPPORT -DUIDGID_NOT_16BIT -DHAVE_DIRENT_H -DHAVE_TERMIOS_H"
   # zip makefile leaves binary as ./zip (or zip.exe)
   if [[ -f "$ZIP_SRC/zip.js" ]]; then mv "$ZIP_SRC/zip.js" "$ZIP_SRC/zip"; fi
   cp "$ZIP_SRC/zip" "$ZIP_SRC/zip.wasm" "$OUT/" 2>/dev/null || {
@@ -54,7 +54,7 @@ if [[ ! -f "$OUT/zip.wasm" || -n "${FORCE:-}" ]]; then
 fi
 
 if [[ ! -f "$OUT/unzip.wasm" || -n "${FORCE:-}" ]]; then
-  build_infozip "$UNZ_SRC" unzip unix/Makefile
+  build_infozip "$UNZ_SRC" unzip unix/Makefile "-include unistd.h -include utime.h -DGOT_UTIMBUF -DLARGE_FILE_SUPPORT -DUSE_UNSHRINK"
   if [[ -f "$UNZ_SRC/unzip.js" ]]; then mv "$UNZ_SRC/unzip.js" "$UNZ_SRC/unzip"; fi
   cp "$UNZ_SRC/unzip" "$UNZ_SRC/unzip.wasm" "$OUT/"
 fi

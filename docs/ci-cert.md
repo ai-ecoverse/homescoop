@@ -421,13 +421,14 @@ changes the boot order for every cert.
 
 | Flag | Meaning |
 | --- | --- |
-| `--kernel <spec \| .tgz \| dir>` | the kernel to boot instead of `HOMESCOOP_CERT_NODE_MODULES`'s (which `ladder-pr` fills from `meta.json`'s `kernel`, still the default) |
+| `--kernel <spec \| .tgz \| dir>` | the kernel to boot instead of `HOMESCOOP_CERT_NODE_MODULES`'s (which `ladder-pr` fills from `meta.json`'s `kernel`, else the `@ai-ecoverse/slicc-kernel` devDependency in the root `package.json`: [`cert-kernel.mjs`](../scripts/browser-cert/cert-kernel.mjs), which logs which one it took) |
 | `--users off\|report\|enforce` | overrides `meta.json`'s `users`; without either the kernel's default applies (`enforce` since 1.74, `off` before) |
 | `--tarball <tgz>` (repeatable) | the packages under test, installed in this order; the first is `ctx.npmName`. Specs see every manifest in `ctx.installed` |
 | `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
 | `--json <file>` | per-spec results: `{ kernel, users, modes, tarballs, specs: [{ spec, status, durationMs, error, cases: { pass: [id], fail: [{ id, message }] }, crash? }], pageErrors, status }` |
 | `--soft` | a failed `ctx.assert` is recorded and the spec goes on (kernel-compat); without it the first failure ends the spec, as `ladder-pr` wants |
 | `--spec <file.mjs>` (repeatable) | run only these spec files of the cert directory |
+| `--live <port>` | boot and install as usual, then keep Chrome open (with a window when `DISPLAY` is set) and serve the specs' `ctx` on `http://127.0.0.1:<port>/`: `GET /` describes it, `POST /ctx/<call>` with a JSON array of arguments calls `run`, `write`, `read`, `pty`, `addUser` and the rest. `cert-review` uses it for its live pairs |
 
 ### Runners and capacity
 
@@ -492,12 +493,23 @@ changes the boot order for every cert.
 ### Proof
 
 [`kernel-compat-proof.yml`](../.github/workflows/kernel-compat-proof.yml) runs
-on PRs that touch these files or the harness itself (`run.mjs`,
-`context.mjs`, `page/`): `ladder-pr` runs no package cert on a scripts-only
+on PRs that touch these files, the harness itself (`run.mjs`,
+`context.mjs`, `page/`) or the root `package.json` (a pin bump): `ladder-pr` runs no package cert on a scripts-only
 PR, so this is the harness's regression test. It calls the workflow twice, as slicc-kernel
-does: `@ai-ecoverse/slicc-kernel@1.81.0` and the newest certified kernel
-(`1.86.0`; bump it with each kernel cert) on `base,ci-certified` must be
-green, and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
+does, on the kernels the root `package.json` pins as devDependencies: the
+certified kernel (`@ai-ecoverse/slicc-kernel`; Renovate bumps it) on
+`base,ci-certified` must be green, and the old one (`slicc-kernel-negative`,
+an npm alias of `@ai-ecoverse/slicc-kernel@1.78.0`) with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
 must report a regression, in a spec and in the sweep, for each of them: the
 Emscripten builds without `slicc_sleep_ms` that exit 70 there
 (slicc-kernel#483, fixed by #496 in 1.81.0).
+
+## Cert review: `cert-review.yml`
+
+Claude reviews every package a same-repo PR builds, after `ladder-pr` finishes, and leaves a verdict.
+
+- **When:** `workflow_run` on a completed `ladder-pr` run for a same-repo pull request (never a fork's), or `workflow_dispatch` with `pr_number`. The plan job (`CERT_LIGHT_RUNNER`) uses only the `ladder-pr` run at the PR's current head; a PR that has moved on waits for its new run.
+- **What Claude gets** (`CERT_RUNNER`): the head checked out, the `host-<package>-prN` tarballs from that run, a cert harness per package (`scripts/cert-review/harness.sh`, the same setup as `ladder-pr`'s cert job: the kernel from the head's `scripts/browser-cert/cert-kernel.mjs`, shared-web and playwright-core from its `package.json` pins through `scripts/dev-pin.mjs`, or the old inline versions for a head that predates them), `gh` to read `ladder-pr`'s logs, and `cert-run`, which runs package code without the Bedrock key or the GitHub token. It checks the change, re-runs specs on other kernels and under `--users enforce` as needed, and writes `verdict.json` (`certified` or `fail` per package, with known issues) and `comment.md`.
+- **The record:** a separate `record` job on a fresh runner, the only one with `statuses` and `pull-requests` write, takes Claude's `verdict.json` and `comment.md` as data, downloads the `ladder-pr` artifacts itself, and runs `scripts/cert-review/verdict.mjs` from the workflow's own commit, never the PR's. It computes each `certified=<sha256> <@scope/name> <version>` line from the artifact; Claude never writes a sha, and a `ladder-pr` run that didn't conclude `success` is never certified (`cert-ci: HELD`). The job posts the comment, uploads the `cert-review-record-<pr>` artifact (`record.json`: `pr`, `head`, `ladder_run`, `cert_review_run` and the result `lines`), and sets a `cert-review` commit status on the PR head whose `target_url` is that record artifact (`…/actions/runs/<run>/artifacts/<id>`): `success` only when every built package is certified. It is a status, not a check run, because a check run created through the API joins the commit's existing GitHub Actions check suite, `ladder-pr`'s.
+- **Live pairs:** before Claude starts, a step with no secrets starts two `run.mjs --live` harnesses per package under Xvfb, with users enforced on the `cert/meta.json` kernel: npm `latest` (the baseline, from 9300) and the PR's tarball (from 9301), listed in `$RUNNER_TEMP/live/live.json`. Claude runs the same thing on both: a failure the baseline shares is pre-existing, never blocks, and gets an issue filed.
+- **Severity:** roll forward. FAIL only for security or secret exposure, data loss, a supply-chain mismatch, a licence violation, a crash, or a regression without a workaround; anything else certifies with `(known: …)`.

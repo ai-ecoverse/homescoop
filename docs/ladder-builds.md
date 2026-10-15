@@ -33,7 +33,43 @@ The same `pkg@version` on the registry is never rebuilt.
 `packages/<name>/cert/*.mjs` on slicc-kernel CDP (see [ci-cert.md](ci-cert.md)).
 Packages in `scripts/ci-certified.json` may Renovate-automerge non-majors;
 `ladder-merge` then OIDC-publishes the exact PR artifact
-(`certified=<sha256>` + `artifact_pr`). Majors / unlisted packages stay manual.
+(`certified=<sha256>` + `artifact_pr` + `artifact_id`). Majors / unlisted packages stay manual.
+
+**Publish gate (`scripts/ladder-merge-resolve.mjs`).** Each touched package
+maps to the newest first-parent commit of the pushed range that touched it,
+and to the PR merged as that commit. When the merged `package.json` version
+is not on npm, `ladder-merge` needs the `host-<pkg>-prN` artifact from a
+ladder-pr run at that PR's merged head that concluded `success`, and one of:
+
+- a `certified=<sha256> <@scope/name> <version>` line naming that package
+  and version, whose sha equals the artifact's `package.tgz`. The merge
+  commit message is read first, then the PR body. Lines count only when the
+  PR's author can write to the repository, since GitHub can fill the merge
+  message from PR text. Third comes the CI cert review: the newest
+  `cert-review` commit status on the merged head from `github-actions[bot]`,
+  if it is `success`, its `target_url` and description name the same run
+  and record artifact, the run is main's `cert-review.yml` (`workflow_run`
+  or `workflow_dispatch`, concluded `success`), and that artifact is the
+  run's `cert-review-record-<pr>`, naming this PR, this head and that run. Its lines need no writer, since main's workflow produced them. Within
+  the source it resolves from, another line naming the package at a
+  different version fails; or
+- no line for the package, the package in `scripts/ci-certified.json`, a PR
+  by `renovate[bot]` or by a writer (a fork can't vouch for its own
+  ladder-pr run, whose workflow file it controls), that run's `ci` job
+  green, and no `cert-review` status of `failure` or `error` on the head (a
+  failed review vetoes; an absent or pending one doesn't).
+
+Anything else (no line, a wrong version or malformed sha, a stale head, a
+failed run, an expired or missing artifact, a sha mismatch) fails the
+package red and dispatches nothing. Versions already on npm dispatch plain
+`package=<name>` and ladder-build skips them. `ladder-build` fetches the
+artifact by `artifact_id` and checks `certified` again; it publishes only
+when dispatched on `main`.
+
+Dry run: `gh workflow run ladder-merge.yml -f sha=<merge commit>` resolves
+and prints the decision without dispatching. `before`, `packages`,
+`assume_unpublished`, `message`, `pr_body`, `pr`, `head` and `ci_certified`
+simulate the other cases (`pr` resolves an open PR, with `sha` its head).
 
 **Manual:** laptop `npm publish` of the exact certified tarball, then land,
 or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
@@ -43,7 +79,8 @@ file (`ladder-build.yml`) keeps a single `npm trust` target.
 
 `workflow_dispatch` input `publish` (default `true`) is the cert-queue valve:
 set `publish=false` on a PR branch to produce `package-tgz-<name>` without
-writing the registry. `ladder-merge` omits the input (and omits `certified`).
+writing the registry. `ladder-merge` omits the input. A dispatch on any ref
+other than `main` never reaches the publish job, whatever `publish` says.
 `ladder-pr` host-builds also upload that artifact (no OIDC). When
 `publish=false`, skip-if-already-published is ignored so a rebuild can still
 emit a tarball for recert.
@@ -59,7 +96,7 @@ When the version document already exists, publish is skipped (success).
 | Workflow | When | What |
 | --- | --- | --- |
 | `ladder-pr.yml` | pull_request touching `packages/**` | Host-build each touched package (no publish) |
-| `ladder-merge.yml` | push to `main` under `packages/**` | `workflow_dispatch` each touched package on `ladder-build.yml` |
+| `ladder-merge.yml` | push to `main` under `packages/**` (`workflow_dispatch`: dry run) | Gate, then `workflow_dispatch` each touched package on `ladder-build.yml` |
 | `ladder-build.yml` | `workflow_dispatch` only | Single-package build; OIDC publish unless `publish=false` |
 
 `ladder-merge` must **not** `uses:` `ladder-build` as a reusable workflow: npm
@@ -80,6 +117,11 @@ is `<command> --version`. Libs without `slicc.commands` skip browser-cert
 (host-smoke is the gate). Green ladder-pr is the Renovate automerge signal.
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
+ladder-pr's `recipe-sha` job commits that sync onto the PR, so main never
+needs it: `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
+--check` and fails, before any build or publish, when the committed version
+base or `homescoop.upstream` disagrees with `recipe.yaml`, naming both
+values.
 
 ## Recipe shape
 

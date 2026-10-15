@@ -54,7 +54,11 @@ echo "== wasi-fnox: cargo build --bin fnox ($TARGET, Rust $RUST)"
   # -C strip: it drops the target_features section wasm-opt reads. Panic
   # locations name source files: map the build machine's paths away.
   # Cargo hands rustc the physical path of OUT_DIR (macOS: /private/var/…,
-  # /private/tmp/…), so map that spelling too.
+  # /private/tmp/…), so map that spelling too. rust-embed (age's i18n
+  # files) stores each file's times, and a file's birth time is when cargo
+  # unpacked the crate on this machine (homescoop#364): SOURCE_DATE_EPOCH,
+  # the v1.39.0 tag's commit time, replaces both, so builds are byte-identical.
+  SOURCE_DATE_EPOCH="$(field source.epoch)" \
   RUSTFLAGS="--cfg tokio_unstable -C codegen-units=1 --remap-path-prefix=$SRC_DIR=/fnox --remap-path-prefix=$(pwd -P)=/fnox --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo" \
     "${CARGO[@]}" build --locked --release --bin fnox --target "$TARGET"
 )

@@ -17,10 +17,12 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
 - **`fnox proxy run -- cmd`:** runs the command with placeholders only. The realm proxy fills in values for the rules in `/etc/fnox/config.toml`.
 - **`fnox proxy rules --json`:** prints a project's rules as proposals.
 - **`fnox check`:** asks the vault about each sealed record.
-- **Refused:** `as_file` secrets, `sync` and `reencrypt`.
+- **Refused:** `as_file` secrets, `sync`, `reencrypt`, and `fnox edit` (use `fnox set`).
 - **age:** decrypting an age secret isn't supported yet (slicc-vault#2). Encrypting to age recipients works.
 - **Other providers:** only `sealed`, `age` and `plain` are built. Values from `plain` are passed on with a warning.
 - **Not in this build:** leases, the daemon, the TUI and the MCP server.
+
+It needs slicc-kernel 1.83.0 or later (`engines`): `/dev/sealed` arrived in slicc-kernel 1.68.0 (KS-2), and the exec tickets that `fnox exec` redeems in slicc-kernel 1.83.0 (KS-8).
 
 Without `/dev/sealed`, every sealed operation fails with `not running in seven: /dev/sealed is missing`.
 

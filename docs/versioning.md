@@ -59,8 +59,15 @@ When the upstream moves, `sync-package-version.mjs <pkg> --write` sets
 - a sentence with a `historical` cue word ("since 3.53.4", "before …",
   "until …") keeps its version;
 - a version right after a `lead` (another component: `slicc-kernel ≥ `,
-  `CPython `, `OpenSSL `) is kept;
+  `CPython ` in `py-*`, `OpenSSL ` in wasix-python) is kept;
+- the previous upstream's shorter prefixes (`8.22` of 8.22.0) become the
+  new one's (`8.23`) under the same rules, as the check accepts them; a
+  patch bump leaves `8.22` alone;
 - each replacement and each kept match is logged to stderr.
+
+A stale `homescoop.upstream` is repaired even when `version` already
+matches the recipe. An allowed spelling (`10.6p1` for 10.6.0) or padding
+(`3.0` for 3.0.0) is not a move: sync leaves it and the text alone.
 
 `package.json` is edited in place (one line per field) rather than
 re-serialised. `--from <old>` rewrites text from an explicit old version
@@ -91,8 +98,12 @@ The allow-list is `scripts/package-meta-versions.json`:
 
 `leads` are matched against the text just before the version, with
 Markdown links reduced to their label. They hold no version, so they do
-not go stale. `spellings` are keyed by the recipe version and lapse on
+not go stale. A key is a package name, `*`, or a prefix ending in `*`
+(`py-*`); a lead never belongs under a key that matches the package whose
+upstream it names (`CPython ` is wasix-python's own version). `spellings` are keyed by the recipe version and lapse on
 the next bump.
+
+`node --test scripts/test/` runs the rewrite and the sync/check fixtures.
 
 ## Exact `@ai-ecoverse` pins
 
