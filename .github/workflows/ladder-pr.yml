@@ -182,7 +182,7 @@ jobs:
 
   cert:
     needs: [detect, recipe-sha, host-build]
-    if: ${{ !cancelled() && needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success' && (needs.host-build.result == 'success' || needs.host-build.result == 'failure') }}
+    if: ${{ !cancelled() && needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -203,15 +203,29 @@ jobs:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: .homescoop-out
       - name: Check package.tgz against package.tgz.sha256
+        env:
+          ART: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          want=$(cut -d' ' -f1 .homescoop-out/package.tgz.sha256)
-          got=$(sha256sum .homescoop-out/package.tgz | cut -d' ' -f1)
-          if [[ ! "$want" =~ ^[0-9a-f]{64}$ || "$got" != "$want" ]]; then
-            echo "::error::host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}: package.tgz sha256 $got does not match package.tgz.sha256 ($want)"
+          for f in package.tgz package.tgz.sha256; do
+            if [[ ! -f ".homescoop-out/$f" ]]; then
+              echo "::error::$ART has no $f; the cert fails closed"
+              exit 1
+            fi
+          done
+          line=$(cat .homescoop-out/package.tgz.sha256)
+          re='^([0-9a-f]{64}) '
+          if [[ "$line" == *$'\n'* || ! "$line" =~ $re ]]; then
+            echo "::error::$ART: package.tgz.sha256 is not one sha256sum line; the cert fails closed"
             exit 1
           fi
-          echo "host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}: package.tgz sha256 $got matches package.tgz.sha256"
+          want=${BASH_REMATCH[1]}
+          got=$(sha256sum .homescoop-out/package.tgz | cut -d' ' -f1)
+          if [[ "$got" != "$want" ]]; then
+            echo "::error::$ART: package.tgz sha256 $got does not match package.tgz.sha256 ($want); the cert fails closed"
+            exit 1
+          fi
+          echo "$ART: package.tgz sha256 $got matches package.tgz.sha256"
       - name: Browser cert (slicc-kernel CDP)
         run: |
           set -euo pipefail
