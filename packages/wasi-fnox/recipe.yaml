@@ -1,8 +1,8 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
 # Upstream is jdx/fnox v1.39.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
-# in-kernel integration needs. CERT-PENDING: tested on slicc-kernel 1.83.0
-# (/dev/sealed and exec tickets); the cert waits for #503's release.
+# in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
+# (/dev/sealed and exec tickets).
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
@@ -12,6 +12,7 @@ summary: "fnox 1.39 for slicc WASI preview1 (command fnox; seven's sealed store)
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "21669929b2517e7b5425263c75c5f055220126cac1720b40549c316c92db77a9"
+  epoch: "1791301147"
 toolchain:
   rust: "1.98.1"
   binaryen: "133"
@@ -40,6 +41,10 @@ about:
       0011 allow the lints that WASI-gated code leaves behind
       0013 set: std IsTerminal on WASI (atty is always false on wasm);
            also (b): an empty sealed value is refused
+      0014 refuse `fnox edit` on WASI (tempfile's temp_dir() and the
+           editor's std Command can't run there; it trapped with 134,
+           homescoop#376): "fnox edit is not available in seven: use
+           fnox set"
     (b) seven (secrets-tokens-design.md; /dev/sealed is §3.7):
       0006 the sealed provider and fnox_core::sealed, the device client
       0007 set: seal a piped value; on a terminal ask the vault dialog
@@ -52,7 +57,9 @@ about:
       0012 exec --shell-grants: materialize {shellGrants} (slicc-vault#9)
            for the agent's bash hook; the child runs in the ticket's cwd
     cargo build --locked --release --bin fnox --target wasm32-wasip1
-    with RUSTFLAGS --cfg tokio_unstable, then wasm-opt -Oz (binaryen
-    133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
-    plus Rust's std and wasi-libc licences. New package → human cert,
-    pending slicc-kernel #503's release.
+    with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
+    v1.39.0 commit time (source.epoch, 2026-10-06T15:39:07Z), so the
+    build is byte-reproducible (homescoop#364), then wasm-opt -Oz
+    (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
+    plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
+    published; 1.39.0-2 adds 0014 and the reproducible build.

@@ -85,6 +85,12 @@ export default async function (ctx) {
     assert.ok(flat(r.stderr).includes(REFUSED), `${cmd}: ${r.stderr}`);
   }
 
+  const edit = await fnox(['edit'], { env: { ...env, EDITOR: 'true' } });
+  assert.notEqual(edit.status, 0, 'fnox edit must fail');
+  assert.notEqual(edit.status, 134, `fnox edit trapped: ${edit.stderr}`);
+  assert.ok(flat(edit.stderr).includes('fnox edit is not available in seven: use fnox set'), `fnox edit: ${edit.stderr}`);
+  assert.doesNotMatch(edit.stderr, /panicked|wasm trap/);
+
   const check = await fnox(['check', '--all']);
   assert.notEqual(check.status, 0);
   assert.match(flat(check.stdout + check.stderr), NO_VAULT, `check --all: ${check.stdout}`);
