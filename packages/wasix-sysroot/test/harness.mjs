@@ -21,7 +21,7 @@ export function arg(args, name) {
 /** The pinned wasixcc in `work`, its environment from install-wasixcc.sh. */
 export function wasixcc(work) {
   const env = { ...process.env };
-  for (const line of sh('bash', [join(root, 'scripts/install-wasixcc.sh'), join(work, 'wasixcc')]).split('\n')) {
+  for (const line of sh('bash', [join(root, 'scripts/install-wasixcc.sh'), process.env.HOMESCOOP_TEST_WASIXCC || join(work, 'wasixcc')]).split('\n')) {
     const m = line.match(/^export ([A-Z_]+)=(.*)$/);
     if (m) env[m[1]] = m[2].replace(/\$PATH/, env.PATH);
   }
