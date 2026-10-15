@@ -70,6 +70,18 @@
       ],
       "issue": "ai-ecoverse/homescoop#332",
       "why": "9.12.0-5 ships bin/coreutils (the glue) 0644, so with the tarball's modes (slicc-kernel >= 1.86.0) cone can't run it by path under enforce (126); 9.12.0-6 ships it 0755. Kernels before 1.86.0 have no kernel.chmod, so the harness leaves bin/ at the default 0755 and the reference passes"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-tar",
+      "spec": "glue-mode.mjs",
+      "case": "installed with the tarball's modes: 644 \\S+/bin/tar|bin/tar by path as cone under users enforce:[\\s\\S]*rc=126",
+      "kernel": ">=1.86.0",
+      "version": "<1.35.0-6",
+      "users": [
+        "enforce"
+      ],
+      "issue": "ai-ecoverse/homescoop#346",
+      "why": "1.35.0-5 ships bin/tar (the glue) 0644, so with the tarball's modes (slicc-kernel >= 1.86.0) cone can't run it by path under enforce (126); 1.35.0-6 ships it 0755. Kernels before 1.86.0 have no kernel.chmod, so the harness leaves bin/ at the default 0755 and the reference passes"
     }
   ]
 }
