@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-xxd",
-  "version": "9.2.1186-1",
+  "version": "9.2.1192-1",
   "description": "xxd (from vim 9.1.1850) for wasm / slicc (emscripten)",
   "license": "Vim",
   "repository": {
@@ -27,7 +27,7 @@
   },
   "homescoop": {
     "recipe": "xxd",
-    "upstream": "9.2.1186"
+    "upstream": "9.2.1192"
   },
   "slicc": {
     "abi": "emscripten",
