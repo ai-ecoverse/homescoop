@@ -47,6 +47,11 @@ on:
         required: false
         default: ''
         type: string
+      pr:
+        description: Resolve against this PR (open or merged) instead of the one merged as sha.
+        required: false
+        default: ''
+        type: string
       head:
         description: Resolve as if the PR had been merged at this head (40 hex).
         required: false
@@ -137,6 +142,7 @@ jobs:
           MESSAGE: ${{ inputs.message }}
           PR_BODY: ${{ inputs.pr_body }}
           HEAD_SHA: ${{ inputs.head }}
+          PR_NUMBER: ${{ inputs.pr }}
           CI_CERTIFIED: ${{ inputs.ci_certified }}
         run: |
           set -euo pipefail
@@ -147,6 +153,7 @@ jobs:
             if [[ -n "$MESSAGE" ]]; then args+=(--message "$MESSAGE"); fi
             if [[ -n "$PR_BODY" ]]; then args+=(--pr-body "$PR_BODY"); fi
             if [[ -n "$HEAD_SHA" ]]; then args+=(--head "$HEAD_SHA"); fi
+            if [[ -n "$PR_NUMBER" ]]; then args+=(--pr "$PR_NUMBER"); fi
             if [[ -n "$CI_CERTIFIED" ]]; then args+=(--ci-certified "$CI_CERTIFIED"); fi
           fi
           node scripts/ladder-merge-resolve.mjs "${args[@]}"

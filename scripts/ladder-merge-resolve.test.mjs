@@ -650,6 +650,7 @@ describe('arguments', () => {
     assert.throws(() => parseArgs(['--package', 'wasi-impeccable', '--sha', '233a01bc']), /usage/);
     assert.throws(() => parseArgs(['--package', '../x', '--sha', sha]), /usage/);
     assert.throws(() => parseArgs(['--package', 'x', '--sha', sha, '--base', 'HEAD^']), /usage/);
+    assert.throws(() => parseArgs(['--package', 'x', '--sha', sha, '--dry-run', '--pr', '#386']), /--pr needs a PR number/);
     assert.equal(parseArgs(['--package', 'x', '--sha', sha, '--base', HEAD]).base, HEAD);
   });
 
@@ -659,6 +660,7 @@ describe('arguments', () => {
       ['--message', ''],
       ['--pr-body', ''],
       ['--head', HEAD],
+      ['--pr', '386'],
       ['--ci-certified', 'sqlite3'],
     ];
     for (const extra of overrides) {

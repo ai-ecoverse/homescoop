@@ -224,7 +224,7 @@ export async function resolvePackage(ctx, io) {
   throw new Error(`${artifactName}${note}: ${mismatches.join(' | ')}`);
 }
 
-function githubIo({ repo, token, sha, head, prBody }) {
+function githubIo({ repo, token, sha, head, prBody, prNumber }) {
   const api = async (path) => {
     const res = await fetch(`https://api.github.com/repos/${repo}${path}`, {
       headers: {
@@ -252,8 +252,8 @@ function githubIo({ repo, token, sha, head, prBody }) {
       throw new Error(`GET ${url} returned ${res.status}`);
     },
     async pullRequest() {
-      const prs = await (await api(`/commits/${sha}/pulls`)).json();
-      const pr = prs.find((p) => p.merged_at && p.merge_commit_sha === sha);
+      const prs = prNumber ? [await (await api(`/pulls/${prNumber}`)).json()] : await (await api(`/commits/${sha}/pulls`)).json();
+      const pr = prs.find((p) => prNumber || (p.merged_at && p.merge_commit_sha === sha));
       if (!pr) return null;
       return { number: pr.number, head: head || pr.head.sha, body: prBody ?? pr.body ?? '', author: pr.user.login };
     },
@@ -308,6 +308,7 @@ export function parseArgs(argv) {
     else if (a === '--head') args.head = argv[++i];
     else if (a === '--message') args.message = argv[++i];
     else if (a === '--pr-body') args.prBody = argv[++i];
+    else if (a === '--pr') args.prNumber = argv[++i];
     else if (a === '--ci-certified') args.ciCertified.push(...argv[++i].split(/[\s,]+/).filter(Boolean));
     else if (a === '--assume-unpublished') args.assumeUnpublished = true;
     else throw new Error(`unknown argument ${a}`);
@@ -317,10 +318,16 @@ export function parseArgs(argv) {
     throw new Error('usage: ladder-merge-resolve.mjs --package <name> --sha <40-hex pushed head> [--base <40-hex>] [--dry-run ...]');
   }
   const overrides =
-    args.head || args.message !== undefined || args.prBody !== undefined || args.ciCertified.length || args.assumeUnpublished;
+    args.head ||
+    args.prNumber ||
+    args.message !== undefined ||
+    args.prBody !== undefined ||
+    args.ciCertified.length ||
+    args.assumeUnpublished;
   if (overrides && !args.dryRun) {
-    throw new Error('--head, --message, --pr-body, --ci-certified and --assume-unpublished need --dry-run');
+    throw new Error('--head, --pr, --message, --pr-body, --ci-certified and --assume-unpublished need --dry-run');
   }
+  if (args.prNumber && !/^[1-9][0-9]*$/.test(args.prNumber)) throw new Error('--pr needs a PR number');
   if (args.head && !/^[0-9a-f]{40}$/.test(args.head)) throw new Error('--head needs a 40-hex commit sha');
   return args;
 }
@@ -368,6 +375,7 @@ async function main(argv) {
       sha: commit,
       head: args.head,
       prBody: args.prBody,
+      prNumber: args.prNumber,
     });
     const result = await resolvePackage(ctx, io);
     const via = result.gate ? ` via ${result.gate}` : '';
