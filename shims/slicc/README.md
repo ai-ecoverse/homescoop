@@ -13,7 +13,8 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 | `slicc_pwd.c` | `getpw*` / `getgr*` from the kernel's `/etc/passwd` and `/etc/group`. `getpwuid`/`getpwnam`/`getpwent` are strong in Emscripten's stubs, so they are `__wrap_*`, linked with `homescoop_slicc_wrap_pwd`. Every profile; manual whole-archive links without the wrap keep the stubs for those three. |
 | `slicc_exec.c` | `execve`: `Module.sliccKernel.execve` keeps the caller's pid (slicc-kernel#99/#176); spawn + `execWait` on older kernels (resets caught handlers; kernel forwards signals) |
 | `slicc_fork.c` + `slicc-fork.js` | `fork` / strong `getpid`/`getppid` (`--js-library`, needs `-sASYNCIFY`); adopts `Module.sliccPid` / `Module.sliccPpid` |
-| `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, uid/gid getters→1000, set*id/setgroups accept only 1000, `sethostname` → EPERM, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1) |
+| `slicc_libc_gaps.c` | `splice` stub, sleeping `nanosleep`, `slicc_sigpipe()`, `sethostname` → EPERM, weak `getpid`/`getppid` from `Module.sliccPid`/`sliccPpid` (fallbacks 42/1), `__syscall_linkat`, `__syscall_uname`; it `#include`s `slicc_cred.c` unless built with `-DSLICC_CRED_SEPARATE` (the shim archives are) |
+| `slicc_cred.c` | The credential library (homescoop#207, #459): `slicc_cred_js` (`Module.sliccKernel.cred()`), `slicc_cred_euid` (exported), the uid/gid getters, `getgroups`, set*id and `setgroups` through `setcred()`. Every link that uses `homescoop_em_cli_ldflags` gets it: the flags end with `-Wl,-u,slicc_cred_euid` and a plain archive of this file (`homescoop_slicc_cred_archive`, built once per `WORK`, keyed on the source, the emcc and `EM_CACHE`). slicc-kernel reads `slicc_cred_js` in the glue to decide whether a program has the credential ABI; without it, stat shows the legacy owner 1000:1000 under users mode. `scripts/check-slicc-cred.mjs` (in `host-run.sh`) refuses an Emscripten package whose command wasm lacks the import or the export, or whose glue doesn't name `slicc_cred_js`. Because `-u` is resolved after every input is read, a whole-archive shim archive anywhere on the link line is fine. A full `slicc_libc_gaps.o` (one compiled without `SLICC_CRED_SEPARATE`, as cmake, wasm-clang and wasm-emscripten do) must come before these flags when the program itself calls a set*id function, or the link has two copies. |
 | `slicc_signals.c` | `slicc_raise` / `slicc_sig_mask` / `kill` (incl. group `kill(0)` / `kill(-pgid)`); `__syscall_pause` → `sliccKernel.pause` |
 | `slicc_select.c` | `pselect()` / poll via the kernel (make `-jN`, curl, sockets) |
 | `slicc_socket.c` | BSD sockets over `Module.sliccKernel.net` (loopback #3571); needs select. `getaddrinfo`: localhost and numeric IPv4 locally, other names via the kernel resolver `net.resolve` (slicc-kernel ≥ 1.27.0, A records only; older kernels: `EAI_NONAME`) |
@@ -24,7 +25,7 @@ tools without a local slicc tree. Sync when the slicc thread sends updates
 
 ## Link profiles (`homescoop_slicc_archive`)
 
-Every profile includes `slicc_libc_gaps.c` + `slicc_pwd.c` + `slicc_signals.c`.
+Every profile includes `slicc_libc_gaps.c` (without credentials) + `slicc_pwd.c` + `slicc_signals.c`; the credentials come from `homescoop_em_cli_ldflags`.
 
 | Profile | Extra objects |
 | --- | --- |
