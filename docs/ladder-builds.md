@@ -378,3 +378,9 @@ Emscripten packages linked with `shims/slicc` since the H1 release
 
 `scripts/check-package-meta.mjs` (run by `host-run.sh` on every build) fails
 a package whose `.wasm`/`.so` imports `slicc.cred_*` without that floor.
+
+It also fails a non-retired package whose `package.json` has no
+`"repository": { "type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/<name>/package" }`.
+npm provenance (ladder-build's OIDC publish) rejects a package without it
+(E422, `repository.url is ""`). `check-package-meta.mjs --drift --all`
+checks it repo-wide.
