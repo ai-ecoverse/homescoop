@@ -33,7 +33,29 @@ The same `pkg@version` on the registry is never rebuilt.
 `packages/<name>/cert/*.mjs` on slicc-kernel CDP (see [ci-cert.md](ci-cert.md)).
 Packages in `scripts/ci-certified.json` may Renovate-automerge non-majors;
 `ladder-merge` then OIDC-publishes the exact PR artifact
-(`certified=<sha256>` + `artifact_pr`). Majors / unlisted packages stay manual.
+(`certified=<sha256>` + `artifact_pr` + `artifact_id`). Majors / unlisted packages stay manual.
+
+**Publish gate (`scripts/ladder-merge-resolve.mjs`).** For each touched
+package whose merged `package.json` version is not on npm, `ladder-merge`
+needs the `host-<pkg>-prN` artifact from a ladder-pr run at the PR's merged
+head that concluded `success`, and one of:
+
+- a `certified=<sha256> <@scope/name> <version>` line in the merge commit
+  naming that package and version, whose sha equals the artifact's
+  `package.tgz`; or
+- no line for the package, the package in `scripts/ci-certified.json`, and
+  that run's `ci` job green.
+
+Anything else (no line, a wrong version or malformed sha, a stale head, a
+failed run, an expired or missing artifact, a sha mismatch) fails the
+package red and dispatches nothing. Versions already on npm dispatch plain
+`package=<name>` and ladder-build skips them. `ladder-build` fetches the
+artifact by `artifact_id` and checks `certified` again; it publishes only
+when dispatched on `main`.
+
+Dry run: `gh workflow run ladder-merge.yml -f sha=<merge commit>` resolves
+and prints the decision without dispatching. `assume_unpublished`,
+`message`, `head`, `packages` and `ci_certified` simulate the other cases.
 
 **Manual:** laptop `npm publish` of the exact certified tarball, then land,
 or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
@@ -43,7 +65,8 @@ file (`ladder-build.yml`) keeps a single `npm trust` target.
 
 `workflow_dispatch` input `publish` (default `true`) is the cert-queue valve:
 set `publish=false` on a PR branch to produce `package-tgz-<name>` without
-writing the registry. `ladder-merge` omits the input (and omits `certified`).
+writing the registry. `ladder-merge` omits the input. A dispatch on any ref
+other than `main` never reaches the publish job, whatever `publish` says.
 `ladder-pr` host-builds also upload that artifact (no OIDC). When
 `publish=false`, skip-if-already-published is ignored so a rebuild can still
 emit a tarball for recert.
@@ -59,7 +82,7 @@ When the version document already exists, publish is skipped (success).
 | Workflow | When | What |
 | --- | --- | --- |
 | `ladder-pr.yml` | pull_request touching `packages/**` | Host-build each touched package (no publish) |
-| `ladder-merge.yml` | push to `main` under `packages/**` | `workflow_dispatch` each touched package on `ladder-build.yml` |
+| `ladder-merge.yml` | push to `main` under `packages/**` (`workflow_dispatch`: dry run) | Gate, then `workflow_dispatch` each touched package on `ladder-build.yml` |
 | `ladder-build.yml` | `workflow_dispatch` only | Single-package build; OIDC publish unless `publish=false` |
 
 `ladder-merge` must **not** `uses:` `ladder-build` as a reusable workflow: npm
