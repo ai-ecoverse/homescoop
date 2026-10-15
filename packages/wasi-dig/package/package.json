@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-dig",
-  "version": "0.1.0-1",
+  "version": "0.1.0-2",
   "description": "dig for slicc WASI: DNS over HTTPS through the realm proxy and DNS over TCP, with dig-style output",
   "license": "Apache-2.0",
   "repository": {
