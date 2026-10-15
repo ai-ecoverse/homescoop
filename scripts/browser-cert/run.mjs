@@ -46,7 +46,7 @@ const jsonOut = flag('--json') ? resolve(flag('--json')) : '';
 const soft = process.argv.includes('--soft');
 if (!pkgName) {
   console.error(
-    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft]',
+    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft] [--spec <file.mjs> ...]',
   );
   process.exit(2);
 }
@@ -56,12 +56,14 @@ if (usersFlag && !USERS.includes(usersFlag)) {
 }
 
 const certDir = flag('--cert') ? resolve(flag('--cert')) : join(root, 'packages', pkgName, 'cert');
-const certSpecs = existsSync(certDir)
-  ? readdirSync(certDir)
-      .filter((f) => f.endsWith('.mjs'))
-      .sort()
-      .map((f) => join(certDir, f))
-  : [];
+const only = flags('--spec');
+const allSpecs = existsSync(certDir) ? readdirSync(certDir).filter((f) => f.endsWith('.mjs')).sort() : [];
+const missing = only.filter((f) => !allSpecs.includes(f));
+if (missing.length) {
+  console.error(`browser-cert: --spec ${missing.join(', ')}: not in ${certDir}`);
+  process.exit(2);
+}
+const certSpecs = allSpecs.filter((f) => !only.length || only.includes(f)).map((f) => join(certDir, f));
 
 const metaPath = join(certDir, 'meta.json');
 /** @type {{ harness?: string, needs?: string[] }} */
