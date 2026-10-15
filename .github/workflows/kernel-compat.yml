@@ -32,7 +32,7 @@ on:
         type: boolean
         default: true
       shards:
-        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3; the base sweep runs inside them'
+        description: 'Shard jobs: auto (about 15 min of measured work each, none over about 20 min, at most 10) or 1-10; the base sweep runs inside them'
         type: string
         default: 'auto'
       expect-regressions:
@@ -80,7 +80,7 @@ on:
         type: boolean
         default: true
       shards:
-        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3'
+        description: 'Shard jobs: auto (about 15 min of measured work each, none over about 20 min, at most 10) or 1-10'
         type: string
         default: 'auto'
 
@@ -98,6 +98,7 @@ jobs:
     outputs:
       runner: ${{ steps.runners.outputs.runner }}
       light-runner: ${{ steps.runners.outputs.light-runner }}
+      parallel: ${{ steps.runners.outputs.parallel }}
     steps:
       - uses: actions/setup-node@v7
         with:
@@ -126,14 +127,14 @@ jobs:
         run: |
           set -euo pipefail
           pool() {
-            echo "runner=${RUNNER:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
-            echo "light-runner=${LIGHT:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
-            echo "runners: ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}: $1"
+            local parallel=3
+            [[ -n "$RUNNER" ]] && parallel=10
+            printf 'runner=%s\nlight-runner=%s\nparallel=%s\n' "${RUNNER:-ubuntu-latest}" "${LIGHT:-ubuntu-latest}" "$parallel" >> "$GITHUB_OUTPUT"
+            echo "runners: ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}, $parallel shards at once: $1"
           }
           hosted() {
-            echo "runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            echo "light-runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            echo "runners: ubuntu-latest: $1"
+            printf 'runner=ubuntu-latest\nlight-runner=ubuntu-latest\nparallel=3\n' >> "$GITHUB_OUTPUT"
+            echo "runners: ubuntu-latest, 3 shards at once: $1"
           }
           compare() {
             node -e "$COMPARE_JS" "$1" "$2"
@@ -221,7 +222,7 @@ jobs:
       regressions: ${{ steps.report.outputs.regressions }}
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: ${{ fromJSON(needs.gate.outputs.parallel || '3') }}
       matrix:
         shard: ${{ fromJson(needs.plan.outputs.shards) }}
     steps:

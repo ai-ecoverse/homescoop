@@ -21,8 +21,8 @@ const root = resolve(here, '../..');
 const KERNEL = '@ai-ecoverse/slicc-kernel';
 const BIOS = 'ai-ecoverse/slicc-bios';
 const HARNESS = ['@ai-ecoverse/slicc-shared-web@^1.4.1', 'playwright-core@1.63.0'];
-const MAX_SHARDS = 3;
-const ESTIMATE = { entry: 10, spec: 4, sweep: 150, shard: 900 };
+const MAX_SHARDS = 10;
+const ESTIMATE = { entry: 10, spec: 4, sweep: 150, shard: 900, limit: 1200 };
 const SWEEP_MODES = ['report', 'enforce'];
 const RUN_TIMEOUT_MS = 25 * 60 * 1000;
 
@@ -147,7 +147,35 @@ export function satisfies(version, range) {
 
 function loadTimings() {
   const file = join(here, 'timings.json');
-  return existsSync(file) ? readJson(file).seconds || {} : {};
+  const doc = existsSync(file) ? readJson(file) : {};
+  return { seconds: doc.seconds || {}, versions: doc.versions || {} };
+}
+
+export function costOf(v, specs) {
+  const failing = specs.some((sp) => (v.runs[sp] || 1) > 1);
+  const runs = failing ? Math.max(...specs.map((sp) => v.runs[sp] || 1)) : 1;
+  return Math.ceil(v.setup * runs + specs.reduce((sum, sp) => sum + (v.specs[sp] ?? ESTIMATE.spec) * (v.runs[sp] || 1), 0));
+}
+
+export function splitEntry(v, specs, target, limit = target) {
+  const whole = costOf(v, specs);
+  if (whole <= limit || specs.length < 2) return [{ specs: null, seconds: whole }];
+  const k = Math.min(specs.length, Math.ceil(whole / target));
+  const parts = Array.from({ length: k }, () => []);
+  for (const sp of [...specs].sort((a, b) => costOf(v, [b]) - costOf(v, [a]) || a.localeCompare(b))) {
+    parts.reduce((lo, part) => (costOf(v, part) < costOf(v, lo) ? part : lo), parts[0]).push(sp);
+  }
+  return parts.filter((part) => part.length).map((part) => ({ specs: part.sort(), seconds: costOf(v, part) }));
+}
+
+export function pack(units, n) {
+  const bins = Array.from({ length: n }, () => ({ seconds: 0, units: [] }));
+  for (const u of [...units].sort((a, b) => b.seconds - a.seconds || a.id.localeCompare(b.id))) {
+    const bin = bins.reduce((lo, b) => (b.seconds < lo.seconds ? b : lo), bins[0]);
+    bin.seconds += u.seconds;
+    bin.units.push(u);
+  }
+  return bins;
 }
 
 function loadLimits() {
@@ -361,25 +389,42 @@ async function plan(args) {
 
   const list = [...entries.values()];
   const timings = loadTimings();
-  const units = [
-    ...list.map((e, i) => ({ id: e.id, entry: i, seconds: timings[e.recipe] ?? ESTIMATE.entry + ESTIMATE.spec * e.specs.length, measured: e.recipe in timings })),
-    ...(sweep ? sweep.modes.map((mode) => ({ id: `sweep-${mode}`, sweep: mode, seconds: timings[`base-sweep:${mode}`] ?? ESTIMATE.sweep, measured: `base-sweep:${mode}` in timings })) : []),
-  ];
-  const total = units.reduce((s, u) => s + u.seconds, 0);
+  const units = [];
+  const template = (recipe) =>
+    Object.entries(timings.versions)
+      .filter(([id]) => id.slice(0, id.lastIndexOf('@')) === recipe)
+      .map(([, v]) => ({ ...v, runs: {} }))
+      .sort((a, b) => costOf(a, Object.keys(a.specs)) - costOf(b, Object.keys(b.specs)))[0];
+  list.forEach((e, i) => {
+    const v = timings.versions[e.id] || template(e.recipe);
+    if (v) {
+      const parts = splitEntry(v, e.specs, ESTIMATE.shard, ESTIMATE.limit);
+      const measured = timings.versions[e.id] ? 'version' : 'recipe';
+      parts.forEach((p, k) => units.push({ id: parts.length > 1 ? `${e.id}#${k + 1}` : e.id, entry: i, specs: p.specs, part: parts.length > 1 ? k + 1 : null, parts: parts.length, seconds: p.seconds, measured }));
+    } else {
+      const seconds = timings.seconds[e.recipe] ?? ESTIMATE.entry + ESTIMATE.spec * e.specs.length;
+      units.push({ id: e.id, entry: i, specs: null, part: null, parts: 1, seconds, measured: e.recipe in timings.seconds ? 'recipe' : null });
+    }
+  });
+  for (const mode of sweep ? sweep.modes : []) {
+    const key = `base-sweep:${mode}`;
+    units.push({ id: `sweep-${mode}`, sweep: mode, seconds: timings.seconds[key] ?? ESTIMATE.sweep, measured: key in timings.seconds ? 'recipe' : null });
+  }
+  const total = units.reduce((sum, u) => sum + u.seconds, 0);
   const asked = String(args.shards || 'auto').trim();
   const wanted = asked === 'auto' ? Math.ceil(total / ESTIMATE.shard) : Number(asked);
-  if (!Number.isInteger(wanted) || wanted < 1) throw new Error(`--shards must be auto or 1..${MAX_SHARDS}, not ${asked}`);
-  const n = Math.min(units.length, MAX_SHARDS, wanted);
-  const bins = Array.from({ length: n }, () => ({ seconds: 0, entries: [], sweeps: [] }));
-  units
-    .sort((a, b) => b.seconds - a.seconds || a.id.localeCompare(b.id))
-    .forEach((u) => {
-      const bin = bins.reduce((lo, b) => (b.seconds < lo.seconds ? b : lo), bins[0]);
-      bin.seconds += u.seconds;
-      if (u.sweep) bin.sweeps.push(u.sweep);
-      else bin.entries.push(u.entry);
-    });
-  for (const b of bins) b.entries.sort((x, y) => x - y);
+  if (!Number.isInteger(wanted) || wanted < 1 || wanted > MAX_SHARDS) throw new Error(`--shards must be auto or 1..${MAX_SHARDS}, not ${asked}`);
+  let n = Math.max(1, Math.min(units.length, wanted));
+  let bins = pack(units, n);
+  while (asked === 'auto' && n < Math.min(units.length, MAX_SHARDS) && Math.max(...bins.map((b) => b.seconds)) > ESTIMATE.limit) {
+    n += 1;
+    bins = pack(units, n);
+  }
+  bins = bins.map((b) => ({
+    seconds: b.seconds,
+    units: b.units.filter((u) => !u.sweep).sort((x, y) => x.entry - y.entry || (x.part || 0) - (y.part || 0)),
+    sweeps: b.units.filter((u) => u.sweep).map((u) => u.sweep),
+  }));
   const tag = createHash('sha256')
     .update(JSON.stringify([kernelIn, setIn, biosRefIn, homescoopRefIn || homescoopSha]))
     .digest('hex')
@@ -407,7 +452,11 @@ async function plan(args) {
     reference,
     entries: list,
     skipped: [...skipped.values()],
-    shards: bins.map((b) => ({ entries: b.entries, sweeps: b.sweeps, estimateS: b.seconds })),
+    shards: bins.map((b) => ({
+      units: b.units.map((u) => ({ entry: u.entry, specs: u.specs, part: u.part, parts: u.parts, estimateS: u.seconds })),
+      sweeps: b.sweeps,
+      estimateS: b.seconds,
+    })),
     sweep,
   };
   writeJson(join(out, 'plan.json'), doc);
@@ -415,7 +464,8 @@ async function plan(args) {
   console.log(`reference ${reference.name}@${reference.version} sha256 ${reference.sha256} (slicc-bios ${bios.sha})`);
   console.log(`work: about ${Math.round(total / 60)} min in ${n} shard(s) (shards ${asked}; ${units.filter((u) => u.measured).length} of ${units.length} items measured in timings.json)`);
   for (const [k, b] of bins.entries()) {
-    console.log(`shard ${k} (~${Math.round(b.seconds / 60)} min): ${[...b.entries.map((i) => list[i].id), ...b.sweeps.map((m) => `base-sweep:${m}`)].join(' ')}`);
+    const label = (u) => (u.part ? `${list[u.entry].id}#${u.part}[${u.specs.join(',')}]` : list[u.entry].id);
+    console.log(`shard ${k} (~${Math.round(b.seconds / 60)} min): ${[...b.units.map(label), ...b.sweeps.map((m) => `base-sweep:${m}`)].join(' ')}`);
   }
   for (const s of doc.skipped) console.log(`skip ${s.package}@${s.version ?? '-'} (${s.origin.join(',')}): ${s.reason}`);
   output('tag', tag);
@@ -452,12 +502,13 @@ function installNeeds(recipe, nm, work) {
   });
 }
 
-function certRun({ label, kernelFile, recipe, cert, tarballs, users, work, logs, logName, env = {} }) {
+function certRun({ label, kernelFile, recipe, cert, tarballs, users, work, logs, logName, specs = null, env = {} }) {
   const json = join(work, `${label}.json`);
   rmSync(json, { force: true });
   const log = join(logs, `${logName}.${label}.log`);
   const args = [join(here, 'run.mjs'), '--package', recipe, ...(cert ? ['--cert', cert] : [])];
   for (const t of tarballs) args.push('--tarball', t);
+  for (const sp of specs || []) args.push('--spec', sp);
   args.push('--kernel', kernelFile, '--users', users, '--json', json, '--soft');
   const started = Date.now();
   const r = sh(process.execPath, args, {
@@ -541,17 +592,22 @@ function shard(args) {
   const sameKernel = plan.kernel.sha256 === plan.reference.sha256;
   const startedAt = new Date();
   const results = [];
-  for (const i of plan.shards[index]?.entries || []) {
-    const e = plan.entries[i];
-    const work = join(out, 'work', slug(e.id));
+  for (const u of plan.shards[index]?.units || []) {
+    const e = plan.entries[u.entry];
+    const name = u.part ? `${slug(e.id)}.part${u.part}` : slug(e.id);
+    const work = join(out, 'work', name);
     const started = Date.now();
-    const result = { ...e, status: 'fail', verdict: 'error', specs: [], reference: null, peers: [], durationMs: 0 };
+    const result = { ...e, part: u.part, parts: u.parts, only: u.specs, reruns: 'specs', status: 'fail', verdict: 'error', specs: [], reference: null, peers: [], durationMs: 0 };
     try {
       const tgz = fetchTarball(e.package, e.version, e.integrity, join(work, 'tgz'));
       result.sha256 = tgz.sha256;
       result.integrity = tgz.integrity;
       result.peers = installNeeds(e.recipe, join(work, 'nm'), work);
-      const base = { recipe: e.recipe, tarballs: [tgz.file], users: e.users, work, logs, logName: slug(e.id) };
+      const base = { recipe: e.recipe, tarballs: [tgz.file], users: e.users, work, logs, logName: name, specs: u.specs };
+      const rerun = (list) => {
+        const named = [...new Set(list.map((f) => f.spec))];
+        return named.some((sp) => sp.startsWith('(')) ? u.specs : named;
+      };
       const facts = (f) => ({
         package: e.package,
         recipe: e.recipe,
@@ -566,7 +622,7 @@ function shard(args) {
       let fails = failuresOf(cand);
       const attempts = [cand.log];
       if (fails.some((f) => !limitOf(f))) {
-        const again = certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile });
+        const again = certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile, specs: rerun(fails.filter((f) => !limitOf(f))) });
         attempts.push(again.log);
         fails = fails.map((f) => (stillFails(f, again) ? f : { ...f, flaky: true }));
       }
@@ -586,10 +642,10 @@ function shard(args) {
         if (sameKernel) {
           for (const f of open) Object.assign(f, { verdict: 'known', why: 'the candidate is the reference kernel' });
         } else {
-          let ref = certRun({ ...base, label: 'reference', kernelFile: referenceFile });
+          let ref = certRun({ ...base, label: 'reference', kernelFile: referenceFile, specs: rerun(open) });
           const refAttempts = [ref.log];
           if (open.some((f) => !refPasses(f, ref))) {
-            const again = certRun({ ...base, label: 'reference-retry', kernelFile: referenceFile });
+            const again = certRun({ ...base, label: 'reference-retry', kernelFile: referenceFile, specs: rerun(open.filter((f) => !refPasses(f, ref))) });
             refAttempts.push(again.log);
             ref = { ...ref, other: again };
           }
@@ -638,7 +694,7 @@ function shard(args) {
       console.log(`::error::${e.id}: ${String(err.message).split('\n')[0]}`);
     }
     result.durationMs = Date.now() - started;
-    console.log(`${e.id}: ${result.status} → ${result.verdict} in ${Math.round(result.durationMs / 1000)} s`);
+    console.log(`${e.id}${u.part ? ` part ${u.part}/${u.parts} (${u.specs.join(', ')})` : ''}: ${result.status} → ${result.verdict} in ${Math.round(result.durationMs / 1000)} s`);
     results.push(result);
     rmSync(work, { recursive: true, force: true });
   }
@@ -777,50 +833,76 @@ function report(args) {
   const packages = [];
   const errors = [];
   const shards = [];
+  const parts = new Map();
   plan.shards.forEach((s, k) => {
-    const idx = s.entries;
     const doc = shardDocs.get(k);
-    shards.push({ shard: k, packages: idx.map((i) => plan.entries[i].id), sweeps: s.sweeps, estimateS: s.estimateS, wallMs: doc?.wallMs ?? null, runner: doc?.runner ?? null, reported: Boolean(doc) });
-    for (const i of idx) {
-      const e = plan.entries[i];
-      const r = doc?.results.find((x) => x.id === e.id);
-      if (!r) {
-        errors.push(`${e.id}: shard ${k} reported nothing`);
-        packages.push({ ...e, status: 'fail', verdict: 'error', error: `shard ${k} reported nothing` });
-        results.push({ package: e.package, recipe: e.recipe, version: e.version, sha256: null, spec: null, users: e.users, status: 'fail', verdict: 'error', durationMs: null, log: null });
-        continue;
-      }
-      if (r.verdict === 'error') errors.push(`${e.id}: ${String(r.error || 'error').split('\n')[0]}`);
-      packages.push({ id: r.id, package: r.package, recipe: r.recipe, version: r.version, sha256: r.sha256 ?? null, origin: r.origin, users: r.users, modes: r.modes ?? null, status: r.status, verdict: r.verdict, durationMs: r.durationMs, peers: r.peers, reference: r.reference ? { status: r.reference.status, log: r.reference.log } : null, error: r.error || null });
-      const specs = r.specs.length ? r.specs : [{ spec: null, status: r.status, verdict: r.verdict, error: r.error }];
-      for (const s of specs) {
-        results.push({
-          package: r.package,
-          recipe: r.recipe,
-          version: r.version,
-          sha256: r.sha256 ?? null,
-          spec: s.spec,
-          users: r.users,
-          status: s.status,
-          verdict: s.verdict,
-          durationMs: s.durationMs ?? null,
-          log: r.log ? `logs/${r.log.split('/').pop()}` : null,
-          ...(s.assertions !== undefined ? { assertions: s.assertions } : {}),
-          ...(s.flaky ? { flaky: true } : {}),
-          ...(s.error && s.status !== 'pass' ? { error: s.error.slice(0, 2000) } : {}),
-          ...(s.cases
-            ? {
-                cases: s.cases.map((c) => ({
-                  ...c,
-                  ...(c.limit ? { limit: { issue: c.limit.issue, why: c.limit.why, kernel: c.limit.kernel } } : {}),
-                })),
-              }
-            : {}),
-          ...(r.reference ? { reference: { status: r.reference.status, log: `logs/${r.reference.log.split('/').pop()}` } } : {}),
-        });
-      }
+    shards.push({
+      shard: k,
+      packages: s.units.map((u) => (u.part ? `${plan.entries[u.entry].id}#${u.part}` : plan.entries[u.entry].id)),
+      sweeps: s.sweeps,
+      estimateS: s.estimateS,
+      wallMs: doc?.wallMs ?? null,
+      runner: doc?.runner ?? null,
+      reported: Boolean(doc),
+    });
+    for (const u of s.units) {
+      const e = plan.entries[u.entry];
+      const r = doc?.results.find((x) => x.id === e.id && (x.part ?? null) === (u.part ?? null));
+      parts.set(u.entry, [...(parts.get(u.entry) || []), { u, k, r }]);
     }
   });
+  const rank = { pass: 0, known: 1, regression: 2, error: 3 };
+  for (const [i, got] of [...parts.entries()].sort(([a], [b]) => a - b)) {
+    const e = plan.entries[i];
+    const lost = got.filter((g) => !g.r);
+    for (const g of lost) errors.push(`${e.id}${g.u.part ? ` part ${g.u.part}` : ''}: shard ${g.k} reported nothing`);
+    const done = got.filter((g) => g.r).map((g) => g.r);
+    if (!done.length) {
+      packages.push({ ...e, status: 'fail', verdict: 'error', error: `shard ${got[0].k} reported nothing` });
+      results.push({ package: e.package, recipe: e.recipe, version: e.version, sha256: null, spec: null, users: e.users, status: 'fail', verdict: 'error', durationMs: null, log: null });
+      continue;
+    }
+    const verdict = [...done.map((r) => r.verdict), ...(lost.length ? ['error'] : [])].reduce((a, b) => (rank[b] > rank[a] ? b : a), 'pass');
+    const r = {
+      ...done[0],
+      status: done.every((x) => x.status === 'pass') && !lost.length ? 'pass' : 'fail',
+      verdict,
+      durationMs: done.reduce((sum, x) => sum + (x.durationMs || 0), 0),
+      specs: done.flatMap((x) => x.specs).sort((a, b) => String(a.spec).localeCompare(String(b.spec))),
+      reference: done.find((x) => x.reference)?.reference || null,
+      error: done.map((x) => x.error).filter(Boolean).join('\n') || null,
+    };
+    for (const x of done) if (x.verdict === 'error') errors.push(`${e.id}${x.part ? ` part ${x.part}` : ''}: ${String(x.error || 'error').split('\n')[0]}`);
+    packages.push({ id: r.id, package: r.package, recipe: r.recipe, version: r.version, sha256: r.sha256 ?? null, origin: r.origin, users: r.users, modes: r.modes ?? null, status: r.status, verdict: r.verdict, durationMs: r.durationMs, parts: got.length, reruns: r.reruns || null, peers: r.peers, reference: r.reference ? { status: r.reference.status, log: r.reference.log } : null, error: r.error || null });
+    const specs = r.specs.length ? r.specs : [{ spec: null, status: r.status, verdict: r.verdict, error: r.error }];
+    for (const s of specs) {
+      const from = done.find((x) => x.specs.includes(s)) || r;
+      results.push({
+        package: r.package,
+        recipe: r.recipe,
+        version: r.version,
+        sha256: r.sha256 ?? null,
+        spec: s.spec,
+        users: r.users,
+        status: s.status,
+        verdict: s.verdict,
+        durationMs: s.durationMs ?? null,
+        log: from.log ? `logs/${from.log.split('/').pop()}` : null,
+        ...(s.assertions !== undefined ? { assertions: s.assertions } : {}),
+        ...(s.flaky ? { flaky: true } : {}),
+        ...(s.error && s.status !== 'pass' ? { error: s.error.slice(0, 2000) } : {}),
+        ...(s.cases
+          ? {
+              cases: s.cases.map((c) => ({
+                ...c,
+                ...(c.limit ? { limit: { issue: c.limit.issue, why: c.limit.why, kernel: c.limit.kernel } } : {}),
+              })),
+            }
+          : {}),
+        ...(from.reference ? { reference: { status: from.reference.status, log: `logs/${from.reference.log.split('/').pop()}` } } : {}),
+      });
+    }
+  }
   for (const s of plan.skipped) {
     results.push({ package: s.package, recipe: s.recipe, version: s.version, sha256: null, spec: null, users: null, status: 'skip', verdict: 'skip', durationMs: null, log: null, why: s.reason });
   }
@@ -997,8 +1079,9 @@ function report(args) {
 
 function timings(args) {
   const out = resolve(args.out || join(here, 'timings.json'));
-  const doc = existsSync(out) ? readJson(out) : { sources: [], seconds: {} };
+  const doc = existsSync(out) ? readJson(out) : { sources: [], seconds: {}, versions: {} };
   const measured = {};
+  const versions = {};
   const sources = [];
   for (const file of String(args.compat || '').split(',').map((x) => x.trim()).filter(Boolean)) {
     const c = readJson(resolve(file));
@@ -1006,6 +1089,25 @@ function timings(args) {
     for (const p of c.packages || []) {
       if (typeof p.durationMs !== 'number') continue;
       measured[p.recipe] = Math.max(measured[p.recipe] || 0, Math.ceil(p.durationMs / 1000));
+      const rows = (c.results || []).filter((r) => r.recipe === p.recipe && r.version === p.version && r.spec && !r.spec.startsWith('('));
+      if (!rows.length || rows.some((r) => typeof r.durationMs !== 'number')) continue;
+      const runsOf = (r) => {
+        const cases = (r.cases || []).filter((x) => !x.flaky && !x.limit);
+        if (cases.length) return cases.some((x) => x.reference !== 'pass') ? 4 : 3;
+        return (r.cases || []).some((x) => x.flaky) ? 2 : 1;
+      };
+      const v = { setup: 0, specs: {}, runs: {} };
+      for (const r of rows) {
+        v.specs[r.spec] = Math.ceil(r.durationMs / 1000);
+        if (runsOf(r) > 1) v.runs[r.spec] = runsOf(r);
+      }
+      const most = Math.max(1, ...Object.values(v.runs));
+      const total = p.durationMs / 1000;
+      const specTime = rows.reduce((sum, r) => sum + (r.durationMs / 1000) * (p.reruns === 'specs' ? runsOf(r) : most), 0);
+      v.setup = Math.max(5, Math.ceil((total - specTime) / (most * (p.parts || 1))));
+      const id = `${p.recipe}@${p.version}`;
+      const specs = Object.keys(v.specs);
+      if (!versions[id] || costOf(v, specs) > costOf(versions[id], Object.keys(versions[id].specs))) versions[id] = v;
     }
     for (const sw of c.sweeps || []) {
       if (typeof sw.wallMs !== 'number') continue;
@@ -1015,13 +1117,16 @@ function timings(args) {
   }
   if (!sources.length) throw new Error('--compat <compat.json>[,<compat.json>…] is required');
   const seconds = { ...doc.seconds, ...measured };
+  const merged = { ...(doc.versions || {}), ...versions };
   const key = (x) => `${x.run} ${x.kernel} ${x.set}`;
   const known = new Set(sources.map(key));
+  const sorted = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
   writeJson(out, {
     sources: [...(doc.sources || []).filter((x) => !known.has(key(x))), ...sources],
-    seconds: Object.fromEntries(Object.entries(seconds).sort(([a], [b]) => a.localeCompare(b))),
+    seconds: sorted(seconds),
+    versions: sorted(Object.fromEntries(Object.entries(merged).map(([id, v]) => [id, { setup: v.setup, specs: sorted(v.specs), runs: sorted(v.runs) }]))),
   });
-  console.log(`timings: ${Object.keys(measured).length} measured, ${Object.keys(seconds).length} in ${relative(root, out)}`);
+  console.log(`timings: ${Object.keys(measured).length} recipes and ${Object.keys(versions).length} versions measured; ${Object.keys(seconds).length} recipes, ${Object.keys(merged).length} versions in ${relative(root, out)}`);
 }
 
 const commands = { plan, shard, report, timings };
