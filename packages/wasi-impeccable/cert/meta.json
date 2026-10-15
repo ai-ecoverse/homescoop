@@ -4,7 +4,7 @@
   "needs": [],
   "needsInstall": [],
   "checklist": [
-    "impeccable --version → 0.1.13 (engine, not npm CLI 4.0.0)",
+    "impeccable --version → 0.1.14 (engine, not npm CLI 4.0.0)",
     "detect dirty.html → overused-font + ai-color-palette + low-contrast, exit 2",
     "detect clean.html → exit 0",
     "detect /home/site (dirty+clean) → findings name dirty.html only, exit 2",
