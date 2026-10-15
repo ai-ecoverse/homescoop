@@ -474,7 +474,7 @@ homescoop_notice_rust() {
   fi
   local meta="$WORK/rust-notices-metadata.json" tree="$WORK/rust-notices-tree.txt"
   (cd "$src" && "${cargo[@]}" metadata --locked --format-version 1 --filter-platform "$target" "${extra[@]}") >"$meta"
-  (cd "$src" && "${cargo[@]}" tree --locked --target "$target" -e normal --prefix none "${treepkg[@]}" "${extra[@]}") >"$tree"
+  (cd "$src" && "${cargo[@]}" tree --locked --target "$target" -e normal,no-proc-macro --prefix none "${treepkg[@]}" "${extra[@]}") >"$tree"
   node "$HOMESCOOP_ROOT/scripts/rust-crate-notices.mjs" "$meta" "$tree" >>"$HOMESCOOP_NOTICES"
   node "$HOMESCOOP_ROOT/scripts/check-rust-notices.mjs" "$HOMESCOOP_NOTICES" "$tree" "$src/Cargo.lock"
   local copyright mit apache

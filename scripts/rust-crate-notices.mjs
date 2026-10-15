@@ -4,9 +4,11 @@
  *
  *   node scripts/rust-crate-notices.mjs <metadata.json> <cargo-tree.txt>
  *
- * cargo-tree.txt is `cargo tree --target <t> -e normal --prefix none [-p pkg]`
+ * cargo-tree.txt is `cargo tree --target <t> -e normal,no-proc-macro --prefix none [-p pkg]`
  * of the build's source tree: the crates cargo compiles into that package for
- * that target, with its features (a workspace's `cargo metadata` resolve
+ * that target, with its features. Proc-macro crates and their dependencies run
+ * on the build host and are not linked, so they are left out (with them,
+ * cargo tree lists host crates such as linux-raw-sys) (a workspace's `cargo metadata` resolve
  * unifies the features of every member, so it lists crates the wasm does not
  * link). metadata.json (`cargo metadata --format-version 1`, same tree, same
  * vendored sources) gives each crate's licence expression and source
