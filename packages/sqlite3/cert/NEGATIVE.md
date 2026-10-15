@@ -23,5 +23,3 @@ AssertionError [ERR_ASSERTION]: The input did not match the regular expression /
 Every other case compares exact stdout (CSV with CRLF rows, JSON, list
 mode) or exact rc and error text, so wrong output fails too. There are no
 patches.
-
-Proof run for ladder-pr's cert job on the pool (throwaway; reverted before review).

@@ -139,8 +139,6 @@ jobs:
     steps:
       # When recipe-sha pushed a commit, build that one: check-package-meta
       # compares the staged package.json with the committed (HEAD) one.
-      - if: matrix.package == 'which'
-        run: exit 1
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.recipe-sha.outputs.sha || '' }}
@@ -204,8 +202,6 @@ jobs:
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: .homescoop-out
-      - if: matrix.package == 'xxd'
-        run: rm .homescoop-out/package.tgz.sha256
       - name: Check package.tgz against package.tgz.sha256
         env:
           ART: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
