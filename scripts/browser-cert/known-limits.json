@@ -58,6 +58,18 @@
       "kernel": ">=1.36.0 <1.73.3",
       "issue": "ai-ecoverse/slicc-kernel#449",
       "why": "the destination's top directory loses its mtime after rsync -a, so the re-run itemizes '.d..t...... ./'; fixed by slicc-kernel#467 in 1.73.3"
+    },
+    {
+      "package": "@ai-ecoverse/wasm-coreutils",
+      "spec": "glue-mode.mjs",
+      "case": "installed with the tarball's modes: 644 \\S+/bin/coreutils|bin/coreutils by path as cone under users enforce: rc=126",
+      "kernel": ">=1.86.0",
+      "version": "<9.12.0-6",
+      "users": [
+        "enforce"
+      ],
+      "issue": "ai-ecoverse/homescoop#332",
+      "why": "9.12.0-5 ships bin/coreutils (the glue) 0644, so with the tarball's modes (slicc-kernel >= 1.86.0) cone can't run it by path under enforce (126); 9.12.0-6 ships it 0755. Kernels before 1.86.0 have no kernel.chmod, so the harness leaves bin/ at the default 0755 and the reference passes"
     }
   ]
 }

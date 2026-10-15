@@ -400,6 +400,13 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
 `kernel.chmod` and keep the defaults. `--json` and `compat.json` say which
 (`modes: tarball` or `kernel defaults`).
 
+**Modes and the reference kernel:** a reference before 1.86.0 has no
+`kernel.chmod`, so it runs with the default modes. A package that ships a
+wrong mode (a `bin/` file `0644`) passes there and fails on a candidate that
+stamps the tarball's modes, which kernel-compat reports as a regression.
+That is the package's bug: add a known limit scoped to the versions before
+the fix (as for `wasm-coreutils` before 9.12.0-6, #332).
+
 **The owner gap:** only modes are stamped, not owners. bios's installer
 writes its files before the first boot and stamps them with `writeMetadata`
 (`@ai-ecoverse/slicc-kernel/meta`), which can also set `uid` and `gid`. The
