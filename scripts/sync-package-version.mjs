@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
-import { loadAllow, rewriteVersion, summaryLine, versionBase } from './upstream-version-text.mjs';
+import { isSpelling, loadAllow, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -231,27 +231,32 @@ function logRewrite(file, offsetLine, r) {
   }
 }
 
-const previous = from ?? String(pkg.homescoop?.upstream ?? versionBase(current));
-const rewriteText = write && previous !== upstream;
-if (write && (next !== current || rewriteText)) {
+const allow = loadAllow();
+const hsUpstream = pkg.homescoop?.upstream;
+const previous = from ?? String(hsUpstream ?? versionBase(current));
+const rewriteText = write && !isSpelling(allow, name, upstream, previous);
+const upstreamStale = (next !== current && hsUpstream === undefined) || (hsUpstream !== undefined && !isSpelling(allow, name, upstream, hsUpstream));
+if (write && (next !== current || rewriteText || upstreamStale)) {
   const raw = readFileSync(pkgPath, 'utf8');
   const want = JSON.parse(raw);
   let out = raw;
   if (next !== current) {
     want.version = next;
+    out = setJsonString(out, /^(\s*"version"\s*:\s*)"(?:[^"\\]|\\.)*"/m, next);
+    console.error(`sync-package-version: ${name} ${current} → ${next}`);
+  }
+  if (upstreamStale) {
     if (!want.homescoop) want.homescoop = {};
     want.homescoop.upstream = upstream;
     want.homescoop.recipe = name;
-    out = setJsonString(out, /^(\s*"version"\s*:\s*)"(?:[^"\\]|\\.)*"/m, next);
     out = setJsonString(out, /("upstream"\s*:\s*)"(?:[^"\\]|\\.)*"/, upstream);
     out = setJsonString(out, /("recipe"\s*:\s*)"(?:[^"\\]|\\.)*"/, name);
-    console.error(`sync-package-version: ${name} ${current} → ${next}`);
+    console.error(`sync-package-version: ${name} homescoop.upstream ${hsUpstream ?? '(none)'} → ${upstream}`);
   }
   if (rewriteText) {
-    const allow = loadAllow();
     const ctx = { allow, name };
     if (typeof want.description === 'string') {
-      const r = rewriteVersion(want.description, previous, upstream, ctx);
+      const r = rewriteUpstream(want.description, previous, upstream, ctx);
       logRewrite('package/package.json description', 1, r);
       if (r.changes.length) {
         want.description = r.text;
@@ -262,7 +267,7 @@ if (write && (next !== current || rewriteText)) {
     const recipeRaw = readFileSync(recipePath, 'utf8');
     const sum = summaryLine(recipeRaw);
     if (sum) {
-      const r = rewriteVersion(sum.text, previous, upstream, ctx);
+      const r = rewriteUpstream(sum.text, previous, upstream, ctx);
       logRewrite('recipe.yaml', recipeRaw.slice(0, sum.index).split('\n').length, r);
       if (r.changes.length) {
         writeFileSync(recipePath, recipeRaw.slice(0, sum.index) + r.text + recipeRaw.slice(sum.index + sum.text.length));
@@ -270,7 +275,7 @@ if (write && (next !== current || rewriteText)) {
     }
     const readmePath = join(root, 'packages', name, 'package', 'README.md');
     if (existsSync(readmePath)) {
-      const r = rewriteVersion(readFileSync(readmePath, 'utf8'), previous, upstream, ctx);
+      const r = rewriteUpstream(readFileSync(readmePath, 'utf8'), previous, upstream, ctx);
       logRewrite('package/README.md', 1, r);
       if (r.changes.length) writeFileSync(readmePath, r.text);
     }

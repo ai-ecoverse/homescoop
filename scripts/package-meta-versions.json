@@ -1,7 +1,8 @@
 {
   "historical": ["since", "before", "until", "prior to", "older than", "fixed in", "introduced in"],
   "leads": {
-    "*": ["slicc-kernel ", "slicc-kernel ≥ ", "slicc-kernel >= ", "slicc-kernel` ≥ ", "slicc-kernel` >= ", "CPython ", "Apache-", "GPL-", "LGPL-", "MPL-"],
+    "*": ["slicc-kernel ", "slicc-kernel ≥ ", "slicc-kernel >= ", "slicc-kernel` ≥ ", "slicc-kernel` >= ", "Apache-", "GPL-", "LGPL-", "MPL-"],
+    "py-*": ["CPython "],
     "libheif": ["libde265 ", "dav1d "],
     "wasix-python": ["OpenSSL ", "`sqlite3` ("],
     "wasix-ruby": ["ruby/"]
