@@ -35,14 +35,16 @@ Packages in `scripts/ci-certified.json` may Renovate-automerge non-majors;
 `ladder-merge` then OIDC-publishes the exact PR artifact
 (`certified=<sha256>` + `artifact_pr` + `artifact_id`). Majors / unlisted packages stay manual.
 
-**Publish gate (`scripts/ladder-merge-resolve.mjs`).** For each touched
-package whose merged `package.json` version is not on npm, `ladder-merge`
-needs the `host-<pkg>-prN` artifact from a ladder-pr run at the PR's merged
-head that concluded `success`, and one of:
+**Publish gate (`scripts/ladder-merge-resolve.mjs`).** Each touched package
+maps to the newest first-parent commit of the pushed range that touched it,
+and to the PR merged as that commit. When the merged `package.json` version
+is not on npm, `ladder-merge` needs the `host-<pkg>-prN` artifact from a
+ladder-pr run at that PR's merged head that concluded `success`, and one of:
 
-- a `certified=<sha256> <@scope/name> <version>` line in the merge commit
-  naming that package and version, whose sha equals the artifact's
-  `package.tgz`; or
+- a `certified=<sha256> <@scope/name> <version>` line naming that package
+  and version, whose sha equals the artifact's `package.tgz`. The merge
+  commit message is read first, then the PR body (only when the PR's author
+  can write to the repository); or
 - no line for the package, the package in `scripts/ci-certified.json`, and
   that run's `ci` job green.
 
@@ -54,8 +56,9 @@ artifact by `artifact_id` and checks `certified` again; it publishes only
 when dispatched on `main`.
 
 Dry run: `gh workflow run ladder-merge.yml -f sha=<merge commit>` resolves
-and prints the decision without dispatching. `assume_unpublished`,
-`message`, `head`, `packages` and `ci_certified` simulate the other cases.
+and prints the decision without dispatching. `before`, `packages`,
+`assume_unpublished`, `message`, `pr_body`, `head` and `ci_certified`
+simulate the other cases.
 
 **Manual:** laptop `npm publish` of the exact certified tarball, then land,
 or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.

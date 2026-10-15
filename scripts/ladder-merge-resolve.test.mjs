@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   LADDER_PR,
@@ -7,6 +11,7 @@ import {
   parseArgs,
   parseCertLines,
   resolvePackage,
+  touchingCommit,
 } from './ladder-merge-resolve.mjs';
 
 const NAME = '@ai-ecoverse/wasi-impeccable';
@@ -32,10 +37,24 @@ function run(id, head, conclusion = 'success', extra = {}) {
   return { id, path: LADDER_PR, head_sha: head, status: 'completed', conclusion, ...extra };
 }
 
-function fakeIo({ published = false, pr = { number: 336, head: HEAD }, artifacts = [], runs = {}, jobs = {}, tarballs = {} } = {}) {
+const PR = { number: 336, head: HEAD, body: 'Bump impeccable', author: 'trieloff' };
+
+function fakeIo({
+  published = false,
+  pr = PR,
+  writers = ['trieloff'],
+  artifacts = [],
+  runs = {},
+  jobs = {},
+  tarballs = {},
+} = {}) {
   const calls = [];
   return {
     calls,
+    async canWrite(login) {
+      calls.push(['canWrite', login]);
+      return writers.includes(login);
+    },
     async published(name, version) {
       calls.push(['published', name, version]);
       return published;
@@ -247,15 +266,49 @@ describe('resolvePackage', () => {
     const io = fakeIo(staleFailed);
     await assert.rejects(
       resolvePackage({ ...ctx, message: 'Merge pull request #336' }, io),
-      /not on npm, the merge commit has no certified=<sha256> @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 line, and wasi-impeccable is not in scripts\/ci-certified\.json/,
+      /not on npm, neither the merge commit nor the PR body has a certified=<sha256> @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 line, and wasi-impeccable is not in scripts\/ci-certified\.json/,
     );
-    assert.deepEqual(io.calls.map(([c]) => c), ['published']);
+    assert.deepEqual(io.calls.map(([c]) => c), ['published', 'pullRequest']);
+  });
+
+  it('falls back to the PR body when the merge commit has no line', async () => {
+    const pr = { ...PR, body: `Queue me\n\ncertified=${GOOD} ${NAME} ${VERSION}\n` };
+    const io = fakeIo({ ...staleFailed, pr });
+    const result = await resolvePackage({ ...ctx, message: 'Merge pull request #336' }, io);
+    assert.equal(result.gate, 'certified= line in the PR #336 body');
+    assert.equal(result.inputs.certified, GOOD);
+    assert.deepEqual(io.calls.find(([c]) => c === 'canWrite'), ['canWrite', 'trieloff']);
+  });
+
+  it('takes the merge commit line over the PR body', async () => {
+    const pr = { ...PR, body: `certified=${OTHER} ${NAME} ${VERSION}` };
+    const io = fakeIo({ ...staleFailed, pr });
+    const result = await resolvePackage(ctx, io);
+    assert.equal(result.gate, 'certified= line in the merge commit');
+    assert.equal(result.inputs.certified, GOOD);
+    assert.equal(io.calls.some(([c]) => c === 'canWrite'), false);
+  });
+
+  it('refuses a PR body line from an author who cannot write', async () => {
+    const pr = { ...PR, author: 'someone', body: `certified=${GOOD} ${NAME} ${VERSION}` };
+    await assert.rejects(
+      resolvePackage({ ...ctx, message: 'Merge pull request #336' }, fakeIo({ ...staleFailed, pr })),
+      /in the body of PR #336, whose author someone cannot write to this repository/,
+    );
+  });
+
+  it('parses the PR body like the merge commit', async () => {
+    const pr = { ...PR, body: `certified=${GOOD.slice(1)} ${NAME} ${VERSION}` };
+    await assert.rejects(
+      resolvePackage({ ...ctx, message: 'Merge pull request #336' }, fakeIo({ ...staleFailed, pr })),
+      /malformed sha256/,
+    );
   });
 
   it('refuses a wrong-package or wrong-version line', async () => {
     await assert.rejects(
       resolvePackage({ ...ctx, message: `certified=${GOOD} @ai-ecoverse/wasm-sqlite3 3.54.0-1` }, fakeIo(staleFailed)),
-      /no certified=<sha256> @ai-ecoverse\/wasi-impeccable/,
+      /has a certified=<sha256> @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 line, and wasi-impeccable is not in/,
     );
     await assert.rejects(
       resolvePackage({ ...ctx, ciCertified: true, message: `certified=${GOOD} ${NAME} 0.1.14-0` }, fakeIo(staleFailed)),
@@ -304,6 +357,50 @@ describe('resolvePackage', () => {
   });
 });
 
+describe('the pushed range', () => {
+  it('maps each package to the newest first-parent commit that touched it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-range-'));
+    const cwd = process.cwd();
+    const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' }).trim();
+    const touch = (path, text) => {
+      mkdirSync(join(dir, path, '..'), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    };
+    const merge = (branch, path, text) => {
+      git('checkout', '-q', '-b', branch, 'main');
+      touch(path, text);
+      git('add', '-A');
+      git('commit', '-q', '-m', `${branch} change`);
+      git('checkout', '-q', 'main');
+      git('merge', '-q', '--no-ff', '-m', `Merge ${branch}`, branch);
+      return git('rev-parse', 'HEAD');
+    };
+    try {
+      git('init', '-q', '-b', 'main');
+      git('config', 'user.name', 'test');
+      git('config', 'user.email', 'test@example.com');
+      touch('packages/a/recipe.yaml', 'v1');
+      touch('packages/b/package/package.json', '{}');
+      git('add', '-A');
+      git('commit', '-q', '-m', 'base');
+      const base = git('rev-parse', 'HEAD');
+      const a1 = merge('a1', 'packages/a/recipe.yaml', 'v2');
+      const b1 = merge('b1', 'packages/b/package/package.json', '{"v":2}');
+      const doc = merge('doc', 'packages/a/build.sh', 'echo');
+      const a2 = merge('a2', 'packages/a/package/README.md', 'hi');
+      process.chdir(dir);
+      assert.equal(touchingCommit('a', base, a2), a2);
+      assert.equal(touchingCommit('a', base, doc), a1);
+      assert.equal(touchingCommit('b', base, a2), b1);
+      assert.equal(touchingCommit('c', base, a2), a2);
+      assert.equal(touchingCommit('b', `${a2}^`, a2), a2);
+    } finally {
+      process.chdir(cwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('arguments', () => {
   const sha = '233a01bc7ef1691fedbb4f6839c8a346609c15c7';
 
@@ -315,10 +412,19 @@ describe('arguments', () => {
     });
     assert.throws(() => parseArgs(['--package', 'wasi-impeccable', '--sha', '233a01bc']), /usage/);
     assert.throws(() => parseArgs(['--package', '../x', '--sha', sha]), /usage/);
+    assert.throws(() => parseArgs(['--package', 'x', '--sha', sha, '--base', 'HEAD^']), /usage/);
+    assert.equal(parseArgs(['--package', 'x', '--sha', sha, '--base', HEAD]).base, HEAD);
   });
 
   it('accepts the test overrides only with --dry-run', () => {
-    for (const extra of [['--assume-unpublished'], ['--message', ''], ['--head', HEAD], ['--ci-certified', 'sqlite3']]) {
+    const overrides = [
+      ['--assume-unpublished'],
+      ['--message', ''],
+      ['--pr-body', ''],
+      ['--head', HEAD],
+      ['--ci-certified', 'sqlite3'],
+    ];
+    for (const extra of overrides) {
       assert.throws(() => parseArgs(['--package', 'x', '--sha', sha, ...extra]), /need --dry-run/, extra.join(' '));
       assert.doesNotThrow(() => parseArgs(['--package', 'x', '--sha', sha, '--dry-run', ...extra]));
     }

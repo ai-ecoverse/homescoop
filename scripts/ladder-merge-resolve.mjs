@@ -68,18 +68,29 @@ export function tarballProblem(got, { name, version, certified }) {
   return '';
 }
 
-export async function resolvePackage({ pkg, name, version, message, ciCertified, assumeUnpublished }, io) {
+export async function certifiedSha({ name, version, message }, pr, io) {
+  const fromCommit = certFor(message, name, version);
+  if (fromCommit || !pr) return { certified: fromCommit, source: 'merge commit' };
+  const fromBody = certFor(pr.body, name, version);
+  if (fromBody && !(await io.canWrite(pr.author))) {
+    throw new Error(`the certified= line is in the body of PR #${pr.number}, whose author ${pr.author} cannot write to this repository`);
+  }
+  return { certified: fromBody, source: `PR #${pr.number} body` };
+}
+
+export async function resolvePackage(ctx, io) {
+  const { pkg, name, version, ciCertified, assumeUnpublished } = ctx;
   if (!assumeUnpublished && (await io.published(name, version))) {
     return { decision: 'skip', reason: `${name}@${version} is already on npm`, inputs: { package: pkg } };
   }
-  const certified = certFor(message, name, version);
+  const pr = await io.pullRequest();
+  const { certified, source } = await certifiedSha(ctx, pr, io);
   if (!certified && !ciCertified) {
     throw new Error(
-      `${name}@${version} is not on npm, the merge commit has no certified=<sha256> ${name} ${version} line, ` +
-        `and ${pkg} is not in scripts/ci-certified.json`,
+      `${name}@${version} is not on npm, neither the merge commit nor the PR body has a ` +
+        `certified=<sha256> ${name} ${version} line, and ${pkg} is not in scripts/ci-certified.json`,
     );
   }
-  const pr = await io.pullRequest();
   if (!pr) throw new Error('no merged PR for this commit, so there is no ladder-pr artifact to publish');
   const artifactName = `host-${pkg}-pr${pr.number}`;
   const artifacts = (await io.artifacts(artifactName))
@@ -106,7 +117,7 @@ export async function resolvePackage({ pkg, name, version, message, ciCertified,
     }
     return {
       decision: 'publish',
-      gate: certified ? 'certified= line' : 'ci-certified (ladder-pr ci job)',
+      gate: certified ? `certified= line in the ${source}` : 'ci-certified (ladder-pr ci job)',
       reason: `${name}@${version} is not on npm; ${artifactName} artifact ${artifact.id} from run ${run.id} at ${pr.head} has sha256 ${got.sha}`,
       inputs: { package: pkg, certified: got.sha, artifact_pr: String(pr.number), artifact_id: String(artifact.id) },
     };
@@ -114,7 +125,7 @@ export async function resolvePackage({ pkg, name, version, message, ciCertified,
   throw new Error(`${artifactName}: ${mismatches.join(' | ')}`);
 }
 
-function githubIo({ repo, token, sha, head }) {
+function githubIo({ repo, token, sha, head, prBody }) {
   const api = async (path) => {
     const res = await fetch(`https://api.github.com/repos/${repo}${path}`, {
       headers: {
@@ -137,7 +148,16 @@ function githubIo({ repo, token, sha, head }) {
     async pullRequest() {
       const prs = await (await api(`/commits/${sha}/pulls`)).json();
       const pr = prs.find((p) => p.merged_at && p.merge_commit_sha === sha);
-      return pr ? { number: pr.number, head: head || pr.head.sha } : null;
+      if (!pr) return null;
+      return { number: pr.number, head: head || pr.head.sha, body: prBody ?? pr.body ?? '', author: pr.user.login };
+    },
+    async canWrite(login) {
+      const res = await fetch(`https://api.github.com/repos/${repo}/collaborators/${encodeURIComponent(login)}/permission`, {
+        headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}` },
+      });
+      if (res.status === 404) return false;
+      if (!res.ok) throw new Error(`GET collaborators/${login}/permission returned ${res.status}`);
+      return ['admin', 'write'].includes((await res.json()).permission);
     },
     async artifacts(name) {
       const q = new URLSearchParams({ name, per_page: '100' });
@@ -171,18 +191,24 @@ export function parseArgs(argv) {
     const a = argv[i];
     if (a === '--package') args.pkg = argv[++i];
     else if (a === '--sha') args.sha = argv[++i];
+    else if (a === '--base') args.base = argv[++i];
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--head') args.head = argv[++i];
     else if (a === '--message') args.message = argv[++i];
+    else if (a === '--pr-body') args.prBody = argv[++i];
     else if (a === '--ci-certified') args.ciCertified.push(...argv[++i].split(/[\s,]+/).filter(Boolean));
     else if (a === '--assume-unpublished') args.assumeUnpublished = true;
     else throw new Error(`unknown argument ${a}`);
   }
-  if (!/^[a-z0-9][a-z0-9._-]*$/.test(args.pkg ?? '') || !/^[0-9a-f]{40}$/.test(args.sha ?? '')) {
-    throw new Error('usage: ladder-merge-resolve.mjs --package <name> --sha <40-hex merge commit> [--dry-run ...]');
+  const hex40 = /^[0-9a-f]{40}$/;
+  if (!/^[a-z0-9][a-z0-9._-]*$/.test(args.pkg ?? '') || !hex40.test(args.sha ?? '') || (args.base && !hex40.test(args.base))) {
+    throw new Error('usage: ladder-merge-resolve.mjs --package <name> --sha <40-hex pushed head> [--base <40-hex>] [--dry-run ...]');
   }
-  const overrides = args.head || args.message !== undefined || args.ciCertified.length || args.assumeUnpublished;
-  if (overrides && !args.dryRun) throw new Error('--head, --message, --ci-certified and --assume-unpublished need --dry-run');
+  const overrides =
+    args.head || args.message !== undefined || args.prBody !== undefined || args.ciCertified.length || args.assumeUnpublished;
+  if (overrides && !args.dryRun) {
+    throw new Error('--head, --message, --pr-body, --ci-certified and --assume-unpublished need --dry-run');
+  }
   if (args.head && !/^[0-9a-f]{40}$/.test(args.head)) throw new Error('--head needs a 40-hex commit sha');
   return args;
 }
@@ -191,11 +217,19 @@ function git(...argv) {
   return execFileSync('git', argv, { encoding: 'utf8' });
 }
 
-function readContext(args) {
-  const { name, version } = JSON.parse(git('show', `${args.sha}:packages/${args.pkg}/package/package.json`));
+export function touchingCommit(pkg, base, head) {
+  const paths = [`packages/${pkg}/recipe.yaml`, `packages/${pkg}/package`];
+  for (const commit of git('rev-list', '--first-parent', `${base}..${head}`).split('\n').filter(Boolean)) {
+    if (git('diff', '--name-only', `${commit}^1`, commit, '--', ...paths).trim()) return commit;
+  }
+  return head;
+}
+
+function readContext(args, commit) {
+  const { name, version } = JSON.parse(git('show', `${commit}:packages/${args.pkg}/package/package.json`));
   let listed = [];
   try {
-    listed = JSON.parse(git('show', `${args.sha}:scripts/ci-certified.json`)).packages ?? [];
+    listed = JSON.parse(git('show', `${commit}:scripts/ci-certified.json`)).packages ?? [];
   } catch {
     listed = [];
   }
@@ -203,7 +237,7 @@ function readContext(args) {
     pkg: args.pkg,
     name,
     version,
-    message: args.message ?? git('log', '-1', '--format=%B', args.sha),
+    message: args.message ?? git('log', '-1', '--format=%B', commit),
     ciCertified: listed.includes(args.pkg) || args.ciCertified.includes(args.pkg),
     assumeUnpublished: Boolean(args.assumeUnpublished),
   };
@@ -213,13 +247,15 @@ async function main(argv) {
   let label = 'ladder-merge-resolve';
   try {
     const args = parseArgs(argv);
-    label = `${args.pkg} at ${args.sha}${args.dryRun ? ' (dry run)' : ''}`;
-    const ctx = readContext(args);
+    const commit = touchingCommit(args.pkg, args.base ?? `${args.sha}^`, args.sha);
+    label = `${args.pkg} at ${commit}${args.dryRun ? ' (dry run)' : ''}`;
+    const ctx = readContext(args, commit);
     const io = githubIo({
       repo: process.env.GITHUB_REPOSITORY || 'ai-ecoverse/homescoop',
       token: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
-      sha: args.sha,
+      sha: commit,
       head: args.head,
+      prBody: args.prBody,
     });
     const result = await resolvePackage(ctx, io);
     const via = result.gate ? ` via ${result.gate}` : '';
