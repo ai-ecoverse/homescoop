@@ -16,6 +16,47 @@ on:
     branches: [main]
     paths:
       - 'packages/**'
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Dry run, never dispatches ladder-build. Merge commit on main to resolve.
+        required: true
+        type: string
+      before:
+        description: Resolve the pushed range before..sha instead of the one merge (default sha^).
+        required: false
+        default: ''
+        type: string
+      packages:
+        description: JSON list of packages to resolve instead of the publishable ones the merge touched.
+        required: false
+        default: ''
+        type: string
+      assume_unpublished:
+        description: Resolve as if the merged versions were not on npm.
+        required: false
+        default: false
+        type: boolean
+      message:
+        description: Resolve against this text instead of the merge commit message.
+        required: false
+        default: ''
+        type: string
+      pr_body:
+        description: Resolve against this text instead of the PR body.
+        required: false
+        default: ''
+        type: string
+      head:
+        description: Resolve as if the PR had been merged at this head (40 hex).
+        required: false
+        default: ''
+        type: string
+      ci_certified:
+        description: Packages to treat as listed in scripts/ci-certified.json (comma separated).
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -27,22 +68,43 @@ jobs:
     outputs:
       packages: ${{ steps.d.outputs.packages }}
       any: ${{ steps.d.outputs.any }}
+      sha: ${{ steps.d.outputs.sha }}
+      base: ${{ steps.d.outputs.base }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: d
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before || inputs.before }}
+          AFTER: ${{ inputs.sha || github.sha }}
+          ONLY: ${{ inputs.packages }}
         run: |
           set -euo pipefail
-          BEFORE="${{ github.event.before }}"
-          AFTER="${{ github.sha }}"
-          if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
-            BEFORE=$(git rev-parse HEAD^ 2>/dev/null || echo HEAD)
+          if [[ ! "$AFTER" =~ ^[0-9a-f]{7,40}$ ]] || ! FULL=$(git rev-parse --verify --quiet "$AFTER^{commit}"); then
+            echo "::error::sha '$AFTER' is not a commit in this repository"
+            exit 1
           fi
-          PKGS=$(node scripts/list-touched-packages.mjs --base "$BEFORE" --head "$AFTER" --json --publishable)
-          echo "packages=$PKGS" >> "$GITHUB_OUTPUT"
-          echo "any=$([ "$PKGS" != '[]' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "touched=$PKGS"
+          AFTER=$FULL
+          if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+            BEFORE=$(git rev-parse "$AFTER^" 2>/dev/null || echo "$AFTER")
+          elif [[ ! "$BEFORE" =~ ^[0-9a-f]{7,40}$ ]] || ! BEFORE=$(git rev-parse --verify --quiet "$BEFORE^{commit}"); then
+            echo "::error::before is not a commit in this repository"
+            exit 1
+          fi
+          if [[ "$EVENT" == workflow_dispatch && -n "$ONLY" ]]; then
+            PKGS=$(node -e 'const p=JSON.parse(process.argv[1]); if(!Array.isArray(p)||!p.every((x)=>/^[a-z0-9][a-z0-9._-]*$/.test(x))) process.exit(1); console.log(JSON.stringify(p))' "$ONLY")
+          else
+            PKGS=$(node scripts/list-touched-packages.mjs --base "$BEFORE" --head "$AFTER" --json --publishable)
+          fi
+          {
+            echo "sha=$AFTER"
+            echo "base=$BEFORE"
+            echo "packages=$PKGS"
+            echo "any=$([ "$PKGS" != '[]' ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT sha=$AFTER touched=$PKGS"
 
   dispatch:
     needs: detect
@@ -57,66 +119,46 @@ jobs:
       contents: read
       actions: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Resolve what ladder-build may publish for ${{ matrix.package }}
+        id: r
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PKG: ${{ matrix.package }}
+          SHA: ${{ needs.detect.outputs.sha }}
+          BASE: ${{ needs.detect.outputs.base }}
+          ASSUME_UNPUBLISHED: ${{ inputs.assume_unpublished }}
+          MESSAGE: ${{ inputs.message }}
+          PR_BODY: ${{ inputs.pr_body }}
+          HEAD_SHA: ${{ inputs.head }}
+          CI_CERTIFIED: ${{ inputs.ci_certified }}
+        run: |
+          set -euo pipefail
+          args=(--package "$PKG" --sha "$SHA" --base "$BASE")
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            args+=(--dry-run)
+            if [[ "$ASSUME_UNPUBLISHED" == true ]]; then args+=(--assume-unpublished); fi
+            if [[ -n "$MESSAGE" ]]; then args+=(--message "$MESSAGE"); fi
+            if [[ -n "$PR_BODY" ]]; then args+=(--pr-body "$PR_BODY"); fi
+            if [[ -n "$HEAD_SHA" ]]; then args+=(--head "$HEAD_SHA"); fi
+            if [[ -n "$CI_CERTIFIED" ]]; then args+=(--ci-certified "$CI_CERTIFIED"); fi
+          fi
+          node scripts/ladder-merge-resolve.mjs "${args[@]}"
       - name: Dispatch ladder-build for ${{ matrix.package }}
+        if: github.event_name == 'push'
         uses: actions/github-script@v9
+        env:
+          INPUTS: ${{ steps.r.outputs.inputs }}
         with:
           script: |
-            const pkg = '${{ matrix.package }}';
-            const fs = require('fs');
-            const { execSync } = require('child_process');
-            let artifactPr = '';
-            let certified = '';
-
-            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-            });
-            const pr = prs.find((p) => p.merged_at) || prs[0];
-            if (pr) {
-              const name = `host-${pkg}-pr${pr.number}`;
-              const { data } = await github.rest.actions.listArtifactsForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                name,
-                per_page: 5,
-              });
-              const art = data.artifacts?.find((a) => !a.expired);
-              if (art) {
-                const res = await github.rest.actions.downloadArtifact({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  artifact_id: art.id,
-                  archive_format: 'zip',
-                });
-                const zip = `${process.env.RUNNER_TEMP}/merge-cert.zip`;
-                const dir = `${process.env.RUNNER_TEMP}/merge-cert`;
-                fs.writeFileSync(zip, Buffer.from(res.data));
-                execSync(`rm -rf "${dir}" && mkdir -p "${dir}" && unzip -qo "${zip}" -d "${dir}"`);
-                const shaFile = `${dir}/package.tgz.sha256`;
-                const tgz = `${dir}/package.tgz`;
-                if (fs.existsSync(shaFile)) {
-                  certified = fs.readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0];
-                } else if (fs.existsSync(tgz)) {
-                  certified = execSync(`sha256sum "${tgz}"`).toString().split(/\s+/)[0];
-                }
-                if (certified) {
-                  artifactPr = String(pr.number);
-                  console.log(`using certified artifact ${name} sha256=${certified}`);
-                }
-              } else {
-                console.log(`no artifact ${name}; ladder-build will rebuild (needs certified= for first publish)`);
-              }
-            } else {
-              console.log('no associated PR; ladder-build will rebuild');
-            }
-
-            const inputs = { package: pkg };
-            if (artifactPr && certified) {
-              inputs.certified = certified;
-              inputs.artifact_pr = artifactPr;
-            }
-            console.log(`dispatch ladder-build.yml`, inputs);
+            const inputs = JSON.parse(process.env.INPUTS);
+            console.log('dispatch ladder-build.yml', inputs);
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,

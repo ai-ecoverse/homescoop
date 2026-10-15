@@ -220,7 +220,7 @@ homescoop_em_cli_ldflags() {
   local extra="${HOMESCOOP_EM_CLI_LDFLAGS_EXTRA:-}"
   # shellcheck disable=SC2086
   # slicc-writev.js: one FS.write per writev (emscripten 4.0.23 splits per iovec).
-  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 --js-library $(homescoop_slicc_dir)/slicc-writev.js${extra:+ ${extra}}"
+  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 --js-library $(homescoop_slicc_dir)/slicc-writev.js --js-library $(homescoop_slicc_dir)/slicc-linkat.js --js-library $(homescoop_slicc_dir)/slicc-uname.js${extra:+ ${extra}}"
 }
 
 homescoop_slicc_dir() {

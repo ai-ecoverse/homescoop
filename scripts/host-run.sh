@@ -158,10 +158,14 @@ node "$ROOT/scripts/check-exact-pins.mjs" "$name"
 echo "== host-run: assert packaging rev / npm semver (refuse plain X.Y.Z and X.Y-N)"
 node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
 
+echo "== host-run: slicc.commands files are 0755"
+node "$ROOT/scripts/command-modes.mjs" --fix "$PKG/package"
+
 echo "== host-run: npm pack"
 mkdir -p "$OUT"
 tgz="$(npm pack "$PKG/package" --pack-destination "$OUT" | tail -1)"
 cp "$OUT/$tgz" "$OUT/package.tgz"
 echo "== host-run: assert packed tarball version is npm-publishable"
 node "$ROOT/scripts/sync-package-version.mjs" --assert-tarball "$OUT/package.tgz"
+node "$ROOT/scripts/command-modes.mjs" --check "$OUT/package.tgz"
 echo "== host-run: $OUT/package.tgz"

@@ -19,11 +19,72 @@ import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { driftErrors, readText } from './upstream-version-text.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const usage = 'usage: check-package-meta.mjs <package>\n       check-package-meta.mjs --drift (--all | <package>...)';
+
+function readRecipe(pkgName) {
+  const r = spawnSync(process.execPath, [join(root, 'scripts/read-recipe.mjs'), pkgName, '--json'], {
+    encoding: 'utf8',
+    cwd: root,
+  });
+  if (r.status !== 0) throw new Error(r.stderr || `read-recipe ${pkgName} failed`);
+  return JSON.parse(r.stdout);
+}
+
+function packageDrift(pkgName, recipe, pkg) {
+  if (recipe.builder === 'retired') return [];
+  return driftErrors({
+    name: pkgName,
+    upstream: recipe.version,
+    pkg,
+    summary: recipe.summary,
+    readme: readText(join(root, 'packages', pkgName, 'package', 'README.md')),
+  });
+}
+
+if (process.argv.includes('--drift')) {
+  const rest = process.argv.slice(2).filter((a) => a !== '--drift');
+  const all = rest.includes('--all');
+  const names = all
+    ? readdirSync(join(root, 'packages')).filter((n) => existsSync(join(root, 'packages', n, 'recipe.yaml'))).sort()
+    : rest.filter((a) => !a.startsWith('-'));
+  if (!names.length || rest.some((a) => a.startsWith('-') && a !== '--all')) {
+    console.error(usage);
+    process.exit(2);
+  }
+  let failed = 0;
+  let checked = 0;
+  for (const n of names) {
+    const pj = join(root, 'packages', n, 'package', 'package.json');
+    if (!existsSync(pj)) {
+      if (all) continue;
+      console.error(`missing ${pj}`);
+      failed++;
+      continue;
+    }
+    const recipe = readRecipe(n);
+    if (recipe.builder === 'retired') continue;
+    checked++;
+    const errs = packageDrift(n, recipe, JSON.parse(readFileSync(pj, 'utf8')));
+    if (errs.length) {
+      failed++;
+      console.error(`check-package-meta --drift (${n}):`);
+      for (const e of errs) console.error(`  - ${e}`);
+    }
+  }
+  if (failed) {
+    console.error(`check-package-meta --drift: ${failed} of ${checked} packages drift from their recipe`);
+    process.exit(1);
+  }
+  console.log(`check-package-meta --drift: ${checked} packages match their recipe`);
+  process.exit(0);
+}
+
 const name = process.argv[2];
 if (!name || name.startsWith('-')) {
-  console.error('usage: check-package-meta.mjs <package>');
+  console.error(usage);
   process.exit(2);
 }
 
@@ -40,13 +101,7 @@ if (!existsSync(pkgPath)) {
   process.exit(1);
 }
 
-const recipe = JSON.parse(
-  spawnSync(
-    process.execPath,
-    [join(root, 'scripts/read-recipe.mjs'), name, '--json'],
-    { encoding: 'utf8', cwd: root }
-  ).stdout
-);
+const recipe = readRecipe(name);
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const about = recipe.about || {};
 const recipeLic = String(about.license || '').trim();
@@ -161,6 +216,8 @@ if (credUsers.length) {
     errors.push(`${credUsers.length} binaries ask slicc-kernel for user ids (slicc.cred_*, wasix-sysroot >= -20, no fallback): package.json needs "engines": { "slicc-kernel": ">=1.44.0" } or later (got ${JSON.stringify(pkg.engines?.['slicc-kernel'] ?? null)})`);
   }
 }
+
+errors.push(...packageDrift(name, recipe, pkg));
 
 if (errors.length) {
   console.error(`check-package-meta (${name}):`);

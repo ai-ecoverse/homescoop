@@ -32,7 +32,7 @@ on:
         type: boolean
         default: true
       shards:
-        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3; the base sweep runs inside them'
+        description: 'Shard jobs: auto (about 15 min of measured work each, none over about 20 min, at most 10) or 1-10; the base sweep runs inside them'
         type: string
         default: 'auto'
       expect-regressions:
@@ -80,7 +80,7 @@ on:
         type: boolean
         default: true
       shards:
-        description: 'Shard jobs: auto (about 15 min of work each, at most 3) or 1-3'
+        description: 'Shard jobs: auto (about 15 min of measured work each, none over about 20 min, at most 10) or 1-10'
         type: string
         default: 'auto'
 
@@ -92,18 +92,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  plan:
-    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main' && (inputs.homescoop-ref || 'main') == 'main' && (inputs.bios-ref || 'main') == 'main' && startsWith(inputs.kernel, '@ai-ecoverse/slicc-kernel@') && !contains(inputs.kernel, ':') && !contains(inputs.kernel, '#'))) && (inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER) || 'ubuntu-latest' }}
-    timeout-minutes: 20
+  gate:
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["schedule","workflow_dispatch","workflow_run","release"]'), github.event_name) && github.ref == 'refs/heads/main')) && (inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER) || 'ubuntu-latest' }}
+    timeout-minutes: 5
     outputs:
       runner: ${{ steps.runners.outputs.runner }}
       light-runner: ${{ steps.runners.outputs.light-runner }}
-      tag: ${{ steps.plan.outputs.tag }}
-      artifact: ${{ steps.plan.outputs.artifact }}
-      shards: ${{ steps.plan.outputs.shards }}
-      count: ${{ steps.plan.outputs.count }}
-      homescoop-sha: ${{ steps.plan.outputs.homescoop-sha }}
+      parallel: ${{ steps.runners.outputs.parallel }}
     steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
       - id: runners
         env:
           SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
@@ -116,26 +115,29 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           RUNNER: ${{ inputs.runner || vars.CERT_RUNNER }}
           LIGHT: ${{ inputs.light-runner || vars.CERT_LIGHT_RUNNER || inputs.runner || vars.CERT_RUNNER }}
+          COMPARE_JS: |
+            const url = `https://api.github.com/repos/${process.argv[1]}/compare/main...${process.argv[2]}`;
+            const get = (auth) => fetch(url, { headers: { Accept: "application/vnd.github+json", "User-Agent": "homescoop-kernel-compat", ...(auth ? { Authorization: `Bearer ${auth}` } : {}) } });
+            (async () => {
+              let r = process.env.GITHUB_TOKEN ? await get(process.env.GITHUB_TOKEN) : null;
+              if (!r || !r.ok) r = await get("");
+              if (!r.ok) throw new Error(`compare ${process.argv[2]}: HTTP ${r.status}`);
+              console.log((await r.json()).status);
+            })().catch((e) => { console.error(String(e.message || e)); process.exit(1); });
         run: |
           set -euo pipefail
           pool() {
-            echo "runner=${RUNNER:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
-            echo "light-runner=${LIGHT:-ubuntu-latest}" >> "$GITHUB_OUTPUT"
-            echo "runners: ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}: $1"
+            local parallel=3
+            [[ -n "$RUNNER" ]] && parallel=10
+            printf 'runner=%s\nlight-runner=%s\nparallel=%s\n' "${RUNNER:-ubuntu-latest}" "${LIGHT:-ubuntu-latest}" "$parallel" >> "$GITHUB_OUTPUT"
+            echo "runners: ${RUNNER:-ubuntu-latest}, light ${LIGHT:-ubuntu-latest}, $parallel shards at once: $1"
           }
           hosted() {
-            echo "runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            echo "light-runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
-            echo "runners: ubuntu-latest: $1"
+            printf 'runner=ubuntu-latest\nlight-runner=ubuntu-latest\nparallel=3\n' >> "$GITHUB_OUTPUT"
+            echo "runners: ubuntu-latest, 3 shards at once: $1"
           }
           compare() {
-            local url="https://api.github.com/repos/$1/compare/main...$2"
-            if [[ -n "${GITHUB_TOKEN:-}" ]] && curl -fsS --retry 2 -H "Authorization: Bearer $GITHUB_TOKEN" -H 'Accept: application/vnd.github+json' "$url" -o "$RUNNER_TEMP/compare.json"; then
-              :
-            else
-              curl -fsS --retry 2 -H 'Accept: application/vnd.github+json' "$url" -o "$RUNNER_TEMP/compare.json" || return 1
-            fi
-            jq -r .status "$RUNNER_TEMP/compare.json"
+            node -e "$COMPARE_JS" "$1" "$2"
           }
           on_main() {
             local status
@@ -158,6 +160,18 @@ jobs:
           else
             pool "$EVENT on $REF, homescoop-ref $HOMESCOOP_REF and bios-ref $BIOS_REF on main, kernel $KERNEL"
           fi
+
+  plan:
+    needs: gate
+    runs-on: ${{ needs.gate.outputs.light-runner }}
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      artifact: ${{ steps.plan.outputs.artifact }}
+      shards: ${{ steps.plan.outputs.shards }}
+      count: ${{ steps.plan.outputs.count }}
+      homescoop-sha: ${{ steps.plan.outputs.homescoop-sha }}
+    steps:
       - uses: actions/checkout@v7
         with:
           repository: ai-ecoverse/homescoop
@@ -199,16 +213,16 @@ jobs:
           overwrite: true
 
   shard:
-    needs: plan
+    needs: [gate, plan]
     if: needs.plan.outputs.count != '0'
-    runs-on: ${{ needs.plan.outputs.runner }}
+    runs-on: ${{ needs.gate.outputs.runner }}
     timeout-minutes: 75
     outputs:
       verdict: ${{ steps.report.outputs.verdict }}
       regressions: ${{ steps.report.outputs.regressions }}
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: ${{ fromJSON(needs.gate.outputs.parallel || '3') }}
       matrix:
         shard: ${{ fromJson(needs.plan.outputs.shards) }}
     steps:
@@ -263,9 +277,9 @@ jobs:
           if-no-files-found: ignore
 
   report:
-    needs: [plan, shard]
+    needs: [gate, plan, shard]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.count != '1' }}
-    runs-on: ${{ needs.plan.outputs.light-runner }}
+    runs-on: ${{ needs.gate.outputs.light-runner }}
     timeout-minutes: 15
     outputs:
       verdict: ${{ steps.report.outputs.verdict }}

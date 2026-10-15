@@ -34,3 +34,24 @@ single exec already lands under the child's pid. The old shim loses the pid
 only on exec chains within one image, which `shims/slicc/test/exec.test.mjs`
 covers (#145). Here the compressor case is a regression guard: it must be
 tar's direct child in `/proc`, and its status must reach tar.
+
+## linkat and glue mode (1.35.0-6)
+
+Against the published `@ai-ecoverse/wasm-tar` 1.35.0-5 (slicc-kernel 1.88.0,
+2026-10-15), checklist.mjs and users.mjs pass, but linkat.mjs fails at its
+first check:
+
+```
+browser-cert: FAIL packages/tar/cert/linkat.mjs
+AssertionError [ERR_ASSERTION]: tar.wasm imports env.__syscall_linkat (the slicc shim beats libc's weak stub)
+```
+
+In 1.35.0-5, libc's weak stub answers EMLINK inside the wasm, so no kernel
+could link. Its `bin/tar` glue is also 0644 (`-rw-r--r--`); host-run's
+command-modes check refuses that for -6.
+
+`glue-mode.mjs` (added after 1.35.0-6 was published, cert-only) against
+1.35.0-5 on slicc-kernel 1.88.0 (users enforce): FAIL. `bin/tar` is 644 in the
+tarball, so the first assertion (`755 …/bin/tar`) fails, and running it by
+path as cone is refused with rc 126 (`Permission denied`), as coreutils
+9.12.0-5 is. 1.35.0-6 installs both files 755 and runs by path.

@@ -36,10 +36,14 @@ on:
         required: false
         default: ''
         type: string
+      artifact_id:
+        description: With artifact_pr, the id of that host-<pkg>-prN artifact to fetch (ladder-merge passes the one it checked). Empty looks it up by name.
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
-  id-token: write
   actions: read
 
 jobs:
@@ -108,6 +112,8 @@ jobs:
     steps:
       - name: Download ladder-pr certified tarball
         uses: actions/github-script@v9
+        env:
+          ARTIFACT_ID: ${{ inputs.artifact_id }}
         with:
           script: |
             const pkg = '${{ inputs.package }}';
@@ -117,14 +123,27 @@ jobs:
               throw new Error('artifact_pr requires certified=<64-char sha256>');
             }
             const name = `host-${pkg}-pr${pr}`;
-            const { data } = await github.rest.actions.listArtifactsForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name,
-              per_page: 5,
-            });
-            const art = data.artifacts?.find((a) => !a.expired);
-            if (!art) throw new Error(`no artifact named ${name}`);
+            const id = process.env.ARTIFACT_ID.trim();
+            let art;
+            if (id) {
+              if (!/^[0-9]+$/.test(id)) throw new Error(`artifact_id ${id} is not a number`);
+              ({ data: art } = await github.rest.actions.getArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: Number(id),
+              }));
+              if (art.name !== name) throw new Error(`artifact ${id} is ${art.name}, not ${name}`);
+              if (art.expired) throw new Error(`artifact ${id} (${name}) has expired`);
+            } else {
+              const { data } = await github.rest.actions.listArtifactsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name,
+                per_page: 5,
+              });
+              art = data.artifacts?.find((a) => !a.expired);
+              if (!art) throw new Error(`no artifact named ${name}`);
+            }
             const res = await github.rest.actions.downloadArtifact({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -149,7 +168,7 @@ jobs:
               if (recorded !== got) throw new Error(`artifact sha file ${recorded} != ${got}`);
             }
             fs.copyFileSync(tgz, `${process.env.RUNNER_TEMP}/package.tgz`);
-            core.info(`certified artifact ${name} sha256=${got}`);
+            core.info(`certified artifact ${name} id=${art.id} sha256=${got}`);
       - uses: actions/upload-artifact@v7
         with:
           name: package-tgz-${{ inputs.package }}
@@ -226,6 +245,7 @@ jobs:
   publish:
     needs: [resolve, host-build, slicc-build, fetch-certified]
     if: >-
+      github.ref == 'refs/heads/main' &&
       always() && needs.resolve.outputs.do_publish == 'true' && (
         needs.host-build.result == 'success' ||
         needs.slicc-build.result == 'success' ||

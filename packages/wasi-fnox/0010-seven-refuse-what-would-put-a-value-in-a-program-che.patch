@@ -1,0 +1,136 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Mon, 12 Oct 2026 15:18:55 +0200
+Subject: [PATCH 10/13] seven: refuse what would put a value in a program,
+ check placeholders
+
+On WASI, `sync` and `reencrypt` fail with "not available in seven: the
+value would be in a program (use a header rule)", and decrypting an
+age secret fails with "age secrets aren't supported in seven yet
+(slicc-vault#2)"; encrypting to age recipients still works. `fnox
+check` asks /dev/sealed for each sealed secret's record with
+`placeholder {name}` and reports removed records and placeholders the
+vault does not know, and warns about records that no rule names yet.
+
+diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
+index 3b505a7..0934c5d 100644
+--- a/crates/fnox-core/src/providers/age.rs
++++ b/crates/fnox-core/src/providers/age.rs
+@@ -332,6 +332,28 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+             .collect()
+     }
+ 
++    #[cfg(target_os = "wasi")]
++    async fn get_secret(&self, _value: &str) -> Result<String> {
++        Err(FnoxError::Seven(crate::sealed::AGE_UNSUPPORTED.to_string()))
++    }
++
++    #[cfg(target_os = "wasi")]
++    async fn get_secrets_batch(
++        &self,
++        secrets: &[(String, String)],
++    ) -> HashMap<String, Result<String>> {
++        secrets
++            .iter()
++            .map(|(key, _)| {
++                (
++                    key.clone(),
++                    Err(FnoxError::Seven(crate::sealed::AGE_UNSUPPORTED.to_string())),
++                )
++            })
++            .collect()
++    }
++
++    #[cfg(not(target_os = "wasi"))]
+     async fn get_secret(&self, value: &str) -> Result<String> {
+         if let Some((wrapped_key, ciphertext)) = Self::parse_batch_value(value) {
+             let batch_key = self.decrypt_batch_key(wrapped_key).await?;
+@@ -341,6 +363,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+         self.decrypt_age_value(value).await
+     }
+ 
++    #[cfg(not(target_os = "wasi"))]
+     async fn get_secrets_batch(
+         &self,
+         secrets: &[(String, String)],
+diff --git a/src/commands/check.rs b/src/commands/check.rs
+index eba2adb..c710080 100644
+--- a/src/commands/check.rs
++++ b/src/commands/check.rs
+@@ -103,6 +103,40 @@ impl CheckCommand {
+                                 continue;
+                             }
+ 
++                            if matches!(
++                                providers.get(resolution_provider),
++                                Some(ProviderConfig::Sealed { .. })
++                            ) {
++                                match fnox_core::sealed::placeholder(&name) {
++                                    Ok(record) if record.state == "removed" => {
++                                        issues.push(format!(
++                                            "Secret '{}' was removed from seven's vault",
++                                            name
++                                        ));
++                                    }
++                                    Ok(record)
++                                        if secret_config.value()
++                                            != Some(record.placeholder.as_str()) =>
++                                    {
++                                        issues.push(format!(
++                                            "Secret '{}' has a placeholder seven's vault does not know; run `fnox set {}`",
++                                            name, name
++                                        ));
++                                    }
++                                    Ok(record) if record.state == "inert" => {
++                                        warnings.push(format!(
++                                            "Secret '{}' is in seven's vault, but no rule names it yet",
++                                            name
++                                        ));
++                                    }
++                                    Ok(_) => {}
++                                    Err(err) => {
++                                        issues.push(format!("Secret '{}': {}", name, err));
++                                    }
++                                }
++                                continue;
++                            }
++
+                             // Try to actually resolve the secret from the provider
+                             match crate::daemon::resolve_one(
+                                 cli,
+diff --git a/src/commands/reencrypt.rs b/src/commands/reencrypt.rs
+index f4cd6af..ad3927c 100644
+--- a/src/commands/reencrypt.rs
++++ b/src/commands/reencrypt.rs
+@@ -39,6 +39,13 @@ pub struct ReencryptCommand {
+ 
+ impl ReencryptCommand {
+     pub async fn run(&self, cli: &Cli, merged_config: Config) -> Result<()> {
++        #[cfg(target_os = "wasi")]
++        {
++            let _ = (cli, merged_config);
++            return Err(FnoxError::Seven(
++                fnox_core::sealed::REFUSED_IN_SEVEN.to_string(),
++            ));
++        }
+         let profile = Config::get_profiles(cli.profile.as_slice());
+         tracing::debug!(
+             "Re-encrypting secrets for profiles '{}'",
+diff --git a/src/commands/sync.rs b/src/commands/sync.rs
+index 506ec31..f5bf862 100644
+--- a/src/commands/sync.rs
++++ b/src/commands/sync.rs
+@@ -47,6 +47,13 @@ pub struct SyncCommand {
+ 
+ impl SyncCommand {
+     pub async fn run(&self, cli: &Cli, merged_config: Config) -> Result<()> {
++        #[cfg(target_os = "wasi")]
++        {
++            let _ = (cli, merged_config);
++            return Err(FnoxError::Seven(
++                fnox_core::sealed::REFUSED_IN_SEVEN.to_string(),
++            ));
++        }
+         let profile = Config::get_profiles(cli.profile.as_slice());
+         let write_profile = Config::resolve_write_profile(&profile, cli.write_profile.as_deref())?;
+         tracing::debug!("Syncing secrets for profile '{}'", write_profile);

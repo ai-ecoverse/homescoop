@@ -540,24 +540,22 @@ rm -rf "$DEST/bin" "$DEST/lib" "$DEST/share"
 mkdir -p "$DEST/bin" "$DEST/lib"
 # Prefer the asyncified artifact kept before DESTDIR install.
 if [[ -f "$WORK/ruby.asyncified.wasm" ]]; then
-  cp "$WORK/ruby.asyncified.wasm" "$DEST/bin/ruby.wasm"
+  cp "$WORK/ruby.asyncified.wasm" "$DEST/bin/ruby"
 elif [[ -f "$STAGE_ROOT/bin/ruby" ]]; then
-  cp "$STAGE_ROOT/bin/ruby" "$DEST/bin/ruby.wasm"
+  cp "$STAGE_ROOT/bin/ruby" "$DEST/bin/ruby"
 elif [[ -f "$STAGE_ROOT/bin/ruby.wasm" ]]; then
-  cp "$STAGE_ROOT/bin/ruby.wasm" "$DEST/bin/ruby.wasm"
+  cp "$STAGE_ROOT/bin/ruby.wasm" "$DEST/bin/ruby"
 elif [[ -f "$WORK/build/ruby" ]]; then
-  cp "$WORK/build/ruby" "$DEST/bin/ruby.wasm"
+  cp "$WORK/build/ruby" "$DEST/bin/ruby"
 fi
-test -f "$DEST/bin/ruby.wasm"
-# SLICC launch.resolve / MRI posix_spawnp PATH preflight need bin/ruby present;
-# host then loads adjacent ruby.wasm via modulePath. Tiny #!wasm stub only —
-# never a second full wasm copy.
-printf '%s\n' '#!wasm' > "$DEST/bin/ruby"
-chmod +x "$DEST/bin/ruby"
-# RubyGems wrappers (gem/bundle/rake) — absolute args need these files present
+test -f "$DEST/bin/ruby"
+[[ "$(head -c 4 "$DEST/bin/ruby" | od -An -tx1 | tr -d ' \n')" == 0061736d ]] || { echo "homescoop wasix-ruby: bin/ruby is not a wasm module" >&2; exit 1; }
+chmod 0755 "$DEST/bin/ruby"
 for s in gem bundle bundler rake irb erb; do
   if [[ -f "$STAGE_ROOT/bin/$s" ]]; then
-    cp "$STAGE_ROOT/bin/$s" "$DEST/bin/$s"
+    sed '1s|^#!.*ruby[^ ]*|#!/usr/bin/env ruby|' "$STAGE_ROOT/bin/$s" > "$DEST/bin/$s"
+    chmod 0755 "$DEST/bin/$s"
+    [[ "$(head -n 1 "$DEST/bin/$s")" == '#!/usr/bin/env ruby' ]] || { echo "homescoop wasix-ruby: bin/$s shebang: $(head -n 1 "$DEST/bin/$s")" >&2; exit 1; }
   fi
 done
 
@@ -566,8 +564,8 @@ done
 # Never re-run wasm-opt if it already transformed (Fatal: export already exists).
 # Never partial-relink only wasm/{setjmp,fiber,machine}.o with a new
 # WASM_*_STACK_BUFFER_SIZE — jmp_buf layout must match every TU in libruby.
-if [[ -f "$DEST/bin/ruby.wasm" ]]; then
-  echo "== wasix-ruby: linked $(wc -c < "$DEST/bin/ruby.wasm") bytes (asyncify via POSTLINK; no second wasm-opt)"
+if [[ -f "$DEST/bin/ruby" ]]; then
+  echo "== wasix-ruby: linked $(wc -c < "$DEST/bin/ruby") bytes (asyncify via POSTLINK; no second wasm-opt)"
 fi
 
 if [[ -d "$STAGE_ROOT/lib/ruby" ]]; then
@@ -692,9 +690,38 @@ if [[ -n "$API_LIB" ]]; then
   done
 fi
 
+python3 - "$API_LIB" <<'PY'
+import sys
+from pathlib import Path
+conf = next(Path(sys.argv[1]).glob("*/rbconfig.rb"))
+text = conf.read_text()
+old = '''  def RbConfig.ruby
+    File.join(
+      RbConfig::CONFIG["bindir"],
+      RbConfig::CONFIG["ruby_install_name"] + RbConfig::CONFIG["EXEEXT"]
+    )
+  end
+'''
+new = '''  def RbConfig.ruby
+    name = RbConfig::CONFIG["ruby_install_name"] + RbConfig::CONFIG["EXEEXT"]
+    own = File.join(RbConfig::CONFIG["bindir"], name)
+    ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).each do |dir|
+      next unless dir.start_with?("/")
+      path = File.join(dir, name)
+      return path if path != own && File.file?(path)
+    end
+    own
+  end
+'''
+if text.count(old) != 1:
+    raise SystemExit(f"homescoop wasix-ruby: RbConfig.ruby not found once in {conf}")
+conf.write_text(text.replace(old, new))
+print(f"RbConfig.ruby: the ruby on PATH, else bin/ruby ({conf.relative_to(Path(sys.argv[1]).parent.parent.parent)})")
+PY
+
 homescoop_stage_license "$SRC/COPYING" "$SRC/BSDL" 2>/dev/null || \
   homescoop_stage_license "$SRC/COPYING" "$SRC/LEGAL"
-homescoop_notices_begin "ruby.wasm statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc)."
+homescoop_notices_begin "bin/ruby statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc)."
 homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
@@ -752,15 +779,15 @@ from pathlib import Path
 dest, ver, pkg_ver, openssl_note, asyncify_buf = (
     Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
 )
-wasm = dest / "bin" / "ruby.wasm"
+wasm = dest / "bin" / "ruby"
 b = wasm.read_bytes()
 if b"epoll_create (errno:%d)" in b or b"epoll_create (errno:" in b:
-    raise SystemExit("PRESTAGE fail: ruby.wasm still contains epoll_create rb_bug — MN/epoll path compiled in")
+    raise SystemExit("PRESTAGE fail: bin/ruby still contains epoll_create rb_bug — MN/epoll path compiled in")
 if b.count(b"asyncify_start_unwind") < 1:
-    raise SystemExit("PRESTAGE fail: ruby.wasm missing asyncify_start_unwind")
+    raise SystemExit("PRESTAGE fail: bin/ruby missing asyncify_start_unwind")
 # date_core must be statically linked
 if b"Date::Error" not in b and b"date_core" not in b and b"invalid date" not in b:
-    raise SystemExit("PRESTAGE fail: ruby.wasm does not look like it linked date_core")
+    raise SystemExit("PRESTAGE fail: bin/ruby does not look like it linked date_core")
 print("PRESTAGE static: no epoll_create rb_bug; asyncify ok; date strings present")
 # SLICC default PATH is /usr/bin:/workspace/... — not the npm package bin.
 # User gem bin first so gem/bundle executables are found by Ruby child processes.
@@ -839,7 +866,7 @@ pkg = {
     "slicc": {
         "abi": "wasi",
         "commands": {
-            "ruby": {"wasm": "bin/ruby.wasm", "env": dict(base_env)},
+            "ruby": {"wasm": "bin/ruby", "env": dict(base_env)},
         },
     },
 }
@@ -859,7 +886,7 @@ for cmd in ("gem", "bundle", "rake", "irb", "erb"):
     script = dest / "bin" / cmd
     if script.is_file():
         pkg["slicc"]["commands"][cmd] = {
-            "wasm": "bin/ruby.wasm",
+            "wasm": "bin/ruby",
             "args": ["${package}/bin/" + cmd],
             "env": dict(env),
         }

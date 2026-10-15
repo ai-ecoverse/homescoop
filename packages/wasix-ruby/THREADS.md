@@ -32,4 +32,4 @@ Expect `CHILD` then `42`. Then Queue / ConditionVariable / Mutex across 2 thread
 ## Homescoop cut (parent)
 - Keep `--with-thread=pthread` (do **not** use `thread=none`).
 - Socket C ext with CMSG / `MSG_CONTROL` undef.
-- Spawn: posix_spawn → proc_spawn3; `bin/ruby` = `#!wasm`; full gemspec lib.
+- Spawn: posix_spawn → proc_spawn3; `bin/ruby` is the wasm module (a `#!wasm` marker up to 3.4.11-11); full gemspec lib.

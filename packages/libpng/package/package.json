@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-libpng",
-  "version": "1.6.50",
+  "version": "1.6.59-1",
   "description": "libpng PNG library (WASM / emscripten, SLICC homescoop ladder)",
   "license": "libpng-2.0",
   "repository": {
@@ -27,6 +27,6 @@
   },
   "homescoop": {
     "recipe": "libpng",
-    "upstream": "1.6.50"
+    "upstream": "1.6.59"
   }
 }

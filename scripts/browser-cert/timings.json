@@ -29,47 +29,541 @@
       "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38595997470",
       "kernel": "1.81.0",
       "set": "base,ci-certified"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/homescoop/actions/runs/38631280134",
+      "kernel": "1.86.0",
+      "set": "all"
+    },
+    {
+      "run": "https://github.com/ai-ecoverse/slicc-kernel/actions/runs/38723150068",
+      "kernel": "1.88.0",
+      "set": "base,catalog,all"
     }
   ],
   "seconds": {
-    "base-sweep:enforce": 103,
-    "base-sweep:report": 95,
-    "bash": 263,
-    "bzip2": 21,
+    "base-sweep:enforce": 83,
+    "base-sweep:report": 85,
+    "bash": 71,
+    "binutils": 10,
+    "bzip2": 8,
     "coreutils": 19,
-    "curl": 10,
-    "diffutils": 10,
-    "findutils": 12,
+    "curl": 9,
+    "diffutils": 9,
+    "file": 14,
+    "findutils": 14,
     "gawk": 5,
-    "git": 33,
-    "grep": 4,
+    "git": 36,
+    "grep": 3,
     "gzip": 7,
+    "imagemagick": 8,
     "jq": 4,
     "less": 6,
-    "mount": 6,
+    "libheif": 50,
+    "mount": 5,
+    "nano": 7,
     "ncurses-utils": 5,
-    "patch": 9,
+    "patch": 11,
     "pkgconf": 4,
     "poppler": 11,
-    "procps": 10,
-    "qpdf": 10,
-    "rsync": 292,
-    "screen": 194,
-    "sed": 4,
-    "tar": 47,
-    "tree": 5,
-    "uv-shim": 111,
-    "wasi-biome": 11,
-    "wasi-dig": 5,
-    "wasi-esbuild": 7,
+    "procps": 11,
+    "py-matplotlib": 1115,
+    "qpdf": 13,
+    "rsync": 87,
+    "screen": 21,
+    "sed": 5,
+    "sqlite3": 6,
+    "tar": 28,
+    "tree": 6,
+    "util-linux": 7,
+    "uv-shim": 162,
+    "wasi-biome": 10,
+    "wasi-dig": 6,
+    "wasi-esbuild": 6,
+    "wasi-gh": 20,
+    "wasi-hf": 55,
+    "wasi-impeccable": 9,
     "wasi-ripgrep": 8,
-    "wasi-typescript": 14,
-    "wasix-gnupg": 18,
-    "wasix-perl": 104,
-    "wasix-python": 337,
-    "wasix-ruby": 795,
+    "wasi-typescript": 17,
+    "wasix-gnupg": 21,
+    "wasix-perl": 171,
+    "wasix-python": 2238,
+    "wasix-ruby": 755,
     "which": 5,
     "xxd": 4,
     "xz": 6
+  },
+  "versions": {
+    "bash@5.3.0-18": {
+      "setup": 12,
+      "specs": {
+        "checklist.mjs": 4,
+        "jobs.mjs": 12,
+        "net.mjs": 2,
+        "pipes.mjs": 3,
+        "selfkill.mjs": 2,
+        "sigint-line.mjs": 35,
+        "umask.mjs": 3,
+        "users.mjs": 2,
+        "writes.mjs": 1
+      },
+      "runs": {}
+    },
+    "binutils@2.47.0-3": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 6
+      },
+      "runs": {}
+    },
+    "bzip2@1.0.8-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 4
+      },
+      "runs": {}
+    },
+    "coreutils@9.12.0-5": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2,
+        "exec-pid.mjs": 1,
+        "timeout-hostname.mjs": 9,
+        "users.mjs": 5
+      },
+      "runs": {}
+    },
+    "curl@8.22.0-4": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 4,
+        "tailnet.mjs": 1
+      },
+      "runs": {}
+    },
+    "diffutils@3.12.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 6
+      },
+      "runs": {}
+    },
+    "file@5.46.0-3": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 10
+      },
+      "runs": {}
+    },
+    "findutils@4.11.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 11
+      },
+      "runs": {}
+    },
+    "gawk@5.4.1-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 1,
+        "inet.mjs": 1
+      },
+      "runs": {}
+    },
+    "git@2.55.0-15": {
+      "setup": 6,
+      "specs": {
+        "checklist.mjs": 17,
+        "tailnet.mjs": 7,
+        "users.mjs": 8
+      },
+      "runs": {}
+    },
+    "grep@3.12.0-3": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 1
+      },
+      "runs": {}
+    },
+    "gzip@1.15.0-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 1,
+        "mtime.mjs": 3
+      },
+      "runs": {}
+    },
+    "imagemagick@7.1.2-32-4": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 3
+      },
+      "runs": {}
+    },
+    "jq@1.8.2-2": {
+      "setup": 5,
+      "specs": {
+        "basic.mjs": 1
+      },
+      "runs": {}
+    },
+    "less@668.0.0-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 3
+      },
+      "runs": {}
+    },
+    "libheif@1.23.6-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 46
+      },
+      "runs": {}
+    },
+    "mount@1.0.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2
+      },
+      "runs": {}
+    },
+    "nano@8.7.1-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 3
+      },
+      "runs": {}
+    },
+    "ncurses-utils@6.5.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2
+      },
+      "runs": {}
+    },
+    "patch@2.8.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 7
+      },
+      "runs": {}
+    },
+    "pkgconf@2.5.1-1": {
+      "setup": 5,
+      "specs": {
+        "pc.mjs": 1
+      },
+      "runs": {}
+    },
+    "poppler@26.10.0-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 7
+      },
+      "runs": {}
+    },
+    "procps@4.0.5-3": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2,
+        "exec-pid.mjs": 2,
+        "users.mjs": 4
+      },
+      "runs": {}
+    },
+    "procps@4.0.7-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2,
+        "exec-pid.mjs": 2,
+        "users.mjs": 4
+      },
+      "runs": {}
+    },
+    "py-matplotlib@3.11.2-7": {
+      "setup": 50,
+      "specs": {
+        "discovery.mjs": 207,
+        "sidemods.mjs": 24
+      },
+      "runs": {
+        "discovery.mjs": 4
+      }
+    },
+    "qpdf@12.4.2-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 9
+      },
+      "runs": {}
+    },
+    "rsync@3.4.4-5": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 70,
+        "daemon.mjs": 5,
+        "tailnet.mjs": 1,
+        "users.mjs": 8
+      },
+      "runs": {}
+    },
+    "screen@5.0.1-10": {
+      "setup": 6,
+      "specs": {
+        "checklist.mjs": 4,
+        "reattach.mjs": 7,
+        "users.mjs": 6
+      },
+      "runs": {}
+    },
+    "sed@4.10.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 1
+      },
+      "runs": {}
+    },
+    "sed@4.9.0-3": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 1
+      },
+      "runs": {}
+    },
+    "sqlite3@3.54.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2
+      },
+      "runs": {}
+    },
+    "tar@1.35.0-5": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 19,
+        "users.mjs": 6
+      },
+      "runs": {}
+    },
+    "tree@2.3.2-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2
+      },
+      "runs": {}
+    },
+    "util-linux@2.42.4-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 3
+      },
+      "runs": {}
+    },
+    "uv-shim@0.1.0-6": {
+      "setup": 14,
+      "specs": {
+        "checklist.mjs": 148
+      },
+      "runs": {}
+    },
+    "wasi-biome@2.5.15-2": {
+      "setup": 6,
+      "specs": {
+        "checklist.mjs": 5
+      },
+      "runs": {}
+    },
+    "wasi-dig@0.1.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 3
+      },
+      "runs": {}
+    },
+    "wasi-dig@0.1.0-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2
+      },
+      "runs": {}
+    },
+    "wasi-esbuild@0.28.2-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 2
+      },
+      "runs": {}
+    },
+    "wasi-gh@2.102.0-1": {
+      "setup": 8,
+      "specs": {
+        "checklist.mjs": 8,
+        "clipboard.mjs": 5,
+        "z-missing-host.mjs": 1
+      },
+      "runs": {}
+    },
+    "wasi-hf@0.1.0-2": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 12
+      },
+      "runs": {
+        "checklist.mjs": 4
+      }
+    },
+    "wasi-impeccable@0.1.14-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 5
+      },
+      "runs": {}
+    },
+    "wasi-ripgrep@15.2.0-3": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 4
+      },
+      "runs": {}
+    },
+    "wasi-typescript@7.0.2-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 12
+      },
+      "runs": {}
+    },
+    "wasix-gnupg@2.4.9-5": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 9,
+        "modes.mjs": 4,
+        "users.mjs": 6
+      },
+      "runs": {}
+    },
+    "wasix-perl@5.42.0-10": {
+      "setup": 10,
+      "specs": {
+        "checklist.mjs": 9,
+        "cwd.mjs": 6,
+        "handles.mjs": 1,
+        "modes.mjs": 2,
+        "prove.mjs": 11,
+        "regex.mjs": 4,
+        "signals.mjs": 3,
+        "times.mjs": 1,
+        "users.mjs": 1
+      },
+      "runs": {
+        "handles.mjs": 4,
+        "prove.mjs": 4
+      }
+    },
+    "wasix-perl@5.42.0-11": {
+      "setup": 10,
+      "specs": {
+        "checklist.mjs": 7,
+        "cwd.mjs": 5,
+        "handles.mjs": 1,
+        "modes.mjs": 2,
+        "prove.mjs": 10,
+        "regex.mjs": 3,
+        "signals.mjs": 3,
+        "times.mjs": 1,
+        "users.mjs": 1
+      },
+      "runs": {}
+    },
+    "wasix-python@3.14.2-16": {
+      "setup": 47,
+      "specs": {
+        "checklist.mjs": 98,
+        "ctypes-varargs.mjs": 2,
+        "ctypes.mjs": 2,
+        "discovery.mjs": 219,
+        "fifo.mjs": 3,
+        "modes.mjs": 69,
+        "round17.mjs": 81,
+        "sidemods.mjs": 29,
+        "signals.mjs": 6,
+        "stdlib.mjs": 6,
+        "tty.mjs": 2,
+        "users.mjs": 3
+      },
+      "runs": {
+        "discovery.mjs": 4,
+        "round17.mjs": 4
+      }
+    },
+    "wasix-python@3.14.2-18": {
+      "setup": 46,
+      "specs": {
+        "checklist.mjs": 84,
+        "ctypes-varargs.mjs": 2,
+        "ctypes.mjs": 2,
+        "discovery.mjs": 210,
+        "fifo.mjs": 3,
+        "modes.mjs": 55,
+        "round17.mjs": 94,
+        "sidemods.mjs": 25,
+        "signals.mjs": 6,
+        "stdlib.mjs": 5,
+        "tty.mjs": 2,
+        "users.mjs": 2
+      },
+      "runs": {}
+    },
+    "wasix-ruby@3.4.11-10": {
+      "setup": 24,
+      "specs": {
+        "checklist.mjs": 60,
+        "modes.mjs": 4,
+        "net.mjs": 41,
+        "signals.mjs": 12,
+        "threads.mjs": 39,
+        "times.mjs": 6,
+        "users.mjs": 7
+      },
+      "runs": {
+        "times.mjs": 4
+      }
+    },
+    "wasix-ruby@3.4.11-11": {
+      "setup": 11,
+      "specs": {
+        "checklist.mjs": 61,
+        "modes.mjs": 5,
+        "net.mjs": 44,
+        "signals.mjs": 12,
+        "threads.mjs": 45,
+        "times.mjs": 8,
+        "users.mjs": 8
+      },
+      "runs": {}
+    },
+    "which@2.23.0-1": {
+      "setup": 5,
+      "specs": {
+        "checklist.mjs": 1
+      },
+      "runs": {}
+    },
+    "xxd@9.2.1172-1": {
+      "setup": 5,
+      "specs": {
+        "roundtrip.mjs": 1
+      },
+      "runs": {}
+    },
+    "xz@5.8.4-1": {
+      "setup": 5,
+      "specs": {
+        "roundtrip.mjs": 3
+      },
+      "runs": {}
+    }
   }
 }

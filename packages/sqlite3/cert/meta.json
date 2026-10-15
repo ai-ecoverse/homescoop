@@ -6,6 +6,8 @@
     "a file database written by one sqlite3 process is read by the next (count, sum)",
     "-csv -header and -json output, a dot-command script on stdin (list mode, separator, group_concat, a window function), .import --csv",
     "compiled-in FTS5, RTREE, math functions and JSON",
+    "WAL (3.54.0-2, SQLITE_OMIT_WAL, homescoop#344): pragma journal_mode=wal answers delete and the following create/insert/select work; the file reopens (insert, sum, journal_mode still delete); .dump replays into a new database with the same rows. 3.54.0-1: 'wal', then disk I/O error and the file no longer opens",
+    "host WAL (3.54.0-3, homescoop#359): a WAL-format database made by host sqlite3 3.54.0 (cert/host-wal.db, header bytes 18/19 = 2) fails read-write and -readonly with 'file is not a database (26)', rc 1; the installed README names that error, the host-side 'pragma journal_mode=delete' fix and one process per database at a time (slicc-kernel#665)",
     "errors: a text file opened as a database gives 'file is not a database', rc 1; a syntax error rc 1; .load fails (SQLITE_OMIT_LOAD_EXTENSION)"
   ]
 }
