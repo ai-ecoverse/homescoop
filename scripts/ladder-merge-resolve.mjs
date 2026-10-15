@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 export const LADDER_PR = '.github/workflows/ladder-pr.yml';
 export const RENOVATE = 'renovate[bot]';
+export const CERT_REVIEW = '.github/workflows/cert-review.yml';
 const SHA256 = /^[0-9a-f]{64}$/;
 
 export function parseCertLines(message) {
@@ -69,18 +70,99 @@ export function tarballProblem(got, { name, version, certified }) {
   return '';
 }
 
+function runProblems(run) {
+  const problems = [];
+  if (run.path !== CERT_REVIEW) problems.push(`run ${run.id} is ${run.path}, not ${CERT_REVIEW}`);
+  if (run.event !== 'workflow_run' && run.event !== 'workflow_dispatch') problems.push(`run ${run.id} is a ${run.event} run`);
+  if (run.head_branch !== 'main') problems.push(`run ${run.id} ran on ${run.head_branch}, not main`);
+  if (run.status !== 'completed' || run.conclusion !== 'success') {
+    problems.push(`run ${run.id} concluded ${run.conclusion || run.status}`);
+  }
+  return problems;
+}
+
+function recordProblems({ run, artifact, pr }, record) {
+  const problems = [];
+  if (artifact.name !== `cert-review-record-${pr.number}`) {
+    problems.push(`artifact ${artifact.id} is ${artifact.name}, not cert-review-record-${pr.number}`);
+  }
+  if (artifact.workflow_run?.id !== run.id) problems.push(`artifact ${artifact.id} is from run ${artifact.workflow_run?.id}, not ${run.id}`);
+  if (artifact.expired) problems.push(`artifact ${artifact.id} has expired`);
+  if (problems.length || record === undefined) return problems;
+  if (!record) return [`artifact ${artifact.id} has no record.json`];
+  if (record.pr !== pr.number) problems.push(`its record is for PR #${record.pr}, not #${pr.number}`);
+  if (record.head !== pr.head) problems.push(`its record is for ${record.head}, not the merged head ${pr.head}`);
+  if (record.cert_review_run !== run.id) problems.push(`its record names run ${record.cert_review_run}, not ${run.id}`);
+  if (!Array.isArray(record.lines)) problems.push('its record has no lines');
+  return problems;
+}
+
+async function unlessGone(request) {
+  try {
+    return await request;
+  } catch (err) {
+    if (err.status === 404) return undefined;
+    throw err;
+  }
+}
+
+export async function certReview(pr, io) {
+  const status = (await io.statuses(pr.head)).find(
+    (st) => st.context === 'cert-review' && st.creator?.login === 'github-actions[bot]',
+  );
+  if (!status) return { state: 'absent' };
+  const url = status.target_url ?? '';
+  const target = url.match(/\/actions\/runs\/(\d+)\/artifacts\/(\d+)$/);
+  if (status.state !== 'success') return { state: status.state, url, runId: target ? Number(target[1]) : undefined };
+  const said = String(status.description ?? '').match(/\brun (\d+), record artifact (\d+)$/);
+  if (!target || !said || said[1] !== target[1] || said[2] !== target[2]) {
+    const problem = `its target_url '${url}' and description '${status.description}' don't name the same run and record artifact`;
+    return { state: 'invalid', url, problem };
+  }
+  const runId = Number(target[1]);
+  const found = { run: await unlessGone(io.run(runId)), artifact: await unlessGone(io.artifact(Number(target[2]))), pr };
+  if (!found.run || !found.artifact) {
+    const gone = !found.run ? `run ${runId}` : `record artifact ${target[2]}`;
+    return { state: 'invalid', url, problem: `${gone} no longer exists` };
+  }
+  let problems = [...runProblems(found.run), ...recordProblems(found)];
+  let record;
+  if (!problems.length) {
+    record = await unlessGone(io.record(found.artifact));
+    if (record === undefined) return { state: 'invalid', url, problem: `record artifact ${target[2]} no longer exists` };
+    problems = recordProblems(found, record);
+  }
+  if (problems.length) return { state: 'invalid', url, problem: problems.join('; ') };
+  return { state: 'success', url, runId, text: record.lines.join('\n') };
+}
+
+function describeReview(review, name, version) {
+  if (review.state === 'absent') return 'there is no cert-review status on the merged head';
+  if (review.state === 'success') return `cert-review run ${review.runId} has no line for ${name} ${version}`;
+  const problem = review.problem ? `: ${review.problem}` : '';
+  return `the cert-review status is ${review.state}${problem} (${review.url})`;
+}
+
 export async function certifiedSha({ name, version, message }, pr, io) {
-  const sources = [
+  const human = [
     { source: 'merge commit', text: message },
     { source: `PR #${pr.number} body`, text: pr.body },
   ];
-  const named = sources.some(({ text }) => parseCertLines(text).some((l) => l.name === name));
-  if (named && !(await io.canWrite(pr.author))) {
-    return { certified: null, ignored: `PR #${pr.number} is by ${pr.author}, who cannot write to this repository` };
-  }
+  const named = human.some(({ text }) => parseCertLines(text).some((l) => l.name === name));
+  const ignored =
+    named && !(await io.canWrite(pr.author))
+      ? `PR #${pr.number} is by ${pr.author}, who cannot write to this repository`
+      : undefined;
+  const sources = ignored ? [] : human;
   for (const { source, text } of sources) {
     const certified = certFor(text, name, version);
     if (certified) return { certified, source };
+  }
+  const review = await certReview(pr, io);
+  if (review.text !== undefined) {
+    const certified = certFor(review.text, name, version);
+    if (certified) return { certified, source: `cert-review run ${review.runId}`, review };
+    sources.push({ source: `cert-review run ${review.runId}`, text: review.text });
   }
   const stale = sources.flatMap(({ source, text }) =>
     parseCertLines(text)
@@ -90,7 +172,7 @@ export async function certifiedSha({ name, version, message }, pr, io) {
   if (stale.length) {
     throw new Error(`the certified= lines name ${name} ${stale.join(', ')}, but the merged package.json is ${name} ${version}`);
   }
-  return { certified: null };
+  return { certified: null, ignored, review };
 }
 
 export async function resolvePackage(ctx, io) {
@@ -100,12 +182,21 @@ export async function resolvePackage(ctx, io) {
   }
   const pr = await io.pullRequest();
   if (!pr) throw new Error('no merged PR for this commit, so there is no ladder-pr artifact to publish');
-  const { certified, source, ignored } = await certifiedSha(ctx, pr, io);
+  const { certified, source, ignored, review } = await certifiedSha(ctx, pr, io);
   if (!certified && !ciCertified) {
     const why = ignored
-      ? `its certified= lines don't count because ${ignored}`
+      ? `the merge commit's and PR body's certified= lines don't count because ${ignored}`
       : `neither the merge commit nor the PR body has a certified=<sha256> ${name} ${version} line`;
-    throw new Error(`${name}@${version} is not on npm, ${why}, and ${pkg} is not in scripts/ci-certified.json`);
+    throw new Error(
+      `${name}@${version} is not on npm, ${why}, ${describeReview(review, name, version)}, ` +
+        `and ${pkg} is not in scripts/ci-certified.json`,
+    );
+  }
+  if (!certified && (review.state === 'failure' || review.state === 'error')) {
+    throw new Error(
+      `${name}@${version} has no certified= line, and the cert-review status on ${pr.head} is ${review.state}, ` +
+        `which vetoes the ci-job path: cert-review run ${review.runId ?? '(none named)'}, ${review.url}`,
+    );
   }
   if (!certified && pr.author !== RENOVATE && (ignored || !(await io.canWrite(pr.author)))) {
     throw new Error(
@@ -147,7 +238,7 @@ export async function resolvePackage(ctx, io) {
   throw new Error(`${artifactName}${note}: ${mismatches.join(' | ')}`);
 }
 
-function githubIo({ repo, token, sha, head, prBody }) {
+function githubIo({ repo, token, sha, head, prBody, prNumber }) {
   const api = async (path) => {
     const res = await fetch(`https://api.github.com/repos/${repo}${path}`, {
       headers: {
@@ -156,8 +247,15 @@ function githubIo({ repo, token, sha, head, prBody }) {
         'x-github-api-version': '2022-11-28',
       },
     });
-    if (!res.ok) throw new Error(`GET ${path} returned ${res.status}`);
+    if (!res.ok) throw Object.assign(new Error(`GET ${path} returned ${res.status}`), { status: res.status });
     return res;
+  };
+  const unzip = async (artifact) => {
+    const res = await api(`/actions/artifacts/${artifact.id}/zip`);
+    const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-'));
+    writeFileSync(join(dir, 'artifact.zip'), Buffer.from(await res.arrayBuffer()));
+    execFileSync('unzip', ['-qo', join(dir, 'artifact.zip'), '-d', join(dir, 'out')]);
+    return join(dir, 'out');
   };
   return {
     async published(name, version) {
@@ -168,8 +266,8 @@ function githubIo({ repo, token, sha, head, prBody }) {
       throw new Error(`GET ${url} returned ${res.status}`);
     },
     async pullRequest() {
-      const prs = await (await api(`/commits/${sha}/pulls`)).json();
-      const pr = prs.find((p) => p.merged_at && p.merge_commit_sha === sha);
+      const prs = prNumber ? [await (await api(`/pulls/${prNumber}`)).json()] : await (await api(`/commits/${sha}/pulls`)).json();
+      const pr = prs.find((p) => prNumber || (p.merged_at && p.merge_commit_sha === sha));
       if (!pr) return null;
       return { number: pr.number, head: head || pr.head.sha, body: prBody ?? pr.body ?? '', author: pr.user.login };
     },
@@ -191,12 +289,18 @@ function githubIo({ repo, token, sha, head, prBody }) {
     async jobs(id) {
       return (await (await api(`/actions/runs/${id}/jobs?filter=latest&per_page=100`)).json()).jobs ?? [];
     },
+    async statuses(ref) {
+      return (await api(`/commits/${ref}/statuses?per_page=100`)).json();
+    },
+    async artifact(id) {
+      return (await api(`/actions/artifacts/${id}`)).json();
+    },
+    async record(artifact) {
+      const file = join(await unzip(artifact), 'record.json');
+      return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+    },
     async download(artifact) {
-      const res = await api(`/actions/artifacts/${artifact.id}/zip`);
-      const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-'));
-      writeFileSync(join(dir, 'artifact.zip'), Buffer.from(await res.arrayBuffer()));
-      execFileSync('unzip', ['-qo', join(dir, 'artifact.zip'), '-d', join(dir, 'out')]);
-      const tgz = join(dir, 'out', 'package.tgz');
+      const tgz = join(await unzip(artifact), 'package.tgz');
       if (!existsSync(tgz)) return {};
       const shaFile = `${tgz}.sha256`;
       const recorded = existsSync(shaFile) ? readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0] : undefined;
@@ -218,6 +322,7 @@ export function parseArgs(argv) {
     else if (a === '--head') args.head = argv[++i];
     else if (a === '--message') args.message = argv[++i];
     else if (a === '--pr-body') args.prBody = argv[++i];
+    else if (a === '--pr') args.prNumber = argv[++i];
     else if (a === '--ci-certified') args.ciCertified.push(...argv[++i].split(/[\s,]+/).filter(Boolean));
     else if (a === '--assume-unpublished') args.assumeUnpublished = true;
     else throw new Error(`unknown argument ${a}`);
@@ -227,10 +332,16 @@ export function parseArgs(argv) {
     throw new Error('usage: ladder-merge-resolve.mjs --package <name> --sha <40-hex pushed head> [--base <40-hex>] [--dry-run ...]');
   }
   const overrides =
-    args.head || args.message !== undefined || args.prBody !== undefined || args.ciCertified.length || args.assumeUnpublished;
+    args.head ||
+    args.prNumber ||
+    args.message !== undefined ||
+    args.prBody !== undefined ||
+    args.ciCertified.length ||
+    args.assumeUnpublished;
   if (overrides && !args.dryRun) {
-    throw new Error('--head, --message, --pr-body, --ci-certified and --assume-unpublished need --dry-run');
+    throw new Error('--head, --pr, --message, --pr-body, --ci-certified and --assume-unpublished need --dry-run');
   }
+  if (args.prNumber && !/^[1-9][0-9]*$/.test(args.prNumber)) throw new Error('--pr needs a PR number');
   if (args.head && !/^[0-9a-f]{40}$/.test(args.head)) throw new Error('--head needs a 40-hex commit sha');
   return args;
 }
@@ -278,6 +389,7 @@ async function main(argv) {
       sha: commit,
       head: args.head,
       prBody: args.prBody,
+      prNumber: args.prNumber,
     });
     const result = await resolvePackage(ctx, io);
     const via = result.gate ? ` via ${result.gate}` : '';

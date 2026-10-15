@@ -45,12 +45,19 @@ ladder-pr run at that PR's merged head that concluded `success`, and one of:
   and version, whose sha equals the artifact's `package.tgz`. The merge
   commit message is read first, then the PR body. Lines count only when the
   PR's author can write to the repository, since GitHub can fill the merge
-  message from PR text. Within the source it resolves from, another line
-  naming the package at a different version fails; or
+  message from PR text. Third comes the CI cert review: the newest
+  `cert-review` commit status on the merged head from `github-actions[bot]`,
+  if it is `success`, its `target_url` and description name the same run
+  and record artifact, the run is main's `cert-review.yml` (`workflow_run`
+  or `workflow_dispatch`, concluded `success`), and that artifact is the
+  run's `cert-review-record-<pr>`, naming this PR, this head and that run. Its lines need no writer, since main's workflow produced them. Within
+  the source it resolves from, another line naming the package at a
+  different version fails; or
 - no line for the package, the package in `scripts/ci-certified.json`, a PR
   by `renovate[bot]` or by a writer (a fork can't vouch for its own
-  ladder-pr run, whose workflow file it controls), and that run's `ci` job
-  green.
+  ladder-pr run, whose workflow file it controls), that run's `ci` job
+  green, and no `cert-review` status of `failure` or `error` on the head (a
+  failed review vetoes; an absent or pending one doesn't).
 
 Anything else (no line, a wrong version or malformed sha, a stale head, a
 failed run, an expired or missing artifact, a sha mismatch) fails the
@@ -61,8 +68,8 @@ when dispatched on `main`.
 
 Dry run: `gh workflow run ladder-merge.yml -f sha=<merge commit>` resolves
 and prints the decision without dispatching. `before`, `packages`,
-`assume_unpublished`, `message`, `pr_body`, `head` and `ci_certified`
-simulate the other cases.
+`assume_unpublished`, `message`, `pr_body`, `pr`, `head` and `ci_certified`
+simulate the other cases (`pr` resolves an open PR, with `sha` its head).
 
 **Manual:** laptop `npm publish` of the exact certified tarball, then land,
 or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
