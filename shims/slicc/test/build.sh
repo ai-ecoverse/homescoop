@@ -50,6 +50,12 @@ emcc -O2 -Wall -Wextra -Werror "$HERE/selfkill-test.c" \
   -o "$OUT/selfkill-test.js"
 mv "$OUT/selfkill-test.js" "$OUT/selfkill-test"
 echo "== built $OUT/selfkill-test"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/uname-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_em_cli_ldflags) \
+  -o "$OUT/uname-test.js"
+mv "$OUT/uname-test.js" "$OUT/uname-test"
+echo "== built $OUT/uname-test"
 
 SLICC_FORK="$WORK/libslicc-fork.a"
 homescoop_slicc_archive "$SLICC_FORK" fork

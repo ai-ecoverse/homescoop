@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
+import { isSpelling, loadAllow, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -138,13 +139,19 @@ if (assertTarballIdx >= 0) {
   process.exit(0);
 }
 
-const name = argv.find((a) => !a.startsWith('-'));
+const fromIdx = argv.indexOf('--from');
+const from = fromIdx >= 0 ? argv[fromIdx + 1] : undefined;
+if (fromIdx >= 0 && (!from || from.startsWith('-'))) {
+  console.error('usage: sync-package-version.mjs <package> --write --from <previous upstream>');
+  process.exit(2);
+}
+const name = argv.find((a, i) => !a.startsWith('-') && (fromIdx < 0 || i !== fromIdx + 1));
 const write = argv.includes('--write');
 const assertPublishable = argv.includes('--assert-publishable');
 
 if (!name) {
   console.error(
-    'usage: sync-package-version.mjs <package> [--write] [--assert-publishable]\n' +
+    'usage: sync-package-version.mjs <package> [--write [--from <previous upstream>]] [--assert-publishable]\n' +
       '       sync-package-version.mjs --assert-tarball <package.tgz>',
   );
   process.exit(2);
@@ -211,13 +218,71 @@ if (!sameUpstream) {
 
 refuseUnpublishable('computed', next);
 
-if (write && next !== current) {
-  pkg.version = next;
-  if (!pkg.homescoop) pkg.homescoop = {};
-  pkg.homescoop.upstream = upstream;
-  pkg.homescoop.recipe = name;
-  writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
-  console.error(`sync-package-version: ${name} ${current} → ${next}`);
+function setJsonString(raw, re, value) {
+  return raw.replace(re, (m, head) => `${head}${JSON.stringify(value)}`);
+}
+
+function logRewrite(file, offsetLine, r) {
+  for (const c of r.changes) {
+    console.error(`sync-package-version: ${name} ${file}:${offsetLine + c.line - 1} ${c.from} → ${c.to}: ${c.excerpt}`);
+  }
+  for (const k of r.kept) {
+    console.error(`sync-package-version: ${name} ${file}:${offsetLine + k.line - 1} kept ${k.from} (${k.reason}): ${k.excerpt}`);
+  }
+}
+
+const allow = loadAllow();
+const hsUpstream = pkg.homescoop?.upstream;
+const previous = from ?? String(hsUpstream ?? versionBase(current));
+const rewriteText = write && !isSpelling(allow, name, upstream, previous);
+const upstreamStale = (next !== current && hsUpstream === undefined) || (hsUpstream !== undefined && !isSpelling(allow, name, upstream, hsUpstream));
+if (write && (next !== current || rewriteText || upstreamStale)) {
+  const raw = readFileSync(pkgPath, 'utf8');
+  const want = JSON.parse(raw);
+  let out = raw;
+  if (next !== current) {
+    want.version = next;
+    out = setJsonString(out, /^(\s*"version"\s*:\s*)"(?:[^"\\]|\\.)*"/m, next);
+    console.error(`sync-package-version: ${name} ${current} → ${next}`);
+  }
+  if (upstreamStale) {
+    if (!want.homescoop) want.homescoop = {};
+    want.homescoop.upstream = upstream;
+    want.homescoop.recipe = name;
+    out = setJsonString(out, /("upstream"\s*:\s*)"(?:[^"\\]|\\.)*"/, upstream);
+    out = setJsonString(out, /("recipe"\s*:\s*)"(?:[^"\\]|\\.)*"/, name);
+    console.error(`sync-package-version: ${name} homescoop.upstream ${hsUpstream ?? '(none)'} → ${upstream}`);
+  }
+  if (rewriteText) {
+    const ctx = { allow, name };
+    if (typeof want.description === 'string') {
+      const r = rewriteUpstream(want.description, previous, upstream, ctx);
+      logRewrite('package/package.json description', 1, r);
+      if (r.changes.length) {
+        want.description = r.text;
+        out = setJsonString(out, /^(\s*"description"\s*:\s*)"(?:[^"\\]|\\.)*"/m, r.text);
+      }
+    }
+    const recipePath = join(root, 'packages', name, 'recipe.yaml');
+    const recipeRaw = readFileSync(recipePath, 'utf8');
+    const sum = summaryLine(recipeRaw);
+    if (sum) {
+      const r = rewriteUpstream(sum.text, previous, upstream, ctx);
+      logRewrite('recipe.yaml', recipeRaw.slice(0, sum.index).split('\n').length, r);
+      if (r.changes.length) {
+        writeFileSync(recipePath, recipeRaw.slice(0, sum.index) + r.text + recipeRaw.slice(sum.index + sum.text.length));
+      }
+    }
+    const readmePath = join(root, 'packages', name, 'package', 'README.md');
+    if (existsSync(readmePath)) {
+      const r = rewriteUpstream(readFileSync(readmePath, 'utf8'), previous, upstream, ctx);
+      logRewrite('package/README.md', 1, r);
+      if (r.changes.length) writeFileSync(readmePath, r.text);
+    }
+  }
+  let same = false;
+  try { same = JSON.stringify(JSON.parse(out)) === JSON.stringify(want); } catch { same = false; }
+  writeFileSync(pkgPath, same ? out : `${JSON.stringify(want, null, 2)}\n`);
 }
 
 console.log(next);

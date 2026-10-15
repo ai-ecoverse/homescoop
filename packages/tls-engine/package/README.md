@@ -1,7 +1,7 @@
 # @ai-ecoverse/wasm-tls-engine
 
 The server side of TLS for [SLICC](https://github.com/ai-ecoverse/slicc)'s
-wasm-realm HTTP proxy (ai-ecoverse/slicc#3571): Mbed TLS 3.6.5 sessions over
+wasm-realm HTTP proxy (ai-ecoverse/slicc#3571): Mbed TLS 3.6.7 sessions over
 memory buffers, compiled with Emscripten to an ES module factory plus
 `slicc-tls-engine.wasm`.
 

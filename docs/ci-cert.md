@@ -156,7 +156,7 @@ jobs:
 | `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
 | `runner` | `''` | `runs-on` for the shards: `inputs.runner \|\| vars.CERT_RUNNER`, **only for a same-repo PR or a trusted run on main** (see [Runners](#runners-and-capacity)), else `ubuntu-latest` |
 | `light-runner` | `''` | `runs-on` for plan and report: `inputs.light-runner \|\| vars.CERT_LIGHT_RUNNER`, else the shards' runner, under the same rule, else `ubuntu-latest` |
-| `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, at most 3) or `1`–`3` |
+| `shards` | `auto` | shard jobs: `auto` (about 15 min of estimated work each, and more shards until none is over about 20 min, at most 10) or `1`–`10` |
 | `fail-on-regression` | `true` | `false` reports regressions without failing |
 | `expect-regressions` | `''` | a negative proof: recipes that must regress, in their spec and in the base sweep. The report fails if one doesn't; other regressions are listed but don't fail it |
 
@@ -228,16 +228,16 @@ jobs:
   `uses:` and `homescoop-ref` for a reproducible run, and `bios-ref` for a
   fixed base set and reference kernel. A pinned sha keeps the pool for a
   trusted event as long as it is on main (a merged commit, not a PR head).
-- **Time:** `base,ci-certified` is a plan job (about 1 min) and one shard
-  (about 8–10 min) on `ubuntu-latest`, plus the queue; `all` takes 2–3
-  shards of up to about 25 min.
+- **Time:** `base,ci-certified` is a gate and a plan job (seconds each) and
+  one shard of about 10 min. `all` is about 4 shards and `base,catalog,all`
+  about 6, none over about 20 min, run side by side on the pool.
 
 ### Jobs
 
 Hosted runners queue jobs for a long time (18–45 min a job on the org's pool
 when it is busy), while the work is minutes, so a call runs as few jobs as it
-can: a gate job, one plan job, 1–3 shard jobs, and a report job only when
-there is more than one shard. The gate and plan take seconds; on the light
+can: a gate job, one plan job, the shard jobs (as many as keep each under
+about 20 min), and a report job only when there is more than one shard. The gate and plan take seconds; on the light
 pool each gets a machine within about a minute.
 
 0. **gate** decides where the other jobs run (see
@@ -249,21 +249,36 @@ pool each gets a machine within about a minute.
    recorded sha), resolves the candidate and the reference kernel (bios's pin
    of `@ai-ecoverse/slicc-kernel`), lists the packages and their versions,
    and reads the base-set tarballs' `slicc.commands` for the sweep. It packs
-   the work into `shards` jobs by the seconds each package and sweep mode
-   took in earlier runs ([`timings.json`](../scripts/browser-cert/timings.json)),
-   or an estimate for what isn't there (10 s plus 4 s a spec; 2.5 min a sweep
-   mode). Refresh it from runs' artifacts with
-   `node scripts/browser-cert/compat.mjs timings --compat a/compat.json,b/compat.json`
-   (each package keeps the longest of the runs given). `plan.json`, `candidate.tgz` and
-   `reference.tgz` go to the `kernel-compat-<tag>-plan` artifact.
-2. **shard** (matrix, `max-parallel: 3`, on `runner` where allowed) runs its packages, then
+   the work into shard jobs by what it took in earlier runs
+   ([`timings.json`](../scripts/browser-cert/timings.json)):
+   - **`versions`**, per `recipe@version`: each spec file's seconds, how many
+     runs a failing one took (the candidate, its retry, the reference, the
+     reference's retry), and the setup each run pays (Chrome, the install
+     into OPFS). A package whose estimate is over about 20 min is split by
+     spec file into parts, each a unit of its own (the bios-pinned
+     `wasix-python@3.14.2-16`: `discovery.mjs` in one part, the other
+     specs in another). A version with no entry uses the cheapest measured
+     version of its recipe, as if it passed;
+   - **`seconds`**, per recipe and sweep mode: the fallback, then an
+     estimate (10 s plus 4 s a spec; 2.5 min a sweep mode).
+
+   With `shards: auto` it starts with one shard per about 15 min and adds
+   shards (up to 10) until none is over about 20 min. Refresh the timings
+   from runs' artifacts with
+   `node scripts/browser-cert/compat.mjs timings --compat a/compat.json,b/compat.json`.
+   `plan.json`, `candidate.tgz` and `reference.tgz` go to the
+   `kernel-compat-<tag>-plan` artifact.
+2. **shard** (matrix, on `runner` where allowed: 10 at once on the pool, 3 on
+   hosted runners) runs its packages (or parts of them), then
    its sweep modes:
    - each package through `scripts/browser-cert/run.mjs --kernel
      candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
      `needs` / `needsTarballScripts` / `needsRepack` installed as `ladder-pr`
      does, with `--soft` (below). A failed case no known limit covers is
      retried once (one that passes the second time passes, marked flaky),
-     then the package runs again on the reference kernel;
+     then run on the reference kernel. Retries and reference runs repeat
+     only the spec files with open failures (`run.mjs --spec`), not the
+     whole package;
    - the **base-set sweep**, once per users mode (`report`, `enforce`): every
      base-set tarball but the kernel in one kernel, and
      [`base-sweep/sweep.mjs`](../scripts/browser-cert/base-sweep/sweep.mjs)
@@ -385,6 +400,13 @@ git's `libexec/git-core/*`) needs that x bit. Older kernels have no
 `kernel.chmod` and keep the defaults. `--json` and `compat.json` say which
 (`modes: tarball` or `kernel defaults`).
 
+**Modes and the reference kernel:** a reference before 1.86.0 has no
+`kernel.chmod`, so it runs with the default modes. A package that ships a
+wrong mode (a `bin/` file `0644`) passes there and fails on a candidate that
+stamps the tarball's modes, which kernel-compat reports as a regression.
+That is the package's bug: add a known limit scoped to the versions before
+the fix (as for `wasm-coreutils` before 9.12.0-6, #332).
+
 **The owner gap:** only modes are stamped, not owners. bios's installer
 writes its files before the first boot and stamps them with `writeMetadata`
 (`@ai-ecoverse/slicc-kernel/meta`), which can also set `uid` and `gid`. The
@@ -405,6 +427,7 @@ changes the boot order for every cert.
 | `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
 | `--json <file>` | per-spec results: `{ kernel, users, modes, tarballs, specs: [{ spec, status, durationMs, error, cases: { pass: [id], fail: [{ id, message }] }, crash? }], pageErrors, status }` |
 | `--soft` | a failed `ctx.assert` is recorded and the spec goes on (kernel-compat); without it the first failure ends the spec, as `ladder-pr` wants |
+| `--spec <file.mjs>` (repeatable) | run only these spec files of the cert directory |
 
 ### Runners and capacity
 
@@ -414,7 +437,9 @@ changes the boot order for every cert.
   share that pool with `ladder-pr`; hence the bounds below.
 - `concurrency`: one group per caller repo, PR (or ref), kernel, set and
   bios-ref; a PR caller's newer run cancels the older one.
-- One call is at most 1 + 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
+- One call is a gate, a plan, up to 10 shards and a report job. On the pool
+  10 shards run at once (cloud-run-bench has up to 30 machines); on hosted
+  runners 3, so a fork PR's call doesn't crowd out `ladder-pr`. The usual
   `base,ci-certified` call is a gate, a plan and one shard job.
 - **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
   `cloud-run-bench`) can reach the GCP metadata server and the pool's
