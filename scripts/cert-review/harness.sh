@@ -20,9 +20,18 @@ install() {
   npm install --prefix "$prefix" --no-fund --no-audit "$@"
 }
 
-kernel=$(field kernel | head -1)
+if [ -f scripts/browser-cert/cert-kernel.mjs ] && [ -f scripts/dev-pin.mjs ]; then
+  kernel=$(node scripts/browser-cert/cert-kernel.mjs "$pkg")
+  shared=$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
+  playwright=$(node scripts/dev-pin.mjs playwright-core)
+else
+  kernel=$(field kernel | head -1)
+  kernel=${kernel:-@ai-ecoverse/slicc-kernel@1.9.0}
+  shared='@ai-ecoverse/slicc-shared-web@^1.4.1'
+  playwright='playwright-core@1.63.0'
+fi
 mkdir -p "$prefix"
-install "${kernel:-@ai-ecoverse/slicc-kernel@1.9.0}" @ai-ecoverse/slicc-shared-web@^1.4.1 playwright-core@1.63.0
+install "$kernel" "$shared" "$playwright"
 
 needs=$(node -e '
   const fs = require("fs");
