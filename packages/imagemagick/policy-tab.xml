@@ -12,9 +12,9 @@
   <!ATTLIST policy value CDATA #IMPLIED>
 ]>
 <policymap>
-  <policy domain="resource" name="memory" value="768MiB"/>
-  <policy domain="resource" name="map" value="512MiB"/>
-  <policy domain="resource" name="disk" value="512MiB"/>
+  <policy domain="resource" name="memory" value="1536MiB"/>
+  <policy domain="resource" name="map" value="256MiB"/>
+  <policy domain="resource" name="disk" value="0"/>
   <policy domain="resource" name="area" value="64MP"/>
   <policy domain="resource" name="width" value="16KP"/>
   <policy domain="resource" name="height" value="16KP"/>

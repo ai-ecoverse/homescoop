@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ImageMagick 7.1.2-33 utilities/magick — port of slicc-emscripten harness/ladder.sh rung_magick.
+# ImageMagick 7.1.2-34 utilities/magick — port of slicc-emscripten harness/ladder.sh rung_magick.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=../../scripts/build-common.sh
@@ -107,7 +107,7 @@ for d in "$CFG_DEST" "$CFG_OPEN"; do
   perl -0 -i -pe 's{^\s*<delegate decode="svg" command="&apos;rsvg-convert&apos;[^\n]*\n}{}m; s{^\s*<!-- Change export-filename to export-png for inkscape[^\n]*\n}{}m; s{^\s*<delegate decode="svg:decode"[^\n]*inkscape[^\n]*\n}{}m' "$d/delegates.xml"
   if grep -q 'inkscape\|rsvg-convert' "$d/delegates.xml"; then echo "homescoop: $d/delegates.xml still names inkscape/rsvg-convert" >&2; exit 1; fi
 done
-grep -q 'name="area" value="64MP"' "$CFG_DEST/policy.xml"
+grep -q 'name="disk" value="0"' "$CFG_DEST/policy.xml"
 
 # argv0 aliases are declared in package.json (convert/identify/mogrify → magick).
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt

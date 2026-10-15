@@ -5,7 +5,8 @@ source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe imagemagick-heif
 
 TB="$WORK/ImageMagick-${VER}.tar.gz"
-SRC="$WORK/ImageMagick-${VER}"
+mkdir -p "$WORK/imagemagick-heif"
+SRC="$WORK/imagemagick-heif/ImageMagick-${VER}"
 
 homescoop_fetch "$URL" "$SHA" "$TB"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC"; fi
@@ -99,7 +100,7 @@ for d in "$CFG_DEST" "$CFG_OPEN"; do
   perl -0 -i -pe 's{^\s*<delegate decode="svg" command="&apos;rsvg-convert&apos;[^\n]*\n}{}m; s{^\s*<!-- Change export-filename to export-png for inkscape[^\n]*\n}{}m; s{^\s*<delegate decode="svg:decode"[^\n]*inkscape[^\n]*\n}{}m' "$d/delegates.xml"
   if grep -q 'inkscape\|rsvg-convert' "$d/delegates.xml"; then echo "homescoop: $d/delegates.xml still names inkscape/rsvg-convert" >&2; exit 1; fi
 done
-grep -q 'name="area" value="64MP"' "$CFG_DEST/policy.xml"
+grep -q 'name="disk" value="0"' "$CFG_DEST/policy.xml"
 
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
 homescoop_notices_begin "magick.wasm statically links the following delegate libraries, including libheif and libde265 (LGPL-3.0-or-later; libde265 is an HEVC decoder, and HEVC is patent-encumbered) from @ai-ecoverse/wasm-libheif. No MPEG-family video codec. share/imagemagick-heif/relink holds magick's objects and every other library it links, so it can be relinked against a modified libheif or libde265 (README.md, Relinking)."

@@ -19,7 +19,7 @@ export default async function policy(ctx) {
   const tab = limits(list.stdout);
   assert.deepEqual(
     [tab.Width, tab.Height, tab.Area, tab.Memory, tab.Map, tab.Disk],
-    ['16000P', '16000P', '64MP', '768MiB', '512MiB', '512MiB'],
+    ['16000P', '16000P', '64MP', '1.5GiB', '256MiB', '0B'],
     `default limits: ${list.stdout}`,
   );
   const pol = await run(['magick', '-list', 'policy']);
@@ -42,11 +42,32 @@ export default async function policy(ctx) {
   assert.equal(raise.status, 1, '-limit cannot raise a policy limit');
   assert.match(raise.stderr, /width or height exceeds limit/);
 
-  const photo = await timed(['magick', '-size', '8064x6048', 'gradient:red-blue', '-resize', '25%', '-quality', '85', 'photo.jpg']);
-  assert.equal(photo.status, 0, `48MP resize: rc ${photo.status} ${photo.stderr}`);
-  assert.doesNotMatch(photo.stderr, FATAL);
-  const size = await run(['magick', 'identify', '-format', '%w %h', 'photo.jpg']);
-  assert.equal(size.stdout, '2016 1512');
+  const bounded = async (argv, ms) => {
+    const t = Date.now();
+    let timer;
+    const r = await Promise.race([
+      run(argv),
+      new Promise((res) => {
+        timer = setTimeout(() => res(null), ms);
+      }),
+    ]);
+    clearTimeout(timer);
+    assert.ok(r, `${argv.join(' ')}: no result within ${ms / 1000} s (pixel cache on disk? homescoop#356)`);
+    return { ...r, ms: Date.now() - t };
+  };
+  const times = [];
+  for (const [mp, w, h] of [[12, 4000, 3000], [24, 6000, 4000], [48, 8064, 6048]]) {
+    for (const pct of [50, 25]) {
+      const out = `photo-${mp}-${pct}.jpg`;
+      const r = await bounded(['magick', '-size', `${w}x${h}`, 'gradient:red-blue', '-resize', `${pct}%`, '-quality', '85', out], 30000);
+      assert.equal(r.status, 0, `${mp} MP resize ${pct}%: rc ${r.status} ${r.stderr}`);
+      assert.doesNotMatch(r.stderr, FATAL);
+      const size = await run(['magick', 'identify', '-format', '%w %h', out]);
+      assert.equal(size.stdout, `${Math.round((w * pct) / 100)} ${Math.round((h * pct) / 100)}`);
+      times.push(`${mp}MP/${pct}% ${r.ms} ms`);
+    }
+  }
+  const photo = { ms: times.join(', ') };
 
   const wide = ['-size', '17000x100', 'xc:white', '-resize', '10%'];
   const tabWide = await run(['magick', ...wide, 'wide-tab.png']);
@@ -60,5 +81,5 @@ export default async function policy(ctx) {
   assert.equal(envLifted.status, 0, `MAGICK_CONFIGURE_PATH=${open}: rc ${envLifted.status} ${envLifted.stderr}`);
   const envPol = await run(['magick', '-list', 'policy'], { MAGICK_CONFIGURE_PATH: open });
   assert.match(envPol.stdout, /Path: \S*\/etc\/ImageMagick-7-open\/policy\.xml/);
-  console.log(`policy: 30000x30000 refused in ${huge.ms} ms, 9000x9000 in ${area.ms} ms, 8064x6048 resize ${photo.ms} ms; magick-open and MAGICK_CONFIGURE_PATH lift`);
+  console.log(`policy: 30000x30000 refused in ${huge.ms} ms, 9000x9000 in ${area.ms} ms, resizes ${photo.ms}; magick-open and MAGICK_CONFIGURE_PATH lift`);
 }

@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-imagemagick`
 
-[ImageMagick](https://imagemagick.org/) 7.1.2-33 `magick` CLI for
+[ImageMagick](https://imagemagick.org/) 7.1.2-34 `magick` CLI for
 [slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm. `convert`,
 `identify`, and `mogrify` are argv0 aliases of the same binary.
 
@@ -28,6 +28,25 @@ magick -version
 convert logo: out.png
 ```
 
+## Switching
+
+`@ai-ecoverse/wasm-imagemagick` and `@ai-ecoverse/wasm-imagemagick-heif` are
+drop-in alternatives with the same commands (`magick`, `convert`,
+`identify`, `mogrify`, `magick-open`). Install one of them. To switch,
+remove the other first:
+
+```bash
+pnpm remove -g @ai-ecoverse/wasm-imagemagick-heif
+pnpm add -g @ai-ecoverse/wasm-imagemagick
+magick -version   # "Delegates (built-in):" lists heic only for wasm-imagemagick-heif
+```
+
+With both installed, one package provides all five commands and the other
+is ignored without a warning. Today slicc-kernel picks
+`@ai-ecoverse/wasm-imagemagick`. wasm-imagemagick-heif declares
+`"slicc": { "replaces": ["@ai-ecoverse/wasm-imagemagick"] }`, which
+slicc-kernel will honour once slicc-kernel#635 is released.
+
 ## Resource limits
 
 The default `etc/ImageMagick-7/policy.xml` is sized for a browser tab, where
@@ -37,9 +56,9 @@ the wasm heap tops out at 2 GiB and a runaway allocation can freeze the tab:
 | --- | --- | --- |
 | width, height | 16000 px | a 30000x30000 request fails at once instead of allocating |
 | area | 64 MP | a 48 MP phone photo (8064x6048) fits |
-| memory | 768 MiB | a 48 MP RGB image in Q16HDRI is about 580 MiB |
-| map | 512 MiB | memory-mapped cache is wasm heap too: memory + map stays under 1.3 GiB |
-| disk | 512 MiB | pixel-cache spill goes to the browser's storage; anything bigger fails fast |
+| memory | 1536 MiB | a 48 MP RGB image in Q16HDRI is about 580 MiB; resizing holds the source and the result |
+| map | 256 MiB | in wasm the memory-mapped cache is heap too: memory + map is 1.75 GiB, under the build's 2 GiB maximum |
+| disk | 0 | no pixel cache on disk: in the browser that spills to storage and a 48 MP resize took minutes; anything over memory fails at once |
 
 Over a limit, magick exits 1 with `width or height exceeds limit` or
 `cache resources exhausted`. `-limit` can only lower these. To lift them,

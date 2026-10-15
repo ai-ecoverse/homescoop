@@ -2,12 +2,12 @@
 name: imagemagick
 builder: host
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
-version: "7.1.2-33"
+version: "7.1.2-34"
 npm: "@ai-ecoverse/wasm-imagemagick"
 summary: "ImageMagick magick CLI (convert/identify/mogrify argv0 aliases)"
 source:
   url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "c768ff077cccff1b682aa56653b54247b268752427ca998992b24cc7c597d9e7"
+  sha256: "f5163a573a1c1bff16358d0a592b2fb168ad0fd3b9dc5ff57dc7820eebc5cf79"
 dependencies:
   build:
     - "@ai-ecoverse/wasm-zlib@1.3.1-2"
@@ -46,7 +46,13 @@ about:
     --with-heic; bump the two together.
     7.1.2-33-1 ships a resource policy sized for a browser tab as the
     default (packages/imagemagick/policy-tab.xml in etc/ImageMagick-7:
-    memory 768MiB, map 512MiB, disk 512MiB, area 64MP, width/height 16KP),
+    memory 1536MiB, map 256MiB, disk 0, area 64MP, width/height 16KP),
     and upstream's policy-open.xml in etc/ImageMagick-7-open, used by the
     magick-open command or MAGICK_CONFIGURE_PATH. delegates.xml has no
     inkscape or rsvg-convert entries.
+    7.1.2-34-1: upstream -34 fixes in-place mogrify without -format/-path
+    (homescoop#353, ImageMagick#9011). The tab policy no longer spills the
+    pixel cache to disk (homescoop#356: with disk 512MiB a 48 MP resize
+    went to the disk cache and hung for minutes): memory 1536MiB, map
+    256MiB (memory + map 1.75 GiB, under the build's 2 GiB maximum
+    memory), disk 0.
