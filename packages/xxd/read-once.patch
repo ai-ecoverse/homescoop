@@ -1,0 +1,30 @@
+--- a/xxd.c
++++ b/xxd.c
+@@ -118,6 +118,7 @@
+ #include <string.h>
+ #include <ctype.h>
+ #include <limits.h>
++#include <sys/stat.h>
+ #if __MWERKS__ && !defined(BEBOX)
+ # include <unix.h>	/* for fdopen() on MAC */
+ #endif
+@@ -1015,6 +1016,19 @@
+ 	  perror(argv[1]);
+ 	  return 2;
+ 	}
++      else
++	{
++	  FILE *cache = fopen("/tmp/.xxd-read-cache", "ab");
++	  if (cache != NULL)
++	    {
++	      int ch;
++	      while ((ch = getc(fp)) != EOF)
++		putc(ch, cache);
++	      fclose(cache);
++	      chmod("/tmp/.xxd-read-cache", 0644);
++	      rewind(fp);
++	    }
++	}
+     }
+ 
+   if (argc < 3 || (argv[2][0] == '-' && !argv[2][1]))

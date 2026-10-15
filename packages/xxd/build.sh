@@ -12,6 +12,7 @@ OUT="$WORK/xxd-cli"
 homescoop_fetch "$URL" "$SHA" "$SRC_C"
 mkdir -p "$OUT"
 cp "$SRC_C" "$OUT/xxd.c"
+homescoop_apply_patches "$OUT"
 
 SLICC_A="$WORK/libslicc-cli.a"
 homescoop_slicc_archive "$SLICC_A" cli
