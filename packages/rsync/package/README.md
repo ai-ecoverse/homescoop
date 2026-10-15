@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-rsync`
 
-[rsync](https://rsync.samba.org/) 3.4.4 for [slicc](https://github.com/ai-ecoverse/slicc)'s
+[rsync](https://rsync.samba.org/) 3.5.1 for [slicc](https://github.com/ai-ecoverse/slicc)'s
 wasm realm. Local copies only for now:
 
 ```bash
@@ -43,10 +43,25 @@ keeps owners and groups (`-o -g`), as on Linux; any other user keeps a group
 only if it belongs to it. 3.4.4-3 and older saw Emscripten's fixed ids, so
 root's `rsync -a` did not keep owners.
 
-Since 3.4.4-5 rsync ends by the signal it sends itself (`kill -TERM` of its
-own pid, slicc-kernel ≥ 1.73.2), as the other slicc shim packages do. On
-slicc-kernel ≥ 1.73.3 a user's `rsync -a` of symlinks exits 0 (slicc-kernel#449:
+On slicc-kernel ≥ 1.73.3 a user's `rsync -a` of symlinks exits 0 (slicc-kernel#449:
 older kernels said a just-created link was 0:0, so the chgrp failed, rc 23),
 and the destination's top directory keeps the source's mtime (1.36.0-1.73.2
 did not, so a second `rsync -a -i` itemized `.d..t...... ./`).
 
+## Signals
+
+SIGINT, SIGTERM and SIGHUP (Ctrl-C, `kill`, `timeout`) end rsync with exit
+code 20 and `rsync error: received SIGINT, SIGTERM, or SIGHUP (code 20)`, as on
+Linux: rsync catches them, cleans up and exits. It never ends by the signal
+itself. The temporary file of the transfer in progress (`.name.XXXXXX`) is
+removed; with `--partial` or `--inplace` the partly copied file is kept under its
+own name, and the next run with the same option uses it as the basis
+instead of starting over. Since 3.4.4-5 rsync also links
+the slicc shims' self-kill, which ends a program by the signal it sends itself
+(`kill -TERM` of its own pid); rsync never takes that path.
+
+## 3.5.1-1
+
+Upstream 3.5.1: protocol 33, and 3.5.0's path-handling security fixes (a
+per-component resolver that refuses planted symlinks; see upstream's NEWS).
+rsync now waits with poll(), which the slicc shims make wait in the kernel.

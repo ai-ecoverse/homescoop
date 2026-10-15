@@ -1,7 +1,7 @@
 /**
  * rsync checklist (homescoop#94): local copies. Every case runs a real local
  * rsync, which forks a receiver (and the receiver a generator) that talk to
- * the sender over pipes; outputs are what upstream rsync 3.4.4 prints.
+ * the sender over pipes; outputs are what upstream rsync 3.5.1 prints.
  */
 export default async function (ctx) {
   const { run, assert } = ctx;
@@ -27,7 +27,7 @@ export default async function (ctx) {
   assert.equal(mk.status, 0, `mkdir stderr=${mk.stderr}`);
 
   const ver = await ok('rsync --version');
-  assert.match(ver.stdout, /^rsync {2}version 3\.4\.4 {2}protocol version 32$/m);
+  assert.match(ver.stdout, /^rsync {2}version 3\.5\.1 {2}protocol version 33$/m);
 
   // A source tree with nested dirs, modes and old mtimes.
   await ok(
@@ -161,18 +161,35 @@ export default async function (ctx) {
   assert.equal(miss2.status, 23, `missing file rc=${miss2.status}`);
   assert.match(miss2.stderr, /link_stat "\/home\/rs\/nosuch" failed/);
 
-  // Ctrl-C mid-sync: SIGINT to the job (a --bwlimit transfer of a 4 MB file,
-  // about 16 s) ends it with code 20, and no rsync process is left behind.
   await ok('mkdir -p big && yes 0123456789abcdef | head -c 4000000 > big/z');
-  const t0 = Date.now();
-  const intr = await sh(
-    'timeout -s INT --preserve-status 2 rsync -a --bwlimit=250 big/ bigout/; echo "rc=$?"; sleep 1; ps -eo comm',
-  );
-  const secs = (Date.now() - t0) / 1000;
-  assert.match(intr.stdout, /^rc=20$/m, `interrupt: ${intr.stdout} stderr=${intr.stderr}`);
-  assert.match(intr.stderr, /received SIGINT, SIGTERM, or SIGHUP \(code 20\)/);
-  assert.ok(secs < 10, `interrupt took ${secs}s`);
-  assert.ok(!/^rsync$/m.test(intr.stdout), `orphaned rsync processes:\n${intr.stdout}`);
+  const SIZE = 4000000;
+  for (const [sig, opts, kept] of [
+    ['INT', '', false],
+    ['TERM', '', false],
+    ['HUP', '', false],
+    ['INT', '--partial', true],
+    ['TERM', '--inplace', true],
+  ]) {
+    const t0 = Date.now();
+    const intr = await sh(
+      `rm -rf bigout; timeout -s ${sig} --preserve-status 2 rsync -a ${opts} --bwlimit=250 big/ bigout/; echo "rc=$?"; sleep 1; ` +
+        'echo "left=$(ls -A bigout 2>/dev/null | tr \'\\n\' \' \')"; echo "size=$(stat -c %s bigout/z 2>/dev/null)"; ps -eo comm',
+    );
+    const secs = (Date.now() - t0) / 1000;
+    const what = `${sig} ${opts || 'plain'}: ${intr.stdout} stderr=${intr.stderr}`;
+    assert.match(intr.stdout, /^rc=20$/m, what);
+    assert.match(intr.stderr, /received SIGINT, SIGTERM, or SIGHUP \(code 20\)/, what);
+    assert.ok(secs < 10, `${sig} ${opts}: took ${secs}s`);
+    assert.ok(!/^rsync$/m.test(intr.stdout), `${sig} ${opts}: orphaned rsync processes:\n${intr.stdout}`);
+    const left = /^left=(.*)$/m.exec(intr.stdout)[1].trim();
+    const size = Number(/^size=(.*)$/m.exec(intr.stdout)[1] || -1);
+    if (kept) {
+      assert.equal(left, 'z', `${sig} ${opts}: only the partial z is kept: ${what}`);
+      assert.ok(size > 0 && size < SIZE, `${sig} ${opts}: partial z has ${size} bytes`);
+    } else {
+      assert.equal(left, '', `${sig} ${opts}: temp file not removed: ${what}`);
+    }
+  }
   const after = await ok('ps -eo comm');
   assert.ok(!/^rsync$/m.test(after.stdout), `rsync still running:\n${after.stdout}`);
 
