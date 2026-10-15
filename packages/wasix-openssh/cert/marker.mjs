@@ -34,7 +34,7 @@ export default async function marker(ctx) {
   for (const b of bins) {
     const m = custom(readFileSync(join(pkgDir, 'bin', b)), 'slicc.libc');
     assert.match(m ?? '', /^wasix-sysroot 2025\.9\.30-(\d+)$/, `${b}: slicc.libc ${JSON.stringify(m)}`);
-    assert.ok(Number(m.split('-').pop()) >= 22, `${b}: ${m}`);
+    assert.ok(Number(m.split('-').pop()) >= 28, `${b}: ${m}`);
   }
-  console.log(`marker: ${bins.join(', ')} carry slicc.libc`);
+  console.log(`marker: ${bins.join(', ')} carry slicc.libc wasix-sysroot >= 2025.9.30-28`);
 }
