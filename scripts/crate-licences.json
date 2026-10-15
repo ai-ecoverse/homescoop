@@ -1,0 +1,14 @@
+{
+  "grit-pattern-matcher 0.5.1": {
+    "url": "https://raw.githubusercontent.com/getgrit/gritql/0de0cdbe598e987899cfd153b48610682342edc1/LICENSE",
+    "sha256": "d0bed1dabb4f2e1d6828349e690f2137d99575e86ec2c7545c74ae53d8430e43"
+  },
+  "grit-util 0.5.1": {
+    "url": "https://raw.githubusercontent.com/getgrit/gritql/0de0cdbe598e987899cfd153b48610682342edc1/LICENSE",
+    "sha256": "d0bed1dabb4f2e1d6828349e690f2137d99575e86ec2c7545c74ae53d8430e43"
+  },
+  "number_prefix 0.4.0": {
+    "url": "https://raw.githubusercontent.com/ogham/rust-number-prefix/eb6ebd215d50df1b199737f0356b988bebaedc84/LICENCE",
+    "sha256": "df8d11b64ecce43b1229cd72745c59513b54ba39f05e3ec7c06780617b7b1fcc"
+  }
+}

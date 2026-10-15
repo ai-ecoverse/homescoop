@@ -14,17 +14,25 @@
  * vendored sources) gives each crate's licence expression and source
  * directory. Local path crates (the package itself, homescoop's crates/) are
  * skipped. Each crate's licence files come from its unpacked source next to
- * its Cargo.toml. A crate that ships none (servo's selectors) gets the text of
- * its declared licence from scripts/licence-texts/<SPDX>.txt when that is a
- * single SPDX id; anything else is an error. Every section names the crate's
+ * its Cargo.toml; for a git dependency, also the directories above it up to the
+ * checkout root (facebook/react's crates have only the repository's LICENSE).
+ * A registry crate that ships none gets the upstream file pinned in
+ * scripts/crate-licences.json ("name version": url + sha256, at the commit in
+ * the crate's .cargo_vcs_info.json), fetched and checked here. Failing that,
+ * a licence without a copyright line (MPL-2.0: servo's selectors) gets its
+ * text from scripts/licence-texts/<SPDX>.txt; anything else is an error. Every section names the crate's
  * source (MPL-2.0 3.2).
  */
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { treeCrates } from './rust-crate-notices-lib.mjs';
 
-const texts = join(dirname(fileURLToPath(import.meta.url)), 'licence-texts');
+const scripts = dirname(fileURLToPath(import.meta.url));
+const texts = join(scripts, 'licence-texts');
+const pinned = JSON.parse(readFileSync(join(scripts, 'crate-licences.json'), 'utf8'));
 const [metaPath, treePath] = process.argv.slice(2);
 const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
 
@@ -41,11 +49,31 @@ const crates = [...want]
 const LICENCE = /^(LICEN[CS]E|COPYING|NOTICE|UNLICENSE|COPYRIGHT)/i;
 const out = [];
 for (const p of crates) {
-  const dir = dirname(p.manifest_path);
-  const files = readdirSync(dir).filter((f) => LICENCE.test(f)).sort();
+  let dir = dirname(p.manifest_path);
+  let files = readdirSync(dir).filter((f) => LICENCE.test(f)).sort();
+  if (!files.length && p.source.startsWith('git+')) {
+    const top = p.manifest_path.match(/^(.*\/git\/checkouts\/[^/]+\/[^/]+)\//)?.[1];
+    for (let d = dirname(dir); top && d.length >= top.length && !files.length; d = dirname(d)) {
+      const found = readdirSync(d).filter((f) => LICENCE.test(f)).sort();
+      if (found.length) {
+        dir = d;
+        files = found;
+      }
+    }
+  }
   out.push(`\n## ${p.name} ${p.version} (${p.license})\n`);
   if (p.source.startsWith('registry+')) out.push(`\nSource: https://crates.io/crates/${p.name}/${p.version}\n`);
   else out.push(`\nSource: ${p.source.replace(/^git\+/, '')}\n`);
+  const pin = pinned[`${p.name} ${p.version}`];
+  if (!files.length && pin) {
+    const r = spawnSync('curl', ['-fsSL', '--retry', '5', '--retry-all-errors', pin.url], { encoding: 'buffer', maxBuffer: 1 << 24 });
+    if (r.status !== 0) throw new Error(`${p.name} ${p.version}: fetching ${pin.url} failed`);
+    const got = createHash('sha256').update(r.stdout).digest('hex');
+    if (got !== pin.sha256) throw new Error(`${p.name} ${p.version}: ${pin.url} sha256 ${got} != ${pin.sha256}`);
+    out.push(`\nThe crate ships no licence file; this is the upstream repository's, at the commit the crate was published from (${pin.url}).\n`);
+    out.push(`\n\`\`\`text\n${r.stdout.toString('utf8').trim()}\n\`\`\`\n`);
+    continue;
+  }
   if (!files.length) {
     const spdx = join(texts, `${p.license}.txt`);
     if (!/^[A-Za-z0-9.-]+$/.test(p.license ?? '') || !existsSync(spdx)) {
