@@ -7,3 +7,7 @@
 ## Gem.ruby is the `#!wasm` marker (published 3.4.11-11)
 
 `launcher.mjs` (homescoop#305): on 3.4.11-11 `Gem.ruby` and `RbConfig.ruby` are `…/wasix-ruby/bin/ruby`, the 7-byte `#!wasm` marker, so `system(Gem.ruby, "-e", "exit 3")` gives 127 (`true /node_modules/@ai-ecoverse/wasix-ruby/bin/ruby 127` against `true /usr/bin/ruby 3`), and a RubyGems-installed executable (shebang `#!…/bin/ruby`) gives "bad interpreter". Checked on slicc-kernel 1.71.1 and 1.92.0.
+
+## 3.4.11-13: negative 3.4.11-12 (wasix-sysroot -28)
+
+3.4.11-13 is a rebuild on wasix-sysroot -28. Ruby has no signal-mask API, so the libc's real masks are not observable from Ruby. The -28 behaviour itself is the sysroot's cert (r28/r28w). On 3.4.11-12 (#368's artifact, sha256 a2efdbf4…, slicc-kernel 1.93.0 Node entry), `sysroot28.mjs` traps 20 of 20 too and fails on the toolchain record (`wasix-sysroot 2025.9.30-27|wasix-sysroot 2025.9.30-27`). The other specs are the regression run of MRI on the -28 libc.
