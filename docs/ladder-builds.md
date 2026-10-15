@@ -71,6 +71,42 @@ and prints the decision without dispatching. `before`, `packages`,
 `assume_unpublished`, `message`, `pr_body`, `pr`, `head` and `ci_certified`
 simulate the other cases (`pr` resolves an open PR, with `sha` its head).
 
+**After the publish** ladder-build polls the registry for up to ten minutes
+(`scripts/verify-published.mjs`) until `dist.integrity` of the version shows
+up, and requires it to equal the sha512 of the exact `package.tgz` it
+published. A mismatch, or a version that never appears, fails the job and
+opens (or comments on) one `publish-failure` issue naming the package,
+version, run and both values. It publishes with `--tag latest` only: for
+homescoop, certified = latest.
+
+**Auto-merge (`ladder-automerge.yml`).** When a `cert-review` run completes
+(or on `workflow_dispatch` with a PR number), ladder-automerge re-derives
+everything from the PR and merges it with a merge commit at its head only if
+it is open, from this repo, not a draft, based on `main`, not labelled
+`homescoop-major` and no recipe goes up a semver major; its newest
+`cert-review` status is a valid record on the head (the resolver's own
+binding); ladder-pr's run at the head and its `ci` job are green; it touches
+publishable package files and none of `.github/workflows/**`, `scripts/**`,
+`shims/**`, `crates/**`, `renovate.json` or the root `package.json`; and
+`mergeable_state` is `clean`, checked again right before the merge. A merge
+with `GITHUB_TOKEN` starts no `push` workflows, so the same run then calls
+`ladder-merge.yml` (`workflow_call`) for the merge commit; ladder-merge
+dispatches for real only on a push to `main` or when that caller is main's
+ladder-automerge, and the resolver re-checks every binding. A skipped PR
+with a green review gets one `auto-merge skipped: <reason>` comment (updated
+on re-runs) and the reason in the job summary; a failed merge comments on a
+`publish-failure` issue. Dispatched from any branch but `main`,
+ladder-automerge is a dry run: it prints the decision and calls ladder-merge
+dry. Runs are serialized repo-wide (`concurrency: ladder-automerge`); GitHub
+keeps only the newest pending run, so a PR whose run was replaced is picked
+up by `workflow_dispatch` or its next review.
+
+**Chain depth.** ladder-pr → cert-review → ladder-automerge is three
+`workflow_run` levels, GitHub's limit. Nothing may hang a fourth
+`workflow_run` off ladder-automerge: its publish runs inside the same run
+(`workflow_call`), and ladder-merge reaches ladder-build by
+`workflow_dispatch`, which starts a new chain.
+
 **Manual:** laptop `npm publish` of the exact certified tarball, then land,
 or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
 
@@ -96,7 +132,8 @@ When the version document already exists, publish is skipped (success).
 | Workflow | When | What |
 | --- | --- | --- |
 | `ladder-pr.yml` | pull_request touching `packages/**` | Host-build each touched package (no publish) |
-| `ladder-merge.yml` | push to `main` under `packages/**` (`workflow_dispatch`: dry run) | Gate, then `workflow_dispatch` each touched package on `ladder-build.yml` |
+| `ladder-automerge.yml` | `cert-review` completed (`workflow_run`), or `workflow_dispatch(pr)` | Merge a green, certified, package-only PR, then call `ladder-merge.yml` for the merge commit |
+| `ladder-merge.yml` | push to `main` under `packages/**`, or `workflow_call` from ladder-automerge (`workflow_dispatch`: dry run) | Gate, then `workflow_dispatch` each touched package on `ladder-build.yml` |
 | `ladder-build.yml` | `workflow_dispatch` only | Single-package build; OIDC publish unless `publish=false` |
 
 `ladder-merge` must **not** `uses:` `ladder-build` as a reusable workflow: npm

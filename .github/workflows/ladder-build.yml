@@ -258,6 +258,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      issues: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -270,6 +271,7 @@ jobs:
           # Do not set registry-url: that writes an empty _authToken and
           # npm 11 then skips the OIDC exchange (ENEEDAUTH).
       - name: Publish via OIDC
+        id: publish
         env:
           NODE_AUTH_TOKEN: ""
           NPM_TOKEN: ""
@@ -331,3 +333,11 @@ jobs:
             echo "npm publish failed for $NPM@$VER (exit $rc)" >&2
             exit "$rc"
           done
+          echo "published=true" >> "$GITHUB_OUTPUT"
+      - name: Verify the registry serves the published bytes
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NPM: ${{ needs.resolve.outputs.npm }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --run-url "$RUN_URL" --issue

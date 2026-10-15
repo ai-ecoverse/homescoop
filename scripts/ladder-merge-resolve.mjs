@@ -238,18 +238,25 @@ export async function resolvePackage(ctx, io) {
   throw new Error(`${artifactName}${note}: ${mismatches.join(' | ')}`);
 }
 
-function githubIo({ repo, token, sha, head, prBody, prNumber }) {
-  const api = async (path) => {
+export function githubApi({ repo, token }) {
+  return async (path, { method = 'GET', body } = {}) => {
     const res = await fetch(`https://api.github.com/repos/${repo}${path}`, {
+      method,
       headers: {
         accept: 'application/vnd.github+json',
         authorization: `Bearer ${token}`,
         'x-github-api-version': '2022-11-28',
+        ...(body ? { 'content-type': 'application/json' } : {}),
       },
+      body: body ? JSON.stringify(body) : undefined,
     });
-    if (!res.ok) throw Object.assign(new Error(`GET ${path} returned ${res.status}`), { status: res.status });
+    if (!res.ok) throw Object.assign(new Error(`${method} ${path} returned ${res.status}`), { status: res.status });
     return res;
   };
+}
+
+export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
+  const api = githubApi({ repo, token });
   const unzip = async (artifact) => {
     const res = await api(`/actions/artifacts/${artifact.id}/zip`);
     const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-'));
