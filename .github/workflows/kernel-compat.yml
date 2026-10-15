@@ -237,10 +237,11 @@ jobs:
         with:
           name: ${{ needs.plan.outputs.artifact }}-plan
           path: ${{ runner.temp }}/plan
-      - name: Chromium for playwright-core 1.63.0
+      - name: Chromium for playwright-core (package.json devDependencies)
         run: |
           set -euo pipefail
-          npm install --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit playwright-core@1.63.0
+          pw=$(node scripts/dev-pin.mjs playwright-core)
+          npm install --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit "$pw"
           if [[ "$RUNNER_NAME" != cloud-run-* ]] && sudo -n true 2>/dev/null; then
             npx --prefix "$RUNNER_TEMP/pw" playwright-core install --with-deps chromium
           else
