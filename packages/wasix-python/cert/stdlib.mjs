@@ -3,7 +3,7 @@
  * known answers. hashlib/hmac (HACL* and OpenSSL 3.5.9), zlib/bz2/lzma
  * round trips, a TLS 1.3 handshake between two ssl.SSLObjects over memory
  * BIOs (self-signed P-256 cert below, valid to 2126), RAND, sqlite3
- * (3.53.4, -11's compile options), threads, subprocess (posix_spawn),
+ * (3.54.0, -11's compile options plus MAX_SCHEMA), threads, subprocess (posix_spawn),
  * select on a pipe, time.tzset with POSIX TZ rules and strftime('%Z')
  * (3.14.2-13). `_ctypes` is covered by cert/ctypes.mjs (slicc-kernel#306).
  */
@@ -103,7 +103,7 @@ out["tz"] = [hasattr(time, "tzset"), tz]
 print(json.dumps(out))
 `;
 
-const SQLITE_11 = ['ATOMIC_INTRINSICS=1', 'DEFAULT_AUTOVACUUM', 'DEFAULT_CACHE_SIZE=-2000', 'DEFAULT_FILE_FORMAT=4',
+const SQLITE_OPTS = ['ATOMIC_INTRINSICS=1', 'DEFAULT_AUTOVACUUM', 'DEFAULT_CACHE_SIZE=-2000', 'DEFAULT_FILE_FORMAT=4',
   'DEFAULT_JOURNAL_SIZE_LIMIT=-1', 'DEFAULT_MMAP_SIZE=0', 'DEFAULT_PAGE_SIZE=4096', 'DEFAULT_PCACHE_INITSZ=20',
   'DEFAULT_RECURSIVE_TRIGGERS', 'DEFAULT_SECTOR_SIZE=4096', 'DEFAULT_SYNCHRONOUS=2', 'DEFAULT_WAL_AUTOCHECKPOINT=1000',
   'DEFAULT_WAL_SYNCHRONOUS=2', 'DEFAULT_WORKER_THREADS=0', 'DIRECT_OVERFLOW_READ', 'DISABLE_LFS',
@@ -111,7 +111,7 @@ const SQLITE_11 = ['ATOMIC_INTRINSICS=1', 'DEFAULT_AUTOVACUUM', 'DEFAULT_CACHE_S
   'MALLOC_SOFT_LIMIT=1024', 'MAX_ATTACHED=10', 'MAX_COLUMN=2000', 'MAX_COMPOUND_SELECT=500',
   'MAX_DEFAULT_PAGE_SIZE=8192', 'MAX_EXPR_DEPTH=1000', 'MAX_FUNCTION_ARG=1000', 'MAX_LENGTH=1000000000',
   'MAX_LIKE_PATTERN_LENGTH=50000', 'MAX_MMAP_SIZE=0', 'MAX_PAGE_COUNT=0xfffffffe', 'MAX_PAGE_SIZE=65536',
-  'MAX_SQL_LENGTH=1000000000', 'MAX_TRIGGER_DEPTH=1000', 'MAX_VARIABLE_NUMBER=32766', 'MAX_VDBE_OP=250000000',
+  'MAX_SCHEMA=10000000', 'MAX_SQL_LENGTH=1000000000', 'MAX_TRIGGER_DEPTH=1000', 'MAX_VARIABLE_NUMBER=32766', 'MAX_VDBE_OP=250000000',
   'MAX_WORKER_THREADS=8', 'MUTEX_PTHREADS', 'OMIT_LOAD_EXTENSION', 'OMIT_WAL', 'SYSTEM_MALLOC', 'TEMP_STORE=1',
   'THREADSAFE=1'];
 
@@ -135,8 +135,8 @@ export default async function (ctx) {
   assert.deepEqual(o.round, [true, true, true, true, true]);
   assert.deepEqual(o.tls, ['3.5.9', 'TLSv1.3', 'TLS_AES_256_GCM_SHA384', 'pong:ping', 'localhost']);
   assert.deepEqual(o.rand, [16, true]);
-  assert.deepEqual(o.sqlite.slice(0, 4), ['3.53.4', 3, 'hello wasix world', [2, 4.0]]);
-  assert.deepEqual(o.sqlite[4], SQLITE_11, 'sqlite compile options differ from 3.14.2-11');
+  assert.deepEqual(o.sqlite.slice(0, 4), ['3.54.0', 3, 'hello wasix world', [2, 4.0]]);
+  assert.deepEqual(o.sqlite[4], SQLITE_OPTS, 'sqlite compile options differ from 3.14.2-11 plus 3.54.0\'s MAX_SCHEMA');
   assert.deepEqual(o.threads, [8000, 328350]);
   assert.deepEqual(o.subprocess, ['hi\n', 'through cat', '/tmp', 'envok', 3, '(3, 14)']);
   assert.deepEqual(o.select, [true, true]);

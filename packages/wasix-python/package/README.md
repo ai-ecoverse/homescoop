@@ -4,9 +4,9 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-27's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-28's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
-- Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.53.4; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
+- Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - No `fork`/`vfork`; `subprocess` via `os.posix_spawn` (`proc_spawn2`/`3`)
 - `os.getuid()`/`getgid()`/`getgroups()` and `pwd`/`grp` come from slicc-kernel's process credentials and its `/etc/passwd`/`/etc/group` (3.14.2-13, wasix-sysroot -20; slicc-kernel ≥ 1.44.0, no fallback: ids are -1 on older kernels). Root is uid 0 with home `/root`.
 - Advisory file locks (`flock`, `fcntl` F_SETLK*, `lockf`) are no-ops (Emscripten parity)
@@ -17,6 +17,18 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 - `TZ` POSIX rules work (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193); `zoneinfo` works with the `tzdata` package
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
+
+Since 3.14.2-19 (wasix-sysroot -28):
+- signal masks are real: `signal.pthread_sigmask` blocks and unblocks
+  through slicc-kernel (≥ 1.88.0), a blocked signal stays pending
+  (`signal.sigpending()`) without running its handler or interrupting
+  `time.sleep`, and its handler runs once when it is unblocked. Up to
+  3.14.2-18 `pthread_sigmask` raised `OSError(0, 'Error')`. Kernels
+  before 1.88.0 take wasix-sysroot -28's ENOSYS fallback (its README).
+  `signal.sigtimedwait`/`sigwaitinfo`/`sigwait` raise ENOSYS (slicc-kernel#520);
+- `sqlite3` (3.54.0 since this release, 3.53.4 before) keeps its compile options; `PRAGMA compile_options` adds `MAX_SCHEMA=10000000`;
+- `THIRD-PARTY-NOTICES.md` carries the licence text of every statically
+  linked component (see the license paragraph below).
 
 Since 3.14.2-18:
 - `ctypes.CDLL(None)` has no `fork` (nor `_Fork`, `__wasi_proc_fork`, …):
@@ -106,8 +118,16 @@ Since 3.14.2-14 (wasix-sysroot -21):
   a byte), and `os.get_terminal_size` and `isatty` answer per descriptor
   (slicc-kernel ≥ 1.48.0; older kernels keep the previous behaviour).
 
-The license is `PSF-2.0 AND GPL-3.0-or-later`, because GNU Readline is linked
-statically. Since 3.14.2-13, `time.tzset()` exists and honours POSIX `TZ` rules.
+The license is `PSF-2.0 AND GPL-3.0-or-later`, because GNU Readline
+(GPL-3.0-or-later) is linked statically: `bin/python.wasm` as a whole is a
+combined work distributed under the GPL-3.0-or-later. CPython's PSF-2.0 and
+the other linked components' licences are GPL-compatible. If you redistribute
+`python.wasm`, or an application that bundles it, the GPL-3.0's terms apply to
+it: redistributors pass on the Corresponding Source, which is the homescoop
+repository at the release's commit plus the sha256-pinned upstream archives
+its recipe lists; homescoop keeps those available. Since 3.14.2-19,
+`THIRD-PARTY-NOTICES.md` has every linked component's licence text, not just a
+table. Since 3.14.2-13, `time.tzset()` exists and honours POSIX `TZ` rules.
 The sysconfig records (`_sysconfigdata*`, `_sysconfig_vars*.json`) carry no
 build-machine paths, host compilers or private stub archives.
 
