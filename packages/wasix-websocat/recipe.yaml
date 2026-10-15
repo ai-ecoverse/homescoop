@@ -1,0 +1,46 @@
+# websocat (vi/websocat) v4 for seven's kernel, built for WASIX (wasm32-wasmer-wasi).
+name: wasix-websocat
+builder: host
+# renovate: datasource=github-tags depName=vi/websocat extractVersion=^v(?<version>4\..*)$
+version: "4.0.0-alpha3"
+npm: "@ai-ecoverse/wasix-websocat"
+summary: "websocat 4.0.0-alpha3 (WebSocket client and server) for slicc WASIX"
+source:
+  url: "https://github.com/vi/websocat/archive/refs/tags/v{{version}}.tar.gz"
+  sha256: "27d6fbc47fff17869a43f82ba619defb1ca2a186d1d7afc0842065b7fa08744a"
+sources:
+  mio:
+    version: "1.0.3+wasix.1"
+    url: "https://cargo-registry.wasix.org/api/v1/crates/mio/{{version}}/download"
+    sha256: "d6382283eb5bc017eab57d653e4872eb35e3c1c730085a14fbed0bce51b9b9e5"
+  licence:
+    version: "8bcec21df3bd17d0f812f2b42056028379e97655"
+    url: "https://raw.githubusercontent.com/vi/websocat/{{version}}/LICENSE"
+    sha256: "6591a6a5ce89cb8c5ff2f9d95f1a43725ee7ea45d76a502337e022add93e36f6"
+toolchain:
+  rust: "1.97.0"
+  wasix_rust: "v2026-09-18.1+rust-1.97"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/vi/websocat
+  license: MIT OR Apache-2.0
+  notes: |
+    The v4 tag ships no LICENSE; sources.licence is the repository's MIT
+    LICENSE (same author, last changed in 8bcec21d), staged as package/LICENSE.
+    Upstream vi/websocat v4.0.0-alpha3, unmodified source, for slicc's
+    kernel (slicc-kernel >= 1.95.0: WASIX epoll and eventfd, #674).
+    Toolchain: wasix-org/rust (target wasm32-wasmer-wasi) linked against
+    @ai-ecoverse/wasix-sysroot (scripts/install-wasixcc.sh), crates from
+    cargo-registry.wasix.org (the WASIX forks of libc, mio, socket2, tokio,
+    ring), resolved in packages/wasix-websocat/Cargo.lock.
+    0001 (build only): crates.io replaced by the WASIX registry; the
+         optional console-subscriber dropped (it needs a tokio newer than
+         the fork); tokio's signal feature added (the fork's process
+         support needs it); mio taken from homescoop-crates/mio.
+    mio/0001: sockets open non-blocking, as upstream mio's unix code does
+         (without it the reactor blocks in send or a second accept).
+    mio/0002: a non-blocking connect's EINPROGRESS is "in progress", not
+         an error. Both are for upstreaming to wasix-org/mio.
