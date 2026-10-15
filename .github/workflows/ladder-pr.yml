@@ -9,25 +9,6 @@ name: ladder-pr
 
 on:
   pull_request:
-    paths:
-      - 'packages/**'
-      - 'scripts/host-run.sh'
-      - 'scripts/build-common.sh'
-      - 'scripts/ladder-run.jsh'
-      - 'scripts/read-recipe.mjs'
-      - 'scripts/recipe-env.mjs'
-      - 'scripts/refresh-recipe-sha.mjs'
-      - 'scripts/list-touched-packages.mjs'
-      - 'scripts/host-smoke.sh'
-      - 'scripts/install-emsdk.sh'
-      - 'scripts/emsdk-patches/**'
-      - 'scripts/install-wasixcc.sh'
-      - 'scripts/sync-package-version.mjs'
-      - 'scripts/check-exact-pins.mjs'
-      - 'scripts/repack-published.mjs'
-      - 'scripts/diff-published.mjs'
-      - 'scripts/browser-cert/**'
-      - '.github/workflows/ladder-pr.yml'
 
 permissions:
   contents: read
@@ -344,3 +325,17 @@ jobs:
       - name: Slicc packages skipped on PR
         run: |
           echo "::notice::slicc builder package(s) ${{ needs.detect.outputs.slicc }} — PR host check skipped; merge still dispatches ladder-build (needs SLICC secrets)."
+
+  ci:
+    needs: [exact-pins, detect, recipe-sha, host-build, cert, slicc-note]
+    if: ${{ always() }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Fail when a ladder-pr job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "::error::ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
+          exit 1
+      - name: Every ladder-pr job passed or was skipped
+        run: |
+          echo "ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
