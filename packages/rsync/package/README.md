@@ -19,7 +19,7 @@ Remote shells (`-e ssh`) need an ssh client in the realm. Daemon modules with
 interactive password prompt (rsync gets an empty password and the daemon
 refuses at once, rc 5).
 
-Built without OpenSSL, xxhash, zstd, lz4, iconv, ACLs or xattrs (bundled zlib
+Built without OpenSSL, xxhash, zstd, lz4, iconv, IDN, ACLs or xattrs (bundled zlib
 and popt). Error messages print Emscripten's errno numbers (`No such file or
 directory (44)` where Linux prints `(2)`).
 
