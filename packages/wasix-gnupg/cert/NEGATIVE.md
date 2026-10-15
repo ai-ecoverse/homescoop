@@ -47,3 +47,7 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
 
 On 1.35.1 it passes: 700 / 700 / 600, and a 755 homedir gets
 "WARNING: unsafe permissions on homedir".
+
+## 2.4.9-6: negative 2.4.9-5 (wasix-sysroot -20 → -28)
+
+`agent-signals.mjs` on published 2.4.9-5 (slicc-kernel 1.93.0 Node entry, 2026-10-15): HUP, TERM and INT behave the same; the agent is idle in `npth_pselect` when the signal comes, so the masked-wait race that -28 closes (the sysroot's r28w window case) does not show here. It fails on the toolchain record: `wasix-sysroot -20` against `-28`. 2.4.9-5's checklist, modes and users (also under users enforce) pass on 1.93.0, so the rest of the cert is the regression run on the -28 libc (-21 to -28: pipe types, EINTR semantics, kernel owners and access, utimens, CPU times, masks).

@@ -45,7 +45,11 @@ tarball checksums ship in `patches/` and `SOURCES.md`.
 
 - Spawns are `posix_spawn` (no fork); `gpg-agent --daemon` detaches by
   starting itself again.
-- Built against wasix-sysroot 2025.9.30-20: user ids come from slicc-kernel's
+- Built against wasix-sysroot 2025.9.30-28 (since 2.4.9-6; -20 before): signal
+  masks are slicc-kernel's (≥ 1.88.0), so gpg-agent's `npth_pselect` with its
+  signal mask waits and wakes atomically: SIGHUP re-reads the configuration
+  and flushes the cache in place, SIGTERM shuts the agent down (it removes its
+  socket and exits), SIGINT shuts it down at once. User ids come from slicc-kernel's
   process credentials, and on slicc-kernel ≥ 1.47.1 a file's owner is the
   caller's ids, so each user's own homedir passes GnuPG's ownership check
   (it refuses a homedir it does not own). Needs slicc-kernel ≥ 1.47.1.
