@@ -62,6 +62,6 @@ the slicc shims' self-kill, which ends a program by the signal it sends itself
 
 ## 3.5.1-1
 
-Upstream 3.5.1: protocol 33, and 3.5.0's path-handling security fixes (a
+Upstream 3.5.1: protocol 33, and the path-handling security fixes introduced in 3.5.0 (a
 per-component resolver that refuses planted symlinks; see upstream's NEWS).
 rsync now waits with poll(), which the slicc shims make wait in the kernel.
