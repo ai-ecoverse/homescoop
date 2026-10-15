@@ -196,6 +196,7 @@ pkg = {
     "version": npm_ver,
     "description": "GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4)",
     "license": "GPL-3.0-or-later",
+    "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-autoconf/package"},
     "files": ["README.md", "LICENSE", "bin", "share"],
     "publishConfig": {"access": "public"},
     "homescoop": {"recipe": "wasix-autoconf", "upstream": ver},

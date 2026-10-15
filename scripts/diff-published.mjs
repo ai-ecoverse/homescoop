@@ -125,7 +125,7 @@ const canon = (v) =>
 const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 
 /** Package metadata a packaging-only release may change when asked to. */
-export const ALLOW_KEYS = new Set(['engines', 'description', 'keywords', 'slicc.env']);
+export const ALLOW_KEYS = new Set(['engines', 'description', 'keywords', 'repository', 'slicc.env']);
 
 /** @returns {{ errors: string[], changes: string[] }} */
 export function diffPackageJson(base, next, allowKeys = []) {
