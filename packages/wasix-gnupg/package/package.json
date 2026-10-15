@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-gnupg",
-  "version": "2.4.9-5",
-  "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -20: user ids from slicc-kernel)",
+  "version": "2.4.9-6",
+  "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -28: user ids and signal masks from slicc-kernel)",
   "engines": {
     "slicc-kernel": ">=1.47.1"
   },
