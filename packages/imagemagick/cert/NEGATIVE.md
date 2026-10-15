@@ -1,3 +1,45 @@
 # Negative: wasm-imagemagick 7.1.2-32-3
 
 7.1.2-32-3 fails `checklist.mjs` at its first assertion: `magick -version` lists only `jng jp2 jpeg lcms png tiff` as built-in delegates, with no freetype, webp, xml or zlib. The `.pc` files that `homescoop_ensure_prefix_pcs` synthesized for wasm-zlib, wasm-libwebp and wasm-freetype said `Version: 0`, so configure's `libwebp >= 0.4.1` and `freetype2 >= 2.8.0` checks failed, and -2/-3 configured `--without-xml`.
+
+## Resource policy (7.1.2-33-1)
+
+`policy.mjs` against the published `@ai-ecoverse/wasm-imagemagick` 7.1.2-32-4, which ships upstream's open policy, fails at its
+first check, before any large allocation (slicc-kernel 1.81.0, 2026-10-14):
+
+```
+browser-cert: FAIL packages/zzneg/cert/policy.mjs
+AssertionError [ERR_ASSERTION]: default limits: Resource limits:
+  Width: 8.38861MP
++   '8.38861MP',
++   '8.38861MP',
++   '8.58993GP',
++   '2GiB',
+```
+
+With that policy `magick -size 30000x30000 xc:white` would start allocating
+a 900 MP pixel cache, which is what hung the tab. On 7.1.2-33-1 the same spec
+refuses it in about 60 ms and the 81 MP canvas in about 50 ms.
+
+## 7.1.2-34-1: disk pixel cache and in-place mogrify
+
+Against the certified, unpublished 7.1.2-33-1 artifact of run 38603486003
+(`host-imagemagick-pr330`, sha256 `c8b68b9cf7a9f628f492da46d367d3a787819d391d6c54714289a281aa24e94f`), slicc-kernel 1.81.0, 2026-10-15:
+
+- mogrify.mjs fails (homescoop#353, fixed upstream in 7.1.2-34):
+
+  ```
+  AssertionError [ERR_ASSERTION]: mogrify in place: rc 1 mogrify: no encode delegate for this image format `' @ warning/constitute.c/WriteImage/1473.
+  ```
+
+- The time-bound resize fails at the first 48 MP case (homescoop#356: with
+  disk 512MiB the pixel cache went to the browser's storage). With the
+  limits check removed, so that the bound is what fails:
+
+  ```
+  AssertionError [ERR_ASSERTION]: magick -size 8064x6048 gradient:red-blue -resize 50% -quality 85 photo-48-50.jpg: no result within 30 s (pixel cache on disk? homescoop#356)
+  ```
+
+  The full policy.mjs fails earlier, at its limits table (768MiB/512MiB/512MiB
+  instead of 1.5GiB/256MiB/0B). On 7.1.2-34-1 the same 48 MP resize takes
+  about 2.5 s, and 12 MP about 0.6 s.

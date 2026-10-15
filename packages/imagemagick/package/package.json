@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-imagemagick",
-  "version": "7.1.2-32-4",
-  "description": "ImageMagick 7.1.2-32 magick CLI for wasm / slicc (emscripten)",
+  "version": "7.1.2-34-1",
+  "description": "ImageMagick 7.1.2-34 magick CLI for wasm / slicc (emscripten)",
   "license": "ImageMagick",
   "repository": {
     "type": "git",
@@ -30,7 +30,7 @@
   },
   "homescoop": {
     "recipe": "imagemagick",
-    "upstream": "7.1.2-32"
+    "upstream": "7.1.2-34"
   },
   "slicc": {
     "abi": "emscripten",
@@ -67,6 +67,14 @@
         "argv0": "mogrify",
         "env": {
           "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7"
+        }
+      },
+      "magick-open": {
+        "glue": "bin/magick",
+        "wasm": "bin/magick.wasm",
+        "argv0": "magick",
+        "env": {
+          "MAGICK_CONFIGURE_PATH": "etc/ImageMagick-7-open"
         }
       }
     }
