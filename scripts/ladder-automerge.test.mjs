@@ -137,9 +137,11 @@ describe('decide', () => {
     assert.match((await decide({ repo: REPO, number: 384 }, fakeIo({ review: false }))).problems.join(), /cert-review on \S+ is absent/);
   });
 
-  it('stops at an already merged PR', async () => {
-    const got = await decide({ repo: REPO, number: 384 }, fakeIo({ pulls: [pull({ merged: true, state: 'closed' })] }));
-    assert.deepEqual(got.problems, ['already merged']);
+  it('stops at an already merged PR, unless a dry run judges it as if open', async () => {
+    const merged = { pulls: [pull({ merged: true, state: 'closed', mergeable_state: 'unknown' })], prFiles: files('packages/coreutils/package/package.json', 'shims/slicc/slicc-uname.js') };
+    assert.deepEqual((await decide({ repo: REPO, number: 384 }, fakeIo(merged))).problems, ['already merged']);
+    const asIfOpen = await decide({ repo: REPO, number: 384, asIfOpen: true }, fakeIo(merged));
+    assert.match(asIfOpen.problems.join('; '), /touches shims\/slicc\/slicc-uname\.js, which stay human; mergeable_state is unknown/);
   });
 });
 

@@ -70,8 +70,9 @@ export async function majorBumps(pr, files, io) {
   return out;
 }
 
-export async function decide({ repo, number }, io) {
-  const pr = await settledPull(number, io);
+export async function decide({ repo, number, asIfOpen }, io) {
+  const settled = await settledPull(number, io);
+  const pr = asIfOpen ? { ...settled, merged: false, state: 'open' } : settled;
   if (pr.merged) return { pr, problems: ['already merged'], review: { state: 'n/a' } };
   const files = await io.files(number);
   const review = await certReview({ number: pr.number, head: pr.head.sha }, io);
@@ -173,7 +174,7 @@ async function main([mode, ...argv]) {
       console.log('no cert-review record names a PR; nothing to merge');
       return output({ merge: 'false' });
     }
-    const { pr, review, problems } = await decide({ repo, number: Number(number) }, io);
+    const { pr, review, problems } = await decide({ repo, number: Number(number), asIfOpen: argv.includes('--as-if-open') }, io);
     const values = { pr: pr.number, head: pr.head.sha, base: pr.base.sha, merge: String(problems.length === 0), report: '' };
     if (problems.length === 0) {
       console.log(`PR #${pr.number} at ${pr.head.sha}: merge (cert-review run ${review.runId}, ladder-pr ci green, mergeable clean)`);

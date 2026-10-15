@@ -10,6 +10,11 @@ on:
         description: PR to consider. Merges only when dispatched on main; on any other branch this is a dry run.
         required: true
         type: string
+      as_if_open:
+        description: Dry runs only, judge a merged or closed PR as if it were still open.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ladder-automerge
@@ -41,10 +46,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ inputs.pr }}
+          AS_IF_OPEN: ${{ inputs.as_if_open }}
           REVIEW_RUN: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          if [[ -n "$PR" ]]; then
+          if [[ "$AS_IF_OPEN" == true ]]; then
+            if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+              echo "::error::as_if_open is for dry runs on other branches"
+              exit 1
+            fi
+            node scripts/ladder-automerge.mjs decide --pr "$PR" --as-if-open
+          elif [[ -n "$PR" ]]; then
             node scripts/ladder-automerge.mjs decide --pr "$PR"
           else
             node scripts/ladder-automerge.mjs decide --cert-review-run "$REVIEW_RUN"
