@@ -389,6 +389,16 @@ jobs:
           done
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
+      - name: Committed cert specs per package, at the reviewed head
+        run: |
+          echo '{}' > "$RUNNER_TEMP/specs.json"
+          for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
+            n=$(gh api "repos/$GH_REPO/contents/packages/$pkg/cert?ref=$HEAD" --jq '[.[] | select(.name | endswith(".mjs"))] | length' 2> /dev/null) || n=0
+            [[ "$n" =~ ^[0-9]+$ ]] || n=0
+            jq --arg p "$pkg" --argjson n "$n" '. + {($p): $n}' "$RUNNER_TEMP/specs.json" > "$RUNNER_TEMP/specs.next" && mv "$RUNNER_TEMP/specs.next" "$RUNNER_TEMP/specs.json"
+          done
+          cat "$RUNNER_TEMP/specs.json"
+
       - name: Verdict from the artifacts (this job's tools, from ${{ github.sha }})
         id: verdict
         run: |
@@ -396,14 +406,15 @@ jobs:
           if node scripts/cert-review/verdict.mjs \
             --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --review "$RUNNER_TEMP/cert-review" \
             --body "$RUNNER_TEMP/cert-review/body.md" --lines "$RUNNER_TEMP/cert-review/lines.txt" --run "$RUN_URL" \
-            --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION"; then
+            --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION" --specs "$RUNNER_TEMP/specs.json"; then
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
           else
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
           fi
           jq -n --arg pr "$PR_NUMBER" --arg head "$HEAD" --arg ladder "$LADDER_RUN" --arg run "$GITHUB_RUN_ID" \
             --rawfile lines "$RUNNER_TEMP/cert-review/lines.txt" \
-            '{pr: ($pr | tonumber), head: $head, ladder_run: ($ladder | tonumber), cert_review_run: ($run | tonumber), lines: ($lines | rtrimstr("\n") | split("\n"))}' \
+            --slurpfile unspecified "$RUNNER_TEMP/cert-review/lines.txt.unspecified" \
+            '{pr: ($pr | tonumber), head: $head, ladder_run: ($ladder | tonumber), cert_review_run: ($run | tonumber), no_cert_specs: $unspecified[0], lines: ($lines | rtrimstr("\n") | split("\n"))}' \
             > "$RUNNER_TEMP/cert-review/record.json"
 
       - uses: actions/upload-artifact@v7

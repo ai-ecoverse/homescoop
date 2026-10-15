@@ -14,6 +14,7 @@ const { values } = parseArgs({
     run: { type: 'string', default: '' },
     'ladder-run': { type: 'string', default: '' },
     'ladder-conclusion': { type: 'string', default: '' },
+    specs: { type: 'string', default: '' },
   },
 });
 
@@ -58,6 +59,17 @@ try {
 } catch (error) {
   problems.push(`no readable verdict.json (${one(error.message)})`);
 }
+let specCounts = null;
+if (values.specs) {
+  try {
+    specCounts = JSON.parse(readFileSync(values.specs, 'utf8'));
+  } catch (error) {
+    problems.push(`no readable specs file (${one(error.message)})`);
+  }
+}
+const UNSPECIFIED = "no committed cert specs; this certification rests on the reviewer's own run";
+const unspecified = (pkg) => specCounts !== null && !(specCounts[pkg.recipe] > 0);
+
 const listOf = (value, what, pkg) => {
   if (value === undefined || value === null) return [];
   if (Array.isArray(value)) return value;
@@ -81,10 +93,11 @@ const lines = packages.map((pkg) => {
   const [v] = found;
   if (v.verdict === 'certified') {
     const known = listOf(v.known, 'known', pkg).map((k) => one(k).slice(0, 120)).filter(Boolean);
+    const notes = [...(unspecified(pkg) ? [UNSPECIFIED] : []), ...(known.length ? [`known: ${known.join(', ')}`] : [])];
     if (held) return { ok: false, line: `cert-ci: HELD ${pkg.name}@${pkg.version}: the reviewer certified it, but ${held}` };
     return {
       ok: true,
-      line: `certified=${pkg.sha} ${pkg.name} ${pkg.version}${known.length ? ` (known: ${known.join(', ')})` : ''}`,
+      line: `certified=${pkg.sha} ${pkg.name} ${pkg.version}${notes.length ? ` (${notes.join('; ')})` : ''}`,
     };
   }
   if (v.verdict === 'fail') return { ok: false, line: `cert-ci: FAIL ${pkg.name}@${pkg.version}: ${one(v.reason) || 'no reason given'}` };
@@ -96,10 +109,14 @@ const comment = existsSync(join(values.review, 'comment.md'))
   ? readFileSync(join(values.review, 'comment.md'), 'utf8').trim()
   : '**Cert review:** the reviewer wrote no comment.';
 const result = lines.map(({ line }) => line).join('\n');
+const unspecifiedNote = specCounts !== null && packages.some(unspecified)
+  ? `\n\n**${packages.filter(unspecified).map((pkg) => pkg.name).join(', ')}: ${UNSPECIFIED}.**`
+  : '';
 const trouble = problems.length ? `\n\n**Problems:**\n${problems.map((p) => `- ${p}`).join('\n')}` : '';
 const footer = values.run ? `\n\n<sub>shas computed from the ladder-pr artifacts, not by the reviewer · [run](${values.run})</sub>` : '';
-writeFileSync(values.body, `${comment}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
+writeFileSync(values.body, `${comment}${unspecifiedNote}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
 writeFileSync(values.lines, `${result}\n`);
+writeFileSync(`${values.lines}.unspecified`, `${JSON.stringify(packages.filter(unspecified).map((pkg) => pkg.name))}\n`);
 
 const passed = !problems.length && lines.length > 0 && lines.every(({ ok }) => ok);
 console.log(result);
