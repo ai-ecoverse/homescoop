@@ -36,7 +36,7 @@ jobs:
           mkdir -p out
           tar xzf .homescoop-out/package.tgz -C out
           sha256sum .homescoop-out/package.tgz out/package/bin/perl.wasm | tee out/sha256.txt "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wasix-perl-repro-${{ matrix.attempt }}
           path: out/sha256.txt
@@ -45,7 +45,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: wasix-perl-repro-*
       - name: both builds are byte-identical
