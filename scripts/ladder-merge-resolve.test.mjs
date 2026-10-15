@@ -291,15 +291,29 @@ describe('resolvePackage', () => {
     const result = await resolvePackage(ctx, io);
     assert.equal(result.gate, 'certified= line in the merge commit');
     assert.equal(result.inputs.certified, GOOD);
-    assert.equal(io.calls.some(([c]) => c === 'canWrite'), false);
+    assert.deepEqual(io.calls.filter(([c]) => c === 'canWrite'), [['canWrite', 'trieloff']]);
   });
 
-  it('refuses a PR body line from an author who cannot write', async () => {
-    const pr = { ...PR, author: 'someone', body: `certified=${GOOD} ${NAME} ${VERSION}` };
-    await assert.rejects(
-      resolvePackage({ ...ctx, message: 'Merge pull request #336' }, fakeIo({ ...staleFailed, pr })),
-      /is in the PR #336 body, whose author someone cannot write to this repository/,
-    );
+  it('ignores the lines in either source when the PR author cannot write', async () => {
+    const line = `certified=${GOOD} ${NAME} ${VERSION}`;
+    const why = /its certified= lines don't count because PR #336 is by someone, who cannot write to this repository, and wasi-impeccable is not in/;
+    const fromCommit = fakeIo({ ...staleFailed, pr: { ...PR, author: 'someone' } });
+    await assert.rejects(resolvePackage({ ...ctx, message: line }, fromCommit), why);
+    const fromBody = fakeIo({ ...staleFailed, pr: { ...PR, author: 'someone', body: line } });
+    await assert.rejects(resolvePackage({ ...ctx, message: 'Merge pull request #336' }, fromBody), why);
+    assert.equal(fromBody.calls.some(([c]) => c === 'download'), false);
+  });
+
+  it('falls through to the ci job for a ci-certified package when the author cannot write', async () => {
+    const io = fakeIo({
+      ...staleFailed,
+      pr: { ...PR, author: 'renovate[bot]' },
+      jobs: { 20: [{ name: 'ci', conclusion: 'success' }] },
+      tarballs: { 2: tarball(OTHER) },
+    });
+    const result = await resolvePackage({ ...ctx, ciCertified: true }, io);
+    assert.match(result.gate, /^ci-certified \(ladder-pr ci job\); lines ignored: PR #336 is by renovate\[bot\]/);
+    assert.equal(result.inputs.certified, OTHER);
   });
 
   it('parses the PR body like the merge commit', async () => {

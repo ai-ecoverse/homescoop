@@ -69,15 +69,17 @@ export function tarballProblem(got, { name, version, certified }) {
 }
 
 export async function certifiedSha({ name, version, message }, pr, io) {
-  const sources = [{ source: 'merge commit', text: message }];
-  if (pr) sources.push({ source: `PR #${pr.number} body`, text: pr.body, author: pr.author });
-  for (const { source, text, author } of sources) {
+  const sources = [
+    { source: 'merge commit', text: message },
+    { source: `PR #${pr.number} body`, text: pr.body },
+  ];
+  const named = sources.some(({ text }) => parseCertLines(text).some((l) => l.name === name));
+  if (named && !(await io.canWrite(pr.author))) {
+    return { certified: null, ignored: `PR #${pr.number} is by ${pr.author}, who cannot write to this repository` };
+  }
+  for (const { source, text } of sources) {
     const certified = certFor(text, name, version);
-    if (!certified) continue;
-    if (author && !(await io.canWrite(author))) {
-      throw new Error(`the certified= line is in the ${source}, whose author ${author} cannot write to this repository`);
-    }
-    return { certified, source };
+    if (certified) return { certified, source };
   }
   const stale = sources.flatMap(({ source, text }) =>
     parseCertLines(text)
@@ -96,14 +98,14 @@ export async function resolvePackage(ctx, io) {
     return { decision: 'skip', reason: `${name}@${version} is already on npm`, inputs: { package: pkg } };
   }
   const pr = await io.pullRequest();
-  const { certified, source } = await certifiedSha(ctx, pr, io);
-  if (!certified && !ciCertified) {
-    throw new Error(
-      `${name}@${version} is not on npm, neither the merge commit nor the PR body has a ` +
-        `certified=<sha256> ${name} ${version} line, and ${pkg} is not in scripts/ci-certified.json`,
-    );
-  }
   if (!pr) throw new Error('no merged PR for this commit, so there is no ladder-pr artifact to publish');
+  const { certified, source, ignored } = await certifiedSha(ctx, pr, io);
+  if (!certified && !ciCertified) {
+    const why = ignored
+      ? `its certified= lines don't count because ${ignored}`
+      : `neither the merge commit nor the PR body has a certified=<sha256> ${name} ${version} line`;
+    throw new Error(`${name}@${version} is not on npm, ${why}, and ${pkg} is not in scripts/ci-certified.json`);
+  }
   const artifactName = `host-${pkg}-pr${pr.number}`;
   const artifacts = (await io.artifacts(artifactName))
     .filter((a) => a.name === artifactName)
@@ -129,7 +131,7 @@ export async function resolvePackage(ctx, io) {
     }
     return {
       decision: 'publish',
-      gate: certified ? `certified= line in the ${source}` : 'ci-certified (ladder-pr ci job)',
+      gate: certified ? `certified= line in the ${source}` : `ci-certified (ladder-pr ci job)${ignored ? `; lines ignored: ${ignored}` : ''}`,
       reason: `${name}@${version} is not on npm; ${artifactName} artifact ${artifact.id} from run ${run.id} at ${pr.head} has sha256 ${got.sha}`,
       inputs: { package: pkg, certified: got.sha, artifact_pr: String(pr.number), artifact_id: String(artifact.id) },
     };

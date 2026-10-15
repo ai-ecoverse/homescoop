@@ -43,9 +43,10 @@ ladder-pr run at that PR's merged head that concluded `success`, and one of:
 
 - a `certified=<sha256> <@scope/name> <version>` line naming that package
   and version, whose sha equals the artifact's `package.tgz`. The merge
-  commit message is read first, then the PR body (only when the PR's author
-  can write to the repository). Within the source it resolves from, another
-  line naming the package at a different version fails; or
+  commit message is read first, then the PR body. Lines count only when the
+  PR's author can write to the repository, since GitHub can fill the merge
+  message from PR text. Within the source it resolves from, another line
+  naming the package at a different version fails; or
 - no line for the package, the package in `scripts/ci-certified.json`, and
   that run's `ci` job green.
 
