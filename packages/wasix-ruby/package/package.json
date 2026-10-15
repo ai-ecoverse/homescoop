@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-ruby",
-  "version": "3.4.11-11",
+  "version": "3.4.11-12",
   "description": "MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; wasix-sysroot 2025.9.30-27: user ids, traps and times from slicc-kernel)",
   "engines": {
     "slicc-kernel": ">=1.44.0"
@@ -31,7 +31,7 @@
     "abi": "wasi",
     "commands": {
       "ruby": {
-        "wasm": "bin/ruby.wasm",
+        "wasm": "bin/ruby",
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
           "RUBYLIB": "${package}/lib/ruby/site_ruby/3.4.0:${package}/lib/ruby/site_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/vendor_ruby/3.4.0:${package}/lib/ruby/vendor_ruby/3.4.0/wasm32-wasi:${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
@@ -40,7 +40,7 @@
         }
       },
       "gem": {
-        "wasm": "bin/ruby.wasm",
+        "wasm": "bin/ruby",
         "args": [
           "${package}/bin/gem"
         ],
@@ -52,7 +52,7 @@
         }
       },
       "bundle": {
-        "wasm": "bin/ruby.wasm",
+        "wasm": "bin/ruby",
         "args": [
           "${package}/bin/bundle"
         ],
@@ -64,7 +64,7 @@
         }
       },
       "rake": {
-        "wasm": "bin/ruby.wasm",
+        "wasm": "bin/ruby",
         "args": [
           "${package}/bin/rake"
         ],

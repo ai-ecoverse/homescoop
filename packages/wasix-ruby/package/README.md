@@ -3,9 +3,32 @@
 MRI Ruby for slicc WASIX. No epoll (poll fallback). See PRESTAGE.md.
 
 Built on wasix-sysroot 2025.9.30-27 or later (the WASIX libc and headers; see
-PRESTAGE.md). `Gem.ruby` and `RbConfig.ruby` are the package's own
-`bin/ruby` (`/node_modules/@ai-ecoverse/wasix-ruby/bin/ruby` in a flat
-install), the same interpreter as the `ruby` command on PATH.
+PRESTAGE.md).
+
+## The interpreter path (3.4.11-12)
+
+`Gem.ruby` and `RbConfig.ruby` are the first `ruby` on PATH outside the
+package, which is slicc-kernel's `/usr/bin/ruby` command. Run through it,
+ruby gets the command's `RUBYLIB`, `GEM_HOME` and `GEM_PATH` defaults, so
+`system(Gem.ruby, "-e", "exit 3")` exits 3 from any process, and RubyGems
+writes `#!/usr/bin/ruby` into the gem executables it installs. Without a
+`ruby` on PATH they fall back to the package's `bin/ruby`.
+
+`bin/ruby` (`RbConfig::CONFIG["bindir"]`) is the wasm module itself, so the
+kernel can exec it by path and use it in a shebang. It doesn't get the
+command's environment: started from ruby (which passes its own `RUBYLIB` and
+`GEM_*` on) it works fully, but started from a shell without them ruby can't
+find RubyGems (`RubyGems were not loaded`). Use `ruby` or `/usr/bin/ruby` from a
+shell. The package's `gem`, `bundle`, `rake`, `irb` and `erb` scripts start
+with `#!/usr/bin/env ruby`, so they also run by path.
+
+Up to 3.4.11-11 `bin/ruby` was a 7-byte `#!wasm` marker that the kernel
+can't exec: `system(Gem.ruby, …)` gave 127, and the executables RubyGems
+installed (shebang `#!…/wasix-ruby/bin/ruby`) gave "bad interpreter". Those
+executables now run when started from ruby; to make them run from a shell
+too, rewrite their shebangs with `gem pristine --only-executables <gem>…`
+for the gems you installed (`--all` would also rewrite the package's own
+gems).
 
 Since 3.4.11-8, single-fd waits (`IO#wait_readable`, blocking `TCPSocket.new`,
 `Net::HTTP`, blocking `SSLSocket#connect`/`#accept`) use poll(): WASIX's select()
@@ -34,7 +57,9 @@ Command env puts user gem bins ahead of the package:
 ${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}
 ```
 
-That covers Ruby child processes (`system`, `spawn`, `bundle exec`, …). To run those gems **by name from your shell**, add the same user gem bin directory to the host PATH, e.g. in `~/.bashrc`:
+Those are defaults: a `PATH` the caller already has wins, as it does when you
+start `ruby` from bash. To run gem executables **by name**, add the user gem
+bin directory to your PATH, e.g. in `~/.bashrc`:
 
 ```bash
 export PATH="$HOME/.local/share/gem/ruby/3.4.0/bin:$PATH"
