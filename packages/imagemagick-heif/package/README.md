@@ -54,11 +54,12 @@ pnpm add -g @ai-ecoverse/wasm-imagemagick-heif
 magick -version   # "Delegates (built-in):" lists heic only for wasm-imagemagick-heif
 ```
 
-With both installed, one package provides all five commands and the other
-is ignored without a warning. Today slicc-kernel picks
-`@ai-ecoverse/wasm-imagemagick`. wasm-imagemagick-heif declares
-`"slicc": { "replaces": ["@ai-ecoverse/wasm-imagemagick"] }`, which
-slicc-kernel will honour once slicc-kernel#635 is released.
+With both installed, one package provides the shared commands and the other
+is ignored without a warning. wasm-imagemagick-heif declares
+`"slicc": { "replaces": ["@ai-ecoverse/wasm-imagemagick"] }`: with
+slicc-kernel 1.94.0 or later it wins automatically when both are installed
+together (e.g. both global). On older kernels the plain package wins, so
+remove it first.
 
 ## Resource limits
 
