@@ -62,11 +62,13 @@ function fakeIo({
     },
     async artifact(id) {
       calls.push(['artifact', id]);
-      if (!byId[id]) throw new Error(`GET /actions/artifacts/${id} returned 404`);
+      if (!byId[id]) throw Object.assign(new Error(`GET /actions/artifacts/${id} returned 404`), { status: 404 });
+      if (byId[id] === 500) throw Object.assign(new Error(`GET /actions/artifacts/${id} returned 500`), { status: 500 });
       return byId[id];
     },
     async record(a) {
       calls.push(['record', a.id]);
+      if (records[a.id] === 404) throw Object.assign(new Error(`GET /actions/artifacts/${a.id}/zip returned 404`), { status: 404 });
       return records[a.id];
     },
     async canWrite(login) {
@@ -87,7 +89,7 @@ function fakeIo({
     },
     async run(id) {
       calls.push(['run', id]);
-      if (!runs[id]) throw new Error(`GET /actions/runs/${id} returned 404`);
+      if (!runs[id]) throw Object.assign(new Error(`GET /actions/runs/${id} returned 404`), { status: 404 });
       return runs[id];
     },
     async jobs(id) {
@@ -549,6 +551,25 @@ describe('the cert-review record', () => {
     const notDownloaded = fakeIo(reviewed({ ra: recordArtifact({ expired: true }) }));
     await assert.rejects(resolvePackage(noLine, notDownloaded), /expired/);
     assert.equal(notDownloaded.calls.some(([c]) => c === 'record'), false);
+  });
+
+  it('treats a deleted run or record artifact as an invalid review, and other API errors as red', async () => {
+    const green = { jobs: { 20: [{ name: 'ci', conclusion: 'success' }] }, pr: renovatePr };
+    const noRun = reviewed();
+    delete noRun.runs[RUN];
+    const deleted = [
+      [noRun, /run 38800000001 no longer exists/],
+      [{ ...reviewed(), byId: {} }, /record artifact 12000000077 no longer exists/],
+      [reviewed({ rec: 404 }), /record artifact 12000000077 no longer exists/],
+    ];
+    for (const [setup, why] of deleted) {
+      await assert.rejects(resolvePackage(noLine, fakeIo(setup)), new RegExp(`the cert-review status is invalid: ${why.source}`));
+      const ci = await resolvePackage({ ...noLine, ciCertified: true }, fakeIo({ ...setup, ...green }));
+      assert.equal(ci.gate, 'ci-certified (ladder-pr ci job)');
+    }
+    const broken = reviewed();
+    broken.byId = { [REC]: 500 };
+    await assert.rejects(resolvePackage({ ...noLine, ciCertified: true }, fakeIo({ ...broken, ...green })), /returned 500/);
   });
 
   it('needs the target_url and the description to name the same run and record artifact', async () => {

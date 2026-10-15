@@ -97,6 +97,15 @@ function recordProblems({ run, artifact, pr }, record) {
   return problems;
 }
 
+async function unlessGone(request) {
+  try {
+    return await request;
+  } catch (err) {
+    if (err.status === 404) return undefined;
+    throw err;
+  }
+}
+
 export async function certReview(pr, io) {
   const status = (await io.statuses(pr.head)).find(
     (st) => st.context === 'cert-review' && st.creator?.login === 'github-actions[bot]',
@@ -111,11 +120,16 @@ export async function certReview(pr, io) {
     return { state: 'invalid', url, problem };
   }
   const runId = Number(target[1]);
-  const found = { run: await io.run(runId), artifact: await io.artifact(Number(target[2])), pr };
+  const found = { run: await unlessGone(io.run(runId)), artifact: await unlessGone(io.artifact(Number(target[2]))), pr };
+  if (!found.run || !found.artifact) {
+    const gone = !found.run ? `run ${runId}` : `record artifact ${target[2]}`;
+    return { state: 'invalid', url, problem: `${gone} no longer exists` };
+  }
   let problems = [...runProblems(found.run), ...recordProblems(found)];
   let record;
   if (!problems.length) {
-    record = await io.record(found.artifact);
+    record = await unlessGone(io.record(found.artifact));
+    if (record === undefined) return { state: 'invalid', url, problem: `record artifact ${target[2]} no longer exists` };
     problems = recordProblems(found, record);
   }
   if (problems.length) return { state: 'invalid', url, problem: problems.join('; ') };
@@ -233,7 +247,7 @@ function githubIo({ repo, token, sha, head, prBody, prNumber }) {
         'x-github-api-version': '2022-11-28',
       },
     });
-    if (!res.ok) throw new Error(`GET ${path} returned ${res.status}`);
+    if (!res.ok) throw Object.assign(new Error(`GET ${path} returned ${res.status}`), { status: res.status });
     return res;
   };
   const unzip = async (artifact) => {
