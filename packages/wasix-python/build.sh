@@ -457,10 +457,46 @@ echo "== wasix-python: compileall (unchecked-hash)"
 "$HOSTPY" "$PKG/test/pyc-check.py" "$PYLIB"
 
 # --- notices -------------------------------------------------------------------
+NOTICES="$B/notices"
+rm -rf "$NOTICES" && mkdir -p "$NOTICES"
+notice_file() {
+  local archive=$1 member=$2 out
+  out="$NOTICES/$(basename "$archive")-${member//\//_}"
+  case "$archive" in
+    *.zip) unzip -p "$archive" "$member" ;;
+    *.tar.xz) tar xJOf "$archive" "$member" ;;
+    *) tar xzOf "$archive" "$member" ;;
+  esac >"$out"
+  test -s "$out" || { echo "homescoop wasix-python: no $member in $archive" >&2; return 1; }
+  printf '%s' "$out"
+}
+top_dir() {
+  case "$1" in
+    *.zip) unzip -Z1 "$1" | head -n 1 ;;
+    *.tar.xz) tar tJf "$1" | head -n 1 ;;
+    *) tar tzf "$1" | head -n 1 ;;
+  esac | cut -d/ -f1
+}
+CPY_LICENSES="$NOTICES/cpython-incorporated.rst"
+tar xzOf "$PY_TGZ" "Python-$VER/Doc/license.rst" | sed -n '/^Licenses and Acknowledgements for Incorporated Software$/,$p' >"$CPY_LICENSES"
+test -s "$CPY_LICENSES"
+CPY_HACL="$NOTICES/cpython-hacl.txt"
+tar xzOf "$PY_TGZ" "Python-$VER/Modules/_hacl/Hacl_Hash_SHA2.c" | sed -n '1,/\*\//p' >"$CPY_HACL"
+grep -q 'MIT License' "$CPY_HACL"
+fetch_src bzip2; BZ2_TB="$SRC_FILE"
+fetch_src xz; XZ_TB="$SRC_FILE"
+fetch_src sqlite; SQ_ZIP="$SRC_FILE"
+fetch_src readline; RL_TB="$SRC_FILE"
+fetch_src ncurses; NC_TB="$SRC_FILE"
+fetch_src libffi; FFI_TB="$SRC_FILE"
+SQ_BLESSING="$NOTICES/sqlite-blessing.txt"
+unzip -p "$SQ_ZIP" "$(top_dir "$SQ_ZIP")/sqlite3.h" | sed -n '1,/May you share freely/p' >"$SQ_BLESSING"
+grep -q 'disclaims copyright' "$SQ_BLESSING"
+SYSROOT_PKG_VER="$(node -p "require('$WASIXCC_SYSROOT_PREFIX/package.json').version")"
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
+LLVM_SRC=https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-20.1.0
+WORK="$B" homescoop_notices_begin "bin/python.wasm statically links the components below. The table lists them; each section after it has the component's licence text."
 {
-  echo "# Third-party notices: @ai-ecoverse/wasix-python"
-  echo
-  echo "bin/python.wasm statically links:"
   echo
   echo "| component | version | license | source |"
   echo "| --- | --- | --- | --- |"
@@ -473,11 +509,32 @@ echo "== wasix-python: compileall (unchecked-hash)"
   echo "| GNU Readline | 8.3 | GPL-3.0-or-later | gnu.org/software/readline |"
   echo "| ncurses (tinfo) | 6.5 | X11 | invisible-island.net/ncurses |"
   echo "| libffi | $(pkg-config --modversion libffi) (wasix-org 09cbf7d + patches/libffi-wasix-varargs.patch) | MIT | github.com/wasix-org/libffi |"
-  echo "| wasix-libc | wasix-sysroot $(node -p "require('$WASIXCC_SYSROOT_PREFIX/package.json').version") | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
-  echo "| libc++, libc++abi, libunwind | wasix-libc v2026-07-03.1 sysroot-ehpic | Apache-2.0 WITH LLVM-exception | github.com/wasix-org/wasix-libc |"
+  echo "| wasix-libc | wasix-sysroot $SYSROOT_PKG_VER | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
+  echo "| libc++, libc++abi, libunwind | wasix-libc v2026-07-03.1 sysroot-ehpic (LLVM 20.1) | Apache-2.0 WITH LLVM-exception | github.com/wasix-org/wasix-libc |"
   echo
-  echo "lib/python3.14/site-packages/pip is pip (MIT), from CPython's ensurepip bundle."
-} >"$DEST/THIRD-PARTY-NOTICES.md"
+  echo "GNU Readline is licensed under the GPL-3.0-or-later and is linked statically, so bin/python.wasm as a whole (a combined work with CPython, whose PSF-2.0 licence is GPL-compatible, and the other components above, all under GPL-compatible licences) is distributed under the terms of the GPL-3.0-or-later; hence the package licence PSF-2.0 AND GPL-3.0-or-later. Its Corresponding Source is the homescoop recipe (packages/wasix-python and scripts/ at the commit this release was built from, https://github.com/ai-ecoverse/homescoop) and the sha256-pinned upstream sources and dev packages its recipe.yaml lists."
+  echo
+  echo "lib/python3.14/site-packages/pip is pip (MIT), from CPython's ensurepip bundle; its licence is in its dist-info."
+} >>"$HOMESCOOP_NOTICES"
+homescoop_notice "CPython $VER: incorporated software (Doc/license.rst)" "$CPY_LICENSES" - "$CPY_HACL" -
+homescoop_notice "OpenSSL $(pkg-config --modversion openssl) (@ai-ecoverse/wasix-openssl), Apache-2.0" "$DEPS/wasix-openssl/package/LICENSE" -
+homescoop_notice "zlib $(pkg-config --modversion zlib) (@ai-ecoverse/wasix-zlib), Zlib" "$DEPS/wasix-zlib/package/LICENSE" -
+homescoop_notice "bzip2 1.0.8" "$(notice_file "$BZ2_TB" "$(top_dir "$BZ2_TB")/LICENSE")" -
+homescoop_notice "xz $(pkg-config --modversion liblzma) (liblzma), 0BSD" "$(notice_file "$XZ_TB" "$(top_dir "$XZ_TB")/COPYING")" - "$(notice_file "$XZ_TB" "$(top_dir "$XZ_TB")/COPYING.0BSD")" -
+homescoop_notice "SQLite $(pkg-config --modversion sqlite3), public domain" "$SQ_BLESSING" -
+homescoop_notice "GNU Readline 8.3, GPL-3.0-or-later" "$(notice_file "$RL_TB" "$(top_dir "$RL_TB")/COPYING")" -
+homescoop_notice "ncurses 6.5 (tinfo), X11" "$(notice_file "$NC_TB" "$(top_dir "$NC_TB")/COPYING")" -
+homescoop_notice "libffi $(pkg-config --modversion libffi) (wasix-org 09cbf7d), MIT" "$(notice_file "$FFI_TB" "$(top_dir "$FFI_TB")/LICENSE")" -
+WORK="$B" homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_PKG_VER; files from tag v2025-09-02.1)" \
+  "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
+  "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
+  "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
+  "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
+  "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
+WORK="$B" homescoop_notice "libc++, libc++abi, libunwind (wasix-libc v2026-07-03.1 sysroot-ehpic, LLVM 20.1; files from llvm-project llvmorg-20.1.0)" \
+  "$LLVM_SRC/libcxx/LICENSE.TXT" 539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b \
+  "$LLVM_SRC/libcxxabi/LICENSE.TXT" e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c \
+  "$LLVM_SRC/libunwind/LICENSE.TXT" b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d
 
 # --- checks --------------------------------------------------------------------
 bash "$PKG/prestage-check.sh" "$DEST/bin/python.wasm" "$PYLIB"
