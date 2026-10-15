@@ -220,7 +220,28 @@ homescoop_em_cli_ldflags() {
   local extra="${HOMESCOOP_EM_CLI_LDFLAGS_EXTRA:-}"
   # shellcheck disable=SC2086
   # slicc-writev.js: one FS.write per writev (emscripten 4.0.23 splits per iovec).
-  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 --js-library $(homescoop_slicc_dir)/slicc-writev.js --js-library $(homescoop_slicc_dir)/slicc-linkat.js --js-library $(homescoop_slicc_dir)/slicc-uname.js${extra:+ ${extra}}"
+  local cred
+  cred="$(homescoop_slicc_cred_archive)" || return 1
+  printf '%s' "-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 --js-library $(homescoop_slicc_dir)/slicc-writev.js --js-library $(homescoop_slicc_dir)/slicc-linkat.js --js-library $(homescoop_slicc_dir)/slicc-uname.js -Wl,-u,slicc_cred_euid ${cred}${extra:+ ${extra}}"
+}
+
+homescoop_slicc_cred_archive() {
+  local src key dir out
+  src="$(homescoop_slicc_dir)/slicc_cred.c"
+  command -v emcc >/dev/null || { echo "homescoop_slicc_cred_archive: no emcc on PATH" >&2; return 1; }
+  key="$({ cat "$src"; command -v emcc; printf '%s' "${EM_CACHE:-}"; } | shasum -a 256 | cut -c1-16)"
+  dir="$WORK/slicc-cred-$key"
+  out="$dir/libslicc_cred.a"
+  if [[ ! -s "$out" ]]; then
+    mkdir -p "$dir"
+    emcc -O2 -c "$src" -o "$dir/slicc_cred.$$.o" >&2 || return 1
+    mv "$dir/slicc_cred.$$.o" "$dir/slicc_cred.o"
+    rm -f "$dir/libslicc_cred.$$.a"
+    emar rcs "$dir/libslicc_cred.$$.a" "$dir/slicc_cred.o" >&2 || return 1
+    mv "$dir/libslicc_cred.$$.a" "$out"
+    echo "== slicc shim: $out (credentials)" >&2
+  fi
+  printf '%s' "$out"
 }
 
 homescoop_slicc_dir() {
@@ -253,8 +274,10 @@ homescoop_slicc_archive() {
   _homescoop_slicc_compile() {
     src="$1"
     base=$(basename "$src" .c)
+    local -a sep=()
+    [[ "$base" == slicc_libc_gaps ]] && sep=(-DSLICC_CRED_SEPARATE)
     echo "== slicc shim: emcc -c $(basename "$src")"
-    emcc -O2 -c "$src" -o "$odir/$base.o"
+    emcc -O2 "${sep[@]}" -c "$src" -o "$odir/$base.o"
     objs+=("$odir/$base.o")
   }
   case "$profile" in
