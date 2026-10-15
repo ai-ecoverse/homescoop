@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 export default async function sqlite3(ctx) {
   const { assert } = ctx;
   const cwd = '/home/sq';
@@ -45,6 +47,23 @@ export default async function sqlite3(ctx) {
   const bad = await run(['sqlite3', 'bad.db', 'select 1 from sqlite_master;']);
   assert.equal(bad.status, 1, `bad.db: rc ${bad.status}`);
   assert.match(bad.stderr, /file is not a database/);
+  const hostWal = readFileSync(new URL('./host-wal.db', import.meta.url));
+  assert.deepEqual([hostWal[18], hostWal[19]], [2, 2], 'the fixture is a WAL-format database (header bytes 18/19)');
+  assert.equal(await ok(['sqlite3', ':memory:', `select writefile('hw.db', unhex('${hostWal.toString('hex')}'));`]), `${hostWal.length}\n`);
+  for (const argv of [['sqlite3', 'hw.db', 'select sum(x) from t;'], ['sqlite3', '-readonly', 'hw.db', 'select sum(x) from t;']]) {
+    const r = await run(argv);
+    assert.equal(r.status, 1, `${argv.join(' ')}: rc ${r.status}`);
+    assert.match(r.stderr, /file is not a database \(26\)/, `a host WAL database (SQLITE_OMIT_WAL): ${r.stderr}`);
+  }
+  const readme = await ctx.read(`/node_modules/${ctx.npmName}/README.md`);
+  assert.ok(readme, 'the package README is installed');
+  const flat = readme.replace(/\s+/g, ' ');
+  assert.match(flat, /WAL-format database made on a host/, 'README: host WAL databases');
+  assert.match(flat, /file is not a database \(26\)/, 'README: the exact error');
+  assert.match(flat, /pragma journal_mode=delete/, 'README: the host-side fix');
+  assert.match(flat, /Use one process per database at a time/, 'README: one process per database');
+  assert.match(flat, /slicc-kernel#665/, 'README: the kernel issue');
+
   const syn = await run(['sqlite3', ':memory:', 'selec 1;']);
   assert.equal(syn.status, 1);
   assert.match(syn.stderr, /syntax error/);
