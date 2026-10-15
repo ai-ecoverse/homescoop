@@ -55,13 +55,14 @@ mask for the wait in one kernel call (`slicc.sigmask_poll`), so a signal
 blocked everywhere else reaches its handler there, as gnupg's daemons and
 openssh expect. `sigwait`, `sigtimedwait` and `sigwaitinfo` fail with ENOSYS
 (up to -27 they reported success with a garbage signal number).
-Known kernel limit (slicc-kernel#561, every wasix-sysroot version): a signal
-that reaches a thread while it runs its own code, not inside a kernel call, is
-handled at the start of the thread's next kernel call, and if that call is a
-wait it still sleeps its whole timeout. Up to -27 this hit every signal sent
-during computation. On slicc-kernel 1.88.0 without `slicc.sigmask_poll`, -28
-leaves it only between the mask swap and the wait inside `pselect`/`ppoll`;
-`slicc.sigmask_poll`, and the fix for #561, close it.
+On slicc-kernel before 1.91.0 (slicc-kernel#561, every wasix-sysroot
+version): a signal that reaches a thread while it runs its own code, not
+inside a kernel call, is handled at the start of the thread's next kernel
+call, and if that call is a wait it still sleeps its whole timeout. Up to -27
+this hit every signal sent during computation; -28 on 1.88.0 leaves it only
+between the mask swap and the wait inside `pselect`/`ppoll`, and
+`slicc.sigmask_poll` (1.89.0) narrows it further. slicc-kernel 1.91.0 fixes
+it: such a wait returns EINTR at once.
 
 Since 2025.9.30-27 setting file times works for every form (homescoop#294).
 Up to -26, `utimensat(…, NULL)`, `futimens(fd, NULL)`, `utimes(p, NULL)` and
