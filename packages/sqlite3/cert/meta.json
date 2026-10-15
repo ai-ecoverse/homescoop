@@ -1,0 +1,11 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.81.0",
+  "checklist": [
+    "sqlite3 -version and sqlite_version() are 3.54.0",
+    "a file database written by one sqlite3 process is read by the next (count, sum)",
+    "-csv -header and -json output, a dot-command script on stdin (list mode, separator, group_concat, a window function), .import --csv",
+    "compiled-in FTS5, RTREE, math functions and JSON",
+    "errors: a text file opened as a database gives 'file is not a database', rc 1; a syntax error rc 1; .load fails (SQLITE_OMIT_LOAD_EXTENSION)"
+  ]
+}
