@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: Dry run, never dispatches ladder-build. Merge commit on main to resolve.
+        description: Dry run, never dispatches ladder-build. Merge commit on main to resolve (full 40-hex sha).
         required: true
         type: string
       before:
@@ -96,6 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.sha || github.sha }}
           fetch-depth: 0
       - id: d
         env:

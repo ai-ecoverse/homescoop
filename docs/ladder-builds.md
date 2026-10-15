@@ -66,7 +66,7 @@ package red and dispatches nothing. Versions already on npm dispatch plain
 artifact by `artifact_id` and checks `certified` again; it publishes only
 when dispatched on `main`.
 
-Dry run: `gh workflow run ladder-merge.yml -f sha=<merge commit>` resolves
+Dry run: `gh workflow run ladder-merge.yml -f sha=<full merge commit sha>` resolves
 and prints the decision without dispatching. `before`, `packages`,
 `assume_unpublished`, `message`, `pr_body`, `pr`, `head` and `ci_certified`
 simulate the other cases (`pr` resolves an open PR, with `sha` its head).
