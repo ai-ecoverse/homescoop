@@ -1,0 +1,44 @@
+{
+  "name": "@ai-ecoverse/wasi-fnox",
+  "version": "1.39.0-1",
+  "description": "fnox 1.39 for slicc WASI: secrets as placeholders, values in seven's sealed store (/dev/sealed)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-fnox/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "fnox",
+    "secrets"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "slicc-kernel": ">=1.64.0"
+  },
+  "homescoop": {
+    "recipe": "wasi-fnox",
+    "upstream": "1.39.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "fnox": {
+        "wasm": "bin/fnox.wasm"
+      }
+    }
+  }
+}
