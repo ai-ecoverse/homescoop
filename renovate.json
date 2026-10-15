@@ -210,6 +210,13 @@
       "automerge": false
     },
     {
+      "description": "Root package.json devDependencies are our own test pins (cert kernel, shared harness, playwright): a bump merges by hand once that version is certified (Lars), so an uncertified kernel never reaches every cert run.",
+      "matchFileNames": [
+        "package.json"
+      ],
+      "automerge": false
+    },
+    {
       "description": "slicc-kernel-negative is the pinned old kernel (npm alias) the negative proofs must fail on (#393); a bump would break the proof.",
       "matchDepNames": [
         "slicc-kernel-negative"
