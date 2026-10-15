@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-findutils`
 
-[GNU findutils](https://www.gnu.org/software/findutils/) 4.10.0 for slicc's
+[GNU findutils](https://www.gnu.org/software/findutils/) 4.11.0 for slicc's
 wasm realm: `find` and `xargs` only (no `locate` / `updatedb`).
 
 `-exec` / `-execdir` / `-ok` and `xargs` (including `-P`) go through slicc's

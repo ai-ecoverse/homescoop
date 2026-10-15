@@ -1,11 +1,11 @@
 # `@ai-ecoverse/wasm-libtiff`
 
-libtiff **4.7.0** built for WebAssembly / emscripten, packaged by
+libtiff **4.7.2** built for WebAssembly / emscripten, packaged by
 [homescoop](https://github.com/ai-ecoverse/homescoop).
 
 | | |
 | --- | --- |
-| Upstream | [libtiff](https://libtiff.gitlab.io/libtiff/) `4.7.0` |
+| Upstream | [libtiff](https://libtiff.gitlab.io/libtiff/) `4.7.2` |
 | Recipe | [`packages/libtiff`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/libtiff) |
 | Build | `build.sh` (ladder `emconfigure`; deps zlib + libjpeg-turbo) |
 

@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-jq",
   "version": "1.8.2-2",
-  "description": "jq 1.8.1 with oniguruma for wasm / slicc",
+  "description": "jq 1.8.2 with oniguruma for wasm / slicc",
   "license": "MIT",
   "repository": {
     "type": "git",
