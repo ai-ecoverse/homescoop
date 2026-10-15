@@ -2,7 +2,7 @@
 
 MRI Ruby for slicc WASIX. No epoll (poll fallback). See PRESTAGE.md.
 
-Built on wasix-sysroot 2025.9.30-27 or later (the WASIX libc and headers; see
+Built on wasix-sysroot 2025.9.30-28 or later (the WASIX libc and headers; see
 PRESTAGE.md).
 
 ## The interpreter path (3.4.11-12)
@@ -36,6 +36,14 @@ rejects an exception set with ENOSYS, so `IO.select` with a third array still
 fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
+
+## 3.4.11-13: wasix-sysroot 2025.9.30-28
+
+A rebuild on wasix-sysroot -28, whose libc keeps real signal masks through
+slicc-kernel (≥ 1.88.0), so MRI's own `pthread_sigmask`/`sigprocmask` calls
+now take effect. Ruby has no API of its own for masks, so
+nothing changes at the Ruby level: `Signal.trap` handlers still run when
+other threads are busy.
 
 ## 3.4.11-11: wasix-sysroot 2025.9.30-27
 

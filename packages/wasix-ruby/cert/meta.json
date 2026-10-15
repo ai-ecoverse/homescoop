@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.71.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.93.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -19,6 +19,7 @@
     "cert/signals.mjs (3.4.11-10, wasix-sysroot -20's slicc.sigaction_set hook, -19's alarm/raise): trap('CHLD') reaps 3 Process.spawn children with Process.wait(-1, WNOHANG), no zombie left; trap WINCH/USR1/ALRM each run once (kill self); trap('TERM','IGNORE') survives kill TERM; an uncaught Interrupt (kill INT self) ends ruby with 130; trap('INT') runs its block and exits 0. On 3.4.11-9 slicc-kernel 1.47.1 ran neither trap('CHLD') nor trap('WINCH') and the uncaught Interrupt exited 0",
     "cert/users.mjs (H1 homescoop#207, slicc-kernel >= 1.44.0): Process.uid/euid/gid/groups, Etc.getpwuid, Etc.getgrgid, Dir.home and a written file's owner as root '0|0|0|0|root|/root|root|/root|true' and as kernel.users.add cone '1000|1000|1000|100,1000|cone|/home/cone|cone|/home/cone|true'",
     "times (3.4.11-11, wasix-sysroot 2025.9.30-27): File.utime with explicit times, then File.utime(nil, nil) and FileUtils.touch set mtime to now (within 5 s); Process.times.utime reaches 0.5 s in a busy loop, stime/cutime/cstime 0. 3.4.11-10 (sysroot -20): File.utime(nil, nil) and FileUtils.touch set mtime 0 (1970) (NEGATIVE.md)",
-    "cert/launcher.mjs (3.4.11-12, homescoop#305): Gem.ruby == RbConfig.ruby == /usr/bin/ruby and system(Gem.ruby, '-e', 'exit 3') gives 3; bin/ruby is the wasm module (\\0asm, executable) and system(bindir/ruby, …) runs with json; the package's gem/rake/bundle start with #!/usr/bin/env ruby and rake/gem run by path from bash; a locally built gem's executable gets #!/usr/bin/ruby and runs (exit 7) by path and by name from bash and from ruby. 3.4.11-11: Gem.ruby was the #!wasm marker bin/ruby, system(Gem.ruby, …) gave 127 (NEGATIVE.md)"
+    "cert/launcher.mjs (3.4.11-12, homescoop#305): Gem.ruby == RbConfig.ruby == /usr/bin/ruby and system(Gem.ruby, '-e', 'exit 3') gives 3; bin/ruby is the wasm module (\\0asm, executable) and system(bindir/ruby, …) runs with json; the package's gem/rake/bundle start with #!/usr/bin/env ruby and rake/gem run by path from bash; a locally built gem's executable gets #!/usr/bin/ruby and runs (exit 7) by path and by name from bash and from ruby. 3.4.11-11: Gem.ruby was the #!wasm marker bin/ruby, system(Gem.ruby, …) gave 127 (NEGATIVE.md)",
+    "cert/sysroot28.mjs (3.4.11-13, wasix-sysroot -28, slicc-kernel 1.93.0): Signal.trap('USR1') counts 20 self-sent USR1 while three threads spin ('trapped 20'), and package.json's description and THIRD-PARTY-NOTICES.md name wasix-sysroot 2025.9.30-28. 3.4.11-12 (sysroot -27): the trap count is the same, the toolchain record says -27 (NEGATIVE.md); the rest of the cert is the regression run on -28"
   ]
 }
