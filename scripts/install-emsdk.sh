@@ -7,10 +7,6 @@
 # is the last archive member, so it ends up truncated on most CI runners and
 # emcc links that run wasm-opt (-O1+, -g) fail at random mid-emconfigure.
 #
-# Same release, install path and .emscripten config as emsdk@0.4.0, so build
-# output is unchanged. The archive is sha256-pinned and tar must succeed
-# before the stamp is written.
-#
 # Prints shell exports (EMSDK, EM_CONFIG, PATH) on stdout:
 #   eval "$(bash scripts/install-emsdk.sh)"
 set -euo pipefail
@@ -36,39 +32,50 @@ case "$(uname -s)-$(uname -m)" in
     ;;
 esac
 
-# emsdk@0.4.0 layout: <cache>/0.4.0/{install,.emscripten}
-ROOT="${EMSDK_CACHE:-$CACHE_BASE}/0.4.0"
+PATCH_DIR="$(cd "$(dirname "$0")" && pwd)/emsdk-patches"
+PATCHES=()
+for patch_file in "$PATCH_DIR"/*.patch; do
+  [[ -f "$patch_file" ]] || continue
+  PATCHES+=("$patch_file")
+done
+if ((${#PATCHES[@]})); then
+  PATCHSET="$(for patch_file in "${PATCHES[@]}"; do printf '%s %s\n' "$(basename "$patch_file")" "$(shasum -a 256 < "$patch_file" | cut -d' ' -f1)"; done | shasum -a 256 | cut -c1-8)"
+  ROOT="${EMSDK_CACHE:-$CACHE_BASE}/0.4.0-$PATCHSET"
+else
+  PATCHSET=none
+  ROOT="${EMSDK_CACHE:-$CACHE_BASE}/0.4.0"
+fi
 INSTALL="$ROOT/install"
 STAMP="$ROOT/.homescoop-emsdk"
+WANT="$RELEASE_HASH patches=$PATCHSET"
 NODE="$(node -p process.execPath)"
 
-if [[ -f "$STAMP" && "$(cat "$STAMP")" == "$RELEASE_HASH" ]]; then
-  echo "== install-emsdk: $ROOT already has $RELEASE_HASH" >&2
+if [[ -f "$STAMP" && "$(cat "$STAMP")" == "$WANT" ]]; then
+  echo "== install-emsdk: $ROOT already has $WANT" >&2
 else
   echo "== install-emsdk: fetch $URL" >&2
   mkdir -p "$ROOT"
+  rm -f "$STAMP"
   TMP="$(mktemp -d "$ROOT/.tmp.XXXXXX")"
   trap 'rm -rf "$TMP"' EXIT
   curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "$URL" -o "$TMP/wasm-binaries.tar.xz"
   echo "$SHA  $TMP/wasm-binaries.tar.xz" | shasum -a 256 -c - >&2
   mkdir -p "$TMP/install"
   tar -xf "$TMP/wasm-binaries.tar.xz" --strip-components=1 -C "$TMP/install"
+  for patch_file in ${PATCHES[@]+"${PATCHES[@]}"}; do
+    patch -d "$TMP/install/emscripten" -p1 -s -f --no-backup-if-mismatch < "$patch_file" >&2
+    echo "== install-emsdk: applied $(basename "$patch_file")" >&2
+  done
+  if ((${#PATCHES[@]})); then
+    rm -f "$TMP/install/emscripten/cache/sysroot/lib/wasm32-emscripten"/libc.a "$TMP/install/emscripten/cache/sysroot/lib/wasm32-emscripten"/libc-*.a
+    rm -rf "$TMP/install/emscripten/cache/build"/libc "$TMP/install/emscripten/cache/build"/libc-*
+    echo "== install-emsdk: patch set $PATCHSET; libc rebuilds on first use" >&2
+  fi
   rm -rf "$INSTALL"
   mv "$TMP/install" "$INSTALL"
-  echo "$RELEASE_HASH" > "$STAMP"
-  echo "== install-emsdk: installed $RELEASE_HASH → $INSTALL" >&2
+  echo "$WANT" > "$STAMP"
+  echo "== install-emsdk: installed $WANT → $INSTALL" >&2
 fi
-
-for patch_file in "$(cd "$(dirname "$0")" && pwd)"/emsdk-patches/*.patch; do
-  [[ -f "$patch_file" ]] || continue
-  if patch -d "$INSTALL/emscripten" -p1 -R --dry-run -s -f < "$patch_file" >/dev/null 2>&1; then
-    continue
-  fi
-  patch -d "$INSTALL/emscripten" -p1 -s -f --no-backup-if-mismatch < "$patch_file" >&2
-  rm -f "$INSTALL/emscripten/cache/sysroot/lib/wasm32-emscripten"/libc.a "$INSTALL/emscripten/cache/sysroot/lib/wasm32-emscripten"/libc-*.a
-  rm -rf "$INSTALL/emscripten/cache/build"/libc "$INSTALL/emscripten/cache/build"/libc-*
-  echo "== install-emsdk: applied $(basename "$patch_file"); libc rebuilds on first use" >&2
-done
 
 # Same config emsdk@0.4.0 writes. NODE_JS follows the node on PATH, as the
 # npm postinstall's process.execPath did; only rewrite when it changes.
