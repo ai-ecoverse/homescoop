@@ -5,6 +5,7 @@
  */
 #include <emscripten.h>
 #include <errno.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <time.h>
@@ -234,3 +235,9 @@ EM_JS(int, slicc_default_getppid_js, (void), {
 });
 __attribute__((weak)) pid_t __syscall_getpid(void) { return slicc_default_getpid_js(); }
 __attribute__((weak)) pid_t __syscall_getppid(void) { return slicc_default_getppid_js(); }
+
+__attribute__((import_module("env"), import_name("__syscall_linkat")))
+int slicc_linkat_import(int olddirfd, intptr_t oldpath, int newdirfd, intptr_t newpath, int flags);
+int __syscall_linkat(int olddirfd, intptr_t oldpath, int newdirfd, intptr_t newpath, int flags) {
+  return slicc_linkat_import(olddirfd, oldpath, newdirfd, newpath, flags);
+}
