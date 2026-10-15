@@ -151,7 +151,10 @@ for a in liblcms2.a libtiff.a libjpeg.a libfreetype.a libpng16.a libz.a libwebpm
   cp "$PREFIX/lib/$a" "$RELINK/$a"
 done
 cp "$SLICC_A" "$RELINK/libslicc-cli.a"
-cp "$(homescoop_slicc_dir)/slicc-writev.js" "$RELINK/js/"
+for jl in $(printf '%s\n' "$CLI_LDFLAGS" | grep -o -- "--js-library [^ ]*" | cut -d' ' -f2); do
+  cp "$jl" "$RELINK/js/"
+done
+test -f "$RELINK/js/slicc-writev.js"
 printf '%s\n' "$CLI_LDFLAGS" | sed "s#$(homescoop_slicc_dir)/#js/#g" >"$RELINK/ldflags.txt"
 cp "$HOMESCOOP_PKG/relink.sh" "$RELINK/relink.sh"
 echo "== imagemagick-heif: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7 (tab policy) and etc/ImageMagick-7-open"
