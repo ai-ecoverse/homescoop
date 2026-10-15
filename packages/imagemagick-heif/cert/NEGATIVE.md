@@ -53,3 +53,26 @@ AssertionError [ERR_ASSERTION]: default limits: Resource limits:
 With that policy `magick -size 30000x30000 xc:white` would start allocating
 a 900 MP pixel cache, which is what hung the tab. On 7.1.2-33-1 the same spec
 refuses it in about 60 ms and the 81 MP canvas in about 50 ms.
+
+## 7.1.2-34-1: disk pixel cache and in-place mogrify
+
+Against the certified, unpublished 7.1.2-33-1 artifact of run 38603486003
+(`host-imagemagick-heif-pr330`, sha256 `a7a78fd5230837b0cbe0adf290a111cb70dc29cfdba28fcd29a5fd59ec34ab84`), slicc-kernel 1.81.0, 2026-10-15:
+
+- mogrify.mjs fails (homescoop#353, fixed upstream in 7.1.2-34):
+
+  ```
+  AssertionError [ERR_ASSERTION]: mogrify in place: rc 1 mogrify: no encode delegate for this image format `' @ warning/constitute.c/WriteImage/1473.
+  ```
+
+- The time-bound resize fails at the first 48 MP case (homescoop#356: with
+  disk 512MiB the pixel cache went to the browser's storage). With the
+  limits check removed, so that the bound is what fails:
+
+  ```
+  AssertionError [ERR_ASSERTION]: magick -size 8064x6048 gradient:red-blue -resize 50% -quality 85 photo-48-50.jpg: no result within 30 s (pixel cache on disk? homescoop#356)
+  ```
+
+  The full policy.mjs fails earlier, at its limits table (768MiB/512MiB/512MiB
+  instead of 1.5GiB/256MiB/0B). On 7.1.2-34-1 the same 48 MP resize takes
+  about 2.5 s, and 12 MP about 0.6 s.
