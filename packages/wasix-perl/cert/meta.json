@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.71.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.93.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
@@ -26,6 +26,8 @@
     "cert/users.mjs (H1 homescoop#207, slicc-kernel >= 1.44.0): $< $> $( getpwuid getgrgid as root '0|0|0,0|root|/root|root' and as kernel.users.add cone '1000|1000|100,1000,1000|cone|/home/cone|cone'; the getgroups stub in wasix-posix-stubs.h is gone (sysroot -20 asks the kernel)",
     "times (5.42.0-10, wasix-sysroot 2025.9.30-27): utime 1000000000, 1100000000 then utime undef, undef sets mtime to now (within 5 s); times() user CPU reaches 0.5 s in a busy loop, system and children's times 0. 5.42.0-9 (sysroot -20): utime undef, undef sets mtime 0 (1970) (NEGATIVE.md)",
     "handles (5.42.0-11): utime with a filehandle sets explicit times and undef, undef sets now (futimes through futimens; up to -10 a stub, EOPNOTSUPP); flock LOCK_EX, LOCK_SH|LOCK_NB and LOCK_UN succeed on an open handle (advisory no-op, as wasix-python's and wasix-ruby's) and a closed one fails with EBADF (up to -10 every flock failed with EOPNOTSUPP); use filetest 'access' makes -r/-w/-e/-x ask libc's eaccess (wasix-sysroot -25; up to -10 a stub, so -r was false)",
-    "prove (5.42.0-11, patches/0005-sselect-wasi-fd-set.patch): prove t/ with a raw-TAP and a Test::More file gives Files=2, Tests=5, Result: PASS; prove -v shows the TAP; a failing test fails prove (Failed test: 2); IO::Select->can_read over two pipes returns the ready one. 5.42.0-10: prove said 'No plan found in TAP output' and can_read trapped (memory access out of bounds)"
+    "prove (5.42.0-11, patches/0005-sselect-wasi-fd-set.patch): prove t/ with a raw-TAP and a Test::More file gives Files=2, Tests=5, Result: PASS; prove -v shows the TAP; a failing test fails prove (Failed test: 2); IO::Select->can_read over two pipes returns the ready one. 5.42.0-10: prove said 'No plan found in TAP output' and can_read trapped (memory access out of bounds)",
+    "cert/sigmask.mjs (5.42.0-12, wasix-sysroot -28 signal masks, slicc-kernel 1.93.0): POSIX::sigprocmask(SIG_BLOCK, SIGUSR1) with an empty old mask; kill USR1 => $$ stays pending (POSIX::sigpending), does not run $SIG{USR1} and does not cut select(undef, undef, undef, 0.5) short; SIG_UNBLOCK reports it was masked, the handler runs once and nothing is left pending: 'was=0 slept=1 pending=1 blocked_hits=0 masked=1 hits=1 left=0'. 5.42.0-11 (sysroot -27): 'pending=0 blocked_hits=1 masked=0' (NEGATIVE.md)",
+    "cert/wasm-mode.mjs (5.42.0-12): the installed bin/perl.wasm is mode 755 (scripts/command-modes.mjs); 5.42.0-11 shipped it 644"
   ]
 }

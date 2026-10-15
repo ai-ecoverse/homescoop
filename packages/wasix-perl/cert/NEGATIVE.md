@@ -57,3 +57,7 @@ use filetest "access"; -r "/tmp/pa"      not r: Not supported
 
 `prove.mjs` against 5.42.0-10: `prove t/a.t` rc 1, `t/a.t (Wstat: 0 Tests: 0 Failed: 0) Parse errors: No plan found in TAP output`, `Result: FAIL`; `perl t/a.t` prints the TAP. `IO::Select->new($out, $err)->can_read(2)` on IPC::Open3 pipes: `perl: wasm trap: memory access out of bounds`, rc 134. `TAP::Parser::Iterator::Process` with `merge => 1` (no select) reads the lines.
 
+
+## 5.42.0-12: negative 5.42.0-11 (wasix-sysroot -28)
+
+Published 5.42.0-11 (sysroot -27) on slicc-kernel 1.93.0's Node entry, 2026-10-15: `sigmask.mjs` gives `was=0 slept=1 pending=0 blocked_hits=1 masked=0 hits=1 left=0`: `sigprocmask` is ignored, so the self-sent SIGUSR1 runs its handler at once and is never pending. `wasm-mode.mjs` fails: `bin/perl.wasm` is 644.
