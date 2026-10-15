@@ -39,6 +39,8 @@ jobs:
     outputs:
       host: ${{ steps.d.outputs.host }}
       slicc: ${{ steps.d.outputs.slicc }}
+      rebuild: ${{ steps.d.outputs.rebuild }}
+      test: ${{ steps.d.outputs.test }}
       any: ${{ steps.d.outputs.any }}
     steps:
       - uses: actions/checkout@v7
@@ -57,8 +59,12 @@ jobs:
           echo "$CLASS"
           HOST=$(node -e 'const j=JSON.parse(process.argv[1]); console.log(JSON.stringify(j.host))' "$CLASS")
           SLICC=$(node -e 'const j=JSON.parse(process.argv[1]); console.log(JSON.stringify(j.slicc))' "$CLASS")
+          REBUILD=$(node -e 'const j=JSON.parse(process.argv[1]); console.log(JSON.stringify(j.rebuild))' "$CLASS")
+          TEST=$(node -e 'const j=JSON.parse(process.argv[1]); console.log(JSON.stringify(j.test))' "$CLASS")
           echo "host=$HOST" >> "$GITHUB_OUTPUT"
           echo "slicc=$SLICC" >> "$GITHUB_OUTPUT"
+          echo "rebuild=$REBUILD" >> "$GITHUB_OUTPUT"
+          echo "test=$TEST" >> "$GITHUB_OUTPUT"
           echo "any=$([ "$HOST" != '[]' ] || [ "$SLICC" != '[]' ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   recipe-sha:
@@ -168,6 +174,142 @@ jobs:
             .homescoop-out/packaging-only-diff.txt
           if-no-files-found: error
           retention-days: 14
+
+  rebuild:
+    needs: [detect, recipe-sha]
+    if: needs.detect.outputs.rebuild != '[]' && needs.recipe-sha.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect.outputs.rebuild) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.recipe-sha.outputs.sha || '' }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Refresh source sha256 in this checkout
+        run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
+      - name: Sync npm version from recipe (Renovate bumps)
+        run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
+      - name: Second host build (recipe reproducible)
+        run: |
+          set -euo pipefail
+          bash scripts/host-run.sh "${{ matrix.package }}"
+          sha256sum .homescoop-out/package.tgz | tee .homescoop-out/package.tgz.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rebuild-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+          path: |
+            .homescoop-out/package.tgz
+            .homescoop-out/package.tgz.sha256
+          if-no-files-found: error
+          retention-days: 3
+
+  reproducible:
+    needs: [detect, recipe-sha, host-build, rebuild]
+    if: ${{ !cancelled() && needs.detect.outputs.rebuild != '[]' && needs.recipe-sha.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect.outputs.rebuild) }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.recipe-sha.outputs.sha || '' }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+          path: ${{ runner.temp }}/one
+      - uses: actions/download-artifact@v8
+        with:
+          name: rebuild-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+          path: ${{ runner.temp }}/two
+      - name: Both builds are byte-identical
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          one="$RUNNER_TEMP/one/package.tgz"
+          two="$RUNNER_TEMP/two/package.tgz"
+          what=$(node scripts/read-recipe.mjs "$PKG" --field reproducible.path)
+          if [[ -z "$what" ]]; then
+            what=package.tgz
+            a=$(sha256sum "$one" | cut -d' ' -f1)
+            b=$(sha256sum "$two" | cut -d' ' -f1)
+          else
+            a=$(tar -xOzf "$one" "$what" | sha256sum | cut -d' ' -f1)
+            b=$(tar -xOzf "$two" "$what" | sha256sum | cut -d' ' -f1)
+          fi
+          printf '%s: %s\n  host-build %s\n  rebuild    %s\n' "$PKG" "$what" "$a" "$b" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [[ "$a" == "$b" ]]; then
+            echo "$PKG: $what is reproducible"
+            exit 0
+          fi
+          for n in one two; do
+            mkdir -p "$RUNNER_TEMP/$n/x"
+            tar -xzf "$RUNNER_TEMP/$n/package.tgz" -C "$RUNNER_TEMP/$n/x"
+            (cd "$RUNNER_TEMP/$n/x" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/$n/files.txt"
+          done
+          diff "$RUNNER_TEMP/one/files.txt" "$RUNNER_TEMP/two/files.txt" || true
+          echo "::error::$PKG: $what differs between host-build ($a) and rebuild ($b); the build is not reproducible"
+          exit 1
+
+  test:
+    needs: [detect, recipe-sha, host-build]
+    if: ${{ !cancelled() && needs.detect.outputs.test != '[]' && needs.recipe-sha.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect.outputs.test) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.recipe-sha.outputs.sha || '' }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
+          path: .homescoop-out
+      - name: Unpack the built package/ from package.tgz
+        run: tar -xzf .homescoop-out/package.tgz -C "packages/${{ matrix.package }}"
+      - name: Unit tests (test/*.test.mjs)
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          if ! compgen -G 'test/*.test.mjs' >/dev/null; then
+            echo "no test/*.test.mjs"
+            exit 0
+          fi
+          node --test 'test/*.test.mjs'
+      - name: End-to-end tests (test/package.json)
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f test/package.json ]]; then
+            echo "no test/package.json"
+            exit 0
+          fi
+          cd test
+          npm ci --no-audit --no-fund
+          if node -e 'process.exit(require("./package.json").scripts?.["test:e2e"] ? 0 : 1)'; then
+            npm run test:e2e
+          else
+            node --test 'e2e/*.test.mjs'
+          fi
 
   cert:
     needs: [detect, recipe-sha, host-build]
@@ -293,15 +435,15 @@ jobs:
           echo "::notice::slicc builder package(s) ${{ needs.detect.outputs.slicc }} — PR host check skipped; merge still dispatches ladder-build (needs SLICC secrets)."
 
   ci:
-    needs: [exact-pins, detect, recipe-sha, host-build, cert, slicc-note]
+    needs: [exact-pins, detect, recipe-sha, host-build, rebuild, reproducible, test, cert, slicc-note]
     if: ${{ always() }}
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Fail when a ladder-pr job failed or was cancelled
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo "::error::ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
+          echo "::error::ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} rebuild=${{ needs.rebuild.result }} reproducible=${{ needs.reproducible.result }} test=${{ needs.test.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
           exit 1
       - name: Every ladder-pr job passed or was skipped
         run: |
-          echo "ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
+          echo "ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} rebuild=${{ needs.rebuild.result }} reproducible=${{ needs.reproducible.result }} test=${{ needs.test.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
