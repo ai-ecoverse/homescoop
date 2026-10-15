@@ -70,4 +70,7 @@ if strings "$DEST/biome.wasm" | grep -E '/Users/[^/]+/|/home/runner/|/var/folder
   exit 1
 fi
 shasum -a 256 "$DEST/biome.wasm"
+RUST="$(cd "$SRC_DIR" && rustc --version | sed -n 's/^rustc \([0-9.]*\) .*/\1/p')"
+homescoop_notices_begin "biome.wasm (Biome $VERSION, MIT OR Apache-2.0, see LICENSE) statically links these crates, Rust's standard library and wasi-libc."
+(cd "$SRC_DIR" && CARGO_TARGET_DIR="$OUT/target" homescoop_notice_rust "$SRC_DIR" "$TARGET" "$RUST" --root biome_cli)
 echo "OK wasi-biome $VERSION (biome)"

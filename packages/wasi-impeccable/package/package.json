@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-impeccable",
-  "version": "0.1.14-1",
+  "version": "0.1.14-2",
   "description": "impeccable engine 0.1.14 for slicc WASI preview1 (command impeccable; file-local and HTTP verbs)",
   "license": "Apache-2.0",
   "repository": {
@@ -20,6 +20,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin"
   ],
   "publishConfig": {

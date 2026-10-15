@@ -25,14 +25,15 @@ homescoop_apply_patches "$SRC_DIR"
 TARGET=wasm32-wasip1-threads
 
 export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "== wasi-impeccable: installing rustup (stable + $TARGET)"
+RUST="$(node "$HOMESCOOP_ROOT/scripts/read-recipe.mjs" wasi-impeccable --field toolchain.rust)"
+if ! command -v rustup >/dev/null 2>&1; then
+  echo "== wasi-impeccable: installing rustup"
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --profile minimal --default-toolchain stable --target "$TARGET"
+    | sh -s -- -y --profile minimal --default-toolchain none
   export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"
 fi
-command -v cargo >/dev/null || { echo "missing cargo" >&2; exit 1; }
-rustup target add "$TARGET" >/dev/null 2>&1 || true
+rustup toolchain install "$RUST" --profile minimal --target "$TARGET"
+CARGO=(cargo "+$RUST")
 
 OUT="$WORK/wasi-impeccable-${VERSION}"
 mkdir -p "$OUT/bin"
@@ -43,7 +44,7 @@ if [[ ! -f "$OUT/bin/impeccable.wasm" || -n "${FORCE:-}" ]]; then
     cd "$SRC_DIR"
     CARGO_PROFILE_RELEASE_DEBUG=0 \
     CARGO_PROFILE_RELEASE_STRIP=true \
-      cargo build --release -p impeccable --target "$TARGET"
+      "${CARGO[@]}" build --release -p impeccable --target "$TARGET"
   )
   cp "$SRC_DIR/target/$TARGET/release/impeccable.wasm" "$OUT/bin/impeccable.wasm"
 fi
@@ -84,4 +85,6 @@ then
   exit 1
 fi
 
+homescoop_notices_begin "impeccable.wasm (impeccable engine $VERSION, Apache-2.0, see LICENSE; homescoop's crates/wasix-ureq and wasix-command) statically links these crates, Rust's standard library and wasi-libc."
+HOMESCOOP_CARGO=CARGO homescoop_notice_rust "$SRC_DIR" "$TARGET" "$RUST" --root impeccable
 echo "== wasi-impeccable: staged → $HOMESCOOP_PKG/package ($VERSION)"

@@ -85,6 +85,19 @@ if (existsSync(rootLic) && !/\bApache-2\.0\b/.test(recipeLic)) {
     );
   }
 }
+// A Rust wasm links crates.io crates whose licences ask for their notice in
+// every copy (homescoop#343): build.sh must generate THIRD-PARTY-NOTICES.md
+// (homescoop_notice_rust) and package.json must ship it.
+const buildSh = join(root, 'packages', name, 'build.sh');
+if (existsSync(buildSh) && /\bcargo\b[^\n]*\bbuild\b|\$\{CARGO\[@\]\}"? build/.test(readFileSync(buildSh, 'utf8')) && pkg.slicc?.abi === 'wasi') {
+  const notices = join(root, 'packages', name, 'package', 'THIRD-PARTY-NOTICES.md');
+  if (!existsSync(notices) || statSync(notices).size < 200) {
+    errors.push('Rust wasm package without a generated THIRD-PARTY-NOTICES.md (homescoop_notice_rust in build.sh)');
+  }
+  if (!Array.isArray(pkg.files) || !pkg.files.includes('THIRD-PARTY-NOTICES.md')) {
+    errors.push('package.json files[] must include "THIRD-PARTY-NOTICES.md" (Rust wasm package)');
+  }
+}
 const files = pkg.files;
 if (!Array.isArray(files) || !files.includes('LICENSE')) {
   errors.push('package.json files[] must include "LICENSE"');

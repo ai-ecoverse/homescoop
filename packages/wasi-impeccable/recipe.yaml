@@ -6,6 +6,8 @@ builder: host
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
 version: "0.1.14"
 npm: "@ai-ecoverse/wasi-impeccable"
+toolchain:
+  rust: "1.98.1"
 summary: "impeccable engine 0.1.14 for slicc WASI preview1 (command impeccable; file-local, HTTP and live verbs)"
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
@@ -35,3 +37,6 @@ about:
     files other processes create).
     --version prints the crate / engine VERSION (0.1.x). wasm-opt -Oz.
     Command impeccable → bin/impeccable.wasm (abi=wasi).
+    0.1.14-2 (homescoop#343) pins Rust 1.98.1 and ships
+    THIRD-PARTY-NOTICES.md (homescoop_notice_rust): every crate the wasm
+    links, Rust's standard library and wasi-libc.

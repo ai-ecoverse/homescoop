@@ -7,9 +7,14 @@ source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe wasi-ripgrep
 
 # Prefer rustup's cargo (wasm32-wasip1 std); fall back to PATH.
-export PATH="${HOME}/.cargo/bin:${PATH}"
-command -v cargo >/dev/null || { echo "missing cargo" >&2; exit 1; }
-rustup target add wasm32-wasip1 >/dev/null 2>&1 || true
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"
+RUST="$(node "$HOMESCOOP_ROOT/scripts/read-recipe.mjs" wasi-ripgrep --field toolchain.rust)"
+if ! command -v rustup >/dev/null 2>&1; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+  export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"
+fi
+rustup toolchain install "$RUST" --profile minimal --target wasm32-wasip1
+CARGO=(cargo "+$RUST")
 
 OUT="$WORK/wasi-ripgrep-${VER}"
 SRC="$WORK/ripgrep-${VER}"
@@ -22,7 +27,7 @@ if [[ ! -f "$OUT/bin/rg.wasm" || -n "${FORCE:-}" ]]; then
   mkdir -p "$OUT/bin"
   homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
   tar xzf "$TB" -C "$WORK"
-  (cd "$SRC" && cargo vendor --locked --versioned-dirs "$VENDOR" >/dev/null)
+  (cd "$SRC" && "${CARGO[@]}" vendor --locked --versioned-dirs "$VENDOR" >/dev/null)
   # homescoop#168: grep-cli treats stdin as never readable on WASI, so
   # `cmd | rg pat` searched the cwd. patches/ applies to the vendored crate;
   # an empty "files" map makes cargo skip per-file checksums for it only.
@@ -36,9 +41,9 @@ if [[ ! -f "$OUT/bin/rg.wasm" || -n "${FORCE:-}" ]]; then
   # Strip at link time — unstripped release is ~22 MB.
   # Keep host paths out of the wasm (panic and log locations).
   (cd "$SRC" && CARGO_TARGET_DIR="$WORK/ripgrep-target" \
-    RUSTFLAGS="--remap-path-prefix=$VENDOR=/vendor --remap-path-prefix=$SRC=/ripgrep --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$(rustc --print sysroot)=/rustc" \
+    RUSTFLAGS="--remap-path-prefix=$VENDOR=/vendor --remap-path-prefix=$SRC=/ripgrep --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$(rustc "+$RUST" --print sysroot)=/rustc" \
     CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_RELEASE_STRIP=true \
-    cargo build --release --locked --offline --target wasm32-wasip1 \
+    "${CARGO[@]}" build --release --locked --offline --target wasm32-wasip1 \
       --config 'source.crates-io.replace-with="vendored-sources"' \
       --config "source.vendored-sources.directory=\"$VENDOR\"")
   cp "$WORK/ripgrep-target/wasm32-wasip1/release/rg.wasm" "$OUT/bin/rg.wasm"
@@ -80,6 +85,11 @@ else
   echo "homescoop: no LICENSE-MIT/UNLICENSE in ripgrep-${VER}.crate" >&2
   exit 1
 fi
+
+homescoop_notices_begin "rg.wasm (ripgrep $VER, MIT OR Unlicense, see LICENSE) statically links these crates, Rust's standard library and wasi-libc."
+HOMESCOOP_CARGO=CARGO homescoop_notice_rust "$SRC" wasm32-wasip1 "$RUST" -- --offline \
+  --config 'source.crates-io.replace-with="vendored-sources"' \
+  --config "source.vendored-sources.directory=\"$VENDOR\""
 
 # Refuse host paths in the wasm.
 if strings "$DEST/rg.wasm" | grep -E '/Users/|/home/[^/]+/\.cargo' | grep -v 'crate' >/dev/null
