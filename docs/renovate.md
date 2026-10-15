@@ -16,8 +16,9 @@ When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
 2. **`ladder-merge`** — after merge to `main`, dispatches `ladder-build` for
    each touched package (`createWorkflowDispatch`, not a reusable
    `workflow_call` — npm OIDC trusts the calling workflow filename).
-   `sync-package-version.mjs` aligns `package.json` with the new recipe
-   version before packing.
+   `package.json` must already match the new recipe version (the
+   `recipe-sha` job below commits that); `ladder-build` fails on a
+   mismatch instead of syncing.
 
 `ladder-pr`'s `recipe-sha` job runs `sync-package-version.mjs --write`,
 which also rewrites the old upstream version in `description`, the recipe

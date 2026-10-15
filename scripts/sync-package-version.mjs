@@ -151,7 +151,7 @@ const assertPublishable = argv.includes('--assert-publishable');
 
 if (!name) {
   console.error(
-    'usage: sync-package-version.mjs <package> [--write [--from <previous upstream>]] [--assert-publishable]\n' +
+    'usage: sync-package-version.mjs <package> [--check | --write [--from <previous upstream>]] [--assert-publishable]\n' +
       '       sync-package-version.mjs --assert-tarball <package.tgz>',
   );
   process.exit(2);
@@ -236,6 +236,16 @@ const hsUpstream = pkg.homescoop?.upstream;
 const previous = from ?? String(hsUpstream ?? versionBase(current));
 const rewriteText = write && !isSpelling(allow, name, upstream, previous);
 const upstreamStale = (next !== current && hsUpstream === undefined) || (hsUpstream !== undefined && !isSpelling(allow, name, upstream, hsUpstream));
+if (argv.includes('--check')) {
+  const drift = [];
+  if (next !== current) drift.push(`version is ${current}, but recipe.yaml ${upstream} gives ${next}`);
+  if (upstreamStale) drift.push(`homescoop.upstream is ${hsUpstream ?? '(none)'}, but recipe.yaml version is ${upstream}`);
+  if (drift.length) {
+    console.error(`sync-package-version: ${name} package/package.json disagrees with recipe.yaml: ${drift.join('; ')}`);
+    process.exit(1);
+  }
+}
+
 if (write && (next !== current || rewriteText || upstreamStale)) {
   const raw = readFileSync(pkgPath, 'utf8');
   const want = JSON.parse(raw);

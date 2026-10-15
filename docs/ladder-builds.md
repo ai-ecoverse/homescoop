@@ -117,6 +117,11 @@ is `<command> --version`. Libs without `slicc.commands` skip browser-cert
 (host-smoke is the gate). Green ladder-pr is the Renovate automerge signal.
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
+ladder-pr's `recipe-sha` job commits that sync onto the PR, so main never
+needs it: `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
+--check` and fails, before any build or publish, when the committed version
+base or `homescoop.upstream` disagrees with `recipe.yaml`, naming both
+values.
 
 ## Recipe shape
 

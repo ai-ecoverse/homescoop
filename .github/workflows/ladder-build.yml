@@ -70,8 +70,10 @@ jobs:
             exit 2
           fi
           NPM=$(node scripts/read-recipe.mjs "$PKG" --field npm)
-          # Align reported version with recipe (no write — checkout is ephemeral here).
-          VER=$(node scripts/sync-package-version.mjs "$PKG")
+          if ! VER=$(node scripts/sync-package-version.mjs "$PKG" --check 2> "$RUNNER_TEMP/drift.txt"); then
+            echo "::error::$PKG: $(tr '\n' ' ' < "$RUNNER_TEMP/drift.txt")"
+            exit 1
+          fi
           echo "builder=$BUILDER" >> "$GITHUB_OUTPUT"
           echo "npm=$NPM" >> "$GITHUB_OUTPUT"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
