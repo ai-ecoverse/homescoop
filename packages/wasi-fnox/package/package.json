@@ -27,7 +27,7 @@
     "access": "public"
   },
   "engines": {
-    "slicc-kernel": ">=1.64.0"
+    "slicc-kernel": ">=1.83.0"
   },
   "homescoop": {
     "recipe": "wasi-fnox",

@@ -22,6 +22,8 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
 - **Other providers:** only `sealed`, `age` and `plain` are built. Values from `plain` are passed on with a warning.
 - **Not in this build:** leases, the daemon, the TUI and the MCP server.
 
+It needs slicc-kernel 1.83.0 or later (`engines`): `/dev/sealed` arrived in slicc-kernel 1.68.0 (KS-2), and the exec tickets that `fnox exec` redeems in slicc-kernel 1.83.0 (KS-8).
+
 Without `/dev/sealed`, every sealed operation fails with `not running in seven: /dev/sealed is missing`.
 
 ## Licence
