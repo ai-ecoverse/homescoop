@@ -232,8 +232,14 @@ jobs:
 
 Hosted runners queue jobs for a long time (18–45 min a job on the org's pool
 when it is busy), while the work is minutes, so a call runs as few jobs as it
-can: one plan job, 1–3 shard jobs, and a report job only when there is more
-than one shard.
+can: a gate job, one plan job, 1–3 shard jobs, and a report job only when
+there is more than one shard. The gate and plan take seconds; on the light
+pool each gets a machine within about a minute.
+
+0. **gate** decides where the other jobs run (see
+   [Runners](#runners-and-capacity)). It runs only the workflow file's own
+   script, a GitHub API call for each sha ref, and checks nothing out, so
+   it may run on the light pool for any event that could get the pool.
 
 1. **plan** reads bios's lockfiles at `bios-ref` (through the GitHub API, at a
    recorded sha), resolves the candidate and the reference kernel (bios's pin
@@ -404,8 +410,8 @@ changes the boot order for every cert.
   share that pool with `ladder-pr`; hence the bounds below.
 - `concurrency`: one group per caller repo, PR (or ref), kernel, set and
   bios-ref; a PR caller's newer run cancels the older one.
-- One call is at most 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
-  `base,ci-certified` call is a plan job and one shard job.
+- One call is at most 1 + 1 + 3 + 1 jobs, `max-parallel: 3`; the usual
+  `base,ci-certified` call is a gate, a plan and one shard job.
 - **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
   `cloud-run-bench`) can reach the GCP metadata server and the pool's
   service-account token. `runner` / `CERT_RUNNER` (shards) and
@@ -419,15 +425,16 @@ changes the boot order for every cert.
       `<version>` (no artifact, no git or file spec);
     - `homescoop-ref` either `main` or a full 40-hex sha that is on
       homescoop's main, and `bios-ref` either `main` or a full sha on
-      slicc-bios's main. The plan job checks a sha with the compare API
+      slicc-bios's main. The gate job checks a sha with the compare API
       (`compare/main...<sha>` is `behind` or `identical`).
 
   Anything else runs on `ubuntu-latest`, whatever `runner` says: fork PRs,
   `pull_request_target`, `merge_group`, dispatches from another ref, a
   branch name, short sha or unmerged sha as `homescoop-ref` / `bios-ref`, or
-  a failed check. The plan job logs which, and why. `runs-on` can't check a
-  sha, so with a sha ref (or a bare version) plan itself stays on
-  `ubuntu-latest`; shards and report go to the pool once it has checked.
+  a failed check. The gate job logs which, and why. `runs-on` can't check a
+  sha, so the gate's own `runs-on` checks only the event and ref (a
+  same-repo PR, or a trusted event on main) and it runs nothing from the
+  refs it checks; plan, shards and report run where it says.
   The org requires approval before an outside contributor's workflow runs,
   and agents never approve one.
   `compat.mjs plan` also takes only registry versions and dist-tags for the
@@ -436,8 +443,9 @@ changes the boot order for every cert.
   The check lives in the workflow file, so a fork PR could change it in its
   own copy. That is why the org's approval of outside contributors' runs is
   the backstop.
-- Plan and report use `light-runner` / `CERT_LIGHT_RUNNER`, else the shards'
-  runner. On the pool a job gets a machine within about a minute, where
+- Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
+  (`cloud-run`, 4 vCPU / 8 GiB), else the shards' runner. The shards use
+  `runner` / `CERT_RUNNER` (`cloud-run-bench`). On the pool a job gets a machine within about a minute, where
   `ubuntu-latest` can queue for 15–40.
 - **No root on the pool.** Its machines run with "no new privileges", so
   `sudo` cannot become root. The Chromium step installs the system libraries
