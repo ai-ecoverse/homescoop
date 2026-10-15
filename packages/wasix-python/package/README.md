@@ -26,8 +26,7 @@ Since 3.14.2-19 (wasix-sysroot -28):
   3.14.2-18 `pthread_sigmask` raised `OSError(0, 'Error')`. Kernels
   before 1.88.0 take wasix-sysroot -28's ENOSYS fallback (its README).
   `signal.sigtimedwait`/`sigwaitinfo`/`sigwait` raise ENOSYS (slicc-kernel#520);
-- `sqlite3` is SQLite 3.54.0 (was 3.53.4), with the same compile options
-  (3.54.0 adds `MAX_SCHEMA=10000000` to `PRAGMA compile_options`);
+- `sqlite3` (3.54.0 since this release, 3.53.4 before) keeps its compile options; `PRAGMA compile_options` adds `MAX_SCHEMA=10000000`;
 - `THIRD-PARTY-NOTICES.md` carries the licence text of every statically
   linked component (see the license paragraph below).
 

@@ -472,10 +472,10 @@ notice_file() {
 }
 top_dir() {
   case "$1" in
-    *.zip) unzip -Z1 "$1" | head -n 1 ;;
-    *.tar.xz) tar tJf "$1" | head -n 1 ;;
-    *) tar tzf "$1" | head -n 1 ;;
-  esac | cut -d/ -f1
+    *.zip) unzip -Z1 "$1" ;;
+    *.tar.xz) tar tJf "$1" ;;
+    *) tar tzf "$1" ;;
+  esac | awk -F/ 'NR == 1 { print $1 }'
 }
 CPY_LICENSES="$NOTICES/cpython-incorporated.rst"
 tar xzOf "$PY_TGZ" "Python-$VER/Doc/license.rst" | sed -n '/^Licenses and Acknowledgements for Incorporated Software$/,$p' >"$CPY_LICENSES"
