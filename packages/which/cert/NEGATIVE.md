@@ -16,3 +16,5 @@ CI-certified (thr_b83wwqmt4e): `@ai-ecoverse/wasm-which@2.23.0-1` on slicc-kerne
 - `which -a` lists two PATH providers for the same name
 - missing command exits 1
 - `which which` finds itself
+
+Proof run for ladder-pr's cert job on the pool (throwaway; reverted before review).
