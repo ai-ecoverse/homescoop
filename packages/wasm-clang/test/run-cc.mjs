@@ -59,7 +59,7 @@ const arg = (n) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 if (!arg('--tarball')) {
-  console.error('usage: run-cc.mjs --tarball <wasm-clang package.tgz | npm spec> [--expect current|old] [--kernel <npm spec>]');
+  console.error('usage: run-cc.mjs --tarball <wasm-clang package.tgz | npm spec> [--expect current|old] [--kernel <npm spec>] [--probes r18,r21,…]');
   process.exit(2);
 }
 const expect = arg('--expect') ?? 'current';
@@ -142,6 +142,9 @@ try {
   console.log(`== ${cpkg.name}@${cpkg.version}, wasix-sysroot ${sysVer}, ${kernelSpec}, users enforce, layout ${layout}, expect ${expect}`);
   console.log(`== slicc.env WASIXCC_SYSROOT_PREFIX ${JSON.stringify(cpkg.slicc?.env?.WASIXCC_SYSROOT_PREFIX ?? null)}`);
   const sys = unpack(`${S}/wasix-sysroot@${sysVer}`, join(work, 'sysroot'), ['package/package.json', `package/${VARIANT}`]);
+  const binVer = cpkg.dependencies?.[`${S}/wasm-binaryen`];
+  const binaryen = layout === 'flat' && binVer ? unpack(`${S}/wasm-binaryen@${binVer}`, join(work, 'binaryen')) : undefined;
+  if (binaryen) neutraliseGlue(binaryen);
 
   const nm = join(work, 'nm');
   mkdirSync(nm, { recursive: true });
@@ -173,6 +176,7 @@ try {
     console.log(`== pnpm layout: ${ln.stdout.trim().split('\n').pop()}`);
   } else {
     await copyTree(clang, `/node_modules/${S}/wasm-clang`);
+    if (binaryen) await copyTree(binaryen, `/node_modules/${S}/wasm-binaryen`);
     await copyTree(sys, layout === 'flat' ? `/node_modules/${S}/wasix-sysroot` : `/shared/lib/node_modules/${S}/wasix-sysroot`, noCxx);
   }
   console.log(`== kernel ${kver} (Node entry): ${files} files installed`);
@@ -184,7 +188,9 @@ try {
     await new Promise((res) => setTimeout(res, 200));
   }
   const ccEnv = { TMPDIR: '/tmp' };
-  const names = expect === 'old' ? ['r24'] : ['r18', 'r21', 'r24', 'r24link', 'r26', 'r27'];
+  const all = ['r18', 'r21', 'r24', 'r24link', 'r26', 'r27', 'r28', 'r28w'];
+  const names = expect === 'old' ? ['r24'] : (arg('--probes')?.split(',') ?? all);
+  for (const n of names) assert.ok(all.includes(n), `--probes: unknown probe ${n}`);
   assert.equal((await run(['mkdir', '-p', '/home/cc', `${PROBES_AT}/bin`])).status, 0);
   for (const n of names) {
     await k.writeFile(`/home/cc/${n}.c`, readFileSync(join(probes, `${n}.c`)));
@@ -193,7 +199,8 @@ try {
     assert.equal(r.status, 0, `wasixcc ${n}.c: rc=${r.status}\n${r.stdout}${r.stderr}`);
     const wasm = Buffer.from(await k.readFile(`${PROBES_AT}/bin/${n}.wasm`));
     const marker = libcMarker(wasm);
-    console.log(`== ${n}.wasm: ${wasm.length} bytes in ${((Date.now() - t) / 1000).toFixed(1)} s, slicc.libc ${JSON.stringify(marker ?? null)}`);
+    const asyncified = WebAssembly.Module.exports(new WebAssembly.Module(wasm)).some((e) => e.name === 'asyncify_start_unwind');
+    console.log(`== ${n}.wasm: ${wasm.length} bytes in ${((Date.now() - t) / 1000).toFixed(1)} s, slicc.libc ${JSON.stringify(marker ?? null)}, asyncify ${asyncified ? 'yes' : 'no'}`);
     if (expect === 'current') assert.equal(marker, `wasix-sysroot ${sysVer}`, `${n}.wasm slicc.libc marker`);
     else assert.equal(marker, undefined, `${n}.wasm: a pre -22 libc has no slicc.libc marker`);
   }
