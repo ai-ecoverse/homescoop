@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-findutils",
-  "version": "4.10.0-1",
-  "description": "GNU findutils 4.10.0 (find + xargs) for wasm / slicc",
+  "version": "4.11.0-1",
+  "description": "GNU findutils 4.11.0 (find + xargs) for wasm / slicc",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
   },
   "homescoop": {
     "recipe": "findutils",
-    "upstream": "4.10.0"
+    "upstream": "4.11.0"
   },
   "slicc": {
     "abi": "emscripten",

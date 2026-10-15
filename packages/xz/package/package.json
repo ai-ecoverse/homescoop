@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-xz",
-  "version": "5.8.1-1",
-  "description": "XZ Utils 5.8.1 (xz/lzma + liblzma) for wasm / slicc",
+  "version": "5.8.4-1",
+  "description": "XZ Utils 5.8.4 (xz/lzma + liblzma) for wasm / slicc",
   "license": "0BSD",
   "repository": {
     "type": "git",
@@ -12,7 +12,7 @@
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "xz", "lzma"],
   "files": ["README.md", "LICENSE", "bin", "lib", "include"],
   "publishConfig": { "access": "public" },
-  "homescoop": { "recipe": "xz", "upstream": "5.8.1" },
+  "homescoop": { "recipe": "xz", "upstream": "5.8.4" },
   "slicc": {
     "abi": "emscripten",
     "commands": {

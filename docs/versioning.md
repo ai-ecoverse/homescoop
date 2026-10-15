@@ -42,6 +42,58 @@ CI before certification, not at publish.
 The same check refuses tarballs that contain hard links or symlinks: `npm pack`
 keeps them, but the registry rejects the publish (E415 "Hard link is not allowed").
 
+## Upstream versions in text (#355)
+
+The committed package is the published one: `package.json` `version`,
+`homescoop.upstream`, `description`, the recipe `summary` and
+`package/README.md` all name the recipe's upstream version. There are no
+templates; the text is plain.
+
+When the upstream moves, `sync-package-version.mjs <pkg> --write` sets
+`version` / `homescoop.upstream` and replaces the previous upstream string
+(the old `homescoop.upstream`) with the new one in those three texts:
+
+- exact matches only: the old string must not touch a letter, digit, `.`
+  or `-` continuation, so `4.9` leaves `4.9.0-3` alone and `2.5` leaves
+  `2.5.15` alone;
+- a sentence with a `historical` cue word ("since 3.53.4", "before …",
+  "until …") keeps its version;
+- a version right after a `lead` (another component: `slicc-kernel ≥ `,
+  `CPython `, `OpenSSL `) is kept;
+- each replacement and each kept match is logged to stderr.
+
+`package.json` is edited in place (one line per field) rather than
+re-serialised. `--from <old>` rewrites text from an explicit old version
+when the version fields are already right (jq 1.8.1 → 1.8.2 text).
+
+`check-package-meta.mjs <pkg>` (run by `host-run.sh`, so by ladder-pr and
+ladder-build) fails on drift, and `check-package-meta.mjs --drift --all`
+runs only that rule over every non-retired package:
+
+- `version` is not `<recipe>-N` (two-part and `.postN` upstreams padded
+  as above), or is a plain `X.Y.Z`;
+- `homescoop.upstream` is not the recipe version (or an allowed spelling);
+- description, summary or README names a version with the recipe
+  version's major that is not the recipe version, an allowed spelling, a
+  prefix of it (`2.5` for 2.5.15) or an `X.Y.Z-N` packaging revision, and
+  is neither in a historical sentence nor after a lead. Other components'
+  versions usually have another major, which keeps the allow-list short.
+
+The allow-list is `scripts/package-meta-versions.json`:
+
+```json
+{
+  "historical": ["since", "before", "until"],
+  "leads": { "*": ["slicc-kernel ≥ "], "libheif": ["libde265 ", "dav1d "] },
+  "spellings": { "wasix-openssh": { "10.6.0": "10.6p1" } }
+}
+```
+
+`leads` are matched against the text just before the version, with
+Markdown links reduced to their label. They hold no version, so they do
+not go stale. `spellings` are keyed by the recipe version and lapse on
+the next bump.
+
 ## Exact `@ai-ecoverse` pins
 
 Every `@ai-ecoverse/*` entry in `dependencies`, `peerDependencies` and

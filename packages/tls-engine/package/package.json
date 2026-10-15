@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-tls-engine",
-  "version": "3.6.5-1",
-  "description": "Mbed TLS 3.6.5 server engine for SLICC's wasm-realm proxy: TLS sessions over memory buffers, externally signed leaves (ES module + wasm)",
+  "version": "3.6.7-1",
+  "description": "Mbed TLS 3.6.7 server engine for SLICC's wasm-realm proxy: TLS sessions over memory buffers, externally signed leaves (ES module + wasm)",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -23,6 +23,6 @@
   "publishConfig": { "access": "public" },
   "homescoop": {
     "recipe": "tls-engine",
-    "upstream": "3.6.5"
+    "upstream": "3.6.7"
   }
 }
