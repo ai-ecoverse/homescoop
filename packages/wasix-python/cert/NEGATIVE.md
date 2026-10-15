@@ -128,3 +128,5 @@ script and a subprocess inside the venv, and a chained user sitecustomize.
 ## 3.14.2-19: negative 3.14.2-18 (homescoop#340, #343)
 
 3.14.2-18 (published, sha256 5ef04fe2…7c06) on slicc-kernel 1.92.0's Node entry, 2026-10-15: `notices.mjs` fails: its `THIRD-PARTY-NOTICES.md` is the 1083-byte table, and every licence text is missing (`CPython incorporated software`, `OpenSSL Apache-2.0`, `zlib`, `bzip2`, `xz 0BSD`, `SQLite`, `GNU Readline GPL-3.0`, `ncurses`, `libffi`, `wasix-libc musl`, `libc++`, …, `GPL combined work`). `stdlib.mjs` fails on `sqlite3.sqlite_version` 3.53.4 against 3.54.0.
+
+`sigmask.mjs` (wasix-sysroot -28) fails on 3.14.2-18 (sysroot -27, slicc-kernel 1.93.0 Node entry): its first `signal.pthread_sigmask(SIG_BLOCK, {SIGUSR1})` raises `OSError(0, 'Error')`, rc 1.

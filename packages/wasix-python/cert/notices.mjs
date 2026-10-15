@@ -19,6 +19,7 @@ want = {
     "libc++abi": "The libc++abi library is dual licensed",
     "libunwind": "The libunwind library is dual licensed",
     "GPL combined work": "distributed under the terms of the GPL-3.0-or-later",
+    "Corresponding Source": "Redistributors pass on its Corresponding Source",
 }
 print(json.dumps({"bytes": len(text.encode()), "missing": sorted(k for k, v in want.items() if v not in text),
                   "fences": sum(1 for l in text.splitlines() if l.startswith("~~~") or l.startswith("\x60\x60\x60")) % 2}))
