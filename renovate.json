@@ -1,12 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "github>ai-ecoverse/slicc-shared-web"
   ],
   "description": [
     "Homescoope recipes pin upstream library versions in packages/*/recipe.yaml.",
     "A custom regex manager reads `# renovate: …` comments above `version:` and opens one PR per package when upstream cuts a release.",
-    "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof). Majors and new packages stay manual."
+    "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof). Majors and new packages stay manual.",
+    "Extends the shared SLICC preset, which turns automerge on globally. Here, any merged change under packages/** can publish, so the rules below turn automerge off for packages/**, @ai-ecoverse re-pins and the publish-path workflows; only the CI-certified non-major recipe rule turns it back on."
   ],
   "semanticCommits": "enabled",
   "platformAutomerge": true,
@@ -37,6 +38,13 @@
     }
   ],
   "packageRules": [
+    {
+      "description": "Anything under packages/** can publish once merged: no automerge (the shared preset turns it on globally). Only the CI-certified recipe rule below turns it back on.",
+      "matchFileNames": [
+        "packages/**"
+      ],
+      "automerge": false
+    },
     {
       "description": "Default: recipe bumps do not automerge until CI-certified.",
       "matchFileNames": [
@@ -92,6 +100,22 @@
       ]
     },
     {
+      "description": "@ai-ecoverse pins in a shipped package.json are re-pin waves: each one is a packaging release that needs a cert, so never automerge.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        "packages/*/package/package.json"
+      ],
+      "matchPackageNames": [
+        "@ai-ecoverse/**"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "homescoop-repin"
+      ]
+    },
+    {
       "description": "libpng 1.7 is a parallel beta line; stay on the 1.6.x stable series.",
       "matchDepNames": [
         "pnggroup/libpng"
@@ -120,6 +144,14 @@
       ],
       "minimumReleaseAge": "3 days",
       "automerge": true
+    },
+    {
+      "description": "The publish path (ladder-*.yml) and cert-review.yml, whose status feeds the publish gate: action and pin bumps there are reviewed by hand, never automerged.",
+      "matchFileNames": [
+        ".github/workflows/ladder-*.yml",
+        ".github/workflows/cert-review.yml"
+      ],
+      "automerge": false
     },
     {
       "description": "github-script major bumps can break ladder-merge; review by hand.",
@@ -160,6 +192,34 @@
       ],
       "matchPackageNames": [
         "!@ai-ecoverse/**"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Semver majors of anything (recipes, workflow actions, npm, Cargo) stay human: never automerge.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "crates/** (the shared Rust crates): ladder-pr builds no dependent package for a crates-only PR, so CI would not test what a bump affects. Never automerge.",
+      "matchFileNames": [
+        "crates/**"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Root package.json devDependencies are our own test pins (cert kernel, shared harness, playwright): a bump merges by hand once that version is certified (Lars), so an uncertified kernel never reaches every cert run.",
+      "matchFileNames": [
+        "package.json"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "slicc-kernel-negative is the pinned old kernel (npm alias) the negative proofs must fail on (#393); a bump would break the proof.",
+      "matchDepNames": [
+        "slicc-kernel-negative"
       ],
       "enabled": false
     },
