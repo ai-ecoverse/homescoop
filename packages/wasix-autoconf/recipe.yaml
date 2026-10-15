@@ -11,6 +11,8 @@ source:
 # (wasix-perl 5.42.0-11, wasix-m4 1.4.20-2). Drop repack: when the next release rebuilds.
 repack:
   from: "2.72.0-3"
+  fields:
+    - repository
 dependencies:
   build: []
   host: []

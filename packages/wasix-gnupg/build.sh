@@ -224,6 +224,7 @@ pkg = {
     # owner check needs 1.47.1, which reports owners as the caller's ids.
     "engines": {"slicc-kernel": ">=1.47.1"},
     "license": "GPL-3.0-or-later",
+    "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-gnupg/package"},
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses", "patches"],
     "publishConfig": {"access": "public"},
     "homescoop": {

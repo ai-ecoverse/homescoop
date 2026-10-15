@@ -6,6 +6,11 @@
     "slicc-kernel": ">=1.44.0"
   },
   "license": "Ruby",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-ruby/package"
+  },
   "files": [
     "README.md",
     "LICENSE",

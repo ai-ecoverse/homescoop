@@ -33,15 +33,31 @@ function readRecipe(pkgName) {
   return JSON.parse(r.stdout);
 }
 
+const REPOSITORY_URL = 'git+https://github.com/ai-ecoverse/homescoop.git';
+
+function repositoryErrors(pkgName, pkg) {
+  const r = pkg.repository;
+  const dir = `packages/${pkgName}/package`;
+  const want = `"repository": { "type": "git", "url": "${REPOSITORY_URL}", "directory": "${dir}" }`;
+  if (!r || typeof r !== 'object') return [`package.json has no repository (npm provenance on publish needs it, E422): add ${want}`];
+  const errs = [];
+  if (r.url !== REPOSITORY_URL) errs.push(`package.json repository.url is ${JSON.stringify(r.url ?? null)}, not "${REPOSITORY_URL}" (npm provenance checks it against the publishing repo)`);
+  if (r.directory !== dir) errs.push(`package.json repository.directory is ${JSON.stringify(r.directory ?? null)}, not "${dir}"`);
+  return errs;
+}
+
 function packageDrift(pkgName, recipe, pkg) {
   if (recipe.builder === 'retired') return [];
-  return driftErrors({
-    name: pkgName,
-    upstream: recipe.version,
-    pkg,
-    summary: recipe.summary,
-    readme: readText(join(root, 'packages', pkgName, 'package', 'README.md')),
-  });
+  return [
+    ...repositoryErrors(pkgName, pkg),
+    ...driftErrors({
+      name: pkgName,
+      upstream: recipe.version,
+      pkg,
+      summary: recipe.summary,
+      readme: readText(join(root, 'packages', pkgName, 'package', 'README.md')),
+    }),
+  ];
 }
 
 if (process.argv.includes('--drift')) {

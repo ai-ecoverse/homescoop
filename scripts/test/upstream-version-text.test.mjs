@@ -35,6 +35,7 @@ const curlPkg = (version, upstream) => `{
   "name": "@ai-ecoverse/wasm-curl",
   "version": "${version}",
   "description": "curl 8.22 + libcurl for wasm / slicc",
+  "repository": { "type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/curl/package" },
   "files": ["README.md", "LICENSE", "bin"],
   "homescoop": { "recipe": "curl", "upstream": "${upstream}" }
 }
@@ -116,7 +117,7 @@ test('sync --write leaves allowed spellings and padded upstreams alone', () => {
     ['wasix-openssh', '10.6.0', '10.6p1', 'OpenSSH 10.6p1 client'],
     ['zip', '3.0.0', '3.0', 'Info-ZIP zip 3.0'],
   ]) {
-    const pkg = `{\n  "name": "@ai-ecoverse/${name}",\n  "version": "${recipeVersion}-1",\n  "description": "${text}",\n  "homescoop": { "recipe": "${name}", "upstream": "${upstream}" }\n}\n`;
+    const pkg = `{\n  "name": "@ai-ecoverse/${name}",\n  "version": "${recipeVersion}-1",\n  "description": "${text}",\n  "repository": { "type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/${name}/package" },\n  "homescoop": { "recipe": "${name}", "upstream": "${upstream}" }\n}\n`;
     const fx = fixture(name, { recipeVersion, summary: text, pkg, readme: `${text}.\n` });
     try {
       const before = fx.read();
