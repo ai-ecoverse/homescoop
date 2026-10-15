@@ -43,4 +43,8 @@ about:
     mio/0001: sockets open non-blocking, as upstream mio's unix code does
          (without it the reactor blocks in send or a second accept).
     mio/0002: a non-blocking connect's EINPROGRESS is "in progress", not
-         an error. Both are for upstreaming to wasix-org/mio.
+         an error.
+    mio/0003: TcpStream::take_error reads the socket's error
+         (SOCK_OPTION_LAST_ERROR); the target's Rust std always answers
+         None, so a refused uplink connect looked connected.
+         All three are for upstreaming to wasix-org/mio.

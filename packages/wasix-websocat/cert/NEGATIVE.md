@@ -1,6 +1,6 @@
 # Negative proof (wasix-websocat)
 
-**Date:** 2026-10-15, slicc-kernel 1.95.0 (users enforce), local builds of 4.0.0-alpha3-1 from this recipe (package.tgz `6d8b89b8…`). This is the package's first cert.
+**Date:** 2026-10-15, slicc-kernel 1.95.0 (users enforce), local builds of 4.0.0-alpha3-1 from this recipe (package.tgz `8170b26a…`). This is the package's first cert.
 
 ## Empty wasm
 
@@ -26,6 +26,15 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 ```
 
 The server accepts the first connection and then blocks its only thread on the listener, because the fork opens blocking sockets (mio/0001). With mio/0001 alone, every client fails at once with `Operation in progress (os error 26)`: the non-blocking connect's EINPROGRESS is returned as an error (mio/0002).
+
+## Through the uplink (`test/uplink.mjs`, the `ci` command)
+
+- **Without the mio patches:** the first `ws://echo.test/` through the uplink never exits:
+  ```
+  AssertionError [ERR_ASSERTION]: ws:// through the uplink: no exit within 30 s
+  ```
+- **With mio/0001 and mio/0002 but not mio/0003:** ws://, wss:// -k and the strict wss:// refusal pass, but a refused uplink port isn't reported. The kernel refuses the non-blocking connect asynchronously, and the target's Rust std `take_error()` always answers `None`, so websocat writes to a dead socket and exits **0** with `ERROR … operation was canceled`. The spec wants rc 14 `Connection refused`.
+- **The strict wss:// case** is itself the negative of `-k`: without `-k`, the throwaway CA is refused (rc 8, an invalid peer certificate). So chain verification is on, and the `-k` run proves only the handshake and framing.
 
 ## On slicc-kernel 1.94.0
 
