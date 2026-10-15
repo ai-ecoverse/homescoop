@@ -41,6 +41,26 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-29 `poll` and `ppoll` take a `pollfd` that asks for neither
+reading nor writing (`events` 0, as OpenSSH's client loop passes for idle
+channels, or only bits WASI can't poll): the entry is skipped, and its
+`revents` stays 0 unless the descriptor is bad, which gives `POLLNVAL` at
+once. Up to -28 the whole call failed with ENOSYS. Such an entry gets no
+`POLLHUP`/`POLLERR` (WASI polls only for reading and writing); `POLLPRI` is
+`POLLIN` in these headers. A call with only such entries waits out its
+timeout, or until a signal handler runs. `epoll_ctl` maps Linux's
+`EPOLL_CTL_ADD`/`MOD`/`DEL` (1/3/2, what `<sys/epoll.h>` defines) to WASIX's
+0/1/2 and fails with -1 and `errno`; up to -28 it passed the Linux number on
+(an ADD arrived as a WASIX MOD, a MOD as an invalid op) and returned the
+errno as its value, so every error looked like success (homescoop#443).
+`epoll_wait` gives back the whole 64-bit `data` (up to -28 any value whose
+low 32 bits are 0 came back as the fd) and as many events as `maxevents`
+asks for (it was capped at 64), `epoll_create1` honours `EPOLL_CLOEXEC`, and
+`epoll_pwait` installs its signal mask for the wait. WASIX epoll needs
+slicc-kernel ≥ 1.95.0; older kernels answer ENOSYS. On slicc-kernel 1.95.x
+`EPOLL_CTL_MOD` of an fd that isn't registered adds it instead of failing
+with ENOENT: the kernel still takes -28's numbering (slicc-kernel#684).
+
 Since 2025.9.30-28 signal masks work. `sigprocmask` and `pthread_sigmask`
 hand the thread's mask to slicc-kernel (`slicc.sigmask_set`), which holds a
 blocked signal as pending and delivers it when it is unblocked, before the
