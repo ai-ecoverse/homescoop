@@ -30,3 +30,16 @@ Against the published 3.54.0-1 (built without `SQLITE_OMIT_WAL`), the WAL
 case fails: `pragma journal_mode=wal` answers `wal`, and the statements after it fail with
 `Error in 2nd command line argument: disk I/O error`, rc 1. Every later open
 of the file fails with `disk I/O error (10)` (homescoop#344).
+
+## Host WAL databases (3.54.0-3)
+
+Against the published 3.54.0-2, on slicc-kernel 1.94.0, the binary
+behaves the same: `cert/host-wal.db` fails read-write and `-readonly` with
+`file is not a database (26)`, rc 1. The checklist then fails at the README
+check, because -2's README doesn't cover host WAL databases:
+
+```
+browser-cert: FAIL packages/sqlite3/cert/checklist.mjs
+AssertionError [ERR_ASSERTION]: README: host WAL databases
+  expected: /WAL-format database made on a host/,
+```

@@ -27,3 +27,7 @@ about:
     private _sqlite3 does: there is no shared memory (-shm) in the wasm
     realm, and a database switched to WAL could no longer be opened.
     journal_mode=WAL now answers delete and the file stays usable.
+    3.54.0-3 changes only the README and the cert (homescoop#359): a
+    WAL-format database made on a host fails with "file is not a database
+    (26)" and is switched with journal_mode=delete on the host first; one
+    process per database at a time (slicc-kernel#665). build.sh is unchanged.
