@@ -2,8 +2,8 @@
 # source with upstream's pnpm/wasm/build.mjs plus patches/, and a
 # host-import module for slicc-kernel.
 name: wasi-pnpm
-# Not built by the ladder; .github/workflows/wasi-pnpm.yml builds and tests it.
-builder: retired
+builder: host
+reproducible: true
 version: "12.9.1"
 npm: "@ai-ecoverse/wasi-pnpm"
 summary: "pnpm 12 for slicc WASI (commands pnpm, pn)"

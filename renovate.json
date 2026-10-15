@@ -231,7 +231,6 @@
         "packages/wasi-gh/**",
         "packages/wasi-hf/**",
         "packages/wasi-llvm/**",
-        "packages/wasi-pnpm/**",
         "packages/wasi-protoc-gen-connect-go/**",
         "packages/wasi-protoc-gen-go/**",
         "packages/wasi-protoc-gen-go-grpc/**",
