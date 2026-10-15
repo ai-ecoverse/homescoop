@@ -3,6 +3,11 @@
   "version": "2.72.0-6",
   "description": "GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4)",
   "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-autoconf/package"
+  },
   "files": [
     "README.md",
     "LICENSE",

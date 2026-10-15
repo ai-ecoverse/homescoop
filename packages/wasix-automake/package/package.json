@@ -3,6 +3,11 @@
   "version": "1.17.0-8",
   "description": "GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4)",
   "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-automake/package"
+  },
   "files": [
     "README.md",
     "LICENSE",
