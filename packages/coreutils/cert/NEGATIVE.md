@@ -57,3 +57,7 @@ with "fork system call failed".
 `glue-mode.mjs` against 9.12.0-5 on slicc-kernel 1.88.0 (users enforce), 2026-10-15: FAIL: `bin/coreutils` is 644 in the tarball, and running it by path as cone gives `bash: line 1: …/bin/coreutils: Permission denied`, rc 126.
 
 `linkat.mjs` against 9.12.0-5, 2026-10-15: FAIL at its first assertion, `coreutils.wasm imports env.__syscall_linkat`. -5 has no such import (Emscripten's weak C stub answers EMLINK inside the wasm), so even slicc-kernel 1.90.0 can't link for it.
+
+## 9.12.0-7: negative 9.12.0-6 (uname import, emsdk paths)
+
+`uname.mjs` on published 9.12.0-6: coreutils.wasm has no `env.__syscall_uname` import (Emscripten's weak C stub answers inside the wasm, so no kernel can), and its debug strings name `/home/runner/.cache/emsdk/0.4.0/install/...`.

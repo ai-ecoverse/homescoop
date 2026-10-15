@@ -6,6 +6,19 @@ GNU coreutils (single-binary) for slicc.
 pnpm add -g @ai-ecoverse/wasm-coreutils
 ```
 
+## `uname` (9.12.0-7)
+
+`uname` asks slicc-kernel through the import `env.__syscall_uname`
+(slicc-kernel#625) instead of Emscripten's built-in answer. A kernel that
+answers it gives `Linux`, its hostname, the release in
+`/proc/sys/kernel/osrelease` (`6.0.0-slicc`) and `wasm32`; older kernels
+leave the default, which is what 9.12.0-6 always printed: `Emscripten`,
+`emscripten`, `4.0.23`, `#1`, `wasm32`.
+
+The wasm no longer carries the build machine's emsdk cache path in its debug
+strings (homescoop#358 maps it to `/emsdk`), so a rebuild elsewhere gives the
+same bytes.
+
 ## Running by path (9.12.0-6)
 
 `bin/coreutils` (the Emscripten glue the `slicc.commands` entries name) is
