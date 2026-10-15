@@ -222,6 +222,7 @@ jobs:
               echo "$pkg: no live pair, its cert harness is $harness"
               continue
             fi
+            peers=$(jq -r '[(.needsRepack // []), (.needsTarballScripts // [])] | add | length > 0' "packages/$pkg/cert/meta.json" 2> /dev/null || echo false)
             head_tgz="$RUNNER_TEMP/artifacts/host-$pkg-pr$PR_NUMBER/package.tgz"
             name=$(tar -xzf "$head_tgz" -O package/package.json | jq -r .name)
             base_tgz=
@@ -234,8 +235,8 @@ jobs:
                 HOMESCOOP_CERT_NODE_MODULES="$RUNNER_TEMP/harness/$pkg/node_modules" nohup node .cert-review-tools/scripts/browser-cert/run.mjs \
                   --package "$pkg" --cert "packages/$pkg/cert" --tarball "$tgz" --users enforce --live "$port" \
                   > "$RUNNER_TEMP/live/$pkg-$side.log" 2>&1 &
-                jq --arg pkg "$pkg" --arg side "$side" --arg tgz "$tgz" --argjson port "$port" --argjson pid "$!" \
-                  '. + [{package: $pkg, side: $side, tarball: $tgz, url: "http://127.0.0.1:\($port)/", pid: $pid}]' \
+                jq --arg pkg "$pkg" --arg side "$side" --arg tgz "$tgz" --argjson port "$port" --argjson pid "$!" --argjson peers "$peers" \
+                  '. + [{package: $pkg, side: $side, tarball: $tgz, url: "http://127.0.0.1:\($port)/", pid: $pid, peers_from_pr: $peers}]' \
                   "$RUNNER_TEMP/live/live.json" > "$RUNNER_TEMP/live/next.json" && mv "$RUNNER_TEMP/live/next.json" "$RUNNER_TEMP/live/live.json"
               fi
               port=$((port + 1))
@@ -278,7 +279,7 @@ jobs:
             - Each package has a cert harness in `${{ runner.temp }}/harness/<package>` (its kernel, `needs` and Chromium). Run its specs, on any kernel and users mode:
               `cert-run env HOMESCOOP_CERT_NODE_MODULES=${{ runner.temp }}/harness/<package>/node_modules node scripts/browser-cert/run.mjs --package <package> --tarball <package.tgz> [--kernel @ai-ecoverse/slicc-kernel@<version>] [--users enforce] [--soft] [--json <out.json>]`
               For a spec of your own, put it in a directory and pass `--cert <dir>`. See `docs/ci-cert.md` and `scripts/browser-cert/README.md` for the spec API.
-            - **Live pairs, for a regression check right away.** For each package, two Chromes with windows run the harness under `--users enforce` on the `cert/meta.json` kernel, with the package installed and booted: one with npm `latest` (the baseline; missing for a new package) and one with this pull request's tarball. `${{ runner.temp }}/live/live.json` lists each one's `url`, and their logs are next to it. `GET <url>` describes it; `POST <url>ctx/<call>` with a JSON array of arguments calls the same `ctx` the specs get, for example `curl -s <url>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/pty` and `ctx/addUser`. Run the same thing on both sides. Something that fails the same way on the baseline is pre-existing: it never blocks the certification.
+            - **Live pairs, for a regression check right away.** For each package, two Chromes with windows run the harness under `--users enforce` on the `cert/meta.json` kernel, with the package installed and booted: one with npm `latest` (the baseline; missing for a new package) and one with this pull request's tarball. `${{ runner.temp }}/live/live.json` lists each one's `url`, and their logs are next to it. `GET <url>` describes it; `POST <url>ctx/<call>` with a JSON array of arguments calls the same `ctx` the specs get, for example `curl -s <url>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/pty` and `ctx/addUser`. Run the same thing on both sides. Something that fails the same way on the baseline is pre-existing: it never blocks the certification. **Except** where an entry has `"peers_from_pr": true`: both sides then share peers rebuilt from this pull request (`needsRepack`, `needsTarballScripts`), so a shared failure may come from those peers. Check it against the published peers before you call it pre-existing.
             - **Run every command that executes package or pull-request code through `cert-run`**, which drops the Bedrock key and the GitHub token from its environment.
             - `npm view` and `npm pack` reach the registry, for the version on npm today (`latest`) and its tarball. `gh issue list -R <repo> --search …` finds existing issues (homescoop's and slicc-kernel's) to cite.
 
@@ -327,9 +328,12 @@ jobs:
   record:
     name: cert-review / record
     needs: [plan, review]
-    if: always() && needs.plan.outputs.go == 'true'
+    if: always() && needs.plan.outputs.go == 'true' && needs.review.result != 'cancelled'
     runs-on: ${{ vars.CERT_RUNNER || 'cloud-run-bench' }}
     timeout-minutes: 20
+    concurrency:
+      group: cert-review-record-${{ needs.plan.outputs.number }}
+      cancel-in-progress: true
     permissions:
       actions: read
       contents: read
