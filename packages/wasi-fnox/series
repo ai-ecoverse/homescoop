@@ -14,3 +14,4 @@ b   0010-seven-refuse-what-would-put-a-value-in-a-program-che.patch
 a   0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch
 b   0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch
 a+b 0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch
+a   0014-edit-refuse-fnox-edit-on-WASI-instead-of-panicking.patch

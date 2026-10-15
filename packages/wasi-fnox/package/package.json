@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-fnox",
-  "version": "1.39.0-1",
+  "version": "1.39.0-2",
   "description": "fnox 1.39 for slicc WASI: secrets as placeholders, values in seven's sealed store (/dev/sealed)",
   "license": "MIT",
   "repository": {
@@ -27,7 +27,7 @@
     "access": "public"
   },
   "engines": {
-    "slicc-kernel": ">=1.64.0"
+    "slicc-kernel": ">=1.83.0"
   },
   "homescoop": {
     "recipe": "wasi-fnox",
