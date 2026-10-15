@@ -61,30 +61,46 @@ jobs:
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             if (pr.head.repo?.full_name !== `${owner}/${repo}`) return skip(`#${number} comes from a fork`);
             const head = process.env.HEAD_SHA || pr.head.sha;
+            const { data: commit } = await github.rest.repos.getCommit({ owner, repo, ref: head });
+            const builtFrom =
+              commit.author?.login === 'github-actions[bot]' &&
+              commit.parents.length === 1 &&
+              commit.commit.message.startsWith('chore: refresh recipe sha256 and package version')
+                ? commit.parents[0].sha
+                : null;
+            const accepted = [head, builtFrom].filter(Boolean);
+            const usable = (r) => r?.status === 'completed' && r.conclusion !== 'action_required';
             let run;
             if (process.env.LADDER_RUN) {
               ({ data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(process.env.LADDER_RUN) }));
             } else {
-              for (let minute = 0; minute < 120; minute++) {
-                [run] = (
-                  await github.rest.actions.listWorkflowRuns({
-                    owner,
-                    repo,
-                    workflow_id: 'ladder-pr.yml',
-                    head_sha: head,
-                    event: 'pull_request',
-                    per_page: 1,
-                  })
-                ).data.workflow_runs;
-                if (run?.status === 'completed') break;
-                core.info(`ladder-pr on ${head}: ${run?.status ?? 'not started'}`);
+              for (let minute = 0; minute < 120 && !usable(run); minute++) {
+                for (const sha of accepted) {
+                  const [found] = (
+                    await github.rest.actions.listWorkflowRuns({
+                      owner,
+                      repo,
+                      workflow_id: 'ladder-pr.yml',
+                      head_sha: sha,
+                      event: 'pull_request',
+                      per_page: 1,
+                    })
+                  ).data.workflow_runs;
+                  if (usable(found)) {
+                    run = found;
+                    break;
+                  }
+                }
+                if (usable(run)) break;
+                core.info(`ladder-pr on ${accepted.join(' or ')}: not completed yet`);
                 await new Promise((resolve) => setTimeout(resolve, 60000));
               }
             }
-            if (run?.status !== 'completed') return skip(`no completed ladder-pr run on ${head}`);
-            if (run.head_sha !== head) {
+            if (!usable(run)) return skip(`no completed ladder-pr run on ${accepted.join(' or ')}`);
+            if (!accepted.includes(run.head_sha)) {
               return skip(`#${number} moved on from ${run.head_sha} to ${head}; ladder-pr on the new head starts its own review`);
             }
+            if (builtFrom && run.head_sha === builtFrom) core.info(`${head} is ladder-pr's recipe-sha commit on ${builtFrom}; run ${run.id} built it`);
             const pattern = new RegExp(`^host-(.+)-pr${number}$`);
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               owner,
