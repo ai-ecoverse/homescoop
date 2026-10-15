@@ -518,5 +518,17 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
+echo "== wasix-sysroot: LICENSE from wasix-libc v2025-09-02.1"
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
+LIC="$WORK/licenses"
+mkdir -p "$LIC"
+homescoop_fetch "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 "$LIC/wasix-libc-LICENSE"
+homescoop_fetch "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 "$LIC/wasix-libc-LICENSE-APACHE-LLVM"
+homescoop_fetch "$WLIBC/LICENSE-APACHE" a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2 "$LIC/wasix-libc-LICENSE-APACHE"
+homescoop_fetch "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 "$LIC/wasix-libc-LICENSE-MIT"
+homescoop_fetch "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af "$LIC/musl-COPYRIGHT"
+homescoop_fetch "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0 "$LIC/cloudlibc-LICENSE"
+homescoop_stage_licenses "$LIC/wasix-libc-LICENSE" "$LIC/wasix-libc-LICENSE-APACHE-LLVM" "$LIC/wasix-libc-LICENSE-APACHE" "$LIC/wasix-libc-LICENSE-MIT" "$LIC/musl-COPYRIGHT" "$LIC/cloudlibc-LICENSE"
+
 homescoop_assert_no_package_links "$PKG"
 echo "== wasix-sysroot: staged $(node -p "require('$PKG/package.json').version") from $BASE_VER"
