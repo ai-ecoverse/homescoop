@@ -13,7 +13,7 @@
  * Prints one package name per line. Exits 0 even when empty (caller decides).
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,23 +48,72 @@ function isPublishTrigger(norm) {
   );
 }
 
-/** @param {string[]} paths */
+function globRegExp(glob) {
+  let re = '';
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === '*' && glob[i + 1] === '*') {
+      i++;
+      if (glob[i + 1] === '/') {
+        i++;
+        re += '(?:.*/)?';
+      } else {
+        re += '.*';
+      }
+    } else if (c === '*') {
+      re += '[^/]*';
+    } else if (c === '?') {
+      re += '[^/]';
+    } else {
+      re += c.replace(/[\\^$.+()|{}[\]]/g, '\\$&');
+    }
+  }
+  return new RegExp(`^${re}$`);
+}
+
+function readRecipe(name, ...args) {
+  const r = spawnSync('node', [join(root, 'scripts/read-recipe.mjs'), name, ...args], {
+    encoding: 'utf8',
+    cwd: root,
+  });
+  if (r.status !== 0) {
+    console.error(r.stderr || r.stdout || `read-recipe.mjs ${name} failed`);
+    process.exit(1);
+  }
+  return (r.stdout || '').trim();
+}
+
+function recipeInputs() {
+  const out = [];
+  for (const name of readdirSync(join(root, 'packages')).sort()) {
+    const file = join(root, 'packages', name, 'recipe.yaml');
+    if (!existsSync(file) || !/^inputs:/m.test(readFileSync(file, 'utf8'))) continue;
+    const globs = JSON.parse(readRecipe(name, '--json')).inputs;
+    if (!Array.isArray(globs) || globs.some((g) => typeof g !== 'string' || !g)) {
+      console.error(`packages/${name}/recipe.yaml: inputs must be a list of path globs`);
+      process.exit(1);
+    }
+    out.push({ name, res: globs.map(globRegExp) });
+  }
+  return out;
+}
+
 function packagesFromPaths(paths, publishable) {
-  const set = new Set();
+  const names = new Set();
+  const inputs = publishable ? [] : recipeInputs();
   for (const p of paths) {
     const norm = p.replace(/\\/g, '/');
     if (publishable && !isPublishTrigger(norm)) continue;
     const m = norm.match(/^packages\/([^/]+)\//);
-    if (!m) continue;
-    const name = m[1];
+    if (m) names.add(m[1]);
+    for (const { name, res } of inputs) {
+      if (res.some((re) => re.test(norm))) names.add(name);
+    }
+  }
+  const set = new Set();
+  for (const name of names) {
     if (!existsSync(join(root, 'packages', name, 'recipe.yaml'))) continue;
-    // Retired recipes must not enter CI matrices / ladder-build.
-    const builder = spawnSync(
-      'node',
-      [join(root, 'scripts/read-recipe.mjs'), name, '--field', 'builder'],
-      { encoding: 'utf8', cwd: root }
-    );
-    if ((builder.stdout || '').trim() === 'retired') continue;
+    if (readRecipe(name, '--field', 'builder') === 'retired') continue;
     set.add(name);
   }
   return [...set].sort();

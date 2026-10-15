@@ -160,6 +160,22 @@ needs it: `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
 base or `homescoop.upstream` disagrees with `recipe.yaml`, naming both
 values.
 
+### Recipe checks in `ladder-pr`
+
+A recipe directory says how it is checked; `ladder-pr` runs it, with no
+workflow file of its own:
+
+| Recipe declares | `ladder-pr` runs |
+| --- | --- |
+| `inputs:` in `recipe.yaml`, a list of path globs (`crates/wasix-net/**`, `scripts/build-common.sh`) | the recipe's jobs when a PR changes a matching file, as if it touched `packages/<name>/` (`list-touched-packages.mjs`; `--publishable`, so `ladder-merge`, ignores them) |
+| `packages/<name>/test/*.test.mjs` | `test (<name>)`: `node --test 'test/*.test.mjs'` in `packages/<name>`, on the built `package/` (the `host-<name>-prN` tarball unpacked over it) |
+| `packages/<name>/test/package.json` | the same job: `npm ci` in `test/`, then `npm run test:e2e` when it has that script (its flags, its `pretest:e2e`), else `node --test 'e2e/*.test.mjs'` |
+| `reproducible: true` in `recipe.yaml` | `rebuild (<name>)`, a second `host-run.sh` in parallel with `host-build`, and `reproducible (<name>)`: the two `package.tgz` must have the same sha256 |
+| `reproducible:` with `path: package/<file>` | the same, comparing only that file of the tarball (the main `.wasm`), for a build whose tarball is not byte-stable |
+| `ci:` in `cert/meta.json` | each command, from the repo root, after the browser cert in `cert (<name>)`, with the tarball at `.homescoop-out/package.tgz`: recipe-specific checks, as a script in the recipe directory |
+
+`ci`, the required check, needs every one of these jobs.
+
 ## Recipe shape
 
 ```yaml
