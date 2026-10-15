@@ -148,19 +148,29 @@ describe('decide', () => {
 describe('merge', () => {
   it('merges at the head with a merge commit and returns its first parent', async () => {
     const io = fakeIo();
-    assert.deepEqual(await merge({ number: 384, head: HEAD }, io), { merged: true, sha: 'c'.repeat(40), before: BASE });
+    assert.deepEqual(await merge({ repo: REPO, number: 384, head: HEAD }, io), { merged: true, sha: 'c'.repeat(40), before: BASE });
     assert.deepEqual(io.calls.find(([c]) => c === 'merge'), ['merge', 384, HEAD]);
   });
 
-  it('re-checks the head and mergeable_state right before the PUT', async () => {
-    await assert.rejects(merge({ number: 384, head: BASE }, fakeIo()), /moved from 9bf55736\S* to dafd2762/);
-    await assert.rejects(merge({ number: 384, head: HEAD }, fakeIo({ pulls: [pull({ mergeable_state: 'behind' })] })), /mergeable_state is behind right before the merge/);
+  it('re-runs every check right before the PUT', async () => {
+    await assert.rejects(merge({ repo: REPO, number: 384, head: BASE }, fakeIo()), /moved from 9bf55736\S* to dafd2762/);
+    const late = [
+      [{ pulls: [pull({ mergeable_state: 'behind' })] }, /no longer qualifies right before the merge: mergeable_state is behind/],
+      [{ pulls: [pull({ labels: [{ name: 'homescoop-major' }] })] }, /no longer qualifies .*labelled homescoop-major/],
+      [{ review: false }, /no longer qualifies .*cert-review on \S+ is absent/],
+      [{ ladder: null }, /no longer qualifies .*no ladder-pr run/],
+    ];
+    for (const [over, why] of late) {
+      const io = fakeIo(over);
+      await assert.rejects(merge({ repo: REPO, number: 384, head: HEAD }, io), why);
+      assert.equal(io.calls.some(([c]) => c === 'merge'), false);
+    }
   });
 
   it('treats a PR merged elsewhere as done, and any other failure as an error', async () => {
     const elsewhere = fakeIo({ pulls: [pull(), pull({ merged: true })], mergeFails: true });
-    assert.deepEqual(await merge({ number: 384, head: HEAD }, elsewhere), { merged: false, reason: 'already merged' });
-    await assert.rejects(merge({ number: 384, head: HEAD }, fakeIo({ mergeFails: true })), /returned 405/);
+    assert.deepEqual(await merge({ repo: REPO, number: 384, head: HEAD }, elsewhere), { merged: false, reason: 'already merged' });
+    await assert.rejects(merge({ repo: REPO, number: 384, head: HEAD }, fakeIo({ mergeFails: true })), /returned 405/);
   });
 });
 

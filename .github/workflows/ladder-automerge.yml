@@ -94,6 +94,8 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      actions: read
+      statuses: read
     outputs:
       sha: ${{ steps.m.outputs.sha }}
       before: ${{ steps.m.outputs.before }}

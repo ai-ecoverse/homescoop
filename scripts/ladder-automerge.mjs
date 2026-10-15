@@ -81,11 +81,11 @@ export async function decide({ repo, number, asIfOpen }, io) {
   return { pr, review, problems: mergeProblems({ repo, pr, review, ladder, files, majors }) };
 }
 
-export async function merge({ number, head }, io) {
-  const pr = await settledPull(number, io);
-  if (pr.merged) return { merged: false, reason: 'already merged' };
+export async function merge({ repo, number, head }, io) {
+  const { pr, problems } = await decide({ repo, number }, io);
+  if (problems[0] === 'already merged') return { merged: false, reason: 'already merged' };
   if (pr.head.sha !== head) throw new Error(`PR #${number} moved from ${head} to ${pr.head.sha}`);
-  if (pr.mergeable_state !== 'clean') throw new Error(`PR #${number} mergeable_state is ${pr.mergeable_state} right before the merge`);
+  if (problems.length) throw new Error(`PR #${number} no longer qualifies right before the merge: ${problems.join('; ')}`);
   let sha;
   try {
     ({ sha } = await io.mergePull(number, head));
@@ -193,7 +193,7 @@ async function main([mode, ...argv]) {
   if (mode === 'merge') {
     const number = Number(at('--pr'));
     try {
-      const done = await merge({ number, head: at('--head') }, io);
+      const done = await merge({ repo, number, head: at('--head') }, io);
       if (!done.merged) {
         console.log(`PR #${number}: ${done.reason}; nothing to publish here`);
         return output({ sha: '', before: '' });

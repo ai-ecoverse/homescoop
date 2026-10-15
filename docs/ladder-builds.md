@@ -88,7 +88,7 @@ it is open, from this repo, not a draft, based on `main`, not labelled
 binding); ladder-pr's run at the head and its `ci` job are green; it touches
 publishable package files and none of `.github/workflows/**`, `scripts/**`,
 `shims/**`, `crates/**`, `renovate.json` or the root `package.json`; and
-`mergeable_state` is `clean`, checked again right before the merge. A merge
+`mergeable_state` is `clean`. Every check runs again right before the merge. A merge
 with `GITHUB_TOKEN` starts no `push` workflows, so the same run then calls
 `ladder-merge.yml` (`workflow_call`) for the merge commit; ladder-merge
 dispatches for real only on a push to `main` or when that caller is main's
