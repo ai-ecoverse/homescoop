@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: Dry run, never dispatches ladder-build. Merge commit on main to resolve.
+        description: Dry run, never dispatches ladder-build. Merge commit on main to resolve (full 40-hex sha).
         required: true
         type: string
       before:
@@ -63,6 +63,23 @@ on:
         default: ''
         type: string
 
+  workflow_call:
+    inputs:
+      sha:
+        description: The merge commit to resolve (real only when the caller is main's ladder-automerge).
+        required: true
+        type: string
+      before:
+        description: Its first parent.
+        required: false
+        default: ''
+        type: string
+      pr:
+        description: Dry calls only, the PR to resolve as if merged at sha.
+        required: false
+        default: ''
+        type: string
+
 permissions:
   contents: read
   actions: write
@@ -75,13 +92,16 @@ jobs:
       any: ${{ steps.d.outputs.any }}
       sha: ${{ steps.d.outputs.sha }}
       base: ${{ steps.d.outputs.base }}
+      real: ${{ steps.d.outputs.real }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.sha || github.sha }}
           fetch-depth: 0
       - id: d
         env:
           EVENT: ${{ github.event_name }}
+          REAL: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.workflow_ref == format('{0}/.github/workflows/ladder-automerge.yml@refs/heads/main', github.repository)) }}
           BEFORE: ${{ github.event.before || inputs.before }}
           AFTER: ${{ inputs.sha || github.sha }}
           ONLY: ${{ inputs.packages }}
@@ -98,7 +118,7 @@ jobs:
             echo "::error::before is not a commit in this repository"
             exit 1
           fi
-          if [[ "$EVENT" == workflow_dispatch && -n "$ONLY" ]]; then
+          if [[ "$REAL" != true && -n "$ONLY" ]]; then
             PKGS=$(node -e 'const p=JSON.parse(process.argv[1]); if(!Array.isArray(p)||!p.every((x)=>/^[a-z0-9][a-z0-9._-]*$/.test(x))) process.exit(1); console.log(JSON.stringify(p))' "$ONLY")
           else
             PKGS=$(node scripts/list-touched-packages.mjs --base "$BEFORE" --head "$AFTER" --json --publishable)
@@ -106,10 +126,11 @@ jobs:
           {
             echo "sha=$AFTER"
             echo "base=$BEFORE"
+            echo "real=$REAL"
             echo "packages=$PKGS"
             echo "any=$([ "$PKGS" != '[]' ] && echo true || echo false)"
           } >> "$GITHUB_OUTPUT"
-          echo "event=$EVENT sha=$AFTER touched=$PKGS"
+          echo "event=$EVENT real=$REAL sha=$AFTER touched=$PKGS"
 
   dispatch:
     needs: detect
@@ -135,7 +156,7 @@ jobs:
         id: r
         env:
           GH_TOKEN: ${{ github.token }}
-          EVENT: ${{ github.event_name }}
+          REAL: ${{ needs.detect.outputs.real }}
           PKG: ${{ matrix.package }}
           SHA: ${{ needs.detect.outputs.sha }}
           BASE: ${{ needs.detect.outputs.base }}
@@ -148,7 +169,7 @@ jobs:
         run: |
           set -euo pipefail
           args=(--package "$PKG" --sha "$SHA" --base "$BASE")
-          if [[ "$EVENT" == workflow_dispatch ]]; then
+          if [[ "$REAL" != true ]]; then
             args+=(--dry-run)
             if [[ "$ASSUME_UNPUBLISHED" == true ]]; then args+=(--assume-unpublished); fi
             if [[ -n "$MESSAGE" ]]; then args+=(--message "$MESSAGE"); fi
@@ -159,7 +180,7 @@ jobs:
           fi
           node scripts/ladder-merge-resolve.mjs "${args[@]}"
       - name: Dispatch ladder-build for ${{ matrix.package }}
-        if: github.event_name == 'push'
+        if: needs.detect.outputs.real == 'true'
         uses: actions/github-script@v9
         env:
           INPUTS: ${{ steps.r.outputs.inputs }}
