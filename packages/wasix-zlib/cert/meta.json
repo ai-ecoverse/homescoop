@@ -11,5 +11,8 @@
     "compress2 level 9 of 64 KiB to under a quarter, uncompress byte-exact",
     "gzopen/gzwrite/gzread round trip through a file; the .gz is real gzip (coreutils/bash see the 1f 8b magic)",
     "zlibVersion() is 1.3.1"
+  ],
+  "ci": [
+    "node scripts/wasix-lib-cert.mjs wasix-zlib --tarball .homescoop-out/package.tgz"
   ]
 }

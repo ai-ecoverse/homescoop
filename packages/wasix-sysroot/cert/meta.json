@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.91.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
   "slicc_fs": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -37,11 +37,19 @@
   ],
   "extra_kernels": [
     "@ai-ecoverse/slicc-kernel@1.89.0 (slicc-kernel#551, slicc.sigmask_poll, before #567: r28 and r28w with R28_KERNEL_MASK=1 pass in all five variants; the window lines need R28_WINDOW off)",
-    "@ai-ecoverse/slicc-kernel@1.88.0 (slicc-kernel#513, masks without sigmask_poll: the libc fallback; r28 and r28w with R28_KERNEL_MASK=1 pass in all five variants, R28_WINDOW off)",
+    "@ai-ecoverse/slicc-kernel@1.88.0 (slicc-kernel#513, masks without sigmask_poll: the libc fallback; r28 passes with R28_KERNEL_MASK=1 and r28w without it (that flag needs slicc.sigmask_poll) in all five variants, R28_WINDOW off)",
     "@ai-ecoverse/slicc-kernel@1.77.0 (before slicc-kernel#513: no kernel masks; r28 and r28w pass their no-mask branches, signals delivered at once as up to -27)",
     "@ai-ecoverse/slicc-kernel@1.69.0 (before slicc-kernel#404: r26 fails only its fstatat/openat/mkdirat dirfd forms, which are the kernel's)",
     "@ai-ecoverse/slicc-kernel@1.61.0 (no slicc_fs.path_access: r25 with --allow-absent gives the stat-based check, all permissive)",
     "@ai-ecoverse/slicc-kernel@1.57.0 (no slicc_fs owner imports: r24 with --allow-absent gives -23 behaviour; modes, r20, r22, r23 pass)",
     "@ai-ecoverse/slicc-kernel@1.47.1 (no slicc_tty: r18, r19, r20, tzname, modes pass; r21 falls back to the -20 behaviour)"
+  ],
+  "ci": [
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R28_WINDOW=1 R23_DLFORK=1; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe modes --variant $v || exit 1; done",
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R28_WINDOW=1 R23_DLFORK=1; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r19 --variant $v || exit 1; done",
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R28_WINDOW=1 R23_DLFORK=1; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r23fork --variant $v || exit 1; done",
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R28_WINDOW=1 R23_DLFORK=1; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r27 --variant $v || exit 1; done",
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R28_WINDOW=1 R23_DLFORK=1; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r28 --variant $v || exit 1; done",
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R28_WINDOW=1 R23_DLFORK=1; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r28w --variant $v || exit 1; done"
   ]
 }

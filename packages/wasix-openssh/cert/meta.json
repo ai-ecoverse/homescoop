@@ -36,5 +36,8 @@
     "cert/users.mjs (10.6.0-6): as root and as kernel.users.add({name:'cone'}): ssh -G gives the user's name and ~ from passwd (/root, /home/cone); ssh-keygen -t ecdsa writes a 0600 key and 0644 .pub owned by that uid; ssh -i ~/.ssh/id_ecdsa (~ from pw_dir, -F /dev/null) logs in to the host sshd and accept-new writes the user's own known_hosts (owned by the user); after chmod 644 the key is refused with UNPROTECTED PRIVATE KEY FILE",
     "cert/winsize.mjs (10.6.0-6, wasix-sysroot -21 per-fd winsize): ssh -t in an 80x24 pty, remote stty size 24 80; resize to 120x40 (SIGWINCH → window-change); remote stty size 40 120",
     "cert/marker.mjs (10.6.0-7, wasix-sysroot -28): every bin/*.wasm carries the slicc.libc custom section \"wasix-sysroot 2025.9.30-N\", N >= 28 (10.6.0-6: N = 22, NEGATIVE.md)"
+  ],
+  "ci": [
+    "bash packages/wasix-openssh/cert/ci.sh --tarball .homescoop-out/package.tgz"
   ]
 }
