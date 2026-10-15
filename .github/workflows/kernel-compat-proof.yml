@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/kernel-compat.yml'
       - '.github/workflows/kernel-compat-proof.yml'
+      - 'package.json'
+      - 'scripts/dev-pin.mjs'
       - 'scripts/browser-cert/compat.mjs'
       - 'scripts/browser-cert/known-limits.json'
       - 'scripts/browser-cert/base-sweep/**'
@@ -21,24 +23,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  positive:
-    uses: ./.github/workflows/kernel-compat.yml
-    with:
-      kernel: '@ai-ecoverse/slicc-kernel@1.81.0'
-      set: 'base,ci-certified'
-      homescoop-ref: ${{ github.event.pull_request.head.sha }}
+  kernels:
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      positive: ${{ steps.k.outputs.positive }}
+      negative: ${{ steps.k.outputs.negative }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - id: k
+        run: |
+          set -euo pipefail
+          positive=$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-kernel)
+          negative=$(node scripts/dev-pin.mjs slicc-kernel-negative)
+          echo "kernels (package.json devDependencies): positive $positive, negative $negative"
+          printf 'positive=%s\nnegative=%s\n' "$positive" "$negative" >> "$GITHUB_OUTPUT"
 
-  positive-latest:
+  positive:
+    needs: kernels
     uses: ./.github/workflows/kernel-compat.yml
     with:
-      kernel: '@ai-ecoverse/slicc-kernel@1.86.0'
+      kernel: ${{ needs.kernels.outputs.positive }}
       set: 'base,ci-certified'
       homescoop-ref: ${{ github.event.pull_request.head.sha }}
 
   negative:
+    needs: kernels
     uses: ./.github/workflows/kernel-compat.yml
     with:
-      kernel: '@ai-ecoverse/slicc-kernel@1.78.0'
+      kernel: ${{ needs.kernels.outputs.negative }}
       set: 'base,ci-certified'
       homescoop-ref: ${{ github.event.pull_request.head.sha }}
       expect-regressions: 'grep,sed,xz,jq,findutils,diffutils,patch'

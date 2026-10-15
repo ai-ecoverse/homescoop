@@ -421,7 +421,7 @@ changes the boot order for every cert.
 
 | Flag | Meaning |
 | --- | --- |
-| `--kernel <spec \| .tgz \| dir>` | the kernel to boot instead of `HOMESCOOP_CERT_NODE_MODULES`'s (which `ladder-pr` fills from `meta.json`'s `kernel`, still the default) |
+| `--kernel <spec \| .tgz \| dir>` | the kernel to boot instead of `HOMESCOOP_CERT_NODE_MODULES`'s (which `ladder-pr` fills from `meta.json`'s `kernel`, else the `@ai-ecoverse/slicc-kernel` devDependency in the root `package.json`: [`cert-kernel.mjs`](../scripts/browser-cert/cert-kernel.mjs), which logs which one it took) |
 | `--users off\|report\|enforce` | overrides `meta.json`'s `users`; without either the kernel's default applies (`enforce` since 1.74, `off` before) |
 | `--tarball <tgz>` (repeatable) | the packages under test, installed in this order; the first is `ctx.npmName`. Specs see every manifest in `ctx.installed` |
 | `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
@@ -492,12 +492,13 @@ changes the boot order for every cert.
 ### Proof
 
 [`kernel-compat-proof.yml`](../.github/workflows/kernel-compat-proof.yml) runs
-on PRs that touch these files or the harness itself (`run.mjs`,
-`context.mjs`, `page/`): `ladder-pr` runs no package cert on a scripts-only
+on PRs that touch these files, the harness itself (`run.mjs`,
+`context.mjs`, `page/`) or the root `package.json` (a pin bump): `ladder-pr` runs no package cert on a scripts-only
 PR, so this is the harness's regression test. It calls the workflow twice, as slicc-kernel
-does: `@ai-ecoverse/slicc-kernel@1.81.0` and the newest certified kernel
-(`1.86.0`; bump it with each kernel cert) on `base,ci-certified` must be
-green, and `1.78.0` with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
+does, on the kernels the root `package.json` pins as devDependencies: the
+certified kernel (`@ai-ecoverse/slicc-kernel`; Renovate bumps it) on
+`base,ci-certified` must be green, and the old one (`slicc-kernel-negative`,
+an npm alias of `@ai-ecoverse/slicc-kernel@1.78.0`) with `expect-regressions: grep,sed,xz,jq,findutils,diffutils,patch`
 must report a regression, in a spec and in the sweep, for each of them: the
 Emscripten builds without `slicc_sleep_ms` that exit 70 there
 (slicc-kernel#483, fixed by #496 in 1.81.0).

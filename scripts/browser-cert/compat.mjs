@@ -15,12 +15,13 @@ import {
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commandsOf } from './base-sweep/sweep.mjs';
+import { devPin } from '../dev-pin.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
 const KERNEL = '@ai-ecoverse/slicc-kernel';
 const BIOS = 'ai-ecoverse/slicc-bios';
-const HARNESS = ['@ai-ecoverse/slicc-shared-web@^1.4.1', 'playwright-core@1.63.0'];
+const HARNESS = ['@ai-ecoverse/slicc-shared-web', 'playwright-core'].map((name) => devPin(name));
 const MAX_SHARDS = 10;
 const ESTIMATE = { entry: 10, spec: 4, sweep: 150, shard: 900, limit: 1200 };
 const SWEEP_MODES = ['report', 'enforce'];
