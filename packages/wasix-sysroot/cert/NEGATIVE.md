@@ -1,5 +1,32 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-28: poll/ppoll refuse events 0, epoll_ctl misnumbers its ops (-29, homescoop#394, #443)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-28.tgz --probe r29 --kernel-dir <slicc-kernel 1.97.0>`, default variant, 2026-10-16: FAIL. Every poll/ppoll case is ENOSYS; `epoll_create1` drops `EPOLL_CLOEXEC`; a second ADD "succeeds" (it arrives as WASIX op 1, which the kernel takes as add-or-modify); errors come back as positive values (44 ENOENT, 28 EINVAL) instead of -1; `data.u64` 0x100000000 comes back as the fd (14) with garbage above; `epoll_wait` stops at 64; `epoll_pwait` ignores its mask and sleeps its 3 s:
+
+```text
+poll mixed: -1 Function not implemented revents=0,0,0,0
+poll none: -1 Function not implemented revents=0,0 wrong
+poll nval: -1 Function not implemented nval=0 revents=0 fast
+poll other bits: -1 Function not implemented revents=0
+ppoll mixed: -1 Function not implemented revents=0,0,0,0
+(ppoll none, nval, other bits: the same)
+epoll: yes cloexec=0
+ctl add: 0
+ctl add again: 0
+wait: 1 events=1 data=ffffffff0000000e
+ctl mod: 0
+wait mod: 1 data=ffffffff0000000e
+ctl del: 0
+ctl del again: 44
+ctl bad op: 28
+ctl not epoll: 28
+many: 64 distinct=64
+pwait: 0 handler=0 slow blocked=1
+```
+
+The same probe's signal lines on -29 against slicc-kernel 1.92.0 (before slicc-kernel#596) show what the 1.93.0 cases catch: `rt thread=0`, `rt child=0`, `rt exec=0` (signal 40's mask bit lost), and `r29 bothterm` exits 143 without bash's "Terminated".
+
 ## Known kernel limit, not a -28 regression: the window (slicc-kernel#561)
 
 r28w's two "window" lines: a child sends SIGUSR1 while the parent busy-loops 400 ms without kernel calls, then the parent waits in `pselect` on an idle pipe for 10 s. On slicc-kernel 1.77.0, 1.88.0 and #551 @2937137 the handler runs at the start of that call (0.00 s) and the wait still sleeps 10 s: `window: arrived_before_wait handler=0; pselect 0 handler=1 slow`, the same with a mask. It's the kernel's, it affects -27 equally (-27 exposes every signal that arrives during computation, the -28 fallback only the instructions between its `sigmask_set` and `poll_oneoff`), and slicc-kernel#567 fixes it: on c0869d4 both lines are `pselect -1 EINTR handler=1 fast`, which `R28_WINDOW=1` asserts. slicc-kernel 1.91.0 ships #567; the -28 cert runs on it with `R28_WINDOW=1` (both lines `pselect -1 EINTR handler=1 fast` in all five variants, 2026-10-15).

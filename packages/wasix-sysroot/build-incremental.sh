@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-28 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-29 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -515,6 +515,33 @@ for v in "${VARIANTS[@]}"; do
     grep -q "$imp" <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks $imp" >&2; exit 1; }
   done
   grep -q " T ppoll$" <<<"$("$LLVM_NM" "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks ppoll" >&2; exit 1; }
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -29 members (poll skips pollfds with no read/write interest; epoll_ctl takes Linux op numbers and returns -1 with errno, epoll_wait has no 64-event cap, epoll_pwait swaps the mask)"
+R29_OBJ="$WORK/r29"
+rm -rf "$R29_OBJ" && mkdir -p "$R29_OBJ/static" "$R29_OBJ/pic"
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  for m in poll epoll; do compile_r18 "$m" "$R29_OBJ/$flavour/$m.o" "${extra[@]}"; done
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R29_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" poll.o epoll.o)
+  for m in poll epoll; do
+    missing="$(comm -23 <(exported "$old/$m.o") <(exported "$R29_OBJ/$flavour/$m.o"))"
+    [[ -z "$missing" ]] || { echo "homescoop: $v $m.o: the patched source lacks: $missing" >&2; exit 1; }
+  done
+  "$LLVM_AR" r "$lib" "$R29_OBJ/$flavour/poll.o" "$R29_OBJ/$flavour/epoll.o"
+  have="$(exported "$lib" 2>/dev/null)"
+  for s in poll ppoll epoll_create epoll_create1 epoll_ctl epoll_wait epoll_pwait; do
+    grep -qx "$s" <<<"$have" || { echo "homescoop: $lib lacks $s" >&2; exit 1; }
+  done
   echo "  $v ($flavour)"
 done
 
