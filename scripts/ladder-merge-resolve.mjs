@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 export const LADDER_PR = '.github/workflows/ladder-pr.yml';
 export const RENOVATE = 'renovate[bot]';
+export const CERT_REVIEW = '.github/workflows/cert-review.yml';
 const SHA256 = /^[0-9a-f]{64}$/;
 
 export function parseCertLines(message) {
@@ -69,18 +70,66 @@ export function tarballProblem(got, { name, version, certified }) {
   return '';
 }
 
+export function certReviewProblems({ run, record, pr }) {
+  const problems = [];
+  if (run.path !== CERT_REVIEW) problems.push(`run ${run.id} is ${run.path}, not ${CERT_REVIEW}`);
+  if (run.event !== 'workflow_run' && run.event !== 'workflow_dispatch') problems.push(`run ${run.id} is a ${run.event} run`);
+  if (run.head_branch !== 'main') problems.push(`run ${run.id} ran on ${run.head_branch}, not main`);
+  if (run.status !== 'completed' || run.conclusion !== 'success') {
+    problems.push(`run ${run.id} concluded ${run.conclusion || run.status}`);
+  }
+  if (!record) return [...problems, `run ${run.id} has no cert-review-record-${pr.number} artifact`];
+  if (record.pr !== pr.number) problems.push(`its record is for PR #${record.pr}, not #${pr.number}`);
+  if (record.head !== pr.head) problems.push(`its record is for ${record.head}, not the merged head ${pr.head}`);
+  if (record.cert_review_run !== run.id) problems.push(`its record names run ${record.cert_review_run}, not ${run.id}`);
+  if (!Array.isArray(record.lines)) problems.push('its record has no lines');
+  return problems;
+}
+
+export async function certReview(pr, io) {
+  const status = (await io.statuses(pr.head)).find(
+    (st) => st.context === 'cert-review' && st.creator?.login === 'github-actions[bot]',
+  );
+  if (!status) return { state: 'absent' };
+  const url = status.target_url ?? '';
+  if (status.state !== 'success') return { state: status.state, url };
+  const runId = Number(url.match(/\/actions\/runs\/(\d+)\/?$/)?.[1]);
+  if (!runId) return { state: 'invalid', url, problem: `its target_url '${url}' names no run` };
+  const run = await io.run(runId);
+  const artifact = (await io.runArtifacts(runId)).find((a) => a.name === `cert-review-record-${pr.number}` && !a.expired);
+  const record = artifact ? await io.record(artifact) : null;
+  const problems = certReviewProblems({ run, record, pr });
+  if (problems.length) return { state: 'invalid', url, problem: problems.join('; ') };
+  return { state: 'success', url, runId, text: record.lines.join('\n') };
+}
+
+function describeReview(review, name, version) {
+  if (review.state === 'absent') return 'there is no cert-review status on the merged head';
+  if (review.state === 'success') return `cert-review run ${review.runId} has no line for ${name} ${version}`;
+  const problem = review.problem ? `: ${review.problem}` : '';
+  return `the cert-review status is ${review.state}${problem} (${review.url})`;
+}
+
 export async function certifiedSha({ name, version, message }, pr, io) {
-  const sources = [
+  const human = [
     { source: 'merge commit', text: message },
     { source: `PR #${pr.number} body`, text: pr.body },
   ];
-  const named = sources.some(({ text }) => parseCertLines(text).some((l) => l.name === name));
-  if (named && !(await io.canWrite(pr.author))) {
-    return { certified: null, ignored: `PR #${pr.number} is by ${pr.author}, who cannot write to this repository` };
-  }
+  const named = human.some(({ text }) => parseCertLines(text).some((l) => l.name === name));
+  const ignored =
+    named && !(await io.canWrite(pr.author))
+      ? `PR #${pr.number} is by ${pr.author}, who cannot write to this repository`
+      : undefined;
+  const sources = ignored ? [] : human;
   for (const { source, text } of sources) {
     const certified = certFor(text, name, version);
     if (certified) return { certified, source };
+  }
+  const review = await certReview(pr, io);
+  if (review.text !== undefined) {
+    const certified = certFor(review.text, name, version);
+    if (certified) return { certified, source: `cert-review run ${review.runId}`, review };
+    sources.push({ source: `cert-review run ${review.runId}`, text: review.text });
   }
   const stale = sources.flatMap(({ source, text }) =>
     parseCertLines(text)
@@ -90,7 +139,7 @@ export async function certifiedSha({ name, version, message }, pr, io) {
   if (stale.length) {
     throw new Error(`the certified= lines name ${name} ${stale.join(', ')}, but the merged package.json is ${name} ${version}`);
   }
-  return { certified: null };
+  return { certified: null, ignored, review };
 }
 
 export async function resolvePackage(ctx, io) {
@@ -100,12 +149,21 @@ export async function resolvePackage(ctx, io) {
   }
   const pr = await io.pullRequest();
   if (!pr) throw new Error('no merged PR for this commit, so there is no ladder-pr artifact to publish');
-  const { certified, source, ignored } = await certifiedSha(ctx, pr, io);
+  const { certified, source, ignored, review } = await certifiedSha(ctx, pr, io);
   if (!certified && !ciCertified) {
     const why = ignored
-      ? `its certified= lines don't count because ${ignored}`
+      ? `the merge commit's and PR body's certified= lines don't count because ${ignored}`
       : `neither the merge commit nor the PR body has a certified=<sha256> ${name} ${version} line`;
-    throw new Error(`${name}@${version} is not on npm, ${why}, and ${pkg} is not in scripts/ci-certified.json`);
+    throw new Error(
+      `${name}@${version} is not on npm, ${why}, ${describeReview(review, name, version)}, ` +
+        `and ${pkg} is not in scripts/ci-certified.json`,
+    );
+  }
+  if (!certified && (review.state === 'failure' || review.state === 'error')) {
+    throw new Error(
+      `${name}@${version} has no certified= line, and the cert-review status on ${pr.head} is ${review.state}, ` +
+        `which vetoes the ci-job path: ${review.url}`,
+    );
   }
   if (!certified && pr.author !== RENOVATE && (ignored || !(await io.canWrite(pr.author)))) {
     throw new Error(
@@ -159,6 +217,13 @@ function githubIo({ repo, token, sha, head, prBody }) {
     if (!res.ok) throw new Error(`GET ${path} returned ${res.status}`);
     return res;
   };
+  const unzip = async (artifact) => {
+    const res = await api(`/actions/artifacts/${artifact.id}/zip`);
+    const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-'));
+    writeFileSync(join(dir, 'artifact.zip'), Buffer.from(await res.arrayBuffer()));
+    execFileSync('unzip', ['-qo', join(dir, 'artifact.zip'), '-d', join(dir, 'out')]);
+    return join(dir, 'out');
+  };
   return {
     async published(name, version) {
       const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`;
@@ -191,12 +256,18 @@ function githubIo({ repo, token, sha, head, prBody }) {
     async jobs(id) {
       return (await (await api(`/actions/runs/${id}/jobs?filter=latest&per_page=100`)).json()).jobs ?? [];
     },
+    async statuses(ref) {
+      return (await api(`/commits/${ref}/statuses?per_page=100`)).json();
+    },
+    async runArtifacts(id) {
+      return (await (await api(`/actions/runs/${id}/artifacts?per_page=100`)).json()).artifacts ?? [];
+    },
+    async record(artifact) {
+      const file = join(await unzip(artifact), 'record.json');
+      return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+    },
     async download(artifact) {
-      const res = await api(`/actions/artifacts/${artifact.id}/zip`);
-      const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-'));
-      writeFileSync(join(dir, 'artifact.zip'), Buffer.from(await res.arrayBuffer()));
-      execFileSync('unzip', ['-qo', join(dir, 'artifact.zip'), '-d', join(dir, 'out')]);
-      const tgz = join(dir, 'out', 'package.tgz');
+      const tgz = join(await unzip(artifact), 'package.tgz');
       if (!existsSync(tgz)) return {};
       const shaFile = `${tgz}.sha256`;
       const recorded = existsSync(shaFile) ? readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0] : undefined;

@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
+  CERT_REVIEW,
   LADDER_PR,
   candidateProblems,
+  certReview,
   certFor,
   parseArgs,
   parseCertLines,
@@ -47,10 +49,25 @@ function fakeIo({
   runs = {},
   jobs = {},
   tarballs = {},
+  statuses = [],
+  runArtifacts = {},
+  records = {},
 } = {}) {
   const calls = [];
   return {
     calls,
+    async statuses(sha) {
+      calls.push(['statuses', sha]);
+      return statuses;
+    },
+    async runArtifacts(id) {
+      calls.push(['runArtifacts', id]);
+      return runArtifacts[id] ?? [];
+    },
+    async record(a) {
+      calls.push(['record', a.id]);
+      return records[a.id];
+    },
     async canWrite(login) {
       calls.push(['canWrite', login]);
       return writers.includes(login);
@@ -271,9 +288,9 @@ describe('resolvePackage', () => {
     const io = fakeIo(staleFailed);
     await assert.rejects(
       resolvePackage({ ...ctx, message: 'Merge pull request #336' }, io),
-      /not on npm, neither the merge commit nor the PR body has a certified=<sha256> @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 line, and wasi-impeccable is not in scripts\/ci-certified\.json/,
+      /not on npm, neither the merge commit nor the PR body has a certified=<sha256> @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 line, there is no cert-review status on the merged head, and wasi-impeccable is not in scripts\/ci-certified\.json/,
     );
-    assert.deepEqual(io.calls.map(([c]) => c), ['published', 'pullRequest']);
+    assert.deepEqual(io.calls.map(([c]) => c), ['published', 'pullRequest', 'statuses']);
   });
 
   it('falls back to the PR body when the merge commit has no line', async () => {
@@ -296,7 +313,8 @@ describe('resolvePackage', () => {
 
   it('ignores the lines in either source when the PR author cannot write', async () => {
     const line = `certified=${GOOD} ${NAME} ${VERSION}`;
-    const why = /its certified= lines don't count because PR #336 is by someone, who cannot write to this repository, and wasi-impeccable is not in/;
+    const why =
+      /the merge commit's and PR body's certified= lines don't count because PR #336 is by someone, who cannot write to this repository, there is no cert-review status on the merged head, and wasi-impeccable is not in/;
     const fromCommit = fakeIo({ ...staleFailed, pr: { ...PR, author: 'someone' } });
     await assert.rejects(resolvePackage({ ...ctx, message: line }, fromCommit), why);
     const fromBody = fakeIo({ ...staleFailed, pr: { ...PR, author: 'someone', body: line } });
@@ -332,7 +350,7 @@ describe('resolvePackage', () => {
   it('refuses a wrong-package or wrong-version line', async () => {
     await assert.rejects(
       resolvePackage({ ...ctx, message: `certified=${GOOD} @ai-ecoverse/wasm-sqlite3 3.54.0-1` }, fakeIo(staleFailed)),
-      /has a certified=<sha256> @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 line, and wasi-impeccable is not in/,
+      /has a certified=<sha256> @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 line, there is no cert-review status on the merged head, and wasi-impeccable is not in/,
     );
     await assert.rejects(
       resolvePackage({ ...ctx, ciCertified: true, message: `certified=${GOOD} ${NAME} 0.1.14-0` }, fakeIo(staleFailed)),
@@ -427,6 +445,131 @@ describe('resolvePackage', () => {
   it('fails closed when a run cannot be read', async () => {
     const io = fakeIo({ artifacts: [artifact(1, 10, HEAD)], runs: {} });
     await assert.rejects(resolvePackage(ctx, io), /returned 404/);
+  });
+});
+
+describe('the cert-review record', () => {
+  const RUN = 38800000001;
+  const url = `https://github.com/ai-ecoverse/homescoop/actions/runs/${RUN}`;
+  const status = (extra = {}) => ({
+    context: 'cert-review',
+    state: 'success',
+    target_url: url,
+    creator: { login: 'github-actions[bot]' },
+    ...extra,
+  });
+  const reviewRun = (extra = {}) => ({
+    id: RUN,
+    path: CERT_REVIEW,
+    event: 'workflow_run',
+    head_branch: 'main',
+    status: 'completed',
+    conclusion: 'success',
+    ...extra,
+  });
+  const record = (extra = {}) => ({
+    pr: 336,
+    head: HEAD,
+    ladder_run: 20,
+    cert_review_run: RUN,
+    lines: [`certified=${GOOD} ${NAME} ${VERSION} (known: #343)`],
+    ...extra,
+  });
+  const reviewed = ({ st = status(), rr = reviewRun(), rec = record(), name = 'cert-review-record-336', ...rest } = {}) => ({
+    ...rest,
+    artifacts: rest.artifacts ?? [artifact(2, 20, HEAD)],
+    runs: { 20: run(20, HEAD), [RUN]: rr, ...rest.runs },
+    tarballs: rest.tarballs ?? { 2: tarball(GOOD) },
+    statuses: [st],
+    runArtifacts: { [RUN]: [{ id: 77, name, expired: false }] },
+    records: { 77: rec },
+  });
+  const noLine = { ...ctx, message: 'Merge pull request #336' };
+  const renovatePr = { ...PR, author: 'renovate[bot]' };
+
+  it('certifies from a record of main\'s cert-review run, even on a renovate[bot] PR', async () => {
+    const io = fakeIo(reviewed({ pr: renovatePr }));
+    const result = await resolvePackage(noLine, io);
+    assert.equal(result.gate, `certified= line in the cert-review run ${RUN}`);
+    assert.deepEqual(result.inputs, { package: 'wasi-impeccable', certified: GOOD, artifact_pr: '336', artifact_id: '2' });
+    assert.equal(io.calls.some(([c]) => c === 'canWrite'), false);
+  });
+
+  it('accepts a workflow_dispatch run on main', async () => {
+    const result = await resolvePackage(noLine, fakeIo(reviewed({ rr: reviewRun({ event: 'workflow_dispatch' }) })));
+    assert.equal(result.gate, `certified= line in the cert-review run ${RUN}`);
+  });
+
+  it('reads the merge commit and the PR body first', async () => {
+    const fromCommit = fakeIo(reviewed({ rec: record({ lines: [`certified=${OTHER} ${NAME} ${VERSION}`] }) }));
+    assert.equal((await resolvePackage(ctx, fromCommit)).gate, 'certified= line in the merge commit');
+    assert.equal(fromCommit.calls.some(([c]) => c === 'statuses'), false);
+    const pr = { ...PR, body: `certified=${GOOD} ${NAME} ${VERSION}` };
+    const fromBody = fakeIo(reviewed({ pr }));
+    assert.equal((await resolvePackage(noLine, fromBody)).gate, 'certified= line in the PR #336 body');
+  });
+
+  it('refuses a record whose sha is not the artifact, or with a stale line beside the valid one', async () => {
+    await assert.rejects(
+      resolvePackage(noLine, fakeIo(reviewed({ tarballs: { 2: tarball(OTHER) } }))),
+      new RegExp(`package.tgz sha256 ${OTHER} does not match the certified= line ${GOOD}`),
+    );
+    const stale = record({ lines: [`certified=${GOOD} ${NAME} ${VERSION}`, `certified=${OTHER} ${NAME} 0.1.14-0`] });
+    await assert.rejects(resolvePackage(noLine, fakeIo(reviewed({ rec: stale }))), /and also .*0\.1\.14-0/);
+  });
+
+  it('refuses a record from a branch run, the other events, or a failed run', async () => {
+    const cases = [
+      [reviewRun({ event: 'pull_request', head_branch: 'bb/cert-review-in-ci' }), /is a pull_request run; run \d+ ran on bb\/cert-review-in-ci, not main/],
+      [reviewRun({ event: 'push' }), /is a push run/],
+      [reviewRun({ path: '.github/workflows/ladder-pr.yml' }), /not \.github\/workflows\/cert-review\.yml/],
+      [reviewRun({ conclusion: 'failure' }), /concluded failure/],
+    ];
+    for (const [rr, why] of cases) {
+      await assert.rejects(resolvePackage(noLine, fakeIo(reviewed({ rr }))), why);
+      await assert.rejects(resolvePackage(noLine, fakeIo(reviewed({ rr }))), /the cert-review status is invalid: .*, and wasi-impeccable is not in/);
+    }
+  });
+
+  it('refuses a record for another PR, head or run, or no record at all', async () => {
+    const cases = [
+      [{ rec: record({ pr: 337 }) }, /its record is for PR #337, not #336/],
+      [{ rec: record({ head: STALE }) }, /its record is for 340364dd.*, not the merged head dea953c9/],
+      [{ rec: record({ cert_review_run: 1 }) }, /its record names run 1, not 38800000001/],
+      [{ name: 'cert-review-record-337' }, /has no cert-review-record-336 artifact/],
+      [{ st: status({ target_url: 'https://example.com/x' }) }, /names no run/],
+    ];
+    for (const [over, why] of cases) await assert.rejects(resolvePackage(noLine, fakeIo(reviewed(over))), why);
+  });
+
+  it('ignores a status from anyone but github-actions[bot] and takes the newest', async () => {
+    const forged = fakeIo(reviewed({ st: status({ creator: { login: 'someone' } }) }));
+    await assert.rejects(resolvePackage(noLine, forged), /there is no cert-review status on the merged head/);
+    const io = fakeIo({ ...reviewed(), statuses: [status({ state: 'failure' }), status()] });
+    await assert.rejects(resolvePackage(noLine, io), /the cert-review status is failure \(https:/);
+    assert.deepEqual(await certReview(PR, fakeIo()), { state: 'absent' });
+  });
+
+  it('a failed review vetoes the ci-job path and names the run; absent or pending leaves it alone', async () => {
+    const green = { jobs: { 20: [{ name: 'ci', conclusion: 'success' }] }, pr: renovatePr };
+    for (const state of ['failure', 'error']) {
+      await assert.rejects(
+        resolvePackage({ ...noLine, ciCertified: true }, fakeIo(reviewed({ ...green, st: status({ state }) }))),
+        new RegExp(`the cert-review status on ${HEAD} is ${state}, which vetoes the ci-job path: ${url}`),
+      );
+    }
+    const pending = await resolvePackage({ ...noLine, ciCertified: true }, fakeIo(reviewed({ ...green, st: status({ state: 'pending' }) })));
+    assert.equal(pending.gate, 'ci-certified (ladder-pr ci job)');
+    const absent = await resolvePackage(
+      { ...noLine, ciCertified: true },
+      fakeIo({ ...green, artifacts: [artifact(2, 20, HEAD)], runs: { 20: run(20, HEAD) }, tarballs: { 2: tarball(GOOD) } }),
+    );
+    assert.equal(absent.gate, 'ci-certified (ladder-pr ci job)');
+    const invalid = await resolvePackage(
+      { ...noLine, ciCertified: true },
+      fakeIo(reviewed({ ...green, rr: reviewRun({ head_branch: 'bb/x', event: 'pull_request' }) })),
+    );
+    assert.equal(invalid.gate, 'ci-certified (ladder-pr ci job)');
   });
 });
 
