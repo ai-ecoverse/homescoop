@@ -39,5 +39,3 @@ Every PNG case compares a SHA-256 over the decoded samples with host libheif's,
 heif-info's stdout with the host's, and the corrupt-input cases require
 libheif's own rc and message with no trap. So any wrong pixel, header line or
 exit status fails.
-
-Proof run for ladder-pr's cert job on the pool (throwaway; reverted before review).
