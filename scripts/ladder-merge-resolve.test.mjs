@@ -110,10 +110,15 @@ describe('the certified= line', () => {
     assert.equal(certFor('Merge pull request #1 from x/y', NAME, VERSION), null);
   });
 
-  it('refuses a line for the package at another version', () => {
+  it('leaves a source that only names another version to the caller', () => {
+    assert.equal(certFor(`certified=${GOOD} ${NAME} 0.1.14-0`, NAME, VERSION), null);
+  });
+
+  it('refuses a stale line next to a valid one in the same source', () => {
+    const body = `certified=${OTHER} ${NAME} 0.1.14-0\ncertified=${GOOD} ${NAME} ${VERSION}`;
     assert.throws(
-      () => certFor(`certified=${GOOD} ${NAME} 0.1.14-0`, NAME, VERSION),
-      /names @ai-ecoverse\/wasi-impeccable 0\.1\.14-0, but the merged package\.json is .* 0\.1\.14-1/,
+      () => certFor(body, NAME, VERSION),
+      /name @ai-ecoverse\/wasi-impeccable 0\.1\.14-1 and also @ai-ecoverse\/wasi-impeccable 0\.1\.14-0/,
     );
   });
 
@@ -293,7 +298,7 @@ describe('resolvePackage', () => {
     const pr = { ...PR, author: 'someone', body: `certified=${GOOD} ${NAME} ${VERSION}` };
     await assert.rejects(
       resolvePackage({ ...ctx, message: 'Merge pull request #336' }, fakeIo({ ...staleFailed, pr })),
-      /in the body of PR #336, whose author someone cannot write to this repository/,
+      /is in the PR #336 body, whose author someone cannot write to this repository/,
     );
   });
 
@@ -312,8 +317,28 @@ describe('resolvePackage', () => {
     );
     await assert.rejects(
       resolvePackage({ ...ctx, ciCertified: true, message: `certified=${GOOD} ${NAME} 0.1.14-0` }, fakeIo(staleFailed)),
-      /names @ai-ecoverse\/wasi-impeccable 0\.1\.14-0/,
+      /name @ai-ecoverse\/wasi-impeccable 0\.1\.14-0 in the merge commit, but the merged package\.json is .*0\.1\.14-1/,
     );
+  });
+
+  it('refuses a stale line next to a valid one, in either source', async () => {
+    const both = `certified=${GOOD} ${NAME} ${VERSION}\ncertified=${OTHER} ${NAME} 0.1.14-0`;
+    await assert.rejects(resolvePackage({ ...ctx, message: both }, fakeIo(staleFailed)), /and also .*0\.1\.14-0/);
+    const pr = { ...PR, body: both };
+    await assert.rejects(
+      resolvePackage({ ...ctx, message: 'Merge pull request #336' }, fakeIo({ ...staleFailed, pr })),
+      /and also .*0\.1\.14-0/,
+    );
+  });
+
+  it('ignores a stale line in the source it does not resolve from', async () => {
+    const stale = `certified=${OTHER} ${NAME} 0.1.14-0`;
+    const fromCommit = await resolvePackage(ctx, fakeIo({ ...staleFailed, pr: { ...PR, body: stale } }));
+    assert.equal(fromCommit.gate, 'certified= line in the merge commit');
+    const pr = { ...PR, body: `certified=${GOOD} ${NAME} ${VERSION}` };
+    const fromBody = await resolvePackage({ ...ctx, message: stale }, fakeIo({ ...staleFailed, pr }));
+    assert.equal(fromBody.gate, 'certified= line in the PR #336 body');
+    assert.equal(fromBody.inputs.certified, GOOD);
   });
 
   it('ci-certified: publishes the green run artifact only when its ci job passed', async () => {

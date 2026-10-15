@@ -18,13 +18,13 @@ export function parseCertLines(message) {
   return lines;
 }
 
-export function certFor(message, name, version) {
-  const named = parseCertLines(message).filter((l) => l.name === name);
-  if (named.length === 0) return null;
+export function certFor(text, name, version) {
+  const named = parseCertLines(text).filter((l) => l.name === name);
   const exact = named.filter((l) => l.version === version);
-  if (exact.length === 0) {
-    const seen = named.map((l) => l.version).join(', ');
-    throw new Error(`the certified= line names ${name} ${seen}, but the merged package.json is ${name} ${version}`);
+  if (exact.length === 0) return null;
+  const stale = named.filter((l) => l.version !== version).map((l) => l.version);
+  if (stale.length) {
+    throw new Error(`the certified= lines name ${name} ${version} and also ${name} ${stale.join(', ')}`);
   }
   const bad = exact.find((l) => !SHA256.test(l.sha));
   if (bad) throw new Error(`the certified= line for ${name} ${version} has a malformed sha256 '${bad.sha}'`);
@@ -69,13 +69,25 @@ export function tarballProblem(got, { name, version, certified }) {
 }
 
 export async function certifiedSha({ name, version, message }, pr, io) {
-  const fromCommit = certFor(message, name, version);
-  if (fromCommit || !pr) return { certified: fromCommit, source: 'merge commit' };
-  const fromBody = certFor(pr.body, name, version);
-  if (fromBody && !(await io.canWrite(pr.author))) {
-    throw new Error(`the certified= line is in the body of PR #${pr.number}, whose author ${pr.author} cannot write to this repository`);
+  const sources = [{ source: 'merge commit', text: message }];
+  if (pr) sources.push({ source: `PR #${pr.number} body`, text: pr.body, author: pr.author });
+  for (const { source, text, author } of sources) {
+    const certified = certFor(text, name, version);
+    if (!certified) continue;
+    if (author && !(await io.canWrite(author))) {
+      throw new Error(`the certified= line is in the ${source}, whose author ${author} cannot write to this repository`);
+    }
+    return { certified, source };
   }
-  return { certified: fromBody, source: `PR #${pr.number} body` };
+  const stale = sources.flatMap(({ source, text }) =>
+    parseCertLines(text)
+      .filter((l) => l.name === name)
+      .map((l) => `${l.version} in the ${source}`),
+  );
+  if (stale.length) {
+    throw new Error(`the certified= lines name ${name} ${stale.join(', ')}, but the merged package.json is ${name} ${version}`);
+  }
+  return { certified: null };
 }
 
 export async function resolvePackage(ctx, io) {
