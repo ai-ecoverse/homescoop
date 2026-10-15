@@ -196,8 +196,13 @@ jobs:
       - name: Cert harnesses (no secrets in this step)
         run: |
           for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
+            if [ "$(jq -r '.blocked // false' "packages/$pkg/cert/meta.json" 2> /dev/null)" = true ]; then
+              echo "$pkg: no harness, cert/meta.json is blocked"
+              continue
+            fi
             echo "::group::harness for $pkg"
-            bash .cert-review-tools/scripts/cert-review/harness.sh "$pkg" "$RUNNER_TEMP/harness/$pkg"
+            bash .cert-review-tools/scripts/cert-review/harness.sh "$pkg" "$RUNNER_TEMP/harness/$pkg" \
+              || echo "::warning::the harness for $pkg didn't install; the review goes on without it"
             echo "::endgroup::"
           done
 

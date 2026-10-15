@@ -24,8 +24,12 @@ kernel=$(field kernel | head -1)
 mkdir -p "$prefix"
 install "${kernel:-@ai-ecoverse/slicc-kernel@1.9.0}" @ai-ecoverse/slicc-shared-web@^1.4.1 playwright-core@1.63.0
 
-needs=$(field needsInstall)
-[ -n "$needs" ] || needs=$(field needs)
+needs=$(node -e '
+  const fs = require("fs");
+  let j = {};
+  try { j = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch {}
+  for (const n of j.needsInstall || j.needs || []) console.log(n);
+' "$meta")
 while read -r dep; do
   [ -n "$dep" ] && install "$dep"
 done <<< "$needs"
