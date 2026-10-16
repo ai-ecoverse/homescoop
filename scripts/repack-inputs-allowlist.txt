@@ -1,0 +1,16 @@
+# Build inputs that changed since the bytes a repack reuses, before the #735
+# check (scripts/repack-inputs.mjs) existed. One per line, pinned to the
+# file's git blob (or `deleted`) so a later edit fails again:
+#   <package> <path under packages/<n>/> <blob sha|deleted> #<issue> <reason>
+# Shrinking this list is the fix: rebuild (drop repack:), or say why in
+# repack: inputs_changed:.
+py-numpy build.sh bdd5e90b8208580377693a78bdb51f640f14e92c #832 changed since the reused bytes, needs owner review
+py-scipy tools/__pycache__/f2c_fixes.cpython-314.pyc deleted #832 changed since the reused bytes, needs owner review
+py-scipy tools/wasix_stubs.o deleted #832 changed since the reused bytes, needs owner review
+wasix-autoconf build.sh 8a8feafd3bdfae9bc47287ffd98ab729f1336b16 #832 changed since the reused bytes, needs owner review
+wasix-automake build.sh 934efe50a9926023cd8c5f96d95f7b3922e68f2d #832 changed since the reused bytes, needs owner review
+wasix-ruby build.sh 20109977d282002a4b73536c940eb4e4b97fe898 #832 changed since the reused bytes, needs owner review
+wasm-binaryen build.sh ae72963075f8af82e911a620eaa03de5317bbea9 #832 changed since the reused bytes, needs owner review
+wasm-binaryen sig-layout-sources.txt cd5094c7ee0824553c0b536b905925ccdea3266b #832 changed since the reused bytes, needs owner review
+wasm-clang build.sh 93c93bae5dc337308032b26526e47a0f09b653ff #832 changed since the reused bytes, needs owner review
+wasm-emscripten build.sh 181f5fe34932c55ba5c678bc66b5da4f5dded710 #832 changed since the reused bytes, needs owner review
