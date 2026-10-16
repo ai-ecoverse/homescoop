@@ -27,14 +27,14 @@
     "@ai-ecoverse/py-python-dateutil@2.9.0-post0.2",
     "@ai-ecoverse/py-pytz@2026.4.0-2",
     "@ai-ecoverse/py-six@1.17.0-2",
-    "@ai-ecoverse/py-tzdata@2026.4.0-2"
+    "@ai-ecoverse/py-tzdata@2026.4.0-2",
+    "@ai-ecoverse/py-kiwisolver@1.5.1-7"
   ],
   "needsRepack": [
     "py-numpy",
     "py-pandas",
     "py-scipy",
     "py-contourpy",
-    "py-kiwisolver",
     "py-pillow",
     "py-fonttools",
     "py-cycler",
@@ -43,8 +43,9 @@
   ],
   "checklist": [
     "wasix-python re-pin wave (3.14.2-16; the same cert as the 3.14.2-15 wave): wasix-python's cert/discovery.mjs and cert/sidemods.mjs on the real re-pinned packages, no repin fixture (HOMESCOOP_CERT_NO_REPIN=1: fixtures/repin.mjs throws if any py-* still resolves to another wasix-python)",
-    "py-matplotlib is the tarball under test; the other re-pinned py-* are needsRepack: repack-published.mjs of this checkout, the same bytes as their ladder-pr artifacts (the job logs each sha256); the pure py-* that do not pin wasix-python come from npm",
+    "py-matplotlib is the tarball under test; the other re-pinned py-* are needsRepack (py-kiwisolver: npm 1.5.1-7, built from source since #556): repack-published.mjs of this checkout, the same bytes as their ladder-pr artifacts (the job logs each sha256); the pure py-* that do not pin wasix-python come from npm",
     "discovery.mjs: py-* found without PYTHONPATH in the flat npm /node_modules, one pnpm project, and pnpm 12 `pnpm add -g` (one project per package); a py-* built for wasix-python 3.14.2-13 is skipped and python -v names it; discover() cost logged",
-    "sidemods.mjs: numpy linalg + fft, pandas read_csv + groupby, scipy optimize + integrate, matplotlib Agg PNG, PIL open/resize/save, contourpy, kiwisolver, the pure-Python packages import; no PYTHONPATH"
+    "sidemods.mjs: numpy linalg + fft, pandas read_csv + groupby, scipy optimize + integrate, matplotlib Agg PNG, PIL open/resize/save, contourpy, kiwisolver, the pure-Python packages import; no PYTHONPATH",
+    "constrained.mjs (3.11.2-8, homescoop#197): py-kiwisolver's cert/matplotlib.mjs with this package: plt.subplots(2, 2, layout='constrained') with titles, y labels and a colorbar saves a PNG through ConstrainedLayoutEngine and moves the left column right of the default layout's. 3.11.2-7 pins py-kiwisolver 1.5.1-6, whose strength getters trap: rc 134 (NEGATIVE.md)"
   ]
 }
