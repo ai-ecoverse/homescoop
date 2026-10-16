@@ -1,8 +1,7 @@
 # GNU binutils strings / size / readelf for slicc wasm realm (host ladder).
 name: binutils
 builder: host
-# No renovate pin: upstream tags are binutils-2_47 (underscores), which the
-# recipe regex manager cannot map to 2.47. Bump by hand from mirrors.kernel.org.
+# renovate: datasource=custom.binutils depName=binutils extractVersion=^binutils-(?<version>\d+\.\d+(?:\.\d+)?)\.tar\.xz$
 version: "2.47"
 npm: "@ai-ecoverse/wasm-binutils"
 summary: "GNU binutils strings, size and readelf for slicc"

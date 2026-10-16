@@ -25,6 +25,18 @@
     "**/fixtures/**",
     "crates/wasix-net/**"
   ],
+  "customDatasources": {
+    "binutils": {
+      "description": "GNU binutils release tarballs (git tags are binutils-2_47, which no versioning reads as 2.47)",
+      "defaultRegistryUrlTemplate": "https://mirrors.kernel.org/gnu/binutils/",
+      "format": "html"
+    },
+    "freetype": {
+      "description": "FreeType release tarballs (tags are VER-2-13-3)",
+      "defaultRegistryUrlTemplate": "https://download.savannah.gnu.org/releases/freetype/",
+      "format": "html"
+    }
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -33,7 +45,7 @@
         "/(^|/)packages/[^/]+/recipe\\.ya?ml$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>\\S+?)(?: packageName=(?<packageName>\\S+?))?(?: versioning=(?<versioning>\\S+?))?(?: extractVersion=(?<extractVersion>\\S+?))?(?: registryUrl=(?<registryUrl>\\S+?))?\\s+version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+        "# renovate: datasource=(?<datasource>[a-z.-]+?) depName=(?<depName>\\S+?)(?: packageName=(?<packageName>\\S+?))?(?: versioning=(?<versioning>\\S+?))?(?: extractVersion=(?<extractVersion>\\S+?))?(?: registryUrl=(?<registryUrl>\\S+?))?\\s+version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
       ]
     },
     {
