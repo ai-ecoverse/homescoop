@@ -7,7 +7,8 @@
  * first checks that it is the version the tarball depends on, so the cert
  * runs what a user's install gets. 1.17.0-8 pinned 2.72.0-6, whose autom4te
  * piped m4 --help into grep: without grep, aclocal died with "need GNU m4
- * 1.4 or later: m4".
+ * 1.4 or later: m4". It checks wasix-perl the same way, and that the
+ * pinned wasix-autoconf takes the same perl (one perl in the tree, #656).
  */
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
@@ -43,6 +44,19 @@ export default async function (ctx) {
   const realm = JSON.parse(ac.stdout).version;
   assert.equal(pin, realm, `the tarball pins wasix-autoconf ${pin}, the cert runs ${realm} (cert/meta.json needsInstall)`);
 
+  // One perl in the tree (homescoop#634, #656): the tarball's wasix-perl pin
+  // is the realm's wasix-perl and the one the pinned wasix-autoconf takes, so
+  // npm installs a single @ai-ecoverse/wasix-perl. 1.17.0-9 pinned 5.42.0-11
+  // next to wasix-autoconf 2.72.0-8's 5.42.0-13: two perls.
+  const perlPin = manifest(tarball()).dependencies?.['@ai-ecoverse/wasix-perl'];
+  assert.ok(perlPin, 'the tarball depends on @ai-ecoverse/wasix-perl');
+  const acPerl = JSON.parse(ac.stdout).dependencies?.['@ai-ecoverse/wasix-perl'];
+  assert.equal(perlPin, acPerl, `the tarball pins wasix-perl ${perlPin}, its wasix-autoconf ${realm} pins ${acPerl}: an install gets two perls`);
+  const pl = await sh('cat /node_modules/@ai-ecoverse/wasix-perl/package.json', { cwd: '/tmp' });
+  assert.equal(pl.status, 0, pl.all);
+  const realmPerl = JSON.parse(pl.stdout).version;
+  assert.equal(perlPin, realmPerl, `the tarball pins wasix-perl ${perlPin}, the cert runs ${realmPerl} (cert/meta.json needsInstall)`);
+
   await write('home/p/configure.ac', 'AC_INIT([hello],[1.0])\nAM_INIT_AUTOMAKE([foreign])\nAC_CONFIG_FILES([Makefile])\nAC_OUTPUT\n');
   await write('home/p/Makefile.am', 'bin_SCRIPTS =\n');
   const bare = await sh('mkdir -p /tmp/bare && cd /usr/bin && for t in *; do case $t in *grep|sed|*awk) continue;; esac; ln -sf "/usr/bin/$t" "/tmp/bare/$t"; done', { cwd: '/tmp' });
@@ -62,5 +76,5 @@ export default async function (ctx) {
   const conf = await sh('sh ./configure && grep "^VERSION = " Makefile');
   assert.equal(conf.status, 0, `sh ./configure with grep, sed and gawk: ${conf.all}`);
   assert.match(conf.stdout, /\nVERSION = 1\.0\n$/, conf.all);
-  console.log(`automake: 1.17 on wasix-autoconf ${realm} (the pinned one); aclocal/autoconf/automake --add-missing without grep, sed or awk; configure with them writes VERSION = 1.0`);
+  console.log(`automake: 1.17 on wasix-autoconf ${realm} and wasix-perl ${realmPerl} (the pinned ones, one perl); aclocal/autoconf/automake --add-missing without grep, sed or awk; configure with them writes VERSION = 1.0`);
 }
