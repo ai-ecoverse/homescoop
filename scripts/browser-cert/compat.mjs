@@ -594,6 +594,13 @@ function refPasses(f, ref) {
   return lookup(ref, f) === 'pass';
 }
 
+export function splitOnReference(open, ref) {
+  const same = [];
+  const rest = [];
+  for (const f of open) (lookup(ref, f) === 'fail' ? same : rest).push(f);
+  return { same, rest };
+}
+
 export function compareOnReference(f, ref) {
   const tries = [ref, ref.other].filter(Boolean);
   const seen = tries.map((r) => lookup(r, f));
@@ -651,10 +658,21 @@ function shard(args) {
       let cand = certRun({ ...base, label: 'candidate', kernelFile: candidateFile });
       let fails = failuresOf(cand);
       const attempts = [cand.log];
-      if (fails.some((f) => !limitOf(f))) {
-        const again = certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile, specs: rerun(fails.filter((f) => !limitOf(f))) });
+      let earlyRef = null;
+      const unlimited = fails.filter((f) => !limitOf(f));
+      if (unlimited.length && !sameKernel) {
+        earlyRef = certRun({ ...base, label: 'reference', kernelFile: referenceFile, specs: rerun(unlimited) });
+        const { same } = splitOnReference(unlimited, earlyRef);
+        for (const f of same) {
+          Object.assign(f, { verdict: 'known', reference: 'fail', why: 'fails the same way on the reference kernel', retrySkipped: true });
+          console.log(`${e.id} ${f.spec} ${f.key}: retry skipped: the reference fails the same way`);
+        }
+      }
+      const toRetry = unlimited.filter((f) => !f.retrySkipped);
+      if (toRetry.length) {
+        const again = certRun({ ...base, label: 'candidate-retry', kernelFile: candidateFile, specs: rerun(toRetry) });
         attempts.push(again.log);
-        fails = fails.map((f) => (stillFails(f, again) ? f : { ...f, flaky: true }));
+        fails = fails.map((f) => (f.retrySkipped || !toRetry.includes(f) || stillFails(f, again) ? f : { ...f, flaky: true }));
       }
       result.status = fails.some((f) => !f.flaky) ? 'fail' : 'pass';
       result.log = cand.log;
@@ -663,16 +681,19 @@ function shard(args) {
       result.modes = cand.modes ?? null;
       const open = [];
       for (const f of fails) {
-        if (f.flaky) continue;
+        if (f.flaky || f.retrySkipped) continue;
         const limit = limitOf(f);
         if (limit) Object.assign(f, { verdict: 'known', limit });
         else open.push(f);
+      }
+      if (earlyRef && !open.length) {
+        result.reference = { status: earlyRef.status, log: earlyRef.log, attempts: [earlyRef.log], error: earlyRef.error || null };
       }
       if (open.length) {
         if (sameKernel) {
           for (const f of open) Object.assign(f, { verdict: 'known', why: 'the candidate is the reference kernel' });
         } else {
-          let ref = certRun({ ...base, label: 'reference', kernelFile: referenceFile, specs: rerun(open) });
+          let ref = earlyRef || certRun({ ...base, label: 'reference', kernelFile: referenceFile, specs: rerun(open) });
           const refAttempts = [ref.log];
           if (open.some((f) => !refPasses(f, ref))) {
             const again = certRun({ ...base, label: 'reference-retry', kernelFile: referenceFile, specs: rerun(open.filter((f) => !refPasses(f, ref))) });
@@ -698,6 +719,7 @@ function shard(args) {
         ...(f.why ? { why: f.why } : {}),
         ...(f.limit ? { limit: f.limit } : {}),
         ...(f.reference ? { reference: f.reference } : {}),
+        ...(f.retrySkipped ? { retry: 'skipped: the reference fails the same way' } : {}),
       });
       result.specs = [
         ...cand.specs.map((sp) => {
