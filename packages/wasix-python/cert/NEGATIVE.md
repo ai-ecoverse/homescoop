@@ -151,3 +151,21 @@ script and a subprocess inside the venv, and a chained user sitecustomize.
 ## 3.14.2-22: engines >= 1.100.0 (homescoop#567)
 
 cert-review of #530's first head (05b81d7e) found that on slicc-kernel 1.99.2, which the old `engines` (>=1.51.0) admitted, two python processes on one database lost an acknowledged row. B's insert returned ok, A's commit got `disk I/O error`, and the table ended `[0, 1]`. The cause is that the unix VFS takes `fcntl` locks, and without `slicc.fcntl_lock` the libc grants them locally. `engines` is now `>=1.100.0`. `locks.mjs` no longer accepts local locks (the `PY_LOCKS_LOCAL=1` branch is gone), so on 1.99.2 it fails at `another process got LOCK_EX while this one held it` instead of passing.
+
+## 3.14.2-23: negative 3.14.2-21/-22 (homescoop#515, #516)
+
+The published 3.14.2-21 (npm sha512-JZN9ayQh…) on slicc-kernel 1.100.4's Node entry, 2026-10-16. -22 changes only sqlite's VFS, so it behaves the same here.
+
+- **`mp-manager.mjs` fails at its first step.** `getsockname()` of a bound AF_UNIX socket, the client's `getpeername()` and the accept address are all `(0, b'')`: wasix-libc's `wasi_to_sockaddr` never copied the AF_UNIX address into the caller's buffer. `mp.Manager()` then dies at the first proxy call, rc 1:
+  ```
+  TypeError: str, bytes or bytearray expected, not int
+  ```
+  With the libc fix simulated (`getsockname` patched in Python) but no listener patch, the Manager works and the manager process prints `FileNotFoundError: [Errno 44] No such file or directory: '/tmp/pymp-…/sock-…'` from its finalizer at exit. That's what `cpython-multiprocessing-unix-listener-wasix.patch` stops.
+- **`mp-limits.mjs` fails on its first assertion.** Its output on -21:
+  ```
+  {"methods": ["spawn", "fork", "forkserver"], "start": "spawn", "fork": ["ok", "fork"],
+   "forkserver": ["ValueError", "forkserver start method not available"],
+   "value": [["ok", 0], 1, [1, 2]], "threads": 400, "shm": ["ok", "psm_3c00c7ba"],
+   "has_shmem": true, "executor": [0, 1, 8, 27, 64]}
+  ```
+  The child's `v.value += 5` and `a[0] = 9` are lost silently (start() and exit 0, the parent still sees 1 and [1, 2]). `shared_memory` imports and creates a segment, and the resource tracker then warns about a leaked shared_memory object at shutdown.
