@@ -23,9 +23,11 @@
  */
 #include <ctype.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+#include "mbedtls/asn1.h"
 #include "mbedtls/error.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/platform.h"
@@ -86,8 +88,71 @@ static void leaf_release(leaf *l) {
 
 EMSCRIPTEN_KEEPALIVE int tls_last_error(void) { return last_error; }
 
+/* Mbed TLS 4's mbedtls_strerror names TLS and X.509 errors only: TF-PSA-Crypto
+ * has no English text, so PSA's, PK's and ASN.1's codes come back as
+ * "UNKNOWN ERROR CODE (…)". Name those a leaf can hit (PK's and ASN.1's in
+ * 3.6's words). */
+static const char *crypto_strerror(int code) {
+  switch (code) {
+    case PSA_ERROR_GENERIC_ERROR: return "PSA - Generic error";
+    case PSA_ERROR_NOT_PERMITTED: return "PSA - Not permitted";
+    case PSA_ERROR_NOT_SUPPORTED: return "PSA - Not supported";
+    case PSA_ERROR_INVALID_ARGUMENT: return "PSA - Invalid argument";
+    case PSA_ERROR_INVALID_HANDLE: return "PSA - Invalid handle";
+    case PSA_ERROR_BAD_STATE: return "PSA - Bad state";
+    case PSA_ERROR_BUFFER_TOO_SMALL: return "PSA - Buffer too small";
+    case PSA_ERROR_ALREADY_EXISTS: return "PSA - Already exists";
+    case PSA_ERROR_DOES_NOT_EXIST: return "PSA - Does not exist";
+    case PSA_ERROR_INSUFFICIENT_MEMORY: return "PSA - Insufficient memory";
+    case PSA_ERROR_INSUFFICIENT_STORAGE: return "PSA - Insufficient storage";
+    case PSA_ERROR_INSUFFICIENT_DATA: return "PSA - Insufficient data";
+    case PSA_ERROR_SERVICE_FAILURE: return "PSA - Service failure";
+    case PSA_ERROR_COMMUNICATION_FAILURE: return "PSA - Communication failure";
+    case PSA_ERROR_STORAGE_FAILURE: return "PSA - Storage failure";
+    case PSA_ERROR_HARDWARE_FAILURE: return "PSA - Hardware failure";
+    case PSA_ERROR_INSUFFICIENT_ENTROPY: return "PSA - Insufficient entropy";
+    case PSA_ERROR_INVALID_SIGNATURE: return "PSA - Invalid signature";
+    case PSA_ERROR_INVALID_PADDING: return "PSA - Invalid padding";
+    case PSA_ERROR_CORRUPTION_DETECTED: return "PSA - Corruption detected";
+    case PSA_ERROR_DATA_CORRUPT: return "PSA - Data corrupt";
+    case PSA_ERROR_DATA_INVALID: return "PSA - Data invalid";
+    case PSA_OPERATION_INCOMPLETE: return "PSA - Operation incomplete";
+    case MBEDTLS_ERR_PK_TYPE_MISMATCH: return "PK - Type mismatch, eg attempt to encrypt with an ECDSA key";
+    case MBEDTLS_ERR_PK_FILE_IO_ERROR: return "PK - Read/write of file failed";
+    case MBEDTLS_ERR_PK_KEY_INVALID_VERSION: return "PK - Unsupported key version";
+    case MBEDTLS_ERR_PK_KEY_INVALID_FORMAT: return "PK - Invalid key tag or value";
+    case MBEDTLS_ERR_PK_UNKNOWN_PK_ALG: return "PK - Key algorithm is unsupported (only RSA and EC are supported)";
+    case MBEDTLS_ERR_PK_PASSWORD_REQUIRED: return "PK - Private key password can't be empty";
+    case MBEDTLS_ERR_PK_PASSWORD_MISMATCH: return "PK - Given private key password does not allow for correct decryption";
+    case MBEDTLS_ERR_PK_INVALID_PUBKEY: return "PK - The pubkey tag or value is invalid (only RSA and EC are supported)";
+    case MBEDTLS_ERR_PK_INVALID_ALG: return "PK - The algorithm tag or value is invalid";
+    case MBEDTLS_ERR_PK_UNKNOWN_NAMED_CURVE: return "PK - Elliptic curve is unsupported (only NIST curves are supported)";
+    case MBEDTLS_ERR_PK_FEATURE_UNAVAILABLE: return "PK - Unavailable feature, e.g. RSA disabled for RSA key";
+    case MBEDTLS_ERR_ASN1_OUT_OF_DATA: return "ASN1 - Out of data when parsing an ASN1 data structure";
+    case MBEDTLS_ERR_ASN1_UNEXPECTED_TAG: return "ASN1 - ASN1 tag was of an unexpected value";
+    case MBEDTLS_ERR_ASN1_INVALID_LENGTH: return "ASN1 - Error when trying to determine the length or invalid length";
+    case MBEDTLS_ERR_ASN1_LENGTH_MISMATCH: return "ASN1 - Actual length differs from expected length";
+    case MBEDTLS_ERR_ASN1_INVALID_DATA: return "ASN1 - Data is invalid";
+  }
+  return NULL;
+}
+
 EMSCRIPTEN_KEEPALIVE void tls_strerror(int code, char *out, size_t max) {
-  mbedtls_strerror(code, out, max);
+  if (max == 0) return;
+  const char *text = crypto_strerror(code);
+  if (text) {
+    snprintf(out, max, "%s", text);
+    return;
+  }
+  /* An X.509 error with an ASN.1 cause (high + low level). */
+  int magnitude = code < 0 ? -code : code;
+  int high = magnitude & 0xFF80, low = magnitude & 0x7F;
+  const char *cause = high && low ? crypto_strerror(-low) : NULL;
+  mbedtls_strerror(cause ? -high : code, out, max);
+  if (cause) {
+    size_t n = strlen(out);
+    if (n + 3 < max) snprintf(out + n, max - n, " : %s", cause);
+  }
 }
 
 /* A new P-256 key pair; 0 on failure (tls_last_error). PSA generates it; the
