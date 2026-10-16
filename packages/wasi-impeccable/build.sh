@@ -35,28 +35,32 @@ fi
 rustup toolchain install "$RUST" --profile minimal --target "$TARGET"
 CARGO=(cargo "+$RUST")
 
-OUT="$WORK/wasi-impeccable-${VERSION}"
+# Panic locations name source files: map the work directory, CARGO_HOME
+# (the registry crates) and the toolchain's sysroot away, so the bytes
+# don't depend on where the build ran (homescoop#471). Cargo hands rustc
+# physical paths (macOS: /private/tmp/…), so map that spelling too.
+SYSROOT="$("${CARGO[@]/cargo/rustc}" --print sysroot)"
+CARGO_DIR="${CARGO_HOME:-$HOME/.cargo}"
+mkdir -p "$CARGO_DIR"
+REMAP=(
+  "--remap-path-prefix=$SRC_DIR=/impeccable"
+  "--remap-path-prefix=$(cd "$SRC_DIR" && pwd -P)=/impeccable"
+  "--remap-path-prefix=$CARGO_DIR=/cargo"
+  "--remap-path-prefix=$(cd "$CARGO_DIR" && pwd -P)=/cargo"
+  "--remap-path-prefix=$SYSROOT=/rustc"
+)
+# The cached wasm is keyed by what goes into it (toolchain, target, flags,
+# the patch), not only the upstream version, so a changed build reruns.
+KEY="$( { printf '%s\n' "$RUST" "$TARGET" "${REMAP[@]}"; cat "$HOMESCOOP_PKG"/*.patch; } | shasum -a 256 | cut -c1-12)"
+OUT="$WORK/wasi-impeccable-${VERSION}-$KEY"
 mkdir -p "$OUT/bin"
 
 if [[ ! -f "$OUT/bin/impeccable.wasm" || -n "${FORCE:-}" ]]; then
   echo "== wasi-impeccable: cargo build -p impeccable ($TARGET, stripped)"
-  # Panic locations name source files: map the work directory, CARGO_HOME
-  # (the registry crates) and the toolchain's sysroot away, so the bytes
-  # don't depend on where the build ran (homescoop#471). Cargo hands rustc
-  # physical paths (macOS: /private/tmp/…), so map that spelling too.
-  SYSROOT="$("${CARGO[@]/cargo/rustc}" --print sysroot)"
-  CARGO_DIR="${CARGO_HOME:-$HOME/.cargo}"
-  mkdir -p "$CARGO_DIR"
-  REMAP=(
-    "--remap-path-prefix=$SRC_DIR=/impeccable"
-    "--remap-path-prefix=$(cd "$SRC_DIR" && pwd -P)=/impeccable"
-    "--remap-path-prefix=$CARGO_DIR=/cargo"
-    "--remap-path-prefix=$(cd "$CARGO_DIR" && pwd -P)=/cargo"
-    "--remap-path-prefix=$SYSROOT=/rustc"
-  )
   (
     cd "$SRC_DIR"
-    RUSTFLAGS="${REMAP[*]}" \
+    # CARGO_ENCODED_RUSTFLAGS keeps each flag whole, spaces in paths included.
+    CARGO_ENCODED_RUSTFLAGS="$(IFS=$'\x1f'; printf '%s' "${REMAP[*]}")" \
     CARGO_PROFILE_RELEASE_DEBUG=0 \
     CARGO_PROFILE_RELEASE_STRIP=true \
       "${CARGO[@]}" build --release -p impeccable --target "$TARGET"
