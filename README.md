@@ -80,7 +80,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-sed` | host | **4.9.0-3** |
 | `@ai-ecoverse/wasm-grep` | host | **3.12.0-3** |
 | `@ai-ecoverse/wasm-gawk` | host | **5.3.2-3** (`gawk` + `awk`) |
-| `@ai-ecoverse/wasm-less` | host | **668.0.0-2** (static ncursesw fallbacks) |
+| `@ai-ecoverse/wasm-less` | host | **668.0.0-3** (static ncursesw fallbacks) |
 | `@ai-ecoverse/wasm-sqlite3` | host | **3.54.0-3** (shell amalgamation) |
 | `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-34-4** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7; LGPL relink kit for libiconv) |
 | `@ai-ecoverse/wasm-imagemagick-heif` | host | **7.1.2-34-4**: wasm-imagemagick `--with-heic` linked against wasm-libheif (HEIC/HEIF/AVIF read), same commands. **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
@@ -91,8 +91,8 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-patch` | host | **2.8.0-1** |
 | `@ai-ecoverse/wasm-xxd` | host | **9.1.1850** |
 | `@ai-ecoverse/wasm-binutils` | host | **2.47.0-3** (`strings` / `size` / `readelf`; BFD x86-64/aarch64 ELF + wasm; nm/ar/strip are in wasm-clang) |
-| `@ai-ecoverse/wasm-ncurses-utils` | host | **6.5.0-1** (`clear` / `tput` / `tset` / `reset`; terminfo db via `slicc.env` TERMINFO) |
-| `@ai-ecoverse/wasm-mount` | host | **1.0.0-1** (`mount` / `umount`; in-tree, needs slicc-kernel ≥ 1.17.0 process mounts) |
+| `@ai-ecoverse/wasm-ncurses-utils` | host | **6.5.0-2** (`clear` / `tput` / `tset` / `reset`; terminfo db via `slicc.env` TERMINFO) |
+| `@ai-ecoverse/wasm-mount` | host | **1.0.0-2** (`mount` / `umount`; in-tree, needs slicc-kernel ≥ 1.17.0 process mounts) |
 | `@ai-ecoverse/wasm-tree` | host | **2.3.2-1** (`tree`; emcc on the plain Makefile sources) |
 | `@ai-ecoverse/wasm-util-linux` | host | **2.42.4-1** (`rev` / `column` / `getopt` / `hexdump` / `colrm` / `look`; no mount/libmount/libblkid) |
 | `@ai-ecoverse/wasm-qpdf` | host | **12.4.2-1** (`qpdf` / `fix-qdf` / `zlib-flate`; native crypto, zlib + libjpeg-turbo; replaces pdftk) |
