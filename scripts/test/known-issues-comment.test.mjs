@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { matchIssues, renderComment, titleLead, MARKER } from '../known-issues-comment.mjs';
+import { matchIssues, renderComment, titleLead, findOwnComment, MARKER, BOT } from '../known-issues-comment.mjs';
 
 function fixture(fn) {
   const root = mkdtempSync(join(tmpdir(), 'homescoop-known-'));
@@ -62,4 +62,14 @@ test('renderComment: one marked comment; a "none" body when nothing matches', ()
     assert.ok(none.startsWith(MARKER));
     assert.match(none, /No open `next-build` issue names a package this PR touches \(`file`\)/);
   });
+});
+
+test('findOwnComment: only the bot\'s marked comment, not a marker comment from someone else', () => {
+  const comments = [
+    { id: 1, user: { login: 'mallory' }, body: `${MARKER}\nmine now` },
+    { id: 2, user: { login: BOT }, body: 'unrelated bot comment' },
+    { id: 3, user: { login: BOT }, body: `${MARKER}\n### Known issues` },
+  ];
+  assert.equal(findOwnComment(comments)?.id, 3);
+  assert.equal(findOwnComment(comments.slice(0, 2)), undefined);
 });

@@ -9,7 +9,8 @@
  *       print the comment body (issues.json: gh issue list --json number,title)
  *   node scripts/known-issues-comment.mjs --base A --head B --pr N [--repo owner/name]
  *       list touched packages and next-build issues with gh, then create or
- *       update the one PR comment (found by its marker; never a new one per push)
+ *       update the one PR comment (found by its marker and github-actions[bot] as
+ *       author, or --bot <login>; never a new one per push)
  *
  * A package is named by an issue when its title contains the npm name
  * (`@ai-ecoverse/wasm-sed` or `wasm-sed`) or `packages/<dir>`, or the bare
@@ -104,8 +105,21 @@ export function renderComment(matches) {
   return lines.join('\n') + '\n';
 }
 
+export const BOT = 'github-actions[bot]';
+
+/**
+ * The job's own earlier comment: the marker, written by the workflow token's
+ * identity, so nobody else's comment that starts with the marker is taken over.
+ * @param {{ id: number, body?: string, user?: { login?: string } }[]} comments
+ * @param {string} login
+ */
+export function findOwnComment(comments, login = BOT) {
+  return comments.find((c) => c.user?.login === login && typeof c.body === 'string' && c.body.startsWith(MARKER));
+}
+
 function gh(args, input) {
   const r = spawnSync('gh', args, { encoding: 'utf8', input, maxBuffer: 64 << 20 });
+  if (r.error) throw new Error(`gh ${args.slice(0, 3).join(' ')}: ${r.error.message}`);
   if (r.status !== 0) throw new Error(`gh ${args.slice(0, 3).join(' ')}: ${(r.stderr || r.stdout).trim()}`);
   return r.stdout;
 }
@@ -144,7 +158,7 @@ function main(argv) {
   const comments = JSON.parse(
     gh(['api', '--paginate', '--slurp', `repos/${repo}/issues/${opt.pr}/comments?per_page=100`])
   ).flat();
-  const mine = comments.find((c) => typeof c.body === 'string' && c.body.startsWith(MARKER));
+  const mine = findOwnComment(comments, opt.bot || BOT);
   const any = matches.some((m) => m.issues.length);
   if (!mine && !any) {
     console.error('known-issues: nothing to report and no earlier comment; not commenting');

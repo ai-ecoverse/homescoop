@@ -524,7 +524,8 @@ jobs:
   known-issues:
     if: github.event_name == 'pull_request'
     continue-on-error: true
-    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    # ubuntu-latest has gh; the light pool may not (cert-review installs it).
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: read
