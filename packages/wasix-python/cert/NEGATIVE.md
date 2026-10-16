@@ -169,3 +169,4 @@ The published 3.14.2-21 (npm sha512-JZN9ayQh…) on slicc-kernel 1.100.4's Node 
    "has_shmem": true, "executor": [0, 1, 8, 27, 64]}
   ```
   The child's `v.value += 5` and `a[0] = 9` are lost silently (start() and exit 0, the parent still sees 1 and [1, 2]). `shared_memory` imports and creates a segment, and the resource tracker then warns about a leaked shared_memory object at shutdown.
+- **`native-id.mjs` fails at its first assertion.** On -21 `hasattr(threading, "get_native_id")` is False, and the scipy part (`scipy.fft.set_backend("scipy")`, py-scipy 1.18.0-11) raises `AttributeError: module 'threading' has no attribute 'get_native_id'` (homescoop#587). With `get_native_id` monkeypatched in, the same scipy calls give fft `[6, -1.5+0.866j, -1.5-0.866j]`, so the rest of the spec doesn't depend on anything else.

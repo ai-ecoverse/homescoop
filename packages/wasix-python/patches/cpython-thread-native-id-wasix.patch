@@ -1,0 +1,37 @@
+WASIX: threading.get_native_id() and Thread.native_id, from WASIX's
+thread_id (the kernel's id of the thread within its process). Upstream
+WASI has no PY_HAVE_THREAD_NATIVE_ID, so threading.get_native_id was
+missing and scipy.fft.set_backend (uarray) raised AttributeError.
+
+--- a/Include/pythread.h
++++ b/Include/pythread.h
+@@ -42,7 +42,7 @@ PyAPI_FUNC(unsigned long) PyThread_get_thread_ident(void);
+ #if (defined(__APPLE__) || defined(__linux__) || defined(_WIN32) \
+      || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) \
+      || defined(__OpenBSD__) || defined(__NetBSD__) \
+-     || defined(__DragonFly__) || defined(_AIX))
++     || defined(__DragonFly__) || defined(_AIX) || defined(__wasi__))
+ #define PY_HAVE_THREAD_NATIVE_ID
+ PyAPI_FUNC(unsigned long) PyThread_get_thread_native_id(void);
+ #endif
+--- a/Python/thread_pthread.h
++++ b/Python/thread_pthread.h
+@@ -30,6 +30,8 @@
+ #   include <lwp.h>             /* _lwp_self() */
+ #elif defined(__DragonFly__)
+ #   include <sys/lwp.h>         /* lwp_gettid() */
++#elif defined(__wasi__)
++#   include <wasi/api.h>
+ #endif
+ 
+ /* The POSIX spec requires that use of pthread_attr_setstacksize
+@@ -409,6 +411,9 @@ PyThread_get_thread_native_id(void)
+ #elif defined(__DragonFly__)
+     lwpid_t native_id;
+     native_id = lwp_gettid();
++#elif defined(__wasi__)
++    __wasi_tid_t native_id = 0;
++    (void) __wasi_thread_id(&native_id);
+ #endif
+     return (unsigned long) native_id;
+ }

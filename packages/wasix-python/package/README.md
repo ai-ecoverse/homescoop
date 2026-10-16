@@ -28,6 +28,9 @@ Since 3.14.2-23 (wasix-sysroot -31):
   fixes that for every WASIX program; homescoop#515). slicc-kernel keeps
   socket paths out of the filesystem (slicc-kernel#753), so the listener no
   longer fails when the path it unlinks at close is already gone.
+- `threading.get_native_id()` and `Thread.native_id` exist (WASIX's thread id;
+  homescoop#587). Up to -22 they were missing or `None`, and
+  `scipy.fft.set_backend`/`skip_backend` raised `AttributeError`.
 - **Shared memory fails loudly instead of silently** (homescoop#516).
   Processes share no memory here, so nothing written into an `mp.Value`,
   `mp.Array` (with or without a lock) or `SharedMemory` ever reached another

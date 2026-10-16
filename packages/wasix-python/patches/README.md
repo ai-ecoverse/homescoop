@@ -143,3 +143,14 @@ slicc-kernel keeps path-bound AF_UNIX sockets out of the filesystem
 ENOENT, and `multiprocessing.Manager()` printed a traceback from its
 finalizer at exit (homescoop#515). On WASI the unlink tolerates a missing
 path.
+
+## `cpython-thread-native-id-wasix.patch` (wasix-python 3.14.2-23)
+
+CPython defines `PY_HAVE_THREAD_NATIVE_ID` only for Linux, macOS, Windows,
+the BSDs and AIX, so WASI builds had no `threading.get_native_id()` and
+`Thread.native_id` was `None`; scipy's uarray (`scipy.fft.set_backend`)
+raised `AttributeError` (homescoop#587). WASIX has a per-thread id
+(`__wasi_thread_id`, `wasix_32v1.thread_id`): the patch defines the macro
+for `__wasi__` and returns that id. Within a process it is unique per live
+thread (slicc-kernel: 1 for the main thread, then 2, 3, …); unlike Linux it
+is not system-wide.
