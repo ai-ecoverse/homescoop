@@ -39,3 +39,12 @@ about:
     include/ and share/libheif/relink (see README). dav1d decodes AVIF.
     No encoders (no x265, no aom), no plugin loading, no threads. The
     examples (heif-dec, heif-info) are MIT; heif-convert is heif-dec.
+    1.23.6-2: the relink kit's js/ holds every --js-library of the link
+    flags, not just slicc-writev.js (homescoop#398: main's CLI flags also
+    name slicc-linkat.js and slicc-uname.js, so relink.sh failed on a
+    rebuild); relink-check checks that ldflags.txt names only files in the
+    kit (no build-host path). heif-dec and heif-info link at -O2 (the
+    libraries stay -O3): at -O3 emcc minified the wasm's import and export
+    names, so check-slicc-cred (homescoop#459) could not see the slicc
+    credential library, nor slicc-kernel the slicc_* exports. Rebuilt with
+    main's slicc shims (credentials, linkat, uname).

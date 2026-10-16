@@ -68,8 +68,9 @@ everything you need to relink them against your own build of either library:
   `include/libde265`, `include/dav1d` and `lib/pkgconfig/*.pc`;
 - `share/libheif/relink/`: the application objects (`heif-dec.a`,
   `heif-info.a`, `libheifio.a`), the other static libraries they use
-  (`libpng16.a`, `libjpeg.a`, `libz.a`, `libslicc-gaps.a`), the slicc link
-  flags (`ldflags.txt`, `js/`) and `relink.sh`.
+  (`libpng16.a`, `libjpeg.a`, `libz.a`, `libslicc-gaps.a`,
+  `libslicc_cred.a`), the slicc link flags (`ldflags.txt`, with every
+  `--js-library` they name in `js/`) and `relink.sh`.
 
 With Emscripten 4.0.23 (`emcc` on PATH):
 

@@ -10,7 +10,7 @@ mkdir -p "$OUT"
 cd "$HERE"
 read -r -a FLAGS <ldflags.txt
 for t in heif-dec heif-info; do
-  em++ -O3 -fexceptions -o "$OUT/$t.js" \
+  em++ -O2 -fexceptions -o "$OUT/$t.js" \
     -Wl,--whole-archive "$HERE/$t.a" -Wl,--no-whole-archive \
     "$HERE/libheifio.a" "$HEIF_A" "$DE265_A" "$DAV1D_A" \
     "$HERE/libpng16.a" "$HERE/libjpeg.a" "$HERE/libz.a" \

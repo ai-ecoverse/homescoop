@@ -90,7 +90,11 @@ HEIF_BLD="$WORK/libheif-build"
 SLICC_A="$WORK/libslicc-libheif.a"
 homescoop_slicc_archive "$SLICC_A" gaps
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=2097152 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -lnodefs.js -fexceptions"
-EXE_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
+# -O2 last: CMAKE_BUILD_TYPE=Release links with -O3, where emcc minifies the
+# wasm's import and export names, so slicc_sig_mask, slicc_cred_euid and
+# slicc_cred_js lose their names (check-slicc-cred, homescoop#459). The
+# libraries stay at -O3; only the link of heif-dec and heif-info is -O2.
+EXE_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive -O2"
 
 if [[ ! -f "$HEIF_BLD/examples/heif-dec.wasm" || ! -f "$HEIF_BLD/examples/heif-info.wasm" ]]; then
   echo "== libheif $VERSION: emcmake (static, libde265 + dav1d built in, no plugins, no threads)"
@@ -163,10 +167,34 @@ for t in heif-dec heif-info; do
   emar rcs "$PKGDIR/share/libheif/relink/$t.a" "${objs[@]}"
 done
 cp "$HOMESCOOP_PKG/relink.sh" "$PKGDIR/share/libheif/relink/relink.sh"
-cp "$SLICC_A" "$PKGDIR/share/libheif/relink/libslicc-gaps.a"
-printf '%s\n' "$EXE_LDFLAGS" | sed "s#$SLICC_A#libslicc-gaps.a#g; s#$(homescoop_slicc_dir)/#js/#g" >"$PKGDIR/share/libheif/relink/ldflags.txt"
-mkdir -p "$PKGDIR/share/libheif/relink/js"
-cp "$(homescoop_slicc_dir)/slicc-writev.js" "$PKGDIR/share/libheif/relink/js/"
+# Every file the link flags name by absolute path goes into the kit and is named
+# relative to it (homescoop#398): each --js-library into js/ (the CLI flags
+# gained slicc-linkat.js and slicc-uname.js), the slicc archive as
+# libslicc-gaps.a, and the credential library (homescoop#459).
+KIT="$PKGDIR/share/libheif/relink"
+mkdir -p "$KIT/js"
+read -r -a words <<<"$EXE_LDFLAGS"
+out=()
+prev=""
+for t in "${words[@]}"; do
+  if [[ "$prev" == "--js-library" ]]; then
+    cp "$t" "$KIT/js/"
+    out+=("js/$(basename "$t")")
+  elif [[ "$t" == "$SLICC_A" ]]; then
+    cp "$t" "$KIT/libslicc-gaps.a"
+    out+=("libslicc-gaps.a")
+  elif [[ "$t" == /* ]]; then
+    test -f "$t" || { echo "homescoop: link flag $t is not a file" >&2; exit 1; }
+    cp "$t" "$KIT/$(basename "$t")"
+    out+=("$(basename "$t")")
+  else
+    out+=("$t")
+  fi
+  prev="$t"
+done
+printf '%s\n' "${out[*]}" >"$KIT/ldflags.txt"
+if grep -Eq '(^| )/' "$KIT/ldflags.txt"; then echo "homescoop: $KIT/ldflags.txt names an absolute path" >&2; exit 1; fi
+test -f "$KIT/js/slicc-writev.js"
 for a in libz.a libjpeg.a libpng16.a; do cp "$PREFIX/lib/$a" "$PKGDIR/share/libheif/relink/$a"; done
 
 LIC="$WORK/libheif-licenses"
