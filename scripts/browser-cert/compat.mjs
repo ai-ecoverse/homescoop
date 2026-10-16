@@ -491,7 +491,15 @@ async function plan(args) {
   output('homescoop-sha', homescoopSha);
 }
 
-function installNeeds(recipe, nm, work) {
+export function repackPeer(peer, { dir = root } = {}) {
+  const r = spawnSync(process.execPath, [join(dir, 'scripts/read-recipe.mjs'), peer, '--json'], { cwd: dir, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error(`needsRepack ${peer}: no recipe (${(r.stderr || r.stdout).trim().split('\n')[0]})`);
+  if (JSON.parse(r.stdout).repack?.from) return { kind: 'repack' };
+  const pj = readJson(join(dir, 'packages', peer, 'package', 'package.json'));
+  return { kind: 'published', spec: `${pj.name}@${pj.version}` };
+}
+
+export function installNeeds(recipe, nm, work) {
   const metaPath = join(root, 'packages', recipe, 'cert', 'meta.json');
   const meta = existsSync(metaPath) ? readJson(metaPath) : {};
   const npmInstall = (specs) =>
@@ -505,6 +513,12 @@ function installNeeds(recipe, nm, work) {
   }
   const repacked = [];
   for (const peer of meta.needsRepack || []) {
+    const plan = repackPeer(peer);
+    if (plan.kind === 'published') {
+      console.log(`::warning::${recipe}: needsRepack ${peer} has no repack.from (it builds from source now); installing the published ${plan.spec}. Move it to needs/needsInstall in packages/${recipe}/cert/meta.json`);
+      npmInstall([plan.spec]);
+      continue;
+    }
     const dir = join(work, 'repack', peer);
     must(process.execPath, [join(root, 'scripts/repack-published.mjs'), peer, '--out', dir], { cwd: root });
     console.log(`needsRepack ${peer} sha256 ${readFileSync(join(dir, 'package.tgz.sha256'), 'utf8').split(' ')[0]}`);

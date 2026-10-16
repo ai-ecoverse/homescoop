@@ -281,7 +281,10 @@ pool each gets a machine within about a minute.
    - each package through `scripts/browser-cert/run.mjs --kernel
      candidate.tgz --users <meta.json users, else off>`, with `needsInstall` /
      `needs` / `needsTarballScripts` / `needsRepack` installed as `ladder-pr`
-     does, with `--soft` (below). A failed case no known limit covers is
+     does (a `needsRepack` peer whose recipe has no `repack.from` any more is
+     installed at its published version, with a `::warning::`; exact-pins'
+     `scripts/test/cert-needs.test.mjs` fails a PR that leaves one in a
+     `cert/meta.json`, #600), with `--soft` (below). A failed case no known limit covers is
      retried once (one that passes the second time passes, marked flaky),
      then run on the reference kernel. Retries and reference runs repeat
      only the spec files with open failures (`run.mjs --spec`), not the
