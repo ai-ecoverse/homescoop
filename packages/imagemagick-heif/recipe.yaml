@@ -1,5 +1,6 @@
 name: imagemagick-heif
 builder: host
+runner: pool
 # Shared with packages/imagemagick: build.sh copies its policy-tab.xml and
 # applies its patches, and cert/ re-exports its specs and uses its cert/lib.
 inputs:

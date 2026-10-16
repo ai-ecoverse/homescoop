@@ -3,7 +3,6 @@
 # npth are built from their own tarballs in build.sh (versions + sha256 there).
 name: wasix-gnupg
 builder: host
-runner: pool
 version: "2.4.9"
 npm: "@ai-ecoverse/wasix-gnupg"
 summary: "GnuPG 2.4 for slicc WASIX (gpg, gpg-agent, gpgconf)"

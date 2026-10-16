@@ -1,7 +1,6 @@
 # Info-ZIP zip 3.0 + unzip 6.0 for slicc wasm realm.
 name: zip
 builder: host
-runner: pool
 reproducible: true
 version: "3.0.0"
 npm: "@ai-ecoverse/wasm-zip"

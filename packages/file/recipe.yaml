@@ -1,7 +1,6 @@
 # file(1) for slicc wasm realm (libmagic + magic.mgc).
 name: file
 builder: host
-runner: pool
 # renovate: datasource=github-tags depName=file/file extractVersion=^FILE(?<version>.*)$
 version: "5.46"
 npm: "@ai-ecoverse/wasm-file"

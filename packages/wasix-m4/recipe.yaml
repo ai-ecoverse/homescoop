@@ -1,7 +1,6 @@
 # GNU m4 for slicc WASIX (autoconf dependency).
 name: wasix-m4
 builder: host
-runner: pool
 version: "1.4.20"
 npm: "@ai-ecoverse/wasix-m4"
 summary: "GNU m4 for slicc WASIX (command m4)"

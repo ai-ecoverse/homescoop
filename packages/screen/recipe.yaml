@@ -1,7 +1,6 @@
 # GNU screen — Emscripten ABI (PTY ioctls via musl + SLICC #3733 glue).
 name: screen
 builder: host
-runner: pool
 version: "5.0.1"
 npm: "@ai-ecoverse/wasm-screen"
 summary: "GNU screen 5.0.1 for slicc (emscripten; asyncify fork; slicc-kernel pseudo-terminals)"

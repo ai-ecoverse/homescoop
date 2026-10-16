@@ -2,7 +2,6 @@
 # ssh-keygen; scp/sftp/agent later if cheap. No sshd in the package.
 name: wasix-openssh
 builder: host
-runner: pool
 # Portable tarball is openssh-10.6p1; npm base is 10.6.0 (see docs/versioning.md).
 # Renovate: manual — OpenBSD portable tags are V_X_Y_PZ, not semver.
 version: "10.6.0"

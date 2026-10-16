@@ -3,7 +3,6 @@
 # host-import module for slicc-kernel.
 name: wasi-pnpm
 builder: host
-runner: pool
 reproducible: true
 version: "12.9.1"
 npm: "@ai-ecoverse/wasi-pnpm"

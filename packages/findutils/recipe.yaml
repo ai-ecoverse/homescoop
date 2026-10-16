@@ -1,7 +1,6 @@
 # GNU findutils for slicc wasm realm (find + xargs; no locate/updatedb).
 name: findutils
 builder: host
-runner: pool
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/findutils.git extractVersion=^v(?<version>.*)$
 version: "4.11.0"
 npm: "@ai-ecoverse/wasm-findutils"

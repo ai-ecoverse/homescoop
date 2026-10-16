@@ -1,7 +1,6 @@
 # xxd hexdump from vim (standalone xxd.c).
 name: xxd
 builder: host
-runner: pool
 # renovate: datasource=github-tags depName=vim/vim extractVersion=^v(?<version>.*)$
 version: "9.2.1192"
 npm: "@ai-ecoverse/wasm-xxd"
