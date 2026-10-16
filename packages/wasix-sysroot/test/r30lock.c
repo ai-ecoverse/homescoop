@@ -37,10 +37,17 @@ int main(void) {
     int r = fcntl(cfd, F_GETLK, &g);
     printf("child getlk: %s type=%d start=%lld len=%lld holder=%s\n", res(r), g.l_type, (long long)g.l_start, (long long)g.l_len, g.l_type == F_UNLCK ? "-" : g.l_pid == me ? "parent" : "other");
     printf("child lockf test: %s\n", res(lockf(cfd, F_TEST, 0)));
-    printf("child setlkw: %s\n", res(lk(cfd, F_SETLKW, F_WRLCK, 0, 1)));
+    // F_SETLKW must not return before the parent's unlock: the parent marks
+    // byte 9 just before it unlocks, so the child sees 'U' only if it waited
+    // (homescoop#526: a check that doesn't depend on whose line prints first).
+    const char *w = res(lk(cfd, F_SETLKW, F_WRLCK, 0, 1));
+    char mark = 0;
+    pread(cfd, &mark, 1, 9);
+    printf("child setlkw: %s after unlock: %s\n", w, mark == 'U' ? "yes" : "no");
     _exit(0);
   }
   usleep(500000);
+  pwrite(fd, "U", 1, 9);
   const char *unlocked = res(lk(fd, F_SETLK, F_UNLCK, 0, 5));
   int st = 0;
   waitpid(p, &st, 0);

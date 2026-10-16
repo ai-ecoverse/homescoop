@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-libjpeg-turbo",
-  "version": "3.1.2-3",
+  "version": "3.1.2-4",
   "description": "libjpeg-turbo JPEG codec (WASM / emscripten, SLICC homescoop ladder)",
   "license": "IJG AND BSD-3-Clause AND Zlib",
   "repository": {

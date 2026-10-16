@@ -1,18 +1,42 @@
 name: py-pillow
 builder: host
+reproducible: true
+# renovate: datasource=pypi depName=pillow
 version: "12.3.0"
 npm: "@ai-ecoverse/py-pillow"
 summary: "Pillow for slicc WASIX CPython 3.14"
-# 12.3.0-8 is packaging-only: 12.3.0-7's bytes with wasix-python as a range,
-# ">=3.14.2-16 <3.14.3" (#702). Drop repack: when the next release rebuilds.
-repack:
-  from: "12.3.0-7"
+source:
+  url: "https://files.pythonhosted.org/packages/source/p/pillow/pillow-{{version}}.tar.gz"
+  sha256: "3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce"
+sources:
+  libjpeg_turbo:
+    url: "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.2/libjpeg-turbo-3.1.2.tar.gz"
+    sha256: "8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf"
+  freetype:
+    url: "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.gz"
+    sha256: "5c3a8e78f7b24c20b25b54ee575d6daa40007a5f4eea2845861c3409b3021747"
+  wasix_zlib:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-zlib/-/wasix-zlib-1.3.1-2.tgz"
+    sha256: "4d0602d7fa1456f09ae668dc90b08a862f2ffeda843556beffbed17614873422"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-25.tgz"
+    sha256: "951f2e2db67d3c6a9e7dc4419e12cf86247ded8d994938ef7d589bbd3dabc38f"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.14.2/Python-3.14.2.tgz"
+    sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
 dependencies:
-  build: [wasix-python, zlib, libjpeg-turbo, freetype]
+  build: [wasix-python]
   host: []
   run: [wasix-python]
 about:
   license: MIT-CMU
   notes: |
-    Cross-built with wasixcc. libjpeg + FreeType statically linked (PIC).
-    zlib resolved from wasix-python. No wasm-* runtime deps.
+    Cross-built from the sdist in CI (homescoop#211 A1) with wasixcc (PIC,
+    legacy wasm EH, the variant python.wasm is) as dylink.0 side modules
+    against wasix-python 3.14.2-25's headers: _imaging (libjpeg-turbo 3.1.2
+    static, zlib from python.wasm), _imagingft (FreeType 2.13.3 static),
+    _imagingmath, _imagingmorph. No _imagingtk (no Tk on WASIX; it trapped on
+    import), _imagingcms, _webp or _avif. pillow-wasm-call-signatures.patch
+    gives the Arrow export methods CPython's second parameter (#588).

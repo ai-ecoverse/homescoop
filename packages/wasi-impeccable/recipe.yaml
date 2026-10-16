@@ -55,3 +55,9 @@ about:
     so impeccable.wasm no longer embeds the builder's registry paths and
     the bytes don't depend on CARGO_HOME or the work directory
     (homescoop#471); build.sh fails on any home, temp or rustup path.
+    (The remap flags go to cargo as CARGO_ENCODED_RUSTFLAGS.)
+    0.1.15-4: republishes main's build. #641 changed crates/wasix-command,
+    which shifts 4 bytes of impeccable.wasm (crate metadata hash) with no
+    behaviour change, so main no longer matched npm 0.1.15-3 (homescoop#676).
+    build.sh's wasm cache key covers the vendored crates/wasix-*, so a
+    local rebuild after a crate edit reruns cargo (homescoop#642).

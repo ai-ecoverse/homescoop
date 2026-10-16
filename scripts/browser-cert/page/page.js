@@ -64,6 +64,28 @@ window.opfs = {
     await writable.write(text);
     await writable.close();
   },
+  // Bytes cross the CDP boundary as base64: a string handed to
+  // FileSystemWritableFileStream.write() is UTF-8 encoded (#591), and
+  // File.text() decodes as UTF-8 (#738), so neither may carry binary data.
+  async writeBase64(path, b64) {
+    const raw = atob(b64);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    const writable = await (await file(path, true)).createWritable();
+    await writable.write(bytes);
+    await writable.close();
+  },
+  async readBase64(path) {
+    let bytes;
+    try {
+      bytes = new Uint8Array(await (await (await file(path)).getFile()).arrayBuffer());
+    } catch {
+      return null;
+    }
+    let raw = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) raw += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(raw);
+  },
 };
 
 // Network for cert specs: ctx.serve(fn) installs window.certNet, a responder

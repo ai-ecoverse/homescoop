@@ -28,6 +28,20 @@ homescoop_load_recipe() {
   fi
 }
 
+# Print a digest of every file under <dir> (sorted relative path + sha256),
+# for build-cache keys that must change when a vendored source changes.
+# Usage: homescoop_tree_digest <dir>
+homescoop_tree_digest() {
+  local dir="${1:?homescoop_tree_digest <dir>}" f
+  [[ -d "$dir" ]] || { echo "homescoop_tree_digest: not a directory: $dir" >&2; return 1; }
+  (
+    cd "$dir"
+    find . -type f -print0 | LC_ALL=C sort -z | while IFS= read -r -d '' f; do
+      printf '%s %s\n' "$(shasum -a 256 < "$f" | cut -c1-64)" "$f"
+    done
+  ) | shasum -a 256 | cut -c1-64
+}
+
 # Apply every packages/<name>/*.patch once into <srcdir>.
 homescoop_apply_patches() {
   local srcdir="${1:?}"

@@ -1,5 +1,9 @@
 # py-contourpy: negative proof
 
+## 1.4.0-8 (homescoop#211 A2): -7 behaves the same; it wasn't built in this repo
+
+npm's 1.4.0-7 passes this cert's specs as well: `import.mjs`, `contourpy.mjs` and the new `errors.mjs`, on slicc-kernel 1.108.4's Node entry with wasix-python 3.14.2-25 (2026-10-16). Its bytes come from a build outside homescoop: a meson-python cross build in a `/tmp` venv, whose `_build_config.py` records `/private/tmp/wasix-mpl-ext/...`. ladder-pr couldn't rebuild or check them (`repack:`). 1.4.0-8 is the same contourpy 1.4.0 and pybind11 3.0.1, compiled from the sdist by `build.sh` in CI with `reproducible: true`. It takes wasix-python `>=3.14.2-25` (the headers it is built against) and py-numpy as a range. `errors.mjs` isn't vacuous: it asserts the exact exception types and messages, which a trap (rc 134) or a swallowed C++ exception would fail.
+
 ## 1.4.0-6 (published) fails the 1.4.0-7 cert (homescoop#702)
 
 `node scripts/browser-cert/python-range.mjs py-contourpy --tarball ai-ecoverse-py-contourpy-1.4.0-6.tgz --lock-only`

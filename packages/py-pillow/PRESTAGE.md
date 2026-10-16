@@ -1,7 +1,3 @@
-# py-pillow 12.3.0-2 PRESTAGE
+# py-pillow PRESTAGE
 
-Static PIC link of libjpeg + FreeType into `_imaging` / `_imagingft`.
-zlib left unresolved at link (resolved by wasix-python `python.wasm` exports).
-No `@ai-ecoverse/wasm-*` runtime deps.
-
-Unresolved check: staged `python.wasm` + all staged py-* `.so` only → must be `0 unresolved`.
+Since 12.3.0-9 the package is built from the sdist by `build.sh` in CI. It links libjpeg-turbo and FreeType statically into the PIC side modules, and leaves zlib unresolved; `python.wasm` exports it. `build.sh` runs py-kiwisolver's `test/wasm-call-signatures.mjs` over every `.so` and fails on any mismatch.

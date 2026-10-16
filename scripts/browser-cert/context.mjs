@@ -5,8 +5,9 @@
  * @property {string} npmName
  * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array, user?: string|number}) => Promise<{status:number,stdout:string,stderr:string}>} run (user: slicc-kernel >= 1.44.0)
  * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array}) => Promise<{status:number,stderr:string,writes:string[]}>} runWrites stdout one chunk per write()
- * @property {(path: string, data: string|Uint8Array) => Promise<void>} write
- * @property {(path: string) => Promise<string|null>} read
+ * @property {(path: string, data: string|ArrayBufferView|ArrayBuffer|SharedArrayBuffer|number[]) => Promise<void>} write a string as UTF-8, anything else as its exact bytes
+ * @property {(path: string) => Promise<string|null>} read the file decoded as UTF-8 text (null if missing)
+ * @property {(path: string) => Promise<Buffer|null>} readBytes the file's exact bytes (null if missing)
  * @property {(cfg: {names?: Record<string,string[]>, peers?: Record<string, {http?: {status?: number, headers?: [string,string][], body?: string}, tcp?: string, error?: string}>}) => Promise<void>} uplink
  *   (cert/meta.json "uplink": true) What the kernel's tailnet uplink answers: 100.64.0.0/10 routes to it.
  *   A `tcp` peer is a self-contained function's source: it gets `{ tcp: Uint8Array, peer }` after
@@ -138,9 +139,16 @@ export function makeContext(page, meta) {
     async addUser(opts) {
       return page.evaluate((o) => window.kernel.users.add(o), opts);
     },
+    // A string is written as UTF-8; bytes (any typed-array view, an
+    // ArrayBuffer/SharedArrayBuffer, a number array) as they are, through base64 (a latin1 string came out UTF-8 encoded, #591).
     async write(path, data) {
-      const text = typeof data === 'string' ? data : Buffer.from(data).toString('binary');
-      await page.evaluate((p, t) => window.opfs.write(p, t), path.replace(/^\//, ''), text);
+      const p = path.replace(/^\//, '');
+      if (typeof data === 'string') {
+        await page.evaluate((q, t) => window.opfs.write(q, t), p, data);
+        return;
+      }
+      const bytes = ArrayBuffer.isView(data) ? Buffer.from(data.buffer, data.byteOffset, data.byteLength) : Buffer.from(data);
+      await page.evaluate((q, b) => window.opfs.writeBase64(q, b), p, bytes.toString('base64'));
     },
     async serveWs(responder) {
       await page.evaluate((src) => {
@@ -165,6 +173,11 @@ export function makeContext(page, meta) {
     },
     async read(path) {
       return page.evaluate((p) => window.opfs.read(p), path.replace(/^\//, ''));
+    },
+    // read() decodes UTF-8, so a binary file comes back damaged (#738).
+    async readBytes(path) {
+      const b64 = await page.evaluate((p) => window.opfs.readBase64(p), path.replace(/^\//, ''));
+      return b64 === null ? null : Buffer.from(b64, 'base64');
     },
     async uplink(cfg) {
       await page.evaluate((c) => window.certSetUplink(c), cfg);
