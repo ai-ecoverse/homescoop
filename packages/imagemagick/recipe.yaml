@@ -4,11 +4,6 @@ builder: host
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
 version: "7.1.2-34"
 npm: "@ai-ecoverse/wasm-imagemagick"
-# 7.1.2-34-4 changes only package.json (engines): the 7.1.2-34-3 bytes.
-repack:
-  from: "7.1.2-34-3"
-  fields:
-    - engines
 summary: "ImageMagick magick CLI (convert/identify/mogrify argv0 aliases)"
 source:
   url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/{{version}}.tar.gz"
@@ -81,3 +76,10 @@ about:
     imports slicc_cred_js (the slicc credential library, homescoop#459),
     which needs the kernel's process credentials, K1 in slicc-kernel 1.44.0
     (homescoop#207); wasm-imagemagick-heif already asks for >=1.78.0.
+    7.1.2-34-5 (homescoop#593): magick.wasm keeps the name section and drops
+    the DWARF line tables (CXXFLAGS -g2 at the C++ link of utilities/magick),
+    and the LGPL relink kit moves out of this package into
+    @ai-ecoverse/wasm-imagemagick-relink (packages/imagemagick-relink), the
+    same version on the same registry (LGPL-2.1 s.6(d)); README and notices
+    point there. cert/lib/wasm-check.mjs (ladder-pr ci): name section, no
+    .debug_* sections, no share/ in the tarball, docs name the kit package.

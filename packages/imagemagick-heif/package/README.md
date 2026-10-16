@@ -108,28 +108,25 @@ The libheif, libde265 and dav1d builds are the ones in
 
 ## Relinking (LGPL)
 
-`share/imagemagick-heif/relink/` holds what you need to relink `magick`
-against your own libheif, libde265 or GNU libiconv (LGPL-2.1-or-later), or
-any other of its libraries: magick's objects (`magick.a`,
-`libMagickCore-7.Q16HDRI.a`, `libMagickWand-7.Q16HDRI.a`), the other static
-libraries (`liblcms2.a`, `libtiff.a`, `libjpeg.a`, `libfreetype.a`,
-`libpng16.a`, `libz.a`, `libwebpmux.a`, `libwebpdemux.a`, `libwebp.a`,
-`libsharpyuv.a`, `libopenjp2.a`, `libxml2.a`, `libiconv.a`, the slicc shims
-`libslicc-cli.a` and `libslicc_cred.a`), the link flags (`ldflags.txt`, with
-the `--js-library` files in `js/`) and `relink.sh`. The directory you pass
-holds libheif, libde265 and dav1d (`libheif.a`, `libde265.a`, `libdav1d.a`,
-from `@ai-ecoverse/wasm-libheif`'s `lib/` or your own build), and any other
-library in it replaces the kit's copy of the same name. With Emscripten
-4.0.23:
+`bin/magick.wasm` links its libraries statically. The relink kit, which you
+need to link `magick` again against your own libheif, libde265
+(LGPL-3.0-or-later) or GNU libiconv (LGPL-2.1-or-later), or any other of its
+libraries, is a separate package on the same registry:
+[`@ai-ecoverse/wasm-imagemagick-relink`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick-relink),
+at the same version as this package. Its `share/imagemagick-heif/relink/`
+holds magick's objects, every static library of the link, the link flags and
+`relink.sh`. libheif, libde265 and dav1d come from `@ai-ecoverse/wasm-libheif`
+(its `lib/`) or your own build.
+With Emscripten 4.0.23:
 
 ```bash
-cd node_modules/@ai-ecoverse/wasm-imagemagick-heif
-mkdir -p /tmp/libs && cp ../wasm-libheif/lib/*.a /path/to/your/libiconv.a /tmp/libs/
-bash share/imagemagick-heif/relink/relink.sh /tmp/relinked /tmp/libs
-cp /tmp/relinked/magick /tmp/relinked/magick.wasm bin/
+npm pack @ai-ecoverse/wasm-imagemagick-relink@<this version> && tar xzf ai-ecoverse-wasm-imagemagick-relink-*.tgz
+bash package/share/imagemagick-heif/relink/relink.sh /tmp/relinked /path/to/dir/with/your/libs
+cp /tmp/relinked/magick /tmp/relinked/magick.wasm node_modules/@ai-ecoverse/wasm-imagemagick-heif/bin/
 ```
 
-The full source build is
+The kit lives outside this package so that the runtime download stays small
+(homescoop#593; 7.1.2-34-2 to -34-4 shipped it in `share/`). The full source
+build is
 [`packages/imagemagick-heif/build.sh`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick-heif)
-and its recipe. ladder-pr runs this relink on every build
-(`cert/lib/relink-check.mjs`).
+and its recipe.

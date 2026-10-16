@@ -74,3 +74,6 @@ about:
     shims and the Magick archives, besides libheif, libde265 and dav1d.
     relink-check overrides libiconv.a (published wasm-libiconv),
     libslicc_cred.a and libMagickCore and requires all three to be used.
+    7.1.2-34-5 (homescoop#593): name section without DWARF (CXXFLAGS -g2),
+    and the relink kit moves into @ai-ecoverse/wasm-imagemagick-relink
+    (share/imagemagick-heif/relink there), as for wasm-imagemagick.

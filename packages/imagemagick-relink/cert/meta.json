@@ -1,0 +1,12 @@
+{
+  "harness": "host-node",
+  "checklist": [
+    "relink-check.mjs (ladder-pr ci, homescoop#593): share/imagemagick/relink and share/imagemagick-heif/relink each relink magick with an override directory holding libiconv.a from the recipe's published @ai-ecoverse/wasm-libiconv and copies of the kit's libslicc_cred.a and libMagickCore (the heif kit also wasm-libheif's libheif.a, libde265.a and libdav1d.a); relink.sh must take each from there (homescoop#594)",
+    "the relinked magick.wasm validates, is within 2% of kit.json's size, has kit.json's import and export hashes (the binary the kit's objects made in the runtime build), a name section and no DWARF; the glue has callMain",
+    "ldflags.txt names only files in the kit (every --js-library in js/, no build-host path, homescoop#398); README.md's Relinking section, which THIRD-PARTY-NOTICES.md cites, names every static library of each kit (homescoop#564)",
+    "versions: this package, packages/imagemagick and packages/imagemagick-heif and both kit.json are the same version (build.sh and relink-check.mjs fail otherwise); with --runtime <tgz>, the runtime tarball's bin/magick.wasm must have kit.json's sha256 (cert-review, by hand)"
+  ],
+  "ci": [
+    "node packages/imagemagick-relink/cert/relink-check.mjs"
+  ]
+}

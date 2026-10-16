@@ -91,26 +91,24 @@ libraries `bin/magick.wasm` links statically, among them GNU libiconv 1.18
 
 ## Relinking (LGPL)
 
-`share/imagemagick/relink/` holds what you need to relink `magick` against
-your own libiconv (or any other of its libraries): magick's objects
-(`magick.a`, `libMagickCore-7.Q16HDRI.a`, `libMagickWand-7.Q16HDRI.a`), the
-static libraries it links (`liblcms2.a`, `libtiff.a`, `libjpeg.a`,
-`libfreetype.a`, `libpng16.a`, `libz.a`, `libwebpmux.a`, `libwebpdemux.a`,
-`libwebp.a`, `libsharpyuv.a`, `libopenjp2.a`, `libxml2.a`, `libiconv.a`, the
-slicc shims `libslicc-cli.a` and `libslicc_cred.a`), the link flags
-(`ldflags.txt`, with the `--js-library` files in `js/`) and `relink.sh`. A
-library in the directory you pass replaces the kit's copy of the same name.
+`bin/magick.wasm` links its libraries statically. The relink kit, which you
+need to link `magick` again against your own GNU libiconv (LGPL-2.1-or-later,
+through libxml2) or any other of its libraries, is a separate package on the
+same registry:
+[`@ai-ecoverse/wasm-imagemagick-relink`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick-relink),
+at the same version as this package. Its `share/imagemagick/relink/` holds
+magick's objects, every static library of the link, the link flags and
+`relink.sh`.
 With Emscripten 4.0.23:
 
 ```bash
-cd node_modules/@ai-ecoverse/wasm-imagemagick
-bash share/imagemagick/relink/relink.sh /tmp/relinked /path/to/dir/with/libiconv.a
-cp /tmp/relinked/magick /tmp/relinked/magick.wasm bin/
+npm pack @ai-ecoverse/wasm-imagemagick-relink@<this version> && tar xzf ai-ecoverse-wasm-imagemagick-relink-*.tgz
+bash package/share/imagemagick/relink/relink.sh /tmp/relinked /path/to/dir/with/your/libs
+cp /tmp/relinked/magick /tmp/relinked/magick.wasm node_modules/@ai-ecoverse/wasm-imagemagick/bin/
 ```
 
-The full source build is
+The kit lives outside this package so that the runtime download stays small
+(homescoop#593; 7.1.2-34-2 to -34-4 shipped it in `share/`). The full source
+build is
 [`packages/imagemagick/build.sh`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick)
-and its recipe; libiconv's is
-[`packages/libiconv`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/libiconv).
-ladder-pr runs this relink, with libiconv.a from `@ai-ecoverse/wasm-libiconv`,
-on every build (`cert/lib/relink-check.mjs`).
+and its recipe.

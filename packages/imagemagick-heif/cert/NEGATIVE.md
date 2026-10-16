@@ -134,3 +134,12 @@ relink-check.mjs's override case against the local 7.1.2-34-3 build, whose
 Error: relink.sh did not take libiconv.a from .../override (homescoop#594):
 relinked: .../relinked/magick(.wasm)
 ```
+
+## 7.1.2-34-5: name section only, no kit (homescoop#593)
+
+wasm-check.mjs (wasm-imagemagick's) against the local 7.1.2-34-4 build
+(2026-10-16):
+
+```
+Error: @ai-ecoverse/wasm-imagemagick-heif: bin/magick.wasm has DWARF, .debug_loc 2092872, .debug_abbrev 265209, .debug_info 4117164, .debug_ranges 229902, .debug_str 1111445, .debug_line 2886203, .debug_aranges 199 (homescoop#593: name section only)
+```

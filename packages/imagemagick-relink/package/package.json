@@ -1,0 +1,34 @@
+{
+  "name": "@ai-ecoverse/wasm-imagemagick-relink",
+  "version": "7.1.2-34-5",
+  "description": "LGPL relink kits for @ai-ecoverse/wasm-imagemagick and @ai-ecoverse/wasm-imagemagick-heif of the same version: magick's objects, every static library of the link (GNU libiconv among them), the link flags and relink.sh. Not needed to run ImageMagick.",
+  "license": "ImageMagick AND LGPL-2.1-or-later AND LGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/imagemagick-relink/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick-relink",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "imagemagick",
+    "lgpl",
+    "relink"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "imagemagick-relink",
+    "upstream": "7.1.2-34"
+  }
+}

@@ -101,3 +101,13 @@ AssertionError [ERR_ASSERTION]: w.webp after the refused write (homescoop#585: t
 
 webp-check-size-before-open.patch moves upstream's 16383 px check in
 WriteWEBPImage before OpenBlob.
+
+## 7.1.2-34-5: name section only, no kit (homescoop#593)
+
+wasm-check.mjs against the local 7.1.2-34-4 build (2026-10-16):
+
+```
+Error: @ai-ecoverse/wasm-imagemagick: bin/magick.wasm has DWARF, .debug_loc 1916466, .debug_abbrev 220780, .debug_info 3201567, .debug_ranges 187294, .debug_str 511055, .debug_line 2618988, .debug_aranges 199 (homescoop#593: name section only)
+```
+
+Without DWARF the 7.1.2-34-4 tarball would still fail on `ships share/`.

@@ -65,7 +65,7 @@ CONFIGURE_ARGS=(
   --without-lzma --without-openexr --without-pango --without-raqm
   --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml
   --without-zip --without-zstd --with-webp --with-freetype
-  CFLAGS="-g1 -O2" CXXFLAGS="-g -O2"
+  CFLAGS="-g1 -O2" CXXFLAGS="-g2 -O2"
   LDFLAGS="-L$PREFIX/lib -fexceptions"
 )
 MAKE_LDFLAGS="-L$PREFIX/lib -fexceptions $SLICC_A $CLI_LDFLAGS"
@@ -83,8 +83,9 @@ if [[ -z "$REBUILD" && ( -f "$SRC/utilities/magick" || -f "$SRC/utilities/magick
 fi
 
 # utilities/magick is linked by the C++ driver (utilities/Makefile.am's
-# dummy.cxx), with CXXFLAGS: -g there keeps the name section and the line
-# tables in magick.wasm, as in wasm-imagemagick (-g1 stripped both, homescoop#396).
+# dummy.cxx), with CXXFLAGS: -g2 there keeps the name section (-g1 stripped
+# it, homescoop#396) and drops the DWARF line tables (homescoop#593), as in
+# wasm-imagemagick.
 if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "$REBUILD" ]]; then
   echo "== imagemagick: emconfigure"
   (
@@ -145,7 +146,7 @@ done
 grep -q 'name="disk" value="0"' "$CFG_DEST/policy.xml"
 
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
-homescoop_notices_begin "magick.wasm statically links the following delegate libraries, including libheif and libde265 (LGPL-3.0-or-later; libde265 is an HEVC decoder, and HEVC is patent-encumbered) from @ai-ecoverse/wasm-libheif. No MPEG-family video codec. share/imagemagick-heif/relink holds magick's objects and every other library it links, so it can be relinked against a modified libheif or libde265 (README.md, Relinking)."
+homescoop_notices_begin "magick.wasm statically links the following delegate libraries, including libheif and libde265 (LGPL-3.0-or-later; libde265 is an HEVC decoder, and HEVC is patent-encumbered) from @ai-ecoverse/wasm-libheif. No MPEG-family video codec. The relink kit, magick's objects and every other library it links, so that it can be relinked against a modified libheif, libde265 or GNU libiconv, is the package @ai-ecoverse/wasm-imagemagick-relink of the same version on the same registry (share/imagemagick-heif/relink; README.md, Relinking)."
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
   https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
 homescoop_notice "libjpeg-turbo 3.1.2 (@ai-ecoverse/wasm-libjpeg-turbo)" \
@@ -208,19 +209,39 @@ kit_ldflags() {
   if grep -Eq '(^| )/' "$kit/ldflags.txt"; then echo "homescoop: $kit/ldflags.txt names an absolute path" >&2; exit 1; fi
 }
 
-RELINK="$HOMESCOOP_PKG/package/share/imagemagick-heif/relink"
-rm -rf "$RELINK"
-mkdir -p "$RELINK/js"
-MAGICK_OBJS=()
-while IFS= read -r o; do MAGICK_OBJS+=("$o"); done < <(find "$SRC/utilities" -name '*.o' | sort)
-test "${#MAGICK_OBJS[@]}" -gt 0
-emar rcs "$RELINK/magick.a" "${MAGICK_OBJS[@]}"
-cp "$SRC/MagickWand/.libs/libMagickWand-7.Q16HDRI.a" "$SRC/MagickCore/.libs/libMagickCore-7.Q16HDRI.a" "$RELINK/"
-for a in liblcms2.a libtiff.a libjpeg.a libfreetype.a libpng16.a libz.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libopenjp2.a libxml2.a libiconv.a; do
-  cp "$PREFIX/lib/$a" "$RELINK/$a"
-done
-cp "$SLICC_A" "$RELINK/libslicc-cli.a"
-kit_ldflags "$RELINK" "$CLI_LDFLAGS"
-test -f "$RELINK/js/slicc-writev.js"
-cp "$HOMESCOOP_PKG/relink.sh" "$RELINK/relink.sh"
+# The relink kit (homescoop#395, #593) ships in @ai-ecoverse/wasm-imagemagick-relink:
+# packages/imagemagick-relink/build.sh runs this build with HOMESCOOP_RELINK_KIT
+# set to its share/imagemagick-heif/relink. magick's objects, every static library of
+# the link, the slicc archives and --js-library files, relink.sh, this build's
+# notices and kit.json (the magick.wasm these objects made: sha256, size).
+rm -rf "$HOMESCOOP_PKG/package/share"
+if [[ -n "${HOMESCOOP_RELINK_KIT:-}" ]]; then
+  RELINK="$HOMESCOOP_RELINK_KIT"
+  rm -rf "$RELINK"
+  mkdir -p "$RELINK/js"
+  MAGICK_OBJS=()
+  while IFS= read -r o; do MAGICK_OBJS+=("$o"); done < <(find "$SRC/utilities" -name '*.o' | sort)
+  test "${#MAGICK_OBJS[@]}" -gt 0
+  emar rcs "$RELINK/magick.a" "${MAGICK_OBJS[@]}"
+  cp "$SRC/MagickWand/.libs/libMagickWand-7.Q16HDRI.a" "$SRC/MagickCore/.libs/libMagickCore-7.Q16HDRI.a" "$RELINK/"
+  for a in liblcms2.a libtiff.a libjpeg.a libfreetype.a libpng16.a libz.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libopenjp2.a libxml2.a libiconv.a; do
+    cp "$PREFIX/lib/$a" "$RELINK/$a"
+  done
+  cp "$SLICC_A" "$RELINK/libslicc-cli.a"
+  kit_ldflags "$RELINK" "$CLI_LDFLAGS"
+  test -f "$RELINK/js/slicc-writev.js"
+  cp "$HOMESCOOP_PKG/relink.sh" "$RELINK/relink.sh"
+  cp "$HOMESCOOP_PKG/package/THIRD-PARTY-NOTICES.md" "$RELINK/THIRD-PARTY-NOTICES.md"
+  node -e '
+    const fs = require("fs"), c = require("crypto");
+    const [wasm, pkg, out] = process.argv.slice(1);
+    const b = fs.readFileSync(wasm), m = JSON.parse(fs.readFileSync(pkg, "utf8")), mod = new WebAssembly.Module(b);
+    const h = (l) => c.createHash("sha256").update(l.join("\n")).digest("hex");
+    fs.writeFileSync(out, JSON.stringify({ package: m.name, version: m.version, wasm: "bin/magick.wasm",
+      sha256: c.createHash("sha256").update(b).digest("hex"), size: b.length,
+      imports: h(WebAssembly.Module.imports(mod).map((i) => `${i.module}.${i.name}:${i.kind}`).sort()),
+      exports: h(WebAssembly.Module.exports(mod).map((e) => `${e.name}:${e.kind}`).sort()) }, null, 2) + "\n");
+  ' "$HOMESCOOP_PKG/package/bin/magick.wasm" "$HOMESCOOP_PKG/package/package.json" "$RELINK/kit.json"
+  echo "== imagemagick-heif: relink kit → $RELINK"
+fi
 echo "== imagemagick-heif: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7 (tab policy) and etc/ImageMagick-7-open"
