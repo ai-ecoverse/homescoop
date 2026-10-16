@@ -109,11 +109,13 @@ jobs:
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
             node scripts/sync-package-version.mjs "$pkg" --write
           done
+          # The root README package table is generated from package.json (#639).
+          node scripts/readme-table.mjs --write
       - id: push
         name: Push sha256 and package version onto the PR branch
         run: |
           set -euo pipefail
-          if git diff --quiet -- 'packages/*/recipe.yaml' 'packages/*/package/package.json' 'packages/*/package/README.md'; then
+          if git diff --quiet -- 'packages/*/recipe.yaml' 'packages/*/package/package.json' 'packages/*/package/README.md' README.md; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -124,7 +126,7 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- 'packages/*/recipe.yaml' 'packages/*/package/package.json' 'packages/*/package/README.md'
+          git add -- 'packages/*/recipe.yaml' 'packages/*/package/package.json' 'packages/*/package/README.md' README.md
           git commit -m "chore: refresh recipe sha256 and package version after version bump"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
