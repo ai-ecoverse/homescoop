@@ -15,7 +15,7 @@ command (Node's TLS client against the engine's own API).
 
 ```
 browser-cert: ok packages/tls-engine/cert/realm-proxy.mjs
-ℹ tests 17  ℹ pass 17  ℹ fail 0
+ℹ tests 18  ℹ pass 18  ℹ fail 0
 ```
 
 That is the point of the port: the API and its behaviour must not change for
@@ -46,12 +46,12 @@ browser-cert: FAIL packages/tls-engine/cert/realm-proxy.mjs
 curl: (7) CONNECT tunnel failed, response 501
 ```
 
-and the factory fails in `engine-api.mjs`'s `before`, so all 17 are
+and the factory fails in `engine-api.mjs`'s `before`, so all 18 are
 cancelled (exit 1):
 
 ```
 Aborted(CompileError: WebAssembly.instantiate(): BufferSource argument is empty)
-ℹ pass 0  ℹ cancelled 17
+ℹ pass 0  ℹ cancelled 18
 ```
 
 **TF-PSA-Crypto's default entropy** (no `tls_engine_crypto_config.h`, so
@@ -66,7 +66,7 @@ browser-cert: FAIL packages/tls-engine/cert/realm-proxy.mjs
 curl: (35) ssl_handshake returned: (-0x7280) SSL - The connection indicated an EOF
 ✖ a leaf is a P-256 key pair; only its SubjectPublicKeyInfo leaves the engine
   AssertionError [ERR_ASSERTION]: tls_leaf_new: PSA - Insufficient entropy
-ℹ pass 1  ℹ fail 16
+ℹ pass 1  ℹ fail 17
 ```
 
 (the one pass is the factory and its exports.)
@@ -91,7 +91,9 @@ curl: (35) ssl_handshake returned: (-0x7280) SSL - The connection indicated an E
 - `engine-api.mjs` checks every export `index.d.ts` names, the leaf's SPKI
   (P-256, a new key each time), Node's verification (`authorized`, SAN,
   issuer, ALPN `http/1.1`) and the engine's own view (`tls_version`,
-  `tls_alpn_http11`, `tls_handshake_done`), byte-exact 1 MiB transfers both
+  `tls_alpn_http11`, `tls_handshake_done`), the whole chain going out (a
+  client that trusts only the root accepts a leaf from an intermediate the
+  engine sends, and refuses it without), byte-exact 1 MiB transfers both
   ways, close_notify, `TLS_EOF`, 300 live leaves, no heap growth over 1500
   leaf/session cycles, and six refusals: another key's certificate (named
   by `tls_strerror`), no chain (`TLS_BADARG`), another host's SNI, an

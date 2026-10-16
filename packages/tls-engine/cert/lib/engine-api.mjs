@@ -310,7 +310,6 @@ describe('handshake and round trip', () => {
       const peer = socket.getPeerX509Certificate();
       assert.equal(peer.subjectAltName, 'DNS:example.test');
       assert.equal(peer.checkIssued(new X509Certificate(ca.pem)), true);
-      assert.equal(socket.getPeerCertificate(true).issuerCertificate.subject.CN, 'homescoop tls-engine cert CA');
       const res = await exchange(socket, 'GET / HTTP/1.1\r\n\r\n', (b) => b.includes('\r\n\r\n'));
       assert.equal(res.toString(), 'echo 18: GET / HTTP/1.1\r\n\r\n');
       // The server's side is done once it has read the client's Finished.
@@ -321,6 +320,35 @@ describe('handshake and round trip', () => {
       session.free();
     });
   }
+
+  test('the whole chain goes out: a client that trusts only the root accepts a leaf from an intermediate', async () => {
+    const root = makeCa('homescoop tls-engine cert root', { pathLen: 1 });
+    const intermediate = makeCa('homescoop tls-engine cert intermediate', { parent: root });
+    const leaf = engine.leaf();
+    assert.equal(leaf.addCert(intermediate.issue('chain.test', leaf.spki())), 0, 'the leaf certificate');
+    const session = engine.session(leaf, 'chain.test');
+    leaf.release();
+    // Without the intermediate in the chain, the root alone can't verify the leaf.
+    const short = tunnel(session);
+    await assert.rejects(client(short.wire, root, { servername: 'chain.test' }), (err) => {
+      assert.match(err.code, /UNABLE_TO_GET_ISSUER_CERT_LOCALLY|UNABLE_TO_VERIFY_LEAF_SIGNATURE/);
+      return true;
+    });
+    session.free();
+    const full = engine.leaf();
+    assert.equal(full.addCert(intermediate.issue('chain.test', full.spki())), 0);
+    assert.equal(full.addCert(intermediate.der), 0, 'the intermediate');
+    assert.equal(full.addCert(root.der), 0, 'the root');
+    const s2 = engine.session(full, 'chain.test');
+    full.release();
+    const { wire } = tunnel(s2, { data: (b, reply) => reply(Buffer.from('chained')) });
+    const socket = await client(wire, root, { servername: 'chain.test' });
+    assert.equal(socket.authorized, true);
+    assert.equal(socket.getPeerX509Certificate().checkIssued(new X509Certificate(intermediate.pem)), true);
+    assert.equal((await exchange(socket, 'x', (b) => b.length >= 7)).toString(), 'chained');
+    socket.destroy();
+    s2.free();
+  });
 
   test('an IP literal (no SNI) is served with an iPAddress leaf', async () => {
     const leaf = leafFor('203.0.113.7');

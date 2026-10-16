@@ -84,12 +84,12 @@ function ipBytes(host) {
   return m ? Buffer.from(m.slice(1).map(Number)) : undefined;
 }
 
-function certificate({ issuer, subject, notBefore, notAfter, spki, issuerSpki, ca, host, key }) {
+function certificate({ issuer, subject, notBefore, notAfter, spki, issuerSpki, ca, pathLen = 0, host, key }) {
   const serial = randomBytes(16);
   serial[0] = (serial[0] & 0x7f) | 0x01;
   const list = [extension('2.5.29.14', false, octets(keyId(spki)))];
   if (ca) {
-    list.push(extension('2.5.29.19', true, seq(TRUE, integer(Buffer.of(0)))));
+    list.push(extension('2.5.29.19', true, seq(TRUE, integer(Buffer.of(pathLen)))));
     list.push(extension('2.5.29.15', true, bits(Buffer.of(0x86), 1)));
   } else {
     list.push(extension('2.5.29.35', false, seq(tlv(0x80, keyId(issuerSpki)))));
@@ -119,25 +119,33 @@ export function pem(der) {
 
 const DAY = 86400_000;
 
-/** A self-signed P-256 CA; `issue(host, spki, { notBefore, notAfter })` signs a leaf. */
-export function makeCa(commonName = 'homescoop tls-engine cert CA') {
+/**
+ * A P-256 CA, self-signed or (with `parent`) an intermediate the parent signs;
+ * pathLen 0 as the realm CA has it, unless it is to sign an intermediate.
+ * `issue(host, spki, { notBefore, notAfter })` signs a leaf.
+ */
+export function makeCa(commonName = 'homescoop tls-engine cert CA', { parent, pathLen = 0 } = {}) {
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
   const spki = publicKey.export({ type: 'spki', format: 'der' });
   const dn = { organization: 'homescoop', commonName };
   const now = Date.now();
   const der = certificate({
-    issuer: dn,
+    issuer: parent ? parent.dn : dn,
     subject: dn,
     notBefore: new Date(now - DAY),
     notAfter: new Date(now + 365 * DAY),
     spki,
-    issuerSpki: spki,
+    issuerSpki: parent ? parent.spki : spki,
     ca: true,
-    key: privateKey,
+    pathLen,
+    key: parent ? parent.key : privateKey,
   });
   return {
     der,
     pem: pem(der),
+    dn,
+    spki,
+    key: privateKey,
     issue(host, leafSpki, { notBefore = new Date(now - 3600_000), notAfter = new Date(now + 7 * DAY) } = {}) {
       return certificate({
         issuer: dn,
