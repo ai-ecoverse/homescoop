@@ -111,3 +111,7 @@ On slicc-kernel 1.73.2 and older, an Emscripten program's own `lstat` of a symli
 ## 3.4.4-5: negative 3.4.4-4 for the self-kill
 
 3.4.4-5 is 3.4.4-4 relinked with the slicc shims' self-kill (homescoop#290). The checklist and users specs pass on both; the delta is the shim, which `scripts/check-slicc-cred.mjs` and the shim's own test cover. The README drops the top-directory mtime limit, fixed in slicc-kernel 1.73.3.
+
+## 3.5.x symlink hardening in the destination (homescoop#411, 2026-10-16)
+
+`symlink-dest.mjs` against the published 3.4.4-5 on slicc-kernel 1.92.0, users enforce: FAIL. cone's `rsync -a ~/s/d /tmp/evelink/`, through eve's symlink, exits 0 and copies (3.5.1: rc 3, "refusing to follow a symlink owned by an untrusted user"). With that case left out, root's `rsync -aK /tmp/k/src/ /tmp/k/dA/`, into a dirlink to the absolute `/tmp/k/elsewhere`, exits 0 and writes through it (3.5.1: rc 23, "Symbolic link loop"). 3.5.1-1 passes, and so do the other four specs on it.

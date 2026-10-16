@@ -65,3 +65,21 @@ the slicc shims' self-kill, which ends a program by the signal it sends itself
 Upstream 3.5.1: protocol 33, and the path-handling security fixes introduced in 3.5.0 (a
 per-component resolver that refuses planted symlinks; see upstream's NEWS).
 rsync now waits with poll(), which the slicc shims make wait in the kernel.
+
+## Symlinks in the destination (3.5.x)
+
+3.5.0's secure path resolver (upstream NEWS, "BEHAVIOR CHANGES") changes two
+things you may hit, here as on Linux:
+
+- **A destination directory reached through a symlink another user owns is
+  refused.** If eve's `/tmp/evelink` points to a directory you may write to,
+  `rsync -a src /tmp/evelink/` fails with rc 3: `refusing to follow a symlink
+  owned by an untrusted user; use --insecure-links …`, then `change_dir#1
+  "/tmp/evelink/" failed`. Nothing is copied. 3.4.x followed the link.
+- **`-K` (`--keep-dirlinks`) refuses a destination dirlink whose target is
+  absolute or outside the destination tree**: `Symbolic link loop`, rc 23,
+  and nothing is written through it. 3.4.x wrote through it. A relative
+  dirlink to a directory inside the destination still works.
+
+`--insecure-links` (new in 3.5.0) restores the old behaviour for a run that
+trusts those links. Your own links, and root's, are followed as before.

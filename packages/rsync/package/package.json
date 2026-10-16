@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-rsync",
-  "version": "3.5.1-1",
+  "version": "3.5.1-2",
   "description": "rsync 3.5.1 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair; slicc-kernel >= 1.29.2)",
   "license": "GPL-3.0-or-later",
   "engines": {
