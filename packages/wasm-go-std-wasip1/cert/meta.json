@@ -1,0 +1,15 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasm-go",
+    "@ai-ecoverse/wasm-findutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-go@1.26.5-1",
+    "@ai-ecoverse/wasm-findutils@4.11.0-2"
+  ],
+  "checklist": [
+    "with wasm-go's compile and link (in the kernel, as cone): every std archive in importcfg; a fmt/os program links against this std and runs in the kernel ('hello from go 42 2')"
+  ],
+  "users": "enforce"
+}
