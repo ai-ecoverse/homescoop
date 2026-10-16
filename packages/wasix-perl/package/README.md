@@ -42,9 +42,19 @@ an advisory no-op.
 A packaging-only release of 5.42.0-13 (the same files): `engines` now asks
 for slicc-kernel ≥ 1.100.0, the first kernel with `slicc.fcntl_lock`. On an
 older kernel the libc grants every `fcntl` record lock locally, so two
-processes could both hold a write lock on the same bytes and lose data;
-refusing to install there is the honest answer (homescoop#552). Up to -13
-`engines` said ≥ 1.44.0.
+processes could both hold a write lock on the same bytes and lose data
+(homescoop#552). Up to -13 `engines` said ≥ 1.44.0.
+
+The floor is enforced from slicc-kernel 1.106.2 on: its command catalog
+refuses a package whose `engines.slicc-kernel` the running kernel doesn't
+meet (ai-ecoverse/slicc-kernel#797). Older kernels install the package
+without a warning, and there `fcntl` locks, and so `flock`, aren't real:
+use slicc-kernel ≥ 1.100.0 (homescoop#651).
+
+From slicc-kernel 1.106.2 the commands' `/usr/bin` entries are the
+scripts themselves (slicc-kernel#762), so `pod2man --help` and
+`pod2text --help`, which read their usage from `$0`, print it
+(homescoop#491); older kernels print nothing there.
 
 ## 5.42.0-13: wasix-sysroot 2025.9.30-30
 
