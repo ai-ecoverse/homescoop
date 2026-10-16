@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "pretest:e2e": "bash fixtures/protoc-gen-go/build.sh",
     "test:e2e": "node --test 'e2e/*.test.mjs'"
   },
   "devDependencies": {

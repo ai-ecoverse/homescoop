@@ -2,8 +2,8 @@
 # buf.wasm built by homescoop from buf's source with GOOS=wasip1 and the
 # patches in patches/, and a host-import module for slicc-kernel.
 name: wasi-buf
-# Not built by the ladder; .github/workflows/wasi-buf.yml builds and tests it.
-builder: retired
+builder: host
+reproducible: true
 version: "1.73.0"
 npm: "@ai-ecoverse/wasi-buf"
 summary: "buf 1.73 for slicc WASI preview1 (command buf)"

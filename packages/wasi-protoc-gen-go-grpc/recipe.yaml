@@ -1,8 +1,10 @@
 # protoc-gen-go-grpc (the gRPC code generator for Go) for slicc WASI preview1: a command, so
 # buf generate can run it as a local plugin in slicc-kernel (@ai-ecoverse/wasi-buf).
 name: wasi-protoc-gen-go-grpc
-# Not built by the ladder; .github/workflows/wasi-protoc-plugins.yml builds and tests it.
-builder: retired
+builder: host
+reproducible: true
+inputs:
+  - scripts/build-wasip1-go-command.sh
 version: "1.6.2"
 npm: "@ai-ecoverse/wasi-protoc-gen-go-grpc"
 summary: "protoc-gen-go-grpc 1.6.2 for slicc WASI preview1 (command protoc-gen-go-grpc)"

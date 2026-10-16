@@ -5,7 +5,9 @@
     "py-*": ["CPython "],
     "libheif": ["libde265 ", "dav1d "],
     "wasix-python": ["OpenSSL ", "`sqlite3` ("],
-    "wasix-ruby": ["ruby/"]
+    "wasix-ruby": ["ruby/"],
+    "wasi-buf": ["Go ", "≥ "],
+    "wasi-protoc-gen-*": ["Go "]
   },
   "spellings": {
     "wasix-openssh": { "10.6.0": "10.6p1" }
