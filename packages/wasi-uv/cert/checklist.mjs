@@ -114,6 +114,17 @@ export default async function (ctx) {
   const removed = await sh("uv run python -c 'import charset_normalizer'", '/home/proj');
   assert.notEqual(removed.status, 0, 'uv remove left charset-normalizer');
 
+  // uv tool: install links the tool's executable into ~/.local/bin (the
+  // unix path, a symlink), which runs; uninstall removes it.
+  const tool = await ok(
+    'uv tool install charset-normalizer && ls -l "$HOME/.local/bin" && "$HOME/.local/bin/normalizer" --version && uv tool list',
+    '/home',
+  );
+  assert.match(tool.stdout, /normalizer -> .*\/tools\/charset-normalizer\/bin\/normalizer$/m);
+  assert.match(tool.stdout, /Charset-Normalizer 3\.5\.2/);
+  assert.match(tool.stdout, /^charset-normalizer v3\.5\.2$/m);
+  await ok('uv tool uninstall charset-normalizer && test ! -e "$HOME/.local/bin/normalizer"', '/home');
+
   // A version the links do not have: uv's own error, not a crash.
   const missing = await sh('uv pip install idna==0.1', '/home/u');
   assert.notEqual(missing.status, 0);

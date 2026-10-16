@@ -94,7 +94,9 @@ echo "== wasi-uv: cargo build --bin uv ($TARGET, Rust $RUST with patched std)"
   # rustix needs wasi_ext (and RUSTC_BOOTSTRAP for its #![feature]), as does
   # -Zbuild-std. The kernel gives a process up to 4 GiB. LTO and one
   # codegen unit (uv's release profile) take more memory than CI has room
-  # for on this crate graph. Build paths are mapped away from the wasm.
+  # for on this crate graph. Build paths are mapped away from the wasm, and
+  # SOURCE_DATE_EPOCH (the tag's commit time) stands in for build times.
+  SOURCE_DATE_EPOCH="$(field source.epoch)" \
   RUSTC_BOOTSTRAP=1 \
   CARGO_PROFILE_RELEASE_LTO=off CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
   RUSTFLAGS="--cfg tokio_unstable --cfg wasi_ext -C link-arg=--max-memory=4294967296 --remap-path-prefix=$SRC_DIR=/uv --remap-path-prefix=$(pwd -P)=/uv --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$TC/lib/rustlib/src/rust=/rustc/$RUST --remap-path-prefix=$TC_REAL/lib/rustlib/src/rust=/rustc/$RUST" \

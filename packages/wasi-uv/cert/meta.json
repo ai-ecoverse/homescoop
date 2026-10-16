@@ -16,12 +16,13 @@
     "uv init; uv add idna charset-normalizer writes pyproject.toml and uv.lock, builds the project (uv_build) and syncs",
     "uv run of the project's console script, a dependency's console script (executable), and python",
     "uv lock --check, uv tree, uv remove, rm -rf .venv && uv sync",
+    "uv tool install links the executable into ~/.local/bin (a symlink) and it runs; uv tool uninstall removes it",
     "a version not in the links: uv's error, no panic or trap"
   ],
   "patches": {
     "0001-wasi-build-uv-for-wasm32-wasip1-threads.patch": "the whole spec (the build); uv cache paths and indicatif output in every case",
     "0002-wasi-run-processes-through-wasix-command.patch": "uv python find (interpreter query), uv run, the six sdist build, --compile-bytecode",
-    "0003-wasi-the-filesystem-as-unix.patch": "venv bin/python symlink, cache archive links, uv add (atomic pyproject/uv.lock writes), executable console scripts",
+    "0003-wasi-the-filesystem-as-unix.patch": "venv bin/python symlink, cache archive links, uv tool install's ~/.local/bin link, uv add (atomic pyproject/uv.lock writes), executable console scripts",
     "0004-wasi-a-WASI-platform-for-interpreters-and-wheels.patch": "uv python find (wasi-wasm32 key); wheel selection in every install",
     "0005-wasi-start-uv-in-slicc-s-kernel.patch": "every case run from a non-root cwd; installs (tokio::fs on the blocking pool)",
     "crates/hyper-util-0.1.20.patch": "PyPI through the kernel proxy (checked by hand: the cert kernel has no network)",

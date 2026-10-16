@@ -6,6 +6,7 @@ Subject: [PATCH] wasi: the filesystem as unix
 On WASI uv takes its unix paths: bin/, symlinks (std::os::wasi::fs::
 symlink_path), the cache's archive symlinks and the runtime cfg!(unix)
 choices. WASI has no permission bits, file locks or descriptor dup:
+- uv tool install links executables into the bin directory, as on unix;
 - which: any regular file on PATH is a candidate;
 - file locks are granted and released without a lock;
 - atomic writes reopen the temporary file and carry no mode over;
@@ -24,9 +25,10 @@ choices. WASI has no permission bits, file locks or descriptor dup:
  crates/uv-install-wheel/src/wheel.rs          |  6 +++
  crates/uv-python-commands/src/install.rs      |  2 +-
  crates/uv-python-managed/src/managed.rs       | 16 +++---
+ crates/uv-tool-commands/src/common.rs         |  4 +-
  crates/uv-tool/src/tool.rs                    |  2 +-
  crates/uv-virtualenv/src/virtualenv.rs        |  6 +--
- 14 files changed, 116 insertions(+), 31 deletions(-)
+ 15 files changed, 118 insertions(+), 33 deletions(-)
 
 diff --git a/crates/uv-cache/src/lib.rs b/crates/uv-cache/src/lib.rs
 index 9a017bf..c84f5b4 100644
@@ -448,6 +450,28 @@ index 10270aa..cea3f11 100644
          replace_symlink(executable.path, link).map_err(Error::LinkExecutable)
      } else if cfg!(windows) {
          let launcher = windows_python_launcher(executable.path, executable.window_mode)?;
+diff --git a/crates/uv-tool-commands/src/common.rs b/crates/uv-tool-commands/src/common.rs
+index 09dd61b..0fab72d 100644
+--- a/crates/uv-tool-commands/src/common.rs
++++ b/crates/uv-tool-commands/src/common.rs
+@@ -26,7 +26,7 @@ use uv_distribution_types::{
+     NameRequirementSpecification, Requirement, RequiresPython, Resolution, UnresolvedRequirement,
+ };
+ use uv_errors::{ErrorWithHints, Hinted, Hints};
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use uv_fs::replace_symlink;
+ use uv_fs::{CWD, Simplified};
+ use uv_git::GitResolver;
+@@ -909,7 +909,7 @@ pub(super) fn finalize_tool_install(
+         for (name, src, target) in target_entrypoints {
+             debug!("Installing executable: {name}");
+ 
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             replace_symlink(src, &target).context("Failed to install executable")?;
+ 
+             #[cfg(windows)]
 diff --git a/crates/uv-tool/src/tool.rs b/crates/uv-tool/src/tool.rs
 index bab3c5e..4a521de 100644
 --- a/crates/uv-tool/src/tool.rs

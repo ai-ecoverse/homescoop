@@ -16,7 +16,7 @@ PyPI is reached through the kernel's proxy (`HTTPS_PROXY`, CA in
 `SSL_CERT_FILE`, both set by the kernel). Checked in the kernel: `uv venv`,
 `uv pip install|list|uninstall`, `uv init`, `uv add`, `uv remove`,
 `uv lock`, `uv sync`, `uv tree`, `uv run` (python, modules, console
-scripts), sdist builds (PEP 517, e.g. setuptools) and `--compile-bytecode`.
+scripts), `uv tool install|run|uninstall`, sdist builds (PEP 517, e.g. setuptools) and `--compile-bytecode`.
 
 Limits in seven:
 
