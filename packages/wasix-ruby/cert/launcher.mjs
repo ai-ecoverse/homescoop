@@ -37,7 +37,7 @@ export default async function (ctx) {
   assert.equal(await sh(`PATH=${gems}:$PATH hello c`, 7), 'hello c', 'gem executable by name from bash');
   const fromRuby = await sh(`ruby -e 'system(%q(${gems}/hello), "d"); a = $?.exitstatus; ENV["PATH"] = %q(${gems}:) + ENV["PATH"]; system("hello", "e"); print a, " ", $?.exitstatus'`);
   assert.equal(fromRuby, 'hello d\nhello e\n7 7', `gem executable from ruby: ${fromRuby}`);
-  const loadPath = await sh(`ruby -e 'pkg = File.expand_path("..", RbConfig::CONFIG["bindir"]); mine = $LOAD_PATH.select { |d| d.start_with?(pkg + "/") }; print mine.size, " ", mine.reject { |d| File.directory?(d) }.join(",")'`);
-  assert.equal(loadPath, '2 ', `RUBYLIB names only the package's two library directories that exist (lib/ruby/3.4.0 and its wasm32-wasi), so a require probes no missing ones: ${loadPath}`);
+  const loadPath = await sh(`ruby -e 'pkg = File.expand_path("..", RbConfig::CONFIG["bindir"]); mine = $LOAD_PATH.select { |d| d.start_with?(pkg + "/") }; print mine.size, " missing:", mine.reject { |d| File.directory?(d) }.join(",")'`);
+  assert.equal(loadPath, '2 missing:', `RUBYLIB names only the package's two library directories that exist (lib/ruby/3.4.0 and its wasm32-wasi), so a require probes no missing ones: ${loadPath}`);
   console.log(`launcher: ${interp}; bin/ruby ${own}; gem bindir ${gems}; package load path ${loadPath.trim()}`);
 }
