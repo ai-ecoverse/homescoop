@@ -29,16 +29,20 @@ function fixture(fn) {
   }
 }
 
-test('fixture: stale version and missing package are caught; private skipped; retired separate', () => {
+test('fixture: stale description and missing package are caught; private skipped; retired separate', () => {
   fixture((root, pkg) => {
     const table = renderTable(root);
-    assert.match(table, /\[`@x\/wasm-libpng`\]\(packages\/libpng\) \| \*\*1\.6\.59-2\*\* \| libpng \\\| PNG \|/);
+    assert.match(table, /\[`@x\/wasm-libpng`\]\(https:\/\/www\.npmjs\.com\/package\/@x\/wasm-libpng\) \| \[recipe\]\(packages\/libpng\) \| libpng \\\| PNG \|/);
+    assert.doesNotMatch(table, /1\.6\.59/); // no version column: bumps don't touch README.md
     assert.doesNotMatch(table, /ffmpeg/);
     assert.ok(table.indexOf('Retired') < table.indexOf('@x/old'));
     writeFileSync(join(root, 'README.md'), `# r\n\n${table}\n\ntail\n`);
     assert.equal(checkReadme(root).ok, true);
-    // #639: version bumped in package.json, README row left behind.
+    // A packaging bump alone leaves README.md alone.
     pkg('libpng', { name: '@x/wasm-libpng', version: '1.6.59-3', description: 'libpng | PNG' });
+    assert.equal(checkReadme(root).ok, true);
+    // An upstream bump rewrites a versioned description: README row left behind.
+    pkg('libpng', { name: '@x/wasm-libpng', version: '1.6.60-1', description: 'libpng 1.6.60 | PNG' });
     assert.equal(checkReadme(root).ok, false);
     writeFileSync(join(root, 'README.md'), `# r\n\n${renderTable(root)}\n\ntail\n`);
     assert.equal(checkReadme(root).ok, true);

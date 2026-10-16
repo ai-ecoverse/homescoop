@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 /**
  * Generate the root README package table from packages/<name>/package/package.json
- * (name, version, description) and recipe.yaml `builder:` (retired packages go in
- * their own table). Private packages are left out. The table lives between the
+ * (name, description) and recipe.yaml `builder:` (retired packages go in their
+ * own table). No version column: npm shows the current one, and a version per
+ * row would make every bump edit README.md, so concurrent bumps of neighbouring
+ * rows conflict. Descriptions can carry upstream versions, which
+ * sync-package-version rewrites on an upstream bump, so ladder-pr's recipe-sha
+ * job regenerates the table too. Private packages are left out. The table lives between the
  * `<!-- packages:start -->` and `<!-- packages:end -->` markers (#639, #647, #659).
  *
  *   node scripts/readme-table.mjs            # print the table
@@ -51,14 +55,14 @@ export function renderTable(root = defaultRoot) {
   const rows = (list) =>
     list.map(
       (p) =>
-        `| [\`${cell(p.name)}\`](packages/${p.dir}) | **${cell(p.version)}** | ${cell(p.description)} |`
+        `| [\`${cell(p.name)}\`](https://www.npmjs.com/package/${p.name}) | [recipe](packages/${p.dir}) | ${cell(p.description)} |`
     );
-  const head = ['| npm | version | description |', '| --- | --- | --- |'];
+  const head = ['| npm | recipe | description |', '| --- | --- | --- |'];
   const active = pkgs.filter((p) => !p.retired);
   const retired = pkgs.filter((p) => p.retired);
   const lines = [START, ...head, ...rows(active)];
   if (retired.length) {
-    lines.push('', 'Retired (`builder: retired`; no longer built or published, last version shown):', '', ...head, ...rows(retired));
+    lines.push('', 'Retired (`builder: retired`; no longer built or published):', '', ...head, ...rows(retired));
   }
   lines.push(END);
   return lines.join('\n');

@@ -120,8 +120,8 @@ jobs:
             exit 0
           fi
           if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
-            echo "::error::recipe sha256 / package version is stale on a fork PR; cannot push. Run: node scripts/refresh-recipe-sha.mjs <package> && node scripts/sync-package-version.mjs <package> --write"
-            git diff -- 'packages/*/recipe.yaml' 'packages/*/package/package.json'
+            echo "::error::recipe sha256 / package version / README package table is stale on a fork PR; cannot push. Run: node scripts/refresh-recipe-sha.mjs <package> && node scripts/sync-package-version.mjs <package> --write && node scripts/readme-table.mjs --write"
+            git diff -- 'packages/*/recipe.yaml' 'packages/*/package/package.json' 'packages/*/package/README.md' README.md
             exit 1
           fi
           git config user.name "github-actions[bot]"
