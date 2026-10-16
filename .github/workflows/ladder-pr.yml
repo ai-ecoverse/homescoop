@@ -177,6 +177,9 @@ jobs:
             .homescoop-out/packaging-only-diff.txt
           if-no-files-found: error
           retention-days: 14
+      - if: always()
+        continue-on-error: true
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.21.0
 
   rebuild:
     needs: [detect, recipe-sha]
@@ -211,6 +214,9 @@ jobs:
             .homescoop-out/package.tgz.sha256
           if-no-files-found: error
           retention-days: 3
+      - if: always()
+        continue-on-error: true
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.21.0
 
   reproducible:
     needs: [detect, recipe-sha, host-build, rebuild]
@@ -313,6 +319,9 @@ jobs:
           else
             node --test 'e2e/*.test.mjs'
           fi
+      - if: always()
+        continue-on-error: true
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.21.0
 
   cert:
     needs: [detect, recipe-sha, host-build]
@@ -427,6 +436,9 @@ jobs:
             --tarball .homescoop-out/package.tgz
       - name: Host cert (cert/meta.json ci commands)
         run: node scripts/browser-cert/cert-leg.mjs ci "${{ matrix.package }}"
+      - if: always()
+        continue-on-error: true
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.21.0
 
   slicc-note:
     needs: detect
