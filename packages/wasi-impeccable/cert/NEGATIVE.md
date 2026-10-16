@@ -60,3 +60,21 @@ Rust 1.98.1 builds its self-contained wasm32-wasip1-threads libc with
 the same at both tags, so only the heading and the URLs were wrong.
 `scripts/check-rust-wasi-sdk.mjs` now checks the table against that
 Dockerfile on every build.
+
+## CARGO_HOME registry paths in impeccable.wasm (0.1.15-1, homescoop#471)
+
+0.1.15-1 built without `--remap-path-prefix`, so the panic locations of the registry crates kept the runner's paths. `strings bin/impeccable.wasm` on the published 0.1.15-1 finds 203 of them (`/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/regex-automata-0.4.18/…`, `zlib-rs-0.6.7`, `png-0.18.1`, …), so its bytes depend on where CARGO_HOME is. 0.1.15-3's host-path guard (`/Users/|/home/[^/]+/|/tmp/|/private/(tmp|var)/|/var/folders/|/rustup/`) matches all 203 and fails the build. The old guard (`/Users/[^/]+/Developer|/var/folders/`) matched none.
+
+With the remap, two macOS builds with different CARGO_HOMEs (`~/.cargo` and a fresh `/tmp/…/cargo2`, which downloaded every crate again) and different work trees (`/tmp/…` and `~/.cache/…`) gave the same `impeccable.wasm` (sha256 `9d4eaf1e…`, 2026-10-16). It has 203 `/cargo/registry/…` paths and no host path.
+
+## No telemetry verb (0.1.14-2, homescoop#482)
+
+`cert/telemetry.mjs` on the published 0.1.14-2 (slicc-kernel 1.94.0, users enforce) fails at its first step:
+
+```text
+AssertionError [ERR_ASSERTION]: rc=1
+--- stderr
+Unknown command: "telemetry"
+```
+
+The spec doesn't pass vacuously. With its roll API inverted to demand the opposite header on opted-out rolls, it fails on 0.1.15-3 at the first opted-out roll: `SURFACE CONCEPT SEED (key: off-1; mode: unscoped; source: degraded; …)`.

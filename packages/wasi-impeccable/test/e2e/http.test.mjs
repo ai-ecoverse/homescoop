@@ -92,6 +92,7 @@ function network ({ zip = bundle } = {}) {
       if (u.href === 'https://impeccable.style/api/download/bundle/universal') return reply(302, { location: RELEASE })
       if (u.href === 'https://impeccable.style/api/version') return json(JSON.stringify({ skills: SKILL_VERSION }))
       if (u.host === 'impeccable.style' && u.pathname === '/api/roll') return json(roll)
+      if (u.href === 'https://impeccable.style/api/chosen' && init.method === 'POST') return json('{}')
       if (u.href === RELEASE) return reply(200, {}, zip)
       if (u.href === `${RELEASE}.sig.json`) return reply(200, {}, signature)
       if (u.href === 'https://api.openai.com/v1/images/generations') {
@@ -216,6 +217,33 @@ test('concept-seed rolls through the impeccable.style API', async () => {
     kernel.terminate()
   }
 })
+
+// homescoop#482: 0.1.15's telemetry. Opted out (DO_NOT_TRACK=1), the roll
+// still goes to the API but says X-Impeccable-Telemetry: off, and the
+// choice ping is never sent; opted in, the ping is sent.
+for (const [label, env, off] of [['opted out', { DO_NOT_TRACK: '1' }, true], ['DO_NOT_TRACK=0', { DO_NOT_TRACK: '0' }, false]]) {
+  test(`concept-seed telemetry, ${label}`, async () => {
+    const net = network()
+    const kernel = await kernelWith(net)
+    try {
+      await kernel.writeFile('/home/proj/PRODUCT.md', '# Product\n\nA quiet note-taking app for field researchers.\n')
+      const run = args => kernel.run(['impeccable', 'concept-seed', ...args], { cwd: '/home/proj', env: { ...ENV, ...env } })
+      const roll = await run(['--scope', 'surface', '--from', 'e2e-telemetry'])
+      assert.equal(roll.status, 0, output(roll))
+      assert.match(roll.stdout, /source: api/)
+      const call = net.requests.find(r => r.url.startsWith('https://impeccable.style/api/roll?'))
+      assert.ok(call, `no roll request: ${net.requests.map(r => r.url)}`)
+      assert.equal(call.headers.get('x-impeccable-telemetry'), off ? 'off' : null)
+      const ping = await run(['--kind', 'assigned', '--from', 'e2e-telemetry', '--scope', 'surface'])
+      assert.equal(ping.status, 0, output(ping))
+      assert.equal(ping.stdout, off ? 'choice ping skipped\n' : 'choice recorded\n')
+      const chosen = net.requests.filter(r => r.url === 'https://impeccable.style/api/chosen')
+      assert.equal(chosen.length, off ? 0 : 1, chosen.map(r => r.body?.toString()).join('\n'))
+    } finally {
+      kernel.terminate()
+    }
+  })
+}
 
 test('https without a proxy fails clearly instead of attempting TLS', async () => {
   const kernel = await kernelWith(network())
