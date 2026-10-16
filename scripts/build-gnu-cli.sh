@@ -126,4 +126,8 @@ fi
 echo "  PRESTAGE: $BIN_NAME glue has execWait (slicc execve linked)"
 
 homescoop_stage_license "$SRC_DIR"/COPYING "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING.LIB
+# THIRD-PARTY-NOTICES.md: the wasm links Emscripten's runtime (homescoop#684).
+# package.json files[] ships it. gawk's build.sh writes its own after this.
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== $NAME: staged → $HOMESCOOP_PKG/package"

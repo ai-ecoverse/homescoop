@@ -43,4 +43,6 @@ if [[ -f "$SRC/gzip.js" && ! -f "$SRC/gzip" ]]; then mv "$SRC/gzip.js" "$SRC/gzi
 test -f "$SRC/gzip.wasm" || test -f "$SRC/gzip"
 homescoop_stage_cli "$SRC" gzip
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== gzip: staged → $HOMESCOOP_PKG/package"
