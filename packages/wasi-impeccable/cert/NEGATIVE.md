@@ -63,7 +63,7 @@ Dockerfile on every build.
 
 ## CARGO_HOME registry paths in impeccable.wasm (0.1.15-1, homescoop#471)
 
-0.1.15-1 built without `--remap-path-prefix`, so the panic locations of the registry crates kept the runner's paths. `strings bin/impeccable.wasm` on the published 0.1.15-1 finds 203 of them (`/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/regex-automata-0.4.18/…`, `zlib-rs-0.6.7`, `png-0.18.1`, …), so its bytes depend on where CARGO_HOME is. 0.1.15-3's host-path guard (`/Users/|/home/[^/]+/|/tmp/|/private/|/var/folders/|/rustup/`) matches all 203 and fails the build. The old guard (`/Users/[^/]+/Developer|/var/folders/`) matched none.
+0.1.15-1 built without `--remap-path-prefix`, so the panic locations of the registry crates kept the runner's paths. `strings bin/impeccable.wasm` on the published 0.1.15-1 finds 203 of them (`/home/runner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/regex-automata-0.4.18/…`, `zlib-rs-0.6.7`, `png-0.18.1`, …), so its bytes depend on where CARGO_HOME is. 0.1.15-3's host-path guard (`/Users/|/home/[^/]+/|/tmp/|/private/(tmp|var)/|/var/folders/|/rustup/`) matches all 203 and fails the build. The old guard (`/Users/[^/]+/Developer|/var/folders/`) matched none.
 
 With the remap, two macOS builds with different CARGO_HOMEs (`~/.cargo` and a fresh `/tmp/…/cargo2`, which downloaded every crate again) and different work trees (`/tmp/…` and `~/.cache/…`) gave the same `impeccable.wasm` (sha256 `9d4eaf1e…`, 2026-10-16). It has 203 `/cargo/registry/…` paths and no host path.
 

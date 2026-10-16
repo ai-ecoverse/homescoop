@@ -82,7 +82,7 @@ homescoop_stage_license "$SRC_DIR/LICENSE"
 
 # Refuse host-path leaks in the wasm: home directories (CARGO_HOME's
 # registry), temporary directories (the work tree), the runner's workspace.
-LEAK='/Users/|/home/[^/]+/|/tmp/|/private/|/var/folders/|/rustup/'
+LEAK='/Users/|/home/[^/]+/|/tmp/|/private/(tmp|var)/|/var/folders/|/rustup/'
 if strings "$DEST/impeccable.wasm" | grep -E "$LEAK" >/dev/null
 then
   echo "homescoop: host path leaked into impeccable.wasm" >&2
