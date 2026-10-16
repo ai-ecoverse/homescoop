@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * A repack's input must be attested (cert lane rule, 2026-10-16, from #730).
+ * A repack's input must be attested (cert lane rule, 2026-10-16, from #730),
+ * and so must every built recipe's (#864).
  *
  *   node scripts/cert-review/repack-input.mjs --package <recipe dir> [--ref <commit>]
  *     [--repo owner/repo] [--npm <name>] [--reproduced <file.json>] [--fixtures <dir>]
  *   → JSON on stdout: { package, npm, repack, chain, root, attested, reason }
- *     exit 0 when the input is attested (or the recipe isn't a repack), 1 when it
+ *     exit 0 when the input is attested, 1 when it
  *     is unverifiable, 2 when the trace itself couldn't run.
  *
  * A packaging-only repack (recipe.yaml `repack: from:`) reuses the bytes of a
@@ -31,6 +32,25 @@
  *     path it took, and a default stage dir can be filled by a cache, so a
  *     prebuilt path that was *possible* already makes the root unverifiable.
  *
+ * A recipe that isn't a repack (#864, cert lane ruling on #858/#859) is held
+ * to the same static rule at <ref> itself: its recipe and build scripts must
+ * fetch the pinned source with the recipe's sha and have no stage or prebuilt
+ * path. Its output is { repack: false, built: true, attested, reason }; it
+ * needs no provenance, since the bytes under review are the PR's own build.
+ *
+ * A recipe whose source is committed to this repo declares it, instead of
+ * source.url/sha256 (a root kind, accepted by the cert lane on #864):
+ *
+ *   source:
+ *     in-tree: "src Cargo.toml Cargo.lock"   # paths under packages/<pkg>/
+ *
+ * The declaration is verified, never trusted: every path must be in the tree
+ * being judged (the root's commit, or <ref>); the package build files must
+ * download nothing a pinned sha256 doesn't cover (no curl, wget, git
+ * clone/fetch, or homescoop_fetch without a literal sha256: unpinnedFetches);
+ * and the prebuilt rule applies as for any build. One that fails is
+ * unverifiable, never skipped.
+ *
  * A root with no attestation can still count if it was reproduced from its
  * pinned source: --reproduced is a JSON object { "<npm>@<version>":
  * "<dist.integrity of an independent rebuild>" }, and it counts when the
@@ -47,7 +67,7 @@
  * <dir>/attestations/<npm, / as %2f>@<version>.json, <dir>/tree/<commit>/<path>).
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -155,24 +175,61 @@ export function buildFiles(readAt, commit, pkg) {
     const text = read(path);
     files.push({ path, text });
     const body = stripComments(text).join('\n');
+    const loops = loopWords(body);
     for (const m of body.matchAll(/[^\s;|&<>=`]*\.(?:sh|bash)\b/g)) {
-      const ref = m[0].replace(/["']+$/, '');
-      const { paths, explicit } = resolveRef(ref, path, pkg);
-      const found = paths.find((p) => p === path || seen.has(p) || read(p) != null);
-      if (!found) {
-        if (explicit) problems.push(`${path} runs ${ref}, which isn't in the tree`);
+      const raw = m[0].replace(/["']+$/, '');
+      const refs = expandLoopVars(raw, loops);
+      if (!refs) {
+        problems.push(`${path} runs ${raw}, whose package name is a variable this rule can't resolve (only a literal name, or a for-loop over literal names, can be followed)`);
         continue;
       }
-      if (seen.has(found)) continue;
-      if (depth + 1 > MAX_DEPTH) {
-        problems.push(`${path} runs ${found} past the depth cap of ${MAX_DEPTH}`);
-        continue;
+      for (const ref of refs) {
+        // A package's own build.sh (packages/<x>/…) runs with HOMESCOOP_PKG = <x>.
+        const owner = path.match(/^packages\/([^/]+)\//)?.[1] || pkg;
+        const { paths, explicit } = resolveRef(ref, path, owner);
+        const found = paths.find((p) => p === path || seen.has(p) || read(p) != null);
+        if (!found) {
+          if (explicit) problems.push(`${path} runs ${ref}, which isn't in the tree`);
+          continue;
+        }
+        if (seen.has(found)) continue;
+        if (depth + 1 > MAX_DEPTH) {
+          problems.push(`${path} runs ${found} past the depth cap of ${MAX_DEPTH}`);
+          continue;
+        }
+        seen.add(found);
+        queue.push({ path: found, depth: depth + 1 });
       }
-      seen.add(found);
-      queue.push({ path: found, depth: depth + 1 });
     }
   }
   return { files, problems };
+}
+
+/** `for <var> in <literal words>; do` loops in a script: Map var → words. */
+export function loopWords(body) {
+  const out = new Map();
+  for (const m of String(body).matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^;\n]*?)\s*(?:;|\n)\s*do\b/g)) {
+    const words = m[2].trim().split(/\s+/).map((w) => w.replace(/^(["'])(.*)\1$/, '$2'));
+    if (!words.length || !words.every((w) => /^[A-Za-z0-9_.+-]+$/.test(w))) continue;
+    out.set(m[1], [...new Set([...(out.get(m[1]) || []), ...words])]);
+  }
+  return out;
+}
+
+/**
+ * The references a script path with loop variables stands for: one per loop
+ * word ("packages/$r/build.sh" in `for r in a b; do` → packages/a/…, packages/b/…).
+ * null when a package name under packages/ is still a variable afterwards,
+ * so the caller fails closed instead of guessing.
+ */
+export function expandLoopVars(ref, loops) {
+  let refs = [ref];
+  for (const [name, words] of loops) {
+    const re = new RegExp(`\\$(?:\\{${name}\\}|${name}(?![A-Za-z0-9_]))`, 'g');
+    refs = refs.flatMap((r) => (re.test(r) ? words.map((w) => r.replace(re, w)) : [r]));
+  }
+  if (refs.some((r) => /(?:^|\/)packages\/[^/]*\$/.test(r))) return null;
+  return refs;
 }
 
 /** Prebuilt inputs the build files could take: [{ path, line, why }]. */
@@ -248,6 +305,86 @@ export function checkProvenance(doc, { npm, version, integrity }) {
 }
 
 /**
+ * The static root rule, for one recipe at one commit (cert lane, 2026-10-16;
+ * #834 for repack roots, #864 for every build): the recipe pins a source
+ * sha256, the build fetches it with homescoop_fetch, and no stage or prebuilt
+ * path is possible. `label` names the build in the reasons ("root 1.0.0-1",
+ * "the build at <ref>"). Throws if the tree can't be read (fail closed).
+ * @returns {{ reasons: string[], sha: string, files: { path: string, text: string }[] | null, prebuilt: { path: string, line: number, why: string }[] }}
+ */
+export function sourceRule({ pkg, commit, readAt, recipe, label }) {
+  const reasons = [];
+  const source = recipe.source && typeof recipe.source === 'object' ? recipe.source : {};
+  const sha = source.sha256 || '';
+  const inTree = Object.hasOwn(source, 'in-tree') ? String(source['in-tree']).trim() : null;
+  const build = buildFiles(readAt, commit, pkg);
+  let prebuilt = [];
+  if (!build) {
+    reasons.push(`${label}'s tree has no packages/${pkg}/build.sh`);
+  } else {
+    prebuilt = prebuiltInputs(build.files);
+    if (prebuilt.length) {
+      const lead = label.startsWith('root ') ? 'root staged a prebuilt artifact' : `${label} can stage a prebuilt artifact`;
+      reasons.push(`${lead}: ${label}'s build can take ${prebuilt.map((h) => `${h.why} (${h.path}:${h.line})`).join(', ')}`);
+    }
+    if (build.problems.length) reasons.push(`${label}'s build can't be read in full: ${build.problems.join(', ')}`);
+  }
+  if (inTree !== null) {
+    // An in-tree source (a root kind, not an exception): the declaration is
+    // verified, never trusted. A declaration that fails is unverifiable.
+    reasons.push(...inTreeReasons({ pkg, commit, readAt, source, paths: inTree, files: build ? build.files : [], label }));
+    return { reasons, sha: '', inTree: inTree.split(/\s+/).filter(Boolean), files: build ? build.files : null, prebuilt };
+  }
+  if (build && !fetchesPinnedSource(build.files, sha)) reasons.push(`${label}'s build never fetches the pinned source (no homescoop_fetch of $SRC_SHA, $SHA or ${sha || 'source.sha256'})`);
+  if (!/^[0-9a-f]{64}$/.test(sha)) reasons.push(`${label}'s recipe pins no source sha256 (${sha || 'none'})`);
+  return { reasons, sha, inTree: null, files: build ? build.files : null, prebuilt };
+}
+
+/**
+ * Downloads in the package build files (packages/…/*.sh) that no pinned
+ * sha256 covers: curl, wget, git clone/fetch, and a homescoop_fetch whose
+ * sha256 isn't a 64-hex literal. The shared scripts/*.sh helpers aren't
+ * scanned: their downloads are homescoop_fetch or toolchain installers that
+ * check a pinned sha256 (install-emsdk.sh, install-go.sh, …), reviewed as
+ * repo code.
+ */
+export function unpinnedFetches(files) {
+  const hits = [];
+  for (const { path, text } of files) {
+    if (!path.startsWith('packages/')) continue;
+    const lines = stripComments(text).join('\n').replace(/\\\n\s*/g, ' ').split('\n');
+    lines.forEach((line, i) => {
+      for (const m of line.matchAll(/(?<![-\w/.$])(curl|wget)\s+\S|\bgit\s+(?:-C\s+\S+\s+)?(clone|fetch)\b/g)) {
+        if (/command\s+-v\s*$/.test(line.slice(0, m.index))) continue;
+        hits.push({ path, line: i + 1, why: m[1] ? `a ${m[1]} download` : `a git ${m[2]}` });
+      }
+      for (const m of line.matchAll(/\bhomescoop_fetch\s+("[^"]*"|'[^']*'|\S+)\s+("[^"]*"|'[^']*'|\S+)/g)) {
+        if (!/^[0-9a-f]{64}$/.test(m[2].replace(/^["']|["']$/g, ''))) hits.push({ path, line: i + 1, why: `a homescoop_fetch of ${m[1]} with no literal sha256` });
+      }
+    });
+  }
+  return hits;
+}
+
+/** Why a `source: in-tree:` declaration doesn't hold at <commit> (empty when it does). */
+export function inTreeReasons({ pkg, commit, readAt, source, paths, files, label }) {
+  const reasons = [];
+  if (source.url || source.sha256) reasons.push(`${label}'s recipe declares an in-tree source and also source.url/sha256`);
+  const list = paths.split(/\s+/).filter(Boolean);
+  if (!list.length) reasons.push(`${label}'s recipe declares an in-tree source with no paths`);
+  for (const p of list) {
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.+\/-]*$/.test(p) || p.split('/').includes('..')) {
+      reasons.push(`${label}'s in-tree source path ${p} isn't a plain path inside packages/${pkg}`);
+    } else if (readAt(commit, `packages/${pkg}/${p}`) == null) {
+      reasons.push(`${label}'s in-tree source packages/${pkg}/${p} isn't in its tree ${commit.length === 40 ? commit.slice(0, 12) : commit}`);
+    }
+  }
+  const fetched = unpinnedFetches(files);
+  if (fetched.length) reasons.push(`${label}'s in-tree build downloads what no pinned sha256 covers: ${fetched.map((h) => `${h.why} (${h.path}:${h.line})`).join(', ')}`);
+  return reasons;
+}
+
+/**
  * Follow `repack: from:` back to the first built version and decide whether it is attested.
  * @param {{ pkg: string, npm: string, from: string,
  *   registry: { packument(npm: string): Promise<any>, attestations(npm: string, version: string): Promise<any> },
@@ -282,23 +419,13 @@ export async function trace({ pkg, npm, from, registry, readAt, reproduced = {} 
     }
     // The root: the first version that was actually built.
     const root = version;
-    const reasons = [];
-    const sha = recipe.source && typeof recipe.source === 'object' ? recipe.source.sha256 : '';
-    const build = buildFiles(readAt, commit, pkg);
-    const files = build?.files;
-    if (!build) {
-      reasons.push(`root ${root}'s tree has no packages/${pkg}/build.sh`);
-    } else {
-      const hits = prebuiltInputs(files);
-      if (hits.length) {
-        reasons.push(`root staged a prebuilt artifact: ${root}'s build can take ${hits.map((h) => `${h.why} (${h.path}:${h.line})`).join(', ')}`);
-      }
-      if (build.problems.length) reasons.push(`root ${root}'s build can't be read in full: ${build.problems.join(', ')}`);
-      if (!fetchesPinnedSource(files, sha)) reasons.push(`root ${root}'s build never fetches the pinned source (no homescoop_fetch of $SRC_SHA, $SHA or ${sha || 'source.sha256'})`);
-      link.buildFiles = files.map((f) => f.path);
-      link.prebuilt = hits;
+    const rule = sourceRule({ pkg, commit, readAt, recipe, label: `root ${root}` });
+    const reasons = [...rule.reasons];
+    const { sha } = rule;
+    if (rule.files) {
+      link.buildFiles = rule.files.map((f) => f.path);
+      link.prebuilt = rule.prebuilt;
     }
-    if (!/^[0-9a-f]{64}$/.test(sha || '')) reasons.push(`root ${root}'s recipe pins no source sha256 (${sha || 'none'})`);
     link.sourceSha256 = sha || null;
     const rebuilt = reproduced[`${npm}@${root}`];
     const reproducedOk = Boolean(rebuilt) && rebuilt === meta.dist?.integrity;
@@ -307,7 +434,8 @@ export async function trace({ pkg, npm, from, registry, readAt, reproduced = {} 
       reasons.push(`root ${root} has no provenance from homescoop's ladder on main (${prov.reason}) and no reproducible rebuild on record${rebuilt ? ' (a rebuild gave other bytes)' : ''}`);
     }
     if (reasons.length) return result(false, reasons.join('; '), root);
-    return result(true, prov.ok ? `root ${root} built by ${prov.run || 'ladder-build on main'} from the pinned source` : `root ${root} reproduced from the pinned source`, root);
+    const what = rule.inTree ? 'its in-tree source' : 'the pinned source';
+    return result(true, prov.ok ? `root ${root} built by ${prov.run || 'ladder-build on main'} from ${what}` : `root ${root} reproduced from ${what}`, root);
   }
 }
 
@@ -377,18 +505,30 @@ export function fixtureReader(dir) {
   return (commit, path) => {
     if (!existsSync(join(dir, 'tree', commit))) throw new Error(`commit ${commit} isn't in the fixtures`);
     const file = join(dir, 'tree', commit, path);
-    return existsSync(file) ? readFileSync(file, 'utf8') : null;
+    if (!existsSync(file)) return null;
+    // A directory reads as its listing, as `git show <commit>:<dir>` does.
+    return statSync(file).isDirectory() ? readdirSync(file).sort().join('\n') : readFileSync(file, 'utf8');
   };
 }
 
-/** The repack-input verdict for one recipe at <ref> (a recipe with no repack: is { repack: false }). */
+/** The input verdict for one recipe at <ref>: a repack is traced to its root; a built recipe ({ repack: false, built: true }) gets the root rule itself. */
 export async function repackInput({ pkg, ref, npm, readAt, registry, reproduced }) {
   const text = readAt(ref, `packages/${pkg}/recipe.yaml`);
   if (text == null) throw new Error(`no packages/${pkg}/recipe.yaml at ${ref}`);
   const recipe = parseRecipe(text);
   const from = recipe.repack && typeof recipe.repack === 'object' ? recipe.repack.from : '';
   const name = npm || recipe.npm || `@ai-ecoverse/${pkg}`;
-  if (!from) return { package: pkg, npm: name, repack: false, chain: [], root: null, attested: null, reason: 'not a repack' };
+  if (!from) {
+    // A built recipe (#864): the same static rule a repack's root must meet,
+    // on the recipe and build scripts at <ref> itself. No provenance check:
+    // the bytes under review are this pull request's own ladder-pr build.
+    const label = `${pkg} at ${/^[0-9a-f]{40}$/.test(ref) ? ref.slice(0, 12) : ref}`;
+    const rule = sourceRule({ pkg, commit: ref, readAt, recipe, label });
+    const out = { package: pkg, npm: name, repack: false, built: true, chain: [], root: null, buildFiles: rule.files ? rule.files.map((f) => f.path) : [], prebuilt: rule.prebuilt, sourceSha256: rule.sha || null };
+    if (rule.reasons.length) return { ...out, attested: false, reason: rule.reasons.join('; ') };
+    if (rule.inTree) return { ...out, inTree: rule.inTree, attested: true, reason: `${label} builds its in-tree source (${rule.inTree.join(', ')}), downloads nothing unpinned and can't stage a prebuilt` };
+    return { ...out, attested: true, reason: `${label} fetches the pinned source (${rule.sha}) and can't stage a prebuilt` };
+  }
   return trace({ pkg, npm: name, from, registry, readAt, reproduced });
 }
 
