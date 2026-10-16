@@ -167,3 +167,11 @@ The published 3.14.2-21 (npm sha512-JZN9ayQh…) on slicc-kernel 1.100.4's Node 
   The child's `v.value += 5` and `a[0] = 9` are lost silently (start() and exit 0, the parent still sees 1 and [1, 2]). `shared_memory` imports and creates a segment, and the resource tracker then warns about a leaked shared_memory object at shutdown.
 - **`native-id.mjs` fails at its first assertion.** On -21 `hasattr(threading, "get_native_id")` is False, and the scipy part (`scipy.fft.set_backend("scipy")`, py-scipy 1.18.0-11) raises `AttributeError: module 'threading' has no attribute 'get_native_id'` (homescoop#587). With `get_native_id` monkeypatched in, the same scipy calls give fft `[6, -1.5+0.866j, -1.5-0.866j]`, so the rest of the spec doesn't depend on anything else.
 - **`sqlite-vfs.mjs` (#621) fails on -21** (unix-dotfile VFS, slicc-kernel 1.102.5 Node entry). The sibling connection can't even read while the first one holds `BEGIN IMMEDIATE`: `select count(*)` raises `sqlite3.OperationalError: database is locked` (rc 1), because the dotfile lock shuts out readers too. Forcing the unix VFS on the same -21 binary (`file:…?vfs=unix`, which -22 made the default) passes every case.
+
+## 3.14.2-24: negative 3.14.2-23 (homescoop#515, #669)
+
+The published 3.14.2-23 (wasix-sysroot -30) on slicc-kernel 1.102.5's Node entry: `mp-manager.mjs` fails at its first step. `getsockname()` of a bound AF_UNIX socket, the client's `getpeername()` and the accept address are all `(0, b'')`, and `mp.Manager()` dies at the first proxy call, rc 1:
+```
+TypeError: str, bytes or bytearray expected, not int
+```
+So the advice of -23's shared-ctypes `NotImplementedError` ("use … a Manager") fails too (#669). With `getsockname` patched in Python (what -31's libc does) the same python passes the Manager part, and a Manager `Value(1)` and list passed to a spawned child come back as 6 and `['child']`.
