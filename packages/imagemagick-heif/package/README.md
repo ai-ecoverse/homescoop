@@ -109,19 +109,23 @@ The libheif, libde265 and dav1d builds are the ones in
 ## Relinking (LGPL)
 
 `share/imagemagick-heif/relink/` holds what you need to relink `magick`
-against your own libheif or libde265: magick's objects (`magick.a`,
+against your own libheif, libde265 or GNU libiconv (LGPL-2.1-or-later), or
+any other of its libraries: magick's objects (`magick.a`,
 `libMagickCore-7.Q16HDRI.a`, `libMagickWand-7.Q16HDRI.a`), the other static
 libraries (`liblcms2.a`, `libtiff.a`, `libjpeg.a`, `libfreetype.a`,
 `libpng16.a`, `libz.a`, `libwebpmux.a`, `libwebpdemux.a`, `libwebp.a`,
 `libsharpyuv.a`, `libopenjp2.a`, `libxml2.a`, `libiconv.a`, the slicc shims
 `libslicc-cli.a` and `libslicc_cred.a`), the link flags (`ldflags.txt`, with
-the `--js-library` files in `js/`) and `relink.sh`. libheif, libde265 and dav1d themselves come from
-`@ai-ecoverse/wasm-libheif` (its `lib/`) or from your own build. With
-Emscripten 4.0.23:
+the `--js-library` files in `js/`) and `relink.sh`. The directory you pass
+holds libheif, libde265 and dav1d (`libheif.a`, `libde265.a`, `libdav1d.a`,
+from `@ai-ecoverse/wasm-libheif`'s `lib/` or your own build), and any other
+library in it replaces the kit's copy of the same name. With Emscripten
+4.0.23:
 
 ```bash
 cd node_modules/@ai-ecoverse/wasm-imagemagick-heif
-bash share/imagemagick-heif/relink/relink.sh /tmp/relinked /path/to/dir/with/libheif.a+libde265.a+libdav1d.a
+mkdir -p /tmp/libs && cp ../wasm-libheif/lib/*.a /path/to/your/libiconv.a /tmp/libs/
+bash share/imagemagick-heif/relink/relink.sh /tmp/relinked /tmp/libs
 cp /tmp/relinked/magick /tmp/relinked/magick.wasm bin/
 ```
 

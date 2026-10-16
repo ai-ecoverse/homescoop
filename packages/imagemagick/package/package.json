@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-imagemagick",
-  "version": "7.1.2-34-3",
+  "version": "7.1.2-34-4",
   "description": "ImageMagick 7.1.2-34 magick CLI for wasm / slicc (emscripten)",
   "license": "ImageMagick",
   "repository": {
@@ -28,6 +28,9 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "engines": {
+    "slicc-kernel": ">=1.44.0"
   },
   "homescoop": {
     "recipe": "imagemagick",
