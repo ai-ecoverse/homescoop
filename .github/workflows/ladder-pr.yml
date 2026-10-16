@@ -517,6 +517,36 @@ jobs:
         run: |
           echo "::notice::slicc builder package(s) ${{ needs.detect.outputs.slicc }} — PR host check skipped; merge still dispatches ladder-build (needs SLICC secrets)."
 
+  # Informational: one PR comment, updated in place, listing the open
+  # `next-build` issues that name a touched package, so per-recipe known issues
+  # get fixed when the recipe is next built. Never blocks: not in ci's needs,
+  # and continue-on-error (fork PRs get a read-only token and can't comment).
+  known-issues:
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Comment known next-build issues for touched packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/known-issues-comment.mjs \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}"
+
   ci:
     needs: [exact-pins, detect, recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert, slicc-note]
     if: ${{ always() }}
