@@ -67,7 +67,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-lcms2` | host | **2.17.0-1**; dep `@ai-ecoverse/wasm-zlib` |
 | `@ai-ecoverse/wasm-libwebp` | host | **1.5.0-2** |
 | `@ai-ecoverse/wasm-libxml2` | host | **2.13.8-1** |
-| `@ai-ecoverse/wasm-freetype` | host | **2.13.3-2** |
+| `@ai-ecoverse/wasm-freetype` | host | **2.13.3-3** |
 | `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-5** (slicc `libc_gaps` / `slicc_sigpipe`) |
 | `@ai-ecoverse/wasm-libpng` | host | **1.6.50**; dep `@ai-ecoverse/wasm-zlib` |
 | `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2-3** (emcmake, no SIMD) |

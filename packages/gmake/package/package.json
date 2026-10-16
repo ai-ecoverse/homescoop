@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-gmake",
-  "version": "4.4.1-4",
+  "version": "4.4.1-5",
   "description": "GNU make for slicc (rebuild sweep wasix-sysroot 2025.9.30-14; emscripten ABI)",
   "license": "GPL-3.0-or-later",
   "repository": {
