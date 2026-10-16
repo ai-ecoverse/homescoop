@@ -1,5 +1,9 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-29: no named semaphores between processes (-30, homescoop#486)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-29.tgz --probe r30` with `R30_SEM=1` on slicc-kernel 1.99.0, which has `slicc.sem_*` (2026-10-16): FAIL with `R30_SEM=1 but sem_open: No such file or directory`. -29's musl `sem_open` creates `/dev/shm/sem.r30a`, which this kernel doesn't keep (slicc-kernel#716). Even with a working `/dev/shm`, the `MAP_SHARED` page it maps wouldn't be shared with a forked or spawned process. -30 passes every r30 line in all five variants.
+
 ## 2025.9.30-28: poll/ppoll refuse events 0, epoll_ctl misnumbers its ops (-29, homescoop#394, #443)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-28.tgz --probe r29 --kernel-dir <slicc-kernel 1.97.0>`, default variant, 2026-10-16: FAIL. Every poll/ppoll case is ENOSYS; `epoll_create1` drops `EPOLL_CLOEXEC`; a second ADD "succeeds" (it arrives as WASIX op 1, which the kernel takes as add-or-modify); errors come back as positive values (44 ENOENT, 28 EINVAL) instead of -1; `data.u64` 0x100000000 comes back as the fd (14) with garbage above; `epoll_wait` stops at 64; `epoll_pwait` ignores its mask and sleeps its 3 s:

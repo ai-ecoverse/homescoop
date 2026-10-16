@@ -569,6 +569,55 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
+echo "== wasix-sysroot: -30 fcntl F_GETLK/F_SETLK/F_SETLKW through slicc.fcntl_lock (homescoop#407, slicc-kernel#722), lockf"
+for v in "${VARIANTS[@]}"; do
+  python3 - "$PKG/$v/include" <<'PYHDR'
+import sys
+from pathlib import Path
+inc = Path(sys.argv[1])
+edits = [
+    (inc / "__header_fcntl.h", "#define F_DUPFD_CLOEXEC (6)\n", "#define F_DUPFD_CLOEXEC (6)\n#define F_GETLK (12)\n#define F_SETLK (13)\n#define F_SETLKW (14)\n#define F_RDLCK (0)\n#define F_WRLCK (1)\n#define F_UNLCK (2)\n"),
+    (inc / "unistd.h", "#ifdef __wasilibc_unmodified_upstream /* WASI has no POSIX file locking */\nint lockf(int, int, off_t);\n#endif\n", "int lockf(int, int, off_t);\n"),
+    (inc / "unistd.h", "#ifdef __wasilibc_unmodified_upstream /* WASI has no POSIX file locking */\n#define lockf64 lockf\n#endif\n", "#define lockf64 lockf\n"),
+]
+for path, old, new in edits:
+    t = path.read_text()
+    if old not in t and new in t:
+        continue
+    if t.count(old) != 1:
+        sys.exit(f"{path}: not found: {old.splitlines()[0]}")
+    path.write_text(t.replace(old, new))
+PYHDR
+done
+R30L_OBJ="$WORK/r30l"
+rm -rf "$R30L_OBJ" && mkdir -p "$R30L_OBJ/static" "$R30L_OBJ/pic"
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  compile_r18 fcntl "$R30L_OBJ/$flavour/fcntl.o" "${extra[@]}"
+  compile_r20 "$MUSL/src/misc/lockf.c" "$R30L_OBJ/$flavour/lockf.o" "${MUSL_INC[@]}" "${extra[@]}"
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R30L_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" fcntl.o)
+  missing="$(comm -23 <(exported "$old/fcntl.o") <(exported "$R30L_OBJ/$flavour/fcntl.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v fcntl.o lacks: $missing" >&2; exit 1; }
+  if grep -qx lockf.o <<<"$("$LLVM_AR" t "$lib")"; then echo "homescoop: $lib already has lockf.o" >&2; exit 1; fi
+  "$LLVM_AR" r "$lib" "$R30L_OBJ/$flavour/fcntl.o" "$R30L_OBJ/$flavour/lockf.o"
+  have="$(exported "$lib" 2>/dev/null)"
+  for sym in fcntl lockf lockf64; do
+    grep -qx "$sym" <<<"$have" || { echo "homescoop: $lib lacks $sym" >&2; exit 1; }
+  done
+  grep -q __slicc_fcntl_lock <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.fcntl_lock" >&2; exit 1; }
+  grep -q "#define F_SETLK (13)" "$PKG/$v/include/__header_fcntl.h"
+  ! grep -q "WASI has no POSIX file locking" "$PKG/$v/include/unistd.h"
+  echo "  $v ($flavour)"
+done
+
 echo "== wasix-sysroot: LICENSE from wasix-libc v2025-09-02.1"
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
 LIC="$WORK/licenses"

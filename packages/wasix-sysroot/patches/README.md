@@ -277,3 +277,20 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
   - `poll` and `ppoll` with a readable pipe (`POLLIN`), an idle pipe with `events` 0 and with `POLLPRI`, and fd -1: 1, only the first ready; two `events` 0 entries with a 200 ms timeout wait it out and return 0; a closed fd with `events` 0 next to an idle pipe: 1 and `POLLNVAL` at once (of 5 s); an entry with only bit 0x4: 0.
   - epoll (when the kernel has it; `R29_EPOLL=1` requires it): `EPOLL_CLOEXEC` set; ADD, ADD again EEXIST, a readable pipe reported with `data.u64` 0x100000000, MOD to `data.u64` 0 reported as 0, DEL, DEL again ENOENT, op 7 EINVAL, a pipe as the epoll fd EINVAL for ctl and wait, an idle wait 0; 70 readable pipes in one `epoll_wait(…, 100, …)`, all 70 distinct. With kernel masks: SIGUSR1 blocked and pending, `epoll_pwait(…, 3000, &empty)` is EINTR at once with the handler run and SIGUSR1 blocked again after.
   - slicc-kernel 1.93.0's signal fixes (slicc-kernel#596), with kernel masks on ≥ 1.93.0: signal 40 blocked in main is blocked in a new thread, in a forked child and in the program it `exec`s; `r29 bothterm` (main and a thread block SIGTERM, main `pthread_kill`s the thread, the thread unblocks) ends by SIGTERM, so bash prints "Terminated" and `$?` is 143. A fork from a non-main thread doesn't run the child's code on these kernels (slicc-kernel#520), so "a fork takes the forking thread's mask" is covered only from the main thread (r28).
+
+## -30: `sem.c`, named semaphores through slicc-kernel (homescoop#486, slicc-kernel#717)
+
+- **Up to -29**, musl's `sem_open` opened `/dev/shm/sem.<name>` and mapped it `MAP_SHARED`. In slicc-kernel each process has its own wasm memory, so the mapping isn't shared and a named semaphore can't synchronise processes. The kernel's `/dev/shm` also didn't keep files (slicc-kernel#716), so `sem_open` failed with ENOENT. CPython's `multiprocessing` locks are named semaphores.
+- **`sem.c`** replaces `sem_open.o` (with `sem_close`), `sem_unlink.o`, `sem_wait.o`, `sem_trywait.o`, `sem_timedwait.o`, `sem_post.o`, `sem_getvalue.o`, `sem_init.o` and `sem_destroy.o`. It `#include`s those musl sources under `__musl_*` names, including `__shm_mapname` (so there's no clash with `shm_open.o`), and dispatches:
+  - **A named semaphore** is a malloc'd `sem_t` with `__val[3]` = 0x5c1cc5e3 and `__val[0]` = the kernel handle. `sem_init` clears `__val[3]`, so an unnamed one never matches. Tagged ones go to the imports from slicc-kernel#718 (README "Named semaphores"):
+    - `slicc.sem_open(name_ptr, name_len, oflag, mode, value, handle_out)`, with oflag kernel bits 1 = O_CREAT, 2 = O_EXCL and mode `& 0777`;
+    - `sem_close(handle)`, `sem_unlink(name_ptr, name_len)` and `sem_post(handle)`;
+    - `sem_wait(handle, how, clock, deadline_ns)`: how 0 blocks, 1 tries, 2 waits until an absolute CLOCK_REALTIME deadline. A negative `tv_sec` is a deadline of 0; a bad `tv_nsec` is EINVAL;
+    - `sem_getvalue(handle, value_out)`.
+
+    Each returns a WASI errno, which the libc turns into -1 and `errno`.
+  - **Repeat opens:** a table of 256 entries (handle, `sem_t *`, count). A second `sem_open` that gets the same handle back returns the same pointer, and `sem_close` frees the `sem_t` when its count reaches 0. The table lives in program memory, so it follows `fork` (the kernel copies the handles) and is fresh after `exec` (the kernel drops them).
+  - **Names** pass through unchanged; the kernel checks them with musl's `__shm_mapname` rules.
+  - **`ENOSYS`** from `slicc.sem_open`/`sem_unlink` (an older kernel) falls back to musl's file-based code.
+  - **Unnamed** semaphores use musl's futex code, unchanged.
+- **Probe:** `test/r30.c` (asyncified for `fork`), as in the checklist. `R30_SEM=1` requires the kernel's imports.
