@@ -168,7 +168,8 @@ export default async function (ctx) {
   assert.equal(await pc(['--cflags', 'relo']), '-I/home/sdk/share/pkgconfig/../../include');
   assert.equal(await pc(['--libs', 'relo']), '-L/home/sdk/share/pkgconfig/../../lib -lrelo');
 
-  // pkgconf 3 behaviour (cert/NEGATIVE.md: each of these fails on 2.5.1-1).
+  // pkgconf 3 behaviour (cert/NEGATIVE.md: the first four fail on 2.5.1-1;
+  // the last, PKG_CONFIG_IGNORE_CONFLICTS, is the way back to 2.x).
   assert.equal(await pc(['--variable=prefix', 'zlib', 'libpng16']), '/opt/wasm /opt/wasm');
   assert.equal(await pc(['--variable=prefix', 'zlib'], { env: { PKG_CONFIG_ZLIB_PREFIX: '/env' } }), '/env');
   assert.equal(await pc(['--newlines', '--cflags', '--libs', 'zlib']), '-I/opt/wasm/include\n-L/opt/wasm/lib\n-lz');

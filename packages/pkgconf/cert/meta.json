@@ -1,5 +1,6 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "checklist": [
     "--version (pkgconf and pkg-config) is the package's homescoop.upstream",
     "--modversion against a staged .pc",
