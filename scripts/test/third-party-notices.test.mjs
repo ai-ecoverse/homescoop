@@ -12,7 +12,9 @@
 //     links) and recipe sources: (vendored tarballs), minus NOT_LINKED.
 //   - recipe notices.links (explicit list), minus recipe notices.not_linked
 //     (a map: component -> why it isn't linked).
-//   - DECLARED below, for recipes whose bundled code isn't in metadata yet.
+//   - cert/meta.json "notices" (names; scripts/browser-cert/notices.mjs checks
+//     the installed file's licence texts), which replaces DECLARED below,
+//     the issue-sourced list for packages that don't declare them yet.
 //
 // A component counts as named when a homescoop_notice heading in the
 // package's build scripts (and the shared drivers they source) names it (or homescoop_notice_emscripten /
@@ -94,8 +96,8 @@ py-scipy libf2c #729
 py-scipy files #729
 `;
 
-// Bundled code no recipe field names yet (from the issues). Move each into
-// the recipe's notices.links when the recipe is next touched.
+// Bundled code no metadata names yet (from the issues). A package's
+// cert/meta.json "notices" list, once it has one, replaces its entry here.
 const DECLARED = {
   'py-numpy': ['OpenBLAS'], // #726
   'py-scipy': ['OpenBLAS', 'libf2c'], // #729
@@ -159,7 +161,7 @@ function scriptsOf(name) {
 }
 
 /** Pure: the violations for one package, given its metadata and build script lines. */
-export function noticeViolations({ name, recipe, pkg, lines: all }) {
+export function noticeViolations({ name, recipe, pkg, lines: all, certNotices }) {
   const lines = all.filter((l) => !/^\s*#/.test(l));
   const hasWasmCommand = Object.values(pkg.slicc?.commands || {}).some((c) => c && c.wasm);
   const deps = [...asList(recipe.dependencies?.build), ...asList(recipe.dependencies?.host)].map(depName);
@@ -168,11 +170,11 @@ export function noticeViolations({ name, recipe, pkg, lines: all }) {
   if (hasWasmCommand && pkg.slicc?.abi === 'emscripten') required.add('Emscripten');
   if (hasWasmCommand && lines.some((l) => /install-wasixcc\.sh/.test(l))) required.add('wasix-libc');
   const sideModules = deps.includes('wasix-python');
-  if (hasWasmCommand || sideModules || recipe.notices) {
+  if (hasWasmCommand || sideModules || recipe.notices || certNotices?.length) {
     for (const d of deps) required.add(d);
     for (const s of Object.keys(recipe.sources || {})) required.add(s);
     for (const l of asList(recipe.notices?.links)) required.add(l);
-    for (const l of DECLARED[name] || []) required.add(l);
+    for (const l of certNotices?.length ? certNotices : DECLARED[name] || []) required.add(l);
   }
   for (const k of Object.keys(notLinked)) required.delete(k);
   if (!required.size) return [];
@@ -199,7 +201,9 @@ function allPackages() {
     if (!existsSync(join(root, 'packages', name, 'recipe.yaml')) || !existsSync(pj)) continue;
     const recipe = readRecipe(name);
     if (recipe.builder === 'retired') continue;
-    res.push({ name, recipe, pkg: JSON.parse(readFileSync(pj, 'utf8')), lines: scriptsOf(name) });
+    const meta = join(root, 'packages', name, 'cert', 'meta.json');
+    const certNotices = existsSync(meta) ? (JSON.parse(readFileSync(meta, 'utf8')).notices || []).map((n) => n.name) : [];
+    res.push({ name, recipe, pkg: JSON.parse(readFileSync(pj, 'utf8')), lines: scriptsOf(name), certNotices });
   }
   return res;
 }
@@ -253,6 +257,9 @@ test('the rules: Emscripten runtime, wasix-libc, linked dev packages, vendored s
   assert.deepEqual(noticeViolations({ ...wasix, lines: [...wasix.lines, 'homescoop_notice_wasix_libc'] }), []);
   // A static library package (no wasm command) links nothing itself.
   assert.deepEqual(noticeViolations({ ...base, pkg: { files: [] }, recipe: { dependencies: { build: ['@ai-ecoverse/wasm-zlib@1'] } } }), []);
+  // cert/meta.json notices names are required too, and replace DECLARED.
+  assert.deepEqual(noticeViolations({ ...ok, pkg: { files: ['THIRD-PARTY-NOTICES.md'] }, certNotices: ['pybind11'] }), ['pybind11']);
+  assert.deepEqual(noticeViolations({ ...ok, name: 'py-numpy', recipe: { dependencies: { build: ['wasix-python'] } }, certNotices: ['OpenBLAS 0.3.28'] }), ['OpenBLAS 0.3.28']);
   // Recipe notices.links / notices.not_linked.
   assert.deepEqual(noticeViolations({ ...ok, recipe: { dependencies: {}, sources: { gsfonts: {} }, notices: { links: ['Qhull'], not_linked: { gsfonts: 'not shipped' } } } }), ['Qhull']);
 });
