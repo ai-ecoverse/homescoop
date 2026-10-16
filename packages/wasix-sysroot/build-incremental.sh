@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-29 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-30 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -542,6 +542,79 @@ for v in "${VARIANTS[@]}"; do
   for s in poll ppoll epoll_create epoll_create1 epoll_ctl epoll_wait epoll_pwait; do
     grep -qx "$s" <<<"$have" || { echo "homescoop: $lib lacks $s" >&2; exit 1; }
   done
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -30 members (named semaphores through slicc.sem_*, slicc-kernel#717; musl's file-based sem_open on kernels without them)"
+R30_OBJ="$WORK/r30"
+R30_DROP=(sem_destroy.o sem_getvalue.o sem_init.o sem_open.o sem_post.o sem_timedwait.o sem_trywait.o sem_unlink.o sem_wait.o)
+rm -rf "$R30_OBJ" && mkdir -p "$R30_OBJ/static" "$R30_OBJ/pic"
+compile_r20 "$HOMESCOOP_PKG/patches/sem.c" "$R30_OBJ/static/sem.o" "${MUSL_INC[@]}" -I"$MUSL/src/thread" -D_WASI_EMULATED_MMAN
+compile_r20 "$HOMESCOOP_PKG/patches/sem.c" "$R30_OBJ/pic/sem.o" "${MUSL_INC[@]}" -I"$MUSL/src/thread" -D_WASI_EMULATED_MMAN -fPIC -fvisibility=default
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R30_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" "${R30_DROP[@]}")
+  missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(exported "$R30_OBJ/$flavour/sem.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v sem.o lacks: $missing" >&2; exit 1; }
+  "$LLVM_AR" d "$lib" "${R30_DROP[@]}"
+  "$LLVM_AR" r "$lib" "$R30_OBJ/$flavour/sem.o"
+  if grep -qxE 'sem_(destroy|getvalue|init|open|post|timedwait|trywait|unlink|wait)\.o' <<<"$("$LLVM_AR" t "$lib")"; then
+    echo "homescoop: $lib still has upstream semaphore members" >&2; exit 1
+  fi
+  grep -q __slicc_sem_open <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sem_open" >&2; exit 1; }
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -30 fcntl F_GETLK/F_SETLK/F_SETLKW through slicc.fcntl_lock (homescoop#407, slicc-kernel#722), lockf"
+for v in "${VARIANTS[@]}"; do
+  python3 - "$PKG/$v/include" <<'PYHDR'
+import sys
+from pathlib import Path
+inc = Path(sys.argv[1])
+edits = [
+    (inc / "__header_fcntl.h", "#define F_DUPFD_CLOEXEC (6)\n", "#define F_DUPFD_CLOEXEC (6)\n#define F_GETLK (12)\n#define F_SETLK (13)\n#define F_SETLKW (14)\n#define F_RDLCK (0)\n#define F_WRLCK (1)\n#define F_UNLCK (2)\n"),
+    (inc / "unistd.h", "#ifdef __wasilibc_unmodified_upstream /* WASI has no POSIX file locking */\nint lockf(int, int, off_t);\n#endif\n", "int lockf(int, int, off_t);\n"),
+    (inc / "unistd.h", "#ifdef __wasilibc_unmodified_upstream /* WASI has no POSIX file locking */\n#define lockf64 lockf\n#endif\n", "#define lockf64 lockf\n"),
+]
+for path, old, new in edits:
+    t = path.read_text()
+    if old not in t and new in t:
+        continue
+    if t.count(old) != 1:
+        sys.exit(f"{path}: not found: {old.splitlines()[0]}")
+    path.write_text(t.replace(old, new))
+PYHDR
+done
+R30L_OBJ="$WORK/r30l"
+rm -rf "$R30L_OBJ" && mkdir -p "$R30L_OBJ/static" "$R30L_OBJ/pic"
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  compile_r18 fcntl "$R30L_OBJ/$flavour/fcntl.o" "${extra[@]}"
+  compile_r20 "$MUSL/src/misc/lockf.c" "$R30L_OBJ/$flavour/lockf.o" "${MUSL_INC[@]}" "${extra[@]}"
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R30L_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" fcntl.o)
+  missing="$(comm -23 <(exported "$old/fcntl.o") <(exported "$R30L_OBJ/$flavour/fcntl.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v fcntl.o lacks: $missing" >&2; exit 1; }
+  if grep -qx lockf.o <<<"$("$LLVM_AR" t "$lib")"; then echo "homescoop: $lib already has lockf.o" >&2; exit 1; fi
+  "$LLVM_AR" r "$lib" "$R30L_OBJ/$flavour/fcntl.o" "$R30L_OBJ/$flavour/lockf.o"
+  have="$(exported "$lib" 2>/dev/null)"
+  for sym in fcntl lockf lockf64; do
+    grep -qx "$sym" <<<"$have" || { echo "homescoop: $lib lacks $sym" >&2; exit 1; }
+  done
+  grep -q __slicc_fcntl_lock <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.fcntl_lock" >&2; exit 1; }
+  grep -q "#define F_SETLK (13)" "$PKG/$v/include/__header_fcntl.h"
+  ! grep -q "WASI has no POSIX file locking" "$PKG/$v/include/unistd.h"
   echo "  $v ($flavour)"
 done
 
