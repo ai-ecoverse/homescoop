@@ -122,6 +122,7 @@ export default async function (ctx) {
       '[providers.op]', 'type = "1password"', '',
       '[providers.bw]', 'type = "bitwarden"', '',
       '[providers.vault]', 'type = "vault"', 'address = "https://vault.example"', '',
+      '[providers.inf]', 'type = "infisical"', '',
       '[secrets]', 'GH = { provider = "seven", value = "seven_ph_gh_0001" }', '',
       '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', 'env = "GITHUB_TOKEN"', '',
     ].join('\n'),
@@ -133,6 +134,8 @@ export default async function (ctx) {
     FNOX_BW_SESSION: 'fnox_bw_ambient',
     VAULT_TOKEN: 'vault_ambient',
     FNOX_VAULT_NAMESPACE: 'fnox_ns_ambient',
+    INFISICAL_CLIENT_SECRET: 'inf_secret_ambient',
+    FNOX_INFISICAL_TOKEN: 'fnox_inf_ambient',
   };
   const scrub = await run(['fnox', 'proxy', 'run', '--', 'printenv'], { cwd: '/home/scrub', env: { ...env, ...creds } });
   assert.equal(scrub.status, 0, `proxy run with provider credentials: ${scrub.stderr}`);
@@ -153,4 +156,40 @@ export default async function (ctx) {
   assert.doesNotMatch(edit.stderr, /panicked|wasm trap/);
   const missing = await run(['fnox', 'exec', '--', 'no-such-command'], { cwd: '/home/plain', env });
   assert.equal(missing.status, 127, `missing command: ${missing.stderr}`);
+
+  // homescoop#400: the shell integration. hook-env (what activate's prompt
+  // hook runs) trapped on std::process::id(); activate printed a bare
+  // `fnox`, which the fnox() wrapper it defines would call recursively.
+  // An as_file secret is refused (no file in seven) and skipped.
+  await write(
+    'home/hook/fnox.toml',
+    '[providers.plain]\ntype = "plain"\n\n[secrets]\nLVL = { provider = "plain", value = "debug" }\nCERT = { provider = "plain", value = "pem-data", as_file = true }\n',
+  );
+  const hook = await run(['fnox', 'hook-env', '-s', 'bash'], { cwd: '/home/hook', env });
+  assert.notEqual(hook.status, 134, `hook-env trapped: ${hook.stderr}`);
+  assert.equal(hook.status, 0, `hook-env: ${hook.stderr}`);
+  assert.doesNotMatch(hook.stderr, /panicked|wasm trap/);
+  assert.match(hook.stdout, /^export LVL=debug$/m);
+  assert.match(hook.stdout, /^export __FNOX_SESSION=\S+$/m);
+  assert.doesNotMatch(hook.stdout, /CERT|pem-data/, 'an as_file secret reached the shell');
+  assert.ok(flat(hook.stderr).includes(`'CERT': ${REFUSED}`), `hook-env as_file: ${hook.stderr}`);
+  const activate = await run(['fnox', 'activate', 'bash'], { cwd: '/home/hook', env });
+  assert.equal(activate.status, 0, `activate: ${activate.stderr}`);
+  assert.match(activate.stdout, /eval "\$\(\/usr\/bin\/fnox hook-env -s bash\)"/);
+  assert.doesNotMatch(activate.stdout, /(^|[\s(])fnox "\$command"/m, 'activate calls a bare fnox inside its fnox() wrapper');
+  const bash = await run(
+    [
+      'bash',
+      '-c',
+      'eval "$(fnox activate bash)"; _fnox_hook; echo "in=$LVL"; cd /; _fnox_hook; echo "out=${LVL-unset}"; cd /home/hook; _fnox_hook; fnox deactivate; echo "rc=$? off=${LVL-unset} ${__FNOX_SESSION-nosession}"',
+    ],
+    { cwd: '/home/hook', env: { ...env, PWD: '/home/hook' } },
+  );
+  assert.equal(bash.status, 0, `activate in bash: ${bash.stderr}`);
+  assert.doesNotMatch(bash.stderr, /panicked|wasm trap|RangeError/);
+  assert.equal(bash.stdout, 'in=debug\nout=unset\nrc=0 off=unset nosession\n', `activate in bash: ${bash.stderr}`);
+  const getFile = await run(['fnox', 'get', 'CERT'], { cwd: '/home/hook', env });
+  assert.notEqual(getFile.status, 0, 'get of an as_file secret must fail in seven');
+  assert.notEqual(getFile.status, 134, `get as_file trapped: ${getFile.stderr}`);
+  assert.ok(flat(getFile.stderr).includes(REFUSED), `get as_file: ${getFile.stderr}`);
 }
