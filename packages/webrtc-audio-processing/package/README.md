@@ -71,8 +71,13 @@ The canceller:
   mic and reference chunks needn't line up; up to one second of reference
   is kept ahead of the mic (`stats().referenceDropped` counts the rest), and
   a mic frame with no reference gets silence (`referenceShort`).
+  A NaN or ±Infinity sample in either input becomes 0 before APM sees it,
+  and `stats().nonFiniteSamples` counts them. (APM itself has no such
+  guard: one NaN in the mic would stay in its filter state, and every later
+  output sample would be NaN, #744.)
 - `stats()`: `{ delayMs, erleDb, erlDb, divergentFilterFraction,
-  delayMedianMs, voice, referenceDropped, referenceShort, errors }`.
+  delayMedianMs, voice, referenceDropped, referenceShort, nonFiniteSamples,
+  errors }`.
   `delayMs` and `erleDb` come from APM's `GetStatistics()`: AEC3's delay
   estimate from reference to mic (in 4 ms steps) and its echo return loss
   enhancement. Each is `null` until AEC3 has one.

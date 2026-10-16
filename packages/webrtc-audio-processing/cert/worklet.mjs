@@ -84,6 +84,9 @@ async function inPage(base, labSrc, talkWindow) {
     const mainOut = L.run(main, echo.mic, echo.far, 128);
     main.destroy();
     const lag = env ? env.latency : 0;
+    const bad = L.poison(echo);
+    const p = await render(bad, module, false);
+    const pStats = (p.msgs.find((m) => m.kind === 'stats') || {}).stats || null;
     const talk = L.scene(rate, { talk: talkWindow, seconds: 14 });
     const t = await render(talk, module, true);
     const tEnv = t.msgs.find((m) => m.kind === 'env') || null;
@@ -99,6 +102,7 @@ async function inPage(base, labSrc, talkWindow) {
       digest: L.digest(a.out),
       talk: tEnv ? L.talkChecks(talk, t.out, tEnv.latency, talkWindow) : null,
       talkLatency: tEnv ? tEnv.latency : null,
+      poison: { ...L.poisonChecks(bad, p.out, lag), count: bad.count, nonFiniteSamples: pStats ? pStats.nonFiniteSamples : null },
     });
   }
   URL.revokeObjectURL(url);
@@ -111,7 +115,7 @@ export default async function (ctx) {
   const results = await page.evaluate(inPage, base, lab.toString(), TALK);
   const latency = { 16000: [288, 384], 48000: [910, 1198] };
   for (const r of results) {
-    console.log(`worklet ${r.rate} Hz: ${JSON.stringify({ env: r.env, stats: r.stats, echo: r.echo, talk: r.talk, digest: r.digest })}`);
+    console.log(`worklet ${r.rate} Hz: ${JSON.stringify({ env: r.env, stats: r.stats, echo: r.echo, talk: r.talk, poison: r.poison, digest: r.digest })}`);
     assert.deepEqual(r.errors, [], `${r.rate} Hz: the processor threw`);
     assert.ok(r.env, `${r.rate} Hz: the processor never reported`);
     assert.equal(r.env.scope, 'AudioWorkletGlobalScope');
@@ -126,6 +130,9 @@ export default async function (ctx) {
     assert.ok(r.echo.erleDb >= LIMITS.erleDb, `${r.rate} Hz: ERLE ${r.echo.erleDb.toFixed(1)} dB in the worklet`);
     assert.ok(r.stats && r.stats.erleDb >= LIMITS.apmErleDb, `${r.rate} Hz: stats().erleDb ${r.stats && r.stats.erleDb}`);
     assert.ok(r.stats.delayMs !== null && Math.abs(r.stats.delayMs - 80) <= LIMITS.delayToleranceMs, `${r.rate} Hz: delayMs ${r.stats.delayMs} for an 80 ms echo`);
+    assert.equal(r.poison.nonFiniteOut, 0, `${r.rate} Hz: ${r.poison.nonFiniteOut} non-finite output samples after NaN/Infinity input (#744)`);
+    assert.equal(r.poison.nonFiniteSamples, r.poison.count, `${r.rate} Hz: nonFiniteSamples ${r.poison.nonFiniteSamples}`);
+    assert.ok(r.poison.erleAfterDb >= LIMITS.erleDb, `${r.rate} Hz: ERLE ${r.poison.erleAfterDb.toFixed(1)} dB after the non-finite burst`);
     assert.ok(r.talk, `${r.rate} Hz: no double-talk run`);
     assert.ok(r.talk.nearGain >= LIMITS.nearGain, `${r.rate} Hz: near-end gain ${r.talk.nearGain.toFixed(3)} in double talk`);
     assert.ok(r.talk.nearCorr >= LIMITS.nearCorr, `${r.rate} Hz: near-end corr ${r.talk.nearCorr.toFixed(3)} in double talk`);

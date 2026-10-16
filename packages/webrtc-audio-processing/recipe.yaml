@@ -38,3 +38,7 @@ about:
     src/wap.cc is the C ABI; package/index.js is a hand-written wrapper
     that instantiates the wasm synchronously (no fetch, no importScripts,
     no top-level await), for an AudioWorkletGlobalScope and for Node.
+    2.1.0-2: the wrapper replaces NaN and ±Infinity samples in mic and
+    reference with 0 before APM and counts them (stats().nonFiniteSamples):
+    on 2.1.0-1 one NaN mic sample left APM's filter state NaN for good, so
+    every later output sample was NaN, with no error (#744).

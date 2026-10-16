@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-webrtc-audio-processing",
-  "version": "2.1.0-1",
+  "version": "2.1.0-2",
   "description": "WebRTC AEC3 echo cancellation from webrtc-audio-processing 2.1, compiled to wasm, with a synchronous JS wrapper for AudioWorklet and Node",
   "license": "BSD-3-Clause AND Apache-2.0",
   "type": "module",

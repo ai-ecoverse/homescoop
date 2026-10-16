@@ -212,6 +212,27 @@ for (const rate of RATES) {
       assert.equal(make(rate).stats().voice, null);
     });
 
+    test('NaN and Infinity in mic and reference become 0 and are counted; the output stays finite and ERLE recovers (#744)', () => {
+      for (const ns of [false, true]) {
+        const s = L.poison(L.scene(rate));
+        const c = make(rate, { noiseSuppression: ns });
+        const out = L.run(c, s.mic, s.far, 128);
+        const st = c.stats();
+        c.destroy();
+        const m = L.poisonChecks(s, out, c.latencySamples);
+        console.log(`${rate} Hz non-finite input${ns ? ' (ns)' : ''}: ${JSON.stringify({ ...m, nonFiniteSamples: st.nonFiniteSamples })}`);
+        assert.equal(m.nonFiniteOut, 0, `${m.nonFiniteOut} non-finite output samples`);
+        assert.equal(st.nonFiniteSamples, s.count);
+        assert.ok(m.erleBeforeDb >= LIMITS.erleDb, `ERLE before ${m.erleBeforeDb.toFixed(1)} dB`);
+        assert.ok(m.erleAfterDb >= LIMITS.erleDb, `ERLE after ${m.erleAfterDb.toFixed(1)} dB`);
+      }
+      const c = make(rate);
+      const caller = new Float32Array(c.frameSize).fill(NaN);
+      c.cancel(caller, caller);
+      assert.ok(caller.every(Number.isNaN), 'cancel() changed the caller\'s arrays');
+      c.destroy();
+    });
+
     test('a reference that runs ahead or short is queued, and counted', () => {
       const s = L.scene(rate, { seconds: 4 });
       const c = make(rate);

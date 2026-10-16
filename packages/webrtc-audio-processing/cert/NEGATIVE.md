@@ -1,5 +1,51 @@
 # Negative proof (webrtc-audio-processing)
 
+## 2.1.0-2: non-finite input (#744)
+
+**Date:** 2026-10-16. The case `NaN and Infinity in mic and reference
+become 0 and are counted; the output stays finite and ERLE recovers` in
+`lib/node.mjs` (both rates, with and without noise suppression), and its
+counterpart in `worklet.mjs`. The signal is the 80 ms echo scene. Into it
+go 64 NaN mic samples at 6 s, 10 NaN reference samples from 6.5 s,
++Infinity in the mic at 7 s and -Infinity in the reference at 7.2 s: 76
+in all. The output must have no non-finite sample, `nonFiniteSamples` must
+be exactly 76, and ERLE must be >= 20 dB from 9 s on.
+
+**The published 2.1.0-1** (npm tarball sha256
+`89eb9dd3c2cfe198f95c32e9926a2b0c6e4a0496741a278395527ebfe84b121f`) fails
+the new case, and only it. From the first NaN on, every output sample is
+NaN:
+
+```
+16000 Hz non-finite input: {"nonFiniteOut":95776,"erleBeforeDb":null,"erleAfterDb":null}
+48000 Hz non-finite input: {"nonFiniteOut":287328,"erleBeforeDb":null,"erleAfterDb":null}
+✖ NaN and Infinity in mic and reference become 0 and are counted; … AssertionError: 95776 non-finite output samples
+✖ NaN and Infinity in mic and reference become 0 and are counted; … AssertionError: 287328 non-finite output samples
+ℹ tests 18  ℹ pass 16  ℹ fail 2
+browser-cert: FAIL packages/webrtc-audio-processing/cert/worklet.mjs
+AssertionError [ERR_ASSERTION]: 16000 Hz: 95776 non-finite output samples after NaN/Infinity input (#744)
+```
+
+**2.1.0-2** passes (local `host-run.sh` build, tarball sha256
+`da6cd0ccf605bbb9feaf4a0341affc28108fbf0096aa0b256dc2915dbd8acad6`):
+
+```
+16000 Hz non-finite input: {"nonFiniteOut":0,"erleBeforeDb":28.3,"erleAfterDb":32.1,"nonFiniteSamples":76}
+16000 Hz non-finite input (ns): {"nonFiniteOut":0,"erleBeforeDb":40.2,"erleAfterDb":44.1,"nonFiniteSamples":76}
+48000 Hz non-finite input: {"nonFiniteOut":0,"erleBeforeDb":29.9,"erleAfterDb":33.7,"nonFiniteSamples":76}
+48000 Hz non-finite input (ns): {"nonFiniteOut":0,"erleBeforeDb":41.2,"erleAfterDb":45.0,"nonFiniteSamples":76}
+ℹ tests 18  ℹ pass 18  ℹ fail 0
+worklet 16000 Hz: … "poison":{"nonFiniteOut":0,"erleBeforeDb":28.3,"erleAfterDb":32.1,"count":76,"nonFiniteSamples":76}
+worklet 48000 Hz: … "poison":{"nonFiniteOut":0,"erleBeforeDb":29.9,"erleAfterDb":33.7,"count":76,"nonFiniteSamples":76}
+browser-cert: ok packages/webrtc-audio-processing/cert/worklet.mjs
+```
+
+The case also checks that `cancel()` leaves the caller's arrays alone (a
+frame of NaN stays NaN in the caller's buffer). Everything below is the
+2.1.0-1 proof, which still holds.
+
+## 2.1.0-1
+
 **Date:** 2026-10-16. The first `cert/` of a new package. Run locally on
 macOS arm64 against a `host-run.sh` build of 2.1.0-1 (emsdk 4.0.23),
 tarball sha256 `72e37b1f013a2598325fc63a0985e21e0e8acfc2e75e2cee39ee6f56330b3528`,
@@ -11,7 +57,7 @@ Chromium (playwright-core 1.64.0) for `worklet.mjs`. Two builds in different
 `AudioWorkletGlobalScope`, in an `OfflineAudioContext`); `lib/node.mjs` is
 the `ci:` command (`node --test`).
 
-## The build under test passes
+### The build under test passes
 
 ```
 worklet 16000 Hz: … "latency":288 … "stats":{"delayMs":76,"erleDb":27.6,…} "echo":{"erleDb":30.67,…} "talk":{"nearGain":0.739,"nearCorr":0.772,"erleBeforeDb":42.2,…}
@@ -28,7 +74,7 @@ The thresholds sit well below what AEC3 does here: ERLE ≥ 20 dB (measured
 the near end kept in double talk with gain ≥ 0.5 and correlation ≥ 0.6
 (0.74 and 0.77 to 0.82).
 
-## The published 0.0.0
+### The published 0.0.0
 
 The name's placeholder (README and package.json only) has no `index.js`:
 
@@ -39,7 +85,7 @@ browser-cert: FAIL packages/webrtc-audio-processing/cert/worklet.mjs
 Error: TypeError: Failed to fetch dynamically imported module: …/node_modules/@ai-ecoverse/wasm-webrtc-audio-processing/index.js
 ```
 
-## Known-bad builds of 2.1.0-1
+### Known-bad builds of 2.1.0-1
 
 Each is the tarball under test with `dist/webrtc-audio-processing.wasm`
 replaced, and the same `index.js`.
@@ -107,7 +153,7 @@ AssertionError [ERR_ASSERTION]: 16000 Hz: stats().erleDb null
 ℹ tests 16  ℹ pass 4  ℹ fail 12
 ```
 
-## The specs aren't vacuous
+### The specs aren't vacuous
 
 - The far end is a synthetic voice (a gliding 20-harmonic tone with noise
   and a syllable envelope); the echo is that, 80 ms later (40 to 300 ms in
