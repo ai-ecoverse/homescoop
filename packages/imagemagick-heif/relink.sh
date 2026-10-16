@@ -9,7 +9,7 @@ done
 mkdir -p "$OUT"
 cd "$HERE"
 read -r -a FLAGS <ldflags.txt
-em++ -g1 -O2 -fexceptions -o "$OUT/magick.js" \
+em++ -g -O2 -fexceptions -o "$OUT/magick.js" \
   -Wl,--whole-archive magick.a -Wl,--no-whole-archive \
   libMagickCore-7.Q16HDRI.a libMagickWand-7.Q16HDRI.a libMagickCore-7.Q16HDRI.a \
   liblcms2.a libtiff.a libjpeg.a libfreetype.a libpng16.a \

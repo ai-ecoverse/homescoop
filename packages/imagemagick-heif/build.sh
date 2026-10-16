@@ -41,26 +41,59 @@ echo
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
 
-if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "${FORCE:-}" ]]; then
+# The configure in $SRC must be this package's: webp, freetype, xml and heic in
+# (homescoop#350). A tree configured otherwise is configured again.
+im_config_ok() {
+  local h="$SRC/config/config.h" d
+  [[ -f "$h" ]] || return 1
+  for d in WEBP FREETYPE XML HEIC; do
+    grep -q "^#define ${d}_DELEGATE 1" "$h" || return 1
+  done
+}
+# What the tree in $SRC was built with: configure arguments and the link flags.
+# A tree built with others (an older build.sh, other delegates or flags) is
+# configured again (homescoop#350).
+CONFIGURE_ARGS=(
+  --host=wasm32-unknown-emscripten
+  --disable-shared --enable-static --disable-openmp --without-threads
+  --without-modules --disable-docs --without-perl --without-magick-plus-plus
+  --without-x --without-bzlib --without-djvu --without-dps --without-fftw
+  --without-flif --without-fpx --without-fontconfig --without-gslib
+  --without-gvc --with-heic --without-jbig --without-jxl --without-lqr
+  --without-lzma --without-openexr --without-pango --without-raqm
+  --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml
+  --without-zip --without-zstd --with-webp --with-freetype
+  CFLAGS="-g1 -O2" CXXFLAGS="-g -O2"
+  LDFLAGS="-L$PREFIX/lib -fexceptions"
+)
+MAKE_LDFLAGS="-L$PREFIX/lib -fexceptions $SLICC_A $CLI_LDFLAGS"
+STAMP="$SRC/.homescoop-build"
+want_stamp() { printf '%s\n' "${CONFIGURE_ARGS[@]}" "$MAKE_LDFLAGS" | shasum -a 256 | cut -d' ' -f1; }
+REBUILD="${FORCE:-}"
+if [[ -z "$REBUILD" && ( -f "$SRC/utilities/magick" || -f "$SRC/utilities/magick.js" ) ]]; then
+  if ! im_config_ok; then
+    echo "== imagemagick-heif: $SRC was configured with other delegates (homescoop#350), configuring again"
+    REBUILD=1
+  elif [[ "$(cat "$STAMP" 2>/dev/null)" != "$(want_stamp)" ]]; then
+    echo "== imagemagick-heif: $SRC was built with other configure or link flags, configuring again"
+    REBUILD=1
+  fi
+fi
+
+# utilities/magick is linked by the C++ driver (utilities/Makefile.am's
+# dummy.cxx), with CXXFLAGS: -g there keeps the name section and the line
+# tables in magick.wasm, as in wasm-imagemagick (-g1 stripped both, homescoop#396).
+if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "$REBUILD" ]]; then
   echo "== imagemagick: emconfigure"
   (
     cd "$SRC"
+    rm -f "$STAMP"
     if [[ -f Makefile ]]; then
       make distclean >/dev/null 2>&1 || true
     fi
     PKG_CONFIG="$PKG_CONFIG" EM_PKG_CONFIG_PATH="$EM_PKG_CONFIG_PATH" \
       PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR" \
-      emconfigure ./configure --host=wasm32-unknown-emscripten \
-        --disable-shared --enable-static --disable-openmp --without-threads \
-        --without-modules --disable-docs --without-perl --without-magick-plus-plus \
-        --without-x --without-bzlib --without-djvu --without-dps --without-fftw \
-        --without-flif --without-fpx --without-fontconfig --without-gslib \
-        --without-gvc --with-heic --without-jbig --without-jxl --without-lqr \
-        --without-lzma --without-openexr --without-pango --without-raqm \
-        --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml \
-        --without-zip --without-zstd --with-webp --with-freetype \
-        CFLAGS="-g1 -O2" CXXFLAGS="-g1 -O2" \
-        LDFLAGS="-L$PREFIX/lib -fexceptions"
+      emconfigure ./configure "${CONFIGURE_ARGS[@]}"
     for d in WEBP FREETYPE XML HEIC; do
       grep -q "^#define ${d}_DELEGATE 1" config/config.h || { echo "homescoop: configure left out the ${d} delegate" >&2; exit 1; }
     done
@@ -71,7 +104,8 @@ if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "${F
     echo "== imagemagick: emmake utilities/magick"
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
       utilities/magick \
-      LDFLAGS="-L$PREFIX/lib -fexceptions $SLICC_A $CLI_LDFLAGS"
+      LDFLAGS="$MAKE_LDFLAGS"
+    want_stamp >"$STAMP"
   )
 fi
 
@@ -85,6 +119,12 @@ if [[ -f "$UTIL/magick.js" && ! -f "$UTIL/magick" ]]; then
   mv "$UTIL/magick.js" "$UTIL/magick"
 fi
 test -f "$UTIL/magick.wasm"
+# Outside the skip above: whatever built $SRC, this package has the HEIC delegate.
+im_config_ok || { echo "homescoop: $SRC/config/config.h is not wasm-imagemagick-heif's configure (webp, freetype, xml, heic)" >&2; exit 1; }
+if ! LC_ALL=C grep -aq 'heif_' "$UTIL/magick.wasm"; then
+  echo "homescoop: $UTIL/magick.wasm does not link libheif (homescoop#350)" >&2
+  exit 1
+fi
 homescoop_stage_cli "$UTIL" magick
 
 CFG_DEST="$HOMESCOOP_PKG/package/etc/ImageMagick-7"
@@ -139,6 +179,33 @@ tar xJf "$DAV1D_TB" -C "$WORK" dav1d-1.5.4/COPYING
 homescoop_notice "dav1d 1.5.4 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" "$WORK/dav1d-1.5.4/COPYING" -
 homescoop_notice_emscripten
 
+# kit_ldflags <kit> <flags>: write <kit>/ldflags.txt with every file the link
+# flags name by absolute path (each --js-library into js/, archives such as the
+# slicc credential library next to the others) copied into the kit and named
+# relative to it, so relink.sh never reaches into the build host's tree
+# (homescoop#398).
+kit_ldflags() {
+  local kit="$1" prev="" t
+  local -a words=() out=()
+  read -r -a words <<<"$2"
+  mkdir -p "$kit/js"
+  for t in "${words[@]}"; do
+    if [[ "$prev" == "--js-library" ]]; then
+      cp "$t" "$kit/js/"
+      out+=("js/$(basename "$t")")
+    elif [[ "$t" == /* ]]; then
+      test -f "$t" || { echo "homescoop: link flag $t is not a file" >&2; exit 1; }
+      cp "$t" "$kit/$(basename "$t")"
+      out+=("$(basename "$t")")
+    else
+      out+=("$t")
+    fi
+    prev="$t"
+  done
+  printf '%s\n' "${out[*]}" >"$kit/ldflags.txt"
+  if grep -Eq '(^| )/' "$kit/ldflags.txt"; then echo "homescoop: $kit/ldflags.txt names an absolute path" >&2; exit 1; fi
+}
+
 RELINK="$HOMESCOOP_PKG/package/share/imagemagick-heif/relink"
 rm -rf "$RELINK"
 mkdir -p "$RELINK/js"
@@ -151,10 +218,7 @@ for a in liblcms2.a libtiff.a libjpeg.a libfreetype.a libpng16.a libz.a libwebpm
   cp "$PREFIX/lib/$a" "$RELINK/$a"
 done
 cp "$SLICC_A" "$RELINK/libslicc-cli.a"
-for jl in $(printf '%s\n' "$CLI_LDFLAGS" | grep -o -- "--js-library [^ ]*" | cut -d' ' -f2); do
-  cp "$jl" "$RELINK/js/"
-done
+kit_ldflags "$RELINK" "$CLI_LDFLAGS"
 test -f "$RELINK/js/slicc-writev.js"
-printf '%s\n' "$CLI_LDFLAGS" | sed "s#$(homescoop_slicc_dir)/#js/#g" >"$RELINK/ldflags.txt"
 cp "$HOMESCOOP_PKG/relink.sh" "$RELINK/relink.sh"
 echo "== imagemagick-heif: staged → $HOMESCOOP_PKG/package ($VER) + etc/ImageMagick-7 (tab policy) and etc/ImageMagick-7-open"

@@ -56,3 +56,13 @@ about:
     went to the disk cache and hung for minutes): memory 1536MiB, map
     256MiB (memory + map 1.75 GiB, under the build's 2 GiB maximum
     memory), disk 0.
+    7.1.2-34-2: tab policy width/height 64KP, not 16KP (homescoop#445:
+    18000x3000 panoramas were refused, identify -format too); the 64 MP
+    area and 1.5 GiB memory bound what an image costs, and 30000x30000
+    now fails on area, as fast. share/imagemagick/relink is an LGPL relink
+    kit for the static GNU libiconv (homescoop#395), checked by
+    cert/lib/relink-check.mjs in ladder-pr. build.sh configures again a
+    $WORK tree configured with other delegates or built with other flags
+    (a .homescoop-build stamp), and checks the delegates outside the skip
+    (homescoop#350). CXXFLAGS -g (the C++ link of
+    utilities/magick) keeps the name section and line tables, as before.

@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkKitDocs, checkKitFlags, customSections, sameSignature } from '../../../imagemagick/cert/lib/wasm.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../../..');
@@ -24,19 +25,25 @@ try {
     heifLib = join(work, 'libheif/package/lib');
   }
   sh(`tar -xzf '${tarball}' -C '${work}'`);
+  const js = checkKitFlags(join(work, 'package/share/imagemagick-heif/relink'));
+  const docs = checkKitDocs(join(work, 'package'), join(work, 'package/share/imagemagick-heif/relink'));
   sh(`eval "$(bash '${root}/scripts/install-emsdk.sh')" && bash '${work}/package/share/imagemagick-heif/relink/relink.sh' '${work}/relinked' '${heifLib}'`);
   const wasm = readFileSync(join(work, 'relinked/magick.wasm'));
   if (!WebAssembly.validate(wasm)) throw new Error('relinked magick.wasm does not validate');
+  const shippedWasm = readFileSync(join(work, 'package/bin/magick.wasm'));
   const shipped = statSync(join(work, 'package/bin/magick.wasm')).size;
   if (Math.abs(wasm.length - shipped) > shipped * 0.02) throw new Error(`relinked magick.wasm is ${wasm.length} bytes, shipped ${shipped}`);
-  const mod = new WebAssembly.Module(wasm);
-  const names = WebAssembly.Module.exports(mod).map((e) => e.name);
+  const names = sameSignature(wasm, shippedWasm).exports;
   for (const n of ['main', 'slicc_raise']) {
-    if (!names.includes(n) && !names.includes(`_${n}`) && !names.some((x) => x.includes(n))) throw new Error(`relinked magick.wasm lacks ${n}`);
+    if (!names.some((x) => x.includes(n))) throw new Error(`relinked magick.wasm lacks ${n}`);
+  }
+  // homescoop#396: like wasm-imagemagick, magick.wasm keeps its name section (trap stacks show function names).
+  for (const [what, bytes] of [['shipped', shippedWasm], ['relinked', wasm]]) {
+    if (!customSections(bytes).has('name')) throw new Error(`${what} magick.wasm has no name section (homescoop#396)`);
   }
   const glue = readFileSync(join(work, 'relinked/magick'), 'utf8');
   if (!glue.includes('callMain')) throw new Error('relinked glue has no callMain');
-  console.log(`relink-check: share/imagemagick-heif/relink/relink.sh relinked magick against ${heifLib}/libheif.a (${wasm.length} bytes, shipped ${shipped})`);
+  console.log(`relink-check: share/imagemagick-heif/relink/relink.sh relinked magick against ${heifLib}/libheif.a (${wasm.length} bytes, shipped ${shipped}; same imports and exports; name section in both; kit flags: ${js.join(', ')}; README.md, ${docs.cited} names all ${docs.libs} kit libraries)`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
