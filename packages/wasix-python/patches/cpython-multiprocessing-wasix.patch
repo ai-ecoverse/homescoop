@@ -1,0 +1,14 @@
+WASI: build _multiprocessing (SemLock over sem_open) and _posixshmem
+(shm_open/shm_unlink) through configure; WASIX libc has both.
+
+--- a/configure
++++ b/configure
+@@ -31134,8 +31134,6 @@
+     py_cv_module__curses_panel=n/a
+     py_cv_module__dbm=n/a
+     py_cv_module__gdbm=n/a
+-    py_cv_module__multiprocessing=n/a
+-    py_cv_module__posixshmem=n/a
+     py_cv_module__posixsubprocess=n/a
+     py_cv_module__scproxy=n/a
+     py_cv_module__tkinter=n/a

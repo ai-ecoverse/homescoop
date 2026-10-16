@@ -342,13 +342,7 @@ for s in lock_stubs cpp_tls_stubs; do
   wasixcc $DEP_CFLAGS -I"$STUBS" -include "$STUBS/fcntl_wasix_extra.h" -c "$PKG/$s.c" -o "$STUBS/$s.o"
 done
 wasixar rcs "$STUBS/libpython-wasix-stubs.a" "$STUBS"/*.o
-WRAP=""
-for f in flock fcntl lockf; do
-  WRAP+=" -Wl,--wrap=$f"
-done
-for f in flock fcntl lockf; do
-  WRAP+=" -Wl,--export=__wrap_$f"
-done
+WRAP=" -Wl,--wrap=flock -Wl,--export=__wrap_flock"
 # cpp_tls_stubs.c: nothing in CPython references these, so pull them in and
 # export them, as -11 did (python.wasm imported env._ZTH5errno and
 # env.__cxa_thread_atexit_impl otherwise).
@@ -361,7 +355,7 @@ SRCDIR="$B/Python-$VER"
 echo "== wasix-python: CPython $VER source + patches"
 rm -rf "$SRCDIR" && mkdir -p "$SRCDIR"
 tar xzf "$PY_TGZ" -C "$SRCDIR" --strip-components=1
-for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip; do
+for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip cpython-multiprocessing-wasix cpython-multiprocessing-util-wasix; do
   patch -d "$SRCDIR" -p1 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
   echo "  applied $p.patch"
 done
@@ -370,11 +364,10 @@ PY_CFLAGS="-O3 -flto -fPIC -matomics -mbulk-memory -mmutable-globals -pthread -m
 PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-memory -Wl,--import-memory -Wl,--max-memory=4294967296 -Wl,--stack-first -z stack-size=16777216 -Wl,--initial-memory=41943040 -ldl -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
 # Cross answers configure cannot run (wasm32: little endian, no fork, no
 # ptys), and probes that find a declaration WASIX does not back: the
-# netpacket header (no AF_PACKET), memfd_create, and lockf (links through
-# the --wrap no-op but no header declares it), all three off as on -11.
+# netpacket header (no AF_PACKET) and memfd_create, both off as on -11.
 printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words_bigendian=no \
   ac_cv_func_fork=no ac_cv_func_vfork=no \
-  ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no ac_cv_func_lockf=no \
+  ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no \
   ac_cv_working_tzset=yes >"$B/config.site"
 rm -rf "$CROSS" && mkdir -p "$CROSS"
 (
@@ -393,7 +386,7 @@ grep -E '^checking for stdlib extension module' "$B/configure.log" | sed 's/^che
 grep -q '^SOABI=[[:space:]]*cpython-314-wasm32-wasix$' "$CROSS/Makefile" \
   || { grep '^SOABI\|^MULTIARCH' "$CROSS/Makefile" >&2; echo "homescoop wasix-python: SOABI is not cpython-314-wasm32-wasix" >&2; exit 1; }
 # Every library-backed module of -11 must come from configure now, plus _ctypes.
-for m in _ssl _hashlib zlib _bz2 _lzma _sqlite3 readline fcntl grp pwd mmap resource termios _ctypes; do
+for m in _ssl _hashlib zlib _bz2 _lzma _sqlite3 readline fcntl grp pwd mmap resource termios _ctypes _multiprocessing _posixshmem; do
   st="$(sed -n "s/^MODULE_${m^^}_STATE=//p" "$CROSS/Makefile")"
   [[ "$st" == yes ]] || { echo "homescoop wasix-python: module $m is '$st', not yes" >&2; exit 1; }
 done
