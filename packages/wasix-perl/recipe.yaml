@@ -1,6 +1,9 @@
 # Perl 5.42 for slicc WASIX (perl-cross + wasixcc + wasix-sysroot).
 name: wasix-perl
 builder: host
+reproducible: true
+inputs:
+  - scripts/install-wasixcc.sh
 # renovate: datasource=perl-version
 version: "5.42.0"
 npm: "@ai-ecoverse/wasix-perl"

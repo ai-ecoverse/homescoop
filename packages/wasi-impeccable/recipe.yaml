@@ -3,6 +3,11 @@
 # FS-local verbs and the HTTP verbs for wasm32-wasip1.
 name: wasi-impeccable
 builder: host
+inputs:
+  - crates/wasix-net/**
+  - crates/wasix-ureq/**
+  - crates/wasix-command/**
+  - scripts/build-common.sh
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
 version: "0.1.15"
 npm: "@ai-ecoverse/wasi-impeccable"
