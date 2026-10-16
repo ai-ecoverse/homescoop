@@ -34,7 +34,7 @@ packages/<name>/cert/
 `ladder-pr`'s cert leg ([`scripts/browser-cert/cert-leg.mjs`](../scripts/browser-cert/cert-leg.mjs)) fails closed:
 
 - A `host-node` or `host-smoke` harness must declare `ci:` commands. Without them, the leg fails with `<pkg>: cert harness <h> declares no ci commands; nothing was certified`. `ladder-pr` does not guess commands; the recipe declares them.
-- A `cert/meta.json` that is there but is not readable JSON fails the leg, naming the file and the parse error. So does a `ci` that is not a list, or a `ci` entry that is blank or not a string.
+- A `cert/meta.json` that is there but is not readable JSON fails the leg, naming the file and the parse error. So does one that is JSON but not an object (`[]`, `"host-node"`, `42`, `true`, `null`): `<file> is not a JSON object (it is <kind>); nothing was certified`. So does a `ci` that is not a list, or a `ci` entry that is blank or not a string. `run.mjs` reads `meta.json` the same way (`scripts/browser-cert/cert-meta.mjs`) and fails before it boots anything.
 - A leg that runs nothing (no `cert/*.mjs`, no Emscripten CLI to smoke, no `ci:`, or a `blocked` meta without `ci:`) passes, with a `::warning::` and a job-summary line, `<pkg>: no cert specs; this cert leg certifies nothing`. That green is a build, not evidence.
 
 ## Patch ↔ spec mapping
@@ -431,8 +431,8 @@ changes the boot order for every cert.
 | `--kernel <spec \| .tgz \| dir>` | the kernel to boot instead of `HOMESCOOP_CERT_NODE_MODULES`'s (which `ladder-pr` fills from `meta.json`'s `kernel`, else the `@ai-ecoverse/slicc-kernel` devDependency in the root `package.json`: [`cert-kernel.mjs`](../scripts/browser-cert/cert-kernel.mjs), which logs which one it took) |
 | `--users off\|report\|enforce` | overrides `meta.json`'s `users`; without either the kernel's default applies (`enforce` since 1.74, `off` before) |
 | `--tarball <tgz>` (repeatable) | the packages under test, installed in this order; the first is `ctx.npmName`. Specs see every manifest in `ctx.installed` |
-| `--cert <dir>` | the spec directory (default `packages/<package>/cert`) |
-| `--json <file>` | per-spec results: `{ kernel, users, modes, tarballs, specs: [{ spec, status, durationMs, error, cases: { pass: [id], fail: [{ id, message }] }, crash? }], pageErrors, status }` |
+| `--cert <dir>` | the spec directory (default `packages/<package>/cert`). Its `meta.json` sets `needs`, `users`, `uplink` and the rest; a directory without one (a reviewer's own spec) takes `packages/<package>/cert/meta.json`, and the log says which file it read (`browser-cert: meta …`) |
+| `--json <file>` | per-spec results: `{ meta, kernel, users, modes, tarballs, specs: [{ spec, status, durationMs, error, cases: { pass: [id], fail: [{ id, message }] }, crash? }], pageErrors, status }` |
 | `--soft` | a failed `ctx.assert` is recorded and the spec goes on (kernel-compat); without it the first failure ends the spec, as `ladder-pr` wants |
 | `--spec <file.mjs>` (repeatable) | run only these spec files of the cert directory |
 | `--live <port>` | boot and install as usual, then keep Chrome open (with a window when `DISPLAY` is set) and serve the specs' `ctx` on `http://127.0.0.1:<port>/`: `GET /` describes it, `POST /ctx/<call>` with a JSON array of arguments calls `run`, `write`, `read`, `pty`, `addUser` and the rest. `cert-review` uses it for its live pairs |

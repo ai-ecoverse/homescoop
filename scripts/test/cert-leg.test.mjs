@@ -11,7 +11,7 @@ const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 function fixture(packages) {
   const root = mkdtempSync(join(tmpdir(), 'homescoop-cert-leg-'));
   mkdirSync(join(root, 'scripts', 'browser-cert'), { recursive: true });
-  copyFileSync(join(scripts, 'browser-cert', 'cert-leg.mjs'), join(root, 'scripts', 'browser-cert', 'cert-leg.mjs'));
+  for (const f of ['cert-leg.mjs', 'cert-meta.mjs']) copyFileSync(join(scripts, 'browser-cert', f), join(root, 'scripts', 'browser-cert', f));
   for (const [name, { meta, specs = [], manifest = {} }] of Object.entries(packages)) {
     const dir = join(root, 'packages', name);
     mkdirSync(join(dir, 'package'), { recursive: true });
@@ -159,6 +159,40 @@ test('a ci: entry that is not a command fails the leg, in plan and in ci', () =>
       const c = f.leg('ci', name);
       assert.equal(c.status, 1, name);
       assert.ok(c.stdout.includes(`::error::packages/${name}/cert/meta.json: ${why}`), c.stdout);
+    }
+  } finally {
+    f.done();
+  }
+});
+
+test('a cert/meta.json that is JSON but not an object fails the leg, in plan and in ci', () => {
+  const f = fixture({
+    list: { meta: '[]' },
+    word: { meta: '"host-node"' },
+    number: { meta: '42' },
+    yes: { meta: 'true' },
+    nothing: { meta: 'null' },
+    listed: { meta: '[{ "harness": "host-node", "ci": ["true"] }]' },
+  });
+  try {
+    for (const [name, kind] of [
+      ['list', 'an array'],
+      ['word', 'a string'],
+      ['number', 'a number'],
+      ['yes', 'a boolean'],
+      ['nothing', 'null'],
+      ['listed', 'an array'],
+    ]) {
+      const why = `packages/${name}/cert/meta.json is not a JSON object (it is ${kind}); nothing was certified`;
+      const p = f.leg('plan', name);
+      assert.equal(p.status, 1, name);
+      assert.ok(p.stderr.includes(`::error::${why}`), p.stderr);
+      assert.doesNotMatch(p.stdout, /browser=/);
+      assert.doesNotMatch(p.stderr, /::warning::/);
+      assert.ok(f.summary().includes(why), name);
+      const c = f.leg('ci', name);
+      assert.equal(c.status, 1, name);
+      assert.ok(c.stdout.includes(`::error::${why}`), c.stdout);
     }
   } finally {
     f.done();
