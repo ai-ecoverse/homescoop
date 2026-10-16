@@ -115,6 +115,20 @@ whatever is newest on the registry rather than the version this package was
 certified with, and a global add cannot override transitive versions. Pin
 the dependency version that is `latest` on npm **and** certified.
 
+**The one range: a py-\*'s python** ([#702](https://github.com/ai-ecoverse/homescoop/issues/702)).
+An `@ai-ecoverse/py-*` package takes `@ai-ecoverse/wasix-python`, in
+`dependencies` (not as a peer), as `>=X.Y.Z-N <X.Y.Z+1`, e.g.
+`">=3.14.2-16 <3.14.3"`. An exact pin nested a second full python (about
+115 MiB) under every py-\* of a consumer on a newer python, and
+`_slicc_site.discover()` then refused the py-\*, because its python wasn't
+the one running. Our versions are semver prereleases, so the range is the
+3.14.2-N line from the floor up: 3.14.2-15 and 3.14.3-1 don't match, and a
+python patch bump is a deliberate re-pin. The floor is the python the
+package is built against or certified with. A py-\* with C extensions is
+certified on the floor and on the newest python
+([ci-cert.md](ci-cert.md#py-python-range)). No other `@ai-ecoverse` pin may
+be a range, py-\* → py-\* included.
+
 `scripts/check-exact-pins.mjs` enforces it: the `exact-pins` job in
 `ladder-pr` checks every package, and `host-run.sh` checks the package it
 packs. Its `PENDING` set (empty now) is for a package whose exact-pin

@@ -17,6 +17,13 @@ node scripts/browser-cert/run.mjs --package jq --tarball path/to/package.tgz
 node scripts/browser-cert/prove-negative.mjs --package jq --tarball path/to/package.tgz [--kernel <spec>] [--users enforce]
 ```
 
+A py-\*'s wasix-python range: one python on the floor and the newest, and the
+specs again on the floor ([ci-cert.md](../../docs/ci-cert.md#py-python-range)):
+
+```sh
+node scripts/browser-cert/python-range.mjs py-numpy --tarball path/to/package.tgz [--lock-only]
+```
+
 Any kernel, any users mode, JSON results (what `kernel-compat.yml` runs):
 
 ```sh

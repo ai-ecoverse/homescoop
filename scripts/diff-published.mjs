@@ -10,7 +10,8 @@
  * must be byte-identical to the base, same path, type and mode. In
  * package.json only "version" and the values (not the names) of
  * @ai-ecoverse/* entries in dependencies / peerDependencies /
- * optionalDependencies may differ, and those values must be exact versions.
+ * optionalDependencies may differ, and those values must be exact versions
+ * (or, for a py-*'s wasix-python, check-exact-pins.mjs's range).
  * --allow-key also lets one of the metadata keys in ALLOW_KEYS (engines,
  * description, keywords, slicc.env) change, reported (recipe repack.fields).
  * Prints a report (file counts, both tarball sha256s, the package.json diff);
@@ -23,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { EXACT } from './check-exact-pins.mjs';
+import { EXACT, rangeAllowed } from './check-exact-pins.mjs';
 
 const DEP_FIELDS = ['dependencies', 'peerDependencies', 'optionalDependencies'];
 const SCOPE = '@ai-ecoverse/';
@@ -169,7 +170,7 @@ export function diffPackageJson(base, next, allowKeys = []) {
         else if (!(n in b)) errors.push(`${k}["${n}"] removed`);
         else if (a[n] !== b[n]) {
           if (!n.startsWith(SCOPE)) errors.push(`${k}["${n}"] changed (${a[n]} → ${b[n]}); only @ai-ecoverse pins may change`);
-          else if (!EXACT.test(b[n])) errors.push(`${k}["${n}"] = ${b[n]} is not exact`);
+          else if (!EXACT.test(b[n]) && !rangeAllowed(next, k, n, b[n])) errors.push(`${k}["${n}"] = ${b[n]} is not exact`);
           else changes.push(`${k}["${n}"]: ${a[n]} → ${b[n]}`);
         }
       }
