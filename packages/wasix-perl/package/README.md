@@ -15,7 +15,7 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
 
-## 5.42.0-15: flock excludes other processes
+## 5.42.0-15 / -16: flock excludes other processes
 
 `flock` takes whole-file `fcntl` record locks (`LOCK_SH` → `F_RDLCK`,
 `LOCK_EX` → `F_WRLCK`, `LOCK_UN` → `F_UNLCK`; `LOCK_NB` → `F_SETLK`, else
@@ -28,16 +28,33 @@ child doesn't inherit it, and closing any handle on the file drops it).
 `fcntl` wants a writable handle for a write lock and a readable one for a
 read lock, so `LOCK_EX` on a read-only handle takes a read lock (other
 writers stay out, other read-only `LOCK_EX` holders don't) and `LOCK_SH` on
-a write-only one a write lock. `lockf` is still an advisory no-op.
+a write-only one a write lock. So two processes that each `LOCK_EX` a
+read-only handle (the `flock(DATA, LOCK_EX|LOCK_NB)` single-instance idiom)
+are both granted: open the lock file read-write for exclusion
+(homescoop#758). `flock` on something that isn't a regular file (a pipe,
+STDOUT on a terminal or pipe, `/dev/null`, a directory) succeeds and
+excludes nobody, since slicc-kernel keeps record locks on regular files
+only (5.42.0-16; -15 failed it with EBADF, homescoop#757). `lockf` is still
+an advisory no-op.
 
 ## 5.42.0-14: needs slicc-kernel ≥ 1.100.0
 
 A packaging-only release of 5.42.0-13 (the same files): `engines` now asks
 for slicc-kernel ≥ 1.100.0, the first kernel with `slicc.fcntl_lock`. On an
 older kernel the libc grants every `fcntl` record lock locally, so two
-processes could both hold a write lock on the same bytes and lose data;
-refusing to install there is the honest answer (homescoop#552). Up to -13
-`engines` said ≥ 1.44.0.
+processes could both hold a write lock on the same bytes and lose data
+(homescoop#552). Up to -13 `engines` said ≥ 1.44.0.
+
+The floor is enforced from slicc-kernel 1.106.2 on: its command catalog
+refuses a package whose `engines.slicc-kernel` the running kernel doesn't
+meet (ai-ecoverse/slicc-kernel#797). Older kernels install the package
+without a warning, and there `fcntl` locks, and so `flock`, aren't real:
+use slicc-kernel ≥ 1.100.0 (homescoop#651).
+
+From slicc-kernel 1.106.2 the commands' `/usr/bin` entries are the
+scripts themselves (slicc-kernel#762), so `pod2man --help` and
+`pod2text --help`, which read their usage from `$0`, print it
+(homescoop#491); older kernels print nothing there.
 
 ## 5.42.0-13: wasix-sysroot 2025.9.30-30
 

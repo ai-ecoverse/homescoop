@@ -78,3 +78,11 @@ The new specs against the published tarballs on slicc-kernel 1.100.3's Node entr
 ## 5.42.0-15: flock (homescoop#631, 2026-10-16)
 
 `cert/flock.mjs` against the published 5.42.0-14 (slicc-kernel 1.100.3): FAIL, `parent=ok ok ok | child=ok ok | blocking=ok:at-once | shared=2`. While the parent holds `LOCK_EX`, the forked child is granted `LOCK_EX|LOCK_NB` and `LOCK_SH|LOCK_NB`, its blocking `LOCK_EX` returns at once, and a writer gets in beside two readers: `wasix-posix-stubs.h` answered every `flock` with success. 5.42.0-15 maps `flock` onto whole-file `fcntl` locks.
+
+## 5.42.0-16: flock on things that aren't regular files (homescoop#757, 2026-10-16)
+
+`cert/flock.mjs` against 5.42.0-15: FAIL, because `flock` on a pipe, STDOUT through a pipe, `/dev/null` or a directory handle fails with EBADF (#757's repro). slicc-kernel keeps record locks on regular files only, and -15 sent every `flock` to `fcntl`. 5.42.0-16 grants `flock` on anything that isn't a regular file, excluding nobody, as -14 and Linux do.
+
+## pod2man / pod2text --help (homescoop#491, 2026-10-16)
+
+`cert/pod.mjs` with the published 5.42.0-14 on slicc-kernel 1.100.3: FAIL, `pod2man --help` exits 0 and prints nothing. pod2usage reads the usage from `$0`, which was a 0-byte `/usr/bin` stub (slicc-kernel#762). On 1.106.2, the cert kernel now, the same tarball passes: the `/usr/bin` entry is the script. The fix is the kernel's; the spec pins it.

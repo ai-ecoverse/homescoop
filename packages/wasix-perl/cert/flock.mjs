@@ -77,6 +77,12 @@ export default async function (ctx) {
     assert.equal(r.status, 0, `${user ?? 'root'}: rc=${r.status} stdout=${r.stdout} stderr=${r.stderr}`);
     assert.equal(r.stdout.trim(), want, `${user ?? 'root'}: flock between processes: ${r.stdout}${r.stderr}`);
   }
+  // Not a regular file: granted, excluding nobody (homescoop#757; -15: EBADF).
+  const other = await run(['bash', '-c', String.raw`perl -e 'use Fcntl ":flock"; pipe(my $r, my $w) or die; open my $n, ">", "/dev/null" or die; opendir(my $dh, "/tmp") or die; open my $d, "<", "/tmp" or die; my @r; for my $h ($w, $r, \*STDOUT, $n, $d) { push @r, join ",", map { flock($h, $_) ? "ok" : "fail:$!" } LOCK_EX, LOCK_SH | LOCK_NB, LOCK_UN } print STDERR "@r
+"' | cat`], { cwd: '/tmp' });
+  assert.equal(other.status, 0, `flock on non-files: ${other.stdout}${other.stderr}`);
+  assert.equal(other.stderr, `${Array(5).fill('ok,ok,ok').join(' ')}
+`, `flock on a pipe's ends, STDOUT through a pipe, /dev/null and a directory handle: ${other.stderr}`);
   // Two separate perl processes, as two autom4te runs (#631's repro).
   const two = await run(['bash', '-c', [
     'cd /tmp && : > L2',
@@ -87,5 +93,5 @@ export default async function (ctx) {
   ].join('\n')], { cwd: '/tmp' });
   assert.equal(two.status, 0, `two processes: ${two.stdout}${two.stderr}`);
   assert.match(two.stdout, /^refused: Resource temporarily unavailable\n$/, `a second process's LOCK_EX|LOCK_NB while the first holds LOCK_EX: ${two.stdout}${two.stderr}`);
-  console.log(`flock: ${want}, as root and cone; a second perl process is refused while the first holds LOCK_EX`);
+  console.log(`flock: ${want}, as root and cone; a second perl process is refused while the first holds LOCK_EX; pipes, STDOUT, /dev/null and a directory are granted`);
 }
