@@ -15,6 +15,15 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
 
+## 5.42.0-14: needs slicc-kernel ≥ 1.100.0
+
+A packaging-only release of 5.42.0-13 (the same files): `engines` now asks
+for slicc-kernel ≥ 1.100.0, the first kernel with `slicc.fcntl_lock`. On an
+older kernel the libc grants every `fcntl` record lock locally, so two
+processes could both hold a write lock on the same bytes and lose data;
+refusing to install there is the honest answer (homescoop#552). Up to -13
+`engines` said ≥ 1.44.0.
+
 ## 5.42.0-13: wasix-sysroot 2025.9.30-30
 
 - POSIX record locks: `Fcntl` exports `F_GETLK`, `F_SETLK`, `F_SETLKW` and
@@ -25,7 +34,7 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   `EAGAIN`, `F_SETLKW` waits for the unlock, and `F_GETLK` names the holder.
   On an older kernel every lock is granted locally and `F_GETLK` answers
   `F_UNLCK`, so a script that probes `F_SETLK` and falls back now thinks it
-  has locking there. The struct is `pack('s s x4 q q l x4', $type, $whence,
+  has locking there (hence -14's `engines` floor). The struct is `pack('s s x4 q q l x4', $type, $whence,
   $start, $len, $pid)` (32 bytes on wasm32). `flock` is unchanged: an
   advisory no-op that succeeds on an open handle.
 - The real DynaLoader, as upstream builds it for a static perl

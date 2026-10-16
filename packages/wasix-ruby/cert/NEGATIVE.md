@@ -18,3 +18,7 @@
 - **locks.mjs** on the published 3.4.11-13 (slicc-kernel 1.100.3 and 1.93.0): rc 1, `uninitialized constant Fcntl::F_GETLK (NameError)`. sysroot -28's headers define no record-lock commands, so ruby's fcntl extension has none.
 - **launcher.mjs**'s load-path case on 3.4.11-13 gives `6`: RUBYLIB names `lib/ruby/site_ruby/3.4.0`, `site_ruby/3.4.0/wasm32-wasi`, `vendor_ruby/3.4.0` and `vendor_ruby/3.4.0/wasm32-wasi`, none of which is in the tarball. With RUBYLIB set to the two existing directories, `ruby -rirb -e 1` makes 6,637 WASI calls instead of 7,901 (`SLICC_WASI_STATS=1`, slicc-kernel 1.100.3's Node entry).
 - **sysroot28.mjs**'s toolchain record expects -30. 3.4.11-13 says `wasix-sysroot 2025.9.30-28|wasix-sysroot 2025.9.30-28`.
+
+## 3.4.11-15: the engines floor (homescoop#552)
+
+`locks.mjs` against the published 3.4.11-14 on slicc-kernel 1.100.3's Node entry, 2026-10-16: FAIL at `engines.slicc-kernel is >=1.100.0 … : >=1.44.0`. -14 admitted kernels without `slicc.fcntl_lock`, where every lock is granted locally. With -15's manifest over the same files, the spec passes (real locks: child EAGAIN, F_SETLKW waited). The spec has no local-answer branch any more, so it also fails on a kernel before 1.100.0.
