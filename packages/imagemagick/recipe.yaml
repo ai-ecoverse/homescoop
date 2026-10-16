@@ -62,6 +62,7 @@ about:
     now fails on area, as fast. share/imagemagick/relink is an LGPL relink
     kit for the static GNU libiconv (homescoop#395), checked by
     cert/lib/relink-check.mjs in ladder-pr. build.sh configures again a
-    $WORK tree configured with other delegates, and checks the delegates
-    outside the skip (homescoop#350). CXXFLAGS -g (the C++ link of
+    $WORK tree configured with other delegates or built with other flags
+    (a .homescoop-build stamp), and checks the delegates outside the skip
+    (homescoop#350). CXXFLAGS -g (the C++ link of
     utilities/magick) keeps the name section and line tables, as before.

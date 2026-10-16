@@ -73,7 +73,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2-2** (emcmake, no SIMD) |
 | `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** (emcmake, codec off) |
 | `@ai-ecoverse/wasm-libtiff` | host | **4.7.0**; deps zlib + jpeg |
-| `@ai-ecoverse/wasm-libheif` | host | **1.23.6-1** (`heif-convert` / `heif-dec` / `heif-info`; libde265 + dav1d; static libs for relinking). **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
+| `@ai-ecoverse/wasm-libheif` | host | **1.23.6-2** (`heif-convert` / `heif-dec` / `heif-info`; libde265 + dav1d; static libs for relinking). **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
 | `@ai-ecoverse/wasm-gmake` | host | **4.4.1-2** (spawn/exec/select/main_envp/gaps) |
 | `@ai-ecoverse/wasm-bash` | host | **5.3.0-9** (readline/history, fork + Asyncify, `/dev/fd` process subst, PIPESTATUS patch; `exec` keeps the pid on slicc-kernel with `execve`) |
 | `@ai-ecoverse/wasm-coreutils` | host | **9.12.0-3** single-binary + argv0 manifest (uid 1000 via gaps; exec keeps the pid) |
@@ -82,8 +82,8 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-gawk` | host | **5.3.2-3** (`gawk` + `awk`) |
 | `@ai-ecoverse/wasm-less` | host | **668.0.0-2** (static ncursesw fallbacks) |
 | `@ai-ecoverse/wasm-sqlite3` | host | **3.54.0-3** (shell amalgamation) |
-| `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-34-1** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
-| `@ai-ecoverse/wasm-imagemagick-heif` | host | **7.1.2-34-1**: wasm-imagemagick `--with-heic` linked against wasm-libheif (HEIC/HEIF/AVIF read), same commands. **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
+| `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-34-2** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7; LGPL relink kit for libiconv) |
+| `@ai-ecoverse/wasm-imagemagick-heif` | host | **7.1.2-34-2**: wasm-imagemagick `--with-heic` linked against wasm-libheif (HEIC/HEIF/AVIF read), same commands. **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
 | `@ai-ecoverse/wasm-tar` | host | **1.35.0-6** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
 | `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
 | `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |

@@ -50,10 +50,34 @@ im_config_ok() {
     grep -q "^#define ${d}_DELEGATE 1" "$h" || return 1
   done
 }
+# What the tree in $SRC was built with: configure arguments and the link flags.
+# A tree built with others (an older build.sh, other delegates or flags) is
+# configured again (homescoop#350).
+CONFIGURE_ARGS=(
+  --host=wasm32-unknown-emscripten
+  --disable-shared --enable-static --disable-openmp --without-threads
+  --without-modules --disable-docs --without-perl --without-magick-plus-plus
+  --without-x --without-bzlib --without-djvu --without-dps --without-fftw
+  --without-flif --without-fpx --without-fontconfig --without-gslib
+  --without-gvc --with-heic --without-jbig --without-jxl --without-lqr
+  --without-lzma --without-openexr --without-pango --without-raqm
+  --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml
+  --without-zip --without-zstd --with-webp --with-freetype
+  CFLAGS="-g1 -O2" CXXFLAGS="-g -O2"
+  LDFLAGS="-L$PREFIX/lib -fexceptions"
+)
+MAKE_LDFLAGS="-L$PREFIX/lib -fexceptions $SLICC_A $CLI_LDFLAGS"
+STAMP="$SRC/.homescoop-build"
+want_stamp() { printf '%s\n' "${CONFIGURE_ARGS[@]}" "$MAKE_LDFLAGS" | shasum -a 256 | cut -d' ' -f1; }
 REBUILD="${FORCE:-}"
-if [[ -z "$REBUILD" && ( -f "$SRC/utilities/magick" || -f "$SRC/utilities/magick.js" ) ]] && ! im_config_ok; then
-  echo "== imagemagick-heif: $SRC was configured with other delegates (homescoop#350), configuring again"
-  REBUILD=1
+if [[ -z "$REBUILD" && ( -f "$SRC/utilities/magick" || -f "$SRC/utilities/magick.js" ) ]]; then
+  if ! im_config_ok; then
+    echo "== imagemagick-heif: $SRC was configured with other delegates (homescoop#350), configuring again"
+    REBUILD=1
+  elif [[ "$(cat "$STAMP" 2>/dev/null)" != "$(want_stamp)" ]]; then
+    echo "== imagemagick-heif: $SRC was built with other configure or link flags, configuring again"
+    REBUILD=1
+  fi
 fi
 
 # utilities/magick is linked by the C++ driver (utilities/Makefile.am's
@@ -63,22 +87,13 @@ if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "$RE
   echo "== imagemagick: emconfigure"
   (
     cd "$SRC"
+    rm -f "$STAMP"
     if [[ -f Makefile ]]; then
       make distclean >/dev/null 2>&1 || true
     fi
     PKG_CONFIG="$PKG_CONFIG" EM_PKG_CONFIG_PATH="$EM_PKG_CONFIG_PATH" \
       PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR" \
-      emconfigure ./configure --host=wasm32-unknown-emscripten \
-        --disable-shared --enable-static --disable-openmp --without-threads \
-        --without-modules --disable-docs --without-perl --without-magick-plus-plus \
-        --without-x --without-bzlib --without-djvu --without-dps --without-fftw \
-        --without-flif --without-fpx --without-fontconfig --without-gslib \
-        --without-gvc --with-heic --without-jbig --without-jxl --without-lqr \
-        --without-lzma --without-openexr --without-pango --without-raqm \
-        --without-raw --without-rsvg --without-uhdr --without-wmf --with-xml \
-        --without-zip --without-zstd --with-webp --with-freetype \
-        CFLAGS="-g1 -O2" CXXFLAGS="-g -O2" \
-        LDFLAGS="-L$PREFIX/lib -fexceptions"
+      emconfigure ./configure "${CONFIGURE_ARGS[@]}"
     for d in WEBP FREETYPE XML HEIC; do
       grep -q "^#define ${d}_DELEGATE 1" config/config.h || { echo "homescoop: configure left out the ${d} delegate" >&2; exit 1; }
     done
@@ -89,7 +104,8 @@ if [[ ! -f "$SRC/utilities/magick" && ! -f "$SRC/utilities/magick.js" || -n "$RE
     echo "== imagemagick: emmake utilities/magick"
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
       utilities/magick \
-      LDFLAGS="-L$PREFIX/lib -fexceptions $SLICC_A $CLI_LDFLAGS"
+      LDFLAGS="$MAKE_LDFLAGS"
+    want_stamp >"$STAMP"
   )
 fi
 

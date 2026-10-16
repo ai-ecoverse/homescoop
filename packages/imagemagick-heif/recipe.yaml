@@ -59,5 +59,6 @@ about:
     (homescoop#396): utilities/magick is a C++ link, and CXXFLAGS -g1
     stripped both; it is -g now, as wasm-imagemagick's default, and
     relink.sh links with -g too. build.sh configures again a $WORK tree
-    configured with other delegates, and checks the delegates outside the
-    skip (homescoop#350).
+    configured with other delegates or built with other flags (a
+    .homescoop-build stamp), and checks the delegates outside the skip
+    (homescoop#350).
