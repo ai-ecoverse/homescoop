@@ -37,6 +37,15 @@ fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
+## 3.4.11-15: needs slicc-kernel ≥ 1.100.0
+
+A packaging-only release of 3.4.11-14 (the same files): `engines` now asks
+for slicc-kernel ≥ 1.100.0, the first kernel with `slicc.fcntl_lock`. On an
+older kernel the libc grants every `IO#fcntl` record lock locally, so two
+processes could both hold a write lock on the same bytes and lose data;
+refusing to install there is the honest answer (homescoop#552). Up to -14
+`engines` said ≥ 1.44.0.
+
 ## 3.4.11-14: wasix-sysroot 2025.9.30-30
 
 - POSIX record locks: `require "fcntl"` now defines `Fcntl::F_GETLK`,
@@ -46,7 +55,7 @@ fails. `io/console` is built, so `irb` and reline work.
   `Process.spawn`ed ruby asking for a write lock on a range another process
   holds gets `Errno::EAGAIN`, `F_SETLKW` waits for the unlock, and `F_GETLK`
   names the holder. On an older kernel every lock is granted locally and
-  `F_GETLK` answers `F_UNLCK`. The struct is `[type, whence, start, len,
+  `F_GETLK` answers `F_UNLCK` (hence -15's `engines` floor). The struct is `[type, whence, start, len,
   pid].pack("s s x4 q q l x4")` (32 bytes). `File#flock` is unchanged: an
   advisory no-op that succeeds (`bundle install` and `gem install` lock
   their files with it).

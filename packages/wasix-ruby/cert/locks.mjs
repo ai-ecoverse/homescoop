@@ -45,11 +45,10 @@ export default async function (ctx) {
   assert.equal(r.status, 0, `rc=${r.status} stdout=${r.stdout} stderr=${r.stderr}`);
   const kv = ctx.kernel?.version ?? '';
   const [maj, min] = kv.split('.').map(Number);
-  const real = maj > 1 || (maj === 1 && min >= 100);
-  const want = real
-    ? 'consts=12,13,14,0,1,2 | parent=ok,ok,EINVAL own=2:0+5 | child=EAGAIN ok ok EAGAIN 1:0+5:parent | unlock=ok | setlkw=ok:waited'
-    : 'consts=12,13,14,0,1,2 | parent=ok,ok,EINVAL own=2:0+5 | child=ok ok ok ok 2:0+5 | unlock=ok | setlkw=ok:at-once';
-  assert.equal(r.stdout.trim(), want,
-    `IO#fcntl F_SETLK/F_SETLKW/F_GETLK on slicc-kernel ${kv || '(unknown)'} (${real ? 'slicc.fcntl_lock: real locks between processes' : 'no slicc.fcntl_lock: the local answer, every lock granted'}): ${r.stdout}${r.stderr}`);
+  const floor = ctx.installed?.[0]?.engines?.['slicc-kernel'];
+  assert.equal(floor, '>=1.100.0', `engines.slicc-kernel is >=1.100.0, the first kernel with slicc.fcntl_lock: on older kernels every lock is granted locally (homescoop#552): ${floor}`);
+  assert.ok(maj > 1 || (maj === 1 && min >= 100), `the cert kernel ${kv || '(unknown)'} satisfies engines ${floor}`);
+  assert.equal(r.stdout.trim(), 'consts=12,13,14,0,1,2 | parent=ok,ok,EINVAL own=2:0+5 | child=EAGAIN ok ok EAGAIN 1:0+5:parent | unlock=ok | setlkw=ok:waited',
+    `IO#fcntl F_SETLK/F_SETLKW/F_GETLK on slicc-kernel ${kv}: real locks between processes through slicc.fcntl_lock: ${r.stdout}${r.stderr}`);
   console.log(`locks (slicc-kernel ${kv}): ${r.stdout.trim()}`);
 }

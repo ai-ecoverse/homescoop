@@ -833,7 +833,7 @@ pkg = {
     "version": pkg_ver,
     "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot {os.environ['SYSROOT_VER']}: user ids, traps and times from slicc-kernel)",
     # wasix-sysroot -20 asks slicc-kernel for user ids, with no fallback (homescoop#207).
-    "engines": {"slicc-kernel": ">=1.44.0"},
+    "engines": {"slicc-kernel": ">=1.100.0"},
     "license": "Ruby",
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-ruby/package"},
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "PRESTAGE.md"],

@@ -70,3 +70,7 @@ The new specs against the published tarballs on slicc-kernel 1.100.3's Node entr
 - **static-xs.mjs** on 5.42.0-12 fails at its first case, rc 255: `Undefined subroutine &DynaLoader::dl_error called at -e line 4.` patches/0004's no-op `boot_DynaLoader` defines nothing else. Without patches/0007 its Encode case gets `Unknown encoding 'UTF-16LE'`, because -12 has no `Encode/Unicode.pm` and no `boot_Encode__Unicode`. -12 is the build without patches/0006 and 0007.
 - **sigmask-inherit.mjs** passes on 5.42.0-12, since masks have been real since -12. On 5.42.0-11 (sysroot -27) it gives `forkchild=none execchild=none systemchild=none kept=none after=none qx=hi nested_in_handler=2 total=2`, against `forkchild=10,15 execchild=10,15 systemchild=10,15 kept=10,15 after=none qx=hi nested_in_handler=1 total=2`.
 - The 12 older specs pass with -12 on 1.100.3, so moving the cert kernel from 1.93.0 to 1.100.3 changes no older case.
+
+## 5.42.0-14: the engines floor (homescoop#552)
+
+`locks.mjs` against the published 5.42.0-13 on slicc-kernel 1.100.3's Node entry, 2026-10-16: FAIL at `engines.slicc-kernel is >=1.100.0 … : >=1.44.0`. -13 admitted kernels without `slicc.fcntl_lock`, where every lock is granted locally. With -14's manifest over the same files, the spec passes (real locks: child EAGAIN, F_SETLKW waited). The spec has no local-answer branch any more, so it also fails on a kernel before 1.100.0.
