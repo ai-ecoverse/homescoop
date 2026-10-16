@@ -1,6 +1,7 @@
 # Perl 5.42 for slicc WASIX (perl-cross + wasixcc + wasix-sysroot).
 name: wasix-perl
 builder: host
+runner: pool
 reproducible: true
 inputs:
   - scripts/install-wasixcc.sh

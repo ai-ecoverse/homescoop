@@ -15,6 +15,7 @@ homescoop_load_recipe() {
   shift || true
   # shellcheck disable=SC1090
   eval "$(node "$HOMESCOOP_ROOT/scripts/recipe-env.mjs" "$name" "$@")"
+  export HOMESCOOP_PKG="$HOMESCOOP_ROOT/packages/$name"
   : "${HOMESCOOP_PKG:?}" "${VERSION:?}"
   # Primary load must export SRC_URL/SRC_SHA; secondary loads only PREFIX_* vars.
   if [[ "$*" != *"--source"* ]]; then

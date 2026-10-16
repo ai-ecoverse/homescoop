@@ -147,9 +147,24 @@ jobs:
         run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
+      - name: Build from the hosted workspace path
+        run: |
+          set -euo pipefail
+          want="/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
+          if [[ "$GITHUB_WORKSPACE" != "$want" ]]; then
+            if [[ -e "$want" && ! -L "$want" ]]; then
+              echo "::error::$want exists and is not a link to the workspace"
+              exit 1
+            fi
+            mkdir -p "$(dirname "$want")"
+            ln -sfn "$GITHUB_WORKSPACE" "$want"
+          fi
+          echo "build root $want ($(cd "$want" && pwd -P))"
+          echo "HOMESCOOP_BUILD_ROOT=$want" >> "$GITHUB_ENV"
       - name: Host build (no publish)
         run: |
           set -euo pipefail
+          cd "$HOMESCOOP_BUILD_ROOT"
           bash scripts/host-run.sh "${{ matrix.package }}"
           ls -la .homescoop-out/package.tgz
       - name: Assert packed version is npm-publishable semver
@@ -201,9 +216,24 @@ jobs:
         run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
+      - name: Build from the hosted workspace path
+        run: |
+          set -euo pipefail
+          want="/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
+          if [[ "$GITHUB_WORKSPACE" != "$want" ]]; then
+            if [[ -e "$want" && ! -L "$want" ]]; then
+              echo "::error::$want exists and is not a link to the workspace"
+              exit 1
+            fi
+            mkdir -p "$(dirname "$want")"
+            ln -sfn "$GITHUB_WORKSPACE" "$want"
+          fi
+          echo "build root $want ($(cd "$want" && pwd -P))"
+          echo "HOMESCOOP_BUILD_ROOT=$want" >> "$GITHUB_ENV"
       - name: Second host build (recipe reproducible)
         run: |
           set -euo pipefail
+          cd "$HOMESCOOP_BUILD_ROOT"
           bash scripts/host-run.sh "${{ matrix.package }}"
           sha256sum .homescoop-out/package.tgz | tee .homescoop-out/package.tgz.sha256
       - uses: actions/upload-artifact@v7

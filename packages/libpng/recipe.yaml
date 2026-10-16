@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: libpng
 builder: host
+runner: pool
 # renovate: datasource=github-tags depName=pnggroup/libpng extractVersion=^v(?<version>.*)$
 version: "1.6.59"
 npm: "@ai-ecoverse/wasm-libpng"

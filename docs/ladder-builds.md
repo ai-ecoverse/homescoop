@@ -184,7 +184,11 @@ pool without the hint, and moves back when its next release drops `repack:`.
 On the pool (`vars.CERT_RUNNER`, `cloud-run-bench`: 8 vCPU / 32 GiB, no queue,
 no sudo) a recipe's bytes can differ from a hosted build: its image lacks some
 of the hosted tools, and the workspace is `/home/runner/_work`, not
-`/home/runner/work`, so a build that embeds a path under it differs. **A recipe
+`/home/runner/work`; `host-build` and `rebuild` therefore build from
+`/home/runner/work/<repo>/<repo>`, a link to the pool's workspace, so a build
+that embeds a path under it (wasix-perl's `Config_heavy.pl`, libpng's include
+directories) records the hosted path (`homescoop_load_recipe` sets
+`HOMESCOOP_PKG` from `HOMESCOOP_ROOT`, since node reports the link's target). **A recipe
 moves to the pool only with evidence of equal bytes:** in the PR that adds
 `runner: pool`, its `host-<pkg>-prN` tarball from the pool must have the same
 sha256 as a hosted twin built from the same tree (`host-run.sh` on
