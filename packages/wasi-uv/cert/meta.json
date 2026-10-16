@@ -5,7 +5,7 @@
   "needsInstall": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
-    "@ai-ecoverse/wasix-python@3.14.2-21"
+    "@ai-ecoverse/wasix-python@3.14.2-24"
   ],
   "checklist": [
     "uv --version is 'uv 0.13.1 ([…] wasm32-wasip1-threads)'",
