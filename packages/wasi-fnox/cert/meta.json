@@ -15,6 +15,7 @@
     "sync and reencrypt refused with `not available in seven: the value would be in a program (use a header rule)`",
     "fnox edit refused cleanly: non-zero status, not 134, \"fnox edit is not available in seven: use fnox set\", no panic or trap (homescoop#376)",
     "proxy rules --json prints the [proxy] rules; proxy run -- printenv shows each rule's env name holding the placeholder and the secret's own name unset",
+    "proxy run with a 1password, a bitwarden and a vault provider configured: their credentials (OP_SERVICE_ACCOUNT_TOKEN, FNOX_OP_SERVICE_ACCOUNT_TOKEN, BW_SESSION, FNOX_BW_SESSION, VAULT_TOKEN, FNOX_VAULT_NAMESPACE) don't reach the child, as upstream (homescoop#401)",
     "exec with only plain secrets: the child gets the value, stderr warns that it was passed as a plain value; exec of a missing command exits 127",
     "exec --shell-grants without a vault fails closed (same errors)",
     "test/sealed.mjs (KS-2, vault double): set from a pipe → seal {name, value} → placeholder stored, value not in fnox.toml, stdout, stderr or /proc/<pid>/cmdline",
@@ -28,7 +29,7 @@
   ],
   "patches": {
     "0001-build-gate-non-WASI-dependencies-by-target.patch": "the build: wasm32-wasip1 links at all (no cloud SDKs, reqwest, keyring, TUI)",
-    "0002-providers-build-only-age-and-plain-for-WASI.patch": "age set encrypts; provider types outside the allowlist fail when used",
+    "0002-providers-build-only-age-and-plain-for-WASI.patch": "age set encrypts; provider types outside the allowlist fail when used; proxy run removes a configured disabled provider's env_dependencies() from the child (NEGATIVE.md: 1.39.0-2 hands FNOX_OP_SERVICE_ACCOUNT_TOKEN through)",
     "0003-cli-compile-out-modules-that-cannot-run-on-WASI.patch": "--help lists no daemon, tui or mcp",
     "0004-wasi-take-the-working-directory-and-home-from-the-en.patch": "get from a subdirectory of the project (cwd from PWD)",
     "0005-wasi-spawn-fnox-exec-children-through-wasix-command.patch": "plain exec: the child runs and gets the value",

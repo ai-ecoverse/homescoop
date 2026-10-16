@@ -34,7 +34,9 @@ about:
       0001 gate non-WASI dependencies (cloud SDKs, reqwest, rustls,
            keyring, TUI, prompts, signals, locks, keepass) by target
       0002 build only the age and plain providers on WASI; others keep
-           their config variants and fail when used
+           their config variants and fail when used, and keep their
+           env_dependencies() (read from the module source at build
+           time), so proxy run scrubs their credentials (homescoop#401)
       0003 compile out mcp, proxy, tui, daemon, leases, prompts on WASI
       0004 cwd from PWD, HOME from the environment, current_thread
       0005 spawn `fnox exec` children through wasix-command
@@ -62,4 +64,5 @@ about:
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
-    published; 1.39.0-2 adds 0014 and the reproducible build.
+    published; 1.39.0-2 adds 0014 and the reproducible build; 1.39.0-3
+    keeps the disabled providers' env_dependencies() in 0002.

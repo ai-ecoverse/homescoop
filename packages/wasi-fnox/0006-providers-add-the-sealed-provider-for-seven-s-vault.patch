@@ -15,10 +15,10 @@ in seven: /dev/sealed is missing". The transport is replaceable, and
 the unit tests run against an in-process mock.
 
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
-index f0ca60e..ed48ac3 100644
+index aeb35c7..1d1614a 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
-@@ -716,7 +716,7 @@ fn wasi_enabled(module: &str) -> bool {
+@@ -755,7 +755,7 @@ fn wasi_enabled(module: &str) -> bool {
      if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("wasi") {
          return true;
      }
