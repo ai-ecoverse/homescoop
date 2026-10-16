@@ -12,6 +12,8 @@ homescoop_fetch "$URL" "$SHA" "$TB"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC"; fi
 homescoop_extract "$TB" "$SRC"
 test -f "$SRC/configure"
+# The patches are wasm-imagemagick's (packages/imagemagick/*.patch, recipe inputs).
+HOMESCOOP_PKG="$HOMESCOOP_ROOT/packages/imagemagick" homescoop_apply_patches "$SRC"
 
 SLICC_A="$WORK/libslicc-cli.a"
 homescoop_slicc_archive "$SLICC_A" cli
@@ -50,7 +52,7 @@ im_config_ok() {
     grep -q "^#define ${d}_DELEGATE 1" "$h" || return 1
   done
 }
-# What the tree in $SRC was built with: configure arguments and the link flags.
+# What the tree in $SRC was built with: configure arguments, link flags, patches.
 # A tree built with others (an older build.sh, other delegates or flags) is
 # configured again (homescoop#350).
 CONFIGURE_ARGS=(
@@ -68,7 +70,7 @@ CONFIGURE_ARGS=(
 )
 MAKE_LDFLAGS="-L$PREFIX/lib -fexceptions $SLICC_A $CLI_LDFLAGS"
 STAMP="$SRC/.homescoop-build"
-want_stamp() { printf '%s\n' "${CONFIGURE_ARGS[@]}" "$MAKE_LDFLAGS" | shasum -a 256 | cut -d' ' -f1; }
+want_stamp() { { printf '%s\n' "${CONFIGURE_ARGS[@]}" "$MAKE_LDFLAGS"; cat "$HOMESCOOP_ROOT"/packages/imagemagick/*.patch; } | shasum -a 256 | cut -d' ' -f1; }
 REBUILD="${FORCE:-}"
 if [[ -z "$REBUILD" && ( -f "$SRC/utilities/magick" || -f "$SRC/utilities/magick.js" ) ]]; then
   if ! im_config_ok; then

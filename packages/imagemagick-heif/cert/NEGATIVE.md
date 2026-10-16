@@ -107,3 +107,19 @@ Against the published `@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-34-1 (npm
   ```
   Error: README.md, Relinking does not name libfreetype.a, libiconv.a, libjpeg.a, liblcms2.a, libopenjp2.a, libpng16.a, libsharpyuv.a, libslicc_cred.a, libtiff.a, libwebp.a, libwebpdemux.a, libwebpmux.a, libxml2.a, libz.a of the kit
   ```
+
+## 7.1.2-34-3: in-place WebP over 16383 px (homescoop#585)
+
+inplace-webp.mjs (wasm-imagemagick's) against the published
+`@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-34-2, slicc-kernel 1.81.0,
+`--users enforce`, 2026-10-16:
+
+```
+browser-cert: FAIL packages/imagemagick-heif/cert/inplace-webp.mjs
+AssertionError [ERR_ASSERTION]: w.webp after the refused write (homescoop#585: truncated)
++ ''
+- 'WEBP 9000 100'
+```
+
+The spec sorts before side-by-side.mjs, which leaves the plain
+wasm-imagemagick 7.1.2-32-4 providing `magick` on kernels before 1.94.0.
