@@ -187,6 +187,40 @@ anything else fails the leg.
 
 Each page call (`ctx.run`, `ctx.write`, …) has to answer within 120 s, or the spec fails with `Runtime.evaluate: no answer in … ms`. `"runTimeoutMs"` changes that for one package. The harness's own default was 30 s, which wasix-python's venv and pnpm-layout steps outgrew on slower CI runners.
 
+### WebSockets: `ctx.serveWs(responder)`
+
+The cert page's transport also has the kernel's optional `websocket`
+(`traits.websocket`), so a program's WebSocket through the kernel's proxy
+(absolute-form `ws:`, or `wss:` inside a `CONNECT` tunnel the kernel
+terminates) gets a far end too: `responder`, a self-contained function that
+runs in the page. It gets `{ url, protocols, headers, send(data), close(code,
+reason) }` for one socket, where `send` delivers a text (`string`) or binary
+(`Uint8Array`) message to the program and `close` ends the socket with that
+code. It answers `null`, which refuses the open (the program sees `502`), or
+`{ protocol, message(data), close(code, reason) }`, its callbacks for what
+the program sends. Before `serveWs` every open is refused. `ctx.wsLog()`
+returns one record per socket: `{ url, protocols, headers, sent, received,
+closed }`, where `sent` is what the far end sent and `received` is what the
+program sent (binary messages as `{ binary: <bytes> }`).
+
+```js
+await ctx.serveWs(({ protocols, send }) => ({
+  protocol: protocols[0] || '',
+  message(data) { send(typeof data === 'string' ? `echo:${data}` : data); },
+}));
+const r = await ctx.run(['curl', '-sS', 'wss://echo.test/']);
+```
+
+`wss:` also needs `@ai-ecoverse/wasm-tls-engine` in `needs`, as for https.
+Programs that skip the proxy and dial TCP themselves (websocat) reach the
+outer world only through an uplink (`ctx.uplink`), whose scripted peers
+answer once and close. websocat's outer `ws:`/`wss:` cert runs on the Node
+entry with host-side echo servers (`packages/wasix-websocat/test/uplink.mjs`).
+[`scripts/browser-cert/selftest/websocket.mjs`](../scripts/browser-cert/selftest/websocket.mjs)
+is the harness's own spec. `kernel-compat-proof` runs it on npm `latest` of
+wasm-curl: curl's `ws:`/`wss:` receive side, plus bash speaking the frames
+by hand on `127.0.0.1:3128` for the send side.
+
 ### Tailnet: `ctx.uplink(config)`
 
 With `"uplink": true` in `cert/meta.json` (slicc-kernel ≥ 1.28.0)

@@ -70,8 +70,73 @@ window.opfs = {
 // standing in for every remote server. The kernel's proxy, TLS termination
 // and HTTP/1.1 stay real; only the far end is the spec's. Without a
 // responder every request fails with 502, as with no transport at all.
+// WebSockets for cert specs: ctx.serveWs(fn) installs window.certWs, the far
+// end of every WebSocket a program opens through the kernel's proxy (ws:, and
+// wss: once the kernel terminates the tunnel). fn gets { url, protocols,
+// headers, send(data), close(code, reason) } and answers null (refused) or
+// { protocol, message(data), close(code, reason) }, its callbacks for what the
+// program sends. Without a responder every open is refused.
+window.certWsLog = [];
+async function certWebSocket({ url, protocols = [], headers = [] }) {
+  if (typeof window.certWs !== 'function') {
+    throw Object.assign(new Error('browser-cert: no ctx.serveWs() responder'), { code: 'ECONNREFUSED' });
+  }
+  const log = { url, protocols, headers, sent: [], received: [], closed: null };
+  window.certWsLog.push(log);
+  const queue = [];
+  let wake = null;
+  let ended = null;
+  let settle;
+  const closed = new Promise((resolve) => (settle = resolve));
+  const finish = (code = 1000, reason = '') => {
+    if (ended) return;
+    ended = { code, reason };
+    log.closed = ended;
+    settle(ended);
+    wake?.();
+  };
+  const peer = await window.certWs({
+    url,
+    protocols,
+    headers,
+    send(data) {
+      if (ended) return;
+      log.sent.push(typeof data === 'string' ? data : { binary: data.length });
+      queue.push(typeof data === 'string' ? data : new Uint8Array(data));
+      wake?.();
+    },
+    close: finish,
+  });
+  if (!peer) throw Object.assign(new Error('browser-cert: ctx.serveWs() refused the WebSocket'), { code: 'ECONNREFUSED' });
+  async function* messages() {
+    for (;;) {
+      while (queue.length) yield queue.shift();
+      if (ended) return;
+      await new Promise((resolve) => (wake = resolve));
+      wake = null;
+    }
+  }
+  return {
+    protocol: peer.protocol ?? '',
+    get buffered() {
+      return 0;
+    },
+    send(data) {
+      log.received.push(typeof data === 'string' ? data : { binary: data.length });
+      peer.message?.(data);
+    },
+    messages: messages(),
+    close(code = 1000, reason = '') {
+      peer.close?.(code, reason);
+      finish(code, reason);
+    },
+    closed,
+  };
+}
+
 const certTransport = {
-  traits: { manualRedirects: true, encodedBodies: true, crossOrigin: 'any' },
+  traits: { manualRedirects: true, encodedBodies: true, crossOrigin: 'any', websocket: true },
+  websocket: certWebSocket,
   async fetch(request) {
     if (typeof window.certNet !== 'function') {
       throw Object.assign(new Error('browser-cert: no ctx.serve() responder'), { status: 502 });
