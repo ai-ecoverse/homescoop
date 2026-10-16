@@ -17,6 +17,10 @@
  *   Install the far end of the network: every request a program makes
  *   through the kernel's proxy (http and https alike) reaches `responder`.
  *   It runs in the page, so it must be self-contained (no closures).
+ * @property {(responder: (sock: {url:string, protocols:string[], headers:[string,string][], send:(data:string|Uint8Array)=>void, close:(code?:number, reason?:string)=>void}) => ({protocol?:string, message?:(data:string|Uint8Array)=>void, close?:(code:number, reason:string)=>void}|null|Promise<object|null>)) => Promise<void>} serveWs
+ *   The far end of every WebSocket a program opens through the kernel's proxy
+ *   (ws:, wss:); self-contained, it runs in the page. null refuses the open.
+ * @property {() => Promise<{url:string, protocols:string[], headers:[string,string][], sent:any[], received:any[], closed:{code:number, reason:string}|null}[]>} wsLog
  * @property {(argv: string[], opts?: PtyOptions) => Promise<PtyResult>} pty
  *   Run `argv` as the session leader of a real terminal (kernel.openTerminal)
  *   and script it: each step waits for its `expect` regex in the output
@@ -137,6 +141,14 @@ export function makeContext(page, meta) {
     async write(path, data) {
       const text = typeof data === 'string' ? data : Buffer.from(data).toString('binary');
       await page.evaluate((p, t) => window.opfs.write(p, t), path.replace(/^\//, ''), text);
+    },
+    async serveWs(responder) {
+      await page.evaluate((src) => {
+        window.certWs = new Function(`return (${src})`)();
+      }, responder.toString());
+    },
+    async wsLog() {
+      return page.evaluate(() => window.certWsLog);
     },
     async serve(responder) {
       await page.evaluate((src) => {

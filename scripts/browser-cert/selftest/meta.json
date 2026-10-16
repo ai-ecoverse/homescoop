@@ -1,0 +1,14 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "glueByPath": false,
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-tls-engine"
+  ],
+  "checklist": [
+    "the harness's own regression test, run by kernel-compat-proof against npm latest of @ai-ecoverse/wasm-curl",
+    "websocket.mjs (#458): ctx.serveWs is the far end of a program's WebSocket through the kernel's proxy. curl ws:// gets the far end's text and binary messages and close code; wss:// goes through the kernel's TLS termination; a refused open is 502; a raw client (bash on 127.0.0.1:3128) gets 101 with RFC 6455's accept, its masked frames reach the far end and come back, and its close reaches the far end; ctx.wsLog() records each socket"
+  ]
+}

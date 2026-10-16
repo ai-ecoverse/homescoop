@@ -16,6 +16,7 @@ on:
       - 'scripts/browser-cert/glue.mjs'
       - 'scripts/browser-cert/context.mjs'
       - 'scripts/browser-cert/page/**'
+      - 'scripts/browser-cert/selftest/**'
 
 permissions:
   contents: read
@@ -62,3 +63,31 @@ jobs:
       set: 'base,ci-certified'
       homescoop-ref: ${{ github.event.pull_request.head.sha }}
       expect-regressions: 'grep,sed,xz,jq,findutils,diffutils,patch'
+
+  selftest:
+    needs: kernels
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: The harness's own specs (scripts/browser-cert/selftest) on npm latest of wasm-curl
+        env:
+          KERNEL: ${{ needs.kernels.outputs.positive }}
+        run: |
+          set -euo pipefail
+          NM="$RUNNER_TEMP/nm"
+          needs=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("scripts/browser-cert/selftest/meta.json","utf8")).needs.join(" "))')
+          npm install --prefix "$NM" --no-fund --no-audit "$KERNEL" "$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)" "$(node scripts/dev-pin.mjs playwright-core)" $needs
+          if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then
+            npx --prefix "$NM" playwright-core install --with-deps chromium
+          else
+            npx --prefix "$NM" playwright-core install chromium
+          fi
+          mkdir -p "$RUNNER_TEMP/curl"
+          npm pack @ai-ecoverse/wasm-curl --pack-destination "$RUNNER_TEMP/curl" --silent
+          HOMESCOOP_CERT_NODE_MODULES="$NM/node_modules" node scripts/browser-cert/run.mjs --package curl --tarball "$RUNNER_TEMP"/curl/*.tgz --cert scripts/browser-cert/selftest
