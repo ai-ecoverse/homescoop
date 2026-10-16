@@ -47,8 +47,7 @@ _Noreturn void siglongjmp(sigjmp_buf, int);
  * engines.slicc-kernel). This is perl's own flock emulation without
  * flock(2) (pp_sys.c, fcntl_emulate_flock), with fcntl's semantics: the
  * lock belongs to the process (fork doesn't inherit it, closing any handle
- * on the file drops it), LOCK_EX needs a handle open for writing and
- * LOCK_SH one open for reading (else EBADF).
+ * on the file drops it).
  */
 #undef flock
 static inline int homescoop_flock(int fd, int operation) {
@@ -61,7 +60,17 @@ static inline int homescoop_flock(int fd, int operation) {
     case LOCK_UN: fl.l_type = F_UNLCK; break;
     default: errno = EINVAL; return -1;
   }
-  if (fcntl(fd, (operation & LOCK_NB) ? F_SETLK : F_SETLKW, &fl) == 0) return 0;
+  int cmd = (operation & LOCK_NB) ? F_SETLK : F_SETLKW;
+  if (fcntl(fd, cmd, &fl) == 0) return 0;
+  /* fcntl wants a handle open for writing for F_WRLCK and one open for
+   * reading for F_RDLCK; flock takes either on any handle, and scripts lock
+   * read-only lock files with LOCK_EX. On an open handle of the other mode,
+   * take the other kind: LOCK_EX on a read-only handle is a read lock (it
+   * keeps writers out), LOCK_SH on a write-only one a write lock. */
+  if (errno == EBADF && fl.l_type != F_UNLCK && fcntl(fd, F_GETFD) >= 0) {
+    fl.l_type = fl.l_type == F_WRLCK ? F_RDLCK : F_WRLCK;
+    if (fcntl(fd, cmd, &fl) == 0) return 0;
+  }
   if (errno == EACCES || errno == EAGAIN) errno = EWOULDBLOCK;
   return -1;
 }

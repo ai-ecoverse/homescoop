@@ -6,8 +6,9 @@
  * slicc-kernel enforces from 1.100.0 (slicc.fcntl_lock, slicc-kernel#722),
  * as perl's own flock emulation does without flock(2): fcntl semantics, so
  * a lock belongs to the process (not inherited by fork, released when the
- * process closes any handle on the file), and LOCK_EX needs a handle open
- * for writing, LOCK_SH one open for reading.
+ * process closes any handle on the file). LOCK_EX on a read-only handle is
+ * a read lock (it keeps writers out), LOCK_SH on a write-only one a write
+ * lock, since fcntl wants the handle's mode to match.
  */
 const CODE = String.raw`
 use Fcntl qw(:flock);
@@ -51,12 +52,24 @@ if (!$pid2) {
 }
 waitpid($pid2, 0);
 my $shared = $? >> 8;
-print join(' | ', "parent=@parent", "child=$child", "blocking=$wres:" . ($secs >= 0.8 ? 'waited' : 'at-once'), "shared=$shared"), "\n";
+close $s1;
+# LOCK_EX on a read-only handle (a lock file opened '<') succeeds and keeps
+# a writer's LOCK_EX out (it is a read lock under fcntl).
+open(my $ro, '<', $f) or die;
+my $rox = $try->($ro, LOCK_EX);
+my $pid3 = fork // die;
+if (!$pid3) {
+  open(my $wr, '+>>', $f) or die;
+  exit($try->($wr, LOCK_EX | LOCK_NB) eq 'EWOULDBLOCK' ? 0 : 1);
+}
+waitpid($pid3, 0);
+my $readonly = "$rox:" . ($? >> 8);
+print join(' | ', "parent=@parent", "child=$child", "blocking=$wres:" . ($secs >= 0.8 ? 'waited' : 'at-once'), "shared=$shared", "readonly=$readonly"), "\n";
 `;
 
 export default async function (ctx) {
   const { run, assert, addUser } = ctx;
-  const want = 'parent=ok ok ok | child=EWOULDBLOCK EWOULDBLOCK | blocking=ok:waited | shared=0';
+  const want = 'parent=ok ok ok | child=EWOULDBLOCK EWOULDBLOCK | blocking=ok:waited | shared=0 | readonly=ok:0';
   for (const user of [undefined, 'cone']) {
     if (user) await addUser({ name: user });
     const cwd = user ? `/home/${user}` : '/tmp';
