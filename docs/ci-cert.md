@@ -209,11 +209,14 @@ export default noticesSpec(import.meta.url);
 ```
 
 The spec fails unless the installed package's `THIRD-PARTY-NOTICES.md` has,
-for each component, a `## ` heading naming it, a `License: <expr>` line in
-that section with exactly the declared expression, and the license text
-itself (a phrase of it: `"text"`, or the built-in phrase for each SPDX id in
-`LICENSE_PHRASES`; one alternative of an `OR`, every part of an `AND`). An id
-with no built-in phrase (a `LicenseRef-*`) needs `"text"`.
+for each component, a `## ` heading naming it, the license named in that
+heading or on a `License: ...` line of the section (an SPDX id of the declared
+expression: one alternative of an `OR`, every part of an `AND`), and the
+license text itself (a phrase of it: `"text"`, or the built-in phrase for each
+SPDX id in `LICENSE_PHRASES`, with the same `OR`/`AND` rule). An id with no
+built-in phrase (a `LicenseRef-*`) needs `"text"`. `homescoop_notice`
+([`build-common.sh`](../scripts/build-common.sh)) writes that shape:
+`homescoop_notice "FreeType 2.13.3 (FreeType License, FTL)" <LICENSE.TXT> - <FTL.TXT> -`.
 `scripts/test/notices.test.mjs` checks every `"notices"` list and that it has
 its spec. Add a checklist line for `cert/notices.mjs`.
 

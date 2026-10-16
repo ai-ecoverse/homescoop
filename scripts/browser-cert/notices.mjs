@@ -20,14 +20,16 @@
  * unless, for every declared component, the file has
  *
  *   - a `## ` heading that names it (case-insensitive, whole words),
- *   - in that section, a line `License: <expr>` with exactly the declared
- *     SPDX expression, and
+ *   - the license named, in that heading or on a `License: ...` line of the
+ *     section: an SPDX id of the declared expression (one of an `OR`, each
+ *     of an `AND`; `WITH` exceptions aside), and
  *   - in that section, the license text itself: a phrase from it (`text`, or
  *     the built-in phrase for each SPDX id in LICENSE_PHRASES; for
  *     `A OR B` one of them, for `A AND B` each of them).
  *
- * A component's name is what the heading says: "## OpenBLAS 0.3.28" names
- * "OpenBLAS". Add a checklist line in cert/meta.json for cert/notices.mjs.
+ * homescoop_notice (scripts/build-common.sh) writes this shape:
+ * "## FreeType 2.13.3 (FreeType License, FTL)" names "FreeType" and FTL, and
+ * the fenced license files follow. Add a checklist line in cert/meta.json for cert/notices.mjs.
  * checkNotices() is the pure check (scripts/test/notices.test.mjs).
  */
 import { readFileSync } from 'node:fs';
@@ -131,8 +133,14 @@ export function checkNotices(md, components) {
       continue;
     }
     const body = sec.map((s) => s.body).join('\n');
-    const lic = [...body.matchAll(/^License:\s*(.+?)\s*$/gm)].map((m) => m[1]);
-    if (!lic.includes(c.license)) errors.push(`${c.name}: no "License: ${c.license}" line in its section${lic.length ? ` (it says ${lic.map((l) => `"${l}"`).join(', ')})` : ''}`);
+    // The license is named in the heading ("## FreeType 2.13.3 (FreeType
+    // License, FTL)", homescoop_notice's style) or on a "License:" line.
+    const where = [...sec.map((s) => s.heading), ...[...body.matchAll(/^License:\s*(.+?)\s*$/gm)].map((m) => m[1])].join('\n');
+    for (const group of licenseGroups(c.license)) {
+      if (!group.some((id) => new RegExp(`(^|[^\\w.+-])${esc(id)}($|[^\\w.+-])`).test(where))) {
+        errors.push(`${c.name}: neither its heading nor a "License:" line names ${group.join(' or ')}`);
+      }
+    }
     const text = norm(body);
     if (c.text !== undefined) {
       if (!text.includes(norm(c.text))) errors.push(`${c.name}: its section lacks the license text (no "${c.text}")`);

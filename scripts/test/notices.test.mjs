@@ -72,12 +72,27 @@ test('checkNotices: a component without a heading fails, even if the text mentio
   assert.equal(checkNotices(GOOD.replace('## OpenBLAS 0.3.28', '## OpenBLASish'), COMPONENTS).length, 1);
 });
 
-test('checkNotices: the License: line must be the declared expression', () => {
-  const md = GOOD.replace('License: FTL OR GPL-2.0-only', 'License: FTL');
-  assert.deepEqual(checkNotices(md, COMPONENTS), ['FreeType: no "License: FTL OR GPL-2.0-only" line in its section (it says "FTL")']);
+test('checkNotices: the license is named in the heading or on a License: line of the section', () => {
+  const md = GOOD.replace('License: FTL OR GPL-2.0-only', 'License: MIT');
+  assert.deepEqual(checkNotices(md, COMPONENTS), ['FreeType: neither its heading nor a "License:" line names FTL or GPL-2.0-only']);
+  // one alternative of an OR is enough
+  assert.deepEqual(checkNotices(GOOD.replace('License: FTL OR GPL-2.0-only', 'License: FTL'), COMPONENTS), []);
+  // whole ids: GPL-2.0-only is not GPL-2.0-or-later, BSD-3-Clause is not BSD-3-Clause-Clear
+  assert.equal(checkNotices(GOOD.replace('License: FTL OR GPL-2.0-only', 'License: GPL-2.0-or-later'), COMPONENTS).length, 1);
+  assert.equal(checkNotices(GOOD.replace('License: BSD-3-Clause\n', 'License: BSD-3-Clause-Clear\n'), COMPONENTS).length, 1);
   // a License: line in another section does not count
   const moved = GOOD.replace('License: BSD-3-Clause\n', '').replace('License: LicenseRef-BaKoMa', 'License: LicenseRef-BaKoMa\nLicense: BSD-3-Clause');
-  assert.deepEqual(checkNotices(moved, COMPONENTS), ['OpenBLAS: no "License: BSD-3-Clause" line in its section']);
+  assert.deepEqual(checkNotices(moved, COMPONENTS), ['OpenBLAS: neither its heading nor a "License:" line names BSD-3-Clause']);
+});
+
+test('checkNotices: homescoop_notice style (license in the heading, fenced files)', () => {
+  const md = `# Third-party notices\n\nIntro.\n\n## libjpeg-turbo 3.1.2 (IJG, BSD-3-Clause, Zlib)\n\n\`\`\`text\n${BSD3}\nthe Independent JPEG Group\n\`\`\`\n\n## FreeType 2.13.3 (FreeType License, FTL)\n\n\`\`\`text\n                    The FreeType Project LICENSE\n\`\`\`\n`;
+  const c = [
+    { name: 'libjpeg-turbo', license: 'IJG AND BSD-3-Clause' },
+    { name: 'FreeType', license: 'FTL OR GPL-2.0-only' },
+  ];
+  assert.deepEqual(checkNotices(md, c), []);
+  assert.deepEqual(checkNotices(md, [{ name: 'libjpeg-turbo', license: 'IJG AND MIT' }]), ['libjpeg-turbo: neither its heading nor a "License:" line names MIT', 'libjpeg-turbo: its section lacks the MIT text (no "Permission is hereby granted, free of charge")']);
 });
 
 test('checkNotices: naming the license is not enough, the text must be there', () => {
