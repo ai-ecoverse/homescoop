@@ -163,6 +163,33 @@
       "version": "<3.5.1-2",
       "issue": "ai-ecoverse/homescoop#774",
       "why": "symlink-dest.mjs checks 3.5.x's destination-symlink hardening (#555), documented and certified from 3.5.1-2"
+    },
+    {
+      "package": "@ai-ecoverse/wasix-ruby",
+      "spec": "launcher.mjs",
+      "case": "",
+      "kernel": "*",
+      "version": "<3.4.11-14",
+      "issue": "ai-ecoverse/homescoop#785",
+      "why": "launcher.mjs checks that RUBYLIB names only library directories that exist, from 3.4.11-14 (slicc-kernel#774's package side)"
+    },
+    {
+      "package": "@ai-ecoverse/wasix-ruby",
+      "spec": "locks.mjs",
+      "case": "",
+      "kernel": "*",
+      "version": "<3.4.11-14",
+      "issue": "ai-ecoverse/homescoop#785",
+      "why": "locks.mjs checks Fcntl::F_GETLK and record locks through slicc.fcntl_lock, from 3.4.11-14 on wasix-sysroot -30 (homescoop#552)"
+    },
+    {
+      "package": "@ai-ecoverse/wasix-ruby",
+      "spec": "sysroot28.mjs",
+      "case": "",
+      "kernel": "*",
+      "version": "<3.4.11-14",
+      "issue": "ai-ecoverse/homescoop#785",
+      "why": "sysroot28.mjs expects the wasix-sysroot -30 toolchain record of 3.4.11-14; older builds name -27 or -28"
     }
   ]
 }

@@ -1147,6 +1147,7 @@ function timings(args) {
       if (!rows.length || rows.some((r) => typeof r.durationMs !== 'number')) continue;
       const runsOf = (r) => {
         const cases = (r.cases || []).filter((x) => !x.flaky && !x.limit);
+        if (cases.length && cases.every((x) => x.retry)) return 2;
         if (cases.length) return cases.some((x) => x.reference !== 'pass') ? 4 : 3;
         return (r.cases || []).some((x) => x.flaky) ? 2 : 1;
       };
