@@ -1,5 +1,5 @@
 const SQL = String.raw`
-import json, os, sqlite3, subprocess, time
+import json, os, select, sqlite3, subprocess, time
 D = "/tmp/lock_cli.db"
 for f in (D, D + "-journal"):
     if os.path.exists(f):
@@ -18,13 +18,14 @@ cli = subprocess.Popen(["sqlite3", D], stdin=subprocess.PIPE, stdout=subprocess.
 cli.stdin.write("begin immediate;\ninsert into t values(4);\nselect 'held';\n")
 cli.stdin.flush()
 deadline = time.monotonic() + 30
-while True:
-    line = cli.stdout.readline()
-    if line.strip() == "held":
-        break
-    if not line or time.monotonic() > deadline:
+fd, seen = cli.stdout.fileno(), ""
+while "held" not in seen.split():
+    ready, _, _ = select.select([fd], [], [], max(deadline - time.monotonic(), 0))
+    chunk = os.read(fd, 4096).decode() if ready else ""
+    if not chunk:
         cli.kill()
-        raise SystemExit("sqlite3 CLI never reported 'held': rc=%r stderr=%r" % (cli.wait(), cli.stderr.read()))
+        raise SystemExit("sqlite3 CLI never reported 'held' within 30 s: rc=%r stderr=%r" % (cli.wait(), cli.stderr.read()))
+    seen += chunk
 try:
     c.execute("insert into t values(5)")
     out["python_while_cli_holds"] = "ok"

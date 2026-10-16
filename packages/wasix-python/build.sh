@@ -33,7 +33,13 @@ JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu)}"
 export SOURCE_DATE_EPOCH=1764892800
 export PYTHONHASHSEED=0
 export ZERO_AR_DATE=1
+DEPS_KEY="$(cat "$PKG/build.sh" "$ROOT/scripts/install-wasixcc.sh" | shasum -a 256 | cut -d' ' -f1)"
+if [[ -d "$DEPS" && "$(cat "$DEPS/.homescoop-key" 2>/dev/null)" != "$DEPS_KEY" ]]; then
+  echo "== wasix-python: build.sh or the toolchain pin changed since $DEPS was built; rebuilding the deps"
+  rm -rf "$DEPS"
+fi
 mkdir -p "$B" "$DL" "$DEPS/lib/pkgconfig" "$DEPS/include"
+echo "$DEPS_KEY" >"$DEPS/.homescoop-key"
 
 # --- tools -------------------------------------------------------------------
 # prestage-check.sh disassembles with wabt's wasm-objdump: a pinned 1.0.42
