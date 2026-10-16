@@ -82,10 +82,10 @@ export function asyncify(env, wasm) {
 }
 
 /** A Node kernel (meta.kernel, or a local build in kernelDir) with meta.needs installed. */
-export async function kernel(work, kernelDir, options = {}) {
+export async function kernel(work, kernelDir, options = {}, kernelSpec = meta.kernel) {
   const nm = join(work, 'nm');
   mkdirSync(nm, { recursive: true });
-  sh('npm', ['install', '--prefix', nm, '--no-fund', '--no-audit', '--silent', ...(kernelDir ? [] : [meta.kernel]), ...(meta.needsInstall || meta.needs)]);
+  sh('npm', ['install', '--prefix', nm, '--no-fund', '--no-audit', '--silent', ...(kernelDir ? [] : [kernelSpec]), ...(meta.needsInstall || meta.needs)]);
   const kernelRoot = kernelDir ?? join(nm, 'node_modules/@ai-ecoverse/slicc-kernel');
   const { createNodeKernel } = await import(pathToFileURL(join(kernelRoot, 'dist/node.js')).href);
   const k = await createNodeKernel(options);
@@ -99,7 +99,7 @@ export async function kernel(work, kernelDir, options = {}) {
   for (const need of meta.needs) await copyTree(join(nm, 'node_modules', need), `/node_modules/${need}`);
   return {
     kernel: k,
-    label: kernelDir ?? meta.kernel,
+    label: kernelDir ?? kernelSpec,
     version: JSON.parse(readFileSync(join(kernelRoot, 'package.json'), 'utf8')).version,
     install: (pkg) => copyTree(pkg, `/node_modules/${JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8')).name}`),
     run: (argv, o = {}) => k.run(argv, { cwd: o.cwd || '/home', env: o.env || {}, stdin: o.stdin, ...(o.user !== undefined && { user: o.user }) }),

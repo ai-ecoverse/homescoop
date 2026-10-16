@@ -1,3 +1,9 @@
+# Negative proof (wasix-perl 5.42.0-17)
+
+**Date:** 2026-10-16
+
+5.42.0-17 is a rebuild on wasix-sysroot 2025.9.30-32 (the install-wasixcc pin). `cert/k108/inherit.mjs` against the published `@ai-ecoverse/wasix-perl@5.42.0-16`, with wasm-bash and wasm-coreutils, on slicc-kernel 1.108.1's Node entry: FAIL at the first case. `under trap '' PIPE USR2, %SIG shows the inherited ignores: undef|undef|undef`. -16's libc (-31) starts its sigaction table at SIG_DFL whatever the process inherited, so perl's `%SIG` can't see a `nohup`/`trap ''` ignore. -32 reads `slicc.sigaction_inherited`, and the case expects `IGNORE|IGNORE|undef`.
+
 # Negative proof (wasix-perl 5.42.0-8)
 
 **Date:** 2026-10-10
@@ -74,3 +80,19 @@ The new specs against the published tarballs on slicc-kernel 1.100.3's Node entr
 ## 5.42.0-14: the engines floor (homescoop#552)
 
 `locks.mjs` against the published 5.42.0-13 on slicc-kernel 1.100.3's Node entry, 2026-10-16: FAIL at `engines.slicc-kernel is >=1.100.0 … : >=1.44.0`. -13 admitted kernels without `slicc.fcntl_lock`, where every lock is granted locally. With -14's manifest over the same files, the spec passes (real locks: child EAGAIN, F_SETLKW waited). The spec has no local-answer branch any more, so it also fails on a kernel before 1.100.0.
+
+## 5.42.0-15: flock (homescoop#631, 2026-10-16)
+
+`cert/flock.mjs` against the published 5.42.0-14 (slicc-kernel 1.100.3): FAIL, `parent=ok ok ok | child=ok ok | blocking=ok:at-once | shared=2`. While the parent holds `LOCK_EX`, the forked child is granted `LOCK_EX|LOCK_NB` and `LOCK_SH|LOCK_NB`, its blocking `LOCK_EX` returns at once, and a writer gets in beside two readers: `wasix-posix-stubs.h` answered every `flock` with success. 5.42.0-15 maps `flock` onto whole-file `fcntl` locks.
+
+## 5.42.0-16: flock on things that aren't regular files (homescoop#757, 2026-10-16)
+
+`cert/flock.mjs` against 5.42.0-15: FAIL, because `flock` on a pipe, STDOUT through a pipe, `/dev/null` or a directory handle fails with EBADF (#757's repro). slicc-kernel keeps record locks on regular files only, and -15 sent every `flock` to `fcntl`. 5.42.0-16 grants `flock` on anything that isn't a regular file, excluding nobody, as -14 and Linux do.
+
+## pod2man / pod2text --help (homescoop#491, 2026-10-16)
+
+`cert/pod.mjs` with the published 5.42.0-14 on slicc-kernel 1.100.3: FAIL, `pod2man --help` exits 0 and prints nothing. pod2usage reads the usage from `$0`, which was a 0-byte `/usr/bin` stub (slicc-kernel#762). On 1.106.2, the cert kernel now, the same tarball passes: the `/usr/bin` entry is the script. The fix is the kernel's; the spec pins it.
+
+## Unix-domain socket addresses (homescoop#767, 2026-10-16)
+
+`run.mjs --package wasix-perl --spec unix-socket.mjs --kernel @ai-ecoverse/slicc-kernel@1.108.4 --users enforce` with the published 5.42.0-17: FAIL, `socket|host=die:Bad arg length for Socket::unpack_sockaddr_un, length is 22, should be 112|unpack=die:…|read=hello peer=die:…`. The socket is created, and a forked client connects and writes its line, but every unpack of the 22-byte address dies. patches/0008 gives `__wasi__` Socket.xs's Linux branch, which takes the short address.

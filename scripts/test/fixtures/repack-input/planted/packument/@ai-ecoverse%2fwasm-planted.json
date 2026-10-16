@@ -1,0 +1,10 @@
+{
+  "name": "@ai-ecoverse/wasm-planted",
+  "versions": {
+    "1.0.0-1": {
+      "version": "1.0.0-1",
+      "gitHead": "1111111111111111111111111111111111111111",
+      "dist": { "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==" }
+    }
+  }
+}

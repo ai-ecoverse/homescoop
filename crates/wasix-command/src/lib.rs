@@ -15,6 +15,17 @@
 
 pub mod process;
 
+/// `tokio::process`, which tokio does not have on WASI (feature `tokio`).
+/// On WASI preview1 it is the same API over this crate's [`Command`]; on
+/// every other target it is `tokio::process`.
+#[cfg(feature = "tokio")]
+pub mod tokio {
+    #[cfg(all(target_os = "wasi", target_env = "p1"))]
+    pub use crate::wasix::tokio::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+    #[cfg(not(all(target_os = "wasi", target_env = "p1")))]
+    pub use ::tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+}
+
 #[cfg(all(target_os = "wasi", target_env = "p1"))]
 mod wasix;
 

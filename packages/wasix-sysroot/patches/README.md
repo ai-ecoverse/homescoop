@@ -312,3 +312,23 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
   - If that's the only thing that woke the call, the next wait leaves those entries out for at most 50 ms (the monotonic clock, never past the deadline), then re-checks them. So a hangup that comes later in the call is still reported, within about 50 ms, at the cost of one wakeup per 50 ms while such an entry stays ready.
 - **`sem.c`:** the named-semaphore table grows (realloc, from 16) instead of stopping at 256.
 - **Probe `test/r31.c`:** AF_UNIX addresses (bind/listen/connect/accept, getsockname/getpeername of both ends, a short buffer), events-0 hangup and POLLERR for `poll` and `ppoll`, and 1000 named semaphores.
+
+## -32: `epoll.c`, `sigmask.c`, `sigaction.c` (homescoop#466, #520, #740)
+
+- **`epoll.c`:** `epoll_pwait` with a mask calls `slicc.sigmask_epoll_wait(set_lo, set_hi, epfd, events, maxevents, timeout_ns, nevents)` (slicc-kernel#783). The set drops SIGKILL, SIGSTOP and musl's 32-34, as `pthread_sigmask` does. The first ENOSYS switches the process to -31's swap path for good.
+- **`sigmask.c`:** `sigtimedwait` calls `slicc.sigwait(set_lo, set_hi, timeout_ns, sig_ptr)` (slicc-kernel#786, #801):
+  - a NULL timeout is all bits set (forever), and `{0, 0}` is 0;
+  - `tv_sec < 0` or `tv_nsec` outside 0..999999999 is EINVAL;
+  - EINTR (a handled signal outside the set) is retried with the time left, as musl's `sigtimedwait` does;
+  - EAGAIN at the timeout, and ENOSYS on an older kernel, come back as -1 with errno.
+  `sigwaitinfo` is `sigtimedwait` with no timeout. `sigwait` returns the error number, and leaves errno alone.
+- **`sigaction.c`:** the first `sigaction` call in a process (`signal`, `sigset` and `bsd_signal` go through it) reads `slicc.sigaction_inherited(ign_ptr)` once (slicc-kernel#841). It sets SIG_IGN for each set bit (signal n = bit n-1, never SIGKILL, SIGSTOP or 32-34) whose entry is still SIG_DFL. ENOSYS keeps the defaults.
+  - The libc's table is read only through `sigaction`, so this matches seeding it before constructors, with no constructor-order dependency.
+  - The kernel already applies the inherited ignores itself.
+- **Probe `test/r32.c`** (asyncified; `R32_KERNEL=1` requires the three imports):
+  - **epoll:** 200 rounds of a SIGUSR1 sent by a thread at a random 0-3 ms into `epoll_pwait(…, 2000, &empty)` with SIGUSR1 blocked outside. Every round is EINTR at once, none waits out 2 s, and SIGUSR1 is blocked after. A ready fd gives its event.
+  - **sigwait:** `sigwait`/`sigwaitinfo` take a pending blocked signal without its handler, with `si_code` SI_USER. `sigtimedwait` gives EAGAIN on time at 200 ms, at once for `{0,0}`, and EINVAL for `tv_nsec` 1e9. A handled SIGALRM 200 ms into a 600 ms wait runs and the wait goes on to EAGAIN at 600 ms. Another thread's `kill(getpid())` is taken.
+  - **SIGCHLD:** a child is a zombie by default, reaped (ECHILD) under `SA_NOCLDWAIT`, and a zombie again after SIG_DFL.
+  - **Inherited:** under bash `trap '' PIPE USR2 CHLD`, `exec r32 inherit` reads SIG_IGN for PIPE, USR2 and CHLD and SIG_DFL for TERM, the inherited CHLD ignore reaps, and a handler installed over it runs.
+  - **On a kernel without the imports:** the -31 behaviour, line by line.
+- **`test/r28w.c`:** skips its three ENOSYS sigwait lines on a kernel with `slicc.sigwait`, since a real `sigwaitinfo` of an empty-handed set would wait forever. Those lines are r32's now.

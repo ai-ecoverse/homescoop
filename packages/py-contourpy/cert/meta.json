@@ -5,7 +5,7 @@
     "@ai-ecoverse/py-numpy"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-python@3.14.2-24",
+    "@ai-ecoverse/wasix-python@3.14.2-25",
     "@ai-ecoverse/py-numpy@2.3.2-10"
   ],
   "ci": [
@@ -14,6 +14,7 @@
   "checklist": [
     "cert/import.mjs: import contourpy from /node_modules/@ai-ecoverse/py-contourpy, found by discovery without PYTHONPATH, no nested python; its 1 side modules import",
     "cert/contourpy.mjs: serial lines of x^2 + y^2 at 0.25 are one closed circle of radius 0.5; filled 0.25..0.5; mpl2014",
-    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3 and py-numpy 2.3.2-10 (itself a range); npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs both specs on the newest (3.14.2-24), and python-range.mjs runs them again on the floor (3.14.2-16). The previous release (exact 3.14.2-16, py-numpy 2.3.2-9) nests a second python under 3.14.2-24 (NEGATIVE.md)"
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-25 <3.14.3 (the headers it is built against) and py-numpy >=2.3.2-10 <2.3.3; npm --package-lock-only with 3.14.2-25 resolves one python and one py-numpy at the top level; both specs run on 3.14.2-25",
+    "cert/errors.mjs (1.4.0-8, built from the sdist in CI, homescoop#211 A2): C++ exceptions thrown in _contourpy cross pybind11 3.0.1 as Python exceptions on the legacy-EH C++ runtime python.wasm exports (TypeError for mismatched x/z shapes, ValueError for an unknown generator name and for filled(upper < lower)); the threaded generator with chunk_count 2 gives 2 lines; contourpy.util.build_config() reports 1.4.0. wasm-call-signatures.mjs over the side module: 0 mismatches (pybind11 dispatches every method through one PyCFunction)"
   ]
 }

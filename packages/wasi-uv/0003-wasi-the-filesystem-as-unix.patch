@@ -1,0 +1,518 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: homescoop <homescoop@ai-ecoverse.invalid>
+Date: Fri, 16 Oct 2026 10:35:19 +0200
+Subject: [PATCH] wasi: the filesystem as unix
+
+On WASI uv takes its unix paths: bin/, symlinks (std::os::wasi::fs::
+symlink_path), the cache's archive symlinks and the runtime cfg!(unix)
+choices. WASI has no permission bits, file locks or descriptor dup:
+- uv tool install links executables into the bin directory, as on unix;
+- which: any regular file on PATH is a candidate;
+- file locks are granted and released without a lock;
+- atomic writes reopen the temporary file and carry no mode over;
+- scripts are made executable with slicc's kernel slicc_fs.fd_chmod,
+  which wasix-sysroot's libc uses too (ENOSYS without it: ignored).
+---
+ crates/uv-cache/src/lib.rs                    |  6 +--
+ crates/uv-distribution/src/source/mod.rs      |  4 +-
+ .../src/environment.rs                        |  2 +-
+ crates/uv-fs/src/lib.rs                       | 54 ++++++++++++++++---
+ crates/uv-fs/src/link.rs                      |  6 +++
+ crates/uv-fs/src/locked_file.rs               | 27 ++++++++--
+ crates/uv-fs/src/named_temp_file.rs           |  3 ++
+ crates/uv-fs/src/path.rs                      |  5 +-
+ crates/uv-fs/src/which.rs                     |  8 ++-
+ crates/uv-install-wheel/src/wheel.rs          |  6 +++
+ crates/uv-python-commands/src/install.rs      |  2 +-
+ crates/uv-python-managed/src/managed.rs       | 16 +++---
+ crates/uv-tool-commands/src/common.rs         |  4 +-
+ crates/uv-tool/src/tool.rs                    |  2 +-
+ crates/uv-virtualenv/src/virtualenv.rs        |  6 +--
+ 15 files changed, 118 insertions(+), 33 deletions(-)
+
+diff --git a/crates/uv-cache/src/lib.rs b/crates/uv-cache/src/lib.rs
+index 9a017bf..c84f5b4 100644
+--- a/crates/uv-cache/src/lib.rs
++++ b/crates/uv-cache/src/lib.rs
+@@ -867,7 +867,7 @@ impl Cache {
+                     let entry = entry?;
+ 
+                     // On Unix, archive references use symlinks.
+-                    if cfg!(unix) {
++                    if cfg!(any(unix, target_os = "wasi")) {
+                         if !entry.file_type().is_symlink() {
+                             continue;
+                         }
+@@ -947,7 +947,7 @@ impl Cache {
+     ///
+     /// On Windows, we write structured data ([`Link`]) to a file containing the archive ID and
+     /// version. On Unix, we create a symlink to the target directory.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn create_link(&self, id: &ArchiveId, dst: impl AsRef<Path>) -> io::Result<()> {
+         let dst = dst.as_ref();
+         let dst_parent = dst.parent().expect("Cache entry to have parent");
+@@ -960,7 +960,7 @@ impl Cache {
+     /// Resolve an archive link, returning the fully-resolved path.
+     ///
+     /// Returns an error if the link target does not exist.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn resolve_link(&self, path: impl AsRef<Path>) -> io::Result<PathBuf> {
+         path.as_ref().canonicalize()
+     }
+diff --git a/crates/uv-distribution/src/source/mod.rs b/crates/uv-distribution/src/source/mod.rs
+index 1545618..0592752 100644
+--- a/crates/uv-distribution/src/source/mod.rs
++++ b/crates/uv-distribution/src/source/mod.rs
+@@ -2980,7 +2980,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
+             name.to_string()
+         } else {
+             // Identify the base Python interpreter to use in the cache key.
+-            let base_python = if cfg!(unix) {
++            let base_python = if cfg!(any(unix, target_os = "wasi")) {
+                 self.build_context
+                     .interpreter()
+                     .await
+@@ -3132,7 +3132,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
+         }
+ 
+         // Identify the base Python interpreter to use in the cache key.
+-        let base_python = if cfg!(unix) {
++        let base_python = if cfg!(any(unix, target_os = "wasi")) {
+             self.build_context
+                 .interpreter()
+                 .await
+diff --git a/crates/uv-environment-operations/src/environment.rs b/crates/uv-environment-operations/src/environment.rs
+index 1ff2815..d05ac1c 100644
+--- a/crates/uv-environment-operations/src/environment.rs
++++ b/crates/uv-environment-operations/src/environment.rs
+@@ -307,7 +307,7 @@ impl CachedEnvironment {
+         interpreter: &Interpreter,
+         cache: &Cache,
+     ) -> Result<Interpreter, uv_python_discovery::Error> {
+-        let base_python = if cfg!(unix) {
++        let base_python = if cfg!(any(unix, target_os = "wasi")) {
+             interpreter.find_base_python()?
+         } else {
+             interpreter.to_base_python()?
+diff --git a/crates/uv-fs/src/lib.rs b/crates/uv-fs/src/lib.rs
+index bff547f..c615ab5 100644
+--- a/crates/uv-fs/src/lib.rs
++++ b/crates/uv-fs/src/lib.rs
+@@ -1,3 +1,5 @@
++#![cfg_attr(target_os = "wasi", feature(wasi_ext))]
++
+ use std::io::{self, Write};
+ use std::path::{Path, PathBuf};
+ use std::time::SystemTime;
+@@ -329,16 +331,16 @@ fn replace_with_symlink_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
+ /// Create a symlink at `dst` pointing to `src`, replacing any existing symlink if necessary.
+ ///
+ /// On Unix, this method creates a temporary file, then moves it into place.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub fn replace_symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+-    match fs_err::os::unix::fs::symlink(src.as_ref(), dst.as_ref()) {
++    match create_symlink(src.as_ref(), dst.as_ref()) {
+         Ok(()) => Ok(()),
+         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+             let temp_file = tempfile::Builder::new().make_in(
+                 dst.as_ref()
+                     .parent()
+                     .expect("Symlink path must have a parent"),
+-                |path| fs_err::os::unix::fs::symlink(src.as_ref(), path),
++                |path| create_symlink(src.as_ref(), path),
+             )?;
+             fs_err::rename(temp_file.path(), dst.as_ref())?;
+ 
+@@ -385,6 +387,12 @@ pub fn create_symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::
+     fs_err::os::unix::fs::symlink(src.as_ref(), dst.as_ref())
+ }
+ 
++/// Create a symlink at `dst` pointing to `src`.
++#[cfg(target_os = "wasi")]
++pub fn create_symlink(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
++    std::os::wasi::fs::symlink_path(src.as_ref(), dst.as_ref())
++}
++
+ /// Remove a symbolic link at `path` without following its target.
+ pub fn remove_symlink(path: impl AsRef<Path>) -> io::Result<()> {
+     let path = path.as_ref();
+@@ -481,6 +489,9 @@ pub fn symlink_or_copy_file(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std
+         unix => {
+             fs_err::os::unix::fs::symlink(src.as_ref(), dst.as_ref())?;
+         },
++        target_os = "wasi" => {
++            create_symlink(src, dst)?;
++        },
+     }
+ 
+     Ok(())
+@@ -542,12 +553,19 @@ pub async fn write_atomic_preserve(
+     let parent = path.parent().expect("Write path must have a parent");
+     let temp_file = tempfile_in_with_permissions(parent, permissions.clone())?;
+     // Write through the open handle: the umask may prevent reopening the temporary file.
+-    let mut file = fs_err::tokio::File::from_std(fs_err::File::from_parts(
+-        temp_file.as_file().try_clone()?,
+-        temp_file.as_ref(),
+-    ));
++    #[cfg(not(target_os = "wasi"))]
++    let handle = temp_file.as_file().try_clone()?;
++    // WASI cannot duplicate a descriptor, and has no umask: reopen the file.
++    #[cfg(target_os = "wasi")]
++    #[expect(clippy::disallowed_types)]
++    let handle = std::fs::OpenOptions::new()
++        .write(true)
++        .open::<&Path>(temp_file.as_ref())?;
++    let mut file =
++        fs_err::tokio::File::from_std(fs_err::File::from_parts(handle, temp_file.as_ref()));
+     file.write_all(data.as_ref()).await?;
+     file.flush().await?;
++    #[cfg(not(target_os = "wasi"))]
+     if let Some(permissions) = permissions {
+         temp_file.as_file().set_permissions(permissions)?;
+     }
+@@ -1235,3 +1253,25 @@ mod tests {
+         Ok(())
+     }
+ }
++
++/// Make a file executable (`0o755`) in slicc's kernel, which keeps file modes
++/// behind its `slicc_fs` imports: WASI preview1 has no mode-setting call.
++/// Kernels without them answer `ENOSYS`, which is ignored.
++#[cfg(target_os = "wasi")]
++#[expect(unsafe_code)]
++pub fn set_executable(path: impl AsRef<Path>) -> io::Result<()> {
++    use std::os::fd::AsRawFd;
++
++    #[link(wasm_import_module = "slicc_fs")]
++    unsafe extern "C" {
++        fn fd_chmod(fd: i32, mode: i32) -> i32;
++    }
++    const ENOSYS: i32 = 52;
++
++    let file = fs_err::File::open(path.as_ref())?;
++    // SAFETY: `file` stays open for the call.
++    match unsafe { fd_chmod(file.file().as_raw_fd(), 0o755) } {
++        0 | ENOSYS => Ok(()),
++        errno => Err(io::Error::from_raw_os_error(errno)),
++    }
++}
+diff --git a/crates/uv-fs/src/link.rs b/crates/uv-fs/src/link.rs
+index 04e2e54..44da017 100644
+--- a/crates/uv-fs/src/link.rs
++++ b/crates/uv-fs/src/link.rs
+@@ -877,6 +877,12 @@ fn create_symlink(original: &Path, link: &Path) -> io::Result<()> {
+     fs_err::os::unix::fs::symlink(original, link)
+ }
+ 
++/// Create a symbolic link.
++#[cfg(target_os = "wasi")]
++fn create_symlink(original: &Path, link: &Path) -> io::Result<()> {
++    crate::create_symlink(original, link)
++}
++
+ /// Create a symbolic link.
+ #[cfg(windows)]
+ fn create_symlink(original: &Path, link: &Path) -> io::Result<()> {
+diff --git a/crates/uv-fs/src/locked_file.rs b/crates/uv-fs/src/locked_file.rs
+index d9647a5..de2f8c9 100644
+--- a/crates/uv-fs/src/locked_file.rs
++++ b/crates/uv-fs/src/locked_file.rs
+@@ -110,7 +110,7 @@ impl LockedFileMode {
+     /// (see [rust-lang/rust#148325]), so we use [`rustix::fs::flock`] directly.
+     ///
+     /// [rust-lang/rust#148325]: https://github.com/rust-lang/rust/issues/148325
+-    #[cfg(not(target_os = "android"))]
++    #[cfg(not(any(target_os = "android", target_os = "wasi")))]
+     fn try_lock(self, file: &fs_err::File) -> Result<(), std::fs::TryLockError> {
+         match self {
+             Self::Exclusive => file.try_lock()?,
+@@ -150,7 +150,7 @@ impl LockedFileMode {
+     /// (see [rust-lang/rust#148325]), so we use [`rustix::fs::flock`] directly.
+     ///
+     /// [rust-lang/rust#148325]: https://github.com/rust-lang/rust/issues/148325
+-    #[cfg(not(target_os = "android"))]
++    #[cfg(not(any(target_os = "android", target_os = "wasi")))]
+     fn lock(self, file: &fs_err::File) -> Result<(), io::Error> {
+         match self {
+             Self::Exclusive => file.lock()?,
+@@ -179,6 +179,20 @@ impl LockedFileMode {
+     }
+ }
+ 
++/// WASI has no file locks: every lock is granted.
++#[cfg(all(feature = "tokio", target_os = "wasi"))]
++impl LockedFileMode {
++    #[expect(clippy::unnecessary_wraps, clippy::unused_self)]
++    fn try_lock(self, _file: &fs_err::File) -> Result<(), std::fs::TryLockError> {
++        Ok(())
++    }
++
++    #[expect(clippy::unnecessary_wraps, clippy::unused_self)]
++    fn lock(self, _file: &fs_err::File) -> Result<(), io::Error> {
++        Ok(())
++    }
++}
++
+ impl Display for LockedFileMode {
+     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         match self {
+@@ -405,11 +419,18 @@ impl LockedFile {
+     /// (see [rust-lang/rust#148325]), so we use [`rustix::fs::flock`] directly.
+     ///
+     /// [rust-lang/rust#148325]: https://github.com/rust-lang/rust/issues/148325
+-    #[cfg(not(target_os = "android"))]
++    #[cfg(not(any(target_os = "android", target_os = "wasi")))]
+     fn unlock(&self) -> Result<(), io::Error> {
+         self.0.unlock()
+     }
+ 
++    /// WASI has no file locks (see [`LockedFileMode::lock`]).
++    #[cfg(target_os = "wasi")]
++    #[expect(clippy::unnecessary_wraps, clippy::unused_self)]
++    fn unlock(&self) -> Result<(), io::Error> {
++        Ok(())
++    }
++
+     /// Unlock the file.
+     ///
+     /// Android-specific implementation using [`rustix::fs::flock`] because
+diff --git a/crates/uv-fs/src/named_temp_file.rs b/crates/uv-fs/src/named_temp_file.rs
+index d173b89..7056a85 100644
+--- a/crates/uv-fs/src/named_temp_file.rs
++++ b/crates/uv-fs/src/named_temp_file.rs
+@@ -34,6 +34,9 @@ pub(crate) fn tempfile_in_with_permissions(
+ ) -> io::Result<NamedTempFile> {
+     #[cfg(unix)]
+     let permissions = Some(permissions.unwrap_or_else(|| Permissions::from_mode(0o666)));
++    // WASI has no permission bits to carry over (fchmod is ENOSYS).
++    #[cfg(target_os = "wasi")]
++    let permissions: Option<Permissions> = permissions.and(None);
+     let mut builder = tempfile::Builder::new();
+     if let Some(permissions) = permissions {
+         builder.permissions(permissions);
+diff --git a/crates/uv-fs/src/path.rs b/crates/uv-fs/src/path.rs
+index 7f31356..7a8bded 100644
+--- a/crates/uv-fs/src/path.rs
++++ b/crates/uv-fs/src/path.rs
+@@ -138,9 +138,12 @@ impl<T: AsRef<Path>> PythonExt for T {
+ ///
+ /// Note: Due to the fun quirks *nix paths, how python handles them, and expectations of things that
+ /// might consume those paths, this produces an expression wrapped in `__import__("os").fsdecode()`.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ fn escape_path_for_python<P: AsRef<Path>>(path: P) -> String {
++    #[cfg(unix)]
+     use std::os::unix::ffi::OsStrExt;
++    #[cfg(target_os = "wasi")]
++    use std::os::wasi::ffi::OsStrExt;
+     format!(
+         r#"__import__("os").fsdecode(b"{}")"#,
+         path.as_ref().as_os_str().as_bytes().escape_ascii()
+diff --git a/crates/uv-fs/src/which.rs b/crates/uv-fs/src/which.rs
+index 3230ed7..ec563e5 100644
+--- a/crates/uv-fs/src/which.rs
++++ b/crates/uv-fs/src/which.rs
+@@ -46,7 +46,13 @@ pub fn is_executable(path: &Path) -> bool {
+         }
+     }
+ 
+-    #[cfg(not(target_os = "windows"))]
++    // WASI has no permission bits: any file counts.
++    #[cfg(target_os = "wasi")]
++    if !fs_err::metadata(path).is_ok_and(|metadata| metadata.is_file()) {
++        return false;
++    }
++
++    #[cfg(not(any(target_os = "windows", target_os = "wasi")))]
+     {
+         use std::os::unix::fs::PermissionsExt;
+ 
+diff --git a/crates/uv-install-wheel/src/wheel.rs b/crates/uv-install-wheel/src/wheel.rs
+index 0cd1a86..a17fcb6 100644
+--- a/crates/uv-install-wheel/src/wheel.rs
++++ b/crates/uv-install-wheel/src/wheel.rs
+@@ -355,6 +355,8 @@ pub(crate) fn write_script_entrypoints(
+                     fs::set_permissions(path, Permissions::from_mode(permissions.mode() | 0o111))?;
+                 }
+             }
++            #[cfg(target_os = "wasi")]
++            uv_fs::set_executable(script.as_path())?;
+         }
+     }
+     Ok(())
+@@ -611,6 +613,8 @@ fn install_script(
+                 )?;
+             }
+         }
++        #[cfg(target_os = "wasi")]
++        uv_fs::set_executable(&script_absolute)?;
+ 
+         Some(size_and_encoded_hash)
+     } else {
+@@ -665,6 +669,8 @@ fn install_script(
+                 }
+                 Err(err) => return Err(Error::Io(err)),
+             }
++            #[cfg(target_os = "wasi")]
++            uv_fs::set_executable(&script_absolute)?;
+         }
+ 
+         None
+diff --git a/crates/uv-python-commands/src/install.rs b/crates/uv-python-commands/src/install.rs
+index fde2c1e..485a3ab 100644
+--- a/crates/uv-python-commands/src/install.rs
++++ b/crates/uv-python-commands/src/install.rs
+@@ -1340,7 +1340,7 @@ fn find_matching_bin_link<'a>(
+     mut installations: impl Iterator<Item = &'a ManagedPythonInstallation>,
+     path: &Path,
+ ) -> Option<&'a ManagedPythonInstallation> {
+-    if cfg!(unix) {
++    if cfg!(any(unix, target_os = "wasi")) {
+         if !path.is_symlink() {
+             return None;
+         }
+diff --git a/crates/uv-python-managed/src/managed.rs b/crates/uv-python-managed/src/managed.rs
+index 10270aa..cea3f11 100644
+--- a/crates/uv-python-managed/src/managed.rs
++++ b/crates/uv-python-managed/src/managed.rs
+@@ -406,7 +406,7 @@ impl ManagedPythonInstallation {
+     pub fn executable(&self, windowed: bool) -> PathBuf {
+         let version = match self.implementation() {
+             ImplementationName::CPython => {
+-                if cfg!(unix) {
++                if cfg!(any(unix, target_os = "wasi")) {
+                     format!("{}.{}", self.key.major, self.key.minor)
+                 } else {
+                     String::new()
+@@ -423,7 +423,7 @@ impl ManagedPythonInstallation {
+         // GraalPy always uses `graalpy.exe` as the main executable
+         let variant = if self.implementation() == ImplementationName::GraalPy {
+             ""
+-        } else if cfg!(unix) {
++        } else if cfg!(any(unix, target_os = "wasi")) {
+             self.key.variant.executable_suffix()
+         } else if cfg!(windows) && windowed {
+             // Use windowed Python that doesn't open a terminal.
+@@ -595,7 +595,7 @@ impl ManagedPythonInstallation {
+ 
+     /// Ensure that the `sysconfig` data is patched to match the installation path.
+     pub async fn ensure_sysconfig_patched(&self) -> Result<(), Error> {
+-        if cfg!(unix) && !self.key.os().is_windows() {
++        if cfg!(any(unix, target_os = "wasi")) && !self.key.os().is_windows() {
+             if self.key.os().is_emscripten() {
+                 // Emscripten's stdlib is a zip file so we can't update the
+                 // sysconfig directly
+@@ -650,7 +650,7 @@ impl ManagedPythonInstallation {
+     /// Returns `true` if the path is a link to this installation's binary, e.g., as created by
+     /// [`create_link_to_executable`].
+     pub fn is_bin_link(&self, path: &Path) -> bool {
+-        if cfg!(unix) {
++        if cfg!(any(unix, target_os = "wasi")) {
+             same_file::is_same_file(path, self.executable(false)).unwrap_or_default()
+         } else if cfg!(windows) {
+             let Some(launcher) = Launcher::try_from_path(path).unwrap_or_default() else {
+@@ -825,7 +825,7 @@ impl PythonMinorVersionLink {
+             .expect("Executable should have parent directory");
+ 
+         // The home directory of the Python installation
+-        let target_directory = if cfg!(unix) {
++        let target_directory = if cfg!(any(unix, target_os = "wasi")) {
+             if parent
+                 .components()
+                 .next_back()
+@@ -921,7 +921,7 @@ impl PythonMinorVersionLink {
+         };
+ 
+         cfg_select! {
+-            unix => {
++            any(unix, target_os = "wasi") => {
+                 self.symlink_directory
+                     .symlink_metadata()
+                     .is_ok_and(|metadata| metadata.file_type().is_symlink())
+@@ -1010,7 +1010,7 @@ pub fn create_link_to_executable(
+     let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
+     fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
+ 
+-    if cfg!(unix) {
++    if cfg!(any(unix, target_os = "wasi")) {
+         // Note this will never copy on Unix — we use it here to allow compilation on Windows
+         match symlink_or_copy_file(executable.path, link) {
+             Ok(()) => Ok(()),
+@@ -1047,7 +1047,7 @@ pub fn replace_link_to_executable(
+     let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
+     fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
+ 
+-    if cfg!(unix) {
++    if cfg!(any(unix, target_os = "wasi")) {
+         replace_symlink(executable.path, link).map_err(Error::LinkExecutable)
+     } else if cfg!(windows) {
+         let launcher = windows_python_launcher(executable.path, executable.window_mode)?;
+diff --git a/crates/uv-tool-commands/src/common.rs b/crates/uv-tool-commands/src/common.rs
+index 09dd61b..0fab72d 100644
+--- a/crates/uv-tool-commands/src/common.rs
++++ b/crates/uv-tool-commands/src/common.rs
+@@ -26,7 +26,7 @@ use uv_distribution_types::{
+     NameRequirementSpecification, Requirement, RequiresPython, Resolution, UnresolvedRequirement,
+ };
+ use uv_errors::{ErrorWithHints, Hinted, Hints};
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use uv_fs::replace_symlink;
+ use uv_fs::{CWD, Simplified};
+ use uv_git::GitResolver;
+@@ -909,7 +909,7 @@ pub(super) fn finalize_tool_install(
+         for (name, src, target) in target_entrypoints {
+             debug!("Installing executable: {name}");
+ 
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             replace_symlink(src, &target).context("Failed to install executable")?;
+ 
+             #[cfg(windows)]
+diff --git a/crates/uv-tool/src/tool.rs b/crates/uv-tool/src/tool.rs
+index bab3c5e..4a521de 100644
+--- a/crates/uv-tool/src/tool.rs
++++ b/crates/uv-tool/src/tool.rs
+@@ -130,7 +130,7 @@ impl Display for ToolEntrypoint {
+                         .replace('/', "\\")
+                 )
+             },
+-            unix => {
++            any(unix, target_os = "wasi") => {
+                 write!(
+                     f,
+                     "{} ({})",
+diff --git a/crates/uv-virtualenv/src/virtualenv.rs b/crates/uv-virtualenv/src/virtualenv.rs
+index 1f15549..4fdd865 100644
+--- a/crates/uv-virtualenv/src/virtualenv.rs
++++ b/crates/uv-virtualenv/src/virtualenv.rs
+@@ -199,7 +199,7 @@ pub(crate) fn create(
+     // Use the absolute path for all further operations.
+     let location = absolute;
+ 
+-    let bin_name = if cfg!(unix) {
++    let bin_name = if cfg!(any(unix, target_os = "wasi")) {
+         "bin"
+     } else if cfg!(windows) {
+         "Scripts"
+@@ -252,7 +252,7 @@ pub(crate) fn create(
+     fs_err::create_dir_all(&scripts)?;
+     let executable = scripts.join(format!("python{EXE_SUFFIX}"));
+ 
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     {
+         uv_fs::replace_symlink(&executable_target, &executable)?;
+         uv_fs::replace_symlink(
+@@ -456,7 +456,7 @@ pub(crate) fn create(
+         }
+     }
+ 
+-    #[cfg(not(any(unix, windows)))]
++    #[cfg(not(any(unix, windows, target_os = "wasi")))]
+     {
+         compile_error!("Only Windows and Unix are supported")
+     }

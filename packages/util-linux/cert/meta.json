@@ -1,13 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8"
   ],
   "checklist": [
     "printf 'abc\\n' | rev → cba (bash pipeline); rev FILE; rev keeps UTF-8 characters whole",
@@ -16,9 +16,11 @@
     "getopt -T → rc 4 (enhanced getopt); unknown long option → 'unrecognized option', rc 1",
     "hexdump -C prints offset, hex and |ascii|",
     "colrm 2 3 removes columns; look PREFIX FILE finds sorted matches (look-read-fallback.patch: no mmap on slicc)",
-    "rev / column on a missing file → 'No such file or directory', rc 1"
+    "rev / column on a missing file → 'No such file or directory', rc 1",
+    "users (users enforce, #687): 2.42.4-2 links the slicc credentials (slicc_cred_js); as cone, rev, hexdump -C, look and column on root's 0600 and 0622 files are 'Permission denied', rc 1, no stdout; on root's 0644 and cone's own 0600 they give the contents (compared); root reads all four"
   ],
   "patches": {
     "look-read-fallback.patch": "look PREFIX FILE (slicc's filesystem has no mmap: ENODEV → read the file whole)"
-  }
+  },
+  "users": "enforce"
 }

@@ -1,0 +1,130 @@
+Rust std (library/std) for slicc's kernel, built with -Zbuild-std. WASI
+preview1's std leaves these unsupported; uv and its crates (which, etcetera,
+tempfile) call them:
+- env::split_paths / join_paths: `:`-separated, as on unix (they panicked);
+- env::home_dir: $HOME (None before);
+- env::temp_dir: $TMPDIR, else /tmp (panicked);
+- env::consts::EXE_SUFFIX / EXE_EXTENSION empty: the kernel runs WASI
+  commands by name (python3, not python3.wasm).
+
+--- a/library/std/src/sys/env_consts.rs
++++ b/library/std/src/sys/env_consts.rs
+@@ -378,7 +378,7 @@
+     pub const EXE_EXTENSION: &str = "";
+ }
+ 
+-#[cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "linux"))))]
++#[cfg(all(target_family = "wasm", not(any(target_os = "emscripten", target_os = "linux", target_os = "wasi"))))]
+ pub mod os {
+     pub const FAMILY: &str = "";
+     pub const OS: &str = "";
+@@ -389,6 +389,18 @@
+     pub const EXE_EXTENSION: &str = "wasm";
+ }
+ 
++// slicc's kernel runs WASI commands by name, without a `.wasm` suffix.
++#[cfg(target_os = "wasi")]
++pub mod os {
++    pub const FAMILY: &str = "";
++    pub const OS: &str = "";
++    pub const DLL_PREFIX: &str = "";
++    pub const DLL_SUFFIX: &str = ".wasm";
++    pub const DLL_EXTENSION: &str = "wasm";
++    pub const EXE_SUFFIX: &str = "";
++    pub const EXE_EXTENSION: &str = "";
++}
++
+ #[cfg(target_os = "watchos")]
+ pub mod os {
+     pub const FAMILY: &str = "unix";
+--- a/library/std/src/sys/paths/mod.rs
++++ b/library/std/src/sys/paths/mod.rs
+@@ -39,8 +39,8 @@
+         #[expect(dead_code)]
+         mod unsupported;
+         mod imp {
+-            pub use super::wasi::{getcwd, chdir, temp_dir};
+-            pub use super::unsupported::{current_exe, SplitPaths, split_paths, JoinPathsError, join_paths, home_dir};
++            pub use super::wasi::{getcwd, chdir, temp_dir, SplitPaths, split_paths, JoinPathsError, join_paths, home_dir};
++            pub use super::unsupported::current_exe;
+         }
+     }
+     target_os = "windows" => {
+--- a/library/std/src/sys/paths/wasi.rs
++++ b/library/std/src/sys/paths/wasi.rs
+@@ -1,7 +1,7 @@
+ #![forbid(unsafe_op_in_unsafe_fn)]
+ 
+-use crate::ffi::{CStr, OsString};
+-use crate::io;
++use crate::ffi::{CStr, OsStr, OsString};
++use crate::{fmt, io, iter, slice};
+ use crate::os::wasi::prelude::*;
+ use crate::path::{self, PathBuf};
+ use crate::sys::helpers::run_path_with_cstr;
+@@ -40,6 +40,64 @@
+     }
+ }
+ 
++/// `TMPDIR`, else `/tmp`.
+ pub fn temp_dir() -> PathBuf {
+-    panic!("not supported by WASI yet")
++    crate::env::var_os("TMPDIR").map_or_else(|| PathBuf::from("/tmp"), PathBuf::from)
+ }
++
++/// `HOME`: WASI has no user database.
++pub fn home_dir() -> Option<PathBuf> {
++    crate::env::var_os("HOME").filter(|home| !home.is_empty()).map(PathBuf::from)
++}
++
++// `PATH`-style lists are separated by `:`, as on unix.
++const PATH_SEPARATOR: u8 = b':';
++
++pub type SplitPaths<'a> = iter::Map<
++    slice::Split<'a, u8, impl FnMut(&u8) -> bool + 'static>,
++    impl FnMut(&[u8]) -> PathBuf + 'static,
++>;
++
++#[define_opaque(SplitPaths)]
++pub fn split_paths(unparsed: &OsStr) -> SplitPaths<'_> {
++    fn is_separator(&b: &u8) -> bool {
++        b == PATH_SEPARATOR
++    }
++
++    fn into_pathbuf(part: &[u8]) -> PathBuf {
++        PathBuf::from(OsStr::from_bytes(part))
++    }
++
++    unparsed.as_bytes().split(is_separator).map(into_pathbuf)
++}
++
++#[derive(Debug)]
++pub struct JoinPathsError;
++
++pub fn join_paths<I, T>(paths: I) -> Result<OsString, JoinPathsError>
++where
++    I: Iterator<Item = T>,
++    T: AsRef<OsStr>,
++{
++    let mut joined = Vec::new();
++
++    for (i, path) in paths.enumerate() {
++        let path = path.as_ref().as_bytes();
++        if i > 0 {
++            joined.push(PATH_SEPARATOR)
++        }
++        if path.contains(&PATH_SEPARATOR) {
++            return Err(JoinPathsError);
++        }
++        joined.extend_from_slice(path);
++    }
++    Ok(OsStringExt::from_vec(joined))
++}
++
++impl fmt::Display for JoinPathsError {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        write!(f, "path segment contains separator `{}`", char::from(PATH_SEPARATOR))
++    }
++}
++
++impl crate::error::Error for JoinPathsError {}

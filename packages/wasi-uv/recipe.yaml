@@ -1,0 +1,53 @@
+# Astral's uv for slicc's kernel (homescoop#103): the real uv as a WASI
+# command, replacing @ai-ecoverse/wasix-uv-shim. Upstream is astral-sh/uv;
+# the patches live here (see notes) and keep native builds unchanged.
+name: wasi-uv
+builder: host
+# renovate: datasource=github-releases depName=astral-sh/uv
+version: "0.13.1"
+npm: "@ai-ecoverse/wasi-uv"
+summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run against wasix-python)"
+source:
+  url: "https://github.com/astral-sh/uv/archive/refs/tags/{{version}}.tar.gz"
+  sha256: "e2678d6f868f72631244a7ff7c7faafc803b37d50995165d93373114c6cbcae9"
+  epoch: "1791948226"
+# ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#675).
+reproducible: true
+toolchain:
+  rust: "1.99.0"
+  binaryen: "133"
+  wasi-sdk: "34.0"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  homepage: https://docs.astral.sh/uv/
+  license: MIT OR Apache-2.0
+  notes: |
+    Target wasm32-wasip1-threads (uv runs main on a big-stack thread and
+    tokio's blocking pool). apply.sh unpacks and patches eight crates.io
+    crates into homescoop-crates/, copies homescoop's crates/wasix-command
+    (feature tokio), then applies the uv series:
+      0001 manifests: [patch.crates-io], wasix-command, indicatif wasmbind,
+           ctrlc/diskus off WASI, uv-extract read_at, recursion limit
+      0002 processes through wasix-command (std and tokio::process);
+           interpreter query with -s -P (wasix-python needs PYTHONHOME)
+      0003 filesystem as unix: symlinks (venv, cache, uv tool links), no
+           locks/modes/dup, chmod +x via
+           the kernel's slicc_fs.fd_chmod
+      0004 Os::Wasi, wheel tag wasi_0_0_0_wasm32
+      0005 start: chdir(PWD), 16 blocking threads, 2 ms tick (no tokio IO
+           waker on WASI)
+    crates/: hyper-util (dial via wasix-net), rustls-native-certs,
+    cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
+    and astral-reqwest-middleware/-retry (mechanical: wasm32 means
+    wasm32-unknown, not WASI).
+    rust/: Rust std, built with -Zbuild-std (RUSTC_BOOTSTRAP=1) from a
+    linked copy of the toolchain: split_paths/join_paths, home_dir,
+    temp_dir and an empty EXE_SUFFIX on WASI.
+    C (aws-lc-sys, zstd-sys) with wasi-sdk 34. LTO off, 16 codegen units
+    (memory), then wasm-opt -Oz (binaryen 133). SOURCE_DATE_EPOCH is the
+    0.13.1 tag's commit time (source.epoch, 2026-10-14T03:23:46Z). New package →
+    human cert.

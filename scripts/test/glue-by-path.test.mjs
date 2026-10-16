@@ -84,3 +84,39 @@ test('glueByPath: runs each glue by path as certglue; rc 126 or EACCES fails, an
   assert.equal((await glueByPath(odd, { installDir: 'p/', targets: [{ glue: 'bin/tar', command: 'tar' }], log: () => {} })).status, 'pass');
   await assert.rejects(glueByPath(fakeCtx({ addUser: 'users are off' }), { installDir: 'p/', targets: [], log: () => {} }), /users are off/);
 });
+
+test('glueFallback (#628): a cert kernel before 1.86, or users not enforce, gets a --glue-only run on the dev pin', async () => {
+  const { glueFallback } = await import('../browser-cert/glue.mjs');
+  const pin = '@ai-ecoverse/slicc-kernel@1.102.6';
+  const at = (v) => `@ai-ecoverse/slicc-kernel@${v}`;
+  const fb = (meta, certKernel, manifest = coreutils, fallbackKernel = pin) => glueFallback({ meta, manifest, certKernel, fallbackKernel });
+  assert.deepEqual(fb({}, at('1.12.0')), { why: `${at('1.12.0')}: the kernel keeps its default modes (no kernel.chmod before slicc-kernel 1.86.0)`, kernel: pin, users: 'enforce' });
+  assert.match(fb({ users: 'off' }, at('1.94.0')).why, /users off is not enforce/);
+  assert.match(fb({ users: 'report' }, at('1.94.0')).why, /users report is not enforce/);
+  assert.equal(fb({ users: 'enforce' }, at('1.94.0')), null);
+  assert.equal(fb({}, at('1.94.0')), null, 'users default enforce since 1.74');
+  assert.equal(fb({ glueByPath: false }, at('1.12.0')), null);
+  assert.equal(fb({}, at('1.12.0'), { slicc: { commands: { rg: { wasm: 'bin/rg.wasm' } } } }), null);
+  assert.throws(() => fb({}, at('1.12.0'), coreutils, at('1.80.0')), /fallback kernel .*1\.80\.0 cannot run it either/);
+});
+
+test('runMode and glueStep (#628): --glue-only skips specs and smoke, runs the glue, and fails when it cannot', async () => {
+  const { runMode, glueStep } = await import('../browser-cert/glue.mjs');
+  assert.deepEqual(runMode({ glueOnly: true, specs: 3, abi: 'emscripten', commands: 1 }), { mode: 'glue-only' });
+  assert.deepEqual(runMode({ glueOnly: true, specs: 0, abi: 'wasi', commands: 0 }), { mode: 'glue-only' }, 'never the early skip');
+  assert.deepEqual(runMode({ glueOnly: false, specs: 2, abi: 'wasi', commands: 0 }), { mode: 'specs' });
+  assert.deepEqual(runMode({ glueOnly: false, specs: 0, abi: 'emscripten', commands: 1 }), { mode: 'smoke' });
+  assert.equal(runMode({ glueOnly: false, specs: 0, abi: 'wasi', commands: 1 }).mode, 'skip');
+  assert.equal(runMode({ glueOnly: false, specs: 0, abi: 'emscripten', commands: 0 }).mode, 'skip');
+
+  assert.deepEqual(glueStep({ glueOnly: true, plan: glueCheckPlan(ok) }), { action: 'run' });
+  assert.deepEqual(glueStep({ glueOnly: false, plan: glueCheckPlan(ok) }), { action: 'run' });
+  const old = glueCheckPlan({ ...ok, modes: 'kernel defaults' });
+  const f = glueStep({ glueOnly: true, plan: old });
+  assert.equal(f.action, 'fail');
+  assert.match(f.why, /--glue-only, but glue by path cannot run: .*1\.86\.0/);
+  assert.deepEqual(glueStep({ glueOnly: false, plan: old }), { action: 'skip', why: old.why, log: true });
+  const none = glueCheckPlan({ ...ok, manifest: {} });
+  assert.equal(glueStep({ glueOnly: true, plan: none }).action, 'fail', 'glue-only with no glue fails');
+  assert.deepEqual(glueStep({ glueOnly: false, plan: none }), { action: 'skip', why: none.why, log: false });
+});

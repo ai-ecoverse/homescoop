@@ -50,8 +50,10 @@ REMAP=(
   "--remap-path-prefix=$SYSROOT=/rustc"
 )
 # The cached wasm is keyed by what goes into it (toolchain, target, flags,
-# the patch), not only the upstream version, so a changed build reruns.
-KEY="$( { printf '%s\n' "$RUST" "$TARGET" "${REMAP[@]}"; cat "$HOMESCOOP_PKG"/*.patch; } | shasum -a 256 | cut -c1-12)"
+# the patch and the vendored crates/wasix-*), not only the upstream version,
+# so a changed build reruns (homescoop#642: cargo isn't invoked on a hit, so
+# its own fingerprints can't catch a crate edit).
+KEY="$( { printf '%s\n' "$RUST" "$TARGET" "${REMAP[@]}"; cat "$HOMESCOOP_PKG"/*.patch; homescoop_tree_digest "$SRC_DIR/homescoop-crates"; } | shasum -a 256 | cut -c1-12)"
 OUT="$WORK/wasi-impeccable-${VERSION}-$KEY"
 mkdir -p "$OUT/bin"
 

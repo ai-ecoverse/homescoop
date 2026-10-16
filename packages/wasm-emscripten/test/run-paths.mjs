@@ -132,7 +132,24 @@ try {
     assert.ok(await exists(`${binaryen}/bin/wasm-opt`), `${binaryen}/bin/wasm-opt exists`);
     assert.equal(cache.status, 0, `em-ensure-cache: ${cache.stdout}${cache.stderr}`);
     assert.ok(cache.stdout.includes('stdio.h readable'), cache.stdout);
-    console.log(`PASS ${em.name}@${em.version} (${layout}): clang, wasm-opt and the cache sysroot found beside the package`);
+    let ran = '';
+    if (layout === 'flat') {
+      // The tools emcc drives, run through their glue on this kernel (1.61.0
+      // still exposes process to the worker): from 6.0.9-19 they are the
+      // releases whose Node-host runner stays out of it (homescoop#276).
+      // Flat only: the kernel lists commands from /node_modules.
+      for (const [n, f] of [['wasm-clang', 'bin/llvm.wasm'], ['wasm-binaryen', 'bin/wasm-opt.wasm']]) {
+        await k.writeFile(`${storeOf(n)}/${f}`, readFileSync(join(nm, S, n, f)));
+      }
+      for (const [tool, want] of [['clang', /clang version 24\./], ['wasm-opt', /^wasm-opt version 132\b/]]) {
+        const v = await run([tool, '--version']);
+        assert.equal(v.status, 0, `${tool} --version (${man(tool === 'clang' ? 'wasm-clang' : 'wasm-binaryen').version}): rc=${v.status}\n${v.stdout}${v.stderr}`);
+        assert.match(v.stdout, want, `${tool} --version: ${v.stdout}${v.stderr}`);
+        assert.equal(v.stderr, '', `${tool} --version printed on stderr (the glue's Node-host runner ran a second main?): ${v.stderr}`);
+      }
+      ran = `; clang ${man('wasm-clang').version} and wasm-opt ${man('wasm-binaryen').version} --version run clean through their glue on slicc-kernel ${kver}`;
+    }
+    console.log(`PASS ${em.name}@${em.version} (${layout}): clang, wasm-opt and the cache sysroot found beside the package${ran}`);
   }
   }
 } catch (e) {

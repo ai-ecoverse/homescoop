@@ -7,5 +7,14 @@ license = "MIT OR Apache-2.0"
 description = "std::process::Command for WASI programs in slicc's kernel, over WASIX proc_spawn3"
 publish = false
 
+[features]
+tokio = ["dep:tokio"]
+
+[dependencies]
+tokio = { version = "1.40", optional = true, default-features = false, features = ["io-util", "macros", "time"] }
+
+[target.'cfg(not(all(target_os = "wasi", target_env = "p1")))'.dependencies]
+tokio = { version = "1.40", optional = true, default-features = false, features = ["process"] }
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

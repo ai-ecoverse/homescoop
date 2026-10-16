@@ -1,5 +1,9 @@
 # py-pillow: negative proof
 
+## 12.3.0-8 fails the 12.3.0-9 cert (homescoop#588, #211 A1)
+
+`cert/arrow.mjs` against npm's 12.3.0-8 (wasix-python 3.14.2-25, slicc-kernel 1.108.4 Node entry, 2026-10-16): FAIL with `rc=134 stderr=python3: wasm trap: function signature mismatch`. `wasm-call-signatures.mjs` on -8's `_imaging` finds `method __arrow_c_schema__ -> ExportArrowSchemaPyCapsule: 1 params, called with 2 (flags 0x1)`, and the same for `__arrow_c_array__`. 12.3.0-9 (from the sdist, with `pillow-wasm-call-signatures.patch`) passes, and the checker finds 0 mismatches in all four side modules.
+
 ## 12.3.0-7 (published) fails the 12.3.0-8 cert (homescoop#702)
 
 `node scripts/browser-cert/python-range.mjs py-pillow --tarball ai-ecoverse-py-pillow-12.3.0-7.tgz --lock-only`

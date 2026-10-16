@@ -1,0 +1,44 @@
+name: webrtc-audio-processing
+builder: host
+reproducible: true
+# renovate: datasource=gitlab-tags depName=pulseaudio/webrtc-audio-processing extractVersion=^v(?<version>.*)$ registryUrl=https://gitlab.freedesktop.org
+version: "2.1"
+npm: "@ai-ecoverse/wasm-webrtc-audio-processing"
+summary: "WebRTC AEC3 echo canceller from webrtc-audio-processing 2.1 (wasm + a synchronous JS wrapper for AudioWorklet and Node)"
+source:
+  url: "https://freedesktop.org/software/pulseaudio/webrtc-audio-processing/webrtc-audio-processing-{{version}}.tar.xz"
+  sha256: "ae9302824b2038d394f10213cab05312c564a038434269f11dbf68f511f9f9fe"
+sources:
+  abseil:
+    version: "20240722.0"
+    url: "https://github.com/abseil/abseil-cpp/releases/download/{{version}}/abseil-cpp-{{version}}.tar.gz"
+    sha256: "f50e5ac311a81382da7fa75b97310e4b9006474f9560ac46f54a9967f07d4ae3"
+  abseil-wrap:
+    version: "20240722.0-3"
+    url: "https://github.com/mesonbuild/wrapdb/releases/download/abseil-cpp_{{version}}/abseil-cpp_{{version}}_patch.zip"
+    sha256: "12dd8df1488a314c53e3751abd2750cf233b830651d168b6a9f15e7d0cf71f7b"
+  meson:
+    version: "1.12.1"
+    url: "https://files.pythonhosted.org/packages/source/m/meson/meson-{{version}}.tar.gz"
+    sha256: "ab0a6ca09f8ef70c564c8241fb5a23957886a0b53fb58412b5e07eaf07dba743"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/webrtc-audio-processing
+  license: BSD-3-Clause AND Apache-2.0
+  notes: |
+    For ai-ecoverse/pi-audio (echo.mode "wasm"). freedesktop's meson
+    extraction of WebRTC's AudioProcessing module, built from source with
+    Emscripten: AEC3, the high-pass filter, optional noise suppression and
+    WebRTC's GMM voice activity detector. abseil-cpp comes from the
+    upstream's own meson wrap (wrapdb 20240722.0-3), pinned here and fed to
+    meson's package cache, so the build downloads nothing itself.
+    src/wap.cc is the C ABI; package/index.js is a hand-written wrapper
+    that instantiates the wasm synchronously (no fetch, no importScripts,
+    no top-level await), for an AudioWorkletGlobalScope and for Node.
+    2.1.0-2: the wrapper replaces NaN and ±Infinity samples in mic and
+    reference with 0 before APM and counts them (stats().nonFiniteSamples):
+    on 2.1.0-1 one NaN mic sample left APM's filter state NaN for good, so
+    every later output sample was NaN, with no error (#744).

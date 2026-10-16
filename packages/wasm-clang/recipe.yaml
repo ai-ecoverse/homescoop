@@ -18,6 +18,9 @@ source:
 # leave an a.out alone (homescoop#710, #711).
 # 24.0.0-18: @response files, PCH outputs, -Xlinker -o and -B values
 # (homescoop#721, #722).
+# 24.0.0-19: same-bytes relinks and quoted / nested response files.
+# 24.0.0-20: braces / ~ in response files, no marker left on a failed compile.
+# 24.0.0-21: response files read with clang's own tokenizer rules (homescoop#769).
 repack:
   from: "24.0.0-11"
   files:

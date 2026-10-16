@@ -15,7 +15,8 @@
  * cert/), or "noRepin": true in wasix-python's cert/meta.json (needsInstall
  * pins the published wave for this python): the installed py-* are the real
  * re-pinned packages, so there must be nothing to move and every py-* must
- * declare exactly this python; repin() throws instead of standing in. A new
+ * declare this python, exactly or as a range that holds it (homescoop#702:
+ * ">=3.14.2-16 <3.14.3"); repin() throws instead of standing in. A new
  * python build's cert sets noRepin false again until its own wave.
  */
 import { readFileSync } from 'node:fs';
@@ -23,6 +24,14 @@ import { readFileSync } from 'node:fs';
 const NM = '/node_modules/@ai-ecoverse';
 const AWAY = '.wasix-python.repin';
 const META = JSON.parse(readFileSync(new URL('../meta.json', import.meta.url), 'utf8'));
+const accepts = (spec, version) => {
+  const r = /^>=(\d+)\.(\d+)\.(\d+)-(\d+) <(\d+)\.(\d+)\.(\d+)$/.exec(spec);
+  if (!r) return spec === version;
+  const [x, y, z, n, a, b, c] = r.slice(1).map(Number);
+  const v = /^(\d+)\.(\d+)\.(\d+)(?:-(\d+))?$/.exec(version);
+  if (!v || a !== x || b !== y || c !== z + 1) return false;
+  return Number(v[1]) === x && Number(v[2]) === y && Number(v[3]) === z && (v[4] === undefined || Number(v[4]) >= n);
+};
 const strict = () => process.env.HOMESCOOP_CERT_NO_REPIN === '1' || META.noRepin === true;
 
 export async function repin({ run, read }) {
@@ -33,7 +42,7 @@ export async function repin({ run, read }) {
     const pkgs = await run(['bash', '-c', `ls -d ${NM}/py-* 2>/dev/null || true`], { cwd: '/' });
     for (const p of pkgs.stdout.split('\n').filter(Boolean)) {
       const dep = (JSON.parse(await read(`${p}/package.json`)).dependencies || {})['@ai-ecoverse/wasix-python'];
-      if (dep !== undefined && dep !== want) {
+      if (dep !== undefined && !accepts(dep, want)) {
         throw new Error(`no-repin cert: ${p} depends on wasix-python ${dep}, not ${want}; the py-* are not re-pinned`);
       }
     }

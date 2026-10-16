@@ -12,6 +12,8 @@ source:
 # (-17 hard-coded /shared/lib/node_modules/…, which npm and pnpm never fill;
 # #277) and emscripten-config resolving them physically. Drop repack: when
 # the next release rebuilds.
+# 6.0.9-19 too: wasm-clang 24.0.0-18 and wasm-binaryen 132.0.0-2, whose glue's
+# Node-host runner stays out of noInitialRun hosts (homescoop#276).
 # package/package.json keeps -17's "files" (a repack may not change it), so
 # it still says "Media"; build.sh writes "media" for the next real build, and
 # test/files.test.mjs checks that list against the tarball (#205).

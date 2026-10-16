@@ -4,10 +4,10 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-31's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-32's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
-- No `fork`/`vfork`; `subprocess` via `os.posix_spawn` (`proc_spawn2`/`3`)
+- Two binaries (since 3.14.2-25): the default has no `fork`/`vfork`; `PYTHON_FORK=true` selects the fork-capable one (below). `subprocess` uses `os.posix_spawn` (`proc_spawn2`/`3`) in both
 - `os.getuid()`/`getgid()`/`getgroups()` and `pwd`/`grp` come from slicc-kernel's process credentials and its `/etc/passwd`/`/etc/group` (3.14.2-13, wasix-sysroot -20; slicc-kernel ≥ 1.44.0, no fallback: ids are -1 on older kernels). Root is uid 0 with home `/root`.
 - Record locks (`fcntl` F_SETLK*, `lockf`) go through slicc-kernel (since -21, below); `flock` is a no-op
 - stdout is line-buffered unless it is a regular file, so output streams and survives crashes
@@ -17,6 +17,40 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 - `TZ` POSIX rules work (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193); `zoneinfo` works with the `tzdata` package
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
+
+Since 3.14.2-25 (wasix-sysroot -32):
+
+- **Two binaries, one package (homescoop#357).** `bin/python.wasm` is the
+  default build, without fork, at full speed. `bin/python-fork.wasm` has
+  `os.fork` (HAVE_FORK, fully asyncified). The `python`, `python3`, `pip` and
+  `pip3` commands pick it when the process environment has
+  `PYTHON_FORK=true` (slicc.commands `variants`, slicc-kernel#859). The kernel
+  loads only the chosen wasm, and children inherit the choice through the
+  environment, also when they exec `sys.executable`. Kernels before #859
+  (1.110.0) ignore `variants` and always run the default.
+  - In the default binary, `os.fork()`, `os.forkpty()` and
+    `multiprocessing.get_context("fork")`/`("forkserver")` fail with an
+    error that names the switch: *os.fork() isn't available in this python.
+    Re-run with PYTHON_FORK=true (needs slicc-kernel >= 1.110.0) to use the
+    fork-capable build.* On an older kernel `PYTHON_FORK=true` still runs this
+    default binary, so the message names the kernel too.
+    `hasattr(os, "fork")` stays `False`.
+  - In the fork binary, `os.fork`, `os.waitpid`, threads in a forked child,
+    and `get_context("fork")` `Pool`/`Queue`/`Lock` work. The full asyncify
+    makes it larger and slower (about +60% size, +35-60% interpreter time).
+  - `spawn` stays the default start method in both. Shared ctypes still
+    can't be shared across processes, since a fork copies memory.
+- From the sysroot: `signal.sigwait`, `sigwaitinfo` and `sigtimedwait` work
+  on slicc-kernel ≥ 1.106.2 (homescoop#520), and `select.epoll` masks are
+  atomic there. A signal inherited as ignored (`nohup`, `trap ''`) reads as
+  `SIG_IGN` from `signal.getsignal` on slicc-kernel ≥ 1.108.0 (homescoop#740).
+- **Kernel conditions.** -24's lift of the 256-named-semaphore limit holds
+  only on slicc-kernel ≥ 1.102.2 (#770/#773). On 1.100.x a process still
+  stops at about 250 (homescoop#698). The `engines` floor (≥ 1.100.0) is
+  enforced from slicc-kernel 1.106.2 on (slicc-kernel#797/#806): those kernels
+  refuse the commands on an older kernel. Kernels before 1.106.2 install the
+  package without a warning, and there `fcntl` locks aren't real below
+  1.100.0 (homescoop#651).
 
 Since 3.14.2-24 (wasix-sysroot -31):
 
@@ -32,7 +66,8 @@ Since 3.14.2-24 (wasix-sysroot -31):
   keeps its state in shared memory too.
 - From the sysroot: `select.poll` reports `POLLHUP` for a registered fd with
   no events whose peer closed, and `POLLERR` for a pipe write end whose
-  reader is gone; a process is no longer limited to 256 named semaphores.
+  reader is gone; a process is no longer limited to 256 named semaphores
+  (on slicc-kernel ≥ 1.102.2; see -25).
 
 Since 3.14.2-23:
 

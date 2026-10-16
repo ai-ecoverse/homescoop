@@ -27,7 +27,7 @@ jobs:
         github.event.workflow_run.conclusion != 'cancelled' &&
         github.event.workflow_run.head_repository.full_name == github.repository
       )
-    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'cloud-run' }}
+    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 150
     permissions:
       actions: read
@@ -128,7 +128,7 @@ jobs:
     name: cert-review / review
     needs: plan
     if: needs.plan.outputs.go == 'true'
-    runs-on: ${{ vars.CERT_RUNNER || 'cloud-run-bench' }}
+    runs-on: ${{ vars.CERT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 240
     concurrency:
       group: cert-review-${{ needs.plan.outputs.number }}
@@ -330,7 +330,7 @@ jobs:
     name: cert-review / record
     needs: [plan, review]
     if: always() && needs.plan.outputs.go == 'true' && needs.review.result != 'cancelled'
-    runs-on: ${{ vars.CERT_RUNNER || 'cloud-run-bench' }}
+    runs-on: ${{ vars.CERT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     concurrency:
       group: cert-review-record-${{ needs.plan.outputs.number }}
@@ -399,6 +399,25 @@ jobs:
           done
           cat "$RUNNER_TEMP/specs.json"
 
+      - name: Repack inputs, traced to an attested build (this job's tools, from ${{ github.sha }})
+        run: |
+          # A repack's input must trace to a provenance-attested CI build, or a
+          # reproducible build, from the recipe's pinned source; otherwise the
+          # verdict step makes it INCOMPLETE. Here, not in the review job, so the
+          # reviewer can't touch the result.
+          mkdir -p "$RUNNER_TEMP/cert-review"
+          echo '{}' > "$RUNNER_TEMP/cert-review/repack-input.json"
+          for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
+            npm_name=$(tar -xzf "$RUNNER_TEMP/artifacts/host-$pkg-pr$PR_NUMBER/package.tgz" -O package/package.json 2> /dev/null | jq -r '.name // empty') || npm_name=
+            node scripts/cert-review/repack-input.mjs --package "$pkg" --ref "$HEAD" --repo "$GH_REPO" ${npm_name:+--npm "$npm_name"} \
+              > "$RUNNER_TEMP/repack-input-$pkg.json" || true
+            cat "$RUNNER_TEMP/repack-input-$pkg.json"
+            if jq -e . "$RUNNER_TEMP/repack-input-$pkg.json" > /dev/null 2>&1; then
+              jq --arg p "$pkg" --slurpfile r "$RUNNER_TEMP/repack-input-$pkg.json" '. + {($p): $r[0]}' "$RUNNER_TEMP/cert-review/repack-input.json" > "$RUNNER_TEMP/cert-review/repack-input.next"
+              mv "$RUNNER_TEMP/cert-review/repack-input.next" "$RUNNER_TEMP/cert-review/repack-input.json"
+            fi
+          done
+
       - name: Verdict from the artifacts (this job's tools, from ${{ github.sha }})
         id: verdict
         run: |
@@ -406,7 +425,7 @@ jobs:
           if node scripts/cert-review/verdict.mjs \
             --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --review "$RUNNER_TEMP/cert-review" \
             --body "$RUNNER_TEMP/cert-review/body.md" --lines "$RUNNER_TEMP/cert-review/lines.txt" --run "$RUN_URL" \
-            --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION" --specs "$RUNNER_TEMP/specs.json"; then
+            --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION" --specs "$RUNNER_TEMP/specs.json" --repack-input "$RUNNER_TEMP/cert-review/repack-input.json"; then
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
           else
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
@@ -424,6 +443,7 @@ jobs:
           path: |
             ${{ runner.temp }}/cert-review/record.json
             ${{ runner.temp }}/cert-review/lines.txt
+            ${{ runner.temp }}/cert-review/repack-input.json
           if-no-files-found: error
 
       - name: Comment and the cert-review status on the head

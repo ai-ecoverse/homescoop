@@ -38,6 +38,6 @@ export default async function (ctx) {
   assert.deepEqual(o.unblock_old, [10], `mask before unblocking: ${r.stdout}`);
   assert.equal(o.hits_after, 1, `the handler did not run once after unblocking: ${r.stdout}`);
   assert.deepEqual(o.pending_after, [], `still pending after unblocking: ${r.stdout}`);
-  assert.equal(o.sigtimedwait, 52, `sigtimedwait is ENOSYS on wasix-sysroot -28: ${r.stdout}`);
+  assert.equal(o.sigtimedwait, 'ok', `sigtimedwait times out (None) through slicc.sigwait (wasix-sysroot -32, slicc-kernel >= 1.106.2); -24 and older: ENOSYS (52): ${r.stdout}`);
   console.log(`sigmask: ${r.stdout.trim()}`);
 }

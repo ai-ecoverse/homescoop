@@ -8,6 +8,7 @@
     "real .pc set (zlib, libpng16, OpenSSL, ${pcfiledir}): --modversion, --exists with constraints, --atleast/--exact/--max-version",
     "--cflags/--libs, --static with Requires.private and Libs.private, --*-only-*",
     "--variable, --define-variable, PKG_CONFIG_SYSROOT_DIR, ${pcfiledir}",
-    "pkgconf 3: --variable over several modules, PKG_CONFIG_<MODULE>_<VAR>, --newlines, Conflicts enforced"
+    "pkgconf 3: --variable over several modules, PKG_CONFIG_<MODULE>_<VAR>, --newlines, Conflicts enforced",
+    "pkgconf 3 traversal depth (cert/depth.mjs, 3.0.9-2, homescoop#532): a 260-level Requires chain gives exactly 256 levels of --libs and --cflags by default, exit 0, nothing on stderr; --maximum-traverse-depth=-1, =300 and PKG_CONFIG_MAXIMUM_TRAVERSE_DEPTH=-1 give all 260. 2.5.1-1 gives all 260 by default (NEGATIVE.md)"
   ]
 }

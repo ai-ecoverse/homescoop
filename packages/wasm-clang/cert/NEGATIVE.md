@@ -22,3 +22,15 @@
 ## 24.0.0-18: response files, PCHs, -Xlinker -o (homescoop#721, #722; 2026-10-16)
 
 `run-cc.mjs` (flat, R28) against the published 24.0.0-17: FAIL with `wasixcc -O2 r28.c -Xlinker -o -Xlinker xl.wasm → a.out: asyncify no`, because the driver took the `-Xlinker` that follows the linker's `-o` as the output. With that case left out it fails again, at `wasixcc -v -B /tmp next to an asyncified a.out: rc=1`: the `-B` value counted as a link input, so `-v` ran a link of nothing that removed the a.out (#711). #721's and #722's own repros (`cc @rsp` with the `-o` inside the response file, and `cc -x c-header x.h -o x.pch`) are in the same block. 24.0.0-18 passes all of them.
+
+## 24.0.0-19: same-bytes relinks, quoted and nested response files (Codex on #725, 2026-10-16)
+
+`run-cc.mjs` (flat, R28) against the published 24.0.0-18: FAIL, `wasixcc -O2 r28.c -o r28n.wasm → r28n.wasm: asyncify no`. The link after a `WASIXCC_ASYNCIFY=0` run rewrote the same bytes, and -18 took an unchanged cksum to mean "not written". With that case left out it fails again, at `wasixcc -O2 @q.rsp → sp ace.wasm: asyncify no`: -18 split response files on blanks, so it never saw the quoted output. 24.0.0-19 passes both, and the nested `@outer.rsp` too.
+
+## 24.0.0-20: braces in response files, the marker file (homescoop#754, #755; 2026-10-16)
+
+`run-cc.mjs` (flat, R28) against the published 24.0.0-19: FAIL, `wasixcc -O2 @brace.rsp → br{a,b}.wasm: asyncify no`. -19's `eval` brace-expanded the file's words, so the driver looked for `bra.wasm`. -19 also left a `wasix-out.*` marker in TMPDIR whenever the frontend failed, because `set -e` ended the driver before its cleanup (#754). 24.0.0-20 passes both checks.
+
+## 24.0.0-21: clang's tokenizer for response files (homescoop#769; 2026-10-16)
+
+`run-cc.mjs` (flat, R28) against the published 24.0.0-20: FAIL, `wasixcc -O2 @bq.rsp → q {x}.wasm: asyncify no`. -20 split any file with `{ } ~ $ …` on blanks, so the driver read `-o "q` and `{x}.wasm"` and skipped Asyncify while clang wrote `q {x}.wasm`. @dq.rsp (`$` next to a quoted `-o`) failed on -19 and -20 alike. 24.0.0-21 passes all four new response files, @long.rsp included.

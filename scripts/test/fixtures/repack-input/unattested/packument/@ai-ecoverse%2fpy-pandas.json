@@ -1,0 +1,23 @@
+{
+  "name": "@ai-ecoverse/py-pandas",
+  "versions": {
+    "2.3.2-10": {
+      "version": "2.3.2-10",
+      "dist": {
+        "integrity": "sha512-zEUoIjsicPbuCbBNNlS12qfqaMcI3YfBxvmB+jawFU8Q2gUvrOiOaIyBa4pa5O5zGEAoh1S6s9YXadNHKTQbng=="
+      }
+    },
+    "2.3.2-11": {
+      "version": "2.3.2-11",
+      "dist": {
+        "integrity": "sha512-hbmFmGVqSKXKlOCgP+RXHNAHspRpClxpPtqDL1VxuBZflVBC6HIqLr+y9ciJqAMBigY2wt6GudjM2oMP6WIPKw==",
+        "attestations": {
+          "url": "https://registry.npmjs.org/-/npm/v1/attestations/@ai-ecoverse%2fpy-pandas@2.3.2-11",
+          "provenance": {
+            "predicateType": "https://slsa.dev/provenance/v1"
+          }
+        }
+      }
+    }
+  }
+}

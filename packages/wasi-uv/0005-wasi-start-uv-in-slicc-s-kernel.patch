@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: homescoop <homescoop@ai-ecoverse.invalid>
+Date: Fri, 16 Oct 2026 10:35:28 +0200
+Subject: [PATCH] wasi: start uv in slicc's kernel
+
+- chdir to PWD: wasi-libc starts every program in /.
+- At most 16 blocking threads: the kernel runs 64 threads in a process.
+- A 2 ms timer task: tokio cannot wake its IO driver from another thread
+  on WASI, so a task woken by a blocking thread (every tokio::fs call)
+  would otherwise wait for the next IO event.
+---
+ crates/uv/src/lib.rs | 40 +++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 35 insertions(+), 5 deletions(-)
+
+diff --git a/crates/uv/src/lib.rs b/crates/uv/src/lib.rs
+index c8c8ef8..9f40441 100644
+--- a/crates/uv/src/lib.rs
++++ b/crates/uv/src/lib.rs
+@@ -3111,12 +3111,16 @@ where
+ 
+     // See `min_stack_size` doc comment about `main2`
+     let min_stack_size = min_stack_size();
++    #[cfg(target_os = "wasi")]
++    wasi::init();
+     let main2 = move || {
+-        let runtime = tokio::runtime::Builder::new_current_thread()
+-            .enable_all()
+-            .thread_stack_size(min_stack_size)
+-            .build()
+-            .expect("Failed building the Runtime");
++        let mut builder = tokio::runtime::Builder::new_current_thread();
++        builder.enable_all().thread_stack_size(min_stack_size);
++        #[cfg(target_os = "wasi")]
++        builder.max_blocking_threads(wasi::MAX_BLOCKING_THREADS);
++        let runtime = builder.build().expect("Failed building the Runtime");
++        #[cfg(target_os = "wasi")]
++        runtime.spawn(wasi::tick());
+         // Box the large main future to avoid stack overflows.
+         let result = runtime.block_on(Box::pin(run(cli, GlobalInitialization::Initialize)));
+         // Avoid waiting for pending tasks to complete.
+@@ -3170,3 +3174,29 @@ where
+         }
+     }
+ }
++
++/// slicc's kernel (WASI preview1 with WASIX threads, sockets and processes).
++#[cfg(target_os = "wasi")]
++mod wasi {
++    use std::time::Duration;
++
++    /// The kernel runs at most 64 threads in a process.
++    pub(crate) const MAX_BLOCKING_THREADS: usize = 16;
++
++    /// wasi-libc starts every program in `/`: the kernel passes the working
++    /// directory in `PWD`.
++    pub(crate) fn init() {
++        if let Some(pwd) = std::env::var_os("PWD") {
++            let _ = std::env::set_current_dir(pwd);
++        }
++    }
++
++    /// tokio cannot wake its IO driver from another thread on WASI, so a
++    /// task finished by a blocking thread would wait for the next IO event:
++    /// a timer bounds that wait.
++    pub(crate) async fn tick() {
++        loop {
++            tokio::time::sleep(Duration::from_millis(2)).await;
++        }
++    }
++}

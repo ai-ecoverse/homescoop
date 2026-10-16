@@ -3,6 +3,7 @@
 #define HOMESCOOP_WASIX_POSIX_STUBS_H
 
 #include <errno.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -38,12 +39,47 @@ _Noreturn void siglongjmp(sigjmp_buf, int);
 #define HOMESCOOP_STUB_ERR do { errno = EOPNOTSUPP; return -1; } while (0)
 
 
+/*
+ * flock as whole-file fcntl record locks (homescoop#631): wasix-libc has no
+ * flock symbol, and until 5.42.0-14 this answered every flock with success,
+ * so two autom4te runs raced on one autom4te.cache. slicc-kernel enforces
+ * F_SETLK / F_SETLKW between processes from 1.100.0 (slicc.fcntl_lock;
+ * engines.slicc-kernel). This is perl's own flock emulation without
+ * flock(2) (pp_sys.c, fcntl_emulate_flock), with fcntl's semantics: the
+ * lock belongs to the process (fork doesn't inherit it, closing any handle
+ * on the file drops it).
+ */
 #undef flock
 static inline int homescoop_flock(int fd, int operation) {
-  if (fcntl(fd, F_GETFD) < 0) return -1;
-  int op = operation & ~LOCK_NB;
-  if (op != LOCK_SH && op != LOCK_EX && op != LOCK_UN) { errno = EINVAL; return -1; }
-  return 0;
+  struct flock fl;
+  memset(&fl, 0, sizeof fl);
+  fl.l_whence = SEEK_SET; /* l_start 0, l_len 0: the whole file */
+  switch (operation & ~LOCK_NB) {
+    case LOCK_SH: fl.l_type = F_RDLCK; break;
+    case LOCK_EX: fl.l_type = F_WRLCK; break;
+    case LOCK_UN: fl.l_type = F_UNLCK; break;
+    default: errno = EINVAL; return -1;
+  }
+  /* slicc-kernel keeps record locks on regular files only. flock(2) on a
+   * pipe, a terminal, /dev/null or a directory succeeds on Linux (scripts
+   * flock STDOUT to serialise children's output): grant it, excluding
+   * nobody, as up to 5.42.0-14 (homescoop#757). */
+  struct stat st;
+  if (fstat(fd, &st) != 0) return -1;
+  if (!S_ISREG(st.st_mode)) return 0;
+  int cmd = (operation & LOCK_NB) ? F_SETLK : F_SETLKW;
+  if (fcntl(fd, cmd, &fl) == 0) return 0;
+  /* fcntl wants a handle open for writing for F_WRLCK and one open for
+   * reading for F_RDLCK; flock takes either on any handle, and scripts lock
+   * read-only lock files with LOCK_EX. On an open handle of the other mode,
+   * take the other kind: LOCK_EX on a read-only handle is a read lock (it
+   * keeps writers out), LOCK_SH on a write-only one a write lock. */
+  if (errno == EBADF && fl.l_type != F_UNLCK && fcntl(fd, F_GETFD) >= 0) {
+    fl.l_type = fl.l_type == F_WRLCK ? F_RDLCK : F_WRLCK;
+    if (fcntl(fd, cmd, &fl) == 0) return 0;
+  }
+  if (errno == EACCES || errno == EAGAIN) errno = EWOULDBLOCK;
+  return -1;
 }
 #define flock(fd, op) homescoop_flock((fd), (op))
 

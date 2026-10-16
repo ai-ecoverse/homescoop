@@ -1,0 +1,102 @@
+astral-reqwest-retry: tokio timers on WASI rather than the browser's
+wasmtimer (mechanical wasm32 → wasm32-unknown).
+
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -87,17 +87,17 @@
+ [dev-dependencies.wiremock]
+ version = "0.6.0"
+ 
+-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
++[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies.hyper]
+ version = "1.0"
+ 
+-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
++[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies.tokio]
+ version = "1.6.0"
+ features = ["time"]
+ default-features = false
+ 
+-[target.'cfg(target_arch = "wasm32")'.dependencies.getrandom]
++[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies.getrandom]
+ version = "0.2.0"
+ features = ["js"]
+ 
+-[target.'cfg(target_arch = "wasm32")'.dependencies.wasmtimer]
++[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies.wasmtimer]
+ version = "0.4.3"
+--- a/src/middleware.rs
++++ b/src/middleware.rs
+@@ -105,8 +105,8 @@
+     }
+ }
+ 
+-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
++#[cfg_attr(not(all(target_arch = "wasm32", target_os = "unknown")), async_trait::async_trait)]
++#[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), async_trait::async_trait(?Send))]
+ impl<T, R> Middleware for RetryTransientMiddleware<T, R>
+ where
+     T: RetryPolicy + Send + Sync,
+@@ -174,9 +174,9 @@
+                         n_past_retries,
+                         duration
+                     );
+-                    #[cfg(not(target_arch = "wasm32"))]
++                    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+                     tokio::time::sleep(duration).await;
+-                    #[cfg(target_arch = "wasm32")]
++                    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+                     wasmtimer::tokio::sleep(duration).await;
+ 
+                     n_past_retries += 1;
+--- a/src/retryable_strategy.rs
++++ b/src/retryable_strategy.rs
+@@ -144,9 +144,9 @@
+ ///
+ /// Will only retry if the request failed due to a network error
+ pub fn default_on_request_error(error: &reqwest::Error) -> Option<Retryable> {
+-    #[cfg(not(target_arch = "wasm32"))]
++    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+     let is_connect = error.is_connect();
+-    #[cfg(target_arch = "wasm32")]
++    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+     let is_connect = false;
+     if error.is_timeout() || is_connect {
+         Some(Retryable::Transient)
+@@ -155,7 +155,7 @@
+     } else if error.is_request() {
+         // It seems that hyper::Error(IncompleteMessage) is not correctly handled by reqwest.
+         // Here we check if the Reqwest error was originated by hyper and map it consistently.
+-        #[cfg(not(target_arch = "wasm32"))]
++        #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+         if let Some(hyper_error) = get_source_error_type::<hyper::Error>(&error) {
+             // The hyper::Error(IncompleteMessage) is raised if the HTTP response is well formatted but does not contain all the bytes.
+             // This can happen when the server has started sending back the response but the connection is cut halfway through.
+@@ -175,7 +175,7 @@
+         } else {
+             Some(Retryable::Fatal)
+         }
+-        #[cfg(target_arch = "wasm32")]
++        #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+         Some(Retryable::Fatal)
+     } else {
+         // We omit checking if error.is_status() since we check that already.
+@@ -185,7 +185,7 @@
+     }
+ }
+ 
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ fn classify_io_error(error: &std::io::Error) -> Retryable {
+     match error.kind() {
+         std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted => {
+@@ -196,7 +196,7 @@
+ }
+ 
+ /// Downcasts the given err source into T.
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ fn get_source_error_type<T: std::error::Error + 'static>(
+     err: &dyn std::error::Error,
+ ) -> Option<&T> {

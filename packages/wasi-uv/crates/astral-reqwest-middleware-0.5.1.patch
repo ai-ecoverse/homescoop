@@ -1,0 +1,79 @@
+astral-reqwest-middleware: Send futures on WASI, as uv's client needs
+(mechanical wasm32 → wasm32-unknown).
+
+--- a/src/client.rs
++++ b/src/client.rs
+@@ -246,7 +246,7 @@
+     }
+ }
+ 
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ mod service {
+     use std::{
+         future::Future,
+@@ -365,7 +365,7 @@
+         }
+     }
+ 
+-    #[cfg(not(target_arch = "wasm32"))]
++    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+     pub fn version(self, version: reqwest::Version) -> Self {
+         RequestBuilder {
+             inner: self.inner.version(version),
+@@ -422,7 +422,7 @@
+     /// The timeout is applied from when the request starts connecting until the
+     /// response body has finished. It affects only this request and overrides
+     /// the timeout configured using `ClientBuilder::timeout()`.
+-    #[cfg(not(target_arch = "wasm32"))]
++    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+     pub fn timeout(self, timeout: std::time::Duration) -> Self {
+         RequestBuilder {
+             inner: self.inner.timeout(timeout),
+--- a/src/error.rs
++++ b/src/error.rs
+@@ -106,7 +106,7 @@
+         }
+     }
+ 
+-    #[cfg(not(target_arch = "wasm32"))]
++    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+     /// Returns true if the error is related to connect.
+     pub fn is_connect(&self) -> bool {
+         match self {
+--- a/src/middleware.rs
++++ b/src/middleware.rs
+@@ -32,8 +32,8 @@
+ ///
+ /// [`ClientWithMiddleware`]: crate::ClientWithMiddleware
+ /// [`with`]: crate::ClientBuilder::with
+-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
++#[cfg_attr(not(all(target_arch = "wasm32", target_os = "unknown")), async_trait::async_trait)]
++#[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), async_trait::async_trait(?Send))]
+ pub trait Middleware: 'static + Send + Sync {
+     /// Invoked with a request before sending it. If you want to continue processing the request,
+     /// you should explicitly call `next.run(req, extensions)`.
+@@ -48,8 +48,8 @@
+     ) -> Result<Response>;
+ }
+ 
+-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
++#[cfg_attr(not(all(target_arch = "wasm32", target_os = "unknown")), async_trait::async_trait)]
++#[cfg_attr(all(target_arch = "wasm32", target_os = "unknown"), async_trait::async_trait(?Send))]
+ impl<F> Middleware for F
+ where
+     F: Send
+@@ -78,9 +78,9 @@
+     middlewares: &'a [Arc<dyn Middleware>],
+ }
+ 
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+-#[cfg(target_arch = "wasm32")]
++#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+ pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + 'a>>;
+ 
+ impl<'a> Next<'a> {

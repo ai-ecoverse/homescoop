@@ -312,9 +312,22 @@ byte-identical (path, type, mode, content) to the base, but for `files` and
 the patched files, and in
 `package.json` only `version`, `@ai-ecoverse/*` dependency versions (exact)
 and the recipe's `repack.fields` may differ. The report lands in `.homescoop-out/packaging-only-diff.txt`
-and the `host-<pkg>-prN` artifact. `refresh-recipe-sha.mjs` skips repack
-recipes. Drop `repack:` when the next release really rebuilds (a changed
-`homescoop.upstream` refuses to repack).
+and the `host-<pkg>-prN` artifact. ladder-pr's `recipe-sha` job runs
+`refresh-recipe-sha.mjs --verify-repack`. It checks a repack recipe's
+`source.sha256` against `source.url` but never rewrites it, because no build
+fetches a repack's source (#730); the build steps skip repacks.
+`scripts/recipe-sha-allowlist.txt` lists the known mismatches, each with its
+issue. An entry fails once its pins match, once its issue is closed, or once
+`scripts/cert-review/repack-input.mjs` finds the chain attested. Drop `repack:` when the next release really rebuilds (a changed
+`homescoop.upstream` refuses to repack). A repack is also refused when a build
+input changed since the version whose bytes it reuses was built
+(`scripts/repack-inputs.mjs`, #735). That check follows `repack.from` down to that
+version, and every file under `packages/<n>/` counts as an input except
+`package/`, `cert/`, `test/`, smoke files, `*.md` and the `repack.files` and
+`repack.patches` sources. `recipe.yaml`'s build fields count as inputs too. If a
+change really leaves the bytes alone, say so with `repack: inputs_changed: "<why>"`.
+Changes made before the check existed are pinned per file in
+`scripts/repack-inputs-allowlist.txt` (#832).
 
 Diff any tarball against a published version by hand:
 
@@ -334,6 +347,9 @@ node scripts/diff-published.mjs .homescoop-out/package.tgz @ai-ecoverse/wasix-uv
   ([homescoop#110](https://github.com/ai-ecoverse/homescoop/issues/110));
   prefer official `huggingface_hub` on wasix-python. Source kept for
   provenance.
+- `packages/uv-shim` — the `uv` shim over pip retired
+  ([homescoop#103](https://github.com/ai-ecoverse/homescoop/issues/103)) for
+  Astral's uv itself, `packages/wasi-uv`. Source kept for provenance.
 
 Cleanup commands for historical npm versions:
 

@@ -120,6 +120,16 @@ export default async function (ctx) {
 
 `run` accepts `{ cwd, env, stdin }`.
 
+### Files: `ctx.write(path, data)`, `ctx.read(path)`, `ctx.readBytes(path)`
+
+`write` takes a string (written as UTF-8) or bytes (a `Uint8Array`, `Buffer`,
+any typed-array view or an `ArrayBuffer`), which are written exactly. `read`
+returns the file decoded as UTF-8 text, so use it for text only: a binary
+file comes back damaged (#738). `readBytes` returns the file's exact bytes
+as a `Buffer`. Both return `null` for a missing file. Bytes cross to the
+page as base64; `scripts/browser-cert/selftest/binary.mjs` round-trips all
+256 byte values both ways (#591, #738).
+
 ### Terminal: `ctx.pty(argv, { cols, rows, env, cwd, steps, timeoutMs })`
 
 This runs `argv` as the session leader of a real pty (`kernel.openTerminal`; the kernel adds
@@ -170,6 +180,32 @@ of which still ship 0644 glue) or `--live`. `"glueByPath": false` in
 (0644 `bin/tar`) fails it on slicc-kernel 1.88.0 with
 `EACCES: /node_modules/@ai-ecoverse/wasm-tar/bin/tar`; 1.35.0-6 passes.
 
+A package whose cert kernel can't run it (before 1.86.0, or users not
+`enforce`) used to skip it in `ladder-pr` for good (#628). Now
+`cert-leg.mjs browser-extra`, run after the specs, runs
+`run.mjs --glue-only --users enforce` once more on the root `package.json`'s
+certified dev-pin kernel for such packages: only glue by path, no specs.
+
+### Extra kernels: `"extra_kernels"` in `cert/meta.json`
+
+A string entry is a note: a kernel the specs were checked on by hand.
+`ladder-pr` doesn't run it. An object entry is run by the cert leg (#663):
+
+```json
+{ "kernel": "@ai-ecoverse/slicc-kernel@1.90.0", "why": "slicc-kernel#568's linkat",
+  "specs": true, "env": { "TAR_LINKAT": "1" } }
+```
+
+- `specs`: `true` (every spec) or a list of spec file names, run in the
+  browser on `kernel` (`cert-leg.mjs browser-extra`, after the cert kernel's
+  run). `cert` names a subdirectory of `cert/` to take them from instead
+  (`"cert": "k108"`), and `users` overrides `meta.json`'s users.
+- `ci`: host commands, run after the top-level `ci` ones with
+  `HOMESCOOP_CERT_KERNEL=<kernel>` and `env` in their environment, so a
+  command passes it on itself (`--kernel "$HOMESCOOP_CERT_KERNEL"`).
+- `kernel` is an exact version and `why` is required; an entry that runs
+  nothing, an unknown key, or `specs` on a host harness fails the leg.
+
 ### Peers: `"peers"` in `cert/meta.json`
 
 `"peers": ["imagemagick", "imagemagick-heif"]` names other recipes whose
@@ -186,6 +222,41 @@ anything else fails the leg.
 ### Time per call: `"runTimeoutMs"` in `cert/meta.json`
 
 Each page call (`ctx.run`, `ctx.write`, …) has to answer within 120 s, or the spec fails with `Runtime.evaluate: no answer in … ms`. `"runTimeoutMs"` changes that for one package. The harness's own default was 30 s, which wasix-python's venv and pnpm-layout steps outgrew on slower CI runners.
+
+### Third-party notices: `"notices"` in `cert/meta.json`
+
+A package that bundles or statically links third-party code (OpenBLAS,
+FreeType, Qhull, pybind11, fonts, ...) lists each component with its SPDX
+license expression, and its cert gets a one-line spec
+([`notices.mjs`](../scripts/browser-cert/notices.mjs); homescoop#726):
+
+```json
+"notices": [
+  { "name": "OpenBLAS", "license": "BSD-3-Clause" },
+  { "name": "FreeType", "license": "FTL OR GPL-2.0-only" },
+  { "name": "BaKoMa fonts", "license": "LicenseRef-BaKoMa", "text": "BaKoMa Fonts Licence" }
+]
+```
+
+```js
+// packages/<name>/cert/notices.mjs
+import { noticesSpec } from '../../../scripts/browser-cert/notices.mjs';
+export default noticesSpec(import.meta.url);
+```
+
+The spec fails unless the installed package's `THIRD-PARTY-NOTICES.md` has,
+for each component, a `## ` heading naming it, the license named in that
+heading or on a `License: ...` line of the section (an SPDX id of the declared
+expression: one alternative of an `OR`, every part of an `AND`), and the
+license text itself (a phrase of it: `"text"`, or the built-in phrase for each
+SPDX id in `LICENSE_PHRASES`, taken from the license body so a one-line
+"Licensed under ..." reference does not pass; same `OR`/`AND` rule, `AND`
+binding tighter, parentheses grouping). An id with no
+built-in phrase (a `LicenseRef-*`) needs `"text"`. `homescoop_notice`
+([`build-common.sh`](../scripts/build-common.sh)) writes that shape:
+`homescoop_notice "FreeType 2.13.3 (FreeType License, FTL)" <LICENSE.TXT> - <FTL.TXT> -`.
+`scripts/test/notices.test.mjs` checks every `"notices"` list and that it has
+its spec. Add a checklist line for `cert/notices.mjs`.
 
 ### WebSockets: `ctx.serveWs(responder)`
 
@@ -632,5 +703,6 @@ Claude reviews every package a same-repo PR builds, after `ladder-pr` finishes, 
 - **When:** `workflow_run` on a completed `ladder-pr` run for a same-repo pull request (never a fork's), or `workflow_dispatch` with `pr_number`. The plan job (`CERT_LIGHT_RUNNER`) uses only the `ladder-pr` run at the PR's current head; a PR that has moved on waits for its new run.
 - **What Claude gets** (`CERT_RUNNER`): the head checked out, the `host-<package>-prN` tarballs from that run, a cert harness per package (`scripts/cert-review/harness.sh`, the same setup as `ladder-pr`'s cert job: the kernel from the head's `scripts/browser-cert/cert-kernel.mjs`, shared-web and playwright-core from its `package.json` pins through `scripts/dev-pin.mjs`, or the old inline versions for a head that predates them), `gh` to read `ladder-pr`'s logs, and `cert-run`, which runs package code without the Bedrock key or the GitHub token. It checks the change, re-runs specs on other kernels and under `--users enforce` as needed, and writes `verdict.json` (`certified` or `fail` per package, with known issues) and `comment.md`.
 - **The record:** a separate `record` job on a fresh runner, the only one with `statuses` and `pull-requests` write, takes Claude's `verdict.json` and `comment.md` as data, downloads the `ladder-pr` artifacts itself, and runs `scripts/cert-review/verdict.mjs` from the workflow's own commit, never the PR's. It computes each `certified=<sha256> <@scope/name> <version>` line from the artifact; Claude never writes a sha, and a `ladder-pr` run that didn't conclude `success` is never certified (`cert-ci: HELD`). The job posts the comment, uploads the `cert-review-record-<pr>` artifact (`record.json`: `pr`, `head`, `ladder_run`, `cert_review_run`, the result `lines`, and `no_cert_specs`: the packages with no `packages/<pkg>/cert/*.mjs` at the head, whose lines also say "no committed cert specs; this certification rests on the reviewer's own run"), and sets a `cert-review` commit status on the PR head whose `target_url` is that record artifact (`…/actions/runs/<run>/artifacts/<id>`): `success` only when every built package is certified. It is a status, not a check run, because a check run created through the API joins the commit's existing GitHub Actions check suite, `ladder-pr`'s.
+- **A repack's input must be attested** (cert lane rule, 2026-10-16, from #730). Before the verdict, the `record` job runs `scripts/cert-review/repack-input.mjs` on each built package. For a recipe with `repack: from:` it follows the chain back through the published versions (a version is a repack if the `recipe.yaml` in its tree has `repack:`) to the first version that was actually built, the root. Every version in the chain needs an npm provenance attestation for its own sha512 from `ai-ecoverse/homescoop`'s `ladder-build.yml` on `refs/heads/main`; the root also needs, in the tree at its attested commit, a `source.sha256` pin, a build that `homescoop_fetch`es that source (its sha argument is `$SRC_SHA`/`$SHA`, which `homescoop_load_recipe` exports from `source.sha256`, or the same literal; a fetch of something else doesn't count), and no way to stage a prebuilt artifact instead of compiling: no env-overridable `*_STAGE`, `*_WHEEL`, `*_PREBUILT`, `*_RELEASE_URL` or `*_ARTIFACT` input, no tree outside the repo (`$ROOT/..`), no download of homescoop's own releases. These rules read build.sh and every repo script it runs or sources, recursively (depth cap 8): `scripts/*.sh`, package-local helpers (`$HOMESCOOP_PKG/<x>.sh`, `$(dirname "$0")/<x>.sh`, `./<x>.sh`, `bash <x>.sh`); an explicit reference that isn't in the tree fails closed. That last rule is static because no run records which path it took. A root without provenance can still count through `--reproduced` (a matching `dist.integrity` from an independent rebuild). Otherwise `verdict.mjs` writes `cert-ci: INCOMPLETE <name>@<version>: unverifiable input: <reason>`, whatever the reviewer said, and the package isn't certified; a trace that couldn't run is INCOMPLETE too. The result is `repack-input.json` in the record artifact. Run it locally with `node scripts/cert-review/repack-input.mjs --package <recipe> [--ref <commit>]`.
 - **Live pairs:** before Claude starts, a step with no secrets starts two `run.mjs --live` harnesses per package under Xvfb, with users enforced on the `cert/meta.json` kernel: npm `latest` (the baseline, from 9300) and the PR's tarball (from 9301), listed in `$RUNNER_TEMP/live/live.json`. Claude runs the same thing on both: a failure the baseline shares is pre-existing, never blocks, and gets an issue filed.
 - **Severity:** roll forward. FAIL only for security or secret exposure, data loss, a supply-chain mismatch, a licence violation, a crash, or a regression without a workaround; anything else certifies with `(known: …)`.

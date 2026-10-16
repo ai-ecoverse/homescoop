@@ -12,8 +12,8 @@
  * version, not the one this package was certified with, and a global add
  * cannot override transitive versions. Pin the exact version that is `latest`
  * on npm and certified (docs/versioning.md). The one exception: an
- * @ai-ecoverse/py-* takes wasix-python, in dependencies only, as
- * `>=X.Y.Z-N <X.Y.Z+1` (pythonRange, rangeAllowed; homescoop#702).
+ * @ai-ecoverse/py-* takes wasix-python and other py-*, in dependencies only,
+ * as `>=X.Y.Z-N <X.Y.Z+1` (pythonRange, rangeAllowed; homescoop#702, #625).
  *
  * PENDING lists packages whose packaging-only re-release with exact pins is
  * still in flight (empty since py-matplotlib 3.11.2-3). They are reported,
@@ -54,7 +54,7 @@ export function inPythonRange(version, spec) {
 }
 
 export function rangeAllowed(pkg, field, dep, spec) {
-  return field === 'dependencies' && dep === PYTHON && typeof pkg.name === 'string' && pkg.name.startsWith(PY_SCOPE) && pythonRange(spec) !== null;
+  return field === 'dependencies' && (dep === PYTHON || dep.startsWith(PY_SCOPE)) && typeof pkg.name === 'string' && pkg.name.startsWith(PY_SCOPE) && pythonRange(spec) !== null;
 }
 
 /** Recipes (packages/<name>) still waiting for their exact-pin re-release. */

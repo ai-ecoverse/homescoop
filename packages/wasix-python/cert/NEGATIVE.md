@@ -1,5 +1,16 @@
 
 
+## 3.14.2-24: one binary, no fork, no sigwait (-25, homescoop#357, #520, #740)
+
+npm's 3.14.2-24 on slicc-kernel 1.110.0's Node entry, with wasm-bash, wasm-coreutils and py-numpy 2.3.2-10, 2026-10-16:
+- **`fork-hint.mjs`:** FAIL. `os.fork()` gives the stock `module 'os' has no attribute 'fork'`, and `get_context("fork")` gives `cannot find context for 'fork'`, with no word on how to get fork.
+- **`k859/fork.mjs`:** FAIL. -24 ships no `bin/python-fork.wasm` and no `variants`, so `PYTHON_FORK=true` still runs the build without fork, and `os.fork` raises `AttributeError`.
+- **`sigwait.mjs`:** FAIL. -24 is on wasix-sysroot -31, whose `sigwait` is ENOSYS.
+
+3.14.2-25 passes all three on 1.110.0. On 1.108.4 it passes every spec but `k859/fork.mjs`, which needs #859.
+
+`sigpipe.mjs` (slicc-kernel#810) and `startsignal.mjs` (slicc-kernel#755) pass with -24 on 1.110.0 as well. They are kernel fixes, and they guard against regressions in either.
+
 ## 3.14.2-21: python's sqlite3 locks with a .lock directory the CLI doesn't see (-22, homescoop#513)
 
 `locks.mjs` against the published 3.14.2-21 on slicc-kernel 1.100.0 (Node entry, with wasm-sqlite3 3.54.0-3 as the other process; 2026-10-16): FAIL in its sqlite part. -21's sqlite uses SQLITE_WASI's default `unix-dotfile` VFS, i.e. a `.lock` directory, so it never calls `fcntl` locks. While python holds `BEGIN IMMEDIATE`, the CLI's insert goes through, and python's `commit` then fails with `sqlite3.OperationalError: disk I/O error`. k3mw also saw python's row lost when the CLI held the lock. 3.14.2-22 (`-DSQLITE_DEFAULT_UNIX_VFS="unix"`) gets `database is locked` both ways and keeps rows [1, 2, 4]. Its `fcntl.lockf` part passes on -21 already.

@@ -28,6 +28,20 @@ homescoop_load_recipe() {
   fi
 }
 
+# Print a digest of every file under <dir> (sorted relative path + sha256),
+# for build-cache keys that must change when a vendored source changes.
+# Usage: homescoop_tree_digest <dir>
+homescoop_tree_digest() {
+  local dir="${1:?homescoop_tree_digest <dir>}" f
+  [[ -d "$dir" ]] || { echo "homescoop_tree_digest: not a directory: $dir" >&2; return 1; }
+  (
+    cd "$dir"
+    find . -type f -print0 | LC_ALL=C sort -z | while IFS= read -r -d '' f; do
+      printf '%s %s\n' "$(shasum -a 256 < "$f" | cut -c1-64)" "$f"
+    done
+  ) | shasum -a 256 | cut -c1-64
+}
+
 # Apply every packages/<name>/*.patch once into <srcdir>.
 homescoop_apply_patches() {
   local srcdir="${1:?}"
@@ -509,6 +523,12 @@ homescoop_notice_rust() {
       apache=62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a
       wasisdk=wasi-sdk-33
       ;;
+    1.99.0)
+      copyright=172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af
+      mit=b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1
+      apache=62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a
+      wasisdk=wasi-sdk-33
+      ;;
     *)
       echo "homescoop_notice_rust: no pinned licence sha256 for Rust $rust; add it to the table" >&2
       return 1
@@ -667,9 +687,13 @@ EOF
 # Host CPython must share wasix-python's magic (3.14.x). Last build step.
 # Usage: homescoop_compile_pyc <dir> [<dir>…]
 #   dirs = trees that contain .py (e.g. package/lib/python3.14/site-packages)
+# co_filename must not depend on the build directory (#568): a dir under
+# .../<pkg>/package/<rel> compiles with ddir /node_modules/@ai-ecoverse/<pkg>/<rel>
+# (the path it is imported from in slicc). Other dirs need HOMESCOOP_PYC_DDIR,
+# which names one dir's runtime path, so it takes a single <dir>.
 homescoop_compile_pyc() {
   local HOST_PY="${WASIX_PYTHON_HOST_PY:-}"
-  local root stale=0 py dir base pyc cand
+  local root stale=0 py dir base pyc cand abs ddir pkgdir rel
   if [[ -z "$HOST_PY" ]]; then
     if command -v python3.14 >/dev/null 2>&1; then
       HOST_PY=$(command -v python3.14)
@@ -681,14 +705,31 @@ homescoop_compile_pyc() {
     echo "homescoop_compile_pyc: need at least one directory" >&2
     return 1
   fi
+  # One override can only name one tree's runtime path.
+  if [[ -n "${HOMESCOOP_PYC_DDIR:-}" && $# -gt 1 ]]; then
+    echo "homescoop_compile_pyc: HOMESCOOP_PYC_DDIR applies to one directory; got $#" >&2
+    return 1
+  fi
   for root in "$@"; do
     if [[ ! -d "$root" ]]; then
       echo "homescoop_compile_pyc: not a directory: $root" >&2
       return 1
     fi
-    echo "== compileall (unchecked-hash): $root"
+    abs=$(cd "$root" && pwd -P)
+    if [[ -n "${HOMESCOOP_PYC_DDIR:-}" ]]; then
+      ddir=$HOMESCOOP_PYC_DDIR
+    elif [[ "$abs" == */package/* ]]; then
+      pkgdir=${abs%/package/*}
+      pkgdir=${pkgdir##*/}
+      rel=${abs##*/package/}
+      ddir="/node_modules/@ai-ecoverse/$pkgdir/$rel"
+    else
+      echo "homescoop_compile_pyc: $root is not under <pkg>/package/; set HOMESCOOP_PYC_DDIR" >&2
+      return 1
+    fi
+    echo "== compileall (unchecked-hash, ddir $ddir): $root"
     find "$root" -type d -name '__pycache__' -prune -exec rm -rf {} +
-    "$HOST_PY" -m compileall -q -j0 --invalidation-mode unchecked-hash -d "$root" "$root"
+    "$HOST_PY" -m compileall -q -j0 --invalidation-mode unchecked-hash -d "$ddir" "$root"
   done
   for root in "$@"; do
     while IFS= read -r -d '' py; do

@@ -56,7 +56,10 @@ about:
     static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline, libffi;
     zlib and OpenSSL from wasix-zlib / wasix-openssl), modules found by
     configure (patches/cpython-configure-wasix.patch), asyncify onlylist for
-    fork/posix_spawn, strip. No fork; subprocess via posix_spawn.
+    fork/posix_spawn, strip. No fork in bin/python.wasm; subprocess via
+    posix_spawn. Since 3.14.2-25 a second configure + make with fork
+    (HAVE_FORK, full asyncify) gives bin/python-fork.wasm, which
+    PYTHON_FORK=true selects (slicc.commands variants, homescoop#357).
     `_ctypes` is built with wasix-org/libffi (MIT); import / CDLL / CFUNCTYPE
     need slicc-kernel ≥ 1.51.0 (#306/#316: call_dynamic, closure_*,
     dlopen(NULL)/own path = main).
