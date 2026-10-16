@@ -62,3 +62,18 @@ test('a peer artifact of another version, other bytes or no sha256 fails closed'
     assert.throws(() => peerTarball('wasm-go-std-wasip1', { env: {}, base }), /has no package\.tgz\.sha256/);
   });
 });
+
+test('one matching artifact, which download-artifact unpacks straight into .homescoop-out/peers', () => {
+  fixture((base, art) => {
+    const tgz = art(base, '.homescoop-out/peers', good);
+    assert.equal(peerTarball('wasm-go-std-wasip1', { env: {}, base }), tgz);
+  });
+  fixture((base, art) => {
+    art(base, '.homescoop-out/peers', { name: '@ai-ecoverse/wasm-go', version: '1.27.2-1' });
+    assert.equal(peerTarball('wasm-go-std-wasip1', { env: {}, base }), '@ai-ecoverse/wasm-go-std-wasip1@1.27.2-1');
+  });
+  fixture((base, art) => {
+    art(base, '.homescoop-out/peers', { ...good, version: '1.26.5-1' });
+    assert.throws(() => peerTarball('wasm-go-std-wasip1', { env: {}, base }), /wants @ai-ecoverse\/wasm-go-std-wasip1@1\.27\.2-1/);
+  });
+});

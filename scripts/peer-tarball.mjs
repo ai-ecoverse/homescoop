@@ -21,6 +21,19 @@ function manifestOf(tgz) {
   return JSON.parse(r.stdout);
 }
 
+function checked(tgz, want, recipe) {
+  const sumFile = `${tgz}.sha256`;
+  if (!existsSync(sumFile)) throw new Error(`${tgz} has no package.tgz.sha256 beside it`);
+  const sum = readFileSync(sumFile, 'utf8').split(/\s/)[0];
+  const got = createHash('sha256').update(readFileSync(tgz)).digest('hex');
+  if (sum !== got) throw new Error(`${tgz} is ${got}, its package.tgz.sha256 says ${sum}`);
+  const m = manifestOf(tgz);
+  if (m.name !== want.name || m.version !== want.version) {
+    throw new Error(`${tgz} is ${m.name}@${m.version}, packages/${recipe} wants ${want.name}@${want.version}`);
+  }
+  return tgz;
+}
+
 export function peerTarball(recipe, { env = process.env, base = root } = {}) {
   const want = JSON.parse(readFileSync(join(base, 'packages', recipe, 'package/package.json'), 'utf8'));
   const art = new RegExp(`^host-${recipe.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-pr\\d+$`);
@@ -28,18 +41,10 @@ export function peerTarball(recipe, { env = process.env, base = root } = {}) {
     if (!existsSync(dir)) continue;
     for (const name of readdirSync(dir).filter((n) => art.test(n)).sort()) {
       const tgz = join(dir, name, 'package.tgz');
-      if (!existsSync(tgz)) continue;
-      const sumFile = `${tgz}.sha256`;
-      if (!existsSync(sumFile)) throw new Error(`${tgz} has no package.tgz.sha256 beside it`);
-      const sum = readFileSync(sumFile, 'utf8').split(/\s/)[0];
-      const got = createHash('sha256').update(readFileSync(tgz)).digest('hex');
-      if (sum !== got) throw new Error(`${tgz} is ${got}, its package.tgz.sha256 says ${sum}`);
-      const m = manifestOf(tgz);
-      if (m.name !== want.name || m.version !== want.version) {
-        throw new Error(`${tgz} is ${m.name}@${m.version}, packages/${recipe} wants ${want.name}@${want.version}`);
-      }
-      return tgz;
+      if (existsSync(tgz)) return checked(tgz, want, recipe);
     }
+    const flat = join(dir, 'package.tgz');
+    if (existsSync(flat) && manifestOf(flat).name === want.name) return checked(flat, want, recipe);
   }
   return `${want.name}@${want.version}`;
 }
