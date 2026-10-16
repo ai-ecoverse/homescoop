@@ -100,3 +100,10 @@ Against the published `@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-34-1 (npm
   7.1.2-34-1 configured with `CXXFLAGS="-g1 -O2"`, and utilities/magick is a
   C++ link, so emcc stripped the name section and the line tables. With
   `-g` (wasm-imagemagick's default) both stay.
+
+- relink-check's docs check (homescoop#564), on this PR's first build (the
+  kit list named the libraries by project, without `libslicc_cred.a`):
+
+  ```
+  Error: README.md, Relinking does not name libfreetype.a, libiconv.a, libjpeg.a, liblcms2.a, libopenjp2.a, libpng16.a, libsharpyuv.a, libslicc_cred.a, libtiff.a, libwebp.a, libwebpdemux.a, libwebpmux.a, libxml2.a, libz.a of the kit
+  ```

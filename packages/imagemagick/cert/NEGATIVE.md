@@ -68,3 +68,10 @@ Against the published `@ai-ecoverse/wasm-imagemagick` 7.1.2-34-1 (npm
   ```
   Error: ai-ecoverse-wasm-imagemagick-7.1.2-34-1.tgz has no share/imagemagick/relink/relink.sh (homescoop#395)
   ```
+
+- relink-check's docs check (homescoop#564), on this PR's first build
+  (README section "Licences and relinking (LGPL)", no `libslicc_cred.a`):
+
+  ```
+  Error: THIRD-PARTY-NOTICES.md cites README.md, Relinking, which has no such section
+  ```

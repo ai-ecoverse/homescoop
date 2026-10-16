@@ -77,19 +77,24 @@ MAGICK_CONFIGURE_PATH=/path/to/package/etc/ImageMagick-7-open magick ...
 
 The tab can still run out of memory without limits.
 
-## Licences and relinking (LGPL)
+## Licences
 
 `LICENSE` is ImageMagick's. `THIRD-PARTY-NOTICES.md` has the licences of the
 libraries `bin/magick.wasm` links statically, among them GNU libiconv 1.18
 (LGPL-2.1-or-later, through libxml2) and Emscripten's runtime.
 
+## Relinking (LGPL)
+
 `share/imagemagick/relink/` holds what you need to relink `magick` against
 your own libiconv (or any other of its libraries): magick's objects
 (`magick.a`, `libMagickCore-7.Q16HDRI.a`, `libMagickWand-7.Q16HDRI.a`), the
-static libraries it links (lcms2, tiff, jpeg, freetype, png, zlib, webp with
-sharpyuv, openjpeg, libxml2, libiconv and `libslicc-cli.a`), the slicc link
-flags (`ldflags.txt`, `js/`) and `relink.sh`. A library in the directory you
-pass replaces the kit's copy of the same name. With Emscripten 4.0.23:
+static libraries it links (`liblcms2.a`, `libtiff.a`, `libjpeg.a`,
+`libfreetype.a`, `libpng16.a`, `libz.a`, `libwebpmux.a`, `libwebpdemux.a`,
+`libwebp.a`, `libsharpyuv.a`, `libopenjp2.a`, `libxml2.a`, `libiconv.a`, the
+slicc shims `libslicc-cli.a` and `libslicc_cred.a`), the link flags
+(`ldflags.txt`, with the `--js-library` files in `js/`) and `relink.sh`. A
+library in the directory you pass replaces the kit's copy of the same name.
+With Emscripten 4.0.23:
 
 ```bash
 cd node_modules/@ai-ecoverse/wasm-imagemagick

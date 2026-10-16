@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Small wasm helpers for the relink checks of imagemagick and imagemagick-heif.
@@ -68,4 +68,24 @@ export function checkKitFlags(kit) {
   const missing = files.filter((f) => !existsSync(join(kit, f)));
   if (missing.length) throw new Error(`relink kit lacks ${missing.join(', ')}, which its ldflags.txt names`);
   return js;
+}
+
+/**
+ * Throws unless the package docs match the kit (homescoop#564): the README
+ * section that THIRD-PARTY-NOTICES.md cites ("README.md, Relinking") exists,
+ * and it names every static library in the kit.
+ */
+export function checkKitDocs(pkg, kit) {
+  const readme = readFileSync(join(pkg, 'README.md'), 'utf8');
+  const notices = readFileSync(join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8');
+  const cited = (notices.match(/README\.md, ([A-Z][A-Za-z]+)/) ?? [])[1];
+  if (!cited) throw new Error('THIRD-PARTY-NOTICES.md does not point to a README.md section');
+  const at = readme.search(new RegExp(`^## ${cited}\\b`, 'm'));
+  if (at < 0) throw new Error(`THIRD-PARTY-NOTICES.md cites README.md, ${cited}, which has no such section`);
+  const next = readme.slice(at + 3).search(/^## /m);
+  const section = next < 0 ? readme.slice(at) : readme.slice(at, at + 3 + next);
+  const libs = readdirSync(kit).filter((f) => f.endsWith('.a'));
+  const unnamed = libs.filter((f) => !section.includes(`\`${f}\``));
+  if (unnamed.length) throw new Error(`README.md, ${cited} does not name ${unnamed.join(', ')} of the kit`);
+  return { cited, libs: libs.length };
 }

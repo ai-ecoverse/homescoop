@@ -105,9 +105,11 @@ The libheif, libde265 and dav1d builds are the ones in
 `share/imagemagick-heif/relink/` holds what you need to relink `magick`
 against your own libheif or libde265: magick's objects (`magick.a`,
 `libMagickCore-7.Q16HDRI.a`, `libMagickWand-7.Q16HDRI.a`), the other static
-libraries (lcms2, tiff, jpeg, freetype, png, zlib, webp with sharpyuv,
-openjpeg, libxml2, libiconv and `libslicc-cli.a`), the slicc link flags (`ldflags.txt`,
-`js/`) and `relink.sh`. libheif, libde265 and dav1d themselves come from
+libraries (`liblcms2.a`, `libtiff.a`, `libjpeg.a`, `libfreetype.a`,
+`libpng16.a`, `libz.a`, `libwebpmux.a`, `libwebpdemux.a`, `libwebp.a`,
+`libsharpyuv.a`, `libopenjp2.a`, `libxml2.a`, `libiconv.a`, the slicc shims
+`libslicc-cli.a` and `libslicc_cred.a`), the link flags (`ldflags.txt`, with
+the `--js-library` files in `js/`) and `relink.sh`. libheif, libde265 and dav1d themselves come from
 `@ai-ecoverse/wasm-libheif` (its `lib/`) or from your own build. With
 Emscripten 4.0.23:
 
