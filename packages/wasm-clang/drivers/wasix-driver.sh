@@ -48,9 +48,31 @@ rdynamic=0
 pie=0
 out=
 prev=
+# no_output: a call that compiles or prints but writes no program, so there
+# is nothing to post-link (homescoop#710). link_inputs: the inputs a link
+# would read (sources, objects, archives, response files; not headers, not
+# option values); without any, the driver adds no link libraries, so
+# `cc -v` doesn't run a link of nothing over an a.out (homescoop#711).
+no_output=0
+link_inputs=0
+takes_value=0
 for a in "$@"; do
+  if [ "$takes_value" -eq 1 ]; then
+    takes_value=0
+  else
+    case "$a" in
+      -o | -I | -L | -D | -U | -x | -MF | -MT | -MQ | -include | -imacros | -isystem | -idirafter | -iquote | \
+        -isysroot | --sysroot | -target | -arch | -Xlinker | -Xclang | -Xassembler | -Xpreprocessor | -mllvm | -z | -u | -e)
+        takes_value=1 ;;
+      -) link_inputs=1 ;;
+      -*) ;;
+      *.h | *.hh | *.hpp | *.hxx | *.H | *.h++) ;;
+      *) link_inputs=1 ;;
+    esac
+  fi
   case "$a" in
     -c|-E|-S|-M|-MM) compile_only=1 ;;
+    -fsyntax-only | '-###' | --analyze | -emit-ast | -fdriver-only) no_output=1 ;;
     -shared) shared=1; PIC=yes ;;
     -fPIC|-fpic) PIC=yes ;;
     -rdynamic|-Wl,-rdynamic) rdynamic=1; PIC=yes ;;
@@ -60,9 +82,11 @@ for a in "$@"; do
   if [ "$prev" = "-o" ]; then
     out=$a
   else
-    # The joined form, -oFILE (not clang's -objc* / -object* options).
+    # The joined form, -oFILE (but clang's own -objcmt-*, -object and
+    # -object-file-name= options). A linker -o (-Wl,-o,FILE) doesn't count:
+    # clang passes its own -o after it, so the program is still a.out.
     case "$a" in
-      -objc* | -object*) ;;
+      -objcmt-* | -object | -object-file-name=*) ;;
       -o?*) out=${a#-o} ;;
     esac
   fi
@@ -171,7 +195,7 @@ trap 'rm -f "$rsp"' EXIT
     printf '%s\n' "$a"
   done
 
-  if [ "$compile_only" -eq 0 ]; then
+  if [ "$compile_only" -eq 0 ] && [ "$link_inputs" -eq 1 ]; then
     # Shared side module: no libc (resolve against the PIE main at dlopen).
     if [ "$shared" -eq 1 ]; then
       printf '%s\n' \
@@ -319,20 +343,17 @@ wasix_imports_fork() {
 }
 
 # A link without -o writes a.out, as clang does (homescoop#692: until
-# 24.0.0-16 such a link skipped the Asyncify step). Only for a real link of
-# sources or objects, so `cc --version` never touches an old a.out.
-if [ -z "$out" ] && [ "$compile_only" -eq 0 ]; then
-  links=$has_src
-  for a in "$@"; do
-    case "$a" in *.o | *.a | *.lo | *.obj) links=1 ;; esac
-  done
-  [ "$links" -eq 1 ] && out=a.out
+# 24.0.0-16 such a link skipped the Asyncify step). Only for a real link
+# (link inputs, not -fsyntax-only / -### and the like: #710), so `cc
+# --version` or `cc -fsyntax-only x.c` never touches an old a.out.
+if [ -z "$out" ] && [ "$compile_only" -eq 0 ] && [ "$no_output" -eq 0 ] && [ "$link_inputs" -eq 1 ]; then
+  out=a.out
 fi
 
 # Post-link Asyncify when the module needs host-driven fork / stack_checkpoint
 # (SLICC realm) or when exceptions=off (wasixcc setjmp path).
 # WASIXCC_ASYNCIFY=1 forces it, WASIXCC_ASYNCIFY=0 skips it.
-if [ "$compile_only" -eq 0 ] && [ "$shared" -eq 0 ] && [ -n "$out" ] && [ -f "$out" ]; then
+if [ "$compile_only" -eq 0 ] && [ "$no_output" -eq 0 ] && [ "$shared" -eq 0 ] && [ -n "$out" ] && [ -f "$out" ]; then
   chmod +x "$out" 2>/dev/null || true
   need_asyncify=0
   case "${WASIXCC_ASYNCIFY:-}:$EXCEPTIONS" in

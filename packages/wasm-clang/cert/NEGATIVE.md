@@ -14,3 +14,7 @@
 ## 24.0.0-16: a.out and -oFILE (homescoop#692, 2026-10-16)
 
 `run-cc.mjs` (flat, R28) against the published 24.0.0-15: FAIL, `wasixcc -O2 r28.c → a.out: asyncify no`. The driver took the output path only from a separate `-o FILE`, so a link without `-o`, or with the joined `-oFILE`, skipped the whole post-link step, the import check and `WASIXCC_ASYNCIFY` included. 24.0.0-16 asyncifies both, and `WASIXCC_ASYNCIFY=0` still skips the step.
+
+## 24.0.0-17: calls that write no program (homescoop#710, #711; 2026-10-16)
+
+`run-cc.mjs` (flat, R28) against the published 24.0.0-16: FAIL with `wasixcc -v next to an asyncified a.out: rc=1`. The driver added its link libraries to every call that wasn't compile-only, so `-v` with no inputs ran a link of nothing, and the failed link removed the a.out (#711, the same on -15). With `-v` left out it fails again, at `wasixcc -fsyntax-only r18.c next to an asyncified a.out: rc=1`: -16's a.out default ran the Asyncify step over the old a.out (`asyncify_start_unwind already exists`, #710). 24.0.0-17 adds link libraries only when there are link inputs, and post-links only real links. `--version`, `-v`, `-fsyntax-only`, `-###` and a header-only input all exit 0 and leave an asyncified a.out and a non-wasm one unchanged.
