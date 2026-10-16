@@ -138,8 +138,8 @@ CONF_CACHE=(
   ac_cv_func_endutent=no
   ac_cv_func_getutent=no
   ac_cv_func_openpty=yes
-  # Headers may declare ppoll/getifaddrs/madvise; wasix-libc does not link them.
-  ac_cv_func_ppoll=no
+  # Headers may declare getifaddrs/madvise; wasix-libc does not link them.
+  ac_cv_func_ppoll=yes
   ac_cv_func_poll=yes
   ac_cv_func_getifaddrs=no
   ac_cv_func_madvise=no
@@ -192,7 +192,7 @@ CONF_CACHE=(
     RANLIB=llvm-ranlib \
     STRIP=llvm-strip \
     CFLAGS="-O2 $SSL_CFLAGS $Z_CFLAGS" \
-    CPPFLAGS="$SSL_CFLAGS $Z_CFLAGS -Dppoll=homescoop_compat_ppoll" \
+    CPPFLAGS="$SSL_CFLAGS $Z_CFLAGS" \
     LDFLAGS="-Wl,--fatal-warnings $SSL_LIBS $Z_LIBS" \
     LIBS="$SSL_LIBS $Z_LIBS" \
     >"$BUILD/$GDIR.configure.log" 2>&1 || {
@@ -215,7 +215,7 @@ CONF_CACHE=(
     fi
   done
   # Belt-and-braces: never compile SCM_RIGHTS paths on WASIX.
-  for def in HAVE_CONTROL_IN_MSGHDR HAVE_ACCRIGHTS_IN_MSGHDR HAVE_PPOLL HAVE_IFADDRS_H HAVE_GETIFADDRS MADV_DONTDUMP; do
+  for def in HAVE_CONTROL_IN_MSGHDR HAVE_ACCRIGHTS_IN_MSGHDR HAVE_IFADDRS_H HAVE_GETIFADDRS MADV_DONTDUMP; do
     if grep -qE "^#define ${def}(\s|\$)" config.h 2>/dev/null; then
       sed -i.bak "s|^#define ${def}.*$|/* #undef ${def} */|" config.h
       echo "== config.h: undef ${def}"
