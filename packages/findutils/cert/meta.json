@@ -1,13 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.17.4",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+    "@ai-ecoverse/wasm-bash@5.3.0-18",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-7"
   ],
   "checklist": [
     "find -name / -type d over a small tree",
@@ -18,9 +18,11 @@
     "xargs batching, -n1, -I{}",
     "xargs -P4 over 8 jobs: all run, xargs waits",
     "xargs with a failing command → 123",
-    "find --version reports 4.11.0"
+    "find --version reports 4.11.0",
+    "users (users enforce, 4.11.0-2, homescoop#459): find.wasm and xargs.wasm link the slicc credential library (import slicc_cred_js, export slicc_cred_euid, the glue names slicc_cred_js: scripts/check-slicc-cred.mjs in host-run.sh) and slicc_pwd; in a directory with a root file r (0:0) and c chowned 1000:1000: as root, find -user root and -uid 0 give ./r, -user cone and -group 1000 give ./c, -printf '%u:%g %U:%G' gives root:root 0:0 and cone:cone 1000:1000, -nouser nothing; as cone, -user cone gives ./c and -user root ./r. 4.11.0-1: -user root and -user cone fail ('invalid user name or UID argument'), -printf names are numbers, -nouser lists both (NEGATIVE.md)"
   ],
   "patches": {
     "gnulib-emscripten-locale.patch": "gnulib getlocalename_l-unsafe.c needs langinfo on emscripten; the build fails without it (same patch as coreutils, path gl/lib/)"
-  }
+  },
+  "users": "enforce"
 }
