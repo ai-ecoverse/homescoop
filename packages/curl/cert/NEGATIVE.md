@@ -61,3 +61,15 @@ homescoop: bin/curl.wasm (an Emscripten command) lacks the slicc credential libr
 ```
 
 8.22.0-5 builds with `CMAKE_C_FLAGS_RELEASE=-DNDEBUG`, so it compiles and links at `-O2`. Its wasm exports `slicc_sig_mask`, `slicc_raise`, `slicc_sigpipe` and `slicc_cred_euid`, and imports `slicc_cred_js` and the net shims' `slicc_socket_js`, `slicc_poll_js` and the rest.
+
+## users.mjs (users enforce, #723)
+
+**Date:** 2026-10-16, slicc-kernel 1.102.6 `--users enforce`.
+
+- `prove-negative.mjs --package curl --spec users.mjs --users enforce` → FAIL
+  (`WebAssembly.compile(): BufferSource argument is empty`).
+- The npm build without the credential library (curl 8.22.0-4, qpdf
+  12.4.2-1) passes users.mjs on 1.102.6 too: the kernel refuses the opens
+  and stamps the creator's ids itself. The spec guards the behaviour as a
+  non-root user; host-run's `check-slicc-cred.mjs` guards the link. That
+  build fails glue-by-path (0644 glue, `EACCES`).
