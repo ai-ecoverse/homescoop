@@ -37,6 +37,20 @@ fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
+## 3.4.11-16: the engines floor, and bundle exec
+
+The `engines` floor (slicc-kernel ≥ 1.100.0, below) is enforced from
+slicc-kernel 1.106.2 on: its command catalog refuses a package whose
+`engines.slicc-kernel` the running kernel doesn't meet
+(ai-ecoverse/slicc-kernel#797). Older kernels install the package without a
+warning, and there `fcntl` record locks aren't real: use slicc-kernel ≥
+1.100.0 (homescoop#651).
+
+From slicc-kernel 1.106.2 the commands' `/usr/bin` entries are real files
+(slicc-kernel#762), so `bundle exec ruby …` no longer warns
+`/usr/bin/ruby is empty` (homescoop#379). Older kernels print that warning,
+and the command still runs.
+
 ## 3.4.11-15: needs slicc-kernel ≥ 1.100.0
 
 A packaging-only release of 3.4.11-14 (the same files): `engines` now asks

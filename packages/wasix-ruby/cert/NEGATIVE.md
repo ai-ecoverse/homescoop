@@ -22,3 +22,7 @@
 ## 3.4.11-15: the engines floor (homescoop#552)
 
 `locks.mjs` against the published 3.4.11-14 on slicc-kernel 1.100.3's Node entry, 2026-10-16: FAIL at `engines.slicc-kernel is >=1.100.0 … : >=1.44.0`. -14 admitted kernels without `slicc.fcntl_lock`, where every lock is granted locally. With -15's manifest over the same files, the spec passes (real locks: child EAGAIN, F_SETLKW waited). The spec has no local-answer branch any more, so it also fails on a kernel before 1.100.0.
+
+## bundle exec (homescoop#379, 2026-10-16)
+
+`cert/bundle-exec.mjs` with the published 3.4.11-15 on slicc-kernel 1.100.3: FAIL, rc 1, because `/usr/bin/ruby` is a 0-byte command entry (slicc-kernel#762) and every `bundle exec ruby` warns `/usr/bin/ruby is empty`. On 1.106.2, the cert kernel now, the same binary passes, as does 3.4.11-16 (a packaging-only README release) with all twelve specs. The fix is the kernel's; the spec pins it.
