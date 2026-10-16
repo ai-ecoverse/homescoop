@@ -73,8 +73,6 @@ xz Emscripten #684
 xz files #684
 zip Emscripten #684
 zip files #684
-wasix-m4 wasix-libc #713
-wasix-m4 files #713
 py-contourpy pybind11 #797
 py-contourpy files #797
 py-kiwisolver cppy #815
