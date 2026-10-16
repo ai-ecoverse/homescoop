@@ -61,3 +61,10 @@ with "fork system call failed".
 ## 9.12.0-7: negative 9.12.0-6 (uname import, emsdk paths)
 
 `uname.mjs` on published 9.12.0-6: coreutils.wasm has no `env.__syscall_uname` import (Emscripten's weak C stub answers inside the wasm, so no kernel can), and its debug strings name `/home/runner/.cache/emsdk/0.4.0/install/...`.
+
+## uname.mjs's Linux branch (homescoop#425)
+
+Until 2026-10-16 the cert kernel was 1.88.0, which doesn't answer `env.__syscall_uname`, so CI only ran the fallback branch. The cert kernel is now 1.100.4 (slicc-kernel answers the import from 1.98.0 on, #701), and the spec reads the kernel version from `/proc/version`: on a kernel >= 1.98.0 it requires the Linux branch. Runs of `run.mjs --spec uname.mjs`, 2026-10-16:
+
+- published 9.12.0-7 on 1.100.4 and on 1.98.0: pass, `Linux slicc 6.0.0-slicc #1 SMP PREEMPT_DYNAMIC wasm32 Emscripten`. On 1.88.0 it takes the fallback branch and passes, `Emscripten emscripten 4.0.23 #1 wasm32 Emscripten`.
+- published 9.12.0-6 on 1.100.4: FAIL at the first assertion, `coreutils.wasm does not import env.__syscall_uname, so no kernel can answer uname()`. With the three tarball checks switched off, the run still fails: `uname -s is Emscripten on slicc-kernel 1.100.4, which answers env.__syscall_uname (>= 1.98.0): Emscripten`.
