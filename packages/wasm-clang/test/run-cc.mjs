@@ -250,6 +250,28 @@ try {
     if (expect === 'current') assert.equal(marker, `wasix-sysroot ${sysVer}`, `${n}.wasm slicc.libc marker`);
     else assert.equal(marker, undefined, `${n}.wasm: a pre -22 libc has no slicc.libc marker`);
   }
+  if (expect === 'current' && names.includes('r28') && binaryen) {
+    // homescoop#692: a link without -o (a.out) and the joined -oFILE get the
+    // same Asyncify step as -o FILE; WASIXCC_ASYNCIFY=0 skips it.
+    const variants = [
+      [['-O2', 'r28.c'], 'a.out', true, {}],
+      [['-O2', 'r28.c', '-or28j.wasm'], 'r28j.wasm', true, {}],
+      [['-O2', 'r28.c', '-o', 'r28n.wasm'], 'r28n.wasm', false, { WASIXCC_ASYNCIFY: '0' }],
+    ];
+    for (const [argv, file, want, env] of variants) {
+      const r = await run(['wasixcc', ...argv], { cwd: '/home/cc', env: { ...ccEnv, ...env } });
+      assert.equal(r.status, 0, `wasixcc ${argv.join(' ')}: rc=${r.status}\n${r.stdout}${r.stderr}`);
+      const mod = new WebAssembly.Module(Buffer.from(await k.readFile(`/home/cc/${file}`)));
+      const got = WebAssembly.Module.exports(mod).some((e) => e.name === 'asyncify_start_unwind');
+      assert.equal(got, want, `wasixcc ${argv.join(' ')}${env.WASIXCC_ASYNCIFY ? ` (WASIXCC_ASYNCIFY=${env.WASIXCC_ASYNCIFY})` : ''} → ${file}: asyncify ${got ? 'yes' : 'no'}`);
+    }
+    const before = createHash('sha256').update(Buffer.from(await k.readFile('/home/cc/a.out'))).digest('hex');
+    const v = await run(['wasixcc', '--version'], { cwd: '/home/cc', env: ccEnv });
+    assert.equal(v.status, 0, `wasixcc --version next to an a.out: ${v.stderr}`);
+    const after = createHash('sha256').update(Buffer.from(await k.readFile('/home/cc/a.out'))).digest('hex');
+    assert.equal(after, before, 'wasixcc --version rewrote the a.out beside it');
+    console.log('== r28 as a.out and with -or28j.wasm: asyncified; WASIXCC_ASYNCIFY=0: not; wasixcc --version leaves the a.out alone');
+  }
   await k.writeFile(`${PROBES_AT}/package.json`, JSON.stringify({
     name: 'wasm-clang-cc-probes',
     version: '0.0.0',

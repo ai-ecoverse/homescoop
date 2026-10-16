@@ -12,7 +12,8 @@ source:
 # Asyncify check reads the import section with od, no grep: homescoop#451)
 # and glue-node-runner.patch (the glue's Node-host runner stays out of
 # slicc-kernel's Node process worker: homescoop#276). build.sh applies both
-# at the next real build.
+# at the next real build. 24.0.0-16: the driver's Asyncify step also covers a
+# link without -o (a.out) and -oFILE (homescoop#692).
 repack:
   from: "24.0.0-11"
   files:
