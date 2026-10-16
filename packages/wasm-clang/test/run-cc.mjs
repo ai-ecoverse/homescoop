@@ -269,11 +269,14 @@ try {
       // Response files with quotes and nesting, as clang reads them.
       [['-O2', '@q.rsp'], 'sp ace.wasm', true, {}],
       [['-O2', '@outer.rsp'], 'nest.wasm', true, {}],
+      // Braces and ~ in a response file are clang's literal names (#755).
+      [['-O2', '@brace.rsp'], 'br{a,b}.wasm', true, {}],
     ];
     await k.writeFile('/home/cc/r28h.h', await k.readFile('/home/cc/r28.c'));
     await k.writeFile('/home/cc/q.rsp', 'r28.c -o "sp ace.wasm"\n');
     await k.writeFile('/home/cc/outer.rsp', '@inner.rsp\n');
     await k.writeFile('/home/cc/inner.rsp', 'r28.c\n-o nest.wasm\n');
+    await k.writeFile('/home/cc/brace.rsp', 'r28.c -o br{a,b}.wasm\n');
     for (const [argv, file, want, env] of variants) {
       const r = await run(['wasixcc', ...argv], { cwd: '/home/cc', env: { ...ccEnv, ...env } });
       assert.equal(r.status, 0, `wasixcc ${argv.join(' ')}: rc=${r.status}\n${r.stdout}${r.stderr}`);
@@ -306,6 +309,12 @@ try {
         assert.equal(await aout(), before, `wasixcc ${argv.join(' ')} changed or removed the ${content ? 'non-wasm' : 'asyncified'} a.out beside it`);
       }
     }
+    // A failed compile next to an existing output leaves no marker file (#754).
+    await k.writeFile('/home/cc/bad.c', 'int main(void) { return }\n');
+    const bad = await run(['wasixcc', '-O2', 'bad.c', '-o', 'r28n.wasm'], { cwd: '/home/cc', env: ccEnv });
+    assert.notEqual(bad.status, 0, `wasixcc bad.c: ${bad.stdout}${bad.stderr}`);
+    const left = await run(['bash', '-c', 'set -- /tmp/wasix-out.*; [ -e "$1" ] && echo "$#" || echo 0'], { cwd: '/home/cc' });
+    assert.equal(left.stdout.trim(), '0', `marker files left in /tmp after a failed compile: ${left.stdout}${left.stderr}`);
     const rsp = new WebAssembly.Module(Buffer.from(await k.readFile('/home/cc/r28r.wasm')));
     assert.ok(WebAssembly.Module.exports(rsp).some((e) => e.name === 'asyncify_start_unwind'), 'wasixcc -O2 @args.rsp (r28.c -o r28r.wasm): r28r.wasm is not asyncified');
     const pch = await run(['bash', '-c', 'test -s x.pch && { test -x x.pch && echo executable || echo plain; }'], { cwd: '/home/cc' });
