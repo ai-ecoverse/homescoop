@@ -82,6 +82,15 @@
       ],
       "issue": "ai-ecoverse/homescoop#346",
       "why": "1.35.0-5 ships bin/tar (the glue) 0644, so with the tarball's modes (slicc-kernel >= 1.86.0) cone can't run it by path under enforce (126); 1.35.0-6 ships it 0755. Kernels before 1.86.0 have no kernel.chmod, so the harness leaves bin/ at the default 0755 and the reference passes"
+    },
+    {
+      "package": "@ai-ecoverse/wasix-perl",
+      "spec": "wasm-mode.mjs",
+      "case": "bin/perl\\.wasm mode",
+      "kernel": ">=1.86.0",
+      "version": "<5.42.0-12",
+      "issue": "ai-ecoverse/homescoop#383",
+      "why": "5.42.0-11 ships bin/perl.wasm 0644, so with the tarball's modes (slicc-kernel >= 1.86.0) the spec sees 644; 5.42.0-12 ships it 0755. Kernels before 1.86.0 have no kernel.chmod, so the harness leaves bin/ at the default 0755 and the reference passes. Lapses when bios pins perl -12"
     }
   ]
 }
