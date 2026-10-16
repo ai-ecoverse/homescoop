@@ -5,6 +5,7 @@
 # - pwd-test against `cli` (slicc_pwd.c, linked with --wrap);
 # - cred-test against `cli` (process credentials, slicc-kernel K1);
 # - selfkill-test against `cli` (raise/kill of the program itself);
+# - rlimit-test against `cli` (setrlimit/getrlimit/prlimit, homescoop#178);
 # - exec-test against `cli` (most packages) and exec-test-fork against
 #   `fork` (bash, tar, findutils: fork emulation + Asyncify).
 set -euo pipefail
@@ -63,6 +64,12 @@ emcc -O2 -Wall -Wextra -Werror "$HERE/uname-test.c" \
   -o "$OUT/uname-test.js"
 mv "$OUT/uname-test.js" "$OUT/uname-test"
 echo "== built $OUT/uname-test"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/rlimit-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_em_cli_ldflags) \
+  -o "$OUT/rlimit-test.js"
+mv "$OUT/rlimit-test.js" "$OUT/rlimit-test"
+echo "== built $OUT/rlimit-test"
 
 SLICC_FORK="$WORK/libslicc-fork.a"
 homescoop_slicc_archive "$SLICC_FORK" fork
