@@ -27,7 +27,7 @@ jobs:
         github.event.workflow_run.conclusion != 'cancelled' &&
         github.event.workflow_run.head_repository.full_name == github.repository
       )
-    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'cloud-run' }}
+    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 150
     permissions:
       actions: read
@@ -128,7 +128,7 @@ jobs:
     name: cert-review / review
     needs: plan
     if: needs.plan.outputs.go == 'true'
-    runs-on: ${{ vars.CERT_RUNNER || 'cloud-run-bench' }}
+    runs-on: ${{ vars.CERT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 240
     concurrency:
       group: cert-review-${{ needs.plan.outputs.number }}
@@ -330,7 +330,7 @@ jobs:
     name: cert-review / record
     needs: [plan, review]
     if: always() && needs.plan.outputs.go == 'true' && needs.review.result != 'cancelled'
-    runs-on: ${{ vars.CERT_RUNNER || 'cloud-run-bench' }}
+    runs-on: ${{ vars.CERT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     concurrency:
       group: cert-review-record-${{ needs.plan.outputs.number }}
