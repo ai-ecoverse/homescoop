@@ -18,3 +18,7 @@
 ## 24.0.0-17: calls that write no program (homescoop#710, #711; 2026-10-16)
 
 `run-cc.mjs` (flat, R28) against the published 24.0.0-16: FAIL with `wasixcc -v next to an asyncified a.out: rc=1`. The driver added its link libraries to every call that wasn't compile-only, so `-v` with no inputs ran a link of nothing, and the failed link removed the a.out (#711, the same on -15). With `-v` left out it fails again, at `wasixcc -fsyntax-only r18.c next to an asyncified a.out: rc=1`: -16's a.out default ran the Asyncify step over the old a.out (`asyncify_start_unwind already exists`, #710). 24.0.0-17 adds link libraries only when there are link inputs, and post-links only real links. `--version`, `-v`, `-fsyntax-only`, `-###` and a header-only input all exit 0 and leave an asyncified a.out and a non-wasm one unchanged.
+
+## 24.0.0-18: response files, PCHs, -Xlinker -o (homescoop#721, #722; 2026-10-16)
+
+`run-cc.mjs` (flat, R28) against the published 24.0.0-17: FAIL with `wasixcc -O2 r28.c -Xlinker -o -Xlinker xl.wasm → a.out: asyncify no`, because the driver took the `-Xlinker` that follows the linker's `-o` as the output. With that case left out it fails again, at `wasixcc -v -B /tmp next to an asyncified a.out: rc=1`: the `-B` value counted as a link input, so `-v` ran a link of nothing that removed the a.out (#711). #721's and #722's own repros (`cc @rsp` with the `-o` inside the response file, and `cc -x c-header x.h -o x.pch`) are in the same block. 24.0.0-18 passes all of them.

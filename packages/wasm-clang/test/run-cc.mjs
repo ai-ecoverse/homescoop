@@ -258,6 +258,8 @@ try {
       [['-O2', 'r28.c', '-or28j.wasm'], 'r28j.wasm', true, {}],
       // clang passes its own -o after -Wl,-o,FILE, so the program is a.out.
       [['-O2', 'r28.c', '-Wl,-o,r28l.wasm'], 'a.out', true, {}],
+      // -Xlinker -o is the linker's, not the program's (homescoop#722).
+      [['-O2', 'r28.c', '-Xlinker', '-o', '-Xlinker', 'xl.wasm'], 'a.out', true, {}],
       [['-O2', 'r28.c', '-o', 'r28n.wasm'], 'r28n.wasm', false, { WASIXCC_ASYNCIFY: '0' }],
     ];
     for (const [argv, file, want, env] of variants) {
@@ -277,7 +279,11 @@ try {
         return 'missing';
       }
     };
-    const nonLinks = [['--version'], ['-v'], ['-fsyntax-only', 'r18.c'], ['-###', 'r18.c'], ['x.h']];
+    // A response file whose -o the program goes to (homescoop#721), a PCH
+    // (#722) and -v with an option value (#711).
+    await k.writeFile('/home/cc/args.rsp', 'r28.c -o r28r.wasm\n');
+    const nonLinks = [['--version'], ['-v'], ['-v', '-B', '/tmp'], ['-fsyntax-only', 'r18.c'], ['-###', 'r18.c'], ['x.h'],
+      ['-x', 'c-header', 'x.h', '-o', 'x.pch'], ['-O2', '@args.rsp']];
     for (const content of [undefined, '#!/bin/sh\necho not wasm\n']) {
       if (content) await k.writeFile('/home/cc/a.out', content);
       const before = await aout();
@@ -287,7 +293,11 @@ try {
         assert.equal(await aout(), before, `wasixcc ${argv.join(' ')} changed or removed the ${content ? 'non-wasm' : 'asyncified'} a.out beside it`);
       }
     }
-    console.log(`== r28 as a.out (also with -Wl,-o,r28l.wasm, which clang's own -o overrides) and with -or28j.wasm: asyncified; WASIXCC_ASYNCIFY=0: not; ${nonLinks.map((a) => a.join(' ')).join(', ')} leave an asyncified and a non-wasm a.out alone`);
+    const rsp = new WebAssembly.Module(Buffer.from(await k.readFile('/home/cc/r28r.wasm')));
+    assert.ok(WebAssembly.Module.exports(rsp).some((e) => e.name === 'asyncify_start_unwind'), 'wasixcc -O2 @args.rsp (r28.c -o r28r.wasm): r28r.wasm is not asyncified');
+    const pch = await run(['bash', '-c', 'test -s x.pch && { test -x x.pch && echo executable || echo plain; }'], { cwd: '/home/cc' });
+    assert.equal(pch.stdout, 'plain\n', `x.pch: ${pch.stdout}${pch.stderr}`);
+    console.log(`== r28 as a.out (also with -Wl,-o or -Xlinker -o, which clang's own -o overrides), with -or28j.wasm and from @args.rsp: asyncified; x.pch left plain; WASIXCC_ASYNCIFY=0: not; ${nonLinks.map((a) => a.join(' ')).join(', ')} leave an asyncified and a non-wasm a.out alone`);
   }
   await k.writeFile(`${PROBES_AT}/package.json`, JSON.stringify({
     name: 'wasm-clang-cc-probes',

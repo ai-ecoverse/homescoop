@@ -47,30 +47,40 @@ shared=0
 rdynamic=0
 pie=0
 out=
-prev=
 # no_output: a call that compiles or prints but writes no program, so there
 # is nothing to post-link (homescoop#710). link_inputs: the inputs a link
-# would read (sources, objects, archives, response files; not headers, not
-# option values); without any, the driver adds no link libraries, so
-# `cc -v` doesn't run a link of nothing over an a.out (homescoop#711).
+# would read (sources, objects, archives; not headers, not option values);
+# without any, the driver adds no link libraries, so `cc -v` doesn't run a
+# link of nothing over an a.out (homescoop#711).
 no_output=0
 link_inputs=0
 takes_value=0
-for a in "$@"; do
+want_out=0
+scan_arg() {
+  _a=$1
+  if [ "$want_out" -eq 1 ]; then
+    # The argument after an option -o (not after a -o that was itself
+    # another option's value, as in -Xlinker -o: homescoop#722).
+    want_out=0
+    out=$_a
+    return 0
+  fi
   if [ "$takes_value" -eq 1 ]; then
     takes_value=0
-  else
-    case "$a" in
-      -o | -I | -L | -D | -U | -x | -MF | -MT | -MQ | -include | -imacros | -isystem | -idirafter | -iquote | \
-        -isysroot | --sysroot | -target | -arch | -Xlinker | -Xclang | -Xassembler | -Xpreprocessor | -mllvm | -z | -u | -e)
-        takes_value=1 ;;
-      -) link_inputs=1 ;;
-      -*) ;;
-      *.h | *.hh | *.hpp | *.hxx | *.H | *.h++) ;;
-      *) link_inputs=1 ;;
-    esac
+    return 0
   fi
-  case "$a" in
+  case "$_a" in
+    -o) want_out=1; return 0 ;;
+    -I | -L | -B | -D | -U | -x | -MF | -MT | -MQ | -include | -imacros | -isystem | -idirafter | -iquote | \
+      -isysroot | --sysroot | -target | -arch | -Xlinker | -Xclang | -Xassembler | -Xpreprocessor | -mllvm | \
+      -z | -u | -e | -working-directory | -resource-dir)
+      takes_value=1; return 0 ;;
+    -) link_inputs=1 ;;
+    -*) ;;
+    *.h | *.hh | *.hpp | *.hxx | *.H | *.h++) ;;
+    *) link_inputs=1 ;;
+  esac
+  case "$_a" in
     -c|-E|-S|-M|-MM) compile_only=1 ;;
     -fsyntax-only | '-###' | --analyze | -emit-ast | -fdriver-only) no_output=1 ;;
     -shared) shared=1; PIC=yes ;;
@@ -79,18 +89,31 @@ for a in "$@"; do
     -pie|-Wl,-pie) pie=1; PIC=yes ;;
     *.c|*.cc|*.cpp|*.cxx|*.C|*.m|*.mm|*.s|*.S|*.i|*.ii|*.h|*.hpp) has_src=1 ;;
   esac
-  if [ "$prev" = "-o" ]; then
-    out=$a
-  else
-    # The joined form, -oFILE (but clang's own -objcmt-*, -object and
-    # -object-file-name= options). A linker -o (-Wl,-o,FILE) doesn't count:
-    # clang passes its own -o after it, so the program is still a.out.
-    case "$a" in
-      -objcmt-* | -object | -object-file-name=*) ;;
-      -o?*) out=${a#-o} ;;
-    esac
-  fi
-  prev=$a
+  # The joined form, -oFILE (but clang's own -objcmt-*, -object and
+  # -object-file-name= options). A linker -o (-Wl,-o,FILE) doesn't count:
+  # clang passes its own -o after it, so the program is still a.out.
+  case "$_a" in
+    -objcmt-* | -object | -object-file-name=*) ;;
+    -o?*) out=${_a#-o} ;;
+  esac
+}
+for a in "$@"; do
+  case "$a" in
+    @?*)
+      # A response file (CMake, Ninja, Meson): scan its words too, one level
+      # deep, so its -o and inputs count (homescoop#721). Words only: no
+      # quotes, as those generators write them.
+      if [ -r "${a#@}" ]; then
+        set -f
+        # shellcheck disable=SC2013
+        for w in $(cat "${a#@}"); do scan_arg "$w"; done
+        set +f
+      else
+        link_inputs=1
+      fi
+      ;;
+    *) scan_arg "$a" ;;
+  esac
 done
 
 # -fPIC on an executable link (no -shared, producing a binary) → dynamic-main / PIE.
@@ -287,10 +310,32 @@ trap 'rm -f "$rsp"' EXIT
   fi
 } >"$rsp"
 
+# A link without -o writes a.out, as clang does (homescoop#692: until
+# 24.0.0-16 such a link skipped the Asyncify step). Only for a real link
+# (link inputs, not -fsyntax-only / -### and the like: #710), so `cc
+# --version` or `cc -fsyntax-only x.c` never touches an old a.out.
+if [ -z "$out" ] && [ "$compile_only" -eq 0 ] && [ "$no_output" -eq 0 ] && [ "$link_inputs" -eq 1 ]; then
+  out=a.out
+fi
+
+# Whether this call writes $out: it's missing now, or its bytes change. A
+# call that only reads (a PCH, a response file whose -o this driver didn't
+# see, a failed probe) must not post-process a stale file (homescoop#721).
+pre_sum=
+if [ -n "$out" ] && [ -f "$out" ]; then
+  pre_sum=$(cksum <"$out" 2>/dev/null || echo unknown)
+fi
+
 "$FRONTEND" "@$rsp"
 status=$?
 if [ "$status" -ne 0 ]; then
   exit "$status"
+fi
+fresh=0
+if [ -n "$out" ] && [ -f "$out" ]; then
+  if [ -z "$pre_sum" ] || [ "$(cksum <"$out" 2>/dev/null || echo unknown)" != "$pre_sum" ]; then
+    fresh=1
+  fi
 fi
 
 # Does the module import wasix_32v1.proc_fork, stack_checkpoint or
@@ -342,18 +387,28 @@ wasix_imports_fork() {
   return 1
 }
 
-# A link without -o writes a.out, as clang does (homescoop#692: until
-# 24.0.0-16 such a link skipped the Asyncify step). Only for a real link
-# (link inputs, not -fsyntax-only / -### and the like: #710), so `cc
-# --version` or `cc -fsyntax-only x.c` never touches an old a.out.
-if [ -z "$out" ] && [ "$compile_only" -eq 0 ] && [ "$no_output" -eq 0 ] && [ "$link_inputs" -eq 1 ]; then
-  out=a.out
-fi
 
 # Post-link Asyncify when the module needs host-driven fork / stack_checkpoint
 # (SLICC realm) or when exceptions=off (wasixcc setjmp path).
 # WASIXCC_ASYNCIFY=1 forces it, WASIXCC_ASYNCIFY=0 skips it.
-if [ "$compile_only" -eq 0 ] && [ "$no_output" -eq 0 ] && [ "$shared" -eq 0 ] && [ -n "$out" ] && [ -f "$out" ]; then
+# A wasm module? 0 yes, 1 no (a PCH, a script: not a program to post-link,
+# homescoop#722), 2 when od can't tell.
+is_wasm() {
+  _m=$(od -An -v -tu1 -N 4 "$1" 2>/dev/null) || return 2
+  # shellcheck disable=SC2086
+  set -- $_m
+  [ "$*" = "0 97 115 109" ]
+}
+post_link=0
+if [ "$compile_only" -eq 0 ] && [ "$no_output" -eq 0 ] && [ "$shared" -eq 0 ] && [ "$fresh" -eq 1 ]; then
+  if is_wasm "$out"; then
+    post_link=1
+  elif [ $? -eq 2 ]; then
+    echo "wasix-driver: cannot read $out (needs od from coreutils) to decide on Asyncify; set WASIXCC_ASYNCIFY=1 or 0" >&2
+    exit 1
+  fi
+fi
+if [ "$post_link" -eq 1 ]; then
   chmod +x "$out" 2>/dev/null || true
   need_asyncify=0
   case "${WASIXCC_ASYNCIFY:-}:$EXCEPTIONS" in

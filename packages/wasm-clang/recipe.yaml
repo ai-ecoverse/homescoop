@@ -16,6 +16,8 @@ source:
 # link without -o (a.out) and -oFILE (homescoop#692).
 # 24.0.0-17: calls that write no program (-v, -fsyntax-only, -###, a header)
 # leave an a.out alone (homescoop#710, #711).
+# 24.0.0-18: @response files, PCH outputs, -Xlinker -o and -B values
+# (homescoop#721, #722).
 repack:
   from: "24.0.0-11"
   files:
