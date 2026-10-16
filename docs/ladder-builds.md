@@ -71,10 +71,13 @@ and prints the decision without dispatching. `before`, `packages`,
 `assume_unpublished`, `message`, `pr_body`, `pr`, `head` and `ci_certified`
 simulate the other cases (`pr` resolves an open PR, with `sha` its head).
 
-**After the publish** ladder-build polls the registry for up to ten minutes
-(`scripts/verify-published.mjs`) until `dist.integrity` of the version shows
-up, and requires it to equal the sha512 of the exact `package.tgz` it
-published. A mismatch, or a version that never appears, fails the job and
+**After the publish** ladder-build polls the registry for up to thirty minutes
+(`scripts/verify-published.mjs --timeout 1800`) until `dist.integrity` of the
+version shows up, and requires it to equal the sha512 of the exact
+`package.tgz` it published. The window only covers a version that isn't
+visible yet: the first version of a new, 22 MB package took about 18 minutes
+(homescoop#686). A visible version with another integrity fails at once. A
+mismatch, or a version that never appears, fails the job and
 opens (or comments on) one `publish-failure` issue naming the package,
 version, run and both values. It publishes with `--tag latest` only: for
 homescoop, certified = latest.
