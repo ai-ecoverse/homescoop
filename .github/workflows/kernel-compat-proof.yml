@@ -13,6 +13,7 @@ on:
       - 'scripts/browser-cert/run.mjs'
       - 'scripts/browser-cert/cases.mjs'
       - 'scripts/browser-cert/cert-meta.mjs'
+      - 'scripts/browser-cert/glue.mjs'
       - 'scripts/browser-cert/context.mjs'
       - 'scripts/browser-cert/page/**'
 
