@@ -2,6 +2,7 @@
 # libs, headers, pkg-config) that wasix-ruby and wasix-python link against.
 name: wasix-zlib
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=madler/zlib extractVersion=^v(?<version>.*)$
 version: "1.3.1"
 npm: "@ai-ecoverse/wasix-zlib"

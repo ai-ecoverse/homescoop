@@ -3,6 +3,7 @@
 # link against.
 name: wasix-openssl
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=openssl/openssl extractVersion=^openssl-(?<version>3\.5\.\d+)$
 version: "3.5.9"
 npm: "@ai-ecoverse/wasix-openssl"

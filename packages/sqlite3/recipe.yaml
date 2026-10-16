@@ -1,6 +1,7 @@
 # SQLite CLI (amalgamation shell.c) for slicc wasm realm.
 name: sqlite3
 builder: host
+runner: pool
 # renovate: datasource=github-tags depName=sqlite/sqlite extractVersion=^version-(?<version>.*)$
 version: "3.54.0"
 npm: "@ai-ecoverse/wasm-sqlite3"

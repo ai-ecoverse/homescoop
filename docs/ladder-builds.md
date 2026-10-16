@@ -172,9 +172,28 @@ workflow file of its own:
 | `packages/<name>/test/package.json` | the same job: `npm ci` in `test/`, then `npm run test:e2e` when it has that script (its flags, its `pretest:e2e`), else `node --test 'e2e/*.test.mjs'` |
 | `reproducible: true` in `recipe.yaml` | `rebuild (<name>)`, a second `host-run.sh` in parallel with `host-build`, and `reproducible (<name>)`: the two `package.tgz` must have the same sha256 |
 | `reproducible:` with `path: package/<file>` | the same, comparing only that file of the tarball (the main `.wasm`), for a build whose tarball is not byte-stable |
+| `runner: pool` in `recipe.yaml` | `host-build`, `rebuild` and `test` on `vars.CERT_RUNNER` instead of `ubuntu-latest` (see Runners) |
 | `ci:` in `cert/meta.json` | each command, from the repo root, after the browser cert in `cert (<name>)`, with the tarball at `.homescoop-out/package.tgz`: recipe-specific checks, as a script in the recipe directory |
 
 `ci`, the required check, needs every one of these jobs.
+
+**Runners.** `host-build`, `rebuild` and `test` run on `ubuntu-latest` unless
+the recipe says `runner: pool`. A recipe whose ladder jobs compile nothing, a
+packaging-only `repack:` with no `smoke.c` and no tests by layout, runs on the
+pool without the hint, and moves back when its next release drops `repack:`.
+On the pool (`vars.CERT_RUNNER`, `cloud-run-bench`: 8 vCPU / 32 GiB, no queue,
+no sudo) a recipe's bytes can differ from a hosted build: its image lacks some
+of the hosted tools, and the workspace is `/home/runner/_work`, not
+`/home/runner/work`, so a build that embeds a path under it differs. **A recipe
+moves to the pool only with evidence of equal bytes:** in the PR that adds
+`runner: pool`, its `host-<pkg>-prN` tarball from the pool must have the same
+sha256 as a hosted twin built from the same tree (`host-run.sh` on
+`ubuntu-latest`), and the PR body says so. `cert`, `exact-pins`, `detect`,
+`reproducible`, `slicc-note` and `ci` run on the pools as before;
+`recipe-sha`, which pushes with `contents: write`, stays on `ubuntu-latest`. A
+fork PR runs everything on `ubuntu-latest`, since a pool job can reach the
+pool's service-account token. `ladder-build`, which publishes with
+`id-token: write`, stays hosted.
 
 ## Recipe shape
 

@@ -3,6 +3,7 @@
 # plus a host-import module for slicc-kernel.
 name: wasi-gh
 builder: host
+runner: pool
 reproducible: true
 version: "2.102.0"
 npm: "@ai-ecoverse/wasi-gh"
