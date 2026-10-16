@@ -23,3 +23,10 @@ A build then also wants `make` (`@ai-ecoverse/wasm-gmake`).
 Before 2.72.0-7, `autom4te` (and `aclocal`, `autoreconf`, `automake` through
 it) needed grep too, and without it failed with a misleading
 `autom4te: error: need GNU m4 1.4 or later: m4`.
+
+## Licence
+
+GPL-3.0-or-later. Parts of the m4 sources carry the Autoconf Configure Script
+Exception (it covers the `configure` scripts Autoconf writes), and the
+Autom4te Perl modules are GPL-2.0-or-later. `LICENSE` holds all three texts:
+`COPYINGv3`, `COPYING.EXCEPTION` and `COPYING` (GPLv2).
