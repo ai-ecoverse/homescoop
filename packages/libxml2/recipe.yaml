@@ -10,7 +10,7 @@ source:
   sha256: "98087fd181d9070724f3fbc65c7377db03038eb92bd882374daff44940138821"
 dependencies:
   build:
-    - "@ai-ecoverse/wasm-libiconv@1.18.0-1"
+    - "@ai-ecoverse/wasm-libiconv@1.19.0-2"
   host: []
   run: []
 about:
