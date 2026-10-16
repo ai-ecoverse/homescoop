@@ -23,6 +23,7 @@ export default async function (ctx) {
       { expect: '[$#] ', timeoutMs: 5000 },
       { write: `echo "c${i}=$?"\r` },
       { expect: `c${i}=130`, timeoutMs: 5000 },
+      { expect: '[$#] ', timeoutMs: 5000 },
     );
   }
   for (let i = 0; i < N; i++) {
@@ -35,6 +36,7 @@ export default async function (ctx) {
       { expect: 'Killed', timeoutMs: 5000 },
       { write: `echo "z${i}=$((6*7))"\r` },
       { expect: `z${i}=42`, timeoutMs: 5000 },
+      { expect: '[$#] ', timeoutMs: 5000 },
     );
   }
   steps.push({ write: 'jobs; echo "jobs: $(jobs | wc -l) left"\r' }, { expect: 'jobs: 0 left' }, { write: 'exit 0\r' });
