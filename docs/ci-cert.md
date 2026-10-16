@@ -187,6 +187,41 @@ anything else fails the leg.
 
 Each page call (`ctx.run`, `ctx.write`, …) has to answer within 120 s, or the spec fails with `Runtime.evaluate: no answer in … ms`. `"runTimeoutMs"` changes that for one package. The harness's own default was 30 s, which wasix-python's venv and pnpm-layout steps outgrew on slower CI runners.
 
+### Third-party notices: `"notices"` in `cert/meta.json`
+
+A package that bundles or statically links third-party code (OpenBLAS,
+FreeType, Qhull, pybind11, fonts, ...) lists each component with its SPDX
+license expression, and its cert gets a one-line spec
+([`notices.mjs`](../scripts/browser-cert/notices.mjs); homescoop#726):
+
+```json
+"notices": [
+  { "name": "OpenBLAS", "license": "BSD-3-Clause" },
+  { "name": "FreeType", "license": "FTL OR GPL-2.0-only" },
+  { "name": "BaKoMa fonts", "license": "LicenseRef-BaKoMa", "text": "BaKoMa Fonts Licence" }
+]
+```
+
+```js
+// packages/<name>/cert/notices.mjs
+import { noticesSpec } from '../../../scripts/browser-cert/notices.mjs';
+export default noticesSpec(import.meta.url);
+```
+
+The spec fails unless the installed package's `THIRD-PARTY-NOTICES.md` has,
+for each component, a `## ` heading naming it, the license named in that
+heading or on a `License: ...` line of the section (an SPDX id of the declared
+expression: one alternative of an `OR`, every part of an `AND`), and the
+license text itself (a phrase of it: `"text"`, or the built-in phrase for each
+SPDX id in `LICENSE_PHRASES`, taken from the license body so a one-line
+"Licensed under ..." reference does not pass; same `OR`/`AND` rule, `AND`
+binding tighter, parentheses grouping). An id with no
+built-in phrase (a `LicenseRef-*`) needs `"text"`. `homescoop_notice`
+([`build-common.sh`](../scripts/build-common.sh)) writes that shape:
+`homescoop_notice "FreeType 2.13.3 (FreeType License, FTL)" <LICENSE.TXT> - <FTL.TXT> -`.
+`scripts/test/notices.test.mjs` checks every `"notices"` list and that it has
+its spec. Add a checklist line for `cert/notices.mjs`.
+
 ### WebSockets: `ctx.serveWs(responder)`
 
 The cert page's transport also has the kernel's optional `websocket`
