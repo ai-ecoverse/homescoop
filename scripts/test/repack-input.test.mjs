@@ -7,6 +7,10 @@
 //                ladder-build on main, its recipe and build.sh at the attested commit.
 //   prebuilt/    the same real attestation, with a build.sh that can stage a
 //                prebuilt tree (WASIX_PKGCONF_STAGE, the py-pandas shape). PLANTED.
+//   helper/      the same real attestation, with the prebuilt path in a package-local
+//                helper build.sh runs ($HOMESCOOP_PKG/stage-prebuilt.sh). PLANTED.
+//   otherfetch/  the same real attestation, with a build that homescoop_fetches only an
+//                upstream prebuilt; source.sha256 is pinned but never used. PLANTED.
 //   planted/     a repack of a version published from a laptop: gitHead, no provenance. PLANTED.
 //   unattested/  py-pandas as recorded from npm: 2.3.2-11 repacks 2.3.2-10, which has
 //                neither provenance nor a gitHead (#730).
@@ -17,7 +21,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fixtureReader, fixtureRegistry, prebuiltInputs, repackInput } from '../cert-review/repack-input.mjs';
+import { MAX_DEPTH, buildFiles, fetchesPinnedSource, fixtureReader, fixtureRegistry, prebuiltInputs, repackInput, resolveRef } from '../cert-review/repack-input.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, 'fixtures/repack-input');
@@ -51,6 +55,69 @@ test('NEGATIVE: an attested root whose build could stage a prebuilt is unverifia
   assert.equal(r.chain[0].provenance, true, 'the attestation itself is real and valid');
   assert.equal(r.attested, false);
   assert.match(r.reason, /^root staged a prebuilt artifact: .*WASIX_PKGCONF_STAGE \(packages\/pkgconf\/build\.sh:13\)/);
+});
+
+test('NEGATIVE: an attested root whose prebuilt path sits in a package-local helper is unverifiable', async () => {
+  const r = await run(join(fixtures, 'helper'), 'pkgconf');
+  assert.equal(r.chain[0].provenance, true);
+  assert.equal(r.attested, false);
+  assert.ok(r.chain[0].buildFiles.includes('packages/pkgconf/stage-prebuilt.sh'), r.chain[0].buildFiles.join(', '));
+  assert.match(r.reason, /^root staged a prebuilt artifact: .*WASIX_PKGCONF_STAGE \(packages\/pkgconf\/stage-prebuilt\.sh:4\)/);
+});
+
+test('NEGATIVE: an attested root that homescoop_fetches only something else is unverifiable', async () => {
+  const r = await run(join(fixtures, 'otherfetch'), 'pkgconf');
+  assert.equal(r.chain[0].provenance, true);
+  assert.equal(r.attested, false);
+  assert.match(r.reason, /root 3\.0\.9-1's build never fetches the pinned source/);
+});
+
+test('helpers: every form build.sh runs a repo script by is followed, recursively, with a depth cap', () => {
+  const tree = {
+    'packages/p/build.sh': [
+      'source "$ROOT/scripts/build-common.sh"',
+      'bash "$HOMESCOOP_PKG/a.sh"',
+      '"$(dirname "$0")/b.sh"',
+      './c.sh',
+      'bash d.sh',
+      'bash "${HOMESCOOP_PKG}/tools/e.sh"',
+      'bash "$SRC_DIR/configure.sh"   # in the fetched source: not ours',
+    ].join('\n'),
+    'scripts/build-common.sh': 'homescoop_fetch() { :; }',
+    'packages/p/a.sh': 'bash "$ROOT/scripts/f.sh"',
+    'packages/p/b.sh': ':',
+    'packages/p/c.sh': ':',
+    'packages/p/d.sh': ':',
+    'packages/p/tools/e.sh': 'bash "$(dirname "$0")/g.sh"',
+    'packages/p/tools/g.sh': ':',
+    'scripts/f.sh': ':',
+  };
+  const readAt = (_, path) => tree[path] ?? null;
+  const b = buildFiles(readAt, 'c', 'p');
+  assert.deepEqual(b.problems, []);
+  assert.deepEqual(new Set(b.files.map((f) => f.path)), new Set(Object.keys(tree)));
+
+  const missing = buildFiles((_, path) => (path === 'packages/p/build.sh' ? 'bash "$HOMESCOOP_PKG/gone.sh"' : null), 'c', 'p');
+  assert.deepEqual(missing.problems, ['packages/p/build.sh runs "$HOMESCOOP_PKG/gone.sh, which isn\'t in the tree']);
+
+  const chain = {};
+  for (let i = 0; i <= MAX_DEPTH + 1; i++) chain[i ? `packages/p/h${i}.sh` : 'packages/p/build.sh'] = `bash "$HOMESCOOP_PKG/h${i + 1}.sh"`;
+  const deep = buildFiles((_, path) => chain[path] ?? null, 'c', 'p');
+  assert.match(deep.problems.join(), /past the depth cap/);
+
+  assert.deepEqual(resolveRef('"$SRC/cnf/configure_mods.sh', 'packages/p/build.sh', 'p').explicit, false);
+});
+
+test('the pinned source: a homescoop_fetch of $SRC_SHA / $SHA / the literal sha, not reassigned first', () => {
+  const sha = 'ab'.repeat(32);
+  const f = (text) => fetchesPinnedSource([{ path: 'build.sh', text }], sha);
+  assert.equal(f('homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"'), true);
+  assert.equal(f('homescoop_fetch "$URL" "${SHA}" "$TB"'), true);
+  assert.equal(f(`homescoop_fetch \\\n  "$URL" \\\n  ${sha} "$TB"`), true);
+  assert.equal(f('homescoop_fetch "$OTHER_URL" "$OTHER_SHA" "$TB"'), false);
+  assert.equal(f(`homescoop_fetch "$URL" ${'cd'.repeat(32)} "$TB"`), false);
+  assert.equal(f('SRC_SHA="$(cat other.sha)"\nhomescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"'), false);
+  assert.equal(f('# homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"'), false);
 });
 
 test('py-pandas as recorded (#730): 2.3.2-10 has no provenance and no gitHead', async () => {

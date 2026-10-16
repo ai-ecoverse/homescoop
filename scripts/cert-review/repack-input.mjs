@@ -99,26 +99,80 @@ export function parseRecipe(text) {
 
 const stripComments = (text) => String(text).split('\n').map((l) => (/^\s*#/.test(l) ? '' : l));
 
-/** build.sh and the scripts/*.sh it runs (transitively), build-common.sh excluded. */
+export const MAX_DEPTH = 8;
+
+/**
+ * The shell scripts a reference in <from> can mean, most specific first, and
+ * whether the reference is explicit (it names the repo or the package dir,
+ * so a missing file is an error, not a path into the fetched source).
+ */
+export function resolveRef(ref, from, pkg) {
+  const dir = from.split('/').slice(0, -1).join('/');
+  const norm = (path) => {
+    const out = [];
+    for (const part of path.split('/')) {
+      if (part === '..') out.pop();
+      else if (part && part !== '.') out.push(part);
+    }
+    return out.join('/');
+  };
+  let m;
+  if ((m = ref.match(/(?:^|[/"'(])(scripts\/[A-Za-z0-9_.\/-]+\.(?:sh|bash))$/)) && /\$\{?(?:HOMESCOOP_)?ROOT\}?\/scripts\/|^\.\.\/\.\.\/scripts\/|pwd\)\/scripts\/|^\(?scripts\//.test(ref)) {
+    return { paths: [norm(m[1])], explicit: true };
+  }
+  if ((m = ref.match(/(?:^|[/"'(])(packages\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.\/-]+\.(?:sh|bash))$/))) return { paths: [norm(m[1])], explicit: true };
+  if ((m = ref.match(/\$\{?HOMESCOOP_PKG\}?\/([A-Za-z0-9_.\/-]+\.(?:sh|bash))$/))) return { paths: [norm(`packages/${pkg}/${m[1]}`)], explicit: true };
+  if ((m = ref.match(/\$\(\s*dirname\s+"?\$(?:0|\{BASH_SOURCE(?:\[0\])?\})"?\s*\)"?\/([A-Za-z0-9_.\/-]+\.(?:sh|bash))$/))) {
+    return { paths: [norm(`${dir}/${m[1]}`)], explicit: true };
+  }
+  // Anything else (./x.sh, bash x.sh, $VAR/x.sh): the package's own file if
+  // there is one, else the referencing file's directory; otherwise it points
+  // into the fetched source or the work dir, which the pinned sha covers.
+  const tail = ref.replace(/^.*\$\{?[A-Za-z_][A-Za-z0-9_]*\}?\//, '').replace(/^.*\)\//, '');
+  if (tail.startsWith('/') || !/^[A-Za-z0-9_.\/-]+\.(?:sh|bash)$/.test(tail)) return { paths: [], explicit: false };
+  return { paths: [...new Set([norm(`packages/${pkg}/${tail}`), norm(`${dir}/${tail}`)])], explicit: false };
+}
+
+/**
+ * build.sh and every repo shell script it runs or sources, recursively
+ * (scripts/*.sh, package-local helpers, $(dirname "$0")/…), up to MAX_DEPTH.
+ * @returns {{ files: { path: string, text: string }[], problems: string[] } | null} null without build.sh
+ */
 export function buildFiles(readAt, commit, pkg) {
   const files = [];
-  const queue = [`packages/${pkg}/build.sh`];
-  const seen = new Set();
+  const problems = [];
+  const cache = new Map();
+  const read = (path) => {
+    if (!cache.has(path)) cache.set(path, readAt(commit, path));
+    return cache.get(path);
+  };
+  const start = `packages/${pkg}/build.sh`;
+  if (read(start) == null) return null;
+  const queue = [{ path: start, depth: 0 }];
+  const seen = new Set([start]);
   while (queue.length) {
-    const path = queue.shift();
-    if (seen.has(path)) continue;
-    seen.add(path);
-    const text = readAt(commit, path);
-    if (text == null) {
-      if (!files.length) return null;
-      continue;
-    }
+    const { path, depth } = queue.shift();
+    const text = read(path);
     files.push({ path, text });
-    for (const m of stripComments(text).join('\n').matchAll(/scripts\/([A-Za-z0-9_.-]+\.sh)/g)) {
-      if (m[1] !== 'build-common.sh') queue.push(`scripts/${m[1]}`);
+    const body = stripComments(text).join('\n');
+    for (const m of body.matchAll(/[^\s;|&<>=`]*\.(?:sh|bash)\b/g)) {
+      const ref = m[0].replace(/["']+$/, '');
+      const { paths, explicit } = resolveRef(ref, path, pkg);
+      const found = paths.find((p) => p === path || seen.has(p) || read(p) != null);
+      if (!found) {
+        if (explicit) problems.push(`${path} runs ${ref}, which isn't in the tree`);
+        continue;
+      }
+      if (seen.has(found)) continue;
+      if (depth + 1 > MAX_DEPTH) {
+        problems.push(`${path} runs ${found} past the depth cap of ${MAX_DEPTH}`);
+        continue;
+      }
+      seen.add(found);
+      queue.push({ path: found, depth: depth + 1 });
     }
   }
-  return files;
+  return { files, problems };
 }
 
 /** Prebuilt inputs the build files could take: [{ path, line, why }]. */
@@ -134,7 +188,29 @@ export function prebuiltInputs(files) {
   return hits;
 }
 
-export const fetchesPinnedSource = (files) => files.some(({ text }) => stripComments(text).some((l) => /\bhomescoop_fetch\s/.test(l)));
+/**
+ * Whether the build fetches the recipe's own source: a homescoop_fetch whose
+ * sha256 argument is the recipe's source.sha256, as $SRC_SHA / $SHA (which
+ * build-common.sh's homescoop_load_recipe exports from it, recipe-env.mjs)
+ * or as the same literal. A $SRC_SHA / $SHA after the same script
+ * reassigned it doesn't count. The URL doesn't matter: the sha256 pins the bytes.
+ */
+export function fetchesPinnedSource(files, sha) {
+  const arg = (a) => a.replace(/^["']|["']$/g, '');
+  return files.some(({ text }) => {
+    let reassigned = false;
+    const lines = stripComments(text).join('\n').replace(/\\\n\s*/g, ' ').split('\n');
+    for (const line of lines) {
+      for (const m of line.matchAll(/\bhomescoop_fetch\s+("[^"]*"|'[^']*'|\S+)\s+("[^"]*"|'[^']*'|\S+)/g)) {
+        const v = arg(m[2]);
+        if (!reassigned && /^\$\{?(?:SRC_SHA|SHA)\}?$/.test(v)) return true;
+        if (/^[0-9a-f]{64}$/.test(sha || '') && v === sha) return true;
+      }
+      if (/(?:^|[;&|]\s*|\s)(?:export\s+|local\s+|declare\s+[-a-z]*\s*)?(?:SRC_SHA|SHA)=/.test(line)) reassigned = true;
+    }
+    return false;
+  });
+}
 
 const integrityHex = (integrity) => {
   const m = String(integrity || '').match(/^sha512-(.+)$/);
@@ -207,18 +283,21 @@ export async function trace({ pkg, npm, from, registry, readAt, reproduced = {} 
     // The root: the first version that was actually built.
     const root = version;
     const reasons = [];
-    const files = buildFiles(readAt, commit, pkg);
-    if (!files) {
+    const sha = recipe.source && typeof recipe.source === 'object' ? recipe.source.sha256 : '';
+    const build = buildFiles(readAt, commit, pkg);
+    const files = build?.files;
+    if (!build) {
       reasons.push(`root ${root}'s tree has no packages/${pkg}/build.sh`);
     } else {
       const hits = prebuiltInputs(files);
       if (hits.length) {
         reasons.push(`root staged a prebuilt artifact: ${root}'s build can take ${hits.map((h) => `${h.why} (${h.path}:${h.line})`).join(', ')}`);
       }
-      if (!fetchesPinnedSource(files)) reasons.push(`root ${root}'s build never fetches the pinned source (no homescoop_fetch)`);
+      if (build.problems.length) reasons.push(`root ${root}'s build can't be read in full: ${build.problems.join(', ')}`);
+      if (!fetchesPinnedSource(files, sha)) reasons.push(`root ${root}'s build never fetches the pinned source (no homescoop_fetch of $SRC_SHA, $SHA or ${sha || 'source.sha256'})`);
+      link.buildFiles = files.map((f) => f.path);
       link.prebuilt = hits;
     }
-    const sha = recipe.source && typeof recipe.source === 'object' ? recipe.source.sha256 : '';
     if (!/^[0-9a-f]{64}$/.test(sha || '')) reasons.push(`root ${root}'s recipe pins no source sha256 (${sha || 'none'})`);
     link.sourceSha256 = sha || null;
     const rebuilt = reproduced[`${npm}@${root}`];
