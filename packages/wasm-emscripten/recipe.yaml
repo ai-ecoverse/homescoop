@@ -12,6 +12,9 @@ source:
 # (-17 hard-coded /shared/lib/node_modules/…, which npm and pnpm never fill;
 # #277) and emscripten-config resolving them physically. Drop repack: when
 # the next release rebuilds.
+# package/package.json keeps -17's "files" (a repack may not change it), so
+# it still says "Media"; build.sh writes "media" for the next real build, and
+# test/files.test.mjs checks that list against the tarball (#205).
 repack:
   from: "6.0.9-17"
   files:

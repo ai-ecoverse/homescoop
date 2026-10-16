@@ -353,7 +353,9 @@ const j = {
     "system",
     "cmake",
     "third_party",
-    "Media",
+    // The tree's media/ (logos): npm matches files case-sensitively on Linux,
+    // where "Media" packed nothing (#205; test/files.test.mjs).
+    "media",
     "ChangeLog.md",
     "emscripten-version.txt",
   ],
