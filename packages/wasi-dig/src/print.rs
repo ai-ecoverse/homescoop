@@ -4,7 +4,8 @@
 use crate::args::Opts;
 use crate::transport::Reply;
 use hickory_proto::op::{Message, OpCode};
-use hickory_proto::rr::{RData, Record};
+use crate::present;
+use hickory_proto::rr::{DNSClass, Name, RData, Record, RecordType};
 use std::fmt::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -36,22 +37,8 @@ fn opcode(op: OpCode) -> &'static str {
     }
 }
 
-/// Pad with tabs to `width` (tab stops every 8), at least one tab.
-fn pad(s: &str, width: usize) -> String {
-    let mut out = s.to_string();
-    let mut col = s.chars().count();
-    loop {
-        out.push('\t');
-        col = (col / 8 + 1) * 8;
-        if col >= width {
-            break;
-        }
-    }
-    out
-}
-
-/// The record's data as dig prints it.
-pub fn rdata(data: &RData) -> String {
+/// The record's data as dig prints it (`crypto`: false for `+nocrypto`).
+pub fn rdata(data: &RData, crypto: bool) -> String {
     match data {
         // dig quotes every character-string of a TXT record.
         RData::TXT(txt) => txt
@@ -81,46 +68,84 @@ pub fn rdata(data: &RData) -> String {
             let value = String::from_utf8_lossy(&caa.value).into_owned();
             format!("{flags} {} \"{}\"", caa.tag.as_str(), value.replace('"', "\\\""))
         }
+        RData::CNAME(n) => present::name(&n.0),
+        RData::NS(n) => present::name(&n.0),
+        RData::PTR(n) => present::name(&n.0),
+        RData::MX(mx) => format!("{} {}", mx.preference, present::name(&mx.exchange)),
+        RData::SRV(srv) => {
+            format!("{} {} {} {}", srv.priority, srv.weight, srv.port, present::name(&srv.target))
+        }
+        RData::SOA(soa) => format!(
+            "{} {} {} {} {} {} {}",
+            present::name(&soa.mname),
+            present::name(&soa.rname),
+            soa.serial,
+            soa.refresh as u32,
+            soa.retry as u32,
+            soa.expire as u32,
+            soa.minimum
+        ),
+        RData::HTTPS(https) => present::svcb(&https.0),
+        RData::SVCB(svcb) => present::svcb(svcb),
+        // RFC 3597, as BIND prints NULL and the types it doesn't know.
+        RData::NULL(null) => present::unknown(&null.anything),
+        RData::Unknown { code, rdata } => {
+            let bytes = &rdata.anything;
+            present::dnssec(u16::from(*code), bytes, crypto).unwrap_or_else(|| present::unknown(bytes))
+        }
         other => other.to_string(),
     }
 }
 
-pub fn record_line(r: &Record) -> String {
-    format!(
-        "{}{}\t{}\t{}\t{}",
-        pad(&r.name.to_string(), 24),
-        r.ttl,
-        r.dns_class,
-        r.record_type(),
-        rdata(&r.data)
-    )
+/// One record in dig's columns: TTL at 24, class at 32, type at 40, rdata
+/// at 48, as BIND's masterdump lays them out (tabs, then spaces after a
+/// field that is wider than its column).
+pub fn record_line(r: &Record, crypto: bool) -> String {
+    let mut out = present::name(&r.name);
+    let mut col = out.chars().count();
+    for (field, to) in [
+        (r.ttl.to_string(), 24),
+        (present::class_name(u16::from(r.dns_class)), 32),
+        (present::type_name(u16::from(r.record_type())), 40),
+        (rdata(&r.data, crypto), 48),
+    ] {
+        present::indent(&mut out, &mut col, to);
+        col += field.chars().count();
+        out.push_str(&field);
+    }
+    out
+}
+
+/// A question as BIND prints it: `;`, then the name, class at 32 and type
+/// at 40, counted without the `;` (message.c prints it before
+/// `dns_master_questiontotext`).
+fn question_line(name: &Name, class: DNSClass, qtype: RecordType) -> String {
+    let mut out = String::from(";");
+    let owner = present::name(name);
+    let mut col = owner.chars().count();
+    out.push_str(&owner);
+    for (field, to) in [(present::class_name(u16::from(class)), 32), (present::type_name(u16::from(qtype)), 40)] {
+        present::indent(&mut out, &mut col, to);
+        col += field.chars().count();
+        out.push_str(&field);
+    }
+    out
 }
 
 /// `Fri Oct 10 01:00:00 UTC 2026`.
 fn when() -> String {
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let days = (secs / 86_400) as i64;
-    let rem = secs % 86_400;
-    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
+    let (y, m, d, hh, mm, ss) = present::civil(secs);
     const WD: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
     const MO: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     format!(
         "{} {} {:02} {:02}:{:02}:{:02} UTC {}",
-        WD[days.rem_euclid(7) as usize],
+        WD[(secs / 86_400 % 7) as usize],
         MO[(m - 1) as usize],
         d,
-        rem / 3600,
-        rem % 3600 / 60,
-        rem % 60,
+        hh,
+        mm,
+        ss,
         y
     )
 }
@@ -129,7 +154,7 @@ pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
     let mut out = String::new();
     if o.short {
         for r in &msg.answers {
-            let _ = writeln!(out, "{}", rdata(&r.data));
+            let _ = writeln!(out, "{}", rdata(&r.data, o.crypto));
         }
         return out;
     }
@@ -191,7 +216,7 @@ pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
             let _ = writeln!(out, ";; QUESTION SECTION:");
         }
         for q in &msg.queries {
-            let _ = writeln!(out, "{}{}\t{}", pad(&format!(";{}", q.name()), 32), q.query_class(), q.query_type());
+            let _ = writeln!(out, "{}", question_line(q.name(), q.query_class(), q.query_type()));
         }
         if o.comments {
             out.push('\n');
@@ -209,7 +234,7 @@ pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
             let _ = writeln!(out, ";; {title} SECTION:");
         }
         for r in records {
-            let _ = writeln!(out, "{}", record_line(r));
+            let _ = writeln!(out, "{}", record_line(r, o.crypto));
         }
         if o.comments {
             out.push('\n');
@@ -228,12 +253,13 @@ pub fn render(o: &Opts, msg: &Message, reply: &Reply) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hickory_proto::rr::rdata::{CAA, MX, SOA, SRV, TXT};
+    use hickory_proto::rr::rdata::svcb::{Alpn, IpHint, Mandatory, SvcParamKey, SvcParamValue, SVCB, Unknown};
+    use hickory_proto::rr::rdata::{A, CAA, HTTPS, MX, NULL, SOA, SRV, TXT};
     use hickory_proto::rr::{Name, RData, Record};
     use std::str::FromStr;
 
     fn line(data: RData) -> String {
-        record_line(&Record::from_rdata(Name::from_str("example.com.").unwrap(), 300, data))
+        record_line(&Record::from_rdata(Name::from_str("example.com.").unwrap(), 300, data), true)
     }
 
     #[test]
@@ -270,10 +296,52 @@ mod tests {
     }
 
     #[test]
-    fn padding() {
-        assert_eq!(pad("a.", 24), "a.\t\t\t");
-        assert_eq!(pad("example.com.", 24), "example.com.\t\t");
-        assert_eq!(pad("a-very-long-name.example.com.", 24), "a-very-long-name.example.com.\t");
-        assert_eq!(pad(";example.com.", 32), ";example.com.\t\t\t");
+    fn https_and_unknown_like_bind() {
+        // homescoop#403: hickory printed `1 . alpn=h2,` and `Unknown\tAQIDBA==`.
+        let https = |params| RData::HTTPS(HTTPS(SVCB::new(1, Name::root(), params)));
+        assert_eq!(
+            line(https(vec![(SvcParamKey::Alpn, SvcParamValue::Alpn(Alpn(vec!["h2".into()])))])),
+            "example.com.\t\t300\tIN\tHTTPS\t1 . alpn=\"h2\""
+        );
+        assert_eq!(
+            rdata(
+                &https(vec![
+                    (SvcParamKey::Mandatory, SvcParamValue::Mandatory(Mandatory(vec![SvcParamKey::Alpn, SvcParamKey::Ipv4Hint]))),
+                    (SvcParamKey::Alpn, SvcParamValue::Alpn(Alpn(vec!["h3".into(), "h2".into(), "a,b\\c".into()]))),
+                    (SvcParamKey::NoDefaultAlpn, SvcParamValue::NoDefaultAlpn),
+                    (SvcParamKey::Port, SvcParamValue::Port(8443)),
+                    (
+                        SvcParamKey::Ipv4Hint,
+                        SvcParamValue::Ipv4Hint(IpHint(vec![A::new(192, 0, 2, 1), A::new(192, 0, 2, 2)]))
+                    ),
+                    (SvcParamKey::Unknown(7), SvcParamValue::Unknown(Unknown(b"/q{?dns}".to_vec()))),
+                ]),
+                true
+            ),
+            "1 . mandatory=alpn,ipv4hint alpn=\"h3,h2,a\\\\,b\\\\\\\\c\" no-default-alpn port=8443 ipv4hint=192.0.2.1,192.0.2.2 key7=\"/q{?dns}\""
+        );
+        let unknown = Record::from_rdata(
+            Name::from_str("unknown.test.").unwrap(),
+            60,
+            RData::Unknown { code: RecordType::Unknown(999), rdata: NULL::with(vec![1, 2, 3, 4]) },
+        );
+        assert_eq!(record_line(&unknown, true), "unknown.test.\t\t60\tIN\tTYPE999\t\\# 4 01020304");
+        assert_eq!(rdata(&unknown.data, true), "\\# 4 01020304");
+    }
+
+    #[test]
+    fn columns_and_questions() {
+        let long = Record::from_rdata(
+            Name::from_str("a-very-long-owner-name-for-testing.github.io.").unwrap(),
+            3600,
+            RData::A("185.199.110.153".parse().unwrap()),
+        );
+        assert_eq!(record_line(&long, true), "a-very-long-owner-name-for-testing.github.io. 3600 IN A\t185.199.110.153");
+        let q = |n: &str, t| question_line(&Name::from_str(n).unwrap(), DNSClass::IN, t);
+        assert_eq!(q("example.com.", RecordType::A), ";example.com.\t\t\tIN\tA");
+        // BIND counts the columns without the ';'.
+        assert_eq!(q("abcdefghijklmn.", RecordType::A), ";abcdefghijklmn.\t\t\tIN\tA");
+        assert_eq!(q("a-name-that-is-wider-than-32.example.", RecordType::AAAA), ";a-name-that-is-wider-than-32.example. IN AAAA");
+        assert_eq!(q("unknown.test.", RecordType::Unknown(999)), ";unknown.test.\t\t\tIN\tTYPE999");
     }
 }

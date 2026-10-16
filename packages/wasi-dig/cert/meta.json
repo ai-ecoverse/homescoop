@@ -12,6 +12,12 @@
     "NXDOMAIN: rc 0, SOA in AUTHORITY, empty +short",
     "endpoint choice: default, @https://…, +https=…, DIG_DOH_URL",
     "DNS over TCP to @100.100.100.100 through the uplink: answer, ;; SERVER …#53(…) (TCP), the dial in the uplink log; the tailnet name is NXDOMAIN over DoH",
-    "failures: refused @server → rc 9 'communications error' + 'no servers could be reached'; DoH 503 → rc 9; non-DNS content type → rc 9; +notcp → rc 1 'no UDP'; bad type → rc 1"
+    "failures: refused @server → rc 9 'communications error' + 'no servers could be reached'; DoH 503 → rc 9; non-DNS content type → rc 9; +notcp → rc 1 'no UDP'; bad type → rc 1",
+    "AD flag (homescoop#177): queries set AD by default, so a validating resolver's answer prints `ad` (the fake sets it for signed.test); +noadflag clears it; +cdflag sets CD (echoed as `cd`)",
+    "BIND's columns (homescoop#177, masterdump.c indent()): TTL at 24, class 32, type 40, rdata 48, tabs then spaces; an owner wider than its column gets a space (`<long name>. 300 IN\\tA 192.0.2.20`); the question counts columns without the `;`",
+    "DNSSEC presentation (homescoop#177, RFC 4034/5155 as BIND prints them): DNSKEY `257 3 13 <base64 in 56-character words>`, +nocrypto `[key id = 2371]`; DS `2371 13 2 <HEX in 56-character words>`; RRSIG with YYYYMMDDHHMMSS times and the signer, +nocrypto `[omitted]`; NSEC `\\000.nonexist… RRSIG NSEC TYPE128`; NSEC3 base32hex hash and type list; NSEC3PARAM `1 0 0 -` (real cloudflare.com, ietf.org and nic.cz rdata)",
+    "HTTPS/SVCB (homescoop#403): `1 . alpn=\"h2\"`; cloudflare.com's and crypto.cloudflare.com's real HTTPS rdata: alpn=\"h3,h2\", ipv4hint/ipv6hint lists, ech= unsplit base64",
+    "unknown types (homescoop#403, RFC 3597): TYPE999 in the type column (question and answer) and `\\# 4 01020304` as its data",
+    "DoH 502 (homescoop#177): rc 9 and the hint that the endpoint may not allow cross-origin requests from a browser (cloudflare-dns.com does)"
   ]
 }

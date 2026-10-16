@@ -23,9 +23,33 @@ function dnsFake(req) {
     'www.example.test': [['CNAME', 600, 'example.test']],
     '_sip._tcp.example.test': [['SRV', 300, [0, 5, 5060, 'sip.example.test']]],
     '10.2.0.192.in-addr.arpa': [['PTR', 300, 'example.test']],
+    'a-very-long-owner-name-for-testing.example.test': [['A', 300, '192.0.2.20']],
+    // homescoop#403: HTTPS (RFC 9460) and a type nobody knows (RFC 3597).
+    'https.test': [['HTTPS', 300, { hex: '00010000010003026832' }]],
+    'cloudflare.test': [
+      ['HTTPS', 300, { hex: '0001000001000602683302683200040008681084e5681085e500060020260647000000000000000000681084e5260647000000000000000000681085e5' }],
+    ],
+    'ech.test': [
+      ['HTTPS', 300, { hex: '0001000001000302683200040008a29f874fa29f884f000500470045fe0d0041b0002000207e7457212c943718f88248ddf09c2951848323daa0aa293faf922b9313acec490004000100010012636c6f7564666c6172652d6563682e636f6d0000000600202606470000070000000000' + '00a29f874f260647000007000000000000a29f884f' }],
+    ],
+    'unknown.test': [['TYPE999', 60, { hex: '01020304' }]],
+    // homescoop#177: DNSSEC records (cloudflare.com's KSK, DS and an RRSIG,
+    // ietf.org's NSEC, nic.cz's NSEC3), under a zone the fake "validates".
+    'signed.test': [
+      ['A', 300, '192.0.2.30'],
+      ['DNSKEY', 3600, { hex: '0101030d99db2cc14cabdc33d6d77da63a2f15f71112584f234e8d1dc428e39e8a4a97e1aa271a555dc90701e17e2a4c4b6f120b7c32d44f4ac02bd894cf2d4be7778a19' }],
+      ['DS', 86400, { hex: '09430d0232996839a6d808afe3eb4a795a0e6a7a39a76fc52ff228b22b76f6d63826f2b9' }],
+      ['RRSIG', 300, { hex: '00010d020000012c6ad32b4a6ad06c2a86c90a636c6f7564666c61726503636f6d00e64fb2eccd95d0599ae2339d08d29aadfb231e75f9296039a378cd63ab0f866910c377f3c05e693f951d24c51805d833d6d6c098aa0ce342446c8e1becb9125c' }],
+      ['NSEC3PARAM', 0, { hex: '0100000000' }],
+    ],
+    'nonexist.signed.test': [['NSEC', 1800, { hex: '0100086e6f6e6578697374067369676e656404746573740000110000000000030000000000000000000080' }]],
+    '763un4dcc4ck4mccm0gpgd68pmclpt31.signed.test': [['NSEC3', 1800, { hex: '01000000001439bd2520728c525523f7dfd40cd0aeed2be991130006400000080002' }]],
   };
   const TAILNET = { 'host.tailnet.test': [['A', 60, '100.64.1.7']] };
-  const TYPES = { A: 1, NS: 2, CNAME: 5, SOA: 6, PTR: 12, MX: 15, TXT: 16, AAAA: 28, SRV: 33, OPT: 41, CAA: 257 };
+  const TYPES = {
+    A: 1, NS: 2, CNAME: 5, SOA: 6, PTR: 12, MX: 15, TXT: 16, AAAA: 28, SRV: 33, OPT: 41, CAA: 257,
+    DS: 43, RRSIG: 46, NSEC: 47, DNSKEY: 48, NSEC3: 50, NSEC3PARAM: 51, HTTPS: 65, TYPE999: 999,
+  };
   const u16 = (n) => [(n >> 8) & 255, n & 255];
   const u32 = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
   const name = (s) => {
@@ -38,6 +62,7 @@ function dnsFake(req) {
     return [b.length, ...b];
   };
   const rdata = (type, d) => {
+    if (d && d.hex) return d.hex.match(/../g).map((x) => parseInt(x, 16));
     switch (type) {
       case 'A': return d.split('.').map(Number);
       case 'AAAA': {
@@ -85,7 +110,10 @@ function dnsFake(req) {
     const nx = qname !== 'whoami.test' && !zone[qname];
     const auth = nx || !ans.length ? [rr('example.test', ZONE['example.test'].find((r) => r[0] === 'SOA'))] : [];
     const opt = hasOpt ? [[0, ...u16(41), ...u16(1232), ...u32(0), ...u16(0)]] : [];
-    const flags = 0x8000 | (q[2] & 1 ? 0x0100 : 0) | 0x0080 | (nx ? 3 : 0);
+    // A validating resolver: AD when the query asks for it (dig sets AD
+    // by default) and the name is in the signed zone; CD echoed.
+    const ad = q[3] & 0x20 && (qname === 'signed.test' || qname.endsWith('.signed.test')) ? 0x0020 : 0;
+    const flags = 0x8000 | (q[2] & 1 ? 0x0100 : 0) | 0x0080 | ad | (q[3] & 0x10) | (nx ? 3 : 0);
     return new Uint8Array([
       q[0], q[1], ...u16(flags), ...u16(1), ...u16(ans.length), ...u16(auth.length), ...u16(opt.length),
       ...q.slice(12, qend), ...ans.flat(), ...auth.flat(), ...opt.flat(),
@@ -99,6 +127,8 @@ function dnsFake(req) {
   }
   const url = new URL(req.url);
   if (url.pathname === '/down') return { status: 503, body: 'resolver down\n' };
+  // What the realm proxy answers when an endpoint refuses CORS.
+  if (url.pathname === '/cors') return { status: 502, body: 'Bad Gateway\n' };
   if (url.pathname === '/html') return { headers: [['content-type', 'text/html']], body: '<p>not dns</p>' };
   const ctype = (req.headers.find(([k]) => k.toLowerCase() === 'content-type') ?? [])[1];
   if (req.method !== 'POST' || ctype !== 'application/dns-message') {
@@ -200,4 +230,66 @@ export default async function (ctx) {
   const badType = await dig(['-t', 'BOGUS', 'example.test']);
   assert.equal(badType.status, 1);
   assert.match(badType.stderr, /invalid type: BOGUS/);
+  // A browser embedder: a DoH endpoint without CORS comes back as 502.
+  const cors = await dig(['@https://doh.test/cors', '+tries=1', 'example.test']);
+  assert.equal(cors.status, 9);
+  assert.match(cors.stderr, /HTTP 502 from https:\/\/doh\.test\/cors \(the DoH endpoint may not allow cross-origin requests from a browser; cloudflare-dns\.com does\)/);
+
+  // homescoop#177: the AD flag. dig sets AD in its queries, so a validating
+  // resolver says `ad`; +noadflag clears it; +cdflag sets CD.
+  const flags = async (...args) => /^;; flags: ([a-z ]+);/m.exec(await ok(args))?.[1];
+  assert.equal(await flags('signed.test'), 'qr rd ra ad');
+  assert.equal(await flags('+noadflag', 'signed.test'), 'qr rd ra');
+  assert.equal(await flags('+cdflag', 'signed.test'), 'qr rd ra ad cd');
+  assert.equal(await flags('example.test'), 'qr rd ra');
+
+  // homescoop#177: BIND's columns when the owner is wider than one.
+  assert.equal(
+    await ok(['+noall', '+answer', 'a-very-long-owner-name-for-testing.example.test']),
+    'a-very-long-owner-name-for-testing.example.test. 300 IN\tA 192.0.2.20\n',
+  );
+  assert.equal(
+    await ok(['+noall', '+question', 'a-very-long-owner-name-for-testing.example.test']),
+    ';a-very-long-owner-name-for-testing.example.test. IN A\n',
+  );
+
+  // homescoop#177: DNSSEC records in RFC 4034 / 5155 presentation format,
+  // as BIND prints them (base64 and hex in 56-character words).
+  assert.deepEqual(await short('dnskey', 'signed.test'), [
+    '257 3 13 mdsswUyr3DPW132mOi8V9xESWE8jTo0dxCjjnopKl+GqJxpVXckHAeF+ KkxLbxILfDLUT0rAK9iUzy1L53eKGQ==',
+  ]);
+  assert.deepEqual(await short('+nocrypto', 'dnskey', 'signed.test'), ['257 3 13 [key id = 2371]']);
+  assert.deepEqual(await short('ds', 'signed.test'), [
+    '2371 13 2 32996839A6D808AFE3EB4A795A0E6A7A39A76FC52FF228B22B76F6D6 3826F2B9',
+  ]);
+  assert.deepEqual(await short('rrsig', 'signed.test'), [
+    'A 13 2 300 20261017080114 20261015060114 34505 cloudflare.com. 5k+y7M2V0Fma4jOdCNKarfsjHnX5KWA5o3jNY6sPhmkQw3fzwF5pP5Ud JMUYBdgz1tbAmKoM40JEbI4b7LkSXA==',
+  ]);
+  assert.deepEqual(await short('+nocrypto', 'rrsig', 'signed.test'), [
+    'A 13 2 300 20261017080114 20261015060114 34505 cloudflare.com. [omitted]',
+  ]);
+  assert.deepEqual(await short('nsec', 'nonexist.signed.test'), ['\\000.nonexist.signed.test. RRSIG NSEC TYPE128']);
+  assert.deepEqual(await short('nsec3param', 'signed.test'), ['1 0 0 -']);
+  assert.equal(
+    await ok(['+noall', '+answer', 'nsec3', '763un4dcc4ck4mccm0gpgd68pmclpt31.signed.test']),
+    '763un4dcc4ck4mccm0gpgd68pmclpt31.signed.test. 1800 IN NSEC3 1 0 0 - 76UIA83IHH95A8VNRVA0PK5ETKLUJ48J A AAAA RRSIG\n',
+  );
+  assert.equal(
+    await ok(['+noall', '+answer', 'dnskey', 'signed.test']),
+    'signed.test.\t\t3600\tIN\tDNSKEY\t257 3 13 mdsswUyr3DPW132mOi8V9xESWE8jTo0dxCjjnopKl+GqJxpVXckHAeF+ KkxLbxILfDLUT0rAK9iUzy1L53eKGQ==\n',
+  );
+
+  // homescoop#403: HTTPS in BIND's format, unknown types as RFC 3597.
+  assert.deepEqual(await short('-t', 'HTTPS', 'https.test'), ['1 . alpn="h2"']);
+  assert.equal(
+    await ok(['+noall', '+answer', 'https', 'cloudflare.test']),
+    'cloudflare.test.\t300\tIN\tHTTPS\t1 . alpn="h3,h2" ipv4hint=104.16.132.229,104.16.133.229 ipv6hint=2606:4700::6810:84e5,2606:4700::6810:85e5\n',
+  );
+  assert.deepEqual(await short('https', 'ech.test'), [
+    '1 . alpn="h2" ipv4hint=162.159.135.79,162.159.136.79 ech=AEX+DQBBsAAgACB+dFchLJQ3GPiCSN3wnClRhIMj2qCqKT+vkiuTE6zsSQAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA= ipv6hint=2606:4700:7::a29f:874f,2606:4700:7::a29f:884f',
+  ]);
+  assert.deepEqual(await short('-t', 'TYPE999', 'unknown.test'), ['\\# 4 01020304']);
+  const unknown = await ok(['-t', 'TYPE999', 'unknown.test']);
+  assert.ok(unknown.includes(';; QUESTION SECTION:\n;unknown.test.\t\t\tIN\tTYPE999\n'), unknown);
+  assert.ok(unknown.includes(';; ANSWER SECTION:\nunknown.test.\t\t60\tIN\tTYPE999\t\\# 4 01020304\n'), unknown);
 }

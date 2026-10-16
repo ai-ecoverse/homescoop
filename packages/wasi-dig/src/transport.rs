@@ -58,6 +58,13 @@ pub fn send(o: &Opts, query: &[u8]) -> Result<Reply, String> {
         let status = res.status();
         let ctype = res.header("content-type").unwrap_or("").to_ascii_lowercase();
         let bytes = res.into_bytes().map_err(|e| e.to_string())?;
+        if status == 502 {
+            // In a browser the realm proxy can only fetch endpoints that
+            // allow CORS; it answers 502 when the preflight is refused.
+            return Err(format!(
+                "HTTP 502 from {url} (the DoH endpoint may not allow cross-origin requests from a browser; cloudflare-dns.com does)"
+            ));
+        }
         if status != 200 {
             return Err(format!("HTTP {status} from {url}"));
         }
