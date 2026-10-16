@@ -1,5 +1,49 @@
 # Negative proof (zip)
 
+## 3.0.0-3 (homescoop#570, CVE-2022-0529/0530)
+
+**Date:** 2026-10-16, slicc-kernel 1.94.0, users enforce, with the same setup as 3.0.0-2 below.
+
+3.0.0-2's `UNICODE_SUPPORT` (#431) turned on unzip 6.0's Unicode name code. 3.0.0-3 fixes three problems in it:
+
+- **CVE-2022-0529/0530.** Debian's fix (unzip 6.0-31, `cve-2022-0529-and-cve-2022-0530.patch`) is carried as `unzip-cve-2022-0529-0530.patch`, without its two `getZip64Data` hunks, which depend on Debian's CVE-2014-8141 patch. `utf8.mjs`'s `unzip -U` pass runs that code (below).
+- **#570's new case.** unzip took a Unicode Path extra field even when it isn't UTF-8, and then couldn't create the file. 3.0.0-1 ignored the field.
+- **The `-U` arm that fix missed** (`unzip-escape-bound.patch`, below).
+
+The 3.0.0-3 recipe, rebuilt without `unzip-unipath-utf8.patch` (every other patch applied), fails only `utf8.mjs` (`--soft`). Its entry `n.txt` has a Unicode Path field holding `ff c0 80 ed a0 80 2e`. These are the first failures; the `-U` ones follow, below:
+
+```
+FAIL utf8.mjs:27#5 | unzip -l shows n.txt
+FAIL utf8.mjs:31   | unzip -d: rc 50
+                     error:  cannot create out/�����.
+                             Illegal byte sequence
+FAIL utf8.mjs:34#5 | out/n.txt: cat: out/n.txt: No such file or directory
+```
+
+The published 3.0.0-2 (`d212c879…`) fails the same way. 3.0.0-3 extracts `out/n.txt` with its bytes, and every spec and `cert/noshell/` pass.
+
+**`unzip -U` (homescoop#583).** `-U` escapes every non-ASCII name (`#L01f600.txt`) through `utf8_to_local_string` → `wide_to_local_string`, the code with CVE-2022-0529/0530 in it. `utf8.mjs` runs `unzip -U -l` and `unzip -U -d` on `esc.zip`, which holds:
+- a CP437 name with a Unicode Path field that isn't UTF-8;
+- `e.txt` with a Unicode Path of `😀.txt`;
+- `café.txt` (bit 11).
+
+| Build | `utf8.mjs` lines 53–63 (`-U`) |
+| --- | --- |
+| 3.0.0-3 | pass |
+| without `unzip-cve-2022-0529-0530.patch` | pass: the UTF-8 check drops the field before it reaches that code |
+| without `unzip-unipath-utf8.patch` | `unzip -U -l: rc 2` and `-U -d: rc 2`, `error: Unicode filename corrupt.` (the CVE fix catching the bad field), but no `RuntimeError` |
+| neither (the published 3.0.0-2) | also `RuntimeError: memory access out of bounds`, rc 70, for both |
+
+**`unzip -U` of 31-bit characters (`unzip-escape-bound.patch`, Codex P1 on #579).** unzip still decodes 5- and 6-byte UTF-8 sequences. With `-U`, each becomes a 10-byte `#L7fffffff`, but `wide_to_local_string()` reserved 8 bytes an escape (`MAX_ESCAPE_BYTES`), and its `-U` arm appended with `strcat()`: Debian's CVE-2022-0529 fix bounded only the other arm. `utf8.mjs`'s `six.zip` holds a bit-11 name of 24 such sequences (`fd bf bf bf bf bf`) and `ok.txt`. The 3.0.0-3 recipe without this patch (every other patch applied), and the published 3.0.0-2, fail only lines 77–83:
+
+```
+FAIL utf8.mjs:77 | unzip -U -l six.zip: rc 70   (RuntimeError: memory access out of bounds)
+FAIL utf8.mjs:79 | unzip -U -l shows every 31-bit character as #L7fffffff
+FAIL utf8.mjs:81 | unzip -U -d six.zip: rc 70
+```
+
+With it, both list and extract `w#L7fffffff…#L7fffffff.txt` (24 escapes) and `ok.txt` with their bytes.
+
 ## 3.0.0-2 (homescoop#431, #432, #439, #440, #441)
 
 **Date:** 2026-10-16, slicc-kernel 1.94.0 (`cert/meta.json`, users enforce), wasm-bash 5.3.0-18 and wasm-coreutils 9.12.0-7 installed for `cert/*.mjs`, nothing but wasm-zip for `cert/noshell/`. Local builds (macOS arm64, emsdk 4.0.23, `bash scripts/host-run.sh zip`): the 3.0.0-2 tarball passes every spec and `cert/noshell/`, also on slicc-kernel 1.100.4.

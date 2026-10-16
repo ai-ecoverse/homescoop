@@ -28,5 +28,8 @@ about:
     Links slicc cli profile. zip-*.patch go into zip's tree, in filename
     order: zip -s 0 of a split archive (split-copy, #440), zip - to stdout
     (stdout-seek, #439), zip -T without a shell and a failed test's double
-    fclose (test-spawn, test-failed-fclose, #432). cert/meta.json maps each
+    fclose (test-spawn, test-failed-fclose, #432). unzip-*.patch go into
+    unzip's: Debian's CVE-2022-0529/0530 fix for the Unicode name code, the
+    -U escape arm that fix missed bounded too (escape-bound), and a Unicode
+    Path field that isn't UTF-8 is ignored (#570). cert/meta.json maps each
     to its spec.

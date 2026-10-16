@@ -1,0 +1,52 @@
+--- a/fileio.c
++++ b/fileio.c
+@@ -1996,6 +1996,36 @@
+ 
+ 
+ 
++#ifdef UNICODE_SUPPORT
++/* Well-formed UTF-8 (RFC 3629): no overlong forms, no surrogates, nothing
++   above U+10FFFF (homescoop#570). */
++static int utf8_is_valid(ZCONST char *s)
++{
++    ZCONST uch *p = (ZCONST uch *)s;
++
++    while (*p) {
++        ulg c;
++        int n, i;
++
++        if (*p < 0x80) { p++; continue; }
++        else if (*p >= 0xc2 && *p <= 0xdf) { n = 1; c = *p & 0x1f; }
++        else if (*p >= 0xe0 && *p <= 0xef) { n = 2; c = *p & 0x0f; }
++        else if (*p >= 0xf0 && *p <= 0xf4) { n = 3; c = *p & 0x07; }
++        else return FALSE;
++        for (i = 1; i <= n; i++) {
++            if ((p[i] & 0xc0) != 0x80) return FALSE;
++            c = (c << 6) | (p[i] & 0x3f);
++        }
++        if ((n == 2 && c < 0x800) || (n == 3 && c < 0x10000) ||
++            (c >= 0xd800 && c <= 0xdfff) || c > 0x10ffff)
++            return FALSE;
++        p += n + 1;
++    }
++    return TRUE;
++}
++#endif /* UNICODE_SUPPORT */
++
++
+ /************************/
+ /* Function do_string() */
+ /************************/
+@@ -2313,6 +2343,12 @@
+                   /* the standard filename field is UTF-8 */
+                   free(G.unipath_filename);
+                   G.unipath_filename = G.filename_full;
++                } else if (G.unipath_filename &&
++                           !utf8_is_valid(G.unipath_filename)) {
++                  /* homescoop#570: a Unicode Path field that isn't UTF-8
++                     can't name a file; keep the stored name instead. */
++                  free(G.unipath_filename);
++                  G.unipath_filename = NULL;
+                 }
+               }
+               if (G.unipath_filename) {

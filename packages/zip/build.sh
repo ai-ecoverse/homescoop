@@ -89,7 +89,11 @@ fi
 
 homescoop_stage_cli "$OUT" zip
 homescoop_stage_cli "$OUT" unzip
-# zip's licence (2007-Mar-4) and unzip's (2009-Jan-02): the package ships both.
-homescoop_stage_licenses "$ZIP_SRC"/LICENSE "$UNZ_SRC"/LICENSE
+# zip's licence (2007-Mar-4) and unzip's (2009-Jan-02): the package ships both,
+# each under its program's name.
+mkdir -p "$WORK/licenses"
+cp "$ZIP_SRC/LICENSE" "$WORK/licenses/zip-3.0-LICENSE"
+cp "$UNZ_SRC/LICENSE" "$WORK/licenses/unzip-6.0-LICENSE"
+homescoop_stage_licenses "$WORK/licenses/zip-3.0-LICENSE" "$WORK/licenses/unzip-6.0-LICENSE"
 echo "== zip: staged → $HOMESCOOP_PKG/package"
 
