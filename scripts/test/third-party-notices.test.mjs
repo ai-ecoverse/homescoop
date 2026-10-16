@@ -138,8 +138,9 @@ function aliases(c) {
 }
 
 // The package's own *.sh, plus the shared scripts/*.sh build drivers they
-// source (build-gnu-cli.sh). build-common.sh only defines the helpers, so
-// its template headings don't count for every package.
+// source (build-gnu-cli.sh). build-common.sh and notices-common.sh only
+// define the helpers: their template headings don't count, a call does.
+const HELPERS = new Set(['build-common.sh', 'notices-common.sh']);
 function scriptsOf(name) {
   const dir = join(root, 'packages', name);
   const lines = readdirSync(dir)
@@ -150,7 +151,7 @@ function scriptsOf(name) {
   const shared = new Set();
   for (const l of lines) {
     const m = l.match(/^\s*(?:source|\.)\s+"?\$\{?(?:ROOT|HOMESCOOP_ROOT)\}?\/scripts\/([\w.-]+\.sh)"?/);
-    if (m && m[1] !== 'build-common.sh') shared.add(m[1]);
+    if (m && !HELPERS.has(m[1])) shared.add(m[1]);
   }
   for (const f of shared) lines.push(...readFileSync(join(root, 'scripts', f), 'utf8').split('\n'));
   return lines;
