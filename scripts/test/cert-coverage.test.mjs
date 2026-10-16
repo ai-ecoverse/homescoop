@@ -65,7 +65,6 @@ const NO_USERS_ENFORCE = [
   'sqlite3', // #819
   'wasi-biome', // #819
   'wasi-dig', // #819
-  'wasi-esbuild', // #819
   'wasi-fnox', // #819
   'wasi-ripgrep', // #819
   'wasi-uv', // #772
