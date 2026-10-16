@@ -291,6 +291,9 @@ jobs:
           retention-days: 30
           overwrite: true
           if-no-files-found: ignore
+      - if: always()
+        continue-on-error: true
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.21.0
 
   report:
     needs: [gate, plan, shard]
