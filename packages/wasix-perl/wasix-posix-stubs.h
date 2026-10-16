@@ -3,6 +3,7 @@
 #define HOMESCOOP_WASIX_POSIX_STUBS_H
 
 #include <errno.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -38,12 +39,31 @@ _Noreturn void siglongjmp(sigjmp_buf, int);
 #define HOMESCOOP_STUB_ERR do { errno = EOPNOTSUPP; return -1; } while (0)
 
 
+/*
+ * flock as whole-file fcntl record locks (homescoop#631): wasix-libc has no
+ * flock symbol, and until 5.42.0-14 this answered every flock with success,
+ * so two autom4te runs raced on one autom4te.cache. slicc-kernel enforces
+ * F_SETLK / F_SETLKW between processes from 1.100.0 (slicc.fcntl_lock;
+ * engines.slicc-kernel). This is perl's own flock emulation without
+ * flock(2) (pp_sys.c, fcntl_emulate_flock), with fcntl's semantics: the
+ * lock belongs to the process (fork doesn't inherit it, closing any handle
+ * on the file drops it), LOCK_EX needs a handle open for writing and
+ * LOCK_SH one open for reading (else EBADF).
+ */
 #undef flock
 static inline int homescoop_flock(int fd, int operation) {
-  if (fcntl(fd, F_GETFD) < 0) return -1;
-  int op = operation & ~LOCK_NB;
-  if (op != LOCK_SH && op != LOCK_EX && op != LOCK_UN) { errno = EINVAL; return -1; }
-  return 0;
+  struct flock fl;
+  memset(&fl, 0, sizeof fl);
+  fl.l_whence = SEEK_SET; /* l_start 0, l_len 0: the whole file */
+  switch (operation & ~LOCK_NB) {
+    case LOCK_SH: fl.l_type = F_RDLCK; break;
+    case LOCK_EX: fl.l_type = F_WRLCK; break;
+    case LOCK_UN: fl.l_type = F_UNLCK; break;
+    default: errno = EINVAL; return -1;
+  }
+  if (fcntl(fd, (operation & LOCK_NB) ? F_SETLK : F_SETLKW, &fl) == 0) return 0;
+  if (errno == EACCES || errno == EAGAIN) errno = EWOULDBLOCK;
+  return -1;
 }
 #define flock(fd, op) homescoop_flock((fd), (op))
 
