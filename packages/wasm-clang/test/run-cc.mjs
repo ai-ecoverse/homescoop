@@ -271,18 +271,31 @@ try {
       [['-O2', '@outer.rsp'], 'nest.wasm', true, {}],
       // Braces and ~ in a response file are clang's literal names (#755).
       [['-O2', '@brace.rsp'], 'br{a,b}.wasm', true, {}],
+      // Quotes, backslashes, tabs and CRLF next to { } ~ $, read by clang's
+      // tokenizer, not the shell's (#769), also in a long file.
+      [['-O2', '@bq.rsp'], 'q {x}.wasm', true, {}],
+      [['-O2', '@dq.rsp'], 'd o.wasm', true, {}],
+      [['-O2', '@esc.rsp'], "e s'c~.wasm", true, {}],
+      [['-O2', '@long.rsp'], 'long {$L}.wasm', true, {}],
     ];
     await k.writeFile('/home/cc/r28h.h', await k.readFile('/home/cc/r28.c'));
     await k.writeFile('/home/cc/q.rsp', 'r28.c -o "sp ace.wasm"\n');
     await k.writeFile('/home/cc/outer.rsp', '@inner.rsp\n');
     await k.writeFile('/home/cc/inner.rsp', 'r28.c\n-o nest.wasm\n');
     await k.writeFile('/home/cc/brace.rsp', 'r28.c -o br{a,b}.wasm\n');
+    await k.writeFile('/home/cc/bq.rsp', 'r28.c -o "q {x}.wasm"\n');
+    await k.writeFile('/home/cc/dq.rsp', '-DX=$Y r28.c -o "d o.wasm"\n');
+    await k.writeFile('/home/cc/esc.rsp', "r28.c\t-o e\\ s\\'c~.wasm\r\n");
+    const defs = Array.from({ length: 400 }, (_, i) => `'-DLONG_${i}="v ${i}"' -I"inc dir ${i}"`).join('\n');
+    await k.writeFile('/home/cc/long.rsp', `${defs}\nr28.c -o 'long {$L}.wasm'\n`);
     for (const [argv, file, want, env] of variants) {
+      const t0 = Date.now();
       const r = await run(['wasixcc', ...argv], { cwd: '/home/cc', env: { ...ccEnv, ...env } });
       assert.equal(r.status, 0, `wasixcc ${argv.join(' ')}: rc=${r.status}\n${r.stdout}${r.stderr}`);
       const mod = new WebAssembly.Module(Buffer.from(await k.readFile(`/home/cc/${file}`)));
       const got = WebAssembly.Module.exports(mod).some((e) => e.name === 'asyncify_start_unwind');
       assert.equal(got, want, `wasixcc ${argv.join(' ')}${env.WASIXCC_ASYNCIFY ? ` (WASIXCC_ASYNCIFY=${env.WASIXCC_ASYNCIFY})` : ''} → ${file}: asyncify ${got ? 'yes' : 'no'}`);
+      if (argv.includes('@long.rsp')) console.log(`== wasixcc -O2 @long.rsp (${defs.length + 40} bytes, 800 quoted words): ${Date.now() - t0} ms`);
     }
     // Calls that write no program leave an a.out beside them alone, the
     // asyncified one and a non-wasm one (homescoop#710, #711).
