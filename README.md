@@ -70,7 +70,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-freetype` | host | **2.13.3-2** |
 | `@ai-ecoverse/wasm-pkgconf` | host | **2.3.0-5** (slicc `libc_gaps` / `slicc_sigpipe`) |
 | `@ai-ecoverse/wasm-libpng` | host | **1.6.50**; dep `@ai-ecoverse/wasm-zlib` |
-| `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2-2** (emcmake, no SIMD) |
+| `@ai-ecoverse/wasm-libjpeg-turbo` | host | **3.1.2-3** (emcmake, no SIMD) |
 | `@ai-ecoverse/wasm-openjpeg` | host | **2.5.3** (emcmake, codec off) |
 | `@ai-ecoverse/wasm-libtiff` | host | **4.7.0**; deps zlib + jpeg |
 | `@ai-ecoverse/wasm-libheif` | host | **1.23.6-2** (`heif-convert` / `heif-dec` / `heif-info`; libde265 + dav1d; static libs for relinking). **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
