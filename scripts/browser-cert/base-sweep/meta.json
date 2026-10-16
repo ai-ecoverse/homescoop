@@ -191,6 +191,13 @@
         "-V"
       ]
     },
+    "unzip": {
+      "argv": [
+        "unzip",
+        "-v"
+      ],
+      "why": "UnZip has no --version: it answers 'caution: both -n and -o specified' and exits 10 (PK_PARAM); -v prints the version banner, rc 0"
+    },
     "uptime": {
       "argv": [
         "uptime"
@@ -233,6 +240,13 @@
     },
     "yes": {
       "sh": "yes | head -1"
+    },
+    "zipinfo": {
+      "argv": [
+        "zipinfo",
+        "-h"
+      ],
+      "why": "wasm-zip 3.0.0-4 (#644) adds zipinfo, which exits 10 on --version like unzip (#660); -h prints the ZipInfo banner and usage, rc 0"
     }
   },
   "real": {
