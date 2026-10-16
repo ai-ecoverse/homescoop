@@ -16,6 +16,7 @@ import { spawnSync } from 'node:child_process';
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   openSync,
@@ -28,7 +29,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -56,20 +57,30 @@ function filesUnder(dir, rel = '') {
 
 export function corruptTargets(pkgRoot) {
   const manifest = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
+  const real = realpathSync(pkgRoot);
+  const within = (file) => {
+    const rel = relative(real, realpathSync(file));
+    return rel !== '' && rel.split(sep)[0] !== '..' && !isAbsolute(rel);
+  };
   const targets = new Set();
   const missing = [];
+  const outside = [];
+  const consider = (rel, named) => {
+    const file = resolve(pkgRoot, rel);
+    if (!existsSync(file)) return named && missing.push(rel);
+    if (lstatSync(file).isSymbolicLink() || !within(file)) return outside.push(rel);
+    if (statSync(file).isFile()) targets.add(relative(real, realpathSync(file)).split(sep).join('/'));
+    else if (named) missing.push(rel);
+  };
   for (const command of Object.values(manifest.slicc?.commands ?? {})) {
     const wasm = command?.wasm;
     if (typeof wasm !== 'string' || !wasm) continue;
-    const rel = wasm.replace(/^\$\{package\}\//, '').replace(/^\.\//, '');
-    const file = join(pkgRoot, rel);
-    if (existsSync(file) && statSync(file).isFile()) targets.add(rel);
-    else missing.push(rel);
+    consider(wasm.replace(/^\$\{package\}\//, '').replace(/^\.\//, ''), true);
   }
   for (const rel of filesUnder(join(pkgRoot, 'bin'), 'bin')) {
-    if (rel.endsWith('.wasm') || startsWithMagic(join(pkgRoot, rel))) targets.add(rel);
+    if (rel.endsWith('.wasm') || startsWithMagic(join(pkgRoot, rel))) consider(rel, false);
   }
-  return { targets: [...targets].sort(), missing: [...new Set(missing)].sort() };
+  return { targets: [...targets].sort(), missing: [...new Set(missing)].sort(), outside: [...new Set(outside)].sort() };
 }
 
 function passThrough(argv) {
@@ -109,7 +120,11 @@ function main() {
       console.error(`prove-negative: cannot unpack ${tarball}`);
       return 1;
     }
-    const { targets, missing } = corruptTargets(pkgRoot);
+    const { targets, missing, outside } = corruptTargets(pkgRoot);
+    if (outside.length) {
+      console.error(`prove-negative: ${outside.join(', ')}: a link, or outside the package; refusing to touch it`);
+      return 1;
+    }
     for (const rel of missing) console.error(`prove-negative: slicc.commands names ${rel} as wasm, but the tarball has no such file`);
     if (targets.length === 0) {
       console.error('prove-negative: no WebAssembly module to corrupt (no slicc.commands wasm, no bin/*.wasm, nothing under bin/ starting with \\0asm)');
@@ -139,7 +154,7 @@ function main() {
       console.error('prove-negative: cert unexpectedly PASSED on corrupted wasm');
       return 1;
     }
-    const failed = (report?.specs || []).filter((s) => s.status === 'fail');
+    const failed = (report?.specs || []).filter((s) => s.status === 'fail' && s.error !== 'no default export');
     if (!failed.length) {
       console.error(
         `prove-negative: the cert did not get to run a spec (${report?.error || `run.mjs exited ${r.status ?? r.signal} without a report`}); nothing is proven`,

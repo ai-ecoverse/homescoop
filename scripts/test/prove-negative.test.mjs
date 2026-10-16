@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, copyFileSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -22,13 +22,13 @@ for (const f of JSON.parse(process.env.STUB_FILES)) sizes[f] = statSync(join(dir
 appendFileSync(process.env.STUB_LOG, JSON.stringify({ argv, sizes }) + '\\n');
 const mode = process.env.STUB_MODE;
 const empty = Object.entries(sizes).filter(([f]) => JSON.parse(process.env.STUB_RUNS).includes(f)).every(([, n]) => n === 0);
-const specs = mode === 'boot' ? [] : [{ spec: 'checklist.mjs', status: empty && mode !== 'pass' ? 'fail' : 'pass' }];
+const specs = mode === 'boot' ? [] : mode === 'noexport' ? [{ spec: 'checklist.mjs', status: 'fail', durationMs: 0, error: 'no default export' }] : [{ spec: 'checklist.mjs', status: empty && mode !== 'pass' ? 'fail' : 'pass' }];
 const status = mode === 'boot' || specs.some((s) => s.status === 'fail') ? 1 : 0;
 writeFileSync(at('--json'), JSON.stringify({ specs, error: mode === 'boot' ? '@ai-ecoverse/slicc-shared-web not found' : null, status: status ? 'fail' : 'pass' }));
 process.exit(status);
 `;
 
-function fixture(files, manifest) {
+function fixture(files, manifest, links = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'homescoop-prove-negative-')));
   mkdirSync(join(root, 'scripts', 'browser-cert'), { recursive: true });
   copyFileSync(join(scripts, 'browser-cert', 'prove-negative.mjs'), join(root, 'scripts', 'browser-cert', 'prove-negative.mjs'));
@@ -41,15 +41,20 @@ function fixture(files, manifest) {
     writeFileSync(join(pkg, rel), body);
     chmodSync(join(pkg, rel), 0o755);
   }
+  for (const [rel, target] of Object.entries(links)) {
+    mkdirSync(dirname(join(pkg, rel)), { recursive: true });
+    symlinkSync(target.replace('$ROOT', root), join(pkg, rel));
+  }
+  writeFileSync(join(root, 'outside.wasm'), WASM);
   const tgz = join(root, 'good.tgz');
-  spawnSync('tar', ['-czf', tgz, '-C', join(root, 'src'), 'package']);
+  spawnSync('tar', ['-czf', tgz, '-C', join(root, 'src'), 'package'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
   const log = join(root, 'stub.log');
   const prove = (runs, mode = 'spec', extra = []) => {
     rmSync(log, { force: true });
     const r = spawnSync(process.execPath, [join(root, 'scripts/browser-cert/prove-negative.mjs'), '--package', 'fixture', '--tarball', tgz, ...extra], {
       cwd: root,
       encoding: 'utf8',
-      env: { ...process.env, STUB_LOG: log, STUB_MODE: mode, STUB_FILES: JSON.stringify(Object.keys(files)), STUB_RUNS: JSON.stringify(runs) },
+      env: { ...process.env, TMPDIR: root, STUB_LOG: log, STUB_MODE: mode, STUB_FILES: JSON.stringify(Object.keys(files)), STUB_RUNS: JSON.stringify(runs) },
     });
     let calls = [];
     try {
@@ -57,7 +62,7 @@ function fixture(files, manifest) {
     } catch {}
     return { ...r, out: `${r.stdout}${r.stderr}`, calls };
   };
-  return { prove, done: () => rmSync(root, { recursive: true, force: true }) };
+  return { prove, outside: () => readFileSync(join(root, 'outside.wasm')), done: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 const ruby = {
@@ -121,6 +126,9 @@ test('a cert that passes on the corrupted tarball, or never runs a spec, proves 
     const boot = f.prove(['bin/ruby'], 'boot');
     assert.equal(boot.status, 1, boot.out);
     assert.match(boot.out, /the cert did not get to run a spec \(@ai-ecoverse\/slicc-shared-web not found\); nothing is proven/);
+    const noexport = f.prove(['bin/ruby'], 'noexport');
+    assert.equal(noexport.status, 1, noexport.out);
+    assert.match(noexport.out, /the cert did not get to run a spec .*; nothing is proven/);
   } finally {
     f.done();
   }
@@ -138,5 +146,24 @@ test('run.mjs flags pass through; the corrupted tarball comes first and the repo
     assert.deepEqual(argv.slice(argv.indexOf('--json') + 2), ['--kernel', '1.93.0', '--users', 'enforce', '--tarball', '/tmp/peer.tgz']);
   } finally {
     f.done();
+  }
+});
+
+test('a command wasm outside the package, or a link, is refused and left alone', () => {
+  for (const [manifest, links] of [
+    [{ slicc: { commands: { ruby: { wasm: '../../../outside.wasm' } } } }, {}],
+    [{ slicc: { commands: { ruby: { wasm: 'bin/ruby' } } } }, { 'bin/ruby': '$ROOT/outside.wasm' }],
+    [{ slicc: { commands: {} } }, { bin: '$ROOT' }],
+  ]) {
+    const f = fixture({ 'lib/keep.txt': 'x' }, manifest, links);
+    try {
+      const r = f.prove([]);
+      assert.equal(r.status, 1, r.out);
+      assert.match(r.out, /: a link, or outside the package; refusing to touch it/);
+      assert.equal(r.calls.length, 0);
+      assert.deepEqual(f.outside(), WASM);
+    } finally {
+      f.done();
+    }
   }
 });
