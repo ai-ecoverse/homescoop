@@ -102,3 +102,56 @@ int slicc_uname_import(intptr_t buf);
 int __syscall_uname(intptr_t buf) {
   return slicc_uname_import(buf);
 }
+
+// Resource limits (homescoop#178). Emscripten's libc answers prlimit64 with a
+// stub that refuses every change (EPERM), so `ulimit -S -n 64` failed in bash
+// and the kernel never saw the call. Here each process keeps its own limits:
+// they start where the stub's answers were (RLIMIT_NOFILE 4096, the size of
+// FS.MAX_OPEN_FDS; RLIMIT_STACK the wasm stack; the rest unlimited), and those
+// hard limits are what the process really has, so they can be lowered, never
+// raised, by root too (EPERM, as Linux for NOFILE beyond nr_open). A soft limit
+// may move anywhere up to its hard limit. fork() copies them with the rest of
+// memory; an exec starts a new program at the defaults (slicc-kernel keeps no
+// limits to pass on). The limits are advisory: nothing enforces them yet.
+#include <sys/resource.h>
+#include <unistd.h>
+#include <emscripten/stack.h>
+
+static struct rlimit slicc_rlimits[RLIM_NLIMITS];
+static int slicc_rlimits_ready;
+
+static void slicc_rlimits_init(void) {
+  if (slicc_rlimits_ready) return;
+  for (int i = 0; i < RLIM_NLIMITS; i++) slicc_rlimits[i].rlim_cur = slicc_rlimits[i].rlim_max = RLIM_INFINITY;
+  slicc_rlimits[RLIMIT_NOFILE].rlim_cur = slicc_rlimits[RLIMIT_NOFILE].rlim_max = 4096;
+  rlim_t stack = emscripten_stack_get_base() - emscripten_stack_get_end();
+  slicc_rlimits[RLIMIT_STACK].rlim_cur = slicc_rlimits[RLIMIT_STACK].rlim_max = stack;
+  slicc_rlimits_ready = 1;
+}
+
+int __syscall_prlimit64(int pid, int resource, intptr_t new_limit, intptr_t old_limit) {
+  if (pid != 0 && pid != getpid()) return -EPERM;
+  if (resource < 0 || resource >= RLIM_NLIMITS) return -EINVAL;
+  slicc_rlimits_init();
+  struct rlimit *cur = &slicc_rlimits[resource];
+  struct rlimit want;
+  if (new_limit) {
+    want = *(const struct rlimit *)new_limit;
+    if (want.rlim_cur > want.rlim_max) return -EINVAL;
+    if (want.rlim_max > cur->rlim_max) return -EPERM;
+  }
+  if (old_limit) *(struct rlimit *)old_limit = *cur;
+  if (new_limit) *cur = want;
+  return 0;
+}
+
+// Emscripten's libc leaves out musl's src/linux, so prlimit() itself was
+// missing (an undefined symbol at link time).
+int prlimit(pid_t pid, int resource, const struct rlimit *new_limit, struct rlimit *old_limit) {
+  int r = __syscall_prlimit64(pid, resource, (intptr_t)new_limit, (intptr_t)old_limit);
+  if (r < 0) {
+    errno = -r;
+    return -1;
+  }
+  return 0;
+}

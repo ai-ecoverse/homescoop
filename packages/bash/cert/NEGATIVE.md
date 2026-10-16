@@ -142,3 +142,11 @@ In CI, 58cdd390's successor lost the first ^C of `cert/jobs.mjs`. A key that rea
 
 5.3.0-12 also passes slicc-kernel's three #240 tests (ported) 3/3 each, ^C to subshell and builtin jobs 5/5, and kill-after-early-^Z with 0 failures in 48 rounds.
 
+
+## 5.3.0-19: ulimit (homescoop#178, 2026-10-16)
+
+`ulimit.mjs` against the published 5.3.0-18 (slicc-kernel 1.73.2, the cert kernel): FAIL, as root. `ulimit -S -n 64` is refused with `cannot modify limit: Operation not permitted`, and so is every other change: `-S -c 0`, `-H -n 1024`, and even `-S -n 5000` over the hard limit, which should be `Invalid argument`. stdout shows 4096 at every step. Emscripten's libc compiles `__syscall_prlimit64` in as a stub that refuses any new limit with EPERM and never asks the kernel. 5.3.0-19 links the shims' `__syscall_prlimit64` and passes.
+
+## 5.3.0-19: 40 symlink follows in redirections (homescoop#611, 2026-10-16)
+
+`symloop.mjs` against the published 5.3.0-18: FAIL at its first assertion, because `bin/bash`'s `FS.lookupPath` still has `nlinks < 40`. That release predates `scripts/emsdk-patches/libfs-symloop.patch` (#603). With that check switched off, the 40-link case fails: `bash: line 1: /tmp/s40/l0: Symbolic link loop`, rc 1. 39 links work. 5.3.0-19 is built with the patch.
