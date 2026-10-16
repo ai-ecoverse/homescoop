@@ -1,4 +1,5 @@
 import { repin } from '../../wasix-python/cert/fixtures/repin.mjs';
+import { assertRepinned } from './lib/repinned.mjs';
 
 const S = '@ai-ecoverse';
 const NM = `/node_modules/${S}`;
@@ -21,8 +22,8 @@ const IMPORTS =
   'import numpy, pandas, scipy.optimize, matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot, PIL, kiwisolver, contourpy, fontTools, cycler, packaging, pyparsing, dateutil, pytz, six, tzdata; print(numpy.__version__, pandas.__version__, scipy.__version__, matplotlib.__version__)';
 
 export default async function (ctx) {
-  process.env.HOMESCOOP_CERT_NO_REPIN = '1';
   const { run, write, read, assert } = ctx;
+  await assertRepinned(ctx);
   const sh = async (cmd) => {
     const r = await run(['bash', '-c', `set -e\n${cmd}`], { cwd: '/' });
     assert.equal(r.status, 0, `${cmd.slice(0, 200)}: ${r.stderr}`);
@@ -87,6 +88,7 @@ export default async function (ctx) {
     console.log(`discovery: refused before re-pin: ${stale.map(([p, v]) => `${p} (wasix-python ${v})`).join(', ')}`);
   }
   const pins = await repin(ctx);
+  assert.deepEqual(pins.moved, [], 'nothing to stand in for: the py-* are re-pinned');
   let r;
   try {
     await flatAndCost();

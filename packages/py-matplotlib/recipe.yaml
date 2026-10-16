@@ -4,7 +4,7 @@ version: "3.11.2"
 npm: "@ai-ecoverse/py-matplotlib"
 summary: "matplotlib Agg for slicc WASIX CPython 3.14"
 repack:
-  from: "3.11.2-7"
+  from: "3.11.2-8"
   files:
     - README.md
 dependencies:
