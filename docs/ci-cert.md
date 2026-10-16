@@ -75,6 +75,38 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 CI-certified set (automerge non-majors): see `scripts/ci-certified.json`
 (jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep, procps, which).
 
+## py-* python range
+
+A py-\* takes wasix-python as a range ([versioning.md](versioning.md#exact-ai-ecoverse-pins),
+#702). Its `cert/meta.json` installs the **newest** python in `needsInstall`
+(`@ai-ecoverse/wasix-python@<newest>`), so ladder-pr's browser cert runs on
+it, and declares one `ci` command:
+
+```sh
+node scripts/browser-cert/python-range.mjs <py-pkg> [--tarball .homescoop-out/package.tgz] [--lock-only] [--keep]
+```
+
+It takes the **floor** from the range in `packages/<py-pkg>/package/package.json`.
+Both pythons must be in the range; it warns when npm has a newer one in the
+range than `needsInstall`.
+
+1. For the floor and the newest, `npm install --package-lock-only` of the
+   tarball with that wasix-python must resolve exactly one python, at the
+   top level, at that version. The exact-pinned release before it nests a
+   second python under the newest, so this is its NEGATIVE.
+2. Without `--lock-only` (every py-\* with C extensions),
+   `scripts/cert-review/harness.sh` installs the cert's harness (kernel,
+   `needs`, Chromium). The script then moves wasix-python to the floor and
+   runs the package's specs again through `run.mjs`.
+
+A py-\*'s import smoke is `pyImport(ctx, { pkg, module, version, minExt })` from
+[`scripts/browser-cert/py-import.mjs`](../scripts/browser-cert/py-import.mjs).
+It checks that the package brings no python of its own and that `module` imports
+from `/node_modules/@ai-ecoverse/<pkg>` with no `PYTHONPATH` (discovery). It
+imports every `*.cpython-314-wasm32-wasix.so` under the module, and there must
+be at least `minExt` of them. A module named in `skip` is left out, and the spec's checklist says why (py-pillow's `PIL._imagingtk` traps on import, #588). It logs the wasix-python it ran on
+(`pythonUnderTest(ctx)`).
+
 ## Context API (`cert/*.mjs`)
 
 ```js

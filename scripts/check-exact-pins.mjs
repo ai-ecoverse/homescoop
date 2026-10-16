@@ -11,7 +11,9 @@
  * all fail: `pnpm add -g` / `npm i -g` would resolve the newest matching
  * version, not the one this package was certified with, and a global add
  * cannot override transitive versions. Pin the exact version that is `latest`
- * on npm and certified (docs/versioning.md).
+ * on npm and certified (docs/versioning.md). The one exception: an
+ * @ai-ecoverse/py-* takes wasix-python, in dependencies only, as
+ * `>=X.Y.Z-N <X.Y.Z+1` (pythonRange, rangeAllowed; homescoop#702).
  *
  * PENDING lists packages whose packaging-only re-release with exact pins is
  * still in flight (empty since py-matplotlib 3.11.2-3). They are reported,
@@ -29,6 +31,32 @@ const FIELDS = ['dependencies', 'peerDependencies', 'optionalDependencies'];
 export const EXACT =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
+export const PYTHON = '@ai-ecoverse/wasix-python';
+const PY_SCOPE = '@ai-ecoverse/py-';
+const RANGE = /^>=(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-(0|[1-9]\d*) <(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+
+export function pythonRange(spec) {
+  const m = typeof spec === 'string' ? RANGE.exec(spec) : null;
+  if (!m) return null;
+  const [x, y, z, n, a, b, c] = m.slice(1).map(Number);
+  if (a !== x || b !== y || c !== z + 1) return null;
+  return { floor: `${x}.${y}.${z}-${n}`, below: `${a}.${b}.${c}` };
+}
+
+export function inPythonRange(version, spec) {
+  const r = pythonRange(spec);
+  if (!r) return version === spec;
+  const v = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(0|[1-9]\d*))?$/.exec(String(version));
+  if (!v) return false;
+  const [fx, fy, fz, fn] = r.floor.split(/[.-]/).map(Number);
+  if (Number(v[1]) !== fx || Number(v[2]) !== fy || Number(v[3]) !== fz) return false;
+  return v[4] === undefined || Number(v[4]) >= fn;
+}
+
+export function rangeAllowed(pkg, field, dep, spec) {
+  return field === 'dependencies' && dep === PYTHON && typeof pkg.name === 'string' && pkg.name.startsWith(PY_SCOPE) && pythonRange(spec) !== null;
+}
+
 /** Recipes (packages/<name>) still waiting for their exact-pin re-release. */
 export const PENDING = new Set([]);
 
@@ -41,6 +69,7 @@ export function pinErrors(pkg) {
   for (const field of FIELDS) {
     for (const [dep, spec] of Object.entries(pkg[field] || {})) {
       if (!dep.startsWith(SCOPE)) continue;
+      if (rangeAllowed(pkg, field, dep, spec)) continue;
       if (typeof spec !== 'string' || !EXACT.test(spec.trim()) || spec !== spec.trim()) {
         errors.push(`${field}["${dep}"] = ${JSON.stringify(spec)} is not an exact version`);
       }
