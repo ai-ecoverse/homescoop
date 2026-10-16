@@ -2,17 +2,17 @@
 set -euo pipefail
 
 # renovate: datasource=github-releases depName=WebAssembly/wasi-sdk extractVersion=^wasi-sdk-(?<version>\d+)$
-WASI_SDK_MAJOR="24"
+WASI_SDK_MAJOR="34"
 VERSION="${HOMESCOOP_WASI_SDK_VERSION:-$WASI_SDK_MAJOR.0}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
     ARCH=x86_64-linux
-    PINNED_SHA="c6c38aab56e5de88adf6c1ebc9c3ae8da72f88ec2b656fb024eda8d4167a0bc5"
+    PINNED_SHA="b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
     ;;
   Darwin-arm64)
     ARCH=arm64-macos
-    PINNED_SHA="aeae999396d5f5caa5ce419f52e83c35869d5fd21d40af80acba2c80f51b0b3a"
+    PINNED_SHA="9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9"
     ;;
   *)
     echo "install-wasi-sdk: unsupported host $(uname -s)-$(uname -m)" >&2
