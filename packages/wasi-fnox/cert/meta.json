@@ -2,7 +2,8 @@
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.83.0",
   "needs": [
-    "@ai-ecoverse/wasm-coreutils"
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-bash"
   ],
   "source": "jdx/fnox v1.39.0 + packages/wasi-fnox/NNNN-*.patch (apply.sh); each patch maps to cert cases below",
   "checklist": [
@@ -18,6 +19,7 @@
     "proxy run with a 1password, a bitwarden and a vault provider configured: their credentials (OP_SERVICE_ACCOUNT_TOKEN, FNOX_OP_SERVICE_ACCOUNT_TOKEN, BW_SESSION, FNOX_BW_SESSION, VAULT_TOKEN, FNOX_VAULT_NAMESPACE) don't reach the child, as upstream (homescoop#401)",
     "exec with only plain secrets: the child gets the value, stderr warns that it was passed as a plain value; exec of a missing command exits 127",
     "exec --shell-grants without a vault fails closed (same errors)",
+    "shell integration (homescoop#400): hook-env -s bash exits 0 with `export LVL=debug` and the session, no panic or 134 trap; activate bash names /usr/bin/fnox, not a bare fnox its fnox() wrapper would call recursively; in bash, eval \"$(fnox activate bash)\" loads the secret at the hook, drops it outside the project, and fnox deactivate unsets it; an as_file secret is refused (no file in seven): hook-env skips it with the exec message, get fails with it",
     "test/sealed.mjs (KS-2, vault double): set from a pipe → seal {name, value} → placeholder stored, value not in fnox.toml, stdout, stderr or /proc/<pid>/cmdline",
     "test/sealed.mjs (KS-2, vault double): set on a terminal → request {kind: value} → status polled → placeholder stored; ^C sends cancel and exits 130; ^C during a 10 s machine wait cancels after the reply",
     "test/sealed.mjs (KS-2, vault double): check → placeholder {name}: removed records and unknown placeholders are errors, inert records warnings",
@@ -41,7 +43,8 @@
     "0011-wasi-allow-the-lints-that-code-compiled-out-on-WASI-.patch": "lint-only: the WASI build has no warnings (no runtime case)",
     "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs cases 9 and 14 (NEGATIVE.md: without 0012, case 9 fails)",
     "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs cases 6–8: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal (NEGATIVE.md: without 0013, case 6 fails)",
-    "0014-edit-refuse-fnox-edit-on-WASI-instead-of-panicking.patch": "checklist: fnox edit fails with \"fnox edit is not available in seven: use fnox set\", not the 134 trap (NEGATIVE.md: 1.39.0-1 traps)"
+    "0014-edit-refuse-fnox-edit-on-WASI-instead-of-panicking.patch": "checklist: fnox edit fails with \"fnox edit is not available in seven: use fnox set\", not the 134 trap (NEGATIVE.md: 1.39.0-1 traps)",
+    "0015-hook-env-and-activate-the-shell-integration-on-WASI.patch": "checklist: hook-env exits 0 with the exports (NEGATIVE.md: 1.39.0-3 traps with 134, \"no pids on this platform\"); activate names /usr/bin/fnox and works in bash; as_file refused in hook-env and get"
   },
   "sealedKernel": "@ai-ecoverse/slicc-kernel@1.83.0",
   "ci": [

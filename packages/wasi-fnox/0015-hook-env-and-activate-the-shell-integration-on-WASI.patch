@@ -1,0 +1,94 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Fri, 16 Oct 2026 08:45:37 +0200
+Subject: [PATCH] hook-env and activate: the shell integration on WASI
+
+`fnox hook-env`, which `fnox activate`'s prompt hook runs, keys its
+session hashes with std::process::id(). That panics on WASI ("no pids
+on this platform"), so the hook trapped with 134 at every prompt
+(homescoop#400). On WASI the pid now comes from the kernel, through
+wasix-command's process::id().
+
+`fnox activate` names fnox by its path in the hook it prints. WASI's
+std has no current_exe(), so 0003 printed a bare `fnox`. Inside the
+fnox() shell function that wraps the command, a bare `fnox` calls
+that function again, until the shell runs out of stack. Like upstream's
+which::which fallback, activate now looks for fnox on PATH
+(/usr/bin/fnox in seven).
+
+An as_file secret makes hook-env, get and export write its value to a
+file under std's temp_dir(), which also panics on WASI. In seven that
+file would put the value within a program's reach. So on WASI,
+create_persistent_secret_file refuses with the same message as
+`fnox exec` ("not available in seven: the value would be in a program
+(use a header rule)"). hook-env warns and skips the secret; get fails;
+export falls back to printing the value, as upstream does when the
+file can't be written.
+
+diff --git a/crates/fnox-core/src/temp_file_secrets.rs b/crates/fnox-core/src/temp_file_secrets.rs
+index 75fd08e..dd5501f 100644
+--- a/crates/fnox-core/src/temp_file_secrets.rs
++++ b/crates/fnox-core/src/temp_file_secrets.rs
+@@ -62,6 +62,11 @@ pub fn create_ephemeral_secret_file(key: &str, value: &str) -> Result<NamedTempF
+ /// The `prefix` is used to distinguish caller contexts (e.g., `\"fnox-\"`, `\"fnox-export-\"`,
+ /// `\"fnox-hook-\"`). Returns the file path as a `String`.
+ pub fn create_persistent_secret_file(prefix: &str, key: &str, value: &str) -> Result<String> {
++    // In seven a value in a file is in every program's reach, and std's
++    // temp_dir() and process::id() panic on WASI: refuse, as exec does.
++    #[cfg(target_os = "wasi")]
++    return Err(FnoxError::Seven(crate::sealed::REFUSED_IN_SEVEN.to_string()));
++
+     // Create a unique filename in the system temp directory
+     let temp_dir = env::temp_dir();
+     let timestamp = SystemTime::now()
+diff --git a/src/commands/activate.rs b/src/commands/activate.rs
+index c94ce9a..6c4b341 100644
+--- a/src/commands/activate.rs
++++ b/src/commands/activate.rs
+@@ -31,8 +31,19 @@ impl ActivateCommand {
+         let exe = std::env::current_exe()
+             .or_else(|_| which::which("fnox"))
+             .unwrap_or_else(|_| std::path::PathBuf::from("fnox"));
++        // std has no current_exe() on WASI, and a bare `fnox` makes the
++        // shell's fnox() wrapper call itself until the shell's stack runs out:
++        // find fnox on PATH, as the which fallback above does.
+         #[cfg(target_os = "wasi")]
+-        let exe = std::path::PathBuf::from("fnox");
++        let exe = std::env::var("PATH")
++            .ok()
++            .and_then(|path| {
++                path.split(':')
++                    .filter(|dir| !dir.is_empty())
++                    .map(|dir| std::path::Path::new(dir).join("fnox"))
++                    .find(|candidate| candidate.is_file())
++            })
++            .unwrap_or_else(|| std::path::PathBuf::from("fnox"));
+ 
+         let opts = ActivateOptions {
+             exe,
+diff --git a/src/hook_env.rs b/src/hook_env.rs
+index bc56d41..4a20540 100644
+--- a/src/hook_env.rs
++++ b/src/hook_env.rs
+@@ -85,6 +85,12 @@ impl HookEnvSession {
+ 
+         // Generate a random key for this session's hashes
+         use blake3::Hasher;
++        // std's process::id panics on WASI ("no pids on this platform"); the
++        // kernel knows the pid.
++        #[cfg(not(target_os = "wasi"))]
++        let pid = std::process::id();
++        #[cfg(target_os = "wasi")]
++        let pid = wasix_command::process::id();
+         let hash_key = *Hasher::new()
+             .update(b"fnox-session-")
+             .update(
+@@ -94,7 +100,7 @@ impl HookEnvSession {
+                     .as_nanos()
+                     .to_le_bytes(),
+             )
+-            .update(&std::process::id().to_le_bytes())
++            .update(&pid.to_le_bytes())
+             .finalize()
+             .as_bytes();
+ 

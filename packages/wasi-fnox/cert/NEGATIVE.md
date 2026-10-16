@@ -53,3 +53,16 @@ AssertionError [ERR_ASSERTION]: proxy run handed FNOX_OP_SERVICE_ACCOUNT_TOKEN t
 ```
 
 1.39.0-2's child also got `FNOX_BW_SESSION` and `FNOX_VAULT_NAMESPACE`. `fnox exec` is not part of this case: upstream v1.39.0's `exec` passes these variables through to the child as well (it removes only `FNOX_AGE_KEY`, `FNOX_AGE_KEY_FILE` and Enpass's password), and so does the WASI build.
+
+## 1.39.0-3 (without 0015): `fnox hook-env` traps, `fnox activate` recurses
+
+`cert/checklist.mjs` fails at the homescoop#400 case on 1.39.0-3 (slicc-kernel 1.83.0, 2026-10-16). hook-env keys its session with `std::process::id()`, which panics on WASI:
+
+```text
+browser-cert: FAIL packages/wasi-fnox/cert/checklist.mjs
+AssertionError [ERR_ASSERTION]: hook-env trapped: Error:   × Main thread panicked.
+  ├─▶ at /rustc/48a229ce…/library/std/src/sys/process/unsupported.rs:336:5
+  ╰─▶ no pids on this platform
+```
+
+With only the hook-env half of 0015, `eval "$(fnox activate bash)"; _fnox_hook` in wasm-bash ran out of stack (`RangeError: Maximum call stack size exceeded` in bash.wasm, `LVL` empty): the printed hook called a bare `fnox` inside its own `fnox()` function. 0015 prints `/usr/bin/fnox`.
