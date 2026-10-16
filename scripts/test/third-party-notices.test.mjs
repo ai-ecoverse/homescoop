@@ -15,7 +15,7 @@
 //   - DECLARED below, for recipes whose bundled code isn't in metadata yet.
 //
 // A component counts as named when a homescoop_notice heading in the
-// package's build scripts names it (or homescoop_notice_emscripten /
+// package's build scripts (and the shared drivers they source) names it (or homescoop_notice_emscripten /
 // homescoop_notice_wasix_libc is called), and package.json files[] ships
 // THIRD-PARTY-NOTICES.md. build.sh writes the file at build time, so this
 // is a check of what the next build ships.
@@ -139,13 +139,23 @@ function aliases(c) {
   return [...out].filter(Boolean);
 }
 
+// The package's own *.sh, plus the shared scripts/*.sh build drivers they
+// source (build-gnu-cli.sh). build-common.sh only defines the helpers, so
+// its template headings don't count for every package.
 function scriptsOf(name) {
   const dir = join(root, 'packages', name);
-  return readdirSync(dir)
+  const lines = readdirSync(dir)
     .filter((f) => f.endsWith('.sh'))
     .map((f) => readFileSync(join(dir, f), 'utf8'))
     .join('\n')
     .split('\n');
+  const shared = new Set();
+  for (const l of lines) {
+    const m = l.match(/^\s*(?:source|\.)\s+"?\$\{?(?:ROOT|HOMESCOOP_ROOT)\}?\/scripts\/([\w.-]+\.sh)"?/);
+    if (m && m[1] !== 'build-common.sh') shared.add(m[1]);
+  }
+  for (const f of shared) lines.push(...readFileSync(join(root, 'scripts', f), 'utf8').split('\n'));
+  return lines;
 }
 
 /** Pure: the violations for one package, given its metadata and build script lines. */
