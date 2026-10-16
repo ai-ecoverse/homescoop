@@ -2,7 +2,8 @@
  * wasi-uv checklist (homescoop#103): Astral's uv in slicc's kernel. The
  * cert kernel has no network, so the spec fetches pinned distributions
  * (sha256-checked) and uv resolves from them alone (no-index and
- * find-links in the user's uv.toml); everything else is uv's own venv /
+ * find-links in /home/uv.toml, named by UV_CONFIG_FILE on every run:
+ * HOME differs between harnesses); everything else is uv's own venv /
  * pip / project path.
  */
 import { createHash } from 'node:crypto';
@@ -27,7 +28,8 @@ const DISTS = [
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
-  const sh = (script, cwd = '/home') => run(['bash', '-c', script], { cwd });
+  const env = { UV_CONFIG_FILE: '/home/uv.toml' };
+  const sh = (script, cwd = '/home') => run(['bash', '-c', script], { cwd, env });
   const ok = async (script, cwd) => {
     const r = await sh(script, cwd);
     assert.equal(r.status, 0, `${script}: rc=${r.status}\nstdout=${r.stdout}\nstderr=${r.stderr}`);
@@ -45,8 +47,8 @@ export default async function (ctx) {
     await ok(`base64 -d ${name}.b64 > ${name} && rm ${name}.b64`, '/home/dists');
   }
 
-  // Resolve from /home/dists only (user configuration).
-  await write('/home/.config/uv/uv.toml', 'no-index = true\nfind-links = ["/home/dists"]\n');
+  // Resolve from /home/dists only.
+  await write('/home/uv.toml', 'no-index = true\nfind-links = ["/home/dists"]\n');
 
   // Astral's uv, built for the kernel.
   const ver = await ok('uv --version');

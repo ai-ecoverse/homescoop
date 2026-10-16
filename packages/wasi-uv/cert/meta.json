@@ -34,5 +34,5 @@
     "crates/astral-reqwest-retry-0.9.1.patch": "build; every client request",
     "rust/0001-std-wasi-paths-home-temp-and-no-exe-suffix.patch": "uv python find (PATH split, python not python.wasm), cache under $HOME, temp files"
   },
-  "network": "The cert kernel has no network: the spec fetches pinned distributions (sha256-checked) and uv resolves them alone (no-index, find-links in ~/.config/uv/uv.toml). PyPI over the kernel's CONNECT proxy (TLS with SSL_CERT_FILE) was checked by hand on the Node entry with nodeTransport: uv venv && uv pip install requests && uv run python -c 'import requests' → 2.34.2 /home/u/.venv."
+  "network": "The cert kernel has no network: the spec fetches pinned distributions (sha256-checked) and uv resolves them alone (no-index, find-links in /home/uv.toml via UV_CONFIG_FILE). PyPI over the kernel's CONNECT proxy (TLS with SSL_CERT_FILE) was checked by hand on the Node entry with nodeTransport: uv venv && uv pip install requests && uv run python -c 'import requests' → 2.34.2 /home/u/.venv."
 }
