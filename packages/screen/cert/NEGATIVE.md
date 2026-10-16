@@ -83,3 +83,16 @@ AssertionError [ERR_ASSERTION]: terminal B's device is not visible from the sess
 
 On 1.35.1 it passes, with the published 5.0.1-8 binary as well: the screen
 side needed no change.
+
+## A build-day date in screen -v (5.0.1-10, #497)
+
+Up to 5.0.1-10, `BUILD_DATE` in screen's `Makefile.in` was the time of the build, so
+`bin/screen.wasm` differed between two builds of the same tree (npm-parity sweeps
+38867940630 and 38873494942: same size, different bytes). `cert/checklist.mjs` now
+expects the date from `source.epoch`. Against the published 5.0.1-10 it fails:
+
+```text
+AssertionError [ERR_ASSERTION]: BUILD_DATE comes from source.epoch (SOURCE_DATE_EPOCH), not the build day
++ 'Screen version 5.0.1 (build on 2026-10-13 02:10:52) \n'
+- 'Screen version 5.0.1 (build on 2025-05-15 15:05:28) \n'
+```

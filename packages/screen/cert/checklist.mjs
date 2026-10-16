@@ -16,7 +16,7 @@ export default async function (ctx) {
 
   const ver = await go(['screen', '-v']);
   assert.equal(ver.status, 0);
-  assert.match(ver.stdout, /^Screen version 5\.0\.1 \(build on [0-9-]+ [0-9:]+\) \n$/);
+  assert.equal(ver.stdout, 'Screen version 5.0.1 (build on 2025-05-15 15:05:28) \n', 'BUILD_DATE comes from source.epoch (SOURCE_DATE_EPOCH), not the build day');
 
   // No sessions yet: rc 1 and the socket directory.
   const none = await go(['screen', '-ls']);

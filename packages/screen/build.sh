@@ -23,6 +23,11 @@ homescoop_apply_patches "$SRC_DIR"
 
 JOBS="${HOMESCOOP_JOBS:-4}"
 
+# screen -v prints BUILD_DATE, the build time unless SOURCE_DATE_EPOCH is set
+# (Makefile.in): pin it to the release, so a rebuild has the same bytes (#497).
+SOURCE_DATE_EPOCH="$(node "$ROOT/scripts/read-recipe.mjs" screen --field source.epoch)"
+export SOURCE_DATE_EPOCH
+
 # --- host tic/infocmp ---
 if [[ ! -x "$HOST_PREFIX/bin/tic" ]]; then
   echo "== screen: native ncurses (tic/infocmp)"
