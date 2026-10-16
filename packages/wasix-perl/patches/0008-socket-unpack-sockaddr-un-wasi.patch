@@ -1,0 +1,28 @@
+cpan/Socket/Socket.xs: unpack_sockaddr_un takes WASIX's short addresses
+
+Since wasix-sysroot -31 (homescoop#682) getsockname, getpeername, accept
+and recvfrom report an AF_UNIX address the way Linux does: the family,
+the path and its NUL (offsetof(sun_path) + strlen + 1), not
+sizeof(struct sockaddr_un). Socket.xs takes such lengths only on Linux,
+Cygwin, Solaris and the BSDs; everywhere else it insists on the full 112
+bytes, so unpack_sockaddr_un, IO::Socket::UNIX's hostpath and peerpath
+died with "Bad arg length for Socket::unpack_sockaddr_un, length is 14,
+should be 112" (homescoop#767). __wasi__ takes the Linux branch: the
+short address is copied and zero-filled. Linux's abstract-socket branch
+stays Linux-only.
+
+--- a/cpan/Socket/Socket.xs
++++ b/cpan/Socket/Socket.xs
+@@ -935,9 +935,10 @@
+         if (!SvOK(sun_sv))
+             croak("Undefined address for %s", "Socket::unpack_sockaddr_un");
+         sun_ad = SvPVbyte(sun_sv,sockaddrlen);
+-#   if defined(__linux__) || defined(__CYGWIN__) || defined(sun) || defined(HAS_SOCKADDR_SA_LEN)
++#   if defined(__linux__) || defined(__CYGWIN__) || defined(sun) || defined(HAS_SOCKADDR_SA_LEN) || defined(__wasi__)
+         /* On Linux, Cygwin, Solaris or *BSD sockaddrlen on sockets returned by accept,
+-         * recvfrom, getpeername and getsockname is not equal to sizeof(addr). */
++         * recvfrom, getpeername and getsockname is not equal to sizeof(addr).
++         * WASIX (wasix-sysroot) reports Linux lengths too: family, path, NUL. */
+         if (sockaddrlen < sizeof(addr)) {
+             Copy(sun_ad, &addr, sockaddrlen, char);
+             Zero(((char*)&addr) + sockaddrlen, sizeof(addr) - sockaddrlen, char);

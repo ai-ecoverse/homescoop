@@ -15,6 +15,16 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
 
+## 5.42.0-18: Unix-domain socket addresses
+
+`IO::Socket::UNIX`'s `hostpath` and `peerpath`, and
+`Socket::unpack_sockaddr_un` on what `getsockname`, `getpeername` or
+`accept` return, give the socket's path. Since wasix-sysroot -31 these
+return a Linux-length address (the family, the path and its NUL), and up to
+5.42.0-17 Socket.xs accepted only the full 112-byte `sockaddr_un` there and
+died with `Bad arg length for Socket::unpack_sockaddr_un`; the sockets
+themselves worked (homescoop#767).
+
 ## 5.42.0-15 / -16: flock excludes other processes
 
 `flock` takes whole-file `fcntl` record locks (`LOCK_SH` → `F_RDLCK`,
