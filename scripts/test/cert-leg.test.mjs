@@ -291,10 +291,17 @@ test('extra_kernels: a malformed object entry fails the leg, in plan and in ci',
     specs: [{ extra_kernels: [{ kernel: k, why: 'x', specs: ['../a.mjs'] }] }, /specs is not true or a list/],
     env: [{ extra_kernels: [{ kernel: k, why: 'x', specs: true, env: { A: 1 } }] }, /env is not an object/],
     cert: [{ extra_kernels: [{ kernel: k, why: 'x', specs: true, cert: 'nope' }] }, /cert is not a subdirectory/],
+    absent: [{ extra_kernels: [{ kernel: k, why: 'x', specs: ['b.mjs'] }] }, /specs b\.mjs not in cert\//],
     hostspecs: [{ harness: 'host-node', ci: ['true'], extra_kernels: [{ kernel: k, why: 'x', specs: true }] }, /harness host-node runs no browser specs/],
   };
   const f = fixture(Object.fromEntries(Object.entries(cases).map(([n, [meta]]) => [n, { meta, specs: ['a.mjs'] }])));
   try {
+    // specs: true on a cert/ subdirectory with no spec in it would run nothing.
+    mkdirSync(join(f.root, 'packages', 'emptydir', 'cert', 'empty'), { recursive: true });
+    mkdirSync(join(f.root, 'packages', 'emptydir', 'package'));
+    writeFileSync(join(f.root, 'packages', 'emptydir', 'package', 'package.json'), '{}');
+    writeFileSync(join(f.root, 'packages', 'emptydir', 'cert', 'meta.json'), JSON.stringify({ extra_kernels: [{ kernel: k, why: 'x', specs: true, cert: 'empty' }] }));
+    cases.emptydir = [null, /cert\/empty\/ has no \*\.mjs spec, so nothing would run/];
     for (const [name, [, re]] of Object.entries(cases)) {
       const p = f.leg('plan', name);
       assert.equal(p.status, 1, name);
@@ -332,6 +339,7 @@ test('browser-extra: glue by path on the dev-pin kernel when the cert kernel pre
   });
   try {
     mkdirSync(join(f.root, 'packages', 'tar', 'cert', 'k108'));
+    writeFileSync(join(f.root, 'packages', 'tar', 'cert', 'k108', 'inherit.mjs'), 'export default async () => {};\n');
     for (const name of ['old', 'off']) {
       const r = f.leg('browser-extra', name);
       assert.equal(r.status, 0, r.stdout);

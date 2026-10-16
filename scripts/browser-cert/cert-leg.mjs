@@ -63,6 +63,13 @@ export function readExtraKernels(dir, pkg, meta) {
       bad('cert is not a subdirectory of cert/');
     }
     if (e.cert !== undefined && e.specs === undefined) bad('names a cert directory but no specs');
+    if (e.specs !== undefined) {
+      const specDir = join(dir, 'packages', pkg, 'cert', e.cert || '');
+      const have = existsSync(specDir) ? readdirSync(specDir).filter((f) => f.endsWith('.mjs')) : [];
+      if (!have.length) bad(`specs: cert/${e.cert ? `${e.cert}/` : ''} has no *.mjs spec, so nothing would run on ${e.kernel}`);
+      const absent = Array.isArray(e.specs) ? e.specs.filter((f) => !have.includes(f)) : [];
+      if (absent.length) bad(`specs ${absent.join(', ')} not in cert/${e.cert ? `${e.cert}/` : ''}`);
+    }
     if (e.users !== undefined && !['off', 'report', 'enforce'].includes(e.users)) bad('users is not off, report or enforce');
     if (e.env !== undefined && (!e.env || typeof e.env !== 'object' || Array.isArray(e.env) || Object.entries(e.env).some(([k, v]) => !ENV_NAME.test(k) || typeof v !== 'string'))) {
       bad('env is not an object of NAME: "string"');

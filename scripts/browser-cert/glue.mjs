@@ -100,3 +100,25 @@ export function glueFallback({ meta, manifest, certKernel, fallbackKernel }) {
   if (!extra.run) throw new Error(`glue by path: the fallback kernel ${fallbackKernel} cannot run it either (${extra.why})`);
   return { why: `${certKernel}: ${main.why}`, kernel: fallbackKernel, users: 'enforce' };
 }
+
+/**
+ * What run.mjs does with a package (homescoop#628's --glue-only included):
+ * 'glue-only' (no specs, no smoke), 'specs', 'smoke', or 'skip' (with why).
+ */
+export function runMode({ glueOnly, specs, abi, commands }) {
+  if (glueOnly) return { mode: 'glue-only' };
+  if (specs > 0) return { mode: 'specs' };
+  if (abi !== 'emscripten') return { mode: 'skip', why: `abi=${abi}; no cert/*.mjs` };
+  if (!commands) return { mode: 'skip', why: 'no slicc.commands; lib cert is host-smoke' };
+  return { mode: 'smoke' };
+}
+
+/**
+ * After the specs: 'run' glue by path, 'fail' (--glue-only, but this kernel
+ * or users mode cannot run it), or 'skip' (log `why` when there is glue).
+ */
+export function glueStep({ glueOnly, plan }) {
+  if (plan.run) return { action: 'run' };
+  if (glueOnly) return { action: 'fail', why: `--glue-only, but glue by path cannot run: ${plan.why}` };
+  return { action: 'skip', why: plan.why, log: plan.targets.length > 0 };
+}
