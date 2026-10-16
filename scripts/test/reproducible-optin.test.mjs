@@ -36,7 +36,6 @@ const ALLOW = new Map([
   ['less', 808],
   ['libheif', 808],
   ['libiconv', 808],
-  ['libjpeg-turbo', 638],
   ['libpng', 808],
   ['libtiff', 808],
   ['libwebp', 808],
