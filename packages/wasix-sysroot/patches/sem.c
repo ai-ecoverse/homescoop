@@ -50,9 +50,9 @@ __attribute__((import_module("slicc"), import_name("sem_getvalue")))
 int32_t __slicc_sem_getvalue(int32_t handle, int32_t value_out);
 
 #define SLICC_SEM_TAG 0x5c1cc5e3
-#define SLICC_SEM_MAX 256
-
-static struct { sem_t *sem; uint32_t handle; int count; } named[SLICC_SEM_MAX];
+struct slicc_named { sem_t *sem; uint32_t handle; int count; };
+static struct slicc_named *named;
+static size_t named_cap;
 static volatile int named_lock[1];
 
 static int is_named(const sem_t *s)
@@ -148,21 +148,30 @@ sem_t *sem_open(const char *name, int flags, ...)
 		return SEM_FAILED;
 	}
 	LOCK(named_lock);
-	int free_slot = -1;
-	for (int i = 0; i < SLICC_SEM_MAX; i++) {
+	size_t free_slot = named_cap;
+	for (size_t i = 0; i < named_cap; i++) {
 		if (named[i].sem && named[i].handle == h) {
 			named[i].count++;
 			sem_t *s = named[i].sem;
 			UNLOCK(named_lock);
 			return s;
 		}
-		if (!named[i].sem && free_slot < 0) free_slot = i;
+		if (!named[i].sem && free_slot == named_cap) free_slot = i;
 	}
-	sem_t *s = free_slot < 0 ? 0 : malloc(sizeof *s);
+	if (free_slot == named_cap) {
+		size_t cap = named_cap ? named_cap * 2 : 16;
+		struct slicc_named *grown = realloc(named, cap * sizeof *grown);
+		if (grown) {
+			memset(grown + named_cap, 0, (cap - named_cap) * sizeof *grown);
+			named = grown;
+			named_cap = cap;
+		}
+	}
+	sem_t *s = free_slot < named_cap ? malloc(sizeof *s) : 0;
 	if (!s) {
 		UNLOCK(named_lock);
 		__slicc_sem_close((int32_t)h);
-		errno = free_slot < 0 ? EMFILE : ENOMEM;
+		errno = ENOMEM;
 		return SEM_FAILED;
 	}
 	memset(s, 0, sizeof *s);
@@ -182,7 +191,7 @@ int sem_close(sem_t *s)
 	int32_t err = __slicc_sem_close((int32_t)h);
 	if (err) return fail(err);
 	LOCK(named_lock);
-	for (int i = 0; i < SLICC_SEM_MAX; i++) {
+	for (size_t i = 0; i < named_cap; i++) {
 		if (named[i].sem == s) {
 			if (--named[i].count == 0) {
 				named[i].sem = 0;

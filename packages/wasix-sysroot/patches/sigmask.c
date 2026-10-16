@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
-#include <poll.h>
 #include <wasi/api.h>
 
 __attribute__((import_module("slicc"), import_name("sigmask_set")))
@@ -146,58 +145,3 @@ int sigwait(const sigset_t *restrict mask, int *restrict sig)
 	(void)mask; (void)sig;
 	return ENOSYS;
 }
-
-int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout, const sigset_t *mask)
-{
-	__wasi_subscription_t subs[2 * nfds + 1];
-	__wasi_size_t ns = 0;
-	int nval = 0;
-	for (nfds_t i = 0; i < nfds; i++) {
-		struct pollfd *p = &fds[i];
-		p->revents = 0;
-		if (p->fd < 0) continue;
-		if (!(p->events & (POLLRDNORM | POLLWRNORM))) {
-			__wasi_fdstat_t st;
-			if (__wasi_fd_fdstat_get(p->fd, &st) == __WASI_ERRNO_BADF) { p->revents = POLLNVAL; nval++; }
-			continue;
-		}
-		if (p->events & POLLRDNORM)
-			subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_READ, .u.u.fd_read.file_descriptor = p->fd };
-		if (p->events & POLLWRNORM)
-			subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_WRITE, .u.u.fd_write.file_descriptor = p->fd };
-	}
-	if (timeout) {
-		if (timeout->tv_sec < 0 || timeout->tv_nsec < 0 || timeout->tv_nsec >= 1000000000) { errno = EINVAL; return -1; }
-		__wasi_timestamp_t t;
-		if (__builtin_mul_overflow((__wasi_timestamp_t)timeout->tv_sec, 1000000000, &t) || __builtin_add_overflow(t, (__wasi_timestamp_t)timeout->tv_nsec, &t)) t = UINT64_MAX;
-		subs[ns++] = (__wasi_subscription_t){ .u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = t ? t : 1 };
-	}
-	if (nval) {
-		if (timeout) ns--;
-		if (ns == 0) return nval;
-		subs[ns++] = (__wasi_subscription_t){ .u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = 1 };
-	}
-	__wasi_event_t ev[ns ? ns : 1];
-	__wasi_size_t ne;
-	__wasi_errno_t err = __slicc_poll_masked(mask, subs, ev, ns, &ne);
-	if (err) { errno = err; return -1; }
-	for (__wasi_size_t i = 0; i < ne; i++) {
-		const __wasi_event_t *e = &ev[i];
-		if (e->type != __WASI_EVENTTYPE_FD_READ && e->type != __WASI_EVENTTYPE_FD_WRITE) continue;
-		struct pollfd *p = (struct pollfd *)(uintptr_t)e->userdata;
-		if (e->error == __WASI_ERRNO_BADF) p->revents |= POLLNVAL;
-		else if (e->error == __WASI_ERRNO_PIPE) p->revents |= POLLHUP;
-		else if (e->error) p->revents |= POLLERR;
-		else {
-			p->revents |= e->type == __WASI_EVENTTYPE_FD_READ ? POLLRDNORM : POLLWRNORM;
-			if (e->fd_readwrite.flags & __WASI_EVENTRWFLAGS_FD_READWRITE_HANGUP) p->revents |= POLLHUP;
-		}
-	}
-	int r = 0;
-	for (nfds_t i = 0; i < nfds; i++) {
-		if (fds[i].revents & POLLHUP) fds[i].revents &= ~POLLWRNORM;
-		if (fds[i].revents) r++;
-	}
-	return r;
-}
-
