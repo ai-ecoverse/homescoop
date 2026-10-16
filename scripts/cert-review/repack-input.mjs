@@ -176,9 +176,15 @@ export function buildFiles(readAt, commit, pkg) {
     files.push({ path, text });
     const body = stripComments(text).join('\n');
     const loops = loopWords(body);
+    // A package's own files (packages/<x>/…) run with HOMESCOOP_PKG = <x>;
+    // their once-assigned path variables are substituted. The shared scripts/
+    // helpers' $PKG etc. mean the package being built, as before.
+    const owned = /^packages\/[^/]+\//.test(path);
+    const vars = owned ? pathVars(body) : new Map();
     for (const m of body.matchAll(/[^\s;|&<>=`]*\.(?:sh|bash)\b/g)) {
       const raw = m[0].replace(/["']+$/, '');
-      const refs = expandLoopVars(raw, loops);
+      const substituted = substituteVars(raw, vars);
+      const refs = expandLoopVars(substituted, loops);
       if (!refs) {
         problems.push(`${path} runs ${raw}, whose package name is a variable this rule can't resolve (only a literal name, or a for-loop over literal names, can be followed)`);
         continue;
@@ -186,8 +192,19 @@ export function buildFiles(readAt, commit, pkg) {
       for (const ref of refs) {
         // A package's own build.sh (packages/<x>/…) runs with HOMESCOOP_PKG = <x>.
         const owner = path.match(/^packages\/([^/]+)\//)?.[1] || pkg;
-        const { paths, explicit } = resolveRef(ref, path, owner);
+        const resolved = resolveRef(ref, path, owner);
+        const { paths } = resolved;
+        // Only a reference that names the file itself is explicit; one that
+        // became explicit through a substituted variable may be a generated
+        // file in the work or output dir, so a missing one isn't an error.
+        const explicit = resolved.explicit && (substituted === raw || resolveRef(raw, path, owner).explicit);
         const found = paths.find((p) => p === path || seen.has(p) || read(p) != null);
+        if (owned && found === path && !resolved.explicit && /\$\{?[A-Za-z_]|\)\//.test(ref)) {
+          // "$PKGDIR/build.sh" inside packages/<x>/build.sh: the variable could
+          // be any package's dir, so don't read it as this file (fail closed).
+          problems.push(`${path} runs ${ref}, a script behind a variable this rule can't resolve (it would read as ${path} itself)`);
+          continue;
+        }
         if (!found) {
           if (explicit) problems.push(`${path} runs ${ref}, which isn't in the tree`);
           continue;
@@ -205,13 +222,44 @@ export function buildFiles(readAt, commit, pkg) {
   return { files, problems };
 }
 
+/**
+ * Path variables a script assigns exactly once (PKG="$HOMESCOOP_PKG",
+ * D="$HOMESCOOP_ROOT/packages/$r"): Map var → value. A variable assigned more
+ * than once isn't in the map, so a reference through it stays unresolved.
+ */
+export function pathVars(body) {
+  const seen = new Map();
+  for (const m of String(body).matchAll(/^\s*(?:export\s+|local\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)=("[^"\n]*"|'[^'\n]*'|[^\s;&|]*)\s*(?:$|;)/gm)) {
+    seen.set(m[1], seen.has(m[1]) ? null : m[2].replace(/^(["'])(.*)\1$/, '$2'));
+  }
+  return new Map([...seen].filter(([, v]) => v !== null && /[$/]/.test(v) && !/\$\(|`/.test(v)));
+}
+
+/** <ref> with the once-assigned path variables substituted (a few rounds, for chains). */
+export function substituteVars(ref, vars) {
+  let out = ref;
+  for (let round = 0; round < 4; round++) {
+    const next = out.replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (all, name) => (vars.has(name) ? vars.get(name) : all));
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 /** `for <var> in <literal words>; do` loops in a script: Map var → words. */
 export function loopWords(body) {
   const out = new Map();
-  for (const m of String(body).matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^;\n]*?)\s*(?:;|\n)\s*do\b/g)) {
+  const text = String(body);
+  for (const m of text.matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^;\n]*?)\s*(?:;|\n)\s*do\b/g)) {
     const words = m[2].trim().split(/\s+/).map((w) => w.replace(/^(["'])(.*)\1$/, '$2'));
-    if (!words.length || !words.every((w) => /^[A-Za-z0-9_.+-]+$/.test(w))) continue;
-    out.set(m[1], [...new Set([...(out.get(m[1]) || []), ...words])]);
+    // A loop over anything but literal words: the variable can't be resolved.
+    if (out.get(m[1]) === null || !words.length || !words.every((w) => /^[A-Za-z0-9_.+-]+$/.test(w))) out.set(m[1], null);
+    else out.set(m[1], [...new Set([...(out.get(m[1]) || []), ...words])]);
+  }
+  // A loop variable assigned anywhere else in the file (r=…, read r, local r=…)
+  // may not hold a loop word where it's used: null, so references fail closed.
+  for (const name of out.keys()) {
+    if (new RegExp(`(?:^|[\\s;&|(])(?:export\\s+|local\\s+|declare\\s+[-a-z]*\\s*|readonly\\s+)?${name}\\+?=|\\bread\\s+(?:-[a-z]+\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b`, 'm').test(text)) out.set(name, null);
   }
   return out;
 }
@@ -220,12 +268,17 @@ export function loopWords(body) {
  * The references a script path with loop variables stands for: one per loop
  * word ("packages/$r/build.sh" in `for r in a b; do` → packages/a/…, packages/b/…).
  * null when a package name under packages/ is still a variable afterwards,
- * so the caller fails closed instead of guessing.
+ * or the reference uses a loop variable that's also assigned elsewhere, so
+ * the caller fails closed instead of guessing.
  */
 export function expandLoopVars(ref, loops) {
   let refs = [ref];
   for (const [name, words] of loops) {
     const re = new RegExp(`\\$(?:\\{${name}\\}|${name}(?![A-Za-z0-9_]))`, 'g');
+    if (words === null) {
+      if (refs.some((r) => re.test(r))) return null;
+      continue;
+    }
     refs = refs.flatMap((r) => (re.test(r) ? words.map((w) => r.replace(re, w)) : [r]));
   }
   if (refs.some((r) => /(?:^|\/)packages\/[^/]*\$/.test(r))) return null;
@@ -335,19 +388,65 @@ export function sourceRule({ pkg, commit, readAt, recipe, label }) {
     reasons.push(...inTreeReasons({ pkg, commit, readAt, source, paths: inTree, files: build ? build.files : [], label }));
     return { reasons, sha: '', inTree: inTree.split(/\s+/).filter(Boolean), files: build ? build.files : null, prebuilt };
   }
-  if (build && !fetchesPinnedSource(build.files, sha)) reasons.push(`${label}'s build never fetches the pinned source (no homescoop_fetch of $SRC_SHA, $SHA or ${sha || 'source.sha256'})`);
+  if (build) reasons.push(...pinnedFetchReasons({ pkg, commit, readAt, files: build.files, sha, label }));
   if (!/^[0-9a-f]{64}$/.test(sha)) reasons.push(`${label}'s recipe pins no source sha256 (${sha || 'none'})`);
   return { reasons, sha, inTree: null, files: build ? build.files : null, prebuilt };
 }
 
 /**
+ * The pinned-source check, per package: a $SRC_SHA / $SHA in a file means the
+ * sha of the recipe that file's package loads (homescoop_load_recipe <x>), so
+ * a fetch counts for <pkg> only in packages/<pkg>/ and the shared scripts/,
+ * or in a followed packages/<other>/ whose recipe pins the same sha256. Every
+ * other package build it runs (packages/<other>/build.sh) must fetch its own
+ * recipe's pinned source too.
+ */
+export function pinnedFetchReasons({ pkg, commit, readAt, files, sha, label }) {
+  const reasons = [];
+  const ownerOf = (path) => path.match(/^packages\/([^/]+)\//)?.[1] || null;
+  const shared = files.filter((f) => ownerOf(f.path) === null);
+  const of = (owner) => [...files.filter((f) => ownerOf(f.path) === owner), ...shared];
+  const others = [...new Set(files.map((f) => ownerOf(f.path)).filter((o) => o && o !== pkg))].sort();
+  let ok = fetchesPinnedSource(of(pkg), sha);
+  for (const other of others) {
+    const text = readAt(commit, `packages/${other}/recipe.yaml`);
+    const r = text == null ? null : parseRecipe(text);
+    const otherSha = r?.source && typeof r.source === 'object' ? r.source.sha256 || '' : '';
+    if (!/^[0-9a-f]{64}$/.test(otherSha)) {
+      reasons.push(`${label}'s build runs packages/${other}/, whose recipe pins no source sha256 (${text == null ? 'no recipe.yaml' : otherSha || 'none'})`);
+      continue;
+    }
+    const fetched = fetchesPinnedSource(of(other), otherSha);
+    if (!fetched) reasons.push(`${label}'s build runs packages/${other}/, which never fetches its recipe's pinned source (${otherSha})`);
+    else if (otherSha === sha) ok = true;
+  }
+  if (!ok) reasons.push(`${label}'s build never fetches the pinned source (no homescoop_fetch of $SRC_SHA, $SHA or ${sha || 'source.sha256'})`);
+  return reasons;
+}
+
+/**
  * Downloads in the package build files (packages/…/*.sh) that no pinned
- * sha256 covers: curl, wget, git clone/fetch, and a homescoop_fetch whose
- * sha256 isn't a 64-hex literal. The shared scripts/*.sh helpers aren't
+ * sha256 or lockfile covers: curl, wget, git clone/fetch, a homescoop_fetch
+ * whose sha256 isn't a 64-hex literal, and the INSTALLS (pip, npm/npx, cargo
+ * without --locked/--frozen/--offline, go install/get, rustup, …). The shared scripts/*.sh helpers aren't
  * scanned: their downloads are homescoop_fetch or toolchain installers that
  * check a pinned sha256 (install-emsdk.sh, install-go.sh, …), reviewed as
  * repo code.
  */
+/**
+ * Package-manager and toolchain installs that download from a registry: each
+ * counts as unpinned unless its lockfile-pinned form is used (`pinned`, tested
+ * on the rest of the line).
+ */
+export const INSTALLS = [
+  { re: /\b(?:pip3?|python3?\s+-m\s+pip|uv\s+pip)\s+install\b/g, why: 'a pip install', pinned: /--require-hashes\b/ },
+  { re: /\bnpm\s+(?:install|i|add)\b|\bnpx\s|\b(?:pnpm|yarn)\s+(?:add|install|dlx)\b|\bpnpx\s/g, why: 'an npm/pnpm/yarn install', pinned: /--frozen-lockfile\b|--immutable\b/ },
+  { re: /\bcargo\s+(?:install|fetch|build|update|vendor)\b/g, why: 'a cargo download', pinned: /--locked\b|--frozen\b|--offline\b/ },
+  { re: /\bgo\s+(?:install|get)\b|\bgo\s+mod\s+download\b/g, why: 'a go install', pinned: null },
+  { re: /\brustup\s+(?:toolchain\s+install|target\s+add|component\s+add|install|update)\b|\brustup-init\b/g, why: 'a rustup toolchain download', pinned: null },
+  { re: /\b(?:gem\s+install|apt-get\s+install|apt\s+install|brew\s+install|conda\s+install)\b/g, why: 'a system/package-manager install', pinned: null },
+];
+
 export function unpinnedFetches(files) {
   const hits = [];
   for (const { path, text } of files) {
@@ -357,6 +456,12 @@ export function unpinnedFetches(files) {
       for (const m of line.matchAll(/(?<![-\w/.$])(curl|wget)\s+\S|\bgit\s+(?:-C\s+\S+\s+)?(clone|fetch)\b/g)) {
         if (/command\s+-v\s*$/.test(line.slice(0, m.index))) continue;
         hits.push({ path, line: i + 1, why: m[1] ? `a ${m[1]} download` : `a git ${m[2]}` });
+      }
+      for (const { re, why, pinned } of INSTALLS) {
+        for (const m of line.matchAll(re)) {
+          if (pinned && pinned.test(line.slice(m.index))) continue;
+          hits.push({ path, line: i + 1, why });
+        }
       }
       for (const m of line.matchAll(/\bhomescoop_fetch\s+("[^"]*"|'[^']*'|\S+)\s+("[^"]*"|'[^']*'|\S+)/g)) {
         if (!/^[0-9a-f]{64}$/.test(m[2].replace(/^["']|["']$/g, ''))) hits.push({ path, line: i + 1, why: `a homescoop_fetch of ${m[1]} with no literal sha256` });

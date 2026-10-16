@@ -153,6 +153,8 @@ test('helper references: packages/$r/build.sh over a for-loop is followed; an un
   const dir = plant(t, {
     'packages/demo/recipe.yaml': recipe(PINNED),
     'packages/demo/build.sh': relink,
+    'packages/alpha/recipe.yaml': recipe(PINNED),
+    'packages/beta/recipe.yaml': recipe(PINNED),
     'packages/alpha/build.sh': sub('alpha'),
     'packages/alpha/relink.sh': 'echo alpha\n',
     'packages/beta/build.sh': sub('beta'),
@@ -165,12 +167,27 @@ test('helper references: packages/$r/build.sh over a for-loop is followed; an un
   assert.match(r.reason, /BETA_ARTIFACT \(packages\/beta\/relink\.sh:1\)/);
   assert.doesNotMatch(r.reason, /never fetches the pinned source/);
 
+  // Without beta's prebuilt path, the fetches in the followed builds count,
+  // since both recipes pin the top recipe's sha.
+  const clean = plant(t, {
+    'packages/demo/recipe.yaml': recipe(PINNED),
+    'packages/demo/build.sh': relink,
+    'packages/alpha/recipe.yaml': recipe(PINNED),
+    'packages/beta/recipe.yaml': recipe(PINNED),
+    'packages/alpha/build.sh': sub('alpha'),
+    'packages/beta/build.sh': sub('beta'),
+    'packages/alpha/relink.sh': 'echo alpha\n',
+    'packages/beta/relink.sh': 'echo beta\n',
+  });
+  const c = await judge(clean);
+  assert.equal(c.attested, true, c.reason);
+
   const opaque = plant(t, { 'packages/demo/recipe.yaml': recipe(PINNED), 'packages/demo/build.sh': `${CLEAN}bash "$HOMESCOOP_ROOT/packages/$WHICH/build.sh"\n` });
   const o = await judge(opaque);
   assert.equal(o.attested, false);
   assert.match(o.reason, /runs "\$HOMESCOOP_ROOT\/packages\/\$WHICH\/build\.sh, whose package name is a variable this rule can't resolve/);
 
-  assert.deepEqual(Object.fromEntries(loopWords('for r in a "b"; do x; done\nfor q in $(ls); do y; done')), { r: ['a', 'b'] });
+  assert.deepEqual(Object.fromEntries(loopWords('for r in a "b"; do x; done\nfor q in $(ls); do y; done')), { r: ['a', 'b'], q: null });
   assert.deepEqual(expandLoopVars('packages/${r}/build.sh', new Map([['r', ['a', 'b']]])), ['packages/a/build.sh', 'packages/b/build.sh']);
   assert.equal(expandLoopVars('packages/$x/build.sh', new Map()), null);
   assert.deepEqual(unpinnedFetches([{ path: 'scripts/install-x.sh', text: 'curl -fsSL "$URL"\n' }]), [], 'shared helpers are not scanned');
@@ -213,4 +230,83 @@ test('verdict.mjs: a built recipe that fails the rule is INCOMPLETE whatever the
   const run = cli(broken);
   assert.equal(run.status, 2);
   assert.match(verdict(JSON.parse(run.stdout)).lines, /INCOMPLETE .*couldn't trace it \(no packages\/demo\/recipe\.yaml at HEAD\)/);
+});
+
+test('NEGATIVE: a followed package build fetches its own recipe sha, which only counts for that recipe', async (t) => {
+  // The top recipe pins A; its build.sh only runs packages/b/build.sh, whose
+  // $SHA is b's (homescoop_load_recipe b), pinned to B.
+  const top = `${HEAD}bash "$HOMESCOOP_ROOT/packages/b/build.sh"\n`;
+  const b = `${HEAD}homescoop_load_recipe b\nhomescoop_fetch "$SRC_URL" "$SHA" "$WORK/b.tgz"\n`;
+  const dir = plant(t, {
+    'packages/demo/recipe.yaml': recipe(PINNED),
+    'packages/demo/build.sh': top,
+    'packages/b/recipe.yaml': recipe(`source:\n  url: "https://example.org/b"\n  sha256: "${OTHER}"\n`),
+    'packages/b/build.sh': b,
+  });
+  const r = await judge(dir);
+  assert.equal(r.attested, false);
+  assert.match(r.reason, new RegExp(`demo at HEAD's build never fetches the pinned source \\(no homescoop_fetch of \\$SRC_SHA, \\$SHA or ${SHA}\\)`));
+  // And a followed package that pins nothing (or skip) is a reason of its own.
+  const skip = plant(t, {
+    'packages/demo/recipe.yaml': recipe(PINNED),
+    'packages/demo/build.sh': `${CLEAN}bash "$HOMESCOOP_ROOT/packages/b/build.sh"\n`,
+    'packages/b/recipe.yaml': recipe('source:\n  url: "https://example.org/b"\n  sha256: "skip"\n'),
+    'packages/b/build.sh': b,
+  });
+  const s = await judge(skip);
+  assert.equal(s.attested, false);
+  assert.match(s.reason, /demo at HEAD's build runs packages\/b\/, whose recipe pins no source sha256 \(skip\)/);
+});
+
+test('NEGATIVE: a package script behind one level of indirection, or a reassigned loop variable, fails closed', async (t) => {
+  // PKGDIR="$HOMESCOOP_ROOT/packages/$r" with $r from outside: unresolvable.
+  const indirect = plant(t, {
+    'packages/demo/recipe.yaml': recipe(PINNED),
+    'packages/demo/build.sh': `${CLEAN}PKGDIR="$HOMESCOOP_ROOT/packages/$1"\nbash "$PKGDIR/build.sh"\n`,
+  });
+  const i = await judge(indirect);
+  assert.equal(i.attested, false);
+  assert.match(i.reason, /whose package name is a variable this rule can't resolve/);
+  // A variable assigned twice isn't substituted; read as this file, it fails closed.
+  const twice = plant(t, {
+    'packages/demo/recipe.yaml': recipe(PINNED),
+    'packages/demo/build.sh': `${CLEAN}D="$WORK"\nD="$X"\nbash "$D/build.sh"\n`,
+  });
+  assert.match((await judge(twice)).reason, /runs "\$D\/build\.sh, a script behind a variable this rule can't resolve \(it would read as packages\/demo\/build\.sh itself\)/);
+  // A once-assigned PKG="$HOMESCOOP_PKG" is the package itself: fine.
+  const self = plant(t, { 'packages/demo/recipe.yaml': recipe(PINNED), 'packages/demo/build.sh': `${CLEAN}PKG="$HOMESCOOP_PKG"\nKEY="$(cat "$PKG/build.sh" | shasum)"\n` });
+  assert.equal((await judge(self)).attested, true);
+  // for r in a; do …; done; r="$X"; bash …/packages/$r/build.sh
+  const reused = plant(t, {
+    'packages/demo/recipe.yaml': recipe(PINNED),
+    'packages/demo/build.sh': `${CLEAN}for r in alpha; do echo "$r"; done\nr="$X"\nbash "$HOMESCOOP_ROOT/packages/$r/build.sh"\n`,
+    'packages/alpha/recipe.yaml': recipe(PINNED),
+    'packages/alpha/build.sh': CLEAN,
+  });
+  const u = await judge(reused);
+  assert.equal(u.attested, false);
+  assert.match(u.reason, /packages\/\$r\/build\.sh, whose package name is a variable this rule can't resolve/);
+});
+
+test('NEGATIVE: an in-tree build with a package-manager install is unverifiable, unless lockfile-pinned', async (t) => {
+  const files = { 'packages/demo/recipe.yaml': recipe(INTREE), 'packages/demo/Cargo.toml': '', 'packages/demo/src/main.rs': '' };
+  for (const [line, why] of [
+    ['pip install requests', 'a pip install'],
+    ['python3 -m pip install x', 'a pip install'],
+    ['npx some-tool', 'an npm/pnpm/yarn install'],
+    ['npm install', 'an npm/pnpm/yarn install'],
+    ['cargo install wasm-tools', 'a cargo download'],
+    ['cargo build --release', 'a cargo download'],
+    ['go install golang.org/x/tools@latest', 'a go install'],
+    ['rustup toolchain install 1.98.1', 'a rustup toolchain download'],
+  ]) {
+    const dir = plant(t, { ...files, 'packages/demo/build.sh': `${HEAD}${line}\n` });
+    const r = await judge(dir);
+    assert.equal(r.attested, false, line);
+    assert.match(r.reason, new RegExp(`downloads what no pinned sha256 covers: ${why} \\(packages/demo/build\\.sh:5\\)`), line);
+  }
+  for (const line of ['pip install --require-hashes -r req.txt', 'npm ci', 'pnpm install --frozen-lockfile', 'cargo build --locked --release', 'cargo build --frozen']) {
+    const dir = plant(t, { ...files, 'packages/demo/build.sh': `${HEAD}${line}\n` });
+    assert.equal((await judge(dir)).attested, true, line);
+  }
 });
