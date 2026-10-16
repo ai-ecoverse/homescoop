@@ -54,8 +54,14 @@ out=
 # link of nothing over an a.out (homescoop#711).
 no_output=0
 link_inputs=0
-takes_value=0
+takes_value=
 want_out=0
+lang=
+# An object or library handed to the linker directly (-Xlinker foo.o,
+# -Wl,foo.o,bar.a) is a link input too.
+linker_arg() {
+  case "$1" in *.o | *.a | *.so | *.lo | *.obj | -l?*) link_inputs=1 ;; esac
+}
 scan_arg() {
   _a=$1
   if [ "$want_out" -eq 1 ]; then
@@ -65,8 +71,12 @@ scan_arg() {
     out=$_a
     return 0
   fi
-  if [ "$takes_value" -eq 1 ]; then
-    takes_value=0
+  if [ -n "$takes_value" ]; then
+    case "$takes_value" in
+      -x) lang=$_a ;;
+      -Xlinker) linker_arg "$_a" ;;
+    esac
+    takes_value=
     return 0
   fi
   case "$_a" in
@@ -74,10 +84,26 @@ scan_arg() {
     -I | -L | -B | -D | -U | -x | -MF | -MT | -MQ | -include | -imacros | -isystem | -idirafter | -iquote | \
       -isysroot | --sysroot | -target | -arch | -Xlinker | -Xclang | -Xassembler | -Xpreprocessor | -mllvm | \
       -z | -u | -e | -working-directory | -resource-dir)
-      takes_value=1; return 0 ;;
+      takes_value=$_a; return 0 ;;
+    -x?*) lang=${_a#-x} ;;
     -) link_inputs=1 ;;
+    # Libraries are linker inputs, as for clang (`cc -lfoo` links).
+    -l?*) link_inputs=1 ;;
+    -Wl,*)
+      _ifs=$IFS
+      IFS=,
+      for _w in ${_a#-Wl,}; do linker_arg "$_w"; done
+      IFS=$_ifs
+      ;;
     -*) ;;
-    *.h | *.hh | *.hpp | *.hxx | *.H | *.h++) ;;
+    *.h | *.hh | *.hpp | *.hxx | *.H | *.h++)
+      # A header compiled as a translation unit (-x c main.h) links; one
+      # compiled as a header (no -x, or -x c-header) makes a PCH.
+      case "$lang" in
+        '' | none | *-header | *header-unit) ;;
+        *) link_inputs=1 ;;
+      esac
+      ;;
     *) link_inputs=1 ;;
   esac
   case "$_a" in

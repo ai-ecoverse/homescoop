@@ -258,10 +258,13 @@ try {
       [['-O2', 'r28.c', '-or28j.wasm'], 'r28j.wasm', true, {}],
       // clang passes its own -o after -Wl,-o,FILE, so the program is a.out.
       [['-O2', 'r28.c', '-Wl,-o,r28l.wasm'], 'a.out', true, {}],
+      // A header compiled as C is a translation unit, and links (Codex on #716).
+      [['-O2', '-x', 'c', 'r28h.h', '-o', 'r28h.wasm'], 'r28h.wasm', true, {}],
       // -Xlinker -o is the linker's, not the program's (homescoop#722).
       [['-O2', 'r28.c', '-Xlinker', '-o', '-Xlinker', 'xl.wasm'], 'a.out', true, {}],
       [['-O2', 'r28.c', '-o', 'r28n.wasm'], 'r28n.wasm', false, { WASIXCC_ASYNCIFY: '0' }],
     ];
+    await k.writeFile('/home/cc/r28h.h', await k.readFile('/home/cc/r28.c'));
     for (const [argv, file, want, env] of variants) {
       const r = await run(['wasixcc', ...argv], { cwd: '/home/cc', env: { ...ccEnv, ...env } });
       assert.equal(r.status, 0, `wasixcc ${argv.join(' ')}: rc=${r.status}\n${r.stdout}${r.stderr}`);
@@ -282,8 +285,9 @@ try {
     // A response file whose -o the program goes to (homescoop#721), a PCH
     // (#722) and -v with an option value (#711).
     await k.writeFile('/home/cc/args.rsp', 'r28.c -o r28r.wasm\n');
+    await k.writeFile('/home/cc/syn.rsp', '-fsyntax-only r18.c\n');
     const nonLinks = [['--version'], ['-v'], ['-v', '-B', '/tmp'], ['-fsyntax-only', 'r18.c'], ['-###', 'r18.c'], ['x.h'],
-      ['-x', 'c-header', 'x.h', '-o', 'x.pch'], ['-O2', '@args.rsp']];
+      ['-x', 'c-header', 'x.h', '-o', 'x.pch'], ['-O2', '@args.rsp'], ['@syn.rsp']];
     for (const content of [undefined, '#!/bin/sh\necho not wasm\n']) {
       if (content) await k.writeFile('/home/cc/a.out', content);
       const before = await aout();
