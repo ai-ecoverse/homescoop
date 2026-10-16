@@ -4,6 +4,8 @@
 name: wasi-impeccable
 builder: host
 runner: pool
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
 inputs:
   - crates/wasix-net/**
   - crates/wasix-ureq/**
@@ -49,3 +51,7 @@ about:
     0.1.15-2: the notice names wasi-sdk-33, which Rust 1.98.1 builds its
     wasi-libc from (homescoop#472); wasm-opt is required, and a module it
     rejects fails the build instead of shipping unoptimised (homescoop#473).
+    0.1.15-3: RUSTFLAGS remap the work tree, CARGO_HOME and the sysroot,
+    so impeccable.wasm no longer embeds the builder's registry paths and
+    the bytes don't depend on CARGO_HOME or the work directory
+    (homescoop#471); build.sh fails on any home, temp or rustup path.

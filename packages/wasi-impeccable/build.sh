@@ -40,8 +40,23 @@ mkdir -p "$OUT/bin"
 
 if [[ ! -f "$OUT/bin/impeccable.wasm" || -n "${FORCE:-}" ]]; then
   echo "== wasi-impeccable: cargo build -p impeccable ($TARGET, stripped)"
+  # Panic locations name source files: map the work directory, CARGO_HOME
+  # (the registry crates) and the toolchain's sysroot away, so the bytes
+  # don't depend on where the build ran (homescoop#471). Cargo hands rustc
+  # physical paths (macOS: /private/tmp/…), so map that spelling too.
+  SYSROOT="$("${CARGO[@]/cargo/rustc}" --print sysroot)"
+  CARGO_DIR="${CARGO_HOME:-$HOME/.cargo}"
+  mkdir -p "$CARGO_DIR"
+  REMAP=(
+    "--remap-path-prefix=$SRC_DIR=/impeccable"
+    "--remap-path-prefix=$(cd "$SRC_DIR" && pwd -P)=/impeccable"
+    "--remap-path-prefix=$CARGO_DIR=/cargo"
+    "--remap-path-prefix=$(cd "$CARGO_DIR" && pwd -P)=/cargo"
+    "--remap-path-prefix=$SYSROOT=/rustc"
+  )
   (
     cd "$SRC_DIR"
+    RUSTFLAGS="${REMAP[*]}" \
     CARGO_PROFILE_RELEASE_DEBUG=0 \
     CARGO_PROFILE_RELEASE_STRIP=true \
       "${CARGO[@]}" build --release -p impeccable --target "$TARGET"
@@ -65,10 +80,13 @@ chmod 755 "$DEST/impeccable.wasm"
 
 homescoop_stage_license "$SRC_DIR/LICENSE"
 
-# Refuse clear host-path leaks in the wasm.
-if strings "$DEST/impeccable.wasm" | grep -E '/Users/[^/]+/Developer|/var/folders/' >/dev/null
+# Refuse host-path leaks in the wasm: home directories (CARGO_HOME's
+# registry), temporary directories (the work tree), the runner's workspace.
+LEAK='/Users/|/home/[^/]+/|/tmp/|/private/|/var/folders/|/rustup/'
+if strings "$DEST/impeccable.wasm" | grep -E "$LEAK" >/dev/null
 then
   echo "homescoop: host path leaked into impeccable.wasm" >&2
+  strings "$DEST/impeccable.wasm" | grep -E "$LEAK" | head >&2
   exit 1
 fi
 
