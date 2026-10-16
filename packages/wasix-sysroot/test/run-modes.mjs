@@ -13,7 +13,8 @@
 // checks -22's slicc.libc marker in the linked program (ctx.wasm) and getitimer.
 //
 // --kernel-dir <dir> uses a local slicc-kernel build (its dist/node.js)
-// instead of meta.kernel, e.g. to try one before it is released. With
+// instead of meta.kernel, e.g. to try one before it is released;
+// --kernel <npm spec> a released one (an extra kernel, cert/meta.json). With
 // meta "slicc_fs": true the spec requires the kernel's slicc_fs imports;
 // --allow-absent checks the degraded path on a kernel without them.
 //
@@ -29,7 +30,7 @@ import { ptySession } from '../../../scripts/browser-cert/context.mjs';
 
 const args = process.argv.slice(2);
 if (!arg(args, '--tarball')) {
-  console.error('usage: run-modes.mjs --tarball <wasix-sysroot package.tgz> [--probe NAME] [--variant ehpic] [--kernel-dir <dir>] [--allow-absent]');
+  console.error('usage: run-modes.mjs --tarball <wasix-sysroot package.tgz> [--probe NAME] [--variant ehpic] [--kernel-dir <dir> | --kernel <npm spec>] [--allow-absent]');
   process.exit(2);
 }
 const tarball = resolve(arg(args, '--tarball'));
@@ -46,6 +47,7 @@ const VARIANTS = {
 const variant = arg(args, '--variant') ?? 'default';
 if (!VARIANTS[variant]) throw new Error(`--variant: one of ${Object.keys(VARIANTS).join(', ')}`);
 const kernelDir = arg(args, '--kernel-dir') && resolve(arg(args, '--kernel-dir'));
+const kernelSpec = arg(args, '--kernel') ?? meta.kernel;
 const work = mkdtempSync(join(tmpdir(), 'wasix-sysroot-modes-'));
 
 try {
@@ -63,7 +65,7 @@ try {
   }
   const side = build.side && env.WASIXCC_PIC === 'yes' ? join(work, `lib${build.side}.so`) : undefined;
   if (side) sideModule(env, prefix, build.side, side);
-  const k = await kernel(work, kernelDir, spec.kernelOptions);
+  const k = await kernel(work, kernelDir, spec.kernelOptions, kernelSpec);
   console.log(`== ${k.label} (Node entry)`);
   await k.install(pkg);
   if (side) await k.kernel.writeFile(`/tmp/lib${build.side}.so`, readFileSync(side));

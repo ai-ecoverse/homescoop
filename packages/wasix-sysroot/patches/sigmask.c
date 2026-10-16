@@ -14,6 +14,9 @@ int32_t __slicc_sigpending_get(int32_t ptr);
 __attribute__((import_module("slicc"), import_name("sigmask_poll")))
 int32_t __slicc_sigmask_poll(uint32_t set_lo, uint32_t set_hi, int32_t in_ptr, int32_t out_ptr, int32_t nsubscriptions, int32_t nevents_ptr);
 
+__attribute__((import_module("slicc"), import_name("sigwait")))
+int32_t __slicc_sigwait(uint32_t set_lo, uint32_t set_hi, int64_t timeout_ns, int32_t sig_ptr);
+
 extern _Thread_local unsigned __slicc_signals_run;
 
 #define UNBLOCKABLE ((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)))
@@ -128,11 +131,48 @@ int sigsuspend(const sigset_t *mask)
 	return -1;
 }
 
+static uint64_t now_ns(void)
+{
+	struct timespec t;
+	clock_gettime(CLOCK_MONOTONIC, &t);
+	return (uint64_t)t.tv_sec * 1000000000ULL + (uint64_t)t.tv_nsec;
+}
+
 int sigtimedwait(const sigset_t *restrict mask, siginfo_t *restrict si, const struct timespec *restrict timeout)
 {
-	(void)mask; (void)si; (void)timeout;
-	errno = ENOSYS;
-	return -1;
+	uint64_t s = from_set(mask) & ~UNBLOCKABLE & ~INTERNAL;
+	uint64_t ns = UINT64_MAX, deadline = 0;
+	if (timeout) {
+		if (timeout->tv_sec < 0 || (unsigned long)timeout->tv_nsec >= 1000000000UL) {
+			errno = EINVAL;
+			return -1;
+		}
+		ns = (uint64_t)timeout->tv_sec > (UINT64_MAX - 1 - (uint64_t)timeout->tv_nsec) / 1000000000ULL
+			? UINT64_MAX - 1
+			: (uint64_t)timeout->tv_sec * 1000000000ULL + (uint64_t)timeout->tv_nsec;
+		deadline = now_ns();
+		deadline = deadline > UINT64_MAX - 1 - ns ? UINT64_MAX - 1 : deadline + ns;
+	}
+	for (;;) {
+		uint32_t sig = 0;
+		int32_t err = __slicc_sigwait((uint32_t)s, (uint32_t)(s >> 32), (int64_t)ns, (int32_t)(uintptr_t)&sig);
+		if (!err) {
+			if (si) {
+				memset(si, 0, sizeof *si);
+				si->si_signo = (int)sig;
+				si->si_code = SI_USER;
+			}
+			return (int)sig;
+		}
+		if (err != EINTR) {
+			errno = err;
+			return -1;
+		}
+		if (timeout) {
+			uint64_t t = now_ns();
+			ns = t >= deadline ? 0 : deadline - t;
+		}
+	}
 }
 
 int sigwaitinfo(const sigset_t *restrict mask, siginfo_t *restrict si)
@@ -142,6 +182,13 @@ int sigwaitinfo(const sigset_t *restrict mask, siginfo_t *restrict si)
 
 int sigwait(const sigset_t *restrict mask, int *restrict sig)
 {
-	(void)mask; (void)sig;
-	return ENOSYS;
+	int e = errno;
+	int r = sigtimedwait(mask, 0, 0);
+	if (r < 0) {
+		int err = errno;
+		errno = e;
+		return err;
+	}
+	*sig = r;
+	return 0;
 }

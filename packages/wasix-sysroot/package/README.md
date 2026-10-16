@@ -41,6 +41,12 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-32 (slicc-kernel ≥ 1.108.0 for all three; older kernels keep -31's behaviour):
+
+- **`epoll_pwait` is atomic.** With a mask, it waits through `slicc.sigmask_epoll_wait` (slicc-kernel#783, 1.106.2): the kernel swaps the mask in for the wait and restores it on every path, so a signal the mask unblocks always ends the wait with EINTR. On a kernel without it, the libc keeps -31's swap around `epoll_wait` (homescoop#466).
+- **`sigwait`, `sigwaitinfo` and `sigtimedwait` work** through `slicc.sigwait` (slicc-kernel#786/#801, 1.106.2). They take a pending signal of the set, lowest first, without running its handler, or wait for one. `sigtimedwait` gives EAGAIN at the timeout and EINVAL for a bad `tv_nsec`. A handled signal outside the set runs its handler and the wait goes on, as musl's do. `siginfo_t` carries `si_signo` and `si_code = SI_USER`, with no sender pid. Up to -31, and on older kernels, they were ENOSYS (homescoop#520).
+- **Inherited ignores.** A program started with signals set to SIG_IGN (`nohup`, bash's `trap '' PIPE`) sees SIG_IGN for them in `sigaction`, read from `slicc.sigaction_inherited` (slicc-kernel#841, 1.108.0, homescoop#740). Up to -31 the libc reported SIG_DFL. `sa_flags` reach the kernel unchanged, so `SA_NOCLDWAIT` and SIGCHLD SIG_IGN reap children there.
+
 Since 2025.9.30-31:
 
 - **AF_UNIX addresses.** `getsockname`, `getpeername`, `accept`, `recvfrom`
@@ -57,9 +63,7 @@ Since 2025.9.30-31:
   as on Linux. Up to -30 such an entry never reported anything.
 - **More named semaphores.** The libc no longer limits a process to 256 named
   semaphores. slicc-kernel's own limit goes up with slicc-kernel#770.
-- **Known limit:** `epoll_pwait`'s mask swap isn't atomic yet. The kernel's
-  masked epoll wait comes with slicc-kernel#771, and until then the libc swaps
-  the mask around the wait.
+- **Known limit (lifted in -32):** `epoll_pwait`'s mask swap wasn't atomic.
 
 Since 2025.9.30-30 named semaphores work between processes. `sem_open`,
 `sem_close`, `sem_unlink`, `sem_wait`, `sem_trywait`, `sem_timedwait`,

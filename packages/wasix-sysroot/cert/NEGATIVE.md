@@ -1,5 +1,23 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-31: no kernel sigwait, inherited ignores read as SIG_DFL (-32, homescoop#520, #740, #466)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-31.tgz --probe r32 --kernel @ai-ecoverse/slicc-kernel@1.108.1`, default variant, 2026-10-16: FAIL. The kernel has all three imports (the probe calls them itself), but -31's libc doesn't use them. Every sigwait line is ENOSYS:
+
+```text
+sigwait: Function not implemented sig=-7 handler=0
+sigwaitinfo: -1 Function not implemented signo=0 code=? handler=0
+sigtimedwait 200ms: -1 Function not implemented early
+sigtimedwait 0: -1 Function not implemented fast
+sigtimedwait bad: -1 Function not implemented
+sigtimedwait through a handled alarm: -1 Function not implemented alarm=0 early
+sigwaitinfo from another thread's kill: -1 Function not implemented off handler=0
+```
+
+-32 passes r32 in all five variants on 1.108.1, and its fallback branch on 1.100.1.
+
+`SA_NOCLDWAIT` already reaches the kernel on -31 (its `sigaction_set` passes `sa_flags` raw), so that line is the kernel's, not a -32 change. The epoll_pwait race loop (200 rounds) didn't hit the swap window on -31 either, in this run. The atomic wait is the kernel's #783 and is covered by its own integration tests. Here, `build-incremental.sh` checks that every libc.a references `slicc.sigmask_epoll_wait`, and r32 checks the result.
+
 ## 2025.9.30-30: AF_UNIX addresses, events-0 hangup (-31, homescoop#515, #464)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-30.tgz --probe r31` on slicc-kernel 1.100.1 (2026-10-16): FAIL.

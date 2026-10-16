@@ -14,6 +14,9 @@
 __attribute__((import_module("slicc"), import_name("sigmask_set")))
 int32_t __slicc_sigmask_set(int32_t how, uint32_t set_lo, uint32_t set_hi, int32_t old_ptr);
 
+__attribute__((import_module("slicc"), import_name("sigwait")))
+int32_t __slicc_sigwait(uint32_t set_lo, uint32_t set_hi, int64_t timeout_ns, int32_t sig_ptr);
+
 __attribute__((import_module("slicc"), import_name("sigmask_poll")))
 int32_t __slicc_sigmask_poll(uint32_t set_lo, uint32_t set_hi, int32_t in_ptr, int32_t out_ptr, int32_t nsubscriptions, int32_t nevents_ptr);
 
@@ -196,14 +199,19 @@ int main(void) {
   printf("window masked: arrived_before_wait handler=%d; pselect %s handler=%d %s\n", before_wait, err(r), h, fast(dt, 1));
   reap(p);
 
-  siginfo_t si;
-  struct timespec z = {0, 0};
-  r = sigtimedwait(&all, &si, &z);
-  printf("sigtimedwait: %s\n", err(r));
-  r = sigwaitinfo(&all, &si);
-  printf("sigwaitinfo: %s\n", err(r));
-  int sg = -7;
-  printf("sigwait: %s sig=%d\n", strerror(sigwait(&all, &sg)), sg);
+  uint32_t probe_sig = 0;
+  if (__slicc_sigwait(0, 0, 0, (int32_t)(uintptr_t)&probe_sig) != ENOSYS) {
+    printf("sigwait family: slicc.sigwait (r32)\n");
+  } else {
+    siginfo_t si;
+    struct timespec z = {0, 0};
+    r = sigtimedwait(&all, &si, &z);
+    printf("sigtimedwait: %s\n", err(r));
+    r = sigwaitinfo(&all, &si);
+    printf("sigwaitinfo: %s\n", err(r));
+    int sg = -7;
+    printf("sigwait: %s sig=%d\n", strerror(sigwait(&all, &sg)), sg);
+  }
   printf("r28w done\n");
   return 0;
 }
