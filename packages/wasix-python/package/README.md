@@ -21,9 +21,9 @@ Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `
 Since 3.14.2-23:
 
 - `multiprocessing.connection`'s `Listener` on an AF_UNIX path closes
-  cleanly. slicc-kernel keeps socket paths out of the filesystem
-  (slicc-kernel#753), so the path it unlinks at close is already gone; up to
-  -22 `close()` raised `FileNotFoundError`. `multiprocessing.Manager()` also
+  cleanly on every kernel. slicc-kernel before 1.103.1 keeps socket paths out
+  of the filesystem (slicc-kernel#753), so the path it unlinks at close was
+  already gone, and up to -22 `close()` raised `FileNotFoundError` there. `multiprocessing.Manager()` also
   needs WASIX's libc to return AF_UNIX addresses from `getsockname`, which
   comes with wasix-sysroot -31 in the next release (homescoop#515).
 - `threading.get_native_id()` and `Thread.native_id` exist (WASIX's thread id;

@@ -138,8 +138,8 @@ reached another process: a child's writes to an `mp.Value`/`mp.Array` (any
 
 ## `cpython-multiprocessing-unix-listener-wasix.patch` (wasix-python 3.14.2-23)
 
-slicc-kernel keeps path-bound AF_UNIX sockets out of the filesystem
-(slicc-kernel#753), so `SocketListener`'s `os.unlink(path)` at close got
+slicc-kernel before 1.103.1 keeps path-bound AF_UNIX sockets out of the
+filesystem (slicc-kernel#753, fixed in 1.103.1), so `SocketListener`'s `os.unlink(path)` at close got
 ENOENT, and `multiprocessing.Manager()` printed a traceback from its
 finalizer at exit (homescoop#515). On WASI the unlink tolerates a missing
 path.

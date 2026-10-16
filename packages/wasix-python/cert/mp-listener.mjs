@@ -34,5 +34,5 @@ export default async function (ctx) {
   assert.equal(out.reply, 'ok', o);
   assert.equal(out.close, 'ok', `Listener.close() must not fail on the socket path slicc-kernel keeps out of the filesystem (slicc-kernel#753): ${o}`);
   assert.doesNotMatch(r.stderr, /Traceback/, r.stderr);
-  console.log('multiprocessing.connection over AF_UNIX: a Client sends a pickled dict to a Listener on a path and gets a reply; Listener.close() succeeds although the kernel keeps the socket path out of the filesystem');
+  console.log('multiprocessing.connection over AF_UNIX: a Client sends a pickled dict to a Listener on a path and gets a reply; Listener.close() succeeds (the cert kernel keeps the socket path out of the filesystem, slicc-kernel#753 before 1.103.1)');
 }

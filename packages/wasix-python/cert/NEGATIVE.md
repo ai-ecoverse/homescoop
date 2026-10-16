@@ -156,7 +156,7 @@ cert-review of #530's first head (05b81d7e) found that on slicc-kernel 1.99.2, w
 
 The published 3.14.2-21 (npm sha512-JZN9ayQh…) on slicc-kernel 1.100.4's Node entry, 2026-10-16. -22 changes only sqlite's VFS, so it behaves the same here.
 
-- **`mp-listener.mjs` fails at `close()`.** The Client/Listener round trip on the AF_UNIX path works, then `Listener.close()` raises `FileNotFoundError: [Errno 44] No such file or directory: '/tmp/…/listener'`, because the kernel never put the path in the filesystem (slicc-kernel#753). The same -21 with `cpython-multiprocessing-unix-listener-wasix.patch` applied to its `connection.py` passes. `multiprocessing.Manager()` fails earlier still, with `TypeError: str, bytes or bytearray expected, not int`: libc's `getsockname` returns `(0, b'')` for AF_UNIX. That part waits for wasix-sysroot -31.
+- **`mp-listener.mjs` fails at `close()`.** The Client/Listener round trip on the AF_UNIX path works, then `Listener.close()` raises `FileNotFoundError: [Errno 44] No such file or directory: '/tmp/…/listener'`, because the kernel never put the path in the filesystem (slicc-kernel#753; 1.103.1 makes socket paths filesystem nodes, so there -22 closes cleanly too, and the patch is a no-op). The same -21 with `cpython-multiprocessing-unix-listener-wasix.patch` applied to its `connection.py` passes. `multiprocessing.Manager()` fails earlier still, with `TypeError: str, bytes or bytearray expected, not int`: libc's `getsockname` returns `(0, b'')` for AF_UNIX. That part waits for wasix-sysroot -31.
 - **`mp-limits.mjs` fails on its first assertion.** Its output on -21:
   ```
   {"methods": ["spawn", "fork", "forkserver"], "start": "spawn", "fork": ["ok", "fork"],
