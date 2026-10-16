@@ -1,6 +1,7 @@
 # bzip2 for slicc wasm realm (CLI + static libbz2).
 name: bzip2
 builder: host
+runner: pool
 # renovate: datasource=git-tags depName=https://sourceware.org/git/bzip2.git extractVersion=^bzip2-(?<version>.*)$
 version: "1.0.8"
 npm: "@ai-ecoverse/wasm-bzip2"

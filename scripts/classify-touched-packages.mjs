@@ -37,6 +37,7 @@ const host = [];
 const slicc = [];
 const rebuild = [];
 const test = [];
+const pool = [];
 
 function recipe(p) {
   const r = spawnSync('node', [join(root, 'scripts/read-recipe.mjs'), p, '--json'], {
@@ -58,6 +59,16 @@ function reproducible(p, value) {
   process.exit(1);
 }
 
+function onPool(p, r) {
+  if (r.runner === 'pool') return true;
+  if (r.runner !== undefined && r.runner !== null) {
+    console.error(`packages/${p}/recipe.yaml: runner must be pool, or absent for ubuntu-latest`);
+    process.exit(1);
+  }
+  const repack = r.repack && typeof r.repack === 'object' && r.repack.from;
+  return Boolean(repack) && !existsSync(join(root, 'packages', p, 'smoke.c')) && !hasTests(p);
+}
+
 function hasTests(p) {
   const dir = join(root, 'packages', p, 'test');
   if (!existsSync(dir)) return false;
@@ -73,5 +84,6 @@ for (const p of all) {
   host.push(p);
   if (reproducible(p, r.reproducible)) rebuild.push(p);
   if (hasTests(p)) test.push(p);
+  if (onPool(p, r)) pool.push(p);
 }
-console.log(JSON.stringify({ all, host, slicc, rebuild, test }));
+console.log(JSON.stringify({ all, host, slicc, rebuild, test, pool }));

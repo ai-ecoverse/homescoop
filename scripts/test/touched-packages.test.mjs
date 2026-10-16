@@ -114,22 +114,27 @@ test('inputs that are not a list fail the detect job', () => {
   }
 });
 
-test('classify: rebuild for reproducible recipes, test for recipes with tests by layout', () => {
+test('classify: rebuild for reproducible recipes, test for tests by layout, pool for runner: pool and pure repacks', () => {
   const f = fixture({
     whole: { recipe: 'name: whole\nbuilder: host\nreproducible: true\n', files: { 'test/a.test.mjs': '' } },
     wasm: { recipe: 'name: wasm\nbuilder: host\nreproducible:\n  path: package/bin/x.wasm\n', files: { 'test/package.json': '{}' } },
-    off: { recipe: 'name: off\nbuilder: host\nreproducible: false\n', files: { 'test/helper.mjs': '' } },
-    cone: { recipe: 'name: cone\nbuilder: slicc\nreproducible: true\n', files: { 'test/a.test.mjs': '' } },
+    off: { recipe: 'name: off\nbuilder: host\nreproducible: false\nrunner: pool\n', files: { 'test/helper.mjs': '' } },
+    cone: { recipe: 'name: cone\nbuilder: slicc\nreproducible: true\nrunner: pool\n', files: { 'test/a.test.mjs': '' } },
+    repack: { recipe: 'name: repack\nbuilder: host\nrepack:\n  from: "1.0.0-1"\n' },
+    smoked: { recipe: 'name: smoked\nbuilder: host\nrepack:\n  from: "1.0.0-1"\n', files: { 'smoke.c': 'int main(void) { return 0; }\n' } },
+    tested: { recipe: 'name: tested\nbuilder: host\nrepack:\n  from: "1.0.0-1"\n', files: { 'test/package.json': '{}' } },
+    built: { recipe: 'name: built\nbuilder: host\n' },
   });
   try {
-    const r = f.classify(['packages/whole/build.sh', 'packages/wasm/build.sh', 'packages/off/build.sh', 'packages/cone/build.jsh']);
+    const r = f.classify(['packages/whole/build.sh', 'packages/wasm/build.sh', 'packages/off/build.sh', 'packages/cone/build.jsh', 'packages/repack/package/README.md', 'packages/smoked/package/README.md', 'packages/tested/package/README.md', 'packages/built/build.sh']);
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(JSON.parse(r.stdout), {
-      all: ['cone', 'off', 'wasm', 'whole'],
-      host: ['off', 'wasm', 'whole'],
+      all: ['built', 'cone', 'off', 'repack', 'smoked', 'tested', 'wasm', 'whole'],
+      host: ['built', 'off', 'repack', 'smoked', 'tested', 'wasm', 'whole'],
       slicc: ['cone'],
       rebuild: ['wasm', 'whole'],
-      test: ['wasm', 'whole'],
+      test: ['tested', 'wasm', 'whole'],
+      pool: ['off', 'repack'],
     });
   } finally {
     f.done();
@@ -143,6 +148,19 @@ test('classify: a reproducible value that is not true, false or a package/ path 
       const r = f.classify(['packages/r/build.sh']);
       assert.equal(r.status, 1, bad);
       assert.match(r.stderr, /reproducible must be/);
+    } finally {
+      f.done();
+    }
+  }
+});
+
+test('classify: a runner other than pool fails', () => {
+  for (const bad of ['runner: hosted\n', 'runner: cloud-run-bench\n', 'runner: ubuntu-latest\n']) {
+    const f = fixture({ r: { recipe: `name: r\nbuilder: host\n${bad}` } });
+    try {
+      const r = f.classify(['packages/r/build.sh']);
+      assert.equal(r.status, 1, bad);
+      assert.match(r.stderr, /runner must be pool/);
     } finally {
       f.done();
     }

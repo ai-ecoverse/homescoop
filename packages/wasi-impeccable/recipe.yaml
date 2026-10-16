@@ -3,6 +3,7 @@
 # FS-local verbs and the HTTP verbs for wasm32-wasip1.
 name: wasi-impeccable
 builder: host
+runner: pool
 inputs:
   - crates/wasix-net/**
   - crates/wasix-ureq/**

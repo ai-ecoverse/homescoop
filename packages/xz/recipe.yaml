@@ -1,6 +1,7 @@
 # XZ Utils for slicc wasm realm (xz/lzma CLIs + static liblzma).
 name: xz
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=tukaani-project/xz extractVersion=^v(?<version>.*)$
 version: "5.8.4"
 npm: "@ai-ecoverse/wasm-xz"

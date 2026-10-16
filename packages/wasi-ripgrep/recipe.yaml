@@ -1,6 +1,7 @@
 # ripgrep for slicc WASI preview1 (no Emscripten glue).
 name: wasi-ripgrep
 builder: host
+runner: pool
 # renovate: datasource=crate depName=ripgrep
 version: "15.2.0"
 npm: "@ai-ecoverse/wasi-ripgrep"
