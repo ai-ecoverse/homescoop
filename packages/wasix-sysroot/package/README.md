@@ -53,6 +53,15 @@ between threads. On an older kernel `sem_open` falls back to musl's
 shared between processes, so `MAP_SHARED` mappings and `shm_open` can't
 replace a semaphore.
 
+Also since 2025.9.30-30, POSIX record locks: `<fcntl.h>` defines `F_GETLK`,
+`F_SETLK`, `F_SETLKW` and `F_RDLCK`/`F_WRLCK`/`F_UNLCK`, `lockf` is in
+libc, and `fcntl` hands the three lock commands to slicc-kernel
+(`slicc.fcntl_lock`, slicc-kernel#722), which keeps them per process, as
+Linux does: not inherited by `fork`, kept across `exec`, dropped when any
+descriptor of the file closes. On a kernel without the import every lock is
+granted locally and `F_GETLK` reports `F_UNLCK`, as programs' own stubs did.
+Up to -29 WASIX defined none of these. `flock` is not in libc yet.
+
 Since 2025.9.30-29 `poll` and `ppoll` take a `pollfd` that asks for neither
 reading nor writing (`events` 0, as OpenSSH's client loop passes for idle
 channels, or only bits WASI can't poll): the entry is skipped, and its

@@ -1,5 +1,9 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-29: no POSIX record locks in the headers or libc (-30, homescoop#407)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-29.tgz --probe r30lock`, 2026-10-16: the probe doesn't build (`F_SETLK`, `F_GETLK`, `F_SETLKW`, `F_RDLCK`/`F_WRLCK`/`F_UNLCK` undeclared, `lockf` undeclared and not in libc.a). Programs carried their own numbers and no-op stubs (wasix-python's `fcntl_wasix_extra.h` uses 7/8/9 with `--wrap=fcntl`), so no lock ever reached the kernel, and python's sqlite could write through another process's lock (homescoop#407).
+
 ## 2025.9.30-29: no named semaphores between processes (-30, homescoop#486)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-29.tgz --probe r30` with `R30_SEM=1` on slicc-kernel 1.99.0, which has `slicc.sem_*` (2026-10-16): FAIL with `R30_SEM=1 but sem_open: No such file or directory`. -29's musl `sem_open` creates `/dev/shm/sem.r30a`, which this kernel doesn't keep (slicc-kernel#716). Even with a working `/dev/shm`, the `MAP_SHARED` page it maps wouldn't be shared with a forked or spawned process. -30 passes every r30 line in all five variants.

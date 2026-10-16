@@ -294,3 +294,10 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
   - **`ENOSYS`** from `slicc.sem_open`/`sem_unlink` (an older kernel) falls back to musl's file-based code.
   - **Unnamed** semaphores use musl's futex code, unchanged.
 - **Probe:** `test/r30.c` (asyncified for `fork`), as in the checklist. `R30_SEM=1` requires the kernel's imports.
+
+## -30: `fcntl.c` record locks, musl `lockf.c` (homescoop#407, slicc-kernel#722)
+
+- **Headers:** `__header_fcntl.h` gets `F_GETLK (12)`, `F_SETLK (13)`, `F_SETLKW (14)` (musl's 64-bit numbers, the ABI's) and `F_RDLCK (0)`/`F_WRLCK (1)`/`F_UNLCK (2)`. `unistd.h` declares `lockf` (and `lockf64`) outside the "WASI has no POSIX file locking" guard.
+- **`fcntl.c`** (the -15 F_SETFD fix) handles the three commands. It checks `l_type`, then calls `slicc.fcntl_lock(fd, cmd, flock_ptr) → WASI errno` with the struct as the program gave it; the kernel resolves `l_whence`. `_Static_assert`s pin the cmd, `l_type` and `SEEK_*` numbers and the `struct flock` layout to the ABI on #722. On ENOSYS it checks the fd (EBADF) and answers locally: granted, with F_GETLK giving `F_UNLCK`. `build-incremental.sh` now compiles it (static and PIC) and replaces `fcntl.o`.
+- **`lockf.o`** is musl's `src/misc/lockf.c`, over `fcntl`, so it reaches the kernel too.
+- **Probe:** `test/r30lock.c` (asyncified for `fork`). `R30_LOCK=1` requires the kernel's import.
