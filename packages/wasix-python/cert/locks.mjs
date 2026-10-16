@@ -32,7 +32,7 @@ export default async function (ctx) {
     console.log(`locks: fcntl.lockf(LOCK_EX) held by this process makes another process's LOCK_EX|LOCK_NB fail (${out.held}); after LOCK_UN it gets the lock; os.lockf exists`);
   } else {
     assert.equal(out.held, 'child got', JSON.stringify(out));
-    assert.ok(process.env.PY_LOCKS !== '1', `PY_LOCKS=1 needs slicc.fcntl_lock (slicc-kernel#722): ${JSON.stringify(out)}`);
+    assert.ok(process.env.PY_LOCKS_LOCAL === '1', `the other process got LOCK_EX while this one held it: no slicc.fcntl_lock (slicc-kernel >= 1.100.0, #722)? Set PY_LOCKS_LOCAL=1 to accept the local answer on an older kernel: ${JSON.stringify(out)}`);
     console.log('locks: no slicc.fcntl_lock in this kernel: every lock is granted locally (the other process gets LOCK_EX too), as up to -20; os.lockf exists');
   }
 }
