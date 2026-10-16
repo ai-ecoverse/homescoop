@@ -14,3 +14,7 @@ Of our Emscripten packages, only coreutils (`stat`, `ls`) calls `statx`. Of the 
 - tar's use is an OS/2 macro;
 - util-linux's is in libmount and lsfd, which our build disables;
 - binutils' is in a ChangeLog.
+
+## `libfs-symloop.patch` (homescoop#461)
+
+`src/lib/libfs.js`, `FS.lookupPath`. Its `linkloop` ran `nlinks < 40` passes, and the first pass follows no link, so a path that needs exactly 40 symlink follows got `ELOOP`. Linux allows 40 (`MAXSYMLINKS`: the 41st follow is `ELOOP`), and so do slicc-kernel's own walks (WASI and JS programs, the kernel API; slicc-kernel#700). The patch runs 41 passes. It's a JS library, so it changes the glue of each Emscripten package at its next rebuild, not libc. coreutils' `cert/symloop.mjs` checks 40 and 41 with `cat`.

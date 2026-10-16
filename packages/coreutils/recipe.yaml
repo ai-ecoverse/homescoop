@@ -20,3 +20,5 @@ about:
     Port of slicc-emscripten/build-wasm-gnu.sh. Links slicc cli profile
     (spawn+exec+select+jobs, whole-archive) via build-gnu-cli.sh so
     env/nice/nohup beat libstubs execve.
+    9.12.0-8: rebuilt with scripts/emsdk-patches/libfs-symloop.patch, so a path
+    that needs 40 symlink follows resolves (homescoop#461).
