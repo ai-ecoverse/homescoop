@@ -1,5 +1,8 @@
 name: py-kiwisolver
 builder: host
+# ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#569;
+# a no-op while repack: is set, it takes effect when the next release rebuilds).
+reproducible: true
 # renovate: datasource=pypi depName=kiwisolver
 version: "1.5.1"
 npm: "@ai-ecoverse/py-kiwisolver"
