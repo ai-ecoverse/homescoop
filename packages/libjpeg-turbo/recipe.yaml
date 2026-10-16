@@ -1,6 +1,8 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: libjpeg-turbo
 builder: host
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
 # renovate: datasource=github-releases depName=libjpeg-turbo/libjpeg-turbo
 version: "3.1.2"
 npm: "@ai-ecoverse/wasm-libjpeg-turbo"
@@ -8,6 +10,10 @@ summary: "libjpeg-turbo JPEG codec"
 source:
   url: "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/{{version}}/libjpeg-turbo-{{version}}.tar.gz"
   sha256: "8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf"
+  # SOURCE_DATE_EPOCH: CMake's BUILD string ("build YYYYMMDD" in libjpeg.a)
+  # comes from it, not the build day (#638): the newest file in
+  # libjpeg-turbo-3.1.2.tar.gz, 2025-08-27T01:11:07Z.
+  epoch: "1756257067"
 dependencies:
   build: []
   host: []
@@ -15,3 +21,8 @@ dependencies:
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/libjpeg-turbo
   license: "IJG AND BSD-3-Clause AND Zlib"
+  notes: |
+    3.1.2-4 (#638): SOURCE_DATE_EPOCH from source.epoch, and -DBUILD in UTC
+    from it, pin the "build YYYYMMDD" stamp in libjpeg.a, so the build is
+    byte-reproducible (reproducible: true); build.sh fails if the stamp
+    isn't there.
