@@ -334,6 +334,9 @@ node scripts/diff-published.mjs .homescoop-out/package.tgz @ai-ecoverse/wasix-uv
   ([homescoop#110](https://github.com/ai-ecoverse/homescoop/issues/110));
   prefer official `huggingface_hub` on wasix-python. Source kept for
   provenance.
+- `packages/uv-shim` — the `uv` shim over pip retired
+  ([homescoop#103](https://github.com/ai-ecoverse/homescoop/issues/103)) for
+  Astral's uv itself, `packages/wasi-uv`. Source kept for provenance.
 
 Cleanup commands for historical npm versions:
 
