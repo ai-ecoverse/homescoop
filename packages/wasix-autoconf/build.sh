@@ -155,6 +155,18 @@ if "unshift @include, $pkgdatadir;" not in t:
     )
     autom4te.write_text(t)
 
+# The GNU m4 probe piped m4 --help into grep, so without grep in the realm
+# autom4te (and aclocal through it) died with "need GNU m4 1.4 or later",
+# blaming the m4 it had (homescoop#470). Match in Perl instead.
+t = autom4te.read_text()
+probe_sh = 'if system "$m4 --help </dev/null 2>&1 | grep reload-state >/dev/null";'
+probe_pl = "if (`$m4 --help </dev/null 2>&1` // '') !~ /reload-state/;"
+if probe_sh in t:
+    t = t.replace(probe_sh, probe_pl)
+    autom4te.write_text(t)
+if probe_pl not in t or "| grep" in t:
+    raise SystemExit("autom4te GNU m4 probe not found or still pipes into grep — update the patch")
+
 # Sanity: shebang must be first line
 for script in bin_dir.iterdir():
     if not script.is_file():
@@ -188,9 +200,16 @@ commands["ifnames"] = {
     "script": "bin/ifnames",
     "env": {"autom4te_perllibdir": env["autom4te_perllibdir"]},
 }
-# Two-component upstream → X.Y.0-N (docs/versioning.md); bump N after relocatable fixes
+# The committed package/package.json is the SSOT for -N and the exact
+# @ai-ecoverse pins (docs/versioning.md); a fresh tree starts at X.Y.0-1.
+committed = dest / "package.json"
+old = json.loads(committed.read_text()) if committed.exists() else {}
 parts = ver.split(".")
-npm_ver = f"{ver}.0-3" if len(parts) == 2 else f"{ver}-3"
+npm_ver = old.get("version") or (f"{ver}.0-1" if len(parts) == 2 else f"{ver}-1")
+deps = old.get("dependencies") or {
+    "@ai-ecoverse/wasix-perl": "5.42.0-11",
+    "@ai-ecoverse/wasix-m4": "1.4.20-2",
+}
 pkg = {
     "name": "@ai-ecoverse/wasix-autoconf",
     "version": npm_ver,
@@ -200,17 +219,30 @@ pkg = {
     "files": ["README.md", "LICENSE", "bin", "share"],
     "publishConfig": {"access": "public"},
     "homescoop": {"recipe": "wasix-autoconf", "upstream": ver},
-    "dependencies": {
-        "@ai-ecoverse/wasix-perl": "5.42.0-8",
-        "@ai-ecoverse/wasix-m4": "1.4.20-2",
-    },
     "slicc": {"abi": "wasi", "commands": commands},
+    "dependencies": deps,
 }
 (dest / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
 (dest / "README.md").write_text(
     "# `@ai-ecoverse/wasix-autoconf`\n\n"
-    "GNU Autoconf as slicc script commands. Requires `@ai-ecoverse/wasix-perl` "
-    "and `@ai-ecoverse/wasix-m4`.\n"
+    "GNU Autoconf as slicc script commands: `autoconf`, `autoheader`, `autom4te`,\n"
+    "`autoreconf`, `autoscan`, `autoupdate`, `ifnames`. Its dependencies,\n"
+    "`@ai-ecoverse/wasix-perl` and `@ai-ecoverse/wasix-m4`, are all `autoconf`\n"
+    "itself needs. With `@ai-ecoverse/wasix-automake`, `aclocal`, `autoconf` and\n"
+    "`automake --add-missing` run with those alone (plus a shell and coreutils).\n\n"
+    "## Running `configure`\n\n"
+    "The `configure` script Autoconf writes is a shell script that needs a POSIX\n"
+    "userland, as on any system: `sh` (wasm-bash), coreutils, and **grep, sed\n"
+    "and awk**. They are not dependencies of this package; slicc's base set has\n"
+    "them, and elsewhere:\n\n"
+    "```bash\n"
+    "pnpm add -g @ai-ecoverse/wasm-grep @ai-ecoverse/wasm-sed @ai-ecoverse/wasm-gawk\n"
+    "```\n\n"
+    "Without them `configure` fails with `sed: command not found` (and the like).\n"
+    "A build then also wants `make` (`@ai-ecoverse/wasm-gmake`).\n\n"
+    "Before 2.72.0-7, `autom4te` (and `aclocal`, `autoreconf`, `automake` through\n"
+    "it) needed grep too, and without it failed with a misleading\n"
+    "`autom4te: error: need GNU m4 1.4 or later: m4`.\n"
 )
 print("package.json written")
 PY
