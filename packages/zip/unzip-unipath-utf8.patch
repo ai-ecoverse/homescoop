@@ -1,6 +1,6 @@
 --- a/fileio.c
 +++ b/fileio.c
-@@ -1996,6 +1996,36 @@
+@@ -2012,6 +2012,36 @@
  
  
  
@@ -37,7 +37,7 @@
  /************************/
  /* Function do_string() */
  /************************/
-@@ -2313,6 +2343,12 @@
+@@ -2334,6 +2364,12 @@
                    /* the standard filename field is UTF-8 */
                    free(G.unipath_filename);
                    G.unipath_filename = G.filename_full;

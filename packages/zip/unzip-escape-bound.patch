@@ -5,7 +5,7 @@ Debian's CVE-2022-0529 fix bounded only the no-multibyte arm; the -U
 
 --- a/process.c
 +++ b/process.c
-@@ -2341,7 +2341,10 @@
+@@ -2399,7 +2399,10 @@
    */
  
   /* set this to the max bytes an escape can be */
@@ -17,7 +17,7 @@ Debian's CVE-2022-0529 fix bounded only the no-multibyte arm; the -U
  
  char *wide_to_escape_string(wide_char)
    zwchar wide_char;
-@@ -2480,8 +2483,20 @@
+@@ -2538,8 +2541,20 @@
          strncat(buffer, buf, b);
        } else {
          /* use escape for wide character */
@@ -39,7 +39,7 @@ Debian's CVE-2022-0529 fix bounded only the no-multibyte arm; the -U
          free(escape_string);
        }
      } else if (b > 0) {
-@@ -2496,6 +2511,10 @@
+@@ -2554,6 +2569,10 @@
          int err_msg = 0;
  
          escape_string = wide_to_escape_string(wide_string[i]);
