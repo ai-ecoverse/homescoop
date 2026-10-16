@@ -1,9 +1,31 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
-  "checklist": [
-    "zip -v and unzip -v: Zip 3.0 and UnZip 6.00, with LARGE_FILE_SUPPORT and ZIP64_SUPPORT and the rest of the published 3.0.0-1's special compilation options",
-    "round trip as cone (users enforce): zip -r of a tree with a nested dir and a 64 KiB file, unzip -l lists every entry, unzip -t reports no errors, unzip -p returns the bytes, unzip -d extracts identical files; a missing archive is rc 9"
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
   ],
-  "users": "enforce"
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-18",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-7"
+  ],
+  "checklist": [
+    "zip -v and unzip -v: Zip 3.0 and UnZip 6.00, with LARGE_FILE_SUPPORT and ZIP64_SUPPORT and the rest of the published 3.0.0-1's special compilation options, plus UNICODE_SUPPORT (both) and MBCS-support (unzip) since 3.0.0-2; both say 'Compiled ... on Apr 20 2009', recipe.yaml's source.epoch as SOURCE_DATE_EPOCH (homescoop#441)",
+    "round trip as cone (users enforce): zip -r of a tree with a nested dir and a 64 KiB file, unzip -l lists every entry, unzip -t reports no errors, unzip -p returns the bytes, unzip -d extracts identical files; a missing archive is rc 9",
+    "utf8.mjs (homescoop#431): a host-made archive with UTF-8-flagged names (café.txt, ünï/名前.txt) and a CP437 name with a Unicode Path extra field (naïve.txt): unzip -l shows every name with no '?', unzip -d extracts each under its UTF-8 name with its bytes; zip -r of naïve.txt and ü/名.txt sets the UTF-8 flag (bit 11) on each entry and unzips back",
+    "stdout.mjs (homescoop#439): zip - a.txt big.txt redirected to a file and piped through cat: unzip -t rc 0 with no 'extra bytes', unzip -p returns the bytes, the first local header is at 0; the file has no data descriptors (zip seeked back), the pipe has them",
+    "split.mjs (homescoop#440): zip -s 1m of 3 MB of random data (two 1048576-byte parts and the .zip), zip -s 64k and -s 100k of 400 kB, then zip -s 0 --out: unzip -tq rc 0 and unzip -p's sha256 equals the input's",
+    "ztest.mjs (homescoop#432): zip -T 'test of … OK' rc 0, also for a name with a quote and a $; zip -T -m removes the original after the test; -TT 'unzip -tqq' through the shell; -TT false is rc 8 'FAILED' and -T -m keeps the file",
+    "noshell/ (cert/meta.json ci, homescoop#432): only wasm-zip installed, so no /bin/sh: zip -T, zip -T -v and zip -T -m as cone pass"
+  ],
+  "patches": {
+    "zip-split-copy.patch": "split.mjs: the 1m and 64k merges (without it zip -s 0 stops at the end of the second 1 MiB part, 'invalid compressed data to inflate')",
+    "zip-stdout-seek.patch": "stdout.mjs: both archives (without it each local header is written again after its data, '63 extra bytes', unzip -t rc 2)",
+    "zip-test-failed-fclose.patch": "ztest.mjs: -TT false must be rc 8 'test of bad.zip FAILED' (without it zip closes its output twice on the failed test and crashes, rc 70: 'null function' on 3.0.0-1, abort() on the -2 build)",
+    "zip-test-spawn.patch": "ztest.mjs (the quote-and-$ name) and noshell/ztest.mjs (without it zip -T runs unzip through /bin/sh: 'could not spawn unzip', rc 8)"
+  },
+  "ci": [
+    "HOMESCOOP_CERT_NODE_MODULES=\"${HOMESCOOP_CERT_NODE_MODULES:-$RUNNER_TEMP/homescoop-browser-cert-nm/node_modules}\" node scripts/browser-cert/run.mjs --package zip --cert packages/zip/cert/noshell --tarball .homescoop-out/package.tgz"
+  ]
 }

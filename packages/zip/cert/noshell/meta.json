@@ -1,0 +1,9 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
+  "users": "enforce",
+  "needs": [],
+  "checklist": [
+    "zip -T without a shell (only wasm-zip installed, so no /bin/sh): zip -T and zip -T -m as cone give 'test of … OK' and rc 0 (homescoop#432)"
+  ]
+}
