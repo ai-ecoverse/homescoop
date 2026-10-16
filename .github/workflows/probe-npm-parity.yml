@@ -1,0 +1,109 @@
+name: probe-npm-parity
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.p.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - id: p
+        run: |
+          set -euo pipefail
+          list=$(node --input-type=module -e '
+            import { readdirSync, existsSync, readFileSync } from "node:fs";
+            import { isRecipeRetired } from "./scripts/recipe-status.mjs";
+            const out = [];
+            for (const d of readdirSync("packages").sort()) {
+              const pj = `packages/${d}/package/package.json`;
+              if (!existsSync(`packages/${d}/recipe.yaml`) || !existsSync(pj)) continue;
+              if (JSON.parse(readFileSync(pj, "utf8")).private || isRecipeRetired(d)) continue;
+              out.push(d);
+            }
+            console.log(JSON.stringify(out));
+          ')
+          echo "$list"
+          echo "packages=$list" >> "$GITHUB_OUTPUT"
+
+  sweep:
+    needs: plan
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        package: ${{ fromJson(needs.plan.outputs.packages) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - run: echo "main $(git rev-parse HEAD)"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
+      - run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
+      - id: build
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          bash scripts/host-run.sh "${{ matrix.package }}"
+          sha256sum .homescoop-out/package.tgz
+      - name: npm parity
+        env:
+          PKG: ${{ matrix.package }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          if [[ "$BUILD" != success ]]; then
+            printf '%s\tbuild-failed\t\t\n' "$PKG" > "out/$PKG.tsv"
+            exit 0
+          fi
+          node scripts/npm-parity.mjs .homescoop-out/package.tgz --drift warn --json "out/$PKG.json" || true
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            const files = (r.diffs || []).map((d) => `${d.path.replace(/^package\//, "")} (${d.what})`).join("; ");
+            console.log([process.argv[2], r.verdict, `${r.name || ""}@${r.version || ""} latest ${r.latest || "-"}`, files].join("\t"));
+          ' "out/$PKG.json" "$PKG" > "out/$PKG.tsv"
+          cat "out/$PKG.tsv"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: parity-${{ matrix.package }}
+          path: out/
+          retention-days: 7
+
+  report:
+    needs: sweep
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: parity-*
+          merge-multiple: true
+          path: out
+      - run: |
+          set -euo pipefail
+          cat out/*.tsv | sort > parity.tsv
+          cut -f2 parity.tsv | sort | uniq -c
+          { echo '| recipe | verdict | version | differing entries |'; echo '| --- | --- | --- | --- |'; awk -F'\t' '{ printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4 }' parity.tsv; } >> "$GITHUB_STEP_SUMMARY"
+          cat parity.tsv
+      - uses: actions/upload-artifact@v7
+        with:
+          name: parity-report
+          path: parity.tsv
+          retention-days: 14
