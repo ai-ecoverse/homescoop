@@ -74,6 +74,9 @@ find something, as upstream buf does.
 
 ## What does not work
 
+- Module commands (`buf build`, `lint`, `format`, `generate`, …) fail in
+  SLICC's legacy wasm realm, which does not preopen `/`; only slicc-kernel
+  ≥ 1.30.0 supports them.
 - In SLICC's realm, everything that needs the host module: buf says `this
   runtime cannot start commands or open network connections for buf (it needs
   slicc-kernel with @ai-ecoverse/wasi-buf's host module)`.
