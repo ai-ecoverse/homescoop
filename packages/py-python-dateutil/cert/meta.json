@@ -1,0 +1,17 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-six"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.14.2-25",
+    "@ai-ecoverse/py-six@1.17.0-3"
+  ],
+  "checklist": [
+    "cert/import.mjs: import dateutil 2.9.0.post0 from /node_modules/@ai-ecoverse/py-python-dateutil, found by discovery without PYTHONPATH, no nested python",
+    "cert/dateutil.mjs: parser (RFC 2822 with an offset, ISO, dayfirst, fuzzy), relativedelta (Jan 31 + 1 month = Feb 28; 1990-02-01 to 2026-10-16 = 36 y 8 m 15 d), rrule MONTHLY last Fridays (2026-01-30, 02-27, 03-27), tz.gettz('Europe/Berlin') CEST/CET, tzutc, easter(2027) = 2027-03-28, six importable from py-six 1.17.0-3",
+    "cert/record.mjs (homescoop#625): the package is PyPI's python_dateutil-2.9.0.post0-py2.py3-none-any.whl: every RECORD file with its sha256, none missing or unlisted, every .pyc unchecked-hash on its source; a flipped-byte self-test must be caught",
+    "package.json takes @ai-ecoverse/py-six as \">=1.17.0-3 <1.17.1\" (py-* -> py-* ranges, check-exact-pins.mjs): npm --package-lock-only with py-six 1.17.0-3 resolves one py-six at the top level; 2.9.0-post0.2 (exact 1.17.0-2) nests a second one (NEGATIVE.md)"
+  ]
+}

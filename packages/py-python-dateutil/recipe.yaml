@@ -2,6 +2,11 @@ name: py-python-dateutil
 builder: host
 version: "2.9.0.post0"
 npm: "@ai-ecoverse/py-python-dateutil"
+source:
+  url: "https://files.pythonhosted.org/packages/py2.py3/p/python_dateutil/python_dateutil-{{version}}-py2.py3-none-any.whl"
+  sha256: "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"
+inputs:
+  - scripts/stage-pure-wheel.sh
 summary: "python-dateutil for slicc WASIX CPython"
 dependencies:
   build: []
