@@ -117,7 +117,7 @@ async function certWebSocket({ url, protocols = [], headers = [] }) {
     }
   }
   return {
-    protocol: peer.protocol ?? protocols[0] ?? '',
+    protocol: peer.protocol ?? '',
     get buffered() {
       return 0;
     },
