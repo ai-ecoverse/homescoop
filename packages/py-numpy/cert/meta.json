@@ -1,0 +1,17 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.14.2-24"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-numpy"
+  ],
+  "checklist": [
+    "cert/import.mjs: import numpy from /node_modules/@ai-ecoverse/py-numpy, found by discovery without PYTHONPATH, no nested python; its 19 side modules import",
+    "cert/numpy.mjs: linalg.solve [1,2,3] (residual < 1e-12), det 40, inv, eigvalsh [1,3] (OpenBLAS), matmul, einsum 506, fft [10, -2+2j, -2, -2-2j], default_rng(42).integers [89, 773, 654, 438, 433], int32 * float32 -> float64",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3; npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs both specs on the newest (3.14.2-24), and python-range.mjs runs them again on the floor (3.14.2-16). The previous release (exact 3.14.2-16) nests a second python under 3.14.2-24, and discover() then skips it: ModuleNotFoundError (NEGATIVE.md)"
+  ]
+}

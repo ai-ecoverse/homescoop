@@ -1,0 +1,28 @@
+# py-pillow: negative proof
+
+## 12.3.0-7 (published) fails the 12.3.0-8 cert (homescoop#702)
+
+`node scripts/browser-cert/python-range.mjs py-pillow --tarball ai-ecoverse-py-pillow-12.3.0-7.tgz --lock-only`
+(npm's 12.3.0-7; this PR's `package/package.json` gives the floor 3.14.2-16, and
+`cert/meta.json` the newest, 3.14.2-24), rc 1:
+
+```
+python-range: ok, … with @ai-ecoverse/wasix-python@3.14.2-16 resolves one python, node_modules/@ai-ecoverse/wasix-python 3.14.2-16
+python-range: FAIL … with @ai-ecoverse/wasix-python@3.14.2-24:
+  - a second python: node_modules/@ai-ecoverse/py-pillow/node_modules/@ai-ecoverse/wasix-python 3.14.2-16
+```
+
+12.3.0-8 (a repack of 12.3.0-7 with `">=3.14.2-16 <3.14.3"`) passes both.
+
+In that real npm tree (`npm install @ai-ecoverse/wasix-python@3.14.2-24
+@ai-ecoverse/py-pillow@12.3.0-7`, the whole tree in slicc-kernel 1.102.6's Node
+entry), `cert/import.mjs` fails with `py-pillow brings no python of its own: True`,
+and `cert/pillow.mjs` fails with `ModuleNotFoundError: No module named 'PIL'`:
+`_slicc_site.discover()` resolves py-pillow to its nested 3.14.2-16 and skips it.
+The 12.3.0-8 tree has one python and passes both specs.
+
+## Spec non-vacuous
+
+`cert/pillow.mjs` asserts exact results (not just that the import works), and
+`cert/import.mjs` asserts where PIL was imported from and that no
+nested python sits under the package.

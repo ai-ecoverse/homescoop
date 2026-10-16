@@ -3,10 +3,10 @@ builder: host
 version: "3.3.3"
 npm: "@ai-ecoverse/py-pyparsing"
 summary: "pyparsing for slicc WASIX CPython"
-# 3.3.3-6 is packaging-only: 3.3.3-5's bytes with exact @ai-ecoverse pins
-# (wasix-python 3.14.2-16). Drop repack: when the next release rebuilds.
+# 3.3.3-7 is packaging-only: 3.3.3-6's bytes with wasix-python as a range,
+# ">=3.14.2-16 <3.14.3" (#702). Drop repack: when the next release rebuilds.
 repack:
-  from: "3.3.3-5"
+  from: "3.3.3-6"
 dependencies:
   build: []
   host: []

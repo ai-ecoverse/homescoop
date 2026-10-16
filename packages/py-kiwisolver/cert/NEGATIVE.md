@@ -1,5 +1,26 @@
 # py-kiwisolver: negative proof
 
+## 1.5.1-7 (published) fails the 1.5.1-8 cert (homescoop#702)
+
+`node scripts/browser-cert/python-range.mjs py-kiwisolver --tarball ai-ecoverse-py-kiwisolver-1.5.1-7.tgz --lock-only`
+(npm's 1.5.1-7; this PR's `package/package.json` gives the floor 3.14.2-16, and
+`cert/meta.json` the newest, 3.14.2-24), rc 1:
+
+```
+python-range: ok, … with @ai-ecoverse/wasix-python@3.14.2-16 resolves one python, node_modules/@ai-ecoverse/wasix-python 3.14.2-16
+python-range: FAIL … with @ai-ecoverse/wasix-python@3.14.2-24:
+  - a second python: node_modules/@ai-ecoverse/py-kiwisolver/node_modules/@ai-ecoverse/wasix-python 3.14.2-16
+```
+
+1.5.1-8 (a repack of 1.5.1-7 with `">=3.14.2-16 <3.14.3"`) passes both.
+
+In that real npm tree (`npm install @ai-ecoverse/wasix-python@3.14.2-24
+@ai-ecoverse/py-kiwisolver@1.5.1-7`, the whole tree in slicc-kernel 1.102.6's Node
+entry), `cert/import.mjs` fails with `py-kiwisolver brings no python of its own: True`,
+and `cert/solver.mjs` fails with `ModuleNotFoundError: No module named 'kiwisolver'`:
+`_slicc_site.discover()` resolves py-kiwisolver to its nested 3.14.2-16 and skips it.
+The 1.5.1-8 tree has one python and passes both specs.
+
 ## 1.5.1-6 (published) fails the 1.5.1-7 cert
 
 `@ai-ecoverse/py-kiwisolver@1.5.1-6` (npm), with the rest of the published
