@@ -37,3 +37,4 @@ CLI cannot build. The threaded/large cases in `cert/roundtrip.mjs` (`xz -T0` /
 ## 5.8.4-2: licence texts (homescoop#511, 2026-10-16)
 
 `cert/licence.mjs` against the published 5.8.4-1: FAIL. Its 18 `SPDX-License-Identifier` lines are 0BSD ×15 and GPL-2.0-or-later ×3 (`bin/xzgrep`, `bin/xzdiff`, `bin/xzless`), but package.json says `"license": "0BSD"`: `GPL-2.0-or-later (package/bin/xzdiff, package/bin/xzgrep, package/bin/xzless) is not in package.json's license "0BSD"`. Its `package/LICENSE` is upstream's `COPYING` summary alone, without either licence's text. `build.sh` passed `COPYING`, `LICENSE` and `COPYING.0BSD` to `homescoop_stage_license`, which copies only the first file that exists.
+

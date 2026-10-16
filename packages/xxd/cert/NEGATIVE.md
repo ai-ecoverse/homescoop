@@ -11,3 +11,4 @@ No SLICC patches on this package.
 
 `cert/roundtrip.mjs` requires `xxd | xxd -r` to restore the original bytes
 (`AB\n`). A no-op or truncated dump would fail the equality assert.
+
