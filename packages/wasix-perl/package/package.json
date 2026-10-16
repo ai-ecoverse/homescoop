@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-perl",
-  "version": "5.42.0-12",
-  "description": "Perl 5.42 for slicc WASIX (wasix-sysroot 2025.9.30-28: user ids, %SIG, signal masks and times from slicc-kernel; file modes via slicc_fs; exec/stdio)",
+  "version": "5.42.0-13",
+  "description": "Perl 5.42 for slicc WASIX (wasix-sysroot 2025.9.30-30: user ids, %SIG, signal masks, fcntl record locks and times from slicc-kernel; file modes via slicc_fs; exec/stdio; DynaLoader and all of Encode statically linked)",
   "engines": {
     "slicc-kernel": ">=1.44.0"
   },

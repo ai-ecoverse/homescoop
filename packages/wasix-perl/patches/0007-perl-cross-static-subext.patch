@@ -1,0 +1,33 @@
+perl-cross: link the XS sub-extensions of static extensions
+
+A static extension with XS sub-extensions (cpan/Encode: Byte, CN,
+EBCDIC, JP, KR, Symbol, TW, Unicode) built only its own archive:
+"make static" does not recurse, so the sub-extensions got neither an
+archive under lib/auto, nor a boot in perlmain.c, nor a line in
+static.list, nor their .pm files (encode("UTF-16LE", ...) died with
+"Unknown encoding"). static_subext lists every <ext>/<sub>/Makefile.PL
+of a static extension; each is built with "static pm_to_blib" after its
+parent, and its NAME joins static_pmn (writemain, statars, extlibs).
+homescoop#188. Applied by build.sh (patch -p1 after the perl-cross
+overlay).
+
+--- a/Makefile
++++ b/Makefile
+@@ -38,7 +38,8 @@
+ disabled_dynamic = $(patsubst %,%/pm_to_blib,$(disabled_dynamic_ext))
+ disabled_nonxs = $(patsubst %,%/pm_to_blib,$(disabled_nonxs_ext))
+ # perl module names for static mods
+-static_pmn = $(shell for e in $(fullpath_static_ext) ; do grep '^NAME =' $$e/Makefile | cut -d' ' -f3 ; done)
++static_subext = $(patsubst %/Makefile.PL,%,$(wildcard $(patsubst %,%/*/Makefile.PL,$(fullpath_static_ext))))
++static_pmn = $(shell for e in $(fullpath_static_ext) $(static_subext) ; do grep '^NAME =' $$e/Makefile | cut -d' ' -f3 ; done)
+ 
+ dynaloader_o = $(patsubst %,%$o,$(dynaloader))
+ 
+@@ -242,6 +243,7 @@
+ 
+ $(static_modules): %/pm_to_blib: | %/Makefile $(nonxs_tgt)
+ 	$(MAKE) -C $(dir $@) PERL_CORE=1 LIBPERL=$(LIBPERL) LINKTYPE=static static
++	$(foreach s,$(filter $(dir $@)%,$(static_subext)),$(MAKE) -C $(s) PERL_CORE=1 LIBPERL=$(LIBPERL) LINKTYPE=static static pm_to_blib && ) true
+ 	@touch $@
+ 
+ $(dynamic_modules) $(disabled_dynamic): %/pm_to_blib: | %/Makefile

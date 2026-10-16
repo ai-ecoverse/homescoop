@@ -1,0 +1,22 @@
+perl-cross: build the real DynaLoader (dl_none.xs) in a static perl
+
+perl-cross builds no DynaLoader when usedl=undef. Upstream Configure
+builds it with ext/DynaLoader/dl_none.xs: DynaLoader is present, and
+every dynamic load croaks. With dlsrc=dl_none.xs (hints/wasix) the
+Makefile now keeps dynaloader=DynaLoader, so DynaLoader.o goes into
+libperl.a and writemain registers the real boot_DynaLoader in
+perlmain.c. Replaces patches/0004 (the no-op boot_DynaLoader marker).
+homescoop#186. Applied by build.sh (patch -p1 after the perl-cross
+overlay).
+
+--- a/Makefile.config.SH
++++ b/Makefile.config.SH
+@@ -46,7 +46,7 @@
+ 	fi
+ }
+ 
+-if [ "$usedl" = 'undef' ]; then
++if [ "$usedl" = 'undef' -a "$dlsrc" != 'dl_none.xs' ]; then
+ 	dynaloader=''
+ else
+ 	dynaloader="DynaLoader"
