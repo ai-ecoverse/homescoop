@@ -59,7 +59,6 @@ const ALLOW = new Map([
   ['tree', 808],
   ['util-linux', 808],
   ['wasi-biome', 808],
-  ['wasi-esbuild', 808],
   ['wasi-ripgrep', 808],
   ['wasi-typescript', 808],
   ['wasix-gnupg', 808],
