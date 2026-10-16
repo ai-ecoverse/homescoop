@@ -17,7 +17,26 @@ function readMeta(dir, pkg) {
   if (blank >= 0) {
     throw new Error(`packages/${pkg}/cert/meta.json: ci entry ${blank} is not a command; nothing was certified`);
   }
+  readPeers(dir, pkg, meta);
   return meta;
+}
+
+const RECIPE = /^[a-z0-9][a-z0-9._-]*$/;
+
+// cert/meta.json "peers": other recipes whose host-<peer>-prN artifacts of the
+// same ladder-pr run the cert job downloads into .homescoop-out/peers, for ci
+// commands that check this package against them (homescoop#678).
+export function readPeers(dir, pkg, meta) {
+  if (meta.peers === undefined) return [];
+  const peers = meta.peers;
+  if (!Array.isArray(peers) || !peers.length || peers.some((p) => typeof p !== 'string' || !RECIPE.test(p) || p === pkg)) {
+    throw new Error(`packages/${pkg}/cert/meta.json: peers is not a list of other recipe names; nothing was certified`);
+  }
+  const missing = peers.filter((p) => !existsSync(join(dir, 'packages', p, 'recipe.yaml')));
+  if (missing.length) {
+    throw new Error(`packages/${pkg}/cert/meta.json: peers ${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} not a recipe; nothing was certified`);
+  }
+  return peers;
 }
 
 export function planLeg(pkg, manifest, { dir = root } = {}) {
@@ -44,7 +63,7 @@ export function planLeg(pkg, manifest, { dir = root } = {}) {
       ? `${pkg}: cert/meta.json is blocked and declares no ci commands; this cert leg certifies nothing`
       : `${pkg}: no cert specs; this cert leg certifies nothing`;
   }
-  return { browser, ci, harness, specs: specs.length, error, nothing };
+  return { browser, ci, harness, specs: specs.length, error, nothing, peers: readPeers(dir, pkg, meta) };
 }
 
 function summary(line) {
@@ -77,6 +96,10 @@ function plan(pkg, manifestPath) {
     summary(`${p.nothing}`);
   }
   console.log(`browser=${p.browser}`);
+  if (p.peers.length) {
+    console.error(`cert leg: peers ${p.peers.join(', ')} (their artifacts of this run, if built, in .homescoop-out/peers)`);
+    console.log(`peers=${p.peers.join('|')}`);
+  }
   return 0;
 }
 

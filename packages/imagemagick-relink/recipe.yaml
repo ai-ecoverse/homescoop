@@ -44,3 +44,9 @@ about:
     each kit's kit.json records the magick.wasm its objects made (sha256,
     size, import and export hashes). Keep the version and dependencies in
     step with both runtime recipes: cert/relink-check.mjs fails otherwise.
+    7.1.2-34-6 (homescoop#678): relink-check binds each kit to its runtime:
+    kit.json's sha256 must be the bin/magick.wasm of the runtime package of
+    the same version, from this ladder-pr run (cert/meta.json peers: the cert
+    job downloads host-imagemagick-prN and host-imagemagick-heif-prN) or
+    else from the registry; no such runtime, another sha256, or a runtime
+    that doesn't name this package (homescoop.relink, notices) fails.

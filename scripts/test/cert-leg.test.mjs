@@ -198,3 +198,40 @@ test('a cert/meta.json that is JSON but not an object fails the leg, in plan and
     f.done();
   }
 });
+
+test('peers: a list of other recipes is printed for the artifact download; anything else fails the leg', () => {
+  const f = fixture({
+    kits: { meta: { harness: 'host-node', ci: ['true'], peers: ['run1', 'run2'] } },
+    run1: {},
+    run2: {},
+    self: { meta: { harness: 'host-node', ci: ['true'], peers: ['self'] } },
+    word: { meta: { harness: 'host-node', ci: ['true'], peers: 'run1' } },
+    none: { meta: { harness: 'host-node', ci: ['true'], peers: [] } },
+    glob: { meta: { harness: 'host-node', ci: ['true'], peers: ['run*'] } },
+    ghost: { meta: { harness: 'host-node', ci: ['true'], peers: ['run1', 'nope'] } },
+  });
+  try {
+    for (const r of ['run1', 'run2']) writeFileSync(join(f.root, 'packages', r, 'recipe.yaml'), `name: ${r}\n`);
+    const p = f.leg('plan', 'kits');
+    assert.equal(p.status, 0, p.stderr);
+    assert.deepEqual(p.stdout.trim().split('\n'), ['browser=skip', 'peers=run1|run2']);
+    assert.match(p.stderr, /cert leg: peers run1, run2/);
+    assert.equal(f.leg('ci', 'kits').status, 0);
+    for (const [name, why] of [
+      ['self', 'peers is not a list of other recipe names'],
+      ['word', 'peers is not a list of other recipe names'],
+      ['none', 'peers is not a list of other recipe names'],
+      ['glob', 'peers is not a list of other recipe names'],
+      ['ghost', 'peers nope is not a recipe'],
+    ]) {
+      const r = f.leg('plan', name);
+      assert.equal(r.status, 1, name);
+      assert.ok(r.stderr.includes(`::error::packages/${name}/cert/meta.json: ${why}; nothing was certified`), r.stderr);
+      assert.doesNotMatch(r.stdout, /peers=/);
+      const c = f.leg('ci', name);
+      assert.equal(c.status, 1, name);
+    }
+  } finally {
+    f.done();
+  }
+});

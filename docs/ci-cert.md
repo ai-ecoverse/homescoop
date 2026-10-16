@@ -138,6 +138,19 @@ of which still ship 0644 glue) or `--live`. `"glueByPath": false` in
 (0644 `bin/tar`) fails it on slicc-kernel 1.88.0 with
 `EACCES: /node_modules/@ai-ecoverse/wasm-tar/bin/tar`; 1.35.0-6 passes.
 
+### Peers: `"peers"` in `cert/meta.json`
+
+`"peers": ["imagemagick", "imagemagick-heif"]` names other recipes whose
+artifacts from the same `ladder-pr` run the cert job downloads, when they
+were built in it, into `.homescoop-out/peers/host-<peer>-pr<N>/`
+(`package.tgz`, `package.tgz.sha256`). This is for `ci:` commands that check
+the package against what its peers will publish:
+`packages/imagemagick-relink/cert/relink-check.mjs` compares each kit's
+`kit.json` with the runtime `bin/magick.wasm` (homescoop#678). A peer that
+the PR doesn't build has no artifact, so the command has to look on the
+registry instead. `peers` must be a non-empty list of other recipe names;
+anything else fails the leg.
+
 ### Time per call: `"runTimeoutMs"` in `cert/meta.json`
 
 Each page call (`ctx.run`, `ctx.write`, …) has to answer within 120 s, or the spec fails with `Runtime.evaluate: no answer in … ms`. `"runTimeoutMs"` changes that for one package. The harness's own default was 30 s, which wasix-python's venv and pnpm-layout steps outgrew on slower CI runners.

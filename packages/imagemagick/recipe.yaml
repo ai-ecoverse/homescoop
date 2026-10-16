@@ -83,3 +83,8 @@ about:
     same version on the same registry (LGPL-2.1 s.6(d)); README and notices
     point there. cert/lib/wasm-check.mjs (ladder-pr ci): name section, no
     .debug_* sections, no share/ in the tarball, docs name the kit package.
+    7.1.2-34-6 (homescoop#678): package.json homescoop.relink names
+    @ai-ecoverse/wasm-imagemagick-relink, and THIRD-PARTY-NOTICES.md names it
+    at exactly this version; wasm-check.mjs checks both. The relink
+    package's relink-check fails unless this version's bin/magick.wasm (this
+    PR's artifact, else the registry's) is the binary its kit.json names.
