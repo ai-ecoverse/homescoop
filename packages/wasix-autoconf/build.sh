@@ -178,7 +178,10 @@ for script in bin_dir.iterdir():
 print("relocatable patches applied")
 PY
 
-homescoop_stage_license "$SRC/COPYING" "$SRC/COPYINGv3"
+# Autoconf is GPL-3.0-or-later (COPYINGv3) with the Autoconf Configure Script
+# Exception (COPYING.EXCEPTION) for parts of its m4 sources; the Autom4te Perl
+# modules are GPL-2.0-or-later (COPYING). Ship all three (homescoop#565).
+homescoop_stage_licenses "$SRC/COPYINGv3" "$SRC/COPYING.EXCEPTION" "$SRC/COPYING"
 
 # package.json via Python so ${package} is never shell-expanded
 python3 - "$DEST" "$VER" <<'PY'
@@ -242,7 +245,12 @@ pkg = {
     "A build then also wants `make` (`@ai-ecoverse/wasm-gmake`).\n\n"
     "Before 2.72.0-7, `autom4te` (and `aclocal`, `autoreconf`, `automake` through\n"
     "it) needed grep too, and without it failed with a misleading\n"
-    "`autom4te: error: need GNU m4 1.4 or later: m4`.\n"
+    "`autom4te: error: need GNU m4 1.4 or later: m4`.\n\n"
+    "## Licence\n\n"
+    "GPL-3.0-or-later. Parts of the m4 sources carry the Autoconf Configure Script\n"
+    "Exception (it covers the `configure` scripts Autoconf writes), and the\n"
+    "Autom4te Perl modules are GPL-2.0-or-later. `LICENSE` holds all three texts:\n"
+    "`COPYINGv3`, `COPYING.EXCEPTION` and `COPYING` (GPLv2).\n"
 )
 print("package.json written")
 PY

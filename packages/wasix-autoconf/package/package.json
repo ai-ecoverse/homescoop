@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-autoconf",
-  "version": "2.72.0-8",
+  "version": "2.72.0-9",
   "description": "GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4)",
   "license": "GPL-3.0-or-later",
   "repository": {

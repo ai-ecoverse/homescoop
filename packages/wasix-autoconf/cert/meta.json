@@ -29,6 +29,7 @@
     "autom4te's GNU m4 probe, now matched in Perl, still refuses an m4 that isn't GNU m4: M4=/usr/bin/true autoconf fails with 'need GNU m4 1.4 or later: /usr/bin/true'",
     "with wasm-grep, wasm-sed and wasm-gawk on PATH, sh ./configure writes config.status and a Makefile with VERSION = 1.0",
     "2.72.0-6 (npm latest before): the bare-PATH autom4te --version fails with 'sh: line 1: grep: command not found' and 'need GNU m4 1.4 or later: m4' (NEGATIVE.md)",
-    "2.72.0-8 (packaging-only, -7's bytes): the same checklist.mjs with the wasix-perl it now pins, 5.42.0-13 (cert/meta.json needsInstall)"
+    "2.72.0-8 (packaging-only, -7's bytes): the same checklist.mjs with the wasix-perl it now pins, 5.42.0-13 (cert/meta.json needsInstall)",
+    "cert/licence.mjs (2.72.0-9, homescoop#565): package.json says GPL-3.0-or-later; the tarball's files name GPLv3 ('version 3 of the License'), GPLv2 (the Autom4te modules' 'either version 2') and the Autoconf Configure Script Exception, and package/LICENSE carries each text (sections COPYINGv3, COPYING.EXCEPTION, COPYING); the README has a Licence section; autoconf --version says 'License GPLv3+/Autoconf'. 2.72.0-8: LICENSE is GPLv2 only (NEGATIVE.md)"
   ]
 }
