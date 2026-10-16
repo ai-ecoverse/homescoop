@@ -3,6 +3,7 @@
   "checklist": [
     "xz -k / xz -d small round trip",
     "corrupt input rejected",
-    "xz -T0 and -T2 compress+decompress 4 MiB (mythread_sigmask, upstream since 5.8.4)"
+    "xz -T0 and -T2 compress+decompress 4 MiB (mythread_sigmask, upstream since 5.8.4)",
+    "cert/licence.mjs (5.8.4-2, homescoop#511): the tarball's SPDX-License-Identifier lines are 0BSD (liblzma headers, ...) and GPL-2.0-or-later (exactly bin/xzgrep, bin/xzdiff, bin/xzless); both are in package.json's license \"0BSD AND GPL-2.0-or-later\", and package/LICENSE holds upstream's COPYING summary, COPYING.0BSD and COPYING.GPLv2. 5.8.4-1: license \"0BSD\" and only the COPYING summary (NEGATIVE.md)"
   ]
 }
