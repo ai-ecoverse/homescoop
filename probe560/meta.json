@@ -1,0 +1,1 @@
+{"harness":"slicc-kernel","users":"enforce","needs":["@ai-ecoverse/wasm-bash","@ai-ecoverse/wasm-coreutils"]}

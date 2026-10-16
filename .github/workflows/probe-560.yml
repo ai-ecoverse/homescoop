@@ -1,0 +1,26 @@
+name: probe-560
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  utf8:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [hosted, pool]
+    runs-on: ${{ matrix.runner == 'pool' && vars.CERT_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: |
+          set -euo pipefail
+          NM="$RUNNER_TEMP/nm"
+          npm install --prefix "$NM" --no-fund --no-audit "$(node scripts/browser-cert/cert-kernel.mjs bash)" "$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)" "$(node scripts/dev-pin.mjs playwright-core)" @ai-ecoverse/wasm-bash @ai-ecoverse/wasm-coreutils
+          if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then npx --prefix "$NM" playwright-core install --with-deps chromium; else npx --prefix "$NM" playwright-core install chromium; fi
+          npm pack @ai-ecoverse/wasm-bash @ai-ecoverse/wasm-zip@3.0.0-4 --silent
+          HOMESCOOP_CERT_NODE_MODULES="$NM/node_modules" node scripts/browser-cert/run.mjs --package bash --tarball ai-ecoverse-wasm-bash-*.tgz --tarball ai-ecoverse-wasm-zip-3.0.0-4.tgz --cert probe560 --users enforce
