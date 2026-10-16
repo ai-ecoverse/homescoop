@@ -617,9 +617,9 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
-echo "== wasix-sysroot: -31 AF_UNIX addresses from getsockname/getpeername/accept/recvfrom/recvmsg (patches/common/net.h, homescoop#515)"
+echo "== wasix-sysroot: -31 AF_UNIX addresses both ways: getsockname/getpeername/accept/recvfrom/recvmsg fill sockaddr_un, bind/connect/sendto/sendmsg take sizeof(struct sockaddr_un) (patches/common/net.h, homescoop#515)"
 R31_OBJ="$WORK/r31"
-R31=(getsockname getpeername accept recvfrom recvmsg)
+R31=(getsockname getpeername accept recvfrom recvmsg bind connect sendto sendmsg)
 rm -rf "$R31_OBJ" && mkdir -p "$R31_OBJ/static" "$R31_OBJ/pic"
 for flavour in static pic; do
   extra=()

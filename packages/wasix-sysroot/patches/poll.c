@@ -13,7 +13,7 @@ __wasi_errno_t __slicc_poll_masked(const sigset_t *mask, const __wasi_subscripti
 static __wasi_timestamp_t now_ns(void)
 {
 	__wasi_timestamp_t t = 0;
-	__wasi_clock_time_get(__WASI_CLOCKID_MONOTONIC, 1, &t);
+	if (__wasi_clock_time_get(__WASI_CLOCKID_MONOTONIC, 1, &t)) t = 0;
 	return t;
 }
 
@@ -71,7 +71,7 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 			else if (e->error == __WASI_ERRNO_PIPE) p->revents |= watch && e->type == __WASI_EVENTTYPE_FD_WRITE ? POLLERR : POLLHUP;
 			else if (e->error) p->revents |= POLLERR;
 			else if (e->fd_readwrite.flags & __WASI_EVENTRWFLAGS_FD_READWRITE_HANGUP) {
-				p->revents |= POLLHUP;
+				p->revents |= watch && e->type == __WASI_EVENTTYPE_FD_WRITE ? POLLERR : POLLHUP;
 				if (!watch && e->type == __WASI_EVENTTYPE_FD_READ) p->revents |= POLLRDNORM;
 			} else if (watch) {
 				quiet_watch = 1;

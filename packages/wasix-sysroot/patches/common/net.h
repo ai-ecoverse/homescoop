@@ -112,15 +112,19 @@ static inline int sockaddr_to_wasi(const struct sockaddr *restrict addr, const s
   } else if (addr->sa_family == AF_UNIX && addrlen >= offsetof(struct sockaddr_un, sun_path) + 1) {
     struct sockaddr_un *addrun = (struct sockaddr_un *)addr;
     peer_addr->tag = __WASI_ADDRESS_FAMILY_UNIX;
-    socklen_t pathlen = addrlen - offsetof(struct sockaddr_un, sun_path);
-    if (pathlen > 107) { // Addresses are limited to 107 bytes + 1 null byte only
-      return -1;
+    size_t avail = addrlen - offsetof(struct sockaddr_un, sun_path);
+    if (avail > sizeof(addrun->sun_path)) avail = sizeof(addrun->sun_path);
+    size_t pathlen = strnlen(addrun->sun_path, avail);
+    if (pathlen > 107) {
+      return EINVAL;
     }
-    memcpy(&peer_addr->u.unix.b0, &addrun->sun_path, (size_t)pathlen);
+    memcpy(&peer_addr->u.unix.b0, &addrun->sun_path, pathlen);
     *(uint8_t *)(&peer_addr->u.unix.b0 + pathlen) = '\0';
     return 0;
+  } else if (addr->sa_family != AF_INET && addr->sa_family != AF_INET6 && addr->sa_family != AF_UNIX) {
+    return EAFNOSUPPORT;
   } else {
-    return -1;
+    return EINVAL;
   }
 }
 
