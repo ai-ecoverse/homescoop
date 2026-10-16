@@ -3,7 +3,8 @@
 # wasi-zig and wasi-rustc-stable.yml consume the artifact. No npm publish here.
 #
 # Consumers: download the `wasi-llvm` artifact of a run (actions/download-artifact
-# with run-id), or restore the cache below with the same key (recipe hash).
+# with run-id), or restore the cache below with the same key (recipe hash and
+# the scripts/install-wasi-sdk.sh pin).
 name: wasi-llvm
 
 on:
@@ -48,7 +49,7 @@ jobs:
           path: |
             packages/wasi-llvm/work/prefix
             packages/wasi-llvm/work/wasi-llvm-*-wasm32-wasip1-threads.tar.xz
-          key: wasi-llvm-${{ hashFiles('packages/wasi-llvm/recipe.yaml', 'packages/wasi-llvm/build.sh', 'packages/wasi-llvm/gen-llvm-config.py', 'packages/wasi-llvm/patches/**') }}
+          key: wasi-llvm-${{ hashFiles('packages/wasi-llvm/recipe.yaml', 'packages/wasi-llvm/build.sh', 'packages/wasi-llvm/gen-llvm-config.py', 'packages/wasi-llvm/patches/**', 'scripts/install-wasi-sdk.sh') }}
 
       - name: build (native tablegen, then LLVM/clang/lld for wasm32-wasip1-threads)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -63,7 +64,7 @@ jobs:
           path: |
             packages/wasi-llvm/work/prefix
             packages/wasi-llvm/work/wasi-llvm-*-wasm32-wasip1-threads.tar.xz
-          key: wasi-llvm-${{ hashFiles('packages/wasi-llvm/recipe.yaml', 'packages/wasi-llvm/build.sh', 'packages/wasi-llvm/gen-llvm-config.py', 'packages/wasi-llvm/patches/**') }}
+          key: wasi-llvm-${{ hashFiles('packages/wasi-llvm/recipe.yaml', 'packages/wasi-llvm/build.sh', 'packages/wasi-llvm/gen-llvm-config.py', 'packages/wasi-llvm/patches/**', 'scripts/install-wasi-sdk.sh') }}
 
       - name: verify
         run: |

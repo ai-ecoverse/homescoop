@@ -23,7 +23,7 @@ unset ZIG_LIB_DIR ZIG_GLOBAL_CACHE_DIR ZIG_LOCAL_CACHE_DIR ZIG_EXE || true
 [[ "$(zig version)" == "$VERSION" ]] || { echo "homescoop: host zig $(zig version) != $VERSION" >&2; exit 1; }
 
 LLVM_PREFIX="${WASI_LLVM_PREFIX:-$ROOT/packages/wasi-llvm/work/prefix}"
-SDK="${WASI_SDK_PATH:-$(ls -d "$ROOT"/packages/wasi-llvm/work/wasi-sdk-24.0-* 2>/dev/null | grep -v '\.tar\.gz$' | head -1)}"
+SDK="${WASI_SDK_PATH:-$ROOT/packages/wasi-llvm/work/$(bash "$ROOT/scripts/install-wasi-sdk.sh" --name)}"
 for need in "$LLVM_PREFIX/lib/libLLVMCore.a" "$LLVM_PREFIX/lib/liblldWasm.a" "$SDK/bin/clang++"; do
   test -e "$need" || { echo "homescoop: missing $need (run packages/wasi-llvm/build.sh)" >&2; exit 1; }
 done
