@@ -1,0 +1,25 @@
+mio/0003: TcpStream::take_error reads the socket error (SOCK_OPTION_LAST_ERROR); std answers None on this target.
+Upstream: https://github.com/wasix-org/mio/pull/4
+
+--- a/src/net/tcp/stream.rs
++++ b/src/net/tcp/stream.rs
+@@ -204,8 +204,19 @@
+     /// This will retrieve the stored error in the underlying socket, clearing
+     /// the field in the process. This can be useful for checking errors between
+     /// calls.
++    #[cfg(not(all(target_os = "wasi", target_vendor = "wasmer")))]
+     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+         self.inner.take_error()
++    }
++
++    #[cfg(all(target_os = "wasi", target_vendor = "wasmer"))]
++    #[allow(missing_docs)]
++    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
++        let err = unsafe {
++            ::wasix::sock_get_opt_size(self.inner.as_raw_fd() as u32, ::wasix::SOCK_OPTION_LAST_ERROR)
++                .map_err(|errno| io::Error::from_raw_os_error(errno.raw() as i32))?
++        };
++        Ok(if err == 0 { None } else { Some(io::Error::from_raw_os_error(err as i32)) })
+     }
+ 
+     /// Receives data on the socket from the remote address to which it is

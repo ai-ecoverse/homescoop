@@ -1,0 +1,42 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -34,7 +34,7 @@
+ serde = { version = "1.0.188", features = ["derive"] }
+ sha1 = "0.10.6"
+ tinyvec = "1.6.0"
+-tokio = { version = "1.32", features = ["sync", "net", "rt", "macros", "io-util", "io-std", "time", "process", "fs"] }
++tokio = { version = "1.32", features = ["sync", "signal", "net", "rt", "macros", "io-util", "io-std", "time", "process", "fs"] }
+ tokio-native-tls = {version="0.3.1", optional=true}
+ tokio-util = "0.7.11"
+ tracing = "0.1.37"
+@@ -50,7 +50,6 @@
+ rustls = { version = "0.23.22", optional = true, default-features=false, features=["logging","std","tls12","ring"] }
+ strum = { version = "0.27.1", features = ["derive"] }
+ strum_macros = "0.27.1"
+-console-subscriber = { version = "0.5", optional = true }
+ tokio-io-mock-fork = { version = "0.1.0", features=["text-scenarios"]}
+ 
+ [target.'cfg(all(unix,any(target_os = "linux",target_os = "android",target_os = "freebsd")))'.dependencies]
+@@ -70,7 +69,6 @@
+ ioful_tests=[]
+ online_tests=[]
+ rustls= ["dep:rustls","dep:webpki-roots","dep:tokio-rustls"]
+-tokioconsole = ["tokio/tracing", "dep:console-subscriber"]
+ 
+ [dev-dependencies]
+ assert_cmd = "2.0.16"
+@@ -79,3 +77,6 @@
+ #[patch.crates-io]
+ #tokio-test = { path = "/mnt/fluff/vi/src/tokio/tokio-test" }
+ #tokio = { path = "/mnt/fluff/vi/src/tokio/tokio" }
++
++[patch.crates-io]
++mio = { path = "homescoop-crates/mio" }
+--- /dev/null
++++ b/.cargo/config.toml
+@@ -0,0 +1,5 @@
++[source.crates-io]
++replace-with = "wasix"
++
++[source.wasix]
++registry = "sparse+https://cargo-registry.wasix.org/"

@@ -1,0 +1,25 @@
+{
+  "name": "@ai-ecoverse/wasix-websocat",
+  "version": "4.0.0-alpha3-1",
+  "description": "websocat 4.0.0-alpha3 (WebSocket client and server, like netcat for ws://) for slicc WASIX",
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "slicc-kernel": ">=1.95.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-websocat/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-websocat",
+  "keywords": ["wasm", "wasix", "slicc", "homescoop", "websocat", "websocket"],
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin"],
+  "publishConfig": { "access": "public" },
+  "homescoop": { "recipe": "wasix-websocat", "upstream": "4.0.0-alpha3" },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "websocat": { "wasm": "bin/websocat.wasm" }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+mio/0001: sockets open non-blocking (FDFLAGS_NONBLOCK in new_socket), as the unix backend does.
+Upstream: https://github.com/wasix-org/mio/pull/4
+
+--- a/src/sys/wasi/net.rs
++++ b/src/sys/wasi/net.rs
+@@ -63,6 +63,13 @@
+             proto
+         ).map_err(|errno| io::Error::from_raw_os_error(errno.raw() as i32))?
+     };
++
++    unsafe {
++        let fdstat = wasi::fd_fdstat_get(socket)
++            .map_err(|errno| io::Error::from_raw_os_error(errno.raw() as i32))?;
++        wasi::fd_fdstat_set_flags(socket, fdstat.fs_flags | wasi::FDFLAGS_NONBLOCK)
++            .map_err(|errno| io::Error::from_raw_os_error(errno.raw() as i32))?;
++    }
+ 
+     Ok(
+         socket as libc::c_int
