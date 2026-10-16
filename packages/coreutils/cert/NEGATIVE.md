@@ -68,3 +68,7 @@ Until 2026-10-16 the cert kernel was 1.88.0, which doesn't answer `env.__syscall
 
 - published 9.12.0-7 on 1.100.4 and on 1.98.0: pass, `Linux slicc 6.0.0-slicc #1 SMP PREEMPT_DYNAMIC wasm32 Emscripten`. On 1.88.0 it takes the fallback branch and passes, `Emscripten emscripten 4.0.23 #1 wasm32 Emscripten`.
 - published 9.12.0-6 on 1.100.4: FAIL at the first assertion, `coreutils.wasm does not import env.__syscall_uname, so no kernel can answer uname()`. With the three tarball checks switched off, the run still fails: `uname -s is Emscripten on slicc-kernel 1.100.4, which answers env.__syscall_uname (>= 1.98.0): Emscripten`.
+
+## 9.12.0-8: 40 symlink follows (homescoop#461, 2026-10-16)
+
+`symloop.mjs` against the published 9.12.0-7 (slicc-kernel 1.100.4, users enforce): FAIL at 40 follows, with `cat: /tmp/c40/l0: Symbolic link loop`, rc 1. The 39-link chain passes. Emscripten's `FS.lookupPath` ran 40 passes, and the first follows no link, so the 40th follow was already `ELOOP`. 9.12.0-8 is built with `scripts/emsdk-patches/libfs-symloop.patch` (41 passes; the glue has `nlinks <= 40`), and all ten specs pass on it, symloop.mjs included.
