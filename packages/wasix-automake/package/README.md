@@ -5,7 +5,7 @@ names). Needs wasix-perl, wasix-autoconf and wasix-m4.
 
 With its dependencies alone (plus a shell and coreutils), `aclocal`,
 `autoconf` and `automake --add-missing` write `configure`, `aclocal.m4` and
-`Makefile.in`. From 1.17.0-9 the pinned wasix-autoconf (2.72.0-7) runs
+`Makefile.in`. From 1.17.0-9 the pinned wasix-autoconf (2.72.0-7 and later) runs
 `autom4te` without grep; before, `aclocal` failed without grep with
 `autom4te: error: need GNU m4 1.4 or later: m4`.
 
