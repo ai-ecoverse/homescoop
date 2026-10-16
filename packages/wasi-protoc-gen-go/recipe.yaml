@@ -2,8 +2,10 @@
 # protobuf plugin as a command, so buf generate can run it as a local plugin
 # in slicc-kernel (@ai-ecoverse/wasi-buf).
 name: wasi-protoc-gen-go
-# Not built by the ladder; .github/workflows/wasi-protoc-plugins.yml builds and tests it.
-builder: retired
+builder: host
+reproducible: true
+inputs:
+  - scripts/build-wasip1-go-command.sh
 version: "1.36.12"
 npm: "@ai-ecoverse/wasi-protoc-gen-go"
 summary: "protoc-gen-go 1.36 for slicc WASI preview1 (command protoc-gen-go)"

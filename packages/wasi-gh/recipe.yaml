@@ -2,8 +2,8 @@
 # from gh's source with GOOS=wasip1 and patches/0001-wasip1-slicc-host.patch,
 # plus a host-import module for slicc-kernel.
 name: wasi-gh
-# Not built by the ladder; .github/workflows/wasi-gh.yml builds and tests it.
-builder: retired
+builder: host
+reproducible: true
 version: "2.102.0"
 npm: "@ai-ecoverse/wasi-gh"
 summary: "gh 2.102.0 for slicc WASI preview1 (command gh)"
