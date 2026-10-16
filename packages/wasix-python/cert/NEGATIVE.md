@@ -1,5 +1,14 @@
 
 
+## 3.14.2-19: select.poll fails on an fd with no events, select.epoll errors look like success (-20, homescoop#394, #443)
+
+`epoll.mjs` against the published 3.14.2-19 (wasix-sysroot -28), on slicc-kernel 1.97.0 and 1.94.0 (Node entry, 2026-10-16): FAIL at its first check.
+- **`select.poll`:** with a readable pipe (`POLLIN`) and a second pipe registered with events 0, it raises `OSError: [Errno 52] Function not implemented`. -28's libc `poll` refused the events-0 entry.
+- **`select.epoll` on 1.97.0:** registering the same fd twice succeeds, and so does unregistering an fd that isn't registered. -28's `epoll_ctl` returned the errno as its value, which Python reads as success. 3.14.2-20 gives EEXIST and ENOENT.
+- **asyncio** echoes over loopback with either version, but with -19 an error from epoll would go unnoticed.
+
+On 1.94.0 (no WASIX epoll), `select.epoll()` is ENOSYS with both versions and asyncio picks `PollSelector`.
+
 ## 3.14.2-16: os.utime(p) and Path.touch() set 1970; os.times() is the wall clock (-17, homescoop#294)
 
 `round17.mjs` on slicc-kernel 1.71.1 (Node entry, 2026-10-13), with the published 3.14.2-16 (wasix-sysroot -22):

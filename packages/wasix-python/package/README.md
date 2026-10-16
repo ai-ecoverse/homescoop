@@ -18,6 +18,18 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-20 (wasix-sysroot -29):
+
+- `select.poll` takes a file descriptor registered with no events. Up to -19
+  the call failed with ENOSYS.
+- `select.epoll` errors are real: a second `register` is EEXIST and an
+  `unregister` of an unregistered fd is ENOENT. Up to -19 both succeeded
+  silently. asyncio uses `EpollSelector` on slicc-kernel ≥ 1.95.0 (WASIX
+  epoll) and `PollSelector` on older kernels.
+- `multiprocessing` still has no `_multiprocessing`: named semaphores and
+  POSIX shared memory need slicc-kernel support (`/dev/shm` and memory shared
+  between processes).
+
 Since 3.14.2-19 (wasix-sysroot -28):
 - signal masks are real: `signal.pthread_sigmask` blocks and unblocks
   through slicc-kernel (≥ 1.88.0), a blocked signal stays pending
