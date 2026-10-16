@@ -59,6 +59,12 @@ for a in "$@"; do
   esac
   if [ "$prev" = "-o" ]; then
     out=$a
+  else
+    # The joined form, -oFILE (not clang's -objc* / -object* options).
+    case "$a" in
+      -objc* | -object*) ;;
+      -o?*) out=${a#-o} ;;
+    esac
   fi
   prev=$a
 done
@@ -311,6 +317,17 @@ wasix_imports_fork() {
   done
   return 1
 }
+
+# A link without -o writes a.out, as clang does (homescoop#692: until
+# 24.0.0-16 such a link skipped the Asyncify step). Only for a real link of
+# sources or objects, so `cc --version` never touches an old a.out.
+if [ -z "$out" ] && [ "$compile_only" -eq 0 ]; then
+  links=$has_src
+  for a in "$@"; do
+    case "$a" in *.o | *.a | *.lo | *.obj) links=1 ;; esac
+  done
+  [ "$links" -eq 1 ] && out=a.out
+fi
 
 # Post-link Asyncify when the module needs host-driven fork / stack_checkpoint
 # (SLICC realm) or when exceptions=off (wasixcc setjmp path).

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-clang",
-  "version": "24.0.0-15",
+  "version": "24.0.0-16",
   "description": "Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen)",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@ai-ecoverse/wasix-sysroot": "2025.9.30-28",
-    "@ai-ecoverse/wasm-binaryen": "132.0.0-1"
+    "@ai-ecoverse/wasm-binaryen": "132.0.0-2"
   },
   "engines": {
     "slicc-kernel": ">=1.44.0"
