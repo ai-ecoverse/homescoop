@@ -273,7 +273,10 @@ A release that only changes `package.json` (e.g. moving an exact
 repack:
   from: "0.1.0-1"   # published version whose bytes are reused
   files: []         # optional extra repo files laid over the base (README.md;
-                    # from package/<f>, else the build source packages/<n>/<f>)
+                    # from package/<f>, else the build source packages/<n>/<f>;
+                    # <f>=<src> takes packages/<n>/<src>: bin/cc=drivers/wasix-driver.sh)
+  patches: []       # optional unified diffs over the base's files
+                    # (packages/<n>/<p>.patch, paths a/package/… b/package/…)
   fields: []        # optional package.json metadata that may change too
                     # (engines, description, keywords, slicc.env)
 ```
@@ -281,11 +284,16 @@ repack:
 `host-run.sh` then skips deps, emsdk and `build.sh`, and runs
 `scripts/repack-published.mjs`: `npm pack <npm>@<from>`, then copy its tar
 stream entry by entry (headers too), with the repo's `package/package.json`
-(plus `files`) as the only new data. No `npm pack` of an extracted tree:
+(plus `files`, and the files `patches` touch) as the only new data.
+`patches` are applied with `patch -p1`, no fuzz, after `files`, so a fix to
+shipped text (wasm-clang's glue, homescoop#276) needs no copy of the whole
+file in the repo, and a hunk that doesn't apply fails the repack. No `npm
+pack` of an extracted tree:
 `files` globs are case-sensitive on Linux (wasm-emscripten's `"Media"` packed
 `media/` on macOS only), so a repack could drop files. The result is
 checked by `scripts/diff-published.mjs`: every other entry must be
-byte-identical (path, type, mode, content) to the base, and in
+byte-identical (path, type, mode, content) to the base, but for `files` and
+the patched files, and in
 `package.json` only `version`, `@ai-ecoverse/*` dependency versions (exact)
 and the recipe's `repack.fields` may differ. The report lands in `.homescoop-out/packaging-only-diff.txt`
 and the `host-<pkg>-prN` artifact. `refresh-recipe-sha.mjs` skips repack

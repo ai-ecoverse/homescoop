@@ -263,17 +263,76 @@ if [ "$status" -ne 0 ]; then
   exit "$status"
 fi
 
+# Does the module import wasix_32v1.proc_fork, stack_checkpoint or
+# stack_restore? Reads the wasm's import section with od (coreutils, which
+# this driver needs anyway): 0 yes, 1 no, 2 when it can't be read. Until
+# 24.0.0-15 this was a grep of the whole file, and without grep in the realm
+# the check failed quietly and fork programs were linked without Asyncify
+# (homescoop#451).
+wasix_imports_fork() {
+  _f=$1
+  _size=$(wc -c <"$_f" 2>/dev/null) || return 2
+  _size=$((_size + 0))
+  _magic=$(od -An -v -tu1 -N 8 "$_f" 2>/dev/null) || return 2
+  # shellcheck disable=SC2086
+  set -- $_magic
+  [ "$#" -eq 8 ] && [ "$1 $2 $3 $4" = "0 97 115 109" ] || return 2
+  _off=8
+  while [ "$_off" -lt "$_size" ]; do
+    _hdr=$(od -An -v -tu1 -j "$_off" -N 6 "$_f" 2>/dev/null) || return 2
+    # shellcheck disable=SC2086
+    set -- $_hdr
+    [ "$#" -ge 2 ] || return 2
+    _id=$1
+    shift
+    _len=0 _shift=0 _n=1
+    for _b in "$@"; do
+      _len=$((_len | ((_b & 127) << _shift)))
+      _n=$((_n + 1))
+      [ "$_b" -lt 128 ] && break
+      _shift=$((_shift + 7))
+    done
+    _body=$((_off + _n))
+    if [ "$_id" -eq 2 ]; then
+      _hex=$(od -An -v -tx1 -j "$_body" -N "$_len" "$_f" 2>/dev/null | tr -d ' \n') || return 2
+      [ -n "$_hex" ] || return 2
+      # module "wasix_32v1", then the field: length byte and name, in hex
+      _mod=0a77617369785f33327631
+      case $_hex in
+        *"${_mod}0970726f635f666f726b"* | *"${_mod}10737461636b5f636865636b706f696e74"* | \
+          *"${_mod}0d737461636b5f726573746f7265"*) return 0 ;;
+      esac
+      return 1
+    fi
+    # Custom sections (0) may come anywhere; past the type section (1) there
+    # is no import section.
+    [ "$_id" -le 1 ] || return 1
+    _off=$((_body + _len))
+  done
+  return 1
+}
+
 # Post-link Asyncify when the module needs host-driven fork / stack_checkpoint
 # (SLICC realm) or when exceptions=off (wasixcc setjmp path).
+# WASIXCC_ASYNCIFY=1 forces it, WASIXCC_ASYNCIFY=0 skips it.
 if [ "$compile_only" -eq 0 ] && [ "$shared" -eq 0 ] && [ -n "$out" ] && [ -f "$out" ]; then
   chmod +x "$out" 2>/dev/null || true
   need_asyncify=0
-  case "$EXCEPTIONS" in
-    no|off|none) need_asyncify=1 ;;
+  case "${WASIXCC_ASYNCIFY:-}:$EXCEPTIONS" in
+    1:* | yes:* | on:*) need_asyncify=1 ;;
+    0:* | no:* | off:*) need_asyncify=0 ;;
+    *:no | *:off | *:none) need_asyncify=1 ;;
     *)
-      # UTF-8 import names appear literally in the wasm binary.
-      if grep -a -F -e 'proc_fork' -e 'stack_checkpoint' -e 'stack_restore' "$out" >/dev/null 2>&1; then
+      if wasix_imports_fork "$out"; then
         need_asyncify=1
+      else
+        case $? in
+          1) ;;
+          *)
+            echo "wasix-driver: cannot read the imports of $out (needs od and tr from coreutils) to decide on Asyncify; set WASIXCC_ASYNCIFY=1 or 0" >&2
+            exit 1
+            ;;
+        esac
       fi
       ;;
   esac

@@ -8,8 +8,22 @@ source:
   # Prebuilt by slicc-emscripten/build-wasm-llvm.sh; build.sh stages that artifact.
   url: "https://github.com/llvm/llvm-project"
   sha256: "skip"
+# 24.0.0-15 is packaging-only too: -11's bytes with this driver (cc's
+# Asyncify check reads the import section with od, no grep: homescoop#451)
+# and glue-node-runner.patch (the glue's Node-host runner stays out of
+# slicc-kernel's Node process worker: homescoop#276). build.sh applies both
+# at the next real build.
 repack:
   from: "24.0.0-11"
+  files:
+    - bin/cc=drivers/wasix-driver.sh
+    - bin/gcc=drivers/wasix-driver.sh
+    - bin/c++=drivers/wasix-driver.sh
+    - bin/g++=drivers/wasix-driver.sh
+    - bin/wasixcc=drivers/wasix-driver.sh
+    - bin/wasix++=drivers/wasix-driver.sh
+  patches:
+    - glue-node-runner.patch
   fields:
     - engines
     - slicc.env

@@ -27,16 +27,23 @@
 //   shared the sysroot at /shared/lib/node_modules/@ai-ecoverse/wasix-sysroot
 //          (what 24.0.0-11's slicc.env hard-coded).
 //
-// The glue is neutralised for the Node-entry cert ONLY; the shipped bytes are
-// unchanged (homescoop#276). slicc-emscripten appends a Node-host runner to
-// bin/llvm (and its byte-copies bin/clang, bin/wasm-ld, …) that runs main
-// with process.argv as soon as the runtime is up whenever `process` exists,
-// which is also true inside slicc-kernel's Node process worker: main runs
-// with no arguments, exits the runtime, and the kernel's own callMain traps.
-// The browser realm (slicc) has no `process`, so it is unaffected. This cert
-// writes copies of those glue files with that appended block cut off
-// (everything from "// Node runs the tool immediately" to the end) into the
-// kernel; llvm.wasm, the drivers and the sysroot are the tarball's bytes.
+// The glue runs as shipped (homescoop#276, 24.0.0-15). slicc-emscripten
+// appends a Node-host runner to bin/llvm (and its byte-copies bin/clang,
+// bin/wasm-ld, …) that runs main with process.argv as soon as the runtime is
+// up whenever `process` exists, which is also true inside slicc-kernel's Node
+// process worker: main ran with no arguments, exited the runtime, and the
+// kernel's own callMain trapped. From 24.0.0-15 the runner stays out of a
+// host that sets noInitialRun, as the kernel does (glue-node-runner.patch);
+// the cert requires that guard on every glue of the package under test and
+// runs clang, wasm-ld and llvm-nm --version through it. Older glues (--expect
+// old, and wasm-binaryen's until it ships the guard) are still cut off before
+// the runner ("// Node runs the tool immediately" to the end) in the cert's
+// copy only, as before.
+//
+// The cc driver's Asyncify check (homescoop#451): the realm has no grep (the
+// cert installs none); each probe that imports wasix_32v1.proc_fork,
+// stack_checkpoint or stack_restore must come out asyncified, and the others
+// must not.
 //
 // --expect old is the negative: a clang pinned to a pre -20 sysroot (24.0.0-11
 // → -17) builds r24, and as root under users enforce its chown to a real id
@@ -85,12 +92,14 @@ function unpack(spec, dir, members = []) {
 }
 
 const RUNNER = '\n// Node runs the tool immediately.';
+const UNGUARDED = "if (typeof process !== 'undefined' && process.versions && process.versions.node) {";
+const GUARDED = "if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {";
 /**
- * Cut slicc-emscripten's appended Node-host runner off every glue file in
- * pkg/bin (cert only; see the header). Returns [file, shipped sha256] pairs.
+ * slicc-emscripten's appended Node-host runner in each glue file of pkg/bin:
+ * [file, 'guarded' | 'unguarded', shipped sha256] for every glue that has one.
  */
-function neutraliseGlue(pkg) {
-  const done = [];
+function glueRunners(pkg) {
+  const out = [];
   for (const f of readdirSync(join(pkg, 'bin'))) {
     const p = join(pkg, 'bin', f);
     if (!statSync(p).isFile() || f.endsWith('.wasm')) continue;
@@ -98,14 +107,27 @@ function neutraliseGlue(pkg) {
     const i = s.indexOf(RUNNER);
     if (i < 0) continue;
     const tail = s.slice(i);
-    assert.ok(/if \(typeof process !== 'undefined' && process\.versions && process\.versions\.node\) \{/.test(tail) &&
-      tail.includes("Module['onRuntimeInitialized'] = function sliccNodeMain()") && /\n  \};\n\}\n*$/.test(tail),
+    const kind = tail.includes(GUARDED) ? 'guarded' : tail.includes(UNGUARDED) ? 'unguarded' : undefined;
+    assert.ok(kind && tail.includes("Module['onRuntimeInitialized'] = function sliccNodeMain()") && /\n  \};\n\}\n*$/.test(tail),
       `bin/${f}: the appended block is not the expected sliccNodeMain runner`);
-    done.push([f, createHash('sha256').update(s).digest('hex')]);
-    writeFileSync(p, `${s.slice(0, i)}\n`);
+    out.push([f, kind, createHash('sha256').update(s).digest('hex')]);
+  }
+  return out;
+}
+/** Cut the unguarded runners off (cert only; see the header). Returns the files cut. */
+function neutraliseGlue(pkg) {
+  const done = [];
+  for (const [f, kind] of glueRunners(pkg)) {
+    if (kind !== 'unguarded') continue;
+    const p = join(pkg, 'bin', f);
+    const s = readFileSync(p, 'utf8');
+    writeFileSync(p, `${s.slice(0, s.indexOf(RUNNER))}\n`);
+    done.push(f);
   }
   return done;
 }
+
+const FORK_IMPORTS = ['proc_fork', 'stack_checkpoint', 'stack_restore'];
 
 /** The slicc.libc custom section of a wasm module, or undefined. */
 function libcMarker(buf) {
@@ -134,9 +156,16 @@ let k;
 try {
   const clang = unpack(arg('--tarball'), join(work, 'clang'));
   const cpkg = JSON.parse(readFileSync(join(clang, 'package.json'), 'utf8'));
-  const glue = neutraliseGlue(clang);
-  assert.ok(glue.some(([f]) => f === 'llvm'), 'bin/llvm has no Node-host runner to neutralise (fixed? drop neutraliseGlue)');
-  console.log(`== glue neutralised for the Node entry (cert only): ${glue.length} files, shipped bin/llvm sha256 ${glue.find(([f]) => f === 'llvm')[1]}; llvm.wasm untouched`);
+  const runners = glueRunners(clang);
+  assert.ok(runners.some(([f]) => f === 'llvm'), 'bin/llvm has no Node-host runner (did the glue change? update glueRunners)');
+  if (expect === 'current') {
+    const bad = runners.filter(([, kind]) => kind !== 'guarded').map(([f]) => f);
+    assert.deepEqual(bad, [], `glue whose Node-host runner fires in slicc-kernel's Node process worker (no noInitialRun guard, homescoop#276): ${bad.join(', ')}`);
+    console.log(`== glue as shipped: ${runners.length} files with the noInitialRun-guarded runner, bin/llvm sha256 ${runners.find(([f]) => f === 'llvm')[2]}`);
+  } else {
+    const cut = neutraliseGlue(clang);
+    console.log(`== glue neutralised for the Node entry (cert only, --expect old): ${cut.length} files`);
+  }
   const sysVer = cpkg.dependencies?.[`${S}/wasix-sysroot`];
   assert.ok(sysVer, 'wasm-clang package.json has no @ai-ecoverse/wasix-sysroot dependency');
   console.log(`== ${cpkg.name}@${cpkg.version}, wasix-sysroot ${sysVer}, ${kernelSpec}, users enforce, layout ${layout}, expect ${expect}`);
@@ -144,7 +173,10 @@ try {
   const sys = unpack(`${S}/wasix-sysroot@${sysVer}`, join(work, 'sysroot'), ['package/package.json', `package/${VARIANT}`]);
   const binVer = cpkg.dependencies?.[`${S}/wasm-binaryen`];
   const binaryen = layout === 'flat' && binVer ? unpack(`${S}/wasm-binaryen@${binVer}`, join(work, 'binaryen')) : undefined;
-  if (binaryen) neutraliseGlue(binaryen);
+  if (binaryen) {
+    const cut = neutraliseGlue(binaryen);
+    console.log(`== wasm-binaryen ${binVer}: ${cut.length ? `unguarded runner cut off (cert only) in ${cut.join(', ')}` : 'glue as shipped'}`);
+  }
 
   const nm = join(work, 'nm');
   mkdirSync(nm, { recursive: true });
@@ -187,6 +219,17 @@ try {
     if (i >= 100) assert.fail(`wasixcc --version: rc=${r.status} ${r.stdout}${r.stderr}`);
     await new Promise((res) => setTimeout(res, 200));
   }
+  if (expect === 'current') {
+    // The shipped glue on the Node entry: the kernel's callMain runs the tool.
+    for (const [tool, want] of [['clang', /^clang version 24\./m], ['wasm-ld', /^LLD 24\./m], ['llvm-nm', /LLVM version 24\./]]) {
+      const r = await run([tool, '--version'], { env: { TMPDIR: '/tmp' } });
+      assert.equal(r.status, 0, `${tool} --version through the shipped glue: rc=${r.status}\n${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, want, `${tool} --version: ${r.stdout}${r.stderr}`);
+    }
+    console.log('== clang, wasm-ld and llvm-nm --version run through the shipped glue');
+    const g = await run(['bash', '-c', 'command -v grep || echo "no grep"']);
+    assert.equal(g.stdout, 'no grep\n', `the realm has grep (the Asyncify check must not need it): ${g.stdout}`);
+  }
   const ccEnv = { TMPDIR: '/tmp' };
   const all = ['r18', 'r21', 'r24', 'r24link', 'r26', 'r27', 'r28', 'r28w'];
   const names = expect === 'old' ? ['r24'] : (arg('--probes')?.split(',') ?? all);
@@ -199,8 +242,11 @@ try {
     assert.equal(r.status, 0, `wasixcc ${n}.c: rc=${r.status}\n${r.stdout}${r.stderr}`);
     const wasm = Buffer.from(await k.readFile(`${PROBES_AT}/bin/${n}.wasm`));
     const marker = libcMarker(wasm);
-    const asyncified = WebAssembly.Module.exports(new WebAssembly.Module(wasm)).some((e) => e.name === 'asyncify_start_unwind');
-    console.log(`== ${n}.wasm: ${wasm.length} bytes in ${((Date.now() - t) / 1000).toFixed(1)} s, slicc.libc ${JSON.stringify(marker ?? null)}, asyncify ${asyncified ? 'yes' : 'no'}`);
+    const mod = new WebAssembly.Module(wasm);
+    const asyncified = WebAssembly.Module.exports(mod).some((e) => e.name === 'asyncify_start_unwind');
+    const forks = WebAssembly.Module.imports(mod).some((i) => i.module === 'wasix_32v1' && FORK_IMPORTS.includes(i.name));
+    console.log(`== ${n}.wasm: ${wasm.length} bytes in ${((Date.now() - t) / 1000).toFixed(1)} s, slicc.libc ${JSON.stringify(marker ?? null)}, fork imports ${forks ? 'yes' : 'no'}, asyncify ${asyncified ? 'yes' : 'no'}`);
+    if (expect === 'current') assert.equal(asyncified, forks, `${n}.wasm: cc must asyncify exactly the modules that import ${FORK_IMPORTS.join('/')} (homescoop#451)`);
     if (expect === 'current') assert.equal(marker, `wasix-sysroot ${sysVer}`, `${n}.wasm slicc.libc marker`);
     else assert.equal(marker, undefined, `${n}.wasm: a pre -22 libc has no slicc.libc marker`);
   }
