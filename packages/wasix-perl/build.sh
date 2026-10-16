@@ -75,6 +75,12 @@ else
   if grep -q "tryhints 'hint'" "$SRC/cnf/configure_hint.sh"; then
     patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0002-userhints-tryhints-arg.patch"
   fi
+  if ! grep -q "dl_none.xs" "$SRC/Makefile.config.SH"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0006-perl-cross-static-dynaloader.patch"
+  fi
+  if ! grep -q "^static_subext" "$SRC/Makefile"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0007-perl-cross-static-subext.patch"
+  fi
 
   # List::Util must stay on when usedl=undef (all-static).
   if grep -q 'extonlyif cpan/List-Util "\$usedl" !=' "$SRC/cnf/configure_mods.sh"; then
@@ -97,10 +103,6 @@ PY
   # re_top.h's my_* renames (see the patch header).
   if ! grep -q my_reg_add_data "$SRC/ext/re/re_top.h"; then
     patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0003-re-top-static-split-helpers.patch"
-  fi
-  # Static perl without DynaLoader: see the patch header.
-  if ! grep -q homescoop_boot_DynaLoader "$SRC/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm"; then
-    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0004-miniperl-dynaloader-marker.patch"
   fi
   if ! grep -q wasi_ptrs "$SRC/pp_sys.c"; then
     patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0005-sselect-wasi-fd-set.patch"
@@ -240,8 +242,13 @@ PY
       -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -O2 $EMU_CFLAGS \
       -fno-strict-aliasing -c -o locale.o locale.c
     llvm-ar r libperl.a locale.o
-    # patches/0004: perlmain.c registers a no-op DynaLoader::boot_DynaLoader.
-    grep -q 'newXS("DynaLoader::boot_DynaLoader"' perlmain.c
+    grep -q 'newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file)' perlmain.c
+    grep -q '^dynaloader = DynaLoader$' Makefile.config
+    for sub in Byte CN EBCDIC JP KR Symbol TW Unicode; do
+      grep -q "newXS(\"Encode::${sub}::bootstrap\", boot_Encode__${sub}, file)" perlmain.c
+      grep -q "lib/auto/Encode/${sub}/${sub}.a" static.list
+    done
+    ls -l libperl.a lib/auto/Encode/*.a lib/auto/Encode/*/*.a
     wasixcc -DPERL_CORE -Wno-incompatible-function-pointer-types -Wno-implicit-function-declaration \
       -include "$PKG_ROOT/wasix-posix-stubs.h" -DNO_LOCALE -DNO_ENV_ARRAY_IN_MAIN \
       -Dmain=__main_argc_argv \
@@ -345,19 +352,10 @@ for f in sorted(src.rglob("*")):
 print(f"gap-filled {len(filled)} files from the build lib: {', '.join(filled[:12])}{' …' if len(filled) > 12 else ''}")
 PY
 
-# DynaLoader.pm (perl-cross builds no DynaLoader with usedl=undef): require
-# DynaLoader and `@ISA = ('DynaLoader'); Foo->bootstrap` keep working; for a
-# static module bootstrap finds Foo::bootstrap, and boot_DynaLoader is the
-# no-op from patches/0004.
-if [[ -x "$SRC/miniperl_top" ]]; then
-  (cd "$SRC/ext/DynaLoader" && ../../miniperl_top DynaLoader_pm.PL)
-  cp "$SRC/ext/DynaLoader/DynaLoader.pm" "$DEST/lib/perl5/DynaLoader.pm"
-fi
-test -f "$DEST/lib/perl5/DynaLoader.pm"
-
 # make and make install are best-effort (|| true): refuse a tree that lacks
 # modules from extensions built after the perl link.
-for m in List/Util.pm File/Spec.pm Cwd.pm POSIX.pm Digest/SHA.pm Fcntl.pm Errno.pm; do
+for m in List/Util.pm File/Spec.pm Cwd.pm POSIX.pm Digest/SHA.pm Fcntl.pm Errno.pm DynaLoader.pm \
+  Encode/Byte.pm Encode/CN.pm Encode/EBCDIC.pm Encode/JP.pm Encode/KR.pm Encode/Symbol.pm Encode/TW.pm Encode/Unicode.pm; do
   if [[ -z "$(find "$DEST/lib/perl5" -path "*/$m" -print -quit)" ]]; then
     echo "homescoop wasix-perl: staged lib lacks $m (see $WORK/make-wasix.log)" >&2
     # Where did it go? Build tree, ext dir, install tree.

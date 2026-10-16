@@ -7,13 +7,39 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
 - `fork` / `system` / backticks via WASIX `proc_fork` (asyncify)
 - `PERL5LIB` defaults to package `lib/perl5` plus `~/.local/share/perl5`
 - `use re 'debug'` / `'eval'` and XS `Cwd` (`getcwd`, `abs_path`) work since
-  5.42.0-7: the static perl has no DynaLoader, and these modules only load their
-  XS when `DynaLoader::boot_DynaLoader` exists (-7 provides a no-op one and ships
-  `DynaLoader.pm`). In -6, `perl -Mre=debug` died ("Undefined subroutine
-  &re::install") and `getcwd` inside a mount returned an empty string.
+  5.42.0-7: these modules only load their XS when `DynaLoader::boot_DynaLoader`
+  exists (-7 to -12 provided a no-op one; -13 links the real DynaLoader). In -6,
+  `perl -Mre=debug` died ("Undefined subroutine &re::install") and `getcwd`
+  inside a mount returned an empty string.
 - File modes on slicc-kernel ≥ 1.35.1: `umask`, `chmod`, `mkdir` modes and
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
+
+## 5.42.0-13: wasix-sysroot 2025.9.30-30
+
+- POSIX record locks: `Fcntl` exports `F_GETLK`, `F_SETLK`, `F_SETLKW` and
+  `F_RDLCK`/`F_WRLCK`/`F_UNLCK` (up to -12, `use Fcntl qw(F_SETLK)` died with
+  "Your vendor has not defined Fcntl macro F_GETLK"), and `fcntl` takes them to
+  slicc-kernel (≥ 1.100.0), which keeps the locks per process, as Linux does: a
+  forked child asking for a write lock on a range the parent holds gets
+  `EAGAIN`, `F_SETLKW` waits for the unlock, and `F_GETLK` names the holder.
+  On an older kernel every lock is granted locally and `F_GETLK` answers
+  `F_UNLCK`, so a script that probes `F_SETLK` and falls back now thinks it
+  has locking there. The struct is `pack('s s x4 q q l x4', $type, $whence,
+  $start, $len, $pid)` (32 bytes on wasm32). `flock` is unchanged: an
+  advisory no-op that succeeds on an open handle.
+- The real DynaLoader, as upstream builds it for a static perl
+  (`dl_none.xs`): `DynaLoader::dl_error` says "Not implemented", and loading
+  a module that isn't linked in croaks with "Can't load module …, dynamic
+  loading not available in this perl." Up to -12 `boot_DynaLoader` was a
+  no-op marker and the `dl_*` functions were missing.
+- All of Encode: its XS sub-extensions (`Encode::Unicode`, `Byte`, `Symbol`,
+  `EBCDIC`, `CN`, `JP`, `KR`, `TW`) are linked in, so `encode("UTF-16LE", …)`,
+  `cp1252`, `koi8-r`, `shiftjis`, `euc-kr`, `big5-eten` and the rest of
+  `Encode->encodings(":all")` work. Up to -12 they died with "Unknown
+  encoding".
+- wasix-sysroot -29 and -30 also bring `poll` with `events` 0, WASIX epoll
+  with Linux op numbers and named semaphores (no perl builtin uses them).
 
 ## 5.42.0-12: wasix-sysroot 2025.9.30-28
 
@@ -46,8 +72,8 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   `IO::Select->can_read` could trap.
 - The build is reproducible: `perl -V`'s "Compiled at" is perl 5.42.0's
   release date (`SOURCE_DATE_EPOCH`), archive dates are zero, and a second
-  build of the same commit is byte-identical (checked by
-  `.github/workflows/wasix-perl-repro.yml`).
+  build of the same commit is byte-identical (checked by `ladder-pr`'s
+  `reproducible (wasix-perl)` job, `reproducible: true` in `recipe.yaml`).
 
 ## 5.42.0-10: wasix-sysroot 2025.9.30-27
 

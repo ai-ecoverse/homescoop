@@ -19,7 +19,7 @@ useperlio='define'
 
 # Static core — no dlopen
 usedl='undef'
-dlsrc='none'
+dlsrc='dl_none.xs'
 dlext='none'
 so='none'
 useshrplib='false'
