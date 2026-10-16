@@ -1,0 +1,11 @@
+--- a/bfd/wasm-module.c
++++ b/bfd/wasm-module.c
+@@ -56,6 +56,8 @@
+   WASM_SECTION ( 9, "element"),
+   WASM_SECTION (10, "code"),
+   WASM_SECTION (11, "data"),
++  WASM_SECTION (12, "datacount"),
++  WASM_SECTION (13, "tag"),
+ };
+ 
+ #define WASM_NUMBERED_SECTIONS ARRAY_SIZE (wasm_numbered_sections)
