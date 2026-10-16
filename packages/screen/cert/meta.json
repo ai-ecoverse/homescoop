@@ -10,7 +10,7 @@
     "@ai-ecoverse/wasm-coreutils@9.12.0-5"
   ],
   "checklist": [
-    "screen -v: Screen version 5.0.1 (build timestamp)",
+    "screen -v: 'Screen version 5.0.1 (build on 2025-05-15 15:05:28)', the pinned source.epoch (5.0.1-11, #497; up to -10 the build day, so no two builds had the same bytes)",
     "screen -ls with no sessions: 'No Sockets found in /root/.screen.', rc 1",
     "screen -dmS hs sleep 30: rc 0; -ls lists <pid>.hs, '1 Socket'; -S hs -X quit rc 0; -ls empty again",
     "window fork + exec keeps the pid (slicc-kernel#176): the window's $PPID is the screen server from -ls, and /proc/<its pid> is the program",

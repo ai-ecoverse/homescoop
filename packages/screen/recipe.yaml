@@ -7,6 +7,12 @@ summary: "GNU screen 5.0.1 for slicc (emscripten; asyncify fork; slicc-kernel ps
 source:
   url: "https://mirrors.kernel.org/gnu/screen/screen-{{version}}.tar.gz"
   sha256: "2dae36f4db379ffcd14b691596ba6ec18ac3a9e22bc47ac239789ab58409869d"
+  # SOURCE_DATE_EPOCH for screen -v's "build on" date (BUILD_DATE in
+  # Makefile.in), so a rebuild on another day has the same bytes (#497):
+  # the newest file in screen-5.0.1.tar.gz, 2025-05-15T15:42:28Z.
+  epoch: "1747323748"
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
 sources:
   ncurses:
     version: "6.5"
@@ -29,3 +35,5 @@ about:
     terminals' /dev/ttyN are not visible; no SCM_RIGHTS on kernel sockets);
     cert/reattach.mjs measures it and flips to requiring the attach once the
     attacher's tty is visible from the session.
+    5.0.1-11 (#497): SOURCE_DATE_EPOCH from source.epoch pins screen -v's
+    build date, so the build is byte-reproducible (reproducible: true).
