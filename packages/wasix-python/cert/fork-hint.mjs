@@ -1,4 +1,4 @@
-const HINT = "isn't available in this python. Re-run with PYTHON_FORK=true to use the fork-capable build.";
+const HINT = "isn't available in this python. Re-run with PYTHON_FORK=true (needs slicc-kernel >= 1.110.0) to use the fork-capable build.";
 const SCRIPT = String.raw`
 import json, multiprocessing as mp, os, sys
 def attempt(f):

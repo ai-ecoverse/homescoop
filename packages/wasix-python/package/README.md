@@ -27,11 +27,13 @@ Since 3.14.2-25 (wasix-sysroot -32):
   `PYTHON_FORK=true` (slicc.commands `variants`, slicc-kernel#859). The kernel
   loads only the chosen wasm, and children inherit the choice through the
   environment, also when they exec `sys.executable`. Kernels before #859
-  ignore `variants` and always run the default.
+  (1.110.0) ignore `variants` and always run the default.
   - In the default binary, `os.fork()`, `os.forkpty()` and
     `multiprocessing.get_context("fork")`/`("forkserver")` fail with an
     error that names the switch: *os.fork() isn't available in this python.
-    Re-run with PYTHON_FORK=true to use the fork-capable build.*
+    Re-run with PYTHON_FORK=true (needs slicc-kernel >= 1.110.0) to use the
+    fork-capable build.* On an older kernel `PYTHON_FORK=true` still runs this
+    default binary, so the message names the kernel too.
     `hasattr(os, "fork")` stays `False`.
   - In the fork binary, `os.fork`, `os.waitpid`, threads in a forked child,
     and `get_context("fork")` `Pool`/`Queue`/`Lock` work. The full asyncify

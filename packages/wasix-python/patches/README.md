@@ -159,6 +159,6 @@ is not system-wide.
 ## `cpython-fork-hint-wasix.patch` (wasix-python 3.14.2-25, homescoop#357)
 
 The package ships two pythons: `bin/python.wasm` without fork, and `bin/python-fork.wasm` with it (`HAVE_FORK`, fully asyncified). `PYTHON_FORK=true` selects the second one through slicc.commands `variants`. The stdlib is shared, and the patch only acts where `os.fork` is missing:
-- **`Lib/os.py`:** a module `__getattr__` makes `os.fork` and `os.forkpty` raise `AttributeError("os.fork() isn't available in this python. Re-run with PYTHON_FORK=true to use the fork-capable build.")`. It's an `AttributeError`, so `hasattr(os, "fork")` stays `False` and feature checks work as before. Every other missing name keeps CPython's message.
+- **`Lib/os.py`:** a module `__getattr__` makes `os.fork` and `os.forkpty` raise `AttributeError("os.fork() isn't available in this python. Re-run with PYTHON_FORK=true (needs slicc-kernel >= 1.110.0) to use the fork-capable build.")`. It's an `AttributeError`, so `hasattr(os, "fork")` stays `False` and feature checks work as before. Every other missing name keeps CPython's message.
 - **`Lib/multiprocessing/context.py`:** `get_context("fork"/"forkserver")`, and so `set_start_method`, raise `ValueError` with the same hint.
 - The default start method stays `spawn` on WASI even when forkserver exists, as in the fork build. Upstream 3.14 would pick forkserver there.
