@@ -6,11 +6,19 @@
  *   node scripts/refresh-recipe-sha.mjs bash
  *   node scripts/refresh-recipe-sha.mjs --all
  *   node scripts/refresh-recipe-sha.mjs zlib --check
+ *   node scripts/refresh-recipe-sha.mjs py-numpy --verify-repack
  *
  * Repack recipes (repack.from) never fetch their source, so a wrong sha256
- * would never fail a build (#730). They are always verified, never
- * rewritten: a mismatch fails. scripts/recipe-sha-allowlist.txt lists the
- * known mismatches, one `<package> #<issue> <reason>` per line.
+ * would never fail a build (#730). Builds skip them (their bytes come from
+ * npm, not the source); with --verify-repack (ladder-pr's recipe-sha job)
+ * they are verified, never rewritten, and a mismatch fails.
+ *
+ * scripts/recipe-sha-allowlist.txt lists the known mismatches, one
+ * `<package> #<issue> <reason>` per line. An entry can't outlive its fix:
+ * with --verify-repack it fails once the pins match, once the issue is
+ * closed, or once scripts/cert-review/repack-input.mjs finds the package's
+ * repack chain attested. RECIPE_SHA_FIXTURES=<json> ({ issues: { N: "OPEN" },
+ * attested: { pkg: false } }) stands in for GitHub and npm in tests.
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -23,6 +31,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const all = args.includes('--all');
 const checkOnly = args.includes('--check');
+const verifyRepack = args.includes('--verify-repack');
 const names = all
   ? readdirSync(join(root, 'packages')).filter((d) =>
       existsSync(join(root, 'packages', d, 'recipe.yaml'))
@@ -114,7 +123,7 @@ function replaceSha(text, { oldSha, newSha, urlHint }) {
   return text.replace(re, `sha256: "${newSha}"`);
 }
 
-/** @returns {Map<string, string>} package → the allowlist line */
+/** @returns {Map<string, { line: string, issue: number }>} package → its allowlist entry */
 function readAllowlist(path) {
   const out = new Map();
   if (!existsSync(path)) return out;
@@ -123,12 +132,12 @@ function readAllowlist(path) {
     if (!line || line.startsWith('#')) continue;
     const m = line.match(/^(\S+)\s+#(\d+)\s+\S/);
     if (!m) throw new Error(`${path}:${i + 1}: want "<package> #<issue> <reason>", got "${line}"`);
-    out.set(m[1], line);
+    out.set(m[1], { line, issue: Number(m[2]) });
   }
   return out;
 }
 
-function refreshOne(name, { check = checkOnly, why = '' } = {}) {
+function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {}) {
   const recipe = recipeJson(name);
   const path = join(root, 'packages', name, 'recipe.yaml');
   let text = readFileSync(path, 'utf8');
@@ -191,6 +200,10 @@ function refreshOne(name, { check = checkOnly, why = '' } = {}) {
       console.log(`   sha256 unchanged: ${digest}`);
       continue;
     }
+    if (mismatches) {
+      mismatches.push(`${job.key ? `sources.${job.key}` : 'source'}: ${oldSha || '(empty)'} != ${digest}`);
+      continue;
+    }
     if (check) {
       throw new Error(
         `${name}: recipe sha256 ${oldSha || '(empty)'} != downloaded ${digest} for ${url}. ` +
@@ -210,6 +223,44 @@ function refreshOne(name, { check = checkOnly, why = '' } = {}) {
 }
 
 const allowlist = readAllowlist(join(root, 'scripts/recipe-sha-allowlist.txt'));
+const fixtures = process.env.RECIPE_SHA_FIXTURES ? JSON.parse(readFileSync(process.env.RECIPE_SHA_FIXTURES, 'utf8')) : null;
+
+/** OPEN / CLOSED for a homescoop issue. */
+async function issueState(n) {
+  if (fixtures) return String(fixtures.issues?.[n] ?? 'OPEN').toUpperCase();
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  const res = await fetch(`https://api.github.com/repos/ai-ecoverse/homescoop/issues/${n}`, {
+    headers: { accept: 'application/vnd.github+json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error(`GitHub issue #${n}: HTTP ${res.status}`);
+  return String((await res.json()).state).toUpperCase();
+}
+
+/** true / false from scripts/cert-review/repack-input.mjs; null when the trace couldn't run. */
+function chainAttested(name) {
+  if (fixtures) return fixtures.attested?.[name] ?? false;
+  const r = spawnSync(process.execPath, [join(root, 'scripts/cert-review/repack-input.mjs'), '--package', name], {
+    encoding: 'utf8',
+    cwd: root,
+  });
+  if (r.status === 2 || r.status === null) return null;
+  try {
+    return JSON.parse(r.stdout).attested === true;
+  } catch {
+    return null;
+  }
+}
+
+/** Errors for an allowlist entry that has outlived its fix. */
+async function staleEntry(name, entry, mismatches) {
+  const out = [];
+  if (!mismatches.length) out.push('its pins now match');
+  if ((await issueState(entry.issue)) !== 'OPEN') out.push(`#${entry.issue} is closed`);
+  const attested = chainAttested(name);
+  if (attested === true) out.push('its repack chain is now attested (scripts/cert-review/repack-input.mjs)');
+  if (attested === null) console.log(`::warning::${name}: repack-input.mjs could not trace the chain; attestation not checked`);
+  return out;
+}
 
 for (const name of names) {
   try {
@@ -225,9 +276,23 @@ for (const name of names) {
     const recipe = recipeJson(name);
     if (recipe.repack?.from) {
       // Packaging-only repack of a published tarball: nothing fetches the
-      // source, so verify it here and never rewrite it (#730).
-      if (allowlist.has(name)) {
-        console.log(`skip ${name}: repack of ${recipe.repack.from}, allowlisted: ${allowlist.get(name)}`);
+      // source, so recipe-sha verifies it and never rewrites it (#730).
+      if (!verifyRepack) {
+        console.log(`skip ${name}: repack of ${recipe.repack.from} (pins verified with --verify-repack)`);
+        continue;
+      }
+      const entry = allowlist.get(name);
+      if (entry) {
+        const mismatches = [];
+        refreshOne(name, { check: true, mismatches });
+        const stale = await staleEntry(name, entry, mismatches);
+        if (stale.length) {
+          throw new Error(
+            `${name}: scripts/recipe-sha-allowlist.txt entry "${entry.line}" is stale: ${stale.join('; ')}. ` +
+              'Drop the entry (and fix any pin that still mismatches).'
+          );
+        }
+        console.log(`known ${name}: repack of ${recipe.repack.from}, allowlisted (${entry.line}): ${mismatches.join('; ')}`);
         continue;
       }
       console.log(`verify ${name}: repack of ${recipe.repack.from}`);

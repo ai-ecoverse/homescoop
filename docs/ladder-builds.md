@@ -312,10 +312,13 @@ byte-identical (path, type, mode, content) to the base, but for `files` and
 the patched files, and in
 `package.json` only `version`, `@ai-ecoverse/*` dependency versions (exact)
 and the recipe's `repack.fields` may differ. The report lands in `.homescoop-out/packaging-only-diff.txt`
-and the `host-<pkg>-prN` artifact. `refresh-recipe-sha.mjs` verifies a repack
-recipe's `source.sha256` against `source.url` and never rewrites it (no build
-fetches a repack's source, #730); known mismatches are listed, each with its
-issue, in `scripts/recipe-sha-allowlist.txt`. Drop `repack:` when the next release really rebuilds (a changed
+and the `host-<pkg>-prN` artifact. ladder-pr's `recipe-sha` job runs
+`refresh-recipe-sha.mjs --verify-repack`. It checks a repack recipe's
+`source.sha256` against `source.url` but never rewrites it, because no build
+fetches a repack's source (#730); the build steps skip repacks.
+`scripts/recipe-sha-allowlist.txt` lists the known mismatches, each with its
+issue. An entry fails once its pins match, once its issue is closed, or once
+`scripts/cert-review/repack-input.mjs` finds the chain attested. Drop `repack:` when the next release really rebuilds (a changed
 `homescoop.upstream` refuses to repack).
 
 Diff any tarball against a published version by hand:

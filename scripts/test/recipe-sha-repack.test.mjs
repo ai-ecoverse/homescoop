@@ -13,7 +13,7 @@ const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 
 /** A tree with scripts/{refresh-recipe-sha,read-recipe}.mjs and one fixture recipe. */
-function fixture({ pin, repack = true, allow = '' }) {
+function fixture({ pin, repack = true, allow = '', issues = {}, attested = {}, verify = true }) {
   const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-test-'));
   mkdirSync(join(dir, 'scripts'));
   for (const f of ['refresh-recipe-sha.mjs', 'read-recipe.mjs']) copyFileSync(join(scripts, f), join(dir, 'scripts', f));
@@ -32,7 +32,12 @@ function fixture({ pin, repack = true, allow = '' }) {
     '',
   ].join('\n');
   writeFileSync(join(dir, 'packages/fx/recipe.yaml'), recipe);
-  const run = () => spawnSync(process.execPath, [join(dir, 'scripts/refresh-recipe-sha.mjs'), 'fx'], { encoding: 'utf8' });
+  writeFileSync(join(dir, 'fixtures.json'), JSON.stringify({ issues, attested }));
+  const run = () =>
+    spawnSync(process.execPath, [join(dir, 'scripts/refresh-recipe-sha.mjs'), 'fx', ...(verify ? ['--verify-repack'] : [])], {
+      encoding: 'utf8',
+      env: { ...process.env, RECIPE_SHA_FIXTURES: join(dir, 'fixtures.json') },
+    });
   const read = () => readFileSync(join(dir, 'packages/fx/recipe.yaml'), 'utf8');
   return { dir, run, read, recipe };
 }
@@ -60,15 +65,49 @@ test('a repack whose pin is right passes', () => {
   }
 });
 
-test('an allowlisted repack is skipped; a malformed allowlist line fails', () => {
-  let f = fixture({ pin: 'wrong', allow: '# comment\nfx #730 known bad pin\n' });
+test('without --verify-repack a repack is skipped (builds download nothing)', () => {
+  const f = fixture({ pin: 'wrong', verify: false });
   try {
     const r = f.run();
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /allowlisted: fx #730/);
+    assert.match(r.stdout, /skip fx: repack of 1\.0-1/);
   } finally {
     rmSync(f.dir, { recursive: true, force: true });
   }
+});
+
+test('an allowlisted mismatch passes while its issue is open and its chain unattested', () => {
+  const f = fixture({ pin: 'wrong', allow: '# comment\nfx #730 known bad pin\n', issues: { 730: 'OPEN' }, attested: { fx: false } });
+  try {
+    const r = f.run();
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /known fx: .*allowlisted \(fx #730 known bad pin\): source: f{64} != /);
+    assert.equal(f.read(), f.recipe);
+  } finally {
+    rmSync(f.dir, { recursive: true, force: true });
+  }
+});
+
+test('a stale allowlist entry fails: pins now match, issue closed, or chain attested', () => {
+  const cases = [
+    [{ pin: 'right' }, /is stale: its pins now match/],
+    [{ pin: 'wrong', issues: { 730: 'CLOSED' } }, /is stale: #730 is closed/],
+    [{ pin: 'wrong', attested: { fx: true } }, /is stale: its repack chain is now attested/],
+  ];
+  for (const [opts, re] of cases) {
+    const f = fixture({ allow: 'fx #730 known bad pin\n', ...opts });
+    try {
+      const r = f.run();
+      assert.notEqual(r.status, 0, r.stdout);
+      assert.match(r.stderr, re);
+    } finally {
+      rmSync(f.dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('a malformed allowlist line fails', () => {
+  let f;
   f = fixture({ pin: 'wrong', allow: 'fx no issue\n' });
   try {
     const r = f.run();

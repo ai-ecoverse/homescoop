@@ -91,13 +91,16 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      # --verify-repack: repack recipes' pins are checked here once per PR
+      # (never rewritten; #730); the build steps below skip them.
       - name: Download expanded source URLs and write sha256
         env:
           HOST: ${{ needs.detect.outputs.host }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            node scripts/refresh-recipe-sha.mjs "$pkg"
+            node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.
