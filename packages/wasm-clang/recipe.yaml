@@ -14,6 +14,8 @@ source:
 # slicc-kernel's Node process worker: homescoop#276). build.sh applies both
 # at the next real build. 24.0.0-16: the driver's Asyncify step also covers a
 # link without -o (a.out) and -oFILE (homescoop#692).
+# 24.0.0-17: calls that write no program (-v, -fsyntax-only, -###, a header)
+# leave an a.out alone (homescoop#710, #711).
 repack:
   from: "24.0.0-11"
   files:

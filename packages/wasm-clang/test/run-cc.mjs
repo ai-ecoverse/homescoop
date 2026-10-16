@@ -256,6 +256,8 @@ try {
     const variants = [
       [['-O2', 'r28.c'], 'a.out', true, {}],
       [['-O2', 'r28.c', '-or28j.wasm'], 'r28j.wasm', true, {}],
+      // clang passes its own -o after -Wl,-o,FILE, so the program is a.out.
+      [['-O2', 'r28.c', '-Wl,-o,r28l.wasm'], 'a.out', true, {}],
       [['-O2', 'r28.c', '-o', 'r28n.wasm'], 'r28n.wasm', false, { WASIXCC_ASYNCIFY: '0' }],
     ];
     for (const [argv, file, want, env] of variants) {
@@ -265,12 +267,27 @@ try {
       const got = WebAssembly.Module.exports(mod).some((e) => e.name === 'asyncify_start_unwind');
       assert.equal(got, want, `wasixcc ${argv.join(' ')}${env.WASIXCC_ASYNCIFY ? ` (WASIXCC_ASYNCIFY=${env.WASIXCC_ASYNCIFY})` : ''} → ${file}: asyncify ${got ? 'yes' : 'no'}`);
     }
-    const before = createHash('sha256').update(Buffer.from(await k.readFile('/home/cc/a.out'))).digest('hex');
-    const v = await run(['wasixcc', '--version'], { cwd: '/home/cc', env: ccEnv });
-    assert.equal(v.status, 0, `wasixcc --version next to an a.out: ${v.stderr}`);
-    const after = createHash('sha256').update(Buffer.from(await k.readFile('/home/cc/a.out'))).digest('hex');
-    assert.equal(after, before, 'wasixcc --version rewrote the a.out beside it');
-    console.log('== r28 as a.out and with -or28j.wasm: asyncified; WASIXCC_ASYNCIFY=0: not; wasixcc --version leaves the a.out alone');
+    // Calls that write no program leave an a.out beside them alone, the
+    // asyncified one and a non-wasm one (homescoop#710, #711).
+    await k.writeFile('/home/cc/x.h', '#define X 1\n');
+    const aout = async () => {
+      try {
+        return createHash('sha256').update(Buffer.from(await k.readFile('/home/cc/a.out'))).digest('hex');
+      } catch {
+        return 'missing';
+      }
+    };
+    const nonLinks = [['--version'], ['-v'], ['-fsyntax-only', 'r18.c'], ['-###', 'r18.c'], ['x.h']];
+    for (const content of [undefined, '#!/bin/sh\necho not wasm\n']) {
+      if (content) await k.writeFile('/home/cc/a.out', content);
+      const before = await aout();
+      for (const argv of nonLinks) {
+        const r = await run(['wasixcc', ...argv], { cwd: '/home/cc', env: ccEnv });
+        assert.equal(r.status, 0, `wasixcc ${argv.join(' ')} next to ${content ? 'a non-wasm' : 'an asyncified'} a.out: rc=${r.status}\n${r.stdout}${r.stderr}`);
+        assert.equal(await aout(), before, `wasixcc ${argv.join(' ')} changed or removed the ${content ? 'non-wasm' : 'asyncified'} a.out beside it`);
+      }
+    }
+    console.log(`== r28 as a.out (also with -Wl,-o,r28l.wasm, which clang's own -o overrides) and with -or28j.wasm: asyncified; WASIXCC_ASYNCIFY=0: not; ${nonLinks.map((a) => a.join(' ')).join(', ')} leave an asyncified and a non-wasm a.out alone`);
   }
   await k.writeFile(`${PROBES_AT}/package.json`, JSON.stringify({
     name: 'wasm-clang-cc-probes',
