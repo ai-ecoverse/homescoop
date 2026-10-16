@@ -19,6 +19,7 @@
     "6.0.9-18, npm flat layout: em-config LLVM_ROOT = /node_modules/@ai-ecoverse/wasm-clang/bin (with clang), BINARYEN_ROOT = /node_modules/@ai-ecoverse/wasm-binaryen (with bin/wasm-opt), no '..'; em-ensure-cache links ~/.cache/emscripten/sysroot into emscripten-cache and include/stdio.h reads through it",
     "6.0.9-18, `pnpm add -g` layout: the same, with the roots the .pnpm store copies (…/.pnpm/@ai-ecoverse+wasm-clang@<v>/node_modules/@ai-ecoverse/wasm-clang/bin, …+wasm-binaryen@<v>/…): emscripten-config resolve()s ${package}/../<dep> physically",
     "negative: 6.0.9-17 in the flat layout: em-config LLVM_ROOT = /shared/lib/node_modules/@ai-ecoverse/wasm-clang/bin, which has no clang, and em-ensure-cache fails (missing sysroot at /shared/lib/…)",
+    "6.0.9-19 (packaging-only, homescoop#276): the exact companions are wasm-clang 24.0.0-18 and wasm-binaryen 132.0.0-2; in the flat layout on the cert kernel 1.61.0 (which still exposes process to the worker) clang --version and wasm-opt --version run through their shipped glue with rc 0 and nothing on stderr. 6.0.9-18 (wasm-clang 24.0.0-12): clang --version rc 70, 'clang: error: no input files' (NEGATIVE.md)",
     "not covered (slicc-kernel#390): emcc compiling or linking on slicc-kernel; human check in slicc's webapp realm"
   ]
 }
