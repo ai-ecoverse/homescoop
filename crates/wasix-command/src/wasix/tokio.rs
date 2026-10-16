@@ -215,8 +215,14 @@ impl Command {
         let mut inner = self.std.spawn_with(default)?;
         Ok(Child {
             stdin: inner.stdin.take().map(|end| ChildStdin::new(end.file)),
-            stdout: inner.stdout.take().map(|end| ChildStdout(Pipe::new(end.file))),
-            stderr: inner.stderr.take().map(|end| ChildStderr(Pipe::new(end.file))),
+            stdout: inner
+                .stdout
+                .take()
+                .map(|end| ChildStdout(Pipe::new(end.file))),
+            stderr: inner
+                .stderr
+                .take()
+                .map(|end| ChildStderr(Pipe::new(end.file))),
             inner,
             kill_on_drop: self.kill_on_drop,
         })
@@ -277,10 +283,8 @@ impl Child {
             }
             Ok(buf)
         }
-        let (stdout, stderr) = ::tokio::join!(
-            read_all(self.stdout.take()),
-            read_all(self.stderr.take())
-        );
+        let (stdout, stderr) =
+            ::tokio::join!(read_all(self.stdout.take()), read_all(self.stderr.take()));
         let status = self.wait().await?;
         Ok(Output {
             status,
