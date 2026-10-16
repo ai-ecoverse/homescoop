@@ -126,8 +126,9 @@ scan_arg() {
 # A response file (CMake, Ninja, Meson): its words count as arguments
 # (homescoop#721), nested @files too, up to 8 deep. Quotes and backslashes
 # as clang reads them, through the shell's own quoting (newlines become
-# blanks); a file with anything the shell would run or redirect ($ ` ; | &
-# < > ( )) is split on blanks only, never evaluated.
+# blanks); a file with anything the shell would run, redirect or expand
+# ($ ` ; | & < > ( ) { } ~; globs are off) is split on blanks only, never
+# evaluated (homescoop#755).
 scan_word() {
   case "$1" in
     @?*)
@@ -144,7 +145,7 @@ scan_rsp() {
   _rsp=$(tr '\n\r\t' '   ' <"$1" 2>/dev/null) || { link_inputs=1; return 0; }
   _depth=$2
   case $_rsp in
-    *[\$\`\;\|\&\<\>\(\)]*)
+    *[\$\`\;\|\&\<\>\(\)\{\}\~]*)
       set -f
       # shellcheck disable=SC2086
       set -- $_rsp
@@ -228,7 +229,8 @@ esac
 
 # Defaults → user args → link flags via clang @response-file (one argv per line).
 rsp=$(mktemp "${TMPDIR:-/tmp}/wasix-driver.XXXXXX")
-trap 'rm -f "$rsp"' EXIT
+marker=
+trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
 
 {
   printf '%s\n' \
@@ -376,16 +378,16 @@ fi
 # WASIXCC_ASYNCIFY=0, or one that stopped for want of wasm-opt) still gets
 # its post-link step.
 pre_sum=
-marker=
 if [ -n "$out" ] && [ -f "$out" ]; then
   pre_sum=$(cksum <"$out" 2>/dev/null || echo unknown)
   marker=$(mktemp "${TMPDIR:-/tmp}/wasix-out.XXXXXX") || marker=
 fi
 
-"$FRONTEND" "@$rsp"
-status=$?
+# set -e would end the driver at a failed frontend before any cleanup: take
+# the status instead (the EXIT trap removes the marker too, homescoop#754).
+status=0
+"$FRONTEND" "@$rsp" || status=$?
 if [ "$status" -ne 0 ]; then
-  [ -z "$marker" ] || rm -f "$marker"
   exit "$status"
 fi
 fresh=0
