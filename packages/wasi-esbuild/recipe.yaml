@@ -3,6 +3,7 @@
 # wasm_exec.js and a JS host, which slicc-kernel does not run.
 name: wasi-esbuild
 builder: host
+reproducible: true
 # renovate: datasource=github-tags depName=evanw/esbuild extractVersion=^v(?<version>.*)$
 version: "0.28.2"
 npm: "@ai-ecoverse/wasi-esbuild"

@@ -251,8 +251,13 @@ test('verdict.mjs: an unverifiable input is INCOMPLETE whatever the reviewer say
   assert.equal(pass.status, 0, pass.lines);
   assert.equal(pass.lines, `certified=${sha} @ai-ecoverse/py-pandas 2.3.2-12`);
 
+  // A built recipe passes only with attested: true (#864); the old
+  // { repack: false, attested: null } shape now fails closed.
   const notRepack = verdict('certified', { 'py-pandas': { package: 'py-pandas', repack: false, attested: null } });
-  assert.equal(notRepack.status, 0);
+  assert.equal(notRepack.status, 1);
+  assert.match(notRepack.lines, /^cert-ci: INCOMPLETE .*unverifiable input: no reason given$/);
+  const built = verdict('certified', { 'py-pandas': { package: 'py-pandas', repack: false, built: true, attested: true, reason: 'ok' } });
+  assert.equal(built.status, 0, built.lines);
 
   const missing = verdict('certified', {});
   assert.equal(missing.status, 1);

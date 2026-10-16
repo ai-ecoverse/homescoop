@@ -223,8 +223,9 @@ apply_wasix_patch io-posix-spawn-wasi.patch "$SRC/io.c"
 apply_wasix_patch internal-process-posix-spawn-wasi.patch "$SRC/internal/process.h"
 # Asyncify setjmp only rewinds inside rb_wasm_rt_start; wrap pthread start + TLS state.
 apply_wasix_patch wasm-thread-asyncify-tls.patch "$SRC/thread_pthread.c" WASIX_WASM_THREAD_RT
-# Advisory flock is ENOTSUP on WASIX; return success so File#flock / bundler.lock work.
-apply_wasix_patch flock-wasi-noop.patch "$SRC/missing/flock.c" WASIX_FLOCK_NOOP
+# File#flock as whole-file fcntl record locks (slicc-kernel >= 1.100.0 enforces
+# them between processes; homescoop#578). Upstream's __wasi__ branch is EINVAL.
+apply_wasix_patch flock-wasi-fcntl.patch "$SRC/missing/flock.c" WASIX_FLOCK_FCNTL
 # Single-fd waits (IO#wait_readable, blocking connect) via poll(): WASIX's
 # select() rejects exceptfds and POLLPRI == POLLIN puts readable waits there.
 apply_wasix_patch io-wait-poll-wasi.patch "$SRC/thread.c" WASIX_POLL_WAIT
@@ -924,7 +925,8 @@ ${OPENSSL_NOTE}
 ## Gems / flock / uid (-5)
 - \`GEM_HOME=\${HOME}/.local/share/gem/ruby/3.4.0\` (writable under SLICC HOME).
 - \`GEM_PATH=\${HOME}/.local/share/gem/ruby/3.4.0:\${package}/lib/ruby/gems/3.4.0\`.
-- \`File#flock\` / \`missing/flock.c\` \`__wasi__\`: advisory **no-op success** (was EINVAL).
+- \`File#flock\` / \`missing/flock.c\` \`__wasi__\`: whole-file fcntl record locks (since 3.4.11-17,
+  homescoop#578; up to -16 a no-op success; upstream EINVAL).
 - \`Process.uid\`/\`euid\`/\`gid\`/\`groups\`, \`Etc.getpwuid\` and \`Dir.home\` come from
   slicc-kernel's process credentials (wasix-sysroot -20, slicc-kernel >= 1.44.0):
   root is uid 0 with home /root; a \`kernel.users.add\` user gets its own ids.
@@ -953,7 +955,7 @@ t = Thread.new { puts "CHILD"; 42 }; puts t.value
 require "openssl"; OpenSSL::OPENSSL_VERSION
 require "socket"
 Process.uid # => 0 (root, the kernel's default user)
-f = File.open("flock-test", "w"); f.flock(File::LOCK_EX); f.close # no Errno::EINVAL
+f = File.open("flock-test", "w"); f.flock(File::LOCK_EX); f.close # no Errno::EINVAL; a second process gets false for LOCK_EX|LOCK_NB
 \`\`\`
 Plus Queue/CV/Mutex; \`bundle exec rake\` when #3735 is available.
 

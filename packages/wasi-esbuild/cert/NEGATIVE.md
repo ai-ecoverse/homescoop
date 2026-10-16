@@ -1,5 +1,34 @@
 # Negative proof (wasi-esbuild)
 
+## 0.28.2-3: users enforce (#819)
+
+**Date:** 2026-10-17. 0.28.2-3 is a CI rebuild of 0.28.2-2 (#864) with the
+same source, Go and flags; the cert now boots slicc-kernel 1.102.6 with
+`"users": "enforce"` and adds `cert/users.mjs`. The published 0.28.2-2
+passes both specs there (the command is unchanged), so the negatives are
+the setup the spec guards against and an empty wasm:
+
+- `cert/users.mjs` on 0.28.2-2 with `--users off` (how ladder-pr ran the
+  cert before this change: as root, no permission checks) → FAIL, 10 cases:
+  alice bundles bob's 0600 `secret.ts` (rc 0, `stolen.js` holds
+  `bob-secret-7731`), writes `/home/bob/app/dist/alice.js`, her output is
+  `0:0`, and bob bundles from alice's 0700 home.
+- `prove-negative.mjs --users enforce` (empty `bin/esbuild.wasm`) → FAIL,
+  2 of 2 specs (`checklist.mjs`, `users.mjs`).
+
+Under enforce the messages are esbuild's own, from the kernel's EACCES:
+
+```text
+✘ [ERROR] Cannot read file "../bob/app/src/secret.ts": Permission denied
+✘ [ERROR] Failed to write to output file: open /home/bob/app/dist/alice.js: Permission denied
+✘ [ERROR] Cannot read directory "../alice/src": Permission denied
+```
+
+esbuild still prints its size line and `Done` after a failed write; that is
+upstream's behaviour and the exit code is 1.
+
+## 0.28.2-2
+
 **Date:** 2026-10-09 (0.28.2-2)
 
 ## Without "preopenRoot" (0.28.2-2, unpatched)

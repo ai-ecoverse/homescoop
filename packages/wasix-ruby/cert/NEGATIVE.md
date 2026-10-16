@@ -26,3 +26,9 @@
 ## bundle exec (homescoop#379, 2026-10-16)
 
 `cert/bundle-exec.mjs` with the published 3.4.11-15 on slicc-kernel 1.100.3: FAIL, rc 1, because `/usr/bin/ruby` is a 0-byte command entry (slicc-kernel#762) and every `bundle exec ruby` warns `/usr/bin/ruby is empty`. On 1.106.2, the cert kernel now, the same binary passes, as does 3.4.11-16 (a packaging-only README release) with all twelve specs. The fix is the kernel's; the spec pins it.
+
+## 3.4.11-17: File#flock excludes other processes (homescoop#578, 2026-10-16)
+
+`cert/flock.mjs` against the published 3.4.11-16 (sha256 of npm's tarball, slicc-kernel 1.106.2, users enforce): FAIL at the first case, `same=0 0 0 0 | child=0 0 | unlock=0 | blocking=0:at-once | shared=0:0 0 | readonly=0:0`. While the parent holds `LOCK_EX`, the spawned child gets 0 for `LOCK_EX|LOCK_NB` and `LOCK_SH|LOCK_NB`, its blocking `LOCK_EX` returns at once, and a writer gets in beside a shared holder and beside a read-only `LOCK_EX`. #578's `IO.popen` one-liner prints `0` (Linux: `false`), and a second `bundle install` on the same bundle path takes `bundler.lock` while another process holds it (`held, bundle-try, bundle-got 0, released`). `patches/flock-wasi-noop.patch` answered every `flock` with 0. 3.4.11-17 (`patches/flock-wasi-fcntl.patch`) passes all of it, as root and as cone, and the other twelve specs pass on the same build (wasix-sysroot -32).
+
+What it still can't exclude: `flock` on something that isn't a regular file (a pipe, a terminal, `/dev/null`, a directory) is granted and excludes nobody, since slicc-kernel keeps record locks on regular files only (ai-ecoverse/slicc-kernel#757). `LOCK_EX` on a read-only handle is a read lock, so two of them are both granted (homescoop#758's pattern): open a lock file for writing to exclude. And these are fcntl semantics: a second handle on the file in the same process isn't refused, and closing any handle on it drops the process's lock.

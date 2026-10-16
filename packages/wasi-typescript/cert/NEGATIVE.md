@@ -1,5 +1,32 @@
 # Negative proof (wasi-typescript)
 
+## 7.0.2-2: users enforce (#819)
+
+**Date:** 2026-10-17. 7.0.2-2 is a CI rebuild of 7.0.2-1 (#864) with the
+same source, Go and flags; the cert now boots slicc-kernel 1.102.6 (was
+1.23.0) with `"users": "enforce"` and adds `cert/users.mjs`. The published
+7.0.2-1 passes both specs there (the command is unchanged), so the
+negatives are the setup the spec guards against and an empty wasm:
+
+- `cert/users.mjs` on 7.0.2-1 with `--users off` (how ladder-pr ran the
+  cert before this change: as root, no permission checks) → FAIL, 8 cases:
+  alice type-checks bob's project including his 0600 file (rc 0), emits
+  into `/home/bob/proj/out`, every output is `0:0`, and bob checks alice's
+  0700 home.
+- `prove-negative.mjs --users enforce` (empty `bin/tsc.wasm`) → FAIL,
+  2 of 2 specs (`checklist.mjs`, `users.mjs`).
+
+Under enforce, tsc reports an unreadable file as missing (it never prints
+its contents) and an unwritable output with the kernel's EACCES:
+
+```text
+../bob/proj/src/index.ts(1,21): error TS2307: Cannot find module './secret' or its corresponding type declarations.
+error TS5033: Could not write file '/home/bob/proj/out/index.js': mkdir /home/bob/proj/out: Permission denied.
+error TS5058: The specified path does not exist: '/home/alice/proj'.
+```
+
+## 7.0.2-1
+
 **Date:** 2026-10-09 (7.0.2-1)
 No SLICC patches on this package.
 

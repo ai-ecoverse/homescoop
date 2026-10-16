@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-protoc-gen-go",
-  "version": "1.36.12-0",
+  "version": "1.36.12-1",
   "description": "protoc-gen-go 1.36 (Go protobuf plugin) for slicc WASI preview1 (command protoc-gen-go); a local plugin for @ai-ecoverse/wasi-buf in slicc-kernel",
   "license": "BSD-3-Clause",
   "repository": {

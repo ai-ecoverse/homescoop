@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-protoc-gen-go-grpc",
-  "version": "1.6.2-0",
+  "version": "1.6.2-1",
   "description": "protoc-gen-go-grpc 1.6.2 (the gRPC code generator for Go) for slicc WASI preview1 (command protoc-gen-go-grpc); a local plugin for @ai-ecoverse/wasi-buf in slicc-kernel",
   "license": "Apache-2.0",
   "repository": {

@@ -1,15 +1,23 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.30.0",
-  "needs": [],
-  "needsInstall": [],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8"
+  ],
   "checklist": [
     "esbuild --version → 0.28.2",
     "bundle a multi-file TS project in /home/app (relative import, tsconfig paths alias, node_modules package with exports, JSON) to dist/out.js with --format=esm --minify --sourcemap; types stripped, no imports left, sourcemap lists all five sources",
     "monorepo: from /home/mono/packages/app, bundle src/main.ts importing ../../../shared/util.ts and ../config.json, written to ../../dist/app.js (above the working directory); an absolute entry /home/mono/shared/util.ts bundles too (\"preopenRoot\": true, slicc-kernel >= 1.30.0)",
     "echo 'let x: number = 1' | esbuild --loader=ts → let x = 1;",
     "syntax error on stdin → exit 1, Unexpected \"=\"",
-    "unresolved import → exit 1, Could not resolve \"./missing\", no output file"
+    "unresolved import → exit 1, Could not resolve \"./missing\", no output file",
+    "users enforce: alice bundling an import of bob's 0600 file, or writing into his 0755 directory, fails rc 1 with Permission denied and writes nothing; bob is refused alice's 0700 home; alice's own bundle (with bob's 0644 import) is owned by her; root reads all"
   ],
   "preopenRoot": "The esbuild command sets \"preopenRoot\": true; slicc-kernel >= 1.30.0 then preopens / and ./ (slicc-kernel#144), which replaces 0.28.2-1's 0001-wasip1-outside-preopens.patch."
 }

@@ -399,12 +399,15 @@ jobs:
           done
           cat "$RUNNER_TEMP/specs.json"
 
-      - name: Repack inputs, traced to an attested build (this job's tools, from ${{ github.sha }})
+      - name: Build inputs, the root rule for every package (this job's tools, from ${{ github.sha }})
         run: |
           # A repack's input must trace to a provenance-attested CI build, or a
-          # reproducible build, from the recipe's pinned source; otherwise the
-          # verdict step makes it INCOMPLETE. Here, not in the review job, so the
-          # reviewer can't touch the result.
+          # reproducible build, from the recipe's pinned source (#834). A built
+          # recipe must, at the reviewed head, fetch its pinned source with the
+          # recipe's sha (or build a verified in-tree source) with no stage or
+          # prebuilt path (#864). Otherwise the verdict step makes it INCOMPLETE;
+          # a package whose trace didn't run or errored fails closed. Here, not
+          # in the review job, so the reviewer can't touch the result.
           mkdir -p "$RUNNER_TEMP/cert-review"
           echo '{}' > "$RUNNER_TEMP/cert-review/repack-input.json"
           for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
