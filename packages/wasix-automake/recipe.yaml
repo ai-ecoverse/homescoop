@@ -1,24 +1,14 @@
 # GNU Automake for slicc (Perl scripts; needs autoconf + perl + m4).
 name: wasix-automake
 builder: host
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
 version: "1.17"
 npm: "@ai-ecoverse/wasix-automake"
 summary: "GNU Automake scripts for slicc (needs wasix-perl + wasix-autoconf + wasix-m4)"
 source:
   url: "https://mirrors.kernel.org/gnu/automake/automake-{{version}}.tar.xz"
   sha256: "8920c1fc411e13b90bf704ef9db6f29d540e76d232cb3b2c9f4dc4cc599bd990"
-# 1.17.0-8 is packaging-only: 1.17.0-5's bytes with exact @ai-ecoverse pins
-# (wasix-autoconf 2.72.0-6, wasix-perl 5.42.0-11). 1.17.0-9 too: the pin moves
-# to wasix-autoconf 2.72.0-7, whose autom4te needs no grep (homescoop#470),
-# and the README says what aclocal/automake and configure need. 1.17.0-10
-# too: wasix-autoconf 2.72.0-8 and wasix-perl 5.42.0-13 (homescoop#634).
-# Drop repack: when the next release rebuilds.
-repack:
-  from: "1.17.0-5"
-  files:
-    - README.md
-  fields:
-    - repository
 dependencies:
   build: []
   host: []
