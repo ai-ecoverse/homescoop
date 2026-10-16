@@ -41,4 +41,6 @@ fi
 test -f "$SRC_DIR/make" || test -f "$SRC_DIR/make.js"
 homescoop_stage_cli "$SRC_DIR" make
 homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== gmake: staged → $HOMESCOOP_PKG/package"

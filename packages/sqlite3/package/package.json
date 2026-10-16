@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-sqlite3",
-  "version": "3.54.0-4",
+  "version": "3.54.0-5",
   "description": "sqlite3 CLI 3.54.0 (amalgamation shell) for wasm / slicc (emscripten)",
   "license": "blessing",
   "repository": {
@@ -10,7 +10,7 @@
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/sqlite3",
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "sqlite3", "sqlite"],
-  "files": ["README.md", "LICENSE", "bin"],
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin"],
   "publishConfig": { "access": "public" },
   "homescoop": {
     "recipe": "sqlite3",
