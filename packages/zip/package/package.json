@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-zip",
-  "version": "3.0.0-3",
+  "version": "3.0.0-4",
   "description": "Info-ZIP zip 3.0 + unzip 6.0 for wasm / slicc (emscripten)",
   "license": "Info-ZIP",
   "repository": {
@@ -17,7 +17,8 @@
     "abi": "emscripten",
     "commands": {
       "zip": { "glue": "bin/zip", "wasm": "bin/zip.wasm" },
-      "unzip": { "glue": "bin/unzip", "wasm": "bin/unzip.wasm" }
+      "unzip": { "glue": "bin/unzip", "wasm": "bin/unzip.wasm" },
+      "zipinfo": { "glue": "bin/unzip", "wasm": "bin/unzip.wasm", "argv0": "zipinfo" }
     }
   }
 }

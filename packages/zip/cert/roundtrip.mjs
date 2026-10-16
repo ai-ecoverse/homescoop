@@ -27,6 +27,15 @@ export default async function roundtrip(ctx) {
   assert.equal(await ctx.read('/home/cone/x/tmp/zc/src/a.txt'), 'hello zip\n');
   assert.equal(await ctx.read('/home/cone/x/tmp/zc/src/sub/b.txt'), 'nested\n');
   assert.equal(await ctx.read('/home/cone/x/tmp/zc/src/big.txt'), big);
+  // homescoop#608: zipinfo is unzip in zipinfo mode (argv0), as unzip -Z.
+  for (const [zi, uz] of [[['zipinfo', 'out.zip'], ['unzip', '-Z', 'out.zip']], [['zipinfo', '-1', 'out.zip'], ['unzip', '-Z1', 'out.zip']]]) {
+    const a = await run(zi);
+    const b = await run(uz);
+    assert.equal(a.status, 0, `${zi.join(' ')}: rc ${a.status}\n${a.stderr}`);
+    assert.equal(b.status, 0, `${uz.join(' ')}: rc ${b.status}\n${b.stderr}`);
+    assert.equal(a.stdout, b.stdout, `${zi.join(' ')} prints what ${uz.join(' ')} prints`);
+  }
+  assert.match((await run(['zipinfo', '-1', 'out.zip'])).stdout, /^tmp\/zc\/src\/big\.txt$/m);
   const missing = await run(['unzip', '-l', 'nothere.zip']);
   assert.equal(missing.status, 9, `missing archive: rc ${missing.status}`);
   assert.match(missing.stderr, /cannot find or open nothere\.zip/);

@@ -29,7 +29,11 @@ about:
     order: zip -s 0 of a split archive (split-copy, #440), zip - to stdout
     (stdout-seek, #439), zip -T without a shell and a failed test's double
     fclose (test-spawn, test-failed-fclose, #432). unzip-*.patch go into
-    unzip's: Debian's CVE-2022-0529/0530 fix for the Unicode name code, the
-    -U escape arm that fix missed bounded too (escape-bound), and a Unicode
-    Path field that isn't UTF-8 is ignored (#570). cert/meta.json maps each
-    to its spec.
+    unzip's. unzip-debian-NN-<name>.patch are Debian unzip 6.0-31's
+    debian/patches/<name>, verbatim, NN its place in debian/patches/series
+    (https://deb.debian.org/debian/pool/main/u/unzip/unzip_6.0-31.debian.tar.xz,
+    sha256 d7dc23f5254c6711dc05f467e70236cfd50a7931001c6152904474b19f295c38):
+    the security fixes (#582) and the two that 32 needs to apply (05, 17);
+    not the branding, man page, zipgrep, build-date or build-only ones.
+    Then ours: escape-bound (unzip -U), unipath-short (#582) and
+    unipath-utf8 (#570). cert/meta.json maps each to its spec.

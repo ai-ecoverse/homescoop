@@ -1,0 +1,18 @@
+getUnicodeData(): skip a Unicode Path extra field (0x7075) shorter than
+5 bytes (homescoop#582). Upstream and Debian read its version and CRC
+past the block, and eb_len - 5 wraps around.
+
+--- a/process.c
++++ b/process.c
+@@ -2040,7 +2040,10 @@
+               ef_len - EB_HEADSIZE));
+             break;
+         }
+-        if (eb_id == EF_UNIPATH) {
++        /* homescoop#582: a block shorter than its version byte and CRC
++           (5 bytes) is not a Unicode Path; reading one ran past the block,
++           and eb_len - 5 wrapped around in ULen. Skip it. */
++        if (eb_id == EF_UNIPATH && eb_len >= 5) {
+ 
+           unsigned offset = EB_HEADSIZE;
+           ush ULen = eb_len - 5;

@@ -15,3 +15,5 @@ unzip -l out.zip
   shows them and reads Info-ZIP's Unicode path field.
 - `zip - … > file` and `zip - … | …` write valid archives, and `zip -s 0`
   merges split archives (`zip -s 1m`) back with every byte.
+- `zipinfo` is unzip's zipinfo mode, the same as `unzip -Z`.
+- unzip carries Debian's unzip 6.0 security patches.

@@ -1,5 +1,41 @@
 # Negative proof (zip)
 
+## 3.0.0-4 (homescoop#582, #608)
+
+**Date:** 2026-10-16, slicc-kernel 1.94.0, users enforce, the same setup as below. 3.0.0-4 passes every spec and `cert/noshell/`.
+
+unzip carries 24 of Debian unzip 6.0-31's `debian/patches`, verbatim, as `unzip-debian-NN-<name>.patch`, where NN is the patch's place in Debian's `series`. They come from `unzip_6.0-31.debian.tar.xz`, sha256 `d7dc23f5254c6711dc05f467e70236cfd50a7931001c6152904474b19f295c38`. They apply in that order to `unzip_6.0.orig.tar.gz` with no fuzz:
+- the security fixes;
+- `05` and `17`, which `32` needs in order to apply.
+
+Left out: the branding, man page, zipgrep, build-date (we pin `SOURCE_DATE_EPOCH`) and build-only patches. Debian's `28` (CVE-2022-0529/0530) replaces 3.0.0-3's trimmed copy, and `unzip-escape-bound.patch` is rebuilt on top of it. `unzip-unipath-short.patch` is ours.
+
+`hostile.mjs` (`--soft`) on the published 3.0.0-3 fails every case below except the prefixed archive. `roundtrip.mjs` fails its zipinfo lines with `zipinfo: command not found`, rc 127 (#608).
+
+Each patch below was taken out of the 3.0.0-4 recipe, the rebuild run with the others applied:
+
+| Patch | Case, without the patch |
+| --- | --- |
+| `08` allow-greater-hostver-values | `hostver 10.0: unzip -Z version column` fails |
+| `11` CVE-2014-8141 | no build: `28` needs it. 3.0.0-3: `unzip -l` rc 0 with no corrupt-field warning, `unzip -d` rc 2 |
+| `14` CVE-2015-7696 | passes: `16` covers the case. Ablation |
+| `16` fix-integer-underflow-csiz-decrypted | encrypted entry: rc 3, no "invalid compressed data", a wrapped size (`-t` and `-d`) |
+| `18` CVE-2014-9913 | `unzip -v lists method UnkFFFF` fails |
+| `19` CVE-2016-9844 | `unzip -Z lists method FFFF` fails |
+| `23` CVE-2019-13232 (overlapped entries) | no build: `24` and `26` need it. 3.0.0-3: rc 1, and `b.txt` is written |
+| `24` CVE-2019-13232 (misplaced central directory) | the prefixed-archive case passes with and without it. Ablation; the case is kept as a regression check |
+| `unzip-unipath-short` | `short Unicode Path: no Unicode Path warning` fails, twice |
+
+**Ablation only.** Each of these has no case of its own: no deterministic, observable outcome in this build, or the code isn't compiled.
+- `05` fix-uid-gid-handling and `32` CAN-2026-2034440: mostly under `IZ_HAVE_UXUIDGID`, which this build doesn't define. `05` and `17` are there for `32` to apply.
+- `06` initialize-the-symlink-flag, `07` increase-size-of-cfactorstr.
+- `09` CVE-2014-8139, `10` CVE-2014-8140, `12` CVE-2014-9636.
+- `15` CVE-2015-7697 and `25` (bzip2): bzip2 support is not compiled in.
+- `20` CVE-2018-1000035 (the password prompt).
+- `22` and `26`: CVE-2019-13232 follow-ups, under the overlapped-entries case together with `23`.
+- `33` CAN-2026-2034443, `34` CAN-2026-2034442.
+- `28` CVE-2022-0529/0530 runs under `utf8.mjs`'s `unzip -U` passes (see 3.0.0-3).
+
 ## 3.0.0-3 (homescoop#570, CVE-2022-0529/0530)
 
 **Date:** 2026-10-16, slicc-kernel 1.94.0, users enforce, with the same setup as 3.0.0-2 below.
