@@ -501,28 +501,53 @@ homescoop_notice_rust() {
   (cd "$src" && "${cargo[@]}" tree --locked --target "$target" -e normal,no-proc-macro --prefix none "${treepkg[@]}" "${extra[@]}") >"$tree"
   node "$HOMESCOOP_ROOT/scripts/rust-crate-notices.mjs" "$meta" "$tree" >>"$HOMESCOOP_NOTICES"
   node "$HOMESCOOP_ROOT/scripts/check-rust-notices.mjs" "$HOMESCOOP_NOTICES" "$tree" "$src/Cargo.lock"
-  local copyright mit apache
+  local copyright mit apache wasisdk
   case "$rust" in
     1.98.1)
       copyright=172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af
       mit=b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1
       apache=62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a
+      wasisdk=wasi-sdk-33
       ;;
     *)
       echo "homescoop_notice_rust: no pinned licence sha256 for Rust $rust; add it to the table" >&2
       return 1
       ;;
   esac
+  node "$HOMESCOOP_ROOT/scripts/check-rust-wasi-sdk.mjs" "$rust" "$wasisdk"
   homescoop_notice "Rust $rust standard library (MIT OR Apache-2.0)" \
     "https://raw.githubusercontent.com/rust-lang/rust/$rust/COPYRIGHT" "$copyright" \
     "https://raw.githubusercontent.com/rust-lang/rust/$rust/LICENSE-MIT" "$mit" \
     "https://raw.githubusercontent.com/rust-lang/rust/$rust/LICENSE-APACHE" "$apache"
-  local wl=https://raw.githubusercontent.com/WebAssembly/wasi-libc/wasi-sdk-31
-  homescoop_notice "wasi-libc (wasi-sdk-31; Rust's self-contained $target libc)" \
+  local wl=https://raw.githubusercontent.com/WebAssembly/wasi-libc/$wasisdk
+  homescoop_notice "wasi-libc ($wasisdk; Rust's self-contained $target libc)" \
     "$wl/LICENSE" 2711a8b5a5cdfef0e639f96c1aca12ae23d7d64a02d0507f1bdf14d2b27bbc3a \
     "$wl/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
     "$wl/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
     "$wl/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
+}
+
+# homescoop_wasm_opt <file.wasm> <label> [wasm-opt flags…]
+# wasm-opt -Oz --strip-debug in place. Required: no wasm-opt on PATH, or one
+# that rejects the module, fails the build instead of shipping the input.
+homescoop_wasm_opt() {
+  local wasm="$1" label="$2"
+  shift 2
+  if ! command -v wasm-opt >/dev/null 2>&1; then
+    echo "$label: wasm-opt is not on PATH; build through scripts/host-run.sh (its emsdk brings binaryen) or put emsdk's upstream/bin on PATH" >&2
+    return 1
+  fi
+  local before after
+  before=$(wc -c <"$wasm" | tr -d ' ')
+  echo "== $label: $(wasm-opt --version) -Oz --strip-debug $*"
+  if ! wasm-opt -Oz --strip-debug "$@" "$wasm" -o "$wasm.opt"; then
+    rm -f "$wasm.opt"
+    echo "$label: wasm-opt rejected $wasm" >&2
+    return 1
+  fi
+  mv "$wasm.opt" "$wasm"
+  after=$(wc -c <"$wasm" | tr -d ' ')
+  echo "== $label: wasm-opt $before -> $after bytes"
 }
 
 # Stage an Emscripten CLI binary pair into package/bin and PREFIX/bin.

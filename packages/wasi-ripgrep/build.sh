@@ -50,18 +50,7 @@ if [[ ! -f "$OUT/bin/rg.wasm" || -n "${FORCE:-}" ]]; then
 fi
 test -f "$OUT/bin/rg.wasm"
 
-# Optional further shrink; ignore if binaryen rejects features (bulk-memory).
-if command -v wasm-opt >/dev/null 2>&1; then
-  echo "== wasi-ripgrep: wasm-opt -Oz --strip-debug (best-effort)"
-  if wasm-opt -Oz --strip-debug --enable-bulk-memory \
-       "$OUT/bin/rg.wasm" -o "$OUT/bin/rg.opt.wasm" 2>/dev/null
-  then
-    mv "$OUT/bin/rg.opt.wasm" "$OUT/bin/rg.wasm"
-  else
-    rm -f "$OUT/bin/rg.opt.wasm"
-    echo "== wasi-ripgrep: wasm-opt skipped (validator); keeping cargo-stripped wasm"
-  fi
-fi
+homescoop_wasm_opt "$OUT/bin/rg.wasm" wasi-ripgrep --enable-bulk-memory
 
 echo "== wasi-ripgrep: stage bin/rg.wasm"
 DEST="$HOMESCOOP_PKG/package/bin"

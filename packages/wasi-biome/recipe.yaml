@@ -29,3 +29,5 @@ about:
     2.5.15-3 (homescoop#343) ships THIRD-PARTY-NOTICES.md
     (homescoop_notice_rust): every crate biome.wasm links, Rust's standard
     library (rust-toolchain.toml's 1.98.1) and wasi-libc.
+    2.5.15-4: the notice names wasi-sdk-33, which Rust 1.98.1 builds its
+    wasm32-wasip1-threads wasi-libc from (homescoop#472).

@@ -46,3 +46,6 @@ about:
     0.1.14-2 (homescoop#343) pins Rust 1.98.1 and ships
     THIRD-PARTY-NOTICES.md (homescoop_notice_rust): every crate the wasm
     links, Rust's standard library and wasi-libc.
+    0.1.15-2: the notice names wasi-sdk-33, which Rust 1.98.1 builds its
+    wasi-libc from (homescoop#472); wasm-opt is required, and a module it
+    rejects fails the build instead of shipping unoptimised (homescoop#473).

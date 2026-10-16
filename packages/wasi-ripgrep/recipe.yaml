@@ -28,3 +28,6 @@ about:
     THIRD-PARTY-NOTICES.md: every crate rg.wasm links (cargo metadata for
     wasm32-wasip1 over the vendored sources, checked against cargo tree),
     Rust's standard library and wasi-libc (homescoop_notice_rust).
+    15.2.0-5: the notice names wasi-sdk-33, which Rust 1.98.1 builds its
+    wasi-libc from (homescoop#472); wasm-opt is required, and a module it
+    rejects fails the build instead of shipping unoptimised (homescoop#473).

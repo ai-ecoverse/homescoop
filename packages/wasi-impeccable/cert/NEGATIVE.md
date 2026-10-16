@@ -42,3 +42,21 @@ with the no-TLS error.
 **Good tarball:** CI artifact `@ai-ecoverse/wasi-impeccable@0.1.12-5`, with
 `cert/checklist.mjs` under slicc-kernel@1.15.1 and test/e2e on its Node
 entry.
+
+## THIRD-PARTY-NOTICES.md names the wrong wasi-sdk (0.1.15-1, homescoop#472)
+
+`cert/notices.mjs` against the published `@ai-ecoverse/wasi-impeccable@0.1.15-1` on
+slicc-kernel 1.15.1:
+
+```text
+browser-cert: FAIL packages/wasi-impeccable/cert/notices.mjs
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++   "## wasi-libc (wasi-sdk-31; Rust's self-contained wasm32-wasip1-threads libc)"
+-   "## wasi-libc (wasi-sdk-33; Rust's self-contained wasm32-wasip1-threads libc)"
+```
+
+Rust 1.98.1 builds its self-contained wasm32-wasip1-threads libc with
+`WASI_SDK_PATH=/tmp/wasi-sdk-33.0-x86_64-linux`. The four licence files are
+the same at both tags, so only the heading and the URLs were wrong.
+`scripts/check-rust-wasi-sdk.mjs` now checks the table against that
+Dockerfile on every build.
