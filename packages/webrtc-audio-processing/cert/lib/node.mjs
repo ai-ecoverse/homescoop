@@ -231,6 +231,25 @@ for (const rate of RATES) {
       c.cancel(caller, caller);
       assert.ok(caller.every(Number.isNaN), 'cancel() changed the caller\'s arrays');
       c.destroy();
+      const s = L.scene(rate, { seconds: 3 });
+      const zero = make(rate);
+      const want = L.run(zero, s.mic, new Float32Array(s.mic.length), 128);
+      zero.destroy();
+      const nan = make(rate);
+      const got = L.run(nan, s.mic, new Float32Array(s.mic.length).fill(NaN), 128);
+      assert.equal(nan.stats().nonFiniteSamples, s.mic.length);
+      nan.destroy();
+      assert.ok(L.same(want, got), 'an all-NaN reference differs from a silent one');
+      const p = L.poison(L.scene(rate));
+      const ref = make(rate);
+      const outOfPlace = L.run(ref, p.mic, p.far, 128);
+      ref.destroy();
+      const inPlace = Float32Array.from(p.mic);
+      const ip = make(rate);
+      for (let i = 0; i < inPlace.length; i += 128) ip.cancel(inPlace.subarray(i, i + 128), p.far.subarray(i, i + 128), inPlace.subarray(i, i + 128));
+      assert.equal(ip.stats().nonFiniteSamples, p.count);
+      ip.destroy();
+      assert.ok(L.same(outOfPlace, inPlace), 'cancel(mic, ref, mic) with non-finite mic samples differs');
     });
 
     test('a reference that runs ahead or short is queued, and counted', () => {
