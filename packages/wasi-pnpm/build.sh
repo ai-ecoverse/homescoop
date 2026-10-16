@@ -37,11 +37,7 @@ rustup toolchain install "$RUST" --profile minimal --target wasm32-wasip1-thread
 
 SRC_TGZ="$WORK/pnpm-$COMMIT.tar.gz"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$SRC_TGZ"
-SRC_ROOT="$(field build.srcdir)"
-if [[ -z "$SRC_ROOT" ]] || ! mkdir -p "$SRC_ROOT" 2>/dev/null; then
-  SRC_ROOT="$WORK"
-fi
-SRC="$SRC_ROOT/pnpm-$COMMIT"
+SRC="$WORK/pnpm-$COMMIT"
 rm -rf "$SRC"
 mkdir -p "$SRC"
 tar -xzf "$SRC_TGZ" -C "$SRC" --strip-components=1
@@ -59,8 +55,13 @@ open(path, 'w').write(text[:start] + text[end:])
 PY
 
 CARGO_HOME_DIR="${CARGO_HOME:-$HOME/.cargo}"
-CARGO_ENCODED_RUSTFLAGS="$(printf '%s\x1f%s' "--remap-path-prefix=$SRC=/pnpm" "--remap-path-prefix=$CARGO_HOME_DIR=/cargo")"
+# Cargo hands rustc physical paths (macOS: /private/tmp/…): map those too.
+CARGO_ENCODED_RUSTFLAGS="$(printf '%s\x1f%s\x1f%s' "--remap-path-prefix=$SRC=/pnpm" "--remap-path-prefix=$(cd "$SRC" && pwd -P)=/pnpm" "--remap-path-prefix=$CARGO_HOME_DIR=/cargo")"
 export CARGO_ENCODED_RUSTFLAGS
+# The C the crates compile (tree-sitter's assert()s) names its sources by
+# __FILE__: map CARGO_HOME and the tree there too. cc adds TARGET_CFLAGS to
+# the CFLAGS_<target> that pnpm/wasm/build.mjs sets.
+export TARGET_CFLAGS="-ffile-prefix-map=$CARGO_HOME_DIR=/cargo -ffile-prefix-map=$(cd "$CARGO_HOME_DIR" && pwd -P)=/cargo -ffile-prefix-map=$SRC=/pnpm -ffile-prefix-map=$(cd "$SRC" && pwd -P)=/pnpm"
 (cd "$SRC" && node pnpm/wasm/build.mjs)
 
 DEST="$HOMESCOOP_PKG/package"
@@ -69,8 +70,19 @@ cp "$SRC/target/wasm32-wasip1-threads/release/pnpm.wasm" "$DEST/bin/pnpm.wasm"
 chmod 755 "$DEST/bin/pnpm.wasm"
 cp "$SRC/LICENSE" "$DEST/LICENSE"
 cp "$SRC/pnpm/npm/pnpm/THIRD-PARTY-NOTICES.md" "$DEST/THIRD-PARTY-NOTICES.md"
-if strings "$DEST/bin/pnpm.wasm" | grep -q 'Parking not supported on this platform'; then
+# Not grep -q: under pipefail its early exit fails strings with SIGPIPE, and
+# the pipeline then reads as no match (this check passed a build without 0001).
+if strings "$DEST/bin/pnpm.wasm" | grep 'Parking not supported on this platform' >/dev/null; then
   echo "homescoop: pnpm.wasm still contains parking_lot's panicking wasm parker" >&2
+  exit 1
+fi
+# No build path in the bytes (homescoop#522): the work tree, CARGO_HOME, a
+# home or temp directory. 0002 drops the one env!("CARGO_MANIFEST_DIR"),
+# TARGET_CFLAGS the C sources' __FILE__.
+LEAK="$WORK|$SRC|$CARGO_HOME_DIR|/home/runner|/tmp/homescoop-work|/Users/|/private/(tmp|var)/|/var/folders/"
+if strings "$DEST/bin/pnpm.wasm" | grep -E "$LEAK" >/dev/null; then
+  echo "homescoop: a build path leaked into pnpm.wasm" >&2
+  strings "$DEST/bin/pnpm.wasm" | grep -E "$LEAK" | head >&2
   exit 1
 fi
 shasum -a 256 "$DEST/bin/pnpm.wasm"

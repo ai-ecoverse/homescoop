@@ -1,6 +1,23 @@
 {
-  "harness": "host-node",
-  "ci": [
-    "bash packages/wasi-pnpm/ci/packaging-only.sh .homescoop-out/package.tgz"
-  ]
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "runTimeoutMs": 300000,
+  "network": "ctx.serve() is registry.test: packuments and gzipped tarballs for dep-00 … dep-29, built from test/fixtures/registry.mjs's tarball(); every other host answers 502",
+  "checklist": [
+    "pnpm --version and pn --version → 12.9.1; npm -v (the shim) → 12.9.1",
+    "bob (addUser, users enforce) installs 30 packages (every third depends on the next) from the ctx.serve registry three times from an empty node_modules, with the package's SLICC_WASM_THREADS=256: rc 0, no wasm trap / unreachable / panic, the files in node_modules, dep-29 in pnpm-lock.yaml",
+    "npm run hello (the npm shim through bash) prints the package script's output",
+    "alice can't write into bob's node_modules or his pnpm store (Permission denied), and bob's files are unchanged; alice's own install works",
+    "pnpm.wasm doesn't contain parking_lot_core's 'Parking not supported on this platform' (0001), and contains no build path: no /home/runner, /tmp/homescoop-work or homescoop-work/pnpm- (homescoop#522)",
+    "test/*.test.mjs (unit) and test/e2e/*.test.mjs (Node entry): file:, registry, add -g, publish with --otp, git through wasm-git, CORS-only refusals, the npm aliases"
+  ],
+  "patches": {
+    "0001-parking-lot-core-nightly.patch": "install.mjs: pnpm.wasm has no 'Parking not supported on this platform' (NEGATIVE.md: the build without 0001 has it and fails there; the installs, 30 and 200 packages three times, didn't make a lock park in the harness either way), and the installs finish without a trap; build.sh refuses the parker too",
+    "0002-cli-no-source-checkout-path-on-wasm.patch": "install.mjs: pnpm.wasm has no /home/runner or /tmp/homescoop-work path (NEGATIVE.md: 12.9.1-8 has /home/runner/work/_temp/homescoop-work/pnpm-<commit>/pnpm/crates/cli); build.sh refuses one too"
+  }
 }
