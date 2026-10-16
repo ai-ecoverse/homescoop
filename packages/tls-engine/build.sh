@@ -23,8 +23,10 @@ else
   WORK="$HERE/.work"
 fi
 SRC="$WORK/mbedtls-$VERSION"
-BUILD="$WORK/mbedtls-build"
-PREFIX="$WORK/mbedtls-install"
+# Per version: a CMake cache names its source tree, and an install over
+# another version's would keep that version's headers (3.6's ctr_drbg.h).
+BUILD="$WORK/mbedtls-$VERSION-build"
+PREFIX="$WORK/mbedtls-$VERSION-install"
 OUT="$HERE/package/dist"
 TB="$WORK/mbedtls-$VERSION.tar.bz2"
 mkdir -p "$WORK" "$OUT"
