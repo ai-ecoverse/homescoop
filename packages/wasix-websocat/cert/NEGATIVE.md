@@ -36,6 +36,17 @@ The server accepts the first connection and then blocks its only thread on the l
 - **With mio/0001 and mio/0002 but not mio/0003:** ws://, wss:// -k and the strict wss:// refusal pass, but a refused uplink port isn't reported. The kernel refuses the non-blocking connect asynchronously, and the target's Rust std `take_error()` always answers `None`, so websocat writes to a dead socket and exits **0** with `ERROR … operation was canceled`. The spec wants rc 14 `Connection refused`.
 - **The strict wss:// case** is itself the negative of `-k`: without `-k`, the throwaway CA is refused (rc 8, an invalid peer certificate). So chain verification is on, and the `-k` run proves only the handshake and framing.
 
+## Subprocess specifiers (`subprocess.mjs`, 4.0.0-alpha3-2, homescoop#689)
+
+Against the published 4.0.0-alpha3-1, which has no `0002` patch, on slicc-kernel 1.95.0 with users enforce: the `cmd:` server never exits. It waits for a connection and then panics in the wasix std's `process.rs` ("not implemented"):
+
+```
+browser-cert: FAIL packages/wasix-websocat/cert/subprocess.mjs
+AssertionError [ERR_ASSERTION]: websocat -s 18110 cmd:tr a-z A-Z: no exit within 20 s
+```
+
+With `0002`, all three forms (`-s … cmd:`, `ws-l:… exec:cat`, `… sh-c:cat`) exit non-zero at once, with `exec:, cmd: and sh-c: are not supported on WASIX`.
+
 ## On slicc-kernel 1.94.0
 
 Without WASIX epoll and eventfd (slicc-kernel#674, in 1.95.0), every invocation, `--version` included, aborts with `Failed building the Runtime: Os { code: 52, kind: Unsupported, message: "Function not implemented" }`. Hence `engines.slicc-kernel >=1.95.0`.
