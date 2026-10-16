@@ -15,18 +15,20 @@
  * after every call drains the ciphertext to send (tls_out_size / tls_out_take).
  * The handshake runs inside tls_read / tls_write as needed.
  *
- * Entropy comes from crypto.getRandomValues (MBEDTLS_ENTROPY_HARDWARE_ALT).
+ * Entropy comes from crypto.getRandomValues: tls_engine_crypto_config.h swaps
+ * the built-in OS sources for this file's mbedtls_platform_get_entropy
+ * (MBEDTLS_PSA_DRIVER_GET_ENTROPY), which seeds PSA's DRBG. Since Mbed TLS 4
+ * (TF-PSA-Crypto) every random draw, the leaves' keys and the handshakes
+ * included, comes from that one generator; there is no DRBG of our own.
  */
 #include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/ecp.h"
-#include "mbedtls/entropy.h"
 #include "mbedtls/error.h"
 #include "mbedtls/pk.h"
+#include "mbedtls/platform.h"
 #include "mbedtls/ssl.h"
 #include "mbedtls/x509_crt.h"
 #include "psa/crypto.h"
@@ -37,11 +39,9 @@
 #define TLS_NOMEM (-2)
 #define TLS_BADARG (-3)
 
-static const char *alpn_protocols[] = {"http/1.1", NULL};
+static const char *const alpn_protocols[] = {"http/1.1", NULL};
 static int last_error;
 static int ready;
-static mbedtls_entropy_context entropy;
-static mbedtls_ctr_drbg_context drbg;
 
 EM_JS(int, slicc_random, (unsigned char *out, size_t len), {
   for (let at = 0; at < len; at += 65536) {
@@ -51,22 +51,19 @@ EM_JS(int, slicc_random, (unsigned char *out, size_t len), {
   return 0;
 });
 
-int mbedtls_hardware_poll(void *data, unsigned char *out, size_t len, size_t *olen) {
-  (void)data;
-  int ret = slicc_random(out, len);
-  *olen = ret == 0 ? len : 0;
-  return ret;
+/* PSA's entropy source (MBEDTLS_PSA_DRIVER_GET_ENTROPY): full entropy, every byte. */
+int mbedtls_platform_get_entropy(psa_driver_get_entropy_flags_t flags, size_t *estimate_bits,
+                                 unsigned char *out, size_t len) {
+  if (flags != 0) return PSA_ERROR_NOT_SUPPORTED;
+  if (slicc_random(out, len) != 0) return PSA_ERROR_INSUFFICIENT_ENTROPY;
+  *estimate_bits = 8 * len;
+  return 0;
 }
 
 static int init(void) {
   if (ready) return 0;
   int ret = psa_crypto_init();
   if (ret != PSA_SUCCESS) return last_error = ret;
-  mbedtls_entropy_init(&entropy);
-  mbedtls_ctr_drbg_init(&drbg);
-  ret = mbedtls_ctr_drbg_seed(&drbg, mbedtls_entropy_func, &entropy,
-                              (const unsigned char *)"slicc-tls", 9);
-  if (ret != 0) return last_error = ret;
   ready = 1;
   return 0;
 }
@@ -93,18 +90,28 @@ EMSCRIPTEN_KEEPALIVE void tls_strerror(int code, char *out, size_t max) {
   mbedtls_strerror(code, out, max);
 }
 
-/* A new P-256 key pair; 0 on failure (tls_last_error). */
+/* A new P-256 key pair; 0 on failure (tls_last_error). PSA generates it; the
+ * leaf's PK context takes a copy (as if it had parsed the key), with PK's own
+ * signing policy, and the generated key is destroyed. */
 EMSCRIPTEN_KEEPALIVE leaf *tls_leaf_new(void) {
   if (init() != 0) return NULL;
   leaf *l = calloc(1, sizeof *l);
-  if (!l) return NULL;
+  if (!l) {
+    last_error = TLS_NOMEM;
+    return NULL;
+  }
   l->refs = 1;
   mbedtls_pk_init(&l->key);
   mbedtls_x509_crt_init(&l->chain);
-  int ret = mbedtls_pk_setup(&l->key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-  if (ret == 0)
-    ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(l->key),
-                              mbedtls_ctr_drbg_random, &drbg);
+  psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attr, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
+  psa_set_key_bits(&attr, 256);
+  psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_EXPORT);
+  mbedtls_svc_key_id_t generated = MBEDTLS_SVC_KEY_ID_INIT;
+  int ret = psa_generate_key(&attr, &generated);
+  if (ret == PSA_SUCCESS) ret = mbedtls_pk_copy_from_psa(generated, &l->key);
+  psa_destroy_key(generated);
+  psa_reset_key_attributes(&attr);
   if (ret != 0) {
     last_error = ret;
     leaf_release(l);
@@ -126,7 +133,7 @@ EMSCRIPTEN_KEEPALIVE int tls_leaf_add_cert(leaf *l, const unsigned char *der, si
   int ret = mbedtls_x509_crt_parse_der(&l->chain, der, len);
   if (ret != 0) return last_error = ret;
   if (l->certs == 0) {
-    ret = mbedtls_pk_check_pair(&l->chain.pk, &l->key, mbedtls_ctr_drbg_random, &drbg);
+    ret = mbedtls_pk_check_pair(&l->chain.pk, &l->key);
     if (ret != 0) return last_error = ret;
   }
   l->certs++;
@@ -204,7 +211,6 @@ EMSCRIPTEN_KEEPALIVE session *tls_session_new(leaf *l, const char *host) {
   int ret = mbedtls_ssl_config_defaults(&s->config, MBEDTLS_SSL_IS_SERVER,
                                         MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
   if (ret == 0) {
-    mbedtls_ssl_conf_rng(&s->config, mbedtls_ctr_drbg_random, &drbg);
     mbedtls_ssl_conf_sni(&s->config, on_sni, s);
     ret = mbedtls_ssl_conf_own_cert(&s->config, &l->chain, &l->key);
   }
