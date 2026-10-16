@@ -123,24 +123,49 @@ scan_arg() {
     -o?*) out=${_a#-o} ;;
   esac
 }
-for a in "$@"; do
-  case "$a" in
+# A response file (CMake, Ninja, Meson): its words count as arguments
+# (homescoop#721), nested @files too, up to 8 deep. Quotes and backslashes
+# as clang reads them, through the shell's own quoting (newlines become
+# blanks); a file with anything the shell would run or redirect ($ ` ; | &
+# < > ( )) is split on blanks only, never evaluated.
+scan_word() {
+  case "$1" in
     @?*)
-      # A response file (CMake, Ninja, Meson): scan its words too, one level
-      # deep, so its -o and inputs count (homescoop#721). Words only: no
-      # quotes, as those generators write them.
-      if [ -r "${a#@}" ]; then
-        set -f
-        # shellcheck disable=SC2013
-        for w in $(cat "${a#@}"); do scan_arg "$w"; done
-        set +f
+      if [ "$2" -lt 8 ] && [ -r "${1#@}" ]; then
+        scan_rsp "${1#@}" $(($2 + 1))
       else
         link_inputs=1
       fi
       ;;
-    *) scan_arg "$a" ;;
+    *) scan_arg "$1" ;;
   esac
-done
+}
+scan_rsp() {
+  _rsp=$(tr '\n\r\t' '   ' <"$1" 2>/dev/null) || { link_inputs=1; return 0; }
+  _depth=$2
+  case $_rsp in
+    *[\$\`\;\|\&\<\>\(\)]*)
+      set -f
+      # shellcheck disable=SC2086
+      set -- $_rsp
+      set +f
+      ;;
+    *)
+      # Unbalanced quotes would be an eval syntax error, which ends a POSIX
+      # shell: try it in a subshell first.
+      set -f
+      if (eval "set -- $_rsp") 2>/dev/null; then
+        eval "set -- $_rsp"
+      else
+        # shellcheck disable=SC2086
+        set -- $_rsp
+      fi
+      set +f
+      ;;
+  esac
+  for _w in "$@"; do scan_word "$_w" "$_depth"; done
+}
+for a in "$@"; do scan_word "$a" 0; done
 
 # -fPIC on an executable link (no -shared, producing a binary) → dynamic-main / PIE.
 dynamic_main=0
@@ -344,25 +369,33 @@ if [ -z "$out" ] && [ "$compile_only" -eq 0 ] && [ "$no_output" -eq 0 ] && [ "$l
   out=a.out
 fi
 
-# Whether this call writes $out: it's missing now, or its bytes change. A
-# call that only reads (a PCH, a response file whose -o this driver didn't
-# see, a failed probe) must not post-process a stale file (homescoop#721).
+# Whether this call writes $out: it's missing now, or after the frontend it
+# is newer than a marker made just before it, or its bytes changed. A call
+# that only reads (a PCH, -fsyntax-only) must not post-process a stale file
+# (homescoop#721), and a link that rewrites the same bytes (after a run with
+# WASIXCC_ASYNCIFY=0, or one that stopped for want of wasm-opt) still gets
+# its post-link step.
 pre_sum=
+marker=
 if [ -n "$out" ] && [ -f "$out" ]; then
   pre_sum=$(cksum <"$out" 2>/dev/null || echo unknown)
+  marker=$(mktemp "${TMPDIR:-/tmp}/wasix-out.XXXXXX") || marker=
 fi
 
 "$FRONTEND" "@$rsp"
 status=$?
 if [ "$status" -ne 0 ]; then
+  [ -z "$marker" ] || rm -f "$marker"
   exit "$status"
 fi
 fresh=0
 if [ -n "$out" ] && [ -f "$out" ]; then
-  if [ -z "$pre_sum" ] || [ "$(cksum <"$out" 2>/dev/null || echo unknown)" != "$pre_sum" ]; then
+  if [ -z "$pre_sum" ] || { [ -n "$marker" ] && [ "$out" -nt "$marker" ]; } ||
+    [ "$(cksum <"$out" 2>/dev/null || echo unknown)" != "$pre_sum" ]; then
     fresh=1
   fi
 fi
+[ -z "$marker" ] || rm -f "$marker"
 
 # Does the module import wasix_32v1.proc_fork, stack_checkpoint or
 # stack_restore? Reads the wasm's import section with od (coreutils, which
