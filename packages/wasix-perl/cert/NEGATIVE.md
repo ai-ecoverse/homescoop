@@ -74,3 +74,7 @@ The new specs against the published tarballs on slicc-kernel 1.100.3's Node entr
 ## 5.42.0-14: the engines floor (homescoop#552)
 
 `locks.mjs` against the published 5.42.0-13 on slicc-kernel 1.100.3's Node entry, 2026-10-16: FAIL at `engines.slicc-kernel is >=1.100.0 … : >=1.44.0`. -13 admitted kernels without `slicc.fcntl_lock`, where every lock is granted locally. With -14's manifest over the same files, the spec passes (real locks: child EAGAIN, F_SETLKW waited). The spec has no local-answer branch any more, so it also fails on a kernel before 1.100.0.
+
+## 5.42.0-15: flock (homescoop#631, 2026-10-16)
+
+`cert/flock.mjs` against the published 5.42.0-14 (slicc-kernel 1.100.3): FAIL, `parent=ok ok ok | child=ok ok | blocking=ok:at-once | shared=2`. While the parent holds `LOCK_EX`, the forked child is granted `LOCK_EX|LOCK_NB` and `LOCK_SH|LOCK_NB`, its blocking `LOCK_EX` returns at once, and a writer gets in beside two readers: `wasix-posix-stubs.h` answered every `flock` with success. 5.42.0-15 maps `flock` onto whole-file `fcntl` locks.

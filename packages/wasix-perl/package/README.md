@@ -15,6 +15,21 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
 
+## 5.42.0-15: flock excludes other processes
+
+`flock` takes whole-file `fcntl` record locks (`LOCK_SH` → `F_RDLCK`,
+`LOCK_EX` → `F_WRLCK`, `LOCK_UN` → `F_UNLCK`; `LOCK_NB` → `F_SETLK`, else
+`F_SETLKW`), which slicc-kernel enforces between processes (homescoop#631).
+Up to -14 every `flock` succeeded and excluded nobody, so two autom4te runs
+on one `autom4te.cache` raced ("cannot rename autom4te.cache/output.0t").
+A refused `LOCK_NB` sets `EWOULDBLOCK`. These are `fcntl` semantics, as
+perl's own flock emulation has them: a lock belongs to the process (a forked
+child doesn't inherit it, and closing any handle on the file drops it).
+`fcntl` wants a writable handle for a write lock and a readable one for a
+read lock, so `LOCK_EX` on a read-only handle takes a read lock (other
+writers stay out, other read-only `LOCK_EX` holders don't) and `LOCK_SH` on
+a write-only one a write lock. `lockf` is still an advisory no-op.
+
 ## 5.42.0-14: needs slicc-kernel ≥ 1.100.0
 
 A packaging-only release of 5.42.0-13 (the same files): `engines` now asks
