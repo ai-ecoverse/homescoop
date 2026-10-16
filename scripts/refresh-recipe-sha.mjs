@@ -6,6 +6,11 @@
  *   node scripts/refresh-recipe-sha.mjs bash
  *   node scripts/refresh-recipe-sha.mjs --all
  *   node scripts/refresh-recipe-sha.mjs zlib --check
+ *
+ * Repack recipes (repack.from) never fetch their source, so a wrong sha256
+ * would never fail a build (#730). They are always verified, never
+ * rewritten: a mismatch fails. scripts/recipe-sha-allowlist.txt lists the
+ * known mismatches, one `<package> #<issue> <reason>` per line.
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -109,7 +114,21 @@ function replaceSha(text, { oldSha, newSha, urlHint }) {
   return text.replace(re, `sha256: "${newSha}"`);
 }
 
-function refreshOne(name) {
+/** @returns {Map<string, string>} package → the allowlist line */
+function readAllowlist(path) {
+  const out = new Map();
+  if (!existsSync(path)) return out;
+  for (const [i, raw] of readFileSync(path, 'utf8').split('\n').entries()) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = line.match(/^(\S+)\s+#(\d+)\s+\S/);
+    if (!m) throw new Error(`${path}:${i + 1}: want "<package> #<issue> <reason>", got "${line}"`);
+    out.set(m[1], line);
+  }
+  return out;
+}
+
+function refreshOne(name, { check = checkOnly, why = '' } = {}) {
   const recipe = recipeJson(name);
   const path = join(root, 'packages', name, 'recipe.yaml');
   let text = readFileSync(path, 'utf8');
@@ -151,6 +170,11 @@ function refreshOne(name) {
       console.log(`skip ${name}${job.key ? '/' + job.key : ''}: no url`);
       continue;
     }
+    if (String(src.sha256 || '') === 'skip') {
+      // Unpinned on purpose: build.sh stages a prebuilt artifact, not this URL.
+      console.log(`skip ${name}${job.key ? '/' + job.key : ''}: sha256 skip (prebuilt, not fetched)`);
+      continue;
+    }
     console.log(`== ${name}${job.key ? ' sources.' + job.key : ''}: ${url}`);
     let digest;
     try {
@@ -167,10 +191,11 @@ function refreshOne(name) {
       console.log(`   sha256 unchanged: ${digest}`);
       continue;
     }
-    if (checkOnly) {
+    if (check) {
       throw new Error(
         `${name}: recipe sha256 ${oldSha || '(empty)'} != downloaded ${digest} for ${url}. ` +
-          'Renovate does not update checksums; wait for the recipe-sha job or run refresh-recipe-sha.mjs.'
+          (why ||
+            'Renovate does not update checksums; wait for the recipe-sha job or run refresh-recipe-sha.mjs.')
       );
     }
     text = replaceSha(text, {
@@ -181,8 +206,10 @@ function refreshOne(name) {
     console.log(`   sha256: ${oldSha || '(none)'} → ${digest}`);
   }
 
-  if (!checkOnly) writeFileSync(path, text);
+  if (!check) writeFileSync(path, text);
 }
+
+const allowlist = readAllowlist(join(root, 'scripts/recipe-sha-allowlist.txt'));
 
 for (const name of names) {
   try {
@@ -197,9 +224,23 @@ for (const name of names) {
     }
     const recipe = recipeJson(name);
     if (recipe.repack?.from) {
-      // Packaging-only repack of a published tarball: the source is not built.
-      console.log(`skip ${name}: repack of ${recipe.repack.from}`);
+      // Packaging-only repack of a published tarball: nothing fetches the
+      // source, so verify it here and never rewrite it (#730).
+      if (allowlist.has(name)) {
+        console.log(`skip ${name}: repack of ${recipe.repack.from}, allowlisted: ${allowlist.get(name)}`);
+        continue;
+      }
+      console.log(`verify ${name}: repack of ${recipe.repack.from}`);
+      refreshOne(name, {
+        check: true,
+        why:
+          'This recipe is a repack, so no build fetches its source and nothing else checks the pin. ' +
+          'Record the source the repacked bytes were really built from (or drop repack: and rebuild).',
+      });
       continue;
+    }
+    if (allowlist.has(name)) {
+      console.log(`::warning::${name} is in scripts/recipe-sha-allowlist.txt but is not a repack; drop the entry`);
     }
     if (!recipe.source?.url || recipe.source.url === null) {
       console.log(`skip ${name}: null source`);
