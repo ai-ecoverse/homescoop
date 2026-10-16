@@ -4,7 +4,7 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-31's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-30's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - No `fork`/`vfork`; `subprocess` via `os.posix_spawn` (`proc_spawn2`/`3`)
@@ -18,16 +18,14 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
-Since 3.14.2-23 (wasix-sysroot -31):
+Since 3.14.2-23:
 
-- `multiprocessing.Manager()` works: `dict`, `list`, `Queue`, `Namespace`
-  and the other managed objects, over an AF_UNIX socket. Up to -22 the first
-  proxy call raised `TypeError: str, bytes or bytearray expected, not int`,
-  because WASIX's libc returned family 0 and no path from `getsockname`,
-  `getpeername` and `accept` for every AF_UNIX socket (wasix-sysroot -31
-  fixes that for every WASIX program; homescoop#515). slicc-kernel keeps
-  socket paths out of the filesystem (slicc-kernel#753), so the listener no
-  longer fails when the path it unlinks at close is already gone.
+- `multiprocessing.connection`'s `Listener` on an AF_UNIX path closes
+  cleanly. slicc-kernel keeps socket paths out of the filesystem
+  (slicc-kernel#753), so the path it unlinks at close is already gone; up to
+  -22 `close()` raised `FileNotFoundError`. `multiprocessing.Manager()` also
+  needs WASIX's libc to return AF_UNIX addresses from `getsockname`, which
+  comes with wasix-sysroot -31 in the next release (homescoop#515).
 - `threading.get_native_id()` and `Thread.native_id` exist (WASIX's thread id;
   homescoop#587). Up to -22 they were missing or `None`, and
   `scipy.fft.set_backend`/`skip_backend` raised `AttributeError`.

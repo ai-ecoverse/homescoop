@@ -152,15 +152,11 @@ script and a subprocess inside the venv, and a chained user sitecustomize.
 
 cert-review of #530's first head (05b81d7e) found that on slicc-kernel 1.99.2, which the old `engines` (>=1.51.0) admitted, two python processes on one database lost an acknowledged row. B's insert returned ok, A's commit got `disk I/O error`, and the table ended `[0, 1]`. The cause is that the unix VFS takes `fcntl` locks, and without `slicc.fcntl_lock` the libc grants them locally. `engines` is now `>=1.100.0`. `locks.mjs` no longer accepts local locks (the `PY_LOCKS_LOCAL=1` branch is gone), so on 1.99.2 it fails at `another process got LOCK_EX while this one held it` instead of passing.
 
-## 3.14.2-23: negative 3.14.2-21/-22 (homescoop#515, #516)
+## 3.14.2-23: negative 3.14.2-21/-22 (homescoop#515, #516, #587, #621)
 
 The published 3.14.2-21 (npm sha512-JZN9ayQh…) on slicc-kernel 1.100.4's Node entry, 2026-10-16. -22 changes only sqlite's VFS, so it behaves the same here.
 
-- **`mp-manager.mjs` fails at its first step.** `getsockname()` of a bound AF_UNIX socket, the client's `getpeername()` and the accept address are all `(0, b'')`: wasix-libc's `wasi_to_sockaddr` never copied the AF_UNIX address into the caller's buffer. `mp.Manager()` then dies at the first proxy call, rc 1:
-  ```
-  TypeError: str, bytes or bytearray expected, not int
-  ```
-  With the libc fix simulated (`getsockname` patched in Python) but no listener patch, the Manager works and the manager process prints `FileNotFoundError: [Errno 44] No such file or directory: '/tmp/pymp-…/sock-…'` from its finalizer at exit. That's what `cpython-multiprocessing-unix-listener-wasix.patch` stops.
+- **`mp-listener.mjs` fails at `close()`.** The Client/Listener round trip on the AF_UNIX path works, then `Listener.close()` raises `FileNotFoundError: [Errno 44] No such file or directory: '/tmp/…/listener'`, because the kernel never put the path in the filesystem (slicc-kernel#753). The same -21 with `cpython-multiprocessing-unix-listener-wasix.patch` applied to its `connection.py` passes. `multiprocessing.Manager()` fails earlier still, with `TypeError: str, bytes or bytearray expected, not int`: libc's `getsockname` returns `(0, b'')` for AF_UNIX. That part waits for wasix-sysroot -31.
 - **`mp-limits.mjs` fails on its first assertion.** Its output on -21:
   ```
   {"methods": ["spawn", "fork", "forkserver"], "start": "spawn", "fork": ["ok", "fork"],
