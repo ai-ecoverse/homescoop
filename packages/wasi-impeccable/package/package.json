@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-impeccable",
-  "version": "0.1.14-2",
-  "description": "impeccable engine 0.1.14 for slicc WASI preview1 (command impeccable; file-local and HTTP verbs)",
+  "version": "0.1.15-1",
+  "description": "impeccable engine 0.1.15 for slicc WASI preview1 (command impeccable; file-local and HTTP verbs)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
   },
   "homescoop": {
     "recipe": "wasi-impeccable",
-    "upstream": "0.1.14"
+    "upstream": "0.1.15"
   },
   "slicc": {
     "abi": "wasi",
