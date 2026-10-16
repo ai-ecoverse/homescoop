@@ -1,5 +1,14 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-30: AF_UNIX addresses, events-0 hangup (-31, homescoop#515, #464)
+
+`run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-30.tgz --probe r31` on slicc-kernel 1.100.1 (2026-10-16): FAIL.
+- `bind(…, sizeof(struct sockaddr_un))` gives `-1 Success`: `sockaddr_to_wasi` refused the 108-byte path area and returned -1, which became errno.
+- A python program that binds with the exact length (thr_yix6z44j96's repro, wasix-python 3.14.2-21) gets `(0, b'')` from `getsockname`, from `accept`'s peer and from the client's `getpeername`, so `multiprocessing.Manager()` fails (#515).
+- `poll`/`ppoll` with an events-0 entry on a pipe whose writer closed give `0 revents=0` after the full 2 s (`slow`), and the write end of a pipe whose reader is gone reports nothing.
+
+-31 passes every r31 line in all five variants.
+
 ## 2025.9.30-29: no POSIX record locks in the headers or libc (-30, homescoop#407)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-29.tgz --probe r30lock`, 2026-10-16: the probe doesn't build (`F_SETLK`, `F_GETLK`, `F_SETLKW`, `F_RDLCK`/`F_WRLCK`/`F_UNLCK` undeclared, `lockf` undeclared and not in libc.a). Programs carried their own numbers and no-op stubs (wasix-python's `fcntl_wasix_extra.h` uses 7/8/9 with `--wrap=fcntl`), so no lock ever reached the kernel, and python's sqlite could write through another process's lock (homescoop#407).
