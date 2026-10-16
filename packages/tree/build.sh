@@ -18,7 +18,7 @@ SLICC_A="$WORK/libslicc-tree.a"
 homescoop_slicc_archive "$SLICC_A" gaps
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=262144 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
+CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_wrap_pwd) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
 
 if [[ ! -f "$SRC/tree.wasm" || -n "${FORCE:-}" ]]; then
   echo "== tree: emcc"

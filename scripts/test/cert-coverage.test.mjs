@@ -65,8 +65,6 @@ const NO_USERS_ENFORCE = [
   'qpdf', // #723
   'sed', // #819
   'sqlite3', // #819
-  'tree', // #687
-  'util-linux', // #687
   'wasi-biome', // #819
   'wasi-dig', // #819
   'wasi-esbuild', // #819
@@ -78,7 +76,6 @@ const NO_USERS_ENFORCE = [
   'wasix-perl', // #819
   'wasix-python', // #819
   'wasix-ruby', // #819
-  'which', // #687
   'xxd', // #819
   'xz', // #819
 ];
