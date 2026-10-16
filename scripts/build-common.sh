@@ -455,6 +455,52 @@ homescoop_notice_emscripten() {
     "$em/system/lib/libcxx/LICENSE.TXT" -
 }
 
+# Notices for a Rust wasm (homescoop#343): every crate it links, then
+# Rust's standard library and the target's wasi-libc. Call after
+# homescoop_notices_begin. The cargo command and its arguments come from
+# HOMESCOOP_CARGO (an array name, default "cargo"); the same extra
+# arguments (--offline, --config for vendored sources) follow "--".
+#   homescoop_notice_rust <srcdir> <target> <rust-version> [--root <pkg>] [-- <cargo args…>]
+homescoop_notice_rust() {
+  local src="$1" target="$2" rust="$3"
+  shift 3
+  local -a treepkg=() extra=()
+  if [[ "${1:-}" == --root ]]; then treepkg=(-p "$2"); shift 2; fi
+  if [[ "${1:-}" == -- ]]; then shift; extra=("$@"); fi
+  local -a cargo=(cargo)
+  if [[ -n "${HOMESCOOP_CARGO:-}" ]]; then
+    local -n _hc="$HOMESCOOP_CARGO"
+    cargo=("${_hc[@]}")
+  fi
+  local meta="$WORK/rust-notices-metadata.json" tree="$WORK/rust-notices-tree.txt"
+  (cd "$src" && "${cargo[@]}" metadata --locked --format-version 1 --filter-platform "$target" "${extra[@]}") >"$meta"
+  (cd "$src" && "${cargo[@]}" tree --locked --target "$target" -e normal,no-proc-macro --prefix none "${treepkg[@]}" "${extra[@]}") >"$tree"
+  node "$HOMESCOOP_ROOT/scripts/rust-crate-notices.mjs" "$meta" "$tree" >>"$HOMESCOOP_NOTICES"
+  node "$HOMESCOOP_ROOT/scripts/check-rust-notices.mjs" "$HOMESCOOP_NOTICES" "$tree" "$src/Cargo.lock"
+  local copyright mit apache
+  case "$rust" in
+    1.98.1)
+      copyright=172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af
+      mit=b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1
+      apache=62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a
+      ;;
+    *)
+      echo "homescoop_notice_rust: no pinned licence sha256 for Rust $rust; add it to the table" >&2
+      return 1
+      ;;
+  esac
+  homescoop_notice "Rust $rust standard library (MIT OR Apache-2.0)" \
+    "https://raw.githubusercontent.com/rust-lang/rust/$rust/COPYRIGHT" "$copyright" \
+    "https://raw.githubusercontent.com/rust-lang/rust/$rust/LICENSE-MIT" "$mit" \
+    "https://raw.githubusercontent.com/rust-lang/rust/$rust/LICENSE-APACHE" "$apache"
+  local wl=https://raw.githubusercontent.com/WebAssembly/wasi-libc/wasi-sdk-31
+  homescoop_notice "wasi-libc (wasi-sdk-31; Rust's self-contained $target libc)" \
+    "$wl/LICENSE" 2711a8b5a5cdfef0e639f96c1aca12ae23d7d64a02d0507f1bdf14d2b27bbc3a \
+    "$wl/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
+    "$wl/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
+    "$wl/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
+}
+
 # Stage an Emscripten CLI binary pair into package/bin and PREFIX/bin.
 # Prefer bare <name> (slicc.commands glue path) over <name>.js when both exist.
 homescoop_stage_cli() {

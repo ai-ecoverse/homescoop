@@ -4,6 +4,8 @@ builder: host
 # renovate: datasource=crate depName=ripgrep
 version: "15.2.0"
 npm: "@ai-ecoverse/wasi-ripgrep"
+toolchain:
+  rust: "1.98.1"
 summary: "ripgrep 15 for slicc WASI preview1 (command rg)"
 source:
   url: "https://static.crates.io/crates/ripgrep/ripgrep-{{version}}.crate"
@@ -21,3 +23,7 @@ about:
     bin/rg.wasm (no glue). Default features only (no PCRE2).
     patches/grep-cli-wasi-stdin.patch (homescoop#168) applies to the
     vendored grep-cli: piped and redirected stdin are searched, as on Linux.
+    15.2.0-4 (homescoop#343) pins Rust 1.98.1 and ships
+    THIRD-PARTY-NOTICES.md: every crate rg.wasm links (cargo metadata for
+    wasm32-wasip1 over the vendored sources, checked against cargo tree),
+    Rust's standard library and wasi-libc (homescoop_notice_rust).

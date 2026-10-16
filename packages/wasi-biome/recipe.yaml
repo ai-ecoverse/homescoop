@@ -26,3 +26,6 @@ about:
     run on std threads and rayon; the kernel runs wasi thread-spawn.
     0001-wasi-cli.patch: no daemon (sockets, child processes) and no
     `biome upgrade` on WASI; the working directory comes from PWD.
+    2.5.15-3 (homescoop#343) ships THIRD-PARTY-NOTICES.md
+    (homescoop_notice_rust): every crate biome.wasm links, Rust's standard
+    library (rust-toolchain.toml's 1.98.1) and wasi-libc.
