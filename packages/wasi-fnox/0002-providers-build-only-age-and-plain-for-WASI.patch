@@ -10,11 +10,18 @@ available in the WASI build of fnox". Their modules, the hardware-key
 setup paths and age plugin support are compiled out on WASI, and
 BitwardenBackend is kept as a plain enum for the configuration types.
 
+Disabled providers also keep their env_dependencies(), read at build
+time from the compiled-out module's source (the build fails if that is
+not a literal list), so `proxy run` still removes a configured
+provider's credentials (FNOX_OP_SERVICE_ACCOUNT_TOKEN, FNOX_BW_SESSION,
+VAULT_NAMESPACE, ...) from the child, and the resolver orders by them,
+as upstream does (homescoop#401).
+
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
-index 3b82500..f0ca60e 100644
+index 3b82500..aeb35c7 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
-@@ -407,9 +407,15 @@ fn generate_provider_methods(
+@@ -407,9 +407,19 @@ fn generate_provider_methods(
          daemon_cache_arms.push(quote! {
              Self::#variant { daemon_cache, .. } => daemon_cache.unwrap_or(true)
          });
@@ -26,14 +33,18 @@ index 3b82500..f0ca60e 100644
 +                Self::#variant { .. } => #module::env_dependencies()
 +            });
 +        } else {
++            // The module is compiled out, but its credentials must still be
++            // scrubbed from children (proxy run) and ordered by the resolver,
++            // as upstream does: take its list from the module's source.
++            let deps = disabled_env_dependencies(&provider.module);
 +            env_deps_arms.push(quote! {
-+                Self::#variant { .. } => &[]
++                Self::#variant { .. } => &[#(#deps),*]
 +            });
 +        }
          let interactive = provider.requires_interactive_auth;
          interactive_auth_arms.push(quote! {
              Self::#variant { .. } => #interactive
-@@ -421,6 +427,7 @@ fn generate_provider_methods(
+@@ -421,6 +431,7 @@ fn generate_provider_methods(
      // Build use statements for provider modules
      let module_uses: Vec<TokenStream> = providers
          .iter()
@@ -41,10 +52,45 @@ index 3b82500..f0ca60e 100644
          .map(|(_name, provider)| {
              let module = Ident::new(&provider.module, Span::call_site());
              quote! { use super::super::#module; }
-@@ -705,6 +712,13 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
+@@ -705,6 +716,48 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
      }
  }
  
++/// The variable names `env_dependencies()` returns in
++/// `src/providers/<module>.rs`, for a provider whose module is compiled out
++/// on WASI. The build fails if the function is not a literal list of string
++/// literals, so an upstream change can't silently empty it.
++fn disabled_env_dependencies(module: &str) -> Vec<String> {
++    let path = format!("src/providers/{module}.rs");
++    println!("cargo:rerun-if-changed={path}");
++    let src = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
++    let sig = "pub fn env_dependencies() -> &'static [&'static str] {";
++    let (_, rest) = src
++        .split_once(sig)
++        .unwrap_or_else(|| panic!("{path}: no `{sig}`"));
++    let (body, _) = rest
++        .split_once("\n}")
++        .unwrap_or_else(|| panic!("{path}: env_dependencies() has no end"));
++    let body = body.trim();
++    let list = body
++        .strip_prefix("&[")
++        .and_then(|l| l.strip_suffix(']'))
++        .unwrap_or_else(|| panic!("{path}: env_dependencies() is not a literal list: {body}"));
++    list.split(',')
++        .map(str::trim)
++        .filter(|item| !item.is_empty())
++        .map(|item| {
++            item.strip_prefix('"')
++                .and_then(|i| i.strip_suffix('"'))
++                .filter(|i| !i.contains(['"', '\\']))
++                .unwrap_or_else(|| {
++                    panic!("{path}: env_dependencies() entry {item} is not a plain string")
++                })
++                .to_string()
++        })
++        .collect()
++}
++
 +fn wasi_enabled(module: &str) -> bool {
 +    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("wasi") {
 +        return true;
@@ -55,7 +101,7 @@ index 3b82500..f0ca60e 100644
  fn generate_provider_instantiate(
      providers: &[(String, ProviderToml)],
  ) -> Result<String, Box<dyn std::error::Error>> {
-@@ -722,6 +736,18 @@ fn generate_provider_instantiate(
+@@ -722,6 +775,18 @@ fn generate_provider_instantiate(
              vec![]
          };
  

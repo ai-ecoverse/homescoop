@@ -111,6 +111,36 @@ export default async function (ctx) {
   const scrubbed = await fnox(['proxy', 'run', '--', 'printenv', 'GH']);
   assert.notEqual(scrubbed.status, 0, 'the secret name itself must be scrubbed in proxy run');
 
+  // homescoop#401: providers the WASI build compiles out keep their
+  // env_dependencies(), so proxy run removes a configured provider's
+  // credentials from the child as upstream does. The FNOX_* names and
+  // VAULT_NAMESPACE are only in those lists, not in proxy's fixed one.
+  await write(
+    'home/scrub/fnox.toml',
+    [
+      '[providers.seven]', 'type = "sealed"', '',
+      '[providers.op]', 'type = "1password"', '',
+      '[providers.bw]', 'type = "bitwarden"', '',
+      '[providers.vault]', 'type = "vault"', 'address = "https://vault.example"', '',
+      '[secrets]', 'GH = { provider = "seven", value = "seven_ph_gh_0001" }', '',
+      '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', 'env = "GITHUB_TOKEN"', '',
+    ].join('\n'),
+  );
+  const creds = {
+    OP_SERVICE_ACCOUNT_TOKEN: 'ops_ambient',
+    FNOX_OP_SERVICE_ACCOUNT_TOKEN: 'fnox_ops_ambient',
+    BW_SESSION: 'bw_ambient',
+    FNOX_BW_SESSION: 'fnox_bw_ambient',
+    VAULT_TOKEN: 'vault_ambient',
+    FNOX_VAULT_NAMESPACE: 'fnox_ns_ambient',
+  };
+  const scrub = await run(['fnox', 'proxy', 'run', '--', 'printenv'], { cwd: '/home/scrub', env: { ...env, ...creds } });
+  assert.equal(scrub.status, 0, `proxy run with provider credentials: ${scrub.stderr}`);
+  assert.match(scrub.stdout, /^GITHUB_TOKEN=seven_ph_gh_0001$/m);
+  for (const name of Object.keys(creds)) {
+    assert.doesNotMatch(scrub.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed ${name} to the child (homescoop#401)`);
+  }
+
   await write('home/plain/fnox.toml', '[providers.plain]\ntype = "plain"\n\n[secrets]\nLOG_LEVEL = { provider = "plain", value = "debug" }\n');
   const plain = await run(['fnox', 'exec', '--', 'printenv', 'LOG_LEVEL'], { cwd: '/home/plain', env });
   assert.equal(plain.status, 0, `plain exec: ${plain.stderr}`);

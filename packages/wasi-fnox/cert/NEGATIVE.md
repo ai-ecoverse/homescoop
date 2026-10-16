@@ -42,3 +42,14 @@ Error:   × Main thread panicked.
   ╰─▶ not supported by WASI yet
 fnox: wasm trap: unreachable          (status 134)
 ```
+
+## 1.39.0-2: `proxy run` hands a disabled provider's credentials to the child
+
+`cert/checklist.mjs` fails at the homescoop#401 case on the published 1.39.0-2 (slicc-kernel 1.83.0, 2026-10-16). Its 0002 gave every provider the WASI build compiles out an empty `env_dependencies()`, so `proxy run` removed only its fixed list (`OP_SERVICE_ACCOUNT_TOKEN`, `BW_SESSION`, `VAULT_TOKEN`, …) and not the configured providers' own names, as upstream does:
+
+```text
+browser-cert: FAIL packages/wasi-fnox/cert/checklist.mjs
+AssertionError [ERR_ASSERTION]: proxy run handed FNOX_OP_SERVICE_ACCOUNT_TOKEN to the child (homescoop#401)
+```
+
+1.39.0-2's child also got `FNOX_BW_SESSION` and `FNOX_VAULT_NAMESPACE`. `fnox exec` is not part of this case: upstream v1.39.0's `exec` passes these variables through to the child as well (it removes only `FNOX_AGE_KEY`, `FNOX_AGE_KEY_FILE` and Enpass's password), and so does the WASI build.
