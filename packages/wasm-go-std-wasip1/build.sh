@@ -6,7 +6,7 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe wasm-go-std-wasip1
 
-command -v go >/dev/null || { echo "missing go" >&2; exit 1; }
+eval "$(bash "$ROOT/scripts/install-go.sh" wasm-go-std-wasip1 "$WORK/go-toolchain")"
 HOST_GO="$(go env GOVERSION)"
 WANT="go${VER}"
 if [[ "$HOST_GO" != "$WANT" ]]; then
