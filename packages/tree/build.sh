@@ -42,4 +42,6 @@ if [[ -f "$SRC/tree.js" ]]; then mv "$SRC/tree.js" "$SRC/tree"; fi
 test -f "$SRC/tree.wasm"
 homescoop_stage_cli "$SRC" tree
 homescoop_stage_license "$SRC"/LICENSE
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== tree: staged → $HOMESCOOP_PKG/package ($VERSION)"
