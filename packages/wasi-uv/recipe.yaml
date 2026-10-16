@@ -34,8 +34,8 @@ about:
            ctrlc/diskus off WASI, uv-extract read_at, recursion limit
       0002 processes through wasix-command (std and tokio::process);
            interpreter query with -s -P (wasix-python needs PYTHONHOME)
-      0003 filesystem as unix: symlinks (venv, cache, uv tool links), no
-           locks/modes/dup, chmod +x via
+      0003 filesystem as unix: symlinks (venv, cache, uv tool links), file
+           locks via slicc.fcntl_lock (#706), no modes/dup, chmod +x via
            the kernel's slicc_fs.fd_chmod
       0004 Os::Wasi, wheel tag wasi_0_0_0_wasm32
       0005 start: chdir(PWD), 16 blocking threads, 2 ms tick (no tokio IO

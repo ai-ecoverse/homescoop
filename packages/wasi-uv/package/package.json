@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-uv",
-  "version": "0.13.1-1",
+  "version": "0.13.1-2",
   "description": "Astral's uv 0.13 for slicc WASI: uv venv, pip, init, add, lock, sync and run against wasix-python",
   "license": "MIT OR Apache-2.0",
   "repository": {
