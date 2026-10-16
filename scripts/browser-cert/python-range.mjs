@@ -103,9 +103,9 @@ function main(argv) {
     sh('npm', ['install', '--prefix', prefix, '--no-fund', '--no-audit', '--silent', `${PYTHON}@${range.floor}`]);
     const nm = join(prefix, 'node_modules');
     const got = JSON.parse(readFileSync(join(nm, PYTHON, 'package.json'), 'utf8')).version;
-    const nested = nestedIn(nm);
+    const nested = nestedIn(nm).filter((n) => !n.endsWith(` ${range.floor}`));
     if (got !== range.floor || nested.length) {
-      console.error(`::error::${pkg}: the floor harness has ${PYTHON} ${got}${nested.length ? ` and nested ${nested.join(', ')}` : ''}, not one ${range.floor}`);
+      console.error(`::error::${pkg}: the floor harness has ${PYTHON} ${got}${nested.length ? ` and nested ${nested.join(', ')}` : ''}; every py-* must resolve to ${range.floor}`);
       return 1;
     }
     console.log(`python-range: ${pkg}'s specs on the floor python, ${PYTHON}@${range.floor}`);

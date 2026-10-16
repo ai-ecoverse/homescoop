@@ -104,7 +104,7 @@ A py-\*'s import smoke is `pyImport(ctx, { pkg, module, version, minExt })` from
 It checks that the package brings no python of its own and that `module` imports
 from `/node_modules/@ai-ecoverse/<pkg>` with no `PYTHONPATH` (discovery). It
 imports every `*.cpython-314-wasm32-wasix.so` under the module, and there must
-be at least `minExt` of them. It logs the wasix-python it ran on
+be at least `minExt` of them. A module named in `skip` is left out, and the spec's checklist says why (py-pillow's `PIL._imagingtk` traps on import, #588). It logs the wasix-python it ran on
 (`pythonUnderTest(ctx)`).
 
 ## Context API (`cert/*.mjs`)

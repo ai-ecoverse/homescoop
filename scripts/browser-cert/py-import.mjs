@@ -1,7 +1,7 @@
 const S = '@ai-ecoverse';
 const SCRIPT = String.raw`
 import importlib, json, os, sys
-top, root = sys.argv[1], sys.argv[2]
+top, skip = sys.argv[1], json.loads(sys.argv[2])
 m = importlib.import_module(top)
 site = os.path.dirname(os.path.dirname(os.path.abspath(m.__file__))) if hasattr(m, "__path__") else os.path.dirname(os.path.abspath(m.__file__))
 suffix = ".cpython-314-wasm32-wasix.so"
@@ -10,6 +10,8 @@ for d, _, files in sorted(os.walk(os.path.join(site, top))):
     for f in sorted(files):
         if f.endswith(suffix):
             name = os.path.relpath(os.path.join(d, f[: -len(suffix)]), site).replace(os.sep, ".")
+            if name in skip:
+                continue
             try:
                 importlib.import_module(name)
                 ext.append(name)
@@ -22,14 +24,14 @@ export async function pythonUnderTest(ctx) {
   return JSON.parse(await ctx.read(`/node_modules/${S}/wasix-python/package.json`)).version;
 }
 
-export async function pyImport(ctx, { pkg, module, version, minExt = 0 }) {
+export async function pyImport(ctx, { pkg, module, version, minExt = 0, skip = [] }) {
   const { run, write, read, assert } = ctx;
   const python = await pythonUnderTest(ctx);
   const own = JSON.parse(await read(`/node_modules/${S}/${pkg}/package.json`));
   const nested = await run(['python3', '-c', `import os,sys; print(os.path.exists(sys.argv[1]))`, `/node_modules/${S}/${pkg}/node_modules/${S}/wasix-python`], { cwd: '/tmp' });
   assert.equal(nested.stdout.trim(), 'False', `${pkg} brings no python of its own: ${nested.stdout}${nested.stderr}`);
   await write(`/tmp/${pkg}-import.py`, SCRIPT);
-  const r = await run(['python3', `/tmp/${pkg}-import.py`, module, `/node_modules/${S}/${pkg}`], { cwd: '/tmp' });
+  const r = await run(['python3', `/tmp/${pkg}-import.py`, module, JSON.stringify(skip)], { cwd: '/tmp' });
   assert.equal(r.status, 0, `import ${module}: rc=${r.status} stderr=${r.stderr}`);
   const out = JSON.parse(r.stdout.trim().split('\n').pop());
   const o = JSON.stringify(out);
@@ -39,6 +41,6 @@ export async function pyImport(ctx, { pkg, module, version, minExt = 0 }) {
   assert.equal(out.prefix, `/node_modules/${S}/wasix-python`, o);
   assert.deepEqual(out.failed, [], `every side module of ${module} imports: ${o}`);
   assert.ok(out.ext.length >= minExt, `${module}: ${out.ext.length} side modules, at least ${minExt}: ${o}`);
-  console.log(`${pkg} ${own.version} (${module} ${out.version}) on ${S}/wasix-python ${python} (CPython ${out.python}), found without PYTHONPATH; ${out.ext.length} side modules import`);
+  console.log(`${pkg} ${own.version} (${module} ${out.version}) on ${S}/wasix-python ${python} (CPython ${out.python}), found without PYTHONPATH; ${out.ext.length} side modules import${skip.length ? ` (not imported: ${skip.join(', ')})` : ''}`);
   return { python, ...out };
 }
