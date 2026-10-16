@@ -25,6 +25,12 @@ program) now lock each other out on the same database. Up to -21, a CLI write
 during a python transaction went through, and python's commit then failed
 with `disk I/O error`.
 
+**-22 needs slicc-kernel ≥ 1.100.0** (`engines`; it was ≥ 1.51.0). Its
+`fcntl` locks only reach other processes through slicc-kernel's
+`slicc.fcntl_lock` (1.100.0, #722). On an older kernel the libc grants every
+lock locally, so two python processes writing one database could lose a row
+(homescoop#567); -21's `.lock` directory had kept them apart.
+
 Since 3.14.2-21 (wasix-sysroot -30):
 
 - `multiprocessing` works with the `spawn` start method (the default):
@@ -199,7 +205,7 @@ On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) un
 python -m venv v && v/bin/pip install requests && v/bin/python -c "import requests"
 ```
 
-**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.51.0 for `_ctypes`). On older kernels a
+**Venvs need slicc-kernel ≥ 1.29.0** (`engines` asks for ≥ 1.100.0 since -22, for sqlite's locks; ≥ 1.51.0 before, for `_ctypes`). On older kernels a
 venv's `bin/python` and `bin/pip` run as the base interpreter: `v/bin/pip
 install` then installs into the **base** package directory, not the venv.
 

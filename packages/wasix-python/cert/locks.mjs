@@ -17,8 +17,14 @@ c.execute("commit")
 cli = subprocess.Popen(["sqlite3", D], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 cli.stdin.write("begin immediate;\ninsert into t values(4);\nselect 'held';\n")
 cli.stdin.flush()
-while cli.stdout.readline().strip() != "held":
-    pass
+deadline = time.monotonic() + 30
+while True:
+    line = cli.stdout.readline()
+    if line.strip() == "held":
+        break
+    if not line or time.monotonic() > deadline:
+        cli.kill()
+        raise SystemExit("sqlite3 CLI never reported 'held': rc=%r stderr=%r" % (cli.wait(), cli.stderr.read()))
 try:
     c.execute("insert into t values(5)")
     out["python_while_cli_holds"] = "ok"
@@ -61,8 +67,8 @@ export default async function (ctx) {
   const out = JSON.parse(r.stdout.trim().split('\n').pop());
   assert.equal(out.lockf, true, JSON.stringify(out));
   assert.equal(out.released, 'child got', JSON.stringify(out));
-  if (out.held.startsWith('child refused')) {
-    await write('/tmp/lock_cli.py', SQL);
+  assert.match(out.held, /^child refused/, `another process got LOCK_EX while this one held it: this kernel has no slicc.fcntl_lock (slicc-kernel >= 1.100.0, #722, which engines requires since -22): ${JSON.stringify(out)}`);
+  await write('/tmp/lock_cli.py', SQL);
   const q = await run(['python3', '/tmp/lock_cli.py'], { cwd: '/tmp' });
   assert.equal(q.status, 0, `rc=${q.status} stderr=${q.stderr}`);
   const sq = JSON.parse(q.stdout.trim().split('\n').pop());
@@ -71,9 +77,4 @@ export default async function (ctx) {
   assert.equal(sq.python_while_cli_holds, 'database is locked', JSON.stringify(sq));
   assert.deepEqual(sq.rows, [1, 2, 4], `no lost or extra row: ${JSON.stringify(sq)}`);
   console.log(`locks: fcntl.lockf(LOCK_EX) held by this process makes another process's LOCK_EX|LOCK_NB fail (${out.held}); after LOCK_UN it gets the lock; os.lockf exists; python's sqlite3 (unix VFS, no .lock dir) and the Emscripten sqlite3 CLI lock each other out both ways ("database is locked"), rows [1, 2, 4]`);
-  } else {
-    assert.equal(out.held, 'child got', JSON.stringify(out));
-    assert.ok(process.env.PY_LOCKS_LOCAL === '1', `the other process got LOCK_EX while this one held it: no slicc.fcntl_lock (slicc-kernel >= 1.100.0, #722)? Set PY_LOCKS_LOCAL=1 to accept the local answer on an older kernel: ${JSON.stringify(out)}`);
-    console.log('locks: no slicc.fcntl_lock in this kernel: every lock is granted locally (the other process gets LOCK_EX too), as up to -20; os.lockf exists');
-  }
 }
