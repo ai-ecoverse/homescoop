@@ -60,6 +60,13 @@ static inline int homescoop_flock(int fd, int operation) {
     case LOCK_UN: fl.l_type = F_UNLCK; break;
     default: errno = EINVAL; return -1;
   }
+  /* slicc-kernel keeps record locks on regular files only. flock(2) on a
+   * pipe, a terminal, /dev/null or a directory succeeds on Linux (scripts
+   * flock STDOUT to serialise children's output): grant it, excluding
+   * nobody, as up to 5.42.0-14 (homescoop#757). */
+  struct stat st;
+  if (fstat(fd, &st) != 0) return -1;
+  if (!S_ISREG(st.st_mode)) return 0;
   int cmd = (operation & LOCK_NB) ? F_SETLK : F_SETLKW;
   if (fcntl(fd, cmd, &fl) == 0) return 0;
   /* fcntl wants a handle open for writing for F_WRLCK and one open for
