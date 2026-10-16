@@ -34,6 +34,8 @@ if [[ -n "$repack_from" ]]; then
   echo "== host-run: packaging-only repack of $repack_from (recipe repack:)"
   node "$ROOT/scripts/check-exact-pins.mjs" "$name"
   node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
+  echo "== host-run: check package meta (license / LICENSE / files / drift)"
+  node "$ROOT/scripts/check-package-meta.mjs" "$name"
   mkdir -p "$OUT"
   node "$ROOT/scripts/repack-published.mjs" "$name" --out "$OUT"
   node "$ROOT/scripts/sync-package-version.mjs" --assert-tarball "$OUT/package.tgz"
