@@ -14,7 +14,7 @@
     "orientation: irot is applied (17x9 lossless shows as 9x17 with the red block top right; the iPhone still is 3024x4032 portrait); the embedded EXIF Orientation in JPEG output is reset to 1, and --with-exif keeps the original EXIF (Orientation 6, iPhone 13 Pro Max) in the .exif sidecar",
     "heif-convert to JPEG: each image of example.heic (-1.jpg, -2.jpg), the portrait's primary, depth and gain map; -q 30 is smaller than -q 92",
     "corrupt input: truncated, garbage after ftyp and empty files give rc 1 and a missing file rc 10, with the same messages as host libheif, from both tools, no trap and no output file; damaged HEVC data in a valid file does not trap",
-    "relinkable (LGPL): ladder-pr runs share/libheif/relink/relink.sh from the tarball, links heif-dec and heif-info again from lib/*.a and the shipped application objects, and the relinked heif-dec decodes rainbow-451x461.heic to the host pixels"
+    "relinkable (LGPL): ladder-pr runs share/libheif/relink/relink.sh from the tarball, links heif-dec and heif-info again from lib/*.a and the shipped application objects, and the relinked heif-dec decodes rainbow-451x461.heic to the host pixels; every --js-library that the kit's ldflags.txt names is in the kit's js/ (homescoop#398: a 1.23.6-1 build.sh on main shipped only slicc-writev.js, while the flags also name slicc-linkat.js and slicc-uname.js)"
   ],
   "ci": [
     "node packages/libheif/cert/lib/relink-check.mjs"
