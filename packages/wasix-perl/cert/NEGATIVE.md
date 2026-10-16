@@ -61,3 +61,12 @@ use filetest "access"; -r "/tmp/pa"      not r: Not supported
 ## 5.42.0-12: negative 5.42.0-11 (wasix-sysroot -28)
 
 Published 5.42.0-11 (sysroot -27) on slicc-kernel 1.93.0's Node entry, 2026-10-15: `sigmask.mjs` gives `was=0 slept=1 pending=0 blocked_hits=1 masked=0 hits=1 left=0`: `sigprocmask` is ignored, so the self-sent SIGUSR1 runs its handler at once and is never pending. `wasm-mode.mjs` fails: `bin/perl.wasm` is 644.
+
+## 5.42.0-13: negative 5.42.0-12 (wasix-sysroot -28) and -11
+
+The new specs against the published tarballs on slicc-kernel 1.100.3's Node entry (users enforce), 2026-10-16. The -13 artifact of the same run passes all of them on 1.100.3 and on 1.93.0 (locks.mjs takes its no-`slicc.fcntl_lock` branch there).
+
+- **locks.mjs** on 5.42.0-12 fails at once, rc 255: `Your vendor has not defined Fcntl macro F_GETLK, used at -e line 8`. sysroot -28's headers define no record-lock commands, so Fcntl has none.
+- **static-xs.mjs** on 5.42.0-12 fails at its first case, rc 255: `Undefined subroutine &DynaLoader::dl_error called at -e line 4.` patches/0004's no-op `boot_DynaLoader` defines nothing else. Without patches/0007 its Encode case gets `Unknown encoding 'UTF-16LE'`, because -12 has no `Encode/Unicode.pm` and no `boot_Encode__Unicode`. -12 is the build without patches/0006 and 0007.
+- **sigmask-inherit.mjs** passes on 5.42.0-12, since masks have been real since -12. On 5.42.0-11 (sysroot -27) it gives `forkchild=none execchild=none systemchild=none kept=none after=none qx=hi nested_in_handler=2 total=2`, against `forkchild=10,15 execchild=10,15 systemchild=10,15 kept=10,15 after=none qx=hi nested_in_handler=1 total=2`.
+- The 12 older specs pass with -12 on 1.100.3, so moving the cert kernel from 1.93.0 to 1.100.3 changes no older case.
