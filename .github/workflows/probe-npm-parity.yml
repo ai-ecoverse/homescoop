@@ -21,6 +21,10 @@ jobs:
       - id: p
         run: |
           set -euo pipefail
+          list='["bash","binutils","bzip2","coreutils","diffutils","file","freetype","gawk","gmake","grep","gzip","imagemagick","imagemagick-heif","jq","lcms2","less","libiconv","libjpeg-turbo","libpng","libtiff","libwebp","libxml2","mount","nano","ncurses-utils","patch","poppler","procps","screen","sed","sqlite3","tar","tls-engine","tree","util-linux","wasix-automake","wasix-gnupg","wasix-openssh","wasix-ruby","which","wasix-python"]'
+          echo "$list"
+          echo "packages=$list" >> "$GITHUB_OUTPUT"
+          exit 0
           list=$(node --input-type=module -e '
             import { readdirSync, existsSync, readFileSync } from "node:fs";
             import { isRecipeRetired } from "./scripts/recipe-status.mjs";
@@ -48,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: 56131d90f3bdbd6120f426a9b0089ed753f4ceb8
           persist-credentials: false
       - name: main's tree, with the PR's npm-parity scripts
         run: |
