@@ -23,6 +23,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { recorder } from './cases.mjs';
+import { certMetaFile, pathLabel, readCertMeta } from './cert-meta.mjs';
 import { makeContext } from './context.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -66,15 +67,27 @@ if (missing.length) {
 }
 const certSpecs = allSpecs.filter((f) => !only.length || only.includes(f)).map((f) => join(certDir, f));
 
-const metaPath = join(certDir, 'meta.json');
+const { file: metaFile, fallback: metaFallback } = certMetaFile(root, pkgName, certDir);
+let metaError = null;
 /** @type {{ harness?: string, needs?: string[] }} */
-const meta = existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, 'utf8')) : {};
+let meta = {};
+if (metaFile) {
+  try {
+    meta = readCertMeta(metaFile, pathLabel(root, metaFile));
+  } catch (err) {
+    metaError = err.message;
+  }
+  console.log(
+    `browser-cert: meta ${pathLabel(root, metaFile)}${metaFallback ? ` (${pathLabel(root, certDir)} has no meta.json)` : ''}`,
+  );
+}
 const harness = meta.harness || (certSpecs.length ? 'slicc-kernel' : 'smoke');
 const users = usersFlag || meta.users || '';
 
 const report = {
   package: pkgName,
   cert: relative(root, certDir),
+  meta: metaFile ? pathLabel(root, metaFile) : null,
   harness,
   users: users || null,
   kernel: null,
@@ -101,6 +114,12 @@ function sha256(file) {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
 }
 
+if (metaError) {
+  console.error(`browser-cert: ${metaError}`);
+  report.error = metaError;
+  writeReport('fail');
+  process.exit(1);
+}
 if (harness === 'host-smoke' || harness === 'host-node') {
   console.log(`browser-cert: ${pkgName} harness=${harness} — delegated to ladder-pr host steps`);
   writeReport('skip');
@@ -379,7 +398,7 @@ try {
         process.exitCode = 1;
         continue;
       }
-      const label = relative(root, specPath);
+      const label = pathLabel(root, specPath);
       const started = Date.now();
       const rec = recorder(ctx.assert, { soft, roots: [join(root, 'packages'), certDir], root });
       try {

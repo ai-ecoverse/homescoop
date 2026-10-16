@@ -3,19 +3,13 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readCertMeta } from './cert-meta.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HOST_HARNESSES = ['host-node', 'host-smoke'];
 
 function readMeta(dir, pkg) {
-  const file = join(dir, 'packages', pkg, 'cert', 'meta.json');
-  if (!existsSync(file)) return {};
-  let meta;
-  try {
-    meta = JSON.parse(readFileSync(file, 'utf8'));
-  } catch (err) {
-    throw new Error(`packages/${pkg}/cert/meta.json is not readable JSON: ${err.message.split('\n')[0]}; nothing was certified`);
-  }
+  const meta = readCertMeta(join(dir, 'packages', pkg, 'cert', 'meta.json'), `packages/${pkg}/cert/meta.json`);
   if (meta.ci !== undefined && !Array.isArray(meta.ci)) {
     throw new Error(`packages/${pkg}/cert/meta.json: ci is not a list of commands; nothing was certified`);
   }
