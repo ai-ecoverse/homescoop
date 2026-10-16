@@ -177,6 +177,22 @@ workflow file of its own:
 
 `ci`, the required check, needs every one of these jobs.
 
+**npm parity (`npm-parity (<name>)`, every built package).** The same
+`pkg@version` is never published twice, so the tarball a PR certifies must
+be the one npm ends up with. `scripts/npm-parity.mjs` checks the
+`host-<name>-prN` tarball against the registry (#402, #493, #497):
+
+| The packed version | Verdict |
+| --- | --- |
+| sorts below npm `latest` (or is a published version other than `latest`) | **behind**: fails. The build is behind main (a stale merge base); merge main. `ladder-build` publishes with `--tag latest`, so an older version must never ship |
+| is on npm, and every entry (path, type, mode, link, content) is the same | **same**: passes, nothing to publish |
+| is on npm with other entries | **drift**: these bytes would never ship. Bump the packaging revision (`-N+1`) or revert. Warns for now (`--drift warn`); it fails once main has no drifted recipe (`--drift fail`) |
+| is not on npm and sorts above `latest`, or npm has no such package | **new**: passes, a release |
+
+A registry that doesn't answer (after three tries) fails the job. The
+comparison is `scripts/tarball-parity.mjs`, which pool-parity uses too; run
+it by hand with `node scripts/npm-parity.mjs .homescoop-out/package.tgz`.
+
 **Runners.** `host-build`, `rebuild` and `test` run on `ubuntu-latest` unless
 the recipe says `runner: pool`. A recipe whose ladder jobs compile nothing, a
 packaging-only `repack:` with no `smoke.c` and no tests by layout, runs on the
