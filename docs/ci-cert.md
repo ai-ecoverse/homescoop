@@ -49,8 +49,14 @@ only smoke `--version` are not enough for patched packages.
 2. Negative proof in `cert/NEGATIVE.md`:
    - **With patches:** rebuild once with the SLICC patch removed; the cert
      case that maps to that patch (or the build) must fail. Record the log.
-   - **Without patches:** `prove-negative.mjs` (empty `.wasm`) plus an
-     in-spec wrong-output / non-zero-exit assert.
+   - **Without patches:** `prove-negative.mjs` plus an in-spec
+     wrong-output / non-zero-exit assert. It empties every WebAssembly
+     module a command runs: each `slicc.commands` `wasm` (wasix-ruby's
+     `bin/ruby` too), every `bin/*.wasm`, and any other `bin/` file that
+     starts with `\0asm`. It passes other flags (`--kernel`, `--users`,
+     `--cert`, peer `--tarball`s) to `run.mjs`, and it proves the negative
+     only when a spec ran and failed: a cert that never got to a spec (no
+     harness, no Chrome) proves nothing and exits 1.
 3. Add the recipe dir name to `scripts/ci-certified.json` and run
    `node scripts/sync-ci-certified-renovate.mjs`.
 4. Majors and brand-new packages stay `automerge: false` + label for human review.
