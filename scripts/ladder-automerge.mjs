@@ -1,7 +1,9 @@
 #!/usr/bin/env node
+import { execFile } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { certReview, githubApi, githubIo } from './ladder-merge-resolve.mjs';
 import { reportFromEnv } from './publish-failure-issue.mjs';
 import { npmify } from './upstream-version-text.mjs';
@@ -106,6 +108,43 @@ export async function merge({ repo, number, head }, io) {
   return { merged: true, sha, before: commit.parents[0].sha };
 }
 
+export const CLOSING_ISSUES = `query($owner: String!, $name: String!, $pr: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $pr) {
+      closingIssuesReferences(first: 100) { nodes { number state repository { nameWithOwner } } }
+    }
+  }
+}`;
+
+export async function closeLinkedIssues({ repo, number, sha }, io) {
+  const [owner, name] = repo.split('/');
+  const done = { closed: [], skipped: [], warnings: [] };
+  let nodes;
+  try {
+    const data = await io.graphql(CLOSING_ISSUES, { owner, name, pr: number });
+    nodes = data?.repository?.pullRequest?.closingIssuesReferences?.nodes;
+    if (!Array.isArray(nodes)) throw new Error('no closingIssuesReferences in the answer');
+  } catch (err) {
+    done.warnings.push(`cannot read the issues PR #${number} closes: ${err.message}`);
+    return done;
+  }
+  for (const issue of nodes) {
+    const where = issue?.repository?.nameWithOwner ?? '';
+    const ref = `${where}#${issue?.number}`;
+    if (where.toLowerCase() !== repo.toLowerCase()) done.skipped.push(`${ref}: another repo`);
+    else if (issue.state !== 'OPEN') done.skipped.push(`${ref}: ${String(issue.state).toLowerCase()}`);
+    else {
+      try {
+        await io.gh(['issue', 'close', String(issue.number), '--repo', repo, '--comment', `Closed by #${number} (merge ${sha}), merged by ladder-automerge.`]);
+        done.closed.push(issue.number);
+      } catch (err) {
+        done.warnings.push(`cannot close #${issue.number}: ${err.message}`);
+      }
+    }
+  }
+  return done;
+}
+
 export function commentBody(reason) {
   return `${MARKER}\nauto-merge skipped: ${reason}\n`;
 }
@@ -129,6 +168,7 @@ function liveIo({ repo, token }) {
     }
     return all;
   };
+  const gh = (args) => promisify(execFile)('gh', args, { env: { ...process.env, GH_TOKEN: token ?? '' } });
   return {
     ...githubIo({ repo, token }),
     sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
@@ -159,6 +199,13 @@ function liveIo({ repo, token }) {
     comments: (n) => pages(`/issues/${n}/comments`),
     addComment: (n, body) => json(`/issues/${n}/comments`, { method: 'POST', body: { body } }),
     editComment: (id, body) => json(`/issues/comments/${id}`, { method: 'PATCH', body: { body } }),
+    async graphql(query, { owner, name, pr }) {
+      const { stdout } = await gh(['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`]);
+      const got = JSON.parse(stdout);
+      if (got.errors?.length) throw new Error(got.errors.map((e) => e.message).join('; '));
+      return got.data;
+    },
+    gh,
   };
 }
 
@@ -216,7 +263,15 @@ async function main([mode, ...argv]) {
       process.exit(1);
     }
   }
-  throw new Error('usage: ladder-automerge.mjs decide (--pr <n> | --cert-review-run <id>) | merge --pr <n> --head <sha> [--run-url <url>] | report --pr <n> --reason <text>');
+  if (mode === 'close-issues') {
+    const number = Number(at('--pr'));
+    const done = await closeLinkedIssues({ repo, number, sha: at('--sha') }, io);
+    for (const n of done.closed) console.log(`closed #${n} (linked from PR #${number})`);
+    for (const why of done.skipped) console.log(`left ${why}`);
+    for (const why of done.warnings) console.log(`::warning::ladder-automerge: ${why}`);
+    return;
+  }
+  throw new Error('usage: ladder-automerge.mjs decide (--pr <n> | --cert-review-run <id>) | merge --pr <n> --head <sha> [--run-url <url>] | report --pr <n> --reason <text> | close-issues --pr <n> --sha <merge sha>');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -111,6 +111,13 @@ jobs:
           HEAD_SHA: ${{ needs.decide.outputs.head }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/ladder-automerge.mjs merge --pr "$PR" --head "$HEAD_SHA" --run-url "$RUN_URL"
+      - if: steps.m.outputs.sha != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ needs.decide.outputs.pr }}
+          MERGE_SHA: ${{ steps.m.outputs.sha }}
+        run: node scripts/ladder-automerge.mjs close-issues --pr "$PR" --sha "$MERGE_SHA"
 
   would-merge:
     needs: decide

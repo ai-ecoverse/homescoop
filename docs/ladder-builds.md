@@ -95,7 +95,10 @@ dispatches for real only on a push to `main` or when that caller is main's
 ladder-automerge, and the resolver re-checks every binding. A skipped PR
 with a green review gets one `auto-merge skipped: <reason>` comment (updated
 on re-runs) and the reason in the job summary; a failed merge comments on a
-`publish-failure` issue. Dispatched from any branch but `main`,
+`publish-failure` issue. A `GITHUB_TOKEN` merge fires no `Closes #N`, so
+after a merge the job closes the PR's still-open same-repo
+`closingIssuesReferences` itself (`Closed by #PR (merge <sha>), merged by
+ladder-automerge.`); a close failure is a warning. Dispatched from any branch but `main`,
 ladder-automerge is a dry run: it prints the decision and calls ladder-merge
 dry. Runs are serialized repo-wide (`concurrency: ladder-automerge`); GitHub
 keeps only the newest pending run, so a PR whose run was replaced is picked
