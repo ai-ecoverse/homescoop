@@ -120,6 +120,16 @@ export default async function (ctx) {
 
 `run` accepts `{ cwd, env, stdin }`.
 
+### Files: `ctx.write(path, data)`, `ctx.read(path)`, `ctx.readBytes(path)`
+
+`write` takes a string (written as UTF-8) or bytes (a `Uint8Array`, `Buffer`,
+any typed-array view or an `ArrayBuffer`), which are written exactly. `read`
+returns the file decoded as UTF-8 text, so use it for text only: a binary
+file comes back damaged (#738). `readBytes` returns the file's exact bytes
+as a `Buffer`. Both return `null` for a missing file. Bytes cross to the
+page as base64; `scripts/browser-cert/selftest/binary.mjs` round-trips all
+256 byte values both ways (#591, #738).
+
 ### Terminal: `ctx.pty(argv, { cols, rows, env, cwd, steps, timeoutMs })`
 
 This runs `argv` as the session leader of a real pty (`kernel.openTerminal`; the kernel adds
