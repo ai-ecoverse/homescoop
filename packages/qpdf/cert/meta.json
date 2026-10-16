@@ -1,7 +1,10 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
     "@ai-ecoverse/wasm-coreutils@9.12.0-3"
@@ -18,6 +21,7 @@
     "--linearize: --check-linearization 'no linearization errors', --check 'File is linearized'; unlinearized file reported as such",
     "fix-qdf repairs a hand-edited QDF file (longer content stream): --check clean, edited text present",
     "zlib-flate -compress | -uncompress round trip, 78 9c header, garbage -uncompress fails",
-    "garbage PDF rc 2 (can't find PDF header), truncated PDF rc 3 (file is damaged), missing file rc 2"
+    "garbage PDF rc 2 (can't find PDF header), truncated PDF rc 3 (file is damaged), missing file rc 2",
+    "12.4.2-2 (#459, #625): bin/qpdf.wasm, fix-qdf.wasm and zlib-flate.wasm link the slicc shims and the credential library. host-run's check-slicc-cred.mjs gates it, and 12.4.2-1, linked at -O3, had none of them (NEGATIVE.md)"
   ]
 }

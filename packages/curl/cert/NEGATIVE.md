@@ -50,3 +50,14 @@ uplink, which does not know it:
 ```
 emscripten:1 rc=6 stderr=curl: (6) Could not resolve: emscripten:1
 ```
+
+## The slicc shims and credentials (8.22.0-4, #459, #625)
+
+`8.22.0-4`'s `bin/curl.wasm` exports none of the slicc shims' symbols and imports nothing from them. CMake's Release type adds `-O3` to the link line, and `emcc -O3` drops their `EMSCRIPTEN_KEEPALIVE` exports, so the `--whole-archive` net shims and the credential library never reach the binary. On main, host-run's `check-slicc-cred.mjs` therefore refused to build curl:
+
+```text
+homescoop: bin/curl.wasm (an Emscripten command) lacks the slicc credential library (import slicc_cred_js, export slicc_cred_euid): slicc-kernel shows every file as 1000:1000 under users (homescoop#459)
+  check-slicc-cred: 0 of 1 wasm link the slicc shims; 1 Emscripten command wasm; 1 problem(s)
+```
+
+8.22.0-5 builds with `CMAKE_C_FLAGS_RELEASE=-DNDEBUG`, so it compiles and links at `-O2`. Its wasm exports `slicc_sig_mask`, `slicc_raise`, `slicc_sigpipe` and `slicc_cred_euid`, and imports `slicc_cred_js` and the net shims' `slicc_socket_js`, `slicc_poll_js` and the rest.

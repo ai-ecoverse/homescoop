@@ -34,6 +34,8 @@ if [[ ! -f "$BLD/qpdf/qpdf.wasm" || -n "${FORCE:-}" ]]; then
   env PKG_CONFIG_LIBDIR=/nonexistent PKG_CONFIG_PATH= \
     emcmake cmake -S "$SRC" -B "$BLD" -G "Unix Makefiles" \
       -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
+      -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \
       -DCMAKE_C_FLAGS="-O2 -fwasm-exceptions" \
       -DCMAKE_CXX_FLAGS="-O2 -fwasm-exceptions" \
       -DCMAKE_EXE_LINKER_FLAGS="$EXE_LDFLAGS" \

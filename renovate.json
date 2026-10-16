@@ -31,6 +31,11 @@
       "defaultRegistryUrlTemplate": "https://mirrors.kernel.org/gnu/binutils/",
       "format": "html"
     },
+    "curl": {
+      "description": "curl release tarballs (tags are curl-8_22_0, which extractVersion can't turn into a version)",
+      "defaultRegistryUrlTemplate": "https://curl.se/download/",
+      "format": "html"
+    },
     "freetype": {
       "description": "FreeType release tarballs (tags are VER-2-13-3)",
       "defaultRegistryUrlTemplate": "https://download.savannah.gnu.org/releases/freetype/",

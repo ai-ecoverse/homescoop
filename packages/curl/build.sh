@@ -77,6 +77,9 @@ test -f "$ZLIB_A" || { echo "missing $ZLIB_A (host-run should unpack wasm-zlib)"
 configure_args=(
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_C_FLAGS=-O2
+  # Release would add -O3 to the link, and emcc -O3 drops the slicc shims'
+  # EMSCRIPTEN_KEEPALIVE exports (slicc_sig_mask, slicc_cred_euid): #459.
+  -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG
   -DBUILD_CURL_EXE=ON
   -DBUILD_SHARED_LIBS=OFF
   -DBUILD_STATIC_LIBS=ON

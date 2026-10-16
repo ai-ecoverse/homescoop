@@ -77,7 +77,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | cmake | `Kitware/CMake` | github-releases |
 | coreutils | savannah `coreutils.git` | |
 | binutils | `mirrors.kernel.org/gnu/binutils/` | `custom.binutils` (html listing): tags are `binutils-2_47` |
-| curl | `curl/curl` | **dead**: tags are `curl-X_Y_Z`, which `extractVersion` can't read; moves to a `curl.se/download/` listing once curl builds on main again |
+| curl | `curl.se/download/` | `custom.curl` (html listing): tags are `curl-X_Y_Z` |
 | diffutils | savannah `diffutils.git` | |
 | freetype | `download.savannah.gnu.org/releases/freetype/` | `custom.freetype` (html listing): tags are `VER-X-Y-Z` |
 | gawk | savannah `gawk.git` | |
