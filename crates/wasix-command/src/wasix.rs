@@ -15,9 +15,6 @@ use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawF
 use std::os::wasi::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
-#[cfg(feature = "tokio")]
-pub(crate) mod tokio;
-
 mod sys {
     #[link(wasm_import_module = "wasix_32v1")]
     extern "C" {
@@ -672,3 +669,8 @@ fn read2(out: Option<ChildStdout>, err: Option<ChildStderr>) -> io::Result<(Vec<
     }
     Ok((stdout, stderr))
 }
+
+// At the end, so that adding it moved no line of this file (panic
+// locations name lines, and other packages' wasm would change).
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio;
