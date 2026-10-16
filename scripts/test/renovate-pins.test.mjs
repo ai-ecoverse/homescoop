@@ -42,9 +42,7 @@ test('every recipe # renovate: comment is read by the recipe manager, with the v
   }
 });
 
-const DEAD = {
-  curl: 'extractVersion ^curl-(?<major>…)_(?<minor>…)_(?<patch>…)$ keeps no release; custom.curl waits for a curl that builds on main again',
-};
+const DEAD = {};
 
 test('every extractVersion compiles and has a version group (Renovate keeps only that group)', () => {
   for (const { dir, found } of pins()) {
@@ -77,13 +75,17 @@ const LISTINGS = {
     hrefs: ['../', 'binutils-2.46.0.tar.xz', 'binutils-2.46.0.tar.xz.sig', 'binutils-2.46.1.tar.xz', 'binutils-2.47.tar.bz2', 'binutils-2.47.tar.xz', 'binutils-2.47.tar.xz.sig', 'binutils-with-gold-2.44.tar.xz', 'binutils-2.9.1a.tar.gz'],
     want: ['2.46.0', '2.46.1', '2.47'],
   },
+  curl: {
+    hrefs: ['/download/curl-8.23.0.tar.bz2', '/download/curl-8.23.0.tar.xz', '/download/curl-8.23.0.tar.xz.asc', '/download/curl-8.22.0.tar.xz', '/download/curl-8.22.0.zip', '/docs/', 'curl-7.88.1.tar.xz'],
+    want: ['8.23.0', '8.22.0'],
+  },
   freetype: {
     hrefs: ['freetype-2.13.3.tar.gz', 'freetype-2.13.3.tar.gz.sig', 'freetype-2.15.0.tar.gz', 'freetype-2.15.0.tar.xz', 'freetype-doc-2.15.0.tar.gz', 'ft2demos-2.15.0.tar.gz', 'freetype-old/'],
     want: ['2.13.3', '2.15.0'],
   },
 };
 
-test('binutils and freetype: their extractVersion turns the release directory into versions', () => {
+test('binutils, curl and freetype: their extractVersion turns the release directory into versions', () => {
   const byDir = Object.fromEntries(pins().map((p) => [p.dir, p.found[0]]));
   for (const [dir, { hrefs, want }] of Object.entries(LISTINGS)) {
     const g = byDir[dir];

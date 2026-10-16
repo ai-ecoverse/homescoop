@@ -1,7 +1,7 @@
 # curl + libcurl for slicc wasm realm (loopback sockets + Mbed TLS).
 name: curl
 builder: host
-# renovate: datasource=github-releases depName=curl/curl extractVersion=^curl-(?<major>\d+)_(?<minor>\d+)_(?<patch>\d+)$
+# renovate: datasource=custom.curl depName=curl extractVersion=^/download/curl-(?<version>\d+\.\d+\.\d+)\.tar\.xz$
 version: "8.22.0"
 npm: "@ai-ecoverse/wasm-curl"
 summary: "curl 8.22 + libcurl (Mbed TLS, zlib, HTTP/1.1) for slicc"
