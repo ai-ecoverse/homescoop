@@ -126,8 +126,11 @@ the one running. Our versions are semver prereleases, so the range is the
 python patch bump is a deliberate re-pin. The floor is the python the
 package is built against or certified with. A py-\* with C extensions is
 certified on the floor and on the newest python
-([ci-cert.md](ci-cert.md#py-python-range)). No other `@ai-ecoverse` pin may
-be a range, py-\* → py-\* included.
+([ci-cert.md](ci-cert.md#py-python-range)). A py-\* takes another py-\* the
+same way, e.g. py-python-dateutil's `"@ai-ecoverse/py-six": ">=1.17.0-3 <1.17.1"`
+(#625, with the #211 wave for the rest), so a newer release of a dependency
+doesn't nest an old copy under each dependent. No other `@ai-ecoverse` pin may
+be a range.
 
 `scripts/check-exact-pins.mjs` enforces it: the `exact-pins` job in
 `ladder-pr` checks every package, and `host-run.sh` checks the package it

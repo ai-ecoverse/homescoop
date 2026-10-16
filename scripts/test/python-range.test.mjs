@@ -22,7 +22,7 @@ test('inPythonRange: the X.Y.Z-N line from the floor, as npm semver', () => {
   assert.equal(inPythonRange('3.14.2-24', '3.14.2-16'), false);
 });
 
-test('pinErrors: the range passes for wasix-python in a py-* dependencies, nowhere else', () => {
+test('pinErrors: the range passes for wasix-python and py-* in a py-* dependencies, nowhere else', () => {
   assert.deepEqual(pinErrors(numpy(RANGE)), []);
   assert.deepEqual(pinErrors(numpy('3.14.2-24')), []);
   assert.equal(pinErrors(numpy(RANGE, 'peerDependencies')).length, 1);
@@ -30,7 +30,11 @@ test('pinErrors: the range passes for wasix-python in a py-* dependencies, nowhe
   assert.equal(pinErrors(numpy('>=3.14.2-16')).length, 1);
   assert.equal(pinErrors(numpy('^3.14.2-16')).length, 1);
   assert.equal(pinErrors({ name: '@ai-ecoverse/wasix-uv-shim', dependencies: { [PY]: RANGE } }).length, 1);
-  assert.equal(pinErrors({ name: '@ai-ecoverse/py-scipy', dependencies: { '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.3.3' } }).length, 1);
+  assert.deepEqual(pinErrors({ name: '@ai-ecoverse/py-scipy', dependencies: { '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.3.3' } }), []);
+  assert.equal(pinErrors({ name: '@ai-ecoverse/py-scipy', dependencies: { '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.4.0' } }).length, 1);
+  assert.equal(pinErrors({ name: '@ai-ecoverse/py-scipy', peerDependencies: { '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.3.3' } }).length, 1);
+  assert.equal(pinErrors({ name: '@ai-ecoverse/wasm-x', dependencies: { '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.3.3' } }).length, 1);
+  assert.equal(pinErrors({ name: '@ai-ecoverse/py-x', dependencies: { '@ai-ecoverse/wasm-bash': '>=5.3.0-1 <5.3.1' } }).length, 1);
   assert.equal(rangeAllowed({ name: 'py-numpy' }, 'dependencies', PY, RANGE), false);
 });
 

@@ -1,0 +1,14 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.14.2-24"
+  ],
+  "checklist": [
+    "cert/import.mjs: import tzdata from /node_modules/@ai-ecoverse/py-tzdata, found by discovery without PYTHONPATH (no wasix-python dependency: a pure package, accepted under any python)",
+    "cert/tzdata.mjs: zoneinfo with an empty system tzpath reads Europe/Berlin (CEST/CET) and Asia/Kolkata (IST) from the package; fold 0/1 at 2026-10-25 02:30; the TZif file; available_timezones; IANA 2026d",
+    "cert/record.mjs (homescoop#625): the package is PyPI's tzdata-2026.4-py2.py3-none-any.whl: every file in its dist-info RECORD is there with its sha256, none missing and none unlisted, and every .pyc is unchecked-hash on its source; a self-test flips one byte in a copy and must see both the RECORD mismatch and the stale .pyc"
+  ]
+}
