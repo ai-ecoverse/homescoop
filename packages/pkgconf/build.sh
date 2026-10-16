@@ -46,4 +46,6 @@ if [[ -f "$HOMESCOOP_PKG/package/bin/pkgconf.js" || -f "$HOMESCOOP_PKG/package/b
   chmod +x "$HOMESCOOP_PKG/package/bin/pkg-config"
 fi
 homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== pkgconf: staged → $HOMESCOOP_PKG/package"
