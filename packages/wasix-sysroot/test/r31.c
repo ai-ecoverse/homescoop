@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
 #include <stddef.h>
@@ -68,6 +69,29 @@ static void unix_addrs(void) {
   unlink(path);
 }
 
+static void *close_later(void *arg) {
+  usleep(300000);
+  close(*(int *)arg);
+  return NULL;
+}
+
+static void late(const char *n, int pp, int watch_write) {
+  static int a[2];
+  pipe(a);
+  if (!watch_write) write(a[1], "x", 1);
+  struct pollfd e = {watch_write ? a[1] : a[0], 0, 0};
+  pthread_t t;
+  pthread_create(&t, NULL, close_later, watch_write ? &a[0] : &a[1]);
+  double t0 = now();
+  struct timespec three = {3, 0};
+  int r = pp ? ppoll(&e, 1, &three, NULL) : poll(&e, 1, 3000);
+  double dt = now() - t0;
+  pthread_join(t, NULL);
+  printf("%s events0 %s, peer closes later: %d revents=%s %s\n", n, watch_write ? "writable write end" : "readable read end", r,
+         e.revents == POLLERR ? "POLLERR" : e.revents == POLLHUP ? "POLLHUP" : e.revents ? "other" : "0", dt >= 0.25 && dt < 1.5 ? "in time" : "wrong");
+  close(watch_write ? a[1] : a[0]);
+}
+
 static void hangup(void) {
   for (int pp = 0; pp < 2; pp++) {
     const char *n = pp ? "ppoll" : "poll";
@@ -99,6 +123,8 @@ static void hangup(void) {
     r = pp ? ppoll(&e, 1, &two, NULL) : poll(&e, 1, 2000);
     printf("%s events0 write end, reader gone: %d revents=%s\n", n, r, e.revents == POLLERR ? "POLLERR" : e.revents == POLLHUP ? "POLLHUP" : e.revents ? "other" : "0");
     close(a[1]);
+    late(n, pp, 1);
+    late(n, pp, 0);
   }
 }
 

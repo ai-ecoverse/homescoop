@@ -9,6 +9,7 @@
 __wasi_errno_t __slicc_poll_masked(const sigset_t *mask, const __wasi_subscription_t *in, __wasi_event_t *out, __wasi_size_t n, __wasi_size_t *nevents);
 
 #define WATCH ((uintptr_t)1)
+#define RECHECK_NS ((__wasi_timestamp_t)50000000)
 
 static __wasi_timestamp_t now_ns(void)
 {
@@ -52,9 +53,13 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 		if (nval) {
 			if (ns == 0) return nval;
 			subs[ns++] = (__wasi_subscription_t){ .u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = 1 };
-		} else if (has_timeout) {
-			__wasi_timestamp_t t = now_ns();
-			__wasi_timestamp_t left = deadline > t ? deadline - t : 0;
+		} else if (has_timeout || skip_watch) {
+			__wasi_timestamp_t left = RECHECK_NS;
+			if (has_timeout) {
+				__wasi_timestamp_t t = now_ns();
+				left = deadline > t ? deadline - t : 0;
+				if (skip_watch && left > RECHECK_NS) left = RECHECK_NS;
+			}
 			subs[ns++] = (__wasi_subscription_t){ .u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = left ? left : 1 };
 		}
 		__wasi_event_t ev[ns ? ns : 1];
@@ -84,9 +89,11 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 			if (fds[i].revents & POLLHUP) fds[i].revents &= ~POLLWRNORM;
 			if (fds[i].revents) r++;
 		}
-		if (r || !quiet_watch) return r;
+		if (r) return r;
 		if (has_timeout && now_ns() >= deadline) return 0;
-		skip_watch = 1;
+		if (quiet_watch) skip_watch = 1;
+		else if (skip_watch) skip_watch = 0;
+		else return 0;
 	}
 }
 
