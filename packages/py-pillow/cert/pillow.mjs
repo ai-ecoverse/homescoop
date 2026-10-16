@@ -10,7 +10,7 @@ d.text((34, 4), "Hi", fill=(255, 255, 255), font=ImageFont.load_default(size=16)
 out = {"features": {k: features.check(k) for k in ("jpg", "zlib", "freetype2")}}
 out["font"] = type(ImageFont.load_default(size=16)).__name__
 out["px"] = [im.getpixel((10, 10)), im.getpixel((0, 0))]
-out["text"] = im.crop((34, 0, 64, 24)).getbbox() is not None
+out["text"] = sum(1 for px in im.crop((34, 0, 64, 24)).getdata() if px != (10, 20, 30))
 small = im.resize((32, 24), Image.Resampling.LANCZOS)
 out["small"] = [small.size, small.getpixel((8, 8))]
 buf = io.BytesIO(); im.save(buf, "PNG"); png = buf.getvalue()
@@ -35,7 +35,7 @@ export default async function (ctx) {
   assert.deepEqual(out.features, { jpg: true, zlib: true, freetype2: true }, o);
   assert.equal(out.font, 'FreeTypeFont', o);
   assert.deepEqual(out.px, [[200, 100, 50], [10, 20, 30]], o);
-  assert.equal(out.text, true, o);
+  assert.ok(out.text > 20, `FreeType drew "Hi": ${out.text} pixels off the background: ${o}`);
   assert.deepEqual(out.small[0], [32, 24], o);
   assert.deepEqual(out.png, ['89504e470d0a1a0a', [64, 48], 'RGB', [200, 100, 50]], o);
   assert.deepEqual(out.jpeg, ['ffd8ff', 'JPEG', [64, 48], [true, true, true]], o);
