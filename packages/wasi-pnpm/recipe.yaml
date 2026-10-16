@@ -12,6 +12,8 @@ source:
   url: "https://github.com/pnpm/pnpm/archive/5dafb0980042af99fb1aa24478d16f03b8474b50.tar.gz"
   sha256: "5ade48506ae88ed031994ea1aab5bfc161d1a3b60f4604100f719678a42684ee"
   commit: "5dafb0980042af99fb1aa24478d16f03b8474b50"
+build:
+  srcdir: "/home/runner/work/_temp/homescoop-work"
 toolchain:
   # Exactly what pnpm/wasm/build.mjs at that commit requires.
   rust: "nightly-2026-08-27"

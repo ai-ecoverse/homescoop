@@ -37,7 +37,11 @@ rustup toolchain install "$RUST" --profile minimal --target wasm32-wasip1-thread
 
 SRC_TGZ="$WORK/pnpm-$COMMIT.tar.gz"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$SRC_TGZ"
-SRC="$WORK/pnpm-$COMMIT"
+SRC_ROOT="$(field build.srcdir)"
+if [[ -z "$SRC_ROOT" ]] || ! mkdir -p "$SRC_ROOT" 2>/dev/null; then
+  SRC_ROOT="$WORK"
+fi
+SRC="$SRC_ROOT/pnpm-$COMMIT"
 rm -rf "$SRC"
 mkdir -p "$SRC"
 tar -xzf "$SRC_TGZ" -C "$SRC" --strip-components=1
