@@ -2,6 +2,11 @@ name: py-pytz
 builder: host
 version: "2026.4"
 npm: "@ai-ecoverse/py-pytz"
+source:
+  url: "https://files.pythonhosted.org/packages/py2.py3/p/pytz/pytz-{{version}}-py2.py3-none-any.whl"
+  sha256: "9d514388fbc89ca0833203464272ac485b8828568ab73532f5020f17e892a0ff"
+inputs:
+  - scripts/stage-pure-wheel.sh
 summary: "pytz for slicc WASIX CPython"
 dependencies:
   build: []

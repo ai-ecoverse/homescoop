@@ -2,6 +2,11 @@ name: py-tzdata
 builder: host
 version: "2026.4"
 npm: "@ai-ecoverse/py-tzdata"
+source:
+  url: "https://files.pythonhosted.org/packages/py2.py3/t/tzdata/tzdata-{{version}}-py2.py3-none-any.whl"
+  sha256: "c2169a8b0a7a5e9674da5a135ccdfb2b3e671b333ed9fed17b41f73c34476e81"
+inputs:
+  - scripts/stage-pure-wheel.sh
 summary: "tzdata for slicc WASIX CPython"
 dependencies:
   build: []

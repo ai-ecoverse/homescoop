@@ -2,6 +2,11 @@ name: py-six
 builder: host
 version: "1.17.0"
 npm: "@ai-ecoverse/py-six"
+source:
+  url: "https://files.pythonhosted.org/packages/py2.py3/s/six/six-{{version}}-py2.py3-none-any.whl"
+  sha256: "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+inputs:
+  - scripts/stage-pure-wheel.sh
 summary: "six for slicc WASIX CPython"
 dependencies:
   build: []
