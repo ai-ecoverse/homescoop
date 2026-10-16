@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-numpy"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.14.2-24",
+    "@ai-ecoverse/py-numpy@2.3.2-10"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-contourpy"
+  ],
+  "checklist": [
+    "cert/import.mjs: import contourpy from /node_modules/@ai-ecoverse/py-contourpy, found by discovery without PYTHONPATH, no nested python; its 1 side modules import",
+    "cert/contourpy.mjs: serial lines of x^2 + y^2 at 0.25 are one closed circle of radius 0.5; filled 0.25..0.5; mpl2014",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3 and py-numpy 2.3.2-10 (itself a range); npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs both specs on the newest (3.14.2-24), and python-range.mjs runs them again on the floor (3.14.2-16). The previous release (exact 3.14.2-16, py-numpy 2.3.2-9) nests a second python under 3.14.2-24 (NEGATIVE.md)"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-numpy"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.14.2-24",
+    "@ai-ecoverse/py-numpy@2.3.2-10"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-scipy"
+  ],
+  "checklist": [
+    "cert/import.mjs: import scipy from /node_modules/@ai-ecoverse/py-scipy, found by discovery without PYTHONPATH, no nested python; its 94 side modules import (scipy.linalg._matfuncs_sqrtm_triu is not imported: importing it on its own fails with a circular-import ImportError on every python, 1.18.0-11 too; linalg.sqrtm works; homescoop#211)",
+    "cert/scipy.mjs: optimize.minimize BFGS on rosen -> [1, 1, 1]; quad(sin, 0, pi) 2; solve_ivp y' = -y -> e^-1; linalg lu/expm; sparse csr matvec [3, 3, 9]; special gamma(5) 24, erf(0.5); stats norm cdf/ppf, ttest_ind p 0.315334; CubicSpline of x^3 at 1.5 = 3.375; signal.butter(2, 0.5); fft [0, 2, 0, 2]",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3 and py-numpy 2.3.2-10 (itself a range); npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs both specs on the newest (3.14.2-24), and python-range.mjs runs them again on the floor (3.14.2-16). The previous release (exact 3.14.2-16, py-numpy 2.3.2-9) nests a second python under 3.14.2-24 (NEGATIVE.md)"
+  ]
+}
