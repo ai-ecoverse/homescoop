@@ -4,8 +4,8 @@
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
 `scp`, `sftp`, and `ssh-add`.
 
-Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-28** (since
-10.6.0-7; -6 was on -22, -5 on -18), linking
+Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-29** (since
+10.6.0-8; -7 was on -28, -6 on -22, -5 on -18), linking
 **wasix-openssl 3.5.9-3** and **wasix-zlib 1.3.1-2** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
@@ -70,18 +70,19 @@ backs up `known_hosts` with a copy when `link()` is unavailable (patch
 
 ## Sysroot
 
-**wasix-sysroot 2025.9.30-28**: select/pselect timeouts and socketpair
+**wasix-sysroot 2025.9.30-29**: select/pselect timeouts and socketpair
 flags (-18), signals and EINTR (-19), the kernel's users (-20), per-fd
 terminals (-21), the `slicc.libc` marker in every binary (-22), so
-slicc-kernel gives it EINTR semantics, and real signal masks (-28,
-slicc-kernel ≥ 1.88.0). OpenSSH 10.6's client loop blocks SIGWINCH, SIGINT,
-SIGTERM and friends and waits in **ppoll** with its unblocking mask; on -28
-that wait is atomic, so a signal that arrives while ssh is busy is handled
-at the next wait instead of waiting out its timeout (10.6.0-6 and older
-ignored the mask). ssh keeps OpenSSH's own `ppoll` (openbsd-compat, on top of
-`pselect` with the mask, built as `homescoop_compat_ppoll`): -28's libc
-`ppoll`, like its `poll`, refuses a `pollfd` asking for no events (ENOSYS),
-which ssh's client loop passes for idle channels.
+slicc-kernel gives it EINTR semantics, real signal masks (-28,
+slicc-kernel ≥ 1.88.0), and a `ppoll` that takes pollfds asking for no
+events (-29). OpenSSH 10.6's client loop blocks SIGWINCH, SIGINT, SIGTERM
+and friends and waits in **ppoll** with its unblocking mask, passing events-0
+pollfds for idle channels. Since 10.6.0-8 that's the libc's `ppoll`, whose
+wait is atomic (`slicc.sigmask_poll`), so a signal that arrives while ssh is
+busy is handled at the next wait instead of waiting out its timeout.
+10.6.0-7 used OpenSSH's own openbsd-compat `ppoll` on top of `pselect`,
+because -28's libc `ppoll` refused events-0 pollfds (ENOSYS); 10.6.0-6 and
+older ignored the mask.
 
 ## Not in v1
 

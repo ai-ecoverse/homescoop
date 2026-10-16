@@ -1,5 +1,9 @@
 # Negative proof (wasix-openssh)
 
+## 10.6.0-7: openbsd-compat ppoll, not the libc's (-8, homescoop#394)
+
+`ppoll.mjs` against the published 10.6.0-7 (`cert/ci.sh`, local sshd + paramiko, 2026-10-16): FAIL on its first check, `ssh.wasm still carries the openbsd-compat ppoll`. The other lines pass the same way with -7, since its compat `ppoll` (`pselect` with the mask) behaves like -29's libc `ppoll`, so this is a toolchain refresh. The reason -7 needed the compat copy: -28's libc `ppoll` returned ENOSYS for the events-0 pollfds ssh passes for idle channels. Every session ended with `poll: Function not implemented` (#386). -29 accepts those entries, and 10.6.0-8 links it.
+
 ## 10.6.0-5 (wasix-sysroot -18) against the 10.6.0-6 cert
 
 `node packages/wasix-openssh/cert/run.mjs --tarball ai-ecoverse-wasix-openssh-10.6.0-5.tgz`
