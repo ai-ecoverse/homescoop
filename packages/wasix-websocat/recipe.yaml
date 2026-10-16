@@ -31,7 +31,7 @@ about:
     The v4 tag ships no LICENSE; package/LICENSE is sources.licence, the
     repository's MIT LICENSE (same author, last changed in 8bcec21d), then
     the Apache-2.0 text (SPDX), as Cargo.toml declares MIT/Apache-2.0.
-    Upstream vi/websocat v4.0.0-alpha3 (one WASIX source patch, 0002), for slicc's
+    Upstream vi/websocat v4.0.0-alpha3 (two WASIX source patches, 0002 and 0003), for slicc's
     kernel (slicc-kernel >= 1.95.0: WASIX epoll and eventfd, #674).
     Toolchain: wasix-org/rust (target wasm32-wasmer-wasi) linked against
     @ai-ecoverse/wasix-sysroot (scripts/install-wasixcc.sh), crates from
@@ -45,6 +45,10 @@ about:
          error and a non-zero exit; the target's std has no process
          spawning, and without it the process panicked and the peer exited
          0 (homescoop#689).
+    0003 (WASIX): --exec-after-listen is refused at planning time, and the
+         Rhai subprocess_new / subprocess_new_osstr / system functions
+         fail, so no path reaches the target's process support (a spawned
+         child made tokio's reactor abort with EIO, homescoop#709).
     mio/0001: sockets open non-blocking, as upstream mio's unix code does
          (without it the reactor blocks in send or a second accept).
     mio/0002: a non-blocking connect's EINPROGRESS is "in progress", not

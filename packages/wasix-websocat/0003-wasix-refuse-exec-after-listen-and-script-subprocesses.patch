@@ -1,0 +1,59 @@
+diff -ruN b/src/scenario_executor/subprocess.rs c/src/scenario_executor/subprocess.rs
+--- b/src/scenario_executor/subprocess.rs	2025-12-27 02:36:59.000000000 +0100
++++ c/src/scenario_executor/subprocess.rs	2026-10-16 13:39:14.170757820 +0200
+@@ -671,8 +671,34 @@
+     Ok(())
+ }
+ 
++#[cfg(all(target_os = "wasi", target_vendor = "wasmer"))]
++const WASIX_REFUSED: &str = "subprocesses are not supported on WASIX";
++
++#[cfg(all(target_os = "wasi", target_vendor = "wasmer"))]
++fn subprocess_new_refused(ctx: NativeCallContext, _program_name: String) -> RhResult<Handle<Command>> {
++    Err(ctx.err(WASIX_REFUSED))
++}
++
++#[cfg(all(target_os = "wasi", target_vendor = "wasmer"))]
++fn subprocess_new_osstr_refused(ctx: NativeCallContext, _program_name: OsString) -> RhResult<Handle<Command>> {
++    Err(ctx.err(WASIX_REFUSED))
++}
++
++#[cfg(all(target_os = "wasi", target_vendor = "wasmer"))]
++fn simplified_exec_refused(ctx: NativeCallContext, _cmdline: &str) -> RhResult<Handle<Hangup>> {
++    Err(ctx.err(WASIX_REFUSED))
++}
++
+ pub fn register(engine: &mut Engine) {
++    #[cfg(all(target_os = "wasi", target_vendor = "wasmer"))]
++    {
++        engine.register_fn("subprocess_new", subprocess_new_refused);
++        engine.register_fn("subprocess_new_osstr", subprocess_new_osstr_refused);
++        engine.register_fn("system", simplified_exec_refused);
++    }
++    #[cfg(not(all(target_os = "wasi", target_vendor = "wasmer")))]
+     engine.register_fn("subprocess_new", subprocess_new);
++    #[cfg(not(all(target_os = "wasi", target_vendor = "wasmer")))]
+     engine.register_fn("subprocess_new_osstr", subprocess_new_osstr);
+     engine.register_fn("arg", subprocess_arg);
+     engine.register_fn("arg_osstr", subprocess_arg_osstr);
+@@ -704,5 +730,6 @@
+     #[cfg(unix)]
+     engine.register_fn("dup2", subprocess_dup2);
+ 
++    #[cfg(not(all(target_os = "wasi", target_vendor = "wasmer")))]
+     engine.register_fn("system", simplified_exec);
+ }
+diff -ruN b/src/scenario_planner/buildscenario.rs c/src/scenario_planner/buildscenario.rs
+--- b/src/scenario_planner/buildscenario.rs	2025-12-27 02:36:59.000000000 +0100
++++ c/src/scenario_planner/buildscenario.rs	2026-10-16 13:38:56.442352141 +0200
+@@ -31,6 +31,10 @@
+         // * registry-send: or other things that send sockets elsewhere instead of reading or writing to them
+         //       this omits the right side and the copier completely.
+ 
++        if cfg!(all(target_os = "wasi", target_vendor = "wasmer")) && self.opts.exec_after_listen.is_some() {
++            anyhow::bail!("--exec-after-listen is not supported on WASIX: subprocesses don't work in this build");
++        }
++
+         let mut env = ScenarioPrintingEnvironment {
+             printer,
+             opts: &self.opts,
