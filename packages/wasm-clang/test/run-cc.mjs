@@ -263,8 +263,17 @@ try {
       // -Xlinker -o is the linker's, not the program's (homescoop#722).
       [['-O2', 'r28.c', '-Xlinker', '-o', '-Xlinker', 'xl.wasm'], 'a.out', true, {}],
       [['-O2', 'r28.c', '-o', 'r28n.wasm'], 'r28n.wasm', false, { WASIXCC_ASYNCIFY: '0' }],
+      // The same link again without the override rewrites the same bytes,
+      // and still gets its post-link step (Codex P1 on #725).
+      [['-O2', 'r28.c', '-o', 'r28n.wasm'], 'r28n.wasm', true, {}],
+      // Response files with quotes and nesting, as clang reads them.
+      [['-O2', '@q.rsp'], 'sp ace.wasm', true, {}],
+      [['-O2', '@outer.rsp'], 'nest.wasm', true, {}],
     ];
     await k.writeFile('/home/cc/r28h.h', await k.readFile('/home/cc/r28.c'));
+    await k.writeFile('/home/cc/q.rsp', 'r28.c -o "sp ace.wasm"\n');
+    await k.writeFile('/home/cc/outer.rsp', '@inner.rsp\n');
+    await k.writeFile('/home/cc/inner.rsp', 'r28.c\n-o nest.wasm\n');
     for (const [argv, file, want, env] of variants) {
       const r = await run(['wasixcc', ...argv], { cwd: '/home/cc', env: { ...ccEnv, ...env } });
       assert.equal(r.status, 0, `wasixcc ${argv.join(' ')}: rc=${r.status}\n${r.stdout}${r.stderr}`);
@@ -301,7 +310,7 @@ try {
     assert.ok(WebAssembly.Module.exports(rsp).some((e) => e.name === 'asyncify_start_unwind'), 'wasixcc -O2 @args.rsp (r28.c -o r28r.wasm): r28r.wasm is not asyncified');
     const pch = await run(['bash', '-c', 'test -s x.pch && { test -x x.pch && echo executable || echo plain; }'], { cwd: '/home/cc' });
     assert.equal(pch.stdout, 'plain\n', `x.pch: ${pch.stdout}${pch.stderr}`);
-    console.log(`== r28 as a.out (also with -Wl,-o or -Xlinker -o, which clang's own -o overrides), with -or28j.wasm and from @args.rsp: asyncified; x.pch left plain; WASIXCC_ASYNCIFY=0: not; ${nonLinks.map((a) => a.join(' ')).join(', ')} leave an asyncified and a non-wasm a.out alone`);
+    console.log(`== r28 as a.out (also with -Wl,-o or -Xlinker -o, which clang's own -o overrides), with -or28j.wasm, from @args.rsp and from quoted and nested response files: asyncified; a same-bytes relink after WASIXCC_ASYNCIFY=0 too; x.pch left plain; WASIXCC_ASYNCIFY=0: not; ${nonLinks.map((a) => a.join(' ')).join(', ')} leave an asyncified and a non-wasm a.out alone`);
   }
   await k.writeFile(`${PROBES_AT}/package.json`, JSON.stringify({
     name: 'wasm-clang-cc-probes',
