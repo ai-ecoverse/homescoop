@@ -1,8 +1,12 @@
 
 
+## 3.14.2-21: python's sqlite3 locks with a .lock directory the CLI doesn't see (-22, homescoop#513)
+
+`locks.mjs` against the published 3.14.2-21 on slicc-kernel 1.100.0 (Node entry, with wasm-sqlite3 3.54.0-3 as the other process; 2026-10-16): FAIL in its sqlite part. -21's sqlite uses SQLITE_WASI's default `unix-dotfile` VFS, i.e. a `.lock` directory, so it never calls `fcntl` locks. While python holds `BEGIN IMMEDIATE`, the CLI's insert goes through, and python's `commit` then fails with `sqlite3.OperationalError: disk I/O error`. k3mw also saw python's row lost when the CLI held the lock. 3.14.2-22 (`-DSQLITE_DEFAULT_UNIX_VFS="unix"`) gets `database is locked` both ways and keeps rows [1, 2, 4]. Its `fcntl.lockf` part passes on -21 already.
+
 ## 3.14.2-20: no multiprocessing, no locks between processes (-21, homescoop#481, #407)
 
-`multiprocessing.mjs` against the published 3.14.2-20 on slicc-kernel 1.100.0 (Node entry, 2026-10-16): FAIL at the Pool, `ModuleNotFoundError: No module named '_multiprocessing'` (CPython's configure marks it n/a on WASI). `locks.mjs`: -20 has `os.lockf` = False, and its `fcntl.lockf` went through a `--wrap=fcntl` no-op stub, so no lock ever reached the kernel. Its sqlite3 used SQLITE_WASI's default `unix-dotfile` VFS (a `.lock` directory no other program looks at): while python held `BEGIN IMMEDIATE` the Emscripten sqlite3 CLI's insert went through, and python's `commit` then failed with `sqlite3.OperationalError: disk I/O error` (the `locks.mjs` sqlite part, slicc-kernel 1.100.0; homescoop#513). 3.14.2-21 (unix VFS) gets `database is locked` both ways and keeps rows [1, 2, 4].
+`multiprocessing.mjs` against the published 3.14.2-20 on slicc-kernel 1.100.0 (Node entry, 2026-10-16): FAIL at the Pool, `ModuleNotFoundError: No module named '_multiprocessing'` (CPython's configure marks it n/a on WASI). `locks.mjs`: -20 has `os.lockf` = False, and its `fcntl.lockf` went through a `--wrap=fcntl` no-op stub, so no lock ever reached the kernel.
 
 ## 3.14.2-19: select.poll fails on an fd with no events, select.epoll errors look like success (-20, homescoop#394, #443)
 

@@ -18,6 +18,13 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-22 the `sqlite3` module uses SQLite's `unix` VFS, with `fcntl`
+locks, instead of SQLITE_WASI's default `unix-dotfile`, whose `.lock`
+directory no other program saw. Python and the sqlite3 CLI (or another
+program) now lock each other out on the same database. Up to -21, a CLI write
+during a python transaction went through, and python's commit then failed
+with `disk I/O error`.
+
 Since 3.14.2-21 (wasix-sysroot -30):
 
 - `multiprocessing` works with the `spawn` start method (the default):
