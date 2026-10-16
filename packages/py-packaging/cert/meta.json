@@ -4,7 +4,7 @@
     "@ai-ecoverse/wasix-python"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-python@3.14.2-24"
+    "@ai-ecoverse/wasix-python@3.14.2-25"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-packaging --lock-only"
@@ -12,6 +12,7 @@
   "checklist": [
     "cert/import.mjs: import packaging on wasix-python 3.14.2-24 from /node_modules/@ai-ecoverse/py-packaging, found by discovery without PYTHONPATH, no nested python",
     "cert/packaging.mjs: Version ordering (rc < final < post, 1.9 < 1.10 < 2.0.dev3), SpecifierSet >=1.0,<2,!=1.9, Requirement with extras/specifier/marker, Marker.evaluate, canonicalize_name, sys_tags starts with cp314",
-    "python-range.mjs --lock-only (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3; npm --package-lock-only with wasix-python 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level. The previous release (exact 3.14.2-16) nests a second python under 3.14.2-24 (NEGATIVE.md)"
+    "python-range.mjs --lock-only (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3; npm --package-lock-only with wasix-python 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level. The previous release (exact 3.14.2-16) nests a second python under 3.14.2-24 (NEGATIVE.md)",
+    "cert/record.mjs (26.3.0-8, built in CI from PyPI's packaging-*-py3-none-any.whl through scripts/stage-pure-wheel.sh): every dist-info RECORD file present with its sha256, none missing or unlisted, every .pyc unchecked-hash on its source; a flipped-byte self-test must be caught"
   ]
 }

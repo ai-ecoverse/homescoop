@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-packaging",
-  "version": "26.3.0-7",
+  "version": "26.3.0-8",
   "description": "packaging for slicc WASIX CPython",
   "license": "Apache-2.0 OR BSD-2-Clause",
   "repository": {
