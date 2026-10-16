@@ -30,8 +30,16 @@ try {
   if (!existsSync(join(work, 'package/share/imagemagick/relink/relink.sh'))) throw new Error(`${tarball} has no share/imagemagick/relink/relink.sh (homescoop#395)`);
   const js = checkKitFlags(join(work, 'package/share/imagemagick/relink'));
   const docs = checkKitDocs(join(work, 'package'), join(work, 'package/share/imagemagick/relink'));
-  const log = sh(`eval "$(bash '${root}/scripts/install-emsdk.sh')" && bash '${work}/package/share/imagemagick/relink/relink.sh' '${work}/relinked' '${iconv}'`);
-  if (!log.includes(`libiconv.a from ${iconv}`)) throw new Error(`relink.sh did not take libiconv.a from ${iconv}:\n${log}`);
+  // The override directory: libiconv.a from npm, plus copies of the kit's own
+  // libslicc_cred.a (named in ldflags.txt) and libMagickCore (named in relink.sh):
+  // relink.sh must take each of them from there.
+  const kit = join(work, 'package/share/imagemagick/relink');
+  const ovr = join(work, 'override');
+  sh(`mkdir -p '${ovr}' && cp '${iconv}/libiconv.a' '${ovr}/' && cp '${kit}/libslicc_cred.a' '${kit}/libMagickCore-7.Q16HDRI.a' '${ovr}/'`);
+  const log = sh(`eval "$(bash '${root}/scripts/install-emsdk.sh')" && bash '${kit}/relink.sh' '${work}/relinked' '${ovr}'`);
+  for (const a of ['libiconv.a', 'libslicc_cred.a', 'libMagickCore-7.Q16HDRI.a']) {
+    if (!log.includes(`${a} from ${ovr}`)) throw new Error(`relink.sh did not take ${a} from ${ovr}:\n${log}`);
+  }
   const wasm = readFileSync(join(work, 'relinked/magick.wasm'));
   if (!WebAssembly.validate(wasm)) throw new Error('relinked magick.wasm does not validate');
   const shippedWasm = readFileSync(join(work, 'package/bin/magick.wasm'));

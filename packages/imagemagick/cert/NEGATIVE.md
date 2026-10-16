@@ -75,3 +75,12 @@ Against the published `@ai-ecoverse/wasm-imagemagick` 7.1.2-34-1 (npm
   ```
   Error: THIRD-PARTY-NOTICES.md cites README.md, Relinking, which has no such section
   ```
+
+- relink-check's override case (Codex P2 on #545): its override directory
+  also holds copies of `libslicc_cred.a` (named in `ldflags.txt`) and
+  `libMagickCore-7.Q16HDRI.a`. On this PR's earlier `relink.sh`, which only
+  took the delegate libraries from there:
+
+  ```
+  Error: relink.sh did not take libslicc_cred.a from .../override:
+  ```
