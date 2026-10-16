@@ -118,3 +118,39 @@ Against wasix-org/libffi 09cbf7d (`recipe.yaml` sources.libffi), `src/wasm32/ffi
 - Checked with a C program through `ffi_prep_cif_var` on slicc-kernel 1.51.0 (snprintf with int/double/long long/char*/long double, sscanf, open with mode, plus a fixed call) and by `cert/ctypes-varargs.mjs`.
 - Upstream: offering it to wasix-org/libffi is Lars's call.
 
+
+## `cpython-multiprocessing-noshare-wasix.patch` (wasix-python 3.14.2-23)
+
+WASIX processes share no memory, so multiprocessing's shared memory never
+reached another process: a child's writes to an `mp.Value`/`mp.Array` (any
+`lock`) or a `SharedMemory` were lost without an error (homescoop#516).
+
+- `multiprocessing.heap`'s arena reduction raises `NotImplementedError` on
+  WASI. A shared ctypes object passed to a child fails at `start()`; inside
+  one process it works as before.
+- `multiprocessing.shared_memory` raises `ImportError`, as on upstream WASI
+  builds (no `_posixshmem` there). `_posixshmem` stays built, since the
+  resource tracker imports it.
+- Without `os.fork`, `multiprocessing.context` drops the `fork` and
+  `forkserver` contexts, so `get_all_start_methods()` is `['spawn']` and
+  `get_context("fork")` raises `ValueError`. A build with `os.fork`
+  (homescoop#357) keeps them.
+
+## `cpython-multiprocessing-unix-listener-wasix.patch` (wasix-python 3.14.2-23)
+
+slicc-kernel before 1.103.1 keeps path-bound AF_UNIX sockets out of the
+filesystem (slicc-kernel#753, fixed in 1.103.1), so `SocketListener`'s `os.unlink(path)` at close got
+ENOENT, and `multiprocessing.Manager()` printed a traceback from its
+finalizer at exit (homescoop#515). On WASI the unlink tolerates a missing
+path.
+
+## `cpython-thread-native-id-wasix.patch` (wasix-python 3.14.2-23)
+
+CPython defines `PY_HAVE_THREAD_NATIVE_ID` only for Linux, macOS, Windows,
+the BSDs and AIX, so WASI builds had no `threading.get_native_id()` and
+`Thread.native_id` was `None`; scipy's uarray (`scipy.fft.set_backend`)
+raised `AttributeError` (homescoop#587). WASIX has a per-thread id
+(`__wasi_thread_id`, `wasix_32v1.thread_id`): the patch defines the macro
+for `__wasi__` and returns that id. Within a process it is unique per live
+thread (slicc-kernel: 1 for the main thread, then 2, 3, …); unlike Linux it
+is not system-wide.

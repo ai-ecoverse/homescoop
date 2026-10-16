@@ -4,12 +4,12 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-28's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-30's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - No `fork`/`vfork`; `subprocess` via `os.posix_spawn` (`proc_spawn2`/`3`)
 - `os.getuid()`/`getgid()`/`getgroups()` and `pwd`/`grp` come from slicc-kernel's process credentials and its `/etc/passwd`/`/etc/group` (3.14.2-13, wasix-sysroot -20; slicc-kernel ≥ 1.44.0, no fallback: ids are -1 on older kernels). Root is uid 0 with home `/root`.
-- Advisory file locks (`flock`, `fcntl` F_SETLK*, `lockf`) are no-ops (Emscripten parity)
+- Record locks (`fcntl` F_SETLK*, `lockf`) go through slicc-kernel (since -21, below); `flock` is a no-op
 - stdout is line-buffered unless it is a regular file, so output streams and survives crashes
 - `signal.alarm`/`setitimer` and `time.sleep` resuming after a signal (the sysroot's libc patches, `patches/`)
 - Bundled `pip` 25.3; `.pyc` are unchecked-hash
@@ -17,6 +17,33 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 - `TZ` POSIX rules work (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193); `zoneinfo` works with the `tzdata` package
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
+
+Since 3.14.2-23:
+
+- `multiprocessing.connection`'s `Listener` on an AF_UNIX path closes
+  cleanly on every kernel. slicc-kernel before 1.103.1 keeps socket paths out
+  of the filesystem (slicc-kernel#753), so the path it unlinks at close was
+  already gone, and up to -22 `close()` raised `FileNotFoundError` there. `multiprocessing.Manager()` also
+  needs WASIX's libc to return AF_UNIX addresses from `getsockname`, which
+  comes with wasix-sysroot -31 in the next release (homescoop#515).
+- `threading.get_native_id()` and `Thread.native_id` exist (WASIX's thread id;
+  homescoop#587). Up to -22 they were missing or `None`, and
+  `scipy.fft.set_backend`/`skip_backend` raised `AttributeError`.
+- **Shared memory fails loudly instead of silently** (homescoop#516).
+  Processes share no memory here, so nothing written into an `mp.Value`,
+  `mp.Array` (with or without a lock) or `SharedMemory` ever reached another
+  process, and up to -22 nothing said so.
+  - Passing a `Value`, `Array` or other shared ctypes object to a child
+    (`Process` arguments, `Pool` initargs) now raises `NotImplementedError` at
+    `start()`, naming a Queue, a Pipe or a Manager as the alternatives. Inside
+    one process (threads) they work as before.
+  - `multiprocessing.shared_memory` raises `ImportError` on import, as on
+    upstream WASI builds, and `multiprocessing.managers.HAS_SHMEM` is
+    `False`.
+  - `multiprocessing.get_all_start_methods()` is `['spawn']`, and
+    `get_context("fork")`/`("forkserver")` raise `ValueError`. Up to -22 they
+    listed `fork` and `forkserver`, and a fork `Process` failed at `start()`
+    with `AttributeError` (no `os.fork`, homescoop#357).
 
 Since 3.14.2-22 the `sqlite3` module uses SQLite's `unix` VFS, with `fcntl`
 locks, instead of SQLITE_WASI's default `unix-dotfile`, whose `.lock`
@@ -36,9 +63,10 @@ Since 3.14.2-21 (wasix-sysroot -30):
 - `multiprocessing` works with the `spawn` start method (the default):
   `Pool`, `Queue`, `Lock`, `Semaphore` and the other synchronisation
   primitives, across processes. Its named semaphores are kept by slicc-kernel
-  (≥ 1.99.0). `shared_memory` and shared ctypes (`Value`/`Array` with
-  `lock=False`) don't work, because processes don't share memory. There is
-  no `fork` start method (no `os.fork`).
+  (≥ 1.99.0). `shared_memory` and shared ctypes (`Value`/`Array`, whatever
+  their `lock`) aren't shared between processes, because processes don't
+  share memory (an error since -23). There is no `fork` start method (no
+  `os.fork`).
 - `fcntl.lockf`/`fcntl.fcntl` record locks and `os.lockf` go through the libc
   to slicc-kernel (slicc-kernel#722) and hold against other processes, such as
   a second python or the sqlite3 CLI on the same database. On an older kernel

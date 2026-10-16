@@ -151,3 +151,19 @@ script and a subprocess inside the venv, and a chained user sitecustomize.
 ## 3.14.2-22: engines >= 1.100.0 (homescoop#567)
 
 cert-review of #530's first head (05b81d7e) found that on slicc-kernel 1.99.2, which the old `engines` (>=1.51.0) admitted, two python processes on one database lost an acknowledged row. B's insert returned ok, A's commit got `disk I/O error`, and the table ended `[0, 1]`. The cause is that the unix VFS takes `fcntl` locks, and without `slicc.fcntl_lock` the libc grants them locally. `engines` is now `>=1.100.0`. `locks.mjs` no longer accepts local locks (the `PY_LOCKS_LOCAL=1` branch is gone), so on 1.99.2 it fails at `another process got LOCK_EX while this one held it` instead of passing.
+
+## 3.14.2-23: negative 3.14.2-21/-22 (homescoop#515, #516, #587, #621)
+
+The published 3.14.2-21 (npm sha512-JZN9ayQh…) on slicc-kernel 1.100.4's Node entry, 2026-10-16. -22 changes only sqlite's VFS, so it behaves the same here.
+
+- **`mp-listener.mjs` fails at `close()`.** The Client/Listener round trip on the AF_UNIX path works, then `Listener.close()` raises `FileNotFoundError: [Errno 44] No such file or directory: '/tmp/…/listener'`, because the kernel never put the path in the filesystem (slicc-kernel#753; 1.103.1 makes socket paths filesystem nodes, so there -22 closes cleanly too, and the patch is a no-op). The same -21 with `cpython-multiprocessing-unix-listener-wasix.patch` applied to its `connection.py` passes. `multiprocessing.Manager()` fails earlier still, with `TypeError: str, bytes or bytearray expected, not int`: libc's `getsockname` returns `(0, b'')` for AF_UNIX. That part waits for wasix-sysroot -31.
+- **`mp-limits.mjs` fails on its first assertion.** Its output on -21:
+  ```
+  {"methods": ["spawn", "fork", "forkserver"], "start": "spawn", "fork": ["ok", "fork"],
+   "forkserver": ["ValueError", "forkserver start method not available"],
+   "value": [["ok", 0], 1, [1, 2]], "threads": 400, "shm": ["ok", "psm_3c00c7ba"],
+   "has_shmem": true, "executor": [0, 1, 8, 27, 64]}
+  ```
+  The child's `v.value += 5` and `a[0] = 9` are lost silently (start() and exit 0, the parent still sees 1 and [1, 2]). `shared_memory` imports and creates a segment, and the resource tracker then warns about a leaked shared_memory object at shutdown.
+- **`native-id.mjs` fails at its first assertion.** On -21 `hasattr(threading, "get_native_id")` is False, and the scipy part (`scipy.fft.set_backend("scipy")`, py-scipy 1.18.0-11) raises `AttributeError: module 'threading' has no attribute 'get_native_id'` (homescoop#587). With `get_native_id` monkeypatched in, the same scipy calls give fft `[6, -1.5+0.866j, -1.5-0.866j]`, so the rest of the spec doesn't depend on anything else.
+- **`sqlite-vfs.mjs` (#621) fails on -21** (unix-dotfile VFS, slicc-kernel 1.102.5 Node entry). The sibling connection can't even read while the first one holds `BEGIN IMMEDIATE`: `select count(*)` raises `sqlite3.OperationalError: database is locked` (rc 1), because the dotfile lock shuts out readers too. Forcing the unix VFS on the same -21 binary (`file:…?vfs=unix`, which -22 made the default) passes every case.

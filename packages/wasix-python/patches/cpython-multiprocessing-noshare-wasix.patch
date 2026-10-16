@@ -1,0 +1,55 @@
+WASI without os.fork: multiprocessing offers only the spawn start method,
+and fails loudly where it would share memory between processes
+(homescoop#516): shared ctypes refuse to be pickled to another process,
+and multiprocessing.shared_memory raises ImportError, as on upstream WASI.
+
+--- a/Lib/multiprocessing/context.py
++++ b/Lib/multiprocessing/context.py
+@@ -319,10 +319,13 @@ if sys.platform != 'win32':
+         'spawn': SpawnContext(),
+         'forkserver': ForkServerContext(),
+     }
++    if sys.platform == 'wasi' and not hasattr(os, 'fork'):
++        del _concrete_contexts['fork'], _concrete_contexts['forkserver']
+     # bpo-33725: running arbitrary code after fork() is no longer reliable
+     # on macOS since macOS 10.14 (Mojave). Use spawn by default instead.
+     # gh-84559: We changed everyones default to a thread safeish one in 3.14.
+-    if reduction.HAVE_SEND_HANDLE and sys.platform != 'darwin':
++    if ('forkserver' in _concrete_contexts and reduction.HAVE_SEND_HANDLE
++            and sys.platform != 'darwin'):
+         _default_context = DefaultContext(_concrete_contexts['forkserver'])
+     else:
+         _default_context = DefaultContext(_concrete_contexts['spawn'])
+--- a/Lib/multiprocessing/heap.py
++++ b/Lib/multiprocessing/heap.py
+@@ -98,6 +98,11 @@ else:
+             return util.get_temp_dir()
+ 
+     def reduce_arena(a):
++        if sys.platform == 'wasi':
++            raise NotImplementedError(
++                'multiprocessing: Value, Array and other shared ctypes '
++                'cannot be shared with another process on WASI, where '
++                'processes share no memory; use a Queue, a Pipe or a Manager')
+         if a.fd == -1:
+             raise ValueError('Arena is unpicklable because '
+                              'forking was enabled when it was created')
+--- a/Lib/multiprocessing/shared_memory.py
++++ b/Lib/multiprocessing/shared_memory.py
+@@ -14,11 +14,16 @@ import os
+ import errno
+ import struct
+ import secrets
++import sys
+ import types
+ 
+ if os.name == "nt":
+     import _winapi
+     _USE_POSIX = False
++elif sys.platform == "wasi":
++    raise ImportError(
++        "multiprocessing.shared_memory is not available on WASI: "
++        "processes share no memory")
+ else:
+     import _posixshmem
+     _USE_POSIX = True
