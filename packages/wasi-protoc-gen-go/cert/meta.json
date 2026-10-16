@@ -1,0 +1,14 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasi-buf"
+  ],
+  "checklist": [
+    "as dev (addUser, users enforce): protoc-gen-go --version \u2192 protoc-gen-go v1.36.12",
+    "buf generate (npm @ai-ecoverse/wasi-buf) runs protoc-gen-go as a local: plugin on test/fixtures/module; gen/ is byte-for-byte test/fixtures/golden (acme/pet/v1/kind.pb.go, acme/pet/v1/pet.pb.go), native protoc-gen-go's output",
+    "a local: plugin that isn't installed \u2192 rc 1 'executable file not found in $PATH'",
+    "test/e2e/generate.test.mjs (Node entry): the same golden comparison"
+  ]
+}
