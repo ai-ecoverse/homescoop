@@ -4,7 +4,7 @@
 # and keep the ladder out of it, as for wasi-rustc.
 #
 # LLVM 21 + clang + lld as static libraries for a wasm32-wasip1-threads host
-# (built with wasi-sdk 24). The shared LLVM for SLICC's WASI toolchains: the
+# (built with the wasi-sdk in scripts/install-wasi-sdk.sh). The shared LLVM for SLICC's WASI toolchains: the
 # LLVM-enabled wasi-zig links it, and wasi-rustc can build against it as an
 # external LLVM (bin/llvm-config is a python3 script for the build machine).
 name: wasi-llvm
