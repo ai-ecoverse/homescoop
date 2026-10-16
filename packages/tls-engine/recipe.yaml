@@ -2,6 +2,8 @@
 # used by SLICC's in-realm HTTP proxy to terminate CONNECT tunnels (#3571).
 name: tls-engine
 builder: host
+# The engine's tarball is byte-stable (#598): ladder-pr builds it twice.
+reproducible: true
 # renovate: datasource=github-releases depName=Mbed-TLS/mbedtls extractVersion=^mbedtls-(?<version>.*)$
 version: "4.2.0"
 npm: "@ai-ecoverse/wasm-tls-engine"
