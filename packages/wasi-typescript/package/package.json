@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-typescript",
-  "version": "7.0.2-1",
+  "version": "7.0.2-2",
   "description": "TypeScript 7 (the native tsc) for slicc WASI preview1 (command tsc); tsc.wasm built by homescoop from microsoft/typescript-go typescript/v7.0.2 with GOOS=wasip1",
   "license": "Apache-2.0",
   "repository": {

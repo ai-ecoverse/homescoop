@@ -68,7 +68,6 @@ const NO_USERS_ENFORCE = [
   'wasi-esbuild', // #819
   'wasi-fnox', // #819
   'wasi-ripgrep', // #819
-  'wasi-typescript', // #819
   'wasi-uv', // #772
   'wasix-gnupg', // #819
   'wasix-perl', // #819
