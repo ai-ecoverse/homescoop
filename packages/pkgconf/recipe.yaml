@@ -2,12 +2,12 @@
 name: pkgconf
 builder: host
 # renovate: datasource=github-tags depName=pkgconf/pkgconf extractVersion=^pkgconf-(?<version>.*)$
-version: "2.5.1"
+version: "3.0.9"
 npm: "@ai-ecoverse/wasm-pkgconf"
 summary: "pkgconf / pkg-config for wasm"
 source:
   url: "https://distfiles.ariadne.space/pkgconf/pkgconf-{{version}}.tar.gz"
-  sha256: "ab89d59810d9cad5dfcd508f25efab8ea0b1c8e7bad91c2b6351f13e6a5940d8"
+  sha256: "642700ab125e6dcb3ceb822469420b0132c26f5585dec88cbe6057134525e57d"
 dependencies:
   build: []
   host: []

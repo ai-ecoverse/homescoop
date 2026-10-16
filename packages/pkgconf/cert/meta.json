@@ -1,8 +1,13 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "checklist": [
-    "--version",
+    "--version (pkgconf and pkg-config) is the package's homescoop.upstream",
     "--modversion against a staged .pc",
-    "missing package fails"
+    "missing package fails",
+    "real .pc set (zlib, libpng16, OpenSSL, ${pcfiledir}): --modversion, --exists with constraints, --atleast/--exact/--max-version",
+    "--cflags/--libs, --static with Requires.private and Libs.private, --*-only-*",
+    "--variable, --define-variable, PKG_CONFIG_SYSROOT_DIR, ${pcfiledir}",
+    "pkgconf 3: --variable over several modules, PKG_CONFIG_<MODULE>_<VAR>, --newlines, Conflicts enforced"
   ]
 }
