@@ -1,0 +1,46 @@
+# LGPL relink kits of wasm-imagemagick and wasm-imagemagick-heif (homescoop#593).
+name: imagemagick-relink
+builder: host
+# build.sh runs both ImageMagick builds; a change to either rebuilds the kits.
+inputs:
+  - packages/imagemagick/**
+  - packages/imagemagick-heif/**
+# renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
+version: "7.1.2-34"
+npm: "@ai-ecoverse/wasm-imagemagick-relink"
+summary: "Relink kits (objects, static libraries, relink.sh) for wasm-imagemagick and wasm-imagemagick-heif"
+source:
+  url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/{{version}}.tar.gz"
+  sha256: "f5163a573a1c1bff16358d0a592b2fb168ad0fd3b9dc5ff57dc7820eebc5cf79"
+dependencies:
+  build:
+    - "@ai-ecoverse/wasm-zlib@1.3.1-2"
+    - "@ai-ecoverse/wasm-libjpeg-turbo@3.1.2"
+    - "@ai-ecoverse/wasm-libpng@1.6.59-1"
+    - "@ai-ecoverse/wasm-lcms2@2.19.1-1"
+    - "@ai-ecoverse/wasm-libtiff@4.7.2-1"
+    - "@ai-ecoverse/wasm-libwebp@1.5.0-1"
+    - "@ai-ecoverse/wasm-openjpeg@2.5.3"
+    - "@ai-ecoverse/wasm-freetype@2.13.3-1"
+    - "@ai-ecoverse/wasm-libxml2@2.15.4-1"
+    - "@ai-ecoverse/wasm-libiconv@1.18.0-1"
+    - "@ai-ecoverse/wasm-libheif@1.23.6-1"
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick-relink
+  license: ImageMagick AND LGPL-2.1-or-later AND LGPL-3.0-or-later
+  notes: |
+    homescoop#593. wasm-imagemagick and wasm-imagemagick-heif link GNU
+    libiconv (LGPL-2.1-or-later), and the heif build libheif and libde265
+    (LGPL-3.0-or-later), statically. Their relink kits shipped inside the
+    runtime packages (7.1.2-34-2 to -34-4) and made every install 2.8x
+    (base) and 1.3x (heif) bigger. Since 7.1.2-34-5 they are this package,
+    at the same version on the same registry (LGPL-2.1 s.6(d), LGPL-3.0
+    s.4(d)): share/imagemagick/relink and share/imagemagick-heif/relink.
+    build.sh runs packages/imagemagick/build.sh and
+    packages/imagemagick-heif/build.sh with HOMESCOOP_RELINK_KIT, so each
+    kit comes from the build of the runtime package of the same version;
+    each kit's kit.json records the magick.wasm its objects made (sha256,
+    size, import and export hashes). Keep the version and dependencies in
+    step with both runtime recipes: cert/relink-check.mjs fails otherwise.

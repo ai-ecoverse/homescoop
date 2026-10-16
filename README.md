@@ -82,8 +82,9 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasm-gawk` | host | **5.3.2-3** (`gawk` + `awk`) |
 | `@ai-ecoverse/wasm-less` | host | **668.0.0-3** (static ncursesw fallbacks) |
 | `@ai-ecoverse/wasm-sqlite3` | host | **3.54.0-3** (shell amalgamation) |
-| `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-34-4** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7; LGPL relink kit for libiconv) |
-| `@ai-ecoverse/wasm-imagemagick-heif` | host | **7.1.2-34-4**: wasm-imagemagick `--with-heic` linked against wasm-libheif (HEIC/HEIF/AVIF read), same commands. **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
+| `@ai-ecoverse/wasm-imagemagick` | host | **7.1.2-34-5** (`magick` / `convert` / `identify` / `mogrify`; etc/ImageMagick-7) |
+| `@ai-ecoverse/wasm-imagemagick-heif` | host | **7.1.2-34-5**: wasm-imagemagick `--with-heic` linked against wasm-libheif (HEIC/HEIF/AVIF read), same commands. **Optional, never in a base set:** HEVC decoder, HEVC is patent-encumbered |
+| `@ai-ecoverse/wasm-imagemagick-relink` | host | **7.1.2-34-5**: the LGPL relink kits of wasm-imagemagick and wasm-imagemagick-heif (magick's objects, every library they link, `relink.sh`), same version. Optional: install it only to relink |
 | `@ai-ecoverse/wasm-tar` | host | **1.35.0-6** (fork + Asyncify for `-z`/`-j`/`-J`, wait4/exec linked) |
 | `@ai-ecoverse/wasm-gzip` | host | **1.13.0-2** (`gzip` / `gunzip` / `zcat`, `-DGNU_STANDARD=0`) |
 | `@ai-ecoverse/wasm-zip` | host | **3.0.0-1** (`zip` / `unzip`) |

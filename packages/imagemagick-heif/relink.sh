@@ -32,7 +32,7 @@ read -r -a words <ldflags.txt
 for w in "${words[@]}"; do
   if [[ "$w" == *.a && "$w" != */* ]]; then FLAGS+=("$(lib "$w")"); else FLAGS+=("$w"); fi
 done
-em++ -g -O2 -fexceptions -o "$OUT/magick.js" \
+em++ -g2 -O2 -fexceptions -o "$OUT/magick.js" \
   -Wl,--whole-archive "$(lib magick.a)" -Wl,--no-whole-archive \
   "${LIBS[@]}" -lm "$(lib libslicc-cli.a)" "${FLAGS[@]}"
 mv "$OUT/magick.js" "$OUT/magick"
