@@ -65,6 +65,7 @@ const ALLOW = new Map([
   ['wasix-openssh', 808],
   ['wasix-openssl', 808],
   ['wasix-python', 808],
+  ['wasix-ruby', 808],
   ['wasix-sysroot', 808],
   ['wasix-websocat', 808],
   ['wasix-zlib', 808],
