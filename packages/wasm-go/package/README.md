@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-go`
 
-Go 1.26 `compile` / `link` / `asm` for wasip1/wasm — tools half of SLICC's
+Go 1.27 `compile` / `link` / `asm` for wasip1/wasm — tools half of SLICC's
 `go` driver (PR #3657 / GO-CONTRACT).
 
 Layout:

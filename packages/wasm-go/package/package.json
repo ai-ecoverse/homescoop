@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-go",
-  "version": "1.26.5-2",
-  "description": "Go 1.26 wasip1 compile/link/asm tools for slicc go driver (GOROOT half)",
+  "version": "1.27.2-1",
+  "description": "Go 1.27 wasip1 compile/link/asm tools for slicc go driver (GOROOT half)",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
   },
   "homescoop": {
     "recipe": "wasm-go",
-    "upstream": "1.26.5"
+    "upstream": "1.27.2"
   },
   "slicc": {
     "abi": "wasi",

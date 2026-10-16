@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-go-std-wasip1",
-  "version": "1.26.5-1",
-  "description": "Go 1.26 std export archives for wasip1/wasm (slicc go driver)",
+  "version": "1.27.2-1",
+  "description": "Go 1.27 std export archives for wasip1/wasm (slicc go driver)",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -29,7 +29,7 @@
   },
   "homescoop": {
     "recipe": "wasm-go-std-wasip1",
-    "upstream": "1.26.5"
+    "upstream": "1.27.2"
   },
   "slicc": {
     "abi": "wasi",
