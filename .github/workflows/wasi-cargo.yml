@@ -33,14 +33,10 @@ jobs:
       - name: install Rust 1.83 with WASI threads std
         run: rustup toolchain install 1.83.0 --profile minimal --target wasm32-wasip1-threads
 
-      - name: install wasi-sdk 24
+      - name: install wasi-sdk (scripts/install-wasi-sdk.sh pin)
         run: |
           set -euo pipefail
-          curl -fL --retry 3 -o wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz
-          tar -xzf wasi-sdk.tar.gz
-          rm wasi-sdk.tar.gz
-          mv wasi-sdk-24.0-* wasi-sdk
-          echo "WASI_SDK_PATH=${{ github.workspace }}/wasi-sdk" >> "$GITHUB_ENV"
+          bash homescoop/scripts/install-wasi-sdk.sh "${{ github.workspace }}/wasi-sdk" | sed -n 's/^export //p' >> "$GITHUB_ENV"
 
       - name: prepare offline Cargo process bridge
         run: |

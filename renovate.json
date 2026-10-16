@@ -35,6 +35,16 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>\\S+?)(?: packageName=(?<packageName>\\S+?))?(?: versioning=(?<versioning>\\S+?))?(?: extractVersion=(?<extractVersion>\\S+?))?(?: registryUrl=(?<registryUrl>\\S+?))?\\s+version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "wasi-sdk pin in scripts/install-wasi-sdk.sh (# renovate comment above WASI_SDK_MAJOR). A bump also needs the two sha256 pins in that file; the install fails closed until they are updated.",
+      "managerFilePatterns": [
+        "/(^|/)scripts/install-wasi-sdk\\.sh$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>\\S+?)(?: extractVersion=(?<extractVersion>\\S+?))?\\s+WASI_SDK_MAJOR=\"(?<currentValue>[^\"]+)\""
+      ]
     }
   ],
   "packageRules": [
