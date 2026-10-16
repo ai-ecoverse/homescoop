@@ -1,0 +1,34 @@
+Don't compile pnpm-cli's source checkout path into the wasm build.
+
+Reason: current_source_pnpm_version() walks up from env!("CARGO_MANIFEST_DIR")
+to find the checkout's pnpm11/pnpm/package.json, for pnpm run from its own
+source tree. env! is a string literal, so --remap-path-prefix doesn't reach
+it: pnpm.wasm carried <srcdir>/pnpm-<commit>/pnpm/crates/cli, and its bytes
+depended on the directory it was built in (homescoop#522). pnpm.wasm never
+runs from a checkout; at runtime the lookup only tried paths like
+/home/runner/…/pnpm11/pnpm/package.json and their parents. On wasm the
+function answers None, which is what it found there anyway.
+
+Upstream: not filed (Lars decides).
+removeWhen: upstream stops embedding CARGO_MANIFEST_DIR in non-test code.
+
+--- a/pnpm/crates/cli/src/cli_args/package_manager.rs
++++ b/pnpm/crates/cli/src/cli_args/package_manager.rs
+@@ -197,8 +197,15 @@
+ }
+ 
+ pub(crate) fn current_source_pnpm_version() -> Option<String> {
+-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+-    manifest_dir.ancestors().find_map(pnpm_version_from)
++    // pnpm.wasm never runs from its source checkout, and env! would compile
++    // the checkout's absolute path into it.
++    #[cfg(target_family = "wasm")]
++    return None;
++    #[cfg(not(target_family = "wasm"))]
++    {
++        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
++        manifest_dir.ancestors().find_map(pnpm_version_from)
++    }
+ }
+ 
+ fn pnpm_version_from(root_dir: &Path) -> Option<String> {

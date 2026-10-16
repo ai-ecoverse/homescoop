@@ -6,10 +6,12 @@ load, which makes pnpm hang or fail with os error 73.
 
 `bin/pnpm.wasm` is built by homescoop from pnpm's source (v12.9.1, commit
 `5dafb09`) with pnpm's own `pnpm/wasm/build.mjs` (Rust nightly-2026-08-27,
-WASI SDK 34, WABT 1.0.42) and one documented patch: `parking_lot_core` is built
-with its `nightly` feature, so a contended lock waits with
+WASI SDK 34, WABT 1.0.42) and two documented patches. `parking_lot_core` is
+built with its `nightly` feature, so a contended lock waits with
 `memory.atomic.wait32` instead of panicking ("Parking not supported on this
-platform") as the upstream `@pnpm/wasm` 12.9.1 binary does under load. It is
+platform") as the upstream `@pnpm/wasm` 12.9.1 binary does under load; and
+pnpm-cli doesn't compile its source checkout's path into the wasm, which
+holds no build path. It is
 therefore not byte-identical to `@pnpm/wasm` (MIT; see `LICENSE` and
 `THIRD-PARTY-NOTICES.md`). It imports three host modules besides
 WASI; `host/pnpm-host.mjs` implements them on top of slicc-kernel, which loads it

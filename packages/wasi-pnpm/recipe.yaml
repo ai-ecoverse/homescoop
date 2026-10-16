@@ -12,8 +12,6 @@ source:
   url: "https://github.com/pnpm/pnpm/archive/5dafb0980042af99fb1aa24478d16f03b8474b50.tar.gz"
   sha256: "5ade48506ae88ed031994ea1aab5bfc161d1a3b60f4604100f719678a42684ee"
   commit: "5dafb0980042af99fb1aa24478d16f03b8474b50"
-build:
-  srcdir: "/home/runner/work/_temp/homescoop-work"
 toolchain:
   # Exactly what pnpm/wasm/build.mjs at that commit requires.
   rust: "nightly-2026-08-27"
@@ -33,9 +31,14 @@ about:
   notes: |
     build.sh fetches the pinned pnpm source, applies patches/ (0001: build
     parking_lot_core with its `nightly` feature, so contended locks wait
-    with memory.atomic.wait32 instead of panicking), drops the
+    with memory.atomic.wait32 instead of panicking; 0002: pnpm-cli doesn't
+    compile its checkout's CARGO_MANIFEST_DIR into the wasm, so the bytes
+    don't depend on the build directory, homescoop#522), drops the
     .cargo/config.toml block that points crates.io at pnpm's vendored
     .pnpm/crates (Cargo.lock checksums still apply), and runs upstream's
     pnpm/wasm/build.mjs with the pinned toolchain and remapped paths.
     host/pnpm-host.mjs implements pnpm_host, pnpm_fs and pnpm_atomic on
-    slicc-kernel's per-command imports hook.
+    slicc-kernel's per-command imports hook. build.sh fails when strings
+    finds the work tree, CARGO_HOME or a home or temp path in pnpm.wasm.
+    12.9.1-9 is built from source again (12.9.1-8 was a packaging-only
+    repack of -7, pinned to the runner's /home/runner/work/_temp path).
