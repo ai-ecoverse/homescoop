@@ -77,8 +77,12 @@ export function corruptTargets(pkgRoot) {
     if (typeof wasm !== 'string' || !wasm) continue;
     consider(wasm.replace(/^\$\{package\}\//, '').replace(/^\.\//, ''), true);
   }
-  for (const rel of filesUnder(join(pkgRoot, 'bin'), 'bin')) {
-    if (rel.endsWith('.wasm') || startsWithMagic(join(pkgRoot, rel))) consider(rel, false);
+  const bin = join(pkgRoot, 'bin');
+  if (existsSync(bin) && (lstatSync(bin).isSymbolicLink() || !within(bin))) outside.push('bin');
+  else {
+    for (const rel of filesUnder(bin, 'bin')) {
+      if (rel.endsWith('.wasm') || startsWithMagic(join(pkgRoot, rel))) consider(rel, false);
+    }
   }
   return { targets: [...targets].sort(), missing: [...new Set(missing)].sort(), outside: [...new Set(outside)].sort() };
 }

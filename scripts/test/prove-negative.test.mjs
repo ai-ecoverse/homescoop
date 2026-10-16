@@ -46,6 +46,7 @@ function fixture(files, manifest, links = {}) {
     symlinkSync(target.replace('$ROOT', root), join(pkg, rel));
   }
   writeFileSync(join(root, 'outside.wasm'), WASM);
+  mkdirSync(join(root, 'empty'), { recursive: true });
   const tgz = join(root, 'good.tgz');
   spawnSync('tar', ['-czf', tgz, '-C', join(root, 'src'), 'package'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
   const log = join(root, 'stub.log');
@@ -154,12 +155,14 @@ test('a command wasm outside the package, or a link, is refused and left alone',
     [{ slicc: { commands: { ruby: { wasm: '../../../outside.wasm' } } } }, {}],
     [{ slicc: { commands: { ruby: { wasm: 'bin/ruby' } } } }, { 'bin/ruby': '$ROOT/outside.wasm' }],
     [{ slicc: { commands: {} } }, { bin: '$ROOT' }],
+    [{ slicc: { commands: {} } }, { bin: '$ROOT/empty' }],
   ]) {
     const f = fixture({ 'lib/keep.txt': 'x' }, manifest, links);
     try {
       const r = f.prove([]);
       assert.equal(r.status, 1, r.out);
       assert.match(r.out, /: a link, or outside the package; refusing to touch it/);
+      if (links.bin) assert.match(r.out, /prove-negative: bin: a link/);
       assert.equal(r.calls.length, 0);
       assert.deepEqual(f.outside(), WASM);
     } finally {
