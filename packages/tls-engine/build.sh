@@ -56,5 +56,7 @@ emcc -Oz -flto "-DTF_PSA_CRYPTO_USER_CONFIG_FILE=\"$CRYPTO_CONFIG\"" \
   -I "$PREFIX/include" "$HERE/src/slicc_tls_engine.c" \
   "$PREFIX/lib/libmbedtls.a" "$PREFIX/lib/libmbedx509.a" "$PREFIX/lib/libtfpsacrypto.a" \
   "${ENGINE_LINK_FLAGS[@]}" -o "$OUT/slicc-tls-engine.mjs"
-homescoop_stage_license "$SRC"/LICENSE
+# Mbed TLS's and TF-PSA-Crypto's (the crypto in the wasm): the same terms,
+# each naming its own files.
+homescoop_stage_licenses "$SRC"/LICENSE "$SRC"/tf-psa-crypto/LICENSE
 ls -la "$OUT"
