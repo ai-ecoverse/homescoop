@@ -341,6 +341,9 @@ const j = {
   files: [
     "README.md",
     "LICENSE",
+    // LICENSE says "see AUTHORS file" (homescoop#538).
+    "AUTHORS",
+    "SECURITY.md",
     "emscripten-config",
     "bin",
     "lib",

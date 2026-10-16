@@ -52,3 +52,17 @@ test('media/ (the logos) is in the tarball', () => {
   const { paths } = tarball();
   for (const f of ['logo.png', 'logo.svg', 'powered_by_logo.png']) assert.ok(paths.includes(`package/media/${f}`), `no package/media/${f}`);
 });
+
+// homescoop#538: LICENSE says "see AUTHORS file", so the next real build
+// ships every file it cites. Static (build.sh's list and the staged tree),
+// because 6.0.9-19 is a repack of -17, which can't add files.
+test('every file LICENSE cites is in build.sh files and staged in package/', () => {
+  const lic = readFileSync(new URL('package/LICENSE', here), 'utf8');
+  const cited = [...new Set([...lic.matchAll(/see (\S+) file/g)].map((m) => m[1]))];
+  assert.ok(cited.includes('AUTHORS'), 'LICENSE no longer cites AUTHORS; update this test');
+  const files = buildShFiles();
+  for (const f of [...cited, 'SECURITY.md']) {
+    assert.ok(files.includes(f), `build.sh files lacks ${f}`);
+    assert.ok(existsSync(new URL(`package/${f}`, here)), `packages/wasm-emscripten/package/${f} is not committed`);
+  }
+});
