@@ -69,3 +69,8 @@ about:
     magick w.webp -resize 200% w.webp destroyed the input (reachable from
     plain magick since the 64KP policy of -34-2). The writer now refuses
     before opening the file. cert/inplace-webp.mjs.
+    7.1.2-34-4: relink.sh takes any kit archive from the directory it is
+    given, as wasm-imagemagick's does (homescoop#594): libiconv.a, the slicc
+    shims and the Magick archives, besides libheif, libde265 and dav1d.
+    relink-check overrides libiconv.a (published wasm-libiconv),
+    libslicc_cred.a and libMagickCore and requires all three to be used.

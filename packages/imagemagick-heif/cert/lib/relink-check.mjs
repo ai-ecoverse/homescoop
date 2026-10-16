@@ -27,7 +27,20 @@ try {
   sh(`tar -xzf '${tarball}' -C '${work}'`);
   const js = checkKitFlags(join(work, 'package/share/imagemagick-heif/relink'));
   const docs = checkKitDocs(join(work, 'package'), join(work, 'package/share/imagemagick-heif/relink'));
-  sh(`eval "$(bash '${root}/scripts/install-emsdk.sh')" && bash '${work}/package/share/imagemagick-heif/relink/relink.sh' '${work}/relinked' '${heifLib}'`);
+  // The override directory (homescoop#594, as wasm-imagemagick's): wasm-libheif's
+  // libheif.a, libde265.a and libdav1d.a, libiconv.a from the recipe's published
+  // @ai-ecoverse/wasm-libiconv, and copies of the kit's libslicc_cred.a (named in
+  // ldflags.txt) and libMagickCore; relink.sh must take each from there.
+  const kit = join(work, 'package/share/imagemagick-heif/relink');
+  const ovr = join(work, 'override');
+  const iconvDep = sh(`node '${root}/scripts/read-recipe.mjs' imagemagick-heif --deps`).split('\n').find((d) => d.startsWith('@ai-ecoverse/wasm-libiconv@'));
+  if (!iconvDep) throw new Error('recipe has no @ai-ecoverse/wasm-libiconv build dependency');
+  sh(`mkdir -p '${work}/iconv' '${ovr}' && cd '${work}/iconv' && npm pack '${iconvDep}' --silent && tar -xzf *.tgz`);
+  sh(`cp '${heifLib}/libheif.a' '${heifLib}/libde265.a' '${heifLib}/libdav1d.a' '${work}/iconv/package/lib/libiconv.a' '${kit}/libslicc_cred.a' '${kit}/libMagickCore-7.Q16HDRI.a' '${ovr}/'`);
+  const log = sh(`eval "$(bash '${root}/scripts/install-emsdk.sh')" && bash '${kit}/relink.sh' '${work}/relinked' '${ovr}' 2>&1`);
+  for (const a of ['libiconv.a', 'libslicc_cred.a', 'libMagickCore-7.Q16HDRI.a']) {
+    if (!log.includes(`${a} from ${ovr}`)) throw new Error(`relink.sh did not take ${a} from ${ovr} (homescoop#594):\n${log}`);
+  }
   const wasm = readFileSync(join(work, 'relinked/magick.wasm'));
   if (!WebAssembly.validate(wasm)) throw new Error('relinked magick.wasm does not validate');
   const shippedWasm = readFileSync(join(work, 'package/bin/magick.wasm'));
@@ -43,7 +56,7 @@ try {
   }
   const glue = readFileSync(join(work, 'relinked/magick'), 'utf8');
   if (!glue.includes('callMain')) throw new Error('relinked glue has no callMain');
-  console.log(`relink-check: share/imagemagick-heif/relink/relink.sh relinked magick against ${heifLib}/libheif.a (${wasm.length} bytes, shipped ${shipped}; same imports and exports; name section in both; kit flags: ${js.join(', ')}; README.md, ${docs.cited} names all ${docs.libs} kit libraries)`);
+  console.log(`relink-check: share/imagemagick-heif/relink/relink.sh relinked magick against ${heifLib}/libheif.a with libiconv.a, libslicc_cred.a and libMagickCore from the override directory (${wasm.length} bytes, shipped ${shipped}; same imports and exports; name section in both; kit flags: ${js.join(', ')}; README.md, ${docs.cited} names all ${docs.libs} kit libraries)`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

@@ -123,3 +123,14 @@ AssertionError [ERR_ASSERTION]: w.webp after the refused write (homescoop#585: t
 
 The spec sorts before side-by-side.mjs, which leaves the plain
 wasm-imagemagick 7.1.2-32-4 providing `magick` on kernels before 1.94.0.
+
+## 7.1.2-34-4: relink overrides (homescoop#594)
+
+relink-check.mjs's override case against the local 7.1.2-34-3 build, whose
+`relink.sh` takes only libheif, libde265 and dav1d from its directory
+(2026-10-16):
+
+```
+Error: relink.sh did not take libiconv.a from .../override (homescoop#594):
+relinked: .../relinked/magick(.wasm)
+```
