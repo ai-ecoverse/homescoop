@@ -36,11 +36,11 @@
  * Does not publish.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { pinErrors } from './check-exact-pins.mjs';
 import { diffTarballs, fetchPublished, readTarball, sha256 } from './diff-published.mjs';
 
@@ -88,7 +88,17 @@ const die = (msg) => {
   process.exit(1);
 };
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main();
+// Run as a script (not imported by a test). Compare real paths: ladder-pr
+// builds from /home/runner/work/…, a link to the pool's workspace, and
+// import.meta.url is the link's target.
+const invoked = (() => {
+  try {
+    return realpathSync(process.argv[1] ?? '') === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+if (invoked) main();
 
 function main() {
 const args = process.argv.slice(2);
