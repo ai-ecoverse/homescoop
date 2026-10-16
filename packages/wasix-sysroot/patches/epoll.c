@@ -5,8 +5,15 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 extern _Thread_local unsigned __slicc_signals_run;
+
+__attribute__((import_module("slicc"), import_name("sigmask_epoll_wait")))
+int32_t __slicc_sigmask_epoll_wait(uint32_t set_lo, uint32_t set_hi, int32_t epfd, int32_t events_ptr, int32_t maxevents, int64_t timeout_ns, int32_t nevents_ptr);
+
+#define UNBLOCKABLE ((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)))
+#define INTERNAL (0x7ULL << 31)
 
 int epoll_create(int size)
 {
@@ -59,7 +66,7 @@ int epoll_ctl(int fd, int op, int fd2, struct epoll_event *ev)
 	return 0;
 }
 
-static int wait_all(int fd, struct epoll_event *ev, int cnt, int to)
+static int wait_all(int fd, struct epoll_event *ev, int cnt, int to, const uint64_t *mask, int *nosys)
 {
 	__wasi_timestamp_t timeout = to < 0 ? UINT64_MAX : (__wasi_timestamp_t)to * 1000000;
 	__wasi_epoll_event_t stack[64];
@@ -69,7 +76,17 @@ static int wait_all(int fd, struct epoll_event *ev, int cnt, int to)
 		if (!ev2) { ev2 = stack; cnt = 64; }
 	}
 	__wasi_size_t n = 0;
-	__wasi_errno_t err = __wasi_epoll_wait(fd, ev2, (__wasi_size_t)cnt, timeout, &n);
+	__wasi_errno_t err;
+	if (mask) {
+		err = (__wasi_errno_t)__slicc_sigmask_epoll_wait((uint32_t)*mask, (uint32_t)(*mask >> 32), fd, (int32_t)(uintptr_t)ev2, (int32_t)cnt, (int64_t)timeout, (int32_t)(uintptr_t)&n);
+		if (err == ENOSYS) {
+			*nosys = 1;
+			if (ev2 != stack) free(ev2);
+			return -1;
+		}
+	} else {
+		err = __wasi_epoll_wait(fd, ev2, (__wasi_size_t)cnt, timeout, &n);
+	}
 	if (!err) {
 		for (__wasi_size_t c = 0; c < n; c++) {
 			uint32_t e = 0;
@@ -84,10 +101,21 @@ static int wait_all(int fd, struct epoll_event *ev, int cnt, int to)
 	return (int)n;
 }
 
+static int no_masked_wait;
+
 int epoll_pwait(int fd, struct epoll_event *ev, int cnt, int to, const sigset_t *sigs)
 {
 	if (cnt <= 0 || (unsigned)cnt > SIZE_MAX / sizeof(__wasi_epoll_event_t)) { errno = EINVAL; return -1; }
-	if (!sigs) return wait_all(fd, ev, cnt, to);
+	if (!sigs) return wait_all(fd, ev, cnt, to, NULL, NULL);
+	if (!no_masked_wait) {
+		uint64_t m;
+		memcpy(&m, sigs, sizeof m);
+		m &= ~UNBLOCKABLE & ~INTERNAL;
+		int nosys = 0;
+		int r = wait_all(fd, ev, cnt, to, &m, &nosys);
+		if (!nosys) return r;
+		no_masked_wait = 1;
+	}
 	unsigned before = __slicc_signals_run;
 	sigset_t old;
 	pthread_sigmask(SIG_SETMASK, sigs, &old);
@@ -96,7 +124,7 @@ int epoll_pwait(int fd, struct epoll_event *ev, int cnt, int to, const sigset_t 
 		errno = EINTR;
 		r = -1;
 	} else {
-		r = wait_all(fd, ev, cnt, to);
+		r = wait_all(fd, ev, cnt, to, NULL, NULL);
 	}
 	int e = errno;
 	pthread_sigmask(SIG_SETMASK, &old, NULL);

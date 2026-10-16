@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-31 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-32 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -128,7 +128,7 @@ done
 # #193), and socketpair() honours SOCK_NONBLOCK/SOCK_CLOEXEC (upstream
 # 2025b44a5d); sigaction reports dispositions to the kernel through
 # slicc.sigaction_set (ENOSYS on older kernels, ignored). See patches/README.md.
-echo "== wasix-sysroot: -18 members (pselect, chdir, __tz, socketpair, sigaction)"
+echo "== wasix-sysroot: -18 members (pselect, chdir, __tz, socketpair, sigaction; -32: sigaction seeds inherited SIG_IGN from slicc.sigaction_inherited)"
 homescoop_load_recipe wasix-sysroot --source wasix_libc
 LIBC_TGZ="$WORK/$(basename "$WASIX_LIBC_SRC_URL")"
 homescoop_fetch "$WASIX_LIBC_SRC_URL" "$WASIX_LIBC_SRC_SHA" "$LIBC_TGZ"
@@ -173,6 +173,7 @@ for v in "${VARIANTS[@]}"; do
   done
   "$LLVM_AR" r "$lib" "$R18_OBJ/$flavour/pselect.o" "$R18_OBJ/$flavour/chdir.o" "$R18_OBJ/$flavour/__tz.o" "$R18_OBJ/$flavour/socketpair.o" "$R18_OBJ/$flavour/sigaction.o"
   grep -q __slicc_sigaction_set <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigaction_set" >&2; exit 1; }
+  grep -q __slicc_sigaction_inherited <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigaction_inherited" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
 
@@ -491,7 +492,7 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
-echo "== wasix-sysroot: -28 members (pthread_sigmask, sigpending, sigsuspend, sigtimedwait, sigwaitinfo, sigwait, ppoll; slicc.sigmask_set / sigpending_get / sigmask_poll)"
+echo "== wasix-sysroot: -28 members (pthread_sigmask, sigpending, sigsuspend, sigtimedwait, sigwaitinfo, sigwait, ppoll; slicc.sigmask_set / sigpending_get / sigmask_poll; -32: sigwait/sigwaitinfo/sigtimedwait through slicc.sigwait)"
 R28_OBJ="$WORK/r28"
 R28_DROP=(pthread_sigmask.o sigpending.o sigsuspend.o sigtimedwait.o sigwaitinfo.o sigwait.o)
 rm -rf "$R28_OBJ" && mkdir -p "$R28_OBJ/static" "$R28_OBJ/pic"
@@ -511,13 +512,13 @@ for v in "${VARIANTS[@]}"; do
   if grep -qxE 'pthread_sigmask\.o|sigpending\.o|sigsuspend\.o|sigtimedwait\.o|sigwaitinfo\.o|sigwait\.o' <<<"$("$LLVM_AR" t "$lib")"; then
     echo "homescoop: $lib still has the upstream signal-mask members" >&2; exit 1
   fi
-  for imp in __slicc_sigmask_set __slicc_sigmask_poll; do
+  for imp in __slicc_sigmask_set __slicc_sigmask_poll __slicc_sigwait; do
     grep -q "$imp" <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks $imp" >&2; exit 1; }
   done
   echo "  $v ($flavour)"
 done
 
-echo "== wasix-sysroot: -29 members (poll skips pollfds with no read/write interest; epoll_ctl takes Linux op numbers and returns -1 with errno, epoll_wait has no 64-event cap, epoll_pwait swaps the mask)"
+echo "== wasix-sysroot: -29 members (poll skips pollfds with no read/write interest; epoll_ctl takes Linux op numbers and returns -1 with errno, epoll_wait has no 64-event cap; -32: epoll_pwait through slicc.sigmask_epoll_wait, the mask swap on ENOSYS)"
 R29_OBJ="$WORK/r29"
 rm -rf "$R29_OBJ" && mkdir -p "$R29_OBJ/static" "$R29_OBJ/pic"
 for flavour in static pic; do
@@ -541,6 +542,7 @@ for v in "${VARIANTS[@]}"; do
   for s in poll ppoll epoll_create epoll_create1 epoll_ctl epoll_wait epoll_pwait; do
     grep -qx "$s" <<<"$have" || { echo "homescoop: $lib lacks $s" >&2; exit 1; }
   done
+  grep -q __slicc_sigmask_epoll_wait <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigmask_epoll_wait" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
 

@@ -1,6 +1,7 @@
 /* homescoop: wasix-libc v2025-09-02.1 libc-top-half/musl/src/signal/sigaction.c
  * (sha256 a3cdb7ff…) with slicc.sigaction_set reporting, SA_RESETHAND and
- * SIG_IGN in __wasm_signal (wasix-sysroot -18). */
+ * SIG_IGN in __wasm_signal (wasix-sysroot -18), and the SIG_IGN dispositions
+ * inherited across exec seeded from slicc.sigaction_inherited (-32). */
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
@@ -24,6 +25,9 @@ static void slicc_report_disposition(int sig, void (*handler)(int), int flags)
 	int32_t d = handler == SIG_DFL ? 0 : handler == SIG_IGN ? 1 : 2;
 	(void)__slicc_sigaction_set(sig, d, flags);
 }
+
+__attribute__((import_module("slicc"), import_name("sigaction_inherited")))
+int32_t __slicc_sigaction_inherited(int32_t ign_ptr);
 
 static int unmask_done;
 static unsigned long handler_set[_NSIG/(8*sizeof(long))];
@@ -230,6 +234,30 @@ void __wasm_signal(int sig) {
 }
 #endif
 
+#ifndef __wasilibc_unmodified_upstream
+static volatile int inherited_state;
+
+static void seed_inherited(void)
+{
+	if (inherited_state == 2) return;
+	if (a_cas(&inherited_state, 0, 1) != 0) {
+		while (inherited_state != 2) a_spin();
+		return;
+	}
+	unsigned long long ign = 0;
+	if (__slicc_sigaction_inherited((int32_t)(uintptr_t)&ign) == 0) {
+		LOCK(__eintr_handler_lock);
+		for (int sig = 1; sig < _NSIG && sig <= 64; sig++) {
+			if (!(ign >> (sig - 1) & 1) || sig == SIGKILL || sig == SIGSTOP || sig - 32U < 3) continue;
+			if (__eintr_handler_callbacks[sig].handler == SIG_DFL)
+				__eintr_handler_callbacks[sig].handler = SIG_IGN;
+		}
+		UNLOCK(__eintr_handler_lock);
+	}
+	a_store(&inherited_state, 2);
+}
+#endif
+
 int __libc_sigaction(int sig, const struct sigaction *restrict sa, struct sigaction *restrict old)
 {
 	struct k_sigaction ksa, ksa_old;
@@ -269,6 +297,7 @@ int __libc_sigaction(int sig, const struct sigaction *restrict sa, struct sigact
 	if (a_cas(&__eintr_callback_registered, 0, 1) == 0) {
 		__wasi_callback_signal("__wasm_signal");
 	}
+	seed_inherited();
 	int r = 0;
 	if (sig-32U < 3 || sig-1U >= _NSIG-1) {
 		r = EINVAL;
