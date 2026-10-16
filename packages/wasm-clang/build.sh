@@ -249,6 +249,22 @@ sys.exit(subprocess.run(cmd).returncode)
 PY
 test -f "$OUT_DIR/llvm.js" && test -f "$OUT_DIR/llvm.wasm"
 mv "$OUT_DIR/llvm.js" "$OUT_DIR/llvm"
+# slicc-emscripten's appended Node-host runner must stay out of a host that
+# calls main itself (noInitialRun: slicc-kernel's Node process worker;
+# homescoop#276). The 24.0.0-15 repack applies glue-node-runner.patch.
+python3 - "$OUT_DIR/llvm" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="latin1").read()
+old = "// Node run can move files between the host disk and the in-wasm filesystem.\nif (typeof process !== 'undefined' && process.versions && process.versions.node) {\n"
+new = ("// Node run can move files between the host disk and the in-wasm filesystem.\n"
+       "// A host that calls main itself sets noInitialRun, as slicc-kernel's Node\n"
+       "// process worker does; then this runner stays out of it (homescoop#276).\n"
+       "if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {\n")
+if s.count(old) != 1 and new not in s:
+    sys.exit("homescoop: llvm glue: the Node-host runner's guard is not the expected one (homescoop#276)")
+open(p, "w", encoding="latin1").write(s.replace(old, new))
+PY
 n=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).read_text().count("sliccKernel"))' "$OUT_DIR/llvm")
 echo "  sliccKernel refs: $n"
 [[ "$n" -gt 0 ]] || { echo "homescoop: PRESTAGE fail — llvm glue has 0 sliccKernel" >&2; exit 1; }

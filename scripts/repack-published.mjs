@@ -14,14 +14,18 @@
  *     files:               # optional; repo files laid over the base, from
  *       - README.md        # packages/<name>/package/<f>, else the build
  *                          # source packages/<name>/<f> (package.json always)
+ *       - bin/cc=drivers/wasix-driver.sh   # <f>=<src>: from packages/<name>/<src>
+ *     patches:             # optional; unified diffs over the base's files
+ *       - glue.patch       # (packages/<name>/<p>, paths a/package/… b/package/…),
+ *                          # applied with patch -p1 after `files`
  *     fields:              # optional; package.json metadata that may
  *       - engines          # change too (diff-published ALLOW_KEYS:
  *                          # engines, description, keywords, slicc.env)
  *
  * The base is `npm pack <recipe.npm>@<from>` (npm checks the registry
  * integrity). Its tar stream is copied entry by entry, headers included;
- * only package/package.json (and `files`) get the repo's bytes from
- * packages/<name>/package/. No npm pack of an extracted tree: that would
+ * only package/package.json (and `files`, and the files `patches` touch) get
+ * new bytes, from packages/<name>/package/ (or the patches). No npm pack of an extracted tree: that would
  * re-apply `files` globs, which differ between case-insensitive and Linux
  * filesystems. diff-published.mjs then checks the result: only package.json
  * "version" and @ai-ecoverse/* pins may differ from the base. host-run.sh
@@ -32,7 +36,8 @@
  * Does not publish.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -40,8 +45,63 @@ import { pinErrors } from './check-exact-pins.mjs';
 import { diffTarballs, fetchPublished, readTarball, sha256 } from './diff-published.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const args = process.argv.slice(2);
+
+/** The tarball paths (package/…) a unified diff touches, from its +++ lines. */
+export function patchTargets(text) {
+  const out = [];
+  for (const m of text.matchAll(/^\+\+\+ b\/(\S+)/gm)) if (!out.includes(m[1])) out.push(m[1]);
+  return out;
+}
+
+/**
+ * Apply a unified diff (a/package/… b/package/…) to tarball entries with
+ * `patch -p1`: `get(path)` gives each target's current bytes; returns
+ * path → patched bytes. Throws when patch rejects a hunk or a target is not
+ * a file of the base.
+ * @param {string} text
+ * @param {(path: string) => Buffer | undefined} get
+ * @returns {Map<string, Buffer>}
+ */
+export function applyPatch(text, get) {
+  const targets = patchTargets(text);
+  if (!targets.length) throw new Error('patch names no +++ b/<path> target');
+  const dir = mkdtempSync(join(tmpdir(), 'repack-patch-'));
+  try {
+    for (const t of targets) {
+      if (!t.startsWith('package/') || t.includes('..')) throw new Error(`patch target ${t} is not under package/`);
+      const data = get(t);
+      if (!data) throw new Error(`patch target ${t} is not a file of the base`);
+      mkdirSync(dirname(join(dir, t)), { recursive: true });
+      writeFileSync(join(dir, t), data);
+    }
+    const r = spawnSync('patch', ['-p1', '-d', dir, '--forward', '--batch', '--no-backup-if-mismatch', '-F0', '-r', '-'], { input: text, encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`patch failed (rc ${r.status}):\n${r.stdout}${r.stderr}`);
+    return new Map(targets.map((t) => [t, readFileSync(join(dir, t))]));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 let name;
+const die = (msg) => {
+  console.error(`repack-published (${name}): ${msg}`);
+  process.exit(1);
+};
+
+// Run as a script (not imported by a test). Compare real paths: ladder-pr
+// builds from /home/runner/work/…, a link to the pool's workspace, and
+// import.meta.url is the link's target.
+const invoked = (() => {
+  try {
+    return realpathSync(process.argv[1] ?? '') === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+if (invoked) main();
+
+function main() {
+const args = process.argv.slice(2);
 let outDir = process.env.HOMESCOOP_OUT || join(root, '.homescoop-out');
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--out') outDir = args[++i];
@@ -57,10 +117,6 @@ if (!name) {
 }
 outDir = resolve(outDir);
 
-const die = (msg) => {
-  console.error(`repack-published (${name}): ${msg}`);
-  process.exit(1);
-};
 const run = (cmd, argv, opts = {}) => {
   const r = spawnSync(cmd, argv, { encoding: 'utf8', ...opts });
   if (r.status !== 0) die(`${cmd} ${argv.join(' ')} failed:\n${r.stderr || r.stdout}`);
@@ -70,10 +126,20 @@ const run = (cmd, argv, opts = {}) => {
 const recipe = JSON.parse(run(process.execPath, [join(root, 'scripts/read-recipe.mjs'), name, '--json']));
 const from = String(recipe.repack?.from || '');
 if (!from) die('recipe has no repack.from');
-const extra = Array.isArray(recipe.repack?.files) ? recipe.repack.files.map(String) : [];
+const fileSpecs = (Array.isArray(recipe.repack?.files) ? recipe.repack.files.map(String) : []).map((spec) => {
+  const [f, src] = spec.split('=');
+  return { f, src };
+});
+const extra = fileSpecs.map(({ f }) => f);
 const fields = Array.isArray(recipe.repack?.fields) ? recipe.repack.fields.map(String) : [];
-for (const f of extra) {
-  if (f === 'package.json' || f.includes('..') || f.startsWith('/')) die(`bad repack.files entry ${f}`);
+const patches = Array.isArray(recipe.repack?.patches) ? recipe.repack.patches.map(String) : [];
+for (const { f, src } of fileSpecs) {
+  for (const p of [f, src ?? '']) {
+    if (p === 'package.json' || p.includes('..') || p.startsWith('/')) die(`bad repack.files entry ${f}${src ? `=${src}` : ''}`);
+  }
+}
+for (const p of patches) {
+  if (p.includes('..') || p.startsWith('/') || !p.endsWith('.patch')) die(`bad repack.patches entry ${p}`);
 }
 const repoPkgDir = join(root, 'packages', name, 'package');
 const repoPkg = JSON.parse(readFileSync(join(repoPkgDir, 'package.json'), 'utf8'));
@@ -83,7 +149,7 @@ const pins = pinErrors(repoPkg);
 if (pins.length) die(`not exact:\n  - ${pins.join('\n  - ')}`);
 
 const spec = `${repoPkg.name}@${from}`;
-console.log(`== repack-published: ${spec} + packages/${name}/package/{${['package.json', ...extra].join(',')}} → ${repoPkg.version}`);
+console.log(`== repack-published: ${spec} + packages/${name}/package/{${['package.json', ...extra].join(',')}}${patches.length ? ` + patches ${patches.join(', ')}` : ''} → ${repoPkg.version}`);
 const baseTgz = fetchPublished(spec);
 const baseEntries = readTarball(baseTgz);
 const basePj = baseEntries.get('package/package.json');
@@ -95,17 +161,34 @@ if (up(basePkg) !== up(repoPkg)) die(`homescoop.upstream ${up(basePkg)} (base) !
 
 /** @type {Map<string, Buffer>} */
 const replace = new Map();
-for (const f of ['package.json', ...extra]) {
-  // A repo file under package/, else the build-source copy beside it that
-  // build.sh stages into the package (e.g. wasm-emscripten's emscripten-config).
+for (const { f, src: from } of [{ f: 'package.json' }, ...fileSpecs]) {
+  // <f>=<src>: packages/<name>/<src> (wasm-clang's bin/cc from its drivers/).
+  // Else a repo file under package/, else the build-source copy beside it
+  // that build.sh stages into the package (wasm-emscripten's emscripten-config).
   const staged = join(repoPkgDir, f);
-  const src = existsSync(staged) || f === 'package.json' ? staged : join(root, 'packages', name, f);
-  if (!existsSync(src)) die(`missing ${staged} (or packages/${name}/${f})`);
+  const src = from ? join(root, 'packages', name, from) : existsSync(staged) || f === 'package.json' ? staged : join(root, 'packages', name, f);
+  if (!existsSync(src)) die(from ? `missing packages/${name}/${from}` : `missing ${staged} (or packages/${name}/${f})`);
   if (!baseEntries.has(`package/${f}`)) die(`${spec} has no package/${f} to replace`);
   replace.set(`package/${f}`, readFileSync(src));
 }
+const patched = [];
+for (const p of patches) {
+  const file = join(root, 'packages', name, p);
+  if (!existsSync(file)) die(`missing packages/${name}/${p}`);
+  let out;
+  try {
+    out = applyPatch(readFileSync(file, 'utf8'), (t) => replace.get(t) ?? (baseEntries.get(t)?.type === '0' ? baseEntries.get(t).data : undefined));
+  } catch (e) {
+    die(`${p}: ${e.message}`);
+  }
+  for (const [t, data] of out) {
+    replace.set(t, data);
+    if (!patched.includes(t.slice('package/'.length))) patched.push(t.slice('package/'.length));
+  }
+  console.log(`== repack-published: ${p} patched ${out.size} file(s)`);
+}
 const next = rewriteTarball(baseTgz, replace);
-const res = diffTarballs(next, baseTgz, { allow: extra, allowKeys: fields, baseLabel: spec });
+const res = diffTarballs(next, baseTgz, { allow: [...extra, ...patched], allowKeys: fields, baseLabel: spec });
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'packaging-only-diff.txt'), `${res.report}\n`);
 console.log(res.report);
@@ -115,6 +198,7 @@ writeFileSync(dest, next);
 writeFileSync(`${dest}.sha256`, `${sha256(next)}  package.tgz\n`);
 console.log(`== repack-published: ${dest}`);
 console.log(`${repoPkg.name}@${repoPkg.version} sha256 ${sha256(next)}`);
+}
 
 /**
  * Copy the base tar stream entry by entry, header bytes included; only the
@@ -124,7 +208,7 @@ console.log(`${repoPkg.name}@${repoPkg.version} sha256 ${sha256(next)}`);
  * @param {Buffer} tgz
  * @param {Map<string, Buffer>} replace
  */
-function rewriteTarball(tgz, replace) {
+export function rewriteTarball(tgz, replace) {
   const buf = gunzipSync(tgz);
   const parts = [];
   const done = new Set();
