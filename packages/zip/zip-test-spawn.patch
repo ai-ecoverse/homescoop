@@ -1,0 +1,149 @@
+--- a/zip.c
++++ b/zip.c
+@@ -1279,6 +1279,70 @@
+ }
+ #endif /* !MACOS */
+ 
++#ifdef __EMSCRIPTEN__
++/* slicc (homescoop#432): zip -T ran "unzip -v" through popen() and
++   "unzip -t -qq 'name'" through system(), that is through /bin/sh, which
++   seven has only when a shell is installed, and so failed with "could not
++   spawn unzip" without one.  Run unzip itself, found on PATH, with an argv
++   and no shell; an archive name needs no quoting.  A command given with -TT
++   is still a shell command and still runs through system(). */
++#include <spawn.h>
++#include <sys/wait.h>
++extern char **environ;
++
++/* Reap pid: its wait status, as system() and pclose() return, or -1. */
++local int unzip_wait(pid_t pid)
++{
++  int status;
++
++  while (waitpid(pid, &status, 0) < 0) {
++    if (errno != EINTR)
++      return -1;
++  }
++  return status;
++}
++
++/* Start argv; when out is not NULL, *out reads its stdout.  The pid, or -1. */
++local pid_t unzip_spawn(char **argv, FILE **out)
++{
++  posix_spawn_file_actions_t fa;
++  int p[2] = {-1, -1};
++  pid_t pid;
++  int r;
++
++  if (out != NULL && pipe(p) != 0)
++    return -1;
++  if (posix_spawn_file_actions_init(&fa) != 0) {
++    if (out != NULL) { close(p[0]); close(p[1]); }
++    return -1;
++  }
++  if (out != NULL &&
++      (posix_spawn_file_actions_adddup2(&fa, p[1], 1) != 0 ||
++       posix_spawn_file_actions_addclose(&fa, p[0]) != 0 ||
++       posix_spawn_file_actions_addclose(&fa, p[1]) != 0)) {
++    posix_spawn_file_actions_destroy(&fa);
++    close(p[0]); close(p[1]);
++    return -1;
++  }
++  r = posix_spawnp(&pid, argv[0], &fa, NULL, argv, environ);
++  posix_spawn_file_actions_destroy(&fa);
++  if (out != NULL)
++    close(p[1]);
++  if (r != 0) {
++    if (out != NULL)
++      close(p[0]);
++    errno = r;
++    return -1;
++  }
++  if (out != NULL && (*out = fdopen(p[0], "r")) == NULL) {
++    close(p[0]);
++    unzip_wait(pid);
++    return -1;
++  }
++  return pid;
++}
++#endif /* __EMSCRIPTEN__ */
++
+ local int check_unzip_version(unzippath)
+   char *unzippath;
+ {
+@@ -1291,11 +1355,22 @@
+     char buf[1001];
+     float UnZip_Version = 0.0;
+ 
++#ifdef __EMSCRIPTEN__
++    char *argv[3];
++    pid_t pid;
++
++    argv[0] = unzippath;
++    argv[1] = "-v";
++    argv[2] = NULL;
++    if ((pid = unzip_spawn(argv, &unzip_out)) < 0) {
++      unzip_out = NULL;
++#else
+     cmd[0] = '\0';
+     strncat(cmd, unzippath, 4000);
+     strcat(cmd, " -v");
+ 
+     if ((unzip_out = popen(cmd, "r")) == NULL) {
++#endif
+       perror("unzip pipe error");
+     } else {
+       if (fgets(buf, 1000, unzip_out) == NULL) {
+@@ -1311,7 +1386,12 @@
+           }
+         }
+       }
++#ifdef __EMSCRIPTEN__
++      fclose(unzip_out);
++      unzip_wait(pid);
++#else
+       pclose(unzip_out);
++#endif
+     }
+     if (UnZip_Version < 6.0 && zip64_archive) {
+       sprintf(buf, "Found UnZip version %4.2f", UnZip_Version);
+@@ -1472,6 +1552,26 @@
+     unzip_path = NULL;
+ 
+   } else {
++# ifdef __EMSCRIPTEN__
++    char *argv[5];
++    int i = 0;
++    pid_t pid;
++
++    if (check_unzip_version("unzip") == 0)
++      ZIPERR(ZE_TEST, zipfile);
++    argv[i++] = "unzip";
++    argv[i++] = "-t";
++    if (!verbose) argv[i++] = "-qq";
++    argv[i++] = zipname;
++    argv[i] = NULL;
++    if ((pid = unzip_spawn(argv, (FILE **)NULL)) < 0) {
++      perror("unzip");
++      result = -1;
++    } else {
++      result = unzip_wait(pid);
++    }
++    cmd = NULL;
++# else /* !__EMSCRIPTEN__ */
+     if ((cmd = malloc(20 + strlen(zipname))) == NULL) {
+       ziperr(ZE_MEM, "building command string for testing archive");
+     }
+@@ -1491,8 +1591,12 @@
+ # else
+     strcat(cmd, zipname);
+ # endif
++# endif /* ?__EMSCRIPTEN__ */
+   }
+ 
++# ifdef __EMSCRIPTEN__
++  if (cmd != NULL)  /* -TT: the user's command, through the shell */
++# endif
+   result = system(cmd);
+ # ifdef VMS
+   /* Convert success severity to 0, others to non-zero. */

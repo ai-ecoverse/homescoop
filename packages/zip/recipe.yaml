@@ -1,12 +1,16 @@
 # Info-ZIP zip 3.0 + unzip 6.0 for slicc wasm realm.
 name: zip
 builder: host
+reproducible: true
 version: "3.0.0"
 npm: "@ai-ecoverse/wasm-zip"
 summary: "Info-ZIP zip/unzip for slicc"
 source:
   url: "https://deb.debian.org/debian/pool/main/z/zip/zip_3.0.orig.tar.gz"
   sha256: "f0e8bb1f9b7eb0b01285495a2699df3a4b766784c1765a8f1aeedf63c0806369"
+  # SOURCE_DATE_EPOCH for __DATE__ in zip -v / unzip -v (homescoop#441):
+  # UnZip 6.00's release day, 2009-04-20T00:00:00Z, the newer of the two.
+  epoch: "1240185600"
 sources:
   unzip:
     version: "6.0"
@@ -21,4 +25,8 @@ about:
   license: Info-ZIP
   notes: |
     Builds zip 3.0 and unzip 6.0 (second tarball fetched in build.sh).
-    Links slicc cli profile.
+    Links slicc cli profile. zip-*.patch go into zip's tree, in filename
+    order: zip -s 0 of a split archive (split-copy, #440), zip - to stdout
+    (stdout-seek, #439), zip -T without a shell and a failed test's double
+    fclose (test-spawn, test-failed-fclose, #432). cert/meta.json maps each
+    to its spec.

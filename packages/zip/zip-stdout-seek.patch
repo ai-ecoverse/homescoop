@@ -1,0 +1,22 @@
+--- a/zip.c
++++ b/zip.c
+@@ -4810,7 +4810,19 @@
+ #  endif
+     y = zfdopen(fileno(stdout), FOPW);
+ #else
++# ifdef __EMSCRIPTEN__
++    /* Emscripten's stdout FILE has a seek hook that moves nothing and
++       returns 0, so is_seekable() takes any stdout, a pipe too, for a
++       seekable file, and every local header "rewritten" after its data
++       lands at the end of the stream instead (homescoop#439).  A FILE of
++       our own on fd 1 seeks with lseek(): a redirect to a file seeks, a
++       pipe fails with ESPIPE and gets data descriptors, as on Unix. */
++    if ((y = zfdopen(fileno(stdout), FOPW)) == NULL) {
++      ZIPERR(ZE_CREAT, "stdout");
++    }
++# else
+     y = stdout;
++# endif
+ #endif
+     /* tempzip must be malloced so a later free won't barf */
+     tempzip = malloc(4);

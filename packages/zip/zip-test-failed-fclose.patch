@@ -1,0 +1,14 @@
+--- a/zip.c
++++ b/zip.c
+@@ -5910,6 +5910,11 @@
+   if (fclose(y)) {
+     ZIPERR(d ? ZE_WRITE : ZE_TEMP, tempzip);
+   }
++  /* bfwrite() keeps the output in current_local_file too: forget it, or a
++     failed zip -T reaches ziperr(), which closes it again and crashes
++     (rc 70 instead of 8, homescoop#432). */
++  if (current_local_file == y)
++    current_local_file = NULL;
+   y = NULL;
+   if (in_file != NULL) {
+     fclose(in_file);

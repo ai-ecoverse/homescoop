@@ -1,8 +1,62 @@
 # Negative proof (zip)
 
+## 3.0.0-2 (homescoop#431, #432, #439, #440, #441)
+
+**Date:** 2026-10-16, slicc-kernel 1.94.0 (`cert/meta.json`, users enforce), wasm-bash 5.3.0-18 and wasm-coreutils 9.12.0-7 installed for `cert/*.mjs`, nothing but wasm-zip for `cert/noshell/`. Local builds (macOS arm64, emsdk 4.0.23, `bash scripts/host-run.sh zip`): the 3.0.0-2 tarball passes every spec and `cert/noshell/`, also on slicc-kernel 1.100.4.
+
+### Each patch removed
+
+The 3.0.0-2 recipe, rebuilt with one patch left out (the other three applied):
+
+| Left out | Fails | How |
+| --- | --- | --- |
+| `zip-split-copy.patch` | `split.mjs` | `unzip -tq of the merged 1m split: rc 2`, `error:  invalid compressed data to inflate r.bin` |
+| `zip-stdout-seek.patch` | `stdout.mjs` | `unzip -t file.zip: rc 2`, `warning [file.zip]:  128 extra bytes at beginning or within zipfile` |
+| `zip-test-failed-fclose.patch` | `ztest.mjs` | `zip -T -TT false: rc 70`, `test of bad.zip FAILED` then `Aborted(native code called abort())` |
+| `zip-test-spawn.patch` | `ztest.mjs`, `noshell/ztest.mjs` | `zip -T "it's $HOME.zip": rc 8` with `sh: -c: line 1: unexpected EOF while looking for matching '''`; with no shell, `zip -T: rc 8` |
+
+Every other spec passes in each of these builds.
+
+### The published 3.0.0-1, and main's build.sh
+
+`@ai-ecoverse/wasm-zip@3.0.0-1` (npm) and main's build.sh with only unzip's link line fixed (`LF2`, so it builds after #459; no patches, no Unicode flags, no `SOURCE_DATE_EPOCH`) fail the same specs. `roundtrip.mjs` passes on both.
+
+- `options.mjs`: `zip -v lists UNICODE_SUPPORT`. With `--soft` also: unzip has no `UNICODE_SUPPORT` or `MBCS-support`, and both print `Compiled ... on Sep 28 2026.` (3.0.0-1) or the day of the build (`on Oct 16 2026.`) instead of `on Apr 20 2009.` (#441).
+- `utf8.mjs`: `unzip -l shows café.txt`. It lists `caf??.txt`, `??n??/??????.txt`, and the CP437 name with a Unicode Path extra field as `na?ve.txt`. `--soft` shows the rest:
+  - `out/naïve.txt: No such file or directory`. unzip ignores the extra field and creates the CP437 name, which isn't UTF-8: Emscripten logs `Invalid UTF-8 leading byte 0x0000008b`, and the file gets a mangled name;
+  - `naïve.txt: UTF-8 flag (bit 11) 0 !== 2048`, the same for `ü/` and `ü/名.txt`.
+  - The UTF-8-flagged names do extract under their names with their bytes. On this kernel the "Is a directory" failure of #431 (slicc-kernel#756) does not reproduce, with these builds or with 3.0.0-1.
+- `stdout.mjs`: `unzip -t file.zip: rc 2`, `128 extra bytes at beginning or within zipfile` (#439).
+- `split.mjs`: `unzip -tq of the merged 1m split: rc 2`, `invalid compressed data to inflate r.bin` (#440).
+- `ztest.mjs`:
+  - 3.0.0-1: `zip -T: rc 70`, `unzip pipe error: Function not implemented`, then `RuntimeError: null function`;
+  - main's build: `zip -T -TT false: rc 70`;
+  - main's build without a shell (`cert/noshell/`): `zip -T: rc 8`, `unzip pipe error: No such file or directory` (#432).
+
+### Empty wasm
+
+```
+browser-cert: FAIL packages/zip/cert/options.mjs (crash at packages/zip/cert/options.mjs:3)
+Error: Error: WebAssembly.compile(): BufferSource argument is empty
+browser-cert: FAIL packages/zip/cert/roundtrip.mjs (crash at packages/zip/cert/roundtrip.mjs:10)
+browser-cert: FAIL packages/zip/cert/split.mjs
+browser-cert: FAIL packages/zip/cert/stdout.mjs
+browser-cert: FAIL packages/zip/cert/utf8.mjs (crash at packages/zip/cert/utf8.mjs:21)
+browser-cert: FAIL packages/zip/cert/ztest.mjs (crash at packages/zip/cert/ztest.mjs:15)
+prove-negative: ok — cert failed on bad zip tarball (status 1)
+```
+
+### The causes
+
+- **#439** is Emscripten's libc, not the kernel. Its `stdout` FILE has a seek hook that returns 0 and moves nothing (`__emscripten_stdout_seek` in `musl/src/stdio/stdout.c`). So zip's `is_seekable()` takes any stdout for a seekable file, a pipe too. Each local header "rewritten" after its data then lands at the end of the stream. `lseek(1, …)` through the kernel is right: EINVAL on a file at 0, ESPIPE on a pipe. The patch writes through `fdopen(1)`, whose seek is `lseek`.
+- **#440** is upstream zip 3.0, and macOS's `/usr/bin/zip` 3.0 does the same: `zip -s 64k` then `zip -s 0 --out` corrupts the archive there too. `bfcopy()` opens the next split only when a read sees EOF. When an entry's bytes on a split end exactly on a 16 KiB read (`CBSZ`), the next read returns 0 and the copy stops short. That happens on every middle split of a 1m or 64k split. The parts zip -s writes in seven match macOS's byte for byte, apart from the timestamps and owner ids, and macOS's zip -s 0 of seven's parts fails the same way.
+- **#432**: zip -T ran `unzip -v` with `popen()` and `unzip -t -qq 'name'` with `system()`, both through `/bin/sh`. Without a shell that fails, and a name with a quote breaks the command line even with one. The patch spawns unzip with an argv. A failed test then crashed: `bfwrite()` keeps the output in `current_local_file`, and `ziperr()` closed it a second time (upstream).
+
+## 3.0.0-1 (#429)
+
 **Date:** 2026-10-15, slicc-kernel 1.94.0 (users enforce), against the ladder-pr artifact of #429 (`host-zip-pr429`, package.tgz sha256 `0ea3f809cf92d606d5a5297207be068a6f22b683baac39e3cf1f5168cb01e54b`, version 3.0.0-1). This is the first cert/ for zip (homescoop#426), so zip isn't in `scripts/ci-certified.json`.
 
-## Empty wasm
+### Empty wasm
 
 ```
 browser-cert: FAIL packages/zip/cert/options.mjs (crash at packages/zip/cert/options.mjs:3)
@@ -12,7 +66,7 @@ Error: Error: WebAssembly.compile(): BufferSource argument is empty
 prove-negative: ok — cert failed on bad zip tarball (status 1)
 ```
 
-## The build before #429
+### The build before #429
 
 main's `build.sh` (at 57e6ab5d … bd70917c) builds nothing:
 
@@ -32,7 +86,7 @@ AssertionError [ERR_ASSERTION]: zip -r: rc 19
 zip error: Not supported (uzoff_t not same size as zoff_t)
 ```
 
-## The specs aren't vacuous
+### The specs aren't vacuous
 
 - `options.mjs`: `zip -v` and `unzip -v` must name Zip 3.0 and UnZip 6.00 and list LARGE_FILE_SUPPORT, ZIP64_SUPPORT and the rest of the published 3.0.0-1's options. A build without the flags fails, as shown above.
 - `roundtrip.mjs` runs as the user cone (users enforce):

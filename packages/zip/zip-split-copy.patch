@@ -1,0 +1,27 @@
+--- a/fileio.c
++++ b/fileio.c
+@@ -1628,6 +1628,16 @@
+         free((zvoid *)b);
+         return ZE_READ;
+       }
++      else if (!des && n != (uzoff_t)(-1L) && m < n &&
++               current_in_disk + 1 < total_disks) {
++        /* This split ended exactly where the last read did, so that read
++           did not see EOF and the check below did not open the next split.
++           Open it now instead of ending the entry short.  It happens when
++           an entry's bytes on a split are a multiple of CBSZ: on every
++           middle split when the split size is one (zip -s 64k, -s 1m),
++           and zip -s 0 truncated the entry there (homescoop#440). */
++        goto next_split;
++      }
+       else {
+         break;
+       }
+@@ -1847,6 +1857,7 @@
+       continue;
+ 
+     if ((des || n != (uzoff_t)(-1L)) && m < n && feof(in_file)) {
++next_split:
+       /* open next split */
+       current_in_disk++;
+ 
