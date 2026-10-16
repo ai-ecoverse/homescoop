@@ -35,16 +35,8 @@ bzip2 Emscripten #684
 bzip2 files #684
 cmake Emscripten #684
 cmake files #684
-coreutils Emscripten #684
-coreutils files #684
-findutils Emscripten #684
-findutils files #684
 gmake Emscripten #684
 gmake files #684
-grep Emscripten #684
-grep files #684
-gzip Emscripten #684
-gzip files #684
 mount Emscripten #684
 mount files #684
 ncurses-utils Emscripten #684
@@ -53,8 +45,6 @@ pkgconf Emscripten #684
 pkgconf files #684
 procps Emscripten #684
 procps files #684
-sed Emscripten #684
-sed files #684
 sqlite3 Emscripten #684
 sqlite3 files #684
 tree Emscripten #684
