@@ -4,6 +4,8 @@ set -euo pipefail
 HOMESCOOP_ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=/dev/null
 source "$HOMESCOOP_ROOT/scripts/build-common.sh"
+# shellcheck source=/dev/null
+source "$HOMESCOOP_ROOT/scripts/notices-common.sh"
 homescoop_load_recipe wasix-m4
 
 PKG="$HOMESCOOP_PKG"
@@ -92,4 +94,10 @@ if [[ -x "$WASM_OPT" ]]; then
 fi
 
 homescoop_stage_license "$SRC/COPYING"
+# m4.wasm links wasix-libc statically (homescoop#713). The GPL source:
+# SOURCES.md names the upstream tarball, and the patch ships beside it.
+homescoop_notices_begin "m4.wasm statically links the following."
+homescoop_notice_wasix_libc
+mkdir -p "$DEST/patches"
+cp "$PKG/getlocalename-wasix.patch" "$DEST/patches/"
 echo "== wasix-m4 staged $(du -sh "$DEST/bin/m4.wasm" | awk '{print $1}')"

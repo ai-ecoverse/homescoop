@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-m4",
-  "version": "1.4.20-3",
+  "version": "1.4.20-4",
   "description": "GNU m4 for slicc WASIX (fcntl F_SETFD fix via wasix-sysroot 2025.9.30-14)",
   "license": "GPL-3.0-or-later",
   "engines": {
@@ -14,6 +14,9 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "SOURCES.md",
+    "patches",
     "bin"
   ],
   "publishConfig": {
