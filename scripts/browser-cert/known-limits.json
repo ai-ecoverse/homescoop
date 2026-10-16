@@ -91,6 +91,15 @@
       "version": "<5.42.0-12",
       "issue": "ai-ecoverse/homescoop#383",
       "why": "5.42.0-11 ships bin/perl.wasm 0644, so with the tarball's modes (slicc-kernel >= 1.86.0) the spec sees 644; 5.42.0-12 ships it 0755. Kernels before 1.86.0 have no kernel.chmod, so the harness leaves bin/ at the default 0755 and the reference passes. Lapses when bios pins perl -12"
+    },
+    {
+      "package": "@ai-ecoverse/wasix-python",
+      "spec": "epoll.mjs",
+      "case": "select\\.poll with an events-0 fd: |register twice must be EEXIST: |unregister of an unregistered fd must be ENOENT: ",
+      "kernel": "*",
+      "version": "<3.14.2-20",
+      "issue": "ai-ecoverse/homescoop#525",
+      "why": "3.14.2-19 and older link wasix-sysroot 2025.9.30-28 or older (bios's catalog pins -18, on -27). That libc's poll() refuses an fd with events 0 (ENOSYS) before it reaches the kernel, and its epoll_ctl passes Linux's ADD (1) untranslated, which the kernel's dual numbering reads as add-or-modify: register twice gives 0, and so does unregister again (slicc-kernel#684 drops the dual numbering). 3.14.2-20 is on sysroot -29 (homescoop#443) and passes"
     }
   ]
 }
