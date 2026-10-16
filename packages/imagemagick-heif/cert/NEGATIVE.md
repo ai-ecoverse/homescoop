@@ -76,3 +76,27 @@ Against the certified, unpublished 7.1.2-33-1 artifact of run 38603486003
   The full policy.mjs fails earlier, at its limits table (768MiB/512MiB/512MiB
   instead of 1.5GiB/256MiB/0B). On 7.1.2-34-1 the same 48 MP resize takes
   about 2.5 s, and 12 MP about 0.6 s.
+
+## 7.1.2-34-2: panoramas, name section
+
+Against the published `@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-34-1 (npm
+`latest`), slicc-kernel 1.81.0, `--users enforce`, 2026-10-16:
+
+- policy.mjs (wasm-imagemagick's) fails at its limits table (`Width:
+  16000P`). Its homescoop#445 case alone:
+
+  ```
+  identify -format: rc 1 "" identify: width or height exceeds limit `pano.jpg' (18000x3000) > (16000x16000) @ error/cache.c/OpenPixelCache/3813.
+  magick pano.jpg -resize 2000x thumb.jpg: rc 1 magick: width or height exceeds limit `pano.jpg' (18000x3000) > (16000x16000) @ error/cache.c/OpenPixelCache/3813.
+  ```
+
+- `cert/lib/relink-check.mjs` (homescoop#396): the kit relinks (same imports
+  and exports as the shipped binary), then
+
+  ```
+  Error: shipped magick.wasm has no name section (homescoop#396)
+  ```
+
+  7.1.2-34-1 configured with `CXXFLAGS="-g1 -O2"`, and utilities/magick is a
+  C++ link, so emcc stripped the name section and the line tables. With
+  `-g` (wasm-imagemagick's default) both stay.

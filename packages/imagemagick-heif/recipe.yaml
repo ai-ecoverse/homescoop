@@ -1,5 +1,10 @@
 name: imagemagick-heif
 builder: host
+# Shared with packages/imagemagick: build.sh copies its policy-tab.xml, and
+# cert/ re-exports its policy.mjs and mogrify.mjs and uses its cert/lib.
+inputs:
+  - packages/imagemagick/policy-tab.xml
+  - packages/imagemagick/cert/**
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
 version: "7.1.2-34"
 npm: "@ai-ecoverse/wasm-imagemagick-heif"
@@ -49,3 +54,10 @@ about:
     went to the disk cache and hung for minutes): memory 1536MiB, map
     256MiB (memory + map 1.75 GiB, under the build's 2 GiB maximum
     memory), disk 0.
+    7.1.2-34-2: tab policy width/height 64KP, not 16KP (homescoop#445,
+    panoramas). magick.wasm keeps its name section and line tables
+    (homescoop#396): utilities/magick is a C++ link, and CXXFLAGS -g1
+    stripped both; it is -g now, as wasm-imagemagick's default, and
+    relink.sh links with -g too. build.sh configures again a $WORK tree
+    configured with other delegates, and checks the delegates outside the
+    skip (homescoop#350).

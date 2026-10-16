@@ -43,3 +43,28 @@ Against the certified, unpublished 7.1.2-33-1 artifact of run 38603486003
   The full policy.mjs fails earlier, at its limits table (768MiB/512MiB/512MiB
   instead of 1.5GiB/256MiB/0B). On 7.1.2-34-1 the same 48 MP resize takes
   about 2.5 s, and 12 MP about 0.6 s.
+
+## 7.1.2-34-2: panoramas, relink kit
+
+Against the published `@ai-ecoverse/wasm-imagemagick` 7.1.2-34-1 (npm
+`latest`), slicc-kernel 1.81.0, `--users enforce`, 2026-10-16:
+
+- policy.mjs fails at its limits table (`Width: 16000P` where 64000P is
+  expected). Its homescoop#445 case alone (an 18000x3000 JPEG made with
+  `magick-open`, then plain `identify -format` and `magick -resize`):
+
+  ```
+  identify -format: rc 1 "" identify: width or height exceeds limit `pano.jpg' (18000x3000) > (16000x16000) @ error/cache.c/OpenPixelCache/3813.
+  magick pano.jpg -resize 2000x thumb.jpg: rc 1 magick: width or height exceeds limit `pano.jpg' (18000x3000) > (16000x16000) @ error/cache.c/OpenPixelCache/3813.
+  AssertionError [ERR_ASSERTION]: identify -format pano.jpg: rc 1 identify: width or height exceeds limit `pano.jpg' (18000x3000) > (16000x16000) @ error/cache.c/OpenPixelCache/3813.
+  ```
+
+  The same binary with 7.1.2-34-2's `policy-tab.xml` in place of its
+  `etc/ImageMagick-7/policy.xml` passes the whole policy.mjs (identify 0.3 s,
+  thumbnail 1.1 s): the change is the policy, not the build.
+
+- `cert/lib/relink-check.mjs` (homescoop#395):
+
+  ```
+  Error: ai-ecoverse-wasm-imagemagick-7.1.2-34-1.tgz has no share/imagemagick/relink/relink.sh (homescoop#395)
+  ```

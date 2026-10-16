@@ -16,6 +16,6 @@
   <policy domain="resource" name="map" value="256MiB"/>
   <policy domain="resource" name="disk" value="0"/>
   <policy domain="resource" name="area" value="64MP"/>
-  <policy domain="resource" name="width" value="16KP"/>
-  <policy domain="resource" name="height" value="16KP"/>
+  <policy domain="resource" name="width" value="64KP"/>
+  <policy domain="resource" name="height" value="64KP"/>
 </policymap>
