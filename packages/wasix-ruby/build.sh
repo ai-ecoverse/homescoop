@@ -819,7 +819,7 @@ for rel in (
     f"lib/ruby/{api}",
     f"lib/ruby/{api}/{arch_name}",
 ):
-    if (dest / rel).is_dir():
+    if (dest / rel).is_dir() and any(f.is_file() for f in (dest / rel).rglob("*")):
         rubylib_parts.append("${package}/" + rel)
 rubylib = ":".join(rubylib_parts)
 # User-writable gem home (SLICC HOME); package gems on GEM_PATH for bundled stdgems.
@@ -916,7 +916,8 @@ ${OPENSSL_NOTE}
 
 ## Relocation / RUBYLIB
 - Stdlib under \`lib/ruby/<API>\` (e.g. **3.4.0**), arch \`…/wasm32-wasi/rbconfig.rb\`.
-- \`RUBYLIB\` = site_ruby + vendor_ruby + api (+ each \`/wasm32-wasi\`), all \`\${package}/…\`.
+- \`RUBYLIB\` = api + \`/wasm32-wasi\` (and site_ruby, vendor_ruby when they hold files;
+  npm packs no empty directory), all \`\${package}/…\`.
 - **Certify only** at \`/shared/lib/node_modules/@ai-ecoverse/wasix-ruby\` with
   manifest env. Never at \`/ruby\` (hides missing RUBYLIB — -3 false pass).
 

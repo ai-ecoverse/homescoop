@@ -37,6 +37,28 @@ fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
+## 3.4.11-14: wasix-sysroot 2025.9.30-30
+
+- POSIX record locks: `require "fcntl"` now defines `Fcntl::F_GETLK`,
+  `F_SETLK`, `F_SETLKW` and `F_RDLCK`/`F_WRLCK`/`F_UNLCK` (up to 3.4.11-13
+  they were missing: `NameError`), and `IO#fcntl` passes them to slicc-kernel
+  (≥ 1.100.0), which keeps the locks per process, as Linux does. A
+  `Process.spawn`ed ruby asking for a write lock on a range another process
+  holds gets `Errno::EAGAIN`, `F_SETLKW` waits for the unlock, and `F_GETLK`
+  names the holder. On an older kernel every lock is granted locally and
+  `F_GETLK` answers `F_UNLCK`. The struct is `[type, whence, start, len,
+  pid].pack("s s x4 q q l x4")` (32 bytes). `File#flock` is unchanged: an
+  advisory no-op that succeeds (`bundle install` and `gem install` lock
+  their files with it).
+- `RUBYLIB` names only the package's library directories that exist,
+  `lib/ruby/3.4.0` and its `wasm32-wasi`. Up to 3.4.11-13 it also named
+  `site_ruby` and `vendor_ruby` (and their `wasm32-wasi`), which npm never
+  packs because they are empty, so every require of the standard library
+  first probed four missing directories. `ruby -rirb -e 1` makes about 16%
+  fewer file-system calls (slicc-kernel#774).
+- wasix-sysroot -29 and -30 also bring `poll` with `events` 0 and named
+  semaphores (no Ruby API uses them).
+
 ## 3.4.11-13: wasix-sysroot 2025.9.30-28
 
 A rebuild on wasix-sysroot -28, whose libc keeps real signal masks through
