@@ -1,4 +1,4 @@
-# Go 1.26 toolchain tools for SLICC's `go` driver (GO-CONTRACT / PR #3657).
+# Go 1.27 toolchain tools for SLICC's `go` driver (GO-CONTRACT / PR #3657).
 # Queue: after wasix-python, py-numpy, py-pandas. Revision versions only.
 #
 # Package split (40 MiB npm cap):

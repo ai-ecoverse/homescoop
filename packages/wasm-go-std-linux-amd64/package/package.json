@@ -34,7 +34,7 @@
   "slicc": {
     "abi": "wasi",
     "go": {
-      "version": "go1.26.5",
+      "version": "go1.27.2",
       "std": [
         {
           "target": "linux/amd64",

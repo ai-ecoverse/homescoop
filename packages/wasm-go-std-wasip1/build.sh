@@ -14,6 +14,12 @@ if [[ "$HOST_GO" != "$WANT" ]]; then
   exit 1
 fi
 
+MANIFEST_GO="$(node -p 'require(process.argv[1]).slicc.go.version' "$HOMESCOOP_PKG/package/package.json")"
+if [[ "$MANIFEST_GO" != "$WANT" ]]; then
+  echo "homescoop: package.json slicc.go.version is $MANIFEST_GO but recipe wants $WANT (homescoop#746)" >&2
+  exit 1
+fi
+
 OUT="$WORK/wasm-go-std-wasip1-${VER}"
 DIR="$OUT/goroot/pkg/wasip1_wasm"
 mkdir -p "$DIR"
