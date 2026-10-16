@@ -107,6 +107,11 @@ PY
   if ! grep -q wasi_ptrs "$SRC/pp_sys.c"; then
     patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0005-sselect-wasi-fd-set.patch"
   fi
+  # unpack_sockaddr_un takes the sysroot's Linux-length AF_UNIX addresses
+  # (homescoop#767; see the patch header).
+  if ! grep -q 'HAS_SOCKADDR_SA_LEN) || defined(__wasi__)' "$SRC/cpan/Socket/Socket.xs"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0008-socket-unpack-sockaddr-un-wasi.patch"
+  fi
 
   # Errno_pm.PL picks its errno.h by $^O, the build machine's OS: on a Linux
   # host it reads /usr/include/errno.h. Key it on the target's osname, so
