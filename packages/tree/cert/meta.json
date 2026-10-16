@@ -1,10 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8"
   ],
   "checklist": [
     "tree in a fixture dir: UTF-8 line drawing, hidden files skipped, '4 directories, 4 files' (tree 2.x counts the root) (bytes compared)",
@@ -16,6 +19,8 @@
     "tree -J prints JSON that parses: directory tree + report {directories, files}",
     "tree --help exits 0 with usage",
     "missing directory → '[error opening dir]', rc 2",
-    "tree -L 0 → 'Invalid level', rc 1"
-  ]
+    "tree -L 0 → 'Invalid level', rc 1",
+    "users (users enforce, #687, #824): 2.3.2-2 links the slicc credentials (slicc_cred_js); as cone, tree on a root-owned fixture prints '[error opening dir]' for root's 0700 and 0711 dirs (rc 2, '6 directories, 2 files'), lists nothing in the 0744 one and reads its own 0700 (bytes compared; upstream 2.3.2 natively gives the same); -J has {error: 'error opening dir'} for both and parses; root reads all ('6 directories, 5 files'). 2.3.2-3 links homescoop_slicc_wrap_pwd: tree -pug names owners ('root     root', 'cone     users') for root and cone; 2.3.2-2 printed the uid (NEGATIVE.md)"
+  ],
+  "users": "enforce"
 }
