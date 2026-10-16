@@ -1,6 +1,7 @@
 # GNU nano with static widec ncurses (same Emscripten path as wasm-less).
 name: nano
 builder: host
+runner: pool
 version: "8.7.1"
 npm: "@ai-ecoverse/wasm-nano"
 summary: "GNU nano 8.7.1 with ncurses 6.5 for slicc wasm realm"

@@ -1,5 +1,6 @@
 name: py-kiwisolver
 builder: host
+runner: pool
 # renovate: datasource=pypi depName=kiwisolver
 version: "1.5.1"
 npm: "@ai-ecoverse/py-kiwisolver"

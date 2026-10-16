@@ -1,5 +1,6 @@
 name: py-six
 builder: host
+runner: pool
 version: "1.17.0"
 npm: "@ai-ecoverse/py-six"
 source:

@@ -1,6 +1,7 @@
 # ncurses' clear / tput / tset / reset for slicc wasm realm (host ladder).
 name: ncurses-utils
 builder: host
+runner: pool
 version: "6.5"
 npm: "@ai-ecoverse/wasm-ncurses-utils"
 summary: "ncurses 6.5 clear, tput, tset and reset for slicc"

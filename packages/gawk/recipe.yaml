@@ -1,6 +1,7 @@
 # GNU gawk for slicc wasm realm (host ladder).
 name: gawk
 builder: host
+runner: pool
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/gawk.git extractVersion=^gawk-(?<version>\d+\.\d+\.\d+)$
 version: "5.4.1"
 npm: "@ai-ecoverse/wasm-gawk"

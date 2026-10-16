@@ -1,5 +1,6 @@
 name: webrtc-audio-processing
 builder: host
+runner: pool
 reproducible: true
 # renovate: datasource=gitlab-tags depName=pulseaudio/webrtc-audio-processing extractVersion=^v(?<version>.*)$ registryUrl=https://gitlab.freedesktop.org
 version: "2.1"

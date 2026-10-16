@@ -3,6 +3,7 @@
 # the patches live here (see notes) and keep native builds unchanged.
 name: wasi-uv
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=astral-sh/uv
 version: "0.13.1"
 npm: "@ai-ecoverse/wasi-uv"

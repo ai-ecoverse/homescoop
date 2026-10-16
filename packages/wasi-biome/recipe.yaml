@@ -3,6 +3,7 @@
 # library for a JS host, not a CLI, and Biome publishes no WASI build.
 name: wasi-biome
 builder: host
+runner: pool
 # renovate: datasource=github-tags depName=biomejs/biome extractVersion=^@biomejs/biome@(?<version>.*)$
 version: "2.5.15"
 npm: "@ai-ecoverse/wasi-biome"

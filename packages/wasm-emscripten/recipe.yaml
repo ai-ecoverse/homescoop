@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — Emscripten 6.0.9 driver for slicc.
 name: wasm-emscripten
 builder: host
+runner: pool
 version: "6.0.9"
 npm: "@ai-ecoverse/wasm-emscripten"
 summary: "Emscripten 6.0.9 (emcc) for slicc via wasix-python"

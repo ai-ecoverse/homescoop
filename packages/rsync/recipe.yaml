@@ -1,6 +1,7 @@
 # rsync for slicc wasm realm (host ladder).
 name: rsync
 builder: host
+runner: pool
 # renovate: datasource=github-tags depName=RsyncProject/rsync extractVersion=^v(?<version>.*)$
 version: "3.5.1"
 npm: "@ai-ecoverse/wasm-rsync"

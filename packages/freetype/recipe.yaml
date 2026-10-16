@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: freetype
 builder: host
+runner: pool
 # renovate: datasource=custom.freetype depName=freetype extractVersion=^freetype-(?<version>\d+\.\d+\.\d+)\.tar\.gz$
 version: "2.13.3"
 npm: "@ai-ecoverse/wasm-freetype"

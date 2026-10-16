@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: lcms2
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=mm2/Little-CMS extractVersion=^lcms(?<version>.*)$
 version: "2.19.1"
 npm: "@ai-ecoverse/wasm-lcms2"

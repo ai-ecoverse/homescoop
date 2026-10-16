@@ -1,5 +1,6 @@
 name: py-tzdata
 builder: host
+runner: pool
 version: "2026.4"
 npm: "@ai-ecoverse/py-tzdata"
 source:

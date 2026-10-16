@@ -1,5 +1,6 @@
 name: py-pytz
 builder: host
+runner: pool
 version: "2026.4"
 npm: "@ai-ecoverse/py-pytz"
 source:

@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — Clang/LLD as wasm tools (slicc-emscripten llvm-wasm).
 name: wasm-clang
 builder: host
+runner: pool
 version: "24.0.0"
 npm: "@ai-ecoverse/wasm-clang"
 summary: "Clang/LLD 24 for slicc (wasm tool, WASIX drivers)"

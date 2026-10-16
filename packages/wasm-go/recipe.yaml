@@ -7,6 +7,7 @@
 #   @ai-ecoverse/wasm-go-std-linux-amd64 — optional cross-compile std (optional later)
 name: wasm-go
 builder: host
+runner: pool
 # renovate: datasource=golang-version depName=go
 version: "1.26.5"
 npm: "@ai-ecoverse/wasm-go"

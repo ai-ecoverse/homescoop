@@ -1,6 +1,7 @@
 # websocat (vi/websocat) v4 for seven's kernel, built for WASIX (wasm32-wasmer-wasi).
 name: wasix-websocat
 builder: host
+runner: pool
 # renovate: datasource=github-tags depName=vi/websocat extractVersion=^v(?<version>4\..*)$
 version: "4.0.0-alpha3"
 npm: "@ai-ecoverse/wasix-websocat"

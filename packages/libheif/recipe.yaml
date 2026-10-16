@@ -1,5 +1,6 @@
 name: libheif
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=strukturag/libheif extractVersion=^v(?<version>.*)$
 version: "1.23.6"
 npm: "@ai-ecoverse/wasm-libheif"

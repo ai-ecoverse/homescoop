@@ -1,6 +1,7 @@
 # util-linux text tools (rev, column, hexdump, colrm, look, getopt) for slicc.
 name: util-linux
 builder: host
+runner: pool
 # renovate: datasource=github-tags depName=util-linux/util-linux extractVersion=^v(?<version>.*)$
 version: "2.42.4"
 npm: "@ai-ecoverse/wasm-util-linux"
