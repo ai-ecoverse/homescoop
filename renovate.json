@@ -45,13 +45,14 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Homebrew-shaped recipe.yaml upstream pins (see # renovate comments).",
+      "description": "Homebrew-shaped recipe.yaml upstream pins (see # renovate comments). depName is optional: a pin without one (perl-version, python-version, golang-version) is named after its datasource.",
       "managerFilePatterns": [
         "/(^|/)packages/[^/]+/recipe\\.ya?ml$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z.-]+?) depName=(?<depName>\\S+?)(?: packageName=(?<packageName>\\S+?))?(?: versioning=(?<versioning>\\S+?))?(?: extractVersion=(?<extractVersion>\\S+?))?(?: registryUrl=(?<registryUrl>\\S+?))?\\s+version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
-      ]
+        "# renovate: datasource=(?<datasource>[a-z.-]+?)(?: depName=(?<depName>\\S+?))?(?: packageName=(?<packageName>\\S+?))?(?: versioning=(?<versioning>\\S+?))?(?: extractVersion=(?<extractVersion>\\S+?))?(?: registryUrl=(?<registryUrl>\\S+?))?\\s+version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+      ],
+      "depNameTemplate": "{{#if depName}}{{{depName}}}{{else}}{{{datasource}}}{{/if}}"
     },
     {
       "customType": "regex",
@@ -249,6 +250,16 @@
         "slicc-kernel-negative"
       ],
       "enabled": false
+    },
+    {
+      "description": "Renovate has no perl-version datasource: wasix-perl's pin reads Perl's release tags (stable 5.even.N) instead, without touching the recipe.",
+      "matchDatasources": [
+        "perl-version"
+      ],
+      "overrideDatasource": "github-tags",
+      "overrideDepName": "Perl/perl5",
+      "overridePackageName": "Perl/perl5",
+      "extractVersion": "^v(?<version>5\\.\\d*[02468]\\.\\d+)$"
     },
     {
       "description": "Retired recipes (builder: retired): no Renovate PRs for any file in their package directory (recipe pins, Cargo.toml, go.mod). They are built, if at all, by their own workflows from pinned sources (e.g. wasi-rustc-stable.yml), so a recipe bump builds nothing. Synced by scripts/sync-ci-certified-renovate.mjs.",

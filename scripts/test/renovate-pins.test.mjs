@@ -23,8 +23,6 @@ function pins() {
 }
 
 const UNREAD = {
-  'wasix-perl': 'datasource=perl-version with no depName',
-  'wasix-python': 'datasource=python-version with no depName',
 };
 
 test('every recipe # renovate: comment is read by the recipe manager, with the version: line it pins', () => {
