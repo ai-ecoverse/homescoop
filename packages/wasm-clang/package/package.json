@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-clang",
-  "version": "24.0.0-17",
+  "version": "24.0.0-18",
   "description": "Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen)",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
