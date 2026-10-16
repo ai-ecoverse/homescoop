@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.93.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.100.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
@@ -12,8 +12,7 @@
     "@ai-ecoverse/wasm-grep@3.12.0-3"
   ],
   "ci": [
-    "node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz --layout flat --kernel @ai-ecoverse/slicc-kernel@1.83.0 --probes r18,r21,r24,r24link,r26,r27",
-    "R28_KERNEL_MASK=1 R28_WINDOW=1 node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz --layout flat --probes r18,r21,r24,r26,r27,r28,r28w",
+    "R28_KERNEL_MASK=1 R28_WINDOW=1 node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz --layout flat --probes r18,r21,r24,r24link,r26,r27,r28,r28w",
     "node packages/wasm-clang/test/run-cc.mjs --tarball .homescoop-out/package.tgz --layout pnpm --probes r18,r21,r24,r26,r27",
     "node packages/wasm-clang/test/run-cc.mjs --tarball @ai-ecoverse/wasm-clang@24.0.0-11 --expect old"
   ],
