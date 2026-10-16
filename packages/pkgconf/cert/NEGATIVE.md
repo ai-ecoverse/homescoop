@@ -38,3 +38,7 @@ Line 175 fails twice (the exit status and the output). Line 177,
 `PKG_CONFIG_IGNORE_CONFLICTS=1`, is the escape hatch and passes on 2.5.1-1
 too. Without `--soft` the run stops at line 173
 (`+ '/opt/wasm' - '/opt/wasm /opt/wasm'`).
+
+## Traversal depth (homescoop#532, 3.0.9-2; 2026-10-16)
+
+`run.mjs --package pkgconf --spec depth.mjs --kernel @ai-ecoverse/slicc-kernel@1.108.4` with the published `@ai-ecoverse/wasm-pkgconf@2.5.1-1`: FAIL, `pkg-config --libs d0: the default traversal depth is 256 levels: -ld257 -ld258 -ld259 (260 flags)`, because 2.5.1 follows the whole chain. The published 3.0.9-1 passes, and so does 3.0.9-2, which has the same bytes and adds the README note. The spec pins upstream's behaviour; it isn't patched.
