@@ -33,6 +33,9 @@
  * ladder-pr / ladder-build produce the same tarball. Remove `repack:` when
  * the next release really rebuilds.
  *
+ * Refuses first when a build input changed since the bytes it reuses were
+ * built (scripts/repack-inputs.mjs, #735).
+ *
  * Does not publish.
  */
 import { spawnSync } from 'node:child_process';
@@ -43,6 +46,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { pinErrors } from './check-exact-pins.mjs';
 import { diffTarballs, fetchPublished, readTarball, sha256 } from './diff-published.mjs';
+import { checkRepackInputs, describe } from './repack-inputs.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -147,6 +151,17 @@ if (recipe.npm && repoPkg.name !== recipe.npm) die(`package.json name ${repoPkg.
 if (repoPkg.version === from) die(`package.json version ${from} is the base; bump -N`);
 const pins = pinErrors(repoPkg);
 if (pins.length) die(`not exact:\n  - ${pins.join('\n  - ')}`);
+
+// #735: refuse to reuse bytes whose build inputs changed since they were built.
+let inputs;
+try {
+  inputs = checkRepackInputs({ root, name });
+} catch (e) {
+  die(`repack-inputs: ${e.message}`);
+}
+const inputsMsg = describe(name, inputs);
+if (!inputs.ok) die(inputsMsg);
+if (inputsMsg) console.log(`== repack-inputs: ${inputsMsg}`);
 
 const spec = `${repoPkg.name}@${from}`;
 console.log(`== repack-published: ${spec} + packages/${name}/package/{${['package.json', ...extra].join(',')}}${patches.length ? ` + patches ${patches.join(', ')}` : ''} → ${repoPkg.version}`);
