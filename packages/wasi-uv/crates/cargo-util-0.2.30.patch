@@ -1,0 +1,123 @@
+cargo-util: compile on WASI (uv-git uses ProcessBuilder). Paths as bytes
+and symlinks through std::os::wasi; exec_replace runs the process; read2
+reads stdout then stderr. git itself is not spawned on WASI yet (std
+Command), so git dependencies fail there.
+
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -5,6 +5,7 @@
+ //! > crate may make major changes to its APIs or be deprecated without warning.
+ 
+ #![allow(clippy::disallowed_methods)]
++#![cfg_attr(target_os = "wasi", feature(wasi_ext))]
+ 
+ pub use self::read2::read2;
+ pub use du::du;
+--- a/src/paths.rs
++++ b/src/paths.rs
+@@ -391,9 +391,12 @@
+ 
+ /// Converts a path to UTF-8 bytes.
+ pub fn path2bytes(path: &Path) -> Result<&[u8]> {
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     {
++        #[cfg(unix)]
+         use std::os::unix::prelude::*;
++        #[cfg(target_os = "wasi")]
++        use std::os::wasi::ffi::OsStrExt;
+         Ok(path.as_os_str().as_bytes())
+     }
+     #[cfg(windows)]
+@@ -410,9 +413,12 @@
+ 
+ /// Converts UTF-8 bytes to a path.
+ pub fn bytes2path(bytes: &[u8]) -> Result<PathBuf> {
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     {
++        #[cfg(unix)]
+         use std::os::unix::prelude::*;
++        #[cfg(target_os = "wasi")]
++        use std::os::wasi::ffi::OsStrExt;
+         Ok(PathBuf::from(OsStr::from_bytes(bytes)))
+     }
+     #[cfg(windows)]
+@@ -624,6 +630,8 @@
+     let link_result = if src.is_dir() {
+         #[cfg(unix)]
+         use std::os::unix::fs::symlink;
++        #[cfg(target_os = "wasi")]
++        use std::os::wasi::fs::symlink_path as symlink;
+         #[cfg(windows)]
+         // FIXME: This should probably panic or have a copy fallback. Symlinks
+         // are not supported in all windows environments. Currently symlinking
+--- a/src/process_builder.rs
++++ b/src/process_builder.rs
+@@ -620,6 +620,22 @@
+     }
+ }
+ 
++/// WASI cannot replace the process image: run the process as normal.
++#[cfg(target_os = "wasi")]
++mod imp {
++    use super::ProcessBuilder;
++    use anyhow::Result;
++    use std::io;
++
++    pub fn exec_replace(process_builder: &ProcessBuilder) -> Result<()> {
++        process_builder.exec()
++    }
++
++    pub fn command_line_too_big(_err: &io::Error) -> bool {
++        false
++    }
++}
++
+ #[cfg(windows)]
+ mod imp {
+     use super::{ProcessBuilder, ProcessError};
+--- a/src/process_error.rs
++++ b/src/process_error.rs
+@@ -138,6 +138,11 @@
+         }
+     }
+ 
++    #[cfg(target_os = "wasi")]
++    fn status_to_string(status: ExitStatus) -> String {
++        status.to_string()
++    }
++
+     #[cfg(windows)]
+     fn status_to_string(status: ExitStatus) -> String {
+         use windows_sys::Win32::Foundation::*;
+--- a/src/read2.rs
++++ b/src/read2.rs
+@@ -81,6 +81,27 @@
+     }
+ }
+ 
++/// WASI has no non-blocking pipes to multiplex: read stdout, then stderr.
++#[cfg(target_os = "wasi")]
++mod imp {
++    use std::io::{self, Read};
++    use std::process::{ChildStderr, ChildStdout};
++
++    pub fn read2(
++        mut out_pipe: ChildStdout,
++        mut err_pipe: ChildStderr,
++        data: &mut dyn FnMut(bool, &mut Vec<u8>, bool),
++    ) -> io::Result<()> {
++        let mut out = Vec::new();
++        out_pipe.read_to_end(&mut out)?;
++        data(true, &mut out, true);
++        let mut err = Vec::new();
++        err_pipe.read_to_end(&mut err)?;
++        data(false, &mut err, true);
++        Ok(())
++    }
++}
++
+ #[cfg(windows)]
+ mod imp {
+     use std::io;

@@ -669,3 +669,8 @@ fn read2(out: Option<ChildStdout>, err: Option<ChildStderr>) -> io::Result<(Vec<
     }
     Ok((stdout, stderr))
 }
+
+// At the end, so that adding it moved no line of this file (panic
+// locations name lines, and other packages' wasm would change).
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio;

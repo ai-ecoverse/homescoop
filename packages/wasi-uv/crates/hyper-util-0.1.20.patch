@@ -1,0 +1,89 @@
+hyper-util: dial on WASI without socket2 or TcpSocket (neither exists there).
+connect() opens the socket with wasix-net (WASIX sock_connect, slicc's
+kernel) and hands it to tokio::net::TcpStream::from_std. socket2 becomes
+a non-WASI dependency; keepalive and bind options do not apply on WASI.
+
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -191,11 +191,14 @@
+ [dependencies.pin-project-lite]
+ version = "0.2.4"
+ 
+-[dependencies.socket2]
++[target.'cfg(not(target_os = "wasi"))'.dependencies.socket2]
+ version = ">=0.5.9, <0.7"
+ features = ["all"]
+ optional = true
+ 
++[target.'cfg(target_os = "wasi")'.dependencies.wasix-net]
++version = "0.1"
++
+ [dependencies.tokio]
+ version = "1"
+ optional = true
+--- a/src/client/legacy/connect/http.rs
++++ b/src/client/legacy/connect/http.rs
+@@ -12,8 +12,11 @@
+ use futures_util::future::Either;
+ use http::uri::{Scheme, Uri};
+ use pin_project_lite::pin_project;
++#[cfg(not(target_os = "wasi"))]
+ use socket2::TcpKeepalive;
+-use tokio::net::{TcpSocket, TcpStream};
++#[cfg(not(target_os = "wasi"))]
++use tokio::net::TcpSocket;
++use tokio::net::TcpStream;
+ use tokio::time::Sleep;
+ use tracing::{debug, trace, warn};
+ 
+@@ -99,6 +102,7 @@
+     retries: Option<u32>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl TcpKeepaliveConfig {
+     /// Converts into a `socket2::TcpKeealive` if there is any keep alive configuration.
+     fn into_tcpkeepalive(self) -> Option<TcpKeepalive> {
+@@ -791,6 +795,7 @@
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn bind_local_address(
+     socket: &socket2::Socket,
+     dst_addr: &SocketAddr,
+@@ -819,6 +824,34 @@
+     Ok(())
+ }
+ 
++/// WASI has no socket2 and no `TcpSocket`: dial with WASIX `sock_connect`
++/// (slicc's kernel) and hand the connected stream to tokio.
++#[cfg(target_os = "wasi")]
++fn connect(
++    addr: &SocketAddr,
++    config: &Config,
++    connect_timeout: Option<Duration>,
++) -> Result<impl Future<Output = Result<TcpStream, ConnectError>>, ConnectError> {
++    use std::os::fd::{FromRawFd, IntoRawFd};
++
++    let _ = config;
++    let addr = *addr;
++    Ok(async move {
++        let stream = match connect_timeout {
++            Some(dur) => wasix_net::TcpStream::connect_timeout(&addr, dur),
++            None => wasix_net::TcpStream::connect(addr),
++        }
++        .map_err(ConnectError::m("tcp connect error"))?;
++        stream
++            .set_nonblocking(true)
++            .map_err(ConnectError::m("tcp set_nonblocking error"))?;
++        // SAFETY: the descriptor is a connected socket this function owns.
++        let std = unsafe { std::net::TcpStream::from_raw_fd(stream.into_raw_fd()) };
++        TcpStream::from_std(std).map_err(ConnectError::m("tcp open error"))
++    })
++}
++
++#[cfg(not(target_os = "wasi"))]
+ fn connect(
+     addr: &SocketAddr,
+     config: &Config,

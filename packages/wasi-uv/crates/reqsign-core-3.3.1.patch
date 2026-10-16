@@ -1,0 +1,83 @@
+reqsign-core: wasm32-unknown, not every wasm32, is the browser (mechanical:
+target_arch = "wasm32" becomes all(target_arch = "wasm32", target_os =
+"unknown")); WASI keeps Send futures and the JWT module. home_dir from
+std on WASI.
+
+--- a/src/context.rs
++++ b/src/context.rs
+@@ -281,7 +281,7 @@
+         std::env::vars().collect()
+     }
+ 
+-    #[cfg(any(unix, target_os = "redox"))]
++    #[cfg(any(unix, target_os = "redox", target_os = "wasi"))]
+     fn home_dir(&self) -> Option<PathBuf> {
+         #[allow(deprecated)]
+         std::env::home_dir()
+@@ -292,7 +292,7 @@
+         windows::home_dir_inner()
+     }
+ 
+-    #[cfg(target_arch = "wasm32")]
++    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+     fn home_dir(&self) -> Option<PathBuf> {
+         None
+     }
+--- a/src/futures_util.rs
++++ b/src/futures_util.rs
+@@ -16,27 +16,27 @@
+ // under the License.
+ 
+ /// BoxedFuture is the type alias of [`futures::future::BoxFuture`].
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ pub type BoxedFuture<'a, T> = futures::future::BoxFuture<'a, T>;
+ 
+ /// BoxedFuture is the type alias of [`futures::future::LocalBoxFuture`].
+-#[cfg(target_arch = "wasm32")]
++#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+ pub type BoxedFuture<'a, T> = futures::future::LocalBoxFuture<'a, T>;
+ 
+ /// MaybeSend is a marker to determine whether a type is `Send` or not.
+ ///
+ /// [`MaybeSend`] is equivalent to `Send` on non-wasm32 target.
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ pub trait MaybeSend: Send {}
+ 
+ /// MaybeSend is a marker to determine whether a type is `Send` or not.
+ ///
+ /// [`MaybeSend`] is empty on wasm32 target.
+-#[cfg(target_arch = "wasm32")]
++#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+ pub trait MaybeSend {}
+ 
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ impl<T: Send> MaybeSend for T {}
+ 
+-#[cfg(target_arch = "wasm32")]
++#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+ impl<T> MaybeSend for T {}
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -184,7 +184,7 @@
+ pub mod error;
+ mod futures_util;
+ pub mod hash;
+-#[cfg(all(not(target_arch = "wasm32"), feature = "jwt"))]
++#[cfg(all(not(all(target_arch = "wasm32", target_os = "unknown")), feature = "jwt"))]
+ pub mod jwt;
+ pub mod time;
+ pub mod utils;
+--- a/src/signer.rs
++++ b/src/signer.rs
+@@ -924,7 +924,7 @@
+         assert!(!error.to_string().contains(CREDENTIAL_SECRET));
+     }
+ 
+-    #[cfg(not(target_arch = "wasm32"))]
++    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+     #[test]
+     fn sign_future_remains_send_on_native_targets() {
+         fn assert_send<T: Send>(_future: T) {}

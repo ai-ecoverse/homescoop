@@ -1,5 +1,14 @@
 # `@ai-ecoverse/wasix-uv-shim`
 
+**Retired.** Use [`@ai-ecoverse/wasi-uv`](https://www.npmjs.com/package/@ai-ecoverse/wasi-uv),
+Astral's uv itself built for slicc's kernel
+([homescoop#103](https://github.com/ai-ecoverse/homescoop/issues/103)). Both
+provide the `uv` command: uninstall this one first. The recipe is
+`builder: retired`; source under `../src/` is kept for provenance only.
+
+---
+
+Historical notes (the former package):
 A small `uv` for [slicc](https://github.com/ai-ecoverse/slicc): uv's everyday
 commands mapped onto `python -m venv` and the pip in
 [`@ai-ecoverse/wasix-python`](https://www.npmjs.com/package/@ai-ecoverse/wasix-python).
