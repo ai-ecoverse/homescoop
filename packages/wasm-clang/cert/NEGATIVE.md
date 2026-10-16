@@ -30,3 +30,7 @@
 ## 24.0.0-20: braces in response files, the marker file (homescoop#754, #755; 2026-10-16)
 
 `run-cc.mjs` (flat, R28) against the published 24.0.0-19: FAIL, `wasixcc -O2 @brace.rsp → br{a,b}.wasm: asyncify no`. -19's `eval` brace-expanded the file's words, so the driver looked for `bra.wasm`. -19 also left a `wasix-out.*` marker in TMPDIR whenever the frontend failed, because `set -e` ended the driver before its cleanup (#754). 24.0.0-20 passes both checks.
+
+## 24.0.0-21: clang's tokenizer for response files (homescoop#769; 2026-10-16)
+
+`run-cc.mjs` (flat, R28) against the published 24.0.0-20: FAIL, `wasixcc -O2 @bq.rsp → q {x}.wasm: asyncify no`. -20 split any file with `{ } ~ $ …` on blanks, so the driver read `-o "q` and `{x}.wasm"` and skipped Asyncify while clang wrote `q {x}.wasm`. @dq.rsp (`$` next to a quoted `-o`) failed on -19 and -20 alike. 24.0.0-21 passes all four new response files, @long.rsp included.

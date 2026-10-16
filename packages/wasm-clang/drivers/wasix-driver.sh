@@ -124,16 +124,20 @@ scan_arg() {
   esac
 }
 # A response file (CMake, Ninja, Meson): its words count as arguments
-# (homescoop#721), nested @files too, up to 8 deep. Quotes and backslashes
-# as clang reads them, through the shell's own quoting (newlines become
-# blanks); a file with anything the shell would run, redirect or expand
-# ($ ` ; | & < > ( ) { } ~; globs are off) is split on blanks only, never
-# evaluated (homescoop#755).
+# (homescoop#721), nested @files too (relative to the current directory, as
+# clang resolves them), up to 8 deep. The file is tokenised the way clang's
+# GNU tokenizer (llvm::cl::TokenizeGNUCommandLine) reads it, character by
+# character and never through eval (homescoop#755, #769): blanks (space,
+# tab, CR, LF) separate words; ' and " quote up to the same quote, and a
+# backslash escapes the next character, in quotes or not (a final one is
+# kept); an empty quoted word is a word; an unterminated quote runs to the
+# end of the file; a UTF-8 byte order mark is skipped.
 scan_word() {
   case "$1" in
     @?*)
       if [ "$2" -lt 8 ] && [ -r "${1#@}" ]; then
         scan_rsp "${1#@}" $(($2 + 1))
+        _depth=$2
       else
         link_inputs=1
       fi
@@ -141,29 +145,131 @@ scan_word() {
     *) scan_arg "$1" ;;
   esac
 }
+rsp_init() {
+  _rx=$(printf '\t\r\n\034\035\036\037\002\003\004\005\006.\357\273\277.')
+  rsp_bom=${_rx#*.}
+  rsp_bom=${rsp_bom%.}
+  _rx=${_rx%%.*}
+  rsp_tab=${_rx%"${_rx#?}"}
+  _rx=${_rx#?}
+  rsp_cr=${_rx%"${_rx#?}"}
+  _rx=${_rx#?}
+  rsp_nl=${_rx%"${_rx#?}"}
+  rsp_seps=${_rx#?}
+  rsp_ws=" $rsp_tab$rsp_cr$rsp_nl"
+}
+# The tokenizer's state: the word so far (_rt), whether one is open (_rin),
+# the open quote (_rq), a pending backslash (_resc); finished words go to
+# _ro, each followed by _rfs.
+# rsp_sep C: the blank C (a space or a newline) between two runs.
+rsp_sep() {
+  if [ "$_resc" -eq 1 ] || [ -n "$_rq" ]; then
+    _rt=$_rt$1 _resc=0
+  elif [ "$_rin" -eq 1 ]; then
+    _ro=$_ro$_rt$_rfs _rt='' _rin=0
+  fi
+}
+# rsp_run TEXT: a run of the file with no space or newline in it.
+rsp_run() {
+  _rc=$1
+  if [ "$_resc" -eq 1 ] && [ -n "$_rc" ]; then
+    _rx=${_rc#?}
+    _rt=$_rt${_rc%"$_rx"} _rc=$_rx _resc=0
+  fi
+  while [ -n "$_rc" ]; do
+    if [ -n "$_rq" ]; then
+      if [ "$_rq" = \" ]; then _rp=${_rc%%[\"\\]*}; else _rp=${_rc%%[\'\\]*}; fi
+      _rt=$_rt$_rp _rc=${_rc#"$_rp"}
+      case $_rc in
+        '') ;;
+        \\) _resc=1 _rc= ;;
+        \\*)
+          _rc=${_rc#?}
+          _rx=${_rc#?}
+          _rt=$_rt${_rc%"$_rx"} _rc=$_rx
+          ;;
+        *) _rq='' _rc=${_rc#?} ;;
+      esac
+    else
+      case $_rc in
+        [$rsp_ws]*) rsp_sep ' '; _rc=${_rc#?} ;;
+        \\) _resc=1 _rin=1 _rc= ;;
+        \\*)
+          _rc=${_rc#?}
+          _rx=${_rc#?}
+          _rt=$_rt${_rc%"$_rx"} _rin=1 _rc=$_rx
+          ;;
+        \"*) _rq=\" _rin=1 _rc=${_rc#?} ;;
+        \'*) _rq=\' _rin=1 _rc=${_rc#?} ;;
+        *)
+          # shellcheck disable=SC2295 # the blanks are a bracket expression
+          _rp=${_rc%%[\"\'\\$rsp_ws]*}
+          _rt=$_rt$_rp _rin=1 _rc=${_rc#"$_rp"}
+          ;;
+      esac
+    fi
+  done
+}
 scan_rsp() {
-  _rsp=$(tr '\n\r\t' '   ' <"$1" 2>/dev/null) || { link_inputs=1; return 0; }
+  # The trailing "." keeps trailing newlines from the command substitution.
+  _r=$(cat <"$1" 2>/dev/null && echo .) || { link_inputs=1; return 0; }
+  _r=${_r%.}
+  [ -n "${rsp_ws:-}" ] || rsp_init
+  _r=${_r#"$rsp_bom"}
   _depth=$2
-  case $_rsp in
-    *[\$\`\;\|\&\<\>\(\)\{\}\~]*)
-      set -f
+  _rifs=$IFS
+  set -f
+  case $_r in
+    *[\"\'\\$rsp_cr]*)
+      # Quotes or backslashes: the file is cut at its spaces and newlines
+      # (into runs, by the shell's field splitting on two bytes the file
+      # doesn't hold; an empty field is two blanks in a row) and the runs
+      # are read character by character, so the work grows with the file.
+      _rfs='' _rrs='' _rx=$rsp_seps
+      while [ -n "$_rx" ] && [ -z "$_rrs" ]; do
+        _ry=${_rx%"${_rx#?}"}
+        _rx=${_rx#?}
+        case $_r in *"$_ry"*) continue ;; esac
+        if [ -z "$_rfs" ]; then _rfs=$_ry; else _rrs=$_ry; fi
+      done
+      if [ -z "$_rrs" ]; then
+        set +f
+        link_inputs=1
+        return 0
+      fi
+      _r=$(printf '%s' "$_r" | tr ' \n' "$_rfs$_rrs") || { set +f; link_inputs=1; return 0; }
+      _rt='' _rin=0 _rq='' _resc=0 _ro=''
+      _rnl=0
+      IFS=$_rrs
+      for _rl in $_r; do
+        [ "$_rnl" -eq 0 ] || rsp_sep "$rsp_nl"
+        _rnl=1 _rfirst=1
+        IFS=$_rfs
+        for _rw in $_rl; do
+          [ "$_rfirst" -eq 1 ] || rsp_sep ' '
+          _rfirst=0
+          rsp_run "$_rw"
+        done
+        # Field splitting drops the last field's closing separator.
+        case $_rl in *"$_rfs") rsp_sep ' ' ;; esac
+      done
+      case $_r in *"$_rrs") rsp_sep "$rsp_nl" ;; esac
+      if [ "$_resc" -eq 1 ]; then _rt=$_rt\\ _rin=1; fi
+      [ "$_rin" -eq 0 ] || _ro=$_ro$_rt$_rfs
+      IFS=$_rfs
       # shellcheck disable=SC2086
-      set -- $_rsp
-      set +f
+      set -- $_ro
       ;;
     *)
-      # Unbalanced quotes would be an eval syntax error, which ends a POSIX
-      # shell: try it in a subshell first.
-      set -f
-      if (eval "set -- $_rsp") 2>/dev/null; then
-        eval "set -- $_rsp"
-      else
-        # shellcheck disable=SC2086
-        set -- $_rsp
-      fi
-      set +f
+      # No quotes, backslashes or CRs: clang splits on blanks, and so does
+      # this (globs off).
+      IFS=$rsp_ws
+      # shellcheck disable=SC2086
+      set -- $_r
       ;;
   esac
+  set +f
+  IFS=$_rifs
   for _w in "$@"; do scan_word "$_w" "$_depth"; done
 }
 for a in "$@"; do scan_word "$a" 0; done
