@@ -1,0 +1,27 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasi-protoc-gen-go",
+    "@ai-ecoverse/wasi-protoc-gen-go-grpc",
+    "@ai-ecoverse/wasi-protoc-gen-connect-go"
+  ],
+  "network": "ctx.serve() is files.test, serving the image buf built in the kernel (read from OPFS); every other host answers 502, so buf.build is unreachable",
+  "checklist": [
+    "as dev (addUser, users enforce): buf --version → 1.73.0; protoc-gen-go, protoc-gen-go-grpc and protoc-gen-connect-go --version",
+    "build -o an image, ls-files, lint clean (0) and a seeded PascalCase violation (100)",
+    "format -d --exit-code → 100 and the unified diff (diff -u header, -/+ lines) printed in-process; format -w rewrites the file back",
+    "breaking against an image and against a directory: a deleted field → 100 and the 'was deleted' finding",
+    "ls-files and breaking against http://files.test/image.binpb (ctx.serve through the kernel's proxy); a 404 → rc 1 'got HTTP status code 404'",
+    "generate with protoc-gen-go, protoc-gen-go-grpc and protoc-gen-connect-go as local: plugins → pet.pb.go, kind.pb.go, pet_grpc.pb.go, petv1connect/pet.connect.go",
+    "an unreachable registry (buf.build/…) → rc 1 'the server hosted at that remote is unavailable'; a git input without git → 'exec: \"git\": executable file not found in $PATH'; beta registry plugin push → 'buf on wasip1 cannot reach a Docker engine'",
+    "test/e2e/buf.test.mjs (Node entry, slicc-kernel 1.30.0): convert, config init, a git input over smart HTTP through wasm-git, and the commands without the host module"
+  ],
+  "patches": {
+    "0001-wasip1-unix-build-tags.patch": "the build: buf compiles for GOOS=wasip1 at all (every case runs buf.wasm)",
+    "0002-diff-without-exec-on-wasip1.patch": "format -d prints the unified diff in-process (NEGATIVE.md: without 0002, format -d runs `diff -u`, which seven doesn't have)",
+    "0003-no-docker-engine-on-wasip1.patch": "beta registry plugin push fails with 'buf on wasip1 cannot reach a Docker engine' (without 0003 the moby client doesn't compile for wasip1)",
+    "0005-host-module-on-wasip1.patch": "generate starts the plugins, ls-files/breaking read the image over HTTP, the registry error (NEGATIVE.md: without 0005, generate and the HTTP input fail with ENOSYS)"
+  }
+}
