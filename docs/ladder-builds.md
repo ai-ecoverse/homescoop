@@ -192,7 +192,7 @@ be the one npm ends up with. `scripts/npm-parity.mjs` checks the
 | --- | --- |
 | sorts below npm `latest` (or is a published version other than `latest`) | **behind**: fails. The build is behind main (a stale merge base); merge main. `ladder-build` publishes with `--tag latest`, so an older version must never ship |
 | is on npm, and every entry (path, type, mode, link, content) is the same | **same**: passes, nothing to publish |
-| is on npm with other entries | **drift**: these bytes would never ship. Bump the packaging revision (`-N+1`) or revert. Warns for now (`--drift warn`); it fails once main has no drifted recipe (`--drift fail`) |
+| is on npm with other entries | **drift**: these bytes would never ship. Bump the packaging revision (`-N+1`) or revert. Fails (`--drift fail`, since the #497 bumps; the sweep and the bumps are on #497) |
 | is not on npm and sorts above `latest`, or npm has no such package | **new**: passes, a release |
 
 A registry that doesn't answer (after three tries) fails the job. The

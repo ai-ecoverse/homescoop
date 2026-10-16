@@ -326,8 +326,8 @@ jobs:
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: .homescoop-out
-      - name: The built version against npm (behind latest fails; same version, other contents warns)
-        run: node scripts/npm-parity.mjs .homescoop-out/package.tgz --drift warn
+      - name: The built version against npm (behind latest, or the same version with other contents, fails)
+        run: node scripts/npm-parity.mjs .homescoop-out/package.tgz --drift fail
 
   test:
     needs: [detect, recipe-sha, host-build]
