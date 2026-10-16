@@ -149,7 +149,34 @@ export function lab() {
     };
   }
 
-  return { rng, speech, room, scene, bursts, run, power, erle, kept, lagOf, same, digest, echoChecks, talkChecks };
+  function poison(s) {
+    const r = s.rate;
+    const mic = Float32Array.from(s.mic);
+    const far = Float32Array.from(s.far);
+    const at = (t) => Math.round(t * r);
+    mic.fill(NaN, at(6), at(6) + 64);
+    for (let i = 0; i < 10; i++) far[at(6.5) + 7 * i] = NaN;
+    mic[at(7)] = Infinity;
+    far[at(7.2)] = -Infinity;
+    return { ...s, mic, far, count: 76 };
+  }
+
+  function nonFiniteIn(x) {
+    let n = 0;
+    for (let i = 0; i < x.length; i++) if (!Number.isFinite(x[i])) n++;
+    return n;
+  }
+
+  function poisonChecks(s, out, lag) {
+    const r = s.rate;
+    return {
+      nonFiniteOut: nonFiniteIn(out),
+      erleBeforeDb: erle(s.mic, out, 4 * r, 6 * r, lag),
+      erleAfterDb: erle(s.mic, out, 9 * r, s.mic.length - lag, lag),
+    };
+  }
+
+  return { rng, speech, room, scene, bursts, run, poison, nonFiniteIn, poisonChecks, power, erle, kept, lagOf, same, digest, echoChecks, talkChecks };
 }
 
 export const LIMITS = {

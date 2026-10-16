@@ -31,6 +31,8 @@ export interface CancellerStats {
   referenceDropped: number;
   /** Reference samples that were missing when a mic frame was processed (replaced by silence). */
   referenceShort: number;
+  /** NaN and ±Infinity samples in mic or reference, each replaced by 0 before APM sees it. */
+  nonFiniteSamples: number;
   /** Frames APM returned an error for. */
   errors: number;
 }

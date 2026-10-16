@@ -4,6 +4,18 @@ const STATS = 5;
 const LATENCY = { 16000: [288, 96], 48000: [910, 288] };
 const ESPIPE = 70;
 
+function finite(buf, from, to) {
+  let bad = 0;
+  for (let i = from; i < to; i++) {
+    const v = buf[i];
+    if (v - v !== 0) {
+      buf[i] = 0;
+      bad++;
+    }
+  }
+  return bad;
+}
+
 function compile(wasm) {
   if (wasm instanceof WebAssembly.Module) return wasm;
   if (wasm instanceof ArrayBuffer || ArrayBuffer.isView(wasm)) return new WebAssembly.Module(wasm);
@@ -93,6 +105,7 @@ export function instantiate(wasm, options = {}) {
     let refSize = 0;
     let refDropped = 0;
     let refShort = 0;
+    let nonFinite = 0;
     let fill = 0;
     let buffer = null;
     let mic = null;
@@ -126,6 +139,7 @@ export function instantiate(wasm, options = {}) {
       while (i < src.length) {
         const k = Math.min(src.length - i, refCap - at);
         refRing.set(src.subarray(i, i + k), at);
+        nonFinite += finite(refRing, at, at + k);
         i += k;
         at = (at + k) % refCap;
       }
@@ -173,6 +187,7 @@ export function instantiate(wasm, options = {}) {
           const k = Math.min(frame - fill, n - j);
           if (j < refs) pushRef(refIn.subarray(j, Math.min(j + k, refs)));
           mic.set(micIn.subarray(j, j + k), fill);
+          nonFinite += finite(mic, fill, fill + k);
           result.set(out.subarray(fill, fill + k), j);
           fill += k;
           j += k;
@@ -200,6 +215,7 @@ export function instantiate(wasm, options = {}) {
           voice: voice === null || voice < 0 ? null : voice === 1,
           referenceDropped: refDropped,
           referenceShort: refShort,
+          nonFiniteSamples: nonFinite,
           errors: failed,
         };
       },
