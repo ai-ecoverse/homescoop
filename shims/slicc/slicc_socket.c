@@ -23,6 +23,17 @@
  * for every other name, A records only, since these sockets are IPv4. On
  * older kernels other names are EAI_NONAME, as before.
  *
+ * getnameinfo (and so musl's gethostbyaddr, which calls it) answers from
+ * /etc/hosts, as musl and glibc do first: slicc-kernel's has 127.0.0.1
+ * localhost, ::1 localhost, 127.0.1.1 <hostname> and 10.0.2.2
+ * host.slicc.internal. The rest of 127.0.0.0/8 (and ::1 without a hosts
+ * file) is localhost; any other address has no name (EAI_NONAME with
+ * NI_NAMEREQD, else the numeric form). No PTR queries go to the uplink.
+ * Services come from /etc/services when there is one, else the number.
+ * It replaces Emscripten's JS getnameinfo, which knew only the names of its
+ * own fake-DNS addresses, so daemons logged loopback clients as UNKNOWN
+ * (homescoop#176).
+ *
  * Link with --whole-archive (or as an object) so these win over libc's.
  */
 #include <emscripten.h>
@@ -31,6 +42,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include <stdio.h>
+#include <ctype.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -499,4 +512,116 @@ void freeaddrinfo(struct addrinfo *ai) {
     free(ai); /* ai is the head of its struct slicc_ai */
     ai = next;
   }
+}
+
+/* ---- getnameinfo: /etc/hosts and loopback, never the uplink (homescoop#176) ---- */
+
+/* An IPv4 address as the IPv4-mapped IPv6 one, so both families compare alike. */
+static void mapped(unsigned char out[16], const void *a, int family) {
+  if (family == AF_INET) {
+    memcpy(out, "\0\0\0\0\0\0\0\0\0\0\xff\xff", 12);
+    memcpy(out + 12, a, 4);
+  } else {
+    memcpy(out, a, 16);
+  }
+}
+
+/* The first name of the first /etc/hosts line for `a` into buf (size >= 256); "" when none. */
+static void hosts_name(char *buf, const unsigned char a[16]) {
+  char line[512];
+  FILE *f = fopen("/etc/hosts", "r");
+  buf[0] = '\0';
+  if (!f) return;
+  while (fgets(line, sizeof line, f)) {
+    char *p = strchr(line, '#'), *z;
+    unsigned char ip[16];
+    struct in_addr v4;
+    struct in6_addr v6;
+    if (p) *p = '\0';
+    for (p = line; *p && isspace((unsigned char)*p); p++);
+    for (z = p; *z && !isspace((unsigned char)*z); z++);
+    if (!*z) continue; /* an address with no name */
+    *z++ = '\0';
+    if (inet_pton(AF_INET, p, &v4) == 1) mapped(ip, &v4, AF_INET);
+    else if (inet_pton(AF_INET6, p, &v6) == 1) mapped(ip, &v6, AF_INET6);
+    else continue;
+    if (memcmp(ip, a, 16) != 0) continue;
+    for (p = z; *p && isspace((unsigned char)*p); p++);
+    for (z = p; *z && !isspace((unsigned char)*z); z++);
+    if (z > p && z - p < 256) {
+      memcpy(buf, p, (size_t)(z - p));
+      buf[z - p] = '\0';
+      break;
+    }
+  }
+  fclose(f);
+}
+
+/* The /etc/services name of port (tcp, or udp with NI_DGRAM) into buf (size >= 33); "" when none. */
+static void service_name(char *buf, int port, int dgram) {
+  char line[128];
+  FILE *f = fopen("/etc/services", "r");
+  buf[0] = '\0';
+  if (!f) return;
+  while (fgets(line, sizeof line, f)) {
+    char *p = strchr(line, '#'), *z;
+    if (p) *p = '\0';
+    for (p = line; *p && !isspace((unsigned char)*p); p++);
+    if (!*p || p == line || p - line > 32) continue;
+    *p++ = '\0';
+    for (; *p && isspace((unsigned char)*p); p++);
+    unsigned long n = strtoul(p, &z, 10);
+    if (z == p || n != (unsigned long)port) continue;
+    if (strncmp(z, dgram ? "/udp" : "/tcp", 4) != 0) continue;
+    strcpy(buf, line);
+    break;
+  }
+  fclose(f);
+}
+
+int getnameinfo(const struct sockaddr *restrict sa, socklen_t sl, char *restrict node, socklen_t nodelen,
+                char *restrict serv, socklen_t servlen, int flags) {
+  unsigned char a[16];
+  const void *raw;
+  int family, port;
+  char buf[256];
+  if (!sa) return EAI_FAMILY;
+  family = sa->sa_family;
+  if (family == AF_INET) {
+    if (sl < (socklen_t)sizeof(struct sockaddr_in)) return EAI_FAMILY;
+    raw = &((const struct sockaddr_in *)sa)->sin_addr;
+    port = ntohs(((const struct sockaddr_in *)sa)->sin_port);
+  } else if (family == AF_INET6) {
+    if (sl < (socklen_t)sizeof(struct sockaddr_in6)) return EAI_FAMILY;
+    raw = &((const struct sockaddr_in6 *)sa)->sin6_addr;
+    port = ntohs(((const struct sockaddr_in6 *)sa)->sin6_port);
+  } else {
+    return EAI_FAMILY;
+  }
+  mapped(a, raw, family);
+  if (node && nodelen) {
+    buf[0] = '\0';
+    if (!(flags & NI_NUMERICHOST)) {
+      hosts_name(buf, a);
+      /* 127.0.0.0/8 (also IPv4-mapped) and ::1 are this machine's loopback. */
+      int v4mapped = memcmp(a, "\0\0\0\0\0\0\0\0\0\0\xff\xff", 12) == 0;
+      if (!*buf && ((v4mapped && a[12] == 127) ||
+                    memcmp(a, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1", 16) == 0))
+        strcpy(buf, "localhost");
+    }
+    if (!*buf) {
+      if (flags & NI_NAMEREQD) return EAI_NONAME;
+      if (!inet_ntop(family, raw, buf, sizeof buf)) return EAI_SYSTEM;
+    }
+    if (strlen(buf) >= (size_t)nodelen) return EAI_OVERFLOW;
+    strcpy(node, buf);
+  }
+  if (serv && servlen) {
+    buf[0] = '\0';
+    if (!(flags & NI_NUMERICSERV)) service_name(buf, port, (flags & NI_DGRAM) != 0);
+    if (!*buf) snprintf(buf, sizeof buf, "%d", port);
+    if (strlen(buf) >= (size_t)servlen) return EAI_OVERFLOW;
+    strcpy(serv, buf);
+  }
+  return 0;
 }

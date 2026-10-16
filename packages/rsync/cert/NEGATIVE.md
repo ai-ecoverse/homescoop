@@ -115,3 +115,7 @@ On slicc-kernel 1.73.2 and older, an Emscripten program's own `lstat` of a symli
 ## 3.5.x symlink hardening in the destination (homescoop#411, 2026-10-16)
 
 `symlink-dest.mjs` against the published 3.4.4-5 on slicc-kernel 1.92.0, users enforce: FAIL. cone's `rsync -a ~/s/d /tmp/evelink/`, through eve's symlink, exits 0 and copies (3.5.1: rc 3, "refusing to follow a symlink owned by an untrusted user"). With that case left out, root's `rsync -aK /tmp/k/src/ /tmp/k/dA/`, into a dirlink to the absolute `/tmp/k/elsewhere`, exits 0 and writes through it (3.5.1: rc 23, "Symbolic link loop"). 3.5.1-1 passes, and so do the other four specs on it.
+
+## 3.5.1-3: daemon client names (homescoop#176, 2026-10-16)
+
+`daemon.mjs` against the published 3.5.1-2 (3.5.1-1's binary) on slicc-kernel 1.92.0, users enforce: FAIL. Every connection logs `name lookup failed for 127.0.0.1: Name does not resolve`, then `connect from UNKNOWN (127.0.0.1)`. The `[lh]` module (`hosts allow = localhost`, `hosts deny = *`) refuses the pull with `@ERROR: access denied to lh from UNKNOWN (127.0.0.1)`, rc 5, and the `[nolh]` module (`hosts deny = localhost`) lets it in, rc 0. Emscripten's JS getnameinfo knew only its own fake-DNS addresses, so `NI_NAMEREQD` on 127.0.0.1 was `EAI_NONAME`. 3.5.1-3 links the socket shim's getnameinfo (`/etc/hosts`, then loopback) and passes.

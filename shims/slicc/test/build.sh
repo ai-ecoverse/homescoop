@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the shim test programs (Emscripten) into test/out/:
-# - resolve-test against the `net` profile, the archive curl links;
+# - resolve-test and nameinfo-test against the `net` profile, the archive
+#   curl links;
 # - pwd-test against `cli` (slicc_pwd.c, linked with --wrap);
 # - cred-test against `cli` (process credentials, slicc-kernel K1);
 # - selfkill-test against `cli` (raise/kill of the program itself);
@@ -23,6 +24,12 @@ emcc -O2 -Wall -Wextra -Werror "$HERE/resolve-test.c" \
   -o "$OUT/resolve-test.js"
 mv "$OUT/resolve-test.js" "$OUT/resolve-test"
 echo "== built $OUT/resolve-test"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/nameinfo-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_A") $(homescoop_em_cli_ldflags) \
+  -o "$OUT/nameinfo-test.js"
+mv "$OUT/nameinfo-test.js" "$OUT/nameinfo-test"
+echo "== built $OUT/nameinfo-test"
 
 SLICC_CLI="$WORK/libslicc-cli.a"
 homescoop_slicc_archive "$SLICC_CLI" cli

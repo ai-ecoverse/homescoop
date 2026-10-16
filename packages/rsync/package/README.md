@@ -68,8 +68,8 @@ rsync now waits with poll(), which the slicc shims make wait in the kernel.
 
 ## Symlinks in the destination (3.5.x)
 
-3.5.0's secure path resolver (upstream NEWS, "BEHAVIOR CHANGES") changes two
-things you may hit, here as on Linux:
+The secure path resolver introduced in 3.5.0 (upstream NEWS, "BEHAVIOR
+CHANGES") changes two things you may hit, here as on Linux:
 
 - **A destination directory reached through a symlink another user owns is
   refused.** If eve's `/tmp/evelink` points to a directory you may write to,
@@ -81,5 +81,19 @@ things you may hit, here as on Linux:
   and nothing is written through it. 3.4.x wrote through it. A relative
   dirlink to a directory inside the destination still works.
 
-`--insecure-links` (new in 3.5.0) restores the old behaviour for a run that
-trusts those links. Your own links, and root's, are followed as before.
+What counts is who owns the link, not who runs rsync: links you own, and
+links root owns, are followed as before, while root is refused through eve's
+link too. `--insecure-links` (introduced in 3.5.0) restores the old behaviour for a
+run that trusts those links.
+
+## Daemon: client names (3.5.1-3)
+
+`rsync --daemon` names its clients by reverse lookup (`reverse lookup = yes`,
+the default). From 3.5.1-3 that lookup answers from the kernel's
+`/etc/hosts`: a loopback client is `localhost` (`connect from localhost
+(127.0.0.1)` in the log), so `hosts allow = localhost` and the like match by
+name. Other addresses have no name (`connect from UNKNOWN (…)`); no query
+goes to the tailnet or any DNS server, so `hosts allow` / `hosts deny` for
+them takes addresses (`100.64.0.0/10`). Before 3.5.1-3 every client was
+`UNKNOWN`, after a `name lookup failed for 127.0.0.1` line, and only
+addresses matched; `reverse lookup = no` still skips the lookup.
