@@ -434,6 +434,17 @@ jobs:
           mkdir -p "$PROBE"
           tar -xzf .homescoop-out/package.tgz -C "$PROBE" package/package.json
           node scripts/browser-cert/cert-leg.mjs plan "${{ matrix.package }}" --manifest "$PROBE/package/package.json" >> "$GITHUB_OUTPUT"
+      # cert/meta.json "peers": the host-<peer>-prN artifacts of this run, for
+      # ci commands that check the package against them (homescoop#678). A
+      # peer not built in this run has no artifact; the ci command then falls
+      # back to the registry, and fails when that has no such version either.
+      - name: Peer artifacts of this run (cert/meta.json peers)
+        if: steps.plan.outputs.peers != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: host-@(${{ steps.plan.outputs.peers }})-pr${{ github.event.pull_request.number }}
+          path: .homescoop-out/peers
       - name: Browser cert (slicc-kernel CDP)
         if: steps.plan.outputs.browser == 'run'
         run: |

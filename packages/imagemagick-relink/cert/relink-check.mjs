@@ -1,5 +1,5 @@
-// ladder-pr ci (cert/meta.json, homescoop#593, #395, #594): both kits of the
-// package relink magick. The override directory holds libiconv.a from the
+// ladder-pr ci (cert/meta.json, homescoop#593, #395, #594, #678): both kits of
+// the package relink magick. The override directory holds libiconv.a from the
 // recipe's published @ai-ecoverse/wasm-libiconv and copies of the kit's
 // libslicc_cred.a and libMagickCore (the heif kit also wasm-libheif's three
 // libraries), and relink.sh must take each from there. The relinked
@@ -7,12 +7,19 @@
 // the binary the kit's objects made, about its size, a name section and no
 // DWARF. Versions: this package, both runtime recipes and both kit.json agree.
 //
+// The binding (homescoop#678): each kit's kit.json must name the runtime
+// package's bin/magick.wasm of the same version, byte for byte. The runtime
+// tarball is, in this order: --runtime <tgz>; the same ladder-pr run's
+// host-<recipe>-prN artifact (cert/meta.json peers, downloaded into
+// .homescoop-out/peers, or $HOMESCOOP_CERT_PEERS, e.g. cert-review's
+// $RUNNER_TEMP/artifacts); else the registry's <runtime>@<version>. No runtime
+// of that version anywhere, another sha256, or a runtime that doesn't name
+// this package as its relink kit fails the check.
+//
 //   node packages/imagemagick-relink/cert/relink-check.mjs [relink.tgz] [--runtime <runtime.tgz> ...]
-// --runtime (cert-review, by hand): a runtime tarball of the same version
-// whose bin/magick.wasm must be the binary kit.json names (same sha256).
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -87,16 +94,48 @@ try {
     if (!glue.includes('callMain')) throw new Error(`${r}: relinked glue has no callMain`);
     out.push(`${r}: ${wasm.length} bytes (kit.json ${meta.size}), same ${sig.imports.length} imports and ${sig.exports.length} exports, name section, no DWARF, ${js.length} js libraries, README names ${docs.libs} libraries`);
   }
+  // homescoop#678: each kit against the runtime package of its version.
+  const RELINK = '@ai-ecoverse/wasm-imagemagick-relink';
+  const peers = resolve(process.env.HOMESCOOP_CERT_PEERS || join(root, '.homescoop-out/peers'));
+  const given = new Map();
   for (const t of runtimes) {
-    const d = join(work, `runtime-${out.length}`);
+    const d = join(work, `given-${given.size}`);
     sh(`mkdir -p '${d}' && tar -xzf '${t}' -C '${d}'`);
-    const m = json(join(d, 'package/package.json'));
-    const r = Object.keys(KITS).find((k) => KITS[k] === m.name);
-    if (!r) throw new Error(`${t} is ${m.name}, not a runtime package of these kits`);
+    given.set(json(join(d, 'package/package.json')).name, { dir: join(d, 'package'), from: t });
+  }
+  for (const [r, npm] of Object.entries(KITS)) {
     const meta = json(join(pkg, 'share', r, 'relink/kit.json'));
-    const got = sha256(readFileSync(join(d, 'package/bin/magick.wasm')));
-    if (m.version !== meta.version || got !== meta.sha256) throw new Error(`${m.name}@${m.version} bin/magick.wasm ${got} is not kit.json's ${meta.version} ${meta.sha256}`);
-    out.push(`${m.name}@${m.version}: bin/magick.wasm is the kit's build (sha256 ${got})`);
+    let rt = given.get(npm);
+    if (!rt) {
+      const art = existsSync(peers) ? readdirSync(peers).find((n) => new RegExp(`^host-${r}-pr\\d+$`).test(n)) : undefined;
+      if (art && existsSync(join(peers, art, 'package.tgz'))) {
+        const tgz = join(peers, art, 'package.tgz');
+        const want = existsSync(join(peers, art, 'package.tgz.sha256')) ? readFileSync(join(peers, art, 'package.tgz.sha256'), 'utf8').split(/\s/)[0] : null;
+        const got = sha256(readFileSync(tgz));
+        if (want && want !== got) throw new Error(`${art}/package.tgz is ${got}, its package.tgz.sha256 says ${want}`);
+        const d = join(work, `peer-${r}`);
+        sh(`mkdir -p '${d}' && tar -xzf '${tgz}' -C '${d}'`);
+        rt = { dir: join(d, 'package'), from: `this run's ${art} (${got})` };
+      } else {
+        const d = join(work, `registry-${r}`);
+        const r2 = spawnSync('bash', ['-c', `mkdir -p '${d}' && cd '${d}' && npm pack '${npm}@${meta.version}' --silent && tar -xzf *.tgz`], { encoding: 'utf8' });
+        if (r2.status !== 0) {
+          throw new Error(`${npm}@${meta.version} is neither built in this run (no ${peers}/host-${r}-prN) nor on the registry: share/${r}/relink would ship without its runtime (homescoop#678)`);
+        }
+        rt = { dir: join(d, 'package'), from: `the registry's ${npm}@${meta.version}` };
+      }
+    }
+    const m = json(join(rt.dir, 'package.json'));
+    if (m.name !== npm || m.version !== meta.version) throw new Error(`${rt.from} is ${m.name}@${m.version}, share/${r}/relink/kit.json ${npm}@${meta.version}`);
+    const got = sha256(readFileSync(join(rt.dir, 'bin/magick.wasm')));
+    if (got !== meta.sha256) {
+      throw new Error(`${npm}@${m.version} bin/magick.wasm from ${rt.from} is ${got}, but share/${r}/relink/kit.json names ${meta.sha256}: the kit is not that binary's build (homescoop#678)`);
+    }
+    if (m.homescoop?.relink !== RELINK) throw new Error(`${npm}@${m.version} package.json homescoop.relink is ${m.homescoop?.relink ?? '(none)'}, not ${RELINK}`);
+    if (!readFileSync(join(rt.dir, 'THIRD-PARTY-NOTICES.md'), 'utf8').includes(`${RELINK}@${m.version}`)) {
+      throw new Error(`${npm}@${m.version} THIRD-PARTY-NOTICES.md does not name ${RELINK}@${m.version}`);
+    }
+    out.push(`${npm}@${m.version} from ${rt.from}: bin/magick.wasm is the kit's build (sha256 ${got}), and it names ${RELINK}@${m.version}`);
   }
   console.log(`relink-check (wasm-imagemagick-relink ${version}): ${out.join('; ')}`);
 } finally {

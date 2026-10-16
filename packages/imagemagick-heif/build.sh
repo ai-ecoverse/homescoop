@@ -146,7 +146,9 @@ done
 grep -q 'name="disk" value="0"' "$CFG_DEST/policy.xml"
 
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
-homescoop_notices_begin "magick.wasm statically links the following delegate libraries, including libheif and libde265 (LGPL-3.0-or-later; libde265 is an HEVC decoder, and HEVC is patent-encumbered) from @ai-ecoverse/wasm-libheif. No MPEG-family video codec. The relink kit, magick's objects and every other library it links, so that it can be relinked against a modified libheif, libde265 or GNU libiconv, is the package @ai-ecoverse/wasm-imagemagick-relink of the same version on the same registry (share/imagemagick-heif/relink; README.md, Relinking)."
+# The notices name the relink kit package of exactly this version (homescoop#678).
+PKG_VERSION="$(node -p 'require(process.argv[1]).version' "$HOMESCOOP_PKG/package/package.json")"
+homescoop_notices_begin "magick.wasm statically links the following delegate libraries, including libheif and libde265 (LGPL-3.0-or-later; libde265 is an HEVC decoder, and HEVC is patent-encumbered) from @ai-ecoverse/wasm-libheif. No MPEG-family video codec. The relink kit, magick's objects and every other library it links, so that it can be relinked against a modified libheif, libde265 or GNU libiconv, is the package @ai-ecoverse/wasm-imagemagick-relink@$PKG_VERSION, this version, on the same registry (share/imagemagick-heif/relink; README.md, Relinking)."
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
   https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
 homescoop_notice "libjpeg-turbo 3.1.2 (@ai-ecoverse/wasm-libjpeg-turbo)" \
