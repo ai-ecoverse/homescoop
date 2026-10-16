@@ -208,7 +208,17 @@ directories) records the hosted path (`homescoop_load_recipe` sets
 moves to the pool only with evidence of equal bytes:** in the PR that adds
 `runner: pool`, its `host-<pkg>-prN` tarball from the pool must have the same
 sha256 as a hosted twin built from the same tree (`host-run.sh` on
-`ubuntu-latest`), and the PR body says so. `cert`, `exact-pins`, `detect`,
+`ubuntu-latest`), and the PR body says so. **And it stays checked:**
+[`pool-parity.yml`](../.github/workflows/pool-parity.yml) builds every pool
+recipe (`classify-touched-packages.mjs --all`'s `pool`) on both runners from
+the same commit of main, every Monday and on `workflow_dispatch` (its
+`packages` input takes any host recipe, for a candidate or an image rollout),
+and compares the two `package.tgz` sha256s, listing the entries that differ
+(`scripts/tarball-parity.mjs`, npm-parity's comparison). A recipe that
+differs fails the run and opens, or comments on, one `pool-parity` issue;
+move it back to hosted, or fix the difference. Dispatch it whenever the
+runner-bench image or the hosted image changes (#499).
+`cert`, `exact-pins`, `detect`,
 `reproducible`, `slicc-note` and `ci` run on the pools as before;
 `recipe-sha`, which pushes with `contents: write`, stays on `ubuntu-latest`. A
 fork PR runs everything on `ubuntu-latest`, since a pool job can reach the
