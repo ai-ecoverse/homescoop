@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasix-python`
 
-CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
+CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
