@@ -1,0 +1,457 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: homescoop <homescoop@ai-ecoverse.invalid>
+Date: Fri, 16 Oct 2026 10:35:09 +0200
+Subject: [PATCH] wasi: build uv for wasm32-wasip1-threads
+
+Workspace and crate manifests for slicc's kernel (WASI preview1 with
+WASIX threads, sockets and processes):
+- [patch.crates-io] for eight crates homescoop patches (homescoop-crates/,
+  unpacked and patched by apply.sh): hyper-util dials over wasix-net;
+  cargo-util and rustls-native-certs compile on WASI; reqsign and
+  astral-reqwest treat wasm32-unknown, not every wasm32, as the browser.
+- wasix-command (homescoop's crate, feature tokio) for std::process and
+  tokio::process, which WASI does not have.
+- indicatif's wasmbind (std::time on WASI); ctrlc and diskus only off
+  WASI (no signals; no unix metadata, so cache size adds file lengths).
+- uv-extract reads at an offset with std::os::wasi::fs::FileExt.
+- The uv binary's recursion limit: run()'s future is deeper on wasm32.
+---
+ Cargo.lock                                    | 40 +++++++++++--------
+ Cargo.toml                                    | 15 ++++++-
+ crates/uv-auth/Cargo.toml                     |  1 +
+ crates/uv-build-frontend/Cargo.toml           |  1 +
+ crates/uv-command-support/Cargo.toml          |  1 +
+ crates/uv-extract/src/lib.rs                  |  2 +
+ .../src/vendor/cloneable_seekable_reader.rs   |  4 ++
+ crates/uv-installer/Cargo.toml                |  1 +
+ crates/uv-project-commands/Cargo.toml         |  5 ++-
+ crates/uv-project-commands/src/edit.rs        |  2 +
+ crates/uv-python-interpreter/Cargo.toml       |  1 +
+ crates/uv-shell/Cargo.toml                    |  1 +
+ crates/uv-tool-commands/Cargo.toml            |  1 +
+ crates/uv/Cargo.toml                          |  4 +-
+ crates/uv/src/bin/uv.rs                       |  2 +
+ crates/uv/src/commands/cache_size.rs          | 15 +++++--
+ 16 files changed, 74 insertions(+), 22 deletions(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index b1a7179..2316116 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -277,8 +277,6 @@ dependencies = [
+ [[package]]
+ name = "astral-reqwest-middleware"
+ version = "0.5.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "98e1c6be25cfbf1bb4fea1a9da51bc05d3259a9062df4e53f54e5607895e33c9"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+@@ -292,8 +290,6 @@ dependencies = [
+ [[package]]
+ name = "astral-reqwest-retry"
+ version = "0.9.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "48c76a42c052d7a95249b90b83d44e8f1bbde7c8e08dbed50d49c58321815da3"
+ dependencies = [
+  "anyhow",
+  "astral-reqwest-middleware",
+@@ -748,8 +744,6 @@ dependencies = [
+ [[package]]
+ name = "cargo-util"
+ version = "0.2.30"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "5d7123d293f652da25899a771e48756075710465b2eedb0fc35aa3b368e9cf5c"
+ dependencies = [
+  "anyhow",
+  "core-foundation 0.10.1",
+@@ -2219,8 +2213,6 @@ dependencies = [
+ [[package]]
+ name = "hyper-util"
+ version = "0.1.20"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "96547c2556ec9d12fb1578c4eaf448b04993e7fb79cbaad930a656880a6bdfa0"
+ dependencies = [
+  "base64 0.22.1",
+  "bytes",
+@@ -2238,6 +2230,7 @@ dependencies = [
+  "tokio",
+  "tower-service",
+  "tracing",
++ "wasix-net",
+  "windows-registry",
+ ]
+ 
+@@ -2399,6 +2392,7 @@ dependencies = [
+  "portable-atomic",
+  "unicode-width 0.2.2",
+  "unit-prefix",
++ "web-time",
+ ]
+ 
+ [[package]]
+@@ -3966,8 +3960,6 @@ dependencies = [
+ [[package]]
+ name = "reqsign-core"
+ version = "3.3.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "ff052daffb0599681c50f85c59e7236438976efe991ab864edd9f3b235501a0f"
+ dependencies = [
+  "anyhow",
+  "base64 0.23.1",
+@@ -4002,8 +3994,6 @@ dependencies = [
+ [[package]]
+ name = "reqsign-google"
+ version = "3.1.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "272a5813571885c1455ffe106f0c768577e6ce69313446d4476e8d41dcf6ac5a"
+ dependencies = [
+  "bytes",
+  "form_urlencoded",
+@@ -4021,8 +4011,6 @@ dependencies = [
+ [[package]]
+ name = "reqsign-http-send-reqwest"
+ version = "4.0.6"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3a2c75a3a87bc894a10ef7e7139e71a330a3f602cfaab38c4578ec9aefc181df"
+ dependencies = [
+  "anyhow",
+  "bytes",
+@@ -4284,8 +4272,6 @@ dependencies = [
+ [[package]]
+ name = "rustls-native-certs"
+ version = "0.8.4"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "dab5152771c58876a2146916e53e35057e1a4dfa2b9df0f0305b07f611fdea4d"
+ dependencies = [
+  "openssl-probe",
+  "rustls-pki-types",
+@@ -5955,6 +5941,7 @@ dependencies = [
+  "uv-state",
+  "uv-static",
+  "uv-warnings",
++ "wasix-command",
+  "wiremock",
+ ]
+ 
+@@ -6183,6 +6170,7 @@ dependencies = [
+  "uv-virtualenv",
+  "uv-warnings",
+  "uv-workspace",
++ "wasix-command",
+ ]
+ 
+ [[package]]
+@@ -6377,6 +6365,7 @@ dependencies = [
+  "uv-shell",
+  "uv-static",
+  "uv-warnings",
++ "wasix-command",
+ ]
+ 
+ [[package]]
+@@ -6973,6 +6962,7 @@ dependencies = [
+  "uv-types",
+  "uv-warnings",
+  "walkdir",
++ "wasix-command",
+ ]
+ 
+ [[package]]
+@@ -7397,6 +7387,7 @@ dependencies = [
+  "uv-virtualenv",
+  "uv-warnings",
+  "uv-workspace",
++ "wasix-command",
+ ]
+ 
+ [[package]]
+@@ -7644,6 +7635,7 @@ dependencies = [
+  "uv-python-types",
+  "uv-static",
+  "uv-trampoline-builder",
++ "wasix-command",
+  "which",
+  "windows",
+ ]
+@@ -7992,6 +7984,7 @@ dependencies = [
+  "tracing",
+  "uv-fs",
+  "uv-static",
++ "wasix-command",
+  "windows",
+  "windows-registry",
+ ]
+@@ -8177,6 +8170,7 @@ dependencies = [
+  "uv-virtualenv",
+  "uv-warnings",
+  "uv-workspace",
++ "wasix-command",
+ ]
+ 
+ [[package]]
+@@ -8424,6 +8418,20 @@ version = "0.11.1+wasi-snapshot-preview1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
+ 
++[[package]]
++name = "wasix-command"
++version = "0.1.0"
++dependencies = [
++ "libc",
++ "tokio",
++]
++
++[[package]]
++name = "wasix-net"
++version = "0.1.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "966dbac17aacf0e6e9743a1b497aa384b89f3270343a3e5e7adc2fc05d975f93"
++
+ [[package]]
+ name = "wasm-bindgen"
+ version = "0.2.114"
+diff --git a/Cargo.toml b/Cargo.toml
+index 4213611..e517571 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -203,7 +203,7 @@ hex = { version = "0.4.3", default-features = false, features = ["std"] }
+ http = { version = "1.1.0", default-features = false, features = ["std"] }
+ http-content-range = { version = "0.2.4", default-features = false }
+ indexmap = { version = "2.5.0", default-features = false, features = ["std"] }
+-indicatif = { version = "0.18.0", default-features = false, features = ["unicode-width"] }
++indicatif = { version = "0.18.0", default-features = false, features = ["unicode-width", "wasmbind"] }
+ indoc = { version = "2.0.5", default-features = false }
+ itertools = { version = "0.14.0", default-features = false, features = ["use_std"] }
+ jiff = { version = "0.2.0", default-features = false, features = [
+@@ -354,6 +354,8 @@ unscanny = { version = "0.1.0", default-features = false }
+ url = { version = "2.5.2", default-features = false, features = ["serde", "std"] }
+ version-ranges = { version = "0.2.2", package = "astral-version-ranges", default-features = false }
+ walkdir = { version = "2.5.0", default-features = false }
++# slicc's kernel: std::process and tokio::process on WASI (homescoop's crate).
++wasix-command = { path = "homescoop-crates/wasix-command", features = ["tokio"] }
+ webpki-root-certs = { version = "1", default-features = false }
+ which = { version = "8.0.0", default-features = false, features = ["real-sys"] }
+ windows = { version = "0.61.0", default-features = false, features = [
+@@ -560,3 +562,14 @@ codegen-units = 1
+ # The profile that 'cargo dist' will build with.
+ [profile.dist]
+ inherits = "release"
++
++# slicc's kernel (WASI preview1 + WASIX sockets): crates patched by homescoop.
++[patch.crates-io]
++astral-reqwest-middleware = { path = "homescoop-crates/astral-reqwest-middleware-0.5.1" }
++astral-reqwest-retry = { path = "homescoop-crates/astral-reqwest-retry-0.9.1" }
++cargo-util = { path = "homescoop-crates/cargo-util-0.2.30" }
++hyper-util = { path = "homescoop-crates/hyper-util-0.1.20" }
++reqsign-core = { path = "homescoop-crates/reqsign-core-3.3.1" }
++reqsign-google = { path = "homescoop-crates/reqsign-google-3.1.1" }
++reqsign-http-send-reqwest = { path = "homescoop-crates/reqsign-http-send-reqwest-4.0.6" }
++rustls-native-certs = { path = "homescoop-crates/rustls-native-certs-0.8.4" }
+diff --git a/crates/uv-auth/Cargo.toml b/crates/uv-auth/Cargo.toml
+index 710ca33..f9da00f 100644
+--- a/crates/uv-auth/Cargo.toml
++++ b/crates/uv-auth/Cargo.toml
+@@ -44,6 +44,7 @@ tokio = { workspace = true }
+ toml = { workspace = true }
+ tracing = { workspace = true }
+ url = { workspace = true }
++wasix-command = { workspace = true }
+ 
+ [dev-dependencies]
+ insta = { workspace = true }
+diff --git a/crates/uv-build-frontend/Cargo.toml b/crates/uv-build-frontend/Cargo.toml
+index fd18480..3cb1f55 100644
+--- a/crates/uv-build-frontend/Cargo.toml
++++ b/crates/uv-build-frontend/Cargo.toml
+@@ -50,6 +50,7 @@ tokio = { workspace = true }
+ toml_edit = { workspace = true }
+ tracing = { workspace = true }
+ rustc-hash = { workspace = true }
++wasix-command = { workspace = true }
+ 
+ [dev-dependencies]
+ insta = { workspace = true }
+diff --git a/crates/uv-command-support/Cargo.toml b/crates/uv-command-support/Cargo.toml
+index 8cc6be7..a5c69c7 100644
+--- a/crates/uv-command-support/Cargo.toml
++++ b/crates/uv-command-support/Cargo.toml
+@@ -34,6 +34,7 @@ rustc-hash = { workspace = true }
+ thiserror = { workspace = true }
+ tokio = { workspace = true }
+ tracing = { workspace = true }
++wasix-command = { workspace = true }
+ 
+ [target.'cfg(unix)'.dependencies]
+ nix = { workspace = true }
+diff --git a/crates/uv-extract/src/lib.rs b/crates/uv-extract/src/lib.rs
+index e1459c3..955107c 100644
+--- a/crates/uv-extract/src/lib.rs
++++ b/crates/uv-extract/src/lib.rs
+@@ -1,3 +1,5 @@
++#![cfg_attr(target_os = "wasi", feature(wasi_ext))]
++
+ pub use error::Error;
+ use regex::regex;
+ pub use sync::*;
+diff --git a/crates/uv-extract/src/vendor/cloneable_seekable_reader.rs b/crates/uv-extract/src/vendor/cloneable_seekable_reader.rs
+index 8ce93a4..3f71adc 100644
+--- a/crates/uv-extract/src/vendor/cloneable_seekable_reader.rs
++++ b/crates/uv-extract/src/vendor/cloneable_seekable_reader.rs
+@@ -179,6 +179,10 @@ fn read_at(file: &fs_err::File, buf: &mut [u8], offset: u64) -> std::io::Result<
+     {
+         file.seek_read(buf, offset)
+     }
++    #[cfg(target_os = "wasi")]
++    {
++        std::os::wasi::fs::FileExt::read_at(file.file(), buf, offset)
++    }
+ }
+ 
+ #[cfg(test)]
+diff --git a/crates/uv-installer/Cargo.toml b/crates/uv-installer/Cargo.toml
+index 9d71972..d3b22a7 100644
+--- a/crates/uv-installer/Cargo.toml
++++ b/crates/uv-installer/Cargo.toml
+@@ -54,6 +54,7 @@ tokio = { workspace = true }
+ tracing = { workspace = true }
+ url = { workspace = true }
+ walkdir = { workspace = true }
++wasix-command = { workspace = true }
+ 
+ [dev-dependencies]
+ uv-python-types = { workspace = true }
+diff --git a/crates/uv-project-commands/Cargo.toml b/crates/uv-project-commands/Cargo.toml
+index b53476b..20a3788 100644
+--- a/crates/uv-project-commands/Cargo.toml
++++ b/crates/uv-project-commands/Cargo.toml
+@@ -68,7 +68,6 @@ anstream = { workspace = true }
+ anyhow = { workspace = true }
+ async_zip = { workspace = true, features = ["zstd-read"] }
+ clap = { workspace = true }
+-ctrlc = { workspace = true }
+ fs-err = { workspace = true }
+ futures = { workspace = true }
+ indicatif = { workspace = true }
+@@ -86,3 +85,7 @@ toml = { workspace = true }
+ toml_edit = { workspace = true }
+ tracing = { workspace = true }
+ url = { workspace = true }
++wasix-command = { workspace = true }
++
++[target.'cfg(not(target_os = "wasi"))'.dependencies]
++ctrlc = { workspace = true }
+diff --git a/crates/uv-project-commands/src/edit.rs b/crates/uv-project-commands/src/edit.rs
+index 9775d93..3f9738b 100644
+--- a/crates/uv-project-commands/src/edit.rs
++++ b/crates/uv-project-commands/src/edit.rs
+@@ -128,6 +128,8 @@ impl ProjectEdit {
+             .collect::<io::Result<Vec<_>>>()?;
+         let files = Arc::new(Mutex::new(files));
+ 
++        // WASI has no signal handlers: an interrupted edit is not reverted.
++        #[cfg(not(target_os = "wasi"))]
+         let _ = ctrlc::set_handler({
+             let files = Arc::clone(&files);
+             move || {
+diff --git a/crates/uv-python-interpreter/Cargo.toml b/crates/uv-python-interpreter/Cargo.toml
+index 8e735f5..4127f42 100644
+--- a/crates/uv-python-interpreter/Cargo.toml
++++ b/crates/uv-python-interpreter/Cargo.toml
+@@ -43,6 +43,7 @@ tempfile = { workspace = true }
+ thiserror = { workspace = true }
+ tracing = { workspace = true }
+ which = { workspace = true }
++wasix-command = { workspace = true }
+ 
+ [target.'cfg(target_os = "windows")'.dependencies]
+ windows = { workspace = true }
+diff --git a/crates/uv-shell/Cargo.toml b/crates/uv-shell/Cargo.toml
+index 69b5504..d8c76f9 100644
+--- a/crates/uv-shell/Cargo.toml
++++ b/crates/uv-shell/Cargo.toml
+@@ -24,6 +24,7 @@ fs-err = { workspace = true }
+ same-file = { workspace = true }
+ tokio = { workspace = true }
+ tracing = { workspace = true }
++wasix-command = { workspace = true }
+ 
+ [target.'cfg(unix)'.dependencies]
+ nix = { workspace = true }
+diff --git a/crates/uv-tool-commands/Cargo.toml b/crates/uv-tool-commands/Cargo.toml
+index 30a49b6..4bb15b1 100644
+--- a/crates/uv-tool-commands/Cargo.toml
++++ b/crates/uv-tool-commands/Cargo.toml
+@@ -71,6 +71,7 @@ serde_json = { workspace = true }
+ thiserror = { workspace = true }
+ tokio = { workspace = true }
+ tracing = { workspace = true }
++wasix-command = { workspace = true }
+ 
+ [target.'cfg(windows)'.dependencies]
+ self-replace = { workspace = true }
+diff --git a/crates/uv/Cargo.toml b/crates/uv/Cargo.toml
+index d9e0974..2b1f790 100644
+--- a/crates/uv/Cargo.toml
++++ b/crates/uv/Cargo.toml
+@@ -80,7 +80,6 @@ axoupdater = { workspace = true, features = [
+ ], optional = true }
+ clap = { workspace = true, features = ["derive", "string", "wrap_help"] }
+ console = { workspace = true }
+-diskus = { workspace = true }
+ etcetera = { workspace = true }
+ fs-err = { workspace = true, features = ["tokio"] }
+ futures = { workspace = true }
+@@ -102,6 +101,9 @@ url = { workspace = true }
+ walkdir = { workspace = true }
+ which = { workspace = true }
+ 
++[target.'cfg(not(target_os = "wasi"))'.dependencies]
++diskus = { workspace = true }
++
+ [target.'cfg(target_os = "windows")'.dependencies]
+ self-replace = { workspace = true }
+ uv-windows = { workspace = true }
+diff --git a/crates/uv/src/bin/uv.rs b/crates/uv/src/bin/uv.rs
+index ee178a7..7cef970 100644
+--- a/crates/uv/src/bin/uv.rs
++++ b/crates/uv/src/bin/uv.rs
+@@ -1,3 +1,5 @@
++// wasm32: the layout of `run()`'s future is deeper than the default query limit.
++#![cfg_attr(target_os = "wasi", recursion_limit = "256")]
+ // Don't optimize the alloc crate away due to it being otherwise unused.
+ // https://github.com/rust-lang/rust/issues/64402
+ #[cfg(feature = "performance-memory-allocator")]
+diff --git a/crates/uv/src/commands/cache_size.rs b/crates/uv/src/commands/cache_size.rs
+index 306aa3c..e6b5faf 100644
+--- a/crates/uv/src/commands/cache_size.rs
++++ b/crates/uv/src/commands/cache_size.rs
+@@ -2,6 +2,7 @@ use std::fmt::Write;
+ 
+ use anstream::stream::IsTerminal;
+ use anyhow::Result;
++#[cfg(not(target_os = "wasi"))]
+ use diskus::DiskUsage;
+ 
+ use crate::commands::human_readable_bytes;
+@@ -40,9 +41,17 @@ pub(crate) fn cache_size(
+         return Ok(ExitStatus::Success);
+     }
+ 
+-    let disk_usage = DiskUsage::new(vec![cache.root().to_path_buf()]);
+-
+-    let total_bytes = disk_usage.count_ignoring_errors();
++    #[cfg(not(target_os = "wasi"))]
++    let total_bytes = DiskUsage::new(vec![cache.root().to_path_buf()]).count_ignoring_errors();
++    // diskus needs unix metadata: on WASI, add up the files' lengths.
++    #[cfg(target_os = "wasi")]
++    let total_bytes = walkdir::WalkDir::new(cache.root())
++        .into_iter()
++        .filter_map(Result::ok)
++        .filter_map(|entry| entry.metadata().ok())
++        .filter(std::fs::Metadata::is_file)
++        .map(|metadata| metadata.len())
++        .sum::<u64>();
+ 
+     if human_readable {
+         let bytes = human_readable_bytes(total_bytes);

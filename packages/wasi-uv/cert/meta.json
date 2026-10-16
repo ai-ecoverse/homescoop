@@ -1,0 +1,38 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.100.4",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils", "@ai-ecoverse/wasix-python"],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-python@3.14.2-21"
+  ],
+  "checklist": [
+    "uv --version is 'uv 0.13.1 ([…] wasm32-wasip1-threads)'",
+    "uv python find: /usr/bin/python3 (wasix-python), listed as cpython-3.14.x-wasi-wasm32-none",
+    "homescoop#103 done-when: uv venv && uv pip install requests && uv run python -c 'import requests' (sys.prefix is the venv; pyvenv.cfg written by uv; bin/python symlinks wasix-python)",
+    "requests is in the venv only; uv pip list shows it; uv pip uninstall removes it",
+    "an sdist (six, --no-binary) builds with setuptools in an isolated environment; --compile-bytecode writes __pycache__",
+    "uv init; uv add idna charset-normalizer writes pyproject.toml and uv.lock, builds the project (uv_build) and syncs",
+    "uv run of the project's console script, a dependency's console script (executable), and python",
+    "uv lock --check, uv tree, uv remove, rm -rf .venv && uv sync",
+    "a version not in the links: uv's error, no panic or trap"
+  ],
+  "patches": {
+    "0001-wasi-build-uv-for-wasm32-wasip1-threads.patch": "the whole spec (the build); uv cache paths and indicatif output in every case",
+    "0002-wasi-run-processes-through-wasix-command.patch": "uv python find (interpreter query), uv run, the six sdist build, --compile-bytecode",
+    "0003-wasi-the-filesystem-as-unix.patch": "venv bin/python symlink, cache archive links, uv add (atomic pyproject/uv.lock writes), executable console scripts",
+    "0004-wasi-a-WASI-platform-for-interpreters-and-wheels.patch": "uv python find (wasi-wasm32 key); wheel selection in every install",
+    "0005-wasi-start-uv-in-slicc-s-kernel.patch": "every case run from a non-root cwd; installs (tokio::fs on the blocking pool)",
+    "crates/hyper-util-0.1.20.patch": "PyPI through the kernel proxy (checked by hand: the cert kernel has no network)",
+    "crates/rustls-native-certs-0.8.4.patch": "build; TLS to the kernel proxy's CA (by hand)",
+    "crates/cargo-util-0.2.30.patch": "build",
+    "crates/reqsign-core-3.3.1.patch": "build",
+    "crates/reqsign-google-3.1.1.patch": "build",
+    "crates/reqsign-http-send-reqwest-4.0.6.patch": "build",
+    "crates/astral-reqwest-middleware-0.5.1.patch": "build; every client request",
+    "crates/astral-reqwest-retry-0.9.1.patch": "build; every client request",
+    "rust/0001-std-wasi-paths-home-temp-and-no-exe-suffix.patch": "uv python find (PATH split, python not python.wasm), cache under $HOME, temp files"
+  },
+  "network": "The cert kernel has no network: the spec fetches pinned distributions (sha256-checked) and uv resolves them alone (no-index, find-links in ~/.config/uv/uv.toml). PyPI over the kernel's CONNECT proxy (TLS with SSL_CERT_FILE) was checked by hand on the Node entry with nodeTransport: uv venv && uv pip install requests && uv run python -c 'import requests' → 2.34.2 /home/u/.venv."
+}

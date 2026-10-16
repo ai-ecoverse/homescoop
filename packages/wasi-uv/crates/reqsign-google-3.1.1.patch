@@ -1,0 +1,12 @@
+reqsign-google: the jwt feature on WASI too (mechanical wasm32 → wasm32-unknown).
+
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -143,6 +143,6 @@
+ features = ["full"]
+ default-features = false
+ 
+-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.reqsign-core]
++[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dependencies.reqsign-core]
+ version = "3.3.1"
+ features = ["jwt"]

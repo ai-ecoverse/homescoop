@@ -1,4 +1,12 @@
 {
+  "archive-trait 0.0.15": {
+    "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/147d8d21524d5610e9488c93a7eac4a1cca7f3ab/LICENSE-MIT",
+    "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+  },
+  "astral-mail-headers 0.0.1": {
+    "url": "https://raw.githubusercontent.com/astral-sh/astral-mail-headers/9292b7783d8298ad7324c79e4b6c20aa8d6e46f7/LICENSE-MIT",
+    "sha256": "7eed948b4bb4122b67f174287f0b6c675916d4cbdf54da8930c2df6f923a7eec"
+  },
   "grit-pattern-matcher 0.5.1": {
     "url": "https://raw.githubusercontent.com/getgrit/gritql/0de0cdbe598e987899cfd153b48610682342edc1/LICENSE",
     "sha256": "d0bed1dabb4f2e1d6828349e690f2137d99575e86ec2c7545c74ae53d8430e43"
@@ -10,6 +18,26 @@
   "number_prefix 0.4.0": {
     "url": "https://raw.githubusercontent.com/ogham/rust-number-prefix/eb6ebd215d50df1b199737f0356b988bebaedc84/LICENCE",
     "sha256": "df8d11b64ecce43b1229cd72745c59513b54ba39f05e3ec7c06780617b7b1fcc"
+  },
+  "priority-queue 2.7.0": {
+    "url": "https://raw.githubusercontent.com/garro95/priority-queue/0c76fb8fe75e4457f16f8e6c8e86508d1a89ba1d/MPL-2.0.txt",
+    "sha256": "c73cc0c27b0f24d5612e76bf83b5845c4fbd0374a1a8483f3d16befe58a60c9a"
+  },
+  "purl 0.1.6": {
+    "url": "https://raw.githubusercontent.com/phylum-dev/purl/93152aae4005766d3ea7dcd0e5d8beaee3f0fad8/LICENSE",
+    "sha256": "93dd22d1a0fbb1ccb4e320a7ac1f5f58c7338eb11f8893756b7819cd1b62b5e3"
+  },
+  "seahash 4.1.0": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/MIT.txt",
+    "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+  },
+  "tar-codec 0.0.15": {
+    "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/147d8d21524d5610e9488c93a7eac4a1cca7f3ab/LICENSE-MIT",
+    "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+  },
+  "tar-framing 0.0.15": {
+    "url": "https://raw.githubusercontent.com/astral-sh/astral-codec/147d8d21524d5610e9488c93a7eac4a1cca7f3ab/LICENSE-MIT",
+    "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
   },
   "tokio-io-mock-fork 0.1.0": {
     "url": "https://raw.githubusercontent.com/tokio-rs/tokio/3d0d0fd2af9192ca5cf2836451e96dffab68216a/tokio-test/LICENSE",

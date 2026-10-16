@@ -1,0 +1,269 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: homescoop <homescoop@ai-ecoverse.invalid>
+Date: Fri, 16 Oct 2026 10:35:15 +0200
+Subject: [PATCH] wasi: run processes through wasix-command
+
+std::process cannot spawn on wasip1 and tokio has no process module on
+WASI. Every spawn site imports Command, Child, Stdio and ExitStatus from
+wasix-command instead, which is std's and tokio's on other targets, so
+native builds are unchanged. On WASI:
+- run_to_completion waits without forwarding signals;
+- the interpreter query runs python with -s -P rather than -I: -I implies
+  -E, and wasix-python finds its standard library through PYTHONHOME,
+  which the kernel sets for the command;
+- canonicalize_executable keeps the path (no realpath);
+- uv run does not copy entrypoints into an ephemeral environment.
+---
+ crates/uv-auth/src/keyring.rs                   |  5 +++--
+ crates/uv-build-frontend/src/error.rs           |  2 +-
+ crates/uv-build-frontend/src/lib.rs             |  8 ++++----
+ crates/uv-command-support/src/child.rs          |  8 ++++++--
+ crates/uv-installer/src/compile.rs              |  4 ++--
+ crates/uv-project-commands/src/check/ty.rs      |  2 +-
+ crates/uv-project-commands/src/format.rs        |  2 +-
+ crates/uv-project-commands/src/run.rs           | 16 ++++++++++++++--
+ crates/uv-python-interpreter/src/interpreter.rs | 15 +++++++++++++--
+ crates/uv-shell/src/runnable.rs                 |  2 +-
+ crates/uv-tool-commands/src/run.rs              |  2 +-
+ 11 files changed, 47 insertions(+), 19 deletions(-)
+
+diff --git a/crates/uv-auth/src/keyring.rs b/crates/uv-auth/src/keyring.rs
+index 2d58b77..0bb6eac 100644
+--- a/crates/uv-auth/src/keyring.rs
++++ b/crates/uv-auth/src/keyring.rs
+@@ -1,5 +1,6 @@
+-use std::{io::Write, process::Stdio};
+-use tokio::process::Command;
++use std::io::Write;
++use wasix_command::Stdio;
++use wasix_command::tokio::Command;
+ use tracing::{debug, instrument, trace, warn};
+ use uv_redacted::DisplaySafeUrl;
+ use uv_warnings::{warn_user_once, warn_user_once_with_chain};
+diff --git a/crates/uv-build-frontend/src/error.rs b/crates/uv-build-frontend/src/error.rs
+index 80c8b24..66ccf32 100644
+--- a/crates/uv-build-frontend/src/error.rs
++++ b/crates/uv-build-frontend/src/error.rs
+@@ -2,7 +2,7 @@ use std::env;
+ use std::fmt::{Display, Formatter};
+ use std::io;
+ use std::path::PathBuf;
+-use std::process::ExitStatus;
++use wasix_command::ExitStatus;
+ 
+ use crate::PythonRunnerOutput;
+ use owo_colors::OwoColorize;
+diff --git a/crates/uv-build-frontend/src/lib.rs b/crates/uv-build-frontend/src/lib.rs
+index 23ce191..bc41219 100644
+--- a/crates/uv-build-frontend/src/lib.rs
++++ b/crates/uv-build-frontend/src/lib.rs
+@@ -11,7 +11,6 @@ use std::fmt::Formatter;
+ use std::fmt::Write;
+ use std::io;
+ use std::path::{Path, PathBuf};
+-use std::process::ExitStatus;
+ use std::str::FromStr;
+ use std::sync::{Arc, LazyLock};
+ use std::{env, iter};
+@@ -24,7 +23,8 @@ use serde::de::{self, IntoDeserializer, SeqAccess, Visitor, value};
+ use serde::{Deserialize, Deserializer};
+ use tempfile::TempDir;
+ use tokio::io::AsyncBufReadExt;
+-use tokio::process::Command;
++use wasix_command::ExitStatus;
++use wasix_command::tokio::Command;
+ use tokio::sync::{Mutex, Semaphore};
+ use tracing::{Instrument, debug, info_span, instrument, warn};
+ use uv_auth::CredentialsCache;
+@@ -1323,8 +1323,8 @@ impl PythonRunner {
+             .env_remove(EnvVars::UV_API_KEY)
+             .env_remove(EnvVars::PYX_AUTH_TOKEN)
+             .env_remove(EnvVars::UV_AUTH_TOKEN)
+-            .stdout(std::process::Stdio::piped())
+-            .stderr(std::process::Stdio::piped())
++            .stdout(wasix_command::Stdio::piped())
++            .stderr(wasix_command::Stdio::piped())
+             .spawn()
+             .map_err(|err| Error::CommandFailed(venv.python_executable().to_path_buf(), err))?;
+ 
+diff --git a/crates/uv-command-support/src/child.rs b/crates/uv-command-support/src/child.rs
+index ae5f0c7..de3f845 100644
+--- a/crates/uv-command-support/src/child.rs
++++ b/crates/uv-command-support/src/child.rs
+@@ -1,7 +1,7 @@
+ use std::path::PathBuf;
+ 
+ use anyhow::bail;
+-use tokio::process::Child;
++use wasix_command::tokio::Child;
+ use tracing::debug;
+ use uv_fs::Simplified;
+ use uv_warnings::warn_user;
+@@ -364,7 +364,11 @@ pub async fn run_to_completion(mut handle: Child) -> anyhow::Result<ExitStatus>
+ 
+     // On Windows, we just ignore the console CTRL_C_EVENT and assume it will always be sent to the
+     // child by the console. There's not a clear programmatic way to forward the signal anyway.
+-    #[cfg(not(unix))]
++    // WASI has no signals to forward.
++    #[cfg(target_os = "wasi")]
++    let status = handle.wait().await?;
++
++    #[cfg(windows)]
+     let status = {
+         let _ctrl_c_handler =
+             tokio::spawn(async { while tokio::signal::ctrl_c().await.is_ok() {} });
+diff --git a/crates/uv-installer/src/compile.rs b/crates/uv-installer/src/compile.rs
+index 10886e0..68e3ea5 100644
+--- a/crates/uv-installer/src/compile.rs
++++ b/crates/uv-installer/src/compile.rs
+@@ -1,6 +1,5 @@
+ use std::panic::AssertUnwindSafe;
+ use std::path::{Path, PathBuf};
+-use std::process::Stdio;
+ use std::time::Duration;
+ use std::{env, io, panic};
+ 
+@@ -8,7 +7,8 @@ use async_channel::{Receiver, SendError};
+ use tempfile::tempdir_in;
+ use thiserror::Error;
+ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+-use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
++use wasix_command::Stdio;
++use wasix_command::tokio::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+ use tokio::sync::oneshot;
+ use tracing::{debug, instrument};
+ use walkdir::WalkDir;
+diff --git a/crates/uv-project-commands/src/check/ty.rs b/crates/uv-project-commands/src/check/ty.rs
+index 8a262a5..47c780c 100644
+--- a/crates/uv-project-commands/src/check/ty.rs
++++ b/crates/uv-project-commands/src/check/ty.rs
+@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
+ use std::str::FromStr;
+ 
+ use anyhow::{Context, Result};
+-use tokio::process::Command;
++use wasix_command::tokio::Command;
+ use tracing::debug;
+ 
+ use uv_bin_install::{BinVersion, Binary, ResolvedVersion, bin_install, find_matching_version};
+diff --git a/crates/uv-project-commands/src/format.rs b/crates/uv-project-commands/src/format.rs
+index 5eb8c95..c8d30d5 100644
+--- a/crates/uv-project-commands/src/format.rs
++++ b/crates/uv-project-commands/src/format.rs
+@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
+ use std::str::FromStr;
+ 
+ use anyhow::{Context, Result};
+-use tokio::process::Command;
++use wasix_command::tokio::Command;
+ use tracing::debug;
+ 
+ use uv_bin_install::{BinVersion, Binary, ResolvedVersion, bin_install, find_matching_version};
+diff --git a/crates/uv-project-commands/src/run.rs b/crates/uv-project-commands/src/run.rs
+index faafeba..1c35f3e 100644
+--- a/crates/uv-project-commands/src/run.rs
++++ b/crates/uv-project-commands/src/run.rs
+@@ -13,7 +13,7 @@ use futures::StreamExt;
+ use itertools::Itertools;
+ use owo_colors::OwoColorize;
+ use thiserror::Error;
+-use tokio::process::Command;
++use wasix_command::tokio::Command;
+ use tracing::{debug, trace, warn};
+ use url::Url;
+ 
+@@ -1532,7 +1532,7 @@ impl ParsedRunCommand {
+             //
+             // We don't do this check on Windows since the file path would
+             // be invalid anyway, and thus couldn't refer to a local file.
+-            if !cfg!(unix) || matches!(target_path.try_exists(), Ok(false)) {
++            if !cfg!(any(unix, target_os = "wasi")) || matches!(target_path.try_exists(), Ok(false)) {
+                 let url = DisplaySafeUrl::parse(&target.to_string_lossy())?;
+                 return Ok(Self::PendingRemote(PendingRemoteRunCommand {
+                     url,
+@@ -2120,6 +2120,18 @@ fn copy_entrypoint(
+     Ok(())
+ }
+ 
++/// WASI: entrypoints are not copied into an ephemeral environment.
++#[cfg(target_os = "wasi")]
++#[expect(clippy::unnecessary_wraps)]
++fn copy_entrypoint(
++    _source: &Path,
++    _target: &Path,
++    _previous_executable: &Path,
++    _python_executable: &Path,
++) -> Result<(), CopyEntrypointError> {
++    Ok(())
++}
++
+ /// Create a copy of the entrypoint at `source` at `target`, if it's a Python script launcher,
+ /// replacing the target Python executable with a new one.
+ #[cfg(windows)]
+diff --git a/crates/uv-python-interpreter/src/interpreter.rs b/crates/uv-python-interpreter/src/interpreter.rs
+index 7f85a54..34dda34 100644
+--- a/crates/uv-python-interpreter/src/interpreter.rs
++++ b/crates/uv-python-interpreter/src/interpreter.rs
+@@ -2,7 +2,7 @@ use std::borrow::Cow;
+ use std::env::consts::ARCH;
+ use std::fmt::{Display, Formatter};
+ use std::path::{Path, PathBuf};
+-use std::process::{Command, ExitStatus};
++use wasix_command::{Command, ExitStatus};
+ use std::sync::OnceLock;
+ use std::{env, io};
+ 
+@@ -900,6 +900,12 @@ pub fn canonicalize_executable(path: impl AsRef<Path>) -> std::io::Result<PathBu
+         }
+     }
+ 
++    // WASI has no realpath: keep the path, as on Windows.
++    #[cfg(target_os = "wasi")]
++    {
++        Ok(path.to_path_buf())
++    }
++
+     #[cfg(unix)]
+     fs_err::canonicalize(path)
+ }
+@@ -1159,8 +1165,13 @@ impl InterpreterInfo {
+             tempdir.path().escape_for_python()
+         );
+         let mut command = Command::new(interpreter);
++        #[cfg(not(target_os = "wasi"))]
++        command.arg("-I"); // Isolated mode.
++        // Isolated mode without `-E`: wasix-python finds its standard library
++        // through `PYTHONHOME`, which slicc's kernel sets for the command.
++        #[cfg(target_os = "wasi")]
++        command.arg("-s").arg("-P");
+         command
+-            .arg("-I") // Isolated mode.
+             .arg("-B") // Don't write bytecode.
+             .arg("-c")
+             .arg(script);
+diff --git a/crates/uv-shell/src/runnable.rs b/crates/uv-shell/src/runnable.rs
+index 8983532..632806e 100644
+--- a/crates/uv-shell/src/runnable.rs
++++ b/crates/uv-shell/src/runnable.rs
+@@ -3,7 +3,7 @@
+ use std::env::consts::EXE_EXTENSION;
+ use std::ffi::OsStr;
+ use std::path::Path;
+-use std::process::Command;
++use wasix_command::Command;
+ 
+ pub struct WindowsRunnable;
+ 
+diff --git a/crates/uv-tool-commands/src/run.rs b/crates/uv-tool-commands/src/run.rs
+index c8e453a..d0d2e5a 100644
+--- a/crates/uv-tool-commands/src/run.rs
++++ b/crates/uv-tool-commands/src/run.rs
+@@ -11,7 +11,7 @@ use anyhow::{Context, bail};
+ use console::Term;
+ use itertools::Itertools;
+ use owo_colors::OwoColorize;
+-use tokio::process::Command;
++use wasix_command::tokio::Command;
+ use tracing::{debug, warn};
+ 
+ use uv_cache::{Cache, Refresh};

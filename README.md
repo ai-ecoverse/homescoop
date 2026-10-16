@@ -108,6 +108,7 @@ dispatch `ladder-build`. Versions: [docs/versioning.md](docs/versioning.md).
 | `@ai-ecoverse/wasi-fnox` | host | **1.39.0-4** (`fnox`: upstream jdx/fnox v1.39.0 + 14 patches carried here for the WASI build and seven's integration, applied by `apply.sh`; the sealed provider over slicc-kernel `/dev/sealed` and exec tickets, plus age and plain; `fnox edit` refused; byte-reproducible build) |
 | `@ai-ecoverse/wasix-websocat` | host | **4.0.0-alpha3-1** (`websocat`: upstream vi/websocat v4 for WASIX, wasm32-wasmer-wasi on wasix-sysroot; crate forks from cargo-registry.wasix.org plus three mio patches (wasix-org/mio#4); an upstream alpha; slicc-kernel ≥ 1.95.0; outer hosts need an exit, no proxy support) |
 | `@ai-ecoverse/wasix-uv-shim` | host | **0.1.0-6** (`uv` venv/pip/run/add/remove/sync/init over wasix-python's venv + pip; not Astral's uv, see #103) |
+| `@ai-ecoverse/wasi-uv` | host | **0.13.1-1** (`uv`: Astral's uv 0.13.1 for wasm32-wasip1-threads + 5 uv patches, 8 patched crates.io crates and a Rust std patch (`-Zbuild-std`), applied by `apply.sh`/`build.sh`; venv, pip, init/add/lock/sync/run, sdist builds against wasix-python; replaces wasix-uv-shim, #103) |
 | `@ai-ecoverse/wasm-webrtc-audio-processing` | host | **2.1.0-2**: WebRTC AEC3 (webrtc-audio-processing 2.1 + abseil-cpp) as one standalone wasm and a synchronous JS wrapper, for an AudioWorklet or Node (pi-audio's `wasm` echo mode); not a realm program |
 | `@ai-ecoverse/wasm-cmake` | slicc* | stub (ladder `rung_cmake`) |
 

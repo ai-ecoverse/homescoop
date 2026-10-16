@@ -1,0 +1,75 @@
+reqsign-http-send-reqwest: native reqwest path on WASI, no wasm-bindgen
+(mechanical wasm32 → wasm32-unknown).
+
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -71,15 +71,15 @@
+ [dev-dependencies.wasm-bindgen-test]
+ version = "0.3"
+ 
+-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies.tokio]
++[target.'cfg(not(all(target_arch = "wasm32", target_os = "unknown")))'.dev-dependencies.tokio]
+ version = "1"
+ features = [
+     "macros",
+     "rt-multi-thread",
+ ]
+ 
+-[target.'cfg(target_arch = "wasm32")'.dependencies.futures-channel]
++[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies.futures-channel]
+ version = "0.3"
+ 
+-[target.'cfg(target_arch = "wasm32")'.dependencies.wasm-bindgen-futures]
++[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies.wasm-bindgen-futures]
+ version = "0.4"
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -93,13 +93,13 @@
+ //! let http_send = ReqwestHttpSend::new(client);
+ //! ```
+ use bytes::Bytes;
+-#[cfg(target_arch = "wasm32")]
++#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+ use futures_channel::oneshot;
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ use http_body_util::BodyExt;
+ use reqsign_core::{Error, HttpSend, Result};
+ use reqwest::{Client, Request};
+-#[cfg(target_arch = "wasm32")]
++#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+ use wasm_bindgen_futures::spawn_local;
+ 
+ /// Reqwest-based implementation of the `HttpSend` trait.
+@@ -139,19 +139,19 @@
+         let req = Request::try_from(req)
+             .map_err(|e| Error::unexpected("failed to convert request").with_source(e))?;
+ 
+-        #[cfg(not(target_arch = "wasm32"))]
++        #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+         {
+             return http_send_native(&self.client, req).await;
+         }
+ 
+-        #[cfg(target_arch = "wasm32")]
++        #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+         {
+             return http_send_wasm(&self.client, req).await;
+         }
+     }
+ }
+ 
+-#[cfg(not(target_arch = "wasm32"))]
++#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+ async fn http_send_native(client: &Client, req: Request) -> Result<http::Response<Bytes>> {
+     let resp = client
+         .execute(req)
+@@ -167,7 +167,7 @@
+     Ok(http::Response::from_parts(parts, bs))
+ }
+ 
+-#[cfg(target_arch = "wasm32")]
++#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+ async fn http_send_wasm(client: &Client, req: Request) -> Result<http::Response<Bytes>> {
+     let (tx, rx) = oneshot::channel();
+     let client = client.clone();

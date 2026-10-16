@@ -1,0 +1,21 @@
+rustls-native-certs: compile on WASI, which has no certificate store.
+load_native_certs() is empty there; SSL_CERT_FILE / SSL_CERT_DIR still
+apply (slicc's kernel sets SSL_CERT_FILE to its proxy's CA).
+
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -43,6 +43,14 @@
+ #[cfg(target_os = "macos")]
+ use macos as platform;
+ 
++/// WASI has no certificate store: only `SSL_CERT_FILE` / `SSL_CERT_DIR` apply.
++#[cfg(target_os = "wasi")]
++mod platform {
++    pub fn load_native_certs() -> crate::CertificateResult {
++        crate::CertificateResult::default()
++    }
++}
++
+ /// Load root certificates found in the platform's native certificate store.
+ ///
+ /// ## Environment Variables
