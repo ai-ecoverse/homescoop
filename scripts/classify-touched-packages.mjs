@@ -3,6 +3,7 @@
  * Classify touched packages by recipe.builder for CI matrices.
  *
  *   node scripts/classify-touched-packages.mjs --base A --head B
+ *   node scripts/classify-touched-packages.mjs --all   (every recipe, as if all were touched)
  *   → JSON { host: string[], slicc: string[], all: string[] }
  */
 import { spawnSync } from 'node:child_process';
@@ -13,26 +14,34 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 let base, head;
+const every = args.includes('--all');
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--base') base = args[++i];
   else if (args[i] === '--head') head = args[++i];
 }
-if (!base || !head) {
-  console.error('usage: classify-touched-packages.mjs --base <ref> --head <ref>');
+if (!every && (!base || !head)) {
+  console.error('usage: classify-touched-packages.mjs --base <ref> --head <ref> | --all');
   process.exit(2);
 }
 
-const listed = spawnSync(
-  'node',
-  [join(root, 'scripts/list-touched-packages.mjs'), '--base', base, '--head', head, '--json'],
-  { encoding: 'utf8', cwd: root }
-);
-if (listed.status !== 0) {
-  console.error(listed.stderr || listed.stdout);
-  process.exit(1);
-}
 /** @type {string[]} */
-const all = JSON.parse(listed.stdout.trim() || '[]');
+let all;
+if (every) {
+  all = readdirSync(join(root, 'packages'))
+    .filter((p) => existsSync(join(root, 'packages', p, 'recipe.yaml')))
+    .sort();
+} else {
+  const listed = spawnSync(
+    'node',
+    [join(root, 'scripts/list-touched-packages.mjs'), '--base', base, '--head', head, '--json'],
+    { encoding: 'utf8', cwd: root }
+  );
+  if (listed.status !== 0) {
+    console.error(listed.stderr || listed.stdout);
+    process.exit(1);
+  }
+  all = JSON.parse(listed.stdout.trim() || '[]');
+}
 const host = [];
 const slicc = [];
 const rebuild = [];
@@ -75,8 +84,12 @@ function hasTests(p) {
   return existsSync(join(dir, 'package.json')) || readdirSync(dir).some((f) => f.endsWith('.test.mjs'));
 }
 
-for (const p of all) {
+for (const p of [...all]) {
   const r = recipe(p);
+  if (r.builder === 'retired') {
+    all.splice(all.indexOf(p), 1);
+    continue;
+  }
   if ((r.builder || 'slicc') !== 'host') {
     slicc.push(p);
     continue;

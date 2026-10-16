@@ -1,0 +1,213 @@
+name: pool-parity
+
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: 'Comma-separated recipes to build on both runners (default: every recipe the classifier puts on the pool)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pool-parity
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    outputs:
+      packages: ${{ steps.p.outputs.packages }}
+      sha: ${{ steps.p.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - id: p
+        env:
+          ONLY: ${{ inputs.packages }}
+        run: |
+          set -euo pipefail
+          node scripts/classify-touched-packages.mjs --all > "$RUNNER_TEMP/class.json"
+          list=$(node -e '
+            const c = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            const only = [...new Set((process.env.ONLY || "").split(",").map((s) => s.trim()).filter(Boolean))];
+            const off = only.filter((p) => !c.host.includes(p));
+            if (off.length) { console.error(`not a host recipe: ${off.join(", ")}`); process.exit(1); }
+            console.log(JSON.stringify(only.length ? only : c.pool));
+          ' "$RUNNER_TEMP/class.json")
+          echo "pool recipes at $(git rev-parse HEAD): $list"
+          echo "packages=$list" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        package: ${{ fromJson(needs.plan.outputs.packages) }}
+        side: [hosted, pool]
+    runs-on: ${{ matrix.side == 'pool' && vars.CERT_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
+      - run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
+      - name: Build from the hosted workspace path
+        run: |
+          set -euo pipefail
+          want="/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
+          if [[ "$GITHUB_WORKSPACE" != "$want" ]]; then
+            if [[ -e "$want" && ! -L "$want" ]]; then
+              echo "::error::$want exists and is not a link to the workspace"
+              exit 1
+            fi
+            mkdir -p "$(dirname "$want")"
+            ln -sfn "$GITHUB_WORKSPACE" "$want"
+          fi
+          echo "build root $want ($(cd "$want" && pwd -P)) on $RUNNER_NAME"
+          echo "HOMESCOOP_BUILD_ROOT=$want" >> "$GITHUB_ENV"
+      - name: Host build (${{ matrix.side }})
+        run: |
+          set -euo pipefail
+          cd "$HOMESCOOP_BUILD_ROOT"
+          bash scripts/host-run.sh "${{ matrix.package }}"
+          sha256sum .homescoop-out/package.tgz | tee .homescoop-out/package.tgz.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: parity-${{ matrix.package }}-${{ matrix.side }}
+          path: |
+            .homescoop-out/package.tgz
+            .homescoop-out/package.tgz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  compare:
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.packages != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.plan.outputs.packages) }}
+    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v8
+        with:
+          name: parity-${{ matrix.package }}-hosted
+          path: ${{ runner.temp }}/hosted
+      - uses: actions/download-artifact@v8
+        with:
+          name: parity-${{ matrix.package }}-pool
+          path: ${{ runner.temp }}/pool
+      - name: The pool build has the hosted twin's sha256
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          a=$(cut -d' ' -f1 "$RUNNER_TEMP/hosted/package.tgz.sha256")
+          b=$(cut -d' ' -f1 "$RUNNER_TEMP/pool/package.tgz.sha256")
+          mkdir -p out
+          if [[ "$a" == "$b" ]]; then
+            echo "$PKG: pool and hosted twin are byte-identical ($a)" | tee -a "$GITHUB_STEP_SUMMARY"
+            printf '%s\tsame\t%s\t\n' "$PKG" "$a" > "out/$PKG.tsv"
+            exit 0
+          fi
+          node scripts/tarball-parity.mjs "$RUNNER_TEMP/hosted/package.tgz" "$RUNNER_TEMP/pool/package.tgz" --labels hosted,pool | tee "$RUNNER_TEMP/diff.txt" || true
+          first=$(grep -m1 '^  package/' "$RUNNER_TEMP/diff.txt" | sed 's/^  //' || true)
+          printf '%s\tdiffer\thosted %s pool %s\t%s\n' "$PKG" "$a" "$b" "${first:-entries identical, tarball bytes differ}" > "out/$PKG.tsv"
+          echo "::error::$PKG: the pool build ($b) differs from its hosted twin ($a): ${first:-the entries are identical, the tarball bytes differ}. Move it back to ubuntu-latest (drop runner: pool) or fix the difference"
+          echo "$PKG: pool $b, hosted $a; first difference: ${first:-tarball bytes only}" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: verdict-${{ matrix.package }}
+          path: out/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  report:
+    needs: [plan, build, compare]
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.packages != '[]' }}
+    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: verdict-*
+          merge-multiple: true
+          path: out
+      - name: Open or comment on the pool-parity issue when a pool build drifts
+        uses: actions/github-script@v9
+        env:
+          SHA: ${{ needs.plan.outputs.sha }}
+          PACKAGES: ${{ needs.plan.outputs.packages }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const want = JSON.parse(process.env.PACKAGES);
+            const rows = (fs.existsSync('out') ? fs.readdirSync('out') : [])
+              .filter((f) => f.endsWith('.tsv'))
+              .flatMap((f) => fs.readFileSync(`out/${f}`, 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t')));
+            const seen = new Set(rows.map((r) => r[0]));
+            for (const p of want) if (!seen.has(p)) rows.push([p, 'no verdict', 'a build failed or was cancelled', '']);
+            rows.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+            const bad = rows.filter((r) => r[1] !== 'same').map((r) => r[0]);
+            const table = ['| recipe | verdict | sha256 | first difference |', '| --- | --- | --- | --- |', ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');
+            await core.summary.addRaw(`${table}\n`).write();
+            if (!bad.length) {
+              core.info(`every recipe matches its hosted twin at ${process.env.SHA}`);
+              return;
+            }
+            const title = 'pool-parity: pool builds differ from their hosted twins';
+            const body = [
+              `pool-parity at ${process.env.SHA} (${process.env.RUN}): ${bad.join(' ')}`,
+              '',
+              table,
+              '',
+              'A recipe on `runner: pool` must build the same bytes as `ubuntu-latest` (docs/ladder-builds.md, Runners). Move the ones that differ back to hosted, or fix what differs, and close this issue once a run is clean.',
+            ].join('\n');
+            const label = 'pool-parity';
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch (err) {
+              if (err.status !== 404) throw err;
+              await github.rest.issues.createLabel({ owner, repo, name: label, color: 'b60205', description: 'a pool build differs from its hosted twin' });
+            }
+            const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: label, per_page: 100 });
+            const same = open.find((i) => i.title === title && !i.pull_request);
+            if (same) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: same.number, body });
+              core.info(`commented on #${same.number}`);
+            } else {
+              const { data } = await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+              core.info(`opened #${data.number}`);
+            }
+            core.setFailed(`recipes whose pool build differs from the hosted twin: ${bad.join(' ')}`);

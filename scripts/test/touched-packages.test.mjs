@@ -141,6 +141,30 @@ test('classify: rebuild for reproducible recipes, test for tests by layout, pool
   }
 });
 
+test('classify --all: every recipe but the retired ones, as if all were touched (pool-parity)', () => {
+  const f = fixture({
+    pooled: { recipe: 'name: pooled\nbuilder: host\nrunner: pool\n' },
+    repack: { recipe: 'name: repack\nbuilder: host\nrepack:\n  from: "1.0.0-1"\n' },
+    hosted: { recipe: 'name: hosted\nbuilder: host\n' },
+    gone: { recipe: 'name: gone\nbuilder: retired\nrunner: pool\n' },
+  });
+  try {
+    mkdirSync(join(f.root, 'packages', 'no-recipe'), { recursive: true });
+    const r = spawnSync(process.execPath, [join(f.root, 'scripts/classify-touched-packages.mjs'), '--all'], { cwd: f.root, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), {
+      all: ['hosted', 'pooled', 'repack'],
+      host: ['hosted', 'pooled', 'repack'],
+      slicc: [],
+      rebuild: [],
+      test: [],
+      pool: ['pooled', 'repack'],
+    });
+  } finally {
+    f.done();
+  }
+});
+
 test('classify: a reproducible value that is not true, false or a package/ path fails', () => {
   for (const bad of ['reproducible: yes\n', 'reproducible:\n  path: bin/x.wasm\n']) {
     const f = fixture({ r: { recipe: `name: r\nbuilder: host\n${bad}` } });
