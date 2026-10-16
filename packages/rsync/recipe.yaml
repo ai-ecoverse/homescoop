@@ -8,6 +8,13 @@ summary: "rsync file synchronisation for slicc"
 source:
   url: "https://download.samba.org/pub/rsync/src/rsync-{{version}}.tar.gz"
   sha256: "c55f9c9dc10fb8bec397b399a0fdded53cc9a2d8e30891bb0d63724d25c37bef"
+# 3.5.1-2 is packaging-only: 3.5.1-1's bytes with the README's "Symlinks in
+# the destination (3.5.x)" (homescoop#411). Drop repack: when the next
+# release rebuilds.
+repack:
+  from: "3.5.1-1"
+  files:
+    - README.md
 dependencies:
   build: []
   host: []
