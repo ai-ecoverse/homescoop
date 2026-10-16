@@ -25,5 +25,12 @@ constraints), `--variable` and `--define-variable` print what they did in
   and `pkgconf` packages; `--print-variables` lists in file order.
 - New: `--newlines`, and the `Requires.shared`, `Cflags.shared`, `Libs.shared`,
   `Link.ABI`, `Source` and `License.file` fields.
+- `Requires` chains are followed 256 levels deep by default, pkgconf 3.0's
+  guard against stack exhaustion. Past that, `--cflags` and `--libs` exit 0
+  and leave the deeper modules' flags out, with no warning; 2.x followed the
+  whole chain. `--maximum-traverse-depth=-1` (or a larger depth) or
+  `PKG_CONFIG_MAXIMUM_TRAVERSE_DEPTH=-1` in the environment follows all of it.
+  Real dependency graphs are far shallower; about 1500 levels deep, `-1`
+  runs out of stack in 2.x and 3.x alike (exit 70) (homescoop#532).
 
 See [NEWS](https://github.com/pkgconf/pkgconf/blob/master/NEWS).
