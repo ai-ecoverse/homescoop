@@ -47,6 +47,18 @@ AssertionError [ERR_ASSERTION]: websocat -s 18110 cmd:tr a-z A-Z: no exit within
 
 With `0002`, all three forms (`-s … cmd:`, `ws-l:… exec:cat`, `… sh-c:cat`) exit non-zero at once, with `exec:, cmd: and sh-c: are not supported on WASIX`.
 
+## `--exec-after-listen` and `-x` subprocesses (4.0.0-alpha3-3, homescoop#709)
+
+Against the published 4.0.0-alpha3-2 (no `0003`), on slicc-kernel 1.95.0 with users enforce, `subprocess.mjs` fails at `--exec-after-listen`. The command runs (`hi` is printed), and then websocat aborts in tokio's I/O driver (rc 134, `unexpected error when polling the I/O driver … I/O error`):
+
+```
+browser-cert: FAIL packages/wasix-websocat/cert/subprocess.mjs
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /--exec-after-listen is not supported on WASIX/. Input:
+'hi\n' + 'Using --binary mode by default\n' + …
+```
+
+With `0003`, `--exec-after-listen` exits non-zero before it listens, and `-x` scripts calling `execute()`, `execute_for_status()` or `system()` fail with `subprocesses are not supported on WASIX`, with no abort.
+
 ## On slicc-kernel 1.94.0
 
 Without WASIX epoll and eventfd (slicc-kernel#674, in 1.95.0), every invocation, `--version` included, aborts with `Failed building the Runtime: Os { code: 52, kind: Unsupported, message: "Function not implemented" }`. Hence `engines.slicc-kernel >=1.95.0`.
