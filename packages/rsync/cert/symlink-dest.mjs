@@ -11,6 +11,11 @@
  *    target is refused, rc 23, "Symbolic link loop"; an in-tree relative
  *    dirlink still works, rc 0, the file landing in the link's target.
  *
+ * 3. what counts is the link's owner, not the caller (homescoop#555): cone's
+ *    own link and a link root owns are followed (rc 0), root is refused
+ *    through eve's link (rc 3), and -K refuses a dirlink escaping the tree
+ *    (../out, rc 23) as it does an absolute one.
+ *
  * 3.4.4-5 followed eve's link and wrote through the absolute dirlink (rc 0
  * both), NEGATIVE.md. A kernel change to symlink ownership or to
  * O_NOFOLLOW/openat would show up here.
@@ -52,5 +57,22 @@ export default async function (ctx) {
   const rel = await sh('rsync -aK /tmp/k/src/ /tmp/k/dR/ && readlink /tmp/k/dR/d && cat /tmp/k/dR/real/b');
   assert.equal(rel.status, 0, `-K into an in-tree relative dirlink: ${rel.all}`);
   assert.equal(rel.stdout, 'real\nb\n', rel.all);
-  console.log('symlink-dest: eve\'s link refused for cone (rc 3, untrusted user), --insecure-links copies; -K: absolute dirlink rc 23 (Symbolic link loop), in-tree relative dirlink rc 0');
+  // 3. The link's owner counts, not the caller (homescoop#555).
+  await ok('rm -rf ~/mt ~/mylink && mkdir ~/mt && ln -s mt ~/mylink', 'cone');
+  const own = await sh('rsync -a ~/s/d ~/mylink/ && cat ~/mt/d/f', 'cone');
+  assert.equal(own.status, 0, `cone into its own link: ${own.all}`);
+  assert.equal(own.stdout, 'a\n', own.all);
+  await ok('rm -rf /tmp/p && mkdir -p -m 755 /tmp/p && mkdir -m 1777 /tmp/p/rt && ln -s rt /tmp/p/rootlink');
+  const rootLink = await sh('rsync -a ~/s/d /tmp/p/rootlink/ && cat /tmp/p/rt/d/f', 'cone');
+  assert.equal(rootLink.status, 0, `cone into root's link: ${rootLink.all}`);
+  assert.equal(rootLink.stdout, 'a\n', rootLink.all);
+  const rootRefused = await sh('rm -rf /tmp/evereal/* && rsync -a /home/cone/s/d /tmp/evelink/; echo "rc=$?"; ls -A /tmp/evereal | wc -l');
+  assert.equal(rootRefused.stdout, 'rc=3\n0\n', `root through eve's link: ${rootRefused.all}`);
+  assert.match(rootRefused.stderr, /refusing to follow a symlink owned by an untrusted user/, rootRefused.all);
+  await ok('rm -rf /tmp/q && mkdir -p /tmp/q/src/d /tmp/q/dst /tmp/q/out && echo y > /tmp/q/src/d/y && ln -s ../out /tmp/q/dst/d');
+  const up = await sh('rsync -aK /tmp/q/src/ /tmp/q/dst/');
+  assert.equal(up.status, 23, `-K into a ../out dirlink: ${up.all}`);
+  assert.match(up.stderr, /Symbolic link loop/, up.all);
+  assert.equal(await ok('ls -A /tmp/q/out | wc -l'), '0\n', 'nothing written through the ../out dirlink');
+  console.log('symlink-dest: cone\'s own and root\'s links followed, root refused through eve\'s (rc 3), -K ../out rc 23; eve\'s link refused for cone (rc 3, untrusted user), --insecure-links copies; -K: absolute dirlink rc 23 (Symbolic link loop), in-tree relative dirlink rc 0');
 }
