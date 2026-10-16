@@ -18,6 +18,19 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
+Since 3.14.2-21 (wasix-sysroot -30):
+
+- `multiprocessing` works with the `spawn` start method (the default):
+  `Pool`, `Queue`, `Lock`, `Semaphore` and the other synchronisation
+  primitives, across processes. Its named semaphores are kept by slicc-kernel
+  (≥ 1.99.0). `shared_memory` and shared ctypes (`Value`/`Array` with
+  `lock=False`) don't work, because processes don't share memory. There is
+  no `fork` start method (no `os.fork`).
+- `fcntl.lockf`/`fcntl.fcntl` record locks and `os.lockf` go through the libc
+  to slicc-kernel (slicc-kernel#722) and hold against other processes, such as
+  a second python or the sqlite3 CLI on the same database. On an older kernel
+  every lock is granted locally, as before. `fcntl.flock` is still a no-op.
+
 Since 3.14.2-20 (wasix-sysroot -29):
 
 - `select.poll` takes a file descriptor registered with no events. Up to -19
@@ -26,9 +39,7 @@ Since 3.14.2-20 (wasix-sysroot -29):
   `unregister` of an unregistered fd is ENOENT. Up to -19 both succeeded
   silently. asyncio uses `EpollSelector` on slicc-kernel ≥ 1.95.0 (WASIX
   epoll) and `PollSelector` on older kernels.
-- `multiprocessing` still has no `_multiprocessing`: named semaphores and
-  POSIX shared memory need slicc-kernel support (`/dev/shm` and memory shared
-  between processes).
+- `multiprocessing` had no `_multiprocessing` (fixed in -21).
 
 Since 3.14.2-19 (wasix-sysroot -28):
 - signal masks are real: `signal.pthread_sigmask` blocks and unblocks
