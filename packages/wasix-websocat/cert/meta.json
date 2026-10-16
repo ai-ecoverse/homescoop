@@ -18,6 +18,7 @@
   ],
   "users": "enforce",
   "ci": [
-    "node packages/wasix-websocat/test/uplink.mjs --tarball .homescoop-out/package.tgz"
+    "node packages/wasix-websocat/test/uplink.mjs --tarball .homescoop-out/package.tgz",
+    "node packages/wasix-websocat/test/uplink.mjs --tarball .homescoop-out/package.tgz --kernel \"$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-kernel)\""
   ]
 }

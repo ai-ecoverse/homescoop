@@ -1,3 +1,6 @@
+mio/0003: TcpStream::take_error reads the socket error (SOCK_OPTION_LAST_ERROR); std answers None on this target.
+Upstream: https://github.com/wasix-org/mio/pull/4
+
 --- a/src/net/tcp/stream.rs
 +++ b/src/net/tcp/stream.rs
 @@ -204,8 +204,19 @@

@@ -1,3 +1,6 @@
+mio/0001: sockets open non-blocking (FDFLAGS_NONBLOCK in new_socket), as the unix backend does.
+Upstream: https://github.com/wasix-org/mio/pull/4
+
 --- a/src/sys/wasi/net.rs
 +++ b/src/sys/wasi/net.rs
 @@ -63,6 +63,13 @@

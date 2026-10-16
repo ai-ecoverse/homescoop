@@ -47,4 +47,4 @@ about:
     mio/0003: TcpStream::take_error reads the socket's error
          (SOCK_OPTION_LAST_ERROR); the target's Rust std always answers
          None, so a refused uplink connect looked connected.
-         All three are for upstreaming to wasix-org/mio.
+         All three are proposed upstream as wasix-org/mio#4.

@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasix-websocat`
 
-[websocat](https://github.com/vi/websocat) 4.0.0-alpha3, the WebSocket client and server ("netcat for `ws://`"), built for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel as a WASIX program. It's upstream's source, unmodified. The build patches only crate wiring and the WASIX fork of mio; see the recipe.
+[websocat](https://github.com/vi/websocat) 4.0.0-alpha3, the WebSocket client and server ("netcat for `ws://`"), built for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel as a WASIX program. **This is an upstream alpha:** websocat v4 has no stable release yet. It's upstream's source, unmodified. The build patches only crate wiring and the WASIX fork of mio; see the recipe.
 
 ```bash
 pnpm add -g @ai-ecoverse/wasix-websocat

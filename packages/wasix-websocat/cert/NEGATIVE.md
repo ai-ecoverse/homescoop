@@ -1,6 +1,6 @@
 # Negative proof (wasix-websocat)
 
-**Date:** 2026-10-15, slicc-kernel 1.95.0 (users enforce), local builds of 4.0.0-alpha3-1 from this recipe (package.tgz `8170b26a…`). This is the package's first cert.
+**Date:** 2026-10-16. The 4.0.0-alpha3-1 build from this recipe on main 35928284 (wasix-sysroot 2025.9.30-30, package.tgz `248cf42c…`) passes `frames`, `loopback` and `version` on slicc-kernel 1.95.0 (the floor) and on 1.102.6 (the root package.json pin), users enforce, and `test/uplink.mjs` on both. The negatives below are from the same recipe on wasix-sysroot -28 (2026-10-15). This is the package's first cert.
 
 ## Empty wasm
 

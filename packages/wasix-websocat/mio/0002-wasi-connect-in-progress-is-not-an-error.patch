@@ -1,3 +1,6 @@
+mio/0002: a non-blocking connect's EINPROGRESS is "in progress", not an error.
+Upstream: https://github.com/wasix-org/mio/pull/4
+
 --- a/src/sys/wasi/tcp.rs
 +++ b/src/sys/wasi/tcp.rs
 @@ -28,11 +28,14 @@
