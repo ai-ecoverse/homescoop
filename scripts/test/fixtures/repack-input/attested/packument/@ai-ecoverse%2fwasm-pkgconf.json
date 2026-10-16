@@ -1,0 +1,17 @@
+{
+  "name": "@ai-ecoverse/wasm-pkgconf",
+  "versions": {
+    "3.0.9-1": {
+      "version": "3.0.9-1",
+      "dist": {
+        "integrity": "sha512-1MhB86vPbO9qUSSD1SsuCSFhj6x88XveHs/qRVXgukXo7m1OO/qoDdhp/qnteS8m1QaF8FGeVQzKXLjWiO696Q==",
+        "attestations": {
+          "url": "https://registry.npmjs.org/-/npm/v1/attestations/@ai-ecoverse%2fwasm-pkgconf@3.0.9-1",
+          "provenance": {
+            "predicateType": "https://slsa.dev/provenance/v1"
+          }
+        }
+      }
+    }
+  }
+}

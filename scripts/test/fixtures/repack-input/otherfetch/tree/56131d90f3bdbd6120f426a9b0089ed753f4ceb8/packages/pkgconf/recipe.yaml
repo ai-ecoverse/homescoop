@@ -1,0 +1,21 @@
+# Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
+name: pkgconf
+builder: host
+# renovate: datasource=github-tags depName=pkgconf/pkgconf extractVersion=^pkgconf-(?<version>.*)$
+version: "3.0.9"
+npm: "@ai-ecoverse/wasm-pkgconf"
+summary: "pkgconf / pkg-config for wasm"
+source:
+  url: "https://distfiles.ariadne.space/pkgconf/pkgconf-{{version}}.tar.gz"
+  sha256: "642700ab125e6dcb3ceb822469420b0132c26f5585dec88cbe6057134525e57d"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/pkgconf
+  license: ISC
+  notes: |
+    CLI link flags via homescoop_em_cli_ldflags (+ STACK_SIZE=1MB).
+    package.json slicc.commands maps pkgconf and pkg-config onto
+    bin/pkgconf{.wasm}.

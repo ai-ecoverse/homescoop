@@ -1,0 +1,9 @@
+# PLANTED (repack-input.test.mjs): a repack of a version published with no provenance.
+name: planted
+version: "1.0.0"
+npm: "@ai-ecoverse/wasm-planted"
+source:
+  url: "https://example.org/planted-{{version}}.tar.gz"
+  sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+repack:
+  from: "1.0.0-1"
