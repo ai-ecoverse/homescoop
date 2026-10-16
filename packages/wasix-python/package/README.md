@@ -4,7 +4,7 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-30's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-31's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - No `fork`/`vfork`; `subprocess` via `os.posix_spawn` (`proc_spawn2`/`3`)
@@ -17,6 +17,22 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 - `TZ` POSIX rules work (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193); `zoneinfo` works with the `tzdata` package
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
+
+Since 3.14.2-24 (wasix-sysroot -31):
+
+- `multiprocessing.Manager()` works: `dict`, `list`, `Queue`, `Namespace`,
+  `Value` and the other managed objects, also passed to spawned children,
+  over an AF_UNIX socket. Up to -23 the first proxy call raised
+  `TypeError: str, bytes or bytearray expected, not int`: WASIX's libc
+  returned family 0 and no path from `getsockname`, `getpeername` and
+  `accept` for every AF_UNIX socket (homescoop#515). `socket.getsockname()`
+  of a bound AF_UNIX socket now gives its path, and an unbound one `''`.
+- A Manager is what the -23 error for shared ctypes recommends, so that
+  advice holds now (homescoop#669). The error also names `Barrier`, which
+  keeps its state in shared memory too.
+- From the sysroot: `select.poll` reports `POLLHUP` for a registered fd with
+  no events whose peer closed, and `POLLERR` for a pipe write end whose
+  reader is gone; a process is no longer limited to 256 named semaphores.
 
 Since 3.14.2-23:
 

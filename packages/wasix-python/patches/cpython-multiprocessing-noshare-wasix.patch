@@ -22,15 +22,16 @@ and multiprocessing.shared_memory raises ImportError, as on upstream WASI.
          _default_context = DefaultContext(_concrete_contexts['spawn'])
 --- a/Lib/multiprocessing/heap.py
 +++ b/Lib/multiprocessing/heap.py
-@@ -98,6 +98,11 @@ else:
+@@ -98,6 +98,12 @@ else:
              return util.get_temp_dir()
  
      def reduce_arena(a):
 +        if sys.platform == 'wasi':
 +            raise NotImplementedError(
-+                'multiprocessing: Value, Array and other shared ctypes '
-+                'cannot be shared with another process on WASI, where '
-+                'processes share no memory; use a Queue, a Pipe or a Manager')
++                'multiprocessing: Value, Array, Barrier and other objects '
++                'in shared memory cannot be shared with another process on '
++                'WASI, where processes share no memory; use a Queue, a Pipe '
++                'or a Manager')
          if a.fd == -1:
              raise ValueError('Arena is unpicklable because '
                               'forking was enabled when it was created')

@@ -126,7 +126,8 @@ reached another process: a child's writes to an `mp.Value`/`mp.Array` (any
 `lock`) or a `SharedMemory` were lost without an error (homescoop#516).
 
 - `multiprocessing.heap`'s arena reduction raises `NotImplementedError` on
-  WASI. A shared ctypes object passed to a child fails at `start()`; inside
+  WASI, naming Value, Array and Barrier (since -24) and recommending a
+  Queue, a Pipe or a Manager. A shared ctypes object passed to a child fails at `start()`; inside
   one process it works as before.
 - `multiprocessing.shared_memory` raises `ImportError`, as on upstream WASI
   builds (no `_posixshmem` there). `_posixshmem` stays built, since the
