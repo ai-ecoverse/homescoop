@@ -103,7 +103,7 @@ test('homescoop_wasm_opt: a wasm-opt that rejects the module fails the build and
 });
 
 test('homescoop_wasm_opt: optimises in place and logs the version, flags and sizes', () => {
-  const r = wasmOpt('[ "$1" = --version ] && { echo "wasm-opt version 125"; exit 0; }; for a; do case "$prev" in -o) printf opt > "$a";; esac; prev=$a; done; echo "$*" > /dev/stderr');
+  const r = wasmOpt('[ "$1" = --version ] && { echo "wasm-opt version 125"; exit 0; }; for a; do case "$prev" in -o) printf opt > "$a";; esac; prev=$a; done; echo "$*" >&2');
   assert.equal(r.status, 0, r.out);
   assert.match(r.out, /== demo: wasm-opt version 125 -Oz --strip-debug --enable-bulk-memory\n/);
   assert.match(r.out, /-Oz --strip-debug --enable-bulk-memory .*x\.wasm -o .*x\.wasm\.opt/);
