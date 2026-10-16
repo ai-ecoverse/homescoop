@@ -84,14 +84,22 @@ chmod 755 "$DEST/bin/websocat.wasm"
 echo "== wasix-websocat: wasm-opt $before → $(wc -c <"$DEST/bin/websocat.wasm" | tr -d ' ') bytes"
 
 homescoop_fetch "$LICENCE_URL" "$LICENCE_SHA" "$WORK/websocat-LICENSE"
-homescoop_stage_license "$WORK/websocat-LICENSE"
+homescoop_fetch "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/Apache-2.0.txt" \
+  074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff "$WORK/Apache-2.0.txt"
+{
+  cat "$WORK/websocat-LICENSE"
+  printf '\n---\n\nwebsocat %s'"'"'s Cargo.toml declares `license = "MIT/Apache-2.0"`; the Apache License 2.0 text follows (SPDX license-list-data v3.29.0).\n\n' "$VERSION"
+  cat "$WORK/Apache-2.0.txt"
+} >"$WORK/websocat-LICENSE-dual"
+homescoop_stage_license "$WORK/websocat-LICENSE-dual"
 
 homescoop_notices_begin "websocat.wasm (vi/websocat $VERSION, MIT OR Apache-2.0, see LICENSE; mio $MIO_VER with homescoop's patches, MIT) statically links these crates, the wasix-org Rust standard library ($WASIX_RUST) and @ai-ecoverse/wasix-sysroot $SYSROOT_VERSION."
 META="$WORK/wasix-websocat-metadata.json"
 TREE="$WORK/wasix-websocat-tree.txt"
 (cd "$SRC_DIR" && "${CARGO[@]}" metadata --locked --format-version 1 --filter-platform "$TARGET" "${FEATURES[@]}") >"$META"
 (cd "$SRC_DIR" && "${CARGO[@]}" tree --locked --target "$TARGET" -e normal,no-proc-macro --prefix none "${FEATURES[@]}") >"$TREE"
-node "$ROOT/scripts/rust-crate-notices.mjs" "$META" "$TREE" >>"$HOMESCOOP_NOTICES"
+node "$ROOT/scripts/rust-crate-notices.mjs" "$META" "$TREE" |
+  sed -E 's#^Source: https://crates\.io/crates/([^/]+)/([^ ]+\+wasix\.[0-9]+)$#Source: https://cargo-registry.wasix.org/api/v1/crates/\1/\2/download (the WASIX fork, from cargo-registry.wasix.org)#' >>"$HOMESCOOP_NOTICES"
 node "$ROOT/scripts/check-rust-notices.mjs" "$HOMESCOOP_NOTICES" "$TREE" "$SRC_DIR/Cargo.lock"
 homescoop_notice "mio $MIO_VER, the wasix-org fork of tokio-rs/mio with homescoop's mio/*.patch (MIT)" \
   "$MIO_DIR/LICENSE" -

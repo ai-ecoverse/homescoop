@@ -28,8 +28,9 @@ about:
   homepage: https://github.com/vi/websocat
   license: MIT OR Apache-2.0
   notes: |
-    The v4 tag ships no LICENSE; sources.licence is the repository's MIT
-    LICENSE (same author, last changed in 8bcec21d), staged as package/LICENSE.
+    The v4 tag ships no LICENSE; package/LICENSE is sources.licence, the
+    repository's MIT LICENSE (same author, last changed in 8bcec21d), then
+    the Apache-2.0 text (SPDX), as Cargo.toml declares MIT/Apache-2.0.
     Upstream vi/websocat v4.0.0-alpha3, unmodified source, for slicc's
     kernel (slicc-kernel >= 1.95.0: WASIX epoll and eventfd, #674).
     Toolchain: wasix-org/rust (target wasm32-wasmer-wasi) linked against
