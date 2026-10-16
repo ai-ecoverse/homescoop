@@ -15,18 +15,22 @@
  * after every call drains the ciphertext to send (tls_out_size / tls_out_take).
  * The handshake runs inside tls_read / tls_write as needed.
  *
- * Entropy comes from crypto.getRandomValues (MBEDTLS_ENTROPY_HARDWARE_ALT).
+ * Entropy comes from crypto.getRandomValues: tls_engine_crypto_config.h swaps
+ * the built-in OS sources for this file's mbedtls_platform_get_entropy
+ * (MBEDTLS_PSA_DRIVER_GET_ENTROPY), which seeds PSA's DRBG. Since Mbed TLS 4
+ * (TF-PSA-Crypto) every random draw, the leaves' keys and the handshakes
+ * included, comes from that one generator; there is no DRBG of our own.
  */
 #include <ctype.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/ecp.h"
-#include "mbedtls/entropy.h"
+#include "mbedtls/asn1.h"
 #include "mbedtls/error.h"
 #include "mbedtls/pk.h"
+#include "mbedtls/platform.h"
 #include "mbedtls/ssl.h"
 #include "mbedtls/x509_crt.h"
 #include "psa/crypto.h"
@@ -37,36 +41,37 @@
 #define TLS_NOMEM (-2)
 #define TLS_BADARG (-3)
 
-static const char *alpn_protocols[] = {"http/1.1", NULL};
+static const char *const alpn_protocols[] = {"http/1.1", NULL};
 static int last_error;
 static int ready;
-static mbedtls_entropy_context entropy;
-static mbedtls_ctr_drbg_context drbg;
 
+/* A throw must not unwind through C: psa_crypto_init would be left half
+ * done (#551). A failure is an error code, and the next call tries again. */
 EM_JS(int, slicc_random, (unsigned char *out, size_t len), {
-  for (let at = 0; at < len; at += 65536) {
-    const n = Math.min(65536, len - at);
-    globalThis.crypto.getRandomValues(HEAPU8.subarray(out + at, out + at + n));
+  try {
+    for (let at = 0; at < len; at += 65536) {
+      const n = Math.min(65536, len - at);
+      globalThis.crypto.getRandomValues(HEAPU8.subarray(out + at, out + at + n));
+    }
+    return 0;
+  } catch (err) {
+    return -1;
   }
-  return 0;
 });
 
-int mbedtls_hardware_poll(void *data, unsigned char *out, size_t len, size_t *olen) {
-  (void)data;
-  int ret = slicc_random(out, len);
-  *olen = ret == 0 ? len : 0;
-  return ret;
+/* PSA's entropy source (MBEDTLS_PSA_DRIVER_GET_ENTROPY): full entropy, every byte. */
+int mbedtls_platform_get_entropy(psa_driver_get_entropy_flags_t flags, size_t *estimate_bits,
+                                 unsigned char *out, size_t len) {
+  if (flags != 0) return PSA_ERROR_NOT_SUPPORTED;
+  if (slicc_random(out, len) != 0) return PSA_ERROR_INSUFFICIENT_ENTROPY;
+  *estimate_bits = 8 * len;
+  return 0;
 }
 
 static int init(void) {
   if (ready) return 0;
   int ret = psa_crypto_init();
   if (ret != PSA_SUCCESS) return last_error = ret;
-  mbedtls_entropy_init(&entropy);
-  mbedtls_ctr_drbg_init(&drbg);
-  ret = mbedtls_ctr_drbg_seed(&drbg, mbedtls_entropy_func, &entropy,
-                              (const unsigned char *)"slicc-tls", 9);
-  if (ret != 0) return last_error = ret;
   ready = 1;
   return 0;
 }
@@ -89,22 +94,95 @@ static void leaf_release(leaf *l) {
 
 EMSCRIPTEN_KEEPALIVE int tls_last_error(void) { return last_error; }
 
-EMSCRIPTEN_KEEPALIVE void tls_strerror(int code, char *out, size_t max) {
-  mbedtls_strerror(code, out, max);
+/* Mbed TLS 4's mbedtls_strerror names TLS and X.509 errors only: TF-PSA-Crypto
+ * has no English text, so PSA's, PK's and ASN.1's codes come back as
+ * "UNKNOWN ERROR CODE (…)". Name those a leaf can hit (PK's and ASN.1's in
+ * 3.6's words). */
+static const char *crypto_strerror(int code) {
+  switch (code) {
+    case PSA_ERROR_GENERIC_ERROR: return "PSA - Generic error";
+    case PSA_ERROR_NOT_PERMITTED: return "PSA - Not permitted";
+    case PSA_ERROR_NOT_SUPPORTED: return "PSA - Not supported";
+    case PSA_ERROR_INVALID_ARGUMENT: return "PSA - Invalid argument";
+    case PSA_ERROR_INVALID_HANDLE: return "PSA - Invalid handle";
+    case PSA_ERROR_BAD_STATE: return "PSA - Bad state";
+    case PSA_ERROR_BUFFER_TOO_SMALL: return "PSA - Buffer too small";
+    case PSA_ERROR_ALREADY_EXISTS: return "PSA - Already exists";
+    case PSA_ERROR_DOES_NOT_EXIST: return "PSA - Does not exist";
+    case PSA_ERROR_INSUFFICIENT_MEMORY: return "PSA - Insufficient memory";
+    case PSA_ERROR_INSUFFICIENT_STORAGE: return "PSA - Insufficient storage";
+    case PSA_ERROR_INSUFFICIENT_DATA: return "PSA - Insufficient data";
+    case PSA_ERROR_SERVICE_FAILURE: return "PSA - Service failure";
+    case PSA_ERROR_COMMUNICATION_FAILURE: return "PSA - Communication failure";
+    case PSA_ERROR_STORAGE_FAILURE: return "PSA - Storage failure";
+    case PSA_ERROR_HARDWARE_FAILURE: return "PSA - Hardware failure";
+    case PSA_ERROR_INSUFFICIENT_ENTROPY: return "PSA - Insufficient entropy";
+    case PSA_ERROR_INVALID_SIGNATURE: return "PSA - Invalid signature";
+    case PSA_ERROR_INVALID_PADDING: return "PSA - Invalid padding";
+    case PSA_ERROR_CORRUPTION_DETECTED: return "PSA - Corruption detected";
+    case PSA_ERROR_DATA_CORRUPT: return "PSA - Data corrupt";
+    case PSA_ERROR_DATA_INVALID: return "PSA - Data invalid";
+    case PSA_OPERATION_INCOMPLETE: return "PSA - Operation incomplete";
+    case MBEDTLS_ERR_PK_TYPE_MISMATCH: return "PK - Type mismatch, eg attempt to encrypt with an ECDSA key";
+    case MBEDTLS_ERR_PK_FILE_IO_ERROR: return "PK - Read/write of file failed";
+    case MBEDTLS_ERR_PK_KEY_INVALID_VERSION: return "PK - Unsupported key version";
+    case MBEDTLS_ERR_PK_KEY_INVALID_FORMAT: return "PK - Invalid key tag or value";
+    case MBEDTLS_ERR_PK_UNKNOWN_PK_ALG: return "PK - Key algorithm is unsupported (only RSA and EC are supported)";
+    case MBEDTLS_ERR_PK_PASSWORD_REQUIRED: return "PK - Private key password can't be empty";
+    case MBEDTLS_ERR_PK_PASSWORD_MISMATCH: return "PK - Given private key password does not allow for correct decryption";
+    case MBEDTLS_ERR_PK_INVALID_PUBKEY: return "PK - The pubkey tag or value is invalid (only RSA and EC are supported)";
+    case MBEDTLS_ERR_PK_INVALID_ALG: return "PK - The algorithm tag or value is invalid";
+    case MBEDTLS_ERR_PK_UNKNOWN_NAMED_CURVE: return "PK - Elliptic curve is unsupported (only NIST curves are supported)";
+    case MBEDTLS_ERR_PK_FEATURE_UNAVAILABLE: return "PK - Unavailable feature, e.g. RSA disabled for RSA key";
+    case MBEDTLS_ERR_ASN1_OUT_OF_DATA: return "ASN1 - Out of data when parsing an ASN1 data structure";
+    case MBEDTLS_ERR_ASN1_UNEXPECTED_TAG: return "ASN1 - ASN1 tag was of an unexpected value";
+    case MBEDTLS_ERR_ASN1_INVALID_LENGTH: return "ASN1 - Error when trying to determine the length or invalid length";
+    case MBEDTLS_ERR_ASN1_LENGTH_MISMATCH: return "ASN1 - Actual length differs from expected length";
+    case MBEDTLS_ERR_ASN1_INVALID_DATA: return "ASN1 - Data is invalid";
+  }
+  return NULL;
 }
 
-/* A new P-256 key pair; 0 on failure (tls_last_error). */
+EMSCRIPTEN_KEEPALIVE void tls_strerror(int code, char *out, size_t max) {
+  if (max == 0) return;
+  const char *text = crypto_strerror(code);
+  if (text) {
+    snprintf(out, max, "%s", text);
+    return;
+  }
+  /* An X.509 error with an ASN.1 cause (high + low level). */
+  int magnitude = code < 0 ? -code : code;
+  int high = magnitude & 0xFF80, low = magnitude & 0x7F;
+  const char *cause = high && low ? crypto_strerror(-low) : NULL;
+  mbedtls_strerror(cause ? -high : code, out, max);
+  if (cause) {
+    size_t n = strlen(out);
+    if (n + 3 < max) snprintf(out + n, max - n, " : %s", cause);
+  }
+}
+
+/* A new P-256 key pair; 0 on failure (tls_last_error). PSA generates it; the
+ * leaf's PK context takes a copy (as if it had parsed the key), with PK's own
+ * signing policy, and the generated key is destroyed. */
 EMSCRIPTEN_KEEPALIVE leaf *tls_leaf_new(void) {
   if (init() != 0) return NULL;
   leaf *l = calloc(1, sizeof *l);
-  if (!l) return NULL;
+  if (!l) {
+    last_error = TLS_NOMEM;
+    return NULL;
+  }
   l->refs = 1;
   mbedtls_pk_init(&l->key);
   mbedtls_x509_crt_init(&l->chain);
-  int ret = mbedtls_pk_setup(&l->key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-  if (ret == 0)
-    ret = mbedtls_ecp_gen_key(MBEDTLS_ECP_DP_SECP256R1, mbedtls_pk_ec(l->key),
-                              mbedtls_ctr_drbg_random, &drbg);
+  psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attr, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
+  psa_set_key_bits(&attr, 256);
+  psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_EXPORT);
+  mbedtls_svc_key_id_t generated = MBEDTLS_SVC_KEY_ID_INIT;
+  int ret = psa_generate_key(&attr, &generated);
+  if (ret == PSA_SUCCESS) ret = mbedtls_pk_copy_from_psa(generated, &l->key);
+  psa_destroy_key(generated);
+  psa_reset_key_attributes(&attr);
   if (ret != 0) {
     last_error = ret;
     leaf_release(l);
@@ -126,7 +204,7 @@ EMSCRIPTEN_KEEPALIVE int tls_leaf_add_cert(leaf *l, const unsigned char *der, si
   int ret = mbedtls_x509_crt_parse_der(&l->chain, der, len);
   if (ret != 0) return last_error = ret;
   if (l->certs == 0) {
-    ret = mbedtls_pk_check_pair(&l->chain.pk, &l->key, mbedtls_ctr_drbg_random, &drbg);
+    ret = mbedtls_pk_check_pair(&l->chain.pk, &l->key);
     if (ret != 0) return last_error = ret;
   }
   l->certs++;
@@ -204,7 +282,6 @@ EMSCRIPTEN_KEEPALIVE session *tls_session_new(leaf *l, const char *host) {
   int ret = mbedtls_ssl_config_defaults(&s->config, MBEDTLS_SSL_IS_SERVER,
                                         MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
   if (ret == 0) {
-    mbedtls_ssl_conf_rng(&s->config, mbedtls_ctr_drbg_random, &drbg);
     mbedtls_ssl_conf_sni(&s->config, on_sni, s);
     ret = mbedtls_ssl_conf_own_cert(&s->config, &l->chain, &l->key);
   }

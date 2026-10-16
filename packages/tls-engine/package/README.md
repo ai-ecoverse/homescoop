@@ -1,7 +1,7 @@
 # @ai-ecoverse/wasm-tls-engine
 
 The server side of TLS for [SLICC](https://github.com/ai-ecoverse/slicc)'s
-wasm-realm HTTP proxy (ai-ecoverse/slicc#3571): Mbed TLS 3.6.7 sessions over
+wasm-realm HTTP proxy (ai-ecoverse/slicc#3571): Mbed TLS 4.2.0 sessions over
 memory buffers, compiled with Emscripten to an ES module factory plus
 `slicc-tls-engine.wasm`.
 
@@ -12,7 +12,9 @@ memory buffers, compiled with Emscripten to an ES module factory plus
   SNI must name `host`. ALPN offers `http/1.1` only. TLS 1.2 and 1.3.
 - Pull-shaped I/O: `tls_feed` ciphertext in, `tls_read` plaintext out
   (0 = needs more), `tls_write` plaintext in, drain `tls_out_take`.
-- Entropy: `crypto.getRandomValues`.
+- Entropy: `crypto.getRandomValues`, the source of PSA's random generator
+  (TF-PSA-Crypto), which makes every key and handshake.
+- `tls_strerror` names TLS, X.509, PK, ASN.1 and PSA errors.
 - Built for pages and workers only (`-sENVIRONMENT=web,worker`: no Node
   branch, whose `import('module')` would land in a bundler's eager graph).
   In Node, pass the module's bytes: `createTlsEngine({ wasmBinary })`.

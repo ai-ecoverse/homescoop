@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# tls-engine build.sh — Mbed TLS (static, emcmake) + src/slicc_tls_engine.c
-# → package/dist/slicc-tls-engine.mjs + .wasm. Needs emcc/emcmake, cmake,
-# curl and shasum on PATH. WORK: scratch dir (default: ./.work).
+# tls-engine build.sh — Mbed TLS 4 with its bundled TF-PSA-Crypto (static,
+# emcmake) + src/slicc_tls_engine.c → package/dist/slicc-tls-engine.mjs +
+# .wasm. Needs emcc/emcmake, cmake, python3, curl and shasum on PATH. WORK:
+# scratch dir (default: ./.work).
+#
+# src/tls_engine_crypto_config.h is TF-PSA-Crypto's user config (the entropy
+# source: crypto.getRandomValues). The library and the engine must see the
+# same configuration, so both get it.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="${HOMESCOOP_ROOT:-$(cd "$HERE/../.." && pwd)}"
@@ -18,8 +23,10 @@ else
   WORK="$HERE/.work"
 fi
 SRC="$WORK/mbedtls-$VERSION"
-BUILD="$WORK/mbedtls-build"
-PREFIX="$WORK/mbedtls-install"
+# Per version: a CMake cache names its source tree, and an install over
+# another version's would keep that version's headers (3.6's ctr_drbg.h).
+BUILD="$WORK/mbedtls-$VERSION-build"
+PREFIX="$WORK/mbedtls-$VERSION-install"
 OUT="$HERE/package/dist"
 TB="$WORK/mbedtls-$VERSION.tar.bz2"
 mkdir -p "$WORK" "$OUT"
@@ -27,12 +34,14 @@ mkdir -p "$WORK" "$OUT"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
 [[ -d "$SRC" ]] || tar -xjf "$TB" -C "$WORK"
 
-if [[ ! -f "$PREFIX/lib/libmbedtls.a" || -n "${FORCE:-}" ]]; then
+CRYPTO_CONFIG="$HERE/src/tls_engine_crypto_config.h"
+if [[ ! -f "$PREFIX/lib/libtfpsacrypto.a" || -n "${FORCE:-}" ]]; then
   echo "== tls-engine: Mbed TLS $VERSION (static)"
   emcmake cmake -S "$SRC" -B "$BUILD" -DCMAKE_BUILD_TYPE=MinSizeRel \
     -DENABLE_TESTING=OFF -DENABLE_PROGRAMS=OFF -DUSE_SHARED_MBEDTLS_LIBRARY=OFF \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
-    '-DCMAKE_C_FLAGS=-Oz -flto -DMBEDTLS_ENTROPY_HARDWARE_ALT -DMBEDTLS_NO_PLATFORM_ENTROPY'
+    -DTF_PSA_CRYPTO_USER_CONFIG_FILE="$CRYPTO_CONFIG" \
+    '-DCMAKE_C_FLAGS=-Oz -flto'
   cmake --build "$BUILD" --parallel 8
   cmake --install "$BUILD"
 fi
@@ -40,10 +49,14 @@ fi
 echo "== tls-engine: engine"
 # shellcheck source=link-flags.sh
 source "$HERE/link-flags.sh"
-emcc -Oz -flto -DMBEDTLS_ENTROPY_HARDWARE_ALT -DMBEDTLS_NO_PLATFORM_ENTROPY \
+# libtfpsacrypto.a is the crypto (libmbedcrypto.a is a copy under the 3.x
+# name). The p256-m and Everest drivers, off by default as in 3.6, are built
+# into it: no libp256m.a or libeverest.a any more.
+emcc -Oz -flto "-DTF_PSA_CRYPTO_USER_CONFIG_FILE=\"$CRYPTO_CONFIG\"" \
   -I "$PREFIX/include" "$HERE/src/slicc_tls_engine.c" \
-  "$PREFIX/lib/libmbedtls.a" "$PREFIX/lib/libmbedx509.a" "$PREFIX/lib/libmbedcrypto.a" \
-  "$PREFIX/lib/libeverest.a" "$PREFIX/lib/libp256m.a" \
+  "$PREFIX/lib/libmbedtls.a" "$PREFIX/lib/libmbedx509.a" "$PREFIX/lib/libtfpsacrypto.a" \
   "${ENGINE_LINK_FLAGS[@]}" -o "$OUT/slicc-tls-engine.mjs"
-homescoop_stage_license "$SRC"/LICENSE
+# Mbed TLS's and TF-PSA-Crypto's (the crypto in the wasm): the same terms,
+# each naming its own files.
+homescoop_stage_licenses "$SRC"/LICENSE "$SRC"/tf-psa-crypto/LICENSE
 ls -la "$OUT"
