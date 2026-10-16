@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-python",
-  "version": "3.14.2-24",
+  "version": "3.14.2-25",
   "description": "CPython 3.14 for slicc WASIX (commands python, python3; cross-built in CI on wasix-sysroot)",
   "license": "PSF-2.0 AND GPL-3.0-or-later",
   "engines": {
@@ -42,6 +42,14 @@
     "commands": {
       "python3": {
         "wasm": "bin/python.wasm",
+        "variants": [
+          {
+            "env": {
+              "PYTHON_FORK": "true"
+            },
+            "wasm": "bin/python-fork.wasm"
+          }
+        ],
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
@@ -50,6 +58,14 @@
       },
       "python": {
         "wasm": "bin/python.wasm",
+        "variants": [
+          {
+            "env": {
+              "PYTHON_FORK": "true"
+            },
+            "wasm": "bin/python-fork.wasm"
+          }
+        ],
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
@@ -58,6 +74,14 @@
       },
       "pip": {
         "wasm": "bin/python.wasm",
+        "variants": [
+          {
+            "env": {
+              "PYTHON_FORK": "true"
+            },
+            "wasm": "bin/python-fork.wasm"
+          }
+        ],
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
@@ -71,6 +95,14 @@
       },
       "pip3": {
         "wasm": "bin/python.wasm",
+        "variants": [
+          {
+            "env": {
+              "PYTHON_FORK": "true"
+            },
+            "wasm": "bin/python-fork.wasm"
+          }
+        ],
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",

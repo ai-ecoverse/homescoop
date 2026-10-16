@@ -22,7 +22,9 @@ A package is accepted if its `slicc.python.requires` (abi, platform) match
 this python's, or it has none (pure Python), and the wasix-python it
 resolves to (Node-style lookup from its real directory), if any, has the
 same exact version as this python: the same version is the same build, so
-native side modules never mix interpreter builds. The first package of a
+native side modules never mix interpreter builds. A package whose python can't
+be resolved is accepted when its declared range (">=3.14.2-16 <3.14.3",
+homescoop#702) holds this python (3.14.2-25). The first package of a
 name wins; others are skipped (reported under -v).
 The result is cached per user in ${XDG_CACHE_HOME:-~/.cache}/slicc-site/
 (3.14.2-17; before, <python>/.slicc-site-cache, which other users could not
@@ -270,6 +272,23 @@ def system_site():
     site.addsitedir(d)
 
 
+def _in_range(version, spec):
+    if not isinstance(spec, str) or not isinstance(version, str) or not spec.startswith(">="):
+        return False
+    low, _, high = spec[2:].partition(" <")
+    try:
+        base, _, n = low.partition("-")
+        vbase, _, vn = version.partition("-")
+        x, y, z = (int(p) for p in base.split("."))
+        a, b, c = (int(p) for p in high.split("."))
+        v = tuple(int(p) for p in vbase.split("."))
+        if (a, b, c) != (x, y, z + 1) or v != (x, y, z):
+            return False
+        return not vn or int(vn) >= int(n)
+    except ValueError:
+        return False
+
+
 def _scan(real, found):
     me = _manifest(real)
     if not me or me.get("name") != _PY_PKG:
@@ -301,7 +320,7 @@ def _scan(real, found):
             if dep:
                 used.add(dep)
             got = (_manifest(dep) or {}).get("version") if dep else deps[_PY_PKG]
-            if got != version:
+            if got != version and not (dep is None and _in_range(version, got)):
                 _say(f"skip {name} {m.get('version')}: built for wasix-python {got}, this is {version}")
                 continue
         if name in by_name:

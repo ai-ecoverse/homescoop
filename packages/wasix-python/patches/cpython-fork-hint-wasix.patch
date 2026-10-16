@@ -1,0 +1,46 @@
+WASIX ships two pythons (homescoop#357): the default binary has no fork, and
+PYTHON_FORK=true selects the fork-capable one. In the default one, os.fork,
+os.forkpty and multiprocessing's fork/forkserver contexts fail with an error
+that names the switch (os stays without the attributes, so hasattr() is
+still False). Spawn stays the default start method in both builds.
+
+--- a/Lib/os.py
++++ b/Lib/os.py
+@@ -1189,3 +1189,14 @@
+ else:
+     # Just an alias to cpu_count() (same docstring)
+     process_cpu_count = cpu_count
++
++
++if sys.platform == "wasi" and "fork" not in globals():
++    def __getattr__(name):
++        if name in ("fork", "forkpty"):
++            raise AttributeError(
++                f"os.{name}() isn't available in this python. Re-run with "
++                f"PYTHON_FORK=true to use the fork-capable build.",
++                name=name, obj=sys.modules[__name__])
++        raise AttributeError(f"module {__name__!r} has no attribute {name!r}",
++                             name=name, obj=sys.modules[__name__])
+--- a/Lib/multiprocessing/context.py
++++ b/Lib/multiprocessing/context.py
+@@ -190,6 +190,11 @@
+         try:
+             ctx = _concrete_contexts[method]
+         except KeyError:
++            if sys.platform == 'wasi' and method in ('fork', 'forkserver'):
++                raise ValueError(
++                    f"multiprocessing's {method!r} start method isn't "
++                    f"available in this python. Re-run with PYTHON_FORK=true "
++                    f"to use the fork-capable build.") from None
+             raise ValueError('cannot find context for %r' % method) from None
+         ctx._check_available()
+         return ctx
+@@ -325,7 +330,7 @@
+     # on macOS since macOS 10.14 (Mojave). Use spawn by default instead.
+     # gh-84559: We changed everyones default to a thread safeish one in 3.14.
+     if ('forkserver' in _concrete_contexts and reduction.HAVE_SEND_HANDLE
+-            and sys.platform != 'darwin'):
++            and sys.platform not in ('darwin', 'wasi')):
+         _default_context = DefaultContext(_concrete_contexts['forkserver'])
+     else:
+         _default_context = DefaultContext(_concrete_contexts['spawn'])
