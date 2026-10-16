@@ -60,6 +60,13 @@ test('a dir outside <pkg>/package/ needs HOMESCOOP_PYC_DDIR', { skip: !hasPython
         stdio: ['ignore', 'ignore', 'pipe'],
       });
     assert.throws(() => run({}));
+    // The override names one tree's runtime path, so two dirs are refused.
+    assert.throws(() =>
+      execFileSync('bash', ['-c', 'source "$HOMESCOOP_ROOT/scripts/build-common.sh"; homescoop_compile_pyc "$1" "$1"', 'x', site], {
+        env: { ...process.env, HOMESCOOP_ROOT: ROOT, HOMESCOOP_WORK: join(a, 'work'), PREFIX: join(a, 'prefix'), WASIX_PYTHON_HOST_PY: 'python3', HOMESCOOP_PYC_DDIR: '/fixed' },
+        stdio: ['ignore', 'ignore', 'pipe'],
+      }),
+    );
     run({ HOMESCOOP_PYC_DDIR: '/fixed' });
     const [pyc] = readdirSync(join(site, '__pycache__'));
     assert.ok(readFileSync(join(site, '__pycache__', pyc)).includes(Buffer.from('/fixed/m.py')));

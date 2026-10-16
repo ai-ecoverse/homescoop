@@ -689,7 +689,8 @@ EOF
 #   dirs = trees that contain .py (e.g. package/lib/python3.14/site-packages)
 # co_filename must not depend on the build directory (#568): a dir under
 # .../<pkg>/package/<rel> compiles with ddir /node_modules/@ai-ecoverse/<pkg>/<rel>
-# (the path it is imported from in slicc). Other dirs need HOMESCOOP_PYC_DDIR.
+# (the path it is imported from in slicc). Other dirs need HOMESCOOP_PYC_DDIR,
+# which names one dir's runtime path, so it takes a single <dir>.
 homescoop_compile_pyc() {
   local HOST_PY="${WASIX_PYTHON_HOST_PY:-}"
   local root stale=0 py dir base pyc cand abs ddir pkgdir rel
@@ -702,6 +703,11 @@ homescoop_compile_pyc() {
   fi
   if [[ $# -lt 1 ]]; then
     echo "homescoop_compile_pyc: need at least one directory" >&2
+    return 1
+  fi
+  # One override can only name one tree's runtime path.
+  if [[ -n "${HOMESCOOP_PYC_DDIR:-}" && $# -gt 1 ]]; then
+    echo "homescoop_compile_pyc: HOMESCOOP_PYC_DDIR applies to one directory; got $#" >&2
     return 1
   fi
   for root in "$@"; do
