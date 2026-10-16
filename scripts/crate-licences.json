@@ -10,5 +10,13 @@
   "number_prefix 0.4.0": {
     "url": "https://raw.githubusercontent.com/ogham/rust-number-prefix/eb6ebd215d50df1b199737f0356b988bebaedc84/LICENCE",
     "sha256": "df8d11b64ecce43b1229cd72745c59513b54ba39f05e3ec7c06780617b7b1fcc"
+  },
+  "tokio-io-mock-fork 0.1.0": {
+    "url": "https://raw.githubusercontent.com/tokio-rs/tokio/3d0d0fd2af9192ca5cf2836451e96dffab68216a/tokio-test/LICENSE",
+    "sha256": "1a594f153f129c2de7b15f3262394bdca3dcc2da40058e3ea435c8473eb1f3a0"
+  },
+  "websocket-sans-io 0.1.0": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/Apache-2.0.txt",
+    "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
   }
 }
