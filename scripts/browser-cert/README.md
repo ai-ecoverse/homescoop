@@ -13,8 +13,8 @@ export HOMESCOOP_CERT_NODE_MODULES=/tmp/cert-nm/node_modules
 # Full checklist (packages/<name>/cert/*.mjs)
 node scripts/browser-cert/run.mjs --package jq --tarball path/to/package.tgz
 
-# Negative proof (must fail)
-node scripts/browser-cert/prove-negative.mjs --package jq --tarball path/to/package.tgz
+# Negative proof (must fail): empties every command's wasm, then runs the specs
+node scripts/browser-cert/prove-negative.mjs --package jq --tarball path/to/package.tgz [--kernel <spec>] [--users enforce]
 ```
 
 Any kernel, any users mode, JSON results (what `kernel-compat.yml` runs):
