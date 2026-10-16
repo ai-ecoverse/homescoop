@@ -4,6 +4,8 @@ import { appendFileSync, existsSync, readFileSync, readdirSync, realpathSync } f
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readCertMeta } from './cert-meta.mjs';
+import { glueFallback } from './glue.mjs';
+import { devPin } from '../dev-pin.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HOST_HARNESSES = ['host-node', 'host-smoke'];
@@ -18,7 +20,58 @@ function readMeta(dir, pkg) {
     throw new Error(`packages/${pkg}/cert/meta.json: ci entry ${blank} is not a command; nothing was certified`);
   }
   readPeers(dir, pkg, meta);
+  readExtraKernels(dir, pkg, meta);
   return meta;
+}
+
+const KERNEL_SPEC = /^@ai-ecoverse\/slicc-kernel@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const SPEC_FILE = /^[\w.-]+\.mjs$/;
+const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
+
+// cert/meta.json "extra_kernels" (homescoop#663). A string entry documents
+// a kernel the specs were checked on by hand; ladder-pr does not run it. An
+// object entry is run by ladder-pr's cert leg:
+//   { "kernel": "@ai-ecoverse/slicc-kernel@x.y.z", "why": "...",
+//     "specs": true | ["a.mjs", ...],  // browser specs on that kernel
+//     "cert": "k108",                  // optional: a cert/ subdirectory
+//     "users": "enforce",              // optional --users override
+//     "env": { "TAR_LINKAT": "1" },    // optional, for specs and ci
+//     "ci": ["<command>", ...] }       // host commands, with
+//                                      // HOMESCOOP_CERT_KERNEL=<kernel>
+export function readExtraKernels(dir, pkg, meta) {
+  const list = meta.extra_kernels;
+  if (list === undefined) return [];
+  const where = `packages/${pkg}/cert/meta.json: extra_kernels`;
+  if (!Array.isArray(list)) throw new Error(`${where} is not a list; nothing was certified`);
+  const runs = [];
+  list.forEach((e, i) => {
+    if (typeof e === 'string') return;
+    const bad = (why) => {
+      throw new Error(`${where}[${i}] ${why}; nothing was certified`);
+    };
+    if (!e || typeof e !== 'object' || Array.isArray(e)) bad('is neither a note nor an object');
+    const known = ['kernel', 'why', 'specs', 'cert', 'users', 'env', 'ci'];
+    const unknown = Object.keys(e).filter((k) => !known.includes(k));
+    if (unknown.length) bad(`has unknown key(s) ${unknown.join(', ')}`);
+    if (typeof e.kernel !== 'string' || !KERNEL_SPEC.test(e.kernel)) bad('kernel is not an exact @ai-ecoverse/slicc-kernel@<version>');
+    if (typeof e.why !== 'string' || !e.why.trim()) bad('has no why');
+    if (e.specs === undefined && e.ci === undefined) bad('runs nothing (no specs, no ci); make it a string note instead');
+    if (e.specs !== undefined && e.specs !== true && !(Array.isArray(e.specs) && e.specs.length && e.specs.every((f) => typeof f === 'string' && SPEC_FILE.test(f)))) {
+      bad('specs is not true or a list of spec file names');
+    }
+    if (e.cert !== undefined && (typeof e.cert !== 'string' || !/^[\w.-]+$/.test(e.cert) || e.cert.startsWith('.') || !existsSync(join(dir, 'packages', pkg, 'cert', e.cert)))) {
+      bad('cert is not a subdirectory of cert/');
+    }
+    if (e.cert !== undefined && e.specs === undefined) bad('names a cert directory but no specs');
+    if (e.users !== undefined && !['off', 'report', 'enforce'].includes(e.users)) bad('users is not off, report or enforce');
+    if (e.env !== undefined && (!e.env || typeof e.env !== 'object' || Array.isArray(e.env) || Object.entries(e.env).some(([k, v]) => !ENV_NAME.test(k) || typeof v !== 'string'))) {
+      bad('env is not an object of NAME: "string"');
+    }
+    if (e.ci !== undefined && (!Array.isArray(e.ci) || !e.ci.length || e.ci.some((c) => typeof c !== 'string' || !c.trim()))) bad('ci is not a list of commands');
+    if (e.specs !== undefined && HOST_HARNESSES.includes(meta.harness || '')) bad(`has specs, but harness ${meta.harness} runs no browser specs (use ci)`);
+    runs.push(e);
+  });
+  return runs;
 }
 
 const RECIPE = /^[a-z0-9][a-z0-9._-]*$/;
@@ -111,30 +164,90 @@ function ci(pkg) {
     console.log(`::error::${err.message}`);
     return 1;
   }
-  const cmds = meta.ci || [];
-  if (!cmds.length) {
+  const runs = [{ cmds: meta.ci || [], env: {}, label: '' }];
+  for (const e of readExtraKernels(root, pkg, meta)) {
+    if (e.ci) runs.push({ cmds: e.ci, env: { ...(e.env || {}), HOMESCOOP_CERT_KERNEL: e.kernel }, label: ` (extra kernel ${e.kernel})` });
+  }
+  if (!runs.some((r) => r.cmds.length)) {
     console.log('host cert: no ci commands');
     return 0;
   }
-  for (const cmd of cmds) {
-    console.log(`::group::host cert: ${cmd}`);
-    const r = spawnSync('bash', ['-c', cmd], { cwd: root, stdio: 'inherit' });
-    console.log('::endgroup::');
-    if (r.status !== 0) {
-      console.log(`::error::${pkg}: host cert command failed (${r.status ?? r.signal}): ${cmd}`);
-      return r.status || 1;
+  for (const { cmds, env, label } of runs) {
+    for (const cmd of cmds) {
+      console.log(`::group::host cert${label}: ${cmd}`);
+      const r = spawnSync('bash', ['-c', cmd], { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
+      console.log('::endgroup::');
+      if (r.status !== 0) {
+        console.log(`::error::${pkg}: host cert command failed${label} (${r.status ?? r.signal}): ${cmd}`);
+        return r.status || 1;
+      }
     }
   }
   return 0;
 }
 
+// The browser runs after the cert kernel's: glue by path on the dev-pin
+// kernel when the cert kernel cannot run it (#628), and each extra_kernels
+// entry with specs (#663). Returns the run.mjs invocations.
+export function browserExtras(pkg, manifest, { dir = root, tarball = '.homescoop-out/package.tgz' } = {}) {
+  if (planLeg(pkg, manifest, { dir }).browser !== 'run') return [];
+  const meta = readMeta(dir, pkg);
+  const certKernel = meta.kernel || devPin('@ai-ecoverse/slicc-kernel', { dir });
+  const base = ['scripts/browser-cert/run.mjs', '--package', pkg, '--tarball', tarball];
+  const out = [];
+  const fallbackKernel = devPin('@ai-ecoverse/slicc-kernel', { dir });
+  const glue = glueFallback({ meta, manifest, certKernel, fallbackKernel });
+  if (glue) {
+    out.push({ label: `glue by path on ${glue.kernel} (${glue.why})`, argv: [...base, '--kernel', glue.kernel, '--users', 'enforce', '--glue-only'], env: {} });
+  }
+  for (const e of readExtraKernels(dir, pkg, meta)) {
+    if (e.specs === undefined) continue;
+    const argv = [...base, '--kernel', e.kernel];
+    if (e.cert) argv.push('--cert', `packages/${pkg}/cert/${e.cert}`);
+    if (Array.isArray(e.specs)) for (const f of e.specs) argv.push('--spec', f);
+    if (e.users) argv.push('--users', e.users);
+    out.push({ label: `extra kernel ${e.kernel}: ${e.why}`, argv, env: e.env || {} });
+  }
+  return out;
+}
+
+function browser(pkg, manifestPath, tarball) {
+  let runs;
+  try {
+    const manifest = manifestPath ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {};
+    runs = browserExtras(pkg, manifest, { tarball });
+  } catch (err) {
+    console.log(`::error::${err.message}`);
+    return 1;
+  }
+  if (!runs.length) {
+    console.log('browser-cert: no extra runs (the cert kernel checks the glue; no extra_kernels with specs)');
+    return 0;
+  }
+  let failed = 0;
+  for (const { label, argv, env } of runs) {
+    console.log(`::group::browser-cert: ${label}`);
+    const r = spawnSync(process.execPath, argv, { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
+    console.log('::endgroup::');
+    if (r.status !== 0) {
+      console.log(`::error::${pkg}: browser cert failed: ${label}`);
+      failed = r.status || 1;
+    }
+  }
+  return failed;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const [mode, pkg] = process.argv.slice(2);
-  const i = process.argv.indexOf('--manifest');
-  const manifest = i > 0 ? process.argv[i + 1] : '';
-  if (!pkg || !['plan', 'ci'].includes(mode)) {
-    console.error('usage: cert-leg.mjs plan <package> [--manifest <package.json>] | cert-leg.mjs ci <package>');
+  const opt = (name) => {
+    const i = process.argv.indexOf(name);
+    return i > 0 ? process.argv[i + 1] : '';
+  };
+  const manifest = opt('--manifest');
+  if (!pkg || !['plan', 'ci', 'browser-extra'].includes(mode)) {
+    console.error('usage: cert-leg.mjs plan <package> [--manifest <package.json>] | cert-leg.mjs ci <package> | cert-leg.mjs browser-extra <package> --manifest <package.json> [--tarball <package.tgz>]');
     process.exit(2);
   }
+  if (mode === 'browser-extra') process.exit(browser(pkg, manifest, opt('--tarball') || '.homescoop-out/package.tgz'));
   process.exit(mode === 'plan' ? plan(pkg, manifest) : ci(pkg));
 }

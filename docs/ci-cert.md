@@ -170,6 +170,32 @@ of which still ship 0644 glue) or `--live`. `"glueByPath": false` in
 (0644 `bin/tar`) fails it on slicc-kernel 1.88.0 with
 `EACCES: /node_modules/@ai-ecoverse/wasm-tar/bin/tar`; 1.35.0-6 passes.
 
+A package whose cert kernel can't run it (before 1.86.0, or users not
+`enforce`) used to skip it in `ladder-pr` for good (#628). Now
+`cert-leg.mjs browser-extra`, run after the specs, runs
+`run.mjs --glue-only --users enforce` once more on the root `package.json`'s
+certified dev-pin kernel for such packages: only glue by path, no specs.
+
+### Extra kernels: `"extra_kernels"` in `cert/meta.json`
+
+A string entry is a note: a kernel the specs were checked on by hand.
+`ladder-pr` doesn't run it. An object entry is run by the cert leg (#663):
+
+```json
+{ "kernel": "@ai-ecoverse/slicc-kernel@1.90.0", "why": "slicc-kernel#568's linkat",
+  "specs": true, "env": { "TAR_LINKAT": "1" } }
+```
+
+- `specs`: `true` (every spec) or a list of spec file names, run in the
+  browser on `kernel` (`cert-leg.mjs browser-extra`, after the cert kernel's
+  run). `cert` names a subdirectory of `cert/` to take them from instead
+  (`"cert": "k108"`), and `users` overrides `meta.json`'s users.
+- `ci`: host commands, run after the top-level `ci` ones with
+  `HOMESCOOP_CERT_KERNEL=<kernel>` and `env` in their environment, so a
+  command passes it on itself (`--kernel "$HOMESCOOP_CERT_KERNEL"`).
+- `kernel` is an exact version and `why` is required; an entry that runs
+  nothing, an unknown key, or `specs` on a host harness fails the leg.
+
 ### Peers: `"peers"` in `cert/meta.json`
 
 `"peers": ["imagemagick", "imagemagick-heif"]` names other recipes whose

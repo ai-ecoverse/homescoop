@@ -64,3 +64,39 @@ export async function glueByPath(ctx, { installDir, targets, log = console.log }
     ...(failed ? { error: cases.fail.map((c) => c.message).join('\n') } : {}),
   };
 }
+
+const kernelVersionOf = (spec) => /@(\d+\.\d+\.\d+[^@\s]*)$/.exec(spec || '')?.[1] || '';
+
+/**
+ * homescoop#628: ladder-pr runs a package's specs on its cert/meta.json
+ * kernel only, so a package whose cert kernel cannot run glue by path (no
+ * kernel.chmod before slicc-kernel 1.86.0, or users not enforce) never got
+ * the check. Returns null when the main run checks the glue itself, else
+ * { why, kernel, users: 'enforce' } for a --glue-only run on `fallbackKernel`
+ * (the root package.json's certified dev pin).
+ */
+export function glueFallback({ meta, manifest, certKernel, fallbackKernel }) {
+  const version = kernelVersionOf(certKernel);
+  const main = glueCheckPlan({
+    soft: false,
+    live: false,
+    modes: atLeast(version, [1, 86]) ? 'tarball' : 'kernel defaults',
+    users: meta?.users || '',
+    kernelVersion: version,
+    meta,
+    manifest,
+  });
+  if (main.run || !main.targets.length || meta?.glueByPath === false) return null;
+  const fallback = kernelVersionOf(fallbackKernel);
+  const extra = glueCheckPlan({
+    soft: false,
+    live: false,
+    modes: atLeast(fallback, [1, 86]) ? 'tarball' : 'kernel defaults',
+    users: 'enforce',
+    kernelVersion: fallback,
+    meta,
+    manifest,
+  });
+  if (!extra.run) throw new Error(`glue by path: the fallback kernel ${fallbackKernel} cannot run it either (${extra.why})`);
+  return { why: `${certKernel}: ${main.why}`, kernel: fallbackKernel, users: 'enforce' };
+}

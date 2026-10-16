@@ -46,10 +46,13 @@ const kernelFlag = flag('--kernel');
 const usersFlag = flag('--users');
 const jsonOut = flag('--json') ? resolve(flag('--json')) : '';
 const soft = process.argv.includes('--soft');
+// --glue-only: only glue by path (#360), on this kernel and users mode; for a
+// package whose cert kernel cannot run it (cert-leg.mjs browser-extra, homescoop#628).
+const glueOnly = process.argv.includes('--glue-only');
 const livePort = Number(flag('--live')) || 0;
 if (!pkgName) {
   console.error(
-    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft] [--spec <file.mjs> ...] [--live <port>]',
+    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft] [--spec <file.mjs> ...] [--live <port>] [--glue-only]',
   );
   process.exit(2);
 }
@@ -170,7 +173,7 @@ const cmdNames = Object.keys(commands);
 
 // Full cert specs may target wasi (python wheels, wasi-pnpm). Smoke-only path
 // still skips non-emscripten without cert/.
-if (certSpecs.length === 0) {
+if (certSpecs.length === 0 && !glueOnly) {
   if (abi !== 'emscripten') {
     console.log(`browser-cert: skip ${npmName} (abi=${abi}; no cert/*.mjs)`);
     cleanup(0, 'skip');
@@ -382,7 +385,9 @@ try {
     await new Promise(() => {});
   }
 
-  if (certSpecs.length > 0) {
+  if (glueOnly) {
+    console.log('browser-cert: --glue-only: no specs, glue by path only');
+  } else if (certSpecs.length > 0) {
     const ctx = {
       ...makeContext(page, { packageName: pkgName, npmName }),
       installed: pkgs.map((p) => p.manifest),
@@ -472,6 +477,10 @@ try {
       console.error(`browser-cert: FAIL glue by path (#360): ${sp.error}`);
       process.exitCode = 1;
     } else console.log(`browser-cert: ok glue by path (#360): ${glue.targets.length} glue file(s) run as certglue under users enforce`);
+  } else if (glueOnly) {
+    console.error(`browser-cert: FAIL --glue-only, but glue by path cannot run: ${glue.why}`);
+    report.specs.push({ spec: 'glue-by-path', status: 'fail', durationMs: 0, error: glue.why });
+    process.exitCode = 1;
   } else if (glue.targets.length) console.log(`browser-cert: glue by path skipped: ${glue.why}`);
 
   if (page.errors?.length) {

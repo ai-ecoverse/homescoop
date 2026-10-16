@@ -84,3 +84,18 @@ test('glueByPath: runs each glue by path as certglue; rc 126 or EACCES fails, an
   assert.equal((await glueByPath(odd, { installDir: 'p/', targets: [{ glue: 'bin/tar', command: 'tar' }], log: () => {} })).status, 'pass');
   await assert.rejects(glueByPath(fakeCtx({ addUser: 'users are off' }), { installDir: 'p/', targets: [], log: () => {} }), /users are off/);
 });
+
+test('glueFallback (#628): a cert kernel before 1.86, or users not enforce, gets a --glue-only run on the dev pin', async () => {
+  const { glueFallback } = await import('../browser-cert/glue.mjs');
+  const pin = '@ai-ecoverse/slicc-kernel@1.102.6';
+  const at = (v) => `@ai-ecoverse/slicc-kernel@${v}`;
+  const fb = (meta, certKernel, manifest = coreutils, fallbackKernel = pin) => glueFallback({ meta, manifest, certKernel, fallbackKernel });
+  assert.deepEqual(fb({}, at('1.12.0')), { why: `${at('1.12.0')}: the kernel keeps its default modes (no kernel.chmod before slicc-kernel 1.86.0)`, kernel: pin, users: 'enforce' });
+  assert.match(fb({ users: 'off' }, at('1.94.0')).why, /users off is not enforce/);
+  assert.match(fb({ users: 'report' }, at('1.94.0')).why, /users report is not enforce/);
+  assert.equal(fb({ users: 'enforce' }, at('1.94.0')), null);
+  assert.equal(fb({}, at('1.94.0')), null, 'users default enforce since 1.74');
+  assert.equal(fb({ glueByPath: false }, at('1.12.0')), null);
+  assert.equal(fb({}, at('1.12.0'), { slicc: { commands: { rg: { wasm: 'bin/rg.wasm' } } } }), null);
+  assert.throws(() => fb({}, at('1.12.0'), coreutils, at('1.80.0')), /fallback kernel .*1\.80\.0 cannot run it either/);
+});
