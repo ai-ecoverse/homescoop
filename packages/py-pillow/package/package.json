@@ -21,6 +21,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "lib"
   ],
   "publishConfig": {

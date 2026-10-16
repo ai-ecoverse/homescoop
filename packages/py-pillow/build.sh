@@ -178,6 +178,9 @@ rows.append(f"{di}/RECORD,,")
 open(os.path.join(site, di, "RECORD"), "w").write("\n".join(rows) + "\n")
 PY
 cp "$SRC/LICENSE" "$DEST/LICENSE"
+WORK="$B" homescoop_notices_begin "The side modules link these libraries statically: libjpeg-turbo 3.1.2 into PIL/_imaging and FreeType 2.13.3 into PIL/_imagingft. zlib is python.wasm's (@ai-ecoverse/wasix-python), and Pillow's own licence is LICENSE."
+WORK="$B" homescoop_notice "libjpeg-turbo 3.1.2 (IJG, BSD-3-Clause, Zlib)" "$JT/src/LICENSE.md" - "$JT/src/README.ijg" -
+WORK="$B" homescoop_notice "FreeType 2.13.3 (FreeType License, FTL)" "$FT/src/LICENSE.TXT" - "$FT/src/docs/FTL.TXT" -
 homescoop_compile_pyc "$SITE"
 node "$ROOT/packages/py-kiwisolver/test/wasm-call-signatures.mjs" "$SITE"/PIL/*"$EXT"
 echo "== py-pillow: staged $(du -sh "$DEST" | awk '{print $1}')"
