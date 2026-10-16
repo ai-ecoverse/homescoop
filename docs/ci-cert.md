@@ -443,8 +443,8 @@ changes the boot order for every cert.
   its runs, its `vars.CERT_RUNNER` and its minutes, not homescoop's. GitHub's
   concurrent-job limit for hosted runners is per organization, so they still
   share that pool with `ladder-pr`; hence the bounds below.
-- `concurrency`: one group per caller repo, PR (or ref), kernel, set and
-  bios-ref; a PR caller's newer run cancels the older one.
+- `concurrency`: one group per caller repo, PR (or ref), kernel, set,
+  bios-ref and reference; a PR caller's newer run cancels the older one.
 - One call is a gate, a plan, up to 10 shards and a report job. On the pool
   10 shards run at once (cloud-run-bench has up to 30 machines); on hosted
   runners 3, so a fork PR's call doesn't crowd out `ladder-pr`. The usual
@@ -458,8 +458,14 @@ changes the boot order for every cert.
     this repo's proof and slicc-kernel's PR calls; or
   - `schedule`, `workflow_dispatch`, `workflow_run` or `release` on
     `refs/heads/main` (the caller's ref, for a call), with:
-    - `kernel` a published `@ai-ecoverse/slicc-kernel@<version>`, or a bare
-      `<version>` (no artifact, no git or file spec);
+    - `kernel` a published `@ai-ecoverse/slicc-kernel@<version>`, a bare
+      `<version>`, or the name of a kernel `.tgz` artifact uploaded earlier
+      in the same calling run, which is the caller's trusted main run (a
+      name that starts with neither `@` nor a digit; the gate logs
+      `artifact kernel <name> from a main run → pool`). An npm-shaped value
+      that isn't a published slicc-kernel version (another package, git,
+      file) still runs hosted;
+    - `reference`, if set, a published slicc-kernel version or dist-tag;
     - `homescoop-ref` either `main` or a full 40-hex sha that is on
       homescoop's main, and `bios-ref` either `main` or a full sha on
       slicc-bios's main. The gate job checks a sha with the compare API
