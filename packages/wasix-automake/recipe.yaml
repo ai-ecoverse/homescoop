@@ -8,9 +8,14 @@ source:
   url: "https://mirrors.kernel.org/gnu/automake/automake-{{version}}.tar.xz"
   sha256: "8920c1fc411e13b90bf704ef9db6f29d540e76d232cb3b2c9f4dc4cc599bd990"
 # 1.17.0-8 is packaging-only: 1.17.0-5's bytes with exact @ai-ecoverse pins
-# (wasix-autoconf 2.72.0-6, wasix-perl 5.42.0-11). Drop repack: when the next release rebuilds.
+# (wasix-autoconf 2.72.0-6, wasix-perl 5.42.0-11). 1.17.0-9 too: the pin moves
+# to wasix-autoconf 2.72.0-7, whose autom4te needs no grep (homescoop#470),
+# and the README says what aclocal/automake and configure need. Drop repack:
+# when the next release rebuilds.
 repack:
   from: "1.17.0-5"
+  files:
+    - README.md
   fields:
     - repository
 dependencies:
