@@ -267,6 +267,7 @@ async function plan(args) {
   const setIn = (args.set || 'base,ci-certified').trim();
   const biosRefIn = (args['bios-ref'] || 'main').trim();
   const homescoopRefIn = (args['homescoop-ref'] || '').trim();
+  const referenceIn = (args.reference || '').trim();
   if (!kernelIn) throw new Error('--kernel is required');
   const homescoopSha = must('git', ['rev-parse', 'HEAD'], { cwd: root }).trim();
   const bios = await biosPins(biosRefIn);
@@ -291,15 +292,29 @@ async function plan(args) {
     candidate = kernelInfo(join(out, 'candidate.tgz'), { spec, source: 'npm', gitHead: view.gitHead || null });
   }
   if (candidate.name !== KERNEL) console.log(`::warning::candidate kernel is ${candidate.name}, not ${KERNEL}`);
-  const pinned = bios.base.find((p) => p.name === KERNEL);
-  if (!pinned) throw new Error(`slicc-bios ${bios.sha} pins no ${KERNEL}`);
-  const refTgz = fetchTarball(KERNEL, pinned.version, pinned.integrity, join(tmp, 'reference'));
-  renameSync(refTgz.file, join(out, 'reference.tgz'));
-  const reference = kernelInfo(join(out, 'reference.tgz'), {
-    spec: `${KERNEL}@${pinned.version}`,
-    source: `slicc-bios ${bios.sha} src/packages/package-lock.json`,
-    gitHead: npmView(`${KERNEL}@${pinned.version}`).gitHead || null,
-  });
+  let reference;
+  if (referenceIn) {
+    const spec = /^\d/.test(referenceIn) ? `${KERNEL}@${referenceIn}` : referenceIn;
+    if (!/^@ai-ecoverse\/slicc-kernel@[0-9A-Za-z.+-]+$/.test(spec)) {
+      throw new Error(`--reference ${referenceIn}: a ${KERNEL} version or dist-tag from the registry (a bare version, or ${KERNEL}@<version|tag>)`);
+    }
+    const view = npmView(spec);
+    if (view.name !== KERNEL) throw new Error(`--reference ${referenceIn} is ${view.name}, not ${KERNEL}`);
+    const refTgz = fetchTarball(KERNEL, view.version, view.dist?.integrity, join(tmp, 'reference'));
+    renameSync(refTgz.file, join(out, 'reference.tgz'));
+    reference = kernelInfo(join(out, 'reference.tgz'), { spec, source: `input reference=${referenceIn}`, origin: 'input', gitHead: view.gitHead || null });
+  } else {
+    const pinned = bios.base.find((p) => p.name === KERNEL);
+    if (!pinned) throw new Error(`slicc-bios ${bios.sha} pins no ${KERNEL}`);
+    const refTgz = fetchTarball(KERNEL, pinned.version, pinned.integrity, join(tmp, 'reference'));
+    renameSync(refTgz.file, join(out, 'reference.tgz'));
+    reference = kernelInfo(join(out, 'reference.tgz'), {
+      spec: `${KERNEL}@${pinned.version}`,
+      source: `slicc-bios ${bios.sha} src/packages/package-lock.json`,
+      origin: 'slicc-bios',
+      gitHead: npmView(`${KERNEL}@${pinned.version}`).gitHead || null,
+    });
+  }
 
   const all = recipes();
   const byDir = new Map(all.map((r) => [r.dir, r]));
@@ -427,7 +442,7 @@ async function plan(args) {
     sweeps: b.units.filter((u) => u.sweep).map((u) => u.sweep),
   }));
   const tag = createHash('sha256')
-    .update(JSON.stringify([kernelIn, setIn, biosRefIn, homescoopRefIn || homescoopSha]))
+    .update(JSON.stringify([kernelIn, setIn, biosRefIn, homescoopRefIn || homescoopSha, ...(referenceIn ? [referenceIn] : [])]))
     .digest('hex')
     .slice(0, 10);
   const server = process.env.GITHUB_SERVER_URL || 'https://github.com';
@@ -435,7 +450,7 @@ async function plan(args) {
     version: 1,
     tag,
     createdAt: new Date().toISOString(),
-    inputs: { kernel: kernelIn, set: setIn, biosRef: biosRefIn, homescoopRef: homescoopRefIn || 'HEAD' },
+    inputs: { kernel: kernelIn, set: setIn, biosRef: biosRefIn, homescoopRef: homescoopRefIn || 'HEAD', reference: referenceIn || null },
     homescoopRef: homescoopSha,
     biosRef: bios.sha,
     bios: { repository: BIOS, ref: biosRefIn, sha: bios.sha, files: bios.files },
@@ -462,7 +477,7 @@ async function plan(args) {
   };
   writeJson(join(out, 'plan.json'), doc);
   console.log(`candidate ${candidate.name}@${candidate.version} sha256 ${candidate.sha256}`);
-  console.log(`reference ${reference.name}@${reference.version} sha256 ${reference.sha256} (slicc-bios ${bios.sha})`);
+  console.log(`reference ${reference.name}@${reference.version} sha256 ${reference.sha256} (${reference.origin === 'input' ? `input reference ${referenceIn}` : `slicc-bios ${bios.sha}`})`);
   console.log(`work: about ${Math.round(total / 60)} min in ${n} shard(s) (shards ${asked}; ${units.filter((u) => u.measured).length} of ${units.length} items measured in timings.json)`);
   for (const [k, b] of bins.entries()) {
     const label = (u) => (u.part ? `${list[u.entry].id}#${u.part}[${u.specs.join(',')}]` : list[u.entry].id);
@@ -954,7 +969,7 @@ function report(args) {
   }
   const compat = {
     kernel: { spec: plan.kernel.spec, name: plan.kernel.name, version: plan.kernel.version, sha256: plan.kernel.sha256, integrity: plan.kernel.integrity, gitHead: plan.kernel.gitHead, source: plan.kernel.source },
-    reference: { spec: plan.reference.spec, version: plan.reference.version, sha256: plan.reference.sha256, gitHead: plan.reference.gitHead, source: plan.reference.source },
+    reference: { spec: plan.reference.spec, version: plan.reference.version, sha256: plan.reference.sha256, gitHead: plan.reference.gitHead, source: plan.reference.source, origin: plan.reference.origin || 'slicc-bios' },
     homescoopRef: plan.homescoopRef,
     biosRef: plan.biosRef,
     inputs: plan.inputs,
@@ -976,7 +991,9 @@ function report(args) {
   md.push(`## kernel-compat: ${k.name}@${k.version} ${ICON[verdict === 'regression' ? 'regression' : verdict]} ${verdict}`);
   md.push('');
   md.push(`- candidate: \`${k.spec}\` → ${k.name}@${k.version}, sha256 \`${k.sha256}\`${k.gitHead ? `, gitHead \`${k.gitHead}\`` : ''}`);
-  md.push(`- reference (pinned by slicc-bios \`${plan.inputs.biosRef}\` = \`${plan.biosRef}\`): ${plan.reference.version}, sha256 \`${plan.reference.sha256}\``);
+  md.push(plan.reference.origin === 'input'
+    ? `- reference (the \`reference\` input, \`${plan.inputs.reference}\`): ${plan.reference.version}, sha256 \`${plan.reference.sha256}\`; base set and catalog from slicc-bios \`${plan.inputs.biosRef}\` = \`${plan.biosRef}\``
+    : `- reference (pinned by slicc-bios \`${plan.inputs.biosRef}\` = \`${plan.biosRef}\`): ${plan.reference.version}, sha256 \`${plan.reference.sha256}\``);
   md.push(`- homescoop \`${plan.homescoopRef}\`, set \`${plan.inputs.set}\``);
   md.push(`- specs: ${summary.pass} pass, ${summary.known} known, ${summary.regression} regression, ${summary.skip} skipped; base sweep: ${summary.sweep.pass} pass, ${summary.sweep.known} known, ${summary.sweep.regression} regression${errors.length ? `; **${errors.length} errors**` : ''}`);
   md.push('');

@@ -19,6 +19,10 @@ on:
         description: 'slicc-bios ref whose lockfiles give the base set, the catalog and the reference kernel'
         type: string
         default: 'main'
+      reference:
+        description: 'Reference kernel: a published @ai-ecoverse/slicc-kernel version or dist-tag (1.98.2, @ai-ecoverse/slicc-kernel@latest). Empty: the kernel bios-ref''s lockfile pins. The base set and catalog still come from bios-ref'
+        type: string
+        default: ''
       runner:
         description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a same-repo PR or a trusted run on main (docs/ci-cert.md), else ubuntu-latest'
         type: string
@@ -67,6 +71,10 @@ on:
         description: 'slicc-bios ref whose lockfiles give the base set, the catalog and the reference kernel'
         type: string
         default: 'main'
+      reference:
+        description: 'Reference kernel: a published @ai-ecoverse/slicc-kernel version or dist-tag (1.98.2, @ai-ecoverse/slicc-kernel@latest). Empty: the kernel bios-ref''s lockfile pins. The base set and catalog still come from bios-ref'
+        type: string
+        default: ''
       runner:
         description: 'runs-on label for the shards (empty: vars.CERT_RUNNER). Used only for a same-repo PR or a trusted run on main (docs/ci-cert.md), else ubuntu-latest'
         type: string
@@ -88,7 +96,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: kernel-compat-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.kernel }}-${{ inputs.set }}-${{ inputs.bios-ref }}
+  group: kernel-compat-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.kernel }}-${{ inputs.set }}-${{ inputs.bios-ref }}-${{ inputs.reference }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -110,6 +118,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
           KERNEL: ${{ inputs.kernel }}
+          REFERENCE: ${{ inputs.reference }}
           HOMESCOOP_REF: ${{ inputs.homescoop-ref || 'main' }}
           BIOS_REF: ${{ inputs.bios-ref || 'main' }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -153,12 +162,14 @@ jobs:
             hosted "$EVENT on $REF is neither a same-repo pull_request nor schedule, workflow_dispatch, workflow_run or release on refs/heads/main"
           elif ! [[ "$KERNEL" =~ ^@ai-ecoverse/slicc-kernel@[0-9A-Za-z.+-]+$ || "$KERNEL" =~ ^[0-9][0-9A-Za-z.+-]*$ ]]; then
             hosted "kernel $KERNEL is not a published @ai-ecoverse/slicc-kernel version"
+          elif [[ -n "$REFERENCE" ]] && ! [[ "$REFERENCE" =~ ^@ai-ecoverse/slicc-kernel@[0-9A-Za-z.+-]+$ || "$REFERENCE" =~ ^[0-9][0-9A-Za-z.+-]*$ ]]; then
+            hosted "reference $REFERENCE is not a published @ai-ecoverse/slicc-kernel version or dist-tag"
           elif ! on_main ai-ecoverse/homescoop "$HOMESCOOP_REF"; then
             hosted "homescoop-ref $HOMESCOOP_REF is neither main nor a 40-hex sha reachable from homescoop main"
           elif ! on_main ai-ecoverse/slicc-bios "$BIOS_REF"; then
             hosted "bios-ref $BIOS_REF is neither main nor a 40-hex sha reachable from slicc-bios main"
           else
-            pool "$EVENT on $REF, homescoop-ref $HOMESCOOP_REF and bios-ref $BIOS_REF on main, kernel $KERNEL"
+            pool "$EVENT on $REF, homescoop-ref $HOMESCOOP_REF and bios-ref $BIOS_REF on main, kernel $KERNEL${REFERENCE:+, reference $REFERENCE}"
           fi
 
   plan:
@@ -198,12 +209,14 @@ jobs:
           BIOS_REF: ${{ inputs.bios-ref || 'main' }}
           HOMESCOOP_REF: ${{ inputs.homescoop-ref }}
           SHARDS: ${{ inputs.shards || 'auto' }}
+          REFERENCE: ${{ inputs.reference }}
           KERNEL_DIR: ${{ steps.kind.outputs.kind == 'artifact' && format('{0}/kernel-artifact', runner.temp) || '' }}
         run: |
           set -euo pipefail
           node scripts/browser-cert/compat.mjs plan \
             --kernel "$KERNEL" --set "$SET" --bios-ref "$BIOS_REF" --homescoop-ref "$HOMESCOOP_REF" --shards "$SHARDS" \
             ${KERNEL_DIR:+--kernel-dir "$KERNEL_DIR"} \
+            ${REFERENCE:+--reference "$REFERENCE"} \
             --out "$RUNNER_TEMP/plan"
       - uses: actions/upload-artifact@v7
         with:
