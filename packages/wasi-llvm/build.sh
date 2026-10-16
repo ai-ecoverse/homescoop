@@ -39,15 +39,7 @@ shopt -u nullglob
 # wasi-sdk 24: the toolchain wasi-rustc's CI builds with, so a shared libLLVM
 # and rustc's C++ agree on libc++ and wasi-libc.
 if [[ -z "${WASI_SDK_PATH:-}" ]]; then
-  case "$(uname -s)-$(uname -m)" in
-    Darwin-arm64) sdk=wasi-sdk-24.0-arm64-macos; sdk_sha=aeae999396d5f5caa5ce419f52e83c35869d5fd21d40af80acba2c80f51b0b3a ;;
-    Linux-x86_64) sdk=wasi-sdk-24.0-x86_64-linux; sdk_sha=c6c38aab56e5de88adf6c1ebc9c3ae8da72f88ec2b656fb024eda8d4167a0bc5 ;;
-    *) echo "homescoop: set WASI_SDK_PATH (no wasi-sdk 24 pin for $(uname -sm))" >&2; exit 1 ;;
-  esac
-  homescoop_fetch "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/$sdk.tar.gz" \
-    "$sdk_sha" "$PKG_WORK/$sdk.tar.gz"
-  [[ -d "$PKG_WORK/$sdk" ]] || tar xzf "$PKG_WORK/$sdk.tar.gz" -C "$PKG_WORK"
-  WASI_SDK_PATH="$PKG_WORK/$sdk"
+  eval "$(bash "$ROOT/scripts/install-wasi-sdk.sh" "$PKG_WORK/$(bash "$ROOT/scripts/install-wasi-sdk.sh" --name)")"
 fi
 SDK="$WASI_SDK_PATH"
 "$SDK/bin/clang" --version | head -1
