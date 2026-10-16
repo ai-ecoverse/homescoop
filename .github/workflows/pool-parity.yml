@@ -39,7 +39,7 @@ jobs:
           node scripts/classify-touched-packages.mjs --all > "$RUNNER_TEMP/class.json"
           list=$(node -e '
             const c = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-            const only = (process.env.ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
+            const only = [...new Set((process.env.ONLY || "").split(",").map((s) => s.trim()).filter(Boolean))];
             const off = only.filter((p) => !c.host.includes(p));
             if (off.length) { console.error(`not a host recipe: ${off.join(", ")}`); process.exit(1); }
             console.log(JSON.stringify(only.length ? only : c.pool));
