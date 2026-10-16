@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # renovate: datasource=github-releases depName=WebAssembly/wasi-sdk extractVersion=^wasi-sdk-(?<version>\d+)$
-WASI_SDK_MAJOR="24"
+WASI_SDK_MAJOR="34"
 VERSION="${HOMESCOOP_WASI_SDK_VERSION:-$WASI_SDK_MAJOR.0}"
 
 case "$(uname -s)-$(uname -m)" in
