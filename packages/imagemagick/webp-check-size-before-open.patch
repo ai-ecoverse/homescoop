@@ -1,0 +1,20 @@
+--- a/coders/webp.c
++++ b/coders/webp.c
+@@ -1153,11 +1153,15 @@
+   assert(image->signature == MagickCoreSignature);
+   if (IsEventLogging() != MagickFalse)
+     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
++  /*
++    Refuse what WebP cannot hold before OpenBlob truncates the output file:
++    in place (magick a.webp ... a.webp) that would destroy the input.
++  */
++  if ((image->columns > 16383UL) || (image->rows > 16383UL))
++    ThrowWriterException(ImageError,"WidthOrHeightExceedsLimit");
+   status=OpenBlob(image_info,image,WriteBinaryBlobMode,exception);
+   if (status == MagickFalse)
+     return(status);
+-  if ((image->columns > 16383UL) || (image->rows > 16383UL))
+-    ThrowWriterException(ImageError,"WidthOrHeightExceedsLimit");
+   if (WebPConfigInit(&configure) == 0)
+     ThrowWriterException(ResourceLimitError,"UnableToEncodeImageFile");
+   if (image->quality != UndefinedCompressionQuality)

@@ -1,10 +1,11 @@
 name: imagemagick-heif
 builder: host
-# Shared with packages/imagemagick: build.sh copies its policy-tab.xml, and
-# cert/ re-exports its policy.mjs and mogrify.mjs and uses its cert/lib.
+# Shared with packages/imagemagick: build.sh copies its policy-tab.xml and
+# applies its patches, and cert/ re-exports its specs and uses its cert/lib.
 inputs:
   - packages/imagemagick/policy-tab.xml
   - packages/imagemagick/cert/**
+  - packages/imagemagick/*.patch
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
 version: "7.1.2-34"
 npm: "@ai-ecoverse/wasm-imagemagick-heif"
@@ -62,3 +63,9 @@ about:
     configured with other delegates or built with other flags (a
     .homescoop-build stamp), and checks the delegates outside the skip
     (homescoop#350).
+    7.1.2-34-3: webp-check-size-before-open.patch (homescoop#585). WebP
+    holds at most 16383 px a side, and upstream's writer truncated the
+    output before refusing a wider image, so an in-place write such as
+    magick w.webp -resize 200% w.webp destroyed the input (reachable from
+    plain magick since the 64KP policy of -34-2). The writer now refuses
+    before opening the file. cert/inplace-webp.mjs.

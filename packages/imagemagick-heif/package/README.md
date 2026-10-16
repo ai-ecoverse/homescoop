@@ -41,6 +41,12 @@ Configure XMLs ship under `etc/ImageMagick-7/`.
 WebP lossless (`-define webp:lossless=true`) drops the RGB of fully transparent
 pixels, as libwebp does by default; add `-define webp:exact=true` to keep it.
 
+WebP holds at most 16383 px a side. A wider image is refused (`width or
+height exceeds limit`, rc 1) before the output is opened, so an existing
+`.webp`, the input of an in-place `magick a.webp -resize 200% a.webp`
+included, is left as it was (homescoop#585; until 7.1.2-34-2 it was
+truncated). Resize to at most 16383 px, or write another format.
+
 ## Switching
 
 `@ai-ecoverse/wasm-imagemagick` and `@ai-ecoverse/wasm-imagemagick-heif` are

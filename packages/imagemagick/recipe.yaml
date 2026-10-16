@@ -66,3 +66,9 @@ about:
     (a .homescoop-build stamp), and checks the delegates outside the skip
     (homescoop#350). CXXFLAGS -g (the C++ link of
     utilities/magick) keeps the name section and line tables, as before.
+    7.1.2-34-3: webp-check-size-before-open.patch (homescoop#585). WebP
+    holds at most 16383 px a side, and upstream's writer truncated the
+    output before refusing a wider image, so an in-place write such as
+    magick w.webp -resize 200% w.webp destroyed the input (reachable from
+    plain magick since the 64KP policy of -34-2). The writer now refuses
+    before opening the file. cert/inplace-webp.mjs.

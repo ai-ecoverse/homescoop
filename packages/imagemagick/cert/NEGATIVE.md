@@ -84,3 +84,20 @@ Against the published `@ai-ecoverse/wasm-imagemagick` 7.1.2-34-1 (npm
   ```
   Error: relink.sh did not take libslicc_cred.a from .../override:
   ```
+
+## 7.1.2-34-3: in-place WebP over 16383 px (homescoop#585)
+
+inplace-webp.mjs against the published `@ai-ecoverse/wasm-imagemagick`
+7.1.2-34-2 (npm `latest`), slicc-kernel 1.81.0, `--users enforce`,
+2026-10-16. `magick w.webp -resize 200% w.webp` exits 1, but the input is gone:
+
+```
+browser-cert: FAIL packages/imagemagick/cert/inplace-webp.mjs
+AssertionError [ERR_ASSERTION]: w.webp after the refused write (homescoop#585: truncated)
++ actual - expected
+
++ ''
+```
+
+webp-check-size-before-open.patch moves upstream's 16383 px check in
+WriteWEBPImage before OpenBlob.
