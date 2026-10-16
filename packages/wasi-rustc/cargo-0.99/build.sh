@@ -7,7 +7,7 @@ set -eu
 : "${RUSTC:?}"
 src=$(CDPATH= cd -- "$1" && pwd)
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-builtins=$(find "$WASI_SDK_PATH/lib/clang" -name libclang_rt.builtins-wasm32.a -print -quit)
+builtins=$(find "$WASI_SDK_PATH/lib/clang" \( -path '*/wasm32-unknown-wasip1-threads/libclang_rt.builtins.a' -o -name libclang_rt.builtins-wasm32.a \) -print -quit)
 test -f "$builtins"
 export CC_wasm32_wasip1_threads="$here/wasi-compat/clang"
 export CFLAGS_wasm32_wasip1_threads="--target=wasm32-wasip1-threads --sysroot=$WASI_SDK_PATH/share/wasi-sysroot -pthread"

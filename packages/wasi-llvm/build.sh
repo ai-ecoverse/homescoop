@@ -4,7 +4,7 @@
 # work/wasi-llvm-<version>-wasm32-wasip1-threads.tar.xz.
 #
 # Env:
-#   WASI_SDK_PATH   wasi-sdk to build with (default: fetch wasi-sdk 24 for this host)
+#   WASI_SDK_PATH   wasi-sdk to build with (default: fetch the scripts/install-wasi-sdk.sh pin for this host)
 #   NATIVE_TBLGEN   dir with llvm-tblgen / clang-tblgen / llvm-min-tblgen of this
 #                   LLVM version (default: build them natively from the same source)
 #   JOBS            ninja -j (default: CPUs - 2)
@@ -36,7 +36,7 @@ for p in "$HOMESCOOP_PKG"/patches/*.patch; do
 done
 shopt -u nullglob
 
-# wasi-sdk 24: the toolchain wasi-rustc's CI builds with, so a shared libLLVM
+# The wasi-sdk pinned in scripts/install-wasi-sdk.sh, which wasi-rustc's CI also builds with, so a shared libLLVM
 # and rustc's C++ agree on libc++ and wasi-libc.
 if [[ -z "${WASI_SDK_PATH:-}" ]]; then
   eval "$(bash "$ROOT/scripts/install-wasi-sdk.sh" "$PKG_WORK/$(bash "$ROOT/scripts/install-wasi-sdk.sh" --name)")"
