@@ -1,5 +1,9 @@
 
 
+## 3.14.2-21: python's sqlite3 locks with a .lock directory the CLI doesn't see (-22, homescoop#513)
+
+`locks.mjs` against the published 3.14.2-21 on slicc-kernel 1.100.0 (Node entry, with wasm-sqlite3 3.54.0-3 as the other process; 2026-10-16): FAIL in its sqlite part. -21's sqlite uses SQLITE_WASI's default `unix-dotfile` VFS, i.e. a `.lock` directory, so it never calls `fcntl` locks. While python holds `BEGIN IMMEDIATE`, the CLI's insert goes through, and python's `commit` then fails with `sqlite3.OperationalError: disk I/O error`. k3mw also saw python's row lost when the CLI held the lock. 3.14.2-22 (`-DSQLITE_DEFAULT_UNIX_VFS="unix"`) gets `database is locked` both ways and keeps rows [1, 2, 4]. Its `fcntl.lockf` part passes on -21 already.
+
 ## 3.14.2-20: no multiprocessing, no locks between processes (-21, homescoop#481, #407)
 
 `multiprocessing.mjs` against the published 3.14.2-20 on slicc-kernel 1.100.0 (Node entry, 2026-10-16): FAIL at the Pool, `ModuleNotFoundError: No module named '_multiprocessing'` (CPython's configure marks it n/a on WASI). `locks.mjs`: -20 has `os.lockf` = False, and its `fcntl.lockf` went through a `--wrap=fcntl` no-op stub, so no lock ever reached the kernel.
@@ -143,3 +147,7 @@ script and a subprocess inside the venv, and a chained user sitecustomize.
 3.14.2-18 (published, sha256 5ef04fe2…7c06) on slicc-kernel 1.92.0's Node entry, 2026-10-15: `notices.mjs` fails: its `THIRD-PARTY-NOTICES.md` is the 1083-byte table, and every licence text is missing (`CPython incorporated software`, `OpenSSL Apache-2.0`, `zlib`, `bzip2`, `xz 0BSD`, `SQLite`, `GNU Readline GPL-3.0`, `ncurses`, `libffi`, `wasix-libc musl`, `libc++`, …, `GPL combined work`). `stdlib.mjs` fails on `sqlite3.sqlite_version` 3.53.4 against 3.54.0.
 
 `sigmask.mjs` (wasix-sysroot -28) fails on 3.14.2-18 (sysroot -27, slicc-kernel 1.93.0 Node entry): its first `signal.pthread_sigmask(SIG_BLOCK, {SIGUSR1})` raises `OSError(0, 'Error')`, rc 1.
+
+## 3.14.2-22: engines >= 1.100.0 (homescoop#567)
+
+cert-review of #530's first head (05b81d7e) found that on slicc-kernel 1.99.2, which the old `engines` (>=1.51.0) admitted, two python processes on one database lost an acknowledged row. B's insert returned ok, A's commit got `disk I/O error`, and the table ended `[0, 1]`. The cause is that the unix VFS takes `fcntl` locks, and without `slicc.fcntl_lock` the libc grants them locally. `engines` is now `>=1.100.0`. `locks.mjs` no longer accepts local locks (the `PY_LOCKS_LOCAL=1` branch is gone), so on 1.99.2 it fails at `another process got LOCK_EX while this one held it` instead of passing.
