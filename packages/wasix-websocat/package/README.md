@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasix-websocat`
 
-[websocat](https://github.com/vi/websocat) 4.0.0-alpha3, the WebSocket client and server ("netcat for `ws://`"), built for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel as a WASIX program. **This is an upstream alpha:** websocat v4 has no stable release yet. It's upstream's source, unmodified. The build patches only crate wiring and the WASIX fork of mio; see the recipe.
+[websocat](https://github.com/vi/websocat) 4.0.0-alpha3, the WebSocket client and server ("netcat for `ws://`"), built for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel as a WASIX program. **This is an upstream alpha:** websocat v4 has no stable release yet. It's upstream's source with one WASIX patch (subprocess specifiers fail cleanly; see below). The build also patches crate wiring and the WASIX fork of mio; see the recipe.
 
 ```bash
 pnpm add -g @ai-ecoverse/wasix-websocat
@@ -21,5 +21,10 @@ websocat v4 opens its own TCP connections and does its own TLS, with rustls and 
   - an address fails with `Network unreachable`.
 - **No TLS server:** websocat v4 can't serve `wss://`.
 - **What the cert covers through an uplink:** `ws://` echo, and `wss://` with `-k`. That's the TLS handshake and framing against a throwaway CA. Chain verification uses the embedded webpki roots, and is covered by slicc-bios end to end.
+
+## Limits on WASIX
+
+- **No subprocesses:** `exec:`, `cmd:` and `sh-c:` are refused at startup with `exec:, cmd: and sh-c: are not supported on WASIX` and a non-zero exit, because this target can't spawn processes (homescoop#689). Scenario scripts (`-x`) that spawn processes aren't supported either.
+- **A listener that can't bind** (for example, the port is in use) logs the error but exits 0. That's upstream v4's behaviour (homescoop#696).
 
 websocat 4 is upstream's current line but still a pre-release: options and specifiers differ from websocat 1.x (see `websocat --help`; for example, there's no `-1`).

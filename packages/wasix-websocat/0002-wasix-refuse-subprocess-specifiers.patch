@@ -1,0 +1,14 @@
+diff -ruN a/src/scenario_planner/fromstr.rs b/src/scenario_planner/fromstr.rs
+--- a/src/scenario_planner/fromstr.rs	2025-12-27 02:36:59.000000000 +0100
++++ b/src/scenario_planner/fromstr.rs	2026-10-16 12:58:14.433015532 +0200
+@@ -228,6 +228,10 @@
+             Ok(ParseStrChunkResult::Endpoint(Endpoint::UdpServerFdNamed(
+                 s.to_owned(),
+             )))
++        } else if cfg!(all(target_os = "wasi", target_vendor = "wasmer"))
++            && (x.strip_prefix("exec:").is_some() || x.strip_prefix_many(&["cmd:", "sh-c:"]).is_some())
++        {
++            anyhow::bail!("exec:, cmd: and sh-c: are not supported on WASIX: this build cannot spawn subprocesses")
+         } else if let Some(rest) = x.strip_prefix("exec:") {
+             Ok(ParseStrChunkResult::Endpoint(Endpoint::Exec(
+                 rest.to_owned(),
