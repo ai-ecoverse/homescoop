@@ -62,3 +62,21 @@ does), `cert/checklist.mjs` on slicc-kernel 1.23.0's Node entry → FAIL
 The checklist asserts exit statuses, file counts, the rules and files
 reported, exact formatter output (files and stdin) and the refusal
 messages.
+
+## THIRD-PARTY-NOTICES.md names the wrong wasi-sdk (2.5.15-3, homescoop#472)
+
+`cert/notices.mjs` against the published `@ai-ecoverse/wasi-biome@2.5.15-3` on
+slicc-kernel 1.23.0:
+
+```text
+browser-cert: FAIL packages/wasi-biome/cert/notices.mjs
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++   "## wasi-libc (wasi-sdk-31; Rust's self-contained wasm32-wasip1-threads libc)"
+-   "## wasi-libc (wasi-sdk-33; Rust's self-contained wasm32-wasip1-threads libc)"
+```
+
+Rust 1.98.1 builds its self-contained wasm32-wasip1-threads libc with
+`WASI_SDK_PATH=/tmp/wasi-sdk-33.0-x86_64-linux`. The four licence files are
+the same at both tags, so only the heading and the URLs were wrong.
+`scripts/check-rust-wasi-sdk.mjs` now checks the table against that
+Dockerfile on every build.
