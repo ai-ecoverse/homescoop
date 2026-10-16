@@ -28,7 +28,8 @@ export async function verifyPublished({ name, version, integrity }, { fetchVersi
 
 async function fetchVersion(name, version) {
   try {
-    const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`);
+    // A hung request counts as one more transient answer, not a hung job.
+    const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`, { signal: AbortSignal.timeout(30000) });
     if (res.status !== 200) return { status: res.status };
     return { status: 200, integrity: (await res.json()).dist?.integrity };
   } catch (err) {
@@ -37,7 +38,10 @@ async function fetchVersion(name, version) {
 }
 
 function parseArgs(argv) {
-  const args = { tgz: argv[0], timeout: 600, interval: 15 };
+  // --timeout bounds only the wait for the version to become visible (a new,
+  // large package took about 18 min, homescoop#686); a visible version with
+  // another integrity fails at once.
+  const args = { tgz: argv[0], timeout: 1800, interval: 15 };
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--npm') args.npm = argv[++i];
