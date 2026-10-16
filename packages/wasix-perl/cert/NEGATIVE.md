@@ -1,3 +1,9 @@
+# Negative proof (wasix-perl 5.42.0-17)
+
+**Date:** 2026-10-16
+
+5.42.0-17 is a rebuild on wasix-sysroot 2025.9.30-32 (the install-wasixcc pin). `cert/k108/inherit.mjs` against the published `@ai-ecoverse/wasix-perl@5.42.0-16`, with wasm-bash and wasm-coreutils, on slicc-kernel 1.108.1's Node entry: FAIL at the first case. `under trap '' PIPE USR2, %SIG shows the inherited ignores: undef|undef|undef`. -16's libc (-31) starts its sigaction table at SIG_DFL whatever the process inherited, so perl's `%SIG` can't see a `nohup`/`trap ''` ignore. -32 reads `slicc.sigaction_inherited`, and the case expects `IGNORE|IGNORE|undef`.
+
 # Negative proof (wasix-perl 5.42.0-8)
 
 **Date:** 2026-10-10
