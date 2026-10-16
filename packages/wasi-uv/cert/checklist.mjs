@@ -29,7 +29,14 @@ const DISTS = [
 export default async function (ctx) {
   const { run, write, assert } = ctx;
   const env = { UV_CONFIG_FILE: '/home/uv.toml' };
-  const sh = (script, cwd = '/home') => run(['bash', '-c', script], { cwd, env });
+  // One uv command per call: each page call has to answer within the
+  // harness's 120 s, and chains of uv commands came close to it on a loaded
+  // runner (homescoop#707). The step is logged first, so a timeout's
+  // "crash at ?" follows the command that hung.
+  const sh = (script, cwd = '/home') => {
+    console.log(`wasi-uv: ${cwd}$ ${script}`);
+    return run(['bash', '-c', script], { cwd, env });
+  };
   const ok = async (script, cwd) => {
     const r = await sh(script, cwd);
     assert.equal(r.status, 0, `${script}: rc=${r.status}\nstdout=${r.stdout}\nstderr=${r.stderr}`);
@@ -60,13 +67,13 @@ export default async function (ctx) {
   assert.match(find.stdout, /cpython-3\.14\.\d+-wasi-wasm32-none/);
 
   // homescoop#103's "done when".
-  const done = await ok(
-    "mkdir -p /home/u && cd /home/u && uv venv && uv pip install requests && " +
-      "uv run python -c 'import requests, sys; print(requests.__version__, sys.prefix)'",
-  );
+  await ok('mkdir -p /home/u');
+  const venv = await ok('uv venv', '/home/u');
+  assert.match(venv.stderr, /Creating virtual environment at: \.venv/);
+  const req = await ok('uv pip install requests', '/home/u');
+  assert.match(req.stderr, /\+ requests==2\.34\.2/);
+  const done = await ok("uv run python -c 'import requests, sys; print(requests.__version__, sys.prefix)'", '/home/u');
   assert.equal(done.stdout.trim().split('\n').pop(), '2.34.2 /home/u/.venv');
-  assert.match(done.stderr, /Creating virtual environment at: \.venv/);
-  assert.match(done.stderr, /\+ requests==2\.34\.2/);
   const cfg = await ok('cat /home/u/.venv/pyvenv.cfg && ls -l /home/u/.venv/bin/python');
   assert.match(cfg.stdout, /^include-system-site-packages = false$/m);
   assert.match(cfg.stdout, /^uv = 0\.13\.1$/m);
@@ -84,12 +91,14 @@ export default async function (ctx) {
   // An sdist: a PEP 517 build in an isolated environment (setuptools),
   // its hooks run by wasix-python over pipes; and bytecode compilation
   // (a python worker fed over stdin/stdout).
-  const sdist = await ok('uv pip install --no-binary six six && uv pip install --reinstall --compile-bytecode idna', '/home/u');
+  const sdist = await ok('uv pip install --no-binary six six', '/home/u');
   assert.match(sdist.stderr, /Built six==1\.17\.0/);
-  assert.match(sdist.stderr, /Bytecode compiled \d+ files/);
-  const six = await ok("uv run python -c 'import six; print(six.__version__)' && ls .venv/lib/python3.14/site-packages/idna/__pycache__", '/home/u');
+  const pyc = await ok('uv pip install --reinstall --compile-bytecode idna', '/home/u');
+  assert.match(pyc.stderr, /Bytecode compiled \d+ files/);
+  const six = await ok("uv run python -c 'import six; print(six.__version__)'", '/home/u');
   assert.match(six.stdout, /^1\.17\.0$/m);
-  assert.match(six.stdout, /\.pyc$/m);
+  const cache = await ok('ls .venv/lib/python3.14/site-packages/idna/__pycache__', '/home/u');
+  assert.match(cache.stdout, /\.pyc$/m);
 
   // A project: init, add (pyproject + uv.lock + sync + the project built by
   // uv_build), run its console script and a dependency's, lock --check,
@@ -98,32 +107,29 @@ export default async function (ctx) {
   await ok('uv add idna charset-normalizer', '/home/proj');
   const toml = await ok('cat pyproject.toml && test -s uv.lock', '/home/proj');
   assert.match(toml.stdout, /"idna>=3\.20"/);
-  const runs = await ok(
-    "uv run proj && uv run normalizer --version && uv run python -c 'import idna; print(idna.__version__)'",
-    '/home/proj',
-  );
-  assert.match(runs.stdout, /^Hello from proj!$/m);
-  assert.match(runs.stdout, /Charset-Normalizer 3\.5\.2/);
-  assert.match(runs.stdout, /^3\.20$/m);
+  assert.match((await ok('uv run proj', '/home/proj')).stdout, /^Hello from proj!$/m);
+  assert.match((await ok('uv run normalizer --version', '/home/proj')).stdout, /Charset-Normalizer 3\.5\.2/);
+  assert.match((await ok("uv run python -c 'import idna; print(idna.__version__)'", '/home/proj')).stdout, /^3\.20$/m);
   const scripts = await ok('ls -l .venv/bin/proj .venv/bin/normalizer', '/home/proj');
   assert.match(scripts.stdout, /^-rwx/m, 'console scripts are executable (slicc_fs.fd_chmod)');
-  await ok('uv lock --check && uv tree', '/home/proj');
+  await ok('uv lock --check', '/home/proj');
+  await ok('uv tree', '/home/proj');
   await ok('uv remove charset-normalizer', '/home/proj');
-  const synced = await ok("rm -rf .venv && uv sync && uv run python -c 'import idna'", '/home/proj');
+  await ok('rm -rf .venv', '/home/proj');
+  const synced = await ok('uv sync', '/home/proj');
   assert.match(synced.stderr, /\+ idna==3\.20/);
+  await ok("uv run python -c 'import idna'", '/home/proj');
   const removed = await sh("uv run python -c 'import charset_normalizer'", '/home/proj');
   assert.notEqual(removed.status, 0, 'uv remove left charset-normalizer');
 
   // uv tool: install links the tool's executable into ~/.local/bin (the
   // unix path, a symlink), which runs; uninstall removes it.
-  const tool = await ok(
-    'uv tool install charset-normalizer && ls -l "$HOME/.local/bin" && "$HOME/.local/bin/normalizer" --version && uv tool list',
-    '/home',
-  );
-  assert.match(tool.stdout, /normalizer -> .*\/tools\/charset-normalizer\/bin\/normalizer$/m);
-  assert.match(tool.stdout, /Charset-Normalizer 3\.5\.2/);
-  assert.match(tool.stdout, /^charset-normalizer v3\.5\.2$/m);
-  await ok('uv tool uninstall charset-normalizer && test ! -e "$HOME/.local/bin/normalizer"', '/home');
+  await ok('uv tool install charset-normalizer');
+  assert.match((await ok('ls -l "$HOME/.local/bin"')).stdout, /normalizer -> .*\/tools\/charset-normalizer\/bin\/normalizer$/m);
+  assert.match((await ok('"$HOME/.local/bin/normalizer" --version')).stdout, /Charset-Normalizer 3\.5\.2/);
+  assert.match((await ok('uv tool list')).stdout, /^charset-normalizer v3\.5\.2$/m);
+  await ok('uv tool uninstall charset-normalizer');
+  await ok('test ! -e "$HOME/.local/bin/normalizer"');
 
   // A version the links do not have: uv's own error, not a crash.
   const missing = await sh('uv pip install idna==0.1', '/home/u');
