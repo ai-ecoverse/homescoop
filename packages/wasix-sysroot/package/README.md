@@ -41,6 +41,26 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-31:
+
+- **AF_UNIX addresses.** `getsockname`, `getpeername`, `accept`, `recvfrom`
+  and `recvmsg` return the socket's `sockaddr_un`: `AF_UNIX` and the path,
+  length `offsetof(sun_path) + strlen + 1`, or an unnamed address of
+  `sizeof(sa_family_t)`. Up to -30 the family came back 0 and the path empty.
+  `bind`, `connect`, `sendto` and `sendmsg` take `sizeof(struct sockaddr_un)`
+  as the length, as most C programs pass it. Up to -30 that failed with
+  -1 and errno -1 ("Success"); a bad address now gives EINVAL or
+  EAFNOSUPPORT.
+- **Hangup on events-0 pollfds.** A `poll`/`ppoll` entry with no read/write
+  interest is watched for hangup. A pipe or socket whose peer closed gives
+  `POLLHUP`, and the write end of a pipe whose reader is gone gives `POLLERR`,
+  as on Linux. Up to -30 such an entry never reported anything.
+- **More named semaphores.** The libc no longer limits a process to 256 named
+  semaphores. slicc-kernel's own limit goes up with slicc-kernel#770.
+- **Known limit:** `epoll_pwait`'s mask swap isn't atomic yet. The kernel's
+  masked epoll wait comes with slicc-kernel#771, and until then the libc swaps
+  the mask around the wait.
+
 Since 2025.9.30-30 named semaphores work between processes. `sem_open`,
 `sem_close`, `sem_unlink`, `sem_wait`, `sem_trywait`, `sem_timedwait`,
 `sem_post` and `sem_getvalue` on a named semaphore go to slicc-kernel

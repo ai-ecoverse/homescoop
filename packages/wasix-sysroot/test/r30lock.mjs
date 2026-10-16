@@ -7,8 +7,8 @@ const KERNEL = [
   'child setlk other range: 0',
   'child getlk: 0 type=1 start=0 len=5 holder=parent',
   'child lockf test: -1 Permission denied',
-  'parent unlock: 0',
   'child setlkw: 0',
+  'parent unlock: 0',
 ];
 const LOCAL = [
   'child setlk wr: 0',

@@ -41,9 +41,10 @@ int main(void) {
     _exit(0);
   }
   usleep(500000);
-  printf("parent unlock: %s\n", res(lk(fd, F_SETLK, F_UNLCK, 0, 5)));
+  const char *unlocked = res(lk(fd, F_SETLK, F_UNLCK, 0, 5));
   int st = 0;
   waitpid(p, &st, 0);
+  printf("parent unlock: %s\n", unlocked);
   printf("child exit %d\n", WIFEXITED(st) ? WEXITSTATUS(st) : -1);
   printf("lockf tlock: %s\n", res(lockf(fd, F_TLOCK, 0)));
   printf("lockf ulock: %s\n", res(lockf(fd, F_ULOCK, 0)));

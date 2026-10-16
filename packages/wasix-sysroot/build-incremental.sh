@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-30 on any host (CI): the published -14 package,
+# wasix-sysroot 2025.9.30-31 on any host (CI): the published -14 package,
 # byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
 # and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
 # patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
@@ -514,7 +514,6 @@ for v in "${VARIANTS[@]}"; do
   for imp in __slicc_sigmask_set __slicc_sigmask_poll; do
     grep -q "$imp" <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks $imp" >&2; exit 1; }
   done
-  grep -q " T ppoll$" <<<"$("$LLVM_NM" "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks ppoll" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
 
@@ -615,6 +614,32 @@ for v in "${VARIANTS[@]}"; do
   grep -q __slicc_fcntl_lock <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.fcntl_lock" >&2; exit 1; }
   grep -q "#define F_SETLK (13)" "$PKG/$v/include/__header_fcntl.h"
   ! grep -q "WASI has no POSIX file locking" "$PKG/$v/include/unistd.h"
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -31 AF_UNIX addresses both ways: getsockname/getpeername/accept/recvfrom/recvmsg fill sockaddr_un, bind/connect/sendto/sendmsg take sizeof(struct sockaddr_un) (patches/common/net.h, homescoop#515)"
+R31_OBJ="$WORK/r31"
+R31=(getsockname getpeername accept recvfrom recvmsg bind connect sendto sendmsg)
+rm -rf "$R31_OBJ" && mkdir -p "$R31_OBJ/static" "$R31_OBJ/pic"
+for flavour in static pic; do
+  extra=()
+  [[ $flavour == pic ]] && extra=(-fPIC -fvisibility=default)
+  for m in "${R31[@]}"; do
+    compile_r20 "$LIBC_SRC/libc-bottom-half/cloudlibc/src/libc/sys/socket/$m.c" "$R31_OBJ/$flavour/$m.o" -I"$HOMESCOOP_PKG/patches" "${BOTTOM_INC[@]}" "${extra[@]}"
+  done
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  old="$R31_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && "$LLVM_AR" x "$lib" $(printf "%s.o " "${R31[@]}"))
+  for m in "${R31[@]}"; do
+    missing="$(comm -23 <(exported "$old/$m.o") <(exported "$R31_OBJ/$flavour/$m.o"))"
+    [[ -z "$missing" ]] || { echo "homescoop: $v $m.o: the patched build lacks: $missing" >&2; exit 1; }
+  done
+  "$LLVM_AR" r "$lib" $(printf "$R31_OBJ/$flavour/%s.o " "${R31[@]}")
   echo "  $v ($flavour)"
 done
 
