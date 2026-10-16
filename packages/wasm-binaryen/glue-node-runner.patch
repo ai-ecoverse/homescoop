@@ -1,0 +1,111 @@
+wasm-binaryen glue (homescoop#276): slicc-emscripten's appended Node-host
+runner (sliccNodeMain) ran main with process.argv as soon as the runtime was
+up whenever `process` existed, which slicc-kernel's Node process worker
+exposed until 1.93.0: main ran with no arguments, exited the runtime, and the
+kernel's own callMain trapped. The kernel sets noInitialRun; the runner now
+stays out of a host that does. The 8 tool glues.
+
+--- a/package/bin/wasm-as
++++ b/package/bin/wasm-as
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();
+--- a/package/bin/wasm-ctor-eval
++++ b/package/bin/wasm-ctor-eval
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();
+--- a/package/bin/wasm-dis
++++ b/package/bin/wasm-dis
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();
+--- a/package/bin/wasm-emscripten-finalize
++++ b/package/bin/wasm-emscripten-finalize
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();
+--- a/package/bin/wasm-metadce
++++ b/package/bin/wasm-metadce
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();
+--- a/package/bin/wasm-opt
++++ b/package/bin/wasm-opt
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();
+--- a/package/bin/wasm-split
++++ b/package/bin/wasm-split
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();
+--- a/package/bin/wasm2js
++++ b/package/bin/wasm2js
+@@ -3,7 +3,9 @@
+ // and then calls Module.callMain itself.
+ // SLICC_PRELOAD and SLICC_EXPORT are comma-separated virt=host pairs so a
+ // Node run can move files between the host disk and the in-wasm filesystem.
+-if (typeof process !== 'undefined' && process.versions && process.versions.node) {
++// A host that calls main itself sets noInitialRun, as slicc-kernel's Node
++// process worker does; then this runner stays out of it (homescoop#276).
++if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {
+   var sliccPrevInit = Module['onRuntimeInitialized'];
+   Module['onRuntimeInitialized'] = function sliccNodeMain() {
+     if (sliccPrevInit) sliccPrevInit();

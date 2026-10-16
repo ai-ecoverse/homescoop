@@ -8,6 +8,14 @@ source:
   # Prebuilt objects from slicc-emscripten/build-wasm-binaryen.sh; build.sh relinks.
   url: "https://github.com/WebAssembly/binaryen"
   sha256: "skip"
+# 132.0.0-2 is packaging-only: 132.0.0-1's bytes with glue-node-runner.patch
+# (the glue's Node-host runner stays out of slicc-kernel's Node process
+# worker, homescoop#276). build.sh applies the same at the next real build.
+# Drop repack: then.
+repack:
+  from: "132.0.0-1"
+  patches:
+    - glue-node-runner.patch
 dependencies:
   build: []
   host: []

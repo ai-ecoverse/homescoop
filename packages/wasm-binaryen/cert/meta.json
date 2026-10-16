@@ -1,0 +1,16 @@
+{
+  "harness": "host-node",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.100.4",
+  "host": "node packages/wasm-binaryen/cert/node-entry.mjs --tarball <package.tgz> [--kernel <spec>]: the tarball installed at /node_modules/@ai-ecoverse/wasm-binaryen in slicc-kernel's Node entry, users enforce, the glue as shipped; every tool's --version, and wasm-as / wasm-opt -O2 / wasm-opt --asyncify / wasm-dis on a module that imports wasix_32v1.proc_fork, as root and as kernel user cone. ladder-pr runs every ci command after host-build.",
+  "ci": [
+    "node packages/wasm-binaryen/cert/node-entry.mjs --tarball .homescoop-out/package.tgz --kernel @ai-ecoverse/slicc-kernel@1.92.0",
+    "node packages/wasm-binaryen/cert/node-entry.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "patches": {
+    "glue-node-runner.patch": "the 8 tools' appended Node-host runner (sliccNodeMain) runs only when the host doesn't set noInitialRun (homescoop#276): node-entry.mjs requires the guard on every glue and runs the tools through the shipped glue on slicc-kernel 1.92.0 (which still exposes process to the worker) and on the cert kernel"
+  },
+  "checklist": [
+    "132.0.0-2 (packaging-only: -1's bytes with glue-node-runner.patch, homescoop#276): every glue of the 8 tools carries the noInitialRun-guarded runner; on slicc-kernel 1.92.0 and 1.100.4 (Node entry, users enforce) wasm-opt, wasm-metadce, wasm-emscripten-finalize, wasm-ctor-eval, wasm-split, wasm2js, wasm-as and wasm-dis --version print 'version 132'; as root and as cone, wasm-as builds a module importing wasix_32v1.proc_fork, wasm-opt -O2 leaves it unasyncified, wasm-opt --asyncify --pass-arg=asyncify-imports@wasix_32v1.proc_fork (as wasm-clang's cc runs it) exports asyncify_start_unwind / asyncify_stop_rewind and keeps the import, and wasm-dis prints both",
+    "132.0.0-1 on 1.92.0: the glue check fails; with the glue as shipped every tool exits at once on the Node entry (NEGATIVE.md)"
+  ]
+}

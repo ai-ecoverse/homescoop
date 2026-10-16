@@ -112,6 +112,22 @@ relink_one() {
     $(homescoop_em_cli_ldflags) \
     -o "$out_dir/$name.js"
   mv "$out_dir/$name.js" "$out_dir/$name"
+  # slicc-emscripten's appended Node-host runner must stay out of a host that
+  # calls main itself (noInitialRun: slicc-kernel's Node process worker;
+  # homescoop#276). The 132.0.0-2 repack applies glue-node-runner.patch.
+  python3 - "$out_dir/$name" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="latin1").read()
+old = "// Node run can move files between the host disk and the in-wasm filesystem.\nif (typeof process !== 'undefined' && process.versions && process.versions.node) {\n"
+new = ("// Node run can move files between the host disk and the in-wasm filesystem.\n"
+       "// A host that calls main itself sets noInitialRun, as slicc-kernel's Node\n"
+       "// process worker does; then this runner stays out of it (homescoop#276).\n"
+       "if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {\n")
+if s.count(old) != 1 and new not in s:
+    sys.exit(f"homescoop: {p}: the Node-host runner's guard is not the expected one (homescoop#276)")
+open(p, "w", encoding="latin1").write(s.replace(old, new))
+PY
   local n
   n=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).read_text().count("sliccKernel"))' "$out_dir/$name")
   echo "  $name sliccKernel refs: $n"

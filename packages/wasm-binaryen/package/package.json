@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-binaryen",
-  "version": "132.0.0-1",
+  "version": "132.0.0-2",
   "description": "Binaryen 132 wasm tools for slicc (wasm-opt and friends)",
   "license": "Apache-2.0",
   "repository": {
