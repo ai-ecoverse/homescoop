@@ -213,7 +213,9 @@ for each component, a `## ` heading naming it, the license named in that
 heading or on a `License: ...` line of the section (an SPDX id of the declared
 expression: one alternative of an `OR`, every part of an `AND`), and the
 license text itself (a phrase of it: `"text"`, or the built-in phrase for each
-SPDX id in `LICENSE_PHRASES`, with the same `OR`/`AND` rule). An id with no
+SPDX id in `LICENSE_PHRASES`, taken from the license body so a one-line
+"Licensed under ..." reference does not pass; same `OR`/`AND` rule, `AND`
+binding tighter, parentheses grouping). An id with no
 built-in phrase (a `LicenseRef-*`) needs `"text"`. `homescoop_notice`
 ([`build-common.sh`](../scripts/build-common.sh)) writes that shape:
 `homescoop_notice "FreeType 2.13.3 (FreeType License, FTL)" <LICENSE.TXT> - <FTL.TXT> -`.
