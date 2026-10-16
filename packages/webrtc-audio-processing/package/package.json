@@ -1,0 +1,33 @@
+{
+  "name": "@ai-ecoverse/wasm-webrtc-audio-processing",
+  "version": "2.1.0-1",
+  "description": "WebRTC AEC3 echo cancellation from webrtc-audio-processing 2.1, compiled to wasm, with a synchronous JS wrapper for AudioWorklet and Node",
+  "license": "BSD-3-Clause AND Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./node": {
+      "types": "./node.d.ts",
+      "default": "./node.js"
+    },
+    "./webrtc-audio-processing.wasm": "./dist/webrtc-audio-processing.wasm",
+    "./package.json": "./package.json"
+  },
+  "types": "./index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/webrtc-audio-processing/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/webrtc-audio-processing",
+  "keywords": ["wasm", "emscripten", "homescoop", "webrtc", "aec3", "echo-cancellation", "audioworklet"],
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "index.js", "index.d.ts", "node.js", "node.d.ts", "dist/webrtc-audio-processing.wasm"],
+  "publishConfig": { "access": "public" },
+  "homescoop": {
+    "recipe": "webrtc-audio-processing",
+    "upstream": "2.1"
+  }
+}
