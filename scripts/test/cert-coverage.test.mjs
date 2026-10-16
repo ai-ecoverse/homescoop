@@ -61,7 +61,6 @@ const NO_USERS_ENFORCE = [
   'patch', // #819
   'poppler', // #819
   'procps', // #819
-  'sed', // #819
   'sqlite3', // #819
   'wasi-biome', // #819
   'wasi-dig', // #819
