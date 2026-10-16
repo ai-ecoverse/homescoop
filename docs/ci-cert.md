@@ -523,6 +523,8 @@ must report a regression, in a spec and in the sweep, for each of them: the
 Emscripten builds without `slicc_sleep_ms` that exit 70 there
 (slicc-kernel#483, fixed by #496 in 1.81.0).
 
+The `@ai-ecoverse/slicc-kernel` pin must be a certified kernel, and `ci` enforces it: `ladder-pr`'s `exact-pins` job runs [`check-cert-kernel.mjs`](../scripts/check-cert-kernel.mjs), which fails unless the pin is exact, its slicc-kernel release `v<pin>` has a `certified @ai-ecoverse/slicc-kernel@<pin> sha256=<hex>` line, and the registry tarball re-hashes to that sha256.
+
 ## Cert review: `cert-review.yml`
 
 Claude reviews every package a same-repo PR builds, after `ladder-pr` finishes, and leaves a verdict.
