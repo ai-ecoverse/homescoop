@@ -116,8 +116,9 @@ int main(int argc, char **argv) {
   ts.tv_sec = 0;
   clock_gettime(CLOCK_REALTIME, &ts);
   ts.tv_sec += 10;
-  printf("exec handoff: %s\n", res(sem_timedwait(e, &ts)));
+  const char *handoff = res(sem_timedwait(e, &ts));
   waitpid(p, &st, 0);
+  printf("exec handoff: %s\n", handoff);
   printf("exec child exit %d\n", WIFEXITED(st) ? WEXITSTATUS(st) : -1);
 
   printf("unlink: %s\n", res(sem_unlink("/r30a")));
