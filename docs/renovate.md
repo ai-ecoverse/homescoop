@@ -76,9 +76,10 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | bash | savannah `bash.git` | tags `bash-X.Y` |
 | cmake | `Kitware/CMake` | github-releases |
 | coreutils | savannah `coreutils.git` | |
-| curl | `curl/curl` | tags `curl-X_Y_Z` → `X.Y.Z` |
+| binutils | `mirrors.kernel.org/gnu/binutils/` | `custom.binutils` (html listing): tags are `binutils-2_47` |
+| curl | `curl/curl` | **dead**: tags are `curl-X_Y_Z`, which `extractVersion` can't read; moves to a `curl.se/download/` listing once curl builds on main again |
 | diffutils | savannah `diffutils.git` | |
-| freetype | freedesktop `freetype.git` | tags `VER-X-Y-Z` → `X.Y.Z` |
+| freetype | `download.savannah.gnu.org/releases/freetype/` | `custom.freetype` (html listing): tags are `VER-X-Y-Z` |
 | gawk | savannah `gawk.git` | |
 | git | `git/git` | github-releases |
 | gmake | savannah `make.git` | |
@@ -101,6 +102,23 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | tls-engine | `Mbed-TLS/mbedtls` | tags `mbedtls-X.Y.Z` |
 | xxd | `vim/vim` | tags `vX.Y.Z` (vim patch level) |
 | zlib | `madler/zlib` | github-releases |
+
+**Tags Renovate can't read.** `extractVersion` keeps only its `version`
+group, so it can't turn `binutils-2_47`, `curl-8_22_0` or `VER-2-13-3` into
+a version: a `major`/`minor`/`patch` pattern there drops every release, and
+the pin never moves. Those recipes read the upstream's release directory
+instead, through a `customDatasources` entry in `renovate.json` with
+`"format": "html"` (each link is a candidate) and an `extractVersion` on the
+tarball's file name:
+
+```yaml
+# renovate: datasource=custom.binutils depName=binutils extractVersion=^binutils-(?<version>\d+\.\d+(?:\.\d+)?)\.tar\.xz$
+version: "2.47"
+```
+
+`scripts/test/renovate-pins.test.mjs` checks every recipe's comment against
+the manager's regex: the `version:` it captures, a `version` group in each
+`extractVersion`, and a `customDatasources` entry for each `custom.*`.
 
 Intentionally untracked: `ffmpeg` (retired), `zip` (Info-ZIP 3.0 frozen),
 `magick-native` (removed — ABI mismatch with `@imagemagick/magick-wasm`;
