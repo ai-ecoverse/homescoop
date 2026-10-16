@@ -361,7 +361,7 @@ SRCDIR="$B/Python-$VER"
 echo "== wasix-python: CPython $VER source + patches"
 rm -rf "$SRCDIR" && mkdir -p "$SRCDIR"
 tar xzf "$PY_TGZ" -C "$SRCDIR" --strip-components=1
-for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip cpython-multiprocessing-wasix cpython-multiprocessing-util-wasix cpython-multiprocessing-noshare-wasix cpython-multiprocessing-unix-listener-wasix cpython-thread-native-id-wasix; do
+for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip cpython-multiprocessing-wasix cpython-multiprocessing-util-wasix cpython-multiprocessing-noshare-wasix cpython-multiprocessing-unix-listener-wasix cpython-thread-native-id-wasix cpython-fork-hint-wasix; do
   patch -d "$SRCDIR" -p1 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
   echo "  applied $p.patch"
 done
@@ -375,19 +375,24 @@ printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words
   ac_cv_func_fork=no ac_cv_func_vfork=no \
   ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no \
   ac_cv_working_tzset=yes >"$B/config.site"
-rm -rf "$CROSS" && mkdir -p "$CROSS"
-(
-  cd "$CROSS"
-  CONFIG_SITE="$B/config.site" ../../configure \
-    --host=wasm32-unknown-wasix --build="$(sh ../../config.guess)" \
-    --prefix="$PREFIX_PY" --with-build-python="$HOSTPY" \
-    --disable-shared --with-ensurepip=no --disable-test-modules \
-    --enable-wasm-pthreads --with-pkg-config=yes --with-system-ffi \
-    CC=wasixcc AR=wasixar RANLIB=wasixranlib \
-    CFLAGS="$PY_CFLAGS" LDFLAGS="$PY_LDFLAGS" \
-    LIBS="$STUBS/libpython-wasix-stubs.a$WRAP" \
-    >"$B/configure.log" 2>&1
-) || { tail -80 "$B/configure.log" >&2; exit 1; }
+configure_python() {
+  local dir=$1 site=$2 prefix=$3
+  rm -rf "$dir" && mkdir -p "$dir"
+  (
+    cd "$dir"
+    CONFIG_SITE="$site" ../../configure \
+      --host=wasm32-unknown-wasix --build="$(sh ../../config.guess)" \
+      --prefix="$prefix" --with-build-python="$HOSTPY" \
+      --disable-shared --with-ensurepip=no --disable-test-modules \
+      --enable-wasm-pthreads --with-pkg-config=yes --with-system-ffi \
+      CC=wasixcc AR=wasixar RANLIB=wasixranlib \
+      CFLAGS="$PY_CFLAGS" LDFLAGS="$PY_LDFLAGS" \
+      LIBS="$STUBS/libpython-wasix-stubs.a$WRAP" \
+      >"$dir/configure.log" 2>&1
+  ) || { tail -80 "$dir/configure.log" >&2; exit 1; }
+}
+configure_python "$CROSS" "$B/config.site" "$PREFIX_PY"
+cp "$CROSS/configure.log" "$B/configure.log"
 grep -E '^checking for stdlib extension module' "$B/configure.log" | sed 's/^checking for stdlib extension module /  module /' || true
 grep -q '^SOABI=[[:space:]]*cpython-314-wasm32-wasix$' "$CROSS/Makefile" \
   || { grep '^SOABI\|^MULTIARCH' "$CROSS/Makefile" >&2; echo "homescoop wasix-python: SOABI is not cpython-314-wasm32-wasix" >&2; exit 1; }
@@ -420,12 +425,28 @@ FEATS=(--enable-threads --enable-bulk-memory --enable-mutable-globals --enable-s
 "$WASM_OPT" -O3 --strip-debug --strip-producers "${FEATS[@]}" "$B/python-async.wasm" -o "$B/python.wasm"
 node "$PKG/drop-exports.mjs" "$B/python.wasm" fork _Fork _fork_internal __vfork_internal __wasi_proc_fork __wasi_proc_fork_env
 
+
+echo "== wasix-python: the fork build (HAVE_FORK, full asyncify; PYTHON_FORK=true, homescoop#357)"
+CROSS_FORK="$B/Python-$VER/cross-build/wasm32-wasix-fork"
+sed '/^ac_cv_func_fork=no$/d' "$B/config.site" >"$B/config-fork.site"
+configure_python "$CROSS_FORK" "$B/config-fork.site" "$B/prefix-fork"
+grep -q '^#define HAVE_FORK 1$' "$CROSS_FORK/pyconfig.h" || { echo "homescoop wasix-python: the fork build has no HAVE_FORK" >&2; exit 1; }
+! grep -q '^#define HAVE_FORK 1$' "$CROSS/pyconfig.h" || { echo "homescoop wasix-python: the default build has HAVE_FORK" >&2; exit 1; }
+make -C "$CROSS_FORK" -j"$JOBS" all >"$B/make-fork.log" 2>&1 || { tail -80 "$B/make-fork.log" >&2; exit 1; }
+test -f "$CROSS_FORK/python.wasm"
+"$WASM_OPT" --asyncify -O3 \
+  --pass-arg=asyncify-imports@wasix_32v1.proc_fork,wasix_32v1.stack_checkpoint,wasix_32v1.stack_restore \
+  "${FEATS[@]}" "$CROSS_FORK/python.wasm" -o "$B/python-fork-async.wasm"
+"$WASM_OPT" -O3 --strip-debug --strip-producers "${FEATS[@]}" "$B/python-fork-async.wasm" -o "$B/python-fork.wasm"
+node "$PKG/drop-exports.mjs" "$B/python-fork.wasm" fork _Fork _fork_internal __vfork_internal __wasi_proc_fork __wasi_proc_fork_env
+
 # --- stage ---------------------------------------------------------------------
 echo "== wasix-python: stage into package/"
 rm -rf "$DEST/bin" "$DEST/lib" "$DEST/include"
 mkdir -p "$DEST/bin" "$DEST/lib"
 cp "$B/python.wasm" "$DEST/bin/python.wasm"
-chmod 755 "$DEST/bin/python.wasm"
+cp "$B/python-fork.wasm" "$DEST/bin/python-fork.wasm"
+chmod 755 "$DEST/bin/python.wasm" "$DEST/bin/python-fork.wasm"
 cp -R "$PREFIX_PY/include" "$DEST/include"
 cp "$PREFIX_PY/lib/libpython3.14.a" "$DEST/lib/"
 cp -R "$PREFIX_PY/lib/pkgconfig" "$DEST/lib/pkgconfig"
@@ -537,10 +558,12 @@ WORK="$B" homescoop_notice "libc++, libc++abi, libunwind (wasix-libc v2026-07-03
 
 # --- checks --------------------------------------------------------------------
 bash "$PKG/prestage-check.sh" "$DEST/bin/python.wasm" "$PYLIB"
+bash "$PKG/prestage-check.sh" "$DEST/bin/python-fork.wasm" "$PYLIB"
 # No host artefacts: native binaries, build-machine paths, host-platform wheels.
 python3 "$PKG/test/staging-check.py" "$DEST"
 # Every import of the published py-* side modules is exported (homescoop#181).
 node "$PKG/test/side-abi.mjs" --wasm "$DEST/bin/python.wasm" --report "$B/side-abi.md"
+node "$PKG/test/side-abi.mjs" --wasm "$DEST/bin/python-fork.wasm" --report "$B/side-abi-fork.md"
 
 # Config review (the perl -7 lesson): dumped for the diff against -11.
 echo "== wasix-python: pyconfig.h"
