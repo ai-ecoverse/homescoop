@@ -120,6 +120,24 @@ See `packages/curl/cert/checklist.mjs`.
 
 `scripts/host-run.sh` sets every file a package's `slicc.commands` names (`glue`, `wasm`, `script`) to 0755 before `npm pack` (`scripts/command-modes.mjs --fix`), and fails if one of them is not 0755 in `package.tgz` (`--check`). Under slicc-kernel's users enforce a 0644 glue run by path is `Permission denied` (126). Packaging-only repacks keep the published tarball's modes.
 
+### Glue by path (#360)
+
+After the specs, `run.mjs` runs every distinct `glue` file of the package's
+`slicc.commands` **by path**, as a non-root user (`certglue`, added with
+`kernel.users.add`): `/node_modules/<package>/bin/<glue> --version`, from
+`/tmp`, with an empty stdin. A glue the kernel won't execute (rc 126, or
+`EACCES`/`EPERM` from `kernel.run`) fails the cert as the `glue-by-path`
+spec; any other outcome passes, since only the mode is in question. So every
+package is checked the way coreutils' and tar's `glue-mode.mjs` check theirs,
+without a spec of its own. It runs only where the answer means something:
+users `enforce` (the `meta.json` value, `--users`, or the kernel default from
+1.74), a kernel that stamps tarball modes (`modes: tarball`, slicc-kernel ≥
+1.86.0), and not under `--soft` (kernel-compat runs published packages, some
+of which still ship 0644 glue) or `--live`. `"glueByPath": false` in
+`cert/meta.json` turns it off for one package. `@ai-ecoverse/wasm-tar@1.35.0-5`
+(0644 `bin/tar`) fails it on slicc-kernel 1.88.0 with
+`EACCES: /node_modules/@ai-ecoverse/wasm-tar/bin/tar`; 1.35.0-6 passes.
+
 ### Time per call: `"runTimeoutMs"` in `cert/meta.json`
 
 Each page call (`ctx.run`, `ctx.write`, …) has to answer within 120 s, or the spec fails with `Runtime.evaluate: no answer in … ms`. `"runTimeoutMs"` changes that for one package. The harness's own default was 30 s, which wasix-python's venv and pnpm-layout steps outgrew on slower CI runners.

@@ -25,6 +25,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { recorder } from './cases.mjs';
 import { certMetaFile, pathLabel, readCertMeta } from './cert-meta.mjs';
 import { makeContext } from './context.mjs';
+import { glueByPath, glueCheckPlan } from './glue.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -462,6 +463,16 @@ try {
     }
     report.specs.push({ spec: 'smoke', status: process.exitCode ? 'fail' : 'pass', durationMs: 0 });
   }
+
+  const glue = glueCheckPlan({ soft, live: Boolean(livePort), modes: report.modes, users, kernelVersion: report.kernel?.version, meta, manifest });
+  if (glue.run) {
+    const sp = await glueByPath(makeContext(page, { packageName: pkgName, npmName }), { installDir: main.installDir, targets: glue.targets });
+    report.specs.push(sp);
+    if (sp.status === 'fail') {
+      console.error(`browser-cert: FAIL glue by path (#360): ${sp.error}`);
+      process.exitCode = 1;
+    } else console.log(`browser-cert: ok glue by path (#360): ${glue.targets.length} glue file(s) run as certglue under users enforce`);
+  } else if (glue.targets.length) console.log(`browser-cert: glue by path skipped: ${glue.why}`);
 
   if (page.errors?.length) {
     console.error('browser-cert: page errors', page.errors);
