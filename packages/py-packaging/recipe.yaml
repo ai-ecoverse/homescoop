@@ -1,12 +1,14 @@
 name: py-packaging
 builder: host
+reproducible: true
 version: "26.3"
 npm: "@ai-ecoverse/py-packaging"
 summary: "packaging for slicc WASIX CPython"
-# 26.3.0-7 is packaging-only: 26.3.0-6's bytes with wasix-python as a range,
-# ">=3.14.2-16 <3.14.3" (#702). Drop repack: when the next release rebuilds.
-repack:
-  from: "26.3.0-6"
+source:
+  url: "https://files.pythonhosted.org/packages/py3/p/packaging/packaging-{{version}}-py3-none-any.whl"
+  sha256: "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c"
+inputs:
+  - scripts/stage-pure-wheel.sh
 dependencies:
   build: []
   host: []

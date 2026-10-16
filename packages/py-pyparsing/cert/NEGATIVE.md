@@ -1,5 +1,9 @@
 # py-pyparsing: negative proof
 
+## 3.3.3-8: a CI-built root (cert lane, 2026-10-16)
+
+3.3.3-7 and the releases before it repack bytes whose root traces to gitHead f22dcbc2, whose tree has no py-pyparsing recipe. Nothing can rebuild or attest them. 3.3.3-8 is built in ladder-pr from PyPI's pinned wheel by `scripts/stage-pure-wheel.sh`, so its npm provenance covers the build. It behaves the same as 3.3.3-7: the import and real-use specs pass on both. `record.mjs` is the new check: the files are the wheel's, the `.pyc` match their sources, and its built-in flipped-byte self-test keeps it from being vacuous.
+
 ## 3.3.3-6 (published) fails the 3.3.3-7 cert (homescoop#702)
 
 `node scripts/browser-cert/python-range.mjs py-pyparsing --tarball ai-ecoverse-py-pyparsing-3.3.3-6.tgz --lock-only`
