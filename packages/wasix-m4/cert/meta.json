@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "checklist": [
+    "package.json engines slicc-kernel >=1.44.0 (1.4.20-3): its wasm asks the kernel for user ids (wasix-sysroot >= -20, no fallback); 1.4.20-2 had no engines and check-package-meta refused to build it (#625)",
+    "m4 --version: m4 (GNU M4) 1.4.20",
+    "define from stdin: define(`x', `y')x gives y",
+    "real use: include from -I, eval(2**10), ifelse/len, changequote",
+    "syscmd(`true') sysval 0 and esyscmd(`echo hi'): m4 forks /bin/sh through the kernel (wasm-bash)",
+    "a missing input file: rc 1 and m4: cannot open `nosuchfile', in the C and C.UTF-8 locales"
+  ],
+  "patches": {
+    "getlocalename-wasix.patch": "the build (NEGATIVE.md): without it gnulib's lib/getlocalename_l-unsafe.c has no WASI branch and stops at #error \"Please port gnulib getlocalename_l-unsafe.c to your platform!\". cert/checklist.mjs runs m4 in the C and C.UTF-8 locales"
+  }
+}
