@@ -1,0 +1,17 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.14.2-24"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-fonttools --lock-only"
+  ],
+  "checklist": [
+    "cert/import.mjs: import fontTools on wasix-python 3.14.2-24 from /node_modules/@ai-ecoverse/py-fonttools, found by discovery without PYTHONPATH, no nested python",
+    "cert/fonttools.mjs: FontBuilder builds a TrueType font (.notdef, A, space; cmap, hmtx, glyf, name, OS/2, post), saves it and reads it back: glyph order, cmap {0x20 space, 0x41 A}, advance 600, BoundsPen bounds of A [100, 0, 500, 700], family \"Cert\", sfnt magic 00010000",
+    "python-range.mjs --lock-only (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3; npm --package-lock-only with wasix-python 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level. The previous release (exact 3.14.2-16) nests a second python under 3.14.2-24 (NEGATIVE.md)"
+  ]
+}

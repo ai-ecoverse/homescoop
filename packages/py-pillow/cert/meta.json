@@ -1,0 +1,17 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.14.2-24"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-pillow"
+  ],
+  "checklist": [
+    "cert/import.mjs: import PIL from /node_modules/@ai-ecoverse/py-pillow, found by discovery without PYTHONPATH, no nested python; its 4 side modules import (PIL._imagingtk is not imported: it traps on import on every python, the same on 12.3.0-7; homescoop#588)",
+    "cert/pillow.mjs: features jpg/zlib/freetype2; ImageFont.load_default(size=16) is a FreeTypeFont and draws text; rectangle pixels; LANCZOS resize; PNG and JPEG (libjpeg) round trips through BytesIO; GaussianBlur; convert(\"L\") 124",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3; npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs both specs on the newest (3.14.2-24), and python-range.mjs runs them again on the floor (3.14.2-16). The previous release (exact 3.14.2-16) nests a second python under 3.14.2-24, and discover() then skips it: ModuleNotFoundError (NEGATIVE.md)"
+  ]
+}
