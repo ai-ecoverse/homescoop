@@ -71,8 +71,9 @@ if (values.specs) {
 const UNSPECIFIED = "no committed cert specs; this certification rests on the reviewer's own run";
 const unspecified = (pkg) => specCounts !== null && !(specCounts[pkg.recipe] > 0);
 
-// A repack's input must be attested (repack-input.mjs): an unverifiable input
-// is INCOMPLETE, whatever the reviewer says. With --repack-input, a package
+// A repack's input must be attested, and a built recipe must fetch its pinned
+// source with no stage or prebuilt path (repack-input.mjs, #834 and #864): an
+// unverifiable input is INCOMPLETE, whatever the reviewer says. With --repack-input, a package
 // with no entry, or one whose trace didn't run, fails closed.
 let repackInputs = null;
 if (values['repack-input']) {
@@ -88,7 +89,8 @@ const unverifiable = (pkg) => {
   const r = repackInputs[pkg.recipe];
   if (!r || typeof r !== 'object') return "repack-input.mjs didn't run for it";
   if (r.error) return `repack-input.mjs couldn't trace it (${one(r.error)})`;
-  if (r.repack === false) return '';
+  // A built recipe (repack: false) is held to the same root rule (#864):
+  // only attested: true passes, for repacks and builds alike.
   if (r.attested === true) return '';
   return one(r.reason) || 'no reason given';
 };
@@ -146,7 +148,7 @@ const unspecifiedNote = specCounts !== null && packages.some(unspecified)
   : '';
 const incomplete = lines.filter(({ line }) => line.startsWith('cert-ci: INCOMPLETE'));
 const incompleteNote = incomplete.length
-  ? `\n\n**Not certified, whatever the review says: ${incomplete.length === 1 ? "a repack's input is" : "repacks' inputs are"} unverifiable.** A repack must trace its bytes to a provenance-attested CI build, or a reproducible build, from the recipe's pinned source (\`scripts/cert-review/repack-input.mjs\`).`
+  ? `\n\n**Not certified, whatever the review says: ${incomplete.length === 1 ? 'an input is' : 'inputs are'} unverifiable.** A build must fetch the recipe's pinned source (homescoop_fetch with its sha256) with no stage or prebuilt path, and a repack must trace its bytes to such a build that is provenance-attested from CI, or reproducible (\`scripts/cert-review/repack-input.mjs\`).`
   : '';
 const trouble = problems.length ? `\n\n**Problems:**\n${problems.map((p) => `- ${p}`).join('\n')}` : '';
 const footer = values.run ? `\n\n<sub>shas computed from the ladder-pr artifacts, not by the reviewer · [run](${values.run})</sub>` : '';
