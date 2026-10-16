@@ -33,3 +33,4 @@ CLI cannot build. The threaded/large cases in `cert/roundtrip.mjs` (`xz -T0` /
 
 **Good tarball:** `@ai-ecoverse/wasm-xz@5.8.1-1` — `cert/roundtrip.mjs` passes
 (including `-T0`/`-T2` 4 MiB).
+
