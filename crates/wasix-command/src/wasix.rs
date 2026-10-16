@@ -15,6 +15,9 @@ use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawF
 use std::os::wasi::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "tokio")]
+pub(crate) mod tokio;
+
 mod sys {
     #[link(wasm_import_module = "wasix_32v1")]
     extern "C" {
