@@ -17,15 +17,25 @@ dig example.com
 dig +short mx example.com
 dig -x 1.1.1.1 +short
 dig +noall +answer txt example.com
-dig @https://dns.google/dns-query example.com AAAA
+dig @https://1.1.1.1/dns-query example.com AAAA
+dig +short dnskey cloudflare.com
+dig https cloudflare.com
 dig @100.100.100.100 my-host.tailnet.ts.net
 ```
 
-Types: A, AAAA, MX, TXT, CNAME, NS, SOA, SRV, PTR, CAA, ANY and the rest that
-hickory-proto knows (`TYPEnnn` too). Options: `+short`, `+[no]all`, `+[no]cmd`,
-`+[no]comments`, `+[no]question`, `+[no]answer`, `+[no]authority`,
-`+[no]additional`, `+[no]stats`, `+[no]recurse`, `+[no]edns`, `+[no]dnssec`,
-`+time=N`, `+tries=N`, `+tcp`. `+notcp` is refused (no UDP).
+In a browser, the realm proxy can reach only DoH endpoints that allow
+cross-origin requests. cloudflare-dns.com and 1.1.1.1 do; dns.google doesn't, and dig
+reports `HTTP 502` with a hint.
+
+Types: every mnemonic BIND knows, and `TYPEnnn`. Records print as BIND's dig
+prints them: its columns, DNSSEC records (DNSKEY, DS, RRSIG, NSEC, NSEC3,
+NSEC3PARAM) in RFC 4034 presentation format, HTTPS/SVCB with BIND's SvcParams
+and unknown types as RFC 3597's `\# <length> <hex>`. Options: `+short`,
+`+[no]all`, `+[no]cmd`, `+[no]comments`, `+[no]question`, `+[no]answer`,
+`+[no]authority`, `+[no]additional`, `+[no]stats`, `+[no]recurse`,
+`+[no]edns`, `+[no]dnssec`, `+[no]adflag` (on by default, as in dig),
+`+[no]cdflag`, `+[no]crypto`, `+time=N`, `+tries=N`, `+tcp`. `+notcp` is
+refused (no UDP).
 
 Exit status: 0 with an answer (NXDOMAIN included), 1 for a usage error, 9 when
 no server answers.

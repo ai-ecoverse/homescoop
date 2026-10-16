@@ -4,6 +4,7 @@
 //! through the uplink, or a resolver on the realm's loopback).
 
 mod args;
+mod present;
 mod print;
 mod transport;
 
@@ -29,7 +30,8 @@ Options:
   +short           only the answer data
   +[no]all +[no]cmd +[no]comments +[no]question +[no]answer +[no]authority
   +[no]additional +[no]stats    what to print
-  +[no]recurse +[no]edns +[no]dnssec +time=N +tries=N +https[=url] +tcp
+  +[no]recurse +[no]edns +[no]dnssec +[no]adflag +[no]cdflag +[no]crypto
+  +time=N +tries=N +https[=url] +tcp
   -h, -v           help, version
 ";
 
@@ -46,6 +48,9 @@ fn query_id(doh: bool) -> u16 {
 fn build(o: &Opts, id: u16) -> Result<Vec<u8>, String> {
     let mut m = Message::new(id, MessageType::Query, OpCode::Query);
     m.metadata.recursion_desired = o.recurse;
+    // As BIND's dig: AD is set by default (+adflag), CD only with +cdflag.
+    m.metadata.authentic_data = o.adflag;
+    m.metadata.checking_disabled = o.cdflag;
     let mut q = Query::query(o.name.clone(), o.qtype);
     q.set_query_class(o.qclass);
     m.add_query(q);

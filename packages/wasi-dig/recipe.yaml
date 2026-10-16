@@ -6,6 +6,8 @@ builder: host
 version: "0.1.0"
 npm: "@ai-ecoverse/wasi-dig"
 summary: "dig for slicc WASI (wasm32-wasip1): DNS over HTTPS / TCP, dig-style output"
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
 toolchain:
   rust: "1.98.1"
 dependencies:
@@ -23,6 +25,10 @@ about:
     absolute form through the kernel's proxy, so no TLS in the program.
     @https://… picks another endpoint; @host is DNS over TCP to host:53
     (a tailnet resolver through the uplink, or a loopback resolver).
-    +notcp is refused: the kernel has no UDP. THIRD-PARTY-NOTICES.md is
+    +notcp is refused: the kernel has no UDP. Output follows BIND 9.20
+    (src/present.rs): masterdump.c's columns, type and class mnemonics,
+    RFC 3597 for unknown types, SVCB/HTTPS and the DNSSEC types from their
+    rdata; AD is set in queries (+[no]adflag), +cdflag, +nocrypto.
+    THIRD-PARTY-NOTICES.md is
     generated from cargo metadata plus Rust's std and wasi-libc licences.
     New package → human cert.

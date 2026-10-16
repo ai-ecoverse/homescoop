@@ -30,6 +30,12 @@ pub struct Opts {
     pub recurse: bool,
     pub edns: bool,
     pub dnssec: bool,
+    /// AD in the query (BIND's default; `+noadflag` clears it).
+    pub adflag: bool,
+    /// CD in the query (`+cdflag`).
+    pub cdflag: bool,
+    /// Keys, signatures and digests in DNSSEC records (`+nocrypto` omits them).
+    pub crypto: bool,
     pub timeout: Duration,
     pub tries: u32,
     pub cmd: bool,
@@ -49,15 +55,10 @@ pub enum Parsed {
     Version,
 }
 
-/// Record types `dig NAME TYPE` takes as a bare word.
+/// A record type as dig reads it, as a bare word or after `-t`: BIND's
+/// mnemonics (any case) and `TYPEnnn`.
 fn bare_type(word: &str) -> Option<RecordType> {
-    let up = word.to_ascii_uppercase();
-    match up.as_str() {
-        "A" | "AAAA" | "ANY" | "CAA" | "CNAME" | "DNSKEY" | "DS" | "HINFO" | "HTTPS" | "MX"
-        | "NAPTR" | "NS" | "NULL" | "OPT" | "PTR" | "SOA" | "SRV" | "SSHFP" | "SVCB" | "TLSA"
-        | "TXT" | "AXFR" | "IXFR" => RecordType::from_str(&up).ok(),
-        _ => up.strip_prefix("TYPE").and_then(|n| n.parse::<u16>().ok()).map(RecordType::from),
-    }
+    crate::present::type_code(word).map(RecordType::from)
 }
 
 fn bare_class(word: &str) -> Option<DNSClass> {
@@ -132,6 +133,9 @@ fn plus_option(o: &mut Opts, opt: &str) -> Result<(), String> {
                 o.edns = true;
             }
         }
+        "adflag" => o.adflag = on,
+        "cdflag" => o.cdflag = on,
+        "crypto" => o.crypto = on,
         "time" | "timeout" => {
             let secs: u64 = val
                 .and_then(|v| v.parse().ok())
@@ -161,8 +165,8 @@ fn plus_option(o: &mut Opts, opt: &str) -> Result<(), String> {
             o.stats = on;
         }
         "search" | "defname" | "ignore" | "fail" | "besteffort" | "ttlid" | "cl" | "class"
-        | "ttlunits" | "multiline" | "identify" | "nsid" | "cookie" | "adflag" | "cdflag"
-        | "aaonly" | "aaflag" | "bufsize" | "idnin" | "idnout" | "showsearch" | "crypto" => {}
+        | "ttlunits" | "multiline" | "identify" | "nsid" | "cookie" | "aaonly" | "aaflag"
+        | "bufsize" | "idnin" | "idnout" | "showsearch" => {}
         _ => return Err(format!("Invalid option: +{opt}")),
     }
     Ok(())
@@ -180,6 +184,9 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Parsed, String> 
         recurse: true,
         edns: true,
         dnssec: false,
+        adflag: true,
+        cdflag: false,
+        crypto: true,
         timeout: Duration::from_secs(5),
         tries: 2,
         cmd: true,
@@ -290,6 +297,10 @@ mod tests {
         assert_eq!((o.name.to_string().as_str(), o.qtype), ("example.com.", RecordType::MX));
         let o = run(&[]);
         assert_eq!((o.name.to_string().as_str(), o.qtype), (".", RecordType::NS));
+        assert_eq!(run(&["rrsig", "example.com"]).qtype, RecordType::RRSIG);
+        assert_eq!(run(&["-t", "nsec3param", "example.com"]).qtype, RecordType::NSEC3PARAM);
+        assert_eq!(run(&["example.com", "TYPE999"]).qtype, RecordType::Unknown(999));
+        assert_eq!(u16::from(run(&["zonemd", "example.com"]).qtype), 63);
     }
 
     #[test]
@@ -325,6 +336,9 @@ mod tests {
         let o = run(&["+norec", "+time=2", "+tries=1", "x"]);
         assert!(!o.recurse);
         assert_eq!((o.timeout, o.tries), (Duration::from_secs(2), 1));
+        assert!(o.adflag && !o.cdflag && o.crypto);
+        let o = run(&["+noadflag", "+cdflag", "+nocrypto", "x"]);
+        assert!(!o.adflag && o.cdflag && !o.crypto);
         assert!(parse(["+notcp".to_string()]).is_err());
         assert!(parse(["+bogus".to_string()]).is_err());
     }
