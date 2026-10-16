@@ -8,7 +8,7 @@
 name: wasm-go
 builder: host
 # renovate: datasource=golang-version depName=go
-version: "1.26.5"
+version: "1.27.2"
 npm: "@ai-ecoverse/wasm-go"
 summary: "Go 1.26 wasip1 tools (compile/link/asm) for slicc go driver"
 source:
