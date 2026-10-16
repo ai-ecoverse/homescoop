@@ -122,6 +122,7 @@ export default async function (ctx) {
       '[providers.op]', 'type = "1password"', '',
       '[providers.bw]', 'type = "bitwarden"', '',
       '[providers.vault]', 'type = "vault"', 'address = "https://vault.example"', '',
+      '[providers.inf]', 'type = "infisical"', '',
       '[secrets]', 'GH = { provider = "seven", value = "seven_ph_gh_0001" }', '',
       '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', 'env = "GITHUB_TOKEN"', '',
     ].join('\n'),
@@ -133,6 +134,8 @@ export default async function (ctx) {
     FNOX_BW_SESSION: 'fnox_bw_ambient',
     VAULT_TOKEN: 'vault_ambient',
     FNOX_VAULT_NAMESPACE: 'fnox_ns_ambient',
+    INFISICAL_CLIENT_SECRET: 'inf_secret_ambient',
+    FNOX_INFISICAL_TOKEN: 'fnox_inf_ambient',
   };
   const scrub = await run(['fnox', 'proxy', 'run', '--', 'printenv'], { cwd: '/home/scrub', env: { ...env, ...creds } });
   assert.equal(scrub.status, 0, `proxy run with provider credentials: ${scrub.stderr}`);

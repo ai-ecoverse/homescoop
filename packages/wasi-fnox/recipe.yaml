@@ -13,6 +13,8 @@ source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "21669929b2517e7b5425263c75c5f055220126cac1720b40549c316c92db77a9"
   epoch: "1791301147"
+# ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
+reproducible: true
 toolchain:
   rust: "1.98.1"
   binaryen: "133"

@@ -16,7 +16,7 @@
     "sync and reencrypt refused with `not available in seven: the value would be in a program (use a header rule)`",
     "fnox edit refused cleanly: non-zero status, not 134, \"fnox edit is not available in seven: use fnox set\", no panic or trap (homescoop#376)",
     "proxy rules --json prints the [proxy] rules; proxy run -- printenv shows each rule's env name holding the placeholder and the secret's own name unset",
-    "proxy run with a 1password, a bitwarden and a vault provider configured: their credentials (OP_SERVICE_ACCOUNT_TOKEN, FNOX_OP_SERVICE_ACCOUNT_TOKEN, BW_SESSION, FNOX_BW_SESSION, VAULT_TOKEN, FNOX_VAULT_NAMESPACE) don't reach the child, as upstream (homescoop#401)",
+    "proxy run with a 1password, a bitwarden, a vault and an infisical provider configured: their credentials (OP_SERVICE_ACCOUNT_TOKEN, FNOX_OP_SERVICE_ACCOUNT_TOKEN, BW_SESSION, FNOX_BW_SESSION, VAULT_TOKEN, FNOX_VAULT_NAMESPACE, INFISICAL_CLIENT_SECRET, FNOX_INFISICAL_TOKEN) don't reach the child, as upstream (homescoop#401)",
     "exec with only plain secrets: the child gets the value, stderr warns that it was passed as a plain value; exec of a missing command exits 127",
     "exec --shell-grants without a vault fails closed (same errors)",
     "shell integration (homescoop#400): hook-env -s bash exits 0 with `export LVL=debug` and the session, no panic or 134 trap; activate bash names /usr/bin/fnox, not a bare fnox its fnox() wrapper would call recursively; in bash, eval \"$(fnox activate bash)\" loads the secret at the hook, drops it outside the project, and fnox deactivate unsets it; an as_file secret is refused (no file in seven): hook-env skips it with the exec message, get fails with it",
