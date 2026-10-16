@@ -5,7 +5,7 @@
  * @property {string} npmName
  * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array, user?: string|number}) => Promise<{status:number,stdout:string,stderr:string}>} run (user: slicc-kernel >= 1.44.0)
  * @property {(argv: string[], opts?: {cwd?: string, env?: Record<string,string>, stdin?: string|Uint8Array}) => Promise<{status:number,stderr:string,writes:string[]}>} runWrites stdout one chunk per write()
- * @property {(path: string, data: string|Uint8Array) => Promise<void>} write
+ * @property {(path: string, data: string|ArrayBufferView|ArrayBuffer|SharedArrayBuffer|number[]) => Promise<void>} write a string as UTF-8, anything else as its exact bytes
  * @property {(path: string) => Promise<string|null>} read the file decoded as UTF-8 text (null if missing)
  * @property {(path: string) => Promise<Buffer|null>} readBytes the file's exact bytes (null if missing)
  * @property {(cfg: {names?: Record<string,string[]>, peers?: Record<string, {http?: {status?: number, headers?: [string,string][], body?: string}, tcp?: string, error?: string}>}) => Promise<void>} uplink
@@ -139,15 +139,15 @@ export function makeContext(page, meta) {
     async addUser(opts) {
       return page.evaluate((o) => window.kernel.users.add(o), opts);
     },
-    // A string is written as UTF-8; bytes (Uint8Array, Buffer, ArrayBuffer)
-    // as they are, through base64 (a latin1 string came out UTF-8 encoded, #591).
+    // A string is written as UTF-8; bytes (any typed-array view, an
+    // ArrayBuffer/SharedArrayBuffer, a number array) as they are, through base64 (a latin1 string came out UTF-8 encoded, #591).
     async write(path, data) {
       const p = path.replace(/^\//, '');
       if (typeof data === 'string') {
         await page.evaluate((q, t) => window.opfs.write(q, t), p, data);
         return;
       }
-      const bytes = data instanceof ArrayBuffer ? Buffer.from(data) : Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+      const bytes = ArrayBuffer.isView(data) ? Buffer.from(data.buffer, data.byteOffset, data.byteLength) : Buffer.from(data);
       await page.evaluate((q, b) => window.opfs.writeBase64(q, b), p, bytes.toString('base64'));
     },
     async serveWs(responder) {

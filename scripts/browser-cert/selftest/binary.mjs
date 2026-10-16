@@ -32,6 +32,9 @@ export default async function ({ run, write, read, readBytes, assert }) {
   await write(`${dir}/view.bin`, all.subarray(250));
   assert.deepEqual([...(await readBytes(`${dir}/view.bin`))], [250, 251, 252, 253, 254, 255], 'only the view is written');
 
+  await write(`${dir}/arr.bin`, [0, 0x80, 0xff, 0x89, 0x50]);
+  assert.deepEqual([...(await readBytes(`${dir}/arr.bin`))], [0, 0x80, 0xff, 0x89, 0x50], 'a number array is written as bytes');
+
   // Strings are unchanged: UTF-8 text in, text out.
   await write(`${dir}/text.txt`, 'caf\u00e9\n');
   assert.equal(await read(`${dir}/text.txt`), 'caf\u00e9\n');
