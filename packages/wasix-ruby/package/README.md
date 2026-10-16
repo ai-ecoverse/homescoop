@@ -37,6 +37,29 @@ fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
+## 3.4.11-17: File#flock excludes other processes
+
+`File#flock` takes whole-file `fcntl` record locks (`LOCK_SH` → read lock,
+`LOCK_EX` → write lock, `LOCK_UN` → unlock; `LOCK_NB` doesn't wait), which
+slicc-kernel (≥ 1.100.0) enforces between processes (homescoop#578). Up to
+-16 every `flock` returned 0 and excluded nobody, so two `bundle install` or
+`gem install` runs on one bundle path or gem directory didn't wait for each
+other. Now a second process's `flock(File::LOCK_EX | File::LOCK_NB)` is
+`false` while another holds the lock, and a blocking one waits.
+
+These are `fcntl` semantics, as wasix-perl's `flock` has them since
+5.42.0-15: a lock belongs to the process, so a second handle on the same
+file in the same process isn't refused, and closing any handle on the file
+drops the process's lock on it. `fcntl` wants a writable handle for a write
+lock, so `LOCK_EX` on a read-only handle takes a read lock: it keeps writers
+out, but two read-only `LOCK_EX` holders are both granted; open a lock file
+for writing to exclude (homescoop#758). `flock` on something that isn't a
+regular file (a pipe, STDOUT, `/dev/null`, a directory) succeeds and excludes
+nobody, since slicc-kernel keeps record locks on regular files only
+(ai-ecoverse/slicc-kernel#757).
+
+A real rebuild, on wasix-sysroot 2025.9.30-32.
+
 ## 3.4.11-16: the engines floor, and bundle exec
 
 The `engines` floor (slicc-kernel ≥ 1.100.0, below) is enforced from
@@ -70,9 +93,8 @@ refusing to install there is the honest answer (homescoop#552). Up to -14
   holds gets `Errno::EAGAIN`, `F_SETLKW` waits for the unlock, and `F_GETLK`
   names the holder. On an older kernel every lock is granted locally and
   `F_GETLK` answers `F_UNLCK` (hence -15's `engines` floor). The struct is `[type, whence, start, len,
-  pid].pack("s s x4 q q l x4")` (32 bytes). `File#flock` is unchanged: an
-  advisory no-op that succeeds (`bundle install` and `gem install` lock
-  their files with it).
+  pid].pack("s s x4 q q l x4")` (32 bytes). `File#flock` was unchanged: an
+  advisory no-op that succeeded (real locks since 3.4.11-17).
 - `RUBYLIB` names only the package's library directories that exist,
   `lib/ruby/3.4.0` and its `wasm32-wasi`. Up to 3.4.11-13 it also named
   `site_ruby` and `vendor_ruby` (and their `wasm32-wasi`), which npm never
