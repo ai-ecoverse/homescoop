@@ -281,6 +281,32 @@ describe('import', () => {
     for (const name of EXPORTS) assert.equal(typeof m[name], 'function', name);
   });
 
+  test('no entropy is an error, not a JS throw, and a fresh instance recovers (#551)', async () => {
+    const m = await createTlsEngine({ wasmBinary: wasm });
+    const fresh = new Engine(m);
+    const real = globalThis.crypto.getRandomValues;
+    globalThis.crypto.getRandomValues = () => {
+      throw new Error('no entropy');
+    };
+    let ptr;
+    try {
+      ptr = m._tls_leaf_new();
+    } finally {
+      globalThis.crypto.getRandomValues = real;
+    }
+    assert.equal(ptr, 0, 'a leaf without entropy');
+    assert.equal(fresh.strerror(m._tls_last_error()), 'PSA - Insufficient entropy');
+    const leaf = fresh.leaf();
+    assert.equal(leaf.addCert(ca.issue('again.test', leaf.spki())), 0);
+    const session = fresh.session(leaf, 'again.test');
+    leaf.release();
+    const { wire } = tunnel(session, { data: (b, reply) => reply(Buffer.from('recovered')) });
+    const socket = await client(wire, ca, { servername: 'again.test' });
+    assert.equal((await exchange(socket, 'x', (b) => b.length >= 9)).toString(), 'recovered');
+    socket.destroy();
+    session.free();
+  });
+
   test('a leaf is a P-256 key pair; only its SubjectPublicKeyInfo leaves the engine', () => {
     const leaf = engine.leaf();
     const spki = leaf.spki();

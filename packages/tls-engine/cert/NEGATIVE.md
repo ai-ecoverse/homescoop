@@ -11,18 +11,29 @@ a `host-run.sh` build of 4.2.0-1 (emsdk 4.0.23). Not in
 tunnels with the tarball under test); `lib/engine-api.mjs` is the `ci:`
 command (Node's TLS client against the engine's own API).
 
-## The published 3.6.7-1 passes both
+## The published 3.6.7-1
+
+`realm-proxy.mjs` passes, and so do 18 of the 19 cases of `engine-api.mjs`:
+the API and its behaviour mustn't change for slicc. The one that fails is the
+entropy case (#551). When `crypto.getRandomValues` throws, 3.6.7-1 lets the
+exception unwind through the wasm and out of `tls_leaf_new`. 4.2.0-1 catches
+it in `slicc_random` and returns 0 with `PSA - Insufficient entropy`, and the
+same instance makes a leaf once entropy is back:
 
 ```
-browser-cert: ok packages/tls-engine/cert/realm-proxy.mjs
-ℹ tests 18  ℹ pass 18  ℹ fail 0
+✖ no entropy is an error, not a JS throw, and a fresh instance recovers (#551)
+  Error: no entropy
+ℹ tests 19  ℹ pass 18  ℹ fail 1
 ```
 
-That is the point of the port: the API and its behaviour must not change for
-slicc. The one difference the specs see is the error code of a refused leaf
-certificate: 3.6.7-1 returns `-20352 ECP - Bad input parameters to function`,
-4.2.0-1 `-16128 PK - Type mismatch, eg attempt to encrypt with an ECDSA key`.
-Both are named, and both are < 0.
+(The 4.2.0-1 build before the catch, at a38dbcce, fails the same way. Under
+TF-PSA-Crypto, the throw also left `psa_crypto_init` half done, so that
+instance never made a leaf again.)
+
+The specs see one other difference: the error code of a refused leaf
+certificate. 3.6.7-1 returns `-20352 ECP - Bad input parameters to function`
+and 4.2.0-1 returns `-16128 PK - Type mismatch, eg attempt to encrypt with an
+ECDSA key`. Both are named, and both are < 0.
 
 ## The 3.6.7 engine against Mbed TLS 4.2.0
 
@@ -46,12 +57,12 @@ browser-cert: FAIL packages/tls-engine/cert/realm-proxy.mjs
 curl: (7) CONNECT tunnel failed, response 501
 ```
 
-and the factory fails in `engine-api.mjs`'s `before`, so all 18 are
+and the factory fails in `engine-api.mjs`'s `before`, so all 19 are
 cancelled (exit 1):
 
 ```
 Aborted(CompileError: WebAssembly.instantiate(): BufferSource argument is empty)
-ℹ pass 0  ℹ cancelled 18
+ℹ pass 0  ℹ cancelled 19
 ```
 
 **TF-PSA-Crypto's default entropy** (no `tls_engine_crypto_config.h`, so
@@ -66,7 +77,7 @@ browser-cert: FAIL packages/tls-engine/cert/realm-proxy.mjs
 curl: (35) ssl_handshake returned: (-0x7280) SSL - The connection indicated an EOF
 ✖ a leaf is a P-256 key pair; only its SubjectPublicKeyInfo leaves the engine
   AssertionError [ERR_ASSERTION]: tls_leaf_new: PSA - Insufficient entropy
-ℹ pass 1  ℹ fail 17
+ℹ pass 1  ℹ fail 18
 ```
 
 (the one pass is the factory and its exports.)
@@ -78,7 +89,10 @@ curl: (35) ssl_handshake returned: (-0x7280) SSL - The connection indicated an E
 ```
 ✖ a leaf certificate for another key is refused, and a leaf without one has no session
   AssertionError [ERR_ASSERTION]: tls_strerror does not name -16128: UNKNOWN ERROR CODE (3F00)
+ℹ pass 17  ℹ fail 2
 ```
+
+(The other failure is the entropy case: that build predates the catch.)
 
 ## The specs aren't vacuous
 
@@ -88,7 +102,8 @@ curl: (35) ssl_handshake returned: (-0x7280) SSL - The connection indicated an E
   300000-byte download by sha256 and a 170824-byte upload hashed by the far
   end, two requests on one tunnel, and rc 60 for a CA that didn't sign the
   leaf (with `-k` going through, so the failure is the chain).
-- `engine-api.mjs` checks every export `index.d.ts` names, the leaf's SPKI
+- `engine-api.mjs` checks every export `index.d.ts` names, that no entropy
+  is an error code (not a throw) that a fresh instance recovers from, the leaf's SPKI
   (P-256, a new key each time), Node's verification (`authorized`, SAN,
   issuer, ALPN `http/1.1`) and the engine's own view (`tls_version`,
   `tls_alpn_http11`, `tls_handshake_done`), the whole chain going out (a

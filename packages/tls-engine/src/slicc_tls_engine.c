@@ -45,12 +45,18 @@ static const char *const alpn_protocols[] = {"http/1.1", NULL};
 static int last_error;
 static int ready;
 
+/* A throw must not unwind through C: psa_crypto_init would be left half
+ * done (#551). A failure is an error code, and the next call tries again. */
 EM_JS(int, slicc_random, (unsigned char *out, size_t len), {
-  for (let at = 0; at < len; at += 65536) {
-    const n = Math.min(65536, len - at);
-    globalThis.crypto.getRandomValues(HEAPU8.subarray(out + at, out + at + n));
+  try {
+    for (let at = 0; at < len; at += 65536) {
+      const n = Math.min(65536, len - at);
+      globalThis.crypto.getRandomValues(HEAPU8.subarray(out + at, out + at + n));
+    }
+    return 0;
+  } catch (err) {
+    return -1;
   }
-  return 0;
 });
 
 /* PSA's entropy source (MBEDTLS_PSA_DRIVER_GET_ENTROPY): full entropy, every byte. */
