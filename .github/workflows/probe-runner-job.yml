@@ -1,0 +1,72 @@
+name: probe-runner-job
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    strategy:
+      fail-fast: false
+      matrix:
+        pool: [job, bench, hosted]
+    runs-on: ${{ matrix.pool == 'job' && 'cloud-run-job' || matrix.pool == 'bench' && 'cloud-run-bench' || 'ubuntu-latest' }}
+    steps:
+      - run: |
+          set -u
+          mkdir -p "$RUNNER_TEMP/inv"
+          for d in /usr/bin /usr/sbin /usr/local/bin /bin /sbin "$HOME/.cargo/bin" /opt/cargo/bin; do [ -d "$d" ] && find "$d" -maxdepth 1 \( -type f -o -type l \) -perm -u+x -printf '%f\n'; done | sort -u > "$RUNNER_TEMP/inv/bins.txt"
+          dpkg-query -W -f '${Package} ${Version}\n' 2>/dev/null | sort -u > "$RUNNER_TEMP/inv/pkgver.txt"
+          cut -d' ' -f1 "$RUNNER_TEMP/inv/pkgver.txt" > "$RUNNER_TEMP/inv/pkgs.txt"
+          v() { printf '%-14s %s\n' "$1" "$( ( "$@" ) 2>&1 | head -1 )"; }
+          {
+            echo "os: $(. /etc/os-release 2>/dev/null; echo "$PRETTY_NAME") kernel=$(uname -r) arch=$(uname -m)"
+            echo "glibc: $(ldd --version 2>&1 | head -1)"
+            echo "nproc=$(nproc) mem=$(free -m 2>/dev/null | awk '/Mem:/{print $2"M"}') disk_free=$(df -h "$RUNNER_TEMP" | awk 'NR==2{print $4}') tmp_free=$(df -h /tmp | awk 'NR==2{print $4}')"
+            echo "user=$(id -un) uid=$(id -u) sudo=$(sudo -n true 2>/dev/null && echo yes || echo no)"
+            echo "python3 -m venv: $(python3 -m venv "$RUNNER_TEMP/v" >/dev/null 2>&1 && echo ok || echo FAIL)"
+            echo "python3 ensurepip: $(python3 -c 'import ensurepip' 2>&1 && echo ok || echo FAIL)"
+            echo "TMPDIR=${TMPDIR:-unset} HOME=$HOME CARGO_HOME=${CARGO_HOME:-unset} RUSTUP_HOME=${RUSTUP_HOME:-unset} GOROOT=${GOROOT:-unset} PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"
+            echo "locale: $(locale 2>/dev/null | head -1) LANG=${LANG:-unset} LC_ALL=${LC_ALL:-unset} available=$(locale -a 2>/dev/null | tr '\n' ' ')"
+            echo "umask: $(umask) TZ=${TZ:-unset} date=$(date +%Z)"
+            echo "PATH=$PATH"
+          } | tee "$RUNNER_TEMP/inv/facts.txt"
+          {
+            v gcc gcc --version; v g++ g++ --version; v clang clang --version; v cmake cmake --version; v make make --version
+            v ninja ninja --version; v meson meson --version; v pkg-config pkg-config --version; v autoconf autoconf --version
+            v automake automake --version; v libtool libtool --version; v m4 m4 --version; v bison bison --version; v flex flex --version
+            v perl perl -e 'print $^V'; v python3 python3 --version; v pip3 pip3 --version; v ruby ruby --version; v node node --version
+            v npm npm --version; v go go version; v rustc rustc --version; v cargo cargo --version; v rustup rustup --version
+            v git git --version; v curl curl --version; v wget wget --version; v tar tar --version; v xz xz --version; v zstd zstd --version
+            v bzip2 bash -c 'bzip2 --version 2>&1 </dev/null'; v gzip gzip --version; v unzip unzip -v; v zip zip -v; v file file --version
+            v patch patch --version; v sed sed --version; v gawk gawk --version; v jq jq --version; v xxd bash -c 'xxd -v 2>&1'
+            v shasum shasum --version; v sha256sum sha256sum --version; v gh gh --version; v docker docker --version; v wasm-opt wasm-opt --version
+            v chromium bash -c 'chromium --version || google-chrome --version'
+          } | tee "$RUNNER_TEMP/inv/versions.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: inventory-${{ matrix.pool }}
+          path: ${{ runner.temp }}/inv
+
+  compare:
+    needs: inventory
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: inventory-*
+      - run: |
+          for ref in bench hosted; do
+            [ -d inventory-$ref ] && [ -d inventory-job ] || { echo "missing inventory for job or $ref"; continue; }
+            echo "#### job vs $ref"
+            echo "== binaries on $ref, not on job"; comm -13 inventory-job/bins.txt inventory-$ref/bins.txt | tr '\n' ' '; echo
+            echo "== binaries on job, not on $ref"; comm -23 inventory-job/bins.txt inventory-$ref/bins.txt | tr '\n' ' '; echo
+            echo "== packages on $ref, not on job"; comm -13 inventory-job/pkgs.txt inventory-$ref/pkgs.txt | tr '\n' ' '; echo
+            echo "== packages on job, not on $ref"; comm -23 inventory-job/pkgs.txt inventory-$ref/pkgs.txt | tr '\n' ' '; echo
+            echo "== package versions that differ (job | $ref)"; join inventory-job/pkgver.txt inventory-$ref/pkgver.txt | awk '$2 != $3 {print $1": "$2" | "$3}' | head -200
+            echo "== tool versions (diff job $ref)"; diff inventory-job/versions.txt inventory-$ref/versions.txt || true
+          done
+          for p in job bench hosted; do echo "== facts $p"; cat inventory-$p/facts.txt 2>/dev/null || echo missing; done
