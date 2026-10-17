@@ -1,5 +1,9 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-34: handlers ignore sa_mask, and a handler's own signal nests (-35, slicc-kernel#975)
+
+`test/r35.c` against npm -34 on slicc-kernel 1.120.2's Node entry (2026-10-17): FAIL. Both cases print `usr2_inside=1 max_depth=2 order=<2<>>`. The SIGUSR2 that `sa_mask` should hold back runs inside the SIGUSR1 handler, and the handler's own SIGUSR1 nests even without `SA_NODEFER`. -35 gives `<><>2` (depth 1), and `<<>>2` with `SA_NODEFER`.
+
 ## 2025.9.30-33: no flock, SA_SIGINFO handlers never run, no sender in siginfo_t, POLLHUP on a write end (-34)
 
 On slicc-kernel 1.117.3's Node entry (2026-10-17):
