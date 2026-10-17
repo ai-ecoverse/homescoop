@@ -98,6 +98,8 @@ export const TOOLCHAINS = [
 
 const SHARED = new Set(['scripts/build-common.sh', 'scripts/host-run.sh']);
 
+const OUTSIDE = /\$\{?(?:HOMESCOOP_)?ROOT\}?\/\.\.\//;
+
 function code(text) {
   return text
     .split('\n')
@@ -134,6 +136,7 @@ export function toolchainInputs(name, dir = root, recipe = null) {
   if ((r.builder || 'slicc') !== 'host') return [];
   if (r.repack && typeof r.repack === 'object' && r.repack.from) return [];
   const scripts = buildScripts(name, dir);
+  if (scripts.some((s) => OUTSIDE.test(s.text))) return [];
   const globs = [];
   for (const t of TOOLCHAINS) {
     if (scripts.some((s) => t.uses.test(s.text))) globs.push(...t.inputs);
