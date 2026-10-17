@@ -172,13 +172,18 @@ PY
 homescoop_stage_license "$SRC/COPYING" "$SRC/COPYING" 2>/dev/null || \
   homescoop_stage_license "$SRC/COPYING" "$SRC/README"
 
-# npm version: 1.17 → 1.17.0-N (bump manually in package/ after rebuild)
 python3 - "$DEST" "$VER" <<'PY'
 import json, sys
 from pathlib import Path
 dest, ver = Path(sys.argv[1]), sys.argv[2]
+committed = dest / "package.json"
+old = json.loads(committed.read_text()) if committed.exists() else {}
 parts = ver.split(".")
-npm_ver = f"{ver}.0-5" if len(parts) == 2 else f"{ver}-5"
+npm_ver = old.get("version") or (f"{ver}.0-1" if len(parts) == 2 else f"{ver}-1")
+deps = old.get("dependencies") or {
+    "@ai-ecoverse/wasix-autoconf": "2.72.0-8",
+    "@ai-ecoverse/wasix-perl": "5.42.0-13",
+}
 am_env = {
     "AUTOMAKE_LIBDIR": f"${{package}}/share/automake-{ver}",
     "ACLOCAL_AUTOMAKE_DIR": f"${{package}}/share/aclocal-{ver}",
@@ -201,17 +206,15 @@ pkg = {
     "files": ["README.md", "LICENSE", "bin", "share"],
     "publishConfig": {"access": "public"},
     "homescoop": {"recipe": "wasix-automake", "upstream": ver},
-    "dependencies": {
-        "@ai-ecoverse/wasix-autoconf": "2.72.0-4",
-        "@ai-ecoverse/wasix-perl": "5.42.0-8",
-    },
     "slicc": {"abi": "wasi", "commands": commands},
+    "dependencies": deps,
 }
 (dest / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
-(dest / "README.md").write_text(
-    "# `@ai-ecoverse/wasix-automake`\n\n"
-    "GNU Automake scripts for slicc. Needs wasix-perl, wasix-autoconf, wasix-m4.\n"
-)
+if not (dest / "README.md").exists():
+    (dest / "README.md").write_text(
+        "# `@ai-ecoverse/wasix-automake`\n\n"
+        "GNU Automake scripts for slicc. Needs wasix-perl, wasix-autoconf, wasix-m4.\n"
+    )
 print("package.json", npm_ver)
 PY
 
