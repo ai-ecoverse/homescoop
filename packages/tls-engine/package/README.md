@@ -12,7 +12,7 @@ TLS for [SLICC](https://github.com/ai-ecoverse/slicc): Mbed TLS 4.2.0 sessions o
 
 ## Client sessions
 
-- **The trust store is the caller's.** `tls_ca_new` makes an empty store. `tls_ca_add_der` adds one DER root, and `tls_ca_add_bundle` adds concatenated DER, such as the package's `roots.der`, returning how many roots it added. The engine never loads roots by itself.
+- **The trust store is the caller's.** `tls_ca_new` makes an empty store. `tls_ca_add_der` adds one DER root, and `tls_ca_add_bundle` adds concatenated DER, such as the package's `roots.der`, returning how many roots it added. On an error (< 0) it may have added the roots before the bad one, so discard that store. The engine never loads roots by itself.
 - **Starting a session:** `tls_client_new(ca, servername, alpn, alpn_len, flags)` starts one. It takes the server name as a C string, an ALPN list in wire format (length-prefixed names; `0, 0` for none) and flags.
   - **Verification is required.** The chain must reach a root in `ca`, the leaf must name the server, every certificate must be within its validity period by the clock, and the leaf must allow server use (extendedKeyUsage serverAuth and keyUsage).
   - Without a store, or with an empty server name, there's no session (`TLS_BADARG`).
