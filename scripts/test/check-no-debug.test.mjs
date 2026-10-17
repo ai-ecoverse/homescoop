@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allowlisted, arMembers, debugIn, scan } from '../check-no-debug.mjs';
+import { allowlisted, arMembers, debugIn, scan, stripArchive } from '../check-no-debug.mjs';
 
 const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'check-no-debug.mjs');
 const leb = (n) => {
@@ -102,4 +102,35 @@ test('--strip refuses an objcopy that drops the name section (or any other non-d
     assert.match(r.stderr, /also dropped name; only \.debug_\* may go/);
     assert.deepEqual(readFileSync(join(pkg, 'bin', 'tool.wasm')), dbg, 'the file is left as it was');
   });
+});
+
+test('stripArchive rewrites members in place, nested archives too, and moves the GNU symbol table offsets with them', () => {
+  const nested = ar([['n.o', dbg]]);
+  const body = [['a.o', dbg], ['b.o', clean], ['inner.a', nested]];
+  const offsets = [];
+  let p = 8 + 60 + 4 + 4 * 3 + 6;
+  for (const [, d] of body) {
+    offsets.push(p);
+    p += 60 + d.length + (d.length & 1);
+  }
+  const sym = Buffer.alloc(4 + 4 * 3);
+  sym.writeUInt32BE(3, 0);
+  offsets.forEach((o, i) => sym.writeUInt32BE(o, 4 + 4 * i));
+  const symtab = Buffer.concat([sym, Buffer.from('a\0b\0n\0', 'latin1')]);
+  const a = ar([['', symtab], ...body]);
+  const stripped = stripArchive(a, (b) => clean);
+  assert.deepEqual(debugIn(stripped), []);
+  const members = arMembers(stripped);
+  assert.deepEqual(members.map((m) => m.name), ['a.o', 'b.o', 'inner.a']);
+  assert.deepEqual(members[0].data, clean);
+  assert.deepEqual(debugIn(members[2].data), []);
+  const table = stripped.subarray(8 + 60, 8 + 60 + 4 + 12);
+  let q = 8;
+  const starts = [];
+  while (q + 60 <= stripped.length) {
+    starts.push(q);
+    const size = parseInt(stripped.toString('latin1', q + 48, q + 58).trim(), 10);
+    q += 60 + size + (size & 1);
+  }
+  assert.deepEqual([1, 2, 3].map((i) => table.readUInt32BE(4 * i)), starts.slice(1), 'each symbol points at its member header after the rewrite');
 });

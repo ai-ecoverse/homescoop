@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { chmodSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -67,8 +68,77 @@ export function debugIn(buf) {
   const members = arMembers(buf);
   if (!members) return [];
   const out = [];
-  for (const m of members) for (const s of customSections(m.data) || []) if (s.name.startsWith('.debug')) out.push({ member: m.name, ...s });
+  for (const m of members) {
+    const inner = customSections(m.data);
+    if (inner) for (const s of inner) if (s.name.startsWith('.debug')) out.push({ member: m.name, ...s });
+    if (!inner && arMembers(m.data)) for (const s of debugIn(m.data)) out.push({ ...s, member: `${m.name}(${s.member})` });
+  }
   return out;
+}
+
+function rawMembers(buf) {
+  const out = [];
+  let p = 8;
+  while (p + 60 <= buf.length) {
+    const header = buf.subarray(p, p + 60);
+    const size = parseInt(header.toString('latin1', 48, 58).trim(), 10);
+    if (!Number.isFinite(size)) throw new Error(`bad archive member header at ${p}`);
+    const name = header.toString('latin1', 0, 16).trim();
+    const bsd = name.startsWith('#1/') ? Number(name.slice(3)) : 0;
+    out.push({ offset: p, header, name, bsd, data: buf.subarray(p + 60, p + 60 + size) });
+    p += 60 + size + (size & 1);
+  }
+  return out;
+}
+
+function remapSymbols(m, map) {
+  const body = Buffer.from(m.data);
+  const at = m.bsd;
+  const name = m.bsd ? body.toString('latin1', 0, m.bsd).replace(/\0+$/, '') : m.name;
+  const fix = (old) => {
+    if (!map.has(old)) throw new Error(`archive symbol table names offset ${old}, which is no member`);
+    return map.get(old);
+  };
+  if (name === '/') {
+    const n = body.readUInt32BE(0);
+    for (let i = 0; i < n; i++) body.writeUInt32BE(fix(body.readUInt32BE(4 + 4 * i)), 4 + 4 * i);
+  } else if (name === '/SYM64/') {
+    const n = Number(body.readBigUInt64BE(0));
+    for (let i = 0; i < n; i++) body.writeBigUInt64BE(BigInt(fix(Number(body.readBigUInt64BE(8 + 8 * i)))), 8 + 8 * i);
+  } else if (name.startsWith('__.SYMDEF')) {
+    const len = body.readUInt32LE(at);
+    for (let q = at + 4; q < at + 4 + len; q += 8) body.writeUInt32LE(fix(body.readUInt32LE(q + 4)), q + 4);
+  }
+  return body;
+}
+
+export function stripArchive(buf, stripModule) {
+  const members = rawMembers(buf);
+  const datas = members.map((m) => {
+    if (m.name === '/' || m.name === '/SYM64/' || m.name === '//' || (m.bsd && m.data.toString('latin1', 0, m.bsd).startsWith('__.SYMDEF'))) return null;
+    const head = m.data.subarray(0, m.bsd);
+    const content = m.data.subarray(m.bsd);
+    let next = content;
+    if (customSections(content)) next = debugIn(content).length ? stripModule(content, m.name) : content;
+    else if (arMembers(content)) next = stripArchive(content, stripModule);
+    return next === content ? m.data : Buffer.concat([head, next]);
+  });
+  const map = new Map();
+  let p = 8;
+  members.forEach((m, i) => {
+    map.set(m.offset, p);
+    const size = (datas[i] ?? m.data).length;
+    p += 60 + size + (size & 1);
+  });
+  const parts = [buf.subarray(0, 8)];
+  members.forEach((m, i) => {
+    const data = datas[i] ?? (m.name === '//' ? m.data : remapSymbols(m, map));
+    const header = Buffer.from(m.header);
+    header.write(String(data.length).padEnd(10), 48, 10, 'latin1');
+    parts.push(header, data);
+    if (data.length & 1) parts.push(Buffer.from('\n'));
+  });
+  return Buffer.concat(parts);
 }
 
 export function keptSections(buf) {
@@ -132,27 +202,36 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       process.exit(0);
     }
     const tool = process.env.HOMESCOOP_OBJCOPY || 'llvm-objcopy';
-    for (const f of scan(resolve(dir))) {
-      const p = join(resolve(dir), f.file);
-      const tmp = `${p}.nodebug`;
-      const r = spawnSync(tool, ['--strip-debug', p, tmp], { encoding: 'utf8' });
-      if (r.status !== 0) {
-        rmSync(tmp, { force: true });
-        console.error(`check-no-debug: ${tool} --strip-debug ${f.file} failed: ${r.error?.message ?? ''}${r.stderr}`);
-        process.exit(1);
+    const work = mkdtempSync(join(tmpdir(), 'check-no-debug-'));
+    let n = 0;
+    const stripModule = (buf, label) => {
+      const a = join(work, `${n}.in`);
+      const b = join(work, `${n++}.out`);
+      writeFileSync(a, buf);
+      const r = spawnSync(tool, ['--strip-debug', a, b], { encoding: 'utf8' });
+      if (r.status !== 0) throw new Error(`${tool} --strip-debug ${label} failed: ${r.error?.message ?? ''}${r.stderr}`);
+      const out = readFileSync(b);
+      const lost = lostSections(keptSections(buf), keptSections(out));
+      if (lost.length) throw new Error(`${tool} --strip-debug ${label} also dropped ${lost.join(', ')}; only .debug_* may go (the name section stays for backtraces)`);
+      if (debugIn(out).length) throw new Error(`${tool} --strip-debug ${label} left DWARF`);
+      return out;
+    };
+    try {
+      for (const f of scan(resolve(dir))) {
+        const p = join(resolve(dir), f.file);
+        const buf = readFileSync(p);
+        const out = customSections(buf) ? stripModule(buf, f.file) : stripArchive(buf, (b, m) => stripModule(b, `${f.file}(${m})`));
+        const mode = statSync(p).mode;
+        writeFileSync(p, out);
+        chmodSync(p, mode);
+        const names = keptSections(out).filter((x) => x === 'name' || x.endsWith(':name')).length;
+        console.log(`  stripped ${f.file}: ${f.bytes} bytes of ${f.sections.join(' ')}${names ? `; name section kept (${names})` : ''}`);
       }
-      const before = keptSections(readFileSync(p));
-      const lost = lostSections(before, keptSections(readFileSync(tmp)));
-      if (lost.length) {
-        rmSync(tmp, { force: true });
-        console.error(`check-no-debug: ${tool} --strip-debug ${f.file} also dropped ${lost.join(', ')}; only .debug_* may go (the name section stays for backtraces)`);
-        process.exit(1);
-      }
-      const mode = statSync(p).mode;
-      renameSync(tmp, p);
-      chmodSync(p, mode);
-      const names = before.filter((n) => n === 'name' || n.endsWith(':name')).length;
-      console.log(`  stripped ${f.file}: ${f.bytes} bytes of ${f.sections.join(' ')}${names ? `; name section kept (${names})` : ''}`);
+    } catch (e) {
+      console.error(`check-no-debug: ${e.message}`);
+      process.exit(1);
+    } finally {
+      rmSync(work, { recursive: true, force: true });
     }
     process.exit(0);
   }
