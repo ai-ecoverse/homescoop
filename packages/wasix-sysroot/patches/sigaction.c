@@ -206,6 +206,24 @@ volatile int __eintr_valid_flag;
 #else
 _Thread_local unsigned __slicc_signals_run;
 
+/* homescoop -35 (slicc-kernel#975): while a handler runs, the thread blocks
+ * its sa_mask and, unless SA_NODEFER, the signal itself, as POSIX says;
+ * the old mask comes back when it returns. The kernel doesn't see sa_mask
+ * (slicc.sigaction_set has no mask), so libc swaps the thread's mask through
+ * pthread_sigmask (slicc.sigmask_set) around the call. A signal blocked so
+ * stays pending and is delivered when the mask is restored. Returns 1 if the
+ * mask was changed. */
+static int handler_mask_enter(int sig, const struct k_sigaction *ksa, sigset_t *old)
+{
+	static const unsigned none[sizeof ksa->mask / sizeof ksa->mask[0]];
+	if ((ksa->flags & SA_NODEFER) && !memcmp(ksa->mask, none, sizeof none)) return 0;
+	sigset_t m;
+	sigemptyset(&m);
+	memcpy(&m, ksa->mask, sizeof ksa->mask);
+	if (!(ksa->flags & SA_NODEFER)) sigaddset(&m, sig);
+	return pthread_sigmask(SIG_BLOCK, &m, old) == 0;
+}
+
 __attribute__((export_name("__wasm_signal")))
 void __wasm_signal(int sig) {
 	if (sig-32U < 3 || sig-1U >= _NSIG-1) {
@@ -221,6 +239,7 @@ void __wasm_signal(int sig) {
 		return;
 	}
 	if (ksa.handler != 0) {
+		sigset_t old_mask;
 		/* homescoop: SA_RESETHAND resets to SIG_DFL on entry (POSIX). */
 		if (ksa.flags & SA_RESETHAND) {
 			LOCK(__eintr_handler_lock);
@@ -241,9 +260,13 @@ void __wasm_signal(int sig) {
 			siginfo_t si;
 			_Alignas(16) unsigned char uc[256] = {0};
 			__slicc_fill_siginfo(&si, sig, __slicc_siginfo_take(sig, (int32_t)(uintptr_t)&k) == 0 ? &k : 0);
+			int swapped = handler_mask_enter(sig, &ksa, &old_mask);
 			((void (*)(int, siginfo_t *, void *))ksa.handler)(sig, &si, uc);
+			if (swapped) pthread_sigmask(SIG_SETMASK, &old_mask, 0);
 		} else {
+			int swapped = handler_mask_enter(sig, &ksa, &old_mask);
 			ksa.handler(sig);
+			if (swapped) pthread_sigmask(SIG_SETMASK, &old_mask, 0);
 		}
 	} else {
 		unsigned long set[_NSIG/(8*sizeof(long))];

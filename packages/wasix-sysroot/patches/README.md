@@ -360,3 +360,14 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
   - `<sys/stat.h>` declares the four (wasi-libc hid them).
 - **Probe `test/r34.c`** (`R34_KERNEL=1`, slicc-kernel ≥ 1.120.0): FIFO creation, the umask, EEXIST (also over a dangling link), ENOENT, `mkfifoat` with a dirfd and with AT_FDCWD, each `mknod` type, and a forked writer and a reader meeting through the FIFO. On the cert kernel: ENOSYS.
 - **Not changed:** `pthread_kill` of the main thread still goes through `kill(getpid())` (the placeholder tid), so it arrives as SI_USER, not SI_TKILL.
+
+## -35: `sigaction.c` — sa_mask and SA_NODEFER (slicc-kernel#975)
+
+- **The gap:** `slicc.sigaction_set` carries no mask, and up to -34 `__wasm_signal` called handlers with the thread's mask unchanged. So `sa_mask` was never applied, and a handler's own signal could nest even without `SA_NODEFER`.
+- **The fix:** `__wasm_signal` now blocks `sa_mask` and, unless `SA_NODEFER`, the signal itself, through `pthread_sigmask(SIG_BLOCK)` (`slicc.sigmask_set`) before it calls the handler. It restores the old mask with `SIG_SETMASK` when the handler returns.
+  - A signal blocked this way stays pending, and the kernel delivers it at the restore (lowest number first).
+  - With `SA_NODEFER` and an empty `sa_mask`, there's no call.
+  - On a kernel without `slicc.sigmask_set`, `pthread_sigmask` only updates libc's own copy, so nothing is masked, as before.
+- **Probe `test/r35.c`:**
+  - **sa_mask:** a SIGUSR1 handler with SIGUSR2 in `sa_mask` raises SIGUSR2 and SIGUSR1. Neither runs inside it (depth 1); both run after it returns (order `<><>2`), and no mask is left behind.
+  - **SA_NODEFER:** the nested SIGUSR1 runs at once (depth 2), while SIGUSR2 still waits.

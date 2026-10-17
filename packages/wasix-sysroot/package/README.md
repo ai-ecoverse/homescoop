@@ -41,6 +41,8 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-35: **`sa_mask` and `SA_NODEFER` work** (slicc-kernel#975). While a handler runs, its `sa_mask` and, unless `SA_NODEFER`, its own signal are blocked, and the thread's mask comes back when it returns. libc swaps the mask through `slicc.sigmask_set` (slicc-kernel ≥ 1.93.0). Up to -34 handlers ran with the mask unchanged.
+
 Since 2025.9.30-34 (slicc-kernel ≥ 1.120.0 for all of it; older kernels keep -33's behaviour):
 
 - **The sender in `siginfo_t`.** `sigwaitinfo`/`sigtimedwait` fill `si_code`, `si_pid` and `si_uid` (and `si_status` for SIGCHLD) through `slicc.sigwait_info` (slicc-kernel#911, 1.114.0, homescoop#770). A `kill()` is SI_USER with the sender's pid and uid, `pthread_kill` SI_TKILL, a child's exit CLD_EXITED with its status. Up to -33 it was always SI_USER with pid and uid 0.
