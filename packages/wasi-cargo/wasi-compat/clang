@@ -5,6 +5,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 case "$*" in
   *libgit2/*)
     exec "$WASI_SDK_PATH/bin/clang" -I"$here" -include "$here/wasi_compat.h" \
-      -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS "$@" ;;
+      -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS \
+      -Wno-error=incompatible-pointer-types "$@" ;;
   *) exec "$WASI_SDK_PATH/bin/clang" "$@" ;;
 esac
