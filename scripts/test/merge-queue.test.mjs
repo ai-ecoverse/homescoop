@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LADDER_PR, githubIo, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
 import { checkGroup, gitIn, groupMembers, proofPaths, treeDigester } from '../merge-group-check.mjs';
-import { globRegExp } from '../list-touched-packages.mjs';
+import { globRegExp, toolchainInputs } from '../list-touched-packages.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHA_A = 'a'.repeat(64);
@@ -372,3 +372,42 @@ test('ladder-automerge: under a merge queue a mergeable PR that is "blocked" (di
   assert.deepEqual(mergeProblems(args), ['mergeable_state is blocked']);
   assert.deepEqual(mergeProblems({ ...args, queue: true, pr: { ...pr, mergeable_state: 'dirty', mergeable: false } }), ['mergeable_state is dirty (merge queue)']);
 });
+
+for (const moves of [true, false]) {
+  test(`${moves ? 'NEGATIVE: ' : ''}a toolchain file main ${moves ? 'changed' : 'left alone'} under a member's artifact ${moves ? 'fails' : 'passes'} the group (toolchain default inputs, #857)`, async () => {
+    const r = repo();
+    try {
+      r.put('packages/alpha/build.sh', 'emcc x.c\n');
+      r.put('shims/slicc/slicc_x.c', 'int x;\n');
+      const start = r.commit('alpha builds with emcc');
+      const a = branch(r, 'bb/a', start, () => r.pkg('alpha', '1.0.0-2'));
+      r.put(moves ? 'shims/slicc/slicc_x.c' : 'docs/x.md', 'int y;\n');
+      const moved = r.commit('main moves');
+      const b = branch(r, 'bb/b', moved, () => r.put('README.md', 'docs\n'));
+      const m1 = queueMerge(r, moved, a, 11, 'bb/a');
+      const m2 = queueMerge(r, m1, b, 12, 'bb/b');
+      const cwd = process.cwd();
+      process.chdir(r.dir);
+      let got;
+      try {
+        got = await checkGroup(
+          {
+            head: m2,
+            members: groupMembers(moved, m2, r.git),
+            touched: touchedOf(r),
+            digest: treeDigester(r.git, (p) => toolchainInputs(p, r.dir, { builder: 'host' })),
+            owners: (pkg) => touchingCommit(pkg, moved, m2),
+            context: (pkg, m) => readCtx(r, pkg, m.commit),
+          },
+          groupIo(r, { a, b }),
+        );
+      } finally {
+        process.chdir(cwd);
+      }
+      const tree = got.problems.filter((p) => /^alpha: its tree in the group head .* is not the tree #11's artifact was built from/.test(p));
+      assert.equal(tree.length, moves ? 1 : 0, got.problems.join('\n'));
+    } finally {
+      r.cleanup();
+    }
+  });
+}

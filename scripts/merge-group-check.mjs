@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { globRegExp } from './list-touched-packages.mjs';
+import { globRegExp, toolchainInputs } from './list-touched-packages.mjs';
 import { CONTEXT, groupStatus } from './cert-review/status.mjs';
 import { certReview, githubApi, githubIo, readContext, resolvePackage, touchingCommit } from './ladder-merge-resolve.mjs';
 
@@ -119,7 +119,7 @@ function node(script, ...argv) {
 
 function recipeInputs(pkg) {
   const r = node('read-recipe.mjs', pkg, '--json');
-  return Array.isArray(r.inputs) ? r.inputs : [];
+  return [...(Array.isArray(r.inputs) ? r.inputs : []), ...toolchainInputs(pkg, root, r)];
 }
 
 function parseArgs(argv) {
