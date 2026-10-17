@@ -23,9 +23,11 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
     process.exit(2);
   }
   try {
-    console.log(devPin(name));
+    const spec = devPin(name);
+    console.log(spec);
+    console.error(`dev-pin: PASS ${spec}`);
   } catch (err) {
-    console.error(`dev-pin: ${err.message}`);
+    console.error(`dev-pin: FAIL ${err.message}`);
     process.exit(1);
   }
 }

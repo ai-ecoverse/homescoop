@@ -405,8 +405,10 @@ async function main(argv) {
     if (process.env.GITHUB_OUTPUT) {
       appendFileSync(process.env.GITHUB_OUTPUT, `inputs=${JSON.stringify(result.inputs)}\n`);
     }
+    console.log(`ladder-merge-resolve: PASS ${label}: ${result.decision}`);
   } catch (err) {
     console.log(`::error::${label}: refuse to publish: ${String(err.message).replace(/\s*\n\s*/g, ' ')}`);
+    console.log(`ladder-merge-resolve: FAIL ${label}`);
     process.exit(1);
   }
 }

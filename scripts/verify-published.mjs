@@ -75,9 +75,11 @@ async function main(argv) {
   );
   if (result.ok) {
     console.log(`${name}@${version}: the registry serves ${integrity}, the sha512 of the published package.tgz (sha256 ${sha256})`);
+    console.log(`verify-published: PASS ${name}@${version}`);
     return;
   }
   console.log(`::error::${name}@${version}: ${result.reason}`);
+  console.log(`verify-published: FAIL ${name}@${version}`);
   if (args.issue) {
     const body = [
       `ladder-build published or tried to publish **${name}@${version}**, and the registry check failed.`,

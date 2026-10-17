@@ -485,6 +485,7 @@ async function plan(args) {
     console.log(`shard ${k} (~${Math.round(b.seconds / 60)} min): ${[...b.units.map(label), ...b.sweeps.map((m) => `base-sweep:${m}`)].join(' ')}`);
   }
   for (const s of doc.skipped) console.log(`skip ${s.package}@${s.version ?? '-'} (${s.origin.join(',')}): ${s.reason}`);
+  args.gateSummary = `${units.length} items in ${n} shard(s), ${doc.skipped.length} skipped`;
   output('tag', tag);
   output('artifact', `kernel-compat-${tag}`);
   output('shards', JSON.stringify(bins.map((_, k) => k)));
@@ -772,6 +773,7 @@ function shard(args) {
     sweeps,
     results,
   });
+  args.gateSummary = `shard ${index}: ${results.length} results, ${sweeps.length} sweep(s)`;
 }
 
 function sweepMode(plan, kdir, mode, out, limits) {
@@ -1121,6 +1123,13 @@ function report(args) {
   writeFileSync(join(out, 'summary.md'), text);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
   console.log(text);
+  const ran = results.filter((r) => r.verdict !== 'skip').length;
+  if (!ran) {
+    console.log(`::error::kernel-compat: the report has 0 rows that ran (${results.length} skipped); a run that tested nothing is not a pass`);
+    console.log('compat report: FAIL 0 rows');
+    process.exit(1);
+  }
+  args.gateSummary = `${ran} rows, ${regressions} regression(s), verdict ${verdict}`;
   output('verdict', verdict);
   output('regressions', String(regressions));
   if (errors.length) {
@@ -1207,6 +1216,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
     await fn(args);
   } catch (err) {
     console.error(err.stack || err);
+    console.error(`compat ${args._[0]}: FAIL ${String(err.message || err).split('\n')[0]}`);
     process.exit(1);
   }
+  console.log(`compat ${args._[0]}: PASS${args.gateSummary ? ` ${args.gateSummary}` : ''}`);
 }

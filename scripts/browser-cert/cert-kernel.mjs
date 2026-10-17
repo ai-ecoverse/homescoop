@@ -33,9 +33,11 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
     process.exit(2);
   }
   try {
-    console.log(certKernel(pkg));
+    const spec = certKernel(pkg);
+    console.log(spec);
+    console.error(`cert-kernel: PASS ${pkg}: ${spec}`);
   } catch (err) {
-    console.error(`browser-cert: no cert kernel for ${pkg}: ${err.message}`);
+    console.error(`cert-kernel: FAIL browser-cert: no cert kernel for ${pkg}: ${err.message}`);
     process.exit(1);
   }
 }

@@ -817,9 +817,12 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
     const known = readKnownInputs(values.known || KNOWN_INPUTS);
     const out = await repackInput({ pkg: values.package, ref: values.ref, npm: values.npm, readAt, registry, reproduced, known });
     console.log(JSON.stringify(out, null, 2));
-    process.exit(out.attested === false ? 1 : 0);
+    if (out.attested === true) console.error(`repack-input: PASS ${values.package}: attested${out.known?.length ? `, known ${out.known.length}` : ''}`);
+    else console.error(`repack-input: FAIL ${values.package}: unverifiable: ${out.reason ?? 'no reason'}`);
+    process.exit(out.attested === true ? 0 : 1);
   } catch (error) {
     console.log(JSON.stringify({ package: values.package, error: String(error.message || error) }, null, 2));
+    console.error(`repack-input: FAIL ${values.package}: trace error: ${String(error.message || error).split('\n')[0]}`);
     process.exit(2);
   }
 }

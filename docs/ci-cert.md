@@ -703,6 +703,10 @@ Emscripten builds without `slicc_sleep_ms` that exit 70 there
 
 The `@ai-ecoverse/slicc-kernel` pin must be a certified kernel, and `ci` enforces it: `ladder-pr`'s `exact-pins` job runs [`check-cert-kernel.mjs`](../scripts/check-cert-kernel.mjs), which fails unless the pin is exact, its slicc-kernel release `v<pin>` has a `certified @ai-ecoverse/slicc-kernel@<pin> sha256=<hex>` line, and the registry tarball re-hashes to that sha256.
 
+## Gate verdict lines
+
+A gate's silence must never read as a pass (#968). Every script that gates a merge, a release or a cert prints `<gate>: PASS <detail>` when it passes (and `<gate>: FAIL <detail>` where it can), and every caller runs it through `node scripts/gate.mjs <gate> -- <command> …`. The wrapper streams the child's stdout and stderr unchanged, so `x=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs …)` still captures the value. It exits with the child's code. When the child exits 0 without a `<gate>: PASS` line it exits 3, so an early exit 0, a CLI guard that didn't fire, or empty output fails the job. The gates are check-exact-pins, check-cert-kernel, browser-cert/cert-kernel (`cert-kernel`), dev-pin, browser-cert/compat (`compat plan|shard|report`; a report with 0 rows that ran is a FAIL), cert-review/repack-input, ladder-merge-resolve and verify-published. `scripts/test/gate-verdict.test.mjs` checks that each prints its line and that every call in the workflows, host-run.sh and cert-review/harness.sh goes through gate.mjs. kernel-compat.yml, ladder-merge.yml and harness.sh check out scripts at a ref that may predate gate.mjs, so they use it only when `scripts/gate.mjs` exists at that ref.
+
 ## Cert review: `cert-review.yml`
 
 Claude reviews every package a same-repo PR builds, after `ladder-pr` finishes, and leaves a verdict.

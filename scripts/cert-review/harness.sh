@@ -21,9 +21,18 @@ install() {
 }
 
 if [ -f scripts/browser-cert/cert-kernel.mjs ] && [ -f scripts/dev-pin.mjs ]; then
-  kernel=$(node scripts/browser-cert/cert-kernel.mjs "$pkg")
-  shared=$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
-  playwright=$(node scripts/dev-pin.mjs playwright-core)
+  gated() {
+    local g=$1
+    shift
+    if [ -f scripts/gate.mjs ]; then node scripts/gate.mjs "$g" -- "$@"; else "$@"; fi
+  }
+  kernel=$(gated cert-kernel node scripts/browser-cert/cert-kernel.mjs "$pkg")
+  shared=$(gated dev-pin node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
+  playwright=$(gated dev-pin node scripts/dev-pin.mjs playwright-core)
+  if [ -z "$kernel" ] || [ -z "$shared" ] || [ -z "$playwright" ]; then
+    echo "harness.sh: an empty kernel, shared-web or playwright pin for $pkg" >&2
+    exit 1
+  fi
 else
   kernel=$(field kernel | head -1)
   kernel=${kernel:-@ai-ecoverse/slicc-kernel@1.9.0}

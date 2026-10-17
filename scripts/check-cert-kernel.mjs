@@ -94,9 +94,9 @@ async function main() {
   try {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
     const { pin, sha256 } = await checkCertKernel(pkg);
-    console.log(`check-cert-kernel: ${KERNEL}@${pin} is certified, sha256=${sha256}`);
+    console.log(`check-cert-kernel: PASS ${KERNEL}@${pin} is certified, sha256=${sha256}`);
   } catch (e) {
-    console.log(`::error::check-cert-kernel: ${e.message}. Pin the cert kernel in package.json to a certified version.`);
+    console.log(`::error::check-cert-kernel: FAIL ${e.message}. Pin the cert kernel in package.json to a certified version.`);
     process.exit(1);
   }
 }
