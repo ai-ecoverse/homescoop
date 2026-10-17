@@ -1,0 +1,39 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8"
+  ],
+  "runTimeoutMs": 600000,
+  "checklist": [
+    "rustc --version is 1.98.1; rustc -vV says host wasm32-wasip1-threads and LLVM version 21.1.8 (the wasi-llvm it links)",
+    "corpus, compiled and run in the kernel: hello world; -O with std::fs, std::env (args, OUT), process::exit(7); a crate with a dependency (greet as an rlib, --extern) printing `hello, slicc!` and fib(25)=75025; an out-of-bounds panic; a missing source and E0308 fail with rc 1",
+    "every compiled program imports only wasi_snapshot_preview1 functions and exports _start; the corpus sizes and import sets are logged for the old-vs-new comparison",
+    "users enforce: alice compiles in her home (the output is hers), is refused bob's 0600 source (couldn't read … Permission denied) and his 0755 directory (nothing left there), compiles his 0644 source into her home; root compiles everything",
+    "test/imports.mjs (ci): rustc.wasm imports only env (shared memory), wasi (thread-spawn), wasi_snapshot_preview1 and wasix_32v1, and the list is logged for the import-set diff"
+  ],
+  "patches": {
+    "0003-rust-1.98-wasi-host-paths.patch": "PATH splitting, TMPDIR and HOME in the WASI host std: the driver's PATH and the corpus runs",
+    "0004-rust-1.98-static-llvm-lld.patch": "lld inside rustc.wasm: every corpus link",
+    "0005-rust-1.98-llvm-wasi-threads-target.patch": "bootstrap's in-tree LLVM config for a wasip1-threads host (applied for parity; this build takes wasi-llvm's llvm-config instead)",
+    "0006-rust-1.98-wasi-sysroot-env.patch": "the sysroot the driver passes: the target std the corpus links",
+    "0007-rust-1.98-llvm-wasi-endian.patch": "endian headers of the in-tree LLVM on a WASI host (applied for parity; wasi-llvm carries the same guards)",
+    "0008-rust-1.98-llvm-wasi-unix.patch": "bootstrap treats the WASI host as Unix-like for the in-tree LLVM (applied for parity; wasi-llvm's llvm-config is used)",
+    "0009-rust-1.98-llvm-wasi-support.patch": "LLVM Support/ExecutionEngine on a WASI host, in-tree copy (applied for parity; wasi-llvm carries the same guards)",
+    "0010-rust-1.98-wasi-no-dlopen.patch": "no dlopen on WASI: rustc.wasm links without libloading",
+    "0011-rust-1.98-wasi-output-writeable.patch": "the output-writeable check skipped on WASI: every corpus -o",
+    "0012-rust-1.98-wasi-process-proc-macros.patch": "proc macros as child processes (wasix_32v1.proc_spawn3 in the import list); wasi-cargo's cert drives cargo with it",
+    "0013-rust-1.98-wasi-cwd-from-pwd.patch": "cwd from $PWD: relative sources in the corpus",
+    "0014-rust-1.98-wasi-no-permission-bits.patch": "no permission bits on WASI preview1: outputs are written",
+    "0015-rust-1.98-wasi-fatal-exit.patch": "fatal errors exit instead of trapping: the missing-source and E0308 cases return rc 1"
+  },
+  "ci": [
+    "node packages/wasi-rustc/test/imports.mjs --tarball .homescoop-out/package.tgz"
+  ]
+}
