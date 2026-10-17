@@ -63,23 +63,6 @@ on:
         default: ''
         type: string
 
-  workflow_call:
-    inputs:
-      sha:
-        description: The merge commit to resolve (real only when the caller is main's ladder-automerge).
-        required: true
-        type: string
-      before:
-        description: Its first parent.
-        required: false
-        default: ''
-        type: string
-      pr:
-        description: Dry calls only, the PR to resolve as if merged at sha.
-        required: false
-        default: ''
-        type: string
-
 permissions:
   contents: read
   actions: write
@@ -101,7 +84,7 @@ jobs:
       - id: d
         env:
           EVENT: ${{ github.event_name }}
-          REAL: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.workflow_ref == format('{0}/.github/workflows/ladder-automerge.yml@refs/heads/main', github.repository)) }}
+          REAL: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           BEFORE: ${{ github.event.before || inputs.before }}
           AFTER: ${{ inputs.sha || github.sha }}
           ONLY: ${{ inputs.packages }}
