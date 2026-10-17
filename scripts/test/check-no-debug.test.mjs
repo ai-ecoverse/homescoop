@@ -77,6 +77,7 @@ test('the CLI fails on DWARF, and --strip removes it with the objcopy it is give
     const fail = spawnSync(process.execPath, [script, 'no-such-recipe', pkg], { encoding: 'utf8' });
     assert.equal(fail.status, 1, fail.stdout + fail.stderr);
     assert.match(fail.stderr, /2 file\(s\) ship 98 bytes of DWARF \(homescoop#908\)/);
+    assert.match(fail.stderr, /^check-no-debug: FAIL /m);
     const tool = join(dir, 'fake-objcopy');
     writeFileSync(tool, `#!/usr/bin/env node\nconst fs = require('fs');\nconst [, , flag, src, dst] = process.argv;\nif (flag !== '--strip-debug') process.exit(3);\nconst b = fs.readFileSync(src);\nfs.writeFileSync(dst, b.subarray(0, 0).length ? b : (b.toString('latin1', 0, 8) === '!<arch>\\n' ? ${JSON.stringify(ar([['x.o', clean]]).toString('base64'))} : ${JSON.stringify(clean.toString('base64'))}), 'base64');\n`);
     chmodSync(tool, 0o755);
@@ -84,10 +85,12 @@ test('the CLI fails on DWARF, and --strip removes it with the objcopy it is give
     assert.equal(strip.status, 0, strip.stdout + strip.stderr);
     assert.match(strip.stdout, /stripped bin\/tool\.wasm: 49 bytes/);
     assert.match(strip.stdout, /stripped lib\/libx\.a: 49 bytes/);
+    assert.match(strip.stdout, /^check-no-debug: PASS \S+: stripped 2 file\(s\)$/m);
     assert.deepEqual(readFileSync(join(pkg, 'bin', 'tool.wasm')), clean);
     const ok = spawnSync(process.execPath, [script, 'no-such-recipe', pkg], { encoding: 'utf8' });
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
     assert.match(ok.stdout, /no \.debug_\* sections/);
+    assert.match(ok.stdout, /^check-no-debug: PASS /m);
   });
 });
 

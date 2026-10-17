@@ -198,7 +198,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
   const debug = spawnSync(process.execPath, [join(root, 'scripts/read-recipe.mjs'), name, '--field', 'debug'], { encoding: 'utf8' }).stdout.trim();
   if (mode === '--strip') {
     if (allowlisted(name)) {
-      console.log(`check-no-debug: ${name}: allowlisted (${allowlisted(name)}), not stripped`);
+      console.log(`check-no-debug: PASS ${name}: allowlisted (${allowlisted(name)}), not stripped`);
       process.exit(0);
     }
     const tool = process.env.HOMESCOOP_OBJCOPY || 'llvm-objcopy';
@@ -216,8 +216,10 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
       if (debugIn(out).length) throw new Error(`${tool} --strip-debug ${label} left DWARF`);
       return out;
     };
+    let files = [];
     try {
-      for (const f of scan(resolve(dir))) {
+      files = scan(resolve(dir));
+      for (const f of files) {
         const p = join(resolve(dir), f.file);
         const buf = readFileSync(p);
         const out = customSections(buf) ? stripModule(buf, f.file) : stripArchive(buf, (b, m) => stripModule(b, `${f.file}(${m})`));
@@ -228,25 +230,26 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
         console.log(`  stripped ${f.file}: ${f.bytes} bytes of ${f.sections.join(' ')}${names ? `; name section kept (${names})` : ''}`);
       }
     } catch (e) {
-      console.error(`check-no-debug: ${e.message}`);
+      console.error(`check-no-debug: FAIL ${name}: ${e.message}`);
       process.exit(1);
     } finally {
       rmSync(work, { recursive: true, force: true });
     }
+    console.log(`check-no-debug: PASS ${name}: stripped ${files.length} file(s)`);
     process.exit(0);
   }
   const found = scan(resolve(dir));
   const total = found.reduce((a, f) => a + f.bytes, 0);
   for (const f of found) console.log(`  ${f.file}: ${f.bytes} bytes of ${f.sections.join(' ')}${f.members ? ` in ${f.members} member(s)` : ''}`);
   if (!found.length) {
-    console.log(`check-no-debug: ${name}: no .debug_* sections in any wasm, archive or object`);
+    console.log(`check-no-debug: PASS ${name}: no .debug_* sections in any wasm, archive or object`);
     process.exit(0);
   }
   const issue = allowlisted(name);
   if (debug === 'true' || issue) {
-    console.log(`check-no-debug: ${name}: ${found.length} file(s), ${total} bytes of DWARF, allowed (${debug === 'true' ? 'recipe debug: true' : `allowlist ${issue}`})`);
+    console.log(`check-no-debug: PASS ${name}: ${found.length} file(s), ${total} bytes of DWARF, allowed (${debug === 'true' ? 'recipe debug: true' : `allowlist ${issue}`})`);
     process.exit(0);
   }
-  console.error(`check-no-debug: ${name}: ${found.length} file(s) ship ${total} bytes of DWARF (homescoop#908). host-run strips it with llvm-objcopy --strip-debug unless the recipe sets debug: true; set debug: true to ship it on purpose, or allowlist it with an issue in scripts/check-no-debug-allowlist.txt`);
+  console.error(`check-no-debug: FAIL ${name}: ${found.length} file(s) ship ${total} bytes of DWARF (homescoop#908). host-run strips it with llvm-objcopy --strip-debug unless the recipe sets debug: true; set debug: true to ship it on purpose, or allowlist it with an issue in scripts/check-no-debug-allowlist.txt`);
   process.exit(1);
 }
