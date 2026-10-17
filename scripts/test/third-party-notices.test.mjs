@@ -48,8 +48,6 @@ py-matplotlib Qhull #743
 py-matplotlib Agg #743
 py-matplotlib BaKoMa #743
 py-matplotlib files #743
-py-numpy OpenBLAS #726
-py-numpy files #726
 py-pandas ujson #729
 py-pandas klib #729
 py-pandas files #729
@@ -75,6 +73,7 @@ const NOT_LINKED = {
     'py-numpy': 'build-time headers and Python API; py-numpy ships its own notices',
     wasix_python: 'headers to build side modules against',
     cpython: 'headers to build side modules against',
+    cython: 'build tool: Cython-generated C carries no licence obligation',
     cxxrt: 'libc++ runtime, Apache-2.0 WITH LLVM-exception (no notice for compiled code)',
     meson: 'build tool',
     perl_cross: 'cross-build system',
