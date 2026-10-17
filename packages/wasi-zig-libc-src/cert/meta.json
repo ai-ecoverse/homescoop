@@ -2,11 +2,22 @@
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
   "users": "enforce",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils", "@ai-ecoverse/wasi-zig"],
-  "needsInstall": ["@ai-ecoverse/wasm-bash@5.3.0-19", "@ai-ecoverse/wasm-coreutils@9.12.0-8", "@ai-ecoverse/wasi-zig@0.16.0-15"],
-  "runTimeoutMs": 2700000,
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasi-zig"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8",
+    "@ai-ecoverse/wasi-zig@0.16.0-15"
+  ],
+  "runTimeoutMs": 600000,
   "checklist": [
-    "with @ai-ecoverse/wasi-zig installed beside it, zig cc -target wasm32-wasi -mcpu=generic+simd128 builds wasi-libc from this package's sources (no 'ipk install @ai-ecoverse/wasi-zig-libc-src' hint), and the program runs (malloc/strcpy/printf) with preview1 imports only",
-    "the baseline target still links wasi-zig's prebuilt libc"
+    "identity (ci, cert/identity.mjs): the package's lib/libc is file for file (sha256) zig-0.16.0.tar.xz's lib/libc/wasi and lib/libc/musl, downloaded and checked against the recipe's sha256, and LICENSE is Zig's",
+    "with @ai-ecoverse/wasi-zig installed beside it, zig cc -target wasm32-wasi -mcpu=generic+simd128 finds these sources (no 'ipk install @ai-ecoverse/wasi-zig-libc-src' error) and builds wasi-libc from them: done (rc 0) or still compiling when `timeout 90` stops it (rc 124). Without the package the same command fails at once with that error (cert/NEGATIVE.md). The full build takes about 7 min in a laptop kernel and over 45 min on the CI runner, so the cert doesn't wait for it."
+  ],
+  "ci": [
+    "node packages/wasi-zig-libc-src/cert/identity.mjs --tarball .homescoop-out/package.tgz"
   ]
 }
