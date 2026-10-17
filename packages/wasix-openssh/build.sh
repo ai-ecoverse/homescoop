@@ -31,8 +31,6 @@ ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 
 # Isolated toolchain with the pinned certified wasix-sysroot (until 10.6.0-5
 # this pinned -18 here, which is why it stayed behind).
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
-export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
 SYSROOT_VER="$(sed -n 's/.*sysroot=\([^ ]*\).*/\1/p' "$WASIXCC_PREFIX/.homescoop-toolchain" | head -1)"
 [[ -n "$SYSROOT_VER" ]] || { echo "homescoop wasix-openssh: no sysroot= in $WASIXCC_PREFIX/.homescoop-toolchain" >&2; exit 1; }

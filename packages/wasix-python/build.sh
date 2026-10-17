@@ -33,10 +33,6 @@ JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu)}"
 export SOURCE_DATE_EPOCH=1764892800
 export PYTHONHASHSEED=0
 export ZERO_AR_DATE=1
-# wasix-sysroot -34 ahead of install-wasixcc.sh's default (homescoop#984 flips
-# the default once every dependent is on -34; this override then goes).
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
-export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 DEPS_KEY="$(cat "$PKG/build.sh" "$ROOT/scripts/install-wasixcc.sh" | shasum -a 256 | cut -d' ' -f1)"
 if [[ -d "$DEPS" && "$(cat "$DEPS/.homescoop-key" 2>/dev/null)" != "$DEPS_KEY" ]]; then
   echo "== wasix-python: build.sh or the toolchain pin changed since $DEPS was built; rebuilding the deps"

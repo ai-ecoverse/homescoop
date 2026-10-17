@@ -31,10 +31,13 @@ BINARYEN_VERSION="133"
 # eaccess through slicc-kernel (>= 1.63.0), AT_EACCESS 0x200, linkat flags;
 # -26 an empty path is ENOENT (fstatat AT_EMPTY_PATH is fstat); -27 utimensat/
 # futimens with NULL/UTIME_NOW/UTIME_OMIT, clock/times/getrusage as process CPU.
+# -33 is built from source in CI (wasix-libc v2026-07-03.1, llvm-project
+# 6bb93a24; homescoop#890), so no input is unattested; -34 adds flock
+# (slicc.flock), the sender in siginfo_t, SA_SIGINFO handlers and mkfifo.
 # Override with HOMESCOOP_WASIX_SYSROOT_VERSION + HOMESCOOP_WASIX_SYSROOT_SHA
 # when a package needs another certified sysroot.
-SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-32}"
-SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-e457055502355f6aa416b80553deab0aeb9e25b8c8142239e7bfb3366e651344}"
+SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-34}"
+SYSROOT_SHA="${HOMESCOOP_WASIX_SYSROOT_SHA:-18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0}"
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
