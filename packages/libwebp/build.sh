@@ -34,7 +34,8 @@ mkdir -p "$HOMESCOOP_PKG/package/include/webp" "$PREFIX/include/webp"
 cp "$SRC_DIR/src/webp/"*.h "$HOMESCOOP_PKG/package/include/webp/"
 cp "$SRC_DIR/src/webp/"*.h "$PREFIX/include/webp/"
 cp "$SRC_DIR/sharpyuv/sharpyuv.h" "$HOMESCOOP_PKG/package/include/" 2>/dev/null || true
-homescoop_write_pc libwebp "$VERSION" "-lwebp"
+homescoop_write_pc libsharpyuv "$VERSION" "-lsharpyuv"
+homescoop_write_pc libwebp "$VERSION" "-lwebp" "libsharpyuv"
 homescoop_write_pc libwebpmux "$VERSION" "-lwebpmux" "libwebp"
 homescoop_write_pc libwebpdemux "$VERSION" "-lwebpdemux" "libwebp"
 homescoop_stage_licenses "$SRC_DIR"/COPYING "$SRC_DIR"/PATENTS
