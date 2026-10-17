@@ -131,7 +131,7 @@ jobs:
             echo "::warning::recipe-sha: this branch's refresh-recipe-sha.mjs predates the verdict line (#1019); merge main to get the wrapped check"
           fi
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            "${gate[@]}" node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
+            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.

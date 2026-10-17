@@ -168,7 +168,7 @@ test('run.mjs (cert-run) and refresh-recipe-sha (recipe-sha) print their verdict
   // recipe-sha runs the PR head's script (its job checks out the head to push): it is wrapped
   // whenever that script prints the verdict, and only a pre-#1019 branch runs it unwrapped, with a warning.
   assert.match(pr, /grep -q 'recipe-sha: PASS' scripts\/refresh-recipe-sha\.mjs; then\n\s*gate=\(node scripts\/gate\.mjs recipe-sha --\)/);
-  assert.match(pr, /"\$\{gate\[@\]\}" node scripts\/refresh-recipe-sha\.mjs "\$pkg" --verify-repack/);
+  assert.match(pr, /\$\{gate\[@\]\+"\$\{gate\[@\]\}"\} node scripts\/refresh-recipe-sha\.mjs "\$pkg" --verify-repack/);
   assert.match(pr, /::warning::recipe-sha: this branch's refresh-recipe-sha\.mjs predates the verdict line/);
   assert.match(pr, /node scripts\/gate\.mjs cert-run -- node scripts\/browser-cert\/run\.mjs/);
   assert.match(pr, /node scripts\/gate\.mjs host-smoke -- bash scripts\/host-smoke\.sh/);
