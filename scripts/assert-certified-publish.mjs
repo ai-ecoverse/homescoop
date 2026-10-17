@@ -8,13 +8,15 @@
  *
  * Exit 0  — hashes match; caller may `npm publish`
  * Exit 10 — version document already exists; skip publish
- * Exit 2  — refuse
+ * Exit 2  — refuse (also when the version sorts below npm's latest: the
+ *           publish uses --tag latest, so it would move latest back; #891)
  *
  *   node scripts/assert-certified-publish.mjs <tgz> --npm <name> --certified <sha256>
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { compareVersions } from './npm-parity.mjs';
 
 const tgz = process.argv[2];
 if (!tgz || tgz.startsWith('-')) {
@@ -54,7 +56,8 @@ if (name !== npmName) {
   process.exit(2);
 }
 
-const url = `https://registry.npmjs.org/${encodeURIComponent(npmName)}/${version}`;
+const registry = process.env.HOMESCOOP_REGISTRY || 'https://registry.npmjs.org';
+const url = `${registry}/${encodeURIComponent(npmName)}/${version}`;
 const res = await fetch(url);
 if (res.status === 200) {
   console.log(`already on npm: ${npmName}@${version} — skip publish`);
@@ -62,6 +65,28 @@ if (res.status === 200) {
 }
 if (res.status !== 404) {
   console.error(`assert-certified-publish: GET ${url} -> ${res.status}`);
+  process.exit(2);
+}
+
+const latestUrl = `${registry}/${encodeURIComponent(npmName)}/latest`;
+const tags = await fetch(latestUrl);
+let latest = null;
+if (tags.status === 200) {
+  latest = (await tags.json().catch(() => null))?.version;
+  if (typeof latest !== 'string') {
+    console.error(`assert-certified-publish: GET ${latestUrl} has no version`);
+    process.exit(2);
+  }
+} else if (tags.status !== 404) {
+  console.error(`assert-certified-publish: GET ${latestUrl} -> ${tags.status}`);
+  process.exit(2);
+}
+if (latest && compareVersions(version, latest) < 0) {
+  console.error(
+    `refuse OIDC publish of ${npmName}@${version}: it sorts below npm latest ${latest}, ` +
+      `and --tag latest would move latest back. Main published past this build after it was certified; ` +
+      `bump the packaging revision above ${latest} (homescoop#891).`,
+  );
   process.exit(2);
 }
 
