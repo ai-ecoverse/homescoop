@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 
 #define W 64
 #define H 48
@@ -34,7 +35,11 @@ int main(int argc, char **argv) {
   png_init_io(png, fp);
   png_set_compression_level(png, 9);
   png_set_IHDR(png, info, W, H, 8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-  png_text text = { PNG_TEXT_COMPRESSION_zTXt, "Comment", "homescoop libpng probe", 0, NULL, 0, NULL, NULL };
+  png_text text;
+  memset(&text, 0, sizeof text);
+  text.compression = PNG_TEXT_COMPRESSION_zTXt;
+  text.key = "Comment";
+  text.text = "homescoop libpng probe";
   png_set_text(png, info, &text, 1);
   png_write_info(png, info);
   png_bytep rows[H];
