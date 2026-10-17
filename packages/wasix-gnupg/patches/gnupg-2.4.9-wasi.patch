@@ -607,3 +607,91 @@
      {
        block = 1;
        rc = gnupg_rename_file (fname, bakfname, &block);
+--- a/g10/keydb.c
++++ b/g10/keydb.c
+@@ -351,6 +351,40 @@
+ 
+   /* The file does not yet exist, create it now. */
+   oldmask = umask (077);
++#ifdef __wasi__
++  /* homescoop#712: rt_from_file reads FILENAME without the lock, and a
++   * gpg that opens it between the create and the header write below sees
++   * an empty file and takes it for a keyring.  Write the header to the
++   * temporary file and rename it into place, so the keybox only ever
++   * appears complete (renames are atomic in slicc-kernel >= 1.117.2).  */
++  if (is_box && !is_secured_filename (filename))
++    {
++      estream_t fp = es_fopen (tmp_fname, "wb");
++      if (!fp)
++        rc = gpg_error_from_syserror ();
++      else
++        {
++          rc = _keybox_write_header_blob (fp, 1);
++          if (es_fclose (fp) && !rc)
++            rc = gpg_error_from_syserror ();
++        }
++      if (!rc)
++        rc = gnupg_rename_file (tmp_fname, filename, NULL);
++      umask (oldmask);
++      if (rc)
++        {
++          gnupg_remove (tmp_fname);
++          log_error (_("error creating keybox '%s': %s\n"),
++                     filename, gpg_strerror (rc));
++          goto leave;
++        }
++      iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, filename);
++      if (!opt.quiet)
++        log_info (_("keybox '%s' created\n"), filename);
++      rc = 0;
++      goto leave;
++    }
++#endif /*__wasi__*/
+   if (is_secured_filename (filename))
+     {
+       iobuf = NULL;
+@@ -430,8 +464,44 @@
+    KEYDB_RESOURCE_TYPE_KEYBOX, KEYDB_RESOURCE_TYPE_KEYRING or
+    KEYDB_RESOURCE_TYPE_KEYNONE.  If the file is a keybox and it has
+    the OpenPGP flag set, then R_OPENPGP is also set.  */
++#ifdef __wasi__
++static KeydbResourceType rt_from_file_1 (const char *filename,
++                                         int *r_found, int *r_openpgp);
++
++/* homescoop#712: the probe below reads FILENAME without the lock, and a
++ * file shorter than a keybox header may be a keybox another gpg is still
++ * creating, which the probe would take for a keyring.  Probe such a file
++ * again under its dotlock, which the creator holds until the header is
++ * written.  */
++static KeydbResourceType
++rt_from_file (const char *filename, int *r_found, int *r_openpgp)
++{
++  struct stat st;
++  KeydbResourceType rt;
++  dotlock_t lockhd;
++
++  if (gnupg_stat (filename, &st) || st.st_size >= 32)
++    return rt_from_file_1 (filename, r_found, r_openpgp);
++  lockhd = dotlock_create (filename, 0);
++  if (!lockhd)
++    return rt_from_file_1 (filename, r_found, r_openpgp);
++  if (dotlock_take (lockhd, -1))
++    {
++      dotlock_destroy (lockhd);
++      return rt_from_file_1 (filename, r_found, r_openpgp);
++    }
++  rt = rt_from_file_1 (filename, r_found, r_openpgp);
++  dotlock_release (lockhd);
++  dotlock_destroy (lockhd);
++  return rt;
++}
++
++static KeydbResourceType
++rt_from_file_1 (const char *filename, int *r_found, int *r_openpgp)
++#else /*!__wasi__*/
+ static KeydbResourceType
+ rt_from_file (const char *filename, int *r_found, int *r_openpgp)
++#endif /*!__wasi__*/
+ {
+   u32 magic;
+   unsigned char verbuf[4];
