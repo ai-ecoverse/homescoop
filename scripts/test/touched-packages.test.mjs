@@ -166,7 +166,7 @@ test('classify --all: every recipe but the retired ones, as if all were touched 
 });
 
 test('classify: a reproducible value that is not true, false or a package/ path fails', () => {
-  for (const bad of ['reproducible: yes\n', 'reproducible:\n  path: bin/x.wasm\n']) {
+  for (const bad of ['reproducible: yes\n', 'reproducible:\n  path: bin/x.wasm\n', 'reproducible:\n  same_path: soon\n', 'reproducible:\n  same: 1\n']) {
     const f = fixture({ r: { recipe: `name: r\nbuilder: host\n${bad}` } });
     try {
       const r = f.classify(['packages/r/build.sh']);
@@ -188,5 +188,19 @@ test('classify: a runner other than pool fails', () => {
     } finally {
       f.done();
     }
+  }
+});
+
+test('classify: reproducible.same_path (an issue number), alone or with path:, still rebuilds (#668)', () => {
+  const f = fixture({
+    same: { recipe: 'name: same\nbuilder: host\nreproducible:\n  same_path: 668\n' },
+    both: { recipe: 'name: both\nbuilder: host\nreproducible:\n  path: package/bin/x.wasm\n  same_path: 668\n' },
+  });
+  try {
+    const r = f.classify(['packages/same/build.sh', 'packages/both/build.sh']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout).rebuild, ['both', 'same']);
+  } finally {
+    f.done();
   }
 });

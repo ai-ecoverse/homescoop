@@ -157,19 +157,9 @@ jobs:
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
       - name: Build from the hosted workspace path
-        run: |
-          set -euo pipefail
-          want="/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
-          if [[ "$GITHUB_WORKSPACE" != "$want" ]]; then
-            if [[ -e "$want" && ! -L "$want" ]]; then
-              echo "::error::$want exists and is not a link to the workspace"
-              exit 1
-            fi
-            mkdir -p "$(dirname "$want")"
-            ln -sfn "$GITHUB_WORKSPACE" "$want"
-          fi
-          echo "build root $want ($(cd "$want" && pwd -P))"
-          echo "HOMESCOOP_BUILD_ROOT=$want" >> "$GITHUB_ENV"
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: bash scripts/ladder-build-root.sh host "${{ matrix.package }}" >> "$GITHUB_ENV"
       - name: Host build (no publish)
         run: |
           set -euo pipefail
@@ -225,20 +215,13 @@ jobs:
         run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
-      - name: Build from the hosted workspace path
-        run: |
-          set -euo pipefail
-          want="/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
-          if [[ "$GITHUB_WORKSPACE" != "$want" ]]; then
-            if [[ -e "$want" && ! -L "$want" ]]; then
-              echo "::error::$want exists and is not a link to the workspace"
-              exit 1
-            fi
-            mkdir -p "$(dirname "$want")"
-            ln -sfn "$GITHUB_WORKSPACE" "$want"
-          fi
-          echo "build root $want ($(cd "$want" && pwd -P))"
-          echo "HOMESCOOP_BUILD_ROOT=$want" >> "$GITHUB_ENV"
+      # Another directory (a real copy), WORK and user name than host-build's,
+      # so reproducible proves path independence (#668); a recipe known to
+      # embed its path sets reproducible.same_path: <issue>.
+      - name: Build from a second workspace path
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: bash scripts/ladder-build-root.sh rebuild "${{ matrix.package }}" >> "$GITHUB_ENV"
       - name: Second host build (recipe reproducible)
         run: |
           set -euo pipefail
@@ -249,8 +232,8 @@ jobs:
         with:
           name: rebuild-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: |
-            .homescoop-out/package.tgz
-            .homescoop-out/package.tgz.sha256
+            ${{ env.HOMESCOOP_BUILD_ROOT }}/.homescoop-out/package.tgz
+            ${{ env.HOMESCOOP_BUILD_ROOT }}/.homescoop-out/package.tgz.sha256
           if-no-files-found: error
           retention-days: 3
       - if: always()
