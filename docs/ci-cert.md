@@ -486,12 +486,14 @@ The unit is a **case**: one assertion of a spec, or one sweep command.
   call and goes on after a failed one, so one failure doesn't hide the next.
   A case is named by its call site in the spec (with the spec's helpers):
   `packages/rsync/cert/users.mjs:41<packages/rsync/cert/users.mjs:88`, plus
-  `#n` for the nth time that line runs. The candidate and the reference are
-  compared by call site, without the `#n`: a racy assertion in a loop fails
-  on different iterations from run to run, so `:88#4` on the candidate is the
-  same failure as `:88#2` on the reference, and a call site is a regression
-  only if it fails on the candidate and none of its runs fail on the
-  reference.
+  `#n` for the nth time that line runs. A racy assertion in a loop fails on
+  different iterations from run to run, so the reference is also compared
+  by call site, by count: a candidate failure the reference doesn't have
+  under the same id still fails "the same way" if the reference fails at
+  least as many instances of that call site as the candidate does
+  (`:88#4 #5 #6` against `:88 #2 #3`). One more failing instance than the
+  reference (`:88#3 #4 #5` against `:88#2`) is a regression. A candidate
+  retry still fails a case if it fails any instance of its call site.
 - **Crashes:** an exception that isn't an assertion (a `TypeError`, a page
   call that never answers) ends the spec. Its signature is where it happened
   plus the first line of the message, with numbers and URLs blanked out.
@@ -502,8 +504,8 @@ The verdicts:
 - `known`: it fails on the candidate, and either
   - a [`known-limits.json`](../scripts/browser-cert/known-limits.json) entry
     covers it, or
-  - it fails the same way on the reference (the same call site, or a crash
-    with the same signature), or
+  - it fails the same way on the reference (the same case, as many failing
+    instances of its call site, or a crash with the same signature), or
   - the reference crashed before reaching it.
 - `regression`: anything else. That means it passes on the reference, or
   the reference never reached it without crashing, or the candidate crashes

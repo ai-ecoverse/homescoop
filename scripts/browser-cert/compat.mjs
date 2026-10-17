@@ -560,11 +560,17 @@ function certRun({ label, kernelFile, recipe, cert, tarballs, users, work, logs,
   return { ...rep, exit: r.status, durationMs, log: relative(dirname(logs), log) };
 }
 
+export const siteOf = (id) => String(id).replace(/#\d+$/, '');
+
 export function failuresOf(rep) {
   const out = [];
   for (const sp of rep.specs) {
     if (sp.status !== 'fail') continue;
-    for (const c of sp.cases?.fail || []) out.push({ spec: sp.spec, key: c.id, kind: 'case', text: c.message });
+    const fails = sp.cases?.fail || [];
+    for (const c of fails) {
+      const site = siteOf(c.id);
+      out.push({ spec: sp.spec, key: c.id, kind: 'case', text: c.message, site, atSite: fails.filter((x) => siteOf(x.id) === site).length });
+    }
     if (sp.crash) out.push({ spec: sp.spec, key: 'crash', kind: 'crash', text: sp.crash.message, signature: sp.crash.signature, where: sp.crash.where });
     if (!sp.cases?.fail.length && !sp.crash) out.push({ spec: sp.spec, key: '(spec)', kind: 'spec', text: sp.error || '' });
   }
@@ -573,24 +579,25 @@ export function failuresOf(rep) {
   return out;
 }
 
-export const siteOf = (id) => String(id).replace(/#\d+$/, '');
-
-function lookup(rep, f) {
+function lookup(rep, f, { anyAtSite = false } = {}) {
   if (f.kind === 'boot') return rep.specs.length ? 'pass' : 'fail';
   if (f.kind === 'page') return !rep.specs.length ? 'unreached' : rep.pageErrors?.length ? 'fail' : 'pass';
   const sp = rep.specs.find((x) => x.spec === f.spec);
   if (!sp) return 'unreached';
   if (f.kind === 'spec') return sp.status;
   if (f.kind === 'crash') return sp.crash ? (sp.crash.signature === f.signature ? 'fail' : 'crash') : 'pass';
-  const line = siteOf(f.key);
-  if (sp.cases?.fail.some((c) => siteOf(c.id) === line)) return 'fail';
-  if (sp.cases?.pass.some((id) => siteOf(id) === line)) return 'pass';
+  const fails = sp.cases?.fail || [];
+  if (fails.some((c) => c.id === f.key)) return 'fail';
+  const site = f.site ?? siteOf(f.key);
+  const there = fails.filter((c) => siteOf(c.id) === site).length;
+  if (there && (anyAtSite || there >= (f.atSite ?? 1))) return 'fail';
+  if (sp.cases?.pass.includes(f.key)) return 'pass';
   if (sp.status === 'pass' && !sp.cases) return 'pass';
   return sp.crash ? 'crash' : 'unreached';
 }
 
 export function stillFails(f, again) {
-  return lookup(again, f) !== 'pass';
+  return lookup(again, f, { anyAtSite: true }) !== 'pass';
 }
 
 function refPasses(f, ref) {

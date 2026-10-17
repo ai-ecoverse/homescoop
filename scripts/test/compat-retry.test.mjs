@@ -70,6 +70,11 @@ test('NEGATIVE: a line that fails only on the candidate is a regression, whateve
   assert.deepEqual(same.map((f) => f.key), [`${G}:64`]);
   assert.deepEqual(rest.map((f) => f.key), [`${G}:88#4`]);
   assert.equal(compareOnReference(rest[0], ref).verdict, 'regression');
+  const table = rep([spec('concurrent.mjs', loop([`${G}:88#3`, `${G}:88#4`, `${G}:88#5`]), [`${G}:88#3`, `${G}:88#4`, `${G}:88#5`])]);
+  const one = rep([spec('concurrent.mjs', loop([`${G}:88#2`]), [`${G}:88#2`])]);
+  const split = splitOnReference(failuresOf(table), one);
+  assert.equal(split.same.length, 0, 'the reference failing one iteration does not cover three on the candidate');
+  for (const f of split.rest) assert.equal(compareOnReference(f, one).verdict, 'regression', f.key);
   const elsewhere = rep([spec('concurrent.mjs', loop([]), [`${G}:89#4`])]);
   assert.equal(compareOnReference(rest[0], elsewhere).verdict, 'regression', 'another line failing on the reference does not cover :88');
 });
@@ -80,4 +85,8 @@ test('known-limits: wasix-gnupg concurrent.mjs is known-racy below 2.4.9-8 only'
   for (const v of ['2.4.9-5', '2.4.9-6', '2.4.9-7']) assert.equal(findLimit(limits, facts(v))?.issue, 'ai-ecoverse/homescoop#712', v);
   for (const v of ['2.4.9-8', '2.4.9-9', '2.5.0-1']) assert.equal(findLimit(limits, facts(v)), null, `${v} is still held to concurrent.mjs`);
   assert.equal(findLimit(limits, { ...facts('2.4.9-5'), spec: 'checklist.mjs' }), null, 'only concurrent.mjs');
+  for (const text of ['TypeError: cannot read properties of undefined', `cone: --check-trustdb:\ntrustdb=2`, 'engines.slicc-kernel is >=1.100.0, the first kernel with slicc.fcntl_lock: >=1.86.0']) {
+    assert.equal(findLimit(limits, { ...facts('2.4.9-5'), text }), null, `still compared with the reference: ${text}`);
+  }
+  assert.ok(findLimit(limits, { ...facts('2.4.9-5'), text: 'gpg waits for the lock (2.4.9-7 doesn\'t):\nheld' }));
 });
