@@ -1,0 +1,31 @@
+{
+ "name": "@ai-ecoverse/wasm-libpng",
+ "versions": {
+  "1.6.59-1": {
+   "version": "1.6.59-1",
+   "dist": {
+    "integrity": "sha512-urrsfSYb8hPlD9C+TYqMHNDvV3pxf0IK8R8a4WHkmfF5eBCicbM8L3b8wanR67W0o/xWJiPpojhLpBxAxa4fqw=="
+   },
+   "repository": {
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "type": "git",
+    "directory": "packages/libpng/package"
+   }
+  },
+  "1.6.59-2": {
+   "version": "1.6.59-2",
+   "dist": {
+    "integrity": "sha512-yKzRzoxkBwniMuVrCGLrW/zB1P4uPj+8zRVMY861gpJjHpu+Wvs7XbhIS76jhRwArrhwwiZVxpEgsRiHNe1/CQ=="
+   },
+   "repository": {
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "type": "git",
+    "directory": "packages/libpng/package"
+   }
+  }
+ },
+ "time": {
+  "1.6.59-1": "2026-10-06T09:22:50.514Z",
+  "1.6.59-2": "2026-10-16T09:22:45.823Z"
+ }
+}

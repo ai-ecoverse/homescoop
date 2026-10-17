@@ -1,71 +1,4 @@
 #!/usr/bin/env node
-/**
- * A repack's input must be attested (cert lane rule, 2026-10-16, from #730),
- * and so must every built recipe's (#864).
- *
- *   node scripts/cert-review/repack-input.mjs --package <recipe dir> [--ref <commit>]
- *     [--repo owner/repo] [--npm <name>] [--reproduced <file.json>] [--fixtures <dir>]
- *   → JSON on stdout: { package, npm, repack, chain, root, attested, reason }
- *     exit 0 when the input is attested, 1 when it
- *     is unverifiable, 2 when the trace itself couldn't run.
- *
- * A packaging-only repack (recipe.yaml `repack: from:`) reuses the bytes of a
- * published version. This follows `repack: from:` back through the published
- * versions: a version counts as a repack if the recipe.yaml in the tree it was
- * built from has `repack:`. The first version that was actually built is the
- * root. The input is attested only if:
- *
- *   - every version in the chain has an npm provenance attestation whose SLSA
- *     build is ai-ecoverse/homescoop's ladder-build.yml on refs/heads/main,
- *     for the published tarball's own sha512 (a repack in CI is a pure function
- *     of its input and the repo's files; one published from a laptop is not);
- *     its tree is the attested commit, or (with no attestation) the gitHead;
- *   - the root's tree has packages/<package>/recipe.yaml with a pinned
- *     source.sha256 (64 hex, not "skip");
- *   - the root's build fetched that pinned source: build.sh, or a
- *     scripts/*.sh it runs, calls homescoop_fetch (which checks the sha256);
- *   - the root's build couldn't stage a prebuilt artifact instead of
- *     compiling: no env-overridable *_STAGE / *_WHEEL / *_PREBUILT /
- *     *_RELEASE_URL / *_ARTIFACT input, no tree outside the repo ($ROOT/..),
- *     no download of homescoop's own release artifacts. This is a static rule
- *     on the build script at the root's commit: the run doesn't record which
- *     path it took, and a default stage dir can be filled by a cache, so a
- *     prebuilt path that was *possible* already makes the root unverifiable.
- *
- * A recipe that isn't a repack (#864, cert lane ruling on #858/#859) is held
- * to the same static rule at <ref> itself: its recipe and build scripts must
- * fetch the pinned source with the recipe's sha and have no stage or prebuilt
- * path. Its output is { repack: false, built: true, attested, reason }; it
- * needs no provenance, since the bytes under review are the PR's own build.
- *
- * A recipe whose source is committed to this repo declares it, instead of
- * source.url/sha256 (a root kind, accepted by the cert lane on #864):
- *
- *   source:
- *     in-tree: "src Cargo.toml Cargo.lock"   # paths under packages/<pkg>/
- *
- * The declaration is verified, never trusted: every path must be in the tree
- * being judged (the root's commit, or <ref>); the package build files must
- * download nothing a pinned sha256 doesn't cover (no curl, wget, git
- * clone/fetch, or homescoop_fetch without a literal sha256: unpinnedFetches);
- * and the prebuilt rule applies as for any build. One that fails is
- * unverifiable, never skipped.
- *
- * A root with no attestation can still count if it was reproduced from its
- * pinned source: --reproduced is a JSON object { "<npm>@<version>":
- * "<dist.integrity of an independent rebuild>" }, and it counts when the
- * integrity matches the published one. The prebuilt and pinned-source rules
- * apply to it too.
- *
- * Not checked: the sigstore signature on the attestation bundle. npm verifies
- * it at publish time and serves it over HTTPS; `npm audit signatures` checks
- * it again offline if needed.
- *
- * Trees are read with `git show` in the current clone, or with the GitHub
- * contents API when --repo is given. The registry is registry.npmjs.org, or
- * the recorded fixtures in --fixtures (<dir>/packument/<npm, / as %2f>.json,
- * <dir>/attestations/<npm, / as %2f>@<version>.json, <dir>/tree/<commit>/<path>).
- */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -77,7 +10,6 @@ export const PUBLISH_WORKFLOWS = ['.github/workflows/ladder-build.yml'];
 export const MAIN = 'refs/heads/main';
 const SLSA = 'https://slsa.dev/provenance/v1';
 
-/** Prebuilt inputs a build script can take instead of compiling the pinned source. */
 export const PREBUILT = [
   {
     re: /\$\{([A-Za-z0-9_]*(?:STAGE|STAGED|WHEEL|WHL|PREBUILT|RELEASE_URL|ARTIFACT)[A-Za-z0-9_]*):?[-=?]/g,
@@ -87,11 +19,6 @@ export const PREBUILT = [
   { re: /ai-ecoverse\/homescoop\/releases\/download/g, why: () => "a download of homescoop's own release artifacts" },
 ];
 
-/**
- * The recipe.yaml subset this needs: top-level scalars and one level of
- * nested map scalars (source.url, source.sha256, repack.from).
- * @param {string} text
- */
 export function parseRecipe(text) {
   const out = {};
   let section = null;
@@ -121,11 +48,6 @@ const stripComments = (text) => String(text).split('\n').map((l) => (/^\s*#/.tes
 
 export const MAX_DEPTH = 8;
 
-/**
- * The shell scripts a reference in <from> can mean, most specific first, and
- * whether the reference is explicit (it names the repo or the package dir,
- * so a missing file is an error, not a path into the fetched source).
- */
 export function resolveRef(ref, from, pkg) {
   const dir = from.split('/').slice(0, -1).join('/');
   const norm = (path) => {
@@ -145,19 +67,11 @@ export function resolveRef(ref, from, pkg) {
   if ((m = ref.match(/\$\(\s*dirname\s+"?\$(?:0|\{BASH_SOURCE(?:\[0\])?\})"?\s*\)"?\/([A-Za-z0-9_.\/-]+\.(?:sh|bash))$/))) {
     return { paths: [norm(`${dir}/${m[1]}`)], explicit: true };
   }
-  // Anything else (./x.sh, bash x.sh, $VAR/x.sh): the package's own file if
-  // there is one, else the referencing file's directory; otherwise it points
-  // into the fetched source or the work dir, which the pinned sha covers.
   const tail = ref.replace(/^.*\$\{?[A-Za-z_][A-Za-z0-9_]*\}?\//, '').replace(/^.*\)\//, '');
   if (tail.startsWith('/') || !/^[A-Za-z0-9_.\/-]+\.(?:sh|bash)$/.test(tail)) return { paths: [], explicit: false };
   return { paths: [...new Set([norm(`packages/${pkg}/${tail}`), norm(`${dir}/${tail}`)])], explicit: false };
 }
 
-/**
- * build.sh and every repo shell script it runs or sources, recursively
- * (scripts/*.sh, package-local helpers, $(dirname "$0")/…), up to MAX_DEPTH.
- * @returns {{ files: { path: string, text: string }[], problems: string[] } | null} null without build.sh
- */
 export function buildFiles(readAt, commit, pkg) {
   const files = [];
   const problems = [];
@@ -176,9 +90,6 @@ export function buildFiles(readAt, commit, pkg) {
     files.push({ path, text });
     const body = stripComments(text).join('\n');
     const loops = loopWords(body);
-    // A package's own files (packages/<x>/…) run with HOMESCOOP_PKG = <x>;
-    // their once-assigned path variables are substituted. The shared scripts/
-    // helpers' $PKG etc. mean the package being built, as before.
     const owned = /^packages\/[^/]+\//.test(path);
     const vars = owned ? pathVars(body) : new Map();
     for (const m of body.matchAll(/[^\s;|&<>=`]*\.(?:sh|bash)\b/g)) {
@@ -190,18 +101,12 @@ export function buildFiles(readAt, commit, pkg) {
         continue;
       }
       for (const ref of refs) {
-        // A package's own build.sh (packages/<x>/…) runs with HOMESCOOP_PKG = <x>.
         const owner = path.match(/^packages\/([^/]+)\//)?.[1] || pkg;
         const resolved = resolveRef(ref, path, owner);
         const { paths } = resolved;
-        // Only a reference that names the file itself is explicit; one that
-        // became explicit through a substituted variable may be a generated
-        // file in the work or output dir, so a missing one isn't an error.
         const explicit = resolved.explicit && (substituted === raw || resolveRef(raw, path, owner).explicit);
         const found = paths.find((p) => p === path || seen.has(p) || read(p) != null);
         if (owned && found === path && !resolved.explicit && /\$\{?[A-Za-z_]|\)\//.test(ref)) {
-          // "$PKGDIR/build.sh" inside packages/<x>/build.sh: the variable could
-          // be any package's dir, so don't read it as this file (fail closed).
           problems.push(`${path} runs ${ref}, a script behind a variable this rule can't resolve (it would read as ${path} itself)`);
           continue;
         }
@@ -222,11 +127,6 @@ export function buildFiles(readAt, commit, pkg) {
   return { files, problems };
 }
 
-/**
- * Path variables a script assigns exactly once (PKG="$HOMESCOOP_PKG",
- * D="$HOMESCOOP_ROOT/packages/$r"): Map var → value. A variable assigned more
- * than once isn't in the map, so a reference through it stays unresolved.
- */
 export function pathVars(body) {
   const seen = new Map();
   for (const m of String(body).matchAll(/^\s*(?:export\s+|local\s+|readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)=("[^"\n]*"|'[^'\n]*'|[^\s;&|]*)\s*(?:$|;)/gm)) {
@@ -235,7 +135,6 @@ export function pathVars(body) {
   return new Map([...seen].filter(([, v]) => v !== null && /[$/]/.test(v) && !/\$\(|`/.test(v)));
 }
 
-/** <ref> with the once-assigned path variables substituted (a few rounds, for chains). */
 export function substituteVars(ref, vars) {
   let out = ref;
   for (let round = 0; round < 4; round++) {
@@ -246,31 +145,20 @@ export function substituteVars(ref, vars) {
   return out;
 }
 
-/** `for <var> in <literal words>; do` loops in a script: Map var → words. */
 export function loopWords(body) {
   const out = new Map();
   const text = String(body);
   for (const m of text.matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^;\n]*?)\s*(?:;|\n)\s*do\b/g)) {
     const words = m[2].trim().split(/\s+/).map((w) => w.replace(/^(["'])(.*)\1$/, '$2'));
-    // A loop over anything but literal words: the variable can't be resolved.
     if (out.get(m[1]) === null || !words.length || !words.every((w) => /^[A-Za-z0-9_.+-]+$/.test(w))) out.set(m[1], null);
     else out.set(m[1], [...new Set([...(out.get(m[1]) || []), ...words])]);
   }
-  // A loop variable assigned anywhere else in the file (r=…, read r, local r=…)
-  // may not hold a loop word where it's used: null, so references fail closed.
   for (const name of out.keys()) {
     if (new RegExp(`(?:^|[\\s;&|(])(?:export\\s+|local\\s+|declare\\s+[-a-z]*\\s*|readonly\\s+)?${name}\\+?=|\\bread\\s+(?:-[a-z]+\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b`, 'm').test(text)) out.set(name, null);
   }
   return out;
 }
 
-/**
- * The references a script path with loop variables stands for: one per loop
- * word ("packages/$r/build.sh" in `for r in a b; do` → packages/a/…, packages/b/…).
- * null when a package name under packages/ is still a variable afterwards,
- * or the reference uses a loop variable that's also assigned elsewhere, so
- * the caller fails closed instead of guessing.
- */
 export function expandLoopVars(ref, loops) {
   let refs = [ref];
   for (const [name, words] of loops) {
@@ -285,7 +173,6 @@ export function expandLoopVars(ref, loops) {
   return refs;
 }
 
-/** Prebuilt inputs the build files could take: [{ path, line, why }]. */
 export function prebuiltInputs(files) {
   const hits = [];
   for (const { path, text } of files) {
@@ -298,13 +185,6 @@ export function prebuiltInputs(files) {
   return hits;
 }
 
-/**
- * Whether the build fetches the recipe's own source: a homescoop_fetch whose
- * sha256 argument is the recipe's source.sha256, as $SRC_SHA / $SHA (which
- * build-common.sh's homescoop_load_recipe exports from it, recipe-env.mjs)
- * or as the same literal. A $SRC_SHA / $SHA after the same script
- * reassigned it doesn't count. The URL doesn't matter: the sha256 pins the bytes.
- */
 export function fetchesPinnedSource(files, sha) {
   const arg = (a) => a.replace(/^["']|["']$/g, '');
   return files.some(({ text }) => {
@@ -327,10 +207,6 @@ const integrityHex = (integrity) => {
   return m ? Buffer.from(m[1], 'base64').toString('hex') : '';
 };
 
-/**
- * The SLSA provenance of <npm>@<version>, checked against homescoop's ladder on main.
- * @returns {{ ok: boolean, reason: string, commit?: string, run?: string }}
- */
 export function checkProvenance(doc, { npm, version, integrity }) {
   if (!doc) return { ok: false, reason: 'no npm provenance attestation' };
   const slsa = (doc.attestations || []).find((a) => a?.predicateType === SLSA);
@@ -357,14 +233,6 @@ export function checkProvenance(doc, { npm, version, integrity }) {
   return { ok: true, reason: '', commit, run: statement.predicate?.runDetails?.metadata?.invocationId };
 }
 
-/**
- * The static root rule, for one recipe at one commit (cert lane, 2026-10-16;
- * #834 for repack roots, #864 for every build): the recipe pins a source
- * sha256, the build fetches it with homescoop_fetch, and no stage or prebuilt
- * path is possible. `label` names the build in the reasons ("root 1.0.0-1",
- * "the build at <ref>"). Throws if the tree can't be read (fail closed).
- * @returns {{ reasons: string[], sha: string, files: { path: string, text: string }[] | null, prebuilt: { path: string, line: number, why: string }[] }}
- */
 export function sourceRule({ pkg, commit, readAt, recipe, label }) {
   const reasons = [];
   const source = recipe.source && typeof recipe.source === 'object' ? recipe.source : {};
@@ -383,8 +251,6 @@ export function sourceRule({ pkg, commit, readAt, recipe, label }) {
     if (build.problems.length) reasons.push(`${label}'s build can't be read in full: ${build.problems.join(', ')}`);
   }
   if (inTree !== null) {
-    // An in-tree source (a root kind, not an exception): the declaration is
-    // verified, never trusted. A declaration that fails is unverifiable.
     reasons.push(...inTreeReasons({ pkg, commit, readAt, source, paths: inTree, files: build ? build.files : [], label }));
     return { reasons, sha: '', inTree: inTree.split(/\s+/).filter(Boolean), files: build ? build.files : null, prebuilt };
   }
@@ -393,14 +259,6 @@ export function sourceRule({ pkg, commit, readAt, recipe, label }) {
   return { reasons, sha, inTree: null, files: build ? build.files : null, prebuilt };
 }
 
-/**
- * The pinned-source check, per package: a $SRC_SHA / $SHA in a file means the
- * sha of the recipe that file's package loads (homescoop_load_recipe <x>), so
- * a fetch counts for <pkg> only in packages/<pkg>/ and the shared scripts/,
- * or in a followed packages/<other>/ whose recipe pins the same sha256. Every
- * other package build it runs (packages/<other>/build.sh) must fetch its own
- * recipe's pinned source too.
- */
 export function pinnedFetchReasons({ pkg, commit, readAt, files, sha, label }) {
   const reasons = [];
   const ownerOf = (path) => path.match(/^packages\/([^/]+)\//)?.[1] || null;
@@ -424,20 +282,6 @@ export function pinnedFetchReasons({ pkg, commit, readAt, files, sha, label }) {
   return reasons;
 }
 
-/**
- * Downloads in the package build files (packages/…/*.sh) that no pinned
- * sha256 or lockfile covers: curl, wget, git clone/fetch, a homescoop_fetch
- * whose sha256 isn't a 64-hex literal, and the INSTALLS (pip, npm/npx, cargo
- * without --locked/--frozen/--offline, go install/get, rustup, …). The shared scripts/*.sh helpers aren't
- * scanned: their downloads are homescoop_fetch or toolchain installers that
- * check a pinned sha256 (install-emsdk.sh, install-go.sh, …), reviewed as
- * repo code.
- */
-/**
- * Package-manager and toolchain installs that download from a registry: each
- * counts as unpinned unless its lockfile-pinned form is used (`pinned`, tested
- * on the rest of the line).
- */
 export const INSTALLS = [
   { re: /\b(?:pip3?|python3?\s+-m\s+pip|uv\s+pip)\s+install\b/g, why: 'a pip install', pinned: /--require-hashes\b/ },
   { re: /\bnpm\s+(?:install|i|add)\b|\bnpx\s|\b(?:pnpm|yarn)\s+(?:add|install|dlx)\b|\bpnpx\s/g, why: 'an npm/pnpm/yarn install', pinned: /--frozen-lockfile\b|--immutable\b/ },
@@ -471,7 +315,6 @@ export function unpinnedFetches(files) {
   return hits;
 }
 
-/** Why a `source: in-tree:` declaration doesn't hold at <commit> (empty when it does). */
 export function inTreeReasons({ pkg, commit, readAt, source, paths, files, label }) {
   const reasons = [];
   if (source.url || source.sha256) reasons.push(`${label}'s recipe declares an in-tree source and also source.url/sha256`);
@@ -489,12 +332,6 @@ export function inTreeReasons({ pkg, commit, readAt, source, paths, files, label
   return reasons;
 }
 
-/**
- * Follow `repack: from:` back to the first built version and decide whether it is attested.
- * @param {{ pkg: string, npm: string, from: string,
- *   registry: { packument(npm: string): Promise<any>, attestations(npm: string, version: string): Promise<any> },
- *   readAt(commit: string, path: string): string | null, reproduced?: Record<string, string> }} o
- */
 export async function trace({ pkg, npm, from, registry, readAt, reproduced = {} }) {
   const chain = [];
   const result = (attested, reason, root = null) => ({ package: pkg, npm, repack: true, chain, root, attested, reason });
@@ -522,7 +359,6 @@ export async function trace({ pkg, npm, from, registry, readAt, reproduced = {} 
       version = String(next);
       continue;
     }
-    // The root: the first version that was actually built.
     const root = version;
     const rule = sourceRule({ pkg, commit, readAt, recipe, label: `root ${root}` });
     const reasons = [...rule.reasons];
@@ -544,7 +380,6 @@ export async function trace({ pkg, npm, from, registry, readAt, reproduced = {} 
   }
 }
 
-/** Trees from the current git clone. */
 export function gitReader(cwd = process.cwd()) {
   return (commit, path) => {
     try {
@@ -560,7 +395,6 @@ export function gitReader(cwd = process.cwd()) {
   };
 }
 
-/** Trees from the GitHub contents API (gh). */
 export function githubReader(repo) {
   return (commit, path) => {
     try {
@@ -611,30 +445,353 @@ export function fixtureReader(dir) {
     if (!existsSync(join(dir, 'tree', commit))) throw new Error(`commit ${commit} isn't in the fixtures`);
     const file = join(dir, 'tree', commit, path);
     if (!existsSync(file)) return null;
-    // A directory reads as its listing, as `git show <commit>:<dir>` does.
     return statSync(file).isDirectory() ? readdirSync(file).sort().join('\n') : readFileSync(file, 'utf8');
   };
 }
 
-/** The input verdict for one recipe at <ref>: a repack is traced to its root; a built recipe ({ repack: false, built: true }) gets the root rule itself. */
-export async function repackInput({ pkg, ref, npm, readAt, registry, reproduced }) {
-  const text = readAt(ref, `packages/${pkg}/recipe.yaml`);
+export const KNOWN_INPUTS = fileURLToPath(new URL('./known-inputs.txt', import.meta.url));
+export const MAX_INPUT_DEPTH = 8;
+const NPM_SPEC = /^(@ai-ecoverse\/[a-z0-9][a-z0-9._-]*)@([0-9][0-9A-Za-z.+-]*)$/;
+const DEP_KEYS = ['build', 'host', 'run', 'mamba', 'npm'];
+const DOC_SINK = /\.(?:md|txt|json|xml|html?|pc|ya?ml|toml|cfg|conf|ini)["']?$/;
+const OUR_NPM = /registry\.npmjs\.org\/@ai-ecoverse(?:\/|%2[fF])/;
+const TARBALL = /registry\.npmjs\.org\/@ai-ecoverse(?:\/|%2[fF])([a-z0-9][a-z0-9._-]*)\/-\/([^\s"'<>()|;&]*?)\.tgz/g;
+const NPM_CMD = /(?:^\s*|[;&|(]\s*|\$\(\s*|\b(?:then|do|else)\s+)(?:(?:env\s+(?:-\S+\s+)*)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*|command\s+|sudo\s+|exec\s+)*(?:npm\s+(?:pack|install|i|add|exec|ci)|pnpm\s+(?:add|install|i|dlx|exec)|yarn\s+(?:add|dlx)|npx|pnpx)\b(.*)$/;
+
+export function parseKnownInputs(text) {
+  const out = new Map();
+  String(text).split(/\r?\n/).forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line) return;
+    const m = line.match(/^(@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*)@([0-9][0-9A-Za-z.+-]*) #(\d+) (\S.*)$/);
+    if (!m) throw new Error(`known-inputs line ${i + 1} isn't "<@scope/name>@<version> #<issue> <reason>": ${line}`);
+    const key = `${m[1]}@${m[2]}`;
+    if (out.has(key)) throw new Error(`known-inputs line ${i + 1} repeats ${key}`);
+    out.set(key, { npm: m[1], version: m[2], issue: m[3], reason: m[4] });
+  });
+  return out;
+}
+
+export function readKnownInputs(path = KNOWN_INPUTS) {
+  return parseKnownInputs(readFileSync(path, 'utf8'));
+}
+
+function tarballInput(name, tail, where, resolve) {
+  const versions = tail.startsWith(`${name}-`) ? resolve(tail.slice(name.length + 1)) : null;
+  if (!versions) return { problem: `${where} fetches @ai-ecoverse/${name} as ${tail}.tgz, whose version this rule can't resolve` };
+  return { inputs: versions.map((version) => ({ npm: `@ai-ecoverse/${name}`, version, via: where })) };
+}
+
+export function recipeInputs(text, recipeVersion = '') {
+  const inputs = [];
+  const problems = [];
+  let top = null;
+  let sub = null;
+  const unquote = (s) => s.trim().replace(/^(["'])(.*)\1$/, '$2');
+  const spec = (s, where) => {
+    const item = unquote(s);
+    if (!item.startsWith('@ai-ecoverse/')) return;
+    const m = item.match(NPM_SPEC);
+    if (m) inputs.push({ npm: m[1], version: m[2], via: where });
+    else problems.push(`${where} installs ${item}, which isn't pinned to an exact version`);
+  };
+  const literal = (v) => (/^[0-9][0-9A-Za-z.+-]*$/.test(v) ? [v] : null);
+  String(text).split(/\r?\n/).forEach((raw, i) => {
+    if (!raw.trim() || raw.trim().startsWith('#')) return;
+    const indent = raw.match(/^ */)[0].length;
+    const body = raw.trim().replace(/\s+#.*$/, '');
+    const where = `recipe.yaml:${i + 1}`;
+    if (indent === 0) {
+      top = body.match(/^([A-Za-z0-9_-]+):/)?.[1] || null;
+      sub = null;
+    }
+    if (top === 'dependencies' && indent === 2) {
+      const m = body.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+      sub = m ? m[1] : null;
+      if (m && DEP_KEYS.includes(sub) && /^\[.*\]$/.test(m[2])) {
+        m[2].slice(1, -1).split(',').filter((s) => s.trim()).forEach((s) => spec(s, where));
+      }
+    } else if (top === 'dependencies' && indent > 2 && DEP_KEYS.includes(sub) && body.startsWith('- ')) {
+      spec(body.slice(2), where);
+    }
+    const url = body.match(/^(?:-\s+)?url:\s*(.*)$/);
+    if (!url || !OUR_NPM.test(url[1])) return;
+    const value = unquote(url[1]).replaceAll('{{version}}', recipeVersion);
+    const hits = [...value.matchAll(TARBALL)];
+    if (!hits.length) problems.push(`${where} points at homescoop's npm (${value}) with no tarball this rule can read`);
+    for (const m of hits) {
+      const r = tarballInput(m[1], m[2], where, literal);
+      if (r.problem) problems.push(r.problem);
+      else inputs.push(...r.inputs);
+    }
+  });
+  return { inputs, problems };
+}
+
+function assignedValues(name, lines) {
+  const out = [];
+  const re = new RegExp(`(?:^|[\\s;&|(])(?:export\\s+|local\\s+|readonly\\s+|declare\\s+[-a-z]*\\s*)?${name}=("[^"]*"|'[^']*'|[^\\s;&|)]*)`);
+  for (const line of lines) {
+    const m = line.match(re);
+    if (m) out.push(m[1].replace(/^(["'])(.*)\1$/, '$2'));
+  }
+  return out;
+}
+
+function shellLines(text) {
+  const lines = stripComments(text).join('\n').replace(/\\\n\s*/g, ' ').split('\n');
+  const out = [];
+  let end = null;
+  for (const line of lines) {
+    if (end !== null) {
+      if (line.trim() === end) end = null;
+      out.push('');
+      continue;
+    }
+    const doc = line.match(/^\s*(cat|tee)\b([^<|]*)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\3([^|]*)$/);
+    const sink = doc && (doc[1] === 'cat' ? (`${doc[2]} ${doc[5]}`.match(/>>?\s*(\S+)/) || [])[1] : doc[2].trim().split(/\s+/).pop());
+    if (doc && sink && DOC_SINK.test(sink)) end = doc[4];
+    out.push(line);
+  }
+  return out;
+}
+
+export function buildFileInputs(files) {
+  const inputs = [];
+  const problems = [];
+  const all = files.map(({ path, text }) => ({ path, lines: shellLines(text) }));
+  const everywhere = all.flatMap((f) => f.lines);
+  const resolver = (lines) => (expr) => {
+    let parts = [''];
+    const re = /\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?|([^$]+)/g;
+    for (const m of expr.matchAll(re)) {
+      if (m[2] !== undefined) {
+        parts = parts.map((p) => p + m[2]);
+        continue;
+      }
+      const values = new Set();
+      for (const v of assignedValues(m[1], lines)) {
+        const d = v.match(/^\$\{([A-Za-z_][A-Za-z0-9_]*):?-([^}$]*)\}$/);
+        if (d) {
+          values.add(d[2]);
+          for (const o of assignedValues(d[1], everywhere)) values.add(o);
+        } else values.add(v);
+      }
+      if (!values.size) return null;
+      parts = parts.flatMap((p) => [...values].map((v) => p + v));
+    }
+    return parts.every((p) => /^[0-9][0-9A-Za-z.+-]*$/.test(p)) ? [...new Set(parts)] : null;
+  };
+  for (const { path, lines } of all) {
+    const resolve = resolver(lines);
+    lines.forEach((line, i) => {
+      const where = `${path}:${i + 1}`;
+      if (OUR_NPM.test(line)) {
+        const hits = [...line.matchAll(TARBALL)];
+        if (!hits.length) problems.push(`${where} points at homescoop's npm with no tarball this rule can read`);
+        for (const m of hits) {
+          const r = tarballInput(m[1], m[2], where, resolve);
+          if (r.problem) problems.push(r.problem);
+          else inputs.push(...r.inputs);
+        }
+      }
+      const cmd = line.match(NPM_CMD);
+      if (!cmd) return;
+      for (const m of cmd[1].matchAll(/(?<![\w/.-])(@ai-ecoverse\/[A-Za-z0-9._${}-]+(?:@[^\s"'`;|&)]*)?)/g)) {
+        const s = m[1].replace(/["']+$/, '');
+        const pinned = s.match(NPM_SPEC);
+        if (pinned) inputs.push({ npm: pinned[1], version: pinned[2], via: where });
+        else problems.push(`${where} installs ${s}, which isn't pinned to an exact version`);
+      }
+    });
+  }
+  return { inputs, problems };
+}
+
+function memoRegistry(registry) {
+  const packuments = new Map();
+  const attestations = new Map();
+  const once = (map, key, get) => {
+    if (!map.has(key)) map.set(key, get());
+    return map.get(key);
+  };
+  return {
+    packument: (npm) => once(packuments, npm, () => registry.packument(npm)),
+    attestations: (npm, version) => once(attestations, `${npm}@${version}`, () => registry.attestations(npm, version)),
+  };
+}
+
+function memoReader(readAt) {
+  const cache = new Map();
+  return (commit, path) => {
+    const key = `${commit}:${path}`;
+    if (!cache.has(key)) cache.set(key, readAt(commit, path));
+    return cache.get(key);
+  };
+}
+
+function recipeDirs(meta, npm) {
+  const dirs = [];
+  const fromRepo = String(meta?.repository?.directory || '').match(/^packages\/([^/]+)(?:\/package)?\/?$/)?.[1];
+  if (fromRepo) dirs.push(fromRepo);
+  const bare = npm.replace(/^@ai-ecoverse\//, '');
+  dirs.push(bare);
+  if (bare.startsWith('wasm-')) dirs.push(bare.slice(5));
+  return [...new Set(dirs)];
+}
+
+export function inputsAt({ readAt, commit, pkg, recipeText, recipe, files }) {
+  const fromRecipe = recipeInputs(recipeText, recipe?.version || '');
+  const fromBuild = buildFileInputs(files || []);
+  const seen = new Set();
+  const inputs = [...fromRecipe.inputs, ...fromBuild.inputs]
+    .map((i) => ({ ...i, via: i.via.startsWith('recipe.yaml') ? `packages/${pkg}/${i.via}` : i.via }))
+    .filter((i) => {
+      const key = `${i.npm}@${i.version}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const problems = [...fromRecipe.problems.map((p) => `packages/${pkg}/${p}`), ...fromBuild.problems];
+  return { inputs, problems, commit };
+}
+
+export function inputChecker({ registry, readAt, known = new Map(), reproduced = {} }) {
+  const ctx = { registry: memoRegistry(registry), readAt: memoReader(readAt), known, reproduced, memo: new Map(), active: new Set(), cycles: 0 };
+  const check = (npm, version, depth = 1) => checkInput(ctx, npm, version, depth);
+  return { check, ctx };
+}
+
+async function checkInput(ctx, npm, version, depth) {
+  const key = `${npm}@${version}`;
+  if (ctx.memo.has(key)) return ctx.memo.get(key);
+  if (ctx.active.has(key)) {
+    ctx.cycles++;
+    return { ok: false, known: [], reason: `${key} is an input of its own build` };
+  }
+  if (depth > MAX_INPUT_DEPTH) return { ok: false, known: [], reason: `${key} is past the input depth cap of ${MAX_INPUT_DEPTH}` };
+  const cycles = ctx.cycles;
+  ctx.active.add(key);
+  let result;
+  try {
+    const own = await ownTrace(ctx, npm, version, depth);
+    if (own.ok) result = own;
+    else {
+      const entry = ctx.known.get(key);
+      if (!entry) result = own;
+      else {
+        const next = await successor(ctx, npm, version, depth);
+        result = next
+          ? { ok: false, known: [], reason: `${key} is on the known list (#${entry.issue}), but ${npm}@${next} is attested, so the entry has expired: bump to it` }
+          : { ok: true, known: [key], reason: '' };
+      }
+    }
+  } finally {
+    ctx.active.delete(key);
+  }
+  if (ctx.cycles === cycles) ctx.memo.set(key, result);
+  return result;
+}
+
+async function ownTrace(ctx, npm, version, depth) {
+  const key = `${npm}@${version}`;
+  const fail = (reason) => ({ ok: false, known: [], reason: `${key}: ${reason}` });
+  const packument = await ctx.registry.packument(npm);
+  const meta = packument?.versions?.[version];
+  if (!meta) return fail("it isn't published");
+  let traced = null;
+  let pkg = null;
+  for (const dir of recipeDirs(meta, npm)) {
+    const t = await trace({ pkg: dir, npm, from: version, registry: ctx.registry, readAt: ctx.readAt, reproduced: ctx.reproduced });
+    traced = t;
+    pkg = dir;
+    if (!/ has no packages\/[^/]+\/recipe\.yaml$/.test(t.reason)) break;
+  }
+  if (!traced.attested) return fail(traced.reason);
+  const commit = traced.chain[traced.chain.length - 1].commit;
+  const recipeText = ctx.readAt(commit, `packages/${pkg}/recipe.yaml`);
+  const recipe = parseRecipe(recipeText);
+  const named = recipe.npm || `@ai-ecoverse/${pkg}`;
+  if (named !== npm) return fail(`packages/${pkg}/recipe.yaml at ${commit.slice(0, 12)} builds ${named}, not ${npm}`);
+  const build = buildFiles(ctx.readAt, commit, pkg);
+  const found = inputsAt({ readAt: ctx.readAt, commit, pkg, recipeText, recipe, files: build ? build.files : [] });
+  if (found.problems.length) return fail(`its build at ${commit.slice(0, 12)} can't be read in full: ${found.problems.join(', ')}`);
+  const knownSet = new Set();
+  for (const input of found.inputs) {
+    const r = await checkInput(ctx, input.npm, input.version, depth + 1);
+    if (!r.ok) return { ok: false, known: [], reason: `${key} needs ${r.reason}` };
+    r.known.forEach((k) => knownSet.add(k));
+  }
+  return { ok: true, known: [...knownSet], reason: '' };
+}
+
+async function successor(ctx, npm, version, depth) {
+  const key = `${npm}@${version}`;
+  const packument = await ctx.registry.packument(npm);
+  const time = packument?.time || {};
+  const at = Date.parse(time[version] || '');
+  const later = Object.keys(packument?.versions || {})
+    .filter((v) => v !== version)
+    .filter((v) => !Number.isFinite(at) || !Number.isFinite(Date.parse(time[v] || '')) || Date.parse(time[v]) > at)
+    .sort((a, b) => (Date.parse(time[b] || '') || 0) - (Date.parse(time[a] || '') || 0));
+  for (const v of later) {
+    const meta = packument.versions[v];
+    const prov = checkProvenance(await ctx.registry.attestations(npm, v), { npm, version: v, integrity: meta?.dist?.integrity });
+    if (!prov.ok) continue;
+    const r = await ownTrace(ctx, npm, v, depth);
+    if (r.ok && !r.known.includes(key)) return v;
+  }
+  return null;
+}
+
+export async function buildInputVerdict({ checker, readAt, commit, pkg, recipeText, recipe, files }) {
+  const found = inputsAt({ readAt, commit, pkg, recipeText, recipe, files });
+  const inputs = found.inputs.map((i) => ({ input: `${i.npm}@${i.version}`, via: i.via }));
+  if (found.problems.length) return { inputs, attested: false, reason: `its build inputs can't be read in full: ${found.problems.join(', ')}`, known: [] };
+  const knownSet = new Set();
+  const reasons = [];
+  for (const [n, input] of found.inputs.entries()) {
+    const r = await checker.check(input.npm, input.version);
+    inputs[n].ok = r.ok;
+    if (r.known.length) inputs[n].known = r.known;
+    if (!r.ok) reasons.push(`build input ${r.reason} (${input.via})`);
+    r.known.forEach((k) => knownSet.add(k));
+  }
+  const known = [...knownSet].map((k) => `links unattested ${k} (homescoop#${checker.ctx.known.get(k).issue})`);
+  return { inputs, attested: !reasons.length, reason: reasons.join('; '), known };
+}
+
+export async function repackInput({ pkg, ref, npm, readAt, registry, reproduced = {}, known = new Map() }) {
+  const read = memoReader(readAt);
+  const reg = memoRegistry(registry);
+  const text = read(ref, `packages/${pkg}/recipe.yaml`);
   if (text == null) throw new Error(`no packages/${pkg}/recipe.yaml at ${ref}`);
   const recipe = parseRecipe(text);
   const from = recipe.repack && typeof recipe.repack === 'object' ? recipe.repack.from : '';
   const name = npm || recipe.npm || `@ai-ecoverse/${pkg}`;
+  let out;
+  let at;
   if (!from) {
-    // A built recipe (#864): the same static rule a repack's root must meet,
-    // on the recipe and build scripts at <ref> itself. No provenance check:
-    // the bytes under review are this pull request's own ladder-pr build.
     const label = `${pkg} at ${/^[0-9a-f]{40}$/.test(ref) ? ref.slice(0, 12) : ref}`;
-    const rule = sourceRule({ pkg, commit: ref, readAt, recipe, label });
-    const out = { package: pkg, npm: name, repack: false, built: true, chain: [], root: null, buildFiles: rule.files ? rule.files.map((f) => f.path) : [], prebuilt: rule.prebuilt, sourceSha256: rule.sha || null };
+    const rule = sourceRule({ pkg, commit: ref, readAt: read, recipe, label });
+    out = { package: pkg, npm: name, repack: false, built: true, chain: [], root: null, buildFiles: rule.files ? rule.files.map((f) => f.path) : [], prebuilt: rule.prebuilt, sourceSha256: rule.sha || null };
     if (rule.reasons.length) return { ...out, attested: false, reason: rule.reasons.join('; ') };
-    if (rule.inTree) return { ...out, inTree: rule.inTree, attested: true, reason: `${label} builds its in-tree source (${rule.inTree.join(', ')}), downloads nothing unpinned and can't stage a prebuilt` };
-    return { ...out, attested: true, reason: `${label} fetches the pinned source (${rule.sha}) and can't stage a prebuilt` };
+    if (rule.inTree) out = { ...out, inTree: rule.inTree, attested: true, reason: `${label} builds its in-tree source (${rule.inTree.join(', ')}), downloads nothing unpinned and can't stage a prebuilt` };
+    else out = { ...out, attested: true, reason: `${label} fetches the pinned source (${rule.sha}) and can't stage a prebuilt` };
+    at = { commit: ref, recipeText: text, recipe, files: rule.files || [] };
+  } else {
+    out = await trace({ pkg, npm: name, from, registry: reg, readAt: read, reproduced });
+    if (!out.attested) return out;
+    const commit = out.chain[out.chain.length - 1].commit;
+    const recipeText = read(commit, `packages/${pkg}/recipe.yaml`);
+    const build = buildFiles(read, commit, pkg);
+    at = { commit, recipeText, recipe: parseRecipe(recipeText), files: build ? build.files : [] };
   }
-  return trace({ pkg, npm: name, from, registry, readAt, reproduced });
+  const checker = inputChecker({ registry: reg, readAt: read, known, reproduced });
+  const inputs = await buildInputVerdict({ checker, readAt: read, pkg, ...at });
+  out = { ...out, inputs: inputs.inputs, known: inputs.known };
+  if (!inputs.attested) return { ...out, attested: false, reason: inputs.reason };
+  return out;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -646,17 +803,19 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       npm: { type: 'string' },
       reproduced: { type: 'string' },
       fixtures: { type: 'string' },
+      known: { type: 'string' },
     },
   });
   if (!values.package) {
-    console.error('usage: repack-input.mjs --package <recipe dir> [--ref <commit>] [--repo owner/repo] [--npm <name>] [--reproduced <file>] [--fixtures <dir>]');
+    console.error('usage: repack-input.mjs --package <recipe dir> [--ref <commit>] [--repo owner/repo] [--npm <name>] [--reproduced <file>] [--fixtures <dir>] [--known <file>]');
     process.exit(2);
   }
   try {
     const readAt = values.fixtures ? fixtureReader(values.fixtures) : values.repo ? githubReader(values.repo) : gitReader();
     const registry = values.fixtures ? fixtureRegistry(values.fixtures) : npmRegistry();
     const reproduced = values.reproduced ? JSON.parse(readFileSync(values.reproduced, 'utf8')) : {};
-    const out = await repackInput({ pkg: values.package, ref: values.ref, npm: values.npm, readAt, registry, reproduced });
+    const known = readKnownInputs(values.known || KNOWN_INPUTS);
+    const out = await repackInput({ pkg: values.package, ref: values.ref, npm: values.npm, readAt, registry, reproduced, known });
     console.log(JSON.stringify(out, null, 2));
     process.exit(out.attested === false ? 1 : 0);
   } catch (error) {
