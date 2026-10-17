@@ -132,12 +132,14 @@ zig build-obj "$ZSRC/lib/compiler_rt.zig" -target wasm32-wasi -mcpu generic+atom
 "$SDK/bin/clang" "${TARGET_FLAGS[@]}" -O2 -c "$HOMESCOOP_PKG/llvm-shims.c" -o "$OBJ/llvm-shims.o"
 
 echo "== wasi-zig (LLVM): prebuilt wasi-libc, libc++ and Zig runtimes for the native wasm32-wasi target (0025, 0026)"
-PRE="$OBJ/prebuilt"
+PRE="/tmp/homescoop-wasi-zig-$VERSION-prebuilt"
+rm -rf "$PRE"
 mkdir -p "$PRE/src" "$PRE/out"
+cp -a "$ZSRC/lib" "$PRE/lib"
 printf 'int main(void) { return 0; }\n' > "$PRE/src/m.c"
 printf '#include <string>\nint main() { std::string s("x"); return (int)s.size() - 1; }\n' > "$PRE/src/m.cpp"
 ( cd "$PRE/src"
-  common=(-target wasm32-wasi --zig-lib-dir "$ZSRC/lib" --global-cache-dir "$PRE/gc")
+  common=(-target wasm32-wasi --zig-lib-dir "$PRE/lib" --global-cache-dir "$PRE/gc")
   zig build-exe m.c -lc "${common[@]}" --name mc
   zig build-exe m.c -lc -mexec-model=reactor -fno-entry "${common[@]}" --name mr
   zig build-exe m.cpp -lc -lc++ "${common[@]}" --name mx 2> "$PRE/cxx.log" )
@@ -191,7 +193,8 @@ find "$PKG/lib/compiler_rt" -name '*_test.zig' -exec sh -c \
     esac
   done )
 mkdir -p "$PKG/lib/prebuilt/wasm32-wasi"
-cp "$OBJ"/prebuilt/out/* "$PKG/lib/prebuilt/wasm32-wasi/"
+cp "$PRE"/out/* "$PKG/lib/prebuilt/wasm32-wasi/"
+rm -rf "$PRE"
 cp -a "$L/libc/include/wasm-wasi-musl" "$L/libc/include/generic-musl" "$PKG/lib/libc/include/"
 find "$PKG/lib" -type l -exec sh -c 'for l; do t=$(readlink -f "$l"); rm "$l"; cp -a "$t" "$l"; done' _ {} +
 cp "$SRC/LICENSE" "$PKG/LICENSE"
