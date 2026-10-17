@@ -23,11 +23,8 @@ const NO_CERT = [
   'emscripten-cache', // #426
   'freetype', // #426
   'gmake', // #426
-  'lcms2', // #426
   'libiconv', // #426
   'libjpeg-turbo', // #426
-  'libpng', // #426
-  'libtiff', // #426
   'libwebp', // #426
   'libxml2', // #426
   'openjpeg', // #426

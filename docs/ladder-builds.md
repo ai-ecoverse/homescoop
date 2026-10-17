@@ -206,6 +206,10 @@ the push to `main`. It runs what a combined head can change:
   at the merge commit `ladder-merge` will pick for it (`touchingCommit`). So a
   group passes only if the push will publish each PR's certified artifact, or
   skip a version that's already on npm.
+  On a real `merge_group` it then posts the `cert-review` commit status on the
+  group head, which is where the queue evaluates required checks: `success`
+  "queued PRs certified: #a@sha, #b@sha", or `failure` with the reason. The dry
+  run only prints what it would post (docs/ci-cert.md, cert review).
 - `kernel-compat`: `kernel-compat-proof.yml` (as `workflow_call`) on the
   group head, when the group touches that workflow's own `paths:`.
 

@@ -1,0 +1,15 @@
+{
+  "harness": "host-node",
+  "host": "node scripts/em-lib-cert.mjs libtiff --tarball <package.tgz | npm spec>: with the pinned emsdk (scripts/install-emsdk.sh), unpacks the tarball and the recipe's @ai-ecoverse build inputs at their pinned versions, compiles test/probe.c with nothing but pkg-config of the package's .pc (PKG_CONFIG_LIBDIR: the package and those inputs, no host dirs), links it with -Wl,--fatal-warnings, runs it under Node (NODERAWFS) and then test/check.mjs. A static library has no commands of its own.",
+  "pkgconfig": [
+    "libtiff-4"
+  ],
+  "checklist": [
+    "TIFFGetVersion() and libtiff-4.pc's Version are the recipe version; the .pc Requires zlib and libjpeg resolve to the recipe's pinned build inputs",
+    "the probe compiles and links from the .pc flags alone with -Wl,--fatal-warnings: no undefined symbol and no signature mismatch",
+    "a four-page 32x24 RGB TIFF with Adobe deflate (zlib), LZW, JPEG (libjpeg-turbo, quality 95) and PackBits pages, the lossless ones with the horizontal predictor; TIFFReadRGBAImageOriented gives the exact pixels back (JPEG within 24), with each page's compression and description; Node walks the IFDs (Compression 8, 5, 7, 32773) and inflates the deflate page's first strip with its own zlib"
+  ],
+  "ci": [
+    "node scripts/em-lib-cert.mjs libtiff --tarball .homescoop-out/package.tgz"
+  ]
+}

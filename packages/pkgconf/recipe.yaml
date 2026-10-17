@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: pkgconf
 builder: host
+reproducible: true
 # renovate: datasource=github-tags depName=pkgconf/pkgconf extractVersion=^pkgconf-(?<version>.*)$
 version: "3.0.9"
 npm: "@ai-ecoverse/wasm-pkgconf"
@@ -8,13 +9,8 @@ summary: "pkgconf / pkg-config for wasm"
 source:
   url: "https://distfiles.ariadne.space/pkgconf/pkgconf-{{version}}.tar.gz"
   sha256: "642700ab125e6dcb3ceb822469420b0132c26f5585dec88cbe6057134525e57d"
-# 3.0.9-2 is packaging-only: 3.0.9-1's bytes with the README's note on the
-# 256-level traversal depth (homescoop#532). Drop this block at the next
-# real build (the next upstream version).
-repack:
-  from: "3.0.9-1"
-  files:
-    - README.md
+# 3.0.9-3 is a real build again (THIRD-PARTY-NOTICES.md, homescoop#684);
+# 3.0.9-2 was a packaging-only repack of 3.0.9-1 (README, homescoop#532).
 dependencies:
   build: []
   host: []
