@@ -257,7 +257,7 @@ it by hand with `node scripts/npm-parity.mjs .homescoop-out/package.tgz`.
 the recipe says `runner: pool`. A recipe whose ladder jobs compile nothing, a
 packaging-only `repack:` with no `smoke.c` and no tests by layout, runs on the
 pool without the hint, and moves back when its next release drops `repack:`.
-On the pool (`vars.CERT_RUNNER`, `cloud-run-bench`: 8 vCPU / 32 GiB, no queue,
+On the pool (`vars.CERT_RUNNER`, `cloud-run-job`: 10 vCPU / 32 GiB per job,
 no sudo) a recipe's bytes can differ from a hosted build: its image lacks some
 of the hosted tools, and the workspace is `/home/runner/_work`, not
 `/home/runner/work`; `host-build` therefore builds from
