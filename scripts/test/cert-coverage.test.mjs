@@ -31,7 +31,6 @@ const NO_CERT = [
   'libwebp', // #426
   'libxml2', // #426
   'openjpeg', // #426
-  'zlib', // #426
 ];
 
 // "<recipe>: <checklist item>" that no spec, ci command or named file checks.
