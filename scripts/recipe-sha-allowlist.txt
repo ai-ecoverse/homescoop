@@ -1,4 +1,3 @@
 # Repack recipes whose source.sha256 is known not to match source.url.
 # scripts/refresh-recipe-sha.mjs verifies every other repack's pin.
 # One entry per line: <package> #<issue> <reason>. Shrinking this list is the fix.
-py-pandas #730 sha256 matches no public pandas 2.3.2 archive; the pandas source build (#211) replaces it
