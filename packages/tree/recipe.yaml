@@ -1,6 +1,7 @@
 # Steve Baker's tree for slicc wasm realm (host ladder).
 name: tree
 builder: host
+runner: pool
 # renovate: datasource=gitlab-tags depName=OldManProgrammer/unix-tree
 version: "2.3.2"
 npm: "@ai-ecoverse/wasm-tree"

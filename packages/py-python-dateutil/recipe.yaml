@@ -1,6 +1,5 @@
 name: py-python-dateutil
 builder: host
-runner: pool
 version: "2.9.0.post0"
 npm: "@ai-ecoverse/py-python-dateutil"
 source:

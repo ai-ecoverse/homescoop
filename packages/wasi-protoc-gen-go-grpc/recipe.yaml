@@ -2,6 +2,7 @@
 # buf generate can run it as a local plugin in slicc-kernel (@ai-ecoverse/wasi-buf).
 name: wasi-protoc-gen-go-grpc
 builder: host
+runner: pool
 reproducible: true
 inputs:
   - scripts/build-wasip1-go-command.sh
