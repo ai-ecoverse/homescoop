@@ -96,3 +96,9 @@ The new specs against the published tarballs on slicc-kernel 1.100.3's Node entr
 ## Unix-domain socket addresses (homescoop#767, 2026-10-16)
 
 `run.mjs --package wasix-perl --spec unix-socket.mjs --kernel @ai-ecoverse/slicc-kernel@1.108.4 --users enforce` with the published 5.42.0-17: FAIL, `socket|host=die:Bad arg length for Socket::unpack_sockaddr_un, length is 22, should be 112|unpack=die:…|read=hello peer=die:…`. The socket is created, and a forked client connects and writes its line, but every unpack of the 22-byte address dies. patches/0008 gives `__wasi__` Socket.xs's Linux branch, which takes the short address.
+
+## 5.42.0-19: libc flock and mkfifo (homescoop#758, #765, #878; 2026-10-17)
+
+Against the published 5.42.0-18 on slicc-kernel 1.120.2 (Node entry):
+- **`cert/flock.mjs`:** FAIL, `flock on a pipe's two ends (#765): ok granted child-shares after-un-ok`. -18's fcntl emulation grants every lock on a pipe, so the read end's `LOCK_EX|LOCK_NB` is granted while the write end holds `LOCK_EX`. Linux, and -19, give EWOULDBLOCK.
+- **`cert/mkfifo.mjs`:** FAIL, `r: No such file or directory`. -18's `mkfifo` is wasix-posix-stubs.h's EOPNOTSUPP stub, so nothing is created.

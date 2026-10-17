@@ -1,5 +1,6 @@
-# SLICC wasm-realm TLS engine: Mbed TLS server sessions over memory buffers,
-# used by SLICC's in-realm HTTP proxy to terminate CONNECT tunnels (#3571).
+# SLICC TLS engine: Mbed TLS sessions over memory buffers. Server sessions
+# terminate CONNECT tunnels in SLICC's in-realm HTTP proxy (#3571); client
+# sessions verify a server for slicc-kernel's raw TLS (slicc-kernel#922).
 name: tls-engine
 builder: host
 runner: pool
@@ -8,17 +9,29 @@ reproducible: true
 # renovate: datasource=github-releases depName=Mbed-TLS/mbedtls extractVersion=^mbedtls-(?<version>.*)$
 version: "4.2.0"
 npm: "@ai-ecoverse/wasm-tls-engine"
-summary: "Mbed TLS 4.2.0 server engine (ES module + wasm) for SLICC's realm proxy"
+summary: "Mbed TLS 4.2.0 TLS engine (ES module + wasm): server sessions for SLICC's realm proxy, verifying client sessions for the kernel"
 source:
   url: "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-{{version}}/mbedtls-{{version}}.tar.bz2"
   sha256: "2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea"
+sources:
+  # Mozilla's root store as curl publishes it (dist/roots.der). A bump needs
+  # the new sha256; the build fails closed until it is updated.
+  roots:
+# renovate: datasource=custom.curl-cacert depName=curl-cacert versioning=regex:^(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})$ extractVersion=^cacert-(?<version>\d{4}-\d{2}-\d{2})\.pem$
+    version: "2026-09-25"
+    url: "https://curl.se/ca/cacert-{{version}}.pem"
+    sha256: "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505"
+  mpl:
+    version: "3.27.0"
+    url: "https://raw.githubusercontent.com/spdx/license-list-data/v{{version}}/text/MPL-2.0.txt"
+    sha256: "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
 dependencies:
   build: []
   host: []
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/tls-engine
-  license: Apache-2.0
+  license: Apache-2.0 AND MPL-2.0
   notes: |
     Not a realm program: SLICC's kernel imports it (a lazy chunk plus the wasm
     asset). src/slicc_tls_engine.c is the engine; it holds no CA key (leaves

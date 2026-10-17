@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { githubApi } from './ladder-merge-resolve.mjs';
@@ -66,6 +66,6 @@ async function main(argv) {
   await reportFromEnv({ title, body: readFileSync(file, 'utf8') });
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   await main(process.argv.slice(2));
 }

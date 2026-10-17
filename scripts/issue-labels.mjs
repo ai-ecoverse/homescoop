@@ -8,7 +8,7 @@
  *   node scripts/issue-labels.mjs --event                label the issue in $GITHUB_EVENT_PATH if it has none
  *   node scripts/issue-labels.mjs --backlog [--apply]    every open unlabelled issue; --apply labels them
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -187,6 +187,6 @@ async function main(argv) {
   throw new Error('usage: issue-labels.mjs --title <title> | --event | --backlog [--apply]');
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   await main(process.argv.slice(2));
 }

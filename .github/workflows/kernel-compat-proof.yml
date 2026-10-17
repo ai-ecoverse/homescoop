@@ -49,8 +49,9 @@ jobs:
       - id: k
         run: |
           set -euo pipefail
-          positive=$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-kernel)
-          negative=$(node scripts/dev-pin.mjs slicc-kernel-negative)
+          positive=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs @ai-ecoverse/slicc-kernel)
+          negative=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs slicc-kernel-negative)
+          [[ -n "$positive" && -n "$negative" ]] || { echo "::error::dev-pin: an empty kernel pin"; exit 1; }
           echo "kernels (package.json devDependencies): positive $positive, negative $negative"
           printf 'positive=%s\nnegative=%s\n' "$positive" "$negative" >> "$GITHUB_OUTPUT"
 
@@ -90,7 +91,10 @@ jobs:
           set -euo pipefail
           NM="$RUNNER_TEMP/nm"
           needs=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("scripts/browser-cert/selftest/meta.json","utf8")).needs.join(" "))')
-          npm install --prefix "$NM" --no-fund --no-audit "$KERNEL" "$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)" "$(node scripts/dev-pin.mjs playwright-core)" $needs
+          shared=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
+          playwright=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs playwright-core)
+          [[ -n "$KERNEL" && -n "$shared" && -n "$playwright" ]] || { echo "::error::browser-cert: an empty kernel, shared-web or playwright pin"; exit 1; }
+          npm install --prefix "$NM" --no-fund --no-audit "$KERNEL" "$shared" "$playwright" $needs
           if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then
             npx --prefix "$NM" playwright-core install --with-deps chromium
           else
@@ -98,4 +102,4 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/curl"
           npm pack @ai-ecoverse/wasm-curl --pack-destination "$RUNNER_TEMP/curl" --silent
-          HOMESCOOP_CERT_NODE_MODULES="$NM/node_modules" node scripts/browser-cert/run.mjs --package curl --tarball "$RUNNER_TEMP"/curl/*.tgz --cert scripts/browser-cert/selftest
+          HOMESCOOP_CERT_NODE_MODULES="$NM/node_modules" node scripts/gate.mjs cert-run -- node scripts/browser-cert/run.mjs --package curl --tarball "$RUNNER_TEMP"/curl/*.tgz --cert scripts/browser-cert/selftest

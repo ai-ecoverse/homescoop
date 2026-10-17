@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { devPin } from '../dev-pin.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -26,16 +26,18 @@ export function certKernel(pkg, { dir = root, log = console.error } = {}) {
   return spec;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const pkg = process.argv[2];
   if (!pkg) {
     console.error('usage: cert-kernel.mjs <package>');
     process.exit(2);
   }
   try {
-    console.log(certKernel(pkg));
+    const spec = certKernel(pkg);
+    console.log(spec);
+    console.error(`cert-kernel: PASS ${pkg}: ${spec}`);
   } catch (err) {
-    console.error(`browser-cert: no cert kernel for ${pkg}: ${err.message}`);
+    console.error(`cert-kernel: FAIL browser-cert: no cert kernel for ${pkg}: ${err.message}`);
     process.exit(1);
   }
 }

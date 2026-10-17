@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-websocat",
-  "version": "4.0.0-alpha3-4",
+  "version": "4.0.0-alpha3-5",
   "description": "websocat 4.0.0-alpha3 (WebSocket client and server, like netcat for ws://) for slicc WASIX",
   "license": "MIT OR Apache-2.0",
   "engines": {

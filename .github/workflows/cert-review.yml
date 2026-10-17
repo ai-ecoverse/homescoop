@@ -449,8 +449,13 @@ jobs:
           echo '{}' > "$RUNNER_TEMP/cert-review/repack-input.json"
           for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
             npm_name=$(tar -xzf "$RUNNER_TEMP/artifacts/host-$pkg-pr$PR_NUMBER/package.tgz" -O package/package.json 2> /dev/null | jq -r '.name // empty') || npm_name=
-            node scripts/cert-review/repack-input.mjs --package "$pkg" --ref "$HEAD" --repo "$GH_REPO" ${npm_name:+--npm "$npm_name"} \
-              > "$RUNNER_TEMP/repack-input-$pkg.json" || true
+            rc=0
+            node scripts/gate.mjs repack-input -- node scripts/cert-review/repack-input.mjs --package "$pkg" --ref "$HEAD" --repo "$GH_REPO" ${npm_name:+--npm "$npm_name"} \
+              > "$RUNNER_TEMP/repack-input-$pkg.json" || rc=$?
+            if [[ "$rc" -eq 3 ]]; then
+              echo "::error::repack-input.mjs printed no verdict for $pkg; nothing is certified without one"
+              exit 1
+            fi
             cat "$RUNNER_TEMP/repack-input-$pkg.json"
             if jq -e . "$RUNNER_TEMP/repack-input-$pkg.json" > /dev/null 2>&1; then
               jq --arg p "$pkg" --slurpfile r "$RUNNER_TEMP/repack-input-$pkg.json" '. + {($p): $r[0]}' "$RUNNER_TEMP/cert-review/repack-input.json" > "$RUNNER_TEMP/cert-review/repack-input.next"
@@ -458,14 +463,20 @@ jobs:
             fi
           done
 
+      - name: npm parity against the registry now, not as ladder-pr saw it (this job's tools, from ${{ github.sha }})
+        run: |
+          mkdir -p "$RUNNER_TEMP/cert-review"
+          node scripts/cert-review/parity-now.mjs --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --out "$RUNNER_TEMP/cert-review/parity.json" || true
+
       - name: Verdict from the artifacts (this job's tools, from ${{ github.sha }})
         id: verdict
         run: |
           mkdir -p "$RUNNER_TEMP/cert-review"
-          if node scripts/cert-review/verdict.mjs \
+          if node scripts/gate.mjs cert-verdict -- node scripts/cert-review/verdict.mjs \
             --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --review "$RUNNER_TEMP/cert-review" \
             --body "$RUNNER_TEMP/cert-review/body.md" --lines "$RUNNER_TEMP/cert-review/lines.txt" --run "$RUN_URL" \
-            --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION" --specs "$RUNNER_TEMP/specs.json" --repack-input "$RUNNER_TEMP/cert-review/repack-input.json"; then
+            --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION" --specs "$RUNNER_TEMP/specs.json" --repack-input "$RUNNER_TEMP/cert-review/repack-input.json" \
+            --parity "$RUNNER_TEMP/cert-review/parity.json"; then
             echo "conclusion=success" >> "$GITHUB_OUTPUT"
           else
             echo "conclusion=failure" >> "$GITHUB_OUTPUT"
@@ -484,6 +495,7 @@ jobs:
             ${{ runner.temp }}/cert-review/record.json
             ${{ runner.temp }}/cert-review/lines.txt
             ${{ runner.temp }}/cert-review/repack-input.json
+            ${{ runner.temp }}/cert-review/parity.json
           if-no-files-found: error
 
       - name: Comment and the cert-review status on the head

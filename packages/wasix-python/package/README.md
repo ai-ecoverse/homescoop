@@ -4,12 +4,12 @@ CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-32's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-34's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - Two binaries (since 3.14.2-25): the default has no `fork`/`vfork`; `PYTHON_FORK=true` selects the fork-capable one (below). `subprocess` uses `os.posix_spawn` (`proc_spawn2`/`3`) in both
 - `os.getuid()`/`getgid()`/`getgroups()` and `pwd`/`grp` come from slicc-kernel's process credentials and its `/etc/passwd`/`/etc/group` (3.14.2-13, wasix-sysroot -20; slicc-kernel ≥ 1.44.0, no fallback: ids are -1 on older kernels). Root is uid 0 with home `/root`.
-- Record locks (`fcntl` F_SETLK*, `lockf`) go through slicc-kernel (since -21, below); `flock` is a no-op
+- Record locks (`fcntl` F_SETLK*, `lockf`) go through slicc-kernel (since -21, below). Since 3.14.2-26 `fcntl.flock` is real: per open file description, on any descriptor (`slicc.flock`, slicc-kernel ≥ 1.117.0). On older kernels it's a whole-file record lock, and up to -25 it was a no-op.
 - stdout is line-buffered unless it is a regular file, so output streams and survives crashes
 - `signal.alarm`/`setitimer` and `time.sleep` resuming after a signal (the sysroot's libc patches, `patches/`)
 - Bundled `pip` 25.3; `.pyc` are unchecked-hash
@@ -116,8 +116,10 @@ Since 3.14.2-21 (wasix-sysroot -30):
   primitives, across processes. Its named semaphores are kept by slicc-kernel
   (≥ 1.99.0). `shared_memory` and shared ctypes (`Value`/`Array`, whatever
   their `lock`) aren't shared between processes, because processes don't
-  share memory (an error since -23). There is no `fork` start method (no
-  `os.fork`).
+  share memory (an error since -23). The default binary has no `fork` start
+  method (no `os.fork`). `PYTHON_FORK=true` selects the fork-capable binary,
+  which has fork and forkserver (since -25, above). Neither binary has
+  `os.forkpty`/`os.openpty`: WASIX has no ptys.
 - `fcntl.lockf`/`fcntl.fcntl` record locks and `os.lockf` go through the libc
   to slicc-kernel (slicc-kernel#722) and hold against other processes, such as
   a second python or the sqlite3 CLI on the same database. On an older kernel

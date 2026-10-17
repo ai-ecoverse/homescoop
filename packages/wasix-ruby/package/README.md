@@ -37,7 +37,18 @@ fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
-## 3.4.11-17: File#flock excludes other processes
+## 3.4.11-18: real File#flock (wasix-sysroot -34; slicc-kernel ≥ 1.120.0)
+
+- **What changed:** `File#flock` is libc's `flock(2)`, through slicc-kernel's `slicc.flock`.
+- **Semantics, as on Linux:**
+  - a lock belongs to the open file description, on any IO: a file, a pipe, a terminal, a socket or a directory;
+  - a second `File.open` of the same file, or a pipe's other end, conflicts;
+  - a `dup` and a spawned child's inherited descriptor share the lock;
+  - `LOCK_EX` on a read-only file excludes.
+- **Before:** -17 used whole-file fcntl record locks, which belonged to the process, covered regular files only, and on a read-only handle took a read lock instead of `LOCK_EX`.
+- **Kernel:** this needs slicc-kernel ≥ 1.120.0 (engines).
+
+## 3.4.11-17: File#flock excludes other processes (up to -17)
 
 `File#flock` takes whole-file `fcntl` record locks (`LOCK_SH` → read lock,
 `LOCK_EX` → write lock, `LOCK_UN` → unlock; `LOCK_NB` doesn't wait), which

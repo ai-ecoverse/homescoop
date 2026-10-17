@@ -59,4 +59,31 @@ emcc -Oz -flto "-DTF_PSA_CRYPTO_USER_CONFIG_FILE=\"$CRYPTO_CONFIG\"" \
 # Mbed TLS's and TF-PSA-Crypto's (the crypto in the wasm): the same terms,
 # each naming its own files.
 homescoop_stage_licenses "$SRC"/LICENSE "$SRC"/tf-psa-crypto/LICENSE
+
+echo "== tls-engine: roots.der"
+# Mozilla's root store from curl's dated, sha256-pinned PEM bundle, as
+# concatenated DER in the bundle's order (byte-stable). It is MPL-2.0 data:
+# THIRD-PARTY-NOTICES.md names it, with that licence's text.
+homescoop_load_recipe tls-engine --source roots
+homescoop_load_recipe tls-engine --source mpl
+ROOTS_PEM="$WORK/cacert-$ROOTS_VERSION.pem"
+homescoop_fetch "$ROOTS_URL" "$ROOTS_SHA" "$ROOTS_PEM"
+ROOTS_COUNT="$(python3 - "$ROOTS_PEM" "$OUT/roots.der" <<'PY'
+import base64, re, sys
+pem = open(sys.argv[1], encoding="utf-8").read()
+blocks = re.findall(r"-----BEGIN CERTIFICATE-----\n(.*?)-----END CERTIFICATE-----", pem, re.S)
+with open(sys.argv[2], "wb") as out:
+    for block in blocks:
+        out.write(base64.b64decode("".join(block.split())))
+print(len(blocks))
+PY
+)"
+(( ROOTS_COUNT > 100 )) || { echo "tls-engine: only $ROOTS_COUNT roots in $ROOTS_PEM" >&2; exit 1; }
+homescoop_notices_begin "dist/roots.der (the default root store a client session may load) is derived from:"
+printf '\n## Mozilla CA certificate store, as curl publishes it (cacert-%s.pem)\n\n%s\n' \
+  "$ROOTS_VERSION" "Source: $ROOTS_URL (sha256 $ROOTS_SHA). The $ROOTS_COUNT PEM certificates are decoded to DER and concatenated in the bundle's order, unmodified otherwise. Licence: MPL-2.0, from Mozilla's NSS (certdata.txt); its text follows." \
+  >>"$HOMESCOOP_NOTICES"
+homescoop_notice "Mozilla Public License 2.0" "$MPL_URL" "$MPL_SHA"
+node -e 'const r = require(process.argv[1]).slicc.tls.roots; if (r.date !== process.argv[2] || r.sha256 !== process.argv[3]) { console.error(`package.json slicc.tls.roots (${r.date}) does not match the recipe (${process.argv[2]})`); process.exit(1); }' "$HERE/package/package.json" "$ROOTS_VERSION" "$ROOTS_SHA"
+echo "== tls-engine: $ROOTS_COUNT roots from cacert-$ROOTS_VERSION.pem"
 ls -la "$OUT"

@@ -77,12 +77,23 @@ export default async function (ctx) {
     assert.equal(r.status, 0, `${user ?? 'root'}: rc=${r.status} stdout=${r.stdout} stderr=${r.stderr}`);
     assert.equal(r.stdout.trim(), want, `${user ?? 'root'}: flock between processes: ${r.stdout}${r.stderr}`);
   }
-  // Not a regular file: granted, excluding nobody (homescoop#757; -15: EBADF).
+  // Not a regular file: locks are taken (homescoop#757; -15: EBADF). Since -19 they exclude other descriptions (below).
   const other = await run(['bash', '-c', String.raw`perl -e 'use Fcntl ":flock"; pipe(my $r, my $w) or die; open my $n, ">", "/dev/null" or die; opendir(my $dh, "/tmp") or die; open my $d, "<", "/tmp" or die; my @r; for my $h ($w, $r, \*STDOUT, $n, $d) { push @r, join ",", map { flock($h, $_) ? "ok" : "fail:$!" } LOCK_EX, LOCK_SH | LOCK_NB, LOCK_UN } print STDERR "@r
 "' | cat`], { cwd: '/tmp' });
   assert.equal(other.status, 0, `flock on non-files: ${other.stdout}${other.stderr}`);
   assert.equal(other.stderr, `${Array(5).fill('ok,ok,ok').join(' ')}
 `, `flock on a pipe's ends, STDOUT through a pipe, /dev/null and a directory handle: ${other.stderr}`);
+  // 5.42.0-19: libc's flock (slicc.flock, per open file description; #765, #758).
+  // A pipe's other end is another description and conflicts; a forked child's
+  // inherited end is the same description and shares the lock (as on Linux).
+  const pipeLock = await run(['perl', '-e', String.raw`use Fcntl ":flock"; pipe(my $r, my $w) or die; my @o = (flock($w, LOCK_EX) ? "ok" : "fail:$!", flock($r, LOCK_EX | LOCK_NB) ? "granted" : ($!{EWOULDBLOCK} ? "EWOULDBLOCK" : "fail:$!")); my $pid = fork // die; if (!$pid) { exit(flock($w, LOCK_EX | LOCK_NB) ? 0 : 1) } waitpid($pid, 0); push @o, $? >> 8 ? "child-refused" : "child-shares"; flock($w, LOCK_UN); push @o, flock($r, LOCK_EX | LOCK_NB) ? "after-un-ok" : "after-un-fail:$!"; print "@o\n"`], { cwd: '/tmp' });
+  assert.equal(pipeLock.status, 0, `flock on a pipe: ${pipeLock.stdout}${pipeLock.stderr}`);
+  assert.equal(pipeLock.stdout, 'ok EWOULDBLOCK child-shares after-un-ok\n', `flock on a pipe's two ends (#765): ${pipeLock.stdout}${pipeLock.stderr}`);
+  // #758: the single-instance idiom, flock(DATA, LOCK_EX|LOCK_NB) on a read-only handle.
+  await run(['bash', '-c', String.raw`printf '%s\n' 'use Fcntl ":flock"; flock(DATA, LOCK_EX|LOCK_NB) or die "already running\n"; print "running\n"; sleep 3;' '__DATA__' > /tmp/one.pl`], { cwd: '/tmp' });
+  const one = await run(['bash', '-c', 'perl /tmp/one.pl & sleep 1; perl /tmp/one.pl; wait'], { cwd: '/tmp' });
+  assert.equal(one.stdout, 'running\n', `the second instance must not run (#758): ${one.stdout}${one.stderr}`);
+  assert.match(one.stderr, /^already running\n$/, `the second instance's flock(DATA) is refused (#758): ${one.stdout}${one.stderr}`);
   // Two separate perl processes, as two autom4te runs (#631's repro).
   const two = await run(['bash', '-c', [
     'cd /tmp && : > L2',
@@ -93,5 +104,5 @@ export default async function (ctx) {
   ].join('\n')], { cwd: '/tmp' });
   assert.equal(two.status, 0, `two processes: ${two.stdout}${two.stderr}`);
   assert.match(two.stdout, /^refused: Resource temporarily unavailable\n$/, `a second process's LOCK_EX|LOCK_NB while the first holds LOCK_EX: ${two.stdout}${two.stderr}`);
-  console.log(`flock: ${want}, as root and cone; a second perl process is refused while the first holds LOCK_EX; pipes, STDOUT, /dev/null and a directory are granted`);
+  console.log(`flock: ${want}, as root and cone; a second perl process is refused while the first holds LOCK_EX; pipes, STDOUT, /dev/null and a directory take locks; a pipe's read end is refused while its write end holds LOCK_EX and a forked child's inherited write end shares it (#765); the flock(DATA, LOCK_EX|LOCK_NB) single-instance idiom refuses a second instance (#758)`);
 }

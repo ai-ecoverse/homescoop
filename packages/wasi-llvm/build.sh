@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# LLVM 21 + clang + lld as static libraries for a wasm32-wasip1-threads host.
-# Output: work/prefix (lib/*.a, include/, bin/llvm-config) and
-# work/wasi-llvm-<version>-wasm32-wasip1-threads.tar.xz.
-#
-# Env:
-#   WASI_SDK_PATH   wasi-sdk to build with (default: fetch the scripts/install-wasi-sdk.sh pin for this host)
-#   NATIVE_TBLGEN   dir with llvm-tblgen / clang-tblgen / llvm-min-tblgen of this
-#                   LLVM version (default: build them natively from the same source)
-#   JOBS            ninja -j (default: CPUs - 2)
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
@@ -15,7 +6,7 @@ export HOMESCOOP_ROOT="$ROOT"
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe wasi-llvm
 
-PKG_WORK="$HOMESCOOP_PKG/work"
+PKG_WORK="$WORK/wasi-llvm"
 mkdir -p "$PKG_WORK"
 TARBALL="$PKG_WORK/llvm-project-${VERSION}.src.tar.xz"
 SRC="$PKG_WORK/llvm-project-${VERSION}.src"
@@ -36,28 +27,31 @@ for p in "$HOMESCOOP_PKG"/patches/*.patch; do
 done
 shopt -u nullglob
 
-# The wasi-sdk pinned in scripts/install-wasi-sdk.sh, which wasi-rustc's CI also builds with, so a shared libLLVM
-# and rustc's C++ agree on libc++ and wasi-libc.
-if [[ -z "${WASI_SDK_PATH:-}" ]]; then
-  eval "$(bash "$ROOT/scripts/install-wasi-sdk.sh" "$PKG_WORK/$(bash "$ROOT/scripts/install-wasi-sdk.sh" --name)")"
-fi
+field() { node "$ROOT/scripts/read-recipe.mjs" wasi-llvm --field "$1"; }
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) sdk_host=linux_x64 ;;
+  Darwin-arm64) sdk_host=macos_arm64 ;;
+  *) echo "homescoop: no wasi-sdk pin for $(uname -sm)" >&2; exit 1 ;;
+esac
+HOMESCOOP_WASI_SDK_VERSION="$(field toolchain.wasi-sdk)"
+HOMESCOOP_WASI_SDK_SHA="$(field "toolchain.wasi_sdk_sha256_$sdk_host")"
+export HOMESCOOP_WASI_SDK_VERSION HOMESCOOP_WASI_SDK_SHA
+eval "$(bash "$ROOT/scripts/install-wasi-sdk.sh" "$PKG_WORK/$(bash "$ROOT/scripts/install-wasi-sdk.sh" --name)")"
 SDK="$WASI_SDK_PATH"
 "$SDK/bin/clang" --version | head -1
 
-if [[ -z "${NATIVE_TBLGEN:-}" ]]; then
-  echo "== native tablegen tools ($VERSION)"
-  if [[ ! -x "$NATIVE/bin/clang-tblgen" ]]; then
-    cmake -G Ninja -S "$SRC/llvm" -B "$NATIVE" -DCMAKE_BUILD_TYPE=Release \
-      -DLLVM_ENABLE_PROJECTS=clang -DLLVM_TARGETS_TO_BUILD=WebAssembly \
-      -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF \
-      -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF
-    ninja -C "$NATIVE" -j"$JOBS" llvm-tblgen llvm-min-tblgen clang-tblgen
-  fi
-  NATIVE_TBLGEN="$NATIVE/bin"
+echo "== native tablegen tools ($VERSION)"
+if [[ ! -x "$NATIVE/bin/clang-tblgen" ]]; then
+  cmake -G Ninja -S "$SRC/llvm" -B "$NATIVE" -DCMAKE_BUILD_TYPE=Release \
+    -DLLVM_ENABLE_PROJECTS=clang -DLLVM_TARGETS_TO_BUILD=WebAssembly \
+    -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF \
+    -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF
+  ninja -C "$NATIVE" -j"$JOBS" llvm-tblgen llvm-min-tblgen clang-tblgen
 fi
+NATIVE_TBLGEN="$NATIVE/bin"
 
 echo "== configure LLVM $VERSION for wasm32-wasip1-threads"
-FLAGS="--target=wasm32-wasip1-threads --sysroot=$SDK/share/wasi-sysroot -pthread -D_WASI_EMULATED_MMAN"
+FLAGS="--target=wasm32-wasip1-threads --sysroot=$SDK/share/wasi-sysroot -pthread -D_WASI_EMULATED_MMAN -ffile-prefix-map=$SRC=/llvm-project -ffile-prefix-map=$BUILD=/build -ffile-prefix-map=$SDK=/wasi-sdk"
 cmake -G Ninja -S "$SRC/llvm" -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$INSTALL" \
   -DCMAKE_SYSTEM_NAME=WASI -DCMAKE_SYSTEM_PROCESSOR=wasm32 -DWASI=TRUE -DUNIX=1 \
@@ -94,7 +88,22 @@ done
 [[ "$("$INSTALL/bin/llvm-config" --version)" == "$VERSION" ]]
 [[ "$("$INSTALL/bin/llvm-config" --targets-built)" == "WebAssembly" ]]
 
-OUT="$PKG_WORK/wasi-llvm-${VERSION}-wasm32-wasip1-threads.tar.xz"
-tar cJf "$OUT" -C "$PKG_WORK" --exclude='prefix/bin/[a-km-z]*' prefix
-shasum -a 256 "$OUT"
-echo "OK wasi-llvm $VERSION → $INSTALL"
+DEST="$HOMESCOOP_PKG/package"
+rm -rf "$DEST/bin" "$DEST/include" "$DEST/lib"
+mkdir -p "$DEST/bin"
+cp "$INSTALL/bin/llvm-config" "$DEST/bin/llvm-config"
+chmod 755 "$DEST/bin/llvm-config"
+cp -R "$INSTALL/include" "$INSTALL/lib" "$DEST/"
+cp "$INSTALL/LICENSE.TXT" "$DEST/LICENSE"
+if find "$DEST" -type l | grep -q .; then
+  echo "homescoop: symlinks in the package" >&2
+  find "$DEST" -type l >&2
+  exit 1
+fi
+if grep -rlE "$PKG_WORK|$ROOT|/home/runner/" "$DEST/bin" "$DEST/lib/cmake" "$DEST/include" >/dev/null 2>&1; then
+  echo "homescoop: a build path leaked into the package" >&2
+  grep -rlE "$PKG_WORK|$ROOT|/home/runner/" "$DEST/bin" "$DEST/lib/cmake" "$DEST/include" | head >&2
+  exit 1
+fi
+du -sh "$DEST/lib" "$DEST/include"
+echo "OK wasi-llvm $VERSION → $DEST"

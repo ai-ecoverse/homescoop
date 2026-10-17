@@ -8,6 +8,7 @@ name="${1:?usage: host-smoke.sh <package>}"
 SMOKE="$ROOT/packages/$name/smoke.c"
 if [[ ! -f "$SMOKE" ]]; then
   echo "host-smoke: no $SMOKE — skip"
+  echo "host-smoke: PASS $name has no smoke.c"
   exit 0
 fi
 
@@ -41,3 +42,4 @@ emcc -O0 "$SMOKE" \
 echo "== host-smoke: node $WORKDIR/smoke.cjs"
 node "$WORKDIR/smoke.cjs" "$WORKDIR"
 echo "== host-smoke: $name OK"
+echo "host-smoke: PASS $name"

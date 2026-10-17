@@ -32,7 +32,8 @@ export default async function (ctx) {
     const o = JSON.stringify(out);
     assert.deepEqual(out.hasattr, [false, false], `hasattr(os, "fork") stays False: ${o}`);
     assert.deepEqual(out.fork, ['AttributeError', `os.fork() ${HINT}`], o);
-    assert.deepEqual(out.forkpty, ['AttributeError', `os.forkpty() ${HINT}`], o);
+    // Neither build has forkpty (no ptys), so no hint that PYTHON_FORK=true would help (#783).
+    assert.deepEqual(out.forkpty, ['AttributeError', "module 'os' has no attribute 'forkpty'"], o);
     assert.deepEqual(out.other, ['AttributeError', "module 'os' has no attribute 'no_such_thing'"], o);
     assert.deepEqual(out.ctx_fork, ['ValueError', `multiprocessing's 'fork' start method ${HINT}`], o);
     assert.deepEqual(out.ctx_forkserver, ['ValueError', `multiprocessing's 'forkserver' start method ${HINT}`], o);
@@ -40,5 +41,5 @@ export default async function (ctx) {
     assert.deepEqual(out.methods, ['spawn'], o);
     assert.equal(out.start, 'spawn', o);
   }
-  console.log(`default binary (no PYTHON_FORK, or PYTHON_FORK=1 / false, which aren't "true"): hasattr(os, "fork") False; os.fork(), os.forkpty() raise AttributeError and get_context/set_start_method("fork"/"forkserver") ValueError, each "… ${HINT}"; start methods ['spawn']`);
+  console.log(`default binary (no PYTHON_FORK, or PYTHON_FORK=1 / false, which aren't "true"): hasattr(os, "fork") False; os.fork() raises AttributeError (os.forkpty() the stock one, #783) and get_context/set_start_method("fork"/"forkserver") ValueError, each "… ${HINT}"; start methods ['spawn']`);
 }

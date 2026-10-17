@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { readCertMeta } from './cert-meta.mjs';
 import { glueFallback } from './glue.mjs';
 import { devPin } from '../dev-pin.mjs';
@@ -234,7 +234,7 @@ function browser(pkg, manifestPath, tarball) {
   let failed = 0;
   for (const { label, argv, env } of runs) {
     console.log(`::group::browser-cert: ${label}`);
-    const r = spawnSync(process.execPath, argv, { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
+    const r = spawnSync(process.execPath, [join(root, 'scripts/gate.mjs'), 'cert-run', '--', process.execPath, ...argv], { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
     console.log('::endgroup::');
     if (r.status !== 0) {
       console.log(`::error::${pkg}: browser cert failed: ${label}`);
@@ -244,7 +244,7 @@ function browser(pkg, manifestPath, tarball) {
   return failed;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const [mode, pkg] = process.argv.slice(2);
   const opt = (name) => {
     const i = process.argv.indexOf(name);
@@ -255,6 +255,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
     console.error('usage: cert-leg.mjs plan <package> [--manifest <package.json>] | cert-leg.mjs ci <package> | cert-leg.mjs browser-extra <package> --manifest <package.json> [--tarball <package.tgz>]');
     process.exit(2);
   }
-  if (mode === 'browser-extra') process.exit(browser(pkg, manifest, opt('--tarball') || '.homescoop-out/package.tgz'));
-  process.exit(mode === 'plan' ? plan(pkg, manifest) : ci(pkg));
+  const code = mode === 'browser-extra' ? browser(pkg, manifest, opt('--tarball') || '.homescoop-out/package.tgz') : mode === 'plan' ? plan(pkg, manifest) : ci(pkg);
+  (mode === 'plan' ? console.error : console.log)(code === 0 ? `cert-leg: PASS ${mode} ${pkg}` : `cert-leg: FAIL ${mode} ${pkg}`);
+  process.exit(code);
 }

@@ -9,8 +9,8 @@
  * Exits 0 when every entry is the same, 1 otherwise, listing the entries
  * that differ.
  */
+import { fileURLToPath } from 'node:url';
 import { readFileSync, realpathSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 import { readTarball, sha256 } from './diff-published.mjs';
 
 const oct = (m) => m.toString(8).padStart(4, '0');
@@ -70,4 +70,4 @@ function main() {
   return 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) process.exit(main());
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exit(main());

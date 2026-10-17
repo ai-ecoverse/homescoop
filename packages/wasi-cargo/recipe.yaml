@@ -1,0 +1,32 @@
+name: wasi-cargo
+builder: host
+reproducible: true
+version: "0.99.0"
+npm: "@ai-ecoverse/wasi-cargo"
+summary: "Cargo 0.99 (Rust 1.98.1's) for slicc WASI (command cargo), with the wasi-rustc driver"
+source:
+  url: "https://static.rust-lang.org/dist/rustc-1.98.1-src.tar.xz"
+  sha256: "be1816e7f6c40abb90245ad6e024bed2a7e88d7dda4561e4d5470207df616b9f"
+toolchain:
+  rust: "1.98.1"
+  wasi-sdk: "34.0"
+  wasi_sdk_sha256_linux_x64: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-cargo
+  license: (MIT OR Apache-2.0) AND GPL-2.0-only WITH GCC-exception-2.0 AND MPL-2.0 AND BSD-2-Clause AND BSD-3-Clause AND Unicode-3.0 AND Zlib AND blessing
+  notes: |
+    Cargo 0.99 is Rust 1.98.1's own src/tools/cargo, in the same
+    rustc-1.98.1-src.tar.xz wasi-rustc builds from (sha256-pinned; its
+    vendor/ holds every crate, so the build is offline and --locked).
+    build.sh applies packages/wasi-rustc/patches to the Rust tree, builds the
+    stage1 compiler and its wasm32-wasip1-threads std with x.py (PATH
+    splitting and cwd from $PWD, patches 0003 and 0013), then Cargo for
+    wasm32-wasip1-threads with stage0's cargo: patches/cargo.patch, the
+    wasix-command bridge crate, and git2/home/filetime/tar/jobserver from
+    vendor/ with their patches/ (cargo.patch's [patch.crates-io]). wasi-sdk
+    34.0 is pinned here (toolchain, passed to scripts/install-wasi-sdk.sh). bin/cargo is the driver
+    that runs the installed wasi-rustc.

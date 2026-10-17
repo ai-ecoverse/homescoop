@@ -630,11 +630,11 @@ changes the boot order for every cert.
 - `concurrency`: one group per caller repo, PR (or ref), kernel, set,
   bios-ref and reference; a PR caller's newer run cancels the older one.
 - One call is a gate, a plan, up to 10 shards and a report job. On the pool
-  10 shards run at once (cloud-run-bench has up to 30 machines); on hosted
+  10 shards run at once (the cloud-run-job pool scales per job); on hosted
   runners 3, so a fork PR's call doesn't crowd out `ladder-pr`. The usual
   `base,ci-certified` call is a gate, a plan and one shard job.
 - **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
-  `cloud-run-bench`) can reach the GCP metadata server and the pool's
+  `cloud-run-job`) can reach the GCP metadata server and the pool's
   service-account token. `runner` / `CERT_RUNNER` (shards) and
   `light-runner` / `CERT_LIGHT_RUNNER` (plan, report) are used only for:
   - a `pull_request` from a branch of the calling repo (`head.repo` is
@@ -672,7 +672,7 @@ changes the boot order for every cert.
   the backstop.
 - Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
   (`cloud-run`, 4 vCPU / 8 GiB), else the shards' runner. The shards use
-  `runner` / `CERT_RUNNER` (`cloud-run-bench`). On the pool a job gets a machine within about a minute, where
+  `runner` / `CERT_RUNNER` (`cloud-run-job`). On the pool a job gets a machine within about a minute, where
   `ubuntu-latest` can queue for 15–40.
 - **No root on the pool.** Its machines run with "no new privileges", so
   `sudo` cannot become root. The Chromium step installs the system libraries
@@ -702,6 +702,10 @@ Emscripten builds without `slicc_sleep_ms` that exit 70 there
 (slicc-kernel#483, fixed by #496 in 1.81.0).
 
 The `@ai-ecoverse/slicc-kernel` pin must be a certified kernel, and `ci` enforces it: `ladder-pr`'s `exact-pins` job runs [`check-cert-kernel.mjs`](../scripts/check-cert-kernel.mjs), which fails unless the pin is exact, its slicc-kernel release `v<pin>` has a `certified @ai-ecoverse/slicc-kernel@<pin> sha256=<hex>` line, and the registry tarball re-hashes to that sha256.
+
+## Gate verdict lines
+
+A gate's silence must never read as a pass (#968). Every script that gates a merge, a release or a cert prints `<gate>: PASS <detail>` when it passes (and `<gate>: FAIL <detail>` where it can), and every caller runs it through `node scripts/gate.mjs <gate> -- <command> …`. The wrapper streams the child's stdout and stderr unchanged, so `x=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs …)` still captures the value. It exits with the child's code. When the child exits 0 without a `<gate>: PASS` line it exits 3, so an early exit 0, a CLI guard that didn't fire, or empty output fails the job. The gates are check-exact-pins, check-cert-kernel, browser-cert/cert-kernel (`cert-kernel`), dev-pin, browser-cert/compat (`compat plan|shard|report`; a report with 0 rows that ran is a FAIL), cert-review/repack-input, ladder-merge-resolve and verify-published, and (#981's second half) npm-parity, check-package-meta (`package-meta`), refresh-recipe-sha `--verify-repack` (`recipe-sha`), host-smoke.sh (`host-smoke`; PASS with no `smoke.c`), browser-cert/run.mjs (`cert-run`, also glue by path and cert-leg's extra-kernel runs), browser-cert/cert-leg (`cert-leg` plan, browser-extra and ci; plan prints its verdict on stderr, since its stdout is `GITHUB_OUTPUT`), assert-certified-publish (`certified-publish`; exit 10, already on npm, prints FAIL and is passed through as the skip) and cert-review/verdict (`cert-verdict`). `scripts/test/gate-verdict.test.mjs` checks that each prints its line and that every call in the workflows, host-run.sh and cert-review/harness.sh goes through gate.mjs. kernel-compat.yml, ladder-merge.yml and harness.sh check out scripts at a ref that may predate gate.mjs, so they use it only when `scripts/gate.mjs` exists at that ref.
 
 ## Cert review: `cert-review.yml`
 
@@ -735,6 +739,7 @@ Claude reviews every package a same-repo PR builds, after `ladder-pr` finishes, 
   - an entry **expires** once its package has an attested successor: a version published later (by the packument's `time`; with no times, any other version), with provenance, whose trace passes without that entry. A successor that only passes through other unexpired entries still counts. From then on, a dependent that pins the old version is INCOMPLETE (`… the entry has expired: bump to it`) until it bumps.
 - **Not checked:** the sigstore signature on an attestation bundle. npm verifies it at publish and serves it over HTTPS, and `npm audit signatures` checks it again offline.
 - **CLI:** `node scripts/cert-review/repack-input.mjs --package <recipe dir> [--ref <commit>] [--repo owner/repo] [--npm <name>] [--reproduced <file.json>] [--known <file>] [--fixtures <dir>]` prints `{ package, npm, repack, built?, chain, root, attested, reason, inputs, known }`. It exits 0 when attested, 1 when unverifiable, and 2 when the trace couldn't run. It reads trees with `git show` in the current clone, or through the GitHub contents API with `--repo` (the record job does that). It reads packuments and attestations from registry.npmjs.org, or from recorded fixtures: `<dir>/packument/<npm, / as %2f>.json`, `<dir>/attestations/<npm, / as %2f>@<version>.json`, `<dir>/tree/<commit>/<path>`. `--reproduced` is a JSON object `{ "<npm>@<version>": "<dist.integrity of an independent rebuild>" }`. The provenance must be for the tarball's own sha512, because a CI repack is a pure function of its input and the repo's files, and a laptop publish isn't. The tree it judges is the attested commit, or the gitHead when there's no attestation.
+- **npm parity at record time** (#891). ladder-pr's `npm-parity` job judges each tarball against npm as it was then, but main can publish the same package before cert-review runs. So the `record` job runs `scripts/cert-review/parity-now.mjs` on the ladder-pr tarballs against the registry as it is now (`npm-parity.mjs`'s check with `--drift fail`), writes `parity.json` into the record artifact, and `verdict.mjs --parity` applies it whatever the reviewer said: `behind` (the version sorts below `latest`) is `cert-ci: BEHIND`, `drift` (the version is on npm with other bytes) is `cert-ci: DRIFT`, and a check that failed, didn't run, or left no file is `cert-ci: INCOMPLETE`. None of these gets a `certified=` line. `same` certifies with the note "on npm with the same contents at record time; nothing to publish"; `new` certifies as before. At publish, `assert-certified-publish.mjs` also refuses (exit 2) a version that sorts below npm's `latest` by then, since `--tag latest` would move it back. A version that is already on npm skips the publish (exit 10) only when npm has the same bytes (`dist.integrity`) or the same entries; other contents fail the publish instead of skipping it silently, because those bytes would never ship (#971).
 - **Live pairs:** before Claude starts, a step with no secrets starts two `run.mjs --live` harnesses per package under Xvfb, with users enforced on the `cert/meta.json` kernel: npm `latest` (the baseline, from 9300) and the PR's tarball (from 9301), listed in `$RUNNER_TEMP/live/live.json`. Claude runs the same thing on both: a failure the baseline shares is pre-existing, never blocks, and gets an issue filed.
 - **Severity:** roll forward. FAIL only for security or secret exposure, data loss, a supply-chain mismatch, a licence violation, a crash, or a regression without a workaround; anything else certifies with `(known: …)`.
 

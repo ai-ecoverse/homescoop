@@ -32,6 +32,32 @@ export interface TlsEngineModule {
   _tls_version(session: number): number;
   _tls_alpn_http11(session: number): number;
   _tls_session_free(session: number): void;
+  /** An empty trust store; 0 on failure. */
+  _tls_ca_new(): number;
+  /** Add one DER root: 0 or < 0. */
+  _tls_ca_add_der(ca: number, der: number, len: number): number;
+  /** Add concatenated DER roots (roots.der): how many were added, or < 0. */
+  _tls_ca_add_bundle(ca: number, bytes: number, len: number): number;
+  _tls_ca_count(ca: number): number;
+  _tls_ca_free(ca: number): void;
+  /**
+   * A client session to `servername` (a C string) verifying against `ca`; 0 on failure.
+   * `alpn`/`alpnLen`: an ALPN list in wire format (0, 0 for none). `flags`: 0, or
+   * 1 (TLS_CLIENT_INSECURE_SKIP_VERIFY) to finish the handshake whatever verification finds.
+   */
+  _tls_client_new(ca: number, servername: number, alpn: number, alpnLen: number, flags: number): number;
+  /** 1 when the handshake is done, 0 when it needs more ciphertext, < 0 an error. */
+  _tls_handshake(session: number): number;
+  /** MBEDTLS_X509_BADCERT_* flags: 0 verified, -1 no certificate yet. */
+  _tls_verify_result(session: number): number;
+  /** The flags in words at `out`; its length, or < 0. */
+  _tls_verify_info(flags: number, out: number, max: number): number;
+  /** The protocol ALPN agreed on at `out`: its length, 0 for none. */
+  _tls_alpn(session: number, out: number, max: number): number;
+  /** How many certificates the server sent. */
+  _tls_peer_count(session: number): number;
+  /** The server's certificate at `index` (0 = its leaf) as DER at `out`: its length, or < 0. */
+  _tls_peer_der(session: number, index: number, out: number, max: number): number;
 }
 
 export interface TlsEngineOptions {

@@ -20,7 +20,7 @@ about:
   license: Apache-2.0
   notes: |
     Configure linux-generic32 with the pinned wasixcc (scripts/install-wasixcc.sh,
-    wasix-sysroot 2025.9.30-17), flags after wasix-org/openssl's wasix.sh:
+    wasix-sysroot 2025.9.30-34), flags after wasix-org/openssl's wasix.sh:
     no-asm no-shared no-dso no-tests no-apps no-afalgeng, OPENSSL_NO_SECURE_MEMORY,
     OPENSSL_NO_DGRAM, OPENSSL_THREADS (WASIX has pthreads). Built twice: lib/
     (no-pic, static-main on the asyncify sysroot: ruby) and lib-pic/ (-fPIC,

@@ -40,6 +40,11 @@
       "description": "FreeType release tarballs (tags are VER-2-13-3)",
       "defaultRegistryUrlTemplate": "https://download.savannah.gnu.org/releases/freetype/",
       "format": "html"
+    },
+    "curl-cacert": {
+      "description": "curl's dated extracts of Mozilla's CA certificate store (cacert-YYYY-MM-DD.pem), for tls-engine's roots.der. A bump also needs the sha256 in packages/tls-engine/recipe.yaml and slicc.tls.roots in its package.json; the build fails closed until both match.",
+      "defaultRegistryUrlTemplate": "https://curl.se/docs/caextract.html",
+      "format": "html"
     }
   },
   "customManagers": [

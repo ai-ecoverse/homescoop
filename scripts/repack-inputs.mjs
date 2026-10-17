@@ -203,13 +203,7 @@ export function describe(name, res) {
   return `${head}\ndrop repack: and rebuild, or say why the bytes are unchanged with repack: inputs_changed: "<reason>"`;
 }
 
-const invoked = (() => {
-  try {
-    return realpathSync(process.argv[1] ?? '') === realpathSync(fileURLToPath(import.meta.url));
-  } catch {
-    return false;
-  }
-})();
+const invoked = process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
 if (invoked) {
   const name = process.argv[2];
   if (!name) {

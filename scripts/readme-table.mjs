@@ -15,7 +15,7 @@
  *
  * scripts/test/readme-table.test.mjs runs --check in ladder-pr.
  */
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -87,7 +87,7 @@ export function checkReadme(root = defaultRoot) {
   return { path, readme, want, ok: want === readme };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const arg = process.argv[2];
   if (arg === '--write') {
     const { path, want, ok } = checkReadme();
