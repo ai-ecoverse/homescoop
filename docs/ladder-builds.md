@@ -328,6 +328,29 @@ fork PR runs everything on `ubuntu-latest`, since a pool job can reach the
 pool's service-account token. `ladder-build`, which publishes with
 `id-token: write`, stays hosted.
 
+## Gate verdicts
+
+A gate's silence is never a pass (#968, #981). Every gate ends with one line,
+`<gate>: PASS <summary>` or `<gate>: FAIL <summary>`, and its caller runs it
+through `node scripts/gate.mjs <gate> -- <command>`. The wrapper fails unless
+that line is there and agrees with the exit status, so an early `exit 0`, a
+script whose main guard never fires, or empty output fails the job.
+
+| gate | script | callers |
+| --- | --- | --- |
+| `exact-pins` | `check-exact-pins.mjs` | `host-run.sh`; ladder-pr `exact-pins` |
+| `package-meta` | `check-package-meta.mjs` | `host-run.sh` |
+| `npm-parity` | `npm-parity.mjs` | ladder-pr `npm-parity` |
+| `recipe-sha` | `refresh-recipe-sha.mjs` | ladder-pr `recipe-sha` |
+| `prove-negative` | `browser-cert/prove-negative.mjs` | by hand, cert lanes |
+| `cert-leg` | `browser-cert/cert-leg.mjs` | ladder-pr `cert` |
+| `cert-run` | `browser-cert/run.mjs` (also glue by path, `--glue-only`) | `cert-leg.mjs browser-extra`; ladder-pr `cert` |
+| `kernel-compat`, `kernel-compat-plan`, `kernel-compat-shard` | `browser-cert/compat.mjs report`, `plan`, `shard` | `kernel-compat.yml` |
+| `pool-parity` | the `compare` step | `pool-parity.yml`'s `report` (a missing verdict is "no verdict") |
+
+`scripts/test/gate-verdicts.test.mjs` checks each gate name against a stubbed
+silent `exit 0`, and that each script prints its own line.
+
 ## Recipe shape
 
 ```yaml

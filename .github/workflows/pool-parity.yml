@@ -133,6 +133,7 @@ jobs:
           if [[ "$a" == "$b" ]]; then
             echo "$PKG: pool and hosted twin are byte-identical ($a)" | tee -a "$GITHUB_STEP_SUMMARY"
             printf '%s\tsame\t%s\t\n' "$PKG" "$a" > "out/$PKG.tsv"
+            echo "pool-parity: PASS $PKG same $a"
             exit 0
           fi
           node scripts/tarball-parity.mjs "$RUNNER_TEMP/hosted/package.tgz" "$RUNNER_TEMP/pool/package.tgz" --labels hosted,pool | tee "$RUNNER_TEMP/diff.txt" || true
@@ -140,6 +141,7 @@ jobs:
           printf '%s\tdiffer\thosted %s pool %s\t%s\n' "$PKG" "$a" "$b" "${first:-entries identical, tarball bytes differ}" > "out/$PKG.tsv"
           echo "::error::$PKG: the pool build ($b) differs from its hosted twin ($a): ${first:-the entries are identical, the tarball bytes differ}. Move it back to ubuntu-latest (drop runner: pool) or fix the difference"
           echo "$PKG: pool $b, hosted $a; first difference: ${first:-tarball bytes only}" >> "$GITHUB_STEP_SUMMARY"
+          echo "pool-parity: FAIL $PKG differs (pool $b, hosted $a)"
           exit 1
       - if: always()
         uses: actions/upload-artifact@v7

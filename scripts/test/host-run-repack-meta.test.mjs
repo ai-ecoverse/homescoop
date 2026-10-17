@@ -13,7 +13,7 @@ function hostRun(readme) {
   const root = mkdtempSync(join(tmpdir(), 'homescoop-repack-'));
   try {
     mkdirSync(join(root, 'scripts'));
-    for (const f of ['host-run.sh', 'read-recipe.mjs', 'check-exact-pins.mjs', 'sync-package-version.mjs', 'check-package-meta.mjs', 'upstream-version-text.mjs', 'package-meta-versions.json', 'repack-published.mjs', 'diff-published.mjs']) {
+    for (const f of ['gate.mjs', 'host-run.sh', 'read-recipe.mjs', 'check-exact-pins.mjs', 'sync-package-version.mjs', 'check-package-meta.mjs', 'upstream-version-text.mjs', 'package-meta-versions.json', 'repack-published.mjs', 'diff-published.mjs']) {
       copyFileSync(join(scripts, f), join(root, 'scripts', f));
     }
     const pkg = join(root, 'packages', 'tool', 'package');

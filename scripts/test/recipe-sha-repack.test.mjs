@@ -16,7 +16,7 @@ const sha = (b) => createHash('sha256').update(b).digest('hex');
 function fixture({ pin, repack = true, allow = '', issues = {}, attested = {}, verify = true }) {
   const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-test-'));
   mkdirSync(join(dir, 'scripts'));
-  for (const f of ['refresh-recipe-sha.mjs', 'read-recipe.mjs']) copyFileSync(join(scripts, f), join(dir, 'scripts', f));
+  for (const f of ['refresh-recipe-sha.mjs', 'read-recipe.mjs', 'gate.mjs']) copyFileSync(join(scripts, f), join(dir, 'scripts', f));
   if (allow) writeFileSync(join(dir, 'scripts/recipe-sha-allowlist.txt'), allow);
   const src = join(dir, 'src-1.0.tar.gz');
   writeFileSync(src, 'source bytes\n');

@@ -215,7 +215,7 @@ jobs:
           KERNEL_DIR: ${{ steps.kind.outputs.kind == 'artifact' && format('{0}/kernel-artifact', runner.temp) || '' }}
         run: |
           set -euo pipefail
-          node scripts/browser-cert/compat.mjs plan \
+          node scripts/gate.mjs kernel-compat-plan -- node scripts/browser-cert/compat.mjs plan \
             --kernel "$KERNEL" --set "$SET" --bios-ref "$BIOS_REF" --homescoop-ref "$HOMESCOOP_REF" --shards "$SHARDS" \
             ${KERNEL_DIR:+--kernel-dir "$KERNEL_DIR"} \
             ${REFERENCE:+--reference "$REFERENCE"} \
@@ -264,7 +264,7 @@ jobs:
             npx --prefix "$RUNNER_TEMP/pw" playwright-core install chromium
           fi
       - name: Cert specs and base sweep on the candidate kernel
-        run: node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
+        run: node scripts/gate.mjs kernel-compat-shard -- node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -280,7 +280,7 @@ jobs:
           EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
         run: |
           set -euo pipefail
-          node scripts/browser-cert/compat.mjs report \
+          node scripts/gate.mjs kernel-compat -- node scripts/browser-cert/compat.mjs report \
             --plan "$RUNNER_TEMP/plan/plan.json" --results "$RUNNER_TEMP/out" --out "$RUNNER_TEMP/compat" \
             --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"
       - if: ${{ !cancelled() && needs.plan.outputs.count == '1' }}
@@ -321,7 +321,7 @@ jobs:
           EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
         run: |
           set -euo pipefail
-          node scripts/browser-cert/compat.mjs report \
+          node scripts/gate.mjs kernel-compat -- node scripts/browser-cert/compat.mjs report \
             --plan "$RUNNER_TEMP/results/${{ needs.plan.outputs.artifact }}-plan/plan.json" \
             --results "$RUNNER_TEMP/results" --out "$RUNNER_TEMP/compat" \
             --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"

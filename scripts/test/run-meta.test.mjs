@@ -11,6 +11,7 @@ const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 function fixture(packages) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'homescoop-run-meta-')));
   cpSync(join(scripts, 'browser-cert'), join(root, 'scripts', 'browser-cert'), { recursive: true });
+  cpSync(join(scripts, 'gate.mjs'), join(root, 'scripts', 'gate.mjs'));
   for (const [name, meta] of Object.entries(packages)) {
     mkdirSync(join(root, 'packages', name, 'cert'), { recursive: true });
     if (meta !== undefined) writeFileSync(join(root, 'packages', name, 'cert', 'meta.json'), typeof meta === 'string' ? meta : JSON.stringify(meta));

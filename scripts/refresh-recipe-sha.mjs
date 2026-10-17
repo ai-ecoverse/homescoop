@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
+import { say } from './gate.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -314,6 +315,8 @@ for (const name of names) {
     refreshOne(name);
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
+    say('recipe-sha', false, `${name}: ${(e instanceof Error ? e.message : String(e)).split('\n')[0].slice(0, 200)}`);
     process.exit(1);
   }
 }
+say('recipe-sha', true, `${names.length} recipe${names.length === 1 ? '' : 's'}${checkOnly ? ' checked' : ''}${verifyRepack ? ', repacks verified' : ''}`);

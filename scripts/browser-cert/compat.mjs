@@ -11,11 +11,13 @@ import {
   renameSync,
   rmSync,
   writeFileSync,
+  realpathSync,
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commandsOf } from './base-sweep/sweep.mjs';
 import { devPin } from '../dev-pin.mjs';
+import { say } from '../gate.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -1122,13 +1124,16 @@ function report(args) {
   console.log(text);
   output('verdict', verdict);
   output('regressions', String(regressions));
+  gateNote = `${verdict}, ${regressions} regression(s) on ${k.name}@${k.version}`;
   if (errors.length) {
     console.log(`::error::kernel-compat could not answer for ${errors.length} item(s): ${errors.join('; ').slice(0, 1000)}`);
+    say('kernel-compat', false, `${errors.length} item(s) unanswered`);
     process.exit(1);
   }
   if (expected.length) {
     if (problems.length) {
       console.log(`::error::negative proof fails on ${k.name}@${k.version}: ${problems.join('; ')}`);
+      say('kernel-compat', false, `negative proof fails on ${k.name}@${k.version}`);
       process.exit(1);
     }
     console.log(`::notice::negative proof holds on ${k.name}@${k.version}: ${expected.join(', ')} regress; all regressions: ${[...byRecipe.keys()].join(', ')}`);
@@ -1137,7 +1142,10 @@ function report(args) {
   if (regressions) {
     const msg = `${regressions} regression(s) on ${k.name}@${k.version} against ${plan.reference.version}: ${[...byRecipe.keys()].join(', ')}`;
     console.log(failOnRegression ? `::error::${msg}` : `::warning::${msg}`);
-    if (failOnRegression) process.exit(1);
+    if (failOnRegression) {
+      say('kernel-compat', false, msg);
+      process.exit(1);
+    }
   }
 }
 
@@ -1194,18 +1202,22 @@ function timings(args) {
   console.log(`timings: ${Object.keys(measured).length} recipes and ${Object.keys(versions).length} versions measured; ${Object.keys(seconds).length} recipes, ${Object.keys(merged).length} versions in ${relative(root, out)}`);
 }
 
+let gateNote = '';
 const commands = { plan, shard, report, timings };
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
   const args = parseArgs(process.argv.slice(2));
   const fn = commands[args._[0]];
   if (!fn) {
     console.error(`usage: compat.mjs ${Object.keys(commands).join('|')} [--flags]`);
     process.exit(2);
   }
+  const gate = args._[0] === 'report' ? 'kernel-compat' : `kernel-compat-${args._[0]}`;
   try {
     await fn(args);
   } catch (err) {
     console.error(err.stack || err);
+    say(gate, false, String(err?.message || err).split('\n')[0].slice(0, 200));
     process.exit(1);
   }
+  say(gate, true, gateNote || args._[0]);
 }

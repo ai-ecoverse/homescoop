@@ -26,6 +26,7 @@ import { recorder } from './cases.mjs';
 import { certMetaFile, pathLabel, readCertMeta } from './cert-meta.mjs';
 import { makeContext } from './context.mjs';
 import { glueByPath, glueCheckPlan, glueStep, runMode } from './glue.mjs';
+import { say } from '../gate.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -104,6 +105,7 @@ const report = {
 };
 
 function writeReport(status) {
+  say('cert-run', status !== 'fail', `${pkgName} ${status}${report.error ? `: ${String(report.error).split('\n')[0].slice(0, 160)}` : ''}`);
   if (!jsonOut) return;
   report.status = status;
   mkdirSync(dirname(jsonOut), { recursive: true });

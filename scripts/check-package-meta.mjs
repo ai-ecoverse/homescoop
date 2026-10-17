@@ -20,6 +20,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { driftErrors, readText } from './upstream-version-text.mjs';
+import { say } from './gate.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const usage = 'usage: check-package-meta.mjs <package>\n       check-package-meta.mjs --drift (--all | <package>...)';
@@ -92,9 +93,11 @@ if (process.argv.includes('--drift')) {
   }
   if (failed) {
     console.error(`check-package-meta --drift: ${failed} of ${checked} packages drift from their recipe`);
+    say('package-meta', false, `${failed} of ${checked} packages drift from their recipe`);
     process.exit(1);
   }
   console.log(`check-package-meta --drift: ${checked} packages match their recipe`);
+  say('package-meta', true, `${checked} packages match their recipe`);
   process.exit(0);
 }
 
@@ -110,10 +113,12 @@ const licPath = join(root, 'packages', name, 'package', 'LICENSE');
 
 if (!existsSync(recipePath)) {
   console.error(`missing ${recipePath}`);
+  say('package-meta', false, `${name}: no recipe.yaml`);
   process.exit(1);
 }
 if (!existsSync(pkgPath)) {
   console.error(`missing ${pkgPath}`);
+  say('package-meta', false, `${name}: no package/package.json`);
   process.exit(1);
 }
 
@@ -238,6 +243,8 @@ errors.push(...packageDrift(name, recipe, pkg));
 if (errors.length) {
   console.error(`check-package-meta (${name}):`);
   for (const e of errors) console.error(`  - ${e}`);
+  say('package-meta', false, `${name}: ${errors.length} problem${errors.length === 1 ? '' : 's'}`);
   process.exit(1);
 }
 console.log(`${name}: license ${pkgLic} ok`);
+say('package-meta', true, `${name}`);

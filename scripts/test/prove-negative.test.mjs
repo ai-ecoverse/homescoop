@@ -32,6 +32,7 @@ function fixture(files, manifest, links = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'homescoop-prove-negative-')));
   mkdirSync(join(root, 'scripts', 'browser-cert'), { recursive: true });
   copyFileSync(join(scripts, 'browser-cert', 'prove-negative.mjs'), join(root, 'scripts', 'browser-cert', 'prove-negative.mjs'));
+  copyFileSync(join(scripts, 'gate.mjs'), join(root, 'scripts', 'gate.mjs'));
   writeFileSync(join(root, 'scripts', 'browser-cert', 'run.mjs'), STUB);
   const pkg = join(root, 'src', 'package');
   mkdirSync(pkg, { recursive: true });

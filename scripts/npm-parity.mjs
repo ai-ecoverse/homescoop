@@ -23,6 +23,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readTarball } from './diff-published.mjs';
 import { compareTarballs, describe } from './tarball-parity.mjs';
+import { say } from './gate.mjs';
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -169,7 +170,9 @@ function main() {
     mkdirSync(dirname(resolve(json)), { recursive: true });
     writeFileSync(json, `${JSON.stringify(r, null, 2)}\n`);
   }
-  return r.level === 'error' ? 1 : 0;
+  const code = r.level === 'error' ? 1 : 0;
+  say('npm-parity', code === 0, `${r.verdict}${r.name ? ` ${r.name}@${r.version}` : ''}`);
+  return code;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) process.exit(main());

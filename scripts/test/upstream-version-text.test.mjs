@@ -13,7 +13,7 @@ const allow = loadAllow();
 function fixture(name, { recipeVersion, summary, pkg, readme }) {
   const root = mkdtempSync(join(tmpdir(), 'homescoop-uvt-'));
   mkdirSync(join(root, 'scripts'));
-  for (const f of ['sync-package-version.mjs', 'read-recipe.mjs', 'upstream-version-text.mjs', 'package-meta-versions.json', 'check-package-meta.mjs']) {
+  for (const f of ['gate.mjs', 'sync-package-version.mjs', 'read-recipe.mjs', 'upstream-version-text.mjs', 'package-meta-versions.json', 'check-package-meta.mjs']) {
     copyFileSync(join(scripts, f), join(root, 'scripts', f));
   }
   const dir = join(root, 'packages', name);
