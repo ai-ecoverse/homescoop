@@ -33,6 +33,10 @@ JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu)}"
 export SOURCE_DATE_EPOCH=1764892800
 export PYTHONHASHSEED=0
 export ZERO_AR_DATE=1
+# wasix-sysroot -34 ahead of install-wasixcc.sh's default (homescoop#984 flips
+# the default once every dependent is on -34; this override then goes).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
+export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 DEPS_KEY="$(cat "$PKG/build.sh" "$ROOT/scripts/install-wasixcc.sh" | shasum -a 256 | cut -d' ' -f1)"
 if [[ -d "$DEPS" && "$(cat "$DEPS/.homescoop-key" 2>/dev/null)" != "$DEPS_KEY" ]]; then
   echo "== wasix-python: build.sh or the toolchain pin changed since $DEPS was built; rebuilding the deps"
@@ -94,9 +98,9 @@ fi
 "$HOSTPY" -c 'import sys; assert sys.version_info[:3] == (3, 14, 2), sys.version'
 
 # --- WASIX toolchain ---------------------------------------------------------
-# Pinned wasixcc + wasix-sysroot 2025.9.30-18. sysroot-ehpic (legacy EH, PIC)
-# already has the setitimer → proc_raise_interval2 and clock_nanosleep EINTR
-# libc patches (patches/README.md); advisory locks are lock_stubs.c below.
+# Pinned wasixcc + wasix-sysroot (-34 below). sysroot-ehpic (legacy EH, PIC)
+# has the setitimer → proc_raise_interval2 and clock_nanosleep EINTR libc
+# patches (patches/README.md); flock, fcntl record locks and lockf are libc's.
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 # C++ runtime ABI of the side modules (README "Side modules"): the published
 # py-* extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a
@@ -336,19 +340,20 @@ if [[ "${HOMESCOOP_STOP_AFTER:-}" == deps ]]; then
 fi
 
 # --- stubs ---------------------------------------------------------------------
-# No-op advisory locks and C++ TLS symbols: an archive, since configure lists
-# LIBS twice. Since 3.14.2-13 user and group ids and pwd/grp come from
+# C++ TLS symbols: an archive, since configure lists LIBS twice. flock is
+# libc's since 3.14.2-26 (wasix-sysroot -34, slicc.flock); -11 to -25 wrapped
+# it to a no-op here (lock_stubs.c). Since 3.14.2-13 user and group ids and pwd/grp come from
 # wasix-sysroot -20's libc (slicc-kernel process credentials, /etc/passwd;
 # homescoop#207), not uid/gid-1000 stubs.
 STUBS="$B/stubs"
 rm -rf "$STUBS" && mkdir -p "$STUBS"
 cp "$PKG/fcntl_wasix_extra.h" "$STUBS/"
-for s in lock_stubs cpp_tls_stubs; do
+for s in cpp_tls_stubs; do
   # shellcheck disable=SC2086
   wasixcc $DEP_CFLAGS -I"$STUBS" -include "$STUBS/fcntl_wasix_extra.h" -c "$PKG/$s.c" -o "$STUBS/$s.o"
 done
 wasixar rcs "$STUBS/libpython-wasix-stubs.a" "$STUBS"/*.o
-WRAP=" -Wl,--wrap=flock -Wl,--export=__wrap_flock"
+WRAP=""
 # cpp_tls_stubs.c: nothing in CPython references these, so pull them in and
 # export them, as -11 did (python.wasm imported env._ZTH5errno and
 # env.__cxa_thread_atexit_impl otherwise).
@@ -513,7 +518,7 @@ SQ_BLESSING="$NOTICES/sqlite-blessing.txt"
 unzip -p "$SQ_ZIP" "$(top_dir "$SQ_ZIP")/sqlite3.h" | sed -n '1,/May you share freely/p' >"$SQ_BLESSING"
 grep -q 'disclaims copyright' "$SQ_BLESSING"
 SYSROOT_PKG_VER="$(node -p "require('$WASIXCC_SYSROOT_PREFIX/package.json').version")"
-WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
 LLVM_SRC=https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-20.1.0
 WORK="$B" homescoop_notices_begin "bin/python.wasm statically links the components below. The table lists them; each section after it has the component's licence text."
 {
@@ -545,7 +550,7 @@ homescoop_notice "SQLite $(pkg-config --modversion sqlite3), public domain" "$SQ
 homescoop_notice "GNU Readline 8.3, GPL-3.0-or-later" "$(notice_file "$RL_TB" "$(top_dir "$RL_TB")/COPYING")" -
 homescoop_notice "ncurses 6.5 (tinfo), X11" "$(notice_file "$NC_TB" "$(top_dir "$NC_TB")/COPYING")" -
 homescoop_notice "libffi $(pkg-config --modversion libffi) (wasix-org 09cbf7d), MIT" "$(notice_file "$FFI_TB" "$(top_dir "$FFI_TB")/LICENSE")" -
-WORK="$B" homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_PKG_VER; files from tag v2025-09-02.1)" \
+WORK="$B" homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_PKG_VER; files from tag v2026-07-03.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \

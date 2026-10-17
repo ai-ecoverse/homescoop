@@ -186,3 +186,7 @@ The published 3.14.2-23 (wasix-sysroot -30) on slicc-kernel 1.102.5's Node entry
 TypeError: str, bytes or bytearray expected, not int
 ```
 So the advice of -23's shared-ctypes `NotImplementedError` ("use … a Manager") fails too (#669). With `getsockname` patched in Python (what -31's libc does) the same python passes the Manager part, and a Manager `Value(1)` and list passed to a spawned child come back as 6 and `['child']`.
+
+## 3.14.2-26: fcntl.flock (wasix-sysroot -34; 2026-10-17)
+
+`cert/k120/flock.mjs` against the published 3.14.2-25 on slicc-kernel 1.120.2 (Node entry): FAIL. Every lock is granted: `{"rw": "granted", "rw_after_un": "granted", "readonly": "granted", "after_close": "granted", "pipe_other_end": "granted", "pipe_dup": "granted"}`. -25's `build.sh` wrapped `flock` to a no-op (`lock_stubs.c`), so a second process gets `LOCK_EX|LOCK_NB` while the first holds `LOCK_EX`.
