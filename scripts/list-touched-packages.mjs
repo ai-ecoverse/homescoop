@@ -86,9 +86,10 @@ function readRecipe(name, args, dir = root) {
 export const TOOLCHAINS = [
   {
     name: 'emscripten',
-    uses: /\bem(?:cc|\+\+|configure|make|cmake|ar|ranlib)\b|\bhomescoop_(?:slicc|em)_/,
+    uses: /\bem(?:cc|configure|make|cmake|ar|ranlib)\b|\bem\+\+(?![\w+])|\bhomescoop_(?:slicc|em)_/,
     inputs: ['scripts/install-emsdk.sh', 'scripts/emsdk-patches/**', 'shims/slicc/*.c', 'shims/slicc/*.h', 'shims/slicc/*.js'],
   },
+  { name: 'binaryen', uses: /\bhomescoop_wasm_opt\b/, inputs: ['scripts/install-emsdk.sh'] },
   { name: 'wasixcc', uses: /\binstall-wasixcc\.sh\b/, inputs: ['scripts/install-wasixcc.sh'] },
   { name: 'rust', uses: /\binstall-rust\.sh\b/, inputs: ['scripts/install-rust.sh'] },
   { name: 'go', uses: /\binstall-go\.sh\b/, inputs: ['scripts/install-go.sh'] },

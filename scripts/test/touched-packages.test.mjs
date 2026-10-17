@@ -210,6 +210,8 @@ test('toolchain default inputs: a shared toolchain file touches every built reci
     em: { recipe: 'name: em\nbuilder: host\n', files: { 'build.sh': 'source "$ROOT/scripts/build-common.sh"\nemconfigure ./configure\n' } },
     gnu: { recipe: 'name: gnu\nbuilder: host\n', files: { 'build.sh': 'source "$ROOT/scripts/build-common.sh"\nsource "$ROOT/scripts/build-gnu-cli.sh"\n' } },
     slicc: { recipe: 'name: slicc\nbuilder: host\n', files: { 'build.sh': 'LIBS="$(homescoop_slicc_archive "$WORK/s.a" gaps)"\n' } },
+    cxx: { recipe: 'name: cxx\nbuilder: host\n', files: { 'build.sh': 'CXX=em++ make\n' } },
+    opt: { recipe: 'name: opt\nbuilder: host\n', files: { 'build.sh': 'homescoop_wasm_opt "$OUT/x.wasm" x -Oz\n' } },
     wx: { recipe: 'name: wx\nbuilder: host\n', files: { 'build.sh': 'eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"\n' } },
     go: { recipe: 'name: go\nbuilder: host\n', files: { 'build.sh': 'eval "$(bash "$ROOT/scripts/install-go.sh" go "$WORK/go")"\n' } },
     said: { recipe: 'name: said\nbuilder: host\n', files: { 'build.sh': '# binaryen, pinned as in scripts/install-wasixcc.sh; not emcc\ncargo build\n' } },
@@ -222,10 +224,10 @@ test('toolchain default inputs: a shared toolchain file touches every built reci
     writeFileSync(join(f.root, 'scripts/build-common.sh'), 'homescoop_x() { emcc "$@"; bash "$ROOT/scripts/install-wasixcc.sh"; }\n');
     for (const s of ['install-emsdk.sh', 'install-wasixcc.sh', 'install-go.sh']) writeFileSync(join(f.root, 'scripts', s), '\n');
     const cases = [
-      [['shims/slicc/slicc_cred.c'], ['em', 'gnu', 'slicc']],
-      [['shims/slicc/slicc-fork.js'], ['em', 'gnu', 'slicc']],
-      [['scripts/emsdk-patches/libfs-symloop.patch'], ['em', 'gnu', 'slicc']],
-      [['scripts/install-emsdk.sh'], ['em', 'gnu', 'slicc']],
+      [['shims/slicc/slicc_cred.c'], ['cxx', 'em', 'gnu', 'slicc']],
+      [['shims/slicc/slicc-fork.js'], ['cxx', 'em', 'gnu', 'slicc']],
+      [['scripts/emsdk-patches/libfs-symloop.patch'], ['cxx', 'em', 'gnu', 'slicc']],
+      [['scripts/install-emsdk.sh'], ['cxx', 'em', 'gnu', 'opt', 'slicc']],
       [['scripts/build-gnu-cli.sh'], ['gnu']],
       [['scripts/install-wasixcc.sh'], ['wx']],
       [['scripts/install-go.sh'], ['go']],
