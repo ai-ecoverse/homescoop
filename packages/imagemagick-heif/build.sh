@@ -144,6 +144,13 @@ for d in "$CFG_DEST" "$CFG_OPEN"; do
   if grep -q 'inkscape\|rsvg-convert' "$d/delegates.xml"; then echo "homescoop: $d/delegates.xml still names inkscape/rsvg-convert" >&2; exit 1; fi
 done
 grep -q 'name="disk" value="0"' "$CFG_DEST/policy.xml"
+for d in "$CFG_DEST" "$CFG_OPEN"; do
+  HS_PREFIX="$PREFIX" HS_EMSDK="${EMSDK:-}" perl -i -pe 'BEGIN { @m = grep { $_->[0] ne "" } ([$ENV{HS_PREFIX}, "/prefix"], [$ENV{HS_EMSDK} ne "" ? "$ENV{HS_EMSDK}/install" : "", "/emsdk"]) } for my $x (@m) { my $q = quotemeta($x->[0]); s/$q/$x->[1]/g }' "$d/configure.xml"
+  for leak in "$HOMESCOOP_ROOT" "$WORK" "$PREFIX" "${EMSDK:-}"; do
+    [[ -z "$leak" ]] && continue
+    if grep -qF "$leak" "$d/configure.xml"; then echo "homescoop: $d/configure.xml still holds the build path $leak (homescoop#937)" >&2; exit 1; fi
+  done
+done
 
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING "$SRC"/Copyright.txt
 # The notices name the relink kit package of exactly this version (homescoop#678).

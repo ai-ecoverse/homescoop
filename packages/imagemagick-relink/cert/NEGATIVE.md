@@ -60,3 +60,7 @@ wasm-check.mjs: `package.json homescoop.relink is (none), not @ai-ecoverse/wasm-
 7.1.2-34-7 changes only the build inputs. They're now zlib 1.3.1-4, libjpeg-turbo 3.1.2-4, libpng 1.6.59-3, lcms2 2.19.1-3, libtiff 4.7.2-3, libwebp 1.6.0-3, openjpeg 2.5.3-1, freetype 2.13.3-3, libxml2 2.15.4-2, libiconv 1.19.0-2 and (heif, relink) libheif 1.23.6-4. Each is the attested latest. libwebp moves from upstream 1.5.0 to 1.6.0 and libiconv from 1.18 to 1.19, and the notices follow them.
 
 The ImageMagick code is unchanged, so the negatives above still stand. The first ladder-pr run of homescoop#929 is a negative for its inputs too. With libwebp 1.6.0-2, whose `libwebp.pc` lacks libsharpyuv, the magick link failed with `undefined symbol: SharpYuvInit / SharpYuvGetConversionMatrix / SharpYuvConvert`. libwebp 1.6.0-3 (homescoop#930) fixes that, and the second run is green.
+
+## 7.1.2-34-8: configure.xml without build paths (homescoop#937; 2026-10-17)
+
+The runtime packages' `configure.xml` no longer holds build paths. The kit's version follows them, because the three packages are one version. The kit itself is unchanged. Its delegate archives, copied from the attested packages, still carry their own build paths in debug info. That belongs to those packages, not this release.
