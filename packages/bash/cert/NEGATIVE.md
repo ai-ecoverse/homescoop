@@ -158,3 +158,13 @@ In CI, 58cdd390's successor lost the first ^C of `cert/jobs.mjs`. A key that rea
 The published 5.3.0-19 also has 7 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/bash.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 5.3.0-20 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 5.3.0-19 too; the negative is the #908 check.
+
+## cert/k122/siginherit.mjs on slicc-kernel 1.122.0 (homescoop#973, slicc-kernel#967)
+
+On 1.122.0 the kernel reports inherited ignores before constructors run, so `cert/k122/siginherit.mjs` has no lenient branch. The published 5.3.0-19 fails it:
+
+```text
+AssertionError: the child bash shows the inherited SIGPIPE ignore, and no TERM trap: ""
+```
+
+5.3.0-20 passes. The child shows `trap -- '' SIGPIPE`. A grandchild under `trap '' PIPE INT` shows both. An ignore set in a finished subshell is not inherited.

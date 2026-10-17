@@ -54,3 +54,11 @@ No wasm-procps republish required.
 ## 4.0.7-4: the inherited-ignore and flock shims (homescoop#973, #947; 2026-10-17)
 
 4.0.7-4 links the updated `shims/slicc` (#960). A `constructor(101)` in `slicc_signals.c` seeds `SIG_IGN` for each signal the kernel's `sliccKernel.sigInherited()` reports; on a kernel without the hook it changes nothing. A strong `flock()` in `slicc_libc_gaps.c` goes through the `env.__syscall_flock` import, which answers 0 without the kernel half (slicc-kernel#967 and #968). The built wasm now imports `env.slicc_sig_inherited_js`, and `env.__syscall_flock` where the program calls `flock`. The published 4.0.7-3 imports neither, so on a hooked kernel it can't see an inherited ignore, and its `flock` never conflicts. The program code is unchanged, and the specs pass on 4.0.7-3 as well. The build also gets #908's prefix maps and DWARF strip.
+
+`cert/k122/flock.mjs` is an extra-kernel row on slicc-kernel 1.122.0, the first release whose `__syscall_flock` wrapper (slicc-kernel#968) answers the shim. It needs `@ai-ecoverse/wasix-perl` 5.42.0-19, whose flock is libc's `slicc.flock`. The published 4.0.7-3 fails it there:
+
+```text
+AssertionError: pgrep's flock(LOCK_SH|LOCK_NB) was granted while perl 1003 held LOCK_EX: the shim's flock does not reach the kernel
+```
+
+4.0.7-4 passes. pgrep's second open is refused with EWOULDBLOCK, so `pgrep -L -F` prints the holder's pid. After the holder exits, `pgrep -L -F` fails with "Locking check for pidfile failed".

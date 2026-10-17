@@ -28,7 +28,19 @@
     "selfkill (5.3.0-18, slicc-kernel >= 1.73.2: #456, the kernel side of #422): bash -c 'kill -TERM $$' / -KILL / -INT ends bash by the signal: ctx.sync.run gives status null and signal 15/9/2, wait gives 128+n and the signal, nothing after the kill runs; 'exit 143' stays exit 143 with no signal; a trapped TERM prints its trap and bash goes on, an ignored one too. 5.3.0-17: every self-kill is a plain exit 128+n with no signal (slicc-kernel#422)",
     "cert/ulimit.mjs (5.3.0-19, homescoop#178, shims/slicc/slicc_libc_gaps.c __syscall_prlimit64 + prlimit): as root and as kernel.users.add({name:'cone'}): ulimit -S -n / -H -n start at 4096 / 4096; ulimit -S -n 64 and ulimit -S -c 0 succeed and stick (64, 0); a subshell (fork) sees 64; ulimit -H -n 8192 fails 'cannot modify limit: Operation not permitted' (hard limits only go down, root too); ulimit -S -n 5000 over the hard limit fails 'Invalid argument'; ulimit -H -n 1024 succeeds, then ulimit -n 2048 fails EPERM; a new bash (exec) starts at 4096 again (slicc-kernel keeps no limits); ulimit -a shows open files 64 and core file size unlimited. 5.3.0-18: every change 'Operation not permitted' (NEGATIVE.md)",
     "cert/symloop.mjs (5.3.0-19, scripts/emsdk-patches/libfs-symloop.patch, homescoop#611 / #461): bin/bash's FS.lookupPath has nlinks <= 40; bash's own redirections (echo hi >, read <) and [ -e ] work through chains of 39 and 40 symlinks, and the 41st follow is 'Symbolic link loop' (rc 1), as on Linux. 5.3.0-18: the 40-link redirect is ELOOP (NEGATIVE.md)",
-    "cert/siginherit.mjs (homescoop#973, shims/slicc/slicc_signals.c): a constructor seeds the sigaction table with SIG_IGN for each signal the kernel's sliccKernel.sigInherited() reports (bit n = signal n; only SIG_DFL entries, never SIGKILL/SIGSTOP, never a handler). On a kernel without the hook (the cert kernel today) the child of trap '' PIPE starts with defaults: bash -c 'trap -p PIPE' prints nothing, rc 0, no trap; a trap set in the same shell shows trap -- '' SIGPIPE. With the hook (slicc-kernel#967) the child prints trap -- '' SIGPIPE; that strict row comes with the kernel"
+    "cert/siginherit.mjs (homescoop#973, shims/slicc/slicc_signals.c): a constructor seeds the sigaction table with SIG_IGN for each signal the kernel's sliccKernel.sigInherited() reports (bit n = signal n; only SIG_DFL entries, never SIGKILL/SIGSTOP, never a handler). On a kernel without the hook (the cert kernel today) the child of trap '' PIPE starts with defaults: bash -c 'trap -p PIPE' prints nothing, rc 0, no trap; a trap set in the same shell shows trap -- '' SIGPIPE. With the hook (slicc-kernel#967) the child prints trap -- '' SIGPIPE; that strict row comes with the kernel",
+    "cert/k122/siginherit.mjs (5.3.0-20, homescoop#973, on slicc-kernel 1.122.0): after trap '' PIPE, a child bash's trap -p shows exactly trap -- '' SIGPIPE (no TERM); a grandchild under trap '' PIPE INT shows both; an ignore set in a finished subshell is not inherited. 5.3.0-19's child shows nothing (NEGATIVE.md)"
   ],
-  "uplink": true
+  "uplink": true,
+  "extra_kernels": [
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.122.0",
+      "why": "sliccKernel.sigInherited() before constructors (slicc-kernel#967) behind shims/slicc's sigaction seed (homescoop#973): cert/k122/siginherit.mjs, the strict branch of cert/siginherit.mjs",
+      "specs": [
+        "siginherit.mjs"
+      ],
+      "cert": "k122",
+      "users": "enforce"
+    }
+  ]
 }
