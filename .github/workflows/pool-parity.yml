@@ -155,29 +155,55 @@ jobs:
     runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
+      actions: read
       issues: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@v7
         with:
-          pattern: verdict-*
-          merge-multiple: true
-          path: out
+          ref: ${{ needs.plan.outputs.sha }}
+          sparse-checkout: scripts/cert-review
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: One verdict-<recipe> per planned recipe, nothing else named verdict-*
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGES: ${{ needs.plan.outputs.packages }}
+        run: |
+          set -euo pipefail
+          expect=$(node -e 'console.log(JSON.stringify(JSON.parse(process.env.PACKAGES).map((p) => ({ name: `verdict-${p}`, byName: true, optional: true }))))')
+          node scripts/gate.mjs artifact-pick -- node scripts/cert-review/artifacts.mjs \
+            --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --expect "$expect" --guard '^verdict-'
+      - if: steps.pick.outputs.ids != ''
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.pick.outputs.ids }}
+          path: verdicts${{ steps.pick.outputs.single && format('/{0}', steps.pick.outputs.single) || '' }}
       - name: Open or comment on the pool-parity issue when a pool build drifts
         uses: actions/github-script@v9
         env:
           SHA: ${{ needs.plan.outputs.sha }}
           PACKAGES: ${{ needs.plan.outputs.packages }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMPARE: ${{ needs.compare.result }}
         with:
           script: |
             const fs = require('fs');
             const { owner, repo } = context.repo;
             const want = JSON.parse(process.env.PACKAGES);
-            const rows = (fs.existsSync('out') ? fs.readdirSync('out') : [])
-              .filter((f) => f.endsWith('.tsv'))
-              .flatMap((f) => fs.readFileSync(`out/${f}`, 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t')));
-            const seen = new Set(rows.map((r) => r[0]));
-            for (const p of want) if (!seen.has(p)) rows.push([p, 'no verdict', 'a build failed or was cancelled', '']);
+            const rows = [];
+            for (const p of want) {
+              const file = `verdicts/verdict-${p}/${p}.tsv`;
+              const own = fs.existsSync(file)
+                ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t')).filter((r) => r[0] === p)
+                : [];
+              rows.push(own.length === 1 ? own[0] : [p, 'no verdict', own.length ? `verdict-${p} has ${own.length} rows` : 'a build failed or was cancelled', '']);
+            }
+            if (process.env.COMPARE !== 'success' && rows.every((r) => r[1] === 'same')) {
+              rows.push(['(compare)', 'no verdict', `a compare leg ended ${process.env.COMPARE}, yet every verdict says same`, '']);
+            }
             rows.sort((a, b) => (a[0] < b[0] ? -1 : 1));
             const bad = rows.filter((r) => r[1] !== 'same').map((r) => r[0]);
             const table = ['| recipe | verdict | sha256 | first difference |', '| --- | --- | --- | --- |', ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');

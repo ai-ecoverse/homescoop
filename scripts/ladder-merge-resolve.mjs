@@ -59,6 +59,7 @@ export function candidateProblems({ artifact, run, jobs, head, needCi }) {
 }
 
 export function tarballProblem(got, { name, version, certified }) {
+  if (got.digestProblem) return got.digestProblem;
   if (!got.sha) return 'the artifact has no package.tgz';
   if (got.recorded !== got.sha) return `package.tgz is ${got.sha}, but package.tgz.sha256 says ${got.recorded ?? 'nothing'}`;
   if (certified && got.sha !== certified) {
@@ -220,6 +221,15 @@ export async function resolvePackage(ctx, io) {
   }
   const note = ignored ? ` (certified= lines ignored: ${ignored})` : '';
   if (usable.length === 0) throw new Error(`no usable ${artifactName}${note}: ${rejected.join(' | ')}`);
+  if (!certified) {
+    const digests = [...new Set(usable.map(({ artifact }) => artifact.digest))];
+    if (digests.length > 1) {
+      throw new Error(
+        `${artifactName}${note}: ${usable.length} usable artifacts with different bytes ` +
+          `(${usable.map(({ artifact }) => `${artifact.id} ${artifact.digest}`).join(', ')}), and no certified= line picks one`,
+      );
+    }
+  }
   const mismatches = [];
   for (const { artifact, run } of certified ? usable : usable.slice(0, 1)) {
     const got = await io.download(artifact);
@@ -236,6 +246,12 @@ export async function resolvePackage(ctx, io) {
     };
   }
   throw new Error(`${artifactName}${note}: ${mismatches.join(' | ')}`);
+}
+
+export function zipDigestProblem(artifact, bytes) {
+  if (!/^sha256:[0-9a-f]{64}$/.test(String(artifact.digest ?? ''))) return `artifact ${artifact.id} has no sha256 digest`;
+  const got = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+  return got === artifact.digest ? '' : `artifact ${artifact.id} downloaded as ${got}, not its digest ${artifact.digest}`;
 }
 
 export function githubApi({ repo, token }) {
@@ -260,9 +276,12 @@ export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
   const unzip = async (artifact) => {
     const res = await api(`/actions/artifacts/${artifact.id}/zip`);
     const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-'));
-    writeFileSync(join(dir, 'artifact.zip'), Buffer.from(await res.arrayBuffer()));
+    const bytes = Buffer.from(await res.arrayBuffer());
+    writeFileSync(join(dir, 'artifact.zip'), bytes);
+    const digestProblem = zipDigestProblem(artifact, bytes);
+    if (digestProblem) return { digestProblem };
     execFileSync('unzip', ['-qo', join(dir, 'artifact.zip'), '-d', join(dir, 'out')]);
-    return join(dir, 'out');
+    return { dir: join(dir, 'out') };
   };
   return {
     async published(name, version) {
@@ -303,11 +322,15 @@ export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
       return (await api(`/actions/artifacts/${id}`)).json();
     },
     async record(artifact) {
-      const file = join(await unzip(artifact), 'record.json');
+      const { dir, digestProblem } = await unzip(artifact);
+      if (digestProblem) throw new Error(digestProblem);
+      const file = join(dir, 'record.json');
       return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
     },
     async download(artifact) {
-      const tgz = join(await unzip(artifact), 'package.tgz');
+      const { dir, digestProblem } = await unzip(artifact);
+      if (digestProblem) return { digestProblem };
+      const tgz = join(dir, 'package.tgz');
       if (!existsSync(tgz)) return {};
       const shaFile = `${tgz}.sha256`;
       const recorded = existsSync(shaFile) ? readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0] : undefined;

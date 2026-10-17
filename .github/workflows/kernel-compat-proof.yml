@@ -57,6 +57,9 @@ jobs:
 
   positive:
     needs: kernels
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/kernel-compat.yml
     with:
       kernel: ${{ needs.kernels.outputs.positive }}
@@ -65,6 +68,9 @@ jobs:
 
   negative:
     needs: kernels
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/kernel-compat.yml
     with:
       kernel: ${{ needs.kernels.outputs.negative }}

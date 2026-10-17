@@ -626,6 +626,7 @@ jobs:
     if: github.event_name == 'merge_group' && needs.group.outputs.compat == 'true'
     permissions:
       contents: read
+      actions: read
     uses: ./.github/workflows/kernel-compat-proof.yml
     with:
       homescoop-ref: ${{ github.event.merge_group.head_sha || inputs.group_head }}

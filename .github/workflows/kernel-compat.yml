@@ -184,6 +184,8 @@ jobs:
       shards: ${{ steps.plan.outputs.shards }}
       count: ${{ steps.plan.outputs.count }}
       homescoop-sha: ${{ steps.plan.outputs.homescoop-sha }}
+      plan-id: ${{ steps.plan-artifact.outputs.artifact-id }}
+      plan-digest: ${{ steps.plan-artifact.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -222,6 +224,7 @@ jobs:
             ${REFERENCE:+--reference "$REFERENCE"} \
             --out "$RUNNER_TEMP/plan"
       - uses: actions/upload-artifact@v7
+        id: plan-artifact
         with:
           name: ${{ steps.plan.outputs.artifact }}-plan
           path: ${{ runner.temp }}/plan
@@ -236,6 +239,26 @@ jobs:
     outputs:
       verdict: ${{ steps.report.outputs.verdict }}
       regressions: ${{ steps.report.outputs.regressions }}
+      id-0: ${{ steps.ids.outputs.id-0 }}
+      digest-0: ${{ steps.ids.outputs.digest-0 }}
+      id-1: ${{ steps.ids.outputs.id-1 }}
+      digest-1: ${{ steps.ids.outputs.digest-1 }}
+      id-2: ${{ steps.ids.outputs.id-2 }}
+      digest-2: ${{ steps.ids.outputs.digest-2 }}
+      id-3: ${{ steps.ids.outputs.id-3 }}
+      digest-3: ${{ steps.ids.outputs.digest-3 }}
+      id-4: ${{ steps.ids.outputs.id-4 }}
+      digest-4: ${{ steps.ids.outputs.digest-4 }}
+      id-5: ${{ steps.ids.outputs.id-5 }}
+      digest-5: ${{ steps.ids.outputs.digest-5 }}
+      id-6: ${{ steps.ids.outputs.id-6 }}
+      digest-6: ${{ steps.ids.outputs.digest-6 }}
+      id-7: ${{ steps.ids.outputs.id-7 }}
+      digest-7: ${{ steps.ids.outputs.digest-7 }}
+      id-8: ${{ steps.ids.outputs.id-8 }}
+      digest-8: ${{ steps.ids.outputs.digest-8 }}
+      id-9: ${{ steps.ids.outputs.id-9 }}
+      digest-9: ${{ steps.ids.outputs.digest-9 }}
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.gate.outputs.parallel || '3') }}
@@ -251,7 +274,7 @@ jobs:
           node-version: '24'
       - uses: actions/download-artifact@v8
         with:
-          name: ${{ needs.plan.outputs.artifact }}-plan
+          artifact-ids: ${{ needs.plan.outputs.plan-id }}
           path: ${{ runner.temp }}/plan
       - name: Chromium for playwright-core (package.json devDependencies)
         run: |
@@ -272,6 +295,7 @@ jobs:
           gate=(); [[ -f scripts/gate.mjs ]] && gate=(node scripts/gate.mjs "compat shard" --)
           "${gate[@]}" node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
       - if: always()
+        id: shard-artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ needs.plan.outputs.artifact }}-shard-${{ matrix.shard }}
@@ -279,6 +303,13 @@ jobs:
           retention-days: 3
           overwrite: true
           if-no-files-found: ignore
+      - id: ids
+        if: always() && steps.shard-artifact.outputs.artifact-id != ''
+        env:
+          SHARD: ${{ matrix.shard }}
+          ID: ${{ steps.shard-artifact.outputs.artifact-id }}
+          DIGEST: ${{ steps.shard-artifact.outputs.artifact-digest }}
+        run: printf 'id-%s=%s\ndigest-%s=%s\n' "$SHARD" "$ID" "$SHARD" "$DIGEST" >> "$GITHUB_OUTPUT"
       - id: report
         if: ${{ !cancelled() && needs.plan.outputs.count == '1' }}
         env:
@@ -307,6 +338,9 @@ jobs:
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.count != '1' }}
     runs-on: ${{ needs.gate.outputs.light-runner }}
     timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
     outputs:
       verdict: ${{ steps.report.outputs.verdict }}
       regressions: ${{ steps.report.outputs.regressions }}
@@ -318,10 +352,40 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - id: tools
+        run: echo "missing=$([[ -f scripts/cert-review/artifacts.mjs ]] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+      - if: steps.tools.outputs.missing == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: ai-ecoverse/homescoop
+          ref: main
+          path: .artifact-tools
+          sparse-checkout: scripts/cert-review
+          persist-credentials: false
+      - name: The plan and shard artifacts, by the ids and digests their jobs uploaded
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: ${{ needs.plan.outputs.artifact }}
+          SHARDS: ${{ needs.plan.outputs.shards }}
+          PLAN_ID: ${{ needs.plan.outputs.plan-id }}
+          PLAN_DIGEST: ${{ needs.plan.outputs.plan-digest }}
+          SHARD_OUTPUTS: ${{ toJSON(needs.shard.outputs) }}
+        run: |
+          set -euo pipefail
+          expect=$(node -e '
+            const e = process.env, out = JSON.parse(e.SHARD_OUTPUTS || "{}");
+            const list = [{ name: `${e.ARTIFACT}-plan`, id: e.PLAN_ID, digest: e.PLAN_DIGEST }];
+            for (const k of JSON.parse(e.SHARDS || "[]")) list.push({ name: `${e.ARTIFACT}-shard-${k}`, id: out[`id-${k}`], digest: out[`digest-${k}`], optional: true });
+            console.log(JSON.stringify(list));
+          ')
+          tools=.; [[ -f scripts/cert-review/artifacts.mjs ]] || tools=.artifact-tools
+          node "$tools/scripts/gate.mjs" artifact-pick -- node "$tools/scripts/cert-review/artifacts.mjs" \
+            --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --expect "$expect" --guard "^${ARTIFACT}-"
       - uses: actions/download-artifact@v8
         with:
-          pattern: ${{ needs.plan.outputs.artifact }}-*
-          path: ${{ runner.temp }}/results
+          artifact-ids: ${{ steps.pick.outputs.ids }}
+          path: ${{ runner.temp }}/results${{ steps.pick.outputs.single && format('/{0}', steps.pick.outputs.single) || '' }}
       - id: report
         env:
           FAIL_ON_REGRESSION: ${{ inputs.fail-on-regression && 'true' || 'false' }}
