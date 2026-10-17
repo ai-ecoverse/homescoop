@@ -17,6 +17,30 @@ int32_t __slicc_sigmask_poll(uint32_t set_lo, uint32_t set_hi, int32_t in_ptr, i
 __attribute__((import_module("slicc"), import_name("sigwait")))
 int32_t __slicc_sigwait(uint32_t set_lo, uint32_t set_hi, int64_t timeout_ns, int32_t sig_ptr);
 
+/* -34 (homescoop#770, slicc-kernel#892/#911, 1.114.0): sigwait with the
+ * sender. The kernel fills the fields that fit in `size` bytes and writes back
+ * how many it filled. Shared with sigaction.c's SA_SIGINFO path. */
+__attribute__((import_module("slicc"), import_name("sigwait_info")))
+int32_t __slicc_sigwait_info(uint32_t set_lo, uint32_t set_hi, int64_t timeout_ns, int32_t info_ptr);
+
+struct __slicc_siginfo { uint32_t size; int32_t signo, code, pid; uint32_t uid; int32_t status; };
+_Static_assert(sizeof(struct __slicc_siginfo) == 24, "slicc siginfo struct");
+
+void __slicc_fill_siginfo(siginfo_t *si, int sig, const struct __slicc_siginfo *k)
+{
+	memset(si, 0, sizeof *si);
+	si->si_signo = sig;
+	si->si_code = SI_USER;
+	if (!k) return;
+	/* size covers the fields the kernel filled: code at 8, pid at 12, uid at 16, status at 20. */
+	if (k->size >= 12) si->si_code = k->code;
+	if (k->size >= 16) si->si_pid = k->pid;
+	if (k->size >= 20) si->si_uid = k->uid;
+	if (k->size >= 24 && sig == SIGCHLD) si->si_status = k->status;
+}
+
+static volatile int sigwait_info_missing;
+
 extern _Thread_local unsigned __slicc_signals_run;
 
 #define UNBLOCKABLE ((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)))
@@ -155,14 +179,24 @@ int sigtimedwait(const sigset_t *restrict mask, siginfo_t *restrict si, const st
 	}
 	for (;;) {
 		uint32_t sig = 0;
-		int32_t err = __slicc_sigwait((uint32_t)s, (uint32_t)(s >> 32), (int64_t)ns, (int32_t)(uintptr_t)&sig);
-		if (!err) {
-			if (si) {
-				memset(si, 0, sizeof *si);
-				si->si_signo = (int)sig;
-				si->si_code = SI_USER;
+		int32_t err = ENOSYS;
+		struct __slicc_siginfo k = { .size = sizeof k };
+		if (!sigwait_info_missing) {
+			err = __slicc_sigwait_info((uint32_t)s, (uint32_t)(s >> 32), (int64_t)ns, (int32_t)(uintptr_t)&k);
+			if (err == ENOSYS) sigwait_info_missing = 1;
+			else if (!err) {
+				sig = (uint32_t)k.signo;
+				if (si) __slicc_fill_siginfo(si, (int)sig, &k);
+				return (int)sig;
 			}
-			return (int)sig;
+		}
+		if (err == ENOSYS) {
+			/* A kernel before 1.114.0: no sender, SI_USER with pid and uid 0 (-32). */
+			err = __slicc_sigwait((uint32_t)s, (uint32_t)(s >> 32), (int64_t)ns, (int32_t)(uintptr_t)&sig);
+			if (!err) {
+				if (si) __slicc_fill_siginfo(si, (int)sig, 0);
+				return (int)sig;
+			}
 		}
 		if (err != EINTR) {
 			errno = err;

@@ -1,5 +1,14 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-33: no flock, SA_SIGINFO handlers never run, no sender in siginfo_t, POLLHUP on a write end (-34)
+
+On slicc-kernel 1.117.3's Node entry (2026-10-17):
+- **flock:** `test/r33.c` doesn't link against -33 (`run-modes.mjs --probe r33 --tarball <-33>`): `wasm-ld: error: … undefined symbol: flock`. `<sys/file.h>` declares it, but libc defines nothing.
+- **SA_SIGINFO:** a program that installs an `SA_SIGINFO` handler for SIGHUP and calls `raise(SIGHUP)` prints `got=0` on -33 and on -32: the handler never runs. -34 runs it (r33: `signo=1 code=SI_USER pid=sender`).
+- **The sender:** -33's `sigwaitinfo` reports a forked child's `kill` as `si_pid` 0 (homescoop#770). -34 gives the child's pid.
+- **poll:** for a pipe write end whose reader has closed, `poll(POLLOUT)` returns `revents=POLLHUP` on -33 (#629). -34 returns `POLLOUT|POLLERR`.
+- **mkfifo (#878):** -33's libc has no `mkfifo`, `mkfifoat`, `mknod` or `mknodat`, and `<sys/stat.h>` hides them (`WASI has no fifo`), so `test/r34.c` doesn't compile against -33. On 1.120.0, -34 makes the FIFO.
+
 ## 2025.9.30-32: unverifiable root, no __cxa_thread_atexit (-33, homescoop#890, #864)
 
 **Supply chain.** -32's `recipe.yaml` `source.url` is our own npm `@ai-ecoverse/wasix-sysroot@2025.9.30-14`, a local build. Every libc, libc++, compiler-rt, crt object and header in -15…-32 comes from it, and nothing records how it was made. The cert lane marks -29…-32 FAIL ("unverifiable input"). -33's only inputs are public, sha256-pinned tarballs:

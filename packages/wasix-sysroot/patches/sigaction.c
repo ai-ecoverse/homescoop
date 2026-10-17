@@ -29,6 +29,11 @@ static void slicc_report_disposition(int sig, void (*handler)(int), int flags)
 __attribute__((import_module("slicc"), import_name("sigaction_inherited")))
 int32_t __slicc_sigaction_inherited(int32_t ign_ptr);
 
+__attribute__((import_module("slicc"), import_name("siginfo_take")))
+int32_t __slicc_siginfo_take(int32_t sig, int32_t info_ptr);
+struct __slicc_siginfo { uint32_t size; int32_t signo, code, pid; uint32_t uid; int32_t status; };
+void __slicc_fill_siginfo(siginfo_t *si, int sig, const struct __slicc_siginfo *k);
+
 static int unmask_done;
 static unsigned long handler_set[_NSIG/(8*sizeof(long))];
 #ifdef __wasilibc_unmodified_upstream
@@ -224,7 +229,22 @@ void __wasm_signal(int sig) {
 			UNLOCK(__eintr_handler_lock);
 			slicc_report_disposition(sig, SIG_DFL, 0);
 		}
-		ksa.handler(sig);
+		if (ksa.flags & SA_SIGINFO) {
+			/* homescoop -34 (homescoop#770): an SA_SIGINFO handler takes three
+			 * arguments, and wasm's call_indirect traps on a mismatched type,
+			 * so it can't be called as handler(sig). siginfo_t has the sender
+			 * from slicc.siginfo_take (kernel 1.114.0); without one recorded
+			 * (ENOENT) or without the import (ENOSYS), SI_USER, pid and uid 0.
+			 * There is no machine context (WASIX has no ucontext_t): the third
+			 * argument points at 256 zero bytes, so it is never NULL. */
+			struct __slicc_siginfo k = { .size = sizeof k };
+			siginfo_t si;
+			_Alignas(16) unsigned char uc[256] = {0};
+			__slicc_fill_siginfo(&si, sig, __slicc_siginfo_take(sig, (int32_t)(uintptr_t)&k) == 0 ? &k : 0);
+			((void (*)(int, siginfo_t *, void *))ksa.handler)(sig, &si, uc);
+		} else {
+			ksa.handler(sig);
+		}
 	} else {
 		unsigned long set[_NSIG/(8*sizeof(long))];
 		__block_all_sigs(&set);

@@ -339,3 +339,24 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
 - **Where it goes:** `sysroot-ehpic` and `sysroot-exnref-ehpic` only, the two trees where -32 had it, from wasix-python's setitimer libc patch in the -14 base.
 - **Why:** upstream v2026-07-03.1 has neither. libc's own setitimer doesn't need it, since it imports the call privately (`setitimer.c`), but wasix-python's build checks for it.
 - **Test:** `test/globals.mjs` fails on any defined global, or any non-C++ header, that a candidate drops against npm -32.
+
+## -34: `sigmask.c`, `sigaction.c`, `flock.c`, `poll.c` (homescoop#770, #629, #559; slicc-kernel#892, #893)
+
+- **`sigmask.c`:** `sigtimedwait` (so `sigwaitinfo`) calls `slicc.sigwait_info(set_lo, set_hi, timeout_ns, info_ptr)` (slicc-kernel#911, 1.114.0) with `struct { u32 size; i32 signo, code, pid; u32 uid; i32 status; }`, `size` 24 in and the filled size out. `siginfo_t` gets `si_code` (SI_USER, SI_TKILL, CLD_*), `si_pid`, `si_uid` and, for SIGCHLD, `si_status`, each only if the kernel filled it. The first ENOSYS is remembered, and the -32 path (`slicc.sigwait`, SI_USER with pid and uid 0) runs from then on. `__slicc_fill_siginfo` is shared with `sigaction.c`.
+- **`sigaction.c`:** an `SA_SIGINFO` handler is called as `sa_sigaction(sig, &si, ctx)`. Up to -33 `__wasm_signal` called it through the one-argument `sa_handler` type: wasm's `call_indirect` refuses a mismatched type, and the handler never ran. `si` comes from `slicc.siginfo_take(sig, info_ptr)`, the sender of the instance just delivered. ENOENT (none recorded) or ENOSYS gives SI_USER with pid and uid 0. WASIX has no `ucontext_t`, so `ctx` points at 256 zero bytes.
+- **`flock.c`** (new member; `<sys/file.h>` declared `flock` but libc had no definition) calls `slicc.flock(fd, op)` (slicc-kernel#893, 1.117.0): locks per open file description on any descriptor, EWOULDBLOCK for a `LOCK_NB` conflict, EINTR when a handled signal ends a wait. With `SA_RESTART` the kernel resumes the wait itself (slicc-kernel#931, 1.117.3), so there is no EINTR loop in libc. On ENOSYS (remembered), `flock` is a whole-file `fcntl` lock (`F_SETLK`/`F_SETLKW`, EACCES as EWOULDBLOCK): per process, EBADF for `LOCK_EX` on a read-only descriptor or on a pipe.
+- **`poll.c`:** an entry asking for `POLLOUT` on a pipe or FIFO write end whose readers are gone reports `POLLOUT|POLLERR`, as Linux's `pipe_poll` does (#629). It reported `POLLHUP`, which is the read end's. A socket keeps `POLLHUP`. An events-0 read end gets only `POLLHUP` from a hangup, never `POLLIN`.
+- **Probe `test/r33.c`** (asyncified; `R33_KERNEL=1` requires the imports, slicc-kernel ≥ 1.117.3):
+  - **siginfo:** a forked child's `kill(getppid(), SIGUSR1)` through `sigwaitinfo` is SI_USER with the child's pid and our uid. Its exit through `sigtimedwait` is CLD_EXITED, status 7, with its pid. `pthread_kill` to a thread in `sigwaitinfo` is SI_TKILL with our pid.
+  - **SA_SIGINFO:** a handler runs for a child's `kill` (SI_USER, the child's pid, non-NULL context) and for `raise` (our pid).
+  - **flock:** on a pipe the other end conflicts, and `LOCK_UN` frees it. `LOCK_EX` on a read-only descriptor excludes another open of the file, and `LOCK_SH|LOCK_NB` there too, while a `dup` and a forked child's inherited descriptor share it. EBADF, EINVAL. With a holder in a child, a handled SIGALRM ends a blocking `LOCK_EX` with EINTR, and under `SA_RESTART` the wait goes on until the holder leaves.
+  - **poll/ppoll:** `POLLOUT|POLLERR` for a write end without readers. An events-0 readable read end reports `POLLHUP` within 1 s when a forked writer exits 200 ms in (#559; -31's 50 ms re-check, now with fork as the issue asked).
+  - **On a kernel without the imports:** sigwait* as -32 there, SA_SIGINFO with SI_USER and pid 0, and flock's fcntl fallback, line by line.
+- **`mkfifo.c`** (new member, #878): `mkfifo`, `mkfifoat`, `mknod` and `mknodat` call `slicc_fs.path_mkfifo(dirfd, path, len, mode & 07777)` (slicc-kernel#957, 1.120.0).
+  - The kernel applies the umask, answers EEXIST for any existing name (a dangling link too), and doesn't follow the last component.
+  - Paths resolve against the preopens, as `chown` does.
+  - `mknod` with S_IFIFO is `mkfifo`. S_IFREG (or no type) creates an empty file with `O_CREAT|O_EXCL`. S_IFCHR, S_IFBLK and S_IFSOCK give EPERM, as for an unprivileged Linux process.
+  - ENOSYS (an older kernel) comes back as -1 ENOSYS.
+  - `<sys/stat.h>` declares the four (wasi-libc hid them).
+- **Probe `test/r34.c`** (`R34_KERNEL=1`, slicc-kernel ≥ 1.120.0): FIFO creation, the umask, EEXIST (also over a dangling link), ENOENT, `mkfifoat` with a dirfd and with AT_FDCWD, each `mknod` type, and a forked writer and a reader meeting through the FIFO. On the cert kernel: ENOSYS.
+- **Not changed:** `pthread_kill` of the main thread still goes through `kill(getpid())` (the placeholder tid), so it arrives as SI_USER, not SI_TKILL.

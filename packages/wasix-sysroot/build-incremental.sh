@@ -687,6 +687,58 @@ PYHDR
   echo "  $v"
 done
 
+echo "== wasix-sysroot: -34 flock() through slicc.flock (slicc-kernel#893; fcntl whole-file lock on ENOSYS); mkfifo/mkfifoat/mknod/mknodat through slicc_fs.path_mkfifo (#878, slicc-kernel#957)"
+for v in "${VARIANTS[@]}"; do
+  python3 - "$PKG/$v/include/sys/stat.h" <<'PYHDR'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text()
+edits = [
+    ("#ifdef __wasilibc_unmodified_upstream /* WASI has no fifo */\nint mkfifo(const char *, mode_t);\n#endif\n", "int mkfifo(const char *, mode_t);\n"),
+    ("#ifdef __wasilibc_unmodified_upstream /* WASI has no fifo */\nint mkfifoat(int, const char *, mode_t);\n#endif\n", "int mkfifoat(int, const char *, mode_t);\n"),
+    ("#ifdef __wasilibc_unmodified_upstream /* WASI has no mknod */\n#if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)\nint mknod(const char *, mode_t, dev_t);\nint mknodat(int, const char *, mode_t, dev_t);\n#endif\n#endif\n",
+     "#if defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE)\nint mknod(const char *, mode_t, dev_t);\nint mknodat(int, const char *, mode_t, dev_t);\n#endif\n"),
+]
+for old, new in edits:
+    if old not in t and new in t:
+        continue
+    if t.count(old) != 1:
+        sys.exit(f"{p}: not found: {old.splitlines()[1]}")
+    t = t.replace(old, new)
+p.write_text(t)
+PYHDR
+  ! grep -q "WASI has no fifo\|WASI has no mknod" "$PKG/$v/include/sys/stat.h"
+done
+R34_OBJ="$WORK/r34"
+rm -rf "$R34_OBJ" && mkdir -p "$R34_OBJ/static" "$R34_OBJ/pic"
+for m in flock mkfifo; do
+  compile_r18 $m "$R34_OBJ/static/$m.o"
+  compile_r18 $m "$R34_OBJ/pic/$m.o" -fPIC -fvisibility=default
+done
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  for sym in mkfifo mkfifoat mknod mknodat; do
+    if grep -qx "$sym" <<<"$(exported "$lib" 2>/dev/null)"; then echo "homescoop: $lib already defines $sym" >&2; exit 1; fi
+  done
+  "$LLVM_AR" r "$lib" "$R34_OBJ/$flavour/mkfifo.o"
+  for sym in mkfifo mkfifoat mknod mknodat; do
+    grep -qx "$sym" <<<"$(exported "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks $sym" >&2; exit 1; }
+  done
+  grep -q __slicc_fs_path_mkfifo <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_fs.path_mkfifo" >&2; exit 1; }
+  if grep -qx flock.o <<<"$("$LLVM_AR" t "$lib")"; then echo "homescoop: $lib already has flock.o" >&2; exit 1; fi
+  if grep -qx flock <<<"$(exported "$lib" 2>/dev/null)"; then echo "homescoop: $lib already defines flock" >&2; exit 1; fi
+  "$LLVM_AR" r "$lib" "$R34_OBJ/$flavour/flock.o"
+  grep -qx flock <<<"$(exported "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks flock" >&2; exit 1; }
+  grep -q __slicc_flock <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.flock" >&2; exit 1; }
+  for imp in __slicc_sigwait_info __slicc_siginfo_take; do
+    grep -q "$imp" <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks $imp" >&2; exit 1; }
+  done
+  echo "  $v ($flavour)"
+done
+
 echo "== wasix-sysroot: LICENSE from wasix-libc v2026-07-03.1"
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
 LIC="$WORK/licenses"
