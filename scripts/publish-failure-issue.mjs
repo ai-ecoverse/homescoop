@@ -3,17 +3,25 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { githubApi } from './ladder-merge-resolve.mjs';
+import { areaOf, npmPackage } from './issue-labels.mjs';
 
 export const LABEL = 'publish-failure';
 
-export async function reportFailure({ title, body }, gh) {
+export function labelsOf(title, packages) {
+  const name = String(title).match(/(@ai-ecoverse\/[a-z0-9._-]+)@/)?.[1];
+  const pkg = name && npmPackage(name, packages);
+  const area = pkg && areaOf(pkg);
+  return [LABEL, 'ci', ...(area ? [area] : [])];
+}
+
+export async function reportFailure({ title, body }, gh, packages) {
   const same = (await gh.openIssues(LABEL)).find((i) => i.title === title && !i.pull_request);
   if (same) {
     await gh.comment(same.number, body);
     return { action: 'commented on', number: same.number };
   }
   await gh.ensureLabel(LABEL);
-  const created = await gh.createIssue({ title, body, labels: [LABEL] });
+  const created = await gh.createIssue({ title, body, labels: labelsOf(title, packages) });
   return { action: 'opened', number: created.number };
 }
 

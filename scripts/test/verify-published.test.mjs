@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { integrityOf, verifyPublished } from '../verify-published.mjs';
-import { LABEL, reportFailure } from '../publish-failure-issue.mjs';
+import { LABEL, labelsOf, reportFailure } from '../publish-failure-issue.mjs';
 
 const want = integrityOf(Buffer.from('the published package.tgz'));
 const other = integrityOf(Buffer.from('some other tarball'));
@@ -103,7 +103,15 @@ describe('reportFailure', () => {
   it('opens one labelled issue', async () => {
     const io = gh([{ number: 7, title: 'publish-failure: other@1.0.0-1' }]);
     assert.deepEqual(await reportFailure({ title: 'publish-failure: x@1.0.0-1', body: 'b' }, io), { action: 'opened', number: 501 });
-    assert.deepEqual(io.calls.slice(1), [['label', LABEL], ['create', { title: 'publish-failure: x@1.0.0-1', body: 'b', labels: [LABEL] }]]);
+    assert.deepEqual(io.calls.slice(1), [['label', LABEL], ['create', { title: 'publish-failure: x@1.0.0-1', body: 'b', labels: [LABEL, 'ci'] }]]);
+  });
+
+  it('labels a package failure with its area', () => {
+    const packages = ['py-numpy', 'sed', 'wasix-sysroot'];
+    assert.deepEqual(labelsOf('publish-failure: @ai-ecoverse/py-numpy@2.3.4-2', packages), [LABEL, 'ci', 'area:python']);
+    assert.deepEqual(labelsOf('publish-failure: @ai-ecoverse/wasix-sysroot@2025.9.30-34', packages), [LABEL, 'ci', 'area:sysroot']);
+    assert.deepEqual(labelsOf('publish-failure: @ai-ecoverse/wasm-sed@4.10-3', packages), [LABEL, 'ci']);
+    assert.deepEqual(labelsOf('publish-failure: auto-merge of #12', packages), [LABEL, 'ci']);
   });
 
   it('comments on the open issue with the same title instead of opening another', async () => {
