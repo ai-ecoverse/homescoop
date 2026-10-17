@@ -309,6 +309,10 @@ test('ladder-pr on a merge group publishes, pushes and uploads nothing', () => {
       assert.ok(gated, `${name} writes something but its if (${cond || 'none'}) does not keep it to pull_request`);
     }
   }
+  const ci = jobs.find((j) => j.startsWith('  ci:'));
+  assert.match(ci, /^ {4}name: \$\{\{ github\.event_name == 'workflow_dispatch' && 'ci \(group dry run\)' \|\| 'ci' \}\}$/m, 'a dry run never reports under the required ci name');
+  const compat = jobs.find((j) => j.startsWith('  kernel-compat:'));
+  assert.match(compat, /^ {4}if: github\.event_name == 'merge_group' && /m, 'only a real merge group sends its head to kernel-compat (whose pool gate trusts dispatches on main)');
   for (const writer of ['recipe-sha', 'host-build', 'rebuild']) {
     const job = jobs.find((j) => j.startsWith(`  ${writer}:`));
     assert.match(job, /^ {4}if: github\.event_name == 'pull_request' && /m, `${writer} runs only on pull_request`);

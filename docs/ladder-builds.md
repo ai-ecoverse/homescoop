@@ -230,7 +230,11 @@ entries behind it). Read the `group` job's errors:
 **Dry run.** `gh workflow run ladder-pr.yml --ref <branch> -f group_head=<sha>`
 runs the group path on any commit shaped like a queue group (build it with
 `git merge --no-ff -m 'Merge pull request #N from <owner>/<branch>' <pr head>`
-per PR, from `origin/main`, and push it to a scratch branch).
+per PR, from `origin/main`, and push it to a scratch branch). A dry run's
+verdict job is named `ci (group dry run)`, so it never stands in for the
+required `ci` on the dispatched branch's head, and it skips `kernel-compat`
+(kernel-compat trusts a dispatch on `main` with the cert pool, and a dry-run
+head can be any commit).
 
 **GITHUB_TOKEN.** ladder-automerge enables auto-merge with `GITHUB_TOKEN`.
 Events caused by that token start no workflows, so GitHub might not fire

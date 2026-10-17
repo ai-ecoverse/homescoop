@@ -612,7 +612,7 @@ jobs:
 
   kernel-compat:
     needs: group
-    if: needs.group.outputs.compat == 'true'
+    if: github.event_name == 'merge_group' && needs.group.outputs.compat == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/kernel-compat-proof.yml
@@ -620,6 +620,7 @@ jobs:
       homescoop-ref: ${{ github.event.merge_group.head_sha || inputs.group_head }}
 
   ci:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'ci (group dry run)' || 'ci' }}
     needs: [exact-pins, detect, recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert, slicc-note, group, kernel-compat]
     if: ${{ always() }}
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
