@@ -44,8 +44,13 @@ decrypt yet).
   and there are no stale locks to remove. Up to 2.4.9-7 dotlock fell back
   to an `O_EXCL` lock file (OPFS has no hard links), which raced: runs
   failed with "Oops, … is not locked" or "lockfile disappeared". The lock
-  files stay in place. `gpgconf --lock`/`--unlock` still use the old lock
-  file protocol and don't exclude a running gpg.
+  files stay in place. Since 2.4.9-10, root gives a lock file it creates in
+  another user's directory to that directory's owner (only one it created
+  itself, never a name that was already there), and a gpg that can't
+  open a lock file for writing replaces it if no process holds it
+  (homescoop#888). `gpgconf --lock`/`--unlock` aren't supported: an fcntl
+  lock ends with its process, so no lock can outlive gpgconf, and both say
+  so and fail (homescoop#881).
 - Concurrent gpg runs in a fresh homedir (2.4.9-9, homescoop#712): gpg
   reads the keybox without a lock and takes an empty `pubring.kbx` for an
   old-style keyring. Up to 2.4.9-8 gpg created the keybox empty and wrote
@@ -55,7 +60,24 @@ decrypt yet).
   into place, which is atomic for other processes from slicc-kernel
   1.117.2 (engines floor; ai-ecoverse/slicc-kernel#925). Updates already
   replace the keybox by a rename, and its backup (`pubring.kbx~`) is a
-  copy, so the keybox name is always there.
+  copy, so the keybox name is always there. A keyring shorter than a
+  keybox header is probed under its lock, unless the caller can write
+  neither the lock file nor its directory (an empty keyring in a read-only
+  directory, homescoop#955).
+- Keybox updates (2.4.9-10, homescoop#966): on slicc-kernel's OPFS root a
+  file created under a name that was just renamed away gets the renamed
+  file's inode number (ai-ecoverse/slicc-kernel#954). Up to 2.4.9-9 every
+  update was written to `pubring.kbx.tmp`, so all versions of the keybox
+  shared one inode number, and a `gpg -k` running alongside imports
+  sometimes failed with `keydb_search_next failed: Provided object is too
+  short` (no key was lost). 2.4.9-10 writes each update to a tmp name of
+  its own (`pubring.kbx.tmp.<pid>.<n>.<time>`) and removes it if the update
+  fails. slicc-kernel 1.122.3 fixes #954. The unique names stay for the
+  kernels from the engines floor (1.117.2) up to 1.122.3.
+- Heavy concurrency (many gpg runs on one homedir at once) can still run
+  into ai-ecoverse/slicc-kernel#980: an OPFS call that never answers leaves
+  its gpg holding the keybox lock, the other runs wait for it, and some fail
+  with "Operation timed out". Nothing written is lost.
 
 ## How it is built
 
@@ -64,7 +86,7 @@ tarball checksums ship in `patches/` and `SOURCES.md`.
 
 - Spawns are `posix_spawn` (no fork); `gpg-agent --daemon` detaches by
   starting itself again.
-- Built against wasix-sysroot 2025.9.30-28 (since 2.4.9-6; -20 before): signal
+- Built against wasix-sysroot 2025.9.30-34 (since 2.4.9-10; 2.4.9-7 to -9 used -31/-32, 2.4.9-6 used -28, earlier ones -20): signal
   masks are slicc-kernel's (≥ 1.88.0), so gpg-agent's `npth_pselect` with its
   signal mask waits and wakes atomically: SIGHUP re-reads the configuration
   and flushes the cache in place, SIGTERM shuts the agent down (it removes its
