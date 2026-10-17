@@ -122,8 +122,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # This job checks out the PR head (to push), so a branch from before #1019 has a
+          # refresh-recipe-sha.mjs that prints no verdict line. Wrap it only when it does.
+          gate=()
+          if [[ -f scripts/gate.mjs ]] && grep -q 'recipe-sha: PASS' scripts/refresh-recipe-sha.mjs; then
+            gate=(node scripts/gate.mjs recipe-sha --)
+          else
+            echo "::warning::recipe-sha: this branch's refresh-recipe-sha.mjs predates the verdict line (#1019); merge main to get the wrapped check"
+          fi
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            node scripts/gate.mjs recipe-sha -- node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
+            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.
