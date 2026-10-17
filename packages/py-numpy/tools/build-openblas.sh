@@ -181,6 +181,12 @@ for sub in [Path("lapack-netlib/SRC"), Path("lapack-netlib/SRC/DEPRECATED"), Pat
             n,
         )
         xerbla_calls += k
+        n2, k = re.subn(
+            r"xerbla_\(\s*([a-zA-Z0-9_]+)\s*,\s*([a-zA-Z0-9_]+)\s*,\s*\(ftnlen\)\s*strlen\([a-zA-Z0-9_]+\)\s*\)",
+            r"xerbla_(\1, \2)",
+            n2,
+        )
+        xerbla_calls += k
         # common_interface style in comments etc.
         if n2 != t:
             p.write_text(n2)
@@ -279,7 +285,7 @@ echo "== OpenBLAS: make netlib (f2c LAPACK) =="
 # netlib can OOM at high -j on this host; keep modest then fall back
 make -j4 "${OB_MAKE[@]}" netlib || make -j1 "${OB_MAKE[@]}" netlib
 
-LIBA=$(ls -1 libopenblas*.a | head -1)
+LIBA=$(ls -1 libopenblas_*.a | head -1)
 test -f "$LIBA"
 
 echo "== strip xerbla*.o (numpy provides python_xerbla) and tmglib =="
@@ -288,6 +294,12 @@ if [[ -s /tmp/ob-strip-$$.txt ]]; then
   # xargs batches: wasixar d archive.a obj...
   xargs -n 40 "$AR" d "$LIBA" < /tmp/ob-strip-$$.txt
   echo "stripped $(wc -l < /tmp/ob-strip-$$.txt | tr -d " ") objects"
+  for _ in 1 2 3 4; do
+    "$AR" t "$LIBA" | grep -E "^(xerbla|cblas_xerbla)" > /tmp/ob-strip-$$.txt || true
+    [[ -s /tmp/ob-strip-$$.txt ]] || break
+    xargs -n 40 "$AR" d "$LIBA" < /tmp/ob-strip-$$.txt
+    echo "stripped $(wc -l < /tmp/ob-strip-$$.txt | tr -d " ") more same-named objects"
+  done
 fi
 rm -f /tmp/ob-strip-$$.txt
 
@@ -303,6 +315,8 @@ else
   make -f Makefile.install install PREFIX="$PREFIX" NO_SHARED=1 LIBNAMESUFFIX= 2>/dev/null || true
   [[ -f "$PREFIX/include/openblas_config.h" ]] || cp config.h "$PREFIX/include/openblas_config.h"
 fi
+rm -f "$PREFIX"/lib/libopenblas*
+cp -f "$LIBA" "$PREFIX/lib/libopenblas.a"
 
 # Ensure installed cblas.h has int returns (Makefile.install may regenerate)
 python3 - <<PY
@@ -334,7 +348,7 @@ for n in blas lapack cblas; do
 done
 
 echo "== OpenBLAS: verify symbols =="
-NM="$HOME/.wasixcc/llvm/bin/llvm-nm"
+NM="$(dirname "$WASIXCC_BIN")/llvm/bin/llvm-nm"
 [[ -x "$NM" ]] || NM=llvm-nm
 "$NM" "$PREFIX/lib/libopenblas.a" | grep -E ' T (cblas_dgemm|dgemm_|dgesv_|dgesvd_)$' | head
 # xerbla must NOT be defined in the archive

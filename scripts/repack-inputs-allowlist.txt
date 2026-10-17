@@ -4,7 +4,6 @@
 #   <package> <path under packages/<n>/> <blob sha|deleted> #<issue> <reason>
 # Shrinking this list is the fix: rebuild (drop repack:), or say why in
 # repack: inputs_changed:.
-py-numpy build.sh bdd5e90b8208580377693a78bdb51f640f14e92c #832 changed since the reused bytes, needs owner review
 py-scipy tools/__pycache__/f2c_fixes.cpython-314.pyc deleted #832 changed since the reused bytes, needs owner review
 py-scipy tools/wasix_stubs.o deleted #832 changed since the reused bytes, needs owner review
 wasm-binaryen build.sh ae72963075f8af82e911a620eaa03de5317bbea9 #832 changed since the reused bytes, needs owner review

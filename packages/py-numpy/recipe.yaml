@@ -1,17 +1,32 @@
 # NumPy for slicc WASIX CPython 3.14 (side modules, dlopen).
 name: py-numpy
 builder: host
+reproducible: true
 # renovate: datasource=pypi depName=numpy
 version: "2.3.2"
 npm: "@ai-ecoverse/py-numpy"
 summary: "NumPy 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-{{version}}.tar.gz"
-  sha256: "ba0e7a1eaf217bb27dce8ab13450ca3e062cc917a3b84721d6874099d48922b9"
-# 2.3.2-10 is packaging-only: 2.3.2-9's bytes with wasix-python as a range,
-# ">=3.14.2-16 <3.14.3" (#702). Drop repack: when the next release rebuilds.
-repack:
-  from: "2.3.2-9"
+  sha256: "e0486a11ec30cdecb53f184d496d1c6a20786c81e55e41640270130056f8ee48"
+sources:
+  openblas:
+    url: "https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.28/OpenBLAS-0.3.28.tar.gz"
+    sha256: "f1003466ad074e9b0c8d421a204121100b0751c96fc6fcf3d1456bd12f8a00a1"
+  cython:
+    url: "https://files.pythonhosted.org/packages/7c/24/f7351052cf9db771fe4f32fca47fd66e6d9b53d8613b17faf7d130a9d553/cython-3.1.4-py3-none-any.whl"
+    sha256: "d194d95e4fa029a3f6c7d46bdd16d973808c7ea4797586911fdb67cb98b1a2c6"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-27.tgz"
+    sha256: "2824bccd95f7d45dace30a5d0a74f3384d0390bcadfff38b4e8275c9ade1af37"
+  cxxrt:
+    url: "https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
+    sha256: "54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.14.2/Python-3.14.2.tgz"
+    sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
 dependencies:
   build:
     - wasix-python
