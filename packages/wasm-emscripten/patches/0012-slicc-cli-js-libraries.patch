@@ -1,0 +1,21 @@
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -881,6 +881,18 @@
+       path = os.path.join(slicc_lib, obj)
+       if os.path.isfile(path) and path not in linker_args:
+         linker_args.append(path)
++    # The JS halves of slicc_libc_gaps.o (writev, linkat, uname) and the
++    # exports and raise wrap of homescoop_slicc_keep_exports.
++    for js in ('slicc-writev.js', 'slicc-linkat.js', 'slicc-uname.js'):
++      path = os.path.join(slicc_lib, js)
++      if os.path.isfile(path) and path not in settings.JS_LIBRARIES:
++        settings.JS_LIBRARIES.append(path)
++    if os.path.isfile(os.path.join(slicc_lib, 'slicc_signals.o')):
++      for sym in ('slicc_raise', 'slicc_sig_mask', 'slicc_sigpipe'):
++        linker_args.append('--undefined=' + sym)
++      linker_args.append('--wrap=raise')
++    if os.path.isfile(os.path.join(slicc_lib, 'slicc_libc_gaps.o')):
++      linker_args.append('--undefined=slicc_cred_euid')
+ 
+   autoconf = os.environ.get('EMMAKEN_JUST_CONFIGURE') or 'conftest.c' in options.input_files or 'conftest.cpp' in options.input_files
+   if autoconf:

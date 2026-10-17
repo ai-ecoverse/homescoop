@@ -10,7 +10,7 @@
 
 ## 6.0.9-20: built from the 6.0.9 tag in CI (homescoop#859, #205, #538, #745; 2026-10-17)
 
-- **Supply chain.** The published 6.0.9-19 is a repack whose root, 6.0.9-11, was an rsync of a local slicc-emscripten checkout: no provenance and no recorded commit. `repack-input.mjs` makes that INCOMPLETE. 6.0.9-20 fetches the emscripten 6.0.9 tag (4e422385, the emscripten_revision of emsdk's 6.0.9 release f04ea239) by sha256 and applies `patches/0001-0011`. They're 0001-0004, 0006 and 0007 as before, plus 0005, 0008, 0009 and 0010, recovered from the published tree, and the new 0011. Through 0010 the patched tree reproduces the published one file for file. 0011 adds `-ffile-prefix-map=<cache>=/emsdk/cache` and `<llvm root>=/emsdk/llvm` to the system library flags: without them the DWARF in every embuilder library names the cache's sysroot/include and clang's resource headers, both build paths, and emscripten-cache's two CI builds differed in 45 of 50 archives. The shim objects are compiled in CI by that tree's emcc on emsdk 6.0.9's prebuilt clang and binaryen, which `scripts/emscripten-tree.sh` pins by sha256.
+- **Supply chain.** The published 6.0.9-19 is a repack whose root, 6.0.9-11, was an rsync of a local slicc-emscripten checkout: no provenance and no recorded commit. `repack-input.mjs` makes that INCOMPLETE. 6.0.9-20 fetches the emscripten 6.0.9 tag (4e422385, the emscripten_revision of emsdk's 6.0.9 release f04ea239) by sha256 and applies `patches/0001-0012`. They're 0001-0004, 0006 and 0007 as before, plus 0005, 0008, 0009 and 0010, recovered from the published tree, and the new 0011 and 0012. Through 0010 the patched tree reproduces the published one file for file. 0011 adds `-ffile-prefix-map=<cache>=/emsdk/cache` and `<llvm root>=/emsdk/llvm` to the system library flags: without them the DWARF in every embuilder library names the cache's sysroot/include and clang's resource headers, both build paths, and emscripten-cache's two CI builds differed in 45 of 50 archives. The shim objects are compiled in CI by that tree's emcc on emsdk 6.0.9's prebuilt clang and binaryen, which `scripts/emscripten-tree.sh` pins by sha256.
 - **Tarball against 6.0.9-19.** The two differ in four ways:
   - the 8 `lib/slicc/*.o` objects and `slicc-fork.js` (today's `shims/slicc`);
   - new `AUTHORS` and `SECURITY.md` (#538; LICENSE cites them);
@@ -20,3 +20,14 @@
   Everything else is byte-identical.
 - **`test/files.test.mjs` fails on 6.0.9-19:** `build.sh files entries name the tarball exactly` reports `Media (there: media)`. npm on Linux matches `files` case-sensitively, so a Linux pack of -19's list would drop the logos (#205). The package.json now says `media`, and all three file tests pass on 6.0.9-20.
 - **By path (#745).** On 1.110.7, `run-paths.mjs` (flat) passes for 6.0.9-20: clang and wasm-opt run by path, and `emcc -v` reaches clang. On 1.61.0, the old cert kernel, `emcc -v` fails with `[Errno 45] Exec format error`.
+
+## 0012: the JS halves of today's shims (homescoop#1056)
+
+Building `lib/slicc` from today's `shims/slicc` broke the default link. `slicc_libc_gaps.o` now imports `env.__syscall_uname`, but 0005's defaults did not add `slicc-uname.js`, so any program calling `uname()` failed:
+
+```text
+error: undefined symbol: __syscall_uname
+```
+
+6.0.9-19's objects have no such import. 0012 ships `slicc-writev.js`, `slicc-linkat.js` and `slicc-uname.js` in `lib/slicc/`, and adds them as `--js-library` defaults. The default link also gets `homescoop_slicc_keep_exports`'s `-u slicc_raise`, `slicc_sig_mask`, `slicc_sigpipe` and `slicc_cred_euid`, plus `--wrap=raise`, so it matches `homescoop_em_cli_ldflags`. build.sh's PRESTAGE now links a program that calls `uname`, `link`, `getuid`, `getrlimit` and `raise` with the packaged defaults, and runs it under node: `uname 0 Emscripten`, and the SIGUSR1 handler runs.
+

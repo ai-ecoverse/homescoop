@@ -80,13 +80,35 @@ python3 -c "import pathlib,sys; d=pathlib.Path(sys.argv[1]).read_bytes(); sys.ex
   exit 1
 }
 echo "  PRESTAGE: slicc_signals.o has stride-140 encoding"
-cp "$SLICC_SHIMS/slicc-fork.js" "$PKG/lib/slicc/slicc-fork.js"
+for js in slicc-fork.js slicc-writev.js slicc-linkat.js slicc-uname.js; do
+  cp "$SLICC_SHIMS/$js" "$PKG/lib/slicc/$js"
+done
 
 echo "== wasm-emscripten: emcc with the packaged tree and read-only package"
 PRE_WORK="$WORK/wasm-emscripten-prestage"
 rm -rf "$PRE_WORK"
 mkdir -p "$PRE_WORK"
 printf 'int main(void){return 0;}\n' > "$PRE_WORK/hello.c"
+cat > "$PRE_WORK/calls.c" <<'C'
+#include <signal.h>
+#include <stdio.h>
+#include <sys/resource.h>
+#include <sys/utsname.h>
+#include <unistd.h>
+static void on_usr1(int sig) { (void)sig; puts("usr1"); }
+int main(void) {
+  struct utsname u;
+  struct rlimit r;
+  int rc = uname(&u);
+  printf("uname %d %s\n", rc, u.sysname);
+  printf("link %d\n", link("/no-such-src", "/no-such-dst") == -1);
+  printf("uid %d\n", (int)getuid());
+  printf("rlimit %d\n", getrlimit(RLIMIT_NOFILE, &r));
+  signal(SIGUSR1, on_usr1);
+  printf("raise %d\n", raise(SIGUSR1));
+  return 0;
+}
+C
 chmod -R a-w "$HOST_EM"
 RO_CLEANUP() { chmod -R u+w "$HOST_EM" 2>/dev/null || true; }
 trap RO_CLEANUP EXIT
@@ -98,6 +120,17 @@ for env_flag in ENVIRONMENT_IS_WEB ENVIRONMENT_IS_WORKER ENVIRONMENT_IS_NODE; do
   grep -q "$env_flag" "$PRE_WORK/hello.js"
 done
 grep -q sliccKernel "$PRE_WORK/hello.js"
+EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$PKG/lib/slicc" "${HOST_EMCC[@]}" "$PRE_WORK/calls.c" -o "$PRE_WORK/calls.js"
+for imp in __syscall_uname slicc_cred_js; do
+  grep -q "$imp" "$PRE_WORK/calls.js" || { echo "homescoop: calls.js lacks $imp (homescoop#1056)" >&2; exit 1; }
+done
+CALLS_OUT="$(node "$PRE_WORK/calls.js")"
+printf '%s\n' "$CALLS_OUT"
+grep -q '^uname 0 ' <<<"$CALLS_OUT"
+grep -q '^link 1$' <<<"$CALLS_OUT"
+grep -q '^rlimit 0$' <<<"$CALLS_OUT"
+grep -q '^usr1$' <<<"$CALLS_OUT"
+grep -q '^raise 0$' <<<"$CALLS_OUT"
 if EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" "$PRE_WORK/hello.c" -o "$PRE_WORK/hello-cl.js" --closure=1 2>"$PRE_WORK/closure.err"; then
   echo "homescoop: --closure=1 should have failed" >&2
   exit 1
@@ -107,7 +140,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links and runs (#1056), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"
@@ -162,7 +195,10 @@ test -f "$PKG/lib/slicc-vfs-pre.js"
 for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs slicc_main_envp slicc_fork; do
   test -f "$PKG/lib/slicc/$obj.o"
 done
-test -f "$PKG/lib/slicc/slicc-fork.js"
+for js in slicc-fork.js slicc-writev.js slicc-linkat.js slicc-uname.js; do
+  test -f "$PKG/lib/slicc/$js"
+done
+grep -q "slicc-uname.js" "$PKG/tools/link.py"
 grep -q 'Module.sliccPpid' "$PKG/lib/slicc/slicc-fork.js"
 grep -q '__syscall_getpid' "$PKG/lib/slicc/slicc_libc_gaps.o" || \
   llvm-nm "$PKG/lib/slicc/slicc_libc_gaps.o" 2>/dev/null | grep -q getpid || true
