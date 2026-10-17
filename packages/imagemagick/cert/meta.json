@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.81.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
   "needs": [
     "@ai-ecoverse/wasm-poppler"
   ],

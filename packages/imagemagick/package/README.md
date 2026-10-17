@@ -86,7 +86,7 @@ The tab can still run out of memory without limits.
 ## Licences
 
 `LICENSE` is ImageMagick's. `THIRD-PARTY-NOTICES.md` has the licences of the
-libraries `bin/magick.wasm` links statically, among them GNU libiconv 1.18
+libraries `bin/magick.wasm` links statically, among them GNU libiconv 1.19
 (LGPL-2.1-or-later, through libxml2) and Emscripten's runtime.
 
 ## Relinking (LGPL)
