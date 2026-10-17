@@ -70,3 +70,7 @@ Emscripten 4.0.23, 2026-10-16), fails twice:
 credentials) and copies every file the flags name into the kit; relink-check
 then relinks heif-dec and heif-info and decodes rainbow-451x461.heic to the
 host pixels.
+
+## 1.23.6-4: attested build inputs (homescoop#864; 2026-10-17)
+
+1.23.6-4 changes only the build inputs: wasm-zlib 1.3.1-4 (was 1.3.1-3, which has no provenance), wasm-libjpeg-turbo 3.1.2-4 (was 3.1.2-2, a laptop publish), and wasm-libpng 1.6.59-3 (was 1.6.59-1, a laptop publish). The library versions behind them, and so the THIRD-PARTY-NOTICES text, stay the same. The cert kernel moves from 1.72.0 to 1.110.1 (certified). libheif's code and patches are unchanged, so the published 1.23.6-3 passes these specs too, and the negatives above still stand.
