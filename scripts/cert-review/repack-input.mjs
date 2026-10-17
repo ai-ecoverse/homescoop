@@ -556,12 +556,134 @@ function shellLines(text) {
   return out;
 }
 
+/**
+ * Whether a helper's `${VAR:-default}` can't take effect, so its default isn't
+ * a build input (homescoop#984). Every file that runs or sources the helper
+ * must be a package build.sh (packages/<x>/build.sh) that sets VAR first, and
+ * in each all of these hold:
+ * - the assignment is at top level: column 0, outside if/case/loops/functions/
+ *   subshells;
+ * - it is `export VAR=<literal>`, or `VAR=<literal>` then a top-level `export VAR`;
+ * - it comes before the first line that runs the helper, and nothing from it
+ *   to the last such line reassigns or unsets VAR;
+ * - the helper inherits it: no `env -i`, `env -u VAR` or `sudo` without
+ *   -E/--preserve-env on a line that runs it.
+ * Anything else: false, and both values count (fail closed).
+ */
+export function deadDefault(name, helperPath, all) {
+  const helper = helperPath.split('/').pop();
+  const stem = helper.replace(/\.(?:sh|bash)$/, '');
+  const runs = (line) => line.includes(helper);
+  const literal = String.raw`(?:"[^"$\`\\]*"|'[^']*'|[^\s;&|$\`"'()<>]+)`;
+  const assign = new RegExp(`^(export\\s+)?${name}=${literal}\\s*$`);
+  const exportOnly = new RegExp(`^export\\s+${name}\\s*$`);
+  const touches = new RegExp(`(?:^|[\\s;&|(])(?:(?:export|local|readonly|declare|typeset)(?:\\s+-[a-zA-Z]+)*\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*(?:=\\S*)?\\s+)*${name}(?:\\+?=|\\s|;|$)|\\bunset\\b[^;&|]*\\b${name}\\b|\\b(?:read|mapfile|readarray|printf\\s+-v)\\b[^;&|]*\\b${name}\\b`);
+  const scrubs = new RegExp(`\\benv\\s+(?:\\S+\\s+)*?(?:-i\\b|--ignore-environment\\b|-\\s|-u\\s*${name}\\b|--unset[= ]${name}\\b)|\\bsudo\\b(?![^;&|]*\\s(?:-E\\b|--preserve-env\\b))`);
+  const others = all.filter((f) => f.path !== helperPath);
+  const callers = others.filter((f) => f.lines.some(runs));
+  if (!callers.length) return false;
+  // Every caller is a package build.sh, and none names the helper any other way
+  // (a loop over "install-wasixcc", a variable holding its name).
+  if (callers.some((f) => !/^packages\/[^/]+\/build\.sh$/.test(f.path))) return false;
+  if (others.some((f) => f.lines.some((l) => l.includes(stem) && !runs(l)))) return false;
+  const marks = new Map();
+  for (const f of callers) {
+    const { lines } = f;
+    const calls = lines.map((l, i) => (runs(l) ? i : -1)).filter((i) => i >= 0);
+    const first = calls[0];
+    if (calls.some((i) => scrubs.test(lines[i]))) return false;
+    const code = codeLines(lines);
+    const track = blockTracker();
+    let depth = 0;
+    let at = -1;
+    let exp = -1;
+    for (let i = 0; i < first; i++) {
+      const line = lines[i];
+      if (at < 0 && depth === 0 && code[i]) {
+        const m = line.match(assign);
+        if (m) {
+          at = i;
+          if (m[1]) exp = i;
+        }
+      } else if (at >= 0 && exp < 0 && depth === 0 && code[i] && exportOnly.test(line)) {
+        exp = i;
+      }
+      depth = track(line);
+      if (depth < 0) return false;
+    }
+    if (at < 0 || exp < 0) return false;
+    for (let i = at; i <= first; i++) if (!code[i]) return false;
+    marks.set(f, new Set([at, exp]));
+  }
+  // Nothing else, in any file but the helper, sets, exports, unsets or reads VAR
+  // (a function defined before the override and run after it, a sourced file).
+  return !others.some((f) => f.lines.some((l, i) => touches.test(l) && !marks.get(f)?.has(i)));
+}
+
+/**
+ * Which lines are shell code: false inside a heredoc body (any `<<WORD`, up to
+ * its terminator) and inside quotes left open across lines.
+ */
+function codeLines(lines) {
+  const out = [];
+  let end = null;
+  let quote = null;
+  for (const line of lines) {
+    if (end !== null) {
+      out.push(false);
+      if (line.replace(/^\t+/, '') === end) end = null;
+      continue;
+    }
+    out.push(quote === null);
+    let q = quote;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (q === null) {
+        if (c === '\\') i++;
+        else if (c === "'" || c === '"') q = c;
+      } else if (q === '"' && c === '\\') i++;
+      else if (c === q) q = null;
+    }
+    quote = q;
+    if (quote === null) {
+      const doc = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, (m) => (/^['"]?[A-Za-z_][A-Za-z0-9_]*['"]?$/.test(m) ? m : '""')).match(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1(?!<)/);
+      if (doc && !/<<</.test(line)) end = doc[2];
+    }
+  }
+  return out;
+}
+
+/**
+ * Shell block nesting, line by line (comment-free lines): if/case/loops,
+ * { } groups and function bodies, ( ) subshells. Quoted text doesn't count,
+ * and inside a case the pattern parentheses don't either. An approximation
+ * that errs towards "nested", which only ever keeps a default as an input.
+ */
+function blockTracker() {
+  let depth = 0;
+  let cases = 0;
+  return (line) => {
+    const t = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, '""').trim();
+    if (t) {
+      const opens = (t.match(/(?:^|[;&|(]\s*|\b(?:then|do|else)\s+)(?:if|case|while|until|for|select)\b/g) || []).length;
+      const closes = (t.match(/(?:^|[;&|]\s*)(?:fi|esac|done)\b/g) || []).length;
+      cases += (t.match(/(?:^|[;&|(]\s*|\b(?:then|do|else)\s+)case\b/g) || []).length;
+      const braces = (t.match(/(?:^|[\s)])\{(?=\s|$)/g) || []).length - (t.match(/(?:^|[\s;])\}(?=\s|;|$)/g) || []).length;
+      const parens = cases > 0 ? 0 : (t.match(/\(/g) || []).length - (t.match(/\)/g) || []).length;
+      cases -= (t.match(/(?:^|[;&|]\s*)esac\b/g) || []).length;
+      if (cases < 0) cases = 0;
+      depth += opens - closes + braces + parens;
+    }
+    return depth;
+  };
+}
+
 export function buildFileInputs(files) {
   const inputs = [];
   const problems = [];
   const all = files.map(({ path, text }) => ({ path, lines: shellLines(text) }));
   const everywhere = all.flatMap((f) => f.lines);
-  const resolver = (lines) => (expr) => {
+  const resolver = (lines, path) => (expr) => {
     let parts = [''];
     const re = /\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?|([^$]+)/g;
     for (const m of expr.matchAll(re)) {
@@ -573,7 +695,7 @@ export function buildFileInputs(files) {
       for (const v of assignedValues(m[1], lines)) {
         const d = v.match(/^\$\{([A-Za-z_][A-Za-z0-9_]*):?-([^}$]*)\}$/);
         if (d) {
-          values.add(d[2]);
+          if (!deadDefault(d[1], path, all)) values.add(d[2]);
           for (const o of assignedValues(d[1], everywhere)) values.add(o);
         } else values.add(v);
       }
@@ -583,7 +705,7 @@ export function buildFileInputs(files) {
     return parts.every((p) => /^[0-9][0-9A-Za-z.+-]*$/.test(p)) ? [...new Set(parts)] : null;
   };
   for (const { path, lines } of all) {
-    const resolve = resolver(lines);
+    const resolve = resolver(lines, path);
     lines.forEach((line, i) => {
       const where = `${path}:${i + 1}`;
       if (OUR_NPM.test(line)) {
