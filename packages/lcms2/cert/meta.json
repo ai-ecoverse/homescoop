@@ -1,0 +1,15 @@
+{
+  "harness": "host-node",
+  "host": "node scripts/em-lib-cert.mjs lcms2 --tarball <package.tgz | npm spec>: with the pinned emsdk (scripts/install-emsdk.sh), unpacks the tarball and the recipe's @ai-ecoverse build inputs at their pinned versions, compiles test/probe.c with nothing but pkg-config of the package's .pc (PKG_CONFIG_LIBDIR: the package and those inputs, no host dirs), links it with -Wl,--fatal-warnings, runs it under Node (NODERAWFS) and then test/check.mjs. A static library has no commands of its own.",
+  "pkgconfig": [
+    "lcms2"
+  ],
+  "checklist": [
+    "cmsGetEncodedCMMversion() and lcms2.pc's Version are the recipe version",
+    "the probe compiles and links from the .pc flags alone with -Wl,--fatal-warnings: no undefined symbol and no signature mismatch",
+    "sRGB red in D50 XYZ within 1e-3 of (0.436065, 0.222493, 0.013627); white is Lab L 100, a and b 0; sRGB -> Lab -> sRGB returns four samples within 1; cmsDeltaE; the built-in sRGB profile saved with cmsSaveProfileToMem reopens with its header, and Node reads probe.icc: size, acsp, mntr / RGB / XYZ and the rXYZ, gXYZ, bXYZ, wtpt and rTRC tags"
+  ],
+  "ci": [
+    "node scripts/em-lib-cert.mjs lcms2 --tarball .homescoop-out/package.tgz"
+  ]
+}
