@@ -572,49 +572,85 @@ function shellLines(text) {
  */
 export function deadDefault(name, helperPath, all) {
   const helper = helperPath.split('/').pop();
-  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const runsRe = new RegExp(`(?:^|[\\s;&|(\`"'$/])${esc(helper)}(?=["'\\s);|&]|$)`);
-  const runs = (line) => runsRe.test(line);
+  const stem = helper.replace(/\.(?:sh|bash)$/, '');
+  const runs = (line) => line.includes(helper);
   const literal = String.raw`(?:"[^"$\`\\]*"|'[^']*'|[^\s;&|$\`"'()<>]+)`;
   const assign = new RegExp(`^(export\\s+)?${name}=${literal}\\s*$`);
   const exportOnly = new RegExp(`^export\\s+${name}\\s*$`);
-  const touches = new RegExp(`(?:^|[\\s;&|(])(?:(?:export|local|readonly|declare(?:\\s+-[a-zA-Z]+)*|typeset)\\s+(?:-[a-zA-Z]+\\s+)*)?${name}\\+?=|\\bunset\\s+(?:-[vf]\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b|\\b(?:read|mapfile|readarray|printf\\s+-v)\\s+(?:-[a-zA-Z]+\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b|\\bexport\\s+-n\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b`);
+  const touches = new RegExp(`(?:^|[\\s;&|(])(?:(?:export|local|readonly|declare|typeset)(?:\\s+-[a-zA-Z]+)*\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*(?:=\\S*)?\\s+)*${name}(?:\\+?=|\\s|;|$)|\\bunset\\b[^;&|]*\\b${name}\\b|\\b(?:read|mapfile|readarray|printf\\s+-v)\\b[^;&|]*\\b${name}\\b`);
   const scrubs = new RegExp(`\\benv\\s+(?:\\S+\\s+)*?(?:-i\\b|--ignore-environment\\b|-\\s|-u\\s*${name}\\b|--unset[= ]${name}\\b)|\\bsudo\\b(?![^;&|]*\\s(?:-E\\b|--preserve-env\\b))`);
-  const others = all.filter((f) => f.path !== helperPath && f.lines.some(runs));
-  if (!others.length) return false;
-  if (others.some((f) => !/^packages\/[^/]+\/build\.sh$/.test(f.path))) return false;
-  return others.every(({ lines }) => {
+  const others = all.filter((f) => f.path !== helperPath);
+  const callers = others.filter((f) => f.lines.some(runs));
+  if (!callers.length) return false;
+  // Every caller is a package build.sh, and none names the helper any other way
+  // (a loop over "install-wasixcc", a variable holding its name).
+  if (callers.some((f) => !/^packages\/[^/]+\/build\.sh$/.test(f.path))) return false;
+  if (others.some((f) => f.lines.some((l) => l.includes(stem) && !runs(l)))) return false;
+  const marks = new Map();
+  for (const f of callers) {
+    const { lines } = f;
     const calls = lines.map((l, i) => (runs(l) ? i : -1)).filter((i) => i >= 0);
     const first = calls[0];
-    const last = calls[calls.length - 1];
     if (calls.some((i) => scrubs.test(lines[i]))) return false;
+    const code = codeLines(lines);
     const track = blockTracker();
     let depth = 0;
     let at = -1;
-    let isExported = false;
+    let exp = -1;
     for (let i = 0; i < first; i++) {
       const line = lines[i];
-      if (at < 0) {
+      if (at < 0 && depth === 0 && code[i]) {
         const m = line.match(assign);
-        if (m && depth === 0) {
+        if (m) {
           at = i;
-          isExported = Boolean(m[1]);
+          if (m[1]) exp = i;
         }
-      } else if (exportOnly.test(line)) {
-        if (depth !== 0) return false;
-        isExported = true;
-      } else if (touches.test(line)) {
-        return false;
+      } else if (at >= 0 && exp < 0 && depth === 0 && code[i] && exportOnly.test(line)) {
+        exp = i;
       }
       depth = track(line);
       if (depth < 0) return false;
     }
-    if (at < 0 || !isExported) return false;
-    for (let i = first; i <= last; i++) {
-      if (touches.test(lines[i])) return false;
+    if (at < 0 || exp < 0) return false;
+    for (let i = at; i <= first; i++) if (!code[i]) return false;
+    marks.set(f, new Set([at, exp]));
+  }
+  // Nothing else, in any file but the helper, sets, exports, unsets or reads VAR
+  // (a function defined before the override and run after it, a sourced file).
+  return !others.some((f) => f.lines.some((l, i) => touches.test(l) && !marks.get(f)?.has(i)));
+}
+
+/**
+ * Which lines are shell code: false inside a heredoc body (any `<<WORD`, up to
+ * its terminator) and inside quotes left open across lines.
+ */
+function codeLines(lines) {
+  const out = [];
+  let end = null;
+  let quote = null;
+  for (const line of lines) {
+    if (end !== null) {
+      out.push(false);
+      if (line.replace(/^\t+/, '') === end) end = null;
+      continue;
     }
-    return true;
-  });
+    out.push(quote === null);
+    let q = quote;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (q === null) {
+        if (c === '\\') i++;
+        else if (c === "'" || c === '"') q = c;
+      } else if (q === '"' && c === '\\') i++;
+      else if (c === q) q = null;
+    }
+    quote = q;
+    if (quote === null) {
+      const doc = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, (m) => (/^['"]?[A-Za-z_][A-Za-z0-9_]*['"]?$/.test(m) ? m : '""')).match(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1(?!<)/);
+      if (doc && !/<<</.test(line)) end = doc[2];
+    }
+  }
+  return out;
 }
 
 /**

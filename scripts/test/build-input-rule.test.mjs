@@ -205,6 +205,19 @@ test('a helper default that an unconditional top-level export overrides is not a
   assert.deepEqual(versions(`${set}eval "$(sudo bash "$ROOT/scripts/install-wasixcc.sh")"\n`), both, 'sudo without -E: both');
   assert.deepEqual(versions(`${set}eval "$(sudo -E bash "$ROOT/scripts/install-wasixcc.sh")"\n`), ['2025.9.30-34'], 'sudo -E keeps the environment');
   assert.deepEqual(versions(`DEPS_KEY="$(cat "$ROOT/scripts/install-wasixcc.sh" | shasum)"\n${set}${call}`), both, 'any mention of the helper before the override counts as a call: both');
+  assert.deepEqual(versions(`: <<'OFF'\n${set}OFF\n${call}`), both, 'inside a heredoc (the block-comment idiom): both');
+  assert.deepEqual(versions(`bash <<EOF\n${set}EOF\n${call}`), both, 'in a heredoc a child shell runs: both');
+  assert.deepEqual(versions(`NOTE="first\n${set}last"\n${call}`), both, 'inside a multi-line string: both');
+  assert.deepEqual(versions(`reset() { unset HOMESCOOP_WASIX_SYSROOT_VERSION; }\n${set}reset\n${call}`), both, 'a function defined before the override that unsets it: both');
+  assert.deepEqual(versions(`reset() { export -n HOMESCOOP_WASIX_SYSROOT_VERSION; }\n${set}reset\n${call}`), both, 'a function that un-exports it: both');
+  assert.deepEqual(versions(`for s in install-wasixcc; do eval "$(bash "$ROOT/scripts/$s.sh")"; done\n${set}${call}`), both, 'the helper named through a loop word before the override: both');
+  assert.deepEqual(versions(`H=install-wasixcc.sh\neval "$(bash "$ROOT/scripts/$H")"\n${set}${call}`), both, 'the helper named through a variable before the override: both');
+  const sourced = buildFileInputs([
+    { path: 'packages/demo/build.sh', text: `${set}. "$PKG/env.sh"\n${call}` },
+    { path: 'packages/demo/env.sh', text: 'unset HOMESCOOP_WASIX_SYSROOT_VERSION\n' },
+    { path: 'scripts/install-wasixcc.sh', text: helper },
+  ]).inputs.map((i) => i.version).sort();
+  assert.deepEqual(sourced, both, 'a sourced file that unsets it: both');
   const wrapped = buildFileInputs([
     { path: 'packages/demo/build.sh', text: `${set}bash "$ROOT/scripts/wrap.sh"\n` },
     { path: 'scripts/wrap.sh', text: 'eval "$(bash "$ROOT/scripts/install-wasixcc.sh")"\n' },
