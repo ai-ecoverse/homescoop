@@ -98,7 +98,10 @@ export const TOOLCHAINS = [
 
 const SHARED = new Set(['scripts/build-common.sh', 'scripts/host-run.sh']);
 
-const OUTSIDE = /\$\{?(?:HOMESCOOP_)?ROOT\}?\/\.\.\//;
+export const OUTSIDE_BUILDS = new Map([
+  ['cmake', '#859: relinks prebuilt objects from ../slicc-emscripten'],
+  ['emscripten-cache', '#859: copies the ../slicc-emscripten cache tree'],
+]);
 
 function code(text) {
   return text
@@ -135,8 +138,8 @@ export function toolchainInputs(name, dir = root, recipe = null) {
   const r = recipe || JSON.parse(readRecipe(name, ['--json'], dir));
   if ((r.builder || 'slicc') !== 'host') return [];
   if (r.repack && typeof r.repack === 'object' && r.repack.from) return [];
+  if (OUTSIDE_BUILDS.has(name)) return [];
   const scripts = buildScripts(name, dir);
-  if (scripts.some((s) => OUTSIDE.test(s.text))) return [];
   const globs = [];
   for (const t of TOOLCHAINS) {
     if (scripts.some((s) => t.uses.test(s.text))) globs.push(...t.inputs);
