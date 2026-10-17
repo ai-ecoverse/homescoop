@@ -25,7 +25,8 @@ dig @100.100.100.100 my-host.tailnet.ts.net
 
 In a browser, the realm proxy can reach only DoH endpoints that allow
 cross-origin requests. cloudflare-dns.com and 1.1.1.1 do; dns.google doesn't, and dig
-reports `HTTP 502` with a hint.
+reports `HTTP 502` with a hint. A 502 from cloudflare-dns.com or 1.1.1.1 means the
+network or the proxy failed, and dig says so.
 
 Types: every mnemonic BIND knows, and `TYPEnnn`. Records print as BIND's dig
 prints them: its columns, DNSSEC records (DNSKEY, DS, RRSIG, NSEC, NSEC3,
