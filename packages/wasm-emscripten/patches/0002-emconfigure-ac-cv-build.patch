@@ -1,9 +1,8 @@
 # Seed ac_cv_build for emconfigure so config.guess does not need a host triple
 # inside the slicc wasm realm.
-diff --git a/emconfigure.py b/emconfigure.py
 --- a/emconfigure.py
 +++ b/emconfigure.py
-@@ -47,6 +47,11 @@ def run():
+@@ -47,6 +47,11 @@
      return 1
  
    env = building.get_building_env()

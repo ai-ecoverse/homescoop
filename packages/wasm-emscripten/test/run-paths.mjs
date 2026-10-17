@@ -147,7 +147,16 @@ try {
         assert.match(v.stdout, want, `${tool} --version: ${v.stdout}${v.stderr}`);
         assert.equal(v.stderr, '', `${tool} --version printed on stderr (the glue's Node-host runner ran a second main?): ${v.stderr}`);
       }
-      ran = `; clang ${man('wasm-clang').version} and wasm-opt ${man('wasm-binaryen').version} --version run clean through their glue on slicc-kernel ${kver}`;
+      for (const [cmd, want] of [['"$(em-config LLVM_ROOT)/clang" --version', /clang version 24\./], ['"$(em-config BINARYEN_ROOT)/bin/wasm-opt" --version', /^wasm-opt version 132\b/]]) {
+        const p = await run(['bash', '-c', cmd]);
+        assert.equal(p.status, 0, `${cmd} by path (homescoop#745): rc=${p.status}\n${p.stdout}${p.stderr}`);
+        assert.match(p.stdout, want, `${cmd}: ${p.stdout}`);
+      }
+      const ev = await run(['emcc', '-v']);
+      assert.doesNotMatch(ev.stderr, /Exec format error/, `emcc -v (homescoop#745): ${ev.stderr}`);
+      assert.equal(ev.status, 0, `emcc -v: rc=${ev.status}\n${ev.stdout}${ev.stderr}`);
+      assert.match(`${ev.stdout}${ev.stderr}`, /Target: wasm32-unknown-emscripten/, 'emcc -v runs LLVM_ROOT/clang by path');
+      ran = `; clang ${man('wasm-clang').version} and wasm-opt ${man('wasm-binaryen').version} --version run clean through their glue on slicc-kernel ${kver}, by path too, and emcc -v reaches clang`;
     }
     console.log(`PASS ${em.name}@${em.version} (${layout}): clang, wasm-opt and the cache sysroot found beside the package${ran}`);
   }

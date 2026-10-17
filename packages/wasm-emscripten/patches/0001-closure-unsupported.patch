@@ -1,8 +1,7 @@
 # Refuse Closure Compiler in SLICC's Emscripten package (no Java / npm closure).
-diff --git a/tools/building.py b/tools/building.py
 --- a/tools/building.py
 +++ b/tools/building.py
-@@ -515,6 +515,10 @@ def js_optimizer(filename, passes):
+@@ -516,6 +516,10 @@
  
  
  def get_closure_compiler():
@@ -13,10 +12,9 @@ diff --git a/tools/building.py b/tools/building.py
    # First check if the user configured a specific CLOSURE_COMPILER in their settings
    if config.CLOSURE_COMPILER:
      return config.CLOSURE_COMPILER
-diff --git a/tools/link.py b/tools/link.py
 --- a/tools/link.py
 +++ b/tools/link.py
-@@ -1266,6 +1266,11 @@ def phase_linker_setup(linker_args):  # ruff: ignore[complex-structure, too-many
+@@ -1254,6 +1254,11 @@
    if options.use_closure_compiler:
      settings.USE_CLOSURE_COMPILER = 1
  

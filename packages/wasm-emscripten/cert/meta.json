@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.61.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.7",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -20,6 +20,7 @@
     "6.0.9-18, `pnpm add -g` layout: the same, with the roots the .pnpm store copies (…/.pnpm/@ai-ecoverse+wasm-clang@<v>/node_modules/@ai-ecoverse/wasm-clang/bin, …+wasm-binaryen@<v>/…): emscripten-config resolve()s ${package}/../<dep> physically",
     "negative: 6.0.9-17 in the flat layout: em-config LLVM_ROOT = /shared/lib/node_modules/@ai-ecoverse/wasm-clang/bin, which has no clang, and em-ensure-cache fails (missing sysroot at /shared/lib/…)",
     "6.0.9-19 (packaging-only, homescoop#276): the exact companions are wasm-clang 24.0.0-18 and wasm-binaryen 132.0.0-2; in the flat layout on the cert kernel 1.61.0 (which still exposes process to the worker) clang --version and wasm-opt --version run through their shipped glue with rc 0 and nothing on stderr. 6.0.9-18 (wasm-clang 24.0.0-12): clang --version rc 70, 'clang: error: no input files' (NEGATIVE.md)",
-    "not covered (slicc-kernel#390): emcc compiling or linking on slicc-kernel; human check in slicc's webapp realm"
+    "6.0.9-20 (homescoop#859): built in CI from the emscripten 6.0.9 tag (4e422385, emsdk release f04ea239's emscripten_revision) fetched by sha256, with patches/0001-0010; the lib/slicc objects compiled by that tree's emcc on emsdk 6.0.9's prebuilt clang. The tarball equals the published 6.0.9-19 except the lib/slicc objects (today's shims), AUTHORS and SECURITY.md (#538), media/ (#205, also on Linux) and six upstream lint dotfiles under system/lib",
+    "by path (homescoop#745, slicc-kernel >= 1.110.7): in the flat layout, bash -c '\"$(em-config LLVM_ROOT)/clang\" --version' and '\"$(em-config BINARYEN_ROOT)/bin/wasm-opt\" --version' exit 0, and emcc -v exits 0 with Target: wasm32-unknown-emscripten (it runs LLVM_ROOT/clang by path); emcc compiling still needs a node with vm (slicc-kernel#390 part 2, slicc-jsh)"
   ]
 }
