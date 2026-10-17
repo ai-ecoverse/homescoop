@@ -288,3 +288,322 @@
      opt.session_env = session_env_new ();
      if (!opt.session_env)
        log_fatal ("error allocating session environment block: %s\n",
+--- a/common/dotlock.c
++++ b/common/dotlock.c
+@@ -412,6 +412,10 @@
+   char *tname;         /* Name of the lockfile template.        */
+   size_t nodename_off; /* Offset in TNAME of the nodename part. */
+   size_t nodename_len; /* Length of the nodename part.          */
++# ifdef __wasi__
++  unsigned int use_fcntl:1; /* fcntl record lock on LOCKNAME.     */
++  int lockfd;               /* LOCKNAME, open while H lives.      */
++# endif
+ #endif /*!HAVE_DOSISH_SYSTEM */
+ };
+ 
+@@ -681,6 +685,190 @@
+ 
+ 
+ 
++#ifdef __wasi__
++/* WASIX on slicc-kernel (homescoop#712): the OPFS root has no hard links
++ * (link() is EPERM/EMLINK, slicc-kernel#563), so the link() + st_nlink
++ * protocol can't work and the O_EXCL fallback races (a reader sees the
++ * lock file before its pid is written and removes it as stale). Instead,
++ * as on Windows, keep LOCKNAME open and lock it with an fcntl record lock,
++ * which slicc-kernel enforces between processes (slicc.fcntl_lock,
++ * >= 1.100.0) and drops when the holder exits, so there are no stale
++ * locks. The lock file stays in place: removing it would let a newcomer
++ * lock a fresh file beside a holder of the old one. fcntl locks belong to
++ * the process, so two handles of one file in a process exclude each other
++ * here, and a handle's descriptor stays open while another handle of the
++ * file holds its lock (closing it would drop that lock). */
++static int next_wait_interval (int *wtime, long *timeout);
++
++static dotlock_t
++dotlock_create_fcntl (dotlock_t h, const char *file_to_lock)
++{
++  LOCK_all_lockfiles ();
++  h->next = all_lockfiles;
++  all_lockfiles = h;
++
++  h->use_fcntl = 1;
++  h->lockfd = -1;
++  h->lockname = xtrymalloc (strlen (file_to_lock) + 6 );
++  if (!h->lockname)
++    goto failed;
++  strcpy (stpcpy (h->lockname, file_to_lock), EXTSEP_S "lock");
++  h->lockfd = open (h->lockname, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
++  if (h->lockfd == -1)
++    {
++      int saveerrno = errno;
++      my_error_2 (_("can't create '%s': %s\n"), h->lockname, strerror (errno));
++      if (h->info_cb)
++        h->info_cb (h, h->info_cb_value, DOTLOCK_FILE_ERROR,
++                    _("can't create '%s': %s\n"),
++                    h->lockname, strerror (saveerrno));
++      my_set_errno (saveerrno);
++      goto failed;
++    }
++  UNLOCK_all_lockfiles ();
++  return h;
++
++ failed:
++  {
++    int saveerrno = errno;
++    all_lockfiles = h->next;
++    UNLOCK_all_lockfiles ();
++    xfree (h->lockname);
++    xfree (h);
++    my_set_errno (saveerrno);
++  }
++  return NULL;
++}
++
++/* Whether another handle of H's file in this process holds its lock.
++ * Call with all_lockfiles locked.  */
++static int
++dotlock_fcntl_held_elsewhere (dotlock_t h)
++{
++  dotlock_t r;
++
++  for (r = all_lockfiles; r; r = r->next)
++    if (r != h && r->use_fcntl && r->locked && r->lockname
++        && !strcmp (r->lockname, h->lockname))
++      return 1;
++  return 0;
++}
++
++static int
++dotlock_fcntl_set (dotlock_t h, short type)
++{
++  struct flock fl;
++
++  memset (&fl, 0, sizeof fl);
++  fl.l_type = type;
++  fl.l_whence = SEEK_SET; /* l_start 0, l_len 0: the whole file.  */
++  while (fcntl (h->lockfd, F_SETLK, &fl) == -1)
++    if (errno != EINTR)
++      return -1;
++  return 0;
++}
++
++static int
++dotlock_take_fcntl (dotlock_t h, long timeout)
++{
++  int wtime = 0;
++  int timedout = 0;
++  int busy;
++
++ again:
++  LOCK_all_lockfiles ();
++  busy = dotlock_fcntl_held_elsewhere (h);
++  if (!busy)
++    {
++      if (!dotlock_fcntl_set (h, F_WRLCK))
++        {
++          h->locked = 1;
++          UNLOCK_all_lockfiles ();
++          return 0; /* okay */
++        }
++      busy = (errno == EAGAIN || errno == EACCES);
++    }
++  UNLOCK_all_lockfiles ();
++  if (!busy)
++    {
++      int saveerrno = errno;
++      my_error_2 (_("lock '%s' not made: %s\n"),
++                  h->lockname, strerror (saveerrno));
++      if (h->info_cb)
++        h->info_cb (h, h->info_cb_value, DOTLOCK_FILE_ERROR,
++                    _("lock '%s' not made: %s\n"),
++                    h->lockname, strerror (saveerrno));
++      my_set_errno (saveerrno);
++      return -1;
++    }
++
++  if (timeout)
++    {
++      struct timeval tv;
++      int wtimereal;
++
++      wtimereal = next_wait_interval (&wtime, &timeout);
++      if (!timeout)
++        timedout = 1;  /* remember.  */
++
++      if (wtime >= 800)
++        {
++          my_info_1 (_("waiting for lock %s...\n"), h->lockname);
++          if (h->info_cb
++              && h->info_cb (h, h->info_cb_value, DOTLOCK_WAITING,
++                             _("waiting for lock %s...\n"), h->lockname))
++            {
++              my_set_errno (ECANCELED);
++              return -1;
++            }
++        }
++
++      tv.tv_sec = wtimereal / 1000;
++      tv.tv_usec = (wtimereal % 1000) * 1000;
++      select (0, NULL, NULL, NULL, &tv);
++      goto again;
++    }
++
++  my_set_errno (timedout? ETIMEDOUT : EACCES);
++  return -1;
++}
++
++static int
++dotlock_release_fcntl (dotlock_t h)
++{
++  if (dotlock_fcntl_set (h, F_UNLCK))
++    {
++      int saveerrno = errno;
++      my_error_1 ("release_dotlock: error unlocking '%s'\n", h->lockname);
++      if (h->info_cb)
++        h->info_cb (h, h->info_cb_value, DOTLOCK_FILE_ERROR,
++                    "release_dotlock: error unlocking '%s'\n", h->lockname);
++      my_set_errno (saveerrno);
++      return -1;
++    }
++  return 0;
++}
++
++/* Destroy: unlock if locked, close the descriptor unless another handle
++ * of the file holds the lock (then it stays open, a few bytes, until
++ * exit).  Called with H already off the list.  */
++static void
++dotlock_destroy_fcntl (dotlock_t h)
++{
++  int keep;
++
++  if (h->locked)
++    dotlock_release_fcntl (h);
++  LOCK_all_lockfiles ();
++  keep = dotlock_fcntl_held_elsewhere (h);
++  UNLOCK_all_lockfiles ();
++  if (h->lockfd != -1 && !keep)
++    close (h->lockfd);
++  h->lockfd = -1;
++}
++#endif /*__wasi__*/
++
++
+ #ifdef  HAVE_POSIX_SYSTEM
+ static int
+ dotlock_get_process_id (dotlock_t h)
+@@ -770,6 +958,10 @@
+   size_t tnamelen;
+   int pid;
+ 
++#ifdef __wasi__
++  if (!h->by_parent && !h->no_write)
++    return dotlock_create_fcntl (h, file_to_lock);
++#endif
+   pid = dotlock_get_process_id (h);
+   snprintf (pidstr, sizeof pidstr, "%10d\n", pid);
+ 
+@@ -1151,6 +1343,13 @@
+ static void
+ dotlock_destroy_unix (dotlock_t h)
+ {
++#ifdef __wasi__
++  if (h->use_fcntl)
++    {
++      dotlock_destroy_fcntl (h);
++      return;
++    }
++#endif
+   if (h->locked && h->lockname)
+     unlink (h->lockname);
+   if (h->tname && !h->use_o_excl)
+@@ -1569,6 +1768,11 @@
+ #ifdef HAVE_DOSISH_SYSTEM
+   ret = dotlock_take_w32 (h, timeout);
+ #else /*!HAVE_DOSISH_SYSTEM*/
++# ifdef __wasi__
++  if (h->use_fcntl)
++    ret = dotlock_take_fcntl (h, timeout);
++  else
++# endif
+   ret = dotlock_take_unix (h, timeout);
+ #endif /*!HAVE_DOSISH_SYSTEM*/
+ 
+@@ -1683,6 +1887,11 @@
+ #ifdef HAVE_DOSISH_SYSTEM
+   ret = dotlock_release_w32 (h);
+ #else
++# ifdef __wasi__
++  if (h->use_fcntl)
++    ret = dotlock_release_fcntl (h);
++  else
++# endif
+   ret = dotlock_release_unix (h);
+ #endif
+ 
+--- a/kbx/keybox-update.c
++++ b/kbx/keybox-update.c
+@@ -92,6 +92,41 @@
+ }
+ 
+ 
++#ifdef __wasi__
++/* Copy SRC to DST (homescoop#712).  See rename_tmp_file.  */
++static int
++copy_file_for_backup (const char *src, const char *dst)
++{
++  FILE *in, *out;
++  char buf[8192];
++  size_t n;
++  int rc = 0;
++
++  in = fopen (src, "rb");
++  if (!in)
++    return gpg_error_from_syserror ();
++  out = fopen (dst, "wb");
++  if (!out)
++    {
++      rc = gpg_error_from_syserror ();
++      fclose (in);
++      return rc;
++    }
++  while ((n = fread (buf, 1, sizeof buf, in)) > 0)
++    if (fwrite (buf, 1, n, out) != n)
++      {
++        rc = gpg_error_from_syserror ();
++        break;
++      }
++  if (!rc && ferror (in))
++    rc = gpg_error_from_syserror ();
++  fclose (in);
++  if (fclose (out) && !rc)
++    rc = gpg_error_from_syserror ();
++  return rc;
++}
++#endif /*__wasi__*/
++
+ static int
+ rename_tmp_file (const char *bakfname, const char *tmpfname,
+                  const char *fname, int secret )
+@@ -118,7 +153,21 @@
+ /*    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)fname ); */
+ 
+   /* First make a backup file except for secret keyboxes. */
++#ifdef __wasi__
++  /* On slicc-kernel's OPFS a rename takes long enough that a gpg reading
++   * the keybox without the lock (keydb_search) often opens it between
++   * the two renames below and fails with ENOENT. Copy the backup instead,
++   * so that FNAME is always there and the rename replaces it.  */
++  if (!secret)
++    {
++      rc = copy_file_for_backup (fname, bakfname);
++      if (rc)
++        goto leave;
++    }
++  if (0)
++#else
+   if (!secret)
++#endif
+     {
+       block = 1;
+       rc = gnupg_rename_file (fname, bakfname, &block);

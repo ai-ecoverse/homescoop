@@ -3,19 +3,19 @@
 name: wasm-go-std-linux-amd64
 builder: host
 # renovate: datasource=golang-version depName=go
-version: "1.26.5"
+version: "1.27.2"
 npm: "@ai-ecoverse/wasm-go-std-linux-amd64"
-summary: "Go 1.26 std .a archives for linux/amd64 (slicc go cross-compile)"
+summary: "Go 1.27 std .a archives for linux/amd64 (slicc go cross-compile)"
 source:
   url: "https://go.dev/dl/go{{version}}.src.tar.gz"
-  sha256: "495be4bc87176ac567392e5b4116abd98466d33d7b49d41e764ccc6976b2dc42"
+  sha256: "03495da2ba64894d40f5c4992e49454fa78b50690604ff92b6afff5081b76e62"
 sources:
   go_linux_amd64:
     url: "https://go.dev/dl/go{{version}}.linux-amd64.tar.gz"
-    sha256: "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053"
+    sha256: "ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5"
   go_darwin_arm64:
     url: "https://go.dev/dl/go{{version}}.darwin-arm64.tar.gz"
-    sha256: "efb87ff28af9a188d0536ef5d42e63dd52ba8263cd7344a993cc48dd11dedb6a"
+    sha256: "76812b213b1b2302c978d28fa52fa92d541704b9e7d9d5db8002c50e4018c4c5"
 dependencies:
   build: []
   host: []

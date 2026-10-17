@@ -1,7 +1,6 @@
 # GNU which for slicc wasm realm (host ladder).
 name: which
 builder: host
-runner: pool
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/which.git extractVersion=^v?(?<version>.*)$
 version: "2.23"
 npm: "@ai-ecoverse/wasm-which"

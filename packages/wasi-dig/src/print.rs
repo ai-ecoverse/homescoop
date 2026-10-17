@@ -89,6 +89,7 @@ pub fn rdata(data: &RData, crypto: bool) -> String {
         RData::SVCB(svcb) => present::svcb(svcb),
         // RFC 3597, as BIND prints NULL and the types it doesn't know.
         RData::NULL(null) => present::unknown(&null.anything),
+        RData::Update0(_) => present::unknown(&[]),
         RData::Unknown { code, rdata } => {
             let bytes = &rdata.anything;
             present::dnssec(u16::from(*code), bytes, crypto).unwrap_or_else(|| present::unknown(bytes))
@@ -135,7 +136,7 @@ fn question_line(name: &Name, class: DNSClass, qtype: RecordType) -> String {
 /// `Fri Oct 10 01:00:00 UTC 2026`.
 fn when() -> String {
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-    let (y, m, d, hh, mm, ss) = present::civil(secs);
+    let (y, m, d, hh, mm, ss) = present::civil(secs as i64);
     const WD: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
     const MO: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     format!(

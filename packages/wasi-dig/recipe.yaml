@@ -8,6 +8,8 @@ npm: "@ai-ecoverse/wasi-dig"
 summary: "dig for slicc WASI (wasm32-wasip1): DNS over HTTPS / TCP, dig-style output"
 # ladder-pr builds it twice and compares the package.tgz sha256.
 reproducible: true
+source:
+  in-tree: "src Cargo.toml Cargo.lock"
 toolchain:
   rust: "1.98.1"
 dependencies:
@@ -18,7 +20,8 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-dig
   license: Apache-2.0
   notes: |
-    cargo build --locked --release --target wasm32-wasip1 (pinned Rust)
+    cargo build --locked --release --target wasm32-wasip1 (pinned Rust from
+    scripts/install-rust.sh: rustc, cargo and rust-std by sha256)
     after vendoring crates/wasix-net (homescoop_vendor_crates). DNS wire
     format: hickory-proto (no tokio). No @server: DNS over HTTPS (RFC 8484
     POST, id 0) to $DIG_DOH_URL or https://cloudflare-dns.com/dns-query, in

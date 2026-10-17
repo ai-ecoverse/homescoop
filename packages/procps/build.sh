@@ -91,4 +91,7 @@ for c in free pgrep pkill kill uptime pidof; do
 done
 
 homescoop_stage_license "$SRC"/COPYING "$SRC"/COPYING.LIB "$SRC"/LICENSE
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
+homescoop_notice "homescoop: wasm-stubs.c and the slicc shims (Apache-2.0)" "$ROOT/LICENSE" -
 echo "== procps: staged → $HOMESCOOP_PKG/package"

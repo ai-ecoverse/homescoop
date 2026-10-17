@@ -33,6 +33,12 @@ function dnsFake(req) {
       ['HTTPS', 300, { hex: '0001000001000302683200040008a29f874fa29f884f000500470045fe0d0041b0002000207e7457212c943718f88248ddf09c2951848323daa0aa293faf922b9313acec490004000100010012636c6f7564666c6172652d6563682e636f6d0000000600202606470000070000000000' + '00a29f874f260647000007000000000000a29f884f' }],
     ],
     'unknown.test': [['TYPE999', 60, { hex: '01020304' }]],
+    'null.test': [['NULL', 60, { hex: '' }]],
+    'emptyunknown.test': [['TYPE999', 60, { hex: '' }]],
+    'emptya.test': [['A', 60, { hex: '' }]],
+    'uid.test': [['UID', 60, { hex: '000003e8' }]],
+    'emptykey.test': [['DNSKEY', 3600, { hex: '0101030d' }], ['DS', 3600, { hex: '09430d02' }]],
+    'wrap.signed.test': [['RRSIG', 300, { hex: '00010d020000012cffffffff0000000086c90a636c6f7564666c61726503636f6d00abcd' }]],
     // homescoop#177: DNSSEC records (cloudflare.com's KSK, DS and an RRSIG,
     // ietf.org's NSEC, nic.cz's NSEC3), under a zone the fake "validates".
     'signed.test': [
@@ -49,6 +55,7 @@ function dnsFake(req) {
   const TYPES = {
     A: 1, NS: 2, CNAME: 5, SOA: 6, PTR: 12, MX: 15, TXT: 16, AAAA: 28, SRV: 33, OPT: 41, CAA: 257,
     DS: 43, RRSIG: 46, NSEC: 47, DNSKEY: 48, NSEC3: 50, NSEC3PARAM: 51, HTTPS: 65, TYPE999: 999,
+    NULL: 10, UID: 101,
   };
   const u16 = (n) => [(n >> 8) & 255, n & 255];
   const u32 = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
@@ -62,7 +69,7 @@ function dnsFake(req) {
     return [b.length, ...b];
   };
   const rdata = (type, d) => {
-    if (d && d.hex) return d.hex.match(/../g).map((x) => parseInt(x, 16));
+    if (d && typeof d.hex === 'string') return (d.hex.match(/../g) ?? []).map((x) => parseInt(x, 16));
     switch (type) {
       case 'A': return d.split('.').map(Number);
       case 'AAAA': {
@@ -128,7 +135,7 @@ function dnsFake(req) {
   const url = new URL(req.url);
   if (url.pathname === '/down') return { status: 503, body: 'resolver down\n' };
   // What the realm proxy answers when an endpoint refuses CORS.
-  if (url.pathname === '/cors') return { status: 502, body: 'Bad Gateway\n' };
+  if (url.pathname === '/cors' || url.pathname === '/bad-gateway') return { status: 502, body: 'Bad Gateway\n' };
   if (url.pathname === '/html') return { headers: [['content-type', 'text/html']], body: '<p>not dns</p>' };
   const ctype = (req.headers.find(([k]) => k.toLowerCase() === 'content-type') ?? [])[1];
   if (req.method !== 'POST' || ctype !== 'application/dns-message') {
@@ -233,7 +240,13 @@ export default async function (ctx) {
   // A browser embedder: a DoH endpoint without CORS comes back as 502.
   const cors = await dig(['@https://doh.test/cors', '+tries=1', 'example.test']);
   assert.equal(cors.status, 9);
-  assert.match(cors.stderr, /HTTP 502 from https:\/\/doh\.test\/cors \(the DoH endpoint may not allow cross-origin requests from a browser; cloudflare-dns\.com does\)/);
+  assert.match(cors.stderr, /HTTP 502 from https:\/\/doh\.test\/cors \(the DoH endpoint may be offline, or may not allow cross-origin requests from a browser; cloudflare-dns\.com does\)/);
+  for (const url of ['https://cloudflare-dns.com/bad-gateway', 'https://1.1.1.1/bad-gateway']) {
+    const r = await run(['bash', '-c', `DIG_DOH_URL=${url} dig +tries=1 example.test`], { cwd });
+    assert.equal(r.status, 9, `${url}: rc=${r.status}`);
+    assert.ok(r.stderr.includes(`HTTP 502 from ${url} (the network or the proxy failed)`), `${url}: ${r.stderr}`);
+    assert.doesNotMatch(r.stderr, /cross-origin/, `${url}: no CORS hint for an endpoint that allows CORS`);
+  }
 
   // homescoop#177: the AD flag. dig sets AD in its queries, so a validating
   // resolver says `ad`; +noadflag clears it; +cdflag sets CD.
@@ -289,6 +302,21 @@ export default async function (ctx) {
     '1 . alpn="h2" ipv4hint=162.159.135.79,162.159.136.79 ech=AEX+DQBBsAAgACB+dFchLJQ3GPiCSN3wnClRhIMj2qCqKT+vkiuTE6zsSQAEAAEAAQASY2xvdWRmbGFyZS1lY2guY29tAAA= ipv6hint=2606:4700:7::a29f:874f,2606:4700:7::a29f:884f',
   ]);
   assert.deepEqual(await short('-t', 'TYPE999', 'unknown.test'), ['\\# 4 01020304']);
+  assert.deepEqual(await short('-t', 'NULL', 'null.test'), ['\\# 0']);
+  assert.equal(await ok(['+noall', '+answer', '-t', 'NULL', 'null.test']), 'null.test.\t\t60\tIN\tNULL\t\\# 0\n');
+  assert.deepEqual(await short('-t', 'TYPE999', 'emptyunknown.test'), ['\\# 0']);
+  const emptyA = await dig(['+tries=1', 'emptya.test']);
+  assert.equal(emptyA.status, 9, `an empty A record is a bad packet: rc=${emptyA.status}`);
+  assert.match(emptyA.stderr, /Got bad packet: unexpected record with length 0/);
+  assert.deepEqual(await short('dnskey', 'emptykey.test'), ['257 3 13']);
+  assert.deepEqual(await short('ds', 'emptykey.test'), ['2371 13 2']);
+  assert.equal(await ok(['+noall', '+answer', 'dnskey', 'emptykey.test']), 'emptykey.test.\t\t3600\tIN\tDNSKEY\t257 3 13\n');
+  assert.equal(await ok(['+noall', '+answer', 'ds', 'emptykey.test']), 'emptykey.test.\t\t3600\tIN\tDS\t2371 13 2\n');
+  assert.deepEqual(await short('-t', 'UID', 'uid.test'), ['\\# 4 000003E8']);
+  assert.ok((await ok(['+noall', '+answer', '-t', 'uid', 'uid.test'])).includes('\tIN\tUID\t'), 'UID mnemonic');
+  assert.deepEqual(await short('rrsig', 'wrap.signed.test'), [
+    'A 13 2 300 19691231235959 19700101000000 34505 cloudflare.com. q80=',
+  ]);
   const unknown = await ok(['-t', 'TYPE999', 'unknown.test']);
   assert.ok(unknown.includes(';; QUESTION SECTION:\n;unknown.test.\t\t\tIN\tTYPE999\n'), unknown);
   assert.ok(unknown.includes(';; ANSWER SECTION:\nunknown.test.\t\t60\tIN\tTYPE999\t\\# 4 01020304\n'), unknown);

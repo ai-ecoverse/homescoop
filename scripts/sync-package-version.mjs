@@ -239,17 +239,21 @@ const hsUpstream = pkg.homescoop?.upstream;
 const previous = from ?? String(hsUpstream ?? versionBase(current));
 const rewriteText = write && !isSpelling(allow, name, upstream, previous);
 const upstreamStale = hsUpstream === undefined || !isSpelling(allow, name, upstream, hsUpstream);
+const goVersion = pkg.slicc?.go?.version;
+const goWant = `go${upstream}`;
+const goStale = goVersion !== undefined && goVersion !== goWant;
 if (argv.includes('--check')) {
   const drift = [];
   if (next !== current) drift.push(`version is ${current}, but recipe.yaml ${upstream} gives ${next}`);
   if (upstreamStale) drift.push(`homescoop.upstream is ${hsUpstream ?? '(none)'}, but recipe.yaml version is ${upstream}`);
+  if (goStale) drift.push(`slicc.go.version is ${goVersion}, but recipe.yaml version is ${upstream}`);
   if (drift.length) {
     console.error(`sync-package-version: ${name} package/package.json disagrees with recipe.yaml: ${drift.join('; ')}`);
     process.exit(1);
   }
 }
 
-if (write && (next !== current || rewriteText || upstreamStale)) {
+if (write && (next !== current || rewriteText || upstreamStale || goStale)) {
   const raw = readFileSync(pkgPath, 'utf8');
   const want = JSON.parse(raw);
   let out = raw;
@@ -265,6 +269,11 @@ if (write && (next !== current || rewriteText || upstreamStale)) {
     out = setJsonString(out, /("upstream"\s*:\s*)"(?:[^"\\]|\\.)*"/, upstream);
     out = setJsonString(out, /("recipe"\s*:\s*)"(?:[^"\\]|\\.)*"/, name);
     console.error(`sync-package-version: ${name} homescoop.upstream ${hsUpstream ?? '(none)'} → ${upstream}`);
+  }
+  if (goStale) {
+    want.slicc.go.version = goWant;
+    out = setJsonString(out, /("go"\s*:\s*\{[^{}]*?"version"\s*:\s*)"(?:[^"\\]|\\.)*"/, goWant);
+    console.error(`sync-package-version: ${name} slicc.go.version ${goVersion} → ${goWant}`);
   }
   if (rewriteText) {
     const ctx = { allow, name };

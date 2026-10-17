@@ -6,6 +6,9 @@ builder: host
 version: "1.0.0"
 npm: "@ai-ecoverse/wasm-mount"
 summary: "mount / umount for slicc (process mounts via slicc-kernel)"
+# The source is committed here (cert root rule, #870).
+source:
+  in-tree: "src"
 dependencies:
   build: []
   host: []

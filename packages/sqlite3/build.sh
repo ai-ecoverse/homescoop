@@ -55,4 +55,6 @@ if [[ -f "$OUT/sqlite3.js" && ! -f "$OUT/sqlite3" ]]; then
 fi
 homescoop_stage_cli "$OUT" sqlite3
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== sqlite3: staged → $HOMESCOOP_PKG/package ($VER)"

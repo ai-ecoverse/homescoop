@@ -37,3 +37,5 @@ about:
     attacher's tty is visible from the session.
     5.0.1-11 (#497): SOURCE_DATE_EPOCH from source.epoch pins screen -v's
     build date, so the build is byte-reproducible (reproducible: true).
+    5.0.1-12 (homescoop#849): packaging-only, publishes main's build (npm's
+    5.0.1-11 orders the emscripten_stack_* exports differently).
