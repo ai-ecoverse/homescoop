@@ -39,11 +39,24 @@
     "-30 fcntl locks (run-modes.mjs --probe r30lock, all five variants; homescoop#407, ABI of slicc-kernel#722): the headers define F_GETLK 12, F_SETLK 13, F_SETLKW 14 and F_RDLCK/F_WRLCK/F_UNLCK 0/1/2 (up to -29 WASIX defined none, so F_SETLK did not compile); unistd.h declares lockf, and libc.a has musl's lockf. fcntl passes the three commands to slicc.fcntl_lock(fd, cmd, flock_ptr), the struct flock layout static-asserted (32 bytes, l_whence 2, l_start 8, l_len 16, l_pid 24). A bad l_type is EINVAL and a closed fd EBADF. On a kernel without the import (ENOSYS, 1.99.0) the local answer: every lock granted, F_GETLK gives F_UNLCK, as the programs' own no-op stubs did. With R30_LOCK=1 (#722): the parent's write lock on bytes 0-4 makes the fork child's F_SETLK EAGAIN, a disjoint range works, F_GETLK names the parent's F_WRLCK 0+5, lockf F_TEST EACCES, and F_SETLKW waits for the parent's unlock",
     "-31 (run-modes.mjs --probe r31, all five variants; homescoop#515, #464, #500): AF_UNIX addresses: bind/listen on /tmp/r31.sock with sizeof(struct sockaddr_un) works (up to -30 sockaddr_to_wasi refused a 108-byte sun_path area and returned -1 with errno -1, 'Success'); getsockname gives AF_UNIX, the path, length offsetof(sun_path)+strlen+1; the accepted peer and the client's own name are unnamed (length sizeof(sa_family_t)); the client's getpeername gives the path; a 4-byte buffer gets the family and the full length back (up to -30 wasi_to_sockaddr never copied the sockaddr_un: family 0, empty path; wasix-python's multiprocessing.Manager failed on it). poll and ppoll: an events-0 entry is watched for hangup: a pipe whose write end is closed gives POLLHUP at once (of 2 s), the write end of a pipe whose reader is gone POLLERR; a readable pipe and a writable pipe with events 0 report nothing and the call waits out its 300 ms; a writable write end (and a readable read end) with events 0 still reports POLLERR (POLLHUP) when the peer closes 300 ms into a 3 s wait; POLLIN after the writer closed is POLLIN|POLLHUP (up to -30 the events-0 entries never reported and the call slept its timeout). Named semaphores: 1000 distinct names open, read back and close (the libc's table grows; up to -30 a fixed 256), with R31_SEMS=1 on a kernel with slicc-kernel#770; without it the kernel's own 256-handle EMFILE cap shows",
     "-31 coverage (homescoop#463): ci now also runs r18, r20, tzname, r21, fifo, r22, r23, r24, r25 and r26 in default and ehpic on the cert kernel",
-    "-32 (run-modes.mjs --probe r32, all five variants on slicc-kernel 1.108.1 with R32_KERNEL=1; homescoop#466, #520, #740): epoll_pwait with a mask goes through slicc.sigmask_epoll_wait: 200 rounds of a SIGUSR1 sent by a thread at a random 0-3 ms into epoll_pwait(2 s, empty mask) all end EINTR at once (none waits out the 2 s) and SIGUSR1 is blocked after; a ready fd gives its event. sigwait/sigwaitinfo/sigtimedwait go through slicc.sigwait: a pending blocked SIGUSR2 is taken by sigwait (0, sig 12) and SIGUSR1 by sigwaitinfo (10, si_code SI_USER) with no handler run; sigtimedwait 200 ms EAGAIN on time, {0,0} EAGAIN at once, tv_nsec 1e9 EINVAL; a handled SIGALRM at 200 ms of a 600 ms wait runs and the wait still ends EAGAIN at 600 ms; another thread's kill(getpid()) is taken. SIGCHLD: default zombie (status 3), SA_NOCLDWAIT reaped (ECHILD), SIG_DFL zombie again. Under bash trap '' PIPE USR2 CHLD, exec'd r32 reads SIG_IGN for PIPE/USR2/CHLD and SIG_DFL for TERM from sigaction (slicc.sigaction_inherited), the inherited CHLD ignore reaps, a handler over an inherited ignore runs; without the trap all SIG_DFL. On the cert kernel (no imports): epoll_pwait's swap fallback (200 EINTR), sigwait family ENOSYS, SA_NOCLDWAIT no effect, all SIG_DFL, as -31. -31 on 1.108.1: FAIL (NEGATIVE.md)"
+    "-32 (run-modes.mjs --probe r32, all five variants on slicc-kernel 1.108.1 with R32_KERNEL=1; homescoop#466, #520, #740): epoll_pwait with a mask goes through slicc.sigmask_epoll_wait: 200 rounds of a SIGUSR1 sent by a thread at a random 0-3 ms into epoll_pwait(2 s, empty mask) all end EINTR at once (none waits out the 2 s) and SIGUSR1 is blocked after; a ready fd gives its event. sigwait/sigwaitinfo/sigtimedwait go through slicc.sigwait: a pending blocked SIGUSR2 is taken by sigwait (0, sig 12) and SIGUSR1 by sigwaitinfo (10, si_code SI_USER) with no handler run; sigtimedwait 200 ms EAGAIN on time, {0,0} EAGAIN at once, tv_nsec 1e9 EINVAL; a handled SIGALRM at 200 ms of a 600 ms wait runs and the wait still ends EAGAIN at 600 ms; another thread's kill(getpid()) is taken. SIGCHLD: default zombie (status 3), SA_NOCLDWAIT reaped (ECHILD), SIG_DFL zombie again. Under bash trap '' PIPE USR2 CHLD, exec'd r32 reads SIG_IGN for PIPE/USR2/CHLD and SIG_DFL for TERM from sigaction (slicc.sigaction_inherited), the inherited CHLD ignore reaps, a handler over an inherited ignore runs; without the trap all SIG_DFL. On the cert kernel (no imports): epoll_pwait's swap fallback (200 EINTR), sigwait family ENOSYS, SA_NOCLDWAIT no effect, all SIG_DFL, as -31. -31 on 1.108.1: FAIL (NEGATIVE.md)",
+    "-33 (homescoop#890, #864): built from source in CI. build-source.sh runs wasix-libc v2026-07-03.1's build32-general.sh for each of the five variants (libc, compiler-rt builtins + profile, libc++/libc++abi/libunwind from llvm-project 6bb93a24) with wasix-org's LLVM 21.1.206, both sha256-pinned in recipe.yaml; build-incremental.sh layers the -15\u2026-32 libc changes on that, no longer on npm -14. Every -32 probe row (modes, r18\u2026r32) passes on -33 in the same variants and kernels. test/globals.mjs (ci): every defined global of each variant's archives and crt objects in npm -32 is still defined in -33 (100 files; the C++ runtimes aside, #935), with one explained removal: -14's internal __musl_sem_shm_mapname (shm_open.o defines __shm_mapname). The include/ file list keeps every non-C++ header. The PIC trees get -32's __wasi_proc_raise_interval2 wrapper and api_wasix.h declaration back (patches/proc_raise_interval2.c, #943: wasix-python's build checks for it). libc.imports is identical. The C++ runtimes are upstream's: legacy EH in sysroot-eh/ehpic, exnref in the exnref trees (LLVM 20.1), with a real __cxa_thread_atexit (#211 B); -32 had LLVM 24 exnref runtimes in all four EH trees. eh-compat/gxx_wasm_personality.c adds __gxx_wasm_personality_v0 (what LLVM 24 codegen calls) over _Unwind_CallPersonality to each EH tree's libunwind.a",
+    "test/cxx-eh.mjs (ci), in all four EH trees (sysroot-eh, sysroot-ehpic, sysroot-exnref-eh, sysroot-exnref-ehpic), each with two compilers: wasm-clang 24.0.0-21's c++ inside slicc-kernel's Node entry, and wasixcc's clang 21.1.206 on the host (the compiler wasix-python and the C++ py-* use). Two programs per build. cxx-eh.cpp: a std::runtime_error subclass, std::out_of_range from vector::at, an int, a throw through two destructors (both run), std::exception_ptr rethrown and rethrown again, a throw caught inside a std::thread, and a thread_local std::string give caught=117107 dtors=2 tl=tls seen=in thread. cxx-terminate.cpp: a throw out of a noexcept function reaches std::terminate and the std::set_terminate handler (prints, then raise(SIGKILL), rc 137). 8/8 pass on -33. wasm-clang 24.0.0-21's driver emits exnref code in every mode, so the legacy rows add -mllvm --wasm-use-legacy-eh=true (its next release gets that from WASIXCC_WASM_EXCEPTIONS=legacy), and exnref-ehpic sets WASIXCC_ASYNCIFY=0 (wasm-opt's asyncify Flatten aborts on try_table, on -32 too). -32: the link fails, undefined __cxa_thread_atexit (NEGATIVE.md)",
+    "known (homescoop#935): libc++ is 20.1 (_LIBCPP_VERSION 200100), not -32's 24.0; <version> defines 165 __cpp_lib_* macros, not 195 (C++23/26 library features, listed on #935)",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md names the base (wasix-libc v2026-07-03.1, llvm-project 6bb93a24) and carries the license text of wasix-libc, musl, cloudlibc, libc++, libc++abi, libunwind and compiler-rt (homescoop#726)"
   ],
   "extra_kernels": [
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.102.2",
+      "why": "slicc-kernel#773, 65,536 named semaphores per process: r31 with R31_SEMS=1 opens, reads and closes 1000 distinct names (homescoop#500, #663)",
+      "env": {
+        "R31_SEMS": "1"
+      },
+      "ci": [
+        "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\"; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r31 --variant $v --kernel \"$HOMESCOOP_CERT_KERNEL\" || exit 1; done"
+      ]
+    },
     "@ai-ecoverse/slicc-kernel@1.108.1 (slicc.sigmask_epoll_wait #783, slicc.sigwait #786/#801, slicc.sigaction_inherited and SIGCHLD reaping #841: r32 with R32_KERNEL=1 in all five variants; r28w (its sigwait lines skipped), r29 and r18 pass in default and ehpic)",
-    "@ai-ecoverse/slicc-kernel@1.102.2 (slicc-kernel#773, 65,536 named semaphores per process: r31 with R31_SEMS=1 opens, reads and closes 1000 distinct names in all five variants)",
     "@ai-ecoverse/slicc-kernel@1.99.0 (slicc.sem_* without slicc.fcntl_lock: r30 with R30_SEM=1 passes; r30lock without R30_LOCK gives the local answer, every lock granted)",
     "@ai-ecoverse/slicc-kernel@1.98.4 (no slicc.sem_*: r30 without R30_SEM passes its fallback branch, sem_open ENOENT as up to -29; r29 with R29_EPOLL=1 passes)",
     "@ai-ecoverse/slicc-kernel@1.94.0 (no WASIX epoll: r29 without R29_EPOLL gives epoll -1 ENOSYS; its poll/ppoll and signal lines pass in all five variants)",
@@ -70,6 +83,39 @@
     "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\"; for p in r18 r20 tzname r21 fifo r22 r23 r24 r25 r26; do for v in default ehpic; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe $p --variant $v || exit 1; done; done",
     "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R32_KERNEL=1; for v in default ehpic exnrefpic eh noeh; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r32 --variant $v --kernel @ai-ecoverse/slicc-kernel@1.108.1 || exit 1; done",
     "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\"; for v in default ehpic; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe r32 --variant $v || exit 1; done",
-    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R29_EPOLL=1; for p in r28w r29 r18; do for v in default ehpic; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe $p --variant $v --kernel @ai-ecoverse/slicc-kernel@1.108.1 || exit 1; done; done"
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\" R28_KERNEL_MASK=1 R29_EPOLL=1; for p in r28w r29 r18; do for v in default ehpic; do node packages/wasix-sysroot/test/run-modes.mjs --tarball .homescoop-out/package.tgz --probe $p --variant $v --kernel @ai-ecoverse/slicc-kernel@1.108.1 || exit 1; done; done",
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\"; node packages/wasix-sysroot/test/cxx-eh.mjs --sysroot .homescoop-out/package.tgz --tarball @ai-ecoverse/wasm-clang@24.0.0-21",
+    "node packages/wasix-sysroot/test/notices-host.mjs .homescoop-out/package.tgz",
+    "export HOMESCOOP_TEST_WASIXCC=\"${RUNNER_TEMP:-/tmp}/wasix-sysroot-cert-wasixcc\"; node packages/wasix-sysroot/test/globals.mjs --tarball .homescoop-out/package.tgz --against @ai-ecoverse/wasix-sysroot@2025.9.30-32"
+  ],
+  "notices": [
+    {
+      "name": "wasix-libc",
+      "license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+    },
+    {
+      "name": "musl",
+      "license": "MIT"
+    },
+    {
+      "name": "cloudlibc",
+      "license": "BSD-2-Clause"
+    },
+    {
+      "name": "libc++",
+      "license": "Apache-2.0 WITH LLVM-exception"
+    },
+    {
+      "name": "libc++abi",
+      "license": "Apache-2.0 WITH LLVM-exception"
+    },
+    {
+      "name": "libunwind",
+      "license": "Apache-2.0 WITH LLVM-exception"
+    },
+    {
+      "name": "compiler-rt",
+      "license": "Apache-2.0 WITH LLVM-exception"
+    }
   ]
 }

@@ -83,6 +83,7 @@ static void *sender(void *arg) {
   while (!sender_stop) {
     int want = usr1;
     usleep(rand_r(&seed) % 3000);
+    if (sender_stop) break;
     pthread_kill(main_thread, SIGUSR1);
     sender_sent++;
     while (usr1 == want && !sender_stop) usleep(200);
@@ -118,6 +119,10 @@ static void pwait(void) {
   }
   sender_stop = 1;
   pthread_join(t, NULL);
+  /* A SIGUSR1 the sender sent after the last round is pending (blocked):
+   * unblocking delivers it to the handler now, not to the next epoll_pwait. */
+  block(SIGUSR1, SIG_UNBLOCK);
+  block(SIGUSR1, SIG_BLOCK);
   printf("pwait race: rounds=%d eintr=%d other=%d slow=%d worst=%s handled=%s blocked=%d\n", rounds, eintr, other, slow, worst < 1 ? "<1s" : ">1s", usr1 >= rounds ? "all" : "some", blocked(SIGUSR1));
   write(p[1], "x", 1);
   int r = epoll_pwait(ep, out, 4, 2000, &empty);

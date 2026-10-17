@@ -29,6 +29,16 @@ const KEYS = [
   'mDMEatLmshYJKwYBBAHaRw8BAQdAYmWNJ8F0WI90RLmajnjqPPnXOygfSjUDRKiX+rmK6XS0GnRpZGU2IDx0aWRlNkBleGFtcGxlLnRlc3Q+iK8EExYKAFcWIQRKkNAsbGeyI4g1Glo5x85cA2GccgUCatLmshsUgAAAAAAEAA5tYW51MiwyLjUrMS4xMiwwLDMCGwMFCwkIBwICIgIGFQoJCAsCBBYCAwECHgcCF4AACgkQOcfOXANhnHJSxwEA7Rn9AH8kDGw+0mfyA/KcFW614F94+mY6ORgPdBIiN7sA/RGYc21wXk0vwE1foq8dA/KfeS9zZUzRbpDxVMpun30P',
 ];
 
+// Six more (uids tide7 … tide12), already in the keybox before the concurrent
+// imports of the existing-keybox rounds.
+const HELD = [
+  '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',
+];
 
 // Holds F_WRLCK on ARGV[0] until gpg's log (ARGV[1]) says it waits, then 1 s
 // more (at most 60 s).
@@ -72,27 +82,45 @@ export default async function (ctx) {
   assert.match(ex, /waiting for lock .*pubring\.kbx\.lock/, `gpg waits for the lock (2.4.9-7 doesn't):\n${ex}`);
   assert.match(ex, /^uid U0 <u0@example\.org>\nuid U1 <u1@example\.org>$/m, `both keys:\n${ex}`);
 
-  // 2. Six concurrent imports of distinct keys into a fresh homedir.
+  // 2. Six concurrent imports of distinct keys into a fresh homedir, then
+  //    into one whose keybox exists: empty (gpg -k ran once) or holding six
+  //    other keys (homescoop#956).
   await addUser({ name: 'cone' });
   await write('/tmp/gpg-keys.b64', KEYS.join('\n') + '\n');
-  await sh(`i=0; while read -r k; do i=$((i + 1)); echo "$k" | base64 -d > /tmp/gpg-key-$i.gpg; done < /tmp/gpg-keys.b64; chmod 644 /tmp/gpg-key-*.gpg`);
-  const rounds = [['root', 1], ['root', 2], ['root', 3], ['cone', 4]];
-  for (const [user, round] of rounds) {
+  await write('/tmp/gpg-held.b64', HELD.join('\n') + '\n');
+  await sh(`i=0; while read -r k; do i=$((i + 1)); echo "$k" | base64 -d > /tmp/gpg-key-$i.gpg; done < /tmp/gpg-keys.b64; while read -r k; do echo "$k" | base64 -d; done < /tmp/gpg-held.b64 > /tmp/gpg-held.gpg; chmod 644 /tmp/gpg-key-*.gpg /tmp/gpg-held.gpg`);
+  const PREFILL = {
+    fresh: () => [],
+    empty: (gh) => [`gpg --homedir ${gh} --batch -k > /dev/null 2>&1`],
+    held: (gh) => [`gpg --homedir ${gh} --batch --import /tmp/gpg-held.gpg > /dev/null 2>&1 || echo "prefill failed"`],
+  };
+  const rounds = [
+    ['root', 1, 'fresh'], ['root', 2, 'fresh'], ['root', 3, 'fresh'], ['cone', 4, 'fresh'],
+    ['root', 5, 'empty'], ['root', 6, 'held'], ['root', 7, 'held'], ['root', 8, 'held'], ['cone', 9, 'held'],
+  ];
+  for (const [user, round, prefill] of rounds) {
     const gh = `${user === 'root' ? '/root' : `/home/${user}`}/imp${round}`;
+    const held = prefill === 'held' ? HELD.length : 0;
     const out = await sh([
       `rm -rf ${gh} ${gh}.*.log; mkdir -m 700 -p ${gh}`,
+      ...PREFILL[prefill](gh),
+      `[ ${prefill === 'fresh' ? '!' : ''} -s ${gh}/pubring.kbx ] || echo "prefill: unexpected keybox state"`,
       `for i in $(seq ${KEYS.length}); do (gpg --homedir ${gh} --batch --import /tmp/gpg-key-$i.gpg > ${gh}.$i.log 2>&1; echo "rc$i=$?" >> ${gh}.$i.log) & done; wait`,
       `for i in $(seq ${KEYS.length}); do echo "== $i"; cat ${gh}.$i.log; done`,
       `echo "== list"; GNUPGHOME=${gh} ${UIDS}`,
       `gpgconf --homedir ${gh} --kill gpg-agent`,
     ].join('\n'), { cwd: gh.replace(/\/imp\d$/, ''), ...(user === 'cone' && { user }) });
+    assert.doesNotMatch(out, /^prefill/m, `${user} round ${round} (${prefill}): keybox set up:\n${out}`);
     const runs = out.split(/^== /m).slice(1, KEYS.length + 1);
     for (let i = 1; i <= KEYS.length; i++) {
-      assert.match(runs[i - 1], new RegExp(`^rc${i}=0$`, 'm'), `${user} round ${round}: import ${i} exits 0:\n${out}`);
-      assert.doesNotMatch(runs[i - 1], /error|invalid|failed|Oops|lockfile|can't lock|not locked/i, `${user} round ${round}: import ${i} logs no error:\n${out}`);
+      assert.match(runs[i - 1], new RegExp(`^rc${i}=0$`, 'm'), `${user} round ${round} (${prefill}): import ${i} exits 0:\n${out}`);
+      assert.doesNotMatch(runs[i - 1], /error|invalid|failed|Oops|lockfile|can't lock|not locked|General/i, `${user} round ${round} (${prefill}): import ${i} logs no error:\n${out}`);
     }
-    const listed = new Set(out.match(/^uid tide\d <tide\d@example\.test>$/gm) ?? []);
-    assert.equal(listed.size, KEYS.length, `${user} round ${round}: all ${KEYS.length} keys kept:\n${out}`);
+    const listed = new Set(out.match(/^uid tide\d+ <tide\d+@example\.test>$/gm) ?? []);
+    for (let i = 1; i <= KEYS.length + held; i++) {
+      assert.ok(listed.has(`uid tide${i} <tide${i}@example.test>`), `${user} round ${round} (${prefill}): key tide${i} kept:\n${out}`);
+    }
+    assert.equal(listed.size, KEYS.length + held, `${user} round ${round} (${prefill}): ${KEYS.length + held} keys:\n${out}`);
   }
 
   // 3. Parallel --quick-gen-key in one homedir.
@@ -117,5 +145,5 @@ export default async function (ctx) {
   }
   const floor = ctx.installed?.[0]?.engines?.['slicc-kernel'];
   assert.equal(floor, '>=1.117.2', `engines.slicc-kernel is >=1.117.2: slicc.fcntl_lock (1.100.0) and renames atomic for other processes (slicc-kernel#925): ${floor}`);
-  console.log(`concurrent: gpg waits for an fcntl holder of pubring.kbx.lock; ${KEYS.length} concurrent imports into a fresh homedir, 3 rounds as root and 1 as cone, keep every key with no errors; ${N} parallel --quick-gen-key as root and cone all succeed`);
+  console.log(`concurrent: gpg waits for an fcntl holder of pubring.kbx.lock; ${KEYS.length} concurrent imports into a fresh homedir (3 rounds as root, 1 as cone), an existing empty keybox (1 round) and a keybox holding ${HELD.length} keys (3 rounds as root, 1 as cone) keep every key with no errors; ${N} parallel --quick-gen-key as root and cone all succeed`);
 }
