@@ -207,7 +207,7 @@ jobs:
               await github.rest.issues.createComment({ owner, repo, issue_number: same.number, body });
               core.info(`commented on #${same.number}`);
             } else {
-              const { data } = await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+              const { data } = await github.rest.issues.create({ owner, repo, title, body, labels: [label, 'repro', 'ci'] });
               core.info(`opened #${data.number}`);
             }
             core.setFailed(`recipes whose pool build differs from the hosted twin: ${bad.join(' ')}`);
