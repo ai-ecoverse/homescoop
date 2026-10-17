@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { parityProblem } from './parity-now.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -16,6 +17,7 @@ const { values } = parseArgs({
     'ladder-conclusion': { type: 'string', default: '' },
     specs: { type: 'string', default: '' },
     'repack-input': { type: 'string', default: '' },
+    parity: { type: 'string', default: '' },
   },
 });
 
@@ -98,6 +100,20 @@ const forcedKnown = (pkg) => {
   return r.known.map((k) => one(k)).filter(Boolean);
 };
 
+let parity = null;
+if (values.parity) {
+  try {
+    parity = JSON.parse(readFileSync(values.parity, 'utf8'));
+    if (!parity || typeof parity !== 'object' || Array.isArray(parity)) throw new Error('not an object');
+  } catch (error) {
+    problems.push(`no readable npm parity file (${one(error.message)})`);
+    parity = {};
+  }
+}
+const stale = (pkg) => (parity === null ? null : parityProblem(parity[pkg.recipe]));
+const sameAsNpm = (pkg) => parity?.[pkg.recipe]?.verdict === 'same';
+const SAME = 'on npm with the same contents at record time; nothing to publish';
+
 const listOf = (value, what, pkg) => {
   if (value === undefined || value === null) return [];
   if (Array.isArray(value)) return value;
@@ -125,9 +141,13 @@ const lines = packages.map((pkg) => {
   if (input && v.verdict !== 'fail') {
     return { ok: false, line: `cert-ci: INCOMPLETE ${pkg.name}@${pkg.version}: unverifiable input: ${input}` };
   }
+  const npm = stale(pkg);
+  if (npm && v.verdict !== 'fail') {
+    return { ok: false, line: `cert-ci: ${npm.tag} ${pkg.name}@${pkg.version}: ${npm.why}` };
+  }
   if (v.verdict === 'certified') {
     const known = [...forcedKnown(pkg), ...listOf(v.known, 'known', pkg).map((k) => one(k).slice(0, 120)).filter(Boolean)];
-    const notes = [...(unspecified(pkg) ? [UNSPECIFIED] : []), ...(known.length ? [`known: ${known.join(', ')}`] : [])];
+    const notes = [...(unspecified(pkg) ? [UNSPECIFIED] : []), ...(sameAsNpm(pkg) ? [SAME] : []), ...(known.length ? [`known: ${known.join(', ')}`] : [])];
     if (held) return { ok: false, line: `cert-ci: HELD ${pkg.name}@${pkg.version}: the reviewer certified it, but ${held}` };
     return {
       ok: true,
@@ -135,7 +155,7 @@ const lines = packages.map((pkg) => {
     };
   }
   if (v.verdict === 'fail') {
-    const also = input ? `; also unverifiable input: ${input}` : '';
+    const also = `${input ? `; also unverifiable input: ${input}` : ''}${npm ? `; also ${npm.why}` : ''}`;
     return { ok: false, line: `cert-ci: FAIL ${pkg.name}@${pkg.version}: ${one(v.reason) || 'no reason given'}${also}` };
   }
   problems.push(`${pkg.name}@${pkg.version}: verdict "${one(v.verdict)}" is neither certified nor fail`);
@@ -149,13 +169,22 @@ const result = lines.map(({ line }) => line).join('\n');
 const unspecifiedNote = specCounts !== null && packages.some(unspecified)
   ? `\n\n**${packages.filter(unspecified).map((pkg) => pkg.name).join(', ')}: ${UNSPECIFIED}.**`
   : '';
-const incomplete = lines.filter(({ line }) => line.startsWith('cert-ci: INCOMPLETE'));
+const parityLine = (line) => /^cert-ci: INCOMPLETE \S+: npm parity /.test(line);
+const incomplete = lines.filter(({ line }) => line.startsWith('cert-ci: INCOMPLETE') && !parityLine(line));
 const incompleteNote = incomplete.length
   ? `\n\n**Not certified, whatever the review says: ${incomplete.length === 1 ? 'an input is' : 'inputs are'} unverifiable.** A build must fetch the recipe's pinned source (homescoop_fetch with its sha256) with no stage or prebuilt path, and a repack must trace its bytes to such a build that is provenance-attested from CI, or reproducible (\`scripts/cert-review/repack-input.mjs\`).`
   : '';
+const behind = lines.filter(({ line }) => /^cert-ci: (BEHIND|DRIFT) /.test(line));
+const behindNote = behind.length
+  ? `\n\n**Not certified, whatever the review says: npm moved on after ladder-pr checked it.** Merge main and bump the packaging revision above npm's \`latest\`, so these bytes can ship (homescoop#891).`
+  : '';
+const parityUnknown = lines.filter(({ line }) => parityLine(line));
+const parityNote = parityUnknown.length
+  ? `\n\n**Not certified, whatever the review says: the record job couldn't check npm parity.** The registry didn't answer, or the check didn't run; re-run cert-review (homescoop#891).`
+  : '';
 const trouble = problems.length ? `\n\n**Problems:**\n${problems.map((p) => `- ${p}`).join('\n')}` : '';
 const footer = values.run ? `\n\n<sub>shas computed from the ladder-pr artifacts, not by the reviewer · [run](${values.run})</sub>` : '';
-writeFileSync(values.body, `${comment}${unspecifiedNote}${incompleteNote}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
+writeFileSync(values.body, `${comment}${unspecifiedNote}${incompleteNote}${behindNote}${parityNote}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
 writeFileSync(values.lines, `${result}\n`);
 writeFileSync(`${values.lines}.unspecified`, `${JSON.stringify(packages.filter(unspecified).map((pkg) => pkg.name))}\n`);
 

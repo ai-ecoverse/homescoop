@@ -7,14 +7,20 @@
  * Land-before-publish therefore cannot ship an uncertified rebuild.
  *
  * Exit 0  — hashes match; caller may `npm publish`
- * Exit 10 — version document already exists; skip publish
- * Exit 2  — refuse
+ * Exit 10 — the version is already on npm with these contents; skip publish
+ *           (the same entries, not necessarily the same bytes: npm-parity's rule)
+ * Exit 2  — refuse (also when the version sorts below npm's latest: the
+ *           publish uses --tag latest, so it would move latest back; #891,
+ *           and when the version is on npm with other contents, so these
+ *           bytes would never ship; #971)
  *
  *   node scripts/assert-certified-publish.mjs <tgz> --npm <name> --certified <sha256>
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { compareVersions, packPublished } from './npm-parity.mjs';
+import { compareTarballs, describe } from './tarball-parity.mjs';
 
 const tgz = process.argv[2];
 if (!tgz || tgz.startsWith('-')) {
@@ -54,14 +60,58 @@ if (name !== npmName) {
   process.exit(2);
 }
 
-const url = `https://registry.npmjs.org/${encodeURIComponent(npmName)}/${version}`;
+const registry = process.env.HOMESCOOP_REGISTRY || 'https://registry.npmjs.org';
+const url = `${registry}/${encodeURIComponent(npmName)}/${version}`;
 const res = await fetch(url);
 if (res.status === 200) {
-  console.log(`already on npm: ${npmName}@${version} — skip publish`);
-  process.exit(10);
+  const integrity = `sha512-${createHash('sha512').update(buf).digest('base64')}`;
+  const doc = await res.json().catch(() => null);
+  if (doc?.dist?.integrity === integrity) {
+    console.log(`already on npm: ${npmName}@${version}, byte-identical — skip publish`);
+    process.exit(10);
+  }
+  let cmp;
+  try {
+    cmp = compareTarballs(packPublished(`${npmName}@${version}`), buf, { labels: ['npm', 'build'] });
+  } catch (err) {
+    console.error(`assert-certified-publish: ${npmName}@${version} is on npm, and comparing it failed: ${err.message}`);
+    process.exit(2);
+  }
+  if (cmp.same) {
+    console.log(`already on npm: ${npmName}@${version}, same contents — skip publish`);
+    process.exit(10);
+  }
+  console.error(
+    `refuse: ${npmName}@${version} is already on npm with different contents (${cmp.diffs.length} entr${cmp.diffs.length === 1 ? 'y' : 'ies'}), ` +
+      `so these bytes would never ship. Bump the packaging revision (homescoop#971).`,
+  );
+  for (const line of describe(cmp, { max: 20 })) console.error(line);
+  process.exit(2);
 }
 if (res.status !== 404) {
   console.error(`assert-certified-publish: GET ${url} -> ${res.status}`);
+  process.exit(2);
+}
+
+const latestUrl = `${registry}/${encodeURIComponent(npmName)}/latest`;
+const tags = await fetch(latestUrl);
+let latest = null;
+if (tags.status === 200) {
+  latest = (await tags.json().catch(() => null))?.version;
+  if (typeof latest !== 'string') {
+    console.error(`assert-certified-publish: GET ${latestUrl} has no version`);
+    process.exit(2);
+  }
+} else if (tags.status !== 404) {
+  console.error(`assert-certified-publish: GET ${latestUrl} -> ${tags.status}`);
+  process.exit(2);
+}
+if (latest && compareVersions(version, latest) < 0) {
+  console.error(
+    `refuse OIDC publish of ${npmName}@${version}: it sorts below npm latest ${latest}, ` +
+      `and --tag latest would move latest back. Main published past this build after it was certified; ` +
+      `bump the packaging revision above ${latest} (homescoop#891).`,
+  );
   process.exit(2);
 }
 
