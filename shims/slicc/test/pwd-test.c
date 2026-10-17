@@ -1,6 +1,6 @@
 /*
  * passwd/group lookups through slicc_pwd.c, as screen and bash use them.
- * Prints one line per lookup; flock() pulls Emscripten's
+ * Prints one line per lookup; chroot() pulls Emscripten's
  * emscripten_libc_stubs.o (which also defines getpwuid/getpwnam/getpwent)
  * into the link, so this also proves the --wrap avoids a duplicate symbol.
  */
@@ -33,6 +33,7 @@ static void show_gr(const char *tag, struct group *gr) {
 
 int main(void) {
   printf("flock %d\n", flock(0, LOCK_SH));
+  printf("chroot %d\n", chroot("/") == 0 || errno != 0);
   // uid 1000 by number: getuid() is the kernel's (cred-test.c).
   show_pw("uid", getpwuid(1000));
   show_pw("root", getpwnam("root"));
