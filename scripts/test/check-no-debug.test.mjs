@@ -90,3 +90,16 @@ test('the CLI fails on DWARF, and --strip removes it with the objcopy it is give
     assert.match(ok.stdout, /no \.debug_\* sections/);
   });
 });
+
+test('--strip refuses an objcopy that drops the name section (or any other non-debug section)', () => {
+  fixture(({ dir, pkg }) => {
+    const tool = join(dir, 'bad-objcopy');
+    const bare = wasm();
+    writeFileSync(tool, `#!/usr/bin/env node\nrequire('fs').writeFileSync(process.argv[4], Buffer.from(${JSON.stringify(bare.toString('base64'))}, 'base64'));\n`);
+    chmodSync(tool, 0o755);
+    const r = spawnSync(process.execPath, [script, 'no-such-recipe', pkg, '--strip'], { encoding: 'utf8', env: { ...process.env, HOMESCOOP_OBJCOPY: tool } });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /also dropped name; only \.debug_\* may go/);
+    assert.deepEqual(readFileSync(join(pkg, 'bin', 'tool.wasm')), dbg, 'the file is left as it was');
+  });
+});

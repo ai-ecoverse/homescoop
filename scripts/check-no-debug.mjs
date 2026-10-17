@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, readFileSync, readdirSync, renameSync, statSync } from 'node:fs';
+import { chmodSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -71,6 +71,26 @@ export function debugIn(buf) {
   return out;
 }
 
+export function keptSections(buf) {
+  const own = customSections(buf);
+  const pick = (secs) => secs.map((x) => x.name).filter((n) => !n.startsWith('.debug') && !n.startsWith('reloc..debug'));
+  if (own) return pick(own);
+  const members = arMembers(buf);
+  if (!members) return [];
+  return members.flatMap((m) => pick(customSections(m.data) || []).map((n) => `${m.name}:${n}`));
+}
+
+export function lostSections(before, after) {
+  const left = [...after];
+  const lost = [];
+  for (const n of before) {
+    const i = left.indexOf(n);
+    if (i < 0) lost.push(n);
+    else left.splice(i, 1);
+  }
+  return lost;
+}
+
 export function scan(dir) {
   const found = [];
   const walk = (d) => {
@@ -117,13 +137,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       const tmp = `${p}.nodebug`;
       const r = spawnSync(tool, ['--strip-debug', p, tmp], { encoding: 'utf8' });
       if (r.status !== 0) {
+        rmSync(tmp, { force: true });
         console.error(`check-no-debug: ${tool} --strip-debug ${f.file} failed: ${r.error?.message ?? ''}${r.stderr}`);
+        process.exit(1);
+      }
+      const before = keptSections(readFileSync(p));
+      const lost = lostSections(before, keptSections(readFileSync(tmp)));
+      if (lost.length) {
+        rmSync(tmp, { force: true });
+        console.error(`check-no-debug: ${tool} --strip-debug ${f.file} also dropped ${lost.join(', ')}; only .debug_* may go (the name section stays for backtraces)`);
         process.exit(1);
       }
       const mode = statSync(p).mode;
       renameSync(tmp, p);
       chmodSync(p, mode);
-      console.log(`  stripped ${f.file}: ${f.bytes} bytes of ${f.sections.join(' ')}`);
+      const names = before.filter((n) => n === 'name' || n.endsWith(':name')).length;
+      console.log(`  stripped ${f.file}: ${f.bytes} bytes of ${f.sections.join(' ')}${names ? `; name section kept (${names})` : ''}`);
     }
     process.exit(0);
   }
