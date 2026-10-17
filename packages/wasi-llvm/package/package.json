@@ -1,0 +1,35 @@
+{
+  "name": "@ai-ecoverse/wasi-llvm",
+  "version": "21.1.8-1",
+  "description": "LLVM 21.1.8, clang and lld as static libraries for a wasm32-wasip1-threads host, with a python3 llvm-config; a build input for the LLVM-enabled wasi-rustc and wasi-zig",
+  "license": "Apache-2.0 WITH LLVM-exception",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-llvm/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-llvm",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "llvm",
+    "clang",
+    "lld"
+  ],
+  "homescoop": {
+    "recipe": "wasi-llvm",
+    "upstream": "21.1.8"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "include",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
