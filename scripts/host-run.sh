@@ -140,6 +140,15 @@ command -v emconfigure >/dev/null
 command -v emmake >/dev/null
 command -v emcc >/dev/null
 emcc --version | head -1
+em_debug="$(node "$ROOT/scripts/read-recipe.mjs" "$name" --field debug 2>/dev/null || true)"
+for map in "$ROOT=/src" "$WORK=/build" "$PREFIX=/prefix"; do
+  case " ${EMCC_CFLAGS-} " in
+    *" -ffile-prefix-map=$map "*) ;;
+    *) EMCC_CFLAGS="${EMCC_CFLAGS:+$EMCC_CFLAGS }-ffile-prefix-map=$map" ;;
+  esac
+done
+export EMCC_CFLAGS
+echo "== host-run: EMCC_CFLAGS=$EMCC_CFLAGS (homescoop#908)"
 
 # Prefer GNU make (Homebrew `make` formula → gmake). BSD make breaks
 # autoconf dependency-tracking and FreeType.
@@ -162,6 +171,11 @@ fi
 echo "== host-run: WORK=$WORK"
 bash "$PKG/build.sh"
 
+echo "== host-run: no DWARF in the package's wasm, archives and objects (homescoop#908)"
+if [[ "$em_debug" != true ]]; then
+  node "$ROOT/scripts/check-no-debug.mjs" "$name" "$PKG/package" --strip
+fi
+node "$ROOT/scripts/check-no-debug.mjs" "$name" "$PKG/package"
 echo "== host-run: slicc shims carry the kernel credentials (slicc_cred_js)"
 node "$ROOT/scripts/check-slicc-cred.mjs" "$PKG/package"
 echo "== host-run: check package meta (license / LICENSE / files)"

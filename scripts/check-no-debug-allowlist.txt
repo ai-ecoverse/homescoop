@@ -1,0 +1,10 @@
+emscripten-cache #908 the emsdk system libraries the cache ships are emsdk's own build; rebuilt with #859
+py-numpy #908 wasixcc extension modules; not EMCC_CFLAGS
+py-pandas #908 wasixcc extension modules; not EMCC_CFLAGS
+py-scipy #908 wasixcc extension modules; not EMCC_CFLAGS
+wasix-gnupg #908 wasixcc build; not EMCC_CFLAGS
+wasix-m4 #908 wasixcc build; not EMCC_CFLAGS
+wasix-openssh #908 wasixcc build; not EMCC_CFLAGS
+wasix-perl #908 wasixcc build; not EMCC_CFLAGS
+wasix-sysroot #908 wasix-libc and libc++ archives built with debug info; wasixcc builds, not EMCC_CFLAGS
+wasm-clang #908 libclang_rt.builtins from the slicc-emscripten prebuilt; rebuilt with #859
