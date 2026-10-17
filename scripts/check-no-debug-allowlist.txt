@@ -1,10 +1,10 @@
-emscripten-cache #908 the emsdk system libraries the cache ships are emsdk's own build; rebuilt with #859
-py-numpy #908 wasixcc extension modules; not EMCC_CFLAGS
-py-pandas #908 wasixcc extension modules; not EMCC_CFLAGS
-py-scipy #908 wasixcc extension modules; not EMCC_CFLAGS
-wasix-gnupg #908 wasixcc build; not EMCC_CFLAGS
-wasix-m4 #908 wasixcc build; not EMCC_CFLAGS
-wasix-openssh #908 wasixcc build; not EMCC_CFLAGS
-wasix-perl #908 wasixcc build; not EMCC_CFLAGS
-wasix-sysroot #908 wasix-libc and libc++ archives built with debug info; wasixcc builds, not EMCC_CFLAGS
-wasm-clang #908 libclang_rt.builtins from the slicc-emscripten prebuilt; rebuilt with #859
+emscripten-cache #859 the emsdk system libraries it ships come from the unattested local cache; they go through the strip at the #859 source rebuild
+py-numpy #908 wasixcc extension modules; the line goes when the -34 dependent wave rebuilds it
+py-pandas #908 wasixcc extension modules; the line goes when the -34 dependent wave rebuilds it
+py-scipy #908 wasixcc extension modules; the line goes when the -34 dependent wave rebuilds it
+wasix-gnupg #908 wasixcc build; the line goes when the -34 dependent wave rebuilds it
+wasix-m4 #908 wasixcc build; the line goes when the -34 dependent wave rebuilds it
+wasix-openssh #908 wasixcc build; the line goes when the -34 dependent wave rebuilds it
+wasix-perl #908 wasixcc build; the line goes when the -34 dependent wave rebuilds it
+wasix-sysroot #908 wasix-libc and libc++ archives with debug info; the line goes at its -34 rebuild
+wasm-clang #859 libclang_rt.builtins from the slicc-emscripten prebuilt; it goes through the strip at the #859 source rebuild
