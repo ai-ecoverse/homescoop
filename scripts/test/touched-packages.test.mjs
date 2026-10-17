@@ -250,10 +250,10 @@ test('toolchain default inputs: a shared toolchain file touches every built reci
   }
 });
 
-test('the real tree: cmake and emscripten-cache (#859) get no toolchain inputs; wasix-sysroot keeps install-wasixcc.sh', async () => {
+test('the real tree: cmake and emscripten-cache (#859) get no toolchain inputs; wasixcc and Emscripten consumers keep theirs', async () => {
   const { toolchainInputs } = await import('../list-touched-packages.mjs');
   assert.deepEqual(toolchainInputs('cmake'), []);
   assert.deepEqual(toolchainInputs('emscripten-cache'), []);
-  assert.ok(toolchainInputs('wasix-sysroot').includes('scripts/install-wasixcc.sh'), toolchainInputs('wasix-sysroot').join(' '));
-  assert.ok(toolchainInputs('coreutils').includes('shims/slicc/*.c'));
+  assert.ok(toolchainInputs('wasix-zlib').includes('scripts/install-wasixcc.sh'), `wasix-zlib: ${toolchainInputs('wasix-zlib').join(' ')}`);
+  assert.ok(toolchainInputs('coreutils').includes('shims/slicc/*.c'), `coreutils: ${toolchainInputs('coreutils').join(' ')}`);
 });
