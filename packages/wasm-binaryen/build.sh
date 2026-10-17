@@ -1,241 +1,126 @@
 #!/usr/bin/env bash
-# Relink Binaryen 132 CLI tools against current libslicc and stage
-# @ai-ecoverse/wasm-binaryen. Reuses .o/.a from slicc-emscripten/build/binaryen-wasm.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
-# shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/wasm-binaryen"
-VERSION="132"
-PKG_VER="132.0.0-1"
+homescoop_load_recipe wasm-binaryen
 PKG="$HOMESCOOP_PKG/package"
-WORK="${HOMESCOOP_WORK:-${TMPDIR:-/tmp}/homescoop-work}/wasm-binaryen-relink"
-mkdir -p "$WORK"
-SLICC_EM="${SLICC_EMSCRIPTEN:-$ROOT/../slicc-emscripten}"
-BINARYEN="${BINARYEN_WASM:-$SLICC_EM/build/binaryen-wasm}"
-POST_JS="$SLICC_EM/slicc-node-main.js"
+PKG_VER="$(node -p 'require(process.argv[1]).version' "$PKG/package.json")"
+TB="$WORK/binaryen-$VERSION.tar.gz"
+SRC="$WORK/binaryen-$VERSION-src"
+BLD="$WORK/binaryen-$VERSION-build"
+POST_JS="$ROOT/scripts/slicc-node-main.js"
+JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
+TOOLS=(wasm-opt wasm-metadce wasm-emscripten-finalize wasm-ctor-eval wasm-split wasm2js wasm-as wasm-dis)
 
-if [[ -x "$SLICC_EM/src/emscripten/em++" ]]; then
-  export EM_CONFIG="${SLICC_EM}/emscripten-config"
-  export EM_CACHE="${SLICC_EM}/cache"
-  export EMSDK_PYTHON="${EMSDK_PYTHON:-/opt/homebrew/bin/python3.13}"
-  EMXX="$SLICC_EM/src/emscripten/em++"
-  EMCC="$SLICC_EM/src/emscripten/emcc"
-  EMAR="$SLICC_EM/src/emscripten/emar"
-else
-  EMXX="$(command -v em++)"
-  EMCC="$(command -v emcc)"
-  EMAR="$(command -v emar)"
+homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
+rm -rf "$SRC"
+mkdir -p "$SRC"
+tar -xzf "$TB" -C "$SRC" --strip-components=1
+grep -q 'project(binaryen LANGUAGES C CXX VERSION 132)' "$SRC/CMakeLists.txt"
+
+eval "$(bash "$ROOT/scripts/emscripten-tree.sh" "$WORK/binaryen-em")"
+export EM_CONFIG="$EMSCRIPTEN_TREE_CONFIG"
+EMCC=(python3 "$EMSCRIPTEN_TREE/emcc.py")
+EMXX=(python3 "$EMSCRIPTEN_TREE/em++.py")
+EMAR=(python3 "$EMSCRIPTEN_TREE/emar.py")
+
+if [[ ! -f "$BLD/lib/libbinaryen.a" || -n "${FORCE:-}" ]]; then
+  echo "== wasm-binaryen: emcmake (Release, emscripten tools only)"
+  rm -rf "$BLD"
+  python3 "$EMSCRIPTEN_TREE/emcmake.py" cmake -S "$SRC" -B "$BLD" -G "Unix Makefiles" \
+    -DCMAKE_BUILD_TYPE=Release \
+    "-DCMAKE_C_FLAGS=-ffile-prefix-map=$SRC=/binaryen -ffile-prefix-map=$BLD=/binaryen/build" \
+    "-DCMAKE_CXX_FLAGS=-ffile-prefix-map=$SRC=/binaryen -ffile-prefix-map=$BLD=/binaryen/build" \
+    -DBUILD_TESTS=OFF \
+    -DBUILD_FUZZTEST=OFF \
+    -DBUILD_STATIC_LIB=ON \
+    -DBUILD_EMSCRIPTEN_TOOLS_ONLY=ON \
+    -DENABLE_WERROR=OFF
+  make -C "$BLD" -j"$JOBS" "${TOOLS[@]}"
 fi
-
-for need in "$BINARYEN/lib/libbinaryen.a" "$POST_JS" \
-  "$BINARYEN/src/tools/CMakeFiles/wasm-opt.dir/wasm-opt.cpp.o"
-do
-  test -f "$need" || { echo "homescoop: missing $need" >&2; exit 1; }
-done
-
-export EMAR="$EMAR"
-echo "== wasm-binaryen: sigaction/sigset_t layout scan (fail if a new one appears)"
-python3 "$ROOT/scripts/slicc-sig-layout-guard.py" \
-  --ninja "$BINARYEN/build.ninja" \
-  --allowlist "$HOMESCOOP_PKG/sig-layout-sources.txt" \
-  --src-root "$SLICC_EM/src/binaryen" \
-  --archive lib/libbinaryen.a \
-  --object src/tools/CMakeFiles/wasm-opt.dir/wasm-opt.cpp.o \
-  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/fuzzing.cpp.o \
-  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/heap-types.cpp.o \
-  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/random.cpp.o \
-  --object src/tools/CMakeFiles/wasm-opt.dir/fuzzing/parameters.cpp.o \
-  --object src/tools/CMakeFiles/wasm-metadce.dir/wasm-metadce.cpp.o \
-  --object src/tools/CMakeFiles/wasm-emscripten-finalize.dir/wasm-emscripten-finalize.cpp.o \
-  --object src/tools/CMakeFiles/wasm-ctor-eval.dir/wasm-ctor-eval.cpp.o \
-  --object src/tools/CMakeFiles/wasm2js.dir/wasm2js.cpp.o \
-  --object src/tools/CMakeFiles/wasm-as.dir/wasm-as.cpp.o \
-  --object src/tools/CMakeFiles/wasm-dis.dir/wasm-dis.cpp.o \
-  --object src/tools/wasm-split/CMakeFiles/wasm-split.dir/wasm-split.cpp.o \
-  --object src/tools/wasm-split/CMakeFiles/wasm-split.dir/split-options.cpp.o \
-  --object src/tools/wasm-split/CMakeFiles/wasm-split.dir/instrumenter.cpp.o \
-  --recompile
+test -f "$BLD/lib/libbinaryen.a"
 
 echo "== wasm-binaryen: libslicc spawn archive"
 SLICC_A="$WORK/libslicc-binaryen.a"
-ODIR="$WORK/slicc-objs"
+ODIR="$WORK/binaryen-slicc-objs"
 rm -rf "$ODIR"
 mkdir -p "$ODIR"
 objs=()
 for src in slicc_spawn slicc_exec slicc_libc_gaps slicc_signals; do
-  echo "== slicc shim: $EMCC -c ${src}.c"
-  "$EMCC" -O2 -c "$ROOT/shims/slicc/${src}.c" -o "$ODIR/${src}.o"
+  "${EMCC[@]}" -O2 -c "$ROOT/shims/slicc/${src}.c" -o "$ODIR/${src}.o"
   objs+=("$ODIR/${src}.o")
 done
-KEEP_O="$ODIR/keep-slicc-spawn.o"
-"$EMCC" -O2 -c "$HOMESCOOP_PKG/keep-slicc-spawn.c" -o "$KEEP_O"
-objs+=("$KEEP_O")
+"${EMCC[@]}" -O2 -c "$HOMESCOOP_PKG/keep-slicc-spawn.c" -o "$ODIR/keep-slicc-spawn.o"
+objs+=("$ODIR/keep-slicc-spawn.o")
 rm -f "$SLICC_A"
-"$EMAR" rcs "$SLICC_A" "${objs[@]}"
-strings "$ODIR/slicc_spawn.o" | grep -q sliccKernel || {
-  echo "homescoop: slicc_spawn.o missing sliccKernel string" >&2
-  exit 1
-}
+"${EMAR[@]}" rcs "$SLICC_A" "${objs[@]}"
+grep -q sliccKernel "$ODIR/slicc_spawn.o"
 
-# Classic Module glue (no EXPORT_ES6) + realm ENVIRONMENT + sliccKernel spawn.
-# -lnodefs.js: host PRESTAGE via run-wasm-cli; slicc mounts its own VFS instead.
-export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=8388608 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -sDISABLE_EXCEPTION_CATCHING=0 -sEXPORTED_FUNCTIONS=_main,_homescoop_keep_slicc_spawn -lnodefs.js --extern-post-js=${POST_JS}"
+"${EMCC[@]}" -O2 -c "$ROOT/shims/slicc/slicc_cred.c" -o "$ODIR/slicc_cred.o"
+CRED="$ODIR/libslicc_cred.a"
+rm -f "$CRED"
+"${EMAR[@]}" rcs "$CRED" "$ODIR/slicc_cred.o"
+LDFLAGS_REALM=(
+  -sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1
+  -sSTACK_SIZE=8388608 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0
+  -sEXPORTED_RUNTIME_METHODS=FS,callMain -sDISABLE_EXCEPTION_CATCHING=0
+  -sEXPORTED_FUNCTIONS=_main,_homescoop_keep_slicc_spawn -lnodefs.js
+  --js-library "$ROOT/shims/slicc/slicc-writev.js"
+  --js-library "$ROOT/shims/slicc/slicc-linkat.js"
+  --js-library "$ROOT/shims/slicc/slicc-uname.js"
+  "--extern-post-js=$POST_JS"
+  -Wl,-u,slicc_cred_euid "$CRED"
+)
 
-# slicc-emscripten's appended Node-host runner must stay out of a host that
-# calls main itself (noInitialRun: slicc-kernel's Node process worker;
-# homescoop#276). The 132.0.0-2 repack applies glue-node-runner.patch. Also
-# for a cached relink from before the fix.
-guard_runner() {
-  python3 - "$1" <<'PY'
-import sys
-p = sys.argv[1]
-s = open(p, encoding="latin1").read()
-old = "// Node run can move files between the host disk and the in-wasm filesystem.\nif (typeof process !== 'undefined' && process.versions && process.versions.node) {\n"
-new = ("// Node run can move files between the host disk and the in-wasm filesystem.\n"
-       "// A host that calls main itself sets noInitialRun, as slicc-kernel's Node\n"
-       "// process worker does; then this runner stays out of it (homescoop#276).\n"
-       "if (typeof process !== 'undefined' && process.versions && process.versions.node && !Module['noInitialRun']) {\n")
-if s.count(old) != 1 and new not in s:
-    sys.exit(f"homescoop: {p}: the Node-host runner's guard is not the expected one (homescoop#276)")
-open(p, "w", encoding="latin1").write(s.replace(old, new))
-PY
-}
-
+OUT="$WORK/binaryen-relink"
+rm -rf "$OUT"
+mkdir -p "$OUT"
 relink_one() {
   local name=$1
   shift
-  local -a tool_objs=("$@")
-  local out_dir="$WORK/relink"
-  mkdir -p "$out_dir"
-  if [[ -f "$out_dir/$name" && -f "$out_dir/$name.wasm" ]]; then
-    local existing
-    existing=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).read_text().count("sliccKernel"))' "$out_dir/$name")
-    if [[ "$existing" -gt 0 ]]; then
-      echo "== relink $name: skip (already has $existing sliccKernel refs)"
-      guard_runner "$out_dir/$name"
-      return 0
-    fi
-    echo "== relink $name: re-link (prior glue had 0 sliccKernel)"
-  else
-    echo "== relink $name"
-  fi
-  for o in "${tool_objs[@]}"; do
-    test -f "$o" || { echo "homescoop: missing $o" >&2; exit 1; }
-  done
-  # shellcheck disable=SC2046,SC2086
-  "$EMXX" -O3 -fexceptions -fno-rtti \
-    "${tool_objs[@]}" \
-    "$BINARYEN/lib/libbinaryen.a" \
+  local o
+  for o in "$@"; do test -f "$o" || { echo "homescoop: missing $o" >&2; exit 1; }; done
+  echo "== relink $name"
+  "${EMXX[@]}" -O3 -g -fexceptions -fno-rtti "$@" "$BLD/lib/libbinaryen.a" \
     -Wl,--whole-archive "$SLICC_A" -Wl,--no-whole-archive \
     -Wl,-u,homescoop_keep_slicc_spawn \
-    $(homescoop_em_cli_ldflags) \
-    -o "$out_dir/$name.js"
-  mv "$out_dir/$name.js" "$out_dir/$name"
-  guard_runner "$out_dir/$name"
-  local n
-  n=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).read_text().count("sliccKernel"))' "$out_dir/$name")
-  echo "  $name sliccKernel refs: $n"
-  [[ "$n" -gt 0 ]] || { echo "homescoop: $name glue has 0 sliccKernel" >&2; exit 1; }
+    "${LDFLAGS_REALM[@]}" \
+    -o "$OUT/$name.js"
+  mv "$OUT/$name.js" "$OUT/$name"
+  "$EMSDK_RELEASE_LLVM/llvm-objcopy" --strip-debug --remove-section=name "$OUT/$name.wasm" "$OUT/$name.stripped.wasm"
+  mv "$OUT/$name.stripped.wasm" "$OUT/$name.wasm"
+  grep -q sliccKernel "$OUT/$name"
+  grep -q "!Module\['noInitialRun'\]" "$OUT/$name"
+  grep -q 'slicc_cred_js' "$OUT/$name"
+  if LC_ALL=C grep -aEq '/(home|Users|__w|private/var)/' "$OUT/$name.wasm"; then
+    echo "homescoop: $name.wasm names a build path" >&2
+    exit 1
+  fi
 }
-
-B="$BINARYEN/src/tools/CMakeFiles"
-S="$BINARYEN/src/tools/wasm-split/CMakeFiles"
-
-relink_one wasm-opt \
-  "$B/wasm-opt.dir/wasm-opt.cpp.o" \
-  "$B/wasm-opt.dir/fuzzing/fuzzing.cpp.o" \
-  "$B/wasm-opt.dir/fuzzing/heap-types.cpp.o" \
-  "$B/wasm-opt.dir/fuzzing/random.cpp.o" \
-  "$B/wasm-opt.dir/fuzzing/parameters.cpp.o"
-
-relink_one wasm-metadce "$B/wasm-metadce.dir/wasm-metadce.cpp.o"
-relink_one wasm-emscripten-finalize "$B/wasm-emscripten-finalize.dir/wasm-emscripten-finalize.cpp.o"
-relink_one wasm-ctor-eval "$B/wasm-ctor-eval.dir/wasm-ctor-eval.cpp.o"
-relink_one wasm2js "$B/wasm2js.dir/wasm2js.cpp.o"
-relink_one wasm-as "$B/wasm-as.dir/wasm-as.cpp.o"
-relink_one wasm-dis "$B/wasm-dis.dir/wasm-dis.cpp.o"
-relink_one wasm-split \
-  "$S/wasm-split.dir/wasm-split.cpp.o" \
-  "$S/wasm-split.dir/split-options.cpp.o" \
+T="$BLD/src/tools/CMakeFiles"
+S="$BLD/src/tools/wasm-split/CMakeFiles"
+relink_one wasm-opt "$T/wasm-opt.dir/wasm-opt.cpp.o" "$T/wasm-opt.dir/fuzzing/fuzzing.cpp.o" \
+  "$T/wasm-opt.dir/fuzzing/heap-types.cpp.o" "$T/wasm-opt.dir/fuzzing/random.cpp.o" \
+  "$T/wasm-opt.dir/fuzzing/parameters.cpp.o"
+relink_one wasm-metadce "$T/wasm-metadce.dir/wasm-metadce.cpp.o"
+relink_one wasm-emscripten-finalize "$T/wasm-emscripten-finalize.dir/wasm-emscripten-finalize.cpp.o"
+relink_one wasm-ctor-eval "$T/wasm-ctor-eval.dir/wasm-ctor-eval.cpp.o"
+relink_one wasm2js "$T/wasm2js.dir/wasm2js.cpp.o"
+relink_one wasm-as "$T/wasm-as.dir/wasm-as.cpp.o"
+relink_one wasm-dis "$T/wasm-dis.dir/wasm-dis.cpp.o"
+relink_one wasm-split "$S/wasm-split.dir/wasm-split.cpp.o" "$S/wasm-split.dir/split-options.cpp.o" \
   "$S/wasm-split.dir/instrumenter.cpp.o"
 
 echo "== wasm-binaryen: stage package $PKG_VER"
 rm -rf "$PKG/bin"
 mkdir -p "$PKG/bin"
-
-TOOLS=(wasm-opt wasm-metadce wasm-emscripten-finalize wasm-ctor-eval wasm-split wasm2js wasm-as wasm-dis)
 for name in "${TOOLS[@]}"; do
-  cp "$WORK/relink/$name" "$PKG/bin/$name"
-  cp "$WORK/relink/$name.wasm" "$PKG/bin/$name.wasm"
+  cp "$OUT/$name" "$PKG/bin/$name"
+  cp "$OUT/$name.wasm" "$PKG/bin/$name.wasm"
   chmod +x "$PKG/bin/$name" "$PKG/bin/$name.wasm"
 done
-
-cp "$SLICC_EM/src/binaryen/LICENSE" "$PKG/LICENSE"
-
-cat > "$PKG/README.md" <<'EOF'
-# @ai-ecoverse/wasm-binaryen
-
-Binaryen **132** CLI tools for the slicc wasm realm. Relinked with current
-libslicc (`Module.sliccKernel` spawn) + `ENVIRONMENT=web,worker,node`.
-
-Ships the Emscripten-facing tool set:
-
-`wasm-opt`, `wasm-metadce`, `wasm-emscripten-finalize`, `wasm-ctor-eval`,
-`wasm-split`, `wasm2js`, `wasm-as`, `wasm-dis`.
-
-Used by `@ai-ecoverse/wasm-emscripten` (as `BINARYEN_ROOT`) and by
-`@ai-ecoverse/wasm-clang` drivers for fork Asyncify (`wasm-opt --asyncify`).
-EOF
-
-node - "$PKG" "$PKG_VER" <<'JS'
-const fs = require("fs");
-const path = require("path");
-const pkgDir = process.argv[2];
-const ver = process.argv[3];
-const tools = [
-  "wasm-opt",
-  "wasm-metadce",
-  "wasm-emscripten-finalize",
-  "wasm-ctor-eval",
-  "wasm-split",
-  "wasm2js",
-  "wasm-as",
-  "wasm-dis",
-];
-const commands = {};
-for (const t of tools) {
-  commands[t] = { glue: `bin/${t}`, wasm: `bin/${t}.wasm`, argv0: t };
-}
-const j = {
-  name: "@ai-ecoverse/wasm-binaryen",
-  version: ver,
-  description: "Binaryen 132 wasm tools for slicc (wasm-opt and friends)",
-  license: "Apache-2.0",
-  repository: {
-    type: "git",
-    url: "git+https://github.com/ai-ecoverse/homescoop.git",
-    directory: "packages/wasm-binaryen/package",
-  },
-  homepage: "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-binaryen",
-  keywords: ["wasm", "binaryen", "slicc", "homescoop", "wasm-opt", "emscripten"],
-  files: ["README.md", "LICENSE", "bin"],
-  publishConfig: { access: "public" },
-  homescoop: { recipe: "wasm-binaryen", upstream: "132" },
-  slicc: { abi: "emscripten", commands },
-};
-fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify(j, null, 2) + "\n");
-JS
-
-echo "== wasm-binaryen: sizes"
-du -sh "$PKG" "$PKG/bin"/wasm-opt.wasm
-
-echo "== wasm-binaryen: PRESTAGE smoke (not --version)"
+cp "$SRC/LICENSE" "$PKG/LICENSE"
+du -sh "$PKG/bin"/wasm-opt.wasm
 node "$ROOT/scripts/smoke-binaryen.mjs"
-
-echo "== wasm-binaryen: PRESTAGE pack (no links)"
-STAGE="$HOMESCOOP_PKG"
-TGZ=$(homescoop_npm_pack_no_links "$PKG" "$STAGE")
-echo "STAGED: $TGZ"
-ls -lh "$TGZ"
+echo "OK wasm-binaryen $PKG_VER"

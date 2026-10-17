@@ -1,21 +1,16 @@
-# Homebrew-shaped recipe — Binaryen 132 tools for slicc (wasm realm).
 name: wasm-binaryen
 builder: host
+reproducible: true
 version: "132"
 npm: "@ai-ecoverse/wasm-binaryen"
 summary: "Binaryen 132 wasm tools for slicc (wasm-opt and friends)"
 source:
-  # Prebuilt objects from slicc-emscripten/build-wasm-binaryen.sh; build.sh relinks.
-  url: "https://github.com/WebAssembly/binaryen"
-  sha256: "skip"
-# 132.0.0-2 is packaging-only: 132.0.0-1's bytes with glue-node-runner.patch
-# (the glue's Node-host runner stays out of slicc-kernel's Node process
-# worker, homescoop#276). build.sh applies the same at the next real build.
-# Drop repack: then.
-repack:
-  from: "132.0.0-1"
-  patches:
-    - glue-node-runner.patch
+  url: "https://github.com/WebAssembly/binaryen/archive/d03c25ea43d8f147fc222f9b88ff3bf641abe8da.tar.gz"
+  sha256: "f16d9e97dc1b7ce3397f0cf10336f015d7aee9ef54f0d6dd98632436388be81a"
+inputs:
+  - "packages/wasm-emscripten/patches/**"
+  - "packages/wasm-emscripten/package/package.json"
+  - "scripts/slicc-node-main.js"
 dependencies:
   build: []
   host: []
@@ -24,10 +19,11 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-binaryen
   license: Apache-2.0
   notes: |
-    Relink slicc-emscripten/build/binaryen-wasm tools against libslicc
-    (Module.sliccKernel spawn) with ENVIRONMENT=web,worker,node. Ships the
-    Emscripten tool set only (BUILD_EMSCRIPTEN_TOOLS_ONLY): wasm-opt,
+    Binaryen d03c25ea (emsdk 6.0.9 release f04ea239's binaryen_revision,
+    version_132 + 49, reports "version 132"), built in CI with emcmake from
+    the patched emscripten 6.0.9 tree on emsdk 6.0.9's prebuilt compilers
+    (scripts/emscripten-tree.sh). BUILD_EMSCRIPTEN_TOOLS_ONLY: wasm-opt,
     wasm-metadce, wasm-emscripten-finalize, wasm-ctor-eval, wasm-split,
-    wasm2js, wasm-as, wasm-dis. PRESTAGE is scripts/smoke-binaryen.mjs
-    (wasm-opt -O, not --version). sig-layout-sources.txt is empty unless
-    wasm-rt-impl.c (or similar) enters the link.
+    wasm2js, wasm-as, wasm-dis, each relinked against libslicc
+    (Module.sliccKernel spawn) with ENVIRONMENT=web,worker,node and the
+    Node-host runner (scripts/slicc-node-main.js). homescoop#859.
