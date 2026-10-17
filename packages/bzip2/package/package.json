@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-bzip2",
-  "version": "1.0.8-3",
+  "version": "1.0.8-4",
   "description": "bzip2 1.0.8 (bzip2/bunzip2/bzcat/bzip2recover + libbz2) for wasm / slicc",
   "license": "bzip2-1.0.6",
   "repository": {
@@ -10,7 +10,7 @@
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/bzip2",
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "bzip2"],
-  "files": ["README.md", "LICENSE", "bin", "lib", "include"],
+  "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "include"],
   "publishConfig": { "access": "public" },
   "homescoop": { "recipe": "bzip2", "upstream": "1.0.8" },
   "slicc": {
