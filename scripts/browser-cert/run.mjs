@@ -104,6 +104,8 @@ const report = {
 };
 
 function writeReport(status) {
+  const what = `${pkgName} ${status}${report.error ? `: ${String(report.error).split('\n')[0].slice(0, 160)}` : ''}`;
+  console.log(status === 'fail' ? `cert-run: FAIL ${what}` : `cert-run: PASS ${what}`);
   if (!jsonOut) return;
   report.status = status;
   mkdirSync(dirname(jsonOut), { recursive: true });

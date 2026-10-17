@@ -234,7 +234,7 @@ function browser(pkg, manifestPath, tarball) {
   let failed = 0;
   for (const { label, argv, env } of runs) {
     console.log(`::group::browser-cert: ${label}`);
-    const r = spawnSync(process.execPath, argv, { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
+    const r = spawnSync(process.execPath, [join(root, 'scripts/gate.mjs'), 'cert-run', '--', process.execPath, ...argv], { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
     console.log('::endgroup::');
     if (r.status !== 0) {
       console.log(`::error::${pkg}: browser cert failed: ${label}`);
@@ -255,6 +255,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
     console.error('usage: cert-leg.mjs plan <package> [--manifest <package.json>] | cert-leg.mjs ci <package> | cert-leg.mjs browser-extra <package> --manifest <package.json> [--tarball <package.tgz>]');
     process.exit(2);
   }
-  if (mode === 'browser-extra') process.exit(browser(pkg, manifest, opt('--tarball') || '.homescoop-out/package.tgz'));
-  process.exit(mode === 'plan' ? plan(pkg, manifest) : ci(pkg));
+  const code = mode === 'browser-extra' ? browser(pkg, manifest, opt('--tarball') || '.homescoop-out/package.tgz') : mode === 'plan' ? plan(pkg, manifest) : ci(pkg);
+  (mode === 'plan' ? console.error : console.log)(code === 0 ? `cert-leg: PASS ${mode} ${pkg}` : `cert-leg: FAIL ${mode} ${pkg}`);
+  process.exit(code);
 }
