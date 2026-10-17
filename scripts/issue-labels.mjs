@@ -6,10 +6,9 @@
  *
  *   node scripts/issue-labels.mjs --title '<title>'      print the labels, one per line
  *   node scripts/issue-labels.mjs --event                label the issue in $GITHUB_EVENT_PATH if it has none
- *   node scripts/issue-labels.mjs --backlog [--apply]    every open unlabelled issue (gh); --apply writes
+ *   node scripts/issue-labels.mjs --backlog [--apply]    every open unlabelled issue; --apply labels them
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,13 +42,23 @@ export function listPackages(root = ROOT) {
   return readdirSync(dir).filter((d) => existsSync(join(dir, d, 'recipe.yaml'))).sort();
 }
 
+export function glob(pattern, name) {
+  const [first, ...rest] = pattern.split('*');
+  if (!name.startsWith(first)) return false;
+  let at = first.length;
+  const last = rest.pop();
+  for (const piece of rest) {
+    const i = name.indexOf(piece, at);
+    if (i < 0) return false;
+    at = i + piece.length;
+  }
+  return name.length - at >= last.length && name.endsWith(last);
+}
+
 function packageOf(word, packages) {
   const w = word.replace(/['’]s$/, '').replace(/[.,;]+$/, '');
   if (!w) return [];
-  if (w.includes('*')) {
-    const re = new RegExp(`^${w.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
-    return packages.filter((p) => re.test(p) || re.test(`wasm-${p}`));
-  }
+  if (w.includes('*')) return w.replace(/\*/g, '').length < 3 ? [] : packages.filter((p) => glob(w, p) || glob(w, `wasm-${p}`));
   if (packages.includes(w)) return [w];
   const bare = w.replace(PREFIX, '');
   if (bare !== w && packages.includes(bare)) return [bare];
@@ -128,8 +137,19 @@ async function api(path, { method = 'GET', body } = {}) {
 async function ensureLabels(labels) {
   for (const name of labels) {
     if ((await api(`/labels/${encodeURIComponent(name)}`)).status !== 404) continue;
-    await api('/labels', { method: 'POST', body: { name, color: COLORS[name] || 'ededed', description: name === TRIAGE ? 'no label rule matched: label by hand' : '' } });
+    try {
+      await api('/labels', { method: 'POST', body: { name, color: COLORS[name] || 'ededed', description: name === TRIAGE ? 'no label rule matched: label by hand' : '' } });
+    } catch (err) {
+      if (!/: 422 .*already_exists/s.test(err.message)) throw err;
+    }
   }
+}
+
+async function labelIssue(number, title) {
+  const labels = labelsFor(title);
+  await ensureLabels(labels);
+  await api(`/issues/${number}/labels`, { method: 'POST', body: { labels } });
+  return labels;
 }
 
 async function fromEvent() {
@@ -139,20 +159,23 @@ async function fromEvent() {
   if (SKIP.has(issue.number)) return console.log(`#${issue.number} is skipped`);
   const current = (await (await api(`/issues/${issue.number}/labels`)).json()).map((l) => l.name);
   if (current.length) return console.log(`#${issue.number} already has ${current.join(', ')}`);
-  const labels = labelsFor(issue.title);
-  await ensureLabels(labels);
-  await api(`/issues/${issue.number}/labels`, { method: 'POST', body: { labels } });
-  console.log(`#${issue.number}: ${labels.join(', ')}`);
+  console.log(`#${issue.number}: ${(await labelIssue(issue.number, issue.title)).join(', ')}`);
 }
 
-function backlog(apply) {
-  const repo = process.env.GITHUB_REPOSITORY || 'ai-ecoverse/homescoop';
-  const issues = JSON.parse(execFileSync('gh', ['issue', 'list', '-R', repo, '--state', 'open', '--limit', '1000', '--json', 'number,title,labels'], { encoding: 'utf8' }));
-  for (const i of issues) {
-    if (i.labels.length || SKIP.has(i.number)) continue;
-    const labels = labelsFor(i.title);
+export function unlabelled(issues) {
+  return issues.filter((i) => !i.pull_request && !i.labels.length && !SKIP.has(i.number));
+}
+
+async function backlog(apply) {
+  const issues = [];
+  for (let page = 1; ; page++) {
+    const batch = await (await api(`/issues?state=open&per_page=100&page=${page}`)).json();
+    issues.push(...batch);
+    if (batch.length < 100) break;
+  }
+  for (const i of unlabelled(issues)) {
+    const labels = apply ? await labelIssue(i.number, i.title) : labelsFor(i.title);
     console.log(`#${i.number}\t${labels.join(',')}\t${i.title}`);
-    if (apply) execFileSync('gh', ['issue', 'edit', String(i.number), '-R', repo, '--add-label', labels.join(',')], { stdio: 'inherit' });
   }
 }
 

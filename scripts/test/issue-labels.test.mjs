@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
-import { LABELS, TRIAGE, areaOf, labelsFor, listPackages, packagesIn } from '../issue-labels.mjs';
+import { LABELS, TRIAGE, areaOf, glob, labelsFor, listPackages, packagesIn, unlabelled } from '../issue-labels.mjs';
 
 const packages = listPackages();
 
@@ -50,6 +50,35 @@ describe('packagesIn', () => {
   });
 });
 
+describe('glob', () => {
+  it('matches linearly, so a hostile title can\'t stall the job', () => {
+    assert.equal(glob('wasm-go-std-*', 'wasm-go-std-wasip1'), true);
+    assert.equal(glob('*-std-*', 'wasm-go-std-wasip1'), true);
+    assert.equal(glob('wasm-*-x', 'wasm-go'), false);
+    const t = Date.now();
+    assert.deepEqual(labelsFor(`${'*'.repeat(5000)}z: hi`, packages), [TRIAGE]);
+    assert.deepEqual(labelsFor(`${'a*'.repeat(5000)}z: hi`, packages), [TRIAGE]);
+    assert.ok(Date.now() - t < 2000);
+  });
+
+  it('ignores a bare wildcard', () => {
+    assert.deepEqual(packagesIn('*: everything', packages), []);
+  });
+});
+
+describe('unlabelled', () => {
+  it('keeps open issues with no labels, not pull requests or the skipped ones', () => {
+    const issues = [
+      { number: 1, labels: [] },
+      { number: 2, labels: [{ name: 'ci' }] },
+      { number: 3, labels: [], pull_request: {} },
+      { number: 7, labels: [] },
+      { number: 390, labels: [] },
+    ];
+    assert.deepEqual(unlabelled(issues).map((i) => i.number), [1]);
+  });
+});
+
 describe('areaOf', () => {
   it('follows the brief', () => {
     assert.equal(areaOf('py-numpy'), 'area:python');
@@ -70,9 +99,11 @@ describe('the filers', () => {
     assert.match(yml, /issues\.create\(\{[^}]*labels: \[label, 'repro', 'ci'\]/);
   });
 
-  it('the issues-opened fallback runs this script with issues: write only', () => {
+  it('the fallback (issues opened, plus an hourly sweep for GITHUB_TOKEN filers) runs this script with issues: write only', () => {
     const yml = readFileSync(new URL('../../.github/workflows/issue-labels.yml', import.meta.url), 'utf8');
     assert.match(yml, /issues:\s*\n\s*types: \[opened\]/);
+    assert.match(yml, /schedule:\s*\n\s*- cron:/);
+    assert.match(yml, /node scripts\/issue-labels\.mjs --backlog --apply/);
     const lines = yml.split('\n');
     const at = lines.indexOf('permissions:');
     const block = [];
