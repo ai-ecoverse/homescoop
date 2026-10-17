@@ -7,7 +7,6 @@
 py-numpy build.sh bdd5e90b8208580377693a78bdb51f640f14e92c #832 changed since the reused bytes, needs owner review
 py-scipy tools/__pycache__/f2c_fixes.cpython-314.pyc deleted #832 changed since the reused bytes, needs owner review
 py-scipy tools/wasix_stubs.o deleted #832 changed since the reused bytes, needs owner review
-wasix-autoconf build.sh 8a8feafd3bdfae9bc47287ffd98ab729f1336b16 #832 changed since the reused bytes, needs owner review
 wasm-binaryen build.sh ae72963075f8af82e911a620eaa03de5317bbea9 #832 changed since the reused bytes, needs owner review
 wasm-binaryen sig-layout-sources.txt cd5094c7ee0824553c0b536b905925ccdea3266b #832 changed since the reused bytes, needs owner review
 wasm-clang build.sh 93c93bae5dc337308032b26526e47a0f09b653ff #832 changed since the reused bytes, needs owner review

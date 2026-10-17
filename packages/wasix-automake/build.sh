@@ -181,8 +181,8 @@ old = json.loads(committed.read_text()) if committed.exists() else {}
 parts = ver.split(".")
 npm_ver = old.get("version") or (f"{ver}.0-1" if len(parts) == 2 else f"{ver}-1")
 deps = old.get("dependencies") or {
-    "@ai-ecoverse/wasix-autoconf": "2.72.0-8",
-    "@ai-ecoverse/wasix-perl": "5.42.0-13",
+    "@ai-ecoverse/wasix-autoconf": "2.72.0-10",
+    "@ai-ecoverse/wasix-perl": "5.42.0-18",
 }
 am_env = {
     "AUTOMAKE_LIBDIR": f"${{package}}/share/automake-{ver}",

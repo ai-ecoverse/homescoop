@@ -332,3 +332,10 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
   - **Inherited:** under bash `trap '' PIPE USR2 CHLD`, `exec r32 inherit` reads SIG_IGN for PIPE, USR2 and CHLD and SIG_DFL for TERM, the inherited CHLD ignore reaps, and a handler installed over it runs.
   - **On a kernel without the imports:** the -31 behaviour, line by line.
 - **`test/r28w.c`:** skips its three ENOSYS sigwait lines on a kernel with `slicc.sigwait`, since a real `sigwaitinfo` of an empty-handed set would wait forever. Those lines are r32's now.
+
+## -33: `proc_raise_interval2.c` (homescoop#943)
+
+- **What it is:** `__wasi_proc_raise_interval2`, the public wrapper for `wasix_32v1.proc_raise_interval2`, written in the style of wasix-libc's generated `__wasixlibc_real.c`, plus its `api_wasix.h` declaration.
+- **Where it goes:** `sysroot-ehpic` and `sysroot-exnref-ehpic` only, the two trees where -32 had it, from wasix-python's setitimer libc patch in the -14 base.
+- **Why:** upstream v2026-07-03.1 has neither. libc's own setitimer doesn't need it, since it imports the call privately (`setitimer.c`), but wasix-python's build checks for it.
+- **Test:** `test/globals.mjs` fails on any defined global, or any non-C++ header, that a candidate drops against npm -32.

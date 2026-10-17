@@ -177,6 +177,15 @@ export default async function (ctx) {
   assert.equal(activate.status, 0, `activate: ${activate.stderr}`);
   assert.match(activate.stdout, /eval "\$\(\/usr\/bin\/fnox hook-env -s bash\)"/);
   assert.doesNotMatch(activate.stdout, /(^|[\s(])fnox "\$command"/m, 'activate calls a bare fnox inside its fnox() wrapper');
+  const noPath = await run(['/usr/bin/fnox', 'activate', 'bash'], { cwd: '/home/hook', env: { ...env, PATH: '/nonexistent' } });
+  assert.equal(noPath.status, 0, `activate with no fnox on PATH: ${noPath.stderr}`);
+  assert.match(noPath.stdout, /eval "\$\(\/usr\/bin\/fnox hook-env -s bash\)"/, `activate with no fnox on PATH: ${noPath.stdout}`);
+  assert.doesNotMatch(noPath.stdout, /(^|[\s(])fnox "\$command"/m, 'activate with no fnox on PATH calls a bare fnox inside its fnox() wrapper');
+  const expFile = await run(['fnox', 'export', '--format', 'env'], { cwd: '/home/hook', env });
+  assert.equal(expFile.status, 0, `export with an as_file secret: ${expFile.stderr}`);
+  assert.notEqual(expFile.status, 134, `export as_file trapped: ${expFile.stderr}`);
+  assert.match(expFile.stdout, /^CERT=pem-data$/m, `export prints an as_file secret's value, as upstream does when the file can't be written: ${expFile.stdout}`);
+  assert.match(expFile.stdout, /^LVL=debug$/m);
   const bash = await run(
     [
       'bash',

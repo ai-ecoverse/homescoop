@@ -1,0 +1,32 @@
+{
+  "name": "@ai-ecoverse/wasi-zig-libc-src",
+  "version": "0.16.0-16",
+  "description": "wasi-libc's C sources for @ai-ecoverse/wasi-zig: zig cc for wasm32-wasi CPUs and modes beyond the prebuilt baseline",
+  "license": "MIT AND Apache-2.0 WITH LLVM-exception",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-zig-libc-src/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-zig-libc-src",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "zig",
+    "libc"
+  ],
+  "homescoop": {
+    "recipe": "wasi-zig-libc-src",
+    "upstream": "0.16.0"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

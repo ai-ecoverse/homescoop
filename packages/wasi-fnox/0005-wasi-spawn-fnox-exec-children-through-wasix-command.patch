@@ -22,7 +22,7 @@ index 6b9c26e..410ac62 100644
   "which",
  ]
  
-@@ -7830,6 +7831,13 @@ dependencies = [
+@@ -7830,6 +7831,14 @@ dependencies = [
   "wit-bindgen",
  ]
  
@@ -31,6 +31,7 @@ index 6b9c26e..410ac62 100644
 +version = "0.1.0"
 +dependencies = [
 + "libc",
++ "tokio",
 +]
 +
  [[package]]

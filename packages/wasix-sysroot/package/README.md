@@ -41,6 +41,15 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-33 the package is **built from source in CI** (homescoop#890). Up to -32 it was npm -14, a local build, with our libc changes patched in.
+- **Inputs:** wasix-libc v2026-07-03.1, built per variant by its own `build32-general.sh` (libc, compiler-rt, and libc++/libc++abi/libunwind from llvm-project 6bb93a24), and wasix-org's LLVM 21.1.206. All are public and sha256-pinned.
+- **libc:** our libc changes are layered on top as before. Every exported libc symbol and `libc.imports` is the same as -32's.
+- **The C++ runtimes are upstream's:**
+  - legacy wasm EH in `sysroot-eh`/`sysroot-ehpic`, exnref in the `exnref-*` trees, LLVM 20.1;
+  - now with a real `__cxa_thread_atexit`, so `thread_local` objects with destructors link and run;
+  - plus `__gxx_wasm_personality_v0`, the personality LLVM 24 code (wasm-clang) calls.
+  - -32 had LLVM 24 exnref runtimes in all four EH trees. libc++ 20.1 defines fewer C++23/26 `__cpp_lib_*` feature macros than -32's libc++ 24.0: 165, not 195 (homescoop#935).
+
 Since 2025.9.30-32 (slicc-kernel ≥ 1.108.0 for all three; older kernels keep -31's behaviour):
 
 - **`epoll_pwait` is atomic.** With a mask, it waits through `slicc.sigmask_epoll_wait` (slicc-kernel#783, 1.106.2): the kernel swaps the mask in for the wait and restores it on every path, so a signal the mask unblocks always ends the wait with EINTR. On a kernel without it, the libc keeps -31's swap around `epoll_wait` (homescoop#466).

@@ -259,7 +259,7 @@ workflow file of its own:
 | Recipe declares | `ladder-pr` runs |
 | --- | --- |
 | `inputs:` in `recipe.yaml`, a list of path globs (`crates/wasix-net/**`, `scripts/build-common.sh`) | the recipe's jobs when a PR changes a matching file, as if it touched `packages/<name>/` (`list-touched-packages.mjs`; `--publishable`, so `ladder-merge`, ignores them) |
-| a build (`builder: host`, no `repack:`) whose own scripts use a shared toolchain: `packages/<name>/*.sh` and the `scripts/*.sh` they run or source (not `build-common.sh` or `host-run.sh`), comments ignored | the same, without declaring it: Emscripten (`emcc`, `emconfigure`, `emmake`, `emcmake`, `emar`, `homescoop_slicc_*`, `homescoop_em_*`) adds `scripts/install-emsdk.sh`, `scripts/emsdk-patches/**` and `shims/slicc/*.{c,h,js}`; `homescoop_wasm_opt` (emsdk's binaryen) adds `scripts/install-emsdk.sh`; `install-wasixcc.sh`, `install-rust.sh`, `install-go.sh` or `install-wasi-sdk.sh` adds that script; and each `scripts/*.sh` it runs is an input too (`toolchainInputs` in `list-touched-packages.mjs`, also in the merge-queue tree check, #857). A shim, emsdk-patch or sysroot change therefore rebuilds every consumer, and npm-parity makes the PR bump the ones whose bytes change |
+| a build (`builder: host`, no `repack:`) whose own scripts use a shared toolchain: `packages/<name>/*.sh` and the `scripts/*.sh` they run or source (not `build-common.sh` or `host-run.sh`), comments ignored | the same, without declaring it: Emscripten (`emcc`, `emconfigure`, `emmake`, `emcmake`, `emar`, `homescoop_slicc_*`, `homescoop_em_*`) adds `scripts/install-emsdk.sh`, `scripts/emsdk-patches/**` and `shims/slicc/*.{c,h,js}`; `homescoop_wasm_opt` (emsdk's binaryen) adds `scripts/install-emsdk.sh`; `install-wasixcc.sh`, `install-rust.sh`, `install-go.sh` or `install-wasi-sdk.sh` adds that script; and each `scripts/*.sh` it runs is an input too (`toolchainInputs` in `list-touched-packages.mjs`, also in the merge-queue tree check, #857). cmake and emscripten-cache, which take their objects from the slicc-emscripten checkout outside the repo, get none (`OUTSIDE_BUILDS`): CI can't build them until #859. A shim, emsdk-patch or sysroot change therefore rebuilds every consumer, and npm-parity makes the PR bump the ones whose bytes change |
 | `packages/<name>/test/*.test.mjs` | `test (<name>)`: `node --test 'test/*.test.mjs'` in `packages/<name>`, on the built `package/` (the `host-<name>-prN` tarball unpacked over it) |
 | `packages/<name>/test/package.json` | the same job: `npm ci` in `test/`, then `npm run test:e2e` when it has that script (its flags, its `pretest:e2e`), else `node --test 'e2e/*.test.mjs'` |
 | `reproducible: true` in `recipe.yaml` | `rebuild (<name>)`, a second `host-run.sh` in parallel with `host-build`, and `reproducible (<name>)`: the two `package.tgz` must have the same sha256 |
@@ -316,6 +316,11 @@ and compares the two `package.tgz` sha256s, listing the entries that differ
 differs fails the run and opens, or comments on, one `pool-parity` issue;
 move it back to hosted, or fix the difference. Dispatch it whenever the
 runner-bench image or the hosted image changes (#499).
+Some recipes stay hosted for reasons outside their bytes (#390 C2):
+`less`, because greenwoodsoftware.com answers the pool's egress with 403
+(the source is fetched only from the pinned upstream URL); `qpdf`, whose
+`qpdf.wasm` comes out differently on the pool in some runs (#804); and
+`wasix-python`, whose `build.sh` runs `sudo apt-get`.
 `cert`, `exact-pins`, `detect`,
 `reproducible`, `slicc-note` and `ci` run on the pools as before;
 `recipe-sha`, which pushes with `contents: write`, stays on `ubuntu-latest`. A

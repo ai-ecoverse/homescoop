@@ -73,4 +73,7 @@ about:
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
     published; 1.39.0-2 adds 0014 and the reproducible build; 1.39.0-3
     keeps the disabled providers' env_dependencies() in 0002; 1.39.0-4
-    adds 0015.
+    adds 0015; 1.39.0-5 puts tokio in 0005's Cargo.lock entry for
+    wasix-command (its optional tokio feature), so --locked builds again,
+    and 0015's activate names /usr/bin/fnox when PATH has none
+    (homescoop#554).

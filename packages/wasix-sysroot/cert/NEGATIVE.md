@@ -1,5 +1,18 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-32: unverifiable root, no __cxa_thread_atexit (-33, homescoop#890, #864)
+
+**Supply chain.** -32's `recipe.yaml` `source.url` is our own npm `@ai-ecoverse/wasix-sysroot@2025.9.30-14`, a local build. Every libc, libc++, compiler-rt, crt object and header in -15…-32 comes from it, and nothing records how it was made. The cert lane marks -29…-32 FAIL ("unverifiable input"). -33's only inputs are public, sha256-pinned tarballs:
+- wasix-libc v2026-07-03.1;
+- llvm-project 6bb93a24;
+- wasix-org's LLVM 21.1.206 release.
+
+They are built by `build-source.sh` + `build-incremental.sh` in ladder-pr.
+
+The comparison also corrects the record about -14: it wasn't wasix-libc v2025-09-02.1, the tag this recipe named. Its libc defines `__wasi_context_*`, `__wasi_proc_spawn3`, `proc_exec4`, `proc_fork_env` and `proc_exit2`, which first appear in v2026-06-25.1/v2026-07-03.1, and it lacks v2025-09-02.1's `__wasilibc_exec_combine_strings`.
+
+**Behaviour.** `test/cxx-eh.mjs` (four EH trees × wasm-clang 24 and wasixcc clang 21, C++ exceptions and std::terminate) with npm's -32 as `--sysroot`, against wasm-clang 24.0.0-21 on slicc-kernel 1.100.0's Node entry (2026-10-17), fails at the link: `wasm-ld: error: … undefined symbol: __cxa_thread_atexit`, from the `thread_local std::string`. -32's libc++abi has no `__cxa_thread_atexit` (#211). -33 passes all 8 builds (`caught=117107 dtors=2 tl=tls seen=in thread`, and the terminate handler). Without `eh-compat/gxx_wasm_personality.c`, -33 fails the same spec with `undefined symbol: __gxx_wasm_personality_v0`. LLVM 24 codegen calls that personality, and LLVM 20's libunwind names it `_Unwind_CallPersonality`.
+
 ## 2025.9.30-31: no kernel sigwait, inherited ignores read as SIG_DFL (-32, homescoop#520, #740, #466)
 
 `run-modes.mjs --tarball ai-ecoverse-wasix-sysroot-2025.9.30-31.tgz --probe r32 --kernel @ai-ecoverse/slicc-kernel@1.108.1`, default variant, 2026-10-16: FAIL. The kernel has all three imports (the probe calls them itself), but -31's libc doesn't use them. Every sigwait line is ENOSYS:
