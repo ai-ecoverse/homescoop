@@ -35,3 +35,5 @@ about:
     3.5.1-3: rebuilt with the socket shim's getnameinfo (/etc/hosts and
     loopback, homescoop#176), so the daemon names loopback clients
     (localhost) and hosts allow/deny by name match.
+    3.5.1-4: packaging-only, publishes main's build (npm had other bytes at
+    3.5.1-3; homescoop#617 parity sweep).
