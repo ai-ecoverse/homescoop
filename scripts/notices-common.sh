@@ -24,8 +24,10 @@ homescoop_notice_wasix_libc() {
     return 1
   }
   ver="$(node -p "require(process.argv[1]).version" "$prefix/package.json")"
-  local wl=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-  homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $ver; files from tag v2025-09-02.1)" \
+  local tag=v2025-09-02.1
+  [[ "${ver##*-}" =~ ^[0-9]+$ ]] && ((${ver##*-} >= 33)) && tag=v2026-07-03.1
+  local wl=https://raw.githubusercontent.com/wasix-org/wasix-libc/$tag
+  homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $ver; files from tag $tag)" \
     "$wl/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
     "$wl/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
     "$wl/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
