@@ -60,7 +60,13 @@ try {
   const run = join(work, 'run');
   mkdirSync(run);
   sh('emcc', ['-O2', join(pkgDir, 'test/probe.c'), ...flags, '-Wl,--fatal-warnings', '-sENVIRONMENT=node', '-sNODERAWFS=1', '-o', join(run, 'probe.js')], { env });
-  const stdout = sh(process.execPath, [join(run, 'probe.js'), run], { cwd: run });
+  let stdout;
+  try {
+    stdout = sh(process.execPath, [join(run, 'probe.js'), run], { cwd: run });
+  } catch (e) {
+    const out = `${e.stdout ?? ''}`.trim();
+    throw new Error(`test/probe.c exited ${e.status ?? e.signal}${out ? `:\n${out}` : ' with no output'}`);
+  }
   console.log(stdout.trim().split('\n').map((l) => `   ${l}`).join('\n'));
   assert.match(stdout, /^probe ok$/m, 'every check in test/probe.c passed');
   const check = join(pkgDir, 'test/check.mjs');
