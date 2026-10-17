@@ -26,6 +26,10 @@ export default async function hello(ctx) {
   const { assert } = ctx;
   await ctx.addUser({ name: 'cone' });
   const goVersion = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasm-go/package.json')).slicc.go.version;
+  const rootVersion = (await ctx.read('/node_modules/@ai-ecoverse/wasm-go/goroot/VERSION')).split('\n')[0];
+  assert.equal(goVersion, rootVersion, 'package.json slicc.go.version is goroot/VERSION (homescoop#746)');
+  const stdVersion = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasm-go-std-wasip1/package.json')).slicc.go.version;
+  assert.equal(stdVersion, rootVersion, 'the std package installed with it has the same slicc.go.version');
   for (const tool of ['compile', 'link', 'asm']) {
     const v = await ctx.run([`${TOOLS}/${tool}`, '-V'], { cwd: '/home', user: 'cone' });
     assert.equal(v.status, 0, `${tool} -V: ${v.stderr}`);

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-esbuild",
-  "version": "0.28.2-2",
+  "version": "0.28.2-3",
   "description": "esbuild 0.28 for slicc WASI preview1 (command esbuild); esbuild.wasm built by homescoop from esbuild v0.28.2 with GOOS=wasip1",
   "license": "MIT",
   "engines": {

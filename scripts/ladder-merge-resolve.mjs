@@ -365,7 +365,7 @@ export function touchingCommit(pkg, base, head) {
   return head;
 }
 
-function readContext(args, commit) {
+export function readContext(args, commit) {
   const { name, version } = JSON.parse(git('show', `${commit}:packages/${args.pkg}/package/package.json`));
   let listed = [];
   try {

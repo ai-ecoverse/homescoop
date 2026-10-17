@@ -1,0 +1,20 @@
+{
+ "name": "@ai-ecoverse/wasix-sysroot",
+ "versions": {
+  "2025.9.30-14": {
+   "version": "2025.9.30-14",
+   "dist": {
+    "integrity": "sha512-mV9b+4IW9Hoz4aBlEPZHSjtuYF2oITSvNesfEl4hhxrMouz5jXvQVPQ30o/SuU9VyuMxKYsQ7wub8l2haYswpw=="
+   },
+   "gitHead": "c20b25fb83d20dee0b99fe86ad62bdf6ae013708",
+   "repository": {
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "type": "git",
+    "directory": "packages/wasix-sysroot/package"
+   }
+  }
+ },
+ "time": {
+  "2025.9.30-14": "2026-10-01T10:54:57.936Z"
+ }
+}

@@ -1,15 +1,22 @@
 {
   "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "peers": [
+    "wasm-go"
+  ],
   "needs": [
     "@ai-ecoverse/wasm-go",
     "@ai-ecoverse/wasm-findutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-go@1.26.5-1",
-    "@ai-ecoverse/wasm-findutils@4.11.0-2"
+    "@ai-ecoverse/wasm-findutils@4.11.0-3"
+  ],
+  "needsTarballScripts": [
+    "packages/wasm-go-std-linux-amd64/test/wasm-go-tarball.mjs"
   ],
   "checklist": [
-    "with wasm-go's compile and link (in the kernel, as cone, GOOS=linux GOARCH=amd64): a fmt/os program cross-links against this std into a 64-bit little-endian x86-64 ET_EXEC ELF over 1 MB, read back byte-exact (ctx.readBytes, homescoop#738): every PT_LOAD lies inside the file and e_entry falls in an executable one; on a linux/amd64 host it runs and prints 'hello from go 42 1'"
+    "package.json slicc.go.version (go1.27.2) is the goroot/VERSION of the wasm-go it pairs with, so seven's go driver matches them by (version, target) (homescoop#746)",
+    "with wasm-go's compile and link of the same version (this run's peer artifact, else the registry's; in the kernel, as cone, GOOS=linux GOARCH=amd64): a fmt/os program cross-links against this std into a 64-bit little-endian x86-64 ET_EXEC ELF over 1 MB, read back byte-exact (ctx.readBytes, homescoop#738): every PT_LOAD lies inside the file and e_entry falls in an executable one; on a linux/amd64 host it runs and prints 'hello from go 42 1'"
   ],
   "users": "enforce"
 }

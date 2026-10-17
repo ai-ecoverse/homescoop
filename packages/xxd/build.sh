@@ -31,4 +31,6 @@ test -f "$OUT/xxd.wasm"
 homescoop_stage_cli "$OUT" xxd
 # xxd ships as a single .c from vim; keep package/LICENSE (Vim license excerpt).
 homescoop_stage_license "$HOMESCOOP_PKG/package/LICENSE"
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== xxd: staged → $HOMESCOOP_PKG/package ($VER)"

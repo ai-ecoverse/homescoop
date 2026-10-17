@@ -1,0 +1,14 @@
+{
+  "harness": "host-node",
+  "host": "node packages/zlib/test/run-zlib.mjs --tarball <package.tgz | npm spec>: with the pinned emsdk (scripts/install-emsdk.sh), compiles test/zprobe.c with nothing but the package's own lib/pkgconfig/zlib.pc flags (PKG_CONFIG_LIBDIR, no host dirs), links it with -Wl,--fatal-warnings, and runs it under Node (NODERAWFS). A static library has no commands of its own.",
+  "checklist": [
+    "zlib.pc's Version and zlibVersion() are the recipe upstream (1.3.1); the probe compiles from the .pc's Cflags/Libs alone",
+    "the link has no warnings (-Wl,--fatal-warnings): the shipped zconf.h is the configured one libz.a was compiled with, so z_off_t agrees (sizeof 8) and crc32_combine / adler32_combine / gzseek / gztell / gzoffset link real functions, not trapping stubs",
+    "crc32('123456789') = cbf43926, adler32 = 091e01de, and their _combine of '1234' + '56789'",
+    "compress2 level 9 of 64 KiB to under a quarter, uncompress byte-exact",
+    "gzopen/gzwrite/gzread round trip through a file, gzseek SEEK_SET/SEEK_CUR, gztell and gzoffset on it; Node's own zlib inflates that probe.gz to the same 64 KiB"
+  ],
+  "ci": [
+    "node packages/zlib/test/run-zlib.mjs --tarball .homescoop-out/package.tgz"
+  ]
+}

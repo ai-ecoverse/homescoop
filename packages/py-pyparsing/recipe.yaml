@@ -1,12 +1,14 @@
 name: py-pyparsing
 builder: host
+reproducible: true
 version: "3.3.3"
 npm: "@ai-ecoverse/py-pyparsing"
 summary: "pyparsing for slicc WASIX CPython"
-# 3.3.3-7 is packaging-only: 3.3.3-6's bytes with wasix-python as a range,
-# ">=3.14.2-16 <3.14.3" (#702). Drop repack: when the next release rebuilds.
-repack:
-  from: "3.3.3-6"
+source:
+  url: "https://files.pythonhosted.org/packages/py3/p/pyparsing/pyparsing-{{version}}-py3-none-any.whl"
+  sha256: "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4"
+inputs:
+  - scripts/stage-pure-wheel.sh
 dependencies:
   build: []
   host: []

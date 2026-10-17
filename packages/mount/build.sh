@@ -31,4 +31,6 @@ for prog in mount umount; do
   homescoop_stage_cli "$OBJ" "$prog"
 done
 homescoop_stage_license "$ROOT/LICENSE"
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== mount: staged → $HOMESCOOP_PKG/package ($VERSION)"

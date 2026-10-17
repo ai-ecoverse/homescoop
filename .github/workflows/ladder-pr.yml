@@ -9,6 +9,18 @@ name: ladder-pr
 
 on:
   pull_request:
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      group_head:
+        description: Check this commit as a merge group head (40 hex); docs/ladder-builds.md has the dry run.
+        required: true
+        type: string
+      group_base:
+        description: The queue's base branch, as a ref the checkout has.
+        required: false
+        default: origin/main
+        type: string
 
 permissions:
   contents: read
@@ -28,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.group_head || '' }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -50,16 +63,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.group_head || '' }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - id: d
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          GROUP_BASE: ${{ inputs.group_base || 'origin/main' }}
         run: |
           set -euo pipefail
-          BASE="${{ github.event.pull_request.base.sha }}"
-          HEAD="${{ github.event.pull_request.head.sha }}"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            BASE="$PR_BASE"
+            HEAD="$PR_HEAD"
+          else
+            HEAD=$(git rev-parse HEAD)
+            BASE=$(git merge-base "$GROUP_BASE" "$HEAD")
+          fi
           CLASS=$(node scripts/classify-touched-packages.mjs --base "$BASE" --head "$HEAD")
           echo "$CLASS"
           HOST=$(node -e 'const j=JSON.parse(process.argv[1]); console.log(JSON.stringify(j.host))' "$CLASS")
@@ -76,7 +99,7 @@ jobs:
 
   recipe-sha:
     needs: detect
-    if: needs.detect.outputs.host != '[]'
+    if: github.event_name == 'pull_request' && needs.detect.outputs.host != '[]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -137,7 +160,7 @@ jobs:
 
   host-build:
     needs: [detect, recipe-sha]
-    if: needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success'
+    if: github.event_name == 'pull_request' && needs.detect.outputs.host != '[]' && needs.recipe-sha.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -157,19 +180,9 @@ jobs:
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
       - name: Build from the hosted workspace path
-        run: |
-          set -euo pipefail
-          want="/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
-          if [[ "$GITHUB_WORKSPACE" != "$want" ]]; then
-            if [[ -e "$want" && ! -L "$want" ]]; then
-              echo "::error::$want exists and is not a link to the workspace"
-              exit 1
-            fi
-            mkdir -p "$(dirname "$want")"
-            ln -sfn "$GITHUB_WORKSPACE" "$want"
-          fi
-          echo "build root $want ($(cd "$want" && pwd -P))"
-          echo "HOMESCOOP_BUILD_ROOT=$want" >> "$GITHUB_ENV"
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: bash scripts/ladder-build-root.sh host "${{ matrix.package }}" >> "$GITHUB_ENV"
       - name: Host build (no publish)
         run: |
           set -euo pipefail
@@ -207,7 +220,7 @@ jobs:
 
   rebuild:
     needs: [detect, recipe-sha]
-    if: needs.detect.outputs.rebuild != '[]' && needs.recipe-sha.result == 'success'
+    if: github.event_name == 'pull_request' && needs.detect.outputs.rebuild != '[]' && needs.recipe-sha.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -225,20 +238,13 @@ jobs:
         run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
-      - name: Build from the hosted workspace path
-        run: |
-          set -euo pipefail
-          want="/home/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
-          if [[ "$GITHUB_WORKSPACE" != "$want" ]]; then
-            if [[ -e "$want" && ! -L "$want" ]]; then
-              echo "::error::$want exists and is not a link to the workspace"
-              exit 1
-            fi
-            mkdir -p "$(dirname "$want")"
-            ln -sfn "$GITHUB_WORKSPACE" "$want"
-          fi
-          echo "build root $want ($(cd "$want" && pwd -P))"
-          echo "HOMESCOOP_BUILD_ROOT=$want" >> "$GITHUB_ENV"
+      # Another directory (a real copy), WORK and user name than host-build's,
+      # so reproducible proves path independence (#668); a recipe known to
+      # embed its path sets reproducible.same_path: <issue>.
+      - name: Build from a second workspace path
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: bash scripts/ladder-build-root.sh rebuild "${{ matrix.package }}" >> "$GITHUB_ENV"
       - name: Second host build (recipe reproducible)
         run: |
           set -euo pipefail
@@ -249,8 +255,8 @@ jobs:
         with:
           name: rebuild-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: |
-            .homescoop-out/package.tgz
-            .homescoop-out/package.tgz.sha256
+            ${{ env.HOMESCOOP_BUILD_ROOT }}/.homescoop-out/package.tgz
+            ${{ env.HOMESCOOP_BUILD_ROOT }}/.homescoop-out/package.tgz.sha256
           if-no-files-found: error
           retention-days: 3
       - if: always()
@@ -558,16 +564,60 @@ jobs:
             --pr "${{ github.event.pull_request.number }}" \
             --repo "${{ github.repository }}"
 
+  # A merge group (or its workflow_dispatch dry run) builds nothing: it binds
+  # each queued PR's ladder-pr artifact and cert-review to the group head, the
+  # way ladder-merge will at the push (docs/ladder-builds.md, merge queue).
+  group:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      compat: ${{ steps.g.outputs.compat }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.group_head || '' }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - id: g
+        name: Every queued PR's artifact and cert binds to the group head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GROUP_BASE: ${{ inputs.group_base || 'origin/main' }}
+        run: node scripts/merge-group-check.mjs --base "$GROUP_BASE" --head "$(git rev-parse HEAD)"
+
+  kernel-compat:
+    needs: group
+    if: github.event_name == 'merge_group' && needs.group.outputs.compat == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/kernel-compat-proof.yml
+    with:
+      homescoop-ref: ${{ github.event.merge_group.head_sha || inputs.group_head }}
+
   ci:
-    needs: [exact-pins, detect, recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert, slicc-note]
+    name: ${{ github.event_name == 'workflow_dispatch' && 'ci (group dry run)' || 'ci' }}
+    needs: [exact-pins, detect, recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert, slicc-note, group, kernel-compat]
     if: ${{ always() }}
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Fail when a ladder-pr job failed or was cancelled
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo "::error::ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} rebuild=${{ needs.rebuild.result }} reproducible=${{ needs.reproducible.result }} npm-parity=${{ needs.npm-parity.result }} test=${{ needs.test.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
+          echo "::error::ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} rebuild=${{ needs.rebuild.result }} reproducible=${{ needs.reproducible.result }} npm-parity=${{ needs.npm-parity.result }} test=${{ needs.test.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }} group=${{ needs.group.result }} kernel-compat=${{ needs.kernel-compat.result }}"
+          exit 1
+      - name: A merge group passes only on a successful group check
+        if: ${{ github.event_name != 'pull_request' && (needs.group.result != 'success' || needs.exact-pins.result != 'success') }}
+        run: |
+          echo "::error::merge group: group=${{ needs.group.result }} exact-pins=${{ needs.exact-pins.result }}"
           exit 1
       - name: Every ladder-pr job passed or was skipped
         run: |
-          echo "ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} rebuild=${{ needs.rebuild.result }} reproducible=${{ needs.reproducible.result }} npm-parity=${{ needs.npm-parity.result }} test=${{ needs.test.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }}"
+          echo "ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} rebuild=${{ needs.rebuild.result }} reproducible=${{ needs.reproducible.result }} npm-parity=${{ needs.npm-parity.result }} test=${{ needs.test.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }} group=${{ needs.group.result }} kernel-compat=${{ needs.kernel-compat.result }}"

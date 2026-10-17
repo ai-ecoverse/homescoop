@@ -1,14 +1,22 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
-  "needs": [],
-  "needsInstall": [],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8"
+  ],
   "checklist": [
     "tsc --version → Version 7.0.2",
     "tsc --noEmit -p . on a multi-file project (tsconfig.json, nested dir, @types package in node_modules) → exit 0, no output, nothing emitted",
     "tsc -p . → exit 0; dist/*.js without types and dist/*.d.ts declarations",
     "a return type changed in math.ts → --noEmit exits 1 with TS2322 in src/index.ts and TS2362 in src/shapes/area.ts (cross-file), none in math.ts",
     "the same errors with emit → exit 2, output still written",
-    "tsc -p /home/nothere → exit 1, error TS5058"
+    "tsc -p /home/nothere → exit 1, error TS5058",
+    "users enforce: alice checking bob's project with a 0600 file gets TS2307 for it (rc 1, no secret printed), emitting into his project fails TS5033 Permission denied and writes nothing; bob is refused alice's 0700 home (TS5058); each user's output is theirs; root checks everything"
   ]
 }

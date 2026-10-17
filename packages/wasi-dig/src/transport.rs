@@ -45,6 +45,19 @@ fn port(o: &Opts) -> u16 {
     }
 }
 
+fn allows_cors(url: &str) -> bool {
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let host = host.rsplit_once('@').map_or(host, |(_, h)| h);
+    let host = match host.find(']') {
+        Some(end) if host.starts_with('[') => &host[..=end],
+        _ => host.split(':').next().unwrap_or(host),
+    };
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    matches!(host.as_str(), "cloudflare-dns.com" | "1.1.1.1" | "1.0.0.1" | "[2606:4700:4700::1111]" | "[2606:4700:4700::1001]")
+        || host.ends_with(".cloudflare-dns.com")
+}
+
 pub fn send(o: &Opts, query: &[u8]) -> Result<Reply, String> {
     let start = Instant::now();
     if let Some(url) = doh_url(&o.server) {
@@ -61,9 +74,13 @@ pub fn send(o: &Opts, query: &[u8]) -> Result<Reply, String> {
         if status == 502 {
             // In a browser the realm proxy can only fetch endpoints that
             // allow CORS; it answers 502 when the preflight is refused.
-            return Err(format!(
-                "HTTP 502 from {url} (the DoH endpoint may not allow cross-origin requests from a browser; cloudflare-dns.com does)"
-            ));
+            return Err(if allows_cors(&url) {
+                format!("HTTP 502 from {url} (the network or the proxy failed)")
+            } else {
+                format!(
+                    "HTTP 502 from {url} (the DoH endpoint may be offline, or may not allow cross-origin requests from a browser; cloudflare-dns.com does)"
+                )
+            });
         }
         if status != 200 {
             return Err(format!("HTTP {status} from {url}"));
@@ -107,4 +124,22 @@ pub fn send(o: &Opts, query: &[u8]) -> Result<Reply, String> {
         });
     }
     Err(last)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::allows_cors;
+
+    #[test]
+    fn cors_endpoints() {
+        assert!(allows_cors("https://cloudflare-dns.com/dns-query"));
+        assert!(allows_cors("https://CLOUDFLARE-DNS.COM./dns-query"));
+        assert!(allows_cors("https://1.1.1.1/dns-query"));
+        assert!(allows_cors("https://1.0.0.1:443/dns-query?x=1"));
+        assert!(allows_cors("https://[2606:4700:4700::1111]:443/dns-query"));
+        assert!(allows_cors("https://mozilla.cloudflare-dns.com/dns-query"));
+        assert!(!allows_cors("https://dns.google/dns-query"));
+        assert!(!allows_cors("https://cloudflare-dns.com.evil.test/dns-query"));
+        assert!(!allows_cors("https://evilcloudflare-dns.com/dns-query"));
+    }
 }

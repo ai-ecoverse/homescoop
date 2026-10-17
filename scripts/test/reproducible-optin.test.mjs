@@ -59,14 +59,13 @@ const ALLOW = new Map([
   ['tree', 808],
   ['util-linux', 808],
   ['wasi-biome', 808],
-  ['wasi-esbuild', 808],
   ['wasi-ripgrep', 808],
-  ['wasi-typescript', 808],
   ['wasix-gnupg', 808],
   ['wasix-m4', 808],
   ['wasix-openssh', 808],
   ['wasix-openssl', 808],
   ['wasix-python', 808],
+  ['wasix-ruby', 808],
   ['wasix-sysroot', 808],
   ['wasix-websocat', 808],
   ['wasix-zlib', 808],
@@ -85,7 +84,9 @@ function recipe(p) {
   return JSON.parse(r.stdout);
 }
 
-const optedIn = (v) => v === 'true' || v === true || (v && typeof v === 'object' && typeof v.path === 'string');
+// true, or a map (path: package/<file> and/or same_path: <issue>, #668);
+// classify-touched-packages.mjs validates the map.
+const optedIn = (v) => v === 'true' || v === true || (v !== null && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0);
 
 const packages = readdirSync(join(root, 'packages')).filter((p) => existsSync(join(root, 'packages', p, 'recipe.yaml'))).sort();
 const recipes = new Map(packages.map((p) => [p, recipe(p)]));

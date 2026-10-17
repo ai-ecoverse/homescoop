@@ -53,4 +53,6 @@ fi
 test -f "$SRC/which.wasm"
 homescoop_stage_cli "$SRC" which
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== which: staged → $HOMESCOOP_PKG/package ($VERSION)"

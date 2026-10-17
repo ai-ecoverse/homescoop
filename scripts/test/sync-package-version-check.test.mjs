@@ -106,3 +106,34 @@ test('a PEP 440 post-release maps to X.Y.Z-postN.<rev>, the shape on npm', () =>
   assert.equal(check('2.9.0.post0', xxdPkg('2.9.0-post0.0', '2.9.0.post0')).status, 1);
   assert.equal(check('2.9.1', xxdPkg('2.9.0-post0.2', '2.9.0.post0'), ['--write']).stdout, '2.9.1-1\n');
 });
+
+const goPkg = (version, upstream, go) => `{
+  "name": "@ai-ecoverse/wasm-xxd",
+  "version": "${version}",
+  "description": "xxd for wasm / slicc",
+  "homescoop": { "recipe": "xxd", "upstream": "${upstream}" },
+  "slicc": {
+    "abi": "wasi",
+    "go": {
+      "version": "${go}",
+      "std": [{ "target": "wasip1/wasm", "dir": "goroot/pkg/wasip1_wasm" }]
+    }
+  }
+}
+`;
+
+test('slicc.go.version follows the recipe version: --check names the drift, --write fixes it in place (homescoop#746)', () => {
+  const ok = check('1.27.2', goPkg('1.27.2-1', '1.27.2', 'go1.27.2'));
+  assert.equal(ok.status, 0, ok.stderr);
+  const stale = check('1.27.2', goPkg('1.27.2-1', '1.27.2', 'go1.26.5'));
+  assert.equal(stale.status, 1);
+  assert.match(stale.stderr, /disagrees with recipe\.yaml: slicc\.go\.version is go1\.26\.5, but recipe\.yaml version is 1\.27\.2\n$/);
+  assert.equal(stale.after, goPkg('1.27.2-1', '1.27.2', 'go1.26.5'));
+  const w = check('1.27.2', goPkg('1.27.2-1', '1.27.2', 'go1.26.5'), ['--write']);
+  assert.equal(w.status, 0, w.stderr);
+  assert.equal(w.after, goPkg('1.27.2-1', '1.27.2', 'go1.27.2'));
+  const bump = check('1.27.2', goPkg('1.26.5-2', '1.26.5', 'go1.26.5'), ['--write']);
+  assert.equal(bump.status, 0, bump.stderr);
+  assert.equal(bump.after, goPkg('1.27.2-1', '1.27.2', 'go1.27.2'));
+  assert.equal(check('9.2.1186', xxdPkg('9.2.1186-1', '9.2.1186'), ['--write']).after, xxdPkg('9.2.1186-1', '9.2.1186'));
+});
