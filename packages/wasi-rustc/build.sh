@@ -11,23 +11,20 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "homescoop: wasi-rustc builds on Linux x86_64 only (the bootstrap config names $(uname -sm)'s triple)" >&2; exit 1 ;;
 esac
 
-PKG_WORK="$WORK/wasi-rustc"
+PKG_WORK="/tmp/homescoop-wasi-rustc-$VERSION"
 SRC="$PKG_WORK/rustc-$VERSION-src"
 mkdir -p "$PKG_WORK"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$PKG_WORK/rustc-$VERSION-src.tar.xz"
-if [[ ! -f "$SRC/.homescoop-patched" ]]; then
-  rm -rf "$SRC"
-  tar -xJf "$PKG_WORK/rustc-$VERSION-src.tar.xz" -C "$PKG_WORK"
-  for p in "$HOMESCOOP_PKG"/patches/*.patch; do
-    excludes=()
-    while read -r f; do
-      [[ -d "$SRC/$(dirname "$f")" ]] || { echo "== $(basename "$p"): $f is not in the source tarball, skipped"; excludes+=("--exclude=$f"); }
-    done < <(sed -n 's|^+++ b/||p' "$p")
-    echo "== patch $(basename "$p")"
-    (cd "$SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check ${excludes[@]+"${excludes[@]}"} "$p" && git apply ${excludes[@]+"${excludes[@]}"} "$p")
-  done
-  touch "$SRC/.homescoop-patched"
-fi
+rm -rf "$SRC"
+tar -xJf "$PKG_WORK/rustc-$VERSION-src.tar.xz" -C "$PKG_WORK"
+for p in "$HOMESCOOP_PKG"/patches/*.patch; do
+  excludes=()
+  while read -r f; do
+    [[ -d "$SRC/$(dirname "$f")" ]] || { echo "== $(basename "$p"): $f is not in the source tarball, skipped"; excludes+=("--exclude=$f"); }
+  done < <(sed -n 's|^+++ b/||p' "$p")
+  echo "== patch $(basename "$p")"
+  (cd "$SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check ${excludes[@]+"${excludes[@]}"} "$p" && git apply ${excludes[@]+"${excludes[@]}"} "$p")
+done
 
 HOMESCOOP_WASI_SDK_VERSION="$(field toolchain.wasi-sdk)"
 HOMESCOOP_WASI_SDK_SHA="$(field toolchain.wasi_sdk_sha256_linux_x64)"
