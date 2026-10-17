@@ -13,6 +13,13 @@ AssertionError [ERR_ASSERTION]: compile: hello.go:4:2: could not import fmt (ope
 
 `hello.mjs` builds an importcfg from every archive `find` lists in the std package. As `cone`, it compiles `hello.go` (fmt and os) with wasm-go's `compile`, then links it with `link`:
 - wasip1: the binary runs in the kernel and must print `hello from go 42 <argc>`;
-- linux/amd64: the output must be a 64-bit little-endian ELF over 1 MB.
+- linux/amd64: the output, read back byte-exact with `ctx.readBytes`, must be a 64-bit little-endian x86-64 executable ELF over 1 MB whose PT_LOAD segments lie inside the file and whose entry point falls in an executable one. On a linux/amd64 host it must run and print `hello from go 42 1`.
+
+Before homescoop#738 the spec read the ELF with `ctx.read`, which decodes UTF-8: the header bytes are ASCII, so it passed, but the bytes came back as 2,642,048 instead of 2,675,813 and segfaulted on a linux/amd64 host. The same spec on that read path (`Buffer.from(await ctx.read(…), 'latin1')`) now fails (slicc-kernel 1.102.6, users enforce, 1.26.5-1 from npm, 2026-10-16):
+
+```
+browser-cert: FAIL packages/wasm-go-std-linux-amd64/cert/hello.mjs
+AssertionError [ERR_ASSERTION]: PT_LOAD 2 (654592+72057594037931265) lies inside the 1981749-byte file
+```
 
 wasm-go's spec also checks `compile`, `link` and `asm -V` for `version go1.26.5`.

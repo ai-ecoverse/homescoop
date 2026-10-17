@@ -3,7 +3,6 @@
 # in slicc-kernel (@ai-ecoverse/wasi-buf).
 name: wasi-protoc-gen-go
 builder: host
-runner: pool
 reproducible: true
 inputs:
   - scripts/build-wasip1-go-command.sh

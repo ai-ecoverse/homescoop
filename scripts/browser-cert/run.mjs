@@ -25,7 +25,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { recorder } from './cases.mjs';
 import { certMetaFile, pathLabel, readCertMeta } from './cert-meta.mjs';
 import { makeContext } from './context.mjs';
-import { glueByPath, glueCheckPlan } from './glue.mjs';
+import { glueByPath, glueCheckPlan, glueStep, runMode } from './glue.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -46,10 +46,13 @@ const kernelFlag = flag('--kernel');
 const usersFlag = flag('--users');
 const jsonOut = flag('--json') ? resolve(flag('--json')) : '';
 const soft = process.argv.includes('--soft');
+// --glue-only: only glue by path (#360), on this kernel and users mode; for a
+// package whose cert kernel cannot run it (cert-leg.mjs browser-extra, homescoop#628).
+const glueOnly = process.argv.includes('--glue-only');
 const livePort = Number(flag('--live')) || 0;
 if (!pkgName) {
   console.error(
-    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft] [--spec <file.mjs> ...] [--live <port>]',
+    'usage: run.mjs --package <name> --tarball <package.tgz> [--tarball <more.tgz>] [--cert <dir>] [--kernel <npm spec | kernel .tgz | dir>] [--users off|report|enforce] [--json <out.json>] [--soft] [--spec <file.mjs> ...] [--live <port>] [--glue-only]',
   );
   process.exit(2);
 }
@@ -170,15 +173,10 @@ const cmdNames = Object.keys(commands);
 
 // Full cert specs may target wasi (python wheels, wasi-pnpm). Smoke-only path
 // still skips non-emscripten without cert/.
-if (certSpecs.length === 0) {
-  if (abi !== 'emscripten') {
-    console.log(`browser-cert: skip ${npmName} (abi=${abi}; no cert/*.mjs)`);
-    cleanup(0, 'skip');
-  }
-  if (cmdNames.length === 0) {
-    console.log(`browser-cert: skip ${npmName} (no slicc.commands; lib cert is host-smoke)`);
-    cleanup(0, 'skip');
-  }
+const mode = runMode({ glueOnly, specs: certSpecs.length, abi, commands: cmdNames.length });
+if (mode.mode === 'skip') {
+  console.log(`browser-cert: skip ${npmName} (${mode.why})`);
+  cleanup(0, 'skip');
 }
 
 function listFiles(dir, base = dir) {
@@ -382,7 +380,9 @@ try {
     await new Promise(() => {});
   }
 
-  if (certSpecs.length > 0) {
+  if (mode.mode === 'glue-only') {
+    console.log('browser-cert: --glue-only: no specs, glue by path only');
+  } else if (mode.mode === 'specs') {
     const ctx = {
       ...makeContext(page, { packageName: pkgName, npmName }),
       installed: pkgs.map((p) => p.manifest),
@@ -465,14 +465,19 @@ try {
   }
 
   const glue = glueCheckPlan({ soft, live: Boolean(livePort), modes: report.modes, users, kernelVersion: report.kernel?.version, meta, manifest });
-  if (glue.run) {
+  const step = glueStep({ glueOnly, plan: glue });
+  if (step.action === 'run') {
     const sp = await glueByPath(makeContext(page, { packageName: pkgName, npmName }), { installDir: main.installDir, targets: glue.targets });
     report.specs.push(sp);
     if (sp.status === 'fail') {
       console.error(`browser-cert: FAIL glue by path (#360): ${sp.error}`);
       process.exitCode = 1;
     } else console.log(`browser-cert: ok glue by path (#360): ${glue.targets.length} glue file(s) run as certglue under users enforce`);
-  } else if (glue.targets.length) console.log(`browser-cert: glue by path skipped: ${glue.why}`);
+  } else if (step.action === 'fail') {
+    console.error(`browser-cert: FAIL ${step.why}`);
+    report.specs.push({ spec: 'glue-by-path', status: 'fail', durationMs: 0, error: step.why });
+    process.exitCode = 1;
+  } else if (step.log) console.log(`browser-cert: glue by path skipped: ${step.why}`);
 
   if (page.errors?.length) {
     console.error('browser-cert: page errors', page.errors);

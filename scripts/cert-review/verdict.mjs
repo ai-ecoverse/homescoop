@@ -15,6 +15,7 @@ const { values } = parseArgs({
     'ladder-run': { type: 'string', default: '' },
     'ladder-conclusion': { type: 'string', default: '' },
     specs: { type: 'string', default: '' },
+    'repack-input': { type: 'string', default: '' },
   },
 });
 
@@ -70,6 +71,30 @@ if (values.specs) {
 const UNSPECIFIED = "no committed cert specs; this certification rests on the reviewer's own run";
 const unspecified = (pkg) => specCounts !== null && !(specCounts[pkg.recipe] > 0);
 
+// A repack's input must be attested, and a built recipe must fetch its pinned
+// source with no stage or prebuilt path (repack-input.mjs, #834 and #864): an
+// unverifiable input is INCOMPLETE, whatever the reviewer says. With --repack-input, a package
+// with no entry, or one whose trace didn't run, fails closed.
+let repackInputs = null;
+if (values['repack-input']) {
+  try {
+    repackInputs = JSON.parse(readFileSync(values['repack-input'], 'utf8'));
+  } catch (error) {
+    problems.push(`no readable repack-input file (${one(error.message)})`);
+    repackInputs = {};
+  }
+}
+const unverifiable = (pkg) => {
+  if (repackInputs === null) return '';
+  const r = repackInputs[pkg.recipe];
+  if (!r || typeof r !== 'object') return "repack-input.mjs didn't run for it";
+  if (r.error) return `repack-input.mjs couldn't trace it (${one(r.error)})`;
+  // A built recipe (repack: false) is held to the same root rule (#864):
+  // only attested: true passes, for repacks and builds alike.
+  if (r.attested === true) return '';
+  return one(r.reason) || 'no reason given';
+};
+
 const listOf = (value, what, pkg) => {
   if (value === undefined || value === null) return [];
   if (Array.isArray(value)) return value;
@@ -88,9 +113,15 @@ const lines = packages.map((pkg) => {
   const found = find(pkg);
   if (found.length !== 1) {
     problems.push(`${pkg.name}@${pkg.version}: ${found.length} verdicts`);
+    const input = unverifiable(pkg);
+    if (input) return { ok: false, line: `cert-ci: INCOMPLETE ${pkg.name}@${pkg.version}: unverifiable input: ${input}` };
     return { ok: false, line: `cert-ci: NO VERDICT ${pkg.name}@${pkg.version}` };
   }
   const [v] = found;
+  const input = unverifiable(pkg);
+  if (input && v.verdict !== 'fail') {
+    return { ok: false, line: `cert-ci: INCOMPLETE ${pkg.name}@${pkg.version}: unverifiable input: ${input}` };
+  }
   if (v.verdict === 'certified') {
     const known = listOf(v.known, 'known', pkg).map((k) => one(k).slice(0, 120)).filter(Boolean);
     const notes = [...(unspecified(pkg) ? [UNSPECIFIED] : []), ...(known.length ? [`known: ${known.join(', ')}`] : [])];
@@ -100,7 +131,10 @@ const lines = packages.map((pkg) => {
       line: `certified=${pkg.sha} ${pkg.name} ${pkg.version}${notes.length ? ` (${notes.join('; ')})` : ''}`,
     };
   }
-  if (v.verdict === 'fail') return { ok: false, line: `cert-ci: FAIL ${pkg.name}@${pkg.version}: ${one(v.reason) || 'no reason given'}` };
+  if (v.verdict === 'fail') {
+    const also = input ? `; also unverifiable input: ${input}` : '';
+    return { ok: false, line: `cert-ci: FAIL ${pkg.name}@${pkg.version}: ${one(v.reason) || 'no reason given'}${also}` };
+  }
   problems.push(`${pkg.name}@${pkg.version}: verdict "${one(v.verdict)}" is neither certified nor fail`);
   return { ok: false, line: `cert-ci: NO VERDICT ${pkg.name}@${pkg.version}` };
 });
@@ -112,9 +146,13 @@ const result = lines.map(({ line }) => line).join('\n');
 const unspecifiedNote = specCounts !== null && packages.some(unspecified)
   ? `\n\n**${packages.filter(unspecified).map((pkg) => pkg.name).join(', ')}: ${UNSPECIFIED}.**`
   : '';
+const incomplete = lines.filter(({ line }) => line.startsWith('cert-ci: INCOMPLETE'));
+const incompleteNote = incomplete.length
+  ? `\n\n**Not certified, whatever the review says: ${incomplete.length === 1 ? 'an input is' : 'inputs are'} unverifiable.** A build must fetch the recipe's pinned source (homescoop_fetch with its sha256) with no stage or prebuilt path, and a repack must trace its bytes to such a build that is provenance-attested from CI, or reproducible (\`scripts/cert-review/repack-input.mjs\`).`
+  : '';
 const trouble = problems.length ? `\n\n**Problems:**\n${problems.map((p) => `- ${p}`).join('\n')}` : '';
 const footer = values.run ? `\n\n<sub>shas computed from the ladder-pr artifacts, not by the reviewer · [run](${values.run})</sub>` : '';
-writeFileSync(values.body, `${comment}${unspecifiedNote}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
+writeFileSync(values.body, `${comment}${unspecifiedNote}${incompleteNote}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
 writeFileSync(values.lines, `${result}\n`);
 writeFileSync(`${values.lines}.unspecified`, `${JSON.stringify(packages.filter(unspecified).map((pkg) => pkg.name))}\n`);
 

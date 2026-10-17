@@ -44,7 +44,6 @@ const NO_USERS_ENFORCE = [
   'bash', // #819
   'binutils', // #819
   'bzip2', // #819
-  'curl', // #723
   'diffutils', // #819
   'file', // #819
   'gawk', // #819
@@ -62,23 +61,16 @@ const NO_USERS_ENFORCE = [
   'patch', // #819
   'poppler', // #819
   'procps', // #819
-  'qpdf', // #723
-  'sed', // #819
   'sqlite3', // #819
-  'tree', // #687
-  'util-linux', // #687
   'wasi-biome', // #819
   'wasi-dig', // #819
-  'wasi-esbuild', // #819
   'wasi-fnox', // #819
   'wasi-ripgrep', // #819
-  'wasi-typescript', // #819
   'wasi-uv', // #772
   'wasix-gnupg', // #819
   'wasix-perl', // #819
   'wasix-python', // #819
   'wasix-ruby', // #819
-  'which', // #687
   'xxd', // #819
   'xz', // #819
 ];

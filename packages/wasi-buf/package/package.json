@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-buf",
-  "version": "1.73.0-2",
+  "version": "1.73.0-3",
   "description": "buf 1.73 (Protocol Buffers CLI) for slicc WASI preview1 (command buf); buf.wasm built by homescoop from buf v1.73.0 with documented patches",
   "license": "Apache-2.0",
   "repository": {

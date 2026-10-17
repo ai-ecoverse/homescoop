@@ -1,0 +1,7 @@
+# PLANTED (repack-input.test.mjs): the built root, published from a laptop.
+name: planted
+version: "1.0.0"
+npm: "@ai-ecoverse/wasm-planted"
+source:
+  url: "https://example.org/planted-{{version}}.tar.gz"
+  sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

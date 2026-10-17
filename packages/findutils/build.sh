@@ -71,4 +71,6 @@ for cmd_dir in find xargs; do
   homescoop_stage_cli "$STAGE" "$cmd"
 done
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== findutils: staged → $HOMESCOOP_PKG/package"

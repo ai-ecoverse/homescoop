@@ -1,10 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.23.0",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-8",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-3"
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-9"
   ],
   "checklist": [
     "strings -n 8 on bash.wasm prints readable strings (GNU bash, version …), every line ≥ 8 chars",
@@ -14,7 +17,11 @@
     "strings -d on an x86-64 ELF object reads only data sections (BFD)",
     "size on x86-64 and aarch64 ELF objects: Berkeley table; size -A per-section",
     "readelf -h (ELF64, REL, X86-64 / AArch64) and readelf -sW symbols",
-    "errors: strings missing file rc 1; size on non-object 'file format not recognized' rc≠0; readelf on non-ELF 'Not an ELF file' rc 1"
+    "errors: strings missing file rc 1; size on non-object 'file format not recognized' rc≠0; readelf on non-ELF 'Not an ELF file' rc 1",
+    "wasm (homescoop#646): size -A reads WebAssembly modules through BFD's wasm32 target, including the DataCount (12) and Tag (13) sections Emscripten emits (wasm-datacount-tag.patch): an MVP module, one with DataCount and one with a Tag section list their .wasm.* sections, and Emscripten's bash.wasm lists import, datacount, code and data; Berkeley size prints its table; an unknown section id (14) is still 'file format not recognized'. 2.47.0-4: DataCount and bash.wasm are 'file format not recognized' (NEGATIVE.md)"
   ],
-  "needsNote": "In slicc-kernel 1.23.0, /usr/bin/<cmd> is a synthetic 0-byte file, so `strings /usr/bin/bash` prints nothing; the spec reads bash.wasm from the installed wasm-bash package instead."
+  "needsNote": "In slicc-kernel 1.23.0, /usr/bin/<cmd> is a synthetic 0-byte file, so `strings /usr/bin/bash` prints nothing; the spec reads bash.wasm from the installed wasm-bash package instead.",
+  "patches": {
+    "wasm-datacount-tag.patch": "BFD's wasm-module.c names sections 1-11 only and refuses a module with a later one; the patch adds 12 (datacount) and 13 (tag), read as plain contents sections. Upstream binutils master still lists 1-11 (checked 2026-10-17). cert/wasm.mjs checks size -A on both and on bash.wasm"
+  }
 }

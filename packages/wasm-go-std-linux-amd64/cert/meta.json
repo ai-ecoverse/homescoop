@@ -9,7 +9,7 @@
     "@ai-ecoverse/wasm-findutils@4.11.0-2"
   ],
   "checklist": [
-    "with wasm-go's compile and link (in the kernel, as cone, GOOS=linux GOARCH=amd64): a fmt/os program cross-links against this std into a 64-bit little-endian ELF executable"
+    "with wasm-go's compile and link (in the kernel, as cone, GOOS=linux GOARCH=amd64): a fmt/os program cross-links against this std into a 64-bit little-endian x86-64 ET_EXEC ELF over 1 MB, read back byte-exact (ctx.readBytes, homescoop#738): every PT_LOAD lies inside the file and e_entry falls in an executable one; on a linux/amd64 host it runs and prints 'hello from go 42 1'"
   ],
   "users": "enforce"
 }

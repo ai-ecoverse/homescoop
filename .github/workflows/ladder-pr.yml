@@ -91,13 +91,16 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      # --verify-repack: repack recipes' pins are checked here once per PR
+      # (never rewritten; #730); the build steps below skip them.
       - name: Download expanded source URLs and write sha256
         env:
           HOST: ${{ needs.detect.outputs.host }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            node scripts/refresh-recipe-sha.mjs "$pkg"
+            node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.
@@ -503,6 +506,11 @@ jobs:
           export HOMESCOOP_CERT_NODE_MODULES="$CERT_NM/node_modules"
           node scripts/browser-cert/run.mjs \
             --package "${{ matrix.package }}" \
+            --tarball .homescoop-out/package.tgz
+          # Glue by path on the dev-pin kernel when the cert kernel can't run it
+          # (#628), and each cert/meta.json extra_kernels entry with specs (#663).
+          node scripts/browser-cert/cert-leg.mjs browser-extra "${{ matrix.package }}" \
+            --manifest "${RUNNER_TEMP}/bcert-probe/package/package.json" \
             --tarball .homescoop-out/package.tgz
       - name: Host cert (cert/meta.json ci commands)
         run: node scripts/browser-cert/cert-leg.mjs ci "${{ matrix.package }}"
