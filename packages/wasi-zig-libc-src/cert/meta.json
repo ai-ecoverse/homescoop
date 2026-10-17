@@ -1,23 +1,12 @@
 {
-  "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
-  "users": "enforce",
-  "needs": [
-    "@ai-ecoverse/wasm-bash",
-    "@ai-ecoverse/wasm-coreutils",
-    "@ai-ecoverse/wasi-zig"
-  ],
-  "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-19",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-8",
-    "@ai-ecoverse/wasi-zig@0.16.0-15"
-  ],
-  "runTimeoutMs": 600000,
+  "harness": "host-node",
+  "host": "Two host checks (ci): test/identity.mjs compares the package with the sha256-pinned zig source tarball, and test/host-build.mjs builds wasi-libc from the package's sources with the sha256-pinned host zig 0.16.0 and runs a program linked against it under node:wasi. A source package has no commands of its own. The in-kernel path (wasi-zig building wasi-libc from these sources for a non-baseline CPU) takes about 7 min on a laptop and ran past 45 min on the CI runner, so it isn't a cert spec (cert/NEGATIVE.md).",
   "checklist": [
-    "identity (ci, test/identity.mjs): the package's lib/libc is file for file (sha256) zig-0.16.0.tar.xz's lib/libc/wasi and lib/libc/musl, downloaded and checked against the recipe's sha256, and LICENSE is Zig's",
-    "with @ai-ecoverse/wasi-zig installed beside it, zig cc -target wasm32-wasi -mcpu=generic+simd128 finds these sources (no 'ipk install @ai-ecoverse/wasi-zig-libc-src' error) and builds wasi-libc from them: done (rc 0) or still compiling when `timeout 90` stops it (rc 124). Without the package the same command fails at once with that error (cert/NEGATIVE.md). The full build takes about 7 min in a laptop kernel and over 45 min on the CI runner, so the cert doesn't wait for it."
+    "identity (test/identity.mjs): the package's lib/libc is file for file (sha256) zig-0.16.0.tar.xz's lib/libc/wasi and lib/libc/musl, downloaded and checked against the recipe's sha256, and LICENSE is Zig's",
+    "a complete wasi-libc (test/host-build.mjs): host zig 0.16.0 (ziglang.org, the recipe's per-host sha256) with zig's lib/ and this package's libc/wasi and libc/musl builds wasi-libc for -target wasm32-wasi -mcpu=generic+simd128 -O2, links a malloc/strcpy/printf program that imports only wasi_snapshot_preview1, and the program prints `simd128 libc 12 argc=2` under node:wasi"
   ],
   "ci": [
-    "node packages/wasi-zig-libc-src/test/identity.mjs --tarball .homescoop-out/package.tgz"
+    "node packages/wasi-zig-libc-src/test/identity.mjs --tarball .homescoop-out/package.tgz",
+    "node packages/wasi-zig-libc-src/test/host-build.mjs --tarball .homescoop-out/package.tgz"
   ]
 }
