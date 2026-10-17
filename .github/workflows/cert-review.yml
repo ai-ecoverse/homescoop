@@ -115,12 +115,14 @@ jobs:
                   return await finish();
                 }
                 await status('pending', 'cert-review plan started');
+                core.setOutput('pending_on', facts.sha);
                 if (!usable(run)) {
                   facts.ladder = run.conclusion;
                   return await finish();
                 }
               } else {
                 await status('pending', 'cert-review plan started');
+                core.setOutput('pending_on', facts.sha);
                 for (let minute = 0; minute < 120 && !usable(run); minute++) {
                   for (const sha of accepted) {
                     const [found] = (
@@ -152,6 +154,19 @@ jobs:
               facts.error = err.message;
               return await finish();
             }
+
+      - name: A failure status when the plan stopped after its pending one
+        if: (failure() || cancelled()) && steps.plan.outputs.pending_on != ''
+        uses: actions/github-script@v9
+        env:
+          HEAD: ${{ steps.plan.outputs.pending_on }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const { failIfOurs } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cert-review/status.mjs`);
+            const { owner, repo } = context.repo;
+            const r = await failIfOurs({ github, owner, repo, sha: process.env.HEAD, runUrl: process.env.RUN_URL, description: 'not certified: the cert-review plan did not finish' });
+            core.info(r.why);
 
   review:
     name: cert-review / review
@@ -489,8 +504,15 @@ jobs:
     runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
+      contents: read
       statuses: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: scripts/cert-review
+          persist-credentials: false
+
       - name: A failure status, so no head is left pending
         uses: actions/github-script@v9
         env:
@@ -499,13 +521,7 @@ jobs:
           DESCRIPTION: 'not certified: cert-review did not finish (review ${{ needs.review.result }}, record ${{ needs.record.result }})'
         with:
           script: |
+            const { failIfOurs } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cert-review/status.mjs`);
             const { owner, repo } = context.repo;
-            const { HEAD: sha, RUN_URL: url, DESCRIPTION: description } = process.env;
-            const { data } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha, per_page: 100 });
-            const now = data.statuses.find((s) => s.context === 'cert-review')?.target_url ?? '';
-            if (now !== url && !now.startsWith(`${url}/`)) {
-              core.notice(`the cert-review status on ${sha} is from another run (${now || 'none'}); it posts its own`);
-              return;
-            }
-            await github.rest.repos.createCommitStatus({ owner, repo, sha, state: 'failure', context: 'cert-review', description, target_url: url });
-            core.info(`cert-review=failure on ${sha}: ${description}`);
+            const r = await failIfOurs({ github, owner, repo, sha: process.env.HEAD, runUrl: process.env.RUN_URL, description: process.env.DESCRIPTION });
+            core.info(r.why);

@@ -208,6 +208,7 @@ async function main(argv) {
   if (/^[0-9a-f]{40}$/.test(args.head ?? '')) {
     try {
       const said = await reportStatus({ head: args.head, post: args.post, decision, runUrl }, api);
+      if (args.post) out('posted', 'true');
       console.log(said);
       summary(`- ${said}`);
     } catch (err) {

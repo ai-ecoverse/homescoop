@@ -593,8 +593,8 @@ jobs:
           GROUP_BASE: ${{ inputs.group_base || 'origin/main' }}
           POST_STATUS: ${{ github.event_name == 'merge_group' && '--post-status' || '' }}
         run: node scripts/merge-group-check.mjs --base "$GROUP_BASE" --head "$(git rev-parse HEAD)" ${POST_STATUS:+"$POST_STATUS"}
-      - name: A failure cert-review status on the group head when the check didn't run
-        if: failure() && github.event_name == 'merge_group' && steps.g.outcome != 'failure'
+      - name: A failure cert-review status on the group head when the check didn't post one
+        if: failure() && github.event_name == 'merge_group' && steps.g.outputs.posted != 'true'
         uses: actions/github-script@v9
         env:
           HEAD: ${{ github.event.merge_group.head_sha }}
@@ -608,7 +608,7 @@ jobs:
               sha: process.env.HEAD,
               state: 'failure',
               context: 'cert-review',
-              description: 'merge group check did not run',
+              description: 'merge group check did not post a status',
               target_url: process.env.RUN_URL,
             });
 

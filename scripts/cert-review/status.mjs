@@ -30,3 +30,17 @@ export function groupStatus({ problems, members, error }) {
   const list = (members ?? []).map((m) => `#${m.number}@${String(m.head).slice(0, 7)}`).join(', ');
   return post('success', `queued PRs certified: ${list}`);
 }
+
+export function ownedBy(targetUrl, runUrl) {
+  const url = String(targetUrl ?? '');
+  return Boolean(runUrl) && (url === runUrl || url.startsWith(`${runUrl}/`));
+}
+
+export async function failIfOurs({ github, owner, repo, sha, runUrl, description }) {
+  if (!sha) return { posted: false, why: 'no head to post on' };
+  const { data } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha, per_page: 100 });
+  const now = data.statuses.find((s) => s.context === CONTEXT)?.target_url ?? '';
+  if (!ownedBy(now, runUrl)) return { posted: false, why: `the ${CONTEXT} status on ${sha} is from another run (${now || 'none'}); it posts its own` };
+  await github.rest.repos.createCommitStatus({ owner, repo, sha, state: 'failure', context: CONTEXT, description: clip(description), target_url: runUrl });
+  return { posted: true, why: `${CONTEXT}=failure on ${sha}: ${clip(description)}` };
+}

@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CONTEXT, LIMIT, STATES, groupStatus, planStatus } from '../cert-review/status.mjs';
+import { CONTEXT, LIMIT, STATES, failIfOurs, groupStatus, ownedBy, planStatus } from '../cert-review/status.mjs';
 import { reportStatus } from '../merge-group-check.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -16,9 +16,10 @@ function workflow(name) {
   return readFileSync(join(ROOT, '.github/workflows', name), 'utf8');
 }
 
-function planScript() {
-  const lines = workflow('cert-review.yml').split('\n');
-  const at = lines.findIndex((l) => l.trim() === 'id: plan');
+function stepScript(file, marker) {
+  const lines = workflow(file).split('\n');
+  const at = lines.findIndex((l) => l.trim() === marker);
+  assert.ok(at >= 0, marker);
   const start = lines.findIndex((l, i) => i > at && l.trim() === 'script: |');
   const indent = lines[start + 1].match(/^ */)[0];
   const body = [];
@@ -28,6 +29,8 @@ function planScript() {
   }
   return body.join('\n');
 }
+
+const planScript = () => stepScript('cert-review.yml', 'id: plan');
 
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 
@@ -249,7 +252,8 @@ test('cert-review.yml: plan runs for forks and cancelled runs, may post statuses
   const unfinished = y.slice(y.indexOf('  unfinished:\n'));
   assert.match(unfinished, /needs: \[plan, review, record\]/);
   assert.match(unfinished, /if: always\(\) && needs\.plan\.outputs\.go == 'true' && needs\.record\.result != 'success'/);
-  assert.match(unfinished, /from another run/);
+  assert.match(unfinished, /failIfOurs/);
+  assert.match(unfinished, /sparse-checkout: scripts\/cert-review/);
 });
 
 test('ladder-pr.yml: the group job may post statuses, and posts only on a real merge group', () => {
@@ -258,7 +262,7 @@ test('ladder-pr.yml: the group job may post statuses, and posts only on a real m
   assert.match(group, /statuses: write/);
   assert.doesNotMatch(group, /contents: write|pull-requests: write|actions: write/);
   assert.match(group, /POST_STATUS: \$\{\{ github\.event_name == 'merge_group' && '--post-status' \|\| '' \}\}/);
-  assert.match(group, /if: failure\(\) && github\.event_name == 'merge_group'/);
+  assert.match(group, /if: failure\(\) && github\.event_name == 'merge_group' && steps\.g\.outputs\.posted != 'true'/);
 });
 
 test('groupStatus: success names each queued PR at its head; a problem or error is failure', () => {
@@ -290,4 +294,75 @@ test('merge-group-check.mjs: a group that fails closed reports a failure status,
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /failed closed: .*adds no commit/);
   assert.match(r.stdout, new RegExp(`dry run, would post cert-review=failure on ${head}: merge group check failed: `));
+});
+
+const RUN = 'https://github.com/ai-ecoverse/homescoop/actions/runs/123';
+
+function statusApi(targetUrl) {
+  const posted = [];
+  const github = {
+    rest: {
+      repos: {
+        getCombinedStatusForRef: async () => ({ data: { statuses: targetUrl === undefined ? [{ context: 'ci', target_url: RUN }] : [{ context: 'other', target_url: 'x' }, { context: CONTEXT, target_url: targetUrl }] } }),
+        createCommitStatus: async (s) => posted.push(s),
+      },
+    },
+  };
+  return { github, posted };
+}
+
+test('ownedBy: this run\'s plan and record URLs, never another run whose id shares its leading digits', () => {
+  assert.equal(ownedBy(RUN, RUN), true);
+  assert.equal(ownedBy(`${RUN}/artifacts/9`, RUN), true);
+  assert.equal(ownedBy(`${RUN}4`, RUN), false);
+  assert.equal(ownedBy(`${RUN}4/artifacts/9`, RUN), false);
+  assert.equal(ownedBy('', RUN), false);
+  assert.equal(ownedBy(undefined, RUN), false);
+  assert.equal(ownedBy(RUN, ''), false);
+});
+
+test('failIfOurs: fails a head whose cert-review status is this run\'s, and leaves any other alone', async () => {
+  const rows = [
+    [RUN, true],
+    [`${RUN}/artifacts/77`, true],
+    [`${RUN}4`, false],
+    ['https://github.com/ai-ecoverse/homescoop/actions/runs/999/artifacts/1', false],
+    [undefined, false],
+  ];
+  for (const [target, posts] of rows) {
+    const { github, posted } = statusApi(target);
+    const r = await failIfOurs({ github, owner: 'ai-ecoverse', repo: 'homescoop', sha: H, runUrl: RUN, description: 'not certified: x' });
+    assert.equal(r.posted, posts, String(target));
+    assert.equal(posted.length, posts ? 1 : 0, String(target));
+    if (posts) assert.deepEqual(posted[0], { owner: 'ai-ecoverse', repo: 'homescoop', sha: H, state: 'failure', context: CONTEXT, description: 'not certified: x', target_url: RUN });
+  }
+  const { github, posted } = statusApi(RUN);
+  assert.equal((await failIfOurs({ github, owner: 'o', repo: 'r', sha: '', runUrl: RUN, description: 'x' })).posted, false);
+  assert.deepEqual(posted, []);
+});
+
+async function runStep(file, marker, env, target) {
+  const { github, posted } = statusApi(target);
+  const fn = new AsyncFunction('github', 'context', 'core', 'process', stepScript(file, marker));
+  await fn(github, { repo: { owner: 'ai-ecoverse', repo: 'homescoop' } }, { info() {}, notice() {} }, { env: { GITHUB_WORKSPACE: ROOT, RUN_URL: RUN, ...env } });
+  return posted;
+}
+
+test('the unfinished job and the plan\'s fallback step fail only a head this run left pending', async () => {
+  const steps = [
+    ['- name: A failure status, so no head is left pending', { HEAD: H, DESCRIPTION: 'not certified: cert-review did not finish (review failure, record skipped)' }, /did not finish \(review failure/],
+    ['- name: A failure status when the plan stopped after its pending one', { HEAD: H }, /the cert-review plan did not finish/],
+  ];
+  for (const [marker, env, description] of steps) {
+    const own = await runStep('cert-review.yml', marker, env, RUN);
+    assert.equal(own.length, 1, marker);
+    assert.equal(own[0].state, 'failure');
+    assert.equal(own[0].sha, H);
+    assert.match(own[0].description, description);
+    assert.deepEqual(await runStep('cert-review.yml', marker, env, `${RUN}4`), [], marker);
+    assert.deepEqual(await runStep('cert-review.yml', marker, env, undefined), [], marker);
+  }
+  const y = workflow('cert-review.yml');
+  assert.match(y, /if: \(failure\(\) \|\| cancelled\(\)\) && steps\.plan\.outputs\.pending_on != ''/);
+  assert.equal(planScript().match(/core\.setOutput\('pending_on', facts\.sha\)/g).length, 2);
 });
