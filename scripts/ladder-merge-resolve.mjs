@@ -7,7 +7,6 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LADDER_PR = '.github/workflows/ladder-pr.yml';
-export const RENOVATE = 'renovate[bot]';
 export const CERT_REVIEW = '.github/workflows/cert-review.yml';
 const SHA256 = /^[0-9a-f]{64}$/;
 
@@ -35,7 +34,7 @@ export function certFor(text, name, version) {
   return shas[0];
 }
 
-export function candidateProblems({ artifact, run, jobs, head, needCi }) {
+export function candidateProblems({ artifact, run, jobs, head }) {
   const problems = [];
   if (artifact.expired) problems.push('the artifact has expired');
   if (run.path !== LADDER_PR) problems.push(`run ${run.id} is ${run.path}, not ${LADDER_PR}`);
@@ -48,12 +47,6 @@ export function candidateProblems({ artifact, run, jobs, head, needCi }) {
       .map((j) => `${j.name}: ${j.conclusion}`);
     const detail = failed.length ? ` (${failed.join(', ')})` : '';
     problems.push(`run ${run.id} concluded ${run.conclusion || run.status}${detail}`);
-  }
-  if (needCi) {
-    const ci = jobs.find((j) => j.name === 'ci');
-    if (ci?.conclusion !== 'success') {
-      problems.push(`run ${run.id} has no successful ci job (ci: ${ci ? ci.conclusion || ci.status : 'missing'})`);
-    }
   }
   return problems;
 }
@@ -177,32 +170,20 @@ export async function certifiedSha({ name, version, message }, pr, io) {
 }
 
 export async function resolvePackage(ctx, io) {
-  const { pkg, name, version, ciCertified, assumeUnpublished } = ctx;
+  const { pkg, name, version, assumeUnpublished } = ctx;
   if (!assumeUnpublished && (await io.published(name, version))) {
     return { decision: 'skip', reason: `${name}@${version} is already on npm`, inputs: { package: pkg } };
   }
   const pr = await io.pullRequest();
   if (!pr) throw new Error('no merged PR for this commit, so there is no ladder-pr artifact to publish');
   const { certified, source, ignored, review } = await certifiedSha(ctx, pr, io);
-  if (!certified && !ciCertified) {
+  if (!certified) {
     const why = ignored
       ? `the merge commit's and PR body's certified= lines don't count because ${ignored}`
       : `neither the merge commit nor the PR body has a certified=<sha256> ${name} ${version} line`;
     throw new Error(
-      `${name}@${version} is not on npm, ${why}, ${describeReview(review, name, version)}, ` +
-        `and ${pkg} is not in scripts/ci-certified.json`,
-    );
-  }
-  if (!certified && (review.state === 'failure' || review.state === 'error')) {
-    throw new Error(
-      `${name}@${version} has no certified= line, and the cert-review status on ${pr.head} is ${review.state}, ` +
-        `which vetoes the ci-job path: cert-review run ${review.runId ?? '(none named)'}, ${review.url}`,
-    );
-  }
-  if (!certified && pr.author !== RENOVATE && (ignored || !(await io.canWrite(pr.author)))) {
-    throw new Error(
-      `${name}@${version} has no certified= line that counts, and a green ci job only counts on a PR by ` +
-        `${RENOVATE} or by a writer: PR #${pr.number} is by ${pr.author}`,
+      `${name}@${version} is not on npm, ${why}, and ${describeReview(review, name, version)}: ` +
+        'every publish needs a certified= line bound to its bytes',
     );
   }
   const artifactName = `host-${pkg}-pr${pr.number}`;
@@ -215,33 +196,23 @@ export async function resolvePackage(ctx, io) {
   for (const artifact of artifacts) {
     const run = await io.run(artifact.workflow_run?.id);
     const jobs = await io.jobs(run.id);
-    const problems = candidateProblems({ artifact, run, jobs, head: pr.head, needCi: !certified });
+    const problems = candidateProblems({ artifact, run, jobs, head: pr.head });
     if (problems.length) rejected.push(`artifact ${artifact.id}: ${problems.join('; ')}`);
     else usable.push({ artifact, run });
   }
   const note = ignored ? ` (certified= lines ignored: ${ignored})` : '';
   if (usable.length === 0) throw new Error(`no usable ${artifactName}${note}: ${rejected.join(' | ')}`);
   const mismatches = [];
-  const good = [];
   for (const { artifact, run } of usable) {
     const got = await io.download(artifact);
     const problem = tarballProblem(got, { name, version, certified });
-    if (problem) mismatches.push(`artifact ${artifact.id}: ${problem}`);
-    else good.push({ artifact, run, got });
-    if (certified && good.length) break;
-  }
-  const shas = [...new Set(good.map(({ got }) => got.sha))];
-  if (shas.length > 1) {
-    throw new Error(
-      `${artifactName}${note}: ${good.length} usable artifacts with different package.tgz ` +
-        `(${good.map(({ artifact, got }) => `${artifact.id} ${got.sha}`).join(', ')}), and no certified= line picks one`,
-    );
-  }
-  if (good.length) {
-    const { artifact, run, got } = good[0];
+    if (problem) {
+      mismatches.push(`artifact ${artifact.id}: ${problem}`);
+      continue;
+    }
     return {
       decision: 'publish',
-      gate: certified ? `certified= line in the ${source}` : `ci-certified (ladder-pr ci job)${ignored ? `; lines ignored: ${ignored}` : ''}`,
+      gate: `certified= line in the ${source}`,
       reason: `${name}@${version} is not on npm; ${artifactName} artifact ${artifact.id} from run ${run.id} at ${pr.head} has sha256 ${got.sha}`,
       inputs: { package: pkg, certified: got.sha, artifact_pr: String(pr.number), artifact_id: String(artifact.id) },
     };
@@ -343,7 +314,7 @@ export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
 }
 
 export function parseArgs(argv) {
-  const args = { ciCertified: [] };
+  const args = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--package') args.pkg = argv[++i];
@@ -354,7 +325,6 @@ export function parseArgs(argv) {
     else if (a === '--message') args.message = argv[++i];
     else if (a === '--pr-body') args.prBody = argv[++i];
     else if (a === '--pr') args.prNumber = argv[++i];
-    else if (a === '--ci-certified') args.ciCertified.push(...argv[++i].split(/[\s,]+/).filter(Boolean));
     else if (a === '--assume-unpublished') args.assumeUnpublished = true;
     else throw new Error(`unknown argument ${a}`);
   }
@@ -367,10 +337,9 @@ export function parseArgs(argv) {
     args.prNumber ||
     args.message !== undefined ||
     args.prBody !== undefined ||
-    args.ciCertified.length ||
     args.assumeUnpublished;
   if (overrides && !args.dryRun) {
-    throw new Error('--head, --pr, --message, --pr-body, --ci-certified and --assume-unpublished need --dry-run');
+    throw new Error('--head, --pr, --message, --pr-body and --assume-unpublished need --dry-run');
   }
   if (args.prNumber && !/^[1-9][0-9]*$/.test(args.prNumber)) throw new Error('--pr needs a PR number');
   if (args.head && !/^[0-9a-f]{40}$/.test(args.head)) throw new Error('--head needs a 40-hex commit sha');
@@ -391,18 +360,11 @@ export function touchingCommit(pkg, base, head) {
 
 export function readContext(args, commit) {
   const { name, version } = JSON.parse(git('show', `${commit}:packages/${args.pkg}/package/package.json`));
-  let listed = [];
-  try {
-    listed = JSON.parse(git('show', `${commit}:scripts/ci-certified.json`)).packages ?? [];
-  } catch {
-    listed = [];
-  }
   return {
     pkg: args.pkg,
     name,
     version,
     message: args.message ?? git('log', '-1', '--format=%B', commit),
-    ciCertified: listed.includes(args.pkg) || args.ciCertified.includes(args.pkg),
     assumeUnpublished: Boolean(args.assumeUnpublished),
   };
 }

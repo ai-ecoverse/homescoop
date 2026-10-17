@@ -54,7 +54,9 @@ node scripts/refresh-recipe-sha.mjs <package>
 Recipe bumps automerge **only** for packages in
 [`scripts/ci-certified.json`](../scripts/ci-certified.json) (full
 `packages/<name>/cert/*.mjs` checklist + recorded negative proof; sync into
-`renovate.json` via `node scripts/sync-ci-certified-renovate.mjs`). Semver
+`renovate.json` via `node scripts/sync-ci-certified-renovate.mjs`). The list
+only scopes automerge; the merge queue still requires cert-review, and the
+publish still needs cert-review's `certified=` line. Semver
 **majors** and packages not on that list stay manual (`homescoop-major` /
 `homescoop-recipe`). See [ci-cert.md](ci-cert.md).
 

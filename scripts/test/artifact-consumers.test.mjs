@@ -104,7 +104,7 @@ test('artifacts.mjs prints its verdict line: FAIL on a planted extra (a fake API
 const NAME = '@ai-ecoverse/wasm-grep';
 const VERSION = '3.12.0-2';
 const HEAD = 'dea953c9b0682a7f6bce2a102c07652d4b0d5f9f';
-const PR = { number: 7, head: HEAD, body: '', author: 'renovate[bot]' };
+const PR = { number: 7, head: HEAD, body: '', author: 'trieloff' };
 
 function io({ artifacts, tarballs = {} }) {
   return {
@@ -119,18 +119,20 @@ function io({ artifacts, tarballs = {} }) {
   };
 }
 const ladderArt = (id, digest) => ({ id, name: 'host-grep-pr7', expired: false, digest, created_at: new Date(Date.UTC(2026, 9, 17, 0, 0, id)).toISOString(), workflow_run: { id: 100 + id, head_sha: HEAD } });
-const ciCtx = { pkg: 'grep', name: NAME, version: VERSION, message: 'Merge pull request #7', ciCertified: true, assumeUnpublished: false };
+const ctx = (line) => ({ pkg: 'grep', name: NAME, version: VERSION, message: `Merge pull request #7\n\n${line}`, assumeUnpublished: false });
 
-test('ladder-merge-resolve, ci-certified path: two usable artifacts with different package.tgz refuse; the same tarball in two zips publishes', async () => {
+test('ladder-merge-resolve: a publish without a certified= line is refused, a green ci job notwithstanding', async () => {
+  const tgz = { sha: 'a'.repeat(64), recorded: 'a'.repeat(64), name: NAME, version: VERSION };
+  await assert.rejects(resolvePackage(ctx(''), io({ artifacts: [ladderArt(1, D('one'))], tarballs: { 1: tgz } })), /every publish needs a certified= line bound to its bytes/);
+});
+
+test('ladder-merge-resolve: a certified= line picks the artifact with its bytes; bytes that differ from the line are refused', async () => {
   const tgz = (c) => ({ sha: c.repeat(64), recorded: c.repeat(64), name: NAME, version: VERSION });
   const two = [ladderArt(1, D('zip-one')), ladderArt(2, D('zip-two'))];
-  await assert.rejects(resolvePackage(ciCtx, io({ artifacts: two, tarballs: { 1: tgz('a'), 2: tgz('b') } })), /2 usable artifacts with different package\.tgz/);
-  const same = await resolvePackage(ciCtx, io({ artifacts: two, tarballs: { 1: tgz('a'), 2: tgz('a') } }));
-  assert.equal(same.decision, 'publish');
-  assert.equal(same.inputs.artifact_id, '2');
-  assert.equal(same.inputs.certified, 'a'.repeat(64));
-  const one = await resolvePackage(ciCtx, io({ artifacts: [ladderArt(1, D('one'))], tarballs: { 1: tgz('a') } }));
-  assert.equal(one.inputs.artifact_id, '1');
+  const picked = await resolvePackage(ctx(`certified=${'a'.repeat(64)} ${NAME} ${VERSION}`), io({ artifacts: two, tarballs: { 1: tgz('a'), 2: tgz('b') } }));
+  assert.equal(picked.inputs.artifact_id, '1');
+  assert.equal(picked.inputs.certified, 'a'.repeat(64));
+  await assert.rejects(resolvePackage(ctx(`certified=${'c'.repeat(64)} ${NAME} ${VERSION}`), io({ artifacts: two, tarballs: { 1: tgz('a'), 2: tgz('b') } })), /does not match the certified= line/);
 });
 
 test('ladder-merge-resolve: a zip that does not match its artifact digest is refused', async (t) => {
