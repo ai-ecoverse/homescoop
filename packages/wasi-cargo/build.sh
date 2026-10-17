@@ -76,10 +76,11 @@ wasi-root = "$WASI_SYSROOT"
 cc = "gcc"
 TOML
 unset RUSTFLAGS || true
-./x.py build library --stage 1 --target "$TARGET" --config config.cargo.toml
+./x.py build library --stage 1 --target "$BUILD_TRIPLE,$TARGET" --config config.cargo.toml
 STAGE1="$SRC/build/$BUILD_TRIPLE/stage1"
 STAGE0_CARGO="$SRC/build/$BUILD_TRIPLE/stage0/bin/cargo"
 test -d "$STAGE1/lib/rustlib/$TARGET/lib"
+test -d "$STAGE1/lib/rustlib/$BUILD_TRIPLE/lib"
 test -x "$STAGE0_CARGO"
 
 CARGO_SRC="$PKG_WORK/cargo"
