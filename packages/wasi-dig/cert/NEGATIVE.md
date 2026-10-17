@@ -1,5 +1,39 @@
 # Negative proof (wasi-dig)
 
+## 0.1.0-4: the root rule, #573/#574/#599, users enforce (#864, #819)
+
+**Date:** 2026-10-17.
+
+**Supply chain.** cert-review's root rule (`scripts/cert-review/repack-input.mjs`):
+- 0.1.0-3 (npm latest before this) is **not attested**: its recipe had no
+  `source:` (sha none), and its build fetched rustup through `curl sh.rustup.rs`
+  and `rustup toolchain install`, which no pinned sha256 covers.
+- 0.1.0-4 at this head: `attested: true`, "builds its in-tree source (src,
+  Cargo.toml, Cargo.lock), downloads nothing unpinned and can't stage a
+  prebuilt". Rust 1.98.1 comes from `scripts/install-rust.sh` (rustc, cargo
+  and rust-std from static.rust-lang.org by sha256, checked against
+  `channel-rust-1.98.1.toml`); crates come through `cargo … --locked`.
+
+**Behaviour.** The published 0.1.0-3 against this checklist on slicc-kernel
+1.102.6, users enforce, `--soft`: `checklist.mjs` fails 18 cases, and passes
+all the older ones. `users.mjs` passes on both, since dig itself opens no files:
+
+```text
+DoH 502, doh.test/cors          no "may be offline" wording
+DoH 502, cloudflare-dns.com     '(the DoH endpoint may not allow cross-origin requests …; cloudflare-dns.com does)'  (#573)
+DoH 502, 1.1.1.1                the same CORS hint                                                     (#573)
+-t NULL null.test (rdlength 0)  rc 9 ';; Got bad packet: unexpected record with length 0 in non-update message'  (#574)
+-t TYPE999, rdlength 0          the same bad packet                                                    (#574)
+DNSKEY / DS with no key/digest  'emptykey.test.\t\t3600\tIN\tDNSKEY\t257 3 13 ' (trailing space)          (#574)
+-t UID uid.test                 rc 1 'dig: invalid type: UID'                                          (#599)
+RRSIG expiration 0xffffffff     '21060207062815'                     want '19691231235959'                 (#599)
+```
+
+An empty A record is still a bad packet on both.
+`prove-negative.mjs --users enforce` (empty `bin/dig.wasm`): FAIL, 2 of 2 specs.
+
+## 0.1.0-3 and earlier
+
 **Date:** 2026-10-10 (0.1.0-1)
 New package, so it needs human cert first and is not in `scripts/ci-certified.json`.
 

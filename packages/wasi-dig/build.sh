@@ -20,20 +20,13 @@ mkdir -p "$SRC"
 cp -R "$HOMESCOOP_PKG/Cargo.toml" "$HOMESCOOP_PKG/Cargo.lock" "$HOMESCOOP_PKG/src" "$SRC/"
 homescoop_vendor_crates "$SRC" wasix-net
 
-export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"
-if ! command -v rustup >/dev/null 2>&1; then
-  echo "== wasi-dig: installing rustup"
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
-    sh -s -- -y --profile minimal --default-toolchain none
-  export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:${PATH}"
-fi
-rustup toolchain install "$RUST" --profile minimal --target "$TARGET"
-CARGO=(cargo "+$RUST")
+eval "$(bash "$ROOT/scripts/install-rust.sh" "$RUST" "$WORK/rust-$RUST" "$TARGET")"
+CARGO=(cargo)
 
 echo "== wasi-dig: unit tests (host)"
 (cd "$SRC" && "${CARGO[@]}" test --locked --release --quiet)
 
-echo "== wasi-dig: cargo build ($TARGET, Rust $RUST)"
+echo "== wasi-dig: build $TARGET with Rust $RUST"
 (
   cd "$SRC"
   # Keep host paths out of panic messages.

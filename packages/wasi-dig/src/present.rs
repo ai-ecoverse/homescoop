@@ -135,6 +135,10 @@ const TYPES: &[(u16, &str)] = &[
     (67, "HHIT"),
     (68, "BRID"),
     (99, "SPF"),
+    (100, "UINFO"),
+    (101, "UID"),
+    (102, "GID"),
+    (103, "UNSPEC"),
     (104, "NID"),
     (105, "L32"),
     (106, "L64"),
@@ -263,14 +267,26 @@ fn base32hex(data: &[u8]) -> String {
 
 /// `dns_time32_totext`: `YYYYMMDDHHMMSS`, UTC.
 pub fn time32(t: u32) -> String {
-    let (y, m, d, hh, mm, ss) = civil(u64::from(t));
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as u32)
+        .unwrap_or(0);
+    time64(time64_from32(t, now))
+}
+
+pub fn time64_from32(value: u32, now: u32) -> i64 {
+    i64::from(now) + i64::from(value.wrapping_sub(now) as i32)
+}
+
+pub fn time64(t: i64) -> String {
+    let (y, m, d, hh, mm, ss) = civil(t);
     format!("{y:04}{m:02}{d:02}{hh:02}{mm:02}{ss:02}")
 }
 
 /// Civil UTC date and time from seconds since 1970 (Howard Hinnant).
-pub fn civil(secs: u64) -> (i64, u32, u32, u64, u64, u64) {
-    let days = (secs / 86_400) as i64;
-    let rem = secs % 86_400;
+pub fn civil(secs: i64) -> (i64, u32, u32, i64, i64, i64) {
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;
@@ -351,11 +367,11 @@ pub fn dnssec(code: u16, rd: &[u8], crypto: bool) -> Option<String> {
             if code == 25 && flags & 0xc000 == 0xc000 {
                 return Some(out);
             }
-            out.push(' ');
-            if crypto {
+            if !crypto {
+                let _ = write!(out, " [key id = {}]", key_tag(rd));
+            } else if rd.len() > 4 {
+                out.push(' ');
                 out.push_str(&base64(&rd[4..], Some(WORD)));
-            } else {
-                let _ = write!(out, "[key id = {}]", key_tag(rd));
             }
             Some(out)
         }
@@ -364,7 +380,7 @@ pub fn dnssec(code: u16, rd: &[u8], crypto: bool) -> Option<String> {
             let tag = u16_at(rd, 0)?;
             let (alg, digest) = (*rd.get(2)?, *rd.get(3)?);
             let body = if crypto { hex(&rd[4..], WORD) } else { "[omitted]".into() };
-            Some(format!("{tag} {alg} {digest} {body}"))
+            Some(if body.is_empty() { format!("{tag} {alg} {digest}") } else { format!("{tag} {alg} {digest} {body}") })
         }
         // RRSIG, SIG: totext_rrsig.
         46 | 24 => {
@@ -564,6 +580,10 @@ mod tests {
         assert_eq!(type_name(999), "TYPE999");
         assert_eq!(type_name(65305), "TYPE65305");
         assert_eq!(type_code("rrsig"), Some(46));
+        assert_eq!(type_code("UID"), Some(101));
+        assert_eq!(type_name(100), "UINFO");
+        assert_eq!(type_name(102), "GID");
+        assert_eq!(type_code("unspec"), Some(103));
         assert_eq!(type_code("NSAP-PTR"), Some(23));
         assert_eq!(type_code("TYPE999"), Some(999));
         assert_eq!(type_code("TYPE"), None);
@@ -592,7 +612,11 @@ mod tests {
         assert_eq!(base32hex(&[0xff; 5]), "VVVVVVVV");
         assert_eq!(base32hex(b"f"), "CO");
         assert_eq!(time32(1_791_301_147), "20261006153907");
-        assert_eq!(time32(0), "19700101000000");
+        let now = 1_791_301_147;
+        assert_eq!(time64(time64_from32(0, now)), "19700101000000");
+        assert_eq!(time64(time64_from32(0xffff_ffff, now)), "19691231235959");
+        assert_eq!(time64(time64_from32(0xffff_ffff, 0xf000_0000)), "21060207062815");
+        assert_eq!(time64(time64_from32(now + 86_400, now)), "20261007153907");
     }
 
     #[test]
@@ -614,6 +638,8 @@ mod tests {
             "257 3 13 mdsswUyr3DPW132mOi8V9xESWE8jTo0dxCjjnopKl+GqJxpVXckHAeF+ KkxLbxILfDLUT0rAK9iUzy1L53eKGQ=="
         );
         assert_eq!(dnssec(48, &ksk, false).unwrap(), "257 3 13 [key id = 2371]");
+        assert_eq!(dnssec(48, &ksk[..4], true).unwrap(), "257 3 13");
+        assert_eq!(dnssec(43, &[0x09, 0x43, 13, 2], true).unwrap(), "2371 13 2");
         let ds = [&[0x09, 0x43, 13, 2][..], &[0xab; 32][..]].concat();
         assert_eq!(
             dnssec(43, &ds, true).unwrap(),
