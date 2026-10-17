@@ -2,7 +2,7 @@
  * File#flock (homescoop#420, #578). Up to 3.4.11-16 missing/flock.c's
  * __wasi__ branch answered every flock with 0 (patches/flock-wasi-noop.patch),
  * so it excluded nobody: two `bundle install`s on one bundle path raced. Since
- * 3.4.11-17 (patches/flock-wasi-fcntl.patch) it takes whole-file fcntl record
+ * 3.4.11-17 (patches/flock-wasi-fcntl.patch) it took whole-file fcntl record
  * locks (F_SETLK / F_SETLKW), which slicc-kernel enforces between processes
  * from 1.100.0 (slicc.fcntl_lock), as wasix-perl 5.42.0-15 did for #631:
  * fcntl semantics, so a lock belongs to the process (a second handle in the
@@ -11,6 +11,8 @@
  * on a write-only one a write lock. Anything that isn't a regular file (pipe,
  * /dev/null, a directory) is granted and excludes nobody (slicc-kernel keeps
  * record locks on regular files only, slicc-kernel#757; NEGATIVE.md).
+ * Since 3.4.11-18 it is libc's flock (wasix-sysroot -34, slicc.flock): per
+ * open file description, on any descriptor, as on Linux.
  */
 const GEMFILE = 'source "https://rubygems.org"\ngem "json"\n';
 const TRACE = 'class File; alias_method :homescoop_flock, :flock; def flock(op); r = homescoop_flock(op); $stderr.puts "FLOCK #{File.basename(path)} #{op} #{r}"; r; end; end\n';
@@ -92,7 +94,8 @@ export default async function (ctx) {
     return { out: r.stdout, err: r.stderr };
   };
   const floor = ctx.installed?.[0]?.engines?.['slicc-kernel'];
-  assert.equal(floor, '>=1.100.0', `engines.slicc-kernel is >=1.100.0, the first kernel with slicc.fcntl_lock: ${floor}`);
+  const fm = /^>=1\.(\d+)\.\d+$/.exec(floor ?? '');
+  assert.ok(fm && Number(fm[1]) >= 117, `engines.slicc-kernel is at least >=1.117.0, the first kernel with slicc.flock: ${floor}`);
 
   // Between processes, as root and as a user (#578's repro is the child= field).
   await write('/tmp/ruby-flock-child.rb', CHILD);
@@ -112,6 +115,11 @@ export default async function (ctx) {
   // Not a regular file: granted, excluding nobody (slicc-kernel#757).
   const other = await sh(String.raw`ruby -e 'r, w = IO.pipe; n = File.open("/dev/null", "w"); d = File.open("/tmp"); $stderr.puts [w, r, $stdout, n, d].map { |io| h = File.for_fd(io.fileno, autoclose: false); [File::LOCK_EX, File::LOCK_SH | File::LOCK_NB, File::LOCK_UN].map { |op| h.flock(op).inspect }.join(",") }.join(" ")' | cat`);
   assert.equal(other.err, `${Array(5).fill('0,0,0').join(' ')}\n`, `File#flock on a pipe's ends, STDOUT through a pipe, /dev/null and a directory: ${other.err}`);
+
+  // 3.4.11-18: libc's flock, per open file description. A pipe's other end is
+  // another description and conflicts (-17 granted every lock on a pipe).
+  const pipe = await sh(String.raw`ruby -e 'r, w = IO.pipe; wf = File.for_fd(w.fileno, autoclose: false); rf = File.for_fd(r.fileno, autoclose: false); a = wf.flock(File::LOCK_EX); b = rf.flock(File::LOCK_EX | File::LOCK_NB); wf.flock(File::LOCK_UN); c = rf.flock(File::LOCK_EX | File::LOCK_NB); print [a, b, c].map(&:inspect).join(" ")'`);
+  assert.equal(pipe.out, '0 false 0', `File#flock on a pipe's two ends: ${pipe.out}${pipe.err}`);
 
   // bundler and rubygems still lock with File#flock and complete.
   await write('/tmp/flock-trace.rb', TRACE);
