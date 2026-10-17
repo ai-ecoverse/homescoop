@@ -19,7 +19,7 @@
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-10",
     "@ai-ecoverse/wasm-coreutils@9.12.0-4",
-    "@ai-ecoverse/wasix-python@3.14.2-25",
+    "@ai-ecoverse/wasix-python@3.14.2-27",
     "@ai-ecoverse/py-numpy@2.3.2-10",
     "@ai-ecoverse/py-pillow@12.3.0-8",
     "@ai-ecoverse/py-fonttools@4.66.1-7",
@@ -37,9 +37,10 @@
   "checklist": [
     "cert/import.mjs: import kiwisolver 1.5.1 from /node_modules/@ai-ecoverse/py-kiwisolver, found by discovery without PYTHONPATH, no nested python; its side module imports",
     "cert/solver.mjs: import kiwisolver (1.5.1); strength.weak/medium/strong/required are 1, 1000, 1e6, 1001001000; a Solver with required, strong and weak constraints and a strong edit variable (suggestValue 150) solves left 150, width 300, right 450, mid 300; hasConstraint/hasEditVariable; Constraint op/strength/violated/expression, Expression constant/value/terms, Term variable/coefficient/value, Variable name/context/setContext/value, Solver dumps/reset. 1.5.1-6: the first strength getter ends python with 'wasm trap: function signature mismatch', rc 134 (NEGATIVE.md)",
-    "cert/matplotlib.mjs: with the published range wave from npm (py-matplotlib 3.11.2-9, py-contourpy 1.4.0-7, py-numpy 2.3.2-10, …, homescoop#702; wasix-python 3.14.2-25, whose cert fixture is strict since -25, so nothing may be nested), plt.subplots(2, 2, layout='constrained') with titles, y labels and a colorbar saves a PNG through ConstrainedLayoutEngine, and the left column's x0 moves right of the default layout's. 1.5.1-6: rc 134 (homescoop#197)",
+    "cert/matplotlib.mjs: with the published range wave from npm (py-matplotlib 3.11.2-9, py-contourpy 1.4.0-7, py-numpy 2.3.2-10, \u2026, homescoop#702; wasix-python 3.14.2-25, whose cert fixture is strict since -25, so nothing may be nested), plt.subplots(2, 2, layout='constrained') with titles, y labels and a colorbar saves a PNG through ConstrainedLayoutEngine, and the left column's x0 moves right of the default layout's. 1.5.1-6: rc 134 (homescoop#197)",
     "test/call-signatures.test.mjs: the package has one side module; its 27 PyMethodDef and 4 PyGetSetDef entries all have the arity CPython calls them with (1.5.1-6: 21 mismatches)",
-    "python-range.mjs (1.5.1-8, homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3 (it is built against 3.14.2-16's headers); npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs every spec on 3.14.2-24, python-range.mjs again on 3.14.2-16. 1.5.1-7 (exact 3.14.2-16) nests a second python under 3.14.2-24 (NEGATIVE.md)"
+    "python-range.mjs (1.5.1-8, homescoop#702; -9: >=3.14.2-26): the tarball takes wasix-python >=3.14.2-27 <3.14.3 (it is built against 3.14.2-27's headers); npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs every spec on 3.14.2-24, python-range.mjs again on 3.14.2-16. 1.5.1-7 (exact 3.14.2-16) nests a second python under 3.14.2-24 (NEGATIVE.md)",
+    "1.5.1-9 (homescoop#890, #984): built from the PyPI sdist again (no repack:), against wasix-python 3.14.2-27's headers (was -16, an expired input), with wasixcc on wasix-sysroot 2025.9.30-34 through build.sh's HOMESCOOP_WASIX_SYSROOT_VERSION/SHA override until #984 flips the default; build.sh checks that the dependency is >=<headers' version> <3.14.3. import.mjs, solver.mjs and matplotlib.mjs as before"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-kiwisolver"
