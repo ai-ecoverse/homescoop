@@ -1,29 +1,12 @@
-# Homebrew-shaped recipe — Emscripten 6.0.9 driver for slicc.
 name: wasm-emscripten
 builder: host
+reproducible: true
 version: "6.0.9"
 npm: "@ai-ecoverse/wasm-emscripten"
 summary: "Emscripten 6.0.9 (emcc) for slicc via wasix-python"
 source:
-  url: "https://github.com/emscripten-core/emscripten"
-  sha256: "skip"
-# 6.0.9-18 is packaging-only: 6.0.9-17's bytes with slicc.env
-# EM_CACHE_PACKAGE / EM_LLVM_PACKAGE / EM_BINARYEN_PACKAGE = ${package}/../<dep>
-# (-17 hard-coded /shared/lib/node_modules/…, which npm and pnpm never fill;
-# #277) and emscripten-config resolving them physically. Drop repack: when
-# the next release rebuilds.
-# 6.0.9-19 too: wasm-clang 24.0.0-18 and wasm-binaryen 132.0.0-2, whose glue's
-# Node-host runner stays out of noInitialRun hosts (homescoop#276).
-# package/package.json keeps -17's "files" (a repack may not change it), so
-# it still says "Media"; build.sh writes "media" for the next real build, and
-# test/files.test.mjs checks that list against the tarball (#205).
-repack:
-  from: "6.0.9-17"
-  files:
-    - emscripten-config
-    - README.md
-  fields:
-    - slicc.env
+  url: "https://github.com/emscripten-core/emscripten/archive/4e4223852a0835923411059a3929907d7df1232e.tar.gz"
+  sha256: "426911732c683c5940e3e089782d90d272ec2738c933e53593f9e9a65ff6aa96"
 dependencies:
   build: []
   host: []
@@ -36,6 +19,9 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-emscripten
   license: MIT
   notes: |
-    Stages slicc-emscripten/src/emscripten (excluding test/docs) with
-    September slicc patches, Closure refuse, ac_cv_build seeding, and
-    writable EM_CACHE + sysroot symlink into emscripten-cache.
+    The emscripten 6.0.9 tag (4e422385, the emsdk 6.0.9 release f04ea239's
+    emscripten_revision), fetched by sha256, with patches/*.patch (the slicc
+    delta) applied. No compile except the lib/slicc shim objects, built with
+    that tree's emcc on emsdk 6.0.9's own prebuilt clang and binaryen
+    (scripts/emscripten-tree.sh pins them; they compile, none of their bytes
+    ship). homescoop#859.

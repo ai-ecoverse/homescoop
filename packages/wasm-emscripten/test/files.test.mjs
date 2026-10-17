@@ -15,13 +15,8 @@ import { test } from 'node:test';
 const here = new URL('..', import.meta.url);
 const tgz = process.env.HOMESCOOP_TGZ || fileURLToPath(new URL('../../.homescoop-out/package.tgz', here));
 
-/** The `files: [...]` array of the package.json build.sh writes. */
 function buildShFiles() {
-  const sh = readFileSync(new URL('build.sh', here), 'utf8');
-  const m = /^\s*files: \[\n([\s\S]*?)^\s*\],$/m.exec(sh);
-  assert.ok(m, 'build.sh has no files: [...] in its package.json');
-  const body = m[1].replace(/\/\/.*$/gm, '');
-  return new Function(`return [${body}]`)();
+  return JSON.parse(readFileSync(new URL('package/package.json', here), 'utf8')).files;
 }
 
 /** Top-level names in the tarball's package/, and every path. */

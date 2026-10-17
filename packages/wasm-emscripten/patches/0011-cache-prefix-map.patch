@@ -1,0 +1,20 @@
+--- a/tools/system_libs.py
++++ b/tools/system_libs.py
+@@ -18,7 +18,7 @@
+ from glob import iglob
+ from time import time
+ 
+-from . import building, cache, diagnostics, shared, utils
++from . import building, cache, config, diagnostics, shared, utils
+ from .cmdline import options
+ from .settings import settings
+ from .toolchain_profiler import ToolchainProfiler
+@@ -80,6 +80,8 @@
+   relative_source_dir = os.path.relpath(source_dir, build_dir)
+   flags += [f'-ffile-prefix-map={source_dir}={DETERMINISTIC_PREFIX}',
+             f'-ffile-prefix-map={relative_source_dir}={DETERMINISTIC_PREFIX}',
++            f'-ffile-prefix-map={cache.get_path("")}=/emsdk/cache',
++            f'-ffile-prefix-map={os.path.dirname(os.path.abspath(os.path.expanduser(config.LLVM_ROOT)))}=/emsdk/llvm',
+             f'-fdebug-compilation-dir={DETERMINISTIC_PREFIX}']
+   return flags
+ 

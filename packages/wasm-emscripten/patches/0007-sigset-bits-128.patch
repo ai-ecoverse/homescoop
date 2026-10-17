@@ -1,4 +1,3 @@
-diff --git a/system/lib/libc/musl/arch/emscripten/bits/alltypes.h b/system/lib/libc/musl/arch/emscripten/bits/alltypes.h
 --- a/system/lib/libc/musl/arch/emscripten/bits/alltypes.h
 +++ b/system/lib/libc/musl/arch/emscripten/bits/alltypes.h
 @@ -404,15 +404,11 @@
