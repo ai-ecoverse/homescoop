@@ -3,7 +3,6 @@
 # go over DNS over HTTPS through the realm proxy or DNS over TCP.
 name: wasi-dig
 builder: host
-runner: pool
 version: "0.1.0"
 npm: "@ai-ecoverse/wasi-dig"
 summary: "dig for slicc WASI (wasm32-wasip1): DNS over HTTPS / TCP, dig-style output"

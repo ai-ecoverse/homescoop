@@ -3,7 +3,6 @@
 # util-linux (see packages/mount/README.md for the comparison).
 name: mount
 builder: host
-runner: pool
 version: "1.0.0"
 npm: "@ai-ecoverse/wasm-mount"
 summary: "mount / umount for slicc (process mounts via slicc-kernel)"

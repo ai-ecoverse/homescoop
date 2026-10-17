@@ -2,7 +2,6 @@
 # Split from tools: one target's std is ~124 MB raw / ~30 MB gzipped (>40 MiB cap).
 name: wasm-go-std-wasip1
 builder: host
-runner: pool
 # renovate: datasource=golang-version depName=go
 version: "1.26.5"
 npm: "@ai-ecoverse/wasm-go-std-wasip1"

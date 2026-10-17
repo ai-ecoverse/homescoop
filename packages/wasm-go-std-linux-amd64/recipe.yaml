@@ -2,7 +2,6 @@
 # Queue: after wasm-go + wasm-go-std-wasip1 if needed. Revision versions only.
 name: wasm-go-std-linux-amd64
 builder: host
-runner: pool
 # renovate: datasource=golang-version depName=go
 version: "1.26.5"
 npm: "@ai-ecoverse/wasm-go-std-linux-amd64"

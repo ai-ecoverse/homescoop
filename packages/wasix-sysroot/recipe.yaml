@@ -1,7 +1,6 @@
 # Homebrew-shaped recipe — WASIX sysroot data (wasixcc SYSROOT_PREFIX layout).
 name: wasix-sysroot
 builder: host
-runner: pool
 version: "2025.9.30"
 npm: "@ai-ecoverse/wasix-sysroot"
 summary: "WASIX libc/libcxx/compiler-rt sysroots for wasm32-wasi"
