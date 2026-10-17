@@ -221,8 +221,9 @@ pkg = {
     "version": pkg_ver,
     "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -28: user ids and signal masks from slicc-kernel)",
     # wasix-sysroot -20 asks slicc-kernel for user ids (no fallback); the homedir
-    # owner check needs 1.47.1, which reports owners as the caller's ids.
-    "engines": {"slicc-kernel": ">=1.47.1"},
+    # owner check needs 1.47.1, which reports owners as the caller's ids;
+    # dotlock's fcntl locks need 1.100.0 (slicc.fcntl_lock, homescoop#712).
+    "engines": {"slicc-kernel": ">=1.100.0"},
     "license": "GPL-3.0-or-later",
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-gnupg/package"},
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses", "patches"],

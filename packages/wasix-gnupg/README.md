@@ -37,6 +37,21 @@ decrypt yet).
   next gpg starts a new one).
 - `gpg-agent --daemon PROGRAM` (run a program under the agent) needs fork
   and is not supported.
+- Lock files (2.4.9-8, homescoop#712): gpg's dotlock holds an `fcntl` write
+  lock on `<file>.lock` (`pubring.kbx.lock`, `trustdb.gpg.lock`), which
+  slicc-kernel (≥ 1.100.0) enforces between processes and drops when the
+  holder exits, so concurrent gpg runs on one homedir no longer lose keys
+  and there are no stale locks to remove. Up to 2.4.9-7 dotlock fell back
+  to an `O_EXCL` lock file (OPFS has no hard links), which raced: runs
+  failed with "Oops, … is not locked" or "lockfile disappeared". The lock
+  files stay in place. `gpgconf --lock`/`--unlock` still use the old lock
+  file protocol and don't exclude a running gpg.
+- gpg reads the keybox without a lock. A WASIX program's rename over a
+  file isn't atomic for other processes yet (ai-ecoverse/slicc-kernel#903),
+  so a gpg that reads while another one writes can fail with
+  `keydb_search failed: No such file or directory` or `invalid packet`.
+  The failing run writes nothing, so run it again. The keybox's backup
+  (`pubring.kbx~`) is a copy, so the keybox name is always there.
 
 ## How it is built
 
