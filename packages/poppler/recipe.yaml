@@ -1,7 +1,6 @@
 # poppler PDF utilities (pdftotext, pdftoppm, …) for slicc wasm realm (host ladder).
 name: poppler
 builder: host
-runner: pool
 # renovate: datasource=gitlab-tags depName=poppler/poppler extractVersion=^poppler-(?<version>.*)$ registryUrl=https://gitlab.freedesktop.org
 version: "26.10.0"
 npm: "@ai-ecoverse/wasm-poppler"

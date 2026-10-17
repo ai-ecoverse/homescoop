@@ -1,7 +1,6 @@
 # LGPL relink kits of wasm-imagemagick and wasm-imagemagick-heif (homescoop#593).
 name: imagemagick-relink
 builder: host
-runner: pool
 # build.sh runs both ImageMagick builds; a change to either rebuilds the kits.
 inputs:
   - packages/imagemagick/**

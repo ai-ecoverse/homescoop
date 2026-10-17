@@ -1,7 +1,6 @@
 # ImageMagick utilities/magick for slicc wasm realm (host ladder).
 name: imagemagick
 builder: host
-runner: pool
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
 version: "7.1.2-34"
 npm: "@ai-ecoverse/wasm-imagemagick"
