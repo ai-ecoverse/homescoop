@@ -1,15 +1,16 @@
 {
   "name": "@ai-ecoverse/wasm-tls-engine",
-  "version": "4.2.0-1",
-  "description": "Mbed TLS 4.2.0 server engine for SLICC's wasm-realm proxy: TLS sessions over memory buffers, externally signed leaves (ES module + wasm)",
-  "license": "Apache-2.0",
+  "version": "4.2.0-2",
+  "description": "Mbed TLS 4.2.0 TLS engine for SLICC: server sessions for the wasm-realm proxy (externally signed leaves) and verifying client sessions (SNI, ALPN, a caller's trust store or the bundled Mozilla roots), over memory buffers (ES module + wasm)",
+  "license": "Apache-2.0 AND MPL-2.0",
   "type": "module",
   "exports": {
     ".": {
       "types": "./index.d.ts",
       "default": "./dist/slicc-tls-engine.mjs"
     },
-    "./slicc-tls-engine.wasm": "./dist/slicc-tls-engine.wasm"
+    "./slicc-tls-engine.wasm": "./dist/slicc-tls-engine.wasm",
+    "./roots.der": "./dist/roots.der"
   },
   "types": "./index.d.ts",
   "repository": {
@@ -18,11 +19,37 @@
     "directory": "packages/tls-engine/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/tls-engine",
-  "keywords": ["wasm", "emscripten", "slicc", "homescoop", "mbedtls", "tls"],
-  "files": ["README.md", "LICENSE", "index.d.ts", "dist"],
-  "publishConfig": { "access": "public" },
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "mbedtls",
+    "tls"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "index.d.ts",
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "homescoop": {
     "recipe": "tls-engine",
     "upstream": "4.2.0"
+  },
+  "slicc": {
+    "tls": {
+      "roots": {
+        "file": "dist/roots.der",
+        "source": "https://curl.se/ca/cacert-2026-09-25.pem",
+        "date": "2026-09-25",
+        "sha256": "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505",
+        "license": "MPL-2.0"
+      }
+    }
   }
 }
