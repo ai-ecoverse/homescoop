@@ -190,21 +190,10 @@ jobs:
           COMPARE: ${{ needs.compare.result }}
         with:
           script: |
-            const fs = require('fs');
             const { owner, repo } = context.repo;
             const want = JSON.parse(process.env.PACKAGES);
-            const rows = [];
-            for (const p of want) {
-              const file = `verdicts/verdict-${p}/${p}.tsv`;
-              const own = fs.existsSync(file)
-                ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t')).filter((r) => r[0] === p)
-                : [];
-              rows.push(own.length === 1 ? own[0] : [p, 'no verdict', own.length ? `verdict-${p} has ${own.length} rows` : 'a build failed or was cancelled', '']);
-            }
-            if (process.env.COMPARE !== 'success' && rows.every((r) => r[1] === 'same')) {
-              rows.push(['(compare)', 'no verdict', `a compare leg ended ${process.env.COMPARE}, yet every verdict says same`, '']);
-            }
-            rows.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+            const { verdictRows } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cert-review/pool-verdicts.mjs`);
+            const rows = verdictRows({ dir: 'verdicts', want, compare: process.env.COMPARE });
             const bad = rows.filter((r) => r[1] !== 'same').map((r) => r[0]);
             const table = ['| recipe | verdict | sha256 | first difference |', '| --- | --- | --- | --- |', ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');
             await core.summary.addRaw(`${table}\n`).write();

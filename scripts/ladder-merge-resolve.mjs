@@ -221,23 +221,24 @@ export async function resolvePackage(ctx, io) {
   }
   const note = ignored ? ` (certified= lines ignored: ${ignored})` : '';
   if (usable.length === 0) throw new Error(`no usable ${artifactName}${note}: ${rejected.join(' | ')}`);
-  if (!certified) {
-    const digests = [...new Set(usable.map(({ artifact }) => artifact.digest))];
-    if (digests.length > 1) {
-      throw new Error(
-        `${artifactName}${note}: ${usable.length} usable artifacts with different bytes ` +
-          `(${usable.map(({ artifact }) => `${artifact.id} ${artifact.digest}`).join(', ')}), and no certified= line picks one`,
-      );
-    }
-  }
   const mismatches = [];
-  for (const { artifact, run } of certified ? usable : usable.slice(0, 1)) {
+  const good = [];
+  for (const { artifact, run } of usable) {
     const got = await io.download(artifact);
     const problem = tarballProblem(got, { name, version, certified });
-    if (problem) {
-      mismatches.push(`artifact ${artifact.id}: ${problem}`);
-      continue;
-    }
+    if (problem) mismatches.push(`artifact ${artifact.id}: ${problem}`);
+    else good.push({ artifact, run, got });
+    if (certified && good.length) break;
+  }
+  const shas = [...new Set(good.map(({ got }) => got.sha))];
+  if (shas.length > 1) {
+    throw new Error(
+      `${artifactName}${note}: ${good.length} usable artifacts with different package.tgz ` +
+        `(${good.map(({ artifact, got }) => `${artifact.id} ${got.sha}`).join(', ')}), and no certified= line picks one`,
+    );
+  }
+  if (good.length) {
+    const { artifact, run, got } = good[0];
     return {
       decision: 'publish',
       gate: certified ? `certified= line in the ${source}` : `ci-certified (ladder-pr ci job)${ignored ? `; lines ignored: ${ignored}` : ''}`,

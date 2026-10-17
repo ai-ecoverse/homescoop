@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { discover, pick } from '../cert-review/artifacts.mjs';
+import { verdictRows } from '../cert-review/pool-verdicts.mjs';
 import { LADDER_PR, githubIo, resolvePackage, tarballProblem, zipDigestProblem } from '../ladder-merge-resolve.mjs';
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -120,11 +121,15 @@ function io({ artifacts, tarballs = {} }) {
 const ladderArt = (id, digest) => ({ id, name: 'host-grep-pr7', expired: false, digest, created_at: new Date(Date.UTC(2026, 9, 17, 0, 0, id)).toISOString(), workflow_run: { id: 100 + id, head_sha: HEAD } });
 const ciCtx = { pkg: 'grep', name: NAME, version: VERSION, message: 'Merge pull request #7', ciCertified: true, assumeUnpublished: false };
 
-test('ladder-merge-resolve, ci-certified path: two usable artifacts with different bytes refuse, one publishes', async () => {
-  const good = { sha: 'a'.repeat(64), recorded: 'a'.repeat(64), name: NAME, version: VERSION };
-  await assert.rejects(resolvePackage(ciCtx, io({ artifacts: [ladderArt(1, D('one')), ladderArt(2, D('two'))], tarballs: { 1: good, 2: good } })), /2 usable artifacts with different bytes/);
-  const one = await resolvePackage(ciCtx, io({ artifacts: [ladderArt(1, D('one'))], tarballs: { 1: good } }));
-  assert.equal(one.decision, 'publish');
+test('ladder-merge-resolve, ci-certified path: two usable artifacts with different package.tgz refuse; the same tarball in two zips publishes', async () => {
+  const tgz = (c) => ({ sha: c.repeat(64), recorded: c.repeat(64), name: NAME, version: VERSION });
+  const two = [ladderArt(1, D('zip-one')), ladderArt(2, D('zip-two'))];
+  await assert.rejects(resolvePackage(ciCtx, io({ artifacts: two, tarballs: { 1: tgz('a'), 2: tgz('b') } })), /2 usable artifacts with different package\.tgz/);
+  const same = await resolvePackage(ciCtx, io({ artifacts: two, tarballs: { 1: tgz('a'), 2: tgz('a') } }));
+  assert.equal(same.decision, 'publish');
+  assert.equal(same.inputs.artifact_id, '2');
+  assert.equal(same.inputs.certified, 'a'.repeat(64));
+  const one = await resolvePackage(ciCtx, io({ artifacts: [ladderArt(1, D('one'))], tarballs: { 1: tgz('a') } }));
   assert.equal(one.inputs.artifact_id, '1');
 });
 
@@ -208,4 +213,39 @@ test('cert-review picks the ladder-pr artifacts through discover(), not a bare n
   const text = readFileSync(join(workflows, 'cert-review.yml'), 'utf8');
   assert.match(text, /discover\(\{ artifacts, pattern:/);
   assert.match(text, /verdict_id: \$\{\{ steps\.verdict\.outputs\.artifact-id \}\}/);
+});
+
+function downloaded(t, verdicts) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'pool-verdicts-')));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const names = Object.keys(verdicts);
+  for (const name of names) {
+    const into = join(dir, 'verdicts', name);
+    mkdirSync(into, { recursive: true });
+    for (const [file, text] of Object.entries(verdicts[name])) writeFileSync(join(into, file), text);
+  }
+  return join(dir, 'verdicts');
+}
+
+test("pool-parity report: download-artifact's layout, one artifact or several, gives one verdict-<recipe>/ per recipe", () => {
+  const text = readFileSync(join(workflows, 'pool-parity.yml'), 'utf8');
+  assert.match(text, /path: verdicts\$\{\{ steps\.pick\.outputs\.single && format\('\/\{0\}', steps\.pick\.outputs\.single\) \|\| '' \}\}/);
+  assert.match(text, /verdictRows\(\{ dir: 'verdicts', want, compare: process\.env\.COMPARE \}\)/);
+});
+
+test('pool-parity report: one verdict, several, a planted foreign row, a stray directory, and a failed compare leg', (t) => {
+  const one = downloaded(t, { 'verdict-grep': { 'grep.tsv': 'grep\tsame\taaa\t\n' } });
+  assert.deepEqual(verdictRows({ dir: one, want: ['grep'], compare: 'success' }), [['grep', 'same', 'aaa', '']]);
+  const several = downloaded(t, { 'verdict-grep': { 'grep.tsv': 'grep\tsame\taaa\t\n' }, 'verdict-sed': { 'sed.tsv': 'sed\tdiffer\thosted a pool b\tpackage/x\n' } });
+  assert.deepEqual(verdictRows({ dir: several, want: ['grep', 'sed'], compare: 'failure' }).map((r) => r.slice(0, 2)), [['grep', 'same'], ['sed', 'differ']]);
+  const foreign = downloaded(t, { 'verdict-grep': { 'grep.tsv': 'grep\tsame\taaa\t\n', 'sed.tsv': 'sed\tsame\tbbb\t\n' }, 'verdict-sed': { 'sed.tsv': 'sed\tdiffer\tx\ty\n' } });
+  assert.deepEqual(verdictRows({ dir: foreign, want: ['grep', 'sed'], compare: 'failure' }).map((r) => r.slice(0, 2)), [['grep', 'same'], ['sed', 'differ']]);
+  const twice = downloaded(t, { 'verdict-grep': { 'grep.tsv': 'grep\tsame\ta\t\ngrep\tsame\tb\t\n' } });
+  assert.match(verdictRows({ dir: twice, want: ['grep'], compare: 'success' })[0][2], /has 2 rows/);
+  const stray = downloaded(t, { 'verdict-grep': { 'grep.tsv': 'grep\tsame\taaa\t\n' }, 'verdict-evil': { 'evil.tsv': 'x' } });
+  assert.ok(verdictRows({ dir: stray, want: ['grep'], compare: 'success' }).some((r) => r[0] === '(layout)' && r[1] === 'no verdict'));
+  const allSame = verdictRows({ dir: one, want: ['grep'], compare: 'failure' });
+  assert.ok(allSame.some((r) => r[0] === '(compare)' && r[1] === 'no verdict'));
+  const missing = verdictRows({ dir: join(one, 'nope'), want: ['grep'], compare: 'success' });
+  assert.deepEqual(missing[0].slice(0, 2), ['grep', 'no verdict']);
 });
