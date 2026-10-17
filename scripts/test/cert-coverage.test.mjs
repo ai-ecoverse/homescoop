@@ -25,7 +25,6 @@ const NO_CERT = [
   'gmake', // #426
   'libiconv', // #426
   'libjpeg-turbo', // #426
-  'libwebp', // #426
   'libxml2', // #426
   'openjpeg', // #426
 ];
