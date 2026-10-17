@@ -556,12 +556,98 @@ function shellLines(text) {
   return out;
 }
 
+/**
+ * Whether a helper's `${VAR:-default}` can't take effect, so its default isn't
+ * a build input (homescoop#984). Every file that runs or sources the helper
+ * must be a package build.sh (packages/<x>/build.sh) that sets VAR first, and
+ * in each all of these hold:
+ * - the assignment is at top level: column 0, outside if/case/loops/functions/
+ *   subshells;
+ * - it is `export VAR=<literal>`, or `VAR=<literal>` then a top-level `export VAR`;
+ * - it comes before the first line that runs the helper, and nothing from it
+ *   to the last such line reassigns or unsets VAR;
+ * - the helper inherits it: no `env -i`, `env -u VAR` or `sudo` without
+ *   -E/--preserve-env on a line that runs it.
+ * Anything else: false, and both values count (fail closed).
+ */
+export function deadDefault(name, helperPath, all) {
+  const helper = helperPath.split('/').pop();
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const runsRe = new RegExp(`(?:^|[\\s;&|(\`"'$/])${esc(helper)}(?=["'\\s);|&]|$)`);
+  const runs = (line) => runsRe.test(line);
+  const literal = String.raw`(?:"[^"$\`\\]*"|'[^']*'|[^\s;&|$\`"'()<>]+)`;
+  const assign = new RegExp(`^(export\\s+)?${name}=${literal}\\s*$`);
+  const exportOnly = new RegExp(`^export\\s+${name}\\s*$`);
+  const touches = new RegExp(`(?:^|[\\s;&|(])(?:(?:export|local|readonly|declare(?:\\s+-[a-zA-Z]+)*|typeset)\\s+(?:-[a-zA-Z]+\\s+)*)?${name}\\+?=|\\bunset\\s+(?:-[vf]\\s+)?(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b|\\b(?:read|mapfile|readarray|printf\\s+-v)\\s+(?:-[a-zA-Z]+\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b|\\bexport\\s+-n\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s+)*${name}\\b`);
+  const scrubs = new RegExp(`\\benv\\s+(?:\\S+\\s+)*?(?:-i\\b|--ignore-environment\\b|-\\s|-u\\s*${name}\\b|--unset[= ]${name}\\b)|\\bsudo\\b(?![^;&|]*\\s(?:-E\\b|--preserve-env\\b))`);
+  const others = all.filter((f) => f.path !== helperPath && f.lines.some(runs));
+  if (!others.length) return false;
+  if (others.some((f) => !/^packages\/[^/]+\/build\.sh$/.test(f.path))) return false;
+  return others.every(({ lines }) => {
+    const calls = lines.map((l, i) => (runs(l) ? i : -1)).filter((i) => i >= 0);
+    const first = calls[0];
+    const last = calls[calls.length - 1];
+    if (calls.some((i) => scrubs.test(lines[i]))) return false;
+    const track = blockTracker();
+    let depth = 0;
+    let at = -1;
+    let isExported = false;
+    for (let i = 0; i < first; i++) {
+      const line = lines[i];
+      if (at < 0) {
+        const m = line.match(assign);
+        if (m && depth === 0) {
+          at = i;
+          isExported = Boolean(m[1]);
+        }
+      } else if (exportOnly.test(line)) {
+        if (depth !== 0) return false;
+        isExported = true;
+      } else if (touches.test(line)) {
+        return false;
+      }
+      depth = track(line);
+      if (depth < 0) return false;
+    }
+    if (at < 0 || !isExported) return false;
+    for (let i = first; i <= last; i++) {
+      if (touches.test(lines[i])) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Shell block nesting, line by line (comment-free lines): if/case/loops,
+ * { } groups and function bodies, ( ) subshells. Quoted text doesn't count,
+ * and inside a case the pattern parentheses don't either. An approximation
+ * that errs towards "nested", which only ever keeps a default as an input.
+ */
+function blockTracker() {
+  let depth = 0;
+  let cases = 0;
+  return (line) => {
+    const t = line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, '""').trim();
+    if (t) {
+      const opens = (t.match(/(?:^|[;&|(]\s*|\b(?:then|do|else)\s+)(?:if|case|while|until|for|select)\b/g) || []).length;
+      const closes = (t.match(/(?:^|[;&|]\s*)(?:fi|esac|done)\b/g) || []).length;
+      cases += (t.match(/(?:^|[;&|(]\s*|\b(?:then|do|else)\s+)case\b/g) || []).length;
+      const braces = (t.match(/(?:^|[\s)])\{(?=\s|$)/g) || []).length - (t.match(/(?:^|[\s;])\}(?=\s|;|$)/g) || []).length;
+      const parens = cases > 0 ? 0 : (t.match(/\(/g) || []).length - (t.match(/\)/g) || []).length;
+      cases -= (t.match(/(?:^|[;&|]\s*)esac\b/g) || []).length;
+      if (cases < 0) cases = 0;
+      depth += opens - closes + braces + parens;
+    }
+    return depth;
+  };
+}
+
 export function buildFileInputs(files) {
   const inputs = [];
   const problems = [];
   const all = files.map(({ path, text }) => ({ path, lines: shellLines(text) }));
   const everywhere = all.flatMap((f) => f.lines);
-  const resolver = (lines) => (expr) => {
+  const resolver = (lines, path) => (expr) => {
     let parts = [''];
     const re = /\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?|([^$]+)/g;
     for (const m of expr.matchAll(re)) {
@@ -573,7 +659,7 @@ export function buildFileInputs(files) {
       for (const v of assignedValues(m[1], lines)) {
         const d = v.match(/^\$\{([A-Za-z_][A-Za-z0-9_]*):?-([^}$]*)\}$/);
         if (d) {
-          values.add(d[2]);
+          if (!deadDefault(d[1], path, all)) values.add(d[2]);
           for (const o of assignedValues(d[1], everywhere)) values.add(o);
         } else values.add(v);
       }
@@ -583,7 +669,7 @@ export function buildFileInputs(files) {
     return parts.every((p) => /^[0-9][0-9A-Za-z.+-]*$/.test(p)) ? [...new Set(parts)] : null;
   };
   for (const { path, lines } of all) {
-    const resolve = resolver(lines);
+    const resolve = resolver(lines, path);
     lines.forEach((line, i) => {
       const where = `${path}:${i + 1}`;
       if (OUR_NPM.test(line)) {

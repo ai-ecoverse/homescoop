@@ -140,6 +140,8 @@ test('NEGATIVE: a tool-only homescoop input (an install-* helper) is checked the
 
   const overridden = buildFileInputs([{ path: 'packages/demo/build.sh', text: 'export HOMESCOOP_TOOL_VERSION=2025.9.30-32\n' }, { path: 'scripts/install-tool.sh', text: helper }]);
   assert.deepEqual(overridden.inputs.map((i) => i.version).sort(), ['2025.9.30-14', '2025.9.30-32'], 'an override a build file sets is an input too');
+  const conditional = buildFileInputs([{ path: 'packages/demo/build.sh', text: 'if [[ -n "$X" ]]; then\n  export HOMESCOOP_TOOL_VERSION=2025.9.30-32\nfi\neval "$(bash "$ROOT/scripts/install-tool.sh")"\n' }, { path: 'scripts/install-tool.sh', text: helper }]);
+  assert.deepEqual(conditional.inputs.map((i) => i.version).sort(), ['2025.9.30-14', '2025.9.30-32'], 'an override a build file sets is an input too, and inside an if the default still is');
   const unresolved = buildFileInputs([{ path: 'scripts/x.sh', text: 'V="$(cat v)"\ncurl -O "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-$V.tgz"\n' }]);
   assert.match(unresolved.problems.join(), /whose version this rule can't resolve/);
   const npm = buildFileInputs([{ path: 'packages/demo/build.sh', text: [
@@ -177,4 +179,36 @@ test('the known list: the shipped file parses, every entry names #864, and a mal
   const ok = spawnSync(process.execPath, [script, '--fixtures', dir, '--package', 'demo'], { encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stdout);
   assert.equal(KNOWN_INPUTS, join(here, '../cert-review/known-inputs.txt'));
+});
+
+test('a helper default that an unconditional top-level export overrides is not an input (homescoop#984)', () => {
+  const helper = `#!/usr/bin/env bash\nV="\${HOMESCOOP_WASIX_SYSROOT_VERSION:-2025.9.30-32}"\nfetch "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-$V.tgz" "$SHA" "$DL/s.tgz"\n`;
+  const versions = (build) => buildFileInputs([{ path: 'packages/demo/build.sh', text: build }, { path: 'scripts/install-wasixcc.sh', text: helper }]).inputs.map((i) => i.version).sort();
+  const call = 'if ! command -v wasixcc >/dev/null; then\n  eval "$(bash "$ROOT/scripts/install-wasixcc.sh")"\nfi\n';
+  const set = 'export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34\n';
+  const both = ['2025.9.30-32', '2025.9.30-34'];
+  assert.deepEqual(versions(`#!/usr/bin/env bash\nset -euo pipefail\n${set}${call}`), ['2025.9.30-34'], 'an exported top-level override before the call: only the override');
+  assert.deepEqual(versions(`HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34\nexport HOMESCOOP_WASIX_SYSROOT_VERSION\n${call}`), ['2025.9.30-34'], 'VAR=<literal> then export VAR: only the override');
+  assert.deepEqual(versions(`HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34\n${call}`), both, 'not exported: the helper never sees it');
+  assert.deepEqual(versions(`if true; then\n${set}fi\n${call}`), both, 'inside an if (even unindented): both');
+  assert.deepEqual(versions(`  ${set}${call}`), both, 'indented: both');
+  assert.deepEqual(versions(`f() {\n${set}}\nf\n${call}`), both, 'inside a function: both');
+  assert.deepEqual(versions(`(\n${set})\n${call}`), both, 'inside a subshell: both');
+  assert.deepEqual(versions(`case "$x" in\n  a)\n${set};;\nesac\n${call}`), both, 'inside a case: both');
+  assert.deepEqual(versions(`${call}${set}`), both, 'after the helper call: both');
+  assert.deepEqual(versions(`${set}unset HOMESCOOP_WASIX_SYSROOT_VERSION\n${call}`), both, 'unset after the override: both');
+  const unresolved = buildFileInputs([{ path: 'packages/demo/build.sh', text: `${set}export HOMESCOOP_WASIX_SYSROOT_VERSION="$(cat v)"\n${call}` }, { path: 'scripts/install-wasixcc.sh', text: helper }]);
+  assert.match(unresolved.problems.join(), /whose version this rule can't resolve/, 'reassigned from a command before the call: unresolvable, fails closed');
+  assert.deepEqual(versions(`${set}HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-33\n${call}`).includes('2025.9.30-32'), true, 'reassigned to another literal: the default still counts');
+  assert.deepEqual(versions(`${set}eval "$(env -i bash "$ROOT/scripts/install-wasixcc.sh")"\n`), both, 'env -i on the helper call: both');
+  assert.deepEqual(versions(`${set}eval "$(env -u HOMESCOOP_WASIX_SYSROOT_VERSION bash "$ROOT/scripts/install-wasixcc.sh")"\n`), both, 'env -u VAR on the helper call: both');
+  assert.deepEqual(versions(`${set}eval "$(sudo bash "$ROOT/scripts/install-wasixcc.sh")"\n`), both, 'sudo without -E: both');
+  assert.deepEqual(versions(`${set}eval "$(sudo -E bash "$ROOT/scripts/install-wasixcc.sh")"\n`), ['2025.9.30-34'], 'sudo -E keeps the environment');
+  assert.deepEqual(versions(`DEPS_KEY="$(cat "$ROOT/scripts/install-wasixcc.sh" | shasum)"\n${set}${call}`), both, 'any mention of the helper before the override counts as a call: both');
+  const wrapped = buildFileInputs([
+    { path: 'packages/demo/build.sh', text: `${set}bash "$ROOT/scripts/wrap.sh"\n` },
+    { path: 'scripts/wrap.sh', text: 'eval "$(bash "$ROOT/scripts/install-wasixcc.sh")"\n' },
+    { path: 'scripts/install-wasixcc.sh', text: helper },
+  ]).inputs.map((i) => i.version).sort();
+  assert.deepEqual(wrapped, both, 'the helper run from a shared script, not the package build.sh: both');
 });
