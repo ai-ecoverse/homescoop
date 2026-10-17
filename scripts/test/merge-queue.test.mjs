@@ -319,60 +319,6 @@ test('ladder-pr on a merge group publishes, pushes and uploads nothing', () => {
   }
 });
 
-test('ladder-automerge hands a qualifying PR to the queue (auto-merge, merge commit, at the decided head) and merges nothing itself', async () => {
-  const { merge, AUTO_MERGE, ENQUEUE } = await import('../ladder-automerge.mjs');
-  const head = 'd'.repeat(40);
-  const calls = [];
-  const pr = {
-    number: 11, node_id: 'PR_11', merged: false, state: 'open', draft: false, mergeable: true, mergeable_state: 'clean', changed_files: 1,
-    head: { sha: head, repo: { full_name: 'x/y' } }, base: { ref: 'main', sha: 'e'.repeat(40) }, labels: [],
-  };
-  const io = (queueOn, gqlError) => ({
-    ...memberIo({ number: 11, head, sha: SHA_A, pkg: 'alpha', version: '1.0.0-2' }),
-    pull: async () => pr,
-    files: async () => [{ filename: 'packages/alpha/recipe.yaml' }],
-    file: async () => 'version: 1.0.1\n',
-    ladderRun: async () => ({ run: { id: 1, status: 'completed', conclusion: 'success' }, jobs: [{ name: 'ci', conclusion: 'success' }] }),
-    mergeQueue: async (branch) => (calls.push(['mergeQueue', branch]), queueOn),
-    gql: async (q, vars) => {
-      calls.push([q === AUTO_MERGE ? 'auto-merge' : q === ENQUEUE ? 'enqueue' : 'other', vars]);
-      if (q === AUTO_MERGE && gqlError) throw new Error(gqlError);
-      return {};
-    },
-    mergePull: async () => (calls.push(['PUT merge']), { sha: 'f'.repeat(40) }),
-    commit: async () => ({ parents: [{ sha: 'e'.repeat(40) }] }),
-  });
-  const queued = await merge({ repo: 'x/y', number: 11, head }, io(true));
-  assert.equal(queued.queued, true);
-  assert.equal(queued.merged, false, 'no merge sha: the publish waits for the queue\'s push to main');
-  assert.deepEqual(calls, [['mergeQueue', 'main'], ['auto-merge', { id: 'PR_11', head }]]);
-
-  calls.length = 0;
-  await merge({ repo: 'x/y', number: 11, head }, io(true, 'GraphQL: Pull request is in clean status (enablePullRequestAutoMerge)'));
-  assert.deepEqual(calls.map((c) => c[0]), ['mergeQueue', 'auto-merge', 'enqueue']);
-
-  calls.length = 0;
-  await assert.rejects(merge({ repo: 'x/y', number: 11, head }, io(true, 'GraphQL: Head sha didn\'t match expected head')), /Head sha/);
-  assert.ok(!calls.some((c) => c[0] === 'PUT merge'), 'a refused enqueue never falls back to a direct merge');
-
-  calls.length = 0;
-  const direct = await merge({ repo: 'x/y', number: 11, head }, io(false));
-  assert.deepEqual(direct, { merged: true, sha: 'f'.repeat(40), before: 'e'.repeat(40) });
-  assert.deepEqual(calls.map((c) => c[0]), ['mergeQueue', 'PUT merge'], 'without a queue it merges as before');
-});
-
-test('ladder-automerge: under a merge queue a mergeable PR that is "blocked" (direct merges are) still qualifies; without a queue it does not', async () => {
-  const { mergeProblems } = await import('../ladder-automerge.mjs');
-  const pr = {
-    number: 11, merged: false, state: 'open', draft: false, mergeable: true, mergeable_state: 'blocked', changed_files: 1,
-    head: { sha: 'd'.repeat(40), repo: { full_name: 'x/y' } }, base: { ref: 'main' }, labels: [],
-  };
-  const args = { repo: 'x/y', pr, review: { state: 'success' }, ladder: { run: { status: 'completed', conclusion: 'success' }, jobs: [{ name: 'ci', conclusion: 'success' }] }, files: [{ filename: 'packages/alpha/recipe.yaml' }], majors: [] };
-  assert.deepEqual(mergeProblems({ ...args, queue: true }), []);
-  assert.deepEqual(mergeProblems(args), ['mergeable_state is blocked']);
-  assert.deepEqual(mergeProblems({ ...args, queue: true, pr: { ...pr, mergeable_state: 'dirty', mergeable: false } }), ['mergeable_state is dirty (merge queue)']);
-});
-
 for (const moves of [true, false]) {
   test(`${moves ? 'NEGATIVE: ' : ''}a toolchain file main ${moves ? 'changed' : 'left alone'} under a member's artifact ${moves ? 'fails' : 'passes'} the group (toolchain default inputs, #857)`, async () => {
     const r = repo();

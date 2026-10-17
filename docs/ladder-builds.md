@@ -82,43 +82,16 @@ opens (or comments on) one `publish-failure` issue naming the package,
 version, run and both values. It publishes with `--tag latest` only: for
 homescoop, certified = latest.
 
-**Auto-merge (`ladder-automerge.yml`).** When a `cert-review` run completes
-(or on `workflow_dispatch` with a PR number), ladder-automerge re-derives
-everything from the PR and merges it with a merge commit at its head only if
-it is open, from this repo, not a draft, based on `main`, not labelled
-`homescoop-major` and no recipe goes up a semver major; its newest
-`cert-review` status is a valid record on the head (the resolver's own
-binding); ladder-pr's run at the head and its `ci` job are green; it touches
-publishable package files and none of `.github/workflows/**`, `scripts/**`,
-`shims/**`, `crates/**`, `renovate.json` or the root `package.json`; and
-`mergeable_state` is `clean`. Every check runs again right before the merge. A merge
-with `GITHUB_TOKEN` starts no `push` workflows, so the same run then calls
-`ladder-merge.yml` (`workflow_call`) for the merge commit; ladder-merge
-dispatches for real only on a push to `main` or when that caller is main's
-ladder-automerge, and the resolver re-checks every binding. A skipped PR
-with a green review gets one `auto-merge skipped: <reason>` comment (updated
-on re-runs) and the reason in the job summary; a failed merge comments on a
-`publish-failure` issue. A `GITHUB_TOKEN` merge fires no `Closes #N`, so
-after a merge the job closes the PR's still-open same-repo
-`closingIssuesReferences` itself (`Closed by #PR (merge <sha>), merged by
-ladder-automerge.`); a close failure is a warning. When `main` has a merge
-queue, ladder-automerge doesn't merge (the queue rejects a direct merge): it
-enables auto-merge with a merge commit at the decided head
-(`enablePullRequestAutoMerge`, `expectedHeadOid`; `enqueuePullRequest` if
-GitHub answers that the PR is already in clean status), and the publish runs
-from the queue's push to `main`, see *Merge queue* below. Without a queue,
-enabling auto-merge on a clean PR is refused, so it merges directly as above;
-the same code works before and after the ruleset. Dispatched from any branch but `main`,
-ladder-automerge is a dry run: it prints the decision and calls ladder-merge
-dry. Runs are serialized repo-wide (`concurrency: ladder-automerge`); GitHub
-keeps only the newest pending run, so a PR whose run was replaced is picked
-up by `workflow_dispatch` or its next review.
-
-**Chain depth.** ladder-pr → cert-review → ladder-automerge is three
-`workflow_run` levels, GitHub's limit. Nothing may hang a fourth
-`workflow_run` off ladder-automerge: its publish runs inside the same run
-(`workflow_call`), and ladder-merge reaches ladder-build by
-`workflow_dispatch`, which starts a new chain.
+**Merging.** PRs merge through the merge queue only (*Merge queue* below):
+open the PR, then enable GitHub's native auto-merge right away with
+`gh pr merge <n> --auto --merge --match-head-commit <sha>`. GitHub waits for the
+required checks (`ci` and `cert-review`), then enqueues; nothing has to wait
+for cert-review by hand. Renovate does the same for the PRs its rules
+automerge (`platformAutomerge`). The queue's merges are pushes to `main`, so
+`ladder-merge` runs on that push and `Closes #N` closes the linked issues.
+The `ladder-automerge` workflow that used to merge certified package PRs with
+`GITHUB_TOKEN` is retired: under the queue it could only enable auto-merge,
+and an enqueue by `GITHUB_TOKEN` starts no `merge_group` run.
 
 **Manual:** laptop `npm publish` of the exact certified tarball, then land,
 or `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`.
@@ -145,8 +118,7 @@ When the version document already exists, publish is skipped (success).
 | Workflow | When | What |
 | --- | --- | --- |
 | `ladder-pr.yml` | pull_request; `merge_group`; `workflow_dispatch(group_head)` (group dry run) | Host-build each touched package (no publish); on a merge group, check the combined head without building |
-| `ladder-automerge.yml` | `cert-review` completed (`workflow_run`), or `workflow_dispatch(pr)` | Hand a green, certified, package-only PR to the merge queue (with no queue: merge it, then call `ladder-merge.yml` for the merge commit) |
-| `ladder-merge.yml` | push to `main` under `packages/**`, or `workflow_call` from ladder-automerge (`workflow_dispatch`: dry run) | Gate, then `workflow_dispatch` each touched package on `ladder-build.yml` |
+| `ladder-merge.yml` | push to `main` under `packages/**` (`workflow_dispatch`: dry run) | Gate, then `workflow_dispatch` each touched package on `ladder-build.yml` |
 | `ladder-build.yml` | `workflow_dispatch` only | Single-package build; OIDC publish unless `publish=false` |
 
 `ladder-merge` must **not** `uses:` `ladder-build` as a reusable workflow: npm
@@ -164,7 +136,7 @@ via `@ai-ecoverse/slicc-shared-web/harness` CDP
 (`scripts/browser-cert/run.mjs`). Optional
 `packages/<name>/browser-cert.json` sets `argv` / expected `stdout`; default
 is `<command> --version`. Libs without `slicc.commands` skip browser-cert
-(host-smoke is the gate). Green ladder-pr is the Renovate automerge signal.
+(host-smoke is the gate). The required checks (`ci`, `cert-review`) gate a Renovate automerge.
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
 ladder-pr's `recipe-sha` job commits that sync onto the PR, so main never
@@ -176,9 +148,11 @@ values.
 ### Merge queue
 
 `main` merges through a merge queue (merge commits only, ALLGREEN, at most
-3 entries). `gh pr merge N --auto --merge --match-head-commit <sha>`
-enqueues the PR once its own checks are green; the required check is
-ladder-pr's `ci`.
+3 entries). Run `gh pr merge N --auto --merge --match-head-commit <sha>`
+as soon as the PR is up: GitHub enqueues it once the required checks are
+green, ladder-pr's `ci` and the `cert-review` status. Enable auto-merge with
+your own token (or Renovate's app token): an enqueue by `GITHUB_TOKEN` starts
+no `merge_group` run, so the group would never get its checks.
 
 **What a group runs.** The queue builds `gh-readonly-queue/main/pr-N-…`, one
 merge commit per queued PR on top of `main` (each PR head is the second
@@ -240,16 +214,9 @@ required `ci` on the dispatched branch's head, and it skips `kernel-compat`
 (kernel-compat trusts a dispatch on `main` with the cert pool, and a dry-run
 head can be any commit).
 
-**GITHUB_TOKEN.** ladder-automerge enables auto-merge with `GITHUB_TOKEN`.
-Events caused by that token start no workflows, so GitHub might not fire
-`merge_group` (or the push) for a PR it enqueued. It fails safe either way:
-- if no `merge_group` fires, `ci` never reports on the group, and the queue drops the PR at its
-  check timeout. The PR stays open, nothing is merged and nothing is published;
-- if the push to `main` starts no ladder-merge, the merge lands, but nothing
-  publishes. Publish the certified artifact by hand (*Manual* above:
-  `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`) and report it.
-
-The rollback is to disable the ruleset; ladder-automerge then merges directly again.
+**If the push starts no ladder-merge**, the merge lands but nothing
+publishes. Publish the certified artifact by hand (*Manual* above:
+`gh workflow run ladder-build.yml -f package=… -f certified=<sha>`) and report it.
 
 ### Recipe checks in `ladder-pr`
 
