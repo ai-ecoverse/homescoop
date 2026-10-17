@@ -13,6 +13,6 @@
     "zlibVersion() is 1.3.1"
   ],
   "ci": [
-    "node scripts/wasix-lib-cert.mjs wasix-zlib --tarball .homescoop-out/package.tgz"
+    "HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34 HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0 node scripts/wasix-lib-cert.mjs wasix-zlib --tarball .homescoop-out/package.tgz"
   ]
 }

@@ -27,6 +27,8 @@ grep -q '^#if 1    /\* was set to #if 1 by ./configure \*/' "$SRC/zconf.h" || {
 }
 
 # The pinned toolchain in WORK: a developer's ~/.wasixcc is neither used nor touched.
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
+export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
 DEST="$HOMESCOOP_PKG/package"
 rm -rf "$DEST/lib" "$DEST/lib-pic" "$DEST/include"
@@ -70,8 +72,8 @@ cp "$SRC/zlib.h" "$SRC/zconf.h" "$DEST/include/"
 
 homescoop_stage_licenses "$SRC/LICENSE"
 homescoop_notices_begin "libz.a (both flavours) is zlib itself (LICENSE); it is compiled against and meant to be linked with the following."
-WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc headers (@ai-ecoverse/wasix-sysroot 2025.9.30-17; files from tag v2025-09-02.1)" \
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
+homescoop_notice "wasix-libc headers (@ai-ecoverse/wasix-sysroot $HOMESCOOP_WASIX_SYSROOT_VERSION; files from tag v2026-07-03.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
   "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af
