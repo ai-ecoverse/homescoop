@@ -1,6 +1,7 @@
 # jq for slicc wasm realm (with bundled oniguruma).
 name: jq
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=jqlang/jq extractVersion=^jq-(?<version>.*)$
 version: "1.8.2"
 npm: "@ai-ecoverse/wasm-jq"

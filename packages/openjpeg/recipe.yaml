@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: openjpeg
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=uclouvain/openjpeg extractVersion=^v(?<version>.*)$
 version: "2.5.3"
 npm: "@ai-ecoverse/wasm-openjpeg"

@@ -1,6 +1,7 @@
 # GNU tar for slicc wasm realm.
 name: tar
 builder: host
+runner: pool
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/tar.git extractVersion=^v(?<version>.*)$
 version: "1.35"
 npm: "@ai-ecoverse/wasm-tar"

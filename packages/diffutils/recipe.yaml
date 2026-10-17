@@ -1,6 +1,7 @@
 # GNU diffutils for slicc wasm realm.
 name: diffutils
 builder: host
+runner: pool
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/diffutils.git extractVersion=^v(?<version>.*)$
 version: "3.12"
 npm: "@ai-ecoverse/wasm-diffutils"

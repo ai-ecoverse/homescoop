@@ -1,6 +1,7 @@
 # GNU libiconv for slicc wasm realm (libxml2 --with-iconv).
 name: libiconv
 builder: host
+runner: pool
 # renovate: datasource=git-tags depName=https://git.savannah.gnu.org/git/libiconv.git extractVersion=^v(?<version>.*)$
 version: "1.19"
 npm: "@ai-ecoverse/wasm-libiconv"
