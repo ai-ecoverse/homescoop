@@ -169,7 +169,8 @@ const result = lines.map(({ line }) => line).join('\n');
 const unspecifiedNote = specCounts !== null && packages.some(unspecified)
   ? `\n\n**${packages.filter(unspecified).map((pkg) => pkg.name).join(', ')}: ${UNSPECIFIED}.**`
   : '';
-const incomplete = lines.filter(({ line }) => line.startsWith('cert-ci: INCOMPLETE'));
+const parityLine = (line) => /^cert-ci: INCOMPLETE \S+: npm parity /.test(line);
+const incomplete = lines.filter(({ line }) => line.startsWith('cert-ci: INCOMPLETE') && !parityLine(line));
 const incompleteNote = incomplete.length
   ? `\n\n**Not certified, whatever the review says: ${incomplete.length === 1 ? 'an input is' : 'inputs are'} unverifiable.** A build must fetch the recipe's pinned source (homescoop_fetch with its sha256) with no stage or prebuilt path, and a repack must trace its bytes to such a build that is provenance-attested from CI, or reproducible (\`scripts/cert-review/repack-input.mjs\`).`
   : '';
@@ -177,9 +178,13 @@ const behind = lines.filter(({ line }) => /^cert-ci: (BEHIND|DRIFT) /.test(line)
 const behindNote = behind.length
   ? `\n\n**Not certified, whatever the review says: npm moved on after ladder-pr checked it.** Merge main and bump the packaging revision above npm's \`latest\`, so these bytes can ship (homescoop#891).`
   : '';
+const parityUnknown = lines.filter(({ line }) => parityLine(line));
+const parityNote = parityUnknown.length
+  ? `\n\n**Not certified, whatever the review says: the record job couldn't check npm parity.** The registry didn't answer, or the check didn't run; re-run cert-review (homescoop#891).`
+  : '';
 const trouble = problems.length ? `\n\n**Problems:**\n${problems.map((p) => `- ${p}`).join('\n')}` : '';
 const footer = values.run ? `\n\n<sub>shas computed from the ladder-pr artifacts, not by the reviewer · [run](${values.run})</sub>` : '';
-writeFileSync(values.body, `${comment}${unspecifiedNote}${incompleteNote}${behindNote}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
+writeFileSync(values.body, `${comment}${unspecifiedNote}${incompleteNote}${behindNote}${parityNote}\n\n\`\`\`\n${result}\n\`\`\`${trouble}${footer}\n`);
 writeFileSync(values.lines, `${result}\n`);
 writeFileSync(`${values.lines}.unspecified`, `${JSON.stringify(packages.filter(unspecified).map((pkg) => pkg.name))}\n`);
 

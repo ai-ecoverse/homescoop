@@ -108,6 +108,8 @@ test('NEGATIVE: fail closed when the registry does not answer, the parity file i
   const r = record(dir, down);
   assert.equal(r.status, 1);
   assert.match(r.lines, /^cert-ci: INCOMPLETE @ai-ecoverse\/wasm-grep@3\.12\.0-6: npm parity at record time failed: npm-parity: npm view|^cert-ci: INCOMPLETE @ai-ecoverse\/wasm-grep@3\.12\.0-6: npm parity at record time failed: npm view/);
+  assert.match(r.body, /the record job couldn't check npm parity/);
+  assert.doesNotMatch(r.body, /unverifiable/);
   const gone = record(dir, down, { parity: join(dir, 'no-such.json') });
   assert.equal(gone.status, 1);
   assert.match(gone.body, /no readable npm parity file/);
