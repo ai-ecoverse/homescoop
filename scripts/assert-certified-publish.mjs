@@ -27,6 +27,7 @@ if (!tgz || tgz.startsWith('-')) {
   console.error(
     'usage: assert-certified-publish.mjs <tgz> --npm <name> [--certified <sha256>]',
   );
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 
@@ -42,6 +43,7 @@ const certified = (flag('--certified') || process.env.CERTIFIED || '')
 
 if (!npmName) {
   console.error('assert-certified-publish: --npm is required');
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 
@@ -57,6 +59,7 @@ if (name !== npmName) {
   console.error(
     `assert-certified-publish: tarball name ${name} != --npm ${npmName}`,
   );
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 
@@ -68,6 +71,7 @@ if (res.status === 200) {
   const doc = await res.json().catch(() => null);
   if (doc?.dist?.integrity === integrity) {
     console.log(`already on npm: ${npmName}@${version}, byte-identical — skip publish`);
+    console.log(`certified-publish: FAIL ${npmName}@${version} is already on npm: nothing to publish (exit 10, skip)`);
     process.exit(10);
   }
   let cmp;
@@ -75,10 +79,12 @@ if (res.status === 200) {
     cmp = compareTarballs(packPublished(`${npmName}@${version}`), buf, { labels: ['npm', 'build'] });
   } catch (err) {
     console.error(`assert-certified-publish: ${npmName}@${version} is on npm, and comparing it failed: ${err.message}`);
+    console.log('certified-publish: FAIL refused');
     process.exit(2);
   }
   if (cmp.same) {
     console.log(`already on npm: ${npmName}@${version}, same contents — skip publish`);
+    console.log(`certified-publish: FAIL ${npmName}@${version} is already on npm: nothing to publish (exit 10, skip)`);
     process.exit(10);
   }
   console.error(
@@ -86,10 +92,12 @@ if (res.status === 200) {
       `so these bytes would never ship. Bump the packaging revision (homescoop#971).`,
   );
   for (const line of describe(cmp, { max: 20 })) console.error(line);
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 if (res.status !== 404) {
   console.error(`assert-certified-publish: GET ${url} -> ${res.status}`);
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 
@@ -100,10 +108,12 @@ if (tags.status === 200) {
   latest = (await tags.json().catch(() => null))?.version;
   if (typeof latest !== 'string') {
     console.error(`assert-certified-publish: GET ${latestUrl} has no version`);
+    console.log('certified-publish: FAIL refused');
     process.exit(2);
   }
 } else if (tags.status !== 404) {
   console.error(`assert-certified-publish: GET ${latestUrl} -> ${tags.status}`);
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 if (latest && compareVersions(version, latest) < 0) {
@@ -112,6 +122,7 @@ if (latest && compareVersions(version, latest) < 0) {
       `and --tag latest would move latest back. Main published past this build after it was certified; ` +
       `bump the packaging revision above ${latest} (homescoop#891).`,
   );
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 
@@ -122,6 +133,7 @@ if (!/^[0-9a-f]{64}$/.test(certified)) {
       `(got ${certified ? 'invalid certified input' : 'empty certified'}). ` +
       `Publish the certified tarball from a laptop first, then land.`,
   );
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 
@@ -130,8 +142,10 @@ if (certified !== sha256) {
     `refuse OIDC publish of ${npmName}@${version}: ` +
       `certified=${certified} != tarball sha256=${sha256}`,
   );
+  console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
 
 console.log(`certified sha256 matches — allow first publish of ${npmName}@${version}`);
+console.log(`certified-publish: PASS ${npmName}@${version}`);
 process.exit(0);

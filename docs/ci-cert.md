@@ -630,11 +630,11 @@ changes the boot order for every cert.
 - `concurrency`: one group per caller repo, PR (or ref), kernel, set,
   bios-ref and reference; a PR caller's newer run cancels the older one.
 - One call is a gate, a plan, up to 10 shards and a report job. On the pool
-  10 shards run at once (cloud-run-bench has up to 30 machines); on hosted
+  10 shards run at once (the cloud-run-job pool scales per job); on hosted
   runners 3, so a fork PR's call doesn't crowd out `ladder-pr`. The usual
   `base,ci-certified` call is a gate, a plan and one shard job.
 - **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
-  `cloud-run-bench`) can reach the GCP metadata server and the pool's
+  `cloud-run-job`) can reach the GCP metadata server and the pool's
   service-account token. `runner` / `CERT_RUNNER` (shards) and
   `light-runner` / `CERT_LIGHT_RUNNER` (plan, report) are used only for:
   - a `pull_request` from a branch of the calling repo (`head.repo` is
@@ -672,7 +672,7 @@ changes the boot order for every cert.
   the backstop.
 - Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
   (`cloud-run`, 4 vCPU / 8 GiB), else the shards' runner. The shards use
-  `runner` / `CERT_RUNNER` (`cloud-run-bench`). On the pool a job gets a machine within about a minute, where
+  `runner` / `CERT_RUNNER` (`cloud-run-job`). On the pool a job gets a machine within about a minute, where
   `ubuntu-latest` can queue for 15–40.
 - **No root on the pool.** Its machines run with "no new privileges", so
   `sudo` cannot become root. The Chromium step installs the system libraries
@@ -705,7 +705,7 @@ The `@ai-ecoverse/slicc-kernel` pin must be a certified kernel, and `ci` enforce
 
 ## Gate verdict lines
 
-A gate's silence must never read as a pass (#968). Every script that gates a merge, a release or a cert prints `<gate>: PASS <detail>` when it passes (and `<gate>: FAIL <detail>` where it can), and every caller runs it through `node scripts/gate.mjs <gate> -- <command> …`. The wrapper streams the child's stdout and stderr unchanged, so `x=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs …)` still captures the value. It exits with the child's code. When the child exits 0 without a `<gate>: PASS` line it exits 3, so an early exit 0, a CLI guard that didn't fire, or empty output fails the job. The gates are check-exact-pins, check-cert-kernel, browser-cert/cert-kernel (`cert-kernel`), dev-pin, browser-cert/compat (`compat plan|shard|report`; a report with 0 rows that ran is a FAIL), cert-review/repack-input, ladder-merge-resolve and verify-published. `scripts/test/gate-verdict.test.mjs` checks that each prints its line and that every call in the workflows, host-run.sh and cert-review/harness.sh goes through gate.mjs. kernel-compat.yml, ladder-merge.yml and harness.sh check out scripts at a ref that may predate gate.mjs, so they use it only when `scripts/gate.mjs` exists at that ref.
+A gate's silence must never read as a pass (#968). Every script that gates a merge, a release or a cert prints `<gate>: PASS <detail>` when it passes (and `<gate>: FAIL <detail>` where it can), and every caller runs it through `node scripts/gate.mjs <gate> -- <command> …`. The wrapper streams the child's stdout and stderr unchanged, so `x=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs …)` still captures the value. It exits with the child's code. When the child exits 0 without a `<gate>: PASS` line it exits 3, so an early exit 0, a CLI guard that didn't fire, or empty output fails the job. The gates are check-exact-pins, check-cert-kernel, browser-cert/cert-kernel (`cert-kernel`), dev-pin, browser-cert/compat (`compat plan|shard|report`; a report with 0 rows that ran is a FAIL), cert-review/repack-input, ladder-merge-resolve and verify-published, and (#981's second half) npm-parity, check-package-meta (`package-meta`), refresh-recipe-sha `--verify-repack` (`recipe-sha`), host-smoke.sh (`host-smoke`; PASS with no `smoke.c`), browser-cert/run.mjs (`cert-run`, also glue by path and cert-leg's extra-kernel runs), browser-cert/cert-leg (`cert-leg` plan, browser-extra and ci; plan prints its verdict on stderr, since its stdout is `GITHUB_OUTPUT`), assert-certified-publish (`certified-publish`; exit 10, already on npm, prints FAIL and is passed through as the skip) and cert-review/verdict (`cert-verdict`). `scripts/test/gate-verdict.test.mjs` checks that each prints its line and that every call in the workflows, host-run.sh and cert-review/harness.sh goes through gate.mjs. kernel-compat.yml, ladder-merge.yml and harness.sh check out scripts at a ref that may predate gate.mjs, so they use it only when `scripts/gate.mjs` exists at that ref.
 
 ## Cert review: `cert-review.yml`
 

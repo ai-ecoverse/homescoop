@@ -25,7 +25,17 @@ return a Linux-length address (the family, the path and its NUL), and up to
 died with `Bad arg length for Socket::unpack_sockaddr_un`; the sockets
 themselves worked (homescoop#767).
 
-## 5.42.0-15 / -16: flock excludes other processes
+## 5.42.0-19: real flock and mkfifo (wasix-sysroot -34; slicc-kernel ≥ 1.120.0)
+
+- **flock** is libc's own `flock(2)`, through slicc-kernel's `slicc.flock`. As on Linux, a lock belongs to the open file description, on any handle: a file, a pipe, a terminal, a socket or a directory.
+  - A `dup`ed handle and one a forked child inherits share the lock. A second `open` of the same file, or the other end of a pipe, conflicts.
+  - `LOCK_EX` on a read-only handle excludes, so the `flock(DATA, LOCK_EX|LOCK_NB)` single-instance idiom refuses a second instance (homescoop#758). Locks on pipes and STDOUT exclude too (homescoop#765).
+  - A handled signal can end a blocking `flock` with EINTR, as on Linux.
+  - flock and `fcntl` record locks are separate, as on Linux.
+- **mkfifo:** `POSIX::mkfifo` and `mknod` make real FIFOs (`slicc_fs.path_mkfifo`, homescoop#878). Up to -18 they failed with EOPNOTSUPP.
+- **Kernel:** this needs slicc-kernel ≥ 1.120.0 (engines).
+
+## 5.42.0-15 / -16: flock excludes other processes (up to -18)
 
 `flock` takes whole-file `fcntl` record locks (`LOCK_SH` → `F_RDLCK`,
 `LOCK_EX` → `F_WRLCK`, `LOCK_UN` → `F_UNLCK`; `LOCK_NB` → `F_SETLK`, else

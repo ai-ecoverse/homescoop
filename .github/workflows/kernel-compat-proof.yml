@@ -102,4 +102,4 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/curl"
           npm pack @ai-ecoverse/wasm-curl --pack-destination "$RUNNER_TEMP/curl" --silent
-          HOMESCOOP_CERT_NODE_MODULES="$NM/node_modules" node scripts/browser-cert/run.mjs --package curl --tarball "$RUNNER_TEMP"/curl/*.tgz --cert scripts/browser-cert/selftest
+          HOMESCOOP_CERT_NODE_MODULES="$NM/node_modules" node scripts/gate.mjs cert-run -- node scripts/browser-cert/run.mjs --package curl --tarball "$RUNNER_TEMP"/curl/*.tgz --cert scripts/browser-cert/selftest

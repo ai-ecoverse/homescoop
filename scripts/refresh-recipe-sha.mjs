@@ -314,6 +314,8 @@ for (const name of names) {
     refreshOne(name);
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
+    console.log(`recipe-sha: FAIL ${name}: ${(e instanceof Error ? e.message : String(e)).split('\n')[0].slice(0, 200)}`);
     process.exit(1);
   }
 }
+console.log(`recipe-sha: PASS ${names.length} recipe${names.length === 1 ? '' : 's'}${checkOnly ? ' checked' : ''}${verifyRepack ? ', repacks verified' : ''}`);

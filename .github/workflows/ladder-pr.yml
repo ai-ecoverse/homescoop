@@ -123,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
+            node scripts/gate.mjs recipe-sha -- node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.
@@ -202,7 +202,7 @@ jobs:
           path: .homescoop-out/package.tgz
           retention-days: 14
       - name: Link/run smoke.c against PREFIX
-        run: bash scripts/host-smoke.sh "${{ matrix.package }}"
+        run: node scripts/gate.mjs host-smoke -- bash scripts/host-smoke.sh "${{ matrix.package }}"
       - name: Record tarball sha256
         run: sha256sum .homescoop-out/package.tgz | tee .homescoop-out/package.tgz.sha256
       - uses: actions/upload-artifact@v7
@@ -338,7 +338,7 @@ jobs:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: .homescoop-out
       - name: The built version against npm (behind latest, or the same version with other contents, fails)
-        run: node scripts/npm-parity.mjs .homescoop-out/package.tgz --drift fail
+        run: node scripts/gate.mjs npm-parity -- node scripts/npm-parity.mjs .homescoop-out/package.tgz --drift fail
 
   test:
     needs: [detect, recipe-sha, host-build]
@@ -444,7 +444,7 @@ jobs:
           PROBE="${RUNNER_TEMP}/bcert-probe"
           mkdir -p "$PROBE"
           tar -xzf .homescoop-out/package.tgz -C "$PROBE" package/package.json
-          node scripts/browser-cert/cert-leg.mjs plan "${{ matrix.package }}" --manifest "$PROBE/package/package.json" >> "$GITHUB_OUTPUT"
+          node scripts/gate.mjs cert-leg -- node scripts/browser-cert/cert-leg.mjs plan "${{ matrix.package }}" --manifest "$PROBE/package/package.json" >> "$GITHUB_OUTPUT"
       # cert/meta.json "peers": the host-<peer>-prN artifacts of this run, for
       # ci commands that check the package against them (homescoop#678). A
       # peer not built in this run has no artifact; the ci command then falls
@@ -511,16 +511,16 @@ jobs:
             npx --prefix "$CERT_NM" playwright-core install chromium
           fi
           export HOMESCOOP_CERT_NODE_MODULES="$CERT_NM/node_modules"
-          node scripts/browser-cert/run.mjs \
+          node scripts/gate.mjs cert-run -- node scripts/browser-cert/run.mjs \
             --package "${{ matrix.package }}" \
             --tarball .homescoop-out/package.tgz
           # Glue by path on the dev-pin kernel when the cert kernel can't run it
           # (#628), and each cert/meta.json extra_kernels entry with specs (#663).
-          node scripts/browser-cert/cert-leg.mjs browser-extra "${{ matrix.package }}" \
+          node scripts/gate.mjs cert-leg -- node scripts/browser-cert/cert-leg.mjs browser-extra "${{ matrix.package }}" \
             --manifest "${RUNNER_TEMP}/bcert-probe/package/package.json" \
             --tarball .homescoop-out/package.tgz
       - name: Host cert (cert/meta.json ci commands)
-        run: node scripts/browser-cert/cert-leg.mjs ci "${{ matrix.package }}"
+        run: node scripts/gate.mjs cert-leg -- node scripts/browser-cert/cert-leg.mjs ci "${{ matrix.package }}"
       - if: always()
         continue-on-error: true
         uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.21.0

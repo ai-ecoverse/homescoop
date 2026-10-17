@@ -35,7 +35,7 @@ if [[ -n "$repack_from" ]]; then
   node "$ROOT/scripts/gate.mjs" check-exact-pins -- node "$ROOT/scripts/check-exact-pins.mjs" "$name"
   node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
   echo "== host-run: check package meta (license / LICENSE / files / drift)"
-  node "$ROOT/scripts/check-package-meta.mjs" "$name"
+  node "$ROOT/scripts/gate.mjs" package-meta -- node "$ROOT/scripts/check-package-meta.mjs" "$name"
   mkdir -p "$OUT"
   node "$ROOT/scripts/repack-published.mjs" "$name" --out "$OUT"
   node "$ROOT/scripts/sync-package-version.mjs" --assert-tarball "$OUT/package.tgz"
@@ -165,7 +165,7 @@ bash "$PKG/build.sh"
 echo "== host-run: slicc shims carry the kernel credentials (slicc_cred_js)"
 node "$ROOT/scripts/check-slicc-cred.mjs" "$PKG/package"
 echo "== host-run: check package meta (license / LICENSE / files)"
-node "$ROOT/scripts/check-package-meta.mjs" "$name"
+node "$ROOT/scripts/gate.mjs" package-meta -- node "$ROOT/scripts/check-package-meta.mjs" "$name"
 echo "== host-run: exact @ai-ecoverse pins"
 node "$ROOT/scripts/gate.mjs" check-exact-pins -- node "$ROOT/scripts/check-exact-pins.mjs" "$name"
 

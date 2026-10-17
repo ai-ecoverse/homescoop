@@ -92,9 +92,11 @@ if (process.argv.includes('--drift')) {
   }
   if (failed) {
     console.error(`check-package-meta --drift: ${failed} of ${checked} packages drift from their recipe`);
+    console.log(`package-meta: FAIL ${failed} of ${checked} packages drift from their recipe`);
     process.exit(1);
   }
   console.log(`check-package-meta --drift: ${checked} packages match their recipe`);
+  console.log(`package-meta: PASS ${checked} packages match their recipe`);
   process.exit(0);
 }
 
@@ -110,10 +112,12 @@ const licPath = join(root, 'packages', name, 'package', 'LICENSE');
 
 if (!existsSync(recipePath)) {
   console.error(`missing ${recipePath}`);
+  console.log(`package-meta: FAIL ${name}: no recipe.yaml`);
   process.exit(1);
 }
 if (!existsSync(pkgPath)) {
   console.error(`missing ${pkgPath}`);
+  console.log(`package-meta: FAIL ${name}: no package/package.json`);
   process.exit(1);
 }
 
@@ -238,6 +242,8 @@ errors.push(...packageDrift(name, recipe, pkg));
 if (errors.length) {
   console.error(`check-package-meta (${name}):`);
   for (const e of errors) console.error(`  - ${e}`);
+  console.log(`package-meta: FAIL ${name}: ${errors.length} problem${errors.length === 1 ? '' : 's'}`);
   process.exit(1);
 }
 console.log(`${name}: license ${pkgLic} ok`);
+console.log(`package-meta: PASS ${name}`);

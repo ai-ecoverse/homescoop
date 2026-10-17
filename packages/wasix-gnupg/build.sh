@@ -40,6 +40,10 @@ LIBS=(
 
 # No wasixcc on PATH (CI runners): install the pinned toolchain, which
 # brings wasix-sysroot 2025.9.30-17 (slicc_stat_owner, slicc_fs).
+# wasix-sysroot -34 ahead of install-wasixcc.sh's default (homescoop#984 flips
+# the default once every dependent is on -34; this override then goes).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
+export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi
@@ -178,8 +182,8 @@ cp "$PKG"/patches/* "$DEST/patches/"
 # in too; its licence files are pinned by tag (the sysroot is a 2025-09-30
 # snapshot of wasix-libc, so this is the nearest earlier tag).
 homescoop_notices_begin "The gpg, gpgv, gpg-agent, gpgconf and gpg-connect-agent wasm modules statically link libgpg-error 1.61, libgcrypt 1.12.4, libassuan 3.0.2, libksba 1.8.1 and npth 1.8 (licences in licenses/, sources in SOURCES.md) and the following."
-WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version"); files from tag v2025-09-02.1)" \
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version"); files from tag v2026-07-03.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -219,7 +223,7 @@ for c in cmds.values():
 pkg = {
     "name": "@ai-ecoverse/wasix-gnupg",
     "version": pkg_ver,
-    "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -28: user ids and signal masks from slicc-kernel)",
+    "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -34: user ids and signal masks from slicc-kernel)",
     # wasix-sysroot -20 asks slicc-kernel for user ids (no fallback); the homedir
     # owner check needs 1.47.1, which reports owners as the caller's ids;
     # dotlock's fcntl locks need 1.100.0 (slicc.fcntl_lock, homescoop#712);

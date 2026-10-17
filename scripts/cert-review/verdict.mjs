@@ -191,4 +191,5 @@ writeFileSync(`${values.lines}.unspecified`, `${JSON.stringify(packages.filter(u
 const passed = !problems.length && lines.length > 0 && lines.every(({ ok }) => ok);
 console.log(result);
 for (const p of problems) console.error(`problem: ${p}`);
+console.log(passed ? `cert-verdict: PASS ${lines.length} line(s)` : `cert-verdict: FAIL ${lines.length} line(s), ${problems.length} problem(s)`);
 process.exit(passed ? 0 : 1);

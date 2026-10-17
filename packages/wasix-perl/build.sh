@@ -13,11 +13,15 @@ DEST="$PKG/package"
 VER="$VERSION"
 WORK="${WASIX_PERL_WORK:-$PKG/work}"
 SRC="$WORK/perl-build"
-STAGE="${WASIX_PERL_STAGE:-$WORK/stage}"
+STAGE="$WORK/stage"
 PREFIX_INSTALL="$STAGE"
 
 # No wasixcc on PATH (CI runners): install the pinned toolchain, which
 # brings wasix-sysroot (asyncify tree "sysroot" for real fork).
+# wasix-sysroot -34 ahead of install-wasixcc.sh's default (homescoop#984 flips
+# the default once every dependent is on -34; this override then goes).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
+export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi
@@ -45,10 +49,6 @@ sed --version 2>&1 | head -1 | grep -qi GNU || {
 
 mkdir -p "$WORK" "$DEST"
 
-if [[ -n "${WASIX_PERL_STAGE:-}" && -f "$WASIX_PERL_STAGE/bin/perl.wasm" ]]; then
-  echo "== wasix-perl: using prebuilt stage $WASIX_PERL_STAGE"
-  STAGE="$WASIX_PERL_STAGE"
-else
   TARBALL="$WORK/perl-${VER}.tar.xz"
   homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TARBALL"
 
@@ -294,7 +294,6 @@ PY
   # Ensure binary is present for staging even if installperl skipped wasm
   mkdir -p "$STAGE/usr/bin"
   cp -f perl "$STAGE/usr/bin/perl"
-fi
 
 echo "== stage package tree"
 rm -rf "$DEST/bin" "$DEST/lib" "$DEST/share"
@@ -336,6 +335,13 @@ PRIVLIB="$INST/lib/perl5/$VER"
 [[ -d "$PRIVLIB" ]] || { echo "no privlib $PRIVLIB under $INST" >&2; find "$INST" -maxdepth 4 -type d >&2; exit 1; }
 mkdir -p "$DEST/lib/perl5"
 cp -a "$PRIVLIB/." "$DEST/lib/perl5/"
+# Config_heavy.pl records ccflags' -include of the stubs header by its
+# absolute build path; name it relative to the repo so a rebuild in another
+# directory gives the same bytes (homescoop#850).
+CH="$(find "$DEST/lib/perl5" -name Config_heavy.pl -print -quit)"
+test -n "$CH"
+sed -i "s|$PKG/wasix-posix-stubs.h|packages/wasix-perl/wasix-posix-stubs.h|g" "$CH"
+! grep -q "$HOMESCOOP_ROOT" "$CH"
 # Gap-fill from the build tree's lib/ (modules installperl left out), never
 # tests; an archlib module is filled into wasm32-wasix/ when it lives there.
 python3 - "$SRC/lib" "$DEST/lib/perl5" <<'PY'
@@ -410,8 +416,8 @@ done
 
 homescoop_stage_license "$SRC/Artistic" "$SRC/Copying" "$SRC/LICENSE" "$WORK/perl-build/Artistic"
 homescoop_notices_begin "perl.wasm statically links the following."
-WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version"); files from tag v2025-09-02.1)" \
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version"); files from tag v2026-07-03.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \

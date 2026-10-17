@@ -1,9 +1,10 @@
 WASIX ships two pythons (homescoop#357): the default binary has no fork, and
 PYTHON_FORK=true selects the fork-capable one (slicc-kernel >= 1.110.0, whose
-command variants make the choice). In the default one, os.fork,
-os.forkpty and multiprocessing's fork/forkserver contexts fail with an error
-that names the switch (os stays without the attributes, so hasattr() is
-still False). Spawn stays the default start method in both builds.
+command variants make the choice). In the default one, os.fork and
+multiprocessing's fork/forkserver contexts fail with an error that names
+the switch (os stays without the attributes, so hasattr() is still False).
+os.forkpty gets the stock error: neither build has it, since WASIX has no
+ptys (homescoop#783). Spawn stays the default start method in both builds.
 
 --- a/Lib/os.py
 +++ b/Lib/os.py
@@ -15,7 +16,7 @@ still False). Spawn stays the default start method in both builds.
 +
 +if sys.platform == "wasi" and "fork" not in globals():
 +    def __getattr__(name):
-+        if name in ("fork", "forkpty"):
++        if name == "fork":
 +            raise AttributeError(
 +                f"os.{name}() isn't available in this python. Re-run with "
 +                f"PYTHON_FORK=true (needs slicc-kernel >= 1.110.0) to use "

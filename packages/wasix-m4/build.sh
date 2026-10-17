@@ -15,7 +15,9 @@ WORK="${WASIX_M4_WORK:-$PKG/work}"
 SRC="$WORK/m4-$VER"
 
 # No wasixcc on PATH (CI runners): install the pinned toolchain
-# (scripts/install-wasixcc.sh: wasix-sysroot 2025.9.30-15 since #148).
+# (scripts/install-wasixcc.sh; wasix-sysroot -34 ahead of its default, #984).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
+export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi

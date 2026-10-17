@@ -40,6 +40,10 @@ YAML_SRC="$WORK/yaml-$YAML_VER"
 
 # No wasixcc on PATH (CI runners): install the pinned toolchain
 # (wasix-sysroot -17 since #180), as wasix-gnupg and wasix-perl do.
+# wasix-sysroot -34 ahead of install-wasixcc.sh's default (homescoop#984 flips
+# the default once every dependent is on -34; this override then goes).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
+export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi
@@ -223,9 +227,9 @@ apply_wasix_patch io-posix-spawn-wasi.patch "$SRC/io.c"
 apply_wasix_patch internal-process-posix-spawn-wasi.patch "$SRC/internal/process.h"
 # Asyncify setjmp only rewinds inside rb_wasm_rt_start; wrap pthread start + TLS state.
 apply_wasix_patch wasm-thread-asyncify-tls.patch "$SRC/thread_pthread.c" WASIX_WASM_THREAD_RT
-# File#flock as whole-file fcntl record locks (slicc-kernel >= 1.100.0 enforces
-# them between processes; homescoop#578). Upstream's __wasi__ branch is EINVAL.
-apply_wasix_patch flock-wasi-fcntl.patch "$SRC/missing/flock.c" WASIX_FLOCK_FCNTL
+# File#flock is libc's flock(2) since 3.4.11-18 (wasix-sysroot -34, slicc.flock):
+# configure finds it, so missing/flock.c isn't built. -17's
+# flock-wasi-fcntl.patch (whole-file fcntl record locks) is gone.
 # Single-fd waits (IO#wait_readable, blocking connect) via poll(): WASIX's
 # select() rejects exceptfds and POLLPRI == POLLIN puts readable waits there.
 apply_wasix_patch io-wait-poll-wasi.patch "$SRC/thread.c" WASIX_POLL_WAIT
@@ -726,8 +730,8 @@ homescoop_notices_begin "bin/ruby statically links the following (ext/openssl, e
 homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
 homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
-WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files from tag v2025-09-02.1)" \
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files from tag v2026-07-03.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -832,9 +836,9 @@ base_env = {
 pkg = {
     "name": "@ai-ecoverse/wasix-ruby",
     "version": pkg_ver,
-    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot {os.environ['SYSROOT_VER']}: user ids, traps and times from slicc-kernel)",
+    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot {os.environ['SYSROOT_VER']}: user ids, traps, flock and times from slicc-kernel)",
     # wasix-sysroot -20 asks slicc-kernel for user ids, with no fallback (homescoop#207).
-    "engines": {"slicc-kernel": ">=1.100.0"},
+    "engines": {"slicc-kernel": ">=1.120.0"},
     "license": "Ruby",
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-ruby/package"},
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "PRESTAGE.md"],
@@ -925,8 +929,8 @@ ${OPENSSL_NOTE}
 ## Gems / flock / uid (-5)
 - \`GEM_HOME=\${HOME}/.local/share/gem/ruby/3.4.0\` (writable under SLICC HOME).
 - \`GEM_PATH=\${HOME}/.local/share/gem/ruby/3.4.0:\${package}/lib/ruby/gems/3.4.0\`.
-- \`File#flock\` / \`missing/flock.c\` \`__wasi__\`: whole-file fcntl record locks (since 3.4.11-17,
-  homescoop#578; up to -16 a no-op success; upstream EINVAL).
+- \`File#flock\`: libc's flock(2) through slicc.flock, per open file description (since 3.4.11-18,
+  wasix-sysroot -34; -17 whole-file fcntl record locks, homescoop#578; up to -16 a no-op success).
 - \`Process.uid\`/\`euid\`/\`gid\`/\`groups\`, \`Etc.getpwuid\` and \`Dir.home\` come from
   slicc-kernel's process credentials (wasix-sysroot -20, slicc-kernel >= 1.44.0):
   root is uid 0 with home /root; a \`kernel.users.add\` user gets its own ids.
