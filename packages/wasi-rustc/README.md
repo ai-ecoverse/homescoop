@@ -3,18 +3,6 @@
 `rustc` (LLVM-in-wasm) for **slicc**. Host: `wasm32-wasip1-threads`.
 Default compile target: **wasm32-wasip1**.
 
-## Patched cut `1.83.0-2`
-
-- Works: `rustc --version`, `rustc hello.rs` → `hello.wasm`, `-O`,
-  `std::fs` / `env` / `process::exit`
-- Linker: **rust-lld** (bundled). Next: spawn `wasm-ld` from
-  `@ai-ecoverse/wasm-clang` over WASIX (`-C linker=wasm-ld` in target spec).
-- PATH reaches rustc.wasm. The host std patch supports PATH splitting, TMPDIR,
-  and HOME; bundled rust-lld links quietly.
-- Cargo: deferred
-- Provenance: the pinned Rust 1.83 fork, built with in-tree `x.py` by
-  `.github/workflows/wasi-rustc-patched.yml`, plus two local patches in `patches/`.
-
 ## Layout
 
 - `bin/rustc` — shell driver (injects `--sysroot` + `--target`, preserves PATH)
@@ -24,51 +12,50 @@ Default compile target: **wasm32-wasip1**.
 ## Environment
 
 - `RUST_MIN_STACK=16777216` recommended (large LLVM stack)
-- Run dep: `@ai-ecoverse/wasm-clang` (for upcoming wasm-ld spawn)
+- `slicc.dependencies` names `@ai-ecoverse/wasm-clang` (for a later wasm-ld spawn)
 
-## Sizes (this cut)
+## Build (`build.sh`, ladder host build)
 
-See SPIKE.md / publish report.
+`build.sh` builds Rust 1.98.1 from `rustc-1.98.1-src.tar.xz` (sha256-pinned in
+`recipe.yaml`; vendored crates, llvm-project and cargo included), so a ladder
+build is an attested root (#876). Steps:
 
-## Stage from CI
+- apply `patches/0003-*` … `0015-*` to the Rust tree;
+- install the wasi-sdk `scripts/install-wasi-sdk.sh` pins (34.0);
+- fetch `@ai-ecoverse/wasi-llvm` (LLVM/clang/lld 21.1.8 static for a
+  wasm32-wasip1-threads host) by sha256 (`sources.wasi_llvm`) and check its
+  `llvm-config` and libraries;
+- syntax-check rustc's LLVM wrapper against it;
+- `make-stable-config.py` writes the bootstrap config: host
+  `wasm32-wasip1-threads` with wasi-llvm's `llvm-config`, targets
+  `wasm32-wasip1` and `wasm32-wasip1-threads`, the in-tree LLVM 22 only for the
+  Linux build machine, `remap-debuginfo` so no build path is embedded;
+- `x.py install`, then stage `bin/rustc.wasm` (without its `name` section and
+  DWARF, `scripts/split-name-section.py`), `bin/rustc` (`rustc-driver.sh`) and
+  `lib/rustlib/wasm32-wasip1`.
 
-The `wasi-rustc-patched` and `wasi-rustc-stable` workflows are retired (#876). Their artifacts were staged with
-`python3 packages/wasi-rustc/stage-patched.py <artifact.tgz> --expected-version <package-version>`.
-The script stages only the compiler and `wasm32-wasip1` rustlib, excluding
-the Linux host rustlib and duplicate debug copy. The recipe is
-`builder: retired` so ladder-merge does not OIDC-publish the 1.83 spike;
-`build.sh` is a refuse stub. Certified cuts come from `wasi-rustc-stable.yml`.
+Linux x86_64 only. Stage0 comes from static.rust-lang.org, checked against
+`src/stage0`'s sha256s. `cert/` holds the specs (a compile-and-run corpus,
+users enforce) and `test/imports.mjs` (rustc.wasm's import set).
 
-## Rust 1.98.1 static build
-
-`.github/workflows/wasi-rustc-stable.yml` builds Rust 1.98.1 from the pinned
-upstream tag. The compiler links the external LLVM 21 from `packages/wasi-llvm`
-(the `wasi-llvm` artifact of `.github/workflows/wasi-llvm.yml`, chosen by run
-id when the workflow is dispatched); the in-tree LLVM 22 is built only for the
-x86_64 build machine. `rustc.wasm` keeps LLVM and LLD inside it.
-`make-stable-config.py` generates the bootstrap config from an absolute
-wasi-sdk path and, with `--llvm-config`, points the WASI host at the external
-LLVM. `patches/0003-*` adds WASI host paths and environment support, and
+`patches/0003-*` adds WASI host paths and environment support, and
 `patches/0004-*` embeds LLD (adding `LLVMDTLTO` only from LLVM 22) and
 configures an in-tree LLVM for the WASI host. `patches/0005-*` through
 `0009-*` port the in-tree LLVM 22 to the threaded WASI host; wasi-llvm carries
 the same guards for 21.
 `patches/0010-*` replaces `libloading` with a load error on WASI, which has no
-`dlopen`: proc-macro crates, codegen-backend dylibs and libEnzyme do not load.
+`dlopen`: codegen-backend dylibs and libEnzyme do not load.
 `patches/0011-*` skips rustc's output-writeable check on WASI: preview1 has no
 permission bits, so std reports every existing file as read-only.
 `rustc.wasm` itself links through wasi-sdk `clang++` with
 `-Clink-self-contained=no`, libc++abi and wasi-emulated-mman, since this build
 does not ship the self-contained `rust-lld`.
-The workflow emits `wasi-rustc-stable.tgz` for staging and SLICC acceptance.
-Cargo follows acceptance of this compiler; the PIC LLVM side module follows
-Cargo.
 
 ### Function names (`names/package`)
 
-`stage-patched.py` ships `rustc.wasm` without its `name` section and DWARF
-(`scripts/split-name-section.py --strip-debug`): 116.6 MB instead of
-169.7 MB to store and load. The names go to the optional
+`build.sh` ships `rustc.wasm` without its `name` section and DWARF
+(`scripts/split-name-section.py --strip-debug`): about 117 MB instead of
+170 MB to store and load. The names go to the optional
 `@ai-ecoverse/wasi-rustc-names` package of the same version, as
 `bin/rustc.wasm.names`. Nothing depends on it. With it installed and
 `SLICC_WASM_BACKTRACE=1`, SLICC names a compiler trap's frames from it;
@@ -99,7 +86,7 @@ same RPC as the dylib bridge, carried over a pipe:
   with that message, then restarts the program on its next use.
 - **Stray output.** A macro's own stdout output is passed to stderr.
 
-`cargo/make-proc-macro-fixture.sh` builds the offline acceptance workspace:
+`packages/wasi-cargo/make-proc-macro-fixture.sh` builds the offline acceptance workspace:
 serde/serde_json, thiserror, clap derive, and a panicking derive.
 
 Only a compiler that itself runs on WASI accepts `--crate-type proc-macro` for
@@ -122,7 +109,5 @@ and exits with status 1.
 
 ## Cargo
 
-Cargo 0.99 is its own recipe, `packages/wasi-cargo`, built in the ladder
-from the same `rustc-1.98.1-src.tar.xz` with this recipe's patches applied
-to its stage1 std. `wasi-rustc-stable.yml` (a dispatch-only workflow) is
-gone; wasi-rustc moves to a ladder recipe next (#876).
+Cargo 0.99 is its own recipe, `packages/wasi-cargo`, built from the same
+source tarball with these patches applied to its stage1 std.
