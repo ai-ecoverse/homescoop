@@ -23,7 +23,7 @@ export function createRepo (root, name, files, { tag, branch } = {}) {
   return { url: `${name}.git`, commit }
 }
 
-export async function startGitServer ({ host = '127.0.0.1' } = {}) {
+export async function startGitServer ({ host = '127.0.0.1', name = host } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'wasi-pnpm-git-'))
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost')
@@ -67,7 +67,7 @@ export async function startGitServer ({ host = '127.0.0.1' } = {}) {
     })
   })
   await new Promise(resolve => server.listen(0, host === '127.0.0.1' ? host : '0.0.0.0', resolve))
-  const base = `http://${host}:${server.address().port}/`
+  const base = `http://${name}:${server.address().port}/`
   return {
     root,
     base,

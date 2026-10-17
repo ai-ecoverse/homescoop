@@ -3,7 +3,6 @@
 // registry and a local git server; nothing reaches the real registry.
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
-import { networkInterfaces } from 'node:os'
 import { join, relative } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -43,7 +42,6 @@ const writeJson = (kernel, path, value) => kernel.writeFile(path, JSON.stringify
 const output = result => `${result.stdout}${result.stderr}`
 const flat = text => text.replace(/[\s│╰─▶×]+/g, '')
 const mentions = (result, message) => flat(output(result)).includes(flat(message))
-const lanAddress = () => Object.values(networkInterfaces()).flat().find(i => i?.family === 'IPv4' && !i.internal)?.address
 
 test('pnpm runs and installs a file: dependency offline', async () => {
   const kernel = await kernelWith(['wasi-pnpm'], undefined)
@@ -157,9 +155,8 @@ test('pnpm publishes with auth and --otp, streams a large body and never prints 
   }
 })
 
-test('pnpm installs a git dependency through wasm-git', { skip: lanAddress() || process.env.CI ? false : 'no non-loopback address for the realm proxy to reach' }, async () => {
-  assert.ok(lanAddress(), 'CI needs a non-loopback IPv4 for the git-clone test (the realm proxy refuses loopback)')
-  const git = await startGitServer({ host: lanAddress() })
+test('pnpm installs a git dependency through wasm-git', async () => {
+  const git = await startGitServer({ name: 'host.slicc.internal' })
   const repo = git.repo('lib-git', { 'package.json': JSON.stringify({ name: 'lib-git', version: '1.0.0', main: 'index.js' }), 'index.js': 'module.exports = "git"\n' }, { tag: 'v1.0.0' })
   const kernel = await kernelWith(['wasi-pnpm', 'wasm-git', 'wasm-tls-engine'])
   try {
