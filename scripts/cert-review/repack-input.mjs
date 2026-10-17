@@ -452,9 +452,11 @@ export function fixtureReader(dir) {
 export const KNOWN_INPUTS = fileURLToPath(new URL('./known-inputs.txt', import.meta.url));
 export const MAX_INPUT_DEPTH = 8;
 const NPM_SPEC = /^(@ai-ecoverse\/[a-z0-9][a-z0-9._-]*)@([0-9][0-9A-Za-z.+-]*)$/;
+const DEP_KEYS = ['build', 'host', 'run', 'mamba', 'npm'];
+const DOC_SINK = /\.(?:md|txt|json|xml|html?|pc|ya?ml|toml|cfg|conf|ini)["']?$/;
 const OUR_NPM = /registry\.npmjs\.org\/@ai-ecoverse(?:\/|%2[fF])/;
 const TARBALL = /registry\.npmjs\.org\/@ai-ecoverse(?:\/|%2[fF])([a-z0-9][a-z0-9._-]*)\/-\/([^\s"'<>()|;&]*?)\.tgz/g;
-const NPM_CMD = /(?:^|[;&|(]\s*|\$\(\s*|\b(?:then|do|else)\s+)(?:npm\s+(?:pack|install|i|add|exec|ci)|pnpm\s+(?:add|install|i|dlx|exec)|yarn\s+(?:add|dlx)|npx|pnpx)\b(.*)$/;
+const NPM_CMD = /(?:^\s*|[;&|(]\s*|\$\(\s*|\b(?:then|do|else)\s+)(?:(?:env\s+(?:-\S+\s+)*)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*|command\s+|sudo\s+|exec\s+)*(?:npm\s+(?:pack|install|i|add|exec|ci)|pnpm\s+(?:add|install|i|dlx|exec)|yarn\s+(?:add|dlx)|npx|pnpx)\b(.*)$/;
 
 export function parseKnownInputs(text) {
   const out = new Map();
@@ -506,10 +508,10 @@ export function recipeInputs(text, recipeVersion = '') {
     if (top === 'dependencies' && indent === 2) {
       const m = body.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
       sub = m ? m[1] : null;
-      if (m && (sub === 'build' || sub === 'host') && /^\[.*\]$/.test(m[2])) {
+      if (m && DEP_KEYS.includes(sub) && /^\[.*\]$/.test(m[2])) {
         m[2].slice(1, -1).split(',').filter((s) => s.trim()).forEach((s) => spec(s, where));
       }
-    } else if (top === 'dependencies' && indent > 2 && (sub === 'build' || sub === 'host') && body.startsWith('- ')) {
+    } else if (top === 'dependencies' && indent > 2 && DEP_KEYS.includes(sub) && body.startsWith('- ')) {
       spec(body.slice(2), where);
     }
     const url = body.match(/^(?:-\s+)?url:\s*(.*)$/);
@@ -546,8 +548,9 @@ function shellLines(text) {
       out.push('');
       continue;
     }
-    const doc = line.match(/^\s*(?:cat|tee)\b[^<]*<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/);
-    if (doc) end = doc[2];
+    const doc = line.match(/^\s*(cat|tee)\b([^<|]*)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\3([^|]*)$/);
+    const sink = doc && (doc[1] === 'cat' ? (`${doc[2]} ${doc[5]}`.match(/>>?\s*(\S+)/) || [])[1] : doc[2].trim().split(/\s+/).pop());
+    if (doc && sink && DOC_SINK.test(sink)) end = doc[4];
     out.push(line);
   }
   return out;

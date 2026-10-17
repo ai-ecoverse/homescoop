@@ -72,6 +72,16 @@ test('an unlisted unattested input is INCOMPLETE', async (t) => {
   assert.match(v.lines, /^cert-ci: INCOMPLETE @ai-ecoverse\/wasm-demo@1\.0\.0-1: unverifiable input: build input @ai-ecoverse\/wasm-zlib@1\.3\.1-2/);
 });
 
+test('NEGATIVE: every dependency list host-run.sh installs is an input, run: included', async (t) => {
+  for (const key of ['run', 'npm', 'mamba']) {
+    const text = recipe().replace('  run: []\n', key === 'run' ? '  run:\n    - "@ai-ecoverse/wasm-zlib@1.3.1-2"\n' : `  run: []\n  ${key}: ["@ai-ecoverse/wasm-zlib@1.3.1-2"]\n`);
+    const dir = plant(t, { 'packages/demo/recipe.yaml': text });
+    const r = await judge(dir);
+    assert.equal(r.attested, false, key);
+    assert.match(r.reason, /^build input @ai-ecoverse\/wasm-zlib@1\.3\.1-2: /, key);
+  }
+});
+
 test('a listed input stays certified, with the known note forced into the line whatever the reviewer says', async (t) => {
   const dir = plant(t, { 'packages/demo/recipe.yaml': recipe({ build: ['@ai-ecoverse/wasm-zlib@1.3.1-2'] }) });
   const r = await judge(dir, known('@ai-ecoverse/wasm-zlib@1.3.1-2 #864 no provenance'));
@@ -132,8 +142,24 @@ test('NEGATIVE: a tool-only homescoop input (an install-* helper) is checked the
   assert.deepEqual(overridden.inputs.map((i) => i.version).sort(), ['2025.9.30-14', '2025.9.30-32'], 'an override a build file sets is an input too');
   const unresolved = buildFileInputs([{ path: 'scripts/x.sh', text: 'V="$(cat v)"\ncurl -O "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-$V.tgz"\n' }]);
   assert.match(unresolved.problems.join(), /whose version this rule can't resolve/);
-  const npm = buildFileInputs([{ path: 'packages/demo/build.sh', text: 'npm pack @ai-ecoverse/wasm-zlib@1.3.1-2\npnpm add -g @ai-ecoverse/wasm-sed\ncat > README.md <<EOF\npnpm add -g @ai-ecoverse/wasm-demo\nEOF\n' }]);
-  assert.deepEqual(npm.inputs.map((i) => `${i.npm}@${i.version}`), ['@ai-ecoverse/wasm-zlib@1.3.1-2']);
+  const npm = buildFileInputs([{ path: 'packages/demo/build.sh', text: [
+    'npm pack @ai-ecoverse/wasm-zlib@1.3.1-2',
+    'pnpm add -g @ai-ecoverse/wasm-sed',
+    'cat > "$PKG/README.md" <<EOF',
+    'pnpm add -g @ai-ecoverse/wasm-demo',
+    'EOF',
+    'get() {',
+    '  npm pack @ai-ecoverse/wasm-libpng@1.6.59-1',
+    '  env A=1 npx @ai-ecoverse/wasm-xz@5.8.1-1',
+    '}',
+    'cat > "$WORK/get.sh" <<\'EOF\'',
+    'npm pack @ai-ecoverse/wasm-bzip2@1.0.8-3',
+    'EOF',
+    'cat <<EOF | bash',
+    'npm pack @ai-ecoverse/wasm-lcms2@2.19.1-1',
+    'EOF',
+  ].join('\n') }]);
+  assert.deepEqual(npm.inputs.map((i) => `${i.npm}@${i.version}`), ['@ai-ecoverse/wasm-zlib@1.3.1-2', '@ai-ecoverse/wasm-libpng@1.6.59-1', '@ai-ecoverse/wasm-xz@5.8.1-1', '@ai-ecoverse/wasm-bzip2@1.0.8-3', '@ai-ecoverse/wasm-lcms2@2.19.1-1'], 'indented and prefixed commands count, and only a heredoc into a doc file is skipped');
   assert.deepEqual(npm.problems, ["packages/demo/build.sh:2 installs @ai-ecoverse/wasm-sed, which isn't pinned to an exact version"]);
 });
 
