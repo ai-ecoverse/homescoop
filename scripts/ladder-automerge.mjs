@@ -23,7 +23,7 @@ export function isMajorBump(from, to) {
   return a === undefined || b === undefined || Number(b) > Number(a);
 }
 
-export function mergeProblems({ repo, pr, review, ladder, files, majors }) {
+export function mergeProblems({ repo, pr, review, ladder, files, majors, queue = false }) {
   if (pr.merged) return ['already merged'];
   const problems = [];
   if (pr.state !== 'open') problems.push(`PR #${pr.number} is ${pr.state}`);
@@ -49,7 +49,8 @@ export function mergeProblems({ repo, pr, review, ladder, files, majors }) {
   const human = [...new Set(paths.filter((p) => HUMAN_ONLY.some((re) => re.test(p))))];
   if (human.length) problems.push(`it touches ${human.slice(0, 5).join(', ')}${human.length > 5 ? ', …' : ''}, which stay human`);
   if (!paths.some((p) => PUBLISHABLE.test(p))) problems.push('it touches no publishable package file');
-  if (pr.mergeable_state !== 'clean') problems.push(`mergeable_state is ${pr.mergeable_state}`);
+  const ready = pr.mergeable_state === 'clean' || (queue && pr.mergeable_state === 'blocked' && pr.mergeable === true);
+  if (!ready) problems.push(`mergeable_state is ${pr.mergeable_state}${queue ? ' (merge queue)' : ''}`);
   return problems;
 }
 
@@ -81,7 +82,8 @@ export async function decide({ repo, number, asIfOpen }, io) {
   const review = await certReview({ number: pr.number, head: pr.head.sha }, io);
   const ladder = await io.ladderRun(pr.head.sha);
   const majors = await majorBumps(pr, files, io);
-  return { pr, review, problems: mergeProblems({ repo, pr, review, ladder, files, majors }) };
+  const queue = await io.mergeQueue(pr.base.ref);
+  return { pr, review, queue, problems: mergeProblems({ repo, pr, review, ladder, files, majors, queue }) };
 }
 
 async function mergedHere(pr, head, io) {
@@ -92,10 +94,14 @@ async function mergedHere(pr, head, io) {
 }
 
 export async function merge({ repo, number, head }, io) {
-  const { pr, problems } = await decide({ repo, number }, io);
+  const { pr, problems, queue: queued } = await decide({ repo, number }, io);
   if (problems[0] === 'already merged') return mergedHere(pr, head, io);
   if (pr.head.sha !== head) throw new Error(`PR #${number} moved from ${head} to ${pr.head.sha}`);
   if (problems.length) throw new Error(`PR #${number} no longer qualifies right before the merge: ${problems.join('; ')}`);
+  if (queued) {
+    const how = await queue(pr, head, io);
+    return { merged: false, queued: true, reason: `${how} at ${head}; the queue's push to ${pr.base.ref} starts ladder-merge` };
+  }
   let sha;
   try {
     ({ sha } = await io.mergePull(number, head));
@@ -106,6 +112,31 @@ export async function merge({ repo, number, head }, io) {
   }
   const commit = await io.commit(sha);
   return { merged: true, sha, before: commit.parents[0].sha };
+}
+
+export const MERGE_QUEUE = `query($owner: String!, $name: String!, $branch: String!) {
+  repository(owner: $owner, name: $name) { mergeQueue(branch: $branch) { id } }
+}`;
+
+export const AUTO_MERGE = `mutation($id: ID!, $head: GitObjectID!) {
+  enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: MERGE, expectedHeadOid: $head }) {
+    pullRequest { number autoMergeRequest { enabledAt } }
+  }
+}`;
+
+export const ENQUEUE = `mutation($id: ID!, $head: GitObjectID!) {
+  enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $head }) { mergeQueueEntry { position } }
+}`;
+
+export async function queue(pr, head, io) {
+  try {
+    await io.gql(AUTO_MERGE, { id: pr.node_id, head });
+    return 'auto-merge (merge commit) enabled, the queue takes it';
+  } catch (err) {
+    if (!/clean status/i.test(err.message)) throw err;
+    await io.gql(ENQUEUE, { id: pr.node_id, head });
+    return 'enqueued';
+  }
 }
 
 export const CLOSING_ISSUES = `query($owner: String!, $name: String!, $pr: Int!) {
@@ -199,6 +230,18 @@ function liveIo({ repo, token }) {
     comments: (n) => pages(`/issues/${n}/comments`),
     addComment: (n, body) => json(`/issues/${n}/comments`, { method: 'POST', body: { body } }),
     editComment: (id, body) => json(`/issues/comments/${id}`, { method: 'PATCH', body: { body } }),
+    async gql(query, vars) {
+      const args = ['api', 'graphql', '-f', `query=${query}`];
+      for (const [k, v] of Object.entries(vars)) args.push('-f', `${k}=${v}`);
+      const got = JSON.parse((await gh(args)).stdout);
+      if (got.errors?.length) throw new Error(got.errors.map((e) => e.message).join('; '));
+      return got.data;
+    },
+    async mergeQueue(branch) {
+      const [owner, name] = repo.split('/');
+      const got = await this.gql(MERGE_QUEUE, { owner, name, branch });
+      return Boolean(got.repository?.mergeQueue?.id);
+    },
     async graphql(query, { owner, name, pr }) {
       const { stdout } = await gh(['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`]);
       const got = JSON.parse(stdout);
@@ -250,6 +293,11 @@ async function main([mode, ...argv]) {
     const number = Number(at('--pr'));
     try {
       const done = await merge({ repo, number, head: at('--head') }, io);
+      if (done.queued) {
+        console.log(`PR #${number}: ${done.reason}`);
+        summary(`PR #${number}: ${done.reason}`);
+        return output({ sha: '', before: '' });
+      }
       if (!done.merged) {
         console.log(`PR #${number}: ${done.reason}; nothing to publish here`);
         return output({ sha: '', before: '' });
