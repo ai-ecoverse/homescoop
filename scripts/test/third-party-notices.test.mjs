@@ -48,9 +48,6 @@ py-matplotlib Qhull #743
 py-matplotlib Agg #743
 py-matplotlib BaKoMa #743
 py-matplotlib files #743
-py-pandas ujson #729
-py-pandas klib #729
-py-pandas files #729
 py-scipy OpenBLAS #729
 py-scipy libf2c #729
 py-scipy files #729
@@ -61,7 +58,6 @@ py-scipy files #729
 const DECLARED = {
   'py-numpy': ['OpenBLAS'], // #726
   'py-scipy': ['OpenBLAS', 'libf2c'], // #729
-  'py-pandas': ['ujson', 'klib'], // #729
   'py-matplotlib': ['Qhull', 'Agg', 'BaKoMa'], // #743
   'py-contourpy': ['pybind11'], // #797
 };

@@ -9,19 +9,43 @@
     "@ai-ecoverse/py-six"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-python@3.14.2-24",
-    "@ai-ecoverse/py-numpy@2.3.2-10",
-    "@ai-ecoverse/py-python-dateutil@2.9.0-post0.2",
-    "@ai-ecoverse/py-pytz@2026.4.0-2",
-    "@ai-ecoverse/py-tzdata@2026.4.0-2",
-    "@ai-ecoverse/py-six@1.17.0-2"
+    "@ai-ecoverse/wasix-python@3.14.2-27",
+    "@ai-ecoverse/py-numpy@2.3.2-11",
+    "@ai-ecoverse/py-python-dateutil@2.9.0-post0.3",
+    "@ai-ecoverse/py-pytz@2026.4.0-3",
+    "@ai-ecoverse/py-tzdata@2026.4.0-3",
+    "@ai-ecoverse/py-six@1.17.0-3"
   ],
   "ci": [
-    "node scripts/browser-cert/python-range.mjs py-pandas"
+    "node scripts/browser-cert/python-range.mjs py-pandas",
+    "node packages/py-pandas/test/py-vs-sdist.mjs --tarball .homescoop-out/package.tgz"
   ],
   "checklist": [
     "cert/import.mjs: import pandas from /node_modules/@ai-ecoverse/py-pandas, found by discovery without PYTHONPATH, no nested python; its 44 side modules import",
     "cert/pandas.mjs: read_csv, groupby agg, merge, a tz-aware Europe/Berlin date_range across the 2026-03-29 DST change (tzdata/pytz), interpolate, resample 3h, pivot_table, to_csv, dateutil-parsed Timestamp",
-    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-16 <3.14.3 and py-numpy 2.3.2-10 (itself a range); npm --package-lock-only with 3.14.2-16 and with 3.14.2-24 resolves one python, at the top level; ladder-pr's browser cert runs both specs on the newest (3.14.2-24), and python-range.mjs runs them again on the floor (3.14.2-16). The previous release (exact 3.14.2-16, py-numpy 2.3.2-9) nests a second python under 3.14.2-24 (NEGATIVE.md)"
-  ]
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-27 <3.14.3 and py-numpy >=2.3.2-11 <2.3.3 (the headers it is built against); npm --package-lock-only resolves one python and one numpy, at the top level, and the specs run on the newest",
+    "2.3.2-12 (homescoop#211 A4, #730): built from the PyPI sdist (pandas-2.3.2.tar.gz, sha256 ab7b58f8\u2026) in CI with meson 1.9.1 and Cython 3.1.4 against wasix-python 3.14.2-27 and py-numpy 2.3.2-11 headers, no repack. test/py-vs-sdist.mjs (ci): of the shipped pandas .py files, all but 3 equal the sdist's byte for byte; 2 equal it with 0002-lazy-ctypes.patch applied; pandas/_version_meson.py is the sdist's top-level file installed by meson. -11's pandas/_version.py differs from the sdist (NEGATIVE.md). 44 side modules, 0 call-signature mismatches",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md carries klib, ultrajson, numpy and musl (compiled in), and the LICENSES/ files of the vendored Python code (homescoop#726)"
+  ],
+  "notices": [
+    {
+      "name": "klib",
+      "license": "MIT"
+    },
+    {
+      "name": "ultrajson",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "numpy",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "musl",
+      "license": "MIT"
+    }
+  ],
+  "patches": {
+    "0002-lazy-ctypes.patch": "cert/import.mjs: import pandas (and pandas.errors) works without _ctypes; test/py-vs-sdist.mjs checks the two patched files equal the sdist's with the patch applied"
+  }
 }

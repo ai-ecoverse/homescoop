@@ -29,3 +29,7 @@ passes the lockfile check on both pythons, and both specs on 3.14.2-24 and
 `cert/pandas.mjs` asserts exact results, not just that the import works.
 `cert/import.mjs` asserts where pandas was imported from, and that no nested
 python sits under the package.
+
+## 2.3.2-12: built from the PyPI sdist (homescoop#211, #730; 2026-10-17)
+
+`test/py-vs-sdist.mjs --tarball <npm 2.3.2-11>`: FAIL, `pandas/_version.py: differs from the sdist file`. -11 repacked -10, a local build that wasn't made from the published pandas-2.3.2.tar.gz, and the recipe's old sha256 matched no public archive (#730). -12 builds from the sdist itself, and every shipped .py file is the sdist's, or the sdist's with 0002-lazy-ctypes.patch applied.
