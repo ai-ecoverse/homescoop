@@ -150,9 +150,9 @@ async function registry(t, routes) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-function publishGate(url, tgz, certified) {
+function publishGate(url, tgz, certified, npm = '/nonexistent/npm') {
   return new Promise((ok) => {
-    const p = spawn(process.execPath, [join(scripts, 'assert-certified-publish.mjs'), tgz, '--npm', NAME, '--certified', certified], { env: { ...process.env, HOMESCOOP_REGISTRY: url } });
+    const p = spawn(process.execPath, [join(scripts, 'assert-certified-publish.mjs'), tgz, '--npm', NAME, '--certified', certified], { env: { ...process.env, HOMESCOOP_REGISTRY: url, HOMESCOOP_NPM: npm, HOMESCOOP_NPM_RETRY_S: '0' } });
     let out = '';
     p.stdout.on('data', (d) => (out += d));
     p.stderr.on('data', (d) => (out += d));
@@ -172,10 +172,31 @@ test('#891 at publish: assert-certified-publish refuses a certified version that
   assert.equal((await publishGate(above, tgz, sha)).status, 0);
   const unknown = await registry(t, {});
   assert.equal((await publishGate(unknown, tgz, sha)).status, 0);
-  const already = await registry(t, { [`/${NAME}/3.12.0-4`]: [200, { version: '3.12.0-4' }], [`/${NAME}/latest`]: [200, { version: '3.12.0-5' }] });
+  const integrity = `sha512-${createHash('sha512').update(readFileSync(tgz)).digest('base64')}`;
+  const already = await registry(t, { [`/${NAME}/3.12.0-4`]: [200, { version: '3.12.0-4', dist: { integrity } }], [`/${NAME}/latest`]: [200, { version: '3.12.0-5' }] });
   assert.equal((await publishGate(already, tgz, sha)).status, 10);
   const broken = await registry(t, { [`/${NAME}/latest`]: [500, {}] });
   assert.equal((await publishGate(broken, tgz, sha)).status, 2);
   const odd = await registry(t, { [`/${NAME}/latest`]: [200, { nope: 1 }] });
   assert.equal((await publishGate(odd, tgz, sha)).status, 2);
+});
+
+test('#971 at publish: a version already on npm skips only with the same contents; other contents fail instead of skipping', async (t) => {
+  const dir = workdir(t);
+  const tgz = tarball(dir, '3.12.0-5');
+  const sha = createHash('sha256').update(readFileSync(tgz)).digest('hex');
+  const url = await registry(t, { [`/${NAME}/3.12.0-5`]: [200, { version: '3.12.0-5', dist: { integrity: 'sha512-other' } }], [`/${NAME}/latest`]: [200, { version: '3.12.0-5' }] });
+  const repacked = await publishGate(url, tgz, sha, fakeNpm(dir, { versions: ['3.12.0-5'], latest: '3.12.0-5', published: tarball(dir, '3.12.0-5') }));
+  assert.equal(repacked.status, 10, repacked.out);
+  assert.match(repacked.out, /same contents — skip publish/);
+  const drift = await publishGate(url, tgz, sha, fakeNpm(dir, { versions: ['3.12.0-5'], latest: '3.12.0-5', published: tarball(dir, '3.12.0-5', 'stripped\n') }));
+  assert.equal(drift.status, 2, drift.out);
+  assert.match(drift.out, /refuse: @ai-ecoverse\/wasm-grep@3\.12\.0-5 is already on npm with different contents \(1 entry\), so these bytes would never ship/);
+  assert.match(drift.out, /package\/README\.md: content/);
+  const down = join(dir, 'down-npm');
+  writeFileSync(down, '#!/usr/bin/env bash\necho "npm error code ETIMEDOUT" >&2\nexit 1\n');
+  chmodSync(down, 0o755);
+  const unknown = await publishGate(url, tgz, sha, down);
+  assert.equal(unknown.status, 2, unknown.out);
+  assert.match(unknown.out, /is on npm, and comparing it failed/);
 });
