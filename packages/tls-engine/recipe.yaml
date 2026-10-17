@@ -17,7 +17,7 @@ sources:
   # Mozilla's root store as curl publishes it (dist/roots.der). A bump needs
   # the new sha256; the build fails closed until it is updated.
   roots:
-    # renovate: datasource=custom.curl-cacert depName=curl-cacert versioning=regex:^(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})$ extractVersion=^cacert-(?<version>\d{4}-\d{2}-\d{2})\.pem$
+# renovate: datasource=custom.curl-cacert depName=curl-cacert versioning=regex:^(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})$ extractVersion=^cacert-(?<version>\d{4}-\d{2}-\d{2})\.pem$
     version: "2026-09-25"
     url: "https://curl.se/ca/cacert-{{version}}.pem"
     sha256: "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505"

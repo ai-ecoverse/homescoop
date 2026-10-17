@@ -403,7 +403,8 @@ static int parse_alpn(session *s, const unsigned char *wire, size_t len) {
   return 1;
 }
 
-/* A client session to `servername` (a C string), verifying the server's chain
+/* A client session to `servername` (a C string; one trailing dot, an absolute
+ * name, is dropped for SNI and the check, homescoop#1033), verifying the server's chain
  * against `trust`; 0 on failure. `alpn` is an ALPN list in wire format (or
  * 0, 0). Verification is required unless flags has
  * TLS_CLIENT_INSECURE_SKIP_VERIFY, which still records the result
@@ -424,7 +425,9 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
     return NULL;
   }
   strcpy(s->host, servername);
-  s->ip_len = servername[0] ? mbedtls_x509_crt_parse_cn_inet_pton(servername, s->ip) : 0;
+  size_t name_len = strlen(s->host);
+  if (name_len > 1 && s->host[name_len - 1] == '.') s->host[name_len - 1] = 0;
+  s->ip_len = s->host[0] ? mbedtls_x509_crt_parse_cn_inet_pton(s->host, s->ip) : 0;
   mbedtls_ssl_init(&s->ssl);
   mbedtls_ssl_config_init(&s->config);
   if (trust) {
@@ -446,7 +449,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
     if (alpn_len > 0) ret = mbedtls_ssl_conf_alpn_protocols(&s->config, s->alpn);
   }
   if (ret == 0) ret = mbedtls_ssl_setup(&s->ssl, &s->config);
-  if (ret == 0) ret = mbedtls_ssl_set_hostname(&s->ssl, s->ip_len || !servername[0] ? NULL : servername);
+  if (ret == 0) ret = mbedtls_ssl_set_hostname(&s->ssl, s->ip_len || !s->host[0] ? NULL : s->host);
   if (ret != 0) {
     last_error = ret;
     session_free(s);
@@ -531,9 +534,9 @@ static int want(int ret) {
          ret == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS;
 }
 
-/* Plaintext from the client: > 0 bytes, 0 when more ciphertext is needed, TLS_EOF, or an error. */
+/* Plaintext from the peer: > 0 bytes, 0 when more ciphertext is needed, TLS_EOF, or an error. */
 EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
-  for (;;) {
+  for (int spins = 0;; spins++) {
     int ret;
     if (!mbedtls_ssl_is_handshake_over(&s->ssl)) {
       ret = mbedtls_ssl_handshake(&s->ssl);
@@ -545,6 +548,10 @@ EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
     }
     if (ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY || ret == MBEDTLS_ERR_SSL_CONN_EOF) return TLS_EOF;
     if (ret == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) continue;
+    /* A client's TLS 1.3 NewSessionTickets (two may share a record) each end a
+     * read with WANT_READ while the data behind them is already buffered: go
+     * on while ciphertext or a record is waiting (homescoop#1032). */
+    if (want(ret) && spins < 64 && (s->in_len > 0 || mbedtls_ssl_check_pending(&s->ssl))) continue;
     if (want(ret)) return 0;
     return last_error = ret;
   }

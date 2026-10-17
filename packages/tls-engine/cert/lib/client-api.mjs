@@ -154,6 +154,28 @@ class Wire {
     this.e.with(chunk, (p) => this.m._tls_feed(this.s, p, chunk.length));
     return true;
   }
+  feedQueued() {
+    let fed = 0;
+    while (this.chunks.length && this.m._tls_in_room(this.s) > 0) {
+      let chunk = this.chunks.shift();
+      const room = this.m._tls_in_room(this.s);
+      if (chunk.length > room) {
+        this.chunks.unshift(chunk.subarray(room));
+        chunk = chunk.subarray(0, room);
+      }
+      fed += this.e.with(chunk, (p) => this.m._tls_feed(this.s, p, chunk.length));
+    }
+    return fed;
+  }
+  readBuffered() {
+    const parts = [];
+    for (;;) {
+      const out = this.e.into((p, max) => this.m._tls_read(this.s, p, max));
+      this.flush();
+      if (!(out instanceof Uint8Array)) return { text: Buffer.concat(parts).toString(), last: out };
+      parts.push(out);
+    }
+  }
   flush() {
     while (this.m._tls_out_size(this.s) > 0) {
       const out = this.e.into((p, max) => this.m._tls_out_take(this.s, p, max));
@@ -273,6 +295,42 @@ describe('client sessions (slicc-kernel#922)', () => {
       wire.close();
     });
   }
+
+  test('TLS 1.3: a response buffered behind the NewSessionTickets comes out without more input, and the connection stays open (homescoop#1032)', async () => {
+    const response = 'HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: keep-alive\r\n\r\nok';
+    const srv = await server('client.test', {
+      tls: { minVersion: 'TLSv1.3' },
+      onSocket: (socket) => socket.on('data', () => socket.write(response)),
+    });
+    const { wire, result } = await attempt(srv.port, 'client.test');
+    assert.equal(result, 1);
+    for (let i = 0; i < 2; i++) {
+      await wire.write(Buffer.from('GET / HTTP/1.1\r\nHost: client.test\r\n\r\n'));
+      const until = Date.now() + 2000;
+      let got = '';
+      while (!got.endsWith('ok') && Date.now() < until) {
+        await new Promise((r) => setTimeout(r, 50));
+        if (wire.feedQueued() === 0) continue;
+        const { text, last } = wire.readBuffered();
+        assert.equal(last, 0, engine.strerror(last));
+        got += text;
+      }
+      assert.equal(got, response, `request ${i + 1}`);
+      assert.equal(wire.m._tls_in_room(wire.s), 40 * 1024, 'nothing left buffered');
+    }
+    assert.equal(wire.ended, false, 'the server kept the connection open');
+    wire.close();
+  });
+
+  test('an absolute name (one trailing dot) is the same host for SNI and the check (homescoop#1033)', async () => {
+    const srv = await server('dot.test');
+    const { wire, result } = await attempt(srv.port, 'dot.test.');
+    assert.equal(result, 1, engine.strerror(result));
+    assert.equal(wire.verify, 0);
+    await srv.secure;
+    assert.equal(srv.seen.servername, 'dot.test');
+    wire.close();
+  });
 
   test('no ALPN offered gives no protocol', async () => {
     const srv = await server('client.test', { tls: { ALPNProtocols: ['h2'] } });

@@ -20,12 +20,14 @@ TLS for [SLICC](https://github.com/ai-ecoverse/slicc): Mbed TLS 4.2.0 sessions o
 - **Server names:**
   - A DNS name is sent as SNI and checked against the leaf's DNS names, as Mbed TLS checks them (subjectAltName, else the CN).
   - An IPv4 or IPv6 literal is not sent as SNI (RFC 6066). It must match an iPAddress subjectAltName of the leaf, never a DNS name or a CN that spells it.
+  - One trailing dot (an absolute name such as `example.com.`) is dropped, for SNI and the check alike.
 - **Protocol:** TLS 1.2 minimum and TLS 1.3 maximum. No renegotiation, and no session tickets or resumption: every connection is a full handshake and a full verification.
 - **Handshake:** `tls_handshake` drives it. It returns 1 when the handshake is done, 0 when it needs more ciphertext, and otherwise an error. A refused chain is `MBEDTLS_ERR_X509_CERT_VERIFY_FAILED`.
   - `tls_verify_result` gives Mbed TLS's `MBEDTLS_X509_BADCERT_*` flags (0 = verified, -1 = no certificate yet), and `tls_verify_info` puts them in words.
   - `tls_alpn` gives the agreed protocol, and `tls_version` the version.
   - `tls_peer_count` and `tls_peer_der` give the server's chain as sent, its leaf first.
   - After the handshake, the I/O is the server sessions'.
+  - `tls_read` returns 0 only when nothing buffered can still be processed. TLS 1.3 NewSessionTickets ahead of the data are consumed within the same call (homescoop#1032).
 
 ### Limits
 
