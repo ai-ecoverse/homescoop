@@ -16,6 +16,8 @@ homescoop_apply_patches "$SRC_DIR"
 SLICC_A="$WORK/libslicc-gaps.a"
 homescoop_slicc_archive "$SLICC_A" gaps
 
+# CFLAGS without autoconf's default -g: the DWARF it adds names the build
+# directory (DW_AT_comp_dir), so a rebuild elsewhere differs (reproducible).
 # pkgconf_trace keeps a 64 KiB buffer on the stack (Emscripten's default).
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1MB"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports) $SLICC_A"
@@ -26,7 +28,7 @@ if [[ ! -f "$SRC_DIR/pkgconf" && ! -f "$SRC_DIR/pkgconf.js" || -n "${FORCE:-}" ]
     cd "$SRC_DIR"
     emconfigure ./configure \
       --disable-dependency-tracking --disable-shared --enable-static \
-      LDFLAGS="$(homescoop_em_cli_ldflags)"
+      CFLAGS="-O2" LDFLAGS="$(homescoop_em_cli_ldflags)"
     homescoop_fix_darwin_ar Makefile
     emmake make pkgconf LDFLAGS="$CLI_LDFLAGS"
   )
@@ -46,4 +48,6 @@ if [[ -f "$HOMESCOOP_PKG/package/bin/pkgconf.js" || -f "$HOMESCOOP_PKG/package/b
   chmod +x "$HOMESCOOP_PKG/package/bin/pkg-config"
 fi
 homescoop_stage_license "$SRC_DIR"/LICENSE "$SRC_DIR"/COPYING "$SRC_DIR"/COPYING.LIB "$SRC_DIR"/license.txt "$SRC_DIR"/LICENSE.md
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== pkgconf: staged → $HOMESCOOP_PKG/package"

@@ -25,8 +25,13 @@ Limits in seven:
   packages come from homescoop's `@ai-ecoverse/py-*` npm packages.
 - **No git dependencies** (uv spawns git through code that cannot spawn on
   WASI yet), no `uv python install`, no `uv self update`.
-- **No file locks:** two uv processes on one cache or environment at the
-  same time are not serialised.
+- **File locks are record locks** (since 0.13.1-2, homescoop#706): uv's locks
+  on a cache, an environment or a project are whole-file `fcntl` locks in
+  slicc-kernel (`slicc.fcntl_lock`, ≥ 1.100.0), so two uv processes on one
+  cache or environment are serialised: the second says `Waiting to acquire
+  exclusive lock`, and `uv cache clean` waits for running uv processes. Up
+  to 0.13.1-1 every lock was granted without one. Locks are per kernel, not
+  across browser tabs (slicc-kernel#675).
 - Files are copied from the cache into environments (`UV_LINK_MODE=copy`,
   set by the command).
 

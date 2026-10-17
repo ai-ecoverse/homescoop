@@ -8,27 +8,30 @@ symlink_path), the cache's archive symlinks and the runtime cfg!(unix)
 choices. WASI has no permission bits, file locks or descriptor dup:
 - uv tool install links executables into the bin directory, as on unix;
 - which: any regular file on PATH is a candidate;
-- file locks are granted and released without a lock;
+- file locks are whole-file record locks through slicc's kernel
+  slicc.fcntl_lock (slicc-kernel >= 1.100.0), with flock's semantics
+  between the holders in one process (homescoop#706); ENOSYS without it:
+  granted, as before;
 - atomic writes reopen the temporary file and carry no mode over;
 - scripts are made executable with slicc's kernel slicc_fs.fd_chmod,
   which wasix-sysroot's libc uses too (ENOSYS without it: ignored).
 ---
- crates/uv-cache/src/lib.rs                    |  6 +--
- crates/uv-distribution/src/source/mod.rs      |  4 +-
- .../src/environment.rs                        |  2 +-
- crates/uv-fs/src/lib.rs                       | 54 ++++++++++++++++---
- crates/uv-fs/src/link.rs                      |  6 +++
- crates/uv-fs/src/locked_file.rs               | 27 ++++++++--
- crates/uv-fs/src/named_temp_file.rs           |  3 ++
- crates/uv-fs/src/path.rs                      |  5 +-
- crates/uv-fs/src/which.rs                     |  8 ++-
- crates/uv-install-wheel/src/wheel.rs          |  6 +++
- crates/uv-python-commands/src/install.rs      |  2 +-
- crates/uv-python-managed/src/managed.rs       | 16 +++---
- crates/uv-tool-commands/src/common.rs         |  4 +-
- crates/uv-tool/src/tool.rs                    |  2 +-
- crates/uv-virtualenv/src/virtualenv.rs        |  6 +--
- 15 files changed, 118 insertions(+), 33 deletions(-)
+ crates/uv-cache/src/lib.rs                    |   6 +-
+ crates/uv-distribution/src/source/mod.rs      |   4 +-
+ .../src/environment.rs                        |   2 +-
+ crates/uv-fs/src/lib.rs                       |  54 +++-
+ crates/uv-fs/src/link.rs                      |   6 +
+ crates/uv-fs/src/locked_file.rs               | 289 +++++++++++++++++-
+ crates/uv-fs/src/named_temp_file.rs           |   3 +
+ crates/uv-fs/src/path.rs                      |   5 +-
+ crates/uv-fs/src/which.rs                     |   8 +-
+ crates/uv-install-wheel/src/wheel.rs          |   6 +
+ crates/uv-python-commands/src/install.rs      |   2 +-
+ crates/uv-python-managed/src/managed.rs       |  16 +-
+ crates/uv-tool-commands/src/common.rs         |   4 +-
+ crates/uv-tool/src/tool.rs                    |   2 +-
+ crates/uv-virtualenv/src/virtualenv.rs        |   6 +-
+ 15 files changed, 371 insertions(+), 42 deletions(-)
 
 diff --git a/crates/uv-cache/src/lib.rs b/crates/uv-cache/src/lib.rs
 index 9a017bf..c84f5b4 100644
@@ -217,7 +220,7 @@ index 04e2e54..44da017 100644
  #[cfg(windows)]
  fn create_symlink(original: &Path, link: &Path) -> io::Result<()> {
 diff --git a/crates/uv-fs/src/locked_file.rs b/crates/uv-fs/src/locked_file.rs
-index d9647a5..de2f8c9 100644
+index d9647a5..afbf617 100644
 --- a/crates/uv-fs/src/locked_file.rs
 +++ b/crates/uv-fs/src/locked_file.rs
 @@ -110,7 +110,7 @@ impl LockedFileMode {
@@ -238,28 +241,314 @@ index d9647a5..de2f8c9 100644
      fn lock(self, file: &fs_err::File) -> Result<(), io::Error> {
          match self {
              Self::Exclusive => file.lock()?,
-@@ -179,6 +179,20 @@ impl LockedFileMode {
+@@ -179,6 +179,227 @@ impl LockedFileMode {
      }
  }
  
-+/// WASI has no file locks: every lock is granted.
++/// WASI preview1 has no file locks: slicc's kernel keeps POSIX record locks
++/// behind its `slicc.fcntl_lock` import (slicc-kernel >= 1.100.0), which
++/// wasix-sysroot's libc uses for `fcntl`. See [`wasi_lock`].
 +#[cfg(all(feature = "tokio", target_os = "wasi"))]
 +impl LockedFileMode {
-+    #[expect(clippy::unnecessary_wraps, clippy::unused_self)]
-+    fn try_lock(self, _file: &fs_err::File) -> Result<(), std::fs::TryLockError> {
++    fn try_lock(self, file: &fs_err::File) -> Result<(), std::fs::TryLockError> {
++        wasi_lock::try_lock(self, file)
++    }
++
++    fn lock(self, file: &fs_err::File) -> Result<(), io::Error> {
++        wasi_lock::lock(self, file)
++    }
++}
++
++/// `flock` semantics on top of the kernel's whole-file `fcntl` record locks.
++///
++/// A record lock belongs to the process, not to the descriptor: a second
++/// descriptor of the same file in the same process would be granted any
++/// lock, one unlock would drop them all, and closing any descriptor of the
++/// file drops the process's locks on it. So the process keeps a table per
++/// lock file of who holds what: holders in this process exclude each other
++/// here (as `flock` on separate descriptors does), the kernel holds the
++/// strongest mode any of them holds (write if one is exclusive, read if all
++/// are shared), and the descriptors of a file that still has holders stay
++/// open until the last one lets go. A kernel without the import answers
++/// `ENOSYS`, and the lock is granted without one (as before).
++#[cfg(all(feature = "tokio", target_os = "wasi"))]
++mod wasi_lock {
++    use std::collections::HashMap;
++    use std::io;
++    use std::os::fd::AsRawFd;
++    use std::path::PathBuf;
++    use std::sync::{LazyLock, Mutex};
++    use std::time::Duration;
++
++    use super::LockedFileMode;
++
++    const F_SETLK: i32 = 13;
++    const F_RDLCK: i16 = 0;
++    const F_WRLCK: i16 = 1;
++    const F_UNLCK: i16 = 2;
++    const EAGAIN: i32 = 6;
++    const EBADF: i32 = 8;
++    const EINTR: i32 = 27;
++    const ENOSYS: i32 = 52;
++
++    /// musl's wasm32 `struct flock`, as the kernel reads it (32 bytes).
++    #[repr(C)]
++    struct Flock {
++        l_type: i16,
++        l_whence: i16,
++        pad: u32,
++        l_start: i64,
++        l_len: i64,
++        l_pid: i32,
++        pad2: u32,
++    }
++
++    #[link(wasm_import_module = "slicc")]
++    #[expect(unsafe_code)]
++    unsafe extern "C" {
++        fn fcntl_lock(fd: i32, cmd: i32, lock: *mut Flock) -> i32;
++    }
++
++    /// `F_SETLK` of the whole file, as `l_type`; the kernel's errno.
++    #[expect(unsafe_code)]
++    fn set(fd: i32, l_type: i16) -> i32 {
++        let mut lock = Flock {
++            l_type,
++            l_whence: 0,
++            pad: 0,
++            l_start: 0,
++            l_len: 0,
++            l_pid: 0,
++            pad2: 0,
++        };
++        loop {
++            // SAFETY: `lock` is a live, writable 32-byte struct for the call.
++            match unsafe { fcntl_lock(fd, F_SETLK, &raw mut lock) } {
++                EINTR => {}
++                errno => return errno,
++            }
++        }
++    }
++
++    #[derive(Default)]
++    struct Entry {
++        /// Descriptor and mode of each holder in this process.
++        holders: Vec<(i32, LockedFileMode)>,
++        /// What the kernel holds for this process.
++        held: Option<i16>,
++        /// Descriptors closed by their owners while others hold the file.
++        parked: Vec<fs_err::File>,
++    }
++
++    static TABLE: LazyLock<Mutex<HashMap<PathBuf, Entry>>> = LazyLock::new(Mutex::default);
++
++    fn key(file: &fs_err::File) -> PathBuf {
++        fs_err::canonicalize(file.path()).unwrap_or_else(|_| file.path().to_path_buf())
++    }
++
++    fn wanted(holders: &[(i32, LockedFileMode)]) -> Option<i16> {
++        if holders
++            .iter()
++            .any(|(_, mode)| matches!(mode, LockedFileMode::Exclusive))
++        {
++            Some(F_WRLCK)
++        } else if holders.is_empty() {
++            None
++        } else {
++            Some(F_RDLCK)
++        }
++    }
++
++    pub(super) fn try_lock(
++        mode: LockedFileMode,
++        file: &fs_err::File,
++    ) -> Result<(), std::fs::TryLockError> {
++        let fd = file.file().as_raw_fd();
++        let mut table = TABLE
++            .lock()
++            .unwrap_or_else(std::sync::PoisonError::into_inner);
++        let entry = table.entry(key(file)).or_default();
++        let conflict = match mode {
++            LockedFileMode::Exclusive => !entry.holders.is_empty(),
++            LockedFileMode::Shared => entry
++                .holders
++                .iter()
++                .any(|(_, m)| matches!(m, LockedFileMode::Exclusive)),
++        };
++        if conflict {
++            return Err(std::fs::TryLockError::WouldBlock);
++        }
++        let mut holders = entry.holders.clone();
++        holders.push((fd, mode));
++        let want = wanted(&holders);
++        if want != entry.held {
++            let l_type = want.unwrap_or(F_UNLCK);
++            let mut errno = set(fd, l_type);
++            // The kernel wants a descriptor open for writing for a write
++            // lock: on a read-only one, a read lock still keeps writers out.
++            if errno == EBADF && l_type == F_WRLCK {
++                errno = set(fd, F_RDLCK);
++            }
++            match errno {
++                0 | ENOSYS => {}
++                EAGAIN => return Err(std::fs::TryLockError::WouldBlock),
++                errno => {
++                    return Err(std::fs::TryLockError::Error(io::Error::from_raw_os_error(
++                        errno,
++                    )));
++                }
++            }
++            entry.held = want;
++        }
++        entry.holders = holders;
 +        Ok(())
 +    }
 +
-+    #[expect(clippy::unnecessary_wraps, clippy::unused_self)]
-+    fn lock(self, _file: &fs_err::File) -> Result<(), io::Error> {
-+        Ok(())
++    /// Blocking lock: tries again until granted. `F_SETLKW` would wait in
++    /// the kernel, but not for holders in this process, and not while the
++    /// table is free for their unlocks.
++    pub(super) fn lock(mode: LockedFileMode, file: &fs_err::File) -> Result<(), io::Error> {
++        let mut pause = Duration::from_millis(5);
++        loop {
++            match try_lock(mode, file) {
++                Ok(()) => return Ok(()),
++                Err(std::fs::TryLockError::WouldBlock) => {}
++                Err(std::fs::TryLockError::Error(err)) => return Err(err),
++            }
++            std::thread::sleep(pause);
++            pause = (pause * 2).min(Duration::from_millis(100));
++        }
++    }
++
++    /// Release `file`'s lock and close it, or keep it open while other
++    /// holders in this process hold the file (closing would drop theirs).
++    pub(super) fn release(file: fs_err::File) -> Result<(), io::Error> {
++        let fd = file.file().as_raw_fd();
++        let path = key(&file);
++        let mut table = TABLE
++            .lock()
++            .unwrap_or_else(std::sync::PoisonError::into_inner);
++        let Some(entry) = table.get_mut(&path) else {
++            return Ok(());
++        };
++        entry.holders.retain(|(holder, _)| *holder != fd);
++        let want = wanted(&entry.holders);
++        let mut result = Ok(());
++        if want != entry.held {
++            // A downgrade (write to read) or an unlock never waits.
++            match set(fd, want.unwrap_or(F_UNLCK)) {
++                0 | ENOSYS => entry.held = want,
++                errno => result = Err(io::Error::from_raw_os_error(errno)),
++            }
++        }
++        if entry.holders.is_empty() {
++            // Nobody in this process holds the file: close them all.
++            table.remove(&path);
++        } else {
++            entry.parked.push(file);
++        }
++        result
++    }
++
++    /// A descriptor whose lock was refused: closing it while others in this
++    /// process hold the file would drop their locks, so it waits with them.
++    pub(super) fn park(file: fs_err::File) {
++        let path = key(&file);
++        let mut table = TABLE
++            .lock()
++            .unwrap_or_else(std::sync::PoisonError::into_inner);
++        match table.get_mut(&path) {
++            Some(entry) if !entry.holders.is_empty() => entry.parked.push(file),
++            _ => {
++                table.remove(&path);
++            }
++        }
 +    }
 +}
 +
  impl Display for LockedFileMode {
      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
          match self {
-@@ -405,11 +419,18 @@ impl LockedFile {
+@@ -192,10 +413,31 @@ impl Display for LockedFileMode {
+ #[cfg(feature = "tokio")]
+ #[derive(Debug)]
+ #[must_use]
++#[cfg(not(target_os = "wasi"))]
+ pub struct LockedFile(fs_err::File);
+ 
++/// A file lock that is automatically released when dropped.
++///
++/// On WASI the descriptor may outlive the lock (see [`wasi_lock`]), so
++/// [`Drop`] hands it over instead of closing it.
++#[cfg(feature = "tokio")]
++#[derive(Debug)]
++#[must_use]
++#[cfg(target_os = "wasi")]
++pub struct LockedFile(std::mem::ManuallyDrop<fs_err::File>);
++
+ #[cfg(feature = "tokio")]
+ impl LockedFile {
++    #[cfg(not(target_os = "wasi"))]
++    fn new(file: fs_err::File) -> Self {
++        Self(file)
++    }
++
++    #[cfg(target_os = "wasi")]
++    fn new(file: fs_err::File) -> Self {
++        Self(std::mem::ManuallyDrop::new(file))
++    }
++
+     /// Inner implementation for [`LockedFile::acquire`].
+     async fn lock_file(
+         file: fs_err::File,
+@@ -211,7 +453,7 @@ impl LockedFile {
+         let file = match try_lock_exclusive.await? {
+             (Ok(()), file) => {
+                 trace!("Acquired {mode} lock for `{resource}`");
+-                return Ok(Self(file));
++                return Ok(Self::new(file));
+             }
+             (Err(err), file) => {
+                 // Log error code and enum kind to help debugging more exotic failures.
+@@ -237,14 +479,18 @@ impl LockedFile {
+                 path: path.clone(),
+             })??;
+         // Not an fs_err method, we need to build our own path context
+-        result.map_err(|err| LockedFileError::Lock {
+-            resource: resource.to_string(),
+-            path,
+-            source: err,
+-        })?;
++        if let Err(err) = result {
++            #[cfg(target_os = "wasi")]
++            wasi_lock::park(file);
++            return Err(LockedFileError::Lock {
++                resource: resource.to_string(),
++                path,
++                source: err,
++            });
++        }
+ 
+         trace!("Acquired {mode} lock for `{resource}`");
+-        Ok(Self(file))
++        Ok(Self::new(file))
+     }
+ 
+     /// Inner implementation for [`LockedFile::acquire_no_wait`].
+@@ -256,9 +502,11 @@ impl LockedFile {
+         match mode.try_lock(&file) {
+             Ok(()) => {
+                 trace!("Acquired {mode} lock for `{resource}`");
+-                Some(Self(file))
++                Some(Self::new(file))
+             }
+             Err(err) => {
++                #[cfg(target_os = "wasi")]
++                wasi_lock::park(file);
+                 // Log error code and enum kind to help debugging more exotic failures.
+                 if !is_known_already_locked_error(&err) {
+                     debug!("Try lock error: {err:?}");
+@@ -405,7 +653,7 @@ impl LockedFile {
      /// (see [rust-lang/rust#148325]), so we use [`rustix::fs::flock`] directly.
      ///
      /// [rust-lang/rust#148325]: https://github.com/rust-lang/rust/issues/148325
@@ -268,17 +557,32 @@ index d9647a5..de2f8c9 100644
      fn unlock(&self) -> Result<(), io::Error> {
          self.0.unlock()
      }
+@@ -426,7 +674,24 @@ impl LockedFile {
+     }
+ }
  
-+    /// WASI has no file locks (see [`LockedFileMode::lock`]).
-+    #[cfg(target_os = "wasi")]
-+    #[expect(clippy::unnecessary_wraps, clippy::unused_self)]
-+    fn unlock(&self) -> Result<(), io::Error> {
-+        Ok(())
+-#[cfg(feature = "tokio")]
++#[cfg(all(feature = "tokio", target_os = "wasi"))]
++impl Drop for LockedFile {
++    #[expect(unsafe_code)]
++    fn drop(&mut self) {
++        let path = self.0.path().to_path_buf();
++        // SAFETY: `self.0` is not used again; this is the only take.
++        let file = unsafe { std::mem::ManuallyDrop::take(&mut self.0) };
++        match wasi_lock::release(file) {
++            Ok(()) => trace!("Released lock at `{}`", path.display()),
++            Err(err) => error!(
++                "Failed to unlock resource at `{}`; program may be stuck: {err}",
++                path.display()
++            ),
++        }
 +    }
++}
 +
-     /// Unlock the file.
-     ///
-     /// Android-specific implementation using [`rustix::fs::flock`] because
++#[cfg(all(feature = "tokio", not(target_os = "wasi")))]
+ impl Drop for LockedFile {
+     fn drop(&mut self) {
+         match self.unlock() {
 diff --git a/crates/uv-fs/src/named_temp_file.rs b/crates/uv-fs/src/named_temp_file.rs
 index d173b89..7056a85 100644
 --- a/crates/uv-fs/src/named_temp_file.rs
