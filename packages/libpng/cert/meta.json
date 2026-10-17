@@ -1,0 +1,15 @@
+{
+  "harness": "host-node",
+  "host": "node scripts/em-lib-cert.mjs libpng --tarball <package.tgz | npm spec>: with the pinned emsdk (scripts/install-emsdk.sh), unpacks the tarball and the recipe's @ai-ecoverse build inputs at their pinned versions, compiles test/probe.c with nothing but pkg-config of the package's .pc (PKG_CONFIG_LIBDIR: the package and those inputs, no host dirs), links it with -Wl,--fatal-warnings, runs it under Node (NODERAWFS) and then test/check.mjs. A static library has no commands of its own.",
+  "pkgconfig": [
+    "libpng"
+  ],
+  "checklist": [
+    "png_get_libpng_ver() and libpng.pc's Version are the recipe version",
+    "the probe compiles and links from the .pc flags alone with -Wl,--fatal-warnings: no undefined symbol and no signature mismatch",
+    "writes a 64x48 RGBA PNG at compression 9 with a zTXt comment, reads it back with png_read_image (pixels and the comment exact) and with the simplified png_image API (to gray); Node decodes probe.png itself: signature, every chunk's CRC, IHDR, the zTXt text and the IDAT scanlines inflated with Node's zlib and unfiltered to the same pixels"
+  ],
+  "ci": [
+    "node scripts/em-lib-cert.mjs libpng --tarball .homescoop-out/package.tgz"
+  ]
+}

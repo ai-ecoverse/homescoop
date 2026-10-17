@@ -9,8 +9,7 @@ source:
   url: "https://github.com/mm2/Little-CMS/releases/download/lcms{{version}}/lcms2-{{version}}.tar.gz"
   sha256: "bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8"
 dependencies:
-  build:
-    - @ai-ecoverse/wasm-zlib@1.3.1-2
+  build: []
   host: []
   run: []
 about:
