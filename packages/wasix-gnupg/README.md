@@ -45,7 +45,8 @@ decrypt yet).
   to an `O_EXCL` lock file (OPFS has no hard links), which raced: runs
   failed with "Oops, … is not locked" or "lockfile disappeared". The lock
   files stay in place. Since 2.4.9-10, root gives a lock file it creates in
-  another user's directory to that directory's owner, and a gpg that can't
+  another user's directory to that directory's owner (only one it created
+  itself, never a name that was already there), and a gpg that can't
   open a lock file for writing replaces it if no process holds it
   (homescoop#888). `gpgconf --lock`/`--unlock` aren't supported: an fcntl
   lock ends with its process, so no lock can outlive gpgconf, and both say

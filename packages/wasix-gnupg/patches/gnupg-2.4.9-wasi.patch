@@ -301,7 +301,7 @@
  #endif /*!HAVE_DOSISH_SYSTEM */
  };
  
-@@ -681,6 +685,254 @@
+@@ -681,6 +685,275 @@
  
  
  
@@ -322,10 +322,10 @@
 +
 +/* homescoop#888: the lock file stays, so one that another user created
 + * (root running gpg on someone's homedir) would keep the homedir's owner
-+ * from opening it for writing.  Root gives a lock file it creates to the
-+ * directory's owner, and a caller who can't open a lock file for writing
-+ * replaces it if no process holds a lock on it (the directory's owner
-+ * may remove it).  */
++ * from opening it for writing.  Root gives a lock file it creates (with
++ * O_EXCL, never one that was there) to the directory's owner, and a
++ * caller who can't open a lock file for writing replaces it if no process
++ * holds a lock on it (the directory's owner may remove it).  */
 +static int
 +dotlock_fcntl_dir (const char *lockname, struct stat *st)
 +{
@@ -345,6 +345,9 @@
 +  return rc;
 +}
 +
++/* Only a lock file this call created, and only a regular file with one
++ * link, is given away: a symlink or hard link planted under the lock
++ * name must not make root chown its target.  */
 +static void
 +dotlock_fcntl_give (int fd, const char *lockname)
 +{
@@ -352,8 +355,24 @@
 +
 +  if (geteuid () || fstat (fd, &st) || dotlock_fcntl_dir (lockname, &dst))
 +    return;
++  if (!S_ISREG (st.st_mode) || st.st_nlink != 1)
++    return;
 +  if (st.st_uid != dst.st_uid || st.st_gid != dst.st_gid)
 +    fchown (fd, dst.st_uid, dst.st_gid);
++}
++
++static int
++dotlock_fcntl_open (const char *lockname, int *r_created)
++{
++  int fd;
++
++  *r_created = 0;
++  fd = open (lockname, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
++  if (fd != -1)
++    *r_created = 1;
++  else if (errno == EEXIST)
++    fd = open (lockname, O_RDWR | O_CLOEXEC);
++  return fd;
 +}
 +
 +static int
@@ -376,6 +395,8 @@
 +static dotlock_t
 +dotlock_create_fcntl (dotlock_t h, const char *file_to_lock)
 +{
++  int created;
++
 +  LOCK_all_lockfiles ();
 +  h->next = all_lockfiles;
 +  all_lockfiles = h;
@@ -386,17 +407,17 @@
 +  if (!h->lockname)
 +    goto failed;
 +  strcpy (stpcpy (h->lockname, file_to_lock), EXTSEP_S "lock");
-+  h->lockfd = open (h->lockname, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
++  h->lockfd = dotlock_fcntl_open (h->lockname, &created);
 +  if (h->lockfd == -1 && (errno == EACCES || errno == EPERM))
 +    {
 +      int saveerrno = errno;
 +
 +      if (dotlock_fcntl_reclaim (h->lockname))
-+        h->lockfd = open (h->lockname, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
++        h->lockfd = dotlock_fcntl_open (h->lockname, &created);
 +      else
 +        errno = saveerrno;
 +    }
-+  if (h->lockfd != -1)
++  if (h->lockfd != -1 && created)
 +    dotlock_fcntl_give (h->lockfd, h->lockname);
 +  if (h->lockfd == -1)
 +    {
@@ -556,7 +577,7 @@
  #ifdef  HAVE_POSIX_SYSTEM
  static int
  dotlock_get_process_id (dotlock_t h)
-@@ -770,6 +1022,10 @@
+@@ -770,6 +1043,10 @@
    size_t tnamelen;
    int pid;
  
@@ -567,7 +588,7 @@
    pid = dotlock_get_process_id (h);
    snprintf (pidstr, sizeof pidstr, "%10d\n", pid);
  
-@@ -1151,6 +1407,13 @@
+@@ -1151,6 +1428,13 @@
  static void
  dotlock_destroy_unix (dotlock_t h)
  {
@@ -581,7 +602,7 @@
    if (h->locked && h->lockname)
      unlink (h->lockname);
    if (h->tname && !h->use_o_excl)
-@@ -1569,6 +1832,11 @@
+@@ -1569,6 +1853,11 @@
  #ifdef HAVE_DOSISH_SYSTEM
    ret = dotlock_take_w32 (h, timeout);
  #else /*!HAVE_DOSISH_SYSTEM*/
@@ -593,7 +614,7 @@
    ret = dotlock_take_unix (h, timeout);
  #endif /*!HAVE_DOSISH_SYSTEM*/
  
-@@ -1683,6 +1951,11 @@
+@@ -1683,6 +1972,11 @@
  #ifdef HAVE_DOSISH_SYSTEM
    ret = dotlock_release_w32 (h);
  #else

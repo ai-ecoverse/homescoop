@@ -10,6 +10,8 @@
  *    trustdb, and every lock file in the homedir is cone's. 2.4.9-8 and -9
  *    leave root-owned 0644 lock files that cone can't open for writing.
  *    A root-owned lock file left by an older gpg is replaced by cone's gpg.
+ *    A lock name cone points at a root file (a symlink) doesn't make root's
+ *    gpg give that file to cone: only lock files it creates are given away.
  * 3. homescoop#881: gpgconf --lock / --unlock say they aren't supported on
  *    WASI, never "invalid size of lockfile".
  */
@@ -66,6 +68,19 @@ export default async function (ctx) {
     assert.match(after, new RegExp(`^${step}=0$`, 'm'), `cone's ${step} after root used the homedir (2.4.9-9: Permission denied / No agent running):\n${after}`);
   }
   assert.doesNotMatch(after, /Permission denied|can't (allocate|create) lock|No agent running/, `cone: no lock errors:\n${after}`);
+
+  // A lock name that cone points at a root file: root's gpg must not give
+  // the target away (only a lock file it creates itself is cone's).
+  await sh('root', 'mkdir -p /srv/t; echo secret > /srv/t/f; chmod 755 /srv/t; chmod 644 /srv/t/f');
+  const planted = await sh('cone', `rm -f ${h}/pubring.kbx.lock ${h}/trustdb.gpg.lock; ln -s /srv/t/f ${h}/pubring.kbx.lock; ln -s /srv/t/f ${h}/trustdb.gpg.lock; ls -l ${h}/pubring.kbx.lock`);
+  assert.match(planted, /pubring\.kbx\.lock -> \/srv\/t\/f/, `planted a symlink:\n${planted}`);
+  const viaLink = await sh('root', [
+    `gpg --homedir ${h} --batch -k > /dev/null 2>&1; echo "k=$?"`,
+    `gpgconf --homedir ${h} --kill gpg-agent`,
+    'stat -c "target %U %a" /srv/t/f',
+  ].join('\n'));
+  assert.match(viaLink, /^target root 644$/m, `root's gpg leaves a symlinked lock file's target alone (2.4.9-10 before the fix: cone 644):\n${viaLink}`);
+  await sh('cone', `rm -f ${h}/pubring.kbx.lock ${h}/trustdb.gpg.lock`);
 
   // A root-owned lock file that an older gpg left behind.
   const stale = await sh('root', `rm -f ${h}/pubring.kbx.lock; : > ${h}/pubring.kbx.lock; chmod 644 ${h}/pubring.kbx.lock; stat -c "%U %a" ${h}/pubring.kbx.lock`);
