@@ -1,0 +1,13 @@
+{
+  "harness": "host-node",
+  "host": "node packages/llvm-emscripten/test/check.mjs --tarball <package.tgz>: unpacks the package, checks manifest.json and the files it names, compares lib/clang/24 with the published wasm-clang's, then compiles the generated mains of clang, lld, llvm-ar and llvm-nm with the manifest's multicall flags, links each from the manifest with the same emscripten tree (scripts/emscripten-tree.sh) and runs them under node. A build input has no commands of its own.",
+  "checklist": [
+    "package.json: @ai-ecoverse/llvm-emscripten 24.0.0-N, no install scripts, no slicc.commands; no symlinks; no build path (/home/, /Users/, /__w/, /private/var/, /private/tmp/, the work dir) in any .a, .o, .h, .inc, .def or the manifest",
+    "manifest.json: llvm-project b158b0ae; EH js, LLVM_ENABLE_EH/RTTI/LTO/THREADS off; the 128-byte musl sigset_t and the wasm-emscripten patch-set sha256; every object, library and driver main it names is in the package; the 6 tools' link flags are equal (less --gc-sections) and carry no absolute path or realm setting; the generated mains initialize LLVM as wasm-clang's multicall.cpp expects",
+    "lib/clang/24 is file for file the published wasm-clang 24.0.0-21's resource dir (its lib/ builtins, which wasm-clang adds from wasix-sysroot, aside)",
+    "clang, lld, llvm-ar and llvm-nm link from the manifest and run under node: clang --version is 24.0.0git (llvm-project.git b158b0ae…) with default target unknown, as published; clang -O2 -c compiles C to a wasm object, lld links it, the module computes add(40, 2) = 42 and mul(6, 7) = 42; llvm-ar archives it and llvm-nm lists T add and T mul; the linked sizes are logged"
+  ],
+  "ci": [
+    "node packages/llvm-emscripten/test/check.mjs --tarball .homescoop-out/package.tgz"
+  ]
+}
