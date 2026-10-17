@@ -17,12 +17,18 @@ on:
       - 'scripts/browser-cert/context.mjs'
       - 'scripts/browser-cert/page/**'
       - 'scripts/browser-cert/selftest/**'
+  workflow_call:
+    inputs:
+      homescoop-ref:
+        description: The homescoop commit to prove (ladder-pr passes a merge group head)
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: kernel-compat-proof-${{ github.event.pull_request.number }}
+  group: kernel-compat-proof-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -35,6 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.homescoop-ref || '' }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -53,7 +60,7 @@ jobs:
     with:
       kernel: ${{ needs.kernels.outputs.positive }}
       set: 'base,ci-certified'
-      homescoop-ref: ${{ github.event.pull_request.head.sha }}
+      homescoop-ref: ${{ inputs.homescoop-ref || github.event.pull_request.head.sha }}
 
   negative:
     needs: kernels
@@ -61,7 +68,7 @@ jobs:
     with:
       kernel: ${{ needs.kernels.outputs.negative }}
       set: 'base,ci-certified'
-      homescoop-ref: ${{ github.event.pull_request.head.sha }}
+      homescoop-ref: ${{ inputs.homescoop-ref || github.event.pull_request.head.sha }}
       expect-regressions: 'grep,sed,xz,jq,findutils,diffutils,patch'
 
   selftest:
@@ -71,6 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.homescoop-ref || '' }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:

@@ -101,7 +101,14 @@ on re-runs) and the reason in the job summary; a failed merge comments on a
 `publish-failure` issue. A `GITHUB_TOKEN` merge fires no `Closes #N`, so
 after a merge the job closes the PR's still-open same-repo
 `closingIssuesReferences` itself (`Closed by #PR (merge <sha>), merged by
-ladder-automerge.`); a close failure is a warning. Dispatched from any branch but `main`,
+ladder-automerge.`); a close failure is a warning. When `main` has a merge
+queue, ladder-automerge doesn't merge (the queue rejects a direct merge): it
+enables auto-merge with a merge commit at the decided head
+(`enablePullRequestAutoMerge`, `expectedHeadOid`; `enqueuePullRequest` if
+GitHub answers that the PR is already in clean status), and the publish runs
+from the queue's push to `main`, see *Merge queue* below. Without a queue,
+enabling auto-merge on a clean PR is refused, so it merges directly as above;
+the same code works before and after the ruleset. Dispatched from any branch but `main`,
 ladder-automerge is a dry run: it prints the decision and calls ladder-merge
 dry. Runs are serialized repo-wide (`concurrency: ladder-automerge`); GitHub
 keeps only the newest pending run, so a PR whose run was replaced is picked
@@ -137,8 +144,8 @@ When the version document already exists, publish is skipped (success).
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `ladder-pr.yml` | pull_request touching `packages/**` | Host-build each touched package (no publish) |
-| `ladder-automerge.yml` | `cert-review` completed (`workflow_run`), or `workflow_dispatch(pr)` | Merge a green, certified, package-only PR, then call `ladder-merge.yml` for the merge commit |
+| `ladder-pr.yml` | pull_request; `merge_group`; `workflow_dispatch(group_head)` (group dry run) | Host-build each touched package (no publish); on a merge group, check the combined head without building |
+| `ladder-automerge.yml` | `cert-review` completed (`workflow_run`), or `workflow_dispatch(pr)` | Hand a green, certified, package-only PR to the merge queue (with no queue: merge it, then call `ladder-merge.yml` for the merge commit) |
 | `ladder-merge.yml` | push to `main` under `packages/**`, or `workflow_call` from ladder-automerge (`workflow_dispatch`: dry run) | Gate, then `workflow_dispatch` each touched package on `ladder-build.yml` |
 | `ladder-build.yml` | `workflow_dispatch` only | Single-package build; OIDC publish unless `publish=false` |
 
@@ -165,6 +172,80 @@ needs it: `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
 --check` and fails, before any build or publish, when the committed version
 base or `homescoop.upstream` disagrees with `recipe.yaml`, naming both
 values.
+
+### Merge queue
+
+`main` merges through a merge queue (merge commits only, ALLGREEN, at most
+3 entries). `gh pr merge N --auto --merge --match-head-commit <sha>`
+enqueues the PR once its own checks are green; the required check is
+ladder-pr's `ci`.
+
+**What a group runs.** The queue builds `gh-readonly-queue/main/pr-N-…`, one
+merge commit per queued PR on top of `main` (each PR head is the second
+parent), and fires `merge_group`. ladder-pr then builds **nothing**, pushes
+nothing and uploads nothing: `recipe-sha`, `host-build` and `rebuild` (and
+everything after them) run on `pull_request` only, and publishing stays on
+the push to `main`. It runs what a combined head can change:
+
+- `exact-pins`: the exact pins, the cert kernel and every
+  `scripts/test/*.test.mjs` check, on the group head. These are the checks
+  that caught both crossings of 10-16 (#814 with #816, #854 with
+  reproducible-optin).
+- `detect`, on the group's range from `main`.
+- `group` (`scripts/merge-group-check.mjs`): from `main` to the group head,
+  every first-parent commit must be a two-parent `Merge pull request #N`
+  commit whose PR is open with that second parent as its head (so what's queued is
+  the head that was checked). For each package a member touches (recipe
+  `inputs:` included), it fails the group:
+  - when two queued PRs touch the package, since no artifact was built from the combined tree;
+  - when the package's tree in the group head (`packages/<pkg>/**` plus its `inputs:` files)
+    differs from the tree at its PR's head, i.e. main changed it after the artifact was built.
+  
+  It also requires a green `cert-review` on the head of every PR that host-builds a package, and runs
+  ladder-merge's own resolver (`resolvePackage`, read-only) for each publishable package
+  at the merge commit `ladder-merge` will pick for it (`touchingCommit`). So a
+  group passes only if the push will publish each PR's certified artifact, or
+  skip a version that's already on npm.
+- `kernel-compat`: `kernel-compat-proof.yml` (as `workflow_call`) on the
+  group head, when the group touches that workflow's own `paths:`.
+
+**At the push.** The queue fast-forwards `main` to the group head; one push
+can carry several merges. `ladder-merge` resolves each publishable package at
+the newest first-parent merge that touched it, whose PR (`/commits/<merge>/pulls`,
+`merge_commit_sha`) gives the PR number, the head and the cert, exactly as for a
+button merge (`scripts/test/merge-queue.test.mjs`). The queue's merge
+message is `Merge pull request #N from …` plus the title, so `certified=`
+lines go in the PR body (or come from cert-review), not in a hand-edited
+merge message.
+
+**When a group fails.** The queue drops the failing PR (and rebuilds the
+entries behind it). Read the `group` job's errors:
+- *touched by #a and #b*: let one land, then rebase the other onto `main`;
+  its ladder-pr rebuilds against the new tree, cert-review runs again, and you enqueue it again.
+- *tree … is not the tree #n's artifact was built from*: rebase #n.
+- *cert-review … is failure / pending / absent*, or *ladder-merge would refuse*:
+  the same refusal ladder-merge would give after merging. Fix the cert, then enqueue again.
+- an `exact-pins` failure: a real crossing; fix it on the PR that comes second.
+
+**Dry run.** `gh workflow run ladder-pr.yml --ref <branch> -f group_head=<sha>`
+runs the group path on any commit shaped like a queue group (build it with
+`git merge --no-ff -m 'Merge pull request #N from <owner>/<branch>' <pr head>`
+per PR, from `origin/main`, and push it to a scratch branch). A dry run's
+verdict job is named `ci (group dry run)`, so it never stands in for the
+required `ci` on the dispatched branch's head, and it skips `kernel-compat`
+(kernel-compat trusts a dispatch on `main` with the cert pool, and a dry-run
+head can be any commit).
+
+**GITHUB_TOKEN.** ladder-automerge enables auto-merge with `GITHUB_TOKEN`.
+Events caused by that token start no workflows, so GitHub might not fire
+`merge_group` (or the push) for a PR it enqueued. It fails safe either way:
+- if no `merge_group` fires, `ci` never reports on the group, and the queue drops the PR at its
+  check timeout. The PR stays open, nothing is merged and nothing is published;
+- if the push to `main` starts no ladder-merge, the merge lands, but nothing
+  publishes. Publish the certified artifact by hand (*Manual* above:
+  `gh workflow run ladder-build.yml -f package=… -f certified=<sha>`) and report it.
+
+The rollback is to disable the ruleset; ladder-automerge then merges directly again.
 
 ### Recipe checks in `ladder-pr`
 
