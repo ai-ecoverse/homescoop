@@ -32,7 +32,7 @@ See SPIKE.md / publish report.
 
 ## Stage from CI
 
-Download the `wasi-rustc-patched` or `wasi-rustc-stable` artifact, then run
+The `wasi-rustc-patched` and `wasi-rustc-stable` workflows are retired (#876). Their artifacts were staged with
 `python3 packages/wasi-rustc/stage-patched.py <artifact.tgz> --expected-version <package-version>`.
 The script stages only the compiler and `wasm32-wasip1` rustlib, excluding
 the Linux host rustlib and duplicate debug copy. The recipe is
@@ -120,42 +120,9 @@ panic=abort that would trap. On WASI, `run_compiler` registers a hook that
 finishes the session's diagnostics ("aborting due to N previous errors")
 and exits with status 1.
 
-## Cargo 0.99 (`cargo-0.99/`)
+## Cargo
 
-Cargo 0.99 is Rust 1.98.1's own submodule (rust-lang/cargo `797e8a9`). The
-stable workflow builds it right after rustc, with the stage1 compiler, so it
-links this recipe's wasm32-wasip1-threads std.
-
-- `prepare.sh` applies `cargo.patch` and adds the WASIX Command bridge.
-- `git2`, `home`, `filetime`, `tar` and `jobserver` come from crates.io with one small WASI
-  patch each (`[patch.crates-io]`).
-- libgit2 builds with the headers in `wasi-compat/`. Cargo uses it only for
-  local repositories, and git fetch fails with a message that names the realm.
-- Registry HTTP: on WASI, `util/network/http_async.rs` is a plain HTTP/1.1
-  client that talks to the realm proxy (`https_proxy`) with absolute-form
-  `https://` targets. The proxy does TLS, so there is no curl or TLS stack.
-  It handles chunked or sized bodies and redirects. Requests run on 6
-  worker threads, each with a keep-alive connection; set
-  `CARGO_HTTP_MAX_CONNECTIONS` to change that, and `http.multiplexing =
-  false` means one. With 350 ms of proxy latency per request (the browser's
-  fetch path), a cold serde + serde_json + clap 4.6 lockfile takes 4.0 s
-  instead of 10.7 s serially, and fetching 28 crates takes 5.4 s instead of
-  10.7 s.
-- Processes go through `cargo/wasix-command`.
-- WASI has no cross-process jobserver, so the jobserver is not handed to
-  children.
-- File locks are skipped, because WASI std reports them unsupported.
-
-## Offline Cargo groundwork
-
-`.github/workflows/wasi-cargo.yml` builds the pinned Cargo 0.84 fork for
-`wasm32-wasip1-threads` with Rust 1.83 and wasi-sdk 24. `prepare-cargo.py`
-replaces its private `extend_imports.wasm_run` runner with a generic
-`cargo/wasix-command` adapter for SLICC's `proc_spawn3`/`proc_join`. The
-first Cargo acceptance disables the fork's private HTTP import and uses `--offline`;
-registry access will be added over the realm proxy after the path dependency
-workspace builds in SLICC. The adapter captures child output through
-pre-created files under TMPDIR, preserving argv, environment, cwd, streams,
-and exit status without filling a pipe.
-The native dependency audit and the offline exclusions are in
-[`cargo/DEPENDENCIES.md`](cargo/DEPENDENCIES.md).
+Cargo 0.99 is its own recipe, `packages/wasi-cargo`, built in the ladder
+from the same `rustc-1.98.1-src.tar.xz` with this recipe's patches applied
+to its stage1 std. `wasi-rustc-stable.yml` (a dispatch-only workflow) is
+gone; wasi-rustc moves to a ladder recipe next (#876).

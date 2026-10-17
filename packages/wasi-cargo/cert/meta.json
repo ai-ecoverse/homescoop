@@ -1,0 +1,23 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasi-rustc"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8",
+    "@ai-ecoverse/wasi-rustc@1.98.1-4"
+  ],
+  "runTimeoutMs": 600000,
+  "checklist": [
+    "cargo --version is cargo 1.98.x (797e8a9bc, Rust 1.98.1's cargo)",
+    "cargo build --offline --release of a two-crate path workspace with a build.rs (writes OUT_DIR/gen.rs, sets rustc-env): Compiling util and app, Finished, app.wasm prints count=12 triangle=78 by=build.rs and imports only wasi_snapshot_preview1",
+    "a second build is fresh (no Compiling); changing count.txt (rerun-if-changed) reruns build.rs: cargo run prints count=20 triangle=210",
+    "a type error fails with rc 101 and error[E0277]",
+    "users enforce: alice builds her crate (target/ owned by her); in bob's read-only crate cargo build fails with Permission denied and leaves nothing, and --target-dir elsewhere still fails rc 101 on bob's Cargo.lock"
+  ]
+}
