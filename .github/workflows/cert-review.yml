@@ -449,8 +449,13 @@ jobs:
           echo '{}' > "$RUNNER_TEMP/cert-review/repack-input.json"
           for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
             npm_name=$(tar -xzf "$RUNNER_TEMP/artifacts/host-$pkg-pr$PR_NUMBER/package.tgz" -O package/package.json 2> /dev/null | jq -r '.name // empty') || npm_name=
-            node scripts/cert-review/repack-input.mjs --package "$pkg" --ref "$HEAD" --repo "$GH_REPO" ${npm_name:+--npm "$npm_name"} \
-              > "$RUNNER_TEMP/repack-input-$pkg.json" || true
+            rc=0
+            node scripts/gate.mjs repack-input -- node scripts/cert-review/repack-input.mjs --package "$pkg" --ref "$HEAD" --repo "$GH_REPO" ${npm_name:+--npm "$npm_name"} \
+              > "$RUNNER_TEMP/repack-input-$pkg.json" || rc=$?
+            if [[ "$rc" -eq 3 ]]; then
+              echo "::error::repack-input.mjs printed no verdict for $pkg; nothing is certified without one"
+              exit 1
+            fi
             cat "$RUNNER_TEMP/repack-input-$pkg.json"
             if jq -e . "$RUNNER_TEMP/repack-input-$pkg.json" > /dev/null 2>&1; then
               jq --arg p "$pkg" --slurpfile r "$RUNNER_TEMP/repack-input-$pkg.json" '. + {($p): $r[0]}' "$RUNNER_TEMP/cert-review/repack-input.json" > "$RUNNER_TEMP/cert-review/repack-input.next"

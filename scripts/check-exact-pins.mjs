@@ -20,7 +20,7 @@
  * not failed; once a package is exact it must leave PENDING (the check
  * fails on a stale entry).
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -139,9 +139,14 @@ function main() {
   }
   if (failed) {
     console.error('check-exact-pins: pin every @ai-ecoverse/* dependency to an exact, certified version (docs/versioning.md)');
+    console.error(`check-exact-pins: FAIL ${checked} package.json checked`);
     process.exit(1);
   }
-  console.log(`check-exact-pins: ${checked} package.json ok`);
+  if (!checked) {
+    console.error('check-exact-pins: FAIL no package.json to check');
+    process.exit(1);
+  }
+  console.log(`check-exact-pins: PASS ${checked} package.json`);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main();
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) main();

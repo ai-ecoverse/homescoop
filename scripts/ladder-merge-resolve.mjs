@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -405,12 +405,14 @@ async function main(argv) {
     if (process.env.GITHUB_OUTPUT) {
       appendFileSync(process.env.GITHUB_OUTPUT, `inputs=${JSON.stringify(result.inputs)}\n`);
     }
+    console.log(`ladder-merge-resolve: PASS ${label}: ${result.decision}`);
   } catch (err) {
     console.log(`::error::${label}: refuse to publish: ${String(err.message).replace(/\s*\n\s*/g, ' ')}`);
+    console.log(`ladder-merge-resolve: FAIL ${label}`);
     process.exit(1);
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   await main(process.argv.slice(2));
 }

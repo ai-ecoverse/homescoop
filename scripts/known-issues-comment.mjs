@@ -19,7 +19,7 @@
  * the title counts: bodies mention wasm-bash, wasix-perl and friends as tools
  * in nearly every repro, and issue titles here name the package they are about.
  */
-import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -180,4 +180,4 @@ function main(argv) {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main(process.argv.slice(2));
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) main(process.argv.slice(2));

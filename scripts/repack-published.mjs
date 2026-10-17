@@ -92,16 +92,7 @@ const die = (msg) => {
   process.exit(1);
 };
 
-// Run as a script (not imported by a test). Compare real paths: ladder-pr
-// builds from /home/runner/work/…, a link to the pool's workspace, and
-// import.meta.url is the link's target.
-const invoked = (() => {
-  try {
-    return realpathSync(process.argv[1] ?? '') === realpathSync(fileURLToPath(import.meta.url));
-  } catch {
-    return false;
-  }
-})();
+const invoked = process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
 if (invoked) main();
 
 function main() {

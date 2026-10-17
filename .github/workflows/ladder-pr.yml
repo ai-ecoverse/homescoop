@@ -45,8 +45,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - run: node scripts/check-exact-pins.mjs
-      - run: node scripts/check-cert-kernel.mjs
+      - run: node scripts/gate.mjs check-exact-pins -- node scripts/check-exact-pins.mjs
+      - run: node scripts/gate.mjs check-cert-kernel -- node scripts/check-cert-kernel.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - run: node --test 'scripts/test/*.test.mjs'
@@ -462,9 +462,10 @@ jobs:
           set -euo pipefail
           CERT_NM="${RUNNER_TEMP}/homescoop-browser-cert-nm"
           mkdir -p "$CERT_NM"
-          KERNEL_SPEC=$(node scripts/browser-cert/cert-kernel.mjs "${{ matrix.package }}")
-          SHARED_WEB=$(node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
-          PLAYWRIGHT=$(node scripts/dev-pin.mjs playwright-core)
+          KERNEL_SPEC=$(node scripts/gate.mjs cert-kernel -- node scripts/browser-cert/cert-kernel.mjs "${{ matrix.package }}")
+          SHARED_WEB=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
+          PLAYWRIGHT=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs playwright-core)
+          [[ -n "$KERNEL_SPEC" && -n "$SHARED_WEB" && -n "$PLAYWRIGHT" ]] || { echo "::error::browser-cert: an empty kernel, shared-web or playwright pin"; exit 1; }
           echo "browser-cert: harness $SHARED_WEB $PLAYWRIGHT (package.json devDependencies)"
           npm install --prefix "$CERT_NM" --no-fund --no-audit \
             "$KERNEL_SPEC" \

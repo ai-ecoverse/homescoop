@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -794,7 +794,7 @@ export async function repackInput({ pkg, ref, npm, readAt, registry, reproduced 
   return out;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const { values } = parseArgs({
     options: {
       package: { type: 'string' },
@@ -817,9 +817,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const known = readKnownInputs(values.known || KNOWN_INPUTS);
     const out = await repackInput({ pkg: values.package, ref: values.ref, npm: values.npm, readAt, registry, reproduced, known });
     console.log(JSON.stringify(out, null, 2));
-    process.exit(out.attested === false ? 1 : 0);
+    if (out.attested === true) console.error(`repack-input: PASS ${values.package}: attested${out.known?.length ? `, known ${out.known.length}` : ''}`);
+    else console.error(`repack-input: FAIL ${values.package}: unverifiable: ${out.reason ?? 'no reason'}`);
+    process.exit(out.attested === true ? 0 : 1);
   } catch (error) {
     console.log(JSON.stringify({ package: values.package, error: String(error.message || error) }, null, 2));
+    console.error(`repack-input: FAIL ${values.package}: trace error: ${String(error.message || error).split('\n')[0]}`);
     process.exit(2);
   }
 }

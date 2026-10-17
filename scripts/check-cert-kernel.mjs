@@ -13,8 +13,8 @@
  * GITHUB_TOKEN, when set, authenticates the release lookup.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXACT } from './check-exact-pins.mjs';
 
@@ -94,11 +94,11 @@ async function main() {
   try {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
     const { pin, sha256 } = await checkCertKernel(pkg);
-    console.log(`check-cert-kernel: ${KERNEL}@${pin} is certified, sha256=${sha256}`);
+    console.log(`check-cert-kernel: PASS ${KERNEL}@${pin} is certified, sha256=${sha256}`);
   } catch (e) {
-    console.log(`::error::check-cert-kernel: ${e.message}. Pin the cert kernel in package.json to a certified version.`);
+    console.log(`::error::check-cert-kernel: FAIL ${e.message}. Pin the cert kernel in package.json to a certified version.`);
     process.exit(1);
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) await main();
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) await main();

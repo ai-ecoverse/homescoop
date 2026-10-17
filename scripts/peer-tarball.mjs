@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -49,7 +49,7 @@ export function peerTarball(recipe, { env = process.env, base = root } = {}) {
   return `${want.name}@${want.version}`;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const recipe = process.argv[2];
   if (!recipe) {
     console.error('usage: peer-tarball.mjs <recipe>');

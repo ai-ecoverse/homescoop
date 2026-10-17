@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { readCertMeta } from './cert-meta.mjs';
 import { glueFallback } from './glue.mjs';
 import { devPin } from '../dev-pin.mjs';
@@ -244,7 +244,7 @@ function browser(pkg, manifestPath, tarball) {
   return failed;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const [mode, pkg] = process.argv.slice(2);
   const opt = (name) => {
     const i = process.argv.indexOf(name);

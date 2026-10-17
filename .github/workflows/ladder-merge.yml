@@ -161,7 +161,8 @@ jobs:
             if [[ -n "$PR_NUMBER" ]]; then args+=(--pr "$PR_NUMBER"); fi
             if [[ -n "$CI_CERTIFIED" ]]; then args+=(--ci-certified "$CI_CERTIFIED"); fi
           fi
-          node scripts/ladder-merge-resolve.mjs "${args[@]}"
+          gate=(); [[ -f scripts/gate.mjs ]] && gate=(node scripts/gate.mjs ladder-merge-resolve --)
+          "${gate[@]}" node scripts/ladder-merge-resolve.mjs "${args[@]}"
       - name: Dispatch ladder-build for ${{ matrix.package }}
         if: needs.detect.outputs.real == 'true'
         uses: actions/github-script@v9

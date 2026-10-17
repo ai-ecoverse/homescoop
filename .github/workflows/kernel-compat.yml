@@ -215,7 +215,8 @@ jobs:
           KERNEL_DIR: ${{ steps.kind.outputs.kind == 'artifact' && format('{0}/kernel-artifact', runner.temp) || '' }}
         run: |
           set -euo pipefail
-          node scripts/browser-cert/compat.mjs plan \
+          gate=(); [[ -f scripts/gate.mjs ]] && gate=(node scripts/gate.mjs "compat plan" --)
+          "${gate[@]}" node scripts/browser-cert/compat.mjs plan \
             --kernel "$KERNEL" --set "$SET" --bios-ref "$BIOS_REF" --homescoop-ref "$HOMESCOOP_REF" --shards "$SHARDS" \
             ${KERNEL_DIR:+--kernel-dir "$KERNEL_DIR"} \
             ${REFERENCE:+--reference "$REFERENCE"} \
@@ -255,7 +256,9 @@ jobs:
       - name: Chromium for playwright-core (package.json devDependencies)
         run: |
           set -euo pipefail
-          pw=$(node scripts/dev-pin.mjs playwright-core)
+          gate=(); [[ -f scripts/gate.mjs ]] && gate=(node scripts/gate.mjs dev-pin --)
+          pw=$("${gate[@]}" node scripts/dev-pin.mjs playwright-core)
+          [[ -n "$pw" ]] || { echo "::error::dev-pin: no playwright-core pin"; exit 1; }
           npm install --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit "$pw"
           if [[ "$RUNNER_NAME" != cloud-run-* ]] && sudo -n true 2>/dev/null; then
             npx --prefix "$RUNNER_TEMP/pw" playwright-core install --with-deps chromium
@@ -264,7 +267,10 @@ jobs:
             npx --prefix "$RUNNER_TEMP/pw" playwright-core install chromium
           fi
       - name: Cert specs and base sweep on the candidate kernel
-        run: node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
+        run: |
+          set -euo pipefail
+          gate=(); [[ -f scripts/gate.mjs ]] && gate=(node scripts/gate.mjs "compat shard" --)
+          "${gate[@]}" node scripts/browser-cert/compat.mjs shard --plan "$RUNNER_TEMP/plan/plan.json" --index ${{ matrix.shard }} --out "$RUNNER_TEMP/out"
       - if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -280,7 +286,8 @@ jobs:
           EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
         run: |
           set -euo pipefail
-          node scripts/browser-cert/compat.mjs report \
+          gate=(); [[ -f scripts/gate.mjs ]] && gate=(node scripts/gate.mjs "compat report" --)
+          "${gate[@]}" node scripts/browser-cert/compat.mjs report \
             --plan "$RUNNER_TEMP/plan/plan.json" --results "$RUNNER_TEMP/out" --out "$RUNNER_TEMP/compat" \
             --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"
       - if: ${{ !cancelled() && needs.plan.outputs.count == '1' }}
@@ -321,7 +328,8 @@ jobs:
           EXPECT_REGRESSIONS: ${{ inputs.expect-regressions }}
         run: |
           set -euo pipefail
-          node scripts/browser-cert/compat.mjs report \
+          gate=(); [[ -f scripts/gate.mjs ]] && gate=(node scripts/gate.mjs "compat report" --)
+          "${gate[@]}" node scripts/browser-cert/compat.mjs report \
             --plan "$RUNNER_TEMP/results/${{ needs.plan.outputs.artifact }}-plan/plan.json" \
             --results "$RUNNER_TEMP/results" --out "$RUNNER_TEMP/compat" \
             --fail-on-regression "$FAIL_ON_REGRESSION" --expect-regressions "$EXPECT_REGRESSIONS"
