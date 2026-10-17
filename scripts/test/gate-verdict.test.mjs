@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -120,4 +120,38 @@ test('every gate script prints "<gate>: PASS", and every caller in the workflows
     }
   }
   assert.deepEqual(bad, [], 'run gates as: node scripts/gate.mjs <gate> -- node scripts/<gate>.mjs …');
+});
+
+function compatReport(t, { skipped = [], sweepRows = null }) {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-compat-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const kernel = { name: '@ai-ecoverse/slicc-kernel', version: '1.0.0', spec: '@ai-ecoverse/slicc-kernel@1.0.0', sha256: 'a'.repeat(64) };
+  const plan = {
+    kernel,
+    reference: { ...kernel, version: '0.9.0', origin: 'input' },
+    inputs: { set: 'base', biosRef: 'main', reference: '' },
+    biosRef: 'main',
+    homescoopRef: 'main',
+    entries: [],
+    skipped,
+    shards: sweepRows ? [{ units: [], sweeps: ['enforce'], estimateS: 1 }] : [],
+    ...(sweepRows ? { sweep: { modes: ['enforce'] } } : {}),
+  };
+  mkdirSync(join(dir, 'plan'));
+  mkdirSync(join(dir, 'results'));
+  writeFileSync(join(dir, 'plan', 'plan.json'), JSON.stringify(plan));
+  if (sweepRows) writeFileSync(join(dir, 'results', 'sweep-enforce.json'), JSON.stringify({ mode: 'enforce', wallMs: 1000, rows: sweepRows }));
+  const env = { ...process.env };
+  delete env.GITHUB_OUTPUT;
+  delete env.GITHUB_STEP_SUMMARY;
+  return spawnSync(node, [gate, 'compat report', '--', node, join(root, 'scripts/browser-cert/compat.mjs'), 'report', '--plan', join(dir, 'plan', 'plan.json'), '--results', join(dir, 'results'), '--out', join(dir, 'out')], { encoding: 'utf8', env });
+}
+
+test('NEGATIVE: a kernel-compat report where nothing ran fails; one with only base-sweep rows passes', (t) => {
+  const none = compatReport(t, { skipped: [{ package: '@ai-ecoverse/wasm-x', recipe: 'x', version: '1.0.0-1', origin: ['base'], reason: 'no recipe' }] });
+  assert.equal(none.status, 1, none.stdout + none.stderr);
+  assert.match(none.stdout, /compat report: FAIL 0 rows/);
+  const sweep = compatReport(t, { sweepRows: [{ case: 'ls', verdict: 'pass' }, { case: 'cat', verdict: 'pass' }] });
+  assert.equal(sweep.status, 0, sweep.stdout + sweep.stderr);
+  assert.match(sweep.stdout, /compat report: PASS 2 rows, 0 regression\(s\), verdict pass/);
 });

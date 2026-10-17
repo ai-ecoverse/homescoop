@@ -1123,9 +1123,9 @@ function report(args) {
   writeFileSync(join(out, 'summary.md'), text);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
   console.log(text);
-  const ran = results.filter((r) => r.verdict !== 'skip').length;
+  const ran = results.filter((r) => r.verdict !== 'skip').length + sweepOut.filter((r) => r.verdict !== 'skip').length;
   if (!ran) {
-    console.log(`::error::kernel-compat: the report has 0 rows that ran (${results.length} skipped); a run that tested nothing is not a pass`);
+    console.log(`::error::kernel-compat: the report has 0 rows that ran (${results.length + sweepOut.length} skipped); a run that tested nothing is not a pass`);
     console.log('compat report: FAIL 0 rows');
     process.exit(1);
   }
