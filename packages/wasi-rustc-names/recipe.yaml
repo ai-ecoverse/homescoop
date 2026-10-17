@@ -1,0 +1,33 @@
+name: wasi-rustc-names
+builder: host
+reproducible: true
+version: "1.98.1"
+npm: "@ai-ecoverse/wasi-rustc-names"
+summary: "Function names (the wasm name section) of @ai-ecoverse/wasi-rustc's rustc.wasm, for SLICC_WASM_BACKTRACE"
+source:
+  url: "https://static.rust-lang.org/dist/rustc-{{version}}-src.tar.xz"
+  sha256: "be1816e7f6c40abb90245ad6e024bed2a7e88d7dda4561e4d5470207df616b9f"
+sources:
+  wasi_llvm:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasi-llvm/-/wasi-llvm-21.1.8-1.tgz"
+    sha256: "9164e184f20140922bc2279324cda1d187d19d92392ed014f8721894fb9f3630"
+  wasi_rustc:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasi-rustc/-/wasi-rustc-1.98.1-5.tgz"
+    sha256: "3f60ac2d139d0956a204bbcc1dfb4c9ce670e74b5f327af4063fe32ca6eb3164"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-rustc-names
+  license: (MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception
+  notes: |
+    build.sh runs packages/wasi-rustc/build.sh, the same reproducible build
+    from the same pinned source, wasi-llvm and wasi-sdk (this recipe pins the
+    same source and wasi-llvm sha256s). That build splits rustc.wasm's name
+    section into rustc.wasm.names (scripts/split-name-section.py). This recipe
+    then fetches the published @ai-ecoverse/wasi-rustc of the same version by
+    sha256 (sources.wasi_rustc) and ships rustc.wasm.names only if the
+    rebuilt, stripped rustc.wasm is byte-identical to the published one, so
+    the names belong to that exact binary. Release it at wasi-rustc's
+    version, after wasi-rustc.
