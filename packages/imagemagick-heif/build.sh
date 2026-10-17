@@ -160,9 +160,9 @@ homescoop_notice "Little CMS 2.19.1 (@ai-ecoverse/wasm-lcms2)" \
   https://raw.githubusercontent.com/mm2/Little-CMS/lcms2.19.1/LICENSE 6dbd60437f8ef91d8de1f08ad75882547fd4931bfcc3566a0735f28db1484d31
 homescoop_notice "LibTIFF 4.7.2 (@ai-ecoverse/wasm-libtiff)" \
   https://gitlab.com/libtiff/libtiff/-/raw/v4.7.2/LICENSE.md 0e27c2382d7b8147972bbb746e04059a1152c8d0fda9d03ef1399d1a433c4ade
-homescoop_notice "libwebp 1.5.0 (@ai-ecoverse/wasm-libwebp)" \
-  https://raw.githubusercontent.com/webmproject/libwebp/v1.5.0/COPYING 5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf \
-  https://raw.githubusercontent.com/webmproject/libwebp/v1.5.0/PATENTS cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c
+homescoop_notice "libwebp 1.6.0 (@ai-ecoverse/wasm-libwebp)" \
+  https://raw.githubusercontent.com/webmproject/libwebp/v1.6.0/COPYING 5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf \
+  https://raw.githubusercontent.com/webmproject/libwebp/v1.6.0/PATENTS cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c
 homescoop_notice "OpenJPEG 2.5.3 (@ai-ecoverse/wasm-openjpeg)" \
   https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.3/LICENSE a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6
 homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the FreeType License" \
@@ -170,10 +170,10 @@ homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the F
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1
 homescoop_notice "libxml2 2.15.4 (@ai-ecoverse/wasm-libxml2)" \
   https://raw.githubusercontent.com/GNOME/libxml2/v2.15.4/Copyright 5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626
-ICONV_TB="$WORK/libiconv-1.18.tar.gz"
-homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.18.tar.gz 3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8 "$ICONV_TB"
-tar xzf "$ICONV_TB" -C "$WORK" libiconv-1.18/COPYING.LIB
-homescoop_notice "GNU libiconv 1.18 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later; source and build: homescoop packages/libiconv (recipe.yaml, build.sh), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libiconv" "$WORK/libiconv-1.18/COPYING.LIB" -
+ICONV_TB="$WORK/libiconv-1.19.tar.gz"
+homescoop_fetch https://mirrors.kernel.org/gnu/libiconv/libiconv-1.19.tar.gz 88dd96a8c0464eca144fc791ae60cd31cd8ee78321e67397e25fc095c4a19aa6 "$ICONV_TB"
+tar xzf "$ICONV_TB" -C "$WORK" libiconv-1.19/COPYING.LIB
+homescoop_notice "GNU libiconv 1.19 (@ai-ecoverse/wasm-libiconv, for libxml2), LGPL-2.1-or-later; source and build: homescoop packages/libiconv (recipe.yaml, build.sh), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libiconv" "$WORK/libiconv-1.19/COPYING.LIB" -
 homescoop_notice "libheif 1.23.6 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" \
   https://raw.githubusercontent.com/strukturag/libheif/v1.23.6/COPYING fa81ce652315b013359d6e8e4744335f31a50c7c192907176d3632f78a3b4596
 homescoop_notice "libde265 1.1.3 (@ai-ecoverse/wasm-libheif); source and build: homescoop packages/libheif (recipe.yaml, build.sh, patches), https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif" \

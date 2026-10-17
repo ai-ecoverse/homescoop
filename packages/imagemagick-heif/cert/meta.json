@@ -1,13 +1,13 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.81.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-18",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-5",
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-9",
     "@ai-ecoverse/wasm-imagemagick@7.1.2-32-4"
   ],
   "fixtures": "packages/libheif/cert/fixtures (fixtures.json: sources and licences; references.json: host libheif 1.23.6 pixels)",
