@@ -574,7 +574,7 @@ jobs:
       contents: read
       actions: read
       pull-requests: read
-      statuses: read
+      statuses: write
     outputs:
       compat: ${{ steps.g.outputs.compat }}
     steps:
@@ -591,7 +591,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GROUP_BASE: ${{ inputs.group_base || 'origin/main' }}
-        run: node scripts/merge-group-check.mjs --base "$GROUP_BASE" --head "$(git rev-parse HEAD)"
+          POST_STATUS: ${{ github.event_name == 'merge_group' && '--post-status' || '' }}
+        run: node scripts/merge-group-check.mjs --base "$GROUP_BASE" --head "$(git rev-parse HEAD)" ${POST_STATUS:+"$POST_STATUS"}
+      - name: A failure cert-review status on the group head when the check didn't run
+        if: failure() && github.event_name == 'merge_group' && steps.g.outcome != 'failure'
+        uses: actions/github-script@v9
+        env:
+          HEAD: ${{ github.event.merge_group.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: process.env.HEAD,
+              state: 'failure',
+              context: 'cert-review',
+              description: 'merge group check did not run',
+              target_url: process.env.RUN_URL,
+            });
 
   kernel-compat:
     needs: group

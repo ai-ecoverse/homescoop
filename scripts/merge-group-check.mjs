@@ -5,6 +5,7 @@ import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { globRegExp } from './list-touched-packages.mjs';
+import { CONTEXT, groupStatus } from './cert-review/status.mjs';
 import { certReview, githubApi, githubIo, readContext, resolvePackage, touchingCommit } from './ladder-merge-resolve.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -126,25 +127,43 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--base') args.base = argv[++i];
     else if (argv[i] === '--head') args.head = argv[++i];
+    else if (argv[i] === '--post-status') args.post = true;
     else throw new Error(`unknown argument ${argv[i]}`);
   }
   if (!args.base || !/^[0-9a-f]{40}$/.test(args.head ?? '')) {
-    throw new Error('usage: merge-group-check.mjs --base <main ref> --head <40-hex group head>');
+    throw new Error('usage: merge-group-check.mjs --base <main ref> --head <40-hex group head> [--post-status]');
   }
   return args;
+}
+
+export async function reportStatus({ head, post, decision, runUrl }, send) {
+  const line = `${CONTEXT}=${decision.state} on ${head}: ${decision.description}`;
+  if (!post) return `dry run, would post ${line}`;
+  await send(`/statuses/${head}`, {
+    method: 'POST',
+    body: { state: decision.state, context: CONTEXT, description: decision.description, ...(runUrl ? { target_url: runUrl } : {}) },
+  });
+  return `posted ${line}`;
 }
 
 async function main(argv) {
   const out = (k, v) => process.env.GITHUB_OUTPUT && appendFileSync(process.env.GITHUB_OUTPUT, `${k}=${v}\n`);
   const summary = (s) => process.env.GITHUB_STEP_SUMMARY && appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${s}\n`);
+  const repo = process.env.GITHUB_REPOSITORY || 'ai-ecoverse/homescoop';
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  const api = githubApi({ repo, token });
+  const { GITHUB_SERVER_URL: server, GITHUB_RUN_ID: runId } = process.env;
+  const runUrl = server && runId ? `${server}/${repo}/actions/runs/${runId}` : undefined;
+  let args = {};
+  let decision;
+  let members = [];
+  let problems = [];
   try {
-    const { base, head } = parseArgs(argv);
+    args = parseArgs(argv);
+    const { base, head } = args;
     const git = gitIn(root);
     const from = git('merge-base', base, head).trim();
-    const members = groupMembers(from, head, git);
-    const repo = process.env.GITHUB_REPOSITORY || 'ai-ecoverse/homescoop';
-    const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-    const api = githubApi({ repo, token });
+    members = groupMembers(from, head, git);
     const io = {
       pull: async (n) => (await api(`/pulls/${n}`)).json(),
       member: (m) => githubIo({ repo, token, sha: m.commit, head: m.head, prNumber: String(m.number) }),
@@ -153,7 +172,7 @@ async function main(argv) {
       const { all, host } = node('classify-touched-packages.mjs', '--base', m.base, '--head', m.commit);
       return { all, host, publishable: node('list-touched-packages.mjs', '--base', m.base, '--head', m.commit, '--json', '--publishable') };
     };
-    const { problems, notes } = await checkGroup(
+    const checked = await checkGroup(
       {
         head,
         members,
@@ -164,12 +183,13 @@ async function main(argv) {
       },
       io,
     );
+    problems = checked.problems;
     const changed = git('diff', '--name-only', from, head).split('\n').filter(Boolean);
     const res = proofPaths(readFileSync(join(root, PROOF), 'utf8')).map(globRegExp);
     const compat = changed.some((p) => res.some((re) => re.test(p)));
     out('compat', String(compat));
     summary(`### merge group ${head} on ${from}`);
-    for (const n of notes) {
+    for (const n of checked.notes) {
       console.log(n);
       summary(`- ${n}`);
     }
@@ -178,12 +198,25 @@ async function main(argv) {
       console.log(`::error::merge group: ${p}`);
       summary(`- **refused:** ${p}`);
     }
-    if (problems.length) process.exit(1);
-    console.log(`merge group of ${members.map((m) => `#${m.number}`).join(', ')}: every member's artifact and cert binds to the group head`);
+    decision = groupStatus({ problems, members });
   } catch (err) {
-    console.log(`::error::merge group check failed closed: ${String(err.message).replace(/\s*\n\s*/g, ' ')}`);
-    process.exit(1);
+    const message = String(err.message).replace(/\s*\n\s*/g, ' ');
+    console.log(`::error::merge group check failed closed: ${message}`);
+    problems = [message];
+    decision = groupStatus({ error: message });
   }
+  if (/^[0-9a-f]{40}$/.test(args.head ?? '')) {
+    try {
+      const said = await reportStatus({ head: args.head, post: args.post, decision, runUrl }, api);
+      console.log(said);
+      summary(`- ${said}`);
+    } catch (err) {
+      console.log(`::error::merge group: posting the ${CONTEXT} status failed: ${err.message}`);
+      process.exit(1);
+    }
+  }
+  if (problems.length) process.exit(1);
+  console.log(`merge group of ${members.map((m) => `#${m.number}`).join(', ')}: every member's artifact and cert binds to the group head`);
 }
 
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) {

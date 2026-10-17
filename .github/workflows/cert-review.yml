@@ -21,18 +21,14 @@ permissions:
 jobs:
   plan:
     name: cert-review / plan
-    if: >-
-      github.event_name == 'workflow_dispatch' || (
-        github.event.workflow_run.event == 'pull_request' &&
-        github.event.workflow_run.conclusion != 'cancelled' &&
-        github.event.workflow_run.head_repository.full_name == github.repository
-      )
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
     runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 150
     permissions:
       actions: read
       contents: read
       pull-requests: read
+      statuses: write
     outputs:
       go: ${{ steps.plan.outputs.go }}
       number: ${{ steps.plan.outputs.number }}
@@ -42,86 +38,119 @@ jobs:
       base: ${{ steps.plan.outputs.base }}
       ladder_conclusion: ${{ steps.plan.outputs.ladder_conclusion }}
     steps:
-      - name: The pull request, its ladder-pr run at the head, and the packages it built
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: scripts/cert-review
+          persist-credentials: false
+
+      - name: The pull request, its ladder-pr run at the head, the packages it built, and the cert-review status
         id: plan
         uses: actions/github-script@v9
         env:
           NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || inputs.pr_number }}
           LADDER_RUN: ${{ github.event.workflow_run.id }}
+          LADDER_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
           HEAD_SHA: ${{ inputs.head }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           script: |
+            const { CONTEXT, planStatus } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cert-review/status.mjs`);
             const { owner, repo } = context.repo;
-            const skip = (why) => {
-              core.notice(why);
-              core.setOutput('go', 'false');
-            };
-            const number = Number(process.env.NUMBER);
-            if (!number) return skip('no pull request');
-            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
-            if (pr.head.repo?.full_name !== `${owner}/${repo}`) return skip(`#${number} comes from a fork`);
-            const head = process.env.HEAD_SHA || pr.head.sha;
-            const { data: commit } = await github.rest.repos.getCommit({ owner, repo, ref: head });
-            const builtFrom =
-              commit.author?.login === 'github-actions[bot]' &&
-              commit.parents.length === 1 &&
-              commit.commit.message.startsWith('chore: refresh recipe sha256 and package version')
-                ? commit.parents[0].sha
-                : null;
-            const accepted = [head, builtFrom].filter(Boolean);
-            const usable = (r) => r?.status === 'completed' && r.conclusion !== 'action_required';
-            let run;
-            if (process.env.LADDER_RUN) {
-              ({ data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(process.env.LADDER_RUN) }));
-            } else {
-              for (let minute = 0; minute < 120 && !usable(run); minute++) {
-                for (const sha of accepted) {
-                  const [found] = (
-                    await github.rest.actions.listWorkflowRuns({
-                      owner,
-                      repo,
-                      workflow_id: 'ladder-pr.yml',
-                      head_sha: sha,
-                      event: 'pull_request',
-                      per_page: 1,
-                    })
-                  ).data.workflow_runs;
-                  if (usable(found)) {
-                    run = found;
-                    break;
-                  }
-                }
-                if (usable(run)) break;
-                core.info(`ladder-pr on ${accepted.join(' or ')}: not completed yet`);
-                await new Promise((resolve) => setTimeout(resolve, 60000));
+            const env = process.env;
+            const facts = { sha: env.RUN_HEAD_SHA || env.HEAD_SHA || null };
+            const status = (state, description) =>
+              github.rest.repos.createCommitStatus({ owner, repo, sha: facts.sha, state, context: CONTEXT, description, target_url: env.RUN_URL });
+            const finish = async () => {
+              const d = planStatus(facts);
+              if (d.state) {
+                await status(d.state, d.description);
+                core.info(`${CONTEXT}=${d.state} on ${facts.sha}: ${d.description}`);
+              } else core.notice(`no ${CONTEXT} status: ${d.description}`);
+              core.setOutput('go', String(d.go));
+              if (!d.go) return;
+              const outputs = { number: facts.number, head: facts.sha, base: facts.base, ladder_run: facts.run, ladder_conclusion: facts.ladder, packages: JSON.stringify(facts.packages) };
+              for (const [key, value] of Object.entries(outputs)) {
+                core.info(`${key}=${value}`);
+                core.setOutput(key, String(value));
               }
-            }
-            if (!usable(run)) return skip(`no completed ladder-pr run on ${accepted.join(' or ')}`);
-            if (!accepted.includes(run.head_sha)) {
-              return skip(`#${number} moved on from ${run.head_sha} to ${head}; ladder-pr on the new head starts its own review`);
-            }
-            if (builtFrom && run.head_sha === builtFrom) core.info(`${head} is ladder-pr's recipe-sha commit on ${builtFrom}; run ${run.id} built it`);
-            const pattern = new RegExp(`^host-(.+)-pr${number}$`);
-            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
-              owner,
-              repo,
-              run_id: run.id,
-              per_page: 100,
-            });
-            const packages = artifacts.filter((a) => !a.expired && pattern.test(a.name)).map((a) => a.name.match(pattern)[1]);
-            if (!packages.length) return skip(`ladder-pr run ${run.id} built no package for #${number}`);
-            const outputs = {
-              go: 'true',
-              number,
-              head,
-              base: pr.base.sha,
-              ladder_run: run.id,
-              ladder_conclusion: run.conclusion,
-              packages: JSON.stringify(packages),
             };
-            for (const [key, value] of Object.entries(outputs)) {
-              core.info(`${key}=${value}`);
-              core.setOutput(key, String(value));
+            try {
+              let pr;
+              facts.number = Number(env.NUMBER) || 0;
+              if (facts.number) {
+                ({ data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: facts.number }));
+              } else if (env.RUN_HEAD_BRANCH && env.RUN_HEAD_OWNER) {
+                const open = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', head: `${env.RUN_HEAD_OWNER}:${env.RUN_HEAD_BRANCH}`, per_page: 100 });
+                pr = open.find((p) => p.head.sha === env.RUN_HEAD_SHA) ?? open[0];
+                facts.number = pr?.number ?? 0;
+              }
+              if (!pr) return await finish();
+              facts.fork = pr.head.repo?.full_name !== `${owner}/${repo}`;
+              facts.base = pr.base.sha;
+              const head = env.HEAD_SHA || pr.head.sha;
+              facts.head = head;
+              const { data: commit } = await github.rest.repos.getCommit({ owner, repo, ref: head });
+              const builtFrom =
+                commit.author?.login === 'github-actions[bot]' &&
+                commit.parents.length === 1 &&
+                commit.commit.message.startsWith('chore: refresh recipe sha256 and package version')
+                  ? commit.parents[0].sha
+                  : null;
+              const accepted = [head, builtFrom].filter(Boolean);
+              if (env.RUN_HEAD_SHA && !accepted.includes(env.RUN_HEAD_SHA)) {
+                facts.moved = true;
+                return await finish();
+              }
+              facts.sha = head;
+              const usable = (r) => r?.status === 'completed' && r.conclusion !== 'action_required';
+              let run;
+              if (env.LADDER_RUN) {
+                ({ data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: Number(env.LADDER_RUN) }));
+                if (run.run_attempt > Number(env.LADDER_ATTEMPT || run.run_attempt) || run.status !== 'completed') {
+                  facts.superseded = true;
+                  return await finish();
+                }
+                await status('pending', 'cert-review plan started');
+                if (!usable(run)) {
+                  facts.ladder = run.conclusion;
+                  return await finish();
+                }
+              } else {
+                await status('pending', 'cert-review plan started');
+                for (let minute = 0; minute < 120 && !usable(run); minute++) {
+                  for (const sha of accepted) {
+                    const [found] = (
+                      await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: 'ladder-pr.yml', head_sha: sha, event: 'pull_request', per_page: 1 })
+                    ).data.workflow_runs;
+                    if (usable(found)) {
+                      run = found;
+                      break;
+                    }
+                  }
+                  if (usable(run)) break;
+                  core.info(`ladder-pr on ${accepted.join(' or ')}: not completed yet`);
+                  await new Promise((resolve) => setTimeout(resolve, 60000));
+                }
+                if (!usable(run)) return await finish();
+              }
+              if (!accepted.includes(run.head_sha)) {
+                facts.moved = true;
+                return await finish();
+              }
+              if (builtFrom && run.head_sha === builtFrom) core.info(`${head} is ladder-pr's recipe-sha commit on ${builtFrom}; run ${run.id} built it`);
+              facts.run = run.id;
+              facts.ladder = run.conclusion;
+              const pattern = new RegExp(`^host-(.+)-pr${facts.number}$`);
+              const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: run.id, per_page: 100 });
+              facts.packages = artifacts.filter((a) => !a.expired && pattern.test(a.name)).map((a) => a.name.match(pattern)[1]);
+              return await finish();
+            } catch (err) {
+              facts.error = err.message;
+              return await finish();
             }
 
   review:
@@ -452,3 +481,31 @@ jobs:
             -f state="$CONCLUSION" -f context=cert-review -f target_url="$RUN_URL/artifacts/$RECORD_ID" \
             -f description="$([ "$CONCLUSION" = success ] && echo "certified: run $GITHUB_RUN_ID, record artifact $RECORD_ID" || echo "not certified: run $GITHUB_RUN_ID, record artifact $RECORD_ID")" \
             --jq '"status \(.id) \(.state) on \(.url)"'
+
+  unfinished:
+    name: cert-review / unfinished
+    needs: [plan, review, record]
+    if: always() && needs.plan.outputs.go == 'true' && needs.record.result != 'success'
+    runs-on: ${{ vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      statuses: write
+    steps:
+      - name: A failure status, so no head is left pending
+        uses: actions/github-script@v9
+        env:
+          HEAD: ${{ needs.plan.outputs.head }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DESCRIPTION: 'not certified: cert-review did not finish (review ${{ needs.review.result }}, record ${{ needs.record.result }})'
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const { HEAD: sha, RUN_URL: url, DESCRIPTION: description } = process.env;
+            const { data } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: sha, per_page: 100 });
+            const now = data.statuses.find((s) => s.context === 'cert-review')?.target_url ?? '';
+            if (now !== url && !now.startsWith(`${url}/`)) {
+              core.notice(`the cert-review status on ${sha} is from another run (${now || 'none'}); it posts its own`);
+              return;
+            }
+            await github.rest.repos.createCommitStatus({ owner, repo, sha, state: 'failure', context: 'cert-review', description, target_url: url });
+            core.info(`cert-review=failure on ${sha}: ${description}`);
