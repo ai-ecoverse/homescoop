@@ -1,6 +1,7 @@
 # Homebrew-shaped recipe — declarative metadata; body is build.sh (host) or build.jsh (slicc).
 name: pkgconf
 builder: host
+reproducible: true
 # renovate: datasource=github-tags depName=pkgconf/pkgconf extractVersion=^pkgconf-(?<version>.*)$
 version: "3.0.9"
 npm: "@ai-ecoverse/wasm-pkgconf"
