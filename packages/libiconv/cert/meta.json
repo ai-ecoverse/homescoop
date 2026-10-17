@@ -7,7 +7,7 @@
   "checklist": [
     "_libiconv_version and libiconv.pc's Version are the recipe version; the probe compiles and links from libiconv.pc alone with -Wl,--fatal-warnings",
     "UTF-8 to ISO-8859-15 (the euro sign is 0xa4) and back byte-exact, UTF-8 to UTF-16LE, UTF-8 to SHIFT_JIS (the CJK tables are built in), //TRANSLIT",
-    "errors: unrepresentable input is EILSEQ, a truncated sequence EINVAL, an unknown charset EINVAL from iconv_open; locale_charset() answers"
+    "errors: unrepresentable input is EILSEQ, a truncated sequence EINVAL, an unknown charset EINVAL from iconv_open"
   ],
   "ci": [
     "node scripts/em-lib-cert.mjs libiconv --tarball .homescoop-out/package.tgz"

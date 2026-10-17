@@ -21,7 +21,6 @@ const HOST_HARNESSES = ['host-node', 'host-smoke'];
 const NO_CERT = [
   'cmake', // #426
   'emscripten-cache', // #426
-  'gmake', // #426
   'libjpeg-turbo', // #426
   'openjpeg', // #426
 ];

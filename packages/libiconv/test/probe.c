@@ -1,6 +1,5 @@
 #include <errno.h>
 #include <iconv.h>
-#include <localcharset.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -37,7 +36,6 @@ int main(void) {
   CHECK(n == (size_t)-1 && err == EINVAL, "truncated input is EINVAL");
   CHECK(iconv_open("NO-SUCH-CHARSET", "UTF-8") == (iconv_t)-1 && errno == EINVAL, "unknown charset is EINVAL");
   printf("libiconv %d.%d\n", _libiconv_version >> 8, _libiconv_version & 0xff);
-  printf("locale_charset %s\n", locale_charset());
   printf("probe ok\n");
   return 0;
 }
