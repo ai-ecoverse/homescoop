@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-libheif",
-  "version": "1.23.6-4",
+  "version": "1.23.6-5",
   "description": "libheif 1.23.6 HEIF/HEIC/AVIF decoder with heif-convert and heif-info for slicc (WASM / emscripten). Optional: contains an HEVC decoder (libde265), and HEVC is patent-encumbered. Static libs and headers included for LGPL relinking.",
   "license": "LGPL-3.0-or-later AND MIT AND BSD-2-Clause",
   "repository": {
