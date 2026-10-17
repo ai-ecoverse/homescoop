@@ -175,7 +175,12 @@ echo "== host-run: no DWARF in the package's wasm, archives and objects (homesco
 if [[ "$em_debug" != true ]]; then
   node "$ROOT/scripts/check-no-debug.mjs" "$name" "$PKG/package" --strip
 fi
-node "$ROOT/scripts/check-no-debug.mjs" "$name" "$PKG/package"
+nodebug="$(node "$ROOT/scripts/check-no-debug.mjs" "$name" "$PKG/package")"
+printf '%s\n' "$nodebug"
+if ! grep -q "^check-no-debug: $name: " <<<"$nodebug"; then
+  echo "host-run: check-no-debug printed no verdict for $name (homescoop#968)" >&2
+  exit 1
+fi
 echo "== host-run: slicc shims carry the kernel credentials (slicc_cred_js)"
 node "$ROOT/scripts/check-slicc-cred.mjs" "$PKG/package"
 echo "== host-run: check package meta (license / LICENSE / files)"

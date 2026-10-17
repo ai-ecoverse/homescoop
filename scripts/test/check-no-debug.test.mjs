@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,4 +133,14 @@ test('stripArchive rewrites members in place, nested archives too, and moves the
     q += 60 + size + (size & 1);
   }
   assert.deepEqual([1, 2, 3].map((i) => table.readUInt32BE(4 * i)), starts.slice(1), 'each symbol points at its member header after the rewrite');
+});
+
+test('the CLI runs the same through a symlinked checkout (cloud-run runners, homescoop#968)', () => {
+  fixture(({ dir, pkg }) => {
+    const link = join(dir, 'linked-scripts');
+    symlinkSync(dirname(script), link);
+    const r = spawnSync(process.execPath, [join(link, 'check-no-debug.mjs'), 'no-such-recipe', pkg], { encoding: 'utf8' });
+    assert.equal(r.status, 1, `through the symlink: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, /ship 98 bytes of DWARF/);
+  });
 });

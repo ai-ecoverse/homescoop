@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-git",
-  "version": "2.55.0-16",
+  "version": "2.55.0-17",
   "description": "Git for slicc (emscripten ABI; user names and ids from slicc-kernel >= 1.47.1)",
   "engines": {
     "slicc-kernel": ">=1.47.1"

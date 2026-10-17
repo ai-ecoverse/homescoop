@@ -593,6 +593,21 @@ homescoop_stage_cli() {
 
 # Write a relocatable .pc into package/lib/pkgconfig and PREFIX.
 # Uses ${pcfiledir} so consumers can stage the package tree anywhere.
+homescoop_scrub_build_paths() {
+  local f
+  for f in "$@"; do
+    [[ -f "$f" ]] || { echo "homescoop_scrub_build_paths: no $f" >&2; return 1; }
+    HS_EMSDK="${EMSDK:+$EMSDK/install}" HS_PREFIX="${PREFIX:-}" HS_WORK="${WORK:-}" HS_ROOT="${HOMESCOOP_ROOT:-}" perl -pi -e '
+      BEGIN { @m = grep { $_->[0] ne "" } ([$ENV{HS_EMSDK}, "/emsdk"], [$ENV{HS_PREFIX}, "/prefix"], [$ENV{HS_WORK}, "/build"], [$ENV{HS_ROOT}, "/src"]) }
+      for my $x (@m) { my $q = quotemeta($x->[0]); s/$q/$x->[1]/g }' "$f"
+    local leak
+    for leak in "${EMSDK:-}" "${PREFIX:-}" "${WORK:-}" "${HOMESCOOP_ROOT:-}"; do
+      [[ -n "$leak" ]] || continue
+      if grep -qF "$leak" "$f"; then echo "homescoop_scrub_build_paths: $f still names $leak" >&2; return 1; fi
+    done
+  done
+}
+
 # homescoop_write_pc <pc-name> <version> <libs> [requires] [extra-cflags]
 #   libs e.g. "-ljpeg" or "-lpng16 -lz"
 homescoop_write_pc() {

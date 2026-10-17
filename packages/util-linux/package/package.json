@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-util-linux",
-  "version": "2.42.4-3",
+  "version": "2.42.4-4",
   "description": "util-linux rev, column, hexdump, colrm, look and getopt for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND MIT",
   "repository": {
