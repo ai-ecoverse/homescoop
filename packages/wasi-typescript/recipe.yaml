@@ -3,6 +3,7 @@
 # the command tsc. No node is needed.
 name: wasi-typescript
 builder: host
+reproducible: true
 # renovate: datasource=github-tags depName=microsoft/typescript-go extractVersion=^typescript/v(?<version>.*)$
 version: "7.0.2"
 npm: "@ai-ecoverse/wasi-typescript"

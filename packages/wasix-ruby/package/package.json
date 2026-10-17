@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-ruby",
-  "version": "3.4.11-16",
-  "description": "MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; wasix-sysroot 2025.9.30-30: user ids, traps and times from slicc-kernel)",
+  "version": "3.4.11-17",
+  "description": "MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; wasix-sysroot 2025.9.30-32: user ids, traps and times from slicc-kernel)",
   "engines": {
     "slicc-kernel": ">=1.100.0"
   },

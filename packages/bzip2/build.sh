@@ -52,4 +52,6 @@ for s in bzgrep bzdiff; do
 done
 
 homescoop_stage_license "$SRC"/LICENSE "$SRC"/COPYING
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== bzip2: staged → $HOMESCOOP_PKG/package"

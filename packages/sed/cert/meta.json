@@ -1,8 +1,23 @@
 {
   "harness": "slicc-kernel",
-  "needs": ["@ai-ecoverse/wasm-bash"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-8"
+  ],
   "checklist": [
     "sed -i in-place edit",
-    "sed e (execute) command via popen"
-  ]
+    "sed e (execute) command via popen",
+    "streams (#683): sed s/1/one/g on a 200,000-line seq file, to stdout and to a file, compared byte for byte in node (the glue's gathered writev); sed -n 's/5$/x/p' big | sed -n '$=' → 20000; seq 10 | sed -n '3,5p;8q'",
+    "-i.bak -E with -e … -e '/Z/w xs': the edited file, the .bak original and xs compared",
+    "-z: printf 'a\\0b\\0' | sed -z s/b/B/ → a\\0B\\0 (od -c)",
+    "-i keeps a 0640 mode; -i --follow-symlinks edits the link's target and keeps the link, plain -i replaces the link with a regular file and leaves the target",
+    "users (users enforce): cone's sed -i on /etc/passwd → rc 4 \"couldn't open temporary file /etc/sedXXXXXX: Permission denied\", /etc/passwd byte-identical; cone's sed -i on its own 0600 file keeps 600 1000:1000; cone's sed p on root's 0600 → rc 2 \"can't read …: Permission denied\"",
+    "exit statuses: sed s/a/ → rc 1 (\"-e expression #1, char 4: unterminated 's' command\"); sed p /nonexistent → rc 2 \"can't read /nonexistent: No such file or directory\""
+  ],
+  "users": "enforce"
 }

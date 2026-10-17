@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-gh",
-  "version": "2.102.0-1",
+  "version": "2.102.0-2",
   "description": "gh 2.102.0 (GitHub CLI) for slicc WASI preview1 (command gh); gh.wasm built by homescoop from gh v2.102.0 with a documented patch",
   "license": "MIT",
   "repository": {

@@ -98,4 +98,6 @@ LIC="$WORK/util-linux-LICENSE"
   done
 } > "$LIC"
 homescoop_stage_license "$LIC"
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== util-linux: staged → $HOMESCOOP_PKG/package ($VERSION)"

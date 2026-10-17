@@ -1,12 +1,14 @@
 name: py-fonttools
 builder: host
+reproducible: true
 version: "4.66.1"
 npm: "@ai-ecoverse/py-fonttools"
 summary: "fonttools for slicc WASIX CPython"
-# 4.66.1-7 is packaging-only: 4.66.1-6's bytes with wasix-python as a range,
-# ">=3.14.2-16 <3.14.3" (#702). Drop repack: when the next release rebuilds.
-repack:
-  from: "4.66.1-6"
+source:
+  url: "https://files.pythonhosted.org/packages/py3/f/fonttools/fonttools-{{version}}-py3-none-any.whl"
+  sha256: "7234ae9e28db64273fbbfa72caebd0a97e3bdba6b05064114741b9539ef339d0"
+inputs:
+  - scripts/stage-pure-wheel.sh
 dependencies:
   build: []
   host: []
