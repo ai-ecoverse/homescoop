@@ -83,9 +83,7 @@ The patch:
    `F_UNLCK`.
 3. Adds `flock()` / `lockf()` no-op sources under `libc-bottom-half/sources/`.
 
-Until the sysroot is rebuilt, wasix-python links `lock_stubs.c` with
-`-Wl,--wrap=flock,--wrap=fcntl,--wrap=lockf` (same pattern as uid stubs).
-`fcntl_wasix_extra.h` mirrors the 7/8/9 cmd numbers for the fcntl module.
+**Historical; not applied.** wasix-sysroot -30 brought real fcntl record locks and `lockf` (`slicc.fcntl_lock`, F_GETLK/F_SETLK/F_SETLKW 12/13/14). -34 brought real `flock` (`slicc.flock`, per open file description). Up to 3.14.2-25 wasix-python linked `lock_stubs.c` with `-Wl,--wrap=flock`, a no-op. Since -26 `fcntl.flock` is libc's. `fcntl_wasix_extra.h`'s `#ifndef` fallbacks don't apply, because the sysroot defines the constants.
 
 ## `cpython-stdout-line-buffer-nonreg.patch` (wasix-python 3.14.2-7)
 

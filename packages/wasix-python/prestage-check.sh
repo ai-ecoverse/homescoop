@@ -67,31 +67,21 @@ IMPORTS=$("$OBJDUMP" -x -j Import "$WASM") || fail "wasm-objdump cannot read $WA
 echo "$IMPORTS" | grep -q '<- slicc\.cred_get' || fail "python.wasm does not import slicc.cred_get (wasix-sysroot -20 credentials)"
 ok "uid from slicc-kernel (imports slicc.cred_get)"
 
-python3 - "$OBJDUMP" "$WASM" <<'PY' || fail "lock wrap export check failed"
+python3 - "$OBJDUMP" "$WASM" <<'PY' || fail "lock check failed"
 import re, subprocess, sys
 objdump, wasm = sys.argv[1:3]
 exp = subprocess.check_output([objdump, "-x", "-j", "Export", wasm], text=True, stderr=subprocess.STDOUT)
 imp = subprocess.check_output([objdump, "-x", "-j", "Import", wasm], text=True, stderr=subprocess.STDOUT)
-m = re.search(r'func\[(\d+)\][^\n]*->\s*"__wrap_flock"', exp)
-if not m:
-    raise SystemExit("Export section missing __wrap_flock")
-fi = int(m.group(1))
-for name in ("__wrap_fcntl", "__wrap_lockf"):
+# 3.14.2-26: flock is libc's (wasix-sysroot -34), so no lock call is wrapped.
+for name in ("__wrap_flock", "__wrap_fcntl", "__wrap_lockf"):
     if re.search(rf'->\s*"{name}"', exp):
-        raise SystemExit(f"{name} is still exported: fcntl locks and lockf must reach libc (wasix-sysroot -30)")
-for name in ("slicc.fcntl_lock", "slicc.sem_open"):
+        raise SystemExit(f"{name} is still exported: flock, fcntl locks and lockf must reach libc (wasix-sysroot -34)")
+for name in ("slicc.flock", "slicc.fcntl_lock", "slicc.sem_open"):
     if f"<- {name}" not in imp and not re.search(rf'{re.escape(name)}\b', imp):
         raise SystemExit(f"python.wasm does not import {name}")
-dis = subprocess.check_output([objdump, "-d", wasm], text=True, stderr=subprocess.STDOUT)
-m = re.search(rf"func\[{fi}\][^:]*:.*?(?=func\[\d+\]|\Z)", dis, re.S)
-if not m:
-    raise SystemExit(f"no func[{fi}] (export __wrap_flock) in disassembly")
-body = m.group(0)[:400]
-if "i32.const 0" not in body and "41 00" not in body:
-    raise SystemExit(f"__wrap_flock func[{fi}] does not return 0:\n" + body)
-print("lock wraps ok: flock no-op; fcntl/lockf through libc; imports slicc.fcntl_lock, slicc.sem_open")
+print("locks ok: flock, fcntl/lockf through libc; imports slicc.flock, slicc.fcntl_lock, slicc.sem_open")
 PY
-ok "flock is a no-op; fcntl locks, lockf and named semaphores go to slicc-kernel"
+ok "flock, fcntl locks, lockf and named semaphores go to slicc-kernel"
 
 python3 - "$WASM" <<'PY' || fail "missing builtin init symbol string"
 import sys
