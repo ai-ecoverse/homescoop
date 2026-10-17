@@ -59,6 +59,7 @@ python3 "$HOMESCOOP_PKG/make-stable-config.py" --wasi-sdk "$WASI_SDK_PATH" \
   --llvm-config "$LLVM_CONFIG" --build "$BUILD_TRIPLE" --output config.wasi.toml
 unset RUSTFLAGS CARGO_TARGET_WASM32_WASIP1_RUSTFLAGS CARGO_TARGET_WASM32_WASIP1_THREADS_RUSTFLAGS || true
 export RUSTFLAGS_NOT_BOOTSTRAP=""
+export CFLAGS_wasm32_wasip1_threads="--target=wasm32-wasip1-threads" CXXFLAGS_wasm32_wasip1_threads="--target=wasm32-wasip1-threads"
 ./x.py install --config config.wasi.toml
 
 DEST="$HOMESCOOP_PKG/package"
