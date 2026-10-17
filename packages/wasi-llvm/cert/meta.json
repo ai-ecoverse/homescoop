@@ -1,0 +1,13 @@
+{
+  "harness": "host-node",
+  "host": "node packages/wasi-llvm/cert/check.mjs --tarball <package.tgz>: unpacks the package, checks llvm-config and the library set, then compiles cert/smoke/smoke.cpp against it with the recipe's wasi-sdk 34.0 (toolchain.wasi-sdk, through scripts/install-wasi-sdk.sh) and runs it under node:wasi. A build input has no commands of its own.",
+  "checklist": [
+    "package.json: @ai-ecoverse/wasi-llvm, version <recipe>-N, no install scripts, no slicc.commands; no symlinks or hard links; no build-machine path in llvm-config, lib/cmake or the headers",
+    "llvm-config (python3): --version 21.1.8, --targets-built WebAssembly, --shared-mode static, --host-target wasm32-unknown-wasip1, --prefix follows the unpacked package, and every library --libs --link-static names for core/support/webassembly/target/mc/passes/option/lto is in lib/",
+    "the static libraries rustc and zig link are there: LLVMCore, LLVMSupport, LLVMOption, LLVMWebAssemblyCodeGen/AsmParser, LLVMPasses, LLVMLTO, clangFrontendTool, clangCodeGen, clangDriver, clangStaticAnalyzerCore, lldCommon/ELF/Wasm/COFF/MachO/MinGW",
+    "smoke.cpp links with the recipe's wasi-sdk (clang++ --target=wasm32-wasip1-threads, llvm-config's --cxxflags and --libs) and runs under node:wasi: an IRBuilder module verifies and prints `%2 = add i32 %0, %1`, the WebAssembly backend emits an object, lld::wasm::link (--threads=1) links it, and the linked add.wasm computes add(40, 2) = 42; its import set and size are logged"
+  ],
+  "ci": [
+    "node packages/wasi-llvm/cert/check.mjs --tarball .homescoop-out/package.tgz"
+  ]
+}
