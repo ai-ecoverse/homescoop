@@ -672,8 +672,11 @@ changes the boot order for every cert.
   the backstop.
 - Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
   (`ubuntu-latest`; the old `cloud-run` pool is retired), else the shards'
-  runner. The shards use `runner` / `CERT_RUNNER` (`cloud-run-job`: 10 vCPU /
-  32 GiB per job, a 32 GB memory-backed disk). Never hard-code a pool label;
+  runner. The shards use `runner` / `CERT_RUNNER` (`cloud-run-job`, image
+  `runner-job`: 8 vCPU allocated, where `nproc` may say 9–10, the host's;
+  32 GiB of memory that the memory-backed filesystem shares, about 32 GB
+  free at start; no sudo; one fresh machine per job, 6 h timeout; egress
+  only, from a link-local 169.254.x address). Never hard-code a pool label;
   `cloud-run-bench` and `cloud-run` are retired. On the pool a job gets a machine within about a minute, where
   `ubuntu-latest` can queue for 15–40.
 - **No root on the pool.** Its machines run with "no new privileges", so
