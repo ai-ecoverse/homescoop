@@ -13,11 +13,12 @@ function fixture(packages) {
   mkdirSync(join(root, 'scripts', 'browser-cert'), { recursive: true });
   for (const f of ['cert-leg.mjs', 'cert-meta.mjs', 'glue.mjs']) copyFileSync(join(scripts, 'browser-cert', f), join(root, 'scripts', 'browser-cert', f));
   copyFileSync(join(scripts, 'dev-pin.mjs'), join(root, 'scripts', 'dev-pin.mjs'));
+  copyFileSync(join(scripts, 'gate.mjs'), join(root, 'scripts', 'gate.mjs'));
   writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { '@ai-ecoverse/slicc-kernel': '1.102.6' } }));
   // A stand-in run.mjs: records each invocation (argv and the env it got).
   writeFileSync(
     join(root, 'scripts', 'browser-cert', 'run.mjs'),
-    "import { appendFileSync } from 'node:fs';\nappendFileSync('runs.jsonl', JSON.stringify({ argv: process.argv.slice(2), env: { K: process.env.TAR_LINKAT || null } }) + '\\n');\nprocess.exit(process.argv.includes('--fail-me') ? 4 : 0);\n",
+    "import { appendFileSync } from 'node:fs';\nappendFileSync('runs.jsonl', JSON.stringify({ argv: process.argv.slice(2), env: { K: process.env.TAR_LINKAT || null } }) + '\\n');\nif (!process.env.SILENT_RUN) console.log(process.argv.includes('--fail-me') ? 'cert-run: FAIL stub' : 'cert-run: PASS stub');\nprocess.exit(process.argv.includes('--fail-me') ? 4 : 0);\n",
   );
   for (const [name, { meta, specs = [], manifest = {} }] of Object.entries(packages)) {
     const dir = join(root, 'packages', name);
@@ -28,11 +29,11 @@ function fixture(packages) {
     for (const s of specs) writeFileSync(join(dir, 'cert', s), 'export default async () => {};\n');
   }
   const summary = join(root, 'summary.md');
-  const leg = (mode, name) =>
+  const leg = (mode, name, env = {}) =>
     spawnSync(
       process.execPath,
       [join(root, 'scripts/browser-cert/cert-leg.mjs'), mode, name, ...(mode === 'plan' || mode === 'browser-extra' ? ['--manifest', join(root, 'packages', name, 'package', 'package.json')] : [])],
-      { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: summary } },
+      { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: summary, ...env } },
     );
   const read = () => (existsSync(summary) ? readFileSync(summary, 'utf8') : '');
   return { root, leg, summary: read, done: () => rmSync(root, { recursive: true, force: true }) };
@@ -358,6 +359,21 @@ test('browser-extra: glue by path on the dev-pin kernel when the cert kernel pre
       { argv: [...base('tar'), '--kernel', '@ai-ecoverse/slicc-kernel@1.90.0'], env: { K: '1' } },
       { argv: [...base('tar'), '--kernel', '@ai-ecoverse/slicc-kernel@1.108.1', '--cert', 'packages/tar/cert/k108', '--spec', 'inherit.mjs', '--users', 'report'], env: { K: null } },
     ]);
+  } finally {
+    f.done();
+  }
+});
+
+test('browser-extra: a run.mjs that exits 0 without its cert-run verdict fails the leg (#981)', () => {
+  const f = fixture({ old: { meta: { kernel: '@ai-ecoverse/slicc-kernel@1.12.0' }, specs: ['a.mjs'], manifest: cli } });
+  try {
+    const r = f.leg('browser-extra', 'old', { SILENT_RUN: '1' });
+    assert.notEqual(r.status, 0, r.stdout);
+    assert.match(r.stderr, /cert-run: exited 0 without a "cert-run: PASS" line/);
+    assert.match(r.stdout, /^cert-leg: FAIL browser-extra old$/m);
+    const ok = f.leg('browser-extra', 'old');
+    assert.equal(ok.status, 0, ok.stdout);
+    assert.match(ok.stdout, /^cert-leg: PASS browser-extra old$/m);
   } finally {
     f.done();
   }

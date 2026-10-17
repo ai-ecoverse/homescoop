@@ -301,7 +301,7 @@
  #endif /*!HAVE_DOSISH_SYSTEM */
  };
  
-@@ -681,6 +685,190 @@
+@@ -681,6 +685,275 @@
  
  
  
@@ -320,9 +320,83 @@
 + * file holds its lock (closing it would drop that lock). */
 +static int next_wait_interval (int *wtime, long *timeout);
 +
++/* homescoop#888: the lock file stays, so one that another user created
++ * (root running gpg on someone's homedir) would keep the homedir's owner
++ * from opening it for writing.  Root gives a lock file it creates (with
++ * O_EXCL, never one that was there) to the directory's owner, and a
++ * caller who can't open a lock file for writing replaces it if no process
++ * holds a lock on it (the directory's owner may remove it).  */
++static int
++dotlock_fcntl_dir (const char *lockname, struct stat *st)
++{
++  char *dir, *p;
++  int rc;
++
++  dir = strdup (lockname);
++  if (!dir)
++    return -1;
++  p = strrchr (dir, '/');
++  if (p == dir)
++    p[1] = 0;
++  else if (p)
++    *p = 0;
++  rc = stat (p ? dir : ".", st);
++  free (dir);
++  return rc;
++}
++
++/* Only a lock file this call created, and only a regular file with one
++ * link, is given away: a symlink or hard link planted under the lock
++ * name must not make root chown its target.  */
++static void
++dotlock_fcntl_give (int fd, const char *lockname)
++{
++  struct stat st, dst;
++
++  if (geteuid () || fstat (fd, &st) || dotlock_fcntl_dir (lockname, &dst))
++    return;
++  if (!S_ISREG (st.st_mode) || st.st_nlink != 1)
++    return;
++  if (st.st_uid != dst.st_uid || st.st_gid != dst.st_gid)
++    fchown (fd, dst.st_uid, dst.st_gid);
++}
++
++static int
++dotlock_fcntl_open (const char *lockname, int *r_created)
++{
++  int fd;
++
++  *r_created = 0;
++  fd = open (lockname, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
++  if (fd != -1)
++    *r_created = 1;
++  else if (errno == EEXIST)
++    fd = open (lockname, O_RDWR | O_CLOEXEC);
++  return fd;
++}
++
++static int
++dotlock_fcntl_reclaim (const char *lockname)
++{
++  struct flock fl;
++  int fd, ok;
++
++  fd = open (lockname, O_RDONLY | O_CLOEXEC);
++  if (fd == -1)
++    return 0;
++  memset (&fl, 0, sizeof fl);
++  fl.l_type = F_RDLCK;
++  fl.l_whence = SEEK_SET;
++  ok = !fcntl (fd, F_SETLK, &fl) && !unlink (lockname);
++  close (fd);
++  return ok;
++}
++
 +static dotlock_t
 +dotlock_create_fcntl (dotlock_t h, const char *file_to_lock)
 +{
++  int created;
++
 +  LOCK_all_lockfiles ();
 +  h->next = all_lockfiles;
 +  all_lockfiles = h;
@@ -333,7 +407,18 @@
 +  if (!h->lockname)
 +    goto failed;
 +  strcpy (stpcpy (h->lockname, file_to_lock), EXTSEP_S "lock");
-+  h->lockfd = open (h->lockname, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
++  h->lockfd = dotlock_fcntl_open (h->lockname, &created);
++  if (h->lockfd == -1 && (errno == EACCES || errno == EPERM))
++    {
++      int saveerrno = errno;
++
++      if (dotlock_fcntl_reclaim (h->lockname))
++        h->lockfd = dotlock_fcntl_open (h->lockname, &created);
++      else
++        errno = saveerrno;
++    }
++  if (h->lockfd != -1 && created)
++    dotlock_fcntl_give (h->lockfd, h->lockname);
 +  if (h->lockfd == -1)
 +    {
 +      int saveerrno = errno;
@@ -492,7 +577,7 @@
  #ifdef  HAVE_POSIX_SYSTEM
  static int
  dotlock_get_process_id (dotlock_t h)
-@@ -770,6 +958,10 @@
+@@ -770,6 +1043,10 @@
    size_t tnamelen;
    int pid;
  
@@ -503,7 +588,7 @@
    pid = dotlock_get_process_id (h);
    snprintf (pidstr, sizeof pidstr, "%10d\n", pid);
  
-@@ -1151,6 +1343,13 @@
+@@ -1151,6 +1428,13 @@
  static void
  dotlock_destroy_unix (dotlock_t h)
  {
@@ -517,7 +602,7 @@
    if (h->locked && h->lockname)
      unlink (h->lockname);
    if (h->tname && !h->use_o_excl)
-@@ -1569,6 +1768,11 @@
+@@ -1569,6 +1853,11 @@
  #ifdef HAVE_DOSISH_SYSTEM
    ret = dotlock_take_w32 (h, timeout);
  #else /*!HAVE_DOSISH_SYSTEM*/
@@ -529,7 +614,7 @@
    ret = dotlock_take_unix (h, timeout);
  #endif /*!HAVE_DOSISH_SYSTEM*/
  
-@@ -1683,6 +1887,11 @@
+@@ -1683,6 +1972,11 @@
  #ifdef HAVE_DOSISH_SYSTEM
    ret = dotlock_release_w32 (h);
  #else
@@ -543,7 +628,43 @@
  
 --- a/kbx/keybox-update.c
 +++ b/kbx/keybox-update.c
-@@ -92,6 +92,41 @@
+@@ -76,6 +76,35 @@
+   gpg_error_t err;
+ 
+   err = keybox_tmp_names (template, 0, r_bakfname, r_tmpfname);
++#ifdef __wasi__
++  /* homescoop#966: on slicc-kernel's OPFS root a file created under a
++   * name that was just renamed away gets the inode number of the renamed
++   * file (slicc-kernel#954).  With one tmp name for every update, each
++   * new keybox shares its inode number with the one it replaces, and a
++   * concurrent reader reads the wrong file's bytes ("Provided object is
++   * too short").  Use a tmp name of its own for every update.  */
++  if (!err)
++    {
++      static unsigned int counter;
++      char *name;
++
++      name = xtryasprintf ("%s.%d.%u.%lu", *r_tmpfname, (int)getpid (),
++                           ++counter, (unsigned long)time (NULL));
++      if (!name)
++        {
++          err = gpg_error_from_syserror ();
++          xfree (*r_tmpfname);
++          *r_tmpfname = NULL;
++          xfree (*r_bakfname);
++          *r_bakfname = NULL;
++        }
++      else
++        {
++          xfree (*r_tmpfname);
++          *r_tmpfname = name;
++        }
++    }
++#endif /*__wasi__*/
+   if (!err)
+     {
+       err = _keybox_ll_open (r_fp, *r_tmpfname, KEYBOX_LL_OPEN_CREATE);
+@@ -92,6 +121,41 @@
  }
  
  
@@ -585,7 +706,7 @@
  static int
  rename_tmp_file (const char *bakfname, const char *tmpfname,
                   const char *fname, int secret )
-@@ -118,7 +153,21 @@
+@@ -118,8 +182,22 @@
  /*    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)fname ); */
  
    /* First make a backup file except for secret keyboxes. */
@@ -594,19 +715,31 @@
 +   * the keybox without the lock (keydb_search) often opens it between
 +   * the two renames below and fails with ENOENT. Copy the backup instead,
 +   * so that FNAME is always there and the rename replaces it.  */
-+  if (!secret)
-+    {
+   if (!secret)
+     {
 +      rc = copy_file_for_backup (fname, bakfname);
 +      if (rc)
 +        goto leave;
 +    }
 +  if (0)
 +#else
-   if (!secret)
++  if (!secret)
 +#endif
-     {
++    {
        block = 1;
        rc = gnupg_rename_file (fname, bakfname, &block);
+       if (rc)
+@@ -346,6 +424,10 @@
+   rc = rename_tmp_file (bakfname, tmpfname, fname, secret);
+ 
+  leave:
++#ifdef __wasi__
++  if (rc && tmpfname)
++    gnupg_remove (tmpfname);
++#endif
+   xfree(bakfname);
+   xfree(tmpfname);
+   return rc;
 --- a/g10/keydb.c
 +++ b/g10/keydb.c
 @@ -351,6 +351,40 @@
@@ -650,7 +783,7 @@
    if (is_secured_filename (filename))
      {
        iobuf = NULL;
-@@ -430,8 +464,44 @@
+@@ -430,8 +464,78 @@
     KEYDB_RESOURCE_TYPE_KEYBOX, KEYDB_RESOURCE_TYPE_KEYRING or
     KEYDB_RESOURCE_TYPE_KEYNONE.  If the file is a keybox and it has
     the OpenPGP flag set, then R_OPENPGP is also set.  */
@@ -663,6 +796,34 @@
 + * creating, which the probe would take for a keyring.  Probe such a file
 + * again under its dotlock, which the creator holds until the header is
 + * written.  */
++static int
++rt_from_file_lockable (const char *filename)
++{
++  char *lockname, *dir, *p;
++  int ok;
++
++  lockname = xtryasprintf ("%s.lock", filename);
++  if (!lockname)
++    return 0;
++  ok = !gnupg_access (lockname, W_OK);
++  if (!ok)
++    {
++      dir = xtrystrdup (filename);
++      if (dir)
++        {
++          p = strrchr (dir, '/');
++          if (p == dir)
++            p[1] = 0;
++          else if (p)
++            *p = 0;
++          ok = !gnupg_access (p ? dir : ".", W_OK);
++          xfree (dir);
++        }
++    }
++  xfree (lockname);
++  return ok;
++}
++
 +static KeydbResourceType
 +rt_from_file (const char *filename, int *r_found, int *r_openpgp)
 +{
@@ -671,6 +832,12 @@
 +  dotlock_t lockhd;
 +
 +  if (gnupg_stat (filename, &st) || st.st_size >= 32)
++    return rt_from_file_1 (filename, r_found, r_openpgp);
++  /* homescoop#955: a caller who can write neither the lock file nor its
++   * directory (an empty keyring in a read-only directory) probes without
++   * the lock, so dotlock logs no error.  Keyboxes are created by a
++   * rename, so a short file there is not one being created.  */
++  if (!rt_from_file_lockable (filename))
 +    return rt_from_file_1 (filename, r_found, r_openpgp);
 +  lockhd = dotlock_create (filename, 0);
 +  if (!lockhd)
@@ -695,3 +862,22 @@
  {
    u32 magic;
    unsigned char verbuf[4];
+--- a/tools/gpgconf.c
++++ b/tools/gpgconf.c
+@@ -655,6 +655,16 @@
+   dotlock_t h;
+   unsigned int flags = DOTLOCK_LOCK_BY_PARENT;
+ 
++#ifdef __wasi__
++  /* homescoop#881: gpg's dotlock is an fcntl lock here, which ends with
++   * the process holding it, so no lock can outlive gpgconf.  */
++  (void)h;
++  (void)flags;
++  log_error ("--%slock '%s': not supported on WASI (gpg locks with fcntl"
++             " locks, which end with their process)\n",
++             do_lock? "" : "un", filename);
++  return;
++#endif
+   if (!do_lock)
+     flags |= DOTLOCK_LOCKED;
+ 

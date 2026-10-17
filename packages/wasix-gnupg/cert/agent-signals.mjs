@@ -45,6 +45,6 @@ export default async function (ctx) {
   assert.equal(alive, false, `gpg-agent ${second} still alive after SIGINT`);
   const manifest = await ok('for d in /node_modules /*/node_modules /*/*/node_modules /*/*/*/node_modules; do f=$d/@ai-ecoverse/wasix-gnupg/package.json; if [ -f $f ]; then cat $f; break; fi; done');
   const rec = /wasix-sysroot -\d+/.exec(JSON.parse(manifest).description)?.[0];
-  assert.equal(rec, 'wasix-sysroot -28', `toolchain record: ${rec}`);
+  assert.equal(rec, 'wasix-sysroot -34', `toolchain record: ${rec}`);
   console.log(`agent-signals: pid ${first}, HUP reloads in place, TERM exits in ${secs}s, INT exits; ${rec}`);
 }

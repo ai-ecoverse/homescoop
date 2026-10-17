@@ -12,12 +12,21 @@
  *    another creates it sees an empty file, takes it for a pubring.gpg
  *    keyring and fails with "invalid packet (ctb=00)" (2.4.9-9 creates the
  *    keybox by renaming a complete file into place).
+ * 2b. After an import, pubring.kbx doesn't share its inode number with a
+ *    new pubring.kbx.tmp, and no tmp file is left (2.4.9-10, homescoop#966,
+ *    slicc-kernel#954). Four readers (gpg -k, gpg --list-keys --with-colons)
+ *    run alongside six imports into a keybox holding six keys: every read
+ *    exits 0 with no error and lists the held keys, and every key is kept.
+ *    2.4.9-9 shares the inode number, and its readers sometimes fail with
+ *    "keydb_search_next failed: Provided object is too short".
  * 3. Four parallel --quick-gen-key runs in one homedir: all succeed and
  *    keep their keys, --check-trustdb is clean. No tolerance for unlocked
  *    keybox reads: renames are atomic for other processes since
  *    slicc-kernel 1.117.2 (slicc-kernel#925, homescoop#934).
  */
 const N = 4;
+const READERS = 4;
+const READER_ROUNDS = 1;
 
 // Six distinct public keys (ed25519, uids tide1 … tide6 <tideN@example.test>).
 const KEYS = [
@@ -123,6 +132,55 @@ export default async function (ctx) {
     assert.equal(listed.size, KEYS.length + held, `${user} round ${round} (${prefill}): ${KEYS.length + held} keys:\n${out}`);
   }
 
+  // 2b. Readers alongside the imports (homescoop#966). On slicc-kernel's OPFS
+  //     root a file created under a just-renamed-away name gets the renamed
+  //     file's st_ino (slicc-kernel#954), so with one tmp name per keybox
+  //     every version of pubring.kbx shares one inode number and a reader
+  //     can read the wrong file's bytes. 2.4.9-10 writes each update to a tmp
+  //     name of its own: after an import, pubring.kbx's inode number is not
+  //     the one a new pubring.kbx.tmp gets, and no tmp file is left. Then
+  //     four readers run gpg -k and gpg --list-keys --with-colons while six
+  //     imports go into a keybox holding six keys (one round: more rounds
+  //     run into slicc-kernel#980, an OPFS call that never answers).
+  const ino = await sh([
+    'gh=/root/ino; rm -rf $gh; mkdir -m 700 -p $gh',
+    'gpg --homedir $gh --batch --import /tmp/gpg-held.gpg > /dev/null 2>&1; gpg --homedir $gh --batch --import /tmp/gpg-key-1.gpg > /dev/null 2>&1',
+    'a=$(stat -c %i $gh/pubring.kbx); : > $gh/pubring.kbx.tmp; b=$(stat -c %i $gh/pubring.kbx.tmp); rm -f $gh/pubring.kbx.tmp',
+    'echo "kbx=$a tmp=$b"; ls $gh; gpgconf --homedir $gh --kill gpg-agent',
+  ].join('\n'));
+  const [, kbxIno, tmpIno] = /^kbx=(\d+) tmp=(\d+)$/m.exec(ino) ?? [];
+  assert.ok(kbxIno && tmpIno, `inode numbers:\n${ino}`);
+  assert.notEqual(kbxIno, tmpIno, `pubring.kbx doesn't share its inode number with a new pubring.kbx.tmp (2.4.9-9 renames every update from pubring.kbx.tmp):\n${ino}`);
+  assert.doesNotMatch(ino, /^pubring\.kbx\.tmp/m, `no tmp file left:\n${ino}`);
+  for (let round = 1; round <= READER_ROUNDS; round++) {
+    const gh = `/root/rd${round}`;
+    const out = await sh([
+      `rm -rf ${gh} ${gh}.*; mkdir -m 700 -p ${gh}`,
+      PREFILL.held(gh)[0],
+      `for i in $(seq ${KEYS.length}); do (gpg --homedir ${gh} --batch --import /tmp/gpg-key-$i.gpg > ${gh}.i$i 2>&1; echo "rc=$?" >> ${gh}.i$i) & done`,
+      `for i in $(seq ${READERS}); do (for j in 1; do gpg --homedir ${gh} --batch -k > ${gh}.r$i.k$j 2>&1; echo "rc=$?" >> ${gh}.r$i.k$j; gpg --homedir ${gh} --batch --list-keys --with-colons > ${gh}.r$i.c$j 2>&1; echo "rc=$?" >> ${gh}.r$i.c$j; done) & done`,
+      'wait',
+      `for f in ${gh}.i* ${gh}.r*; do echo "== $f"; cat $f; done`,
+      `echo "== list"; GNUPGHOME=${gh} ${UIDS}`,
+      `gpgconf --homedir ${gh} --kill gpg-agent`,
+    ].join('\n'), { cwd: '/root' });
+    const parts = out.split(/^== /m).slice(1);
+    const imports = parts.filter((p) => p.startsWith(`${gh}.i`));
+    const reads = parts.filter((p) => p.startsWith(`${gh}.r`));
+    assert.equal(imports.length, KEYS.length, `readers round ${round}: ${KEYS.length} imports:\n${out}`);
+    assert.equal(reads.length, READERS * 2, `readers round ${round}: ${READERS * 2} reads:\n${out}`);
+    for (const part of imports) assert.match(part, /^rc=0$/m, `readers round ${round}: ${part.split('\n')[0]} exits 0:\n${out}`);
+    for (const part of reads) {
+      const name = part.split('\n')[0];
+      assert.match(part, /^rc=0$/m, `readers round ${round}: ${name} exits 0 (2.4.9-9: keydb_search_next failed: Provided object is too short):\n${out}`);
+      assert.doesNotMatch(part, /^gpg: .*(error|invalid|failed|too short|General)/im, `readers round ${round}: ${name} logs no error:\n${out}`);
+      const uids = (part.match(/^uid[ :]/gm) ?? []).length;
+      assert.ok(uids >= HELD.length, `readers round ${round}: ${name} lists at least the ${HELD.length} held keys (${uids}):\n${out}`);
+    }
+    const listed = new Set(out.match(/^uid tide\d+ <tide\d+@example\.test>$/gm) ?? []);
+    assert.equal(listed.size, KEYS.length + HELD.length, `readers round ${round}: every key kept:\n${out}`);
+  }
+
   // 3. Parallel --quick-gen-key in one homedir.
   for (const user of ['root', 'cone']) {
     const gh = `${user === 'root' ? '/root' : `/home/${user}`}/cg`;
@@ -145,5 +203,5 @@ export default async function (ctx) {
   }
   const floor = ctx.installed?.[0]?.engines?.['slicc-kernel'];
   assert.equal(floor, '>=1.117.2', `engines.slicc-kernel is >=1.117.2: slicc.fcntl_lock (1.100.0) and renames atomic for other processes (slicc-kernel#925): ${floor}`);
-  console.log(`concurrent: gpg waits for an fcntl holder of pubring.kbx.lock; ${KEYS.length} concurrent imports into a fresh homedir (3 rounds as root, 1 as cone), an existing empty keybox (1 round) and a keybox holding ${HELD.length} keys (3 rounds as root, 1 as cone) keep every key with no errors; ${N} parallel --quick-gen-key as root and cone all succeed`);
+  console.log(`concurrent: gpg waits for an fcntl holder of pubring.kbx.lock; ${KEYS.length} concurrent imports into a fresh homedir (3 rounds as root, 1 as cone), an existing empty keybox (1 round) and a keybox holding ${HELD.length} keys (3 rounds as root, 1 as cone) keep every key with no errors; after an import pubring.kbx has an inode number of its own and no tmp file is left, and ${READERS * 2} reads alongside ${KEYS.length} imports all succeed; ${N} parallel --quick-gen-key as root and cone all succeed`);
 }

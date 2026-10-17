@@ -20,6 +20,11 @@ const GATES = {
   'repack-input': 'scripts/cert-review/repack-input.mjs',
   'ladder-merge-resolve': 'scripts/ladder-merge-resolve.mjs',
   'verify-published': 'scripts/verify-published.mjs',
+  'npm-parity': 'scripts/npm-parity.mjs',
+  'package-meta': 'scripts/check-package-meta.mjs',
+  'cert-leg': 'scripts/browser-cert/cert-leg.mjs',
+  'certified-publish': 'scripts/assert-certified-publish.mjs',
+  'cert-verdict': 'scripts/cert-review/verdict.mjs',
 };
 if (existsSync(join(root, 'scripts/check-no-debug.mjs'))) GATES['check-no-debug'] = 'scripts/check-no-debug.mjs';
 
@@ -154,4 +159,21 @@ test('NEGATIVE: a kernel-compat report where nothing ran fails; one with only ba
   const sweep = compatReport(t, { sweepRows: [{ case: 'ls', verdict: 'pass' }, { case: 'cat', verdict: 'pass' }] });
   assert.equal(sweep.status, 0, sweep.stdout + sweep.stderr);
   assert.match(sweep.stdout, /compat report: PASS 2 rows, 0 regression\(s\), verdict pass/);
+});
+
+test('run.mjs (cert-run) and refresh-recipe-sha (recipe-sha) print their verdicts, and their gate calls go through gate.mjs', () => {
+  assert.match(readFileSync(join(root, 'scripts/browser-cert/run.mjs'), 'utf8'), /cert-run: PASS/);
+  assert.match(readFileSync(join(root, 'scripts/refresh-recipe-sha.mjs'), 'utf8'), /recipe-sha: PASS/);
+  const pr = readFileSync(join(root, '.github/workflows/ladder-pr.yml'), 'utf8');
+  assert.match(pr, /node scripts\/gate\.mjs recipe-sha -- node scripts\/refresh-recipe-sha\.mjs "\$pkg" --verify-repack/);
+  assert.match(pr, /node scripts\/gate\.mjs cert-run -- node scripts\/browser-cert\/run\.mjs/);
+  assert.match(pr, /node scripts\/gate\.mjs host-smoke -- bash scripts\/host-smoke\.sh/);
+  assert.match(readFileSync(join(root, '.github/workflows/kernel-compat-proof.yml'), 'utf8'), /node scripts\/gate\.mjs cert-run -- node scripts\/browser-cert\/run\.mjs/);
+  assert.match(readFileSync(join(root, 'scripts/browser-cert/cert-leg.mjs'), 'utf8'), /'scripts\/gate\.mjs'\), 'cert-run', '--'/);
+});
+
+test('host-smoke.sh says PASS, even when there is no smoke.c to run', () => {
+  const r = spawnSync(node, [gate, 'host-smoke', '--', 'bash', join(root, 'scripts/host-smoke.sh'), 'no-such-recipe'], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^host-smoke: PASS no-such-recipe has no smoke\.c$/m);
 });

@@ -169,7 +169,10 @@ function main() {
     mkdirSync(dirname(resolve(json)), { recursive: true });
     writeFileSync(json, `${JSON.stringify(r, null, 2)}\n`);
   }
-  return r.level === 'error' ? 1 : 0;
+  const code = r.level === 'error' ? 1 : 0;
+  const what = `${r.verdict}${r.name ? ` ${r.name}@${r.version}` : ''}`;
+  console.log(code === 0 ? `npm-parity: PASS ${what}` : `npm-parity: FAIL ${what}`);
+  return code;
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exit(main());
