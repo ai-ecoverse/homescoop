@@ -1,15 +1,22 @@
 {
   "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "peers": [
+    "wasm-go"
+  ],
   "needs": [
     "@ai-ecoverse/wasm-go",
     "@ai-ecoverse/wasm-findutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-go@1.26.5-1",
-    "@ai-ecoverse/wasm-findutils@4.11.0-2"
+    "@ai-ecoverse/wasm-findutils@4.11.0-3"
+  ],
+  "needsTarballScripts": [
+    "packages/wasm-go-std-wasip1/test/wasm-go-tarball.mjs"
   ],
   "checklist": [
-    "with wasm-go's compile and link (in the kernel, as cone): every std archive in importcfg; a fmt/os program links against this std and runs in the kernel ('hello from go 42 2')"
+    "package.json slicc.go.version (go1.27.2) is the goroot/VERSION of the wasm-go it pairs with, so seven's go driver matches them by (version, target) (homescoop#746)",
+    "with wasm-go's compile and link of the same version (this run's peer artifact, else the registry's; in the kernel, as cone): every std archive in importcfg; a fmt/os program links against this std and runs in the kernel ('hello from go 42 2')"
   ],
   "users": "enforce"
 }

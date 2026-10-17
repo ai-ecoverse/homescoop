@@ -1,16 +1,27 @@
 {
   "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "peers": [
+    "wasm-go-std-wasip1"
+  ],
   "needs": [
     "@ai-ecoverse/wasm-go-std-wasip1",
-    "@ai-ecoverse/wasm-findutils"
+    "@ai-ecoverse/wasm-findutils",
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-go-std-wasip1@1.26.5-1",
-    "@ai-ecoverse/wasm-findutils@4.11.0-2"
+    "@ai-ecoverse/wasm-findutils@4.11.0-3",
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-9"
+  ],
+  "needsTarballScripts": [
+    "packages/wasm-go/test/std-wasip1-tarball.mjs"
   ],
   "checklist": [
-    "compile, link and asm -V print 'version go1.26.5' (run by path in the kernel, as cone, users enforce)",
-    "with wasm-go-std-wasip1 1.26.5-1: compile and link a fmt/os program in the kernel; the wasip1 binary runs there and prints 'hello from go 42 3'"
+    "compile, link and asm -V print 'version go1.27.2', package.json slicc.go.version is goroot/VERSION (go1.27.2), and the wasm-go-std-wasip1 installed with it says the same (run by path in the kernel, as cone, users enforce; homescoop#746)",
+    "with wasm-go-std-wasip1 of the same version (this run's peer artifact, else the registry's): compile and link a fmt/os program in the kernel; the wasip1 binary runs there and prints 'hello from go 42 3'",
+    "goroot/pkg/include ships Go's assembler headers (textflag.h, funcdata.h, asm_*.h): as gopher, asm -I goroot/pkg/include assembles a textflag.h NOSPLIT function (gensymabis and object), compile -symabis declares it, the object joins main's archive, and the linked program prints 'asm says 42'; asm without -I can't open textflag.h, as upstream Go's asm (homescoop#747). 1.26.5-2: no goroot/pkg/include (NEGATIVE.md)"
   ],
   "users": "enforce"
 }

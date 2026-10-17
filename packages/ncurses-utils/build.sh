@@ -110,4 +110,6 @@ done
 homescoop_assert_no_package_links "$HOMESCOOP_PKG/package"
 
 homescoop_stage_license "$NC_SRC"/COPYING
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== ncurses-utils: staged → $HOMESCOOP_PKG/package ($VERSION)"

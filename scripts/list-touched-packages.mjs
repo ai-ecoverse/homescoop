@@ -13,8 +13,8 @@
  * Prints one package name per line. Exits 0 even when empty (caller decides).
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,7 +48,7 @@ function isPublishTrigger(norm) {
   );
 }
 
-function globRegExp(glob) {
+export function globRegExp(glob) {
   let re = '';
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i];
@@ -131,22 +131,26 @@ function gitDiffNames(base, head) {
   return r.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 }
 
-const args = parseArgs(process.argv);
-let paths = [];
-if (args.stdin) {
-  paths = readFileSync(0, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-} else if (args.files) {
-  paths = readFileSync(args.files, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-} else if (args.base && args.head) {
-  paths = gitDiffNames(args.base, args.head);
-} else {
-  console.error('need --base/--head, --files, or --stdin');
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv);
+  let paths = [];
+  if (args.stdin) {
+    paths = readFileSync(0, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  } else if (args.files) {
+    paths = readFileSync(args.files, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  } else if (args.base && args.head) {
+    paths = gitDiffNames(args.base, args.head);
+  } else {
+    console.error('need --base/--head, --files, or --stdin');
+    process.exit(2);
+  }
+
+  const pkgs = packagesFromPaths(paths, args.publishable);
+  if (args.json) {
+    console.log(JSON.stringify(pkgs));
+  } else {
+    for (const p of pkgs) console.log(p);
+  }
 }
 
-const pkgs = packagesFromPaths(paths, args.publishable);
-if (args.json) {
-  console.log(JSON.stringify(pkgs));
-} else {
-  for (const p of pkgs) console.log(p);
-}
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) main();

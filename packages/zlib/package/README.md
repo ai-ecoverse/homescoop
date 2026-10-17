@@ -8,14 +8,17 @@ zlib **1.3.1** built for WebAssembly / emscripten inside
 | --- | --- |
 | Upstream | [madler/zlib](https://github.com/madler/zlib) `v1.3.1` |
 | Recipe | [`packages/zlib`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/zlib) |
-| Build | `build.jsh` (ladder `emconfigure` / `emmake`) |
+| Build | `build.sh` in CI: `emconfigure ./configure --static` / `emmake make libz.a` from the pinned zlib.net tarball |
 
 ## Contents
 
 After a ladder build:
 
 - `lib/libz.a` — static archive
-- `include/zlib.h`, `include/zconf.h`
+- `include/zlib.h`, `include/zconf.h` (the configured `zconf.h` `libz.a` was compiled with)
+- `lib/pkgconfig/zlib.pc` (relocatable: `prefix=${pcfiledir}/../..`)
+
+Link with the `.pc` flags, e.g. `PKG_CONFIG_LIBDIR=<package>/lib/pkgconfig pkg-config --cflags --libs zlib`.
 
 ## Versioning
 

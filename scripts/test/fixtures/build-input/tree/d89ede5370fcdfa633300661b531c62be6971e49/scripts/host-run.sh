@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# host-run.sh <package> — install recipe deps into $PREFIX, run build.sh, npm pack.
+# Runs on a host with Node + emcc (via emsdk npm or system PATH).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+name="${1:?usage: host-run.sh <package>}"
+PKG="$ROOT/packages/$name"
+OUT="${HOMESCOOP_OUT:-$ROOT/.homescoop-out}"
+PREFIX="${PREFIX:-$OUT/prefix}"
+if [[ -n "${HOMESCOOP_WORK:-}" ]]; then
+  WORK="$HOMESCOOP_WORK"
+elif [[ -n "${CI:-}" ]]; then
+  WORK="${TMPDIR:-/tmp}/homescoop-work"
+else
+  WORK="$OUT/work"
+fi
+export HOMESCOOP_ROOT="$ROOT" PREFIX WORK HOMESCOOP_WORK="$WORK"
+
+builder="$(node "$ROOT/scripts/read-recipe.mjs" "$name" --field builder || true)"
+builder="${builder:-host}"
+if [[ "$builder" == "retired" ]]; then
+  echo "host-run.sh: package '$name' is retired — refuse build/publish" >&2
+  exit 2
+fi
+if [[ "$builder" != "host" ]]; then
+  echo "host-run.sh: recipe builder is '$builder' (expected host)" >&2
+  exit 2
+fi
+# Packaging-only release (recipe repack.from): the published tarball's bytes
+# plus the repo's package.json. No deps, no emsdk, no build.sh.
+repack_from="$(node "$ROOT/scripts/read-recipe.mjs" "$name" --field repack.from || true)"
+if [[ -n "$repack_from" ]]; then
+  echo "== host-run: packaging-only repack of $repack_from (recipe repack:)"
+  node "$ROOT/scripts/check-exact-pins.mjs" "$name"
+  node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
+  mkdir -p "$OUT"
+  node "$ROOT/scripts/repack-published.mjs" "$name" --out "$OUT"
+  node "$ROOT/scripts/sync-package-version.mjs" --assert-tarball "$OUT/package.tgz"
+  echo "== host-run: $OUT/package.tgz"
+  exit 0
+fi
+
+if [[ ! -f "$PKG/build.sh" ]]; then
+  echo "missing $PKG/build.sh" >&2
+  exit 1
+fi
+
+mkdir -p "$OUT" "$PREFIX/lib" "$PREFIX/include" "$WORK"
+
+# Optional: unpack npm deps into PREFIX (headers + libs from prior rungs).
+# Forge/mamba specs (name or name=ver) are slicc-only — skip on the host path.
+# Prefer a local packages/*/package tree when the npm version is not on the
+# registry yet (same-repo ladder builds).
+is_npm_spec() {
+  local s="$1"
+  [[ "$s" == @* ]] && return 0
+  [[ "$s" =~ @[0-9] ]] && return 0
+  [[ "$s" == *@latest ]] && return 0
+  return 1
+}
+
+# Resolve @ai-ecoverse/wasm-foo@1.2.3 → packages/foo/package when present
+# *and* already built (lib/, include/, or bin/). Metadata-only trees would
+# otherwise shadow the registry and leave PREFIX empty on fresh CI runners.
+local_wasm_pkg_dir() {
+  local spec="$1"
+  local name dir
+  if [[ "$spec" =~ ^@ai-ecoverse/wasm-([a-z0-9-]+)(@(.+))?$ ]]; then
+    name="${BASH_REMATCH[1]}"
+    dir="$ROOT/packages/$name/package"
+    if [[ -d "$dir" && -f "$dir/package.json" ]]; then
+      if [[ -d "$dir/lib" || -d "$dir/include" || -d "$dir/bin" || -d "$dir/dist" ]]; then
+        echo "$dir"
+        return 0
+      fi
+      echo "== host-run: skip empty local $dir (no lib/include/bin; use npm)" >&2
+    fi
+  fi
+  return 1
+}
+
+rm -f "$PREFIX/lib/pkgconfig/.homescoop-archive-versions"
+while IFS= read -r spec; do
+  [[ -z "$spec" ]] && continue
+  if ! is_npm_spec "$spec"; then
+    echo "== host-run: skip mamba/forge dep '$spec' (use slicc builder / ipk mamba)"
+    continue
+  fi
+  tmp="$(mktemp -d)"
+  (
+    cd "$tmp"
+    if local_dir="$(local_wasm_pkg_dir "$spec")"; then
+      echo "== host-run: local pack $local_dir → $PREFIX"
+      npm pack "$local_dir" --silent
+    else
+      echo "== host-run: npm pack $spec → $PREFIX"
+      npm pack "$spec" --silent
+    fi
+    tar xzf ./*.tgz
+    dep_ver="$(node -p 'const j = require("./package/package.json"); (j.homescoop && j.homescoop.upstream) || String(j.version).replace(/-[^-]*$/, "")')"
+    mkdir -p "$PREFIX/lib/pkgconfig"
+    for a in package/lib/*.a package/package/lib/*.a; do
+      [[ -f "$a" ]] && printf '%s %s\n' "$(basename "$a")" "$dep_ver" >>"$PREFIX/lib/pkgconfig/.homescoop-archive-versions"
+    done
+    if [[ -d package/lib ]]; then cp -R package/lib/. "$PREFIX/lib/"; fi
+    if [[ -d package/include ]]; then cp -R package/include/. "$PREFIX/include/"; fi
+    if [[ -d package/package/lib ]]; then cp -R package/package/lib/. "$PREFIX/lib/"; fi
+    if [[ -d package/package/include ]]; then cp -R package/package/include/. "$PREFIX/include/"; fi
+    # pkg-config metadata (homescoop_write_pc → lib/pkgconfig/*.pc)
+    if [[ -d package/lib/pkgconfig ]]; then
+      mkdir -p "$PREFIX/lib/pkgconfig"
+      cp -R package/lib/pkgconfig/. "$PREFIX/lib/pkgconfig/"
+    fi
+    if [[ -d package/package/lib/pkgconfig ]]; then
+      mkdir -p "$PREFIX/lib/pkgconfig"
+      cp -R package/package/lib/pkgconfig/. "$PREFIX/lib/pkgconfig/"
+    fi
+  )
+  rm -rf "$tmp"
+done < <(node "$ROOT/scripts/read-recipe.mjs" "$name" --deps || true)
+
+# shellcheck source=./build-common.sh
+source "$ROOT/scripts/build-common.sh"
+homescoop_ensure_prefix_pcs
+
+# Cap binaryen parallelism — GHA runners can OOM wasm-opt at high -j.
+export BINARYEN_CORES="${BINARYEN_CORES:-2}"
+if ! command -v emconfigure >/dev/null 2>&1; then
+  if [[ -n "${HOMESCOOP_EMSDK_ROOT:-}" && -x "$HOMESCOOP_EMSDK_ROOT/emcc" ]]; then
+    export PATH="$HOMESCOOP_EMSDK_ROOT:$PATH"
+  else
+    echo "== host-run: installing emsdk 4.0.23 (pinned)"
+    eval "$(bash "$ROOT/scripts/install-emsdk.sh")"
+  fi
+fi
+command -v emconfigure >/dev/null
+command -v emmake >/dev/null
+command -v emcc >/dev/null
+emcc --version | head -1
+
+# Prefer GNU make (Homebrew `make` formula → gmake). BSD make breaks
+# autoconf dependency-tracking and FreeType.
+if command -v gmake >/dev/null 2>&1; then
+  export MAKE=gmake
+elif [[ -x /opt/homebrew/opt/make/bin/gmake ]]; then
+  export MAKE=/opt/homebrew/opt/make/bin/gmake
+  export PATH="/opt/homebrew/opt/make/bin:$PATH"
+fi
+if [[ -n "${MAKE:-}" ]]; then
+  echo "== host-run: MAKE=$MAKE"
+fi
+
+echo "== host-run: build.sh ($name)"
+bc_work="$(bash -c 'source "$HOMESCOOP_ROOT/scripts/build-common.sh" && printf %s "$WORK"')"
+if [[ "$bc_work" != "$WORK" ]]; then
+  echo "host-run.sh: build-common.sh would build in $bc_work, not $WORK" >&2
+  exit 1
+fi
+echo "== host-run: WORK=$WORK"
+bash "$PKG/build.sh"
+
+echo "== host-run: slicc shims carry the kernel credentials (slicc_cred_js)"
+node "$ROOT/scripts/check-slicc-cred.mjs" "$PKG/package"
+echo "== host-run: check package meta (license / LICENSE / files)"
+node "$ROOT/scripts/check-package-meta.mjs" "$name"
+echo "== host-run: exact @ai-ecoverse pins"
+node "$ROOT/scripts/check-exact-pins.mjs" "$name"
+
+echo "== host-run: assert packaging rev / npm semver (refuse plain X.Y.Z and X.Y-N)"
+node "$ROOT/scripts/sync-package-version.mjs" "$name" --assert-publishable
+
+echo "== host-run: slicc.commands files are 0755"
+node "$ROOT/scripts/command-modes.mjs" --fix "$PKG/package"
+
+echo "== host-run: npm pack"
+mkdir -p "$OUT"
+tgz="$(npm pack "$PKG/package" --pack-destination "$OUT" | tail -1)"
+cp "$OUT/$tgz" "$OUT/package.tgz"
+echo "== host-run: assert packed tarball version is npm-publishable"
+node "$ROOT/scripts/sync-package-version.mjs" --assert-tarball "$OUT/package.tgz"
+node "$ROOT/scripts/command-modes.mjs" --check "$OUT/package.tgz"
+echo "== host-run: $OUT/package.tgz"

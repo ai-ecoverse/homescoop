@@ -71,10 +71,6 @@ if (values.specs) {
 const UNSPECIFIED = "no committed cert specs; this certification rests on the reviewer's own run";
 const unspecified = (pkg) => specCounts !== null && !(specCounts[pkg.recipe] > 0);
 
-// A repack's input must be attested, and a built recipe must fetch its pinned
-// source with no stage or prebuilt path (repack-input.mjs, #834 and #864): an
-// unverifiable input is INCOMPLETE, whatever the reviewer says. With --repack-input, a package
-// with no entry, or one whose trace didn't run, fails closed.
 let repackInputs = null;
 if (values['repack-input']) {
   try {
@@ -89,10 +85,17 @@ const unverifiable = (pkg) => {
   const r = repackInputs[pkg.recipe];
   if (!r || typeof r !== 'object') return "repack-input.mjs didn't run for it";
   if (r.error) return `repack-input.mjs couldn't trace it (${one(r.error)})`;
-  // A built recipe (repack: false) is held to the same root rule (#864):
-  // only attested: true passes, for repacks and builds alike.
   if (r.attested === true) return '';
   return one(r.reason) || 'no reason given';
+};
+const forcedKnown = (pkg) => {
+  const r = repackInputs?.[pkg.recipe];
+  if (!r || r.attested !== true || r.known === undefined) return [];
+  if (!Array.isArray(r.known)) {
+    problems.push(`${pkg.name}@${pkg.version}: repack-input.mjs's "known" isn't a list`);
+    return [];
+  }
+  return r.known.map((k) => one(k)).filter(Boolean);
 };
 
 const listOf = (value, what, pkg) => {
@@ -123,7 +126,7 @@ const lines = packages.map((pkg) => {
     return { ok: false, line: `cert-ci: INCOMPLETE ${pkg.name}@${pkg.version}: unverifiable input: ${input}` };
   }
   if (v.verdict === 'certified') {
-    const known = listOf(v.known, 'known', pkg).map((k) => one(k).slice(0, 120)).filter(Boolean);
+    const known = [...forcedKnown(pkg), ...listOf(v.known, 'known', pkg).map((k) => one(k).slice(0, 120)).filter(Boolean)];
     const notes = [...(unspecified(pkg) ? [UNSPECIFIED] : []), ...(known.length ? [`known: ${known.join(', ')}`] : [])];
     if (held) return { ok: false, line: `cert-ci: HELD ${pkg.name}@${pkg.version}: the reviewer certified it, but ${held}` };
     return {

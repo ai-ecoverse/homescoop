@@ -63,8 +63,18 @@ function recipe(p) {
 function reproducible(p, value) {
   if (value === undefined || value === null || value === 'false') return false;
   if (value === 'true') return true;
-  if (value && typeof value === 'object' && typeof value.path === 'string' && /^package\/./.test(value.path)) return true;
-  console.error(`packages/${p}/recipe.yaml: reproducible must be true, false, or a map with path: package/<file>`);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    // path: package/<file> compares one file; same_path: <issue> rebuilds in
+    // host-build's directory, for a build known to embed its path (#668).
+    const keys = Object.keys(value);
+    const ok =
+      keys.length > 0 &&
+      keys.every((k) => k === 'path' || k === 'same_path') &&
+      (value.path === undefined || (typeof value.path === 'string' && /^package\/./.test(value.path))) &&
+      (value.same_path === undefined || /^[1-9][0-9]*$/.test(String(value.same_path)));
+    if (ok) return true;
+  }
+  console.error(`packages/${p}/recipe.yaml: reproducible must be true, false, or a map with path: package/<file> and/or same_path: <issue number>`);
   process.exit(1);
 }
 

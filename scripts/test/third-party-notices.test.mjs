@@ -35,22 +35,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ALLOWLIST = `
 cmake Emscripten #684
 cmake files #684
-gmake Emscripten #684
-gmake files #684
-mount Emscripten #684
-mount files #684
-ncurses-utils Emscripten #684
-ncurses-utils files #684
 pkgconf Emscripten #684
 pkgconf files #684
-sqlite3 Emscripten #684
-sqlite3 files #684
 wasm-binaryen Emscripten #684
 wasm-binaryen files #684
 wasm-clang Emscripten #684
 wasm-clang files #684
-xxd Emscripten #684
-xxd files #684
 xz Emscripten #684
 xz files #684
 zip Emscripten #684

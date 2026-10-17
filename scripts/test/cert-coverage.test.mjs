@@ -31,7 +31,6 @@ const NO_CERT = [
   'libwebp', // #426
   'libxml2', // #426
   'openjpeg', // #426
-  'zlib', // #426
 ];
 
 // "<recipe>: <checklist item>" that no spec, ci command or named file checks.
@@ -63,7 +62,6 @@ const NO_USERS_ENFORCE = [
   'procps', // #819
   'sqlite3', // #819
   'wasi-biome', // #819
-  'wasi-dig', // #819
   'wasi-fnox', // #819
   'wasi-ripgrep', // #819
   'wasi-uv', // #772

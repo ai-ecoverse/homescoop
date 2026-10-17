@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-go-std-wasip1`
 
-Go 1.26 standard-library export archives for `wasip1/wasm`.
+Go 1.27 standard-library export archives for `wasip1/wasm`.
 
 ```text
 goroot/pkg/wasip1_wasm/<import path>.a

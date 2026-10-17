@@ -44,6 +44,7 @@ function fakeIo({ pulls = [pull()], prFiles = files('packages/wasix-ruby/recipe.
     run: async () => ({ id: RUN, path: CERT_REVIEW, event: 'workflow_run', head_branch: 'main', status: 'completed', conclusion: 'success' }),
     artifact: async () => ({ id: REC, name: 'cert-review-record-384', expired: false, workflow_run: { id: RUN } }),
     record: async () => record,
+    mergeQueue: async () => false,
     async mergePull(num, sha) {
       calls.push(['merge', num, sha]);
       if (mergeFails) throw Object.assign(new Error('PUT /pulls/384/merge returned 405'), { status: 405 });
