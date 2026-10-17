@@ -14,7 +14,8 @@ std has no current_exe(), so 0003 printed a bare `fnox`. Inside the
 fnox() shell function that wraps the command, a bare `fnox` calls
 that function again, until the shell runs out of stack. Like upstream's
 which::which fallback, activate now looks for fnox on PATH
-(/usr/bin/fnox in seven).
+(/usr/bin/fnox in seven), and with none on PATH it names /usr/bin/fnox,
+where slicc installs commands, never a bare `fnox` (homescoop#554).
 
 An as_file secret makes hook-env, get and export write its value to a
 file under std's temp_dir(), which also panics on WASI. In seven that
@@ -62,7 +63,7 @@ index c94ce9a..6c4b341 100644
 +                    .map(|dir| std::path::Path::new(dir).join("fnox"))
 +                    .find(|candidate| candidate.is_file())
 +            })
-+            .unwrap_or_else(|| std::path::PathBuf::from("fnox"));
++            .unwrap_or_else(|| std::path::PathBuf::from("/usr/bin/fnox"));
  
          let opts = ActivateOptions {
              exe,

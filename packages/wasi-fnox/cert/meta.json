@@ -44,7 +44,7 @@
     "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs cases 9 and 14 (NEGATIVE.md: without 0012, case 9 fails)",
     "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs cases 6–8: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal (NEGATIVE.md: without 0013, case 6 fails)",
     "0014-edit-refuse-fnox-edit-on-WASI-instead-of-panicking.patch": "checklist: fnox edit fails with \"fnox edit is not available in seven: use fnox set\", not the 134 trap (NEGATIVE.md: 1.39.0-1 traps)",
-    "0015-hook-env-and-activate-the-shell-integration-on-WASI.patch": "checklist: hook-env exits 0 with the exports (NEGATIVE.md: 1.39.0-3 traps with 134, \"no pids on this platform\"); activate names /usr/bin/fnox and works in bash; as_file refused in hook-env and get"
+    "0015-hook-env-and-activate-the-shell-integration-on-WASI.patch": "checklist: hook-env exits 0 with the exports (NEGATIVE.md: 1.39.0-3 traps with 134, \"no pids on this platform\"); activate names /usr/bin/fnox and works in bash, also with no fnox on PATH (NEGATIVE.md: 1.39.0-4 prints a bare fnox, homescoop#554); as_file refused in hook-env and get; export prints an as_file value"
   },
   "sealedKernel": "@ai-ecoverse/slicc-kernel@1.83.0",
   "ci": [
