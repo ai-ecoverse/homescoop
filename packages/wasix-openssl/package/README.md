@@ -2,7 +2,7 @@
 
 [OpenSSL](https://www.openssl.org) 3.5.9 (LTS) for
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX programs, built with the
-pinned wasixcc on wasix-sysroot 2025.9.30-17. A build-time package: no
+pinned wasixcc on wasix-sysroot 2025.9.30-34. A build-time package: no
 commands, no `openssl` CLI.
 
 | directory | for |
