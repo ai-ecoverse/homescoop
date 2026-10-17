@@ -41,6 +41,14 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-34 (slicc-kernel ≥ 1.120.0 for all of it; older kernels keep -33's behaviour):
+
+- **The sender in `siginfo_t`.** `sigwaitinfo`/`sigtimedwait` fill `si_code`, `si_pid` and `si_uid` (and `si_status` for SIGCHLD) through `slicc.sigwait_info` (slicc-kernel#911, 1.114.0, homescoop#770). A `kill()` is SI_USER with the sender's pid and uid, `pthread_kill` SI_TKILL, a child's exit CLD_EXITED with its status. Up to -33 it was always SI_USER with pid and uid 0.
+- **`SA_SIGINFO` handlers run**, with a `siginfo_t` carrying the sender (`slicc.siginfo_take`). Up to -33 they never ran: the libc called them with the wrong wasm type.
+- **`flock()`** is in libc, through `slicc.flock` (slicc-kernel#893, 1.117.0). It has Linux's semantics: locks per open file description on files, directories, pipes, sockets and terminals, and `LOCK_EX` works on a read-only descriptor. A handled signal ends a wait with EINTR, and `SA_RESTART` resumes it (1.117.3). On an older kernel it's a whole-file `fcntl` lock. Before, `<sys/file.h>` declared it but nothing defined it, so programs (perl, ruby) fell back to their own emulation.
+- **`poll`:** a pipe write end without readers gives `POLLOUT|POLLERR`, as on Linux, not `POLLHUP` (homescoop#629).
+- **`mkfifo`, `mkfifoat`, `mknod(S_IFIFO)`** make real FIFOs through `slicc_fs.path_mkfifo` (slicc-kernel#957, **1.120.0**, homescoop#878). On older kernels they are ENOSYS. Up to -33 libc had none of them.
+
 Since 2025.9.30-33 the package is **built from source in CI** (homescoop#890). Up to -32 it was npm -14, a local build, with our libc changes patched in.
 - **Inputs:** wasix-libc v2026-07-03.1, built per variant by its own `build32-general.sh` (libc, compiler-rt, and libc++/libc++abi/libunwind from llvm-project 6bb93a24), and wasix-org's LLVM 21.1.206. All are public and sha256-pinned.
 - **libc:** our libc changes are layered on top as before. Every exported libc symbol and `libc.imports` is the same as -32's.
@@ -93,7 +101,7 @@ libc, and `fcntl` hands the three lock commands to slicc-kernel
 Linux does: not inherited by `fork`, kept across `exec`, dropped when any
 descriptor of the file closes. On a kernel without the import every lock is
 granted locally and `F_GETLK` reports `F_UNLCK`, as programs' own stubs did.
-Up to -29 WASIX defined none of these. `flock` is not in libc yet.
+Up to -29 WASIX defined none of these. `flock` is in libc since -34 (above).
 
 Since 2025.9.30-29 `poll` and `ppoll` take a `pollfd` that asks for neither
 reading nor writing (`events` 0, as OpenSSH's client loop passes for idle
