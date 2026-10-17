@@ -179,7 +179,7 @@ async function main(argv) {
         touched,
         digest: treeDigester(git, recipeInputs),
         owners: (pkg) => touchingCommit(pkg, from, head),
-        context: (pkg, m) => readContext({ pkg, ciCertified: [] }, m.commit),
+        context: (pkg, m) => readContext({ pkg }, m.commit),
       },
       io,
     );

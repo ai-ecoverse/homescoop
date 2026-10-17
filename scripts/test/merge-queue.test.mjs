@@ -69,7 +69,7 @@ function twoPrGroup(r, { samepackage = false } = {}) {
 
 function readCtx(r, pkg, commit) {
   const { name, version } = JSON.parse(r.git('show', `${commit}:packages/${pkg}/package/package.json`));
-  return { pkg, name, version, message: r.git('log', '-1', '--format=%B', commit), ciCertified: false, assumeUnpublished: false };
+  return { pkg, name, version, message: r.git('log', '-1', '--format=%B', commit), assumeUnpublished: false };
 }
 
 function touchedOf(r) {

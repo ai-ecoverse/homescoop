@@ -2,7 +2,10 @@
 
 Human certification remains the bar. `ladder-pr` browser-cert / host-smoke are
 how that bar is **encoded in CI** so recipe bumps can automerge once a package
-is listed in [`scripts/ci-certified.json`](../scripts/ci-certified.json).
+is listed in [`scripts/ci-certified.json`](../scripts/ci-certified.json). The list
+is the cert-covered set (Renovate automerge, and kernel-compat's `ci-certified`
+set); it is not a publish gate. Every publish needs a `certified=` line bound to
+its bytes, from cert-review's record (cert lane ruling (a), 2026-10-17).
 
 ## Layout
 
@@ -72,7 +75,7 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
 
-CI-certified set (automerge non-majors): see `scripts/ci-certified.json`
+CI-certified set (automerge non-majors and kernel-compat's `ci-certified` set, not a publish gate): see `scripts/ci-certified.json`
 (jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep, procps, which).
 
 ## py-* python range
@@ -729,7 +732,7 @@ A matrix whose legs have dynamic names has no per-leg job outputs, so its consum
 | kernel-compat shards, report | plan's `<artifact>-plan`, shard `<artifact>-shard-<k>` | by `plan-id`/`plan-digest` and each shard's `id-<k>`/`digest-<k>`; nothing else named `<artifact>-*` |
 | ladder-build slicc-build, publish | resolve's `recipe-deps-<pkg>`; host-build's, slicc-build's or fetch-certified's `package-tgz-<pkg>` | by id; publish also checks the digest |
 | ladder-build fetch-certified | ladder-pr `host-<pkg>-prN` | `artifact_id`, which ladder-merge always passes; without it, exactly one live artifact with that name. Either way the zip must match the artifact's digest, and `package.tgz` must match `certified` |
-| ladder-merge-resolve | ladder-pr `host-<pkg>-prN`, cert-review's record | the zip must match the artifact's digest; on the ci-certified path, two usable artifacts with different digests refuse |
+| ladder-merge-resolve | ladder-pr `host-<pkg>-prN`, cert-review's record | the zip must match the artifact's digest, and `package.tgz` must match the `certified=` line |
 | pool-parity report | compare's `verdict-<recipe>` | `byName`, nothing else named `verdict-*`; each file's rows must be for its own recipe, and a failed compare leg with every verdict `same` is a failure |
 
 The rest download by name on purpose: ladder-pr's jobs (the PR's own workflow and build, whose bytes cert-review judges), kernel-compat's candidate kernel (the caller's artifact) and pool-parity's compare (main's builds). `scripts/test/artifact-consumers.test.mjs` fails on any other download that isn't by id, on `gh run download` and on `merge-multiple: true`.

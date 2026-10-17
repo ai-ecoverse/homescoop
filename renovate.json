@@ -6,7 +6,7 @@
   "description": [
     "Homescoope recipes pin upstream library versions in packages/*/recipe.yaml.",
     "A custom regex manager reads `# renovate: …` comments above `version:` and opens one PR per package when upstream cuts a release.",
-    "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof). Majors and new packages stay manual.",
+    "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof); the merge queue still requires cert-review, and every publish needs its certified= line. Majors and new packages stay manual.",
     "Extends the shared SLICC preset, which turns automerge on globally. Here, any merged change under packages/** can publish, so the rules below turn automerge off for packages/**, @ai-ecoverse re-pins and the publish-path workflows; only the CI-certified non-major recipe rule turns it back on."
   ],
   "semanticCommits": "enabled",
@@ -103,7 +103,7 @@
       ]
     },
     {
-      "description": "CI-certified packages (see scripts/ci-certified.json) — non-major only. Synced by scripts/sync-ci-certified-renovate.mjs.",
+      "description": "CI-certified packages (see scripts/ci-certified.json) — non-major only; automerge scope, not a publish gate. Synced by scripts/sync-ci-certified-renovate.mjs.",
       "matchFileNames": [
         "packages/coreutils/recipe.yaml",
         "packages/gawk/recipe.yaml",
@@ -270,10 +270,9 @@
       "description": "Retired recipes (builder: retired): no Renovate PRs for any file in their package directory (recipe pins, Cargo.toml, go.mod). They are built, if at all, by their own workflows from pinned sources (e.g. wasi-rustc-stable.yml), so a recipe bump builds nothing. Synced by scripts/sync-ci-certified-renovate.mjs.",
       "matchFileNames": [
         "packages/ffmpeg/**",
+        "packages/uv-shim/**",
         "packages/wasi-hf/**",
-        "packages/wasi-llvm/**",
-        "packages/wasi-rustc/**",
-        "packages/wasi-zig/**"
+        "packages/wasi-rustc/**"
       ],
       "enabled": false
     }
