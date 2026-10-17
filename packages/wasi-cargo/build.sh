@@ -20,9 +20,14 @@ homescoop_fetch "$SRC_URL" "$SRC_SHA" "$PKG_WORK/rustc-$RUST-src.tar.xz"
 if [[ ! -f "$SRC/.homescoop-patched" ]]; then
   rm -rf "$SRC"
   tar -xJf "$PKG_WORK/rustc-$RUST-src.tar.xz" -C "$PKG_WORK"
-  for p in "$ROOT"/packages/wasi-rustc/patches/00{03..15}-*.patch; do
+  for p in "$ROOT"/packages/wasi-rustc/patches/*.patch; do
+    case "$(basename "$p")" in 0001-* | 0002-*) continue ;; esac
+    excludes=()
+    while read -r f; do
+      [[ -d "$SRC/$(dirname "$f")" ]] || { echo "== $(basename "$p"): $f is not in the source tarball, skipped"; excludes+=("--exclude=$f"); }
+    done < <(sed -n 's|^+++ b/||p' "$p")
     echo "== rust patch $(basename "$p")"
-    (cd "$SRC" && git apply --check "$p" && git apply "$p")
+    (cd "$SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check ${excludes[@]+"${excludes[@]}"} "$p" && git apply ${excludes[@]+"${excludes[@]}"} "$p")
   done
   touch "$SRC/.homescoop-patched"
 fi
@@ -81,8 +86,8 @@ CARGO_SRC="$PKG_WORK/cargo"
 rm -rf "$CARGO_SRC"
 cp -R "$SRC/src/tools/cargo" "$CARGO_SRC"
 mkdir -p "$CARGO_SRC/.cargo"
-sed "s|^directory = .*|directory = \"$SRC/vendor\"|" "$SRC/.cargo/config.toml" > "$CARGO_SRC/.cargo/config.toml"
-(cd "$CARGO_SRC" && git apply --check "$HOMESCOOP_PKG/patches/cargo.patch" && git apply "$HOMESCOOP_PKG/patches/cargo.patch")
+sed "s|^directory = .*|directory = \"$SRC/vendor\"|" "$SRC/.cargo/config.toml" >> "$CARGO_SRC/.cargo/config.toml"
+(cd "$CARGO_SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check "$HOMESCOOP_PKG/patches/cargo.patch" && git apply "$HOMESCOOP_PKG/patches/cargo.patch")
 cp -R "$HOMESCOOP_PKG/wasix-command" "$CARGO_SRC/crates/wasix-command"
 mkdir -p "$CARGO_SRC/slicc"
 for spec in git2:0.21.0 home:0.5.12 filetime:0.2.29 tar:0.4.46 jobserver:0.1.34; do
