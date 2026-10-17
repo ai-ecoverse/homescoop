@@ -316,6 +316,11 @@ and compares the two `package.tgz` sha256s, listing the entries that differ
 differs fails the run and opens, or comments on, one `pool-parity` issue;
 move it back to hosted, or fix the difference. Dispatch it whenever the
 runner-bench image or the hosted image changes (#499).
+Some recipes stay hosted for reasons outside their bytes (#390 C2):
+`less`, because greenwoodsoftware.com answers the pool's egress with 403
+(the source is fetched only from the pinned upstream URL); `qpdf`, whose
+`qpdf.wasm` comes out differently on the pool in some runs (#804); and
+`wasix-python`, whose `build.sh` runs `sudo apt-get`.
 `cert`, `exact-pins`, `detect`,
 `reproducible`, `slicc-note` and `ci` run on the pools as before;
 `recipe-sha`, which pushes with `contents: write`, stays on `ubuntu-latest`. A
