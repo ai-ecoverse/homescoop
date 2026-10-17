@@ -13,8 +13,8 @@ sources:
     url: "https://files.pythonhosted.org/packages/source/p/pybind11/pybind11-3.0.1.tar.gz"
     sha256: "9c0f40056a016da59bab516efb523089139fcc6f2ba7e4930854c61efb932051"
   wasix_python:
-    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-25.tgz"
-    sha256: "951f2e2db67d3c6a9e7dc4419e12cf86247ded8d994938ef7d589bbd3dabc38f"
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-27.tgz"
+    sha256: "2824bccd95f7d45dace30a5d0a74f3384d0390bcadfff38b4e8275c9ade1af37"
   cxxrt:
     url: "https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
     sha256: "54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
@@ -32,7 +32,7 @@ about:
   notes: |
     Cross-built from the sdist in CI (homescoop#211 A2) with wasixcc++
     (legacy wasm EH, PIC) and pybind11 3.0.1 as one dylink.0 side module,
-    _contourpy.cpython-314-wasm32-wasix.so, against wasix-python 3.14.2-25's
+    _contourpy.cpython-314-wasm32-wasix.so, against wasix-python 3.14.2-27's
     headers and the libc++ headers of the C++ runtime python.wasm exports
     (wasix-libc v2026-07-03.1 sysroot-ehpic), as py-kiwisolver. pybind11's
     numpy support finds numpy at run time, so no numpy headers are needed.

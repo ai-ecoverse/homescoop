@@ -3,7 +3,7 @@
 Pillow 12.3.0 for slicc WASIX CPython 3.14 (`cp314-wasix_wasm32`): JPEG, PNG (zlib) and FreeType text.
 
 - Side modules `_imaging` (libjpeg-turbo 3.1.2 linked in statically; zlib comes from `python.wasm`), `_imagingft` (FreeType 2.13.3 statically), `_imagingmath` and `_imagingmorph`. No `_imagingtk` (there is no Tk on WASIX), `_imagingcms`, `_webp` or `_avif`.
-- Takes `@ai-ecoverse/wasix-python` `>=3.14.2-25 <3.14.3`: the python whose headers it is built against, and later revisions of that line.
+- Takes `@ai-ecoverse/wasix-python` `>=3.14.2-27 <3.14.3`: the python whose headers it is built against, and later revisions of that line.
 
 ## Since 12.3.0-9
 
