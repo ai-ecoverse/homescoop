@@ -154,3 +154,21 @@ The 4.2.0-1 build also passes, unchanged:
 ```
 
 - **4.2.0-2 as built:** `lib/client-api.mjs` passes 17/17, and `lib/engine-api.mjs` passes 19/19 unchanged, so the server ABI is untouched. The tarball is byte-identical over two builds.
+
+## 4.2.0-3: client certificates, the ciphersuite, no SNI, chain-only (slicc-kernel#1004)
+
+**Date:** 2026-10-17. The base is homescoop origin/main 2167761.
+
+- **The published 4.2.0-2** fails the 6 new cases of `lib/client-api.mjs` (17 of 23 pass): it has no `tls_ciphersuite`, `tls_client_cert` or `tls_name_mismatch`, and `tls_client_new` refuses flags 2 and 4.
+
+```
+✖ TLSv1.3: tls_ciphersuite gives the IANA number of the suite the server picked (#1004)
+✖ TLSv1.2: tls_ciphersuite gives the IANA number of the suite the server picked (#1004)
+✖ a client certificate: a server that requires one accepts it and sees its subject, refuses without, and the key bytes are wiped (#1004)
+✖ a client key: DER, encrypted PEM with its passphrase; refused: … (#1004)
+✖ TLS_CLIENT_NO_SNI sends no SNI and still refuses a leaf for another host (#1004)
+✖ TLS_CLIENT_VERIFY_CHAIN_ONLY skips only the name: … (#1004)
+ℹ pass 17  ℹ fail 6
+```
+
+- **4.2.0-3 as built:** `lib/client-api.mjs` passes 23/23 and `lib/engine-api.mjs` 19/19 (the server ABI is unchanged).
