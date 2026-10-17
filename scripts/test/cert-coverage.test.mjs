@@ -61,7 +61,6 @@ const NO_USERS_ENFORCE = [
   'wasi-fnox', // #819
   'wasi-ripgrep', // #819
   'wasi-uv', // #772
-  'wasix-gnupg', // #819
   'wasix-perl', // #819
   'wasix-python', // #819
   'wasix-ruby', // #819
