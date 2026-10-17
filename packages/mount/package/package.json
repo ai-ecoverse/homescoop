@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-mount",
-  "version": "1.0.0-2",
+  "version": "1.0.0-3",
   "description": "mount / umount for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "Apache-2.0",
   "repository": {
@@ -20,6 +20,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin"
   ],
   "publishConfig": {
