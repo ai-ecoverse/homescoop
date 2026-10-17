@@ -630,11 +630,11 @@ changes the boot order for every cert.
 - `concurrency`: one group per caller repo, PR (or ref), kernel, set,
   bios-ref and reference; a PR caller's newer run cancels the older one.
 - One call is a gate, a plan, up to 10 shards and a report job. On the pool
-  10 shards run at once (cloud-run-bench has up to 30 machines); on hosted
+  10 shards run at once (the cloud-run-job pool scales per job); on hosted
   runners 3, so a fork PR's call doesn't crowd out `ladder-pr`. The usual
   `base,ci-certified` call is a gate, a plan and one shard job.
 - **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
-  `cloud-run-bench`) can reach the GCP metadata server and the pool's
+  `cloud-run-job`) can reach the GCP metadata server and the pool's
   service-account token. `runner` / `CERT_RUNNER` (shards) and
   `light-runner` / `CERT_LIGHT_RUNNER` (plan, report) are used only for:
   - a `pull_request` from a branch of the calling repo (`head.repo` is
@@ -672,7 +672,7 @@ changes the boot order for every cert.
   the backstop.
 - Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
   (`cloud-run`, 4 vCPU / 8 GiB), else the shards' runner. The shards use
-  `runner` / `CERT_RUNNER` (`cloud-run-bench`). On the pool a job gets a machine within about a minute, where
+  `runner` / `CERT_RUNNER` (`cloud-run-job`). On the pool a job gets a machine within about a minute, where
   `ubuntu-latest` can queue for 15–40.
 - **No root on the pool.** Its machines run with "no new privileges", so
   `sudo` cannot become root. The Chromium step installs the system libraries
