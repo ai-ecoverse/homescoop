@@ -204,3 +204,44 @@ test('classify: reproducible.same_path (an issue number), alone or with path:, s
     f.done();
   }
 });
+
+test('toolchain default inputs: a shared toolchain file touches every built recipe whose build uses it (#857)', () => {
+  const f = fixture({
+    em: { recipe: 'name: em\nbuilder: host\n', files: { 'build.sh': 'source "$ROOT/scripts/build-common.sh"\nemconfigure ./configure\n' } },
+    gnu: { recipe: 'name: gnu\nbuilder: host\n', files: { 'build.sh': 'source "$ROOT/scripts/build-common.sh"\nsource "$ROOT/scripts/build-gnu-cli.sh"\n' } },
+    slicc: { recipe: 'name: slicc\nbuilder: host\n', files: { 'build.sh': 'LIBS="$(homescoop_slicc_archive "$WORK/s.a" gaps)"\n' } },
+    wx: { recipe: 'name: wx\nbuilder: host\n', files: { 'build.sh': 'eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"\n' } },
+    go: { recipe: 'name: go\nbuilder: host\n', files: { 'build.sh': 'eval "$(bash "$ROOT/scripts/install-go.sh" go "$WORK/go")"\n' } },
+    said: { recipe: 'name: said\nbuilder: host\n', files: { 'build.sh': '# binaryen, pinned as in scripts/install-wasixcc.sh; not emcc\ncargo build\n' } },
+    repacked: { recipe: 'name: repacked\nbuilder: host\nrepack:\n  from: "1.0.0-1"\n', files: { 'build.sh': 'emcc x.c\n' } },
+    cone: { recipe: 'name: cone\nbuilder: slicc\n', files: { 'build.sh': 'emcc x.c\n' } },
+  });
+  try {
+    mkdirSync(join(f.root, 'scripts'), { recursive: true });
+    writeFileSync(join(f.root, 'scripts/build-gnu-cli.sh'), 'emmake make\n');
+    writeFileSync(join(f.root, 'scripts/build-common.sh'), 'homescoop_x() { emcc "$@"; bash "$ROOT/scripts/install-wasixcc.sh"; }\n');
+    for (const s of ['install-emsdk.sh', 'install-wasixcc.sh', 'install-go.sh']) writeFileSync(join(f.root, 'scripts', s), '\n');
+    const cases = [
+      [['shims/slicc/slicc_cred.c'], ['em', 'gnu', 'slicc']],
+      [['shims/slicc/slicc-fork.js'], ['em', 'gnu', 'slicc']],
+      [['scripts/emsdk-patches/libfs-symloop.patch'], ['em', 'gnu', 'slicc']],
+      [['scripts/install-emsdk.sh'], ['em', 'gnu', 'slicc']],
+      [['scripts/build-gnu-cli.sh'], ['gnu']],
+      [['scripts/install-wasixcc.sh'], ['wx']],
+      [['scripts/install-go.sh'], ['go']],
+      [['shims/slicc/README.md'], []],
+      [['shims/slicc/test/nameinfo.test.mjs'], []],
+      [['scripts/build-common.sh'], []],
+    ];
+    for (const [paths, want] of cases) {
+      const r = f.touched(paths);
+      assert.equal(r.status, 0, r.stderr);
+      assert.deepEqual(JSON.parse(r.stdout), want, paths.join(' '));
+    }
+    const r = f.touched(['shims/slicc/slicc_cred.c', 'scripts/install-wasixcc.sh'], '--publishable');
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), []);
+  } finally {
+    f.done();
+  }
+});
