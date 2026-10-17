@@ -220,6 +220,6 @@ async function main(argv) {
   console.log(`merge group of ${members.map((m) => `#${m.number}`).join(', ')}: every member's artifact and cert binds to the group head`);
 }
 
-if (process.argv[1] && realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   await main(process.argv.slice(2));
 }

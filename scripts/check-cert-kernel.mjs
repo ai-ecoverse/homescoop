@@ -13,8 +13,8 @@
  * GITHUB_TOKEN, when set, authenticates the release lookup.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXACT } from './check-exact-pins.mjs';
 
@@ -101,4 +101,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) await main();
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) await main();

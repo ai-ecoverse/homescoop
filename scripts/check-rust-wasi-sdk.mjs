@@ -8,8 +8,8 @@
  * Reads WASI_SDK_PATH=/tmp/wasi-sdk-<N>.<M>-… from the release's
  * src/ci/docker/host-x86_64/dist-various-2/Dockerfile (or --dockerfile).
  */
+import { fileURLToPath } from 'node:url';
 import { readFileSync, realpathSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 
 export const dockerfileUrl = (rust) =>
   `https://raw.githubusercontent.com/rust-lang/rust/${rust}/src/ci/docker/host-x86_64/dist-various-2/Dockerfile`;
@@ -62,4 +62,4 @@ async function main() {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) process.exit(await main());
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exit(await main());

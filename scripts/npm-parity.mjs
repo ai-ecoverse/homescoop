@@ -16,11 +16,11 @@
  * - new: the version is not on npm and sorts above latest (or the package
  *   is not on npm at all): a new release.
  */
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { readTarball } from './diff-published.mjs';
 import { compareTarballs, describe } from './tarball-parity.mjs';
 
@@ -172,4 +172,4 @@ function main() {
   return r.level === 'error' ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) process.exit(main());
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exit(main());

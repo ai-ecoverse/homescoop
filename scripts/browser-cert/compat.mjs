@@ -11,6 +11,7 @@ import {
   renameSync,
   rmSync,
   writeFileSync,
+  realpathSync,
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1195,7 +1196,7 @@ function timings(args) {
 }
 
 const commands = { plan, shard, report, timings };
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const args = parseArgs(process.argv.slice(2));
   const fn = commands[args._[0]];
   if (!fn) {
