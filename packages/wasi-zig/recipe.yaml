@@ -1,38 +1,44 @@
-# RETIRED from ladder — do not host-run or OIDC-publish from ladder-build.
-#
-# Certified @ai-ecoverse/wasi-zig 0.16.0-15 (Zig 0.16 + LLVM 21: zig cc/c++)
-# comes from packages/wasi-zig/build-llvm.sh after a wasi-llvm artifact
-# (.github/workflows/wasi-llvm.yml, consume by run id). Optional
-# @ai-ecoverse/wasi-zig-libc-src (same packaging rev) holds wasi-libc C sources
-# for zig cc beyond the prebuilt baseline; it has no separate recipe (staged
-# under this package by build-llvm.sh). Browser-certify, then publish the
-# staged tarballs. See docs/ladder-builds.md "Retired recipes".
-#
-# packages/wasi-zig/build.sh is the old no-LLVM (-11) path for local use only.
 name: wasi-zig
-builder: retired
+builder: host
+reproducible: true
 # renovate: datasource=github-releases depName=ziglang/zig
 version: "0.16.0"
 npm: "@ai-ecoverse/wasi-zig"
-summary: "RETIRED from ladder — Zig 0.16+LLVM 21 from build-llvm.sh + wasi-llvm artifact"
+summary: "Zig 0.16.0 with LLVM 21 for slicc WASI (command zig; zig cc / c++)"
 source:
   url: "https://ziglang.org/download/{{version}}/zig-{{version}}.tar.xz"
   sha256: "43186959edc87d5c7a1be7b7d2a25efffd22ce5807c7af99067f86f99641bfdf"
+sources:
+  wasi_llvm:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasi-llvm/-/wasi-llvm-21.1.8-1.tgz"
+    sha256: "9164e184f20140922bc2279324cda1d187d19d92392ed014f8721894fb9f3630"
+toolchain:
+  zig_sha256_linux_x64: "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00"
+  zig_sha256_macos_arm64: "b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489"
+  llvm: "21.1.8"
+  wasi-sdk: "34.0"
+  wasi_sdk_sha256_linux_x64: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
+  wasi_sdk_sha256_macos_arm64: "9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9"
 dependencies:
   build: []
   host: []
   run: []
 about:
   homepage: https://ziglang.org/
-  license: MIT
+  license: MIT AND Apache-2.0 WITH LLVM-exception
   notes: |
-    Retired from ladder 2026-10-03 so ladder cannot republish no-LLVM -11 over
-    certified LLVM builds. Manual-only: wasi-llvm.yml artifact → build-llvm.sh
-    (patches 0017–0026, in-process clang, prebuilt wasi-libc/libc++, optional
-    wasi-zig-libc-src) → certify → npm publish the tarball(s). wasi-llvm stays
-    workflow-only (no npm). wasi-zig-libc-src has no packages/*/recipe.yaml, so
-    list-touched-packages cannot dispatch it; changes live under wasi-zig.
-    slicc.env: ZIG_LIB_DIR=${package}/lib, ZIG_GLOBAL_CACHE_DIR=${HOME}/.cache/zig
-    (spawn-time ${NAME} expansion; case-sensitive HOME — pairs with SLICC #3716).
-    Wasm linker: no start section for wasm32-wasi (export _start only).
-    Compiler imports wasix_32v1 (proc_spawn3/proc_join). User wasm32-wasi stays preview1.
+    build.sh fetches the zig 0.16.0 source and the host zig 0.16.0
+    (ziglang.org, sha256 per host), installs wasi-sdk 34.0 (pinned here, as
+    wasi-llvm does) and fetches the published
+    @ai-ecoverse/wasi-llvm by sha256 (#876). It applies patches/, compiles
+    zig's C++ glue (libzigcpp) with wasi-sdk clang++, resolves the compiler
+    module through `zig build`, builds the compiler object without libc,
+    builds wasi-libc, libc++ and Zig's runtimes for the baseline wasm32-wasi
+    target once (prebuilt in lib/prebuilt), and links zig.wasm with wasi-sdk
+    (threads, imported shared memory) against wasi-llvm. lib/ holds zig's
+    std, runtimes, clang's wasm resource headers and the libc headers;
+    wasi-libc's C sources are @ai-ecoverse/wasi-zig-libc-src (its own
+    recipe). slicc.env: ZIG_LIB_DIR=${package}/lib,
+    ZIG_GLOBAL_CACHE_DIR=${HOME}/.cache/zig, ZIG_EXE=zig. Wasm output has no
+    start section (export _start only). The compiler imports wasix_32v1
+    (proc_spawn3/proc_join); user wasm32-wasi programs stay preview1.
