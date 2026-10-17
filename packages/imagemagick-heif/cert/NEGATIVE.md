@@ -149,3 +149,17 @@ Error: @ai-ecoverse/wasm-imagemagick-heif: bin/magick.wasm has DWARF, .debug_loc
 7.1.2-34-7 changes only the build inputs. They're now zlib 1.3.1-4, libjpeg-turbo 3.1.2-4, libpng 1.6.59-3, lcms2 2.19.1-3, libtiff 4.7.2-3, libwebp 1.6.0-3, openjpeg 2.5.3-1, freetype 2.13.3-3, libxml2 2.15.4-2, libiconv 1.19.0-2 and (heif, relink) libheif 1.23.6-4. Each is the attested latest. libwebp moves from upstream 1.5.0 to 1.6.0 and libiconv from 1.18 to 1.19, and the notices follow them.
 
 The ImageMagick code is unchanged, so the negatives above still stand. The first ladder-pr run of homescoop#929 is a negative for its inputs too. With libwebp 1.6.0-2, whose `libwebp.pc` lacks libsharpyuv, the magick link failed with `undefined symbol: SharpYuvInit / SharpYuvGetConversionMatrix / SharpYuvConvert`. libwebp 1.6.0-3 (homescoop#930) fixes that, and the second run is green.
+
+## 7.1.2-34-8: configure.xml without build paths (homescoop#937; 2026-10-17)
+
+`cert/lib/wasm-check.mjs` against the published 7.1.2-34-7 fails:
+
+```text
+@ai-ecoverse/wasm-imagemagick: build paths in the tarball (homescoop#937):
+  package/etc/ImageMagick-7/configure.xml: .homescoop-out
+  package/etc/ImageMagick-7/configure.xml: /home/runner/work
+  package/etc/ImageMagick-7-open/configure.xml: .homescoop-out
+  …
+```
+
+The CFLAGS, LDFLAGS, LIBS, CC/CXX and DISTCHECK_CONFIG_FLAGS entries held the runner's checkout path (`…/.homescoop-out/prefix`) and its emsdk cache. In 34-8, build.sh rewrites them to `/prefix` and `/emsdk`, and the build fails if a build path is left. The local build passes wasm-check (darwin-arm64), with `LIBS … -L/prefix/lib/…` and `CC /emsdk/emscripten/emcc`.
