@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-qpdf",
-  "version": "12.4.2-2",
+  "version": "12.4.2-3",
   "description": "qpdf PDF merge/split/rotate/decrypt/linearize tool for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "Apache-2.0",
   "repository": {

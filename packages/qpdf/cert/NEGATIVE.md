@@ -35,3 +35,7 @@ that the hand-edited QDF file draws warnings before `fix-qdf` and none after.
   and stamps the creator's ids itself. The spec guards the behaviour as a
   non-root user; host-run's `check-slicc-cred.mjs` guards the link. That
   build fails glue-by-path (0644 glue, `EACCES`).
+
+## 12.4.2-3: attested build inputs (homescoop#864; 2026-10-17)
+
+12.4.2-3 changes only the build inputs: wasm-zlib 1.3.1-4 (was the unattested 1.3.1-2) and wasm-libjpeg-turbo 3.1.2-4 (was 3.1.2-1, the latest is used now). The cert kernel is 1.110.1 (certified), and the coreutils pin is 9.12.0-9. The qpdf code is unchanged, so the published 12.4.2-2 passes these specs too, and the negatives above still stand. This build passes `checklist.mjs`, `users.mjs` and glue by path on 1.110.1 under users enforce.
