@@ -1,0 +1,15 @@
+{
+  "harness": "host-node",
+  "host": "node scripts/em-lib-cert.mjs freetype --tarball <package.tgz | npm spec>: with the pinned emsdk, unpacks the tarball and the recipe's @ai-ecoverse build inputs at their pinned versions, compiles test/probe.c with nothing but pkg-config of freetype2.pc (PKG_CONFIG_LIBDIR: those packages only), links it with -Wl,--fatal-warnings, runs it under Node (NODERAWFS) and then test/check.mjs. A static library has no commands of its own.",
+  "pkgconfig": [
+    "freetype2"
+  ],
+  "checklist": [
+    "FT_Library_Version and freetype2.pc's Version are the recipe version; the probe compiles and links from freetype2.pc alone with -Wl,--fatal-warnings",
+    "a buffer that is no font is FT_Err_Unknown_File_Format; an outline of a 28x28 square with a 12x12 hole (opposite winding) passes FT_Outline_Check and FT_Outline_Get_BBox",
+    "FT_Outline_Get_Bitmap renders it into a 32x32 gray bitmap: exactly the ring is 255 and the rest 0 (640 pixels inked); Node reads probe.pgm and checks every pixel"
+  ],
+  "ci": [
+    "node scripts/em-lib-cert.mjs freetype --tarball .homescoop-out/package.tgz"
+  ]
+}

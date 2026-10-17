@@ -1,0 +1,15 @@
+{
+  "harness": "host-node",
+  "host": "node scripts/em-lib-cert.mjs libxml2 --tarball <package.tgz | npm spec>: with the pinned emsdk, unpacks the tarball and the recipe's @ai-ecoverse build inputs at their pinned versions, compiles test/probe.c with nothing but pkg-config of libxml-2.0.pc (PKG_CONFIG_LIBDIR: those packages only), links it with -Wl,--fatal-warnings, runs it under Node (NODERAWFS) and then test/check.mjs. A static library has no commands of its own.",
+  "pkgconfig": [
+    "libxml-2.0"
+  ],
+  "checklist": [
+    "LIBXML_DOTTED_VERSION and libxml-2.0.pc's Version are the recipe version; the probe compiles and links from libxml-2.0.pc alone with -Wl,--fatal-warnings: the .pc Requires libiconv, which resolves to the recipe's pinned wasm-libiconv (2.15.4-2's .pc said -liconv with no path to it: NEGATIVE.md)",
+    "an ISO-8859-1 document parses (iconv) and XPath answers sum(//price) = 19.5, the French title as UTF-8 and two books; malformed XML is refused",
+    "a new element with CJK text and & < > saves as UTF-16 and re-reads; Node decodes probe.xml itself (UTF-16LE BOM, the declaration, the re-encoded title, the escaped new book)"
+  ],
+  "ci": [
+    "node scripts/em-lib-cert.mjs libxml2 --tarball .homescoop-out/package.tgz"
+  ]
+}
