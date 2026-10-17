@@ -40,6 +40,8 @@
 #define TLS_EOF (-1)
 #define TLS_NOMEM (-2)
 #define TLS_BADARG (-3)
+#define TLS_CLIENT_INSECURE_SKIP_VERIFY 1
+#define ALPN_MAX 8
 
 static const char *const alpn_protocols[] = {"http/1.1", NULL};
 static int last_error;
@@ -215,10 +217,76 @@ EMSCRIPTEN_KEEPALIVE void tls_leaf_free(leaf *l) { leaf_release(l); }
 
 /* ---- sessions ------------------------------------------------------------ */
 
+/* ---- trust stores: the roots a client session verifies against --------- */
+
+typedef struct {
+  mbedtls_x509_crt roots;
+  int certs;
+  int refs;
+} ca;
+
+static void ca_release(ca *c) {
+  if (--c->refs > 0) return;
+  mbedtls_x509_crt_free(&c->roots);
+  free(c);
+}
+
+/* An empty trust store; 0 on failure (PSA must start: parsing keys needs it). */
+EMSCRIPTEN_KEEPALIVE ca *tls_ca_new(void) {
+  if (init() != 0) return NULL;
+  ca *c = calloc(1, sizeof *c);
+  if (!c) {
+    last_error = TLS_NOMEM;
+    return NULL;
+  }
+  c->refs = 1;
+  mbedtls_x509_crt_init(&c->roots);
+  return c;
+}
+
+/* Add one DER certificate as a trusted root: 0, or < 0. */
+EMSCRIPTEN_KEEPALIVE int tls_ca_add_der(ca *c, const unsigned char *der, size_t len) {
+  int ret = mbedtls_x509_crt_parse_der(&c->roots, der, len);
+  if (ret != 0) return last_error = ret;
+  c->certs++;
+  return 0;
+}
+
+/* Add concatenated DER certificates (roots.der): how many were added, or < 0
+ * for a malformed bundle. A certificate Mbed TLS cannot use is skipped. */
+EMSCRIPTEN_KEEPALIVE int tls_ca_add_bundle(ca *c, const unsigned char *bytes, size_t len) {
+  int added = 0;
+  size_t at = 0;
+  while (at < len) {
+    unsigned char *p = (unsigned char *)bytes + at;
+    unsigned char *start = p;
+    size_t body;
+    int ret = mbedtls_asn1_get_tag(&p, (unsigned char *)bytes + len, &body,
+                                   MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (ret != 0) return last_error = ret;
+    size_t whole = (size_t)(p - start) + body;
+    if (mbedtls_x509_crt_parse_der(&c->roots, start, whole) == 0) {
+      c->certs++;
+      added++;
+    }
+    at += whole;
+  }
+  return added;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_ca_count(ca *c) { return c->certs; }
+
+EMSCRIPTEN_KEEPALIVE void tls_ca_free(ca *c) { ca_release(c); }
+
 typedef struct {
   mbedtls_ssl_context ssl;
   mbedtls_ssl_config config;
   leaf *leaf;
+  ca *trust;
+  unsigned char ip[16];
+  size_t ip_len;
+  char alpn_buf[256];
+  const char *alpn[ALPN_MAX + 1];
   char host[256];
   unsigned char in[IN_CAP], out[OUT_CAP];
   size_t in_len, out_len;
@@ -259,6 +327,7 @@ static void session_free(session *s) {
   mbedtls_ssl_free(&s->ssl);
   mbedtls_ssl_config_free(&s->config);
   if (s->leaf) leaf_release(s->leaf);
+  if (s->trust) ca_release(s->trust);
   free(s);
 }
 
@@ -296,6 +365,154 @@ EMSCRIPTEN_KEEPALIVE session *tls_session_new(leaf *l, const char *host) {
   return s;
 }
 
+static int want(int ret);
+
+/* An IP-literal server name is checked against the leaf's iPAddress SANs
+ * only (RFC 6125): never its CN or a dNSName spelling the address. */
+static int ip_san_matches(const mbedtls_x509_crt *crt, const unsigned char *ip, size_t len) {
+  for (const mbedtls_x509_sequence *cur = &crt->subject_alt_names; cur && cur->buf.p; cur = cur->next) {
+    unsigned char type = (unsigned char)cur->buf.tag & MBEDTLS_ASN1_TAG_VALUE_MASK;
+    if (type == MBEDTLS_X509_SAN_IP_ADDRESS && cur->buf.len == len && memcmp(cur->buf.p, ip, len) == 0)
+      return 1;
+  }
+  return 0;
+}
+
+static int on_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags) {
+  session *s = ctx;
+  if (depth == 0 && s->ip_len > 0 && !ip_san_matches(crt, s->ip, s->ip_len))
+    *flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
+  return 0;
+}
+
+static int parse_alpn(session *s, const unsigned char *wire, size_t len) {
+  if (len == 0) return 0;
+  if (len >= sizeof s->alpn_buf) return TLS_BADARG;
+  size_t at = 0, out = 0;
+  int n = 0;
+  while (at < len) {
+    size_t item = wire[at++];
+    if (item == 0 || at + item > len || n == ALPN_MAX) return TLS_BADARG;
+    memcpy(s->alpn_buf + out, wire + at, item);
+    s->alpn_buf[out + item] = 0;
+    s->alpn[n++] = s->alpn_buf + out;
+    out += item + 1;
+    at += item;
+  }
+  s->alpn[n] = NULL;
+  return 1;
+}
+
+/* A client session to `servername` (a C string; one trailing dot, an absolute
+ * name, is dropped for SNI and the check, homescoop#1033), verifying the server's chain
+ * against `trust`; 0 on failure. `alpn` is an ALPN list in wire format (or
+ * 0, 0). Verification is required unless flags has
+ * TLS_CLIENT_INSECURE_SKIP_VERIFY, which still records the result
+ * (tls_verify_result). TLS 1.2 or 1.3, no renegotiation, no resumption. */
+EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
+                                             const unsigned char *alpn, size_t alpn_len, int flags) {
+  if (init() != 0) return NULL;
+  int insecure = (flags & TLS_CLIENT_INSECURE_SKIP_VERIFY) != 0;
+  if ((flags & ~TLS_CLIENT_INSECURE_SKIP_VERIFY) != 0 || !servername ||
+      strlen(servername) >= sizeof(((session *)0)->host) ||
+      (!insecure && (!trust || servername[0] == 0))) {
+    last_error = TLS_BADARG;
+    return NULL;
+  }
+  session *s = calloc(1, sizeof *s);
+  if (!s) {
+    last_error = TLS_NOMEM;
+    return NULL;
+  }
+  strcpy(s->host, servername);
+  size_t name_len = strlen(s->host);
+  if (name_len > 1 && s->host[name_len - 1] == '.') s->host[name_len - 1] = 0;
+  s->ip_len = s->host[0] ? mbedtls_x509_crt_parse_cn_inet_pton(s->host, s->ip) : 0;
+  mbedtls_ssl_init(&s->ssl);
+  mbedtls_ssl_config_init(&s->config);
+  if (trust) {
+    s->trust = trust;
+    trust->refs++;
+  }
+  int ret = parse_alpn(s, alpn, alpn_len);
+  if (ret >= 0)
+    ret = mbedtls_ssl_config_defaults(&s->config, MBEDTLS_SSL_IS_CLIENT,
+                                      MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
+  if (ret == 0) {
+    mbedtls_ssl_conf_authmode(&s->config, insecure ? MBEDTLS_SSL_VERIFY_OPTIONAL : MBEDTLS_SSL_VERIFY_REQUIRED);
+    if (trust) mbedtls_ssl_conf_ca_chain(&s->config, &trust->roots, NULL);
+    mbedtls_ssl_conf_min_tls_version(&s->config, MBEDTLS_SSL_VERSION_TLS1_2);
+    mbedtls_ssl_conf_max_tls_version(&s->config, MBEDTLS_SSL_VERSION_TLS1_3);
+    mbedtls_ssl_conf_renegotiation(&s->config, MBEDTLS_SSL_RENEGOTIATION_DISABLED);
+    mbedtls_ssl_conf_session_tickets(&s->config, MBEDTLS_SSL_SESSION_TICKETS_DISABLED);
+    mbedtls_ssl_conf_verify(&s->config, on_verify, s);
+    if (alpn_len > 0) ret = mbedtls_ssl_conf_alpn_protocols(&s->config, s->alpn);
+  }
+  if (ret == 0) ret = mbedtls_ssl_setup(&s->ssl, &s->config);
+  if (ret == 0) ret = mbedtls_ssl_set_hostname(&s->ssl, s->ip_len || !s->host[0] ? NULL : s->host);
+  if (ret != 0) {
+    last_error = ret;
+    session_free(s);
+    return NULL;
+  }
+  mbedtls_ssl_set_bio(&s->ssl, s, bio_send, bio_recv, NULL);
+  return s;
+}
+
+/* Drive the handshake: 1 when it is done, 0 when it needs more ciphertext
+ * (drain tls_out first), or an error (a refused certificate is
+ * MBEDTLS_ERR_X509_CERT_VERIFY_FAILED; tls_verify_result says why). */
+EMSCRIPTEN_KEEPALIVE int tls_handshake(session *s) {
+  for (;;) {
+    if (mbedtls_ssl_is_handshake_over(&s->ssl)) return 1;
+    int ret = mbedtls_ssl_handshake(&s->ssl);
+    if (ret == 0) return 1;
+    if (ret == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) continue;
+    if (want(ret)) return 0;
+    return last_error = ret;
+  }
+}
+
+/* Mbed TLS's verification flags (MBEDTLS_X509_BADCERT_*): 0 when the chain
+ * verified, -1 before the server's certificate arrived. */
+EMSCRIPTEN_KEEPALIVE int tls_verify_result(session *s) {
+  return (int)mbedtls_ssl_get_verify_result(&s->ssl);
+}
+
+/* The verification flags in words, one reason per line. */
+EMSCRIPTEN_KEEPALIVE int tls_verify_info(int flags, char *out, size_t max) {
+  return mbedtls_x509_crt_verify_info(out, max, "", (uint32_t)flags);
+}
+
+/* The protocol ALPN agreed on, at the start of `out`: its length, or 0 for none. */
+EMSCRIPTEN_KEEPALIVE int tls_alpn(session *s, char *out, size_t max) {
+  const char *p = mbedtls_ssl_get_alpn_protocol(&s->ssl);
+  if (!p) return 0;
+  size_t n = strlen(p);
+  if (n > max) return TLS_BADARG;
+  memcpy(out, p, n);
+  return (int)n;
+}
+
+static const mbedtls_x509_crt *peer_chain(session *s) { return mbedtls_ssl_get_peer_cert(&s->ssl); }
+
+/* How many certificates the server sent. */
+EMSCRIPTEN_KEEPALIVE int tls_peer_count(session *s) {
+  int n = 0;
+  for (const mbedtls_x509_crt *c = peer_chain(s); c && c->raw.p; c = c->next) n++;
+  return n;
+}
+
+/* The server's certificate at `index` (0 = its leaf) as DER: its length, or < 0. */
+EMSCRIPTEN_KEEPALIVE int tls_peer_der(session *s, int index, unsigned char *out, size_t max) {
+  const mbedtls_x509_crt *c = peer_chain(s);
+  for (int i = 0; c && c->raw.p && i < index; i++) c = c->next;
+  if (index < 0 || !c || !c->raw.p) return TLS_BADARG;
+  if (c->raw.len > max) return TLS_NOMEM;
+  memcpy(out, c->raw.p, c->raw.len);
+  return (int)c->raw.len;
+}
+
 /* Take up to `len` bytes of ciphertext from the client; how many were taken. */
 EMSCRIPTEN_KEEPALIVE int tls_feed(session *s, const unsigned char *bytes, size_t len) {
   size_t room = IN_CAP - s->in_len;
@@ -317,9 +534,9 @@ static int want(int ret) {
          ret == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS;
 }
 
-/* Plaintext from the client: > 0 bytes, 0 when more ciphertext is needed, TLS_EOF, or an error. */
+/* Plaintext from the peer: > 0 bytes, 0 when more ciphertext is needed, TLS_EOF, or an error. */
 EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
-  for (;;) {
+  for (int spins = 0;; spins++) {
     int ret;
     if (!mbedtls_ssl_is_handshake_over(&s->ssl)) {
       ret = mbedtls_ssl_handshake(&s->ssl);
@@ -331,6 +548,10 @@ EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
     }
     if (ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY || ret == MBEDTLS_ERR_SSL_CONN_EOF) return TLS_EOF;
     if (ret == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) continue;
+    /* A client's TLS 1.3 NewSessionTickets (two may share a record) each end a
+     * read with WANT_READ while the data behind them is already buffered: go
+     * on while ciphertext or a record is waiting (homescoop#1032). */
+    if (want(ret) && spins < 64 && (s->in_len > 0 || mbedtls_ssl_check_pending(&s->ssl))) continue;
     if (want(ret)) return 0;
     return last_error = ret;
   }

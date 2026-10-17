@@ -126,3 +126,31 @@ The 4.2.0-1 build also passes, unchanged:
   and `node.test.mjs` (the registry over https, pnpm installs through the
   realm proxy), with the engine replaced by 4.2.0-1. The one `node.test.mjs`
   case not run needs wasix-python, which was not installed (no TLS).
+
+## 4.2.0-2: client sessions (slicc-kernel#922)
+
+**Date:** 2026-10-17. The base is homescoop origin/main 50f524c, with `host-run.sh` builds (emsdk 4.0.23).
+
+- **The published 4.2.0-1** has no client API. `lib/client-api.mjs` fails before its first case: `TypeError: this.m._tls_ca_new is not a function`.
+- **A 4.2.0-2 build with the hostname check removed** (`mbedtls_ssl_set_hostname(&s->ssl, NULL)` for every server name) fails 4 of the 15 cases of the first head's `lib/client-api.mjs`:
+  - **the wrong-hostname row is accepted** instead of refused;
+  - TLS 1.3 and 1.2 send no SNI;
+  - the insecure-flag row no longer reports CN_MISMATCH.
+
+```
+✖ TLSv1.3: the chain verifies, ALPN agrees, the peer chain reads back, and 1 MiB goes each way
+✖ TLSv1.2: the chain verifies, ALPN agrees, the peer chain reads back, and 1 MiB goes each way
+✖ refused: a leaf for another host name
+✖ TLS_CLIENT_INSECURE_SKIP_VERIFY finishes the handshake and still reports the result
+ℹ pass 11  ℹ fail 4
+```
+
+- **3990d82, the first head of #1022,** fails the two cases added for the cert-review findings: `TLS 1.3: a response buffered behind the NewSessionTickets comes out without more input` (homescoop#1032; `tls_read` returns 0 with the response buffered, and nothing more arrives) and `an absolute name (one trailing dot)` (homescoop#1033; CN_MISMATCH). It passes the other 15.
+
+```
+✖ TLS 1.3: a response buffered behind the NewSessionTickets comes out without more input, and the connection stays open (homescoop#1032)
+✖ an absolute name (one trailing dot) is the same host for SNI and the check (homescoop#1033)
+ℹ pass 15  ℹ fail 2
+```
+
+- **4.2.0-2 as built:** `lib/client-api.mjs` passes 17/17, and `lib/engine-api.mjs` passes 19/19 unchanged, so the server ABI is untouched. The tarball is byte-identical over two builds.
