@@ -112,7 +112,6 @@ const ctx = {
   name: NAME,
   version: VERSION,
   message: MERGE_BODY,
-  ciCertified: false,
   assumeUnpublished: false,
 };
 
@@ -168,7 +167,7 @@ describe('the certified= line', () => {
 });
 
 describe('candidate runs', () => {
-  const ok = { artifact: artifact(1, 10, HEAD), run: run(10, HEAD), jobs: [], head: HEAD, needCi: false };
+  const ok = { artifact: artifact(1, 10, HEAD), run: run(10, HEAD), jobs: [], head: HEAD };
 
   it('accepts a successful ladder-pr run at the merged head', () => {
     assert.deepEqual(candidateProblems(ok), []);
