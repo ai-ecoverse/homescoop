@@ -38,7 +38,7 @@ for (const name of [...Object.keys(GATES), 'kernel-compat-plan', 'kernel-compat-
   test(`${name}: a stubbed early exit 0 with no verdict fails its caller (#981)`, () => {
     const silent = gate(name, 'process.exit(0)');
     assert.equal(silent.status, 1, silent.stdout);
-    assert.match(silent.stdout, new RegExp(`::error::${name}: no "${name}: PASS\\|FAIL" verdict line \\(exit 0\\)`));
+    assert.match(silent.stderr, new RegExp(`::error::${name}: no "${name}: PASS\\|FAIL" verdict line \\(exit 0\\)`));
     const pass = gate(name, `console.log(${JSON.stringify(`${name}: PASS stub`)})`);
     assert.equal(pass.status, 0, pass.stdout);
     const lies = gate(name, `console.log(${JSON.stringify(`${name}: FAIL stub`)})`);

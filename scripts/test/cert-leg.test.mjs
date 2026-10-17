@@ -369,7 +369,7 @@ test('browser-extra: a run.mjs that exits 0 without its cert-run verdict fails t
   try {
     const r = f.leg('browser-extra', 'old', { SILENT_RUN: '1' });
     assert.notEqual(r.status, 0, r.stdout);
-    assert.match(r.stdout, /::error::cert-run: no "cert-run: PASS\|FAIL" verdict line \(exit 0\)/);
+    assert.match(r.stderr, /::error::cert-run: no "cert-run: PASS\|FAIL" verdict line \(exit 0\)/);
     assert.match(r.stdout, /^cert-leg: FAIL browser-extra old$/m);
     const ok = f.leg('browser-extra', 'old');
     assert.equal(ok.status, 0, ok.stdout);

@@ -58,12 +58,12 @@ function main(argv) {
     keep(c.toString());
   });
   child.on('error', (err) => {
-    console.log(`::error::${gate}: cannot run ${cmd}: ${err.message}`);
+    console.error(`::error::${gate}: cannot run ${cmd}: ${err.message}`);
     process.exit(127);
   });
   child.on('close', (status, signal) => {
     const { code, message } = judge(gate, signal ? 128 : status, text);
-    if (message) console.log(`::error::${message}`);
+    if (message) console.error(`::error::${message}`);
     process.exit(code);
   });
 }
