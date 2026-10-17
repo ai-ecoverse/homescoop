@@ -164,7 +164,7 @@ const ex = WebAssembly.Module.exports(m).map((e) => e.name);
 for (const need of ['_start', 'wasi_thread_start', 'memory'])
   if (!ex.includes(need)) { console.error('missing export', need); process.exit(1); }
 JS
-node "$ROOT/packages/wasi-rustc/cargo/check-cargo-wasm.mjs" "$OBJ/out/zig.wasm"
+node "$ROOT/packages/wasi-cargo/check-cargo-wasm.mjs" "$OBJ/out/zig.wasm"
 
 echo "== wasi-zig (LLVM): stage work/package-llvm"
 PKG="$PKG_WORK/package-llvm"

@@ -1,24 +1,47 @@
 {
   "name": "@ai-ecoverse/wasi-cargo",
-  "version": "0.99.0-2",
+  "version": "0.99.0-3",
   "description": "Cargo inside SLICC's WASI realm (offline path dependencies prototype)",
   "license": "(MIT OR Apache-2.0) AND GPL-2.0-only WITH GCC-exception-2.0 AND MPL-2.0 AND BSD-2-Clause AND BSD-3-Clause AND Unicode-3.0 AND Zlib AND blessing",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
-    "directory": "packages/wasi-rustc/cargo/package"
+    "directory": "packages/wasi-cargo/package"
   },
-  "keywords": ["wasm", "wasi", "slicc", "cargo", "rust"],
-  "files": ["README.md", "LICENSE", "bin"],
-  "publishConfig": { "access": "public" },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-cargo",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "cargo",
+    "rust"
+  ],
+  "homescoop": {
+    "recipe": "wasi-cargo",
+    "upstream": "0.99.0"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "slicc": {
     "abi": "wasi",
-    "dependencies": ["@ai-ecoverse/wasi-rustc"],
+    "dependencies": [
+      "@ai-ecoverse/wasi-rustc"
+    ],
     "commands": {
-      "cargo": { "script": "bin/cargo" },
+      "cargo": {
+        "script": "bin/cargo"
+      },
       "cargo.wasm": {
         "wasm": "bin/cargo.wasm",
-        "env": { "RUST_MIN_STACK": "16777216" }
+        "env": {
+          "RUST_MIN_STACK": "16777216"
+        }
       }
     },
     "env": {
