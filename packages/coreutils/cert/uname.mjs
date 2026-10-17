@@ -35,7 +35,7 @@ export default async function (ctx) {
   assert.ok(imports.includes('env.__syscall_uname'), 'coreutils.wasm does not import env.__syscall_uname, so no kernel can answer uname() (shims/slicc, slicc-kernel#625)');
   const text = Buffer.from(bytes).toString('latin1');
   assert.ok(!/\.cache\/emsdk|Caches\/emsdk|emsdk\/0\.4\.0/.test(text), 'coreutils.wasm names the emsdk cache directory (homescoop#358 maps it to /emsdk)');
-  assert.ok(text.includes('/emsdk/emscripten/'), 'coreutils.wasm has no /emsdk/ paths at all');
+  assert.ok(!text.includes('.debug_info'), 'coreutils.wasm ships no DWARF (homescoop#908), so no source paths at all');
   const fields = ['-s', '-n', '-r', '-v', '-m', '-o'];
   const r = await run(['bash', '-c', [
     ...fields.map((f) => `uname ${f}`),
@@ -73,5 +73,5 @@ export default async function (ctx) {
     assert.ok(!answers, `uname -s is ${s} on slicc-kernel ${kv?.join('.')}, which answers env.__syscall_uname (>= ${ANSWERS.join('.')}): ${r.stdout}`);
     assert.deepEqual([s, rel, v, m], ['Emscripten', '4.0.23', '#1', 'wasm32'], `uname without a kernel answer: ${r.stdout}`);
   }
-  console.log(`uname: ${[s, n, rel, v, m, o].join(' ')} on ${kv ? `slicc-kernel ${kv.join('.')}` : procVersion} (osrelease ${osrelease}${procHost.startsWith('(no ') ? '' : `, /proc/sys/kernel/hostname ${procHost}`}); env.__syscall_uname imported; emsdk paths are /emsdk`);
+  console.log(`uname: ${[s, n, rel, v, m, o].join(' ')} on ${kv ? `slicc-kernel ${kv.join('.')}` : procVersion} (osrelease ${osrelease}${procHost.startsWith('(no ') ? '' : `, /proc/sys/kernel/hostname ${procHost}`}); env.__syscall_uname imported; no emsdk path and no DWARF`);
 }
