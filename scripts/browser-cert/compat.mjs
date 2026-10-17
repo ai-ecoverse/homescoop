@@ -573,6 +573,8 @@ export function failuresOf(rep) {
   return out;
 }
 
+export const siteOf = (id) => String(id).replace(/#\d+$/, '');
+
 function lookup(rep, f) {
   if (f.kind === 'boot') return rep.specs.length ? 'pass' : 'fail';
   if (f.kind === 'page') return !rep.specs.length ? 'unreached' : rep.pageErrors?.length ? 'fail' : 'pass';
@@ -580,8 +582,9 @@ function lookup(rep, f) {
   if (!sp) return 'unreached';
   if (f.kind === 'spec') return sp.status;
   if (f.kind === 'crash') return sp.crash ? (sp.crash.signature === f.signature ? 'fail' : 'crash') : 'pass';
-  if (sp.cases?.pass.includes(f.key)) return 'pass';
-  if (sp.cases?.fail.some((c) => c.id === f.key)) return 'fail';
+  const line = siteOf(f.key);
+  if (sp.cases?.fail.some((c) => siteOf(c.id) === line)) return 'fail';
+  if (sp.cases?.pass.some((id) => siteOf(id) === line)) return 'pass';
   if (sp.status === 'pass' && !sp.cases) return 'pass';
   return sp.crash ? 'crash' : 'unreached';
 }
