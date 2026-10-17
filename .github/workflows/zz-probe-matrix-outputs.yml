@@ -1,0 +1,43 @@
+name: zz-probe (merge-queue dry run style, do not keep)
+on: pull_request
+permissions:
+  contents: read
+  actions: read
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [0, 1, 2]
+    outputs:
+      id-0: ${{ steps.ids.outputs.id-0 }}
+      digest-0: ${{ steps.ids.outputs.digest-0 }}
+      id-1: ${{ steps.ids.outputs.id-1 }}
+      digest-1: ${{ steps.ids.outputs.digest-1 }}
+      id-2: ${{ steps.ids.outputs.id-2 }}
+      digest-2: ${{ steps.ids.outputs.digest-2 }}
+    steps:
+      - run: mkdir out && echo "${{ matrix.shard }}" > out/x && sleep $(( ${{ matrix.shard }} * 5 ))
+      - id: up
+        uses: actions/upload-artifact@v7
+        with:
+          name: probe-shard-${{ matrix.shard }}
+          path: out
+      - id: ids
+        env:
+          SHARD: ${{ matrix.shard }}
+          ID: ${{ steps.up.outputs.artifact-id }}
+          DIGEST: ${{ steps.up.outputs.artifact-digest }}
+        run: printf 'id-%s=%s\ndigest-%s=%s\n' "$SHARD" "$ID" "$SHARD" "$DIGEST" >> "$GITHUB_OUTPUT"
+  report:
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          OUT: ${{ toJSON(needs.shard.outputs) }}
+        run: echo "$OUT"
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.shard.outputs.id-0 }},${{ needs.shard.outputs.id-1 }},${{ needs.shard.outputs.id-2 }}
+          path: r
+      - run: find r -type f | sort
