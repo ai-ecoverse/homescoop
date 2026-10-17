@@ -42,6 +42,11 @@ heif-convert --list-decoders
   shortcut, which turns off HEVC deblocking and SAO, is patched out, so
   pixels match a native libheif. libheif's default security limits apply,
   and `--disable-limits` lifts them.
+- **Exit status:** when an output can't be written (a missing directory, a
+  directory in the way, no permission, a full disk), `heif-convert` and
+  `heif-dec` print `could not write image` and exit 1. Upstream exits 0
+  there; `heif-dec-write-errors.patch` fixes that, also for the depth,
+  auxiliary, tile, sequence, XMP and EXIF outputs.
 
 ## Licences
 
@@ -57,7 +62,7 @@ heif-convert --list-decoders
 that `bin/*.wasm` links statically. The sources are the upstream release
 tarballs pinned (with sha256) in
 [`packages/libheif/recipe.yaml`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif/recipe.yaml),
-plus the two patches next to it, and `build.sh` there is the complete build.
+plus the three patches next to it, and `build.sh` there is the complete build.
 
 ## Relinking (LGPL)
 
