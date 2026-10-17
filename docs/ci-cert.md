@@ -633,8 +633,8 @@ changes the boot order for every cert.
   10 shards run at once (the cloud-run-job pool scales per job); on hosted
   runners 3, so a fork PR's call doesn't crowd out `ladder-pr`. The usual
   `base,ci-certified` call is a gate, a plan and one shard job.
-- **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
-  `cloud-run-job`) can reach the GCP metadata server and the pool's
+- **No fork PR code on a pool.** A job on the Cloud Run pool
+  (`cloud-run-job`) can reach the GCP metadata server and the pool's
   service-account token. `runner` / `CERT_RUNNER` (shards) and
   `light-runner` / `CERT_LIGHT_RUNNER` (plan, report) are used only for:
   - a `pull_request` from a branch of the calling repo (`head.repo` is
@@ -671,13 +671,15 @@ changes the boot order for every cert.
   own copy. That is why the org's approval of outside contributors' runs is
   the backstop.
 - Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
-  (`cloud-run`, 4 vCPU / 8 GiB), else the shards' runner. The shards use
-  `runner` / `CERT_RUNNER` (`cloud-run-job`). On the pool a job gets a machine within about a minute, where
+  (`ubuntu-latest`; the old `cloud-run` pool is retired), else the shards'
+  runner. The shards use `runner` / `CERT_RUNNER` (`cloud-run-job`: 10 vCPU /
+  32 GiB per job, a 32 GB memory-backed disk). Never hard-code a pool label;
+  `cloud-run-bench` and `cloud-run` are retired. On the pool a job gets a machine within about a minute, where
   `ubuntu-latest` can queue for 15–40.
 - **No root on the pool.** Its machines run with "no new privileges", so
   `sudo` cannot become root. The Chromium step installs the system libraries
   (`playwright-core install --with-deps`) only where `sudo -n true` works and
-  the runner isn't `cloud-run-*`; the runner-bench image already has
+  the runner isn't `cloud-run-*`; the runner-job image already has
   Chrome's libraries and fonts, so there it installs the browser only.
   Nothing else in kernel-compat needs root: users exist only inside the
   kernel.

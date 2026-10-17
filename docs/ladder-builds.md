@@ -258,7 +258,7 @@ the recipe says `runner: pool`. A recipe whose ladder jobs compile nothing, a
 packaging-only `repack:` with no `smoke.c` and no tests by layout, runs on the
 pool without the hint, and moves back when its next release drops `repack:`.
 On the pool (`vars.CERT_RUNNER`, `cloud-run-job`: 10 vCPU / 32 GiB per job,
-no sudo) a recipe's bytes can differ from a hosted build: its image lacks some
+a 32 GB memory-backed disk, no sudo) a recipe's bytes can differ from a hosted build: its image lacks some
 of the hosted tools, and the workspace is `/home/runner/_work`, not
 `/home/runner/work`; `host-build` therefore builds from
 `/home/runner/work/<repo>/<repo>`, a link to the pool's workspace, so a build
@@ -282,7 +282,7 @@ and compares the two `package.tgz` sha256s, listing the entries that differ
 (`scripts/tarball-parity.mjs`, npm-parity's comparison). A recipe that
 differs fails the run and opens, or comments on, one `pool-parity` issue;
 move it back to hosted, or fix the difference. Dispatch it whenever the
-runner-bench image or the hosted image changes (#499).
+runner-job image or the hosted image changes (#499).
 Some recipes stay hosted for reasons outside their bytes (#390 C2):
 `less`, because greenwoodsoftware.com answers the pool's egress with 403
 (the source is fetched only from the pinned upstream URL); `qpdf`, whose
