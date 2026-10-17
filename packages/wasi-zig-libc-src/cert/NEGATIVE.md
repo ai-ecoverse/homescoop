@@ -21,5 +21,5 @@ error: wasi-libc for this target builds from its C sources, which are not instal
 With this package beside wasi-zig, the same command is still compiling
 wasi-libc from these sources when `timeout 90` stops it (rc 124). Run to the
 end (7 min in a laptop kernel), a `-mcpu=generic+simd128` program linked
-against it prints its output with preview1 imports only. `cert/identity.mjs`
+against it prints its output with preview1 imports only. `test/identity.mjs`
 fails on any file that differs from the zig source tarball's.
