@@ -321,7 +321,20 @@ jobs:
               break
             fi
             if printf '%s\n' "$out" | grep -q 'cannot publish over the previously published versions'; then
-              echo "already on registry: $NPM@$VER — treating as success"
+              echo "already on registry: $NPM@$VER — success only if npm has these contents (homescoop#971)"
+              again=0
+              for wait in 0 15 30 60 120; do
+                sleep "$wait"
+                set +e
+                node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
+                again=$?
+                set -e
+                [[ "$again" -eq 0 ]] || break
+              done
+              if [[ "$again" -ne 10 ]]; then
+                echo "::error::$NPM@$VER is on npm, but not with these contents (assert-certified-publish exit $again): these bytes never shipped"
+                exit 1
+              fi
               break
             fi
             if printf '%s\n' "$out" | grep -Eq 'ENEEDAUTH|need auth' && [[ $attempt -lt $max ]]; then

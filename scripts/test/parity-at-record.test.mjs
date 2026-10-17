@@ -202,3 +202,85 @@ test('#971 at publish: a version already on npm skips only with the same content
   assert.equal(unknown.status, 2, unknown.out);
   assert.match(unknown.out, /is on npm, and comparing it failed/);
 });
+
+function publishStep(root) {
+  const doc = readFileSync(join(root, '.github/workflows/ladder-build.yml'), 'utf8');
+  const at = doc.indexOf('      - name: Publish via OIDC');
+  const run = doc.indexOf('        run: |\n', at) + '        run: |\n'.length;
+  const end = doc.indexOf('\n      - ', run);
+  return doc
+    .slice(run, end === -1 ? undefined : end)
+    .split('\n')
+    .map((l) => l.replace(/^ {10}/, ''))
+    .join('\n');
+}
+
+function runPublish(t, dir, { url, published, sha }) {
+  const bin = join(dir, 'bin');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, 'npm'),
+    `#!/usr/bin/env bash
+case "$1" in
+  -v) echo 11.0.0 ;;
+  publish) echo "npm error 403 You cannot publish over the previously published versions: 3.12.0-6." >&2; exit 1 ;;
+  pack) cp "${published}" "$4/published.tgz" ;;
+esac
+`,
+  );
+  chmodSync(join(bin, 'npm'), 0o755);
+  const temp = join(dir, 'runner-temp');
+  mkdirSync(temp, { recursive: true });
+  const script = publishStep(join(scripts, '..'))
+    .replaceAll('${{ runner.temp }}', temp)
+    .replaceAll('${{ needs.resolve.outputs.npm }}', NAME)
+    .replaceAll('${{ inputs.certified }}', sha);
+  return new Promise((ok) => {
+    const p = spawn('bash', ['-c', script], {
+      cwd: join(scripts, '..'),
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: dir, GITHUB_OUTPUT: join(dir, 'gh-output'), NPM_CONFIG_USERCONFIG: '', ACTIONS_ID_TOKEN_REQUEST_URL: 'http://127.0.0.1:9/oidc', HOMESCOOP_REGISTRY: url, HOMESCOOP_NPM: join(bin, 'npm'), HOMESCOOP_NPM_RETRY_S: '0' },
+    });
+    let out = '';
+    p.stdout.on('data', (d) => (out += d));
+    p.stderr.on('data', (d) => (out += d));
+    p.on('close', (status) => ok({ status, out, temp }));
+  });
+}
+
+test('#971 in ladder-build: a lost publish race ("cannot publish over") succeeds only when npm has these contents', async (t) => {
+  const dir = workdir(t);
+  const tgz = tarball(dir, '3.12.0-6');
+  const sha = createHash('sha256').update(readFileSync(tgz)).digest('hex');
+  let published = false;
+  const server = createServer((req, res) => {
+    const path = decodeURIComponent(req.url);
+    if (path === `/${NAME}/latest`) return res.writeHead(200).end(JSON.stringify({ version: published ? '3.12.0-6' : '3.12.0-5' }));
+    if (path === `/${NAME}/3.12.0-6` && published) return res.writeHead(200).end(JSON.stringify({ version: '3.12.0-6', dist: { integrity: 'sha512-other' } }));
+    if (path === `/${NAME}/3.12.0-6`) {
+      published = true;
+      return res.writeHead(404).end('{}');
+    }
+    res.writeHead(404).end('{}');
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  t.after(() => server.close());
+  const url = `http://127.0.0.1:${server.address().port}`;
+  writeFileSync(join(dir, 'pkg.tgz'), readFileSync(tgz));
+  const prep = (d) => {
+    mkdirSync(join(d, 'runner-temp'), { recursive: true });
+    writeFileSync(join(d, 'runner-temp', 'package.tgz'), readFileSync(tgz));
+  };
+  const other = join(dir, 'other');
+  mkdirSync(other);
+  prep(other);
+  const lost = await runPublish(t, other, { url, published: tarball(dir, '3.12.0-6', 'someone else\n'), sha });
+  assert.equal(lost.status, 1, lost.out);
+  assert.match(lost.out, /is on npm, but not with these contents \(assert-certified-publish exit 2\): these bytes never shipped/);
+  published = false;
+  const same = join(dir, 'same');
+  mkdirSync(same);
+  prep(same);
+  const won = await runPublish(t, same, { url, published: tgz, sha });
+  assert.equal(won.status, 0, won.out);
+  assert.match(won.out, /same contents — skip publish/);
+});
