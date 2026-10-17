@@ -13,10 +13,11 @@
  * GITHUB_TOKEN, when set, authenticates the release lookup.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXACT } from './check-exact-pins.mjs';
+import { say } from './gate.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const KERNEL = '@ai-ecoverse/slicc-kernel';
@@ -95,10 +96,12 @@ async function main() {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
     const { pin, sha256 } = await checkCertKernel(pkg);
     console.log(`check-cert-kernel: ${KERNEL}@${pin} is certified, sha256=${sha256}`);
+    say('cert-kernel', true, `${KERNEL}@${pin}`);
   } catch (e) {
     console.log(`::error::check-cert-kernel: ${e.message}. Pin the cert kernel in package.json to a certified version.`);
+    say('cert-kernel', false, e.message.slice(0, 200));
     process.exit(1);
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) await main();
+if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1]))) await main();

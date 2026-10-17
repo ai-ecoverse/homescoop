@@ -297,7 +297,7 @@ jobs:
           VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
           NPM="${{ needs.resolve.outputs.npm }}"
           set +e
-          node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
+          node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
           gate=$?
           set -e
           if [[ "$gate" -eq 10 ]]; then
@@ -344,4 +344,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NPM: ${{ needs.resolve.outputs.npm }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --timeout 1800 --run-url "$RUN_URL" --issue
+        run: node scripts/gate.mjs verify-published -- node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --timeout 1800 --run-url "$RUN_URL" --issue

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { say } from '../gate.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -162,4 +163,5 @@ writeFileSync(`${values.lines}.unspecified`, `${JSON.stringify(packages.filter(u
 const passed = !problems.length && lines.length > 0 && lines.every(({ ok }) => ok);
 console.log(result);
 for (const p of problems) console.error(`problem: ${p}`);
+say('cert-verdict', passed, `${lines.length} line(s), ${problems.length} problem(s)`);
 process.exit(passed ? 0 : 1);

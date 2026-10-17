@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { reportFromEnv } from './publish-failure-issue.mjs';
+import { say } from './gate.mjs';
 
 export function integrityOf(buf) {
   return `sha512-${createHash('sha512').update(buf).digest('base64')}`;
@@ -76,6 +77,7 @@ async function main(argv) {
   );
   if (result.ok) {
     console.log(`${name}@${version}: the registry serves ${integrity}, the sha512 of the published package.tgz (sha256 ${sha256})`);
+    say('verify-published', true, `${name}@${version} ${integrity}`);
     return;
   }
   console.log(`::error::${name}@${version}: ${result.reason}`);
@@ -92,12 +94,14 @@ async function main(argv) {
     ].join('\n');
     await reportFromEnv({ title: `publish-failure: ${name}@${version}`, body });
   }
+  say('verify-published', false, `${name}@${version}: ${result.reason}`);
   process.exit(1);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
   await main(process.argv.slice(2)).catch((err) => {
     console.log(`::error::verify-published: ${err.message}`);
+    say('verify-published', false, err.message.slice(0, 200));
     process.exit(1);
   });
 }

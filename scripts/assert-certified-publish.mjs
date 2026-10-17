@@ -15,12 +15,14 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { say } from './gate.mjs';
 
 const tgz = process.argv[2];
 if (!tgz || tgz.startsWith('-')) {
   console.error(
     'usage: assert-certified-publish.mjs <tgz> --npm <name> [--certified <sha256>]',
   );
+  say('certified-publish', false, 'refused');
   process.exit(2);
 }
 
@@ -36,6 +38,7 @@ const certified = (flag('--certified') || process.env.CERTIFIED || '')
 
 if (!npmName) {
   console.error('assert-certified-publish: --npm is required');
+  say('certified-publish', false, 'refused');
   process.exit(2);
 }
 
@@ -51,6 +54,7 @@ if (name !== npmName) {
   console.error(
     `assert-certified-publish: tarball name ${name} != --npm ${npmName}`,
   );
+  say('certified-publish', false, 'refused');
   process.exit(2);
 }
 
@@ -58,10 +62,12 @@ const url = `https://registry.npmjs.org/${encodeURIComponent(npmName)}/${version
 const res = await fetch(url);
 if (res.status === 200) {
   console.log(`already on npm: ${npmName}@${version} — skip publish`);
+  say('certified-publish', false, `${npmName}@${version} is already on npm: nothing to publish (exit 10, skip)`);
   process.exit(10);
 }
 if (res.status !== 404) {
   console.error(`assert-certified-publish: GET ${url} -> ${res.status}`);
+  say('certified-publish', false, 'refused');
   process.exit(2);
 }
 
@@ -72,6 +78,7 @@ if (!/^[0-9a-f]{64}$/.test(certified)) {
       `(got ${certified ? 'invalid certified input' : 'empty certified'}). ` +
       `Publish the certified tarball from a laptop first, then land.`,
   );
+  say('certified-publish', false, 'refused');
   process.exit(2);
 }
 
@@ -80,8 +87,10 @@ if (certified !== sha256) {
     `refuse OIDC publish of ${npmName}@${version}: ` +
       `certified=${certified} != tarball sha256=${sha256}`,
   );
+  say('certified-publish', false, 'refused');
   process.exit(2);
 }
 
 console.log(`certified sha256 matches — allow first publish of ${npmName}@${version}`);
+say('certified-publish', true, `${npmName}@${version} certified=${sha256}`);
 process.exit(0);

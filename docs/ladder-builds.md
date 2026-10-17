@@ -347,6 +347,11 @@ script whose main guard never fires, or empty output fails the job.
 | `cert-run` | `browser-cert/run.mjs` (also glue by path, `--glue-only`) | `cert-leg.mjs browser-extra`; ladder-pr `cert` |
 | `kernel-compat`, `kernel-compat-plan`, `kernel-compat-shard` | `browser-cert/compat.mjs report`, `plan`, `shard` | `kernel-compat.yml` |
 | `pool-parity` | the `compare` step | `pool-parity.yml`'s `report` (a missing verdict is "no verdict") |
+| `cert-kernel` | `check-cert-kernel.mjs` | ladder-pr `exact-pins` |
+| `host-smoke` | `host-smoke.sh` (says PASS when there's no `smoke.c`) | ladder-pr `host-build` |
+| `certified-publish` | `assert-certified-publish.mjs` (exit 10, already on npm, says FAIL and is the skip) | ladder-build `publish` |
+| `verify-published` | `verify-published.mjs` | ladder-build `verify` |
+| `cert-verdict` | `cert-review/verdict.mjs` | cert-review `record` |
 
 `scripts/test/gate-verdicts.test.mjs` checks each gate name against a stubbed
 silent `exit 0`, and that each script prints its own line.

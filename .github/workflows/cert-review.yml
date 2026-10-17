@@ -462,7 +462,7 @@ jobs:
         id: verdict
         run: |
           mkdir -p "$RUNNER_TEMP/cert-review"
-          if node scripts/cert-review/verdict.mjs \
+          if node scripts/gate.mjs cert-verdict -- node scripts/cert-review/verdict.mjs \
             --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --review "$RUNNER_TEMP/cert-review" \
             --body "$RUNNER_TEMP/cert-review/body.md" --lines "$RUNNER_TEMP/cert-review/lines.txt" --run "$RUN_URL" \
             --ladder-run "$LADDER_RUN" --ladder-conclusion "$LADDER_CONCLUSION" --specs "$RUNNER_TEMP/specs.json" --repack-input "$RUNNER_TEMP/cert-review/repack-input.json"; then

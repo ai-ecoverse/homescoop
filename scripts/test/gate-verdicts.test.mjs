@@ -19,6 +19,10 @@ const GATES = {
   'cert-leg': 'scripts/browser-cert/cert-leg.mjs',
   'cert-run': 'scripts/browser-cert/run.mjs',
   'kernel-compat': 'scripts/browser-cert/compat.mjs',
+  'cert-kernel': 'scripts/check-cert-kernel.mjs',
+  'certified-publish': 'scripts/assert-certified-publish.mjs',
+  'verify-published': 'scripts/verify-published.mjs',
+  'cert-verdict': 'scripts/cert-review/verdict.mjs',
 };
 
 test('judge: only a verdict that agrees with the exit status passes', () => {
@@ -34,7 +38,7 @@ test('judge: only a verdict that agrees with the exit status passes', () => {
   assert.equal(verdictLine('g', false, 'why'), 'g: FAIL why');
 });
 
-for (const name of [...Object.keys(GATES), 'kernel-compat-plan', 'kernel-compat-shard', 'pool-parity']) {
+for (const name of [...Object.keys(GATES), 'kernel-compat-plan', 'kernel-compat-shard', 'pool-parity', 'host-smoke']) {
   test(`${name}: a stubbed early exit 0 with no verdict fails its caller (#981)`, () => {
     const silent = gate(name, 'process.exit(0)');
     assert.equal(silent.status, 1, silent.stdout);
@@ -79,4 +83,27 @@ test('callers run the gates through gate.mjs: host-run.sh and kernel-compat.yml'
   const pp = readFileSync(join(root, '.github/workflows/pool-parity.yml'), 'utf8');
   assert.match(pp, /echo "pool-parity: PASS \$PKG same/);
   assert.match(pp, /echo "pool-parity: FAIL \$PKG differs/);
+});
+
+test('the publish-path callers run their gates through gate.mjs: ladder-pr, ladder-build, cert-review', () => {
+  const wf = (f) => readFileSync(join(root, '.github/workflows', f), 'utf8');
+  const pr = wf('ladder-pr.yml');
+  for (const [script, name] of [
+    ['check-exact-pins.mjs', 'exact-pins'],
+    ['check-cert-kernel.mjs', 'cert-kernel'],
+    ['refresh-recipe-sha.mjs "$pkg" --verify-repack', 'recipe-sha'],
+    ['host-smoke.sh', 'host-smoke'],
+    ['npm-parity.mjs', 'npm-parity'],
+    ['browser-cert/run.mjs', 'cert-run'],
+    ['browser-cert/cert-leg.mjs plan', 'cert-leg'],
+    ['browser-cert/cert-leg.mjs browser-extra', 'cert-leg'],
+    ['browser-cert/cert-leg.mjs ci', 'cert-leg'],
+  ]) {
+    const lines = pr.split('\n').filter((l) => l.includes(script) && !/^\s*#/.test(l) && !l.includes('::error::'));
+    assert.ok(lines.length, `ladder-pr.yml runs ${script}`);
+    for (const l of lines) assert.match(l, new RegExp(`scripts/gate\\.mjs ${name} -- `), l);
+  }
+  assert.match(wf('ladder-build.yml'), /node scripts\/gate\.mjs certified-publish -- node scripts\/assert-certified-publish\.mjs/);
+  assert.match(wf('ladder-build.yml'), /node scripts\/gate\.mjs verify-published -- node scripts\/verify-published\.mjs/);
+  assert.match(wf('cert-review.yml'), /if node scripts\/gate\.mjs cert-verdict -- node scripts\/cert-review\/verdict\.mjs/);
 });
