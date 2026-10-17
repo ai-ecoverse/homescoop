@@ -75,4 +75,6 @@ done
 # xzless scripts (adapted from GNU gzip) GPL-2.0-or-later. Ship both texts
 # (homescoop#511); package.json's license is "0BSD AND GPL-2.0-or-later".
 homescoop_stage_licenses "$SRC"/COPYING "$SRC"/COPYING.0BSD "$SRC"/COPYING.GPLv2
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== xz: staged → $HOMESCOOP_PKG/package"

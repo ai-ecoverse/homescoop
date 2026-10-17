@@ -95,5 +95,7 @@ mkdir -p "$WORK/licenses"
 cp "$ZIP_SRC/LICENSE" "$WORK/licenses/zip-3.0-LICENSE"
 cp "$UNZ_SRC/LICENSE" "$WORK/licenses/unzip-6.0-LICENSE"
 homescoop_stage_licenses "$WORK/licenses/zip-3.0-LICENSE" "$WORK/licenses/unzip-6.0-LICENSE"
+homescoop_notices_begin "The wasm modules in bin/ statically link the following."
+homescoop_notice_emscripten
 echo "== zip: staged → $HOMESCOOP_PKG/package"
 

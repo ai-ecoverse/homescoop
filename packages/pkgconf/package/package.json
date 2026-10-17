@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-pkgconf",
-  "version": "3.0.9-2",
+  "version": "3.0.9-3",
   "description": "pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder)",
   "license": "ISC",
   "repository": {
@@ -19,6 +19,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin"
   ],
   "publishConfig": {

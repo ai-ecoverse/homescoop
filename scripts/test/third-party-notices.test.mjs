@@ -33,18 +33,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Today's violations: "<package> <component> #<issue>", one per line.
 // Shrink this list; never add to it without an issue.
 const ALLOWLIST = `
-cmake Emscripten #684
-cmake files #684
-pkgconf Emscripten #684
-pkgconf files #684
-wasm-binaryen Emscripten #684
-wasm-binaryen files #684
-wasm-clang Emscripten #684
-wasm-clang files #684
-xz Emscripten #684
-xz files #684
-zip Emscripten #684
-zip files #684
+cmake Emscripten #844
+cmake files #844
+wasm-binaryen Emscripten #844
+wasm-binaryen files #844
+wasm-clang Emscripten #844
+wasm-clang files #844
 py-contourpy pybind11 #797
 py-contourpy files #797
 py-kiwisolver cppy #815
