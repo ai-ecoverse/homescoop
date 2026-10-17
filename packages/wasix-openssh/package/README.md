@@ -6,7 +6,7 @@
 
 Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-29** (since
 10.6.0-8; -7 was on -28, -6 on -22, -5 on -18), linking
-**wasix-openssl 3.5.9-3** and **wasix-zlib 1.3.1-2** via pkg-config only
+**wasix-openssl 3.5.9-4** and **wasix-zlib 1.3.1-3** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
 ```bash
