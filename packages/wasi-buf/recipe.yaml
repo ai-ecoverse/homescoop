@@ -3,6 +3,7 @@
 # patches in patches/, and a host-import module for slicc-kernel.
 name: wasi-buf
 builder: host
+runner: pool
 reproducible: true
 version: "1.73.0"
 npm: "@ai-ecoverse/wasi-buf"

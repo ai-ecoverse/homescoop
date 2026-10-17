@@ -6,7 +6,6 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { networkInterfaces } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -49,7 +48,6 @@ async function kernelWithModule ({ dir = APP, packages = [], network = { transpo
   return kernel
 }
 
-const lanAddress = () => Object.values(networkInterfaces()).flat().find(i => i?.family === 'IPv4' && !i.internal)?.address
 
 async function serve (routes) {
   const server = createServer((req, res) => {
@@ -282,9 +280,7 @@ test('buf reports an unreachable registry', async () => {
 })
 
 test('buf reads a git input over smart HTTP through wasm-git', async () => {
-  const host = lanAddress()
-  assert.ok(host, 'a non-loopback IPv4 address for the realm proxy (it refuses loopback)')
-  const server = await startGitServer({ host })
+  const server = await startGitServer({ name: 'host.slicc.internal' })
   bareRepo(server.root, 'pets', files)
   const kernel = await kernelWithModule({ packages: ['wasm-git'] })
   try {

@@ -71,10 +71,10 @@ export function globRegExp(glob) {
   return new RegExp(`^${re}$`);
 }
 
-function readRecipe(name, ...args) {
-  const r = spawnSync('node', [join(root, 'scripts/read-recipe.mjs'), name, ...args], {
+function readRecipe(name, args, dir = root) {
+  const r = spawnSync('node', [join(dir, 'scripts/read-recipe.mjs'), name, ...args], {
     encoding: 'utf8',
-    cwd: root,
+    cwd: dir,
   });
   if (r.status !== 0) {
     console.error(r.stderr || r.stdout || `read-recipe.mjs ${name} failed`);
@@ -83,17 +83,78 @@ function readRecipe(name, ...args) {
   return (r.stdout || '').trim();
 }
 
+export const TOOLCHAINS = [
+  {
+    name: 'emscripten',
+    uses: /\bem(?:cc|configure|make|cmake|ar|ranlib)\b|\bem\+\+(?![\w+])|\bhomescoop_(?:slicc|em)_/,
+    inputs: ['scripts/install-emsdk.sh', 'scripts/emsdk-patches/**', 'shims/slicc/*.c', 'shims/slicc/*.h', 'shims/slicc/*.js'],
+  },
+  { name: 'binaryen', uses: /\bhomescoop_wasm_opt\b/, inputs: ['scripts/install-emsdk.sh'] },
+  { name: 'wasixcc', uses: /\binstall-wasixcc\.sh\b/, inputs: ['scripts/install-wasixcc.sh'] },
+  { name: 'rust', uses: /\binstall-rust\.sh\b/, inputs: ['scripts/install-rust.sh'] },
+  { name: 'go', uses: /\binstall-go\.sh\b/, inputs: ['scripts/install-go.sh'] },
+  { name: 'wasi-sdk', uses: /\binstall-wasi-sdk\.sh\b/, inputs: ['scripts/install-wasi-sdk.sh'] },
+];
+
+const SHARED = new Set(['scripts/build-common.sh', 'scripts/host-run.sh']);
+
+function code(text) {
+  return text
+    .split('\n')
+    .filter((l) => !/^\s*#/.test(l))
+    .map((l) => l.replace(/\s#\s.*$/, ''))
+    .join('\n');
+}
+
+export function buildScripts(name, dir = root) {
+  const own = join(dir, 'packages', name);
+  if (!existsSync(join(own, 'build.sh'))) return [];
+  const queue = readdirSync(own)
+    .filter((f) => /\.(?:sh|bash)$/.test(f))
+    .sort()
+    .map((f) => `packages/${name}/${f}`);
+  const seen = new Set(queue);
+  const out = [];
+  while (queue.length) {
+    const path = queue.shift();
+    const text = code(readFileSync(join(dir, path), 'utf8'));
+    out.push({ path, text });
+    for (const m of text.matchAll(/\bscripts\/([A-Za-z0-9._-]+\.sh)\b/g)) {
+      const ref = `scripts/${m[1]}`;
+      if (seen.has(ref) || SHARED.has(ref) || !existsSync(join(dir, ref))) continue;
+      seen.add(ref);
+      queue.push(ref);
+    }
+  }
+  return out;
+}
+
+export function toolchainInputs(name, dir = root, recipe = null) {
+  const r = recipe || JSON.parse(readRecipe(name, ['--json'], dir));
+  if ((r.builder || 'slicc') !== 'host') return [];
+  if (r.repack && typeof r.repack === 'object' && r.repack.from) return [];
+  const scripts = buildScripts(name, dir);
+  const globs = [];
+  for (const t of TOOLCHAINS) {
+    if (scripts.some((s) => t.uses.test(s.text))) globs.push(...t.inputs);
+  }
+  for (const s of scripts) if (s.path.startsWith('scripts/')) globs.push(s.path);
+  return [...new Set(globs)];
+}
+
 function recipeInputs() {
   const out = [];
   for (const name of readdirSync(join(root, 'packages')).sort()) {
     const file = join(root, 'packages', name, 'recipe.yaml');
-    if (!existsSync(file) || !/^inputs:/m.test(readFileSync(file, 'utf8'))) continue;
-    const globs = JSON.parse(readRecipe(name, '--json')).inputs;
+    if (!existsSync(file)) continue;
+    const recipe = JSON.parse(readRecipe(name, ['--json']));
+    const globs = /^inputs:/m.test(readFileSync(file, 'utf8')) ? recipe.inputs : [];
     if (!Array.isArray(globs) || globs.some((g) => typeof g !== 'string' || !g)) {
       console.error(`packages/${name}/recipe.yaml: inputs must be a list of path globs`);
       process.exit(1);
     }
-    out.push({ name, res: globs.map(globRegExp) });
+    const all = [...globs, ...toolchainInputs(name, root, recipe)];
+    if (all.length) out.push({ name, res: all.map(globRegExp) });
   }
   return out;
 }
@@ -113,7 +174,7 @@ function packagesFromPaths(paths, publishable) {
   const set = new Set();
   for (const name of names) {
     if (!existsSync(join(root, 'packages', name, 'recipe.yaml'))) continue;
-    if (readRecipe(name, '--field', 'builder') === 'retired') continue;
+    if (readRecipe(name, ['--field', 'builder']) === 'retired') continue;
     set.add(name);
   }
   return [...set].sort();

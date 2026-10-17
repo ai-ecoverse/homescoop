@@ -1,27 +1,34 @@
 /**
- * Concurrent gpg runs on one homedir (homescoop#712). gnupg's dotlock takes
- * <file>.lock with link() + st_nlink, and slicc-kernel's OPFS root has no
- * hard links (slicc-kernel#563), so up to 2.4.9-7 it fell back to an O_EXCL
- * lock file that raced: of four parallel --quick-gen-key runs in one homedir
- * some logged "Oops, '…/pubring.kbx.lock' is not locked" / "error reading
- * lockfile" / "lockfile disappeared" and lost their key. Since 2.4.9-8
- * dotlock on WASI holds an fcntl write lock on the lock file
- * (slicc.fcntl_lock, slicc-kernel >= 1.100.0), which the kernel releases
- * when its holder exits.
+ * Concurrent gpg runs on one homedir (homescoop#712).
  *
- * 1. Exclusion, deterministically: a ruby process holds an fcntl write lock
- *    on pubring.kbx.lock; gpg must say "waiting for lock" and write its key
- *    only after the release.
- * 2. Four parallel --quick-gen-key runs, as root and as cone: no lock errors,
- *    and every run that succeeded has its key in the keyring. A run may
- *    still fail an unlocked read of the keybox (keydb_search: "No such file
- *    or directory", or "invalid packet"): a WASIX process's rename over a
- *    file isn't atomic for other processes in slicc-kernel 1.106.2
- *    (ai-ecoverse/slicc-kernel#903), and gpg reads the keybox without the
- *    lock while another gpg renames its update into place. Such a run fails
- *    cleanly and writes nothing; the spec counts it and logs it.
+ * 1. Exclusion: a ruby process holds an fcntl write lock on
+ *    pubring.kbx.lock; gpg must say "waiting for lock" and write its key
+ *    only after the release (2.4.9-8: dotlock as an fcntl lock, since OPFS
+ *    has no hard links, slicc-kernel#563).
+ * 2. Six gpg --import runs of six distinct keys at once into a fresh
+ *    homedir, three rounds as root and one as cone (slicc-bios#496's test):
+ *    every run exits 0, every key is in the keyring, and no run logs an
+ *    error. 2.4.9-8 loses keys here: a gpg that probes pubring.kbx while
+ *    another creates it sees an empty file, takes it for a pubring.gpg
+ *    keyring and fails with "invalid packet (ctb=00)" (2.4.9-9 creates the
+ *    keybox by renaming a complete file into place).
+ * 3. Four parallel --quick-gen-key runs in one homedir: all succeed and
+ *    keep their keys, --check-trustdb is clean. No tolerance for unlocked
+ *    keybox reads: renames are atomic for other processes since
+ *    slicc-kernel 1.117.2 (slicc-kernel#925, homescoop#934).
  */
 const N = 4;
+
+// Six distinct public keys (ed25519, uids tide1 … tide6 <tideN@example.test>).
+const KEYS = [
+  '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',
+];
+
 
 // Holds F_WRLCK on ARGV[0] until gpg's log (ARGV[1]) says it waits, then 1 s
 // more (at most 60 s).
@@ -65,9 +72,30 @@ export default async function (ctx) {
   assert.match(ex, /waiting for lock .*pubring\.kbx\.lock/, `gpg waits for the lock (2.4.9-7 doesn't):\n${ex}`);
   assert.match(ex, /^uid U0 <u0@example\.org>\nuid U1 <u1@example\.org>$/m, `both keys:\n${ex}`);
 
-  // 2. Parallel runs in one homedir.
+  // 2. Six concurrent imports of distinct keys into a fresh homedir.
   await addUser({ name: 'cone' });
-  let raced = 0;
+  await write('/tmp/gpg-keys.b64', KEYS.join('\n') + '\n');
+  await sh(`i=0; while read -r k; do i=$((i + 1)); echo "$k" | base64 -d > /tmp/gpg-key-$i.gpg; done < /tmp/gpg-keys.b64; chmod 644 /tmp/gpg-key-*.gpg`);
+  const rounds = [['root', 1], ['root', 2], ['root', 3], ['cone', 4]];
+  for (const [user, round] of rounds) {
+    const gh = `${user === 'root' ? '/root' : `/home/${user}`}/imp${round}`;
+    const out = await sh([
+      `rm -rf ${gh} ${gh}.*.log; mkdir -m 700 -p ${gh}`,
+      `for i in $(seq ${KEYS.length}); do (gpg --homedir ${gh} --batch --import /tmp/gpg-key-$i.gpg > ${gh}.$i.log 2>&1; echo "rc$i=$?" >> ${gh}.$i.log) & done; wait`,
+      `for i in $(seq ${KEYS.length}); do echo "== $i"; cat ${gh}.$i.log; done`,
+      `echo "== list"; GNUPGHOME=${gh} ${UIDS}`,
+      `gpgconf --homedir ${gh} --kill gpg-agent`,
+    ].join('\n'), { cwd: gh.replace(/\/imp\d$/, ''), ...(user === 'cone' && { user }) });
+    const runs = out.split(/^== /m).slice(1, KEYS.length + 1);
+    for (let i = 1; i <= KEYS.length; i++) {
+      assert.match(runs[i - 1], new RegExp(`^rc${i}=0$`, 'm'), `${user} round ${round}: import ${i} exits 0:\n${out}`);
+      assert.doesNotMatch(runs[i - 1], /error|invalid|failed|Oops|lockfile|can't lock|not locked/i, `${user} round ${round}: import ${i} logs no error:\n${out}`);
+    }
+    const listed = new Set(out.match(/^uid tide\d <tide\d@example\.test>$/gm) ?? []);
+    assert.equal(listed.size, KEYS.length, `${user} round ${round}: all ${KEYS.length} keys kept:\n${out}`);
+  }
+
+  // 3. Parallel --quick-gen-key in one homedir.
   for (const user of ['root', 'cone']) {
     const gh = `${user === 'root' ? '/root' : `/home/${user}`}/cg`;
     const out = await sh([
@@ -78,20 +106,16 @@ export default async function (ctx) {
       'gpg --batch --check-trustdb > /dev/null 2>&1; echo "trustdb=$?"',
       'gpgconf --kill gpg-agent',
     ].join('\n'), { cwd: gh.replace(/\/cg$/, ''), ...(user === 'cone' && { user }) });
-    assert.doesNotMatch(out, /Oops|lockfile|can't lock|not locked|lock '.*' not made|No agent running/i, `${user}: no lock errors:\n${out}`);
+    assert.doesNotMatch(out, /Oops|lockfile|can't lock|not locked|lock '.*' not made|No agent running|invalid packet|keydb_search failed/i, `${user}: no lock or keybox errors:\n${out}`);
     const listed = new Set(out.match(/^uid U\d <u\d@example\.org>$/gm) ?? []);
     const runs = out.split(/^== /m).slice(1, N + 1);
     for (let i = 1; i <= N; i++) {
-      const ok = new RegExp(`^rc${i}=0$`, 'm').test(runs[i - 1]);
-      if (ok) assert.ok(listed.has(`uid U${i} <u${i}@example.org>`), `${user}: run ${i} succeeded, so its key is in the keyring:\n${out}`);
-      else {
-        assert.match(runs[i - 1], /keydb_search failed: No such file or directory|invalid packet|already exists/, `${user}: run ${i} failed only on an unlocked keybox read (slicc-kernel rename):\n${out}`);
-        raced += 1;
-      }
+      assert.match(runs[i - 1], new RegExp(`^rc${i}=0$`, 'm'), `${user}: --quick-gen-key ${i} exits 0:\n${out}`);
+      assert.ok(listed.has(`uid U${i} <u${i}@example.org>`), `${user}: key ${i} is in the keyring:\n${out}`);
     }
     assert.match(out, /^trustdb=0$/m, `${user}: --check-trustdb:\n${out}`);
   }
   const floor = ctx.installed?.[0]?.engines?.['slicc-kernel'];
-  assert.equal(floor, '>=1.100.0', `engines.slicc-kernel is >=1.100.0, the first kernel with slicc.fcntl_lock: ${floor}`);
-  console.log(`concurrent: gpg waits for an fcntl holder of pubring.kbx.lock; ${N} parallel --quick-gen-key in one homedir, as root and cone: no lock errors, every successful run's key kept (${raced} run(s) hit the unlocked-read rename race)`);
+  assert.equal(floor, '>=1.117.2', `engines.slicc-kernel is >=1.117.2: slicc.fcntl_lock (1.100.0) and renames atomic for other processes (slicc-kernel#925): ${floor}`);
+  console.log(`concurrent: gpg waits for an fcntl holder of pubring.kbx.lock; ${KEYS.length} concurrent imports into a fresh homedir, 3 rounds as root and 1 as cone, keep every key with no errors; ${N} parallel --quick-gen-key as root and cone all succeed`);
 }

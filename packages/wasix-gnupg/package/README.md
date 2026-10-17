@@ -46,12 +46,16 @@ decrypt yet).
   failed with "Oops, … is not locked" or "lockfile disappeared". The lock
   files stay in place. `gpgconf --lock`/`--unlock` still use the old lock
   file protocol and don't exclude a running gpg.
-- gpg reads the keybox without a lock. A WASIX program's rename over a
-  file isn't atomic for other processes yet (ai-ecoverse/slicc-kernel#903),
-  so a gpg that reads while another one writes can fail with
-  `keydb_search failed: No such file or directory` or `invalid packet`.
-  The failing run writes nothing, so run it again. The keybox's backup
-  (`pubring.kbx~`) is a copy, so the keybox name is always there.
+- Concurrent gpg runs in a fresh homedir (2.4.9-9, homescoop#712): gpg
+  reads the keybox without a lock and takes an empty `pubring.kbx` for an
+  old-style keyring. Up to 2.4.9-8 gpg created the keybox empty and wrote
+  its header afterwards, so of six concurrent `gpg --import` runs into a
+  new homedir some failed with `invalid packet (ctb=00)` and lost their
+  key. 2.4.9-9 writes the new keybox to `pubring.kbx.tmp` and renames it
+  into place, which is atomic for other processes from slicc-kernel
+  1.117.2 (engines floor; ai-ecoverse/slicc-kernel#925). Updates already
+  replace the keybox by a rename, and its backup (`pubring.kbx~`) is a
+  copy, so the keybox name is always there.
 
 ## How it is built
 
