@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# wasix-sysroot 2025.9.30-32 on any host (CI): the published -14 package,
-# byte for byte, plus slicc_stat_owner.o in every libc.a (replacing fstat.o
-# and fstatat.o; -15, d292a32) and slicc_fs file modes (-16/-17, homescoop#169):
-# patches/posix.c and patches/at_fdcwd.c replace posix.o and at_fdcwd.o.
-# The full rebuild in
-# build.sh (stage ~/.wasixcc, rebuild the libc++ runtimes) stays local:
-# HOMESCOOP_WASIX_SYSROOT_FULL=1.
+# wasix-sysroot 2025.9.30-33 on any host (CI): build-source.sh builds the five
+# variants from wasix-libc v2026-07-03.1 and llvm-project 6bb93a24 (homescoop#890),
+# and the steps below layer the -15…-32 libc changes on them.
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
@@ -14,30 +10,32 @@ source "$ROOT/scripts/build-common.sh"
 VARIANTS=(sysroot sysroot-eh sysroot-ehpic sysroot-exnref-eh sysroot-exnref-ehpic)
 PIC_VARIANTS=" sysroot-ehpic sysroot-exnref-ehpic "
 
-# recipe.yaml source: the published -14 tarball, sha256-pinned.
 homescoop_load_recipe wasix-sysroot
-BASE_TGZ="$WORK/$(basename "$SRC_URL")"
-BASE_VER="$(basename "$SRC_URL" .tgz)"
-BASE_VER="${BASE_VER#wasix-sysroot-}"
-homescoop_fetch "$SRC_URL" "$SRC_SHA" "$BASE_TGZ"
-
-# Pinned WASIX toolchain (clang 21 + llvm-ar), in WORK so a developer's
-# ~/.wasixcc is neither used nor touched.
 PKG="$HOMESCOOP_PKG/package"
-eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
-CLANG="$WASIXCC_LLVM_LOCATION/bin/clang"
-LLVM_AR="$WASIXCC_LLVM_LOCATION/bin/llvm-ar"
+BASE="$WORK/source-out"
+if [[ -z "${HOMESCOOP_SYSROOT_SOURCE_REUSE:-}" || ! -f "$BASE/.done" ]]; then
+  bash "$HOMESCOOP_PKG/build-source.sh" "$BASE"
+fi
+BASE_VER="wasix-libc v2026-07-03.1 + llvm-project 6bb93a24 (from source)"
+CLANG="$WORK/source-llvm/bin/clang"
+LLVM_AR="$WORK/source-llvm/bin/llvm-ar"
+LLVM_NM="$WORK/source-llvm/bin/llvm-nm"
 RES="$("$CLANG" -print-resource-dir)"
 test -x "$CLANG" && test -x "$LLVM_AR" && test -d "$RES"
-
-echo "== wasix-sysroot: base @ai-ecoverse/wasix-sysroot@$BASE_VER"
-BASE="$WORK/wasix-sysroot-base"
-rm -rf "$BASE" && mkdir -p "$BASE"
-tar xzf "$BASE_TGZ" -C "$BASE" --no-same-owner
+arx() {
+  local lib=$1 list m
+  shift
+  list="$("$LLVM_AR" t "$lib")"
+  local -a want=()
+  for m in "$@"; do
+    case $'\n'"$list"$'\n' in *$'\n'"$m"$'\n'*) want+=("$m") ;; esac
+  done
+  if [ "${#want[@]}" -gt 0 ]; then "$LLVM_AR" x "$lib" "${want[@]}"; fi
+}
 for v in "${VARIANTS[@]}"; do
-  test -f "$BASE/package/$v/lib/wasm32-wasip1/libc.a"
+  test -f "$BASE/$v/lib/wasm32-wasip1/libc.a"
   rm -rf "${PKG:?}/$v"
-  cp -R "$BASE/package/$v" "$PKG/$v"
+  cp -R "$BASE/$v" "$PKG/$v"
 done
 
 echo "== wasix-sysroot: compile slicc_stat_owner.c"
@@ -78,7 +76,7 @@ for v in "${VARIANTS[@]}"; do
 done
 
 # -16: file modes through the kernel's slicc_fs imports (slicc-kernel#197).
-# Upstream v2025-09-02.1 sources with chmod/fchmod/fchmodat/umask and
+# Upstream v2026-07-03.1 sources with chmod/fchmod/fchmodat/umask and
 # create modes added; see patches/README.md. Same target features as the
 # shipped posix.o (no simd), so the objects stay link-compatible.
 echo "== wasix-sysroot: compile slicc_fs posix.c / at_fdcwd.c"
@@ -97,7 +95,7 @@ for src in posix at_fdcwd; do
   compile_fs "$src" "$FS_OBJ/static/$src.o"
   compile_fs "$src" "$FS_OBJ/pic/$src.o" -fPIC -fvisibility=default
 done
-LLVM_NM="$WASIXCC_LLVM_LOCATION/bin/llvm-nm"
+LLVM_NM="$WORK/source-llvm/bin/llvm-nm"
 defined() { "$LLVM_NM" --defined-only -j "$1" | sort -u; }
 
 echo "== wasix-sysroot: replace posix.o and at_fdcwd.o in every libc.a"
@@ -107,10 +105,10 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$WORK/slicc-fs/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" posix.o at_fdcwd.o)
+  (cd "$old" && arx "$lib" posix.o at_fdcwd.o)
   for src in posix at_fdcwd; do
     # The patched file must define everything the shipped object did: a
-    # mismatch means the base libc is not v2025-09-02.1.
+    # mismatch means the base libc is not v2026-07-03.1.
     missing="$(comm -23 <(defined "$old/$src.o") <(defined "$FS_OBJ/$flavour/$src.o"))"
     if [[ -n "$missing" ]]; then
       echo "homescoop: $v $src.o: patched source lacks: $missing" >&2
@@ -129,9 +127,8 @@ done
 # 2025b44a5d); sigaction reports dispositions to the kernel through
 # slicc.sigaction_set (ENOSYS on older kernels, ignored). See patches/README.md.
 echo "== wasix-sysroot: -18 members (pselect, chdir, __tz, socketpair, sigaction; -32: sigaction seeds inherited SIG_IGN from slicc.sigaction_inherited)"
-homescoop_load_recipe wasix-sysroot --source wasix_libc
-LIBC_TGZ="$WORK/$(basename "$WASIX_LIBC_SRC_URL")"
-homescoop_fetch "$WASIX_LIBC_SRC_URL" "$WASIX_LIBC_SRC_SHA" "$LIBC_TGZ"
+LIBC_TGZ="$WORK/$(basename "$SRC_URL")"
+homescoop_fetch "$SRC_URL" "$SRC_SHA" "$LIBC_TGZ"
 LIBC_SRC="$WORK/wasix-libc-src"
 rm -rf "$LIBC_SRC" && mkdir -p "$LIBC_SRC"
 tar xzf "$LIBC_TGZ" -C "$LIBC_SRC" --strip-components=1
@@ -163,7 +160,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R18_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" pselect.o chdir.o __tz.o socketpair.o sigaction.o)
+  (cd "$old" && arx "$lib" pselect.o chdir.o __tz.o socketpair.o sigaction.o)
   for m in pselect chdir __tz socketpair sigaction; do
     missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R18_OBJ/$flavour/$m.o"))"
     if [[ -n "$missing" ]]; then
@@ -206,7 +203,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R19_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" setitimer.o getitimer.o clock_nanosleep.o sleep.o raise.o pthread_kill.o)
+  (cd "$old" && arx "$lib" setitimer.o getitimer.o clock_nanosleep.o sleep.o raise.o pthread_kill.o)
   for m in "${R19[@]}"; do
     missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R19_OBJ/$flavour/$m.o"))"
     if [[ -n "$missing" ]]; then
@@ -218,7 +215,7 @@ for v in "${VARIANTS[@]}"; do
   [[ -z "$missing" ]] || { echo "homescoop: $v setitimer.o lacks getitimer.o's $missing" >&2; exit 1; }
   "$LLVM_AR" d "$lib" getitimer.o
   "$LLVM_AR" r "$lib" $(printf "$R19_OBJ/$flavour/%s.o " "${R19[@]}")
-  if "$LLVM_NM" -j "$lib" 2>/dev/null | grep -qx __homescoop_itimer_real_left; then
+  if grep -qx __homescoop_itimer_real_left <<<"$("$LLVM_NM" -j "$lib" 2>/dev/null)"; then
     echo "homescoop: $lib still has __homescoop_itimer_real_left" >&2; exit 1
   fi
   undef="$("$LLVM_NM" -u "$lib" 2>/dev/null)"
@@ -237,7 +234,7 @@ echo "== wasix-sysroot: -20 members (slicc_identity, musl passwd)"
 R20_OBJ="$WORK/r20"
 rm -rf "$R20_OBJ" && mkdir -p "$R20_OBJ/static" "$R20_OBJ/pic"
 PASSWD=(getpwent getpw_r getgrent getgr_r)
-R20_DROP=(setuid.o seteuid.o setgid.o setegid.o setgroups.o)
+R20_DROP=(setuid.o seteuid.o setgid.o setegid.o setgroups.o getuid.o geteuid.o getgid.o getegid.o)
 exported() { "$LLVM_NM" --defined-only --extern-only -j "$1" | sort -u; }
 compile_r20() {
   local src=$1 out=$2; shift 2
@@ -262,7 +259,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R20_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" slicc_identity.o "${R20_DROP[@]}")
+  (cd "$old" && arx "$lib" slicc_identity.o "${R20_DROP[@]}")
   # Every global the replaced members defined is still defined.
   missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(for m in slicc_identity "${PASSWD[@]}"; do exported "$R20_OBJ/$flavour/$m.o"; done | sort -u))"
   if [[ -n "$missing" ]]; then
@@ -271,7 +268,7 @@ for v in "${VARIANTS[@]}"; do
   fi
   "$LLVM_AR" d "$lib" "${R20_DROP[@]}"
   "$LLVM_AR" r "$lib" "$R20_OBJ/$flavour/slicc_identity.o" $(printf "$R20_OBJ/$flavour/%s.o " "${PASSWD[@]}")
-  "$LLVM_AR" t "$lib" | grep -qx getpw_r.o
+  grep -qx getpw_r.o <<<"$("$LLVM_AR" t "$lib")"
   grep -q __slicc_cred_get <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.cred_get" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
@@ -320,7 +317,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R21_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" tcgetattr.o tcsetattr.o tcflush.o tcdrain.o ioctl.o isatty.o)
+  (cd "$old" && arx "$lib" tcgetattr.o tcsetattr.o tcflush.o tcdrain.o ioctl.o isatty.o)
   for m in "${R21_TOP[@]}" "${R21_BOTTOM[@]}"; do
     missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R21_OBJ/$flavour/$m.o"))"
     if [[ -n "$missing" ]]; then
@@ -342,7 +339,7 @@ done
 # crt1 and no marker; the main program's counts. See patches/README.md.
 VER="$(node -p "require('$PKG/package.json').version")"
 echo "== wasix-sysroot: -22 slicc.libc marker \"wasix-sysroot $VER\" in every crt1*.o"
-WASM_LD="$WASIXCC_LLVM_LOCATION/bin/wasm-ld"
+WASM_LD="$WORK/source-llvm/bin/wasm-ld"
 MARK="$WORK/r22"
 rm -rf "$MARK" && mkdir -p "$MARK"
 printf '__asm__(".section .custom_section.slicc.libc,\\"\\",@\\n.ascii \\"wasix-sysroot %s\\"\\n.text\\n");\n' "$VER" > "$MARK/marker.c"
@@ -370,7 +367,7 @@ for v in $PIC_VARIANTS; do
   lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
   old="$R23_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" fork.o _Fork.o)
+  (cd "$old" && arx "$lib" fork.o _Fork.o)
   stubs="$(for m in "${R23[@]}"; do exported "$old/$m.o" 2>/dev/null; done)"
   if grep -qxE 'fork|_Fork|_fork_internal' <<<"$stubs"; then
     echo "homescoop: $v fork.o/_Fork.o are no longer upstream's empty EH stubs" >&2
@@ -400,7 +397,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R24_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" "${R24_DROP[@]}")
+  (cd "$old" && arx "$lib" "${R24_DROP[@]}")
   missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(exported "$R24_OBJ/$flavour/slicc_chown.o"))"
   [[ -z "$missing" ]] || { echo "homescoop: $v slicc_chown.o lacks: $missing" >&2; exit 1; }
   "$LLVM_AR" d "$lib" "${R24_DROP[@]}"
@@ -446,7 +443,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R25_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" faccessat.o)
+  (cd "$old" && arx "$lib" faccessat.o)
   missing="$(comm -23 <(defined "$old/faccessat.o") <(defined "$R25_OBJ/$flavour/faccessat.o"))"
   [[ -z "$missing" ]] || { echo "homescoop: $v faccessat.o: patched source lacks: $missing" >&2; exit 1; }
   "$LLVM_AR" r "$lib" "$R25_OBJ/$flavour/faccessat.o"
@@ -475,8 +472,8 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R27_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old/emu"
-  (cd "$old" && "$LLVM_AR" x "$lib" utimensat.o futimens.o clock.o times.o getrusage.o)
-  (cd "$old/emu" && "$LLVM_AR" x "$emu" clock.o)
+  (cd "$old" && arx "$lib" utimensat.o futimens.o clock.o times.o getrusage.o)
+  (cd "$old/emu" && arx "$emu" clock.o)
   missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(for m in utimens cputime; do exported "$R27_OBJ/$flavour/$m.o"; done | sort -u))"
   [[ -z "$missing" ]] || { echo "homescoop: $v -27 members lack: $missing" >&2; exit 1; }
   missing="$(comm -23 <(exported "$old/emu/clock.o") <(exported "$R27_OBJ/$flavour/emulated_clock.o"))"
@@ -504,7 +501,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R28_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" "${R28_DROP[@]}")
+  (cd "$old" && arx "$lib" "${R28_DROP[@]}")
   missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(exported "$R28_OBJ/$flavour/sigmask.o"))"
   [[ -z "$missing" ]] || { echo "homescoop: $v sigmask.o lacks: $missing" >&2; exit 1; }
   "$LLVM_AR" d "$lib" "${R28_DROP[@]}"
@@ -532,7 +529,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R29_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" poll.o epoll.o)
+  (cd "$old" && arx "$lib" poll.o epoll.o)
   for m in poll epoll; do
     missing="$(comm -23 <(exported "$old/$m.o") <(exported "$R29_OBJ/$flavour/$m.o"))"
     [[ -z "$missing" ]] || { echo "homescoop: $v $m.o: the patched source lacks: $missing" >&2; exit 1; }
@@ -552,17 +549,23 @@ R30_DROP=(sem_destroy.o sem_getvalue.o sem_init.o sem_open.o sem_post.o sem_time
 rm -rf "$R30_OBJ" && mkdir -p "$R30_OBJ/static" "$R30_OBJ/pic"
 compile_r20 "$HOMESCOOP_PKG/patches/sem.c" "$R30_OBJ/static/sem.o" "${MUSL_INC[@]}" -I"$MUSL/src/thread" -D_WASI_EMULATED_MMAN
 compile_r20 "$HOMESCOOP_PKG/patches/sem.c" "$R30_OBJ/pic/sem.o" "${MUSL_INC[@]}" -I"$MUSL/src/thread" -D_WASI_EMULATED_MMAN -fPIC -fvisibility=default
+compile_r20 "$MUSL/src/mman/shm_open.c" "$R30_OBJ/static/shm_open.o" "${MUSL_INC[@]}" -D_WASI_EMULATED_MMAN
+compile_r20 "$MUSL/src/mman/shm_open.c" "$R30_OBJ/pic/shm_open.o" "${MUSL_INC[@]}" -D_WASI_EMULATED_MMAN -fPIC -fvisibility=default
 for v in "${VARIANTS[@]}"; do
   lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
   flavour=static
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R30_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" "${R30_DROP[@]}")
-  missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(exported "$R30_OBJ/$flavour/sem.o"))"
+  (cd "$old" && arx "$lib" "${R30_DROP[@]}")
+  have_shm=0
+  grep -qx shm_open.o <<<"$("$LLVM_AR" t "$lib")" && have_shm=1
+  news=("$R30_OBJ/$flavour/sem.o")
+  ((have_shm)) || news+=("$R30_OBJ/$flavour/shm_open.o")
+  missing="$(comm -23 <(for o in "$old"/*.o; do exported "$o"; done | sort -u) <(for o in "${news[@]}"; do exported "$o"; done | sort -u))"
   [[ -z "$missing" ]] || { echo "homescoop: $v sem.o lacks: $missing" >&2; exit 1; }
   "$LLVM_AR" d "$lib" "${R30_DROP[@]}"
-  "$LLVM_AR" r "$lib" "$R30_OBJ/$flavour/sem.o"
+  "$LLVM_AR" r "$lib" "${news[@]}"
   if grep -qxE 'sem_(destroy|getvalue|init|open|post|timedwait|trywait|unlink|wait)\.o' <<<"$("$LLVM_AR" t "$lib")"; then
     echo "homescoop: $lib still has upstream semaphore members" >&2; exit 1
   fi
@@ -604,7 +607,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R30L_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" fcntl.o)
+  (cd "$old" && arx "$lib" fcntl.o)
   missing="$(comm -23 <(exported "$old/fcntl.o") <(exported "$R30L_OBJ/$flavour/fcntl.o"))"
   [[ -z "$missing" ]] || { echo "homescoop: $v fcntl.o lacks: $missing" >&2; exit 1; }
   if grep -qx lockf.o <<<"$("$LLVM_AR" t "$lib")"; then echo "homescoop: $lib already has lockf.o" >&2; exit 1; fi
@@ -636,7 +639,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R31_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && "$LLVM_AR" x "$lib" $(printf "%s.o " "${R31[@]}"))
+  (cd "$old" && arx "$lib" $(printf "%s.o " "${R31[@]}"))
   for m in "${R31[@]}"; do
     missing="$(comm -23 <(exported "$old/$m.o") <(exported "$R31_OBJ/$flavour/$m.o"))"
     [[ -z "$missing" ]] || { echo "homescoop: $v $m.o: the patched build lacks: $missing" >&2; exit 1; }
@@ -645,8 +648,47 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
-echo "== wasix-sysroot: LICENSE from wasix-libc v2025-09-02.1"
-WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
+echo "== wasix-sysroot: __wasi_proc_raise_interval2 in the PIC trees, as in -32 (patches/proc_raise_interval2.c, homescoop#943)"
+PRI_OBJ="$WORK/pri"
+rm -rf "$PRI_OBJ" && mkdir -p "$PRI_OBJ"
+for v in sysroot-ehpic sysroot-exnref-ehpic; do
+  hdr="$PKG/$v/include/wasi/api_wasix.h"
+  if ! grep -q '__wasi_proc_raise_interval2(' "$hdr"; then
+    python3 - "$hdr" <<'PYHDR'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text()
+mark = "/**\n * Forks the current process into a new subprocess. If the function\n"
+decl = """/**
+ * Send a signal after an initial delay, optionally repeating (it_value + it_interval).
+ * Nanoseconds. Added as proc_raise_interval2; legacy proc_raise_interval unchanged.
+ */
+__wasi_errno_t __wasi_proc_raise_interval2(
+    __wasi_signal_t sig,
+    __wasi_timestamp_t initial,
+    __wasi_timestamp_t interval,
+    __wasi_bool_t repeat
+) __attribute__((__warn_unused_result__));
+"""
+if t.count(mark) != 1:
+    sys.exit(f"{p}: no single proc_fork comment to insert before")
+p.write_text(t.replace(mark, decl + mark))
+PYHDR
+  fi
+  "$CLANG" --target=wasm32-wasip1 --sysroot="$PKG/$v" -resource-dir="$RES" -isystem "$PKG/$v/include" \
+    -matomics -mbulk-memory -mmutable-globals -pthread -O2 -fPIC -fvisibility=default \
+    -c "$HOMESCOOP_PKG/patches/proc_raise_interval2.c" -o "$PRI_OBJ/$v.o"
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  if grep -qx __wasi_proc_raise_interval2 <<<"$(exported "$lib" 2>/dev/null)"; then echo "homescoop: $lib already defines __wasi_proc_raise_interval2" >&2; exit 1; fi
+  cp "$PRI_OBJ/$v.o" "$PRI_OBJ/proc_raise_interval2.o"
+  "$LLVM_AR" r "$lib" "$PRI_OBJ/proc_raise_interval2.o"
+  grep -qx __wasi_proc_raise_interval2 <<<"$(exported "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks __wasi_proc_raise_interval2" >&2; exit 1; }
+  echo "  $v"
+done
+
+echo "== wasix-sysroot: LICENSE from wasix-libc v2026-07-03.1"
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
 LIC="$WORK/licenses"
 mkdir -p "$LIC"
 homescoop_fetch "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 "$LIC/wasix-libc-LICENSE"
@@ -656,6 +698,16 @@ homescoop_fetch "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a7
 homescoop_fetch "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af "$LIC/musl-COPYRIGHT"
 homescoop_fetch "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0 "$LIC/cloudlibc-LICENSE"
 homescoop_stage_licenses "$LIC/wasix-libc-LICENSE" "$LIC/wasix-libc-LICENSE-APACHE-LLVM" "$LIC/wasix-libc-LICENSE-APACHE" "$LIC/wasix-libc-LICENSE-MIT" "$LIC/musl-COPYRIGHT" "$LIC/cloudlibc-LICENSE"
+
+LLS="$WORK/source-llvm-project"
+homescoop_notices_begin "The five sysroots are built from source (build-source.sh): wasix-libc v2026-07-03.1 (https://github.com/wasix-org/wasix-libc/tree/v2026-07-03.1) with our changes in patches/, and the LLVM runtimes from llvm-project 6bb93a243f6d15855f485f5aec3810d9e2de150d, the commit that tag pins (https://github.com/wasix-org/llvm-project/tree/6bb93a243f6d15855f485f5aec3810d9e2de150d). Up to 2025.9.30-32 the libc came from a local build (npm -14) of the same wasix-libc line: its __wasi_proc_spawn3, proc_exec4 and __wasi_context_* symbols first appear in v2026-06-25.1/v2026-07-03.1, not in v2025-09-02.1, which its recipe named."
+homescoop_notice "wasix-libc v2026-07-03.1 (libc, crt, headers; Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT)" "$LIC/wasix-libc-LICENSE" - "$LIC/wasix-libc-LICENSE-APACHE-LLVM" - "$LIC/wasix-libc-LICENSE-MIT" -
+homescoop_notice "musl (libc-top-half; MIT)" "$LIC/musl-COPYRIGHT" -
+homescoop_notice "cloudlibc (libc-bottom-half; BSD-2-Clause)" "$LIC/cloudlibc-LICENSE" -
+homescoop_notice "libc++ 20.1 (llvm-project 6bb93a24; Apache-2.0 WITH LLVM-exception)" "$LLS/libcxx/LICENSE.TXT" -
+homescoop_notice "libc++abi 20.1 (llvm-project 6bb93a24; Apache-2.0 WITH LLVM-exception)" "$LLS/libcxxabi/LICENSE.TXT" -
+homescoop_notice "libunwind 20.1 (llvm-project 6bb93a24; Apache-2.0 WITH LLVM-exception)" "$LLS/libunwind/LICENSE.TXT" -
+homescoop_notice "compiler-rt 20.1 (builtins, profile; llvm-project 6bb93a24; Apache-2.0 WITH LLVM-exception)" "$LLS/compiler-rt/LICENSE.TXT" -
 
 homescoop_assert_no_package_links "$PKG"
 echo "== wasix-sysroot: staged $(node -p "require('$PKG/package.json').version") from $BASE_VER"

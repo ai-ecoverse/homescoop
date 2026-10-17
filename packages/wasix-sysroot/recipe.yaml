@@ -4,16 +4,23 @@ builder: host
 version: "2025.9.30"
 npm: "@ai-ecoverse/wasix-sysroot"
 summary: "WASIX libc/libcxx/compiler-rt sysroots for wasm32-wasi"
-# CI base: the published -14 (build-incremental.sh adds slicc_stat_owner).
 source:
-  url: "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-2025.9.30-14.tgz"
-  sha256: "1a88c9f1b12b0bffaf6502914abc4f1b40443ddccbfa84d8bbc44fc86a0e652e"
+  url: "https://github.com/wasix-org/wasix-libc/archive/refs/tags/v2026-07-03.1.tar.gz"
+  sha256: "55091ce6af5b549b3c97f61592bd2506e6a7e5da3588cb2f77a64388468ad231"
 sources:
-  # wasix-libc at the tag -14's libc was built from: __tz.c (-18) compiles
-  # against its private musl headers (time_impl.h, libc.h, lock.h).
-  wasix_libc:
-    url: "https://github.com/wasix-org/wasix-libc/archive/refs/tags/v2025-09-02.1.tar.gz"
-    sha256: "cfcf126e6e5246dd140ccacf956fb2447952a771723954f5c0766720ee538e9d"
+  llvm_project:
+    url: "https://github.com/llvm/llvm-project/archive/6bb93a243f6d15855f485f5aec3810d9e2de150d.tar.gz"
+    sha256: "b62854f0704e513f2a93a0955a41e08894c60bcf750ba32f26b3637e6fa14b05"
+  llvm_linux_x86_64:
+    url: "https://github.com/wasix-org/llvm-project/releases/download/21.1.206/LLVM-Linux-x86_64-gnu.tar.gz"
+    sha256: "ab32cf976226dc9478c9cb8331fa877163ff34d78b190fb201d6eac92cb7dab0"
+  llvm_macos_aarch64:
+    url: "https://github.com/wasix-org/llvm-project/releases/download/21.1.206/LLVM-MacOS-aarch64.tar.gz"
+    sha256: "0ca2393e0445928fd6614688625415063fdf7842cf41a29e22e68834e648539b"
+notices:
+  not_linked:
+    llvm_linux_x86_64: "wasix-org's LLVM 21.1.206 toolchain, used to build the sysroots; nothing of it ships"
+    llvm_macos_aarch64: "the same toolchain for macOS hosts; nothing of it ships"
 dependencies:
   build: []
   host: []
@@ -22,11 +29,10 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-sysroot
   license: Apache-2.0 WITH LLVM-exception
   notes: |
-    Package root is the SYSROOT_PREFIX (five variants). No commands —
-    consumed by wasm-clang drivers / wasixcc. CI builds 2025.9.30-17 with
-    build-incremental.sh: the published -14 tarball byte for byte plus
-    slicc_stat_owner.o in every libc.a (replacing fstat.o/fstatat.o) and
-    patched posix.o/at_fdcwd.o (file modes via the kernel's slicc_fs
-    imports, homescoop#169), using the pinned install-wasixcc toolchain. The full rebuild (stage a local
-    ~/.wasixcc, rebuild the libc++ runtimes) is build.sh with
-    HOMESCOOP_WASIX_SYSROOT_FULL=1.
+    Package root is the SYSROOT_PREFIX (five variants). No commands:
+    consumed by wasm-clang drivers / wasixcc. Since 2025.9.30-33 (homescoop#890)
+    CI builds everything from source: build-source.sh runs wasix-libc
+    v2026-07-03.1's own build32-general.sh for each variant (libc,
+    compiler-rt, libc++/libc++abi/libunwind from llvm-project 6bb93a24) with
+    wasix-org's LLVM 21.1.206, and build-incremental.sh layers our libc
+    changes (patches/, slicc_*.c) on top. No input comes from our own npm.

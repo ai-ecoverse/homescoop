@@ -8,7 +8,6 @@
 #define sem_open __musl_sem_open
 #define sem_close __musl_sem_close
 #define sem_unlink __musl_sem_unlink
-#define __shm_mapname __musl_sem_shm_mapname
 #include "sem_init.c"
 #include "sem_destroy.c"
 #include "sem_getvalue.c"
