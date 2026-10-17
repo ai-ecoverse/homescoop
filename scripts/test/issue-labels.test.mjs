@@ -99,6 +99,14 @@ describe('the filers', () => {
     assert.match(yml, /issues\.create\(\{[^}]*labels: \[label, 'repro', 'ci'\]/);
   });
 
+  it('cert-review tells its reviewer to label what it files', () => {
+    const yml = readFileSync(new URL('../../.github/workflows/cert-review.yml', import.meta.url), 'utf8');
+    const prompt = yml.slice(yml.indexOf('gh issue create'), yml.indexOf('YOUR ANSWER'));
+    for (const l of ['next-build', 'area:kernel', 'area:python', 'area:sysroot', 'area:toolchain', 'repro', 'license', 'supply-chain', 'data-integrity', 'cert-coverage']) assert.ok(prompt.includes(`\`${l}\``), l);
+    assert.match(prompt, /`--label`/);
+    assert.match(prompt, /\[cert\] <package>: …/);
+  });
+
   it('the fallback (issues opened, plus an hourly sweep for GITHUB_TOKEN filers) runs this script with issues: write only', () => {
     const yml = readFileSync(new URL('../../.github/workflows/issue-labels.yml', import.meta.url), 'utf8');
     assert.match(yml, /issues:\s*\n\s*types: \[opened\]/);
