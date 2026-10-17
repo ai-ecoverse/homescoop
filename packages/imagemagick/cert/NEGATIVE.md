@@ -131,3 +131,8 @@ The ImageMagick code is unchanged, so the negatives above still stand. The first
 ```
 
 The CFLAGS, LDFLAGS, LIBS, CC/CXX and DISTCHECK_CONFIG_FLAGS entries held the runner's checkout path (`…/.homescoop-out/prefix`) and its emsdk cache. In 34-8, build.sh rewrites them to `/prefix` and `/emsdk`, and the build fails if a build path is left. The local build passes wasm-check (darwin-arm64), with `LIBS … -L/prefix/lib/…` and `CC /emsdk/emscripten/emcc`.
+
+## 7.1.2-34-9: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+The release itself only adds the README note on writing `.heic`/`.avif` (homescoop#940). Its version moves with imagemagick-relink, whose kit archives are stripped in this wave. The published 34-8 has no DWARF and no build path, so it passes every spec, and the negatives above still stand.
+

@@ -153,6 +153,11 @@ for h in "$SRC_DIR"/libheif/api/libheif/*.h "$HEIF_BLD"/libheif/heif_version.h; 
 done
 test -f "$PKGDIR/include/libheif/heif.h"
 test -f "$PKGDIR/include/libheif/heif_version.h"
+HS_STAGE="$STAGE" perl -pi -e 's/\Q$ENV{HS_STAGE}\E/\/usr\/local/g' "$PKGDIR/include/libheif/heif_version.h"
+if grep -rqF "$WORK" "$PKGDIR/include"; then
+  echo "homescoop: $PKGDIR/include still names the build directory $WORK (homescoop#908)" >&2
+  exit 1
+fi
 cp -R "$STAGE/include/libde265" "$STAGE/include/dav1d" "$PKGDIR/include/"
 cp -R "$STAGE/include/libde265" "$STAGE/include/dav1d" "$PREFIX/include/"
 homescoop_write_pc libde265 "$LIBDE265_VERSION" "-lde265"

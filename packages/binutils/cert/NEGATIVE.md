@@ -11,3 +11,9 @@ Runs: slicc-kernel 1.110.1, users enforce, `scripts/browser-cert/run.mjs` with t
   ```
   The same happens to the Tag module (13) and to Emscripten's own bash.wasm (sections 1-7, 9, 12, 10, 11, 0): BFD's `wasm-module.c` names ids 1-11 only and gives up on the rest.
 - **This build (2.47.0-5, with `wasm-datacount-tag.patch`)** passes both specs. `size -A` lists `.wasm.datacount` and `.wasm.tag`, and bash.wasm's import, datacount, code and data sections. The Berkeley table prints zeros, since no wasm section is allocated text, data or bss. An unknown id (14) is still `file format not recognized`.
+
+## 2.47.0-6: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+The published 2.47.0-5 also has 90 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/size.wasm, bin/strings.wasm, bin/readelf.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+2.47.0-6 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 2.47.0-5 too; the negative is the #908 check.
