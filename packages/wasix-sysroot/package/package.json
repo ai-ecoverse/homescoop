@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-sysroot",
-  "version": "2025.9.30-33",
+  "version": "2025.9.30-34",
   "description": "WASIX sysroots: st_uid/st_gid, chown and access() through slicc-kernel file owners (getuid()/getgid() on older kernels), file modes via slicc_fs, F_SETFD CLOEXEC fix, select exceptfds, physical chdir, POSIX TZ, socketpair flags, sigaction_set, alarm/setitimer/getitimer, EINTR sleeps, raise/pthread_kill, process credentials from slicc-kernel (no fixed uid 1000), per-fd termios/winsize from slicc-kernel (Linux and WASIX ioctl numbers), fork in the PIC variants, signal masks, poll/ppoll with events 0, epoll_ctl with Linux op numbers, named semaphores through slicc-kernel, wasip1, clang24 exnref",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {

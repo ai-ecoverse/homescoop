@@ -18,6 +18,12 @@ static __wasi_timestamp_t now_ns(void)
 	return t;
 }
 
+static int is_socket(int fd)
+{
+	__wasi_fdstat_t st;
+	return __wasi_fd_fdstat_get(fd, &st) == 0 && (st.fs_filetype == __WASI_FILETYPE_SOCKET_STREAM || st.fs_filetype == __WASI_FILETYPE_SOCKET_DGRAM);
+}
+
 static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_timestamp_t timeout, const sigset_t *mask)
 {
 	__wasi_timestamp_t deadline = 0;
@@ -72,11 +78,18 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 			if (e->type != __WASI_EVENTTYPE_FD_READ && e->type != __WASI_EVENTTYPE_FD_WRITE) continue;
 			struct pollfd *p = (struct pollfd *)(uintptr_t)(e->userdata & ~WATCH);
 			int watch = (e->userdata & WATCH) != 0;
+			int gone = e->error == __WASI_ERRNO_PIPE || (!e->error && (e->fd_readwrite.flags & __WASI_EVENTRWFLAGS_FD_READWRITE_HANGUP));
 			if (e->error == __WASI_ERRNO_BADF) p->revents |= POLLNVAL;
-			else if (e->error == __WASI_ERRNO_PIPE) p->revents |= watch && e->type == __WASI_EVENTTYPE_FD_WRITE ? POLLERR : POLLHUP;
+			else if (gone && e->type == __WASI_EVENTTYPE_FD_WRITE && watch) p->revents |= POLLERR;
+			else if (gone && e->type == __WASI_EVENTTYPE_FD_WRITE && !is_socket(p->fd)) {
+				/* -34 (homescoop#629): a pipe or FIFO write end whose readers are
+				 * gone is writable and in error, as Linux's pipe_poll says: POLLOUT|POLLERR
+				 * (the write then fails with EPIPE). POLLHUP is the read end's. */
+				p->revents |= POLLWRNORM | POLLERR;
+			} else if (e->error == __WASI_ERRNO_PIPE) p->revents |= POLLHUP;
 			else if (e->error) p->revents |= POLLERR;
-			else if (e->fd_readwrite.flags & __WASI_EVENTRWFLAGS_FD_READWRITE_HANGUP) {
-				p->revents |= watch && e->type == __WASI_EVENTTYPE_FD_WRITE ? POLLERR : POLLHUP;
+			else if (gone) {
+				p->revents |= POLLHUP;
 				if (!watch && e->type == __WASI_EVENTTYPE_FD_READ) p->revents |= POLLRDNORM;
 			} else if (watch) {
 				quiet_watch = 1;
