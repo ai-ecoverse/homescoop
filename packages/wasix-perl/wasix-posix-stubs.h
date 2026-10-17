@@ -40,48 +40,12 @@ _Noreturn void siglongjmp(sigjmp_buf, int);
 
 
 /*
- * flock as whole-file fcntl record locks (homescoop#631): wasix-libc has no
- * flock symbol, and until 5.42.0-14 this answered every flock with success,
- * so two autom4te runs raced on one autom4te.cache. slicc-kernel enforces
- * F_SETLK / F_SETLKW between processes from 1.100.0 (slicc.fcntl_lock;
- * engines.slicc-kernel). This is perl's own flock emulation without
- * flock(2) (pp_sys.c, fcntl_emulate_flock), with fcntl's semantics: the
- * lock belongs to the process (fork doesn't inherit it, closing any handle
- * on the file drops it).
+ * flock: libc's own since 5.42.0-19 (wasix-sysroot 2025.9.30-34's flock.c,
+ * slicc.flock in slicc-kernel 1.117.0, homescoop#758, #765). The lock belongs
+ * to the open file description, on any descriptor, and LOCK_EX works on a
+ * read-only handle. -15 to -18 emulated flock here with whole-file fcntl
+ * record locks (per process, regular files only).
  */
-#undef flock
-static inline int homescoop_flock(int fd, int operation) {
-  struct flock fl;
-  memset(&fl, 0, sizeof fl);
-  fl.l_whence = SEEK_SET; /* l_start 0, l_len 0: the whole file */
-  switch (operation & ~LOCK_NB) {
-    case LOCK_SH: fl.l_type = F_RDLCK; break;
-    case LOCK_EX: fl.l_type = F_WRLCK; break;
-    case LOCK_UN: fl.l_type = F_UNLCK; break;
-    default: errno = EINVAL; return -1;
-  }
-  /* slicc-kernel keeps record locks on regular files only. flock(2) on a
-   * pipe, a terminal, /dev/null or a directory succeeds on Linux (scripts
-   * flock STDOUT to serialise children's output): grant it, excluding
-   * nobody, as up to 5.42.0-14 (homescoop#757). */
-  struct stat st;
-  if (fstat(fd, &st) != 0) return -1;
-  if (!S_ISREG(st.st_mode)) return 0;
-  int cmd = (operation & LOCK_NB) ? F_SETLK : F_SETLKW;
-  if (fcntl(fd, cmd, &fl) == 0) return 0;
-  /* fcntl wants a handle open for writing for F_WRLCK and one open for
-   * reading for F_RDLCK; flock takes either on any handle, and scripts lock
-   * read-only lock files with LOCK_EX. On an open handle of the other mode,
-   * take the other kind: LOCK_EX on a read-only handle is a read lock (it
-   * keeps writers out), LOCK_SH on a write-only one a write lock. */
-  if (errno == EBADF && fl.l_type != F_UNLCK && fcntl(fd, F_GETFD) >= 0) {
-    fl.l_type = fl.l_type == F_WRLCK ? F_RDLCK : F_WRLCK;
-    if (fcntl(fd, cmd, &fl) == 0) return 0;
-  }
-  if (errno == EACCES || errno == EAGAIN) errno = EWOULDBLOCK;
-  return -1;
-}
-#define flock(fd, op) homescoop_flock((fd), (op))
 
 #undef lockf
 static inline int homescoop_lockf(int fd, int cmd, off_t len) {
@@ -102,17 +66,8 @@ static inline int homescoop_fchdir(int fd) {
 static inline int homescoop_pause(void) { HOMESCOOP_STUB_ERR; }
 #define pause() homescoop_pause()
 
-#undef mkfifo
-static inline int homescoop_mkfifo(const char *path, mode_t mode) {
-  (void)path; (void)mode; HOMESCOOP_STUB_ERR;
-}
-#define mkfifo(path, mode) homescoop_mkfifo((path), (mode))
-
-#undef mknod
-static inline int homescoop_mknod(const char *path, mode_t mode, dev_t dev) {
-  (void)path; (void)mode; (void)dev; HOMESCOOP_STUB_ERR;
-}
-#define mknod(path, mode, dev) homescoop_mknod((path), (mode), (dev))
+/* mkfifo, mknod: libc's since 5.42.0-19 (wasix-sysroot -34, slicc_fs.path_mkfifo in
+ * slicc-kernel 1.120.0, homescoop#878); up to -18 they failed with EOPNOTSUPP here. */
 
 int eaccess(const char *path, int mode);
 
