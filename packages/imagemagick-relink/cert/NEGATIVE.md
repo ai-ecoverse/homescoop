@@ -64,3 +64,11 @@ The ImageMagick code is unchanged, so the negatives above still stand. The first
 ## 7.1.2-34-8: configure.xml without build paths (homescoop#937; 2026-10-17)
 
 The runtime packages' `configure.xml` no longer holds build paths. The kit's version follows them, because the three packages are one version. The kit itself is unchanged. Its delegate archives, copied from the attested packages, still carry their own build paths in debug info. That belongs to those packages, not this release.
+
+## 7.1.2-34-9: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+`node scripts/check-no-debug.mjs imagemagick-relink` (host-run's #908 check) fails on the published 7.1.2-34-8: 20 file(s) ship 19,309,880 bytes of DWARF.
+
+The published 7.1.2-34-8 also has 652 occurrence(s) of the CI build directory `/tmp/homescoop-work` in share/imagemagick/relink/liblcms2.a, share/imagemagick/relink/libxml2.a, share/imagemagick/relink/libfreetype.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+7.1.2-34-9 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 7.1.2-34-8 too; the negative is the #908 check.

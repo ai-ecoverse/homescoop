@@ -4,7 +4,10 @@ import { join } from 'node:path';
 export default async function ({ assert, dir, stdout, version }) {
   const v = version.replaceAll('.', '\\.');
   assert.match(stdout, new RegExp(`^libwebp encoder ${v} decoder ${v}$`, 'm'), 'WebPGetEncoderVersion and WebPGetDecoderVersion are the recipe version');
-  for (const name of ['lossless', 'lossy', 'sharp-yuv']) assert.match(stdout, new RegExp(`^${name}: \\d+ bytes, 64x48,`, 'm'), `${name} decoded 64x48`);
+  for (const name of ['lossless', 'lossy', 'argb', 'sharp-yuv']) assert.match(stdout, new RegExp(`^${name}: \\d+ bytes, 64x48,`, 'm'), `${name} decoded 64x48`);
+  assert.match(stdout, /^sharp-yuv differs from argb: \d+ vs \d+ bytes$/m, 'use_sharp_yuv changes the bitstream (homescoop#931)');
+  assert.match(stdout, /^sharpyuv \d+\.\d+\.\d+$/m, 'SharpYuvGetVersion through libsharpyuv.pc');
+  assert.match(stdout, /^demux: frame 1 64x48, \d+ bytes$/m, 'WebPDemux frame 1');
   const webp = readFileSync(join(dir, 'probe.webp'));
   assert.equal(webp.toString('latin1', 0, 4), 'RIFF');
   assert.equal(webp.toString('latin1', 8, 12), 'WEBP');

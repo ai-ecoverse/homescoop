@@ -72,3 +72,11 @@ Until 2026-10-16 the cert kernel was 1.88.0, which doesn't answer `env.__syscall
 ## 9.12.0-8: 40 symlink follows (homescoop#461, 2026-10-16)
 
 `symloop.mjs` against the published 9.12.0-7 (slicc-kernel 1.100.4, users enforce): FAIL at 40 follows, with `cat: /tmp/c40/l0: Symbolic link loop`, rc 1. The 39-link chain passes. Emscripten's `FS.lookupPath` ran 40 passes, and the first follows no link, so the 40th follow was already `ELOOP`. 9.12.0-8 is built with `scripts/emsdk-patches/libfs-symloop.patch` (41 passes; the glue has `nlinks <= 40`), and all ten specs pass on it, symloop.mjs included.
+
+## 9.12.0-10: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+`node scripts/check-no-debug.mjs coreutils` (host-run's #908 check) fails on the published 9.12.0-9: 1 file(s) ship 4,396,207 bytes of DWARF.
+
+The published 9.12.0-9 also has 1 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/coreutils.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+9.12.0-10 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 9.12.0-9 too; the negative is the #908 check.

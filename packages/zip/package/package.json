@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-zip",
-  "version": "3.0.0-5",
+  "version": "3.0.0-6",
   "description": "Info-ZIP zip 3.0 + unzip 6.0 for wasm / slicc (emscripten)",
   "license": "Info-ZIP",
   "repository": {
