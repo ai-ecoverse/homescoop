@@ -1,10 +1,10 @@
 const S = '@ai-ecoverse';
 const SCRIPT = String.raw`
-import importlib, json, os, sys
+import importlib, json, os, sys, sysconfig
 top, skip = sys.argv[1], json.loads(sys.argv[2])
 m = importlib.import_module(top)
 site = os.path.dirname(os.path.dirname(os.path.abspath(m.__file__))) if hasattr(m, "__path__") else os.path.dirname(os.path.abspath(m.__file__))
-suffix = ".cpython-314-wasm32-wasix.so"
+suffix = sysconfig.get_config_var("EXT_SUFFIX") or ".cpython-314-wasm32-wasix.so"
 ext, failed = [], []
 for d, _, files in sorted(os.walk(os.path.join(site, top))):
     for f in sorted(files):
