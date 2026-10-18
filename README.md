@@ -107,6 +107,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-poppler`](https://www.npmjs.com/package/@ai-ecoverse/wasm-poppler) | [recipe](packages/poppler) | poppler PDF utilities (pdftotext, pdftoppm, pdfinfo, …) for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-procps`](https://www.npmjs.com/package/@ai-ecoverse/wasm-procps) | [recipe](packages/procps) | procps-ng for slicc (WASM / emscripten, SLICC homescoop); user names from slicc-kernel >= 1.44.0 |
 | [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) | [recipe](packages/py-contourpy) | contourpy for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
+| [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) (dist-tag `python3.15`) | [recipe](packages/py-contourpy3.15) | contourpy for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) | [recipe](packages/py-cycler) | cycler for slicc WASIX CPython |
 | [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fonttools for slicc WASIX CPython |
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
