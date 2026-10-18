@@ -21,6 +21,10 @@ rm -rf "$SRC"
 mkdir -p "$SRC"
 tar -xzf "$PKG_WORK/llvm-project.tar.gz" -C "$SRC" --strip-components=1
 grep -q 'set(LLVM_VERSION_MAJOR 24)' "$SRC/cmake/Modules/LLVMVersion.cmake"
+for p in "$HOMESCOOP_PKG"/patches/*.patch; do
+  echo "== patch $(basename "$p")"
+  patch -p1 -d "$SRC" --no-backup-if-mismatch < "$p"
+done
 
 eval "$(bash "$ROOT/scripts/emscripten-tree.sh" "$PKG_WORK/em")"
 export EM_CONFIG="$EMSCRIPTEN_TREE_CONFIG"
@@ -68,7 +72,7 @@ ninja -C "$BLD" -j"$JOBS" "${TARGETS[@]}" clang-resource-headers
 echo "== llvm-emscripten: stage package/"
 rm -rf "$PKG/lib" "$PKG/objects" "$PKG/include" "$PKG/drivers" "$PKG/manifest.json"
 python3 "$HOMESCOOP_PKG/stage.py" "$SRC" "$BLD" "$PKG_WORK/edges.json" "$PKG" "$COMMIT" \
-  "$EMSCRIPTEN_TREE" "$EMSCRIPTEN_TREE_CACHE" "$ROOT/packages/wasm-emscripten/patches"
+  "$EMSCRIPTEN_TREE" "$EMSCRIPTEN_TREE_CACHE" "$ROOT/packages/wasm-emscripten/patches" "$HOMESCOOP_PKG/patches"
 cp "$SRC/llvm/LICENSE.TXT" "$PKG/LICENSE"
 if find "$PKG" -type l | grep -q .; then
   echo "homescoop: symlinks in the package" >&2

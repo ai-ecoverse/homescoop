@@ -30,3 +30,5 @@ about:
     llvm-objcopy and llvm-symbolizer (no tool is linked here) and ships them
     with lib/clang/24, the headers multicall.cpp needs, the generated driver
     mains and manifest.json, which stage F (wasm-clang) links from.
+    patches/0001 (24.0.0-2) makes getMainExecutable use argv[0] (through
+    PATH) on Emscripten, so clang finds itself for its -cc1 and link jobs.

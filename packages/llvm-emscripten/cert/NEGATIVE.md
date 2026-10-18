@@ -20,3 +20,13 @@
 - The old build tree is gone, so its library set and objects can't be diffed. Stage F's link will compare `llvm.wasm`'s imports, exports and sizes with 24.0.0-21.
 
 **The check is not vacuous.** `test/check.mjs` on a copy of the package without `lib/libLLVMSupport.a` → FAIL, 12 cases: the manifest's file list, all four links, and every run after them. On the real package it passes. clang -O2 -c, then lld, gives a module that computes add(40, 2) = 42 and mul(6, 7) = 42, and llvm-ar and llvm-nm see `T add` and `T mul`.
+
+## 24.0.0-2: getMainExecutable on Emscripten (patches/0001, homescoop#859 stage F)
+
+`node packages/llvm-emscripten/test/check.mjs --tarball` with the published 24.0.0-1 (local, macOS): **FAIL, 3 checks.**
+- manifest.json has no `llvm_patches`.
+- `clang.js -### -v` (found through PATH): `InstalledDir: ` (empty) and `"" "-cc1"`.
+- `clang.js` run by an absolute path: `InstalledDir: ` (empty).
+
+Every other check passes as before. In slicc-kernel, the same empty main executable makes clang spawn `""`, `clang: error: unable to execute command: posix_spawn failed: No such file or directory` (found by thr_t4h9qnrjas linking wasm-clang). thr_t4h9qnrjas checked this patch in the kernel: Path.cpp compiled with it, using the manifest's multicall flags, and linked ahead of libLLVMSupport.a. With it, wasm-clang's run-cc.mjs (r18 to r28w, users enforce) and its cxx-eh cert pass.
+

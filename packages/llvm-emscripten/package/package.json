@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/llvm-emscripten",
-  "version": "24.0.0-1",
+  "version": "24.0.0-2",
   "description": "LLVM/clang/lld 24 (llvm-project b158b0ae) built with emscripten 6.0.9: the objects, static libraries and link manifest @ai-ecoverse/wasm-clang links (a build input)",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {

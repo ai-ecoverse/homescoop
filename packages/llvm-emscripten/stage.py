@@ -7,8 +7,8 @@ import shutil
 import sys
 from pathlib import Path
 
-src, build, edges_path, pkg, commit, em_tree, em_cache, patches = sys.argv[1:]
-src, build, pkg, em_tree, em_cache, patches = map(Path, (src, build, pkg, em_tree, em_cache, patches))
+src, build, edges_path, pkg, commit, em_tree, em_cache, patches, llvm_patches = sys.argv[1:]
+src, build, pkg, em_tree, em_cache, patches, llvm_patches = map(Path, (src, build, pkg, em_tree, em_cache, patches, llvm_patches))
 edges = json.loads(Path(edges_path).read_text())
 
 
@@ -34,6 +34,7 @@ manifest = {
     "emsdk_release": "f04ea239d533260dd1db760dd2d668d5f9a88d6b",
     "wasm_emscripten_patches_sha256": digest.hexdigest(),
     "wasm_emscripten_patches": sorted(p.name for p in patches.glob("*.patch")),
+    "llvm_patches": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(llvm_patches.glob("*.patch"))},
     "sysroot": {"sigset_t": "128-byte (musl alltypes.h __bits[128/sizeof(long)])"},
     "config": {
         "CMAKE_BUILD_TYPE": "Release",
