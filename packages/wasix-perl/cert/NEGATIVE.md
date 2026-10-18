@@ -102,3 +102,10 @@ The new specs against the published tarballs on slicc-kernel 1.100.3's Node entr
 Against the published 5.42.0-18 on slicc-kernel 1.120.2 (Node entry):
 - **`cert/flock.mjs`:** FAIL, `flock on a pipe's two ends (#765): ok granted child-shares after-un-ok`. -18's fcntl emulation grants every lock on a pipe, so the read end's `LOCK_EX|LOCK_NB` is granted while the write end holds `LOCK_EX`. Linux, and -19, give EWOULDBLOCK.
 - **`cert/mkfifo.mjs`:** FAIL, `r: No such file or directory`. -18's `mkfifo` is wasix-posix-stubs.h's EOPNOTSUPP stub, so nothing is created.
+
+## 5.42.0-20: Linux file-type bits (homescoop#1015, #752, #682; 2026-10-18)
+
+- **#1015, `file-type-bits.mjs`:** the published 5.42.0-19 on slicc-kernel 1.120.2 under users enforce fails 5 of 6 assertions: `fifo mode=140600 type=140000`, `sock mode=160755 type=160000`, `IFIFO=140000 IFSOCK=160000 IFMT=160000`, while coreutils `stat -c %f` in the same session gives `1180` and `c1ed`. patches/0009 makes perl report Linux's bits and Fcntl's constants Linux's.
+- **#682 (AF_UNIX bind 'Success'):** no longer reproduces. `unix-socket.mjs` passes on the published 5.42.0-19 (wasix-sysroot -34, slicc-kernel 1.120.2, users enforce), with bind, listen, connect and accept through `IO::Socket::UNIX`, and hostpath/peerpath equal to the path. sysroot -31 fixed bind, and 5.42.0-18's patches/0008 fixed unpack_sockaddr_un.
+- **#752:** 5.42.0-19's description and THIRD-PARTY-NOTICES both name wasix-sysroot 2025.9.30-34. build.sh now fails if the description doesn't name the sysroot it builds on.
+

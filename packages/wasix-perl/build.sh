@@ -108,6 +108,9 @@ PY
   if ! grep -q 'HAS_SOCKADDR_SA_LEN) || defined(__wasi__)' "$SRC/cpan/Socket/Socket.xs"; then
     patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0008-socket-unpack-sockaddr-un-wasi.patch"
   fi
+  if ! grep -q 'homescoop#1015' "$SRC/pp_sys.c"; then
+    patch -d "$SRC" -p1 --no-backup-if-mismatch < "$PKG/patches/0009-stat-linux-file-type-bits-wasi.patch"
+  fi
 
   # Errno_pm.PL picks its errno.h by $^O, the build machine's OS: on a Linux
   # host it reads /usr/include/errno.h. Key it on the target's osname, so
@@ -419,6 +422,12 @@ homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${W
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
   "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
   "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
+
+SYSROOT_VER="$(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version")"
+if ! node -e 'const d = require(process.argv[1]).description; process.exit(d.includes("wasix-sysroot " + process.argv[2] + ":") || d.includes("wasix-sysroot " + process.argv[2] + ")") ? 0 : 1)' "$DEST/package.json" "$SYSROOT_VER"; then
+  echo "homescoop: package.json's description doesn't name the wasix-sysroot it was built on ($SYSROOT_VER) (homescoop#752)" >&2
+  exit 1
+fi
 
 # package.json / README written separately; refresh version stamp if present
 if [[ -f "$DEST/package.json" ]]; then
