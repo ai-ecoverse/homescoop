@@ -295,6 +295,7 @@ typedef struct {
   int flags;
   int started;
   int name_mismatch;
+  int name_check_error;
   int own_set;
   mbedtls_x509_crt own_chain;
   mbedtls_pk_context own_key;
@@ -397,9 +398,19 @@ static int ip_san_matches(const mbedtls_x509_crt *crt, const unsigned char *ip, 
  * the CN_MISMATCH bit. */
 static int dns_name_mismatch(session *s, mbedtls_x509_crt *crt) {
   uint32_t found = 0;
-  mbedtls_x509_crt_verify(crt, s->trust ? &s->trust->roots : NULL, NULL, s->host, &found, NULL, NULL);
+  int ret = s->name_check_error
+                ? s->name_check_error
+                : mbedtls_x509_crt_verify(crt, s->trust ? &s->trust->roots : NULL, NULL, s->host,
+                                          &found, NULL, NULL);
+  /* A check that could not run (an allocation failure, a fatal X.509 error)
+   * is a mismatch: fail closed. */
+  if (ret != 0 && ret != MBEDTLS_ERR_X509_CERT_VERIFY_FAILED) return 1;
   return (found & MBEDTLS_X509_BADCERT_CN_MISMATCH) != 0;
 }
+
+/* Test hook: make the TLS_CLIENT_NO_SNI name check fail with `code`, as an
+ * allocation failure inside it would. It can only make a session stricter. */
+EMSCRIPTEN_KEEPALIVE void tls_test_name_check_error(session *s, int code) { s->name_check_error = code; }
 
 static int on_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags) {
   session *s = ctx;
