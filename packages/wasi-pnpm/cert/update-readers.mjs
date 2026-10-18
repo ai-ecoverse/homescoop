@@ -96,7 +96,12 @@ export default async function (ctx) {
   const mvObs = ((await read('/tmp/mvt-obs')) ?? '').split('\n').filter(Boolean);
   const mvHalf = mvObs.filter((l) => !['absent', 'torn', '240 pj'].includes(l)).length;
   // 10 renames there; an update renames big twice (aside, in) and fresh once.
-  const allowed = mvHalf === 0 ? 0 : Math.ceil((mvHalf / 10) * 3) + 2;
+  // Plus 2 for the kernel's write-behind: a directory renamed right after its
+  // files were written can briefly list fewer of them in another process
+  // (CI saw one sample of 174 of 260 files, no package.json, with 0 in the
+  // mv baseline; homescoop#1212). 12.9.1-10 is half there 30-43 and 146-174
+  // times.
+  const allowed = (mvHalf === 0 ? 0 : Math.ceil((mvHalf / 10) * 3)) + 2;
   console.log(`update-readers: the kernel's mv of a 240-file directory, 10 times: ${mvHalf} of ${mvObs.length} samples half there (allowed per package: ${allowed})`);
 
   await write('/tmp/upd-poll.sh', POLL);
