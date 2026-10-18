@@ -1,14 +1,55 @@
+# matplotlib for slicc WASIX CPython 3.14 (side modules, dlopen).
 name: py-matplotlib
 builder: host
+# renovate: datasource=pypi depName=matplotlib
 version: "3.11.2"
 npm: "@ai-ecoverse/py-matplotlib"
 summary: "matplotlib Agg for slicc WASIX CPython 3.14"
-repack:
-  from: "3.11.2-8"
-  files:
-    - README.md
+source:
+  url: "https://files.pythonhosted.org/packages/e7/c8/9aa712a0afb882649424dd8de8ad9aa6235e796e84c6052e8f6dc1598d0d/matplotlib-{{version}}.tar.gz"
+  sha256: "cec596316640f2b394b8f0daa0ea61a8eae82d017b620b9f202befb972a59ea4"
+sources:
+  # matplotlib's meson subproject wraps (subprojects/*.wrap pin the same sha256s);
+  # build.sh puts them in subprojects/packagecache and meson runs with
+  # --wrap-mode=nodownload.
+  freetype:
+    url: "https://download.savannah.nongnu.org/releases/freetype/freetype-2.14.3.tar.xz"
+    sha256: "36bc4f1cc413335368ee656c42afca65c5a3987e8768cc28cf11ba775e785a5f"
+  harfbuzz:
+    url: "https://github.com/harfbuzz/harfbuzz/releases/download/14.1.0/harfbuzz-14.1.0.tar.xz"
+    sha256: "ee0eb3a1da2c5a28147f12dff55f6c7d60aeeeb29ac7ef334eabe84c8476c105"
+  libraqm:
+    url: "https://github.com/HOST-Oman/libraqm/archive/v0.10.5/libraqm-0.10.5.tar.gz"
+    sha256: "7f3dd21b4b3bd28a36f2c911d31d91a9d69341697713923ef1aac65d56ebcafd"
+  qhull:
+    url: "https://github.com/qhull/qhull/archive/v8.0.2/qhull-8.0.2.tar.gz"
+    sha256: "8774e9a12c70b0180b95d6b0b563c5aa4bea8d5960c15e18ae3b6d2521d64f8b"
+  sheenbidi:
+    url: "https://github.com/Tehreer/SheenBidi/archive/refs/tags/v3.0.0/sheenbidi-3.0.0.tar.gz"
+    sha256: "86c56014034739ba39a24c23eb00323b0bf6f737354f665786015fca842af786"
+  pybind11:
+    url: "https://files.pythonhosted.org/packages/cd/8a/37362fc2b949d5f733a8b0f2ff51ba423914cabefe69f1d1b6aab710f5fe/pybind11-3.0.1-py3-none-any.whl"
+    sha256: "aa8f0aa6e0a94d3b64adfc38f560f33f15e589be2175e103c0a33c6bce55ee89"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-27.tgz"
+    sha256: "2824bccd95f7d45dace30a5d0a74f3384d0390bcadfff38b4e8275c9ade1af37"
+  cxxrt:
+    url: "https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
+    sha256: "54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
+  meson:
+    url: "https://files.pythonhosted.org/packages/9c/07/b48592d325cb86682829f05216e4efb2dc881762b8f1bafb48b57442307a/meson-1.9.1-py3-none-any.whl"
+    sha256: "f824ab770c041a202f532f69e114c971918ed2daff7ea56583d80642564598d0"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.14.2/Python-3.14.2.tgz"
+    sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+reproducible: true
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+notices:
+  not_linked:
+    meson: "build tool"
 dependencies:
-  build: [wasix-python, py-numpy, freetype]
+  build: [wasix-python]
   host: []
   run:
     - wasix-python
@@ -24,4 +65,8 @@ dependencies:
 about:
   license: PSF-2.0
   notes: |
-    Agg backend. FreeType statically linked (PIC wasixcc). No wasm-* runtime deps.
+    Built from the PyPI sdist in CI since 3.11.2-10 (homescoop#211 A5): meson 1.9.1
+    on the host python, matplotlib's own subprojects (FreeType, HarfBuzz, libraqm,
+    SheenBidi, Qhull; sha256-pinned, no download), pybind11 3.0.1 headers, wasixcc
+    side modules (sysroot-ehpic, legacy EH, PIC) against wasix-python 3.14.2-27.
+    Agg backend.

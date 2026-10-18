@@ -20,7 +20,6 @@ const ALLOW = new Map([
   ['coreutils', 808],
   ['curl', 808],
   ['diffutils', 808],
-  ['emscripten-cache', 808],
   ['file', 808],
   ['findutils', 808],
   ['freetype', 808],

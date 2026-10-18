@@ -190,24 +190,6 @@
       "version": "<3.4.11-14",
       "issue": "ai-ecoverse/homescoop#785",
       "why": "sysroot28.mjs expects the wasix-sysroot -30 toolchain record of 3.4.11-14; older builds name -27 or -28"
-    },
-    {
-      "package": "@ai-ecoverse/wasix-gnupg",
-      "spec": "concurrent.mjs",
-      "case": "gpg finishes only after the holder released|gpg waits for the lock|both keys:|no lock errors:|no lock or keybox errors:|so its key is in the keyring|failed only on an unlocked keybox read|keybox set up:|import \\d+ exits 0:|import \\d+ logs no error:|key tide\\d+ kept:|\\d+ keys:|--quick-gen-key \\d+ exits 0:",
-      "kernel": "*",
-      "version": "<2.4.9-8",
-      "issue": "ai-ecoverse/homescoop#712",
-      "why": "concurrent.mjs checks the fcntl dotlock of 2.4.9-8 (#874). Up to 2.4.9-7 dotlock is an O_EXCL lock file, so the fcntl-holder exclusion checks always fail and the parallel-run checks fail on whichever runs lose the race, on any kernel (the bios pin is 2.4.9-5). The existing-keybox rounds (#956) and part 1 (#951) assert the same lock behaviour. Crashes, --check-trustdb and the engines floor are still compared with the reference"
-    },
-    {
-      "package": "@ai-ecoverse/wasix-gnupg",
-      "spec": "concurrent.mjs",
-      "case": "readers round \\d+:|doesn't share its inode number",
-      "kernel": "*",
-      "version": "<2.4.9-10",
-      "issue": "ai-ecoverse/homescoop#966",
-      "why": "The readers round and the inode check test 2.4.9-10's fixes. Up to 2.4.9-8, readers can see a half-written keybox (the creation race fixed in -9, #951); up to 2.4.9-9, every update renames from one pubring.kbx.tmp, so readers can read another file's bytes on kernels before slicc-kernel#954's fix (1.123.1). The bios pin is 2.4.9-5, so these fail on any kernel. 2.4.9-10 and later are held to them."
     }
   ]
 }

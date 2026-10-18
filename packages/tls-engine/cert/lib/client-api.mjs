@@ -24,6 +24,9 @@ import { makeCa, pem } from './x509.mjs';
 const SCRATCH = 64 * 1024;
 const BADARG = -3;
 const INSECURE = 1;
+const NO_SNI = 2;
+const CHAIN_ONLY = 4;
+const SUITES = { TLS_AES_128_GCM_SHA256: 0x1301, TLS_AES_256_GCM_SHA384: 0x1302, TLS_CHACHA20_POLY1305_SHA256: 0x1303, 'ECDHE-ECDSA-AES128-GCM-SHA256': 0xc02b, 'ECDHE-ECDSA-AES256-GCM-SHA384': 0xc02c, 'ECDHE-ECDSA-CHACHA20-POLY1305': 0xcca9 };
 const VERIFY_FAILED = -0x2700;
 const BAD_CERTIFICATE = -0x7a00;
 const BADCERT = { EXPIRED: 0x01, CN_MISMATCH: 0x04, NOT_TRUSTED: 0x08, EXT_KEY_USAGE: 0x1000 };
@@ -81,6 +84,23 @@ class Engine {
         : this.m._tls_client_new(ca, n, 0, 0, flags)
     );
     return ptr || null;
+  }
+  ownCert(s, chain, key, pass = '') {
+    const der = Buffer.concat(chain.map((c) => Buffer.from(c)));
+    const keyBytes = typeof key === 'string' ? Buffer.concat([Buffer.from(key), Buffer.of(0)]) : Buffer.from(key);
+    const passBytes = Buffer.from(pass);
+    const k = this.m._malloc(keyBytes.length);
+    this.m.HEAPU8.set(keyBytes, k);
+    const p = this.m._malloc(passBytes.length + 1);
+    this.m.HEAPU8.set(passBytes, p);
+    try {
+      const ret = this.with(der, (c) => this.m._tls_client_cert(s, c, der.length, k, keyBytes.length, p, passBytes.length));
+      const wiped = this.m.HEAPU8.subarray(k, k + keyBytes.length).every((b) => b === 0) && this.m.HEAPU8.subarray(p, p + passBytes.length).every((b) => b === 0);
+      return { ret, wiped };
+    } finally {
+      this.m._free(k);
+      this.m._free(p);
+    }
   }
 }
 
@@ -263,9 +283,10 @@ async function server(host, { certOpts, tls = {}, onSocket } = {}) {
   return { ...s, leaf: c.der };
 }
 
-async function attempt(port, servername, { store = trust, alpn, flags } = {}) {
+async function attempt(port, servername, { store = trust, alpn, flags, own } = {}) {
   const s = engine.client(store, servername, { alpn, flags });
   assert.ok(s, `tls_client_new: ${engine.strerror(engine.m._tls_last_error())}`);
+  if (own) assert.equal(engine.ownCert(s, ...own).ret, 0);
   const wire = new Wire(engine, s, port);
   const result = await wire.handshake();
   return { wire, result };
@@ -330,6 +351,171 @@ describe('client sessions (slicc-kernel#922)', () => {
     await srv.secure;
     assert.equal(srv.seen.servername, 'dot.test');
     wire.close();
+  });
+
+  for (const [version, cipher] of [['TLSv1.3', 'TLS_AES_256_GCM_SHA384'], ['TLSv1.2', 'ECDHE-ECDSA-AES128-GCM-SHA256']]) {
+    test(`${version}: tls_ciphersuite gives the IANA number of the suite the server picked (#1004)`, async () => {
+      const srv = await server('client.test', { tls: { minVersion: version, maxVersion: version, ciphers: cipher, ciphersuites: version === 'TLSv1.3' ? cipher : undefined } });
+      const s = engine.client(trust, 'client.test');
+      assert.equal(engine.m._tls_ciphersuite(s), 0);
+      const wire = new Wire(engine, s, srv.port);
+      assert.equal(await wire.handshake(), 1);
+      assert.equal(engine.m._tls_ciphersuite(s), SUITES[cipher]);
+      wire.close();
+    });
+  }
+
+  test('a client certificate: a server that requires one accepts it and sees its subject, refuses without, and the key bytes are wiped (#1004)', async () => {
+    const seen = [];
+    const srv = await server('client.test', {
+      tls: { requestCert: true, rejectUnauthorized: true, ca: ca.pem },
+      onSocket: (socket) => {
+        seen.push(socket.getPeerCertificate().subject?.CN);
+        socket.pipe(socket);
+      },
+    });
+    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    const leaf = ca.issue('client.test', publicKey.export({ type: 'spki', format: 'der' }), { eku: '1.3.6.1.5.5.7.3.2' });
+    const keyPem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+    const s = engine.client(trust, 'client.test');
+    assert.deepEqual(engine.ownCert(s, [leaf, ca.der], keyPem), { ret: 0, wiped: true });
+    assert.equal(engine.ownCert(s, [leaf], keyPem).ret, BADARG);
+    const wire = new Wire(engine, s, srv.port);
+    const hs = await wire.handshake();
+    assert.equal(hs, 1, engine.strerror(hs));
+    assert.equal(engine.ownCert(s, [leaf], keyPem).ret, BADARG);
+    const back = wire.read(4);
+    await wire.write(Buffer.from('mtls'));
+    assert.equal((await back).toString(), 'mtls');
+    assert.deepEqual(seen, ['client.test']);
+    wire.close();
+    const bare = await attempt(srv.port, 'client.test');
+    let r = bare.result;
+    if (r === 1) r = await bare.wire.read(1).then((b) => (b.length ? 1 : -1));
+    assert.ok(r < 0, `without a certificate: ${r}`);
+    bare.wire.close();
+  });
+
+  test('tls_last_alert: the server\'s fatal alert, 116 from a TLS 1.3 server wanting a client certificate and 40 from a TLS 1.2 one; -1 without one and for a server session (slicc-kernel#1004)', async () => {
+    const FATAL_ALERT = -0x7780;
+    for (const [version, alert] of [['TLSv1.3', 116], ['TLSv1.2', 40]]) {
+      const srv = await server('client.test', { tls: { minVersion: version, maxVersion: version, requestCert: true, rejectUnauthorized: true, ca: ca.pem } });
+      const { wire, result } = await attempt(srv.port, 'client.test');
+      let r = result;
+      if (r === 1) {
+        assert.equal(engine.m._tls_last_alert(wire.s), -1, 'none before the alert');
+        do {
+          r = engine.m._tls_read(wire.s, engine.scratch, 1);
+          wire.flush();
+        } while (r === 0 && (await wire.more()));
+      }
+      assert.equal(r, FATAL_ALERT, `${version}: ${engine.strerror(r)}`);
+      assert.equal(engine.m._tls_last_alert(wire.s), alert, version);
+      wire.close();
+    }
+    const fine = await server('client.test');
+    const ok = await attempt(fine.port, 'client.test');
+    assert.equal(ok.result, 1);
+    assert.equal(engine.m._tls_last_alert(ok.wire.s), -1);
+    ok.wire.close();
+    const leaf = engine.m._tls_leaf_new();
+    const spki = engine.into((p, max) => engine.m._tls_leaf_spki(leaf, p, max));
+    const der = ca.issue('server.test', spki);
+    assert.equal(engine.with(der, (p) => engine.m._tls_leaf_add_cert(leaf, p, der.length)), 0);
+    const host = engine.with(new TextEncoder().encode('server.test\0'), (p) => engine.m._tls_session_new(leaf, p));
+    assert.ok(host);
+    assert.equal(engine.m._tls_last_alert(host), -1);
+    engine.m._tls_session_free(host);
+    engine.m._tls_leaf_free(leaf);
+  });
+
+  test('a client key: DER, encrypted PEM with its passphrase; refused: a wrong passphrase, a key for another certificate, a chain that is not DER, an empty chain or key (#1004)', async () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    const leaf = ca.issue('client.test', publicKey.export({ type: 'spki', format: 'der' }), { eku: '1.3.6.1.5.5.7.3.2' });
+    const fresh = () => engine.client(trust, 'client.test');
+    assert.equal(engine.ownCert(fresh(), [leaf], privateKey.export({ type: 'pkcs8', format: 'der' })).ret, 0);
+    assert.equal(engine.ownCert(fresh(), [leaf], privateKey.export({ type: 'sec1', format: 'der' })).ret, 0);
+    const locked = privateKey.export({ type: 'pkcs8', format: 'pem', cipher: 'aes-256-cbc', passphrase: 'open sesame' });
+    assert.deepEqual(engine.ownCert(fresh(), [leaf], locked, 'open sesame'), { ret: 0, wiped: true });
+    const wrong = engine.ownCert(fresh(), [leaf], locked, 'wrong');
+    assert.ok(wrong.ret < 0 && wrong.wiped, `wrong passphrase: ${wrong.ret}`);
+    const other = generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey.export({ type: 'pkcs8', format: 'pem' });
+    assert.equal(engine.ownCert(fresh(), [leaf], other).ret, BADARG);
+    assert.ok(engine.ownCert(fresh(), [Buffer.from('junk')], other).ret < 0);
+    assert.equal(engine.ownCert(fresh(), [], other).ret, BADARG);
+    assert.equal(engine.ownCert(fresh(), [leaf], new Uint8Array(0)).ret, BADARG);
+  });
+
+  test('TLS_CLIENT_NO_SNI sends no SNI and still refuses a leaf for another host (#1004)', async () => {
+    const good = await server('client.test');
+    const ok = await attempt(good.port, 'client.test', { flags: NO_SNI });
+    assert.equal(ok.result, 1, engine.strerror(ok.result));
+    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    const late = ca.issue('client.test', publicKey.export({ type: 'spki', format: 'der' }), { eku: '1.3.6.1.5.5.7.3.2' });
+    assert.equal(engine.ownCert(ok.wire.s, [late], privateKey.export({ type: 'pkcs8', format: 'pem' })).ret, BADARG, 'after the handshake started');
+    await good.secure;
+    assert.equal(good.seen.servername, false);
+    ok.wire.close();
+    const wrong = await server('other.test');
+    const refused = await attempt(wrong.port, 'client.test', { flags: NO_SNI });
+    assert.equal(refused.result, VERIFY_FAILED);
+    assert.ok(refused.wire.verify & BADCERT.CN_MISMATCH);
+    refused.wire.close();
+    const dotted = await attempt(good.port, 'client.test.', { flags: NO_SNI });
+    assert.equal(dotted.result, 1);
+    dotted.wire.close();
+    const ipOk = await server('127.0.0.1');
+    const ip = await attempt(ipOk.port, '127.0.0.1', { flags: NO_SNI });
+    assert.equal(ip.result, 1);
+    ip.wire.close();
+    for (const [port, what] of [[good.port, 'a leaf that names the host'], [wrong.port, 'a leaf for another host']]) {
+      const failing = engine.client(trust, 'client.test', { flags: NO_SNI });
+      assert.equal(engine.m._tls_test_name_check_error(failing), 0);
+      const failWire = new Wire(engine, failing, port);
+      assert.equal(await failWire.handshake(), VERIFY_FAILED, `a name check that cannot run fails closed: ${what}`);
+      assert.ok(failWire.verify & BADCERT.CN_MISMATCH);
+      assert.equal(engine.m._tls_test_name_check_error(failing), BADARG, 'not on a session whose handshake started');
+      failWire.close();
+    }
+    const dnsOnly = await server('127.0.0.1', { certOpts: { san: 'dns' } });
+    const ipRefused = await attempt(dnsOnly.port, '127.0.0.1', { flags: NO_SNI });
+    assert.equal(ipRefused.result, VERIFY_FAILED);
+    ipRefused.wire.close();
+  });
+
+  test('TLS_CLIENT_VERIFY_CHAIN_ONLY skips only the name: a wrong host connects and says so, an untrusted or expired chain is still refused, and it cannot be combined with INSECURE (#1004)', async () => {
+    const wrong = await server('other.test');
+    const ok = await attempt(wrong.port, 'client.test', { flags: CHAIN_ONLY });
+    assert.equal(ok.result, 1, engine.strerror(ok.result));
+    assert.equal(ok.wire.verify, 0);
+    assert.equal(engine.m._tls_name_mismatch(ok.wire.s), 1);
+    await wrong.secure;
+    assert.equal(wrong.seen.servername, 'client.test');
+    ok.wire.close();
+    const right = await server('client.test');
+    const match = await attempt(right.port, 'client.test', { flags: CHAIN_ONLY });
+    assert.equal(engine.m._tls_name_mismatch(match.wire.s), 0);
+    match.wire.close();
+    const c = serverCert(makeCa('untrusted'), 'other.test');
+    const untrusted = await listen({ key: c.key, cert: c.cert });
+    servers.push(untrusted.server);
+    const refused = await attempt(untrusted.port, 'client.test', { flags: CHAIN_ONLY });
+    assert.equal(refused.result, VERIFY_FAILED);
+    refused.wire.close();
+    const day = 86400_000;
+    const old = await server('client.test', { certOpts: { notBefore: new Date(Date.now() - 3 * day), notAfter: new Date(Date.now() - day) } });
+    const expired = await attempt(old.port, 'client.test', { flags: CHAIN_ONLY });
+    assert.equal(expired.result, VERIFY_FAILED);
+    expired.wire.close();
+    for (const flags of [CHAIN_ONLY | INSECURE, CHAIN_ONLY | INSECURE | NO_SNI, 8, 16 | NO_SNI]) {
+      assert.equal(engine.client(trust, 'client.test', { flags }), null, `flags ${flags}`);
+      assert.equal(engine.m._tls_last_error(), BADARG);
+    }
+    for (const flags of [INSECURE | NO_SNI, NO_SNI | CHAIN_ONLY]) {
+      const s = engine.client(trust, 'client.test', { flags });
+      assert.ok(s, `flags ${flags}`);
+      engine.m._tls_session_free(s);
+    }
   });
 
   test('no ALPN offered gives no protocol', async () => {
@@ -414,7 +600,7 @@ describe('client sessions (slicc-kernel#922)', () => {
   });
 
   test('no session without a store or a server name while verification is required, nor with unknown flags', () => {
-    for (const [store, name, flags] of [[0, 'client.test', 0], [trust, '', 0], [trust, 'client.test', 2]]) {
+    for (const [store, name, flags] of [[0, 'client.test', 0], [trust, '', 0], [trust, 'client.test', 8]]) {
       assert.equal(engine.client(store, name, { flags }), null);
       assert.equal(engine.m._tls_last_error(), BADARG);
     }

@@ -62,12 +62,27 @@ export CARGO_ENCODED_RUSTFLAGS
 # __FILE__: map CARGO_HOME and the tree there too. cc adds TARGET_CFLAGS to
 # the CFLAGS_<target> that pnpm/wasm/build.mjs sets.
 export TARGET_CFLAGS="-ffile-prefix-map=$CARGO_HOME_DIR=/cargo -ffile-prefix-map=$(cd "$CARGO_HOME_DIR" && pwd -P)=/cargo -ffile-prefix-map=$SRC=/pnpm -ffile-prefix-map=$(cd "$SRC" && pwd -P)=/pnpm"
+# Link with the name section but without the DWARF std ships
+# (strip=debuginfo; debug stays false) and keep that module (patches/0003): names.py moves its Rust function names, renumbered
+# past the two imports build.mjs adds, into pnpm.wasm.names, and drops the
+# generated-only name section build.mjs's wat2wasm --debug-names writes, so
+# SLICC reads @ai-ecoverse/wasi-pnpm-names under SLICC_WASM_BACKTRACE=1. The
+# code is the same either way: wasm2wat --no-debug-names ignores names.
+export CARGO_PROFILE_RELEASE_STRIP=debuginfo
+LINKED="$WORK/pnpm.linked.wasm"
+NAMES_OUT="$WORK/pnpm.wasm.names"
+rm -f "$LINKED" "$NAMES_OUT"
+export PNPM_WASM_LINKED="$LINKED"
 (cd "$SRC" && node pnpm/wasm/build.mjs)
 
 DEST="$HOMESCOOP_PKG/package"
 mkdir -p "$DEST/bin"
-cp "$SRC/target/wasm32-wasip1-threads/release/pnpm.wasm" "$DEST/bin/pnpm.wasm"
+python3 "$HOMESCOOP_PKG/names.py" "$LINKED" "$SRC/target/wasm32-wasip1-threads/release/pnpm.wasm" \
+  "$DEST/bin/pnpm.wasm" "$NAMES_OUT"
 chmod 755 "$DEST/bin/pnpm.wasm"
+# Beside pnpm.wasm, where SLICC looks first for a module without a name
+# section under SLICC_WASM_BACKTRACE=1 (5.9 MB, 0.8 MB gzipped).
+cp "$NAMES_OUT" "$DEST/bin/pnpm.wasm.names"
 cp "$SRC/LICENSE" "$DEST/LICENSE"
 cp "$SRC/pnpm/npm/pnpm/THIRD-PARTY-NOTICES.md" "$DEST/THIRD-PARTY-NOTICES.md"
 # Not grep -q: under pipefail its early exit fails strings with SIGPIPE, and
@@ -85,5 +100,9 @@ if strings "$DEST/bin/pnpm.wasm" | grep -E "$LEAK" >/dev/null; then
   strings "$DEST/bin/pnpm.wasm" | grep -E "$LEAK" | head >&2
   exit 1
 fi
-shasum -a 256 "$DEST/bin/pnpm.wasm"
+if strings "$NAMES_OUT" | grep -E "$LEAK" >/dev/null; then
+  echo "homescoop: a build path leaked into pnpm.wasm.names" >&2
+  exit 1
+fi
+shasum -a 256 "$DEST/bin/pnpm.wasm" "$NAMES_OUT"
 echo "OK wasi-pnpm $VERSION (pnpm $COMMIT + patches)"

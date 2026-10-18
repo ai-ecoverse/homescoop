@@ -72,12 +72,17 @@ decrypt yet).
   sometimes failed with `keydb_search_next failed: Provided object is too
   short` (no key was lost). 2.4.9-10 writes each update to a tmp name of
   its own (`pubring.kbx.tmp.<pid>.<n>.<time>`) and removes it if the update
-  fails. slicc-kernel 1.122.3 fixes #954. The unique names stay for the
-  kernels from the engines floor (1.117.2) up to 1.122.3.
-- Heavy concurrency (many gpg runs on one homedir at once) can still run
-  into ai-ecoverse/slicc-kernel#980: an OPFS call that never answers leaves
-  its gpg holding the keybox lock, the other runs wait for it, and some fail
-  with "Operation timed out". Nothing written is lost.
+  fails. slicc-kernel 1.123.1 fixes #954 (ai-ecoverse/slicc-kernel#963).
+  The unique names are kept for kernels < 1.123.1, from the engines floor
+  (1.117.2) up.
+- Root's gpg on someone else's homedir (2.4.9-11, homescoop#1031): a keybox
+  or trustdb it creates there, a keybox it updates, and the update's backup
+  `pubring.kbx~` belong to the directory's (or the replaced keybox's)
+  owner, as its lock files do (homescoop#888). Before, an import as root left `pubring.kbx`
+  root-owned and the owner's gpg found no writable keyring. Only a regular
+  file with one link that this gpg created is given away. A backup that an
+  older run left root-owned is replaced when the owner's gpg next updates
+  the keybox.
 
 ## How it is built
 

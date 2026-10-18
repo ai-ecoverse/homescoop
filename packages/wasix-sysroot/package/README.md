@@ -41,6 +41,20 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-38: `poll(POLLIN)` on an empty pipe read end whose writers are gone gives `POLLHUP` alone, as on Linux, on slicc-kernel ≥ 1.125.0 (homescoop#1133). A socket at EOF still gives `POLLIN`.
+
+Since 2025.9.30-37:
+- **`S_IF*` file-type bits are Linux's:** `S_IFMT` 0170000, `S_IFIFO` 0010000, `S_IFSOCK` 0140000. wasi-libc had 0160000, 0140000 and 0160000 (homescoop#1015).
+  - **Compatibility:** programs and side modules built on -36 or older keep the old values until they're rebuilt. Rebuild everything that compares `st_mode` together.
+- **Device nodes:** `/dev/null`, `/dev/zero` and the kernel's other device nodes `stat` as 0666, not as type bits alone (homescoop#1112).
+
+Since 2025.9.30-36:
+- **A ready fd wins over a pending signal:** `ppoll`, `pselect` and `epoll_pwait` with an fd ready return it and leave a signal pending that their mask would unblock, as on Linux. Up to -35 they returned EINTR (homescoop#949).
+- **`gethostname()`/`uname()`** give the kernel's node name (`HOSTNAME`, `slicc` by default), not `wasmer.sh` (homescoop#1050).
+- **`poll`:** `POLLIN|POLLOUT` on a pipe write end without readers gives `POLLOUT|POLLERR`, and `POLLOUT` on a socket whose peer closed gives `POLLOUT|POLLHUP` (homescoop#975).
+- **`share/wasm32-wasi/`:** wasi-libc's ABI check files (`*-symbols.txt`, `predefined-macros.txt`, `include-all.c`) aren't shipped since -33 (homescoop#950).
+- **`sigsetjmp`/`siglongjmp` work** in the EH trees, including out of a signal handler. The saved mask comes back with savemask 1. Up to -35, every `siglongjmp` ended the program (homescoop#1059).
+
 Since 2025.9.30-35: **`sa_mask` and `SA_NODEFER` work** (slicc-kernel#975). While a handler runs, its `sa_mask` and, unless `SA_NODEFER`, its own signal are blocked, and the thread's mask comes back when it returns. libc swaps the mask through `slicc.sigmask_set` (slicc-kernel ≥ 1.93.0). Up to -34 handlers ran with the mask unchanged.
 
 Since 2025.9.30-34 (slicc-kernel ≥ 1.120.0 for all of it; older kernels keep -33's behaviour):

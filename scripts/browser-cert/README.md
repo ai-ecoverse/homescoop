@@ -6,6 +6,7 @@ See [docs/ci-cert.md](../../docs/ci-cert.md).
 npm install --prefix /tmp/cert-nm \
   @ai-ecoverse/slicc-kernel@^1.8.10 \
   @ai-ecoverse/slicc-shared-web@^1.4.1 \
+  monocart-coverage-reports@3.0.0 \
   playwright-core@1.63.0
 npx --prefix /tmp/cert-nm playwright-core install chromium
 export HOMESCOOP_CERT_NODE_MODULES=/tmp/cert-nm/node_modules

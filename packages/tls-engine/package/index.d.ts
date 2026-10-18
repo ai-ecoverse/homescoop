@@ -43,7 +43,11 @@ export interface TlsEngineModule {
   /**
    * A client session to `servername` (a C string) verifying against `ca`; 0 on failure.
    * `alpn`/`alpnLen`: an ALPN list in wire format (0, 0 for none). `flags`: 0, or
-   * 1 (TLS_CLIENT_INSECURE_SKIP_VERIFY) to finish the handshake whatever verification finds.
+   * 1 (TLS_CLIENT_INSECURE_SKIP_VERIFY) to finish the handshake whatever verification finds,
+   * 2 (TLS_CLIENT_NO_SNI) to send no SNI (the name is still checked, exactly as with SNI), 4
+   * (TLS_CLIENT_VERIFY_CHAIN_ONLY): SKIPS THE HOSTNAME CHECK; the caller MUST check the
+   * server's identity itself (e.g. Node's checkServerIdentity), and tls_name_mismatch says
+   * what the skipped check found. Every other combination than 0, 1, 2, 4, 1|2 and 2|4 is refused.
    */
   _tls_client_new(ca: number, servername: number, alpn: number, alpnLen: number, flags: number): number;
   /** 1 when the handshake is done, 0 when it needs more ciphertext, < 0 an error. */
@@ -58,6 +62,21 @@ export interface TlsEngineModule {
   _tls_peer_count(session: number): number;
   /** The server's certificate at `index` (0 = its leaf) as DER at `out`: its length, or < 0. */
   _tls_peer_der(session: number, index: number, out: number, max: number): number;
+  /**
+   * The client's own chain (concatenated DER, leaf first) and private key (PEM, NUL
+   * included in `keyLen`, or DER; `pass` decrypts an encrypted key, 0, 0 for none),
+   * before the first handshake call: 0 or < 0 (TLS_BADARG for a key that doesn't match the
+   * leaf, a second call or a call after the handshake started). The key and passphrase bytes are wiped.
+   */
+  _tls_client_cert(session: number, chain: number, chainLen: number, key: number, keyLen: number, pass: number, passLen: number): number;
+  /** 1 when the leaf did not name the server: under TLS_CLIENT_VERIFY_CHAIN_ONLY, the skipped check's result. */
+  _tls_name_mismatch(session: number): number;
+  /** Test hook: the TLS_CLIENT_NO_SNI name check fails as an allocation failure would, so every leaf is refused (only ever stricter). */
+  _tls_test_name_check_error(session: number): number;
+  /** The negotiated ciphersuite's IANA number, 0 before the handshake. */
+  _tls_ciphersuite(session: number): number;
+  /** The description number of the fatal alert the server sent (e.g. 116 certificate_required, 40 handshake_failure), -1 for none and for a server session. */
+  _tls_last_alert(session: number): number;
 }
 
 export interface TlsEngineOptions {

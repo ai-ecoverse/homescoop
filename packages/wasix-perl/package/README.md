@@ -35,6 +35,17 @@ themselves worked (homescoop#767).
 - **mkfifo:** `POSIX::mkfifo` and `mknod` make real FIFOs (`slicc_fs.path_mkfifo`, homescoop#878). Up to -18 they failed with EOPNOTSUPP.
 - **Kernel:** this needs slicc-kernel ≥ 1.120.0 (engines).
 
+## 5.42.0-20: Linux file-type bits for FIFOs and sockets
+
+`stat` and `lstat` report a FIFO as `0010000` and a socket as `0140000` in
+`(stat)[2]`, as Linux and coreutils `stat -c %f` do, and Fcntl's `S_IFMT`,
+`S_IFIFO` and `S_IFSOCK` are Linux's (`0170000`, `0010000`, `0140000`), so
+`S_ISFIFO`/`S_ISSOCK` agree with them (homescoop#1015). Up to 5.42.0-19 these
+were wasix-libc's values (`0140000` for a FIFO, `0160000` for a socket,
+`S_IFMT` `0160000`), so code comparing raw modes with Linux literals was
+wrong. `-p` and `-S` are unchanged. The build checks that `package.json`'s
+description names the wasix-sysroot it was built on (homescoop#752).
+
 ## 5.42.0-15 / -16: flock excludes other processes (up to -18)
 
 `flock` takes whole-file `fcntl` record locks (`LOCK_SH` → `F_RDLCK`,

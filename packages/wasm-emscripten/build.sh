@@ -80,9 +80,12 @@ python3 -c "import pathlib,sys; d=pathlib.Path(sys.argv[1]).read_bytes(); sys.ex
   exit 1
 }
 echo "  PRESTAGE: slicc_signals.o has stride-140 encoding"
-for js in slicc-fork.js slicc-writev.js slicc-linkat.js slicc-uname.js; do
+for js in slicc-fork.js slicc-writev.js slicc-uname.js; do
   cp "$SLICC_SHIMS/$js" "$PKG/lib/slicc/$js"
 done
+grep -q "__syscall_linkat__sig: 'iipipi'" "$HOST_EM/src/lib/libsigs.js"
+grep -v '__syscall_linkat__sig' "$SLICC_SHIMS/slicc-linkat.js" > "$PKG/lib/slicc/slicc-linkat.js"
+grep -q '__syscall_linkat:' "$PKG/lib/slicc/slicc-linkat.js"
 
 echo "== wasm-emscripten: emcc with the packaged tree and read-only package"
 PRE_WORK="$WORK/wasm-emscripten-prestage"
@@ -120,7 +123,12 @@ for env_flag in ENVIRONMENT_IS_WEB ENVIRONMENT_IS_WORKER ENVIRONMENT_IS_NODE; do
   grep -q "$env_flag" "$PRE_WORK/hello.js"
 done
 grep -q sliccKernel "$PRE_WORK/hello.js"
-EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$PKG/lib/slicc" "${HOST_EMCC[@]}" "$PRE_WORK/calls.c" -o "$PRE_WORK/calls.js"
+EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$PKG/lib/slicc" "${HOST_EMCC[@]}" -Werror "$PRE_WORK/calls.c" -o "$PRE_WORK/calls.js" 2>"$PRE_WORK/calls.err" || {
+  cat "$PRE_WORK/calls.err" >&2
+  echo "homescoop: calls.c does not link with -Werror under the packaged defaults (homescoop#1069)" >&2
+  exit 1
+}
+! grep -q 'signature redefinition' "$PRE_WORK/calls.err"
 for imp in __syscall_uname slicc_cred_js; do
   grep -q "$imp" "$PRE_WORK/calls.js" || { echo "homescoop: calls.js lacks $imp (homescoop#1056)" >&2; exit 1; }
 done
@@ -140,7 +148,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links and runs (#1056), --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"
@@ -222,7 +230,8 @@ test -f "$PKG/emscripten-config"
   echo "homescoop: emscripten-config must not set SLICC_VFS_PRE_JS" >&2
   exit 1
 }
-grep -q '6.0.9-3' "$PKG/package.json"
+grep -q '"@ai-ecoverse/emscripten-cache": "6.0.9-4"' "$PKG/package.json"
+grep -q '"@ai-ecoverse/wasm-binaryen": "132.0.0-3"' "$PKG/package.json"
 grep -q '"esbuild-wasm": "0.28.2"' "$PKG/package.json"
 grep -q '"typescript": "6.0.3"' "$PKG/package.json"
 grep -q '"acorn"' "$PKG/package.json"

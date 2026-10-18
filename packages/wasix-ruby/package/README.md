@@ -37,6 +37,13 @@ fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
+## 3.4.11-20: inputs recorded by version
+
+`package.json`'s `homescoop.openssl` names the wasix-openssl package
+version and the OpenSSL version it links, as THIRD-PARTY-NOTICES.md does;
+up to 3.4.11-19 it was the CI runner's build path (homescoop#637). Same
+sources and inputs as 3.4.11-19.
+
 ## 3.4.11-18: real File#flock (wasix-sysroot -34; slicc-kernel ≥ 1.120.0)
 
 - **What changed:** `File#flock` is libc's `flock(2)`, through slicc-kernel's `slicc.flock`.

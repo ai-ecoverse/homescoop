@@ -1,13 +1,15 @@
-# Homebrew-shaped recipe — prebuilt Emscripten sysroot for slicc.
 name: emscripten-cache
 builder: host
+reproducible: true
 version: "6.0.9"
 npm: "@ai-ecoverse/emscripten-cache"
 summary: "Prebuilt Emscripten 6.0.9 sysroot for slicc (read-only seed)"
 source:
-  # Host-built by slicc-emscripten embuilder; build.sh stages cache/sysroot.
-  url: "https://github.com/emscripten-core/emscripten"
-  sha256: "skip"
+  url: "https://github.com/emscripten-core/emscripten/archive/4e4223852a0835923411059a3929907d7df1232e.tar.gz"
+  sha256: "426911732c683c5940e3e089782d90d272ec2738c933e53593f9e9a65ff6aa96"
+inputs:
+  - "packages/wasm-emscripten/patches/**"
+  - "packages/wasm-emscripten/package/package.json"
 dependencies:
   build: []
   host: []
@@ -16,6 +18,9 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/emscripten-cache
   license: MIT
   notes: |
-    Ships only sysroot/ (~99MB). Runtime CACHE is a writable user dir
-    (~/.cache/emscripten) whose sysroot is a symlink into this package —
-    no 100MB copy; js_output/symbol_lists warm in the user dir.
+    The sysroot (headers + the system libraries listed in libs.txt) that
+    `embuilder build` makes from the emscripten 6.0.9 tag with
+    packages/wasm-emscripten/patches applied, on emsdk 6.0.9's prebuilt
+    clang and binaryen (scripts/emscripten-tree.sh). Same tree and patches as
+    wasm-emscripten 6.0.9-20. Runtime CACHE is a writable user dir whose
+    sysroot is a symlink into this package. homescoop#859.
