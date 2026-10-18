@@ -43,11 +43,6 @@ py-contourpy pybind11 #797
 py-contourpy files #797
 py-kiwisolver cppy #815
 py-kiwisolver files #815
-py-matplotlib freetype #743
-py-matplotlib Qhull #743
-py-matplotlib Agg #743
-py-matplotlib BaKoMa #743
-py-matplotlib files #743
 py-scipy OpenBLAS #729
 py-scipy libf2c #729
 py-scipy files #729
@@ -58,7 +53,6 @@ py-scipy files #729
 const DECLARED = {
   'py-numpy': ['OpenBLAS'], // #726
   'py-scipy': ['OpenBLAS', 'libf2c'], // #729
-  'py-matplotlib': ['Qhull', 'Agg', 'BaKoMa'], // #743
   'py-contourpy': ['pybind11'], // #797
 };
 
