@@ -14,7 +14,7 @@ OUT.wasm is INSTRUMENTED.wasm without its `name` section. OUT.names is the
 payload of a `name` section for OUT.wasm: LINKED's function names (and its
 global and data segment names) with each function index moved by the
 imports build.mjs added, plus names for those imports. SLICC reads it as a
-sidecar (`bin/pnpm.wasm.names` in @ai-ecoverse/wasi-pnpm-names) to name a
+sidecar (`bin/pnpm.wasm.names`, beside pnpm.wasm in the package) to name a
 trap's frames under SLICC_WASM_BACKTRACE=1. It only does so when the module
 itself has no `name` section, which is why OUT.wasm drops the generated one.
 

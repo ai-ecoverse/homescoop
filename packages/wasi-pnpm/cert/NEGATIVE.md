@@ -35,3 +35,13 @@ The published 12.9.1-9 against 12.9.1-10's `install.mjs` (slicc-kernel 1.94.0, u
 
 A local 12.9.1-10-style build (same tree; macOS, so not byte-identical to CI's) passes. names.py found 32445 function names, plus the 2 imports, and checked that the exports `_start`, `malloc`, `free`, `wasi_thread_start` and `__wasm_init_tls` carry their own names at their instrumented indices.
 
+## 12.9.1-11: no half-there packages during an update (homescoop#1128, 2026-10-18)
+
+The published 12.9.1-10 against 12.9.1-11's `cert/update-readers.mjs` (slicc-kernel 1.124.2, users enforce, `--soft`, slicc-heavy): **FAIL.** The observations:
+- `big 240 1.0.0` 825 times and `big 260 2.0.0` 11 times (complete);
+- **`big` half there 43 times, with 0 to 217 files in lib/:** upstream's stage_and_swap deletes the old tree file by file before the new one is renamed in;
+- `fresh absent` 608 times and `fresh 200 1.0.0` 97 times;
+- **`fresh` half there 174 times, with 0 to 199 files and no package.json:** a new package is populated in place.
+
+12.9.1-11's patches/0004 renames the old tree aside, renames the staged one in and only then deletes the old one, and it stages a new package before renaming it into place. The pnpm deps-restorer crate's own unit tests pass with the patch (633 of 633, host `cargo test -p pnpm-deps-restorer --lib`). Upstream's RemoveExisting test (a failing remove_dir_all before the swap) is replaced by one checking that an unremovable old tree no longer fails the swap.
+

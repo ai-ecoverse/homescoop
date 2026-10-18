@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.94.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.124.2",
   "users": "enforce",
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -14,12 +14,14 @@
     "npm run hello (the npm shim through bash) prints the package script's output",
     "alice can't write into bob's node_modules or his pnpm store (Permission denied), and bob's files are unchanged; alice's own install works",
     "pnpm.wasm doesn't contain parking_lot_core's 'Parking not supported on this platform' (0001), and contains no build path: no /home/runner, /tmp/homescoop-work or homescoop-work/pnpm- (homescoop#522)",
+    "12.9.1-11 (patches/0004, homescoop#1128), cert/update-readers.mjs as bob under users enforce: big@1.0.0 (240 files) is updated to big@2.0.0 (260 files) and fresh@1.0.0 (200 files) is added while a second process polls both directories with bash builtins; every observation is absent or a complete version (240/1.0.0, 260/2.0.0, 200/1.0.0), never a directory with another file count or without package.json; afterwards big has 260 files, fresh 200, and no *pacquet-stage* directory is left. 12.9.1-10: big seen half there 43 times (0-217 files), fresh 174 times without package.json (NEGATIVE.md)",
     "12.9.1-10: pnpm.wasm has no name section; bin/pnpm.wasm.names names every function once at pnpm.wasm's indices (count = imported + defined, highest index the last), index 0 is pnpm_atomic.wait32, more than 1000 tokio symbols, and the exports _start, malloc, free and wasi_thread_start carry their own names (the shift past build.mjs's two imports is right). 12.9.1-9: no names file and a generated-only name section (NEGATIVE.md)",
     "test/*.test.mjs (unit) and test/e2e/*.test.mjs (Node entry): file:, registry, add -g, publish with --otp, git through wasm-git, CORS-only refusals, the npm aliases"
   ],
   "patches": {
     "0001-parking-lot-core-nightly.patch": "install.mjs: pnpm.wasm has no 'Parking not supported on this platform' (NEGATIVE.md: the build without 0001 has it and fails there; the installs, 30 and 200 packages three times, didn't make a lock park in the harness either way), and the installs finish without a trap; build.sh refuses the parker too",
     "0002-cli-no-source-checkout-path-on-wasm.patch": "install.mjs: pnpm.wasm has no /home/runner or /tmp/homescoop-work path (NEGATIVE.md: 12.9.1-8 has /home/runner/work/_temp/homescoop-work/pnpm-<commit>/pnpm/crates/cli); build.sh refuses one too",
-    "0003-wasm-build-keep-linked-module.patch": "install.mjs: bin/pnpm.wasm.names exists and its names sit at pnpm.wasm's indices (names.py takes them from the module 0003 keeps; without 0003 build.sh fails: no linked module). It changes no code: build.mjs's instrumented module is the same"
+    "0003-wasm-build-keep-linked-module.patch": "install.mjs: bin/pnpm.wasm.names exists and its names sit at pnpm.wasm's indices (names.py takes them from the module 0003 keeps; without 0003 build.sh fails: no linked module). It changes no code: build.mjs's instrumented module is the same",
+    "0004-hoisted-import-no-empty-dir.patch": "update-readers.mjs: an updated hoisted package (stage_and_swap: old tree renamed aside, staged tree renamed in, old tree deleted afterwards) and a new one (staged, then renamed into place) are never seen half there; 12.9.1-10 fails it (NEGATIVE.md). Upstream's deps-restorer unit tests pass with it (633), with its RemoveExisting test rewritten for the new order"
   }
 }

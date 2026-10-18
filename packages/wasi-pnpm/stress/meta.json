@@ -1,0 +1,9 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.124.2",
+  "users": "enforce",
+  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "runTimeoutMs": 14400000,
+  "network": "registry.npmjs.org only, fetched by the page (CORS); every other host answers 502",
+  "checklist": ["not a cert: .github/workflows/pnpm-agent-loop.yml's stress loop for homescoop#1127"]
+}

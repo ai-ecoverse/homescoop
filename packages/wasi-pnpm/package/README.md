@@ -57,7 +57,24 @@ carried one with generated names only (`f4998`), so a trap named no function.
 Run pnpm with `SLICC_WASM_BACKTRACE=1` in its environment: a trap such as
 `pnpm: wasm trap in thread 4: memory access out of bounds` is then followed by
 up to 40 frames, named from this file. Without the variable nothing reads the
-file. It's 5.9 MB on disk and 0.8 MB of the tarball.
+file. It's 5.9 MB on disk and 0.8 MB of the tarball. To get these names,
+12.9.1-10 links with `strip=debuginfo` instead of pnpm's `strip=symbols`,
+which re-links the code, so it isn't byte for byte 12.9.1-9's (the source,
+toolchain and behaviour are the same), and names from one build don't fit
+another (homescoop#1126).
+
+## Updates in place (12.9.1-11)
+
+When an install replaces a package in a hoisted `node_modules` (a new version,
+or a changed one), a program reading that package meanwhile sees the old
+package or the new one, complete. It never sees a directory with only some of
+its files. pnpm stages the new copy in a sibling directory, renames the old
+one aside, renames the new one in, and only then deletes the old one. Up to
+12.9.1-10 it deleted the old tree first, file by file, which on OPFS takes
+long enough for a running agent to find its own package half gone
+(homescoop#1128). A package that's new to `node_modules` is staged and renamed
+into place too. Between the two renames the directory is briefly absent:
+there's no atomic exchange of non-empty directories.
 
 ## `npm`, `npx` and `i`
 
