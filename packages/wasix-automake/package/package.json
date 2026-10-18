@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-automake",
-  "version": "1.17.0-12",
+  "version": "1.17.0-13",
   "description": "GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4)",
   "license": "GPL-2.0-or-later",
   "repository": {
