@@ -6,7 +6,8 @@ load, which makes pnpm hang or fail with os error 73.
 
 `bin/pnpm.wasm` is built by homescoop from pnpm's source (v12.9.1, commit
 `5dafb09`) with pnpm's own `pnpm/wasm/build.mjs` (Rust nightly-2026-08-27,
-WASI SDK 34, WABT 1.0.42) and two documented patches. `parking_lot_core` is
+WASI SDK 34, WABT 1.0.42) and three documented patches (the third only keeps
+the linked module for its function names). `parking_lot_core` is
 built with its `nightly` feature, so a contended lock waits with
 `memory.atomic.wait32` instead of panicking ("Parking not supported on this
 platform") as the upstream `@pnpm/wasm` 12.9.1 binary does under load; and
@@ -46,6 +47,17 @@ available!" check is a registry request with no use in slicc, where the
 package, not pnpm itself, decides the version. As with every package env value,
 a caller's own environment wins: `PNPM_CONFIG_UPDATE_NOTIFIER=true` brings the
 check back.
+
+## A trap's frames (12.9.1-10)
+
+`bin/pnpm.wasm.names` holds pnpm.wasm's function names: the Rust symbols
+(v0-mangled, as `rustfilt` reads them) and the C ones, at pnpm.wasm's own
+function indices. pnpm.wasm has no name section of its own. Up to 12.9.1-9 it
+carried one with generated names only (`f4998`), so a trap named no function.
+Run pnpm with `SLICC_WASM_BACKTRACE=1` in its environment: a trap such as
+`pnpm: wasm trap in thread 4: memory access out of bounds` is then followed by
+up to 40 frames, named from this file. Without the variable nothing reads the
+file. It's 5.9 MB on disk and 0.8 MB of the tarball.
 
 ## `npm`, `npx` and `i`
 
