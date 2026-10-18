@@ -51,8 +51,16 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 					subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p | WATCH, .u.tag = __WASI_EVENTTYPE_FD_WRITE, .u.u.fd_write.file_descriptor = p->fd };
 				continue;
 			}
-			if (p->events & POLLRDNORM)
-				subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_READ, .u.u.fd_read.file_descriptor = p->fd };
+			if (p->events & POLLRDNORM) {
+				/* -36 (homescoop#975): a descriptor not open for reading (a pipe's
+				 * write end) has no read events on Linux, so POLLIN asks nothing
+				 * there; a hangup on it would hide POLLOUT. Sockets keep it. */
+				__wasi_fdstat_t st;
+				int write_only = __wasi_fd_fdstat_get(p->fd, &st) == 0 && !(st.fs_rights_base & __WASI_RIGHTS_FD_READ)
+					&& st.fs_filetype != __WASI_FILETYPE_SOCKET_STREAM && st.fs_filetype != __WASI_FILETYPE_SOCKET_DGRAM;
+				if (!write_only)
+					subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_READ, .u.u.fd_read.file_descriptor = p->fd };
+			}
 			if (p->events & POLLWRNORM)
 				subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_WRITE, .u.u.fd_write.file_descriptor = p->fd };
 		}
@@ -86,10 +94,17 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 				 * gone is writable and in error, as Linux's pipe_poll says: POLLOUT|POLLERR
 				 * (the write then fails with EPIPE). POLLHUP is the read end's. */
 				p->revents |= POLLWRNORM | POLLERR;
+			} else if (gone && e->type == __WASI_EVENTTYPE_FD_WRITE && !watch) {
+				/* -36 (#975): a socket whose peer is gone: writable (the write
+				 * fails with EPIPE) and hung up, POLLOUT|POLLHUP as on Linux. */
+				p->revents |= POLLWRNORM | POLLHUP;
 			} else if (e->error == __WASI_ERRNO_PIPE) p->revents |= POLLHUP;
 			else if (e->error) p->revents |= POLLERR;
 			else if (gone) {
 				p->revents |= POLLHUP;
+				/* An empty read end whose writers are gone is POLLHUP alone on
+				 * Linux; the kernel's event doesn't say whether data is left
+				 * (nbytes isn't 0 there), so POLLIN stays (homescoop#975, known). */
 				if (!watch && e->type == __WASI_EVENTTYPE_FD_READ) p->revents |= POLLRDNORM;
 			} else if (watch) {
 				quiet_watch = 1;
@@ -99,7 +114,7 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 		}
 		int r = 0;
 		for (nfds_t i = 0; i < nfds; i++) {
-			if (fds[i].revents & POLLHUP) fds[i].revents &= ~POLLWRNORM;
+			if ((fds[i].revents & POLLHUP) && !is_socket(fds[i].fd)) fds[i].revents &= ~POLLWRNORM;
 			if (fds[i].revents) r++;
 		}
 		if (r) return r;

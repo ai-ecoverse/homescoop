@@ -125,6 +125,36 @@ __wasi_errno_t __slicc_poll_masked(const sigset_t *mask, const __wasi_subscripti
 		if (n) return __wasi_poll_oneoff(in, out, n, nevents);
 		return idle(__slicc_signals_run);
 	}
+	if (n) {
+		/* -36 (homescoop#949): with an fd ready at entry, Linux returns it and
+		 * keeps a signal the temporary mask would unblock pending (the old mask
+		 * comes back unless the wait ends with EINTR). The kernel's masked wait
+		 * delivers such a signal first, so look under the current mask, without
+		 * waiting, before swapping it: clock subscriptions become "now". */
+		__wasi_subscription_t now[n];
+		for (__wasi_size_t i = 0; i < n; i++) {
+			now[i] = in[i];
+			if (now[i].u.tag == __WASI_EVENTTYPE_CLOCK) {
+				now[i].u.u.clock.timeout = 0;
+				now[i].u.u.clock.flags = 0;
+			}
+		}
+		__wasi_size_t ne = 0;
+		unsigned ran = __slicc_signals_run;
+		__wasi_errno_t e = __wasi_poll_oneoff(now, out, n, &ne);
+		if (e) return e;
+		__wasi_size_t k = 0;
+		for (__wasi_size_t i = 0; i < ne; i++)
+			if (out[i].type != __WASI_EVENTTYPE_CLOCK) out[k++] = out[i];
+		if (k) {
+			*nevents = k;
+			return 0;
+		}
+		/* A handler ran as the look began (a signal that came while the
+		 * program computed): the call is interrupted, as the masked wait
+		 * itself would have said (test/r28w.c "window"). */
+		if (__slicc_signals_run != ran) return __WASI_ERRNO_INTR;
+	}
 	uint64_t s = from_set(mask) & ~UNBLOCKABLE & ~INTERNAL;
 	__wasi_size_t got = 0;
 	int32_t err = __slicc_sigmask_poll((uint32_t)s, (uint32_t)(s >> 32), (int32_t)(uintptr_t)in, (int32_t)(uintptr_t)out, (int32_t)n, (int32_t)(uintptr_t)&got);

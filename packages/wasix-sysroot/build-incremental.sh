@@ -648,6 +648,60 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
+echo "== wasix-sysroot: -36 uname() nodename from HOSTNAME (slicc-kernel's node name), not wasmer.sh (homescoop#1050)"
+R36_OBJ="$WORK/r36"
+rm -rf "$R36_OBJ" && mkdir -p "$R36_OBJ/static" "$R36_OBJ/pic"
+compile_r18 uname "$R36_OBJ/static/uname.o"
+compile_r18 uname "$R36_OBJ/pic/uname.o" -fPIC -fvisibility=default
+for v in "${VARIANTS[@]}"; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  grep -qx uname.o <<<"$("$LLVM_AR" t "$lib")" || { echo "homescoop: $lib has no uname.o" >&2; exit 1; }
+  old="$R36_OBJ/old-$v"
+  rm -rf "$old" && mkdir -p "$old"
+  (cd "$old" && arx "$lib" uname.o)
+  missing="$(comm -23 <(exported "$old/uname.o") <(exported "$R36_OBJ/$flavour/uname.o"))"
+  [[ -z "$missing" ]] || { echo "homescoop: $v uname.o lacks: $missing" >&2; exit 1; }
+  "$LLVM_AR" r "$lib" "$R36_OBJ/$flavour/uname.o"
+  echo "  $v ($flavour)"
+done
+
+echo "== wasix-sysroot: -36 sigsetjmp as a setjmp call site, siglongjmp restores the mask (EH trees; homescoop#1059)"
+for v in sysroot-eh sysroot-ehpic sysroot-exnref-eh sysroot-exnref-ehpic; do
+  python3 - "$PKG/$v/include/setjmp.h" <<'PYHDR'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text()
+old = "\tint sigsetjmp(sigjmp_buf, int) __setjmp_attr;\n\t_Noreturn void siglongjmp(sigjmp_buf, int);\n#endif\n"
+new = ("\tint sigsetjmp(sigjmp_buf, int) __setjmp_attr;\n\t_Noreturn void siglongjmp(sigjmp_buf, int);\n"
+       "\t/* homescoop (#1059): LLVM's wasm sjlj lowering rewrites only setjmp call\n"
+       "\t * sites, so sigsetjmp records the mask and then is setjmp at the call site. */\n"
+       "\tint __homescoop_sigsetjmp_save(sigjmp_buf, int);\n"
+       "#define sigsetjmp(env, save) (__homescoop_sigsetjmp_save((env), (save)) + setjmp(env))\n#endif\n")
+if new in t:
+    sys.exit(0)
+if t.count(old) != 1:
+    sys.exit(f"{p}: no single sigsetjmp declaration in the EH branch")
+p.write_text(t.replace(old, new))
+PYHDR
+  grep -q '__homescoop_sigsetjmp_save((env)' "$PKG/$v/include/setjmp.h"
+done
+R36J="$WORK/r36j"
+rm -rf "$R36J" && mkdir -p "$R36J/static" "$R36J/pic"
+compile_r18 sigjmp "$R36J/static/siglongjmp.o" -fwasm-exceptions -mllvm -wasm-enable-sjlj -isystem "$PKG/sysroot-eh/include" -D_GNU_SOURCE
+compile_r18 sigjmp "$R36J/pic/siglongjmp.o" -fwasm-exceptions -mllvm -wasm-enable-sjlj -isystem "$PKG/sysroot-eh/include" -D_GNU_SOURCE -fPIC -fvisibility=default
+for v in sysroot-eh sysroot-ehpic sysroot-exnref-eh sysroot-exnref-ehpic; do
+  lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
+  flavour=static
+  [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
+  grep -qx siglongjmp.o <<<"$("$LLVM_AR" t "$lib")" || { echo "homescoop: $lib has no siglongjmp.o" >&2; exit 1; }
+  "$LLVM_AR" r "$lib" "$R36J/$flavour/siglongjmp.o"
+  grep -qx __homescoop_sigsetjmp_save <<<"$(exported "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks __homescoop_sigsetjmp_save" >&2; exit 1; }
+  echo "  $v ($flavour)"
+done
+
 echo "== wasix-sysroot: __wasi_proc_raise_interval2 in the PIC trees, as in -32 (patches/proc_raise_interval2.c, homescoop#943)"
 PRI_OBJ="$WORK/pri"
 rm -rf "$PRI_OBJ" && mkdir -p "$PRI_OBJ"
