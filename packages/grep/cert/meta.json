@@ -1,5 +1,6 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "checklist": [
     "basic match",
     "no-match exit 1",
