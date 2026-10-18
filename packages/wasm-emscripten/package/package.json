@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-emscripten",
-  "version": "6.0.9-20",
+  "version": "6.0.9-22",
   "description": "Emscripten 6.0.9 for slicc (emcc via wasix-python)",
   "license": "MIT",
   "repository": {
@@ -54,8 +54,8 @@
   "dependencies": {
     "@ai-ecoverse/wasix-python": "3.14.2-16",
     "@ai-ecoverse/wasm-clang": "24.0.0-21",
-    "@ai-ecoverse/wasm-binaryen": "132.0.0-2",
-    "@ai-ecoverse/emscripten-cache": "6.0.9-3",
+    "@ai-ecoverse/wasm-binaryen": "132.0.0-3",
+    "@ai-ecoverse/emscripten-cache": "6.0.9-4",
     "esbuild-wasm": "0.28.2",
     "typescript": "6.0.3",
     "acorn": "^8.18.0",

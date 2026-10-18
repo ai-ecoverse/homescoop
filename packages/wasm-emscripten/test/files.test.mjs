@@ -47,3 +47,17 @@ test('media/ (the logos) is in the tarball', () => {
   const { paths } = tarball();
   for (const f of ['logo.png', 'logo.svg', 'powered_by_logo.png']) assert.ok(paths.includes(`package/media/${f}`), `no package/media/${f}`);
 });
+
+test('every file LICENSE cites, and SECURITY.md, is in the tarball (homescoop#538)', () => {
+  const { paths } = tarball();
+  const lic = execFileSync('tar', ['-xzOf', tgz, 'package/LICENSE'], { encoding: 'utf8' });
+  const cited = [...new Set([...lic.matchAll(/see (\S+) file/g)].map((m) => m[1]))];
+  assert.ok(cited.includes('AUTHORS'), 'LICENSE no longer cites AUTHORS; update this test');
+  for (const f of [...cited, 'SECURITY.md']) assert.ok(paths.includes(`package/${f}`), `the tarball lacks package/${f}, which LICENSE cites`);
+});
+
+test("lib/slicc carries today's shims: the inherited-ignore seed and the strong flock() (homescoop#973, #947)", () => {
+  const obj = (n) => execFileSync('tar', ['-xzOf', tgz, `package/lib/slicc/${n}`], { maxBuffer: 1 << 26 }).toString('latin1');
+  assert.match(obj('slicc_signals.o'), /slicc_sig_inherited_js/, 'slicc_signals.o has no slicc_sig_inherited_js (the #973 constructor)');
+  assert.match(obj('slicc_libc_gaps.o'), /__syscall_flock/, 'slicc_libc_gaps.o has no __syscall_flock (the #947 flock)');
+});

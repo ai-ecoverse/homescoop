@@ -16,7 +16,16 @@ TLS for [SLICC](https://github.com/ai-ecoverse/slicc): Mbed TLS 4.2.0 sessions o
 - **Starting a session:** `tls_client_new(ca, servername, alpn, alpn_len, flags)` starts one. It takes the server name as a C string, an ALPN list in wire format (length-prefixed names; `0, 0` for none) and flags.
   - **Verification is required.** The chain must reach a root in `ca`, the leaf must name the server, every certificate must be within its validity period by the clock, and the leaf must allow server use (extendedKeyUsage serverAuth and keyUsage).
   - Without a store, or with an empty server name, there's no session (`TLS_BADARG`).
-  - The only flag is `TLS_CLIENT_INSECURE_SKIP_VERIFY` (1). It lets the handshake finish whatever the chain says, and `tls_verify_result` still reports what verification found.
+  - **Flags:**
+    - `TLS_CLIENT_INSECURE_SKIP_VERIFY` (1) lets the handshake finish whatever the chain says. `tls_verify_result` still reports what verification found.
+    - `TLS_CLIENT_NO_SNI` (2) sends no SNI. The name is still checked exactly as with SNI: by Mbed TLS's own check, after the trailing-dot strip, and an IP literal only against an iPAddress SAN.
+    - **`TLS_CLIENT_VERIFY_CHAIN_ONLY` (4) skips the hostname check. The caller MUST check the server's identity itself**, for example with Node's `checkServerIdentity` on `tls_peer_der(s, 0)`. Chain, validity and key usage are still required, and SNI is still sent. `tls_name_mismatch` gives the skipped check's result, so a mismatch is reported, not silent.
+    - Only 0, 1, 2, 4, 1|2 and 2|4 are allowed. Any other combination, CHAIN_ONLY|INSECURE and unknown bits included, is refused.
+- **A client certificate (mTLS):** `tls_client_cert` takes the caller's own chain (concatenated DER, its leaf first) and private key before the first handshake.
+  - The key is PEM, with the NUL counted, or DER: PKCS#8, SEC1 or PKCS#1, optionally encrypted with a passphrase.
+  - The key must match the leaf. It comes only from the caller; there's no default.
+  - The engine wipes the key and passphrase bytes it was given once they're parsed, and frees (zeroizes) its copy with the session.
+- **Cipher:** `tls_ciphersuite` gives the negotiated ciphersuite's IANA number.
 - **Server names:**
   - A DNS name is sent as SNI and checked against the leaf's DNS names, as Mbed TLS checks them (subjectAltName, else the CN).
   - An IPv4 or IPv6 literal is not sent as SNI (RFC 6066). It must match an iPAddress subjectAltName of the leaf, never a DNS name or a CN that spells it.

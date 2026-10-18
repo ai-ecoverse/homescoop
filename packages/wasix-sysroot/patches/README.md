@@ -371,3 +371,48 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
 - **Probe `test/r35.c`:**
   - **sa_mask:** a SIGUSR1 handler with SIGUSR2 in `sa_mask` raises SIGUSR2 and SIGUSR1. Neither runs inside it (depth 1); both run after it returns (order `<><>2`), and no mask is left behind.
   - **SA_NODEFER:** the nested SIGUSR1 runs at once (depth 2), while SIGUSR2 still waits.
+
+## -36: `sigmask.c`/`epoll.c` (#949), `uname.c` (#1050), `poll.c` (#975)
+
+- **#949, a ready fd wins over a pending signal:**
+  - **The problem:** with an fd ready at entry and a pending signal that the call's temporary mask unblocks, Linux returns the ready count and leaves the signal pending, restoring the old mask unless the wait ends with EINTR. slicc-kernel's masked waits (`slicc.sigmask_poll`, `slicc.sigmask_epoll_wait`) deliver the signal first, so the call returned -1 EINTR.
+  - **The fix:** `__slicc_poll_masked`, which serves `ppoll`, `pselect` and masked `poll_core`, first polls the same subscriptions without waiting, under the current mask, with clock subscriptions set to "now". If an fd is ready it returns those events and the masked wait never runs. `epoll_pwait` does the same with `epoll_wait(…, 0)`.
+- **#1050, `uname.c`:** replaces `uname.o`, whose nodename was a fixed `wasmer.sh`, so `gethostname()` named Wasmer's site.
+  - The nodename is now `HOSTNAME`, which slicc-kernel sets to its node name on every program start, or `slicc` when it's unset, too long or holds a `/`.
+  - The other fields keep upstream's placeholders.
+- **#975, `poll.c`:**
+  - **Write-only descriptors:** `POLLIN` on a descriptor not open for reading (a pipe's write end) asks nothing, as on Linux, so `POLLIN|POLLOUT` on a reader-less write end gives `POLLOUT|POLLERR` instead of `POLLIN|POLLHUP|POLLERR`.
+  - **Sockets:** a socket whose peer is gone gives `POLLOUT|POLLHUP` for `POLLOUT`; it was `POLLHUP`, because the POLLHUP rule hid `POLLWRNORM`. That rule now applies only to non-sockets.
+  - **Still open:** an empty read end whose writers are gone still gives `POLLIN|POLLHUP` (Linux: `POLLHUP`). The kernel's read event doesn't say the pipe is empty, so this stays known.
+- **Probe `test/r36.c`** covers all three, in five variants, on the cert kernel and on 1.124.8.
+- **#1057:** `test/r35.mjs` accepts both `<><>2` and `<>2<>`, the orders in which the two signals a handler held back arrive after it returns. POSIX leaves the order open, and slicc-kernel#974 changed it.
+- **#950:** `share/wasm32-wasi/{defined-symbols.txt,undefined-symbols.txt,predefined-macros.txt,include-all.c}`, wasi-libc's ABI check files, aren't shipped since -33. `build-source.sh` runs upstream's build with `CHECK_SYMBOLS=no`, and nothing in homescoop or wasixcc reads them.
+- **#1059, `sigjmp.c`, EH trees:**
+  - **The cause** (found by ev53): LLVM's wasm setjmp/longjmp lowering rewrites only `setjmp` call sites. So a `sigsetjmp()` call, an ordinary libc function here, never got its `__c_longjmp` catch, and every `siglongjmp` escaped to the host as `[object WebAssembly.Exception]`, exit 70, with or without a signal. The kernel already passes a handler's longjmp through (slicc-kernel#1023).
+  - **The fix:** `<setjmp.h>` makes `sigsetjmp(env, save)` the macro `__homescoop_sigsetjmp_save(env, save) + setjmp(env)`. That records `__fl` and the mask in `__ss`; `__wasm_setjmp`'s state fits in `__jb`. `siglongjmp` (replacing `siglongjmp.o`) restores that mask with `pthread_sigmask` when it was saved, then longjmps.
+  - **Probe `test/r37.c`:**
+    - a plain `sigsetjmp`/`siglongjmp`;
+    - a mask restored by `siglongjmp`;
+    - a jump out of a SIGUSR1 handler that has SIGUSR2 in `sa_mask`: savemask 1 leaves nothing blocked, while savemask 0 keeps the handler's mask, as on Linux.
+    - It runs in the four EH trees; the asyncify tree has no `sigsetjmp`.
+
+## -37: Linux's file-type bits (`build-source.sh`, #1015) and device modes (`../slicc_stat_owner.c`, #1112)
+
+- **Linux's values in `__mode_t.h`:** `build-source.sh` rewrites wasi-libc's `libc-bottom-half/headers/public/__mode_t.h` before upstream's build, so every libc object (and libc++, which uses `st_mode`) is built with them:
+
+| constant | wasi-libc | -37 (Linux/musl) |
+| --- | --- | --- |
+| `S_IFMT` | 0160000 (the OR of the types) | 0170000 |
+| `S_IFIFO` | 0140000 | 0010000 |
+| `S_IFSOCK` | 0160000 | 0140000 |
+
+  The others (`S_IFLNK` 0120000, `S_IFREG` 0100000, `S_IFBLK` 0060000, `S_IFDIR` 0040000, `S_IFCHR` 0020000) were already Linux's. wasi-libc's FIFO value is Linux's socket value, so mixing the two made a FIFO read as a socket.
+  - **What this fixes:** archives (tar/cpio headers), `stat -c %f`-style output and scripts comparing against Linux literals now get Linux's bits.
+  - **Compatibility:** a program or side module built on -36 or older keeps the old values until it rebuilds, so the default moves with a rebuild wave.
+- **`slicc_stat_owner.c`:** `apply_slicc_mode`'s Linux-to-libc mapping is now the identity. It stays explicit.
+  - **#1112:** slicc-kernel's device nodes have no slicc_fs mode (`path_mode` ENOENT, `fd_mode` EBADF for `/dev/null`, `/dev/zero`), so their `st_mode` was the type alone, 020000. A character device that gets no mode from the kernel now gets Linux's 0666.
+- **Probe `test/r38.c`:**
+  - prints each `S_IF*` constant;
+  - stats a regular file, a directory, a symlink (lstat), a pipe, a socketpair end, `/dev/null` and `/dev/zero` (by path and by descriptor);
+  - each comes back with Linux's type bits, and the devices as 020666, matching coreutils' `stat -c %f` (21b6).
+- **`test/fifo.mjs`** expects the new type bits.

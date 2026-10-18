@@ -79,19 +79,14 @@ test('NEGATIVE: a line that fails only on the candidate is a regression, whateve
   assert.equal(compareOnReference(rest[0], elsewhere).verdict, 'regression', 'another line failing on the reference does not cover :88');
 });
 
-test('known-limits: wasix-gnupg concurrent.mjs is known-racy below 2.4.9-9 only, every case but trustdb, engines and crashes', () => {
+test('known-limits: wasix-gnupg concurrent.mjs has no known-limit any more (bios pins 2.4.9-10 since slicc-bios#496)', () => {
+  // #926, #985, #1064 and #1100 covered bios's 2.4.9-5 pin, which predates the concurrent-import fixes. bios pins
+  // 2.4.9-10 since slicc-bios#496 (22fa913), so kernel-compat holds every wasix-gnupg version to the whole spec again.
   const limits = JSON.parse(readFileSync(new URL('../browser-cert/known-limits.json', import.meta.url), 'utf8')).limits;
-  const facts = (version) => ({ package: '@ai-ecoverse/wasix-gnupg', recipe: 'wasix-gnupg', spec: 'concurrent.mjs', version, kernel: '1.113.1-pr.924.38992090760', users: 'off', text: `${G}:88#4: cone: run 2 failed only on an unlocked keybox read` });
-  for (const v of ['2.4.9-5', '2.4.9-6', '2.4.9-7', '2.4.9-8']) assert.equal(findLimit(limits, facts(v))?.issue, 'ai-ecoverse/homescoop#712', v);
-  for (const v of ['2.4.9-9', '2.4.9-10', '2.5.0-1']) assert.equal(findLimit(limits, facts(v)), null, `${v} is still held to concurrent.mjs`);
-  assert.equal(findLimit(limits, { ...facts('2.4.9-5'), spec: 'checklist.mjs' }), null, 'only concurrent.mjs');
-  for (const text of ['TypeError: cannot read properties of undefined', `cone: --check-trustdb:\ntrustdb=2`, 'engines.slicc-kernel is >=1.100.0, the first kernel with slicc.fcntl_lock: >=1.86.0']) {
-    assert.equal(findLimit(limits, { ...facts('2.4.9-5'), text }), null, `still compared with the reference: ${text}`);
+  const facts = (version, text) => ({ package: '@ai-ecoverse/wasix-gnupg', recipe: 'wasix-gnupg', spec: 'concurrent.mjs', version, kernel: '1.124.2', users: 'off', text });
+  for (const v of ['2.4.9-5', '2.4.9-8', '2.4.9-9', '2.4.9-10', '2.4.9-11']) {
+    for (const text of [`${G}:88#4: cone: key 2 is in the keyring:\nuid U0`, 'readers round 3: gpg --list-keys sees every key:\nmissing']) {
+      assert.equal(findLimit(limits, facts(v, text)), null, `${v} is held to concurrent.mjs: ${text}`);
+    }
   }
-  assert.ok(findLimit(limits, { ...facts('2.4.9-5'), text: 'gpg waits for the lock (2.4.9-7 doesn\'t):\nheld' }));
-  // #1018: which key 2.4.9-5 loses differs per run, so every per-key case must be covered, not a list of them.
-  for (const text of ['root: key 2 is in the keyring:\nuid U0', 'cone: key 3 is in the keyring:\nuid U1', 'root round 1 (held): import 4 logs no error:\ngpg: keydb_search failed']) {
-    assert.ok(findLimit(limits, { ...facts('2.4.9-5'), text }), `known below 2.4.9-9: ${text}`);
-  }
-  assert.equal(findLimit(limits, { ...facts('2.4.9-5'), text: 'cone: key 1 is in the keyring:\nx\nRuntimeError: memory access out of bounds' }), null, 'a crash inside a per-key case is still compared');
 });

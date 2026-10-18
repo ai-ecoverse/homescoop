@@ -77,3 +77,14 @@ All against the published 2.4.9-9 on the cert kernel 1.120.2 (Chrome, OPFS root,
 - **#881, `locks.mjs` part 3** (run alone): FAIL. `gpgconf --unlock` gives `release_dotlock: not our lock`, and there's no "not supported" message. With gpg's lock files present, `--lock` itself fails with `invalid size of lockfile` (#881's report).
 
 `dotlock_fcntl_reclaim` checks for a holder with a non-blocking `F_RDLCK` on a read-only descriptor, not with `F_GETLK`. In gpg, `F_GETLK` on such a descriptor reported `F_WRLCK` with no holder, while wasix-ruby's `fcntl(F_GETLK)` on the same file said `F_UNLCK`. That isn't followed up here.
+
+## 2.4.9-11 (homescoop#1031, #1072, #1039)
+
+**Date:** 2026-10-18. The published 2.4.9-10 against 2.4.9-11's `cert/locks.mjs`, on slicc-kernel 1.124.1 under users enforce, `--soft`: **FAIL, 8 cases.**
+- After root's `gpg --homedir /home/cone/h --batch --import` of a public key, `/home/cone/h/pubring.kbx` is `root`.
+- cone's `--quick-gen-key` then fails with `gpg: no writable public keyring found: Not found` / `key generation failed: Not found`, and so does the `--clearsign` that needs that key.
+- In cone's empty `/home/cone/h2`, root's import leaves `pubring.kbx`, `trustdb.gpg` and `private-keys-v1.d` root-owned, and cone's `--quick-gen-key` fails with `agent_genkey failed: Permission denied`.
+
+2.4.9-11 gives each of these (and the update's backup `pubring.kbx~`) to the owner of the directory or of the keybox it replaces. As with #888's lock files, it only does that for a regular file with one link (a directory for `private-keys-v1.d`) that this gpg created, opened without following a symlink. The existing check that a symlinked lock file's target stays `root 644` still holds.
+
+`cert/concurrent.mjs`'s readers round now runs three rounds (#1072), on cert kernel 1.124.1, where slicc-kernel#980 is fixed. The note above about running one round because of #980 applies to 2.4.9-10 and its kernel 1.120.2. The README's #954 note now says 1.123.1 (#1039).

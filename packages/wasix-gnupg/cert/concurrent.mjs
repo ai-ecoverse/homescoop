@@ -26,7 +26,7 @@
  */
 const N = 4;
 const READERS = 4;
-const READER_ROUNDS = 1;
+const READER_ROUNDS = 3;
 
 // Six distinct public keys (ed25519, uids tide1 … tide6 <tideN@example.test>).
 const KEYS = [
@@ -140,8 +140,8 @@ export default async function (ctx) {
   //     name of its own: after an import, pubring.kbx's inode number is not
   //     the one a new pubring.kbx.tmp gets, and no tmp file is left. Then
   //     four readers run gpg -k and gpg --list-keys --with-colons while six
-  //     imports go into a keybox holding six keys (one round: more rounds
-  //     run into slicc-kernel#980, an OPFS call that never answers).
+  //     imports go into a keybox holding six keys, for three rounds
+  //     (slicc-kernel >= 1.124.1 fixes slicc-kernel#980, homescoop#1072).
   const ino = await sh([
     'gh=/root/ino; rm -rf $gh; mkdir -m 700 -p $gh',
     'gpg --homedir $gh --batch --import /tmp/gpg-held.gpg > /dev/null 2>&1; gpg --homedir $gh --batch --import /tmp/gpg-key-1.gpg > /dev/null 2>&1',

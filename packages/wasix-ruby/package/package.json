@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-ruby",
-  "version": "3.4.11-19",
+  "version": "3.4.11-20",
   "description": "MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; wasix-sysroot 2025.9.30-34: user ids, traps, flock and times from slicc-kernel)",
   "engines": {
     "slicc-kernel": ">=1.120.0"
@@ -25,7 +25,7 @@
   "homescoop": {
     "recipe": "wasix-ruby",
     "upstream": "3.4.11",
-    "openssl": "linked against /home/runner/work/homescoop/homescoop/packages/wasix-ruby/work/deps/wasix-openssl/package (OpenSSL 3.x; honours SSL_CERT_FILE). Socket C ext built with HAVE_STRUCT_MSGHDR_MSG_CONTROL / CMSG_* forced off (WASIX ancillary data incomplete).",
+    "openssl": "linked against @ai-ecoverse/wasix-openssl 3.5.9-4 (OpenSSL 3.5.9; honours SSL_CERT_FILE). Socket C ext built with HAVE_STRUCT_MSGHDR_MSG_CONTROL / CMSG_* forced off (WASIX ancillary data incomplete).",
     "asyncify_buf": 65536,
     "asyncify_note": "POSTLINK: wasm-opt --asyncify only (no asyncify-ignore-imports, no restricted import list). Spill macros WASM_{SETJMP,FIBER,SCAN}_STACK_BUFFER_SIZE=65536 (upstream default 6144). No RB_WASM_ASYNCIFY symbol.",
     "threads_note": "pthread + Asyncify trampoline (WASIX_WASM_THREAD_RT); TLS Asyncify state. Certify Thread/Mutex/Queue at real ipk path for -4+.",
