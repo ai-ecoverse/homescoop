@@ -112,6 +112,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
 | [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy 2.3.2 for slicc WASIX CPython 3.14 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
+| [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) (dist-tag `python3.15`) | [recipe](packages/py-numpy3.15) | NumPy 2.5.4 for slicc WASIX CPython 3.15 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32 side modules) |
 | [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
