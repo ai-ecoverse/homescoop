@@ -1,0 +1,51 @@
+name: close-listed-issues
+
+# GitHub closes only the first issue of `Fixes #a, #b, #c`. After every merge to main, this closes the
+# rest of such a list, with a comment (scripts/close-listed-issues.mjs). Merge-queue merges do close
+# linked issues; only the comma lists need this.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commits:
+        description: 'Merge commit shas, comma-separated (for a PR merged before this workflow existed)'
+        required: true
+      dry-run:
+        description: 'List what it would close, close nothing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: close-listed-issues-${{ github.sha }}
+
+jobs:
+  close:
+    name: close-listed-issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: |
+            scripts/close-listed-issues.mjs
+            scripts/gate.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Close the issues a merged PR lists after a closing keyword
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMITS: ${{ github.event_name == 'push' && join(github.event.commits.*.id, ',') || inputs.commits }}
+          DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run && '--dry-run' || '' }}
+        run: node scripts/gate.mjs close-listed-issues -- node scripts/close-listed-issues.mjs --commits "$COMMITS" $DRY
