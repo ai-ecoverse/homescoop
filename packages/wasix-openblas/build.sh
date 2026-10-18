@@ -19,9 +19,13 @@ rm -rf "$B" && mkdir -p "$B"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$WORK/OpenBLAS-$VERSION.tar.gz"
 tar -xzf "$WORK/OpenBLAS-$VERSION.tar.gz" -C "$B"
 
-# The recipe's sysroot (toolchain.wasix_sysroot), not install-wasixcc's default.
-export HOMESCOOP_WASIX_SYSROOT_VERSION="$(field toolchain.wasix_sysroot)"
-export HOMESCOOP_WASIX_SYSROOT_SHA="$(field toolchain.wasix_sysroot_sha256)"
+# wasix-sysroot -38, not install-wasixcc's default. Literal values, so
+# cert-review's input rule can read them; they must match the recipe's
+# toolchain.wasix_sysroot, which wasix-lib-cert.mjs installs for the cert.
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
+export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
+[[ "$HOMESCOOP_WASIX_SYSROOT_VERSION" == "$(field toolchain.wasix_sysroot)" && "$HOMESCOOP_WASIX_SYSROOT_SHA" == "$(field toolchain.wasix_sysroot_sha256)" ]] \
+  || { echo "homescoop: build.sh's wasix-sysroot pin isn't recipe.yaml's toolchain.wasix_sysroot" >&2; exit 1; }
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc-$HOMESCOOP_WASIX_SYSROOT_VERSION")"
 test "$(node -p "require(process.argv[1]).version" "$WASIXCC_SYSROOT_PREFIX/package.json")" = "$HOMESCOOP_WASIX_SYSROOT_VERSION"
 unset CCC_OVERRIDE_OPTIONS WASIXCC_MODULE_KIND WASIXCC_INCLUDE_CPP_SYMBOLS PKG_CONFIG_LIBDIR PKG_CONFIG_PATH || true

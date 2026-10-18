@@ -6,7 +6,8 @@
 //   node scripts/wasix-lib-cert.mjs <package> --tarball <package.tgz> [--kernel-dir <dir>]
 //
 // meta.probes: [{ "name": "zprobe", "src": "test/zprobe.c", "pkg": ["zlib"] }]
-// (optional "flavours": { "-pic": "lib" } for a package with one flavour)
+// (optional "flavours": { "-pic": "lib" } for a package with one flavour, and
+// "cc": "bin/gfortran" for a compiler driver the package ships)
 // gives the commands `zprobe` (static-main, lib/) and `zprobe-pic`
 // (dynamic-main, lib-pic/). A probe is compiled with nothing but the
 // package's own pkg-config Cflags/Libs (as a consumer would) and linked with
@@ -68,7 +69,15 @@ try {
         env: { ...process.env, PKG_CONFIG_PATH: pc, PKG_CONFIG_LIBDIR: pc, PKG_CONFIG_SYSROOT_DIR: '' },
       }).trim().split(/\s+/).filter(Boolean);
       console.log(`   pkg-config ${p.pkg.join(' ')}: ${flags.join(' ').replaceAll(pkg, '<pkg>')}`);
-      sh('wasixcc', ['-O2', join(pkgDir, p.src), ...flags, '-Wl,--fatal-warnings', '-o', join(probes, `bin/${cmd}.wasm`)], {
+      // p.cc: a compiler driver the package ships (wasix-f2c's bin/gfortran),
+      // given a copy of the source, since it may write next to it.
+      let src = join(pkgDir, p.src);
+      if (p.cc) {
+        mkdirSync(join(work, 'src', cmd), { recursive: true });
+        writeFileSync(join(work, 'src', cmd, p.src.split('/').pop()), readFileSync(src));
+        src = join(work, 'src', cmd, p.src.split('/').pop());
+      }
+      sh(p.cc ? join(pkg, p.cc) : 'wasixcc', ['-O2', src, ...flags, '-Wl,--fatal-warnings', '-o', join(probes, `bin/${cmd}.wasm`)], {
         env: { ...env, ...f.env },
       });
       commands[cmd] = { wasm: `bin/${cmd}.wasm` };
