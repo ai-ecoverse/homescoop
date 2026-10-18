@@ -4,7 +4,8 @@
  *
  *   A. Semver trap: plain X.Y.Z that outranks X.Y.Z-N under caret ranges
  *   B. Versions that semver-gt dist-tag latest (a version in the line of a
- *      non-latest dist-tag, e.g. python3.15, is judged against that tag)
+ *      wave tag that passes npm-tag.mjs's rule, e.g. python3.15, is judged
+ *      against that tag; next, certified and other tags never make a channel)
  *   C. REMOVE_ENTIRELY packages (e.g. wasm-ffmpeg — codec distribution)
  *
  * A version under any dist-tag is never listed.
@@ -19,6 +20,7 @@ import { readdirSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REMOVE_ENTIRELY, isRecipeRetired } from './recipe-status.mjs';
+import { tagProblem } from './npm-tag.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const asJson = process.argv.includes('--json');
@@ -109,7 +111,7 @@ export function classify(npm, meta) {
   const latest = tags.latest;
   const channels = new Map();
   for (const [tag, v] of Object.entries(tags)) {
-    if (tag !== 'latest' && lineOf(v) && lineOf(v) !== lineOf(latest)) channels.set(lineOf(v), { tag, version: v });
+    if (!tagProblem(tag) && lineOf(v) && lineOf(v) !== lineOf(latest)) channels.set(lineOf(v), { tag, version: v });
   }
   const plain = versions.filter((v) => PLAIN.test(v));
   const packrevs = versions.filter((v) => PACKREV.test(v));

@@ -113,6 +113,10 @@ test('3: list-semver-cleanup never lists a version under any dist-tag, and judge
   assert.deepEqual(ahead.targets.map((x) => [x.version, x.reason]), [['3.15.0-3', 'outranks-tag']]);
   const plain = cleanup(NAME, meta({ latest: '1.0.0-2', next: '1.0.0' }, ['1.0.0', '1.0.0-2']));
   assert.deepEqual(plain.targets, []);
+  const oldNext = cleanup(NAME, meta({ latest: '2.0.0-1', next: '1.5.0-1' }, ['1.5.0-1', '1.5.0-2', '2.0.0-1']));
+  assert.deepEqual(oldNext.targets, []);
+  const oldCertified = cleanup(NAME, meta({ latest: '2.0.0-1', certified: '2.1.0-1' }, ['2.0.0-1', '2.1.0-1', '2.1.0-2']));
+  assert.deepEqual(oldCertified.targets.map((x) => [x.version, x.reason]), [['2.1.0-2', 'outranks-latest']]);
   const untagged = cleanup(NAME, meta({ latest: '3.14.2-28' }, ['3.14.2-28', '3.15.0-1']));
   assert.deepEqual(untagged.targets.map((x) => x.version), ['3.15.0-1']);
 });
