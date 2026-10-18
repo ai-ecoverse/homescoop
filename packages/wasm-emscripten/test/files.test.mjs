@@ -47,3 +47,11 @@ test('media/ (the logos) is in the tarball', () => {
   const { paths } = tarball();
   for (const f of ['logo.png', 'logo.svg', 'powered_by_logo.png']) assert.ok(paths.includes(`package/media/${f}`), `no package/media/${f}`);
 });
+
+test('every file LICENSE cites, and SECURITY.md, is in the tarball (homescoop#538)', () => {
+  const { paths } = tarball();
+  const lic = execFileSync('tar', ['-xzOf', tgz, 'package/LICENSE'], { encoding: 'utf8' });
+  const cited = [...new Set([...lic.matchAll(/see (\S+) file/g)].map((m) => m[1]))];
+  assert.ok(cited.includes('AUTHORS'), 'LICENSE no longer cites AUTHORS; update this test');
+  for (const f of [...cited, 'SECURITY.md']) assert.ok(paths.includes(`package/${f}`), `the tarball lacks package/${f}, which LICENSE cites`);
+});
