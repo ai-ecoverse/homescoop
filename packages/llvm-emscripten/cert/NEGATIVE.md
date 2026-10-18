@@ -29,3 +29,5 @@
 
 Every other check passes as before. In slicc-kernel, the same empty main executable makes clang spawn `""`, `clang: error: unable to execute command: posix_spawn failed: No such file or directory` (found by thr_t4h9qnrjas linking wasm-clang). thr_t4h9qnrjas checked this patch in the kernel: Path.cpp compiled with it, using the manifest's multicall flags, and linked ahead of libLLVMSupport.a. With it, wasm-clang's run-cc.mjs (r18 to r28w, users enforce) and its cxx-eh cert pass.
 
+**#1098, the notices row:** 24.0.0-1's `lib/libLLVMSupport.a` lists `regcomp.c.o`, `regerror.c.o`, `regexec.c.o`, `regfree.c.o`, `regstrlcpy.c.o`, `blake3.c.o`, `blake3_neon.c.o` and `xxhash.cpp.o`, and the package ships only `LICENSE`. The new check.mjs row fails on it. `check-package-meta.mjs llvm-emscripten` with that archive staged fails too: `lib/libLLVMSupport.a carries LLVM Support code, but the package's notices lack the regex notice …, BLAKE3 …, xxHash …`. With `homescoop_notice_llvm_support` it passes.
+

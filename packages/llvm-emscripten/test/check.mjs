@@ -42,6 +42,11 @@ try {
   const wantPatches = Object.fromEntries(readdirSync(patchDir).filter((f) => f.endsWith('.patch')).sort().map((f) => [f, createHash('sha256').update(readFileSync(join(patchDir, f))).digest('hex')]));
   check(JSON.stringify(m.llvm_patches) === JSON.stringify(wantPatches) && m.llvm_patches['0001-main-executable-emscripten.patch'], `manifest.json records the llvm patches by sha256: ${JSON.stringify(m.llvm_patches)}`);
   check(/128-byte/.test(m.sysroot.sigset_t) && /^[0-9a-f]{64}$/.test(m.wasm_emscripten_patches_sha256), `sysroot sigset_t ${m.sysroot.sigset_t}, wasm-emscripten patches ${m.wasm_emscripten_patches_sha256.slice(0, 12)}…`);
+  // homescoop#1098: LLVM Support's regex, BLAKE3 and xxHash notices.
+  const notices = existsSync(join(pkg, 'THIRD-PARTY-NOTICES.md')) ? readFileSync(join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8') : '';
+  const support = readFileSync(join(pkg, 'lib/libLLVMSupport.a'), 'latin1');
+  const carried = [['regcomp.c.o', 'Henry Spencer'], ['blake3.c.o', 'BLAKE3'], ['xxhash.cpp.o', 'Yann Collet']].filter(([o]) => support.includes(o));
+  check(carried.length === 3 && carried.every(([, marker]) => notices.includes(marker)) && pj.files?.includes('THIRD-PARTY-NOTICES.md'), `THIRD-PARTY-NOTICES.md (in files) has the notices for what libLLVMSupport.a carries: ${carried.map(([o, m]) => `${o} ${notices.includes(m) ? 'ok' : 'MISSING'}`).join(', ') || 'none found'}`);
   const files = walk(pkg);
   check(!files.some((f) => f.link), 'no symlinks');
   const leak = /\/home\/|\/Users\/|\/__w\/|\/private\/var\/|\/private\/tmp\/|\/tmp\/homescoop-/;

@@ -74,6 +74,8 @@ rm -rf "$PKG/lib" "$PKG/objects" "$PKG/include" "$PKG/drivers" "$PKG/manifest.js
 python3 "$HOMESCOOP_PKG/stage.py" "$SRC" "$BLD" "$PKG_WORK/edges.json" "$PKG" "$COMMIT" \
   "$EMSCRIPTEN_TREE" "$EMSCRIPTEN_TREE_CACHE" "$ROOT/packages/wasm-emscripten/patches" "$HOMESCOOP_PKG/patches"
 cp "$SRC/llvm/LICENSE.TXT" "$PKG/LICENSE"
+homescoop_notices_begin "lib/libLLVMSupport.a compiles in the following third-party code from llvm-project $COMMIT (homescoop#1098); clang's and lld's LICENSE.TXT are LICENSE's text."
+homescoop_notice_llvm_support "$SRC"
 if find "$PKG" -type l | grep -q .; then
   echo "homescoop: symlinks in the package" >&2
   exit 1
