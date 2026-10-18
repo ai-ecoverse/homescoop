@@ -254,6 +254,11 @@ test('coverage gaps: --kind coverage needs no --case or --title; another package
   assert.equal(gh.state.issues.length, 3);
   assert.ok(!gh.state.issues[2].labels.includes('cert-coverage'));
   assert.notEqual(caseOf('coverage-notes:x'), 'coverage', 'only the spec name `coverage` collapses');
+  const numpy = await file(gh, t, { package: 'py-numpy', case: 'coverage', title: '[cert] py-numpy: x' });
+  const labels = gh.state.issues.find((i) => `#${i.number}` === numpy).labels;
+  for (const l of ['cert-coverage', 'next-build', 'area:python']) assert.ok(labels.includes(l), `${l} in ${labels}`);
+  await assert.rejects(fileMain(['--kind', 'coverage', '--case', 'flock:x', '--package', 'wasix-ruby', '--body-file', body], { gh, env: {}, root: ROOT, out: () => {}, err: () => {} }), /conflict/);
+  await assert.rejects(fileMain(['--case', 'flock:x', '--kind', 'coverage', '--package', 'wasix-ruby', '--body-file', body], { gh, env: {}, root: ROOT, out: () => {}, err: () => {} }), /conflict/);
 });
 
 test('cert-review.yml: coverage findings go to the package coverage issue', () => {
