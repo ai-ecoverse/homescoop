@@ -40,3 +40,4 @@ crates/target/
 packages/wasm-emscripten/package/*
 !packages/wasm-emscripten/package/package.json
 !packages/wasm-emscripten/package/README.md
+packages/emscripten-cache/package/stamps/

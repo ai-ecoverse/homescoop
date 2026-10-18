@@ -20,7 +20,6 @@ const HOST_HARNESSES = ['host-node', 'host-smoke'];
 // Recipes that ship but have no cert/ at all.
 const NO_CERT = [
   'cmake', // #426
-  'emscripten-cache', // #426
   'freetype', // #426
   'gmake', // #426
   'libiconv', // #426

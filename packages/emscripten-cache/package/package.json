@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/emscripten-cache",
-  "version": "6.0.9-3",
+  "version": "6.0.9-4",
   "description": "Prebuilt Emscripten 6.0.9 sysroot for slicc (read-only seed)",
   "license": "MIT",
   "repository": {
