@@ -2,19 +2,22 @@
 /**
  * A built package tarball against npm (#402, #493, #497).
  *
- *   node scripts/npm-parity.mjs <package.tgz> [--drift warn|fail] [--json <out.json>]
+ *   node scripts/npm-parity.mjs <package.tgz> [--tag <npm-tag>] [--drift warn|fail] [--json <out.json>]
  *
- * - behind: the version sorts below npm's `latest` (or is a published
- *   version other than latest): the build is behind main. Always fails;
- *   ladder-build publishes with --tag latest, so an older version must
- *   never ship.
+ * --tag is the recipe's npm-tag (scripts/npm-tag.mjs; default latest): the
+ * channel ladder-build publishes the version under. Versions under other
+ * dist-tags never count.
+ *
+ * - behind: the version sorts below the version under its tag: the build is
+ *   behind main. Always fails; ladder-build publishes with --tag <tag>, so
+ *   an older version must never ship.
  * - same: the version is on npm with the same entries (path, type, mode,
  *   link, content): nothing to publish.
  * - drift: the version is on npm with different entries, so these bytes
  *   would never ship. Fails with --drift fail (bump the packaging revision
  *   or revert), warns with --drift warn.
- * - new: the version is not on npm and sorts above latest (or the package
- *   is not on npm at all): a new release.
+ * - new: the version is not on npm and sorts above the version under its
+ *   tag (or the tag, or the package, is not on npm yet): a new release.
  */
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -23,6 +26,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { readTarball } from './diff-published.mjs';
 import { compareTarballs, describe } from './tarball-parity.mjs';
+import { DEFAULT_TAG, cliTagProblem } from './npm-tag.mjs';
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -58,13 +62,19 @@ export function nextRevision(version) {
   return m ? `${m[1]}-${Number(m[2]) + 1}` : null;
 }
 
-export function classify(version, registry) {
+export function tagged(registry, tag = DEFAULT_TAG) {
+  if (!registry) return null;
+  if (tag === DEFAULT_TAG) return registry.latest ?? registry.tags?.latest ?? null;
+  return registry.tags?.[tag] ?? null;
+}
+
+export function classify(version, registry, tag = DEFAULT_TAG) {
   if (!registry) return { kind: 'new', why: 'not on npm' };
-  const latest = registry.latest;
+  const latest = tagged(registry, tag);
   const published = registry.versions.includes(version);
   if (latest && compareVersions(version, latest) < 0) return { kind: 'behind', latest, published };
   if (published) return { kind: 'published', latest };
-  return { kind: 'new', latest, why: latest ? `not on npm, above latest ${latest}` : 'not on npm, and npm has no latest' };
+  return { kind: 'new', latest, why: latest ? `not on npm, above ${tag} ${latest}` : `not on npm, and npm has no ${tag}` };
 }
 
 function npm(args) {
@@ -87,7 +97,8 @@ export function registryOf(name) {
   }
   const j = JSON.parse(r.stdout);
   const versions = [j.versions ?? []].flat();
-  return { versions, latest: j['dist-tags']?.latest || null };
+  const tags = j['dist-tags'] && typeof j['dist-tags'] === 'object' ? j['dist-tags'] : {};
+  return { versions, latest: tags.latest || null, tags };
 }
 
 export function packPublished(spec) {
@@ -103,20 +114,28 @@ export function packPublished(spec) {
   }
 }
 
-export function npmParity(tgz, { drift = 'warn', registry = registryOf, pack = packPublished } = {}) {
+export function npmParity(tgz, { drift = 'warn', tag = DEFAULT_TAG, registry = registryOf, pack = packPublished } = {}) {
+  const tagError = cliTagProblem(tag);
+  if (tagError) throw new Error(tagError);
   const entry = readTarball(tgz).get('package/package.json');
   if (!entry) throw new Error('the tarball has no package/package.json');
   const { name, version } = JSON.parse(entry.data.toString('utf8'));
   const id = `${name}@${version}`;
   const reg = registry(name);
-  const c = classify(version, reg);
-  const out = { name, version, latest: c.latest ?? null, drift };
+  if (tag !== DEFAULT_TAG && reg && !tagged(reg, DEFAULT_TAG)) {
+    return { name, version, tag, latest: null, drift, verdict: 'no-latest', level: 'error', message: `${id}: npm has no latest for ${name}, and a first publish under --tag ${tag} would make it latest too: publish the name under latest first` };
+  }
+  if (tag !== DEFAULT_TAG && !reg) {
+    return { name, version, tag, latest: null, drift, verdict: 'no-latest', level: 'error', message: `${id}: ${name} isn't on npm, and a first publish under --tag ${tag} would make it latest too: publish the name under latest first` };
+  }
+  const c = classify(version, reg, tag);
+  const out = { name, version, tag, latest: c.latest ?? null, drift };
   if (c.kind === 'behind') {
     return {
       ...out,
       verdict: 'behind',
       level: 'error',
-      message: `${id} sorts below npm latest ${c.latest}${c.published ? ' (and is already on npm)' : ''}: this build is behind main. Merge main into the branch; ladder-build publishes with --tag latest, so an older version must never ship`,
+      message: `${id} sorts below npm ${tag} ${c.latest}${c.published ? ' (and is already on npm)' : ''}: this build is behind main. Merge main into the branch; ladder-build publishes with --tag ${tag}, so an older version must never ship`,
     };
   }
   if (c.kind === 'new') return { ...out, verdict: 'new', level: 'notice', message: `${id}: a new release (${c.why})` };
@@ -152,13 +171,14 @@ function main() {
   };
   const drift = at('--drift') || 'warn';
   const json = at('--json');
+  const tag = at('--tag') || DEFAULT_TAG;
   if (args.length !== 1 || !['warn', 'fail'].includes(drift)) {
-    console.error('usage: npm-parity.mjs <package.tgz> [--drift warn|fail] [--json <out.json>]');
+    console.error('usage: npm-parity.mjs <package.tgz> [--tag <npm-tag>] [--drift warn|fail] [--json <out.json>]');
     return 2;
   }
   let r;
   try {
-    r = npmParity(readFileSync(args[0]), { drift });
+    r = npmParity(readFileSync(args[0]), { drift, tag });
   } catch (err) {
     r = { verdict: 'error', level: 'error', message: `npm-parity: ${err.message}` };
   }

@@ -416,3 +416,10 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
   - stats a regular file, a directory, a symlink (lstat), a pipe, a socketpair end, `/dev/null` and `/dev/zero` (by path and by descriptor);
   - each comes back with Linux's type bits, and the devices as 020666, matching coreutils' `stat -c %f` (21b6).
 - **`test/fifo.mjs`** expects the new type bits.
+
+## -38: `poll.c`, empty pipe read ends (#1133)
+
+- **The change:** an `FD_READ` hangup on a pipe or FIFO (slicc_fs `fd_mode` says `S_IFIFO`) with `nbytes` 0 gives `POLLHUP` alone, as on Linux.
+- **The kernel half:** slicc-kernel 1.125.0 (#1054) reports `nbytes` as the bytes a read gets at once, 0 when empty. Older kernels report 1, so `POLLIN|POLLHUP` stays there.
+- **Unchanged:** stream sockets at EOF keep `POLLIN|POLLHUP`, and a non-hangup event never loses `POLLIN`, so a `SHUT_WR` half-close still wakes the reader.
+- **Tests:** `test/r36.c` adds those socket rows. r36 and r38 also run on 1.125.0, whose `path_mode`/`fd_mode` answer for `/dev` nodes (slicc-kernel#1039).

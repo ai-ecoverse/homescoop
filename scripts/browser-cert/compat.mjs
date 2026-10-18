@@ -17,6 +17,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commandsOf } from './base-sweep/sweep.mjs';
 import { devPin } from '../dev-pin.mjs';
+import { pickRecipe, recipeOf } from '../npm-tag.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -207,6 +208,7 @@ function recipes() {
     const pj = join(root, 'packages', dir, 'package', 'package.json');
     if (!existsSync(pj)) continue;
     const npm = readJson(pj).name;
+    const { tag, version, upstream, retired } = existsSync(join(root, 'packages', dir, 'recipe.yaml')) ? recipeOf(dir, root) : { tag: 'latest', version: readJson(pj).version, upstream: null, retired: false };
     const certDir = join(root, 'packages', dir, 'cert');
     const specs = existsSync(certDir) ? readdirSync(certDir).filter((f) => f.endsWith('.mjs')).sort() : [];
     const meta = existsSync(join(certDir, 'meta.json')) ? readJson(join(certDir, 'meta.json')) : {};
@@ -215,7 +217,7 @@ function recipes() {
     if (!specs.length) skip = 'no cert/*.mjs';
     else if (meta.blocked) skip = 'cert/meta.json is blocked';
     else if (harness !== 'slicc-kernel') skip = `harness ${harness} (not run.mjs)`;
-    out.push({ dir, npm, specs, meta, skip });
+    out.push({ dir, npm, tag, version, upstream, retired, specs, meta, skip });
   }
   return out;
 }
@@ -319,25 +321,26 @@ async function plan(args) {
 
   const all = recipes();
   const byDir = new Map(all.map((r) => [r.dir, r]));
-  const byNpm = new Map(all.map((r) => [r.npm, r]));
+  const byNpm = { get: (name, version) => pickRecipe(all, name, version) };
   const ciCertified = readJson(join(root, 'scripts/ci-certified.json')).packages;
   const entries = new Map();
   const skipped = new Map();
   const latest = new Map();
-  const latestOf = (name) => {
-    if (!latest.has(name)) {
+  const latestOf = (name, tag = 'latest') => {
+    const key = `${name}@${tag}`;
+    if (!latest.has(key)) {
       try {
-        const v = npmView(`${name}@latest`);
-        latest.set(name, { version: v.version, integrity: v.dist?.integrity || null });
+        const v = npmView(key);
+        latest.set(key, { version: v.version, integrity: v.dist?.integrity || null });
       } catch (err) {
-        latest.set(name, { error: String(err.message).split('\n')[0] });
+        latest.set(key, { error: String(err.message).split('\n')[0] });
       }
     }
-    return latest.get(name);
+    return latest.get(key);
   };
   const skip = (name, version, origin, reason) => {
     const key = `${name}@${version ?? '-'}`;
-    const s = skipped.get(key) || { package: name, recipe: byNpm.get(name)?.dir ?? null, version: version ?? null, origin: [], reason };
+    const s = skipped.get(key) || { package: name, recipe: byNpm.get(name, version)?.dir ?? null, version: version ?? null, origin: [], reason };
     if (!s.origin.includes(origin)) s.origin.push(origin);
     skipped.set(key, s);
   };
@@ -360,7 +363,7 @@ async function plan(args) {
     entries.set(id, e);
   };
   const addLatest = (r, origin) => {
-    const l = latestOf(r.npm);
+    const l = latestOf(r.npm, r.tag);
     if (l.error) return skip(r.npm, null, origin, `not on npm: ${l.error}`);
     add(r, l.version, l.integrity, origin);
   };
@@ -369,7 +372,7 @@ async function plan(args) {
     if (token === 'base' || token === 'catalog') {
       for (const p of bios[token]) {
         if (p.name === KERNEL) continue;
-        const r = byNpm.get(p.name);
+        const r = byNpm.get(p.name, p.version);
         if (!r) skip(p.name, p.version, token, 'no homescoop recipe');
         else add(r, p.version, p.integrity, token);
       }
@@ -379,7 +382,7 @@ async function plan(args) {
       for (const r of all) if (r.specs.length) addLatest(r, token);
     } else {
       const m = /^(@[^@/]+\/[^@]+|[^@]+)(?:@(.+))?$/.exec(token);
-      const r = m && (byDir.get(m[1]) || byNpm.get(m[1]) || byNpm.get(`@ai-ecoverse/${m[1]}`));
+      const r = m && (byDir.get(m[1]) || byNpm.get(m[1], m[2]) || byNpm.get(`@ai-ecoverse/${m[1]}`, m[2]));
       if (!r) throw new Error(`set: ${token} is neither base, catalog, ci-certified, all nor a homescoop recipe`);
       if (m[2]) {
         if (!/^[0-9A-Za-z.+-]+$/.test(m[2])) throw new Error(`set: ${token}: a version or dist-tag from the registry`);
@@ -785,7 +788,8 @@ function sweepMode(plan, kdir, mode, out, limits) {
     const tarballs = plan.sweep.packages.map((p) => fetchTarball(p.name, p.version, p.integrity, join(work, 'tgz')).file);
     mkdirSync(join(work, 'nm'), { recursive: true });
     must('npm', ['install', '--prefix', join(work, 'nm'), '--no-fund', '--no-audit', ...HARNESS], { attempts: 3, cwd: root });
-    const byNpm = new Map(recipes().map((r) => [r.npm, r.dir]));
+    const swept = recipes();
+    const byNpm = { get: (name, version) => pickRecipe(swept, name, version)?.dir };
     const pass = (label, kernelFile, only) => {
       const rowsFile = join(work, `${label}.rows.json`);
       rmSync(rowsFile, { force: true });
@@ -811,7 +815,7 @@ function sweepMode(plan, kdir, mode, out, limits) {
     }
     const facts = (r) => ({
       package: r.package,
-      recipe: byNpm.get(r.package) || null,
+      recipe: byNpm.get(r.package, r.version) || null,
       spec: 'base-sweep',
       case: r.command,
       version: r.version,
@@ -830,7 +834,7 @@ function sweepMode(plan, kdir, mode, out, limits) {
     }
     const open = [];
     for (const r of rows) {
-      r.recipe = byNpm.get(r.package) || null;
+      r.recipe = byNpm.get(r.package, r.version) || null;
       if (r.status !== 'fail') {
         r.verdict = r.status;
         continue;

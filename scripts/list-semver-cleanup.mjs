@@ -3,24 +3,27 @@
  * List npm unpublish / deprecate commands for:
  *
  *   A. Semver trap: plain X.Y.Z that outranks X.Y.Z-N under caret ranges
- *   B. Versions that semver-gt dist-tag latest
+ *   B. Versions that semver-gt dist-tag latest (a version in the line of a
+ *      wave tag that passes npm-tag.mjs's rule, e.g. python3.15, is judged
+ *      against that tag; next, certified and other tags never make a channel)
  *   C. REMOVE_ENTIRELY packages (e.g. wasm-ffmpeg — codec distribution)
+ *
+ * A version under any dist-tag is never listed.
  *
  * THIS SCRIPT ONLY PRINTS COMMANDS. It never runs npm unpublish/deprecate.
  * Lars runs the printed commands with npm 2FA.
  *
  *   node scripts/list-semver-cleanup.mjs
  *   node scripts/list-semver-cleanup.mjs --json
- *   node scripts/list-semver-cleanup.mjs --include-latest-plain
  */
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REMOVE_ENTIRELY, isRecipeRetired } from './recipe-status.mjs';
+import { tagProblem } from './npm-tag.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const asJson = process.argv.includes('--json');
-const includeLatestPlain = process.argv.includes('--include-latest-plain');
 
 const PLAIN = /^(\d+)\.(\d+)\.(\d+)$/;
 const PACKREV = /^(\d+)\.(\d+)\.(\d+)-(\d+)$/;
@@ -92,12 +95,24 @@ function localNpmNames() {
       out.push({ recipe: name, npm: pkg.name });
     }
   }
-  return out.sort((a, b) => a.npm.localeCompare(b.npm));
+  const seen = new Set();
+  return out.filter((r) => !seen.has(r.npm) && seen.add(r.npm)).sort((a, b) => a.npm.localeCompare(b.npm));
 }
 
-function classify(npm, meta) {
+const lineOf = (v) => {
+  const p = parseSemver(v);
+  return p ? `${p.major}.${p.minor}` : null;
+};
+
+export function classify(npm, meta) {
+  const tags = meta['dist-tags'] || {};
+  const tagged = new Set(Object.values(tags));
   const versions = Object.keys(meta.versions || {}).filter((v) => v !== '0.0.0');
-  const latest = meta['dist-tags']?.latest;
+  const latest = tags.latest;
+  const channels = new Map();
+  for (const [tag, v] of Object.entries(tags)) {
+    if (!tagProblem(tag) && lineOf(v) && lineOf(v) !== lineOf(latest)) channels.set(lineOf(v), { tag, version: v });
+  }
   const plain = versions.filter((v) => PLAIN.test(v));
   const packrevs = versions.filter((v) => PACKREV.test(v));
   const targets = [];
@@ -107,38 +122,34 @@ function classify(npm, meta) {
     const hasPackrev = packrevs.some((p) => baseOf(p) === base);
     const latestIsPackrevOfPlain =
       latest && PACKREV.test(latest) && baseOf(latest) === base;
-    const isLatest = latest === v;
-
     if (hasPackrev || latestIsPackrevOfPlain) {
       targets.push({
         version: v,
         reason: 'plain-outranks-packrev',
         detail: `plain ${v} outranks ${base}-N; ^${base}-N resolves to ${v}`,
       });
-    } else if (isLatest && includeLatestPlain) {
-      targets.push({
-        version: v,
-        reason: 'plain-is-latest',
-        detail: `WARNING: ${v} is currently latest — republish as ${v}-1 and retag latest before unpublish`,
-      });
     }
   }
 
   if (latest) {
     for (const v of versions) {
-      if (v === latest) continue;
-      if (!gt(v, latest)) continue;
+      if (tagged.has(v)) continue;
+      const channel = channels.get(lineOf(v));
+      const head = channel ? channel.version : latest;
+      const label = channel ? channel.tag : 'latest';
+      if (!gt(v, head)) continue;
       if (targets.some((t) => t.version === v)) continue;
       targets.push({
         version: v,
-        reason: 'outranks-latest',
-        detail: `${v} > latest ${latest} (semver); loose/^ ranges prefer it over intended latest`,
+        reason: channel ? 'outranks-tag' : 'outranks-latest',
+        detail: `${v} > ${label} ${head} (semver); loose/^ ranges prefer it over intended ${label}`,
       });
     }
   }
 
-  targets.sort((a, b) => cmp(a.version, b.version));
-  return { npm, latest, versions, targets };
+  const kept = targets.filter((t) => !tagged.has(t.version));
+  kept.sort((a, b) => cmp(a.version, b.version));
+  return { npm, latest, versions, targets: kept };
 }
 
 /** @param {{ npm: string, reason: string, detail: string, knownVersions: string[] }} entry */
@@ -220,7 +231,9 @@ async function main() {
   printShell(nonempty);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
