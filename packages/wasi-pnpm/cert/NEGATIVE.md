@@ -38,10 +38,12 @@ A local 12.9.1-10-style build (same tree; macOS, so not byte-identical to CI's) 
 ## 12.9.1-11: no half-there packages during an update (homescoop#1128, 2026-10-18)
 
 The published 12.9.1-10 against 12.9.1-11's `cert/update-readers.mjs` (slicc-kernel 1.124.2, users enforce, `--soft`, slicc-heavy): **FAIL.** The observations:
-- `big 240 1.0.0` 825 times and `big 260 2.0.0` 11 times (complete);
-- **`big` half there 43 times, with 0 to 217 files in lib/:** upstream's stage_and_swap deletes the old tree file by file before the new one is renamed in;
-- `fresh absent` 608 times and `fresh 200 1.0.0` 97 times;
-- **`fresh` half there 174 times, with 0 to 199 files and no package.json:** a new package is populated in place.
+- `big 240 1.0.0` 665 times, `big 260 2.0.0` 7 times and `big torn` once (a sample that raced the rename, allowed);
+- **`big` half there 30 times, with 0 to 234 files in lib/ and package.json still present:** upstream's stage_and_swap deletes the old tree file by file before the new one is renamed in;
+- `fresh absent` 470 times and `fresh 200 1.0.0` 73 times;
+- **`fresh` half there 160 times, with 0 to 200 files and no package.json:** a new package is populated in place.
+
+A sample reads package.json, lists lib/, then reads package.json again. If the two reads disagree or the directory has gone, it counts as `torn` (the reader raced a rename). Otherwise a wrong file count, or a missing package.json, counts as half there. The first CI run of 12.9.1-11, with a single-read poller, counted 2 torn samples as half there (`lib/ 60-240 files, without package.json`), against 30–43 per run on 12.9.1-10.
 
 12.9.1-11's patches/0004 renames the old tree aside, renames the staged one in and only then deletes the old one, and it stages a new package before renaming it into place. The pnpm deps-restorer crate's own unit tests pass with the patch (633 of 633, host `cargo test -p pnpm-deps-restorer --lib`). Upstream's RemoveExisting test (a failing remove_dir_all before the swap) is replaced by one checking that an unremovable old tree no longer fails the swap.
 
