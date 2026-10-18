@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { listRecipes } from './npm-tag.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -13,6 +14,10 @@ export function peerDirs(env = process.env, base = root) {
     join(base, '.homescoop-out/peers'),
     env.RUNNER_TEMP && join(env.RUNNER_TEMP, 'artifacts'),
   ].filter(Boolean).map((d) => resolve(d));
+}
+
+function siblingVersions(recipe, name, base) {
+  return listRecipes(base).filter((r) => r.dir !== recipe && r.npm === name && r.version).map((r) => r.version);
 }
 
 function manifestOf(tgz) {
@@ -44,7 +49,10 @@ export function peerTarball(recipe, { env = process.env, base = root } = {}) {
       if (existsSync(tgz)) return checked(tgz, want, recipe);
     }
     const flat = join(dir, 'package.tgz');
-    if (existsSync(flat) && manifestOf(flat).name === want.name) return checked(flat, want, recipe);
+    if (existsSync(flat)) {
+      const m = manifestOf(flat);
+      if (m.name === want.name && !siblingVersions(recipe, want.name, base).includes(m.version)) return checked(flat, want, recipe);
+    }
   }
   return `${want.name}@${want.version}`;
 }

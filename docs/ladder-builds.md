@@ -81,7 +81,8 @@ visible yet: the first version of a new, 22 MB package took about 18 minutes
 (homescoop#686). A visible version with another integrity fails at once. A
 mismatch, or a version that never appears, fails the job and
 opens (or comments on) one `publish-failure` issue naming the package,
-version, run and both values. It publishes with `--tag latest` only: for
+version, run and both values. It publishes with `--tag latest`, or with the
+recipe's `npm-tag:` (see *Publishing a wave under a dist-tag*): for
 homescoop, certified = latest.
 
 **Merging.** PRs merge through the merge queue only (*Merge queue* below):
@@ -246,10 +247,11 @@ be the one npm ends up with. `scripts/npm-parity.mjs` checks the
 
 | The packed version | Verdict |
 | --- | --- |
-| sorts below npm `latest` (or is a published version other than `latest`) | **behind**: fails. The build is behind main (a stale merge base); merge main. `ladder-build` publishes with `--tag latest`, so an older version must never ship |
+| sorts below the version under its tag on npm (`latest`, or the recipe's `npm-tag`) | **behind**: fails. The build is behind main (a stale merge base); merge main. `ladder-build` publishes with `--tag <tag>`, so an older version must never ship |
 | is on npm, and every entry (path, type, mode, link, content) is the same | **same**: passes, nothing to publish |
 | is on npm with other entries | **drift**: these bytes would never ship. Bump the packaging revision (`-N+1`) or revert. Fails (`--drift fail`, since the #497 bumps; the sweep and the bumps are on #497) |
-| is not on npm and sorts above `latest`, or npm has no such package | **new**: passes, a release |
+| is not on npm and sorts above the version under its tag, or npm has no such tag or package | **new**: passes, a release |
+| has an `npm-tag`, and npm has no `latest` for the name | **no-latest**: fails. The first publish of a name becomes `latest` whatever its tag |
 
 A registry that doesn't answer (after three tries) fails the job. The
 comparison is `scripts/tarball-parity.mjs`, which pool-parity uses too; run
@@ -401,6 +403,68 @@ Diff any tarball against a published version by hand:
 ```bash
 node scripts/diff-published.mjs .homescoop-out/package.tgz @ai-ecoverse/wasix-uv-shim@0.1.0-1
 ```
+
+## Publishing a wave under a dist-tag
+
+A wave (the Python 3.15 wave, #1138) publishes new versions of a name to npm
+without moving `latest`: the wave's packages pin each other by registry URL
+plus sha, so they must be on npm, but the old line stays `latest` until the
+whole set is certified. Publishing stays main-only; there is no long-lived
+branch. During the wave, a second recipe dir sits beside the base one under
+the same npm name, e.g. `packages/wasix-python3.15` with
+`npm: "@ai-ecoverse/wasix-python"` and:
+
+```yaml
+npm-tag: "python3.15"
+```
+
+**The field.** `npm-tag:` is optional; without it a recipe publishes under
+`latest`. It must match `^python\d+\.\d+$` (`scripts/npm-tag.mjs`, the one
+place the rule lives); `latest`, `certified` and `next` are refused, and so
+is anything else. `node scripts/npm-tag.mjs <dir>` prints a recipe's tag.
+`ladder-build` publishes with `npm publish --tag <tag>`, so a tagged recipe
+never moves `latest`. A name with no `latest` on npm refuses a tagged
+publish, since npm makes a name's first version `latest` whatever its tag.
+
+**One recipe per tag.** `scripts/test/npm-tag.test.mjs` fails when two
+recipes of one name publish under the same tag (the second one needs a
+non-latest `npm-tag`), and when a name with two recipes isn't in
+`scripts/npm-tag-allowlist.txt` (`<@scope/name> #<wave issue> <reason>`). An
+entry whose name is back to one recipe is stale and fails too; the fold PR
+drops it.
+
+**The guards, per tag.** Each guard judges a version against the version
+under its own tag, never against other tags:
+
+- `npm-parity` (ladder-pr, `--tag` from the PR's recipe) and `parity-now`
+  (cert-review's record job, which reads `npm-tag` from the PR head's
+  recipe through the API) call a version **behind** when it sorts below the
+  version under its tag. On a tag's first publish there is none, so it's new.
+  An untagged recipe compares with `latest` only.
+- `assert-certified-publish` (ladder-build, `--tag`) refuses the same way at
+  publish time.
+- A version that is already on npm with other bytes is **drift**, whatever
+  its tag.
+- `list-semver-cleanup.mjs` never lists a version that is under any
+  dist-tag, and judges a version in a tagged line (the same `major.minor` as
+  a non-latest tag's version) against that tag instead of `latest`.
+- cert-review's live baseline for a tagged recipe is the version under its
+  tag (`npm pack <name>@<tag>`); on the tag's first publish there is none,
+  as for a new package.
+
+**Lookups.** Everything that goes from a package to its recipe does it by
+dir (`host-<dir>-prN` artifacts, `ladder-build -f package=<dir>`,
+`repository.directory` in the published package.json) or by `name@version`
+(certified= lines, kernel-compat's bios pins via `pickRecipe`), so both dirs
+of one name resolve. The README table has one row per dir and shows the tag.
+
+**The flip.** When the whole wave is certified, the coordinator moves
+`latest` to each package's certified tagged version with `tag-certified.sh`
+(`npm dist-tag add <name>@<version> latest`). The fold PR then `git mv`s the
+tagged dir over the base dir, drops `npm-tag`, and drops the allowlist entry.
+Its next version publishes under `latest` again. The old tag may stay on npm
+until Lars's npm session can delete it (`npm dist-tag rm <name> <tag>`);
+nothing reads it after the fold.
 
 ## Retired recipes
 

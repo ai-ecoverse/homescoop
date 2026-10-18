@@ -4,7 +4,8 @@
  * (name, description) and recipe.yaml `builder:` (retired packages go in their
  * own table). No version column: npm shows the current one, and a version per
  * row would make every bump edit README.md, so concurrent bumps of neighbouring
- * rows conflict. Descriptions can carry upstream versions, which
+ * rows conflict. One row per recipe dir; a dir with a recipe.yaml `npm-tag:`
+ * (a wave beside the latest dir) shows its dist-tag. Descriptions can carry upstream versions, which
  * sync-package-version rewrites on an upstream bump, so ladder-pr's recipe-sha
  * job regenerates the table too. Private packages are left out. The table lives between the
  * `<!-- packages:start -->` and `<!-- packages:end -->` markers (#639, #647, #659).
@@ -38,11 +39,13 @@ export function listPackages(root = defaultRoot) {
     const recipePath = join(dir, name, 'recipe.yaml');
     const recipe = existsSync(recipePath) ? readFileSync(recipePath, 'utf8') : '';
     const m = recipe.match(/^builder:\s*["']?([\w-]+)/m);
+    const tag = recipe.match(/^npm-tag:\s*["']?([^"'\s#]+)/m)?.[1] || null;
     out.push({
       dir: name,
       name: pkg.name,
       version: pkg.version,
       description: pkg.description || '',
+      tag,
       retired: m?.[1] === 'retired',
     });
   }
@@ -55,7 +58,7 @@ export function renderTable(root = defaultRoot) {
   const rows = (list) =>
     list.map(
       (p) =>
-        `| [\`${cell(p.name)}\`](https://www.npmjs.com/package/${p.name}) | [recipe](packages/${p.dir}) | ${cell(p.description)} |`
+        `| [\`${cell(p.name)}\`](https://www.npmjs.com/package/${p.name})${p.tag ? ` (dist-tag \`${cell(p.tag)}\`)` : ''} | [recipe](packages/${p.dir}) | ${cell(p.description)} |`
     );
   const head = ['| npm | recipe | description |', '| --- | --- | --- |'];
   const active = pkgs.filter((p) => !p.retired);

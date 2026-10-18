@@ -1,0 +1,32 @@
+name: llvm-emscripten
+builder: host
+reproducible: true
+version: "24.0.0"
+npm: "@ai-ecoverse/llvm-emscripten"
+summary: "LLVM/clang/lld 24 (llvm-project b158b0ae) built with emscripten 6.0.9: the objects, static libraries and link manifest wasm-clang links"
+source:
+  url: "https://github.com/llvm/llvm-project/archive/b158b0ae6c559f87be325b8f427c5588e6a48823.tar.gz"
+  sha256: "8302c5e0723f93aaee50b507fa7b0b8d8b12eef5dcf4dac9fb60d78b18c81044"
+  commit: "b158b0ae6c559f87be325b8f427c5588e6a48823"
+inputs:
+  - "packages/wasm-emscripten/patches/**"
+  - "packages/wasm-emscripten/package/package.json"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/llvm-emscripten
+  license: Apache-2.0 WITH LLVM-exception
+  notes: |
+    homescoop#859 stage E: a build input, not a command package. llvm-project
+    b158b0ae is emsdk 6.0.9 release f04ea239's llvm revision and the commit
+    published wasm-clang 24.0.0-21 reports. build.sh builds the native
+    tablegen tools from the same source, then configures LLVM with emcmake
+    from the patched emscripten 6.0.9 tree on emsdk's prebuilt compilers
+    (scripts/emscripten-tree.sh, as wasm-binaryen): Release, clang and lld,
+    WebAssembly target only, no threads. It builds only the objects and
+    static libraries of the link edges of clang, lld, llvm-ar, llvm-nm,
+    llvm-objcopy and llvm-symbolizer (no tool is linked here) and ships them
+    with lib/clang/24, the headers multicall.cpp needs, the generated driver
+    mains and manifest.json, which stage F (wasm-clang) links from.

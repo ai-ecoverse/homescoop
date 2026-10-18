@@ -41,6 +41,8 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-38: `poll(POLLIN)` on an empty pipe read end whose writers are gone gives `POLLHUP` alone, as on Linux, on slicc-kernel ≥ 1.125.0 (homescoop#1133). A socket at EOF still gives `POLLIN`.
+
 Since 2025.9.30-37:
 - **`S_IF*` file-type bits are Linux's:** `S_IFMT` 0170000, `S_IFIFO` 0010000, `S_IFSOCK` 0140000. wasi-libc had 0160000, 0140000 and 0160000 (homescoop#1015).
   - **Compatibility:** programs and side modules built on -36 or older keep the old values until they're rebuilt. Rebuild everything that compares `st_mode` together.

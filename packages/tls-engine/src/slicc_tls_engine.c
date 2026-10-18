@@ -559,6 +559,15 @@ EMSCRIPTEN_KEEPALIVE int tls_ciphersuite(session *s) {
   return mbedtls_ssl_get_ciphersuite_id_from_ssl(&s->ssl);
 }
 
+/* The description number of the fatal alert the server sent (116
+ * certificate_required, 40 handshake_failure, ...), -1 when none was received
+ * and for a server session. Mbed TLS's public mbedtls_ssl_get_fatal_alert(). */
+EMSCRIPTEN_KEEPALIVE int tls_last_alert(session *s) {
+  if (s->leaf) return -1;
+  int alert = mbedtls_ssl_get_fatal_alert(&s->ssl);
+  return alert < 0 ? -1 : alert;
+}
+
 /* Drive the handshake: 1 when it is done, 0 when it needs more ciphertext
  * (drain tls_out first), or an error (a refused certificate is
  * MBEDTLS_ERR_X509_CERT_VERIFY_FAILED; tls_verify_result says why). */

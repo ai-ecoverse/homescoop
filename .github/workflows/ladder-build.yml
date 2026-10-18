@@ -52,6 +52,7 @@ jobs:
     outputs:
       builder: ${{ steps.r.outputs.builder }}
       npm: ${{ steps.r.outputs.npm }}
+      npm_tag: ${{ steps.r.outputs.npm_tag }}
       version: ${{ steps.r.outputs.version }}
       package: ${{ steps.r.outputs.package }}
       published: ${{ steps.r.outputs.published }}
@@ -71,15 +72,17 @@ jobs:
             exit 2
           fi
           NPM=$(node scripts/read-recipe.mjs "$PKG" --field npm)
+          NPM_TAG=$(node scripts/npm-tag.mjs "$PKG")
           if ! VER=$(node scripts/sync-package-version.mjs "$PKG" --check 2> "$RUNNER_TEMP/drift.txt"); then
             echo "::error::$PKG: $(tr '\n' ' ' < "$RUNNER_TEMP/drift.txt")"
             exit 1
           fi
           echo "builder=$BUILDER" >> "$GITHUB_OUTPUT"
           echo "npm=$NPM" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "package=$PKG" >> "$GITHUB_OUTPUT"
-          echo "package=$PKG builder=$BUILDER npm=$NPM@$VER"
+          echo "package=$PKG builder=$BUILDER npm=$NPM@$VER tag=$NPM_TAG"
           ART_PR="${{ inputs.artifact_pr }}"
           if [[ -n "$ART_PR" ]]; then
             echo "use_artifact=true" >> "$GITHUB_OUTPUT"
@@ -275,6 +278,15 @@ jobs:
         needs.fetch-certified.result == 'success'
       )
     runs-on: ubuntu-latest
+    # One publish per npm name at a time (#1151): two overlapping runs could both pass the
+    # pre-publish guard against the same old dist-tag, and the lower version, publishing
+    # second, would move the tag back. Serialized, the second run's assert-certified-publish
+    # sees the first one's version under the tag and refuses anything below it. GitHub keeps
+    # one pending run per group: a third run replaces a pending second one. Nothing is lost,
+    # because the newer run carries the higher certified version (roll forward).
+    concurrency:
+      group: npm-publish-${{ needs.resolve.outputs.npm }}
+      cancel-in-progress: false
     # Job-level: setup-node / npm must see ACTIONS_ID_TOKEN_REQUEST_*.
     permissions:
       contents: read
@@ -329,8 +341,10 @@ jobs:
           done
           VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
           NPM="${{ needs.resolve.outputs.npm }}"
+          TAG="${{ needs.resolve.outputs.npm_tag }}"
+          [[ "$TAG" == latest ]] || node scripts/npm-tag.mjs --check "$TAG" || { echo "::error::npm-tag '$TAG' is not a publish channel" >&2; exit 2; }
           set +e
-          node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
+          node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --tag "$TAG" --certified "${{ inputs.certified }}"
           gate=$?
           set -e
           if [[ "$gate" -eq 10 ]]; then
@@ -340,12 +354,12 @@ jobs:
           if [[ "$gate" -ne 0 ]]; then
             exit "$gate"
           fi
-          echo "publishing $NPM@$VER"
+          echo "publishing $NPM@$VER under --tag $TAG"
           attempt=1
           max=4
           while true; do
             set +e
-            out="$(npm publish "$TGZ" --access public --tag latest 2>&1)"
+            out="$(npm publish "$TGZ" --access public --tag "$TAG" 2>&1)"
             rc=$?
             set -e
             printf '%s\n' "$out"
@@ -359,7 +373,7 @@ jobs:
               for wait in 0 15 30 60 120; do
                 sleep "$wait"
                 set +e
-                node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
+                node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --tag "$TAG" --certified "${{ inputs.certified }}"
                 again=$?
                 set -e
                 [[ "$again" -eq 0 ]] || break
@@ -384,10 +398,13 @@ jobs:
         if: steps.publish.outputs.published == 'true'
         # --timeout 1800 waits up to 30 min for the version to become visible
         # (a new 22 MB package took about 18 min, homescoop#686); a visible
-        # version with another integrity fails at once. The step bound covers it.
-        timeout-minutes: 35
+        # version with another integrity fails at once. Then --tag-timeout 300
+        # waits up to 5 min for the dist-tags (#1150). The step bound covers
+        # both waits plus a 30 s hang per request and filing the failure issue.
+        timeout-minutes: 42
         env:
           GH_TOKEN: ${{ github.token }}
           NPM: ${{ needs.resolve.outputs.npm }}
+          NPM_TAG: ${{ needs.resolve.outputs.npm_tag }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/gate.mjs verify-published -- node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --timeout 1800 --run-url "$RUN_URL" --issue
+        run: node scripts/gate.mjs verify-published -- node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --tag "$NPM_TAG" --timeout 1800 --tag-timeout 300 --run-url "$RUN_URL" --issue

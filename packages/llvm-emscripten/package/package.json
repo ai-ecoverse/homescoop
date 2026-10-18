@@ -1,0 +1,37 @@
+{
+  "name": "@ai-ecoverse/llvm-emscripten",
+  "version": "24.0.0-1",
+  "description": "LLVM/clang/lld 24 (llvm-project b158b0ae) built with emscripten 6.0.9: the objects, static libraries and link manifest @ai-ecoverse/wasm-clang links (a build input)",
+  "license": "Apache-2.0 WITH LLVM-exception",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/llvm-emscripten/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/llvm-emscripten",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "llvm",
+    "clang",
+    "lld"
+  ],
+  "homescoop": {
+    "recipe": "llvm-emscripten",
+    "upstream": "24.0.0"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "manifest.json",
+    "drivers",
+    "include",
+    "lib",
+    "objects"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

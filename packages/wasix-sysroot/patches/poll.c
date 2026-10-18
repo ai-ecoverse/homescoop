@@ -18,6 +18,16 @@ static __wasi_timestamp_t now_ns(void)
 	return t;
 }
 
+__attribute__((import_module("slicc_fs"), import_name("fd_mode")))
+int __slicc_fs_fd_mode_poll(int fd, int *mode);
+
+/* A pipe or FIFO: slicc_fs's fd_mode says S_IFIFO (Linux numbering). */
+static int is_fifo(int fd)
+{
+	int mode = 0;
+	return __slicc_fs_fd_mode_poll(fd, &mode) == 0 && (mode & 0170000) == 0010000;
+}
+
 static int is_socket(int fd)
 {
 	__wasi_fdstat_t st;
@@ -102,10 +112,14 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 			else if (e->error) p->revents |= POLLERR;
 			else if (gone) {
 				p->revents |= POLLHUP;
-				/* An empty read end whose writers are gone is POLLHUP alone on
-				 * Linux; the kernel's event doesn't say whether data is left
-				 * (nbytes isn't 0 there), so POLLIN stays (homescoop#975, known). */
-				if (!watch && e->type == __WASI_EVENTTYPE_FD_READ) p->revents |= POLLRDNORM;
+				/* -38 (homescoop#1133): an empty pipe or FIFO read end whose
+				 * writers are gone is POLLHUP alone on Linux. slicc-kernel
+				 * 1.125.0 (#1054) reports nbytes as the bytes a read gets at once,
+				 * 0 when empty; older kernels say 1, so they keep POLLIN. Only
+				 * pipes and FIFOs: a stream socket at EOF stays POLLIN|POLLHUP,
+				 * and a non-hangup event never loses POLLIN. */
+				if (!watch && e->type == __WASI_EVENTTYPE_FD_READ && !(e->fd_readwrite.nbytes == 0 && is_fifo(p->fd)))
+					p->revents |= POLLRDNORM;
 			} else if (watch) {
 				quiet_watch = 1;
 			} else {

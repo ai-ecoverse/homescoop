@@ -176,7 +176,7 @@ const incompleteNote = incomplete.length
   : '';
 const behind = lines.filter(({ line }) => /^cert-ci: (BEHIND|DRIFT) /.test(line));
 const behindNote = behind.length
-  ? `\n\n**Not certified, whatever the review says: npm moved on after ladder-pr checked it.** Merge main and bump the packaging revision above npm's \`latest\`, so these bytes can ship (homescoop#891).`
+  ? `\n\n**Not certified, whatever the review says: npm moved on after ladder-pr checked it.** Merge main and bump the packaging revision above the version under its dist-tag (\`latest\`, or the recipe's \`npm-tag\`), so these bytes can ship (homescoop#891).`
   : '';
 const parityUnknown = lines.filter(({ line }) => parityLine(line));
 const parityNote = parityUnknown.length
