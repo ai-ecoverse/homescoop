@@ -1,0 +1,193 @@
+homescoop (homescoop#1082, refs #1081): numpy.linalg raises LinAlgError for a
+failed factorisation through errstate(call=..., invalid='call'), which needs
+the FP invalid flag that umath_linalg sets with npy_set_floatstatus_invalid().
+wasm has no FP status flags, so solve/inv/cholesky/qr/eig*/svd/lstsq returned
+NaN for a singular or non-positive-definite matrix. umath_linalg now also
+records LAPACK's verdict in a thread-local flag (wasm only) that
+_umath_linalg._wasm_take_invalid() reads and clears, and _linalg.py's
+_lapack_errstate raises the same LinAlgError from it after each call.
+--- a/numpy/linalg/umath_linalg.cpp
++++ b/numpy/linalg/umath_linalg.cpp
+@@ -437,11 +437,25 @@
+     return !!(status & NPY_FPE_INVALID);
+ }
+ 
++#ifdef __wasm__
++/*
++ * homescoop (homescoop#1082, #1081): wasm has no floating-point status flags,
++ * so npy_set_floatstatus_invalid() is a no-op there, numpy's errstate never
++ * sees a failed factorisation, and solve/inv/cholesky/... returned NaN instead
++ * of raising LinAlgError. Keep LAPACK's verdict in this flag as well;
++ * numpy/linalg/_linalg.py reads and clears it after each call.
++ */
++static thread_local int wasm_linalg_invalid;
++#endif
++
+ static inline void
+ set_fp_invalid_or_clear(int error_occurred)
+ {
+     if (error_occurred) {
+         npy_set_floatstatus_invalid();
++#ifdef __wasm__
++        wasm_linalg_invalid = 1;
++#endif
+     }
+     else {
+         npy_clear_floatstatus_barrier((char*)&error_occurred);
+@@ -4684,7 +4698,21 @@
+ /* -------------------------------------------------------------------------- */
+                   /* Module initialization and state  */
+ 
++#ifdef __wasm__
++static PyObject *
++wasm_take_invalid(PyObject *NPY_UNUSED(self), PyObject *NPY_UNUSED(args))
++{
++    int v = wasm_linalg_invalid;
++    wasm_linalg_invalid = 0;
++    return PyBool_FromLong(v);
++}
++#endif
++
+ static PyMethodDef UMath_LinAlgMethods[] = {
++#ifdef __wasm__
++    {"_wasm_take_invalid", wasm_take_invalid, METH_NOARGS,
++     "homescoop: whether a LAPACK call failed since the last call (wasm has no FP flags)"},
++#endif
+     {NULL, NULL, 0, NULL}        /* Sentinel */
+ };
+ 
+--- a/numpy/linalg/_linalg.py
++++ b/numpy/linalg/_linalg.py
+@@ -159,6 +159,24 @@
+     """
+ 
+ 
++# homescoop (homescoop#1082): on wasm the FP status flags that errstate relies
++# on don't exist, so a failed LAPACK call didn't raise; _umath_linalg keeps
++# the failure in a flag that this wrapper turns into the same exception.
++if hasattr(_umath_linalg, '_wasm_take_invalid'):
++    import contextlib as _contextlib
++
++    @_contextlib.contextmanager
++    def _lapack_errstate(*, call, **kwargs):
++        _umath_linalg._wasm_take_invalid()
++        with errstate(call=call, **kwargs):
++            yield
++        if _umath_linalg._wasm_take_invalid():
++            call('invalid value', 0)
++else:
++    def _lapack_errstate(*, call, **kwargs):
++        return errstate(call=call, **kwargs)
++
++
+ def _raise_linalgerror_singular(err, flag):
+     raise LinAlgError("Singular matrix")
+ 
+@@ -466,7 +484,7 @@
+         gufunc = _umath_linalg.solve
+ 
+     signature = 'DD->D' if isComplexType(t) else 'dd->d'
+-    with errstate(call=_raise_linalgerror_singular, invalid='call',
++    with _lapack_errstate(call=_raise_linalgerror_singular, invalid='call',
+                   over='ignore', divide='ignore', under='ignore'):
+         r = gufunc(a, b, signature=signature)
+ 
+@@ -664,7 +682,7 @@
+     t, result_t = _commonType(a)
+ 
+     signature = 'D->D' if isComplexType(t) else 'd->d'
+-    with errstate(call=_raise_linalgerror_singular, invalid='call',
++    with _lapack_errstate(call=_raise_linalgerror_singular, invalid='call',
+                   over='ignore', divide='ignore', under='ignore'):
+         ainv = _umath_linalg.inv(a, signature=signature)
+     return wrap(ainv.astype(result_t, copy=False))
+@@ -892,7 +910,7 @@
+     _assert_stacked_square(a)
+     t, result_t = _commonType(a)
+     signature = 'D->D' if isComplexType(t) else 'd->d'
+-    with errstate(call=_raise_linalgerror_nonposdef, invalid='call',
++    with _lapack_errstate(call=_raise_linalgerror_nonposdef, invalid='call',
+                   over='ignore', divide='ignore', under='ignore'):
+         r = gufunc(a, signature=signature)
+     return wrap(r.astype(result_t, copy=False))
+@@ -1143,7 +1161,7 @@
+     mn = min(m, n)
+ 
+     signature = 'D->D' if isComplexType(t) else 'd->d'
+-    with errstate(call=_raise_linalgerror_qr, invalid='call',
++    with _lapack_errstate(call=_raise_linalgerror_qr, invalid='call',
+                   over='ignore', divide='ignore', under='ignore'):
+         tau = _umath_linalg.qr_r_raw(a, signature=signature)
+ 
+@@ -1175,7 +1193,7 @@
+         gufunc = _umath_linalg.qr_reduced
+ 
+     signature = 'DD->D' if isComplexType(t) else 'dd->d'
+-    with errstate(call=_raise_linalgerror_qr, invalid='call',
++    with _lapack_errstate(call=_raise_linalgerror_qr, invalid='call',
+                   over='ignore', divide='ignore', under='ignore'):
+         q = gufunc(a, tau, signature=signature)
+     r = triu(a[..., :mc, :])
+@@ -1264,7 +1282,7 @@
+     t, result_t = _commonType(a)
+ 
+     signature = 'D->D' if isComplexType(t) else 'd->D'
+-    with errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
++    with _lapack_errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
+                   invalid='call', over='ignore', divide='ignore',
+                   under='ignore'):
+         w = _umath_linalg.eigvals(a, signature=signature)
+@@ -1370,7 +1388,7 @@
+     _assert_stacked_square(a)
+     t, result_t = _commonType(a)
+     signature = 'D->d' if isComplexType(t) else 'd->d'
+-    with errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
++    with _lapack_errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
+                   invalid='call', over='ignore', divide='ignore',
+                   under='ignore'):
+         w = gufunc(a, signature=signature)
+@@ -1517,7 +1535,7 @@
+     t, result_t = _commonType(a)
+ 
+     signature = 'D->DD' if isComplexType(t) else 'd->DD'
+-    with errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
++    with _lapack_errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
+                   invalid='call', over='ignore', divide='ignore',
+                   under='ignore'):
+         w, vt = _umath_linalg.eig(a, signature=signature)
+@@ -1671,7 +1689,7 @@
+         gufunc = _umath_linalg.eigh_up
+ 
+     signature = 'D->dD' if isComplexType(t) else 'd->dd'
+-    with errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
++    with _lapack_errstate(call=_raise_linalgerror_eigenvalues_nonconvergence,
+                   invalid='call', over='ignore', divide='ignore',
+                   under='ignore'):
+         w, vt = gufunc(a, signature=signature)
+@@ -1856,7 +1874,7 @@
+             gufunc = _umath_linalg.svd_s
+ 
+         signature = 'D->DdD' if isComplexType(t) else 'd->ddd'
+-        with errstate(call=_raise_linalgerror_svd_nonconvergence,
++        with _lapack_errstate(call=_raise_linalgerror_svd_nonconvergence,
+                       invalid='call', over='ignore', divide='ignore',
+                       under='ignore'):
+             u, s, vh = gufunc(a, signature=signature)
+@@ -1866,7 +1884,7 @@
+         return SVDResult(wrap(u), s, wrap(vh))
+     else:
+         signature = 'D->d' if isComplexType(t) else 'd->d'
+-        with errstate(call=_raise_linalgerror_svd_nonconvergence,
++        with _lapack_errstate(call=_raise_linalgerror_svd_nonconvergence,
+                       invalid='call', over='ignore', divide='ignore',
+                       under='ignore'):
+             s = _umath_linalg.svd(a, signature=signature)
+@@ -2558,7 +2576,7 @@
+         # the array one larger in that axis
+         b = zeros(b.shape[:-2] + (m, n_rhs + 1), dtype=b.dtype)
+ 
+-    with errstate(call=_raise_linalgerror_lstsq, invalid='call',
++    with _lapack_errstate(call=_raise_linalgerror_lstsq, invalid='call',
+                   over='ignore', divide='ignore', under='ignore'):
+         x, resids, rank, s = _umath_linalg.lstsq(a, b, rcond,
+                                                  signature=signature)

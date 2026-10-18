@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-xz",
-  "version": "5.8.4-3",
+  "version": "5.8.4-4",
   "description": "XZ Utils 5.8.4 (xz/lzma + liblzma) for wasm / slicc",
   "license": "0BSD AND GPL-2.0-or-later",
   "repository": {

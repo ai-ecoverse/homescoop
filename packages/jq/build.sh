@@ -38,6 +38,8 @@ if [[ ! -f "$SRC/jq" && ! -f "$SRC/jq.js" || -n "${FORCE:-}" ]]; then
     homescoop_fix_darwin_ar Makefile
     # Also fix AR in vendor oniguruma if present.
     [[ -f vendor/oniguruma/Makefile ]] && homescoop_fix_darwin_ar vendor/oniguruma/Makefile
+    emmake make src/config_opts.inc
+    homescoop_scrub_build_paths src/config_opts.inc
     # shellcheck disable=SC2086
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
       LDFLAGS="$CLI_LDFLAGS"

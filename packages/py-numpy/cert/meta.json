@@ -15,7 +15,8 @@
     "cert/notices.mjs (homescoop#726): THIRD-PARTY-NOTICES.md names OpenBLAS 0.3.28 (BSD-3-Clause), LAPACK (BSD-3-Clause), GotoBLAS2 (BSD-2-Clause) and libdivide (Zlib), each with its licence text",
     "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-27 <3.14.3 (it is built against 3.14.2-27's headers); npm --package-lock-only resolves one python, at the top level, and the specs run on the newest",
     "cert/patches.mjs: every patch's path (meta.json patches; #727, #1080)",
-    "cert/numpy.mjs: importlib.metadata lists numpy 2.3.2's entry points (array_api, console_scripts f2py/numpy-config, pkg_config, pyinstaller40), as the sdist's pyproject.toml declares them (#1084)"
+    "cert/numpy.mjs: importlib.metadata lists numpy 2.3.2's entry points (array_api, console_scripts f2py/numpy-config, pkg_config, pyinstaller40), as the sdist's pyproject.toml declares them (#1084)",
+    "2.3.2-12 (homescoop#1082, refs #1081): cert/linalg-errors.mjs. A singular solve and inv raise LinAlgError('Singular matrix') for float64, float32, complex128 and one singular matrix in a batch; a non-PD cholesky raises LinAlgError('Matrix is not positive definite'). A good matrix solves to [2, 3], before and after a failure. -11 returns NaN for all of them (NEGATIVE.md)"
   ],
   "notices": [
     {
@@ -39,6 +40,7 @@
     "numpy-wasm-fp-exceptions.patch": "cert/patches.mjs: longdouble -> clongdouble and float16/float32/float64/longdouble casts through lowlevel_strided_loops (the build itself crashed LLVM 21 without it)",
     "numpy-cblas-int-returns.patch": "cert/patches.mjs: np.dot/np.vdot on complex64/complex128 vectors reach cblas_[cz]dot[uc]_sub with OpenBLAS's int-returning signature",
     "numpy-wasix-no-backtrace.patch": "cert/patches.mjs: a + b + c on 2^18 float64 (temporary elision's caller check) works and _multiarray_umath doesn't name backtrace",
-    "numpy-wasm-cpu.patch": "the build: npy_cpu.h stops with #error Unknown CPU on wasm32 without it; every spec imports numpy"
+    "numpy-wasm-cpu.patch": "the build: npy_cpu.h stops with #error Unknown CPU on wasm32 without it; every spec imports numpy",
+    "numpy-wasm-linalg-errors.patch": "cert/linalg-errors.mjs: singular solve/inv and a non-PD cholesky raise LinAlgError through _umath_linalg's wasm failure flag (#1082)"
   }
 }

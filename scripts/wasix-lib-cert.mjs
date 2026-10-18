@@ -6,6 +6,8 @@
 //   node scripts/wasix-lib-cert.mjs <package> --tarball <package.tgz> [--kernel-dir <dir>]
 //
 // meta.probes: [{ "name": "zprobe", "src": "test/zprobe.c", "pkg": ["zlib"] }]
+// (optional "flavours": { "-pic": "lib" } for a package with one flavour, and
+// "cc": "bin/gfortran" for a compiler driver the package ships)
 // gives the commands `zprobe` (static-main, lib/) and `zprobe-pic`
 // (dynamic-main, lib-pic/). A probe is compiled with nothing but the
 // package's own pkg-config Cflags/Libs (as a consumer would) and linked with
@@ -44,7 +46,10 @@ try {
   const pkg = join(work, 'package');
 
   const env = { ...process.env, WASIXCC_RUN_WASM_OPT: 'no' };
-  for (const line of sh('bash', [join(root, 'scripts/install-wasixcc.sh'), join(work, 'wasixcc')]).split('\n')) {
+  // The recipe's own sysroot (toolchain.wasix_sysroot), when it pins one.
+  const tc = JSON.parse(sh(process.execPath, [join(root, 'scripts/read-recipe.mjs'), name, '--json'])).toolchain ?? {};
+  const sysrootEnv = tc.wasix_sysroot ? { HOMESCOOP_WASIX_SYSROOT_VERSION: tc.wasix_sysroot, HOMESCOOP_WASIX_SYSROOT_SHA: tc.wasix_sysroot_sha256 } : {};
+  for (const line of sh('bash', [join(root, 'scripts/install-wasixcc.sh'), join(work, 'wasixcc')], { env: { ...process.env, ...sysrootEnv } }).split('\n')) {
     const m = line.match(/^export ([A-Z_]+)=(.*)$/);
     if (m) env[m[1]] = m[2].replace(/\$PATH/, env.PATH);
   }
@@ -52,7 +57,10 @@ try {
   mkdirSync(join(probes, 'bin'), { recursive: true });
   const commands = {};
   for (const p of meta.probes) {
-    for (const [suffix, f] of Object.entries(FLAVOURS)) {
+    // p.flavours ({ "-pic": "lib" }) picks flavours and their lib dir, for a
+    // package that ships one (wasix-openblas: PIC only, in lib/).
+    const flavours = p.flavours ? Object.entries(p.flavours).map(([s, lib]) => [s, { ...FLAVOURS[s], lib }]) : Object.entries(FLAVOURS);
+    for (const [suffix, f] of flavours) {
       const cmd = `${p.name}${suffix}`;
       console.log(`== link ${cmd} (${f.env.WASIXCC_MODULE_KIND}, ${f.lib}/)`);
       // Only this flavour's .pc files: no host pkg-config dirs.
@@ -61,7 +69,15 @@ try {
         env: { ...process.env, PKG_CONFIG_PATH: pc, PKG_CONFIG_LIBDIR: pc, PKG_CONFIG_SYSROOT_DIR: '' },
       }).trim().split(/\s+/).filter(Boolean);
       console.log(`   pkg-config ${p.pkg.join(' ')}: ${flags.join(' ').replaceAll(pkg, '<pkg>')}`);
-      sh('wasixcc', ['-O2', join(pkgDir, p.src), ...flags, '-Wl,--fatal-warnings', '-o', join(probes, `bin/${cmd}.wasm`)], {
+      // p.cc: a compiler driver the package ships (wasix-f2c's bin/gfortran),
+      // given a copy of the source, since it may write next to it.
+      let src = join(pkgDir, p.src);
+      if (p.cc) {
+        mkdirSync(join(work, 'src', cmd), { recursive: true });
+        writeFileSync(join(work, 'src', cmd, p.src.split('/').pop()), readFileSync(src));
+        src = join(work, 'src', cmd, p.src.split('/').pop());
+      }
+      sh(p.cc ? join(pkg, p.cc) : 'wasixcc', ['-O2', src, ...flags, '-Wl,--fatal-warnings', '-o', join(probes, `bin/${cmd}.wasm`)], {
         env: { ...env, ...f.env },
       });
       commands[cmd] = { wasm: `bin/${cmd}.wasm` };

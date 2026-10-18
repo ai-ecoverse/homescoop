@@ -37,3 +37,11 @@ CLI cannot build. The threaded/large cases in `cert/roundtrip.mjs` (`xz -T0` /
 ## 5.8.4-2: licence texts (homescoop#511, 2026-10-16)
 
 `cert/licence.mjs` against the published 5.8.4-1: FAIL. Its 18 `SPDX-License-Identifier` lines are 0BSD ×15 and GPL-2.0-or-later ×3 (`bin/xzgrep`, `bin/xzdiff`, `bin/xzless`), but package.json says `"license": "0BSD"`: `GPL-2.0-or-later (package/bin/xzdiff, package/bin/xzgrep, package/bin/xzless) is not in package.json's license "0BSD"`. Its `package/LICENSE` is upstream's `COPYING` summary alone, without either licence's text. `build.sh` passed `COPYING`, `LICENSE` and `COPYING.0BSD` to `homescoop_stage_license`, which copies only the first file that exists.
+
+## 5.8.4-4: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+`node scripts/check-no-debug.mjs xz` (host-run's #908 check) fails on the published 5.8.4-3: 2 file(s) ship 1,424,239 bytes of DWARF.
+
+The published 5.8.4-3 also has 76 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/xz.wasm, lib/liblzma.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+5.8.4-4 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 5.8.4-3 too; the negative is the #908 check.

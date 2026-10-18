@@ -1,0 +1,35 @@
+{
+  "name": "@ai-ecoverse/wasix-openblas",
+  "version": "0.3.28-1",
+  "description": "OpenBLAS 0.3.28 for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config",
+  "license": "BSD-3-Clause AND BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-openblas/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openblas",
+  "keywords": [
+    "wasm",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "openblas",
+    "blas",
+    "lapack"
+  ],
+  "homescoop": {
+    "recipe": "wasix-openblas",
+    "upstream": "0.3.28"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "include",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,21 @@
+multiprocessing.util.spawnv_passfds: posix_spawn on WASI (no _posixsubprocess).
+
+--- a/Lib/multiprocessing/util.py
++++ b/Lib/multiprocessing/util.py
+@@ -516,6 +516,16 @@ def _flush_std_streams():
+ #
+ 
+ def spawnv_passfds(path, args, passfds):
++    if sys.platform == "wasi":
++        passfds = tuple(sorted(map(int, passfds)))
++        was = [os.get_inheritable(fd) for fd in passfds]
++        for fd in passfds:
++            os.set_inheritable(fd, True)
++        try:
++            return os.posix_spawn(path, args, os.environ)
++        finally:
++            for fd, inh in zip(passfds, was):
++                os.set_inheritable(fd, inh)
+     import _posixsubprocess
+     passfds = tuple(sorted(map(int, passfds)))
+     errpipe_read, errpipe_write = os.pipe()

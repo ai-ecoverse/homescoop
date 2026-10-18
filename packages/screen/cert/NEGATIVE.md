@@ -96,3 +96,7 @@ AssertionError [ERR_ASSERTION]: BUILD_DATE comes from source.epoch (SOURCE_DATE_
 + 'Screen version 5.0.1 (build on 2026-10-13 02:10:52) \n'
 - 'Screen version 5.0.1 (build on 2025-05-15 15:05:28) \n'
 ```
+
+## 5.0.1-13: the inherited-ignore and flock shims (homescoop#973, #947; 2026-10-17)
+
+5.0.1-13 links the updated `shims/slicc` (#960). A `constructor(101)` in `slicc_signals.c` seeds `SIG_IGN` for each signal the kernel's `sliccKernel.sigInherited()` reports; on a kernel without the hook it changes nothing. A strong `flock()` in `slicc_libc_gaps.c` goes through the `env.__syscall_flock` import, which answers 0 without the kernel half (slicc-kernel#967 and #968). The built wasm now imports `env.slicc_sig_inherited_js`, and `env.__syscall_flock` where the program calls `flock`. The published 5.0.1-12 imports neither, so on a hooked kernel it can't see an inherited ignore, and its `flock` never conflicts. The program code is unchanged, and the specs pass on 5.0.1-12 as well. The build also gets #908's prefix maps and DWARF strip.

@@ -31,6 +31,9 @@ if [[ ! -f "$SRC_DIR/make" && ! -f "$SRC_DIR/make.js" || -n "${FORCE:-}" ]]; the
     emconfigure ./configure --host=wasm32-unknown-emscripten \
       --disable-nls --without-guile --disable-load --without-customs \
       LDFLAGS="$CLI_LDFLAGS"
+    perl -pi -e 's/^#define MAKE_CXX ".*"$/#define MAKE_CXX "c++"/' src/config.h
+    grep -qx '#define MAKE_CXX "c++"' src/config.h
+    homescoop_scrub_build_paths src/config.h
     homescoop_fix_darwin_ar Makefile
     # main_envp provides real main; rename make's main.
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \

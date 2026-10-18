@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-ncurses-utils",
-  "version": "6.5.0-3",
+  "version": "6.5.0-4",
   "description": "ncurses clear, tput, tset and reset for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "X11-distribute-modifications-variant",
   "repository": {

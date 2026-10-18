@@ -21,11 +21,13 @@
 //   node file-issue.mjs --package <recipe> --case <spec>:<case> [--kernel <version|line|any>] \
 //     --title '[cert] <package>: …' --body-file <file> [--label <l>]… [--repo homescoop|slicc-kernel|owner/repo] \
 //     [--run <url>] [--pr <n>] [--version <v>] [--note <text>]
+//   node file-issue.mjs --kind coverage --package <recipe> --body-file <file>   a coverage gap
 //   node file-issue.mjs --list --package <recipe>     the open marked issues of a package, with their cases
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { labelsFor } from '../issue-labels.mjs';
 
 export const VERSION = 'v1';
 export const MARKER_RE = /<!-- cert-review-key: (v\d+ [0-9a-f]{16}) -->/;
@@ -38,6 +40,10 @@ export function packageOf(name, root = process.cwd()) {
   return p.toLowerCase();
 }
 
+export const COVERAGE = 'coverage';
+export const isCoverage = (kase) => kase === COVERAGE;
+export const coverageTitle = (pkg) => `[cert] ${pkg}: cert coverage gaps`;
+
 export function caseOf(text) {
   const s = String(text ?? '').trim();
   if (!s) throw new Error('--case is required (<spec>:<case>)');
@@ -45,6 +51,7 @@ export function caseOf(text) {
   const spec = (at < 0 ? s : s.slice(0, at)).trim().replace(/^.*\//, '').replace(/\.mjs$/i, '').toLowerCase();
   const name = (at < 0 ? '' : s.slice(at + 1)).trim().replace(/\s+/g, ' ').toLowerCase();
   if (!spec) throw new Error(`--case ${JSON.stringify(s)} has no spec before the colon`);
+  if (spec === COVERAGE) return COVERAGE;
   return `${spec}:${name}`;
 }
 
@@ -132,6 +139,12 @@ export function githubIssues({ repo, token, fetchImpl = fetch }) {
 }
 
 export async function fileIssue(gh, { pkg, kase, kernel, title, body, labels = [], run, pr, version, note }) {
+  const coverage = isCoverage(kase);
+  if (coverage) {
+    kernel = 'any';
+    title = coverageTitle(pkg);
+    labels = [...new Set([...labels, ...labelsFor(title, [pkg]).filter((l) => l !== 'triage'), 'cert-coverage'])];
+  }
   if (!/^\[cert\] \S/.test(String(title ?? ''))) throw new Error(`--title must start with "[cert] <package>: " (got ${JSON.stringify(title)})`);
   if (!String(body ?? '').trim()) throw new Error('--body-file is empty');
   const parts = { pkg, kase, kernel };
@@ -140,10 +153,14 @@ export async function fileIssue(gh, { pkg, kase, kernel, title, body, labels = [
   const same = (await gh.openIssues()).filter((i) => keyIn(i.body) === key).sort((a, b) => a.number - b.number);
   if (same.length) {
     const n = same[0].number;
-    await gh.comment(n, [`Seen again by cert-review: ${sighting}.`, note ? `\n${String(note).trim()}` : ''].join('').trimEnd() + '\n');
+    const text = coverage
+      ? [`New coverage gap from cert-review: ${sighting}.`, '', String(body).trim(), note ? `\n${String(note).trim()}` : ''].join('\n')
+      : [`Seen again by cert-review: ${sighting}.`, note ? `\n${String(note).trim()}` : ''].join('');
+    await gh.comment(n, text.trimEnd() + '\n');
     return { action: 'commented', number: n, key };
   }
-  const issue = { title, body: issueBody({ body, key, parts, sighting }), ...(labels.length ? { labels } : {}) };
+  const first = coverage ? `Cert coverage gaps of \`${pkg}\`: specs cert-review suggests. These are suggestions, not defects. Each later gap is added as a comment.\n\n${String(body).trim()}` : body;
+  const issue = { title, body: issueBody({ body: first, key, parts, sighting }), ...(labels.length ? { labels } : {}) };
   let created;
   try {
     created = await gh.create(issue);
@@ -174,7 +191,14 @@ function parseArgs(argv) {
     if (!a.startsWith('--') || i + 1 >= argv.length) throw new Error(`unexpected argument ${a}`);
     const v = argv[++i];
     if (a === '--label') out.labels.push(v);
-    else out[a.slice(2)] = v;
+    else if (a === '--kind') {
+      if (v !== COVERAGE) throw new Error(`--kind ${JSON.stringify(v)}: only "coverage" is known`);
+      out.kind = v;
+    } else out[a.slice(2)] = v;
+  }
+  if (out.kind) {
+    if (out.case && caseOf(out.case) !== COVERAGE) throw new Error(`--kind coverage and --case ${JSON.stringify(out.case)} conflict: a coverage gap has no case of its own`);
+    out.case = COVERAGE;
   }
   return out;
 }
@@ -199,6 +223,7 @@ export async function main(argv, { gh: given, env = process.env, root = process.
     return 0;
   }
   if (!a['body-file']) throw new Error('--body-file is required');
+  if (a.case && caseOf(a.case) === COVERAGE && a.kernel && kernelLine(a.kernel) !== 'any') err(`file-issue: a coverage gap doesn't depend on the kernel; ignoring --kernel ${a.kernel}`);
   const r = await fileIssue(gh, {
     pkg,
     kase: caseOf(a.case),

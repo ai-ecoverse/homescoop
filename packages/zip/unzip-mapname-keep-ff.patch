@@ -1,0 +1,17 @@
+unzip: keep a 0xff byte in a name, as the other 8-bit bytes (homescoop#602).
+mapname() let 128..254 through and dropped 255, so rep\xff1.txt was
+written as rep1.txt with rc 0. Kept, a name that is not UTF-8 reaches
+the realm's path decoding, which refuses it with EILSEQ: unzip reports
+"cannot create" and exits non-zero instead of renaming the entry.
+
+--- a/unix/unix.c
++++ b/unix/unix.c
+@@ -610,7 +610,7 @@
+                  * else allow 8-bit characters (e.g. UTF-8) in filenames:
+                  */
+                 if (uO.cflxflag ||
+-                    (isprint(workch) || (128 <= workch && workch <= 254)))
++                    (isprint(workch) || (128 <= workch && workch <= 255)))
+                     *pp++ = (char)workch;
+         } /* end switch */
+ 

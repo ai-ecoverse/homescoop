@@ -42,3 +42,7 @@ too. Without `--soft` the run stops at line 173
 ## Traversal depth (homescoop#532, 3.0.9-2; 2026-10-16)
 
 `run.mjs --package pkgconf --spec depth.mjs --kernel @ai-ecoverse/slicc-kernel@1.108.4` with the published `@ai-ecoverse/wasm-pkgconf@2.5.1-1`: FAIL, `pkg-config --libs d0: the default traversal depth is 256 levels: -ld257 -ld258 -ld259 (260 flags)`, because 2.5.1 follows the whole chain. The published 3.0.9-1 passes, and so does 3.0.9-2, which has the same bytes and adds the README note. The spec pins upstream's behaviour; it isn't patched.
+
+## 3.0.9-4: the inherited-ignore and flock shims (homescoop#973, #947; 2026-10-17)
+
+3.0.9-4 links the updated `shims/slicc` (#960). A `constructor(101)` in `slicc_signals.c` seeds `SIG_IGN` for each signal the kernel's `sliccKernel.sigInherited()` reports; on a kernel without the hook it changes nothing. A strong `flock()` in `slicc_libc_gaps.c` goes through the `env.__syscall_flock` import, which answers 0 without the kernel half (slicc-kernel#967 and #968). The built wasm now imports `env.slicc_sig_inherited_js`, and `env.__syscall_flock` where the program calls `flock`. The published 3.0.9-3 imports neither, so on a hooked kernel it can't see an inherited ignore, and its `flock` never conflicts. The program code is unchanged, and the specs pass on 3.0.9-3 as well. The build also gets #908's prefix maps and DWARF strip.

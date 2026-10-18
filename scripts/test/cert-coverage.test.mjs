@@ -20,11 +20,7 @@ const HOST_HARNESSES = ['host-node', 'host-smoke'];
 // Recipes that ship but have no cert/ at all.
 const NO_CERT = [
   'cmake', // #426
-  'freetype', // #426
-  'gmake', // #426
-  'libiconv', // #426
   'libjpeg-turbo', // #426
-  'libxml2', // #426
   'openjpeg', // #426
 ];
 
@@ -36,22 +32,13 @@ const UNCOVERED = [
 // Command packages whose cert/meta.json has no "users": "enforce".
 const NO_USERS_ENFORCE = [
   'bash', // #819
-  'binutils', // #819
   'bzip2', // #819
   'diffutils', // #819
-  'file', // #819
   'gawk', // #819
   'git', // #819
   'grep', // #819
-  'gzip', // #819
   'imagemagick', // #819
   'imagemagick-heif', // #819
-  'jq', // #819
-  'less', // #819
-  'libheif', // #819
-  'mount', // #819
-  'nano', // #819
-  'ncurses-utils', // #819
   'patch', // #819
   'poppler', // #819
   'procps', // #819
@@ -62,6 +49,7 @@ const NO_USERS_ENFORCE = [
   'wasi-uv', // #772
   'wasix-perl', // #819
   'wasix-python', // #819
+  'wasix-python3.15', // #819, the 3.15 wave dir (#1138)
   'wasix-ruby', // #819
   'xxd', // #819
   'xz', // #819

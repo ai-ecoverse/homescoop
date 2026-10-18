@@ -1,0 +1,58 @@
+diff --git a/libc-bottom-half/cloudlibc/src/libc/time/clock_nanosleep.c b/libc-bottom-half/cloudlibc/src/libc/time/clock_nanosleep.c
+index 1e8dacf..c0b198d 100644
+--- a/libc-bottom-half/cloudlibc/src/libc/time/clock_nanosleep.c
++++ b/libc-bottom-half/cloudlibc/src/libc/time/clock_nanosleep.c
+@@ -32,11 +32,52 @@ int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *rqtp,
+   if (sub.u.u.clock.timeout == 0)
+     sub.u.u.clock.timeout = 1;
+ 
++  /* Homescoop: relative sleeps need rem on EINTR (PEP 475 / nanosleep). */
++  struct timespec start;
++  int need_rem = rmtp != NULL && (flags & TIMER_ABSTIME) == 0;
++  if (need_rem) {
++    if (clock_gettime(clock_id, &start) != 0)
++      return EINVAL;
++  }
++
+   // Block until polling event is triggered.
+   __wasi_size_t nevents;
+   __wasi_event_t ev;
+   __wasi_errno_t error = __wasi_poll_oneoff(&sub, &ev, 1, &nevents);
+-  return error == 0 && ev.error == 0 ? 0 : ENOTSUP;
++  /* Upstream mapped every poll_oneoff failure (including EINTR) to ENOTSUP.
++   * SLICC returns EINTR when a signal interrupts the wait; CPython retries
++   * only on EINTR. Propagate INTR and fill *rem for relative sleeps. */
++  if (error == __WASI_ERRNO_INTR || ev.error == __WASI_ERRNO_INTR) {
++    if (need_rem) {
++      struct timespec end;
++      if (clock_gettime(clock_id, &end) == 0) {
++        time_t sec = rqtp->tv_sec - (end.tv_sec - start.tv_sec);
++        long nsec = rqtp->tv_nsec - (end.tv_nsec - start.tv_nsec);
++        if (nsec < 0) {
++          sec -= 1;
++          nsec += 1000000000L;
++        }
++        if (sec < 0) {
++          sec = 0;
++          nsec = 0;
++        }
++        rmtp->tv_sec = sec;
++        rmtp->tv_nsec = nsec;
++      } else {
++        rmtp->tv_sec = 0;
++        rmtp->tv_nsec = 0;
++      }
++    }
++    return EINTR;
++  }
++  if (error == 0 && ev.error == 0) {
++    if (need_rem) {
++      rmtp->tv_sec = 0;
++      rmtp->tv_nsec = 0;
++    }
++    return 0;
++  }
++  return ENOTSUP;
+ }
+ 
+ weak_alias(clock_nanosleep, __clock_nanosleep);
