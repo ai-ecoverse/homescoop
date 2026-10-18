@@ -1,14 +1,6 @@
 # `@ai-ecoverse/wasix-python`
 
-CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
-
-## Since 3.15.0-1
-
-**CPython 3.15.0, a new ABI (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
-- **The py-\* built before 3.15 don't load.** Their extension modules are `cpython-314-wasm32-wasix.so` and their `slicc.python.requires.abi` is `cp314`, so `_slicc_site.discover()` leaves them off `sys.path` (`python -v` names each one) and `import numpy` raises `ModuleNotFoundError`. That covers py-numpy, py-pandas, py-scipy, py-matplotlib, py-contourpy, py-kiwisolver and py-pillow until they're rebuilt for 3.15. The pure-Python py-\* load, except those that, until their next release, depend on wasix-python `<3.14.3`: npm or pnpm gives them their own older python, nested beside this one, and discovery refuses them as built for another python.
-- **UTF-8 mode is the default** (PEP 686): `open()` without an encoding and the filesystem encoding are UTF-8 whatever the locale; `-X utf8=0` or `PYTHONUTF8=0` turns it off.
-- Every CPython patch in `patches/` is regenerated against 3.15.0; none is dropped, since 3.15 has none of the fixes. Bundled `pip` 26.2.1.
-- Everything of 3.14.2-28 carries over: both binaries (`PYTHON_FORK=true`), engines slicc-kernel ≥ 1.120.0, real `fcntl`/`lockf`/`flock` locks, sqlite's `unix` VFS, multiprocessing via spawn, `Manager`.
+CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Since 3.14.2-28
 
@@ -16,7 +8,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-34's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-315-wasm32-wasix` (3.14.2-N: `cpython-314-wasm32-wasix`); native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-34's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - Two binaries (since 3.14.2-25): the default has no `fork`/`vfork`; `PYTHON_FORK=true` selects the fork-capable one (below). `subprocess` uses `os.posix_spawn` (`proc_spawn2`/`3`) in both
@@ -24,7 +16,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 - Record locks (`fcntl` F_SETLK*, `lockf`) go through slicc-kernel (since -21, below). Since 3.14.2-26 `fcntl.flock` is real: per open file description, on any descriptor (`slicc.flock`, slicc-kernel ≥ 1.117.0). On older kernels it's a whole-file record lock, and up to -25 it was a no-op.
 - stdout is line-buffered unless it is a regular file, so output streams and survives crashes
 - `signal.alarm`/`setitimer` and `time.sleep` resuming after a signal (the sysroot's libc patches, `patches/`)
-- Bundled `pip` (26.2.1 since 3.15.0-1); `.pyc` are unchecked-hash
+- Bundled `pip` 25.3; `.pyc` are unchecked-hash
 - Not built: `_uuid`, `curses`, `dbm`, `_zstd`, `tkinter`
 - `TZ` POSIX rules work (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193); `zoneinfo` works with the `tzdata` package
 
@@ -179,7 +171,7 @@ Since 3.14.2-17 (wasix-sysroot -27):
   (`os.chown`, `os.stat().st_uid`), and `os.access` asks the kernel
   (≥ 1.63.0).
 - **A system site directory every user shares:**
-  `/usr/local/lib/python3.X/site-packages` (this python's 3.X) is added (with `site.addsitedir`,
+  `/usr/local/lib/python3.14/site-packages` is added (with `site.addsitedir`,
   so its `.pth` files run) after python's own site-packages and the py-*
   packages it finds, when it exists. An embedder can drop a `.pth` there once
   for every user. A virtual environment sees it only with
@@ -287,7 +279,7 @@ side modules were not built for.
 ```text
 python -c "import mmap; print('mmap ok')"
 python -m pip install --prefix <dir> six   # SLICC: HTTPS via realm proxy + SSL_CERT_FILE
-PYTHONPATH=<dir>/lib/python3.15/site-packages python -c "import six"
+PYTHONPATH=<dir>/lib/python3.14/site-packages python -c "import six"
 ```
 
 On plain Wasmer without `_ssl`, use a local wheel (`--no-index --find-links`) until openssl/`_ssl` is enabled.

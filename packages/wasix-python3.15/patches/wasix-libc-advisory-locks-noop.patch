@@ -1,0 +1,81 @@
+From: homescoop wasix-python
+Subject: [PATCH] Advisory locks are no-ops in the SLICC realm
+
+Match Emscripten: flock/fcntl(F_SETLK*)/lockf succeed as no-ops in the
+SLICC realm. Lock cmds are 7/8/9 (after WASI F_DUPFD_CLOEXEC=6).
+---
+diff --git a/libc-bottom-half/cloudlibc/src/libc/fcntl/fcntl.c b/libc-bottom-half/cloudlibc/src/libc/fcntl/fcntl.c
+index 06b7288..cb623af 100644
+--- a/libc-bottom-half/cloudlibc/src/libc/fcntl/fcntl.c
++++ b/libc-bottom-half/cloudlibc/src/libc/fcntl/fcntl.c
+@@ -89,6 +89,23 @@ int fcntl(int fildes, int cmd, ...) {
+       }
+       return fd;
+     }
++    /* homescoop / SLICC: advisory locks are no-ops in the realm
++     * (Emscripten parity). F_GETLK/F_SETLK/F_SETLKW are 7/8/9. */
++    case F_SETLK:
++    case F_SETLKW:
++      return 0;
++    case F_GETLK: {
++      va_list ap;
++      va_start(ap, cmd);
++      struct flock *l = va_arg(ap, struct flock *);
++      va_end(ap);
++      if (l) {
++        l->l_type = F_UNLCK;
++        l->l_pid = 0;
++      }
++      (void)fildes;
++      return 0;
++    }
+     default:
+       errno = EINVAL;
+       return -1;
+diff --git a/libc-bottom-half/headers/public/__header_fcntl.h b/libc-bottom-half/headers/public/__header_fcntl.h
+index 40ba106..0090716 100644
+--- a/libc-bottom-half/headers/public/__header_fcntl.h
++++ b/libc-bottom-half/headers/public/__header_fcntl.h
+@@ -48,6 +48,15 @@
+ #define F_DUPFD (5)
+ #define F_DUPFD_CLOEXEC (6)
+ 
++/* Advisory locks — no-ops in the SLICC realm (see fcntl.c). Numbers sit
++ * after F_DUPFD_CLOEXEC so they do not collide with WASI cmds 1..6. */
++#define F_RDLCK 0
++#define F_WRLCK 1
++#define F_UNLCK 2
++#define F_GETLK 7
++#define F_SETLK 8
++#define F_SETLKW 9
++
+ #define FD_CLOEXEC (1)
+ 
+ #define AT_EACCESS          (0x0)
+diff --git a/libc-bottom-half/sources/flock_noop.c b/libc-bottom-half/sources/flock_noop.c
+new file mode 100644
+index 0000000..dd278d6
+--- /dev/null
++++ b/libc-bottom-half/sources/flock_noop.c
+@@ -0,0 +1,21 @@
++/* homescoop / SLICC: advisory locks are no-ops in the realm (Emscripten
++ * parity). wasix-libc previously had no flock()/lockf(); returning
++ * ENOSYS/EINVAL breaks filelock, pip, sqlite, and jupyter. */
++#include <fcntl.h>
++#include <sys/file.h>
++#include <unistd.h>
++
++int flock(int fd, int op)
++{
++	(void)fd;
++	(void)op;
++	return 0;
++}
++
++int lockf(int fd, int op, off_t size)
++{
++	(void)fd;
++	(void)op;
++	(void)size;
++	return 0;
++}

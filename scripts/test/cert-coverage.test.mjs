@@ -62,6 +62,7 @@ const NO_USERS_ENFORCE = [
   'wasi-uv', // #772
   'wasix-perl', // #819
   'wasix-python', // #819
+  'wasix-python3.15', // #819, the 3.15 wave dir (#1138)
   'wasix-ruby', // #819
   'xxd', // #819
   'xz', // #819

@@ -117,8 +117,6 @@ const SQLITE_OPTS = ['ATOMIC_INTRINSICS=1', 'DEFAULT_AUTOVACUUM', 'DEFAULT_CACHE
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
-  const PKG = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasix-python/package.json'));
-  const PYV = PKG.slicc.python.version;
   await write('/home/stdlib_check.py', `CERT = ${JSON.stringify(CERT)}\nKEY = ${JSON.stringify(KEY)}\n${SCRIPT}`);
   const r = await run(['python', '/home/stdlib_check.py'], { cwd: '/home' });
   assert.equal(r.status, 0, `stdlib_check.py: rc=${r.status}\n${r.stdout}\n${r.stderr}`);
@@ -140,7 +138,7 @@ export default async function (ctx) {
   assert.deepEqual(o.sqlite.slice(0, 4), ['3.54.0', 3, 'hello wasix world', [2, 4.0]]);
   assert.deepEqual(o.sqlite[4], SQLITE_OPTS, 'sqlite compile options differ from 3.14.2-11 plus 3.54.0\'s MAX_SCHEMA');
   assert.deepEqual(o.threads, [8000, 328350]);
-  assert.deepEqual(o.subprocess, ['hi\n', 'through cat', '/tmp', 'envok', 3, `(${PYV.replace('.', ', ')})`]);
+  assert.deepEqual(o.subprocess, ['hi\n', 'through cat', '/tmp', 'envok', 3, '(3, 14)']);
   assert.deepEqual(o.select, [true, true]);
   assert.deepEqual(o.tz, [true, [
     [['EST', 'EDT'], -18000, -14400, 'EST', 'EDT'],

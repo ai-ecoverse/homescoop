@@ -4,11 +4,7 @@
 // sha-pinned) must be exported by python.wasm, or by another side module of
 // the same package set (dylink.0 needed libraries such as libopenblas).
 //
-//   node packages/wasix-python/test/side-abi.mjs --wasm <python.wasm> [--soabi <cpython-XY-wasm32-wasix>] [--base <old python.wasm>] [--report <file.md>]
-//
-// --soabi: a package whose extension modules carry another SOABI (cp314
-// modules against a cp315 python) can't be loaded by this python at all, so
-// its imports are reported (what the C-API change removed) but don't fail.
+//   node packages/wasix-python/test/side-abi.mjs --wasm <python.wasm> [--base <old python.wasm>] [--report <file.md>]
 //
 // --base lists what an older python.wasm (the published one) exported that
 // the side modules use, so a report can say which symbols moved.
@@ -23,7 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const opt = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 if (!opt('--wasm')) {
-  console.error('usage: side-abi.mjs --wasm <python.wasm> [--soabi <soabi>] [--base <python.wasm>] [--report <file.md>]');
+  console.error('usage: side-abi.mjs --wasm <python.wasm> [--base <python.wasm>] [--report <file.md>]');
   process.exit(2);
 }
 
@@ -98,11 +94,6 @@ const manifest = JSON.parse(readFileSync(join(here, 'side-modules.json'), 'utf8'
 const work = mkdtempSync(join(tmpdir(), 'side-abi-'));
 const lines = [];
 let missingTotal = 0;
-let foreignMissing = 0;
-const soabi = opt('--soabi');
-const checked = [];
-const pure = [];
-const foreign = [];
 const tlsMem = [];
 try {
   // Unpack every pinned package; side modules may satisfy each other.
@@ -145,17 +136,9 @@ try {
     const fromMain = [...need].filter((s) => mainExports.has(s));
     const missing = [...need].filter((s) => !mainExports.has(s) && !sideExports.has(s) && !mainEnvImports.has(s)).sort();
     const ssl = fromMain.filter((s) => OPENSSL.test(s)).sort();
-    const tags = [...new Set(own.map((m) => /\.(cpython-\d+-wasm32-wasix)\.so$/.exec(m.file)?.[1]).filter(Boolean))];
-    const alien = soabi && tags.length > 0 && !tags.includes(soabi);
-    if (alien) {
-      foreign.push(`${pkg.name}@${pkg.version} (${tags.join(', ')}): ${missing.length} imports this python.wasm doesn't export`);
-      foreignMissing += missing.length;
-    } else {
-      (tags.length ? checked : pure).push(pkg.name);
-      for (const s of fromMain) fromMainAll.add(s);
-      missingTotal += missing.length;
-    }
-    lines.push(`| ${pkg.name}@${pkg.version}${alien ? ` (foreign SOABI ${tags.join(', ')}: not loadable by ${soabi}; reported only)` : ''} | ${own.length} | ${fromMain.length} | ${missing.length ? missing.join(' ') : '0'} | ${ssl.length ? ssl.join(' ') : '—'} |`);
+    for (const s of fromMain) fromMainAll.add(s);
+    missingTotal += missing.length;
+    lines.push(`| ${pkg.name}@${pkg.version} | ${own.length} | ${fromMain.length} | ${missing.length ? missing.join(' ') : '0'} | ${ssl.length ? ssl.join(' ') : '—'} |`);
   }
   if (base) {
     const lost = [...fromMainAll].filter((s) => !mainExports.has(s));
@@ -167,11 +150,6 @@ try {
   lines.push('', `python.wasm exports ${mainSsl.length} OpenSSL-named symbols.`);
   lines.push('', `python.wasm env imports beyond the loader's: ${unexpectedEnv.length ? unexpectedEnv.join(' ') : 'none'}`);
   lines.push('', `GOT.mem imports of python.wasm thread_local data: ${tlsMem.length ? tlsMem.join(', ') : 'none'}`);
-  if (soabi) {
-    lines.push('', `Packages with ${soabi} side modules (checked): ${checked.length ? checked.join(' ') : 'none'}`);
-    lines.push(`Packages without extension modules (checked): ${pure.length ? pure.join(' ') : 'none'}`);
-    lines.push(`Packages with another SOABI (reported only, ${foreignMissing} unresolved imports in all): ${foreign.length ? foreign.join('; ') : 'none'}`);
-  }
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
@@ -189,7 +167,4 @@ if (tlsMem.length) {
 if (missingTotal) {
   console.error(`side-abi: ${missingTotal} side-module imports unresolved`);
   process.exit(1);
-}
-if (!process.exitCode) {
-  console.log(`side-abi: PASS ${checked.length + pure.length} of ${manifest.packages.length} packages checked (${checked.length} with side modules)${soabi ? ` against ${soabi}, ${foreign.length} with another SOABI reported only` : ''}`);
 }

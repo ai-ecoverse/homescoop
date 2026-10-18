@@ -1,5 +1,3 @@
-import { abiSplit, assertRefused } from './fixtures/abi.mjs';
-
 const SCRIPT = String.raw`
 import json, threading
 out = {"has": hasattr(threading, "get_native_id")}
@@ -28,7 +26,7 @@ with f.skip_backend("scipy"):
     pass
 print(json.dumps([[round(z.real, 3) + 0.0, round(z.imag, 3) + 0.0] for z in a]))
 `;
-const SITE = (p, m) => `/node_modules/@ai-ecoverse/${p}/${m.slicc.python.sitePackages}`;
+const SITE = (p) => `/node_modules/@ai-ecoverse/${p}/lib/python3.14/site-packages`;
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
@@ -40,15 +38,8 @@ export default async function (ctx) {
   assert.equal(out.has, true, `threading.get_native_id must exist (homescoop#587): ${o}`);
   assert.deepEqual(out.main, [true, true], o);
   assert.deepEqual(out.threads, [true, true, true, true], `two live threads and the main thread have three distinct native ids, each matching Thread.native_id: ${o}`);
-  const split = await abiSplit(ctx);
-  if (!split.loadable.includes('py-scipy')) {
-    await assertRefused(ctx, split, 'native-id');
-    console.log(`threading.get_native_id: the main thread's id matches main_thread().native_id; two live threads get distinct ids, each equal to their Thread.native_id; the scipy.fft uarray check waits for a py-scipy built for ${split.want.abi} (the installed one requires ${split.refused.find((p) => p.name === 'py-scipy')?.requires.abi})`);
-    return;
-  }
-  const man = async (p) => JSON.parse(await ctx.read(`/node_modules/@ai-ecoverse/${p}/package.json`));
   await write('/tmp/native_id_scipy.py', SCIPY);
-  const s = await run(['python3', '/tmp/native_id_scipy.py'], { cwd: '/tmp', env: { PYTHONPATH: `${SITE('py-numpy', await man('py-numpy'))}:${SITE('py-scipy', await man('py-scipy'))}` } });
+  const s = await run(['python3', '/tmp/native_id_scipy.py'], { cwd: '/tmp', env: { PYTHONPATH: `${SITE('py-numpy')}:${SITE('py-scipy')}` } });
   assert.equal(s.status, 0, `scipy.fft.set_backend/skip_backend (uarray keys its state by threading.get_native_id): rc=${s.status} stderr=${s.stderr}`);
   assert.deepEqual(JSON.parse(s.stdout.trim().split('\n').pop()), [[6, 0], [-1.5, 0.866], [-1.5, -0.866]], s.stdout);
   console.log('threading.get_native_id: the main thread\'s id matches main_thread().native_id; two live threads get distinct ids, each equal to their Thread.native_id; scipy.fft.set_backend("scipy") and skip_backend work (fft [6, -1.5+0.866j, -1.5-0.866j])');

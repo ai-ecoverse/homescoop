@@ -12,7 +12,7 @@ sense on the build machine:
   driver is wasix++;
 - LLVM_PROF_MERGER (the runner's emsdk) and userbase (the runner's ~/.local).
 
-    python3 sanitize-sysconfig.py <lib/pythonX.Y> <build root>
+    python3 sanitize-sysconfig.py <lib/python3.14> <build root>
 """
 import glob
 import json

@@ -3,7 +3,7 @@ site/sysconfig: WASIX has $HOME, so the user site is ~/.local and enabled
 
 --- a/Lib/site.py
 +++ b/Lib/site.py
-@@ -625,6 +625,12 @@ def check_enableusersite():
+@@ -270,6 +270,12 @@
      if sys.flags.no_user_site:
          return False
  
@@ -16,7 +16,7 @@ site/sysconfig: WASIX has $HOME, so the user site is ~/.local and enabled
      if hasattr(os, "getuid") and hasattr(os, "geteuid"):
          # check process uid == effective uid
          if os.geteuid() != os.getuid():
-@@ -653,8 +659,10 @@ def _getuserbase():
+@@ -298,8 +304,10 @@
      if env_base:
          return env_base
  
@@ -31,7 +31,7 @@ site/sysconfig: WASIX has $HOME, so the user site is ~/.local and enabled
      def joinuser(*args):
 --- a/Lib/sysconfig/__init__.py
 +++ b/Lib/sysconfig/__init__.py
-@@ -116,10 +116,11 @@ def _getuserbase():
+@@ -116,10 +116,11 @@
      if env_base:
          return env_base
  

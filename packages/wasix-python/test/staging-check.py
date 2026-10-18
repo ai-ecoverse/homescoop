@@ -10,10 +10,6 @@ import os
 import sys
 
 dest = sys.argv[1]
-libs = [d for d in os.listdir(os.path.join(dest, "lib")) if d.startswith("python3.")]
-if len(libs) != 1:
-    sys.exit(f"staging-check: want one lib/python3.X, found {libs}")
-ext_suffix = f".cpython-{libs[0][len('python'):].replace('.', '')}-wasm32-wasix.so"
 # The build machine's own roots (the fixed build root under /tmp is the
 # package's documented build prefix and may appear in sysconfig).
 host_paths = [b"/opt/homebrew"]
@@ -37,7 +33,7 @@ for root, _dirs, files in os.walk(dest):
         if f.endswith((".so", ".dylib")):
             if head != b"\x00asm":
                 bad.append(f"non-wasm shared object: {p}")
-            elif not f.endswith(ext_suffix):
+            elif not f.endswith(".cpython-314-wasm32-wasix.so"):
                 bad.append(f"foreign extension suffix: {p}")
         if f.endswith(".whl") and not f.endswith("-none-any.whl"):
             bad.append(f"platform wheel: {p}")

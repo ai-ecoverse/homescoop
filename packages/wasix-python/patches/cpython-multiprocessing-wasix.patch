@@ -3,7 +3,7 @@ WASI: build _multiprocessing (SemLock over sem_open) and _posixshmem
 
 --- a/configure
 +++ b/configure
-@@ -32373,8 +32373,6 @@ case $ac_sys_system in #(
+@@ -31134,8 +31134,6 @@
      py_cv_module__curses_panel=n/a
      py_cv_module__dbm=n/a
      py_cv_module__gdbm=n/a

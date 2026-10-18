@@ -7,7 +7,7 @@ library); and for --enable-wasm-pthreads target wasm32-wasix with up to
 
 --- a/configure
 +++ b/configure
-@@ -9847,7 +9847,7 @@ printf "%s\n" "#define _WASI_EMULATED_GETPID 1" >>confdefs.h
+@@ -9663,7 +9663,7 @@
  
  printf "%s\n" "#define _WASI_EMULATED_PROCESS_CLOCKS 1" >>confdefs.h
  
@@ -16,7 +16,7 @@ library); and for --enable-wasm-pthreads target wasm32-wasix with up to
      echo "#define _WASI_EMULATED_SIGNAL 1" >> confdefs.h
  
      if test "x$enable_wasm_pthreads" = xyes
-@@ -9861,12 +9861,11 @@ then :
+@@ -9677,12 +9677,11 @@
        # Note: wasi requires --export-memory.
        # Note: --export-memory is implicit unless --import-memory is given
        # Note: this requires LLVM >= 16.
@@ -33,7 +33,7 @@ library); and for --enable-wasm-pthreads target wasm32-wasix with up to
  
  fi
  
-@@ -32382,9 +32381,6 @@ case $ac_sys_system in #(
+@@ -31143,9 +31142,6 @@
      py_cv_module__interpreters=n/a
      py_cv_module__interpchannels=n/a
      py_cv_module__interpqueues=n/a
@@ -43,7 +43,7 @@ library); and for --enable-wasm-pthreads target wasm32-wasix with up to
      py_cv_module_syslog=n/a
      py_cv_module_=n/a
  
-@@ -32395,9 +32391,6 @@ case $ac_sys_system in #(
+@@ -31156,9 +31152,6 @@
      py_cv_module__testimportmultiple=n/a
      py_cv_module__testmultiphase=n/a
      py_cv_module__testsinglephase=n/a
@@ -52,4 +52,4 @@ library); and for --enable-wasm-pthreads target wasm32-wasix with up to
 -    py_cv_module_termios=n/a
      py_cv_module_xxlimited=n/a
      py_cv_module_xxlimited_35=n/a
-     py_cv_module_xxlimited_3_13=n/a
+     py_cv_module_=n/a

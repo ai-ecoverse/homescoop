@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
 # Static PRESTAGE checks for wasix-python. Blocking — exit 1 on any failure.
-# Usage: prestage-check.sh <python.wasm> <lib/pythonX.Y>
+# Usage: prestage-check.sh <python.wasm> <lib/python3.14>
 set -euo pipefail
 
 WASM=${1:?python.wasm}
-PYLIB=${2:?lib/pythonX.Y}
+PYLIB=${2:?lib/python3.14}
 OBJDUMP="${WASM_OBJDUMP:-$(command -v wasm-objdump || true)}"
 OBJDUMP="${OBJDUMP:-/opt/homebrew/Cellar/wabt/1.0.41/bin/wasm-objdump}"
 
-PYV="$(basename "$PYLIB")"
-PYV="${PYV#python}"
-[[ "$PYV" =~ ^3\.[0-9]+$ ]] || { echo "PRESTAGE FAIL: $PYLIB is not lib/pythonX.Y" >&2; exit 1; }
-PYVN="${PYV/./}"
-WANT_SOABI="cpython-$PYVN-wasm32-wasix"
-WANT_EXT=".cpython-$PYVN-wasm32-wasix.so"
+WANT_SOABI='cpython-314-wasm32-wasix'
+WANT_EXT=".cpython-314-wasm32-wasix.so"
 WANT_MULTIARCH='wasm32-wasix'
 BAD_THREADS='wasm32-wasi-threads'
 
@@ -25,7 +21,7 @@ test -d "$PYLIB" || fail "missing $PYLIB"
 [[ -x "$OBJDUMP" ]] || fail "wasm-objdump not found at $OBJDUMP"
 
 # Binary substring counts (more reliable than strings|grep on large wasm)
-eval "$(python3 - "$WASM" "$WANT_SOABI" "$WANT_EXT" "$BAD_THREADS" "$PYVN" <<'PY'
+eval "$(python3 - "$WASM" "$WANT_SOABI" "$WANT_EXT" "$BAD_THREADS" <<'PY'
 import sys
 from pathlib import Path
 b = Path(sys.argv[1]).read_bytes()
@@ -33,7 +29,7 @@ soabi, ext, bad = (sys.argv[2].encode(), sys.argv[3].encode(), sys.argv[4].encod
 print(f"WASIX_N={b.count(soabi)}")
 print(f"EXT_N={b.count(ext)}")
 print(f"THREADS_N={b.count(bad)}")
-print(f"THREADS_SO_N={b.count(f'.cpython-{sys.argv[5]}-wasm32-wasi-threads.so'.encode())}")
+print(f"THREADS_SO_N={b.count(b'.cpython-314-wasm32-wasi-threads.so')}")
 PY
 )"
 [[ "$WASIX_N" -gt 0 ]] || fail "wasm: '$WANT_SOABI' count=$WASIX_N (need >0)"
