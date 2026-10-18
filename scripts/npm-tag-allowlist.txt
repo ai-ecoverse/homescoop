@@ -4,3 +4,4 @@
 # scripts/test/npm-tag.test.mjs fails on a name with two recipes that isn't
 # listed here, and on an entry whose name has only one recipe (stale: the wave
 # folded; drop the line in the fold PR).
+@ai-ecoverse/wasix-python #1138 Python 3.15 wave (packages/wasix-python3.15, npm-tag python3.15)
