@@ -116,6 +116,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32 side modules) |
 | [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
+| [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) (dist-tag `python3.15`) | [recipe](packages/py-pillow3.15) | Pillow for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-pyparsing`](https://www.npmjs.com/package/@ai-ecoverse/py-pyparsing) | [recipe](packages/py-pyparsing) | pyparsing for slicc WASIX CPython |
 | [`@ai-ecoverse/py-python-dateutil`](https://www.npmjs.com/package/@ai-ecoverse/py-python-dateutil) | [recipe](packages/py-python-dateutil) | python-dateutil for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pytz`](https://www.npmjs.com/package/@ai-ecoverse/py-pytz) | [recipe](packages/py-pytz) | pytz for slicc WASIX CPython |
