@@ -9,23 +9,29 @@
  * Exit 0  — hashes match; caller may `npm publish`
  * Exit 10 — the version is already on npm with these contents; skip publish
  *           (the same entries, not necessarily the same bytes: npm-parity's rule)
- * Exit 2  — refuse (also when the version sorts below npm's latest: the
- *           publish uses --tag latest, so it would move latest back; #891,
- *           and when the version is on npm with other contents, so these
- *           bytes would never ship; #971)
+ * Exit 2  — refuse (also when the version sorts below the version under
+ *           its --tag: the publish uses --tag <tag>, so it would move that
+ *           tag back; #891, when the version is on npm with other contents,
+ *           so these bytes would never ship; #971, and when --tag is not
+ *           latest but npm has no latest yet, since the first publish of a
+ *           name becomes latest whatever its tag)
  *
- *   node scripts/assert-certified-publish.mjs <tgz> --npm <name> --certified <sha256>
+ * --tag is the recipe's npm-tag (scripts/npm-tag.mjs), default latest.
+ * Versions under other dist-tags never count.
+ *
+ *   node scripts/assert-certified-publish.mjs <tgz> --npm <name> [--tag <npm-tag>] --certified <sha256>
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { compareVersions, packPublished } from './npm-parity.mjs';
 import { compareTarballs, describe } from './tarball-parity.mjs';
+import { DEFAULT_TAG, cliTagProblem } from './npm-tag.mjs';
 
 const tgz = process.argv[2];
 if (!tgz || tgz.startsWith('-')) {
   console.error(
-    'usage: assert-certified-publish.mjs <tgz> --npm <name> [--certified <sha256>]',
+    'usage: assert-certified-publish.mjs <tgz> --npm <name> [--tag <npm-tag>] [--certified <sha256>]',
   );
   console.log('certified-publish: FAIL refused');
   process.exit(2);
@@ -43,6 +49,13 @@ const certified = (flag('--certified') || process.env.CERTIFIED || '')
 
 if (!npmName) {
   console.error('assert-certified-publish: --npm is required');
+  console.log('certified-publish: FAIL refused');
+  process.exit(2);
+}
+
+const tag = flag('--tag') || DEFAULT_TAG;
+if (cliTagProblem(tag)) {
+  console.error(`assert-certified-publish: --tag ${tag}: ${cliTagProblem(tag)}`);
   console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
@@ -101,26 +114,37 @@ if (res.status !== 404) {
   process.exit(2);
 }
 
-const latestUrl = `${registry}/${encodeURIComponent(npmName)}/latest`;
-const tags = await fetch(latestUrl);
-let latest = null;
-if (tags.status === 200) {
-  latest = (await tags.json().catch(() => null))?.version;
-  if (typeof latest !== 'string') {
-    console.error(`assert-certified-publish: GET ${latestUrl} has no version`);
+async function distTag(t) {
+  const url = `${registry}/${encodeURIComponent(npmName)}/${t}`;
+  const r = await fetch(url);
+  if (r.status === 404) return null;
+  if (r.status !== 200) throw new Error(`GET ${url} -> ${r.status}`);
+  const v = (await r.json().catch(() => null))?.version;
+  if (typeof v !== 'string') throw new Error(`GET ${url} has no version`);
+  return v;
+}
+
+let current = null;
+try {
+  current = await distTag(tag);
+  if (tag !== DEFAULT_TAG && !(await distTag(DEFAULT_TAG))) {
+    console.error(
+      `refuse OIDC publish of ${npmName}@${version} under --tag ${tag}: npm has no latest for ${npmName}, ` +
+        `and the first publish of a name becomes latest whatever its tag. Publish the name under latest first.`,
+    );
     console.log('certified-publish: FAIL refused');
     process.exit(2);
   }
-} else if (tags.status !== 404) {
-  console.error(`assert-certified-publish: GET ${latestUrl} -> ${tags.status}`);
+} catch (err) {
+  console.error(`assert-certified-publish: ${err.message}`);
   console.log('certified-publish: FAIL refused');
   process.exit(2);
 }
-if (latest && compareVersions(version, latest) < 0) {
+if (current && compareVersions(version, current) < 0) {
   console.error(
-    `refuse OIDC publish of ${npmName}@${version}: it sorts below npm latest ${latest}, ` +
-      `and --tag latest would move latest back. Main published past this build after it was certified; ` +
-      `bump the packaging revision above ${latest} (homescoop#891).`,
+    `refuse OIDC publish of ${npmName}@${version}: it sorts below npm ${tag} ${current}, ` +
+      `and --tag ${tag} would move ${tag} back. Main published past this build after it was certified; ` +
+      `bump the packaging revision above ${current} (homescoop#891).`,
   );
   console.log('certified-publish: FAIL refused');
   process.exit(2);
@@ -146,6 +170,6 @@ if (certified !== sha256) {
   process.exit(2);
 }
 
-console.log(`certified sha256 matches — allow first publish of ${npmName}@${version}`);
-console.log(`certified-publish: PASS ${npmName}@${version}`);
+console.log(`certified sha256 matches — allow first publish of ${npmName}@${version} under --tag ${tag}`);
+console.log(`certified-publish: PASS ${npmName}@${version} --tag ${tag}`);
 process.exit(0);

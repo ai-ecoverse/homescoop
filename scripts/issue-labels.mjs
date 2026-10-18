@@ -93,7 +93,7 @@ export function npmPackage(name, packages = listPackages()) {
 }
 
 export function areaOf(pkg) {
-  if (pkg.startsWith('py-') || pkg === 'wasix-python') return 'area:python';
+  if (pkg.startsWith('py-') || /^wasix-python(?:\d+\.\d+)?$/.test(pkg)) return 'area:python';
   if (pkg === 'wasix-sysroot') return 'area:sysroot';
   if (TOOLCHAIN.has(pkg) || pkg.startsWith('wasm-go')) return 'area:toolchain';
   return null;

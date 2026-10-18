@@ -19,8 +19,8 @@ export function parseCertLines(message) {
   return lines;
 }
 
-export function certFor(text, name, version) {
-  const named = parseCertLines(text).filter((l) => l.name === name);
+export function certFor(text, name, version, siblings = []) {
+  const named = parseCertLines(text).filter((l) => l.name === name && (l.version === version || !siblings.includes(l.version)));
   const exact = named.filter((l) => l.version === version);
   if (exact.length === 0) return null;
   const stale = named.filter((l) => l.version !== version).map((l) => l.version);
@@ -137,7 +137,7 @@ function describeReview(review, name, version) {
   return `the cert-review status is ${review.state}${problem} (${review.url})`;
 }
 
-export async function certifiedSha({ name, version, message }, pr, io) {
+export async function certifiedSha({ name, version, message, siblings = [] }, pr, io) {
   const human = [
     { source: 'merge commit', text: message },
     { source: `PR #${pr.number} body`, text: pr.body },
@@ -149,18 +149,18 @@ export async function certifiedSha({ name, version, message }, pr, io) {
       : undefined;
   const sources = ignored ? [] : human;
   for (const { source, text } of sources) {
-    const certified = certFor(text, name, version);
+    const certified = certFor(text, name, version, siblings);
     if (certified) return { certified, source };
   }
   const review = await certReview(pr, io);
   if (review.text !== undefined) {
-    const certified = certFor(review.text, name, version);
+    const certified = certFor(review.text, name, version, siblings);
     if (certified) return { certified, source: `cert-review run ${review.runId}`, review };
     sources.push({ source: `cert-review run ${review.runId}`, text: review.text });
   }
   const stale = sources.flatMap(({ source, text }) =>
     parseCertLines(text)
-      .filter((l) => l.name === name)
+      .filter((l) => l.name === name && !siblings.includes(l.version))
       .map((l) => `${l.version} in the ${source}`),
   );
   if (stale.length) {
@@ -358,12 +358,30 @@ export function touchingCommit(pkg, base, head) {
   return head;
 }
 
+const quietShow = (commit) => (path) => execFileSync('git', ['show', `${commit}:${path}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+
+export function siblingVersions(pkg, name, commit, show = quietShow(commit), list = () => git('ls-tree', '--name-only', `${commit}:packages`)) {
+  const out = [];
+  for (const dir of list().split('\n').filter(Boolean)) {
+    if (dir === pkg) continue;
+    let other;
+    try {
+      other = JSON.parse(show(`packages/${dir}/package/package.json`));
+    } catch {
+      continue;
+    }
+    if (other.name === name && other.version) out.push(other.version);
+  }
+  return out;
+}
+
 export function readContext(args, commit) {
   const { name, version } = JSON.parse(git('show', `${commit}:packages/${args.pkg}/package/package.json`));
   return {
     pkg: args.pkg,
     name,
     version,
+    siblings: siblingVersions(args.pkg, name, commit).filter((v) => v !== version),
     message: args.message ?? git('log', '-1', '--format=%B', commit),
     assumeUnpublished: Boolean(args.assumeUnpublished),
   };
