@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <sys/file.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -149,6 +150,19 @@ int __syscall_prlimit64(int pid, int resource, intptr_t new_limit, intptr_t old_
 // missing (an undefined symbol at link time).
 int prlimit(pid_t pid, int resource, const struct rlimit *new_limit, struct rlimit *old_limit) {
   int r = __syscall_prlimit64(pid, resource, (intptr_t)new_limit, (intptr_t)old_limit);
+  if (r < 0) {
+    errno = -r;
+    return -1;
+  }
+  return 0;
+}
+
+EM_JS(int, __syscall_flock, (int fd, int op), {
+  return 0;
+});
+
+int flock(int fd, int op) {
+  int r = __syscall_flock(fd, op);
   if (r < 0) {
     errno = -r;
     return -1;

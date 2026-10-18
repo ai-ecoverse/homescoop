@@ -22,6 +22,7 @@
     "RC4 40-bit encrypted PDF: no or wrong password gives 'Incorrect password', rc 1; -upw u and -opw o extract text; pdfinfo shows the permissions; pdftoppm -upw renders",
     "pdftocairo (pdftoppm) -png writes c-1.png 200x100; -svg/-pdf/-ps/-eps say they need cairo, rc 99 (pdftoppm itself does not)",
     "pdffonts lists Helvetica Type 1 not embedded; pdfunite + pdfseparate round trip; pdftops writes %!PS-Adobe",
-    "errors: garbage PDF rc 1 (xref), missing file rc 1, pdfunite with an encrypted input fails without the multicall usage text"
+    "errors: garbage PDF rc 1 (xref), missing file rc 1, pdfunite with an encrypted input fails without the multicall usage text",
+    "linked libraries (homescoop#922, cert/inputs.mjs): a PDF 1.5 with a Flate content stream and a compressed /XRef stream renders red and blue rects to exact PNG pixels (zlib, libpng); pdftoppm -jpeg writes a 200x100 baseline JPEG and -jpegopt quality=40,progressive=y a smaller SOF2 one (libjpeg-turbo); that JPEG embedded as /DCTDecode is listed as jpeg, pdfimages -j returns it byte for byte and it renders within 24; a 3x1 Flate image in [/ICCBased] with a hand-built RGB profile is listed as icc and renders red and green within 40 and its linear 50% gray as sRGB 188 within 24 with no error (lcms2); 40 Flate pages give 40 pages of pdftotext and 40 pdftoppm -gray PGMs; a damaged Flate stream gives rc 0 or 1 and no trap"
   ]
 }

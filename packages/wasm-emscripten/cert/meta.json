@@ -26,6 +26,7 @@
     "0012 (homescoop#1056): the default link adds lib/slicc's slicc-writev.js, slicc-linkat.js and slicc-uname.js as --js-library, plus -u slicc_raise/slicc_sig_mask/slicc_sigpipe/slicc_cred_euid and --wrap=raise (homescoop_em_cli_ldflags). build.sh's PRESTAGE links a program calling uname, link, getuid, getrlimit and raise with the packaged defaults and runs it under node; before 0012 it failed with undefined symbol: __syscall_uname",
     "6.0.9-21 (homescoop#1028): pins emscripten-cache 6.0.9-4 and wasm-binaryen 132.0.0-3, the CI builds from the same 6.0.9 tree and binaryen d03c25ea. test/pinned-cache.mjs runs emscripten-cache's cert on the pinned version: every library, no build path, and programs using epoll_create1/ppoll link against the frozen sysroot and run. 6.0.9-20's pin, 6.0.9-3, fails (NEGATIVE.md)",
     "6.0.9-21 (homescoop#1069): lib/slicc/slicc-linkat.js ships without __syscall_linkat__sig (emscripten's libsigs.js has the same 'iipipi'), so the default link prints no 'signature redefinition' warning; PRESTAGE links calls.c with -Werror",
-    "6.0.9-21 (homescoop#538): test/files.test.mjs checks that every file LICENSE cites ('see X file') and SECURITY.md are in the tarball"
+    "6.0.9-21 (homescoop#538): test/files.test.mjs checks that every file LICENSE cites ('see X file') and SECURITY.md are in the tarball",
+    "6.0.9-22 (homescoop#960, #973, #947): lib/slicc compiled from shims/slicc with the inherited-ignore seed (slicc_signals.o names slicc_sig_inherited_js) and the strong flock() through env.__syscall_flock (slicc_libc_gaps.o); test/files.test.mjs checks both in the tarball. 6.0.9-21 has neither (NEGATIVE.md)"
   ]
 }

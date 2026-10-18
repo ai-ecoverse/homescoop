@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-xxd",
-  "version": "9.2.1192-2",
+  "version": "9.2.1192-3",
   "description": "xxd (from vim 9.2.1192) for wasm / slicc (emscripten)",
   "license": "Vim",
   "repository": {

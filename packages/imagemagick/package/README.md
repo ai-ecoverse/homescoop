@@ -83,6 +83,16 @@ MAGICK_CONFIGURE_PATH=/path/to/package/etc/ImageMagick-7-open magick ...
 
 The tab can still run out of memory without limits.
 
+## Writing HEIC / AVIF
+
+This package has no HEIC, HEIF or AVIF support at all; that is
+`@ai-ecoverse/wasm-imagemagick-heif`, which reads them only. Upstream
+ImageMagick doesn't fail when you write one anyway: `magick in.png out.heic` (or `.heif`, `.avif`) prints
+`no encode delegate for this image format 'HEIC'` as a **warning**, writes the
+input's own format (PNG here) under the `.heic` name and exits **0**
+(homescoop#940). Only a built-in source such as `gradient:` fails with rc 1.
+Check the result with `identify out.heic`, or write PNG, JPEG, WebP or TIFF.
+
 ## Licences
 
 `LICENSE` is ImageMagick's. `THIRD-PARTY-NOTICES.md` has the licences of the

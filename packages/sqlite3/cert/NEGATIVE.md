@@ -43,3 +43,9 @@ browser-cert: FAIL packages/sqlite3/cert/checklist.mjs
 AssertionError [ERR_ASSERTION]: README: host WAL databases
   expected: /WAL-format database made on a host/,
 ```
+
+## 3.54.0-6: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+The published 3.54.0-5 also has 1 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/sqlite3.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+3.54.0-6 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 3.54.0-5 too; the negative is the #908 check.

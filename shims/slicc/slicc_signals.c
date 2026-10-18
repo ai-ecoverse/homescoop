@@ -52,6 +52,23 @@ EM_JS(int, slicc_pause_js, (void), {
   return -52;
 });
 
+EM_JS(int, slicc_sig_inherited_js, (void), {
+  try {
+    if (Module.sliccKernel && typeof Module.sliccKernel.sigInherited === 'function') return Module.sliccKernel.sigInherited() | 0;
+  } catch (e) {
+  }
+  return 0;
+});
+
+__attribute__((constructor(101))) static void slicc_seed_inherited_ignores(void) {
+  unsigned mask = (unsigned)slicc_sig_inherited_js();
+  for (int sig = 1; sig < 32 && sig < _NSIG; sig++) {
+    if (!(mask & (1u << sig)) || sig == SIGKILL || sig == SIGSTOP) continue;
+    struct sigaction *a = &__sig_actions[sig];
+    if (!(a->sa_flags & SA_SIGINFO) && a->sa_handler == SIG_DFL) a->sa_handler = SIG_IGN;
+  }
+}
+
 static int slicc_default_is_kernels(int sig) {
   if (sig == SIGKILL || sig == SIGSTOP) return 1;
   const struct sigaction *a = &__sig_actions[sig];

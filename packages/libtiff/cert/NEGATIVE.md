@@ -15,3 +15,11 @@ fatal error: 'zlib.h' file not found
 ## The spec isn't vacuous
 
 `test/probe.c` is compiled from the `.pc` flags alone and linked with `-Wl,--fatal-warnings`. It runs real work through the library and checks the results; see the checklist in `meta.json`. `test/check.mjs` then reads the file the probe wrote, independently in Node, and checks it.
+
+## 4.7.2-4: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+`node scripts/check-no-debug.mjs libtiff` (host-run's #908 check) fails on the published 4.7.2-3: 1 file(s) ship 1,088,664 bytes of DWARF.
+
+The published 4.7.2-3 also has 38 occurrence(s) of the CI build directory `/tmp/homescoop-work` in lib/libtiff.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+4.7.2-4 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 4.7.2-3 too; the negative is the #908 check.

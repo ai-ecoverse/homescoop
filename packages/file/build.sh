@@ -35,7 +35,7 @@ if [[ ! -f "$SRC/src/file" && ! -f "$SRC/src/file.js" || -n "${FORCE:-}" ]]; the
       --enable-zlib --enable-bzlib --enable-xzlib \
       --disable-libseccomp \
       --datadir='${prefix}/share' \
-      --prefix="$PREFIX" \
+      --prefix=/usr/local \
       CPPFLAGS="$CPPFLAGS" LDFLAGS="$LDFLAGS"
     homescoop_fix_darwin_ar Makefile
     # Cross: compile magic.mgc with a matching native file-5.46, not the

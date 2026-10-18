@@ -4,6 +4,8 @@
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <webp/mux.h>
+#include <webp/demux.h>
+#include <sharpyuv.h>
 
 #define W 64
 #define H 48
@@ -121,21 +123,32 @@ int main(void) {
     WebPFree(ly);
   }
 
-  WebPConfig cfg;
-  WebPPicture pic;
-  WebPMemoryWriter wr;
-  if (!WebPConfigInit(&cfg) || !WebPPictureInit(&pic)) fail("sharp: WebPConfigInit / WebPPictureInit");
-  cfg.quality = 90;
-  cfg.use_sharp_yuv = 1;
-  pic.width = W;
-  pic.height = H;
+  WebPMemoryWriter plain, wr;
+  WebPMemoryWriterInit(&plain);
   WebPMemoryWriterInit(&wr);
-  pic.writer = WebPMemoryWrite;
-  pic.custom_ptr = &wr;
-  if (!WebPPictureImportRGBA(&pic, src, W * 4) || !WebPEncode(&cfg, &pic)) {
-    fail("sharp: WebPEncode with use_sharp_yuv");
+  for (int sharp = 0; sharp < 2; sharp++) {
+    WebPConfig cfg;
+    WebPPicture pic;
+    if (!WebPConfigInit(&cfg) || !WebPPictureInit(&pic)) fail("argb: WebPConfigInit / WebPPictureInit");
+    cfg.quality = 90;
+    cfg.use_sharp_yuv = sharp;
+    pic.width = W;
+    pic.height = H;
+    pic.use_argb = 1;
+    pic.writer = WebPMemoryWrite;
+    pic.custom_ptr = sharp ? &wr : &plain;
+    if (!WebPPictureImportRGBA(&pic, src, W * 4) || !WebPEncode(&cfg, &pic)) fail(sharp ? "sharp: WebPEncode" : "argb: WebPEncode");
+    WebPPictureFree(&pic);
+  }
+  int sv = SharpYuvGetVersion();
+  printf("sharpyuv %d.%d.%d\n", (sv >> 24) & 0xff, (sv >> 16) & 0xff, (sv >> 8) & 0xff);
+  if (!plain.size || !wr.size) {
+    fail("sharp: no bitstream");
   } else {
+    check("argb", plain.mem, plain.size, src, "VP8 ", 48, 4.0);
     check("sharp-yuv", wr.mem, wr.size, src, "VP8 ", 48, 4.0);
+    if (plain.size == wr.size && !memcmp(plain.mem, wr.mem, wr.size)) fail("sharp-yuv: same bitstream as without use_sharp_yuv (libsharpyuv not used)");
+    else printf("sharp-yuv differs from argb: %zu vs %zu bytes\n", wr.size, plain.size);
     static const uint8_t exif[] = "Exif\0\0homescoop libwebp probe";
     WebPData image = {wr.mem, wr.size}, meta = {exif, sizeof exif}, out = {NULL, 0};
     WebPMux *mux = WebPMuxNew();
@@ -153,13 +166,26 @@ int main(void) {
       uint8_t *px = WebPDecodeRGBA(out.bytes, out.size, &dw, &dh);
       if (!px || dw != W || dh != H) fail("mux: the assembled file decodes");
       WebPFree(px);
+      WebPDemuxer *dmux = WebPDemux(&out);
+      WebPIterator it;
+      if (!dmux || WebPDemuxGetI(dmux, WEBP_FF_CANVAS_WIDTH) != W || WebPDemuxGetI(dmux, WEBP_FF_CANVAS_HEIGHT) != H ||
+          !(WebPDemuxGetI(dmux, WEBP_FF_FORMAT_FLAGS) & EXIF_FLAG) || !WebPDemuxGetFrame(dmux, 1, &it)) {
+        fail("demux: canvas, EXIF flag and frame 1");
+      } else {
+        uint8_t *fp = WebPDecodeRGBA(it.fragment.bytes, it.fragment.size, &dw, &dh);
+        if (!fp || dw != W || dh != H) fail("demux: frame 1 decodes");
+        WebPFree(fp);
+        WebPDemuxReleaseIterator(&it);
+        printf("demux: frame 1 %dx%d, %zu bytes\n", dw, dh, it.fragment.size);
+      }
+      WebPDemuxDelete(dmux);
       WebPMuxDelete(back);
       printf("mux: %zu bytes with EXIF\n", out.size);
     }
     WebPDataClear(&out);
     WebPMuxDelete(mux);
   }
-  WebPPictureFree(&pic);
+  WebPMemoryWriterClear(&plain);
   WebPMemoryWriterClear(&wr);
 
   if (failures) {

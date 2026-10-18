@@ -44,3 +44,13 @@ FAIL the pinned emscripten-cache 6.0.9-3 fails its cert against this tree
 With that row out of the way, its `libc.a` still lacks `epoll_create1`, `ppoll` and `__syscall_pipe`, which the 6.0.9 headers declare. 6.0.9-21 pins 6.0.9-4, the CI build from the same tree, and passes. wasm-binaryen moves from 132.0.0-2 to 132.0.0-3, the CI build of binaryen d03c25ea, which has the credential library.
 
 On 6.0.9-20 a default link that pulls in `lib/slicc/slicc-linkat.js` warns `signature redefinition for: __syscall_linkat__sig`, so `-Werror` links fail (#1069). Emscripten's `libsigs.js` already has the same `'iipipi'`. 6.0.9-21 ships the file without that line, and PRESTAGE links `calls.c` with `-Werror` and requires the warning to be absent.
+
+## 6.0.9-22: the inherited-ignore and flock shims (homescoop#973, #947, via #960; 2026-10-18)
+
+6.0.9-22 compiles `lib/slicc` from #960's `shims/slicc`. `slicc_signals.o` gets the `constructor(101)` that seeds `SIG_IGN` from `sliccKernel.sigInherited()`. `slicc_libc_gaps.o` gets the strong `flock()` through `env.__syscall_flock`. Both are no-ops on kernels without slicc-kernel#967 and #968. On the published 6.0.9-21, `test/files.test.mjs` fails:
+
+```text
+AssertionError: slicc_signals.o has no slicc_sig_inherited_js (the #973 constructor)
+```
+
+The emscripten tree, the patches and the pins are unchanged from 6.0.9-21.

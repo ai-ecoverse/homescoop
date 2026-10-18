@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-9"
+  ],
+  "checklist": [
+    "make --version is GNU Make 4.4.1 (cert/make.mjs, as a non-root user under users enforce)",
+    "make -n prints the recipe without running it; make -q exits 1 before the build and 0 after",
+    "a Makefile with a pattern rule, $< $@ $^, $(wildcard), $(patsubst), $(notdir), an order-only directory prerequisite and a command-line variable builds out/all.txt with the expected content, running cp, echo, cat and mkdir through the shell",
+    "a second make does nothing; a new source rebuilds only its own output; an unknown target exits 2 with 'No rule to make target'; make clean removes out/"
+  ]
+}

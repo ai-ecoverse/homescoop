@@ -6,6 +6,7 @@
 # - cred-test against `cli` (process credentials, slicc-kernel K1);
 # - selfkill-test against `cli` (raise/kill of the program itself);
 # - rlimit-test against `cli` (setrlimit/getrlimit/prlimit, homescoop#178);
+# - siginherit-test and flock-test against `cli` (homescoop#973, #947);
 # - exec-test against `cli` (most packages) and exec-test-fork against
 #   `fork` (bash, tar, findutils: fork emulation + Asyncify).
 set -euo pipefail
@@ -70,6 +71,18 @@ emcc -O2 -Wall -Wextra -Werror "$HERE/rlimit-test.c" \
   -o "$OUT/rlimit-test.js"
 mv "$OUT/rlimit-test.js" "$OUT/rlimit-test"
 echo "== built $OUT/rlimit-test"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/siginherit-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_em_cli_ldflags) \
+  -o "$OUT/siginherit-test.js"
+mv "$OUT/siginherit-test.js" "$OUT/siginherit-test"
+echo "== built $OUT/siginherit-test"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/flock-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_em_cli_ldflags) \
+  -o "$OUT/flock-test.js"
+mv "$OUT/flock-test.js" "$OUT/flock-test"
+echo "== built $OUT/flock-test"
 
 SLICC_FORK="$WORK/libslicc-fork.a"
 homescoop_slicc_archive "$SLICC_FORK" fork

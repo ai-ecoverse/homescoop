@@ -35,3 +35,11 @@ passes, so the rebuild shows no regression on these cases.
 5.46.0-6 changes only the build inputs. Each is now a version with provenance: wasm-zlib 1.3.1-4 (was the unattested 1.3.1-2), wasm-bzip2 1.0.8-4 (was 1.0.8-3), and wasm-xz 5.8.4-2 (was the unattested 5.8.1-1). The THIRD-PARTY-NOTICES entry follows liblzma to 5.8.4; COPYING and COPYING.0BSD have the same sha256 at v5.8.4. The cert kernel is 1.110.1 (certified), and the bash and coreutils pins are 5.3.0-19 and 9.12.0-9.
 
 The file code is unchanged, so the published 5.46.0-5 passes `checklist.mjs` too, and the planted negatives above still stand. This build passes `checklist.mjs` on 1.110.1 under users enforce: every type, `-z` through zlib, libbz2 and liblzma, and glue by path.
+
+## 5.46.0-7: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+`node scripts/check-no-debug.mjs file` (host-run's #908 check) fails on the published 5.46.0-6: 2 file(s) ship 1,437,359 bytes of DWARF.
+
+The published 5.46.0-6 also has 23 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/file.wasm, lib/libmagic.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+5.46.0-7 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 5.46.0-6 too; the negative is the #908 check.

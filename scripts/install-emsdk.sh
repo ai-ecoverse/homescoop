@@ -93,4 +93,5 @@ export EMSDK=$(printf %q "$ROOT")
 export EM_CONFIG=$(printf %q "$ROOT/.emscripten")
 export PATH=$(printf %q "$INSTALL/emscripten"):$(printf %q "$INSTALL/bin"):\$PATH
 case " \${EMCC_CFLAGS-} " in *" $MAP "*) ;; *) export EMCC_CFLAGS=$MAP\${EMCC_CFLAGS:+" \$EMCC_CFLAGS"} ;; esac
+for hs_map in "\${HOMESCOOP_ROOT:+\$HOMESCOOP_ROOT=/src}" "\${WORK:+\$WORK=/build}" "\${PREFIX:+\$PREFIX=/prefix}"; do [ -n "\$hs_map" ] || continue; case " \$EMCC_CFLAGS " in *" -ffile-prefix-map=\$hs_map "*) ;; *) EMCC_CFLAGS="\$EMCC_CFLAGS -ffile-prefix-map=\$hs_map" ;; esac; done; unset hs_map; export EMCC_CFLAGS
 EOF
