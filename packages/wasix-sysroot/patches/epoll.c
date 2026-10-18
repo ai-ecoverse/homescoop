@@ -107,6 +107,13 @@ int epoll_pwait(int fd, struct epoll_event *ev, int cnt, int to, const sigset_t 
 {
 	if (cnt <= 0 || (unsigned)cnt > SIZE_MAX / sizeof(__wasi_epoll_event_t)) { errno = EINVAL; return -1; }
 	if (!sigs) return wait_all(fd, ev, cnt, to, NULL, NULL);
+	/* -36 (homescoop#949): an fd ready at entry wins over a pending signal the
+	 * mask would unblock, as on Linux (the signal stays pending): look without
+	 * waiting under the current mask first. */
+	unsigned ran = __slicc_signals_run;
+	int ready = wait_all(fd, ev, cnt, 0, NULL, NULL);
+	if (ready != 0) return ready;
+	if (__slicc_signals_run != ran) { errno = EINTR; return -1; }
 	if (!no_masked_wait) {
 		uint64_t m;
 		memcpy(&m, sigs, sizeof m);

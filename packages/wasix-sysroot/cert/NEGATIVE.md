@@ -1,5 +1,13 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-35: EINTR over a ready fd, gethostname wasmer.sh, POLLIN hides POLLOUT (-36)
+
+`test/r36.c` against npm -35 on slicc-kernel 1.120.2's Node entry (2026-10-18):
+- `ppoll`, `pselect` and `epoll_pwait` each give `-1 EINTR pending_after=0`: the pending SIGUSR1 ran instead of the ready fd being reported (#949).
+- `gethostname: 0 wasmer.sh` (#1050).
+- `poll POLLIN|POLLOUT on a write end, reader gone: 1 revents=POLLIN|POLLERR|POLLHUP`, and `POLLOUT on a socketpair end, peer closed: 1 revents=POLLHUP` (#975).
+- `test/r37.c` (default variant, cert kernel): rc 70, `[object WebAssembly.Exception]` at the first plain `siglongjmp` (#1059).
+
 ## 2025.9.30-34: handlers ignore sa_mask, and a handler's own signal nests (-35, slicc-kernel#975)
 
 `test/r35.c` against npm -34 on slicc-kernel 1.120.2's Node entry (2026-10-17): FAIL. Both cases print `usr2_inside=1 max_depth=2 order=<2<>>`. The SIGUSR2 that `sa_mask` should hold back runs inside the SIGUSR1 handler, and the handler's own SIGUSR1 nests even without `SA_NODEFER`. -35 gives `<><>2` (depth 1), and `<<>>2` with `SA_NODEFER`.
