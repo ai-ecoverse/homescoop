@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-
-const PYV = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8')).slicc.python.version;
 const WHEEL = String.raw`
 import base64, hashlib, sys, zipfile
 name, ver = "hs_user", "1.0"
@@ -23,6 +20,8 @@ with zipfile.ZipFile(f"{sys.argv[1]}/{name}-{ver}-py3-none-any.whl", "w") as z:
 
 export default async function (ctx) {
   const { run, write, assert, addUser } = ctx;
+  const PKG = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasix-python/package.json'));
+  const PYV = PKG.slicc.python.version;
   await addUser({ name: 'cone' });
   const as = async (user, argv, cwd = user === 'cone' ? '/home/cone' : '/root') => {
     const r = await run(argv, { cwd, ...(user === 'cone' && { user }) });

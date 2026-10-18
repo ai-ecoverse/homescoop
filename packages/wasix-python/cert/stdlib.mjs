@@ -7,9 +7,6 @@
  * select on a pipe, time.tzset with POSIX TZ rules and strftime('%Z')
  * (3.14.2-13). `_ctypes` is covered by cert/ctypes.mjs (slicc-kernel#306).
  */
-import { readFileSync } from 'node:fs';
-
-const PYV = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8')).slicc.python.version;
 const CERT = `-----BEGIN CERTIFICATE-----
 MIIBdTCCARqgAwIBAgIUYJ691OXDq1hZBNBhaN/YMEQ7xSMwCgYIKoZIzj0EAwIw
 FDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MTAxMDA3MDgyM1oYDzIxMjYwOTE2
@@ -120,6 +117,8 @@ const SQLITE_OPTS = ['ATOMIC_INTRINSICS=1', 'DEFAULT_AUTOVACUUM', 'DEFAULT_CACHE
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
+  const PKG = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasix-python/package.json'));
+  const PYV = PKG.slicc.python.version;
   await write('/home/stdlib_check.py', `CERT = ${JSON.stringify(CERT)}\nKEY = ${JSON.stringify(KEY)}\n${SCRIPT}`);
   const r = await run(['python', '/home/stdlib_check.py'], { cwd: '/home' });
   assert.equal(r.status, 0, `stdlib_check.py: rc=${r.status}\n${r.stdout}\n${r.stderr}`);

@@ -7,11 +7,6 @@
  * checked here) with --no-index --find-links.
  */
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-
-const PKG = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8'));
-const PYV = PKG.slicc.python.version;
-const UPSTREAM = PKG.homescoop.upstream;
 
 const WHEELS = [
   ['requests-2.34.2-py3-none-any.whl', '2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0',
@@ -28,6 +23,9 @@ const WHEELS = [
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
+  const PKG = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasix-python/package.json'));
+  const PYV = PKG.slicc.python.version;
+  const UPSTREAM = PKG.homescoop.upstream;
   const env = { PIP_NO_INDEX: '1', PIP_FIND_LINKS: '/home/wheels', PIP_DISABLE_PIP_VERSION_CHECK: '1' };
   const sh = (script, cwd = '/home') => run(['bash', '-c', script], { cwd, env });
   const ok = async (script, cwd) => {
