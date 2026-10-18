@@ -45,10 +45,7 @@ const NO_USERS_ENFORCE = [
   'mount', // #819
   'nano', // #819
   'ncurses-utils', // #819
-  'patch', // #819
   'poppler', // #819
-  'procps', // #819
-  'sqlite3', // #819
   'wasi-biome', // #819
   'wasi-fnox', // #819
   'wasi-ripgrep', // #819
@@ -57,8 +54,6 @@ const NO_USERS_ENFORCE = [
   'wasix-python', // #819
   'wasix-python3.15', // #819, the 3.15 wave dir (#1138)
   'wasix-ruby', // #819
-  'xxd', // #819
-  'xz', // #819
 ];
 
 function recipes(dir = root) {

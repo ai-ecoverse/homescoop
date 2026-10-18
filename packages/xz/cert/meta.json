@@ -1,5 +1,6 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "checklist": [
     "xz -k / xz -d small round trip",
     "corrupt input rejected",

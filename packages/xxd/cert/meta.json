@@ -1,5 +1,6 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "checklist": [
     "xxd | xxd -r round trip",
     "--version / -v"

@@ -1,5 +1,6 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "kernel": "@ai-ecoverse/slicc-kernel@1.81.0",
   "checklist": [
     "sqlite3 -version and sqlite_version() are 3.54.0",
