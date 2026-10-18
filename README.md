@@ -110,6 +110,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) | [recipe](packages/py-cycler) | cycler for slicc WASIX CPython |
 | [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fonttools for slicc WASIX CPython |
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
+| [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) (dist-tag `python3.15`) | [recipe](packages/py-kiwisolver3.15) | kiwisolver for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy 2.3.2 for slicc WASIX CPython 3.14 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) (dist-tag `python3.15`) | [recipe](packages/py-numpy3.15) | NumPy 2.5.4 for slicc WASIX CPython 3.15 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
