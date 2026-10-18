@@ -225,18 +225,28 @@ jobs:
             aarch64 | arm64) arch=arm64 ;;
             *) echo "::error::no gh release for $(uname -m)"; exit 1 ;;
           esac
-          mkdir -p "$RUNNER_TEMP/bin" "$RUNNER_TEMP/cert-review"
-          if ! command -v gh > /dev/null; then
+          mkdir -p "$RUNNER_TEMP/bin" "$RUNNER_TEMP/gh-real" "$RUNNER_TEMP/cert-review"
+          real=$(command -v gh || true)
+          if [ -z "$real" ]; then
             v=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/cli/cli/releases/latest | jq -r '.tag_name | ltrimstr("v")')
-            (cd "$RUNNER_TEMP/bin" \
+            (cd "$RUNNER_TEMP/gh-real" \
               && curl -fsSL -O "https://github.com/cli/cli/releases/download/v$v/gh_${v}_linux_$arch.tar.gz" \
                 -O "https://github.com/cli/cli/releases/download/v$v/gh_${v}_checksums.txt" \
               && sha256sum -c "gh_${v}_checksums.txt" --ignore-missing \
               && tar -xzf "gh_${v}_linux_$arch.tar.gz" --strip-components=2 "gh_${v}_linux_$arch/bin/gh")
+            real="$RUNNER_TEMP/gh-real/gh"
           fi
+          # The agent's gh refuses to create issues: they go through file-issue.mjs, which dedupes them.
+          tools="$GITHUB_WORKSPACE/.cert-review-tools"
+          printf '#!/bin/sh\nexec node "%s/scripts/cert-review/gh-shim.mjs" "$@"\n' "$tools" > "$RUNNER_TEMP/bin/gh"
+          chmod +x "$RUNNER_TEMP/bin/gh"
           printf '#!/bin/sh\nexec env -u AWS_BEARER_TOKEN_BEDROCK -u GH_TOKEN -u GITHUB_TOKEN "$@"\n' > "$RUNNER_TEMP/bin/cert-run"
           chmod +x "$RUNNER_TEMP/bin/cert-run"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          {
+            echo "CERT_REVIEW_REAL_GH=$real"
+            echo "CERT_REVIEW_TOOLS=$tools"
+          } >> "$GITHUB_ENV"
 
       - name: The plan's ladder-pr artifacts, by id and digest
         id: pick
@@ -315,6 +325,9 @@ jobs:
           done
           cat "$RUNNER_TEMP/live/live.json"
 
+      - name: When the review starts (issue-dedupe checks the issues opened after it)
+        run: echo "REVIEW_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Review
         id: review
         uses: anthropics/claude-code-action@a26b07d8c778b0c43f64618e5fd29fd0f8af72e8
@@ -357,7 +370,9 @@ jobs:
             8. Poke around a bit and try the changed package yourself, the way someone in seven would: its commands on real input, the things the change touches, and whatever looks fragile. Write a spec of your own for it (`--cert <dir>`). The committed specs only check what someone already thought of.
 
             SEVERITY (Lars's policy: roll forward, don't reject over minor issues)
-            FAIL only for: a security or secret exposure, data loss or corruption, a supply-chain problem (a hash that doesn't match, an unexplained non-reproducible build), a licence violation, a crash or boot failure, or a regression that breaks a common workflow or a base-set command without a workaround. Everything else (narrow regressions with a workaround, compatibility differences, cosmetic issues, test gaps, docs), and anything that also fails on the baseline, is a known issue: certify, and list it as known. **File each known issue that isn't filed yet** in this repository. Search first, open and closed, in both repositories: `gh issue list -R ai-ecoverse/homescoop --state all --search …` and `gh issue list -R ai-ecoverse/slicc-kernel --state all --search …`, and cite a match as `#<n>` or `ai-ecoverse/slicc-kernel#<n>` instead of filing again. Then `gh issue create`, with a repro, which side it fails on, and the behaviour-level integration test that would catch it. Title it `[cert] <package>: …`, or `[cert] slicc-kernel: …` for a slicc-kernel problem, and label it with one `--label` each: `next-build` for a package's known issue (not for a kernel one, which gets `area:kernel`); the package's area, if it has one (`py-*` and `wasix-python`: `area:python`; `wasix-sysroot`: `area:sysroot`; `wasm-clang`, `wasm-emscripten`, `wasm-binaryen`, `wasi-llvm` and `wasm-go*`: `area:toolchain`); and its class where one fits (`repro`, `license`, `supply-chain`, `data-integrity`, `cert-coverage`). List it in `known` as `#<n>`.
+            FAIL only for: a security or secret exposure, data loss or corruption, a supply-chain problem (a hash that doesn't match, an unexplained non-reproducible build), a licence violation, a crash or boot failure, or a regression that breaks a common workflow or a base-set command without a workaround. Everything else (narrow regressions with a workaround, compatibility differences, cosmetic issues, test gaps, docs), and anything that also fails on the baseline, is a known issue: certify, and list it as known. **File each known issue that isn't filed yet**, and only through `node ${{ github.workspace }}/.cert-review-tools/scripts/cert-review/file-issue.mjs` (the workflow's own copy, not the pull request's). It dedupes: the same package, failing case and kernel line gives one issue, and a later sighting becomes a comment on it with this run's link, the pull request and the package version. `gh issue create` (and any `gh api` that creates an issue) is refused here, and **after the review an `issue-dedupe` check fails this job on any `[cert]` issue this run opened without the script's marker**. First look for a match: `node …/file-issue.mjs --list --package <package>` lists the open filed issues of a package with their cases (reuse a listed case when it's the same failure), and search the older, unmarked ones, open and closed, in both repositories: `gh issue list -R ai-ecoverse/homescoop --state all --search …` and `gh issue list -R ai-ecoverse/slicc-kernel --state all --search …`. Cite an unmarked match as `#<n>` or `ai-ecoverse/slicc-kernel#<n>` instead of filing again. Otherwise write the body (a repro, which side it fails on, and the behaviour-level integration test that would catch it) to a file and run:
+              `node ${{ github.workspace }}/.cert-review-tools/scripts/cert-review/file-issue.mjs --package <recipe dir, or slicc-kernel> --case <spec>:<case> [--kernel <slicc-kernel version>] --title '[cert] <package>: …' --body-file <file> --label <label>…`
+            `--case` names the failing check: the spec's file name and the assertion (`flock:LOCK_EX on a read-only handle`), or for a finding that isn't a spec failure, the check (`notices:BLAKE3`, `meta:patches`, `repro:build dir`). Pass `--kernel` only when the failure depends on the kernel version (its major.minor is part of the key); leave it out otherwise. Title it `[cert] <package>: …`, or `[cert] slicc-kernel: …` (with `--package slicc-kernel`) for a slicc-kernel problem, filed in this repository, and label it with one `--label` each: `next-build` for a package's known issue (not for a kernel one, which gets `area:kernel`); the package's area, if it has one (`py-*` and `wasix-python`: `area:python`; `wasix-sysroot`: `area:sysroot`; `wasm-clang`, `wasm-emscripten`, `wasm-binaryen`, `wasi-llvm` and `wasm-go*`: `area:toolchain`); and its class where one fits (`repro`, `license`, `supply-chain`, `data-integrity`, `cert-coverage`). The script prints the issue as `#<n>`, whether it opened it or commented on an existing one; list that in `known`.
 
             YOUR ANSWER, in `${{ runner.temp }}/cert-review/`
             - `verdict.json`: `{ "packages": [ { "package": "<recipe dir>", "verdict": "certified" | "fail", "known": ["<an issue, as owner/repo#n or #n, or new: a summary of at most ten words>"], "reason": "<one line, for a fail>" } ] }`, one entry per built package. Don't write shas or versions: a later step computes the `certified=` lines from the artifacts.
@@ -373,6 +388,14 @@ jobs:
             ${{ runner.temp }}/cert-review/verdict.json
             ${{ runner.temp }}/cert-review/comment.md
           if-no-files-found: ignore
+
+      - name: Every [cert] issue this run opened went through file-issue.mjs (issue-dedupe; the verdict doesn't depend on it)
+        if: always() && env.REVIEW_STARTED != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          node .cert-review-tools/scripts/gate.mjs issue-dedupe -- node .cert-review-tools/scripts/cert-review/issue-dedupe.mjs
+          --since "$REVIEW_STARTED" --run "$RUN_URL" --repo "$GH_REPO"
 
       - name: Evidence
         if: always()
