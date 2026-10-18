@@ -106,26 +106,23 @@ fi
 "$HOSTPY" -c 'import platform, sys; assert platform.python_version() == sys.argv[1], (sys.version, sys.argv[1])' "$VER"
 
 # --- WASIX toolchain ---------------------------------------------------------
-# Pinned wasixcc + wasix-sysroot (-34 below). sysroot-ehpic (legacy EH, PIC)
-# has the setitimer → proc_raise_interval2 and clock_nanosleep EINTR libc
-# patches (patches/README.md); flock, fcntl record locks and lockf are libc's.
+# Pinned wasixcc + wasix-sysroot: 3.15.0-1 takes -38 through the per-recipe
+# override (-37's Linux S_IF* bits, -38's poll; install-wasixcc.sh's default
+# is still -34). sysroot-ehpic (legacy EH, PIC) has the setitimer →
+# proc_raise_interval2 and clock_nanosleep EINTR libc patches
+# (patches/README.md); flock, fcntl record locks and lockf are libc's.
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
+export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
-# C++ runtime ABI of the side modules (README "Side modules"): the published
-# py-* extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a
-# plain (not thread_local) __wasm_lpad_context from python.wasm, as 3.14.2-11
-# exported them. wasix-sysroot >= -14's rebuilt libc++ runtimes have none of
-# that, so python links the libc++/libc++abi/libunwind of upstream wasix-libc
-# v2026-07-03.1 sysroot-ehpic (what -11 was linked against, byte for byte).
-CXXRT_URL="https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
-CXXRT_SHA="54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
-CXXRT="$B/cxxrt"
-rm -rf "$CXXRT" && mkdir -p "$CXXRT"
-homescoop_fetch "$CXXRT_URL" "$CXXRT_SHA" "$CXXRT/sysroot-ehpic.tar.gz"
-tar xzf "$CXXRT/sysroot-ehpic.tar.gz" -C "$CXXRT"
+# C++ runtime ABI of the side modules (README "Side modules"): py-*
+# extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a plain
+# (not thread_local) __wasm_lpad_context from python.wasm. Up to 3.14.2-28
+# python linked upstream wasix-libc v2026-07-03.1's sysroot-ehpic runtimes
+# for that; since 3.15.0-1 (#211 phase B) it links the pinned sysroot's own:
+# -38's libc++/libc++abi/libunwind define the same globals (llvm 6bb93a24,
+# include/c++ byte-identical, cc7e's measurement on #1138). The checks below
+# keep a later sysroot from changing that ABI silently.
 EHPIC_LIB="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/lib/wasm32-wasip1"
-for a in libc++.a libc++abi.a libc++experimental.a libunwind.a; do
-  cp "$CXXRT/wasix-sysroot-ehpic/sysroot/lib/wasm32-wasi/$a" "$EHPIC_LIB/$a"
-done
 WASM_OPT="$WASIXCC_BINARYEN_LOCATION/bin/wasm-opt"
 LLVM_NM="$WASIXCC_LLVM_LOCATION/bin/llvm-nm"
 export WASIXCC_RUN_WASM_OPT=no WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes
@@ -138,6 +135,10 @@ export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"
 SYSROOT_LIBC="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/lib/wasm32-wasip1/libc.a"
 "$WASIXCC_LLVM_LOCATION/bin/llvm-nm" --defined-only -j "$EHPIC_LIB/libunwind.a" 2>/dev/null | grep -qx _Unwind_CallPersonality \
   || { echo "homescoop wasix-python: libunwind lacks _Unwind_CallPersonality (side-module ABI)" >&2; exit 1; }
+"$LLVM_NM" --defined-only -j "$EHPIC_LIB/libc++abi.a" 2>/dev/null | grep -qx __cxa_thread_atexit \
+  || { echo "homescoop wasix-python: libc++abi lacks __cxa_thread_atexit (side-module ABI)" >&2; exit 1; }
+"$LLVM_NM" --defined-only "$EHPIC_LIB/libunwind.a" 2>/dev/null | grep -q ' D __wasm_lpad_context$' \
+  || { echo "homescoop wasix-python: libunwind's __wasm_lpad_context is not plain data (side-module ABI)" >&2; exit 1; }
 "$LLVM_NM" --defined-only "$SYSROOT_LIBC" 2>/dev/null | grep -q ' T __wasi_proc_raise_interval2$' \
   || { echo "homescoop wasix-python: sysroot-ehpic libc lacks proc_raise_interval2 (setitimer patch)" >&2; exit 1; }
 
@@ -585,7 +586,7 @@ WORK="$B" homescoop_notices_begin "bin/python.wasm statically links the componen
   echo "| ncurses (tinfo) | 6.5 | X11 | invisible-island.net/ncurses |"
   echo "| libffi | $(pkg-config --modversion libffi) (wasix-org 09cbf7d + patches/libffi-wasix-varargs.patch) | MIT | github.com/wasix-org/libffi |"
   echo "| wasix-libc | wasix-sysroot $SYSROOT_PKG_VER | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
-  echo "| libc++, libc++abi, libunwind | wasix-libc v2026-07-03.1 sysroot-ehpic (LLVM 20.1) | Apache-2.0 WITH LLVM-exception | github.com/wasix-org/wasix-libc |"
+  echo "| libc++, libc++abi, libunwind | wasix-sysroot $SYSROOT_PKG_VER sysroot-ehpic | Apache-2.0 WITH LLVM-exception | @ai-ecoverse/wasix-sysroot |"
   echo
   echo "GNU Readline is licensed under the GPL-3.0-or-later and is linked statically, so bin/python.wasm as a whole (a combined work with CPython, whose PSF-2.0 licence is GPL-compatible, and the other components above, all under GPL-compatible licences) is distributed under the terms of the GPL-3.0-or-later; hence the package licence PSF-2.0 AND GPL-3.0-or-later. Redistributors pass on its Corresponding Source: the homescoop repository (https://github.com/ai-ecoverse/homescoop) at the commit this release was built from, plus the sha256-pinned upstream archives and dev packages its recipe.yaml lists, which homescoop keeps available."
   echo
@@ -606,7 +607,7 @@ WORK="$B" homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_PKG_
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
   "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
   "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
-WORK="$B" homescoop_notice "libc++, libc++abi, libunwind (wasix-libc v2026-07-03.1 sysroot-ehpic, LLVM 20.1; files from llvm-project llvmorg-20.1.0)" \
+WORK="$B" homescoop_notice "libc++, libc++abi, libunwind (@ai-ecoverse/wasix-sysroot $SYSROOT_PKG_VER sysroot-ehpic; licence files from llvm-project llvmorg-20.1.0)" \
   "$LLVM_SRC/libcxx/LICENSE.TXT" 539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b \
   "$LLVM_SRC/libcxxabi/LICENSE.TXT" e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c \
   "$LLVM_SRC/libunwind/LICENSE.TXT" b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d

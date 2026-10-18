@@ -8,6 +8,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 - **The py-\* built before 3.15 don't load.** Their extension modules are `cpython-314-wasm32-wasix.so` and their `slicc.python.requires.abi` is `cp314`, so `_slicc_site.discover()` leaves them off `sys.path` (`python -v` names each one) and `import numpy` raises `ModuleNotFoundError`. That covers py-numpy, py-pandas, py-scipy, py-matplotlib, py-contourpy, py-kiwisolver and py-pillow until they're rebuilt for 3.15. The pure-Python py-\* load, except those that, until their next release, depend on wasix-python `<3.14.3`: npm or pnpm gives them their own older python, nested beside this one, and discovery refuses them as built for another python.
 - **UTF-8 mode is the default** (PEP 686): `open()` without an encoding and the filesystem encoding are UTF-8 whatever the locale; `-X utf8=0` or `PYTHONUTF8=0` turns it off.
 - Every CPython patch in `patches/` is regenerated against 3.15.0; none is dropped, since 3.15 has none of the fixes. Bundled `pip` 26.2.1.
+- Built on **wasix-sysroot 2025.9.30-38** (3.14.2-28: -34): -37's Linux `S_IF*` file-type bits and -38's `poll`, which degrades cleanly on kernels before 1.125.0, so `engines` stays slicc-kernel ≥ 1.120.0.
 - Everything of 3.14.2-28 carries over: both binaries (`PYTHON_FORK=true`), engines slicc-kernel ≥ 1.120.0, real `fcntl`/`lockf`/`flock` locks, sqlite's `unix` VFS, multiprocessing via spawn, `Manager`.
 
 ## Since 3.14.2-28
@@ -16,7 +17,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-34's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-315-wasm32-wasix` (3.14.2-N: `cpython-314-wasm32-wasix`); native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-38's `sysroot-ehpic` (-34 up to 3.14.2-28) (legacy wasm EH), SOABI `cpython-315-wasm32-wasix` (3.14.2-N: `cpython-314-wasm32-wasix`); native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - Two binaries (since 3.14.2-25): the default has no `fork`/`vfork`; `PYTHON_FORK=true` selects the fork-capable one (below). `subprocess` uses `os.posix_spawn` (`proc_spawn2`/`3`) in both
@@ -263,24 +264,28 @@ build-machine paths, host compilers or private stub archives.
 ## Side modules: C++ runtime ABI
 
 Native extensions are `dylink.0` side modules that import the C++ runtime from
-`python.wasm`: `libc++`, `libc++abi` and `libunwind` of upstream wasix-libc
-**v2026-07-03.1** `sysroot-ehpic` (legacy wasm EH, PIC), which 3.14.2-11 used
-too. That ABI has:
+`python.wasm`: `libc++`, `libc++abi` and `libunwind` of the pinned
+wasix-sysroot's `sysroot-ehpic` (legacy wasm EH, PIC), 2025.9.30-38 since
+3.15.0-1. Up to 3.14.2-28 they came from upstream wasix-libc v2026-07-03.1's
+`sysroot-ehpic`. Both sets define the same globals (llvm 6bb93a24, identical
+`include/c++`), so side modules built against either load into either. That
+ABI has:
 
 - `_Unwind_CallPersonality(void *)` and the personality `__gxx_personality_wasm0`;
 - a plain global `__wasm_lpad_context` (imported through `GOT.mem`);
 - `__cxa_thread_atexit`.
 
-Build C++ side modules against that runtime: wasixcc with
-`WASIXCC_WASM_EXCEPTIONS=legacy`, `WASIXCC_PIC=yes`, and that sysroot's
-`libc++` headers. wasix-sysroot ≥ 2025.9.30-14 rebuilt the runtimes from a
-newer LLVM. There, `__gxx_wasm_personality_v0(void *)` replaces
-`_Unwind_CallPersonality` and `__wasm_lpad_context` is `thread_local`, so a
-module built on them does not load into this `python.wasm`, and the reverse
-corrupts memory on the first C++ exception. `test/side-abi.mjs` checks every
-published py-* side module's imports against `python.wasm` at build. It fails
-if one is missing, or if a `GOT.mem` import resolves to `thread_local` data the
-side modules were not built for.
+`build.sh` checks all three in the sysroot's archives before linking. Build C++
+side modules against that runtime: wasixcc with `WASIXCC_WASM_EXCEPTIONS=legacy`,
+`WASIXCC_PIC=yes`, and the sysroot's `sysroot-ehpic/include/c++/v1` headers.
+A runtime where `__gxx_wasm_personality_v0(void *)` replaces
+`_Unwind_CallPersonality` and `__wasm_lpad_context` is `thread_local` (as
+in some earlier wasix-sysroot rebuilds) gives modules that don't load
+into this `python.wasm`, and the reverse corrupts memory on the first C++
+exception. `test/side-abi.mjs` checks every published py-* side module's
+imports against `python.wasm` at build. It fails if one is missing, or if a
+`GOT.mem` import resolves to `thread_local` data the side modules were not
+built for.
 
 ## Acceptance (Wasmer / SLICC)
 

@@ -34,7 +34,7 @@
     "access": "public"
   },
   "homescoop": {
-    "recipe": "wasix-python",
+    "recipe": "wasix-python3.15",
     "upstream": "3.15.0"
   },
   "slicc": {

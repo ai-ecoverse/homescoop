@@ -69,8 +69,10 @@ about:
     clock_nanosleep EINTR patches (patches/wasix-libc-*.patch); advisory
     locks are --wrap stubs; user ids and pwd/grp come from the sysroot's libc
     (slicc-kernel process credentials, -20). The C++
-    runtime side modules import (libc++/libc++abi/libunwind) is upstream
-    wasix-libc v2026-07-03.1 sysroot-ehpic, as in -11 (README "Side modules").
+    runtime side modules import (libc++/libc++abi/libunwind) is the pinned
+    wasix-sysroot's sysroot-ehpic (-38 since 3.15.0-1; the same globals as
+    upstream wasix-libc v2026-07-03.1's, which 3.14.2-N linked; README
+    "Side modules").
     stdlib/ adds sys.executable from PATH and puts py-* packages from python's
     npm/pnpm project and pnpm's global projects on sys.path (_slicc_site.py,
     sitecustomize.py, site-packages/slicc-executable.pth).
