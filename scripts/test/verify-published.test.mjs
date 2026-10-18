@@ -156,3 +156,20 @@ describe('dist-tags after a publish (homescoop#1150)', async () => {
     assert.equal(t, 60000);
   });
 });
+
+describe('ladder-build wiring for the dist-tag check (#1151 review)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const wf = readFileSync(new URL('../../.github/workflows/ladder-build.yml', import.meta.url), 'utf8');
+  const job = wf.slice(wf.indexOf('\n  publish:\n'));
+  it('publishes of one npm name are serialized, never cancelled in progress', () => {
+    assert.match(job, /\n {4}concurrency:\n {6}group: npm-publish-\$\{\{ needs\.resolve\.outputs\.npm \}\}\n {6}cancel-in-progress: false\n/);
+  });
+  it('the verify step outlasts both waits, with room for request hangs and the failure issue', () => {
+    const step = job.slice(job.indexOf('- name: Verify the registry serves the published bytes'));
+    const minutes = Number(/timeout-minutes: (\d+)/.exec(step)[1]);
+    const wait = Number(/--timeout (\d+)/.exec(step)[1]);
+    const tagWait = Number(/--tag-timeout (\d+)/.exec(step)[1]);
+    assert.match(step, /--tag "\$NPM_TAG"/);
+    assert.ok(minutes * 60 >= wait + tagWait + 300, `${minutes} min < ${wait}+${tagWait}+300 s`);
+  });
+});
