@@ -7,6 +7,9 @@
  *   is what the interpreter reports: sysconfig SOABI / EXT_SUFFIX,
  *   importlib's first EXTENSION_SUFFIXES entry, sys.implementation.cache_tag,
  *   purelib and stdlib under lib/pythonX.Y.
+ * - A start prints nothing on stderr: 3.15's getpath warns "Could not find
+ *   the platform standard library directory!" when PYTHONHOME is set and
+ *   lib/pythonX.Y/lib-dynload is missing, which npm would drop as empty.
  * - PEP 686 (3.15): UTF-8 mode is the default, so open() without an encoding
  *   and the filesystem encoding are UTF-8; -X utf8=0 turns it off.
  * - The discovery ABI gate: a py-* stand-in requiring another abi (cp314,
@@ -51,6 +54,7 @@ export default async function (ctx) {
   await write('/tmp/version_rows.py', SCRIPT);
   const r = await py(['/tmp/version_rows.py']);
   assert.equal(r.status, 0, `rc=${r.status} ${r.stderr}`);
+  assert.equal(r.stderr, '', `a plain start prints nothing on stderr (3.15's getpath warns when lib/pythonX.Y/lib-dynload is missing): ${r.stderr}`);
   const o = JSON.parse(r.stdout.trim().split('\n').pop());
   const s = JSON.stringify(o);
   const tag = PY.abi.slice(2);

@@ -41,7 +41,7 @@ print("stamps:", [s._stamp(p) for p in found][:6])
 print("scan:", s._scan(real, found))
 `;
 const NATIVE_TOP = ['py-numpy', 'py-pandas', 'py-scipy', 'py-matplotlib'];
-const PURE_TOP = ['py-python-dateutil', 'py-pytz', 'py-six', 'py-tzdata'];
+const PURE_TOP = ['py-six', 'py-python-dateutil', 'py-pytz', 'py-tzdata'];
 const imports = (loadable, top) => {
   const mods = loadable.map((p) => MODULES[p]).filter(Boolean).map((m) => (m === 'scipy' ? 'scipy.optimize' : m));
   const agg = mods.includes('matplotlib') ? '; matplotlib.use("Agg"); import matplotlib.pyplot' : '';
@@ -182,7 +182,7 @@ export default async function (ctx) {
     for (const t of TOP) closure(t, one);
     await project(`${G}/one`, ['wasix-python', ...TOP], [...one]);
     await pythonGAt(`${G}/one/`);
-    r = await pyg(['-c', IMPORTS]);
+    r = await pyg(['-c', imports([...one].filter((n) => split.loadable.includes(n)), TOP)]);
     assert.equal(r.status, 0, `one project: ${r.stderr}`);
     r = await pyg(['-c', `import ${m0}, sys; print(${m0}.__file__)`]);
     assert.ok(r.stdout.startsWith(`${G}/one/`), `${m0} came from ${r.stdout}`);
@@ -207,7 +207,7 @@ export default async function (ctx) {
     await write(`${old.replace(/py-oldbuild$/, 'wasix-python')}/package.json`, JSON.stringify({ name: `${S}/wasix-python`, version: '3.14.2-13' }));
     await sh(`mkdir -p ${G}/py-old/node_modules/${S} && ln -s ../.pnpm/${S}+py-oldbuild@1.0.0-1/node_modules/${S}/py-oldbuild ${G}/py-old/node_modules/${S}/py-oldbuild\nln -s python ${G}/0123abcdef`);
     await pythonGAt(`${G}/python/`);
-    r = await pyg(['-c', IMPORTS]);
+    r = await pyg(['-c', imports([...placed].filter((n) => split.loadable.includes(n)), TOP)]);
     assert.equal(r.status, 0, `global projects: ${r.stderr}`);
     r = await pyg(['-c', `import ${m0}, ${m1}; print(${m0}.__file__, ${m1}.__file__)`]);
     assert.ok(r.stdout.includes(`${G}/${TOP[0]}/`) && r.stdout.includes(`${G}/${TOP[1]}/`), `from ${r.stdout}`);

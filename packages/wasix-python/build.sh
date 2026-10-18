@@ -475,6 +475,13 @@ cp -R "$PREFIX_PY/lib/python$PYV" "$PYLIB"
 rm -rf "$PYLIB/test" "$PYLIB/idlelib/idle_test" "$PYLIB/__phello__/ham" "$PYLIB/venv/scripts/nt" \
   "$PYLIB"/config-"$PYV"-* "$PYLIB/site-packages"/*
 find "$PYLIB" -type d -name __pycache__ -prune -exec rm -rf {} +
+# CPython 3.15's getpath warns on every start ("Could not find the platform
+# standard library directory!") when PYTHONHOME is set and lib-dynload is
+# missing, and npm drops empty directories: every module is built into
+# python.wasm, so lib-dynload gets a README instead.
+mkdir -p "$PYLIB/lib-dynload"
+printf '%s\n' "The standard library's extension modules are built into bin/python.wasm, so this directory has none." \
+  "py-* packages bring their own side modules (slicc.python.sitePackages)." >"$PYLIB/lib-dynload/README.txt"
 cp "$SRCDIR/LICENSE" "$PYLIB/LICENSE.txt"
 cp "$SRCDIR/LICENSE" "$DEST/LICENSE"
 # pip from the bundled ensurepip wheel, unpacked as in -11 (no INSTALLER).
