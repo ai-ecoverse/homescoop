@@ -1,6 +1,7 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "users": "enforce",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -23,6 +24,8 @@
     "pdftocairo (pdftoppm) -png writes c-1.png 200x100; -svg/-pdf/-ps/-eps say they need cairo, rc 99 (pdftoppm itself does not)",
     "pdffonts lists Helvetica Type 1 not embedded; pdfunite + pdfseparate round trip; pdftops writes %!PS-Adobe",
     "errors: garbage PDF rc 1 (xref), missing file rc 1, pdfunite with an encrypted input fails without the multicall usage text",
-    "linked libraries (homescoop#922, cert/inputs.mjs): a PDF 1.5 with a Flate content stream and a compressed /XRef stream renders red and blue rects to exact PNG pixels (zlib, libpng); pdftoppm -jpeg writes a 200x100 baseline JPEG and -jpegopt quality=40,progressive=y a smaller SOF2 one (libjpeg-turbo); that JPEG embedded as /DCTDecode is listed as jpeg, pdfimages -j returns it byte for byte and it renders within 24; a 3x1 Flate image in [/ICCBased] with a hand-built RGB profile is listed as icc and renders red and green within 40 and its linear 50% gray as sRGB 188 within 24 with no error (lcms2); 40 Flate pages give 40 pages of pdftotext and 40 pdftoppm -gray PGMs; a damaged Flate stream gives rc 0 or 1 and no trap"
+    "linked libraries (homescoop#922, cert/inputs.mjs): a PDF 1.5 with a Flate content stream and a compressed /XRef stream renders red and blue rects to exact PNG pixels (zlib, libpng); pdftoppm -jpeg writes a 200x100 baseline JPEG and -jpegopt quality=40,progressive=y a smaller SOF2 one (libjpeg-turbo); that JPEG embedded as /DCTDecode is listed as jpeg, pdfimages -j returns it byte for byte and it renders within 24; a 3x1 Flate image in [/ICCBased] with a hand-built RGB profile is listed as icc and renders red and green within 40 and its linear 50% gray as sRGB 188 within 24 with no error (lcms2); 40 Flate pages give 40 pages of pdftotext and 40 pdftoppm -gray PGMs; a damaged Flate stream gives rc 0 or 1 and no trap",
+    "datadir.mjs (26.10.0-6, homescoop#1000): poppler-multicall.wasm names no build path (/home/, /Users/, /__w/, /private/var/, .cache/emsdk, homescoop-work), and POPPLER_DATADIR is /usr/local/share/poppler (build.sh: -DCMAKE_INSTALL_PREFIX=/usr/local; build.sh fails on the same paths). 26.10.0-5 names /home/runner/.cache/emsdk/…/sysroot/share/poppler (NEGATIVE.md)",
+    "26.10.0-6 (homescoop#819): the cert runs with users enforce"
   ]
 }
