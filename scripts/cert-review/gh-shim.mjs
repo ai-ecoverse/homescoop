@@ -6,7 +6,7 @@
 // This is a guard rail, not the gate: issue-dedupe.mjs, after the review, fails the job on any
 // `[cert]` issue the run opened without a cert-review-key marker, however it was opened.
 import { spawnSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const VALUE_FLAGS = new Set(['-R', '--repo', '--hostname']);
@@ -23,10 +23,33 @@ function positionals(args) {
 
 export function refusal(args) {
   const pos = positionals(args);
-  if (pos[0] === 'issue' && pos[1] === 'create') return '`gh issue create`';
+  if (pos[0] === 'issue' && (pos[1] === 'create' || pos[1] === 'new')) return `\`gh issue ${pos[1]}\``;
   if (pos[0] !== 'api') return null;
   const rest = args.slice(args.indexOf('api') + 1);
   if (rest.some((a) => /\bcreateIssue\b/.test(a))) return 'a GraphQL createIssue';
+  const graphql = positionals(rest)[0] === 'graphql';
+  if (graphql) {
+    // A request body or field read from a file or stdin: look inside it.
+    for (let i = 0; i < rest.length; i++) {
+      const a = rest[i];
+      let file = null;
+      if (a === '--input') file = rest[i + 1];
+      else if (a.startsWith('--input=')) file = a.slice(8);
+      else {
+        const v = /^(-f|-F|--field|--raw-field)$/.test(a) ? rest[i + 1] : a.match(/^(?:-[fF]|--(?:raw-)?field=)(.+)$/)?.[1];
+        file = v?.match(/^[^=]+=@(.+)$/)?.[1] ?? null;
+      }
+      if (file === null || file === undefined) continue;
+      if (file === '-') return 'a GraphQL request read from stdin (it may create an issue)';
+      let text;
+      try {
+        text = readFileSync(file, 'utf8');
+      } catch {
+        return `a GraphQL request from ${file}, which can't be read`;
+      }
+      if (/\bcreateIssue\b/.test(text)) return `a GraphQL createIssue (in ${file})`;
+    }
+  }
   let endpoint = null;
   let method = null;
   let fields = false;

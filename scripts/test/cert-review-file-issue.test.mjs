@@ -132,6 +132,16 @@ test('the gh shim refuses a direct gh issue create (and gh api POSTs that create
   assert.ok(refusal(['api', '/repos/{owner}/{repo}/issues', '--method', 'POST', '--input', 'x.json']));
   assert.ok(refusal(['api', '-X', 'POST', 'repos/a/b/issues/']));
   assert.ok(refusal(['api', 'graphql', '-f', 'query=mutation { createIssue(input: {}) { issue { number } } }']));
+  assert.ok(refusal(['issue', 'new', '--title', '[cert] x: y']), 'gh issue new is an alias of create');
+  const gq = scratch(t);
+  writeFileSync(join(gq, 'm.graphql'), 'mutation { createIssue(input: {repositoryId: "x", title: "y"}) { issue { number } } }');
+  writeFileSync(join(gq, 'q.graphql'), 'query { viewer { login } }');
+  writeFileSync(join(gq, 'body.json'), JSON.stringify({ query: 'mutation { createIssue(input: {}) { issue { number } } }' }));
+  assert.ok(refusal(['api', 'graphql', '-F', `query=@${join(gq, 'm.graphql')}`]), 'a mutation read from a file');
+  assert.ok(refusal(['api', 'graphql', `-fquery=@${join(gq, 'm.graphql')}`]));
+  assert.ok(refusal(['api', 'graphql', '--input', join(gq, 'body.json')]), 'a request body read from a file');
+  assert.ok(refusal(['api', 'graphql', '--input', '-']), 'a request body read from stdin');
+  assert.equal(refusal(['api', 'graphql', '-F', `query=@${join(gq, 'q.graphql')}`]), null, 'a file query that creates nothing');
   assert.equal(refusal(['issue', 'list', '--search', 'create']), null);
   assert.equal(refusal(['api', 'repos/a/b/issues?state=all']), null);
   assert.equal(refusal(['api', 'repos/a/b/issues/5/comments', '-f', 'body=x']), null);
@@ -159,7 +169,7 @@ const marked = (body = 'x') => `${body}\n<!-- cert-review-key: v1 0123456789abcd
 test('issue-dedupe fails on a marker-less [cert] issue the run opened, and passes when every one is marked', async () => {
   const bad = check([issue(1, { body: marked() }), issue(2)], { since: SINCE, run: RUN });
   assert.equal(bad.ok, false);
-  assert.match(bad.line, /^issue-dedupe: FAIL #2 has no cert-review-key marker/);
+  assert.match(bad.line, /^issue-dedupe: FAIL #2 \(opened since this review started, by this or a concurrent cert-review run\): no cert-review-key marker/);
   const good = check([issue(1, { body: marked() })], { since: SINCE, run: RUN });
   assert.equal(good.ok, true);
   assert.match(good.line, /^issue-dedupe: PASS 1 issue\(s\)/);
@@ -177,6 +187,17 @@ test('issue-dedupe fails on a marker-less [cert] issue the run opened, and passe
   assert.match(other.line, /PASS 0 issue/);
   const named = check([issue(7, { title: 'no tag', body: `seen in ${RUN}` })], { since: SINCE, run: RUN });
   assert.equal(named.ok, false, 'an untagged issue that names this run counts too');
+  assert.match(named.line, /#7 \(opened by this run\)/);
+
+  // Concurrent reviews share the bot: an unmarked issue that names another run is that run's, not this one's.
+  const OTHER = 'https://github.com/ai-ecoverse/homescoop/actions/runs/7788';
+  const neighbour = check([issue(9, { body: `filed by ${OTHER}` }), issue(10, { body: marked(`run ${RUN}, PR #1`) })], { since: SINCE, run: RUN });
+  assert.equal(neighbour.ok, true, neighbour.line);
+  assert.match(neighbour.line, /PASS 1 issue\(s\).*#10/);
+  assert.equal(check([issue(11, { body: `seen in ${RUN}7` })], { since: SINCE, run: RUN }).ok, true, '…/runs/777 is not …/runs/77');
+  const anon = check([issue(12)], { since: SINCE, run: RUN });
+  assert.equal(anon.ok, false, 'an unmarked [cert] issue that names no run still fails');
+  assert.match(anon.line, /#12 \(opened since this review started, by this or a concurrent cert-review run\)/);
 
   const lines = [];
   const code = await dedupeMain(['--since', SINCE, '--run', RUN, '--repo', 'a/b'], { list: async () => [issue(8)], out: (l) => lines.push(l) });
