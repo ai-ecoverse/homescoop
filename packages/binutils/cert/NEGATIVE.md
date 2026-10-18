@@ -17,3 +17,7 @@ Runs: slicc-kernel 1.110.1, users enforce, `scripts/browser-cert/run.mjs` with t
 The published 2.47.0-5 also has 90 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/size.wasm, bin/strings.wasm, bin/readelf.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 2.47.0-6 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 2.47.0-5 too; the negative is the #908 check.
+
+## 2.47.0-7: the cert under users enforce (homescoop#819; 2026-10-18)
+
+2.47.0-7 changes no code or build input. The bump exists because ladder-pr rebuilds the package for the cert change, and publish refuses same-version drift (#982). Until now cert/meta.json had no `"users"`, so ladder-pr booted the kernel with its default user mode, and the published 2.47.0-6 was certified that way. cert-coverage.test.mjs's #819 allowlist names binutils for exactly that. With `"users": "enforce"` the specs run with the kernel's credentials enforced. The same specs passed under enforce in #960's cert review, on the cert kernel and on slicc-kernel 1.122.2.

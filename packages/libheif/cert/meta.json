@@ -1,6 +1,7 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "users": "enforce",
   "patches": {
     "emscripten-decode.patch": "upstream libheif turns off libde265's deblocking filter and SAO under __EMSCRIPTEN__ (faster, wrong pixels); the patch keeps the full HEVC decode, and runs dav1d with one thread. Every heif-convert PNG case must equal host libheif 1.23.6 (iPhone stills, depth and gain map, odd sizes): without it the pixel hashes differ (NEGATIVE.md)",
     "no-embind.patch": "build fix only: heif.cc's embind JavaScript bindings are left out of the CLI and the static libheif.a (they need --bind); the link fails without it",
@@ -16,7 +17,8 @@
     "heif-convert to JPEG: each image of example.heic (-1.jpg, -2.jpg), the portrait's primary, depth and gain map; -q 30 is smaller than -q 92",
     "corrupt input: truncated, garbage after ftyp and empty files give rc 1 and a missing file rc 10, with the same messages as host libheif, from both tools, no trap and no output file; damaged HEVC data in a valid file does not trap",
     "relinkable (LGPL): ladder-pr runs share/libheif/relink/relink.sh from the tarball, links heif-dec and heif-info again from lib/*.a and the shipped application objects, and the relinked heif-dec decodes rainbow-451x461.heic to the host pixels; every --js-library that the kit's ldflags.txt names is in the kit's js/ (homescoop#398: a 1.23.6-1 build.sh on main shipped only slicc-writev.js, while the flags also name slicc-linkat.js and slicc-uname.js)",
-    "write errors (homescoop#923, heif-dec-write-errors.patch): heif-convert and heif-dec into a missing directory or onto a directory, PNG and JPEG, exit non-zero with 'could not write image', no trap, no 'Written to' and nothing created; under users enforce a non-root user's write into /etc fails the same way; a good write still exits 0 with 'Written to'. 1.23.6-4 exits 0 (NEGATIVE.md)"
+    "write errors (homescoop#923, heif-dec-write-errors.patch): heif-convert and heif-dec into a missing directory or onto a directory, PNG and JPEG, exit non-zero with 'could not write image', no trap, no 'Written to' and nothing created; under users enforce a non-root user's write into /etc fails the same way; a good write still exits 0 with 'Written to'. 1.23.6-4 exits 0 (NEGATIVE.md)",
+    "1.23.6-7 (homescoop#819): the cert runs with users enforce (cert/meta.json \"users\"); every spec passes as a non-root user and as root under the kernel's credentials"
   ],
   "ci": [
     "node packages/libheif/cert/lib/relink-check.mjs"

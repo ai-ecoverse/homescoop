@@ -1,6 +1,7 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "users": "enforce",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -16,6 +17,7 @@
     "-i: MIME type and charset for each; --mime-type -b for each",
     "stdin: file - and file -b -",
     "-z looks inside gzip (zlib), bzip2 (libbz2) and xz (liblzma, CRC32)",
-    "missing file: 'cannot open' on stdout, rc 0; -E: ERROR and rc 1; mixed with a good file"
+    "missing file: 'cannot open' on stdout, rc 0; -E: ERROR and rc 1; mixed with a good file",
+    "5.46.0-8 (homescoop#819): the cert runs with users enforce (cert/meta.json \"users\"); every spec passes as a non-root user and as root under the kernel's credentials"
   ]
 }
