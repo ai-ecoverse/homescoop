@@ -99,8 +99,9 @@ jobs:
           needs=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("scripts/browser-cert/selftest/meta.json","utf8")).needs.join(" "))')
           shared=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
           playwright=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs playwright-core)
-          [[ -n "$KERNEL" && -n "$shared" && -n "$playwright" ]] || { echo "::error::browser-cert: an empty kernel, shared-web or playwright pin"; exit 1; }
-          npm install --prefix "$NM" --no-fund --no-audit "$KERNEL" "$shared" "$playwright" $needs
+          monocart=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs monocart-coverage-reports)
+          [[ -n "$KERNEL" && -n "$shared" && -n "$playwright" && -n "$monocart" ]] || { echo "::error::browser-cert: an empty kernel, shared-web, playwright or monocart pin"; exit 1; }
+          npm install --prefix "$NM" --no-fund --no-audit "$KERNEL" "$shared" "$monocart" "$playwright" $needs
           if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then
             npx --prefix "$NM" playwright-core install --with-deps chromium
           else

@@ -29,6 +29,8 @@ if [ -f scripts/browser-cert/cert-kernel.mjs ] && [ -f scripts/dev-pin.mjs ]; th
   kernel=$(gated cert-kernel node scripts/browser-cert/cert-kernel.mjs "$pkg")
   shared=$(gated dev-pin node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
   playwright=$(gated dev-pin node scripts/dev-pin.mjs playwright-core)
+  monocart=$(gated dev-pin node scripts/dev-pin.mjs monocart-coverage-reports 2>/dev/null || true)
+  monocart=${monocart:-monocart-coverage-reports@2.13.2}
   if [ -z "$kernel" ] || [ -z "$shared" ] || [ -z "$playwright" ]; then
     echo "harness.sh: an empty kernel, shared-web or playwright pin for $pkg" >&2
     exit 1
@@ -38,9 +40,10 @@ else
   kernel=${kernel:-@ai-ecoverse/slicc-kernel@1.9.0}
   shared='@ai-ecoverse/slicc-shared-web@^1.4.1'
   playwright='playwright-core@1.63.0'
+  monocart='monocart-coverage-reports@2.13.2'
 fi
 mkdir -p "$prefix"
-install "$kernel" "$shared" "$playwright"
+install "$kernel" "$shared" "$monocart" "$playwright"
 
 needs=$(node -e '
   const fs = require("fs");
