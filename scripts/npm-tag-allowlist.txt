@@ -6,3 +6,4 @@
 # folded; drop the line in the fold PR).
 @ai-ecoverse/wasix-python #1138 Python 3.15 wave (packages/wasix-python3.15, npm-tag python3.15)
 @ai-ecoverse/py-numpy #761 Python 3.15 wave (packages/py-numpy3.15, npm-tag python3.15)
+@ai-ecoverse/py-pillow #761 Python 3.15 wave (packages/py-pillow3.15, npm-tag python3.15)
