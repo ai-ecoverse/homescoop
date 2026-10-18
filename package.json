@@ -26,6 +26,7 @@
   "devDependencies": {
     "@ai-ecoverse/slicc-kernel": "1.124.0",
     "@ai-ecoverse/slicc-shared-web": "1.23.3",
+    "monocart-coverage-reports": "2.13.2",
     "playwright-core": "1.64.0",
     "slicc-kernel-negative": "npm:@ai-ecoverse/slicc-kernel@1.78.0"
   },
