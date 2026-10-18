@@ -1,0 +1,6 @@
+# npm names with more than one recipe dir: a wave beside the latest dir, under a
+# non-latest npm-tag (docs/ladder-builds.md, "Publishing a wave under a dist-tag").
+# One line per name: <@scope/name> #<wave issue> <reason>
+# scripts/test/npm-tag.test.mjs fails on a name with two recipes that isn't
+# listed here, and on an entry whose name has only one recipe (stale: the wave
+# folded; drop the line in the fold PR).

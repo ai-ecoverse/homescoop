@@ -345,8 +345,11 @@ jobs:
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
           path: .homescoop-out
-      - name: The built version against npm (behind latest, or the same version with other contents, fails)
-        run: node scripts/gate.mjs npm-parity -- node scripts/npm-parity.mjs .homescoop-out/package.tgz --drift fail
+      - name: The built version against npm (behind its npm-tag, or the same version with other contents, fails)
+        run: |
+          set -euo pipefail
+          tag=$(node scripts/npm-tag.mjs "${{ matrix.package }}")
+          node scripts/gate.mjs npm-parity -- node scripts/npm-parity.mjs .homescoop-out/package.tgz --tag "$tag" --drift fail
 
   test:
     needs: [detect, recipe-sha, host-build]

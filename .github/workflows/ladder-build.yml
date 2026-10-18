@@ -52,6 +52,7 @@ jobs:
     outputs:
       builder: ${{ steps.r.outputs.builder }}
       npm: ${{ steps.r.outputs.npm }}
+      npm_tag: ${{ steps.r.outputs.npm_tag }}
       version: ${{ steps.r.outputs.version }}
       package: ${{ steps.r.outputs.package }}
       published: ${{ steps.r.outputs.published }}
@@ -71,15 +72,17 @@ jobs:
             exit 2
           fi
           NPM=$(node scripts/read-recipe.mjs "$PKG" --field npm)
+          NPM_TAG=$(node scripts/npm-tag.mjs "$PKG")
           if ! VER=$(node scripts/sync-package-version.mjs "$PKG" --check 2> "$RUNNER_TEMP/drift.txt"); then
             echo "::error::$PKG: $(tr '\n' ' ' < "$RUNNER_TEMP/drift.txt")"
             exit 1
           fi
           echo "builder=$BUILDER" >> "$GITHUB_OUTPUT"
           echo "npm=$NPM" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "package=$PKG" >> "$GITHUB_OUTPUT"
-          echo "package=$PKG builder=$BUILDER npm=$NPM@$VER"
+          echo "package=$PKG builder=$BUILDER npm=$NPM@$VER tag=$NPM_TAG"
           ART_PR="${{ inputs.artifact_pr }}"
           if [[ -n "$ART_PR" ]]; then
             echo "use_artifact=true" >> "$GITHUB_OUTPUT"
@@ -329,8 +332,10 @@ jobs:
           done
           VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
           NPM="${{ needs.resolve.outputs.npm }}"
+          TAG="${{ needs.resolve.outputs.npm_tag }}"
+          [[ "$TAG" == latest ]] || node scripts/npm-tag.mjs --check "$TAG" || { echo "::error::npm-tag '$TAG' is not a publish channel" >&2; exit 2; }
           set +e
-          node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
+          node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --tag "$TAG" --certified "${{ inputs.certified }}"
           gate=$?
           set -e
           if [[ "$gate" -eq 10 ]]; then
@@ -340,12 +345,12 @@ jobs:
           if [[ "$gate" -ne 0 ]]; then
             exit "$gate"
           fi
-          echo "publishing $NPM@$VER"
+          echo "publishing $NPM@$VER under --tag $TAG"
           attempt=1
           max=4
           while true; do
             set +e
-            out="$(npm publish "$TGZ" --access public --tag latest 2>&1)"
+            out="$(npm publish "$TGZ" --access public --tag "$TAG" 2>&1)"
             rc=$?
             set -e
             printf '%s\n' "$out"
@@ -359,7 +364,7 @@ jobs:
               for wait in 0 15 30 60 120; do
                 sleep "$wait"
                 set +e
-                node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --certified "${{ inputs.certified }}"
+                node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --tag "$TAG" --certified "${{ inputs.certified }}"
                 again=$?
                 set -e
                 [[ "$again" -eq 0 ]] || break

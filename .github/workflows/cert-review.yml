@@ -279,7 +279,7 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Live pairs, npm latest and the pull request's tarball (no secrets in this step)
+      - name: Live pairs, npm latest (or the recipe's npm-tag) and the pull request's tarball (no secrets in this step)
         run: |
           if [ -z "${DISPLAY:-}" ] && command -v Xvfb > /dev/null; then
             nohup Xvfb :99 -screen 0 1440x900x24 -nolisten tcp > "$RUNNER_TEMP/xvfb.log" 2>&1 &
@@ -298,8 +298,12 @@ jobs:
             peers=$(jq -r '[(.needsRepack // []), (.needsTarballScripts // [])] | add | length > 0' "packages/$pkg/cert/meta.json" 2> /dev/null || echo false)
             head_tgz="$RUNNER_TEMP/artifacts/host-$pkg-pr$PR_NUMBER/package.tgz"
             name=$(tar -xzf "$head_tgz" -O package/package.json | jq -r .name)
+            if ! tag=$(node .cert-review-tools/scripts/npm-tag.mjs "$pkg" --root "$GITHUB_WORKSPACE"); then
+              echo "::warning::$pkg: no valid npm-tag; no baseline"
+              tag=
+            fi
             base_tgz=
-            if (cd "$RUNNER_TEMP/live" && npm pack "$name@latest" --json > "base-$pkg.json" 2> /dev/null); then
+            if [ -n "$tag" ] && (cd "$RUNNER_TEMP/live" && npm pack "$name@$tag" --json > "base-$pkg.json" 2> /dev/null); then
               base_tgz="$RUNNER_TEMP/live/$(jq -r '.[0].filename' "$RUNNER_TEMP/live/base-$pkg.json")"
             fi
             for side in base head; do
@@ -355,7 +359,7 @@ jobs:
             - Each package has a cert harness in `${{ runner.temp }}/harness/<package>` (its kernel, `needs` and Chromium). Run its specs, on any kernel and users mode:
               `cert-run env HOMESCOOP_CERT_NODE_MODULES=${{ runner.temp }}/harness/<package>/node_modules node scripts/browser-cert/run.mjs --package <package> --tarball <package.tgz> [--kernel @ai-ecoverse/slicc-kernel@<version>] [--users enforce] [--soft] [--json <out.json>]`
               For a spec of your own, put it in a directory and pass `--cert <dir>`. See `docs/ci-cert.md` and `scripts/browser-cert/README.md` for the spec API.
-            - **Live pairs, for a regression check right away.** For each package, two Chromes with windows run the harness under `--users enforce` on the `cert/meta.json` kernel, with the package installed and booted: one with npm `latest` (the baseline; missing for a new package) and one with this pull request's tarball. `${{ runner.temp }}/live/live.json` lists each one's `url`, and their logs are next to it. `GET <url>` describes it; `POST <url>ctx/<call>` with a JSON array of arguments calls the same `ctx` the specs get, for example `curl -s <url>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/pty` and `ctx/addUser`. Run the same thing on both sides. Something that fails the same way on the baseline is pre-existing: it never blocks the certification. **Except** where an entry has `"peers_from_pr": true`: both sides then share peers rebuilt from this pull request (`needsRepack`, `needsTarballScripts`), so a shared failure may come from those peers. Check it against the published peers before you call it pre-existing.
+            - **Live pairs, for a regression check right away.** For each package, two Chromes with windows run the harness under `--users enforce` on the `cert/meta.json` kernel, with the package installed and booted: one with npm `latest` (the baseline; for a recipe with an `npm-tag:` the version under that tag; missing for a new package or a tag's first publish) and one with this pull request's tarball. `${{ runner.temp }}/live/live.json` lists each one's `url`, and their logs are next to it. `GET <url>` describes it; `POST <url>ctx/<call>` with a JSON array of arguments calls the same `ctx` the specs get, for example `curl -s <url>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/pty` and `ctx/addUser`. Run the same thing on both sides. Something that fails the same way on the baseline is pre-existing: it never blocks the certification. **Except** where an entry has `"peers_from_pr": true`: both sides then share peers rebuilt from this pull request (`needsRepack`, `needsTarballScripts`), so a shared failure may come from those peers. Check it against the published peers before you call it pre-existing.
             - **Run every command that executes package or pull-request code through `cert-run`**, including any command you take from `cert/meta.json` (`ci`, `needsTarballScripts`), a README or other docs in the pull request, which drops the Bedrock key and the GitHub token from its environment.
             - `npm view` and `npm pack` reach the registry, for the version on npm today (`latest`) and its tarball. `gh issue list -R <repo> --search …` finds existing issues (homescoop's and slicc-kernel's) to cite.
 
@@ -529,7 +533,7 @@ jobs:
       - name: npm parity against the registry now, not as ladder-pr saw it (this job's tools, from ${{ github.sha }})
         run: |
           mkdir -p "$RUNNER_TEMP/cert-review"
-          node scripts/cert-review/parity-now.mjs --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --out "$RUNNER_TEMP/cert-review/parity.json" || true
+          node scripts/cert-review/parity-now.mjs --artifacts "$RUNNER_TEMP/artifacts" --pr "$PR_NUMBER" --head "$HEAD" --repo "$GH_REPO" --out "$RUNNER_TEMP/cert-review/parity.json" || true
 
       - name: Verdict from the artifacts (this job's tools, from ${{ github.sha }})
         id: verdict
