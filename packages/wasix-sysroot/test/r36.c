@@ -92,6 +92,16 @@ int main(void) {
   close(q[0]);
   int sv[2];
   socketpair(AF_UNIX, SOCK_STREAM, 0, sv); close(sv[1]);
+  p = (struct pollfd){ sv[0], POLLIN, 0 };
+  r = poll(&p, 1, 100);
+  printf("poll POLLIN on a socketpair end, peer closed, empty: %d revents=%s\n", r, rev(p.revents));
+  close(sv[0]);
+  socketpair(AF_UNIX, SOCK_STREAM, 0, sv); shutdown(sv[1], SHUT_WR);
+  p = (struct pollfd){ sv[0], POLLIN, 0 };
+  r = poll(&p, 1, 100);
+  printf("poll POLLIN on a socketpair end, peer SHUT_WR: %d revents=%s\n", r, rev(p.revents));
+  close(sv[0]); close(sv[1]);
+  socketpair(AF_UNIX, SOCK_STREAM, 0, sv); close(sv[1]);
   p = (struct pollfd){ sv[0], POLLOUT, 0 };
   r = poll(&p, 1, 100);
   printf("poll POLLOUT on a socketpair end, peer closed: %d revents=%s\n", r, rev(p.revents));
