@@ -43,6 +43,13 @@ export default async function (ctx) {
   await addUser({ name: 'bob' });
   for (const [f, t] of Object.entries(FILES)) await write(`/home/bob/agent/${f}`, t);
   await run(['chown', '-R', 'bob', '/home/bob/agent'], { cwd: '/' });
+  // The kernel's wasm-memory admission (ceiling, live count, learned value;
+  // the KC's suspect 2), at the start and after a bad round.
+  const memories = async () => {
+    const m = await run(['cat', '/proc/sys/kernel/slicc_wasm_memories'], { cwd: '/' });
+    return m.status === 0 ? m.stdout.trim() : `(unreadable: rc=${m.status} ${m.stderr.trim()})`;
+  };
+  writeFileSync(join(OUT, 'wasm-memories-start.txt'), `${await memories()}\n`);
   const bad = [];
   for (let round = 1; round <= ROUNDS; round++) {
     const cold = round % 4 === 1;
@@ -58,7 +65,7 @@ export default async function (ctx) {
     console.log(`round ${round} ${cold ? 'cold' : 'warm'}: rc=${r.status} ${rec.seconds.toFixed(1)}s${trapped ? ' TRAP' : ''}`);
     if (trapped || r.status) {
       bad.push(round);
-      writeFileSync(join(OUT, `round-${round}.txt`), `round ${round} (${cold ? 'cold' : 'warm'} store) rc=${r.status}\n--- stderr\n${r.stderr}\n--- stdout\n${r.stdout}\n`);
+      writeFileSync(join(OUT, `round-${round}.txt`), `round ${round} (${cold ? 'cold' : 'warm'} store) rc=${r.status}\n--- /proc/sys/kernel/slicc_wasm_memories after the round\n${await memories()}\n--- stderr\n${r.stderr}\n--- stdout\n${r.stdout}\n`);
     }
   }
   assert.deepEqual(bad, [], `rounds that trapped or failed (logs in ${OUT}): ${bad.join(',')}`);

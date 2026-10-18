@@ -16,6 +16,7 @@ on:
       kernel:
         description: 'slicc-kernel to run on'
         default: '@ai-ecoverse/slicc-kernel@1.124.2'
+        # also run it on npm latest (1.125.8+), per the KC
       rounds:
         description: 'installs per shard (8 shards)'
         default: '40'

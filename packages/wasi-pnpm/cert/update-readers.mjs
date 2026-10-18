@@ -47,19 +47,21 @@ const registry = {
 };
 
 // One observation per pass: "<pkg> absent" or "<pkg> <files in lib/> <version|nopj>".
+// A sample reads package.json, lists lib/, then reads package.json again
+// and checks the directory is still there. If those disagree, the update
+// moved the directory during the sample (the reader raced a rename, which
+// is fine): "torn". Otherwise it is "<pkg> <files in lib/> <version|nopj>".
 const POLL = [
   'shopt -s nullglob',
+  'pjof() { local pj=; PJ=nopj; if [[ -f $1/package.json ]] && { read -r pj || [[ -n $pj ]]; } < "$1/package.json"; then pj=${pj#*version?:?}; PJ=${pj%%[!0-9.]*}; fi; }',
   'look() {',
-  '  local d=node_modules/$1 pj v',
+  '  local d=node_modules/$1 a b',
   '  if [[ ! -d $d ]]; then echo "$1 absent"; return; fi',
+  '  pjof "$d"; a=$PJ',
   '  local f=("$d"/lib/*)',
-  '  pj=',
-  '  if [[ -f $d/package.json ]] && { read -r pj || [[ -n $pj ]]; } < "$d/package.json"; then',
-  '    v=${pj#*version?:?}; v=${v%%[!0-9.]*}',
-  '  else',
-  '    v=nopj',
-  '  fi',
-  '  echo "$1 ${#f[@]} $v"',
+  '  pjof "$d"; b=$PJ',
+  '  if [[ $a != "$b" || ! -d $d ]]; then echo "$1 torn"; return; fi',
+  '  echo "$1 ${#f[@]} $a"',
   '}',
   'while [[ ! -e /tmp/upd-done ]]; do look big; look fresh; done',
   '',
@@ -95,7 +97,7 @@ export default async function (ctx) {
   const obs = (await read('/tmp/upd-obs')) ?? '';
   const counts = {};
   for (const line of obs.split('\n').filter(Boolean)) counts[line] = (counts[line] ?? 0) + 1;
-  const ok = new Set(['big absent', 'big 240 1.0.0', 'big 260 2.0.0', 'fresh absent', 'fresh 200 1.0.0']);
+  const ok = new Set(['big absent', 'big torn', 'big 240 1.0.0', 'big 260 2.0.0', 'fresh absent', 'fresh torn', 'fresh 200 1.0.0']);
   const bad = Object.entries(counts).filter(([k]) => !ok.has(k));
   const good = Object.entries(counts).filter(([k]) => ok.has(k)).map(([k, v]) => `${k}: ${v}`);
   const partial = {};
