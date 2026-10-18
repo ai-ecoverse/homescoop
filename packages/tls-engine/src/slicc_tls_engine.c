@@ -31,6 +31,7 @@
 #include "mbedtls/error.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/platform.h"
+#include "mbedtls/platform_util.h"
 #include "mbedtls/ssl.h"
 #include "mbedtls/x509_crt.h"
 #include "psa/crypto.h"
@@ -41,6 +42,9 @@
 #define TLS_NOMEM (-2)
 #define TLS_BADARG (-3)
 #define TLS_CLIENT_INSECURE_SKIP_VERIFY 1
+#define TLS_CLIENT_NO_SNI 2
+#define TLS_CLIENT_VERIFY_CHAIN_ONLY 4
+#define TLS_CLIENT_FLAGS (TLS_CLIENT_INSECURE_SKIP_VERIFY | TLS_CLIENT_NO_SNI | TLS_CLIENT_VERIFY_CHAIN_ONLY)
 #define ALPN_MAX 8
 
 static const char *const alpn_protocols[] = {"http/1.1", NULL};
@@ -288,6 +292,13 @@ typedef struct {
   char alpn_buf[256];
   const char *alpn[ALPN_MAX + 1];
   char host[256];
+  int flags;
+  int started;
+  int name_mismatch;
+  int name_check_error;
+  int own_set;
+  mbedtls_x509_crt own_chain;
+  mbedtls_pk_context own_key;
   unsigned char in[IN_CAP], out[OUT_CAP];
   size_t in_len, out_len;
   int in_eof;
@@ -326,6 +337,10 @@ static int on_sni(void *ctx, mbedtls_ssl_context *ssl, const unsigned char *name
 static void session_free(session *s) {
   mbedtls_ssl_free(&s->ssl);
   mbedtls_ssl_config_free(&s->config);
+  if (s->own_set) {
+    mbedtls_x509_crt_free(&s->own_chain);
+    mbedtls_pk_free(&s->own_key);
+  }
   if (s->leaf) leaf_release(s->leaf);
   if (s->trust) ca_release(s->trust);
   free(s);
@@ -378,10 +393,38 @@ static int ip_san_matches(const mbedtls_x509_crt *crt, const unsigned char *ip, 
   return 0;
 }
 
+/* The name check when no hostname was set (TLS_CLIENT_NO_SNI): Mbed TLS's
+ * own, by verifying the received chain again with the name and keeping only
+ * the CN_MISMATCH bit. */
+static int dns_name_mismatch(session *s, mbedtls_x509_crt *crt) {
+  uint32_t found = 0;
+  int ret = s->name_check_error
+                ? MBEDTLS_ERR_X509_ALLOC_FAILED
+                : mbedtls_x509_crt_verify(crt, s->trust ? &s->trust->roots : NULL, NULL, s->host,
+                                          &found, NULL, NULL);
+  /* A check that could not run (an allocation failure, a fatal X.509 error)
+   * is a mismatch: fail closed. */
+  if (ret != 0 && ret != MBEDTLS_ERR_X509_CERT_VERIFY_FAILED) return 1;
+  return (found & MBEDTLS_X509_BADCERT_CN_MISMATCH) != 0;
+}
+
+/* Test hook: make the TLS_CLIENT_NO_SNI name check fail as an allocation
+ * failure inside it would. It takes no code, so it can only make a session
+ * stricter: every leaf is then refused. */
+EMSCRIPTEN_KEEPALIVE int tls_test_name_check_error(session *s) {
+  if (s->started) return TLS_BADARG;
+  s->name_check_error = 1;
+  return 0;
+}
+
 static int on_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags) {
   session *s = ctx;
-  if (depth == 0 && s->ip_len > 0 && !ip_san_matches(crt, s->ip, s->ip_len))
+  if (depth != 0) return 0;
+  if (s->ip_len > 0 && !ip_san_matches(crt, s->ip, s->ip_len)) *flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
+  else if (s->ip_len == 0 && (s->flags & TLS_CLIENT_NO_SNI) && dns_name_mismatch(s, crt))
     *flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
+  s->name_mismatch = (*flags & MBEDTLS_X509_BADCERT_CN_MISMATCH) != 0;
+  if (s->flags & TLS_CLIENT_VERIFY_CHAIN_ONLY) *flags &= ~MBEDTLS_X509_BADCERT_CN_MISMATCH;
   return 0;
 }
 
@@ -413,7 +456,8 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
                                              const unsigned char *alpn, size_t alpn_len, int flags) {
   if (init() != 0) return NULL;
   int insecure = (flags & TLS_CLIENT_INSECURE_SKIP_VERIFY) != 0;
-  if ((flags & ~TLS_CLIENT_INSECURE_SKIP_VERIFY) != 0 || !servername ||
+  int chain_only = (flags & TLS_CLIENT_VERIFY_CHAIN_ONLY) != 0;
+  if ((flags & ~TLS_CLIENT_FLAGS) != 0 || (insecure && chain_only) || !servername ||
       strlen(servername) >= sizeof(((session *)0)->host) ||
       (!insecure && (!trust || servername[0] == 0))) {
     last_error = TLS_BADARG;
@@ -425,6 +469,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
     return NULL;
   }
   strcpy(s->host, servername);
+  s->flags = flags;
   size_t name_len = strlen(s->host);
   if (name_len > 1 && s->host[name_len - 1] == '.') s->host[name_len - 1] = 0;
   s->ip_len = s->host[0] ? mbedtls_x509_crt_parse_cn_inet_pton(s->host, s->ip) : 0;
@@ -449,7 +494,8 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
     if (alpn_len > 0) ret = mbedtls_ssl_conf_alpn_protocols(&s->config, s->alpn);
   }
   if (ret == 0) ret = mbedtls_ssl_setup(&s->ssl, &s->config);
-  if (ret == 0) ret = mbedtls_ssl_set_hostname(&s->ssl, s->ip_len || !s->host[0] ? NULL : s->host);
+  int no_name = s->ip_len || !s->host[0] || (flags & TLS_CLIENT_NO_SNI);
+  if (ret == 0) ret = mbedtls_ssl_set_hostname(&s->ssl, no_name ? NULL : s->host);
   if (ret != 0) {
     last_error = ret;
     session_free(s);
@@ -459,10 +505,65 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
   return s;
 }
 
+/* The client's own chain (concatenated DER, its leaf first) and private key
+ * (PEM or DER; `pass` decrypts an encrypted one), before the first
+ * handshake: 0, or < 0. The key must match the leaf. The caller's buffers
+ * hold key material: the engine wipes the key and passphrase bytes it was
+ * given once parsed, and frees (zeroizes) its copy with the session. */
+EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain, size_t chain_len,
+                                         unsigned char *key, size_t key_len, unsigned char *pass,
+                                         size_t pass_len) {
+  int ret = TLS_BADARG;
+  int mine = 0;
+  if (s->own_set || s->leaf || s->started || chain_len == 0 || key_len == 0) goto done;
+  mbedtls_x509_crt_init(&s->own_chain);
+  mbedtls_pk_init(&s->own_key);
+  s->own_set = mine = 1;
+  for (size_t at = 0; at < chain_len;) {
+    unsigned char *p = (unsigned char *)chain + at;
+    unsigned char *start = p;
+    size_t body;
+    ret = mbedtls_asn1_get_tag(&p, (unsigned char *)chain + chain_len, &body,
+                               MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (ret != 0) goto done;
+    size_t whole = (size_t)(p - start) + body;
+    ret = mbedtls_x509_crt_parse_der(&s->own_chain, start, whole);
+    if (ret != 0) goto done;
+    at += whole;
+  }
+  ret = mbedtls_pk_parse_key(&s->own_key, key, key_len, pass_len ? pass : NULL, pass_len);
+  if (ret == 0 && mbedtls_pk_check_pair(&s->own_chain.pk, &s->own_key) != 0) ret = TLS_BADARG;
+  if (ret == 0) ret = mbedtls_ssl_conf_own_cert(&s->config, &s->own_chain, &s->own_key);
+done:
+  if (key) mbedtls_platform_zeroize(key, key_len);
+  if (pass) mbedtls_platform_zeroize(pass, pass_len);
+  if (ret != 0) {
+    if (mine) {
+      mbedtls_x509_crt_free(&s->own_chain);
+      mbedtls_pk_free(&s->own_key);
+      s->own_set = 0;
+    }
+    return last_error = ret;
+  }
+  return 0;
+}
+
+/* 1 when the leaf did not match the server name. Under TLS_CLIENT_VERIFY_CHAIN_ONLY
+ * this is the check the verification result left out: the caller MUST check the
+ * server's identity itself (e.g. Node's checkServerIdentity). */
+EMSCRIPTEN_KEEPALIVE int tls_name_mismatch(session *s) { return s->name_mismatch; }
+
+/* The negotiated ciphersuite's IANA number, 0 before the handshake. */
+EMSCRIPTEN_KEEPALIVE int tls_ciphersuite(session *s) {
+  if (!mbedtls_ssl_is_handshake_over(&s->ssl)) return 0;
+  return mbedtls_ssl_get_ciphersuite_id_from_ssl(&s->ssl);
+}
+
 /* Drive the handshake: 1 when it is done, 0 when it needs more ciphertext
  * (drain tls_out first), or an error (a refused certificate is
  * MBEDTLS_ERR_X509_CERT_VERIFY_FAILED; tls_verify_result says why). */
 EMSCRIPTEN_KEEPALIVE int tls_handshake(session *s) {
+  s->started = 1;
   for (;;) {
     if (mbedtls_ssl_is_handshake_over(&s->ssl)) return 1;
     int ret = mbedtls_ssl_handshake(&s->ssl);
@@ -536,6 +637,7 @@ static int want(int ret) {
 
 /* Plaintext from the peer: > 0 bytes, 0 when more ciphertext is needed, TLS_EOF, or an error. */
 EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
+  s->started = 1;
   for (int spins = 0;; spins++) {
     int ret;
     if (!mbedtls_ssl_is_handshake_over(&s->ssl)) {
@@ -559,6 +661,7 @@ EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
 
 /* Encrypt up to `len` bytes of plaintext: how many were taken (0: drain tls_out and retry), or an error. */
 EMSCRIPTEN_KEEPALIVE int tls_write(session *s, const unsigned char *bytes, size_t len) {
+  s->started = 1;
   int ret = mbedtls_ssl_write(&s->ssl, bytes, len);
   if (ret >= 0) return ret;
   if (want(ret)) return 0;
