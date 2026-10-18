@@ -3,11 +3,13 @@
   "kernel": "@ai-ecoverse/slicc-kernel@1.47.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
-    "@ai-ecoverse/wasm-coreutils"
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-perl"
   ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-12",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-4"
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasix-perl@5.42.0-19"
   ],
   "checklist": [
     "ps aux lists background sleep",
@@ -18,7 +20,19 @@
     "uptime prints without error (procps, not coreutils stub)",
     "attached-worker process visible in terminal ps (human cert on 1.9.0; kernel cosmetics closed in 1.11/1.12)",
     "bash -c pgrep -f <pattern> does not match itself; exec pkill -f kills sleep, not itself (slicc-kernel#99)",
-    "cert/users.mjs (4.0.5-3, H1 homescoop#207, slicc-kernel >= 1.44.0): `ps -o user=,comm=` lists 'root ps' as root and 'cone ps' as a kernel.users.add({name:'cone'}) user; root's `ps aux` shows cone's `sleep 3` under USER cone and its own `ps aux` under root. procps now links slicc_pwd's --wrap (getpwuid/getpwnam/getpwent)"
+    "cert/users.mjs (4.0.5-3, H1 homescoop#207, slicc-kernel >= 1.44.0): `ps -o user=,comm=` lists 'root ps' as root and 'cone ps' as a kernel.users.add({name:'cone'}) user; root's `ps aux` shows cone's `sleep 3` under USER cone and its own `ps aux` under root. procps now links slicc_pwd's --wrap (getpwuid/getpwnam/getpwent)",
+    "cert/k122/flock.mjs (4.0.7-4, homescoop#947, on slicc-kernel 1.122.0): while a wasix-perl holds LOCK_EX on a pidfile, pgrep -L -F's flock(LOCK_SH|LOCK_NB) fails with EWOULDBLOCK, so pgrep reads the pidfile and prints the holder's pid. Once the holder exits, pgrep -L refuses the pidfile ('Locking check for pidfile failed', rc 1). 4.0.7-3's flock is Emscripten's stub and always succeeds (NEGATIVE.md)"
   ],
-  "needsNote": "needsInstall pulls published coreutils 9.12.0-2 (no stub kill/uptime). Kernel pin 1.14.0 (pnpm global command roots); 1.12.0: real VmSize/VmRSS + meminfo used; 1.11.0: USER/whoami = web_user. coreutils 9.12.0-3 + procps 4.0.5-2 are the exec-pid pair (kernel-execve shim), certified together on slicc-kernel 1.17.3."
+  "needsNote": "needsInstall pulls published coreutils 9.12.0-2 (no stub kill/uptime). Kernel pin 1.14.0 (pnpm global command roots); 1.12.0: real VmSize/VmRSS + meminfo used; 1.11.0: USER/whoami = web_user. coreutils 9.12.0-3 + procps 4.0.5-2 are the exec-pid pair (kernel-execve shim), certified together on slicc-kernel 1.17.3.",
+  "extra_kernels": [
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.122.0",
+      "why": "the __syscall_flock wrapper (slicc-kernel#968, 1.122.0) behind shims/slicc's flock (homescoop#947): cert/k122/flock.mjs, pgrep -L -F sees another process's LOCK_EX (EWOULDBLOCK) and refuses the pidfile once it is released",
+      "specs": [
+        "flock.mjs"
+      ],
+      "cert": "k122",
+      "users": "enforce"
+    }
+  ]
 }

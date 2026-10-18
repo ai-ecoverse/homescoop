@@ -33,6 +33,7 @@ for (const [label, create] of [['slicc-kernel 1.26.6', createOldKernel], ['slicc
     assert.equal(r.status, 0, show(r))
     assert.equal(r.stdout, [
       'flock 0',
+      'chroot 1',
       'uid web_user:x:1000:1000:web_user:/home:/bin/bash',
       'root root:x:0:0:root:/root:/bin/sh',
       'nobody none',

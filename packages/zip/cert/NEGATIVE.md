@@ -176,3 +176,21 @@ zip error: Not supported (uzoff_t not same size as zoff_t)
   - `unzip -p` must return the exact bytes;
   - `unzip -d` must extract identical files;
   - a missing archive must give rc 9 and `cannot find or open`.
+
+## 3.0.0-6: the inherited-ignore and flock shims (homescoop#973, #947; 2026-10-17)
+
+3.0.0-6 links the updated `shims/slicc` (#960). A `constructor(101)` in `slicc_signals.c` seeds `SIG_IGN` for each signal the kernel's `sliccKernel.sigInherited()` reports; on a kernel without the hook it changes nothing. A strong `flock()` in `slicc_libc_gaps.c` goes through the `env.__syscall_flock` import, which answers 0 without the kernel half (slicc-kernel#967 and #968). The built wasm now imports `env.slicc_sig_inherited_js`, and `env.__syscall_flock` where the program calls `flock`. The published 3.0.0-5 imports neither, so on a hooked kernel it can't see an inherited ignore, and its `flock` never conflicts. The program code is unchanged, and the specs pass on 3.0.0-5 as well. The build also gets #908's prefix maps and DWARF strip.
+
+## 3.0.0-6: unzip silently renames entries whose names aren't UTF-8 (homescoop#602)
+
+`cert/badnames.mjs` against the published 3.0.0-6 (slicc-kernel 1.94.0, users enforce, as cone, 2026-10-18) fails:
+
+```text
+browser-cert: FAIL packages/zip/cert/badnames.mjs
+AssertionError [ERR_ASSERTION]: rc 0, but an entry was written under another name: ["caf鮴xt","n","ok.txt","rep1.txt","rep��xt"]
+```
+
+- **`rep\xff1.txt`** became `rep1.txt`: `mapname()` drops 0xff (`unzip-mapname-keep-ff.patch`).
+- **The other names:** went through the glue's lossy `UTF8ToString`, which replaces or eats the bytes after an invalid lead byte (`slicc-strict-paths.js`).
+
+3.0.0-7 exits 50 and names each refused entry ("Illegal byte sequence"), out/ holds only `ok.txt`, and every other spec passes. With only `slicc-strict-paths.js`, `rep\xff1.txt` was still written as `rep1.txt`, so both changes are needed.

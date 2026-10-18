@@ -16,3 +16,13 @@ From slicc-kernel 1.93.0 the kernel's Node lockdown hides `process` from the wor
   `check-slicc-cred.mjs` says the same about all 8 tools: none of them names `slicc_cred_js`, so under users the kernel treats every file they write as 1000:1000. 132.0.0-3 passes on 1.110.7 and on the 1.92.0 row.
 - **Link.** The link is `-O3 -g`. `-g` keeps the wasm import and export names, which `check-slicc-cred` needs; at `-g2` or `-O3` alone emcc minifies them, and `-sASSERTIONS=1` trips "shell environment detected" in the kernel's worker. The DWARF and the name section are then stripped with `llvm-objcopy`, so -3, like -2, has no name section. Sizes: wasm-opt.wasm is 11.1 MB of code (-2: 9.6 MB). The tarball is 19 MB (-2: 17 MB), 82 MB unpacked (-2: 74 MB).
 - **Build paths.** Binaryen keeps its assertions in Release (`BYN_ENABLE_ASSERTIONS`), so `__FILE__` put the absolute work-dir source path into each wasm's data. build.sh passes `-ffile-prefix-map` for the source and build dirs. build.sh and `node-entry.mjs` both fail on any `/home/`, `/Users/`, `/__w/` or `/private/var/` in a tool wasm. Two local builds in different work dirs gave byte-identical tarballs.
+
+## 132.0.0-4: the inherited-ignore and flock shims (homescoop#973, #947, via #960; 2026-10-18)
+
+132.0.0-4 relinks the 8 tools against #960's `shims/slicc`: the `SIG_IGN` seed from `sliccKernel.sigInherited()` and the strong `flock()`. On the published 132.0.0-3, `node-entry.mjs` fails:
+
+```text
+AssertionError: bin/wasm-opt.wasm lacks shims/slicc's inherited-ignore seed (import slicc_sig_inherited_js, homescoop#973)
+```
+
+Binaryen d03c25ea and the link flags are unchanged.

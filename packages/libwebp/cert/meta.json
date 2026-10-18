@@ -1,15 +1,17 @@
 {
   "harness": "host-node",
-  "host": "node scripts/em-lib-cert.mjs libwebp --tarball <package.tgz | npm spec>: with the pinned emsdk, compiles test/probe.c with nothing but pkg-config of the package's libwebp.pc and libwebpmux.pc (PKG_CONFIG_LIBDIR: the package only), links it with -Wl,--fatal-warnings, runs it under Node and then test/check.mjs. A static library has no commands of its own.",
+  "host": "node scripts/em-lib-cert.mjs libwebp --tarball <package.tgz | npm spec>: with the pinned emsdk, compiles test/probe.c with nothing but pkg-config of the package's libwebp.pc, libwebpmux.pc, libwebpdemux.pc and libsharpyuv.pc (PKG_CONFIG_LIBDIR: the package only), links it with -Wl,--fatal-warnings, runs it under Node and then test/check.mjs. A static library has no commands of its own.",
   "pkgconfig": [
     "libwebp",
-    "libwebpmux"
+    "libwebpmux",
+    "libwebpdemux",
+    "libsharpyuv"
   ],
   "checklist": [
     "WebPGetEncoderVersion / WebPGetDecoderVersion and libwebp.pc's Version are the recipe version",
     "the probe compiles and links from libwebp.pc and libwebpmux.pc alone with -Wl,--fatal-warnings: libwebp.pc Requires libsharpyuv (libsharpyuv.pc ships), so the encoder's SharpYuvInit / SharpYuvConvert / SharpYuvGetConversionMatrix resolve (1.6.0-2's libwebp.pc had only -lwebp: NEGATIVE.md)",
-    "a 64x48 RGBA texture round-trips lossless (VP8L) exactly; a gradient lossy at q90 (VP8 + ALPH) and with use_sharp_yuv decodes within 48 per sample, mean 4, alpha exact",
-    "WebPMux assembles the sharp-YUV image with an EXIF chunk and reads it back; Node walks probe.webp: RIFF size, VP8X (alpha and EXIF flags, 64x48 canvas), ALPH, VP8, EXIF with the probe's bytes"
+    "a 64x48 RGBA texture round-trips lossless (VP8L) exactly; a gradient lossy at q90 (VP8 + ALPH) decodes within 48 per sample, mean 4, alpha exact; imported as ARGB (use_argb) it is encoded twice, without and with use_sharp_yuv, both within the same limits, and the sharp-YUV bitstream differs from the plain one, so libsharpyuv really converted it (homescoop#931; SharpYuvGetVersion through libsharpyuv.pc)",
+    "WebPMux assembles the sharp-YUV image with an EXIF chunk and reads it back; WebPDemux (libwebpdemux.pc) reports the 64x48 canvas and the EXIF flag and its frame 1 decodes; Node walks probe.webp: RIFF size, VP8X (alpha and EXIF flags, 64x48 canvas), ALPH, VP8, EXIF with the probe's bytes"
   ],
   "ci": [
     "node scripts/em-lib-cert.mjs libwebp --tarball .homescoop-out/package.tgz"

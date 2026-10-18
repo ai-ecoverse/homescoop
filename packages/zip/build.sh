@@ -44,7 +44,7 @@ export SOURCE_DATE_EPOCH
 SLICC_A="$WORK/libslicc-cli.a"
 homescoop_slicc_archive "$SLICC_A" cli
 
-export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=524288 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
+export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=524288 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain --js-library $HOMESCOOP_PKG/slicc-strict-paths.js"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
 mkdir -p "$OUT"
 

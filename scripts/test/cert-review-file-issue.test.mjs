@@ -222,3 +222,47 @@ test('cert-review.yml: the agent gets the shim and file-issue.mjs, is warned of 
   const record = wf.slice(wf.indexOf('\n  record:'), wf.indexOf('\n  unfinished:'));
   assert.match(record, /if: always\(\) && needs\.plan\.outputs\.go == 'true' && needs\.review\.result != 'cancelled'/, 'a failed check still lets the record job decide the verdict');
 });
+
+test('coverage gaps: two gaps for one package give one issue and one comment that states the second gap', async (t) => {
+  const gh = fakeGitHub();
+  const a = await file(gh, t, { package: 'sed', case: 'coverage', title: '[cert] sed: cert coverage gaps', body: 'no spec checks -z\n', run: 'https://example/runs/1' });
+  const b = await file(gh, t, { package: 'sed', case: 'coverage:no spec for w', title: '[cert] sed: worded differently', body: 'no spec checks the w command\n', run: 'https://example/runs/2', kernel: '1.122.2' });
+  assert.equal(a, b);
+  assert.equal(gh.state.issues.length, 1);
+  const [issue] = gh.state.issues;
+  assert.equal(issue.title, '[cert] sed: cert coverage gaps');
+  assert.ok(issue.labels.includes('cert-coverage'));
+  assert.equal(keyIn(issue.body), keyOf({ pkg: 'sed', kase: 'coverage', kernel: 'any' }));
+  assert.match(issue.body, /no spec checks -z/);
+  assert.equal(issue.comments.length, 1);
+  assert.match(issue.comments[0], /^New coverage gap from cert-review: run https:\/\/example\/runs\/2, PR #11, sed@\S+\.\n\nno spec checks the w command/);
+});
+
+test('coverage gaps: --kind coverage needs no --case or --title; another package gets its own issue; a defect stays separate', async (t) => {
+  const gh = fakeGitHub();
+  const dir = scratch(t);
+  const body = join(dir, 'gap.md');
+  writeFileSync(body, 'no spec checks LOCK_NB\n');
+  const out = [];
+  await fileMain(['--kind', 'coverage', '--package', 'wasix-ruby', '--body-file', body], { gh, env: { GH_REPO: 'ai-ecoverse/homescoop' }, root: ROOT, out: (l) => out.push(l), err: () => {} });
+  const ruby = out.at(-1);
+  assert.equal(gh.state.issues[0].title, '[cert] wasix-ruby: cert coverage gaps');
+  const perl = await file(gh, t, { package: 'wasix-perl', case: 'coverage', title: '[cert] wasix-perl: cert coverage gaps' });
+  assert.notEqual(perl, ruby);
+  const defect = await file(gh, t, { package: 'wasix-ruby' });
+  assert.notEqual(defect, ruby);
+  assert.equal(gh.state.issues.length, 3);
+  assert.ok(!gh.state.issues[2].labels.includes('cert-coverage'));
+  assert.notEqual(caseOf('coverage-notes:x'), 'coverage', 'only the spec name `coverage` collapses');
+  const numpy = await file(gh, t, { package: 'py-numpy', case: 'coverage', title: '[cert] py-numpy: x' });
+  const labels = gh.state.issues.find((i) => `#${i.number}` === numpy).labels;
+  for (const l of ['cert-coverage', 'next-build', 'area:python']) assert.ok(labels.includes(l), `${l} in ${labels}`);
+  await assert.rejects(fileMain(['--kind', 'coverage', '--case', 'flock:x', '--package', 'wasix-ruby', '--body-file', body], { gh, env: {}, root: ROOT, out: () => {}, err: () => {} }), /conflict/);
+  await assert.rejects(fileMain(['--case', 'flock:x', '--kind', 'coverage', '--package', 'wasix-ruby', '--body-file', body], { gh, env: {}, root: ROOT, out: () => {}, err: () => {} }), /conflict/);
+});
+
+test('cert-review.yml: coverage findings go to the package coverage issue', () => {
+  const wf = readFileSync(join(ROOT, '.github/workflows/cert-review.yml'), 'utf8');
+  assert.match(wf, /--kind coverage --package <recipe dir> --body-file <file>/);
+  assert.match(wf, /never a separate issue/);
+});

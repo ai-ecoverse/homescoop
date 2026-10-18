@@ -78,3 +78,17 @@ host pixels.
 ## 1.23.6-5: write errors exit non-zero (homescoop#923; 2026-10-17)
 
 `cert/write-errors.mjs` run against the published 1.23.6-4: `heif-convert rainbow-451x461.heic nodir/x.png` prints `could not write image`, writes nothing and exits **0**. The spec fails at its first error case. 1.23.6-5 adds `heif-dec-write-errors.patch`, and every error case exits 1 with the message. A good write still exits 0 with `Written to`. See the run recorded in the PR.
+
+## 1.23.6-6: no DWARF, no build paths (homescoop#908; 2026-10-17)
+
+`node scripts/check-no-debug.mjs libheif` (host-run's #908 check) fails on the published 1.23.6-5: 1 file(s) ship 544,321 bytes of DWARF.
+
+The published 1.23.6-5 also has 16 occurrence(s) of the CI build directory `/tmp/homescoop-work` in include/libheif/heif_version.h, share/libheif/relink/libpng16.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
+
+1.23.6-6 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 1.23.6-5 too; the negative is the #908 check.
+
+`include/libheif/heif_version.h` named the build's stage directory in `LIBHEIF_PLUGIN_DIRECTORY` (plugin loading is off, so the value is never used). build.sh now writes `/usr/local/lib/libheif` there, and fails if any shipped header still names `$WORK`.
+
+## 1.23.6-7: the cert under users enforce (homescoop#819; 2026-10-18)
+
+1.23.6-7 changes no code or build input. The bump exists because ladder-pr rebuilds the package for the cert change, and publish refuses same-version drift (#982). Until now cert/meta.json had no `"users"`, so ladder-pr booted the kernel with its default user mode, and the published 1.23.6-6 was certified that way. cert-coverage.test.mjs's #819 allowlist names libheif for exactly that. With `"users": "enforce"` the specs run with the kernel's credentials enforced. The same specs passed under enforce in #960's cert review, on the cert kernel and on slicc-kernel 1.122.2.

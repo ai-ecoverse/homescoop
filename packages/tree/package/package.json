@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-tree",
-  "version": "2.3.2-4",
+  "version": "2.3.2-5",
   "description": "tree (recursive directory listing) for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-2.0-or-later",
   "repository": {
