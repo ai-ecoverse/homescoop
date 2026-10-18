@@ -473,11 +473,13 @@ jobs:
           KERNEL_SPEC=$(node scripts/gate.mjs cert-kernel -- node scripts/browser-cert/cert-kernel.mjs "${{ matrix.package }}")
           SHARED_WEB=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
           PLAYWRIGHT=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs playwright-core)
-          [[ -n "$KERNEL_SPEC" && -n "$SHARED_WEB" && -n "$PLAYWRIGHT" ]] || { echo "::error::browser-cert: an empty kernel, shared-web or playwright pin"; exit 1; }
+          MONOCART=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs monocart-coverage-reports)
+          [[ -n "$KERNEL_SPEC" && -n "$SHARED_WEB" && -n "$PLAYWRIGHT" && -n "$MONOCART" ]] || { echo "::error::browser-cert: an empty kernel, shared-web, playwright or monocart pin"; exit 1; }
           echo "browser-cert: harness $SHARED_WEB $PLAYWRIGHT (package.json devDependencies)"
           npm install --prefix "$CERT_NM" --no-fund --no-audit \
             "$KERNEL_SPEC" \
             "$SHARED_WEB" \
+            "$MONOCART" \
             "$PLAYWRIGHT"
           if [[ -f "packages/${{ matrix.package }}/cert/meta.json" ]]; then
             node -e '
