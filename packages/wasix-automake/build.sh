@@ -37,7 +37,7 @@ if [[ ! -x "$STAGE/usr/bin/automake" || -n "${FORCE:-}" ]]; then
   (
     cd "$SRC"
     if [[ ! -f Makefile ]]; then
-      ./configure --prefix=/usr
+      CONFIG_SHELL=/bin/sh SHELL=/bin/sh /bin/sh ./configure --prefix=/usr
     fi
     make -j"${HOMESCOOP_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}"
     make DESTDIR="$STAGE" install
