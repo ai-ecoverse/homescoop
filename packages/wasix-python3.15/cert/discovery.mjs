@@ -152,7 +152,10 @@ export default async function (ctx) {
   console.log(`discovery: flat /node_modules: ${r.stdout.trim()}`);
 
   // Cost, on the flat layout (17 py-*).
-  const pp = (await py(['-c', 'import sys; print(":".join(p for p in sys.path if "/py-" in p))'])).stdout.trim();
+  const found = (await py(['-c', 'import sys; print(":".join(p for p in sys.path if "/py-" in p))'])).stdout.trim();
+  // discover() reads every py-*, also those it refuses (another abi): the
+  // PYTHONPATH it is measured against has the same directories.
+  const pp = [found, ...split.refused.map((p) => `${NM}/${p.name}/${man[p.name].slicc.python.sitePackages}`)].filter(Boolean).join(':');
   const cold = await py(['-c', 'import os, time, _slicc_site as s\nc = s._cache_path(os.path.realpath(__import__("sys").base_prefix))\nc and os.path.exists(c) and os.remove(c)\nt = time.perf_counter(); s.discover(); a = time.perf_counter() - t\nt = time.perf_counter(); s.discover(); b = time.perf_counter() - t\nprint(f"{a*1000:.1f} {b*1000:.1f}")']);
   assert.equal(cold.status, 0, cold.stderr);
   const [coldMs, warmMs] = cold.stdout.trim().split(' ').map(Number);
