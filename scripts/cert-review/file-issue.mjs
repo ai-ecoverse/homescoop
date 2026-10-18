@@ -27,6 +27,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { labelsFor } from '../issue-labels.mjs';
 
 export const VERSION = 'v1';
 export const MARKER_RE = /<!-- cert-review-key: (v\d+ [0-9a-f]{16}) -->/;
@@ -142,7 +143,7 @@ export async function fileIssue(gh, { pkg, kase, kernel, title, body, labels = [
   if (coverage) {
     kernel = 'any';
     title = coverageTitle(pkg);
-    if (!labels.includes('cert-coverage')) labels = [...labels, 'cert-coverage'];
+    labels = [...new Set([...labels, ...labelsFor(title, [pkg]).filter((l) => l !== 'triage'), 'cert-coverage'])];
   }
   if (!/^\[cert\] \S/.test(String(title ?? ''))) throw new Error(`--title must start with "[cert] <package>: " (got ${JSON.stringify(title)})`);
   if (!String(body ?? '').trim()) throw new Error('--body-file is empty');
@@ -192,9 +193,12 @@ function parseArgs(argv) {
     if (a === '--label') out.labels.push(v);
     else if (a === '--kind') {
       if (v !== COVERAGE) throw new Error(`--kind ${JSON.stringify(v)}: only "coverage" is known`);
-      out.case = COVERAGE;
-    }
-    else out[a.slice(2)] = v;
+      out.kind = v;
+    } else out[a.slice(2)] = v;
+  }
+  if (out.kind) {
+    if (out.case && caseOf(out.case) !== COVERAGE) throw new Error(`--kind coverage and --case ${JSON.stringify(out.case)} conflict: a coverage gap has no case of its own`);
+    out.case = COVERAGE;
   }
   return out;
 }
