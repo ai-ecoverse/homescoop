@@ -1,0 +1,146 @@
+--- a/MagickCore/constitute.c
++++ b/MagickCore/constitute.c
+@@ -75,6 +75,7 @@
+ #include "MagickCore/semaphore.h"
+ #include "MagickCore/statistic.h"
+ #include "MagickCore/stream.h"
++#include "MagickCore/random_.h"
+ #include "MagickCore/string_.h"
+ #include "MagickCore/string-private.h"
+ #include "MagickCore/timer.h"
+@@ -1590,12 +1591,26 @@
+   Image
+     *p;
+ 
++  char
++    atomic_path[MagickPathExtent],
++    atomic_tmp[MagickPathExtent],
++    atomic_name[MagickPathExtent];
++
++  struct stat
++    atomic_status;
++
++  MagickBooleanType
++    atomic_existed;
++
+   assert(image_info != (const ImageInfo *) NULL);
+   assert(image_info->signature == MagickCoreSignature);
+   assert(images != (Image *) NULL);
+   assert(images->signature == MagickCoreSignature);
+   if (IsEventLogging() != MagickFalse)
+     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
++  *atomic_tmp='\0';
++  *atomic_name='\0';
++  atomic_existed=MagickFalse;
+   assert(exception != (ExceptionInfo *) NULL);
+   write_info=CloneImageInfo(image_info);
+   *write_info->magick='\0';
+@@ -1613,6 +1628,80 @@
+   sans_exception=DestroyExceptionInfo(sans_exception);
+   if (*write_info->magick == '\0')
+     (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
++  /*
++    homescoop#562: write a single output file to a temporary file beside it
++    and rename it over the target only once the write succeeded, so a failed
++    write never leaves a truncated file or clobbers an existing one.
++  */
++  (void) CopyMagickString(atomic_path,write_info->filename,MagickPathExtent);
++  if ((write_info->blob == (void *) NULL) && (write_info->file == (FILE *) NULL) &&
++      ((GetImageListLength(images) == 1) || (write_info->adjoin != MagickFalse)) &&
++      (*atomic_path != '\0') && (LocaleCompare(atomic_path,"-") != 0) &&
++      (*atomic_path != '|') && (LocaleNCompare(atomic_path,"fd:",3) != 0) &&
++      (strchr(atomic_path,'%') == (char *) NULL) &&
++      (strlen(atomic_path) < (MagickPathExtent-16)) &&
++      ((lstat(atomic_path,&atomic_status) != 0 && errno == ENOENT) ||
++       (lstat(atomic_path,&atomic_status) == 0 && S_ISREG(atomic_status.st_mode))))
++    {
++      RandomInfo
++        *random_info;
++
++      ssize_t
++        j;
++
++      int
++        file = -1;
++
++      atomic_existed=lstat(atomic_path,&atomic_status) == 0 ? MagickTrue :
++        MagickFalse;
++      random_info=AcquireRandomInfo();
++      for (j=0; j < 64; j++)
++      {
++        StringInfo
++          *key_info;
++
++        unsigned char
++          *key_bytes;
++
++        key_info=GetRandomKey(random_info,4);
++        if (key_info == (StringInfo *) NULL)
++          break;
++        key_bytes=GetStringInfoDatum(key_info);
++        (void) FormatLocaleString(atomic_tmp,MagickPathExtent,
++          "%s.%02x%02x%02x%02x~",atomic_path,key_bytes[0],key_bytes[1],
++          key_bytes[2],key_bytes[3]);
++        key_info=DestroyStringInfo(key_info);
++        file=open_utf8(atomic_tmp,O_RDWR | O_CREAT | O_EXCL | O_BINARY,0666);
++        if ((file >= 0) || (errno != EEXIST))
++          break;
++      }
++      random_info=DestroyRandomInfo(random_info);
++      if (file < 0)
++        *atomic_tmp='\0';
++      else
++        {
++          (void) close_utf8(file);
++          const MagickInfo
++            *atomic_info;
++
++          ExceptionInfo
++            *atomic_exception;
++
++          const char
++            *atomic_magick;
++
++          atomic_exception=AcquireExceptionInfo();
++          atomic_info=GetMagickInfo(write_info->magick,atomic_exception);
++          atomic_exception=DestroyExceptionInfo(atomic_exception);
++          atomic_magick=atomic_info != (const MagickInfo *) NULL ?
++            write_info->magick : images->magick;
++          (void) CopyMagickString(atomic_name,images->filename,
++            MagickPathExtent);
++          for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
++            (void) FormatLocaleString(p->filename,MagickPathExtent,"%s:%s",
++              atomic_magick,atomic_tmp);
++        }
++    }
+   p=images;
+   for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
+   {
+@@ -1661,5 +1750,27 @@
+       }
+   }
+   write_info=DestroyImageInfo(write_info);
++  if (*atomic_tmp != '\0')
++    {
++      for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
++        (void) CopyMagickString(p->filename,atomic_name,MagickPathExtent);
++      if ((status != 0) && (exception->severity < ErrorException))
++        {
++          if (atomic_existed != MagickFalse)
++            (void) chmod(atomic_tmp,atomic_status.st_mode & 07777);
++          if (rename_utf8(atomic_tmp,atomic_path) != 0)
++            {
++              (void) remove_utf8(atomic_tmp);
++              ThrowFileException(exception,FileOpenError,"UnableToWriteFile",
++                atomic_path);
++              status=0;
++            }
++        }
++      else
++        {
++          (void) remove_utf8(atomic_tmp);
++          status=0;
++        }
++    }
+   return(status != 0 ? MagickTrue : MagickFalse);
+ }

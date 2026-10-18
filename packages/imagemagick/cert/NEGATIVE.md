@@ -136,3 +136,20 @@ The CFLAGS, LDFLAGS, LIBS, CC/CXX and DISTCHECK_CONFIG_FLAGS entries held the ru
 
 The release itself only adds the README note on writing `.heic`/`.avif` (homescoop#940). Its version moves with imagemagick-relink, whose kit archives are stripped in this wave. The published 34-8 has no DWARF and no build path, so it passes every spec, and the negatives above still stand.
 
+## 7.1.2-34-10: failed writes keep the target, and mogrify -format over an existing target (homescoop#562, #624, #819; 2026-10-18)
+
+- **#562 (write-temp-then-rename.patch).** `atomic-write.mjs` fails on the published 7.1.2-34-9:
+
+  ```text
+  AssertionError: orig.png changed after a failed write (homescoop#562: truncated or clobbered)
+  ```
+
+  With `-size 2000x1000 gradient: -limit memory 20MiB -limit map 0 -depth 8 orig.png`, -9 exits 1 with "cache resources exhausted". By then it has already replaced the existing 64x64 orig.png with a 2000x1000 one. With a larger image, the issue's repro, the result is a truncated file instead. -10 writes to `orig.png.xxxxxxxx~` and renames it over the target only after success, so the same command exits 1 and leaves orig.png byte-identical. The error message now names that temporary file.
+- **#624 (mogrify-format-over-existing.patch).** `mogrify.mjs` fails on -9:
+
+  ```text
+  AssertionError: mogrify -format webp over an existing s.webp (homescoop#624)
+  ```
+
+  s.webp is `PNG 100 50`. mogrify's backup name `s.webp-xxxxxxxx~` names no format, so the input's encoder ran. -10 passes the -format explicitly.
+- **#819.** The cert now runs with `"users": "enforce"`, and every spec passes under it.
