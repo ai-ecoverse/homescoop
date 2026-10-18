@@ -52,6 +52,11 @@ try {
   for (const t of tools) {
     const glue = readFileSync(join(pkg, manifest.slicc.commands[t].glue), 'utf8');
     if (glue.includes(RUNNER)) assert.ok(glue.includes(GUARD), `bin/${t}: the Node-host runner has no noInitialRun guard (homescoop#276)`);
+    const mod = new WebAssembly.Module(readFileSync(join(pkg, manifest.slicc.commands[t].wasm)));
+    const cred = WebAssembly.Module.imports(mod).some((i) => i.name === 'slicc_cred_js') && WebAssembly.Module.exports(mod).some((e) => e.name === 'slicc_cred_euid');
+    const leak = readFileSync(join(pkg, manifest.slicc.commands[t].wasm), 'latin1').match(/\/(?:home|Users|__w|private\/var)\/[\x21-\x7e]{0,80}/);
+    assert.equal(leak, null, `bin/${t}.wasm names a build path: ${leak?.[0]}`);
+    assert.ok(cred && glue.includes('slicc_cred_js'), `bin/${t}.wasm lacks the slicc credential library (import slicc_cred_js, export slicc_cred_euid; homescoop#459): under users the kernel would show every file it writes as 1000:1000`);
   }
   console.log(`== ${manifest.name}@${manifest.version}: ${tools.length} tools, every glue's runner guarded; ${kernelSpec}, users enforce`);
 

@@ -83,7 +83,7 @@ async function runPlan(w) {
         listWorkflowRuns: async ({ head_sha }) => ({ data: { workflow_runs: w.run && w.run.head_sha === head_sha ? [w.run] : [] } }),
         listWorkflowRunArtifacts: async () => {
           if (w.fail === 'artifacts') throw new Error('artifacts 500');
-          return { data: w.artifacts.map((name) => ({ name, expired: false })) };
+          return { data: w.artifacts.map((name, i) => ({ id: 100 + i, name, digest: `sha256:${String(i).repeat(64)}`, expired: false })) };
         },
       },
     },
@@ -164,6 +164,14 @@ test('plan: a package PR goes pending, then hands the review on', async () => {
   assert.equal(outputs.head, H);
   assert.equal(outputs.packages, '["alpha"]');
   assert.equal(outputs.ladder_run, '900');
+  assert.deepEqual(JSON.parse(outputs.artifacts), [{ name: 'host-alpha-pr7', id: 100, digest: `sha256:${'0'.repeat(64)}` }]);
+});
+
+test('plan: two host-<pkg>-prN artifacts with one name fail the plan, nothing is reviewed', async () => {
+  const { final, outputs } = await runPlan(world({ artifacts: ['host-alpha-pr7', 'host-alpha-pr7'] }));
+  assert.equal(final.state, 'failure');
+  assert.match(final.description, /host-alpha-pr7: 2 artifacts with that name/);
+  assert.equal(outputs.go, 'false');
 });
 
 test('plan: a PR that built no package gets success "no package built"', async () => {

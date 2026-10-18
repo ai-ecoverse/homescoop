@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-numpy",
-  "version": "2.3.2-10",
+  "version": "2.3.2-11",
   "description": "NumPy 2.3.2 for slicc WASIX CPython 3.14 (OpenBLAS static into umath/linalg, zero signature_mismatch)",
   "license": "BSD-3-Clause",
   "repository": {
@@ -21,13 +21,14 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "lib"
   ],
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": ">=3.14.2-16 <3.14.3"
+    "@ai-ecoverse/wasix-python": ">=3.14.2-27 <3.14.3"
   },
   "homescoop": {
     "recipe": "py-numpy",

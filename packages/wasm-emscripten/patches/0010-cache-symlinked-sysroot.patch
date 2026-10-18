@@ -1,0 +1,48 @@
+--- a/tools/cache.py
++++ b/tools/cache.py
+@@ -85,8 +85,16 @@
+   assert not config.FROZEN_CACHE, 'Cache cannot be erased when FROZEN_CACHE is set'
+ 
+   with lock('erase'):
+-    # Delete everything except the lockfile itself
+-    utils.delete_contents(cachedir, exclude=[os.path.basename(cachelock_name)])
++    # Delete everything except the lockfile, a symlinked sysroot (read-only
++    # seed from @ai-ecoverse/emscripten-cache), and sysroot_install.stamp
++    # (re-seeded by em-ensure-cache; without it emcc would rewrite headers
++    # through the symlink into the package).
++    exclude = [os.path.basename(cachelock_name)]
++    sysroot = Path(cachedir, 'sysroot')
++    if sysroot.is_symlink():
++      exclude.append('sysroot')
++      exclude.append('sysroot_install.stamp')
++    utils.delete_contents(cachedir, exclude=exclude)
+ 
+ 
+ def get_path(name):
+--- a/tools/system_libs.py
++++ b/tools/system_libs.py
+@@ -8,6 +8,7 @@
+ import itertools
+ import logging
+ import os
++from pathlib import Path
+ import re
+ import shlex
+ import shutil
+@@ -2626,6 +2627,16 @@
+ 
+ @ToolchainProfiler.profile()
+ def ensure_sysroot():
++  # SLICC: sysroot may be a symlink into @ai-ecoverse/emscripten-cache.
++  # Never run install_system_headers through that symlink (package is read-only).
++  stamp = cache.get_path('sysroot_install.stamp')
++  if not Path(stamp).exists():
++    sysroot = Path(cache.get_sysroot(absolute=True))
++    if sysroot.is_symlink() or not os.access(sysroot, os.W_OK):
++      from .shared import exit_with_error
++      exit_with_error(
++          'sysroot_install.stamp missing while sysroot is a package symlink; '
++          'run em-ensure-cache (need @ai-ecoverse/emscripten-cache stamps/)')
+   cache.get('sysroot_install.stamp', install_system_headers, what='system headers')
+ 
+ 

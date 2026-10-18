@@ -57,6 +57,7 @@ jobs:
       published: ${{ steps.r.outputs.published }}
       do_publish: ${{ steps.r.outputs.do_publish }}
       use_artifact: ${{ steps.r.outputs.use_artifact }}
+      deps-id: ${{ steps.deps.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7
       - id: r
@@ -103,6 +104,7 @@ jobs:
           node scripts/read-recipe.mjs "$PKG" --deps > deps.txt || : > deps.txt
           echo "deps:" && cat deps.txt || true
       - uses: actions/upload-artifact@v7
+        id: deps
         with:
           name: recipe-deps-${{ inputs.package }}
           path: deps.txt
@@ -111,6 +113,9 @@ jobs:
     needs: resolve
     if: needs.resolve.outputs.published != 'true' && needs.resolve.outputs.use_artifact == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      tgz-id: ${{ steps.tgz.outputs.artifact-id }}
+      tgz-digest: ${{ steps.tgz.outputs.artifact-digest }}
     steps:
       - name: Download ladder-pr certified tarball
         uses: actions/github-script@v9
@@ -141,11 +146,15 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 name,
-                per_page: 5,
+                per_page: 100,
               });
-              art = data.artifacts?.find((a) => !a.expired);
-              if (!art) throw new Error(`no artifact named ${name}`);
+              const live = (data.artifacts ?? []).filter((a) => a.name === name && !a.expired);
+              if (live.length !== 1) {
+                throw new Error(`${live.length} artifacts named ${name} (${live.map((a) => a.id).join(', ') || 'none'}); pass artifact_id to pick one`);
+              }
+              [art] = live;
             }
+            if (!/^sha256:[0-9a-f]{64}$/.test(art.digest ?? '')) throw new Error(`artifact ${art.id} (${name}) has no sha256 digest`);
             const res = await github.rest.actions.downloadArtifact({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -156,7 +165,10 @@ jobs:
             const { execSync } = require('child_process');
             const zip = `${process.env.RUNNER_TEMP}/cert.zip`;
             const dir = `${process.env.RUNNER_TEMP}/cert`;
-            fs.writeFileSync(zip, Buffer.from(res.data));
+            const bytes = Buffer.from(res.data);
+            const zipDigest = `sha256:${require('crypto').createHash('sha256').update(bytes).digest('hex')}`;
+            if (zipDigest !== art.digest) throw new Error(`artifact ${art.id} (${name}) downloaded as ${zipDigest}, not its digest ${art.digest}`);
+            fs.writeFileSync(zip, bytes);
             execSync(`rm -rf "${dir}" && mkdir -p "${dir}" && unzip -qo "${zip}" -d "${dir}"`);
             const tgz = `${dir}/package.tgz`;
             const shaFile = `${dir}/package.tgz.sha256`;
@@ -170,8 +182,9 @@ jobs:
               if (recorded !== got) throw new Error(`artifact sha file ${recorded} != ${got}`);
             }
             fs.copyFileSync(tgz, `${process.env.RUNNER_TEMP}/package.tgz`);
-            core.info(`certified artifact ${name} id=${art.id} sha256=${got}`);
+            core.info(`certified artifact ${name} id=${art.id} ${art.digest} package.tgz sha256=${got}`);
       - uses: actions/upload-artifact@v7
+        id: tgz
         with:
           name: package-tgz-${{ inputs.package }}
           path: ${{ runner.temp }}/package.tgz
@@ -180,6 +193,9 @@ jobs:
     needs: resolve
     if: needs.resolve.outputs.published != 'true' && needs.resolve.outputs.builder == 'host' && needs.resolve.outputs.use_artifact != 'true'
     runs-on: ubuntu-latest
+    outputs:
+      tgz-id: ${{ steps.tgz.outputs.artifact-id }}
+      tgz-digest: ${{ steps.tgz.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -193,6 +209,7 @@ jobs:
           bash scripts/host-run.sh "${{ inputs.package }}"
           ls -la .homescoop-out/package.tgz
       - uses: actions/upload-artifact@v7
+        id: tgz
         with:
           name: package-tgz-${{ inputs.package }}
           path: .homescoop-out/package.tgz
@@ -201,13 +218,16 @@ jobs:
     needs: resolve
     if: needs.resolve.outputs.published != 'true' && needs.resolve.outputs.builder == 'slicc' && needs.resolve.outputs.use_artifact != 'true'
     runs-on: ubuntu-latest
+    outputs:
+      tgz-id: ${{ steps.tgz.outputs.artifact-id }}
+      tgz-digest: ${{ steps.tgz.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@v7
       - name: Sync npm version from recipe
         run: node scripts/sync-package-version.mjs "${{ inputs.package }}" --write
       - uses: actions/download-artifact@v8
         with:
-          name: recipe-deps-${{ inputs.package }}
+          artifact-ids: ${{ needs.resolve.outputs.deps-id }}
           path: ${{ runner.temp }}
       - id: leader
         uses: ai-ecoverse/slicc/packages/github-workflow/actions/start-leader@main
@@ -238,6 +258,7 @@ jobs:
           path: /tmp/homescoop/out/package.tgz
           local: ${{ runner.temp }}/package.tgz
       - uses: actions/upload-artifact@v7
+        id: tgz
         with:
           name: package-tgz-${{ inputs.package }}
           path: ${{ runner.temp }}/package.tgz
@@ -257,19 +278,31 @@ jobs:
     # Job-level: setup-node / npm must see ACTIONS_ID_TOKEN_REQUEST_*.
     permissions:
       contents: read
+      actions: read
       id-token: write
       issues: write
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
-        with:
-          name: package-tgz-${{ inputs.package }}
-          path: ${{ runner.temp }}
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
           # Do not set registry-url: that writes an empty _authToken and
           # npm 11 then skips the OIDC exchange (ENEEDAUTH).
+      - name: The tarball by the id and digest its build job uploaded
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECT: >-
+            [{"name": "package-tgz-${{ inputs.package }}",
+              "id": "${{ needs.host-build.outputs.tgz-id || needs.slicc-build.outputs.tgz-id || needs.fetch-certified.outputs.tgz-id }}",
+              "digest": "${{ needs.host-build.outputs.tgz-digest || needs.slicc-build.outputs.tgz-digest || needs.fetch-certified.outputs.tgz-digest }}"}]
+        run: >-
+          node scripts/gate.mjs artifact-pick -- node scripts/cert-review/artifacts.mjs
+          --repo "$GITHUB_REPOSITORY" --run "$GITHUB_RUN_ID" --expect "$EXPECT" --guard '^package-tgz-'
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.pick.outputs.ids }}
+          path: ${{ runner.temp }}
       - name: Publish via OIDC
         id: publish
         env:

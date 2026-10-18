@@ -14,6 +14,7 @@ def main() -> None:
         type=Path,
         help="external LLVM for the wasm32-wasip1-threads host (wasi-llvm's bin/llvm-config)",
     )
+    parser.add_argument("--build", default="x86_64-unknown-linux-gnu")
     args = parser.parse_args()
     sdk = args.wasi_sdk.resolve(strict=True)
     sysroot = sdk / "share/wasi-sysroot"
@@ -35,12 +36,13 @@ def main() -> None:
 change-id = "ignore"
 
 [build]
+build = "{args.build}"
 docs = false
 compiler-docs = false
 extended = false
 tools = []
 host = ["wasm32-wasip1-threads"]
-target = ["x86_64-unknown-linux-gnu", "wasm32-wasip1", "wasm32-wasip1-threads"]
+target = ["{args.build}", "wasm32-wasip1", "wasm32-wasip1-threads"]
 cargo-native-static = true
 
 [rust]
@@ -49,6 +51,7 @@ deny-warnings = false
 debug = false
 debuginfo-level = 0
 incremental = false
+remap-debuginfo = true
 strip = false
 llvm-bitcode-linker = false
 llvm-tools = false
@@ -91,7 +94,7 @@ ar = "{ar}"
 ranlib = "{ranlib}"
 codegen-backends = ["llvm"]
 
-[target.'x86_64-unknown-linux-gnu']
+[target.'{args.build}']
 cc = "gcc"
 '''
     args.output.write_text(config)

@@ -1,0 +1,13 @@
+{
+  "harness": "host-node",
+  "host": "node packages/wasi-rustc-names/test/check.mjs --tarball <package.tgz>: fetches the published @ai-ecoverse/wasi-rustc of the same version (sources.wasi_rustc, checked against its sha256) and checks this package's rustc.wasm.names against that rustc.wasm. A data package has no commands; build.sh already refuses to ship names unless the rebuilt, stripped rustc.wasm is byte-identical to the published one.",
+  "checklist": [
+    "build (build.sh): the rebuilt, stripped rustc.wasm's sha256 equals the published wasi-rustc's (the same reproducible build), and the version is the same",
+    "package.json: @ai-ecoverse/wasi-rustc-names at wasi-rustc's version, no scripts, no slicc.commands",
+    "the published rustc.wasm ships without a name section; this package's function-name subsection names every function exactly once (count and highest index equal rustc.wasm's imported + defined functions), including rustc_driver and LLVM symbols",
+    "rustc.wasm with rustc.wasm.names appended as its `name` custom section validates (WebAssembly.validate)"
+  ],
+  "ci": [
+    "node packages/wasi-rustc-names/test/check.mjs --tarball .homescoop-out/package.tgz"
+  ]
+}

@@ -40,10 +40,6 @@ LIBS=(
 
 # No wasixcc on PATH (CI runners): install the pinned toolchain, which
 # brings wasix-sysroot 2025.9.30-17 (slicc_stat_owner, slicc_fs).
-# wasix-sysroot -34 ahead of install-wasixcc.sh's default (homescoop#984 flips
-# the default once every dependent is on -34; this override then goes).
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
-export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
   eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
 fi

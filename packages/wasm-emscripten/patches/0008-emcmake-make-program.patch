@@ -1,0 +1,17 @@
+--- a/emcmake.py
++++ b/emcmake.py
+@@ -39,6 +39,14 @@
+     # See https://github.com/emscripten-core/emscripten/issues/15522
+     args.append(f'-DCMAKE_CROSSCOMPILING_EMULATOR={node_js}')
+ 
++  # SLICC: wasm-gmake is `make` on PATH; Unix Makefiles need CMAKE_MAKE_PROGRAM.
++  if (not has_substr(args, '-DCMAKE_MAKE_PROGRAM')
++      and 'CMAKE_MAKE_PROGRAM' not in os.environ
++      and not any(a.startswith('-G') and 'Ninja' in a for a in args)):
++    make = shutil.which('make')
++    if make:
++      args.append(f'-DCMAKE_MAKE_PROGRAM={make}')
++
+   # Print a better error if we have no CMake executable on the PATH
+   if not os.path.dirname(args[0]) and not shutil.which(args[0]):
+     print(f'emcmake: cmake executable not found on PATH: `{args[0]}`', file=sys.stderr)

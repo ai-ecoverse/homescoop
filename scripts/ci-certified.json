@@ -1,5 +1,5 @@
 {
-  "$comment": "Packages whose packages/<name>/cert/ covers the human checklist and has a recorded negative proof (prove-negative.mjs). Renovate may automerge non-major bumps only for these. Sync renovate.json with: node scripts/sync-ci-certified-renovate.mjs",
+  "$comment": "The cert-covered set: packages whose packages/<name>/cert/ covers the human checklist and has a recorded negative proof (prove-negative.mjs). Renovate may automerge non-major bumps only for these, and kernel-compat's ci-certified set reads this list. Not a publish gate: every publish needs cert-review's certified= line. Sync renovate.json with: node scripts/sync-ci-certified-renovate.mjs",
   "packages": [
     "coreutils",
     "gawk",

@@ -5,7 +5,7 @@
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
   ],
-  "host": "HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34 HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0 node scripts/wasix-lib-cert.mjs wasix-openssl --tarball <package.tgz>: links test/sslprobe.c against lib/ (static-main) and lib-pic/ (dynamic-main) with the pinned wasixcc and runs cert/*.mjs on the kernel's Node entry. A dev package has no commands of its own.",
+  "host": "node scripts/wasix-lib-cert.mjs wasix-openssl --tarball <package.tgz>: links test/sslprobe.c against lib/ (static-main) and lib-pic/ (dynamic-main) with the pinned wasixcc and runs cert/*.mjs on the kernel's Node entry. A dev package has no commands of its own.",
   "probes": [
     {
       "name": "sslprobe",
@@ -27,6 +27,6 @@
     "threads (3.5.9-3): OPENSSL_THREADS in configuration.h (build.sh refuses a build without it, and a Configure that disabled threads); 4 pthreads x 2000 rounds of SHA-256, HMAC-SHA256, RAND_bytes and ERR_raise/ERR_get_error (per-thread queues), CRYPTO_THREAD_write_lock counter and CRYPTO_atomic_add totals exact, CRYPTO_THREAD_run_once + OPENSSL_init_crypto once under contention; both flavours"
   ],
   "ci": [
-    "HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34 HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0 node scripts/wasix-lib-cert.mjs wasix-openssl --tarball .homescoop-out/package.tgz"
+    "node scripts/wasix-lib-cert.mjs wasix-openssl --tarball .homescoop-out/package.tgz"
   ]
 }

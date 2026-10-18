@@ -1,35 +1,20 @@
-# @ai-ecoverse/wasi-zig
+# @ai-ecoverse/wasi-zig (with LLVM 21)
 
-Zig 0.16.0 compiler built for **wasm32-wasi** (no LLVM) for use under slicc.
+Zig 0.16.0 for slicc, built for wasm32-wasi with LLVM 21.1.8, clang and lld.
 
-## First cut (accepted on SLICC)
+- `zig build-exe` / `run` / `test` / `build`, `-ofmt=c`, all optimize modes,
+  with LLVM's optimizer for ReleaseFast / ReleaseSmall / ReleaseSafe.
+- `zig cc` / `zig c++` for wasm32-wasi. wasi-libc, libc++ and Zig's runtimes
+  (compiler_rt, ubsan_rt, zigc) ship prebuilt for the baseline CPU; another
+  CPU or mode (e.g. `-mcpu=generic+simd128`) builds wasi-libc from its C
+  sources, in the optional `@ai-ecoverse/wasi-zig-libc-src` package
+  (`ipk install @ai-ecoverse/wasi-zig-libc-src`).
+- Backends: Debug builds of pure-Zig wasm32 code use Zig's self-hosted wasm
+  backend (fast compiles, as in the no-LLVM package); Release modes, programs
+  that link libc and C/C++ sources use LLVM. `-fllvm` / `-fno-llvm` (or
+  `.use_llvm` on a compile step) override that per build.
+- Targets: wasm32 / wasm64 only (the LLVM inside has the WebAssembly target);
+  clang's resource headers are trimmed to the ones wasm uses.
+- Runs with real threads under slicc (LLVM's thread pool, wasi-threads).
 
-- Works: `zig version`, `zig build-exe`, `zig run`, `zig build`, `zig build run`, `zig build test`, `zig test`, `-ofmt=c`, `ReleaseSmall`
-- Unavailable in this cut: **`zig cc` / `zig c++`** — this package is a no-LLVM wasm32-wasi host; those frontends need LLVM/clang extensions. Use `@ai-ecoverse/wasm-clang` for C/C++ instead.
-
-## Environment
-
-`slicc.env` sets absolute paths (SLICC preopens `/`):
-
-- `ZIG_LIB_DIR=${package}/lib`
-- `ZIG_GLOBAL_CACHE_DIR=${HOME}/.cache/zig` (spawn-time `${NAME}` expansion; case-sensitive)
-- `ZIG_EXE=zig` (bare command name for child spawns; SLICC resolves it)
-
-Without those env vars, upstream `zig env` discovery expects WASI preopens named `/lib` and `/cache`.
-
-## Wasm output (WASI command ABI)
-
-`build-exe -target wasm32-wasi` exports `_start` and does **not** emit a Wasm start section
-(section id 8). Hosts that bind memory after instantiate (SLICC, `node:wasi`) must call
-`_start` themselves — matching `wasm-ld`.
-
-## WASIX (compiler host only)
-
-The compiler binary imports `wasix_32v1` (`proc_spawn3`, `proc_join`, `fd_pipe`, …) so
-`zig run` / `zig build` can spawn on SLICC. User programs built with
-`-target wasm32-wasi` do **not** import wasix unless they call `std.process.spawn`
-themselves (dead-code elimination).
-
-## compiler_rt
-
-The wasm backend cannot fully compile `compiler_rt.zig` (object-mode TODOs). This package ships host-prebuilt archives under `lib/prebuilt/libcompiler_rt-wasm32-*.a` and loads them automatically on the no-LLVM host.
+LLVM is Apache-2.0 WITH LLVM-exception (LICENSE-LLVM.TXT); Zig is MIT (LICENSE).

@@ -2,7 +2,10 @@
 
 Human certification remains the bar. `ladder-pr` browser-cert / host-smoke are
 how that bar is **encoded in CI** so recipe bumps can automerge once a package
-is listed in [`scripts/ci-certified.json`](../scripts/ci-certified.json).
+is listed in [`scripts/ci-certified.json`](../scripts/ci-certified.json). The list
+is the cert-covered set (Renovate automerge, and kernel-compat's `ci-certified`
+set); it is not a publish gate. Every publish needs a `certified=` line bound to
+its bytes, from cert-review's record (cert lane ruling (a), 2026-10-17).
 
 ## Layout
 
@@ -72,7 +75,7 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
 
-CI-certified set (automerge non-majors): see `scripts/ci-certified.json`
+CI-certified set (automerge non-majors and kernel-compat's `ci-certified` set, not a publish gate): see `scripts/ci-certified.json`
 (jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep, procps, which).
 
 ## py-* python range
@@ -633,8 +636,8 @@ changes the boot order for every cert.
   10 shards run at once (the cloud-run-job pool scales per job); on hosted
   runners 3, so a fork PR's call doesn't crowd out `ladder-pr`. The usual
   `base,ci-certified` call is a gate, a plan and one shard job.
-- **No fork PR code on a pool.** A job on a Cloud Run pool (`cloud-run`,
-  `cloud-run-job`) can reach the GCP metadata server and the pool's
+- **No fork PR code on a pool.** A job on the Cloud Run pool
+  (`cloud-run-job`) can reach the GCP metadata server and the pool's
   service-account token. `runner` / `CERT_RUNNER` (shards) and
   `light-runner` / `CERT_LIGHT_RUNNER` (plan, report) are used only for:
   - a `pull_request` from a branch of the calling repo (`head.repo` is
@@ -671,13 +674,18 @@ changes the boot order for every cert.
   own copy. That is why the org's approval of outside contributors' runs is
   the backstop.
 - Gate, plan and report use `light-runner` / `CERT_LIGHT_RUNNER`
-  (`cloud-run`, 4 vCPU / 8 GiB), else the shards' runner. The shards use
-  `runner` / `CERT_RUNNER` (`cloud-run-job`). On the pool a job gets a machine within about a minute, where
+  (`ubuntu-latest`; the old `cloud-run` pool is retired), else the shards'
+  runner. The shards use `runner` / `CERT_RUNNER` (`cloud-run-job`, image
+  `runner-job`: 8 vCPU allocated, where `nproc` may say 9–10, the host's;
+  32 GiB of memory that the memory-backed filesystem shares, about 32 GB
+  free at start; no sudo; one fresh machine per job, 6 h timeout; egress
+  only, from a link-local 169.254.x address). Never hard-code a pool label;
+  `cloud-run-bench` and `cloud-run` are retired. On the pool a job gets a machine within about a minute, where
   `ubuntu-latest` can queue for 15–40.
 - **No root on the pool.** Its machines run with "no new privileges", so
   `sudo` cannot become root. The Chromium step installs the system libraries
   (`playwright-core install --with-deps`) only where `sudo -n true` works and
-  the runner isn't `cloud-run-*`; the runner-bench image already has
+  the runner isn't `cloud-run-*`; the runner-job image already has
   Chrome's libraries and fonts, so there it installs the browser only.
   Nothing else in kernel-compat needs root: users exist only inside the
   kernel.
@@ -706,6 +714,28 @@ The `@ai-ecoverse/slicc-kernel` pin must be a certified kernel, and `ci` enforce
 ## Gate verdict lines
 
 A gate's silence must never read as a pass (#968). Every script that gates a merge, a release or a cert prints `<gate>: PASS <detail>` when it passes (and `<gate>: FAIL <detail>` where it can), and every caller runs it through `node scripts/gate.mjs <gate> -- <command> …`. The wrapper streams the child's stdout and stderr unchanged, so `x=$(node scripts/gate.mjs dev-pin -- node scripts/dev-pin.mjs …)` still captures the value. It exits with the child's code. When the child exits 0 without a `<gate>: PASS` line it exits 3, so an early exit 0, a CLI guard that didn't fire, or empty output fails the job. The gates are check-exact-pins, check-cert-kernel, browser-cert/cert-kernel (`cert-kernel`), dev-pin, browser-cert/compat (`compat plan|shard|report`; a report with 0 rows that ran is a FAIL), cert-review/repack-input, ladder-merge-resolve and verify-published, and (#981's second half) npm-parity, check-package-meta (`package-meta`), refresh-recipe-sha `--verify-repack` (`recipe-sha`), host-smoke.sh (`host-smoke`; PASS with no `smoke.c`), browser-cert/run.mjs (`cert-run`, also glue by path and cert-leg's extra-kernel runs), browser-cert/cert-leg (`cert-leg` plan, browser-extra and ci; plan prints its verdict on stderr, since its stdout is `GITHUB_OUTPUT`), assert-certified-publish (`certified-publish`; exit 10, already on npm, prints FAIL and is passed through as the skip) and cert-review/verdict (`cert-verdict`). `scripts/test/gate-verdict.test.mjs` checks that each prints its line and that every call in the workflows, host-run.sh and cert-review/harness.sh goes through gate.mjs. kernel-compat.yml, ladder-merge.yml and harness.sh check out scripts at a ref that may predate gate.mjs, so they use it only when `scripts/gate.mjs` exists at that ref.
+
+## Artifacts: by id and digest, never by pattern
+
+Jobs that run a PR's code (or a candidate kernel's) can reach the run's artifact token and upload into the run's artifact namespace (cert lane, from slicc-cdp#273). So a consumer of evidence doesn't pick an artifact by pattern or by name from a list. It takes the exact id and digest its producer job reported (`upload-artifact`'s `artifact-id` and `artifact-digest` outputs, passed through job outputs), checks them with `scripts/cert-review/artifacts.mjs` (gate `artifact-pick`), and then downloads with `actions/download-artifact`'s `artifact-ids:`, which fails on a byte mismatch (`digest-mismatch: error`, the default). The check fails when:
+- the artifact under the producer's name isn't the producer's id (an overwrite), isn't from this run, or its digest isn't the producer's;
+- the producer reported an id but no digest, or no upload, and an artifact with that name exists anyway;
+- another artifact matches the consumer's `--guard` pattern (a planted extra).
+
+A matrix whose legs have dynamic names has no per-leg job outputs, so its consumer uses `byName` entries instead. Each one requires exactly one artifact with that name, the guard still fails on extras, and the consumer also checks that the producing jobs succeeded. A planted artifact under a leg's name makes that leg's own upload fail.
+
+| Consumer | Producer | How |
+| --- | --- | --- |
+| cert-review plan | ladder-pr `host-<pkg>-prN` (the PR's own build) | `discover()`: one artifact per name, with a digest; passes `{name, id, digest}` on as `artifacts` |
+| cert-review review, record | the same | by the plan's ids and digests; nothing else named `host-*-prN` |
+| cert-review record | the review's `cert-review-verdict-<pr>` | by the review job's `verdict_id` and `verdict_digest`; with none, no verdict, so nothing is certified |
+| kernel-compat shards, report | plan's `<artifact>-plan`, shard `<artifact>-shard-<k>` | by `plan-id`/`plan-digest` and each shard's `id-<k>`/`digest-<k>`; nothing else named `<artifact>-*` |
+| ladder-build slicc-build, publish | resolve's `recipe-deps-<pkg>`; host-build's, slicc-build's or fetch-certified's `package-tgz-<pkg>` | by id; publish also checks the digest |
+| ladder-build fetch-certified | ladder-pr `host-<pkg>-prN` | `artifact_id`, which ladder-merge always passes; without it, exactly one live artifact with that name. Either way the zip must match the artifact's digest, and `package.tgz` must match `certified` |
+| ladder-merge-resolve | ladder-pr `host-<pkg>-prN`, cert-review's record | the zip must match the artifact's digest, and `package.tgz` must match the `certified=` line |
+| pool-parity report | compare's `verdict-<recipe>` | `byName`, nothing else named `verdict-*`; each file's rows must be for its own recipe, and a failed compare leg with every verdict `same` is a failure |
+
+The rest download by name on purpose: ladder-pr's jobs (the PR's own workflow and build, whose bytes cert-review judges), kernel-compat's candidate kernel (the caller's artifact) and pool-parity's compare (main's builds). `scripts/test/artifact-consumers.test.mjs` fails on any other download that isn't by id, on `gh run download` and on `merge-multiple: true`.
 
 ## Cert review: `cert-review.yml`
 

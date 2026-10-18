@@ -49,10 +49,6 @@ fi
 "$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
 export WASIX_PYTHON_HOST_PY="$HOSTPY"
 
-# wasix-sysroot -34 ahead of install-wasixcc.sh's default (homescoop#984 flips
-# the default once every dependent is on -34; this override then goes).
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
-export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 export WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes WASIXCC_RUN_WASM_OPT=no
 unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS WASIXCC_MODULE_KIND

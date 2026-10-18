@@ -1,22 +1,16 @@
-diff --git a/tools/link.py b/tools/link.py
 --- a/tools/link.py
 +++ b/tools/link.py
-@@ -848,23 +848,46 @@
+@@ -848,12 +848,47 @@
    if not shared.SKIP_SUBPROCS:
      shared.check_llvm_version()
  
--  # slicc: every program linked there may run there (configure tests, build
--  # helpers like freetype's apinames, tools like pkgconf), in a node realm
--  # whose fs has no file descriptors. The pre-js mounts slicc's live VFS into
--  # the program's FS; it does nothing outside slicc.
 +  # Optional node-realm VFS pre-js (explicit SLICC_VFS_PRE_JS only — do not
 +  # default this; wasm-realm programs crash on process.env.SLICC_LIVE_FS).
-   slicc_pre_js = os.environ.get('SLICC_VFS_PRE_JS')
-   if slicc_pre_js and slicc_pre_js not in options.pre_js:
-     options.pre_js.append(slicc_pre_js)
--    # The pre-js holds main until the async VFS mount is done.
-     settings.DEFAULT_LIBRARY_FUNCS_TO_INCLUDE += ['$addRunDependency', '$removeRunDependency']
- 
++  slicc_pre_js = os.environ.get('SLICC_VFS_PRE_JS')
++  if slicc_pre_js and slicc_pre_js not in options.pre_js:
++    options.pre_js.append(slicc_pre_js)
++    settings.DEFAULT_LIBRARY_FUNCS_TO_INCLUDE += ['$addRunDependency', '$removeRunDependency']
++
 +  # Default: homescoop_em_cli_ldflags + libslicc objects so linked programs run
 +  # in the wasm realm. Opt out with SLICC_EMCC_PLAIN=1 (plain web glue).
 +  # Skip for -c (never reaches here), -r, -shared / SIDE_MODULE.
@@ -49,10 +43,10 @@ diff --git a/tools/link.py b/tools/link.py
      # configure tests want a more shell-like style, where we emit return codes on exit()
      settings.EXIT_RUNTIME = 1
 -    # use node.js raw filesystem access, to behave just like a native executable
--    # (in slicc NODERAWFS cannot work; the pre-js above mounts the VFS instead)
--    if not slicc_pre_js:
+-    settings.NODERAWFS = 1
 +    # Host/plain node: NODERAWFS. Wasm-realm CLI defaults use the normal FS.
 +    if not slicc_pre_js and plain:
-       settings.NODERAWFS = 1
++      settings.NODERAWFS = 1
      # Add `#!` line to output JS and make it executable.
      settings.EXECUTABLE = config.NODE_JS[0]
+     # autoconf declares functions without their proper signatures, and STRICT causes that to trip up by passing --fatal-warnings to the linker.

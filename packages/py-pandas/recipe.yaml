@@ -7,12 +7,34 @@ npm: "@ai-ecoverse/py-pandas"
 summary: "Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/p/pandas/pandas-{{version}}.tar.gz"
-  sha256: "fdc955b27b1400b4272c488ad74dae9260bce835c965b9d7a26703545671044e"
-# 2.3.2-11 is packaging-only: 2.3.2-10's bytes with wasix-python as a range,
-# ">=3.14.2-16 <3.14.3", and py-numpy 2.3.2-10 (#702). Drop repack: when the next
-# release rebuilds.
-repack:
-  from: "2.3.2-10"
+  sha256: "ab7b58f8f82706890924ccdfb5f48002b83d2b5a3845976a9fb705d36c34dcdb"
+sources:
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-27.tgz"
+    sha256: "2824bccd95f7d45dace30a5d0a74f3384d0390bcadfff38b4e8275c9ade1af37"
+  py_numpy:
+    url: "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.3.2-11.tgz"
+    sha256: "20bd634ddf3f64bb507b707b6a64b0b8a36444f04ea2b33dedea29aea5f10c2a"
+  cxxrt:
+    url: "https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
+    sha256: "54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
+  cython:
+    url: "https://files.pythonhosted.org/packages/7c/24/f7351052cf9db771fe4f32fca47fd66e6d9b53d8613b17faf7d130a9d553/cython-3.1.4-py3-none-any.whl"
+    sha256: "d194d95e4fa029a3f6c7d46bdd16d973808c7ea4797586911fdb67cb98b1a2c6"
+  meson:
+    url: "https://files.pythonhosted.org/packages/9c/07/b48592d325cb86682829f05216e4efb2dc881762b8f1bafb48b57442307a/meson-1.9.1-py3-none-any.whl"
+    sha256: "f824ab770c041a202f532f69e114c971918ed2daff7ea56583d80642564598d0"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.14.2/Python-3.14.2.tgz"
+    sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+reproducible: true
+notices:
+  not_linked:
+    py_numpy: "build-time headers and Cython declarations; py-numpy ships its own notices"
+    cython: "build tool (Cython 3.1.4, generates the C sources)"
+    meson: "build tool"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
 dependencies:
   build:
     - wasix-python
@@ -29,8 +51,8 @@ about:
   homepage: https://pandas.pydata.org
   license: BSD-3-Clause
   notes: |
-    Cross-built like py-numpy: real meson cross file (host_machine wasi/wasm32),
-    wasixcc shared-library (exnref-ehpic), wasix-python + wasm py-numpy includes
-    (NPY_SIZEOF_LONG=4). Wheel tag cp314-cp314-wasix_wasm32; meson-python emits
-    *cpython-314-wasm32-wasix.so natively (no Darwin rename). Cython 3.1.3.
+    Built from the PyPI sdist in CI since 2.3.2-12 (homescoop#211, #730): meson
+    1.9.1 + Cython 3.1.4 on the host python, a meson cross file (wasi/wasm32),
+    wasixcc shared-library (sysroot-ehpic, legacy EH, PIC), wasix-python 3.14.2-27
+    and py-numpy 2.3.2-11 headers. Side modules *cpython-314-wasm32-wasix.so.
     Manifest slicc.python requires abi=cp314 platform=wasix_wasm32.

@@ -35,6 +35,7 @@ jobs:
       head: ${{ steps.plan.outputs.head }}
       ladder_run: ${{ steps.plan.outputs.ladder_run }}
       packages: ${{ steps.plan.outputs.packages }}
+      artifacts: ${{ steps.plan.outputs.artifacts }}
       base: ${{ steps.plan.outputs.base }}
       ladder_conclusion: ${{ steps.plan.outputs.ladder_conclusion }}
     steps:
@@ -72,7 +73,7 @@ jobs:
               } else core.notice(`no ${CONTEXT} status: ${d.description}`);
               core.setOutput('go', String(d.go));
               if (!d.go) return;
-              const outputs = { number: facts.number, head: facts.sha, base: facts.base, ladder_run: facts.run, ladder_conclusion: facts.ladder, packages: JSON.stringify(facts.packages) };
+              const outputs = { number: facts.number, head: facts.sha, base: facts.base, ladder_run: facts.run, ladder_conclusion: facts.ladder, packages: JSON.stringify(facts.packages), artifacts: JSON.stringify(facts.artifacts ?? []) };
               for (const [key, value] of Object.entries(outputs)) {
                 core.info(`${key}=${value}`);
                 core.setOutput(key, String(value));
@@ -146,9 +147,12 @@ jobs:
               if (builtFrom && run.head_sha === builtFrom) core.info(`${head} is ladder-pr's recipe-sha commit on ${builtFrom}; run ${run.id} built it`);
               facts.run = run.id;
               facts.ladder = run.conclusion;
-              const pattern = new RegExp(`^host-(.+)-pr${facts.number}$`);
+              const { discover } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cert-review/artifacts.mjs`);
               const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { owner, repo, run_id: run.id, per_page: 100 });
-              facts.packages = artifacts.filter((a) => !a.expired && pattern.test(a.name)).map((a) => a.name.match(pattern)[1]);
+              const found = discover({ artifacts, pattern: `^host-(.+)-pr${facts.number}$` });
+              if (found.problems.length) throw new Error(`ladder-pr run ${run.id}: ${found.problems.join('; ')}`);
+              facts.packages = found.found.map((a) => a.match[1]);
+              facts.artifacts = found.found.map(({ name, id, digest }) => ({ name, id, digest }));
               return await finish();
             } catch (err) {
               facts.error = err.message;
@@ -182,6 +186,9 @@ jobs:
       contents: read
       issues: write
       pull-requests: read
+    outputs:
+      verdict_id: ${{ steps.verdict.outputs.artifact-id }}
+      verdict_digest: ${{ steps.verdict.outputs.artifact-digest }}
     env:
       PR_NUMBER: ${{ needs.plan.outputs.number }}
       HEAD: ${{ needs.plan.outputs.head }}
@@ -209,7 +216,7 @@ jobs:
         with:
           node-version: '24'
 
-      - name: gh, cert-run, and the ladder-pr tarballs
+      - name: gh and cert-run
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -230,12 +237,24 @@ jobs:
           printf '#!/bin/sh\nexec env -u AWS_BEARER_TOKEN_BEDROCK -u GH_TOKEN -u GITHUB_TOKEN "$@"\n' > "$RUNNER_TEMP/bin/cert-run"
           chmod +x "$RUNNER_TEMP/bin/cert-run"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-          export PATH="$RUNNER_TEMP/bin:$PATH"
-          for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
-            name="host-$pkg-pr$PR_NUMBER"
-            gh run download "$LADDER_RUN" -n "$name" -D "$RUNNER_TEMP/artifacts/$name"
-          done
-          ls -R "$RUNNER_TEMP/artifacts"
+
+      - name: The plan's ladder-pr artifacts, by id and digest
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACTS: ${{ needs.plan.outputs.artifacts }}
+        run: >-
+          node .cert-review-tools/scripts/gate.mjs artifact-pick -- node .cert-review-tools/scripts/cert-review/artifacts.mjs
+          --repo "$GH_REPO" --run "$LADDER_RUN" --expect "$ARTIFACTS" --guard "^host-.+-pr${PR_NUMBER}\$"
+
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.pick.outputs.ids }}
+          run-id: ${{ needs.plan.outputs.ladder_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/artifacts${{ steps.pick.outputs.single && format('/{0}', steps.pick.outputs.single) || '' }}
+
+      - run: ls -R "$RUNNER_TEMP/artifacts"
 
       - name: Cert harnesses (no secrets in this step)
         run: |
@@ -346,6 +365,7 @@ jobs:
             Don't edit, commit or push anything, and don't comment on the pull request yourself.
 
       - uses: actions/upload-artifact@v7
+        id: verdict
         if: always()
         with:
           name: cert-review-verdict-${{ needs.plan.outputs.number }}
@@ -404,13 +424,23 @@ jobs:
         with:
           node-version: '24'
 
+      - name: The review's verdict artifact, by the id and digest the review job uploaded
+        id: verdict-pick
+        if: needs.review.outputs.verdict_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECT: '[{"name":"cert-review-verdict-${{ needs.plan.outputs.number }}","id":"${{ needs.review.outputs.verdict_id }}","digest":"${{ needs.review.outputs.verdict_digest }}"}]'
+        run: >-
+          node scripts/gate.mjs artifact-pick -- node scripts/cert-review/artifacts.mjs
+          --repo "$GH_REPO" --run "$GITHUB_RUN_ID" --expect "$EXPECT" --guard "^cert-review-verdict-"
+
       - uses: actions/download-artifact@v8
-        continue-on-error: true
+        if: steps.verdict-pick.outcome == 'success'
         with:
-          name: cert-review-verdict-${{ needs.plan.outputs.number }}
+          artifact-ids: ${{ steps.verdict-pick.outputs.ids }}
           path: ${{ runner.temp }}/cert-review
 
-      - name: The ladder-pr tarballs, downloaded here, not taken from the review
+      - name: gh
         run: |
           case "$(uname -m)" in
             x86_64) arch=amd64 ;;
@@ -426,12 +456,22 @@ jobs:
               && sha256sum -c "gh_${v}_checksums.txt" --ignore-missing \
               && tar -xzf "gh_${v}_linux_$arch.tar.gz" --strip-components=2 "gh_${v}_linux_$arch/bin/gh")
           fi
-          export PATH="$RUNNER_TEMP/bin:$PATH"
-          for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
-            name="host-$pkg-pr$PR_NUMBER"
-            gh run download "$LADDER_RUN" -n "$name" -D "$RUNNER_TEMP/artifacts/$name"
-          done
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: The plan's ladder-pr artifacts, by id and digest
+        id: pick
+        env:
+          ARTIFACTS: ${{ needs.plan.outputs.artifacts }}
+        run: >-
+          node scripts/gate.mjs artifact-pick -- node scripts/cert-review/artifacts.mjs
+          --repo "$GH_REPO" --run "$LADDER_RUN" --expect "$ARTIFACTS" --guard "^host-.+-pr${PR_NUMBER}\$"
+
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.pick.outputs.ids }}
+          run-id: ${{ needs.plan.outputs.ladder_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/artifacts${{ steps.pick.outputs.single && format('/{0}', steps.pick.outputs.single) || '' }}
 
       - name: Committed cert specs per package, at the reviewed head
         run: |

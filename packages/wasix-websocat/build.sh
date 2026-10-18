@@ -58,8 +58,6 @@ if [[ ! -x "$WR_DIR/bin/rustc" ]]; then
 fi
 "$WR_DIR/bin/rustc" -vV
 
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-34
-export HOMESCOOP_WASIX_SYSROOT_SHA=18f4592261384d73d2902a95f7fd55d630670244d0444b5e84f713c6871ceac0
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "${WASIXCC_HOME:-$WORK/wasixcc}")"
 SYSROOT_LIB="$WASIXCC_SYSROOT_PREFIX/sysroot/lib/wasm32-wasip1"
 test -f "$SYSROOT_LIB/libc.a" && test -f "$SYSROOT_LIB/crt1-command.o"

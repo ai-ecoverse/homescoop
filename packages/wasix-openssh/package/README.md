@@ -4,9 +4,9 @@
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
 `scp`, `sftp`, and `ssh-add`.
 
-Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-29** (since
-10.6.0-8; -7 was on -28, -6 on -22, -5 on -18), linking
-**wasix-openssl 3.5.9-3** and **wasix-zlib 1.3.1-2** via pkg-config only
+Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-34** (since
+10.6.0-11; -8 to -10 were on -29, -7 on -28, -6 on -22, -5 on -18), linking
+**wasix-openssl 3.5.9-4** and **wasix-zlib 1.3.1-3** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
 ```bash
@@ -70,7 +70,7 @@ backs up `known_hosts` with a copy when `link()` is unavailable (patch
 
 ## Sysroot
 
-**wasix-sysroot 2025.9.30-29**: select/pselect timeouts and socketpair
+**wasix-sysroot 2025.9.30-34**: select/pselect timeouts and socketpair
 flags (-18), signals and EINTR (-19), the kernel's users (-20), per-fd
 terminals (-21), the `slicc.libc` marker in every binary (-22), so
 slicc-kernel gives it EINTR semantics, real signal masks (-28,

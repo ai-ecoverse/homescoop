@@ -291,10 +291,10 @@ if [[ -d "$PKG/patches" ]]; then
 fi
 
 homescoop_notices_begin "The ssh and ssh-keygen (and optional scp/sftp/ssh-add) wasm modules statically link OpenSSL and zlib from the published WASIX dev packages and the wasix libc."
-homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-3), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
-homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-2)" "$ZLIB_PREFIX/LICENSE" -
-WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2025-09-02.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files from tag v2025-09-02.1)" \
+homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-4), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-3)" "$ZLIB_PREFIX/LICENSE" -
+WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files from tag v2026-07-03.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
@@ -309,8 +309,8 @@ homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files fro
   echo "| tarball | sha256 |"
   echo "| --- | --- |"
   echo "| openssh-$UPSTREAM_PORTABLE.tar.gz | \`$SRC_SHA\` |"
-  echo "| @ai-ecoverse/wasix-openssl 3.5.9-3 | (recipe sources.wasix_openssl) |"
-  echo "| @ai-ecoverse/wasix-zlib 1.3.1-2 | (recipe sources.wasix_zlib) |"
+  echo "| @ai-ecoverse/wasix-openssl 3.5.9-4 | (recipe sources.wasix_openssl) |"
+  echo "| @ai-ecoverse/wasix-zlib 1.3.1-3 | (recipe sources.wasix_zlib) |"
   echo
   echo "Build recipe: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openssh"
 } >"$DEST/SOURCES.md"
@@ -355,8 +355,8 @@ pkg = {
     "homescoop": {
         "recipe": "wasix-openssh",
         "upstream": portable,
-        "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-3",
-        "zlib": "@ai-ecoverse/wasix-zlib@1.3.1-2",
+        "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-4",
+        "zlib": "@ai-ecoverse/wasix-zlib@1.3.1-3",
         "sysroot": f"@ai-ecoverse/wasix-sysroot@{sysroot}",
     },
     "slicc": {"abi": "wasi", "commands": cmds},

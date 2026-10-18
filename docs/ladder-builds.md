@@ -31,15 +31,17 @@ The same `pkg@version` on the registry is never rebuilt.
 
 **Publish order:** `ladder-pr` runs host-build, host-smoke, and
 `packages/<name>/cert/*.mjs` on slicc-kernel CDP (see [ci-cert.md](ci-cert.md)).
-Packages in `scripts/ci-certified.json` may Renovate-automerge non-majors;
-`ladder-merge` then OIDC-publishes the exact PR artifact
-(`certified=<sha256>` + `artifact_pr` + `artifact_id`). Majors / unlisted packages stay manual.
+Packages in `scripts/ci-certified.json` may Renovate-automerge non-majors (the
+merge queue still requires cert-review); `ladder-merge` then OIDC-publishes the
+exact PR artifact (`certified=<sha256>` + `artifact_pr` + `artifact_id`). Majors /
+unlisted packages stay manual. The list is not a publish gate: every publish
+needs a `certified=` line.
 
 **Publish gate (`scripts/ladder-merge-resolve.mjs`).** Each touched package
 maps to the newest first-parent commit of the pushed range that touched it,
 and to the PR merged as that commit. When the merged `package.json` version
 is not on npm, `ladder-merge` needs the `host-<pkg>-prN` artifact from a
-ladder-pr run at that PR's merged head that concluded `success`, and one of:
+ladder-pr run at that PR's merged head that concluded `success`, and:
 
 - a `certified=<sha256> <@scope/name> <version>` line naming that package
   and version, whose sha equals the artifact's `package.tgz`. The merge
@@ -52,12 +54,12 @@ ladder-pr run at that PR's merged head that concluded `success`, and one of:
   or `workflow_dispatch`, concluded `success`), and that artifact is the
   run's `cert-review-record-<pr>`, naming this PR, this head and that run. Its lines need no writer, since main's workflow produced them. Within
   the source it resolves from, another line naming the package at a
-  different version fails; or
-- no line for the package, the package in `scripts/ci-certified.json`, a PR
-  by `renovate[bot]` or by a writer (a fork can't vouch for its own
-  ladder-pr run, whose workflow file it controls), that run's `ci` job
-  green, and no `cert-review` status of `failure` or `error` on the head (a
-  failed review vetoes; an absent or pending one doesn't).
+  different version fails.
+
+There is no other path. The ci-certified path (a package in
+`scripts/ci-certified.json`, a green `ci` job, and no line) is retired by cert
+lane ruling (a), 2026-10-17: its expected sha came from the artifact itself, so
+it bound nothing.
 
 Anything else (no line, a wrong version or malformed sha, a stale head, a
 failed run, an expired or missing artifact, a sha mismatch) fails the
@@ -68,7 +70,7 @@ when dispatched on `main`.
 
 Dry run: `gh workflow run ladder-merge.yml -f sha=<full merge commit sha>` resolves
 and prints the decision without dispatching. `before`, `packages`,
-`assume_unpublished`, `message`, `pr_body`, `pr`, `head` and `ci_certified`
+`assume_unpublished`, `message`, `pr_body`, `pr` and `head`
 simulate the other cases (`pr` resolves an open PR, with `sha` its head).
 
 **After the publish** ladder-build polls the registry for up to thirty minutes
@@ -257,8 +259,9 @@ it by hand with `node scripts/npm-parity.mjs .homescoop-out/package.tgz`.
 the recipe says `runner: pool`. A recipe whose ladder jobs compile nothing, a
 packaging-only `repack:` with no `smoke.c` and no tests by layout, runs on the
 pool without the hint, and moves back when its next release drops `repack:`.
-On the pool (`vars.CERT_RUNNER`, `cloud-run-job`: 10 vCPU / 32 GiB per job,
-no sudo) a recipe's bytes can differ from a hosted build: its image lacks some
+On the pool (`vars.CERT_RUNNER`, `cloud-run-job`: 8 vCPU allocated, 32 GiB
+of memory shared with its memory-backed filesystem, no sudo, egress only
+from a link-local address) a recipe's bytes can differ from a hosted build: its image lacks some
 of the hosted tools, and the workspace is `/home/runner/_work`, not
 `/home/runner/work`; `host-build` therefore builds from
 `/home/runner/work/<repo>/<repo>`, a link to the pool's workspace, so a build
@@ -282,7 +285,7 @@ and compares the two `package.tgz` sha256s, listing the entries that differ
 (`scripts/tarball-parity.mjs`, npm-parity's comparison). A recipe that
 differs fails the run and opens, or comments on, one `pool-parity` issue;
 move it back to hosted, or fix the difference. Dispatch it whenever the
-runner-bench image or the hosted image changes (#499).
+runner-job image or the hosted image changes (#499).
 Some recipes stay hosted for reasons outside their bytes (#390 C2):
 `less`, because greenwoodsoftware.com answers the pool's egress with 403
 (the source is fetched only from the pinned upstream URL); `qpdf`, whose
