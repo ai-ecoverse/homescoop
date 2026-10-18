@@ -31,7 +31,8 @@
     "slicc-kernel-negative": "npm:@ai-ecoverse/slicc-kernel@1.78.0"
   },
   "workspaces": [
-    "packages/*/package"
+    "packages/*/package",
+    "!packages/wasix-python3.15/package"
   ],
   "license": "Apache-2.0"
 }
