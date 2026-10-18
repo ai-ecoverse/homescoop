@@ -50,6 +50,7 @@ if [[ ! -f "$BLD/utils/poppler-multicall.wasm" || -n "${FORCE:-}" ]]; then
   env PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig" PKG_CONFIG_PATH= \
     emcmake cmake -S "$SRC" -B "$BLD" -G "Unix Makefiles" \
       -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_FIND_ROOT_PATH="$PREFIX" -DCMAKE_PREFIX_PATH="$PREFIX" \
       -DCMAKE_C_FLAGS="-O2" \
       -DCMAKE_CXX_FLAGS="-O2" \
@@ -74,6 +75,11 @@ if [[ ! -f "$BLD/utils/poppler-multicall.wasm" || -n "${FORCE:-}" ]]; then
 fi
 
 test -f "$BLD/utils/poppler-multicall.wasm"
+grep -aq '/usr/local/share/poppler' "$BLD/utils/poppler-multicall.wasm"
+if LC_ALL=C grep -aEq '/(home|Users|__w|private/var)/|\.cache/emsdk|homescoop-work' "$BLD/utils/poppler-multicall.wasm"; then
+  echo "homescoop: poppler-multicall.wasm names a build path (homescoop#1000)" >&2
+  exit 1
+fi
 if [[ -f "$BLD/utils/poppler-multicall.js" ]]; then
   mv "$BLD/utils/poppler-multicall.js" "$BLD/utils/poppler-multicall"
 fi

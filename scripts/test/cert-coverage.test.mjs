@@ -40,7 +40,6 @@ const NO_USERS_ENFORCE = [
   'imagemagick', // #819
   'imagemagick-heif', // #819
   'patch', // #819
-  'poppler', // #819
   'procps', // #819
   'sqlite3', // #819
   'wasi-biome', // #819
