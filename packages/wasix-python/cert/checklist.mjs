@@ -9,7 +9,9 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-const PYV = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8')).slicc.python.version;
+const PKG = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8'));
+const PYV = PKG.slicc.python.version;
+const UPSTREAM = PKG.homescoop.upstream;
 
 const WHEELS = [
   ['requests-2.34.2-py3-none-any.whl', '2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0',
@@ -69,7 +71,7 @@ export default async function (ctx) {
   assert.match(base.stderr, /No module named 'requests'/);
   // A console script in the venv runs with the venv's python (#!/home/v/bin/python).
   const normalizer = await ok('v/bin/normalizer --version', '/home');
-  assert.match(normalizer.stdout, /^Charset-Normalizer 3\.5\.2 - Python 3\.14\.2/m);
+  assert.match(normalizer.stdout, new RegExp(`^Charset-Normalizer 3\\.5\\.2 - Python ${UPSTREAM.replaceAll('.', '\\.')}`, 'm'));
   // Subprocesses of the venv's python stay in the venv.
   const child = await ok(
     "v/bin/python -c 'import subprocess, sys; subprocess.run([sys.executable, \"-c\", \"import requests, sys; print(sys.prefix)\"], check=True)'",

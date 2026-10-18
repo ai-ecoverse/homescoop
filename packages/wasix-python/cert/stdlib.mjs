@@ -7,6 +7,9 @@
  * select on a pipe, time.tzset with POSIX TZ rules and strftime('%Z')
  * (3.14.2-13). `_ctypes` is covered by cert/ctypes.mjs (slicc-kernel#306).
  */
+import { readFileSync } from 'node:fs';
+
+const PYV = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8')).slicc.python.version;
 const CERT = `-----BEGIN CERTIFICATE-----
 MIIBdTCCARqgAwIBAgIUYJ691OXDq1hZBNBhaN/YMEQ7xSMwCgYIKoZIzj0EAwIw
 FDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MTAxMDA3MDgyM1oYDzIxMjYwOTE2
@@ -138,7 +141,7 @@ export default async function (ctx) {
   assert.deepEqual(o.sqlite.slice(0, 4), ['3.54.0', 3, 'hello wasix world', [2, 4.0]]);
   assert.deepEqual(o.sqlite[4], SQLITE_OPTS, 'sqlite compile options differ from 3.14.2-11 plus 3.54.0\'s MAX_SCHEMA');
   assert.deepEqual(o.threads, [8000, 328350]);
-  assert.deepEqual(o.subprocess, ['hi\n', 'through cat', '/tmp', 'envok', 3, '(3, 14)']);
+  assert.deepEqual(o.subprocess, ['hi\n', 'through cat', '/tmp', 'envok', 3, `(${PYV.replace('.', ', ')})`]);
   assert.deepEqual(o.select, [true, true]);
   assert.deepEqual(o.tz, [true, [
     [['EST', 'EDT'], -18000, -14400, 'EST', 'EDT'],

@@ -80,7 +80,7 @@ export default async function (ctx) {
   for (const user of ['root', 'cone']) {
     for (const cmd of ['pip', 'pip3']) {
       const v = await as(user, [cmd, '--version']);
-      assert.match(v, /^pip \d+\.\d+(\.\d+)? from .* \(python 3\.14\)$/, `${user} ${cmd} --version: ${v}`);
+      assert.match(v, new RegExp(`^pip \\d+\\.\\d+(\\.\\d+)? from .* \\(python ${PYV.replace('.', '\\.')}\\)$`), `${user} ${cmd} --version: ${v}`);
     }
   }
   await as('cone', ['mkdir', '-p', '/home/cone/wheels']);
@@ -90,7 +90,7 @@ export default async function (ctx) {
   const user = await py('cone', 'import hs_user, site; print(hs_user.VALUE, hs_user.__file__.startswith(site.getusersitepackages()))');
   assert.equal(user, '17 True', `pip install --user lands in cone's user site: ${user}`);
   const venvPip = await as('cone', ['iso/bin/pip', '--version']);
-  assert.match(venvPip, /\/home\/cone\/iso\/lib\/python3\.14\/site-packages\/pip /, `a venv's own bin/pip: ${venvPip}`);
+  assert.ok(venvPip.includes(`/home/cone/iso/lib/python${PYV}/site-packages/pip `), `a venv's own bin/pip: ${venvPip}`);
 
   const fork = await py('root', 'import ctypes, os; l = ctypes.CDLL(None); print([n for n in ("fork", "_Fork", "_fork_internal", "__vfork_internal", "__wasi_proc_fork", "__wasi_proc_fork_env") if hasattr(l, n)], hasattr(os, "fork"), hasattr(l, "posix_spawn"), l.system(b"exit 3") >> 8)');
   assert.equal(fork, '[] False True 3', `no fork entry point through ctypes (homescoop#296); posix_spawn and system stay: ${fork}`);
