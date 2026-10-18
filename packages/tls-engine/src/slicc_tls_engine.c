@@ -399,7 +399,7 @@ static int ip_san_matches(const mbedtls_x509_crt *crt, const unsigned char *ip, 
 static int dns_name_mismatch(session *s, mbedtls_x509_crt *crt) {
   uint32_t found = 0;
   int ret = s->name_check_error
-                ? s->name_check_error
+                ? MBEDTLS_ERR_X509_ALLOC_FAILED
                 : mbedtls_x509_crt_verify(crt, s->trust ? &s->trust->roots : NULL, NULL, s->host,
                                           &found, NULL, NULL);
   /* A check that could not run (an allocation failure, a fatal X.509 error)
@@ -408,9 +408,14 @@ static int dns_name_mismatch(session *s, mbedtls_x509_crt *crt) {
   return (found & MBEDTLS_X509_BADCERT_CN_MISMATCH) != 0;
 }
 
-/* Test hook: make the TLS_CLIENT_NO_SNI name check fail with `code`, as an
- * allocation failure inside it would. It can only make a session stricter. */
-EMSCRIPTEN_KEEPALIVE void tls_test_name_check_error(session *s, int code) { s->name_check_error = code; }
+/* Test hook: make the TLS_CLIENT_NO_SNI name check fail as an allocation
+ * failure inside it would. It takes no code, so it can only make a session
+ * stricter: every leaf is then refused. */
+EMSCRIPTEN_KEEPALIVE int tls_test_name_check_error(session *s) {
+  if (s->started) return TLS_BADARG;
+  s->name_check_error = 1;
+  return 0;
+}
 
 static int on_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags) {
   session *s = ctx;

@@ -173,4 +173,4 @@ The 4.2.0-1 build also passes, unchanged:
 
 - **4.2.0-3 as built:** `lib/client-api.mjs` passes 23/23 and `lib/engine-api.mjs` 19/19 (the server ABI is unchanged).
 
-- **The NO_SNI fail-open (Codex P1 on #1089):** a build of this head without the fail-closed line (`if (ret != 0 && ret != MBEDTLS_ERR_X509_CERT_VERIFY_FAILED) return 1;`) fails `TLS_CLIENT_NO_SNI sends no SNI and still refuses a leaf for another host`. With `tls_test_name_check_error(s, PSA_ERROR_INSUFFICIENT_MEMORY)` the nested check can't run, `found` stays 0, and the handshake is accepted. With the line, it's refused with CN_MISMATCH.
+- **The NO_SNI fail-open (Codex P1 on #1089):** a build of this head without the fail-closed line (`if (ret != 0 && ret != MBEDTLS_ERR_X509_CERT_VERIFY_FAILED) return 1;`) fails `TLS_CLIENT_NO_SNI sends no SNI and still refuses a leaf for another host`. With `tls_test_name_check_error(s)` (which injects MBEDTLS_ERR_X509_ALLOC_FAILED; it takes no code, so it can't inject 0 or CERT_VERIFY_FAILED) the nested check can't run, `found` stays 0, and the handshake is accepted. With the line, it's refused with CN_MISMATCH.

@@ -435,12 +435,15 @@ describe('client sessions (slicc-kernel#922)', () => {
     const ip = await attempt(ipOk.port, '127.0.0.1', { flags: NO_SNI });
     assert.equal(ip.result, 1);
     ip.wire.close();
-    const failing = engine.client(trust, 'client.test', { flags: NO_SNI });
-    engine.m._tls_test_name_check_error(failing, -141);
-    const failWire = new Wire(engine, failing, good.port);
-    assert.equal(await failWire.handshake(), VERIFY_FAILED, 'a name check that cannot run fails closed');
-    assert.ok(failWire.verify & BADCERT.CN_MISMATCH);
-    failWire.close();
+    for (const [port, what] of [[good.port, 'a leaf that names the host'], [wrong.port, 'a leaf for another host']]) {
+      const failing = engine.client(trust, 'client.test', { flags: NO_SNI });
+      assert.equal(engine.m._tls_test_name_check_error(failing), 0);
+      const failWire = new Wire(engine, failing, port);
+      assert.equal(await failWire.handshake(), VERIFY_FAILED, `a name check that cannot run fails closed: ${what}`);
+      assert.ok(failWire.verify & BADCERT.CN_MISMATCH);
+      assert.equal(engine.m._tls_test_name_check_error(failing), BADARG, 'not on a session whose handshake started');
+      failWire.close();
+    }
     const dnsOnly = await server('127.0.0.1', { certOpts: { san: 'dns' } });
     const ipRefused = await attempt(dnsOnly.port, '127.0.0.1', { flags: NO_SNI });
     assert.equal(ipRefused.result, VERIFY_FAILED);

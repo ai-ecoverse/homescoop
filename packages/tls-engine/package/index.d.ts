@@ -71,8 +71,8 @@ export interface TlsEngineModule {
   _tls_client_cert(session: number, chain: number, chainLen: number, key: number, keyLen: number, pass: number, passLen: number): number;
   /** 1 when the leaf did not name the server: under TLS_CLIENT_VERIFY_CHAIN_ONLY, the skipped check's result. */
   _tls_name_mismatch(session: number): number;
-  /** Test hook: the TLS_CLIENT_NO_SNI name check fails with `code` (fails closed; only ever stricter). */
-  _tls_test_name_check_error(session: number, code: number): void;
+  /** Test hook: the TLS_CLIENT_NO_SNI name check fails as an allocation failure would, so every leaf is refused (only ever stricter). */
+  _tls_test_name_check_error(session: number): number;
   /** The negotiated ciphersuite's IANA number, 0 before the handshake. */
   _tls_ciphersuite(session: number): number;
 }
