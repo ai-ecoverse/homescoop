@@ -32,10 +32,8 @@ const UNCOVERED = [
 // Command packages whose cert/meta.json has no "users": "enforce".
 const NO_USERS_ENFORCE = [
   'bash', // #819
-  'binutils', // #819
   'bzip2', // #819
   'diffutils', // #819
-  'file', // #819
   'gawk', // #819
   'git', // #819
   'grep', // #819
@@ -44,7 +42,6 @@ const NO_USERS_ENFORCE = [
   'imagemagick-heif', // #819
   'jq', // #819
   'less', // #819
-  'libheif', // #819
   'mount', // #819
   'nano', // #819
   'ncurses-utils', // #819
