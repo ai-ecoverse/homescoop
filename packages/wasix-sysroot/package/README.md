@@ -41,6 +41,11 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-37:
+- **`S_IF*` file-type bits are Linux's:** `S_IFMT` 0170000, `S_IFIFO` 0010000, `S_IFSOCK` 0140000. wasi-libc had 0160000, 0140000 and 0160000 (homescoop#1015).
+  - **Compatibility:** programs and side modules built on -36 or older keep the old values until they're rebuilt. Rebuild everything that compares `st_mode` together.
+- **Device nodes:** `/dev/null`, `/dev/zero` and the kernel's other device nodes `stat` as 0666, not as type bits alone (homescoop#1112).
+
 Since 2025.9.30-36:
 - **A ready fd wins over a pending signal:** `ppoll`, `pselect` and `epoll_pwait` with an fd ready return it and leave a signal pending that their mask would unblock, as on Linux. Up to -35 they returned EINTR (homescoop#949).
 - **`gethostname()`/`uname()`** give the kernel's node name (`HOSTNAME`, `slicc` by default), not `wasmer.sh` (homescoop#1050).

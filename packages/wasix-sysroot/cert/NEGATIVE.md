@@ -1,5 +1,9 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-36: wasi-libc's S_IF* values, devices without permission bits (-37)
+
+`test/r38.c` against npm -36 (default variant, cert kernel, 2026-10-18): FAIL at the first line, `S_IFMT=160000 S_IFSOCK=160000 … S_IFIFO=140000` (Linux: 170000, 140000, 010000; #1015). `/dev/null` and `/dev/zero` stat as `020000`, with no permission bits (#1112; coreutils: 020666).
+
 ## 2025.9.30-35: EINTR over a ready fd, gethostname wasmer.sh, POLLIN hides POLLOUT (-36)
 
 `test/r36.c` against npm -35 on slicc-kernel 1.120.2's Node entry (2026-10-18):

@@ -61,6 +61,40 @@ variant() {
   tar xzf "$LIBC_TGZ" -C "$W" --strip-components=1
   rm -rf "$W/tools/llvm-project"
   ln -s "$LLVM_SRC" "$W/tools/llvm-project"
+  # -37 (homescoop#1015, #1112): Linux's (and musl's) file-type bits in
+  # __mode_t.h, so st_mode means the same as everywhere else: wasi-libc had
+  # S_IFIFO 0140000 (Linux's S_IFSOCK), S_IFSOCK 0160000 and S_IFMT 0160000
+  # (the OR, which can't mask Linux's FIFO bit). Every libc object is built
+  # with these.
+  python3 - "$W/libc-bottom-half/headers/public/__mode_t.h" <<'PYMODE'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+t = p.read_text()
+old = """#define S_IFMT \\
+    (S_IFBLK | S_IFCHR | S_IFDIR | S_IFIFO | S_IFLNK | S_IFREG | S_IFSOCK)
+#define S_IFBLK (0x6000)
+#define S_IFCHR (0x2000)
+#define S_IFDIR (0x4000)
+#define S_IFLNK (0xa000)
+#define S_IFREG (0x8000)
+#define S_IFSOCK (0xe000)
+#define S_IFIFO (0xc000)
+"""
+new = """/* homescoop (wasix-sysroot -37): Linux's values (musl's sys/stat.h). */
+#define S_IFMT (0170000)
+#define S_IFBLK (0060000)
+#define S_IFCHR (0020000)
+#define S_IFDIR (0040000)
+#define S_IFLNK (0120000)
+#define S_IFREG (0100000)
+#define S_IFSOCK (0140000)
+#define S_IFIFO (0010000)
+"""
+if t.count(old) != 1:
+    sys.exit(f"{p}: the S_IF* block isn't wasi-libc's")
+p.write_text(t.replace(old, new))
+PYMODE
   # upstream's own build script, from the pinned tarball (not this repo).
   (cd "$W" && sed -e 's/^prepare_wasix_libc$/:/' -e "s/-j 16/-j $JOBS/" -e "s/--parallel 16/--parallel $JOBS/" \
     build32-general.sh >build32-homescoop.sh)
