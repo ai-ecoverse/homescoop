@@ -3,8 +3,15 @@
 Matplotlib 3.11.2 for slicc WASIX CPython 3.14 (`cp314-wasix_wasm32`).
 
 - Default backend: **Agg**
-- Built with `system-freetype`, `macosx=false`
-- FreeType symbols left unresolved for `@ai-ecoverse/wasm-freetype`
+
+## Since 3.11.2-10
+
+- **Source:** built in homescoop's CI from the PyPI sdist, `matplotlib-3.11.2.tar.gz` (sha256 `cec59631…`). Up to -9 the package was a repack of a local build.
+- **Compiled in:** FreeType 2.14.3, HarfBuzz 14.1.0, libraqm 0.10.5, SheenBidi and Qhull 8.0.2. These are matplotlib's own meson subprojects, pinned to the sha256s its wraps name, with no download at build time.
+- **Also compiled in:** Agg and pybind11's headers.
+- **Toolchain:** wasixcc side modules (`sysroot-ehpic`, legacy EH, PIC) against wasix-python 3.14.2-27.
+- **Notices:** `THIRD-PARTY-NOTICES.md` carries their licences and the fonts' (BaKoMa, DejaVu, STIX, Last Resort).
+- **Dependencies:** py-numpy, py-contourpy, py-kiwisolver and py-pillow are taken as ranges, so npm installs one of each.
 
 ## Since 3.11.2-9
 

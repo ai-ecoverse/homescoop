@@ -36,3 +36,9 @@ rc=134 stderr=python3: wasm trap: function signature mismatch
 ```
 
 The same tree with py-kiwisolver 1.5.1-7 (the published tarball of #556), which is what 3.11.2-8 pins, passes: `ConstrainedLayoutEngine`, a PNG, and the left column at x0 0.137 against the default layout's 0.125.
+
+## 3.11.2-10: built from the PyPI sdist (homescoop#211 A5, #743; 2026-10-18)
+
+- **Supply chain:** npm -9 is a repack of a local build (no provenance on its root), and it ships no THIRD-PARTY-NOTICES.md. Its README says FreeType is left unresolved for `@ai-ecoverse/wasm-freetype`, but the side modules actually link it in (#743).
+- **`test/py-vs-sdist.mjs --tarball <npm 3.11.2-9>`:** FAIL. It lacks 3 `.py` files that the sdist's own meson install puts in place: `tests/data/tinypages/{conf,range4,range6}.py`.
+- **Dependencies:** -9 pins py-numpy 2.3.2-10, py-contourpy 1.4.0-7, py-kiwisolver 1.5.1-8 and py-pillow 12.3.0-8 exactly, so with the -34-wave releases on top npm nests a second copy of each.

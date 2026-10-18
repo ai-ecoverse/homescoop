@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-matplotlib",
-  "version": "3.11.2-9",
+  "version": "3.11.2-10",
   "description": "matplotlib Agg for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)",
   "license": "PSF-2.0",
   "repository": {
@@ -21,22 +21,23 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "lib"
   ],
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": ">=3.14.2-16 <3.14.3",
-    "@ai-ecoverse/py-numpy": "2.3.2-10",
-    "@ai-ecoverse/py-contourpy": "1.4.0-7",
-    "@ai-ecoverse/py-cycler": "0.12.1-7",
-    "@ai-ecoverse/py-fonttools": "4.66.1-7",
-    "@ai-ecoverse/py-kiwisolver": "1.5.1-8",
-    "@ai-ecoverse/py-packaging": "26.3.0-7",
-    "@ai-ecoverse/py-pillow": "12.3.0-8",
-    "@ai-ecoverse/py-pyparsing": "3.3.3-7",
-    "@ai-ecoverse/py-python-dateutil": "2.9.0-post0.2"
+    "@ai-ecoverse/wasix-python": ">=3.14.2-27 <3.14.3",
+    "@ai-ecoverse/py-numpy": ">=2.3.2-11 <2.3.3",
+    "@ai-ecoverse/py-contourpy": ">=1.4.0-9 <1.4.1",
+    "@ai-ecoverse/py-cycler": "0.12.1-8",
+    "@ai-ecoverse/py-fonttools": "4.66.1-8",
+    "@ai-ecoverse/py-kiwisolver": ">=1.5.1-9 <1.5.2",
+    "@ai-ecoverse/py-packaging": "26.3.0-8",
+    "@ai-ecoverse/py-pillow": ">=12.3.0-10 <12.3.1",
+    "@ai-ecoverse/py-pyparsing": "3.3.3-8",
+    "@ai-ecoverse/py-python-dateutil": "2.9.0-post0.3"
   },
   "homescoop": {
     "recipe": "py-matplotlib",
