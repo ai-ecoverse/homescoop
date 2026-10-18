@@ -190,3 +190,7 @@ So the advice of -23's shared-ctypes `NotImplementedError` ("use … a Manager")
 ## 3.14.2-26: fcntl.flock (wasix-sysroot -34; 2026-10-17)
 
 `cert/k120/flock.mjs` against the published 3.14.2-25 on slicc-kernel 1.120.2 (Node entry): FAIL. Every lock is granted: `{"rw": "granted", "rw_after_un": "granted", "readonly": "granted", "after_close": "granted", "pipe_other_end": "granted", "pipe_dup": "granted"}`. -25's `build.sh` wrapped `flock` to a no-op (`lock_stubs.c`), so a second process gets `LOCK_EX|LOCK_NB` while the first holds `LOCK_EX`.
+
+## 3.14.2-28: engines floor 1.120.0 for os.mkfifo (homescoop#1018; 2026-10-18)
+
+`cert/mkfifo.mjs` with the published 3.14.2-27 on slicc-kernel 1.108.4, -27's cert kernel, inside its `engines` range `>=1.100.0`: FAIL. `os.mkfifo` exists, since -26 links wasix-sysroot -34's mkfifo, but it raises OSError ENOSYS ("Function not implemented"). The kernel has no `slicc_fs.path_mkfifo` before 1.120.0. -28 declares `>=1.120.0`, and on its cert kernel 1.120.2 the spec passes.
