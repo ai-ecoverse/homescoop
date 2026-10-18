@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync, realpathSync } from 'n
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { compareVersions } from '../npm-parity.mjs';
 
 export const REPO_URL = 'https://github.com/ai-ecoverse/homescoop';
 export const PUBLISH_WORKFLOWS = ['.github/workflows/ladder-build.yml'];
@@ -847,6 +848,19 @@ async function ownTrace(ctx, npm, version, depth) {
   return { ok: true, known: [...knownSet], reason: '' };
 }
 
+export function recipeDirOf(meta) {
+  return meta?.homescoop?.recipe || String(meta?.repository?.directory || '').match(/^packages\/([^/]+)(?:\/package)?\/?$/)?.[1] || null;
+}
+
+const lineOf = (v) => String(v).match(/^(\d+\.\d+)\./)?.[1] ?? null;
+
+export function sameChannel(listedMeta, listed, meta, version) {
+  const a = recipeDirOf(listedMeta);
+  const b = recipeDirOf(meta);
+  if (!a || !b || a === b) return true;
+  return lineOf(listed) !== null && lineOf(listed) === lineOf(version) && compareVersions(version, listed) > 0;
+}
+
 async function successor(ctx, npm, version, depth) {
   const key = `${npm}@${version}`;
   const packument = await ctx.registry.packument(npm);
@@ -856,8 +870,10 @@ async function successor(ctx, npm, version, depth) {
     .filter((v) => v !== version)
     .filter((v) => !Number.isFinite(at) || !Number.isFinite(Date.parse(time[v] || '')) || Date.parse(time[v]) > at)
     .sort((a, b) => (Date.parse(time[b] || '') || 0) - (Date.parse(time[a] || '') || 0));
+  const listed = packument?.versions?.[version];
   for (const v of later) {
     const meta = packument.versions[v];
+    if (!sameChannel(listed, version, meta, v)) continue;
     const prov = checkProvenance(await ctx.registry.attestations(npm, v), { npm, version: v, integrity: meta?.dist?.integrity });
     if (!prov.ok) continue;
     const r = await ownTrace(ctx, npm, v, depth);

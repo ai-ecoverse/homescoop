@@ -16,7 +16,8 @@ Semver treats `X.Y.Z-N` as a *prerelease* of `X.Y.Z`. A plain
 `1.35.0` therefore **outranks** every `1.35.0-N`, so a range like
 `^1.35.0-2` resolves to `1.35.0` (the oldest, broken build).
 
-`ladder-build.yml` still publishes with `--tag latest` so the intended
+`ladder-build.yml` still publishes with `--tag latest` (or a wave recipe's
+`npm-tag`, docs/ladder-builds.md) so the intended
 revision is the default install target when no range is given — but
 caret/tilde ranges and many lockfiles ignore `latest` and compare
 semver. Plain versions break those.

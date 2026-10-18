@@ -20,6 +20,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { driftErrors, readText } from './upstream-version-text.mjs';
+import { recipeTag } from './npm-tag.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const usage = 'usage: check-package-meta.mjs <package>\n       check-package-meta.mjs --drift (--all | <package>...)';
@@ -127,6 +128,16 @@ const about = recipe.about || {};
 const recipeLic = String(about.license || '').trim();
 const pkgLic = String(pkg.license || '').trim();
 const errors = [];
+
+try {
+  const tag = recipeTag(readFileSync(recipePath, 'utf8'));
+  const own = pkg.publishConfig?.tag;
+  if (tag !== 'latest' && own !== undefined && own !== tag) {
+    errors.push(`package.json publishConfig.tag "${own}" != recipe npm-tag "${tag}" (drop publishConfig.tag; ladder-build passes --tag)`);
+  }
+} catch (err) {
+  errors.push(`recipe ${err.message}`);
+}
 
 if (!recipeLic || recipeLic === 'SEE_UPSTREAM') {
   errors.push(`recipe about.license must be SPDX (got ${recipeLic || '(empty)'})`);

@@ -38,13 +38,13 @@ function artifact(dir, tgz, recipe = 'grep', pr = 7) {
   return sha;
 }
 
-function fakeNpm(dir, { versions, latest, published }) {
+function fakeNpm(dir, { versions, latest, published, tags = {} }) {
   const bin = join(dir, 'fake-npm');
   writeFileSync(
     bin,
     `#!/usr/bin/env bash
 case "$1" in
-  view) echo '${JSON.stringify({ versions, 'dist-tags': { latest } })}' ;;
+  view) echo '${JSON.stringify({ versions, 'dist-tags': { latest, ...tags } })}' ;;
   pack) cp "${published}" "$4/published.tgz" ;;
 esac
 `,
@@ -53,10 +53,13 @@ esac
   return bin;
 }
 
-function record(dir, npm, { parity = true } = {}) {
+function record(dir, npm, { parity = true, tag = null } = {}) {
   const out = join(dir, 'parity.json');
   const env = { ...process.env, HOMESCOOP_NPM: npm, HOMESCOOP_NPM_RETRY_S: '0' };
-  const p = spawnSync(process.execPath, [join(scripts, 'cert-review/parity-now.mjs'), '--artifacts', join(dir, 'artifacts'), '--pr', '7', '--out', out], { encoding: 'utf8', env });
+  const checkout = join(dir, 'checkout');
+  mkdirSync(join(checkout, 'packages', 'grep'), { recursive: true });
+  writeFileSync(join(checkout, 'packages', 'grep', 'recipe.yaml'), `name: grep\nversion: "3.12"\nnpm: "${NAME}"\n${tag ? `npm-tag: "${tag}"\n` : ''}`);
+  const p = spawnSync(process.execPath, [join(scripts, 'cert-review/parity-now.mjs'), '--artifacts', join(dir, 'artifacts'), '--pr', '7', '--checkout', checkout, '--out', out], { encoding: 'utf8', env });
   assert.equal(p.status, 0, p.stderr);
   const review = join(dir, 'review');
   mkdirSync(review, { recursive: true });
@@ -77,6 +80,36 @@ test('#891: a build that was new at ladder-pr time but is behind npm latest at r
   assert.match(r.lines, /^cert-ci: BEHIND @ai-ecoverse\/wasm-grep@3\.12\.0-4: npm at record time: @ai-ecoverse\/wasm-grep@3\.12\.0-4 sorts below npm latest 3\.12\.0-5/);
   assert.doesNotMatch(r.lines, /certified=/);
   assert.match(r.body, /npm moved on after ladder-pr checked it/);
+});
+
+test('npm-tag at record time: a tagged recipe is judged against its own tag, never against latest', (t) => {
+  const dir = workdir(t);
+  const built = tarball(dir, '3.12.0-4');
+  const sha = artifact(dir, built);
+  const above = { versions: ['3.12.0-3', '3.13.0-1'], latest: '3.13.0-1', published: built };
+  const first = record(dir, fakeNpm(dir, above), { tag: 'python3.15' });
+  assert.equal(first.parity.grep.tag, 'python3.15');
+  assert.equal(first.status, 0, first.lines);
+  assert.equal(first.lines, `certified=${sha} ${NAME} 3.12.0-4`);
+  const channel = record(dir, fakeNpm(dir, { ...above, tags: { 'python3.15': '3.12.0-3' } }), { tag: 'python3.15' });
+  assert.equal(channel.status, 0, channel.lines);
+  const untagged = record(dir, fakeNpm(dir, { ...above, tags: { 'python3.15': '3.12.0-3' } }));
+  assert.equal(untagged.status, 1);
+  assert.match(untagged.lines, /^cert-ci: BEHIND .*sorts below npm latest 3\.13\.0-1/);
+  const behind = record(dir, fakeNpm(dir, { ...above, tags: { 'python3.15': '3.12.0-5' } }), { tag: 'python3.15' });
+  assert.equal(behind.status, 1);
+  assert.match(behind.lines, /^cert-ci: BEHIND .*sorts below npm python3\.15 3\.12\.0-5/);
+});
+
+test('NEGATIVE: npm-tag at record time: a reserved or malformed npm-tag at the head is INCOMPLETE', (t) => {
+  const dir = workdir(t);
+  const built = tarball(dir, '3.12.0-4');
+  artifact(dir, built);
+  for (const tag of ['latest', 'next', 'certified', 'py3.15']) {
+    const r = record(dir, fakeNpm(dir, { versions: ['3.12.0-3'], latest: '3.12.0-3', published: built }), { tag });
+    assert.equal(r.status, 1, tag);
+    assert.match(r.lines, /^cert-ci: INCOMPLETE .*the npm-tag of grep at the head: npm-tag/, tag);
+  }
 });
 
 test('#891: the same version with other bytes on npm at record time is DRIFT, not certified', (t) => {
@@ -215,7 +248,7 @@ function publishStep(root) {
     .join('\n');
 }
 
-function runPublish(t, dir, { url, published, sha }) {
+function runPublish(t, dir, { url, published, sha, tag = 'latest', npmScript = null }) {
   const bin = join(dir, 'bin');
   mkdirSync(bin, { recursive: true });
   writeFileSync(
@@ -223,7 +256,7 @@ function runPublish(t, dir, { url, published, sha }) {
     `#!/usr/bin/env bash
 case "$1" in
   -v) echo 11.0.0 ;;
-  publish) echo "npm error 403 You cannot publish over the previously published versions: 3.12.0-6." >&2; exit 1 ;;
+  publish) ${npmScript ?? 'echo "npm error 403 You cannot publish over the previously published versions: 3.12.0-6." >&2; exit 1'} ;;
   pack) cp "${published}" "$4/published.tgz" ;;
 esac
 `,
@@ -234,6 +267,7 @@ esac
   const script = publishStep(join(scripts, '..'))
     .replaceAll('${{ runner.temp }}', temp)
     .replaceAll('${{ needs.resolve.outputs.npm }}', NAME)
+    .replaceAll('${{ needs.resolve.outputs.npm_tag }}', tag)
     .replaceAll('${{ inputs.certified }}', sha);
   return new Promise((ok) => {
     const p = spawn('bash', ['-c', script], {
@@ -283,4 +317,68 @@ test('#971 in ladder-build: a lost publish race ("cannot publish over") succeeds
   const won = await runPublish(t, same, { url, published: tgz, sha });
   assert.equal(won.status, 0, won.out);
   assert.match(won.out, /same contents — skip publish/);
+});
+
+async function channelRegistry(t, routes) {
+  const server = createServer((req, res) => {
+    const r = routes[decodeURIComponent(req.url)];
+    res.writeHead(r ? 200 : 404).end(JSON.stringify(r ?? {}));
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  t.after(() => server.close());
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+async function dryPublish(t, dir, { routes, tag, version = '3.15.0-1' }) {
+  const tgz = tarball(dir, version);
+  const sha = createHash('sha256').update(readFileSync(tgz)).digest('hex');
+  const d = mkdtempSync(join(dir, 'dry-'));
+  mkdirSync(join(d, 'runner-temp'), { recursive: true });
+  writeFileSync(join(d, 'runner-temp', 'package.tgz'), readFileSync(tgz));
+  const log = join(d, 'publish.log');
+  const url = await channelRegistry(t, routes);
+  const r = await runPublish(t, d, { url, published: tgz, sha, tag, npmScript: `shift; printf '%s\\n' "$@" > "${log}"; exit 0` });
+  let argv = null;
+  try {
+    argv = readFileSync(log, 'utf8').trim().split('\n');
+  } catch {}
+  return { ...r, argv, tgz: join(d, 'runner-temp', 'package.tgz') };
+}
+
+test('dry run of ladder-build publish: a tagged recipe publishes with --tag python3.15 and never --tag latest', async (t) => {
+  const dir = workdir(t);
+  const r = await dryPublish(t, dir, { tag: 'python3.15', routes: { [`/${NAME}/latest`]: { version: '3.14.2-28' } } });
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(r.argv, [r.tgz, '--access', 'public', '--tag', 'python3.15']);
+  assert.match(r.out, /certified-publish: PASS @ai-ecoverse\/wasm-grep@3\.15\.0-1 --tag python3\.15/);
+  const next = await dryPublish(t, dir, { tag: 'python3.15', version: '3.15.0-2', routes: { [`/${NAME}/latest`]: { version: '3.14.2-28' }, [`/${NAME}/python3.15`]: { version: '3.15.0-1' } } });
+  assert.equal(next.status, 0, next.out);
+  assert.deepEqual(next.argv, [next.tgz, '--access', 'public', '--tag', 'python3.15']);
+});
+
+test('dry run of ladder-build publish: an untagged recipe still publishes with --tag latest, judged against latest only', async (t) => {
+  const dir = workdir(t);
+  const r = await dryPublish(t, dir, { tag: 'latest', version: '3.14.2-29', routes: { [`/${NAME}/latest`]: { version: '3.14.2-28' }, [`/${NAME}/python3.15`]: { version: '3.15.0-1' } } });
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(r.argv, [r.tgz, '--access', 'public', '--tag', 'latest']);
+});
+
+test('NEGATIVE: dry run of ladder-build publish refuses before npm publish: behind its tag, no latest yet, a reserved or empty tag', async (t) => {
+  const dir = workdir(t);
+  const behind = await dryPublish(t, dir, { tag: 'python3.15', version: '3.15.0-1', routes: { [`/${NAME}/latest`]: { version: '3.14.2-28' }, [`/${NAME}/python3.15`]: { version: '3.15.0-2' } } });
+  assert.notEqual(behind.status, 0);
+  assert.equal(behind.argv, null);
+  assert.match(behind.out, /sorts below npm python3\.15 3\.15\.0-2, and --tag python3\.15 would move python3\.15 back/);
+  const first = await dryPublish(t, dir, { tag: 'python3.15', routes: {} });
+  assert.notEqual(first.status, 0);
+  assert.equal(first.argv, null);
+  assert.match(first.out, /npm has no latest .* becomes latest whatever its tag/);
+  for (const tag of ['next', 'certified', '', 'py3']) {
+    const bad = await dryPublish(t, dir, { tag, routes: { [`/${NAME}/latest`]: { version: '3.14.2-28' } } });
+    assert.notEqual(bad.status, 0, tag);
+    assert.equal(bad.argv, null, tag);
+  }
+  const untaggedBehind = await dryPublish(t, dir, { tag: 'latest', version: '3.14.2-27', routes: { [`/${NAME}/latest`]: { version: '3.14.2-28' } } });
+  assert.notEqual(untaggedBehind.status, 0);
+  assert.equal(untaggedBehind.argv, null);
 });
