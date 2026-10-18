@@ -2,6 +2,10 @@
 
 CPython 3.14 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.14.2-28
+
+**Needs slicc-kernel ≥ 1.120.0** (`engines`; it was ≥ 1.100.0). Since -26, `os.mkfifo` exists (wasix-sysroot -34's libc) and `fcntl.flock` is real, but on older kernels they answer ENOSYS or fall back to a whole-file lock (homescoop#1018).
+
 ## Features
 
 - PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-34's `sysroot-ehpic` (legacy wasm EH), SOABI `cpython-314-wasm32-wasix`; native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
@@ -46,8 +50,8 @@ Since 3.14.2-25 (wasix-sysroot -32):
   `SIG_IGN` from `signal.getsignal` on slicc-kernel ≥ 1.108.0 (homescoop#740).
 - **Kernel conditions.** -24's lift of the 256-named-semaphore limit holds
   only on slicc-kernel ≥ 1.102.2 (#770/#773). On 1.100.x a process still
-  stops at about 250 (homescoop#698). The `engines` floor (≥ 1.100.0) is
-  enforced from slicc-kernel 1.106.2 on (slicc-kernel#797/#806): those kernels
+  stops at about 250 (homescoop#698). The `engines` floor (≥ 1.120.0 since
+  3.14.2-28, ≥ 1.100.0 before) is enforced from slicc-kernel 1.106.2 on (slicc-kernel#797/#806): those kernels
   refuse the commands on an older kernel. Kernels before 1.106.2 install the
   package without a warning, and there `fcntl` locks aren't real below
   1.100.0 (homescoop#651).
