@@ -26,3 +26,7 @@ The 2.3.2-10 tree has one python and passes both specs.
 `cert/numpy.mjs` asserts exact results (not just that the import works), and
 `cert/import.mjs` asserts where numpy was imported from and that no
 nested python sits under the package.
+
+## 2.3.2-12: LinAlgError for a failed factorisation (homescoop#1082; 2026-10-18)
+
+`cert/linalg-errors.mjs` against the published 2.3.2-11 on slicc-kernel 1.120.2 (Node entry, wasix-python 3.14.2-27): FAIL. Every case returns a result instead of raising: `{"solve_singular":["ok",true],"inv_singular":["ok",true],"inv_singular_f32":["ok",true],"inv_singular_c128":["ok",true],"cholesky_nonpd":["ok",true],"inv_batch_one_singular":["ok",true], …}`. `true` means the result holds NaN, so a singular system silently gives a wrong answer. Linux raises `LinAlgError`. The control rows (`solve_good` [2, 3]) pass on both.
