@@ -388,6 +388,9 @@ printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words
 # CPython 3.15's configure no longer has a default HOSTRUNNER for WASI (3.14
 # picked this wasmtime line). Only `make pythoninfo`/the tests use it, so
 # 3.14's value stays, and sysconfig keeps recording the same HOSTRUNNER.
+# CXX: 3.15's configure records the host clang++ by absolute path (3.14 kept
+# the bare name, which sanitize-sysconfig.py rewrote to wasix++), so it's
+# set: sysconfig's CXX/LDCXXSHARED are wasix++ as before.
 WASI_HOSTRUNNER='wasmtime run --wasm max-wasm-stack=16777216 --wasi preview2=n --env PYTHONPATH=/$(shell realpath --relative-to $(abs_srcdir) $(abs_builddir))/$(shell cat pybuilddir.txt):/Lib --dir $(srcdir)::/'
 configure_python() {
   local dir=$1 site=$2 prefix=$3
@@ -399,7 +402,7 @@ configure_python() {
       --prefix="$prefix" --with-build-python="$HOSTPY" \
       --disable-shared --with-ensurepip=no --disable-test-modules \
       --enable-wasm-pthreads --with-pkg-config=yes --with-system-ffi --with-system-libmpdec=no \
-      CC=wasixcc AR=wasixar RANLIB=wasixranlib \
+      CC=wasixcc CXX=wasix++ AR=wasixar RANLIB=wasixranlib \
       CFLAGS="$PY_CFLAGS" LDFLAGS="$PY_LDFLAGS" \
       LIBS="$STUBS/libpython-wasix-stubs.a$WRAP" \
       >"$dir/configure.log" 2>&1
