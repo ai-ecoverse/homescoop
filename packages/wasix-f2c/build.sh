@@ -42,15 +42,19 @@ for p in "$HOMESCOOP_PKG"/patches/libf2c/000*.patch; do
 done
 cp "$HOMESCOOP_PKG/patches/libf2c/make.inc" "$CLAPACK/make.inc"
 LIBF2C="$CLAPACK/F2CLIBS/libf2c"
-# arith.h describes the target's arithmetic. arith-wasm32.h is what
-# arithchk.c prints on wasm32 (IEEE little-endian, 32-bit long and
-# pointers). The host's arithchk must agree on everything but its LP64
-# lines (Long, Intcast, X64_bit_pointers), which libf2c doesn't depend on.
+# arith.h describes the target's arithmetic, so it can't come from the
+# host: arith-wasm32.h is what arithchk.c prints on wasm32 (emscripten,
+# node: IEEE little-endian, 32-bit long and pointers, the canonical quiet
+# NaN 0x7ff80000). An x86_64 host prints its own LP64 lines (Long,
+# Intcast, X64_bit_pointers) and its own NaN (no NANCHECK, QNaN1
+# 0xfff80000); everything else (IEEE_8087, Arith_Kind_ASL, Double_Align)
+# must agree.
 HOSTCC="$(command -v cc)"
 "$HOSTCC" -DNO_FPINIT -O0 -o "$B/arithchk" "$LIBF2C/arithchk.c" -lm
 "$B/arithchk" >"$B/arith-host.h"
-if ! diff <(grep -vE '^#define (Long|Intcast|X64_bit_pointers)( |$)' "$B/arith-host.h") "$HOMESCOOP_PKG/arith-wasm32.h" >&2; then
-  echo "homescoop wasix-f2c: the host's arithchk disagrees with arith-wasm32.h beyond its LP64 lines" >&2
+HOSTONLY='^#define (Long|Intcast|X64_bit_pointers|NANCHECK|QNaN0|QNaN1)( |$)'
+if ! diff <(grep -vE "$HOSTONLY" "$B/arith-host.h") <(grep -vE "$HOSTONLY" "$HOMESCOOP_PKG/arith-wasm32.h") >&2; then
+  echo "homescoop wasix-f2c: the host's arithchk disagrees with arith-wasm32.h beyond its LP64 and NaN lines" >&2
   exit 1
 fi
 cp "$HOMESCOOP_PKG/arith-wasm32.h" "$LIBF2C/arith.h"
