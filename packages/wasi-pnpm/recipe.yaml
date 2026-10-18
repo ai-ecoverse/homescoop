@@ -43,3 +43,8 @@ about:
     finds the work tree, CARGO_HOME or a home or temp path in pnpm.wasm.
     12.9.1-9 is built from source again (12.9.1-8 was a packaging-only
     repack of -7, pinned to the runner's /home/runner/work/_temp path).
+    12.9.1-10 links with CARGO_PROFILE_RELEASE_STRIP=debuginfo, and 0003
+    keeps that linked module. names.py moves its Rust function names,
+    renumbered past build.mjs's two pnpm_atomic imports, into
+    bin/pnpm.wasm.names. It also drops the generated-only name section, so
+    SLICC names a trap's frames under SLICC_WASM_BACKTRACE=1.

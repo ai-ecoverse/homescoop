@@ -28,3 +28,10 @@ That build also showed that build.sh's old parker check, `strings … | grep -q 
 ## Empty wasm (spec not vacuous)
 
 `prove-negative.mjs --package wasi-pnpm` fails at the first `pnpm --version`.
+
+## 12.9.1-10: function names for a trap (2026-10-18)
+
+The published 12.9.1-9 against 12.9.1-10's `install.mjs` (slicc-kernel 1.94.0, users enforce, `--soft`): **FAIL, 10 of 52 assertions.** There is no `bin/pnpm.wasm.names`, and pnpm.wasm has a `name` section of generated names only (`f4998` for function 5000: build.mjs's wasm2wat `--generate-names --no-debug-names` / wat2wasm `--debug-names` round trip). Under `SLICC_WASM_BACKTRACE=1`, SLICC then names no frame: the kernel reads a sidecar only for a module without a name section. That is why bios's `pnpm: wasm trap in thread 4: memory access out of bounds` named nothing.
+
+A local 12.9.1-10-style build (same tree; macOS, so not byte-identical to CI's) passes. names.py found 32445 function names, plus the 2 imports, and checked that the exports `_start`, `malloc`, `free`, `wasi_thread_start` and `__wasm_init_tls` carry their own names at their instrumented indices.
+

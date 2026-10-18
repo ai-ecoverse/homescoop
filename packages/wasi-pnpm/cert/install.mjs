@@ -125,4 +125,64 @@ export default async function (ctx) {
   for (const path of ['/home/runner', '/tmp/homescoop-work', 'homescoop-work/pnpm-']) {
     assert.ok(!wasm.includes(path), `pnpm.wasm contains a build path (${JSON.stringify(path)})`);
   }
+
+  // 12.9.1-10: pnpm.wasm has no name section, and bin/pnpm.wasm.names names
+  // every function at pnpm.wasm's index (the exports check the shift), so
+  // SLICC names a trap's frames under SLICC_WASM_BACKTRACE=1.
+  const bytes = await ctx.readBytes('/node_modules/@ai-ecoverse/wasi-pnpm/bin/pnpm.wasm');
+  const names = (await ctx.readBytes('/node_modules/@ai-ecoverse/wasi-pnpm/bin/pnpm.wasm.names')) ?? Buffer.alloc(0);
+  assert.ok(names.length > 1_000_000, 'bin/pnpm.wasm.names is installed (12.9.1-9: none)');
+  const mod = new WebAssembly.Module(bytes);
+  assert.equal(WebAssembly.Module.customSections(mod, 'name').length, 0, 'pnpm.wasm has no name section of its own (12.9.1-9: generated names only)');
+  const leb = (b, at) => { let v = 0, s = 0, x; do { x = b[at++]; v += (x & 127) * 2 ** s; s += 7; } while (x & 128); return [v, at]; };
+  const fnames = new Map();
+  for (let at = 0; at < names.length;) {
+    const id = names[at];
+    const [size, body] = leb(names, at + 1);
+    if (id === 1) {
+      let [count, p] = leb(names, body);
+      for (; count > 0; count--) {
+        let index, n;
+        [index, p] = leb(names, p);
+        [n, p] = leb(names, p);
+        fnames.set(index, names.toString('utf8', p, p + n));
+        p += n;
+      }
+    }
+    at = body + size;
+  }
+  const imported = WebAssembly.Module.imports(mod).filter((i) => i.kind === 'function').length;
+  let defined = 0;
+  for (let at = 8; at < bytes.length;) {
+    const [size, body] = leb(bytes, at + 1);
+    if (bytes[at] === 3) [defined] = leb(bytes, body);
+    at = body + size;
+  }
+  assert.equal(fnames.size, imported + defined, `pnpm.wasm.names names every function once (${fnames.size} names, ${imported} + ${defined} functions)`);
+  assert.equal(fnames.size ? Math.max(...fnames.keys()) : -1, imported + defined - 1, 'the highest named index is the last function');
+  assert.equal(fnames.get(0), 'pnpm_atomic.wait32', "index 0 is build.mjs's pnpm_atomic.wait32 import");
+  assert.ok([...fnames.values()].filter((n) => /tokio/.test(n)).length > 1000, 'the Rust symbols (tokio) are there');
+  const exportIndex = (field) => {
+    // export section: name, kind 0 (function), index
+    for (let at = 8; at < bytes.length;) {
+      const [size, body] = leb(bytes, at + 1);
+      if (bytes[at] === 7) {
+        let [count, p] = leb(bytes, body);
+        for (; count > 0; count--) {
+          let n, index;
+          [n, p] = leb(bytes, p);
+          const f = bytes.toString('utf8', p, p + n);
+          p += n;
+          const kind = bytes[p++];
+          [index, p] = leb(bytes, p);
+          if (kind === 0 && f === field) return index;
+        }
+      }
+      at = body + size;
+    }
+    return undefined;
+  };
+  for (const f of ['_start', 'malloc', 'free', 'wasi_thread_start']) {
+    assert.equal(fnames.get(exportIndex(f)), f, `the export ${f} carries its own name in pnpm.wasm.names`);
+  }
 }

@@ -1,0 +1,24 @@
+pnpm/wasm/build.mjs: keep the module cargo linked (homescoop wasi-pnpm-names)
+
+With PNPM_WASM_LINKED set, copy target/.../pnpm.wasm there before
+instrumentAtomicWaits rewrites it. build.sh links with
+CARGO_PROFILE_RELEASE_STRIP=debuginfo, and names.py takes that copy's `name`
+section (the Rust symbols), which the wasm2wat / wat2wasm round trip
+replaces with generated names.
+
+--- a/pnpm/wasm/build.mjs
++++ b/pnpm/wasm/build.mjs
+@@ -1,5 +1,5 @@
+ import { spawnSync } from 'node:child_process'
+-import { readFileSync, writeFileSync } from 'node:fs'
++import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
+ import { join } from 'node:path'
+ import { fileURLToPath } from 'node:url'
+ 
+@@ -48,5 +48,6 @@
+ 
+ if (result.status === 0 && command === 'build') {
+   const artifact = join(root, 'target', 'wasm32-wasip1-threads', 'release', 'pnpm.wasm')
++  if (process.env.PNPM_WASM_LINKED) copyFileSync(artifact, process.env.PNPM_WASM_LINKED)
+   writeFileSync(artifact, await instrumentAtomicWaits(readFileSync(artifact)))
+ }
