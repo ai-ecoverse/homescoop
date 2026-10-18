@@ -524,8 +524,34 @@ top_dir() {
   esac | awk -F/ 'NR == 1 { print $1 }'
 }
 CPY_LICENSES="$NOTICES/cpython-incorporated.rst"
-tar xzOf "$PY_TGZ" "Python-$VER/Doc/license.rst" | sed -n '/^Licenses and Acknowledgements for Incorporated Software$/,$p' >"$CPY_LICENSES"
+tar xzOf "$PY_TGZ" "Python-$VER/Doc/license.rst" | sed -n '/^Licenses and Acknowledgements for Incorporated Software$/,$p' >"$CPY_LICENSES.src"
+# 3.15's license.rst pulls expat's notice in with `.. literalinclude::
+# ../Modules/expat/COPYING` instead of inlining it (homescoop#1146): every
+# include is resolved from the same tarball, and none may be left.
+python3 - "$PY_TGZ" "Python-$VER" "$CPY_LICENSES.src" >"$CPY_LICENSES" <<'PY'
+import re, sys, tarfile
+tgz, top, src = sys.argv[1:4]
+lines = open(src, encoding="utf-8").read().split("\n")
+out, i = [], 0
+with tarfile.open(tgz) as t:
+    while i < len(lines):
+        m = re.match(r"^\.\. literalinclude:: \.\./(\S+)$", lines[i])
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        i += 1
+        while i < len(lines) and re.match(r"^\s+:[\w-]+:", lines[i]):
+            i += 1
+        out.append(t.extractfile(f"{top}/{m[1]}").read().decode("utf-8").rstrip("\n"))
+text = "\n".join(out)
+if re.search(r"^\s*\.\. (literalinclude|include)::", text, re.M):
+    sys.exit("homescoop wasix-python: Doc/license.rst still has an include directive")
+sys.stdout.write(text)
+PY
+rm -f "$CPY_LICENSES.src"
 test -s "$CPY_LICENSES"
+grep -q 'Clark Cooper' "$CPY_LICENSES" || { echo "homescoop wasix-python: no expat notice in the CPython licences" >&2; exit 1; }
 CPY_HACL="$NOTICES/cpython-hacl.txt"
 tar xzOf "$PY_TGZ" "Python-$VER/Modules/_hacl/Hacl_Hash_SHA2.c" | sed -n '1,/\*\//p' >"$CPY_HACL"
 grep -q 'MIT License' "$CPY_HACL"
