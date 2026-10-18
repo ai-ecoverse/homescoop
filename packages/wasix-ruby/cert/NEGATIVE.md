@@ -36,3 +36,10 @@ What it still can't exclude: `flock` on something that isn't a regular file (a p
 ## 3.4.11-18: libc flock (wasix-sysroot -34; 2026-10-17)
 
 The new pipe row of `cert/flock.mjs` against the published 3.4.11-17 on slicc-kernel 1.120.2 (Node entry): FAIL, `0 0 0`. -17's whole-file fcntl emulation (`patches/flock-wasi-fcntl.patch`) grants every lock on something that isn't a regular file, so a pipe's read end gets `LOCK_EX|LOCK_NB` while its write end holds `LOCK_EX`. -18 (libc's flock, per open file description) gives `0 false 0`, as Linux does. That fixes the non-regular-files gap noted above (#578, #854).
+
+## 3.4.11-20: inputs by version (homescoop#637, #1045, #989; 2026-10-18)
+
+- **#637, `package-meta.mjs`:** the published 3.4.11-19 on slicc-kernel 1.120.2 under users enforce fails 2 of 6 assertions. `homescoop.openssl` is `linked against /home/runner/work/homescoop/homescoop/packages/wasix-ruby/work/deps/wasix-openssl/package (OpenSSL 3.x; …`, and it's the one package.json string holding a build path. The same tarball with only that string set to what 3.4.11-20's build.sh writes (`@ai-ecoverse/wasix-openssl 3.5.9-4 (OpenSSL 3.5.9; …`) passes: it agrees with the notices' `## OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-4)`, and `OPENSSL_LIBRARY_VERSION` is `OpenSSL 3.5.9`.
+- **#1045:** the checklist's zlib and openssl rows name `wasix-zlib 1.3.1` / `wasix-openssl 3.5.9` without a build number. `package-meta.mjs` checks the build against the notices.
+- **#989:** fixed by 3.4.11-18. It raised `engines.slicc-kernel` to `>=1.120.0` and the cert kernel to 1.120.2, which has `slicc.flock`, and updated `sysroot28.mjs` to -34. `flock.mjs` passes on 3.4.11-18 and -19. What was left: `cert/meta.json` still had a `patches/flock-wasi-fcntl.patch` entry for a file that's gone, and `recipe.yaml`'s comment still described it. Both are removed.
+
