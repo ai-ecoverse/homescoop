@@ -7,6 +7,9 @@
  * checked here) with --no-index --find-links.
  */
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+
+const PYV = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8')).slicc.python.version;
 
 const WHEELS = [
   ['requests-2.34.2-py3-none-any.whl', '2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0',
@@ -58,8 +61,8 @@ export default async function (ctx) {
   const pip = await ok('v/bin/pip install requests', '/home');
   assert.match(pip.stdout, /Successfully installed .*requests/);
   const where = await ok("v/bin/python -c 'import requests; print(requests.__file__)'", '/home');
-  assert.equal(where.stdout, '/home/v/lib/python3.14/site-packages/requests/__init__.py\n');
-  const user = await sh('ls /home/.local/lib/python3.14/site-packages/requests');
+  assert.equal(where.stdout, `/home/v/lib/python${PYV}/site-packages/requests/__init__.py\n`);
+  const user = await sh(`ls /home/.local/lib/python${PYV}/site-packages/requests`);
   assert.notEqual(user.status, 0, 'requests went to the user site');
   const base = await sh("python -c 'import requests'");
   assert.notEqual(base.status, 0, 'requests leaked into the base interpreter');
@@ -77,14 +80,14 @@ export default async function (ctx) {
   // A sitecustomize of the user's own still runs after ours, once, and is
   // what `import sitecustomize` returns.
   await ok(
-    "printf 'import builtins\\nbuiltins.HS_SITE = getattr(builtins, \"HS_SITE\", 0) + 1\\n' > v/lib/python3.14/site-packages/sitecustomize.py",
+    "printf 'import builtins\\nbuiltins.HS_SITE = getattr(builtins, \"HS_SITE\", 0) + 1\\n' > v/lib/python" + PYV + "/site-packages/sitecustomize.py",
     '/home',
   );
   const chained = await ok(
     "v/bin/python -c 'import sitecustomize; print(HS_SITE, sitecustomize.__file__)'",
     '/home',
   );
-  assert.equal(chained.stdout, '1 /home/v/lib/python3.14/site-packages/sitecustomize.py\n');
+  assert.equal(chained.stdout, `1 /home/v/lib/python${PYV}/site-packages/sitecustomize.py\n`);
 
   // A sitecustomize on PYTHONPATH shadows the stdlib one, but the base
   // site-packages .pth hook still sets sys.executable (#157 c).

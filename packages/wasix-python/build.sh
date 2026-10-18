@@ -323,7 +323,7 @@ if [[ ! -f "$DEPS/lib/libffi.a" ]]; then
     cd "$B/libffi"
     # wasix host so src/wasm32/ffi.c takes the non-Emscripten wasix_* path.
     "$B/libffi-src/configure" --host=wasm32-unknown-wasix \
-      --build="$("$B/libffi-src/config.guess")" \
+      --build="$(sh "$B/libffi-src/config.guess")" \
       --prefix="$DEPS" --disable-shared --enable-static \
       --disable-docs --disable-multi-os-directory \
       CC=wasixcc CFLAGS="$DEP_CFLAGS" >"$B/libffi-configure.log" 2>&1
@@ -385,12 +385,16 @@ printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words
   ac_cv_func_fork=no ac_cv_func_vfork=no \
   ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no \
   ac_cv_working_tzset=yes >"$B/config.site"
+# CPython 3.15's configure no longer has a default HOSTRUNNER for WASI (3.14
+# picked this wasmtime line). Only `make pythoninfo`/the tests use it, so
+# 3.14's value stays, and sysconfig keeps recording the same HOSTRUNNER.
+WASI_HOSTRUNNER='wasmtime run --wasm max-wasm-stack=16777216 --wasi preview2=n --env PYTHONPATH=/$(shell realpath --relative-to $(abs_srcdir) $(abs_builddir))/$(shell cat pybuilddir.txt):/Lib --dir $(srcdir)::/'
 configure_python() {
   local dir=$1 site=$2 prefix=$3
   rm -rf "$dir" && mkdir -p "$dir"
   (
     cd "$dir"
-    CONFIG_SITE="$site" ../../configure \
+    CONFIG_SITE="$site" HOSTRUNNER="$WASI_HOSTRUNNER" ../../configure \
       --host=wasm32-unknown-wasix --build="$(sh ../../config.guess)" \
       --prefix="$prefix" --with-build-python="$HOSTPY" \
       --disable-shared --with-ensurepip=no --disable-test-modules \

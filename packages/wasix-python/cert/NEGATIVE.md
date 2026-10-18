@@ -194,3 +194,9 @@ So the advice of -23's shared-ctypes `NotImplementedError` ("use … a Manager")
 ## 3.14.2-28: engines floor 1.120.0 for os.mkfifo (homescoop#1018; 2026-10-18)
 
 `cert/mkfifo.mjs` with the published 3.14.2-27 on slicc-kernel 1.108.4, -27's cert kernel, inside its `engines` range `>=1.100.0`: FAIL. `os.mkfifo` exists, since -26 links wasix-sysroot -34's mkfifo, but it raises OSError ENOSYS ("Function not implemented"). The kernel has no `slicc_fs.path_mkfifo` before 1.120.0. -28 declares `>=1.120.0`, and on its cert kernel 1.120.2 the spec passes.
+
+## 3.15.0-1: CPython 3.15.0, SOABI cpython-315 (homescoop#761; 2026-10-18)
+
+`cert/version.mjs` with the published 3.14.2-28 (npm `latest`): FAIL at its first assertion. `platform.python_version()` is `3.14.2`, not the `3.15.0` of 3.15.0-1's `homescoop.upstream`. -28's tarball says the same statically: `homescoop.upstream` 3.14.2, `slicc.python` `{"version": "3.14", "abi": "cp314", "soabi": "cpython-314-wasm32-wasix", "stdlib": "lib/python3.14"}`, and its `_sysconfigdata__wasi_wasm32-wasix.py` has SOABI `cpython-314-wasm32-wasix` and EXT_SUFFIX `.cpython-314-wasm32-wasix.so`. So every row after it differs too: cache tag `cpython-314`, `lib/python3.14`, and the ABI-gate stand-ins swap (on -28 the cp314 stand-in is the one that's found).
+
+What 3.15.0-1 changes for the py-\*, and what `sidemods.mjs`, `discovery.mjs`, `native-id.mjs` and `fork.mjs` assert since (cert/fixtures/abi.mjs): every published py-\* with extension modules (py-numpy, py-pandas, py-scipy, py-matplotlib, py-contourpy, py-kiwisolver, py-pillow) requires `cp314`, so on 3.15.0-1 discovery leaves it off `sys.path`, `python -v` prints `slicc discover: skip @ai-ecoverse/py-numpy 2.3.2-10: requires {'abi': 'cp314', 'platform': 'wasix_wasm32'}, this python is cp315/wasix_wasm32`, and `import numpy` is `ModuleNotFoundError` (rc 1, no trap). With -28 the same specs import and run all of them.

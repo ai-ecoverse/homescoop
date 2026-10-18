@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+
+const PYV = JSON.parse(readFileSync(new URL('../package/package.json', import.meta.url), 'utf8')).slicc.python.version;
 const WHEEL = String.raw`
 import base64, hashlib, sys, zipfile
 name, ver = "hs_user", "1.0"
@@ -51,11 +54,11 @@ export default async function (ctx) {
   assert.ok(Number(tu) >= 0.4 && Number(tu) < 5 && Number(ru) >= 0.4 && Number(ru) < 5, `os.times / getrusage CPU: ${cpu}`);
   assert.deepEqual(rest, ['0.0', '0.0', '0.0'], `system and children's times: ${cpu}`);
 
-  const site = '/usr/local/lib/python3.14/site-packages';
+  const site = `/usr/local/lib/python${PYV}/site-packages`;
   await as('root', ['mkdir', '-p', `${site}/hs_sys`]);
   await write(`${site}/hs_sys/__init__.py`, 'VALUE = "system"\n');
   await write(`${site}/hs-sys.pth`, 'import sys; sys.hs_sys_pth = True\n');
-  const sys1 = await py('cone', 'import sys, hs_sys; print(hs_sys.VALUE, getattr(sys, "hs_sys_pth", False), sys.path.index("/usr/local/lib/python3.14/site-packages") > max(i for i, p in enumerate(sys.path) if p.endswith("/lib/python3.14/site-packages") and not p.startswith("/usr/local")))');
+  const sys1 = await py('cone', `import sys, hs_sys; print(hs_sys.VALUE, getattr(sys, "hs_sys_pth", False), sys.path.index("${site}") > max(i for i, p in enumerate(sys.path) if p.endswith("/lib/python${PYV}/site-packages") and not p.startswith("/usr/local")))`);
   assert.equal(sys1, 'system True True', `cone sees the system site dir and its .pth, after python's own site-packages: ${sys1}`);
   await as('cone', ['python3', '-m', 'venv', 'iso']);
   await as('cone', ['python3', '-m', 'venv', '--without-pip', '--system-site-packages', 'withsys']);
