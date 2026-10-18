@@ -37,14 +37,8 @@ const NO_USERS_ENFORCE = [
   'gawk', // #819
   'git', // #819
   'grep', // #819
-  'gzip', // #819
   'imagemagick', // #819
   'imagemagick-heif', // #819
-  'jq', // #819
-  'less', // #819
-  'mount', // #819
-  'nano', // #819
-  'ncurses-utils', // #819
   'patch', // #819
   'poppler', // #819
   'procps', // #819
