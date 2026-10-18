@@ -35,5 +35,8 @@ about:
     sha256 d7dc23f5254c6711dc05f467e70236cfd50a7931001c6152904474b19f295c38):
     the security fixes (#582) and the two that 32 needs to apply (05, 17);
     not the branding, man page, zipgrep, build-date or build-only ones.
-    Then ours: escape-bound (unzip -U), unipath-short (#582) and
-    unipath-utf8 (#570). cert/meta.json maps each to its spec.
+    Then ours: escape-bound (unzip -U), mapname-keep-ff (#602),
+    unipath-short (#582) and unipath-utf8 (#570). slicc-strict-paths.js
+    (--js-library) makes every path syscall refuse a name that isn't UTF-8
+    with EILSEQ instead of the glue's lossy decode (#602). cert/meta.json
+    maps each to its spec.

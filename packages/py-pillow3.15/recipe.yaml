@@ -1,0 +1,43 @@
+name: py-pillow3.15
+builder: host
+reproducible: true
+# renovate: datasource=pypi depName=pillow
+version: "13.0.0"
+npm: "@ai-ecoverse/py-pillow"
+npm-tag: "python3.15"
+summary: "Pillow for slicc WASIX CPython 3.15"
+source:
+  url: "https://files.pythonhosted.org/packages/source/p/pillow/pillow-{{version}}.tar.gz"
+  sha256: "cdcd1ba258178f7356d74170c9a81ba4eab6a5d55748bc402a5a2a6fe6be3510"
+sources:
+  libjpeg_turbo:
+    url: "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.2/libjpeg-turbo-3.1.2.tar.gz"
+    sha256: "8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf"
+  freetype:
+    url: "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.gz"
+    sha256: "5c3a8e78f7b24c20b25b54ee575d6daa40007a5f4eea2845861c3409b3021747"
+  wasix_zlib:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-zlib/-/wasix-zlib-1.3.1-3.tgz"
+    sha256: "f55d56c0837722e5d1e309f4344f723c95c7f68cd3ddb3089d6b4c025aaf14c7"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python]
+about:
+  license: MIT-CMU
+  notes: |
+    Cross-built from the sdist in CI (the cp315 line, homescoop#761) with wasixcc (PIC,
+    legacy wasm EH, the variant python.wasm is) as dylink.0 side modules
+    against wasix-python 3.15.0-1's headers (wasix-sysroot -38): _imaging (libjpeg-turbo 3.1.2
+    static, zlib from python.wasm), _imagingft (FreeType 2.13.3 static),
+    _imagingmath, _imagingmorph. No _imagingtk (no Tk on WASIX; it trapped on
+    import), _imagingcms, _webp or _avif. pillow-wasm-call-signatures.patch
+    gives the Arrow export methods CPython's second parameter (#588).

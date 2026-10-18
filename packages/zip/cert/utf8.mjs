@@ -40,8 +40,10 @@ export default async function utf8(ctx) {
 
   // unzip -U escapes every non-ASCII Unicode name (#U/#L), through the
   // conversion code that CVE-2022-0529/0530 are in (homescoop#583). A CP437
-  // name with a Unicode Path field that isn't UTF-8 keeps its stored name;
-  // on 3.0.0-2 both commands trapped (memory access out of bounds, rc 70).
+  // name with a Unicode Path field that isn't UTF-8 keeps its stored name,
+  // which isn't UTF-8 either, so from 3.0.0-7 that entry is refused (rc 50,
+  // "Illegal byte sequence") instead of being written under a mangled name
+  // (homescoop#602); on 3.0.0-2 both commands trapped (rc 70).
   const cpBad = Buffer.from([0x6e, 0x61, 0x8b, 0x76, 0x65, 0x2e, 0x74, 0x78, 0x74]);
   const esc = storedZip([
     { name: cpBad, data: u8('c\n'), extra: unicodePathExtra(cpBad, Buffer.from([0xff, 0xc0, 0x80, 0xed, 0xa0, 0x80, 0x2e])) },
@@ -55,12 +57,13 @@ export default async function utf8(ctx) {
   assert.match(ul.stdout, /\s#L01f600\.txt\n/, 'unzip -U -l escapes 😀.txt');
   assert.match(ul.stdout, /\s3 files\n/);
   const ud = await ctx.run(['unzip', '-U', '-d', 'esc', 'esc.zip'], { cwd, user: USER });
-  assert.equal(ud.status, 0, `unzip -U -d: rc ${ud.status}\n${ud.stdout}${ud.stderr}`);
+  assert.equal(ud.status, 50, `unzip -U -d: rc ${ud.status}\n${ud.stdout}${ud.stderr}`);
   assert.doesNotMatch(ud.stdout + ud.stderr, /RuntimeError/);
+  assert.match(ud.stdout + ud.stderr, /cannot create esc\/na[^\n]*ve\.txt\n\s*Illegal byte sequence/, 'the CP437 entry is refused by name');
   assert.equal((await ctx.run(['cat', 'esc/#L01f600.txt'], { cwd, user: USER })).stdout, 'e\n');
   assert.equal((await ctx.run(['cat', 'esc/café.txt'], { cwd, user: USER })).stdout, 'y\n');
-  const cp = await sh(ctx, 'cat esc/na*txt', cwd);
-  assert.equal(cp.stdout, 'c\n', 'the CP437 entry is extracted under its stored name');
+  const cp = await ctx.run(['ls', '-1A', 'esc'], { cwd, user: USER });
+  assert.equal(cp.stdout, '#L01f600.txt\ncafé.txt\n', 'nothing is written under a mangled name');
 
   // A bit-11 name of 5- and 6-byte sequences (legacy UTF-8, which unzip
   // still decodes): each is a 31-bit value, a 10-byte "#L7fffffff" under -U.

@@ -1,5 +1,6 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "checklist": [
     "jq -n arithmetic",
     "stdin filter",
