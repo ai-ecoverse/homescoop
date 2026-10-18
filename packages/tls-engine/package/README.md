@@ -26,6 +26,8 @@ TLS for [SLICC](https://github.com/ai-ecoverse/slicc): Mbed TLS 4.2.0 sessions o
   - The key must match the leaf. It comes only from the caller; there's no default.
   - The engine wipes the key and passphrase bytes it was given once they're parsed, and frees (zeroizes) its copy with the session.
 - **Cipher:** `tls_ciphersuite` gives the negotiated ciphersuite's IANA number.
+- **Alerts:** after a handshake or read fails with Mbed TLS's FATAL_ALERT_MESSAGE, `tls_last_alert` gives the description number of the alert the server sent: 116 (certificate_required) from a TLS 1.3 server that wanted a client certificate, 40 (handshake_failure) from a TLS 1.2 one. Otherwise, and for a server session, it's -1.
+- **Not exposed (known):** the negotiated key-exchange group and signature algorithm. Mbed TLS 4.2.0 has no public getter for either, only the configured group list.
 - **Server names:**
   - A DNS name is sent as SNI and checked against the leaf's DNS names, as Mbed TLS checks them (subjectAltName, else the CN).
   - An IPv4 or IPv6 literal is not sent as SNI (RFC 6066). It must match an iPAddress subjectAltName of the leaf, never a DNS name or a CN that spells it.

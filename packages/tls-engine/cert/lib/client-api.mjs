@@ -396,6 +396,39 @@ describe('client sessions (slicc-kernel#922)', () => {
     bare.wire.close();
   });
 
+  test('tls_last_alert: the server\'s fatal alert, 116 from a TLS 1.3 server wanting a client certificate and 40 from a TLS 1.2 one; -1 without one and for a server session (slicc-kernel#1004)', async () => {
+    const FATAL_ALERT = -0x7780;
+    for (const [version, alert] of [['TLSv1.3', 116], ['TLSv1.2', 40]]) {
+      const srv = await server('client.test', { tls: { minVersion: version, maxVersion: version, requestCert: true, rejectUnauthorized: true, ca: ca.pem } });
+      const { wire, result } = await attempt(srv.port, 'client.test');
+      let r = result;
+      if (r === 1) {
+        assert.equal(engine.m._tls_last_alert(wire.s), -1, 'none before the alert');
+        do {
+          r = engine.m._tls_read(wire.s, engine.scratch, 1);
+          wire.flush();
+        } while (r === 0 && (await wire.more()));
+      }
+      assert.equal(r, FATAL_ALERT, `${version}: ${engine.strerror(r)}`);
+      assert.equal(engine.m._tls_last_alert(wire.s), alert, version);
+      wire.close();
+    }
+    const fine = await server('client.test');
+    const ok = await attempt(fine.port, 'client.test');
+    assert.equal(ok.result, 1);
+    assert.equal(engine.m._tls_last_alert(ok.wire.s), -1);
+    ok.wire.close();
+    const leaf = engine.m._tls_leaf_new();
+    const spki = engine.into((p, max) => engine.m._tls_leaf_spki(leaf, p, max));
+    const der = ca.issue('server.test', spki);
+    assert.equal(engine.with(der, (p) => engine.m._tls_leaf_add_cert(leaf, p, der.length)), 0);
+    const host = engine.with(new TextEncoder().encode('server.test\0'), (p) => engine.m._tls_session_new(leaf, p));
+    assert.ok(host);
+    assert.equal(engine.m._tls_last_alert(host), -1);
+    engine.m._tls_session_free(host);
+    engine.m._tls_leaf_free(leaf);
+  });
+
   test('a client key: DER, encrypted PEM with its passphrase; refused: a wrong passphrase, a key for another certificate, a chain that is not DER, an empty chain or key (#1004)', async () => {
     const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
     const leaf = ca.issue('client.test', publicKey.export({ type: 'spki', format: 'der' }), { eku: '1.3.6.1.5.5.7.3.2' });
