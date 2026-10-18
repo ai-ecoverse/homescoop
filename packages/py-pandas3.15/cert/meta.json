@@ -1,0 +1,47 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-numpy",
+    "@ai-ecoverse/py-python-dateutil",
+    "@ai-ecoverse/py-tzdata",
+    "@ai-ecoverse/py-six"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.15.0-1",
+    "@ai-ecoverse/py-numpy@2.5.4-1",
+    "@ai-ecoverse/py-python-dateutil@2.9.0-post0.3",
+    "@ai-ecoverse/py-tzdata@2026.4.0-3",
+    "@ai-ecoverse/py-six@1.17.0-3"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-pandas3.15",
+    "node packages/py-pandas3.15/test/py-vs-sdist.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "checklist": [
+    "cert/import.mjs: import pandas from /node_modules/@ai-ecoverse/py-pandas, found by discovery without PYTHONPATH, no nested python; its 44 side modules import",
+    "cert/pandas.mjs: read_csv, groupby agg, merge, a tz-aware Europe/Berlin date_range across the 2026-03-29 DST change (tzdata/pytz), interpolate, resample 3h, pivot_table, to_csv, dateutil-parsed Timestamp",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md carries klib, ultrajson, numpy and musl (compiled in), and the LICENSES/ files of the vendored Python code (homescoop#726)",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 and py-numpy >=2.5.4-1 <2.5.5 (the headers it is built against)",
+    "3.0.6-1 (homescoop#761, the cp315 wave; npm-tag python3.15): pandas 3.0.6 from the PyPI sdist (66b07ef7\u2026) against wasix-python 3.15.0-1 and py-numpy 2.5.4-1, Cython 3.3.0, wasix-sysroot -38 (libc++ headers from the sysroot). No patches: wasix-python has ctypes, so 0002-lazy-ctypes goes. pytz is no longer a pandas dependency (pandas 3). test/py-vs-sdist.mjs: every shipped .py is the sdist's"
+  ],
+  "notices": [
+    {
+      "name": "klib",
+      "license": "MIT"
+    },
+    {
+      "name": "ultrajson",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "numpy",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "musl",
+      "license": "MIT"
+    }
+  ],
+  "patches": {}
+}
