@@ -11,7 +11,8 @@
     "define from stdin: define(`x', `y')x gives y",
     "real use: include from -I, eval(2**10), ifelse/len, changequote",
     "syscmd(`true') sysval 0 and esyscmd(`echo hi'): m4 forks /bin/sh through the kernel (wasm-bash)",
-    "a missing input file: rc 1 and m4: cannot open `nosuchfile', in the C and C.UTF-8 locales"
+    "a missing input file: rc 1 and m4: cannot open `nosuchfile', in the C and C.UTF-8 locales",
+    "cert/notices.mjs (1.4.20-6, homescoop#862): the installed package ships THIRD-PARTY-NOTICES.md naming the wasix-libc of the wasix-sysroot m4.wasm links (and its tag) with the wasi-libc, MIT, musl and cloudlibc texts, SOURCES.md naming m4-1.4.20.tar.xz and patches/getlocalename-wasix.patch, and that patch; package.json's description names no other sysroot (1.4.20-5 says -14, built on -34: NEGATIVE.md)"
   ],
   "patches": {
     "getlocalename-wasix.patch": "the build (NEGATIVE.md): without it gnulib's lib/getlocalename_l-unsafe.c has no WASI branch and stops at #error \"Please port gnulib getlocalename_l-unsafe.c to your platform!\". cert/checklist.mjs runs m4 in the C and C.UTF-8 locales"

@@ -25,3 +25,14 @@ The patch adds `__wasi__` to the musl branch (`nl_langinfo_l (NL_LOCALE_NAME (ca
 ## Empty wasm
 
 `prove-negative.mjs` empties `bin/m4.wasm`. With an empty wasm every case fails, starting with `m4 --version`.
+
+## 1.4.20-5: the description names a sysroot m4.wasm doesn't link (homescoop#862)
+
+`cert/notices.mjs` against the published 1.4.20-5 (slicc-kernel 1.102.6, 2026-10-17) fails:
+
+```text
+browser-cert: FAIL packages/wasix-m4/cert/notices.mjs
+AssertionError [ERR_ASSERTION]: package.json description names wasix-sysroot 2025.9.30-14, but m4.wasm links 2025.9.30-34
+```
+
+The same tarball with 1.4.20-6's description ("GNU m4 1.4.20 for slicc WASIX") passes `checklist.mjs` and `notices.mjs`. The notices, SOURCES.md and patch checks pass on -5 too; they guard against a later `files:` or `notices-common.sh` change dropping them.
