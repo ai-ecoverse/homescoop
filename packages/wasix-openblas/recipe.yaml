@@ -6,7 +6,7 @@ builder: host
 runner: pool
 reproducible: true
 # renovate: datasource=github-releases depName=OpenMathLib/OpenBLAS extractVersion=^v(?<version>.*)$
-version: "0.3.28"
+version: "0.3.34"
 npm: "@ai-ecoverse/wasix-openblas"
 summary: "OpenBLAS for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config"
 source:
