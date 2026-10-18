@@ -120,3 +120,56 @@ describe('reportFailure', () => {
     assert.deepEqual(io.calls.slice(1), [['comment', 9, 'again']]);
   });
 });
+
+describe('dist-tags after a publish (homescoop#1150)', async () => {
+  const { tagProblem, verifyTags } = await import('../verify-published.mjs');
+  it('an untagged publish moves latest to the version (or a newer one raced past it)', () => {
+    assert.equal(tagProblem({ version: '3.14.2-29', tag: 'latest' }, { latest: '3.14.2-29' }), '');
+    assert.equal(tagProblem({ version: '3.14.2-29', tag: 'latest' }, { latest: '3.14.2-30' }), '');
+  });
+  it('a tagged publish puts its tag on the version and leaves latest alone', () => {
+    assert.equal(tagProblem({ version: '3.15.0-1', tag: 'python3.15' }, { latest: '3.14.2-29', 'python3.15': '3.15.0-1' }), '');
+  });
+  it('NEGATIVE: the tag missing or behind, or latest on a tagged version, is a problem', () => {
+    assert.match(tagProblem({ version: '3.15.0-1', tag: 'python3.15' }, { latest: '3.14.2-29' }), /no python3\.15 dist-tag/);
+    assert.match(tagProblem({ version: '3.14.2-29', tag: 'latest' }, { latest: '3.14.2-28' }), /latest is 3\.14\.2-28, not 3\.14\.2-29/);
+    assert.match(tagProblem({ version: '3.15.0-1', tag: 'python3.15' }, { latest: '3.15.0-1', 'python3.15': '3.15.0-1' }), /latest moved to 3\.15\.0-1/);
+  });
+  it('polls a lagging packument, but fails at once when latest landed on a tagged version', async () => {
+    let t = 0;
+    const answers = [{ status: 200, tags: { latest: '3.14.2-29' } }, { status: 503 }, { status: 200, tags: { latest: '3.14.2-29', 'python3.15': '3.15.0-1' } }];
+    const ok = await verifyTags({ name: 'n', version: '3.15.0-1', tag: 'python3.15' }, { fetchTags: async () => answers.shift(), sleep: async (ms) => { t += ms; }, now: () => t, timeoutMs: 60000, intervalMs: 15000 });
+    assert.equal(ok.ok, true);
+    assert.equal(t, 30000);
+    t = 0;
+    let calls = 0;
+    const bad = await verifyTags({ name: 'n', version: '3.15.0-1', tag: 'python3.15' }, { fetchTags: async () => { calls++; return { status: 200, tags: { latest: '3.15.0-1', 'python3.15': '3.15.0-1' } }; }, sleep: async (ms) => { t += ms; }, now: () => t, timeoutMs: 60000, intervalMs: 15000 });
+    assert.equal(bad.ok, false);
+    assert.equal(calls, 1);
+    assert.match(bad.reason, /latest moved/);
+  });
+  it('NEGATIVE: a tag that never shows up fails after the timeout', async () => {
+    let t = 0;
+    const r = await verifyTags({ name: 'n', version: '3.15.0-1', tag: 'python3.15' }, { fetchTags: async () => ({ status: 200, tags: { latest: '3.14.2-29' } }), sleep: async (ms) => { t += ms; }, now: () => t, timeoutMs: 60000, intervalMs: 15000 });
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /no python3\.15 dist-tag/);
+    assert.equal(t, 60000);
+  });
+});
+
+describe('ladder-build wiring for the dist-tag check (#1151 review)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const wf = readFileSync(new URL('../../.github/workflows/ladder-build.yml', import.meta.url), 'utf8');
+  const job = wf.slice(wf.indexOf('\n  publish:\n'));
+  it('publishes of one npm name are serialized, never cancelled in progress', () => {
+    assert.match(job, /\n {4}concurrency:\n {6}group: npm-publish-\$\{\{ needs\.resolve\.outputs\.npm \}\}\n {6}cancel-in-progress: false\n/);
+  });
+  it('the verify step outlasts both waits, with room for request hangs and the failure issue', () => {
+    const step = job.slice(job.indexOf('- name: Verify the registry serves the published bytes'));
+    const minutes = Number(/timeout-minutes: (\d+)/.exec(step)[1]);
+    const wait = Number(/--timeout (\d+)/.exec(step)[1]);
+    const tagWait = Number(/--tag-timeout (\d+)/.exec(step)[1]);
+    assert.match(step, /--tag "\$NPM_TAG"/);
+    assert.ok(minutes * 60 >= wait + tagWait + 300, `${minutes} min < ${wait}+${tagWait}+300 s`);
+  });
+});

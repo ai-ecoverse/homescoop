@@ -278,6 +278,15 @@ jobs:
         needs.fetch-certified.result == 'success'
       )
     runs-on: ubuntu-latest
+    # One publish per npm name at a time (#1151): two overlapping runs could both pass the
+    # pre-publish guard against the same old dist-tag, and the lower version, publishing
+    # second, would move the tag back. Serialized, the second run's assert-certified-publish
+    # sees the first one's version under the tag and refuses anything below it. GitHub keeps
+    # one pending run per group: a third run replaces a pending second one. Nothing is lost,
+    # because the newer run carries the higher certified version (roll forward).
+    concurrency:
+      group: npm-publish-${{ needs.resolve.outputs.npm }}
+      cancel-in-progress: false
     # Job-level: setup-node / npm must see ACTIONS_ID_TOKEN_REQUEST_*.
     permissions:
       contents: read
@@ -389,10 +398,13 @@ jobs:
         if: steps.publish.outputs.published == 'true'
         # --timeout 1800 waits up to 30 min for the version to become visible
         # (a new 22 MB package took about 18 min, homescoop#686); a visible
-        # version with another integrity fails at once. The step bound covers it.
-        timeout-minutes: 35
+        # version with another integrity fails at once. Then --tag-timeout 300
+        # waits up to 5 min for the dist-tags (#1150). The step bound covers
+        # both waits plus a 30 s hang per request and filing the failure issue.
+        timeout-minutes: 42
         env:
           GH_TOKEN: ${{ github.token }}
           NPM: ${{ needs.resolve.outputs.npm }}
+          NPM_TAG: ${{ needs.resolve.outputs.npm_tag }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/gate.mjs verify-published -- node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --timeout 1800 --run-url "$RUN_URL" --issue
+        run: node scripts/gate.mjs verify-published -- node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --tag "$NPM_TAG" --timeout 1800 --tag-timeout 300 --run-url "$RUN_URL" --issue
