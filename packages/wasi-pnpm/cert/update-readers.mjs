@@ -79,6 +79,26 @@ export default async function (ctx) {
   const first = await run(['pnpm', 'install', '--registry', REGISTRY], { cwd: app, user: 'bob' });
   assert.equal(first.status, 0, `install big@1.0.0: ${out(first)}`);
 
+  // The kernel's own directory rename, as a baseline: OPFS moves a directory
+  // in one step where the browser can (FileSystemHandle.move), else
+  // slicc-kernel copies it, which a reader can see half done. That window
+  // is the kernel's; pnpm must add none of its own.
+  for (let i = 0; i < 240; i++) await write(`/tmp/mvt/a/lib/f${String(i).padStart(3, '0')}.js`, `module.exports = ${i};\n${'// pad\n'.repeat(40)}`);
+  await write('/tmp/mvt/a/package.json', JSON.stringify({ name: 'mvt', version: '1.0.0' }));
+  await write('/tmp/mvt-poll.sh', [
+    'shopt -s nullglob',
+    'look() { local d=$1 f p; [[ -d $d ]] || { echo absent; return; }; f=("$d"/lib/*); [[ -f $d/package.json ]] && p=pj || p=nopj; [[ -d $d ]] || { echo torn; return; }; echo "${#f[@]} $p"; }',
+    'while [[ ! -e /tmp/mvt/done ]]; do look /tmp/mvt/a; look /tmp/mvt/b; done',
+    '',
+  ].join('\n'));
+  const mv = await run(['bash', '-c', 'bash /tmp/mvt-poll.sh > /tmp/mvt-obs & P=$!; sleep 1; for i in 1 2 3 4 5; do mv /tmp/mvt/a /tmp/mvt/b && mv /tmp/mvt/b /tmp/mvt/a; done; touch /tmp/mvt/done; wait $P'], { cwd: '/tmp' });
+  assert.equal(mv.status, 0, `the mv baseline: ${out(mv)}`);
+  const mvObs = ((await read('/tmp/mvt-obs')) ?? '').split('\n').filter(Boolean);
+  const mvHalf = mvObs.filter((l) => !['absent', 'torn', '240 pj'].includes(l)).length;
+  // 10 renames there; an update renames big twice (aside, in) and fresh once.
+  const allowed = mvHalf === 0 ? 0 : Math.ceil((mvHalf / 10) * 3) + 2;
+  console.log(`update-readers: the kernel's mv of a 240-file directory, 10 times: ${mvHalf} of ${mvObs.length} samples half there (allowed per package: ${allowed})`);
+
   await write('/tmp/upd-poll.sh', POLL);
   await write(`${app}/package.json.next`, manifest({ big: '2.0.0', fresh: '1.0.0' }));
   await run(['chown', 'bob', `${app}/package.json.next`], { cwd: '/' });
@@ -112,7 +132,10 @@ export default async function (ctx) {
   const summary = [...good, ...Object.entries(partial).map(([pkg, p]) => `${pkg} HALF THERE: ${p.obs} (lib/ ${p.min}-${p.max} files, ${p.nopj} without package.json)`)].join(', ');
   console.log(`update-readers: ${summary}`);
   assert.ok((counts['big 240 1.0.0'] ?? 0) > 0 && (counts['big 260 2.0.0'] ?? 0) > 0, `the poller saw big's old and new versions: ${summary}`);
-  assert.deepEqual(bad, [], `a reader saw a package half there (dir with the wrong file count or no package.json): ${summary}`);
+  for (const pkg of ['big', 'fresh']) {
+    const n = partial[pkg]?.obs ?? 0;
+    assert.ok(n <= allowed, `a reader saw ${pkg} half there ${n} times, more than the kernel's own directory rename allows (${allowed}; ${mvHalf} half-there samples over 10 plain mv's): ${summary}`);
+  }
 
   const ls = await run(['bash', '-c', 'shopt -s nullglob; f=(node_modules/big/lib/*); g=(node_modules/fresh/lib/*); s=(node_modules/*pacquet-stage*); echo "${#f[@]} ${#g[@]} ${#s[@]}"'], { cwd: app, user: 'bob' });
   assert.equal(ls.stdout.trim(), '260 200 0', `after the update: big 260 files, fresh 200, no staging dirs left: ${out(ls)}`);
