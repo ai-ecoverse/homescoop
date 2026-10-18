@@ -280,14 +280,19 @@ rm -f "$WORK/libruby-wasix-stubs.a"
 wasixar rcs "$WORK/libruby-wasix-stubs.a" "$WORK/ruby-wasix-stubs.o"
 
 OPENSSL_FLAGS=()
-OPENSSL_NOTE="skipped (no $OPENSSL_PREFIX/lib/libssl.a)"
+OPENSSL_NOTE="skipped (no libssl.a in the wasix-openssl input)"
 if [[ -f "$OPENSSL_PREFIX/lib/libssl.a" && -f "$OPENSSL_PREFIX/include/openssl/ssl.h" ]]; then
   OPENSSL_FLAGS+=(
     "--with-openssl-dir=${OPENSSL_PREFIX}"
     "--with-openssl-include=${OPENSSL_PREFIX}/include"
     "--with-openssl-lib=${OPENSSL_PREFIX}/lib"
   )
-  OPENSSL_NOTE="linked against ${OPENSSL_PREFIX} (OpenSSL 3.x; honours SSL_CERT_FILE). Socket C ext built with HAVE_STRUCT_MSGHDR_MSG_CONTROL / CMSG_* forced off (WASIX ancillary data incomplete)."
+  # The input's package version and OpenSSL version, not its build path
+  # (homescoop#637).
+  OPENSSL_PKG_VER="$(node -p "require('${OPENSSL_PREFIX}/package.json').version")"
+  OPENSSL_UPSTREAM_VER="$(sed -n 's/^# *define OPENSSL_VERSION_STR "\([0-9.]*\)"$/\1/p' "$OPENSSL_PREFIX/include/openssl/opensslv.h")"
+  [[ -n "$OPENSSL_PKG_VER" && -n "$OPENSSL_UPSTREAM_VER" ]] || { echo "wasix-ruby: no wasix-openssl version" >&2; exit 1; }
+  OPENSSL_NOTE="linked against @ai-ecoverse/wasix-openssl ${OPENSSL_PKG_VER} (OpenSSL ${OPENSSL_UPSTREAM_VER}; honours SSL_CERT_FILE). Socket C ext built with HAVE_STRUCT_MSGHDR_MSG_CONTROL / CMSG_* forced off (WASIX ancillary data incomplete)."
 else
   echo "== wasix-ruby: openssl $OPENSSL_NOTE"
 fi
