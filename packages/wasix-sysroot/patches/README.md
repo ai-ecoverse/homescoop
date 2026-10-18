@@ -395,3 +395,24 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
     - a mask restored by `siglongjmp`;
     - a jump out of a SIGUSR1 handler that has SIGUSR2 in `sa_mask`: savemask 1 leaves nothing blocked, while savemask 0 keeps the handler's mask, as on Linux.
     - It runs in the four EH trees; the asyncify tree has no `sigsetjmp`.
+
+## -37: Linux's file-type bits (`build-source.sh`, #1015) and device modes (`../slicc_stat_owner.c`, #1112)
+
+- **Linux's values in `__mode_t.h`:** `build-source.sh` rewrites wasi-libc's `libc-bottom-half/headers/public/__mode_t.h` before upstream's build, so every libc object (and libc++, which uses `st_mode`) is built with them:
+
+| constant | wasi-libc | -37 (Linux/musl) |
+| --- | --- | --- |
+| `S_IFMT` | 0160000 (the OR of the types) | 0170000 |
+| `S_IFIFO` | 0140000 | 0010000 |
+| `S_IFSOCK` | 0160000 | 0140000 |
+
+  The others (`S_IFLNK` 0120000, `S_IFREG` 0100000, `S_IFBLK` 0060000, `S_IFDIR` 0040000, `S_IFCHR` 0020000) were already Linux's. wasi-libc's FIFO value is Linux's socket value, so mixing the two made a FIFO read as a socket.
+  - **What this fixes:** archives (tar/cpio headers), `stat -c %f`-style output and scripts comparing against Linux literals now get Linux's bits.
+  - **Compatibility:** a program or side module built on -36 or older keeps the old values until it rebuilds, so the default moves with a rebuild wave.
+- **`slicc_stat_owner.c`:** `apply_slicc_mode`'s Linux-to-libc mapping is now the identity. It stays explicit.
+  - **#1112:** slicc-kernel's device nodes have no slicc_fs mode (`path_mode` ENOENT, `fd_mode` EBADF for `/dev/null`, `/dev/zero`), so their `st_mode` was the type alone, 020000. A character device that gets no mode from the kernel now gets Linux's 0666.
+- **Probe `test/r38.c`:**
+  - prints each `S_IF*` constant;
+  - stats a regular file, a directory, a symlink (lstat), a pipe, a socketpair end, `/dev/null` and `/dev/zero` (by path and by descriptor);
+  - each comes back with Linux's type bits, and the devices as 020666, matching coreutils' `stat -c %f` (21b6).
+- **`test/fifo.mjs`** expects the new type bits.

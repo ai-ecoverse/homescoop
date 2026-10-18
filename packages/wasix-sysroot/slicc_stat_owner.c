@@ -106,10 +106,18 @@ static void to_public_stat_owned(const __wasi_filestat_t *in, struct stat *out) 
 
 /* wasix-sysroot -21: slicc_fs's mode may carry the file type, in Linux
  * numbering. WASI has no FIFO filetype, so a pipe's S_IFIFO (slicc-kernel
- * fd_mode on a pipe) can only come from there. Map Linux's type bits to
- * WASIX's __mode_t.h (FIFO 0o010000 -> 0o140000, socket 0o140000 ->
- * 0o160000; the rest are equal) and let them replace the WASI filetype; a
- * mode without type bits (older kernels) keeps the WASI one. */
+ * fd_mode on a pipe) can only come from there. Since -37 __mode_t.h has
+ * Linux's values, so the mapping is the identity (it stays explicit, so a
+ * header that differs still maps right); the type replaces the WASI
+ * filetype, and a mode without type bits (older kernels) keeps the WASI one. */
+/* -37 (homescoop#1112): slicc-kernel's device nodes (/dev/null, /dev/zero,
+ * /dev/tty, ...) have no slicc_fs mode (path_mode ENOENT, fd_mode EBADF), so
+ * st_mode was the type alone, 020000. Give a character device that got no
+ * mode Linux's 0666 for those nodes. */
+static void device_fallback(struct stat *buf) {
+  if (S_ISCHR(buf->st_mode) && !(buf->st_mode & 07777)) buf->st_mode |= 0666;
+}
+
 static void apply_slicc_mode(struct stat *buf, int mode) {
   mode_t type;
   switch (mode & 0170000) {
@@ -148,6 +156,7 @@ int fstat(int fildes, struct stat *buf) {
   int mode;
   if (__slicc_fs_fd_mode(fildes, &mode) == 0)
     apply_slicc_mode(buf, mode);
+  device_fallback(buf);
   if (e == 0)
     apply_owner(buf, 0, owner);
   else if (!__atomic_load_n(&owner_absent, __ATOMIC_RELAXED))
@@ -185,6 +194,7 @@ int __wasilibc_nocwd_fstatat(int fd, const char *restrict path,
   int nofollow = (flag & AT_SYMLINK_NOFOLLOW) ? 1 : 0;
   if (__slicc_fs_path_mode(fd, path, len, nofollow, &mode) == 0)
     apply_slicc_mode(buf, mode);
+  device_fallback(buf);
   if (e == 0)
     apply_owner(buf, 0, owner);
   else if (!__atomic_load_n(&owner_absent, __ATOMIC_RELAXED))
