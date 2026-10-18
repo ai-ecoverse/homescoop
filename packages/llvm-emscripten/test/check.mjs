@@ -92,15 +92,14 @@ try {
   console.log(`clang default target: ${(/^Target: (.*)$/m.exec(r.out) || [])[1]}`);
   r = tool('clang', ['-print-targets']);
   check(/wasm32\s+- WebAssembly 32-bit/.test(r.out) && /wasm64\s+- WebAssembly 64-bit/.test(r.out) && !/x86|aarch64|arm\b/.test(r.out), `registered targets are wasm32 and wasm64 only, as published: ${r.out.replace(/\s+/g, ' ').trim()}`);
-  // 24.0.0-2 (patches/0001): getMainExecutable resolves argv[0], through
-  // PATH when it has no slash. Up to 24.0.0-1 it was "" on Emscripten, so
-  // clang spawned "" -cc1 ("posix_spawn failed" in slicc-kernel). Under
-  // node, argv[0] is the script as given and Emscripten's PATH is "/".
+  // 24.0.0-2 (patches/0001): getMainExecutable resolves argv[0] (through
+  // PATH when it has no slash, as in slicc-kernel). Up to 24.0.0-1 it was ""
+  // on Emscripten, so clang spawned "" -cc1 ("posix_spawn failed" in
+  // slicc-kernel). Under node, argv[0] is the script's absolute path, so the
+  // script is preloaded at that path in the in-wasm filesystem.
   writeFileSync(join(out, 'e.c'), 'int e;\n');
-  r = run(process.execPath, ['clang.js', '-###', '-v', '--target=wasm32-unknown-unknown', '-c', '/w/e.c'], { cwd: out, env: { ...process.env, SLICC_PRELOAD: `/clang.js=${join(out, 'clang.js')},/w/e.c=${join(out, 'e.c')}` } });
-  check(/^InstalledDir: \/$/m.test(r.out) && /^ "\/clang\.js" "-cc1"/m.test(r.out), `clang found by PATH: InstalledDir / and "/clang.js" -cc1 (24.0.0-1: "" -cc1): ${(/^InstalledDir:.*$/m.exec(r.out) || ['no InstalledDir'])[0]} | ${(/^ "[^"]*" "-cc1"/m.exec(r.out) || ['no -cc1 line'])[0]}`);
   r = run(process.execPath, [join(out, 'clang.js'), '-###', '-v', '--target=wasm32-unknown-unknown', '-c', '/w/e.c'], { env: { ...process.env, SLICC_PRELOAD: `${join(out, 'clang.js')}=${join(out, 'clang.js')},/w/e.c=${join(out, 'e.c')}` } });
-  check(r.out.includes(`InstalledDir: ${out}\n`) && r.out.includes(` "${join(out, 'clang.js')}" "-cc1"`), `clang by a path: InstalledDir is its directory: ${(/^InstalledDir:.*$/m.exec(r.out) || ['no InstalledDir'])[0]}`);
+  check(r.out.includes(`InstalledDir: ${out}\n`) && r.out.includes(` "${join(out, 'clang.js')}" "-cc1"`), `clang knows its own path: InstalledDir is its directory and -cc1 runs it (24.0.0-1: empty, "" -cc1): ${(/^InstalledDir:.*$/m.exec(r.out) || ['no InstalledDir'])[0].replace(out, '<out>')} | ${(/^ "[^"]*" "-cc1"/m.exec(r.out) || ['no -cc1 line'])[0].replace(out, '<out>')}`);
   r = tool('lld', ['-flavor', 'wasm', '--version']);
   check(/LLD 24\.0\.0/.test(r.out), `lld --version: ${r.out.trim().split('\n')[0]}`);
   writeFileSync(join(out, 's.c'), 'int add(int a, int b) { return a + b; }\nint mul(int a, int b) { return a * b; }\n');

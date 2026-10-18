@@ -23,10 +23,9 @@
 
 ## 24.0.0-2: getMainExecutable on Emscripten (patches/0001, homescoop#859 stage F)
 
-`node packages/llvm-emscripten/test/check.mjs --tarball` with the published 24.0.0-1 (local, macOS): **FAIL, 3 checks.**
+`node packages/llvm-emscripten/test/check.mjs --tarball` with the published 24.0.0-1 (local, macOS): **FAIL, 2 checks.**
 - manifest.json has no `llvm_patches`.
-- `clang.js -### -v` (found through PATH): `InstalledDir: ` (empty) and `"" "-cc1"`.
-- `clang.js` run by an absolute path: `InstalledDir: ` (empty).
+- `clang.js -### -v` run by its path: `InstalledDir: ` (empty) and `"" "-cc1"`.
 
 Every other check passes as before. In slicc-kernel, the same empty main executable makes clang spawn `""`, `clang: error: unable to execute command: posix_spawn failed: No such file or directory` (found by thr_t4h9qnrjas linking wasm-clang). thr_t4h9qnrjas checked this patch in the kernel: Path.cpp compiled with it, using the manifest's multicall flags, and linked ahead of libLLVMSupport.a. With it, wasm-clang's run-cc.mjs (r18 to r28w, users enforce) and its cxx-eh cert pass.
 
