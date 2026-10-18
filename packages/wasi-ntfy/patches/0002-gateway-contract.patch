@@ -1,0 +1,359 @@
+Follow the ntfy gateway's contract (ntfy.sliccy.ai, sliccy-ai#42/#47) in the client.
+
+Reason: upstream's client (client/client.go handleSubscribeConnLoop) says
+"The retry logic is crude and may lose messages": after a dropped stream it
+waits 10 s and reconnects with the original options, so it loses or repeats
+messages, and it ignores Retry-After. The gateway drops a subscriber that
+falls 1 MiB behind and answers 429 with retry-after: 60. This patch:
+- remembers the last message id of each subscription and reconnects with
+  since=<last id> (since=<time of the open event> before the first message),
+  skipping a repeat of the last message, so a drop loses and repeats nothing;
+- waits max(10 s, Retry-After) before reconnecting after a 429;
+- ends ntfy sub with a non-zero exit on 401 or 403 (a forged, revoked or
+  wrongly scoped token), instead of retrying every 10 s for ever;
+- retries a publish after a 429 with Retry-After, waiting that long, at most
+  twice, when the body can be re-sent (a message or a --file); otherwise, or
+  after more than 5 minutes, it fails and names the wait;
+- refuses a message over 1 MiB (arguments, --message or stdin) before any
+  request, where upstream silently cut stdin at 1 MiB; --file attachments
+  are not capped by the client;
+- reads stream lines up to 4 MiB (upstream: bufio.Scanner's 64 KiB) and
+  reports a scanner error, so one over-long line cannot loop a since= resume.
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: upstream's subscribe loop resumes with since=, honours
+Retry-After and stops on auth errors, and publish refuses oversize messages.
+
+diff --git a/client/client.go b/client/client.go
+index c226096..b402a73 100644
+--- a/client/client.go
++++ b/client/client.go
+@@ -12,6 +12,7 @@ import (
+ 	"io"
+ 	"net/http"
+ 	"regexp"
++	"strconv"
+ 	"strings"
+ 	"sync"
+ 	"time"
+@@ -24,8 +25,49 @@ const (
+ 
+ const (
+ 	maxResponseBytes = 4096
++	maxLineBytes     = 4 * 1024 * 1024
++	reconnectDelay   = 10 * time.Second
++	publishRetries   = 2
++	maxRetryAfter    = 5 * time.Minute
+ )
+ 
++type StatusError struct {
++	Code       int
++	RetryAfter time.Duration
++	Message    string
++}
++
++func (e *StatusError) Error() string {
++	return e.Message
++}
++
++func newStatusError(resp *http.Response, body []byte) *StatusError {
++	text := strings.TrimSpace(string(body))
++	if text == "" {
++		text = fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
++	}
++	return &StatusError{Code: resp.StatusCode, RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After")), Message: text}
++}
++
++func parseRetryAfter(value string) time.Duration {
++	value = strings.TrimSpace(value)
++	if value == "" {
++		return 0
++	}
++	if seconds, err := strconv.Atoi(value); err == nil {
++		if seconds < 0 {
++			return 0
++		}
++		return time.Duration(seconds) * time.Second
++	}
++	if at, err := http.ParseTime(value); err == nil {
++		if wait := time.Until(at); wait > 0 {
++			return wait
++		}
++	}
++	return 0
++}
++
+ var (
+ 	topicRegex = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`) // Same as in server/server.go
+ )
+@@ -33,6 +75,7 @@ var (
+ // Client is the ntfy client that can be used to publish and subscribe to ntfy topics
+ type Client struct {
+ 	Messages      chan *Message
++	Fatal         chan error
+ 	config        *Config
+ 	subscriptions map[string]*subscription
+ 	mu            sync.Mutex
+@@ -78,6 +121,7 @@ type subscription struct {
+ func New(config *Config) *Client {
+ 	return &Client{
+ 		Messages:      make(chan *Message, 50), // Allow reading a few messages
++		Fatal:         make(chan error, 1),
+ 		config:        config,
+ 		subscriptions: make(map[string]*subscription),
+ 	}
+@@ -102,27 +146,49 @@ func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishO
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	req, err := http.NewRequest("POST", topicURL, body)
+-	if err != nil {
+-		return nil, err
++	seeker, rewindable := body.(io.Seeker)
++	var start int64
++	if rewindable {
++		if start, err = seeker.Seek(0, io.SeekCurrent); err != nil {
++			rewindable = false
++		}
+ 	}
+-	for _, option := range options {
+-		if err := option(req); err != nil {
++	var b []byte
++	for attempt := 0; ; attempt++ {
++		req, err := http.NewRequest("POST", topicURL, body)
++		if err != nil {
++			return nil, err
++		}
++		for _, option := range options {
++			if err := option(req); err != nil {
++				return nil, err
++			}
++		}
++		log.Debug("%s Publishing message with headers %s", util.ShortTopicURL(topicURL), req.Header)
++		resp, err := http.DefaultClient.Do(req)
++		if err != nil {
++			return nil, err
++		}
++		b, err = io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
++		resp.Body.Close()
++		if err != nil {
++			return nil, err
++		}
++		if resp.StatusCode == http.StatusOK {
++			break
++		}
++		statusErr := newStatusError(resp, b)
++		if statusErr.Code != http.StatusTooManyRequests || statusErr.RetryAfter <= 0 {
++			return nil, statusErr
++		}
++		if !rewindable || attempt >= publishRetries || statusErr.RetryAfter > maxRetryAfter {
++			return nil, fmt.Errorf("%s (rate limited: retry after %s)", statusErr.Message, statusErr.RetryAfter)
++		}
++		log.Warn("%s Rate limited (429), retrying after %s", util.ShortTopicURL(topicURL), statusErr.RetryAfter)
++		time.Sleep(statusErr.RetryAfter)
++		if _, err := seeker.Seek(start, io.SeekStart); err != nil {
+ 			return nil, err
+ 		}
+-	}
+-	log.Debug("%s Publishing message with headers %s", util.ShortTopicURL(topicURL), req.Header)
+-	resp, err := http.DefaultClient.Do(req)
+-	if err != nil {
+-		return nil, err
+-	}
+-	defer resp.Body.Close()
+-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+-	if err != nil {
+-		return nil, err
+-	}
+-	if resp.StatusCode != http.StatusOK {
+-		return nil, errors.New(strings.TrimSpace(string(b)))
+ 	}
+ 	m, err := toMessage(string(b), topicURL, "")
+ 	if err != nil {
+@@ -152,7 +218,7 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
+ 	log.Debug("%s Polling from topic", util.ShortTopicURL(topicURL))
+ 	options = append(options, WithPoll())
+ 	go func() {
+-		err := performSubscribeRequest(ctx, msgChan, topicURL, "", options...)
++		err := performSubscribeRequest(ctx, msgChan, topicURL, "", nil, options...)
+ 		close(msgChan)
+ 		errChan <- err
+ 	}()
+@@ -196,7 +262,7 @@ func (c *Client) Subscribe(topic string, options ...SubscribeOption) (string, er
+ 		topicURL: topicURL,
+ 		cancel:   cancel,
+ 	}
+-	go handleSubscribeConnLoop(ctx, c.Messages, topicURL, subscriptionID, options...)
++	go handleSubscribeConnLoop(ctx, c.Messages, c.Fatal, topicURL, subscriptionID, options...)
+ 	return subscriptionID, nil
+ }
+ 
+@@ -225,23 +291,57 @@ func (c *Client) expandTopicURL(topic string) (string, error) {
+ 	return fmt.Sprintf("%s/%s", c.config.DefaultHost, topic), nil
+ }
+ 
+-func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicURL, subcriptionID string, options ...SubscribeOption) {
++type resumePoint struct {
++	lastID   string
++	openTime int64
++}
++
++func (p *resumePoint) option() SubscribeOption {
++	return func(r *http.Request) error {
++		since := p.lastID
++		if since == "" && p.openTime > 0 {
++			since = strconv.FormatInt(p.openTime, 10)
++		}
++		if since != "" {
++			q := r.URL.Query()
++			q.Set("since", since)
++			r.URL.RawQuery = q.Encode()
++		}
++		return nil
++	}
++}
++
++func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, fatal chan error, topicURL, subcriptionID string, options ...SubscribeOption) {
++	resume := &resumePoint{}
+ 	for {
+-		// TODO The retry logic is crude and may lose messages. It should record the last message like the
+-		//      Android client, use since=, and do incremental backoff too
+-		if err := performSubscribeRequest(ctx, msgChan, topicURL, subcriptionID, options...); err != nil {
++		connOptions := append(append([]SubscribeOption{}, options...), resume.option())
++		delay := reconnectDelay
++		if err := performSubscribeRequest(ctx, msgChan, topicURL, subcriptionID, resume, connOptions...); err != nil {
++			var statusErr *StatusError
++			if errors.As(err, &statusErr) {
++				if statusErr.Code == http.StatusUnauthorized || statusErr.Code == http.StatusForbidden {
++					select {
++					case fatal <- fmt.Errorf("%s: %d %s: %s", util.ShortTopicURL(topicURL), statusErr.Code, http.StatusText(statusErr.Code), statusErr.Message):
++					default:
++					}
++					return
++				}
++				if statusErr.RetryAfter > delay {
++					delay = statusErr.RetryAfter
++				}
++			}
+ 			log.Warn("%s Connection failed: %s", util.ShortTopicURL(topicURL), err.Error())
+ 		}
+ 		select {
+ 		case <-ctx.Done():
+ 			log.Info("%s Connection exited", util.ShortTopicURL(topicURL))
+ 			return
+-		case <-time.After(10 * time.Second): // TODO Add incremental backoff
++		case <-time.After(delay):
+ 		}
+ 	}
+ }
+ 
+-func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, subscriptionID string, options ...SubscribeOption) error {
++func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, subscriptionID string, resume *resumePoint, options ...SubscribeOption) error {
+ 	streamURL := fmt.Sprintf("%s/json", topicURL)
+ 	log.Debug("%s Listening to %s", util.ShortTopicURL(topicURL), streamURL)
+ 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
+@@ -263,9 +363,10 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
+ 		if err != nil {
+ 			return err
+ 		}
+-		return errors.New(strings.TrimSpace(string(b)))
++		return newStatusError(resp, b)
+ 	}
+ 	scanner := bufio.NewScanner(resp.Body)
++	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), maxLineBytes)
+ 	for scanner.Scan() {
+ 		messageJSON := scanner.Text()
+ 		m, err := toMessage(messageJSON, topicURL, subscriptionID)
+@@ -273,11 +374,20 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
+ 			return err
+ 		}
+ 		log.Trace("%s Message received: %s", util.ShortTopicURL(topicURL), messageJSON)
++		if resume != nil && m.Event == "open" && resume.lastID == "" && resume.openTime == 0 {
++			resume.openTime = m.Time
++		}
+ 		if m.Event == MessageEvent {
++			if resume != nil {
++				if m.ID != "" && m.ID == resume.lastID {
++					continue
++				}
++				resume.lastID = m.ID
++			}
+ 			msgChan <- m
+ 		}
+ 	}
+-	return nil
++	return scanner.Err()
+ }
+ 
+ func toMessage(s, topicURL, subscriptionID string) (*Message, error) {
+diff --git a/cmd/publish.go b/cmd/publish.go
+index 1920b99..923945a 100644
+--- a/cmd/publish.go
++++ b/cmd/publish.go
+@@ -267,13 +267,21 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
+ 	if c.String("message") != "" {
+ 		message = c.String("message")
+ 	}
++	if len(message) > maxMessageBytes {
++		err = errMessageTooLarge()
++		return
++	}
+ 	if message == "" && isStdinRedirected() {
+ 		var data []byte
+-		data, err = io.ReadAll(io.LimitReader(c.App.Reader, 1024*1024))
++		data, err = io.ReadAll(io.LimitReader(c.App.Reader, maxMessageBytes+1))
+ 		if err != nil {
+ 			log.Debug("Failed to read from stdin: %s", err.Error())
+ 			return
+ 		}
++		if len(data) > maxMessageBytes {
++			err = errMessageTooLarge()
++			return
++		}
+ 		message = strings.TrimSpace(string(data))
+ 	}
+ 	return
+@@ -298,6 +306,12 @@ func remainingArgs(c *cli.Context, fromIndex int) []string {
+ 	return []string{}
+ }
+ 
++const maxMessageBytes = 1024 * 1024
++
++func errMessageTooLarge() error {
++	return fmt.Errorf("message is over the 1 MiB limit (%d bytes); send it as an attachment with --file instead", maxMessageBytes)
++}
++
+ func waitForProcess(pid int) (message string, err error) {
+ 	if goruntime.GOOS == "wasip1" {
+ 		return "", errors.New("--wait-pid is not available on wasip1: slicc-kernel gives ntfy no process table to watch")
+diff --git a/cmd/subscribe.go b/cmd/subscribe.go
+index df356c1..4867a66 100644
+--- a/cmd/subscribe.go
++++ b/cmd/subscribe.go
+@@ -207,15 +207,19 @@ func doSubscribe(c *cli.Context, cl *client.Client, conf *client.Config, topic,
+ 		}
+ 		cmds[subscriptionID] = command
+ 	}
+-	for m := range cl.Messages {
+-		cmd, ok := cmds[m.SubscriptionID]
+-		if !ok {
+-			continue
++	for {
++		select {
++		case err := <-cl.Fatal:
++			return err
++		case m := <-cl.Messages:
++			cmd, ok := cmds[m.SubscriptionID]
++			if !ok {
++				continue
++			}
++			log.Debug("%s Dispatching received message: %s", logMessagePrefix(m), m.Raw)
++			printMessageOrRunCommand(c, m, cmd)
+ 		}
+-		log.Debug("%s Dispatching received message: %s", logMessagePrefix(m), m.Raw)
+-		printMessageOrRunCommand(c, m, cmd)
+ 	}
+-	return nil
+ }
+ 
+ func maybeAddAuthHeader(s client.Subscribe, conf *client.Config) client.SubscribeOption {

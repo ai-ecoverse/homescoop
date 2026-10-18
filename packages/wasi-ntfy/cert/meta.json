@@ -1,0 +1,33 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.125.4",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-20",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-10"
+  ],
+  "checklist": [
+    "as cone (addUser, users enforce): ntfy --version → ntfy version 2.32.0 (checklist.mjs)",
+    "streaming ntfy sub runs under coreutils timeout 90, so a build that never exits fails its assertions instead of hanging the boot",
+    "ntfy pub --token tk_… --title sends POST /<topic> with Authorization: Bearer and X-Title, and prints the server's message (checklist.mjs)",
+    "~/.config/ntfy/client.yml default-host and default-token apply to ntfy pub and ntfy sub (checklist.mjs)",
+    "ntfy sub --poll --since all prints each message's JSON; with a command it runs sh -c once per message, in order, with NTFY_ID, NTFY_TITLE, NTFY_MESSAGE, NTFY_TOPIC and NTFY_RAW (attachment.url included) and a 60 KiB message line (checklist.mjs)",
+    "ntfy pub --wait-pid fails with a clear error and sends nothing (checklist.mjs)",
+    "a subscribe-only token's publish gets 403 and exits non-zero; no token or a forged one gets 401 and exits non-zero (auth.mjs)",
+    "ntfy sub with a forged token exits 1 after one request (no retry loop); a token revoked mid-stream ends ntfy sub after the reconnect's 401 (auth.mjs)",
+    "a publish answered 429 with retry-after: 3 is sent again after 3 s and succeeds; retry-after: 600 fails at once with one request (ratelimit.mjs)",
+    "ntfy sub answered 429 with retry-after: 14 reconnects after 14 s, not upstream's 10 s (ratelimit.mjs)",
+    "a dropped stream reconnects with since=<last id>: m1 m2 / m2 m3 / m4 runs the command for m1 m2 m3 m4 exactly once each; before any message it resumes from the open event's time (reconnect.mjs)",
+    "a message over 1 MiB (stdin or --message) is refused before any request; exactly 1 MiB is sent (size.mjs)",
+    "without the host module, ntfy pub reports that the runtime cannot open a connection and sends nothing (z-missing-host.mjs)",
+    "test/e2e/ntfy.test.mjs (Node entry, a real streaming server): a message's command runs before the next line is sent (it acks with a nested ntfy pub), a 60 KiB line split across chunks, Bearer auth, the missing host module"
+  ],
+  "patches": {
+    "0001-wasip1-slicc-host.patch": "every spec: the package does not build for wasip1 without it (cert/NEGATIVE.md). HTTP through ntfy_host in checklist.mjs and the missing-host case in z-missing-host.mjs; spawn of sh -c with the NTFY_* environment in checklist.mjs; --wait-pid's error in checklist.mjs; the per-line yield in test/e2e/ntfy.test.mjs.",
+    "0002-gateway-contract.patch": "since= resume and de-duplication in reconnect.mjs; Retry-After in ratelimit.mjs; 401/403 ending ntfy sub in auth.mjs; the 1 MiB refusal in size.mjs. Built without it, those specs fail (cert/NEGATIVE.md)."
+  }
+}
