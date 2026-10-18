@@ -98,6 +98,52 @@ export default async function (ctx) {
     assert.ok(reclaim.includes(`uid ${uid}`), `cone keeps ${uid}:\n${reclaim}`);
   }
 
+  const kgh = '/root/k1';
+  const exp = await sh('root', [
+    `rm -rf ${kgh}; mkdir -m 700 ${kgh}`,
+    `gpg --homedir ${kgh} ${GEN('K1 <k1@example.org>').replace(/^gpg /, '')} > /dev/null 2>&1; echo "kgen=$?"`,
+    `gpg --homedir ${kgh} --batch --armor --export k1@example.org > /tmp/k1.asc; echo "kexp=$?"`,
+    `gpgconf --homedir ${kgh} --kill gpg-agent`,
+  ].join('\n'));
+  assert.match(exp, /^kexp=0$/m, `root exports a public key:\n${exp}`);
+  const imp = await sh('root', [
+    `gpg --homedir ${h} --batch --import /tmp/k1.asc > /dev/null 2>&1; echo "imp=$?"`,
+    `gpgconf --homedir ${h} --kill gpg-agent`,
+    `stat -c "%n %U" ${h}/pubring.kbx ${h}/pubring.kbx~`,
+  ].join('\n'));
+  assert.match(imp, /^imp=0$/m, `root imports a key into cone's keybox:\n${imp}`);
+  assert.match(imp, /pubring\.kbx cone$/m, `pubring.kbx is cone's after root's import (2.4.9-10: root):\n${imp}`);
+  assert.match(imp, /pubring\.kbx~ cone$/m, `pubring.kbx~ is cone's after root's import (2.4.9-10: root):\n${imp}`);
+  const own = await sh('cone', [
+    `export GNUPGHOME=${h}`,
+    `${GEN('C4 <c4@example.org>')} 2>&1; echo "gen=$?"`,
+    'echo hi | gpg --batch --pinentry-mode loopback --passphrase "" --local-user c4@example.org --clearsign > /dev/null 2>&1; echo "sign=$?"',
+    'gpg --batch -k k1@example.org > /dev/null 2>&1; echo "k1=$?"',
+    'gpgconf --kill gpg-agent',
+  ].join('\n'));
+  for (const step of ['gen', 'sign', 'k1']) {
+    assert.match(own, new RegExp(`^${step}=0$`, 'm'), `cone's ${step} after root's import (2.4.9-10: no writable public keyring):\n${own}`);
+  }
+  assert.doesNotMatch(own, /no writable public keyring/, `cone's keyring stays writable:\n${own}`);
+  const h2 = '/home/cone/h2';
+  await sh('cone', `rm -rf ${h2}; mkdir -m 700 ${h2}`);
+  const fresh = await sh('root', [
+    `gpg --homedir ${h2} --batch --import /tmp/k1.asc > /dev/null 2>&1; echo "imp=$?"`,
+    `gpgconf --homedir ${h2} --kill gpg-agent`,
+    `for f in pubring.kbx pubring.kbx~ trustdb.gpg private-keys-v1.d; do [ -e ${h2}/$f ] && stat -c "%n %U" ${h2}/$f; done`,
+  ].join('\n'));
+  assert.match(fresh, /^imp=0$/m, `root imports into cone's empty homedir:\n${fresh}`);
+  for (const [line, , owner] of fresh.matchAll(/^(\S+) (\S+)$/gm)) {
+    if (/pubring\.kbx|trustdb\.gpg|private-keys-v1\.d/.test(line)) assert.equal(owner, 'cone', `a file root's gpg creates in cone's homedir is cone's (2.4.9-10: root): ${line}\n${fresh}`);
+  }
+  assert.match(fresh, /pubring\.kbx cone$/m, `root's gpg created cone's pubring.kbx:\n${fresh}`);
+  const fresh2 = await sh('cone', [
+    `export GNUPGHOME=${h2}`,
+    `${GEN('C5 <c5@example.org>')} 2>&1; echo "gen=$?"`,
+    'gpgconf --kill gpg-agent',
+  ].join('\n'));
+  assert.match(fresh2, /^gen=0$/m, `cone generates a key in the homedir root's gpg created a keybox in:\n${fresh2}`);
+
   // 3. gpgconf --lock / --unlock.
   const gl = await sh('cone', [
     `export GNUPGHOME=${h}`,
@@ -108,5 +154,5 @@ export default async function (ctx) {
   assert.match(gl, /--lock '[^']*pubring\.kbx': not supported on WASI/, `gpgconf --lock says it isn't supported:\n${gl}`);
   assert.match(gl, /--unlock '[^']*pubring\.kbx': not supported on WASI/, `gpgconf --unlock says it isn't supported:\n${gl}`);
   assert.doesNotMatch(gl, /^lock=0$/m, `gpgconf --lock fails:\n${gl}`);
-  console.log('locks: an empty keyring in a read-only directory lists with rc 0 (#955); after root uses cone\'s homedir its lock files are cone\'s and cone generates, signs and updates the trustdb, and an unlocked root-owned lock file is replaced (#888); gpgconf --lock/--unlock say they are not supported on WASI (#881)');
+  console.log('locks: an empty keyring in a read-only directory lists with rc 0 (#955); after root uses cone\'s homedir its lock files are cone\'s and cone generates, signs and updates the trustdb, and an unlocked root-owned lock file is replaced (#888); after root imports a key into cone\'s keybox, pubring.kbx and its backup are cone\'s and cone generates and signs, and a keybox root creates in cone\'s empty homedir is cone\'s (#1031); gpgconf --lock/--unlock say they are not supported on WASI (#881)');
 }

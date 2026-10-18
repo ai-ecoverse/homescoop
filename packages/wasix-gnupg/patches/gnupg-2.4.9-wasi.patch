@@ -256,6 +256,36 @@
              {
                log_error ("setsid() failed: %s\n", strerror(errno) );
                cleanup ();
+@@ -2353,8 +2388,27 @@
+       if (gnupg_mkdir (fname, "-rwx"))
+         log_error (_("can't create directory '%s': %s\n"),
+                    fname, strerror (errno) );
+-      else if (!opt.quiet)
+-        log_info (_("directory '%s' created\n"), fname);
++      else
++        {
++#ifdef __wasi__
++          /* homescoop#1031: a private-keys directory a root agent creates
++           * in someone else's homedir is the homedir's owner's.  */
++          struct stat hst, dst;
++          int dfd;
++
++          if (!geteuid () && !gnupg_stat (home, &hst)
++              && (dfd = open (fname, O_RDONLY | O_DIRECTORY | O_NOFOLLOW
++                              | O_CLOEXEC)) != -1)
++            {
++              if (!fstat (dfd, &dst) && S_ISDIR (dst.st_mode)
++                  && (dst.st_uid != hst.st_uid || dst.st_gid != hst.st_gid))
++                fchown (dfd, hst.st_uid, hst.st_gid);
++              close (dfd);
++            }
++#endif /*__wasi__*/
++          if (!opt.quiet)
++            log_info (_("directory '%s' created\n"), fname);
++        }
+ 
+       if (gnupg_chmod (fname, "-rwx"))
+         log_error (_("can't set permissions of '%s': %s\n"),
 --- a/tools/gpgconf-comp.c
 +++ b/tools/gpgconf-comp.c
 @@ -3038,9 +3038,15 @@
@@ -628,7 +658,18 @@
  
 --- a/kbx/keybox-update.c
 +++ b/kbx/keybox-update.c
-@@ -76,6 +76,35 @@
+@@ -25,6 +25,10 @@
+ #include <time.h>
+ #include <unistd.h>
+ #include <assert.h>
++#ifdef __wasi__
++#include <fcntl.h>
++#include <sys/stat.h>
++#endif
+ 
+ #include "keybox-defs.h"
+ #include "../common/sysutils.h"
+@@ -76,6 +80,35 @@
    gpg_error_t err;
  
    err = keybox_tmp_names (template, 0, r_bakfname, r_tmpfname);
@@ -664,11 +705,52 @@
    if (!err)
      {
        err = _keybox_ll_open (r_fp, *r_tmpfname, KEYBOX_LL_OPEN_CREATE);
-@@ -92,6 +121,41 @@
+@@ -92,6 +125,84 @@
  }
  
  
 +#ifdef __wasi__
++/* homescoop#1031: root's gpg updating someone else's keybox renames a
++ * root-created tmp file over it, so the owner's gpg finds no writable
++ * keyring afterwards.  Give a file this gpg just created to the owner of
++ * REF (the file it replaces) or, without one, of PATH's directory.  As in
++ * dotlock_fcntl_give, only a regular file with one link, opened without
++ * following a symlink, is given away.  */
++static void
++give_to_owner (const char *path, const char *ref)
++{
++  struct stat st, want;
++  char *dir, *p;
++  int fd, rc;
++
++  if (geteuid ())
++    return;
++  if (ref && !stat (ref, &want))
++    rc = 0;
++  else
++    {
++      dir = strdup (path);
++      if (!dir)
++        return;
++      p = strrchr (dir, '/');
++      if (p == dir)
++        p[1] = 0;
++      else if (p)
++        *p = 0;
++      rc = stat (p ? dir : ".", &want);
++      free (dir);
++    }
++  if (rc)
++    return;
++  fd = open (path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
++  if (fd == -1)
++    return;
++  if (!fstat (fd, &st) && S_ISREG (st.st_mode) && st.st_nlink == 1
++      && (st.st_uid != want.st_uid || st.st_gid != want.st_gid))
++    fchown (fd, want.st_uid, want.st_gid);
++  close (fd);
++}
++
 +/* Copy SRC to DST (homescoop#712).  See rename_tmp_file.  */
 +static int
 +copy_file_for_backup (const char *src, const char *dst)
@@ -682,6 +764,8 @@
 +  if (!in)
 +    return gpg_error_from_syserror ();
 +  out = fopen (dst, "wb");
++  if (!out && errno == EACCES && !gnupg_remove (dst))
++    out = fopen (dst, "wb");
 +  if (!out)
 +    {
 +      rc = gpg_error_from_syserror ();
@@ -706,7 +790,7 @@
  static int
  rename_tmp_file (const char *bakfname, const char *tmpfname,
                   const char *fname, int secret )
-@@ -118,8 +182,22 @@
+@@ -118,8 +229,23 @@
  /*    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)fname ); */
  
    /* First make a backup file except for secret keyboxes. */
@@ -720,6 +804,7 @@
 +      rc = copy_file_for_backup (fname, bakfname);
 +      if (rc)
 +        goto leave;
++      give_to_owner (bakfname, fname);
 +    }
 +  if (0)
 +#else
@@ -729,7 +814,27 @@
        block = 1;
        rc = gnupg_rename_file (fname, bakfname, &block);
        if (rc)
-@@ -346,6 +424,10 @@
+@@ -127,6 +253,9 @@
+     }
+ 
+   /* Then rename the file. */
++#ifdef __wasi__
++  give_to_owner (tmpfname, fname);
++#endif
+   rc = gnupg_rename_file (tmpfname, fname, NULL);
+   if (block)
+     {
+@@ -181,6 +310,9 @@
+       rc = _keybox_ll_open (&newfp, fname, KEYBOX_LL_OPEN_CREATE);
+       if (rc)
+         return rc;
++#ifdef __wasi__
++      give_to_owner (fname, NULL);
++#endif
+ 
+       rc = _keybox_write_header_blob (newfp, for_openpgp);
+       if (rc)
+@@ -346,6 +478,10 @@
    rc = rename_tmp_file (bakfname, tmpfname, fname, secret);
  
   leave:
@@ -742,7 +847,59 @@
    return rc;
 --- a/g10/keydb.c
 +++ b/g10/keydb.c
-@@ -351,6 +351,40 @@
+@@ -26,6 +26,9 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
++#ifdef __wasi__
++#include <fcntl.h>
++#endif
+ 
+ #include "gpg.h"
+ #include "../common/util.h"
+@@ -210,6 +213,41 @@
+    the keyring or keybox will be created.
+ 
+    Return 0 if it is okay to access the specified file.  */
++#ifdef __wasi__
++/* homescoop#1031: a keybox root's gpg creates in someone else's homedir
++ * belongs to the directory's owner, as its lock files do (homescoop#888).
++ * Only a regular file with one link, opened without following a symlink.  */
++static void
++wasi_give_to_dir_owner (const char *path)
++{
++  struct stat st, want;
++  char *dir, *p;
++  int fd, rc;
++
++  if (geteuid ())
++    return;
++  dir = xtrystrdup (path);
++  if (!dir)
++    return;
++  p = strrchr (dir, '/');
++  if (p == dir)
++    p[1] = 0;
++  else if (p)
++    *p = 0;
++  rc = stat (p ? dir : ".", &want);
++  xfree (dir);
++  if (rc)
++    return;
++  fd = open (path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
++  if (fd == -1)
++    return;
++  if (!fstat (fd, &st) && S_ISREG (st.st_mode) && st.st_nlink == 1
++      && (st.st_uid != want.st_uid || st.st_gid != want.st_gid))
++    fchown (fd, want.st_uid, want.st_gid);
++  close (fd);
++}
++#endif /*__wasi__*/
++
+ static gpg_error_t
+ maybe_create_keyring_or_box (char *filename, int is_box, int force_create)
+ {
+@@ -351,6 +389,43 @@
  
    /* The file does not yet exist, create it now. */
    oldmask = umask (077);
@@ -764,7 +921,10 @@
 +            rc = gpg_error_from_syserror ();
 +        }
 +      if (!rc)
-+        rc = gnupg_rename_file (tmp_fname, filename, NULL);
++        {
++          wasi_give_to_dir_owner (tmp_fname);
++          rc = gnupg_rename_file (tmp_fname, filename, NULL);
++        }
 +      umask (oldmask);
 +      if (rc)
 +        {
@@ -783,7 +943,7 @@
    if (is_secured_filename (filename))
      {
        iobuf = NULL;
-@@ -430,8 +464,78 @@
+@@ -430,8 +505,78 @@
     KEYDB_RESOURCE_TYPE_KEYBOX, KEYDB_RESOURCE_TYPE_KEYRING or
     KEYDB_RESOURCE_TYPE_KEYNONE.  If the file is a keybox and it has
     the OpenPGP flag set, then R_OPENPGP is also set.  */
@@ -881,3 +1041,28 @@
    if (!do_lock)
      flags |= DOTLOCK_LOCKED;
  
+--- a/g10/tdbio.c
++++ b/g10/tdbio.c
+@@ -742,6 +742,22 @@
+       db_fd = gnupg_open (db_name, O_RDWR | MY_O_BINARY, 0);
+       if (db_fd == -1)
+         log_fatal (_("can't open '%s': %s\n"), db_name, strerror (errno));
++#ifdef __wasi__
++      /* homescoop#1031: a trustdb root's gpg creates in someone else's
++       * homedir is the directory's owner's, as its lock files are
++       * (homescoop#888).  Only a regular file with one link.  */
++      if (!geteuid ())
++        {
++          struct stat st, dst;
++
++          *p = 0;
++          if (!fstat (db_fd, &st) && !stat (fname, &dst)
++              && S_ISREG (st.st_mode) && st.st_nlink == 1
++              && (st.st_uid != dst.st_uid || st.st_gid != dst.st_gid))
++            fchown (db_fd, dst.st_uid, dst.st_gid);
++          *p = save_slash;
++        }
++#endif /*__wasi__*/
+ 
+       rc = create_version_record (ctrl);
+       if (rc)
