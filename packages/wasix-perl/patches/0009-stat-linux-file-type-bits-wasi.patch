@@ -1,0 +1,56 @@
+pp_sys.c, ext/Fcntl/Fcntl.xs: Linux's file-type bits for FIFOs and sockets
+
+wasix-libc's S_IFIFO and S_IFSOCK are 0140000 and 0160000, and its S_IFMT
+is 0160000; Linux's are 0010000, 0140000 and 0170000 (homescoop#1015).
+perl's stat and lstat report the Linux bits for FIFOs and sockets, and
+Fcntl's S_IFMT, S_IFIFO and S_IFSOCK (which S_ISFIFO and S_ISSOCK use) are
+the Linux values, so scripts that compare raw modes with Linux octal
+literals work. -p and -S keep testing the raw mode in PL_statcache with
+libc's macros.
+
+--- a/pp_sys.c
++++ b/pp_sys.c
+@@ -3254,7 +3254,22 @@
+                 }
+             }
+         }
++#ifdef __wasi__
++        /* homescoop#1015: wasix-libc's S_IFIFO and S_IFSOCK are 0140000
++         * and 0160000 (and its S_IFMT 0160000).  Report Linux's file-type
++         * bits (0010000, 0140000), as Fcntl's constants do; -p and -S
++         * still test the raw mode in PL_statcache.  */
++        {
++            UV mode = (UV)PL_statcache.st_mode;
++            if ((mode & S_IFMT) == S_IFIFO)
++                mode = (mode & ~(UV)0170000) | 0010000;
++            else if ((mode & S_IFMT) == S_IFSOCK)
++                mode = (mode & ~(UV)0170000) | 0140000;
++            mPUSHu(mode);
++        }
++#else
+         mPUSHu(PL_statcache.st_mode);
++#endif
+         mPUSHu(PL_statcache.st_nlink);
+         
+         sv_setuid(PUSHmortal, PL_statcache.st_uid);
+--- a/ext/Fcntl/Fcntl.xs
++++ b/ext/Fcntl/Fcntl.xs
+@@ -19,6 +19,18 @@
+ #include <unistd.h>
+ #endif
+ 
++#ifdef __wasi__
++/* homescoop#1015: Linux's file-type bits for FIFOs and sockets, which
++ * perl's stat reports on wasix (wasix-libc's are 0140000 and 0160000,
++ * and its S_IFMT, 0160000, leaves out 0010000).  */
++#  undef S_IFMT
++#  define S_IFMT 0170000
++#  undef S_IFIFO
++#  define S_IFIFO 0010000
++#  undef S_IFSOCK
++#  define S_IFSOCK 0140000
++#endif
++
+ /* This comment is a kludge to get metaconfig to see the symbols
+     VAL_O_NONBLOCK
+     VAL_EAGAIN
