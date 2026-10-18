@@ -75,6 +75,8 @@ export interface TlsEngineModule {
   _tls_test_name_check_error(session: number): number;
   /** The negotiated ciphersuite's IANA number, 0 before the handshake. */
   _tls_ciphersuite(session: number): number;
+  /** The description number of the fatal alert the server sent (e.g. 116 certificate_required, 40 handshake_failure), -1 for none and for a server session. */
+  _tls_last_alert(session: number): number;
 }
 
 export interface TlsEngineOptions {
