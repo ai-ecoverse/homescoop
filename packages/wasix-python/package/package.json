@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-python",
-  "version": "3.14.2-28",
-  "description": "CPython 3.14 for slicc WASIX (commands python, python3; cross-built in CI on wasix-sysroot)",
+  "version": "3.15.0-1",
+  "description": "CPython 3.15 for slicc WASIX (commands python, python3; cross-built in CI on wasix-sysroot)",
   "license": "PSF-2.0 AND GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.120.0"
@@ -35,7 +35,7 @@
   },
   "homescoop": {
     "recipe": "wasix-python",
-    "upstream": "3.14.2"
+    "upstream": "3.15.0"
   },
   "slicc": {
     "abi": "wasi",
@@ -116,12 +116,12 @@
       }
     },
     "python": {
-      "version": "3.14",
-      "abi": "cp314",
+      "version": "3.15",
+      "abi": "cp315",
       "platform": "wasix_wasm32",
-      "soabi": "cpython-314-wasm32-wasix",
-      "stdlib": "lib/python3.14",
-      "sitePackages": "lib/python3.14/site-packages"
+      "soabi": "cpython-315-wasm32-wasix",
+      "stdlib": "lib/python3.15",
+      "sitePackages": "lib/python3.15/site-packages"
     }
   }
 }
