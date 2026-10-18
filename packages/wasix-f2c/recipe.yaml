@@ -1,0 +1,43 @@
+# Fortran 77 for slicc WASIX through f2c: a build input (libf2c.a, f2c.h,
+# the f2c translator's source and the gfortran -> f2c -> wasixcc wrapper)
+# that py-scipy compiles its Fortran with (homescoop A6 split).
+name: wasix-f2c
+builder: host
+runner: pool
+reproducible: true
+version: "3.2.1"
+npm: "@ai-ecoverse/wasix-f2c"
+summary: "Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with a host build script, and a gfortran -> f2c -> wasixcc wrapper"
+source:
+  # CLAPACK 3.2.1 (netlib; Pyodide's libf2c pin, same sha256): only
+  # F2CLIBS/libf2c is built.
+  url: "https://www.netlib.org/clapack/clapack.tgz"
+  sha256: "6dc4c382164beec8aaed8fd2acc36ad24232c406eda6db462bd4c41d5e455fac"
+sources:
+  f2c:
+    # hoodmane/f2c (f2c 20240504 with Pyodide's -R/ftnlen changes), the
+    # tool Pyodide's scipy build clones.
+    url: "https://github.com/hoodmane/f2c/archive/caa9abcaddd19154a5e6d77faa78b6289547bef5.tar.gz"
+    sha256: "70b365d32b93fe8f2814b28ec515730d63c17f102d0c801936cf722127c01adc"
+    commit: "caa9abcaddd19154a5e6d77faa78b6289547bef5"
+toolchain:
+  wasix_sysroot: "2025.9.30-38"
+  wasix_sysroot_sha256: "1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-f2c
+  license: SMLNJ AND MPL-2.0
+  notes: |
+    build.sh: libf2c from CLAPACK 3.2.1's F2CLIBS with patches/libf2c
+    0001-0007 (Pyodide's, as packages/py-scipy carried them) and make.inc,
+    compiled with the pinned wasixcc on wasix-sysroot -38, PIC with legacy
+    EH (scipy's side modules). arith.h is arith-wasm32.h, checked against the
+    host's arithchk. 0005 leaves c_abs/z_abs to OpenBLAS. The translator is
+    shipped as source (share/f2c/src) with bin/build-f2c.sh, which builds it
+    with the host cc at use time, so one tarball serves every build host.
+    bin/gfortran translates .f/.F with f2c -R and compiles with $WASIX_CC,
+    answers meson's identity probes itself, and takes project fixes from
+    $F2C_FIXES.

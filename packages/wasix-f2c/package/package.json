@@ -1,0 +1,36 @@
+{
+  "name": "@ai-ecoverse/wasix-f2c",
+  "version": "3.2.1-1",
+  "description": "Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc)",
+  "license": "SMLNJ AND MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-f2c/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-f2c",
+  "keywords": [
+    "wasm",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "f2c",
+    "fortran"
+  ],
+  "homescoop": {
+    "recipe": "wasix-f2c",
+    "upstream": "3.2.1"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "include",
+    "lib",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

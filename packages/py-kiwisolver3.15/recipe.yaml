@@ -1,0 +1,35 @@
+name: py-kiwisolver3.15
+builder: host
+# ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#569;
+# a no-op while repack: is set, it takes effect when the next release rebuilds).
+reproducible: true
+# renovate: datasource=pypi depName=kiwisolver
+version: "1.5.1"
+npm: "@ai-ecoverse/py-kiwisolver"
+npm-tag: "python3.15"
+summary: "kiwisolver for slicc WASIX CPython 3.15"
+source:
+  url: "https://files.pythonhosted.org/packages/source/k/kiwisolver/kiwisolver-{{version}}.tar.gz"
+  sha256: "f1303ef2eec81262a4b708c3e858afe58d7c75ad91c1c05266eda7673369859a"
+sources:
+  cppy:
+    url: "https://files.pythonhosted.org/packages/source/c/cppy/cppy-1.3.1.tar.gz"
+    sha256: "55b5307c11874f242ea135396f398cb67a5bbde4fab3e3c3294ea5fce43a6d68"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python]
+about:
+  license: BSD-3-Clause
+  notes: |
+    Cross-built from the sdist with wasixcc++ (legacy wasm EH, PIC) as a
+    dylink.0 side module against wasix-python 3.15.0-1's headers and the
+    libc++ headers of the C++ runtime python.wasm exports (wasix-libc
+    v2026-07-03.1 sysroot-ehpic). Wheel tag cp315-wasix_wasm32; native
+    _cext.cpython-315-wasm32-wasix.so.

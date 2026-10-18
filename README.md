@@ -110,12 +110,15 @@ versions are on npm.
 | [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) | [recipe](packages/py-cycler) | cycler for slicc WASIX CPython |
 | [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fonttools for slicc WASIX CPython |
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
+| [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) (dist-tag `python3.15`) | [recipe](packages/py-kiwisolver3.15) | kiwisolver for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy 2.3.2 for slicc WASIX CPython 3.14 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) (dist-tag `python3.15`) | [recipe](packages/py-numpy3.15) | NumPy 2.5.4 for slicc WASIX CPython 3.15 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32 side modules) |
+| [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) (dist-tag `python3.15`) | [recipe](packages/py-pandas3.15) | Pandas 3.0.6 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules) |
 | [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
+| [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) (dist-tag `python3.15`) | [recipe](packages/py-pillow3.15) | Pillow for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-pyparsing`](https://www.npmjs.com/package/@ai-ecoverse/py-pyparsing) | [recipe](packages/py-pyparsing) | pyparsing for slicc WASIX CPython |
 | [`@ai-ecoverse/py-python-dateutil`](https://www.npmjs.com/package/@ai-ecoverse/py-python-dateutil) | [recipe](packages/py-python-dateutil) | python-dateutil for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pytz`](https://www.npmjs.com/package/@ai-ecoverse/py-pytz) | [recipe](packages/py-pytz) | pytz for slicc WASIX CPython |
@@ -153,6 +156,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasi-zig-libc-src`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig-libc-src) | [recipe](packages/wasi-zig-libc-src) | wasi-libc's C sources for @ai-ecoverse/wasi-zig: zig cc for wasm32-wasi CPUs and modes beyond the prebuilt baseline |
 | [`@ai-ecoverse/wasix-autoconf`](https://www.npmjs.com/package/@ai-ecoverse/wasix-autoconf) | [recipe](packages/wasix-autoconf) | GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4) |
 | [`@ai-ecoverse/wasix-automake`](https://www.npmjs.com/package/@ai-ecoverse/wasix-automake) | [recipe](packages/wasix-automake) | GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4) |
+| [`@ai-ecoverse/wasix-f2c`](https://www.npmjs.com/package/@ai-ecoverse/wasix-f2c) | [recipe](packages/wasix-f2c) | Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc) |
 | [`@ai-ecoverse/wasix-gnupg`](https://www.npmjs.com/package/@ai-ecoverse/wasix-gnupg) | [recipe](packages/wasix-gnupg) | GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -34: user ids and signal masks from slicc-kernel) |
 | [`@ai-ecoverse/wasix-m4`](https://www.npmjs.com/package/@ai-ecoverse/wasix-m4) | [recipe](packages/wasix-m4) | GNU m4 1.4.20 for slicc WASIX |
 | [`@ai-ecoverse/wasix-openblas`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openblas) | [recipe](packages/wasix-openblas) | OpenBLAS 0.3.28 for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config |

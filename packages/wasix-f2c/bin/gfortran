@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+# gfortran for wasm32-wasix: Fortran 77 through f2c, then the C compiler.
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0 (http://mozilla.org/MPL/2.0/): the f2c replay below follows
+# pyodide-build's _f2c_fixes.py / pywasmcross (Pyodide, MPL-2.0), as
+# packages/py-scipy/tools/gfortran did. homescoop's changes are under the
+# same licence.
+"""gfortran → f2c → $WASIX_CC.
+
+- A compile of .f/.F sources: each is translated with `f2c -R` (Fortran REAL
+  functions return float, as OpenBLAS's f2c'd LAPACK does) next to the
+  source (.F first through the C preprocessor), and the C is compiled with
+  $WASIX_CC (default wasixcc) and -I<package>/include for f2c.h. gfortran-only
+  flags are dropped.
+- Link-only calls (no Fortran source) go to $WASIX_CC as they are. A link
+  that produces an executable from Fortran (no -c, no -shared) adds
+  <package>/lib/libf2c.a, as gfortran adds libgfortran.
+- meson's identity probes (--version, -v, -dumpversion, -dumpfullversion,
+  -E -dM -) are answered here as GNU Fortran 13.2.0 for wasm32-wasi, so no
+  host gfortran is needed. Anything else without a source goes to
+  $REAL_GFORTRAN if it's set, else fails.
+
+Environment:
+  F2C_PATH     the f2c to run (default: f2c on PATH, else bin/build-f2c.sh
+               builds it once into $WASIX_F2C_CACHE or ~/.cache/wasix-f2c)
+  WASIX_CC     the C compiler (default wasixcc)
+  F2C_INCLUDE  where f2c.h is (default <package>/include)
+  F2C_FIXES    a Python file with optional fix_f2c_input(path),
+               fix_f2c_output(path) and fix_args(args) hooks (scipy's fixes)
+  REAL_GFORTRAN  a host gfortran for other probes (optional)
+"""
+from __future__ import annotations
+
+import importlib.util
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+PKG = Path(__file__).resolve().parent.parent
+GFORTRAN_VERSION = "13.2.0"
+FORTRAN_SUFFIXES = (".f", ".F", ".for", ".FOR", ".f77", ".F77")
+DROP_EXACT = {"-ffixed-form", "-ffree-form", "-fno-second-underscore", "-fPIC", "-fpic", "-cpp", "-nocpp"}
+DROP_PREFIX = ("-fallow-", "-fdefault-", "-fblas-", "-J", "-finit-", "-freal-", "-fimplicit-", "-fcheck",
+               "-ffpe-", "-fbacktrace", "-frecursive", "-std=", "-fmodule", "-ffixed-line-length", "-fno-automatic")
+
+
+def hooks():
+    path = os.environ.get("F2C_FIXES")
+    if not path:
+        return None
+    spec = importlib.util.spec_from_file_location("wasix_f2c_fixes", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def hook(mod, name, *args):
+    fn = getattr(mod, name, None) if mod else None
+    if fn:
+        fn(*args)
+
+
+def f2c_path() -> str:
+    if os.environ.get("F2C_PATH"):
+        return os.environ["F2C_PATH"]
+    found = shutil.which("f2c")
+    if found:
+        return found
+    out = subprocess.run([str(PKG / "bin" / "build-f2c.sh")], check=True, stdout=subprocess.PIPE, text=True).stdout
+    return out.strip().splitlines()[-1]
+
+
+def wasix_cc() -> str:
+    return os.environ.get("WASIX_CC", "wasixcc")
+
+
+def probe(argv: list[str]) -> int | None:
+    """meson's identity probes, answered as GNU Fortran for wasm32-wasi."""
+    if argv in (["--version"], ["-v", "--version"]):
+        print(f"GNU Fortran (wasix-f2c: f2c -R and {wasix_cc()}) {GFORTRAN_VERSION}")
+        print("This is f2c translating Fortran 77 to C for wasm32-wasix, not GNU Fortran.")
+        return 0
+    if argv in (["-dumpversion"], ["-dumpfullversion"]):
+        print(GFORTRAN_VERSION)
+        return 0
+    if argv == ["-v"]:
+        print(f"Target: wasm32-wasi\ngcc version {GFORTRAN_VERSION} (wasix-f2c)", file=sys.stderr)
+        return 0
+    if "-E" in argv and "-dM" in argv and argv[-1] == "-":
+        defs = subprocess.run([wasix_cc(), "-E", "-dM", "-x", "c", "-"], stdin=subprocess.DEVNULL,
+                              check=True, stdout=subprocess.PIPE, text=True).stdout
+        major, minor, patch = GFORTRAN_VERSION.split(".")
+        keep = [l for l in defs.splitlines() if not l.startswith(("#define __GNUC__", "#define __GNUC_MINOR__", "#define __GNUC_PATCHLEVEL__", "#define __clang"))]
+        keep += [f"#define __GNUC__ {major}", f"#define __GNUC_MINOR__ {minor}", f"#define __GNUC_PATCHLEVEL__ {patch}", "#define __GFORTRAN__ 1"]
+        print("\n".join(sorted(keep)))
+        return 0
+    return None
+
+
+def translate(src: str, mod) -> str:
+    """f2c -R one Fortran source next to itself; returns the .c path."""
+    path = Path(src).resolve()
+    hook(mod, "fix_f2c_input", Path(src))
+    if path.suffix in (".F", ".F77"):
+        pre = path.with_suffix(".f77")
+        subprocess.check_call([wasix_cc(), "-E", "-P", "-C", "-traditional-cpp", "-x", "c", str(path), "-o", str(pre)])
+        path = pre
+    out = path.with_suffix(".c")
+    with open(path) as fin, open(out, "w") as fout:
+        subprocess.check_call([f2c_path(), "-R"], stdin=fin, stdout=fout, cwd=path.parent)
+    c = str(Path(src).with_suffix(".c")) if Path(src).suffix not in (".F", ".F77") else str(out)
+    hook(mod, "fix_f2c_output", Path(c))
+    return c
+
+
+def main() -> int:
+    argv = sys.argv[1:]
+    sources = [a for a in argv if a.endswith(FORTRAN_SUFFIXES) and not a.startswith("-")]
+    if not sources:
+        answered = probe(argv)
+        if answered is not None:
+            return answered
+        if any(a.startswith("-Wl,") or a in ("-shared", "-dynamiclib") or a.endswith((".o", ".a", ".so", ".wasm"))
+               for a in argv):
+            os.execvp(wasix_cc(), [wasix_cc(), *argv])
+        real = os.environ.get("REAL_GFORTRAN")
+        if real:
+            os.execvp(real, [real, *argv])
+        print(f"wasix-f2c gfortran: nothing to translate or link in {' '.join(argv)!r} (set REAL_GFORTRAN for other queries)", file=sys.stderr)
+        return 2
+
+    mod = hooks()
+    args = [wasix_cc()]
+    for a in argv:
+        if a in sources:
+            args.append(translate(a, mod))
+        elif a in DROP_EXACT or a.startswith(DROP_PREFIX):
+            continue
+        else:
+            args.append(a)
+    args.insert(1, f"-I{os.environ.get('F2C_INCLUDE', str(PKG / 'include'))}")
+    links = "-c" not in argv and "-E" not in argv and "-S" not in argv
+    if links and "-shared" not in argv:
+        args += [str(PKG / "lib" / "libf2c.a"), "-lm"]
+    hook(mod, "fix_args", args)
+    os.execvp(args[0], args)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
