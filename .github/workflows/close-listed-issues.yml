@@ -46,6 +46,14 @@ jobs:
       - name: Close the issues a merged PR lists after a closing keyword
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMITS: ${{ github.event_name == 'push' && join(github.event.commits.*.id, ',') || inputs.commits }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          COMMITS: ${{ inputs.commits }}
           DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run && '--dry-run' || '' }}
-        run: node scripts/gate.mjs close-listed-issues -- node scripts/close-listed-issues.mjs --commits "$COMMITS" $DRY
+        run: |
+          if [ "$EVENT" = push ]; then
+            node scripts/gate.mjs close-listed-issues -- node scripts/close-listed-issues.mjs --before "$BEFORE" --after "$AFTER"
+          else
+            node scripts/gate.mjs close-listed-issues -- node scripts/close-listed-issues.mjs --commits "$COMMITS" $DRY
+          fi
