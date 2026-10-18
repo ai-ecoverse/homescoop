@@ -1,0 +1,198 @@
+wasm call_indirect checks the callee's exact signature: CPython calls
+METH_NOARGS methods as f(self, NULL) and PyGetSetDef getters as
+get(self, closure), so the one-parameter definitions trap with
+"function signature mismatch" (homescoop#197). Give each its unused
+second parameter.
+
+--- a/py/src/constraint.cpp
++++ b/py/src/constraint.cpp
+@@ -124,13 +124,13 @@ Constraint_repr(Constraint *self)
+ }
+ 
+ PyObject *
+-Constraint_expression(Constraint *self)
++Constraint_expression(Constraint *self, PyObject*)
+ {
+     return cppy::incref(self->expression);
+ }
+ 
+ PyObject *
+-Constraint_op(Constraint *self)
++Constraint_op(Constraint *self, PyObject*)
+ {
+     PyObject *res = 0;
+ 
+@@ -154,7 +154,7 @@ Constraint_op(Constraint *self)
+ }
+ 
+ PyObject *
+-Constraint_strength(Constraint *self)
++Constraint_strength(Constraint *self, PyObject*)
+ {
+     ACQUIRE_GLOBAL_LOCK();
+     double strength = self->constraint.strength();
+@@ -163,7 +163,7 @@ Constraint_strength(Constraint *self)
+ }
+ 
+ PyObject *
+-Constraint_violated(Constraint *self)
++Constraint_violated(Constraint *self, PyObject*)
+ {
+     ACQUIRE_GLOBAL_LOCK();
+     bool violated = self->constraint.violated();
+--- a/py/src/expression.cpp
++++ b/py/src/expression.cpp
+@@ -101,21 +101,21 @@ Expression_repr( Expression* self )
+ 
+ 
+ PyObject*
+-Expression_terms( Expression* self )
++Expression_terms( Expression* self, PyObject* )
+ {
+     return cppy::incref( self->terms );
+ }
+ 
+ 
+ PyObject*
+-Expression_constant( Expression* self )
++Expression_constant( Expression* self, PyObject* )
+ {
+     return PyFloat_FromDouble( self->constant );
+ }
+ 
+ 
+ PyObject*
+-Expression_value( Expression* self )
++Expression_value( Expression* self, PyObject* )
+ {
+     double result = self->constant;
+     Py_ssize_t size = PyTuple_GET_SIZE( self->terms );
+--- a/py/src/solver.cpp
++++ b/py/src/solver.cpp
+@@ -208,7 +208,7 @@ Solver_suggestValue( Solver* self, PyObject* args )
+ 
+ 
+ PyObject*
+-Solver_updateVariables( Solver* self )
++Solver_updateVariables( Solver* self, PyObject* )
+ {
+ 	ACQUIRE_GLOBAL_LOCK();
+ 	self->solver.updateVariables();
+@@ -218,7 +218,7 @@ Solver_updateVariables( Solver* self )
+ 
+ 
+ PyObject*
+-Solver_reset( Solver* self )
++Solver_reset( Solver* self, PyObject* )
+ {
+ 	ACQUIRE_GLOBAL_LOCK();
+ 	self->solver.reset();
+@@ -228,7 +228,7 @@ Solver_reset( Solver* self )
+ 
+ 
+ PyObject*
+-Solver_dump( Solver* self )
++Solver_dump( Solver* self, PyObject* )
+ {
+ 	ACQUIRE_GLOBAL_LOCK();
+ 	std::string dumps = self->solver.dumps();
+@@ -239,7 +239,7 @@ Solver_dump( Solver* self )
+ }
+ 
+ PyObject*
+-Solver_dumps( Solver* self )
++Solver_dumps( Solver* self, PyObject* )
+ {
+ 	ACQUIRE_GLOBAL_LOCK();
+ 	std::string dumps = self->solver.dumps();
+--- a/py/src/strength.cpp
++++ b/py/src/strength.cpp
+@@ -35,28 +35,28 @@ strength_dealloc( PyObject* self )
+ 
+ 
+ PyObject*
+-strength_weak( strength* self )
++strength_weak( strength* self, void* )
+ {
+ 	return PyFloat_FromDouble( kiwi::strength::weak );
+ }
+ 
+ 
+ PyObject*
+-strength_medium( strength* self )
++strength_medium( strength* self, void* )
+ {
+ 	return PyFloat_FromDouble( kiwi::strength::medium );
+ }
+ 
+ 
+ PyObject*
+-strength_strong( strength* self )
++strength_strong( strength* self, void* )
+ {
+ 	return PyFloat_FromDouble( kiwi::strength::strong );
+ }
+ 
+ 
+ PyObject*
+-strength_required( strength* self )
++strength_required( strength* self, void* )
+ {
+ 	return PyFloat_FromDouble( kiwi::strength::required );
+ }
+--- a/py/src/term.cpp
++++ b/py/src/term.cpp
+@@ -87,21 +87,21 @@ Term_repr( Term* self )
+ 
+ 
+ PyObject*
+-Term_variable( Term* self )
++Term_variable( Term* self, PyObject* )
+ {
+ 	return cppy::incref( self->variable );
+ }
+ 
+ 
+ PyObject*
+-Term_coefficient( Term* self )
++Term_coefficient( Term* self, PyObject* )
+ {
+ 	return PyFloat_FromDouble( self->coefficient );
+ }
+ 
+ 
+ PyObject*
+-Term_value( Term* self )
++Term_value( Term* self, PyObject* )
+ {
+ 	Variable* pyvar = reinterpret_cast<Variable*>( self->variable );
+ 	ACQUIRE_GLOBAL_LOCK();
+--- a/py/src/variable.cpp
++++ b/py/src/variable.cpp
+@@ -103,7 +103,7 @@ Variable_repr( Variable* self )
+ 
+ 
+ PyObject*
+-Variable_name( Variable* self )
++Variable_name( Variable* self, PyObject* )
+ {
+ 	ACQUIRE_GLOBAL_LOCK();
+ 	std::string name = self->variable.name();
+@@ -139,7 +139,7 @@ Variable_context_locked( Variable* self )
+ 
+ 
+ PyObject*
+-Variable_context( Variable* self )
++Variable_context( Variable* self, PyObject* )
+ {
+ 	PyObject* context;
+ 	Py_BEGIN_CRITICAL_SECTION(self);
+@@ -170,7 +170,7 @@ Variable_setContext( Variable* self, PyObject* value )
+ 
+ 
+ PyObject*
+-Variable_value( Variable* self )
++Variable_value( Variable* self, PyObject* )
+ {
+ 	ACQUIRE_GLOBAL_LOCK();
+ 	double value = self->variable.value();
