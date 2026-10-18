@@ -31,3 +31,16 @@ error: undefined symbol: __syscall_uname
 
 6.0.9-19's objects have no such import. 0012 ships `slicc-writev.js`, `slicc-linkat.js` and `slicc-uname.js` in `lib/slicc/`, and adds them as `--js-library` defaults. The default link also gets `homescoop_slicc_keep_exports`'s `-u slicc_raise`, `slicc_sig_mask`, `slicc_sigpipe` and `slicc_cred_euid`, plus `--wrap=raise`, so it matches `homescoop_em_cli_ldflags`. build.sh's PRESTAGE now links a program that calls `uname`, `link`, `getuid`, `getrlimit` and `raise` with the packaged defaults, and runs it under node: `uname 0 Emscripten`, and the SIGUSR1 handler runs.
 
+
+## 6.0.9-21: the companion pins and the -Werror link (homescoop#1028, #1069; 2026-10-18)
+
+`test/pinned-cache.mjs` runs emscripten-cache's cert on the exact emscripten-cache version a tarball pins. The published 6.0.9-20 pins 6.0.9-3, which fails it:
+
+```text
+AssertionError: libraries name a build path in their DWARF (patch 0011 maps the cache and the llvm root): libGL-getprocaddr: /Users/trieloff/Developer/ai-ecoverse/slicc-emscripten/cache/sysroot/include | …
+FAIL the pinned emscripten-cache 6.0.9-3 fails its cert against this tree
+```
+
+With that row out of the way, its `libc.a` still lacks `epoll_create1`, `ppoll` and `__syscall_pipe`, which the 6.0.9 headers declare. 6.0.9-21 pins 6.0.9-4, the CI build from the same tree, and passes. wasm-binaryen moves from 132.0.0-2 to 132.0.0-3, the CI build of binaryen d03c25ea, which has the credential library.
+
+On 6.0.9-20 a default link that pulls in `lib/slicc/slicc-linkat.js` warns `signature redefinition for: __syscall_linkat__sig`, so `-Werror` links fail (#1069). Emscripten's `libsigs.js` already has the same `'iipipi'`. 6.0.9-21 ships the file without that line, and PRESTAGE links `calls.c` with `-Werror` and requires the warning to be absent.
