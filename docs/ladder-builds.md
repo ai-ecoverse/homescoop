@@ -333,7 +333,8 @@ resolved URL differs from the one at the merge-base with the PR's base
 (`--base`, default `origin/main`; `RECIPE_SHA_BASE` overrides it). A package that
 is new at the base counts as a changed URL. Even then, only a pin carried over
 from the base (Renovate bumps only `version:`) or an empty one is refreshed: a pin
-the branch already set fails when its bytes move. When the URL is unchanged and the
+the branch already set fails when its bytes move. So a new package's recipe
+carries either the right sha256 or an empty one (`sha256: ""`), which gets filled in. When the URL is unchanged and the
 bytes differ from the pin, it prints
 `recipe-sha: FAIL <pkg>: <url> changed bytes for an unchanged URL (pinned <old>, got <new>)`,
 exits non-zero and writes nothing, so the job pushes nothing. A person decides.
