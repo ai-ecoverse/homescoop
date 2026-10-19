@@ -1,0 +1,105 @@
+wasi-libc dlmalloc: refresh the thread's view of the shared memory before
+returning a block above it (homescoop#1287, slicc-kernel#1172).
+
+Applies to wasix-libc v2026-07-03.1 and to wasi-libc 2e6fb9d8 (wasi-sdk 34):
+dlmalloc/src/dlmalloc.c is the same file in both. patch -p1 from the libc root.
+
+
+--- a/dlmalloc/src/dlmalloc.c
++++ b/dlmalloc/src/dlmalloc.c
+@@ -2,6 +2,7 @@
+ // It sets configuration flags and controls which symbols are exported.
+ 
+ #include <stddef.h>
++#include <stdint.h>
+ #include <malloc.h>
+ 
+ // Define configuration macros for dlmalloc.
+@@ -62,10 +63,36 @@
+ // Include the upstream dlmalloc's malloc.c.
+ #include "malloc.c"
+ 
++// homescoop#1287 (slicc-kernel#1172): refresh this thread's view of the
++// shared memory before handing out a block above it.
++//
++// With shared memory, another thread's sbrk can grow the memory
++// (memory.grow) and malloc can then give this thread a block from the new
++// pages while V8 still holds this thread's old memory length (it refreshes
++// it lazily, at an interrupt or a stack check). Plain loads and stores are
++// fine, but bulk-memory memory.fill/memory.copy (what memset and memcpy
++// compile to) are checked against the stale length and trap "memory access
++// out of bounds". memory.grow(0) on this thread refreshes the view, so a
++// block that ends above it gets one before it is returned. calloc and
++// realloc do their own memset/memcpy only after that check (dlcalloc's and
++// dlrealloc's internal ones could meet the stale length). A block below the
++// view, the common case, costs one memory.size.
++//
++// This file is the same in wasix-libc and wasi-libc, so the patch applies
++// to both (homescoop packages/wasix-sysroot/patches/dlmalloc-memory-view.patch).
++static inline void *__slicc_memory_view(void *ptr, size_t size) {
++    if (ptr != 0 &&
++        (unsigned long long)(uintptr_t)ptr + size >
++            (unsigned long long)__builtin_wasm_memory_size(0) * 65536ull) {
++        __builtin_wasm_memory_grow(0, 0);
++    }
++    return ptr;
++}
++
+ // Export the public names.
+ 
+ void *malloc(size_t size) {
+-    return dlmalloc(size);
++    return __slicc_memory_view(dlmalloc(size), size);
+ }
+ 
+ void free(void *ptr) {
+@@ -73,19 +100,45 @@
+ }
+ 
+ void *calloc(size_t nmemb, size_t size) {
+-    return dlcalloc(nmemb, size);
++    // dlcalloc's overflow check, then dlmalloc + the view check + memset
++    // (HAVE_MMAP is 0, so every chunk must be cleared).
++    size_t req = 0;
++    if (nmemb != 0) {
++        req = nmemb * size;
++        if (((nmemb | size) & ~(size_t)0xffff) && (req / nmemb != size))
++            req = MAX_SIZE_T; /* force downstream failure on overflow */
++    }
++    void *mem = __slicc_memory_view(dlmalloc(req), req);
++    if (mem != 0)
++        memset(mem, 0, req);
++    return mem;
+ }
+ 
+ void *realloc(void *ptr, size_t size) {
+-    return dlrealloc(ptr, size);
++    // dlrealloc, with its move (malloc + memcpy + free) done after the view
++    // check: in place if it can be, else a new block.
++    if (ptr == 0)
++        return malloc(size);
++    if (dlrealloc_in_place(ptr, size) == ptr)
++        return __slicc_memory_view(ptr, size);
++    void *mem = malloc(size);
++    if (mem != 0) {
++        size_t old = dlmalloc_usable_size(ptr);
++        memcpy(mem, ptr, old < size ? old : size);
++        dlfree(ptr);
++    }
++    return mem;
+ }
+ 
+ int posix_memalign(void **memptr, size_t alignment, size_t size) {
+-    return dlposix_memalign(memptr, alignment, size);
++    int r = dlposix_memalign(memptr, alignment, size);
++    if (r == 0)
++        __slicc_memory_view(*memptr, size);
++    return r;
+ }
+ 
+ void* aligned_alloc(size_t alignment, size_t bytes) {
+-    return dlmemalign(alignment, bytes);
++    return __slicc_memory_view(dlmemalign(alignment, bytes), bytes);
+ }
+ 
+ size_t malloc_usable_size(void *ptr) {

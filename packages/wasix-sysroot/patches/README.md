@@ -423,3 +423,16 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
 - **The kernel half:** slicc-kernel 1.125.0 (#1054) reports `nbytes` as the bytes a read gets at once, 0 when empty. Older kernels report 1, so `POLLIN|POLLHUP` stays there.
 - **Unchanged:** stream sockets at EOF keep `POLLIN|POLLHUP`, and a non-hangup event never loses `POLLIN`, so a `SHUT_WR` half-close still wakes the reader.
 - **Tests:** `test/r36.c` adds those socket rows. r36 and r38 also run on 1.125.0, whose `path_mode`/`fd_mode` answer for `/dev` nodes (slicc-kernel#1039).
+
+## `dlmalloc-memory-view.patch` — refresh the thread's memory view (homescoop#1287)
+
+Upstream: `dlmalloc/src/dlmalloc.c`, the wrapper around dlmalloc's `malloc.c`. It's the same file in wasix-libc v2026-07-03.1 and wasi-libc 2e6fb9d8 (wasi-sdk 34), so this one patch serves both: `build-source.sh` applies it to every variant's source, and the wasi-sdk sysroot for wasm32-wasip1-threads takes the same file (t4h9).
+
+With a shared memory, V8 refreshes another thread's cached memory length lazily, at its next interrupt or stack check (slicc-kernel#1172). malloc on thread A grows the memory (`sbrk` → `memory.grow`); malloc on thread B then hands out a block from the new pages; B's inlined `memory.fill`/`memory.copy` (memset/memcpy) is checked against the stale length and traps "memory access out of bounds". Plain stores aren't affected.
+
+The public wrappers call `memory.grow(0)`, which refreshes this thread's view, when the block they return ends above `memory.size`:
+- `malloc`, `posix_memalign` and `aligned_alloc` check the block they return;
+- `calloc` is `dlmalloc` + the check + `memset` (dlcalloc's own memset would come before any check);
+- `realloc` is `dlrealloc_in_place`, else `malloc` (checked) + `memcpy` + `free` (dlrealloc's own move would copy before any check).
+
+`sbrk` is unchanged: the thread that grows sees its own grow. No upstream report (project rule).

@@ -61,6 +61,12 @@ variant() {
   tar xzf "$LIBC_TGZ" -C "$W" --strip-components=1
   rm -rf "$W/tools/llvm-project"
   ln -s "$LLVM_SRC" "$W/tools/llvm-project"
+  # -39 (homescoop#1287, slicc-kernel#1172): dlmalloc refreshes this thread's
+  # view of the shared memory (memory.grow(0)) before it returns a block
+  # above it, so a memset/memcpy into memory another thread's sbrk just grew
+  # can't trap on V8's stale length. The same .patch applies to wasi-libc.
+  patch -d "$W" -p1 -s <"$HOMESCOOP_PKG/patches/dlmalloc-memory-view.patch"
+  grep -q __slicc_memory_view "$W/dlmalloc/src/dlmalloc.c"
   # -37 (homescoop#1015, #1112): Linux's (and musl's) file-type bits in
   # __mode_t.h, so st_mode means the same as everywhere else: wasi-libc had
   # S_IFIFO 0140000 (Linux's S_IFSOCK), S_IFSOCK 0160000 and S_IFMT 0160000
