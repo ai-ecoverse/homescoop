@@ -64,9 +64,8 @@ Not a negative proof but the reason for this release. pnpm-agent-loop run 391817
 
 ## 12.9.1-15: the project directory and the pin (patches/0007, 0008; thr_r75dacjwyi, 2026-10-19)
 
-The published 12.9.1-13 against `cert/project-dir.mjs` (slicc-kernel 1.128.0, users enforce, as root with a `/node_modules`, `--soft`): **FAIL, 5 of 9 assertions.**
+The published 12.9.1-13 against `cert/project-dir.mjs` (slicc-kernel 1.128.0, users enforce, as root with a `/node_modules`, `--soft`): **FAIL, 6 of 9 assertions.**
 - `pnpm add tiny` in `/tmp/empty`, which has no package.json, exits 1 with `ERR_PNPM_PACKAGE_MANIFEST_IO_ERROR … No such file or directory (os error 44)`, and `/tmp/empty/package.json` has no `tiny`. pnpm walked up to `/`, whose `node_modules` is a project marker.
-- `pnpm init` with a registry whose latest pnpm is 99.0.0 pins `packageManager: pnpm@99.0.0` and `devEngines.packageManager: {version: 99.0.0, onFail: download}`. The next `pnpm add tiny` then fails with `× resolve pnpm@99.0.0` (in a live seven, against the real registry: ERR_PNPM_UNSUPPORTED_RUNTIME for 12.14.0).
+- `pnpm init`, with a registry whose latest pnpm is 99.0.0, pins `packageManager: pnpm@99.0.0` and `devEngines.packageManager: {version: 99.0.0, onFail: download}`. The next `pnpm add tiny` fails with **`ERR_PNPM_UNSUPPORTED_RUNTIME` × This WebContainer runtime cannot install or switch to pnpm v99.0.0**, the live seven's error (there it was 12.14.0).
 
-(12.9.1-14, the same pnpm code, behaves the same.) 0007 pins the running pnpm on wasm, and 0008 stops the prefix walk below `/` unless pnpm runs in `/`.
-
+A local build of 12.9.1-15 (macOS, the same patches) passes all 9. pnpm resolves its own pin, the running 12.9.1, from the default registry whatever `--registry` says, so the spec's stub answers registry.npmjs.org's `/pnpm` too (12.9.1 and 99.0.0). 0007 pins the running pnpm on wasm, and 0008 stops the prefix walk below `/` unless pnpm runs in `/`.

@@ -16,20 +16,38 @@ import { tarball } from '../test/fixtures/registry.mjs';
 const REGISTRY = 'http://registry.test/';
 const tgz = tarball({ 'package.json': JSON.stringify({ name: 'tiny', version: '1.0.0', main: 'index.js' }), 'index.js': 'module.exports = 1;\n' });
 const TINY = { tgz: tgz.toString('base64'), integrity: `sha512-${createHash('sha512').update(tgz).digest('base64')}` };
+// pnpm's own packument: the running version (a pinned project resolves it as
+// a config dependency, from the default registry) and a newer latest.
+const PNPM = {};
+for (const v of ['12.9.1', '99.0.0']) {
+  const t = tarball({ 'package.json': JSON.stringify({ name: 'pnpm', version: v, bin: { pnpm: 'bin/pnpm.cjs' } }), 'bin/pnpm.cjs': '' });
+  PNPM[v] = { tgz: t.toString('base64'), integrity: `sha512-${createHash('sha512').update(t).digest('base64')}` };
+}
 const registry = {
   toString: () => `(req) => {
     const TINY = ${JSON.stringify(TINY)};
+    const PNPM = ${JSON.stringify(PNPM)};
     const BASE = ${JSON.stringify(REGISTRY)};
     const json = (body) => ({ headers: [['content-type', 'application/json']], body: JSON.stringify(body) });
     const u = new URL(req.url);
+    const bytes = (b64) => ({ headers: [['content-type', 'application/octet-stream']], body: Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)) });
+    // pnpm resolves its own pin from the default registry, whatever --registry says.
+    if (u.host === 'registry.npmjs.org' || u.host === 'registry.test') {
+      const m = /^\\/pnpm\\/-\\/pnpm-(\\d+\\.\\d+\\.\\d+)\\.tgz$/.exec(u.pathname);
+      if (m && PNPM[m[1]]) return bytes(PNPM[m[1]].tgz);
+      if (u.pathname === '/pnpm') {
+        const base = 'https://' + u.host + '/';
+        const versions = {};
+        for (const [v, p] of Object.entries(PNPM)) versions[v] = { name: 'pnpm', version: v, bin: { pnpm: 'bin/pnpm.cjs' }, dist: { tarball: base + 'pnpm/-/pnpm-' + v + '.tgz', integrity: p.integrity } };
+        return json({ name: 'pnpm', 'dist-tags': { latest: '99.0.0' }, time: { '12.9.1': '2026-07-01T00:00:00.000Z', '99.0.0': '2026-01-01T00:00:00.000Z' }, versions });
+      }
+    }
     if (u.host !== 'registry.test') return { status: 502, body: 'unreachable' };
     if (u.pathname === '/tiny/-/tiny-1.0.0.tgz') {
       const bin = atob(TINY.tgz);
       return { headers: [['content-type', 'application/octet-stream']], body: Uint8Array.from(bin, (c) => c.charCodeAt(0)) };
     }
     if (u.pathname === '/tiny') return json({ name: 'tiny', 'dist-tags': { latest: '1.0.0' }, versions: { '1.0.0': { name: 'tiny', version: '1.0.0', main: 'index.js', dist: { tarball: BASE + 'tiny/-/tiny-1.0.0.tgz', integrity: TINY.integrity } } } });
-    // A latest pnpm newer than the build, which a WebContainer can't switch to.
-    if (u.pathname === '/pnpm') return json({ name: 'pnpm', 'dist-tags': { latest: '99.0.0' }, time: { '99.0.0': '2026-01-01T00:00:00.000Z' }, versions: { '99.0.0': { name: 'pnpm', version: '99.0.0', dist: { tarball: BASE + 'pnpm/-/pnpm-99.0.0.tgz', integrity: 'sha512-AAAA' } } } });
     return { status: 404, headers: [['content-type', 'application/json']], body: '{"error":"not found"}' };
   }`,
 };
