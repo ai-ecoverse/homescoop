@@ -29,7 +29,11 @@ function upstream(dir, files) {
   git(dir, 'commit', '-qm', 'up');
   const commit = git(dir, 'rev-parse', 'HEAD');
   const tree = git(dir, 'rev-parse', 'HEAD^{tree}');
-  const archive = (level, out) => {
+  const archive = (level, out, zip = false) => {
+    if (zip) {
+      writeFileSync(out, execFileSync('git', ['archive', '--format=zip', `-${level}`, `--prefix=up-${commit}/`, 'HEAD'], { cwd: dir, env, maxBuffer: 1 << 26 }));
+      return;
+    }
     const tar = execFileSync('git', ['archive', '--format=tar', `--prefix=up-${commit}/`, 'HEAD'], { cwd: dir, env, maxBuffer: 1 << 26 });
     writeFileSync(out, execFileSync('gzip', ['-n', `-${level}`], { input: tar }));
   };
@@ -121,19 +125,19 @@ test('a base the script cannot resolve fails closed on a mismatch', () => {
 });
 
 /** A re-rolled archive of one upstream commit, pinned by source.tree. */
-function rerollFixture({ different = false } = {}) {
+function rerollFixture({ different = false, tamper = 'src/a.c', content = 'int a = 1;\n', zip = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-tree-'));
   const up = upstream(join(dir, 'up'), { 'README': 'hello\n', 'src/a.c': 'int a;\n', 'crlf.txt': 'one\ntwo\n', 'ver.txt': 'describe: $Format:%H$\n', 'skip.txt': 'left out\n', 'ign.txt': 'committed but ignored\n', '.gitignore': 'ign.txt\n', '.gitattributes': 'crlf.txt text eol=crlf\nver.txt export-subst\nskip.txt export-ignore\n' });
-  const served = join(dir, 'archive.tar.gz');
-  up.archive(1, served);
+  const served = join(dir, zip ? 'archive' : 'archive.tar.gz');
+  up.archive(zip ? 0 : 1, served, zip);
   const oldSha = sha(readFileSync(served));
   if (different) {
-    writeFileSync(join(up.dir, 'src/a.c'), 'int a = 1;\n');
+    writeFileSync(join(up.dir, tamper), content);
     git(up.dir, 'commit', '-qam', 'tamper');
-    up.archive(9, served);
+    up.archive(9, served, zip);
     git(up.dir, 'reset', '-q', '--hard', up.commit);
   } else {
-    up.archive(9, served);
+    up.archive(9, served, zip);
   }
   const newSha = sha(readFileSync(served));
   assert.notEqual(oldSha, newSha);
@@ -172,6 +176,50 @@ test('a re-rolled archive with a different tree fails, even with --reroll', () =
   }
 });
 
+test('an export-subst file may differ only in its $Format$ placeholders', () => {
+  const f = rerollFixture({ different: true, tamper: 'ver.txt', content: 'describe: $Format:%H$\nimport os; os.system("x")\n' });
+  try {
+    const r = f.run('--reroll');
+    assert.notEqual(r.status, 0, r.stdout);
+    assert.match(r.stdout, /source-tree: FAIL .*differs from the tree: ver\.txt/);
+    assert.equal(f.read(), f.text);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('a zip archive with no extension (codeload zip) is checked by its magic bytes', () => {
+  const f = rerollFixture({ zip: true });
+  try {
+    const ok = f.run('--reroll');
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    assert.match(ok.stdout, /source-tree: PASS archive matches tree/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('a changed URL whose pin this branch already set is not rewritten when its bytes move', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-src-'));
+  try {
+    writeFileSync(join(dir, 'src-1.1.tar.gz'), 'moved\n');
+    const url = `file://${dir}/src-{{version}}.tar.gz`;
+    const branchPin = 'b'.repeat(64);
+    const head = recipe({ version: '1.1', url, pin: branchPin });
+    const f = repo({ baseRecipe: recipe({ url, pin: 'a'.repeat(64) }), headRecipe: head });
+    try {
+      const r = f.run();
+      assert.notEqual(r.status, 0, r.stdout);
+      assert.match(r.stdout, new RegExp(`recipe-sha: FAIL fx: .*changed bytes under a pin this branch already set \\(pinned ${branchPin}`));
+      assert.equal(f.read(), head);
+    } finally {
+      rmSync(f.dir, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('--verify-tree checks a pinned tree when the sha matches', () => {
   const f = rerollFixture({ different: true });
   try {
@@ -191,5 +239,6 @@ test('githubArchive reads repo and commit from archive and codeload URLs', () =>
   const c = 'b158b0ae6c559f87be325b8f427c5588e6a48823';
   assert.deepEqual(githubArchive(`https://github.com/llvm/llvm-project/archive/${c}.tar.gz`), { repo: 'https://github.com/llvm/llvm-project.git', commit: c });
   assert.deepEqual(githubArchive(`https://codeload.github.com/llvm/llvm-project/tar.gz/${c}`), { repo: 'https://github.com/llvm/llvm-project.git', commit: c });
+  assert.deepEqual(githubArchive(`https://codeload.github.com/llvm/llvm-project/zip/${c}`), { repo: 'https://github.com/llvm/llvm-project.git', commit: c });
   assert.equal(githubArchive('https://github.com/wasix-org/wasix-libc/archive/refs/tags/v2026-07-03.1.tar.gz'), null);
 });

@@ -27,7 +27,7 @@ function fixture({ pin, repack = true, allow = '', issues = {}, attested = {}, v
     'version: "1.0"',
     'source:',
     `  url: "file://${dir}/src-{{version}}.tar.gz"`,
-    `  sha256: "${pin === 'right' ? sha(readFileSync(src)) : pin === 'skip' ? 'skip' : 'f'.repeat(64)}"`,
+    `  sha256: "${pin === 'right' ? sha(readFileSync(src)) : pin === 'skip' ? 'skip' : pin === 'empty' ? '' : 'f'.repeat(64)}"`,
     ...(repack ? ['repack:', '  from: "1.0-1"'] : []),
     '',
   ].join('\n');
@@ -118,8 +118,8 @@ test('a malformed allowlist line fails', () => {
   }
 });
 
-test('a new non-repack (no recipe at the base) with a wrong pin is rewritten; sha256 skip is left alone', () => {
-  let f = fixture({ pin: 'wrong', repack: false });
+test('a new non-repack (no recipe at the base) with an empty pin is filled in; sha256 skip is left alone', () => {
+  let f = fixture({ pin: 'empty', repack: false });
   try {
     const g = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: f.dir, encoding: 'utf8' });
     g('init', '-q', '-b', 'main');

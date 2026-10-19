@@ -331,7 +331,9 @@ sha after Renovate with `node scripts/refresh-recipe-sha.mjs <pkg>`.
 rewrites a `source.sha256` or `sources.<key>.sha256` only when that source's
 resolved URL differs from the one at the merge-base with the PR's base
 (`--base`, default `origin/main`; `RECIPE_SHA_BASE` overrides it). A package that
-is new at the base counts as a changed URL. When the URL is unchanged and the
+is new at the base counts as a changed URL. Even then, only a pin carried over
+from the base (Renovate bumps only `version:`) or an empty one is refreshed: a pin
+the branch already set fails when its bytes move. When the URL is unchanged and the
 bytes differ from the pin, it prints
 `recipe-sha: FAIL <pkg>: <url> changed bytes for an unchanged URL (pinned <old>, got <new>)`,
 exits non-zero and writes nothing, so the job pushes nothing. A person decides.
@@ -356,8 +358,12 @@ source:
 hosts), checks the commit's tree is the pin, and compares the archive's files
 with that tree through git itself (`core.autocrlf=false`, the tree's
 `.gitattributes` undo eol conversions, committed files that `.gitignore` matches
-count). The only differences allowed are files marked `export-subst` (listed in
-the log) or `export-ignore`. It prints `source-tree: PASS|FAIL …`.
+count). The only differences allowed are `export-ignore` paths and files marked
+`export-subst` (listed in the log) that match their blob outside the
+`$Format:…$` placeholders. The extractor is chosen by the archive's magic bytes,
+so a codeload zip URL without an extension works. ladder-pr passes the base as
+`RECIPE_SHA_BASE`, not as an argument, because the job runs the branch's own
+script and older ones would take an argument as a package name. It prints `source-tree: PASS|FAIL …`.
 
 A changed sha256 for an unchanged URL whose archive matches `tree:` is a re-roll.
 It still fails in CI. Refresh it explicitly with

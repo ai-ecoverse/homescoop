@@ -120,7 +120,7 @@ jobs:
         env:
           HOST: ${{ needs.detect.outputs.host }}
           GH_TOKEN: ${{ github.token }}
-          BASE_REF: ${{ github.base_ref }}
+          RECIPE_SHA_BASE: origin/${{ github.base_ref }}
         run: |
           set -euo pipefail
           # This job checks out the PR head (to push), so a branch from before #1019 has a
@@ -132,7 +132,7 @@ jobs:
             echo "::warning::recipe-sha: this branch's refresh-recipe-sha.mjs predates the verdict line (#1019); merge main to get the wrapped check"
           fi
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack --verify-tree --base "origin/$BASE_REF"
+            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack --verify-tree
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.

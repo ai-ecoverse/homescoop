@@ -177,14 +177,14 @@ function replaceSha(text, { oldSha, newSha, urlHint }) {
   }
   const start = hintIdx >= 0 ? hintIdx : 0;
   for (let i = start; i < Math.min(lines.length, start + 8); i++) {
-    const m = lines[i].match(/^(\s*sha256:\s*")([0-9a-fA-F]{64})("\s*)$/);
+    const m = lines[i].match(/^(\s*sha256:\s*")([0-9a-fA-F]{64})?("\s*)$/);
     if (m) {
       lines[i] = `${m[1]}${newSha}${m[3]}`;
       return lines.join('\n');
     }
   }
   // Fallback: first sha256 in file
-  const re = /sha256:\s*"([0-9a-fA-F]{64})"/;
+  const re = /sha256:\s*"([0-9a-fA-F]{64})?"/;
   if (!re.test(text)) throw new Error('no sha256 field to replace');
   return text.replace(re, `sha256: "${newSha}"`);
 }
@@ -300,6 +300,13 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
         }
         console.log(`   re-roll: the archive matches ${label}.tree ${pinTree}; sha256 ${oldSha} → ${digest} for the same URL`);
       } else {
+        const baseSha = baseJob ? String(baseJob.src.sha256 || '') : '';
+        if (oldSha && oldSha !== baseSha) {
+          throw new Error(
+            `${url} changed bytes under a pin this branch already set (pinned ${oldSha}, got ${digest}; ${baseRef} pins ${baseSha || '(none)'}). ` +
+              'Only a pin carried over from the base, or an empty one, is refreshed. Nothing was written.'
+          );
+        }
         console.log(`   url changed against ${baseRef}: ${baseUrl || '(new)'} → ${url}`);
         if (pinTree) {
           const r = treeOk();

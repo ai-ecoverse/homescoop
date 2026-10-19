@@ -11,7 +11,7 @@
  * by git archive) or export-ignore (left out of it). Prints
  * `source-tree: PASS|FAIL …`.
  */
-import { mkdtempSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { closeSync, mkdtempSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -62,7 +62,11 @@ export function checkArchiveTree({ archive, repo, commit, tree }) {
     const got = git(['rev-parse', `${commit}^{tree}`]).trim();
     if (got !== tree) return { ok: false, tree: got, subst: [], ignored: [], problems: [`commit ${commit} has tree ${got}, not the pinned ${tree}`] };
 
-    if (/\.zip$/i.test(archive)) execFileSync('unzip', ['-q', archive, '-d', x]);
+    const magic = Buffer.alloc(4);
+    const fd = openSync(archive, 'r');
+    readSync(fd, magic, 0, 4, 0);
+    closeSync(fd);
+    if (magic.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) execFileSync('unzip', ['-q', archive, '-d', x]);
     else execFileSync('tar', ['-xf', archive, '-C', x]);
     const top = readdirSync(x);
     const work = top.length === 1 && statSync(join(x, top[0])).isDirectory() ? join(x, top[0]) : x;
@@ -90,7 +94,14 @@ export function checkArchiveTree({ archive, repo, commit, tree }) {
       else if (diff[i] === 'D') deleted.push(diff[i + 1]);
       else problems.push(`${diff[i]} ${diff[i + 1]}`);
     }
-    const subst = attrs('export-subst', modified);
+    const marked = attrs('export-subst', modified);
+    const subst = new Set();
+    for (const p of marked) {
+      const blob = git(['cat-file', 'blob', `:${p}`]);
+      const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`^${blob.split(/\$Format:[^$]*\$/).map(esc).join('[^\\n]*')}$`);
+      if (re.test(readFileSync(join(work, p), 'utf8'))) subst.add(p);
+    }
     const ignore = attrs('export-ignore', deleted);
     for (const p of modified) if (!subst.has(p)) problems.push(`differs from the tree: ${p}`);
     for (const p of deleted) if (!ignore.has(p)) problems.push(`missing from the archive: ${p}`);
