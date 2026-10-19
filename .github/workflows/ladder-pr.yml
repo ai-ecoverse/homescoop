@@ -163,7 +163,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- 'packages/*/recipe.yaml' 'packages/*/package/package.json' 'packages/*/package/README.md' README.md
-          git commit -m "chore: refresh recipe sha256 and package version after version bump"
+          # [skip ci]: GitHub holds a pull_request run on a github-actions[bot] push for
+          # manual approval (the org's outside-contributor policy). That run would
+          # only repeat this one, which already builds this commit, so none is
+          # started; the ci job reports its result on this commit instead.
+          git commit -m "chore: refresh recipe sha256 and package version after version bump" -m "[skip ci]"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -646,6 +650,9 @@ jobs:
     needs: [exact-pins, detect, recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert, slicc-note, group, kernel-compat]
     if: ${{ always() }}
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Fail when a ladder-pr job failed or was cancelled
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
@@ -660,3 +667,31 @@ jobs:
       - name: Every ladder-pr job passed or was skipped
         run: |
           echo "ladder-pr: exact-pins=${{ needs.exact-pins.result }} detect=${{ needs.detect.result }} recipe-sha=${{ needs.recipe-sha.result }} host-build=${{ needs.host-build.result }} rebuild=${{ needs.rebuild.result }} reproducible=${{ needs.reproducible.result }} npm-parity=${{ needs.npm-parity.result }} test=${{ needs.test.result }} cert=${{ needs.cert.result }} slicc-note=${{ needs.slicc-note.result }} group=${{ needs.group.result }} kernel-compat=${{ needs.kernel-compat.result }}"
+      # recipe-sha's commit is the PR head now and starts no run of its own
+      # ([skip ci]); this run built it, so its ci result is that commit's ci.
+      # A check run made with GITHUB_TOKEN belongs to the GitHub Actions app,
+      # which is the app the rulesets require ci from.
+      - name: Report ci on recipe-sha's commit
+        if: ${{ always() && github.event_name == 'pull_request' && needs.recipe-sha.outputs.sha != '' }}
+        uses: actions/github-script@v9
+        env:
+          SHA: ${{ needs.recipe-sha.outputs.sha }}
+          STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const conclusion = { success: 'success', failure: 'failure', cancelled: 'cancelled' }[process.env.STATUS] || 'failure';
+            await github.rest.checks.create({
+              owner,
+              repo,
+              name: 'ci',
+              head_sha: process.env.SHA,
+              status: 'completed',
+              conclusion,
+              details_url: process.env.RUN_URL,
+              output: {
+                title: `ci ${conclusion}`,
+                summary: `ladder-pr built this commit in ${process.env.RUN_URL} (it was pushed by recipe-sha with [skip ci]).`,
+              },
+            });

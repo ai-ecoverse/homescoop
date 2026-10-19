@@ -143,7 +143,11 @@ is `<command> --version`. Libs without `slicc.commands` skip browser-cert
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
 ladder-pr's `recipe-sha` job commits that sync onto the PR, so main never
-needs it: `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
+needs it. That commit says `[skip ci]`: GitHub holds any `pull_request` run
+on a `github-actions[bot]` push for manual approval (the org's
+outside-contributor policy), and no run of ours ever waits for one. The run
+that pushed it builds it already, and its `ci` job posts the `ci` check on
+the pushed commit. `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
 --check` and fails, before any build or publish, when the committed version
 base or `homescoop.upstream` disagrees with `recipe.yaml`, naming both
 values.
