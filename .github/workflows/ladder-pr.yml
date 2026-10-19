@@ -127,8 +127,8 @@ jobs:
           RECIPE_SHA_BASE: origin/${{ github.base_ref }}
         run: |
           set -euo pipefail
-          # This job checks out the PR head (to push), so a branch from before #1019 has a
-          # refresh-recipe-sha.mjs that prints no verdict line. Wrap it only when it does.
+          # This job runs the PR head's own refresh-recipe-sha.mjs, so a branch from before #1019
+          # has one that prints no verdict line. Wrap it only when it does.
           gate=()
           if [[ -f scripts/gate.mjs ]] && grep -q 'recipe-sha: PASS' scripts/refresh-recipe-sha.mjs; then
             gate=(node scripts/gate.mjs recipe-sha --)
@@ -162,11 +162,16 @@ jobs:
             exit 0
           fi
           git diff -- 'packages/*/recipe.yaml' 'packages/*/package/package.json' 'packages/*/package/README.md' README.md
-          node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            if ! git diff --quiet -- "packages/$pkg/recipe.yaml" "packages/$pkg/package/package.json" "packages/$pkg/package/README.md" README.md; then
+          stale=0
+          while read -r pkg; do
+            if ! git diff --quiet -- "packages/$pkg/recipe.yaml" "packages/$pkg/package/package.json" "packages/$pkg/package/README.md"; then
               echo "recipe-sha: FAIL $pkg: needs refresh: node scripts/refresh-recipe-sha.mjs $pkg && node scripts/sync-package-version.mjs $pkg --write && node scripts/readme-table.mjs --write"
+              stale=$((stale + 1))
             fi
-          done
+          done < <(node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))')
+          if [ "$stale" = 0 ] && ! git diff --quiet -- README.md; then
+            echo "recipe-sha: FAIL README.md: needs refresh: node scripts/readme-table.mjs --write"
+          fi
           echo "::error::recipe sha256 / package version / README package table is stale; CI never pushes to a pull request. Run the command on each 'recipe-sha: FAIL' line above, commit and push"
           exit 1
 

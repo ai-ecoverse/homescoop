@@ -71,7 +71,7 @@ const PUSH = stepRun(
   'The PR branch already carries its sha256 and package version, or the check fails with the command that writes them'
 );
 
-function pushStep(dirty) {
+function pushStep(dirty, readme = false) {
   const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-push-'));
   const git = (...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8' });
   try {
@@ -84,6 +84,7 @@ function pushStep(dirty) {
     git('add', '.');
     git('-c', 'user.name=t', '-c', 'user.email=t@invalid', 'commit', '-qm', 'base');
     if (dirty) writeFileSync(join(dir, 'packages', 'pkg', 'recipe.yaml'), 'version: 1\nsha256: abc\n');
+    if (readme) writeFileSync(join(dir, 'README.md'), 'table v2\n');
     const out = join(dir, 'out');
     const r = spawnSync('bash', ['-c', PUSH], {
       cwd: dir,
@@ -121,5 +122,21 @@ test('the recipe-sha job holds a read-only token and no persisted credentials, a
   assert.match(job, /\n {4}permissions:\n {6}contents: read\n/);
   assert.match(job, /\n {10}persist-credentials: false\n/);
   assert.doesNotMatch(job, /git push|contents: write/);
+});
+
+test('with two packages, one stale and the README table rewritten, only the stale package gets a FAIL line', () => {
+  const r = pushStep(true, true);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  const lines = r.stdout.split('\n').filter((l) => l.startsWith('recipe-sha: FAIL'));
+  assert.deepEqual(lines, [
+    'recipe-sha: FAIL pkg: needs refresh: node scripts/refresh-recipe-sha.mjs pkg && node scripts/sync-package-version.mjs pkg --write && node scripts/readme-table.mjs --write',
+  ]);
+});
+
+test('a README table that alone is stale gets its own FAIL line and no package line', () => {
+  const r = pushStep(false, true);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  const lines = r.stdout.split('\n').filter((l) => l.startsWith('recipe-sha: FAIL'));
+  assert.deepEqual(lines, ['recipe-sha: FAIL README.md: needs refresh: node scripts/readme-table.mjs --write']);
 });
 
