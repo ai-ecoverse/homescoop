@@ -100,7 +100,8 @@ jobs:
   recipe-sha:
     needs: detect
     if: github.event_name == 'pull_request' && needs.detect.outputs.host != '[]'
-    runs-on: ubuntu-latest
+    # Same-repo heads on the light pool; a fork head's refresh-recipe-sha.mjs runs hosted.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: write
     outputs:
@@ -583,7 +584,8 @@ jobs:
   # way ladder-merge will at the push (docs/ladder-builds.md, merge queue).
   group:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    # merge_group and workflow_dispatch are trusted events (the queue's or a maintainer's head), so the light pool.
+    runs-on: ${{ (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       actions: read
