@@ -38,7 +38,15 @@ try {
   check(!pj.scripts && !pj.slicc, 'no install scripts, no slicc.commands (a build input)');
   check(m.llvm_commit === 'b158b0ae6c559f87be325b8f427c5588e6a48823', `llvm-project ${m.llvm_commit}`);
   check(m.eh === 'js' && m.config.LLVM_ENABLE_EH === 'OFF' && m.config.LLVM_ENABLE_RTTI === 'OFF' && m.config.LLVM_ENABLE_LTO === 'OFF' && m.config.LLVM_ENABLE_THREADS === 'OFF', 'EH js, no RTTI, no LTO, no threads (manifest)');
+  const patchDir = join(root, 'packages/llvm-emscripten/patches');
+  const wantPatches = Object.fromEntries(readdirSync(patchDir).filter((f) => f.endsWith('.patch')).sort().map((f) => [f, createHash('sha256').update(readFileSync(join(patchDir, f))).digest('hex')]));
+  check(JSON.stringify(m.llvm_patches) === JSON.stringify(wantPatches) && m.llvm_patches['0001-main-executable-emscripten.patch'], `manifest.json records the llvm patches by sha256: ${JSON.stringify(m.llvm_patches)}`);
   check(/128-byte/.test(m.sysroot.sigset_t) && /^[0-9a-f]{64}$/.test(m.wasm_emscripten_patches_sha256), `sysroot sigset_t ${m.sysroot.sigset_t}, wasm-emscripten patches ${m.wasm_emscripten_patches_sha256.slice(0, 12)}…`);
+  // homescoop#1098: LLVM Support's regex, BLAKE3 and xxHash notices.
+  const notices = existsSync(join(pkg, 'THIRD-PARTY-NOTICES.md')) ? readFileSync(join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8') : '';
+  const support = readFileSync(join(pkg, 'lib/libLLVMSupport.a'), 'latin1');
+  const carried = [['regcomp.c.o', 'Henry Spencer'], ['blake3.c.o', 'BLAKE3'], ['xxhash.cpp.o', 'Yann Collet']].filter(([o]) => support.includes(o));
+  check(carried.length === 3 && carried.every(([, marker]) => notices.includes(marker)) && pj.files?.includes('THIRD-PARTY-NOTICES.md'), `THIRD-PARTY-NOTICES.md (in files) has the notices for what libLLVMSupport.a carries: ${carried.map(([o, m]) => `${o} ${notices.includes(m) ? 'ok' : 'MISSING'}`).join(', ') || 'none found'}`);
   const files = walk(pkg);
   check(!files.some((f) => f.link), 'no symlinks');
   const leak = /\/home\/|\/Users\/|\/__w\/|\/private\/var\/|\/private\/tmp\/|\/tmp\/homescoop-/;
@@ -89,6 +97,14 @@ try {
   console.log(`clang default target: ${(/^Target: (.*)$/m.exec(r.out) || [])[1]}`);
   r = tool('clang', ['-print-targets']);
   check(/wasm32\s+- WebAssembly 32-bit/.test(r.out) && /wasm64\s+- WebAssembly 64-bit/.test(r.out) && !/x86|aarch64|arm\b/.test(r.out), `registered targets are wasm32 and wasm64 only, as published: ${r.out.replace(/\s+/g, ' ').trim()}`);
+  // 24.0.0-2 (patches/0001): getMainExecutable resolves argv[0] (through
+  // PATH when it has no slash, as in slicc-kernel). Up to 24.0.0-1 it was ""
+  // on Emscripten, so clang spawned "" -cc1 ("posix_spawn failed" in
+  // slicc-kernel). Under node, argv[0] is the script's absolute path, so the
+  // script is preloaded at that path in the in-wasm filesystem.
+  writeFileSync(join(out, 'e.c'), 'int e;\n');
+  r = run(process.execPath, [join(out, 'clang.js'), '-###', '-v', '--target=wasm32-unknown-unknown', '-c', '/w/e.c'], { env: { ...process.env, SLICC_PRELOAD: `${join(out, 'clang.js')}=${join(out, 'clang.js')},/w/e.c=${join(out, 'e.c')}` } });
+  check(r.out.includes(`InstalledDir: ${out}\n`) && r.out.includes(` "${join(out, 'clang.js')}" "-cc1"`), `clang knows its own path: InstalledDir is its directory and -cc1 runs it (24.0.0-1: empty, "" -cc1): ${(/^InstalledDir:.*$/m.exec(r.out) || ['no InstalledDir'])[0].replace(out, '<out>')} | ${(/^ "[^"]*" "-cc1"/m.exec(r.out) || ['no -cc1 line'])[0].replace(out, '<out>')}`);
   r = tool('lld', ['-flavor', 'wasm', '--version']);
   check(/LLD 24\.0\.0/.test(r.out), `lld --version: ${r.out.trim().split('\n')[0]}`);
   writeFileSync(join(out, 's.c'), 'int add(int a, int b) { return a + b; }\nint mul(int a, int b) { return a * b; }\n');

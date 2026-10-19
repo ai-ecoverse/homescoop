@@ -19,8 +19,15 @@ sha256, so wasm-clang's root is attested.
   emscripten tag, the emsdk release and the sha256 of the wasm-emscripten
   patch set the objects were compiled with.
 
+One source patch (`patches/0001`, since 24.0.0-2; listed by sha256 in
+`manifest.json`'s `llvm_patches`): on Emscripten, `sys::fs::getMainExecutable`
+resolves `argv[0]`, through `PATH` when it has no slash, as on OpenBSD and
+Haiku. Up to 24.0.0-1 it returned `""` there, so clang had an empty
+`InstalledDir` and spawned `"" -cc1`, which slicc-kernel refuses
+(`posix_spawn failed: No such file or directory`).
+
 Link it with the same emscripten tree (`scripts/emscripten-tree.sh` in
 homescoop) and Emscripten JS exceptions (`-fexceptions
 -sDISABLE_EXCEPTION_CATCHING=0` at link), as wasm-clang does.
 
-Apache-2.0 WITH LLVM-exception; see `LICENSE`.
+Apache-2.0 WITH LLVM-exception; see `LICENSE`. `lib/libLLVMSupport.a` also compiles in Henry Spencer's 4.4BSD regex, BLAKE3 (CC0-1.0 OR Apache-2.0) and xxHash (BSD-2-Clause); their notices are in `THIRD-PARTY-NOTICES.md` (since 24.0.0-2), which a program linking this package should ship.

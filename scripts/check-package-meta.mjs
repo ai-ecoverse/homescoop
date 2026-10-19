@@ -248,6 +248,37 @@ if (credUsers.length) {
   }
 }
 
+// LLVM's Support library compiles in third-party code whose licences ask
+// for their notice in binary copies (homescoop#1046, #1098, #1086): Henry
+// Spencer's regex (llvm/lib/Support/COPYRIGHT.regex), BLAKE3 and xxHash. A
+// package whose archives or wasm carry any of it ships all three notices
+// (homescoop_notice_llvm_support in build.sh).
+const LLVM_SUPPORT = [Buffer.from('llvm_regcomp'), Buffer.from('llvm_regexec() failed to match'), Buffer.from('llvm_blake3_hasher'), Buffer.from('xxh3_64bits')];
+function* binaries(dir) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === 'node_modules') continue;
+    const f = join(dir, e.name);
+    if (e.isDirectory()) yield* binaries(f);
+    else if (e.isFile() && /\.(?:a|o|wasm|so)$/.test(e.name)) yield f;
+  }
+}
+const pkgDir = join(root, 'packages', name, 'package');
+const llvmUser = existsSync(pkgDir) && [...binaries(pkgDir)].find((f) => {
+  const b = readFileSync(f);
+  return LLVM_SUPPORT.some((m) => b.includes(m));
+});
+if (llvmUser) {
+  const text = ['THIRD-PARTY-NOTICES.md', 'LICENSE'].map((f) => join(pkgDir, f)).filter(existsSync).map((f) => readFileSync(f, 'utf8')).join('\n');
+  const missing = [['Henry Spencer', 'the regex notice (llvm/lib/Support/COPYRIGHT.regex)'], ['BLAKE3', 'BLAKE3 (llvm/lib/Support/BLAKE3/LICENSE)'], ['Yann Collet', 'xxHash (llvm/lib/Support/xxhash.cpp)']]
+    .filter(([marker]) => !text.includes(marker)).map(([, what]) => what);
+  if (missing.length) {
+    errors.push(`${llvmUser.slice(pkgDir.length + 1)} carries LLVM Support code, but the package's notices lack ${missing.join(', ')}: call homescoop_notice_llvm_support <llvm-project dir> in build.sh (homescoop#1098)`);
+  }
+  if (!Array.isArray(pkg.files) || !pkg.files.includes('THIRD-PARTY-NOTICES.md')) {
+    errors.push('package.json files[] must include "THIRD-PARTY-NOTICES.md" (LLVM Support notices)');
+  }
+}
+
 errors.push(...packageDrift(name, recipe, pkg));
 
 if (errors.length) {
