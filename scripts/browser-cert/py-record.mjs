@@ -66,7 +66,10 @@ export async function pyRecord(ctx, { pkg, minFiles = 1 }) {
   assert.deepEqual([real.missing, real.mismatch, real.unlisted], [[], [], []], `every file is the wheel's, none missing or extra: ${o}`);
   assert.ok(real.pyc > 0, o);
   assert.deepEqual(real.pyc_bad, [], `every .pyc is unchecked-hash and matches its source: ${o}`);
-  const pyc = victim.replace(/([^/]+)\.py$/, '__pycache__/$1.cpython-314.pyc');
+  // The cache tag of the python line the package targets (lib/python3.X/site-packages).
+  const minor = /^lib\/python3\.(\d+)\//.exec(pj.slicc.python.sitePackages)?.[1] ?? '14';
+  const tag = `cpython-3${minor}`;
+  const pyc = victim.replace(/([^/]+)\.py$/, `__pycache__/$1.${tag}.pyc`);
   assert.deepEqual(selftest.mismatch, [victim], `self-test: one flipped byte in ${victim} is a RECORD mismatch: ${o}`);
   assert.deepEqual(selftest.pyc_bad, [pyc], `self-test: and its .pyc no longer matches its source: ${o}`);
   console.log(`${pkg} ${pj.version}: ${real.dist_info[0]}: all ${real.ok} RECORD files match the wheel (none missing, none extra), ${real.pyc} .pyc unchecked-hash on their sources; self-test: a flipped byte in ${victim} is caught (RECORD and .pyc)`);
