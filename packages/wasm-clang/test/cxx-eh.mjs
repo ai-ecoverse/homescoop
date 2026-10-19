@@ -22,8 +22,12 @@
 //
 // --expect old is the negative: 24.0.0-21's driver emits exnref code even for
 // WASIXCC_WASM_EXCEPTIONS=legacy, so on a -33+ sysroot (legacy-EH runtimes in
-// sysroot-eh/ehpic) both legacy trees fail: the sysroot-eh program does not
-// load, and the sysroot-ehpic link aborts in wasm-opt --asyncify.
+// sysroot-eh/ehpic) the sysroot-ehpic link aborts in wasm-opt --asyncify
+// (Flatten.cpp: unexpected expr type). The sysroot-eh program links exnref
+// code against the legacy runtime; whether it loads depends on the host's
+// wasm engine (the CI runner's node runs it, a mac's node 26 refuses it with
+// an I/O error), so the negative requires only the ehpic failure and that
+// the exnref trees pass.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -138,8 +142,9 @@ try {
     assert.deepEqual(failed, [], `c++ failed in ${failed.length} tree(s):\n${failed.join('\n')}`);
     console.log(`PASS ${cpkg.name}@${cpkg.version}: C++ exceptions (${WANT}) and std::terminate through a handler in all ${built.length} EH trees of wasix-sysroot ${sysVer}, env vars only: ${built.join(', ')}`);
   } else {
-    const legacyFailed = ['sysroot-eh', 'sysroot-ehpic'].filter((t) => failed.some((f) => f.startsWith(`${t} `)));
-    assert.deepEqual(legacyFailed, ['sysroot-eh', 'sysroot-ehpic'], `expected both legacy trees to fail with ${cpkg.version}'s driver (exnref code against legacy-EH runtimes); passed: ${built.join(', ')}`);
+    assert.ok(failed.some((f) => f.startsWith('sysroot-ehpic ')), `expected the legacy PIC tree to fail with ${cpkg.version}'s driver (exnref code, wasm-opt --asyncify); passed: ${built.join(', ')}`);
+    const others = failed.filter((f) => !f.startsWith('sysroot-ehpic ') && !f.startsWith('sysroot-eh '));
+    assert.deepEqual(others, [], `only the legacy trees may fail with ${cpkg.version}'s driver: ${others.join('; ')}`);
     console.log(`PASS negative: ${cpkg.name}@${cpkg.version} on wasix-sysroot ${sysVer}: ${failed.join('; ')}`);
   }
 } catch (e) {

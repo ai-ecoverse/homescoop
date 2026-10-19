@@ -38,14 +38,14 @@
 ## 24.0.0-22: built in CI from llvm-emscripten, and legacy EH (homescoop#859, #965; 2026-10-18)
 
 - **Supply chain.** The published 24.0.0-21 is a repack of 24.0.0-11. That release relinked objects from a local `slicc-emscripten/build/llvm-wasm`, with no provenance and no recorded commit; `repack-input.mjs` makes that INCOMPLETE. 24.0.0-22 fetches `@ai-ecoverse/llvm-emscripten` 24.0.0-2 by sha256. That package is llvm-project b158b0ae compiled in CI by the patched emscripten 6.0.9 tree (#859 stage E). 24.0.0-22 links the six tools and `multicall.cpp` with the same tree against today's `shims/slicc`. The builtins come from the pinned wasix-sysroot tarball, not a staged checkout. The four signal-ABI recompiles are gone, because the objects are compiled against the 128-byte sigset_t.
-- **Legacy EH (#965).** `test/cxx-eh.mjs --expect old` runs the published 24.0.0-21 on wasix-sysroot 2025.9.30-38 and fails both legacy trees:
+- **Legacy EH (#965).** `test/cxx-eh.mjs --expect old` runs the published 24.0.0-21 on wasix-sysroot 2025.9.30-38. The legacy PIC tree always fails. The non-PIC legacy tree fails on a mac's node 26 but runs on the CI runner, so the negative requires only the ehpic failure. The mac run:
 
   ```text
   sysroot-eh cxx-eh.wasm ran: "rc=126" bash: line 1: /home/sysroot-eh.eh.wasm: I/O error
   sysroot-ehpic cxx-eh.cpp: rc=1 … wasix-driver: wasm-opt --asyncify failed
   ```
 
-  Its driver passes `--wasm-use-legacy-eh=false` in every mode. That's exnref code against the legacy-EH runtimes -33+ ship in sysroot-eh/ehpic. 24.0.0-22 passes all four trees.
+  Its driver passes `--wasm-use-legacy-eh=false` in every mode. That's exnref code against the legacy-EH runtimes -33+ ship in sysroot-eh/ehpic, and binaryen's Asyncify can't flatten it. 24.0.0-22 passes all four trees.
 - **Size.** bin/llvm.wasm is 75 MB, as -21's 74.8 MB. The tarball is 27 MB.
 - **Executable path.** With llvm-emscripten 24.0.0-1, `sys::fs::getMainExecutable` returned "" under Emscripten, through the dladdr branch. clang then printed `InstalledDir:` empty and spawned `""` for `-cc1`, and every compile in slicc-kernel failed with `posix_spawn failed: No such file or directory`. 24.0.0-2 carries the patch that resolves argv[0] through PATH (manifest `llvm_patches`), and build.sh refuses an input without it. run-cc.mjs passes again: clang shows `InstalledDir: /usr/bin`, as -21 does.
 - **Notices.** -21 ships no THIRD-PARTY-NOTICES.md, though its llvm.wasm carries LLVM Support's regex, BLAKE3 and xxHash code. check-package-meta now refuses that. -22 ships Emscripten's runtime notices and llvm-emscripten's LLVM Support notices.
