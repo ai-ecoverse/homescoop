@@ -1,0 +1,29 @@
+--- a/Source/cmSystemTools.cxx
++++ b/Source/cmSystemTools.cxx
+@@ -3069,11 +3069,24 @@
+   // Find resources relative to our own executable.
+   std::string exe_dir = cmSystemTools::GetFilenamePath(exe);
+   bool found = false;
++  // homescoop: in slicc the binary runs as /usr/bin/cmake, away from its
++  // package's share tree, so the manifest's CMAKE_ROOT names the modules.
++  {
++    std::string root;
++    if (cmSystemTools::GetEnv("CMAKE_ROOT", root) && !root.empty() &&
++        cmSystemTools::FileExists(cmStrCat(root, "/Modules/CMake.cmake"))) {
++      cmSystemToolsCMakeRoot = root;
++      found = true;
++    }
++  }
+   // When running through a symlink to our own executable,
+   // preserve symlinks in directory components if possible.
+-  do {
++  while (!found) {
+     found = FindCMakeResourcesInInstallTree(exe_dir);
+-  } while (!found && ResolveSymlinkToOwnExecutable(exe, exe_dir));
++    if (found || !ResolveSymlinkToOwnExecutable(exe, exe_dir)) {
++      break;
++    }
++  }
+   // If we have not yet found the resources, the above loop will
+   // have left 'exe' referring to a real file, not a symlink, so
+   // all our binaries should exist under 'exe_dir'.  However, the

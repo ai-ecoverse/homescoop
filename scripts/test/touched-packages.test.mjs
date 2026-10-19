@@ -215,7 +215,6 @@ test('toolchain default inputs: a shared toolchain file touches every built reci
     wx: { recipe: 'name: wx\nbuilder: host\n', files: { 'build.sh': 'eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"\n' } },
     go: { recipe: 'name: go\nbuilder: host\n', files: { 'build.sh': 'eval "$(bash "$ROOT/scripts/install-go.sh" go "$WORK/go")"\n' } },
     said: { recipe: 'name: said\nbuilder: host\n', files: { 'build.sh': '# binaryen, pinned as in scripts/install-wasixcc.sh; not emcc\ncargo build\n' } },
-    cmake: { recipe: 'name: cmake\nbuilder: host\n', files: { 'build.sh': 'SLICC_EM="${SLICC_EMSCRIPTEN:-$ROOT/../slicc-emscripten}"\nemcc -o x.js "$SLICC_EM/build/x.o"\n' } },
     said2: { recipe: 'name: said2\nbuilder: host\n', files: { 'build.sh': 'if [[ -n "${FULL:-}" ]]; then cp "$ROOT/../slicc-emscripten/x" .; fi\nemcc x.c\n' } },
     repacked: { recipe: 'name: repacked\nbuilder: host\nrepack:\n  from: "1.0.0-1"\n', files: { 'build.sh': 'emcc x.c\n' } },
     cone: { recipe: 'name: cone\nbuilder: slicc\n', files: { 'build.sh': 'emcc x.c\n' } },
@@ -250,10 +249,10 @@ test('toolchain default inputs: a shared toolchain file touches every built reci
   }
 });
 
-test('the real tree: cmake and emscripten-cache (#859) get no toolchain inputs; wasixcc and Emscripten consumers keep theirs', async () => {
+test('the real tree: cmake and emscripten-cache, built in CI since #859, get their toolchain inputs; wasixcc and Emscripten consumers keep theirs', async () => {
   const { toolchainInputs } = await import('../list-touched-packages.mjs');
-  assert.deepEqual(toolchainInputs('cmake'), []);
-  assert.deepEqual(toolchainInputs('emscripten-cache'), []);
+  for (const want of ['shims/slicc/*.c', 'scripts/emscripten-tree.sh']) assert.ok(toolchainInputs('cmake').includes(want), `cmake: ${toolchainInputs('cmake').join(' ')}`);
+  assert.deepEqual(toolchainInputs('emscripten-cache'), ['scripts/emscripten-tree.sh']);
   assert.ok(toolchainInputs('wasix-zlib').includes('scripts/install-wasixcc.sh'), `wasix-zlib: ${toolchainInputs('wasix-zlib').join(' ')}`);
   assert.ok(toolchainInputs('coreutils').includes('shims/slicc/*.c'), `coreutils: ${toolchainInputs('coreutils').join(' ')}`);
 });

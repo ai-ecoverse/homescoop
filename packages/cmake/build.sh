@@ -1,246 +1,130 @@
 #!/usr/bin/env bash
-# Relink the prebuilt cmake.wasm objects from slicc-emscripten for the wasm
-# realm (ENVIRONMENT=web,worker,node + libslicc spawn profile). Recompiles
-# musl sigaction/sigset_t layout objects (pre-Oct-2026 .o vs today's cache),
-# applies the CMAKE_ROOT env patch, and recompiles cmSystemTools.cxx.
+# @ai-ecoverse/wasm-cmake: CMake built in CI from the pinned release tarball
+# (homescoop#859 stage G) with emcmake from the patched emscripten 6.0.9 tree
+# on emsdk 6.0.9's prebuilt compilers (scripts/emscripten-tree.sh), linked
+# against today's shims/slicc for the wasm realm (Module.sliccKernel spawn,
+# slicc_poll for libuv's waitpid/SIGCHLD, kernel credentials).
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-HOMESCOOP_PKG="$ROOT/packages/cmake"
-VERSION="4.4.3"
-PKG_VER="4.4.3-9"
-WORK="${HOMESCOOP_WORK:-${TMPDIR:-/tmp}/homescoop-work}"
-export HOMESCOOP_PKG VERSION WORK
-mkdir -p "$WORK"
-
-SLICC_EM="${SLICC_EMSCRIPTEN:-$ROOT/../slicc-emscripten}"
-BUILD="$SLICC_EM/build/cmake-wasm-build"
-SRC_CMAKE="$SLICC_EM/src/cmake-4.4.3"
+homescoop_load_recipe cmake
 PKG="$HOMESCOOP_PKG/package"
-ROOT_ENV_PATCH="$SLICC_EM/patches/cmake-4.4.3-cmake-root-env.patch"
+PKG_VER="$(node -p 'require(process.argv[1]).version' "$PKG/package.json")"
+SERIES="${VERSION%.*}"
+TB="$WORK/cmake-$VERSION.tar.gz"
+SRC="$WORK/cmake-$VERSION-src"
+BLD="$WORK/cmake-$VERSION-build"
 PRERUN="$HOMESCOOP_PKG/cmake-env-prerun.js"
+JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
 
-# Prefer the emscripten that produced the .o/.a tree (ABI match).
-if [[ -x "$SLICC_EM/src/emscripten/em++" ]]; then
-  export EM_CONFIG="${SLICC_EM}/emscripten-config"
-  export EM_CACHE="${SLICC_EM}/cache"
-  export EMSDK_PYTHON="${EMSDK_PYTHON:-/opt/homebrew/bin/python3.13}"
-  EMXX="$SLICC_EM/src/emscripten/em++"
-  EMCC="$SLICC_EM/src/emscripten/emcc"
-  EMAR="$SLICC_EM/src/emscripten/emar"
-else
-  EMXX="$(command -v em++)"
-  EMCC="$(command -v emcc)"
-  EMAR="$(command -v emar)"
-fi
+homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
+rm -rf "$SRC"
+mkdir -p "$SRC"
+tar -xzf "$TB" -C "$SRC" --strip-components=1
+homescoop_apply_patches "$SRC"
+grep -q 'defined(__EMSCRIPTEN__) ||' "$SRC/Utilities/cmlibuv/include/uv/unix.h"
+grep -q 'GetEnv("CMAKE_ROOT", root)' "$SRC/Source/cmSystemTools.cxx"
+grep -q "slicc_spawn_capture(options->file" "$SRC/Utilities/cmlibuv/src/unix/process.c"
+grep -q 'set(CMAKE_HOST_SYSTEM_NAME "WASI")' "$SRC/Modules/CMakeDetermineSystem.cmake"
 
-for need in \
-  "$BUILD/Source/CMakeFiles/cmake.dir/cmakemain.cxx.o" \
-  "$BUILD/Source/CMakeFiles/cmake.dir/cmcmd.cxx.o" \
-  "$BUILD/Source/libCMakeLib.a" \
-  "$BUILD/Utilities/cmlibuv/libcmlibuv.a" \
-  "$ROOT_ENV_PATCH" \
-  "$PRERUN"
-do
-  test -f "$need" || {
-    echo "homescoop: missing $need" >&2
-    exit 1
-  }
-done
-test -d "$SRC_CMAKE/Modules" || {
-  echo "homescoop: missing $SRC_CMAKE/Modules" >&2
-  exit 1
-}
+eval "$(bash "$ROOT/scripts/emscripten-tree.sh" "$WORK/cmake-em")"
+export EM_CONFIG="$EMSCRIPTEN_TREE_CONFIG"
+EMCC=(python3 "$EMSCRIPTEN_TREE/emcc.py")
+EMXX=(python3 "$EMSCRIPTEN_TREE/em++.py")
+EMAR=(python3 "$EMSCRIPTEN_TREE/emar.py")
+MAPS="-ffile-prefix-map=$SRC=/cmake -ffile-prefix-map=$BLD=/cmake/build"
 
-export EMAR="$EMAR"
-echo "== cmake: recompile sigaction/sigset_t layout objects (fail if a new one appears)"
-python3 "$ROOT/scripts/slicc-sig-layout-guard.py" \
-  --ninja "$BUILD/build.ninja" \
-  --allowlist "$HOMESCOOP_PKG/sig-layout-sources.txt" \
-  --src-root "$SRC_CMAKE" \
-  --archive Source/kwsys/libcmsys.a \
-  --archive Source/libCMakeLib.a \
-  --archive Utilities/cmlibuv/libcmlibuv.a \
-  --archive Utilities/cmcurl/lib/libcmcurl.a \
-  --archive Utilities/cmliblzma/libcmliblzma.a \
-  --object Source/CMakeFiles/cmake.dir/cmakemain.cxx.o \
-  --object Source/CMakeFiles/cmake.dir/cmcmd.cxx.o \
-  --recompile
-
-# Ensure CMAKE_ROOT env patch is applied to the cmake source tree.
-if git -C "$SRC_CMAKE" apply --reverse --check "$ROOT_ENV_PATCH" >/dev/null 2>&1; then
-  echo "== cmake: CMAKE_ROOT env patch already applied"
-else
-  echo "== cmake: apply CMAKE_ROOT env patch"
-  git -C "$SRC_CMAKE" apply "$ROOT_ENV_PATCH"
-fi
-
-# Recompile cmSystemTools.cxx into libCMakeLib.a (only object touched by the patch).
-STOOL_O="$BUILD/Source/CMakeFiles/CMakeLib.dir/cmSystemTools.cxx.o"
-echo "== cmake: recompile cmSystemTools.cxx.o"
-"$EMXX" -DCURL_STATICLIB -DLIBARCHIVE_STATIC \
-  -I"$BUILD/Utilities" -I"$BUILD/Source" \
-  -I"$SRC_CMAKE/Source" -I"$SRC_CMAKE/Source/LexerParser" \
-  -isystem "$SRC_CMAKE/Utilities/std" -isystem "$SRC_CMAKE/Utilities" \
-  -fexceptions -O3 -DNDEBUG -std=c++17 \
-  -c "$SRC_CMAKE/Source/cmSystemTools.cxx" -o "$STOOL_O"
-"$EMAR" r "$BUILD/Source/libCMakeLib.a" "$STOOL_O"
-echo "== cmake: updated libCMakeLib.a with CMAKE_ROOT env support"
-
-# Realm slicc shims: spawn/exec + gaps/signals + select/poll (libuv waitpid/SIGCHLD).
-# No slicc_main_envp — cmake already has main (gmake needs main_envp only because
-# of -Dmain=slicc_tool_main). slicc_select provides slicc_poll_js so libuv's poll
-# enters the realm kernel and pending SIGCHLD is delivered.
-SLICC_A="$WORK/libslicc-cmake.a"
-ODIR="$WORK/slicc-objs-cmake-em"
+echo "== cmake: libslicc (spawn, exec, signals, libc gaps with credentials, select/poll)"
+ODIR="$WORK/cmake-slicc-objs"
 rm -rf "$ODIR"
 mkdir -p "$ODIR"
 objs=()
 for src in slicc_spawn slicc_exec slicc_libc_gaps slicc_signals slicc_select; do
-  echo "== slicc shim: $EMCC -c ${src}.c"
-  "$EMCC" -O2 -c "$ROOT/shims/slicc/${src}.c" -o "$ODIR/${src}.o"
+  "${EMCC[@]}" -O2 -c "$ROOT/shims/slicc/${src}.c" -o "$ODIR/${src}.o"
   objs+=("$ODIR/${src}.o")
 done
-rm -f "$SLICC_A"
-"$EMAR" rcs "$SLICC_A" "${objs[@]}"
-echo "== slicc shim: $SLICC_A (spawn+select)"
+SLICC_A="$ODIR/libslicc-cmake.a"
+"${EMAR[@]}" rcs "$SLICC_A" "${objs[@]}"
+grep -q sliccKernel "$ODIR/slicc_spawn.o"
 
-RELINK_OUT="$WORK/cmake-relink"
-mkdir -p "$RELINK_OUT"
-echo "== cmake: relink for web,worker,node → $RELINK_OUT/cmake"
+echo "== cmake: emcmake (Release, no OpenSSL, no dialogs, no tests)"
+rm -rf "$BLD"
+python3 "$EMSCRIPTEN_TREE/emcmake.py" cmake -S "$SRC" -B "$BLD" -G "Unix Makefiles" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=OFF \
+  -DCMAKE_USE_OPENSSL=OFF \
+  -DBUILD_CursesDialog=OFF \
+  -DBUILD_QtDialog=OFF \
+  "-DCMAKE_C_FLAGS=$MAPS" \
+  "-DCMAKE_CXX_FLAGS=-fexceptions $MAPS" \
+  "-DCMAKE_EXE_LINKER_FLAGS=-fexceptions -sDISABLE_EXCEPTION_CATCHING=0"
+test -f "$BLD/Source/CMakeFiles/cmake.dir/link.txt"
 
-export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=4194304 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -sDISABLE_EXCEPTION_CATCHING=0 -lnodefs.js --pre-js ${PRERUN}"
-# Emit .js (no shebang); slicc.commands expects bare bin/cmake.
-# shellcheck disable=SC2046,SC2086
-"$EMXX" -O3 -std=c++17 -fexceptions \
-  "$BUILD/Source/CMakeFiles/cmake.dir/cmakemain.cxx.o" \
-  "$BUILD/Source/CMakeFiles/cmake.dir/cmcmd.cxx.o" \
-  "$BUILD/Source/libCMakeLib.a" \
-  "$BUILD/Utilities/std/libcmstd.a" \
-  "$BUILD/Source/kwsys/libcmsys.a" \
-  "$BUILD/Utilities/cmcurl/lib/libcmcurl.a" \
-  "$BUILD/Utilities/cmnghttp2/libcmnghttp2.a" \
-  "$BUILD/Utilities/cmexpat/libcmexpat.a" \
-  "$BUILD/Utilities/cmjsoncpp/libcmjsoncpp.a" \
-  "$BUILD/Utilities/cmlibarchive/libarchive/libcmlibarchive.a" \
-  "$BUILD/Utilities/cmbzip2/libcmbzip2.a" \
-  "$BUILD/Utilities/cmliblzma/libcmliblzma.a" \
-  "$BUILD/Utilities/cmzstd/libcmzstd.a" \
-  "$BUILD/Utilities/cmlibrhash/libcmlibrhash.a" \
-  "$BUILD/Utilities/cmlibuv/libcmlibuv.a" \
-  "$BUILD/Utilities/cmzlib/libcmzlib.a" \
-  "$BUILD/Utilities/cmllpkgc/libcmllpkgc.a" \
-  $(homescoop_slicc_link_archive "$SLICC_A") \
-  $(homescoop_em_cli_ldflags) \
-  -o "$RELINK_OUT/cmake.js"
-
-test -f "$RELINK_OUT/cmake.js" && test -f "$RELINK_OUT/cmake.wasm"
-cp "$RELINK_OUT/cmake.js" "$RELINK_OUT/cmake"
-
-echo "== cmake: QC glue (realm-safe ENVIRONMENT + slicc_poll_js)"
-RELINK_GLUE="$RELINK_OUT/cmake" python3 - <<'PY'
-from pathlib import Path
-import os
-p = Path(os.environ["RELINK_GLUE"])
-t = p.read_text()
-assert not t.startswith("#!"), "shebang present — realm loader cannot eval"
-assert "ENVIRONMENT_IS_WORKER" in t and "ENVIRONMENT_IS_WEB" in t
-assert "CMAKE_ROOT" in t, "pre-js CMAKE_ROOT bridge missing from glue"
-poll = t.count("slicc_poll_js")
-sel = t.count("slicc_select_js")
-print(f"  require( occurrences: {t.count('require(')}")
-print(f"  NODEFS refs: {t.count('NODEFS')}")
-print(f"  slicc_poll_js: {poll}  slicc_select_js: {sel}")
-assert t.count("NODEFS") > 0, "missing -lnodefs.js"
-assert poll > 0, "PRESTAGE fail — slicc_poll_js missing (need slicc_select.o)"
-print("  QC OK")
+OUT="$WORK/cmake-link"
+rm -rf "$OUT"
+mkdir -p "$OUT"
+echo "== cmake: build, linking for web,worker,node → $OUT/cmake"
+REALM=(
+  -sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1
+  -sSTACK_SIZE=4194304 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0
+  -sEXPORTED_RUNTIME_METHODS=FS,callMain -sDISABLE_EXCEPTION_CATCHING=0
+  -sDECLARE_ASM_MODULE_EXPORTS=0 -lnodefs.js --pre-js "$PRERUN"
+  --js-library "$ROOT/shims/slicc/slicc-writev.js"
+  --js-library "$ROOT/shims/slicc/slicc-linkat.js"
+  --js-library "$ROOT/shims/slicc/slicc-uname.js"
+  -Wl,-u,slicc_raise -Wl,-u,slicc_sig_mask -Wl,-u,slicc_sigpipe -Wl,-u,slicc_cred_euid -Wl,--wrap=raise
+  -Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture -Wl,-u,posix_spawn -Wl,-u,posix_spawnp
+  -Wl,-u,popen -Wl,-u,pclose -Wl,-u,system
+  -Wl,--whole-archive "$SLICC_A" -Wl,--no-whole-archive
+)
+python3 - "$BLD/Source/CMakeFiles/cmake.dir/link.txt" "$OUT/cmake.js" "${REALM[@]}" <<'PY'
+import shlex, sys
+link, out, *realm = sys.argv[1:]
+args = shlex.split(open(link).read())
+if not args[0].endswith("em++"):
+    sys.exit(f"homescoop: cmake's link.txt does not start with em++: {args[0]}")
+i = args.index("-o")
+args[i + 1] = out
+open(link, "w").write(" ".join(shlex.quote(a) for a in args + realm) + "\n")
+print(f"  link.txt: cmake links to {out} with {len(realm)} realm flags")
 PY
+make -C "$BLD" -j"$JOBS" cmake
+test -f "$OUT/cmake.js" && test -f "$OUT/cmake.wasm"
+mv "$OUT/cmake.js" "$OUT/cmake"
+python3 - "$OUT/cmake" <<'PY'
+import sys
+t = open(sys.argv[1], encoding="latin1").read()
+assert not t.startswith("#!"), "shebang present: the realm loader cannot eval it"
+assert "ENVIRONMENT_IS_WORKER" in t and "ENVIRONMENT_IS_WEB" in t
+assert "CMAKE_ROOT" in t, "pre-js CMAKE_ROOT bridge missing from the glue"
+assert t.count("NODEFS") > 0, "missing -lnodefs.js"
+assert t.count("slicc_poll_js") > 0, "slicc_poll_js missing (libuv's poll must enter the kernel)"
+assert "slicc_cred_js" in t, "the credential library is missing"
+print("  glue QC OK")
+PY
+if LC_ALL=C grep -aEq '/(home|Users|__w|private/var)/|homescoop-work' "$OUT/cmake.wasm"; then
+  echo "homescoop: cmake.wasm names a build path" >&2
+  exit 1
+fi
 
 echo "== cmake: stage binary + modules"
-mkdir -p "$PKG/bin" "$PKG/share/cmake-4.4"
-cp "$RELINK_OUT/cmake" "$PKG/bin/cmake"
-cp "$RELINK_OUT/cmake.wasm" "$PKG/bin/cmake.wasm"
+rm -rf "$PKG/bin" "$PKG/share"
+mkdir -p "$PKG/bin" "$PKG/share/cmake-$SERIES"
+cp "$OUT/cmake" "$PKG/bin/cmake"
+cp "$OUT/cmake.wasm" "$PKG/bin/cmake.wasm"
 chmod +x "$PKG/bin/cmake"
-cp "$RELINK_OUT/cmake" "$BUILD/bin/cmake"
-cp "$RELINK_OUT/cmake.wasm" "$BUILD/bin/cmake.wasm"
-chmod +x "$BUILD/bin/cmake"
-rm -f "$BUILD/bin/cmake.js"
-
-rsync -a --delete "$SRC_CMAKE/Modules/" "$PKG/share/cmake-4.4/Modules/"
-rsync -a --delete "$SRC_CMAKE/Templates/" "$PKG/share/cmake-4.4/Templates/"
-
-# SLICC: uname is Emscripten but WASI programs run natively — host=WASI.
-DET="$PKG/share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
-if ! grep -q 'SLICC/homescoop: cmake.wasm' "$DET"; then
-  echo "== cmake: patch CMakeDetermineSystem.cmake (Emscripten host → WASI)"
-  python3 - "$DET" <<'PY'
-from pathlib import Path
-import sys
-p = Path(sys.argv[1])
-t = p.read_text()
-needle = "# find out on which system cmake runs\nif(CMAKE_HOST_UNIX)"
-patch = """# SLICC/homescoop: cmake.wasm's uname reports Emscripten, but WASI programs run
-# natively in the realm (try_run works). Map that host to WASI so
-# Platform/WASI.cmake applies and executables are bare modules (not .js).
-# Explicit -DCMAKE_SYSTEM_NAME=Emscripten still wins below when set by the user.
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Emscripten")
-  set(CMAKE_HOST_SYSTEM_NAME "WASI")
-  set(CMAKE_HOST_SYSTEM_PROCESSOR "wasm32")
-endif()
-
-# find out on which system cmake runs
-if(CMAKE_HOST_UNIX)"""
-if needle not in t:
-    raise SystemExit("homescoop: CMakeDetermineSystem.cmake anchor not found")
-p.write_text(t.replace(needle, patch, 1))
-print("  patched", p)
-PY
-fi
-
-if [[ -f "$SRC_CMAKE/Copyright.txt" ]]; then
-  cp "$SRC_CMAKE/Copyright.txt" "$PKG/LICENSE"
-elif [[ -f "$SRC_CMAKE/LICENSE.rst" ]]; then
-  cp "$SRC_CMAKE/LICENSE.rst" "$PKG/LICENSE"
-fi
-
+cp -R "$SRC/Modules" "$PKG/share/cmake-$SERIES/Modules"
+cp -R "$SRC/Templates" "$PKG/share/cmake-$SERIES/Templates"
+cp "$SRC/LICENSE.rst" "$PKG/LICENSE"
 node -e '
-const fs = require("fs");
-const p = process.argv[1];
-const ver = process.argv[2];
-const j = JSON.parse(fs.readFileSync(p, "utf8"));
-j.version = ver;
-j.description = "CMake 4.4.3 for wasm / slicc (WASI host + slicc_poll for libuv)";
-j.files = ["README.md", "LICENSE", "bin", "share"];
-j.slicc = j.slicc || { abi: "emscripten", commands: {} };
-j.slicc.env = { CMAKE_ROOT: "${package}/share/cmake-4.4" };
-j.slicc.commands = {
-  cmake: {
-    glue: "bin/cmake",
-    wasm: "bin/cmake.wasm",
-    env: { CMAKE_ROOT: "${package}/share/cmake-4.4" },
-  },
-};
-fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
-' "$PKG/package.json" "$PKG_VER"
-
-cat > "$PKG/README.md" <<'EOF'
-# `@ai-ecoverse/wasm-cmake`
-
-CMake 4.4.3 for slicc's wasm realm (relinked with `homescoop_em_cli_ldflags`
-+ libslicc spawn profile). Honors `CMAKE_ROOT` (manifest default:
-`${package}/share/cmake-4.4`) so modules resolve when argv0 is `/usr/bin/cmake`.
-
-```bash
-pnpm add -g @ai-ecoverse/wasm-cmake
-cmake -E echo hello
-cmake -P script.cmake
-```
-EOF
-
-du -sh "$PKG" "$PKG/bin" "$PKG/share"
-echo "== cmake: staged → $PKG ($PKG_VER)"
+const j = require(process.argv[1]);
+const want = "${package}/share/cmake-" + process.argv[2];
+if (j.slicc?.env?.CMAKE_ROOT !== want || j.slicc?.commands?.cmake?.env?.CMAKE_ROOT !== want) { console.error(`homescoop: package.json CMAKE_ROOT is not ${want}`); process.exit(1); }
+' "$PKG/package.json" "$SERIES"
+du -sh "$PKG" "$PKG/bin/cmake.wasm" "$PKG/share"
 
 echo "== cmake: PRESTAGE smoke (not --version)"
 node "$ROOT/scripts/smoke-cmake.mjs"
+echo "OK cmake $PKG_VER"
