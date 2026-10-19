@@ -19,7 +19,7 @@
     "ntfy pub --wait-pid fails with a clear error and sends nothing (checklist.mjs)",
     "a subscribe-only token's publish gets 403 and exits non-zero; no token or a forged one gets 401 and exits non-zero (auth.mjs)",
     "ntfy sub with a forged token exits 1 after one request (no retry loop); a token revoked mid-stream ends ntfy sub after the reconnect's 401 (auth.mjs)",
-    "a publish answered 429 with retry-after: 3 is sent again after 3 s and succeeds; retry-after: 600 fails at once with one request (ratelimit.mjs)",
+    "a publish answered 429 with retry-after: 3 is sent again after 3 s and succeeds, and a --file upload is sent again whole after retry-after: 2; retry-after: 600 fails at once with one request (ratelimit.mjs)",
     "ntfy sub answered 429 with retry-after: 14 reconnects after 14 s, not upstream's 10 s (ratelimit.mjs)",
     "a dropped stream reconnects with since=<last id>: m1 m2 / m2 m3 / m4 runs the command for m1 m2 m3 m4 exactly once each; before any message it resumes from the open event's time (reconnect.mjs)",
     "a message over 1 MiB (stdin or --message) is refused before any request; exactly 1 MiB is sent (size.mjs)",

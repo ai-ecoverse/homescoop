@@ -25,7 +25,7 @@ removeWhen: upstream's subscribe loop resumes with since=, honours
 Retry-After and stops on auth errors, and publish refuses oversize messages.
 
 diff --git a/client/client.go b/client/client.go
-index c226096..b402a73 100644
+index c226096..8be8ddf 100644
 --- a/client/client.go
 +++ b/client/client.go
 @@ -12,6 +12,7 @@ import (
@@ -102,25 +102,42 @@ index c226096..b402a73 100644
  		config:        config,
  		subscriptions: make(map[string]*subscription),
  	}
-@@ -102,27 +146,49 @@ func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishO
+@@ -102,27 +146,53 @@ func (c *Client) PublishReader(topic string, body io.Reader, options ...PublishO
  	if err != nil {
  		return nil, err
  	}
 -	req, err := http.NewRequest("POST", topicURL, body)
 -	if err != nil {
 -		return nil, err
+-	}
+-	for _, option := range options {
+-		if err := option(req); err != nil {
+-			return nil, err
 +	seeker, rewindable := body.(io.Seeker)
 +	var start int64
 +	if rewindable {
 +		if start, err = seeker.Seek(0, io.SeekCurrent); err != nil {
 +			rewindable = false
-+		}
+ 		}
  	}
--	for _, option := range options {
--		if err := option(req); err != nil {
+-	log.Debug("%s Publishing message with headers %s", util.ShortTopicURL(topicURL), req.Header)
+-	resp, err := http.DefaultClient.Do(req)
+-	if err != nil {
+-		return nil, err
+-	}
+-	defer resp.Body.Close()
+-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+-	if err != nil {
+-		return nil, err
 +	var b []byte
++	reqBody := body
++	if _, closes := body.(io.Closer); closes && rewindable {
++		reqBody = struct{ io.Reader }{body}
+ 	}
+-	if resp.StatusCode != http.StatusOK {
+-		return nil, errors.New(strings.TrimSpace(string(b)))
 +	for attempt := 0; ; attempt++ {
-+		req, err := http.NewRequest("POST", topicURL, body)
++		req, err := http.NewRequest("POST", topicURL, reqBody)
 +		if err != nil {
 +			return nil, err
 +		}
@@ -152,25 +169,12 @@ index c226096..b402a73 100644
 +		log.Warn("%s Rate limited (429), retrying after %s", util.ShortTopicURL(topicURL), statusErr.RetryAfter)
 +		time.Sleep(statusErr.RetryAfter)
 +		if _, err := seeker.Seek(start, io.SeekStart); err != nil {
- 			return nil, err
- 		}
--	}
--	log.Debug("%s Publishing message with headers %s", util.ShortTopicURL(topicURL), req.Header)
--	resp, err := http.DefaultClient.Do(req)
--	if err != nil {
--		return nil, err
--	}
--	defer resp.Body.Close()
--	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
--	if err != nil {
--		return nil, err
--	}
--	if resp.StatusCode != http.StatusOK {
--		return nil, errors.New(strings.TrimSpace(string(b)))
++			return nil, err
++		}
  	}
  	m, err := toMessage(string(b), topicURL, "")
  	if err != nil {
-@@ -152,7 +218,7 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
+@@ -152,7 +222,7 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
  	log.Debug("%s Polling from topic", util.ShortTopicURL(topicURL))
  	options = append(options, WithPoll())
  	go func() {
@@ -179,7 +183,7 @@ index c226096..b402a73 100644
  		close(msgChan)
  		errChan <- err
  	}()
-@@ -196,7 +262,7 @@ func (c *Client) Subscribe(topic string, options ...SubscribeOption) (string, er
+@@ -196,7 +266,7 @@ func (c *Client) Subscribe(topic string, options ...SubscribeOption) (string, er
  		topicURL: topicURL,
  		cancel:   cancel,
  	}
@@ -188,7 +192,7 @@ index c226096..b402a73 100644
  	return subscriptionID, nil
  }
  
-@@ -225,23 +291,57 @@ func (c *Client) expandTopicURL(topic string) (string, error) {
+@@ -225,23 +295,57 @@ func (c *Client) expandTopicURL(topic string) (string, error) {
  	return fmt.Sprintf("%s/%s", c.config.DefaultHost, topic), nil
  }
  
@@ -252,7 +256,7 @@ index c226096..b402a73 100644
  	streamURL := fmt.Sprintf("%s/json", topicURL)
  	log.Debug("%s Listening to %s", util.ShortTopicURL(topicURL), streamURL)
  	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
-@@ -263,9 +363,10 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
+@@ -263,9 +367,10 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
  		if err != nil {
  			return err
  		}
@@ -264,7 +268,7 @@ index c226096..b402a73 100644
  	for scanner.Scan() {
  		messageJSON := scanner.Text()
  		m, err := toMessage(messageJSON, topicURL, subscriptionID)
-@@ -273,11 +374,20 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
+@@ -273,11 +378,20 @@ func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicUR
  			return err
  		}
  		log.Trace("%s Message received: %s", util.ShortTopicURL(topicURL), messageJSON)

@@ -70,3 +70,12 @@ the subscribe goroutine blocks in the host call before the main goroutine
 can run the command, so the test hangs until it times out. With the yield,
 the acks for `m1` and `m2` arrive about 100 ms apart, while the stream is
 still open.
+
+## The `--file` retry (Codex review of #1195)
+
+`ratelimit.mjs` sends a `--file` upload that is answered 429 with
+`retry-after: 2`. The first #1195 build (`ntfy.wasm` sha256 `3a8de95d…`)
+passed the open file itself as the request body, and the first request closed
+it, so the retry failed with `seek /home/cone/report.txt: file already
+closed` and the spec failed. The current 0002 wraps a closable body for each
+request. The upload is then sent again whole, and the spec passes.
