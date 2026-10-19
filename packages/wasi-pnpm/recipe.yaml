@@ -50,4 +50,7 @@ about:
     SLICC names a trap's frames under SLICC_WASM_BACKTRACE=1. That re-links
     the code (homescoop#1126). 12.9.1-11's 0004 replaces a hoisted package by
     staging it, renaming the old tree aside, renaming the new one in and
-    only then deleting the old one (homescoop#1128).
+    only then deleting the old one (homescoop#1128). 12.9.1-12's 0005 cuts
+    the wasm port's per-file mode calls (a shard's mode once per directory; no
+    fstat/fchmod of a created file once creation modes are seen to apply), and
+    host/pnpm-host.mjs reads the process umask from the kernel.

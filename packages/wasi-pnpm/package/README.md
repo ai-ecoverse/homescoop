@@ -76,6 +76,17 @@ long enough for a running agent to find its own package half gone
 into place too. Between the two renames the directory is briefly absent:
 there's no atomic exchange of non-empty directories.
 
+## Modes and the umask (12.9.1-12)
+
+pnpm reads the process's umask from the kernel, so `umask 077; pnpm install`
+gives node_modules files 700/600 (bin targets get pnpm's `+x`), and 022 gives
+755/644. Up to 12.9.1-11 the host always answered 022, and files came out
+755/644 whatever the umask. The wasm port also makes fewer mode calls per
+file it creates: each store shard's mode is looked up once, and a created
+file's mode isn't checked and re-applied once the kernel has been seen to
+apply creation modes (about a third of pnpm's own per-file OPFS calls in the
+kernel's trace of an install).
+
 ## `npm`, `npx` and `i`
 
 The package also provides `npm`, `npx` and `i` as small `#!/bin/sh` scripts

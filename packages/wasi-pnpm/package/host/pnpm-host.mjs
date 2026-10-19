@@ -11,6 +11,14 @@ export const errno = {
 
 const TYPE_BITS = { file: 0o100000, dir: 0o040000, symlink: 0o120000 }
 const UMASK = 0o022
+
+function readUmask (ctx) {
+  try {
+    const mask = ctx.syscall?.({ op: 'proc-umask' })
+    if (Number.isInteger(mask) && mask >= 0 && mask <= 0o777) return mask
+  } catch {}
+  return UMASK
+}
 const DEFAULT_UID = 1000
 const MAX_RESPONSE = 1024 * 1024
 
@@ -76,6 +84,8 @@ function withType (stat) {
 }
 
 function createFilesystem (ctx) {
+  // Per process (ctx): read once from the kernel.
+  let processUmask
   const decoder = new TextDecoder('utf-8', { fatal: true })
   const uid = ctx.uid ?? DEFAULT_UID
   function guestPath (pointer, length) {
@@ -163,7 +173,11 @@ function createFilesystem (ctx) {
     fchmod: checked((descriptor, mode) => ctx.fds.fchmod(descriptor, mode & 0o7777)),
     fmode: checked((descriptor, output) => setU32(output, withType(ctx.fds.fstat(descriptor)))),
     lmode: checked((pointer, length, output) => setU32(output, withType(ctx.fs.lstat(guestPath(pointer, length))))),
-    umask: () => UMASK,
+    // The process's umask (12.9.1-12): pnpm computes a copied file's mode
+    // from it, and up to 12.9.1-11 this answered 022 whatever the shell set,
+    // so `umask 077; pnpm install` gave 755/644 files. Read once, from the
+    // kernel; pnpm itself never changes it.
+    umask: () => (processUmask ??= readUmask(ctx)),
     uid: () => uid,
     secure_directory: checked((pointer, length) => {
       const directory = guestPath(pointer, length)

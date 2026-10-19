@@ -91,6 +91,11 @@ function fakeContext () {
         if (this.traits === undefined) throw error('ENOSYS')
         return this.traits
       }
+      if (request.op === 'proc-umask') {
+        this.umaskReads = (this.umaskReads ?? 0) + 1
+        if (this.umask instanceof Error) throw this.umask
+        return this.umask ?? 0o022
+      }
       if (request.op === 'net-request') {
         this.sent.push(request)
         if (this.reply instanceof Error) throw this.reply
@@ -209,6 +214,18 @@ test('pnpm_fs open_nofollow, open_lock, try_lock and modes', () => {
   assert.equal(fs.uid(), 1000)
   assert.equal(fs.grant_directory_mode_beneath(), errno.ENOTSUP)
   assert.equal(fs.sqlite_register(pointer, length, 1), 0)
+})
+
+test('pnpm_fs umask is the process umask, read once (12.9.1-12)', () => {
+  const ctx = fakeContext()
+  ctx.umask = 0o077
+  const fs = createImports(ctx).pnpm_fs
+  assert.equal(fs.umask(), 0o077)
+  assert.equal(fs.umask(), 0o077)
+  assert.equal(ctx.umaskReads, 1)
+  const failing = fakeContext()
+  failing.umask = new Error('ENOSYS')
+  assert.equal(createImports(failing).pnpm_fs.umask(), 0o022)
 })
 
 test('pnpm_fs path_access_executable checks the exec bits', () => {

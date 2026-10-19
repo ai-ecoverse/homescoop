@@ -1,0 +1,118 @@
+fs (wasi): fewer host mode calls per created file (homescoop, the KC's install trace)
+
+slicc-kernel's trace of an install showed pnpm's wasm port spending
+about a third of its per-file OPFS calls on modes:
+- create_inheriting_mode (every store file) looked up its shard
+  directory's mode (lmode) each time: now once per directory per run;
+- grant_file_mode then fstat'ed the new file (fmode) to see whether the
+  umask narrowed its mode, and copy_file_exclusive (every imported file)
+  re-applied the mode it created the file with (fchmod).
+Both are skipped when the umask clears none of the mode's bits and the
+host has been seen to apply creation modes: the first such file is still
+checked, so a host that ignores the creation mode keeps the old path.
+
+--- a/pnpm/crates/fs/src/wasi_fs.rs
++++ b/pnpm/crates/fs/src/wasi_fs.rs
+@@ -269,9 +269,9 @@
+     if requested.is_some_and(|mode| mode.trailing_zeros() >= 6) {
+         return create_new(path, requested.unwrap_or(0o600));
+     }
+-    let parent_mode = match path_mode(parent) {
+-        Ok(mode) if mode & libc::S_IFMT == libc::S_IFDIR => mode,
+-        _ => return create_new(path, requested.unwrap_or(0o666)),
++    let parent_mode = match parent_dir_mode(parent) {
++        Some(mode) => mode,
++        None => return create_new(path, requested.unwrap_or(0o666)),
+     };
+     let mode = crate::file_mode::inherited_file_mode(
+         parent_mode,
+@@ -282,8 +282,51 @@
+     Ok(file)
+ }
+ 
++/// The mode of the directory a file is created in, looked up once per
++/// directory for the process (homescoop: the CAS writer creates every
++/// store file through here, one `lstat` of its shard each, and the
++/// shards' modes don't change during an install). `None` for a path that
++/// isn't a directory, which isn't cached.
++fn parent_dir_mode(parent: &Path) -> Option<u32> {
++    use std::collections::HashMap;
++    use std::sync::{Mutex, OnceLock};
++    static MODES: OnceLock<Mutex<HashMap<std::path::PathBuf, u32>>> = OnceLock::new();
++    let modes = MODES.get_or_init(|| Mutex::new(HashMap::new()));
++    if let Some(mode) = modes.lock().unwrap_or_else(std::sync::PoisonError::into_inner).get(parent) {
++        return Some(*mode);
++    }
++    let mode = path_mode(parent).ok().filter(|mode| mode & libc::S_IFMT == libc::S_IFDIR)?;
++    modes.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(parent.to_path_buf(), mode);
++    Some(mode)
++}
++
++/// Whether a file created with `mode` is known to carry exactly `mode`
++/// without asking (homescoop: one `fstat` per created file otherwise).
++/// That needs the umask to clear none of its bits, and a host that applies
++/// the creation mode: [`creation_mode_checked`] learns that from the first
++/// file whose mode is checked, and until then nothing is skipped.
++pub(crate) fn creation_mode_is_exact(mode: u32) -> bool {
++    CREATION_MODE.load(std::sync::atomic::Ordering::Relaxed) == 1 && mode & current_umask() & 0o777 == 0
++}
++
++/// Record whether a file created with `wanted` (which the umask didn't
++/// narrow) came out with exactly that mode.
++pub(crate) fn creation_mode_checked(wanted: u32, current: u32) {
++    if wanted & current_umask() & 0o777 == 0 {
++        let seen = if current & 0o7777 == wanted & 0o7777 { 1 } else { 2 };
++        let _ = CREATION_MODE.compare_exchange(0, seen, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed);
++    }
++}
++
++/// 0: not known yet; 1: the host applies the creation mode; 2: it doesn't.
++static CREATION_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
++
+ fn grant_file_mode(file: &std::fs::File, wanted: u32) -> io::Result<()> {
++    if creation_mode_is_exact(wanted) {
++        return Ok(());
++    }
+     let current = file_mode(file)? & 0o777;
++    creation_mode_checked(wanted, current);
+     if current | wanted == current {
+         return Ok(());
+     }
+--- a/pnpm/crates/fs/src/copy_file_exclusive.rs
++++ b/pnpm/crates/fs/src/copy_file_exclusive.rs
+@@ -73,7 +73,7 @@
+     let mut source = fs::File::open(source_path)?;
+     let mut target = create_new_with_permissions(target_path, permissions)?;
+     io::copy(&mut source, &mut target)
+-        .and_then(|_| set_file_permissions(&target, permissions))
++        .and_then(|_| assert_permissions(&target, permissions))
+         .and_then(|()| finish(&target))
+         .inspect_err(|_| {
+             if path_still_names(&target, target_path) {
+@@ -82,6 +82,26 @@
+         })
+ }
+ 
++/// Re-apply the mode the target was created with, since the umask can
++/// narrow it. On wasi that is a host call per copied file, skipped when
++/// the umask clears none of its bits and the host has been seen to apply
++/// creation modes (homescoop: one `fchmod` per imported file otherwise).
++fn assert_permissions(target: &fs::File, permissions: &CopyPermissions) -> io::Result<()> {
++    #[cfg(target_os = "wasi")]
++    {
++        if crate::wasi_fs::creation_mode_is_exact(*permissions) {
++            return Ok(());
++        }
++        if let Ok(current) = crate::wasi_fs::file_mode(target) {
++            crate::wasi_fs::creation_mode_checked(*permissions, current);
++            if crate::wasi_fs::creation_mode_is_exact(*permissions) {
++                return Ok(());
++            }
++        }
++    }
++    set_file_permissions(target, permissions)
++}
++
+ /// Copy `source_path` to `target_path`, so that a reader of the target
+ /// sees either what it held before or the whole copy, never a part.
+ ///
