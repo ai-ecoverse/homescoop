@@ -1,5 +1,9 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-38: a memset into memory another thread's sbrk just grew can trap (-39, #1287)
+
+`test/r39.c` against npm -38 (ehpic variant, slicc-kernel 1.125.0, Node entry, 2026-10-19), in batches of 20 alternating with the patched libc: **5 of 320 runs** end `rc=134 r39: wasm trap in thread N: memory access out of bounds` (1/40, 1/40 and 1/40 in three single batches, then 2/200 alternating). With `dlmalloc-memory-view.patch`, the same harness gives **0 of 300**: first -38's libc.a with only dlmalloc.o swapped (0/100 and 0/200 alternating), then -39 built from source, which gives 0/40 in each of the five variants. The race is V8's lazy update of another thread's memory length (slicc-kernel#1172); the rate depends on load, and the canary in slicc-kernel#1173 sees about 8%.
+
 ## 2025.9.30-37: POLLIN on an empty pipe read end whose writers are gone (-38, #1133)
 
 `test/r36.c` against npm -37 on slicc-kernel 1.125.0 (2026-10-18): `poll POLLIN on an empty read end, writer gone: 1 revents=POLLIN|POLLHUP`. Linux, and -38, give `POLLHUP`.

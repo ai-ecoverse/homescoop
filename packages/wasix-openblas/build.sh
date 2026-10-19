@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-openblas: a static, PIC OpenBLAS 0.3.28 for wasm32-wasix (a build
+# wasix-openblas: a static, PIC OpenBLAS (recipe.yaml version) for wasm32-wasix (a build
 # input: py-numpy and py-scipy link it). NOFORTRAN=1 (LAPACK is OpenBLAS's
 # C translation of netlib, built with `make netlib`), TARGET=RISCV64_GENERIC
 # C kernels, single-threaded, the f2c int ABI (wasm-abi.py), as
@@ -78,6 +78,15 @@ if [[ -s "$B/tmglib.txt" ]]; then
   echo "== wasix-openblas: dropped $(wc -l <"$B/tmglib.txt" | tr -d ' ') tmglib objects"
 fi
 wasixranlib "$DEST/lib/libopenblas.a"
+# The whole archive links with --fatal-warnings, as py-numpy links it
+# (--whole-archive): a void/int signature mismatch between two of its own
+# objects (0.3.34's lapack/laed3 against the f2c'd netlib LAPACK, #1173)
+# fails here, not only when a program happens to call the routine.
+printf 'int main(void){return 0;}\n' >"$B/whole.c"
+WASIXCC_MODULE_KIND=dynamic-main wasixcc -O2 "$B/whole.c" -Wl,--whole-archive "$DEST/lib/libopenblas.a" -Wl,--no-whole-archive -lm \
+  -Wl,--fatal-warnings -o "$B/whole.wasm" >"$B/whole.log" 2>&1 \
+  || { echo "homescoop wasix-openblas: libopenblas.a doesn't link --whole-archive --fatal-warnings" >&2; grep -E 'error|warning|>>>' "$B/whole.log" | head -40 >&2; exit 1; }
+echo "== wasix-openblas: --whole-archive --fatal-warnings link ok"
 for h in cblas.h f77blas.h openblas_config.h; do
   cp "$B/prefix/include/$h" "$DEST/include/"
 done
