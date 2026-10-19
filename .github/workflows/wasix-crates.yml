@@ -41,7 +41,7 @@ jobs:
       matrix:
         toolchain: ['1.83.0', stable]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install Rust ${{ matrix.toolchain }}
         run: |
           rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component clippy,rustfmt --target wasm32-wasip1
@@ -63,7 +63,7 @@ jobs:
       matrix:
         target: [wasm32-wasip1, wasm32-wasip1-threads]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 26
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install the wasm32-wasip1 target
         run: rustup target add wasm32-wasip1
       - name: vendor, build for WASI, check both graphs
