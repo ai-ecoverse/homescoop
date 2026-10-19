@@ -52,6 +52,9 @@ jobs:
           set -euo pipefail
           NM="$RUNNER_TEMP/nm"
           bash scripts/cert-review/harness.sh wasi-pnpm "$NM"
+          # A wasm-bash that runs on the older kernels this loop compares
+          # (5.3.0-21+ needs slicc-kernel >= 1.130.2).
+          npm install --prefix "$NM" --no-fund --no-audit @ai-ecoverse/wasm-bash@5.3.0-20
           if [ "$(id -u)" = 0 ] || sudo -n true 2>/dev/null; then
             npx --prefix "$NM" playwright-core install --with-deps chromium
           else
