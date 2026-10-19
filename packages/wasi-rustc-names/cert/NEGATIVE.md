@@ -12,3 +12,7 @@
 - The published 1.98.1-4 names checked against the published wasi-rustc 1.98.1-5 → FAIL, 2 cases: the version, and `one name per function: 231308 names, highest index 231307; rustc.wasm has 231821 functions`.
 - The same 1.98.1-4 names against their own wasi-rustc 1.98.1-4 → all checks pass: 231,308 names for 231,308 functions, rustc_driver and LLVM symbols present, and the reassembled module validates.
 - A names file that doesn't belong to the binary is caught even when the module would still validate.
+
+## 1.98.1-6: follows wasi-rustc 1.98.1-6 (2026-10-19)
+
+wasi-rustc 1.98.1-6 adds LLVM Support's notices (#1086) and pins wasi-llvm 21.1.8-2. Its rustc.wasm is byte-identical to 1.98.1-5's: the same libraries, and the published tarballs' rustc.wasm compare equal. This release pins both (wasi-rustc 1.98.1-6 `f42f669d…8cf1`, wasi-llvm 21.1.8-2 `5181c65f…312e`). Its build again ships the names only if the rebuilt rustc.wasm is byte-identical to the published 1.98.1-6. The published 1.98.1-5 names checked against wasi-rustc 1.98.1-6 fail only on the version: the package must be at wasi-rustc's version.
