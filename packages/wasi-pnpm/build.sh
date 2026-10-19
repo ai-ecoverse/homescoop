@@ -63,11 +63,14 @@ export CARGO_ENCODED_RUSTFLAGS
 # the CFLAGS_<target> that pnpm/wasm/build.mjs sets.
 export TARGET_CFLAGS="-ffile-prefix-map=$CARGO_HOME_DIR=/cargo -ffile-prefix-map=$(cd "$CARGO_HOME_DIR" && pwd -P)=/cargo -ffile-prefix-map=$SRC=/pnpm -ffile-prefix-map=$(cd "$SRC" && pwd -P)=/pnpm"
 # Link with the name section but without the DWARF std ships
-# (strip=debuginfo; debug stays false) and keep that module (patches/0003): names.py moves its Rust function names, renumbered
-# past the two imports build.mjs adds, into pnpm.wasm.names, and drops the
-# generated-only name section build.mjs's wat2wasm --debug-names writes, so
-# SLICC reads @ai-ecoverse/wasi-pnpm-names under SLICC_WASM_BACKTRACE=1. The
-# code is the same either way: wasm2wat --no-debug-names ignores names.
+# (strip=debuginfo instead of pnpm's strip=symbols; debug stays false) and
+# keep that module (patches/0003). names.py moves its Rust function names,
+# renumbered past the two imports build.mjs adds, into bin/pnpm.wasm.names
+# (beside pnpm.wasm), and drops the generated-only name section build.mjs's
+# wat2wasm --debug-names writes, so SLICC names a trap's frames under
+# SLICC_WASM_BACKTRACE=1. The other strip setting re-links the code: since
+# 12.9.1-10 the code isn't 12.9.1-9's (homescoop#1126), and names from one
+# build don't fit another.
 export CARGO_PROFILE_RELEASE_STRIP=debuginfo
 LINKED="$WORK/pnpm.linked.wasm"
 NAMES_OUT="$WORK/pnpm.wasm.names"

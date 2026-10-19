@@ -1,0 +1,211 @@
+deps-restorer: a reader never sees a hoisted package half-removed or half-imported (homescoop#1128)
+
+stage_and_swap removed the old package tree before renaming the staged
+one into place, so for the whole recursive delete (long on OPFS) a
+reader of node_modules/<pkg> saw it empty out file by file, then not
+there. Move the old tree aside with one rename, rename the staged tree
+in, then delete the old one. A brand-new package (import_absent_dir, not
+shared) is populated in a private sibling and renamed into place too.
+Between the two renames the directory is briefly absent; there's no
+portable atomic exchange of non-empty directories. The upstream test
+for a failing remove_dir_all (RemoveExisting) becomes one that an
+unremovable old tree no longer fails the swap.
+
+--- a/pnpm/crates/deps-restorer/src/import_indexed_dir.rs
++++ b/pnpm/crates/deps-restorer/src/import_indexed_dir.rs
+@@ -356,14 +356,25 @@
+             preserve_symlinks,
+         )
+     } else {
+-        populate_dir::<Reporter>(
++        // homescoop#1128: populate a private sibling and rename it into
++        // place, so a reader sees the package complete or not at all,
++        // never with some of its files.
++        let stage = staging::pick_stage_path(dir_path);
++        if let Err(error) = populate_dir::<Reporter>(
+             logged_methods,
+             import_method,
+-            dir_path,
++            &stage,
+             cas_paths,
+             Placement::Fresh,
+             preserve_symlinks.then_some(dir_path),
+-        )
++        ) {
++            let _ = fs::remove_dir_all(&stage);
++            return Err(error);
++        }
++        pnpm_fs::rename_with_retry(&stage, dir_path).map_err(|error| {
++            let _ = fs::remove_dir_all(&stage);
++            ImportIndexedDirError::Swap { from: stage.clone(), to: dir_path.to_path_buf(), error }
++        })
+     }
+ }
+ 
+--- a/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs
++++ b/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs
+@@ -77,20 +77,29 @@
+     //    the swap.
+     let preserved_modules = paths.preserve_modules(keep_modules_dir)?;
+ 
+-    // 3. Remove the old contents. If this fails after step 2, the
+-    //    staged tree and any merge backup hold the preserved data. Try
+-    //    to move it back into place before bailing, and retain those
+-    //    temporary paths if restoration can't run.
+-    if let Err(error) = pnpm_fs::remove_dirent(dir_path) {
++    // 3. Move the old contents aside with one rename (homescoop#1128).
++    //    Removing them here instead, as upstream does, leaves a reader of
++    //    the package (an agent restarting from a hoisted node_modules)
++    //    a directory that empties file by file for as long as the delete
++    //    takes, which on a slow filesystem (OPFS) is long. If this fails
++    //    after step 2, the staged tree and any merge backup hold the
++    //    preserved data. Try to move it back into place before bailing,
++    //    and retain those temporary paths if restoration can't run.
++    let aside = pick_stage_path(dir_path);
++    if let Err(error) = pnpm_fs::rename_with_retry(dir_path, &aside) {
+         paths.cleanup_after_failure(&preserved_modules);
+         return Err(ImportIndexedDirError::RemoveExisting { path: dir_path.to_path_buf(), error });
+     }
+ 
+-    // 4. Move the staged tree into place. There's a brief window
+-    //    between the removal and `rename` where `dir_path` does
+-    //    not exist on disk — acceptable for a slot only this install
+-    //    can reach; a shared slot never enters this function.
++    // 4. Move the staged tree into place. Between the two renames
++    //    `dir_path` does not exist (a directory can't be renamed over a
++    //    non-empty one, and there's no portable exchange), but a reader
++    //    never sees it half-removed or half-populated. On failure the old
++    //    tree goes back first.
+     if let Err(error) = pnpm_fs::rename_with_retry(&paths.stage, dir_path) {
++        if pnpm_fs::rename_with_retry(&aside, dir_path).is_err() {
++            tracing::warn!(?aside, ?dir_path, "could not move the replaced package back after a failed swap");
++        }
+         paths.rescue_or_leak(&preserved_modules, dir_path);
+         return Err(ImportIndexedDirError::Swap {
+             from: paths.stage,
+@@ -98,6 +107,11 @@
+             error,
+         });
+     }
++
++    // 5. Delete the old tree, now out of every reader's way.
++    if let Err(error) = pnpm_fs::remove_dirent(&aside) {
++        tracing::warn!(?aside, %error, "could not remove a replaced package directory");
++    }
+     discard_replaced_modules(&preserved_modules);
+     Ok(())
+ }
+--- a/pnpm/crates/deps-restorer/src/import_indexed_dir/tests/runtimes.rs
++++ b/pnpm/crates/deps-restorer/src/import_indexed_dir/tests/runtimes.rs
+@@ -124,86 +124,60 @@
+     assert_eq!(fs::read(target.join("node_modules/foo/index.js")).unwrap(), b"shipped-nm");
+     assert!(!target.join("node_modules/foo/stale.js").exists());
+ }
+-/// Data-loss regression: if `remove_dir_all(dir_path)` fails *after*
+-/// the preserved `node_modules/` has been moved into the staging
+-/// directory, the staged copy must be restored to its original path
+-/// before the staging directory is cleaned up. Otherwise the
+-/// best-effort cleanup would silently destroy the user's nested deps.
++/// homescoop#1128: the replaced tree is renamed aside before the staged
++/// one goes in, and deleted only afterwards, so a tree that can't be
++/// removed no longer fails the swap (upstream's RemoveExisting
++/// regression): the new package is in place with the preserved
++/// `node_modules/`, and the old tree is left beside it.
+ ///
+-/// We force the removal to fail by chmod'ing a subdirectory inside
+-/// `dir_path` to 0o500: `remove_dir_all` recurses into it and can read
+-/// its entries, but unlinking those entries needs write on the
+-/// containing dir, which 0o500 denies. That fails after `node_modules`
+-/// has been moved into staging (step 3) but before the swap (step 5),
+-/// so the rescue path is exactly what the assertions exercise.
++/// We make the removal fail by chmod'ing a subdirectory of the old tree
++/// to 0o500: its entries can be read but not unlinked.
+ #[test]
+ #[cfg(unix)]
+-fn remove_dir_all_failure_restores_preserved_node_modules() {
++fn unremovable_replaced_tree_does_not_fail_the_swap() {
+     use std::os::unix::fs::PermissionsExt;
+ 
+     let tmp = tempdir().unwrap();
+     let src_root = tmp.path().join("cas");
+     fs::create_dir_all(&src_root).unwrap();
+     let pkg_json = write_source(&src_root, "package.json", b"new");
+-    let bundled = write_source(&src_root, "bundled.js", b"bundled");
+-    let cas = cas_map(&[("package.json", pkg_json), ("node_modules/inner/bundled.js", bundled)]);
++    let cas = cas_map(&[("package.json", pkg_json)]);
+ 
+     let target = tmp.path().join("pkg");
+     fs::create_dir_all(&target).unwrap();
+     fs::write(target.join("stale.txt"), b"stale").unwrap();
+     fs::create_dir_all(target.join("node_modules/inner")).unwrap();
+     fs::write(target.join("node_modules/inner/sentinel"), b"survivor").unwrap();
+-
+-    // Create a write-protected subdirectory whose contents
+-    // `remove_dir_all` can read but not unlink.
+     let locked = target.join("locked_subdir");
+     fs::create_dir_all(&locked).unwrap();
+     fs::write(locked.join("immutable.txt"), b"locked").unwrap();
+     fs::set_permissions(&locked, fs::Permissions::from_mode(0o500)).unwrap();
+ 
+-    let err = import_indexed_dir::<SilentReporter>(
++    import_indexed_dir::<SilentReporter>(
+         &AtomicU8::new(0),
+         PackageImportMethod::Copy,
+         &target,
+         &cas,
+         FORCE_KEEP,
+     )
+-    .expect_err("RemoveExisting should fire");
+-
+-    // Restore perms so the tempdir teardown can succeed regardless of
+-    // what state the failed swap left the tree in.
+-    if locked.exists() {
+-        fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
+-    }
++    .expect("the swap succeeds even though the old tree can't be removed");
+ 
+-    assert!(matches!(err, ImportIndexedDirError::RemoveExisting { .. }), "got: {err:?}");
+-    // The rescue path must have moved `stage/node_modules/` back onto
+-    // `target/node_modules/` before the cleanup rimrafed staging.
+-    assert!(
+-        target.join("node_modules/inner/sentinel").exists(),
+-        "preserved node_modules/ must survive the failed swap",
+-    );
+-    assert_eq!(
+-        fs::read(target.join("node_modules/inner/sentinel")).unwrap(),
+-        b"survivor",
+-        "preserved node_modules/ contents must be intact",
+-    );
+-    assert!(
+-        !target.join("node_modules/inner/bundled.js").exists(),
+-        "a failed swap must restore the conflicting dependency tree",
+-    );
+-    // No staging directory left behind anywhere under the outer
+-    // tempdir.
+-    for entry in walkdir::WalkDir::new(tmp.path()) {
++    let mut leftovers = Vec::new();
++    for entry in walkdir::WalkDir::new(tmp.path()).max_depth(1) {
+         let path = entry.unwrap().into_path();
+-        assert!(
+-            !path
+-                .file_name()
+-                .and_then(|n| n.to_str())
+-                .is_some_and(|n| n.contains("pacquet-stage")),
+-            "staging directory leaked at {path:?}",
+-        );
++        if path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.contains("pacquet-stage")) {
++            let inner = path.join("locked_subdir");
++            if inner.exists() {
++                fs::set_permissions(&inner, fs::Permissions::from_mode(0o700)).unwrap();
++            }
++            leftovers.push(path);
++        }
+     }
++    assert_eq!(fs::read(target.join("package.json")).unwrap(), b"new");
++    assert!(!target.join("stale.txt").exists(), "the old tree's files are not in the new package");
++    assert!(!target.join("locked_subdir").exists());
++    assert_eq!(fs::read(target.join("node_modules/inner/sentinel")).unwrap(), b"survivor", "preserved node_modules/ survives");
++    assert_eq!(leftovers.len(), 1, "the unremovable old tree is left beside the package: {leftovers:?}");
+ }
+ /// `symlink_metadata` errors on the preserved `node_modules/` inspect
+ /// must surface as `InspectTarget`, not be swallowed as "nothing to

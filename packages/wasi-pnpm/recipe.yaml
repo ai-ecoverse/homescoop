@@ -47,4 +47,7 @@ about:
     keeps that linked module. names.py moves its Rust function names,
     renumbered past build.mjs's two pnpm_atomic imports, into
     bin/pnpm.wasm.names. It also drops the generated-only name section, so
-    SLICC names a trap's frames under SLICC_WASM_BACKTRACE=1.
+    SLICC names a trap's frames under SLICC_WASM_BACKTRACE=1. That re-links
+    the code (homescoop#1126). 12.9.1-11's 0004 replaces a hoisted package by
+    staging it, renaming the old tree aside, renaming the new one in and
+    only then deleting the old one (homescoop#1128).

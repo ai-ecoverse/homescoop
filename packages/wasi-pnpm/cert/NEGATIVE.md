@@ -35,3 +35,15 @@ The published 12.9.1-9 against 12.9.1-10's `install.mjs` (slicc-kernel 1.94.0, u
 
 A local 12.9.1-10-style build (same tree; macOS, so not byte-identical to CI's) passes. names.py found 32445 function names, plus the 2 imports, and checked that the exports `_start`, `malloc`, `free`, `wasi_thread_start` and `__wasm_init_tls` carry their own names at their instrumented indices.
 
+## 12.9.1-11: no half-there packages during an update (homescoop#1128, 2026-10-18)
+
+The published 12.9.1-10 against 12.9.1-11's `cert/update-readers.mjs` (slicc-kernel 1.124.2, users enforce, `--soft`, slicc-heavy): **FAIL.** The observations:
+- `big 240 1.0.0` 665 times, `big 260 2.0.0` 7 times and `big torn` once (a sample that raced the rename, allowed);
+- **`big` half there 30 times, with 0 to 234 files in lib/ and package.json still present:** upstream's stage_and_swap deletes the old tree file by file before the new one is renamed in;
+- `fresh absent` 470 times and `fresh 200 1.0.0` 73 times;
+- **`fresh` half there 160 times, with 0 to 200 files and no package.json:** a new package is populated in place.
+
+A sample reads package.json, lists lib/, then reads package.json again. If the two reads disagree or the directory has gone, it counts as `torn` (the reader raced a rename). Otherwise a wrong file count, or a missing package.json, counts as half there. The spec also measures the kernel's own directory rename first: 10 plain `mv`s of a 240-file directory under the same poller. slicc-kernel moves a directory in one step where the browser can (FileSystemHandle.move), and otherwise copies it, which a reader can see half done. That window is the kernel's, and pnpm may add none: a package may be seen half there at most `ceil(mvHalf/10 × 3) + 2` times. The `+ 2` is for the kernel's write-behind, #1212: CI's mv baseline was 0 of 240, yet 12.9.1-11 showed one sample of `big` with 174 of 260 files and no package.json. That's the stage renamed right after pnpm wrote it, before its last files were in OPFS. Locally the baseline was 0 of 296 samples. 12.9.1-10 fails with big half there 37 times and fresh 167.
+
+12.9.1-11's patches/0004 renames the old tree aside, renames the staged one in and only then deletes the old one, and it stages a new package before renaming it into place. The pnpm deps-restorer crate's own unit tests pass with the patch (633 of 633, host `cargo test -p pnpm-deps-restorer --lib`). Upstream's RemoveExisting test (a failing remove_dir_all before the swap) is replaced by one checking that an unremovable old tree no longer fails the swap.
+
