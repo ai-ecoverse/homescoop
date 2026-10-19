@@ -20,6 +20,10 @@ on:
       rounds:
         description: 'installs per shard (8 shards)'
         default: '40'
+      hosted:
+        description: 'run on GitHub-hosted ubuntu-latest instead of the pool (Cloud Run, gVisor): splits a gVisor effect from Linux V8 (homescoop#1127)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,7 +34,7 @@ concurrency:
 
 jobs:
   loop:
-    runs-on: ${{ vars.CERT_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.hosted && 'ubuntu-latest' || vars.CERT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 300
     strategy:
       fail-fast: false
