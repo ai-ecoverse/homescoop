@@ -54,6 +54,10 @@ npm run reserve   # 0.0.0 stubs (NPM_TOKEN)
 npm login && npm run trust   # fledgling → ladder-build.yml
 ```
 
+## Release notes
+
+- [Python 3.15 for slicc](docs/release-notes/python-3.15.md): wasix-python moves to CPython 3.15, along with pandas 3 and Pillow 13, and what changes for your code.
+
 ## Upstream bumps
 
 [Renovate](docs/renovate.md) opens PRs on recipe versions. After merge,
