@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
-import { isSpelling, loadAllow, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
+import { dashedRevision, isDashedBase, isSpelling, loadAllow, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -206,9 +206,9 @@ const revSep = post ? '.' : '-';
 // semver identifier, compared as text: 34-10 would sort below 34-9. Its
 // revisions are -1 to -9, then -9.1, -9.2, …, which keep sorting; the next
 // upstream restarts at -1 (docs/versioning.md).
-const dashed = !post && /^\d+\.\d+\.\d+-[0-9A-Za-z]/.test(targetBase);
-const dashedRev = (v) => v.startsWith(`${targetBase}-`) && /^(?:[1-9]|9\.[1-9]\d*)$/.test(v.slice(`${targetBase}-`.length));
-if (dashed && current.startsWith(`${targetBase}-`) && /^[1-9]\d+$/.test(current.slice(`${targetBase}-`.length))) {
+const dashed = !post && isDashedBase(targetBase);
+const dashedRev = (v) => dashedRevision(targetBase, v) === 'ok';
+if (dashed && dashedRevision(targetBase, current) === 'unsorted') {
   console.error(
     `sync-package-version: ${name} ${current} sorts below ${targetBase}-9 (a dashed upstream's "-N" is compared as text): after -9 use -9.1, -9.2, … (docs/versioning.md)`,
   );

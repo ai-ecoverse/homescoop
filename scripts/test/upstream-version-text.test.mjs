@@ -5,7 +5,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { loadAllow, rewriteUpstream, staleVersions } from '../upstream-version-text.mjs';
+import { dashedRevision, driftErrors, loadAllow, rewriteUpstream, staleVersions, versionBase } from '../upstream-version-text.mjs';
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 const allow = loadAllow();
@@ -131,4 +131,18 @@ test('sync --write leaves allowed spellings and padded upstreams alone', () => {
       fx.cleanup();
     }
   }
+});
+
+test('a dashed upstream (7.1.2-34) takes -1 … -9, then -9.N, in check-package-meta too; -10 sorts below -9 and fails (docs/versioning.md)', () => {
+  assert.equal(versionBase('7.1.2-34-9.1'), '7.1.2-34');
+  assert.equal(versionBase('7.1.2-34-9'), '7.1.2-34');
+  assert.equal(versionBase('7.1.2-34-1'), '7.1.2-34');
+  assert.equal(versionBase('1.0.8-5'), '1.0.8');
+  assert.equal(dashedRevision('7.1.2-34', '7.1.2-34-9.12'), 'ok');
+  assert.equal(dashedRevision('7.1.2-34', '7.1.2-34-10'), 'unsorted');
+  assert.equal(dashedRevision('1.0.8', '1.0.8-10'), null, 'a plain upstream keeps -N for any N');
+  const meta = (version) => driftErrors({ name: 'imagemagick', upstream: '7.1.2-34', pkg: { version, homescoop: { upstream: '7.1.2-34' } }, summary: null, readme: null, allow });
+  for (const v of ['7.1.2-34-1', '7.1.2-34-9', '7.1.2-34-9.1', '7.1.2-34-9.12']) assert.deepEqual(meta(v), [], v);
+  assert.match(meta('7.1.2-34-10').join('\n'), /7\.1\.2-34-10" sorts below 7\.1\.2-34-9 .*-9\.1, -9\.2/);
+  assert.match(meta('7.1.2-33-9.1').join('\n'), /is not a packaging revision of recipe version 7\.1\.2-34/);
 });
