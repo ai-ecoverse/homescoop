@@ -168,3 +168,14 @@ AssertionError: the child bash shows the inherited SIGPIPE ignore, and no TERM t
 ```
 
 5.3.0-20 passes. The child shows `trap -- '' SIGPIPE`. A grandchild under `trap '' PIPE INT` shows both. An ignore set in a finished subshell is not inherited.
+
+## A ^C while bash forks, with the child's setpgid held (homescoop#1230)
+
+`test/fork-sigint.mjs` (the `ci` check) on slicc-kernel 1.129.0, which has `setTestSyscallHook` but not slicc-kernel#1146's fix (users enforce, 2026-10-19):
+
+```text
+wasm-bash 5.3.0-20: AssertionError: round 1: [child forked, bash exit, "after" printed] … actual [true, 130, false], expected [true, null, true]
+wasm-bash 5.3.0-19: 3 rounds … bash keeps the terminal and reads its next line
+```
+
+On 1.130.2 (the fix), both 5.3.0-19 and -20 pass, so this is the regression guard. The kernel's own row (`test/integration/settling-inherited.test.mjs`) fails the same way on 1.129.0 with -20.
