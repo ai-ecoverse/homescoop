@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasix-openblas
 
-[OpenBLAS](http://www.openblas.net/) 0.3.28 compiled for wasm32-wasix by
+[OpenBLAS](http://www.openblas.net/) 0.3.34 compiled for wasm32-wasix by
 homescoop's ladder: a **build input** (no commands) that py-numpy and
 py-scipy link, fetched by sha256, so OpenBLAS is built once.
 

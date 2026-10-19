@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-openblas",
-  "version": "0.3.28-1",
-  "description": "OpenBLAS 0.3.28 for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config",
+  "version": "0.3.34-1",
+  "description": "OpenBLAS 0.3.34 for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config",
   "license": "BSD-3-Clause AND BSD-2-Clause",
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
   ],
   "homescoop": {
     "recipe": "wasix-openblas",
-    "upstream": "0.3.28"
+    "upstream": "0.3.34"
   },
   "files": [
     "README.md",
