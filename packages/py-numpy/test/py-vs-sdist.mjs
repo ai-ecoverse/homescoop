@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// py-numpy3.15 cert (host ci command, homescoop#211, #730): every numpy/**/*.py
+// py-numpy cert (host ci command, homescoop#211, #730): every numpy/**/*.py
 // in a package tarball is the pinned PyPI sdist's file, byte for byte, except
 // the one numpy-wasm-linalg-errors.patch changes, which must equal the sdist's file
 // with that patch applied. Files the build adds or drops are listed by name.
-//   node packages/py-numpy3.15/test/py-vs-sdist.mjs --tarball <package.tgz>
+//   node packages/py-numpy/test/py-vs-sdist.mjs --tarball <package.tgz>
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -20,7 +20,7 @@ if (!tgz) {
   console.error('usage: py-vs-sdist.mjs --tarball <package.tgz>');
   process.exit(2);
 }
-const recipe = JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/read-recipe.mjs'), 'py-numpy3.15', '--json'], { encoding: 'utf8' }));
+const recipe = JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/read-recipe.mjs'), 'py-numpy', '--json'], { encoding: 'utf8' }));
 const version = recipe.version;
 const url = recipe.source.url.replaceAll('{{version}}', version);
 const sha = recipe.source.sha256;
@@ -61,7 +61,7 @@ try {
   // The patched files: apply the patch to a copy of the sdist and compare.
   const patched = join(work, 'patched');
   execFileSync('cp', ['-R', src, patched]);
-  execFileSync('patch', ['-d', patched, '-p1', '-s', '-i', join(root, 'packages/py-numpy3.15/numpy-wasm-linalg-errors.patch')]);
+  execFileSync('patch', ['-d', patched, '-p1', '-s', '-i', join(root, 'packages/py-numpy/numpy-wasm-linalg-errors.patch')]);
   const differs = [];
   for (const f of shipped) {
     if (ADDED.has(f)) continue;

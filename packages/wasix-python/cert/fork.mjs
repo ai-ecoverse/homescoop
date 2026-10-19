@@ -1,3 +1,17 @@
+import { abiSplit, assertRefused } from './fixtures/abi.mjs';
+
+const NUMPY = String.raw`
+    import numpy as np
+    r, w = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        os.write(w, json.dumps(np.linalg.solve(np.array([[2.0, 1.0], [1.0, 3.0]]), np.array([3.0, 5.0])).round(6).tolist()).encode())
+        os._exit(0)
+    os.close(w)
+    os.waitpid(pid, 0)
+    out["numpy_in_child"] = json.loads(os.read(r, 256))
+`;
+
 const SCRIPT = String.raw`
 import ctypes, json, multiprocessing as mp, os, subprocess, sys, threading
 def square(x):
@@ -38,15 +52,7 @@ if __name__ == "__main__":
     os.close(w)
     os.waitpid(pid, 0)
     out["thread_in_child"] = int(os.read(r, 16))
-    import numpy as np
-    r, w = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        os.write(w, json.dumps(np.linalg.solve(np.array([[2.0, 1.0], [1.0, 3.0]]), np.array([3.0, 5.0])).round(6).tolist()).encode())
-        os._exit(0)
-    os.close(w)
-    os.waitpid(pid, 0)
-    out["numpy_in_child"] = json.loads(os.read(r, 256))
+    NUMPY_IN_CHILD
     fx = mp.get_context("fork")
     with fx.Pool(2) as p:
         out["fork_pool"] = p.map(square, range(6))
@@ -75,7 +81,10 @@ if __name__ == "__main__":
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
-  await write('/tmp/fork_rows.py', SCRIPT);
+  const split = await abiSplit(ctx);
+  const numpy = split.loadable.includes('py-numpy');
+  if (!numpy) await assertRefused(ctx, split, 'fork');
+  await write('/tmp/fork_rows.py', SCRIPT.replace('    NUMPY_IN_CHILD\n', numpy ? NUMPY.replace(/^\n/, '') : '    out["numpy_in_child"] = None\n'));
   const r = await run(['python3', '/tmp/fork_rows.py'], { cwd: '/tmp', env: { PYTHON_FORK: 'true' } });
   assert.equal(r.status, 0, `rc=${r.status} stdout=${r.stdout} stderr=${r.stderr}`);
   const out = JSON.parse(r.stdout.trim().split('\n').pop());
@@ -85,7 +94,7 @@ export default async function (ctx) {
   assert.equal(out.start, 'spawn', `spawn stays the default start method: ${o}`);
   assert.equal(out.fork, 7, o);
   assert.equal(out.thread_in_child, 45, o);
-  assert.deepEqual(out.numpy_in_child, [0.8, 1.4], o);
+  assert.deepEqual(out.numpy_in_child, numpy ? [0.8, 1.4] : null, o);
   assert.deepEqual(out.fork_pool, [0, 1, 4, 9, 16, 25], o);
   assert.deepEqual(out.fork_queue, [0, 1, 2], o);
   assert.equal(out.fork_queue_exit, 0, o);
@@ -98,5 +107,5 @@ export default async function (ctx) {
   assert.equal(d.stdout.trim(), 'False', `without PYTHON_FORK, python3 is the default build: ${d.stdout}${d.stderr}`);
   const p = await run(['bash', '-c', 'PYTHON_FORK=true /usr/bin/python3 -c "import os; print(hasattr(os, \'fork\'))"; PYTHON_FORK=true pip --version >/dev/null && echo pip-ok'], { cwd: '/tmp' });
   assert.equal(p.stdout, 'True\npip-ok\n', `the /usr/bin entry and pip honour PYTHON_FORK too: ${p.stdout}${p.stderr}`);
-  console.log(`PYTHON_FORK=true (bin/python-fork.wasm through slicc.commands variants): os.fork + waitpid (exit 7), a thread in a forked child, numpy in a forked child, get_context("fork") Pool.map / Queue [0, 1, 2] / Lock 3 x 20 = 60, spawn Pool whose workers are the fork build too, spawn the default start method, ctypes.CDLL(None).fork AttributeError (no trap), sys.executable children inherit the choice and drop it without the variable; /usr/bin/python3 and pip honour it`);
+  console.log(`PYTHON_FORK=true (bin/python-fork.wasm through slicc.commands variants): os.fork + waitpid (exit 7), a thread in a forked child, ${numpy ? 'numpy in a forked child' : `no numpy in a forked child (no py-numpy for ${split.want.abi} yet)`}, get_context("fork") Pool.map / Queue [0, 1, 2] / Lock 3 x 20 = 60, spawn Pool whose workers are the fork build too, spawn the default start method, ctypes.CDLL(None).fork AttributeError (no trap), sys.executable children inherit the choice and drop it without the variable; /usr/bin/python3 and pip honour it`);
 }

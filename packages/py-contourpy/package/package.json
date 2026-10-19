@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/py-contourpy",
-  "version": "1.4.0-9",
-  "description": "contourpy for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)",
+  "version": "1.4.0-11",
+  "description": "contourpy for slicc WASIX CPython 3.15 (cp315-wasix_wasm32)",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -9,12 +9,26 @@
     "directory": "packages/py-contourpy/package"
   },
   "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-contourpy",
-  "keywords": ["wasm", "wasi", "wasix", "slicc", "homescoop", "python"],
-  "files": ["README.md", "LICENSE", "lib"],
-  "publishConfig": { "access": "public" },
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": ">=3.14.2-27 <3.14.3",
-    "@ai-ecoverse/py-numpy": ">=2.3.2-10 <2.3.3"
+    "@ai-ecoverse/wasix-python": ">=3.15.0-1 <3.15.1",
+    "@ai-ecoverse/py-numpy": ">=2.5.4-1 <2.5.5"
   },
   "homescoop": {
     "recipe": "py-contourpy",
@@ -23,8 +37,11 @@
   },
   "slicc": {
     "python": {
-      "sitePackages": "lib/python3.14/site-packages",
-      "requires": { "abi": "cp314", "platform": "wasix_wasm32" }
+      "sitePackages": "lib/python3.15/site-packages",
+      "requires": {
+        "abi": "cp315",
+        "platform": "wasix_wasm32"
+      }
     }
   }
 }

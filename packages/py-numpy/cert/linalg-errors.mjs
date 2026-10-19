@@ -1,8 +1,8 @@
 /**
  * numpy.linalg raises LinAlgError for a failed factorisation (homescoop#1082):
  * a singular solve and inv, a non-positive-definite cholesky. A good matrix
- * still solves (the control). Up to 2.3.2-11 wasm's missing FP status flags
- * made errstate miss LAPACK's failure, and these returned NaN.
+ * still solves (the control). On wasm (no FP status flags) errstate would miss LAPACK's failure and
+ * these would return NaN; numpy-wasm-linalg-errors.patch (from 2.3.2-12, #1082).
  */
 import { pythonUnderTest } from '../../../scripts/browser-cert/py-import.mjs';
 

@@ -50,7 +50,7 @@ export default async function (ctx) {
   assert.deepEqual(out.stats, [5.5, Math.sqrt(143 / 12), 11], o);
   assert.equal(out.dtype, 'float64', o);
   assert.deepEqual(out.rng, [89, 773, 654, 438, 433], o);
-  // numpy 2.3.2's pyproject.toml entry points (#1084).
+  // numpy 2.5.4's pyproject.toml entry points (#1084).
   assert.deepEqual(out.entry_points, ['array_api:numpy=numpy', 'console_scripts:f2py=numpy.f2py.f2py2e:main', 'console_scripts:numpy-config=numpy._configtool:main', 'pkg_config:numpy=numpy._core.lib.pkgconfig', 'pyinstaller40:hook-dirs=numpy:_pyinstaller_hooks_dir'], o);
   console.log(`numpy on wasix-python ${python}: linalg solve/det/inv/eigvalsh (OpenBLAS), matmul, einsum, fft, default_rng ${JSON.stringify(out.rng)}`);
 }

@@ -1,30 +1,27 @@
-# NumPy for slicc WASIX CPython 3.14 (side modules, dlopen).
+# NumPy for slicc WASIX CPython 3.15 (side modules, dlopen).
 name: py-numpy
 builder: host
 reproducible: true
 # renovate: datasource=pypi depName=numpy
-version: "2.3.2"
+version: "2.5.4"
 npm: "@ai-ecoverse/py-numpy"
-summary: "NumPy 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32)"
+summary: "NumPy 2.5.4 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32)"
 source:
   url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-{{version}}.tar.gz"
-  sha256: "e0486a11ec30cdecb53f184d496d1c6a20786c81e55e41640270130056f8ee48"
+  sha256: "9a94cf751c9ad8ebaa835bcd3d40dacf8534ad086b88c38029b65123c7999d2a"
 sources:
   openblas:
     url: "https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.28/OpenBLAS-0.3.28.tar.gz"
     sha256: "f1003466ad074e9b0c8d421a204121100b0751c96fc6fcf3d1456bd12f8a00a1"
   cython:
-    url: "https://files.pythonhosted.org/packages/7c/24/f7351052cf9db771fe4f32fca47fd66e6d9b53d8613b17faf7d130a9d553/cython-3.1.4-py3-none-any.whl"
-    sha256: "d194d95e4fa029a3f6c7d46bdd16d973808c7ea4797586911fdb67cb98b1a2c6"
+    url: "https://files.pythonhosted.org/packages/bf/77/67b0b24e45073a699610e50f00c18474ff9b09ea29ecc95083bdf5e60acd/cython-3.3.0-py3-none-any.whl"
+    sha256: "9b24b5c8cd536946b62086fcafee6d5509d3f549f72d553d2336af87ffbe0da1"
   wasix_python:
-    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-27.tgz"
-    sha256: "2824bccd95f7d45dace30a5d0a74f3384d0390bcadfff38b4e8275c9ade1af37"
-  cxxrt:
-    url: "https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
-    sha256: "54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
   cpython:
-    url: "https://www.python.org/ftp/python/3.14.2/Python-3.14.2.tgz"
-    sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
 inputs:
   - packages/py-kiwisolver/test/wasm-call-signatures.mjs
 dependencies:
@@ -39,5 +36,5 @@ about:
   notes: |
     Cross-built with wasixcc shared-library (sysroot-ehpic): -fPIC -fvisibility=default
     -shared -nostdlib -Wl,--allow-undefined, dylink.0 side modules named
-    *cpython-314-wasm32-wasix.so under lib/python3.14/site-packages.
-    Manifest slicc.python requires abi=cp314 platform=wasix_wasm32.
+    *cpython-315-wasm32-wasix.so under lib/python3.15/site-packages.
+    Manifest slicc.python requires abi=cp315 platform=wasix_wasm32.

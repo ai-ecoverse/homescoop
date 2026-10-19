@@ -26,13 +26,13 @@ CP_TGZ="$DL/$(basename "$SRC_URL")"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$CP_TGZ"
 
 HOSTPY="${WASIX_PYTHON_HOST_PY:-}"
-if [[ -z "$HOSTPY" ]] && command -v python3.14 >/dev/null 2>&1; then
-  HOSTPY="$(command -v python3.14)"
+if [[ -z "$HOSTPY" ]] && command -v python3.15 >/dev/null 2>&1; then
+  HOSTPY="$(command -v python3.15)"
 fi
 if [[ -z "$HOSTPY" ]]; then
-  HOSTPY="$B/host/bin/python3.14"
+  HOSTPY="$B/host/bin/python3.15"
   if [[ ! -x "$HOSTPY" ]]; then
-    echo "== py-contourpy: host CPython 3.14.2 (compileall)"
+    echo "== py-contourpy: host CPython 3.15.0 (compileall)"
     fetch_src cpython
     rm -rf "$B/host-src" && mkdir -p "$B/host-src"
     tar xzf "$SRC_FILE" -C "$B/host-src" --strip-components=1
@@ -46,9 +46,12 @@ if [[ -z "$HOSTPY" ]]; then
     ) || { tail -40 "$B"/host-*.log >&2; exit 1; }
   fi
 fi
-"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
+"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 15), sys.version'
 export WASIX_PYTHON_HOST_PY="$HOSTPY"
 
+# wasix-sysroot -38, as wasix-python 3.15.0-1 (the cp315 wave, #761).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
+export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 export WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes WASIXCC_RUN_WASM_OPT=no
 unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS WASIXCC_MODULE_KIND
@@ -57,17 +60,14 @@ fetch_src wasix_python
 PYDEV="$B/wasix-python"
 rm -rf "$PYDEV" && mkdir -p "$PYDEV"
 tar xzf "$SRC_FILE" -C "$PYDEV" package/include package/package.json
-PYINC="$PYDEV/package/include/python3.14"
+PYINC="$PYDEV/package/include/python3.15"
 test -f "$PYINC/Python.h"
 PYVER="$(node -p "require('$PYDEV/package/package.json').version")"
 FLOOR="$(node --input-type=module -e "import { pythonRange } from '$ROOT/scripts/check-exact-pins.mjs'; import { readFileSync } from 'node:fs'; const r = pythonRange(JSON.parse(readFileSync('$DEST/package.json', 'utf8')).dependencies['@ai-ecoverse/wasix-python']); console.log(r ? r.floor : '')")"
 [[ "$PYVER" == "$FLOOR" ]] || { echo "homescoop py-contourpy: headers from wasix-python $PYVER, but the package's range floor is '$FLOOR'" >&2; exit 1; }
 
-fetch_src cxxrt
-CXXRT="$B/cxxrt"
-rm -rf "$CXXRT" && mkdir -p "$CXXRT"
-tar xzf "$SRC_FILE" -C "$CXXRT" wasix-sysroot-ehpic/sysroot/include/c++
-CXXINC="$CXXRT/wasix-sysroot-ehpic/sysroot/include/c++/v1"
+# phase B: libc++ headers from the sysroot (-38)
+CXXINC="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/include/c++/v1"
 test -f "$CXXINC/vector"
 
 fetch_src pybind11
@@ -89,10 +89,10 @@ for f in chunk_local contour_generator converter fill_type line_type mpl2005_ori
   echo "== py-contourpy: wasixcc++ src/$f.cpp"
   wasixcc++ "${CXXFLAGS[@]}" -c "$SRC/src/$f.cpp" -o "$OBJ/$f.o"
 done
-SO="_contourpy.cpython-314-wasm32-wasix.so"
+SO="_contourpy.cpython-315-wasm32-wasix.so"
 WASIXCC_MODULE_KIND=shared-library wasixcc++ -shared -fPIC -Wl,--allow-undefined -Wl,--export=PyInit__contourpy -o "$OBJ/$SO" "$OBJ"/*.o
 
-SITE="$DEST/lib/python3.14/site-packages"
+SITE="$DEST/lib/python3.15/site-packages"
 rm -rf "$DEST/lib"
 mkdir -p "$SITE/contourpy/util"
 for f in __init__.py _contourpy.pyi _version.py array.py chunk.py convert.py dechunk.py enum_util.py py.typed typecheck.py types.py; do
@@ -105,7 +105,7 @@ done
 import re, sys
 src, out, version = sys.argv[1:4]
 values = {
-    "python_version": "3.14", "python_install_dir": "lib/python3.14/site-packages/", "python_path": "",
+    "python_version": "3.15", "python_install_dir": "lib/python3.15/site-packages/", "python_path": "",
     "contourpy_version": version, "meson_version": "", "mesonpy_version": "", "pybind11_version": "3.0.1",
     "meson_backend": "", "build_dir": "", "source_dir": "", "cross_build": "True",
     "build_options": "homescoop packages/py-contourpy/build.sh", "buildtype": "release", "cpp_std": "c++17",
@@ -126,7 +126,7 @@ DI="$SITE/contourpy-$VERSION.dist-info"
 mkdir -p "$DI/licenses"
 cp "$SRC/PKG-INFO" "$DI/METADATA"
 cp "$SRC/LICENSE" "$DI/licenses/LICENSE"
-printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-contourpy/build.sh)\nRoot-Is-Purelib: false\nTag: cp314-cp314-wasix_wasm32\n\n' >"$DI/WHEEL"
+printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-contourpy/build.sh)\nRoot-Is-Purelib: false\nTag: cp315-cp315-wasix_wasm32\n\n' >"$DI/WHEEL"
 "$HOSTPY" - "$SITE" "contourpy-$VERSION.dist-info" <<'PY'
 import base64, hashlib, os, sys
 site, di = sys.argv[1], sys.argv[2]
@@ -145,6 +145,8 @@ rows.append(f"{di}/RECORD,,")
 open(os.path.join(site, di, "RECORD"), "w").write("\n".join(rows) + "\n")
 PY
 cp "$SRC/LICENSE" "$DEST/LICENSE"
+WORK="$B" homescoop_notices_begin "contourpy/_contourpy compiles in pybind11 3.0.1's headers (homescoop#797). contourpy's own licence is LICENSE."
+WORK="$B" homescoop_notice "pybind11 3.0.1 (BSD-3-Clause)" "$PB/LICENSE" -
 homescoop_compile_pyc "$SITE"
 node "$ROOT/packages/py-kiwisolver/test/wasm-call-signatures.mjs" "$SITE/contourpy/$SO"
 echo "== py-contourpy: staged $(du -sh "$DEST" | awk '{print $1}')"

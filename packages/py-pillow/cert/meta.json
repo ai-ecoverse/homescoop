@@ -4,7 +4,7 @@
     "@ai-ecoverse/wasix-python"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-python@3.14.2-27"
+    "@ai-ecoverse/wasix-python@3.15.0-1"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-pillow"
@@ -12,11 +12,12 @@
   "checklist": [
     "cert/import.mjs: import PIL from /node_modules/@ai-ecoverse/py-pillow, found by discovery without PYTHONPATH, no nested python; all 4 side modules (_imaging, _imagingft, _imagingmath, _imagingmorph) import. 12.3.0-9 has no _imagingtk (it trapped on import in -8)",
     "cert/pillow.mjs: features jpg/zlib/freetype2; ImageFont.load_default(size=16) is a FreeTypeFont and draws text; rectangle pixels; LANCZOS resize; PNG and JPEG (libjpeg) round trips through BytesIO; GaussianBlur; convert(\"L\") 124",
-    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-27 <3.14.3 (the headers it is built against; 3.14.2-27 since 12.3.0-10); npm --package-lock-only with 3.14.2-25 resolves one python at the top level; floor and newest are both 3.14.2-25, so the specs run on it",
     "cert/arrow.mjs (12.3.0-9, homescoop#588, built from the sdist in CI, homescoop#211 A1): Image.new('RGBA').__arrow_c_schema__() is a PyCapsule and __arrow_c_array__() a (schema, array) capsule pair, for 'L' too. 12.3.0-8: rc 134, wasm trap: function signature mismatch (NEGATIVE.md)",
     "cert/ops.mjs (12.3.0-9, homescoop#792): as a kernel user (addUser, users enforce): ImageMath.lambda_eval(a*2+1) on an L image gives the extrema (155, 511): L 77 and 255; ImageMorph dilation4 changes pixels; PNG, JPEG, GIF, BMP, TIFF, PPM, TGA, QOI and ICO round-trip through BytesIO; load_default(size=20)'s font bytes written to ~/f.ttf open with ImageFont.truetype and give a bbox; a JPEG saved in ~ reopens with draft() and thumbnail()",
     "THIRD-PARTY-NOTICES.md (12.3.0-9, homescoop#726): libjpeg-turbo's LICENSE.md and README.ijg and FreeType's LICENSE.TXT and FTL.TXT, for the static links",
-    "12.3.0-10 (homescoop#890, #984): a rebuild on wasix-sysroot 2025.9.30-34, the sysroot line CI-built from public sources (-33 re-root), through build.sh's HOMESCOOP_WASIX_SYSROOT_VERSION/SHA override until #984 flips install-wasixcc.sh's default. Headers from wasix-python 3.14.2-27 (built on -34 with zlib 1.3.1-3 and openssl 3.5.9-4), dependency >=3.14.2-27 <3.14.3. No source change; every spec as before"
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 (the headers it is built against)",
+    "13.0.0-1 (homescoop#761, the cp315 wave; npm-tag python3.15): Pillow 13.0.0 from the PyPI sdist (cdcd1ba2\u2026) against wasix-python 3.15.0-1, wasix-sysroot -38; same side modules, libjpeg-turbo 3.1.2, FreeType 2.13.3; pillow-wasm-call-signatures.patch applies unchanged; every cp314 spec",
+    "13.0.0-2 (homescoop#761, the fold): packages/py-pillow3.15 moved over packages/py-pillow after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 13.0.0-1; every spec as before"
   ],
   "patches": {
     "pillow-wasm-call-signatures.patch": "ExportArrowSchemaPyCapsule and ExportArrowArrayPyCapsule (METH_VARARGS) get CPython's second parameter; cert/arrow.mjs calls both (12.3.0-8: wasm trap, rc 134, homescoop#588), and build.sh's wasm-call-signatures.mjs run finds 0 mismatches in every side module"

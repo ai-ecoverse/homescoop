@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SciPy for slicc WASIX CPython 3.14, from the PyPI sdist (homescoop#211 A6).
+# SciPy for slicc WASIX CPython 3.15 (the cp315 line, homescoop#761), from the PyPI sdist (homescoop#211 A6).
 # meson + Cython on the host python, numpy's f2py as a code generator, wasixcc
 # PIC side modules; no Fortran (scipy 1.18's -D_without-fortran: only the
 # deprecated scipy.odr goes); BLAS/LAPACK from @ai-ecoverse/wasix-openblas.
@@ -8,8 +8,8 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
 source "$ROOT/scripts/build-common.sh"
 RECIPE=py-scipy
-PYMM=3.14
-PYTAG=314
+PYMM=3.15
+PYTAG=315
 homescoop_load_recipe "$RECIPE"
 
 PKG="$HOMESCOOP_PKG"

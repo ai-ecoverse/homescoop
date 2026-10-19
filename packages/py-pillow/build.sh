@@ -26,13 +26,13 @@ PIL_TGZ="$DL/$(basename "$SRC_URL")"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$PIL_TGZ"
 
 HOSTPY="${WASIX_PYTHON_HOST_PY:-}"
-if [[ -z "$HOSTPY" ]] && command -v python3.14 >/dev/null 2>&1; then
-  HOSTPY="$(command -v python3.14)"
+if [[ -z "$HOSTPY" ]] && command -v python3.15 >/dev/null 2>&1; then
+  HOSTPY="$(command -v python3.15)"
 fi
 if [[ -z "$HOSTPY" ]]; then
-  HOSTPY="$B/host/bin/python3.14"
+  HOSTPY="$B/host/bin/python3.15"
   if [[ ! -x "$HOSTPY" ]]; then
-    echo "== py-pillow: host CPython 3.14.2 (compileall)"
+    echo "== py-pillow: host CPython 3.15.0 (compileall)"
     fetch_src cpython
     rm -rf "$B/host-src" && mkdir -p "$B/host-src"
     tar xzf "$SRC_FILE" -C "$B/host-src" --strip-components=1
@@ -46,9 +46,12 @@ if [[ -z "$HOSTPY" ]]; then
     ) || { tail -40 "$B"/host-*.log >&2; exit 1; }
   fi
 fi
-"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
+"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 15), sys.version'
 export WASIX_PYTHON_HOST_PY="$HOSTPY"
 
+# wasix-sysroot -38, as wasix-python 3.15.0-1 (the cp315 wave, #761).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
+export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 export WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes WASIXCC_RUN_WASM_OPT=no
 unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS WASIXCC_MODULE_KIND
@@ -57,7 +60,7 @@ fetch_src wasix_python
 PYDEV="$B/wasix-python"
 rm -rf "$PYDEV" && mkdir -p "$PYDEV"
 tar xzf "$SRC_FILE" -C "$PYDEV" package/include package/package.json
-PYINC="$PYDEV/package/include/python3.14"
+PYINC="$PYDEV/package/include/python3.15"
 test -f "$PYINC/Python.h"
 PYVER="$(node -p "require('$PYDEV/package/package.json').version")"
 FLOOR="$(node --input-type=module -e "import { pythonRange } from '$ROOT/scripts/check-exact-pins.mjs'; import { readFileSync } from 'node:fs'; const r = pythonRange(JSON.parse(readFileSync('$DEST/package.json', 'utf8')).dependencies['@ai-ecoverse/wasix-python']); console.log(r ? r.floor : '')")"
@@ -137,10 +140,10 @@ FT_OBJ="$(cc_pil "$SRC/src/_imagingft.c")"
 MATH_OBJ="$(cc_pil "$SRC/src/_imagingmath.c")"
 MORPH_OBJ="$(cc_pil "$SRC/src/_imagingmorph.c")"
 
-SITE="$DEST/lib/python3.14/site-packages"
+SITE="$DEST/lib/python3.15/site-packages"
 rm -rf "$DEST/lib"
 mkdir -p "$SITE/PIL"
-EXT=".cpython-314-wasm32-wasix.so"
+EXT=".cpython-315-wasm32-wasix.so"
 link_so() {
   local out=$1; shift
   WASIXCC_MODULE_KIND=shared-library wasixcc -shared -fPIC -fvisibility=default -Wl,--allow-undefined -o "$SITE/PIL/$out$EXT" "$@"
@@ -158,7 +161,7 @@ DI="$SITE/pillow-$VERSION.dist-info"
 mkdir -p "$DI/licenses"
 cp "$SRC/PKG-INFO" "$DI/METADATA"
 cp "$SRC/LICENSE" "$DI/licenses/LICENSE"
-printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-pillow/build.sh)\nRoot-Is-Purelib: false\nTag: cp314-cp314-wasix_wasm32\n\n' >"$DI/WHEEL"
+printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-pillow/build.sh)\nRoot-Is-Purelib: false\nTag: cp315-cp315-wasix_wasm32\n\n' >"$DI/WHEEL"
 printf 'PIL\n' >"$DI/top_level.txt"
 "$HOSTPY" - "$SITE" "pillow-$VERSION.dist-info" <<'PY'
 import base64, hashlib, os, sys

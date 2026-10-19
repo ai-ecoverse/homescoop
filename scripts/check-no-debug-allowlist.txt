@@ -1,6 +1,4 @@
 emscripten-cache #859 the emsdk system libraries it ships come from the unattested local cache; they go through the strip at the #859 source rebuild
-py-numpy #890 wasixcc extension modules; the line goes when the -34 dependent wave rebuilds it
-py-pandas #890 wasixcc extension modules; the line goes when the -34 dependent wave rebuilds it
 wasix-gnupg #890 wasixcc build; the line goes when the -34 dependent wave rebuilds it
 wasix-m4 #890 wasixcc build; the line goes when the -34 dependent wave rebuilds it
 wasix-openssh #890 wasixcc build; the line goes when the -34 dependent wave rebuilds it

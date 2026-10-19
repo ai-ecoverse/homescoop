@@ -44,7 +44,8 @@ export default async function (ctx) {
   assert.deepEqual(out.resample, [3, 12, 21, 9], o);
   assert.deepEqual(out.pivot, { A: [10, 5, 1], B: [7, 8, 0] }, o);
   assert.equal(out.csv, 'city,month,sales,price,revenue\nA,2026-01,10,2.5,25.0\nA,2026-02,5,2.5,12.5\n', o);
-  assert.deepEqual(out.dtypes, ['object', 'object', 'int64'], o);
+  // pandas 3: text columns default to the str dtype (2.x: object).
+  assert.deepEqual(out.dtypes, ['str', 'str', 'int64'], o);
   assert.equal(out.dateutil, '2026-10-16 13:45:00', o);
   console.log(`pandas on wasix-python ${python}: read_csv, groupby agg, merge, tz-aware date_range across DST, interpolate, resample, pivot_table, to_csv, dateutil parsing`);
 }

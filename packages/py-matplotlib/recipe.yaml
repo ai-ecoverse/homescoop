@@ -1,10 +1,10 @@
-# matplotlib for slicc WASIX CPython 3.14 (side modules, dlopen).
+# matplotlib for slicc WASIX CPython 3.15 (side modules, dlopen).
 name: py-matplotlib
 builder: host
 # renovate: datasource=pypi depName=matplotlib
 version: "3.11.2"
 npm: "@ai-ecoverse/py-matplotlib"
-summary: "matplotlib Agg for slicc WASIX CPython 3.14"
+summary: "matplotlib Agg for slicc WASIX CPython 3.15"
 source:
   url: "https://files.pythonhosted.org/packages/e7/c8/9aa712a0afb882649424dd8de8ad9aa6235e796e84c6052e8f6dc1598d0d/matplotlib-{{version}}.tar.gz"
   sha256: "cec596316640f2b394b8f0daa0ea61a8eae82d017b620b9f202befb972a59ea4"
@@ -31,17 +31,14 @@ sources:
     url: "https://files.pythonhosted.org/packages/cd/8a/37362fc2b949d5f733a8b0f2ff51ba423914cabefe69f1d1b6aab710f5fe/pybind11-3.0.1-py3-none-any.whl"
     sha256: "aa8f0aa6e0a94d3b64adfc38f560f33f15e589be2175e103c0a33c6bce55ee89"
   wasix_python:
-    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.14.2-27.tgz"
-    sha256: "2824bccd95f7d45dace30a5d0a74f3384d0390bcadfff38b4e8275c9ade1af37"
-  cxxrt:
-    url: "https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
-    sha256: "54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
   meson:
     url: "https://files.pythonhosted.org/packages/9c/07/b48592d325cb86682829f05216e4efb2dc881762b8f1bafb48b57442307a/meson-1.9.1-py3-none-any.whl"
     sha256: "f824ab770c041a202f532f69e114c971918ed2daff7ea56583d80642564598d0"
   cpython:
-    url: "https://www.python.org/ftp/python/3.14.2/Python-3.14.2.tgz"
-    sha256: "c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d"
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
 reproducible: true
 inputs:
   - packages/py-kiwisolver/test/wasm-call-signatures.mjs
@@ -68,5 +65,5 @@ about:
     Built from the PyPI sdist in CI since 3.11.2-10 (homescoop#211 A5): meson 1.9.1
     on the host python, matplotlib's own subprojects (FreeType, HarfBuzz, libraqm,
     SheenBidi, Qhull; sha256-pinned, no download), pybind11 3.0.1 headers, wasixcc
-    side modules (sysroot-ehpic, legacy EH, PIC) against wasix-python 3.14.2-27.
+    side modules (sysroot-ehpic, legacy EH, PIC) against wasix-python 3.15.0-1.
     Agg backend.

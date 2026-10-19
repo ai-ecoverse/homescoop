@@ -26,7 +26,11 @@ const packageDirs = readdirSync(join(root, 'packages'))
 
 test('every packages/*3.15 npm-tag variant is left out of the root workspaces (#1193)', () => {
   const variants = packageDirs.filter((dir) => /^packages\/[^/]*3\.15\/package$/.test(dir));
-  assert.ok(variants.length > 0, 'expected at least one packages/*3.15 dir');
+  // Between waves (after the fold) there is none, and no exclusion either.
+  if (!variants.length) {
+    assert.ok(!rootJson.workspaces.some((w) => /^!packages\/\*3\.15\//.test(w)), 'no packages/*3.15 dir left: drop the root workspaces exclusion');
+    return;
+  }
   const included = workspaceDirs(rootJson.workspaces, variants);
   assert.deepEqual(included, [], `root package.json workspaces include ${included.join(', ')}`);
 });

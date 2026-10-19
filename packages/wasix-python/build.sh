@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# CPython 3.14 for slicc WASIX, cross-built from source (homescoop#181):
+# CPython for slicc WASIX (the major.minor of recipe.yaml's version), cross-built from source (homescoop#181):
 # a dynamic-main python.wasm on the pinned wasix-sysroot's sysroot-ehpic (legacy
 # wasm EH, PIC; side modules load by dlopen), with its stdlib.
 #
-# Steps: host CPython 3.14.2 (the build python, from the same tarball) →
+# Steps: host CPython $VER (the build python, from the same tarball) →
 # static PIC deps (bzip2, xz, sqlite, ncurses tinfo, readline, libffi; zlib
 # and OpenSSL from the wasix-zlib / wasix-openssl dev packages) → configure +
 # make (modules found by configure via pkg-config) → asyncify + strip →
 # stage, prune, pip, compileall → checks.
 #
 # Everything is built under a fixed root (WASIX_PYTHON_BUILD_ROOT, default
-# /tmp/homescoop-wasix-python), so the paths in _sysconfigdata and the
+# /tmp/homescoop-<recipe dir>), so the paths in _sysconfigdata and the
 # tarball do not depend on the runner's checkout. HOMESCOOP_STOP_AFTER=deps
 # stops after the dependencies (a small local probe).
 set -euo pipefail
@@ -18,19 +18,23 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
 # shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
-homescoop_load_recipe wasix-python
+# The recipe is this directory: wasix-python, or wasix-python while the
+# 3.15 wave publishes under its npm-tag beside the 3.14 dir.
+RECIPE="$(basename "$(cd "$(dirname "$0")" && pwd)")"
+homescoop_load_recipe "$RECIPE"
 
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
-B="${WASIX_PYTHON_BUILD_ROOT:-/tmp/homescoop-wasix-python}"
+B="${WASIX_PYTHON_BUILD_ROOT:-/tmp/homescoop-$RECIPE}"
 DL="$B/dl"
 DEPS="$B/deps"
 CROSS="$B/Python-$VER/cross-build/wasm32-wasix"
 PREFIX_PY="$B/prefix"
 JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu)}"
-# The CPython 3.14.2 release date: __DATE__/__TIME__ (sys.version) and
-# archive mtimes.
-export SOURCE_DATE_EPOCH=1764892800
+# PYV is the major.minor (3.15), PYVN the same without the dot (315): the
+# lib/pythonX.Y paths, libpythonX.Y.a and the SOABI cpython-XY-wasm32-wasix.
+PYV="${VER%.*}"
+PYVN="${PYV/./}"
 export PYTHONHASHSEED=0
 export ZERO_AR_DATE=1
 DEPS_KEY="$(cat "$PKG/build.sh" "$ROOT/scripts/install-wasixcc.sh" | shasum -a 256 | cut -d' ' -f1)"
@@ -65,17 +69,25 @@ done
 # --- sources -----------------------------------------------------------------
 fetch_src() { # fetch_src <recipe source name> -> sets SRC_FILE
   local name=$1 url_var sha_var
-  homescoop_load_recipe wasix-python --source "$name"
+  homescoop_load_recipe "$RECIPE" --source "$name"
   url_var="${name^^}_SRC_URL"; sha_var="${name^^}_SRC_SHA"
   SRC_FILE="$DL/$(basename "${!url_var}")"
   homescoop_fetch "${!url_var}" "${!sha_var}" "$SRC_FILE"
 }
-homescoop_load_recipe wasix-python
+homescoop_load_recipe "$RECIPE"
 PY_TGZ="$DL/Python-$VER.tgz"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$PY_TGZ"
+# __DATE__/__TIME__ (sys.version) and archive mtimes: the release date in
+# the tarball's Misc/NEWS (3.14.2: 2025-12-05, 1764892800).
+SOURCE_DATE_EPOCH="$(tar xzOf "$PY_TGZ" "Python-$VER/Misc/NEWS" | python3 -c '
+import datetime, re, sys
+m = re.search(r"^\*Release date: (\d{4}-\d\d-\d\d)\*$", sys.stdin.read(), re.M)
+print(int(datetime.datetime.strptime(m[1], "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc).timestamp()))')"
+export SOURCE_DATE_EPOCH
+echo "== wasix-python: CPython $VER ($PYV, SOABI cpython-$PYVN-wasm32-wasix), SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
 
 # --- host CPython (the build python) ------------------------------------------
-HOSTPY="$B/host/bin/python3.14"
+HOSTPY="$B/host/bin/python$PYV"
 if [[ ! -x "$HOSTPY" ]]; then
   echo "== wasix-python: host CPython $VER"
   rm -rf "$B/host-src" && mkdir -p "$B/host-src"
@@ -85,35 +97,32 @@ if [[ ! -x "$HOSTPY" ]]; then
     unset CC CFLAGS LDFLAGS CPPFLAGS
     # Only a build python (freeze, compileall): no host OpenSSL, whose
     # pick-up varies by machine (a Homebrew 3.x mismatch fails sharedinstall).
-    ./configure --prefix="$B/host" --without-ensurepip --disable-test-modules \
+    ./configure --prefix="$B/host" --without-ensurepip --disable-test-modules --with-system-libmpdec=no \
       py_cv_module__ssl=n/a py_cv_module__hashlib=n/a >"$B/host-configure.log" 2>&1
     make -j"$JOBS" >"$B/host-make.log" 2>&1
     make install >"$B/host-install.log" 2>&1
   ) || { tail -40 "$B"/host-*.log >&2; exit 1; }
 fi
-"$HOSTPY" -c 'import sys; assert sys.version_info[:3] == (3, 14, 2), sys.version'
+"$HOSTPY" -c 'import platform, sys; assert platform.python_version() == sys.argv[1], (sys.version, sys.argv[1])' "$VER"
 
 # --- WASIX toolchain ---------------------------------------------------------
-# Pinned wasixcc + wasix-sysroot (-34 below). sysroot-ehpic (legacy EH, PIC)
-# has the setitimer → proc_raise_interval2 and clock_nanosleep EINTR libc
-# patches (patches/README.md); flock, fcntl record locks and lockf are libc's.
+# Pinned wasixcc + wasix-sysroot: 3.15.0-1 takes -38 through the per-recipe
+# override (-37's Linux S_IF* bits, -38's poll; install-wasixcc.sh's default
+# is still -34). sysroot-ehpic (legacy EH, PIC) has the setitimer →
+# proc_raise_interval2 and clock_nanosleep EINTR libc patches
+# (patches/README.md); flock, fcntl record locks and lockf are libc's.
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
+export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
-# C++ runtime ABI of the side modules (README "Side modules"): the published
-# py-* extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a
-# plain (not thread_local) __wasm_lpad_context from python.wasm, as 3.14.2-11
-# exported them. wasix-sysroot >= -14's rebuilt libc++ runtimes have none of
-# that, so python links the libc++/libc++abi/libunwind of upstream wasix-libc
-# v2026-07-03.1 sysroot-ehpic (what -11 was linked against, byte for byte).
-CXXRT_URL="https://github.com/wasix-org/wasix-libc/releases/download/v2026-07-03.1/sysroot-ehpic.tar.gz"
-CXXRT_SHA="54e00486bd0ab658009120c3980b967f96c95ec2ec10d23ba49261b9931927d0"
-CXXRT="$B/cxxrt"
-rm -rf "$CXXRT" && mkdir -p "$CXXRT"
-homescoop_fetch "$CXXRT_URL" "$CXXRT_SHA" "$CXXRT/sysroot-ehpic.tar.gz"
-tar xzf "$CXXRT/sysroot-ehpic.tar.gz" -C "$CXXRT"
+# C++ runtime ABI of the side modules (README "Side modules"): py-*
+# extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a plain
+# (not thread_local) __wasm_lpad_context from python.wasm. Up to 3.14.2-28
+# python linked upstream wasix-libc v2026-07-03.1's sysroot-ehpic runtimes
+# for that; since 3.15.0-1 (#211 phase B) it links the pinned sysroot's own:
+# -38's libc++/libc++abi/libunwind define the same globals (llvm 6bb93a24,
+# include/c++ byte-identical, cc7e's measurement on #1138). The checks below
+# keep a later sysroot from changing that ABI silently.
 EHPIC_LIB="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/lib/wasm32-wasip1"
-for a in libc++.a libc++abi.a libc++experimental.a libunwind.a; do
-  cp "$CXXRT/wasix-sysroot-ehpic/sysroot/lib/wasm32-wasi/$a" "$EHPIC_LIB/$a"
-done
 WASM_OPT="$WASIXCC_BINARYEN_LOCATION/bin/wasm-opt"
 LLVM_NM="$WASIXCC_LLVM_LOCATION/bin/llvm-nm"
 export WASIXCC_RUN_WASM_OPT=no WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes
@@ -126,6 +135,10 @@ export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"
 SYSROOT_LIBC="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/lib/wasm32-wasip1/libc.a"
 "$WASIXCC_LLVM_LOCATION/bin/llvm-nm" --defined-only -j "$EHPIC_LIB/libunwind.a" 2>/dev/null | grep -qx _Unwind_CallPersonality \
   || { echo "homescoop wasix-python: libunwind lacks _Unwind_CallPersonality (side-module ABI)" >&2; exit 1; }
+"$LLVM_NM" --defined-only -j "$EHPIC_LIB/libc++abi.a" 2>/dev/null | grep -qx __cxa_thread_atexit \
+  || { echo "homescoop wasix-python: libc++abi lacks __cxa_thread_atexit (side-module ABI)" >&2; exit 1; }
+"$LLVM_NM" --defined-only "$EHPIC_LIB/libunwind.a" 2>/dev/null | grep -q ' D __wasm_lpad_context$' \
+  || { echo "homescoop wasix-python: libunwind's __wasm_lpad_context is not plain data (side-module ABI)" >&2; exit 1; }
 "$LLVM_NM" --defined-only "$SYSROOT_LIBC" 2>/dev/null | grep -q ' T __wasi_proc_raise_interval2$' \
   || { echo "homescoop wasix-python: sysroot-ehpic libc lacks proc_raise_interval2 (setitimer patch)" >&2; exit 1; }
 
@@ -314,7 +327,7 @@ if [[ ! -f "$DEPS/lib/libffi.a" ]]; then
     cd "$B/libffi"
     # wasix host so src/wasm32/ffi.c takes the non-Emscripten wasix_* path.
     "$B/libffi-src/configure" --host=wasm32-unknown-wasix \
-      --build="$("$B/libffi-src/config.guess")" \
+      --build="$(sh "$B/libffi-src/config.guess")" \
       --prefix="$DEPS" --disable-shared --enable-static \
       --disable-docs --disable-multi-os-directory \
       CC=wasixcc CFLAGS="$DEP_CFLAGS" >"$B/libffi-configure.log" 2>&1
@@ -363,7 +376,7 @@ echo "== wasix-python: CPython $VER source + patches"
 rm -rf "$SRCDIR" && mkdir -p "$SRCDIR"
 tar xzf "$PY_TGZ" -C "$SRCDIR" --strip-components=1
 for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip cpython-multiprocessing-wasix cpython-multiprocessing-util-wasix cpython-multiprocessing-noshare-wasix cpython-multiprocessing-unix-listener-wasix cpython-thread-native-id-wasix cpython-fork-hint-wasix; do
-  patch -d "$SRCDIR" -p1 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
+  patch -d "$SRCDIR" -p1 -F0 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
   echo "  applied $p.patch"
 done
 
@@ -376,17 +389,24 @@ printf '%s\n' ac_cv_file__dev_ptmx=no ac_cv_file__dev_ptc=no ax_cv_c_float_words
   ac_cv_func_fork=no ac_cv_func_vfork=no \
   ac_cv_header_netpacket_packet_h=no ac_cv_func_memfd_create=no \
   ac_cv_working_tzset=yes >"$B/config.site"
+# CPython 3.15's configure no longer has a default HOSTRUNNER for WASI (3.14
+# picked this wasmtime line). Only `make pythoninfo`/the tests use it, so
+# 3.14's value stays, and sysconfig keeps recording the same HOSTRUNNER.
+# CXX: 3.15's configure records the host clang++ by absolute path (3.14 kept
+# the bare name, which sanitize-sysconfig.py rewrote to wasix++), so it's
+# set: sysconfig's CXX/LDCXXSHARED are wasix++ as before.
+WASI_HOSTRUNNER='wasmtime run --wasm max-wasm-stack=16777216 --wasi preview2=n --env PYTHONPATH=/$(shell realpath --relative-to $(abs_srcdir) $(abs_builddir))/$(shell cat pybuilddir.txt):/Lib --dir $(srcdir)::/'
 configure_python() {
   local dir=$1 site=$2 prefix=$3
   rm -rf "$dir" && mkdir -p "$dir"
   (
     cd "$dir"
-    CONFIG_SITE="$site" ../../configure \
+    CONFIG_SITE="$site" HOSTRUNNER="$WASI_HOSTRUNNER" ../../configure \
       --host=wasm32-unknown-wasix --build="$(sh ../../config.guess)" \
       --prefix="$prefix" --with-build-python="$HOSTPY" \
       --disable-shared --with-ensurepip=no --disable-test-modules \
-      --enable-wasm-pthreads --with-pkg-config=yes --with-system-ffi \
-      CC=wasixcc AR=wasixar RANLIB=wasixranlib \
+      --enable-wasm-pthreads --with-pkg-config=yes --with-system-ffi --with-system-libmpdec=no \
+      CC=wasixcc CXX=wasix++ AR=wasixar RANLIB=wasixranlib \
       CFLAGS="$PY_CFLAGS" LDFLAGS="$PY_LDFLAGS" \
       LIBS="$STUBS/libpython-wasix-stubs.a$WRAP" \
       >"$dir/configure.log" 2>&1
@@ -395,10 +415,12 @@ configure_python() {
 configure_python "$CROSS" "$B/config.site" "$PREFIX_PY"
 cp "$CROSS/configure.log" "$B/configure.log"
 grep -E '^checking for stdlib extension module' "$B/configure.log" | sed 's/^checking for stdlib extension module /  module /' || true
-grep -q '^SOABI=[[:space:]]*cpython-314-wasm32-wasix$' "$CROSS/Makefile" \
-  || { grep '^SOABI\|^MULTIARCH' "$CROSS/Makefile" >&2; echo "homescoop wasix-python: SOABI is not cpython-314-wasm32-wasix" >&2; exit 1; }
-# Every library-backed module of -11 must come from configure now, plus _ctypes.
-for m in _ssl _hashlib zlib _bz2 _lzma _sqlite3 readline fcntl grp pwd mmap resource termios _ctypes _multiprocessing _posixshmem; do
+grep -q "^SOABI=[[:space:]]*cpython-$PYVN-wasm32-wasix\$" "$CROSS/Makefile" \
+  || { grep '^SOABI\|^MULTIARCH' "$CROSS/Makefile" >&2; echo "homescoop wasix-python: SOABI is not cpython-$PYVN-wasm32-wasix" >&2; exit 1; }
+# Every library-backed module of -11 must come from configure now, plus
+# _ctypes; _decimal and pyexpat from CPython's bundled mpdecimal and expat
+# (3.15 no longer falls back to the bundled mpdecimal by itself).
+for m in _ssl _hashlib zlib _bz2 _lzma _sqlite3 readline fcntl grp pwd mmap resource termios _ctypes _multiprocessing _posixshmem _decimal pyexpat; do
   st="$(sed -n "s/^MODULE_${m^^}_STATE=//p" "$CROSS/Makefile")"
   [[ "$st" == yes ]] || { echo "homescoop wasix-python: module $m is '$st', not yes" >&2; exit 1; }
 done
@@ -449,14 +471,21 @@ cp "$B/python.wasm" "$DEST/bin/python.wasm"
 cp "$B/python-fork.wasm" "$DEST/bin/python-fork.wasm"
 chmod 755 "$DEST/bin/python.wasm" "$DEST/bin/python-fork.wasm"
 cp -R "$PREFIX_PY/include" "$DEST/include"
-cp "$PREFIX_PY/lib/libpython3.14.a" "$DEST/lib/"
+cp "$PREFIX_PY/lib/libpython$PYV.a" "$DEST/lib/"
 cp -R "$PREFIX_PY/lib/pkgconfig" "$DEST/lib/pkgconfig"
-PYLIB="$DEST/lib/python3.14"
-cp -R "$PREFIX_PY/lib/python3.14" "$PYLIB"
+PYLIB="$DEST/lib/python$PYV"
+cp -R "$PREFIX_PY/lib/python$PYV" "$PYLIB"
 # The same prune as 3.14.2-11.
 rm -rf "$PYLIB/test" "$PYLIB/idlelib/idle_test" "$PYLIB/__phello__/ham" "$PYLIB/venv/scripts/nt" \
-  "$PYLIB"/config-3.14-* "$PYLIB/site-packages"/*
+  "$PYLIB"/config-"$PYV"-* "$PYLIB/site-packages"/*
 find "$PYLIB" -type d -name __pycache__ -prune -exec rm -rf {} +
+# CPython 3.15's getpath warns on every start ("Could not find the platform
+# standard library directory!") when PYTHONHOME is set and lib-dynload is
+# missing, and npm drops empty directories: every module is built into
+# python.wasm, so lib-dynload gets a README instead.
+mkdir -p "$PYLIB/lib-dynload"
+printf '%s\n' "The standard library's extension modules are built into bin/python.wasm, so this directory has none." \
+  "py-* packages bring their own side modules (slicc.python.sitePackages)." >"$PYLIB/lib-dynload/README.txt"
 cp "$SRCDIR/LICENSE" "$PYLIB/LICENSE.txt"
 cp "$SRCDIR/LICENSE" "$DEST/LICENSE"
 # pip from the bundled ensurepip wheel, unpacked as in -11 (no INSTALLER).
@@ -499,8 +528,34 @@ top_dir() {
   esac | awk -F/ 'NR == 1 { print $1 }'
 }
 CPY_LICENSES="$NOTICES/cpython-incorporated.rst"
-tar xzOf "$PY_TGZ" "Python-$VER/Doc/license.rst" | sed -n '/^Licenses and Acknowledgements for Incorporated Software$/,$p' >"$CPY_LICENSES"
+tar xzOf "$PY_TGZ" "Python-$VER/Doc/license.rst" | sed -n '/^Licenses and Acknowledgements for Incorporated Software$/,$p' >"$CPY_LICENSES.src"
+# 3.15's license.rst pulls expat's notice in with `.. literalinclude::
+# ../Modules/expat/COPYING` instead of inlining it (homescoop#1146): every
+# include is resolved from the same tarball, and none may be left.
+python3 - "$PY_TGZ" "Python-$VER" "$CPY_LICENSES.src" >"$CPY_LICENSES" <<'PY'
+import re, sys, tarfile
+tgz, top, src = sys.argv[1:4]
+lines = open(src, encoding="utf-8").read().split("\n")
+out, i = [], 0
+with tarfile.open(tgz) as t:
+    while i < len(lines):
+        m = re.match(r"^\.\. literalinclude:: \.\./(\S+)$", lines[i])
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        i += 1
+        while i < len(lines) and re.match(r"^\s+:[\w-]+:", lines[i]):
+            i += 1
+        out.append(t.extractfile(f"{top}/{m[1]}").read().decode("utf-8").rstrip("\n"))
+text = "\n".join(out)
+if re.search(r"^\s*\.\. (literalinclude|include)::", text, re.M):
+    sys.exit("homescoop wasix-python: Doc/license.rst still has an include directive")
+sys.stdout.write(text)
+PY
+rm -f "$CPY_LICENSES.src"
 test -s "$CPY_LICENSES"
+grep -q 'Clark Cooper' "$CPY_LICENSES" || { echo "homescoop wasix-python: no expat notice in the CPython licences" >&2; exit 1; }
 CPY_HACL="$NOTICES/cpython-hacl.txt"
 tar xzOf "$PY_TGZ" "Python-$VER/Modules/_hacl/Hacl_Hash_SHA2.c" | sed -n '1,/\*\//p' >"$CPY_HACL"
 grep -q 'MIT License' "$CPY_HACL"
@@ -531,11 +586,11 @@ WORK="$B" homescoop_notices_begin "bin/python.wasm statically links the componen
   echo "| ncurses (tinfo) | 6.5 | X11 | invisible-island.net/ncurses |"
   echo "| libffi | $(pkg-config --modversion libffi) (wasix-org 09cbf7d + patches/libffi-wasix-varargs.patch) | MIT | github.com/wasix-org/libffi |"
   echo "| wasix-libc | wasix-sysroot $SYSROOT_PKG_VER | Apache-2.0 WITH LLVM-exception, MIT | @ai-ecoverse/wasix-sysroot |"
-  echo "| libc++, libc++abi, libunwind | wasix-libc v2026-07-03.1 sysroot-ehpic (LLVM 20.1) | Apache-2.0 WITH LLVM-exception | github.com/wasix-org/wasix-libc |"
+  echo "| libc++, libc++abi, libunwind | wasix-sysroot $SYSROOT_PKG_VER sysroot-ehpic | Apache-2.0 WITH LLVM-exception | @ai-ecoverse/wasix-sysroot |"
   echo
   echo "GNU Readline is licensed under the GPL-3.0-or-later and is linked statically, so bin/python.wasm as a whole (a combined work with CPython, whose PSF-2.0 licence is GPL-compatible, and the other components above, all under GPL-compatible licences) is distributed under the terms of the GPL-3.0-or-later; hence the package licence PSF-2.0 AND GPL-3.0-or-later. Redistributors pass on its Corresponding Source: the homescoop repository (https://github.com/ai-ecoverse/homescoop) at the commit this release was built from, plus the sha256-pinned upstream archives and dev packages its recipe.yaml lists, which homescoop keeps available."
   echo
-  echo "lib/python3.14/site-packages/pip is pip (MIT), from CPython's ensurepip bundle; its licence is in its dist-info."
+  echo "lib/python$PYV/site-packages/pip is pip (MIT), from CPython's ensurepip bundle; its licence is in its dist-info."
 } >>"$HOMESCOOP_NOTICES"
 homescoop_notice "CPython $VER: incorporated software (Doc/license.rst)" "$CPY_LICENSES" - "$CPY_HACL" -
 homescoop_notice "OpenSSL $(pkg-config --modversion openssl) (@ai-ecoverse/wasix-openssl), Apache-2.0" "$DEPS/wasix-openssl/package/LICENSE" -
@@ -552,7 +607,7 @@ WORK="$B" homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_PKG_
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \
   "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
   "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
-WORK="$B" homescoop_notice "libc++, libc++abi, libunwind (wasix-libc v2026-07-03.1 sysroot-ehpic, LLVM 20.1; files from llvm-project llvmorg-20.1.0)" \
+WORK="$B" homescoop_notice "libc++, libc++abi, libunwind (@ai-ecoverse/wasix-sysroot $SYSROOT_PKG_VER sysroot-ehpic; licence files from llvm-project llvmorg-20.1.0)" \
   "$LLVM_SRC/libcxx/LICENSE.TXT" 539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b \
   "$LLVM_SRC/libcxxabi/LICENSE.TXT" e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c \
   "$LLVM_SRC/libunwind/LICENSE.TXT" b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d
@@ -563,12 +618,12 @@ bash "$PKG/prestage-check.sh" "$DEST/bin/python-fork.wasm" "$PYLIB"
 # No host artefacts: native binaries, build-machine paths, host-platform wheels.
 python3 "$PKG/test/staging-check.py" "$DEST"
 # Every import of the published py-* side modules is exported (homescoop#181).
-node "$PKG/test/side-abi.mjs" --wasm "$DEST/bin/python.wasm" --report "$B/side-abi.md"
-node "$PKG/test/side-abi.mjs" --wasm "$DEST/bin/python-fork.wasm" --report "$B/side-abi-fork.md"
+node "$PKG/test/side-abi.mjs" --wasm "$DEST/bin/python.wasm" --soabi "cpython-$PYVN-wasm32-wasix" --report "$B/side-abi.md"
+node "$PKG/test/side-abi.mjs" --wasm "$DEST/bin/python-fork.wasm" --soabi "cpython-$PYVN-wasm32-wasix" --report "$B/side-abi-fork.md"
 
 # Config review (the perl -7 lesson): dumped for the diff against -11.
 echo "== wasix-python: pyconfig.h"
-grep -E '^#define ' "$DEST/include/python3.14/pyconfig.h" | sort | sed 's/^/  pyconfig: /'
+grep -E '^#define ' "$DEST/include/python$PYV/pyconfig.h" | sort | sed 's/^/  pyconfig: /'
 echo "== wasix-python: sysconfig build_time_vars"
 python3 "$PKG/test/sysconfig-dump.py" "$PYLIB"/_sysconfigdata__wasi_wasm32-wasix.py | sed 's/^/  sysconfig: /'
 echo "== wasix-python: staged $(du -sh "$DEST" | awk '{print $1}')"

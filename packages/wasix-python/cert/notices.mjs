@@ -12,6 +12,7 @@ want = {
     "SQLite": "May you do good and not evil",
     "GNU Readline GPL-3.0": "Version 3, 29 June 2007",
     "ncurses": "Thomas E. Dickey",
+    "expat": "Clark Cooper",
     "libffi": "libffi - Copyright",
     "wasix-libc musl": "musl as a whole is licensed under the following standard MIT license",
     "wasix-libc cloudlibc": "Nuxi",
@@ -22,6 +23,7 @@ want = {
     "Corresponding Source": "Redistributors pass on its Corresponding Source",
 }
 print(json.dumps({"bytes": len(text.encode()), "missing": sorted(k for k, v in want.items() if v not in text),
+                  "directives": [l for l in text.splitlines() if l.lstrip().startswith((".. literalinclude::", ".. include::"))],
                   "fences": sum(1 for l in text.splitlines() if l.startswith("~~~") or l.startswith("\x60\x60\x60")) % 2}))
 `;
 
@@ -33,6 +35,7 @@ export default async function (ctx) {
   const o = JSON.parse(r.stdout.trim());
   assert.deepEqual(o.missing, [], `THIRD-PARTY-NOTICES.md lacks licence texts: ${o.missing.join(', ')}`);
   assert.equal(o.fences, 0, 'unbalanced code fences in THIRD-PARTY-NOTICES.md');
+  assert.deepEqual(o.directives, [], `THIRD-PARTY-NOTICES.md has unresolved Sphinx includes instead of licence texts (homescoop#1146): ${o.directives.join(' | ')}`);
   assert.ok(o.bytes > 100000, `THIRD-PARTY-NOTICES.md is ${o.bytes} bytes`);
   console.log(`notices: ${o.bytes} bytes, every component's licence text present`);
 }

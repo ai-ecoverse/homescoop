@@ -48,8 +48,10 @@ holder.wait(timeout=30)
 c = connect(timeout=10)
 c.execute("insert into t values(5)")
 out["after_kill"] = sorted(v for (v,) in c.execute("select v from t where v < 100"))
-ws = [subprocess.Popen([sys.executable, __file__, "writer", str(k)]) for k in (1, 2, 3)]
-out["writers"] = [w.wait(timeout=120) for w in ws]
+ws = [subprocess.Popen([sys.executable, __file__, "writer", str(k)], stderr=subprocess.PIPE, text=True) for k in (1, 2, 3)]
+errs = [w.communicate(timeout=120)[1] for w in ws]
+out["writers"] = [w.returncode for w in ws]
+out["writer_errors"] = [e.strip().splitlines()[-1] if e.strip() else "" for e in errs]
 def thread_writer(k):
     t = connect(timeout=30)
     for i in range(20):
@@ -76,7 +78,7 @@ export default async function (ctx) {
   assert.equal(out.holder, 'held', o);
   assert.equal(out.while_child_holds, 'database is locked', o);
   assert.deepEqual(out.after_kill, [1, 5], `a SIGKILLed holder's lock is released and its uncommitted row rolled back: ${o}`);
-  assert.deepEqual(out.writers, [0, 0, 0], o);
+  assert.deepEqual(out.writers, [0, 0, 0], `writer processes' exit codes, last stderr lines ${JSON.stringify(out.writer_errors)}: ${o}`);
   assert.deepEqual(out.counts, [75, 60], `3 processes x 25 and 3 threads x 20 inserts, none lost: ${o}`);
   assert.equal(out.integrity, 'ok', o);
   assert.equal(out.dotlock, false, o);
