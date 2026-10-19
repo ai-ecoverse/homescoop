@@ -1,0 +1,36 @@
+name: py-contourpy3.15
+builder: host
+reproducible: true
+# renovate: datasource=pypi depName=contourpy
+version: "1.4.0"
+npm: "@ai-ecoverse/py-contourpy"
+npm-tag: "python3.15"
+summary: "contourpy for slicc WASIX CPython 3.15"
+source:
+  url: "https://files.pythonhosted.org/packages/source/c/contourpy/contourpy-{{version}}.tar.gz"
+  sha256: "20156f5a1ac4f8ce02656e39a61e82164a3d359796dc8026f75b062783d500e1"
+sources:
+  pybind11:
+    url: "https://files.pythonhosted.org/packages/source/p/pybind11/pybind11-3.0.1.tar.gz"
+    sha256: "9c0f40056a016da59bab516efb523089139fcc6f2ba7e4930854c61efb932051"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python, py-numpy]
+about:
+  license: BSD-3-Clause
+  notes: |
+    Cross-built from the sdist in CI (homescoop#211 A2) with wasixcc++
+    (legacy wasm EH, PIC) and pybind11 3.0.1 as one dylink.0 side module,
+    _contourpy.cpython-315-wasm32-wasix.so, against wasix-python 3.15.0-1's
+    headers and the libc++ headers of the C++ runtime python.wasm exports
+    (wasix-libc v2026-07-03.1 sysroot-ehpic), as py-kiwisolver. pybind11's
+    numpy support finds numpy at run time, so no numpy headers are needed.
