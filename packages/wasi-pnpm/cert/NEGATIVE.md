@@ -53,3 +53,7 @@ The published 12.9.1-11 against 12.9.1-12's `cert/modes.mjs` (slicc-kernel 1.124
 
 The same tarball with only 12.9.1-12's `host/pnpm-host.mjs` (the umask read from the kernel, `proc-umask`, once per process) gives 711/600/600 and passes. The 711 is pnpm's bin linking adding `+x`. patches/0005 (the lookups the KC's trace counted: the shard mode once per directory, no per-file `fstat`/`fchmod` once the kernel is seen to apply creation modes) must give the same modes, which the -12 build is certified on.
 
+## 12.9.1-13: 0004 dropped (homescoop#1127's loop, 2026-10-19)
+
+Not a negative proof but the reason for this release. pnpm-agent-loop run 39181721981 ran 12.9.1-11 on slicc-kernel 1.124.2: bios's agent lockfile, 8 shards of 40 rounds each, under users enforce. **41 of the 160 rounds that reported failed**, every one with `failed to rename staging directory "…/node_modules/openai_pacquet-stage_…" to "…/node_modules/openai": Operation timed out (os error 73)`. There were no wasm traps. On this kernel and Chrome 156 OPFS, a directory rename is a file-by-file copy (slicc-kernel#1122, partly addressed in 1.126.1), and for openai's tree the synchronous call ran out of time. 12.9.1-10 had no rename there. So 12.9.1-13 drops 0004, keeps 12.9.1-12's umask and mode-call fixes, and moves update-readers.mjs to stress/. homescoop#1128 is open again for a design that needs no directory rename.
+

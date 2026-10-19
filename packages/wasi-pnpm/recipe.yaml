@@ -48,9 +48,11 @@ about:
     renumbered past build.mjs's two pnpm_atomic imports, into
     bin/pnpm.wasm.names. It also drops the generated-only name section, so
     SLICC names a trap's frames under SLICC_WASM_BACKTRACE=1. That re-links
-    the code (homescoop#1126). 12.9.1-11's 0004 replaces a hoisted package by
-    staging it, renaming the old tree aside, renaming the new one in and
-    only then deleting the old one (homescoop#1128). 12.9.1-12's 0005 cuts
-    the wasm port's per-file mode calls (a shard's mode once per directory; no
-    fstat/fchmod of a created file once creation modes are seen to apply), and
-    host/pnpm-host.mjs reads the process umask from the kernel.
+    the code (homescoop#1126). 12.9.1-12's 0005 cuts the wasm port's
+    per-file mode calls (a shard's mode once per directory; no fstat/fchmod
+    of a created file once creation modes are seen to apply), and
+    host/pnpm-host.mjs reads the process umask from the kernel. 12.9.1-13
+    drops 12.9.1-11's 0004 (stage, rename aside, rename in): on slicc-kernel
+    <= 1.124.x a directory rename copies the tree, and for a large package
+    it timed out (os error 73) in 41 of 160 agent installs (homescoop#1127's
+    loop); homescoop#1128 is open again.
