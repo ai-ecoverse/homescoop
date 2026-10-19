@@ -18,7 +18,7 @@
     "ntfy sub --poll --since all prints each message's JSON; with a command it runs sh -c once per message, in order, with NTFY_ID, NTFY_TITLE, NTFY_MESSAGE, NTFY_TOPIC and NTFY_RAW (attachment.url included) and a 60 KiB message line (checklist.mjs)",
     "ntfy pub --wait-pid fails with a clear error and sends nothing (checklist.mjs)",
     "ntfy pub -u user:pass sends Basic auth; -p, --tags and --click send X-Priority, X-Tags and X-Click; --file sends the file as the body with X-Filename; a message piped through bash's stdin is sent (options.mjs)",
-    "ntfy pub --wait-cmd runs the command through the host's spawn and publishes 'Command failed after … (exit code 3): sh -c 'exit 3'' or 'Command succeeded after …: true' (options.mjs)",
+    "ntfy pub --wait-cmd runs the command through the host's spawn and publishes 'Command failed after … (exit code 3): sh -c \"exit 3\"' or 'Command succeeded after …: true' (options.mjs)",
     "ntfy sub --from-config --poll runs each client.yml subscription's own command with its own token (options.mjs)",
     "the per-message command runs as the invoking user (id -un → cone), --token is not in its environment, and $(…), backticks and ; in a message stay data (command-env.mjs)",
     "a subscribe-only token's publish gets 403 and exits non-zero; no token or a forged one gets 401 and exits non-zero (auth.mjs)",
@@ -27,6 +27,7 @@
     "ntfy sub answered 429 with retry-after: 14 reconnects after 14 s, not upstream's 10 s (ratelimit.mjs)",
     "a dropped stream reconnects with since=<last id>: m1 m2 / m2 m3 / m4 runs the command for m1 m2 m3 m4 exactly once each; before any message it resumes from the open event's time (reconnect.mjs)",
     "a message over 1 MiB (stdin or --message) is refused before any request; exactly 1 MiB is sent (size.mjs)",
+    "the installed README says that the per-message command runs with the invoking user's privileges and that message fields are untrusted input (readme.mjs; 2.32.0-1 fails it)",
     "without the host module, ntfy pub reports that the runtime cannot open a connection and sends nothing (z-missing-host.mjs)",
     "test/e2e/ntfy.test.mjs (Node entry, a real streaming server): a message's command runs before the next line is sent (it acks with a nested ntfy pub), a 60 KiB line split across chunks, Bearer auth, the missing host module"
   ],

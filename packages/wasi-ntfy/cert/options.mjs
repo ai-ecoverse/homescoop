@@ -37,7 +37,7 @@ export default async function (ctx) {
   assert.equal(failed.status, 0, output(failed))
   seen = await requests(ctx)
   assert.equal(seen.length, 1)
-  assert.match(seen[0].text, /^Command failed after \d+(\.\d+)?m?s \(exit code 3\): sh -c 'exit 3'$/)
+  assert.match(seen[0].text, /^Command failed after \d+(\.\d+)?m?s \(exit code 3\): sh -c "exit 3"$/)
 
   await stub(ctx, [published('p5', 'done')])
   const ok = await ntfy(['ntfy', 'pub', '--wait-cmd', `${HOST}/alerts`, 'true'])

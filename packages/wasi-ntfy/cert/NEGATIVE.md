@@ -79,3 +79,16 @@ passed the open file itself as the request body, and the first request closed
 it, so the retry failed with `seek /home/cone/report.txt: file already
 closed` and the spec failed. The current 0002 wraps a closable body for each
 request. The upload is then sent again whole, and the spec passes.
+
+## 2.32.0-2 against 2.32.0-1
+
+2.32.0-2 changes only `README.md` and `package.json`. Every other file in
+the tarball, `bin/ntfy.wasm` included (sha256 `16e635a0…`), is byte-identical
+to the published 2.32.0-1. The new rows from #1196 (`options.mjs`,
+`command-env.mjs`) are coverage of those same bytes, so they pass on
+2.32.0-1 too. What the revision adds is the README's note that the command
+runs with the user's privileges and that message fields are untrusted.
+`readme.mjs` checks it: with the published `@ai-ecoverse/wasi-ntfy@2.32.0-1`
+tarball (2026-10-19), `cert-run: FAIL` (`The input did not match the
+regular expression /The command runs as the user who started \`ntfy sub\`,
+with that user's\nprivileges/`). The 2.32.0-2 tarball passes all 9 specs.
