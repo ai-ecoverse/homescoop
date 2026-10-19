@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-tls-engine",
-  "version": "4.2.0-4",
+  "version": "4.2.0-5",
   "description": "Mbed TLS 4.2.0 TLS engine for SLICC: server sessions for the wasm-realm proxy (externally signed leaves) and verifying client sessions (SNI, ALPN, a caller's trust store or the bundled Mozilla roots), over memory buffers (ES module + wasm)",
   "license": "Apache-2.0 AND MPL-2.0",
   "type": "module",

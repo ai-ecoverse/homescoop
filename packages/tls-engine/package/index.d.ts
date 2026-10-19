@@ -77,6 +77,21 @@ export interface TlsEngineModule {
   _tls_ciphersuite(session: number): number;
   /** The description number of the fatal alert the server sent (e.g. 116 certificate_required, 40 handshake_failure), -1 for none and for a server session. */
   _tls_last_alert(session: number): number;
+  /**
+   * Verify `chain` (concatenated DER, leaf first) against `store` outside any handshake, with a
+   * client session's checks: the default profile, the store's roots, validity by the real clock,
+   * the leaf's key usage (digitalSignature) and extended key usage (serverAuth when listed), and
+   * the session's name check of `hostname` (NUL-terminated; an IP literal only against an
+   * iPAddress SAN, one trailing dot stripped). 0 only when verified (`flagsOut`, a uint32, is 0);
+   * 1 when it verified and failed, with the Mbed TLS verify flags at `flagsOut`; or < 0 with
+   * `flagsOut` set to 0xffffffff (never 0) for a NULL
+   * store, an empty or malformed chain, an allocation failure or any other error.
+   * `hostname` 0 (NULL) skips the name check: the caller must then establish the server's
+   * identity another way, such as an SPKI pin. Nothing is kept.
+   */
+  _tls_chain_verify(store: number, chain: number, chainLen: number, hostname: number, flagsOut: number): number;
+  /** Test hook: the next `_tls_chain_verify` fails as an allocation failure (only ever stricter). */
+  _tls_test_chain_verify_alloc_error(): void;
 }
 
 export interface TlsEngineOptions {
