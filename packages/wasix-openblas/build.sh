@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasix-openblas: a static, PIC OpenBLAS 0.3.28 for wasm32-wasix (a build
+# wasix-openblas: a static, PIC OpenBLAS (recipe.yaml version) for wasm32-wasix (a build
 # input: py-numpy and py-scipy link it). NOFORTRAN=1 (LAPACK is OpenBLAS's
 # C translation of netlib, built with `make netlib`), TARGET=RISCV64_GENERIC
 # C kernels, single-threaded, the f2c int ABI (wasm-abi.py), as

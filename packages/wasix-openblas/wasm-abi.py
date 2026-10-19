@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenBLAS 0.3.28 source edits for wasm32-wasix (run in the source tree).
+"""OpenBLAS 0.3.34 source edits for wasm32-wasix (run in the source tree).
 
 The same edits as packages/py-numpy/tools/build-openblas.sh, after Pyodide:
 - ctest.c / common.h: wasi is an RISCV64_GENERIC target with an empty
@@ -36,15 +36,24 @@ t = t.replace(
     "#elif !defined(OS_EMBEDDED) || defined(__wasi__)",
     "#elif !defined(OS_EMBEDDED)",
 )
+# 0.3.32 moved emscripten to its own ARCH_WASM (an empty YIELDING there), and
+# ARCH_RISCV64's YIELDING is a nop asm that wasm can't assemble: define the
+# empty one for wasi ahead of the RISCV64 block. (<= 0.3.31: the
+# __EMSCRIPTEN__ block.)
 old_y = "#ifdef __EMSCRIPTEN__\n#define YIELDING\n#endif"
 new_y = "#if defined(__EMSCRIPTEN__) || defined(__wasi__)\n#define YIELDING\n#endif"
-if new_y not in t:
-    if old_y not in t:
-        raise SystemExit("YIELDING emscripten block not found")
+rv_y = "#if defined(ARCH_RISCV64)\n#ifndef YIELDING\n"
+wasi_y = "#if defined(__wasi__)\n#define YIELDING\n#endif\n\n"
+if new_y in t or wasi_y + rv_y in t:
+    print("common.h YIELDING already covers wasi")
+elif old_y in t:
     t = t.replace(old_y, new_y)
     print("patched common.h: YIELDING for wasi")
+elif t.count(rv_y) == 1:
+    t = t.replace(rv_y, wasi_y + rv_y)
+    print("patched common.h: YIELDING for wasi (before ARCH_RISCV64)")
 else:
-    print("common.h YIELDING already covers wasi")
+    raise SystemExit("common.h: no YIELDING block to patch for wasi")
 p.write_text(t)
 assert "#elif !defined(OS_EMBEDDED) || defined(__wasi__)" not in t
 
@@ -222,9 +231,21 @@ def weaken(path: Path, old: str, new: str) -> None:  # replace once, idempotent
     path.write_text(t.replace(old, new, 1))
     print(f"edited: {path}")
 
-weaken(Path("driver/others/xerbla.c"),
-       "#else\n\nint BLASFUNC(xerbla)(char *message, blasint *info){",
-       "#else\n\n__attribute__((weak)) int BLASFUNC(xerbla)(char *message, blasint *info){")
+# 0.3.34's xerbla.c dispatches to an openblas_set_xerbla handler and takes
+# the name length as a third argument; the 2-arg ABI has no length, so it
+# passes strlen (the names are C string literals). (<= 0.3.33: the plain
+# printf #else branch.)
+X34_OLD = ("#else\nint BLASFUNC(xerbla)(char *message, blasint *info, blasint length) {\n"
+           "  return openblas_xerbla_dispatch(message, info, length);\n}\n#endif")
+X34_NEW = ("#else\n__attribute__((weak)) int BLASFUNC(xerbla)(char *message, blasint *info) {\n"
+           "  return openblas_xerbla_dispatch(message, info, message ? (blasint)strlen(message) : 0);\n}\n#endif")
+p = Path("driver/others/xerbla.c")
+if "openblas_xerbla_dispatch" in p.read_text():
+    weaken(p, X34_OLD, X34_NEW)
+else:
+    weaken(p,
+           "#else\n\nint BLASFUNC(xerbla)(char *message, blasint *info){",
+           "#else\n\n__attribute__((weak)) int BLASFUNC(xerbla)(char *message, blasint *info){")
 weaken(Path("lapack-netlib/SRC/xerbla_array.c"),
        "/* Subroutine */ int xerbla_array_(",
        "/* Subroutine */ __attribute__((weak)) int xerbla_array_(")

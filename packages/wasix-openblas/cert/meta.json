@@ -9,7 +9,7 @@
     "dgemm_ (Fortran ABI) and cblas_dgemm multiply a 2x3 by a 3x2 matrix exactly (58 64 139 154); ddot_ gives 32",
     "LAPACK (C netlib): dgesv_ solves [[2,1],[1,3]] x = [3,5] to 0.8, 1.4 with info 0; dsyev_ gives eigenvalues 1 and 3",
     "an illegal dgemm_ TRANSA calls the program's own xerbla_ with DGEMM and 1: OpenBLAS's xerbla_ (and xerbla_array_) are weak, so numpy's python_xerbla and scipy's xerbla_array_ win without duplicate symbols",
-    "openblas_get_config() is 'OpenBLAS 0.3.28 NO_LAPACKE NO_AFFINITY RISCV64_GENERIC SINGLE_THREADED'",
+    "openblas_get_config() is 'OpenBLAS <package.json homescoop.upstream> NO_LAPACKE NO_AFFINITY RISCV64_GENERIC SINGLE_THREADED'",
     "build.sh: cblas_dgemm, dgemm_, ddot_, dgesv_, dgesvd_, dsyevd_, zgemm_ and openblas_get_config are defined; xerbla_ and xerbla_array_ are weak; no puts/printf/getenv/atoi stand-ins (OS_EMBEDDED's bare-metal stubs, which clashed with wasix-libc); no build path in the archive or headers; tmglib dropped"
   ],
   "ci": [

@@ -23,7 +23,7 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openblas
   license: BSD-3-Clause AND BSD-2-Clause
   notes: |
-    build.sh: OpenBLAS 0.3.28 with the pinned wasixcc on wasix-sysroot -38
+    build.sh: OpenBLAS (version above) with the pinned wasixcc on wasix-sysroot -38
     (toolchain.wasix_sysroot), PIC with legacy wasm exceptions (the ehpic
     tree numpy's and scipy's side modules use; OpenBLAS is C, so the objects
     carry no EH code). TARGET=RISCV64_GENERIC BINARY=32 NOFORTRAN=1
@@ -31,4 +31,8 @@ about:
     and wasm-abi.py's source edits (packages/py-numpy/tools/build-openblas.sh,
     after Pyodide): every Fortran-style entry returns int (the f2c ABI), and
     xerbla_ is two-argument and weak. tmglib (LAPACK's test-matrix
-    generators) is dropped from the archive.
+    generators) is dropped from the archive. 0.3.32 added an emscripten-only
+    ARCH_WASM / WASM128_GENERIC target (SIMD128 kernels); this build stays on
+    the RISCV64_GENERIC C kernels (wasm-abi.py gives wasi ARCH_RISCV64 and an
+    empty YIELDING), and 0.3.34's xerbla_ handler dispatch keeps the
+    two-argument weak xerbla_ (the name length is strlen).
