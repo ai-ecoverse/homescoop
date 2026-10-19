@@ -91,18 +91,24 @@ if (sourceKey) {
   src = /** @type {Record<string, unknown>} */ (recipe.source || {});
 }
 
+/** @param {Record<string, unknown>} s */
+function varsOf(s) {
+  const v = String(s.version || version);
+  const p = splitVersion(v);
+  return {
+    version: v,
+    major: p.major,
+    minor: p.minor,
+    patch: p.patch,
+    extra: p.extra,
+    amal: String(s.amal || p.amal),
+    year: String(s.year || ''),
+  };
+}
+
 const srcVersion = String(src.version || version);
-const srcParts = splitVersion(srcVersion);
 const year = String(src.year || '');
-const vars = {
-  version: srcVersion,
-  major: srcParts.major,
-  minor: srcParts.minor,
-  patch: srcParts.patch,
-  extra: srcParts.extra,
-  amal: String(src.amal || srcParts.amal),
-  year,
-};
+const vars = varsOf(src);
 
 const url = expand(String(src.url || ''), vars);
 const sha = String(src.sha256 || '');
@@ -157,4 +163,22 @@ if (!sourceKey) {
   console.log(`export ${prefix}VERSION=${shQuote(srcVersion)}`);
 }
 if (year) console.log(`export ${prefix}YEAR=${shQuote(year)}`);
+// source.mirrors / sources.<key>.mirrors, for homescoop_fetch: every source's,
+// whichever --source this call loads, keyed by the pin they must match
+// (HOMESCOOP_MIRRORS_<sha256>, one URL per line). Tried only when the url's
+// download fails; a mirror's bytes count only when they match that sha256.
+for (const [label, s] of [
+  ['source', recipe.source],
+  ...Object.entries(recipe.sources || {}).map(([k, v]) => [`sources.${k}`, v]),
+]) {
+  if (!s || typeof s !== 'object' || s.mirrors === undefined || s.mirrors === null) continue;
+  if (!Array.isArray(s.mirrors) || s.mirrors.some((m) => typeof m !== 'string' || !m)) {
+    console.error(`recipe-env: ${name}: ${label}.mirrors must be a list of URL templates`);
+    process.exit(1);
+  }
+  const pin = String(s.sha256 || '');
+  if (!/^[0-9a-f]{64}$/i.test(pin)) continue;
+  const v = varsOf(s);
+  console.log(`export HOMESCOOP_MIRRORS_${pin.toLowerCase()}=${shQuote(s.mirrors.map((m) => expand(m, v)).join('\n'))}`);
+}
 if (vars.amal) console.log(`export ${prefix}AMAL=${shQuote(vars.amal)}`);

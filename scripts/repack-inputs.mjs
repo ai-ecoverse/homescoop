@@ -70,9 +70,12 @@ export function buildView(recipe) {
   const r = structuredClone(recipe);
   for (const k of RECIPE_NOT_INPUT) delete r[k];
   if (r.dependencies && typeof r.dependencies === 'object') delete r.dependencies.run;
-  // A pinned source is its sha256; the url is only where to get it (a mirror move).
+  // A pinned source is its sha256; the url and its mirrors are only where to get it (a mirror move).
   const pinnedUrl = (src) => {
-    if (src && typeof src === 'object' && /^[0-9a-f]{64}$/i.test(String(src.sha256 || ''))) delete src.url;
+    if (src && typeof src === 'object' && /^[0-9a-f]{64}$/i.test(String(src.sha256 || ''))) {
+      delete src.url;
+      delete src.mirrors;
+    }
   };
   pinnedUrl(r.source);
   if (r.sources && typeof r.sources === 'object') Object.values(r.sources).forEach(pinnedUrl);
