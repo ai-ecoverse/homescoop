@@ -16,5 +16,4 @@ wasix-openblas #1292 @ai-ecoverse/wasm-bash kernel 1.124.2; wasm-bash (unpinned,
 wasix-openssl #1292 @ai-ecoverse/wasm-bash,@ai-ecoverse/wasm-coreutils kernel 1.35.1; wasm-bash (unpinned) needs >=1.130.2, wasm-coreutils >=1.44.0
 wasix-perl #1292 @ai-ecoverse/wasm-bash kernel 1.120.2; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
 wasix-ruby #1292 @ai-ecoverse/wasm-bash kernel 1.120.2; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-wasix-sysroot #1292 @ai-ecoverse/wasm-bash kernel 1.100.1; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2 (RM: cc7e next release)
 wasix-zlib #1292 @ai-ecoverse/wasm-bash,@ai-ecoverse/wasm-coreutils kernel 1.35.1; wasm-bash (unpinned) needs >=1.130.2, wasm-coreutils >=1.44.0
