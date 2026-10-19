@@ -31,5 +31,5 @@ step. See [`ladder-builds.md`](ladder-builds.md).
 
 Do **not** set `registry-url` on `actions/setup-node` and do **not**
 `npm install -g npm@latest` before publish: both can write an empty
-`_authToken` so npm 11 skips the OIDC exchange (`ENEEDAUTH`). Node 24
-already ships npm ≥ 11.5.1. Re-run `npm run trust` after adding packages.
+`_authToken` so npm 11 skips the OIDC exchange (`ENEEDAUTH`). Node 24 and 26
+already ship npm ≥ 11.5.1. Re-run `npm run trust` after adding packages.

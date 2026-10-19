@@ -44,7 +44,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - run: node scripts/gate.mjs check-exact-pins -- node scripts/check-exact-pins.mjs
       - run: node scripts/gate.mjs check-cert-kernel -- node scripts/check-cert-kernel.mjs
         env:
@@ -68,7 +68,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - id: d
         env:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
@@ -113,7 +113,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       # --verify-repack: repack recipes' pins are checked here once per PR
       # (never rewritten; #730); the build steps below skip them.
       - name: Download expanded source URLs and write sha256
@@ -182,7 +182,7 @@ jobs:
           ref: ${{ needs.recipe-sha.outputs.sha || '' }}
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Refresh source sha256 in this checkout
         run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - name: Sync npm version from recipe (Renovate bumps)
@@ -241,7 +241,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Refresh source sha256 in this checkout
         run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - name: Sync npm version from recipe (Renovate bumps)
@@ -286,7 +286,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - uses: actions/download-artifact@v8
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
@@ -340,7 +340,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - uses: actions/download-artifact@v8
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
@@ -367,7 +367,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - uses: actions/download-artifact@v8
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
@@ -419,7 +419,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - uses: actions/download-artifact@v8
         with:
           name: host-${{ matrix.package }}-pr${{ github.event.pull_request.number }}
@@ -567,7 +567,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Comment known next-build issues for touched packages
         env:
           GH_TOKEN: ${{ github.token }}
@@ -599,7 +599,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - id: g
         name: Every queued PR's artifact and cert binds to the group head
         env:

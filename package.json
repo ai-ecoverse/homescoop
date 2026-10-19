@@ -4,7 +4,7 @@
   "description": "Homebrew-shaped recipes for @ai-ecoverse/wasm-* packages",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "fledgling": {
     "provider": "github",

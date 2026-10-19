@@ -214,7 +214,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
 
       - name: gh and cert-run
         env:
@@ -452,7 +452,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
 
       - name: The review's verdict artifact, by the id and digest the review job uploaded
         id: verdict-pick

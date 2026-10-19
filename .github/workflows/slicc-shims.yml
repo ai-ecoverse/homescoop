@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '26'
       - name: build the test programs (pinned emsdk)
         run: |
           eval "$(bash ../../../scripts/install-emsdk.sh)"
@@ -58,5 +58,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '26'
       - run: bash scripts/test-install-emsdk.sh
