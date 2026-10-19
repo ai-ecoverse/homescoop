@@ -11,6 +11,9 @@
   ],
   "semanticCommits": "enabled",
   "platformAutomerge": true,
+  "gitIgnoredAuthors": [
+    "renovate-refresh@homescoop.invalid"
+  ],
   "dependencyDashboard": true,
   "prHourlyLimit": 4,
   "ignorePaths": [
