@@ -29,3 +29,8 @@ A u8 overflow is a compile error (rc 1). Every program has no start section, exp
 **The tool's import set** (`test/imports.mjs`): 0.16.0-15's `zig.wasm` (90,693,545 bytes) has 41 imports: preview1, `env.memory`, `wasi.thread-spawn` and `wasix_32v1.{proc_signal, proc_join, proc_spawn3, fd_pipe, proc_id}`. The PR body has 0.16.0-16's list and the diff. Any new import must be one slicc-kernel implements on the cert pin and on the kernel-compat floor.
 
 **Known, pre-existing:** a refused source leaves an empty output `.wasm` (#954).
+
+## 0.16.0-17: LLVM Support's notices (homescoop#1046 inherited, 2026-10-19)
+
+The published 0.16.0-16 against `test/notices.mjs`: **FAIL.** zig.wasm carries LLVM Support code, but THIRD-PARTY-NOTICES.md names none of Henry Spencer's regex, BLAKE3 or xxHash. 0.16.0-17 pins wasi-llvm 21.1.8-2 (the same libraries, plus share/licenses/llvm-support) and adds them through `homescoop_notice_llvm_support`.
+

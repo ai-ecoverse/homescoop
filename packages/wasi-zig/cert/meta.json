@@ -16,9 +16,11 @@
     "corpus, compiled and run in the kernel: zig build-exe hello.zig -target wasm32-wasi -OReleaseSmall (process.Init main); zig cc -O2 hello.c (exit 3, argv); zig c++ -O2 hello.cpp (iostream, vector, numeric); zig build of a build.zig project with -Doptimize=ReleaseSafe (zig-out/bin/app.wasm) and zig build test (addTest + addRunArtifact, WASIX spawn); a u8 overflow is a compile error, rc 1",
     "every compiled program has no start section, exports _start and imports only wasi_snapshot_preview1; the corpus sizes and import sets are logged for the old-vs-new comparison",
     "users enforce: alice builds in her home (the output is hers), is refused bob's 0600 source and his 0755 directory (nothing left there), builds his 0644 source into her home",
-    "imports (ci, test/imports.mjs): zig.wasm imports only env (shared memory), wasi (thread-spawn), wasi_snapshot_preview1 and wasix_32v1, and the list is logged for the import-set diff"
+    "imports (ci, test/imports.mjs): zig.wasm imports only env (shared memory), wasi (thread-spawn), wasi_snapshot_preview1 and wasix_32v1, and the list is logged for the import-set diff",
+    "test/notices.mjs (ci, 0.16.0-17): zig.wasm carries LLVM Support code (llvm_regcomp, the regexec error string, llvm_blake3_hasher, xxh3_64bits) and THIRD-PARTY-NOTICES.md (in files) has Henry Spencer's regex, BLAKE3 and xxHash notices, from wasi-llvm 21.1.8-2's share/licenses/llvm-support. 0.16.0-16: none of the three (NEGATIVE.md)"
   ],
   "ci": [
-    "node packages/wasi-zig/test/imports.mjs --tarball .homescoop-out/package.tgz"
+    "node packages/wasi-zig/test/imports.mjs --tarball .homescoop-out/package.tgz",
+    "node packages/wasi-zig/test/notices.mjs --tarball .homescoop-out/package.tgz"
   ]
 }
