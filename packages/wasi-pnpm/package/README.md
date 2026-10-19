@@ -110,6 +110,18 @@ latest, so the next command in the project failed with
 `ERR_PNPM_UNSUPPORTED_RUNTIME`. A project pinned to another version still
 works with `npm_config_manage_package_manager_versions=false`.
 
+## The false trap (12.9.1-16)
+
+Under load, pnpm could die with `pnpm: wasm trap in thread N: memory access
+out of bounds` (homescoop#1127). V8 bounds-checks a thread's `memory.fill` and
+`memory.copy` (memset, memcpy) against that thread's own view of the shared
+memory, and that view can lag behind a `memory.grow` another thread just did.
+It's a false trap: no wrong bytes are written, but the install aborts.
+12.9.1-16's allocator refreshes the view (`memory.grow(0)`) before it hands
+a thread memory above it, and since 12.9.1-14 pnpm starts with 256 MiB of
+memory, above an agent install's peak (232 MiB cold, 96 MiB warm), so it
+rarely grows at all.
+
 ## `npm`, `npx` and `i`
 
 The package also provides `npm`, `npx` and `i` as small `#!/bin/sh` scripts

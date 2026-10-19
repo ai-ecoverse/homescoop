@@ -24,11 +24,31 @@ const DEFAULT_UID = 1000
 const MAX_RESPONSE = 1024 * 1024
 
 export function createImports (ctx) {
-  return {
+  const imports = {
     pnpm_atomic: createAtomics(ctx),
     pnpm_fs: createFilesystem(ctx),
     pnpm_host: createHost(ctx),
   }
+  // PNPM_SLICC_PEAK_FILE=<path> (a measurement aid, homescoop#1127): each
+  // thread writes the largest memory size it has seen, in bytes, to
+  // <path>.<tid> after the pnpm_fs call that saw it.
+  const peakFile = ctx.env?.PNPM_SLICC_PEAK_FILE
+  if (peakFile) {
+    let peak = 0
+    const encoder = new TextEncoder()
+    for (const [name, fn] of Object.entries(imports.pnpm_fs)) {
+      imports.pnpm_fs[name] = (...args) => {
+        const result = fn(...args)
+        const size = ctx.memory().buffer.byteLength
+        if (size > peak) {
+          peak = size
+          try { ctx.fs.writeFile(`${peakFile}.${ctx.tid ?? 0}`, encoder.encode(`${size}\n`)) } catch {}
+        }
+        return result
+      }
+    }
+  }
+  return imports
 }
 
 function createAtomics (ctx) {
