@@ -1,0 +1,41 @@
+name: wasi-ntfy
+builder: host
+runner: pool
+reproducible: true
+version: "2.32.0"
+npm: "@ai-ecoverse/wasi-ntfy"
+summary: "ntfy 2.32.0 client for slicc WASI preview1 (command ntfy)"
+source:
+  url: "https://github.com/binwiederhier/ntfy/archive/9d0b6d933d6a6ddc5265bfecadaec1fb1538d89b.tar.gz"
+  sha256: "4a343214604579560f4828b3aa7e6f884679e0480ee5a838a10c998c3a06bb48"
+  commit: "9d0b6d933d6a6ddc5265bfecadaec1fb1538d89b"
+toolchain:
+  go: "1.27.1"
+  go_sha256_linux_x64: "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"
+  go_sha256_macos_arm64: "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"
+build:
+  version: "2.32.0"
+  date: "1792326613"
+  tags: "noserver"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://ntfy.sh
+  license: Apache-2.0 OR GPL-2.0-only
+  notes: |
+    ntfy v2.32.0 (tag v2.32.0, commit 9d0b6d9). build.sh fetches the pinned
+    source and Go 1.27.1, applies patches/*.patch and builds the client only
+    (-tags noserver, upstream's make cli-client: no server, no SQLite, no
+    web app) with GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 -trimpath
+    -buildvcs=false, main.version/commit/date fixed from this recipe so the
+    build is reproducible. The module's go.sum is checked as its modules
+    download.
+    patches/0001-wasip1-slicc-host.patch: wasip1 build files, and HTTP and
+    spawn through package/host/ntfy-host.mjs (ntfy_host imports).
+    patches/0002-gateway-contract.patch: resume with since=<last id>,
+    Retry-After honoured, auth errors end ntfy sub, oversize messages
+    refused before any request.
+    build.date is the tag commit's time (2026-10-18T12:30:13Z) as a Unix
+    time, which is what upstream's Makefile passes.

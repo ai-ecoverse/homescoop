@@ -31,16 +31,9 @@ const UNCOVERED = [
 
 // Command packages whose cert/meta.json has no "users": "enforce".
 const NO_USERS_ENFORCE = [
-  'gzip', // #819
   'imagemagick', // #819
   'imagemagick-heif', // #819
-  'jq', // #819
-  'less', // #819
-  'mount', // #819
-  'nano', // #819
-  'ncurses-utils', // #819
   'patch', // #819
-  'poppler', // #819
   'procps', // #819
   'sqlite3', // #819
   'wasi-biome', // #819

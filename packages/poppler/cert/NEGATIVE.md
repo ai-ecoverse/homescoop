@@ -44,3 +44,13 @@ The poppler code is unchanged, so the published 26.10.0-3 passes `checklist.mjs`
 ## 26.10.0-5: the inherited-ignore and flock shims (homescoop#973, #947; 2026-10-17)
 
 26.10.0-5 links the updated `shims/slicc` (#960). A `constructor(101)` in `slicc_signals.c` seeds `SIG_IGN` for each signal the kernel's `sliccKernel.sigInherited()` reports; on a kernel without the hook it changes nothing. A strong `flock()` in `slicc_libc_gaps.c` goes through the `env.__syscall_flock` import, which answers 0 without the kernel half (slicc-kernel#967 and #968). The built wasm now imports `env.slicc_sig_inherited_js`, and `env.__syscall_flock` where the program calls `flock`. The published 26.10.0-4 imports neither, so on a hooked kernel it can't see an inherited ignore, and its `flock` never conflicts. The program code is unchanged, and the specs pass on 26.10.0-4 as well. The build also gets #908's prefix maps and DWARF strip.
+
+## 26.10.0-6: POPPLER_DATADIR without the build host's emsdk path (homescoop#1000, #819; 2026-10-18)
+
+The new `datadir.mjs` fails on the published 26.10.0-5:
+
+```text
+AssertionError: poppler-multicall.wasm names a build path: /home/runner/.cache/emsdk/0.4.0-44002254/install/emscripten/cache/sysroot/share/popple (homescoop#1000)
+```
+
+That string is POPPLER_DATADIR (CMAKE_INSTALL_FULL_DATADIR/poppler). emcmake had set CMAKE_INSTALL_PREFIX to the CI host's emsdk sysroot. 26.10.0-6 configures with `-DCMAKE_INSTALL_PREFIX=/usr/local`, so the datadir is `/usr/local/share/poppler`. build.sh fails if the wasm names any home, work or emsdk-cache path. Two local builds in different work dirs gave byte-identical tarballs, so the recipe opts into `reproducible: true`. The cert now runs with `"users": "enforce"` (#819), and checklist, inputs and datadir all pass under it.

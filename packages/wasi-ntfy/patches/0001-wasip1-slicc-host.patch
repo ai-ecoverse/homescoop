@@ -1,0 +1,410 @@
+Build the ntfy client for GOOS=wasip1 and reach slicc-kernel for HTTP and commands.
+
+Reason: ntfy v2.32.0's client (-tags noserver) does not build for wasip1:
+cmd/subscribe_unix.go and cmd/publish_unix.go omit wasip1, so
+scriptLauncher, processExists and the help suffix are undefined, and
+client/config_unix.go leaves the default config path empty. wasip1 also
+cannot dial or spawn. slicchost talks to host/ntfy-host.mjs (ntfy_host
+probe/call/take): http.DefaultTransport (what client.Client uses) sends
+requests there and reads the body chunk by chunk, yielding to other
+goroutines before each blocking read, so ntfy sub runs a message's command
+as soon as the line arrives. ntfy sub's per-message command runs as
+sh -c <command> through the host's spawn (no temp script, which wasip1
+would create 0644 and could not exec), with the NTFY_* environment and the
+process stdio inherited, one message at a time as upstream. pub --wait-cmd
+runs its command the same way. pub --wait-pid fails with a clear error:
+there is no process table to watch. The config file is
+~/.config/ntfy/client.yml ($XDG_CONFIG_HOME/ntfy/client.yml when set).
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: ntfy's client builds for GOOS=wasip1 and wasip1 can dial and
+spawn, without this patch.
+
+diff --git a/client/config_wasip1.go b/client/config_wasip1.go
+new file mode 100644
+index 0000000..a5bf1bd
+--- /dev/null
++++ b/client/config_wasip1.go
+@@ -0,0 +1,16 @@
++//go:build wasip1
++
++package client
++
++import (
++	"os"
++	"path/filepath"
++
++	_ "heckel.io/ntfy/v2/slicchost"
++)
++
++func init() {
++	if configDir, err := os.UserConfigDir(); err == nil {
++		DefaultConfigFile = filepath.Join(configDir, "ntfy", "client.yml")
++	}
++}
+diff --git a/cmd/host_other.go b/cmd/host_other.go
+new file mode 100644
+index 0000000..f2b07f4
+--- /dev/null
++++ b/cmd/host_other.go
+@@ -0,0 +1,13 @@
++//go:build !wasip1
++
++package cmd
++
++import (
++	"io"
++
++	"heckel.io/ntfy/v2/slicchost"
++)
++
++func runOnHost([]string, []string, io.Reader, io.Writer, io.Writer) error {
++	return slicchost.ErrUnsupported
++}
+diff --git a/cmd/host_wasip1.go b/cmd/host_wasip1.go
+new file mode 100644
+index 0000000..b06fcbf
+--- /dev/null
++++ b/cmd/host_wasip1.go
+@@ -0,0 +1,28 @@
++//go:build wasip1
++
++package cmd
++
++import (
++	"io"
++
++	"heckel.io/ntfy/v2/slicchost"
++)
++
++const (
++	scriptExt                      = "sh"
++	scriptHeader                   = "#!/bin/sh\n"
++	clientCommandDescriptionSuffix = `The default config file for all client commands is ~/.config/ntfy/client.yml
++($XDG_CONFIG_HOME/ntfy/client.yml when XDG_CONFIG_HOME is set).`
++)
++
++var (
++	scriptLauncher = []string{"sh", "-c"}
++)
++
++func processExists(int) bool {
++	return false
++}
++
++func runOnHost(argv []string, env []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
++	return slicchost.Run(argv, env, "", stdin, stdout, stderr)
++}
+diff --git a/cmd/publish.go b/cmd/publish.go
+index c80c140..1920b99 100644
+--- a/cmd/publish.go
++++ b/cmd/publish.go
+@@ -11,6 +11,7 @@ import (
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	goruntime "runtime"
+ 	"strings"
+ 	"time"
+ )
+@@ -298,6 +299,9 @@ func remainingArgs(c *cli.Context, fromIndex int) []string {
+ }
+ 
+ func waitForProcess(pid int) (message string, err error) {
++	if goruntime.GOOS == "wasip1" {
++		return "", errors.New("--wait-pid is not available on wasip1: slicc-kernel gives ntfy no process table to watch")
++	}
+ 	if !processExists(pid) {
+ 		return "", fmt.Errorf("process with PID %d not running", pid)
+ 	}
+@@ -320,10 +324,15 @@ func runAndWaitForCommand(command []string) (message string, err error) {
+ 		cmd.Stdout = os.Stdout
+ 		cmd.Stderr = os.Stderr
+ 	}
+-	err = cmd.Run()
++	if goruntime.GOOS == "wasip1" {
++		err = runOnHost(command, os.Environ(), nil, cmd.Stdout, cmd.Stderr)
++	} else {
++		err = cmd.Run()
++	}
+ 	runtime := time.Since(start).Round(time.Millisecond)
+ 	if err != nil {
+-		if exitError, ok := err.(*exec.ExitError); ok {
++		var exitError interface{ ExitCode() int }
++		if errors.As(err, &exitError) {
+ 			log.Debug("Command failed after %s (exit code %d): %s", runtime, exitError.ExitCode(), prettyCmd)
+ 			return fmt.Sprintf("Command failed after %s (exit code %d): %s", runtime, exitError.ExitCode(), prettyCmd), nil
+ 		}
+diff --git a/cmd/subscribe.go b/cmd/subscribe.go
+index 8445092..df356c1 100644
+--- a/cmd/subscribe.go
++++ b/cmd/subscribe.go
+@@ -5,6 +5,7 @@ import (
+ 	"fmt"
+ 	"os"
+ 	"os/exec"
++	"runtime"
+ 	"sort"
+ 	"strings"
+ 
+@@ -257,6 +258,9 @@ func runCommand(c *cli.Context, command string, m *client.Message) {
+ }
+ 
+ func runCommandInternal(c *cli.Context, script string, m *client.Message) error {
++	if runtime.GOOS == "wasip1" {
++		return runOnHost(append(append([]string{}, scriptLauncher...), script), envVars(m), c.App.Reader, c.App.Writer, c.App.ErrWriter)
++	}
+ 	scriptFile := fmt.Sprintf("%s/ntfy-subscribe-%s.%s", os.TempDir(), util.RandomString(10), scriptExt)
+ 	log.Debug("%s Running command '%s' via temporary script %s", logMessagePrefix(m), script, scriptFile)
+ 	script = scriptHeader + script
+diff --git a/slicchost/slicchost.go b/slicchost/slicchost.go
+new file mode 100644
+index 0000000..e103f2f
+--- /dev/null
++++ b/slicchost/slicchost.go
+@@ -0,0 +1,20 @@
++package slicchost
++
++import (
++	"errors"
++	"fmt"
++)
++
++var ErrUnsupported = errors.New("this runtime cannot start commands or open network connections for ntfy (it needs slicc-kernel with @ai-ecoverse/wasi-ntfy's host module)")
++
++type ExitError struct {
++	Code int
++}
++
++func (e *ExitError) Error() string {
++	return fmt.Sprintf("exit status %d", e.Code)
++}
++
++func (e *ExitError) ExitCode() int {
++	return e.Code
++}
+diff --git a/slicchost/slicchost_other.go b/slicchost/slicchost_other.go
+new file mode 100644
+index 0000000..2c09174
+--- /dev/null
++++ b/slicchost/slicchost_other.go
+@@ -0,0 +1,18 @@
++//go:build !wasip1
++
++package slicchost
++
++import (
++	"io"
++	"net/http"
++)
++
++func Run([]string, []string, string, io.Reader, io.Writer, io.Writer) error {
++	return ErrUnsupported
++}
++
++type Transport struct{}
++
++func (Transport) RoundTrip(*http.Request) (*http.Response, error) {
++	return nil, ErrUnsupported
++}
+diff --git a/slicchost/slicchost_wasip1.go b/slicchost/slicchost_wasip1.go
+new file mode 100644
+index 0000000..a1d7208
+--- /dev/null
++++ b/slicchost/slicchost_wasip1.go
+@@ -0,0 +1,195 @@
++//go:build wasip1
++
++package slicchost
++
++import (
++	"bytes"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"os"
++	"runtime"
++	"sync"
++	"unsafe"
++)
++
++const probeMagic = 0x6e746679
++
++//go:wasmimport ntfy_host probe
++func hostProbe() uint32
++
++//go:wasmimport ntfy_host call
++func hostCall(request unsafe.Pointer, size uint32) uint32
++
++//go:wasmimport ntfy_host take
++func hostTake(response unsafe.Pointer)
++
++var available = sync.OnceValue(func() bool { return hostProbe() == probeMagic })
++
++func init() {
++	http.DefaultTransport = Transport{}
++}
++
++type envelope struct {
++	OK    bool            `json:"ok"`
++	Error string          `json:"error"`
++	Value json.RawMessage `json:"value"`
++}
++
++func call(request any, value any) error {
++	if !available() {
++		return ErrUnsupported
++	}
++	data, err := json.Marshal(request)
++	if err != nil {
++		return err
++	}
++	size := hostCall(unsafe.Pointer(unsafe.SliceData(data)), uint32(len(data)))
++	response := make([]byte, size)
++	if size > 0 {
++		hostTake(unsafe.Pointer(unsafe.SliceData(response)))
++	}
++	var result envelope
++	if err := json.Unmarshal(response, &result); err != nil {
++		return err
++	}
++	if !result.OK {
++		return errors.New(result.Error)
++	}
++	if value == nil || len(result.Value) == 0 || string(result.Value) == "null" {
++		return nil
++	}
++	return json.Unmarshal(result.Value, value)
++}
++
++func Run(argv []string, env []string, dir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
++	request := map[string]any{
++		"op":   "run",
++		"argv": argv,
++		"env":  env,
++		"dir":  dir,
++	}
++	switch {
++	case stdin == os.Stdin:
++		request["stdin"] = "inherit"
++	case stdin != nil:
++		data, err := io.ReadAll(stdin)
++		if err != nil {
++			return err
++		}
++		request["input"] = data
++	}
++	if stdout == os.Stdout {
++		request["stdout"] = "inherit"
++	}
++	if stderr == os.Stderr {
++		request["stderr"] = "inherit"
++	}
++	var result struct {
++		Status int    `json:"status"`
++		Stdout []byte `json:"stdout"`
++		Stderr []byte `json:"stderr"`
++	}
++	if err := call(request, &result); err != nil {
++		return err
++	}
++	if stdout != nil && stdout != os.Stdout {
++		if _, err := stdout.Write(result.Stdout); err != nil {
++			return err
++		}
++	}
++	if stderr != nil && stderr != os.Stderr {
++		if _, err := stderr.Write(result.Stderr); err != nil {
++			return err
++		}
++	}
++	if result.Status != 0 {
++		return &ExitError{Code: result.Status}
++	}
++	return nil
++}
++
++type Transport struct{}
++
++func (Transport) RoundTrip(request *http.Request) (*http.Response, error) {
++	var body []byte
++	if request.Body != nil {
++		data, err := io.ReadAll(request.Body)
++		_ = request.Body.Close()
++		if err != nil {
++			return nil, err
++		}
++		body = data
++	}
++	headers := [][2]string{}
++	for name, values := range request.Header {
++		for _, value := range values {
++			headers = append(headers, [2]string{name, value})
++		}
++	}
++	var head struct {
++		Handle  int         `json:"handle"`
++		Status  int         `json:"status"`
++		Headers [][2]string `json:"headers"`
++	}
++	if err := call(map[string]any{
++		"op":      "http",
++		"method":  request.Method,
++		"url":     request.URL.String(),
++		"headers": headers,
++		"body":    body,
++	}, &head); err != nil {
++		return nil, err
++	}
++	response := &http.Response{
++		Status:        fmt.Sprintf("%d %s", head.Status, http.StatusText(head.Status)),
++		StatusCode:    head.Status,
++		Proto:         "HTTP/1.1",
++		ProtoMajor:    1,
++		ProtoMinor:    1,
++		Header:        http.Header{},
++		Body:          &responseBody{handle: head.Handle},
++		ContentLength: -1,
++		Request:       request,
++	}
++	for _, pair := range head.Headers {
++		response.Header.Add(pair[0], pair[1])
++	}
++	return response, nil
++}
++
++type responseBody struct {
++	handle  int
++	pending bytes.Buffer
++	done    bool
++	closed  bool
++}
++
++func (b *responseBody) Read(p []byte) (int, error) {
++	for b.pending.Len() == 0 {
++		if b.done || b.closed {
++			return 0, io.EOF
++		}
++		runtime.Gosched()
++		var chunk []byte
++		if err := call(map[string]any{"op": "http.read", "handle": b.handle}, &chunk); err != nil {
++			return 0, err
++		}
++		if len(chunk) == 0 {
++			b.done = true
++			continue
++		}
++		b.pending.Write(chunk)
++	}
++	return b.pending.Read(p)
++}
++
++func (b *responseBody) Close() error {
++	if b.closed {
++		return nil
++	}
++	b.closed = true
++	return call(map[string]any{"op": "http.close", "handle": b.handle}, nil)
++}
