@@ -1,7 +1,9 @@
 # @ai-ecoverse/wasm-clang
 
-Clang/LLD 24 for the slicc wasm realm. Relinked with current libslicc
-(`Module.sliccKernel` spawn) + `ENVIRONMENT=web,worker,node`.
+Clang/LLD 24 for the slicc wasm realm, linked in CI from
+`@ai-ecoverse/llvm-emscripten` (llvm-project b158b0ae compiled by the patched
+emscripten 6.0.9 tree) against current libslicc (`Module.sliccKernel` spawn,
+kernel credentials) with `ENVIRONMENT=web,worker,node`.
 
 Companions:
 

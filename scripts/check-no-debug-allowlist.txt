@@ -7,4 +7,3 @@ wasix-m4 #890 wasixcc build; the line goes when the -34 dependent wave rebuilds 
 wasix-openssh #890 wasixcc build; the line goes when the -34 dependent wave rebuilds it
 wasix-perl #890 wasixcc build; the line goes when the -34 dependent wave rebuilds it
 wasix-sysroot #890 wasix-libc and libc++ archives with debug info; the line goes at its -34 rebuild
-wasm-clang #859 libclang_rt.builtins from the slicc-emscripten prebuilt; it goes through the strip at the #859 source rebuild

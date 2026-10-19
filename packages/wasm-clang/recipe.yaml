@@ -1,40 +1,21 @@
-# Homebrew-shaped recipe — Clang/LLD as wasm tools (slicc-emscripten llvm-wasm).
 name: wasm-clang
 builder: host
+reproducible: true
 version: "24.0.0"
 npm: "@ai-ecoverse/wasm-clang"
 summary: "Clang/LLD 24 for slicc (wasm tool, WASIX drivers)"
 source:
-  # Prebuilt by slicc-emscripten/build-wasm-llvm.sh; build.sh stages that artifact.
-  url: "https://github.com/llvm/llvm-project"
-  sha256: "skip"
-# 24.0.0-15 is packaging-only too: -11's bytes with this driver (cc's
-# Asyncify check reads the import section with od, no grep: homescoop#451)
-# and glue-node-runner.patch (the glue's Node-host runner stays out of
-# slicc-kernel's Node process worker: homescoop#276). build.sh applies both
-# at the next real build. 24.0.0-16: the driver's Asyncify step also covers a
-# link without -o (a.out) and -oFILE (homescoop#692).
-# 24.0.0-17: calls that write no program (-v, -fsyntax-only, -###, a header)
-# leave an a.out alone (homescoop#710, #711).
-# 24.0.0-18: @response files, PCH outputs, -Xlinker -o and -B values
-# (homescoop#721, #722).
-# 24.0.0-19: same-bytes relinks and quoted / nested response files.
-# 24.0.0-20: braces / ~ in response files, no marker left on a failed compile.
-# 24.0.0-21: response files read with clang's own tokenizer rules (homescoop#769).
-repack:
-  from: "24.0.0-11"
-  files:
-    - bin/cc=drivers/wasix-driver.sh
-    - bin/gcc=drivers/wasix-driver.sh
-    - bin/c++=drivers/wasix-driver.sh
-    - bin/g++=drivers/wasix-driver.sh
-    - bin/wasixcc=drivers/wasix-driver.sh
-    - bin/wasix++=drivers/wasix-driver.sh
-  patches:
-    - glue-node-runner.patch
-  fields:
-    - engines
-    - slicc.env
+  url: "https://registry.npmjs.org/@ai-ecoverse/llvm-emscripten/-/llvm-emscripten-24.0.0-2.tgz"
+  sha256: "8b0a0da5d7bea4ef6dc3e5b6c23b241d34819018cfbb7dd26719e8fad25d17e2"
+sources:
+  wasix_sysroot:
+    version: "2025.9.30-38"
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-sysroot/-/wasix-sysroot-2025.9.30-38.tgz"
+    sha256: "1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574"
+inputs:
+  - "packages/wasm-emscripten/patches/**"
+  - "packages/wasm-emscripten/package/package.json"
+  - "scripts/slicc-node-main.js"
 dependencies:
   build: []
   host: []
@@ -45,10 +26,13 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasm-clang
   license: Apache-2.0 WITH LLVM-exception
   notes: |
-    Stage from slicc-emscripten/build/llvm-wasm (ENVIRONMENT=web,worker,node,
-    slicc_spawn.o). Do not rebuild LLVM unless the link profile must change.
-    Drivers are #!/bin/sh wasixcc-compatible wrappers; sysroot is wasix-sysroot.
-    -10: one multi-call module bin/llvm.wasm (clang, lld, ar, nm, objcopy,
-    symbolizer; multicall.cpp) and the signal-ABI sources recompiled against the
-    current sysroot (see PRESTAGE.md).
+    One multi-call module bin/llvm.wasm (clang, lld, llvm-ar, llvm-nm,
+    llvm-objcopy, llvm-symbolizer; multicall.cpp picks the tool by argv[0]),
+    linked in CI from @ai-ecoverse/llvm-emscripten 24.0.0-2 (llvm-project
+    b158b0ae, compiled by the patched emscripten 6.0.9 tree; homescoop#859
+    stage E) against today's shims/slicc, with the patched emscripten 6.0.9
+    tree on emsdk 6.0.9's prebuilt compilers (scripts/emscripten-tree.sh).
+    The resource dir is llvm-emscripten's lib/clang/24 plus the pinned
+    wasix-sysroot's libclang_rt.builtins for wasip1/wasi. Drivers are
+    #!/bin/sh wasixcc-compatible wrappers; the sysroot is wasix-sysroot, and
     wasm-opt for fork Asyncify comes from @ai-ecoverse/wasm-binaryen (PATH).
