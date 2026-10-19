@@ -87,6 +87,17 @@ for p in Path("interface").glob("*.c"):
         ni += 1
 print(f"patched interface/*.c: {ni}")
 
+# lapack/**/*.c (OpenBLAS's own LAPACK, e.g. 0.3.34's lapack/laed3, which
+# replaces netlib's ?laed3_): file-scope prototypes of the f2c'd netlib
+# routines it calls (void LAED4/LACPY/LASET(...);) → int, or the
+# --whole-archive link sees a signature mismatch and dsyevd_ traps (#1173).
+proto_void = re.compile(r"^(\s*(?:extern\s+)?)void(\s+[A-Z][A-Z0-9_]*\s*\([^)]*\)\s*;)", re.M)
+nl = 0
+for p in Path("lapack").rglob("*.c"):
+    if patch_text(p, lambda t: proto_void.sub(r"\1int\2", t)):
+        nl += 1
+print(f"patched lapack/**/*.c prototypes: {nl}")
+
 # lapack-netlib SRC: void foo_ → int foo_ (definitions and extern decls)
 # Then revert complex helpers that f2c truly returns as void.
 void_to_int = re.compile(r"((?:extern)?.+?) void ([a-z0-9]+_)")

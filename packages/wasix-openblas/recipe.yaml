@@ -35,4 +35,7 @@ about:
     ARCH_WASM / WASM128_GENERIC target (SIMD128 kernels); this build stays on
     the RISCV64_GENERIC C kernels (wasm-abi.py gives wasi ARCH_RISCV64 and an
     empty YIELDING), and 0.3.34's xerbla_ handler dispatch keeps the
-    two-argument weak xerbla_ (the name length is strlen).
+    two-argument weak xerbla_ (the name length is strlen). 0.3.34's own
+    lapack/laed3 (which replaces netlib's ?laed3_) declares ?laed4_, ?lacpy_
+    and ?laset_ void: wasm-abi.py makes them int, and build.sh fails unless
+    the whole archive links --whole-archive --fatal-warnings (#1173).

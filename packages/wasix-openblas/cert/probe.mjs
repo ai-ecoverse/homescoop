@@ -18,6 +18,7 @@ export default async function (ctx) {
   assert.match(r.stdout, /^ddot_ 32$/m, out);
   assert.match(r.stdout, /^dgesv_ info=0 x=0\.800000 1\.400000$/m, out);
   assert.match(r.stdout, /^dsyev_ info=0 w=1\.000000 3\.000000$/m, out);
+  assert.match(r.stdout, /^dsyevd_ n=64 info=0 ok$/m, `divide and conquer (lapack/laed3, dlaed4_; #1173): ${out}`);
   assert.match(r.stdout, /^xerbla_ DGEMM\s+1$/m, `the program's own xerbla_ is called: ${out}`);
   assert.match(r.stdout, /^config .*RISCV64_GENERIC/m, out);
   assert.match(r.stdout, new RegExp(`^config OpenBLAS ${reEsc(UPSTREAM)} .*SINGLE_THREADED`, 'm'), `OpenBLAS ${UPSTREAM}, single-threaded (USE_THREAD=0): ${out}`);
