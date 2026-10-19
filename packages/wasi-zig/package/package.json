@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-zig",
-  "version": "0.16.0-16",
+  "version": "0.16.0-17",
   "description": "Zig 0.16.0 compiler with LLVM 21 for slicc WASI (zig cc / c++, LLVM release builds)",
   "license": "MIT AND Apache-2.0 WITH LLVM-exception",
   "repository": {

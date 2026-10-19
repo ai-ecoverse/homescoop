@@ -202,6 +202,9 @@ cp "$LLVM_PREFIX/LICENSE" "$PKG/LICENSE-LLVM.TXT"
 homescoop_notices_begin "zig.wasm is Zig $VERSION's compiler (MIT) linked with LLVM, clang and lld from @ai-ecoverse/wasi-llvm and wasi-sdk 34's libc and libc++. lib/prebuilt holds wasi-libc, libc++ and Zig's runtimes built from Zig's own lib/."
 homescoop_notice "wasi_llvm: @ai-ecoverse/wasi-llvm $("$LLVM_PREFIX/bin/llvm-config" --version) (LLVM, clang and lld; Apache-2.0 WITH LLVM-exception)" \
   "$LLVM_PREFIX/LICENSE" -
+# libLLVMSupport's third-party code (homescoop#1046), from wasi-llvm's
+# share/licenses/llvm-support (>= 21.1.8-2).
+homescoop_notice_llvm_support "$LLVM_PREFIX" "wasi_llvm: LLVM"
 homescoop_notice "wasi-libc (Zig's lib/libc/wasi, prebuilt in lib/prebuilt; MIT, Apache-2.0, Apache-2.0 WITH LLVM-exception)" \
   "$L/libc/wasi/LICENSE" - "$L/libc/wasi/libc-top-half/musl/COPYRIGHT" - "$L/libc/wasi/libc-bottom-half/cloudlibc/LICENSE" -
 homescoop_notice "libc++, libc++abi and libunwind (Zig's lib/libcxx, lib/libcxxabi, lib/libunwind; Apache-2.0 WITH LLVM-exception)" \
