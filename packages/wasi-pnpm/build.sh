@@ -57,6 +57,16 @@ PY
 CARGO_HOME_DIR="${CARGO_HOME:-$HOME/.cargo}"
 # Cargo hands rustc physical paths (macOS: /private/tmp/…): map those too.
 CARGO_ENCODED_RUSTFLAGS="$(printf '%s\x1f%s\x1f%s' "--remap-path-prefix=$SRC=/pnpm" "--remap-path-prefix=$(cd "$SRC" && pwd -P)=/pnpm" "--remap-path-prefix=$CARGO_HOME_DIR=/cargo")"
+# homescoop#1127: pnpm.wasm started at 68 pages (4.3 MiB) and grew its shared
+# memory constantly while rayon workers decode the store index; a first
+# write into a fresh allocation then trapped "memory access out of bounds"
+# on CI's Linux Chromium (a cross-thread memory.grow window, under
+# investigation). Start at 256 MiB so a warm install rarely grows at all.
+# HOMESCOOP_PNPM_INITIAL_MEMORY=0 builds without it (for probe runs).
+PNPM_INITIAL_MEMORY="${HOMESCOOP_PNPM_INITIAL_MEMORY:-268435456}"
+if [[ "$PNPM_INITIAL_MEMORY" != 0 ]]; then
+  CARGO_ENCODED_RUSTFLAGS="$CARGO_ENCODED_RUSTFLAGS$(printf '\x1f%s' "-Clink-arg=--initial-memory=$PNPM_INITIAL_MEMORY")"
+fi
 export CARGO_ENCODED_RUSTFLAGS
 # The C the crates compile (tree-sitter's assert()s) names its sources by
 # __FILE__: map CARGO_HOME and the tree there too. cc adds TARGET_CFLAGS to
@@ -106,6 +116,19 @@ fi
 if strings "$NAMES_OUT" | grep -E "$LEAK" >/dev/null; then
   echo "homescoop: a build path leaked into pnpm.wasm.names" >&2
   exit 1
+fi
+if [[ "$PNPM_INITIAL_MEMORY" != 0 ]]; then
+  node -e '
+    const b = require("fs").readFileSync(process.argv[1]);
+    const mem = WebAssembly.Module.imports(new WebAssembly.Module(b)).find((i) => i.kind === "memory");
+    // The import section entry: env.memory, flags, min pages.
+    const at = b.indexOf(Buffer.from("\x03env\x06memory\x02"));
+    let p = at + 12, v = 0, s = 0, x;
+    const flags = b[p++];
+    do { x = b[p++]; v |= (x & 127) << s; s += 7; } while (x & 128);
+    if (!mem || at < 0 || v * 65536 !== Number(process.argv[2])) { console.error(`pnpm.wasm imports memory with ${v} pages, not ${process.argv[2]} bytes`); process.exit(1); }
+    console.log(`pnpm.wasm: initial memory ${v} pages (${v / 16} MiB), flags ${flags}`);
+  ' "$DEST/bin/pnpm.wasm" "$PNPM_INITIAL_MEMORY"
 fi
 shasum -a 256 "$DEST/bin/pnpm.wasm" "$NAMES_OUT"
 echo "OK wasi-pnpm $VERSION (pnpm $COMMIT + patches)"

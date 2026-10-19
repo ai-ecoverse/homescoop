@@ -85,6 +85,16 @@ file's mode isn't checked and re-applied once the kernel has been seen to
 apply creation modes (about a third of pnpm's own per-file OPFS calls in the
 kernel's trace of an install).
 
+## Kernel copies and initial memory (12.9.1-14)
+
+On slicc-kernel 1.128.0 or later, pnpm imports each file with the kernel's
+own copy (`ctx.fs.copyFile`): one kernel call per file, and no bytes through
+pnpm's memory. Older kernels keep pnpm's own copy. pnpm.wasm starts with
+256 MiB of memory (up to 1 GiB), not 4.3 MiB: growing shared memory while
+pnpm's worker threads allocate trapped on CI's Linux Chromium
+(`pnpm: wasm trap in thread N: memory access out of bounds`, homescoop#1127),
+and a warm install now rarely grows at all.
+
 ## `npm`, `npx` and `i`
 
 The package also provides `npm`, `npx` and `i` as small `#!/bin/sh` scripts

@@ -228,6 +228,25 @@ test('pnpm_fs umask is the process umask, read once (12.9.1-12)', () => {
   assert.equal(createImports(failing).pnpm_fs.umask(), 0o022)
 })
 
+test('pnpm_fs copy_file uses the kernel copy, or answers ENOSYS (12.9.1-14)', () => {
+  const ctx = fakeContext()
+  const fs = createImports(ctx).pnpm_fs
+  const [sp, sl] = put(ctx, 512, '/store/a')
+  const [tp, tl] = put(ctx, 768, '/nm/a')
+  assert.equal(fs.copy_file(sp, sl, tp, tl, 0o644, 1), errno.ENOSYS)
+  const calls = []
+  ctx.fs.copyFile = (from, to, options) => {
+    calls.push([from, to, options])
+    if (to === '/nm/exists') throw Object.assign(new Error('exists'), { code: 'EEXIST' })
+    if (to === '/other/a') throw Object.assign(new Error('cross'), { code: 'EXDEV' })
+  }
+  assert.equal(fs.copy_file(sp, sl, tp, tl, 0o755, 1), 0)
+  assert.deepEqual(calls[0], ['/store/a', '/nm/a', { mode: 0o755, excl: true }])
+  assert.equal(fs.copy_file(sp, sl, ...put(ctx, 1024, '/nm/exists'), 0o644, 1), errno.EEXIST)
+  assert.equal(fs.copy_file(sp, sl, ...put(ctx, 1280, '/other/a'), 0o644, 1), errno.EXDEV)
+  assert.equal(fs.copy_file(sp, sl, tp, tl, 0o644, 2), errno.EINVAL)
+})
+
 test('pnpm_fs path_access_executable checks the exec bits', () => {
   const ctx = fakeContext()
   const { pnpm_fs: fs } = createImports(ctx)
@@ -257,7 +276,7 @@ test('pnpm_fs secure_directory creates a private directory once', () => {
   assert.equal(fs.secure_directory(...put(ctx, 192, '/racy')), 0)
   const real = ctx.fs.mkdir
   ctx.fs.mkdir = () => { throw Object.assign(new Error('EROFS'), { code: 'EROFS' }) }
-  assert.equal(fs.secure_directory(...put(ctx, 256, '/ro/dir')), errno.EIO)
+  assert.equal(fs.secure_directory(...put(ctx, 256, '/ro/dir')), errno.EROFS) // 12.9.1-14 maps EROFS (EIO before)
   ctx.fs.mkdir = real
 })
 

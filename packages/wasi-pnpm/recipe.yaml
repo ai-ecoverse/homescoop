@@ -55,4 +55,8 @@ about:
     drops 12.9.1-11's 0004 (stage, rename aside, rename in): on slicc-kernel
     <= 1.124.x a directory rename copies the tree, and for a large package
     it timed out (os error 73) in 41 of 160 agent installs (homescoop#1127's
-    loop); homescoop#1128 is open again.
+    loop); homescoop#1128 is open again. 12.9.1-14's 0006 copies imported
+    files with slicc-kernel's ctx.fs.copyFile (>= 1.128.0; ENOSYS falls
+    back), and build.sh links pnpm.wasm with 256 MiB of initial memory
+    against homescoop#1127's cross-thread memory.grow traps
+    (HOMESCOOP_PNPM_INITIAL_MEMORY=0 to build without).
