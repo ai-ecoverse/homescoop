@@ -37,8 +37,6 @@ cmake Emscripten #844
 cmake files #844
 wasm-binaryen Emscripten #844
 wasm-binaryen files #844
-wasm-clang Emscripten #844
-wasm-clang files #844
 py-contourpy pybind11 #797
 py-contourpy files #797
 py-kiwisolver cppy #815

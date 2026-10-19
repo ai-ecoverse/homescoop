@@ -295,8 +295,10 @@ if [ "$compile_only" -eq 1 ] || [ "$has_src" -eq 1 ]; then
   do_compile=1
 fi
 
+LEGACY_EH=true
 case "$EXCEPTIONS" in
   exnref|yes)
+    LEGACY_EH=false
     if [ "$PIC" = yes ] || [ "$PIC" = true ]; then
       SYSROOT=$PREFIX/sysroot-exnref-ehpic
     else
@@ -359,7 +361,7 @@ trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
         printf '%s\n' \
           "-fwasm-exceptions" \
           "-mllvm" "--wasm-enable-sjlj" \
-          "-mllvm" "--wasm-use-legacy-eh=false"
+          "-mllvm" "--wasm-use-legacy-eh=$LEGACY_EH"
         ;;
     esac
 
@@ -411,7 +413,7 @@ trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
           printf '%s\n' \
             "-Wl,-mllvm,--wasm-enable-eh" \
             "-Wl,-mllvm,--wasm-enable-sjlj" \
-            "-Wl,-mllvm,--wasm-use-legacy-eh=false" \
+            "-Wl,-mllvm,--wasm-use-legacy-eh=$LEGACY_EH" \
             "-Wl,-mllvm,--exception-model=wasm"
           ;;
       esac
