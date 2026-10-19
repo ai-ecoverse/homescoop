@@ -1,0 +1,227 @@
+SuperLU (scipy 1.18) declares the BLAS routines it calls void; wasix-openblas
+(f2c int ABI) defines them returning int, and wasm calls are type-checked.
+
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/clacon2.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/clacon2.c
+@@ -107,7 +107,7 @@
+     extern float smach(char *);
+     extern int icmax1_slu(int *, singlecomplex *, int *);
+     extern double scsum1_slu(int *, singlecomplex *, int *);
+-    extern void ccopy_(slu_blasint *, singlecomplex *, slu_blasint *, singlecomplex *, slu_blasint *);
++    extern int ccopy_(slu_blasint *, singlecomplex *, slu_blasint *, singlecomplex *, slu_blasint *);
+     slu_blasint n_blas = *n;
+ 
+     safmin = smach("Safe minimum");
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/dlacon2.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/dlacon2.c
+@@ -105,7 +105,7 @@
+ #else
+     extern int idamax_(slu_blasint *, double *, slu_blasint *);
+     extern double dasum_(slu_blasint *, double *, slu_blasint *);
+-    extern void dcopy_(slu_blasint *, double *, slu_blasint *, double *, slu_blasint *);
++    extern int dcopy_(slu_blasint *, double *, slu_blasint *, double *, slu_blasint *);
+ #endif
+ #define d_sign(a, b) (b >= 0 ? fabs(a) : -fabs(a))    /* Copy sign */
+ #define i_dnnt(a) \
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_ccopy_to_ucol.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_ccopy_to_ucol.c
+@@ -26,7 +26,7 @@
+ int num_drop_U;
+ #endif
+ 
+-extern void ccopy_(slu_blasint *, singlecomplex [], slu_blasint *, singlecomplex [], slu_blasint *);
++extern int ccopy_(slu_blasint *, singlecomplex [], slu_blasint *, singlecomplex [], slu_blasint *);
+ 
+ #if 0
+ static singlecomplex *A;  /* used in _compare_ only */
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_dcopy_to_ucol.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_dcopy_to_ucol.c
+@@ -26,7 +26,7 @@
+ int num_drop_U;
+ #endif
+ 
+-extern void dcopy_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
++extern int dcopy_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
+ 
+ #if 0
+ static double *A;  /* used in _compare_ only */
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_ddrop_row.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_ddrop_row.c
+@@ -23,9 +23,9 @@
+ #include <stdlib.h>
+ #include "slu_ddefs.h"
+ 
+-extern void dswap_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
+-extern void daxpy_(slu_blasint *, double *, double [], slu_blasint *, double [], slu_blasint *);
+-extern void dcopy_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
++extern int dswap_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
++extern int daxpy_(slu_blasint *, double *, double [], slu_blasint *, double [], slu_blasint *);
++extern int dcopy_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
+ extern double dasum_(slu_blasint *, double *, slu_blasint *);
+ extern double dnrm2_(slu_blasint *, double *, slu_blasint *);
+ extern double dnrm2_(slu_blasint *, double [], slu_blasint *);
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_sdrop_row.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_sdrop_row.c
+@@ -23,9 +23,9 @@
+ #include <stdlib.h>
+ #include "slu_sdefs.h"
+ 
+-extern void sswap_(slu_blasint *, float [], slu_blasint *, float [], slu_blasint *);
+-extern void saxpy_(slu_blasint *, float *, float [], slu_blasint *, float [], slu_blasint *);
+-extern void scopy_(slu_blasint *, float [], slu_blasint *, float [], slu_blasint *);
++extern int sswap_(slu_blasint *, float [], slu_blasint *, float [], slu_blasint *);
++extern int saxpy_(slu_blasint *, float *, float [], slu_blasint *, float [], slu_blasint *);
++extern int scopy_(slu_blasint *, float [], slu_blasint *, float [], slu_blasint *);
+ extern float sasum_(slu_blasint *, float *, slu_blasint *);
+ extern float snrm2_(slu_blasint *, float *, slu_blasint *);
+ extern double dnrm2_(slu_blasint *, double [], slu_blasint *);
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_zcopy_to_ucol.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_zcopy_to_ucol.c
+@@ -26,7 +26,7 @@
+ int num_drop_U;
+ #endif
+ 
+-extern void zcopy_(slu_blasint *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
++extern int zcopy_(slu_blasint *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
+ 
+ #if 0
+ static doublecomplex *A;  /* used in _compare_ only */
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_zdrop_row.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/ilu_zdrop_row.c
+@@ -23,10 +23,10 @@
+ #include <stdlib.h>
+ #include "slu_zdefs.h"
+ 
+-extern void zswap_(slu_blasint *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
+-extern void zaxpy_(slu_blasint *, doublecomplex *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
+-extern void zcopy_(slu_blasint *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
+-extern void dcopy_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
++extern int zswap_(slu_blasint *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
++extern int zaxpy_(slu_blasint *, doublecomplex *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
++extern int zcopy_(slu_blasint *, doublecomplex [], slu_blasint *, doublecomplex [], slu_blasint *);
++extern int dcopy_(slu_blasint *, double [], slu_blasint *, double [], slu_blasint *);
+ extern double dzasum_(slu_blasint *, doublecomplex *, slu_blasint *);
+ extern double dznrm2_(slu_blasint *, doublecomplex *, slu_blasint *);
+ extern double dnrm2_(slu_blasint *, double [], slu_blasint *);
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slacon2.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slacon2.c
+@@ -105,7 +105,7 @@
+ #else
+     extern int isamax_(slu_blasint *, float *, slu_blasint *);
+     extern float sasum_(slu_blasint *, float *, slu_blasint *);
+-    extern void scopy_(slu_blasint *, float *, slu_blasint *, float *, slu_blasint *);
++    extern int scopy_(slu_blasint *, float *, slu_blasint *, float *, slu_blasint *);
+ #endif
+ #define d_sign(a, b) (b >= 0 ? fabs(a) : -fabs(a))    /* Copy sign */
+ #define i_dnnt(a) \
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_cdefs.h
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_cdefs.h
+@@ -264,16 +264,16 @@
+ 
+ /*! \brief BLAS */
+ 
+-extern void ccopy_(slu_blasint *, singlecomplex *, slu_blasint *, singlecomplex *, slu_blasint *);
+-extern void caxpy_(slu_blasint *, singlecomplex *, singlecomplex *, slu_blasint *, singlecomplex *, slu_blasint *);
+-extern void cgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
++extern int ccopy_(slu_blasint *, singlecomplex *, slu_blasint *, singlecomplex *, slu_blasint *);
++extern int caxpy_(slu_blasint *, singlecomplex *, singlecomplex *, slu_blasint *, singlecomplex *, slu_blasint *);
++extern int cgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
+                    singlecomplex*,  singlecomplex*,  slu_blasint*,  singlecomplex*,
+ 		   slu_blasint*,  singlecomplex*, singlecomplex*,  slu_blasint*);
+-extern void ctrsv_(char*, char*, char*, slu_blasint*, singlecomplex*, slu_blasint*,
++extern int ctrsv_(char*, char*, char*, slu_blasint*, singlecomplex*, slu_blasint*,
+                   singlecomplex*, slu_blasint*);
+-extern void ctrsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
++extern int ctrsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
+                   singlecomplex*, singlecomplex*, slu_blasint*, singlecomplex*, slu_blasint*);
+-extern void cgemv_(char *, slu_blasint *, slu_blasint *, singlecomplex *, singlecomplex *a, slu_blasint *,
++extern int cgemv_(char *, slu_blasint *, slu_blasint *, singlecomplex *, singlecomplex *a, slu_blasint *,
+                   singlecomplex *, slu_blasint *, singlecomplex *, singlecomplex *, slu_blasint *);
+ 
+ extern void cusolve(int, int, singlecomplex*, singlecomplex*);
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_ddefs.h
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_ddefs.h
+@@ -261,16 +261,16 @@
+ 
+ /*! \brief BLAS */
+ 
+-extern void dcopy_(slu_blasint *, double *, slu_blasint *, double *, slu_blasint *);
+-extern void daxpy_(slu_blasint *, double *, double *, slu_blasint *, double *, slu_blasint *);
+-extern void dgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
++extern int dcopy_(slu_blasint *, double *, slu_blasint *, double *, slu_blasint *);
++extern int daxpy_(slu_blasint *, double *, double *, slu_blasint *, double *, slu_blasint *);
++extern int dgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
+                    double*,  double*,  slu_blasint*,  double*,
+ 		   slu_blasint*,  double*, double*,  slu_blasint*);
+-extern void dtrsv_(char*, char*, char*, slu_blasint*, double*, slu_blasint*,
++extern int dtrsv_(char*, char*, char*, slu_blasint*, double*, slu_blasint*,
+                   double*, slu_blasint*);
+-extern void dtrsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
++extern int dtrsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
+                   double*, double*, slu_blasint*, double*, slu_blasint*);
+-extern void dgemv_(char *, slu_blasint *, slu_blasint *, double *, double *a, slu_blasint *,
++extern int dgemv_(char *, slu_blasint *, slu_blasint *, double *, double *a, slu_blasint *,
+                   double *, slu_blasint *, double *, double *, slu_blasint *);
+ 
+ extern void dusolve(int, int, double*, double*);
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_sdefs.h
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_sdefs.h
+@@ -261,16 +261,16 @@
+ 
+ /*! \brief BLAS */
+ 
+-extern void scopy_(slu_blasint *, float *, slu_blasint *, float *, slu_blasint *);
+-extern void saxpy_(slu_blasint *, float *, float *, slu_blasint *, float *, slu_blasint *);
+-extern void sgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
++extern int scopy_(slu_blasint *, float *, slu_blasint *, float *, slu_blasint *);
++extern int saxpy_(slu_blasint *, float *, float *, slu_blasint *, float *, slu_blasint *);
++extern int sgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
+                    float*,  float*,  slu_blasint*,  float*,
+ 		   slu_blasint*,  float*, float*,  slu_blasint*);
+-extern void strsv_(char*, char*, char*, slu_blasint*, float*, slu_blasint*,
++extern int strsv_(char*, char*, char*, slu_blasint*, float*, slu_blasint*,
+                   float*, slu_blasint*);
+-extern void strsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
++extern int strsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
+                   float*, float*, slu_blasint*, float*, slu_blasint*);
+-extern void sgemv_(char *, slu_blasint *, slu_blasint *, float *, float *a, slu_blasint *,
++extern int sgemv_(char *, slu_blasint *, slu_blasint *, float *, float *a, slu_blasint *,
+                   float *, slu_blasint *, float *, float *, slu_blasint *);
+ 
+ extern void susolve(int, int, float*, float*);
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_zdefs.h
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/slu_zdefs.h
+@@ -264,16 +264,16 @@
+ 
+ /*! \brief BLAS */
+ 
+-extern void zcopy_(slu_blasint *, doublecomplex *, slu_blasint *, doublecomplex *, slu_blasint *);
+-extern void zaxpy_(slu_blasint *, doublecomplex *, doublecomplex *, slu_blasint *, doublecomplex *, slu_blasint *);
+-extern void zgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
++extern int zcopy_(slu_blasint *, doublecomplex *, slu_blasint *, doublecomplex *, slu_blasint *);
++extern int zaxpy_(slu_blasint *, doublecomplex *, doublecomplex *, slu_blasint *, doublecomplex *, slu_blasint *);
++extern int zgemm_( char*,  char*,  slu_blasint*,  slu_blasint*,  slu_blasint*,
+                    doublecomplex*,  doublecomplex*,  slu_blasint*,  doublecomplex*,
+ 		   slu_blasint*,  doublecomplex*, doublecomplex*,  slu_blasint*);
+-extern void ztrsv_(char*, char*, char*, slu_blasint*, doublecomplex*, slu_blasint*,
++extern int ztrsv_(char*, char*, char*, slu_blasint*, doublecomplex*, slu_blasint*,
+                   doublecomplex*, slu_blasint*);
+-extern void ztrsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
++extern int ztrsm_(char*, char*, char*, char*, slu_blasint*, slu_blasint*,
+                   doublecomplex*, doublecomplex*, slu_blasint*, doublecomplex*, slu_blasint*);
+-extern void zgemv_(char *, slu_blasint *, slu_blasint *, doublecomplex *, doublecomplex *a, slu_blasint *,
++extern int zgemv_(char *, slu_blasint *, slu_blasint *, doublecomplex *, doublecomplex *a, slu_blasint *,
+                   doublecomplex *, slu_blasint *, doublecomplex *, doublecomplex *, slu_blasint *);
+ 
+ extern void zusolve(int, int, doublecomplex*, doublecomplex*);
+--- a/scipy/sparse/linalg/_dsolve/SuperLU/SRC/zlacon2.c
++++ b/scipy/sparse/linalg/_dsolve/SuperLU/SRC/zlacon2.c
+@@ -107,7 +107,7 @@
+     extern double dmach(char *);
+     extern int izmax1_slu(int *, doublecomplex *, int *);
+     extern double dzsum1_slu(int *, doublecomplex *, int *);
+-    extern void zcopy_(slu_blasint *, doublecomplex *, slu_blasint *, doublecomplex *, slu_blasint *);
++    extern int zcopy_(slu_blasint *, doublecomplex *, slu_blasint *, doublecomplex *, slu_blasint *);
+     slu_blasint n_blas = *n;
+ 
+     safmin = dmach("Safe minimum");

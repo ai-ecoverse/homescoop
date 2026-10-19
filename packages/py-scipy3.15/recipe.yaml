@@ -1,0 +1,63 @@
+# SciPy for slicc WASIX CPython 3.15 (side modules, dlopen; static OpenBLAS).
+name: py-scipy3.15
+builder: host
+# renovate: datasource=pypi depName=scipy
+version: "1.18.1"
+npm: "@ai-ecoverse/py-scipy"
+npm-tag: "python3.15"
+summary: "SciPy 1.18.1 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32)"
+source:
+  url: "https://files.pythonhosted.org/packages/7e/74/66de6258867beb2ef08f35f9f2ac017a52cacd5081714d239ff1a442d458/scipy-{{version}}.tar.gz"
+  sha256: "52c4b7422442aba924d03ad4019852b08a92e64ea187b933135687bfe2747307"
+sources:
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
+  py_numpy:
+    url: "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.5.4-1.tgz"
+    sha256: "9e983a3c6d6edbbdc34cdfbcd49710aa17c5f67161ac19c99a3e2d38cd4c0a6c"
+  wasix_openblas:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openblas/-/wasix-openblas-0.3.28-1.tgz"
+    sha256: "0ed057b469af543641a30b6d781d8db8072802e771d7d0de325597ee24efa88e"
+  cython:
+    url: "https://files.pythonhosted.org/packages/bf/77/67b0b24e45073a699610e50f00c18474ff9b09ea29ecc95083bdf5e60acd/cython-3.3.0-py3-none-any.whl"
+    sha256: "9b24b5c8cd536946b62086fcafee6d5509d3f549f72d553d2336af87ffbe0da1"
+  meson:
+    url: "https://files.pythonhosted.org/packages/9c/07/b48592d325cb86682829f05216e4efb2dc881762b8f1bafb48b57442307a/meson-1.9.1-py3-none-any.whl"
+    sha256: "f824ab770c041a202f532f69e114c971918ed2daff7ea56583d80642564598d0"
+  pybind11:
+    url: "https://files.pythonhosted.org/packages/cd/8a/37362fc2b949d5f733a8b0f2ff51ba423914cabefe69f1d1b6aab710f5fe/pybind11-3.0.1-py3-none-any.whl"
+    sha256: "aa8f0aa6e0a94d3b64adfc38f560f33f15e589be2175e103c0a33c6bce55ee89"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+reproducible: true
+notices:
+  not_linked:
+    py_numpy: "build-time headers, Cython declarations and f2py (code generator); py-numpy ships its own notices"
+    cython: "build tool (Cython 3.3.0, generates the C sources)"
+    meson: "build tool"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+  - packages/py-scipy3.15/tools/scipy_cfix.py
+dependencies:
+  build:
+    - wasix-python
+    - py-numpy
+  host: []
+  run:
+    - wasix-python
+    - py-numpy
+about:
+  homepage: https://scipy.org
+  license: BSD-3-Clause
+  notes: |
+    The cp315 line (homescoop#761), from py-scipy's recipe (homescoop#211 A6): meson
+    1.9.1 + Cython 3.3.0 on the host python, numpy's f2py as the code
+    generator, a meson cross file (wasi/wasm32), wasixcc shared-library side
+    modules (sysroot-ehpic, legacy EH, PIC) against wasix-python 3.15.0-1 and
+    py-numpy 2.5.4-1 headers. scipy 1.18 builds without Fortran
+    (-D_without-fortran: only the deprecated scipy.odr goes). BLAS/LAPACK is
+    @ai-ecoverse/wasix-openblas 0.3.28-1 (C LAPACK, f2c int ABI), linked
+    statically into the extensions that use it; the f2c int-return fixes are
+    Pyodide's (patches/, tools/scipy_cfix.py).

@@ -128,6 +128,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-python-dateutil`](https://www.npmjs.com/package/@ai-ecoverse/py-python-dateutil) | [recipe](packages/py-python-dateutil) | python-dateutil for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pytz`](https://www.npmjs.com/package/@ai-ecoverse/py-pytz) | [recipe](packages/py-pytz) | pytz for slicc WASIX CPython |
 | [`@ai-ecoverse/py-scipy`](https://www.npmjs.com/package/@ai-ecoverse/py-scipy) | [recipe](packages/py-scipy) | SciPy 1.18.1 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32 side modules, static OpenBLAS) |
+| [`@ai-ecoverse/py-scipy`](https://www.npmjs.com/package/@ai-ecoverse/py-scipy) (dist-tag `python3.15`) | [recipe](packages/py-scipy3.15) | SciPy 1.18.1 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules, static OpenBLAS) |
 | [`@ai-ecoverse/py-six`](https://www.npmjs.com/package/@ai-ecoverse/py-six) | [recipe](packages/py-six) | six for slicc WASIX CPython |
 | [`@ai-ecoverse/py-tzdata`](https://www.npmjs.com/package/@ai-ecoverse/py-tzdata) | [recipe](packages/py-tzdata) | tzdata for slicc WASIX CPython |
 | [`@ai-ecoverse/wasm-qpdf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-qpdf) | [recipe](packages/qpdf) | qpdf PDF merge/split/rotate/decrypt/linearize tool for slicc (WASM / emscripten, SLICC homescoop) |
