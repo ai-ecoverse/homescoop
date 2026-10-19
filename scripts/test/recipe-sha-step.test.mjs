@@ -30,7 +30,7 @@ function runWith(refresh) {
     mkdirSync(join(dir, 'scripts'));
     copyFileSync(join(root, 'scripts', 'gate.mjs'), join(dir, 'scripts', 'gate.mjs'));
     writeFileSync(join(dir, 'scripts', 'refresh-recipe-sha.mjs'), refresh);
-    return spawnSync('bash', ['-c', STEP], { cwd: dir, encoding: 'utf8', env: { ...process.env, HOST: '["pkg"]' } });
+    return spawnSync('bash', ['-c', STEP], { cwd: dir, encoding: 'utf8', env: { ...process.env, HOST: '["pkg"]', BASE_REF: 'main' } });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
