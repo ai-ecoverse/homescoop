@@ -2,7 +2,7 @@ multiprocessing.util.spawnv_passfds: posix_spawn on WASI (no _posixsubprocess).
 
 --- a/Lib/multiprocessing/util.py
 +++ b/Lib/multiprocessing/util.py
-@@ -516,6 +516,16 @@
+@@ -516,6 +516,16 @@ def _flush_std_streams():
  #
  
  def spawnv_passfds(path, args, passfds):

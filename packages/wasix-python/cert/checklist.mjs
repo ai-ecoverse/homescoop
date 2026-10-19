@@ -23,6 +23,9 @@ const WHEELS = [
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
+  const PKG = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasix-python/package.json'));
+  const PYV = PKG.slicc.python.version;
+  const UPSTREAM = PKG.homescoop.upstream;
   const env = { PIP_NO_INDEX: '1', PIP_FIND_LINKS: '/home/wheels', PIP_DISABLE_PIP_VERSION_CHECK: '1' };
   const sh = (script, cwd = '/home') => run(['bash', '-c', script], { cwd, env });
   const ok = async (script, cwd) => {
@@ -58,15 +61,15 @@ export default async function (ctx) {
   const pip = await ok('v/bin/pip install requests', '/home');
   assert.match(pip.stdout, /Successfully installed .*requests/);
   const where = await ok("v/bin/python -c 'import requests; print(requests.__file__)'", '/home');
-  assert.equal(where.stdout, '/home/v/lib/python3.14/site-packages/requests/__init__.py\n');
-  const user = await sh('ls /home/.local/lib/python3.14/site-packages/requests');
+  assert.equal(where.stdout, `/home/v/lib/python${PYV}/site-packages/requests/__init__.py\n`);
+  const user = await sh(`ls /home/.local/lib/python${PYV}/site-packages/requests`);
   assert.notEqual(user.status, 0, 'requests went to the user site');
   const base = await sh("python -c 'import requests'");
   assert.notEqual(base.status, 0, 'requests leaked into the base interpreter');
   assert.match(base.stderr, /No module named 'requests'/);
   // A console script in the venv runs with the venv's python (#!/home/v/bin/python).
   const normalizer = await ok('v/bin/normalizer --version', '/home');
-  assert.match(normalizer.stdout, /^Charset-Normalizer 3\.5\.2 - Python 3\.14\.2/m);
+  assert.match(normalizer.stdout, new RegExp(`^Charset-Normalizer 3\\.5\\.2 - Python ${UPSTREAM.replaceAll('.', '\\.')}`, 'm'));
   // Subprocesses of the venv's python stay in the venv.
   const child = await ok(
     "v/bin/python -c 'import subprocess, sys; subprocess.run([sys.executable, \"-c\", \"import requests, sys; print(sys.prefix)\"], check=True)'",
@@ -77,14 +80,14 @@ export default async function (ctx) {
   // A sitecustomize of the user's own still runs after ours, once, and is
   // what `import sitecustomize` returns.
   await ok(
-    "printf 'import builtins\\nbuiltins.HS_SITE = getattr(builtins, \"HS_SITE\", 0) + 1\\n' > v/lib/python3.14/site-packages/sitecustomize.py",
+    "printf 'import builtins\\nbuiltins.HS_SITE = getattr(builtins, \"HS_SITE\", 0) + 1\\n' > v/lib/python" + PYV + "/site-packages/sitecustomize.py",
     '/home',
   );
   const chained = await ok(
     "v/bin/python -c 'import sitecustomize; print(HS_SITE, sitecustomize.__file__)'",
     '/home',
   );
-  assert.equal(chained.stdout, '1 /home/v/lib/python3.14/site-packages/sitecustomize.py\n');
+  assert.equal(chained.stdout, `1 /home/v/lib/python${PYV}/site-packages/sitecustomize.py\n`);
 
   // A sitecustomize on PYTHONPATH shadows the stdlib one, but the base
   // site-packages .pth hook still sets sys.executable (#157 c).

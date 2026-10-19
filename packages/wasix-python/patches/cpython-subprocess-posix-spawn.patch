@@ -3,7 +3,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
 
 --- a/Lib/subprocess.py
 +++ b/Lib/subprocess.py
-@@ -75,7 +75,10 @@
+@@ -75,7 +75,10 @@ else:
      _mswindows = True
  
  # some platforms do not support subprocesses
@@ -15,7 +15,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
  
  if _mswindows:
      import _winapi
-@@ -102,24 +105,14 @@
+@@ -102,24 +105,14 @@ if _mswindows:
                      "CREATE_NO_WINDOW", "DETACHED_PROCESS",
                      "CREATE_DEFAULT_ERROR_MODE", "CREATE_BREAKAWAY_FROM_JOB"])
  else:
@@ -48,7 +48,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
  
      import select
      import selectors
-@@ -718,9 +711,10 @@
+@@ -833,9 +826,10 @@ def _use_posix_spawn():
      if ((_env := os.environ.get('_PYTHON_SUBPROCESS_USE_POSIX_SPAWN')) in ('0', '1')):
          return bool(int(_env))
  
@@ -61,7 +61,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
          return True
  
      # Check libc name and runtime libc version
-@@ -823,7 +817,7 @@
+@@ -998,7 +992,7 @@ class Popen:
                   encoding=None, errors=None, text=None, umask=-1, pipesize=-1,
                   process_group=None):
          """Create new Popen instance."""
@@ -70,7 +70,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
              raise OSError(
                  errno.ENOTSUP, f"{sys.platform} does not support processes."
              )
-@@ -1785,8 +1779,9 @@
+@@ -1952,8 +1946,9 @@ class Popen:
          def _posix_spawn(self, args, executable, env, restore_signals, close_fds,
                           p2cread, p2cwrite,
                           c2pread, c2pwrite,
@@ -82,7 +82,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
              kwargs = {}
              if restore_signals:
                  # See _Py_RestoreSignals() in Python/pylifecycle.c
-@@ -1797,6 +1792,9 @@
+@@ -1964,6 +1959,9 @@ class Popen:
                          sigset.append(signum)
                  kwargs['setsigdef'] = sigset
  
@@ -92,7 +92,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
              file_actions = []
              for fd in (p2cwrite, c2pread, errread):
                  if fd != -1:
-@@ -1809,13 +1807,53 @@
+@@ -1976,13 +1974,53 @@ class Popen:
                  if fd != -1:
                      file_actions.append((os.POSIX_SPAWN_DUP2, fd, fd2))
  
@@ -148,7 +148,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
              self._child_created = True
  
              self._close_pipe_fds(p2cread, p2cwrite,
-@@ -1831,7 +1869,7 @@
+@@ -1998,7 +2036,7 @@ class Popen:
                             restore_signals,
                             gid, gids, uid, umask,
                             start_new_session, process_group):
@@ -157,7 +157,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
  
              if isinstance(args, (str, bytes)):
                  args = [args]
-@@ -1844,7 +1882,6 @@
+@@ -2011,7 +2049,6 @@ class Popen:
                  args = list(args)
  
              if shell:
@@ -165,7 +165,7 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
                  unix_shell = ('/system/bin/sh' if
                            hasattr(sys, 'getandroidapilevel') else '/bin/sh')
                  args = [unix_shell, "-c"] + args
-@@ -1856,141 +1893,46 @@
+@@ -2023,141 +2060,46 @@ class Popen:
  
              sys.audit("subprocess.Popen", executable, args, cwd, env)
  
@@ -247,14 +247,6 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
 -                self._close_pipe_fds(p2cread, p2cwrite,
 -                                     c2pread, c2pwrite,
 -                                     errread, errwrite)
--
--                # Wait for exec to fail or succeed; possibly raising an
--                # exception (limited in size)
--                errpipe_data = bytearray()
--                while True:
--                    part = os.read(errpipe_read, 50000)
--                    errpipe_data += part
--                    if not part or len(errpipe_data) > 50000:
 +            if preexec_fn is not None:
 +                raise OSError(
 +                    errno.ENOTSUP,
@@ -267,7 +259,14 @@ proc_spawn2/3). The edit patch_subprocess_posix_spawn.py made.
 +                    "uid/gid/umask/process_group are not supported via "
 +                    "posix_spawn on this WASIX build"
 +                )
-+
+ 
+-                # Wait for exec to fail or succeed; possibly raising an
+-                # exception (limited in size)
+-                errpipe_data = bytearray()
+-                while True:
+-                    part = os.read(errpipe_read, 50000)
+-                    errpipe_data += part
+-                    if not part or len(errpipe_data) > 50000:
 +            # Resolve executable on PATH when needed (posix_spawn requires path).
 +            if not os.path.dirname(executable):
 +                resolved = None

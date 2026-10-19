@@ -1,3 +1,26 @@
+# wasix-python patches
+
+## CPython 3.15.0 (wasix-python 3.15.0-1, homescoop#761)
+
+Every `cpython-*.patch` was regenerated against pristine 3.15.0: applied in `build.sh`'s order, each hunk checked where it landed, then re-diffed, so all of them apply at offset 0 with no fuzz. `build.sh` applies them with `-F0`, so a hunk that no longer matches fails the build instead of landing somewhere else. Two hunks of the 3.14.2 files did land in the wrong place, matched exactly but at the wrong offset: 3.15's `configure` gives Emscripten the same `py_cv_module_*=n/a` block as WASI, so `cpython-configure-wasix.patch`'s grp/pwd/resource hunk and `cpython-multiprocessing-wasix.patch`'s `_multiprocessing`/`_posixshmem` hunk were applied to the Emscripten case. None was dropped: 3.15.0 still has every problem they fix.
+
+| patch | 3.15.0 |
+| --- | --- |
+| `cpython-configure-wasix.patch` | regenerated; the module hunks now edit the WASI case (3.15 still marks fcntl, grp, pwd, mmap, resource, termios n/a on WASI and keeps wasm32-wasi-threads' 10 MiB memory) |
+| `cpython-platform-triplet-wasix.patch` | regenerated, same change (3.15 has no wasm32-wasix triplet) |
+| `cpython-user-site-wasi.patch` | regenerated, same change (offsets only) |
+| `cpython-subprocess-posix-spawn.patch` | regenerated, same change (3.15's `_can_fork_exec` still excludes wasi; offsets only) |
+| `cpython-stdout-line-buffer-nonreg.patch` | regenerated, same change |
+| `cpython-ensurepip-installed-pip.patch` | regenerated, same change (3.15 adds a `--no-compile` branch just above it; bundled pip 26.2.1) |
+| `cpython-multiprocessing-wasix.patch` | regenerated; the hunk now edits the WASI case (3.15 still marks `_multiprocessing` and `_posixshmem` n/a) |
+| `cpython-multiprocessing-util-wasix.patch` | regenerated, same change |
+| `cpython-multiprocessing-noshare-wasix.patch` | regenerated, same change |
+| `cpython-multiprocessing-unix-listener-wasix.patch` | regenerated, same change |
+| `cpython-thread-native-id-wasix.patch` | rebased by hand: 3.15 added a Solaris branch at both places the 3.14.2 hunks matched, which made them fail; the WASI branch now follows it |
+| `cpython-fork-hint-wasix.patch` | regenerated, same change |
+| `libffi-wasix-varargs.patch` | unchanged: it patches wasix-org/libffi 09cbf7d, whose pin is unchanged |
+| `wasix-libc-*.patch` | unchanged: they patch the sysroot's libc, not CPython, and `build.sh` doesn't apply them (the advisory-locks one is historical) |
+
 # wasix-python libc patches
 
 ## `wasix-libc-setitimer-it-value.patch`
@@ -99,7 +122,7 @@ file (`fstat` + `!S_ISREG`). Terminals already line-buffer; `> file` stays
 block-buffered; `PYTHONUNBUFFERED`/`-u` still win; stderr unchanged. `fstat`
 failure keeps historic block-buffering.
 
-Apply against the CPython 3.14.2 tree used for wasix-python (shipped in the
+Apply against the CPython tree used for wasix-python (3.15.0 since 3.15.0-1; shipped in the
 interpreter package, not as a standalone libc change).
 
 ## `cpython-ensurepip-installed-pip.patch` (wasix-python 3.14.2-17)
@@ -159,4 +182,4 @@ is not system-wide.
 The package ships two pythons: `bin/python.wasm` without fork, and `bin/python-fork.wasm` with it (`HAVE_FORK`, fully asyncified). `PYTHON_FORK=true` selects the second one through slicc.commands `variants`. The stdlib is shared, and the patch only acts where `os.fork` is missing:
 - **`Lib/os.py`:** a module `__getattr__` makes `os.fork` and `os.forkpty` raise `AttributeError("os.fork() isn't available in this python. Re-run with PYTHON_FORK=true (needs slicc-kernel >= 1.110.0) to use the fork-capable build.")`. It's an `AttributeError`, so `hasattr(os, "fork")` stays `False` and feature checks work as before. Every other missing name keeps CPython's message.
 - **`Lib/multiprocessing/context.py`:** `get_context("fork"/"forkserver")`, and so `set_start_method`, raise `ValueError` with the same hint.
-- The default start method stays `spawn` on WASI even when forkserver exists, as in the fork build. Upstream 3.14 would pick forkserver there.
+- The default start method stays `spawn` on WASI even when forkserver exists, as in the fork build. Upstream 3.14 and 3.15 would pick forkserver there.

@@ -5,7 +5,7 @@ and multiprocessing.shared_memory raises ImportError, as on upstream WASI.
 
 --- a/Lib/multiprocessing/context.py
 +++ b/Lib/multiprocessing/context.py
-@@ -319,10 +319,13 @@ if sys.platform != 'win32':
+@@ -328,10 +328,13 @@ if sys.platform != 'win32':
          'spawn': SpawnContext(),
          'forkserver': ForkServerContext(),
      }

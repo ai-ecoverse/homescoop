@@ -9,7 +9,6 @@ wasi-protoc-gen-go #1267 GitHub archive pinned by sha256 only
 wasi-protoc-gen-go-grpc #1267 GitHub archive pinned by sha256 only
 wasix-f2c/sources.f2c #1267 GitHub archive pinned by sha256 only
 wasix-python/sources.libffi #1267 GitHub archive pinned by sha256 only
-wasix-python3.15/sources.libffi #1267 GitHub archive pinned by sha256 only
 wasix-sysroot/sources.llvm_project #1267 GitHub archive pinned by sha256 only
 wasm-binaryen #1267 GitHub archive pinned by sha256 only
 wasm-emscripten #1267 GitHub archive pinned by sha256 only
