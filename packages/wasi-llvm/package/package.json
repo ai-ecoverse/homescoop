@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-llvm",
-  "version": "21.1.8-1",
+  "version": "21.1.8-2",
   "description": "LLVM 21.1.8, clang and lld as static libraries for a wasm32-wasip1-threads host, with a python3 llvm-config; a build input for the LLVM-enabled wasi-rustc and wasi-zig",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
@@ -25,9 +25,11 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin",
     "include",
-    "lib"
+    "lib",
+    "share"
   ],
   "publishConfig": {
     "access": "public"
