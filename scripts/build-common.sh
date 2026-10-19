@@ -496,23 +496,38 @@ homescoop_notice_emscripten() {
 # LLVM's Support library compiles in third-party code whose licences ask
 # for their notice in binary copies (homescoop#1046, #1098, #1086): Henry
 # Spencer's 4.4BSD regex, BLAKE3 and xxHash. Takes them from the llvm-project
-# tree the objects were compiled from (a Rust tree's src/llvm-project too).
-# check-package-meta.mjs requires them of any package that carries that code.
-#   homescoop_notice_llvm_support <llvm-project dir> [<label>]
+# tree the objects were compiled from (a Rust tree's src/llvm-project too),
+# or from a package that ships them in share/licenses/llvm-support
+# (@ai-ecoverse/wasi-llvm >= 21.1.8-2), for a program that links its
+# libraries. check-package-meta.mjs requires them of any package that
+# carries that code.
+#   homescoop_notice_llvm_support <llvm-project dir | package dir> [<label>]
 homescoop_notice_llvm_support() {
-  local s="$1/llvm/lib/Support" label="${2:-LLVM}" xx
-  local f
-  for f in "$s/COPYRIGHT.regex" "$s/BLAKE3/LICENSE" "$s/xxhash.cpp"; do
-    test -s "$f" || { echo "homescoop_notice_llvm_support: missing $f" >&2; return 1; }
-  done
-  xx="$WORK/notices/llvm-support-xxhash-LICENSE"
-  mkdir -p "$WORK/notices"
-  # xxhash.cpp's licence is its opening comment.
-  awk 'NR == 1 && !/^\/\*/ { exit 1 } { print } /\*\// { exit }' "$s/xxhash.cpp" >"$xx"
-  grep -q 'Yann Collet' "$xx" && grep -q 'BSD 2-Clause' "$xx" || { echo "homescoop_notice_llvm_support: no xxHash licence at the top of $s/xxhash.cpp" >&2; return 1; }
-  homescoop_notice "$label Support: regex (Henry Spencer, 4.4BSD; llvm/lib/Support/COPYRIGHT.regex)" "$s/COPYRIGHT.regex" -
-  homescoop_notice "$label Support: BLAKE3 (CC0-1.0 OR Apache-2.0; llvm/lib/Support/BLAKE3/LICENSE)" "$s/BLAKE3/LICENSE" -
+  local label="${2:-LLVM}" regex blake3 xx
+  if [[ -d "$1/llvm/lib/Support" ]]; then
+    local s="$1/llvm/lib/Support" f
+    for f in "$s/COPYRIGHT.regex" "$s/BLAKE3/LICENSE" "$s/xxhash.cpp"; do
+      test -s "$f" || { echo "homescoop_notice_llvm_support: missing $f" >&2; return 1; }
+    done
+    regex="$s/COPYRIGHT.regex" blake3="$s/BLAKE3/LICENSE"
+    xx="$WORK/notices/llvm-support-xxhash-LICENSE"
+    mkdir -p "$WORK/notices"
+    # xxhash.cpp's licence is its opening comment.
+    awk 'NR == 1 && !/^\/\*/ { exit 1 } { print } /\*\// { exit }' "$s/xxhash.cpp" >"$xx"
+  elif [[ -d "$1/share/licenses/llvm-support" ]]; then
+    local d="$1/share/licenses/llvm-support"
+    regex="$d/COPYRIGHT.regex" blake3="$d/BLAKE3-LICENSE" xx="$d/xxhash-LICENSE"
+  else
+    echo "homescoop_notice_llvm_support: $1 is neither an llvm-project tree nor a package with share/licenses/llvm-support" >&2
+    return 1
+  fi
+  test -s "$regex" && test -s "$blake3" && test -s "$xx" || { echo "homescoop_notice_llvm_support: a notice is missing in $1" >&2; return 1; }
+  grep -q 'Henry Spencer' "$regex" && grep -q 'BLAKE3\|CC0' "$blake3" && grep -q 'Yann Collet' "$xx" && grep -q 'BSD 2-Clause' "$xx" \
+    || { echo "homescoop_notice_llvm_support: unexpected notice text in $1" >&2; return 1; }
+  homescoop_notice "$label Support: regex (Henry Spencer, 4.4BSD; llvm/lib/Support/COPYRIGHT.regex)" "$regex" -
+  homescoop_notice "$label Support: BLAKE3 (CC0-1.0 OR Apache-2.0; llvm/lib/Support/BLAKE3/LICENSE)" "$blake3" -
   homescoop_notice "$label Support: xxHash (BSD-2-Clause; llvm/lib/Support/xxhash.cpp)" "$xx" -
+  LLVM_SUPPORT_NOTICES=("$regex" "$blake3" "$xx")
 }
 
 # Notices for a Rust wasm (homescoop#343): every crate it links, then

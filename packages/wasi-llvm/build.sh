@@ -89,12 +89,23 @@ done
 [[ "$("$INSTALL/bin/llvm-config" --targets-built)" == "WebAssembly" ]]
 
 DEST="$HOMESCOOP_PKG/package"
-rm -rf "$DEST/bin" "$DEST/include" "$DEST/lib"
+rm -rf "$DEST/bin" "$DEST/include" "$DEST/lib" "$DEST/share"
 mkdir -p "$DEST/bin"
 cp "$INSTALL/bin/llvm-config" "$DEST/bin/llvm-config"
 chmod 755 "$DEST/bin/llvm-config"
 cp -R "$INSTALL/include" "$INSTALL/lib" "$DEST/"
 cp "$INSTALL/LICENSE.TXT" "$DEST/LICENSE"
+# LLVM Support's third-party notices (homescoop#1046): in
+# THIRD-PARTY-NOTICES.md, and as files in share/licenses/llvm-support for the
+# programs that link these libraries (wasi-rustc, wasi-zig), which pass this
+# package to homescoop_notice_llvm_support.
+rm -rf "$DEST/share"
+homescoop_notices_begin "lib/libLLVMSupport.a compiles in the following third-party code from LLVM $VERSION (homescoop#1046); clang's and lld's LICENSE.TXT are LICENSE's text. The same files are in share/licenses/llvm-support."
+homescoop_notice_llvm_support "$SRC"
+mkdir -p "$DEST/share/licenses/llvm-support"
+cp "${LLVM_SUPPORT_NOTICES[0]}" "$DEST/share/licenses/llvm-support/COPYRIGHT.regex"
+cp "${LLVM_SUPPORT_NOTICES[1]}" "$DEST/share/licenses/llvm-support/BLAKE3-LICENSE"
+cp "${LLVM_SUPPORT_NOTICES[2]}" "$DEST/share/licenses/llvm-support/xxhash-LICENSE"
 if find "$DEST" -type l | grep -q .; then
   echo "homescoop: symlinks in the package" >&2
   find "$DEST" -type l >&2

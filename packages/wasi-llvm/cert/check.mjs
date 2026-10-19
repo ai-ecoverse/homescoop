@@ -54,6 +54,15 @@ const libs = ['LLVMCore', 'LLVMSupport', 'LLVMOption', 'LLVMWebAssemblyCodeGen',
   'clangFrontendTool', 'clangCodeGen', 'clangDriver', 'clangStaticAnalyzerCore', 'lldCommon', 'lldELF', 'lldWasm', 'lldCOFF', 'lldMachO', 'lldMinGW'];
 const missing = libs.filter((l) => !existsSync(join(pkg, 'lib', `lib${l}.a`)));
 check(missing.length === 0, `static libraries present${missing.length ? `; missing ${missing.join(', ')}` : ''}`);
+// homescoop#1046: LLVM Support's regex, BLAKE3 and xxHash notices, in
+// THIRD-PARTY-NOTICES.md (in files) and share/licenses/llvm-support.
+{
+  const notices = existsSync(join(pkg, 'THIRD-PARTY-NOTICES.md')) ? readFileSync(join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8') : '';
+  const support = readFileSync(join(pkg, 'lib/libLLVMSupport.a'), 'latin1');
+  const carried = [['regcomp.c.o', 'Henry Spencer', 'COPYRIGHT.regex'], ['blake3.c.o', 'BLAKE3', 'BLAKE3-LICENSE'], ['xxhash.cpp.o', 'Yann Collet', 'xxhash-LICENSE']].filter(([o]) => support.includes(o));
+  check(carried.length === 3 && carried.every(([, marker, file]) => notices.includes(marker) && existsSync(join(pkg, 'share/licenses/llvm-support', file))) && manifest.files?.includes('THIRD-PARTY-NOTICES.md'),
+    `THIRD-PARTY-NOTICES.md (in files) and share/licenses/llvm-support have the notices for what libLLVMSupport.a carries: ${carried.map(([o, m, f]) => `${o} ${notices.includes(m) && existsSync(join(pkg, 'share/licenses/llvm-support', f)) ? 'ok' : 'MISSING'}`).join(', ') || 'none found'}`);
+}
 const linkLibs = llvmConfig('--libs', '--link-static', 'core', 'support', 'webassembly', 'target', 'mc', 'passes', 'option', 'lto').split(/\s+/);
 check(linkLibs.every((l) => existsSync(join(pkg, 'lib', `lib${l.replace(/^-l/, '')}.a`))), `llvm-config --libs names ${linkLibs.length} libraries, all in lib/`);
 
