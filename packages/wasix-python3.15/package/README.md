@@ -2,6 +2,10 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.0-2
+
+**Needs slicc-kernel ≥ 1.122.3** (`engines`; it was ≥ 1.120.0). Older kernels could leave a sqlite `-journal` behind and wedge a shared sqlite database (homescoop#1152, fixed in slicc-kernel 1.122.3). The cert runs with kernel users enforced (homescoop#819).
+
 ## Since 3.15.0-1
 
 **CPython 3.15.0, a new ABI (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
@@ -59,8 +63,8 @@ Since 3.14.2-25 (wasix-sysroot -32):
   `SIG_IGN` from `signal.getsignal` on slicc-kernel ≥ 1.108.0 (homescoop#740).
 - **Kernel conditions.** -24's lift of the 256-named-semaphore limit holds
   only on slicc-kernel ≥ 1.102.2 (#770/#773). On 1.100.x a process still
-  stops at about 250 (homescoop#698). The `engines` floor (≥ 1.120.0 since
-  3.14.2-28, ≥ 1.100.0 before) is enforced from slicc-kernel 1.106.2 on (slicc-kernel#797/#806): those kernels
+  stops at about 250 (homescoop#698). The `engines` floor (≥ 1.122.3 since
+  3.15.0-2, ≥ 1.120.0 since 3.14.2-28, ≥ 1.100.0 before) is enforced from slicc-kernel 1.106.2 on (slicc-kernel#797/#806): those kernels
   refuse the commands on an older kernel. Kernels before 1.106.2 install the
   package without a warning, and there `fcntl` locks aren't real below
   1.100.0 (homescoop#651).

@@ -100,7 +100,8 @@ jobs:
   recipe-sha:
     needs: detect
     if: github.event_name == 'pull_request' && needs.detect.outputs.host != '[]'
-    runs-on: ubuntu-latest
+    # Same-repo heads on the light pool; a fork head's refresh-recipe-sha.mjs runs hosted.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: write
     outputs:
@@ -120,6 +121,7 @@ jobs:
         env:
           HOST: ${{ needs.detect.outputs.host }}
           GH_TOKEN: ${{ github.token }}
+          RECIPE_SHA_BASE: origin/${{ github.base_ref }}
         run: |
           set -euo pipefail
           # This job checks out the PR head (to push), so a branch from before #1019 has a
@@ -131,7 +133,7 @@ jobs:
             echo "::warning::recipe-sha: this branch's refresh-recipe-sha.mjs predates the verdict line (#1019); merge main to get the wrapped check"
           fi
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack
+            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack --verify-tree
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.
@@ -350,6 +352,8 @@ jobs:
           set -euo pipefail
           tag=$(node scripts/npm-tag.mjs "${{ matrix.package }}")
           node scripts/gate.mjs npm-parity -- node scripts/npm-parity.mjs .homescoop-out/package.tgz --tag "$tag" --drift fail
+      - name: A threaded bulk-memory module records its sized initial heap (homescoop#1287)
+        run: node scripts/gate.mjs threaded-heap -- node scripts/check-threaded-heap.mjs "${{ matrix.package }}" .homescoop-out/package.tgz
 
   test:
     needs: [detect, recipe-sha, host-build]
@@ -583,7 +587,8 @@ jobs:
   # way ladder-merge will at the push (docs/ladder-builds.md, merge queue).
   group:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    # merge_group and workflow_dispatch are trusted events (the queue's or a maintainer's head), so the light pool.
+    runs-on: ${{ (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       actions: read

@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.120.2",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.125.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
@@ -87,7 +87,9 @@
     "3.15.0-1, cert-review round 1 (homescoop#1140, #1141, #1142, #1145, #1146): a start is quiet (lib-dynload README, version.mjs); checklist/round17/stdlib/native-id read the version of the installed wasix-python; discovery's pure fallback builds its layouts from the loadable py-* only; THIRD-PARTY-NOTICES.md has expat's MIT notice, which 3.15's Doc/license.rst pulls in by literalinclude (build.sh resolves includes; notices.mjs wants 'Clark Cooper' and no include directive). cert/stdout-buffer.mjs: python3 -c ... | cat reports line_buffering True, isatty False; > file False; -u and PYTHONUNBUFFERED write-through; a line printed before time.sleep(3) reaches a piped python reader ~3 s before the writer exits (cpython-stdout-line-buffer-nonreg.patch; passes on -28 too)",
     "3.15.0-1: discovery.mjs's cost bound measures discover() against PYTHONPATH with the same py-* directories, the refused cp314 ones included (discover() reads them too; with only the 4 loadable ones on PYTHONPATH the bound failed on loaded CI runners at 1.2-1.3x). sqlite-vfs.mjs reports the writer processes' last stderr line when one fails",
     "3.15.0-1 on wasix-sysroot 2025.9.30-38 (build.sh's HOMESCOOP_WASIX_SYSROOT_VERSION/SHA override; -37's Linux S_IF* bits, -38's poll; RM decision on #1138): engines stays >=1.120.0, cert kernel 1.120.2 (the floor), every spec as before. package.json homescoop.recipe is wasix-python3.15 (#1154)",
-    "3.15.0-1, #211 phase B (cc7e's spec on #1138): python.wasm links wasix-sysroot -38's own sysroot-ehpic libc++/libc++abi/libunwind instead of upstream wasix-libc v2026-07-03.1's (same llvm 6bb93a24, same defined globals, include/c++ identical); build.sh checks _Unwind_CallPersonality (libunwind), __cxa_thread_atexit (libc++abi) and a plain-data __wasm_lpad_context (D, libunwind) before linking; no slicc.python.requires.cxxrt marker (nothing incompatible). test/side-abi.mjs and side-modules.json unchanged. The libc++ notice names wasix-sysroot"
+    "3.15.0-1, #211 phase B (cc7e's spec on #1138): python.wasm links wasix-sysroot -38's own sysroot-ehpic libc++/libc++abi/libunwind instead of upstream wasix-libc v2026-07-03.1's (same llvm 6bb93a24, same defined globals, include/c++ identical); build.sh checks _Unwind_CallPersonality (libunwind), __cxa_thread_atexit (libc++abi) and a plain-data __wasm_lpad_context (D, libunwind) before linking; no slicc.python.requires.cxxrt marker (nothing incompatible). test/side-abi.mjs and side-modules.json unchanged. The libc++ notice names wasix-sysroot",
+    "3.15.0-2 (homescoop#1152, #819): engines slicc-kernel >=1.122.3 (was >=1.120.0): slicc-kernel 1.122.3 (kernel#950) fixed the sqlite -journal ghost that could wedge a shared sqlite db (bisected by ev53: 12/12 on 1.122.2, 0/24 on 1.122.3); the cert kernel moves from 1.120.2 to 1.125.0. Every spec runs with users: enforce (#819). No source change"
   ],
-  "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS."
+  "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS.",
+  "users": "enforce"
 }

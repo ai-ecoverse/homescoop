@@ -8,6 +8,11 @@ pnpm add -g @ai-ecoverse/wasm-bash
 bash -i
 ```
 
+It needs slicc-kernel 1.130.2 or later (`engines`, since 5.3.0-21). On older
+kernels a ^C that arrives while an interactive bash forks a job can end bash
+with exit 130 instead of returning it to its prompt (homescoop#1230,
+slicc-kernel#1146).
+
 ## Users (5.3.0-13, slicc-kernel ≥ 1.44.0)
 
 bash runs as the user the kernel says. `$UID`, `$EUID`, `$GROUPS`, `~` and the

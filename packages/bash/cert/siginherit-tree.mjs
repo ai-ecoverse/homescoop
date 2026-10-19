@@ -1,11 +1,12 @@
 /**
- * The strict half of cert/siginherit.mjs, on slicc-kernel 1.122.0, which
- * reports inherited ignores through sliccKernel.sigInherited() before the
+ * The strict half of cert/siginherit.mjs. From 5.3.0-21 the cert kernel
+ * (1.130.2, past 1.122.0) reports inherited ignores through sliccKernel.sigInherited() before the
  * program's constructors run (slicc-kernel#967). shims/slicc's constructor
  * seeds them into the sigaction table (homescoop#973), so a child bash's
  * trap -p shows the parent's ignore, as on Linux, two levels down too, and
  * only for the signals the parent ignored; a subshell's ignore does not leak. 5.3.0-19 has no constructor, and
- * its child prints nothing. Run from cert/meta.json extra_kernels.
+ * its child prints nothing. Ran as an extra_kernels row on 1.122.0 until
+ * 5.3.0-21's engines (>=1.130.2) made the cert kernel itself have the hook.
  */
 export default async function (ctx) {
   const { run, assert } = ctx;

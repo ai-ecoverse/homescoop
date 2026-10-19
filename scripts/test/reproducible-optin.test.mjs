@@ -16,7 +16,6 @@ const ALLOW = new Map([
   ['bash', 808],
   ['binutils', 808],
   ['bzip2', 808],
-  ['cmake', 808],
   ['coreutils', 808],
   ['curl', 808],
   ['diffutils', 808],

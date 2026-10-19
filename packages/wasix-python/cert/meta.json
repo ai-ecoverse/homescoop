@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.120.2",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.125.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
@@ -82,7 +82,9 @@
     "cert kernel 1.108.4 (certified; was 1.100.0) and the published range wave (py-numpy 2.3.2-10, \u2026, py-matplotlib 3.11.2-9, homescoop#702) in needsInstall with noRepin true: fixtures/repin.mjs accepts a py-* whose >=X.Y.Z-N <X.Y.Z+1 range holds the python under test, and nothing nested is moved; _slicc_site accepts an unresolvable py-* whose declared range holds this python",
     "3.14.2-26 (homescoop#890, #984; wasix-sysroot 2025.9.30-34 through build.sh's HOMESCOOP_WASIX_SYSROOT_VERSION/SHA override until #984 flips the default): fcntl.flock is libc's flock (slicc.flock, per open file description), no longer build.sh's --wrap=flock no-op (lock_stubs.c is gone). cert/flock.mjs on slicc-kernel 1.120.2 (extra_kernels): a second process's LOCK_EX|LOCK_NB is refused while the first holds LOCK_EX and granted after LOCK_UN; LOCK_EX on a read-only file excludes a second read-only open until close; a pipe's other end is refused and a dup of the locked end shares it. On kernels before 1.117.0, flock is libc's whole-file fcntl lock. os.forkpty() no longer hints at PYTHON_FORK=true, since neither build has it (#783, cert/fork-hint.mjs). The README says the fork start method exists under PYTHON_FORK=true (#784). The wasix-libc notice comes from v2026-07-03.1",
     "3.14.2-27 (homescoop#890): a rebuild against wasix-zlib 1.3.1-3 and wasix-openssl 3.5.9-4, both built on wasix-sysroot -34. -26's 1.3.1-2 and 3.5.9-3 inputs expired when their -34 successors were attested. No source change; every spec as before",
-    "3.14.2-28 (homescoop#1018): engines.slicc-kernel >=1.120.0 and cert kernel 1.120.2. os.mkfifo, which configure finds since -26 (wasix-sysroot -34), is ENOSYS on kernels before 1.120.0. cert/mkfifo.mjs: os.mkfifo makes a FIFO (0o644 under umask 022), a second mkfifo is EEXIST, and a writer thread's line comes through it. cert/fork.mjs (PYTHON_FORK=true, slicc-kernel#859) and cert/flock.mjs (slicc.flock) now run on the cert kernel instead of as extra kernels"
+    "3.14.2-28 (homescoop#1018): engines.slicc-kernel >=1.120.0 and cert kernel 1.120.2. os.mkfifo, which configure finds since -26 (wasix-sysroot -34), is ENOSYS on kernels before 1.120.0. cert/mkfifo.mjs: os.mkfifo makes a FIFO (0o644 under umask 022), a second mkfifo is EEXIST, and a writer thread's line comes through it. cert/fork.mjs (PYTHON_FORK=true, slicc-kernel#859) and cert/flock.mjs (slicc.flock) now run on the cert kernel instead of as extra kernels",
+    "3.14.2-29 (homescoop#1152, #819): engines slicc-kernel >=1.122.3 (was >=1.120.0): slicc-kernel 1.122.3 (kernel#950) fixed the sqlite -journal ghost that could wedge a shared sqlite db (bisected by ev53: 12/12 on 1.122.2, 0/24 on 1.122.3); the cert kernel moves from 1.120.2 to 1.125.0. Every spec runs with users: enforce (#819). No source change"
   ],
-  "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS."
+  "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS.",
+  "users": "enforce"
 }

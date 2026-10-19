@@ -1,0 +1,99 @@
+--- a/Utilities/cmlibuv/CMakeLists.txt
++++ b/Utilities/cmlibuv/CMakeLists.txt
+@@ -327,6 +327,21 @@
+     )
+ endif()
+ 
++if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
++  list(APPEND uv_headers
++    include/uv/posix.h
++    )
++  list(APPEND uv_defines
++    _GNU_SOURCE
++    )
++  list(APPEND uv_sources
++    src/unix/posix-hrtime.c
++    src/unix/posix-poll.c
++    src/unix/no-fsevents.c
++    src/unix/no-proctitle.c
++    )
++endif()
++
+ include_directories(
+   ${uv_includes}
+   ${KWSYS_HEADER_ROOT}
+--- a/Utilities/cmlibuv/include/uv/unix.h
++++ b/Utilities/cmlibuv/include/uv/unix.h
+@@ -73,6 +73,7 @@
+       defined(__MSYS__)   || \
+       defined(__HAIKU__)  || \
+       defined(__QNX__)    || \
++      defined(__EMSCRIPTEN__) || \
+       defined(__GNU__)
+ # include "posix.h"
+ #endif
+--- a/Utilities/cmlibuv/src/unix/process.c
++++ b/Utilities/cmlibuv/src/unix/process.c
+@@ -905,6 +905,16 @@
+   return 0;
+ }
+ 
++#if defined(__EMSCRIPTEN__)
++/* homescoop: slicc's realm has no fork. shims/slicc's slicc_spawn_capture
++ * starts the child as a kernel process on the child ends of the stdio pipes
++ * (-1: closed) and returns its pid, or -errno; waitpid and SIGCHLD then come
++ * through the kernel (slicc_poll, slicc_wait). */
++extern char** environ;
++int slicc_spawn_capture(const char *file, char *const *argv, char *const *envp,
++                        const char *cwd, int in_fd, int out_fd, int err_fd);
++#endif
++
+ static int uv__spawn_and_init_child(
+     uv_loop_t* loop,
+     const uv_process_options_t* options,
+@@ -917,6 +927,24 @@
+   int exec_errorno;
+   ssize_t r;
+ 
++#if defined(__EMSCRIPTEN__)
++  {
++    int fds[3];
++    int fd;
++    int child;
++    for (fd = 0; fd < 3; fd++)
++      fds[fd] = fd < stdio_count ? pipes[fd][1] : -1;
++    child = slicc_spawn_capture(options->file, options->args,
++                                options->env != NULL ? options->env : environ,
++                                options->cwd, fds[0], fds[1], fds[2]);
++    (void) signal_pipe; (void) status; (void) err; (void) exec_errorno; (void) r;
++    if (child < 0)
++      return child;
++    *pid = child;
++    return 0;
++  }
++#endif
++
+ #if defined(UV_USE_APPLE_POSIX_SPAWN)
+   uv_once(&posix_spawn_init_once, uv__spawn_init_posix_spawn);
+ 
+--- a/Utilities/cmlibuv/src/unix/thread.c
++++ b/Utilities/cmlibuv/src/unix/thread.c
+@@ -898,7 +898,7 @@
+ }
+ 
+ #if defined(_AIX) || defined(__MVS__) || defined(__PASE__) || \
+-    defined(SUNOS_NO_PTHREAD_NAME)
++    defined(SUNOS_NO_PTHREAD_NAME) || defined(__EMSCRIPTEN__)
+ int uv__thread_setname(const char* name) {
+   return UV_ENOSYS;
+ }
+@@ -940,7 +940,8 @@
+     defined(_AIX) || \
+     defined(__MVS__) || \
+     defined(__PASE__) || \
+-    defined(SUNOS_NO_PTHREAD_NAME)
++    defined(SUNOS_NO_PTHREAD_NAME) || \
++    defined(__EMSCRIPTEN__)
+ int uv__thread_getname(uv_thread_t* tid, char* name, size_t size) {
+   return UV_ENOSYS;
+ }

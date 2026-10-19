@@ -1,0 +1,22 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.110.7",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-gmake"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-20",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-10",
+    "@ai-ecoverse/wasm-gmake@4.4.1-7"
+  ],
+  "checklist": [
+    "cmake --version is cmake version 4.4.3; cmake -E echo prints its argument (cert/cmake.mjs, as a non-root user under users enforce)",
+    "cmake -P runs execute_process(COMMAND bash -c ...) through the kernel's spawn (output and result 0), string(SHA256), file(WRITE), and reports CMAKE_ROOT as the manifest's ${package}/share/cmake-4.4 (cmake-root-env.patch)",
+    "a LANGUAGES NONE project configures with -G \"Unix Makefiles\" (configure_file, a cache variable from -D), and cmake --build runs wasm-gmake, whose recipe calls cmake -E copy and echo_append; a second build does nothing; the files it writes belong to the user",
+    "cmake.wasm imports slicc_cred_js, slicc_sig_inherited_js and slicc_poll_js: it links today's shims/slicc (credentials #459, inherited ignores #973, libuv's poll in the kernel). 4.4.3-9 imports none of the first two (NEGATIVE.md)",
+    "4.4.3-10 (homescoop#859 stage G): built in CI from the cmake 4.4.3 release tarball (sha256) with emcmake from the patched emscripten 6.0.9 tree (scripts/emscripten-tree.sh), libuv-emscripten.patch, cmake-root-env.patch and host-emscripten-is-wasi.patch; no build path in cmake.wasm; reproducible"
+  ]
+}

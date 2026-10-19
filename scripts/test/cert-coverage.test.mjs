@@ -19,7 +19,6 @@ const HOST_HARNESSES = ['host-node', 'host-smoke'];
 
 // Recipes that ship but have no cert/ at all.
 const NO_CERT = [
-  'cmake', // #426
   'libjpeg-turbo', // #426
   'openjpeg', // #426
 ];
@@ -36,8 +35,6 @@ const NO_USERS_ENFORCE = [
   'wasi-ripgrep', // #819
   'wasi-uv', // #772
   'wasix-perl', // #819
-  'wasix-python', // #819
-  'wasix-python3.15', // #819, the 3.15 wave dir (#1138)
   'wasix-ruby', // #819
 ];
 

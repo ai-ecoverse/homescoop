@@ -55,3 +55,13 @@ test('a head whose script prints its verdict passes through the wrapper, with no
   assert.match(r.stdout, /recipe-sha: PASS 1 recipe/);
   assert.doesNotMatch(r.stdout, /::warning::recipe-sha/);
 });
+
+test('a pre-#1267 head, whose script takes every non-flag argument as a package, still gets only the package (the base goes in RECIPE_SHA_BASE)', () => {
+  const r = runWith(
+    "const names = process.argv.slice(2).filter((a) => !a.startsWith('-'));\n" +
+      "if (names.join() !== 'pkg') { console.log('recipe-sha: FAIL ' + names.join()); process.exit(1); }\n" +
+      "console.log('recipe-sha: PASS 1 recipe');\n"
+  );
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /recipe-sha: PASS 1 recipe/);
+});

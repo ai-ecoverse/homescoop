@@ -1,7 +1,7 @@
 {
   "harness": "slicc-kernel",
   "users": "enforce",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.73.2",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.130.2",
   "needs": [
     "@ai-ecoverse/wasm-coreutils",
     "@ai-ecoverse/wasix-perl"
@@ -30,19 +30,13 @@
     "cert/ulimit.mjs (5.3.0-19, homescoop#178, shims/slicc/slicc_libc_gaps.c __syscall_prlimit64 + prlimit): as root and as kernel.users.add({name:'cone'}): ulimit -S -n / -H -n start at 4096 / 4096; ulimit -S -n 64 and ulimit -S -c 0 succeed and stick (64, 0); a subshell (fork) sees 64; ulimit -H -n 8192 fails 'cannot modify limit: Operation not permitted' (hard limits only go down, root too); ulimit -S -n 5000 over the hard limit fails 'Invalid argument'; ulimit -H -n 1024 succeeds, then ulimit -n 2048 fails EPERM; a new bash (exec) starts at 4096 again (slicc-kernel keeps no limits); ulimit -a shows open files 64 and core file size unlimited. 5.3.0-18: every change 'Operation not permitted' (NEGATIVE.md)",
     "cert/symloop.mjs (5.3.0-19, scripts/emsdk-patches/libfs-symloop.patch, homescoop#611 / #461): bin/bash's FS.lookupPath has nlinks <= 40; bash's own redirections (echo hi >, read <) and [ -e ] work through chains of 39 and 40 symlinks, and the 41st follow is 'Symbolic link loop' (rc 1), as on Linux. 5.3.0-18: the 40-link redirect is ELOOP (NEGATIVE.md)",
     "cert/siginherit.mjs (homescoop#973, shims/slicc/slicc_signals.c): a constructor seeds the sigaction table with SIG_IGN for each signal the kernel's sliccKernel.sigInherited() reports (bit n = signal n; only SIG_DFL entries, never SIGKILL/SIGSTOP, never a handler). On a kernel without the hook (the cert kernel today) the child of trap '' PIPE starts with defaults: bash -c 'trap -p PIPE' prints nothing, rc 0, no trap; a trap set in the same shell shows trap -- '' SIGPIPE. With the hook (slicc-kernel#967) the child prints trap -- '' SIGPIPE; that strict row comes with the kernel",
-    "cert/k122/siginherit.mjs (5.3.0-20, homescoop#973, on slicc-kernel 1.122.0): after trap '' PIPE, a child bash's trap -p shows exactly trap -- '' SIGPIPE (no TERM); a grandchild under trap '' PIPE INT shows both; an ignore set in a finished subshell is not inherited. 5.3.0-19's child shows nothing (NEGATIVE.md)",
-    "cert/fork-sigint.mjs (homescoop#1230, smoke row): a fresh interactive bash per round, its first forked job (sleep 5, sleep 5 | cat), ^C 0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 60, 80, 120, 200 and 300 ms after Enter: bash is back at its prompt, runs echo after, and exits 0 (no exit 130, it keeps the terminal). Page-side timing can't land the ^C at proc-fork with the child's setpgid held, so this is a smoke row: 5.3.0-19 and -20 both pass it on slicc-kernel 1.73.2 and 1.125.4. The strict row with the NEGATIVE (-20 exits 130 before slicc-kernel#1146) waits for slicc-kernel/testing's fork hooks"
+    "cert/siginherit-tree.mjs (5.3.0-20, homescoop#973; on slicc-kernel 1.122.0 as an extra kernel until 5.3.0-21, now on the cert kernel 1.130.2): after trap '' PIPE, a child bash's trap -p shows exactly trap -- '' SIGPIPE (no TERM); a grandchild under trap '' PIPE INT shows both; an ignore set in a finished subshell is not inherited. 5.3.0-19's child shows nothing (NEGATIVE.md)",
+    "cert/fork-sigint.mjs (homescoop#1230, smoke row): a fresh interactive bash per round, its first forked job (sleep 5, sleep 5 | cat), ^C 0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 60, 80, 120, 200 and 300 ms after Enter: bash is back at its prompt, runs echo after, and exits 0 (no exit 130, it keeps the terminal). Page-side timing can't land the ^C at proc-fork with the child's setpgid held, so this is a smoke row: 5.3.0-19 and -20 both pass it on slicc-kernel 1.73.2 and 1.125.4. The strict row with the NEGATIVE (-20 exits 130 before slicc-kernel#1146) waits for slicc-kernel/testing's fork hooks",
+    "test/fork-sigint.mjs (ci, homescoop#1230, slicc-kernel 1.130.2's setTestSyscallHook, users enforce, 3 rounds): an interactive bash in a terminal; at its first proc-fork the hook writes ^C, and the child's next proc-setpgid is held 300 ms; then echo \"after\": [child forked, bash still running, after printed] = [true, null, true]. A regression guard for slicc-kernel#1146's fix: 5.3.0-19 and -20 both pass on 1.130.2. On 1.129.0 (the hook, not the fix) 5.3.0-20 gives [true, 130, false] and -19 passes (NEGATIVE.md)",
+    "package.json engines slicc-kernel >=1.130.2 (5.3.0-21, homescoop#1230): the first kernel with slicc-kernel#1146, so this bash can't be installed where a ^C during fork ends an interactive bash with 130; the cert kernel is 1.130.2 too, and every spec passes there (local run.mjs, users enforce)"
   ],
   "uplink": true,
-  "extra_kernels": [
-    {
-      "kernel": "@ai-ecoverse/slicc-kernel@1.122.0",
-      "why": "sliccKernel.sigInherited() before constructors (slicc-kernel#967) behind shims/slicc's sigaction seed (homescoop#973): cert/k122/siginherit.mjs, the strict branch of cert/siginherit.mjs",
-      "specs": [
-        "siginherit.mjs"
-      ],
-      "cert": "k122",
-      "users": "enforce"
-    }
+  "ci": [
+    "node packages/bash/test/fork-sigint.mjs --tarball .homescoop-out/package.tgz --kernel @ai-ecoverse/slicc-kernel@1.130.2"
   ]
 }

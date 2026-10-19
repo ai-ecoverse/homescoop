@@ -159,12 +159,23 @@ The published 5.3.0-19 also has 7 occurrence(s) of the CI build directory `/tmp/
 
 5.3.0-20 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 5.3.0-19 too; the negative is the #908 check.
 
-## cert/k122/siginherit.mjs on slicc-kernel 1.122.0 (homescoop#973, slicc-kernel#967)
+## cert/siginherit-tree.mjs (was cert/k122/siginherit.mjs, an extra kernel row on 1.122.0; homescoop#973, slicc-kernel#967)
 
-On 1.122.0 the kernel reports inherited ignores before constructors run, so `cert/k122/siginherit.mjs` has no lenient branch. The published 5.3.0-19 fails it:
+On 1.122.0 the kernel reports inherited ignores before constructors run, so `cert/siginherit-tree.mjs` has no lenient branch. The published 5.3.0-19 fails it:
 
 ```text
 AssertionError: the child bash shows the inherited SIGPIPE ignore, and no TERM trap: ""
 ```
 
 5.3.0-20 passes. The child shows `trap -- '' SIGPIPE`. A grandchild under `trap '' PIPE INT` shows both. An ignore set in a finished subshell is not inherited.
+
+## A ^C while bash forks, with the child's setpgid held (homescoop#1230)
+
+`test/fork-sigint.mjs` (the `ci` check) on slicc-kernel 1.129.0, which has `setTestSyscallHook` but not slicc-kernel#1146's fix (users enforce, 2026-10-19):
+
+```text
+wasm-bash 5.3.0-20: AssertionError: round 1: [child forked, bash exit, "after" printed] … actual [true, 130, false], expected [true, null, true]
+wasm-bash 5.3.0-19: 3 rounds … bash keeps the terminal and reads its next line
+```
+
+On 1.130.2 (the fix), both 5.3.0-19 and -20 pass, so this is the regression guard. The kernel's own row (`test/integration/settling-inherited.test.mjs`) fails the same way on 1.129.0 with -20.
