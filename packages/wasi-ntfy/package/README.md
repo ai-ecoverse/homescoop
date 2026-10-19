@@ -74,6 +74,15 @@ command. `NTFY_TITLE`, `NTFY_MESSAGE`, `NTFY_TAGS`, `NTFY_PRIORITY` and
 should `unset ${!NTFY_*}` first. Otherwise its `ntfy pub` takes the incoming
 message's topic and fields.
 
+The command runs as the user who started `ntfy sub`, with that user's
+privileges, files and environment. Treat everything in a message (`NTFY_*`)
+as untrusted input: anyone who can publish to the topic, or post to a hook
+URL of it, chooses those values. They arrive as data in the environment, so a
+message's `$(…)` or backticks are not run unless the command itself `eval`s
+them. Quote them (`"$NTFY_MESSAGE"`), and never paste them into a shell
+command line. `--token` is not passed to the command's environment;
+`NTFY_TOKEN` is, if you set it in ntfy's own.
+
 ## The gateway's contract
 
 | The gateway | What the client does |

@@ -17,6 +17,10 @@
     "~/.config/ntfy/client.yml default-host and default-token apply to ntfy pub and ntfy sub (checklist.mjs)",
     "ntfy sub --poll --since all prints each message's JSON; with a command it runs sh -c once per message, in order, with NTFY_ID, NTFY_TITLE, NTFY_MESSAGE, NTFY_TOPIC and NTFY_RAW (attachment.url included) and a 60 KiB message line (checklist.mjs)",
     "ntfy pub --wait-pid fails with a clear error and sends nothing (checklist.mjs)",
+    "ntfy pub -u user:pass sends Basic auth; -p, --tags and --click send X-Priority, X-Tags and X-Click; --file sends the file as the body with X-Filename; a message piped through bash's stdin is sent (options.mjs)",
+    "ntfy pub --wait-cmd runs the command through the host's spawn and publishes 'Command failed after … (exit code 3): sh -c 'exit 3'' or 'Command succeeded after …: true' (options.mjs)",
+    "ntfy sub --from-config --poll runs each client.yml subscription's own command with its own token (options.mjs)",
+    "the per-message command runs as the invoking user (id -un → cone), --token is not in its environment, and $(…), backticks and ; in a message stay data (command-env.mjs)",
     "a subscribe-only token's publish gets 403 and exits non-zero; no token or a forged one gets 401 and exits non-zero (auth.mjs)",
     "ntfy sub with a forged token exits 1 after one request (no retry loop); a token revoked mid-stream ends ntfy sub after the reconnect's 401 (auth.mjs)",
     "a publish answered 429 with retry-after: 3 is sent again after 3 s and succeeds, and a --file upload is sent again whole after retry-after: 2; retry-after: 600 fails at once with one request (ratelimit.mjs)",
@@ -27,7 +31,7 @@
     "test/e2e/ntfy.test.mjs (Node entry, a real streaming server): a message's command runs before the next line is sent (it acks with a nested ntfy pub), a 60 KiB line split across chunks, Bearer auth, the missing host module"
   ],
   "patches": {
-    "0001-wasip1-slicc-host.patch": "every spec: the package does not build for wasip1 without it (cert/NEGATIVE.md). HTTP through ntfy_host in checklist.mjs and the missing-host case in z-missing-host.mjs; spawn of sh -c with the NTFY_* environment in checklist.mjs; --wait-pid's error in checklist.mjs; the per-line yield in test/e2e/ntfy.test.mjs.",
+    "0001-wasip1-slicc-host.patch": "every spec: the package does not build for wasip1 without it (cert/NEGATIVE.md). HTTP through ntfy_host in checklist.mjs and the missing-host case in z-missing-host.mjs; spawn of sh -c with the NTFY_* environment in checklist.mjs; --wait-pid's error in checklist.mjs; --wait-cmd through the host's spawn in options.mjs; the command's user and environment in command-env.mjs; the per-line yield in test/e2e/ntfy.test.mjs.",
     "0002-gateway-contract.patch": "since= resume and de-duplication in reconnect.mjs; Retry-After in ratelimit.mjs; 401/403 ending ntfy sub in auth.mjs; the 1 MiB refusal in size.mjs. Built without it, those specs fail (cert/NEGATIVE.md)."
   }
 }
