@@ -665,8 +665,7 @@ changes the boot order for every cert.
   sha, so the gate's own `runs-on` checks only the event and ref (a
   same-repo PR, or a trusted event on main) and it runs nothing from the
   refs it checks; plan, shards and report run where it says.
-  The org requires approval before an outside contributor's workflow runs,
-  and agents never approve one.
+  The org requires approval before an outside contributor's workflow runs.
   `compat.mjs plan` also takes only registry versions and dist-tags for the
   kernel and for `name@version` in `set`, so `npm pack` never fetches a git
   or file spec.

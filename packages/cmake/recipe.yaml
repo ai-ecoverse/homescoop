@@ -1,14 +1,16 @@
-# Homebrew-shaped recipe — CMake as a wasm tool (ladder rung_cmake / build-wasm-cmake.sh).
 name: cmake
 builder: host
+reproducible: true
 # renovate: datasource=github-releases depName=Kitware/CMake extractVersion=^v(?<version>.*)$
 version: "4.4.3"
 npm: "@ai-ecoverse/wasm-cmake"
 summary: "CMake built for slicc (wasm tool)"
 source:
-  # Prebuilt by slicc-emscripten/build-wasm-cmake.sh; build.sh stages that artifact.
   url: "https://github.com/Kitware/CMake/releases/download/v{{version}}/cmake-{{version}}.tar.gz"
   sha256: "c46400618b4f1f2b43507f24fb22f3ae830c3416cf23b776e16e1d413aa892f0"
+inputs:
+  - "packages/wasm-emscripten/patches/**"
+  - "packages/wasm-emscripten/package/package.json"
 dependencies:
   build: []
   host: []
@@ -17,7 +19,13 @@ about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake
   license: BSD-3-Clause
   notes: |
-    Relink slicc-emscripten/build/cmake-wasm-build against libslicc.
-    Recompile sig-layout-sources.txt (sigaction/sigset_t) before link;
-    slicc-sig-layout-guard.py fails if a new linked source appears.
-    PRESTAGE is scripts/smoke-cmake.mjs (not --version).
+    CMake built in CI from the release tarball with emcmake from the patched
+    emscripten 6.0.9 tree on emsdk 6.0.9's prebuilt compilers
+    (scripts/emscripten-tree.sh), homescoop#859 stage G. Patches:
+    libuv-emscripten.patch (cmlibuv on Emscripten: the posix poll backend, no
+    thread names, and uv_spawn through shims/slicc's slicc_spawn_capture since
+    the realm has no fork), cmake-root-env.patch (CMAKE_ROOT from the environment,
+    since slicc runs the binary as /usr/bin/cmake away from its share tree),
+    host-emscripten-is-wasi.patch (CMakeDetermineSystem maps the Emscripten
+    host to WASI). Linked against shims/slicc (spawn, select/poll, signals,
+    credentials). PRESTAGE is scripts/smoke-cmake.mjs (not --version).

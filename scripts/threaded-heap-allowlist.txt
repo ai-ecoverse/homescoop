@@ -1,0 +1,19 @@
+# Packages with a threaded bulk-memory main module (a shared memory plus
+# memory.fill/memory.copy) whose recipe has no wasm: { initial-memory,
+# measured-peak, measured-by } yet (homescoop#1287, slicc-kernel#1172).
+# "<recipe> #<issue> <reason>". scripts/check-threaded-heap.mjs fails a line
+# whose package gets the fields or stops being threaded: drop it then.
+jq #1287 wasixcc build; sized at its next build
+wasi-biome #1287 Rust (rust-std's bundled wasi-libc); the shared allocator refresh (g86d), then sizing
+wasi-cargo #1287 Rust; the shared allocator refresh (g86d), then sizing
+wasi-impeccable #1287 Rust; the shared allocator refresh (g86d), then sizing
+wasi-pnpm #1287 Rust; -15/-16 link a 256 MiB initial heap and the 0009 allocator refresh; the recipe fields come at its next build (g86d)
+wasi-rustc #1287 Rust; the shared allocator refresh (g86d), then sizing
+wasi-uv #1287 Rust; the shared allocator refresh (g86d), then sizing
+wasi-zig #1287 the shared allocator refresh (g86d), then sizing
+wasix-m4 #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
+wasix-perl #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
+wasix-python #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
+wasix-python3.15 #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
+wasix-ruby #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
+wasix-websocat #1287 Rust on wasix; the shared allocator refresh, then sizing

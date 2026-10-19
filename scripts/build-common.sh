@@ -17,6 +17,10 @@ homescoop_load_recipe() {
   eval "$(node "$HOMESCOOP_ROOT/scripts/recipe-env.mjs" "$name" "$@")"
   export HOMESCOOP_PKG="$HOMESCOOP_ROOT/packages/$name"
   : "${HOMESCOOP_PKG:?}" "${VERSION:?}"
+  # homescoop#1287: wasixcc links the recipe's sized initial heap (wasm.initial-memory).
+  if [[ -n "${WASM_INITIAL_MEMORY:-}" && ":${WASIXCC_LINKER_FLAGS:-}:" != *":--initial-memory=$WASM_INITIAL_MEMORY:"* ]]; then
+    export WASIXCC_LINKER_FLAGS="${WASIXCC_LINKER_FLAGS:+$WASIXCC_LINKER_FLAGS:}--initial-memory=$WASM_INITIAL_MEMORY"
+  fi
   # Primary load must export SRC_URL/SRC_SHA; secondary loads only PREFIX_* vars.
   if [[ "$*" != *"--source"* ]]; then
     : "${SRC_URL:?}" "${SRC_SHA:?}"

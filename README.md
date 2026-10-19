@@ -54,6 +54,10 @@ npm run reserve   # 0.0.0 stubs (NPM_TOKEN)
 npm login && npm run trust   # fledgling → ladder-build.yml
 ```
 
+## Release notes
+
+- [Python 3.15 for slicc](docs/release-notes/python-3.15.md): wasix-python moves to CPython 3.15, along with pandas 3 and Pillow 13, and what changes for your code.
+
 ## Upstream bumps
 
 [Renovate](docs/renovate.md) opens PRs on recipe versions. After merge,
@@ -115,6 +119,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) (dist-tag `python3.15`) | [recipe](packages/py-kiwisolver3.15) | kiwisolver for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
+| [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) (dist-tag `python3.15`) | [recipe](packages/py-matplotlib3.15) | matplotlib Agg for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy 2.3.2 for slicc WASIX CPython 3.14 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) (dist-tag `python3.15`) | [recipe](packages/py-numpy3.15) | NumPy 2.5.4 for slicc WASIX CPython 3.15 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |

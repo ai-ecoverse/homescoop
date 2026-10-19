@@ -1,13 +1,9 @@
 # cmake (emscripten ABI)
-Not linked against wasix-libc; F_SETFD wasix fix N/A.
-Relink of slicc-emscripten `build/cmake-wasm-build` (objects from 2026-09-24).
-`build.sh` recompiles the sigaction/sigset_t layout allowlist before link
-(`packages/cmake/sig-layout-sources.txt`). `--version` is not a sufficient smoke.
+
+Built in CI from the cmake 4.4.3 release tarball with emcmake from the patched emscripten 6.0.9 tree (homescoop#859 stage G), then linked against `shims/slicc`. It is not linked against wasix-libc.
 
 ## PRESTAGE
 ```sh
 node scripts/smoke-cmake.mjs
 ```
-That runs `cmake -E echo`, `cmake -E sha256sum`, `cmake -P`, and a Unix Makefiles
-configure (`CMAKE_MAKE_PROGRAM` stubbed so the host need not have GNU make).
-Must exit 0 with no `Option … registered more than once` and no trap at shutdown.
+This runs `cmake -E echo`, `cmake -E sha256sum`, `cmake -P` and a Unix Makefiles configure. `CMAKE_MAKE_PROGRAM` is stubbed, so the host doesn't need GNU make. It must exit 0, with no `Option … registered more than once` and no trap at shutdown.
