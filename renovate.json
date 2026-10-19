@@ -72,24 +72,24 @@
   ],
   "packageRules": [
     {
-      "description": "Anything under packages/** can publish once merged: no automerge (the shared preset turns it on globally). Only the CI-certified recipe rule below turns it back on.",
+      "description": "Anything under packages/** can publish once merged, so it may only merge through the merge queue, which requires ci and cert-review on the PR head, and every publish needs cert-review's certified= line for its bytes (#1085). So recipe bumps automerge like everything else (platformAutomerge); majors stay human (rules below).",
       "matchFileNames": [
         "packages/**"
       ],
-      "automerge": false
+      "automerge": true
     },
     {
-      "description": "Default: recipe bumps do not automerge until CI-certified.",
+      "description": "Recipe bumps automerge (non-major): the queue's required cert-review certifies them, and an uncertified head can't merge.",
       "matchFileNames": [
         "packages/**/recipe.yaml"
       ],
-      "automerge": false,
+      "automerge": true,
       "addLabels": [
         "homescoop-recipe"
       ]
     },
     {
-      "description": "Semver majors on recipes: always human (Lars).",
+      "description": "Semver majors on recipes don't automerge: the homescoop coordinator's lane owns them. A worker checks the breaking changes, then merges on green ci plus a certified cert-review. The weekly sweep picks up any major left waiting.",
       "matchFileNames": [
         "packages/**/recipe.yaml"
       ],
@@ -133,7 +133,7 @@
       ]
     },
     {
-      "description": "@ai-ecoverse pins in a shipped package.json are re-pin waves: each one is a packaging release that needs a cert, so never automerge.",
+      "description": "@ai-ecoverse pins in a shipped package.json are packaging releases: they automerge once the required cert-review has certified the PR head.",
       "matchManagers": [
         "npm"
       ],
@@ -143,7 +143,7 @@
       "matchPackageNames": [
         "@ai-ecoverse/**"
       ],
-      "automerge": false,
+      "automerge": true,
       "addLabels": [
         "homescoop-repin"
       ]
@@ -229,7 +229,7 @@
       "enabled": false
     },
     {
-      "description": "Semver majors of anything (recipes, workflow actions, npm, Cargo) stay human: never automerge.",
+      "description": "Semver majors of anything (recipes, workflow actions, npm, Cargo) don't automerge: the homescoop coordinator's lane reviews the breaking changes and merges on green plus certified, and the weekly sweep keeps them owned.",
       "matchUpdateTypes": [
         "major"
       ],
@@ -243,11 +243,11 @@
       "automerge": false
     },
     {
-      "description": "Root package.json devDependencies are our own test pins (cert kernel, shared harness, playwright): a bump merges by hand once that version is certified (Lars), so an uncertified kernel never reaches every cert run.",
+      "description": "Root package.json devDependencies are our own test pins (cert kernel, shared harness, playwright). They automerge like the rest (Lars, 10-19): the queue requires ci plus a certified cert-review on the bump, and the kernel and shared-web are certified at latest. Majors stay human; slicc-kernel-negative stays disabled (rule below).",
       "matchFileNames": [
         "package.json"
       ],
-      "automerge": false
+      "automerge": true
     },
     {
       "description": "slicc-kernel-negative is the pinned old kernel (npm alias) the negative proofs must fail on (#393); a bump would break the proof.",
