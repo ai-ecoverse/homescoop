@@ -1,6 +1,5 @@
 # <package>[/sources.<key>] #<issue> <reason>: GitHub commit archives without source.tree (scripts/test/source-tree-pin.test.mjs)
 emscripten-cache #1267 GitHub archive pinned by sha256 only
-llvm-emscripten #1267 GitHub archive pinned by sha256 only
 wasi-buf #1267 GitHub archive pinned by sha256 only
 wasi-gh #1267 GitHub archive pinned by sha256 only
 wasi-ntfy #1267 GitHub archive pinned by sha256 only

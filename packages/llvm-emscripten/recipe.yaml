@@ -8,6 +8,7 @@ source:
   url: "https://github.com/llvm/llvm-project/archive/b158b0ae6c559f87be325b8f427c5588e6a48823.tar.gz"
   sha256: "29064b66a4bec8f33a92022518378b83e2488aae3aea4a4e9285f12948706a2e"
   commit: "b158b0ae6c559f87be325b8f427c5588e6a48823"
+  tree: "3690321ef0f69603e82c2c40464b4a3ffec7cb2f"
 inputs:
   - "packages/wasm-emscripten/patches/**"
   - "packages/wasm-emscripten/package/package.json"
