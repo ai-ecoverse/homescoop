@@ -1,6 +1,7 @@
 # less pager with static widec ncurses (compiled-in terminfo fallbacks).
 name: less
 builder: host
+runner: pool
 # renovate: datasource=github-releases depName=gwsw/less extractVersion=^v(?<version>\d+)$
 version: "668"
 npm: "@ai-ecoverse/wasm-less"
