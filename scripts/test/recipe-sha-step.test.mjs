@@ -122,6 +122,8 @@ test('the recipe-sha job holds a read-only token and no persisted credentials, a
   assert.match(job, /\n {4}permissions:\n {6}contents: read\n/);
   assert.match(job, /\n {10}persist-credentials: false\n/);
   assert.doesNotMatch(job, /git push|contents: write/);
+  assert.match(job, /\n {10}ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}\n/);
+  assert.doesNotMatch(job, /github\.head_ref/);
 });
 
 test('with two packages, one stale and the README table rewritten, only the stale package gets a FAIL line', () => {

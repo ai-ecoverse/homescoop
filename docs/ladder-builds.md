@@ -142,12 +142,11 @@ is `<command> --version`. Libs without `slicc.commands` skip browser-cert
 (host-smoke is the gate). The required checks (`ci`, `cert-review`) gate a Renovate automerge.
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
-ladder-pr's `recipe-sha` job commits that sync onto the PR, so main never
-needs it. That commit says `[skip ci]`: GitHub holds any `pull_request` run
-on a `github-actions[bot]` push for manual approval (the org's
-outside-contributor policy), and no run of ours ever waits for one. The run
-that pushed it builds it already, and its `ci` job posts the `ci` check on
-the pushed commit. `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
+ladder-pr's `recipe-sha` job checks that the PR already carries that sync and
+never pushes: GitHub holds any `pull_request` run on a `github-actions[bot]`
+push for manual approval (the org's outside-contributor policy), so a stale
+branch fails with its `recipe-sha: FAIL <pkg>: needs refresh: <command>`
+line instead (docs/renovate.md), and main never needs the sync. `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
 --check` and fails, before any build or publish, when the committed version
 base or `homescoop.upstream` disagrees with `recipe.yaml`, naming both
 values.
@@ -299,7 +298,7 @@ Some recipes stay hosted for reasons outside their bytes (#390 C2):
 `wasix-python`, whose `build.sh` runs `sudo apt-get`.
 `cert`, `exact-pins`, `detect`,
 `reproducible`, `slicc-note` and `ci` run on the pools as before;
-`recipe-sha`, which pushes with `contents: write`, stays on `ubuntu-latest`. A
+`recipe-sha` (read-only, it never pushes) runs on `CERT_LIGHT_RUNNER` for a same-repo head. A
 fork PR runs everything on `ubuntu-latest`, since a pool job can reach the
 pool's service-account token. `ladder-build`, which publishes with
 `id-token: write`, stays hosted.
