@@ -1,0 +1,100 @@
+cli (wasm): an allocator that refreshes the thread's view of shared memory (homescoop#1127)
+
+V8 bounds-checks bulk-memory memory.fill/memory.copy (memset, memcpy) on a
+thread against that thread's cached memory length, which can lag a
+memory.grow another thread's sbrk just did. malloc then hands this thread
+a block above its view, and the first memset/memcpy into it traps
+"memory access out of bounds" (plain stores work; azw9's analysis in the
+slicc-kernel lane: ~12% of rounds in a Node repro, 13 of 120 pnpm agent
+installs on CI). pnpm's global allocator on wasm wraps the system one:
+a block that ends above memory.size gets a memory.grow(0), which refreshes
+the view, before it is returned; realloc is alloc + refresh + copy + free,
+so dlmalloc's internal memcpy never meets a stale length.
+
+Upstream: not filed (Lars decides).
+removeWhen: V8 updates other threads' memory length before a grown
+block can reach them, or wasi-libc's malloc refreshes it.
+
+--- a/pnpm/crates/cli/src/bin/main.rs
++++ b/pnpm/crates/cli/src/bin/main.rs
+@@ -1,3 +1,80 @@
++// homescoop#1127: on wasm, pnpm's allocator refreshes this thread's view of
++// the shared memory before handing out memory above it (see WasmAlloc).
++#[cfg(target_family = "wasm")]
++#[global_allocator]
++static ALLOC: WasmAlloc = WasmAlloc;
++
++/// The system allocator (wasi-libc's dlmalloc), plus a refresh of V8's
++/// view of the shared memory (homescoop#1127).
++///
++/// When another thread's `sbrk` has just grown the memory (`memory.grow`)
++/// and malloc hands this thread a block from the new pages, this thread's
++/// `memory.size` can still report the old length until V8 next updates it,
++/// at an interrupt or a stack check. Plain stores to the block work, but
++/// bulk-memory `memory.fill`/`memory.copy` (what memset and memcpy compile
++/// to) are bounds-checked against the stale length and trap "memory access
++/// out of bounds". That was the intermittent trap on rayon workers in warm
++/// installs (azw9's analysis, slicc-kernel lane). `memory.grow(0)` on this
++/// thread refreshes the view, so a block that ends above it gets one before
++/// it's returned. `realloc` is done as alloc + refresh + copy + free, so
++/// dlmalloc's own memcpy never runs into a block this thread can't see yet.
++/// A block below the view (the common case) costs one `memory.size`.
++#[cfg(target_family = "wasm")]
++struct WasmAlloc;
++
++#[cfg(target_family = "wasm")]
++impl WasmAlloc {
++    #[inline]
++    fn seen(ptr: *mut u8, size: usize) {
++        use core::arch::wasm32::{memory_grow, memory_size};
++        if !ptr.is_null() && (ptr as usize).saturating_add(size) > memory_size::<0>() * 65536 {
++            memory_grow::<0>(0);
++        }
++    }
++}
++
++#[cfg(target_family = "wasm")]
++unsafe impl std::alloc::GlobalAlloc for WasmAlloc {
++    unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
++        // SAFETY: forwarded to the system allocator with the same layout.
++        let ptr = unsafe { std::alloc::System.alloc(layout) };
++        Self::seen(ptr, layout.size());
++        ptr
++    }
++
++    unsafe fn alloc_zeroed(&self, layout: std::alloc::Layout) -> *mut u8 {
++        // calloc zeroes with memset inside libc, so allocate, refresh, then zero.
++        // SAFETY: as alloc; the block is `layout.size()` bytes when non-null.
++        unsafe {
++            let ptr = self.alloc(layout);
++            if !ptr.is_null() {
++                std::ptr::write_bytes(ptr, 0, layout.size());
++            }
++            ptr
++        }
++    }
++
++    unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
++        // SAFETY: ptr came from System through this allocator with layout.
++        unsafe { std::alloc::System.dealloc(ptr, layout) }
++    }
++
++    unsafe fn realloc(&self, ptr: *mut u8, layout: std::alloc::Layout, new_size: usize) -> *mut u8 {
++        // SAFETY: the caller guarantees ptr/layout describe a live block and
++        // new_size is valid for layout's alignment; the new block holds at
++        // least min(old, new) bytes, copied before the old one is freed.
++        unsafe {
++            let new_layout = std::alloc::Layout::from_size_align_unchecked(new_size, layout.align());
++            let new = self.alloc(new_layout);
++            if !new.is_null() {
++                std::ptr::copy_nonoverlapping(ptr, new, layout.size().min(new_size));
++                self.dealloc(ptr, layout);
++            }
++            new
++        }
++    }
++}
++
+ fn main() -> std::process::ExitCode {
+     pnpm_cli::main()
+ }

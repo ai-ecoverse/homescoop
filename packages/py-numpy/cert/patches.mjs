@@ -1,7 +1,8 @@
 /**
  * The paths py-numpy's patches change (cert/meta.json "patches"; #727, #1080):
- * - numpy-wasm-fp-exceptions.patch: lowlevel_strided_loops' float casts, among
- *   them longdouble -> clongdouble, whose strict-FP form crashed LLVM 21;
+ * - lowlevel_strided_loops' float casts, among them longdouble -> clongdouble,
+ *   whose strict-FP form crashed LLVM 21 (upstream skips the pragmas on wasm
+ *   since 2.5; 2.3.2 needed numpy-wasm-fp-exceptions.patch);
  * - numpy-cblas-int-returns.patch: cblas_cdotu_sub/cdotc_sub/zdotu_sub/zdotc_sub
  *   as int-returning (OpenBLAS's signature; wasm checks it), reached by
  *   np.dot/np.vdot on complex vectors;

@@ -56,13 +56,17 @@ export default async function (ctx) {
     const pre = cold ? 'rm -rf node_modules ~/.local/share/pnpm ~/.cache/pnpm; ' : 'rm -rf node_modules; ';
     const t0 = Date.now();
     const r = await run(['bash', '-c', `${pre}pnpm install --frozen-lockfile --trust-lockfile`], {
-      cwd: '/home/bob/agent', user: 'bob', env: { SLICC_WASM_BACKTRACE: '1' },
+      cwd: '/home/bob/agent', user: 'bob', env: { SLICC_WASM_BACKTRACE: '1', PNPM_SLICC_PEAK_FILE: '/tmp/pnpm-peak' },
     });
     const all = `${r.stdout}\n${r.stderr}`;
     const trapped = TRAP.test(all);
-    const rec = { round, cold, status: r.status, seconds: (Date.now() - t0) / 1000, trapped };
+    // The largest wasm memory pnpm's threads saw (12.9.1-16's host, PNPM_SLICC_PEAK_FILE).
+    const peak = await run(['bash', '-c', 'shopt -s nullglob; m=0; for f in /tmp/pnpm-peak.*; do read -r v < "$f"; (( v > m )) && m=$v; done; rm -f /tmp/pnpm-peak.*; echo $m'], { cwd: '/', user: 'bob' });
+    const peakMiB = Math.round(Number(peak.stdout.trim() || 0) / 1048576);
+    const retried = /retrying once after a false trap/.test(all);
+    const rec = { round, cold, status: r.status, seconds: (Date.now() - t0) / 1000, trapped, retried, peakMiB };
     appendFileSync(join(OUT, 'rounds.jsonl'), `${JSON.stringify(rec)}\n`);
-    console.log(`round ${round} ${cold ? 'cold' : 'warm'}: rc=${r.status} ${rec.seconds.toFixed(1)}s${trapped ? ' TRAP' : ''}`);
+    console.log(`round ${round} ${cold ? 'cold' : 'warm'}: rc=${r.status} ${rec.seconds.toFixed(1)}s peak ${peakMiB} MiB${trapped ? ' TRAP' : ''}${retried ? ' (retried)' : ''}`);
     if (trapped || r.status) {
       bad.push(round);
       writeFileSync(join(OUT, `round-${round}.txt`), `round ${round} (${cold ? 'cold' : 'warm'} store) rc=${r.status}\n--- /proc/sys/kernel/slicc_wasm_memories after the round\n${await memories()}\n--- stderr\n${r.stderr}\n--- stdout\n${r.stdout}\n`);

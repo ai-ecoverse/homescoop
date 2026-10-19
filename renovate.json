@@ -11,6 +11,9 @@
   ],
   "semanticCommits": "enabled",
   "platformAutomerge": true,
+  "gitIgnoredAuthors": [
+    "renovate-refresh@homescoop.invalid"
+  ],
   "dependencyDashboard": true,
   "prHourlyLimit": 4,
   "ignorePaths": [
@@ -89,7 +92,7 @@
       ]
     },
     {
-      "description": "Semver majors on recipes: always human (Lars).",
+      "description": "Semver majors on recipes don't automerge: the homescoop coordinator's lane owns them. A worker checks the breaking changes, then merges on green ci plus a certified cert-review. The weekly sweep picks up any major left waiting.",
       "matchFileNames": [
         "packages/**/recipe.yaml"
       ],
@@ -166,6 +169,13 @@
       "enabled": false
     },
     {
+      "description": "Workflow action pins get their own branches (renovate/actions-…). Renovate names a branch after the sanitized dependency name, so the action ai-ecoverse/slicc-shared-web and the npm devDependency @ai-ecoverse/slicc-shared-web both landed on renovate/ai-ecoverse-slicc-shared-web-1.x, one PR (#1270). A branch automerges only if every update in it does, so the ladder-pr.yml action bump (manual, publish path) kept the root devDependency bump from automerging. scripts/test/renovate-branches.test.mjs checks no two managers share a branch.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "additionalBranchPrefix": "actions-"
+    },
+    {
       "description": "Workflow action pins below a major.",
       "matchManagers": [
         "github-actions"
@@ -229,7 +239,7 @@
       "enabled": false
     },
     {
-      "description": "Semver majors of anything (recipes, workflow actions, npm, Cargo) stay human: never automerge.",
+      "description": "Semver majors of anything (recipes, workflow actions, npm, Cargo) don't automerge: the homescoop coordinator's lane reviews the breaking changes and merges on green plus certified, and the weekly sweep keeps them owned.",
       "matchUpdateTypes": [
         "major"
       ],

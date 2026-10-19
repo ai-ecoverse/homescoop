@@ -5,7 +5,6 @@
     "py-*": ["CPython "],
     "libheif": ["libde265 ", "dav1d "],
     "wasix-python": ["OpenSSL ", "`sqlite3` ("],
-    "wasix-python3.15": ["OpenSSL ", "`sqlite3` ("],
     "wasix-automake": ["GNU m4 "],
     "wasix-ruby": ["ruby/"],
     "wasi-buf": ["Go ", "≥ "],

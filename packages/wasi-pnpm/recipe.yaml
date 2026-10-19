@@ -64,4 +64,8 @@ about:
     registry's latest made every later command fail), and 0008 stops the
     local-prefix walk below `/`, whose base-set node_modules made `/` the
     project of every directory without a manifest (thr_r75dacjwyi, a live
-    seven).
+    seven). 12.9.1-16's 0009 gives pnpm a wasm allocator that refreshes the
+    thread's view of the shared memory (memory.grow(0)) before handing out
+    memory above it (homescoop#1127: V8's bulk-memory bounds checks against a
+    stale per-thread length), in pnpm's own source rather than a patched
+    sysroot.

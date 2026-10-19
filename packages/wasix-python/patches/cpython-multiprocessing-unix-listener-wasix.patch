@@ -5,7 +5,7 @@ close gets ENOENT and multiprocessing.Manager() prints a traceback at exit
 
 --- a/Lib/multiprocessing/connection.py
 +++ b/Lib/multiprocessing/connection.py
-@@ -634,7 +634,8 @@ class SocketListener(object):
+@@ -659,7 +659,8 @@ class SocketListener(object):
          if family == 'AF_UNIX' and not util.is_abstract_socket_namespace(address):
              # Linux abstract socket namespaces do not need to be explicitly unlinked
              self._unlink = util.Finalize(
@@ -15,7 +15,7 @@ close gets ENOENT and multiprocessing.Manager() prints a traceback at exit
                  )
          else:
              self._unlink = None
-@@ -654,6 +655,13 @@ class SocketListener(object):
+@@ -679,6 +680,13 @@ class SocketListener(object):
                  unlink()
  
  

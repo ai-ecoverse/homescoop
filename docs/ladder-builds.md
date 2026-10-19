@@ -142,12 +142,11 @@ is `<command> --version`. Libs without `slicc.commands` skip browser-cert
 (host-smoke is the gate). The required checks (`ci`, `cert-review`) gate a Renovate automerge.
 `scripts/sync-package-version.mjs` sets `package.json` version from the
 recipe when Renovate bumps upstream (leaves existing `X-N` packaging revs).
-ladder-pr's `recipe-sha` job commits that sync onto the PR, so main never
-needs it. That commit says `[skip ci]`: GitHub holds any `pull_request` run
-on a `github-actions[bot]` push for manual approval (the org's
-outside-contributor policy), and no run of ours ever waits for one. The run
-that pushed it builds it already, and its `ci` job posts the `ci` check on
-the pushed commit. `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
+ladder-pr's `recipe-sha` job checks that the PR already carries that sync and
+never pushes: GitHub holds any `pull_request` run on a `github-actions[bot]`
+push for manual approval (the org's outside-contributor policy), so a stale
+branch fails with its `recipe-sha: FAIL <pkg>: needs refresh: <command>`
+line instead (docs/renovate.md), and main never needs the sync. `ladder-build`'s resolve runs `sync-package-version.mjs <pkg>
 --check` and fails, before any build or publish, when the committed version
 base or `homescoop.upstream` disagrees with `recipe.yaml`, naming both
 values.
@@ -294,12 +293,15 @@ move it back to hosted, or fix the difference. Dispatch it whenever the
 runner-job image or the hosted image changes (#499).
 Some recipes stay hosted for reasons outside their bytes (#390 C2):
 `less`, because greenwoodsoftware.com answers the pool's egress with 403
-(the source is fetched only from the pinned upstream URL); `qpdf`, whose
+(its recipe now lists Debian's and MacPorts' byte-identical copies as
+`source.mirrors`, see [Source mirrors](#source-mirrors), so the pool can fetch
+it; the exception goes once pool-parity agrees); `qpdf`, whose
 `qpdf.wasm` comes out differently on the pool in some runs (#804); and
 `wasix-python`, whose `build.sh` runs `sudo apt-get`.
 `cert`, `exact-pins`, `detect`,
 `reproducible`, `slicc-note` and `ci` run on the pools as before;
-`recipe-sha`, which pushes with `contents: write`, stays on `ubuntu-latest`. A
+`recipe-sha` (read-only, it never pushes) runs on `CERT_LIGHT_RUNNER` for a same-repo head,
+whatever the recipe's `runner:`, so its source fetch may need the mirrors above. A
 fork PR runs everything on `ubuntu-latest`, since a pool job can reach the
 pool's service-account token. `ladder-build`, which publishes with
 `id-token: write`, stays hosted.
@@ -377,6 +379,41 @@ commit that log line's verdict in the PR body. An archive that doesn't match the
 tree fails, with or without `--reroll`. ladder-pr's `recipe-sha` job also passes
 `--verify-tree`, so a pinned tree is checked on every PR that touches the package,
 even when the sha256 matches.
+
+### Source mirrors
+
+An upstream that blocks a runner pool (greenwoodsoftware.com answers
+`cloud-run-job` with 403) or times out (ftp.gnu.org) mustn't block CI. A
+source may list byte-identical copies, URL templates expanded like `url`:
+
+```yaml
+source:
+  url: "https://www.greenwoodsoftware.com/less/less-{{version}}.tar.gz"
+  sha256: "2819f555…44b8"
+  mirrors:
+    - "https://deb.debian.org/debian/pool/main/l/less/less_{{version}}.orig.tar.gz"
+    - "https://distfiles.macports.org/less/less-{{version}}.tar.gz"
+```
+
+`sources.<key>.mirrors` works the same. Everything that downloads a source
+(`refresh-recipe-sha.mjs`, so the `recipe-sha` job and the build jobs' refresh
+step, and `homescoop_fetch` in every `build.sh`, which finds a pin's mirrors in
+`HOMESCOOP_MIRRORS_<sha256>` from `recipe-env.mjs`) tries `url` first, then
+each mirror in order, only when the url's download fails, and keeps a mirror's
+bytes only when they match the pinned sha256. It prints
+`source: <pkg> from mirror <url> (sha256 match)`. A url that answers with
+other bytes still fails as above; the mirrors don't hide it.
+
+A mirror never sets or refreshes a pin. `refresh-recipe-sha.mjs` tries one
+only when the source's url and its pin are both the base's, so the pin came
+from the url on an earlier run; a new or changed url, an empty pin, or one the
+branch set, takes its pin from the url alone, and if the url fails, so does
+the recipe. A shallow checkout with no merge-base (ladder-pr's build jobs,
+pool-parity) fetches the base branch's tip (depth 1) for this comparison.
+`homescoop_fetch` compares only with the pin, since the `recipe-sha` job has
+already checked it. Mirrors are no build input (`repack-inputs.mjs`'s
+`buildView` drops them with a pinned url), so adding one needs no `-N` bump.
+`scripts/test/source-mirrors.test.mjs` is the behaviour test.
 
 `scripts/test/source-tree-pin.test.mjs` lists the GitHub commit-archive sources
 without `tree:`. `scripts/source-tree-allowlist.txt` holds today's, each tied to

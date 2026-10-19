@@ -242,6 +242,9 @@ jobs:
           chmod +x "$RUNNER_TEMP/bin/gh"
           printf '#!/bin/sh\nexec env -u AWS_BEARER_TOKEN_BEDROCK -u GH_TOKEN -u GITHUB_TOKEN "$@"\n' > "$RUNNER_TEMP/bin/cert-run"
           chmod +x "$RUNNER_TEMP/bin/cert-run"
+          # The reviewer's on-demand live pair for a capped package (live-pairs.mjs; at most two at once).
+          printf '#!/bin/sh\nexec "%s/bin/cert-run" node "%s/scripts/cert-review/live-pairs.mjs" "$@" --live "%s/live"\n' "$RUNNER_TEMP" "$tools" "$RUNNER_TEMP" > "$RUNNER_TEMP/bin/live-pair"
+          chmod +x "$RUNNER_TEMP/bin/live-pair"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           {
             echo "CERT_REVIEW_REAL_GH=$real"
@@ -279,7 +282,10 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Live pairs, npm latest (or the recipe's npm-tag) and the pull request's tarball (no secrets in this step)
+      - name: Live pairs, npm latest (or the recipe's npm-tag) and the pull request's tarball, for at most LIVE_PAIRS_MAX packages (no secrets in this step)
+        env:
+          BASE: ${{ needs.plan.outputs.base }}
+          LIVE_PAIRS_MAX: ${{ vars.LIVE_PAIRS_MAX || '4' }}
         run: |
           if [ -z "${DISPLAY:-}" ] && command -v Xvfb > /dev/null; then
             nohup Xvfb :99 -screen 0 1440x900x24 -nolisten tcp > "$RUNNER_TEMP/xvfb.log" 2>&1 &
@@ -287,47 +293,17 @@ jobs:
             echo "DISPLAY=:99" >> "$GITHUB_ENV"
           fi
           mkdir -p "$RUNNER_TEMP/live"
-          port=9300
-          echo '[]' > "$RUNNER_TEMP/live/live.json"
-          for pkg in $(jq -r '.[]' <<< "$PACKAGES"); do
-            harness=$(jq -r 'if .blocked then "blocked" else (.harness // "slicc-kernel") end' "packages/$pkg/cert/meta.json" 2> /dev/null || echo slicc-kernel)
-            if [ "$harness" != slicc-kernel ]; then
-              echo "$pkg: no live pair, its cert harness is $harness"
-              continue
-            fi
-            peers=$(jq -r '[(.needsRepack // []), (.needsTarballScripts // [])] | add | length > 0' "packages/$pkg/cert/meta.json" 2> /dev/null || echo false)
-            head_tgz="$RUNNER_TEMP/artifacts/host-$pkg-pr$PR_NUMBER/package.tgz"
-            name=$(tar -xzf "$head_tgz" -O package/package.json | jq -r .name)
-            if ! tag=$(node .cert-review-tools/scripts/npm-tag.mjs "$pkg" --root "$GITHUB_WORKSPACE"); then
-              echo "::warning::$pkg: no valid npm-tag; no baseline"
-              tag=
-            fi
-            base_tgz=
-            if [ -n "$tag" ] && (cd "$RUNNER_TEMP/live" && npm pack "$name@$tag" --json > "base-$pkg.json" 2> /dev/null); then
-              base_tgz="$RUNNER_TEMP/live/$(jq -r '.[0].filename' "$RUNNER_TEMP/live/base-$pkg.json")"
-            fi
-            for side in base head; do
-              tgz=$([ "$side" = base ] && echo "$base_tgz" || echo "$head_tgz")
-              if [ -n "$tgz" ]; then
-                HOMESCOOP_CERT_NODE_MODULES="$RUNNER_TEMP/harness/$pkg/node_modules" nohup node .cert-review-tools/scripts/browser-cert/run.mjs \
-                  --package "$pkg" --cert "packages/$pkg/cert" --tarball "$tgz" --users enforce --live "$port" \
-                  > "$RUNNER_TEMP/live/$pkg-$side.log" 2>&1 &
-                jq --arg pkg "$pkg" --arg side "$side" --arg tgz "$tgz" --argjson port "$port" --argjson pid "$!" --argjson peers "$peers" \
-                  '. + [{package: $pkg, side: $side, tarball: $tgz, url: "http://127.0.0.1:\($port)/", pid: $pid, peers_from_pr: $peers}]' \
-                  "$RUNNER_TEMP/live/live.json" > "$RUNNER_TEMP/live/next.json" && mv "$RUNNER_TEMP/live/next.json" "$RUNNER_TEMP/live/live.json"
-              fi
-              port=$((port + 1))
-            done
-          done
-          jq -r '.[] | "\(.url) \(.pid)"' "$RUNNER_TEMP/live/live.json" | while read -r url pid; do
-            for _ in $(seq 120); do
-              curl -fs "$url" > /dev/null && break
-              kill -0 "$pid" 2> /dev/null || break
-              sleep 2
-            done
-            curl -fsS "$url" || echo "::warning::$url didn't come up; see its log in $RUNNER_TEMP/live"
-          done
-          cat "$RUNNER_TEMP/live/live.json"
+          if ! node .cert-review-tools/scripts/cert-review/live-pairs.mjs up --live "$RUNNER_TEMP/live" --packages "$PACKAGES" \
+            --root "$GITHUB_WORKSPACE" --tools "$GITHUB_WORKSPACE/.cert-review-tools" --artifacts "$RUNNER_TEMP/artifacts" \
+            --harness "$RUNNER_TEMP/harness" --pr "$PR_NUMBER" --base "$BASE" --max "$LIVE_PAIRS_MAX" --note "$RUNNER_TEMP/live/note.md"; then
+            echo "::warning::the live pairs didn't start; the review goes on without them"
+            echo "The live pairs step failed, so this run may have no live pairs: review from ladder-pr's cert jobs and the harness." > "$RUNNER_TEMP/live/note.md"
+          fi
+          {
+            echo 'LIVE_NOTE<<LIVE_NOTE_EOF'
+            cat "$RUNNER_TEMP/live/note.md"
+            echo 'LIVE_NOTE_EOF'
+          } >> "$GITHUB_ENV"
 
       - name: When the review starts (issue-dedupe checks the issues opened after it)
         run: echo "REVIEW_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
@@ -359,7 +335,8 @@ jobs:
             - Each package has a cert harness in `${{ runner.temp }}/harness/<package>` (its kernel, `needs` and Chromium). Run its specs, on any kernel and users mode:
               `cert-run env HOMESCOOP_CERT_NODE_MODULES=${{ runner.temp }}/harness/<package>/node_modules node scripts/browser-cert/run.mjs --package <package> --tarball <package.tgz> [--kernel @ai-ecoverse/slicc-kernel@<version>] [--users enforce] [--soft] [--json <out.json>]`
               For a spec of your own, put it in a directory and pass `--cert <dir>`. See `docs/ci-cert.md` and `scripts/browser-cert/README.md` for the spec API.
-            - **Live pairs, for a regression check right away.** For each package, two Chromes with windows run the harness under `--users enforce` on the `cert/meta.json` kernel, with the package installed and booted: one with npm `latest` (the baseline; for a recipe with an `npm-tag:` the version under that tag; missing for a new package or a tag's first publish) and one with this pull request's tarball. `${{ runner.temp }}/live/live.json` lists each one's `url`, and their logs are next to it. `GET <url>` describes it; `POST <url>ctx/<call>` with a JSON array of arguments calls the same `ctx` the specs get, for example `curl -s <url>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/pty` and `ctx/addUser`. Run the same thing on both sides. Something that fails the same way on the baseline is pre-existing: it never blocks the certification. **Except** where an entry has `"peers_from_pr": true`: both sides then share peers rebuilt from this pull request (`needsRepack`, `needsTarballScripts`), so a shared failure may come from those peers. Check it against the published peers before you call it pre-existing.
+            - **Live pairs, for a regression check right away.** For each package that has one (at most LIVE_PAIRS_MAX, ${{ vars.LIVE_PAIRS_MAX || '4' }} here, so the runner doesn't run out of memory), two Chromes with windows run the harness under `--users enforce` on the `cert/meta.json` kernel, with the package installed and booted: one with npm `latest` (the baseline; for a recipe with an `npm-tag:` the version under that tag; missing for a new package or a tag's first publish) and one with this pull request's tarball. `${{ runner.temp }}/live/live.json` lists each one's `url` (and each package without a pair as `"live": false` with its `why`), and their logs are next to it. `GET <url>` describes it; `POST <url>ctx/<call>` with a JSON array of arguments calls the same `ctx` the specs get, for example `curl -s <url>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/pty` and `ctx/addUser`. Run the same thing on both sides. Something that fails the same way on the baseline is pre-existing: it never blocks the certification. **Except** where an entry has `"peers_from_pr": true`: both sides then share peers rebuilt from this pull request (`needsRepack`, `needsTarballScripts`), so a shared failure may come from those peers. Check it against the published peers before you call it pre-existing.
+              ${{ env.LIVE_NOTE }}
             - **Run every command that executes package or pull-request code through `cert-run`**, including any command you take from `cert/meta.json` (`ci`, `needsTarballScripts`), a README or other docs in the pull request, which drops the Bedrock key and the GitHub token from its environment.
             - `npm view` and `npm pack` reach the registry, for the version on npm today (`latest`) and its tarball. `gh issue list -R <repo> --search …` finds existing issues (homescoop's and slicc-kernel's) to cite.
 
@@ -385,6 +362,10 @@ jobs:
             - `verdict.json`: `{ "packages": [ { "package": "<recipe dir>", "verdict": "certified" | "fail", "known": ["<an issue, as owner/repo#n or #n, or new: a summary of at most ten words>"], "reason": "<one line, for a fail>" } ] }`, one entry per built package. Don't write shas or versions: a later step computes the `certified=` lines from the artifacts.
             - `comment.md`: per package, a short table (what changed, specs and kernels, checklist and patches, surface, licences, findings) and a few sentences on what a human should look at. Mention anything in this setup that got in your way.
             Don't edit, commit or push anything, and don't comment on the pull request yourself.
+
+      - name: Stop the live pairs, their harnesses and Chromes
+        if: always()
+        run: node .cert-review-tools/scripts/cert-review/live-pairs.mjs stop-all --live "$RUNNER_TEMP/live" || true
 
       - uses: actions/upload-artifact@v7
         id: verdict
@@ -412,6 +393,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/evidence"
           cp "${EXECUTION:-$RUNNER_TEMP/claude-execution-output.json}" "$RUNNER_TEMP/evidence/claude-turns.json" 2>/dev/null || true
           cp -r "$RUNNER_TEMP/cert-review" "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          mkdir -p "$RUNNER_TEMP/evidence/live"
+          cp "$RUNNER_TEMP"/live/*.json "$RUNNER_TEMP"/live/note.md "$RUNNER_TEMP/evidence/live/" 2>/dev/null || true
 
       - uses: actions/upload-artifact@v7
         if: always()

@@ -20,6 +20,8 @@ with zipfile.ZipFile(f"{sys.argv[1]}/{name}-{ver}-py3-none-any.whl", "w") as z:
 
 export default async function (ctx) {
   const { run, write, assert, addUser } = ctx;
+  const PKG = JSON.parse(await ctx.read('/node_modules/@ai-ecoverse/wasix-python/package.json'));
+  const PYV = PKG.slicc.python.version;
   await addUser({ name: 'cone' });
   const as = async (user, argv, cwd = user === 'cone' ? '/home/cone' : '/root') => {
     const r = await run(argv, { cwd, ...(user === 'cone' && { user }) });
@@ -51,11 +53,11 @@ export default async function (ctx) {
   assert.ok(Number(tu) >= 0.4 && Number(tu) < 5 && Number(ru) >= 0.4 && Number(ru) < 5, `os.times / getrusage CPU: ${cpu}`);
   assert.deepEqual(rest, ['0.0', '0.0', '0.0'], `system and children's times: ${cpu}`);
 
-  const site = '/usr/local/lib/python3.14/site-packages';
+  const site = `/usr/local/lib/python${PYV}/site-packages`;
   await as('root', ['mkdir', '-p', `${site}/hs_sys`]);
   await write(`${site}/hs_sys/__init__.py`, 'VALUE = "system"\n');
   await write(`${site}/hs-sys.pth`, 'import sys; sys.hs_sys_pth = True\n');
-  const sys1 = await py('cone', 'import sys, hs_sys; print(hs_sys.VALUE, getattr(sys, "hs_sys_pth", False), sys.path.index("/usr/local/lib/python3.14/site-packages") > max(i for i, p in enumerate(sys.path) if p.endswith("/lib/python3.14/site-packages") and not p.startswith("/usr/local")))');
+  const sys1 = await py('cone', `import sys, hs_sys; print(hs_sys.VALUE, getattr(sys, "hs_sys_pth", False), sys.path.index("${site}") > max(i for i, p in enumerate(sys.path) if p.endswith("/lib/python${PYV}/site-packages") and not p.startswith("/usr/local")))`);
   assert.equal(sys1, 'system True True', `cone sees the system site dir and its .pth, after python's own site-packages: ${sys1}`);
   await as('cone', ['python3', '-m', 'venv', 'iso']);
   await as('cone', ['python3', '-m', 'venv', '--without-pip', '--system-site-packages', 'withsys']);
@@ -77,7 +79,7 @@ export default async function (ctx) {
   for (const user of ['root', 'cone']) {
     for (const cmd of ['pip', 'pip3']) {
       const v = await as(user, [cmd, '--version']);
-      assert.match(v, /^pip \d+\.\d+(\.\d+)? from .* \(python 3\.14\)$/, `${user} ${cmd} --version: ${v}`);
+      assert.match(v, new RegExp(`^pip \\d+\\.\\d+(\\.\\d+)? from .* \\(python ${PYV.replace('.', '\\.')}\\)$`), `${user} ${cmd} --version: ${v}`);
     }
   }
   await as('cone', ['mkdir', '-p', '/home/cone/wheels']);
@@ -87,7 +89,7 @@ export default async function (ctx) {
   const user = await py('cone', 'import hs_user, site; print(hs_user.VALUE, hs_user.__file__.startswith(site.getusersitepackages()))');
   assert.equal(user, '17 True', `pip install --user lands in cone's user site: ${user}`);
   const venvPip = await as('cone', ['iso/bin/pip', '--version']);
-  assert.match(venvPip, /\/home\/cone\/iso\/lib\/python3\.14\/site-packages\/pip /, `a venv's own bin/pip: ${venvPip}`);
+  assert.ok(venvPip.includes(`/home/cone/iso/lib/python${PYV}/site-packages/pip `), `a venv's own bin/pip: ${venvPip}`);
 
   const fork = await py('root', 'import ctypes, os; l = ctypes.CDLL(None); print([n for n in ("fork", "_Fork", "_fork_internal", "__vfork_internal", "__wasi_proc_fork", "__wasi_proc_fork_env") if hasattr(l, n)], hasattr(os, "fork"), hasattr(l, "posix_spawn"), l.system(b"exit 3") >> 8)');
   assert.equal(fork, '[] False True 3', `no fork entry point through ctypes (homescoop#296); posix_spawn and system stay: ${fork}`);

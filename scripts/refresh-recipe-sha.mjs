@@ -15,6 +15,11 @@
  * archive's tree matches it, and --reroll asks for the re-roll explicitly.
  * --verify-tree also checks a pinned tree when the sha256 matches.
  *
+ * When a url's download fails, its source.mirrors (sources.<key>.mirrors)
+ * are tried in order, and a mirror's bytes count only when they match the pin.
+ * A mirror never sets or refreshes a pin: it is tried only when the url and
+ * the pin are both the base's (see fetchFromMirrors).
+ *
  * Repack recipes (repack.from) never fetch their source, so a wrong sha256
  * would never fail a build (#730). Builds skip them (their bytes come from
  * npm, not the source); with --verify-repack (ladder-pr's recipe-sha job)
@@ -89,6 +94,9 @@ function sha256File(path) {
   return h.digest('hex');
 }
 
+// curl --retry count; scripts/test/source-mirrors.test.mjs sets 0 so a 403 fails fast.
+const CURL_RETRY = /^\d+$/.test(process.env.HOMESCOOP_FETCH_RETRY || '') ? process.env.HOMESCOOP_FETCH_RETRY : '5';
+
 /** Download url into a temp dir; the caller removes `dir`. */
 function fetchBlob(url) {
   const dir = mkdtempSync(join(tmpdir(), 'homescoop-sha-'));
@@ -96,7 +104,7 @@ function fetchBlob(url) {
   try {
     execFileSync(
       'curl',
-      ['-fsSL', '--retry', '5', '--retry-all-errors', '--retry-delay', '2', '-o', file, url],
+      ['-fsSL', '--retry', CURL_RETRY, '--retry-all-errors', '--retry-delay', '2', '-o', file, url],
       { stdio: ['ignore', 'inherit', 'inherit'] }
     );
   } catch (e) {
@@ -106,20 +114,44 @@ function fetchBlob(url) {
   return { dir, file, digest: sha256File(file) };
 }
 
-/** The recipe at the base ref's merge-base with HEAD, or null when the package is new there. */
+/**
+ * The base commit: the merge-base of HEAD with the base ref. With `tip`, a
+ * shallow checkout (ladder-pr's build jobs, pool-parity) that has no merge-base
+ * fetches the base branch's tip (depth 1) and uses that instead; only the
+ * mirror check asks for it, and a branch behind a base that changed the
+ * source then fails closed until it merges the base.
+ */
 let baseCommit;
-function baseRecipe(name) {
-  if (baseCommit === undefined) {
-    const mb = spawnSync('git', ['merge-base', 'HEAD', baseRef], { encoding: 'utf8', cwd: root });
-    if (mb.status !== 0) {
-      throw new Error(
-        `can't resolve the base ${baseRef} (git merge-base HEAD ${baseRef}: ${(mb.stderr || '').trim() || 'failed'}), ` +
-          'so it can\'t tell whether a source URL changed. Fetch it or pass --base <ref>.'
-      );
+let baseTip;
+function resolveBase({ tip = false } = {}) {
+  if (baseCommit !== undefined) return baseCommit;
+  const mb = spawnSync('git', ['merge-base', 'HEAD', baseRef], { encoding: 'utf8', cwd: root });
+  if (mb.status === 0) return (baseCommit = mb.stdout.trim());
+  const why = `git merge-base HEAD ${baseRef}: ${(mb.stderr || '').trim() || 'failed'}`;
+  if (tip) {
+    if (baseTip !== undefined) return baseTip;
+    const shallow = spawnSync('git', ['rev-parse', '--is-shallow-repository'], { encoding: 'utf8', cwd: root }).stdout.trim() === 'true';
+    const branch = baseRef.replace(/^origin\//, '');
+    if (shallow && branch) {
+      const f = spawnSync('git', ['fetch', '--quiet', '--no-tags', '--depth=1', 'origin', `refs/heads/${branch}`], { encoding: 'utf8', cwd: root });
+      const head = f.status === 0 && spawnSync('git', ['rev-parse', 'FETCH_HEAD'], { encoding: 'utf8', cwd: root });
+      if (head && head.status === 0) {
+        baseTip = head.stdout.trim();
+        console.log(`   base: shallow checkout, comparing against the tip of ${branch} (${baseTip})`);
+        return baseTip;
+      }
     }
-    baseCommit = mb.stdout.trim();
   }
-  const show = spawnSync('git', ['show', `${baseCommit}:packages/${name}/recipe.yaml`], { encoding: 'utf8', cwd: root });
+  throw new Error(
+    `can't resolve the base ${baseRef} (${why}), ` +
+      'so it can\'t tell whether a source URL changed. Fetch it or pass --base <ref>.'
+  );
+}
+
+/** The recipe at the base (see resolveBase), or null when the package is new there. */
+function baseRecipe(name, opts) {
+  const commit = resolveBase(opts);
+  const show = spawnSync('git', ['show', `${commit}:packages/${name}/recipe.yaml`], { encoding: 'utf8', cwd: root });
   if (show.status !== 0) return null;
   const dir = mkdtempSync(join(tmpdir(), 'homescoop-base-'));
   try {
@@ -144,10 +176,10 @@ function sourceJobs(recipe) {
   return jobs;
 }
 
-function expandUrl(src, version) {
+function expandUrl(src, version, template = src.url) {
   const srcVersion = String(src.version || version);
   const sp = splitVersion(srcVersion);
-  return expand(String(src.url || ''), {
+  return expand(String(template || ''), {
     version: srcVersion,
     major: sp.major,
     minor: sp.minor,
@@ -156,6 +188,68 @@ function expandUrl(src, version) {
     amal: String(src.amal || sp.amal),
     year: String(src.year || ''),
   });
+}
+
+/** source.mirrors (or sources.<key>.mirrors), expanded like its url. */
+function mirrorsOf(src, version, label) {
+  if (src.mirrors === undefined || src.mirrors === null) return [];
+  if (!Array.isArray(src.mirrors) || src.mirrors.some((m) => typeof m !== 'string' || !m)) {
+    throw new Error(`${label}.mirrors must be a list of URL templates`);
+  }
+  return src.mirrors.map((m) => expandUrl(src, version, m));
+}
+
+/**
+ * url failed: fetch the source from its mirrors. A mirror only stands in for
+ * the url, it never sets or refreshes a pin: it is tried only when the pin
+ * and the url are both the base's (so the pin came from the url), and its
+ * bytes count only when they match that pin.
+ */
+function fetchFromMirrors({ name, job, label, src, url, version, mirrors, urlError }) {
+  const who = `${name}${job.key ? '/' + job.key : ''}`;
+  const pin = String(src.sha256 || '');
+  const refuse = (why) =>
+    new Error(
+      `${name}: download failed for ${url} (${urlError}), and ${label}.mirrors can't stand in: ${why}. ` +
+        'A mirror never sets or refreshes a pin; the pin comes from the url alone.'
+    );
+  if (!/^[0-9a-f]{64}$/i.test(pin)) throw refuse(`${label}.sha256 is ${pin ? `"${pin}"` : 'empty'}, so there is no pin to match`);
+  let base;
+  try {
+    base = baseRecipe(name, { tip: true });
+  } catch (e) {
+    throw refuse(e instanceof Error ? e.message : String(e));
+  }
+  const baseJob = base && sourceJobs(base).find((j) => j.key === job.key);
+  if (!baseJob) throw refuse(`${label} is new against ${baseRef}`);
+  let baseUrl = null;
+  try {
+    baseUrl = expandUrl(baseJob.src, String(base.version || ''));
+  } catch {
+    baseUrl = null;
+  }
+  if (baseUrl !== url) throw refuse(`the url changed against ${baseRef} (${baseUrl || '(none)'} → ${url})`);
+  const baseSha = String(baseJob.src.sha256 || '');
+  if (baseSha !== pin) throw refuse(`this branch set the pin (${pin}; ${baseRef} pins ${baseSha || '(none)'})`);
+  const tried = [];
+  for (const m of mirrors) {
+    let blob;
+    try {
+      blob = fetchBlob(m);
+    } catch (e) {
+      tried.push(`${m}: download failed`);
+      console.log(`   mirror ${m}: download failed`);
+      continue;
+    }
+    if (blob.digest === pin) {
+      console.log(`source: ${who} from mirror ${m} (sha256 match)`);
+      return blob;
+    }
+    rmSync(blob.dir, { recursive: true, force: true });
+    tried.push(`${m}: sha256 ${blob.digest} != pin ${pin}`);
+    console.log(`   mirror ${m}: sha256 ${blob.digest} does not match the pin ${pin}; rejected`);
+  }
+  throw new Error(`${name}: download failed for ${url} (${urlError}), and no ${label}.mirrors entry matches the pin ${pin}: ${tried.join('; ')}`);
 }
 
 /**
@@ -228,15 +322,20 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
       continue;
     }
     console.log(`== ${name}${job.key ? ' sources.' + job.key : ''}: ${url}`);
+    const mirrors = mirrorsOf(src, version, label);
     let blob;
     try {
       blob = fetchBlob(url);
+      if (mirrors.length) console.log(`source: ${name}${job.key ? '/' + job.key : ''} from url ${url}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(
-        `${name}: download failed for ${url} (${msg}). ` +
-          'Make source.url derive from {{version}} / {{major}}.{{minor}}.'
-      );
+      if (!mirrors.length) {
+        throw new Error(
+          `${name}: download failed for ${url} (${msg}). ` +
+            'Make source.url derive from {{version}} / {{major}}.{{minor}}.'
+        );
+      }
+      blob = fetchFromMirrors({ name, job, label, src, url, version, mirrors, urlError: msg.split('\n')[0] });
     }
     try {
       const digest = blob.digest;

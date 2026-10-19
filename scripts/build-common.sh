@@ -155,13 +155,39 @@ homescoop_stage_licenses() {
 
 homescoop_fetch() {
   # homescoop_fetch <url> <sha256> <tarball-path>
+  # When <url> fails, tries the recipe's mirrors for this pin
+  # (source.mirrors, exported by recipe-env.mjs as HOMESCOOP_MIRRORS_<sha256>)
+  # in order, and keeps a mirror's bytes only when they match <sha256>.
   local url="$1" sha="$2" tarball="$3"
   if [[ ! -f "$tarball" ]]; then
     echo "== fetch $url"
-    if ! curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "$url" -o "$tarball"; then
-      echo "homescoop_fetch: download failed ($url)" >&2
-      echo "Check that source.url derives from {{version}} / {{major}}.{{minor}} and that the file exists." >&2
-      return 1
+    if ! curl -fsSL --retry "${HOMESCOOP_FETCH_RETRY:-5}" --retry-all-errors --retry-delay 2 "$url" -o "$tarball"; then
+      rm -f "$tarball"
+      local mvar="HOMESCOOP_MIRRORS_$(printf '%s' "$sha" | tr 'A-F' 'a-f')" mirror got
+      if [[ "$sha" =~ ^[0-9a-fA-F]{64}$ && -n "${!mvar:-}" ]]; then
+        while IFS= read -r mirror; do
+          [[ -n "$mirror" ]] || continue
+          echo "== fetch $mirror (mirror)"
+          if ! curl -fsSL --retry "${HOMESCOOP_FETCH_RETRY:-5}" --retry-all-errors --retry-delay 2 "$mirror" -o "$tarball.part"; then
+            echo "homescoop_fetch: mirror download failed ($mirror)" >&2
+            rm -f "$tarball.part"
+            continue
+          fi
+          got="$(shasum -a 256 "$tarball.part" | cut -d' ' -f1)"
+          if [[ "$got" == "$(printf '%s' "$sha" | tr 'A-F' 'a-f')" ]]; then
+            mv "$tarball.part" "$tarball"
+            echo "source: ${NAME:-<package>} from mirror $mirror (sha256 match)"
+            break
+          fi
+          echo "homescoop_fetch: mirror $mirror has sha256 $got, not the pin $sha; rejected" >&2
+          rm -f "$tarball.part"
+        done <<<"${!mvar}"
+      fi
+      if [[ ! -f "$tarball" ]]; then
+        echo "homescoop_fetch: download failed ($url)" >&2
+        echo "Check that source.url derives from {{version}} / {{major}}.{{minor}} and that the file exists." >&2
+        return 1
+      fi
     fi
   fi
   if ! echo "$sha  $tarball" | shasum -a 256 -c -; then
