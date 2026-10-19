@@ -26,6 +26,7 @@ const GATES = {
   'certified-publish': 'scripts/assert-certified-publish.mjs',
   'cert-verdict': 'scripts/cert-review/verdict.mjs',
   'issue-dedupe': 'scripts/cert-review/issue-dedupe.mjs',
+  'threaded-heap': 'scripts/check-threaded-heap.mjs',
 };
 if (existsSync(join(root, 'scripts/check-no-debug.mjs'))) GATES['check-no-debug'] = 'scripts/check-no-debug.mjs';
 

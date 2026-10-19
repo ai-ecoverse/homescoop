@@ -126,6 +126,16 @@ console.log(`export NAME=${shQuote(name)}`);
 console.log(`export VERSION=${shQuote(version)}`);
 console.log(`export NPM_NAME=${shQuote(npm)}`);
 console.log(`export RECIPE_LICENSE=${shQuote(license)}`);
+// homescoop#1287: a threaded build's initial heap, sized from its measured
+// peak (recipe.yaml wasm.initial-memory, e.g. 256MiB), in bytes.
+{
+  const size = /^(\d+)\s*(B|KiB|MiB|GiB)?$/.exec(String(recipe.wasm?.['initial-memory'] ?? '').trim());
+  if (recipe.wasm?.['initial-memory'] !== undefined && !size) {
+    console.error(`recipe-env: ${name}: wasm.initial-memory ${recipe.wasm['initial-memory']} is not a size like 256MiB`);
+    process.exit(1);
+  }
+  if (size) console.log(`export WASM_INITIAL_MEMORY=${shQuote(Number(size[1]) * { B: 1, KiB: 1024, MiB: 1024 ** 2, GiB: 1024 ** 3 }[size[2] || 'B'])}`);
+}
 console.log(`export ${prefix}SRC_URL=${shQuote(url)}`);
 console.log(`export ${prefix}SRC_SHA=${shQuote(sha)}`);
 // Aliases used by many build.sh scripts

@@ -352,6 +352,8 @@ jobs:
           set -euo pipefail
           tag=$(node scripts/npm-tag.mjs "${{ matrix.package }}")
           node scripts/gate.mjs npm-parity -- node scripts/npm-parity.mjs .homescoop-out/package.tgz --tag "$tag" --drift fail
+      - name: A threaded bulk-memory module records its sized initial heap (homescoop#1287)
+        run: node scripts/gate.mjs threaded-heap -- node scripts/check-threaded-heap.mjs "${{ matrix.package }}" .homescoop-out/package.tgz
 
   test:
     needs: [detect, recipe-sha, host-build]
