@@ -14,3 +14,4 @@
 @ai-ecoverse/py-fonttools #761 Python 3.15 wave (packages/py-fonttools3.15, npm-tag python3.15)
 @ai-ecoverse/py-packaging #761 Python 3.15 wave (packages/py-packaging3.15, npm-tag python3.15)
 @ai-ecoverse/py-pyparsing #761 Python 3.15 wave (packages/py-pyparsing3.15, npm-tag python3.15)
+@ai-ecoverse/py-scipy #761 Python 3.15 wave (packages/py-scipy3.15, npm-tag python3.15)

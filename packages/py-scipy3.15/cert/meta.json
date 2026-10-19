@@ -1,0 +1,82 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-numpy"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-13",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-4",
+    "@ai-ecoverse/wasix-python@3.15.0-1",
+    "@ai-ecoverse/py-numpy@2.5.4-1"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-scipy3.15"
+  ],
+  "checklist": [
+    "cert/import.mjs: import scipy 1.18.1 (cp315) from /node_modules/@ai-ecoverse/py-scipy, found by discovery without PYTHONPATH, no nested python; 94 of its 95 side modules import (scipy.linalg._matfuncs_sqrtm_triu is not imported on its own: a circular-import ImportError on every python; linalg.sqrtm works)",
+    "cert/scipy.mjs: optimize.minimize BFGS on rosen -> [1, 1, 1]; quad(sin, 0, pi) 2; solve_ivp y' = -y -> e^-1; linalg lu/expm; sparse csr matvec [3, 3, 9]; special gamma(5) 24, erf(0.5); stats norm cdf/ppf, ttest_ind p 0.315334; CubicSpline of x^3 at 1.5 = 3.375; signal.butter(2, 0.5); fft [0, 2, 0, 2]",
+    "cert/lapack.mjs (1.18.1-1, homescoop#211 A6): against wasix-openblas' C LAPACK (f2c int returns): linalg solve/eigh/svd/qr/cholesky/lstsq/schur, batched inv (_batched_linalg), det, blas.zdotc/cdotu (the g77-ABI wrappers), lapack.dgetrf/dgesv, cholesky of -I raises LinAlgError; sparse.linalg splu/spilu (SuperLU, 0006), eigsh/eigs/svds (ARPACK), optimize trust-krylov (trlib, 0009), linprog and milp (HiGHS)",
+    "cert/uarray.mjs (homescoop#589): scipy._lib._uarray._Function's getters domain/arg_extractor/arg_replacer/default, set_backend's and skip_backend's _pickle, get_state()._pickle and a scipy.fft.fft pickle round trip; 1.18.0-12 traps (function signature mismatch, NEGATIVE.md); 0010-uarray-call-signatures.patch",
+    "cert/notices.mjs (homescoop#729): THIRD-PARTY-NOTICES.md names OpenBLAS 0.3.28 (BSD-3-Clause), LAPACK (BSD-3-Clause), GotoBLAS2 (BSD-2-Clause) and pybind11 (BSD-3-Clause), which are linked or compiled in, and the code scipy bundles from its LICENSES_bundled.txt (SuperLU, ARPACK, Qhull, HiGHS, Boost, UNU.RAN and the others with a licence file in the sdist), each with its licence text; LICENSE is LICENSE.txt with LICENSES_bundled.txt appended, as scipy's wheels ship it",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 and py-numpy >=2.5.4-1 <2.5.5 (the headers it is built against)",
+    "1.18.1-2 (homescoop#761, the cp315 wave; npm-tag python3.15): py-scipy's 1.18.1-1 recipe (homescoop#211 A6) for CPython 3.15: wasix-python 3.15.0-1, py-numpy 2.5.4-1 (its headers and f2py), Cython 3.3.0, the same patches 0001-0010, tools/scipy_cfix.py and static wasix-openblas 0.3.28-1; every side module links with -Wl,--fatal-warnings; every cp314 spec"
+  ],
+  "patches": {
+    "0001-gemm_-no-const.patch": "Pyodide: SuperLU's gemm prototypes lose const (they must match the int-ABI BLAS); cert/lapack.mjs runs splu/spilu",
+    "0002-make-int-return-values.patch": "Pyodide: SuperLU, the g77 wrappers and _superlu_utils declare BLAS/LAPACK int; cert/lapack.mjs (splu, zdotc/cdotu)",
+    "0003-Fix-gees-calls.patch": "Pyodide: flapack's gees select callbacks take the int-ABI signature; cert/lapack.mjs runs linalg.schur",
+    "0004-Remove-chla_transtype.patch": "Pyodide: drops chla_transtype from cython_lapack (a char-returning LAPACK helper); cython_lapack links with --fatal-warnings and imports (cert/import.mjs)",
+    "0005-Set-wrapper-return-type-to-int.patch": "Pyodide: _generate_pyx.py declares cython_lapack/cython_blas's wrapped routines int; cython_lapack/cython_blas import (cert/import.mjs) and cert/lapack.mjs calls through them",
+    "0006-superlu-blas-int-returns.patch": "SuperLU 1.18's remaining void BLAS externs -> int; cert/lapack.mjs runs splu/spilu",
+    "0007-Remove-xerbla_array.patch": "drops xerbla_array from cython_lapack (OpenBLAS' f2c one has a hidden string length); cython_lapack links with --fatal-warnings and imports (cert/import.mjs)",
+    "0008-no-test-npz.patch": "skips scipy.special's test-data .npz generation (install_tag tests, needs numpy.loadtxt on the build python); build-only, no runtime effect (cert/import.mjs)",
+    "0009-trlib-no-hidden-strlen.patch": "trlib's dlagtm call loses gfortran's hidden string length; cert/lapack.mjs runs trust-krylov",
+    "0010-uarray-call-signatures.patch": "uarray's getters and BackendState._pickle get CPython's second parameter (homescoop#589); cert/uarray.mjs"
+  },
+  "notices": [
+    {
+      "name": "OpenBLAS",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "LAPACK",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "GotoBLAS2",
+      "license": "BSD-2-Clause"
+    },
+    {
+      "name": "pybind11",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "SuperLU",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "ARPACK",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "Qhull",
+      "license": "Qhull"
+    },
+    {
+      "name": "HiGHS",
+      "license": "MIT"
+    },
+    {
+      "name": "Boost",
+      "license": "BSL-1.0"
+    },
+    {
+      "name": "UNU.RAN",
+      "license": "BSD-3-Clause",
+      "text": "Permission was granted on 23 March 2021 by Josef Leydold"
+    }
+  ]
+}
