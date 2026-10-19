@@ -1,5 +1,16 @@
 # py-scipy: negative proof
 
+## 1.18.0-12 (published) fails the 1.18.1-1 cert (homescoop#589, #211 A6; 2026-10-19)
+
+`cert/uarray.mjs` against npm's py-scipy 1.18.0-12 (wasix-python 3.14.2-28, py-numpy 2.3.2-12, slicc-kernel 1.125.0, Node entry):
+
+```
+FAIL cert/uarray.mjs rc=134 stderr=python3: wasm trap: function signature mismatch
+```
+
+uarray's `_Function` getters and `_pickle` methods are defined with one parameter. CPython calls them with two. 1.18.1-1 passes (0010-uarray-call-signatures.patch), and `wasm-call-signatures.mjs` finds 0 mismatches in all 95 side modules (1.18.0-12: 5, in `_uarray`). `cert/lapack.mjs` passes on both. 1.18.1-1 links OpenBLAS statically instead of shipping `libscipy_openblas.so`.
+
+
 ## 1.18.0-11 (published) fails the 1.18.0-12 cert (homescoop#702)
 
 `node scripts/browser-cert/python-range.mjs py-scipy --tarball ai-ecoverse-py-scipy-1.18.0-11.tgz --lock-only`

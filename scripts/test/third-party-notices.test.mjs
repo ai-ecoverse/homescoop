@@ -43,16 +43,12 @@ py-contourpy pybind11 #797
 py-contourpy files #797
 py-kiwisolver cppy #815
 py-kiwisolver files #815
-py-scipy OpenBLAS #729
-py-scipy libf2c #729
-py-scipy files #729
 `;
 
 // Bundled code no metadata names yet (from the issues). A package's
 // cert/meta.json "notices" list, once it has one, replaces its entry here.
 const DECLARED = {
   'py-numpy': ['OpenBLAS'], // #726
-  'py-scipy': ['OpenBLAS', 'libf2c'], // #729
   'py-contourpy': ['pybind11'], // #797
 };
 
