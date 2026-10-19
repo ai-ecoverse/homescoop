@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const ALLOWLIST = join(root, 'scripts/check-no-debug-allowlist.txt');
@@ -178,6 +179,65 @@ export function scan(dir) {
   return found;
 }
 
+function csvSplit(line) {
+  const out = [];
+  let cur = '';
+  let q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') q = false;
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+const csvField = (v) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+
+/**
+ * After a strip, a wheel's *.dist-info/RECORD still names the old sha256 and
+ * size of every file it lists (homescoop#908 strips after build.sh wrote it).
+ * Rewrite the entries of the changed files, keeping every other byte of the
+ * RECORD. Returns [{record, path}] for each entry rewritten.
+ */
+export function updateRecords(dir, changed) {
+  const want = new Set(changed.map((p) => resolve(p)));
+  const done = [];
+  const walk = (d) => {
+    for (const e of readdirSync(d)) {
+      const p = join(d, e);
+      const st = statSync(p);
+      if (st.isDirectory()) walk(p);
+      else if (e === 'RECORD' && d.endsWith('.dist-info')) {
+        const site = dirname(d);
+        const text = readFileSync(p, 'utf8');
+        const eol = text.includes('\r\n') ? '\r\n' : '\n';
+        let touched = false;
+        const lines = text.split(/\r?\n/).map((line) => {
+          if (!line) return line;
+          const row = csvSplit(line);
+          if (row.length !== 3 || !row[1]) return line;
+          const target = resolve(site, row[0]);
+          if (!want.has(target)) return line;
+          const algo = row[1].split('=', 1)[0];
+          const buf = readFileSync(target);
+          touched = true;
+          done.push({ record: relative(dir, p), path: row[0] });
+          return [csvField(row[0]), `${algo}=${createHash(algo).update(buf).digest('base64url')}`, String(buf.length)].join(',');
+        });
+        if (touched) writeFileSync(p, lines.join(eol));
+      }
+    }
+  };
+  walk(dir);
+  return done;
+}
+
 export function allowlisted(name, text = readFileSync(ALLOWLIST, 'utf8')) {
   for (const [i, raw] of text.split('\n').entries()) {
     const line = raw.trim();
@@ -228,6 +288,9 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
         chmodSync(p, mode);
         const names = keptSections(out).filter((x) => x === 'name' || x.endsWith(':name')).length;
         console.log(`  stripped ${f.file}: ${f.bytes} bytes of ${f.sections.join(' ')}${names ? `; name section kept (${names})` : ''}`);
+      }
+      for (const u of updateRecords(resolve(dir), files.map((f) => join(resolve(dir), f.file)))) {
+        console.log(`  ${u.record}: ${u.path} now has the stripped file's sha256 and size`);
       }
     } catch (e) {
       console.error(`check-no-debug: FAIL ${name}: ${e.message}`);
