@@ -11,6 +11,10 @@ function responder (req) {
     url: req.url,
     auth: header('authorization'),
     title: header('x-title'),
+    filename: header('x-filename'),
+    priority: header('x-priority'),
+    tags: header('x-tags'),
+    click: header('x-click'),
     length: body.length,
     text: body.length <= 65536 ? new TextDecoder().decode(body) : '',
   })
