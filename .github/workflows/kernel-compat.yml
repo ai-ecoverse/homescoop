@@ -110,7 +110,7 @@ jobs:
     steps:
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - id: runners
         env:
           SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
@@ -193,7 +193,7 @@ jobs:
           ref: ${{ inputs.homescoop-ref || 'main' }}
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - id: kind
         env:
           KERNEL: ${{ inputs.kernel }}
@@ -271,7 +271,7 @@ jobs:
           ref: ${{ needs.plan.outputs.homescoop-sha }}
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - uses: actions/download-artifact@v8
         with:
           artifact-ids: ${{ needs.plan.outputs.plan-id }}
@@ -351,7 +351,7 @@ jobs:
           ref: ${{ needs.plan.outputs.homescoop-sha }}
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - id: tools
         run: echo "missing=$([[ -f scripts/cert-review/artifacts.mjs ]] && echo false || echo true)" >> "$GITHUB_OUTPUT"
       - if: steps.tools.outputs.missing == 'true'

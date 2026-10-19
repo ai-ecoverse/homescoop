@@ -363,7 +363,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - run: npm ci && npm run build && mkdir -p out && npm pack --pack-destination out
       - uses: actions/upload-artifact@v7
         with:

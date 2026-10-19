@@ -45,7 +45,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - id: k
         run: |
           set -euo pipefail
@@ -89,7 +89,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: The harness's own specs (scripts/browser-cert/selftest) on npm latest of wasm-curl
         env:
           KERNEL: ${{ needs.kernels.outputs.positive }}

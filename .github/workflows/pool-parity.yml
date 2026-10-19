@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - id: p
         env:
           ONLY: ${{ inputs.packages }}
@@ -66,7 +66,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
       - run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
       - name: Build from the hosted workspace path
@@ -113,7 +113,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - uses: actions/download-artifact@v8
         with:
           name: parity-${{ matrix.package }}-hosted
@@ -165,7 +165,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: One verdict-<recipe> per planned recipe, nothing else named verdict-*
         id: pick
         env:
