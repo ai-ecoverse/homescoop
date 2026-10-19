@@ -89,7 +89,7 @@
       ]
     },
     {
-      "description": "Semver majors on recipes: always human (Lars).",
+      "description": "Semver majors on recipes don't automerge: the homescoop coordinator's lane owns them. A worker checks the breaking changes, then merges on green ci plus a certified cert-review. The weekly sweep picks up any major left waiting.",
       "matchFileNames": [
         "packages/**/recipe.yaml"
       ],
@@ -229,7 +229,7 @@
       "enabled": false
     },
     {
-      "description": "Semver majors of anything (recipes, workflow actions, npm, Cargo) stay human: never automerge.",
+      "description": "Semver majors of anything (recipes, workflow actions, npm, Cargo) don't automerge: the homescoop coordinator's lane reviews the breaking changes and merges on green plus certified, and the weekly sweep keeps them owned.",
       "matchUpdateTypes": [
         "major"
       ],
