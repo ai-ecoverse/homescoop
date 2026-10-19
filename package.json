@@ -31,8 +31,7 @@
     "slicc-kernel-negative": "npm:@ai-ecoverse/slicc-kernel@1.78.0"
   },
   "workspaces": [
-    "packages/*/package",
-    "!packages/*3.15/package"
+    "packages/*/package"
   ],
   "license": "Apache-2.0"
 }

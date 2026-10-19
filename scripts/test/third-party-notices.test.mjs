@@ -37,17 +37,12 @@ cmake Emscripten #844
 cmake files #844
 wasm-binaryen Emscripten #844
 wasm-binaryen files #844
-py-contourpy pybind11 #797
-py-contourpy files #797
-py-kiwisolver cppy #815
-py-kiwisolver files #815
 `;
 
 // Bundled code no metadata names yet (from the issues). A package's
 // cert/meta.json "notices" list, once it has one, replaces its entry here.
 const DECLARED = {
   'py-numpy': ['OpenBLAS'], // #726
-  'py-contourpy': ['pybind11'], // #797
 };
 
 // Dependencies and sources that are not linked into the shipped wasm.

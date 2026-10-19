@@ -110,29 +110,19 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-pkgconf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-pkgconf) | [recipe](packages/pkgconf) | pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-poppler`](https://www.npmjs.com/package/@ai-ecoverse/wasm-poppler) | [recipe](packages/poppler) | poppler PDF utilities (pdftotext, pdftoppm, pdfinfo, …) for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-procps`](https://www.npmjs.com/package/@ai-ecoverse/wasm-procps) | [recipe](packages/procps) | procps-ng for slicc (WASM / emscripten, SLICC homescoop); user names from slicc-kernel >= 1.44.0 |
-| [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) | [recipe](packages/py-contourpy) | contourpy for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
-| [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) (dist-tag `python3.15`) | [recipe](packages/py-contourpy3.15) | contourpy for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
+| [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) | [recipe](packages/py-contourpy) | contourpy for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) | [recipe](packages/py-cycler) | cycler for slicc WASIX CPython |
-| [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) (dist-tag `python3.15`) | [recipe](packages/py-cycler3.15) | cycler for slicc WASIX CPython |
 | [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fonttools for slicc WASIX CPython |
-| [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) (dist-tag `python3.15`) | [recipe](packages/py-fonttools3.15) | fonttools for slicc WASIX CPython |
-| [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
-| [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) (dist-tag `python3.15`) | [recipe](packages/py-kiwisolver3.15) | kiwisolver for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
-| [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
-| [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) (dist-tag `python3.15`) | [recipe](packages/py-matplotlib3.15) | matplotlib Agg for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
+| [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
+| [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy 2.5.4 for slicc WASIX CPython 3.15 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |
-| [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) (dist-tag `python3.15`) | [recipe](packages/py-packaging3.15) | packaging for slicc WASIX CPython |
-| [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | Pandas 2.3.2 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32 side modules) |
-| [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) (dist-tag `python3.15`) | [recipe](packages/py-pandas3.15) | Pandas 3.0.6 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules) |
-| [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow for slicc WASIX CPython 3.14 (cp314-wasix_wasm32) |
-| [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) (dist-tag `python3.15`) | [recipe](packages/py-pillow3.15) | Pillow for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
+| [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | Pandas 3.0.6 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules) |
+| [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-pyparsing`](https://www.npmjs.com/package/@ai-ecoverse/py-pyparsing) | [recipe](packages/py-pyparsing) | pyparsing for slicc WASIX CPython |
-| [`@ai-ecoverse/py-pyparsing`](https://www.npmjs.com/package/@ai-ecoverse/py-pyparsing) (dist-tag `python3.15`) | [recipe](packages/py-pyparsing3.15) | pyparsing for slicc WASIX CPython |
 | [`@ai-ecoverse/py-python-dateutil`](https://www.npmjs.com/package/@ai-ecoverse/py-python-dateutil) | [recipe](packages/py-python-dateutil) | python-dateutil for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pytz`](https://www.npmjs.com/package/@ai-ecoverse/py-pytz) | [recipe](packages/py-pytz) | pytz for slicc WASIX CPython |
-| [`@ai-ecoverse/py-scipy`](https://www.npmjs.com/package/@ai-ecoverse/py-scipy) | [recipe](packages/py-scipy) | SciPy 1.18.1 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32 side modules, static OpenBLAS) |
-| [`@ai-ecoverse/py-scipy`](https://www.npmjs.com/package/@ai-ecoverse/py-scipy) (dist-tag `python3.15`) | [recipe](packages/py-scipy3.15) | SciPy 1.18.1 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules, static OpenBLAS) |
+| [`@ai-ecoverse/py-scipy`](https://www.npmjs.com/package/@ai-ecoverse/py-scipy) | [recipe](packages/py-scipy) | SciPy 1.18.1 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules, static OpenBLAS) |
 | [`@ai-ecoverse/py-six`](https://www.npmjs.com/package/@ai-ecoverse/py-six) | [recipe](packages/py-six) | six for slicc WASIX CPython |
 | [`@ai-ecoverse/py-tzdata`](https://www.npmjs.com/package/@ai-ecoverse/py-tzdata) | [recipe](packages/py-tzdata) | tzdata for slicc WASIX CPython |
 | [`@ai-ecoverse/wasm-qpdf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-qpdf) | [recipe](packages/qpdf) | qpdf PDF merge/split/rotate/decrypt/linearize tool for slicc (WASM / emscripten, SLICC homescoop) |

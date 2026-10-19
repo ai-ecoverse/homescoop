@@ -1,5 +1,9 @@
 # py-fonttools: negative proof
 
+## The first cp315 release (homescoop#761; 2026-10-18)
+
+npm's cp314 py-fonttools (`latest`) declares `@ai-ecoverse/wasix-python >=3.14.2-16 <3.14.3`, so with wasix-python 3.15.0-1 at the top, npm nests a second, 3.14 python under it (python-range.mjs --lock-only fails, as for the 3.14.2-16 exact pin below). Its .pyc files are `cpython-314`, which 3.15 doesn't use. The cp315 tarball resolves one python and passes every spec on 3.15.0-1 (slicc-kernel 1.125.0); cert/record.mjs checks its `cpython-315` .pyc.
+
 ## 4.66.1-8: a CI-built root (cert lane, 2026-10-16)
 
 4.66.1-7 and the releases before it repack bytes whose root traces to gitHead f22dcbc2, whose tree has no py-fonttools recipe. Nothing can rebuild or attest them. 4.66.1-8 is built in ladder-pr from PyPI's pinned wheel by `scripts/stage-pure-wheel.sh`, so its npm provenance covers the build. It behaves the same as 4.66.1-7: the import and real-use specs pass on both. `record.mjs` is the new check: the files are the wheel's, the `.pyc` match their sources, and its built-in flipped-byte self-test keeps it from being vacuous.

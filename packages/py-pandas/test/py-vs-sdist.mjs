@@ -26,7 +26,7 @@ const url = recipe.source.url.replaceAll('{{version}}', version);
 const sha = recipe.source.sha256;
 // The build adds these (meson install of the sdist's top-level files).
 const ADDED = new Set(['pandas/_version_meson.py']);
-const PATCHED = new Set(['pandas/errors/__init__.py', 'pandas/core/interchange/from_dataframe.py']);
+const PATCHED = new Set();
 
 const work = mkdtempSync(join(tmpdir(), 'py-pandas-sdist-'));
 try {
@@ -39,7 +39,8 @@ try {
   const pkg = join(work, 'pkg');
   execFileSync('mkdir', ['-p', pkg]);
   execFileSync('tar', ['xzf', tgz, '-C', pkg]);
-  const site = join(pkg, 'package/lib/python3.14/site-packages');
+  const libdir = join(pkg, 'package/lib');
+  const site = join(libdir, readdirSync(libdir).find((d) => /^python3\.\d+$/.test(d)), 'site-packages');
   const pys = (dir) => {
     const out = [];
     const walk = (d) => {
@@ -55,10 +56,7 @@ try {
   };
   const shipped = pys(site);
   const upstream = pys(src);
-  // The patched files: apply the patch to a copy of the sdist and compare.
-  const patched = join(work, 'patched');
-  execFileSync('cp', ['-R', src, patched]);
-  execFileSync('patch', ['-d', patched, '-p1', '-s', '-i', join(root, 'packages/py-pandas/0002-lazy-ctypes.patch')]);
+  const patched = src;
   const differs = [];
   for (const f of shipped) {
     if (ADDED.has(f)) continue;
@@ -73,7 +71,7 @@ try {
   for (const f of ADDED) assert.ok(shipped.has(f), `${f} isn't shipped`);
   assert.deepEqual(differs, [], differs.join('\n'));
   assert.deepEqual(missing, [], `sdist .py files not shipped:\n${missing.join('\n')}`);
-  console.log(`PASS test/py-vs-sdist.mjs: ${shipped.size} pandas .py files; ${shipped.size - ADDED.size - PATCHED.size} equal pandas-${version}.tar.gz (sha256 ${sha.slice(0, 12)}…), ${PATCHED.size} equal it with 0002-lazy-ctypes.patch applied, ${ADDED.size} added by the build (${[...ADDED].join(', ')})`);
+  console.log(`PASS test/py-vs-sdist.mjs: ${shipped.size} pandas .py files; ${shipped.size - ADDED.size - PATCHED.size} equal pandas-${version}.tar.gz (sha256 ${sha.slice(0, 12)}…), ${ADDED.size} added by the build (${[...ADDED].join(', ')})`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
