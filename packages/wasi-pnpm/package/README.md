@@ -95,6 +95,21 @@ pnpm's worker threads allocate trapped on CI's Linux Chromium
 (`pnpm: wasm trap in thread N: memory access out of bounds`, homescoop#1127),
 and a warm install now rarely grows at all.
 
+## Projects and the pin (12.9.1-15)
+
+A directory without a `package.json` of its own is its own project: `pnpm
+add <pkg>` there creates `package.json` in it, as native pnpm does. pnpm
+looks for the nearest ancestor with a project marker, and in slicc the root
+holds the base set's `node_modules`, so up to 12.9.1-14 every such
+directory resolved to `/` and the command failed with
+`ERR_PNPM_PACKAGE_MANIFEST_IO_ERROR` (os error 44), leaving a
+`/.tmpXXXXXX`. `/` is a project only when pnpm runs there. `pnpm init`
+pins the running pnpm in `packageManager` and `devEngines`: this pnpm can't
+switch to another version, and up to 12.9.1-14 it pinned the registry's
+latest, so the next command in the project failed with
+`ERR_PNPM_UNSUPPORTED_RUNTIME`. A project pinned to another version still
+works with `npm_config_manage_package_manager_versions=false`.
+
 ## `npm`, `npx` and `i`
 
 The package also provides `npm`, `npx` and `i` as small `#!/bin/sh` scripts
