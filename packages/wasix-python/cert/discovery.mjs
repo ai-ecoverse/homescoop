@@ -22,11 +22,11 @@
  * (packaging-only) re-pin wave.
  */
 import { repin } from './fixtures/repin.mjs';
+import { abiSplit, assertRefused, MODULES } from './fixtures/abi.mjs';
 
 const S = '@ai-ecoverse';
 const NM = `/node_modules/${S}`;
 const G = '/usr/local/share/pnpm/global/v11';
-const TOP = ['py-numpy', 'py-pandas', 'py-scipy', 'py-matplotlib'];
 const DIAG = String.raw`
 import os, sys
 import _slicc_site as s
@@ -40,8 +40,13 @@ print("found:", found)
 print("stamps:", [s._stamp(p) for p in found][:6])
 print("scan:", s._scan(real, found))
 `;
-const IMPORTS =
-  'import numpy, pandas, scipy.optimize, matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot, PIL, kiwisolver, contourpy, fontTools, cycler, packaging, pyparsing, dateutil, pytz, six, tzdata; print(numpy.__version__, pandas.__version__, scipy.__version__, matplotlib.__version__)';
+const NATIVE_TOP = ['py-numpy', 'py-pandas', 'py-scipy', 'py-matplotlib'];
+const PURE_TOP = ['py-six', 'py-python-dateutil', 'py-pytz', 'py-tzdata'];
+const imports = (loadable, top) => {
+  const mods = loadable.map((p) => MODULES[p]).filter(Boolean).map((m) => (m === 'scipy' ? 'scipy.optimize' : m));
+  const agg = mods.includes('matplotlib') ? '; matplotlib.use("Agg"); import matplotlib.pyplot' : '';
+  return `import ${mods.join(', ')}${agg}; print(${top.map((p) => `${MODULES[p]}.__version__`).join(', ')})`;
+};
 
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
@@ -55,6 +60,12 @@ export default async function (ctx) {
   const man = {};
   for (const n of ['wasix-python', ...pkgs]) man[n] = JSON.parse(await read(`${NM}/${n}/package.json`));
   const PYVER = man['wasix-python'].version;
+  const split = await abiSplit(ctx);
+  const nativeTop = NATIVE_TOP.filter((p) => split.loadable.includes(p));
+  const TOP = nativeTop.length ? nativeTop : PURE_TOP.filter((p) => split.loadable.includes(p));
+  const [m0, m1] = TOP.map((p) => MODULES[p]);
+  const IMPORTS = imports(split.loadable, TOP);
+  await assertRefused(ctx, split, 'discovery');
   const deps = (n) => Object.keys(man[n].dependencies || {}).map((d) => d.replace(`${S}/`, '')).filter((d) => man[d]);
   const closure = (n, acc = new Set()) => {
     for (const d of deps(n)) if (d !== 'wasix-python' && !acc.has(d)) { acc.add(d); closure(d, acc); }
@@ -109,7 +120,8 @@ export default async function (ctx) {
   const stale = [];
   for (const dir of nested) {
     const v = JSON.parse(await read(`${dir}/package.json`)).version;
-    if (v !== PYVER) stale.push([dir.slice(NM.length + 1).split('/')[0], v]);
+    const pkg = dir.slice(NM.length + 1).split('/')[0];
+    if (v !== PYVER && split.loadable.includes(pkg)) stale.push([pkg, v]);
   }
   if (stale.length) {
     const v = await py(['-v', '-c', 'pass']);
@@ -140,7 +152,10 @@ export default async function (ctx) {
   console.log(`discovery: flat /node_modules: ${r.stdout.trim()}`);
 
   // Cost, on the flat layout (17 py-*).
-  const pp = (await py(['-c', 'import sys; print(":".join(p for p in sys.path if "/py-" in p))'])).stdout.trim();
+  const found = (await py(['-c', 'import sys; print(":".join(p for p in sys.path if "/py-" in p))'])).stdout.trim();
+  // discover() reads every py-*, also those it refuses (another abi): the
+  // PYTHONPATH it is measured against has the same directories.
+  const pp = [found, ...split.refused.map((p) => `${NM}/${p.name}/${man[p.name].slicc.python.sitePackages}`)].filter(Boolean).join(':');
   const cold = await py(['-c', 'import os, time, _slicc_site as s\nc = s._cache_path(os.path.realpath(__import__("sys").base_prefix))\nc and os.path.exists(c) and os.remove(c)\nt = time.perf_counter(); s.discover(); a = time.perf_counter() - t\nt = time.perf_counter(); s.discover(); b = time.perf_counter() - t\nprint(f"{a*1000:.1f} {b*1000:.1f}")']);
   assert.equal(cold.status, 0, cold.stderr);
   const [coldMs, warmMs] = cold.stdout.trim().split(' ').map(Number);
@@ -170,11 +185,11 @@ export default async function (ctx) {
     for (const t of TOP) closure(t, one);
     await project(`${G}/one`, ['wasix-python', ...TOP], [...one]);
     await pythonGAt(`${G}/one/`);
-    r = await pyg(['-c', IMPORTS]);
+    r = await pyg(['-c', imports([...one].filter((n) => split.loadable.includes(n)), TOP)]);
     assert.equal(r.status, 0, `one project: ${r.stderr}`);
-    r = await pyg(['-c', 'import numpy, sys; print(numpy.__file__)']);
-    assert.ok(r.stdout.startsWith(`${G}/one/`), `numpy came from ${r.stdout}`);
-    console.log(`discovery: one pnpm project: numpy from ${r.stdout.trim()}`);
+    r = await pyg(['-c', `import ${m0}, sys; print(${m0}.__file__)`]);
+    assert.ok(r.stdout.startsWith(`${G}/one/`), `${m0} came from ${r.stdout}`);
+    console.log(`discovery: one pnpm project: ${m0} from ${r.stdout.trim()}`);
     await sh(`rm -rf ${G}`);
 
     // 2. One project per `pnpm add -g` package.
@@ -189,16 +204,16 @@ export default async function (ctx) {
     const old = `${G}/py-old/node_modules/.pnpm/${S}+py-oldbuild@1.0.0-1/node_modules/${S}/py-oldbuild`;
     await write(`${old}/package.json`, JSON.stringify({
       name: `${S}/py-oldbuild`, version: '1.0.0-1', dependencies: { [`${S}/wasix-python`]: '3.14.2-13' },
-      slicc: { python: { sitePackages: 'lib/python3.14/site-packages', requires: { abi: 'cp314', platform: 'wasix_wasm32' } } },
+      slicc: { python: { sitePackages: `lib/python${split.want.version}/site-packages`, requires: { abi: split.want.abi, platform: split.want.platform } } },
     }));
-    await write(`${old}/lib/python3.14/site-packages/oldbuild_marker.py`, 'X = 1\n');
+    await write(`${old}/lib/python${split.want.version}/site-packages/oldbuild_marker.py`, 'X = 1\n');
     await write(`${old.replace(/py-oldbuild$/, 'wasix-python')}/package.json`, JSON.stringify({ name: `${S}/wasix-python`, version: '3.14.2-13' }));
     await sh(`mkdir -p ${G}/py-old/node_modules/${S} && ln -s ../.pnpm/${S}+py-oldbuild@1.0.0-1/node_modules/${S}/py-oldbuild ${G}/py-old/node_modules/${S}/py-oldbuild\nln -s python ${G}/0123abcdef`);
     await pythonGAt(`${G}/python/`);
-    r = await pyg(['-c', IMPORTS]);
+    r = await pyg(['-c', imports([...placed].filter((n) => split.loadable.includes(n)), TOP)]);
     assert.equal(r.status, 0, `global projects: ${r.stderr}`);
-    r = await pyg(['-c', 'import numpy, pandas; print(numpy.__file__, pandas.__file__)']);
-    assert.ok(r.stdout.includes(`${G}/py-numpy/`) && r.stdout.includes(`${G}/py-pandas/`), `from ${r.stdout}`);
+    r = await pyg(['-c', `import ${m0}, ${m1}; print(${m0}.__file__, ${m1}.__file__)`]);
+    assert.ok(r.stdout.includes(`${G}/${TOP[0]}/`) && r.stdout.includes(`${G}/${TOP[1]}/`), `from ${r.stdout}`);
     console.log(`discovery: pnpm add -g, one project each: ${r.stdout.trim()}`);
     r = await pyg(['-v', '-c', 'import importlib.util as u; print(u.find_spec("oldbuild_marker") is None)']);
     const note = r.stderr.split('\n').filter((l) => l.startsWith('slicc discover:') && l.includes('py-oldbuild'));

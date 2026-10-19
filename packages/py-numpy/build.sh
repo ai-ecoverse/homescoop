@@ -26,13 +26,13 @@ NP_TGZ="$DL/$(basename "$SRC_URL")"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$NP_TGZ"
 
 HOSTPY="${WASIX_PYTHON_HOST_PY:-}"
-if [[ -z "$HOSTPY" ]] && command -v python3.14 >/dev/null 2>&1; then
-  HOSTPY="$(command -v python3.14)"
+if [[ -z "$HOSTPY" ]] && command -v python3.15 >/dev/null 2>&1; then
+  HOSTPY="$(command -v python3.15)"
 fi
 if [[ -z "$HOSTPY" ]]; then
-  HOSTPY="$B/host/bin/python3.14"
+  HOSTPY="$B/host/bin/python3.15"
   if [[ ! -x "$HOSTPY" ]]; then
-    echo "== py-numpy: host CPython 3.14.2 (meson, cython, compileall)"
+    echo "== py-numpy: host CPython 3.15.0 (meson, cython, compileall)"
     fetch_src cpython
     rm -rf "$B/host-src" && mkdir -p "$B/host-src"
     tar xzf "$SRC_FILE" -C "$B/host-src" --strip-components=1
@@ -46,10 +46,13 @@ if [[ -z "$HOSTPY" ]]; then
     ) || { tail -40 "$B"/host-*.log >&2; exit 1; }
   fi
 fi
-"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
+"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 15), sys.version'
 export WASIX_PYTHON_HOST_PY="$HOSTPY"
 command -v ninja >/dev/null || { echo "homescoop py-numpy: need ninja" >&2; exit 1; }
 
+# wasix-sysroot -38, as wasix-python 3.15.0-1 (the cp315 wave, #761).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
+export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 export WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes WASIXCC_RUN_WASM_OPT=no
 unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS WASIXCC_MODULE_KIND
@@ -60,17 +63,14 @@ fetch_src wasix_python
 PYDEV="$B/wasix-python"
 rm -rf "$PYDEV" && mkdir -p "$PYDEV"
 tar xzf "$SRC_FILE" -C "$PYDEV" package/include package/package.json
-PYINC="$PYDEV/package/include/python3.14"
+PYINC="$PYDEV/package/include/python3.15"
 test -f "$PYINC/Python.h"
 PYVER="$(node -p "require('$PYDEV/package/package.json').version")"
 FLOOR="$(node --input-type=module -e "import { pythonRange } from '$ROOT/scripts/check-exact-pins.mjs'; import { readFileSync } from 'node:fs'; const r = pythonRange(JSON.parse(readFileSync('$DEST/package.json', 'utf8')).dependencies['@ai-ecoverse/wasix-python']); console.log(r ? r.floor : '')")"
 [[ "$PYVER" == "$FLOOR" ]] || { echo "homescoop py-numpy: headers from wasix-python $PYVER, but the package's range floor is '$FLOOR'" >&2; exit 1; }
 
-fetch_src cxxrt
-CXXRT="$B/cxxrt"
-rm -rf "$CXXRT" && mkdir -p "$CXXRT"
-tar xzf "$SRC_FILE" -C "$CXXRT" wasix-sysroot-ehpic/sysroot/include/c++
-CXXINC="$CXXRT/wasix-sysroot-ehpic/sysroot/include/c++/v1"
+# phase B: libc++ headers from the sysroot (-38: the same runtimes and headers python links)
+CXXINC="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/include/c++/v1"
 test -f "$CXXINC/vector"
 
 echo "== py-numpy: OpenBLAS 0.3.28 (static PIC, f2c LAPACK, int ABI; tools/build-openblas.sh)"
@@ -105,7 +105,7 @@ for t in cc c++; do
 args=(-fvisibility=default)
 so=0
 for a in "\$@"; do
-  case "\$a" in *.cpython-314-wasm32-wasix.so) so=1 ;; esac
+  case "\$a" in *.cpython-315-wasm32-wasix.so) so=1 ;; esac
 done
 for a in "\$@"; do
   case "\$a" in
@@ -125,10 +125,12 @@ done
 cat >"$TOOLS/site/sitecustomize.py" <<EOF
 import platform, sysconfig
 _INC = "$PYINC"
-_OVERRIDES = {"SOABI": "cpython-314-wasm32-wasix", "EXT_SUFFIX": ".cpython-314-wasm32-wasix.so", "INCLUDEPY": _INC,
+_OVERRIDES = {"SOABI": "cpython-315-wasm32-wasix", "EXT_SUFFIX": ".cpython-315-wasm32-wasix.so", "INCLUDEPY": _INC,
     "CONFINCLUDEPY": _INC, "HOST_GNU_TYPE": "wasm32-unknown-wasix", "MULTIARCH": "wasm32-wasix", "Py_ENABLE_SHARED": "0",
-    "SHLIB_SUFFIX": ".so", "SIZEOF_VOID_P": "4", "SIZEOF_SIZE_T": "4", "SIZEOF_LONG": "4", "SIZEOF_TIME_T": "8"}
-_get, _vars, _path = sysconfig.get_config_var, sysconfig.get_config_vars, sysconfig.get_path
+    "SHLIB_SUFFIX": ".so", "SIZEOF_VOID_P": "4", "SIZEOF_SIZE_T": "4", "SIZEOF_LONG": "4", "SIZEOF_TIME_T": "8",
+    # the host python-3.15.pc (LIBPC) would put its own include dir first
+    "LIBPC": "/nonexistent-homescoop"}
+_get, _vars, _path, _paths = sysconfig.get_config_var, sysconfig.get_config_vars, sysconfig.get_path, sysconfig.get_paths
 def get_config_var(name):
     return _OVERRIDES[name] if name in _OVERRIDES else _get(name)
 def get_config_vars(*args):
@@ -139,9 +141,20 @@ def get_config_vars(*args):
     return [get_config_var(a) for a in args]
 def get_path(name, *a, **k):
     return _INC if name in ("include", "platinclude") else _path(name, *a, **k)
-sysconfig.get_config_var, sysconfig.get_config_vars, sysconfig.get_path = get_config_var, get_config_vars, get_path
+def get_paths(*a, **k):
+    d = dict(_paths(*a, **k))
+    d["include"] = d["platinclude"] = _INC
+    return d
+sysconfig.get_config_var, sysconfig.get_config_vars, sysconfig.get_path, sysconfig.get_paths = get_config_var, get_config_vars, get_path, get_paths
 sysconfig.get_platform = lambda: "wasix_wasm32"
 platform.machine = lambda: "wasm32"
+# wasm side modules have no rpaths: meson install's depfixer would run
+# install_name_tool (macOS build machine) or the ELF fixer on them.
+try:
+    import mesonbuild.scripts.depfixer as _depfixer
+    _depfixer.fix_rpath = lambda *a, **k: None
+except ImportError:
+    pass
 EOF
 FLAGS="'-O2', '-fPIC', '-matomics', '-mbulk-memory', '-mmutable-globals', '-pthread', '-I$PYINC', '-I$OBP/include', '-ffile-prefix-map=$B=.'"
 cat >"$TOOLS/cross.ini" <<EOF
@@ -183,18 +196,18 @@ export PKG_CONFIG_LIBDIR="$OBP/lib/pkgconfig"
 echo "== py-numpy: meson setup (numpy's vendored meson)"
 (cd "$SRC" && "$HOSTPY" vendored-meson/meson/meson.py setup "$BUILD" --cross-file "$TOOLS/cross.ini" --native-file "$TOOLS/native.ini" \
   -Dallow-noblas=false -Dblas=openblas -Dlapack=openblas -Dbuildtype=release -Db_ndebug=if-release \
-  --prefix=/usr --python.purelibdir=lib/python3.14/site-packages --python.platlibdir=lib/python3.14/site-packages) >"$B/meson-setup.log" 2>&1 \
+  --prefix=/usr --python.purelibdir=lib/python3.15/site-packages --python.platlibdir=lib/python3.15/site-packages) >"$B/meson-setup.log" 2>&1 \
   || { tail -80 "$B/meson-setup.log" >&2; exit 1; }
 grep -E "Run-time dependency openblas found: YES|Program cython found|Cross compiling" "$B/meson-setup.log" || { grep -n -i "openblas\|blas" "$B/meson-setup.log" | head -20 >&2; exit 1; }
 echo "== py-numpy: ninja (-j$JOBS)"
 ninja -C "$BUILD" -j"$JOBS" >"$B/ninja.log" 2>&1 || { tail -80 "$B/ninja.log" >&2; exit 1; }
-DESTDIR="$STAGE" "$HOSTPY" "$SRC/vendored-meson/meson/meson.py" install -C "$BUILD" --no-rebuild --skip-subprojects >"$B/install.log" 2>&1 \
+PYTHONPATH="$TOOLS/site:$CYSITE:$SRC/vendored-meson/meson" DESTDIR="$STAGE" "$HOSTPY" "$SRC/vendored-meson/meson/meson.py" install -C "$BUILD" --no-rebuild --skip-subprojects >"$B/install.log" 2>&1 \
   || { tail -40 "$B/install.log" >&2; exit 1; }
 unset PYTHONPATH PKG_CONFIG_LIBDIR
 SP="$(dirname "$(find "$STAGE" -type d -path '*/site-packages/numpy' | head -1)")"
 test -d "$SP/numpy"
 
-SITE="$DEST/lib/python3.14/site-packages"
+SITE="$DEST/lib/python3.15/site-packages"
 rm -rf "$DEST/lib"
 mkdir -p "$SITE"
 cp -R "$SP/numpy" "$SITE/numpy"
@@ -216,7 +229,7 @@ DI="$SITE/numpy-$VERSION.dist-info"
 mkdir -p "$DI/licenses"
 cp "$SRC/PKG-INFO" "$DI/METADATA"
 cp "$SRC/LICENSE.txt" "$DI/licenses/LICENSE.txt"
-printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-numpy/build.sh)\nRoot-Is-Purelib: false\nTag: cp314-cp314-wasix_wasm32\n\n' >"$DI/WHEEL"
+printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-numpy/build.sh)\nRoot-Is-Purelib: false\nTag: cp315-cp315-wasix_wasm32\n\n' >"$DI/WHEEL"
 # numpy 2.3.2's pyproject.toml [project.scripts] and [project.entry-points.*] (#1084).
 printf '[array_api]\nnumpy = numpy\n\n[console_scripts]\nf2py = numpy.f2py.f2py2e:main\nnumpy-config = numpy._configtool:main\n\n[pkg_config]\nnumpy = numpy._core.lib.pkgconfig\n\n[pyinstaller40]\nhook-dirs = numpy:_pyinstaller_hooks_dir\n' >"$DI/entry_points.txt"
 "$HOSTPY" - "$SITE" "numpy-$VERSION.dist-info" <<'PY'
@@ -244,11 +257,11 @@ WORK="$B" homescoop_notice "GotoBLAS2 (BSD-2-Clause)" "$OB/OpenBLAS-0.3.28/GotoB
 WORK="$B" homescoop_notice "libdivide (Zlib)" "$SRC/numpy/_core/include/numpy/libdivide/LICENSE.txt" -
 homescoop_compile_pyc "$SITE"
 
-mapfile -t SOS < <(find "$SITE" -name '*.cpython-314-wasm32-wasix.so' | sort)
+mapfile -t SOS < <(find "$SITE" -name '*.cpython-315-wasm32-wasix.so' | sort)
 echo "== py-numpy: ${#SOS[@]} side modules"
 node "$PKG/tools/mismatch.mjs" "${SOS[@]}"
 node "$ROOT/packages/py-kiwisolver/test/wasm-call-signatures.mjs" "${SOS[@]}" || echo "py-numpy: call-signature mismatches above (see PRESTAGE.md)"
-for so in "$SITE/numpy/_core/_multiarray_umath.cpython-314-wasm32-wasix.so" "$SITE/numpy/linalg/_umath_linalg.cpython-314-wasm32-wasix.so"; do
+for so in "$SITE/numpy/_core/_multiarray_umath.cpython-315-wasm32-wasix.so" "$SITE/numpy/linalg/_umath_linalg.cpython-315-wasm32-wasix.so"; do
   test -f "$so"
 done
 grep -E 'NPY_SIZEOF_LONG 4|NPY_SIZEOF_INTP 4' "$SITE/numpy/_core/include/numpy/_numpyconfig.h"

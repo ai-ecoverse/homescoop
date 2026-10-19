@@ -1,6 +1,6 @@
-"""Every .py under lib/python3.14 has its unchecked-hash .pyc (homescoop#181).
+"""Every .py under lib/pythonX.Y has its unchecked-hash .pyc (homescoop#181).
 
-    python3.14 pyc-check.py <lib/python3.14>
+    pythonX.Y pyc-check.py <lib/pythonX.Y>
 
 Files compileall cannot compile (syntax only valid for other versions, e.g.
 lib2to3 test data) are listed and allowed only if they fail to compile here
