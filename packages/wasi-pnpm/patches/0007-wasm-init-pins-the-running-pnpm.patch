@@ -1,0 +1,31 @@
+init (wasm): pin the running pnpm, not the registry's latest (homescoop)
+
+`pnpm init` pins a new project to the registry's `latest` pnpm
+(devEngines.packageManager with onFail: download, and packageManager).
+Native pnpm then downloads that version on the next command. A
+WebContainer pnpm can't install or switch to another pnpm, so every
+later command in the new project failed with ERR_PNPM_UNSUPPORTED_RUNTIME
+("cannot install or switch to pnpm v12.14.0") as soon as `latest` moved
+past the build: `pnpm init && pnpm add is-odd` failed in slicc on
+12.9.1-13. On wasm, version_to_pin answers the running version, as it
+already does offline.
+
+Upstream: not filed (Lars decides).
+removeWhen: upstream's wasm build pins the running version in `pnpm init`.
+
+--- a/pnpm/crates/cli/src/cli_args/init.rs
++++ b/pnpm/crates/cli/src/cli_args/init.rs
+@@ -74,8 +74,12 @@
+ /// tagged. Scaffolding a `package.json` must not fail, hang, or wait on a
+ /// registry that is unreachable, so every failure degrades to the running
+ /// version instead of surfacing.
++///
++/// A WebContainer (wasm) pnpm can't install or switch to another pnpm, so
++/// it pins itself: a pin to `latest` would make every later command in the
++/// new project fail with ERR_PNPM_UNSUPPORTED_RUNTIME.
+ pub(crate) async fn version_to_pin(config: &Config) -> String {
+-    if config.offline || config.prefer_offline {
++    if cfg!(target_family = "wasm") || config.offline || config.prefer_offline {
+         return PNPM_VERSION.to_string();
+     }
+     // One attempt, no retry schedule: a registry that is not answering

@@ -60,3 +60,8 @@ about:
     back), and build.sh links pnpm.wasm with 256 MiB of initial memory
     against homescoop#1127's cross-thread memory.grow traps
     (HOMESCOOP_PNPM_INITIAL_MEMORY=0 to build without).
+    12.9.1-15's 0007 makes `pnpm init` pin the running pnpm (a pin to the
+    registry's latest made every later command fail), and 0008 stops the
+    local-prefix walk below `/`, whose base-set node_modules made `/` the
+    project of every directory without a manifest (thr_r75dacjwyi, a live
+    seven).

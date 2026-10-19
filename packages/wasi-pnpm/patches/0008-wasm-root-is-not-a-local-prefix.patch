@@ -1,0 +1,34 @@
+prefix (wasm): the filesystem root is a local prefix only when pnpm runs there (homescoop)
+
+pnpm's local prefix is the nearest ancestor of the cwd with a project
+marker, node_modules among them. In slicc the root holds the base set's
+/node_modules, so every directory without a manifest of its own resolved
+to `/`: `pnpm add is-odd` in /home scaffolded /package.json (name "",
+written to /.tmpXXXXXX, 214 bytes), failed with
+ERR_PNPM_PACKAGE_MANIFEST_IO_ERROR "initialize the state: No such file or
+directory (os error 44)", and left the temp file at `/`. Had it gone
+through, it would have installed into slicc's base set. Native pnpm
+creates package.json in the cwd there (no ancestor has a marker). On
+wasm the walk stops below the root, and the cwd is the prefix; a command
+run in `/` itself still acts on `/`.
+
+Upstream: not filed (Lars decides).
+removeWhen: slicc's base set no longer lives in /node_modules, or
+upstream's wasm build stops the prefix walk below the root.
+
+--- a/pnpm/crates/cli/src/cli_args/prefix.rs
++++ b/pnpm/crates/cli/src/cli_args/prefix.rs
+@@ -82,6 +82,13 @@
+     let mut current = name.to_path_buf();
+ 
+     loop {
++        // In a WebContainer the filesystem root holds the runtime's own
++        // node_modules (slicc's base set), so it would end every walk: a
++        // command in a directory without a project would act on `/`. The
++        // root is a prefix only when the command runs there.
++        if cfg!(target_family = "wasm") && current != original && current.parent().is_none() {
++            return Ok(original.to_path_buf());
++        }
+         match probe_project_markers(&current, targets, original)? {
+             MarkerProbe::Found => return Ok(current),
+             MarkerProbe::Unreadable => return Ok(original.to_path_buf()),

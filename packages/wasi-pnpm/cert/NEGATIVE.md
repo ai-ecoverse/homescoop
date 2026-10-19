@@ -62,3 +62,11 @@ Not a negative proof but the reason for this release. pnpm-agent-loop run 391817
 - **#1127:** pnpm-agent-loop run 39204855613 ran 12.9.1-13 on kernel 1.124.2 (CI Linux Chromium, users enforce) and got **11 traps in 240 rounds**: `pnpm: wasm trap in thread 3..6: memory access out of bounds`. All were warm-store rounds, on rayon workers in `pnpm_tarball::prefetch::prefetch_cas_paths_blocking`, and each was the first write into a fresh allocation. 12.9.1-13 imports 68 pages (4.3 MiB) of memory and grows it constantly there; 12.9.1-14 imports 4096 pages. The kernel lane is checking the browser side (`--no-sandbox` on Linux, and V8's trap handler). The loop on 12.9.1-14 is the comparison.
 - **0006:** there's no behaviour to refuse; this is a speed change. On cert kernel 1.128.0 every install spec copies through `ctx.fs.copyFile`, and modes.mjs and large-package.mjs must hold as on 12.9.1-13. `test/pnpm-host.test.mjs` checks ENOSYS, EEXIST, EXDEV and EINVAL.
 
+## 12.9.1-15: the project directory and the pin (patches/0007, 0008; thr_r75dacjwyi, 2026-10-19)
+
+The published 12.9.1-13 against `cert/project-dir.mjs` (slicc-kernel 1.128.0, users enforce, as root with a `/node_modules`, `--soft`): **FAIL, 5 of 9 assertions.**
+- `pnpm add tiny` in `/tmp/empty`, which has no package.json, exits 1 with `ERR_PNPM_PACKAGE_MANIFEST_IO_ERROR … No such file or directory (os error 44)`, and `/tmp/empty/package.json` has no `tiny`. pnpm walked up to `/`, whose `node_modules` is a project marker.
+- `pnpm init` with a registry whose latest pnpm is 99.0.0 pins `packageManager: pnpm@99.0.0` and `devEngines.packageManager: {version: 99.0.0, onFail: download}`. The next `pnpm add tiny` then fails with `× resolve pnpm@99.0.0` (in a live seven, against the real registry: ERR_PNPM_UNSUPPORTED_RUNTIME for 12.14.0).
+
+(12.9.1-14, the same pnpm code, behaves the same.) 0007 pins the running pnpm on wasm, and 0008 stops the prefix walk below `/` unless pnpm runs in `/`.
+

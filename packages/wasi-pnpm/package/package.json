@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-14",
+  "version": "12.9.1-15",
   "description": "pnpm 12 for slicc WASI (commands pnpm, pn); pnpm.wasm built by homescoop from pnpm v12.9.1 with a documented patch",
   "license": "MIT",
   "repository": {
@@ -40,7 +40,9 @@
       "0002-cli-no-source-checkout-path-on-wasm.patch",
       "0003-wasm-build-keep-linked-module.patch",
       "0005-wasi-fewer-mode-calls.patch",
-      "0006-wasi-kernel-copy-file.patch"
+      "0006-wasi-kernel-copy-file.patch",
+      "0007-wasm-init-pins-the-running-pnpm.patch",
+      "0008-wasm-root-is-not-a-local-prefix.patch"
     ]
   },
   "slicc": {
