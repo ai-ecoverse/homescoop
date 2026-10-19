@@ -73,6 +73,9 @@ WASI_LIBC=https://raw.githubusercontent.com/WebAssembly/wasi-libc/wasi-sdk-34
 homescoop_notices_begin "rustc.wasm is Rust $VERSION's compiler (MIT OR Apache-2.0; its vendored crates are listed in Rust's COPYRIGHT and their own licences in rustc-$VERSION-src.tar.xz). It statically links these, and lib/rustlib/wasm32-wasip1 holds Rust's standard library and the self-contained wasi-libc."
 homescoop_notice "wasi_llvm: @ai-ecoverse/wasi-llvm $("$LLVM_CONFIG" --version) (LLVM, clang and lld; Apache-2.0 WITH LLVM-exception)" \
   "$PKG_WORK/wasi-llvm/package/LICENSE" -
+# libLLVMSupport's third-party code (homescoop#1086), from wasi-llvm's
+# share/licenses/llvm-support (>= 21.1.8-2).
+homescoop_notice_llvm_support "$PKG_WORK/wasi-llvm/package" "wasi_llvm: LLVM"
 homescoop_notice "Rust $VERSION (MIT OR Apache-2.0)" \
   "$SRC/COPYRIGHT" - "$SRC/LICENSE-MIT" - "$SRC/LICENSE-APACHE" -
 homescoop_notice "wasi-libc and libc++/libc++abi from wasi-sdk 34 (rustc.wasm's host libc; MIT, Apache-2.0, Apache-2.0 WITH LLVM-exception)" \

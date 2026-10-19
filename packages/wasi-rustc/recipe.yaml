@@ -9,8 +9,8 @@ source:
   sha256: "be1816e7f6c40abb90245ad6e024bed2a7e88d7dda4561e4d5470207df616b9f"
 sources:
   wasi_llvm:
-    url: "https://registry.npmjs.org/@ai-ecoverse/wasi-llvm/-/wasi-llvm-21.1.8-1.tgz"
-    sha256: "9164e184f20140922bc2279324cda1d187d19d92392ed014f8721894fb9f3630"
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasi-llvm/-/wasi-llvm-21.1.8-2.tgz"
+    sha256: "5181c65f743599b3eb13ebd878a4e8dc6e1e0e010cdb28bfbc036ce6a438312e"
 toolchain:
   llvm: "21.1.8"
   wasi-sdk: "34.0"
