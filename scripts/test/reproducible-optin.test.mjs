@@ -44,7 +44,6 @@ const ALLOW = new Map([
   ['ncurses-utils', 808],
   ['openjpeg', 808],
   ['patch', 808],
-  ['poppler', 808],
   ['procps', 808],
   ['py-python-dateutil', 808],
   ['py-pytz', 808],

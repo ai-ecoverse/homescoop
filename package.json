@@ -32,7 +32,7 @@
   },
   "workspaces": [
     "packages/*/package",
-    "!packages/wasix-python3.15/package"
+    "!packages/*3.15/package"
   ],
   "license": "Apache-2.0"
 }
