@@ -169,6 +169,13 @@
       "enabled": false
     },
     {
+      "description": "Workflow action pins get their own branches (renovate/actions-…). Renovate names a branch after the sanitized dependency name, so the action ai-ecoverse/slicc-shared-web and the npm devDependency @ai-ecoverse/slicc-shared-web both landed on renovate/ai-ecoverse-slicc-shared-web-1.x, one PR (#1270). A branch automerges only if every update in it does, so the ladder-pr.yml action bump (manual, publish path) kept the root devDependency bump from automerging. scripts/test/renovate-branches.test.mjs checks no two managers share a branch.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "additionalBranchPrefix": "actions-"
+    },
+    {
       "description": "Workflow action pins below a major.",
       "matchManagers": [
         "github-actions"
