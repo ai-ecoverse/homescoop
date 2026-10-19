@@ -41,6 +41,8 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-39: **malloc refreshes the thread's view of a grown shared memory** (homescoop#1287, slicc-kernel#1172). In threaded programs V8 updates another thread's memory length lazily, so a `memset`/`memcpy` (bulk `memory.fill`/`memory.copy`) into a block from pages another thread's `sbrk` just grew could trap with `memory access out of bounds`. `malloc`, `calloc`, `realloc`, `posix_memalign` and `aligned_alloc` now call `memory.grow(0)` before they return a block that ends above this thread's `memory.size`. calloc's zeroing and realloc's copy run after that check. The common case costs one `memory.size` (`patches/dlmalloc-memory-view.patch`; the same file applies to wasi-libc).
+
 Since 2025.9.30-38: `poll(POLLIN)` on an empty pipe read end whose writers are gone gives `POLLHUP` alone, as on Linux, on slicc-kernel ≥ 1.125.0 (homescoop#1133). A socket at EOF still gives `POLLIN`.
 
 Since 2025.9.30-37:
