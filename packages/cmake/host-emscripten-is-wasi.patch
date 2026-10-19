@@ -1,0 +1,18 @@
+--- a/Modules/CMakeDetermineSystem.cmake
++++ b/Modules/CMakeDetermineSystem.cmake
+@@ -7,6 +7,15 @@
+ # CMAKE_SYSTEM_VERSION - on unix this is uname -r, for windows it is empty
+ # CMAKE_SYSTEM - ${CMAKE_SYSTEM}-${CMAKE_SYSTEM_VERSION}, for windows: ${CMAKE_SYSTEM}
+ 
++# homescoop: cmake.wasm's uname reports Emscripten, but WASI programs run
++# natively in slicc's realm (try_run works). Map that host to WASI so
++# Platform/WASI.cmake applies and executables are bare modules (not .js).
++# An explicit -DCMAKE_SYSTEM_NAME=Emscripten still wins below.
++if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Emscripten")
++  set(CMAKE_HOST_SYSTEM_NAME "WASI")
++  set(CMAKE_HOST_SYSTEM_PROCESSOR "wasm32")
++endif()
++
+ # find out on which system cmake runs
+ if(CMAKE_HOST_UNIX)
+   find_program(CMAKE_UNAME NAMES uname PATHS /bin /usr/bin /usr/local/bin)
