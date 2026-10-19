@@ -1,5 +1,9 @@
 # py-scipy: negative proof
 
+## importlib.metadata (homescoop#731; 2026-10-19)
+
+npm's py-scipy 1.18.0-12, the repack of a local build that shipped no dist-info, on wasix-python 3.14.2-28 and slicc-kernel 1.125.0: `import scipy; importlib.metadata.version('scipy')` gives `1.18.0`, then `importlib.metadata.PackageNotFoundError: No package metadata was found for scipy` (rc 1). The CI-built 1.18.1 ships `scipy-1.18.1.dist-info`. `cert/import.mjs` now checks the metadata version (`pyImport`'s `dist`) and passes on both lines.
+
 ## 1.18.1-2: the first cp315 scipy (homescoop#761; 2026-10-19)
 
 npm's cp314 py-scipy (`latest`) declares `@ai-ecoverse/wasix-python` in the 3.14.2 line and a cp314 py-numpy, so with wasix-python 3.15.0-1 at the top, npm nests a 3.14 python and numpy under it, and its `*.cpython-314-wasm32-wasix.so` don't import into python 3.15. 1.18.1-2 passes import, scipy, lapack, uarray and notices on 3.15.0-1 with py-numpy 2.5.4-1 (slicc-kernel 1.125.0).

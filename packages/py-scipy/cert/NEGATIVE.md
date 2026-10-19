@@ -1,5 +1,9 @@
 # py-scipy: negative proof
 
+## importlib.metadata (homescoop#731; 2026-10-19)
+
+npm's py-scipy 1.18.0-12, the repack of a local build that shipped no dist-info, on wasix-python 3.14.2-28 and slicc-kernel 1.125.0: `import scipy; importlib.metadata.version('scipy')` gives `1.18.0`, then `importlib.metadata.PackageNotFoundError: No package metadata was found for scipy` (rc 1). The CI-built 1.18.1 ships `scipy-1.18.1.dist-info`. `cert/import.mjs` now checks the metadata version (`pyImport`'s `dist`) and passes on both lines.
+
 ## 1.18.0-12 (published) fails the 1.18.1-1 cert (homescoop#589, #211 A6; 2026-10-19)
 
 `cert/uarray.mjs` against npm's py-scipy 1.18.0-12 (wasix-python 3.14.2-28, py-numpy 2.3.2-12, slicc-kernel 1.125.0, Node entry):
