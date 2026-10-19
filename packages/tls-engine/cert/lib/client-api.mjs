@@ -682,3 +682,74 @@ describe('client sessions (slicc-kernel#922)', () => {
     wire.close();
   });
 });
+
+describe('tls_chain_verify, a chain checked without a handshake (4.2.0-5, slicc-kernel#1090)', () => {
+  const UNVERIFIED = 0xffffffff;
+  const leafFor = (host, opts) => serverCert(ca, host, opts).der;
+  function verify(chainDers, hostname, store = trust) {
+    const chain = Buffer.concat(chainDers.map((d) => Buffer.from(d)));
+    const flagsPtr = engine.m._malloc(4);
+    engine.m.HEAPU8.fill(0, flagsPtr, flagsPtr + 4);
+    try {
+      const run = (c) => {
+        if (hostname === null) return engine.m._tls_chain_verify(store, c, chain.length, 0, flagsPtr);
+        return engine.with(new TextEncoder().encode(hostname), (h) => engine.m._tls_chain_verify(store, c, chain.length, h, flagsPtr));
+      };
+      const ret = chain.length > 0 ? engine.with(chain, run) : run(0);
+      const h = engine.m.HEAPU8;
+      const flags = (h[flagsPtr] | (h[flagsPtr + 1] << 8) | (h[flagsPtr + 2] << 16) | (h[flagsPtr + 3] << 24)) >>> 0;
+      return { ret, flags };
+    } finally {
+      engine.m._free(flagsPtr);
+    }
+  }
+
+  test('a good chain for its host verifies (0/0), an absolute name too; a wrong host is CN_MISMATCH and passes only with a NULL hostname', () => {
+    const leaf = leafFor('chain.test');
+    assert.deepEqual(verify([leaf, ca.der], 'chain.test'), { ret: 0, flags: 0 });
+    assert.deepEqual(verify([leaf], 'chain.test'), { ret: 0, flags: 0 });
+    assert.deepEqual(verify([leaf], 'chain.test.'), { ret: 0, flags: 0 });
+    assert.deepEqual(verify([leaf], 'other.test'), { ret: 0, flags: BADCERT.CN_MISMATCH });
+    assert.deepEqual(verify([leaf], null), { ret: 0, flags: 0 });
+    assert.deepEqual(verify([leaf], ''), { ret: 0, flags: BADCERT.CN_MISMATCH });
+  });
+
+  test('an untrusted CA, an expired leaf and a clientAuth-only leaf are flagged as a session would flag them', () => {
+    const other = makeCa('homescoop tls-engine other CA');
+    const stranger = other.issue('chain.test', generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ type: 'spki', format: 'der' }));
+    assert.equal(verify([stranger], 'chain.test').flags & BADCERT.NOT_TRUSTED, BADCERT.NOT_TRUSTED);
+    const day = 86400_000;
+    const expired = leafFor('chain.test', { notBefore: new Date(Date.now() - 3 * day), notAfter: new Date(Date.now() - day) });
+    assert.equal(verify([expired], 'chain.test').flags & BADCERT.EXPIRED, BADCERT.EXPIRED);
+    const clientOnly = leafFor('chain.test', { eku: '1.3.6.1.5.5.7.3.2' });
+    assert.deepEqual(verify([clientOnly], 'chain.test'), { ret: 0, flags: BADCERT.EXT_KEY_USAGE });
+  });
+
+  test('an IP literal verifies only against an iPAddress SAN, never a dNSName spelling it', () => {
+    assert.deepEqual(verify([leafFor('192.0.2.9')], '192.0.2.9'), { ret: 0, flags: 0 });
+    assert.deepEqual(verify([leafFor('192.0.2.9', { san: 'dns' })], '192.0.2.9'), { ret: 0, flags: BADCERT.CN_MISMATCH });
+  });
+
+  test('fails closed: a NULL store, no chain, a truncated DER, garbage and an allocation failure are < 0 with flags that are never 0', () => {
+    const leaf = Buffer.from(leafFor('chain.test'));
+    for (const [chain, store] of [[[leaf], 0], [[], trust], [[leaf.subarray(0, leaf.length - 7)], trust], [[Buffer.from('not a certificate')], trust]]) {
+      const got = verify(chain, 'chain.test', store);
+      assert.ok(got.ret < 0, JSON.stringify(got));
+      assert.equal(got.flags, UNVERIFIED);
+    }
+    engine.m._tls_test_chain_verify_alloc_error();
+    const oom = verify([leaf], 'chain.test');
+    assert.ok(oom.ret < 0);
+    assert.equal(oom.flags, UNVERIFIED);
+    assert.deepEqual(verify([leaf], 'chain.test'), { ret: 0, flags: 0 });
+    assert.equal(engine.m._tls_chain_verify(trust, 0, 0, 0, 0), BADARG);
+  });
+
+  test('keeps nothing: 2000 verifications leave the heap where it was', () => {
+    const leaf = leafFor('chain.test');
+    verify([leaf], 'chain.test');
+    const before = engine.m.HEAPU8.length;
+    for (let i = 0; i < 2000; i++) assert.equal(verify([leaf, ca.der], 'chain.test').flags, 0);
+    assert.equal(engine.m.HEAPU8.length, before);
+  });
+});

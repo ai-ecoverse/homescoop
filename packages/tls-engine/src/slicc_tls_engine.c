@@ -29,6 +29,7 @@
 #include <emscripten.h>
 #include "mbedtls/asn1.h"
 #include "mbedtls/error.h"
+#include "mbedtls/oid.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/platform.h"
 #include "mbedtls/platform_util.h"
@@ -382,6 +383,16 @@ EMSCRIPTEN_KEEPALIVE session *tls_session_new(leaf *l, const char *host) {
 
 static int want(int ret);
 
+/* A server name as the client checks it, shared by sessions and
+ * tls_chain_verify: one trailing dot is stripped in place, and the name's
+ * address when it is an IP literal goes to `ip` (its length returned, 0 for
+ * a DNS name). */
+static size_t name_parse(char *host, unsigned char ip[16]) {
+  size_t len = strlen(host);
+  if (len > 1 && host[len - 1] == '.') host[len - 1] = 0;
+  return host[0] ? mbedtls_x509_crt_parse_cn_inet_pton(host, ip) : 0;
+}
+
 /* An IP-literal server name is checked against the leaf's iPAddress SANs
  * only (RFC 6125): never its CN or a dNSName spelling the address. */
 static int ip_san_matches(const mbedtls_x509_crt *crt, const unsigned char *ip, size_t len) {
@@ -391,6 +402,13 @@ static int ip_san_matches(const mbedtls_x509_crt *crt, const unsigned char *ip, 
       return 1;
   }
   return 0;
+}
+
+/* The leaf's name check for an IP literal, shared by sessions and
+ * tls_chain_verify: a leaf without a matching iPAddress SAN is CN_MISMATCH. */
+static void ip_name_flags(const unsigned char *ip, size_t ip_len, const mbedtls_x509_crt *crt,
+                          uint32_t *flags) {
+  if (ip_len > 0 && !ip_san_matches(crt, ip, ip_len)) *flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
 }
 
 /* The name check when no hostname was set (TLS_CLIENT_NO_SNI): Mbed TLS's
@@ -420,7 +438,7 @@ EMSCRIPTEN_KEEPALIVE int tls_test_name_check_error(session *s) {
 static int on_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags) {
   session *s = ctx;
   if (depth != 0) return 0;
-  if (s->ip_len > 0 && !ip_san_matches(crt, s->ip, s->ip_len)) *flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
+  if (s->ip_len > 0) ip_name_flags(s->ip, s->ip_len, crt, flags);
   else if (s->ip_len == 0 && (s->flags & TLS_CLIENT_NO_SNI) && dns_name_mismatch(s, crt))
     *flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
   s->name_mismatch = (*flags & MBEDTLS_X509_BADCERT_CN_MISMATCH) != 0;
@@ -470,9 +488,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
   }
   strcpy(s->host, servername);
   s->flags = flags;
-  size_t name_len = strlen(s->host);
-  if (name_len > 1 && s->host[name_len - 1] == '.') s->host[name_len - 1] = 0;
-  s->ip_len = s->host[0] ? mbedtls_x509_crt_parse_cn_inet_pton(s->host, s->ip) : 0;
+  s->ip_len = name_parse(s->host, s->ip);
   mbedtls_ssl_init(&s->ssl);
   mbedtls_ssl_config_init(&s->config);
   if (trust) {
@@ -710,3 +726,98 @@ EMSCRIPTEN_KEEPALIVE int tls_alpn_http11(session *s) {
 }
 
 EMSCRIPTEN_KEEPALIVE void tls_session_free(session *s) { session_free(s); }
+
+/* ---- offline chain verification (slicc-kernel#1090) --------------------- */
+
+/* Every error path of tls_chain_verify sets this: a caller that reads only
+ * the flags never sees 0 (verified) for a chain that was not verified. */
+#define TLS_CHAIN_UNVERIFIED 0xffffffffu
+
+static int chain_alloc_error;
+
+/* Test hook: the next tls_chain_verify fails as an allocation failure. It
+ * takes no code, so it can only make a verification fail. */
+EMSCRIPTEN_KEEPALIVE void tls_test_chain_verify_alloc_error(void) { chain_alloc_error = 1; }
+
+typedef struct {
+  unsigned char ip[16];
+  size_t ip_len;
+} chain_name;
+
+static int on_chain_verify(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *flags) {
+  const chain_name *n = ctx;
+  if (depth == 0) ip_name_flags(n->ip, n->ip_len, crt, flags);
+  return 0;
+}
+
+static int parse_chain(mbedtls_x509_crt *out, const unsigned char *chain, size_t chain_len) {
+  if (!chain || chain_len == 0) return TLS_BADARG;
+  for (size_t at = 0; at < chain_len;) {
+    unsigned char *p = (unsigned char *)chain + at;
+    unsigned char *start = p;
+    size_t body;
+    int ret = mbedtls_asn1_get_tag(&p, (unsigned char *)chain + chain_len, &body,
+                                   MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (ret != 0) return ret;
+    size_t whole = (size_t)(p - start) + body;
+    ret = mbedtls_x509_crt_parse_der(out, start, whole);
+    if (ret != 0) return ret;
+    at += whole;
+  }
+  return 0;
+}
+
+/* A server's leaf must allow what a client session requires of it: a
+ * digitalSignature key usage and, when it lists extended key usages,
+ * serverAuth. */
+static void usage_flags(const mbedtls_x509_crt *leaf, uint32_t *flags) {
+  if (mbedtls_x509_crt_check_key_usage(leaf, MBEDTLS_X509_KU_DIGITAL_SIGNATURE) != 0)
+    *flags |= MBEDTLS_X509_BADCERT_KEY_USAGE;
+  if (mbedtls_x509_crt_check_extended_key_usage(leaf, MBEDTLS_OID_SERVER_AUTH,
+                                                MBEDTLS_OID_SIZE(MBEDTLS_OID_SERVER_AUTH)) != 0)
+    *flags |= MBEDTLS_X509_BADCERT_EXT_KEY_USAGE;
+}
+
+/* Verify `chain` (concatenated DER, the leaf first) against `store` outside
+ * any handshake, with the checks a client session makes: the default
+ * profile, the store's roots, validity by the real clock, the leaf's usage,
+ * and the session's name check (an IP literal only against an iPAddress SAN,
+ * a DNS name by Mbed TLS, one trailing dot stripped). 0 with *flags_out set
+ * (0 = verified), or < 0 with *flags_out = TLS_CHAIN_UNVERIFIED. A NULL
+ * `hostname` skips the name check: the caller must establish the server's
+ * identity another way (an SPKI pin). Nothing is kept. */
+EMSCRIPTEN_KEEPALIVE int tls_chain_verify(ca *store, const unsigned char *chain, size_t chain_len,
+                                          const char *hostname, uint32_t *flags_out) {
+  if (!flags_out) return TLS_BADARG;
+  *flags_out = TLS_CHAIN_UNVERIFIED;
+  if (init() != 0) return last_error;
+  if (chain_alloc_error) {
+    chain_alloc_error = 0;
+    return last_error = MBEDTLS_ERR_X509_ALLOC_FAILED;
+  }
+  if (!store || (hostname && strlen(hostname) >= 256)) return last_error = TLS_BADARG;
+  char host[256] = {0};
+  chain_name name = {0};
+  if (hostname) {
+    strcpy(host, hostname);
+    name.ip_len = name_parse(host, name.ip);
+  }
+  mbedtls_x509_crt crt;
+  mbedtls_x509_crt_init(&crt);
+  int ret = parse_chain(&crt, chain, chain_len);
+  uint32_t flags = 0;
+  if (ret == 0) {
+    const char *cn = hostname && name.ip_len == 0 && host[0] ? host : NULL;
+    ret = mbedtls_x509_crt_verify_with_profile(&crt, &store->roots, NULL,
+                                               &mbedtls_x509_crt_profile_default, cn, &flags,
+                                               on_chain_verify, &name);
+    if (ret == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED) ret = 0;
+    if (ret == 0 && hostname && !host[0]) flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
+  }
+  if (ret == 0) usage_flags(&crt, &flags);
+  mbedtls_x509_crt_free(&crt);
+  if (ret != 0) return last_error = ret;
+  *flags_out = flags;
+  return 0;
+}
+

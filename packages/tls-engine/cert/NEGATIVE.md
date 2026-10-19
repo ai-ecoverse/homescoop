@@ -178,3 +178,9 @@ The 4.2.0-1 build also passes, unchanged:
 ## 4.2.0-4: tls_last_alert (slicc-kernel#1004)
 - **4.2.0-3 (the published tgz):** `lib/client-api.mjs` fails `tls_last_alert: the server's fatal alert …`, because there's no `_tls_last_alert` export. The other 23 cases pass.
 - **4.2.0-4 as built:** client-api 24/24 and engine-api 19/19 (the server ABI is unchanged).
+
+## 4.2.0-5: tls_chain_verify (slicc-kernel#1090)
+- **4.2.0-4 (the published tgz):** `lib/client-api.mjs` fails the five `tls_chain_verify …` cases, because there's no `_tls_chain_verify` export. The other 24 cases pass.
+- **A build without the fail-closed line at entry** (`*flags_out = TLS_CHAIN_UNVERIFIED;`) fails `fails closed: a NULL store, no chain, a truncated DER, garbage and an allocation failure are < 0 with flags that are never 0`. The error paths then leave the caller's flags at 0, which reads as verified. With the line it passes.
+- **4.2.0-5 as built:** client-api 29/29 and engine-api 19/19 (the server and client session ABIs are unchanged; the session's name parsing and IP-SAN check now go through the same `name_parse` and `ip_name_flags` as `tls_chain_verify`).
+
