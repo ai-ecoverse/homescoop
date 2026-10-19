@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -146,4 +147,47 @@ test('the CLI runs the same through a symlinked checkout (cloud-run runners, hom
     assert.equal(r.status, 1, `through the symlink: ${r.stdout}${r.stderr}`);
     assert.match(r.stderr, /ship 98 bytes of DWARF/);
   });
+});
+
+test('--strip rewrites a wheel RECORD entry for a stripped .so, so the RECORD verifies (cc7e, py-scipy)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'check-no-debug-py-'));
+  try {
+    const site = join(dir, 'package', 'lib', 'python3.14', 'site-packages');
+    mkdirSync(join(site, 'foo'), { recursive: true });
+    mkdirSync(join(site, 'foo-1.0.dist-info'), { recursive: true });
+    const so = 'foo/_x.cpython-314-wasm32-wasi.so';
+    writeFileSync(join(site, so), dbg);
+    writeFileSync(join(site, 'foo', '__init__.py'), 'from ._x import *\n');
+    writeFileSync(join(site, 'foo', 'a,b.py'), 'x = 1\n');
+    const h = (b) => `sha256=${createHash('sha256').update(b).digest('base64url')}`;
+    const initLine = `foo/__init__.py,${h(Buffer.from('from ._x import *\n'))},18`;
+    writeFileSync(
+      join(site, 'foo-1.0.dist-info', 'RECORD'),
+      `${initLine}\n"foo/a,b.py",${h(Buffer.from('x = 1\n'))},6\n${so},${h(dbg)},${dbg.length}\nfoo-1.0.dist-info/RECORD,,\n`,
+    );
+    const tool = join(dir, 'fake-objcopy');
+    writeFileSync(tool, `#!/usr/bin/env node\nconst fs = require('fs');\nconst [, , flag, , dst] = process.argv;\nif (flag !== '--strip-debug') process.exit(3);\nfs.writeFileSync(dst, ${JSON.stringify(clean.toString('base64'))}, 'base64');\n`);
+    chmodSync(tool, 0o755);
+    const r = spawnSync(process.execPath, [script, 'no-such-recipe', join(dir, 'package'), '--strip'], { encoding: 'utf8', env: { ...process.env, HOMESCOOP_OBJCOPY: tool } });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /foo-1\.0\.dist-info\/RECORD: foo\/_x\.cpython-314-wasm32-wasi\.so now has the stripped file's sha256 and size/);
+    const record = readFileSync(join(site, 'foo-1.0.dist-info', 'RECORD'), 'utf8');
+    assert.equal(record, `${initLine}\n"foo/a,b.py",${h(Buffer.from('x = 1\n'))},6\n${so},${h(clean)},${clean.length}\nfoo-1.0.dist-info/RECORD,,\n`, 'only the stripped file\'s entry changes');
+    const py = spawnSync('python3', ['-c', `import base64, csv, hashlib, os, sys
+site = sys.argv[1]
+bad = []
+for row in csv.reader(open(os.path.join(site, "foo-1.0.dist-info", "RECORD"), newline="")):
+    if not row or not row[1]:
+        continue
+    algo, want = row[1].split("=", 1)
+    data = open(os.path.join(site, row[0]), "rb").read()
+    got = base64.urlsafe_b64encode(hashlib.new(algo, data).digest()).rstrip(b"=").decode()
+    if got != want or int(row[2]) != len(data):
+        bad.append(row[0])
+print(" ".join(bad) or "ok")`, site], { encoding: 'utf8' });
+    if (py.error) return;
+    assert.equal(py.stdout.trim(), 'ok', `python's RECORD check after --strip: ${py.stdout}${py.stderr}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
