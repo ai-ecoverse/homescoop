@@ -1,7 +1,7 @@
 {
   "harness": "slicc-kernel",
   "users": "enforce",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.17.0",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.132.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -21,5 +21,5 @@
     "-o maxfile=xyz → bad option (EINVAL); mount over /proc → busy; umount of a plain dir → not mounted",
     "hostfs without a grant hook → refused (harness has no hostfs hook; hostfs connect not covered)"
   ],
-  "needsNote": "Kernel pin 1.17.0 = first release with slicc-kernel#92 process mount/umount2 (MNT_DETACH revocation, nomedium in /proc/mounts, ro enforced at open). The harness page has no hostfs grant hook, so only the hostfs refusal is checked."
+  "needsNote": "Kernel pin 1.132.1 (homescoop#1292: wasm-bash 5.3.0-21 needs >=1.130.2); 1.17.0 was the first release with slicc-kernel#92 process mount/umount2 (MNT_DETACH revocation, nomedium in /proc/mounts, ro enforced at open). The harness page has no hostfs grant hook, so only the hostfs refusal is checked."
 }
