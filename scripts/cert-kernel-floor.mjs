@@ -29,8 +29,10 @@
  * snapshot doesn't know fails with the --refresh command.
  *
  * Today's violations are in scripts/cert-kernel-floor-allowlist.txt, one
- * "<recipe> #<issue> <reason>" line each; a line whose package passes fails
- * ("drop the line"), so the list only shrinks.
+ * "<recipe> #<issue> <npm name>[,<npm name>…] <reason>" line per cert. It
+ * exempts only the needs it names: another need above the cert kernel still
+ * fails, and a named need (or a line) that no longer violates fails ("drop
+ * it"), so the list only shrinks.
  */
 import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -240,29 +242,32 @@ export function kernelsOf(meta, devPinVersion) {
   return out;
 }
 
-/** Pure: one package's problems (strings) on its kernels. */
+/** Pure: one package's violations on its kernels, [{ need: npm name, message }]. */
 export function floorProblems(pkg, kernels, installed) {
   const out = [];
   for (const k of kernels) {
     for (const p of installed) {
       if (!p.engines || satisfies(k.version, p.engines)) continue;
       const chain = p.via.length > 1 ? ` (via ${p.via.slice(0, -1).join(' → ')})` : '';
-      out.push(`packages/${pkg}/cert/meta.json: ${k.why} ${KERNEL}@${k.version} is below ${p.name}@${p.version}'s engines.slicc-kernel ${p.engines}${chain}`);
+      out.push({ need: p.name, message: `packages/${pkg}/cert/meta.json: ${k.why} ${KERNEL}@${k.version} is below ${p.name}@${p.version}'s engines.slicc-kernel ${p.engines}${chain}` });
     }
   }
   return out;
 }
 
+const LINE = '<recipe> #<issue> <npm name>[,<npm name>…] <reason>';
+
+/** One line per cert, naming the needs whose floor it is below: a violation by any other need still fails. */
 export function parseAllowlist(text) {
   const entries = new Map();
   const problems = [];
   for (const raw of String(text ?? '').split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    const m = /^([a-z0-9][a-z0-9._-]*)\s+(#\d+)\s+(\S.*)$/.exec(line);
-    if (!m) problems.push(`${ALLOWLIST}: "${line}" is not "<recipe> #<issue> <reason>"`);
+    const m = /^([a-z0-9][a-z0-9._-]*)\s+(#\d+)\s+((?:@[a-z0-9-]+\/)?[a-z0-9._-]+(?:,(?:@[a-z0-9-]+\/)?[a-z0-9._-]+)*)\s+(\S.*)$/.exec(line);
+    if (!m) problems.push(`${ALLOWLIST}: "${line}" is not "${LINE}"`);
     else if (entries.has(m[1])) problems.push(`${ALLOWLIST}: ${m[1]} is listed twice`);
-    else entries.set(m[1], { issue: m[2], reason: m[3] });
+    else entries.set(m[1], { issue: m[2], needs: m[3].split(','), reason: m[4] });
   }
   return { entries, problems };
 }
@@ -309,8 +314,14 @@ export function check({ recipes, recipeDirs, metas, devPin, snapshot }, allowTex
       continue;
     }
     const allowed = entries.get(pkg) ?? null;
-    if (found.length && !allowed) problems.push(...found);
-    if (!found.length && allowed) problems.push(`${ALLOWLIST} lists ${pkg} (${allowed.issue}), but its cert kernel satisfies every need's engines.slicc-kernel: drop the line`);
+    const named = new Set(allowed?.needs ?? []);
+    problems.push(...found.filter((f) => !named.has(f.need)).map((f) => f.message));
+    if (allowed && !found.length) {
+      problems.push(`${ALLOWLIST} lists ${pkg} (${allowed.issue}), but its cert kernel satisfies every need's engines.slicc-kernel: drop the line`);
+    } else if (allowed) {
+      const stale = allowed.needs.filter((n) => !found.some((f) => f.need === n));
+      if (stale.length) problems.push(`${ALLOWLIST} lists ${stale.join(', ')} for ${pkg} (${allowed.issue}), but its cert kernel satisfies ${stale.length > 1 ? 'their' : 'its'} engines.slicc-kernel: drop ${stale.length > 1 ? 'them' : 'it'} from the line`);
+    }
     results.push({ pkg, found, allowed });
   }
   return { results, problems };
@@ -322,7 +333,7 @@ export function verdictLines({ results, problems }) {
     return [...problems.map((p) => `cert-kernel-floor: FAIL ${p}`), `cert-kernel-floor: FAIL ${problems.length} problem(s) in ${results.length} cert/meta.json file(s)`];
   }
   return [
-    ...listed.map((r) => `cert-kernel-floor: allowlisted ${r.pkg} (${r.allowed.issue}): ${r.found[0]}${r.found.length > 1 ? ` (+${r.found.length - 1} more)` : ''}`),
+    ...listed.flatMap((r) => r.found.map((f) => `cert-kernel-floor: allowlisted ${r.pkg} (${r.allowed.issue}): ${f.message}`)),
     `cert-kernel-floor: PASS ${results.length} cert/meta.json file(s): every cert kernel satisfies its needs' engines.slicc-kernel, ${listed.length} allowlisted`,
   ];
 }

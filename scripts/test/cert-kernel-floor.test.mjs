@@ -135,15 +135,28 @@ test('kernelsOf: cert/meta.json kernel, else the dev-pin; extra_kernels objects 
 test('the allowlist: a listed violation passes and is printed; a line that no longer violates, names no cert, or is malformed fails', () => {
   const low = { kernel: '@ai-ecoverse/slicc-kernel@1.47.1', needs: [BASH] };
   const high = { kernel: '@ai-ecoverse/slicc-kernel@1.132.1', needs: [BASH] };
-  const listed = check(checkout([{ pkg: 'git', meta: low }]), 'git #1292 kernel 1.47.1\n');
+  const line = `git #1292 ${BASH} kernel 1.47.1\n`;
+  const listed = check(checkout([{ pkg: 'git', meta: low }]), line);
   assert.deepEqual(listed.problems, []);
   const lines = verdictLines(listed);
   assert.match(lines[0], /^cert-kernel-floor: allowlisted git \(#1292\): packages\/git\/cert\/meta.json: kernel @ai-ecoverse\/slicc-kernel@1\.47\.1 is below/);
   assert.equal(lines.at(-1), "cert-kernel-floor: PASS 1 cert/meta.json file(s): every cert kernel satisfies its needs' engines.slicc-kernel, 1 allowlisted");
-  assert.match(check(checkout([{ pkg: 'git', meta: high }]), 'git #1292 kernel 1.47.1\n').problems.join(), /lists git \(#1292\), but its cert kernel satisfies every need's engines\.slicc-kernel: drop the line/);
-  assert.match(check(checkout([]), 'gone #1292 why\n').problems.join(), /lists gone, which has no packages\/gone\/cert\/meta.json \(or is retired\): drop the line/);
-  assert.match(parseAllowlist('git because\n').problems.join(), /"git because" is not "<recipe> #<issue> <reason>"/);
-  assert.match(parseAllowlist('git #1 a\ngit #1 b\n').problems.join(), /git is listed twice/);
+  assert.match(check(checkout([{ pkg: 'git', meta: high }]), line).problems.join(), /lists git \(#1292\), but its cert kernel satisfies every need's engines\.slicc-kernel: drop the line/);
+  assert.match(check(checkout([]), `gone #1292 ${BASH} why\n`).problems.join(), /lists gone, which has no packages\/gone\/cert\/meta.json \(or is retired\): drop the line/);
+  assert.match(parseAllowlist('git #1292 because\n').problems.join(), /"git #1292 because" is not "<recipe> #<issue> <npm name>\[,<npm name>…\] <reason>"/);
+  assert.match(parseAllowlist(`git #1 ${BASH} a\ngit #1 ${BASH} b\n`).problems.join(), /git is listed twice/);
+  assert.deepEqual(parseAllowlist(`git #1292 ${BASH},${CORE} why\n`).entries.get('git').needs, [BASH, CORE]);
+});
+
+test('the allowlist exempts only the needs it names: a second need above an allowlisted cert kernel fails; a named need that passes is stale', () => {
+  const raised = [recipes[0], recipe('coreutils', CORE, '9.12.0-11', '>=1.130.0')];
+  const over = { recipes: raised, recipeDirs: new Map(raised.map((r) => [r.dir, r])) };
+  const meta = { kernel: '@ai-ecoverse/slicc-kernel@1.47.1', needs: [BASH, CORE] };
+  const out = check(checkout([{ pkg: 'git', meta }], over), `git #1292 ${BASH} kernel 1.47.1\n`);
+  assert.deepEqual(out.problems, ["packages/git/cert/meta.json: kernel @ai-ecoverse/slicc-kernel@1.47.1 is below @ai-ecoverse/wasm-coreutils@9.12.0-11's engines.slicc-kernel >=1.130.0"]);
+  assert.deepEqual(check(checkout([{ pkg: 'git', meta }], over), `git #1292 ${BASH},${CORE} both\n`).problems, []);
+  const stale = check(checkout([{ pkg: 'git', meta }]), `git #1292 ${BASH},${CORE} both\n`).problems;
+  assert.deepEqual(stale, [`scripts/cert-kernel-floor-allowlist.txt lists ${CORE} for git (#1292), but its cert kernel satisfies its engines.slicc-kernel: drop it from the line`]);
 });
 
 test('--refresh: fetches each name the closures reach once, keeps engines, dependencies and dist-tags', async () => {
