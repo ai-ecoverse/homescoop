@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/py-scipy",
-  "version": "1.18.0-12",
-  "description": "SciPy 1.18.0 for slicc WASIX CPython 3.14 (shared libscipy_openblas.so + $ORIGIN rpath)",
+  "version": "1.18.1-1",
+  "description": "SciPy 1.18.1 for slicc WASIX CPython 3.14 (cp314-wasix_wasm32 side modules, static OpenBLAS)",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -21,18 +21,21 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "lib"
   ],
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-python": ">=3.14.2-16 <3.14.3",
-    "@ai-ecoverse/py-numpy": "2.3.2-10"
+    "@ai-ecoverse/wasix-python": ">=3.14.2-28 <3.14.3",
+    "@ai-ecoverse/py-numpy": ">=2.3.2-12 <2.3.3"
   },
   "homescoop": {
     "recipe": "py-scipy",
-    "upstream": "1.18.0"
+    "upstream": "1.18.1",
+    "cython": "3.2.4",
+    "platform": "wasix_wasm32"
   },
   "slicc": {
     "python": {
