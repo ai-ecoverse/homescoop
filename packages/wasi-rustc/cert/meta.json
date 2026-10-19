@@ -16,7 +16,8 @@
     "corpus, compiled and run in the kernel: hello world; -O with std::fs, std::env (args, OUT), process::exit(7); a crate with a dependency (greet as an rlib, --extern) printing `hello, slicc!` and fib(25)=75025; an out-of-bounds panic; a missing source and E0308 fail with rc 1",
     "every compiled program imports only wasi_snapshot_preview1 functions and exports _start; the corpus sizes and import sets are logged for the old-vs-new comparison",
     "users enforce: alice compiles in her home (the output is hers), is refused bob's 0600 source (couldn't read … Permission denied) and his 0755 directory (nothing left there), compiles his 0644 source into her home; root compiles everything",
-    "test/imports.mjs (ci): rustc.wasm imports only env (shared memory), wasi (thread-spawn), wasi_snapshot_preview1 and wasix_32v1, and the list is logged for the import-set diff"
+    "test/imports.mjs (ci): rustc.wasm imports only env (shared memory), wasi (thread-spawn), wasi_snapshot_preview1 and wasix_32v1, and the list is logged for the import-set diff",
+    "test/notices.mjs (ci, 1.98.1-6, homescoop#1086): rustc.wasm carries LLVM Support code (llvm_regcomp, the regexec error string, llvm_blake3_hasher, xxh3_64bits) and THIRD-PARTY-NOTICES.md (in files) has Henry Spencer's regex, BLAKE3 and xxHash notices, taken from wasi-llvm 21.1.8-2's share/licenses/llvm-support. 1.98.1-5: none of the three (NEGATIVE.md)"
   ],
   "patches": {
     "0003-rust-1.98-wasi-host-paths.patch": "PATH splitting, TMPDIR and HOME in the WASI host std: the driver's PATH and the corpus runs",
@@ -34,6 +35,7 @@
     "0015-rust-1.98-wasi-fatal-exit.patch": "fatal errors exit instead of trapping: the missing-source and E0308 cases return rc 1"
   },
   "ci": [
-    "node packages/wasi-rustc/test/imports.mjs --tarball .homescoop-out/package.tgz"
+    "node packages/wasi-rustc/test/imports.mjs --tarball .homescoop-out/package.tgz",
+    "node packages/wasi-rustc/test/notices.mjs --tarball .homescoop-out/package.tgz"
   ]
 }

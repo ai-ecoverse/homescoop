@@ -27,3 +27,8 @@ It also checks that an out-of-bounds panic reports the index, that a missing sou
 **The tool's import set** (`test/imports.mjs`): 1.98.1-4's `rustc.wasm` imports `env.memory`, `wasi.thread-spawn`, `wasix_32v1.fd_pipe`, `wasix_32v1.proc_spawn3` and preview1 (33 imports). The PR body has 1.98.1-5's list and the diff. Any new import must be one slicc-kernel implements on the cert pin (1.102.6) and on the kernel-compat floor.
 
 **Known differences:** `rustc --version` was `rustc 1.98.1-dev` on 1.98.1-4, a git build with the default dev channel. The source tarball sets the stable channel, so 1.98.1-5 may print `rustc 1.98.1 (48a229cea 2026-09-01)`. The corpus accepts both.
+
+## 1.98.1-6: LLVM Support's notices (homescoop#1086, 2026-10-19)
+
+The published 1.98.1-5 against `test/notices.mjs`: **FAIL.** rustc.wasm carries LLVM Support code (its data holds `llvm_regexec() failed to match`; the function names are in wasi-rustc-names), but THIRD-PARTY-NOTICES.md has neither Henry Spencer's regex notice nor BLAKE3's or xxHash's. Those came only with wasi-llvm 21.1.8-2's share/licenses/llvm-support. 1.98.1-6 pins wasi-llvm 21.1.8-2 (same libraries, plus the notices) and adds them through `homescoop_notice_llvm_support`.
+
