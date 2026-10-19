@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
-import { isSpelling, loadAllow, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
+import { dashedRevision, isDashedBase, isSpelling, loadAllow, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -202,9 +202,23 @@ const revSep = post ? '.' : '-';
 // Same upstream only if current is a valid packaging rev of the npmified base
 // (or plain base we will rewrite). Do NOT treat "2.23-1" as same-upstream of
 // recipe 2.23 — that form is not npm-publishable.
+// A dashed upstream (ImageMagick's 7.1.2-34) makes "34-N" one alphanumeric
+// semver identifier, compared as text: 34-10 would sort below 34-9. Its
+// revisions are -1 to -9, then -9.1, -9.2, …, which keep sorting; the next
+// upstream restarts at -1 (docs/versioning.md).
+const dashed = !post && isDashedBase(targetBase);
+const dashedRev = (v) => dashedRevision(targetBase, v) === 'ok';
+if (dashed && dashedRevision(targetBase, current) === 'unsorted') {
+  console.error(
+    `sync-package-version: ${name} ${current} sorts below ${targetBase}-9 (a dashed upstream's "-N" is compared as text): after -9 use -9.1, -9.2, … (docs/versioning.md)`,
+  );
+  process.exit(1);
+}
 const sameUpstream = post
   ? /^[1-9]\d*$/.test(current.slice(`${targetBase}.`.length)) && current.startsWith(`${targetBase}.`)
-  : isPackagingRev(current) && current.startsWith(`${targetBase}-`);
+  : dashed
+    ? dashedRev(current)
+    : isPackagingRev(current) && current.startsWith(`${targetBase}-`);
 
 let next = current;
 if (!sameUpstream) {

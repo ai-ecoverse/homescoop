@@ -137,3 +137,17 @@ test('slicc.go.version follows the recipe version: --check names the drift, --wr
   assert.equal(bump.after, goPkg('1.27.2-1', '1.27.2', 'go1.27.2'));
   assert.equal(check('9.2.1186', xxdPkg('9.2.1186-1', '9.2.1186'), ['--write']).after, xxdPkg('9.2.1186-1', '9.2.1186'));
 });
+
+test('a dashed upstream takes -1 … -9 and then -9.N; -10 is refused because it sorts below -9 (docs/versioning.md)', () => {
+  for (const v of ['7.1.2-34-1', '7.1.2-34-9', '7.1.2-34-9.1', '7.1.2-34-9.12']) {
+    const r = check('7.1.2-34', xxdPkg(v, '7.1.2-34'));
+    assert.equal(r.status, 0, `${v}: ${r.stderr}`);
+    assert.equal(r.stdout, `${v}\n`);
+  }
+  const bad = check('7.1.2-34', xxdPkg('7.1.2-34-10', '7.1.2-34'));
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /7\.1\.2-34-10 sorts below 7\.1\.2-34-9 .*-9\.1, -9\.2/);
+  const moved = check('7.1.2-35', xxdPkg('7.1.2-34-9.3', '7.1.2-34'), ['--write']);
+  assert.equal(moved.status, 0, moved.stderr);
+  assert.match(moved.after, /"version": "7\.1\.2-35-1"/);
+});

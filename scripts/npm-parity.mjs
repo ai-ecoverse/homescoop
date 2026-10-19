@@ -59,7 +59,11 @@ export function compareVersions(a, b) {
 
 export function nextRevision(version) {
   const m = /^(\d+\.\d+\.\d+)-(\d+)$/.exec(version);
-  return m ? `${m[1]}-${Number(m[2]) + 1}` : null;
+  if (m) return `${m[1]}-${Number(m[2]) + 1}`;
+  const d = /^(\d+\.\d+\.\d+-\d+)-([1-9])(?:\.([1-9]\d*))?$/.exec(version);
+  if (!d) return null;
+  if (d[2] !== '9') return `${d[1]}-${Number(d[2]) + 1}`;
+  return `${d[1]}-9.${d[3] ? Number(d[3]) + 1 : 1}`;
 }
 
 export function tagged(registry, tag = DEFAULT_TAG) {

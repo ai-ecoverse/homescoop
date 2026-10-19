@@ -1,0 +1,27 @@
+--- a/MagickWand/mogrify.c
++++ b/MagickWand/mogrify.c
+@@ -3955,8 +3955,23 @@
+               if (*clone_image->magick == '\0')
+                 (void) CopyMagickString(clone_image->magick,image_info->magick,
+                   MaxTextExtent);
++              char
++                backup_target[MagickPathExtent];
++
++              /*
++                homescoop#624: the backup name ends in "-xxxxxxxx~", which
++                names no format, so -format must be explicit or the image is
++                written in its input format under the new name.
++              */
++              if ((*backup_filename != '\0') && (format != (char *) NULL) &&
++                  (*magic == '\0'))
++                (void) FormatLocaleString(backup_target,MagickPathExtent,
++                  "%s:%s",format,backup_filename);
++              else
++                (void) CopyMagickString(backup_target,backup_filename,
++                  MagickPathExtent);
+               status&=(MagickStatusType) WriteImages(image_info,clone_image,
+-                (*backup_filename != '\0') ? backup_filename :
++                (*backup_filename != '\0') ? backup_target :
+                 clone_image->filename,exception);
+               clone_image=DestroyImageList(clone_image);
+             }

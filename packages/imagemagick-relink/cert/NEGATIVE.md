@@ -72,3 +72,7 @@ The runtime packages' `configure.xml` no longer holds build paths. The kit's ver
 The published 7.1.2-34-8 also has 652 occurrence(s) of the CI build directory `/tmp/homescoop-work` in share/imagemagick/relink/liblcms2.a, share/imagemagick/relink/libxml2.a, share/imagemagick/relink/libfreetype.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 7.1.2-34-9 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 7.1.2-34-8 too; the negative is the #908 check.
+
+## 7.1.2-34-9.1: the #562 and #624 patches in the kits (2026-10-18)
+
+The kits ship wasm-imagemagick(-heif) 7.1.2-34-9.1's objects, built with write-temp-then-rename.patch and mogrify-format-over-existing.patch. The published -9 kits relink programs that clobber an existing target on a failed write, and that write PNG bytes for `mogrify -format webp` over an existing .webp. See packages/imagemagick/cert/NEGATIVE.md. relink-check.mjs relinks both kits.

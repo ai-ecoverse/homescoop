@@ -31,8 +31,6 @@ const UNCOVERED = [
 
 // Command packages whose cert/meta.json has no "users": "enforce".
 const NO_USERS_ENFORCE = [
-  'imagemagick', // #819
-  'imagemagick-heif', // #819
   'wasi-biome', // #819
   'wasi-fnox', // #819
   'wasi-ripgrep', // #819

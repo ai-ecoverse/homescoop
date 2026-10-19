@@ -251,3 +251,18 @@ test('tarball-parity CLI: exit 0 for the same entries, 1 with the list otherwise
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a dashed upstream (ImageMagick 7.1.2-34) goes -1 … -9, then -9.1, -9.2, …, and the next upstream sorts above (docs/versioning.md)', () => {
+  assert.equal(compareVersions('7.1.2-34-10', '7.1.2-34-9'), -1, '34-10 is one alphanumeric identifier: it sorts below 34-9');
+  assert.equal(compareVersions('7.1.2-34-9.1', '7.1.2-34-9'), 1);
+  assert.equal(compareVersions('7.1.2-34-9.2', '7.1.2-34-9.1'), 1);
+  assert.equal(compareVersions('7.1.2-34-9.10', '7.1.2-34-9.9'), 1);
+  assert.equal(compareVersions('7.1.2-35-1', '7.1.2-34-9.12'), 1);
+  assert.equal(compareVersions('7.1.2-34-2', '7.1.2-34-1'), 1);
+  assert.equal(nextRevision('7.1.2-34-8'), '7.1.2-34-9');
+  assert.equal(nextRevision('7.1.2-34-9'), '7.1.2-34-9.1');
+  assert.equal(nextRevision('7.1.2-34-9.1'), '7.1.2-34-9.2');
+  assert.equal(nextRevision('7.1.2-34-9.9'), '7.1.2-34-9.10');
+  assert.equal(classify('7.1.2-34-9.1', { latest: '7.1.2-34-9', versions: ['7.1.2-34-9'] }).kind, 'new');
+  assert.equal(classify('7.1.2-34-10', { latest: '7.1.2-34-9', versions: ['7.1.2-34-9'] }).kind, 'behind');
+});

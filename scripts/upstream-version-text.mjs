@@ -145,8 +145,25 @@ export function staleVersions(text, upstream, { allow, name }) {
   return out;
 }
 
+/**
+ * A dashed upstream (ImageMagick's 7.1.2-34) makes "34-N" one alphanumeric
+ * semver identifier, compared as text, so 34-10 would sort below 34-9. Its
+ * packaging revisions are -1 to -9, then -9.1, -9.2, … (docs/versioning.md).
+ */
+export const isDashedBase = (base) => /^\d+\.\d+\.\d+-[0-9A-Za-z]/.test(String(base));
+export function dashedRevision(base, version) {
+  const v = String(version || '');
+  if (!isDashedBase(base) || !v.startsWith(`${base}-`)) return null;
+  const rev = v.slice(`${base}-`.length);
+  if (/^(?:[1-9]|9\.[1-9]\d*)$/.test(rev)) return 'ok';
+  if (/^[1-9]\d+$/.test(rev)) return 'unsorted';
+  return null;
+}
+
 export function versionBase(version) {
   const v = String(version || '');
+  const dashed = /^(\d+\.\d+\.\d+-[0-9A-Za-z]+)-9\.[1-9]\d*$/.exec(v);
+  if (dashed) return dashed[1];
   const m = /^(.*\d)-(\d+)$/.exec(v);
   if (m && /^\d+\.\d+\.\d+$/.test(m[1])) return m[1];
   const post = /^(.*-post\d+)\.\d+$/.exec(v);
@@ -166,7 +183,9 @@ export function driftErrors({ name, upstream, pkg, summary, readme, allow = load
   const spell = [up, ...spellingsFor(allow, name, up)];
   const version = String(pkg.version || '');
   const base = versionBase(version);
-  if (!sameVersion(base, up)) {
+  if (dashedRevision(npmify(up), version) === 'unsorted') {
+    errors.push(`package.json version "${version}" sorts below ${npmify(up)}-9 (a dashed upstream's "-N" is compared as text): after -9 use -9.1, -9.2, … (docs/versioning.md)`);
+  } else if (!sameVersion(base, up)) {
     errors.push(`package.json version "${version}" is not a packaging revision of recipe version ${up} (run: node scripts/sync-package-version.mjs ${name} --write)`);
   } else if (PLAIN.test(version)) {
     errors.push(`package.json version "${version}" is plain; sync-package-version publishes ${npmify(up)}-1 (run: node scripts/sync-package-version.mjs ${name} --write)`);

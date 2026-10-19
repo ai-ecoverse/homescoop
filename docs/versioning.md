@@ -31,6 +31,17 @@ in sync when releasing. Recipe bumps from Renovate do not publish by
 themselves — bump the npm version (`sync-package-version.mjs` → `X-1`
 for a new upstream) and dispatch `ladder-build`.
 
+If the upstream version has a dash of its own (ImageMagick's `7.1.2-34`),
+the packaging revision becomes part of a single alphanumeric semver
+identifier (`34-9`), and semver compares that as text: `7.1.2-34-10` sorts
+**below** `7.1.2-34-9`, and npm-parity calls it behind. For a dashed upstream,
+the revisions are therefore `-1` to `-9`, then `-9.1`, `-9.2`, … (a numeric
+identifier after `34-9`, so they keep sorting), and the next upstream
+restarts at `-1` (`7.1.2-35-1` sorts above every `7.1.2-34-9.N`).
+`sync-package-version.mjs --check` accepts exactly that shape and refuses
+`-10` and up, and npm-parity's suggested next revision follows it. npm also
+has the older `7.1.2-31.1`.
+
 If upstream is two-component (e.g. GNU which `2.23`, lcms2 `2.17`),
 `sync-package-version.mjs` **pads** to a three-part npm base (`2.23.0-1`).
 Never publish `X.Y-N` — `npm pack` may accept it, but `npm publish` rejects

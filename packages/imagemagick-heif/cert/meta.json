@@ -1,6 +1,7 @@
 {
   "harness": "slicc-kernel",
   "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
+  "users": "enforce",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -25,7 +26,12 @@
     "side-by-side.mjs (homescoop#352), last spec: wasm-imagemagick 7.1.2-32-4 (needsInstall) is copied into node_modules next to this package. On slicc-kernel < 1.94.0, magick, convert, identify and mogrify all run the plain package (no heic in -version), without a warning; from 1.94.0 (slicc.replaces, slicc-kernel#635/#639) they all run wasm-imagemagick-heif. magick-open, which -32-4 lacks, runs this package either way",
     "build (homescoop#350): build.sh builds in $WORK/imagemagick-heif, configures again a tree configured with other delegates, or built with other configure arguments or link flags (.homescoop-build stamp, so a -g1 tree from 7.1.2-34-1 is rebuilt), and checks, outside the configure skip, that config.h has webp, freetype, xml and heic, and that magick.wasm links libheif",
     "inplace-webp.mjs (homescoop#585, webp-check-size-before-open.patch): writing an image over 16383 px a side to WebP fails rc 1 with 'width or height exceeds limit' before the output is opened: magick w.webp -resize 200% w.webp keeps w.webp (WEBP 9000 100), an 18000x3000 panorama or a 100x17000 canvas written over pano.webp keeps it, magick-open the same, and no new.webp appears; 16383x10 and a 17000x1000 image resized to 16383x (16383x964) write. 7.1.2-34-2: w.webp truncated to nothing",
-    "no build paths (homescoop#937, packages/imagemagick/cert/lib/wasm-check.mjs): no file of the tarball holds the build checkout, .homescoop-out, /home/runner/work or the emsdk path; etc/ImageMagick-7*/configure.xml names the delegate prefix as /prefix and emsdk as /emsdk (build.sh rewrites both files and fails if a build path is left). 7.1.2-34-7: five configure.xml entries hold the runner's checkout path (NEGATIVE.md)"
+    "no build paths (homescoop#937, packages/imagemagick/cert/lib/wasm-check.mjs): no file of the tarball holds the build checkout, .homescoop-out, /home/runner/work or the emsdk path; etc/ImageMagick-7*/configure.xml names the delegate prefix as /prefix and emsdk as /emsdk (build.sh rewrites both files and fails if a build path is left). 7.1.2-34-7: five configure.xml entries hold the runner's checkout path (NEGATIVE.md)",
+    "atomic-write.mjs (7.1.2-34-9.1, homescoop#562, write-temp-then-rename.patch): a single output file is written to <target>.xxxxxxxx~ and renamed over the target only once the write succeeded. A -depth 8 PNG write that fails with 'cache resources exhausted' (2000x1000 gradient under -limit memory 20MiB -limit map 0) exits 1, leaves an existing orig.png byte-identical and creates no new.png, with no *~ left; a good write still replaces the target, and an adjoined two-frame GIF keeps both frames. 7.1.2-34-9 overwrites orig.png on the failed write (NEGATIVE.md)",
+    "mogrify.mjs (7.1.2-34-9.1, homescoop#624, mogrify-format-over-existing.patch): mogrify -format webp s.png and -format jpg s.png over an existing s.webp / s.jpg write WEBP 100 50 and JPEG 100 50 with WEBP (RIFF....WEBP) and JPEG (ff d8 ff) magic bytes, and leave no stray files. 7.1.2-34-9 writes PNG bytes under the new name (NEGATIVE.md)",
+    "7.1.2-34-9.1 (homescoop#819): the cert runs with users enforce",
+    "atomic-write.mjs (7.1.2-34-9.1, homescoop#1244): only single-file raster coders (PNG, JPEG, WEBP, GIF, TIFF, BMP, PNM, HEIC, JXL, JP2, QOI, TGA, ICON, PSD), named by extension or the same explicit prefix, take the temp-and-rename path; -write mpr:notes +delete mpr:notes reads the register back and leaves a cwd file named notes unchanged, and an unknown prefix (co:lon.png) writes co:lon.png as upstream does",
+    "atomic-write-users.mjs (7.1.2-34-9.1, homescoop#1245, #1207): as cone under users enforce, magick over a 0444 ro.png exits 1 with Permission denied and leaves it 10x10 and 0444 with no temp file; a HEIC write (no encoder) exits 1 with 'no encode delegate for this image format `HEIC'' and leaves keep.heic unchanged with no HEIC:… temp file"
   ],
   "ci": [
     "node packages/imagemagick/cert/lib/wasm-check.mjs"
