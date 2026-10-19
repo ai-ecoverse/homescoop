@@ -17,14 +17,23 @@ When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
    each touched package (`createWorkflowDispatch`, not a reusable
    `workflow_call` — npm OIDC trusts the calling workflow filename).
    `package.json` must already match the new recipe version (the
-   `recipe-sha` job below commits that); `ladder-build` fails on a
+   `recipe-sha` job below checks that); `ladder-build` fails on a
    mismatch instead of syncing.
 
-`ladder-pr`'s `recipe-sha` job runs `sync-package-version.mjs --write`,
-which also rewrites the old upstream version in `description`, the recipe
-`summary` and `package/README.md`, and pushes those files with the sha256.
-A Renovate PR therefore carries the new version everywhere without hand
-edits; `check-package-meta.mjs` fails the build when any text still names
+`ladder-pr`'s `recipe-sha` job runs `refresh-recipe-sha.mjs` and
+`sync-package-version.mjs --write` (which also rewrites the old upstream
+version in `description`, the recipe `summary` and `package/README.md`)
+and `readme-table.mjs --write` in its checkout, and **only checks**: CI
+never pushes to a pull request (a `github-actions[bot]` push leaves the new
+head's runs waiting for "Approve and run"). A stale branch fails with one
+machine-readable line per package,
+`recipe-sha: FAIL <pkg>: needs refresh: node scripts/refresh-recipe-sha.mjs <pkg> && node scripts/sync-package-version.mjs <pkg> --write && node scripts/readme-table.mjs --write`,
+plus `recipe-sha: FAIL README.md: needs refresh: node scripts/readme-table.mjs --write`
+when only the root table is stale. For a Renovate PR the homescoop
+coordinator's automation acts on those lines: it runs main's scripts on the
+branch and pushes as a user, so ladder-pr runs normally; anyone else runs the
+printed command and pushes. A refreshed PR then carries the new version
+everywhere; `check-package-meta.mjs` fails the build when any text still names
 the old one (docs/versioning.md, "Upstream versions in text").
 
 Manual: `gh workflow run ladder-build.yml -f package=zlib`.
@@ -37,9 +46,8 @@ placeholders so the tarball URL tracks the bump (libxml2's GNOME path is
 versions in `build.sh` — `homescoop_load_recipe` sets them from the
 recipe.
 
-`ladder-pr` downloads the expanded URL, writes `sha256` onto the PR
-branch, and also refreshes sha256 in the host-build checkout so a
-`GITHUB_TOKEN` push does not skip the build. A bump whose patches no
+`ladder-pr` downloads the expanded URL and checks the PR branch's `sha256`
+(see above), and also refreshes sha256 in the host-build checkout. A bump whose patches no
 longer apply fails at `homescoop_apply_patches` with a patch error, not
 a checksum error. It rewrites a sha256 only when the source URL changed
 against the base; new bytes for an unchanged URL fail instead (#1267, see
