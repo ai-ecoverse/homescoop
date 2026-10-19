@@ -54,3 +54,15 @@ AssertionError: slicc_signals.o has no slicc_sig_inherited_js (the #973 construc
 ```
 
 The emscripten tree, the patches and the pins are unchanged from 6.0.9-21.
+
+## 6.0.9-23: the CI-built wasm-clang and wasm-binaryen (homescoop#859; 2026-10-19)
+
+`test/companions.mjs` packs the exact companions a tarball pins. It fails on the published 6.0.9-22:
+
+```text
+FAIL wasm-clang 24.0.0-21 ships no THIRD-PARTY-NOTICES.md; wasm-binaryen 132.0.0-3's wasm-opt.wasm does not import slicc_sig_inherited_js
+```
+
+24.0.0-21 is the last wasm-clang relinked from a local slicc-emscripten tree. 132.0.0-3 predates #960's inherited-ignore shim. 6.0.9-23 pins wasm-clang 24.0.0-22 (stage F, built from llvm-emscripten) and wasm-binaryen 132.0.0-4, and passes. The emscripten tree, the patches and the lib/slicc objects are unchanged from 6.0.9-22.
+
+The same release moves wasix-python from the exact 3.14.2-16 to the range `>=3.15.0-2 <3.15.1`. That's the python3.15 flip; check-exact-pins now allows wasm-emscripten that range, as it allows py-*. It also gains `engines: slicc-kernel >=1.122.3`, because wasix-python 3.15.0-2 refuses older kernels. On the old cert kernel 1.110.7, run-paths fails at once: `python3: @ai-ecoverse/wasix-python@3.15.0-2 needs slicc-kernel >=1.122.3`. So the cert kernel moves to 1.132.0, where em-config, em-ensure-cache and `emcc -v` run through CPython 3.15 in the flat and pnpm layouts.

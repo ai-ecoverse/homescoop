@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.110.7",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.132.0",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -13,7 +13,8 @@
     "node packages/wasm-emscripten/test/run-paths.mjs --tarball .homescoop-out/package.tgz --layout flat",
     "node packages/wasm-emscripten/test/run-paths.mjs --tarball .homescoop-out/package.tgz --layout pnpm",
     "node packages/wasm-emscripten/test/run-paths.mjs --tarball @ai-ecoverse/wasm-emscripten@6.0.9-17 --expect old",
-    "node packages/wasm-emscripten/test/pinned-cache.mjs --tarball .homescoop-out/package.tgz"
+    "node packages/wasm-emscripten/test/pinned-cache.mjs --tarball .homescoop-out/package.tgz",
+    "node packages/wasm-emscripten/test/companions.mjs --tarball .homescoop-out/package.tgz"
   ],
   "host": "node packages/wasm-emscripten/test/run-paths.mjs --tarball <package.tgz> [--layout flat|pnpm] [--expect old] [--kernel <spec>]: npm install of the tarball (its exact companions), laid out flat (npm, slicc's ipk add -g) or as one `pnpm add -g` project (store copies symlinked beside wasm-emscripten), on slicc-kernel's Node entry; em-config LLVM_ROOT / BINARYEN_ROOT and em-ensure-cache's sysroot link must reach the installed wasm-clang (clang), wasm-binaryen (bin/wasm-opt) and emscripten-cache (include/stdio.h). Path resolution only: emcc does not run on slicc-kernel yet (exec of the Emscripten glue by path is ENOEXEC, and there is no node with vm for compiler.mjs), slicc-kernel#390; compiling stays a human check in slicc's webapp realm.",
   "checklist": [
@@ -27,6 +28,8 @@
     "6.0.9-21 (homescoop#1028): pins emscripten-cache 6.0.9-4 and wasm-binaryen 132.0.0-3, the CI builds from the same 6.0.9 tree and binaryen d03c25ea. test/pinned-cache.mjs runs emscripten-cache's cert on the pinned version: every library, no build path, and programs using epoll_create1/ppoll link against the frozen sysroot and run. 6.0.9-20's pin, 6.0.9-3, fails (NEGATIVE.md)",
     "6.0.9-21 (homescoop#1069): lib/slicc/slicc-linkat.js ships without __syscall_linkat__sig (emscripten's libsigs.js has the same 'iipipi'), so the default link prints no 'signature redefinition' warning; PRESTAGE links calls.c with -Werror",
     "6.0.9-21 (homescoop#538): test/files.test.mjs checks that every file LICENSE cites ('see X file') and SECURITY.md are in the tarball",
-    "6.0.9-22 (homescoop#960, #973, #947): lib/slicc compiled from shims/slicc with the inherited-ignore seed (slicc_signals.o names slicc_sig_inherited_js) and the strong flock() through env.__syscall_flock (slicc_libc_gaps.o); test/files.test.mjs checks both in the tarball. 6.0.9-21 has neither (NEGATIVE.md)"
+    "6.0.9-22 (homescoop#960, #973, #947): lib/slicc compiled from shims/slicc with the inherited-ignore seed (slicc_signals.o names slicc_sig_inherited_js) and the strong flock() through env.__syscall_flock (slicc_libc_gaps.o); test/files.test.mjs checks both in the tarball. 6.0.9-21 has neither (NEGATIVE.md)",
+    "6.0.9-23 (homescoop#859): pins wasm-clang 24.0.0-22 (linked in CI from llvm-emscripten; legacy EH, #965) and wasm-binaryen 132.0.0-4 (today's shims). test/companions.mjs packs the exact pins: wasm-clang ships THIRD-PARTY-NOTICES.md with the LLVM Support regex, BLAKE3 and xxHash notices, and wasm-binaryen's wasm-opt.wasm imports slicc_cred_js and slicc_sig_inherited_js. 6.0.9-22's pins (24.0.0-21, 132.0.0-3) fail it (NEGATIVE.md); run-paths' flat row runs clang 24.0.0-22 and wasm-opt 132.0.0-4 through their glue and emcc -v by path",
+    "6.0.9-23 (homescoop#859): wasix-python is the range >=3.15.0-2 <3.15.1 (check-exact-pins PYTHON_CONSUMERS), so emcc runs on CPython 3.15. engines slicc-kernel >=1.122.3, as wasix-python 3.15 requires. run-paths' flat and pnpm rows run em-config, em-ensure-cache and emcc -v through python 3.15 on slicc-kernel 1.132.0"
   ]
 }

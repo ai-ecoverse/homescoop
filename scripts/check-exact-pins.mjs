@@ -13,7 +13,8 @@
  * cannot override transitive versions. Pin the exact version that is `latest`
  * on npm and certified (docs/versioning.md). The one exception: an
  * @ai-ecoverse/py-* takes wasix-python and other py-*, in dependencies only,
- * as `>=X.Y.Z-N <X.Y.Z+1` (pythonRange, rangeAllowed; homescoop#702, #625).
+ * as `>=X.Y.Z-N <X.Y.Z+1` (pythonRange, rangeAllowed; homescoop#702, #625),
+ * and so does wasm-emscripten for wasix-python, which runs emcc (PYTHON_CONSUMERS).
  *
  * PENDING lists packages whose packaging-only re-release with exact pins is
  * still in flight (empty since py-matplotlib 3.11.2-3). They are reported,
@@ -53,8 +54,13 @@ export function inPythonRange(version, spec) {
   return v[4] === undefined || Number(v[4]) >= fn;
 }
 
+/** Packages besides py-* whose code runs on wasix-python and takes it as a range: emcc (homescoop#859). */
+export const PYTHON_CONSUMERS = new Set(['@ai-ecoverse/wasm-emscripten']);
+
 export function rangeAllowed(pkg, field, dep, spec) {
-  return field === 'dependencies' && (dep === PYTHON || dep.startsWith(PY_SCOPE)) && typeof pkg.name === 'string' && pkg.name.startsWith(PY_SCOPE) && pythonRange(spec) !== null;
+  if (field !== 'dependencies' || typeof pkg.name !== 'string' || pythonRange(spec) === null) return false;
+  if (pkg.name.startsWith(PY_SCOPE)) return dep === PYTHON || dep.startsWith(PY_SCOPE);
+  return PYTHON_CONSUMERS.has(pkg.name) && dep === PYTHON;
 }
 
 /** Recipes (packages/<name>) still waiting for their exact-pin re-release. */
