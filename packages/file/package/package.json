@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-file",
-  "version": "5.46.0-8",
+  "version": "5.46.0-9",
   "description": "file 5.46 + magic.mgc for wasm / slicc",
   "license": "BSD-2-Clause",
   "repository": {
