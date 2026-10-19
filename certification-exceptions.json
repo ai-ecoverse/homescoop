@@ -178,10 +178,10 @@
     },
     {
       "package": "@ai-ecoverse/wasix-sysroot",
-      "versions": ["2025.9.30-14", "2025.9.30-29", "2025.9.30-30", "2025.9.30-31", "2025.9.30-32"],
+      "versions": ["2025.9.30-14", "2025.9.30-28", "2025.9.30-29", "2025.9.30-30", "2025.9.30-31", "2025.9.30-32"],
       "verdict": "fail",
       "issue": "https://github.com/ai-ecoverse/homescoop/issues/864",
-      "ruling": "cert lane 2026-10-17 05:55: -14 was built locally with no provenance, and -29..-32 are the -14 tarball with patches on top; not certified"
+      "ruling": "cert lane 2026-10-17 05:55: -14 was built locally with no provenance, and -29..-32 are the -14 tarball with patches on top; not certified; withdraws the lane's -28 line (ce48e444)"
     },
     {
       "package": "@ai-ecoverse/wasix-uv-shim",

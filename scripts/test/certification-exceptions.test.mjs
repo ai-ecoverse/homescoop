@@ -129,14 +129,20 @@ const NPM = {
   [S + 'wasi-pnpm']: { '12.9.1-11': { deprecated: 'use 12.9.1-15: rayon worker trap' } },
   [S + 'wasm-jq']: { '1.8.2-4': {} },
   [S + 'slicc-kernel']: { '1.129.0': { prov: false }, '1.132.1': { prov: false } },
+  [S + 'wasm-xxd']: { '9.2.1192-3': { prov: { runner: 'some-other-builder' } } },
+  [S + 'wasm-retired']: { '1.0.0-2': { prov: false } },
+  [S + 'wasm-renamed']: { '2.0.0-1': {} },
+  [S + 'slicc-cdp']: { '1.30.11': { prov: { repo: 'https://github.com/ai-ecoverse/slicc-cdp', path: '.github/workflows/release.yml' } } },
 };
 const RULES = doc(
   entry(),
   { package: S + 'py-cycler', versions: ['0.12.1-7'], verdict: 'fail', issue: I(858), ruling: 'cert lane 2026-10-17 04:40: a repack of an unverifiable root' },
   { package: S + 'wasm-bash', versions: ['5.3.0-20'], verdict: 'requires', requires: { [S + 'slicc-kernel']: '>=1.130.2' }, issue: I(1230), ruling: 'FAIL below slicc-kernel 1.130.2' },
   { package: S + 'wasm-git', versions: ['2.55.0-15'], verdict: 'fail', issue: I(858), ruling: 'no provenance' },
+  { package: S + 'wasm-retired', versions: ['1.0.0-2'], verdict: 'fail', issue: I(858), ruling: 'a package no longer under packages/' },
 );
-const NAMES = new Set(Object.keys(NPM).filter((n) => n !== S + 'slicc-kernel'));
+// Today's packages/: wasm-retired and wasm-renamed have left it, slicc-* were never in it.
+const NAMES = new Set(Object.keys(NPM).filter((n) => ![S + 'slicc-kernel', S + 'slicc-cdp', S + 'wasm-retired', S + 'wasm-renamed'].includes(n)));
 
 test('checkOnline: an unknown package, version, range or issue is a typo', async () => {
   const { dir } = fixtures(NPM, ISSUES);
@@ -204,6 +210,10 @@ test('audit: one verdict per homescoop pin; DENY from the file, FAIL without mai
       [S + 'wasm-tar', '1.35.0-8'],
       [S + 'wasi-pnpm', '12.9.1-11'],
       [S + 'wasm-jq', '1.8.2-4', 'npm', integrityOf('tampered')],
+      [S + 'wasm-xxd', '9.2.1192-3'],
+      [S + 'wasm-retired', '1.0.0-2'],
+      [S + 'wasm-renamed', '2.0.0-1'],
+      [S + 'slicc-cdp', '1.30.11'],
     ]);
     const v = (k) => rows[S + k]?.verdict;
     assert.equal(v('py-pandas@3.0.6-1'), 'PASS');
@@ -226,6 +236,11 @@ test('audit: one verdict per homescoop pin; DENY from the file, FAIL without mai
     assert.match(rows[S + 'wasi-pnpm@12.9.1-11'].why, /^npm-deprecated: use 12.9.1-15/);
     assert.equal(v('wasm-jq@1.8.2-4'), 'FAIL');
     assert.match(rows[S + 'wasm-jq@1.8.2-4'].why, /lockfile integrity .* isn't npm's/);
+    assert.equal(v('wasm-xxd@9.2.1192-3'), 'FAIL', 'main provenance from neither a hosted nor a pool runner');
+    assert.match(rows[S + 'wasm-xxd@9.2.1192-3'].why, /^provenance from builder https:\/\/github.com\/actions\/runner\/some-other-builder, not a hosted or pool runner$/);
+    assert.equal(v('wasm-retired@1.0.0-2'), 'DENY', 'an entry outlives its package dir');
+    assert.equal(v('wasm-renamed@2.0.0-1'), 'PASS', 'a pin whose provenance names homescoop counts without a package dir');
+    assert.equal(rows[S + 'slicc-cdp@1.30.11'], undefined, "another repo's package gets no line");
     assert.equal(rows['left-pad@1.3.0'], undefined, 'only homescoop pins get a line');
     assert.equal(rows[S + 'slicc-kernel@1.132.1'], undefined);
     assert.equal(pinLine(rows[S + 'wasm-sed@4.10.0-4']).startsWith(`pin: FAIL ${S}wasm-sed@4.10.0-4 (`), true);
@@ -251,7 +266,7 @@ test('CLI: the verdict line is always last, and any non-PASS pin fails the run',
 
     const ok = cli('--check');
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    assert.match(last(ok), /^certification-exceptions: PASS exceptions.json: 4 entries valid, every package, version and issue exists$/);
+    assert.match(last(ok), /^certification-exceptions: PASS exceptions.json: 5 entries valid, every package, version and issue exists$/);
 
     const write = (name, pins) => {
       const { pkgLock } = lockfiles(integrity, { pins });

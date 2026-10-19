@@ -23,7 +23,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { checkProvenance, fixtureRegistry, npmRegistry, parseKnownInputs, KNOWN_INPUTS } from './cert-review/repack-input.mjs';
+import { checkProvenance, fixtureRegistry, npmRegistry, parseKnownInputs, KNOWN_INPUTS, REPO_URL } from './cert-review/repack-input.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const FILE = join(root, 'certification-exceptions.json');
@@ -290,25 +290,36 @@ export function homescoopNames(dir = root) {
 
 // ---- the audit ----
 
-function runnerOf(doc) {
+function statementOf(doc) {
   const slsa = (doc?.attestations || []).find((a) => a?.predicateType === SLSA);
   try {
-    const id = JSON.parse(Buffer.from(slsa.bundle.dsseEnvelope.payload, 'base64').toString('utf8')).predicate?.runDetails?.builder?.id || '';
-    return id.endsWith('/github-hosted') ? 'hosted' : id.endsWith('/self-hosted') ? 'pool' : id || 'unknown runner';
+    return JSON.parse(Buffer.from(slsa.bundle.dsseEnvelope.payload, 'base64').toString('utf8'));
   } catch {
-    return 'unknown runner';
+    return null;
   }
 }
 
+/** `hosted`, `pool` (a self-hosted runner) or what the provenance says instead. */
+export function runnerOf(doc) {
+  const id = statementOf(doc)?.predicate?.runDetails?.builder?.id || '';
+  return id === 'https://github.com/actions/runner/github-hosted' ? 'hosted' : id === 'https://github.com/actions/runner/self-hosted' ? 'pool' : id ? `builder ${id}` : 'no builder id';
+}
+
+const fromHomescoop = (doc) => statementOf(doc)?.predicate?.buildDefinition?.externalParameters?.workflow?.repository === REPO_URL;
+
 /**
- * One row per distinct homescoop name@version in `pins`. `pins` holds every
- * lockfile pin, homescoop's or not, because a requires entry checks bios's
- * own pins of the required package: every one of them must satisfy the range.
+ * One row per distinct homescoop name@version in `pins`. A pin is homescoop's
+ * when `names` (today's packages/) has it, when an entry names it (entries
+ * outlive the tree), or when its provenance names homescoop's repository.
+ * `pins` holds every lockfile pin, homescoop's or not, because a requires
+ * entry checks bios's own pins of the required package: every one of them
+ * must satisfy the range.
  */
 export async function audit({ doc, pins, names, registry }) {
+  const ours = new Set([...names, ...doc.entries.map((e) => e.package)]);
   const groups = new Map();
   for (const p of pins) {
-    if (!names.has(p.name)) continue;
+    if (!ours.has(p.name) && !(p.name.startsWith('@ai-ecoverse/') && fromHomescoop(await registry.attestations(p.name, p.version)))) continue;
     const key = `${p.name}@${p.version}`;
     if (!groups.has(key)) groups.set(key, { name: p.name, version: p.version, integrities: new Set(), files: new Set() });
     groups.get(key).integrities.add(p.integrity);
@@ -363,7 +374,12 @@ export async function audit({ doc, pins, names, registry }) {
       row('FAIL', prov.reason);
       continue;
     }
-    row('PASS', [`ladder-build@main ${prov.commit.slice(0, 10)}, ${runnerOf(att)}`, ...notes].join('; '));
+    const runner = runnerOf(att);
+    if (runner !== 'hosted' && runner !== 'pool') {
+      row('FAIL', `provenance from ${runner}, not a hosted or pool runner`);
+      continue;
+    }
+    row('PASS', [`ladder-build@main ${prov.commit.slice(0, 10)}, ${runner}`, ...notes].join('; '));
   }
   return rows;
 }
