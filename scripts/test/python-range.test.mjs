@@ -45,7 +45,8 @@ test('diffPackageJson: an exact python pin may become the range in a py-*, nothi
   assert.deepEqual(ok.errors, []);
   assert.ok(ok.changes.includes(`dependencies["${PY}"]: 3.14.2-16 → ${RANGE}`), ok.changes.join('\n'));
   assert.equal(diffPackageJson(base, numpy('>=3.14.2-16')).errors.length, 1);
-  assert.equal(diffPackageJson({ ...base, name: '@ai-ecoverse/wasm-emscripten' }, { ...numpy(RANGE), name: '@ai-ecoverse/wasm-emscripten' }).errors.length, 1);
+  assert.equal(diffPackageJson({ ...base, name: '@ai-ecoverse/wasm-git' }, { ...numpy(RANGE), name: '@ai-ecoverse/wasm-git' }).errors.length, 1);
+  assert.deepEqual(diffPackageJson({ ...base, name: '@ai-ecoverse/wasm-emscripten' }, { ...numpy(RANGE), name: '@ai-ecoverse/wasm-emscripten' }).errors, [], 'wasm-emscripten runs emcc on wasix-python (PYTHON_CONSUMERS)');
 });
 
 test('lockErrors: one python, at the top level, at that version', () => {
@@ -62,4 +63,13 @@ test('newestFrom: the wasix-python of cert/meta.json needsInstall', () => {
   assert.equal(newestFrom({ needsInstall: ['@ai-ecoverse/wasm-bash@5.3.0-13', `${PY}@3.14.2-24`] }), '3.14.2-24');
   assert.equal(newestFrom({ needs: [PY] }), null);
   assert.equal(newestFrom({ needsInstall: [`${PY}-x@1.0.0`] }), null);
+});
+
+test('wasm-emscripten, which runs emcc on wasix-python, may take wasix-python as the range too, and nothing else', () => {
+  const em = (deps) => ({ name: '@ai-ecoverse/wasm-emscripten', dependencies: deps });
+  assert.deepEqual(pinErrors(em({ [PY]: '>=3.15.0-2 <3.15.1' })), []);
+  assert.equal(pinErrors(em({ [PY]: '>=3.15.0-2 <3.16.0' })).length, 1);
+  assert.equal(pinErrors(em({ '@ai-ecoverse/wasm-clang': '>=24.0.0-22 <24.0.1' })).length, 1);
+  assert.equal(pinErrors(em({ '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.3.3' })).length, 1);
+  assert.equal(pinErrors({ name: '@ai-ecoverse/wasm-emscripten', peerDependencies: { [PY]: '>=3.15.0-2 <3.15.1' } }).length, 1);
 });

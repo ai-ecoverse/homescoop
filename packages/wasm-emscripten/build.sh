@@ -231,7 +231,8 @@ test -f "$PKG/emscripten-config"
   exit 1
 }
 grep -q '"@ai-ecoverse/emscripten-cache": "6.0.9-4"' "$PKG/package.json"
-grep -q '"@ai-ecoverse/wasm-binaryen": "132.0.0-3"' "$PKG/package.json"
+grep -q '"@ai-ecoverse/wasm-binaryen": "132.0.0-4"' "$PKG/package.json"
+grep -q '"@ai-ecoverse/wasm-clang": "24.0.0-22"' "$PKG/package.json"
 grep -q '"esbuild-wasm": "0.28.2"' "$PKG/package.json"
 grep -q '"typescript": "6.0.3"' "$PKG/package.json"
 grep -q '"acorn"' "$PKG/package.json"
