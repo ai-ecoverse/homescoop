@@ -18,7 +18,11 @@
  * (close, dup2, open) go along as `[target, source]` pairs (source -1 closes).
  */
 #include <emscripten.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 #include <spawn.h>
 #include <unistd.h>
 #include <stddef.h>
@@ -238,11 +242,48 @@ fail:
   return 2; // ENOENT: an open() file action failed
 }
 
-// The shell resolves PATH, so spawnp is the same call.
+// posix_spawnp searches PATH as musl's execvp does: a name with a '/' is
+// spawned as given; otherwise each PATH entry (an empty one is the cwd) is
+// tried in order and the first executable dir/file is spawned. When none is,
+// the bare name goes to posix_spawn, so a kernel catalog command still runs;
+// a candidate that exists but isn't executable makes that EACCES.
 int posix_spawnp(pid_t *restrict pid, const char *restrict file,
                  const posix_spawn_file_actions_t *fa, const posix_spawnattr_t *restrict attr,
                  char *const argv[restrict], char *const envp[restrict]) {
-  return posix_spawn(pid, file, fa, attr, argv, envp);
+  if (!file || !*file) return ENOENT;
+  if (strchr(file, '/')) return posix_spawn(pid, file, fa, attr, argv, envp);
+  const char *path = getenv("PATH");
+  if (!path) path = "/usr/local/bin:/bin:/usr/bin";
+  size_t flen = strlen(file);
+  int denied = 0;
+  for (const char *p = path;; p++) {
+    const char *z = strchr(p, ':');
+    size_t dlen = z ? (size_t)(z - p) : strlen(p);
+    char buf[PATH_MAX];
+    if (dlen + 3 + flen < sizeof buf) {
+      if (dlen) {
+        memcpy(buf, p, dlen);
+        buf[dlen] = '/';
+        memcpy(buf + dlen + 1, file, flen + 1);
+      } else {
+        memcpy(buf, file, flen + 1);
+      }
+      const char *cand = dlen ? buf : file;
+      if (access(cand, X_OK) == 0) {
+        if (!dlen) {
+          buf[0] = '.';
+          buf[1] = '/';
+          memcpy(buf + 2, file, flen + 1);
+        }
+        return posix_spawn(pid, buf, fa, attr, argv, envp);
+      }
+      if (errno == EACCES) denied = 1;
+    }
+    if (!z) break;
+    p = z;
+  }
+  int r = posix_spawn(pid, file, fa, attr, argv, envp);
+  return r == ENOENT && denied ? EACCES : r;
 }
 
 pid_t __syscall_wait4(pid_t pid, int *wstatus, int options, struct rusage *rusage) {
