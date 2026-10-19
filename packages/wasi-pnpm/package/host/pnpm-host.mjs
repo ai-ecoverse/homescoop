@@ -7,6 +7,7 @@ export const errno = {
   EACCES: 2, EAGAIN: 6, EBADF: 8, ECANCELED: 11, EEXIST: 20, EFAULT: 21,
   EINVAL: 28, EIO: 29, EISDIR: 31, ELOOP: 32, ENOENT: 44, ENOTDIR: 54,
   ENOTEMPTY: 55, ENOTSUP: 58, EPERM: 63, EWOULDBLOCK: 6,
+  ENOSPC: 51, ENOSYS: 52, EROFS: 69, EXDEV: 75,
 }
 
 const TYPE_BITS = { file: 0o100000, dir: 0o040000, symlink: 0o120000 }
@@ -171,6 +172,19 @@ function createFilesystem (ctx) {
       if ((ctx.fds.fstat(descriptor).uid ?? uid) !== uid) throw fail('EACCES', 'WASM SQLite stores must belong to the current user')
     }),
     fchmod: checked((descriptor, mode) => ctx.fds.fchmod(descriptor, mode & 0o7777)),
+    // 12.9.1-14 (patches/0006): one kernel call per imported file where
+    // slicc-kernel (>= 1.128.0) copies it itself; ENOSYS sends pnpm back to
+    // its own copy. flags bit 0: the target must not exist (O_EXCL).
+    copy_file (sourcePointer, sourceLength, targetPointer, targetLength, mode, flags) {
+      if (typeof ctx.fs.copyFile !== 'function') return errno.ENOSYS
+      if (mode < 0 || mode > 0o7777 || (flags & ~1) !== 0) return errno.EINVAL
+      try {
+        ctx.fs.copyFile(guestPath(sourcePointer, sourceLength), guestPath(targetPointer, targetLength), { mode, excl: (flags & 1) !== 0 })
+        return 0
+      } catch (error) {
+        return errorNumber(error)
+      }
+    },
     fmode: checked((descriptor, output) => setU32(output, withType(ctx.fds.fstat(descriptor)))),
     lmode: checked((pointer, length, output) => setU32(output, withType(ctx.fs.lstat(guestPath(pointer, length))))),
     // The process's umask (12.9.1-12): pnpm computes a copied file's mode

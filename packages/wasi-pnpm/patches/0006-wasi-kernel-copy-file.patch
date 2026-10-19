@@ -1,0 +1,122 @@
+fs (wasi): copy an imported file in the kernel where it can (homescoop, the KC's install trace)
+
+slicc-kernel >= 1.128.0 has ctx.fs.copyFile: one kernel call per file, no
+bytes through the process. copy_file_new (the copy importer, and the
+temp file of copy_file_atomic_with_permissions) asks the host for it
+through pnpm_fs.copy_file with the mode pnpm computed and O_EXCL; the
+kernel applies the umask, doesn't follow a link at the target and removes
+a partial target on failure. ENOSYS (an older kernel; asked once) or EXDEV
+falls back to pnpm's own open + io::copy.
+
+--- a/pnpm/crates/fs/src/lib.rs
++++ b/pnpm/crates/fs/src/lib.rs
+@@ -6,6 +6,7 @@
+ pub use copy_dirent::{copy_dir_contents, copy_dirent, create_symlink};
+ pub use copy_file_exclusive::{
+     CopyPermissions, copy_file_atomic, copy_file_atomic_with_permissions, copy_file_exclusive,
++    copy_file_new,
+     copy_permissions, read_file_permissions, set_file_permissions,
+ };
+ pub use cross_device::is_cross_device;
+--- a/pnpm/crates/fs/src/wasi_fs.rs
++++ b/pnpm/crates/fs/src/wasi_fs.rs
+@@ -183,6 +183,28 @@
+     check(unsafe { host::fchmod(file.as_raw_fd(), mode) })
+ }
+ 
++/// Copy `source` to a new `target` in the host (homescoop: one kernel call
++/// per file where slicc-kernel has `ctx.fs.copyFile`). `ENOSYS` once means
++/// the host has no such op; it isn't asked again.
++pub(crate) fn kernel_copy_file(source: &Path, target: &Path, mode: u32) -> io::Result<()> {
++    use std::sync::atomic::{AtomicBool, Ordering};
++    static UNSUPPORTED: AtomicBool = AtomicBool::new(false);
++    if UNSUPPORTED.load(Ordering::Relaxed) {
++        return Err(io::Error::from_raw_os_error(libc::ENOSYS));
++    }
++    let result = with_absolute_path(source, |source| {
++        with_absolute_path(target, |target| {
++            // SAFETY: both paths are readable for the synchronous call; the
++            // host retains neither pointer.
++            check(unsafe { host::copy_file(source.as_ptr(), source.len(), target.as_ptr(), target.len(), mode & 0o7777, 1) })
++        })
++    });
++    if result.as_ref().err().and_then(io::Error::raw_os_error) == Some(libc::ENOSYS) {
++        UNSUPPORTED.store(true, Ordering::Relaxed);
++    }
++    result
++}
++
+ pub(crate) fn path_mode(path: &Path) -> io::Result<u32> {
+     with_absolute_path(path, |path| {
+         let mut mode = 0;
+@@ -252,6 +274,14 @@
+         pub(super) fn check_owner(descriptor: i32) -> i32;
+         pub(super) fn path_access_executable(path: *const u8, length: usize) -> i32;
+         pub(super) fn fchmod(descriptor: i32, mode: u32) -> i32;
++        pub(super) fn copy_file(
++            source: *const u8,
++            source_length: usize,
++            target: *const u8,
++            target_length: usize,
++            mode: u32,
++            flags: u32,
++        ) -> i32;
+         pub(super) fn fmode(descriptor: i32, output: *mut u32) -> i32;
+         pub(super) fn lmode(path: *const u8, length: usize, output: *mut u32) -> i32;
+         pub(super) fn umask() -> u32;
+--- a/pnpm/crates/fs/src/copy_file_exclusive.rs
++++ b/pnpm/crates/fs/src/copy_file_exclusive.rs
+@@ -82,6 +82,28 @@
+         })
+ }
+ 
++/// [`copy_file_exclusive`] with nothing to do on the created file, so on
++/// wasi the host may copy it itself (homescoop: slicc-kernel >= 1.128.0's
++/// `ctx.fs.copyFile`, one kernel call per file and no bytes through the
++/// process). The kernel creates the target exclusively with `permissions`
++/// (applied under the umask, as `open(O_CREAT)`), doesn't follow a link at
++/// it, and removes a partial target on failure. A host without the op
++/// answers `ENOSYS`, and a copy across mounts `EXDEV`: both fall back to
++/// the copy through the process.
++pub fn copy_file_new(
++    source_path: &Path,
++    target_path: &Path,
++    permissions: &CopyPermissions,
++) -> io::Result<()> {
++    #[cfg(target_os = "wasi")]
++    match crate::wasi_fs::kernel_copy_file(source_path, target_path, *permissions) {
++        Ok(()) => return Ok(()),
++        Err(error) if matches!(error.raw_os_error(), Some(libc::ENOSYS | libc::EXDEV)) => {}
++        Err(error) => return Err(error),
++    }
++    copy_file_exclusive(source_path, target_path, permissions, |_| Ok(()))
++}
++
+ /// Re-apply the mode the target was created with, since the umask can
+ /// narrow it. On wasi that is a host call per copied file, skipped when
+ /// the umask clears none of its bits and the host has been seen to apply
+@@ -121,7 +143,7 @@
+         .unwrap_or_else(|| Path::new("."));
+     let temp = tempfile::Builder::new()
+         .make_in(dir, |temp_path| {
+-            copy_file_exclusive(source_path, temp_path, permissions, |_| Ok(()))
++            copy_file_new(source_path, temp_path, permissions)
+         })?;
+     let mut pending = Some(temp.into_temp_path());
+     crate::retry::retry_transient_file_locks(|| {
+--- a/pnpm/crates/deps-restorer/src/link_file.rs
++++ b/pnpm/crates/deps-restorer/src/link_file.rs
+@@ -435,12 +435,7 @@
+ /// partial file it removes on failure would otherwise be adopted by a
+ /// later import as a concurrent writer's finished work.
+ fn copy_file(source_file: &Path, target_link: &Path) -> io::Result<()> {
+-    pnpm_fs::copy_file_exclusive(
+-        source_file,
+-        target_link,
+-        &desired_permissions(source_file)?,
+-        |_| Ok(()),
+-    )
++    pnpm_fs::copy_file_new(source_file, target_link, &desired_permissions(source_file)?)
+ }
+ 
+ /// [`FsReflink::reflink`] for the explicit `Clone` method, then
