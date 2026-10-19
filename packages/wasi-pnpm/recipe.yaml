@@ -68,4 +68,4 @@ about:
     thread's view of the shared memory (memory.grow(0)) before handing out
     memory above it (homescoop#1127: V8's bulk-memory bounds checks against a
     stale per-thread length), in pnpm's own source rather than a patched
-    sysroot; shims/pnpm retries pnpm.wasm once on exactly that trap.
+    sysroot.

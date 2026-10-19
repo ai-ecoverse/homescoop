@@ -50,12 +50,10 @@
     "abi": "wasi",
     "commands": {
       "pnpm": {
-        "script": "shims/pnpm"
+        "wasm": "bin/pnpm.wasm",
+        "imports": "host/pnpm-host.mjs"
       },
       "pn": {
-        "script": "shims/pnpm"
-      },
-      "pnpm-wasm": {
         "wasm": "bin/pnpm.wasm",
         "imports": "host/pnpm-host.mjs",
         "argv0": "pnpm"
