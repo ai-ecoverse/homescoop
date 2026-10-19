@@ -782,8 +782,9 @@ static void usage_flags(const mbedtls_x509_crt *leaf, uint32_t *flags) {
  * any handshake, with the checks a client session makes: the default
  * profile, the store's roots, validity by the real clock, the leaf's usage,
  * and the session's name check (an IP literal only against an iPAddress SAN,
- * a DNS name by Mbed TLS, one trailing dot stripped). 0 with *flags_out set
- * (0 = verified), or < 0 with *flags_out = TLS_CHAIN_UNVERIFIED. A NULL
+ * a DNS name by Mbed TLS, one trailing dot stripped). 0 only when verified
+ * (*flags_out 0); 1 when it verified and failed (*flags_out the reasons);
+ * < 0 for an error, with *flags_out = TLS_CHAIN_UNVERIFIED. A NULL
  * `hostname` skips the name check: the caller must establish the server's
  * identity another way (an SPKI pin). Nothing is kept. */
 EMSCRIPTEN_KEEPALIVE int tls_chain_verify(ca *store, const unsigned char *chain, size_t chain_len,
@@ -818,6 +819,6 @@ EMSCRIPTEN_KEEPALIVE int tls_chain_verify(ca *store, const unsigned char *chain,
   mbedtls_x509_crt_free(&crt);
   if (ret != 0) return last_error = ret;
   *flags_out = flags;
-  return 0;
+  return flags == 0 ? 0 : 1;
 }
 

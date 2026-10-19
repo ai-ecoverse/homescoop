@@ -82,8 +82,9 @@ export interface TlsEngineModule {
    * client session's checks: the default profile, the store's roots, validity by the real clock,
    * the leaf's key usage (digitalSignature) and extended key usage (serverAuth when listed), and
    * the session's name check of `hostname` (NUL-terminated; an IP literal only against an
-   * iPAddress SAN, one trailing dot stripped). 0 with the Mbed TLS verify flags at `flagsOut`
-   * (a uint32; 0 = verified), or < 0 with `flagsOut` set to 0xffffffff (never 0) for a NULL
+   * iPAddress SAN, one trailing dot stripped). 0 only when verified (`flagsOut`, a uint32, is 0);
+   * 1 when it verified and failed, with the Mbed TLS verify flags at `flagsOut`; or < 0 with
+   * `flagsOut` set to 0xffffffff (never 0) for a NULL
    * store, an empty or malformed chain, an allocation failure or any other error.
    * `hostname` 0 (NULL) skips the name check: the caller must then establish the server's
    * identity another way, such as an SPKI pin. Nothing is kept.

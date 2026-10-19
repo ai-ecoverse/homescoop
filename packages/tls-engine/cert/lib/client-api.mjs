@@ -709,25 +709,29 @@ describe('tls_chain_verify, a chain checked without a handshake (4.2.0-5, slicc-
     assert.deepEqual(verify([leaf, ca.der], 'chain.test'), { ret: 0, flags: 0 });
     assert.deepEqual(verify([leaf], 'chain.test'), { ret: 0, flags: 0 });
     assert.deepEqual(verify([leaf], 'chain.test.'), { ret: 0, flags: 0 });
-    assert.deepEqual(verify([leaf], 'other.test'), { ret: 0, flags: BADCERT.CN_MISMATCH });
+    assert.deepEqual(verify([leaf], 'other.test'), { ret: 1, flags: BADCERT.CN_MISMATCH });
     assert.deepEqual(verify([leaf], null), { ret: 0, flags: 0 });
-    assert.deepEqual(verify([leaf], ''), { ret: 0, flags: BADCERT.CN_MISMATCH });
+    assert.deepEqual(verify([leaf], ''), { ret: 1, flags: BADCERT.CN_MISMATCH });
   });
 
-  test('an untrusted CA, an expired leaf and a clientAuth-only leaf are flagged as a session would flag them', () => {
+  test('an untrusted CA, an expired leaf and a clientAuth-only leaf return 1 and are flagged as a session would flag them', () => {
     const other = makeCa('homescoop tls-engine other CA');
     const stranger = other.issue('chain.test', generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ type: 'spki', format: 'der' }));
-    assert.equal(verify([stranger], 'chain.test').flags & BADCERT.NOT_TRUSTED, BADCERT.NOT_TRUSTED);
+    const untrusted = verify([stranger], 'chain.test');
+    assert.equal(untrusted.ret, 1);
+    assert.equal(untrusted.flags & BADCERT.NOT_TRUSTED, BADCERT.NOT_TRUSTED);
     const day = 86400_000;
     const expired = leafFor('chain.test', { notBefore: new Date(Date.now() - 3 * day), notAfter: new Date(Date.now() - day) });
-    assert.equal(verify([expired], 'chain.test').flags & BADCERT.EXPIRED, BADCERT.EXPIRED);
+    const old = verify([expired], 'chain.test');
+    assert.equal(old.ret, 1);
+    assert.equal(old.flags & BADCERT.EXPIRED, BADCERT.EXPIRED);
     const clientOnly = leafFor('chain.test', { eku: '1.3.6.1.5.5.7.3.2' });
-    assert.deepEqual(verify([clientOnly], 'chain.test'), { ret: 0, flags: BADCERT.EXT_KEY_USAGE });
+    assert.deepEqual(verify([clientOnly], 'chain.test'), { ret: 1, flags: BADCERT.EXT_KEY_USAGE });
   });
 
   test('an IP literal verifies only against an iPAddress SAN, never a dNSName spelling it', () => {
     assert.deepEqual(verify([leafFor('192.0.2.9')], '192.0.2.9'), { ret: 0, flags: 0 });
-    assert.deepEqual(verify([leafFor('192.0.2.9', { san: 'dns' })], '192.0.2.9'), { ret: 0, flags: BADCERT.CN_MISMATCH });
+    assert.deepEqual(verify([leafFor('192.0.2.9', { san: 'dns' })], '192.0.2.9'), { ret: 1, flags: BADCERT.CN_MISMATCH });
   });
 
   test('fails closed: a NULL store, no chain, a truncated DER, garbage and an allocation failure are < 0 with flags that are never 0', () => {

@@ -182,5 +182,6 @@ The 4.2.0-1 build also passes, unchanged:
 ## 4.2.0-5: tls_chain_verify (slicc-kernel#1090)
 - **4.2.0-4 (the published tgz):** `lib/client-api.mjs` fails the five `tls_chain_verify …` cases, because there's no `_tls_chain_verify` export. The other 24 cases pass.
 - **A build without the fail-closed line at entry** (`*flags_out = TLS_CHAIN_UNVERIFIED;`) fails `fails closed: a NULL store, no chain, a truncated DER, garbage and an allocation failure are < 0 with flags that are never 0`. The error paths then leave the caller's flags at 0, which reads as verified. With the line it passes.
+- **A build that returns 0 for a verification that failed** (the review's case, `return 0;` instead of `return flags == 0 ? 0 : 1;`) fails three cases on the return code (wrong host, untrusted/expired/clientAuth, the IP literal against a dNSName), so a caller that checks only `== 0` is covered.
 - **4.2.0-5 as built:** client-api 29/29 and engine-api 19/19 (the server and client session ABIs are unchanged; the session's name parsing and IP-SAN check now go through the same `name_parse` and `ip_name_flags` as `tls_chain_verify`).
 
