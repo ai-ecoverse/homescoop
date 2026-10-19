@@ -82,7 +82,7 @@ export default async function (ctx) {
     assert.match(t.stdout, /^tool-ran$/m, `umask ${mask}: the bin runs: ${out(t)}`);
   }
   // The store, written under umask 022 by the first install.
-  const s = await run(['bash', '-c', 'shopt -s nullglob globstar; store=$(pnpm store path); for f in "$store"/files/**/*; do if [[ -f $f ]]; then stat -c "%a %n" "$f"; fi; done'], { cwd: '/home/bob/m022', user: 'bob' });
+  const s = await run(['bash', '-c', 'shopt -s nullglob; store=$(pnpm store path); f=("$store"/files/*/*); stat -c "%a %n" "${f[@]}"'], { cwd: '/home/bob/m022', user: 'bob' });
   assert.equal(s.status, 0, out(s));
   const lines = s.stdout.split('\n').filter((l) => /\/files\//.test(l));
   const exec = lines.filter((l) => /-exec$/.test(l));
