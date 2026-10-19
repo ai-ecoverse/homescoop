@@ -7,6 +7,13 @@
  *   node scripts/refresh-recipe-sha.mjs --all
  *   node scripts/refresh-recipe-sha.mjs zlib --check
  *   node scripts/refresh-recipe-sha.mjs py-numpy --verify-repack
+ *   node scripts/refresh-recipe-sha.mjs llvm-emscripten --reroll [--base origin/main]
+ *
+ * A pin is rewritten only when its resolved URL differs from the one at the
+ * merge-base with --base (default origin/main, or RECIPE_SHA_BASE). New bytes
+ * for an unchanged URL fail (#1267), unless the source pins `tree:`, the
+ * archive's tree matches it, and --reroll asks for the re-roll explicitly.
+ * --verify-tree also checks a pinned tree when the sha256 matches.
  *
  * Repack recipes (repack.from) never fetch their source, so a wrong sha256
  * would never fail a build (#730). Builds skip them (their bytes come from
@@ -20,7 +27,8 @@
  * repack chain attested. RECIPE_SHA_FIXTURES=<json> ({ issues: { N: "OPEN" },
  * attested: { pkg: false } }) stands in for GitHub and npm in tests.
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { checkArchiveTree, describe as describeTree, githubArchive } from './source-tree.mjs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync, execFileSync } from 'node:child_process';
@@ -32,11 +40,15 @@ const args = process.argv.slice(2);
 const all = args.includes('--all');
 const checkOnly = args.includes('--check');
 const verifyRepack = args.includes('--verify-repack');
+const verifyTree = args.includes('--verify-tree');
+const reroll = args.includes('--reroll');
+const baseIdx = args.indexOf('--base');
+const baseRef = baseIdx >= 0 ? args[baseIdx + 1] : process.env.RECIPE_SHA_BASE || 'origin/main';
 const names = all
   ? readdirSync(join(root, 'packages')).filter((d) =>
       existsSync(join(root, 'packages', d, 'recipe.yaml'))
     )
-  : args.filter((a) => !a.startsWith('-'));
+  : args.filter((a, i) => !a.startsWith('-') && !(baseIdx >= 0 && i === baseIdx + 1));
 
 if (!names.length) {
   console.error('usage: refresh-recipe-sha.mjs <package>|--all');
@@ -77,19 +89,73 @@ function sha256File(path) {
   return h.digest('hex');
 }
 
-function fetchSha(url) {
+/** Download url into a temp dir; the caller removes `dir`. */
+function fetchBlob(url) {
   const dir = mkdtempSync(join(tmpdir(), 'homescoop-sha-'));
-  const dest = join(dir, 'blob');
+  const file = join(dir, `blob${(url.match(/\.(tar\.[a-z0-9]+|tgz|txz|tbz2|zip)$/i) || [''])[0]}`);
   try {
     execFileSync(
       'curl',
-      ['-fsSL', '--retry', '5', '--retry-all-errors', '--retry-delay', '2', '-o', dest, url],
+      ['-fsSL', '--retry', '5', '--retry-all-errors', '--retry-delay', '2', '-o', file, url],
       { stdio: ['ignore', 'inherit', 'inherit'] }
     );
-    return sha256File(dest);
+  } catch (e) {
+    rmSync(dir, { recursive: true, force: true });
+    throw e;
+  }
+  return { dir, file, digest: sha256File(file) };
+}
+
+/** The recipe at the base ref's merge-base with HEAD, or null when the package is new there. */
+let baseCommit;
+function baseRecipe(name) {
+  if (baseCommit === undefined) {
+    const mb = spawnSync('git', ['merge-base', 'HEAD', baseRef], { encoding: 'utf8', cwd: root });
+    if (mb.status !== 0) {
+      throw new Error(
+        `can't resolve the base ${baseRef} (git merge-base HEAD ${baseRef}: ${(mb.stderr || '').trim() || 'failed'}), ` +
+          'so it can\'t tell whether a source URL changed. Fetch it or pass --base <ref>.'
+      );
+    }
+    baseCommit = mb.stdout.trim();
+  }
+  const show = spawnSync('git', ['show', `${baseCommit}:packages/${name}/recipe.yaml`], { encoding: 'utf8', cwd: root });
+  if (show.status !== 0) return null;
+  const dir = mkdtempSync(join(tmpdir(), 'homescoop-base-'));
+  try {
+    mkdirSync(join(dir, 'scripts'));
+    mkdirSync(join(dir, 'packages', name), { recursive: true });
+    copyFileSync(join(root, 'scripts/read-recipe.mjs'), join(dir, 'scripts/read-recipe.mjs'));
+    writeFileSync(join(dir, 'packages', name, 'recipe.yaml'), show.stdout);
+    const r = spawnSync(process.execPath, [join(dir, 'scripts/read-recipe.mjs'), name, '--json'], { encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`read-recipe ${name} at ${baseRef}: ${r.stderr}`);
+    return JSON.parse(r.stdout);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function sourceJobs(recipe) {
+  const jobs = [];
+  if (recipe.source && recipe.source.url) jobs.push({ key: null, src: recipe.source });
+  for (const [k, v] of Object.entries(recipe.sources || {})) {
+    if (v && typeof v === 'object' && v.url) jobs.push({ key: k, src: v });
+  }
+  return jobs;
+}
+
+function expandUrl(src, version) {
+  const srcVersion = String(src.version || version);
+  const sp = splitVersion(srcVersion);
+  return expand(String(src.url || ''), {
+    version: srcVersion,
+    major: sp.major,
+    minor: sp.minor,
+    patch: sp.patch,
+    extra: sp.extra || '',
+    amal: String(src.amal || sp.amal),
+    year: String(src.year || ''),
+  });
 }
 
 /**
@@ -111,14 +177,14 @@ function replaceSha(text, { oldSha, newSha, urlHint }) {
   }
   const start = hintIdx >= 0 ? hintIdx : 0;
   for (let i = start; i < Math.min(lines.length, start + 8); i++) {
-    const m = lines[i].match(/^(\s*sha256:\s*")([0-9a-fA-F]{64})("\s*)$/);
+    const m = lines[i].match(/^(\s*sha256:\s*")([0-9a-fA-F]{64})?("\s*)$/);
     if (m) {
       lines[i] = `${m[1]}${newSha}${m[3]}`;
       return lines.join('\n');
     }
   }
   // Fallback: first sha256 in file
-  const re = /sha256:\s*"([0-9a-fA-F]{64})"/;
+  const re = /sha256:\s*"([0-9a-fA-F]{64})?"/;
   if (!re.test(text)) throw new Error('no sha256 field to replace');
   return text.replace(re, `sha256: "${newSha}"`);
 }
@@ -143,34 +209,12 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
   let text = readFileSync(path, 'utf8');
   const version = String(recipe.version || '');
 
-  /** @type {{ key: string|null, src: Record<string, unknown> }[]} */
-  const jobs = [];
-  if (recipe.source && recipe.source.url) {
-    jobs.push({ key: null, src: recipe.source });
-  }
-  const sources = recipe.sources || {};
-  for (const [k, v] of Object.entries(sources)) {
-    if (v && typeof v === 'object' && /** @type {any} */ (v).url) {
-      jobs.push({ key: k, src: /** @type {Record<string, unknown>} */ (v) });
-    }
-  }
-
-  for (const job of jobs) {
+  for (const job of sourceJobs(recipe)) {
     const src = job.src;
-    const srcVersion = String(src.version || version);
-    const sp = splitVersion(srcVersion);
-    const vars = {
-      version: srcVersion,
-      major: sp.major,
-      minor: sp.minor,
-      patch: sp.patch,
-      extra: sp.extra || '',
-      amal: String(src.amal || sp.amal),
-      year: String(src.year || ''),
-    };
+    const label = job.key ? `sources.${job.key}` : 'source';
     let url;
     try {
-      url = expand(String(src.url || ''), vars);
+      url = expandUrl(src, version);
     } catch (e) {
       console.log(`skip ${name}${job.key ? '/' + job.key : ''}: ${e.message}`);
       continue;
@@ -180,14 +224,13 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
       continue;
     }
     if (String(src.sha256 || '') === 'skip') {
-      // Unpinned on purpose: build.sh stages a prebuilt artifact, not this URL.
       console.log(`skip ${name}${job.key ? '/' + job.key : ''}: sha256 skip (prebuilt, not fetched)`);
       continue;
     }
     console.log(`== ${name}${job.key ? ' sources.' + job.key : ''}: ${url}`);
-    let digest;
+    let blob;
     try {
-      digest = fetchSha(url);
+      blob = fetchBlob(url);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(
@@ -195,28 +238,92 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
           'Make source.url derive from {{version}} / {{major}}.{{minor}}.'
       );
     }
-    const oldSha = String(src.sha256 || '');
-    if (oldSha === digest) {
-      console.log(`   sha256 unchanged: ${digest}`);
-      continue;
+    try {
+      const digest = blob.digest;
+      const oldSha = String(src.sha256 || '');
+      const pinTree = src.tree ? String(src.tree) : '';
+      const treeOk = () => {
+        const gh = githubArchive(url);
+        const repo = String(src.git || gh?.repo || '');
+        const commit = String(src.commit || gh?.commit || '');
+        if (!repo || !commit) throw new Error(`${label}.tree needs a GitHub archive URL of a commit, or ${label}.git and ${label}.commit`);
+        const r = checkArchiveTree({ archive: blob.file, repo, commit, tree: pinTree });
+        console.log(`   ${describeTree(r, pinTree)}`);
+        return r;
+      };
+      if (oldSha === digest) {
+        console.log(`   sha256 unchanged: ${digest}`);
+        if (pinTree && verifyTree) {
+          const r = treeOk();
+          if (!r.ok) throw new Error(`${url} does not match the pinned ${label}.tree ${pinTree}: ${r.problems[0]}`);
+        }
+        continue;
+      }
+      if (mismatches) {
+        mismatches.push(`${label}: ${oldSha || '(empty)'} != ${digest}`);
+        continue;
+      }
+      if (check) {
+        throw new Error(
+          `${name}: recipe sha256 ${oldSha || '(empty)'} != downloaded ${digest} for ${url}. ` +
+            (why ||
+              'Renovate does not update checksums; wait for the recipe-sha job or run refresh-recipe-sha.mjs.')
+        );
+      }
+      const base = baseRecipe(name);
+      const baseJob = base && sourceJobs(base).find((j) => j.key === job.key);
+      let baseUrl = null;
+      if (baseJob) {
+        try {
+          baseUrl = expandUrl(baseJob.src, String(base.version || ''));
+        } catch {
+          baseUrl = null;
+        }
+      }
+      if (baseUrl === url) {
+        const unchanged = `${url} changed bytes for an unchanged URL (pinned ${oldSha || '(empty)'}, got ${digest})`;
+        if (!pinTree) {
+          throw new Error(
+            `${unchanged}. The URL is the same as at ${baseRef}, so the upstream bytes moved under the pin. ` +
+              'Nothing was written; find out why before changing the pin.'
+          );
+        }
+        const r = treeOk();
+        if (!r.ok) {
+          throw new Error(`${unchanged}, and it does not match the pinned ${label}.tree ${pinTree} (${r.problems[0]}). Nothing was written.`);
+        }
+        if (!reroll) {
+          throw new Error(
+            `${unchanged}. Its tree matches ${label}.tree ${pinTree}, so this looks like a re-roll of a generated archive. ` +
+              'Nothing was written; refresh it explicitly with --reroll.'
+          );
+        }
+        console.log(`   re-roll: the archive matches ${label}.tree ${pinTree}; sha256 ${oldSha} → ${digest} for the same URL`);
+      } else {
+        const baseSha = baseJob ? String(baseJob.src.sha256 || '') : '';
+        if (oldSha && oldSha !== baseSha) {
+          throw new Error(
+            `${url} changed bytes under a pin this branch already set (pinned ${oldSha}, got ${digest}; ${baseRef} pins ${baseSha || '(none)'}). ` +
+              'Only a pin carried over from the base, or an empty one, is refreshed. Nothing was written.'
+          );
+        }
+        console.log(`   url changed against ${baseRef}: ${baseUrl || '(new)'} → ${url}`);
+        if (pinTree) {
+          const r = treeOk();
+          if (!r.ok) {
+            throw new Error(`${url} does not match the pinned ${label}.tree ${pinTree} (${r.problems[0]}); update ${label}.tree with the URL. Nothing was written.`);
+          }
+        }
+      }
+      text = replaceSha(text, {
+        oldSha,
+        newSha: digest,
+        urlHint: String(src.url || ''),
+      });
+      console.log(`   sha256: ${oldSha || '(none)'} → ${digest}`);
+    } finally {
+      rmSync(blob.dir, { recursive: true, force: true });
     }
-    if (mismatches) {
-      mismatches.push(`${job.key ? `sources.${job.key}` : 'source'}: ${oldSha || '(empty)'} != ${digest}`);
-      continue;
-    }
-    if (check) {
-      throw new Error(
-        `${name}: recipe sha256 ${oldSha || '(empty)'} != downloaded ${digest} for ${url}. ` +
-          (why ||
-            'Renovate does not update checksums; wait for the recipe-sha job or run refresh-recipe-sha.mjs.')
-      );
-    }
-    text = replaceSha(text, {
-      oldSha,
-      newSha: digest,
-      urlHint: String(src.url || ''),
-    });
-    console.log(`   sha256: ${oldSha || '(none)'} → ${digest}`);
   }
 
   if (!check) writeFileSync(path, text);
@@ -314,7 +421,7 @@ for (const name of names) {
     refreshOne(name);
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
-    console.log(`recipe-sha: FAIL ${name}: ${(e instanceof Error ? e.message : String(e)).split('\n')[0].slice(0, 200)}`);
+    console.log(`recipe-sha: FAIL ${name}: ${(e instanceof Error ? e.message : String(e)).split('\n')[0]}`);
     process.exit(1);
   }
 }

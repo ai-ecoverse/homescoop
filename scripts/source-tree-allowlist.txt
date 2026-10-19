@@ -1,0 +1,16 @@
+# <package>[/sources.<key>] #<issue> <reason>: GitHub commit archives without source.tree (scripts/test/source-tree-pin.test.mjs)
+emscripten-cache #1267 GitHub archive pinned by sha256 only
+llvm-emscripten #1267 GitHub archive pinned by sha256 only
+wasi-buf #1267 GitHub archive pinned by sha256 only
+wasi-gh #1267 GitHub archive pinned by sha256 only
+wasi-ntfy #1267 GitHub archive pinned by sha256 only
+wasi-pnpm #1267 GitHub archive pinned by sha256 only
+wasi-protoc-gen-connect-go #1267 GitHub archive pinned by sha256 only
+wasi-protoc-gen-go #1267 GitHub archive pinned by sha256 only
+wasi-protoc-gen-go-grpc #1267 GitHub archive pinned by sha256 only
+wasix-f2c/sources.f2c #1267 GitHub archive pinned by sha256 only
+wasix-python/sources.libffi #1267 GitHub archive pinned by sha256 only
+wasix-python3.15/sources.libffi #1267 GitHub archive pinned by sha256 only
+wasix-sysroot/sources.llvm_project #1267 GitHub archive pinned by sha256 only
+wasm-binaryen #1267 GitHub archive pinned by sha256 only
+wasm-emscripten #1267 GitHub archive pinned by sha256 only

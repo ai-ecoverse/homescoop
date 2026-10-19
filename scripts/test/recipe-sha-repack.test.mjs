@@ -16,7 +16,7 @@ const sha = (b) => createHash('sha256').update(b).digest('hex');
 function fixture({ pin, repack = true, allow = '', issues = {}, attested = {}, verify = true }) {
   const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-test-'));
   mkdirSync(join(dir, 'scripts'));
-  for (const f of ['refresh-recipe-sha.mjs', 'read-recipe.mjs']) copyFileSync(join(scripts, f), join(dir, 'scripts', f));
+  for (const f of ['refresh-recipe-sha.mjs', 'read-recipe.mjs', 'source-tree.mjs']) copyFileSync(join(scripts, f), join(dir, 'scripts', f));
   if (allow) writeFileSync(join(dir, 'scripts/recipe-sha-allowlist.txt'), allow);
   const src = join(dir, 'src-1.0.tar.gz');
   writeFileSync(src, 'source bytes\n');
@@ -27,7 +27,7 @@ function fixture({ pin, repack = true, allow = '', issues = {}, attested = {}, v
     'version: "1.0"',
     'source:',
     `  url: "file://${dir}/src-{{version}}.tar.gz"`,
-    `  sha256: "${pin === 'right' ? sha(readFileSync(src)) : pin === 'skip' ? 'skip' : 'f'.repeat(64)}"`,
+    `  sha256: "${pin === 'right' ? sha(readFileSync(src)) : pin === 'skip' ? 'skip' : pin === 'empty' ? '' : 'f'.repeat(64)}"`,
     ...(repack ? ['repack:', '  from: "1.0-1"'] : []),
     '',
   ].join('\n');
@@ -36,7 +36,7 @@ function fixture({ pin, repack = true, allow = '', issues = {}, attested = {}, v
   const run = () =>
     spawnSync(process.execPath, [join(dir, 'scripts/refresh-recipe-sha.mjs'), 'fx', ...(verify ? ['--verify-repack'] : [])], {
       encoding: 'utf8',
-      env: { ...process.env, RECIPE_SHA_FIXTURES: join(dir, 'fixtures.json') },
+      env: { ...process.env, RECIPE_SHA_FIXTURES: join(dir, 'fixtures.json'), RECIPE_SHA_BASE: 'main' },
     });
   const read = () => readFileSync(join(dir, 'packages/fx/recipe.yaml'), 'utf8');
   return { dir, run, read, recipe };
@@ -118,10 +118,15 @@ test('a malformed allowlist line fails', () => {
   }
 });
 
-test('a non-repack with a wrong pin is still rewritten (Renovate flow); sha256 skip is left alone', () => {
-  let f = fixture({ pin: 'wrong', repack: false });
+test('a new non-repack (no recipe at the base) with an empty pin is filled in; sha256 skip is left alone', () => {
+  let f = fixture({ pin: 'empty', repack: false });
   try {
-    assert.equal(f.run().status, 0);
+    const g = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: f.dir, encoding: 'utf8' });
+    g('init', '-q', '-b', 'main');
+    g('commit', '-q', '--allow-empty', '-m', 'base');
+    const r = f.run();
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /url changed against main: \(new\)/);
     assert.ok(f.read().includes(sha(Buffer.from('source bytes\n'))));
   } finally {
     rmSync(f.dir, { recursive: true, force: true });

@@ -325,6 +325,59 @@ Recipe is SSOT for version, URL (`{{version}}` expanded by
 `host-run.sh` runs `check-package-meta.mjs` before `npm pack`. Refresh
 sha after Renovate with `node scripts/refresh-recipe-sha.mjs <pkg>`.
 
+### A source sha256 never changes silently (#1267)
+
+`refresh-recipe-sha.mjs` (ladder-pr's `recipe-sha` job and `npm run refresh-sha`)
+rewrites a `source.sha256` or `sources.<key>.sha256` only when that source's
+resolved URL differs from the one at the merge-base with the PR's base
+(`--base`, default `origin/main`; `RECIPE_SHA_BASE` overrides it). A package that
+is new at the base counts as a changed URL. Even then, only a pin carried over
+from the base (Renovate bumps only `version:`) or an empty one is refreshed: a pin
+the branch already set fails when its bytes move. So a new package's recipe
+carries either the right sha256 or an empty one (`sha256: ""`), which gets filled in. When the URL is unchanged and the
+bytes differ from the pin, it prints
+`recipe-sha: FAIL <pkg>: <url> changed bytes for an unchanged URL (pinned <old>, got <new>)`,
+exits non-zero and writes nothing, so the job pushes nothing. A person decides.
+If the base can't be resolved (a shallow checkout), a mismatch fails the same way.
+
+GitHub's generated archives (`github.com/<o>/<r>/archive/<40-hex>.tar.gz`,
+`codeload.github.com`) aren't byte-stable: an archive's `export-subst` files
+expand `%(describe)`, which moves when upstream adds a tag, and the compression
+may change. Such a source pins its content with `tree:`, the git tree sha of the
+commit (`gh api repos/<o>/<r>/git/commits/<sha> --jq .tree.sha`):
+
+```yaml
+source:
+  url: "https://github.com/llvm/llvm-project/archive/b158b0ae….tar.gz"
+  sha256: "…"
+  commit: "b158b0ae…"
+  tree: "3690321e…"
+```
+
+`scripts/source-tree.mjs` checks an archive against it: it fetches the commit
+(depth 1) from the repo (taken from the URL, or `git:` and `commit:` for other
+hosts), checks the commit's tree is the pin, and compares the archive's files
+with that tree through git itself (`core.autocrlf=false`, the tree's
+`.gitattributes` undo eol conversions, committed files that `.gitignore` matches
+count). The only differences allowed are `export-ignore` paths and files marked
+`export-subst` (listed in the log) that match their blob outside the
+`$Format:…$` placeholders. The extractor is chosen by the archive's magic bytes,
+so a codeload zip URL without an extension works. ladder-pr passes the base as
+`RECIPE_SHA_BASE`, not as an argument, because the job runs the branch's own
+script and older ones would take an argument as a package name. It prints `source-tree: PASS|FAIL …`.
+
+A changed sha256 for an unchanged URL whose archive matches `tree:` is a re-roll.
+It still fails in CI. Refresh it explicitly with
+`node scripts/refresh-recipe-sha.mjs <pkg> --reroll`, which logs the tree check;
+commit that log line's verdict in the PR body. An archive that doesn't match the
+tree fails, with or without `--reroll`. ladder-pr's `recipe-sha` job also passes
+`--verify-tree`, so a pinned tree is checked on every PR that touches the package,
+even when the sha256 matches.
+
+`scripts/test/source-tree-pin.test.mjs` lists the GitHub commit-archive sources
+without `tree:`. `scripts/source-tree-allowlist.txt` holds today's, each tied to
+#1267; an entry fails once its source pins a tree.
+
 `host-run.sh` also runs `check-slicc-cred.mjs` on the staged package: every
 `.wasm` that links the slicc shims (it exports `slicc_sig_mask`) must import
 `slicc_cred_js` and export `slicc_cred_euid`, so its `getuid()`/`geteuid()`

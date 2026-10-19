@@ -41,7 +41,9 @@ recipe.
 branch, and also refreshes sha256 in the host-build checkout so a
 `GITHUB_TOKEN` push does not skip the build. A bump whose patches no
 longer apply fails at `homescoop_apply_patches` with a patch error, not
-a checksum error.
+a checksum error. It rewrites a sha256 only when the source URL changed
+against the base; new bytes for an unchanged URL fail instead (#1267, see
+[ladder-builds.md](ladder-builds.md#a-source-sha256-never-changes-silently-1267)).
 
 Manual refresh:
 
