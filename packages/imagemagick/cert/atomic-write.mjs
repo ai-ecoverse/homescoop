@@ -40,5 +40,17 @@ export default async function atomicWrite(ctx) {
   await ok(['magick', '-size', '30x20', 'xc:red', 'xc:blue', '-adjoin', 'two.gif']);
   assert.equal((await run(['identify', '-format', '%n\n', 'two.gif'])).stdout.trim().split('\n')[0], '2', 'an adjoined multi-frame write keeps every frame');
   assert.deepEqual(await ls(), ['orig.png', 'two.gif', 'two.gif'], 'no temporary files after successful writes');
+  // homescoop#1244: only single-file raster coders take the temp-and-rename
+  // path. A register (mpr:) or an unknown prefix keeps upstream's write: an
+  // earlier patch renamed an empty temp file over a cwd file with the
+  // register's name, and lost the register.
+  await ctx.write(`${cwd}/notes`, 'my notes\n');
+  await ok(['magick', '-size', '40x40', 'xc:red', '-write', 'mpr:notes', '+delete', 'mpr:notes', '-resize', '50%', 'r.png']);
+  assert.equal(await ctx.read(`${cwd}/notes`), 'my notes\n', 'a file named like an mpr: register is left alone (homescoop#1244)');
+  assert.equal((await run(['identify', '-format', '%m %w %h', 'r.png'])).stdout, 'PNG 20 20', 'the mpr: register is read back');
+  await ok(['magick', '-size', '10x10', 'xc:red', 'co:lon.png']);
+  assert.ok(await ctx.readBytes(`${cwd}/co:lon.png`), 'an unknown prefix writes the file as named, as upstream does');
+  assert.equal(await ctx.readBytes(`${cwd}/lon.png`), null, 'and not lon.png');
+  console.log('atomic-write: mpr: registers and unknown prefixes keep upstream\'s write (homescoop#1244)');
   console.log('atomic-write: a failed -depth 8 PNG write (cache resources exhausted) leaves the existing target byte-identical and creates no new one, no *~ left; good writes replace the target, adjoined frames intact');
 }

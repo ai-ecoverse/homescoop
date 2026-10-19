@@ -152,4 +152,10 @@ The release itself only adds the README note on writing `.heic`/`.avif` (homesco
   ```
 
   s.webp is `PNG 100 50`. mogrify's backup name `s.webp-xxxxxxxx~` names no format, so the input's encoder ran. -9.1 passes the -format explicitly.
+- **#1244, #1245, #1207 (cert-review of the first 9.1 build).** The first version of write-temp-then-rename.patch applied to every coder, and that broke three things:
+  - `-write mpr:orig` wrote and renamed an empty `orig.xxxxxxxx~` over a cwd file named `orig`, losing data, and lost the register.
+  - A 0444 target was replaced by rename.
+  - A HEIC write (no encoder) exited 0 and left a `HEIC:…~` file.
+
+  The patch now takes the temp-and-rename path only for single-file raster coders that have an encoder. They are named by the target's extension or by the same explicit prefix. The target must be one the user may write. Everything else keeps upstream's direct write. `atomic-write.mjs` adds the mpr: and unknown-prefix rows, and the heif package's `atomic-write-users.mjs` adds the read-only and HEIC rows as a non-root user. The published -9 behaves the same on all four, so they're parity rows, and the first 9.1 build failed the mpr: one.
 - **#819.** The cert now runs with `"users": "enforce"`, and every spec passes under it.

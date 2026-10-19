@@ -35,21 +35,78 @@
    assert(exception != (ExceptionInfo *) NULL);
    write_info=CloneImageInfo(image_info);
    *write_info->magick='\0';
-@@ -1613,6 +1628,80 @@
+@@ -1613,6 +1628,124 @@
    sans_exception=DestroyExceptionInfo(sans_exception);
    if (*write_info->magick == '\0')
      (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
 +  /*
 +    homescoop#562: write a single output file to a temporary file beside it
 +    and rename it over the target only once the write succeeded, so a failed
-+    write never leaves a truncated file or clobbers an existing one.
++    write never leaves a truncated file or clobbers an existing one. Only for
++    the single-file raster coders below, named by the target's extension or
++    by the same explicit prefix: never for registers (mpr:), coders that
++    write companion files or display, unknown prefixes, formats without an
++    encoder, or a target the user may not write (homescoop#1244, #1245,
++    #1207), which all keep upstream's direct write.
 +  */
 +  (void) CopyMagickString(atomic_path,write_info->filename,MagickPathExtent);
-+  if ((write_info->blob == (void *) NULL) && (write_info->file == (FILE *) NULL) &&
++  {
++    static const char
++      *atomic_modules[] = { "PNG", "JPEG", "WEBP", "GIF", "TIFF", "BMP",
++        "PNM", "HEIC", "JXL", "JP2", "QOI", "TGA", "ICON", "PSD",
++        (const char *) NULL };
++
++    const MagickInfo
++      *atomic_info;
++
++    ExceptionInfo
++      *atomic_exception;
++
++    const char
++      *colon,
++      *module;
++
++    MagickBooleanType
++      atomic_ok;
++
++    ssize_t
++      k;
++
++    atomic_exception=AcquireExceptionInfo();
++    atomic_info=GetMagickInfo(write_info->magick,atomic_exception);
++    atomic_exception=DestroyExceptionInfo(atomic_exception);
++    atomic_ok=MagickFalse;
++    if ((atomic_info != (const MagickInfo *) NULL) &&
++        (GetImageEncoder(atomic_info) != (EncodeImageHandler *) NULL))
++      {
++        module=GetMagickModuleName(atomic_info);
++        for (k=0; atomic_modules[k] != (const char *) NULL; k++)
++          if ((module != (const char *) NULL) &&
++              (LocaleCompare(module,atomic_modules[k]) == 0))
++            atomic_ok=MagickTrue;
++      }
++    colon=strchr(images->filename,':');
++    if ((colon != (const char *) NULL) && (atomic_ok != MagickFalse))
++      {
++        char
++          prefix[MagickPathExtent];
++
++        (void) CopyMagickString(prefix,images->filename,(size_t)
++          (colon-images->filename+1));
++        if ((LocaleCompare(prefix,write_info->magick) != 0) ||
++            (LocaleCompare(colon+1,atomic_path) != 0))
++          atomic_ok=MagickFalse;
++      }
++    if ((atomic_ok != MagickFalse) &&
++        ((strchr(atomic_path,':') != (char *) NULL) ||
++         ((access_utf8(atomic_path,F_OK) == 0) &&
++          (access_utf8(atomic_path,W_OK) != 0))))
++      atomic_ok=MagickFalse;
++    if ((atomic_ok != MagickFalse) &&
++      (write_info->blob == (void *) NULL) && (write_info->file == (FILE *) NULL) &&
 +      ((GetImageListLength(images) == 1) || (write_info->adjoin != MagickFalse)) &&
 +      (*atomic_path != '\0') && (LocaleCompare(atomic_path,"-") != 0) &&
-+      (*atomic_path != '|') && (LocaleNCompare(atomic_path,"fd:",3) != 0) &&
-+      (strchr(atomic_path,'%') == (char *) NULL) &&
++      (*atomic_path != '|') && (strchr(atomic_path,'%') == (char *) NULL) &&
 +      (strlen(atomic_path) < (MagickPathExtent-16)) &&
 +      ((lstat(atomic_path,&atomic_status) != 0 && errno == ENOENT) ||
 +       (lstat(atomic_path,&atomic_status) == 0 && S_ISREG(atomic_status.st_mode))))
@@ -92,31 +149,18 @@
 +      else
 +        {
 +          (void) close_utf8(file);
-+          const MagickInfo
-+            *atomic_info;
-+
-+          ExceptionInfo
-+            *atomic_exception;
-+
-+          const char
-+            *atomic_magick;
-+
-+          atomic_exception=AcquireExceptionInfo();
-+          atomic_info=GetMagickInfo(write_info->magick,atomic_exception);
-+          atomic_exception=DestroyExceptionInfo(atomic_exception);
-+          atomic_magick=atomic_info != (const MagickInfo *) NULL ?
-+            write_info->magick : images->magick;
 +          (void) CopyMagickString(atomic_name,images->filename,
 +            MagickPathExtent);
 +          for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
 +            (void) FormatLocaleString(p->filename,MagickPathExtent,"%s:%s",
-+              atomic_magick,atomic_tmp);
++              write_info->magick,atomic_tmp);
 +        }
 +    }
++  }
    p=images;
    for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
    {
-@@ -1661,5 +1750,27 @@
+@@ -1661,5 +1794,27 @@
        }
    }
    write_info=DestroyImageInfo(write_info);
