@@ -4,9 +4,10 @@
 
 **Date:** 2026-10-16, slicc-kernel 1.94.0, users enforce, the same setup as below. 3.0.0-4 passes every spec and `cert/noshell/`.
 
-unzip carries 24 of Debian unzip 6.0-31's `debian/patches`, verbatim, as `unzip-debian-NN-<name>.patch`, where NN is the patch's place in Debian's `series`. They come from `unzip_6.0-31.debian.tar.xz`, sha256 `d7dc23f5254c6711dc05f467e70236cfd50a7931001c6152904474b19f295c38`. They apply in that order to `unzip_6.0.orig.tar.gz` with no fuzz:
+unzip carries 27 of Debian unzip 6.0-31's `debian/patches`, verbatim, as `unzip-debian-NN-<name>.patch`, where NN is the patch's place in Debian's `series`. They come from `unzip_6.0-31.debian.tar.xz`, sha256 `d7dc23f5254c6711dc05f467e70236cfd50a7931001c6152904474b19f295c38`. They apply in that order to `unzip_6.0.orig.tar.gz` with no fuzz:
 - the security fixes;
-- `05` and `17`, which `32` needs in order to apply.
+- `05` and `17`, which `32` needs in order to apply;
+- since 3.0.0-9 (#652), the functional fixes `04` (handle-pkware-verification-bit), `21` (fix-warning-messages-on-big-files) and `29` (handle-windows-zip64-files).
 
 Left out: the branding, man page, zipgrep, build-date (we pin `SOURCE_DATE_EPOCH`) and build-only patches. Debian's `28` (CVE-2022-0529/0530) replaces 3.0.0-3's trimmed copy, and `unzip-escape-bound.patch` is rebuilt on top of it. `unzip-unipath-short.patch` is ours.
 
@@ -198,3 +199,14 @@ AssertionError [ERR_ASSERTION]: rc 0, but an entry was written under another nam
 ## 3.0.0-8: the shim's posix_spawnp searches PATH (slicc-kernel#1165, homescoop#1264; 2026-10-19)
 
 3.0.0-8 links the updated `shims/slicc/slicc_spawn.c`. `posix_spawnp` was plain `posix_spawn`; it now searches PATH as execvp does. A candidate that isn't an executable regular file is skipped, and a bare name that isn't found anywhere still goes to the kernel catalog. On #1264, npm-parity found that the build differs from the published 3.0.0-7 in bin/zip and bin/zip.wasm, so this is a packaging bump. The package's own code is unchanged. The behaviour test is coreutils' `cert/spawnp-path.mjs` (`timeout`, the shim's one Emscripten caller that a cert drives).
+
+## 3.0.0-8: a Windows zip64 archive (locator total disks 0) is rejected (homescoop#652)
+
+`cert/zip64.mjs` against the published 3.0.0-8 (slicc-kernel 1.94.0, users enforce, 2026-10-20) fails:
+
+```text
+browser-cert: FAIL packages/zip/cert/zip64.mjs
+AssertionError [ERR_ASSERTION]: unzip -t of a zip64 archive whose locator says 0 total disks: rc 2
+```
+
+macOS's unzip 6.0 without Debian's `29` does the same on that archive ("reported length of central directory is -76 bytes too long", rc 2). With total disks 1 it passes everywhere. 3.0.0-9 carries `unzip-debian-29-handle-windows-zip64-files.patch` and passes every spec. `04` and `21` have no case here: 21 needs an archive past 2^40 bytes, and 04's bit only changes how external attributes are read.

@@ -75,7 +75,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-bash`](https://www.npmjs.com/package/@ai-ecoverse/wasm-bash) | [recipe](packages/bash) | GNU bash 5.3, the shell for slicc: line editing, history, completion and job control |
 | [`@ai-ecoverse/wasm-binutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binutils) | [recipe](packages/binutils) | GNU binutils strings, size and readelf for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-bzip2`](https://www.npmjs.com/package/@ai-ecoverse/wasm-bzip2) | [recipe](packages/bzip2) | bzip2 1.0.8 (bzip2/bunzip2/bzcat/bzip2recover + libbz2) for wasm / slicc |
-| [`@ai-ecoverse/wasm-cmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-cmake) | [recipe](packages/cmake) | CMake 4.4.3 for wasm / slicc (WASI host + slicc_poll for libuv) |
+| [`@ai-ecoverse/wasm-cmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-cmake) | [recipe](packages/cmake) | CMake, the build system generator, to configure and build C and C++ projects in slicc. |
 | [`@ai-ecoverse/wasm-coreutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-coreutils) | [recipe](packages/coreutils) | GNU coreutils (single-binary) for slicc (WASM / emscripten, SLICC homescoop; user ids from slicc-kernel >= 1.44.0) |
 | [`@ai-ecoverse/wasm-curl`](https://www.npmjs.com/package/@ai-ecoverse/wasm-curl) | [recipe](packages/curl) | curl 8.22 + libcurl (Mbed TLS, zlib, HTTP/1.1) for wasm / slicc |
 | [`@ai-ecoverse/wasm-diffutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-diffutils) | [recipe](packages/diffutils) | GNU diffutils 3.12 (diff/cmp/diff3/sdiff) for wasm / slicc |
@@ -115,7 +115,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fonttools for slicc WASIX CPython |
 | [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
-| [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy 2.5.4 for slicc WASIX CPython 3.15 (OpenBLAS static into umath/linalg, zero signature_mismatch) |
+| [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy, the fundamental package for array computing in Python. |
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | Pandas 3.0.6 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules) |
 | [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
@@ -166,7 +166,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-openssl`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openssl) | [recipe](packages/wasix-openssl) | OpenSSL 3.5.9 for slicc WASIX: static (lib/) and PIC (lib-pic/) libcrypto.a and libssl.a, headers, pkg-config |
 | [`@ai-ecoverse/wasix-perl`](https://www.npmjs.com/package/@ai-ecoverse/wasix-perl) | [recipe](packages/wasix-perl) | The Perl 5.42 programming language, with prove, perldoc, pod2man and cpan. |
 | [`@ai-ecoverse/wasix-python`](https://www.npmjs.com/package/@ai-ecoverse/wasix-python) | [recipe](packages/wasix-python) | CPython 3.15 for slicc WASIX (commands python, python3; cross-built in CI on wasix-sysroot) |
-| [`@ai-ecoverse/wasix-ruby`](https://www.npmjs.com/package/@ai-ecoverse/wasix-ruby) | [recipe](packages/wasix-ruby) | MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; wasix-sysroot 2025.9.30-34: user ids, traps, flock and times from slicc-kernel) |
+| [`@ai-ecoverse/wasix-ruby`](https://www.npmjs.com/package/@ai-ecoverse/wasix-ruby) | [recipe](packages/wasix-ruby) | The Ruby 3.4 programming language, with gem, bundle, rake, irb and erb. |
 | [`@ai-ecoverse/wasix-sysroot`](https://www.npmjs.com/package/@ai-ecoverse/wasix-sysroot) | [recipe](packages/wasix-sysroot) | WASIX sysroots: st_uid/st_gid, chown and access() through slicc-kernel file owners (getuid()/getgid() on older kernels), file modes via slicc_fs, F_SETFD CLOEXEC fix, select exceptfds, physical chdir, POSIX TZ, socketpair flags, sigaction_set, alarm/setitimer/getitimer, EINTR sleeps, raise/pthread_kill, process credentials from slicc-kernel (no fixed uid 1000), per-fd termios/winsize from slicc-kernel (Linux and WASIX ioctl numbers), fork in the PIC variants, signal masks, poll/ppoll with events 0, epoll_ctl with Linux op numbers, named semaphores through slicc-kernel, flock, mkfifo, sa_mask, Linux S_IF* bits, wasip1; libc++/libc++abi/libunwind from LLVM 20.1 (legacy EH in sysroot-eh/ehpic, exnref in sysroot-exnref-*) |
 | [`@ai-ecoverse/wasix-websocat`](https://www.npmjs.com/package/@ai-ecoverse/wasix-websocat) | [recipe](packages/wasix-websocat) | websocat 4.0.0-alpha3 (WebSocket client and server, like netcat for ws://) for slicc WASIX |
 | [`@ai-ecoverse/wasix-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasix-zlib) | [recipe](packages/wasix-zlib) | zlib 1.3.1 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config |
@@ -180,7 +180,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-which`](https://www.npmjs.com/package/@ai-ecoverse/wasm-which) | [recipe](packages/which) | GNU which for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-xxd`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xxd) | [recipe](packages/xxd) | xxd (from vim 9.2.1192) for wasm / slicc (emscripten) |
 | [`@ai-ecoverse/wasm-xz`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xz) | [recipe](packages/xz) | XZ Utils 5.8.4 (xz/lzma + liblzma) for wasm / slicc |
-| [`@ai-ecoverse/wasm-zip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zip) | [recipe](packages/zip) | Info-ZIP zip 3.0 + unzip 6.0 for wasm / slicc (emscripten) |
+| [`@ai-ecoverse/wasm-zip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zip) | [recipe](packages/zip) | zip, unzip and zipinfo (Info-ZIP zip 3.0, unzip 6.0) for slicc: make, list, test and extract .zip archives |
 | [`@ai-ecoverse/wasm-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zlib) | [recipe](packages/zlib) | zlib 1.3.1 static library for WebAssembly / emscripten (SLICC homescoop ladder) |
 
 Retired (`builder: retired`; no longer built or published):

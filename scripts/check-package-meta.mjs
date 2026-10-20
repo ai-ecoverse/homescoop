@@ -18,6 +18,7 @@
 import { readFileSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SLICC_SHIM_MARK, shimNoticeErrors } from './shim-notice.mjs';
 import { spawnSync } from 'node:child_process';
 import { driftErrors, readText } from './upstream-version-text.mjs';
 import { recipeTag } from './npm-tag.mjs';
@@ -277,6 +278,13 @@ if (llvmUser) {
   if (!Array.isArray(pkg.files) || !pkg.files.includes('THIRD-PARTY-NOTICES.md')) {
     errors.push('package.json files[] must include "THIRD-PARTY-NOTICES.md" (LLVM Support notices)');
   }
+}
+
+const shimUser = existsSync(pkgDir) && [...binaries(pkgDir)].find((f) => f.endsWith('.wasm') && readFileSync(f).includes(SLICC_SHIM_MARK));
+if (shimUser) {
+  const shim = shimNoticeErrors(shimUser.slice(pkgDir.length + 1), pkg, existsSync(join(pkgDir, 'THIRD-PARTY-NOTICES.md')) ? readFileSync(join(pkgDir, 'THIRD-PARTY-NOTICES.md'), 'utf8') : null, name);
+  errors.push(...shim.errors);
+  if (shim.known) console.log(`package-meta: known: ${name} links the slicc shims without their notice (homescoop${shim.known})`);
 }
 
 errors.push(...packageDrift(name, recipe, pkg));
