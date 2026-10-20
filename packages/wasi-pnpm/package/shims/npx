@@ -37,6 +37,16 @@ name=${cmd##*/}
 case $name in
   ?*@*) name=${name%@*} ;;
 esac
+# A project's own commands first, as npm does (homescoop#667): the nearest
+# node_modules/.bin from the working directory up.
+dir=$PWD
+while :; do
+  if [ -f "$dir/node_modules/.bin/$name" ]; then
+    exec "$dir/node_modules/.bin/$name" "$@"
+  fi
+  [ -z "$dir" ] || [ "$dir" = / ] && break
+  dir=${dir%/*}
+done
 for try in "$cmd" "$name"; do
   if command -v "$try" >/dev/null 2>&1; then
     exec "$try" "$@"

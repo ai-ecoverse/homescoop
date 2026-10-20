@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-curl",
-  "version": "8.22.0-7",
-  "description": "curl 8.22 + libcurl (Mbed TLS, zlib, HTTP/1.1) for wasm / slicc",
+  "version": "8.22.0-8",
+  "description": "curl 8.22, the command-line URL transfer tool, with libcurl.",
   "license": "curl",
   "repository": {
     "type": "git",

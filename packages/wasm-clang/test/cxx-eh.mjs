@@ -20,17 +20,20 @@
 //   node packages/wasm-clang/test/cxx-eh.mjs --tarball .homescoop-out/package.tgz
 //   node packages/wasm-clang/test/cxx-eh.mjs --tarball @ai-ecoverse/wasm-clang@24.0.0-21 --sysroot-version 2025.9.30-38 --expect old
 //
+// In current mode it also compiles deeply nested sources (homescoop#1248): 1000
+// parenthesised levels compile, 2000 levels of parentheses or blocks stop with
+// clang's bracket-depth diagnostic (rc 1), never a wasm trap.
+//
 // --expect old is the negative: 24.0.0-21's driver emits exnref code even for
 // WASIXCC_WASM_EXCEPTIONS=legacy, so on a -33+ sysroot (legacy-EH runtimes in
-// sysroot-eh/ehpic) the sysroot-ehpic link aborts in wasm-opt --asyncify
-// (Flatten.cpp: unexpected expr type). The sysroot-eh program links exnref
-// code against the legacy runtime; whether it loads depends on the host's
-// wasm engine (the CI runner's node runs it, a mac's node 26 refuses it with
-// an I/O error), so the negative requires only the ehpic failure and that
-// the exnref trees pass.
+// sysroot-eh/ehpic) both legacy trees fail, whatever the engine: the
+// sysroot-ehpic link aborts in wasm-opt --asyncify (Flatten.cpp: unexpected
+// expr type), and the sysroot-eh program mixes exnref code with the legacy
+// runtime, so it doesn't validate with exnref off (homescoop#1229). The
+// exnref trees pass.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -68,6 +71,15 @@ function unpack(spec, dir, members = []) {
   }
   sh('tar', ['xzf', tgz, '-C', dir, ...members]);
   return join(dir, 'package');
+}
+
+/** Whether `bytes` is a valid module for a node run with `flag` (a V8 EH feature off). */
+function validates(bytes, flag) {
+  const file = join(work, `validate-${process.pid}-${Math.random().toString(36).slice(2)}.wasm`);
+  writeFileSync(file, bytes);
+  const r = spawnSync(process.execPath, [flag, '-e', 'process.exit(WebAssembly.validate(require("fs").readFileSync(process.argv[1])) ? 0 : 1)', file], { encoding: 'utf8' });
+  rmSync(file, { force: true });
+  return r.status === 0;
 }
 
 const work = mkdtempSync(join(tmpdir(), 'wasm-clang-cxx-eh-'));
@@ -126,6 +138,17 @@ try {
       }
     }
     if (!ok) continue;
+    // homescoop#1229: check the encoding, not only that the program runs. A
+    // legacy tree's program must validate with exnref off, an exnref tree's
+    // with legacy EH off. Engines that accept mixed modules (Node 24's V8
+    // runs one; Node 26's refuses it) can't hide a wrong encoding then.
+    const legacyTree = env.WASIXCC_WASM_EXCEPTIONS === 'legacy';
+    const encoding = legacyTree ? 'legacy' : 'exnref';
+    const pure = validates(Buffer.from(await k.readFile(`/home/${tree}.eh.wasm`)), legacyTree ? '--no-experimental-wasm-exnref' : '--no-experimental-wasm-legacy-eh');
+    if (!pure) {
+      failed.push(`${tree} cxx-eh.wasm is not pure ${encoding} EH (it does not validate with ${legacyTree ? 'exnref' : 'legacy EH'} off)`);
+      continue;
+    }
     const eh = await run(['bash', '-c', `/home/${tree}.eh.wasm; echo rc=$?`], { env: ccEnv });
     if (eh.stdout.trim() !== `${WANT}\nrc=0`) {
       failed.push(`${tree} cxx-eh.wasm ran: ${JSON.stringify(eh.stdout.trim())} ${`${eh.stderr}`.trim().split('\n').slice(-2).join(' | ')}`);
@@ -140,9 +163,32 @@ try {
   }
   if (expect === 'current') {
     assert.deepEqual(failed, [], `c++ failed in ${failed.length} tree(s):\n${failed.join('\n')}`);
+    // homescoop#1248: deep nesting stops with clang's own diagnostic, never a
+    // wasm trap or a hang: the cc driver caps -fbracket-depth at 1024, below
+    // where the realm's engine stack runs out (about 1500 levels).
+    const deep = (n, open, mid, close) => `int f(int x){return ${open.repeat(n)}${mid}${close.repeat(n)};}\n`;
+    const block = (n) => `int g(int x){${'{'.repeat(n)}x++;${'}'.repeat(n)}return x;}\n`;
+    for (const [name, src, want] of [
+      ['p1000.c', deep(1000, '(', 'x', ')'), 0],
+      ['p2000.c', deep(2000, '(', 'x', ')'), 1],
+      ['b2000.c', block(2000), 1],
+    ]) {
+      await k.writeFile(`/home/${name}`, src);
+      const t0 = Date.now();
+      const r = await run(['cc', '-c', name, '-o', `${name}.o`], { env: ccEnv });
+      const ms = Date.now() - t0;
+      assert.equal(r.status, want, `cc -c ${name}: rc=${r.status} after ${ms} ms ${`${r.stderr}`.slice(0, 300)}`);
+      if (want) assert.match(r.stderr, /bracket nesting level exceeded maximum of 1024/, `${name}: ${r.stderr.slice(0, 300)}`);
+      assert.doesNotMatch(r.stderr, /RuntimeError|RangeError|unreachable|divide by zero/, `${name}: ${r.stderr.slice(0, 300)}`);
+    }
+    const own = await run(['cc', '-fbracket-depth=2048', '-fsyntax-only', 'p1000.c'], { env: ccEnv });
+    assert.equal(own.status, 0, `a caller's own -fbracket-depth still wins: ${own.stderr.slice(0, 200)}`);
+    console.log('== deep nesting: 1000 parens compile; 2000 parens and 2000 nested blocks stop with "bracket nesting level exceeded maximum of 1024", rc 1');
     console.log(`PASS ${cpkg.name}@${cpkg.version}: C++ exceptions (${WANT}) and std::terminate through a handler in all ${built.length} EH trees of wasix-sysroot ${sysVer}, env vars only: ${built.join(', ')}`);
   } else {
-    assert.ok(failed.some((f) => f.startsWith('sysroot-ehpic ')), `expected the legacy PIC tree to fail with ${cpkg.version}'s driver (exnref code, wasm-opt --asyncify); passed: ${built.join(', ')}`);
+    for (const tree of ['sysroot-eh', 'sysroot-ehpic']) {
+      assert.ok(failed.some((f) => f.startsWith(`${tree} `)), `expected ${tree} to fail with ${cpkg.version}'s driver (exnref code for a legacy tree); passed: ${built.join(', ')}`);
+    }
     const others = failed.filter((f) => !f.startsWith('sysroot-ehpic ') && !f.startsWith('sysroot-eh '));
     assert.deepEqual(others, [], `only the legacy trees may fail with ${cpkg.version}'s driver: ${others.join('; ')}`);
     console.log(`PASS negative: ${cpkg.name}@${cpkg.version} on wasix-sysroot ${sysVer}: ${failed.join('; ')}`);

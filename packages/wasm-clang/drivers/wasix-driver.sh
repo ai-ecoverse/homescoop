@@ -353,6 +353,11 @@ trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
     "-D_WASI_EMULATED_PROCESS_CLOCKS"
 
   if [ "$do_compile" -eq 1 ]; then
+    # Deep nesting recurses in clang's parser on the engine's own stack, which
+    # in slicc's realm runs out near 1500 levels (a wasm trap, homescoop#1248).
+    # Cap brackets below that so clang stops with its own diagnostic; a later
+    # -fbracket-depth from the caller still wins.
+    printf '%s\n' "-fbracket-depth=1024"
     case "$EXCEPTIONS" in
       no|off|none)
         printf '%s\n' "-fno-exceptions"

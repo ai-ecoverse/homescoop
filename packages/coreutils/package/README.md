@@ -6,6 +6,20 @@ GNU coreutils (single-binary) for slicc.
 pnpm add -g @ai-ecoverse/wasm-coreutils
 ```
 
+## Time zones and the environment (9.12.0-12)
+
+`date`, `touch`, `ls` and the rest honour `TZ`:
+- **POSIX rules:** `EST5EDT`, `JST-9`, `UTC0`, `<+0330>-3:30`, with a rule
+  such as `,M3.2.0,M11.1.0`, or the US rules when there's none.
+- **IANA names:** `America/New_York`, `Europe/Berlin`, from the browser's
+  time zone data.
+- **Defaults:** an empty or unknown `TZ` is UTC, and `date -u` is UTC. With
+  no `TZ` at all, the browser's own time zone applies, as before.
+
+`env -i` and `env -u` leave exactly the environment they say. Before, the
+program filled in Emscripten's placeholders (`USER=web_user`, `PATH=/`,
+`HOME=/home/web_user`, `LANG`).
+
 ## `uname` (9.12.0-7)
 
 `uname` asks slicc-kernel through the import `env.__syscall_uname`

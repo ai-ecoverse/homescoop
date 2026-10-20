@@ -264,6 +264,20 @@ function* binaries(dir) {
   }
 }
 const pkgDir = join(root, 'packages', name, 'package');
+// package.json homescoop.patches, where a package keeps one, names exactly
+// the patches its build applies: the recipe dir's *.patch and patches/*.patch
+// (homescoop#1347: wasi-biome 2.5.15-5 left 0002 out).
+if (Array.isArray(pkg.homescoop?.patches)) {
+  const recipeDir = join(root, 'packages', name);
+  const applied = [recipeDir, join(recipeDir, 'patches')]
+    .filter((d) => existsSync(d))
+    .flatMap((d) => readdirSync(d).filter((f) => f.endsWith('.patch')))
+    .sort();
+  const listed = [...pkg.homescoop.patches].sort();
+  if (JSON.stringify(applied) !== JSON.stringify(listed)) {
+    errors.push(`package.json homescoop.patches [${listed.join(', ')}] != the recipe's patches [${applied.join(', ')}] (homescoop#1347)`);
+  }
+}
 const llvmUser = existsSync(pkgDir) && [...binaries(pkgDir)].find((f) => {
   const b = readFileSync(f);
   return LLVM_SUPPORT.some((m) => b.includes(m));

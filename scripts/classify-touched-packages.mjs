@@ -7,7 +7,7 @@
  *   → JSON { host: string[], slicc: string[], all: string[] }
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,6 +42,8 @@ if (every) {
   }
   all = JSON.parse(listed.stdout.trim() || '[]');
 }
+const pendingFile = join(root, 'scripts/reproducible-pending.json');
+const pending = existsSync(pendingFile) ? JSON.parse(readFileSync(pendingFile, 'utf8')) : {};
 const host = [];
 const slicc = [];
 const rebuild = [];
@@ -60,8 +62,9 @@ function recipe(p) {
   return JSON.parse(r.stdout);
 }
 
-function reproducible(p, value) {
-  if (value === undefined || value === null || value === 'false') return false;
+function reproducible(p, value, built) {
+  if (value === undefined || value === null) return built;
+  if (value === 'false') return false;
   if (value === 'true') return true;
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     // path: package/<file> compares one file; same_path: <issue> rebuilds in
@@ -105,7 +108,7 @@ for (const p of [...all]) {
     continue;
   }
   host.push(p);
-  if (reproducible(p, r.reproducible)) rebuild.push(p);
+  if (reproducible(p, r.reproducible, !(r.repack && typeof r.repack === 'object' && r.repack.from) && !Object.hasOwn(pending, p))) rebuild.push(p);
   if (hasTests(p)) test.push(p);
   if (onPool(p, r)) pool.push(p);
 }

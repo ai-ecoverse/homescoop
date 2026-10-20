@@ -1,0 +1,19 @@
+git clone --local: copy when the file system has no hard links (homescoop#912).
+The realm's OPFS root answers link() with EMLINK. Upstream falls back to
+copying only when --local was not given; with -l/--local it died with
+"failed to create link ... Too many links". A link that the file system
+cannot make (EMLINK, EXDEV, EPERM, ENOSYS, ENOTSUP) now falls back to
+copying with --local too, as --no-hardlinks does; other errors still die.
+
+--- a/builtin/clone.c
++++ b/builtin/clone.c
+@@ -331,7 +331,8 @@
+ 
+ 				continue;
+ 			}
+-			if (option_local > 0)
++			if (option_local > 0 && errno != EMLINK && errno != EXDEV &&
++			    errno != EPERM && errno != ENOSYS && errno != ENOTSUP)
+ 				die_errno(_("failed to create link '%s'"), dest->buf);
+ 			option_no_hardlinks = 1;
+ 		}

@@ -70,7 +70,7 @@ for (const p of crates) {
     if (r.status !== 0) throw new Error(`${p.name} ${p.version}: fetching ${pin.url} failed`);
     const got = createHash('sha256').update(r.stdout).digest('hex');
     if (got !== pin.sha256) throw new Error(`${p.name} ${p.version}: ${pin.url} sha256 ${got} != ${pin.sha256}`);
-    out.push(`\nThe crate ships no licence file; this is the upstream repository's, at the commit the crate was published from (${pin.url}).\n`);
+    out.push(pin.note ? `\n${pin.note} (${pin.url}).\n` : `\nThe crate ships no licence file; this is the upstream repository's, at the commit the crate was published from (${pin.url}).\n`);
     out.push(`\n\`\`\`text\n${r.stdout.toString('utf8').trim()}\n\`\`\`\n`);
     continue;
   }

@@ -43,3 +43,18 @@ AssertionError: a local git workflow asked the uplink
 ## 2.55.0-17: the inherited-ignore and flock shims (homescoop#973, #947; 2026-10-17)
 
 2.55.0-17 links the updated `shims/slicc` (#960). A `constructor(101)` in `slicc_signals.c` seeds `SIG_IGN` for each signal the kernel's `sliccKernel.sigInherited()` reports; on a kernel without the hook it changes nothing. A strong `flock()` in `slicc_libc_gaps.c` goes through the `env.__syscall_flock` import, which answers 0 without the kernel half (slicc-kernel#967 and #968). The built wasm now imports `env.slicc_sig_inherited_js`, and `env.__syscall_flock` where the program calls `flock`. The published 2.55.0-16 imports neither, so on a hooked kernel it can't see an inherited ignore, and its `flock` never conflicts. The program code is unchanged, and the specs pass on 2.55.0-16 as well. The build also gets #908's prefix maps and DWARF strip.
+
+## 2.55.0-17: the burn-down rows (homescoop#887, #903, #912)
+
+`cert/burndown.mjs` (`--soft`) against the published 2.55.0-17 (slicc-kernel 1.132.1, users enforce, 2026-10-20) fails 4 of its 10 assertions:
+- **engines** is `>=1.47.1`. On kernels before 1.57.0, every file stats as the caller's, so `safe.directory` never fires (#887).
+- **dependencies** have no `@ai-ecoverse/wasm-sed`, which `git-sh-setup` (`git submodule` and the other shell subcommands) runs (#903).
+- **`git clone --local`** dies:
+
+  ```text
+  fatal: failed to create link 'c2/.git/objects/3b/e22be7…': Too many links
+  ```
+
+  The OPFS root has no hard links, and upstream copies only when `--local` wasn't given (#912).
+
+2.55.0-18 passes it, and every other spec. It has `engines >=1.130.2` (wasm-bash 5.3.0-22's floor), depends on wasm-sed 4.10.0-5, and carries `clone-local-no-hardlinks.patch`.
