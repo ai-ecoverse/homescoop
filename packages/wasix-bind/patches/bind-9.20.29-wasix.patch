@@ -1,0 +1,55 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -111,7 +111,7 @@
+ DLOPEN_LIBS="$lt_cv_dlopen_libs"
+ AC_SUBST(DLOPEN_LIBS)
+ 
+-AS_IF([test "$enable_static" != "no" && test "$enable_developer" != "yes"],
++AS_IF([test "$enable_static" != "no" && test "$enable_developer" != "yes" && test "$host_os" != "wasi"],
+       [AC_MSG_ERROR([Static linking is not supported as it disables dlopen() and certain security features (e.g. RELRO, ASLR)])])
+ 
+ 
+--- a/configure
++++ b/configure
+@@ -17743,7 +17743,7 @@
+ DLOPEN_LIBS="$lt_cv_dlopen_libs"
+ 
+ 
+-if test "$enable_static" != "no" && test "$enable_developer" != "yes"
++if test "$enable_static" != "no" && test "$enable_developer" != "yes" && test "$host_os" != "wasi"
+ then :
+   as_fn_error $? "Static linking is not supported as it disables dlopen() and certain security features (e.g. RELRO, ASLR)" "$LINENO" 5
+ fi
+--- a/bin/dig/dighost.c
++++ b/bin/dig/dighost.c
+@@ -2758,6 +2758,30 @@
+ 		return;
+ 	} else if (eresult != ISC_R_SUCCESS) {
+ 		debug("send failed: %s", isc_result_totext(eresult));
++		if (!l->tcp_mode && !l->ns_search_only &&
++		    (eresult == ISC_R_NETUNREACH ||
++		     eresult == ISC_R_HOSTUNREACH))
++		{
++			/*
++			 * UDP can't leave this machine (slicc carries it only
++			 * on an uplink that does): ask the same servers over
++			 * TCP now instead of waiting for the read to time out.
++			 */
++			dig_lookup_t *n = NULL;
++
++			dighost_comments(l, "UDP %s, retrying in TCP mode.",
++					 isc_result_totext(eresult));
++			n = requeue_lookup(l, true);
++			n->tcp_mode = true;
++			if (l->trace && l->trace_root) {
++				n->rdtype = l->qrdtype;
++			}
++			query_detach(&query);
++			cancel_lookup(l);
++			lookup_detach(&l);
++			check_if_done();
++			return;
++		}
+ 	}
+ 
+ 	if (l->ns_search_only && !l->trace_root) {

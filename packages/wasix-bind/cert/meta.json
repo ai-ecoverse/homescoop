@@ -1,0 +1,26 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.134.3",
+  "users": "enforce",
+  "uplink": true,
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "network": "The cert uplink carries TCP and no UDP. Its 100.100.100.100:53 is a raw TCP peer answering with dnsFake (wasi-dig's zone, real DNS wire messages); 100.64.9.9:53 refuses. Every UDP send fails with network unreachable, so the checklist covers the patched dighost.c's retry over TCP. No DoH in this build.",
+  "checklist": [
+    "dig -v, host -V, nslookup -version print 9.20.29",
+    "UDP network unreachable: dig prints ';; UDP network unreachable, retrying in TCP mode.' and answers over TCP well within one +time (SERVER \u2026 (TCP)), the TCP dial in the uplink log; +tcp prints no UDP line",
+    "full dig output: banner, ->>HEADER<<- NOERROR, flags qr rd ra, ANSWER section, SERVER line",
+    "dig +short for A, AAAA, MX, TXT (quoted, escaped), CNAME chain, NS, SOA, SRV, CAA, -x PTR, DNSKEY +nocrypto, HTTPS; +noall +answer; NXDOMAIN with the SOA in AUTHORITY",
+    "host: A, AAAA and MX by default, -t mx, reverse lookup, CNAME alias line, NXDOMAIN rc 1",
+    "nslookup: one-shot answer with Server/Address and Non-authoritative answer; -type=mx",
+    "failures: refused server rc 9 (dig) / 1 (host); bad type is BIND's warning (rc 0); bad option rc 1",
+    "/etc/resolv.conf: without it BIND asks 127.0.0.1 (refused); with a nameserver line host, dig and nslookup use it",
+    "users enforce: root, alice and bob get the same answers from dig and host; only root writes /etc/resolv.conf; alice can't write dig's output into bob's 0755 directory; bob's own output is his"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-21",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-11"
+  ]
+}
