@@ -34,3 +34,13 @@ AssertionError: libc.a: the _Exit/_exit members are _Exit__1.o, _exit.o, not the
 ```
 
 The object code is the same. Only the member names differ, and they depended on `os.walk`'s filesystem order in `system_libs.py`: run 39346315809's host-build and rebuild came out different. wasm-emscripten patch 0013 sorts that walk. Two local builds in different work dirs are byte-identical, and their libc.a is `a58cf058…`, CI's name-ordered one. wasm-emscripten -24 still pins 6.0.9-4: its pinned-cache.mjs runs `check.mjs` without `--member-order`, because the names don't change the code. The pin moves to 6.0.9-5 once that's published.
+
+## 6.0.9-6: notices for the compiled runtimes (homescoop#1030; 2026-10-20)
+
+`check.mjs --member-order` (this package's ci row) fails on the published 6.0.9-5:
+
+```text
+AssertionError: THIRD-PARTY-NOTICES.md lacks: musl, LLVM libcxx, LLVM libcxxabi, LLVM libunwind, LLVM compiler-rt, dlmalloc, Emscripten (homescoop#1030)
+```
+
+Emscripten's LICENSE says musl is MIT ("see system/lib/libc/musl/COPYRIGHT") and names the LLVM runtimes' licences, but the package shipped neither file. 6.0.9-6 writes `THIRD-PARTY-NOTICES.md` from the same tree. The libraries are unchanged.

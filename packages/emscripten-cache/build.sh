@@ -41,6 +41,19 @@ if grep -q '__bits\[2\]' "$PKG/sysroot/include/bits/alltypes.h"; then
 fi
 cp "$CACHE/sysroot_install.stamp" "$PKG/stamps/sysroot_install.stamp"
 cp "$EM/LICENSE" "$PKG/LICENSE"
+# THIRD-PARTY-NOTICES.md (homescoop#1030): the licences of the code compiled
+# into the sysroot's libraries. Emscripten's LICENSE names musl's and LLVM's
+# files without shipping them.
+homescoop_notices_begin "The libraries in sysroot/lib/wasm32-emscripten are compiled from the following."
+homescoop_notice "musl (libc.a, libc-debug.a; MIT)" "$EM/system/lib/libc/musl/COPYRIGHT" -
+for part in libcxx:libc++ libcxxabi:libc++abi libunwind:libunwind compiler-rt:libclang_rt.builtins llvm-libc:libc; do
+  dir=${part%%:*}
+  homescoop_notice "LLVM $dir (${part#*:}; Apache-2.0 WITH LLVM-exception)" "$EM/system/lib/$dir/LICENSE.TXT" -
+done
+sed -n '/^ This is a version (aka dlmalloc)/,/^ \* Version 2/p' "$EM/system/lib/dlmalloc.c" > "$WORK/dlmalloc-notice.txt"
+grep -q 'public domain' "$WORK/dlmalloc-notice.txt"
+homescoop_notice "dlmalloc 2.8.6 by Doug Lea (libdlmalloc*.a; public domain, CC0)" "$WORK/dlmalloc-notice.txt" -
+homescoop_notice "Emscripten 6.0.9 (emmalloc, GL, html5, OpenAL, sockets, embind, stubs, crt1; MIT or University of Illinois/NCSA)" "$EM/LICENSE" -
 printf '%s\n' "$PKG_VER" > "$PKG/sysroot/.homescoop-emscripten-cache"
 cp "$EM/emscripten-version.txt" "$PKG/EMSCRIPTEN_VERSION"
 du -sh "$PKG/sysroot"
