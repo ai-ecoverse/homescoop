@@ -4,8 +4,8 @@
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
 `scp`, `sftp`, and `ssh-add`.
 
-Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-34** (since
-10.6.0-11; -8 to -10 were on -29, -7 on -28, -6 on -22, -5 on -18), linking
+Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-39** (since
+10.6.0-12; -11 was on -34, -8 to -10 were on -29, -7 on -28, -6 on -22, -5 on -18), linking
 **wasix-openssl 3.5.9-4** and **wasix-zlib 1.3.1-3** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
@@ -14,6 +14,11 @@ ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
 ssh -o StrictHostKeyChecking=accept-new user@host true
 GIT_SSH_COMMAND=ssh git clone ssh://user@host/repo.git
 ```
+
+## 10.6.0-12
+
+- **Key comments name this machine** (homescoop#1050): ssh-keygen's default comment is `user@host`, where the host comes from `gethostname()`. Since wasix-sysroot -36 that's the exported `HOSTNAME`, or `slicc` if there isn't one. Up to 10.6.0-11 every key said `root@wasmer.sh`, Wasmer's built-in name.
+- **More coverage** (homescoop#1052): `cert/crypto.mjs` covers RSA-3072, ECDSA-384 and passphrase-encrypted keys, `-Y sign`/`verify`, the cipher, MAC and kex matrix (with ML-KEM and sntrup), `ssh -C` both ways, and early-closing pipes.
 
 ## Identity and `~/.ssh`
 
