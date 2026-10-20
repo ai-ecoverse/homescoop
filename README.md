@@ -172,9 +172,9 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-binaryen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binaryen) | [recipe](packages/wasm-binaryen) | Binaryen 132 wasm tools for slicc (wasm-opt and friends) |
 | [`@ai-ecoverse/wasm-clang`](https://www.npmjs.com/package/@ai-ecoverse/wasm-clang) | [recipe](packages/wasm-clang) | Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen) |
 | [`@ai-ecoverse/wasm-emscripten`](https://www.npmjs.com/package/@ai-ecoverse/wasm-emscripten) | [recipe](packages/wasm-emscripten) | Emscripten 6.0.9 for slicc (emcc via wasix-python) |
-| [`@ai-ecoverse/wasm-go`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go) | [recipe](packages/wasm-go) | Go 1.27 wasip1 compile/link/asm tools for slicc go driver (GOROOT half) |
-| [`@ai-ecoverse/wasm-go-std-linux-amd64`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go-std-linux-amd64) | [recipe](packages/wasm-go-std-linux-amd64) | Go 1.27 std export archives for linux/amd64 (slicc go cross-compile) |
-| [`@ai-ecoverse/wasm-go-std-wasip1`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go-std-wasip1) | [recipe](packages/wasm-go-std-wasip1) | Go 1.27 std export archives for wasip1/wasm (slicc go driver) |
+| [`@ai-ecoverse/wasm-go`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go) | [recipe](packages/wasm-go) | The Go 1.27 compiler, linker and assembler that slicc's go command runs. |
+| [`@ai-ecoverse/wasm-go-std-linux-amd64`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go-std-linux-amd64) | [recipe](packages/wasm-go-std-linux-amd64) | The Go 1.27 standard library, prebuilt for cross-compiling Go programs to Linux on x86-64. |
+| [`@ai-ecoverse/wasm-go-std-wasip1`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go-std-wasip1) | [recipe](packages/wasm-go-std-wasip1) | The Go 1.27 standard library, prebuilt for building Go programs in slicc. |
 | [`@ai-ecoverse/wasm-webrtc-audio-processing`](https://www.npmjs.com/package/@ai-ecoverse/wasm-webrtc-audio-processing) | [recipe](packages/webrtc-audio-processing) | WebRTC AEC3 echo cancellation from webrtc-audio-processing 2.1, compiled to wasm, with a synchronous JS wrapper for AudioWorklet and Node |
 | [`@ai-ecoverse/wasm-which`](https://www.npmjs.com/package/@ai-ecoverse/wasm-which) | [recipe](packages/which) | GNU which for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-xxd`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xxd) | [recipe](packages/xxd) | xxd (from vim 9.2.1192) for wasm / slicc (emscripten) |

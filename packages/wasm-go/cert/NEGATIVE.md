@@ -32,3 +32,7 @@ Runs: slicc-kernel 1.110.1, users enforce, `scripts/browser-cert/run.mjs`, the s
   AssertionError [ERR_ASSERTION]: package.json slicc.go.version is goroot/VERSION (homescoop#746)
   ```
 - **This PR's 1.27.2-1**, with std 1.27.2-1: both specs pass. `asm.mjs` checks four things. Without `-I` the assembler can't open `textflag.h`, which is upstream Go's behaviour too: `go build` passes `-I $GOROOT/pkg/include`. With `-I goroot/pkg/include`, `-gensymabis` and the object assemble. `compile -symabis` takes the declaration. The object is appended to main's archive, and the linked program prints `asm says 42`.
+
+## 1.27.2-2: Go's PATENTS (homescoop#897; 2026-10-20)
+
+`cert/licence.mjs` against the published @ai-ecoverse/wasm-go@1.27.2-1: FAIL, `PATENTS is not in the package`, and `files[]` doesn't list it. -1 staged Go's `LICENSE` alone. -2 copies `PATENTS` from the pinned `go1.27.2.src.tar.gz` too.

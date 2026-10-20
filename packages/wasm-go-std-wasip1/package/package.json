@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-go-std-wasip1",
-  "version": "1.27.2-1",
-  "description": "Go 1.27 std export archives for wasip1/wasm (slicc go driver)",
+  "version": "1.27.2-2",
+  "description": "The Go 1.27 standard library, prebuilt for building Go programs in slicc.",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -22,6 +22,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "PATENTS",
     "goroot"
   ],
   "publishConfig": {

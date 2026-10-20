@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-go-std-linux-amd64",
-  "version": "1.27.2-1",
-  "description": "Go 1.27 std export archives for linux/amd64 (slicc go cross-compile)",
+  "version": "1.27.2-2",
+  "description": "The Go 1.27 standard library, prebuilt for cross-compiling Go programs to Linux on x86-64.",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -22,6 +22,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "PATENTS",
     "goroot"
   ],
   "publishConfig": {
