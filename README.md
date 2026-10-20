@@ -86,7 +86,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-gawk`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gawk) | [recipe](packages/gawk) | GNU awk for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-git`](https://www.npmjs.com/package/@ai-ecoverse/wasm-git) | [recipe](packages/git) | Git version control: clone, commit, branch, merge, push and pull. |
 | [`@ai-ecoverse/wasm-gmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gmake) | [recipe](packages/gmake) | GNU make for slicc (rebuild sweep wasix-sysroot 2025.9.30-14; emscripten ABI) |
-| [`@ai-ecoverse/wasm-grep`](https://www.npmjs.com/package/@ai-ecoverse/wasm-grep) | [recipe](packages/grep) | GNU grep for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-grep`](https://www.npmjs.com/package/@ai-ecoverse/wasm-grep) | [recipe](packages/grep) | GNU grep 3.12: search files for lines that match a pattern, with -P (PCRE2). |
 | [`@ai-ecoverse/wasm-gzip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gzip) | [recipe](packages/gzip) | GNU gzip 1.15 for wasm / slicc (emscripten) |
 | [`@ai-ecoverse/wasm-imagemagick`](https://www.npmjs.com/package/@ai-ecoverse/wasm-imagemagick) | [recipe](packages/imagemagick) | Create, convert and edit images from the command line with ImageMagick: magick, convert, identify and mogrify. |
 | [`@ai-ecoverse/wasm-imagemagick-heif`](https://www.npmjs.com/package/@ai-ecoverse/wasm-imagemagick-heif) | [recipe](packages/imagemagick-heif) | ImageMagick with HEIC, HEIF and AVIF support, a drop-in for wasm-imagemagick that includes a patent-encumbered HEVC decoder. |

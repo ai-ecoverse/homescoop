@@ -15,7 +15,7 @@ function pins() {
     const file = join(root, 'packages', dir, 'recipe.yaml');
     if (!existsSync(file)) continue;
     const text = readFileSync(file, 'utf8');
-    const comments = text.match(/^# renovate:.*$/gm) || [];
+    const comments = text.match(/^[ \t]*# renovate:.*$/gm) || [];
     const found = [...text.matchAll(matcher)].map((m) => m.groups);
     out.push({ dir, text, comments, found });
   }

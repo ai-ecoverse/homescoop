@@ -4,9 +4,12 @@
   "checklist": [
     "basic match",
     "no-match exit 1",
-    "LC_ALL=C match (locale patch path)"
+    "LC_ALL=C match (locale patch path)",
+    "cert/perl-regexp.mjs (3.12.0-7, homescoop#680): grep -P '\\d', -oP 'foo=\\K\\w+', a lookbehind, -cP '^\\w+$' and (?i) with a lookahead give GNU grep's output with rc 0 and no stderr; a -P no-match is rc 1, and an unbalanced '(' is rc 2 with 'missing closing parenthesis'. grep links a static PCRE2 10.49 (no JIT), and build.sh fails if config.h lacks HAVE_LIBPCRE. 3.12.0-6: 'Perl matching not supported in a --disable-perl-regexp build', rc 2 (NEGATIVE.md)",
+    "cert/egrep-fgrep.mjs (3.12.0-7, homescoop#645): egrep 'a|z' and egrep -o '[0-9]{3}' match as grep -E; fgrep 'a.' doesn't match and fgrep -x ab does, as grep -F; each prints upstream's 'egrep: warning: egrep is obsolescent; using grep -E' (or the fgrep one) on stderr; plain grep 'a|z' stays BRE (rc 1). 3.12.0-6 ran both as plain grep (NEGATIVE.md)"
   ],
   "patches": {
-    "gnulib-emscripten-locale.patch": "LC_ALL=C grep in cert/checklist.mjs; build fails without the patch"
+    "gnulib-emscripten-locale.patch": "LC_ALL=C grep in cert/checklist.mjs; build fails without the patch",
+    "egrep-fgrep-argv0.patch": "slicc runs egrep and fgrep as bin/grep with argv0 egrep/fgrep, which grep >= 3.8 ignores; under __EMSCRIPTEN__ main() does what upstream's egrep.sh/fgrep.sh do: warn, then run as grep -E / grep -F with the same arguments (homescoop#645). cert/egrep-fgrep.mjs fails without it"
   }
 }
