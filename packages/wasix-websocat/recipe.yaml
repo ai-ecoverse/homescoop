@@ -20,6 +20,8 @@ sources:
 toolchain:
   rust: "1.97.0"
   wasix_rust: "v2026-09-18.1+rust-1.97"
+inputs:
+  - scripts/rust-wasm-refresh-alloc.rs
 dependencies:
   build: []
   host: []
@@ -31,7 +33,7 @@ about:
     The v4 tag ships no LICENSE; package/LICENSE is sources.licence, the
     repository's MIT LICENSE (same author, last changed in 8bcec21d), then
     the Apache-2.0 text (SPDX), as Cargo.toml declares MIT/Apache-2.0.
-    Upstream vi/websocat v4.0.0-alpha3 (two WASIX source patches, 0002 and 0003), for slicc's
+    Upstream vi/websocat v4.0.0-alpha3 (WASIX source patches 0002 and 0003, and 0004's allocator refresh), for slicc's
     kernel (slicc-kernel >= 1.95.0: WASIX epoll and eventfd, #674).
     Toolchain: wasix-org/rust (target wasm32-wasmer-wasi) linked against
     @ai-ecoverse/wasix-sysroot (scripts/install-wasixcc.sh), crates from
@@ -57,3 +59,6 @@ about:
          (SOCK_OPTION_LAST_ERROR); the target's Rust std always answers
          None, so a refused uplink connect looked connected.
          All three are proposed upstream as wasix-org/mio#4.
+    0004 (wasm): homescoop's allocator refresh
+         (scripts/rust-wasm-refresh-alloc.rs) as the global allocator
+         (#1287).

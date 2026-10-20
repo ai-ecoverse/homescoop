@@ -87,19 +87,25 @@ BINARYEN_DIR="$WORK/binaryen-version_$BINARYEN"
 test -x "$BINARYEN_DIR/bin/wasm-opt" || tar xzf "$WORK/$BINARYEN_ASSET" -C "$WORK"
 WASM_OPT="$BINARYEN_DIR/bin/wasm-opt"
 
+# homescoop#1287: 0006 includes the shared allocator refresh on wasm, and the
+# initial heap comes from recipe.yaml's wasm.initial-memory (WASM_INITIAL_MEMORY).
+homescoop_rust_wasm_refresh_alloc
+: "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
+
 echo "== wasi-uv: cargo build --bin uv ($TARGET, Rust $RUST with patched std)"
 (
   cd "$SRC_DIR"
   # tokio refuses fs/net/process on wasm without tokio_unstable; cap-std's
   # rustix needs wasi_ext (and RUSTC_BOOTSTRAP for its #![feature]), as does
-  # -Zbuild-std. The kernel gives a process up to 4 GiB. LTO and one
+  # -Zbuild-std. The kernel gives a process up to 4 GiB; it starts with the
+  # recipe's initial heap. LTO and one
   # codegen unit (uv's release profile) take more memory than CI has room
   # for on this crate graph. Build paths are mapped away from the wasm, and
   # SOURCE_DATE_EPOCH (the tag's commit time) stands in for build times.
   SOURCE_DATE_EPOCH="$(field source.epoch)" \
   RUSTC_BOOTSTRAP=1 \
   CARGO_PROFILE_RELEASE_LTO=off CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
-  RUSTFLAGS="--cfg tokio_unstable --cfg wasi_ext -C link-arg=--max-memory=4294967296 --remap-path-prefix=$SRC_DIR=/uv --remap-path-prefix=$(pwd -P)=/uv --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$TC/lib/rustlib/src/rust=/rustc/$RUST --remap-path-prefix=$TC_REAL/lib/rustlib/src/rust=/rustc/$RUST" \
+  RUSTFLAGS="--cfg tokio_unstable --cfg wasi_ext -C link-arg=--max-memory=4294967296 -C link-arg=--initial-memory=$WASM_INITIAL_MEMORY --remap-path-prefix=$SRC_DIR=/uv --remap-path-prefix=$(pwd -P)=/uv --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$TC/lib/rustlib/src/rust=/rustc/$RUST --remap-path-prefix=$TC_REAL/lib/rustlib/src/rust=/rustc/$RUST" \
     "${CARGO[@]}" build --locked --release -Zbuild-std=std,panic_abort -p uv --bin uv --target "$TARGET"
 )
 WASM="$SRC_DIR/target/$TARGET/release/uv.wasm"

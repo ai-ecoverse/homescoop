@@ -18,7 +18,7 @@ const leb = (n) => {
 };
 const section = (id, body) => [id, ...leb(body.length), ...body];
 const str = (s) => [...leb(s.length), ...Buffer.from(s)];
-const module = ({ shared = true, imported = true, initial = 4096, ops = [0xfc, 0x0b, 0x00], dylink = false } = {}) => {
+const module = ({ shared = true, imported = true, initial = 4096, ops = [0xfc, 0x0b, 0x00], dylink = false, start = false } = {}) => {
   const limits = shared ? [0x03, ...leb(initial), ...leb(65536)] : [0x00, ...leb(initial)];
   const parts = [0, 0x61, 0x73, 0x6d, 1, 0, 0, 0];
   if (dylink) parts.push(...section(0, [...str('dylink.0')]));
@@ -26,6 +26,7 @@ const module = ({ shared = true, imported = true, initial = 4096, ops = [0xfc, 0
   if (imported) parts.push(...section(2, [1, ...str('env'), ...str('memory'), 2, ...limits]));
   parts.push(...section(3, [1, 0]));
   if (!imported) parts.push(...section(5, [1, ...limits]));
+  if (start) parts.push(...section(7, [1, ...str('_start'), 0, 0]));
   const fn = [0, 0x41, 0, 0x41, 0, 0x41, 0, ...ops, 0x0b];
   parts.push(...section(10, [1, ...leb(fn.length), ...fn]));
   return Buffer.from(parts);
@@ -39,6 +40,7 @@ test('inspect: a shared memory, imported or defined, and the memory.fill / memor
   assert.equal(own.copies, 1);
   assert.equal(inspect(module({ shared: false })).memory.shared, false);
   assert.equal(inspect(module({ dylink: true })).side, true);
+  assert.equal(inspect(module({ dylink: true, start: true })).side, false, 'a PIE main (dylink.0, exports _start) is a main');
   assert.equal(inspect(Buffer.from('#!/bin/sh\n')), null);
 });
 
@@ -58,6 +60,7 @@ test('verdict: a threaded bulk-memory main module needs the fields; its linked h
   assert.deepEqual(verdict('x', SIZED, null, [m()]).problems, []);
   assert.match(verdict('x', SIZED, null, [m({ initial: 100 })]).problems.join(), /links an initial memory of 6\.25 MiB, not wasm.initial-memory 256MiB/);
   assert.deepEqual(verdict('x', undefined, null, [m({ shared: false }), m({ ops: [] }), m({ dylink: true })]).problems, []);
+  assert.match(verdict('x', undefined, null, [m({ dylink: true, start: true })]).problems.join(), /needs wasm:/, 'a threaded PIE main needs the fields');
   assert.deepEqual(verdict('x', undefined, '#1287', [m()]).problems, []);
 });
 
