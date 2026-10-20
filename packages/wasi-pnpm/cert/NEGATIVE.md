@@ -74,3 +74,12 @@ A local build of 12.9.1-15 (macOS, the same patches) passes all 9. pnpm resolves
 
 This is a sizing change, so there's no behaviour to refuse. pnpm-agent-loop run 39330831811 (12.9.1-16, kernel 1.124.2, hosted, 120 rounds, 0 traps) recorded pnpm's peak memory with the host's PNPM_SLICC_PEAK_FILE: **280 MiB** on cold-store agent installs, above -16's 256 MiB initial heap, and 96 MiB warm. recipe.yaml now records `wasm: { initial-memory: 320MiB, measured-peak: 280MiB, measured-by: … }`. build.sh links `--initial-memory` from it (recipe-env's WASM_INITIAL_MEMORY) and checks it in pnpm.wasm's import section. scripts/check-threaded-heap.mjs (#1287's guard) checks the linked size against the recipe, and wasi-pnpm leaves its allowlist. 0009's allocator refresh stays as the backstop.
 
+## 12.9.1-18: the hoisted swap, gated on cheap directory renames (homescoop#1128, 2026-10-20)
+
+The published 12.9.1-17 against 12.9.1-18's `cert/update-readers.mjs` (slicc-kernel 1.134.3, users enforce, `--soft`): **FAIL, 1 of 6 assertions.**
+- The kernel's mv baseline shows 0 half-there samples in 312, so the kernel moves directories atomically for its readers.
+- **`big` was seen half there 25 times** (0–234 files in lib/), against 405 complete 1.0.0 samples and 7 complete 2.0.0 ones. That's upstream's file-by-file delete before the rename.
+- `fresh`, a package new to node_modules, was half there 81 times. It's still imported in place in -18 and is only logged.
+
+12.9.1-18's 0010 renames the old tree aside and the new one in where the host's `directory_rename_cheap` says so (slicc-kernel >= 1.134.3 in /proc/version), and keeps upstream's path below that. That's the gate the 12.9.1-11/-12 timeouts called for.
+

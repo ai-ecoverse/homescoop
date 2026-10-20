@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { CA_MISSING, GIT_MISSING, GIT_UNSUPPORTED, TLS_MISSING, MAX_UPLOAD, childEnv, networkRemote, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders, SH_MISSING } from '../package/host/pnpm-host.mjs'
+import { kernelAtLeast, CA_MISSING, GIT_MISSING, GIT_UNSUPPORTED, TLS_MISSING, MAX_UPLOAD, childEnv, networkRemote, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders, SH_MISSING } from '../package/host/pnpm-host.mjs'
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
@@ -245,6 +245,24 @@ test('pnpm_fs copy_file uses the kernel copy, or answers ENOSYS (12.9.1-14)', ()
   assert.equal(fs.copy_file(sp, sl, ...put(ctx, 1024, '/nm/exists'), 0o644, 1), errno.EEXIST)
   assert.equal(fs.copy_file(sp, sl, ...put(ctx, 1280, '/other/a'), 0o644, 1), errno.EXDEV)
   assert.equal(fs.copy_file(sp, sl, tp, tl, 0o644, 2), errno.EINVAL)
+})
+
+test('pnpm_fs directory_rename_cheap reads the kernel version once (12.9.1-18)', () => {
+  const at = (version) => ({ fs: { readFile: () => new TextEncoder().encode(`Linux version 6.12.0 (slicc-kernel ${version}) #1 SMP\n`) } })
+  assert.equal(kernelAtLeast(at('1.134.3'), [1, 134, 3]), true)
+  assert.equal(kernelAtLeast(at('1.135.0'), [1, 134, 3]), true)
+  assert.equal(kernelAtLeast(at('2.0.0'), [1, 134, 3]), true)
+  assert.equal(kernelAtLeast(at('1.134.2'), [1, 134, 3]), false)
+  assert.equal(kernelAtLeast(at('1.124.2'), [1, 134, 3]), false)
+  assert.equal(kernelAtLeast({ fs: { readFile: () => { throw new Error('ENOENT') } } }, [1, 134, 3]), false)
+  const ctx = fakeContext()
+  let reads = 0
+  const real = ctx.fs.readFile
+  ctx.fs.readFile = (path) => { if (path === '/proc/version') { reads++; return new TextEncoder().encode('slicc-kernel 1.134.3') } return real.call(ctx.fs, path) }
+  const fs = createImports(ctx).pnpm_fs
+  assert.equal(fs.directory_rename_cheap(), 1)
+  assert.equal(fs.directory_rename_cheap(), 1)
+  assert.equal(reads, 1)
 })
 
 test('pnpm_fs path_access_executable checks the exec bits', () => {

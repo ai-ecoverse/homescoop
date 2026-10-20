@@ -65,14 +65,15 @@ another (homescoop#1126).
 
 ## Updates in place
 
-12.9.1-11 and -12 staged each imported package in a sibling directory and
-renamed it into place, so a reader never saw a package half there
-(homescoop#1128). On slicc-kernel up to 1.124.x a directory rename copies
-the whole tree, which made installs slower and, for a large package, timed
-out (`failed to rename staging directory … Operation timed out (os error 73)`)
-in a quarter of the agent installs of homescoop#1127's stress loop. 12.9.1-13
-goes back to pnpm's own in-place import, so a package can be seen half
-replaced while an install updates it.
+On slicc-kernel 1.134.3 or later, where renaming a directory is a cheap
+atomic move, replacing a package in a hoisted `node_modules` (a new version,
+or a changed one) never shows a reader a half-there package (12.9.1-18,
+homescoop#1128). pnpm stages the new copy in a sibling directory, renames the
+old one aside, renames the new one in, and only then deletes the old one.
+Between the two renames the directory is briefly absent. On older kernels a
+directory rename copies the whole tree: 12.9.1-11 and -12 did this
+everywhere and timed out on large packages, so there pnpm keeps its own
+remove-then-rename. A package new to `node_modules` is imported in place.
 
 ## Modes and the umask (12.9.1-12)
 
