@@ -78,3 +78,7 @@ about:
     12.9.1-18's 0010 brings back the hoisted swap (stage, rename aside,
     rename in, delete) where the host says directory renames are cheap
     (slicc-kernel >= 1.134.3, from /proc/version; homescoop#1128).
+    12.9.1-19 (no patch): the host starts pnpm's re-run of itself and
+    project commands (#1247, #667), the npx shim looks in node_modules/.bin,
+    and THIRD-PARTY-NOTICES.md adds the linked crates, Rust's std and
+    wasi-libc (#1325).

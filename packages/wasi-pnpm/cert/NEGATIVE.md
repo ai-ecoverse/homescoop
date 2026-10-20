@@ -83,3 +83,9 @@ The published 12.9.1-17 against 12.9.1-18's `cert/update-readers.mjs` (slicc-ker
 
 12.9.1-18's 0010 renames the old tree aside and the new one in where the host's `directory_rename_cheap` says so (slicc-kernel >= 1.134.3 in /proc/version), and keeps upstream's path below that. That's the gate the 12.9.1-11/-12 timeouts called for.
 
+## 12.9.1-19: a project's commands, a pinned project's registry, the notices (2026-10-20)
+
+- **`cert/project-bins.mjs`** (homescoop#1247, #667): 12.9.1-18 (PR #1346's CI tarball) **fails 20 of 24 assertions** on slicc-kernel 1.134.3, users enforce. `npm run`/`pnpm run` in a project with a `file:` dependency exit 1 with "Lifecycle scripts cannot run in slicc yet": the host refused pnpm's re-run of itself (`process.spawn` of `/node_modules/@ai-ecoverse/wasi-pnpm/bin/pnpm.wasm install --verify-deps-before-run-install`). `pnpm exec hello-bin` and `pnpm hello-bin` fail the same way. `npx hello-bin` exits 127 ("not installed"). With -19's host and npx shim on the same pnpm.wasm, it passes.
+- **`cert/pinned-registry.mjs`** (homescoop#1256) documents upstream behaviour and passes on -18 too. That's not a fix but the README's "A private registry and the pin", checked: pnpm's own pin resolves from the user's registry settings only (pnpm-config's `build_package_manager_bootstrap` takes the trusted `.npmrc` files and `pnpm_config_*`; the CLI's `--registry` and the project's `.npmrc` don't reach it).
+- **Notices** (homescoop#1325): `grep -c tokio THIRD-PARTY-NOTICES.md` is 0 in 12.9.1-18, which ships upstream's Yarn notices only.
+
