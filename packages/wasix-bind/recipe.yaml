@@ -7,6 +7,8 @@ builder: host
 version: "9.20.29"
 npm: "@ai-ecoverse/wasix-bind"
 summary: "BIND 9.20 dig, host and nslookup for slicc WASIX"
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
 source:
   url: "https://downloads.isc.org/isc/bind9/{{version}}/bind-{{version}}.tar.xz"
   sha256: "587029508b3b1b43229fae416c97e5543aba45809cefaca98a5004a02a5736c1"
