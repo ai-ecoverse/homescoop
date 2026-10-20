@@ -19,9 +19,12 @@
     "ztest.mjs (homescoop#432): zip -T 'test of … OK' rc 0, also for a name with a quote and a $; zip -T -m removes the original after the test; -TT 'unzip -tqq' through the shell; -TT false is rc 8 'FAILED' and -T -m keeps the file",
     "noshell/ (cert/meta.json ci, homescoop#432): only wasm-zip installed, so no /bin/sh: zip -T, zip -T -v and zip -T -m as cone pass",
     "hostile.mjs (3.0.0-4, homescoop#582), as cone: CVE-2019-13232 refuses overlapped entries (rc 12, the second file not written); a 100-byte prefix is still only a warning (rc 1); 0- and 3-byte Unicode Path fields are skipped; CVE-2014-9913/CVE-2016-9844 list an unknown method above 999 as UnkFFFF/FFFF; version made by 10.0 lists as 10.0; CVE-2014-8141 reports a short Zip64 field corrupt (-l rc 1, -d rc 12); an encrypted entry smaller than its encryption header is invalid data (rc 2, Debian 16); no wasm trap in any of them",
-    "cert/badnames.mjs (3.0.0-7, homescoop#602), as cone: an archive with entries named rep\\xff1.txt, rep\\xfe2.txt, caf\\xe9.txt (Latin-1), a bit-11 name of invalid UTF-8 and ok.txt: unzip -o -d out exits 50 and names each refused entry ('cannot create out/rep…', 'Illegal byte sequence'); out/ holds only ok.txt, nothing under another name; unzip -p still streams. 3.0.0-6 wrote rep1.txt, rep\\ufffd\\ufffdxt, caf\\u9bb4xt and n with rc 0 (NEGATIVE.md). utf8.mjs: unzip -U of a CP437 name whose Unicode Path isn't UTF-8 refuses that entry (rc 50) instead of writing it as na\\ufffdve.txt"
+    "cert/badnames.mjs (3.0.0-7, homescoop#602), as cone: an archive with entries named rep\\xff1.txt, rep\\xfe2.txt, caf\\xe9.txt (Latin-1), a bit-11 name of invalid UTF-8 and ok.txt: unzip -o -d out exits 50 and names each refused entry ('cannot create out/rep…', 'Illegal byte sequence'); out/ holds only ok.txt, nothing under another name; unzip -p still streams. 3.0.0-6 wrote rep1.txt, rep\\ufffd\\ufffdxt, caf\\u9bb4xt and n with rc 0 (NEGATIVE.md). utf8.mjs: unzip -U of a CP437 name whose Unicode Path isn't UTF-8 refuses that entry (rc 50) instead of writing it as na\\ufffdve.txt",
+    "cert/zip64.mjs (3.0.0-9, homescoop#652, unzip-debian-29), as cone: a stored zip with a zip64 end-of-central-directory record and locator whose total disks is 0 (as Windows writes it) and the same with 1: unzip -t says 'No errors detected', rc 0, and unzip -p returns windows\\n for both; zipkit's sameAs resolves by entry, not by local-header index (homescoop#661). 3.0.0-8 fails the total-disks-0 archive, rc 2 (NEGATIVE.md)"
   ],
   "patches": {
+    "slicc-strict-paths.js": "badnames.mjs and utf8.mjs: a path that isn't UTF-8 is EILSEQ at every path syscall (SYSCALLS.getStr), not UTF8ToString's lossy decode (NEGATIVE.md: 3.0.0-6)",
+    "unzip-debian-04-handle-pkware-verification-bit.patch": "Debian unzip 6.0-31 (verbatim, #652). ablation (NEGATIVE.md): no deterministic case (internal attribute bit 2 only changes how external attributes are read)",
     "unzip-debian-05-fix-uid-gid-handling.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): prerequisite of 32; its code is under IZ_HAVE_UXUIDGID, which this build doesn't define",
     "unzip-debian-06-initialize-the-symlink-flag.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): no deterministic case",
     "unzip-debian-07-increase-size-of-cfactorstr.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): no observable outcome in wasm",
@@ -37,24 +40,25 @@
     "unzip-debian-18-cve-2014-9913-unzip-buffer-overflow.patch": "Debian unzip 6.0-31 (verbatim). hostile.mjs: CVE-2014-9913: unzip -v lists method UnkFFFF",
     "unzip-debian-19-cve-2016-9844-zipinfo-buffer-overflow.patch": "Debian unzip 6.0-31 (verbatim). hostile.mjs: CVE-2016-9844: unzip -Z lists method FFFF",
     "unzip-debian-20-cve-2018-1000035-unzip-buffer-overflow.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): password prompt; no case",
+    "unzip-debian-21-fix-warning-messages-on-big-files.patch": "Debian unzip 6.0-31 (verbatim, #652). ablation (NEGATIVE.md): needs an archive past 2^40 bytes",
     "unzip-debian-22-cve-2019-13232-fix-bug-in-undefer-input.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): part of the CVE-2019-13232 set; covered by the overlapped-entries case with 23",
     "unzip-debian-23-cve-2019-13232-zip-bomb-with-overlapped-entries.patch": "Debian unzip 6.0-31 (verbatim). hostile.mjs: CVE-2019-13232: refuses overlapped entries, rc 12, b.txt not written (24 and 26 don't apply without it; the published 3.0.0-3 fails the case)",
     "unzip-debian-24-cve-2019-13232-do-not-raise-alert-for-misplaced-central-directory.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): hostile.mjs's prefixed archive (rc 1, not a zip bomb) passes with and without it; kept as a regression check",
     "unzip-debian-25-cve-2019-13232-fix-bug-in-uzbunzip2.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): bzip2 support is not compiled in",
     "unzip-debian-26-cve-2019-13232-fix-bug-in-uzinflate.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): part of the CVE-2019-13232 set; no separate case",
     "unzip-debian-28-cve-2022-0529-and-cve-2022-0530.patch": "Debian unzip 6.0-31 (verbatim). utf8.mjs unzip -U passes (esc.zip, six.zip); replaces 3.0.0-3's trimmed copy; unzip-escape-bound.patch is made on top of it",
+    "unzip-debian-29-handle-windows-zip64-files.patch": "Debian unzip 6.0-31 (verbatim, #652). zip64.mjs: a zip64 locator with total disks 0 (as Windows writes it) tests clean and extracts (NEGATIVE.md: 3.0.0-8 rc 2)",
     "unzip-debian-32-can-2026-2034440.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): its code is mostly under IZ_HAVE_UXUIDGID; no case",
     "unzip-debian-33-can-2026-2034443.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): no case",
     "unzip-debian-34-can-2026-2034442.patch": "Debian unzip 6.0-31 (verbatim). ablation (NEGATIVE.md): no case",
     "unzip-escape-bound.patch": "3.0.0-3 (rebased onto Debian 28 in 3.0.0-4), utf8.mjs six.zip: unzip -U of a bit-11 name of 6-byte sequences lists and extracts w#L7fffffff…txt (without it, 'RuntimeError: memory access out of bounds', rc 70: the -U arm of wide_to_local_string appended unbounded, and 8 bytes per escape is 2 short)",
+    "unzip-mapname-keep-ff.patch": "badnames.mjs: rep\\xff1.txt is refused by name, not written as rep1.txt (NEGATIVE.md: 3.0.0-6)",
     "unzip-unipath-short.patch": "hostile.mjs: short Unicode Path: 0- and 3-byte fields are skipped, stored names, no Unicode Path warning (homescoop#582)",
     "unzip-unipath-utf8.patch": "3.0.0-3, utf8.mjs: n.txt with a Unicode Path field that isn't UTF-8 extracts as out/n.txt (without it, unzip -l doesn't list n.txt and unzip -d fails 'cannot create out/…: Illegal byte sequence', rc 50, homescoop#570)",
     "zip-split-copy.patch": "split.mjs: the 1m and 64k merges (without it zip -s 0 stops at the end of the second 1 MiB part, 'invalid compressed data to inflate')",
     "zip-stdout-seek.patch": "stdout.mjs: both archives (without it each local header is written again after its data, '63 extra bytes', unzip -t rc 2)",
     "zip-test-failed-fclose.patch": "ztest.mjs: -TT false must be rc 8 'test of bad.zip FAILED' (without it zip closes its output twice on the failed test and crashes, rc 70: 'null function' on 3.0.0-1, abort() on the -2 build)",
-    "zip-test-spawn.patch": "ztest.mjs (the quote-and-$ name) and noshell/ztest.mjs (without it zip -T runs unzip through /bin/sh: 'could not spawn unzip', rc 8)",
-    "unzip-mapname-keep-ff.patch": "badnames.mjs: rep\\xff1.txt is refused by name, not written as rep1.txt (NEGATIVE.md: 3.0.0-6)",
-    "slicc-strict-paths.js": "badnames.mjs and utf8.mjs: a path that isn't UTF-8 is EILSEQ at every path syscall (SYSCALLS.getStr), not UTF8ToString's lossy decode (NEGATIVE.md: 3.0.0-6)"
+    "zip-test-spawn.patch": "ztest.mjs (the quote-and-$ name) and noshell/ztest.mjs (without it zip -T runs unzip through /bin/sh: 'could not spawn unzip', rc 8)"
   },
   "ci": [
     "HOMESCOOP_CERT_NODE_MODULES=\"${HOMESCOOP_CERT_NODE_MODULES:-$RUNNER_TEMP/homescoop-browser-cert-nm/node_modules}\" node scripts/browser-cert/run.mjs --package zip --cert packages/zip/cert/noshell --tarball .homescoop-out/package.tgz"
