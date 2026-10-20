@@ -19,9 +19,9 @@ inputs:
   - scripts/wasm-refresh-malloc.c
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
-  initial-memory: 256MiB
-  measured-peak: 200MiB
-  measured-by: "provisional: the first 1.98.1-8 CI build measures it (HOMESCOOP_WASM_PEAK)"
+  initial-memory: 192MiB
+  measured-peak: 161MiB
+  measured-by: "HOMESCOOP_WASM_PEAK (scripts/wasm-refresh-malloc.c, the highest malloc block end, measured in the allocating thread) of the first 1.98.1-8 CI build (run 39484414298) on slicc-kernel 1.134.3: rustc hi.rs 161 MiB, so a small compile stays in the initial heap. Bigger ones grow past it, which the refresh covers: a 400-function rustc -O 281 MiB, a 1500-function one 675 MiB debug and 1.7 GB at -O"
 dependencies:
   build: []
   host: []
