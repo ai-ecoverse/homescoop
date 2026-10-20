@@ -4,10 +4,12 @@
  * websocat runs tokio's blocking threads for stdin/stdout next to the
  * runtime thread, so buffers are allocated on more than one thread while the
  * shared memory grows: V8 could trap a memset into a fresh block (stale
- * per-thread memory length, slicc-kernel#1172). The allocator refresh and
- * the initial heap (recipe.yaml wasm) must give 0 traps. Each round records
- * the client's and the server's wasm memory (VmSize from /proc/<pid>/status,
- * polled with bash builtins).
+ * per-thread memory length, slicc-kernel#1172). 0004 (the allocator
+ * refresh) must give 0 traps. Each round logs the client's and the server's
+ * wasm memory (VmSize from /proc/<pid>/status, polled with bash builtins);
+ * there's no initial-heap check: wasix-libc v2026-07-03.1's dlmalloc
+ * doesn't use the initial pages, so the package isn't sized (the
+ * threaded-heap allowlist says why).
  */
 export default async function (ctx) {
   const { run, write, assert } = ctx;
@@ -56,6 +58,4 @@ kill $srv 2>/dev/null; wait $srv 2>/dev/null; true
   console.log(`stress: 6 × ${MIB} MiB websocat round trip: ${traps} traps, client and server peak ${Math.round(peak / 1024)} MiB`);
   console.log(`stress: ${r.stdout.trim().split('\n').map((l) => l.replace(/ bytes=.*/, '')).join('; ')}`);
   assert.equal(traps, 0, 'no wasm trap in the client or the server');
-  const limit = Number(process.env.WEBSOCAT_INITIAL_MIB || 128) * 1024;
-  assert.ok(peak > 0 && peak <= limit, `the wasm memory stays within the initial heap (peak ${peak} kB, limit ${limit} kB)`);
 }

@@ -68,11 +68,12 @@ CARGO=(cargo "+$RUST")
 export RUSTC="$WR_DIR/bin/rustc"
 export CC_wasm32_wasmer_wasi=wasixcc AR_wasm32_wasmer_wasi=wasixar
 export CARGO_TARGET_DIR="$SRC_DIR/target"
-# homescoop#1287: 0004 includes the shared allocator refresh on wasm, and the
-# initial heap comes from recipe.yaml's wasm.initial-memory (WASM_INITIAL_MEMORY).
+# homescoop#1287: 0004 includes the shared allocator refresh on wasm. No
+# larger initial heap: wasix-libc v2026-07-03.1's dlmalloc doesn't use the
+# pages between __heap_base and the initial size (try_init_allocator is
+# commented out), so they would only add to the process's memory.
 homescoop_rust_wasm_refresh_alloc
-: "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
-export RUSTFLAGS="-C link-self-contained=no -L native=$SYSROOT_LIB -C link-arg=$SYSROOT_LIB/crt1-command.o -C link-arg=--initial-memory=$WASM_INITIAL_MEMORY -C codegen-units=1 --remap-path-prefix=$SRC_DIR=/websocat --remap-path-prefix=$(cd "$SRC_DIR" && pwd -P)=/websocat --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$WR_DIR=/wasix-rust"
+export RUSTFLAGS="-C link-self-contained=no -L native=$SYSROOT_LIB -C link-arg=$SYSROOT_LIB/crt1-command.o -C codegen-units=1 --remap-path-prefix=$SRC_DIR=/websocat --remap-path-prefix=$(cd "$SRC_DIR" && pwd -P)=/websocat --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$WR_DIR=/wasix-rust"
 FEATURES=(--no-default-features --features rustls)
 
 echo "== wasix-websocat: cargo build ($TARGET, wasix-org/rust $WASIX_RUST, wasix-sysroot $SYSROOT_VERSION)"

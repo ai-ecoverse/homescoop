@@ -78,7 +78,8 @@ Without WASIX epoll and eventfd (slicc-kernel#674, in 1.95.0), every invocation,
   - `88 02 0f a0` for close 4000;
   - `81 02 "hi" 88 02 03 e8` for a text frame and then close 1000.
 
-## 4.0.0-alpha3-6: the allocator refresh and the initial heap (homescoop#1287, 2026-10-20)
+## 4.0.0-alpha3-6: the allocator refresh (homescoop#1287, 2026-10-20)
 
-The published 4.0.0-alpha3-5 passes the new stress row's traps check: 6 × 16 MiB and 6 × 32 MiB piped round trips, 0 traps, on slicc-kernel 1.134.3. The trap is a V8 race (slicc-kernel#1172) seen at 5–12% of rounds under heavier allocation (azw9's canary, wasi-pnpm's loop), so the row is a guard, not a negative. Three runs at 16 MiB peaked at 68, 94 and 70 MiB, varying per round from 20 to 94 MiB, because the client buffers piped stdin; the server stays under 2 MiB. Hence 128 MiB.
+The published 4.0.0-alpha3-5 passes the new stress row's traps check: 6 × 16 MiB and 6 × 32 MiB piped round trips, 0 traps, on slicc-kernel 1.134.3. The trap is a V8 race (slicc-kernel#1172) seen at 5–12% of rounds under heavier allocation (azw9's canary, wasi-pnpm's loop), so the row is a guard, not a negative.
 
+The package isn't sized. A first alpha3-6 linked a 128 MiB initial heap from alpha3-5's measured 20–94 MiB, and in CI (run 39373006444's successor) its client peaked at 156–170 MiB and its idle server at 128 MiB. wasix-libc v2026-07-03.1's dlmalloc has `try_init_allocator` commented out, so malloc never uses the pages between `__heap_base` and the initial size: on this sysroot a larger initial heap only adds memory. websocat stays on the threaded-heap allowlist for that reason.
