@@ -18,3 +18,7 @@ Tailnet names need slicc-kernel ≥ 1.27.0 plus a page uplink (seven's
 Tailscale); then `curl --noproxy '*' http://peer.your-tailnet.ts.net/`
 resolves and connects directly (IPv4 / A records only). Without them such
 names fail with "Could not resolve", as before.
+
+## 8.22.0-8: the environment is the kernel's
+
+`curl -n` finds `~/.netrc` when `HOME` is unset, through the passwd entry's home, as on Linux (homescoop#724). Emscripten's glue used to fill a missing variable with its placeholders (`HOME=/home/web_user`, `USER=web_user`, `PATH=/`, …), so curl looked in `/home/web_user`. curl now links coreutils' `slicc-env.js`, so it sees only the environment the kernel passes. `env -i curl …` gets no `PATH=/` either.

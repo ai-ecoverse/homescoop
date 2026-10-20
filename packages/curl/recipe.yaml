@@ -13,6 +13,8 @@ sources:
     version: "3.6.5"
     url: "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-{{version}}/mbedtls-{{version}}.tar.bz2"
     sha256: "4a11f1777bb95bf4ad96721cac945a26e04bf19f57d905f241fe77ebeddf46d8"
+inputs:
+  - packages/coreutils/slicc-env.js
 dependencies:
   build: []
   host:
