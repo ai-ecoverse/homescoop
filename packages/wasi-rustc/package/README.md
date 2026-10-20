@@ -24,3 +24,8 @@ the recipe, against `@ai-ecoverse/wasi-llvm` 21.1.8 and wasi-sdk 34.
 ## Environment
 
 - `RUST_MIN_STACK=16777216` (set by the package: LLVM needs a large stack)
+
+## LTO
+
+`-C lto=fat` and `-C lto=thin` (Cargo's `lto = true` / `"fat"` / `"thin"`) aren't available: rustc.wasm's LLVM (wasi-llvm 21) can't read the standard library's bitcode, which Rust's LLVM 22 wrote, so rustc says so and stops (homescoop#1237). Local ThinLTO, the default, works.
+

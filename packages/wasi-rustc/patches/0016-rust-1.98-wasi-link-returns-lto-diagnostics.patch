@@ -1,0 +1,39 @@
+--- a/compiler/rustc_codegen_ssa/src/back/link.rs
++++ b/compiler/rustc_codegen_ssa/src/back/link.rs
+@@ -1025,7 +1025,13 @@
+         args.insert(0, std::ffi::CString::new(command.get_program().as_encoded_bytes()).unwrap());
+         let argv = args.iter().map(|arg| arg.as_ptr()).collect::<Vec<_>>();
+         let status = unsafe { RustRunLld(args.len() as std::ffi::c_int, argv.as_ptr()) };
+-        std::process::exit(status);
++        // Back to link_binary, which removes the object files and the
++        // rustcXXXXXX temp dir (an exit here left both behind, homescoop#953).
++        // LLD has printed its own errors to stderr.
++        if status != 0 {
++            sess.dcx().fatal(format!("linking with rust-lld failed: exit status: {status}"));
++        }
++        return;
+     }
+ 
+     let unknown_arg_regex =
+--- a/compiler/rustc_codegen_ssa/src/back/write.rs
++++ b/compiler/rustc_codegen_ssa/src/back/write.rs
+@@ -2118,6 +2118,19 @@
+         let (shared_emitter, shared_emitter_main) = SharedEmitter::new();
+ 
+         // Catch fatal errors to ensure shared_emitter_main.check() can emit the actual diagnostics
++        // On WASI a fatal error can't unwind back to the check below: it exits
++        // from `raise` after `finish`, so `finish` drains the shared emitter
++        // first, or an LTO error (homescoop#1237) exits 1 without a message.
++        #[cfg(target_os = "wasi")]
++        let wasi_finish = || {
++            shared_emitter_main.check(sess, false);
++            sess.finish_diagnostics();
++            sess.dcx().flush_delayed();
++        };
++        #[cfg(target_os = "wasi")]
++        let catch_fatal_errors = |f| {
++            rustc_span::fatal_error::on_wasi_fatal_exit(&wasi_finish, || catch_fatal_errors(f))
++        };
+         let compiled_modules = catch_fatal_errors(|| match maybe_lto_modules {
+             MaybeLtoModules::NoLto(compiled_modules) => {
+                 drop(shared_emitter);

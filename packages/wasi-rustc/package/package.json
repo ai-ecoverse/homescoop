@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-rustc",
-  "version": "1.98.1-6",
-  "description": "rustc (LLVM-in-wasm) for slicc WASI \u2014 default target wasm32-wasip1",
+  "version": "1.98.1-7",
+  "description": "The Rust compiler, to build Rust programs in SLICC.",
   "license": "(MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception",
   "repository": {
     "type": "git",
@@ -34,9 +34,6 @@
   },
   "slicc": {
     "abi": "wasi",
-    "dependencies": [
-      "@ai-ecoverse/wasm-clang"
-    ],
     "commands": {
       "rustc": {
         "script": "bin/rustc"
@@ -45,7 +42,8 @@
         "wasm": "bin/rustc.wasm",
         "env": {
           "RUST_MIN_STACK": "16777216"
-        }
+        },
+        "helper": true
       }
     },
     "env": {
