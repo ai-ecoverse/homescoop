@@ -13,7 +13,8 @@
  * cannot override transitive versions. Pin the exact version that is `latest`
  * on npm and certified (docs/versioning.md). The one exception: an
  * @ai-ecoverse/py-* takes wasix-python and other py-*, in dependencies only,
- * as `>=X.Y.Z-N <X.Y.Z+1` (pythonRange, rangeAllowed; homescoop#702, #625),
+ * as `>=X.Y.Z-N <X.Y.Z+1`, or `>=X.Y.Z-postP.N <X.Y.Z+1` for a post-release
+ * upstream such as dateutil 2.9.0.post0 (pythonRange, rangeAllowed; homescoop#702, #625),
  * and so does wasm-emscripten for wasix-python, which runs emcc (PYTHON_CONSUMERS).
  *
  * PENDING lists packages whose packaging-only re-release with exact pins is
@@ -34,24 +35,31 @@ export const EXACT =
 
 export const PYTHON = '@ai-ecoverse/wasix-python';
 const PY_SCOPE = '@ai-ecoverse/py-';
-const RANGE = /^>=(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-(0|[1-9]\d*) <(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const NUM = '(0|[1-9]\\d*)';
+const RANGE = new RegExp(`^>=${NUM}\\.${NUM}\\.${NUM}-(?:${NUM}|post${NUM}\\.${NUM}) <${NUM}\\.${NUM}\\.${NUM}$`);
+const VERSION = new RegExp(`^${NUM}\\.${NUM}\\.${NUM}(?:-(?:${NUM}|post${NUM}\\.${NUM}))?$`);
 
 export function pythonRange(spec) {
   const m = typeof spec === 'string' ? RANGE.exec(spec) : null;
   if (!m) return null;
-  const [x, y, z, n, a, b, c] = m.slice(1).map(Number);
+  const [x, y, z, n, p, pn, a, b, c] = m.slice(1).map((g) => (g === undefined ? undefined : Number(g)));
   if (a !== x || b !== y || c !== z + 1) return null;
-  return { floor: `${x}.${y}.${z}-${n}`, below: `${a}.${b}.${c}` };
+  const floor = n !== undefined ? `${x}.${y}.${z}-${n}` : `${x}.${y}.${z}-post${p}.${pn}`;
+  return { floor, below: `${a}.${b}.${c}` };
 }
 
 export function inPythonRange(version, spec) {
   const r = pythonRange(spec);
   if (!r) return version === spec;
-  const v = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(0|[1-9]\d*))?$/.exec(String(version));
+  const v = VERSION.exec(String(version));
+  const f = VERSION.exec(r.floor);
   if (!v) return false;
-  const [fx, fy, fz, fn] = r.floor.split(/[.-]/).map(Number);
-  if (Number(v[1]) !== fx || Number(v[2]) !== fy || Number(v[3]) !== fz) return false;
-  return v[4] === undefined || Number(v[4]) >= fn;
+  if (Number(v[1]) !== Number(f[1]) || Number(v[2]) !== Number(f[2]) || Number(v[3]) !== Number(f[3])) return false;
+  if (v[4] === undefined && v[5] === undefined) return true;
+  if (f[4] !== undefined) return v[4] !== undefined && Number(v[4]) >= Number(f[4]);
+  if (v[5] === undefined) return false;
+  const [vp, vn, fp, fn] = [v[5], v[6], f[5], f[6]].map(Number);
+  return vp > fp || (vp === fp && vn >= fn);
 }
 
 /** Packages besides py-* whose code runs on wasix-python and takes it as a range: emcc (homescoop#859). */

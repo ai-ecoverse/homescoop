@@ -73,3 +73,17 @@ test('wasm-emscripten, which runs emcc on wasix-python, may take wasix-python as
   assert.equal(pinErrors(em({ '@ai-ecoverse/py-numpy': '>=2.3.2-10 <2.3.3' })).length, 1);
   assert.equal(pinErrors({ name: '@ai-ecoverse/wasm-emscripten', peerDependencies: { [PY]: '>=3.15.0-2 <3.15.1' } }).length, 1);
 });
+
+test('pythonRange: a post-release upstream takes >=X.Y.Z-postP.N <X.Y.Z+1 (dateutil 2.9.0.post0)', () => {
+  const POST = '>=2.9.0-post0.4 <2.9.1';
+  assert.deepEqual(pythonRange(POST), { floor: '2.9.0-post0.4', below: '2.9.1' });
+  for (const bad of ['>=2.9.0-post0 <2.9.1', '>=2.9.0-post0.4 <2.10.0', '>=2.9.0-post0.04 <2.9.1', '>=2.9.0-post.4 <2.9.1', '>=2.9.0-post0.4.1 <2.9.1', '>=2.9.0-dev0.4 <2.9.1', '>=2.9.0-post0.4', '>=2.9.0-post0.4 <2.9.2']) {
+    assert.equal(pythonRange(bad), null, bad);
+  }
+  for (const v of ['2.9.0-post0.4', '2.9.0-post0.5', '2.9.0-post0.12', '2.9.0-post1.0', '2.9.0']) assert.equal(inPythonRange(v, POST), true, v);
+  for (const v of ['2.9.0-post0.3', '2.9.0-5', '2.9.1', '2.9.0-post0.05', '2.8.2-post0.9', '2.9.0-post0']) assert.equal(inPythonRange(v, POST), false, v);
+  const pandas = { name: '@ai-ecoverse/py-pandas', dependencies: { '@ai-ecoverse/py-python-dateutil': POST } };
+  assert.deepEqual(pinErrors(pandas), []);
+  assert.equal(pinErrors({ ...pandas, dependencies: { '@ai-ecoverse/py-python-dateutil': '>=2.9.0-post0 <2.9.1' } }).length, 1);
+  assert.equal(pinErrors({ name: '@ai-ecoverse/wasm-x', dependencies: { '@ai-ecoverse/py-python-dateutil': POST } }).length, 1);
+});
