@@ -13,16 +13,24 @@ esac
 
 # The python line comes from package.json's slicc.python.sitePackages
 # (lib/python3.X/site-packages): 3.14 for the cp314 dirs, 3.15 for the
-# <recipe>3.15 dirs of the Python 3.15 wave (homescoop#761).
-PYMM="$(node -p "(/^lib\/python(3\.\d+)\/site-packages$/.exec(require('$HOMESCOOP_PKG/package/package.json').slicc.python.sitePackages) || [])[1] || ''")"
+# <recipe>3.15 dirs of the Python 3.15 wave (homescoop#761). A package that
+# serves every line (py3-none, no wasix-python dependency) declares the
+# version-neutral lib/python3/site-packages (homescoop#1283): it ships no
+# .pyc (they're tied to one minor), so no host CPython is built for it.
+PYMM="$(node -p "(/^lib\/python(3(?:\.\d+)?)\/site-packages$/.exec(require('$HOMESCOOP_PKG/package/package.json').slicc.python.sitePackages) || [])[1] || ''")"
+NEUTRAL=
 case "$PYMM" in
+  3) NEUTRAL=1 ;;
   3.14) CPY_VER=3.14.2 CPY_SHA=c609e078adab90e2c6bacb6afafacd5eaf60cd94cf670f1e159565725fcd448d ;;
   3.15) CPY_VER=3.15.0 CPY_SHA=438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68 ;;
-  *) echo "stage-pure-wheel ($name): slicc.python.sitePackages must be lib/python3.14|3.15/site-packages (got '$PYMM')" >&2; exit 1 ;;
+  *) echo "stage-pure-wheel ($name): slicc.python.sitePackages must be lib/python3|3.14|3.15/site-packages (got '$PYMM')" >&2; exit 1 ;;
 esac
 
 HOST_PY="${WASIX_PYTHON_HOST_PY:-}"
-if [[ -z "$HOST_PY" ]] && command -v "python$PYMM" >/dev/null 2>&1; then
+if [[ -n "$NEUTRAL" ]]; then
+  # Only to unpack the wheel (zipfile): any Python 3 on the build machine.
+  HOST_PY="$(command -v python3)"
+elif [[ -z "$HOST_PY" ]] && command -v "python$PYMM" >/dev/null 2>&1; then
   HOST_PY="$(command -v "python$PYMM")"
 fi
 if [[ -z "$HOST_PY" ]]; then
@@ -43,8 +51,10 @@ if [[ -z "$HOST_PY" ]]; then
     ) || { tail -40 "$WORK"/host-python-*.log >&2; exit 1; }
   fi
 fi
-"$HOST_PY" -c 'import sys; assert "%d.%d" % sys.version_info[:2] == sys.argv[1], sys.version' "$PYMM"
-export WASIX_PYTHON_HOST_PY="$HOST_PY"
+if [[ -z "$NEUTRAL" ]]; then
+  "$HOST_PY" -c 'import sys; assert "%d.%d" % sys.version_info[:2] == sys.argv[1], sys.version' "$PYMM"
+  export WASIX_PYTHON_HOST_PY="$HOST_PY"
+fi
 
 WHL="$WORK/$(basename "$SRC_URL")"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$WHL"
@@ -55,4 +65,8 @@ mkdir -p "$SITE"
 find "$SITE" -type d -exec chmod 755 {} +
 find "$SITE" -type f -exec chmod 644 {} +
 echo "== stage-pure-wheel ($name): $(basename "$WHL") → lib/python$PYMM/site-packages ($("$HOST_PY" -V))"
-homescoop_compile_pyc "$SITE"
+if [[ -n "$NEUTRAL" ]]; then
+  echo "== stage-pure-wheel ($name): version-neutral, no .pyc"
+else
+  homescoop_compile_pyc "$SITE"
+fi

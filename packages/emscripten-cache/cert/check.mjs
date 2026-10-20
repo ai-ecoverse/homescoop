@@ -42,6 +42,32 @@ try {
   });
   assert.deepEqual(leaks, [], `libraries name a build path in their DWARF (patch 0011 maps the cache and the llvm root): ${leaks.slice(0, 3).join(' | ')}`);
   console.log('== no library names a build path');
+  // homescoop#1328: libc's musl sources are walked in name order (wasm-emscripten
+  // patch 0013), so exit/_Exit.c is _Exit.o and unistd/_exit.c _exit__1.o on
+  // every host; os.walk's filesystem order made it a coin flip between runners.
+  // --member-order: this package's own ci row; wasm-emscripten's pinned-cache.mjs
+  // also runs this file on 6.0.9-4, whose names are the other way round.
+  const members = (buf) => {
+    const out = [];
+    let names = '';
+    for (let p = 8; p + 60 <= buf.length; ) {
+      const raw = buf.toString('latin1', p, p + 16).trimEnd();
+      const size = Number(buf.toString('latin1', p + 48, p + 58).trim());
+      if (raw === '//') names = buf.toString('latin1', p + 60, p + 60 + size);
+      else if (raw !== '/' && raw !== '/SYM64/') {
+        const n = raw.startsWith('/') ? names.slice(Number(raw.slice(1))).split('/\n')[0] : raw.replace(/\/$/, '');
+        out.push(n);
+      }
+      p += 60 + size + (size & 1);
+    }
+    return out;
+  };
+  for (const lib of args.includes('--member-order') ? ['libc.a', 'libc-debug.a'] : []) {
+    const names = members(readFileSync(join(pkg, 'sysroot/lib/wasm32-emscripten', lib)));
+    const exits = names.filter((n) => /^_exit(__\d+)?\.o$/i.test(n));
+    assert.deepEqual(exits, ['_Exit.o', '_exit__1.o'], `${lib}: the _Exit/_exit members are ${exits.join(', ')}, not the name-ordered _Exit.o, _exit__1.o (homescoop#1328)`);
+  }
+  if (args.includes('--member-order')) console.log('== libc.a and libc-debug.a name _Exit.o and _exit__1.o (musl walked in name order)');
 
   const out = sh('bash', [join(root, 'scripts/emscripten-tree.sh'), treeCache], { stdio: ['ignore', 'pipe', 'inherit'] });
   const ex = Object.fromEntries(out.trim().split('\n').map((l) => l.replace(/^export /, '').split('=')).map(([k, ...v]) => [k, v.join('=').replace(/^'(.*)'$/, '$1')]));

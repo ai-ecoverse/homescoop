@@ -41,11 +41,16 @@ fi
 mkdir -p "$EM/test"
 (cd "$EM" && python3 tools/maint/create_entry_points.py)
 rm -rf "$EM/test"
-PJ="$ROOT/packages/wasm-emscripten/package/package.json"
-if [[ ! -d "$DEST/node_modules/acorn" ]]; then
+# Exact, so the tree's JS optimizer is the same in every build (homescoop#1328):
+# the acorn the ^8.18.0 range resolved to for every published build since
+# 2026-10-05 (emscripten 6.0.9's package-lock has 8.18.0), and the lock's
+# acorn-import-phases.
+ACORN=8.19.0
+ACORN_IMPORT_PHASES=1.0.4
+if [[ "$(node -p 'try { require(process.argv[1] + "/node_modules/acorn/package.json").version } catch { "" }' "$DEST" 2>/dev/null)" != "$ACORN" ]]; then
+  rm -rf "$DEST/node_modules"
   npm install --prefix "$DEST" --no-save --no-package-lock --no-fund --no-audit --ignore-scripts --silent \
-    "acorn@$(node -p 'require(process.argv[1]).dependencies.acorn' "$PJ")" \
-    "acorn-import-phases@$(node -p 'require(process.argv[1]).dependencies["acorn-import-phases"]' "$PJ")" >&2
+    "acorn@$ACORN" "acorn-import-phases@$ACORN_IMPORT_PHASES" >&2
 fi
 REL="$DEST/emsdk-$RELEASE"
 if [[ ! -x "$REL/install/bin/clang" || "$(cat "$REL/.sha256" 2>/dev/null)" != "$BIN_SHA" ]]; then

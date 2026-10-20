@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-python-dateutil",
-  "version": "2.9.0-post0.4",
+  "version": "2.9.0-post0.5",
   "description": "python-dateutil for slicc WASIX CPython",
   "license": "Apache-2.0",
   "repository": {
@@ -34,7 +34,7 @@
   },
   "slicc": {
     "python": {
-      "sitePackages": "lib/python3.14/site-packages"
+      "sitePackages": "lib/python3/site-packages"
     }
   }
 }

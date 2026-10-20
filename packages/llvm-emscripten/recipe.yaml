@@ -11,7 +11,6 @@ source:
   tree: "3690321ef0f69603e82c2c40464b4a3ffec7cb2f"
 inputs:
   - "packages/wasm-emscripten/patches/**"
-  - "packages/wasm-emscripten/package/package.json"
 dependencies:
   build: []
   host: []

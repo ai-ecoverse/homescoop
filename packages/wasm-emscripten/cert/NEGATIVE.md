@@ -67,6 +67,10 @@ FAIL wasm-clang 24.0.0-21 ships no THIRD-PARTY-NOTICES.md; wasm-binaryen 132.0.0
 
 The same release moves wasix-python from the exact 3.14.2-16 to the range `>=3.15.0-2 <3.15.1`. That's the python3.15 flip; check-exact-pins now allows wasm-emscripten that range, as it allows py-*. It also gains `engines: slicc-kernel >=1.122.3`, because wasix-python 3.15.0-2 refuses older kernels. On the old cert kernel 1.110.7, run-paths fails at once: `python3: @ai-ecoverse/wasix-python@3.15.0-2 needs slicc-kernel >=1.122.3`. So the cert kernel moves to 1.132.0, where em-config, em-ensure-cache and `emcc -v` run through CPython 3.15 in the flat and pnpm layouts.
 
-## 6.0.9-24: the shim's posix_spawnp searches PATH (slicc-kernel#1165, homescoop#1264; 2026-10-19)
+## 6.0.9-24: a sorted musl walk (homescoop#1328; 2026-10-20)
 
-6.0.9-24 links the updated `shims/slicc/slicc_spawn.c`. `posix_spawnp` was plain `posix_spawn`; it now searches PATH as execvp does. A candidate that isn't an executable regular file is skipped, and a bare name that isn't found anywhere still goes to the kernel catalog. On #1264, npm-parity found that the build differs from the published 6.0.9-23 in lib/slicc/slicc_spawn.o, so this is a packaging bump. The package's own code is unchanged. The behaviour test is coreutils' `cert/spawnp-path.mjs` (`timeout`, the shim's one Emscripten caller that a cert drives).
+The new `test/files.test.mjs` row fails on the published 6.0.9-23: its `tools/system_libs.py` walks musl in filesystem order. Through embuilder that made libc's `_Exit.o` and `_exit.o` member names depend on the host (emscripten-cache's NEGATIVE.md). Patch 0013 sorts the walk. The other change is `scripts/emscripten-tree.sh`'s exact acorn pins. Apart from those, 6.0.9-24 equals -23.
+
+## 6.0.9-25: the shim's posix_spawnp searches PATH (slicc-kernel#1165, homescoop#1264; 2026-10-19)
+
+6.0.9-25 links the updated `shims/slicc/slicc_spawn.c`. `posix_spawnp` was plain `posix_spawn`; it now searches PATH as execvp does. A candidate that isn't an executable regular file is skipped, and a bare name that isn't found anywhere still goes to the kernel catalog. On #1264, npm-parity found that the build differs from the published 6.0.9-23 in lib/slicc/slicc_spawn.o (6.0.9-24, #1335, left the shim as it was), so this is a packaging bump. The package's own code is unchanged. The behaviour test is coreutils' `cert/spawnp-path.mjs` (`timeout`, the shim's one Emscripten caller that a cert drives).
