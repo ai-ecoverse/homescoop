@@ -42,3 +42,7 @@ The published 1.98.1-6 against -7's `cert/hygiene.mjs` (slicc-kernel 1.134.3, us
   - The same std bitcode (`.llvmbc` extracted from -6's rlibs) links natively with LLVM 21's llvm-link, so the root cause is in the wasm-hosted LLVM. -7's first CI build printed it: `failed to load bitcode of module "adler2-…": Unknown attribute kind (105) (Producer: 'LLVM22.1.8-rust-1.98.1-stable' Reader: 'LLVM 21.1.8')`. std was compiled by the stage rustc with Rust's in-tree LLVM 22, and rustc.wasm links wasi-llvm 21. `-C lto=thin` stayed silent, because ThinLTO's error comes from a worker thread. 0017 refuses fat and thin LTO on the main thread before codegen, naming the reason. A wasi-llvm 22 would make LTO work.
 - **Dependencies:** `slicc.dependencies` is `["@ai-ecoverse/wasm-clang"]`.
 
+## 1.98.1-8: the malloc refresh and the initial heap (homescoop#1287, 2026-10-21)
+
+There's no published negative for the trap: the race (slicc-kernel#1172) didn't show in the row with 1.98.1-7, and it hits 5–12% of rounds only under heavier allocation (azw9's canary, wasi-pnpm's loop). The row is a guard. Its measurement is new: rustc.wasm's VmSize stays at its 11.5 MiB initial memory, because the main thread only waits while rustc works on a spawned thread, so the peak comes from `HOMESCOOP_WASM_PEAK` in the allocating thread. The first -8 CI build gave hello world 161 MiB, a 400-function `-O` 281 MiB, and a 1500-function one 675 MiB debug and 1.7 GB at `-O`. Hence 192 MiB, for small compiles; bigger ones grow under the refresh.
+

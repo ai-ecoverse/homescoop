@@ -52,8 +52,20 @@ for f in compiler/rustc_llvm/llvm-wrapper/*.cpp; do
     -D_WASI_EMULATED_MMAN -DNDEBUG -DLLVM_COMPONENT_WEBASSEMBLY \
     --target=wasm32-wasip1-threads -fsyntax-only "$f"
 done
+# homescoop#1287: rustc.wasm's threads (rustc's own, LLVM's) allocate through
+# wasi-libc's malloc (Rust's System allocator calls it too), which can hand a
+# thread a block in memory another thread just grew, above that thread's view
+# of the shared memory. scripts/wasm-refresh-malloc.c wraps the malloc family
+# at the link and refreshes the view first; the initial memory is
+# recipe.yaml's wasm.initial-memory. Built at the fixed PKG_WORK path.
+: "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
+"$WASI_SDK_PATH/bin/wasm32-wasip1-threads-clang" -O2 -pthread "--sysroot=$WASI_SYSROOT" \
+  -c "$ROOT/scripts/wasm-refresh-malloc.c" -o "$PKG_WORK/wasm-refresh-malloc.o"
 python3 "$HOMESCOOP_PKG/make-stable-config.py" --wasi-sdk "$WASI_SDK_PATH" \
-  --llvm-config "$LLVM_CONFIG" --build "$BUILD_TRIPLE" --output config.wasi.toml
+  --llvm-config "$LLVM_CONFIG" --build "$BUILD_TRIPLE" --output config.wasi.toml \
+  --link-arg="$PKG_WORK/wasm-refresh-malloc.o" \
+  --link-arg="-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=aligned_alloc,--wrap=posix_memalign,--wrap=memalign" \
+  --link-arg="-Wl,--initial-memory=$WASM_INITIAL_MEMORY"
 unset RUSTFLAGS CARGO_TARGET_WASM32_WASIP1_RUSTFLAGS CARGO_TARGET_WASM32_WASIP1_THREADS_RUSTFLAGS || true
 export RUSTFLAGS_NOT_BOOTSTRAP=""
 export CFLAGS_wasm32_wasip1_threads="--target=wasm32-wasip1-threads" CXXFLAGS_wasm32_wasip1_threads="--target=wasm32-wasip1-threads"

@@ -15,6 +15,12 @@ def main() -> None:
         help="external LLVM for the wasm32-wasip1-threads host (wasi-llvm's bin/llvm-config)",
     )
     parser.add_argument("--build", default="x86_64-unknown-linux-gnu")
+    parser.add_argument(
+        "--link-arg",
+        action="append",
+        default=[],
+        help="an extra -Clink-arg for the wasm32-wasip1-threads host (rustc.wasm's link)",
+    )
     args = parser.parse_args()
     sdk = args.wasi_sdk.resolve(strict=True)
     sysroot = sdk / "share/wasi-sysroot"
@@ -32,6 +38,7 @@ def main() -> None:
     if args.llvm_config:
         llvm_config = args.llvm_config.resolve(strict=True)
         host_llvm = f'llvm-config = "{llvm_config}"\n'
+    extra_link = "".join(f'  "-Clink-arg={a}",\n' for a in args.link_arg)
     config = f'''profile = "compiler"
 change-id = "ignore"
 
@@ -87,7 +94,7 @@ rustflags = [
   "-Clink-arg=-ldl",
   "-Clink-arg=-lwasi-emulated-mman",
   "-Clink-arg=-Wl,--max-memory=4294967296",
-]
+{extra_link}]
 cc = "{cc}"
 cxx = "{cxx}"
 ar = "{ar}"
