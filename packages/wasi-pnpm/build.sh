@@ -57,13 +57,13 @@ PY
 CARGO_HOME_DIR="${CARGO_HOME:-$HOME/.cargo}"
 # Cargo hands rustc physical paths (macOS: /private/tmp/…): map those too.
 CARGO_ENCODED_RUSTFLAGS="$(printf '%s\x1f%s\x1f%s' "--remap-path-prefix=$SRC=/pnpm" "--remap-path-prefix=$(cd "$SRC" && pwd -P)=/pnpm" "--remap-path-prefix=$CARGO_HOME_DIR=/cargo")"
-# homescoop#1127: pnpm.wasm started at 68 pages (4.3 MiB) and grew its shared
-# memory constantly while rayon workers decode the store index; a first
-# write into a fresh allocation then trapped "memory access out of bounds"
-# on CI's Linux Chromium (a cross-thread memory.grow window, under
-# investigation). Start at 256 MiB so a warm install rarely grows at all.
+# homescoop#1127/#1287: pnpm.wasm's initial heap, sized from its measured
+# peak (recipe.yaml wasm.initial-memory; recipe-env exports it in bytes as
+# WASM_INITIAL_MEMORY). Growing shared memory while rayon workers allocate
+# let V8 trap a memset into a fresh block; patches/0009's allocator refresh
+# is the backstop for the growth that remains.
 # HOMESCOOP_PNPM_INITIAL_MEMORY=0 builds without it (for probe runs).
-PNPM_INITIAL_MEMORY="${HOMESCOOP_PNPM_INITIAL_MEMORY:-268435456}"
+PNPM_INITIAL_MEMORY="${HOMESCOOP_PNPM_INITIAL_MEMORY:-${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}}"
 if [[ "$PNPM_INITIAL_MEMORY" != 0 ]]; then
   CARGO_ENCODED_RUSTFLAGS="$CARGO_ENCODED_RUSTFLAGS$(printf '\x1f%s' "-Clink-arg=--initial-memory=$PNPM_INITIAL_MEMORY")"
 fi

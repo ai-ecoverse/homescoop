@@ -118,9 +118,9 @@ out of bounds` (homescoop#1127). V8 bounds-checks a thread's `memory.fill` and
 memory, and that view can lag behind a `memory.grow` another thread just did.
 It's a false trap: no wrong bytes are written, but the install aborts.
 12.9.1-16's allocator refreshes the view (`memory.grow(0)`) before it hands
-a thread memory above it, and since 12.9.1-14 pnpm starts with 256 MiB of
-memory, above an agent install's peak (232 MiB cold, 96 MiB warm), so it
-rarely grows at all.
+a thread memory above it. pnpm starts with 320 MiB of memory (since
+12.9.1-17; 256 MiB in -14 to -16), above an agent install's measured peak
+(280 MiB cold, 96 MiB warm), so it rarely grows at all.
 
 ## `npm`, `npx` and `i`
 
