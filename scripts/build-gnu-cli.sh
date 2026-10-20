@@ -41,11 +41,23 @@ SLICC_A="$WORK/libslicc-$SLICC_PROFILE.a"
 homescoop_slicc_archive "$SLICC_A" "$SLICC_PROFILE"
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
+PKG_OBJS=()
+shopt -s nullglob
+for js in "$HOMESCOOP_PKG"/slicc-*.js; do
+  HOMESCOOP_EM_CLI_LDFLAGS_EXTRA+=" --js-library $js"
+done
+for c in "$HOMESCOOP_PKG"/slicc_*.c; do
+  obj="$WORK/$(basename "${c%.c}").o"
+  echo "== $NAME: emcc -c $(basename "$c")"
+  emcc -O2 -c "$c" -o "$obj"
+  PKG_OBJS+=("$obj")
+done
+shopt -u nullglob
 # slicc_pwd.c answers getpwuid/getpwnam/getpwent only through --wrap (they are
 # strong in Emscripten's libc stubs): without it whoami, id -un and ls -l
 # name nobody (homescoop#207).
 CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_slicc_wrap_pwd) $(homescoop_em_cli_ldflags)"
-CLI_LIBS="-Wl,--whole-archive ${SLICC_A} -Wl,--no-whole-archive"
+CLI_LIBS="${PKG_OBJS[*]:+${PKG_OBJS[*]} }-Wl,--whole-archive ${SLICC_A} -Wl,--no-whole-archive"
 
 EXTRA_CFG=()
 case "$NAME" in
