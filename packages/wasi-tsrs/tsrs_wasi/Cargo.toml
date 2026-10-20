@@ -1,0 +1,21 @@
+# homescoop: tsrs as a WASI preview1 command. build.sh copies this crate into
+# the tsrs workspace as crates/tsrs_wasi (the workspace takes crates/*).
+[package]
+name = "tsrs_wasi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+tsrs_core.workspace = true
+tsrs_compiler.workspace = true
+tsrs_execute = { path = "../tsrs_execute" }
+
+[[bin]]
+name = "tsrs"
+path = "src/main.rs"

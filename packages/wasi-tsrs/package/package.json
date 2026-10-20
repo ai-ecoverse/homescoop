@@ -1,0 +1,43 @@
+{
+  "name": "@ai-ecoverse/wasi-tsrs",
+  "version": "0.18.0-1",
+  "description": "tsrs, the Rust port of TypeScript 7's tsc, for slicc WASI preview1 (command tsrs); tsrs.wasm built by homescoop from oxc-project/tsrs v0.18.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-tsrs/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-tsrs",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "typescript",
+    "tsc",
+    "tsrs"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-tsrs",
+    "upstream": "0.18.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "tsrs": {
+        "wasm": "bin/tsrs.wasm"
+      }
+    }
+  }
+}
