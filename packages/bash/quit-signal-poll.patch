@@ -1,0 +1,49 @@
+bash: a ^C interrupts a loop of builtins (homescoop#1236).
+slicc-kernel delivers a signal to an Emscripten program only at a kernel
+call or a write, read or sleep its glue answers. A loop of builtins makes
+none, so `while :; do :; done` never saw a ^C. QUIT, which bash runs for
+every command and loop iteration, now sleeps 0 ms through the shim every
+1024 calls; the kernel delivers the pending SIGINT on the way back, the
+handler sets interrupt_state, and QUIT throws to the top level.
+
+--- a/quit.h
++++ b/quit.h
+@@ -32,8 +32,16 @@
+    place.  The same scheme is used for terminating signals (e.g., SIGHUP)
+    and the terminating_signal variable.  That calls a function which will
+    end up exiting the shell. */
++#if defined (__EMSCRIPTEN__)
++extern void slicc_quit_poll (void);
++#  define SLICC_QUIT_POLL slicc_quit_poll ()
++#else
++#  define SLICC_QUIT_POLL
++#endif
++
+ #define QUIT \
+   do { \
++    SLICC_QUIT_POLL; \
+     if (terminating_signal) termsig_handler (terminating_signal); \
+     if (interrupt_state) throw_to_top_level (); \
+   } while (0)
+--- a/sig.c
++++ b/sig.c
+@@ -65,6 +65,19 @@
+ /* Non-zero after SIGINT. */
+ volatile sig_atomic_t interrupt_state = 0;
+ 
++#if defined (__EMSCRIPTEN__)
++extern void slicc_sleep_ms (double);
++
++void
++slicc_quit_poll (void)
++{
++  static unsigned int calls;
++
++  if ((++calls & 1023) == 0)
++    slicc_sleep_ms (0);
++}
++#endif
++
+ /* Non-zero after SIGWINCH */
+ volatile sig_atomic_t sigwinch_received = 0;
+ 
