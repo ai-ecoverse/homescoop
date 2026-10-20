@@ -46,3 +46,18 @@ dig +tries=1 @192.0.2.53 example.test
 ;; UDP setup with 192.0.2.53#53(192.0.2.53) for example.test failed: network unreachable.
 ;; no servers could be reached          (no TCP retry)
 ```
+
+## 9.20.29-2: dig +nssearch over TCP (homescoop#1379; 2026-10-20)
+
+`checklist.mjs` on npm's `@ai-ecoverse/wasix-bind@9.20.29-1` (slicc-kernel 1.134.3, users enforce) fails 8 of 98 assertions. That count includes the #1370 unrouted-resolver row added after -1. The new rows fail as follows:
+
+- `dig +time=2 +tries=1 +nssearch @100.100.100.100 nss.test` gives `;; NS servers could not be reached`, rc 9.
+- `+tcp +nssearch` fails the same way.
+
+There were two causes:
+
+1. The patch skipped the TCP retry when `ns_search_only` was set.
+2. Upstream's `send_done()` calls `nssearch_next()` after every NSSEARCH send. For the last (or only) query, `check_if_queries_done()` excludes that query, finds nothing else pending, and reports failure before its answer arrives. Over TCP the answer always arrives after the send. So even `+tcp +nssearch` (#1379's workaround) failed against a zone whose NS name resolves; #1379's own repro never got that far.
+
+9.20.29-2 retries `+nssearch` over TCP, and calls `nssearch_next()` from `send_done()` only when there is a next query. This build passes checklist.mjs and users.mjs on the same kernel.
+

@@ -23,6 +23,15 @@ function dnsFake(req) {
     ],
     'www.example.test': [['CNAME', 600, 'example.test']],
     '_sip._tcp.example.test': [['SRV', 300, [0, 5, 5060, 'sip.example.test']]],
+    'nss.test': [
+      ['NS', 86400, '100.100.100.100'],
+      ['SOA', 3600, ['ns1.nss.test', 'hostmaster.nss.test', 2026102001, 7200, 3600, 1209600, 300]],
+    ],
+    'nss2.test': [
+      ['NS', 86400, '100.64.9.9'],
+      ['NS', 86400, '100.100.100.100'],
+      ['SOA', 3600, ['ns1.nss2.test', 'hostmaster.nss2.test', 2026102002, 7200, 3600, 1209600, 300]],
+    ],
     '10.2.0.192.in-addr.arpa': [['PTR', 300, 'example.test']],
     'a-very-long-owner-name-for-testing.example.test': [['A', 300, '192.0.2.20']],
     // homescoop#403: HTTPS (RFC 9460) and a type nobody knows (RFC 3597).
@@ -193,6 +202,17 @@ export default async function (ctx) {
   const tcp = (await cmd(['dig', '+tcp', `@${NS}`, 'example.test'])).stdout;
   assert.doesNotMatch(tcp, /UDP/);
   assert.match(tcp, /\(TCP\)$/m);
+
+  const t2 = Date.now();
+  const nss = await cmd(['dig', '+time=2', '+tries=1', '+nssearch', `@${NS}`, 'nss.test']);
+  assert.ok(Date.now() - t2 < 4000, `dig +nssearch took ${Date.now() - t2} ms`);
+  assert.match(nss.stdout, /^SOA ns1\.nss\.test\. hostmaster\.nss\.test\. 2026102001 7200 3600 1209600 300 from server 100\.100\.100\.100 in \d+ ms\.$/m);
+  assert.doesNotMatch(nss.stdout + nss.stderr, /timed out|no servers could be reached/);
+  const nssTcp = await cmd(['dig', '+time=2', '+tries=1', '+tcp', '+nssearch', `@${NS}`, 'nss.test']);
+  assert.match(nssTcp.stdout, /^SOA ns1\.nss\.test\. .* from server 100\.100\.100\.100 in \d+ ms\.$/m);
+  const nss2 = await cmd(['dig', '+time=2', '+tries=1', '+nssearch', `@${NS}`, 'nss2.test']);
+  assert.match(nss2.stdout, /^SOA ns1\.nss2\.test\. hostmaster\.nss2\.test\. 2026102002 7200 3600 1209600 300 from server 100\.100\.100\.100 in \d+ ms\.$/m);
+  assert.match(nss2.stdout, /^;; Connection to 100\.64\.9\.9#53\(100\.64\.9\.9\) for nss2\.test failed: connection refused\.$/m);
 
   const short = async (...args) => (await cmd(['dig', '+short', `@${NS}`, ...args])).stdout.trimEnd().split('\n');
   assert.deepEqual(await short('example.test'), ['192.0.2.10']);
