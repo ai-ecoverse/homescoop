@@ -11,6 +11,7 @@ inputs:
   - crates/wasix-ureq/**
   - crates/wasix-command/**
   - scripts/build-common.sh
+  - scripts/rust-wasm-refresh-alloc.rs
 # renovate: datasource=github-releases depName=pbakaus/impeccable extractVersion=^engine-v(?<version>.*)$
 version: "0.1.15"
 npm: "@ai-ecoverse/wasi-impeccable"
@@ -20,6 +21,11 @@ summary: "impeccable engine 0.1.15 for slicc WASI preview1 (command impeccable; 
 source:
   url: "https://github.com/pbakaus/impeccable/archive/refs/tags/engine-v{{version}}.tar.gz"
   sha256: "4eea50c9a9d04079b65ed8c80ab8ee21229dba1eecb3dec0cd7b4870c6112d55"
+# homescoop#1287: the initial heap from the measured peak, with headroom.
+wasm:
+  initial-memory: 64MiB
+  measured-peak: 49MiB
+  measured-by: "cert/stress.mjs's impeccable detect --json over a 600-page site (40 rules and 40 paragraphs a page), VmSize polled from /proc/<pid>/status: 49 MiB peak with 0.1.15-4 on slicc-kernel 1.134.3"
 dependencies:
   build: []
   host: []

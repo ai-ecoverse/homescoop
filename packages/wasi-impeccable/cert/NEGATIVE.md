@@ -78,3 +78,8 @@ Unknown command: "telemetry"
 ```
 
 The spec doesn't pass vacuously. With its roll API inverted to demand the opposite header on opted-out rolls, it fails on 0.1.15-3 at the first opted-out roll: `SURFACE CONCEPT SEED (key: off-1; mode: unscoped; source: degraded; …)`.
+
+## 0.1.15-5: the allocator refresh and the initial heap (homescoop#1287, 2026-10-20)
+
+The published 0.1.15-4 passes the new stress row's traps check: 6 rounds over 600 pages, 0 traps on slicc-kernel 1.134.3. The trap is a V8 race (slicc-kernel#1172) at 5–12% of rounds under heavier allocation (azw9's canary, wasi-pnpm's loop), so the row is a guard, not a negative. 0.1.15-4's peak there was 49 MiB, hence the recorded 64 MiB initial heap, which the row checks.
+

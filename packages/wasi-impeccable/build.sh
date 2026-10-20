@@ -53,7 +53,12 @@ REMAP=(
 # the patch and the vendored crates/wasix-*), not only the upstream version,
 # so a changed build reruns (homescoop#642: cargo isn't invoked on a hit, so
 # its own fingerprints can't catch a crate edit).
-KEY="$( { printf '%s\n' "$RUST" "$TARGET" "${REMAP[@]}"; cat "$HOMESCOOP_PKG"/*.patch; homescoop_tree_digest "$SRC_DIR/homescoop-crates"; } | shasum -a 256 | cut -c1-12)"
+# homescoop#1287: 0002 includes the shared allocator refresh on wasm, and the
+# initial heap comes from recipe.yaml's wasm.initial-memory (WASM_INITIAL_MEMORY).
+homescoop_rust_wasm_refresh_alloc
+: "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
+LINK=("-Clink-arg=--initial-memory=$WASM_INITIAL_MEMORY")
+KEY="$( { printf '%s\n' "$RUST" "$TARGET" "${REMAP[@]}" "${LINK[@]}"; cat "$HOMESCOOP_PKG"/*.patch "$HOMESCOOP_WASM_ALLOC_RS"; homescoop_tree_digest "$SRC_DIR/homescoop-crates"; } | shasum -a 256 | cut -c1-12)"
 OUT="$WORK/wasi-impeccable-${VERSION}-$KEY"
 mkdir -p "$OUT/bin"
 
@@ -62,7 +67,7 @@ if [[ ! -f "$OUT/bin/impeccable.wasm" || -n "${FORCE:-}" ]]; then
   (
     cd "$SRC_DIR"
     # CARGO_ENCODED_RUSTFLAGS keeps each flag whole, spaces in paths included.
-    CARGO_ENCODED_RUSTFLAGS="$(IFS=$'\x1f'; printf '%s' "${REMAP[*]}")" \
+    CARGO_ENCODED_RUSTFLAGS="$(IFS=$'\x1f'; printf '%s' "${REMAP[*]}${IFS}${LINK[*]}")" \
     CARGO_PROFILE_RELEASE_DEBUG=0 \
     CARGO_PROFILE_RELEASE_STRIP=true \
       "${CARGO[@]}" build --release -p impeccable --target "$TARGET"

@@ -80,3 +80,9 @@ Until 2026-10-16 the cert kernel was 1.88.0, which doesn't answer `env.__syscall
 The published 9.12.0-9 also has 1 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/coreutils.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 9.12.0-10 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 9.12.0-9 too; the negative is the #908 check.
+
+## 9.12.0-11: posix_spawnp searches PATH (slicc-kernel#1165)
+
+- **9.12.0-10 (the published tgz):** `cert/spawnp-path.mjs` fails its first row. `timeout 5 hs1165script` with the script first on PATH is rc 127, `timeout: failed to run command 'hs1165script': No such file or directory`. The cause is the shim's `posix_spawnp`, which was `posix_spawn`: the bare name reached the kernel, whose `proc-spawn` resolves a bare name in its catalog only. On the cert kernel the other rows pass on both versions.
+- **9.12.0-11 as built:** all six rows pass (the PATH script, found past a directory of the same name earlier on PATH, `./rel/script`, the catalog `seq`, 126 for a mode-644 script, 126 for a name only a directory matches, 127 for a missing name).
+- **9.12.0-11's first cut (ba20f6b9, built with `scripts/host-run.sh coreutils`):** fails the first row, `timeout 5 hs1165script rc=126 stderr=timeout: failed to run command ‘hs1165script’: Permission denied`. It spawned the first candidate that passed `access(X_OK)`, and `dbin/hs1165script` (a directory ahead of the script on PATH) passes it; the search stopped there (Codex P2 on #1264). The fix skips a candidate that isn't a regular file or isn't executable, and one whose spawn is EACCES/ENOENT/ENOTDIR, as execvp does.

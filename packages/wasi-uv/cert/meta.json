@@ -1,14 +1,18 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.132.1",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils", "@ai-ecoverse/wasix-python"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.134.3",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-python"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
     "@ai-ecoverse/wasix-python@3.14.2-24"
   ],
   "checklist": [
-    "uv --version is 'uv 0.13.1 ([\u2026] wasm32-wasip1-threads)'",
+    "uv --version is 'uv 0.13.1 ([…] wasm32-wasip1-threads)'",
     "uv python find: /usr/bin/python3 (wasix-python), listed as cpython-3.14.x-wasi-wasm32-none",
     "homescoop#103 done-when: uv venv && uv pip install requests && uv run python -c 'import requests' (sys.prefix is the venv; pyvenv.cfg written by uv; bin/python symlinks wasix-python)",
     "requests is in the venv only; uv pip list shows it; uv pip uninstall removes it",
@@ -18,7 +22,8 @@
     "uv lock --check, uv tree, uv remove, rm -rf .venv && uv sync",
     "uv tool install links the executable into ~/.local/bin (a symlink) and it runs; uv tool uninstall removes it",
     "a version not in the links: uv's error, no panic or trap",
-    "cert/locks.mjs (homescoop#706, 0.13.1-2): while `uv -vv pip install --no-binary six six` holds the venv's exclusive lock, a second `uv pip install idna` into the same venv logs 'Waiting to acquire exclusive lock for `.venv`' and both succeed, and the venv has six 1.17.0 and idna 3.20; while an install holds the cache's shared lock, `uv cache clean` says 'Cache is currently in-use, waiting for other uv processes to finish', and six still imports afterwards. 0.13.1-1: B doesn't wait (NEGATIVE.md)"
+    "cert/locks.mjs (homescoop#706, 0.13.1-2): while `uv -vv pip install --no-binary six six` holds the venv's exclusive lock, a second `uv pip install idna` into the same venv logs 'Waiting to acquire exclusive lock for `.venv`' and both succeed, and the venv has six 1.17.0 and idna 3.20; while an install holds the cache's shared lock, `uv cache clean` says 'Cache is currently in-use, waiting for other uv processes to finish', and six still imports afterwards. 0.13.1-1: B doesn't wait (NEGATIVE.md)",
+    "cert/stress.mjs (0.13.1-3, homescoop#1287): 6 × uv pip install --no-cache of 41 local wheels (40 × 60 modules and one needing them all) into a fresh venv under SLICC_WASM_BACKTRACE=1: rc 0 and all 40 installed each time, 0 wasm traps, and the wasm memory (VmSize, /proc/<pid>/status) within the 64 MiB initial heap; 0006 (the allocator refresh) and recipe.yaml's wasm.initial-memory"
   ],
   "patches": {
     "0001-wasi-build-uv-for-wasm32-wasip1-threads.patch": "the whole spec (the build); uv cache paths and indicatif output in every case",
@@ -34,7 +39,8 @@
     "crates/reqsign-http-send-reqwest-4.0.6.patch": "build",
     "crates/astral-reqwest-middleware-0.5.1.patch": "build; every client request",
     "crates/astral-reqwest-retry-0.9.1.patch": "build; every client request",
-    "rust/0001-std-wasi-paths-home-temp-and-no-exe-suffix.patch": "uv python find (PATH split, python not python.wasm), cache under $HOME, temp files"
+    "rust/0001-std-wasi-paths-home-temp-and-no-exe-suffix.patch": "uv python find (PATH split, python not python.wasm), cache under $HOME, temp files",
+    "0006-wasi-homescoop-s-allocator-refresh.patch": "stress.mjs: uv's threaded install under load gives 0 traps with homescoop's allocator refresh as the global allocator on wasm; build.sh sets HOMESCOOP_WASM_ALLOC_RS"
   },
-  "network": "The cert kernel has no network: the spec fetches pinned distributions (sha256-checked) and uv resolves them alone (no-index, find-links in /home/uv.toml via UV_CONFIG_FILE). PyPI over the kernel's CONNECT proxy (TLS with SSL_CERT_FILE) was checked by hand on the Node entry with nodeTransport: uv venv && uv pip install requests && uv run python -c 'import requests' \u2192 2.34.2 /home/u/.venv."
+  "network": "The cert kernel has no network: the spec fetches pinned distributions (sha256-checked) and uv resolves them alone (no-index, find-links in /home/uv.toml via UV_CONFIG_FILE). PyPI over the kernel's CONNECT proxy (TLS with SSL_CERT_FILE) was checked by hand on the Node entry with nodeTransport: uv venv && uv pip install requests && uv run python -c 'import requests' → 2.34.2 /home/u/.venv."
 }

@@ -3,13 +3,12 @@
 # measured-peak, measured-by } yet (homescoop#1287, slicc-kernel#1172).
 # "<recipe> #<issue> <reason>". scripts/check-threaded-heap.mjs fails a line
 # whose package gets the fields or stops being threaded: drop it then.
-jq #1287 wasixcc build; sized at its next build
+jq #1287 wasixcc build; wasix-sysroot dlmalloc ignores the initial pages until -40; refresh only, size after -40
 wasi-cargo #1287 Rust; the shared allocator refresh (g86d), then sizing
-wasi-impeccable #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-rustc #1287 Rust; the shared allocator refresh (g86d), then sizing
-wasi-uv #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-zig #1287 the shared allocator refresh (g86d), then sizing
-wasix-m4 #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
-wasix-perl #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
-wasix-ruby #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
-wasix-websocat #1287 Rust on wasix; the shared allocator refresh, then sizing
+wasix-m4 #1287 wasix-sysroot dlmalloc ignores the initial pages until -40; refresh only, size after -40
+wasix-perl #1287 wasix-sysroot dlmalloc ignores the initial pages until -40; refresh only, size after -40
+wasix-python #1287 a PIE main (dylink.0 and _start; the guard missed it until it told PIE mains from side modules); wasix-sysroot dlmalloc ignores the initial pages until -40; refresh only, size after -40; cc7e sizes it at its next build
+wasix-ruby #1287 wasix-sysroot dlmalloc ignores the initial pages until -40; refresh only, size after -40
+wasix-websocat #1287 has the shared allocator refresh (4.0.0-alpha3-6); not sized: wasix-libc v2026-07-03.1's dlmalloc doesn't use the pages between __heap_base and the initial size (try_init_allocator commented out), so a larger initial heap only adds (the alpha3-6 128 MiB build peaked at 167 MiB, alpha3-5 at 94)

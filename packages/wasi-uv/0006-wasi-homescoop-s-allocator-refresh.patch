@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: homescoop <homescoop@ai-ecoverse.invalid>
+Date: Tue, 20 Oct 2026 12:00:00 +0200
+Subject: [PATCH] wasi: homescoop's allocator refresh as the global allocator
+
+V8 checks a thread's memory.fill/memory.copy against that thread's cached
+memory length, which can lag a memory.grow another thread's malloc just
+did, so a memset into a fresh block traps "memory access out of bounds"
+(slicc-kernel#1172, homescoop#1287). On wasm the uv binary includes
+scripts/rust-wasm-refresh-alloc.rs (path in HOMESCOOP_WASM_ALLOC_RS, set by
+build.sh): System, refreshing the view with memory.grow(0) before a block
+above it is returned. uv's own allocator crate picks nothing on wasm32.
+---
+ crates/uv/src/bin/uv.rs | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/crates/uv/src/bin/uv.rs b/crates/uv/src/bin/uv.rs
+index 0000000..0000000 100644
+--- a/crates/uv/src/bin/uv.rs
++++ b/crates/uv/src/bin/uv.rs
+@@ -7,6 +7,15 @@ extern crate uv_performance_memory_allocator;
+ 
+ use std::process::ExitCode;
+ 
++// homescoop#1287: threaded wasm takes homescoop's allocator refresh
++// (scripts/rust-wasm-refresh-alloc.rs) against V8's stale per-thread memory
++// length after another thread's memory.grow.
++#[cfg(target_family = "wasm")]
++#[allow(unsafe_code)]
++mod homescoop_wasm_alloc {
++    include!(env!("HOMESCOOP_WASM_ALLOC_RS"));
++}
++
+ use uv::main as uv_main;
+ 
+ #[allow(unsafe_code)]
