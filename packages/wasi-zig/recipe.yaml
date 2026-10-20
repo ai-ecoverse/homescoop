@@ -19,6 +19,13 @@ toolchain:
   wasi-sdk: "34.0"
   wasi_sdk_sha256_linux_x64: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
   wasi_sdk_sha256_macos_arm64: "9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9"
+inputs:
+  - scripts/wasm-refresh-malloc.c
+# homescoop#1287: the initial heap from the measured peak, with headroom.
+wasm:
+  initial-memory: 96MiB
+  measured-peak: 73MiB
+  measured-by: "cert/heap.mjs: the highest block end wasi-libc's malloc handed out (HOMESCOOP_WASM_PEAK, measured in the allocating thread), over 3 rounds of 4 concurrent zig cc -O2 plus zig build-exe -OReleaseFast and a cold @cImport: 73 MiB (with zig's 57 MiB of data and stack below it); 0.16.0-19 on slicc-kernel 1.134.3. Zig's own allocator (BrkAllocator) grows the memory itself, above the initial heap"
 dependencies:
   build: []
   host: []
@@ -45,3 +52,7 @@ about:
     0.16.0-18's 0027: JIT commands (translate-c, which @cImport runs) take
     zig's path from ZIG_EXE on WASI (#1061), and C++ against the wasm32-wasi
     libc++ (built without exceptions) defaults to -fno-exceptions (#1062).
+    0.16.0-19: zig.wasm's link wraps the malloc family with
+    scripts/wasm-refresh-malloc.c (the view refresh for blocks above a
+    thread's view of the shared memory, #1287), and the initial memory is
+    recipe.yaml's wasm.initial-memory.
