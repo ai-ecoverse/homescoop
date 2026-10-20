@@ -64,7 +64,7 @@ jobs:
         target: [wasm32-wasip1, wasm32-wasip1-threads]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
       - name: install the ${{ matrix.target }} target

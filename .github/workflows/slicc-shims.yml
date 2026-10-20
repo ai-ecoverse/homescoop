@@ -42,7 +42,7 @@ jobs:
         working-directory: shims/slicc/test
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '26'
       - name: build the test programs (pinned emsdk)
@@ -56,7 +56,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '26'
       - run: bash scripts/test-install-emsdk.sh
