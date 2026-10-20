@@ -73,6 +73,10 @@ export default async function (ctx) {
   const { run, write, assert } = ctx;
   const split = await abiSplit(ctx);
   const has = (p) => split.loadable.includes(p);
+  // homescoop#1143: the cert installs the published py-* wave of this python's
+  // line, so every one must load; a refused py-* means the wave is missing.
+  // (A new ABI's first build, before its py-* wave, flips this back.)
+  assert.deepEqual(split.refused.map((p) => `${p.name}@${p.version}`), [], `every installed py-* loads on ${split.want.abi}`);
   await write('/home/sidemods_check.py', script(split.loadable));
   const pins = await repin(ctx);
   let r;

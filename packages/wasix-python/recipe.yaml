@@ -34,6 +34,8 @@ sources:
   readline:
     url: "https://ftp.gnu.org/gnu/readline/readline-8.3.tar.gz"
     sha256: "fe5383204467828cd495ee8d1d3c037a7eba1389c22bc6a041f627976f9061cc"
+    mirrors:
+      - "https://mirrors.kernel.org/gnu/readline/readline-8.3.tar.gz"
   ncurses:
     url: "https://mirrors.kernel.org/gnu/ncurses/ncurses-6.5.tar.gz"
     sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
@@ -42,6 +44,8 @@ sources:
   libffi:
     url: "https://github.com/wasix-org/libffi/archive/09cbf7d66d232a01dbb0c88fd5ae65fa9c15f7c7.tar.gz"
     sha256: "7097de0f66f458c2bd44e0e021e449a2572692067f7136791bdd4788330de978"
+    commit: "09cbf7d66d232a01dbb0c88fd5ae65fa9c15f7c7"
+    tree: "a83f4b7e97c78d8cdb9720cee275b1572a59bd93"
 dependencies:
   build: []
   host: []

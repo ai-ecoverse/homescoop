@@ -3,7 +3,9 @@
  * -34, slicc-kernel 1.117.0), per open file description. Up to 3.14.2-25
  * build.sh wrapped flock to a no-op (lock_stubs.c), so a second process's
  * LOCK_EX|LOCK_NB was granted while the first held LOCK_EX.
- * Run on slicc-kernel 1.120.2 (cert/meta.json extra_kernels).
+ * Runs on the cert kernel; engines.slicc-kernel (>=1.122.3) is above
+ * slicc.flock's 1.117.0, so the whole-file fcntl fallback (EBADF for LOCK_EX on
+ * a read-only fd, LOCK_SH on a write-only one; homescoop#1026) can't run.
  */
 const SCRIPT = String.raw`
 import fcntl, json, os, subprocess, sys
@@ -22,6 +24,15 @@ fcntl.flock(ro, fcntl.LOCK_EX)
 out["readonly"] = other("r")
 ro.close()
 out["after_close"] = other("r")
+# homescoop#1026: LOCK_SH on a write-only fd (the old whole-file fcntl
+# fallback needed read access and gave EBADF).
+wo = open(P, "w")
+try:
+    fcntl.flock(wo, fcntl.LOCK_SH)
+    out["writeonly_sh"] = "ok"
+except OSError as e:
+    out["writeonly_sh"] = f"errno {e.errno}"
+wo.close()
 r, w = os.pipe()
 fcntl.flock(w, fcntl.LOCK_EX)
 try:
@@ -44,6 +55,6 @@ export default async function (ctx) {
   const r = await run(['python3', '/tmp/py_flock.py'], { cwd: '/tmp' });
   assert.equal(r.status, 0, `rc=${r.status} ${r.stdout}${r.stderr}`);
   const out = JSON.parse(r.stdout.trim().split('\n').pop());
-  assert.deepEqual(out, { rw: 'refused', rw_after_un: 'granted', readonly: 'refused', after_close: 'granted', pipe_other_end: 'refused', pipe_dup: 'granted' }, r.stdout);
-  console.log(`fcntl.flock through slicc.flock: a second process's LOCK_EX|LOCK_NB is refused while the first holds LOCK_EX and granted after LOCK_UN; LOCK_EX on a read-only file excludes another read-only open until close; a pipe's other end is refused, a dup of the locked end shares it`);
+  assert.deepEqual(out, { rw: 'refused', rw_after_un: 'granted', readonly: 'refused', after_close: 'granted', writeonly_sh: 'ok', pipe_other_end: 'refused', pipe_dup: 'granted' }, r.stdout);
+  console.log(`fcntl.flock through slicc.flock: a second process's LOCK_EX|LOCK_NB is refused while the first holds LOCK_EX and granted after LOCK_UN; LOCK_EX on a read-only file excludes another read-only open until close; LOCK_SH on a write-only file is granted (#1026); a pipe's other end is refused, a dup of the locked end shares it`);
 }

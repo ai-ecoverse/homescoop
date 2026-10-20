@@ -2,6 +2,14 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.0-4
+
+- **`python3 -I` and `-E` work** (homescoop#1144). They used to stop with `No module named 'encodings'`: they ignore `PYTHONHOME`, which the slicc command sets to this package, and nothing else could find the standard library. Python still ignores `PYTHONPATH` and the other variables under `-E`/`-I`.
+- **`venv.create(dir)` and `python -m venv --copies` make a venv that runs** (homescoop#1269). A copied `bin/python` can't find the standard library here: slicc starts a bare copy of `python.wasm` without the command's environment and with only its name as `argv[0]`. On WASI, venv now always symlinks the interpreter, as `python -m venv` already did by default.
+- **Threads that fill or copy freshly allocated memory** no longer risk `memory access out of bounds` while the heap grows (homescoop#1287, wasix-sysroot 2025.9.30-39).
+- **`mprotect`** is exported (it reports ENOSYS: wasm memory has no page protection), so py-matplotlib's `ft2font` resolves every import.
+- **The bytes don't depend on the build machine** (homescoop#1310): `.pyc` record the install path and the build root is fixed.
+
 ## Since 3.15.0-3
 
 **`latest`, the Python 3.15 flip (homescoop#761).** The cp314 line (3.14.2-29 and earlier) stays on npm by exact version; its C-extension py-* don't load on 3.15. See the [release notes](https://github.com/ai-ecoverse/homescoop/blob/main/docs/release-notes/python-3.15.md).

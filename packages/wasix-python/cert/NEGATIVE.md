@@ -1,5 +1,14 @@
 
 
+## 3.15.0-3: -I/-E, copied venvs (3.15.0-4; #1144, #1269; 2026-10-20)
+
+On npm 3.15.0-3 (slicc-kernel 1.125.0, Node entry):
+- `cert/isolated.mjs`: FAIL `python3 -I: rc=1 Could not find platform independent libraries <prefix>` … `No module named 'encodings'`.
+- `cert/venv.mjs`: FAIL `api: rc=1 Could not find platform independent libraries <prefix>` (venv.create's copied bin/python: a bare wasm, started without the command's PYTHONHOME and with `argv[0]` just `python`, so getpath sees `sys.executable = /usr/bin/python` and never reads the venv's `pyvenv.cfg`).
+- `test/side-abi.mjs` against the cp315 wave: `py-matplotlib@3.11.2-13 … missing mprotect` (ft2font), and before the weak-import fix `py-scipy@1.18.1-3 … _ZTHN17HighsTaskExecutor25threadLocalWorkerDequePtrE`, a weak undefined TLS-init wrapper (dylink.0 import flags 0x11) that needs no definition.
+
+3.15.0-4 passes all of them.
+
 ## 3.14.2-24: one binary, no fork, no sigwait (-25, homescoop#357, #520, #740)
 
 npm's 3.14.2-24 on slicc-kernel 1.110.0's Node entry, with wasm-bash, wasm-coreutils and py-numpy 2.3.2-10, 2026-10-16:

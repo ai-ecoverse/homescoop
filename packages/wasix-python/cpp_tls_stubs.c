@@ -17,3 +17,16 @@ __attribute__((visibility("default")))
 int __cxa_thread_atexit_impl(void (*func)(void *), void *arg, void *dso) {
   return __cxa_atexit(func, arg, dso);
 }
+
+/* mprotect: wasix-libc has none, and py-matplotlib's ft2font (HarfBuzz's
+ * hb_blob "make writable in place", configure saw <sys/mman.h>) imports it,
+ * so the import was unresolved (test/side-abi.mjs). WASM memory has no page
+ * protection: report it unsupported, and HarfBuzz falls back to a copy. */
+#include <errno.h>
+#include <stddef.h>
+__attribute__((visibility("default")))
+int mprotect(void *addr, size_t len, int prot) {
+  (void)addr; (void)len; (void)prot;
+  errno = ENOSYS;
+  return -1;
+}
