@@ -33,9 +33,10 @@ fn main() {
         Some("spawn") => spawn(),
         Some("detach") => detach(&rest),
         Some("probe") => probe(&rest),
+        Some("sleep-reap") => sleep_reap(&rest),
         Some("child") => child(&rest),
         _ => {
-            eprintln!("usage: wasix-selftest http|loopback|spawn|detach|child …");
+            eprintln!("usage: wasix-selftest http|loopback|spawn|detach|probe|sleep-reap|child …");
             2
         }
     };
@@ -552,6 +553,27 @@ fn probe(args: &[&str]) -> i32 {
             1
         }
     }
+}
+
+fn sleep_reap(args: &[&str]) -> i32 {
+    let rounds: u32 = args.first().map_or(20, |n| n.parse().expect("rounds"));
+    for round in 0..rounds {
+        let mut kid = me().args(["child", "sleep", "5"]).spawn().unwrap();
+        std::thread::sleep(Duration::from_millis(40));
+        let mut status = None;
+        for _ in 0..200 {
+            status = kid.try_wait().unwrap();
+            if status.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        if status.and_then(|s| s.code()) != Some(0) {
+            fail("sleep-reap", (round, status));
+        }
+    }
+    println!("ok {rounds} sleeps while a child exits");
+    0
 }
 
 fn child(args: &[&str]) -> i32 {
