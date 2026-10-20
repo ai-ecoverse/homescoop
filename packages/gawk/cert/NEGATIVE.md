@@ -42,3 +42,8 @@ proxy rc=2 stderr=gawk: cmd. line:1: warning: remote host and port information (
 The published 5.4.1-3 also has 2 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/gawk.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 5.4.1-4 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 5.4.1-3 too; the negative is the #908 check.
+
+## 5.4.1-5: extensions and -M documented (homescoop#681; 2026-10-20)
+
+There's no behaviour change, so the negative is the documentation: `cert/extensions.mjs` reads the package README and fails on 5.4.1-4's README, which doesn't mention `-i inplace`, `--disable-extensions` or `-M`. The messages it pins come from npm's 5.4.1-4 (slicc-kernel 1.30.0, users enforce) and are unchanged in this build.
+
