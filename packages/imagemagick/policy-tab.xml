@@ -18,4 +18,7 @@
   <policy domain="resource" name="area" value="64MP"/>
   <policy domain="resource" name="width" value="64KP"/>
   <policy domain="resource" name="height" value="64KP"/>
+  <!-- homescoop#1208: MPC persists the pixel cache to a disk file, which disk=0
+       above forbids; refuse it up front with the policy message. -->
+  <policy domain="coder" rights="none" pattern="{MPC,CACHE}"/>
 </policymap>

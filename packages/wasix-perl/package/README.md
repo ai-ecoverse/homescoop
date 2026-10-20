@@ -3,6 +3,8 @@
 Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
 
 - Cross-built with [perl-cross](https://github.com/arsv/perl-cross) + wasixcc against wasix-sysroot
+- Built on wasix-sysroot 2025.9.30-39 (the asyncify tree, for real fork)
+- From wasix-sysroot and slicc-kernel (≥ 1.120.0): user ids, `%SIG` (inherited IGNORE too), signal masks, `flock` (per open file description) and `fcntl` record locks, `mkfifo` and times; file modes via slicc_fs; DynaLoader and all of Encode statically linked
 - Core XS (POSIX, Fcntl, Cwd, Digest::*, Encode, Socket, …) statically linked
 - `fork` / `system` / backticks via WASIX `proc_fork` (asyncify)
 - `PERL5LIB` defaults to package `lib/perl5` plus `~/.local/share/perl5`
@@ -45,6 +47,13 @@ were wasix-libc's values (`0140000` for a FIFO, `0160000` for a socket,
 `S_IFMT` `0160000`), so code comparing raw modes with Linux literals was
 wrong. `-p` and `-S` are unchanged. The build checks that `package.json`'s
 description names the wasix-sysroot it was built on (homescoop#752).
+
+## 5.42.0-21: both licence texts; wasix-sysroot -39
+
+- **Licence:** perl is `Artistic-1.0-Perl OR GPL-1.0-or-later`, and `LICENSE` now carries both texts, perl's `Artistic` and `Copying` (GPL version 1). Up to 5.42.0-20 it held the Artistic text only (homescoop#995).
+- **Sysroot:** built on wasix-sysroot 2025.9.30-39, whose `malloc` refreshes a thread's view of grown shared memory (homescoop#1287). perl is single-threaded, so nothing changes for scripts. Since -37 libc's `S_IF*` bits are Linux's too, the values `patches/0009` already gives.
+- **flock lifetimes:** a lock belongs to its open file description (since -19). It stays held when a forked child that inherited the handle exits, and is freed when the holder closes its last handle on that description or is killed. `cert/flock-lifetime.mjs` checks each case and EINTR (homescoop#1024).
+- **Config:** no `%Config` value names the build machine's paths (since -19; homescoop#848, #850).
 
 ## 5.42.0-15 / -16: flock excludes other processes (up to -18)
 

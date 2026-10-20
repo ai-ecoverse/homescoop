@@ -16,11 +16,10 @@ SRC="$WORK/perl-build"
 STAGE="$WORK/stage"
 PREFIX_INSTALL="$STAGE"
 
-# No wasixcc on PATH (CI runners): install the pinned toolchain, which
-# brings wasix-sysroot (asyncify tree "sysroot" for real fork).
-if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
-  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
-fi
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39
+export HOMESCOOP_WASIX_SYSROOT_SHA=6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934
+eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc-$HOMESCOOP_WASIX_SYSROOT_VERSION")"
+test "$(node -p "require(process.argv[1]).version" "$WASIXCC_SYSROOT_PREFIX/package.json")" = "$HOMESCOOP_WASIX_SYSROOT_VERSION"
 WASM_OPT="${WASM_OPT:-${WASIXCC_BINARYEN_LOCATION:-$HOME/.wasixcc/binaryen}/bin/wasm-opt}"
 
 # GNU sed required: perl-cross cnf/*.sh uses sed -r and \s (BSD sed breaks version detect).
@@ -413,7 +412,7 @@ for s in prove pod2man perldoc cpan pod2text pod2html; do
   fi
 done
 
-homescoop_stage_license "$SRC/Artistic" "$SRC/Copying" "$SRC/LICENSE" "$WORK/perl-build/Artistic"
+homescoop_stage_licenses "$SRC/Artistic" "$SRC/Copying"
 homescoop_notices_begin "perl.wasm statically links the following."
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
 homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version"); files from tag v2026-07-03.1)" \
@@ -424,8 +423,8 @@ homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${W
   "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
 
 SYSROOT_VER="$(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version")"
-if ! node -e 'const d = require(process.argv[1]).description; process.exit(d.includes("wasix-sysroot " + process.argv[2] + ":") || d.includes("wasix-sysroot " + process.argv[2] + ")") ? 0 : 1)' "$DEST/package.json" "$SYSROOT_VER"; then
-  echo "homescoop: package.json's description doesn't name the wasix-sysroot it was built on ($SYSROOT_VER) (homescoop#752)" >&2
+if ! grep -qxF -- "- Built on wasix-sysroot $SYSROOT_VER (the asyncify tree, for real fork)" "$DEST/README.md"; then
+  echo "homescoop: package/README.md doesn't name the wasix-sysroot it was built on ($SYSROOT_VER) (homescoop#752)" >&2
   exit 1
 fi
 

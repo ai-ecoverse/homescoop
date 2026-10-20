@@ -1,0 +1,29 @@
+--- a/MagickCore/timer.c
++++ b/MagickCore/timer.c
+@@ -211,7 +211,7 @@
+ #define NANOSECONDS_PER_SECOND  1000000000.0
+ #if defined(CLOCK_HIGHRES)
+ #  define CLOCK_ID CLOCK_HIGHRES
+-#elif defined(CLOCK_MONOTONIC_RAW)
++#elif defined(CLOCK_MONOTONIC_RAW) && !defined(__EMSCRIPTEN__)
+ #  define CLOCK_ID CLOCK_MONOTONIC_RAW
+ #elif defined(CLOCK_MONOTONIC_PRECISE)
+ #  define CLOCK_ID CLOCK_MONOTONIC_PRECISE
+@@ -222,9 +222,15 @@
+ #endif
+ 
+   struct timespec 
+-    timer;
++    timer = { 0, 0 };
+ 
+-  (void) clock_gettime(CLOCK_ID,&timer);
++  /*
++    homescoop#679: Emscripten's clock_gettime knows only the four WASI clocks
++    and fails on CLOCK_MONOTONIC_RAW, which left timer uninitialized and
++    identify printing elapsed times like 4294967295:36.000.
++  */
++  if (clock_gettime(CLOCK_ID,&timer) != 0)
++    return(0.0);
+   return((double) timer.tv_sec+timer.tv_nsec/NANOSECONDS_PER_SECOND);
+ #elif defined(MAGICKCORE_HAVE_TIMES) && defined(MAGICKCORE_HAVE_SYSCONF)
+   struct tms

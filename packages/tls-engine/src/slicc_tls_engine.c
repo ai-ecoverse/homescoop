@@ -107,6 +107,11 @@ EMSCRIPTEN_KEEPALIVE int tls_last_error(void) { return last_error; }
  * 3.6's words). */
 static const char *crypto_strerror(int code) {
   switch (code) {
+    /* The engine's own codes first: -1 to -3 are also Mbed TLS's low-level
+     * HMAC_DRBG codes (homescoop#1091), which the engine never returns. */
+    case TLS_EOF: return "tls-engine - the peer closed the connection (TLS_EOF)";
+    case TLS_NOMEM: return "tls-engine - out of memory (TLS_NOMEM)";
+    case TLS_BADARG: return "tls-engine - bad argument (TLS_BADARG)";
     case PSA_ERROR_GENERIC_ERROR: return "PSA - Generic error";
     case PSA_ERROR_NOT_PERMITTED: return "PSA - Not permitted";
     case PSA_ERROR_NOT_SUPPORTED: return "PSA - Not supported";
@@ -470,14 +475,18 @@ static int parse_alpn(session *s, const unsigned char *wire, size_t len) {
  * 0, 0). Verification is required unless flags has
  * TLS_CLIENT_INSECURE_SKIP_VERIFY, which still records the result
  * (tls_verify_result). TLS 1.2 or 1.3, no renegotiation, no resumption. */
-EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
-                                             const unsigned char *alpn, size_t alpn_len, int flags) {
+EMSCRIPTEN_KEEPALIVE session *tls_client_new_name(ca *trust, const unsigned char *servername,
+                                                  size_t servername_len, const unsigned char *alpn,
+                                                  size_t alpn_len, int flags) {
   if (init() != 0) return NULL;
   int insecure = (flags & TLS_CLIENT_INSECURE_SKIP_VERIFY) != 0;
   int chain_only = (flags & TLS_CLIENT_VERIFY_CHAIN_ONLY) != 0;
-  if ((flags & ~TLS_CLIENT_FLAGS) != 0 || (insecure && chain_only) || !servername ||
-      strlen(servername) >= sizeof(((session *)0)->host) ||
-      (!insecure && (!trust || servername[0] == 0))) {
+  /* The name is servername_len bytes, not a C string: a NUL inside it is
+   * refused, never cut at (homescoop#1042). */
+  if ((flags & ~TLS_CLIENT_FLAGS) != 0 || (insecure && chain_only) ||
+      (servername_len > 0 && !servername) || servername_len >= sizeof(((session *)0)->host) ||
+      (servername_len > 0 && memchr(servername, 0, servername_len) != NULL) ||
+      (!insecure && (!trust || servername_len == 0))) {
     last_error = TLS_BADARG;
     return NULL;
   }
@@ -486,7 +495,8 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
     last_error = TLS_NOMEM;
     return NULL;
   }
-  strcpy(s->host, servername);
+  if (servername_len > 0) memcpy(s->host, servername, servername_len);
+  s->host[servername_len] = 0;
   s->flags = flags;
   s->ip_len = name_parse(s->host, s->ip);
   mbedtls_ssl_init(&s->ssl);
@@ -521,11 +531,37 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
   return s;
 }
 
+/* The C-string form: the name ends at its first NUL. Callers whose name may
+ * hold one (from JS) use tls_client_new_name. */
+EMSCRIPTEN_KEEPALIVE session *tls_client_new(ca *trust, const char *servername,
+                                             const unsigned char *alpn, size_t alpn_len, int flags) {
+  if (!servername) {
+    if (init() != 0) return NULL;
+    last_error = TLS_BADARG;
+    return NULL;
+  }
+  return tls_client_new_name(trust, (const unsigned char *)servername, strlen(servername), alpn,
+                             alpn_len, flags);
+}
+
 /* The client's own chain (concatenated DER, its leaf first) and private key
  * (PEM or DER; `pass` decrypts an encrypted one), before the first
  * handshake: 0, or < 0. The key must match the leaf. The caller's buffers
  * hold key material: the engine wipes the key and passphrase bytes it was
  * given once parsed, and frees (zeroizes) its copy with the session. */
+/* Whether the private key carries the certificate's public key, compared as
+ * DER SubjectPublicKeyInfo. mbedtls_pk_check_pair refuses an RSA key parsed
+ * from PKCS#8 under Mbed TLS 4's PSA-backed pk though it matches
+ * (homescoop#1121); a key for another certificate still differs here. */
+static int same_public_key(mbedtls_pk_context *cert, mbedtls_pk_context *key) {
+  static unsigned char a[2048], b[2048];
+  int na = mbedtls_pk_write_pubkey_der(cert, a, sizeof a);
+  int nb = mbedtls_pk_write_pubkey_der(key, b, sizeof b);
+  int same = na > 0 && na == nb && memcmp(a + sizeof a - na, b + sizeof b - nb, (size_t)na) == 0;
+  mbedtls_platform_zeroize(b, sizeof b);
+  return same;
+}
+
 EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain, size_t chain_len,
                                          unsigned char *key, size_t key_len, unsigned char *pass,
                                          size_t pass_len) {
@@ -548,7 +584,9 @@ EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain,
     at += whole;
   }
   ret = mbedtls_pk_parse_key(&s->own_key, key, key_len, pass_len ? pass : NULL, pass_len);
-  if (ret == 0 && mbedtls_pk_check_pair(&s->own_chain.pk, &s->own_key) != 0) ret = TLS_BADARG;
+  if (ret == 0 && mbedtls_pk_check_pair(&s->own_chain.pk, &s->own_key) != 0 &&
+      !same_public_key(&s->own_chain.pk, &s->own_key))
+    ret = TLS_BADARG;
   if (ret == 0) ret = mbedtls_ssl_conf_own_cert(&s->config, &s->own_chain, &s->own_key);
 done:
   if (key) mbedtls_platform_zeroize(key, key_len);

@@ -9,7 +9,8 @@
     "the relinked magick.wasm validates, is within 2% of kit.json's size, has kit.json's import and export hashes (the binary the kit's objects made in the runtime build), a name section and no DWARF; the glue has callMain",
     "ldflags.txt names only files in the kit (every --js-library in js/, no build-host path, homescoop#398); README.md's Relinking section, which THIRD-PARTY-NOTICES.md cites, names every static library of each kit (homescoop#564)",
     "binding (homescoop#678): each kit's kit.json names the runtime package of the same version byte for byte: its bin/magick.wasm has kit.json's sha256, its package.json says homescoop.relink @ai-ecoverse/wasm-imagemagick-relink and its THIRD-PARTY-NOTICES.md names @ai-ecoverse/wasm-imagemagick-relink@<version>. The runtime is the same ladder-pr run's host-<recipe>-prN artifact (peers, .homescoop-out/peers; cert-review: HOMESCOOP_CERT_PEERS=$RUNNER_TEMP/artifacts), else the registry's <runtime>@<version>, else the check fails (no runtime of that version). Versions: this package, packages/imagemagick and packages/imagemagick-heif and both kit.json are one version (build.sh and relink-check.mjs fail otherwise)",
-    "7.1.2-34-9.1 (homescoop#562, #624): the kits' objects carry write-temp-then-rename.patch (MagickCore/constitute.c) and mogrify-format-over-existing.patch (MagickWand/mogrify.c); relink-check.mjs relinks both kits as before"
+    "7.1.2-34-9.1 (homescoop#562, #624): the kits' objects carry write-temp-then-rename.patch (MagickCore/constitute.c) and mogrify-format-over-existing.patch (MagickWand/mogrify.c); relink-check.mjs relinks both kits as before",
+    "7.1.2-34-9.2 (homescoop#561, #586, #679, #1208, #1258): the kits' objects carry timer-monotonic-emscripten.patch, jp2-tile-large.patch and the owner check in write-temp-then-rename.patch; relink-check.mjs relinks both kits as before"
   ],
   "ci": [
     "node packages/imagemagick-relink/cert/relink-check.mjs"
