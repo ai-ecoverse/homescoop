@@ -50,6 +50,12 @@ export interface TlsEngineModule {
    * what the skipped check found. Every other combination than 0, 1, 2, 4, 1|2 and 2|4 is refused.
    */
   _tls_client_new(ca: number, servername: number, alpn: number, alpnLen: number, flags: number): number;
+  /**
+   * The same with the server name as `servernameLen` bytes at `servername` (UTF-8, no NUL
+   * needed): a NUL byte inside the name is refused with TLS_BADARG, never cut at
+   * (homescoop#1042, 4.2.0-6). Prefer it over _tls_client_new for names that come from JS.
+   */
+  _tls_client_new_name(ca: number, servername: number, servernameLen: number, alpn: number, alpnLen: number, flags: number): number;
   /** 1 when the handshake is done, 0 when it needs more ciphertext, < 0 an error. */
   _tls_handshake(session: number): number;
   /** MBEDTLS_X509_BADCERT_* flags: 0 verified, -1 no certificate yet. */
