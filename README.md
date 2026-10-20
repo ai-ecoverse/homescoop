@@ -75,7 +75,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-bash`](https://www.npmjs.com/package/@ai-ecoverse/wasm-bash) | [recipe](packages/bash) | GNU bash 5.3, the shell for slicc: line editing, history, completion and job control |
 | [`@ai-ecoverse/wasm-binutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binutils) | [recipe](packages/binutils) | GNU binutils strings, size and readelf for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-bzip2`](https://www.npmjs.com/package/@ai-ecoverse/wasm-bzip2) | [recipe](packages/bzip2) | bzip2 1.0.8 (bzip2/bunzip2/bzcat/bzip2recover + libbz2) for wasm / slicc |
-| [`@ai-ecoverse/wasm-cmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-cmake) | [recipe](packages/cmake) | CMake 4.4.3 for wasm / slicc (WASI host + slicc_poll for libuv) |
+| [`@ai-ecoverse/wasm-cmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-cmake) | [recipe](packages/cmake) | CMake, the build system generator, to configure and build C and C++ projects in slicc. |
 | [`@ai-ecoverse/wasm-coreutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-coreutils) | [recipe](packages/coreutils) | GNU coreutils (single-binary) for slicc (WASM / emscripten, SLICC homescoop; user ids from slicc-kernel >= 1.44.0) |
 | [`@ai-ecoverse/wasm-curl`](https://www.npmjs.com/package/@ai-ecoverse/wasm-curl) | [recipe](packages/curl) | curl 8.22 + libcurl (Mbed TLS, zlib, HTTP/1.1) for wasm / slicc |
 | [`@ai-ecoverse/wasm-diffutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-diffutils) | [recipe](packages/diffutils) | GNU diffutils 3.12 (diff/cmp/diff3/sdiff) for wasm / slicc |

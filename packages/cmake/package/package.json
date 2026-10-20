@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-cmake",
-  "version": "4.4.3-10",
-  "description": "CMake 4.4.3 for wasm / slicc (WASI host + slicc_poll for libuv)",
+  "version": "4.4.3-11",
+  "description": "CMake, the build system generator, to configure and build C and C++ projects in slicc.",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
@@ -19,6 +19,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin",
     "share"
   ],

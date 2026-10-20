@@ -15,3 +15,17 @@ The build itself is emcmake from the patched emscripten 6.0.9 tree, linked again
 AssertionError: cmake.wasm does not import slicc_cred_js (today's shims/slicc)
 ```
 -9's `-E`, `-P`/`execute_process`, configure and gmake build rows pass. Its shims predate the credential library (#459) and the inherited-ignore seed (#973), so its glue names neither `slicc_cred_js` nor `slicc_sig_inherited_js`. 4.4.3-10 passes every row.
+
+## 4.4.3-11: the burn-down (homescoop#1278, #1279, #1280, #844; 2026-10-20)
+
+On slicc-kernel 1.110.7, users enforce, the published 4.4.3-10 gives:
+
+| case | 4.4.3-10 | 4.4.3-11 |
+|---|---|---|
+| `project(… LANGUAGES NONE)`: `CMAKE_SYSTEM_NAME`, `WASI`, `UNIX` (#1278) | `Linux`, `WASI=`, `UNIX=1` | `WASI`, `WASI=1`, `UNIX=` |
+| `file(DOWNLOAD http://cert.test/f.txt …)` (#1280) | no result in 15 minutes | `0`, the served bytes |
+| `file(DOWNLOAD https://…)` (#1280) | — | `1;"Unsupported protocol"` (documented) |
+| `THIRD-PARTY-NOTICES.md` (#1279, #844) | missing | Emscripten plus 12 bundled libraries |
+
+- **#1278, the cause:** today's `shims/slicc` sends `uname()` to the kernel, which answers `Linux 6.0.0-slicc`. CMakeDetermineSystem also runs `uname -r`/`-m` after the patch's old position. The patch now runs after that detection, and maps both Emscripten and a Linux whose version names slicc to WASI.
+- **#1280, the cause:** cmake.wasm didn't link `slicc_socket.c`, so CMake's curl used Emscripten's WebSocket sockets, which go nowhere in slicc. It's linked now. https needs a TLS backend for CMake's bundled curl, which this package doesn't have; the README says so and gives the workaround.
