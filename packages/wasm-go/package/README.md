@@ -28,3 +28,7 @@ Install with `@ai-ecoverse/wasm-go-std-wasip1` (and optionally
 pnpm add -g @ai-ecoverse/wasm-go @ai-ecoverse/wasm-go-std-wasip1
 go version
 ```
+
+## Licence
+
+Go is BSD-3-Clause (`LICENSE`), and Google's additional patent grant ships next to it as `PATENTS`, both from Go's source tree. Up to 1.27.2-1 the package carried `LICENSE` alone (homescoop#897).

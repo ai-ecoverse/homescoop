@@ -68,12 +68,9 @@ rm -rf "$DEST"
 mkdir -p "$DEST/pkg"
 cp -R "$OUT/goroot/pkg/wasip1_wasm" "$DEST/pkg/wasip1_wasm"
 
-if [[ -f "$(go env GOROOT)/LICENSE" ]]; then
-  homescoop_stage_license "$(go env GOROOT)/LICENSE"
-else
-  curl -fsSL "https://raw.githubusercontent.com/golang/go/go${VER}/LICENSE" \
-    -o "$HOMESCOOP_PKG/package/LICENSE"
-fi
+homescoop_stage_license "$GO_SRC/LICENSE"
+cp "$GO_SRC/PATENTS" "$HOMESCOOP_PKG/package/PATENTS"
+grep -q '^Additional IP Rights Grant (Patents)$' "$HOMESCOOP_PKG/package/PATENTS"
 
 echo "== wasm-go-std-wasip1: staged → $HOMESCOOP_PKG/package ($WANT)"
 echo "== note: if npm pack > 40 MiB gzipped, split this recipe further"
