@@ -85,3 +85,7 @@ Dockerfile on every build.
 
 There's no published negative for the trap: the 2.5.15-4 stress probe (3 × biome check of 400 files and 1 × 3000 files, kernel 1.132.1) didn't trap, and the trap is a V8 race (slicc-kernel#1172) that azw9's canary and wasi-pnpm's loop showed at 5–12% of rounds under heavier allocation. The row fixes 0 traps in 8 rounds and the memory staying within the recorded initial heap. Probes: 400 files peak at 21 MB (VmSize), 3000 files at 98,496 kB, hence 128 MiB.
 
+## 2.5.15-6: homescoop.patches (homescoop#1347, 2026-10-20)
+
+The published 2.5.15-5's `package.json` lists `homescoop.patches: ["0001-wasi-cli.patch"]`, while its build applied 0001 and 0002. `scripts/check-package-meta.mjs` now compares the list with the recipe's patches, and fails 2.5.15-5's package.json. The binary doesn't change.
+
