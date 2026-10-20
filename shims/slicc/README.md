@@ -76,3 +76,10 @@ cd shims/slicc/test && ./build.sh && npm ci && npm test
   the link. Without `--wrap`, plain definitions fail to link (`duplicate
   symbol: getpwnam`, `getpwuid`, `getpwent`), and linking the archive
   without the wrap flags leaves those three on the stubs (`uid none`).
+
+## Licence notice
+
+The shims are homescoop's code, under the repo's Apache-2.0 `LICENSE`. Every wasm that links a `homescoop_slicc_archive` carries them, so its `THIRD-PARTY-NOTICES.md` has a `## homescoop: the slicc shims (shims/slicc, Apache-2.0)` section with that text (homescoop#853):
+- **Writing it:** `homescoop_notice_emscripten` adds the section by itself when the build made a shims archive. Call `homescoop_notice_slicc_shims ["<what>"]` before it to name more homescoop code in the same heading (procps names `wasm-stubs.c`). The section is written once.
+- **Checking it:** `check-package-meta.mjs` fails a build whose wasm links the shims (it holds `slicc_sig_mask`) without that section and its Apache-2.0 text. `scripts/test/shim-notice.test.mjs` checks that every build script that makes an archive calls one of the two helpers after it.
+- **Older tarballs:** a package shows the section from its next build. Packages published before then don't have it.
