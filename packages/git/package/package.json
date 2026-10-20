@@ -1,9 +1,9 @@
 {
   "name": "@ai-ecoverse/wasm-git",
-  "version": "2.55.0-17",
-  "description": "Git for slicc (emscripten ABI; user names and ids from slicc-kernel >= 1.47.1)",
+  "version": "2.55.0-18",
+  "description": "Git version control: clone, commit, branch, merge, push and pull.",
   "engines": {
-    "slicc-kernel": ">=1.47.1"
+    "slicc-kernel": ">=1.130.2"
   },
   "license": "GPL-2.0-only",
   "repository": {
@@ -28,7 +28,8 @@
     "share"
   ],
   "dependencies": {
-    "@ai-ecoverse/wasm-bash": "5.3.0-19"
+    "@ai-ecoverse/wasm-bash": "5.3.0-22",
+    "@ai-ecoverse/wasm-sed": "4.10.0-5"
   },
   "publishConfig": {
     "access": "public"
@@ -54,15 +55,18 @@
       },
       "git-remote-http": {
         "glue": "bin/git-remote-http",
-        "wasm": "bin/git-remote-http.wasm"
+        "wasm": "bin/git-remote-http.wasm",
+        "helper": true
       },
       "git-remote-https": {
         "glue": "bin/git-remote-https",
-        "wasm": "bin/git-remote-https.wasm"
+        "wasm": "bin/git-remote-https.wasm",
+        "helper": true
       },
       "git-shell": {
         "glue": "bin/git-shell",
-        "wasm": "bin/git-shell.wasm"
+        "wasm": "bin/git-shell.wasm",
+        "helper": true
       },
       "scalar": {
         "glue": "bin/scalar",
@@ -75,7 +79,8 @@
         "env": {
           "GIT_EXEC_PATH": "libexec/git-core",
           "GIT_TEMPLATE_DIR": "share/git-core/templates"
-        }
+        },
+        "helper": true
       },
       "git-receive-pack": {
         "glue": "bin/git-receive-pack",
@@ -84,7 +89,8 @@
         "env": {
           "GIT_EXEC_PATH": "libexec/git-core",
           "GIT_TEMPLATE_DIR": "share/git-core/templates"
-        }
+        },
+        "helper": true
       }
     }
   }

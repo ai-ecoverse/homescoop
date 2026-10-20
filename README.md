@@ -84,7 +84,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-findutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-findutils) | [recipe](packages/findutils) | GNU findutils 4.11.0 (find + xargs) for wasm / slicc |
 | [`@ai-ecoverse/wasm-freetype`](https://www.npmjs.com/package/@ai-ecoverse/wasm-freetype) | [recipe](packages/freetype) | FreeType font engine (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-gawk`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gawk) | [recipe](packages/gawk) | GNU awk for slicc (WASM / emscripten, SLICC homescoop) |
-| [`@ai-ecoverse/wasm-git`](https://www.npmjs.com/package/@ai-ecoverse/wasm-git) | [recipe](packages/git) | Git for slicc (emscripten ABI; user names and ids from slicc-kernel >= 1.47.1) |
+| [`@ai-ecoverse/wasm-git`](https://www.npmjs.com/package/@ai-ecoverse/wasm-git) | [recipe](packages/git) | Git version control: clone, commit, branch, merge, push and pull. |
 | [`@ai-ecoverse/wasm-gmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gmake) | [recipe](packages/gmake) | GNU make for slicc (rebuild sweep wasix-sysroot 2025.9.30-14; emscripten ABI) |
 | [`@ai-ecoverse/wasm-grep`](https://www.npmjs.com/package/@ai-ecoverse/wasm-grep) | [recipe](packages/grep) | GNU grep for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-gzip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gzip) | [recipe](packages/gzip) | GNU gzip 1.15 for wasm / slicc (emscripten) |
