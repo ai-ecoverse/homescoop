@@ -1,7 +1,7 @@
 {
   "harness": "slicc-kernel",
   "users": "enforce",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.132.1",
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
