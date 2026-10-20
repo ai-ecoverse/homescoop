@@ -36,12 +36,12 @@ EMXX=(python3 "$EMSCRIPTEN_TREE/em++.py")
 EMAR=(python3 "$EMSCRIPTEN_TREE/emar.py")
 MAPS="-ffile-prefix-map=$SRC=/cmake -ffile-prefix-map=$BLD=/cmake/build"
 
-echo "== cmake: libslicc (spawn, exec, signals, libc gaps with credentials, select/poll)"
+echo "== cmake: libslicc (spawn, exec, signals, libc gaps with credentials, select/poll, sockets for file(DOWNLOAD))"
 ODIR="$WORK/cmake-slicc-objs"
 rm -rf "$ODIR"
 mkdir -p "$ODIR"
 objs=()
-for src in slicc_spawn slicc_exec slicc_libc_gaps slicc_signals slicc_select; do
+for src in slicc_spawn slicc_exec slicc_libc_gaps slicc_signals slicc_select slicc_socket; do
   "${EMCC[@]}" -O2 -c "$ROOT/shims/slicc/${src}.c" -o "$ODIR/${src}.o"
   objs+=("$ODIR/${src}.o")
 done
@@ -118,6 +118,33 @@ chmod +x "$PKG/bin/cmake"
 cp -R "$SRC/Modules" "$PKG/share/cmake-$SERIES/Modules"
 cp -R "$SRC/Templates" "$PKG/share/cmake-$SERIES/Templates"
 cp "$SRC/LICENSE.rst" "$PKG/LICENSE"
+
+# THIRD-PARTY-NOTICES.md (homescoop#844, #1279): the Emscripten runtime and
+# every CMake-bundled library the cmake target links (Utilities/cm*, from
+# link.txt and linkLibs.rsp), each with its licence file from the source tree.
+homescoop_notices_begin "cmake.wasm statically links the following."
+homescoop_notice "Emscripten 6.0.9 (runtime and system libraries)" \
+  "$EMSCRIPTEN_TREE/LICENSE" - \
+  "$EMSCRIPTEN_TREE/system/lib/libc/musl/COPYRIGHT" - \
+  "$EMSCRIPTEN_TREE/system/lib/libcxx/LICENSE.TXT" -
+BUNDLED=()
+while IFS= read -r lib; do BUNDLED+=("$lib"); done < <(grep -ohE "Utilities/cm[a-z0-9]+" "$BLD/Source/CMakeFiles/cmake.dir/link.txt" "$BLD/Source/CMakeFiles/cmake.dir/linkLibs.rsp" | sed 's|Utilities/||' | sort -u)
+test "${#BUNDLED[@]}" -gt 5
+for lib in "${BUNDLED[@]}"; do
+  files=()
+  for f in COPYING LICENSE Copyright.txt NOTICE; do
+    [[ -f "$SRC/Utilities/$lib/$f" ]] && files+=("$SRC/Utilities/$lib/$f" -)
+  done
+  if [[ "${#files[@]}" -eq 0 ]] && grep -q 'OSI-approved BSD 3-Clause License' "$SRC/Utilities/$lib"/*.h; then
+    files+=("$SRC/LICENSE.rst" -)
+  fi
+  if [[ "${#files[@]}" -eq 0 ]]; then
+    echo "homescoop: Utilities/$lib is linked into cmake.wasm but has no licence file (homescoop#1279)" >&2
+    exit 1
+  fi
+  homescoop_notice "$lib (CMake's bundled copy, Utilities/$lib)" "${files[@]}"
+done
+echo "== cmake: notices for the Emscripten runtime and ${#BUNDLED[@]} bundled libraries: ${BUNDLED[*]}"
 node -e '
 const j = require(process.argv[1]);
 const want = "${package}/share/cmake-" + process.argv[2];

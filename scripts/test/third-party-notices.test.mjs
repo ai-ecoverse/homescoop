@@ -33,8 +33,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Today's violations: "<package> <component> #<issue>", one per line.
 // Shrink this list; never add to it without an issue.
 const ALLOWLIST = `
-cmake Emscripten #844
-cmake files #844
 wasm-binaryen Emscripten #844
 wasm-binaryen files #844
 `;
