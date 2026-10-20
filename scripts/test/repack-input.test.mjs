@@ -21,7 +21,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MAX_DEPTH, buildFiles, fetchesPinnedSource, fixtureReader, fixtureRegistry, prebuiltInputs, repackInput, resolveRef } from '../cert-review/repack-input.mjs';
+import { GITHUB_HOSTED, MAX_DEPTH, buildFiles, checkProvenance, fetchesPinnedSource, fixtureReader, fixtureRegistry, prebuiltInputs, repackInput, resolveRef } from '../cert-review/repack-input.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, 'fixtures/repack-input');
@@ -184,6 +184,33 @@ test('NEGATIVE: provenance that is not for these bytes, or not from ladder-build
     assert.equal(r.attested, false);
     assert.match(r.reason, why);
   }
+});
+
+test('checkProvenance takes another repository, workflow and ref, and can require a GitHub-hosted builder', () => {
+  const repo = 'https://github.com/ai-ecoverse/slicc-kernel';
+  const integrity = `sha512-${Buffer.from('ab'.repeat(64), 'hex').toString('base64')}`;
+  const doc = (edit = () => {}) => {
+    const statement = {
+      subject: [{ name: 'pkg:npm/%40ai-ecoverse/slicc-kernel@1.0.0', digest: { sha512: 'ab'.repeat(64) } }],
+      predicate: {
+        buildDefinition: {
+          externalParameters: { workflow: { repository: repo, path: '.github/workflows/release.yml', ref: 'refs/heads/main' } },
+          resolvedDependencies: [{ uri: `git+${repo}@refs/heads/main`, digest: { gitCommit: 'c'.repeat(40) } }],
+        },
+        runDetails: { builder: { id: GITHUB_HOSTED }, metadata: { invocationId: 'run' } },
+      },
+    };
+    edit(statement);
+    return { attestations: [{ predicateType: 'https://slsa.dev/provenance/v1', bundle: { dsseEnvelope: { payload: Buffer.from(JSON.stringify(statement)).toString('base64') } } }] };
+  };
+  const opts = { npm: '@ai-ecoverse/slicc-kernel', version: '1.0.0', integrity, repo, workflows: ['.github/workflows/release.yml'], hosted: true };
+  assert.deepEqual(checkProvenance(doc(), opts), { ok: true, reason: '', commit: 'c'.repeat(40), run: 'run', builder: GITHUB_HOSTED });
+  assert.match(checkProvenance(doc(), { ...opts, repo: undefined, workflows: undefined }).reason, /slicc-kernel, not https:\/\/github.com\/ai-ecoverse\/homescoop/);
+  const selfHosted = doc((s) => (s.predicate.runDetails.builder.id = 'https://github.com/actions/runner/self-hosted'));
+  assert.match(checkProvenance(selfHosted, opts).reason, /self-hosted, not GitHub-hosted/);
+  assert.equal(checkProvenance(selfHosted, { ...opts, hosted: false }).ok, true);
+  const noCommit = doc((s) => (s.predicate.buildDefinition.resolvedDependencies = []));
+  assert.match(checkProvenance(noCommit, opts).reason, /names no slicc-kernel commit/);
 });
 
 test('NEGATIVE: an unattested repack in the middle of the chain breaks it', async () => {

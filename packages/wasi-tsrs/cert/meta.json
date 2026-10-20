@@ -1,0 +1,19 @@
+{
+  "harness": "slicc-kernel",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.132.1",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "checklist": [
+    "tsrs --version → Version 7.1.0-dev (tsrs 0.18.0-ts7.1.0-dev.20260929, microsoft/TypeScript@b85298b6a81f)",
+    "tsrs --noEmit -p . on a multi-file project (tsconfig.json, nested dir, @types package in node_modules) → exit 0, no output, nothing emitted",
+    "tsrs -p . → exit 0; dist/*.js without types and dist/*.d.ts declarations",
+    "a return type changed in math.ts → --noEmit exits 2 (TypeScript 7.1's status; wasi-typescript's 7.0 exits 1) with TS2322 in src/index.ts and TS2362 in src/shapes/area.ts (cross-file), none in math.ts",
+    "the same errors with emit → exit 2, output still written",
+    "tsrs -p /home/nothere → exit 1, error TS5058",
+    "users enforce: alice checking bob's project with a 0600 file gets TS2307 for it (rc 2, no secret printed), emitting into his project fails TS5033 Permission denied and writes nothing; bob is refused alice's 0700 home (TS5058); each user's output is theirs; root checks everything",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md is installed, has the Rust 1.99.1 standard library section and exactly one wasi-libc section, headed wasi-sdk-33"
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-bind",
-  "version": "9.20.29-1",
-  "description": "BIND 9.20 dig, host and nslookup for slicc WASIX",
+  "version": "9.20.29-2",
+  "description": "BIND 9.20 dig, host and nslookup: DNS lookup tools.",
   "license": "MPL-2.0",
   "engines": {
     "slicc-kernel": ">=1.96.0"

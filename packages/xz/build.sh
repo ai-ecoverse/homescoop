@@ -66,8 +66,17 @@ for s in xzgrep xzdiff xzless; do
         -e 's|@enable_path_for_scripts@||g' \
         -e 's|@XZ@|xz|g' \
         -e 's|@XZDEC@|xz|g' \
+        -e 's|@xz@|xz|g' \
+        -e "s|@PACKAGE_VERSION@|$VER|g" \
+        -e 's|@PACKAGE_BUGREPORT@|xz@tukaani.org|g' \
         "$src_in" > "$PKG_BIN/$s"
     chmod +x "$PKG_BIN/$s"
+    # homescoop#537: 5.8.4-1..-4 shipped @xz@ unsubstituted ("@xz@: command
+    # not found"); every @VAR@ must be gone.
+    if grep -nE '@[A-Za-z_]+@' "$PKG_BIN/$s"; then
+      echo "xz: $s still has an unsubstituted @VAR@" >&2
+      exit 1
+    fi
   fi
 done
 

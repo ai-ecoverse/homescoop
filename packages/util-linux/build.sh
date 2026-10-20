@@ -9,7 +9,7 @@ homescoop_load_recipe util-linux
 
 TB="$WORK/util-linux-$VERSION.tar.xz"
 SRC="$WORK/util-linux-$VERSION"
-PROGS=(rev column hexdump colrm look getopt)
+PROGS=(rev column hexdump colrm look getopt flock)
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC"; fi
@@ -17,17 +17,19 @@ homescoop_extract "$TB" "$SRC"
 homescoop_apply_patches "$SRC"
 
 SLICC_A="$WORK/libslicc-util-linux.a"
-homescoop_slicc_archive "$SLICC_A" gaps
+# spawn: flock(1) starts its command with posix_spawnp (flock-slicc.patch,
+# homescoop#977).
+homescoop_slicc_archive "$SLICC_A" spawn
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=262144 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
+CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
 
-# --disable-all-programs also forces rev, colrm, look, getopt and column off,
+# --disable-all-programs also forces rev, colrm, look, getopt, column and flock off,
 # and they have no --enable-<name> to turn them back on (UL_BUILD_INIT with
-# yes/check). Let those five ignore the all-programs default (enable=yes
+# yes/check). Let those six ignore the all-programs default (enable=yes
 # too, or UL_REQUIRES_BUILD turns column back off).
-perl -0pi -e 's/enable_(rev|colrm|look|getopt|column)=\$ul_default_estate(\n\s*build_\1=yes\n\s*if test "x\$ul_default_estate" = xno)(?! &&)/enable_$1=yes$2 && false/g' "$SRC/configure"
-[[ "$(grep -c '= xno && false' "$SRC/configure")" == 5 ]] || {
-  echo "util-linux: configure patch for rev/colrm/look/getopt/column did not apply" >&2
+perl -0pi -e 's/enable_(rev|colrm|look|getopt|column|flock)=\$ul_default_estate(\n\s*build_\1=yes\n\s*if test "x\$ul_default_estate" = xno)(?! &&)/enable_$1=yes$2 && false/g' "$SRC/configure"
+[[ "$(grep -c '= xno && false' "$SRC/configure")" == 6 ]] || {
+  echo "util-linux: configure patch for rev/colrm/look/getopt/column/flock did not apply" >&2
   exit 1
 }
 
@@ -38,7 +40,7 @@ NOSYS="$SRC/homescoop-nosyscall.h"
 {
   echo '#include <sys/syscall.h>'
   grep -rhoE '\b(SYS|__NR)_[a-z0-9_]+' "$SRC"/include "$SRC"/lib "$SRC"/text-utils \
-    "$SRC"/misc-utils "$SRC"/libsmartcols | sort -u | sed 's/^/#undef /'
+    "$SRC"/misc-utils "$SRC"/sys-utils "$SRC"/libsmartcols | sort -u | sed 's/^/#undef /'
 } > "$NOSYS"
 
 if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then

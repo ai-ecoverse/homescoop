@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-binaryen",
-  "version": "132.0.0-4",
-  "description": "Binaryen 132 wasm tools for slicc (wasm-opt and friends)",
+  "version": "132.0.0-5",
+  "description": "Binaryen's wasm-opt and other WebAssembly tools, which Emscripten uses to optimize and finish its output.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -20,6 +20,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "bin"
   ],
   "publishConfig": {
@@ -40,17 +41,20 @@
       "wasm-metadce": {
         "glue": "bin/wasm-metadce",
         "wasm": "bin/wasm-metadce.wasm",
-        "argv0": "wasm-metadce"
+        "argv0": "wasm-metadce",
+        "helper": true
       },
       "wasm-emscripten-finalize": {
         "glue": "bin/wasm-emscripten-finalize",
         "wasm": "bin/wasm-emscripten-finalize.wasm",
-        "argv0": "wasm-emscripten-finalize"
+        "argv0": "wasm-emscripten-finalize",
+        "helper": true
       },
       "wasm-ctor-eval": {
         "glue": "bin/wasm-ctor-eval",
         "wasm": "bin/wasm-ctor-eval.wasm",
-        "argv0": "wasm-ctor-eval"
+        "argv0": "wasm-ctor-eval",
+        "helper": true
       },
       "wasm-split": {
         "glue": "bin/wasm-split",

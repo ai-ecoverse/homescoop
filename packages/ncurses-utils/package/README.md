@@ -18,3 +18,7 @@ linux, dumb, screen, screen-256color, tmux, tmux-256color), found through
 are also compiled in, as in `wasm-less` and `wasm-bash`.
 
 Requires `@ai-ecoverse/slicc-kernel` ≥ 1.17.4.
+
+## 6.5.0-5 (homescoop#1009; 2026-10-20)
+
+The compiled-in terminfo search list is `/usr/share/terminfo` (after `TERMINFO`, which the package sets to its own `share/terminfo`). It used to name the build machine's work directory first, which never exists in slicc. The description is one plain sentence.

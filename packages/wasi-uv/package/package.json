@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-uv",
-  "version": "0.13.1-3",
-  "description": "Astral's uv 0.13 for slicc WASI: uv venv, pip, init, add, lock, sync and run against wasix-python",
+  "version": "0.13.1-4",
+  "description": "Astral's uv for SLICC, with uvx, to manage Python environments and packages.",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
@@ -31,7 +31,7 @@
     "access": "public"
   },
   "engines": {
-    "slicc-kernel": ">=1.100.4"
+    "slicc-kernel": ">=1.104.1"
   },
   "homescoop": {
     "recipe": "wasi-uv",
@@ -43,6 +43,18 @@
       "uv": {
         "wasm": "bin/uv.wasm",
         "preopenRoot": true,
+        "env": {
+          "UV_LINK_MODE": "copy"
+        }
+      },
+      "uvx": {
+        "wasm": "bin/uv.wasm",
+        "preopenRoot": true,
+        "argv0": "uv",
+        "args": [
+          "tool",
+          "uvx"
+        ],
         "env": {
           "UV_LINK_MODE": "copy"
         }

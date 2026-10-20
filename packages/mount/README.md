@@ -27,3 +27,7 @@ Every other homescoop CLI is Emscripten on the host builder, and the
 `Module.sliccKernel` EM_JS shim pattern (as in `slicc_jobs.c`) already exists.
 A WASI build would need its own toolchain path plus custom `slicc.*` imports
 for no gain; the kernel offers both ABIs, so a WASI port stays possible.
+
+## 1.0.0-5 (homescoop#666; 2026-10-20)
+
+`EPERM` from mount or umount now reads `Operation not permitted (not your mount point, or refused by the kernel's mount policy)`. Under users enforce a user may mount only over their own directories, and the old `(process mounts are disabled here)` was wrong for that case.

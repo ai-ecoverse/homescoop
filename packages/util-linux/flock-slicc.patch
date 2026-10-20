@@ -1,0 +1,104 @@
+--- a/sys-utils/flock.c
++++ b/sys-utils/flock.c
+@@ -49,6 +49,15 @@
+ #include "timer.h"
+ #include "default_shell.h"
+ 
++#ifdef __EMSCRIPTEN__
++/* homescoop#977: slicc has no fork(), and a JS setitimer() never interrupts a
++ * blocking flock().  The command is started with posix_spawnp() (the slicc
++ * shim), and -w polls a non-blocking lock until the deadline.  */
++# include <spawn.h>
++# include <time.h>
++extern char **environ;
++#endif
++
+ #ifndef F_OFD_GETLK
+ #define F_OFD_GETLK	36
+ #define F_OFD_SETLK	37
+@@ -349,6 +358,10 @@
+ 		errx(EX_USAGE, _("requires file descriptor, file or directory"));
+ 	}
+ 
++#ifdef __EMSCRIPTEN__
++	struct timespec slicc_deadline = { 0 };
++	int slicc_poll = 0;
++#endif
+ 	if (have_timeout) {
+ 		if (timeout.it_value.tv_sec == 0 &&
+ 		    timeout.it_value.tv_usec == 0) {
+@@ -358,9 +371,23 @@
+ 			 */
+ 			have_timeout = 0;
+ 			block = LOCK_NB;
+-		} else
++		} else {
++#ifdef __EMSCRIPTEN__
++			clock_gettime(CLOCK_MONOTONIC, &slicc_deadline);
++			slicc_deadline.tv_sec += timeout.it_value.tv_sec;
++			slicc_deadline.tv_nsec += timeout.it_value.tv_usec * 1000L;
++			if (slicc_deadline.tv_nsec >= 1000000000L) {
++				slicc_deadline.tv_sec++;
++				slicc_deadline.tv_nsec -= 1000000000L;
++			}
++			slicc_poll = 1;
++			have_timeout = 0;
++			block = LOCK_NB;
++#else
+ 			if (setup_timer(&timer, &timeout, &timeout_handler))
+ 				err(EX_OSERR, _("cannot set up timer"));
++#endif
++		}
+ 	}
+ 
+ 	if (verbose)
+@@ -374,6 +401,22 @@
+ 			 * EAGAIN/EWOULDBLOCK.
+ 			 */
+ 		case EACCES:
++#ifdef __EMSCRIPTEN__
++			if (slicc_poll) {
++				struct timespec now;
++				clock_gettime(CLOCK_MONOTONIC, &now);
++				if (now.tv_sec < slicc_deadline.tv_sec
++				    || (now.tv_sec == slicc_deadline.tv_sec
++					&& now.tv_nsec < slicc_deadline.tv_nsec)) {
++					struct timespec nap = { 0, 20 * 1000 * 1000 };
++					nanosleep(&nap, NULL);
++					continue;
++				}
++				if (verbose)
++					warnx(_("timeout while waiting to get lock"));
++				exit(conflict_exit_code);
++			}
++#endif
+ 			/* -n option set and failed to lock. */
+ 			if (verbose)
+ 				warnx(_("failed to get lock"));
+@@ -439,9 +482,26 @@
+ 			printf(_("%s: executing %s\n"), program_invocation_short_name, cmd_argv[0]);
+ 
+ 		if (!no_fork) {
++#ifdef __EMSCRIPTEN__
++			posix_spawn_file_actions_t fa;
++			int rc;
++			posix_spawn_file_actions_init(&fa);
++			if (do_close)
++				posix_spawn_file_actions_addclose(&fa, fd);
++			rc = posix_spawnp(&f, cmd_argv[0], &fa, NULL, cmd_argv, environ);
++			posix_spawn_file_actions_destroy(&fa);
++			if (rc) {
++				errno = rc;
++				warn(_("failed to execute %s"), cmd_argv[0]);
++				return (rc == ENOMEM) ? EX_OSERR : EX_UNAVAILABLE;
++			}
++			if (f <= 0)
++				errx(EX_OSERR, _("posix_spawnp returned no pid"));
++#else
+ 			f = fork();
+ 			if (f < 0)
+ 				err(EX_OSERR, _("fork failed"));
++#endif
+ 
+ 			/* child */
+ 			else if (f == 0) {

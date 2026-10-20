@@ -1,0 +1,40 @@
+# tsrs (oxc-project/tsrs, the Rust port of the TypeScript 7 compiler) for
+# slicc WASI preview1: native tsrs's tsc driver as the command tsrs.
+# Upstream's @tsrs/wasm is a wasip1 library for a JS host (no _start, files
+# through its own tsrs_host imports), which slicc-kernel cannot run.
+name: wasi-tsrs
+builder: host
+reproducible: true
+# renovate: datasource=github-tags depName=oxc-project/tsrs extractVersion=^v(?<version>.*)$
+version: "0.18.0"
+npm: "@ai-ecoverse/wasi-tsrs"
+summary: "tsrs, the Rust port of TypeScript 7's tsc, for slicc WASI preview1 (command tsrs)"
+source:
+  url: "https://github.com/oxc-project/tsrs/archive/refs/tags/v{{version}}.tar.gz"
+  sha256: "d9a08890fb9b60442e4ae1a9a90b987daef7f3429afb2153cf8ebff635f7fcd6"
+toolchain:
+  # rust-toolchain.toml at v0.18.0.
+  rust: "1.99.1"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/oxc-project/tsrs
+  license: Apache-2.0
+  notes: |
+    No patches to tsrs. tsrs_wasi/ (a bin crate of ours, about 20 lines) is
+    copied into the workspace as crates/tsrs_wasi: main() changes to PWD (the
+    kernel starts WASI processes at /), then runs tsrs_execute's
+    command_line over native tsrs's osSys, the std::fs file system with the
+    embedded lib.*.d.ts. That is crates/tsrs_cli's main without mimalloc,
+    the LSP, the API server and the large-stack thread; crates/tsrs_wasm is
+    the same driver over a JS host file system. Adding the member may add
+    only tsrs_wasi to Cargo.lock (build.sh checks); then
+    cargo build --release --locked -p tsrs_wasi --target wasm32-wasip1 with
+    upstream's module settings (tools/wasm/build.sh: opt-level s,
+    -inlinehint-threshold=150, fat LTO, one codegen unit, panic=abort) and
+    its 80 MiB shadow stack (notes/wasm-build.md, "Stack sizes"), then
+    wasm-opt. Single-threaded, as upstream's module: tsrs_core::NO_THREADS
+    is true on wasm32, so --checkers/--builders run on one thread. NOTICE
+    (tsrs's, with TypeScript's third-party notices) ships as NOTICE.

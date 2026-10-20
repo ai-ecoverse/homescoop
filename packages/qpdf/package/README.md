@@ -19,3 +19,10 @@ For text extraction use `pdftotext` from `@ai-ecoverse/wasm-poppler`.
 
 Built with qpdf's native crypto provider (no OpenSSL or GnuTLS), and with
 zlib and libjpeg-turbo from homescoop.
+
+## 12.4.2-6: fix-qdf is a helper; no pkg-config at configure (homescoop#1354; 2026-10-20)
+
+`fix-qdf` has `"helper": true` in `slicc.commands`, as the KC ruled. It still runs as before; listings that hide helpers leave it out. The description is now one plain sentence. The build configures with no pkg-config, so a zlib port in the emsdk cache can't replace `@ai-ecoverse/wasm-zlib`. The bytes are the same.
+
+`qpdf.wasm` can still come out in one of two 14-byte variants. That comes from emsdk 4.0.23's LLVM: its WebAssembly CFG Stackify pass iterates a pointer-keyed map, and the nesting of one try/delegate pair varies. Both variants behave the same. The fix arrives with an emsdk at or after 6.0.2 (llvm-project#205184). See cert/NEGATIVE.md.
+

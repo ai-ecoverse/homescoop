@@ -19,6 +19,18 @@ test('spawn: exit codes, pipes, stdin, env, cwd, files, try_wait and kill', asyn
   }
 })
 
+test('sleep-reap: std::thread::sleep while a child exits, 20 rounds (homescoop#1255, slicc-kernel#1291)', async () => {
+  const kernel = await kernelWithSelftest()
+  try {
+    const result = await kernel.run(['wasix-selftest', 'sleep-reap', '20'], { cwd: '/tmp' })
+    assert.equal(result.status, 0, output(result))
+    assert.equal(result.stdout, 'ok 20 sleeps while a child exits\n', output(result))
+    assert.equal(result.stderr, '', output(result))
+  } finally {
+    kernel.terminate()
+  }
+})
+
 test('loopback: TCP and HTTP between a process and its child', async () => {
   const kernel = await kernelWithSelftest()
   try {

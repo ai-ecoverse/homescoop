@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-mount",
-  "version": "1.0.0-4",
-  "description": "mount / umount for slicc (WASM / emscripten, SLICC homescoop)",
+  "version": "1.0.0-5",
+  "description": "mount and umount: attach filesystems (tmpfs, hostfs and more) to directories.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

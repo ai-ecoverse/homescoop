@@ -615,6 +615,12 @@ homescoop_notice_rust() {
       apache=62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a
       wasisdk=wasi-sdk-33
       ;;
+    1.99.1)
+      copyright=172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af
+      mit=b71bd43a069ca0641a9ecfe585ca7b3c53b5cc1608f8b68321168698e28b5ea1
+      apache=62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a
+      wasisdk=wasi-sdk-33
+      ;;
     *)
       echo "homescoop_notice_rust: no pinned licence sha256 for Rust $rust; add it to the table" >&2
       return 1

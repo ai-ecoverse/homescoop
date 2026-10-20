@@ -29,10 +29,13 @@ JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || 
 if [[ ! -f "$BLD/qpdf/qpdf.wasm" || -n "${FORCE:-}" ]]; then
   echo "== qpdf: emcmake (static, native crypto, zlib/jpeg from PREFIX)"
   rm -rf "$BLD"
-  # Point the find_path/find_library fallbacks at PREFIX and keep
-  # pkg-config from picking up host .pc files.
+  # Point the find_path/find_library fallbacks at PREFIX, with no
+  # pkg-config at all: Emscripten.cmake resets PKG_CONFIG_LIBDIR to the emsdk
+  # sysroot, whose zlib.pc (Libs: -sUSE_ZLIB) exists once any build on the
+  # machine used the zlib port, and then qpdf links no zlib (homescoop#1354).
   env PKG_CONFIG_LIBDIR=/nonexistent PKG_CONFIG_PATH= \
     emcmake cmake -S "$SRC" -B "$BLD" -G "Unix Makefiles" \
+      -DPKG_CONFIG_EXECUTABLE=/usr/bin/false \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_C_FLAGS_RELEASE=-DNDEBUG \
       -DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG \

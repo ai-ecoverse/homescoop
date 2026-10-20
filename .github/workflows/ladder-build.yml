@@ -292,7 +292,6 @@ jobs:
       contents: read
       actions: read
       id-token: write
-      issues: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -320,6 +319,9 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ""
           NPM_TOKEN: ""
+          NPM: ${{ needs.resolve.outputs.npm }}
+          TAG: ${{ needs.resolve.outputs.npm_tag }}
+          CERTIFIED: ${{ inputs.certified }}
         run: |
           set -euo pipefail
           unset NODE_AUTH_TOKEN NPM_TOKEN NPM_CONFIG_TOKEN || true
@@ -339,72 +341,4 @@ jobs:
             sed -i.bak '/_authToken/d' "$npmrc" || true
             cat "$npmrc" || true
           done
-          VER="$(tar -xOf "$TGZ" package/package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const v=JSON.parse(s).version;if(/^\d+\.\d+\.\d+$/.test(v)){console.error("refuse plain version "+v+" — publish X.Y.Z-N only");process.exit(2)}console.log(v)})')"
-          NPM="${{ needs.resolve.outputs.npm }}"
-          TAG="${{ needs.resolve.outputs.npm_tag }}"
-          [[ "$TAG" == latest ]] || node scripts/npm-tag.mjs --check "$TAG" || { echo "::error::npm-tag '$TAG' is not a publish channel" >&2; exit 2; }
-          set +e
-          node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --tag "$TAG" --certified "${{ inputs.certified }}"
-          gate=$?
-          set -e
-          if [[ "$gate" -eq 10 ]]; then
-            echo "already on registry: $NPM@$VER — skip OIDC publish"
-            exit 0
-          fi
-          if [[ "$gate" -ne 0 ]]; then
-            exit "$gate"
-          fi
-          echo "publishing $NPM@$VER under --tag $TAG"
-          attempt=1
-          max=4
-          while true; do
-            set +e
-            out="$(npm publish "$TGZ" --access public --tag "$TAG" 2>&1)"
-            rc=$?
-            set -e
-            printf '%s\n' "$out"
-            if [[ $rc -eq 0 ]]; then
-              echo "published $NPM@$VER"
-              break
-            fi
-            if printf '%s\n' "$out" | grep -q 'cannot publish over the previously published versions'; then
-              echo "already on registry: $NPM@$VER — success only if npm has these contents (homescoop#971)"
-              again=0
-              for wait in 0 15 30 60 120; do
-                sleep "$wait"
-                set +e
-                node scripts/gate.mjs certified-publish -- node scripts/assert-certified-publish.mjs "$TGZ" --npm "$NPM" --tag "$TAG" --certified "${{ inputs.certified }}"
-                again=$?
-                set -e
-                [[ "$again" -eq 0 ]] || break
-              done
-              if [[ "$again" -ne 10 ]]; then
-                echo "::error::$NPM@$VER is on npm, but not with these contents (assert-certified-publish exit $again): these bytes never shipped"
-                exit 1
-              fi
-              break
-            fi
-            if printf '%s\n' "$out" | grep -Eq 'ENEEDAUTH|need auth' && [[ $attempt -lt $max ]]; then
-              echo "OIDC not ready (attempt $attempt/$max), retry in $((attempt * 15))s"
-              sleep $((attempt * 15))
-              attempt=$((attempt + 1))
-              continue
-            fi
-            echo "npm publish failed for $NPM@$VER (exit $rc)" >&2
-            exit "$rc"
-          done
-          echo "published=true" >> "$GITHUB_OUTPUT"
-      - name: Verify the registry serves the published bytes
-        if: steps.publish.outputs.published == 'true'
-        # --timeout 1800 waits up to 30 min for the version to become visible
-        # (a new 22 MB package took about 18 min, homescoop#686); a visible
-        # version with another integrity fails at once. Then --tag-timeout 300
-        # waits up to 5 min for the dist-tags (#1150). The step bound covers
-        # both waits plus a 30 s hang per request and filing the failure issue.
-        timeout-minutes: 42
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NPM: ${{ needs.resolve.outputs.npm }}
-          NPM_TAG: ${{ needs.resolve.outputs.npm_tag }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/gate.mjs verify-published -- node scripts/verify-published.mjs "${{ runner.temp }}/package.tgz" --npm "$NPM" --tag "$NPM_TAG" --timeout 1800 --tag-timeout 300 --run-url "$RUN_URL" --issue
+          node scripts/gate.mjs publish -- node scripts/npm-publish.mjs "$TGZ" --npm "$NPM" --tag "$TAG" --certified "$CERTIFIED"

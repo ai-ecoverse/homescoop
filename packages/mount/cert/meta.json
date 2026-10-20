@@ -19,7 +19,8 @@
     "mount -t nosuchfs → unknown filesystem type, rc ≠ 0",
     "mount -o ro → write gives Read-only file system",
     "-o maxfile=xyz → bad option (EINVAL); mount over /proc → busy; umount of a plain dir → not mounted",
-    "hostfs without a grant hook → refused (harness has no hostfs hook; hostfs connect not covered)"
+    "hostfs without a grant hook → refused (harness has no hostfs hook; hostfs connect not covered)",
+    "cert/eperm.mjs (1.0.0-5, homescoop#666): under users enforce, bob mounts a tmpfs on /home/bob/m and unmounts it (rc 0 both); mount -t tmpfs none /etc is rc 32 with \"mount: /etc: Operation not permitted (not your mount point, or refused by the kernel's mount policy).\"; root mounts and unmounts /tmp/rm. 1.0.0-4 said \"(process mounts are disabled here)\" (NEGATIVE.md)"
   ],
   "needsNote": "Kernel pin 1.132.1 (homescoop#1292: wasm-bash 5.3.0-21 needs >=1.130.2); 1.17.0 was the first release with slicc-kernel#92 process mount/umount2 (MNT_DETACH revocation, nomedium in /proc/mounts, ro enforced at open). The harness page has no hostfs grant hook, so only the hostfs refusal is checked."
 }

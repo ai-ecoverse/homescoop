@@ -102,9 +102,9 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-libwebp`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libwebp) | [recipe](packages/libwebp) | WebP codec libraries (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-libxml2`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libxml2) | [recipe](packages/libxml2) | libxml2 2.15.4 XML parser with GNU libiconv (WASM / emscripten) |
 | [`@ai-ecoverse/llvm-emscripten`](https://www.npmjs.com/package/@ai-ecoverse/llvm-emscripten) | [recipe](packages/llvm-emscripten) | LLVM/clang/lld 24 (llvm-project b158b0ae) built with emscripten 6.0.9: the objects, static libraries and link manifest @ai-ecoverse/wasm-clang links (a build input) |
-| [`@ai-ecoverse/wasm-mount`](https://www.npmjs.com/package/@ai-ecoverse/wasm-mount) | [recipe](packages/mount) | mount / umount for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-mount`](https://www.npmjs.com/package/@ai-ecoverse/wasm-mount) | [recipe](packages/mount) | mount and umount: attach filesystems (tmpfs, hostfs and more) to directories. |
 | [`@ai-ecoverse/wasm-nano`](https://www.npmjs.com/package/@ai-ecoverse/wasm-nano) | [recipe](packages/nano) | GNU nano, a small and friendly text editor for the terminal. |
-| [`@ai-ecoverse/wasm-ncurses-utils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-ncurses-utils) | [recipe](packages/ncurses-utils) | ncurses clear, tput, tset and reset for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-ncurses-utils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-ncurses-utils) | [recipe](packages/ncurses-utils) | ncurses clear, tput, tset and reset, with a terminfo database. |
 | [`@ai-ecoverse/wasm-openjpeg`](https://www.npmjs.com/package/@ai-ecoverse/wasm-openjpeg) | [recipe](packages/openjpeg) | OpenJPEG JPEG 2000 codec (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-patch`](https://www.npmjs.com/package/@ai-ecoverse/wasm-patch) | [recipe](packages/patch) | GNU patch 2.8 for wasm / slicc (emscripten) |
 | [`@ai-ecoverse/wasm-pkgconf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-pkgconf) | [recipe](packages/pkgconf) | pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder) |
@@ -125,7 +125,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-scipy`](https://www.npmjs.com/package/@ai-ecoverse/py-scipy) | [recipe](packages/py-scipy) | SciPy 1.18.1 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules, static OpenBLAS) |
 | [`@ai-ecoverse/py-six`](https://www.npmjs.com/package/@ai-ecoverse/py-six) | [recipe](packages/py-six) | six for slicc WASIX CPython |
 | [`@ai-ecoverse/py-tzdata`](https://www.npmjs.com/package/@ai-ecoverse/py-tzdata) | [recipe](packages/py-tzdata) | tzdata for slicc WASIX CPython |
-| [`@ai-ecoverse/wasm-qpdf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-qpdf) | [recipe](packages/qpdf) | qpdf PDF merge/split/rotate/decrypt/linearize tool for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-qpdf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-qpdf) | [recipe](packages/qpdf) | qpdf 12.4: inspect, merge, split, rotate, encrypt, decrypt and linearize PDF files. |
 | [`@ai-ecoverse/wasm-rsync`](https://www.npmjs.com/package/@ai-ecoverse/wasm-rsync) | [recipe](packages/rsync) | rsync 3.5.1, for fast incremental file copies. |
 | [`@ai-ecoverse/wasm-screen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-screen) | [recipe](packages/screen) | GNU screen, a terminal multiplexer: detach and reattach sessions with several windows. |
 | [`@ai-ecoverse/wasm-sed`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sed) | [recipe](packages/sed) | GNU sed for slicc (WASM / emscripten, SLICC homescoop) |
@@ -133,7 +133,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-tar`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tar) | [recipe](packages/tar) | GNU tar 1.35 for wasm / slicc (fork + Asyncify for -z/-j/-J) |
 | [`@ai-ecoverse/wasm-tls-engine`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tls-engine) | [recipe](packages/tls-engine) | The TLS engine slicc uses for secure network connections, built on Mbed TLS 4.2.0. |
 | [`@ai-ecoverse/wasm-tree`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tree) | [recipe](packages/tree) | tree (recursive directory listing) for slicc (WASM / emscripten, SLICC homescoop) |
-| [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux rev, column, hexdump, colrm, look and getopt for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux text tools (rev, column, hexdump, colrm, look, getopt) and flock. |
 | [`@ai-ecoverse/wasi-biome`](https://www.npmjs.com/package/@ai-ecoverse/wasi-biome) | [recipe](packages/wasi-biome) | Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC. |
 | [`@ai-ecoverse/wasi-buf`](https://www.npmjs.com/package/@ai-ecoverse/wasi-buf) | [recipe](packages/wasi-buf) | buf 1.73 (Protocol Buffers CLI) for slicc WASI preview1 (command buf); buf.wasm built by homescoop from buf v1.73.0 with documented patches |
 | [`@ai-ecoverse/wasi-cargo`](https://www.npmjs.com/package/@ai-ecoverse/wasi-cargo) | [recipe](packages/wasi-cargo) | Cargo, the Rust package manager and build tool, for SLICC. |
@@ -151,13 +151,14 @@ versions are on npm.
 | [`@ai-ecoverse/wasi-ripgrep`](https://www.npmjs.com/package/@ai-ecoverse/wasi-ripgrep) | [recipe](packages/wasi-ripgrep) | ripgrep 15 for slicc WASI preview1 (command rg) |
 | [`@ai-ecoverse/wasi-rustc`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc) | [recipe](packages/wasi-rustc) | The Rust compiler, to build Rust programs in SLICC. |
 | [`@ai-ecoverse/wasi-rustc-names`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc-names) | [recipe](packages/wasi-rustc-names) | Function names for the Rust compiler's wasm, so SLICC can name the frames of a rustc crash. |
+| [`@ai-ecoverse/wasi-tsrs`](https://www.npmjs.com/package/@ai-ecoverse/wasi-tsrs) | [recipe](packages/wasi-tsrs) | tsrs, the Rust port of TypeScript 7's tsc, for slicc WASI preview1 (command tsrs); tsrs.wasm built by homescoop from oxc-project/tsrs v0.18.0 |
 | [`@ai-ecoverse/wasi-typescript`](https://www.npmjs.com/package/@ai-ecoverse/wasi-typescript) | [recipe](packages/wasi-typescript) | TypeScript 7 (the native tsc) for slicc WASI preview1 (command tsc); tsc.wasm built by homescoop from microsoft/typescript-go typescript/v7.0.2 with GOOS=wasip1 |
-| [`@ai-ecoverse/wasi-uv`](https://www.npmjs.com/package/@ai-ecoverse/wasi-uv) | [recipe](packages/wasi-uv) | Astral's uv 0.13 for slicc WASI: uv venv, pip, init, add, lock, sync and run against wasix-python |
+| [`@ai-ecoverse/wasi-uv`](https://www.npmjs.com/package/@ai-ecoverse/wasi-uv) | [recipe](packages/wasi-uv) | Astral's uv for SLICC, with uvx, to manage Python environments and packages. |
 | [`@ai-ecoverse/wasi-zig`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig) | [recipe](packages/wasi-zig) | The Zig compiler with LLVM, to build Zig, C and C++ programs in SLICC. |
 | [`@ai-ecoverse/wasi-zig-libc-src`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig-libc-src) | [recipe](packages/wasi-zig-libc-src) | wasi-libc's C sources for @ai-ecoverse/wasi-zig: zig cc for wasm32-wasi CPUs and modes beyond the prebuilt baseline |
 | [`@ai-ecoverse/wasix-autoconf`](https://www.npmjs.com/package/@ai-ecoverse/wasix-autoconf) | [recipe](packages/wasix-autoconf) | GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4) |
 | [`@ai-ecoverse/wasix-automake`](https://www.npmjs.com/package/@ai-ecoverse/wasix-automake) | [recipe](packages/wasix-automake) | GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4) |
-| [`@ai-ecoverse/wasix-bind`](https://www.npmjs.com/package/@ai-ecoverse/wasix-bind) | [recipe](packages/wasix-bind) | BIND 9.20 dig, host and nslookup for slicc WASIX |
+| [`@ai-ecoverse/wasix-bind`](https://www.npmjs.com/package/@ai-ecoverse/wasix-bind) | [recipe](packages/wasix-bind) | BIND 9.20 dig, host and nslookup: DNS lookup tools. |
 | [`@ai-ecoverse/wasix-f2c`](https://www.npmjs.com/package/@ai-ecoverse/wasix-f2c) | [recipe](packages/wasix-f2c) | Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc) |
 | [`@ai-ecoverse/wasix-gnupg`](https://www.npmjs.com/package/@ai-ecoverse/wasix-gnupg) | [recipe](packages/wasix-gnupg) | GnuPG 2.4: OpenPGP encryption and signing with gpg, gpgv and gpg-agent. |
 | [`@ai-ecoverse/wasix-m4`](https://www.npmjs.com/package/@ai-ecoverse/wasix-m4) | [recipe](packages/wasix-m4) | GNU m4 1.4.20 for slicc WASIX |
@@ -170,7 +171,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-sysroot`](https://www.npmjs.com/package/@ai-ecoverse/wasix-sysroot) | [recipe](packages/wasix-sysroot) | WASIX sysroots: st_uid/st_gid, chown and access() through slicc-kernel file owners (getuid()/getgid() on older kernels), file modes via slicc_fs, F_SETFD CLOEXEC fix, select exceptfds, physical chdir, POSIX TZ, socketpair flags, sigaction_set, alarm/setitimer/getitimer, EINTR sleeps, raise/pthread_kill, process credentials from slicc-kernel (no fixed uid 1000), per-fd termios/winsize from slicc-kernel (Linux and WASIX ioctl numbers), fork in the PIC variants, signal masks, poll/ppoll with events 0, epoll_ctl with Linux op numbers, named semaphores through slicc-kernel, flock, mkfifo, sa_mask, Linux S_IF* bits, wasip1; libc++/libc++abi/libunwind from LLVM 20.1 (legacy EH in sysroot-eh/ehpic, exnref in sysroot-exnref-*) |
 | [`@ai-ecoverse/wasix-websocat`](https://www.npmjs.com/package/@ai-ecoverse/wasix-websocat) | [recipe](packages/wasix-websocat) | websocat, a WebSocket client and server like netcat for ws:// URLs, for SLICC. |
 | [`@ai-ecoverse/wasix-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasix-zlib) | [recipe](packages/wasix-zlib) | zlib 1.3.1 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config |
-| [`@ai-ecoverse/wasm-binaryen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binaryen) | [recipe](packages/wasm-binaryen) | Binaryen 132 wasm tools for slicc (wasm-opt and friends) |
+| [`@ai-ecoverse/wasm-binaryen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binaryen) | [recipe](packages/wasm-binaryen) | Binaryen's wasm-opt and other WebAssembly tools, which Emscripten uses to optimize and finish its output. |
 | [`@ai-ecoverse/wasm-clang`](https://www.npmjs.com/package/@ai-ecoverse/wasm-clang) | [recipe](packages/wasm-clang) | The Clang and LLD 24 compilers, to build C and C++ programs in slicc. |
 | [`@ai-ecoverse/wasm-emscripten`](https://www.npmjs.com/package/@ai-ecoverse/wasm-emscripten) | [recipe](packages/wasm-emscripten) | Emscripten 6.0.9 for slicc (emcc via wasix-python) |
 | [`@ai-ecoverse/wasm-go`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go) | [recipe](packages/wasm-go) | The Go 1.27 compiler, linker and assembler that slicc's go command runs. |
@@ -179,7 +180,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-webrtc-audio-processing`](https://www.npmjs.com/package/@ai-ecoverse/wasm-webrtc-audio-processing) | [recipe](packages/webrtc-audio-processing) | WebRTC AEC3 echo cancellation from webrtc-audio-processing 2.1, compiled to wasm, with a synchronous JS wrapper for AudioWorklet and Node |
 | [`@ai-ecoverse/wasm-which`](https://www.npmjs.com/package/@ai-ecoverse/wasm-which) | [recipe](packages/which) | GNU which for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-xxd`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xxd) | [recipe](packages/xxd) | xxd (from vim 9.2.1192) for wasm / slicc (emscripten) |
-| [`@ai-ecoverse/wasm-xz`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xz) | [recipe](packages/xz) | XZ Utils 5.8.4 (xz/lzma + liblzma) for wasm / slicc |
+| [`@ai-ecoverse/wasm-xz`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xz) | [recipe](packages/xz) | XZ Utils: xz, unxz, xzcat and the lzma tools, with xzgrep and xzdiff. |
 | [`@ai-ecoverse/wasm-zip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zip) | [recipe](packages/zip) | zip, unzip and zipinfo (Info-ZIP zip 3.0, unzip 6.0) for slicc: make, list, test and extract .zip archives |
 | [`@ai-ecoverse/wasm-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zlib) | [recipe](packages/zlib) | zlib 1.3.1 static library for WebAssembly / emscripten (SLICC homescoop ladder) |
 
