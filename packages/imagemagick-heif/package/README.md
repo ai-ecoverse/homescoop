@@ -80,6 +80,10 @@ the wasm heap tops out at 2 GiB and a runaway allocation can freeze the tab:
 | map | 256 MiB | in wasm the memory-mapped cache is heap too: memory + map is 1.75 GiB, under the build's 2 GiB maximum |
 | disk | 0 | no pixel cache on disk: in the browser that spills to storage and a 48 MP resize took minutes; anything over memory fails at once |
 
+With disk at 0, MPC (which persists the pixel cache to a disk file) is
+refused by policy: use `magick-open` for `.mpc`. JPEG 2000 above 16 MP is
+encoded in 1024x1024 tiles, so a 48 MP image fits the heap.
+
 Over a limit, magick exits 1 with `width or height exceeds limit` or
 `cache resources exhausted`, also for `identify -format`, which decodes the
 image (plain `identify` and `identify -ping` only read the header).

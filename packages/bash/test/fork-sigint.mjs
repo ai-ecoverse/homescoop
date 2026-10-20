@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
 const arg = (n) => {
@@ -14,6 +14,9 @@ const tarball = arg('--tarball');
 const kernelSpec = arg('--kernel') ?? '@ai-ecoverse/slicc-kernel@1.130.2';
 const rounds = Number(arg('--rounds') ?? 3);
 assert.ok(tarball, 'usage: fork-sigint.mjs --tarball <package.tgz> [--kernel <spec>] [--rounds <n>]');
+const meta = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../cert/meta.json'), 'utf8'));
+const coreutils = (meta.needsInstall || []).find((s) => s.startsWith('@ai-ecoverse/wasm-coreutils@'));
+assert.ok(coreutils, 'cert/meta.json needsInstall pins @ai-ecoverse/wasm-coreutils');
 const sh = (cmd, argv) => execFileSync(cmd, argv, { stdio: ['ignore', 'pipe', 'inherit'] }).toString();
 const settle = (ms) => new Promise((r) => setTimeout(r, ms));
 const enc = (t) => new TextEncoder().encode(t);
@@ -27,7 +30,7 @@ try {
   sh('tar', ['xzf', resolve(tarball), '-C', pkg]);
   const nm = join(work, 'nm');
   mkdirSync(nm);
-  sh('npm', ['install', '--prefix', nm, '--no-fund', '--no-audit', '--silent', kernelSpec, '@ai-ecoverse/wasm-coreutils']);
+  sh('npm', ['install', '--prefix', nm, '--no-fund', '--no-audit', '--silent', kernelSpec, coreutils]);
   const kroot = join(nm, 'node_modules/@ai-ecoverse/slicc-kernel');
   const kver = JSON.parse(readFileSync(join(kroot, 'package.json'), 'utf8')).version;
   const { createNodeKernel } = await import(pathToFileURL(join(kroot, 'dist/node.js')).href);

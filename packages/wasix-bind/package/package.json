@@ -1,0 +1,60 @@
+{
+  "name": "@ai-ecoverse/wasix-bind",
+  "version": "9.20.29-1",
+  "description": "BIND 9.20 dig, host and nslookup for slicc WASIX",
+  "license": "MPL-2.0",
+  "engines": {
+    "slicc-kernel": ">=1.96.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-bind/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-bind",
+  "keywords": [
+    "wasm",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "bind",
+    "dns",
+    "dig",
+    "host",
+    "nslookup"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "SOURCES.md",
+    "bin",
+    "licenses",
+    "patches"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-bind",
+    "upstream": "9.20.29",
+    "libuv": "wasix-org/libuv@6fe6259894375cef3a7289d7dcc0a35e539191b3",
+    "urcu": "0.15.7",
+    "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-4",
+    "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-39"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "dig": {
+        "wasm": "bin/dig.wasm"
+      },
+      "host": {
+        "wasm": "bin/host.wasm"
+      },
+      "nslookup": {
+        "wasm": "bin/nslookup.wasm"
+      }
+    }
+  }
+}

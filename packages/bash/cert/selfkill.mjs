@@ -37,5 +37,15 @@ export default async function (ctx) {
   assert.equal(got.trap.out, 't\nafter');
   assert.deepEqual(got.ignore.run, [0, null], JSON.stringify(got.ignore));
   assert.equal(got.ignore.out, 'after');
-  console.log('selfkill: kill -TERM/-KILL/-INT $$ end bash by the signal (sync.run status null + signal, wait 128+n + signal); exit 143 is an exit; a trapped or ignored TERM stays in bash');
+  const inherited = await run(
+    [
+      'bash',
+      '-c',
+      `trap '' TERM HUP; bash -c 'kill -TERM $$; echo t1'; echo rc=$?; bash -c 'trap - TERM; kill -TERM $$; echo t2'; echo rc=$?; bash -c 'trap - HUP; kill -HUP $$; echo h1'; echo rc=$?`,
+    ],
+    { cwd: '/tmp' },
+  );
+  assert.equal(inherited.status, 0, `${inherited.stdout}${inherited.stderr}`);
+  assert.equal(inherited.stdout, 't1\nrc=0\nt2\nrc=0\nh1\nrc=0\n', `a signal the parent ignores stays ignored in a child bash, trap - or not, and kill -SIG $$ returns (homescoop#1070): ${JSON.stringify(inherited.stdout)}`);
+  console.log('selfkill: kill -TERM/-KILL/-INT $$ end bash by the signal (sync.run status null + signal, wait 128+n + signal); exit 143 is an exit; a trapped or ignored TERM stays in bash; under an inherited TERM/HUP ignore a child bash survives kill -TERM/-HUP $$, also after trap -');
 }

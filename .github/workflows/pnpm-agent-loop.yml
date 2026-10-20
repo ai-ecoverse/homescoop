@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           HOMESCOOP_CERT_NODE_MODULES="$RUNNER_TEMP/nm/node_modules" node scripts/browser-cert/run.mjs \
-            --package wasi-pnpm --cert packages/wasi-pnpm/stress --spec agent-loop.mjs --kernel "$KERNEL" \
+            --package wasi-pnpm --cert stress/wasi-pnpm-agent --spec agent-loop.mjs --kernel "$KERNEL" \
             --tarball "$RUNNER_TEMP"/pnpm/*.tgz --users enforce --soft
       - name: Summary
         if: always()

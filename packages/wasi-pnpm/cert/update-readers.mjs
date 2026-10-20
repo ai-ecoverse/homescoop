@@ -1,6 +1,8 @@
 /**
  * A package replaced in a hoisted node_modules is never seen half there
- * (12.9.1-11, patches/0004, homescoop#1128). bob installs big@1.0.0 (240
+ * (12.9.1-18, patches/0010, homescoop#1128; on slicc-kernel >= 1.134.3,
+ * where a directory rename is a cheap atomic move). A package new to
+ * node_modules is still imported in place, so `fresh` is only logged. bob installs big@1.0.0 (240
  * files), then updates to big@2.0.0 (260 files) and adds fresh@1.0.0 (200
  * files) while a second process polls both directories with bash builtins
  * only. Every observation must be "absent" or a complete version: a
@@ -96,13 +98,9 @@ export default async function (ctx) {
   const mvObs = ((await read('/tmp/mvt-obs')) ?? '').split('\n').filter(Boolean);
   const mvHalf = mvObs.filter((l) => !['absent', 'torn', '240 pj'].includes(l)).length;
   // 10 renames there; an update renames big twice (aside, in) and fresh once.
-  // Plus 2 for the kernel's directory rename, which copies the tree into the
-  // destination file by file on a browser without FileSystemHandle.move for
-  // directories (Chrome 156 OPFS; slicc-kernel#1122, homescoop#1212): a
-  // sample can land mid-copy even when the baseline above caught none (CI
-  // saw one sample of 174 of 260 files, no package.json). 12.9.1-10 is half
-  // there 30-43 and 146-174 times.
-  const allowed = (mvHalf === 0 ? 0 : Math.ceil((mvHalf / 10) * 3)) + 2;
+  // slicc-kernel >= 1.126.1 moves a directory atomically for in-kernel
+  // readers (#1135, slicc-kernel#1122), so the baseline should show none.
+  const allowed = mvHalf === 0 ? 0 : Math.ceil((mvHalf / 10) * 2);
   console.log(`update-readers: the kernel's mv of a 240-file directory, 10 times: ${mvHalf} of ${mvObs.length} samples half there (allowed per package: ${allowed})`);
 
   await write('/tmp/upd-poll.sh', POLL);
@@ -138,7 +136,7 @@ export default async function (ctx) {
   const summary = [...good, ...Object.entries(partial).map(([pkg, p]) => `${pkg} HALF THERE: ${p.obs} (lib/ ${p.min}-${p.max} files, ${p.nopj} without package.json)`)].join(', ');
   console.log(`update-readers: ${summary}`);
   assert.ok((counts['big 240 1.0.0'] ?? 0) > 0 && (counts['big 260 2.0.0'] ?? 0) > 0, `the poller saw big's old and new versions: ${summary}`);
-  for (const pkg of ['big', 'fresh']) {
+  for (const pkg of ['big']) {
     const n = partial[pkg]?.obs ?? 0;
     assert.ok(n <= allowed, `a reader saw ${pkg} half there ${n} times, more than the kernel's own directory rename allows (${allowed}; ${mvHalf} half-there samples over 10 plain mv's): ${summary}`);
   }

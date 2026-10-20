@@ -2,7 +2,7 @@
 
 MRI Ruby for slicc WASIX. No epoll (poll fallback). See PRESTAGE.md.
 
-Built on wasix-sysroot 2025.9.30-28 or later (the WASIX libc and headers; see
+Built on wasix-sysroot 2025.9.30-39 (the WASIX libc and headers; see
 PRESTAGE.md).
 
 ## The interpreter path (3.4.11-12)
@@ -36,6 +36,14 @@ rejects an exception set with ENOSYS, so `IO.select` with a third array still
 fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
+
+## 3.4.11-21: bundled gems with C extensions, interruptible locks, a clean load path
+
+- **Bundled gems with a C extension** (homescoop#596): bigdecimal, racc (`racc/cparse`), nkf, syslog, debug and rbs (the versions in `gems/bundled_gems`) are installed, and their extensions are linked into `ruby`. `require "bigdecimal"` works, and so do activesupport and anything else that needs it. `gem list` shows them, and Bundler takes them from the package. A newer version of one of them can't be installed with `gem install`, because that needs a compiler. Up to 3.4.11-20 they were left out and `require "bigdecimal"` was a LoadError.
+- **Interruptible locks** (homescoop#869): `Timeout.timeout`, `Thread#raise` and `Thread#kill` interrupt a blocking `File#flock` or `IO#fcntl(F_SETLKW)`. On slicc the wait is a loop of non-blocking tries with a 20 ms sleep in between, so a lock can come free up to 20 ms before ruby takes it. Up to 3.4.11-20 the interrupt waited until the holder let go.
+- **Load path** (homescoop#597): `$LOAD_PATH` holds only directories that exist. The package's stdlib comes from `WASIX_RUBY_PREFIX` (the command sets it to the package), so the command no longer sets `RUBYLIB`. Yours comes first, and there's no site or vendor directory. Up to 3.4.11-20, eight missing `/nonexistent-ruby-prefix` directories were probed on every require that missed the stdlib.
+- **RbConfig** (homescoop#1114): `RbConfig::CONFIG` names the build tree `/nonexistent-ruby-build` instead of the CI runner's checkout, so the bytes don't depend on where it was built.
+- **Sysroot:** wasix-sysroot 2025.9.30-39, whose `malloc` refreshes a thread's view of grown shared memory (homescoop#1287).
 
 ## 3.4.11-20: inputs recorded by version
 
