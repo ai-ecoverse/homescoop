@@ -25,7 +25,9 @@ homescoop_load_recipe "$RECIPE"
 
 PKG="$HOMESCOOP_PKG"
 DEST="$PKG/package"
-B="${WASIX_PYTHON_BUILD_ROOT:-/tmp/homescoop-$RECIPE}"
+# A fixed build root, not named after the recipe dir: readline and sysconfig
+# record it, so a recipe rename changed every binary (homescoop#1310).
+B="${WASIX_PYTHON_BUILD_ROOT:-/tmp/homescoop-wasix-python}"
 DL="$B/dl"
 DEPS="$B/deps"
 CROSS="$B/Python-$VER/cross-build/wasm32-wasix"
@@ -106,13 +108,14 @@ fi
 "$HOSTPY" -c 'import platform, sys; assert platform.python_version() == sys.argv[1], (sys.version, sys.argv[1])' "$VER"
 
 # --- WASIX toolchain ---------------------------------------------------------
-# Pinned wasixcc + wasix-sysroot: 3.15.0-1 takes -38 through the per-recipe
-# override (-37's Linux S_IF* bits, -38's poll; install-wasixcc.sh's default
+# Pinned wasixcc + wasix-sysroot: -39 since 3.15.0-4 (-38 before), through the per-recipe
+# override (-37's Linux S_IF* bits, -38's poll, -39's dlmalloc memory-view refresh,
+# homescoop#1287; install-wasixcc.sh's default
 # is still -34). sysroot-ehpic (legacy EH, PIC) has the setitimer →
 # proc_raise_interval2 and clock_nanosleep EINTR libc patches
 # (patches/README.md); flock, fcntl record locks and lockf are libc's.
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
-export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39
+export HOMESCOOP_WASIX_SYSROOT_SHA=6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 # C++ runtime ABI of the side modules (README "Side modules"): py-*
 # extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a plain
@@ -240,6 +243,10 @@ if [[ ! -f "$DEPS/lib/libtinfo.a" ]]; then
   rm -rf "$B/ncurses" && mkdir -p "$B/ncurses"
   tar xzf "$SRC_FILE" -C "$B/ncurses" --strip-components=1
   (
+    # set -e: MKfallback.sh's tic can fail (macOS's tic 6.0 can't write
+    # the temporary terminfo tree), and make's failure must stop the build
+    # rather than leave an empty fallback.c (libtinfo then lacks _nc_fallback).
+    set -e
     cd "$B/ncurses"
     ./configure --host="$CROSS_HOST" --build="$(sh ./config.guess)" --prefix="$DEPS" \
       --without-shared --with-normal --without-debug --without-profile \
@@ -366,7 +373,7 @@ WRAP=""
 # cpp_tls_stubs.c: nothing in CPython references these, so pull them in and
 # export them, as -11 did (python.wasm imported env._ZTH5errno and
 # env.__cxa_thread_atexit_impl otherwise).
-for f in _ZTH5errno __cxa_thread_atexit_impl; do
+for f in _ZTH5errno __cxa_thread_atexit_impl mprotect; do
   WRAP+=" -Wl,-u,$f -Wl,--export=$f"
 done
 
@@ -375,7 +382,7 @@ SRCDIR="$B/Python-$VER"
 echo "== wasix-python: CPython $VER source + patches"
 rm -rf "$SRCDIR" && mkdir -p "$SRCDIR"
 tar xzf "$PY_TGZ" -C "$SRCDIR" --strip-components=1
-for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip cpython-multiprocessing-wasix cpython-multiprocessing-util-wasix cpython-multiprocessing-noshare-wasix cpython-multiprocessing-unix-listener-wasix cpython-thread-native-id-wasix cpython-fork-hint-wasix; do
+for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-site-wasi cpython-subprocess-posix-spawn cpython-stdout-line-buffer-nonreg cpython-ensurepip-installed-pip cpython-multiprocessing-wasix cpython-multiprocessing-util-wasix cpython-multiprocessing-noshare-wasix cpython-multiprocessing-unix-listener-wasix cpython-thread-native-id-wasix cpython-fork-hint-wasix cpython-home-wasix; do
   patch -d "$SRCDIR" -p1 -F0 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
   echo "  applied $p.patch"
 done
@@ -503,8 +510,14 @@ python3 "$PKG/sanitize-sysconfig.py" "$PYLIB" "$B"
 
 # Bytecode: unchecked-hash .pyc (no mtimes), by the same CPython.
 echo "== wasix-python: compileall (unchecked-hash)"
-"$HOSTPY" -m compileall -q -j0 --invalidation-mode unchecked-hash "$PYLIB" >/dev/null || true
+# -d: co_filename is the install path, not this checkout's (homescoop#1310).
+"$HOSTPY" -m compileall -q -j0 --invalidation-mode unchecked-hash -d "/node_modules/@ai-ecoverse/wasix-python/lib/python$PYV" "$PYLIB" >/dev/null || true
 "$HOSTPY" "$PKG/test/pyc-check.py" "$PYLIB"
+# No build-machine path in the package (homescoop#1310): not this checkout's,
+# and not a recipe-dir-named build root other than the fixed one.
+if grep -rlaF -e "$ROOT" -e "/home/runner/work" -e "homescoop-wasix-python3" "$DEST" | head -5 | grep .; then
+  echo "homescoop wasix-python: the package embeds a build-machine path (above)" >&2; exit 1
+fi
 
 # --- notices -------------------------------------------------------------------
 NOTICES="$B/notices"

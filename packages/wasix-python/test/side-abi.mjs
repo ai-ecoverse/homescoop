@@ -35,12 +35,27 @@ export function wasmSymbols(buf) {
   const limits = () => { const f = u32(); u32(); if (f & 1) u32(); };
   const imports = [];
   const exports = [];
+  // dylink.0's import info: weak undefined symbols (WASM_SYMBOL_BINDING_WEAK)
+  // need no definition; the loader leaves them null (a C++ _ZTH TLS-init
+  // wrapper is called only if present).
+  const weak = new Set();
   if (buf.readUInt32LE(0) !== 0x6d736100) throw new Error('not wasm');
   while (p < buf.length) {
     const id = buf[p++];
     const size = u32();
     const end = p + size;
-    if (id === 2) {
+    if (id === 0) {
+      const sec = str();
+      if (sec === 'dylink.0') {
+        while (p < end) {
+          const t = buf[p++];
+          const l = u32();
+          const e = p + l;
+          if (t === 4) for (let n = u32(); n > 0; n--) { str(); const f = str(); if (u32() & 1) weak.add(f); }
+          p = e;
+        }
+      }
+    } else if (id === 2) {
       for (let n = u32(); n > 0; n--) {
         const module = str(); const name = str(); const kind = buf[p++];
         if (kind === 0) u32();
@@ -55,7 +70,7 @@ export function wasmSymbols(buf) {
     }
     p = end;
   }
-  return { imports, exports };
+  return { imports: imports.map((i) => ({ ...i, weak: weak.has(i.name) })), exports };
 }
 
 function walk(dir, out = []) {
@@ -135,6 +150,7 @@ try {
     const need = new Set();
     for (const m of own) {
       for (const i of m.imports) {
+        if (i.weak && i.module !== 'GOT.mem') continue;
         if (i.module === 'env' && !SKIP.has(i.name)) need.add(i.name);
         else if (i.module === 'GOT.mem' || i.module === 'GOT.func') need.add(i.name);
         if (i.module === 'GOT.mem' && mainTls.has(i.name) && !manifest.thread_local.includes(i.name)) {

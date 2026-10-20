@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-python",
-  "version": "3.15.0-3",
-  "description": "CPython 3.15 for slicc WASIX (commands python, python3; cross-built in CI on wasix-sysroot)",
+  "version": "3.15.0-4",
+  "description": "The Python programming language (CPython 3.15), with pip.",
   "license": "PSF-2.0 AND GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.122.3"
