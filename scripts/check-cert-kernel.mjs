@@ -1,102 +1,84 @@
 #!/usr/bin/env node
-/**
- * The cert harness's default kernel, the root package.json devDependency
- * @ai-ecoverse/slicc-kernel, is a certified release.
- *
- *   node scripts/check-cert-kernel.mjs
- *
- * Passes only when the pin is an exact version, the ai-ecoverse/slicc-kernel
- * release v<pin> has a `certified @ai-ecoverse/slicc-kernel@<pin> sha256=<hex>`
- * line, and the registry tarball of that version re-hashes to that sha256
- * (as the coordinator's tag-certified.sh does). Any network or parse error
- * fails. slicc-kernel-negative, the old negative-proof kernel, is not checked.
- * GITHUB_TOKEN, when set, authenticates the release lookup.
- */
-import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXACT } from './check-exact-pins.mjs';
+import { checkProvenance } from './cert-review/repack-input.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const KERNEL = '@ai-ecoverse/slicc-kernel';
 const REPO = 'ai-ecoverse/slicc-kernel';
+const REPO_URL = `https://github.com/${REPO}`;
+const WORKFLOW = '.github/workflows/release.yml';
+const MAIN = 'refs/heads/main';
 const REGISTRY = 'https://registry.npmjs.org/';
 const TIMEOUT_MS = 120_000;
 
 async function get(url, headers = {}) {
   const res = await fetch(url, { headers, redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`GET ${url}: HTTP ${res.status}`);
-  return res;
+  return res.json();
 }
 
+const enc = (name) => name.replace('/', '%2f');
+
 export const defaultFetchers = {
-  async release(tag) {
+  manifest: (version) => get(`${REGISTRY}${enc(KERNEL)}/${encodeURIComponent(version)}`),
+  attestations: (version) => get(`${REGISTRY}-/npm/v1/attestations/${enc(KERNEL)}@${encodeURIComponent(version)}`),
+  async compare(commit) {
     const headers = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' };
     if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    return (await get(`https://api.github.com/repos/${REPO}/releases/tags/${encodeURIComponent(tag)}`, headers)).json();
-  },
-  async manifest(version) {
-    return (await get(`${REGISTRY}${KERNEL.replace('/', '%2f')}/${encodeURIComponent(version)}`)).json();
-  },
-  async tarball(url) {
-    return new Uint8Array(await (await get(url)).arrayBuffer());
+    return get(`https://api.github.com/repos/${REPO}/compare/${commit}...main`, headers);
   },
 };
-
-const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * @param {Record<string, any>} pkg parsed root package.json
  * @param {typeof defaultFetchers} fetchers
- * @returns {Promise<{ pin: string, sha256: string }>} throws with the reason it is not certified
+ * @returns {Promise<{ pin: string, integrity: string, commit: string, run: string }>} throws with the reason it fails
  */
 export async function checkCertKernel(pkg, fetchers = defaultFetchers) {
   const pin = pkg?.devDependencies?.[KERNEL];
   if (typeof pin !== 'string' || !EXACT.test(pin)) {
     throw new Error(`devDependencies["${KERNEL}"] = ${JSON.stringify(pin)} is not an exact version`);
   }
-  const tag = `v${pin}`;
-  let release;
+  let manifest;
   try {
-    release = await fetchers.release(tag);
+    manifest = await fetchers.manifest(pin);
   } catch (e) {
-    throw new Error(`${KERNEL}@${pin}: cannot read release ${REPO} ${tag}: ${e.message}`);
+    throw new Error(`${KERNEL}@${pin}: cannot read the registry manifest: ${e.message}`);
   }
-  if (!release || typeof release.body !== 'string' || release.draft || release.tag_name !== tag) {
-    throw new Error(`${KERNEL}@${pin}: release ${REPO} ${tag} is missing, a draft, or has no body`);
+  const integrity = manifest?.dist?.integrity;
+  if (manifest?.version !== pin || typeof integrity !== 'string' || !integrity.startsWith('sha512-')) {
+    throw new Error(`${KERNEL}@${pin}: the registry manifest has no sha512 dist.integrity for ${pin}`);
   }
-  const line = new RegExp(`^certified ${escape(KERNEL)}@${escape(pin)} sha256=([0-9a-f]{64})(?:\\s|$)`, 'gm');
-  const shas = new Set([...release.body.matchAll(line)].map((m) => m[1]));
-  if (shas.size === 0) {
-    throw new Error(`${KERNEL}@${pin} is not certified: release ${REPO} ${tag} has no "certified ${KERNEL}@${pin} sha256=<hex>" line`);
-  }
-  if (shas.size > 1) throw new Error(`${KERNEL}@${pin}: release ${REPO} ${tag} has conflicting certified sha256 lines`);
-  const [cert] = shas;
-  let got;
+  let doc;
   try {
-    const manifest = await fetchers.manifest(pin);
-    const url = manifest?.dist?.tarball;
-    if (manifest?.version !== pin || typeof url !== 'string' || !url.startsWith(REGISTRY)) {
-      throw new Error(`registry manifest has no ${REGISTRY} tarball for ${pin}`);
-    }
-    const bytes = await fetchers.tarball(url);
-    if (!(bytes instanceof Uint8Array) || bytes.length === 0) throw new Error(`empty tarball ${url}`);
-    got = createHash('sha256').update(bytes).digest('hex');
+    doc = await fetchers.attestations(pin);
   } catch (e) {
-    throw new Error(`${KERNEL}@${pin}: cannot re-hash the registry tarball: ${e.message}`);
+    throw new Error(`${KERNEL}@${pin}: cannot read its npm attestations: ${e.message}`);
   }
-  if (got !== cert) throw new Error(`${KERNEL}@${pin}: registry tarball sha256=${got} does not match the certified sha256=${cert}`);
-  return { pin, sha256: cert };
+  const prov = checkProvenance(doc, { npm: KERNEL, version: pin, integrity, repo: REPO_URL, workflows: [WORKFLOW], ref: MAIN, hosted: true });
+  if (!prov.ok) throw new Error(`${KERNEL}@${pin} has no valid provenance: ${prov.reason}`);
+  let cmp;
+  try {
+    cmp = await fetchers.compare(prov.commit);
+  } catch (e) {
+    throw new Error(`${KERNEL}@${pin}: cannot check that commit ${prov.commit} is on ${REPO} main: ${e.message}`);
+  }
+  if (!['ahead', 'identical'].includes(cmp?.status) || cmp?.merge_base_commit?.sha !== prov.commit) {
+    throw new Error(`${KERNEL}@${pin}: provenance commit ${prov.commit} is not on ${REPO} main (compare: ${cmp?.status || 'no status'})`);
+  }
+  return { pin, integrity, commit: prov.commit, run: prov.run || '' };
 }
 
 async function main() {
   try {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-    const { pin, sha256 } = await checkCertKernel(pkg);
-    console.log(`check-cert-kernel: PASS ${KERNEL}@${pin} is certified, sha256=${sha256}`);
+    const { pin, integrity, commit, run } = await checkCertKernel(pkg);
+    console.log(`check-cert-kernel: PASS ${KERNEL}@${pin} was built by ${REPO} ${WORKFLOW} on main from ${commit} (on main), GitHub-hosted, ${run}; npm provenance covers ${integrity}`);
   } catch (e) {
-    console.log(`::error::check-cert-kernel: FAIL ${e.message}. Pin the cert kernel in package.json to a certified version.`);
+    console.log(`::error::check-cert-kernel: FAIL ${e.message}. Pin the cert kernel in package.json to a slicc-kernel release published from main.`);
     process.exit(1);
   }
 }

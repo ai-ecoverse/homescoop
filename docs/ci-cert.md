@@ -722,7 +722,15 @@ must report a regression, in a spec and in the sweep, for each of them: the
 Emscripten builds without `slicc_sleep_ms` that exit 70 there
 (slicc-kernel#483, fixed by #496 in 1.81.0).
 
-The `@ai-ecoverse/slicc-kernel` pin must be a certified kernel, and `ci` enforces it: `ladder-pr`'s `exact-pins` job runs [`check-cert-kernel.mjs`](../scripts/check-cert-kernel.mjs), which fails unless the pin is exact, its slicc-kernel release `v<pin>` has a `certified @ai-ecoverse/slicc-kernel@<pin> sha256=<hex>` line, and the registry tarball re-hashes to that sha256.
+The `@ai-ecoverse/slicc-kernel` pin must be a kernel that slicc-kernel's CI released from main, and `ci` enforces it: `ladder-pr`'s `exact-pins` job runs [`check-cert-kernel.mjs`](../scripts/check-cert-kernel.mjs). It reads the pin's npm provenance (the SLSA v1 attestation npm serves at `/-/npm/v1/attestations/@ai-ecoverse/slicc-kernel@<pin>`) and fails unless:
+- the pin is an exact version;
+- the repository is `https://github.com/ai-ecoverse/slicc-kernel`;
+- the workflow is `.github/workflows/release.yml` at `refs/heads/main`;
+- the builder is GitHub-hosted (`https://github.com/actions/runner/github-hosted`);
+- the subject digest equals the packument's `dist.integrity`;
+- the provenance commit is on slicc-kernel's `main` (the GitHub compare of the commit against `main` is `ahead` or `identical`, with that commit as the merge base).
+
+The checks are `checkProvenance` in [`cert-review/repack-input.mjs`](../scripts/cert-review/repack-input.mjs), with slicc-kernel's repository, workflow and the GitHub-hosted requirement as parameters. slicc-kernel releases only from main, and every PR into its main has passed the required cert-review, so this stands in for the `certified … sha256=` release line it used to read. A network or attestation-fetch error is a `check-cert-kernel: FAIL` with its reason. The check trusts the npm registry's attestation endpoint, as cert-review's root rule does; it doesn't verify the Sigstore bundle itself.
 
 ## Gate verdict lines
 
