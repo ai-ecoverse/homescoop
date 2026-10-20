@@ -109,3 +109,10 @@ Against the published 5.42.0-18 on slicc-kernel 1.120.2 (Node entry):
 - **#682 (AF_UNIX bind 'Success'):** no longer reproduces. `unix-socket.mjs` passes on the published 5.42.0-19 (wasix-sysroot -34, slicc-kernel 1.120.2, users enforce), with bind, listen, connect and accept through `IO::Socket::UNIX`, and hostpath/peerpath equal to the path. sysroot -31 fixed bind, and 5.42.0-18's patches/0008 fixed unpack_sockaddr_un.
 - **#752:** 5.42.0-19's description and THIRD-PARTY-NOTICES both name wasix-sysroot 2025.9.30-34. build.sh now fails if the description doesn't name the sysroot it builds on.
 
+## 5.42.0-21: both licence texts, flock lifetimes, Config paths (homescoop#995, #1024, #848; 2026-10-20)
+
+Against the published 5.42.0-20 on slicc-kernel 1.132.1 (the cert kernel), users enforce, `--spec licence.mjs --spec config-paths.mjs --spec flock-lifetime.mjs`:
+- **#995, `licence.mjs`:** FAIL, 3 of 6 assertions: `package/LICENSE has no GPL-1.0-or-later text ("GNU GENERAL PUBLIC LICENSE Version 1, February 1989")`, and no `==> Artistic <==` / `==> Copying <==` sections. -20's LICENSE is perl's Artistic file alone, because `homescoop_stage_license` copies only the first candidate that exists. -21 stages both through `homescoop_stage_licenses`.
+- **#1024, `flock-lifetime.mjs`:** passes on -20 (`ofd:ex,refused dup:shares | childexit:refused | close:granted | held:refused | kill9:granted | eintr:EINTR`). It guards the behaviour -19 introduced. -18's fcntl emulation granted the second in-process open (`ofd:ex,granted`, the #1024 probes).
+- **#848, `config-paths.mjs`:** passes on -20. The fix landed in -19 (#850). On 5.42.0-18, `Config{ccflags}` held `-include /home/runner/work/homescoop/homescoop/packages/wasix-perl/wasix-posix-stubs.h` (#848's diff).
+- **Description:** -21's `package.json` description is one plain sentence for bios (Install/Update shows it word for word). The #752 check that the build names its wasix-sysroot moves from the description to the README's `- Built on wasix-sysroot <version> …` line.
