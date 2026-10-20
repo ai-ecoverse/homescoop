@@ -8,11 +8,11 @@
     "@ai-ecoverse/py-six"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-python@3.15.0-1",
-    "@ai-ecoverse/py-numpy@2.5.4-1",
-    "@ai-ecoverse/py-python-dateutil@2.9.0-post0.4",
-    "@ai-ecoverse/py-tzdata@2026.4.0-4",
-    "@ai-ecoverse/py-six@1.17.0-4"
+    "@ai-ecoverse/wasix-python@3.15.0-3",
+    "@ai-ecoverse/py-numpy@2.5.4-2",
+    "@ai-ecoverse/py-python-dateutil@2.9.0-post0.5",
+    "@ai-ecoverse/py-tzdata@2026.4.0-5",
+    "@ai-ecoverse/py-six@1.17.0-5"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-pandas",
@@ -24,7 +24,8 @@
     "cert/notices.mjs: THIRD-PARTY-NOTICES.md carries klib, ultrajson, numpy and musl (compiled in), and the LICENSES/ files of the vendored Python code (homescoop#726)",
     "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 and py-numpy >=2.5.4-1 <2.5.5 (the headers it is built against)",
     "3.0.6-1 (homescoop#761, the cp315 wave; npm-tag python3.15): pandas 3.0.6 from the PyPI sdist (66b07ef7\u2026) against wasix-python 3.15.0-1 and py-numpy 2.5.4-1, Cython 3.3.0, wasix-sysroot -38 (libc++ headers from the sysroot). No patches: wasix-python has ctypes, so 0002-lazy-ctypes goes. pytz is no longer a pandas dependency (pandas 3). test/py-vs-sdist.mjs: every shipped .py is the sdist's",
-    "3.0.6-2 (homescoop#761, the fold): packages/py-pandas3.15 moved over packages/py-pandas after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 3.0.6-1; every spec as before; py-python-dateutil is pinned at 2.9.0-post0.4 (a post-release revision can't be a range) and py-tzdata becomes the range >=2026.4.0-4 <2026.4.1, so npm nests no second copy"
+    "3.0.6-2 (homescoop#761, the fold): packages/py-pandas3.15 moved over packages/py-pandas after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 3.0.6-1; every spec as before; py-python-dateutil is pinned at 2.9.0-post0.4 (a post-release revision can't be a range) and py-tzdata becomes the range >=2026.4.0-4 <2026.4.1, so npm nests no second copy",
+    "3.0.6-3 (homescoop#1283, #1337): the pure-Python dependencies as ranges from their version-neutral builds (py-python-dateutil 2.9.0-post0.4 -> >=2.9.0-post0.5 <2.9.1, py-tzdata >=2026.4.0-4 <2026.4.1 -> >=2026.4.0-5 <2026.4.1), so npm installs the current one of each and nests no second copy; same sources and build as 3.0.6-2; every spec as before"
   ],
   "notices": [
     {
