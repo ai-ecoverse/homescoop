@@ -11,6 +11,13 @@ summary: "Biome 2.5 for slicc WASI preview1 (command biome)"
 source:
   url: "https://github.com/biomejs/biome/archive/refs/tags/@biomejs/biome@{{version}}.tar.gz"
   sha256: "0212a8f9e351e2d47580cf8371948dd477ceb01e0fef1a65f81061a2a4a39039"
+inputs:
+  - scripts/rust-wasm-refresh-alloc.rs
+# homescoop#1287: the initial heap from the measured peak, with headroom.
+wasm:
+  initial-memory: 128MiB
+  measured-peak: 97MiB
+  measured-by: "biome check of a 3000-file TypeScript project (cert/stress.mjs's shape, twice its size), VmSize polled from /proc/<pid>/status: 98,496 kB peak with 2.5.15-4 on slicc-kernel 1.132.1; 400 files stay at 21 MB"
 dependencies:
   build: []
   host: []
