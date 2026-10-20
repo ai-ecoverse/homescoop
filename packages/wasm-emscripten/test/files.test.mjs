@@ -61,3 +61,8 @@ test("lib/slicc carries today's shims: the inherited-ignore seed and the strong 
   assert.match(obj('slicc_signals.o'), /slicc_sig_inherited_js/, 'slicc_signals.o has no slicc_sig_inherited_js (the #973 constructor)');
   assert.match(obj('slicc_libc_gaps.o'), /__syscall_flock/, 'slicc_libc_gaps.o has no __syscall_flock (the #947 flock)');
 });
+
+test('tools/system_libs.py walks musl in name order, so libc member names are the same on every host (homescoop#1328, patch 0013)', () => {
+  const src = execFileSync('tar', ['-xzOf', tgz, 'package/tools/system_libs.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  assert.match(src, /dirnames\.sort\(\)\n\n {6}for f in sorted\(filenames\):/, 'libc.get_files walks os.walk in filesystem order');
+});

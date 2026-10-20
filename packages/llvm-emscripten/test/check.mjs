@@ -42,6 +42,16 @@ try {
   const wantPatches = Object.fromEntries(readdirSync(patchDir).filter((f) => f.endsWith('.patch')).sort().map((f) => [f, createHash('sha256').update(readFileSync(join(patchDir, f))).digest('hex')]));
   check(JSON.stringify(m.llvm_patches) === JSON.stringify(wantPatches) && m.llvm_patches['0001-main-executable-emscripten.patch'], `manifest.json records the llvm patches by sha256: ${JSON.stringify(m.llvm_patches)}`);
   check(/128-byte/.test(m.sysroot.sigset_t) && /^[0-9a-f]{64}$/.test(m.wasm_emscripten_patches_sha256), `sysroot sigset_t ${m.sysroot.sigset_t}, wasm-emscripten patches ${m.wasm_emscripten_patches_sha256.slice(0, 12)}…`);
+  // The tree the objects were compiled with is today's: the manifest records
+  // the wasm-emscripten patch set this checkout applies (stage.py's digest).
+  const emDir = join(root, 'packages/wasm-emscripten/patches');
+  const emPatches = readdirSync(emDir).filter((f) => f.endsWith('.patch')).sort();
+  const emDigest = createHash('sha256');
+  for (const f of emPatches) emDigest.update(Buffer.concat([Buffer.from(`${f}\0`), readFileSync(join(emDir, f)), Buffer.from('\0')]));
+  check(
+    JSON.stringify(m.wasm_emscripten_patches) === JSON.stringify(emPatches) && m.wasm_emscripten_patches_sha256 === emDigest.digest('hex'),
+    `manifest.json's wasm-emscripten patches are this checkout's ${emPatches.length}: ${(m.wasm_emscripten_patches || []).length} recorded${emPatches.filter((f) => !(m.wasm_emscripten_patches || []).includes(f)).map((f) => `, missing ${f}`).join('')}`,
+  );
   // homescoop#1098: LLVM Support's regex, BLAKE3 and xxHash notices.
   const notices = existsSync(join(pkg, 'THIRD-PARTY-NOTICES.md')) ? readFileSync(join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8') : '';
   const support = readFileSync(join(pkg, 'lib/libLLVMSupport.a'), 'latin1');

@@ -24,3 +24,13 @@ Comparing the two `libc.a`, 6.0.9-4 defines 58 symbols that 6.0.9-3 lacks, among
 
 ## Reproducibility
 The first CI run of #1016 failed `reproducible`: host-build and rebuild differed in 45 of the 50 libraries. Emscripten maps its own source dir to `/emsdk/emscripten` in DWARF, but not the cache's `sysroot/include` or clang's resource headers, and both live under the build's work dir. wasm-emscripten patch 0011 maps them to `/emsdk/cache` and `/emsdk/llvm`. Two local builds in different work dirs then gave byte-identical tarballs, and no library names a build path. check.mjs keeps that row: no library may contain `/home/`, `/Users/`, `/__w/` or `/private/var/`.
+
+## 6.0.9-5: libc member names that don't depend on the host (homescoop#1328; 2026-10-20)
+
+`check.mjs --member-order` (this package's ci row) fails on the published 6.0.9-4:
+
+```text
+AssertionError: libc.a: the _Exit/_exit members are _Exit__1.o, _exit.o, not the name-ordered _Exit.o, _exit__1.o (homescoop#1328)
+```
+
+The object code is the same. Only the member names differ, and they depended on `os.walk`'s filesystem order in `system_libs.py`: run 39346315809's host-build and rebuild came out different. wasm-emscripten patch 0013 sorts that walk. Two local builds in different work dirs are byte-identical, and their libc.a is `a58cf058…`, CI's name-ordered one. wasm-emscripten -24 still pins 6.0.9-4: its pinned-cache.mjs runs `check.mjs` without `--member-order`, because the names don't change the code. The pin moves to 6.0.9-5 once that's published.
