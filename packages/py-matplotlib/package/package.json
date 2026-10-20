@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/py-matplotlib",
-  "version": "3.11.2-13",
-  "description": "matplotlib Agg for slicc WASIX CPython 3.15 (cp315-wasix_wasm32)",
+  "version": "3.11.2-14",
+  "description": "Matplotlib, plotting and data visualization for Python.",
   "license": "PSF-2.0",
   "repository": {
     "type": "git",

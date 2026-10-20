@@ -217,7 +217,7 @@ rm -rf "$BUILD" "$STAGE"
 export PYTHONPATH="$TOOLS/site:$MESONSITE:$PBSITE"
 echo "== py-matplotlib: meson setup"
 (cd "$SRC" && "$HOSTPY" -m mesonbuild.mesonmain setup "$BUILD" --cross-file "$TOOLS/cross.ini" --native-file "$TOOLS/native.ini" \
-  -Dbuildtype=release -Db_ndebug=if-release -Db_lto=false -Dmacosx=false --wrap-mode=nodownload \
+  -Dbuildtype=release -Db_ndebug=if-release -Db_lto=false -Dmacosx=false -DrcParams-backend=Agg --wrap-mode=nodownload \
   --prefix=/usr --python.purelibdir=lib/python3.15/site-packages --python.platlibdir=lib/python3.15/site-packages) >"$B/meson-setup.log" 2>&1 \
   || { tail -80 "$B/meson-setup.log" >&2; exit 1; }
 grep -E "Run-time dependency pybind11 found: YES" "$B/meson-setup.log" || { tail -40 "$B/meson-setup.log" >&2; exit 1; }
