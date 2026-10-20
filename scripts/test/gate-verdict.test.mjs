@@ -19,7 +19,7 @@ const GATES = {
   compat: 'scripts/browser-cert/compat.mjs',
   'repack-input': 'scripts/cert-review/repack-input.mjs',
   'ladder-merge-resolve': 'scripts/ladder-merge-resolve.mjs',
-  'verify-published': 'scripts/verify-published.mjs',
+  publish: 'scripts/npm-publish.mjs',
   'npm-parity': 'scripts/npm-parity.mjs',
   'package-meta': 'scripts/check-package-meta.mjs',
   'cert-leg': 'scripts/browser-cert/cert-leg.mjs',

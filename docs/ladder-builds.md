@@ -73,15 +73,21 @@ and prints the decision without dispatching. `before`, `packages`,
 `assume_unpublished`, `message`, `pr_body`, `pr` and `head`
 simulate the other cases (`pr` resolves an open PR, with `sha` its head).
 
-**After the publish** ladder-build polls the registry for up to thirty minutes
-(`scripts/verify-published.mjs --timeout 1800`) until `dist.integrity` of the
-version shows up, and requires it to equal the sha512 of the exact
-`package.tgz` it published. The window only covers a version that isn't
-visible yet: the first version of a new, 22 MB package took about 18 minutes
-(homescoop#686). A visible version with another integrity fails at once. A
-mismatch, or a version that never appears, fails the job and
-opens (or comments on) one `publish-failure` issue naming the package,
-version, run and both values. It publishes with `--tag latest`, or with the
+**The publish** is `scripts/npm-publish.mjs`, run through `gate.mjs publish`.
+It runs `assert-certified-publish.mjs` first, which still refuses a version
+that npm already has with other contents (#971), then `npm publish`. npm's
+exit code is the verdict: exit 0 is `publish: PASS <name>@<ver> (published)`,
+and any other npm error is `publish: FAIL …`. When npm answers "cannot
+publish over the previously published versions" (a re-run, or a lost race),
+assert-certified-publish runs again: the same contents on npm is
+`publish: PASS <name>@<ver> (already on npm, same contents)`, other contents
+is a FAIL, and so is a registry that still serves no such version after
+about four minutes of rechecks, since there is nothing to compare the bytes
+with (re-run ladder-build). A missing verdict line fails the step. There is no post-publish
+wait for the registry to serve the version: npm's visibility lag outlasted
+the old 30-minute poll (`verify-published.mjs`) three times on 10-20
+(#1415, #1416, #1474), and each version later appeared byte-identical, so the
+poll and its `publish-failure` issue are gone. It publishes with `--tag latest`, or with the
 recipe's `npm-tag:` (see *Publishing a wave under a dist-tag*): for
 homescoop, certified = latest.
 
