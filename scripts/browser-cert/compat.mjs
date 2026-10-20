@@ -235,26 +235,68 @@ async function github(path, accept) {
   }
 }
 
-async function biosPins(ref) {
-  const sha = (await github(`repos/${BIOS}/commits/${encodeURIComponent(ref)}`, 'application/vnd.github+json')).sha;
-  const file = async (path) =>
-    JSON.parse(await github(`repos/${BIOS}/contents/${path}?ref=${sha}`, 'application/vnd.github.raw'));
-  const pins = async (dir) => {
-    const pkg = await file(`${dir}/package.json`);
-    const lock = await file(`${dir}/package-lock.json`);
-    return Object.keys(pkg.dependencies || {})
-      .sort()
-      .map((name) => {
-        const e = lock.packages?.[`node_modules/${name}`];
-        if (!e?.version) throw new Error(`slicc-bios ${sha} ${dir}/package-lock.json has no ${name}`);
-        return { name, version: e.version, integrity: e.integrity || null };
-      });
+export function lockPins(pkg, lock, where) {
+  return Object.keys(pkg.dependencies || {})
+    .sort()
+    .map((name) => {
+      const e = lock.packages?.[`node_modules/${name}`];
+      if (!e?.version) throw new Error(`${where}/package-lock.json has no ${name}`);
+      return { name, version: e.version, integrity: e.integrity || null };
+    });
+}
+
+const coreOf = (v) => String(v).replace(/[-+].*$/, '');
+
+export function catalogPins(catalog, view = npmView) {
+  return Object.entries(catalog || {})
+    .filter(([, entry]) => entry?.kind !== 'project')
+    .map(([name]) => name)
+    .sort()
+    .map((name) => {
+      const entry = catalog[name];
+      const doc = view(name);
+      let version = doc?.['dist-tags']?.latest;
+      if (entry.range) {
+        const fits = [doc?.versions || []]
+          .flat()
+          .filter((v) => satisfies(coreOf(v), entry.range))
+          .sort(compareVersions);
+        version = fits.at(-1);
+        if (!version) throw new Error(`catalog.json ${name}: no published version satisfies range ${entry.range}`);
+      }
+      if (!version) throw new Error(`catalog.json ${name}: npm has no latest`);
+      const one = version === doc?.version && doc?.dist ? doc : view(`${name}@${version}`);
+      return { name, version, integrity: one?.dist?.integrity || null };
+    });
+}
+
+export async function biosPins(ref, { gh = github, view = npmView } = {}) {
+  const sha = (await gh(`repos/${BIOS}/commits/${encodeURIComponent(ref)}`, 'application/vnd.github+json')).sha;
+  const file = async (path) => JSON.parse(await gh(`repos/${BIOS}/contents/${path}?ref=${sha}`, 'application/vnd.github.raw'));
+  const exists = async (path) => {
+    try {
+      return await file(path);
+    } catch (err) {
+      if (/: 404 /.test(String(err?.message))) return null;
+      throw err;
+    }
   };
+  const pins = async (dir) => lockPins(await file(`${dir}/package.json`), await file(`${dir}/package-lock.json`), `slicc-bios ${sha} ${dir}`);
+  const base = await pins('src/packages');
+  const optional = await exists('src/packages/optional/package.json');
+  if (optional) {
+    return {
+      sha,
+      base,
+      catalog: lockPins(optional, await file('src/packages/optional/package-lock.json'), `slicc-bios ${sha} src/packages/optional`),
+      files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/package.json', 'src/packages/optional/package-lock.json'],
+    };
+  }
   return {
     sha,
-    base: await pins('src/packages'),
-    catalog: await pins('src/packages/optional'),
-    files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/package.json', 'src/packages/optional/package-lock.json'],
+    base,
+    catalog: catalogPins(await file('src/packages/optional/catalog.json'), view),
+    files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/catalog.json'],
   };
 }
 
