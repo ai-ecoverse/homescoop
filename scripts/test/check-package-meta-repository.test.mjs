@@ -13,7 +13,7 @@ function check(name, { builder = 'host', repository }) {
   const root = mkdtempSync(join(tmpdir(), 'homescoop-repo-'));
   try {
     mkdirSync(join(root, 'scripts'));
-    for (const f of ['check-package-meta.mjs', 'read-recipe.mjs', 'upstream-version-text.mjs', 'npm-tag.mjs', 'package-meta-versions.json']) {
+    for (const f of ['check-package-meta.mjs', 'shim-notice.mjs', 'read-recipe.mjs', 'upstream-version-text.mjs', 'npm-tag.mjs', 'package-meta-versions.json']) {
       copyFileSync(join(scripts, f), join(root, 'scripts', f));
     }
     mkdirSync(join(root, 'packages', name, 'package'), { recursive: true });

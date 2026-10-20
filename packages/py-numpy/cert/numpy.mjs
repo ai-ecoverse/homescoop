@@ -24,6 +24,11 @@ out = {
     "stats": [float(m.mean()), float(m.std()), int(m.argmax())],
     "dtype": str((np.int32(7) * np.float32(0.5)).dtype),
 }
+cfg = np.show_config(mode="dicts")["Compilers"]
+args = " ".join(str(cfg[k].get("args", "")) + " " + str(cfg[k].get("linker args", "")) for k in ("c", "c++") if k in cfg)
+import re as _re
+out["config_paths"] = sorted(set(_re.findall(r"(?:/tmp/|/home/|/Users/)[^ ,]*", args)))
+out["config_prefix_map"] = "-ffile-prefix-map" in args
 from importlib.metadata import distribution
 eps = distribution("numpy").entry_points
 out["entry_points"] = sorted(f"{e.group}:{e.name}={e.value}" for e in eps)
@@ -52,5 +57,8 @@ export default async function (ctx) {
   assert.deepEqual(out.rng, [89, 773, 654, 438, 433], o);
   // numpy 2.5.4's pyproject.toml entry points (#1084).
   assert.deepEqual(out.entry_points, ['array_api:numpy=numpy', 'console_scripts:f2py=numpy.f2py.f2py2e:main', 'console_scripts:numpy-config=numpy._configtool:main', 'pkg_config:numpy=numpy._core.lib.pkgconfig', 'pyinstaller40:hook-dirs=numpy:_pyinstaller_hooks_dir'], o);
+  // homescoop#1088: show_config's compiler args name no build path and no -ffile-prefix-map.
+  assert.deepEqual(out.config_paths, [], o);
+  assert.equal(out.config_prefix_map, false, o);
   console.log(`numpy on wasix-python ${python}: linalg solve/det/inv/eigvalsh (OpenBLAS), matmul, einsum, fft, default_rng ${JSON.stringify(out.rng)}`);
 }
