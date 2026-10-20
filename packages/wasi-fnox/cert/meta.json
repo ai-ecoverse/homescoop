@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.132.1",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.134.3",
   "needs": [
     "@ai-ecoverse/wasm-coreutils",
     "@ai-ecoverse/wasm-bash"
@@ -27,7 +27,8 @@
     "test/sealed.mjs cases 12–13 (KS-8, exposure): the child's /proc cmdline has no value; no /proc/<pid>/environ; its own children inherit the value with output still scrubbed; another user (users 'enforce') can't see the process in /proc; a used or forged SLICC_SEALED_TICKET fails the exec with 126 and reveals nothing",
     "bios real setup (B18's seven row, slicc-bios #355): /etc/fnox/config.toml root-owned: a cone reads and resolves it, its writes fail with EACCES, sudo succeeds through the approval, no secret in any cone-readable file",
     "test/sealed.mjs case 14 (KS-8): exec --shell-grants -- /bin/bash -c CMD → materialize {shellGrants: true, path, argv, cwd} with no names → the shell = true secret's placeholder via `placeholder {name}` → real in the bash; the config's own sealed secrets keep placeholders; output scrubbed",
-    "test/sealed.mjs case 15 (KS-8, interpreter chain): fnox never claims `interpreter`; an npm-style `#!/usr/bin/env bash` script is reported as /usr/bin/bash; under an { argv } grant it gets the value when trusted (root-owned, 0755, root-owned dirs), is refused when untrusted (world-writable dir), and is refused under exec = true"
+    "test/sealed.mjs case 15 (KS-8, interpreter chain): fnox never claims `interpreter`; an npm-style `#!/usr/bin/env bash` script is reported as /usr/bin/bash; under an { argv } grant it gets the value when trusted (root-owned, 0755, root-owned dirs), is refused when untrusted (world-writable dir), and is refused under exec = true",
+    "1.39.0-6 (0016): fnox exec -- printenv LVL in a project that also has an as_file secret exits 0 and prints debug, warning \"CERT is not set: it is an as_file secret\" instead of refusing the command, and CERT isn't in the child's environment (homescoop#945); with a mode-644 /tmp/bin/fnox first on PATH, activate names /usr/bin/fnox (slicc_fs.path_access X_OK), and with it 755 names /tmp/bin/fnox (homescoop#1129). 1.39.0-5 fails 6 of these assertions"
   ],
   "patches": {
     "0001-build-gate-non-WASI-dependencies-by-target.patch": "the build: wasm32-wasip1 links at all (no cloud SDKs, reqwest, keyring, TUI)",

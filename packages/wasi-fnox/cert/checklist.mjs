@@ -181,6 +181,28 @@ export default async function (ctx) {
   assert.equal(noPath.status, 0, `activate with no fnox on PATH: ${noPath.stderr}`);
   assert.match(noPath.stdout, /eval "\$\(\/usr\/bin\/fnox hook-env -s bash\)"/, `activate with no fnox on PATH: ${noPath.stdout}`);
   assert.doesNotMatch(noPath.stdout, /(^|[\s(])fnox "\$command"/m, 'activate with no fnox on PATH calls a bare fnox inside its fnox() wrapper');
+  // homescoop#1129 (1.39.0-6, 0016): a fnox earlier on PATH that isn't
+  // executable is passed over; activate names the one the kernel would run.
+  await write('tmp/bin/fnox', '#!/bin/sh\necho not-fnox\n');
+  await run(['chmod', '644', '/tmp/bin/fnox'], { cwd: '/' });
+  const shadow = await run(['fnox', 'activate', 'bash'], { cwd: '/home/hook', env: { ...env, PATH: '/tmp/bin:/usr/bin:/bin' } });
+  assert.equal(shadow.status, 0, `activate with a non-executable fnox first on PATH: ${shadow.stderr}`);
+  assert.match(shadow.stdout, /eval "\$\(\/usr\/bin\/fnox hook-env -s bash\)"/, `#1129 activate skips /tmp/bin/fnox (mode 644): ${shadow.stdout.slice(0, 400)}`);
+  assert.doesNotMatch(shadow.stdout, /\/tmp\/bin\/fnox/, '#1129 the non-executable fnox is not pinned into the hook');
+  await run(['chmod', '755', '/tmp/bin/fnox'], { cwd: '/' });
+  const shadowX = await run(['fnox', 'activate', 'bash'], { cwd: '/home/hook', env: { ...env, PATH: '/tmp/bin:/usr/bin:/bin' } });
+  assert.match(shadowX.stdout, /\/tmp\/bin\/fnox hook-env/, `#1129 an executable fnox first on PATH is the one named: ${shadowX.stdout.slice(0, 400)}`);
+  // homescoop#945 (1.39.0-6, 0016): exec in a project with an as_file
+  // secret runs the command; the as_file secret is left unset, with a
+  // warning naming it, instead of the whole command being refused.
+  const execFile = await run(['fnox', 'exec', '--', 'printenv', 'LVL'], { cwd: '/home/hook', env });
+  assert.equal(execFile.status, 0, `#945 fnox exec with an as_file secret in the project: ${execFile.stderr}`);
+  assert.equal(execFile.stdout, 'debug\n', `#945 the plain secret reaches the command: ${execFile.stdout}`);
+  assert.match(execFile.stderr, /CERT is not set: it is an as_file secret/, `#945 the as_file secret is named in a warning: ${execFile.stderr}`);
+  assert.doesNotMatch(execFile.stderr, /the value would be in a program/, '#945 not the misleading refusal');
+  const execCert = await run(['fnox', 'exec', '--', 'printenv', 'CERT'], { cwd: '/home/hook', env });
+  assert.notEqual(execCert.status, 0, `#945 the as_file secret isn't in the command's environment: ${execCert.stdout}`);
+  assert.doesNotMatch(execCert.stdout, /pem-data/);
   const expFile = await run(['fnox', 'export', '--format', 'env'], { cwd: '/home/hook', env });
   assert.equal(expFile.status, 0, `export with an as_file secret: ${expFile.stderr}`);
   assert.notEqual(expFile.status, 134, `export as_file trapped: ${expFile.stderr}`);
