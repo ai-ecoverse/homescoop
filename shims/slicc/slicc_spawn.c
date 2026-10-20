@@ -63,7 +63,9 @@ EM_JS(int, slicc_spawn_capture_js,
             pairs.push([HEAP32[(actions >> 2) + 2 * i], HEAP32[(actions >> 2) + 2 * i + 1]]);
           }
           // An inherited stdin (-2) is the tool's own fd 0.
-          return Module.sliccKernel.spawn(file, args, envList.length ? env : null,
+          // A NULL envp inherits; an empty one is an empty environment, as
+          // posix_spawn's envp is (env -i; it used to inherit, homescoop#612).
+          return Module.sliccKernel.spawn(file, args, envp ? env : null,
                                           cwd ? UTF8ToString(cwd) : null,
                                           [in_fd === -2 ? 0 : in_fd, out_fd, err_fd], pairs);
         }
@@ -201,6 +203,7 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
   int stdio[3] = {-2, 1, 2};
   int opened[8];
   int nopened = 0;
+  int err = 0;
   // File actions on the child's fds beyond 2: [target, source] (source -1 closes).
   int actions[64];
   int nactions = 0;
@@ -218,7 +221,10 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
       src = -1;
     } else if (op->cmd == SLICC_FDOP_OPEN) {
       src = open(op->path, op->oflag, op->mode);
-      if (src < 0) goto fail;
+      if (src < 0) {
+        err = errno;
+        goto fail;
+      }
       if (nopened < 8) opened[nopened++] = src;
     } else {
       if (op->cmd == SLICC_FDOP_CHDIR) cwd = op->path;
@@ -240,7 +246,9 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
   return 0;
 fail:
   for (int i = 0; i < nopened; i++) close(opened[i]);
-  return 2; // ENOENT: an open() file action failed
+  // The failed open()'s errno, as musl's posix_spawn returns it (homescoop#1302:
+  // this returned 2, which is EACCES in Emscripten's WASI numbering).
+  return err;
 }
 
 // posix_spawnp searches PATH as musl's execvp does: a name with a '/' is

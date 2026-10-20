@@ -17,8 +17,10 @@
  * it the link fails instead of select() never waiting).
  *
  * AF_INET (IPv4) and AF_UNIX, SOCK_STREAM only. getaddrinfo answers
- * localhost, the machine's own gethostname() and numeric IPv4 itself, and
- * asks the kernel's resolver (Module.sliccKernel.net.resolve, slicc-kernel
+ * localhost, the machine's own gethostname() and numeric IPv4 itself, then
+ * the names /etc/hosts lists (musl's order, homescoop#580; slicc-kernel
+ * 1.131.0 and later read the file in net.resolve too), and asks the kernel's
+ * resolver (Module.sliccKernel.net.resolve, slicc-kernel
  * >= 1.27.0: /etc/hosts, then the page's uplink such as Tailscale MagicDNS)
  * for every other name, A records only, since these sockets are IPv4. On
  * older kernels other names are EAI_NONAME, as before.
@@ -424,6 +426,49 @@ static int service_port(const char *service, int flags, int *port) {
 
 #define SLICC_MAX_ADDRS 8
 
+/* A name as /etc/hosts lists it (any field after the address, case-insensitive, a final dot ignored). */
+static int hosts_name_is(const char *field, size_t flen, const char *name) {
+  size_t n = strlen(name);
+  if (n && name[n - 1] == '.') n--;
+  if (flen && field[flen - 1] == '.') flen--;
+  return n && n == flen && strncasecmp(field, name, n) == 0;
+}
+
+/* The IPv4 addresses /etc/hosts gives `name`, first lines first, as musl's
+ * name_from_hosts (homescoop#580): a name root adds there resolves forward as
+ * it does in reverse (getnameinfo), so a daemon's forward check of it can
+ * succeed. Only the lookup moves: a connect still goes through the kernel's
+ * routes and policy, whatever name it came from. 0 when the file has none. */
+static int hosts_ips(const char *name, struct in_addr *ips) {
+  char line[512];
+  int n = 0;
+  FILE *f = fopen("/etc/hosts", "r");
+  if (!f) return 0;
+  while (n < SLICC_MAX_ADDRS && fgets(line, sizeof line, f)) {
+    char *p = strchr(line, '#'), *z;
+    struct in_addr v4;
+    if (p) *p = '\0';
+    for (p = line; *p && isspace((unsigned char)*p); p++);
+    for (z = p; *z && !isspace((unsigned char)*z); z++);
+    if (!*z) continue;
+    *z++ = '\0';
+    if (inet_pton(AF_INET, p, &v4) != 1) continue; /* IPv6 lines: these sockets are IPv4 */
+    for (p = z;; p = z) {
+      for (; *p && isspace((unsigned char)*p); p++);
+      if (!*p) break;
+      for (z = p; *z && !isspace((unsigned char)*z); z++);
+      if (hosts_name_is(p, (size_t)(z - p), name)) {
+        int seen = 0;
+        for (int i = 0; i < n; i++) seen |= ips[i].s_addr == v4.s_addr;
+        if (!seen) ips[n++] = v4;
+        break;
+      }
+    }
+  }
+  fclose(f);
+  return n;
+}
+
 /* Up to SLICC_MAX_ADDRS addresses for node in ips; *count is how many. */
 static int host_ips(const char *node, int flags, struct in_addr *ips, int *count) {
   *count = 1;
@@ -436,6 +481,11 @@ static int host_ips(const char *node, int flags, struct in_addr *ips, int *count
   if (flags & AI_NUMERICHOST) return EAI_NONAME;
   if (is_localhost(node)) {
     ips[0].s_addr = htonl(INADDR_LOOPBACK);
+    return 0;
+  }
+  int listed = hosts_ips(node, ips);
+  if (listed > 0) {
+    *count = listed;
     return 0;
   }
   unsigned found[SLICC_MAX_ADDRS];

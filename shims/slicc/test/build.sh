@@ -7,6 +7,8 @@
 # - selfkill-test against `cli` (raise/kill of the program itself);
 # - rlimit-test against `cli` (setrlimit/getrlimit/prlimit, homescoop#178);
 # - siginherit-test and flock-test against `cli` (homescoop#973, #947);
+# - spawn-test against `cli` (file actions, the environment: homescoop#1302,
+#   #612);
 # - exec-test against `cli` (most packages) and exec-test-fork against
 #   `fork` (bash, tar, findutils: fork emulation + Asyncify).
 set -euo pipefail
@@ -59,6 +61,12 @@ emcc -O2 -Wall -Wextra -Werror "$HERE/selfkill-test.c" \
   -o "$OUT/selfkill-test.js"
 mv "$OUT/selfkill-test.js" "$OUT/selfkill-test"
 echo "== built $OUT/selfkill-test"
+# shellcheck disable=SC2046
+emcc -O2 -Wall -Wextra -Werror "$HERE/spawn-test.c" \
+  $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags) \
+  -o "$OUT/spawn-test.js"
+mv "$OUT/spawn-test.js" "$OUT/spawn-test"
+echo "== built $OUT/spawn-test"
 # shellcheck disable=SC2046
 emcc -O2 -Wall -Wextra -Werror "$HERE/uname-test.c" \
   $(homescoop_slicc_link_archive "$SLICC_CLI") $(homescoop_em_cli_ldflags) \

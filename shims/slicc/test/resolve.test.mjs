@@ -115,3 +115,67 @@ test('a kernel without net.resolve (1.26): as before, EAI_NONAME', async () => {
   const local = await kernel.run(['resolve-test', 'localhost'])
   assert.equal(local.stdout, '127.0.0.1\n', show(local))
 })
+
+// getaddrinfo reads /etc/hosts before the kernel's resolver, as musl does
+// (homescoop#580). On 1.28.0 net.resolve doesn't read the file (slicc-kernel
+// 1.131.0 and later do), so this is the shim's own lookup.
+const hosts = [
+  '127.0.0.1 myhost localhost',
+  '127.0.0.5 other',
+  '10.1.2.3 db db.lan',
+  '10.1.2.4 db',
+  '# 10.9.9.9 commented',
+  '::1 v6only',
+  '169.254.169.254 meta',
+  '100.64.1.2 alias-peer',
+].join('\n') + '\n'
+
+test('a name root adds to /etc/hosts resolves, first lines first, without asking the uplink', async () => {
+  const net = uplink()
+  const kernel = await boot(createNodeKernel, { network: { uplink: net } })
+  await kernel.writeFile('/etc/hosts', hosts)
+  const cases = [['myhost', '127.0.0.1\n'], ['MYHOST.', '127.0.0.1\n'], ['db', '10.1.2.3\n10.1.2.4\n'], ['db.lan', '10.1.2.3\n'], ['other', '127.0.0.5\n']]
+  for (const [name, want] of cases) {
+    const r = await kernel.run(['resolve-test', name])
+    assert.equal(r.status, 0, `${name}: ${show(r)}`)
+    assert.equal(r.stdout, want, name)
+  }
+  assert.deepEqual(net.asked, [], `the uplink was asked: ${JSON.stringify(net.asked)}`)
+  for (const name of ['commented', 'v6only']) {
+    const r = await kernel.run(['resolve-test', name])
+    assert.equal(r.status, 2, `${name}: ${show(r)}`)
+  }
+  assert.deepEqual(net.asked.map(a => a.name), ['commented', 'v6only'])
+})
+
+test('the forward check: a hosts name confirms its own address and refuses others', async () => {
+  const kernel = await boot(createNodeKernel, { network: { uplink: uplink() } })
+  await kernel.writeFile('/etc/hosts', hosts)
+  const cases = [
+    ['127.0.0.1', '127.0.0.1 myhost\n'],
+    ['127.0.0.5', '127.0.0.5 other\n'],
+    ['127.0.0.7', '127.0.0.7 UNKNOWN (localhost is elsewhere)\n'],
+    ['10.1.2.4', '10.1.2.4 db\n'],
+    ['100.64.1.3', '100.64.1.3 UNKNOWN (no name)\n'],
+  ]
+  for (const [addr, want] of cases) {
+    const r = await kernel.run(['resolve-test', '--confirm', addr])
+    assert.equal(r.stdout, want, `${addr}: ${show(r)}`)
+  }
+})
+
+test('a hosts entry changes only the lookup: a connect still takes the kernel\'s routes', async () => {
+  const net = uplink()
+  const kernel = await boot(createNodeKernel, { network: { uplink: net } })
+  await kernel.writeFile('/etc/hosts', hosts)
+  const named = await kernel.run(['resolve-test', 'meta', '80'])
+  const numeric = await kernel.run(['resolve-test', '169.254.169.254', '80'])
+  assert.equal(named.status, 3, show(named))
+  assert.equal(named.stdout, '169.254.169.254\n', show(named))
+  assert.equal(named.stderr, numeric.stderr, `by name and by number alike: ${show(named)}${show(numeric)}`)
+  const peer = await kernel.run(['resolve-test', 'alias-peer', '8080', 'hosts'])
+  assert.equal(peer.stdout, '100.64.1.2\nhello hosts\n', show(peer))
+  assert.deepEqual(net.dialled, [{ host: '100.64.1.2', port: 8080 }])
+  assert.deepEqual(net.asked, [])
+})
+

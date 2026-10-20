@@ -11,6 +11,7 @@
     "slicc-kernel-1-26": "npm:@ai-ecoverse/slicc-kernel@1.26.6",
     "slicc-kernel-k1": "npm:@ai-ecoverse/slicc-kernel@1.47.1",
     "slicc-kernel-current": "npm:@ai-ecoverse/slicc-kernel@1.69.0",
-    "slicc-kernel-selfkill": "npm:@ai-ecoverse/slicc-kernel@1.73.2"
+    "slicc-kernel-selfkill": "npm:@ai-ecoverse/slicc-kernel@1.73.2",
+    "slicc-kernel-hosts": "npm:@ai-ecoverse/slicc-kernel@1.137.0"
   }
 }
