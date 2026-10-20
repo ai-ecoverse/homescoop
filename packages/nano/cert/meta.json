@@ -1,8 +1,11 @@
 {
   "harness": "slicc-kernel",
   "users": "enforce",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.26.6",
-  "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
+  "kernel": "@ai-ecoverse/slicc-kernel@1.132.1",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-8",
     "@ai-ecoverse/wasm-coreutils@9.12.0-3"
@@ -13,6 +16,7 @@
     "not a tty: 'Standard input is not a terminal', rc 1, no file created",
     "pty, new file: type two lines, ^O + Enter ('Write to File: new.txt', '[ Wrote 2 lines ]'), ^X exits 0; bytes compared",
     "pty, existing file: '[ Read 2 lines ]', ^E + UTF-8 text, ^O + Enter, ^X; bytes compared",
-    "pty, modified buffer: ^X asks 'Save modified buffer?', n discards, file unchanged"
+    "pty, modified buffer: ^X asks 'Save modified buffer?', n discards, file unchanged",
+    "cert/locking.mjs (8.7.1-6, homescoop#866): as an added user ed, nano -G f.txt on a pty shows no \"Couldn't determine my identity for lock file\"; while it's open /home/ed/.f.txt.swp exists and holds 'ed' at nano's user-name offset 28; after ^X it's gone (build.sh links homescoop_slicc_wrap_pwd, so getpwuid is the slicc passwd shim's). 8.7.1-5: the identity message, no lock file (NEGATIVE.md)"
   ]
 }
