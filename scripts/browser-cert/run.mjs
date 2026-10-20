@@ -26,6 +26,7 @@ import { recorder } from './cases.mjs';
 import { certMetaFile, pathLabel, readCertMeta } from './cert-meta.mjs';
 import { makeContext } from './context.mjs';
 import { glueByPath, glueCheckPlan, glueStep, runMode } from './glue.mjs';
+import { checkTarballNotices } from './tarball-notices.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
@@ -179,6 +180,24 @@ const mode = runMode({ glueOnly, specs: certSpecs.length, abi, commands: cmdName
 if (mode.mode === 'skip') {
   console.log(`browser-cert: skip ${npmName} (${mode.why})`);
   cleanup(0, 'skip');
+}
+
+if (soft || livePort || glueOnly) {
+  console.log(`browser-cert: tarball notices skipped: ${soft ? '--soft' : livePort ? '--live' : '--glue-only'}`);
+} else {
+  const tn = checkTarballNotices({ root, pkgName, pkgRoot, manifest });
+  if (tn.skipped) {
+    console.log(`notices: PASS ${npmName}: ${tn.skipped}`);
+    report.specs.push({ spec: 'tarball-notices', status: 'pass', durationMs: 0 });
+  } else if (tn.errors.length) {
+    console.error(`browser-cert: FAIL tarball notices (homescoop#893, #906): ${tn.errors.join('; ')}`);
+    console.log(`notices: FAIL ${npmName}: ${tn.errors.length} problem(s)`);
+    report.specs.push({ spec: 'tarball-notices', status: 'fail', durationMs: 0, error: tn.errors.join('; ') });
+    process.exitCode = 1;
+  } else {
+    console.log(`notices: PASS ${npmName}: ${tn.sections.length} section(s)${tn.required.length ? `, including ${tn.required.join(' and ')}` : ''}`);
+    report.specs.push({ spec: 'tarball-notices', status: 'pass', durationMs: 0 });
+  }
 }
 
 function listFiles(dir, base = dir) {

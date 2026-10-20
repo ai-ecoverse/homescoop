@@ -1,0 +1,50 @@
+--- ruby.c
++++ ruby.c
+@@ -757,9 +757,25 @@
+     ruby_push_include(getenv("RUBYLIB"), identical_path);
+ 
+     id_initial_load_path_mark = INITIAL_LOAD_PATH_MARK;
++#if defined(__wasi__) && !(defined(LOAD_RELATIVE) && LOAD_RELATIVE)
++    /* WASIX_LOAD_PATH (homescoop#597): the package sets WASIX_RUBY_PREFIX
++     * to where it is installed; the initial load path (lib/ruby/<ver> and
++     * its arch directory) is taken under it instead of the compiled-in
++     * prefix, which never exists. */
++    const char *wasix_prefix = getenv("WASIX_RUBY_PREFIX");
++    const size_t wasix_prefix_len = wasix_prefix ? strlen(wasix_prefix) : 0;
++#endif
+     while (*paths) {
+         size_t len = strlen(paths);
+-        VALUE path = RUBY_RELATIVE(paths, len);
++        VALUE path;
++#if defined(__wasi__) && !(defined(LOAD_RELATIVE) && LOAD_RELATIVE)
++        if (wasix_prefix_len && len >= exec_prefix_len && !strncmp(paths, ruby_exec_prefix, exec_prefix_len)) {
++            path = rubylib_path_new(wasix_prefix, wasix_prefix_len);
++            rb_str_cat(path, paths + exec_prefix_len, len - exec_prefix_len);
++        }
++        else
++#endif
++        path = RUBY_RELATIVE(paths, len);
+         rb_ivar_set(path, id_initial_load_path_mark, path);
+         rb_ary_push(load_path, path);
+         paths += len + 1;
+--- loadpath.c
++++ loadpath.c
+@@ -10,6 +10,18 @@
+ **********************************************************************/
+ 
+ #include "verconf.h"
++
++/* WASIX_LOAD_PATH (homescoop#597): the compiled-in prefix is a path that
++ * never exists on slicc, so drop the site and vendor directories from the
++ * initial load path; ruby.c maps the rest under $WASIX_RUBY_PREFIX. */
++#if defined(__wasi__)
++# ifndef NO_RUBY_SITE_LIB
++#  define NO_RUBY_SITE_LIB 1
++# endif
++# ifndef NO_RUBY_VENDOR_LIB
++#  define NO_RUBY_VENDOR_LIB 1
++# endif
++#endif
+ #include "ruby/ruby.h"
+ 
+ /* Define RUBY_REVISION to avoid revision.h inclusion via version.h. */

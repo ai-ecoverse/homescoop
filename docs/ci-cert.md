@@ -336,7 +336,7 @@ jobs:
 | `kernel` | (required) | an npm spec (`@ai-ecoverse/slicc-kernel@1.85.1`, or a bare `1.85.1`), or the name of an artifact holding one kernel `.tgz`, uploaded earlier in the calling run |
 | `set` | `base,ci-certified` | comma-separated: `base` and `catalog` (slicc-bios's base set and optional catalog, at the versions bios pins), `ci-certified` ([`scripts/ci-certified.json`](../scripts/ci-certified.json)), `all` (every recipe with `cert/*.mjs`), or recipe / npm names, `name[@version]` |
 | `homescoop-ref` | `main` | the homescoop commit whose specs and scripts run |
-| `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` and `src/packages/optional/package-lock.json` give `base`, `catalog` and the **reference kernel** |
+| `bios-ref` | `main` | the slicc-bios commit whose `src/packages/package-lock.json` gives `base` and the **reference kernel**, and whose `src/packages/optional/catalog.json` gives `catalog`: its keys except `kind: "project"` entries, each at npm `latest`, and an entry with a `range` (wasix-python) at the highest version whose X.Y.Z satisfies it. A commit from before catalog.json reads `src/packages/optional/package.json` and its lock instead |
 | `reference` | `''` | the **reference kernel** to compare against, instead of the one `bios-ref` pins: a published `@ai-ecoverse/slicc-kernel` version (`1.98.2`) or `@ai-ecoverse/slicc-kernel@<version or dist-tag>`. Nothing else is accepted: not git, file or URL specs, and not an artifact. A trusted run (see [Runners](#runners-and-capacity)) checks it like `kernel`, and an invalid one runs on `ubuntu-latest`, where `plan` refuses it. `base` and `catalog` still come from `bios-ref`. `compat.json`'s `reference.origin` (`input` or `slicc-bios`) and `inputs.reference` record the choice, and `summary.md` names it |
 | `runner` | `''` | `runs-on` for the shards: `inputs.runner \|\| vars.CERT_RUNNER`, **only for a same-repo PR or a trusted run on main** (see [Runners](#runners-and-capacity)), else `ubuntu-latest` |
 | `light-runner` | `''` | `runs-on` for plan and report: `inputs.light-runner \|\| vars.CERT_LIGHT_RUNNER`, else the shards' runner, under the same rule, else `ubuntu-latest` |
@@ -485,6 +485,20 @@ pool each gets a machine within about a minute.
 
 The unit is a **case**: one assertion of a spec, or one sweep command.
 
+- **Which cert/:** a published tarball runs the `cert/` that matches it. When
+  the run is for a change (a PR head or a merge group head, not main),
+  `kernel-compat.yml` finds main's merge base with it, and a package whose
+  `cert/` the change touches runs its published tarballs with the **base's**
+  `cert/` (`--cert-base`, extracted into the plan as `base-cert/`); its
+  cert-review already ran the new spec on the new tarball. A `cert/` that is
+  new in the change is skipped.
+- **The reference and `engines`:** when the package or a peer it installs
+  declares `engines.slicc-kernel` above the plan's reference kernel, the
+  reference for that package is its floor (the highest `>=` among them,
+  fetched from npm; `compat.json`'s `reference.at` says why). A reference run
+  that still fails on an engines refusal (`<pkg> needs slicc-kernel >=…; this
+  kernel is …`) makes the failures **can't judge**: known, `reference:
+  engines`, never a regression.
 - **Cases:** under kernel-compat, `run.mjs --soft` records every `ctx.assert`
   call and goes on after a failed one, so one failure doesn't hide the next.
   A case is named by its call site in the spec (with the spec's helpers):

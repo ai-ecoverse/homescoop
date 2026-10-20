@@ -30,15 +30,23 @@ export async function writeBytes(ctx, path, bytes) {
  * entries are { name: Buffer, data: Buffer, flags?: number, extra?: Buffer }.
  * Optional, per entry: method (the header's compression method, the data is
  * still written as given), madeBy (the central "version made by" word),
- * csize/usize (header sizes), sameAs (an index: this central entry points
- * at that entry's local header and has none of its own).
+ * csize/usize (header sizes), sameAs (an entry's index in `entries`, or its
+ * name: this central entry points at that entry's local header and has none
+ * of its own). Options: zip64Eocd: { totalDisks } appends a zip64 end of
+ * central directory record and locator, as Windows writes them (it puts 0
+ * in the locator's total disks, homescoop#652).
  */
-export function storedZip(entries) {
+export function storedZip(entries, options = {}) {
   const locals = [];
   const centrals = [];
-  const offsets = [];
+  const offsets = new Map();
+  const target = (ref) => {
+    const i = typeof ref === 'number' ? ref : entries.findIndex((x) => x.sameAs === undefined && Buffer.from(x.name).equals(Buffer.from(ref)));
+    if (!offsets.has(i)) throw new Error(`sameAs ${String(ref)}: no earlier entry with its own local header`);
+    return offsets.get(i);
+  };
   let off = 0;
-  for (const e of entries) {
+  for (const [index, e] of entries.entries()) {
     const flags = e.flags ?? 0;
     const extra = e.extra ?? Buffer.alloc(0);
     const crc = crc32(e.data);
@@ -59,11 +67,11 @@ export function storedZip(entries) {
       ch.writeUInt16LE(e.name.length, 28);
       ch.writeUInt16LE(extra.length, 30);
       ch.writeUInt32LE((0o100644 << 16) >>> 0, 38);
-      ch.writeUInt32LE(offsets[e.sameAs], 42);
+      ch.writeUInt32LE(target(e.sameAs), 42);
       centrals.push(Buffer.concat([ch, e.name, extra]));
       continue;
     }
-    offsets.push(off);
+    offsets.set(index, off);
     const lh = Buffer.alloc(30);
     lh.writeUInt32LE(0x04034b50, 0);
     lh.writeUInt16LE(10, 4); // version needed
@@ -103,7 +111,21 @@ export function storedZip(entries) {
   end.writeUInt16LE(centrals.length, 10);
   end.writeUInt32LE(cd.length, 12);
   end.writeUInt32LE(off, 16);
-  return Buffer.concat([...locals, cd, end]);
+  if (!options.zip64Eocd) return Buffer.concat([...locals, cd, end]);
+  const z64 = Buffer.alloc(56);
+  z64.writeUInt32LE(0x06064b50, 0);
+  z64.writeBigUInt64LE(44n, 4);
+  z64.writeUInt16LE((3 << 8) | 45, 12);
+  z64.writeUInt16LE(45, 14);
+  z64.writeBigUInt64LE(BigInt(centrals.length), 24);
+  z64.writeBigUInt64LE(BigInt(centrals.length), 32);
+  z64.writeBigUInt64LE(BigInt(cd.length), 40);
+  z64.writeBigUInt64LE(BigInt(off), 48);
+  const loc = Buffer.alloc(20);
+  loc.writeUInt32LE(0x07064b50, 0);
+  loc.writeBigUInt64LE(BigInt(off + cd.length), 8);
+  loc.writeUInt32LE(options.zip64Eocd.totalDisks ?? 1, 16);
+  return Buffer.concat([...locals, cd, z64, loc, end]);
 }
 
 /** Info-ZIP's Unicode Path extra field (0x7075) for a raw local name. */

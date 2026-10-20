@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/py-numpy",
-  "version": "2.5.4-2",
-  "description": "NumPy 2.5.4 for slicc WASIX CPython 3.15 (OpenBLAS static into umath/linalg, zero signature_mismatch)",
+  "version": "2.5.4-3",
+  "description": "NumPy, the fundamental package for array computing in Python.",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",

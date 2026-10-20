@@ -185,3 +185,20 @@ The 4.2.0-1 build also passes, unchanged:
 - **A build that returns 0 for a verification that failed** (the review's case, `return 0;` instead of `return flags == 0 ? 0 : 1;`) fails three cases on the return code (wrong host, untrusted/expired/clientAuth, the IP literal against a dNSName), so a caller that checks only `== 0` is covered.
 - **4.2.0-5 as built:** client-api 29/29 and engine-api 19/19 (the server and client session ABIs are unchanged; the session's name parsing and IP-SAN check now go through the same `name_parse` and `ip_name_flags` as `tls_chain_verify`).
 
+## 4.2.0-6: the burn-down (homescoop#1042, #1091, #1121; 2026-10-20)
+
+`node --test packages/tls-engine/cert/lib/client-api.mjs` against the published 4.2.0-5 fails the three new tests:
+
+```text
+✖ an RSA client key in PKCS#8 … (homescoop#1121)
+  AssertionError: PKCS#8 DER: HMAC_DRBG - Too many random requested in single call
+✖ a server name is its bytes: tls_client_new_name refuses one with a NUL inside … (homescoop#1042)
+  TypeError: engine.m._tls_client_new_name is not a function
+✖ tls_strerror names the engine's own codes … (homescoop#1091)
+```
+
+- **#1121:** `mbedtls_pk_check_pair` refuses an RSA key parsed from PKCS#8 under Mbed TLS 4's PSA-backed pk, though the key matches the leaf. 4.2.0-6 then compares the public key the private key carries with the leaf's, as DER SubjectPublicKeyInfo. A key for another certificate still differs there, and is refused at `tls_client_cert` with `TLS_BADARG`, which the kernel maps to `ERR_OSSL_X509_KEY_VALUES_MISMATCH`.
+- **#1091:** the engine's -1, -2 and -3 are also Mbed TLS's HMAC_DRBG codes, which `mbedtls_strerror` named instead. `crypto_strerror` now names the engine's codes first.
+- **#1042:** the C-string API can't see a NUL. The new `tls_client_new_name` takes the length, so slicc-kernel's binding (zzy4) can switch to it, and refuses a NUL inside the name.
+
+All 32 client-api and 19 engine-api tests pass on 4.2.0-6.

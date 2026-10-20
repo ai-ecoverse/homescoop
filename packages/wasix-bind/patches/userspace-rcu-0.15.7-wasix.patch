@@ -1,0 +1,27 @@
+--- a/include/urcu/arch.h
++++ b/include/urcu/arch.h
+@@ -157,6 +157,13 @@
+ #define URCU_ARCH_LOONGARCH 1
+ #include <urcu/arch/loongarch.h>
+ 
++#elif defined(__wasm__)
++
++#define URCU_ARCH_WASM 1
++#include <urcu/compiler.h>
++#include <urcu/config.h>
++#include <urcu/arch/generic.h>
++
+ #else
+ #error "Cannot build: unrecognized architecture, see <urcu/arch.h>."
+ #endif
+--- a/include/urcu/syscall-compat.h
++++ b/include/urcu/syscall-compat.h
+@@ -16,7 +16,7 @@
+ 
+ #elif defined(__CYGWIN__) || defined(__APPLE__) || \
+ 	defined(__FreeBSD__) || defined(__DragonFly__) || \
+-	defined(__OpenBSD__)
++	defined(__OpenBSD__) || defined(__wasi__)
+ /* Don't include anything on these platforms. */
+ 
+ #else

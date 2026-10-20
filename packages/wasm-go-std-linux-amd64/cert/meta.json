@@ -16,7 +16,8 @@
   ],
   "checklist": [
     "package.json slicc.go.version (go1.27.2) is the goroot/VERSION of the wasm-go it pairs with, so seven's go driver matches them by (version, target) (homescoop#746)",
-    "with wasm-go's compile and link of the same version (this run's peer artifact, else the registry's; in the kernel, as cone, GOOS=linux GOARCH=amd64): a fmt/os program cross-links against this std into a 64-bit little-endian x86-64 ET_EXEC ELF over 1 MB, read back byte-exact (ctx.readBytes, homescoop#738): every PT_LOAD lies inside the file and e_entry falls in an executable one; on a linux/amd64 host it runs and prints 'hello from go 42 1'"
+    "with wasm-go's compile and link of the same version (this run's peer artifact, else the registry's; in the kernel, as cone, GOOS=linux GOARCH=amd64): a fmt/os program cross-links against this std into a 64-bit little-endian x86-64 ET_EXEC ELF over 1 MB, read back byte-exact (ctx.readBytes, homescoop#738): every PT_LOAD lies inside the file and e_entry falls in an executable one; on a linux/amd64 host it runs and prints 'hello from go 42 1'",
+    "cert/licence.mjs (1.27.2-2, homescoop#897): the package ships Go's LICENSE (Copyright 2009 The Go Authors, BSD-3-Clause) and PATENTS (Additional IP Rights Grant (Patents)), both from the pinned go source tarball and both in package.json files[]. 1.27.2-1 shipped LICENSE only (NEGATIVE.md)"
   ],
   "users": "enforce"
 }

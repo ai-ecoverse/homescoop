@@ -18,6 +18,9 @@ puts "lib=" + OpenSSL::OPENSSL_LIBRARY_VERSION
 puts "notices-zlib=" + n[/^## zlib \S+ \(@ai-ecoverse\/wasix-zlib \S+\)/].to_s
 puts "zlib=" + Zlib::ZLIB_VERSION
 puts "paths=" + bad.size.to_s + (bad.empty? ? "" : " " + bad.map { |s| s[0, 120] }.join(" ; "))
+rb = RbConfig::CONFIG.select { |k, v| v.is_a?(String) && v.match?(%r{/home/|/Users/|/tmp/|/__w/|/private/|/work/}) }
+puts "rbconfig=" + rb.size.to_s + (rb.empty? ? "" : " " + rb.map { |k, v| k + "=" + v[0, 120] }.join(" ; "))
+puts "build=" + RbConfig::CONFIG["configure_args"][/--with-libyaml-dir=(\S+?)'/, 1].to_s
 `;
 
 export default async function (ctx) {
@@ -39,5 +42,7 @@ export default async function (ctx) {
   assert.ok(z, `THIRD-PARTY-NOTICES.md has a zlib heading:\n${out}`);
   if (z) assert.equal(get('zlib'), z[1], `Zlib::ZLIB_VERSION is the notices' zlib:\n${out}`);
   assert.equal(get('paths'), '0', `no build path in package.json:\n${out}`);
+  assert.equal(get('rbconfig'), '0', `no build path in RbConfig::CONFIG (homescoop#1114; 3.4.11-20: 9 lines with /home/runner/work/...):\n${out}`);
+  assert.equal(get('build'), '/nonexistent-ruby-build/yaml-prefix', `the build tree is named /nonexistent-ruby-build in rbconfig.rb:\n${out}`);
   console.log(`package-meta: ${r.stdout.trim().replace(/\n/g, ' | ')}`);
 }

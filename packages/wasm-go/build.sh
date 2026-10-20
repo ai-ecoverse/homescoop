@@ -71,12 +71,9 @@ rm -rf "$DEST"
 mkdir -p "$(dirname "$DEST")"
 cp -R "$OUT" "$DEST"
 
-if [[ -f "$(go env GOROOT)/LICENSE" ]]; then
-  homescoop_stage_license "$(go env GOROOT)/LICENSE"
-else
-  curl -fsSL "https://raw.githubusercontent.com/golang/go/go${VER}/LICENSE" \
-    -o "$HOMESCOOP_PKG/package/LICENSE"
-fi
+homescoop_stage_license "$GO_SRC/LICENSE"
+cp "$GO_SRC/PATENTS" "$HOMESCOOP_PKG/package/PATENTS"
+grep -q '^Additional IP Rights Grant (Patents)$' "$HOMESCOOP_PKG/package/PATENTS"
 
 if command -v wasmtime >/dev/null 2>&1; then
   echo "== wasm-go: wasmtime smoke (compile -V)"

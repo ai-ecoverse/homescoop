@@ -29,3 +29,7 @@ Runs: slicc-kernel 1.110.1, users enforce, `scripts/browser-cert/run.mjs`. The w
   - 'go1.27.2'
   ```
 - **1.27.2-1 as Renovate's #742 first built it** (`slicc.go.version` still `go1.26.5`) fails `hello.mjs` the same way. This PR's 1.27.2-1 passes.
+
+## 1.27.2-2: Go's PATENTS (homescoop#897; 2026-10-20)
+
+`cert/licence.mjs` against the published @ai-ecoverse/wasm-go-std-wasip1@1.27.2-1: FAIL, `PATENTS is not in the package`, and `files[]` doesn't list it. -1 staged Go's `LICENSE` alone. -2 copies `PATENTS` from the pinned `go1.27.2.src.tar.gz` too.

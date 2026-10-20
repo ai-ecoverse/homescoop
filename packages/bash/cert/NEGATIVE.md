@@ -179,3 +179,14 @@ wasm-bash 5.3.0-19: 3 rounds … bash keeps the terminal and reads its next line
 ```
 
 On 1.130.2 (the fix), both 5.3.0-19 and -20 pass, so this is the regression guard. The kernel's own row (`test/integration/settling-inherited.test.mjs`) fails the same way on 1.129.0 with -20.
+
+## 5.3.0-21: a ^C never interrupts a loop of builtins (homescoop#1236)
+
+`cert/builtin-loop-sigint.mjs` against the published 5.3.0-21 (slicc-kernel 1.130.2, users enforce, 2026-10-20) fails:
+
+```text
+browser-cert: FAIL packages/bash/cert/builtin-loop-sigint.mjs
+AssertionError [ERR_ASSERTION]: i=0; while ((i<50000000)); do ((i++)); done; echo after=$i: a ^C 300 ms in didn't bring bash back to its prompt
+```
+
+The loop makes no kernel call, so the SIGINT stays pending until it ends. 5.3.0-22's `quit-signal-poll.patch` sleeps 0 ms through the shim every 1024 `QUIT`s; the kernel delivers the SIGINT on the way back, and bash throws to the top level. 5.3.0-22 passes every spec on 1.130.2.
