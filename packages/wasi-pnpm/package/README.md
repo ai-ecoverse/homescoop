@@ -1,7 +1,7 @@
 # @ai-ecoverse/wasi-pnpm
 
 [pnpm](https://pnpm.io) 12 for SLICC's WASI runtime (`@ai-ecoverse/slicc-kernel` ≥ 1.7.2):
-commands `pnpm` and `pn`. Older kernels can lose a sync filesystem answer under
+commands `pnpm` and `pn`, plus `npm`, `npx` and `i`. Older kernels can lose a sync filesystem answer under
 load, which makes pnpm hang or fail with os error 73.
 
 `bin/pnpm.wasm` is built by homescoop from pnpm's source (v12.9.1, commit
@@ -14,7 +14,7 @@ platform") as the upstream `@pnpm/wasm` 12.9.1 binary does under load; and
 pnpm-cli doesn't compile its source checkout's path into the wasm, which
 holds no build path. It is
 therefore not byte-identical to `@pnpm/wasm` (MIT; see `LICENSE` and
-`THIRD-PARTY-NOTICES.md`). It imports three host modules besides
+`THIRD-PARTY-NOTICES.md`, see Notices). It imports three host modules besides
 WASI; `host/pnpm-host.mjs` implements them on top of slicc-kernel, which loads it
 through `slicc.commands.<name>.imports`:
 
@@ -123,6 +123,44 @@ a thread memory above it. pnpm starts with 320 MiB of memory (since
 12.9.1-17; 256 MiB in -14 to -16), above an agent install's measured peak
 (280 MiB cold, 96 MiB warm), so it rarely grows at all.
 
+## A project's commands (12.9.1-19)
+
+`pnpm exec <bin>`, `pnpm <bin>` and `npx <bin>` run the project's own
+`node_modules/.bin/<bin>`, from the project or any directory below it, as
+they do elsewhere (homescoop#667). `npm run` and `pnpm run` also work in a
+project with a `file:` dependency (homescoop#1247): pnpm's
+`verify-deps-before-run` re-runs pnpm for an install first. Up to 12.9.1-18,
+`host/pnpm-host.mjs` refused pnpm's spawns other than `sh` and `git`, so
+these failed with "Lifecycle scripts cannot run in slicc yet". Now the host
+starts pnpm as the `pnpm` command, and any other program as the file pnpm's
+`PATH` finds (`node` stays refused: slicc has none). Install-time lifecycle
+scripts still stay off (`ignore-scripts=true`).
+
+## A private registry and the pin
+
+A project that pins pnpm (`packageManager: pnpm@…`, which `pnpm init`
+writes) resolves pnpm's own package before any command runs (homescoop#1256).
+This is upstream pnpm's behaviour. pnpm takes that registry only from the
+user's own settings: `~/.npmrc`, `pnpm config set registry <url>` or
+`pnpm_config_registry`. It doesn't take it from `--registry`, the project's
+`.npmrc` or `npm_config_registry`, so a repository can't choose where pnpm
+itself comes from. With only a private registry reachable, set it in one of
+the user's places:
+
+```sh
+pnpm config set registry https://registry.example/
+```
+
+Otherwise the command fails with `ERR_PNPM_BAD_CONFIG_DEP` (registry.npmjs.org
+unreachable).
+
+## Notices
+
+`THIRD-PARTY-NOTICES.md` holds upstream pnpm's notices (Yarn), then those
+of everything `bin/pnpm.wasm` links: the crates of pnpm-cli's dependency
+tree for `wasm32-wasip1-threads`, Rust's standard library and wasi-libc
+(since 12.9.1-19, homescoop#1325).
+
 ## `npm`, `npx` and `i`
 
 The package also provides `npm`, `npx` and `i` as small `#!/bin/sh` scripts
@@ -138,10 +176,11 @@ that run pnpm, so the commands agents type every day work:
 | `npm run <script> [-- args]`, `npm test` / `start` / `stop` / `restart` | `pnpm run <script> [args]` |
 | `npm update` / `ls` / `why` / `explain` | `pnpm update` / `list` / `why` |
 | any other `npm <verb>` | `pnpm <verb>` |
-| `npx <command> [args]` | the installed command; a command that is not installed is an error naming what to install (`npm i -g <pkg>`), nothing is downloaded on the fly |
+| `npx <command> [args]` | the project's `node_modules/.bin/<command>` (the nearest one from the working directory up), else the installed command; a command that is neither is an error naming what to install (`npm i -g <pkg>`), nothing is downloaded on the fly |
 
 `pnpm run` (and so `npm run`, `npm test`, `npm start`) runs package scripts
-through the kernel's `sh` (`host/pnpm-host.mjs` answers pnpm's `shell.spawn`);
+through the kernel's `sh` (`host/pnpm-host.mjs` answers pnpm's `shell.spawn`), and
+`pnpm exec` runs the project's commands;
 install-time lifecycle scripts stay off (`ignore-scripts=true`).
 
 pnpm keeps its default `minimumReleaseAge` (one day, `@ai-ecoverse/*`

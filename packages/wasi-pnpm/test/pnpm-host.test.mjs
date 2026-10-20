@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { kernelAtLeast, CA_MISSING, GIT_MISSING, GIT_UNSUPPORTED, TLS_MISSING, MAX_UPLOAD, childEnv, networkRemote, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders, SH_MISSING } from '../package/host/pnpm-host.mjs'
+import { kernelAtLeast, selfProgram, spawnable, resolveCommand, CA_MISSING, GIT_MISSING, GIT_UNSUPPORTED, TLS_MISSING, MAX_UPLOAD, childEnv, networkRemote, waitStatus, PUBLISH_TOO_LARGE, PUBLISH_UNSUPPORTED, createImports, envelope, errno, errorNumber, headerPairs, responseHeaders, SH_MISSING } from '../package/host/pnpm-host.mjs'
 
 function fakeContext () {
   const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true })
@@ -263,6 +263,22 @@ test('pnpm_fs directory_rename_cheap reads the kernel version once (12.9.1-18)',
   assert.equal(fs.directory_rename_cheap(), 1)
   assert.equal(fs.directory_rename_cheap(), 1)
   assert.equal(reads, 1)
+})
+
+test('process.spawn: pnpm itself and project commands run, git/ssh/node keep their rules (12.9.1-19)', () => {
+  assert.equal(selfProgram('/node_modules/@ai-ecoverse/wasi-pnpm/bin/pnpm.wasm'), true)
+  assert.equal(selfProgram('pnpm.wasm'), true)
+  assert.equal(selfProgram('/usr/bin/pnpm'), false)
+  for (const program of ['hello-bin', '/home/bob/app/node_modules/.bin/tsc', 'pnpm']) assert.equal(spawnable({ program }), true, program)
+  for (const program of ['git', '/usr/bin/git', 'ssh', 'node', '']) assert.equal(spawnable({ program }), false, program)
+  const files = { '/a/node_modules/.bin/hb': 'file', '/a/node_modules/.bin/d': 'dir', '/usr/bin/x': 'file', '/a/rel/tool': 'file' }
+  const ctx = { fs: { exists: (p) => p in files, stat: (p) => ({ isDirectory: files[p] === 'dir' }) } }
+  assert.equal(resolveCommand(ctx, 'hb', '/a/node_modules/.bin:/usr/bin', '/a'), '/a/node_modules/.bin/hb')
+  assert.equal(resolveCommand(ctx, 'x', '/a/node_modules/.bin:/usr/bin', '/a'), '/usr/bin/x')
+  assert.equal(resolveCommand(ctx, 'd', '/a/node_modules/.bin', '/a'), undefined)
+  assert.equal(resolveCommand(ctx, 'nope', '/a/node_modules/.bin:/usr/bin', '/a'), undefined)
+  assert.equal(resolveCommand(ctx, 'rel/tool', '', '/a'), '/a/rel/tool')
+  assert.equal(resolveCommand(ctx, 'hb', 'node_modules/.bin', '/a/'), '/a/node_modules/.bin/hb')
 })
 
 test('pnpm_fs path_access_executable checks the exec bits', () => {

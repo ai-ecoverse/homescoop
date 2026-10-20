@@ -328,6 +328,33 @@ export function networkRemote (request) {
   return (request.args ?? []).some(arg => NETWORK_REMOTE.test(String(arg)))
 }
 
+// pnpm's own module, as it names itself when it re-runs (process.execPath).
+export function selfProgram (program) {
+  return /(^|\/)pnpm\.wasm$/.test(String(program))
+}
+
+// A process.spawn the host runs (12.9.1-19): pnpm itself, or a command named
+// by a path or a bare name. Not git/ssh (spawnGit has its own rules) and not
+// node, which pnpm only probes for (`node --version`) and slicc doesn't have.
+export function spawnable (request) {
+  const name = programName(request)
+  return name !== '' && !['git', 'ssh', 'node'].includes(name)
+}
+
+// The file a bare command name runs, by the request's PATH (as execvp), or
+// the program itself when it names a path; undefined if no such file.
+export function resolveCommand (ctx, program, path, cwd) {
+  const abs = (p) => (p.startsWith('/') ? p : `${cwd.replace(/\/$/, '')}/${p}`)
+  const isFile = (p) => { try { return ctx.fs.exists(p) && kindOf(ctx.fs.stat(p)) !== 'dir' } catch { return false } }
+  if (program.includes('/')) return isFile(abs(program)) ? abs(program) : undefined
+  for (const dir of String(path ?? '').split(':')) {
+    if (dir === '') continue
+    const candidate = `${abs(dir).replace(/\/$/, '')}/${program}`
+    if (isFile(candidate)) return candidate
+  }
+  return undefined
+}
+
 export function spawnMessage (request) {
   const program = programName(request)
   return program === 'git' || program === 'ssh' ? GIT_UNSUPPORTED : SCRIPTS_UNSUPPORTED
@@ -561,6 +588,27 @@ function createHost (ctx) {
     return ctx.async.resolve({ ok: true, value: { handle: procHandle(child.pid, child.stdin), pid: child.pid, stdout: fdHandle(child.stdout), stderr: fdHandle(child.stderr) } })
   }
 
+  // 12.9.1-19 (homescoop#1247, #667): pnpm starts itself (the pre-run
+  // install of verify-deps-before-run, program = its own pnpm.wasm path) and
+  // project commands (pnpm exec <bin>, pnpm <bin>: program = the bin's name,
+  // with node_modules/.bin first on the request's PATH). Both run as kernel
+  // processes: pnpm as the pnpm command, a bin as the file pnpm's PATH finds.
+  function spawnCommand (request) {
+    const env = childEnv(request.env, ctx.env)
+    const program = String(request.program ?? '')
+    const cwd = request.cwd ?? ctx.cwd()
+    const argv0 = selfProgram(program) ? 'pnpm' : resolveCommand(ctx, program, env.PATH, cwd)
+    if (argv0 === undefined) return ctx.async.resolve(errorEnvelope(`${program}: command not found`, 'ENOENT'))
+    const stdio = name => (request[name] === 'ignore' || request[name] === 'null' ? 'null' : request[name] === 'inherit' ? 'inherit' : 'pipe')
+    let child
+    try {
+      child = ctx.spawn({ argv: [argv0, ...(request.args ?? []).map(String)], env, cwd, stdin: stdio('stdin'), stdout: stdio('stdout'), stderr: stdio('stderr') })
+    } catch (error) {
+      return ctx.async.resolve(errorEnvelope(`${program} could not start: ${error?.code ?? error?.message ?? 'EIO'}`, error?.code ?? 'EIO'))
+    }
+    return ctx.async.resolve({ ok: true, value: { handle: procHandle(child.pid, child.stdin), pid: child.pid, stdout: fdHandle(child.stdout), stderr: fdHandle(child.stderr) } })
+  }
+
   function processOp (request) {
     const { pid, stdin } = procOf(request.handle)
     switch (request.operation) {
@@ -667,6 +715,7 @@ function createHost (ctx) {
       if (request.operation === 'process.spawn' && programName(request) === 'git') return spawnGit(request)
       if (request.operation === 'process.spawn' && programName(request) === 'sh') return spawnSh(request, ['sh', ...(request.args ?? []).map(String)])
       if (request.operation === 'shell.spawn' && typeof request.script === 'string') return spawnSh(request, ['sh', '-c', request.script, 'sh', ...(request.args ?? []).map(String)])
+      if (request.operation === 'process.spawn' && spawnable(request)) return spawnCommand(request)
       return ctx.async.resolve(errorEnvelope(spawnMessage(request)))
     case 'process.write':
     case 'process.end':
