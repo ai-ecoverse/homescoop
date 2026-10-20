@@ -76,3 +76,7 @@ The published 7.1.2-34-8 also has 652 occurrence(s) of the CI build directory `/
 ## 7.1.2-34-9.1: the #562 and #624 patches in the kits (2026-10-18)
 
 The kits ship wasm-imagemagick(-heif) 7.1.2-34-9.1's objects, built with write-temp-then-rename.patch and mogrify-format-over-existing.patch. The published -9 kits relink programs that clobber an existing target on a failed write, and that write PNG bytes for `mogrify -format webp` over an existing .webp. See packages/imagemagick/cert/NEGATIVE.md. relink-check.mjs relinks both kits.
+
+## 7.1.2-34-9.2: the burn-down patches in the kits (2026-10-20)
+
+The kits ship wasm-imagemagick(-heif) 7.1.2-34-9.2's objects: the timer fix (#679), JP2 tiling above 16 MP (#561), and the owner check in the atomic write (#1258). The default font and the MPC policy are runtime files (etc/), not in the kits. See packages/imagemagick/cert/NEGATIVE.md.

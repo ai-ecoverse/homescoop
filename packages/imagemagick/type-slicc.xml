@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE typemap [
+  <!ELEMENT typemap (type)+>
+  <!ATTLIST typemap xmlns CDATA #FIXED ''>
+  <!ELEMENT type EMPTY>
+  <!ATTLIST type xmlns CDATA #FIXED '' encoding NMTOKEN #IMPLIED
+    family CDATA #REQUIRED format NMTOKEN #REQUIRED foundry NMTOKEN #REQUIRED
+    fullname CDATA #REQUIRED glyphs CDATA #REQUIRED metrics CDATA #REQUIRED
+    name NMTOKEN #REQUIRED stretch NMTOKEN #REQUIRED style NMTOKEN #REQUIRED
+    version CDATA #IMPLIED weight CDATA #REQUIRED>
+]>
+<!--
+  homescoop#586: slicc has no fontconfig, so text without -font needs a font
+  ImageMagick can find. These are the URW Nimbus Sans (Helvetica) Type 1 fonts
+  from gsfonts 8.11 (etc/fonts, GPL with the font exception), the same
+  entries as ImageMagick's type-ghostscript.xml. Paths are relative to this
+  file (etc/ImageMagick-7 and etc/ImageMagick-7-open).
+-->
+<typemap>
+  <type name="Helvetica" fullname="Helvetica Regular" family="Helvetica" foundry="URW" weight="400" style="normal" stretch="normal" format="type1" metrics="../fonts/n019003l.afm" glyphs="../fonts/n019003l.pfb"/>
+  <type name="Helvetica-Bold" fullname="Helvetica Bold" family="Helvetica" foundry="URW" weight="700" style="normal" stretch="normal" format="type1" metrics="../fonts/n019004l.afm" glyphs="../fonts/n019004l.pfb"/>
+  <type name="Helvetica-Oblique" fullname="Helvetica Regular Italic" family="Helvetica" foundry="URW" weight="400" style="italic" stretch="normal" format="type1" metrics="../fonts/n019023l.afm" glyphs="../fonts/n019023l.pfb"/>
+  <type name="Helvetica-BoldOblique" fullname="Helvetica Bold Italic" family="Helvetica" foundry="URW" weight="700" style="italic" stretch="normal" format="type1" metrics="../fonts/n019024l.afm" glyphs="../fonts/n019024l.pfb"/>
+</typemap>
