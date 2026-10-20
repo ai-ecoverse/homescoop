@@ -31,3 +31,6 @@ Every other check passes as before. In slicc-kernel, the same empty main executa
 
 **#1098, the notices row:** 24.0.0-1's `lib/libLLVMSupport.a` lists `regcomp.c.o`, `regerror.c.o`, `regexec.c.o`, `regfree.c.o`, `regstrlcpy.c.o`, `blake3.c.o`, `blake3_neon.c.o` and `xxhash.cpp.o`, and the package ships only `LICENSE`. The new check.mjs row fails on it. `check-package-meta.mjs llvm-emscripten` with that archive staged fails too: `lib/libLLVMSupport.a carries LLVM Support code, but the package's notices lack the regex notice …, BLAKE3 …, xxHash …`. With `homescoop_notice_llvm_support` it passes.
 
+## 24.0.0-3: the manifest's patch set (homescoop#1328; 2026-10-20)
+
+24.0.0-3 is a rebuild for wasm-emscripten's new patch 0013, which sorts the musl walk in `system_libs.py` (libc member names). llvm-emscripten compiles no libc, so its objects and libraries are the same. Only `manifest.json` changes, because it records the tree's patch list and digest. On #1335, npm-parity reported 24.0.0-2's manifest as drift (17119 vs 17084 bytes). The new `check.mjs` row requires the manifest to name this checkout's patch set, and the published 24.0.0-2 fails it: `12 recorded, missing 0013-libc-sorted-walk.patch`.

@@ -14,7 +14,6 @@ sources:
     sha256: "1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574"
 inputs:
   - "packages/wasm-emscripten/patches/**"
-  - "packages/wasm-emscripten/package/package.json"
   - "scripts/slicc-node-main.js"
 dependencies:
   build: []
