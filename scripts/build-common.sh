@@ -440,6 +440,7 @@ homescoop_slicc_archive() {
   esac
   rm -f "$out"
   emar rcs "$out" "${objs[@]}"
+  HOMESCOOP_SLICC_SHIMS=1
   echo "== slicc shim: $out ($profile)"
 }
 
@@ -521,6 +522,15 @@ homescoop_notice_emscripten() {
     "$em/LICENSE" - \
     "$em/system/lib/libc/musl/COPYRIGHT" - \
     "$em/system/lib/libcxx/LICENSE.TXT" -
+  [[ -z "${HOMESCOOP_SLICC_SHIMS:-}" ]] || homescoop_notice_slicc_shims
+}
+
+homescoop_notice_slicc_shims() {
+  test -n "${HOMESCOOP_NOTICES:-}" || { echo "homescoop_notice_slicc_shims: call homescoop_notices_begin first" >&2; return 1; }
+  if grep -q '^## homescoop: .*slicc shims' "$HOMESCOOP_NOTICES"; then
+    return 0
+  fi
+  homescoop_notice "homescoop: ${1:-the slicc shims} (shims/slicc, Apache-2.0)" "$HOMESCOOP_ROOT/LICENSE" -
 }
 
 # LLVM's Support library compiles in third-party code whose licences ask
