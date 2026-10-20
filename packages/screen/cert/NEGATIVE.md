@@ -100,3 +100,9 @@ AssertionError [ERR_ASSERTION]: BUILD_DATE comes from source.epoch (SOURCE_DATE_
 ## 5.0.1-13: the inherited-ignore and flock shims (homescoop#973, #947; 2026-10-17)
 
 5.0.1-13 links the updated `shims/slicc` (#960). A `constructor(101)` in `slicc_signals.c` seeds `SIG_IGN` for each signal the kernel's `sliccKernel.sigInherited()` reports; on a kernel without the hook it changes nothing. A strong `flock()` in `slicc_libc_gaps.c` goes through the `env.__syscall_flock` import, which answers 0 without the kernel half (slicc-kernel#967 and #968). The built wasm now imports `env.slicc_sig_inherited_js`, and `env.__syscall_flock` where the program calls `flock`. The published 5.0.1-12 imports neither, so on a hooked kernel it can't see an inherited ignore, and its `flock` never conflicts. The program code is unchanged, and the specs pass on 5.0.1-12 as well. The build also gets #908's prefix maps and DWARF strip.
+
+## 5.0.1-14: publishConfig.tag and -Q windows (homescoop#1149, #662; 2026-10-20)
+
+- **#1149:** 5.0.1-13's `package.json` has `"publishConfig": {"access": "public", "tag": "next"}`. A plain `npm publish` of that tarball would have gone to `next`, not `latest`. 5.0.1-14 has `{"access": "public"}`.
+- **#662:** there's no negative, because it's upstream behaviour. Native screen 5.0.1, built on macOS from the recipe tarball (only `getpwnam_shadow` → `getpwnam` changed, to compile), gives `[]`, `[0 bash|1 two|]` and `[two]` for #662's script, exactly like wasm-screen. `process.c`: `ShowWindows(-1)` sets `where` only when there is a display, and `AddWindows()` returns an empty string for `where < 0`.
+
