@@ -6,7 +6,6 @@
 jq #1287 wasixcc build; sized at its next build
 wasi-biome #1287 Rust (rust-std's bundled wasi-libc); the shared allocator refresh (g86d), then sizing
 wasi-cargo #1287 Rust; the shared allocator refresh (g86d), then sizing
-wasi-impeccable #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-rustc #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-uv #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-zig #1287 the shared allocator refresh (g86d), then sizing
