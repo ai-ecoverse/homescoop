@@ -8,7 +8,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const STALE = {
   tree: '#847',
-  'util-linux': '#847',
 };
 
 export function readmeKernelErrors(name, readme, meta) {
