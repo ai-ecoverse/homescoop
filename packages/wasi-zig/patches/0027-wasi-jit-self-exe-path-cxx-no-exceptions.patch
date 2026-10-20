@@ -1,0 +1,36 @@
+--- a/src/main.zig
++++ b/src/main.zig
+@@ -5805,8 +5805,15 @@
+         .is_explicit_dynamic_linker = false,
+     };
+ 
+-    const self_exe_path = process.executablePathAlloc(io, arena) catch |err|
+-        fatal("unable to find self exe path: {t}", .{err});
++    // homescoop (#1061): executablePathAlloc is unsupported on WASI, so a JIT
++    // command (translate-c, which @cImport runs too; fmt, reduce, ...) takes
++    // zig's own path from ZIG_EXE, as cmdBuild and buildOutputType do.
++    const self_exe_path: []const u8 = switch (native_os) {
++        .wasi => environ_map.get("ZIG_EXE") orelse
++            fatal("unable to determine zig self exe path on WASI (set ZIG_EXE)", .{}),
++        else => process.executablePathAlloc(io, arena) catch |err|
++            fatal("unable to find self exe path: {t}", .{err}),
++    };
+ 
+     const optimize_mode: std.builtin.OptimizeMode = if (EnvVar.ZIG_DEBUG_CMD.isSet(environ_map))
+         .Debug
+--- a/src/Compilation.zig
++++ b/src/Compilation.zig
+@@ -6586,6 +6586,13 @@
+                 }));
+ 
+                 try libcxx.addCxxArgs(comp, arena, argv);
++
++                // homescoop (#1062): the wasm32-wasi libc++/libc++abi have no
++                // exception support (libcxx.zig builds them -fno-exceptions), so
++                // C++ compiled with exceptions fails to link (__cxa_throw).
++                // Default to -fno-exceptions there, as wasi-sdk's clang does; a
++                // later -fexceptions still wins.
++                if (target.os.tag == .wasi) try argv.append("-fno-exceptions");
+             }
+ 
+             // According to Rich Felker libc headers are supposed to go before C language headers.

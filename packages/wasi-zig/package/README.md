@@ -16,5 +16,12 @@ Zig 0.16.0 for slicc, built for wasm32-wasi with LLVM 21.1.8, clang and lld.
 - Targets: wasm32 / wasm64 only (the LLVM inside has the WebAssembly target);
   clang's resource headers are trimmed to the ones wasm uses.
 - Runs with real threads under slicc (LLVM's thread pool, wasi-threads).
+- `@cImport` and `zig translate-c` work (since 0.16.0-18, homescoop#1061).
+  The first use compiles the translate-c tool into the cache, which takes a
+  while.
+- `zig c++` for wasm32-wasi compiles with `-fno-exceptions` by default
+  (since 0.16.0-18, homescoop#1062): the bundled libc++ has no exception
+  support, as with wasi-sdk's clang. Code that throws aborts instead, and
+  `-fexceptions` turns them back on (and then fails to link).
 
 LLVM is Apache-2.0 WITH LLVM-exception (LICENSE-LLVM.TXT); Zig is MIT (LICENSE).
