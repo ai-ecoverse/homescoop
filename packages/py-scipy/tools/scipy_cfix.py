@@ -76,7 +76,7 @@ def fix_cyutility(path: Path) -> None:
     directory and the C names it in its traceback strings, so two builds
     differ (reproducible job). Name it without the temporary directory."""
     text = path.read_text()
-    path.write_text(re.sub(r"(?:\.\./)*(?:/[^\"\s]*/)?tmp[A-Za-z0-9_]{8}/_cyutility\.pyx", "_cyutility.pyx", text))
+    path.write_text(re.sub(r'"[^"\n]*?tmp[A-Za-z0-9_]{8}/_cyutility\.pyx"', '"_cyutility.pyx"', text))
 
 
 if __name__ == "__main__":

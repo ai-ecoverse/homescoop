@@ -4,4 +4,3 @@
 # "<recipe> #<issue> <npm name>[,<npm name>…] <reason>": a line exempts only
 # the needs it names. A named need, or a line, that no longer violates fails
 # the check: drop it when the kernel moves.
-py-kiwisolver3.15 #1292 @ai-ecoverse/wasix-python kernel 1.100.3; wasix-python 3.15.0-1 needs >=1.120.0 (RM: cc7e next release)

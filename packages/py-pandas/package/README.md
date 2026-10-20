@@ -1,13 +1,33 @@
 # `@ai-ecoverse/py-pandas`
 
-Pandas 2.3.2 built as WASIX side modules for `@ai-ecoverse/wasix-python` (CPython 3.14, `cpython-314-wasm32-wasix`).
+Pandas **3.0.6** built as WASIX side modules for `@ai-ecoverse/wasix-python` CPython 3.15 (`cpython-315-wasm32-wasix`). Since the Python 3.15 flip (homescoop#761) this is `latest`; the cp314 builds stay on npm by exact version ([release notes](https://github.com/ai-ecoverse/homescoop/blob/main/docs/release-notes/python-3.15.md)).
 
-It takes `@ai-ecoverse/wasix-python` 3.14.2 from revision -27 on and `@ai-ecoverse/py-numpy` 2.3.2 from -11 on (the versions whose headers it's built against; ranges in `package.json`), plus the pure-Python date and tz helpers listed in `package.json`.
+- **Build:** in homescoop's CI from the PyPI sdist, `pandas-3.0.6.tar.gz`, with meson and Cython, against wasix-python 3.15.0-1 and py-numpy 2.5.4-1 (wasix-sysroot 2025.9.30-38; C++ headers from the sysroot). No patches.
+- **Ranges:** wasix-python and py-numpy are taken as ranges from those revisions on.
+- **pandas 3 changes behaviour from 2.3:**
+  - copy-on-write is always on;
+  - the default string dtype is `str`, a PyArrow-less Python-backed string array here;
+  - pytz isn't a dependency any more;
+  - several deprecated APIs are removed.
+  See pandas' 3.0 release notes.
 
-## Build (since 2.3.2-12)
-- **Source:** built in homescoop's CI from the PyPI sdist, `pandas-2.3.2.tar.gz` (sha256 `ab7b58f8…`). Up to -11 the package was a repack of a local build (homescoop#730).
-- **Tools on the host python:** meson 1.9.1 and Cython 3.1.4.
-- **Cross build:** a meson cross file (`system='wasi'`, `cpu_family='wasm32'`), compiled with wasixcc as shared-library side modules (`sysroot-ehpic`, legacy EH, PIC) against wasix-python's `include/python3.14` and py-numpy's wasm headers and Cython declarations.
-- **Patch:** `0002-lazy-ctypes.patch` drops the top-level `ctypes` import, since WASIX has no `_ctypes`.
-- **Provenance check:** every shipped `.py` is the sdist's file, or the sdist's with that patch applied (`test/py-vs-sdist.mjs`).
-- **Notices:** `THIRD-PARTY-NOTICES.md` names the code compiled in (klib, ultrajson, numpy's datetime support, musl) and the licences of the vendored Python code.
+## What changes for your code (pandas 3 after 2.3)
+
+- **Copy-on-write is always on.** Chained assignment (`df["a"][0] = 1`) no longer writes through to `df`; use `df.loc[0, "a"] = 1`.
+- **Text columns default to the `str` dtype**, not `object`.
+- **pytz is no longer a dependency**: use `zoneinfo` (or install `@ai-ecoverse/py-pytz` yourself).
+- **Datetimes default to microseconds**: parsed strings become `datetime64[us]`, not `[ns]`.
+- **Removed:**
+  - `DataFrame.applymap` (use `map`);
+  - `swapaxes`;
+  - `Series.view` and `ravel`;
+  - `fillna(method=)` (use `ffill`/`bfill`);
+  - the `axis=` keywords of `groupby`/`rolling`/`resample`;
+  - `read_csv`'s `delim_whitespace`, `date_parser`, `infer_datetime_format` and `keep_date_col`;
+  - `errors="ignore"` in `to_datetime`/`to_numeric`;
+  - `mode.use_inf_as_na`;
+  - the `Index.is_*` attributes.
+
+  `groupby(observed=)` defaults to `True`, and `Series[int]` is always by label.
+
+Details: homescoop's [release notes](https://github.com/ai-ecoverse/homescoop/blob/main/docs/release-notes/python-3.15.md).

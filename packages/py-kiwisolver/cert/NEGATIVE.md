@@ -1,5 +1,9 @@
 # py-kiwisolver: negative proof
 
+## 1.5.1-10: the first cp315 kiwisolver (homescoop#761; 2026-10-18)
+
+npm's cp314 py-kiwisolver 1.5.1-9 declares `@ai-ecoverse/wasix-python >=3.14.2-27 <3.14.3`, so with wasix-python 3.15.0-1 at the top, npm nests a 3.14 python under it (`cert/import.mjs`: "brings no python of its own" fails), and its `_cext.cpython-314-wasm32-wasix.so` doesn't import into python 3.15. 1.5.1-10 passes import and solver on 3.15.0-1 (slicc-kernel 1.125.0).
+
 ## 1.5.1-7 (published) fails the 1.5.1-8 cert (homescoop#702)
 
 `node scripts/browser-cert/python-range.mjs py-kiwisolver --tarball ai-ecoverse-py-kiwisolver-1.5.1-7.tgz --lock-only`

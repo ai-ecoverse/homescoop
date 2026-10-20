@@ -18,8 +18,10 @@ print("found:", found)
 print("stamps:", [s._stamp(p) for p in found][:6])
 print("scan:", s._scan(real, found))
 `;
+// pandas 3 (the cp315 line) no longer depends on pytz, so no top-level
+// package pulls it in.
 const IMPORTS =
-  'import numpy, pandas, scipy.optimize, matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot, PIL, kiwisolver, contourpy, fontTools, cycler, packaging, pyparsing, dateutil, pytz, six, tzdata; print(numpy.__version__, pandas.__version__, scipy.__version__, matplotlib.__version__)';
+  'import numpy, pandas, scipy.optimize, matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot, PIL, kiwisolver, contourpy, fontTools, cycler, packaging, pyparsing, dateutil, six, tzdata; print(numpy.__version__, pandas.__version__, scipy.__version__, matplotlib.__version__)';
 
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
@@ -147,13 +149,15 @@ export default async function (ctx) {
       all.forEach((n) => placed.add(n));
       await project(`${G}/${t}`, [t], all, { 'wasix-python': PYVER });
     }
+    // The cp315 line: an older revision of this python's ABI (3.15.0-0), so
+    // discovery's revision check (not the ABI check) is what skips it.
     const old = `${G}/py-old/node_modules/.pnpm/${S}+py-oldbuild@1.0.0-1/node_modules/${S}/py-oldbuild`;
     await write(`${old}/package.json`, JSON.stringify({
-      name: `${S}/py-oldbuild`, version: '1.0.0-1', dependencies: { [`${S}/wasix-python`]: '3.14.2-13' },
-      slicc: { python: { sitePackages: 'lib/python3.14/site-packages', requires: { abi: 'cp314', platform: 'wasix_wasm32' } } },
+      name: `${S}/py-oldbuild`, version: '1.0.0-1', dependencies: { [`${S}/wasix-python`]: '3.15.0-0' },
+      slicc: { python: { sitePackages: 'lib/python3.15/site-packages', requires: { abi: 'cp315', platform: 'wasix_wasm32' } } },
     }));
-    await write(`${old}/lib/python3.14/site-packages/oldbuild_marker.py`, 'X = 1\n');
-    await write(`${old.replace(/py-oldbuild$/, 'wasix-python')}/package.json`, JSON.stringify({ name: `${S}/wasix-python`, version: '3.14.2-13' }));
+    await write(`${old}/lib/python3.15/site-packages/oldbuild_marker.py`, 'X = 1\n');
+    await write(`${old.replace(/py-oldbuild$/, 'wasix-python')}/package.json`, JSON.stringify({ name: `${S}/wasix-python`, version: '3.15.0-0' }));
     await sh(`mkdir -p ${G}/py-old/node_modules/${S} && ln -s ../.pnpm/${S}+py-oldbuild@1.0.0-1/node_modules/${S}/py-oldbuild ${G}/py-old/node_modules/${S}/py-oldbuild\nln -s python ${G}/0123abcdef`);
     await pythonGAt(`${G}/python/`);
     r = await pyg(['-c', IMPORTS]);
@@ -163,8 +167,8 @@ export default async function (ctx) {
     console.log(`discovery: pnpm add -g, one project each: ${r.stdout.trim()}`);
     r = await pyg(['-v', '-c', 'import importlib.util as u; print(u.find_spec("oldbuild_marker") is None)']);
     const note = r.stderr.split('\n').filter((l) => l.startsWith('slicc discover:') && l.includes('py-oldbuild'));
-    assert.equal(r.stdout.trim(), 'True', 'a py-* built for wasix-python 3.14.2-13 was put on sys.path');
-    assert.ok(note.length === 1 && note[0].includes('3.14.2-13'), `-v note: ${note}`);
+    assert.equal(r.stdout.trim(), 'True', 'a py-* built for wasix-python 3.15.0-0 (an older revision of this ABI) was put on sys.path');
+    assert.ok(note.length === 1 && note[0].includes('3.15.0-0'), `-v note: ${note}`);
     console.log(`discovery: other python's py-* skipped: ${note[0]}`);
   } finally {
     await sh(`rm -rf ${G}`);

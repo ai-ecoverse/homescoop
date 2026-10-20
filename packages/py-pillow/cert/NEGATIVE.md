@@ -30,3 +30,7 @@ The 12.3.0-8 tree has one python and passes both specs.
 `cert/pillow.mjs` asserts exact results (not just that the import works), and
 `cert/import.mjs` asserts where PIL was imported from and that no
 nested python sits under the package.
+
+## 13.0.0-1: the first cp315 Pillow (homescoop#761; 2026-10-18)
+
+npm's cp314 py-pillow 12.3.0-10 declares `@ai-ecoverse/wasix-python >=3.14.2-27 <3.14.3`, so with wasix-python 3.15.0-1 at the top, npm nests a 3.14 python under it (`cert/import.mjs`: "py-pillow brings no python of its own" fails), and its four `*.cpython-314-wasm32-wasix.so` don't import into python 3.15. 13.0.0-1 passes import, pillow, arrow and ops on 3.15.0-1 (slicc-kernel 1.125.0, Node entry).
