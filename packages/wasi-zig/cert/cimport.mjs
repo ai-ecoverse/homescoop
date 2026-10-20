@@ -46,7 +46,7 @@ export default async function (ctx) {
   assert.equal(r.status, 0, `#1061 zig translate-c: ${out(r)}`);
   assert.match(r.stdout, /pub extern fn add_two\(a: c_int, b: c_int\) c_int;/, `#1061 translate-c declares the function: ${out(r)}`);
   assert.match(r.stdout, /pub const struct_point = extern struct/, `#1061 and the struct: ${out(r)}`);
-  assert.match(r.stdout, /pub const LIMIT = 10;/, `#1061 and the macro: ${out(r)}`);
+  assert.match(r.stdout, /pub const LIMIT = @as\(c_int, 10\);/, `#1061 and the macro: ${out(r)}`);
 
   r = await detached('cxx', 'zig c++ -target wasm32-wasi -O2 e.cpp -o e.wasm', `${R}/x`);
   assert.equal(r.status, 0, `#1062 zig c++ without -fno-exceptions links: ${out(r)}`);
