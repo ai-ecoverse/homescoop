@@ -8,7 +8,9 @@
  * - homescoop#1237: `-C lto=fat` and `-C lto=thin` either build a program
  *   that runs, or fail with a diagnostic on stderr, never a silent exit 1.
  *   An LTO error is emitted to the codegen's shared emitter, and 0015's WASI
- *   fatal exit didn't drain it; 0016 does.
+ *   fatal exit didn't drain it; 0016 does. The cause is the std bitcode's
+ *   LLVM 22 against rustc.wasm's LLVM 21, so 0017 refuses -C lto=fat/thin up
+ *   front with that reason (a ThinLTO worker can't report on WASI).
  * - homescoop#1087: no slicc.dependencies (no wasm-clang): rustc links with
  *   the LLD inside rustc.wasm.
  */
