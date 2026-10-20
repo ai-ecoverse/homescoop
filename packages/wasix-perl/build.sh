@@ -423,8 +423,8 @@ homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${W
   "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
 
 SYSROOT_VER="$(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version")"
-if ! node -e 'const d = require(process.argv[1]).description; process.exit(d.includes("wasix-sysroot " + process.argv[2] + ":") || d.includes("wasix-sysroot " + process.argv[2] + ")") ? 0 : 1)' "$DEST/package.json" "$SYSROOT_VER"; then
-  echo "homescoop: package.json's description doesn't name the wasix-sysroot it was built on ($SYSROOT_VER) (homescoop#752)" >&2
+if ! grep -qxF -- "- Built on wasix-sysroot $SYSROOT_VER (the asyncify tree, for real fork)" "$DEST/README.md"; then
+  echo "homescoop: package/README.md doesn't name the wasix-sysroot it was built on ($SYSROOT_VER) (homescoop#752)" >&2
   exit 1
 fi
 

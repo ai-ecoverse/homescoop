@@ -3,6 +3,8 @@
 Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
 
 - Cross-built with [perl-cross](https://github.com/arsv/perl-cross) + wasixcc against wasix-sysroot
+- Built on wasix-sysroot 2025.9.30-39 (the asyncify tree, for real fork)
+- From wasix-sysroot and slicc-kernel (≥ 1.120.0): user ids, `%SIG` (inherited IGNORE too), signal masks, `flock` (per open file description) and `fcntl` record locks, `mkfifo` and times; file modes via slicc_fs; DynaLoader and all of Encode statically linked
 - Core XS (POSIX, Fcntl, Cwd, Digest::*, Encode, Socket, …) statically linked
 - `fork` / `system` / backticks via WASIX `proc_fork` (asyncify)
 - `PERL5LIB` defaults to package `lib/perl5` plus `~/.local/share/perl5`
