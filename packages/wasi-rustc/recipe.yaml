@@ -15,6 +15,13 @@ toolchain:
   llvm: "21.1.8"
   wasi-sdk: "34.0"
   wasi_sdk_sha256_linux_x64: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
+inputs:
+  - scripts/wasm-refresh-malloc.c
+# homescoop#1287: the initial heap from the measured peak, with headroom.
+wasm:
+  initial-memory: 256MiB
+  measured-peak: 200MiB
+  measured-by: "provisional: the first 1.98.1-8 CI build measures it (HOMESCOOP_WASM_PEAK)"
 dependencies:
   build: []
   host: []

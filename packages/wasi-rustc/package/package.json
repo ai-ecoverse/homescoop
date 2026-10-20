@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-rustc",
-  "version": "1.98.1-7",
+  "version": "1.98.1-8",
   "description": "The Rust compiler, to build Rust programs in SLICC.",
   "license": "(MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception",
   "repository": {
