@@ -46,6 +46,13 @@ were wasix-libc's values (`0140000` for a FIFO, `0160000` for a socket,
 wrong. `-p` and `-S` are unchanged. The build checks that `package.json`'s
 description names the wasix-sysroot it was built on (homescoop#752).
 
+## 5.42.0-21: both licence texts; wasix-sysroot -39
+
+- **Licence:** perl is `Artistic-1.0-Perl OR GPL-1.0-or-later`, and `LICENSE` now carries both texts, perl's `Artistic` and `Copying` (GPL version 1). Up to 5.42.0-20 it held the Artistic text only (homescoop#995).
+- **Sysroot:** built on wasix-sysroot 2025.9.30-39, whose `malloc` refreshes a thread's view of grown shared memory (homescoop#1287). perl is single-threaded, so nothing changes for scripts. Since -37 libc's `S_IF*` bits are Linux's too, the values `patches/0009` already gives.
+- **flock lifetimes:** a lock belongs to its open file description (since -19). It stays held when a forked child that inherited the handle exits, and is freed when the holder closes its last handle on that description or is killed. `cert/flock-lifetime.mjs` checks each case and EINTR (homescoop#1024).
+- **Config:** no `%Config` value names the build machine's paths (since -19; homescoop#848, #850).
+
 ## 5.42.0-15 / -16: flock excludes other processes (up to -18)
 
 `flock` takes whole-file `fcntl` record locks (`LOCK_SH` → `F_RDLCK`,
