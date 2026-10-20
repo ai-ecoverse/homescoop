@@ -10,6 +10,7 @@
     "cert/import.mjs: import six from /node_modules/@ai-ecoverse/py-six, found by discovery without PYTHONPATH (no wasix-python dependency: a pure package, accepted under any python)",
     "cert/six.mjs: PY3, the string/integer/text/binary types, b/u, six.moves urllib.parse/configparser/range, add_metaclass and with_metaclass, iteritems, ensure_str/ensure_binary, reraise",
     "cert/record.mjs (homescoop#625): the package is PyPI's six-1.17.0-py2.py3-none-any.whl: every file in its dist-info RECORD is there with its sha256, none missing and none unlisted, and every .pyc is unchecked-hash on its source; a self-test flips one byte in a copy and must see both the RECORD mismatch and the stale .pyc",
-    "1.17.0-4 (homescoop#761): a rebuild because scripts/stage-pure-wheel.sh changed (it now takes the python line from sitePackages; output for 3.14 unchanged). CI's host CPython 3.14.2 writes different .pyc bytes than the build behind 1.17.0-3 (npm-parity drift in the .pyc only; the wheel's files are the same); every spec as before"
+    "1.17.0-4 (homescoop#761): a rebuild because scripts/stage-pure-wheel.sh changed (it now takes the python line from sitePackages; output for 3.14 unchanged). CI's host CPython 3.14.2 writes different .pyc bytes than the build behind 1.17.0-3 (npm-parity drift in the .pyc only; the wheel's files are the same); every spec as before",
+    "1.17.0-5 (homescoop#1283): staged into the version-neutral lib/python3/site-packages (was lib/python3.14/site-packages) and ships no __pycache__/*.cpython-314.pyc: the package is py3-none and serves 3.14 and 3.15 alike; discovery adds the declared sitePackages for any line. cert/record.mjs: every file is the wheel's and there is no .pyc; every spec as before"
   ]
 }
