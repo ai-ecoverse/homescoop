@@ -24,8 +24,3 @@ Comparing the two `libc.a`, 6.0.9-4 defines 58 symbols that 6.0.9-3 lacks, among
 
 ## Reproducibility
 The first CI run of #1016 failed `reproducible`: host-build and rebuild differed in 45 of the 50 libraries. Emscripten maps its own source dir to `/emsdk/emscripten` in DWARF, but not the cache's `sysroot/include` or clang's resource headers, and both live under the build's work dir. wasm-emscripten patch 0011 maps them to `/emsdk/cache` and `/emsdk/llvm`. Two local builds in different work dirs then gave byte-identical tarballs, and no library names a build path. check.mjs keeps that row: no library may contain `/home/`, `/Users/`, `/__w/` or `/private/var/`.
-
-## 6.0.9-5: republishes the CI build (homescoop#1328; 2026-10-20)
-6.0.9-5 is a packaging bump. The slicc shim isn't in it: embuilder builds libc.a from upstream emscripten, and wasm-emscripten's link.py links the shim objects. On #1264, emscripten-cache came into the cone through its recipe `inputs` (wasm-emscripten's package.json, bumped there to 6.0.9-24).
-
-npm's 6.0.9-4 differs from the current CI build in `sysroot/lib/wasm32-emscripten/libc.a` and `libc-debug.a`, though the CI build is reproducible (host-build and rebuild are byte-identical). The only difference is two archive member names: npm has `_Exit__1.o` and `_exit.o` where the CI build has `_Exit.o` and `_exit__1.o`. The object code is the same. The cause is `system_libs.py`'s case-insensitive basename dedup, which follows the source order. The digests are in #1328. cert/check.mjs certifies the CI build as usual.
