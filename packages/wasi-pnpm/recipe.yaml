@@ -75,3 +75,6 @@ about:
     stale per-thread length), in pnpm's own source rather than a patched
     sysroot. 12.9.1-17 links the initial heap from recipe.yaml's wasm
     field (320 MiB, from a measured 280 MiB cold-install peak; #1287).
+    12.9.1-18's 0010 brings back the hoisted swap (stage, rename aside,
+    rename in, delete) where the host says directory renames are cheap
+    (slicc-kernel >= 1.134.3, from /proc/version; homescoop#1128).

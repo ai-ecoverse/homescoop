@@ -13,6 +13,20 @@ export const errno = {
 const TYPE_BITS = { file: 0o100000, dir: 0o040000, symlink: 0o120000 }
 const UMASK = 0o022
 
+// Whether /proc/version names a slicc-kernel at least `want` ([major, minor, patch]).
+export function kernelAtLeast (ctx, want) {
+  try {
+    const text = new TextDecoder().decode(ctx.fs.readFile('/proc/version'))
+    const m = /slicc-kernel (\d+)\.(\d+)\.(\d+)/.exec(text)
+    if (!m) return false
+    const have = m.slice(1).map(Number)
+    for (let i = 0; i < 3; i++) if (have[i] !== want[i]) return have[i] > want[i]
+    return true
+  } catch {
+    return false
+  }
+}
+
 function readUmask (ctx) {
   try {
     const mask = ctx.syscall?.({ op: 'proc-umask' })
@@ -107,6 +121,7 @@ function withType (stat) {
 function createFilesystem (ctx) {
   // Per process (ctx): read once from the kernel.
   let processUmask
+  let renameCheap
   const decoder = new TextDecoder('utf-8', { fatal: true })
   const uid = ctx.uid ?? DEFAULT_UID
   function guestPath (pointer, length) {
@@ -192,6 +207,10 @@ function createFilesystem (ctx) {
       if ((ctx.fds.fstat(descriptor).uid ?? uid) !== uid) throw fail('EACCES', 'WASM SQLite stores must belong to the current user')
     }),
     fchmod: checked((descriptor, mode) => ctx.fds.fchmod(descriptor, mode & 0o7777)),
+    // 12.9.1-18 (patches/0010): 1 where a directory rename is a cheap move.
+    // slicc-kernel 1.134.3 has both rename levers (#1137, #1154); older
+    // kernels rename an OPFS directory by copying its tree.
+    directory_rename_cheap: () => (renameCheap ??= kernelAtLeast(ctx, [1, 134, 3]) ? 1 : 0),
     // 12.9.1-14 (patches/0006): one kernel call per imported file where
     // slicc-kernel (>= 1.128.0) copies it itself; ENOSYS sends pnpm back to
     // its own copy. flags bit 0: the target must not exist (O_EXCL).
