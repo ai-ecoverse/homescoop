@@ -104,7 +104,7 @@ versions are on npm.
 | [`@ai-ecoverse/llvm-emscripten`](https://www.npmjs.com/package/@ai-ecoverse/llvm-emscripten) | [recipe](packages/llvm-emscripten) | LLVM/clang/lld 24 (llvm-project b158b0ae) built with emscripten 6.0.9: the objects, static libraries and link manifest @ai-ecoverse/wasm-clang links (a build input) |
 | [`@ai-ecoverse/wasm-mount`](https://www.npmjs.com/package/@ai-ecoverse/wasm-mount) | [recipe](packages/mount) | mount and umount: attach filesystems (tmpfs, hostfs and more) to directories. |
 | [`@ai-ecoverse/wasm-nano`](https://www.npmjs.com/package/@ai-ecoverse/wasm-nano) | [recipe](packages/nano) | GNU nano, a small and friendly text editor for the terminal. |
-| [`@ai-ecoverse/wasm-ncurses-utils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-ncurses-utils) | [recipe](packages/ncurses-utils) | ncurses clear, tput, tset and reset for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-ncurses-utils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-ncurses-utils) | [recipe](packages/ncurses-utils) | ncurses clear, tput, tset and reset, with a terminfo database. |
 | [`@ai-ecoverse/wasm-openjpeg`](https://www.npmjs.com/package/@ai-ecoverse/wasm-openjpeg) | [recipe](packages/openjpeg) | OpenJPEG JPEG 2000 codec (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-patch`](https://www.npmjs.com/package/@ai-ecoverse/wasm-patch) | [recipe](packages/patch) | GNU patch 2.8 for wasm / slicc (emscripten) |
 | [`@ai-ecoverse/wasm-pkgconf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-pkgconf) | [recipe](packages/pkgconf) | pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder) |

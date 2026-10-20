@@ -72,6 +72,7 @@ if [[ ! -f "$NC_SRC/progs/clear.wasm" || -n "${FORCE:-}" ]]; then
       --without-ada --without-tests --without-manpages \
       --without-debug --enable-widec --disable-stripping \
       --disable-hashed-db --with-default-terminfo-dir=/usr/share/terminfo \
+      --with-terminfo-dirs=/usr/share/terminfo \
       --with-fallbacks="$FALLBACKS"
     homescoop_fix_darwin_ar Makefile
     find . -name Makefile -print0 | while IFS= read -r -d '' mf; do
@@ -89,6 +90,12 @@ for p in "${PROGS[@]}"; do
   test -f "$NC_SRC/progs/$p.wasm"
   homescoop_stage_cli "$NC_SRC/progs" "$p"
 done
+# homescoop#1009: no shipped wasm names the build's work directory (configure's
+# terminfo search list used to: $WASM_PREFIX/share/terminfo).
+if grep -laF "$WORK" "$HOMESCOOP_PKG"/package/bin/*.wasm; then
+  echo "ncurses-utils: a wasm names the build directory $WORK (homescoop#1009)" >&2
+  exit 1
+fi
 
 # --- compiled terminfo database (-x keeps extended caps such as E3) ---
 DB="$HOMESCOOP_PKG/package/share/terminfo"
