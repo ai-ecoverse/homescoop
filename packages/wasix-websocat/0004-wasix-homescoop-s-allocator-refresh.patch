@@ -1,0 +1,24 @@
+wasix: homescoop's allocator refresh as the global allocator (homescoop#1287)
+
+V8 checks a thread's memory.fill/memory.copy against that thread's cached
+memory length, which can lag a memory.grow another thread's malloc just
+did (tokio's blocking threads read stdin and write stdout next to the
+runtime thread), so a memset into a fresh block traps "memory access out
+of bounds" (slicc-kernel#1172). On wasm the binary includes
+scripts/rust-wasm-refresh-alloc.rs (path in HOMESCOOP_WASM_ALLOC_RS, set by
+build.sh).
+
+Upstream: not filed (Lars decides).
+
+--- a/src/main.rs	2025-12-27 02:36:59.000000000 +0100
++++ b/src/main.rs	2026-10-20 07:03:44.951123395 +0200
+@@ -1,3 +1,9 @@
++// homescoop#1287: threaded wasm takes homescoop's allocator refresh
++// (scripts/rust-wasm-refresh-alloc.rs) against V8's stale per-thread memory
++// length after another thread's memory.grow.
++#[cfg(target_family = "wasm")]
++include!(env!("HOMESCOOP_WASM_ALLOC_RS"));
++
+ #[tokio::main(flavor = "current_thread")]
+ async fn main() -> anyhow::Result<()> {
+     #[cfg(feature = "tokioconsole")]
