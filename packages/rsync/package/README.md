@@ -36,7 +36,6 @@ correctly (targets keep their times), but it warns (`failed to set times on
 …: Not supported`) and exits 23, and a re-run itemizes those links again
 (`.L..tp`).
 
-Certified on `@ai-ecoverse/slicc-kernel` 1.30.0.
 
 Since 3.4.4-4 rsync uses slicc-kernel's process credentials: as root, `-a`
 keeps owners and groups (`-o -g`), as on Linux; any other user keeps a group
@@ -97,3 +96,7 @@ goes to the tailnet or any DNS server, so `hosts allow` / `hosts deny` for
 them takes addresses (`100.64.0.0/10`). Before 3.5.1-3 every client was
 `UNKNOWN`, after a `name lookup failed for 127.0.0.1` line, and only
 addresses matched; `reverse lookup = no` still skips the lookup.
+
+## 3.5.1-6
+
+The README no longer names a cert kernel, which went stale whenever `cert/meta.json` moved (homescoop#847). The cert record is the source of truth. The `-c` cert row pins the directory times too (homescoop#969).

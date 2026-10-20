@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-rsync",
-  "version": "3.5.1-5",
-  "description": "rsync 3.5.1 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair; slicc-kernel >= 1.29.2)",
+  "version": "3.5.1-6",
+  "description": "rsync 3.5.1, for fast incremental file copies.",
   "license": "GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.29.2"

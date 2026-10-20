@@ -100,7 +100,7 @@ export default async function (ctx) {
   assert.equal((await ok('cat ex/kept.log')).stdout, 'keep\n', 'excluded file deleted');
 
   // -c: same size and mtime but other bytes. The quick check skips it, -c sends it.
-  await ok('mkdir -p cs cd && echo AAAA > cs/f && echo BBBB > cd/f && touch -d @1643767322 cs/f cd/f');
+  await ok('mkdir -p cs cd && echo AAAA > cs/f && echo BBBB > cd/f && touch -d @1643767322 cs/f cd/f cs cd');
   const quick = await ok('rsync -a -i cs/ cd/');
   assert.equal(quick.stdout, '', `quick check should skip: ${quick.stdout}`);
   assert.equal((await ok('cat cd/f')).stdout, 'BBBB\n');

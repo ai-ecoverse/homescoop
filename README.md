@@ -126,7 +126,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-six`](https://www.npmjs.com/package/@ai-ecoverse/py-six) | [recipe](packages/py-six) | six for slicc WASIX CPython |
 | [`@ai-ecoverse/py-tzdata`](https://www.npmjs.com/package/@ai-ecoverse/py-tzdata) | [recipe](packages/py-tzdata) | tzdata for slicc WASIX CPython |
 | [`@ai-ecoverse/wasm-qpdf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-qpdf) | [recipe](packages/qpdf) | qpdf PDF merge/split/rotate/decrypt/linearize tool for slicc (WASM / emscripten, SLICC homescoop) |
-| [`@ai-ecoverse/wasm-rsync`](https://www.npmjs.com/package/@ai-ecoverse/wasm-rsync) | [recipe](packages/rsync) | rsync 3.5.1 for wasm / slicc: local copies (fork + Asyncify for the sender/receiver pair; slicc-kernel >= 1.29.2) |
+| [`@ai-ecoverse/wasm-rsync`](https://www.npmjs.com/package/@ai-ecoverse/wasm-rsync) | [recipe](packages/rsync) | rsync 3.5.1, for fast incremental file copies. |
 | [`@ai-ecoverse/wasm-screen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-screen) | [recipe](packages/screen) | GNU screen for slicc (emscripten ABI; asyncify fork; PTY via musl+SLICC #3733) |
 | [`@ai-ecoverse/wasm-sed`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sed) | [recipe](packages/sed) | GNU sed for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-sqlite3`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sqlite3) | [recipe](packages/sqlite3) | sqlite3 CLI 3.54.0 (amalgamation shell) for wasm / slicc (emscripten) |
