@@ -1043,26 +1043,31 @@
  
 --- a/g10/tdbio.c
 +++ b/g10/tdbio.c
-@@ -742,6 +742,25 @@
+@@ -742,6 +742,30 @@
        db_fd = gnupg_open (db_name, O_RDWR | MY_O_BINARY, 0);
        if (db_fd == -1)
          log_fatal (_("can't open '%s': %s\n"), db_name, strerror (errno));
 +#ifdef __wasi__
 +      /* homescoop#1031: a trustdb root's gpg creates in someone else's
 +       * homedir is the directory's owner's, as its lock files are
-+       * (homescoop#888).  Only a regular file with one link, and only
-+       * when the name is that file, not a symlink (homescoop#1111).  */
++       * (homescoop#888).  The name is opened again without following a
++       * symlink and that descriptor is the one given away, so a name
++       * pointing at another file never hands it over (homescoop#1111).
++       * Only a regular file with one link.  */
 +      if (!geteuid ())
 +        {
-+          struct stat st, dst, lst;
++          struct stat st, dst;
++          int ofd;
 +
 +          *p = 0;
-+          if (!fstat (db_fd, &st) && !stat (fname, &dst)
-+              && !lstat (db_name, &lst) && S_ISREG (lst.st_mode)
-+              && lst.st_dev == st.st_dev && lst.st_ino == st.st_ino
-+              && S_ISREG (st.st_mode) && st.st_nlink == 1
-+              && (st.st_uid != dst.st_uid || st.st_gid != dst.st_gid))
-+            fchown (db_fd, dst.st_uid, dst.st_gid);
++          if (!stat (fname, &dst)
++              && (ofd = open (db_name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)) != -1)
++            {
++              if (!fstat (ofd, &st) && S_ISREG (st.st_mode) && st.st_nlink == 1
++                  && (st.st_uid != dst.st_uid || st.st_gid != dst.st_gid))
++                fchown (ofd, dst.st_uid, dst.st_gid);
++              close (ofd);
++            }
 +          *p = save_slash;
 +        }
 +#endif /*__wasi__*/
