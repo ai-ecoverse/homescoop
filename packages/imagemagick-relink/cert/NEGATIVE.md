@@ -80,3 +80,7 @@ The kits ship wasm-imagemagick(-heif) 7.1.2-34-9.1's objects, built with write-t
 ## 7.1.2-34-9.2: the burn-down patches in the kits (2026-10-20)
 
 The kits ship wasm-imagemagick(-heif) 7.1.2-34-9.2's objects: the timer fix (#679), JP2 tiling above 16 MP (#561), and the owner check in the atomic write (#1258). The default font and the MPC policy are runtime files (etc/), not in the kits. See packages/imagemagick/cert/NEGATIVE.md.
+
+## 7.1.2-34-9.3: the delegate pins (2026-10-20)
+
+A pin-only release, with no ImageMagick change. The delegates move to their npm `latest` builds: libpng 1.6.59-4, libwebp 1.6.0-4, libtiff 4.7.2-4, libxml2 2.15.4-3, lcms2 2.19.1-4, freetype 2.13.3-4 and libiconv 1.19.0-3, plus libheif 1.23.6-7 for the heif build and the kits. Those builds fixed #941 (build paths), #925 (libwebp.pc lacked `Requires: libsharpyuv`) and #970 (libheif's plugin directory named the build dir). Their own NEGATIVE.md entries hold the before and after. Here, every spec passes as on 9.2, and `magick.wasm` names no build path.
