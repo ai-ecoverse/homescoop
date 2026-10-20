@@ -560,6 +560,15 @@ homescoop_notice_llvm_support() {
   LLVM_SUPPORT_NOTICES=("$regex" "$blake3" "$xx")
 }
 
+# homescoop#1287: threaded Rust wasm takes scripts/rust-wasm-refresh-alloc.rs
+# as its global allocator (V8's stale per-thread memory length after another
+# thread's memory.grow). Exports the path the one-line main.rs patch
+# include!s; call before cargo build.
+homescoop_rust_wasm_refresh_alloc() {
+  export HOMESCOOP_WASM_ALLOC_RS="$HOMESCOOP_ROOT/scripts/rust-wasm-refresh-alloc.rs"
+  test -s "$HOMESCOOP_WASM_ALLOC_RS"
+}
+
 # Notices for a Rust wasm (homescoop#343): every crate it links, then
 # Rust's standard library and the target's wasi-libc. Call after
 # homescoop_notices_begin. The cargo command and its arguments come from
