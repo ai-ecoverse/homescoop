@@ -485,6 +485,20 @@ pool each gets a machine within about a minute.
 
 The unit is a **case**: one assertion of a spec, or one sweep command.
 
+- **Which cert/:** a published tarball runs the `cert/` that matches it. When
+  the run is for a change (a PR head or a merge group head, not main),
+  `kernel-compat.yml` finds main's merge base with it, and a package whose
+  `cert/` the change touches runs its published tarballs with the **base's**
+  `cert/` (`--cert-base`, extracted into the plan as `base-cert/`); its
+  cert-review already ran the new spec on the new tarball. A `cert/` that is
+  new in the change is skipped.
+- **The reference and `engines`:** when the package or a peer it installs
+  declares `engines.slicc-kernel` above the plan's reference kernel, the
+  reference for that package is its floor (the highest `>=` among them,
+  fetched from npm; `compat.json`'s `reference.at` says why). A reference run
+  that still fails on an engines refusal (`<pkg> needs slicc-kernel >=…; this
+  kernel is …`) makes the failures **can't judge**: known, `reference:
+  engines`, never a regression.
 - **Cases:** under kernel-compat, `run.mjs --soft` records every `ctx.assert`
   call and goes on after a failed one, so one failure doesn't hide the next.
   A case is named by its call site in the spec (with the spec's helpers):
