@@ -233,7 +233,7 @@ jobs:
           retention-days: 14
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.23.1
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v2.0.2
 
   rebuild:
     needs: [detect, recipe-sha]
@@ -278,7 +278,7 @@ jobs:
           retention-days: 3
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.23.1
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v2.0.2
 
   reproducible:
     needs: [detect, recipe-sha, host-build, rebuild]
@@ -411,7 +411,7 @@ jobs:
           fi
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.23.1
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v2.0.2
 
   cert:
     needs: [detect, recipe-sha, host-build]
@@ -547,7 +547,7 @@ jobs:
         run: node scripts/gate.mjs cert-leg -- node scripts/browser-cert/cert-leg.mjs ci "${{ matrix.package }}"
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.23.1
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v2.0.2
 
   slicc-note:
     needs: detect
