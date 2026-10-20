@@ -10,9 +10,9 @@ source:
   url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-{{version}}.tar.gz"
   sha256: "9a94cf751c9ad8ebaa835bcd3d40dacf8534ad086b88c38029b65123c7999d2a"
 sources:
-  openblas:
-    url: "https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.28/OpenBLAS-0.3.28.tar.gz"
-    sha256: "f1003466ad074e9b0c8d421a204121100b0751c96fc6fcf3d1456bd12f8a00a1"
+  wasix_openblas:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openblas/-/wasix-openblas-0.3.34-1.tgz"
+    sha256: "eeeaa693400cecb64f351c09f5df4e4793ed841350329c315811f7a3a8c6e14e"
   cython:
     url: "https://files.pythonhosted.org/packages/bf/77/67b0b24e45073a699610e50f00c18474ff9b09ea29ecc95083bdf5e60acd/cython-3.3.0-py3-none-any.whl"
     sha256: "9b24b5c8cd536946b62086fcafee6d5509d3f549f72d553d2336af87ffbe0da1"
