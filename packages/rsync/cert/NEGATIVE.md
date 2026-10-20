@@ -127,3 +127,7 @@ On slicc-kernel 1.73.2 and older, an Emscripten program's own `lstat` of a symli
 The published 3.5.1-4 also has 1 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/rsync.wasm (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 3.5.1-5 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 3.5.1-4 too; the negative is the #908 check.
+
+## 3.5.1-6: a deterministic -c row, no stale kernel line (homescoop#969, #847; 2026-10-20)
+
+No behaviour change, so there's no failing negative to show. #969 was a test race: `cs` and `cd`'s own mtimes came from the `echo >` writes, and `rsync -a -i` correctly reported `.d..t...... ./` when they straddled a second. The row now pins both directories with `touch -d @1643767322`. The README drops `Certified on @ai-ecoverse/slicc-kernel 1.30.0` (meta.json says 1.92.0). `scripts/test/readme-cert-kernel.test.mjs` fails any README whose kernel line differs from its cert/meta.json.

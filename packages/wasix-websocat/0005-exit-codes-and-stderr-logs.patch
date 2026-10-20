@@ -1,0 +1,75 @@
+websocat: failures exit non-zero, log lines go to stderr (homescoop#696, #1023, #868)
+
+- A listener (listen_tcp, udp_server) that can't bind its address exits 15
+  (EXIT_CODE_LISTEN_FAIL), and a readfile:/writefile:/appendfile: that
+  can't open its file exits 16 (EXIT_CODE_FILE_OPEN_FAIL). Upstream v4
+  logged them and exited 0, unlike its connect (14), lookup (20/21) and
+  TLS (8) failures.
+- tracing's log lines go to stderr; upstream's fmt::init() wrote them to
+  stdout, into the data a pipe or redirect carries.
+
+Upstream: not filed (Lars decides).
+
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -12,7 +12,8 @@
+     }
+     #[cfg(not(feature = "tokioconsole"))]
+     {
+-        tracing_subscriber::fmt::init();
++        // Log lines go to stderr, not into the data on stdout (homescoop#868).
++        tracing_subscriber::fmt().with_writer(std::io::stderr).init();
+     }
+     let argv = std::env::args_os();
+     let stderr = std::io::stderr();
+--- a/src/scenario_executor/exit_code.rs
++++ b/src/scenario_executor/exit_code.rs
+@@ -9,6 +9,10 @@
+ pub const EXIT_CODE_WEBSOCKET_UPGRADE_ERROR_BROKEN: i32 = 6;
+ pub const EXIT_CODE_TLS_CLIENT_FAIL: i32 = 8;
+ pub const EXIT_CODE_TCP_CONNECT_FAIL: i32 = 14;
++/// A listener (TCP or UDP) couldn't bind its address (homescoop#696).
++pub const EXIT_CODE_LISTEN_FAIL: i32 = 15;
++/// A file endpoint couldn't open its file (homescoop#1023).
++pub const EXIT_CODE_FILE_OPEN_FAIL: i32 = 16;
+ pub const EXIT_CODE_HOSTNAME_LOOKUP_NO_IPS: i32 = 20;
+ pub const EXIT_CODE_HOSTNAME_LOOKUP_FAIL: i32 = 21;
+ 
+--- a/src/scenario_executor/file.rs
++++ b/src/scenario_executor/file.rs
+@@ -122,6 +122,7 @@
+                 }
+                 Err(e) => {
+                     warn!("Failed to open file `{effective_path:?}`: {e}");
++                    the_scenario.exit_code.set(super::exit_code::EXIT_CODE_FILE_OPEN_FAIL);
+                     return Err(e.into());
+                 }
+             }
+--- a/src/scenario_executor/tcp.rs
++++ b/src/scenario_executor/tcp.rs
+@@ -550,7 +550,10 @@
+         let mut address_to_report = *a.addr().unwrap_or(&NEUTRAL_SOCKADDR4);
+ 
+         let l = match a {
+-            AddressOrFd::Addr(a) => bindopts.bind_tcp(a).await?,
++            AddressOrFd::Addr(a) => bindopts
++                .bind_tcp(a)
++                .await
++                .inspect_err(|_| the_scenario.exit_code.set(super::exit_code::EXIT_CODE_LISTEN_FAIL))?,
+             #[cfg(not(unix))]
+             AddressOrFd::Fd(..) | AddressOrFd::NamedFd(..) => {
+                 error!("Inheriting listeners from parent processes is not supported outside UNIX platforms");
+--- a/src/scenario_executor/udpserver.rs
++++ b/src/scenario_executor/udpserver.rs
+@@ -394,7 +394,10 @@
+         let s = match a {
+             AddressOrFd::Addr(a) => {
+                 address_to_report = a;
+-                bindopts.bind_udp(a).await?
++                bindopts
++                    .bind_udp(a)
++                    .await
++                    .inspect_err(|_| the_scenario.exit_code.set(super::exit_code::EXIT_CODE_LISTEN_FAIL))?
+             }
+             #[cfg(not(unix))]
+             AddressOrFd::Fd(..) | AddressOrFd::NamedFd(..) => {

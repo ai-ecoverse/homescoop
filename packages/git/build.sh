@@ -12,6 +12,7 @@ SRC="$WORK/git-${VER}"
 homescoop_fetch "$URL" "$SHA" "$TB"
 if [[ -n "${FORCE:-}" ]]; then rm -rf "$SRC"; fi
 homescoop_extract "$TB" "$SRC"
+homescoop_apply_patches "$SRC"
 
 LIBCURL_A="$PREFIX/lib/libcurl.a"
 test -f "$LIBCURL_A" || { echo "missing $LIBCURL_A (build wasm-curl first)" >&2; exit 1; }

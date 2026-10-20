@@ -83,3 +83,9 @@ The spec doesn't pass vacuously. With its roll API inverted to demand the opposi
 
 The published 0.1.15-4 passes the new stress row's traps check: 6 rounds over 600 pages, 0 traps on slicc-kernel 1.134.3. The trap is a V8 race (slicc-kernel#1172) at 5–12% of rounds under heavier allocation (azw9's canary, wasi-pnpm's loop), so the row is a guard, not a negative. 0.1.15-4's peak there was 49 MiB, hence the recorded 64 MiB initial heap, which the row checks.
 
+## 0.1.15-6: the stress row's harness calls, deep markup, the allocator's cost (2026-10-20)
+
+- **`cert/stress.mjs`** (homescoop#1363): 0.1.15-5's row ran each 600-page detect in one harness call, which on a slow runner passed 120 s ("Runtime.evaluate: no answer"). Since -6 detect runs detached and the spec polls it once a second. Locally, 4 runs (2 × -4, 2 × -5, alternated; slicc-kernel 1.134.3) all pass, with rounds of 17–45 s and no call near the limit.
+- **homescoop#1364** (is the allocator refresh's realloc slower?): **not reproduced.** In those 12 rounds per version, the median detect is 27.5 s for 0.1.15-4 and 20 s for 0.1.15-5 (both noisy, 17–45 s), and output and traps (0) are the same. The refresh keeps realloc as alloc + copy + free on purpose: libc's realloc copies into a block it may have just taken from memory another thread grew, before the wrapper could refresh the view, and that copy is the trap.
+- **`cert/deep.mjs`** (homescoop#620): upstream behaviour, documented, so -5 passes it too. On -5 here, 1000 and 2000 deep take 1.0 s and 3.8 s (2.1 s and 8.3 s on kernel 1.94.0 in the issue).
+

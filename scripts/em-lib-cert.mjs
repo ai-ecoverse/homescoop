@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -29,11 +29,32 @@ function unpack(spec, dir) {
   return { pkg: join(dir, 'package'), tgz };
 }
 
+const BUILD_PATHS = [/\/home\/runner\/work\//, /\/tmp\/homescoop-work\b/, /\/\.homescoop-out\//, /\/homescoop-work\//];
+
+function buildPathHits(dir, rel = '') {
+  const hits = [];
+  for (const e of readdirSync(join(dir, rel), { withFileTypes: true })) {
+    const r = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory()) hits.push(...buildPathHits(dir, r));
+    else if (e.isFile()) {
+      const s = readFileSync(join(dir, r)).toString('latin1');
+      for (const re of BUILD_PATHS) {
+        const m = re.exec(s);
+        if (m) hits.push(`${r}: ${s.slice(Math.max(0, m.index - 20), m.index + 60).replace(/[^\x20-\x7e]+/g, ' ')}`);
+      }
+    }
+  }
+  return hits;
+}
+
 const work = mkdtempSync(join(tmpdir(), `${name}-em-lib-cert-`));
 try {
   const { pkg, tgz } = unpack(arg('--tarball'), join(work, 'self'));
   const manifest = JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8'));
   console.log(`== ${manifest.name}@${manifest.version} (${tgz})`);
+  const leaks = buildPathHits(pkg);
+  assert.deepEqual(leaks, [], `no shipped file names the build machine's checkout or work directory (homescoop#941, #970)`);
+  console.log('== no build paths in the tarball');
   const pcDirs = [join(pkg, 'lib/pkgconfig')];
   const deps = (recipe.dependencies?.build ?? []).filter((d) => d.startsWith('@ai-ecoverse/'));
   for (const [i, dep] of deps.entries()) {

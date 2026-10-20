@@ -22,8 +22,9 @@
   $REAL_GFORTRAN if it's set, else fails.
 
 Environment:
-  F2C_PATH     the f2c to run (default: f2c on PATH, else bin/build-f2c.sh
-               builds it once into $WASIX_F2C_CACHE or ~/.cache/wasix-f2c)
+  F2C_PATH     the f2c to run (default: the pinned hoodmane/f2c that
+               bin/build-f2c.sh builds once into $WASIX_F2C_CACHE or
+               ~/.cache/wasix-f2c; an f2c on PATH is never used unasked)
   WASIX_CC     the C compiler (default wasixcc)
   F2C_INCLUDE  where f2c.h is (default <package>/include)
   F2C_FIXES    a Python file with optional fix_f2c_input(path),
@@ -34,7 +35,6 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -66,9 +66,8 @@ def hook(mod, name, *args):
 def f2c_path() -> str:
     if os.environ.get("F2C_PATH"):
         return os.environ["F2C_PATH"]
-    found = shutil.which("f2c")
-    if found:
-        return found
+    # homescoop#1197: the pinned translator, not whatever f2c is on PATH (a
+    # distro f2c would translate differently).
     out = subprocess.run([str(PKG / "bin" / "build-f2c.sh")], check=True, stdout=subprocess.PIPE, text=True).stdout
     return out.strip().splitlines()[-1]
 

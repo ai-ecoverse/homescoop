@@ -62,3 +62,6 @@ about:
     0004 (wasm): homescoop's allocator refresh
          (scripts/rust-wasm-refresh-alloc.rs) as the global allocator
          (#1287).
+    0005: a listener that can't bind exits 15 and a file endpoint that
+         can't open its file exits 16 (upstream v4 exited 0; #696, #1023);
+         tracing's log lines go to stderr, not stdout (#868).

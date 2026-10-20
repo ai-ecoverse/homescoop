@@ -7,6 +7,25 @@
     "url": "https://raw.githubusercontent.com/astral-sh/astral-mail-headers/9292b7783d8298ad7324c79e4b6c20aa8d6e46f7/LICENSE-MIT",
     "sha256": "7eed948b4bb4122b67f174287f0b6c675916d4cbdf54da8930c2df6f923a7eec"
   },
+  "backtrace-ext 0.2.1": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/Apache-2.0.txt",
+    "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+    "note": "Neither the crate nor its repository (gankra/backtrace-ext at 043c9535, the commit it was published from) ships a licence file. It is MIT OR Apache-2.0; this is the Apache-2.0 text from SPDX license-list-data v3.29.0"
+  },
+  "bitfields 1.0.3": {
+    "url": "https://raw.githubusercontent.com/gregorygaines/bitfields-rs/a3c3d994c87c4f9cab566b3bbb5eb9bd1b2a9a98/LICENSE",
+    "sha256": "20e54144e38eee8d67e970ab43fd4f124519931090ac015be8c7ff1a6b4a5f88"
+  },
+  "crc24 0.1.6": {
+    "url": "https://raw.githubusercontent.com/sellibitze/crc24-rs/f565288a93806a0202a9c5d194db80dc1dc5a7fd/LICENSE-MIT",
+    "sha256": "44211bdaa21e5ba423e717d1afdcb4752f0277f5fcc5dc5a5dad1fd351624e24",
+    "note": "The crate ships no licence file and no .cargo_vcs_info.json. It is MIT/Apache-2.0; this is the repository's LICENSE-MIT at its head, f565288a"
+  },
+  "cx448 0.1.1": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/BSD-3-Clause.txt",
+    "sha256": "5a93d5831e1297ab10fe643e1a631e83be392896da14ee2951285a79012df69d",
+    "note": "Neither the crate, its repository (dignifiedquire/cx448 at 58785c9e) nor the code its README says it is based on (crate-crypto/x448, RustCrypto/elliptic-curves#1121) ships a licence file or names a copyright holder. It is BSD-3-Clause; this is the SPDX license-list-data v3.29.0 text"
+  },
   "grit-pattern-matcher 0.5.1": {
     "url": "https://raw.githubusercontent.com/getgrit/gritql/0de0cdbe598e987899cfd153b48610682342edc1/LICENSE",
     "sha256": "d0bed1dabb4f2e1d6828349e690f2137d99575e86ec2c7545c74ae53d8430e43"
@@ -14,6 +33,10 @@
   "grit-util 0.5.1": {
     "url": "https://raw.githubusercontent.com/getgrit/gritql/0de0cdbe598e987899cfd153b48610682342edc1/LICENSE",
     "sha256": "d0bed1dabb4f2e1d6828349e690f2137d99575e86ec2c7545c74ae53d8430e43"
+  },
+  "line-index 0.1.2": {
+    "url": "https://raw.githubusercontent.com/rust-lang/rust-analyzer/3bda0cc2c07f6330b543be2c12c5e156847ba94e/LICENSE-MIT",
+    "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
   },
   "number_prefix 0.4.0": {
     "url": "https://raw.githubusercontent.com/ogham/rust-number-prefix/eb6ebd215d50df1b199737f0356b988bebaedc84/LICENCE",
@@ -43,8 +66,17 @@
     "url": "https://raw.githubusercontent.com/tokio-rs/tokio/3d0d0fd2af9192ca5cf2836451e96dffab68216a/tokio-test/LICENSE",
     "sha256": "1a594f153f129c2de7b15f3262394bdca3dcc2da40058e3ea435c8473eb1f3a0"
   },
+  "tree-sitter-iter 1.29.0": {
+    "url": "https://raw.githubusercontent.com/zizmorcore/zizmor/3c116961091b50bd1a08ffefe916469d4d90093c/LICENSE",
+    "sha256": "a6fd1bd18da7cec8284639d5b0d351b90934317be1b9f9ea94a077621c6f35af"
+  },
   "websocket-sans-io 0.1.0": {
     "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/Apache-2.0.txt",
     "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+  },
+  "zune-inflate 0.2.54": {
+    "url": "https://raw.githubusercontent.com/etemesi254/zune-image/69502ce83fdfecdd0beefd677e2abb3781b29d98/LICENSE-ZLIB",
+    "sha256": "7fa429541e55b1509909e058f2d21a37467e4958ec713b357f6e0cf9dc4ee352",
+    "note": "The crate ships no licence file. It is MIT OR Apache-2.0 OR Zlib; this is the repository's LICENSE-ZLIB at 69502ce8, the commit it was published from (the repository has no MIT or Apache file there)"
   }
 }

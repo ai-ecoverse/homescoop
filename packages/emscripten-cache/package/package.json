@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/emscripten-cache",
-  "version": "6.0.9-5",
-  "description": "Prebuilt Emscripten 6.0.9 sysroot for slicc (read-only seed)",
+  "version": "6.0.9-6",
+  "description": "Prebuilt system libraries for Emscripten 6.0.9, so emcc in slicc can compile without building them first.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -19,6 +19,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
     "EMSCRIPTEN_VERSION",
     "sysroot",
     "stamps"

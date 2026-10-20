@@ -79,3 +79,7 @@ homescoop: bin/curl.wasm (an Emscripten command) lacks the slicc credential libr
 The published 8.22.0-6 also has 26 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/curl.wasm, lib/libmbedtls.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 8.22.0-7 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 8.22.0-6 too; the negative is the #908 check.
+
+## 8.22.0-8: curl -n without HOME (homescoop#724; 2026-10-20)
+
+`cert/netrc.mjs` against a build of main (the published 8.22.0-7's recipe), on slicc-kernel 1.102.6 under users enforce: FAIL, 1 of 3 assertions. `env -u HOME curl -n` gives `curl: (26) .netrc error: no such file`. A probe in the same session shows the cause: with `HOME` unset, a program's environment has `HOME=/home/web_user` (`env -u HOME bash -c 'echo $HOME'`), Emscripten's `getEnvStrings` placeholder, so curl never reached its `getpwuid_r` fallback. With `packages/coreutils/slicc-env.js` linked (#612's fix), all four specs pass.

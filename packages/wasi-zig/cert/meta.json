@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.134.3",
   "users": "enforce",
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -17,7 +17,8 @@
     "every compiled program has no start section, exports _start and imports only wasi_snapshot_preview1; the corpus sizes and import sets are logged for the old-vs-new comparison",
     "users enforce: alice builds in her home (the output is hers), is refused bob's 0600 source and his 0755 directory (nothing left there), builds his 0644 source into her home",
     "imports (ci, test/imports.mjs): zig.wasm imports only env (shared memory), wasi (thread-spawn), wasi_snapshot_preview1 and wasix_32v1, and the list is logged for the import-set diff",
-    "test/notices.mjs (ci, 0.16.0-17): zig.wasm carries LLVM Support code (llvm_regcomp, the regexec error string, llvm_blake3_hasher, xxh3_64bits) and THIRD-PARTY-NOTICES.md (in files) has Henry Spencer's regex, BLAKE3 and xxHash notices, from wasi-llvm 21.1.8-2's share/licenses/llvm-support. 0.16.0-16: none of the three (NEGATIVE.md)"
+    "test/notices.mjs (ci, 0.16.0-17): zig.wasm carries LLVM Support code (llvm_regcomp, the regexec error string, llvm_blake3_hasher, xxh3_64bits) and THIRD-PARTY-NOTICES.md (in files) has Henry Spencer's regex, BLAKE3 and xxHash notices, from wasi-llvm 21.1.8-2's share/licenses/llvm-support. 0.16.0-16: none of the three (NEGATIVE.md)",
+    "cert/cimport.mjs (0.16.0-18, patches/0027): zig build-exe of an @cImport(@cInclude(\"stdio.h\")) program with -lc builds and prints \"hi from cimport 42\", and zig translate-c of a header gives pub extern fn add_two, the struct and LIMIT (homescoop#1061: the JIT command's self exe path comes from ZIG_EXE); zig c++ -O2 of std::map::at code without -fno-exceptions links and prints 1 (homescoop#1062). Each zig runs detached and is polled. 0.16.0-17 fails 12 of its 22 assertions (\"unable to find self exe path: OperationUnsupported\"; undefined __cxa_throw)"
   ],
   "ci": [
     "node packages/wasi-zig/test/imports.mjs --tarball .homescoop-out/package.tgz",

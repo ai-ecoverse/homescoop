@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-clang",
-  "version": "24.0.0-22",
-  "description": "Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen)",
+  "version": "24.0.0-23",
+  "description": "The Clang and LLD 24 compilers, to build C and C++ programs in slicc.",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
     "type": "git",
@@ -77,17 +77,20 @@
       "lld": {
         "glue": "bin/llvm",
         "wasm": "bin/llvm.wasm",
-        "argv0": "lld"
+        "argv0": "lld",
+        "helper": true
       },
       "wasm-ld": {
         "glue": "bin/llvm",
         "wasm": "bin/llvm.wasm",
-        "argv0": "wasm-ld"
+        "argv0": "wasm-ld",
+        "helper": true
       },
       "ld.lld": {
         "glue": "bin/llvm",
         "wasm": "bin/llvm.wasm",
-        "argv0": "ld.lld"
+        "argv0": "ld.lld",
+        "helper": true
       },
       "llvm-ar": {
         "glue": "bin/llvm",
@@ -117,7 +120,8 @@
       "llvm-symbolizer": {
         "glue": "bin/llvm",
         "wasm": "bin/llvm.wasm",
-        "argv0": "llvm-symbolizer"
+        "argv0": "llvm-symbolizer",
+        "helper": true
       },
       "ar": {
         "glue": "bin/llvm",

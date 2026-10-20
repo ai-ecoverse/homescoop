@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/py-pandas",
-  "version": "3.0.6-3",
-  "description": "Pandas 3.0.6 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules)",
+  "version": "3.0.6-4",
+  "description": "pandas, data analysis and manipulation for Python.",
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",

@@ -13,6 +13,8 @@ source:
   url: "https://github.com/pnpm/pnpm/archive/5dafb0980042af99fb1aa24478d16f03b8474b50.tar.gz"
   sha256: "5ade48506ae88ed031994ea1aab5bfc161d1a3b60f4604100f719678a42684ee"
   commit: "5dafb0980042af99fb1aa24478d16f03b8474b50"
+  # homescoop#1295: the commit's git tree, the content pin of the GitHub archive.
+  tree: "6cde6a41c90417a1ca575b49ed4296b495a2e1b3"
 toolchain:
   # Exactly what pnpm/wasm/build.mjs at that commit requires.
   rust: "nightly-2026-08-27"
@@ -78,3 +80,7 @@ about:
     12.9.1-18's 0010 brings back the hoisted swap (stage, rename aside,
     rename in, delete) where the host says directory renames are cheap
     (slicc-kernel >= 1.134.3, from /proc/version; homescoop#1128).
+    12.9.1-19 (no patch): the host starts pnpm's re-run of itself and
+    project commands (#1247, #667), the npx shim looks in node_modules/.bin,
+    and THIRD-PARTY-NOTICES.md adds the linked crates, Rust's std and
+    wasi-libc (#1325).

@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-18",
-  "description": "pnpm 12 for slicc WASI (commands pnpm, pn); pnpm.wasm built by homescoop from pnpm v12.9.1 with a documented patch",
+  "version": "12.9.1-19",
+  "description": "The pnpm package manager for SLICC, with npm, npx and i commands, to install and run JavaScript packages.",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -86,3 +86,17 @@ The published 9.12.0-9 also has 1 occurrence(s) of the CI build directory `/tmp/
 - **9.12.0-10 (the published tgz):** `cert/spawnp-path.mjs` fails its first row. `timeout 5 hs1165script` with the script first on PATH is rc 127, `timeout: failed to run command 'hs1165script': No such file or directory`. The cause is the shim's `posix_spawnp`, which was `posix_spawn`: the bare name reached the kernel, whose `proc-spawn` resolves a bare name in its catalog only. On the cert kernel the other rows pass on both versions.
 - **9.12.0-11 as built:** all six rows pass (the PATH script, found past a directory of the same name earlier on PATH, `./rel/script`, the catalog `seq`, 126 for a mode-644 script, 126 for a name only a directory matches, 127 for a missing name).
 - **9.12.0-11's first cut (ba20f6b9, built with `scripts/host-run.sh coreutils`):** fails the first row, `timeout 5 hs1165script rc=126 stderr=timeout: failed to run command ‘hs1165script’: Permission denied`. It spawned the first candidate that passed `access(X_OK)`, and `dbin/hs1165script` (a directory ahead of the script on PATH) passes it; the search stopped there (Codex P2 on #1264). The fix skips a candidate that isn't a regular file or isn't executable, and one whose spawn is EACCES/ENOENT/ENOTDIR, as execvp does.
+
+## 9.12.0-11: env -i keeps Emscripten's defaults, and date ignores TZ (homescoop#612, #535)
+
+`cert/env-tz.mjs` (`--soft`) against the published 9.12.0-11 (slicc-kernel 1.100.4, users enforce, 2026-10-20) fails 20 of its 38 assertions, for example:
+
+```text
+AssertionError [ERR_ASSERTION]: env -i FOO=1 env adds Emscripten's default USER=web_user (homescoop#612): ["USER=web_user","LOGNAME=web_user","PATH=/","PWD=/","HOME=/home/web_user","LANG=en_US.UTF-8","_=env","FOO=1","HOSTNAME=slicc"]
+```
+
+The time rows fail the same way: Emscripten's `tzset` and `localtime` read the browser's time zone and ignore `TZ`, so on a host at UTC+1 `date -u -d @0` printed `01:00:00 UTC+0100`. 9.12.0-12 passes it, and every other spec.
+
+- **Fixes:** `slicc-env.js` builds the environment only from what the kernel passes. `slicc_tz.c` reads `TZ` on each call: POSIX rules in C, IANA names through `Intl`.
+- **Where:** both are linked only into coreutils (`scripts/build-gnu-cli.sh` takes a recipe's `slicc-*.js` and `slicc_*.c`).
+- **Left:** `HOSTNAME=slicc` that `env -i` still shows comes from the kernel's process environment.
