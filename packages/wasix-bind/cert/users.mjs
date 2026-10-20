@@ -39,7 +39,9 @@ export default async function (ctx) {
   // Only root writes /etc/resolv.conf.
   let r = await run(['bash', '-c', 'echo nameserver 100.100.100.100 > /etc/resolv.conf'], { cwd: '/home/alice', user: 'alice' });
   assert.equal(r.status, 1, `alice writing /etc/resolv.conf: ${out(r)}`);
-  assert.equal(await read('etc/resolv.conf'), null);
+  const conf = await read('etc/resolv.conf');
+  assert.match(conf ?? '', /^nameserver 127\.0\.0\.53$/m, `the kernel's default /etc/resolv.conf is unchanged: ${conf}`);
+  assert.doesNotMatch(conf ?? '', /100\.100\.100\.100/);
 
   r = await run(['bash', '-c', 'dig +short @100.100.100.100 users.test > /home/bob/out/a.txt'], { cwd: '/home/alice', user: 'alice' });
   assert.equal(r.status, 1, `alice writing into bob's 0755 directory: ${out(r)}`);

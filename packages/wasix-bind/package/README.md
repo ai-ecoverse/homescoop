@@ -25,11 +25,20 @@ without a resolver it can reach.
   asked again over TCP at once, and dig prints
   `;; UDP network unreachable, retrying in TCP mode.` (the patch in
   `patches/`). Upstream BIND would wait for the read to time out instead.
+  That includes `dig +nssearch`, both for the NS query and for each
+  server's SOA query (homescoop#1379).
 - **TCP** to port 53 reaches a resolver through the uplink, such as
   Tailscale's `100.100.100.100`, or one on the kernel's loopback.
 - **No server argument** means the `nameserver` lines in `/etc/resolv.conf`.
-  slicc ships no such file, and BIND then asks 127.0.0.1, where nothing
-  listens. Root can write one: `echo nameserver 100.100.100.100 > /etc/resolv.conf`.
+  **On slicc-kernel ≥ 1.137.0** the kernel writes `nameserver 127.0.0.53`
+  there and answers DNS itself. So `host <device>.slicc.internal`,
+  `dig host.slicc.internal` and `nslookup <name>` work with no server
+  argument: the kernel answers `/etc/hosts`, `localhost`, `host.slicc.internal`
+  and the uplink's names, and forwards the rest to the uplink's nameserver or
+  its DNS over HTTPS endpoint (homescoop#1282). Older kernels (≥ 1.96.0, the
+  `engines` floor) ship no such file. There BIND asks 127.0.0.1, where
+  nothing listens, so pass a server (`@100.100.100.100`), or have root write
+  one: `echo nameserver 100.100.100.100 > /etc/resolv.conf`.
 
 ## Not in this build
 

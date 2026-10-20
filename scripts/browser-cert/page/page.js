@@ -183,7 +183,7 @@ const certTransport = {
 // closes) or { error: 'ECONNREFUSED' }.
 // Until then every name is unknown and every dial refused.
 window.certUplinkLog = { asked: [], dialled: [], requests: [] };
-async function certUplink() {
+async function certUplink(nameserver) {
   const { fakeUplink } = await import('/dist/testing.js');
   let fake = fakeUplink({});
   const httpPeer = (addr, { status = 200, headers = [], body = '' }) => (conn) => {
@@ -236,6 +236,9 @@ async function certUplink() {
   return {
     traits: { tcp: true, udp: false, ipv6: false },
     routes: { prefixes: ['100.64.0.0/10'] },
+    // cert/meta.json "uplink": { "nameserver": "<addr>" } (slicc-kernel >=
+    // 1.137.0): the kernel's DNS stub forwards what it can't answer there.
+    ...(nameserver ? { nameserver } : {}),
     resolve: (name, family, signal) => {
       window.certUplinkLog.asked.push({ name, family });
       return fake.resolve(name, family, signal);
@@ -251,7 +254,7 @@ window.boot = async (opts = {}) => {
   if (!crossOriginIsolated) {
     throw new Error('page is not cross-origin isolated (need COOP/COEP)');
   }
-  const uplink = opts.uplink ? await certUplink() : undefined;
+  const uplink = opts.uplink ? await certUplink(opts.uplinkNameserver) : undefined;
   window.kernel = await createKernel({
     root: await navigator.storage.getDirectory(),
     network: { transport: certTransport, ...(uplink ? { uplink } : {}) },

@@ -22,11 +22,11 @@
  fi
 --- a/bin/dig/dighost.c
 +++ b/bin/dig/dighost.c
-@@ -2758,6 +2758,30 @@
+@@ -2758,9 +2758,42 @@
  		return;
  	} else if (eresult != ISC_R_SUCCESS) {
  		debug("send failed: %s", isc_result_totext(eresult));
-+		if (!l->tcp_mode && !l->ns_search_only &&
++		if (!l->tcp_mode &&
 +		    (eresult == ISC_R_NETUNREACH ||
 +		     eresult == ISC_R_HOSTUNREACH))
 +		{
@@ -52,15 +52,28 @@
 +		}
  	}
  
- 	if (l->ns_search_only && !l->trace_root) {
-@@ -3211,6 +3235,30 @@
+-	if (l->ns_search_only && !l->trace_root) {
++	/*
++	 * homescoop#1379: hand over to the next NSSEARCH query only if there
++	 * is one.  For the last (or only) query the answer is still to come;
++	 * nssearch_next() would see no other pending query and report "NS
++	 * servers could not be reached" before recv_done() runs, which is what
++	 * a TCP query (one whose answer comes after its send) always hit.
++	 */
++	if (l->ns_search_only && !l->trace_root &&
++	    ISC_LIST_NEXT(query, link) != NULL)
++	{
+ 		nssearch_next(l, query);
+ 	} else {
+ 		query_detach(&query);
+@@ -3211,6 +3244,30 @@
  		lookup_detach(&l);
  		clear_current_lookup();
  		return;
 +	}
 +
 +	if ((eresult == ISC_R_NETUNREACH || eresult == ISC_R_HOSTUNREACH) &&
-+	    !l->ns_search_only)
++	    !l->tcp_mode)
 +	{
 +		/*
 +		 * No UDP route to the server (slicc: an address no uplink
