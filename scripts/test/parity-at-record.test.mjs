@@ -272,7 +272,7 @@ esac
   return new Promise((ok) => {
     const p = spawn('bash', ['-c', script], {
       cwd: join(scripts, '..'),
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: dir, GITHUB_OUTPUT: join(dir, 'gh-output'), NPM_CONFIG_USERCONFIG: '', ACTIONS_ID_TOKEN_REQUEST_URL: 'http://127.0.0.1:9/oidc', HOMESCOOP_REGISTRY: url, HOMESCOOP_NPM: join(bin, 'npm'), HOMESCOOP_NPM_RETRY_S: '0' },
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: dir, GITHUB_OUTPUT: join(dir, 'gh-output'), NPM_CONFIG_USERCONFIG: '', ACTIONS_ID_TOKEN_REQUEST_URL: 'http://127.0.0.1:9/oidc', HOMESCOOP_REGISTRY: url, HOMESCOOP_NPM: join(bin, 'npm'), HOMESCOOP_NPM_RETRY_S: '0', NPM: NAME, TAG: tag, CERTIFIED: sha },
     });
     let out = '';
     p.stdout.on('data', (d) => (out += d));
@@ -309,7 +309,7 @@ test('#971 in ladder-build: a lost publish race ("cannot publish over") succeeds
   prep(other);
   const lost = await runPublish(t, other, { url, published: tarball(dir, '3.12.0-6', 'someone else\n'), sha });
   assert.equal(lost.status, 1, lost.out);
-  assert.match(lost.out, /is on npm, but not with these contents \(assert-certified-publish exit 2\): these bytes never shipped/);
+  assert.match(lost.out, /publish: FAIL @ai-ecoverse\/wasm-grep@3\.12\.0-6: on npm, but not with these contents \(certified-publish exit 2\); these bytes never shipped/);
   published = false;
   const same = join(dir, 'same');
   mkdirSync(same);
@@ -317,6 +317,7 @@ test('#971 in ladder-build: a lost publish race ("cannot publish over") succeeds
   const won = await runPublish(t, same, { url, published: tgz, sha });
   assert.equal(won.status, 0, won.out);
   assert.match(won.out, /same contents — skip publish/);
+  assert.match(won.out, /^publish: PASS @ai-ecoverse\/wasm-grep@3\.12\.0-6 \(already on npm, same contents\)$/m);
 });
 
 async function channelRegistry(t, routes) {
