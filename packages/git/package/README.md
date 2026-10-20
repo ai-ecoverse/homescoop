@@ -17,6 +17,14 @@ pnpm add -g @ai-ecoverse/wasm-git
 git init && git add . && git commit -m ok
 ```
 
+## Shell subcommands and local clones (2.55.0-18)
+
+`git submodule`, `git mergetool` and the other shell-script subcommands run
+through `git-sh-setup`, which needs `sed`, so this package depends on
+`@ai-ecoverse/wasm-sed`. `git clone --local` copies the objects when the file
+system has no hard links (slicc's OPFS root), as `--no-hardlinks` does. It
+needs slicc-kernel 1.130.2 or later.
+
 ## Users (2.55.0-14, slicc-kernel ≥ 1.47.1)
 
 git runs as the kernel's user. Without `user.name`, the author name comes from

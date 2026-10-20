@@ -5,7 +5,8 @@
   "uplink": true,
   "needs": [
     "@ai-ecoverse/wasm-bash",
-    "@ai-ecoverse/wasm-coreutils"
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-sed"
   ],
   "checklist": [
     "local bare-repo init",
@@ -14,7 +15,11 @@
     "fetch",
     "a local init / commit / clone (default ident from the hostname for the reflog) / log makes zero uplink queries (the shim answers gethostname() locally)",
     "tailnet (homescoop#139, uplink): git ls-remote http://peer.tail1234.ts.net:8080/repo.git (no_proxy=*) resolves via the kernel resolver/uplink (family 4), dials 100.64.1.2:8080, sends GET /repo.git/info/refs?service=git-upload-pack with the right Host, and prints the advertised HEAD and refs/heads/main",
-    "a name answered with 127.0.0.1 \u2192 rc 128 'Could not resolve', nothing dialled",
-    "cert/users.mjs (2.55.0-14, H1 homescoop#207): as root and as kernel.users.add({name:'cone'}), git init + commit in ~ with only user.email set: no 'dubious ownership', author 'root <root@slicc.test>' / 'cone <cone@slicc.test>' (name from /etc/passwd via getpwuid), clean status, toplevel /root/repo and /home/cone/repo. A real rebuild (2.55.0-12/-13 were repacks of -11) on shims/slicc with process credentials"
-  ]
+    "a name answered with 127.0.0.1 → rc 128 'Could not resolve', nothing dialled",
+    "cert/users.mjs (2.55.0-14, H1 homescoop#207): as root and as kernel.users.add({name:'cone'}), git init + commit in ~ with only user.email set: no 'dubious ownership', author 'root <root@slicc.test>' / 'cone <cone@slicc.test>' (name from /etc/passwd via getpwuid), clean status, toplevel /root/repo and /home/cone/repo. A real rebuild (2.55.0-12/-13 were repacks of -11) on shims/slicc with process credentials",
+    "cert/burndown.mjs (2.55.0-18), users enforce: (homescoop#887) alice runs git status in root's chmod a+rwX repository and gets \"detected dubious ownership\", rc 128, since every kernel engines (>=1.130.2) allows reports real owners; (homescoop#903) git submodule add of a local repository works and git submodule status shows sub (heads/main): package.json depends on @ai-ecoverse/wasm-sed, which git-sh-setup calls; (homescoop#912) git clone --local copies when link() fails with EMLINK, as on the OPFS root (clone-local-no-hardlinks.patch), and fsck is clean. 2.55.0-17 fails the submodule and --local rows (NEGATIVE.md)"
+  ],
+  "patches": {
+    "clone-local-no-hardlinks.patch": "burndown.mjs: git clone --local copies instead of 'failed to create link … Too many links' (NEGATIVE.md: 2.55.0-17)"
+  }
 }
