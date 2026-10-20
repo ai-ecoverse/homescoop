@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-f2c",
-  "version": "3.2.1-1",
+  "version": "3.2.1-2",
   "description": "Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc)",
   "license": "SMLNJ AND MPL-2.0",
   "repository": {

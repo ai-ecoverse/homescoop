@@ -110,10 +110,10 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-pkgconf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-pkgconf) | [recipe](packages/pkgconf) | pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-poppler`](https://www.npmjs.com/package/@ai-ecoverse/wasm-poppler) | [recipe](packages/poppler) | poppler PDF utilities (pdftotext, pdftoppm, pdfinfo, …) for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-procps`](https://www.npmjs.com/package/@ai-ecoverse/wasm-procps) | [recipe](packages/procps) | procps-ng for slicc (WASM / emscripten, SLICC homescoop); user names from slicc-kernel >= 1.44.0 |
-| [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) | [recipe](packages/py-contourpy) | contourpy for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
+| [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) | [recipe](packages/py-contourpy) | contourpy, contour calculation for Python (used by matplotlib). |
 | [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) | [recipe](packages/py-cycler) | cycler for slicc WASIX CPython |
-| [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fonttools for slicc WASIX CPython |
-| [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
+| [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fontTools, a library for manipulating fonts in Python. |
+| [`@ai-ecoverse/py-kiwisolver`](https://www.npmjs.com/package/@ai-ecoverse/py-kiwisolver) | [recipe](packages/py-kiwisolver) | kiwisolver, a fast constraint solver for Python (used by matplotlib). |
 | [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy, the fundamental package for array computing in Python. |
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |

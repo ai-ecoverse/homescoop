@@ -115,10 +115,10 @@ values = {
     "build_cpu": "", "build_cpu_family": "", "build_cpu_endian": "", "build_cpu_system": "",
 }
 text = open(src).read()
-missing = sorted(set(re.findall(r"@([a-z_]+)@", text)) - set(values))
+missing = sorted(set(re.findall(r"@([a-z0-9_]+)@", text)) - set(values))
 if missing:
     sys.exit(f"homescoop py-contourpy: _build_config.py.in has unknown keys {missing}")
-open(out, "w").write(re.sub(r"@([a-z_]+)@", lambda m: values[m.group(1)], text))
+open(out, "w").write(re.sub(r"@([a-z0-9_]+)@", lambda m: values[m.group(1)], text))
 PY
 cp "$OBJ/$SO" "$SITE/contourpy/$SO"
 chmod 755 "$SITE/contourpy/$SO"
