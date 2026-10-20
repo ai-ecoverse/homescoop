@@ -16,7 +16,8 @@
 //
 // For each .wasm in a package (a tarball or a directory), a main module with
 // a shared memory and bulk-memory opcodes needs those fields (a side module,
-// one with a dylink.0 section, runs in its host program's memory and heap), and its linked
+// one with a dylink.0 section and no _start, runs in its host program's memory
+// and heap; a PIE main exports _start and counts), and its linked
 // initial memory must be the recorded one. Packages not yet sized are listed
 // in scripts/threaded-heap-allowlist.txt ("<recipe> #<issue> <reason>"); an
 // entry for a package that no longer needs it is stale and fails.
@@ -62,14 +63,22 @@ export function inspect(buf) {
   let memory = null;
   let fills = 0;
   let copies = 0;
-  let side = false;
+  let dylink = false;
+  let start = false;
   while (p < buf.length) {
     const id = buf[p++];
     const size = u32();
     const end = p + size;
     if (id === 0) {
       const n = name();
-      if (n === 'dylink.0' || n === 'dylink') side = true;
+      if (n === 'dylink.0' || n === 'dylink') dylink = true;
+    } else if (id === 7) {
+      const n = u32();
+      for (let i = 0; i < n; i++) {
+        if (name() === '_start') start = true;
+        p++;
+        u32();
+      }
     } else if (id === 2) {
       const n = u32();
       for (let i = 0; i < n && !memory; i++) {
@@ -98,7 +107,11 @@ export function inspect(buf) {
     }
     p = end;
   }
-  return { memory, fills, copies, side };
+  // A side module (dylink.0, loaded by dlopen) runs in its host program's
+  // memory and heap. A PIE main (wasix-python's python.wasm) has dylink.0 too,
+  // because it dlopens side modules, but it is a WASI command: it exports
+  // _start and owns the heap.
+  return { memory, fills, copies, side: dylink && !start };
 }
 
 export function bytes(size) {
