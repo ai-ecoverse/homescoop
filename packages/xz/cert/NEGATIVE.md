@@ -45,3 +45,10 @@ CLI cannot build. The threaded/large cases in `cert/roundtrip.mjs` (`xz -T0` /
 The published 5.8.4-3 also has 76 occurrence(s) of the CI build directory `/tmp/homescoop-work` in bin/xz.wasm, lib/liblzma.a (`__FILE__` strings and DWARF), so the bytes depend on where it was built.
 
 5.8.4-4 is built with `-ffile-prefix-map` (the checkout as `/src`, WORK as `/build`, PREFIX as `/prefix`), and host-run strips every wasm module, archive and object with `llvm-objcopy --strip-debug`. The name section stays, and check-no-debug asserts that no other section is lost. The package code is unchanged, so its specs pass on 5.8.4-3 too; the negative is the #908 check.
+
+## 5.8.4-5: xzgrep and xzdiff as commands (homescoop#537; 2026-10-20)
+
+- **5.8.4-4 from npm** fails `cert/scripts.mjs` (11 of 14 assertions): `xzgrep beta a.txt.xz` gives `bash: line 1: xzgrep: command not found`, rc 127.
+- **Hidden behind that:** the scripts never worked. build.sh's sed left `@xz@`, `@PACKAGE_VERSION@` and `@PACKAGE_BUGREPORT@` in them. With the commands registered but that sed unchanged, `xzgrep` fails with `line 255: @xz@: command not found` (rc 2). 5.8.4-5 substitutes all of them, and build.sh fails if any `@VAR@` is left.
+- **xzless stays unregistered.** It sets `LESSOPEN='|xz -cdfqQ -- %s'`, and wasm-less 668.0.0-5 doesn't run that pipe: `less` on the `.xz` file asks `"a.txt.xz" may be a binary file.  See it anyway?`. The spec checks that it's still rc 127.
+
