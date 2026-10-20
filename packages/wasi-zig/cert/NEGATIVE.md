@@ -34,3 +34,11 @@ A u8 overflow is a compile error (rc 1). Every program has no start section, exp
 
 The published 0.16.0-16 against `test/notices.mjs`: **FAIL.** zig.wasm carries LLVM Support code, but THIRD-PARTY-NOTICES.md names none of Henry Spencer's regex, BLAKE3 or xxHash. 0.16.0-17 pins wasi-llvm 21.1.8-2 (the same libraries, plus share/licenses/llvm-support) and adds them through `homescoop_notice_llvm_support`.
 
+## 0.16.0-18: @cImport, translate-c, C++ without -fno-exceptions (homescoop#1061, #1062, 2026-10-20)
+
+The published 0.16.0-17 against -18's `cert/cimport.mjs` (slicc-kernel 1.134.3, users enforce): **FAIL, 12 of 22 assertions.**
+- **@cImport and translate-c:** `zig build-exe ci.zig -lc` and `zig translate-c api.h` both exit 1 with `error: unable to find self exe path: OperationUnsupported`, from jitCmdInner's `executablePathAlloc`, which 0003 didn't cover.
+- **C++:** `zig c++ -O2 e.cpp` fails with `wasm-ld: error: …e.o: undefined symbol: __cxa_allocate_exception` / `__cxa_throw`.
+
+homescoop#1060 (the prebuilt archives' DWARF paths) was fixed by c56dc1ed, which builds the prebuilt runtimes at one fixed path. `reproducible (wasi-zig)` passed on #1234 (0.16.0-17).
+

@@ -42,3 +42,6 @@ about:
     ZIG_GLOBAL_CACHE_DIR=${HOME}/.cache/zig, ZIG_EXE=zig. Wasm output has no
     start section (export _start only). The compiler imports wasix_32v1
     (proc_spawn3/proc_join); user wasm32-wasi programs stay preview1.
+    0.16.0-18's 0027: JIT commands (translate-c, which @cImport runs) take
+    zig's path from ZIG_EXE on WASI (#1061), and C++ against the wasm32-wasi
+    libc++ (built without exceptions) defaults to -fno-exceptions (#1062).
