@@ -67,6 +67,12 @@ variant() {
   # can't trap on V8's stale length. The same .patch applies to wasi-libc.
   patch -d "$W" -p1 -s <"$HOMESCOOP_PKG/patches/dlmalloc-memory-view.patch"
   grep -q __slicc_memory_view "$W/dlmalloc/src/dlmalloc.c"
+  # -40 (homescoop#1287): dlmalloc uses the pages up to __heap_end again
+  # (try_init_allocator); (#1124) readdir/scandirat ask fstatat for an UNKNOWN
+  # type (a FIFO).
+  patch -d "$W" -p1 -s <"$HOMESCOOP_PKG/patches/dlmalloc-init-heap.patch"
+  grep -q 'homescoop (#1287): under the lock' "$W/dlmalloc/src/malloc.c"
+  patch -d "$W" -p1 -s <"$HOMESCOOP_PKG/patches/readdir-dtype.patch"
   # -37 (homescoop#1015, #1112): Linux's (and musl's) file-type bits in
   # __mode_t.h, so st_mode means the same as everywhere else: wasi-libc had
   # S_IFIFO 0140000 (Linux's S_IFSOCK), S_IFSOCK 0160000 and S_IFMT 0160000

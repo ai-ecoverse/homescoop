@@ -1,5 +1,12 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-39: the initial memory unused, sigsetjmp(bufs[i++]), poll, readdir (-40; #1287, #1120, #1119, #1124; 2026-10-20)
+
+`test/r40.c` against npm -39 (default and ehpic, slicc-kernel 1.132.1, Node entry):
+- **heap:** FAIL, `heap: initial 1025 pages, grew 640 pages`. A 64 MiB initial memory, and 40 MiB of mallocs still grew it by 40 MiB, because malloc never used the initial pages. -40: `grew 0 pages` in all five variants, PIE mains included.
+- **sigsetjmp:** `sigsetjmp(bufs[i++], 1)` sets `i` to 2, and the `siglongjmp(bufs[0], 5)` traps (`wasm trap: unreachable`, rc 134; #1120).
+- **poll and readdir** on -36…-39 (from #1119 and #1124): `poll(POLLIN)` on a reader-less write end times out with `0 revents=0`, and on an O_WRONLY regular file it gives `0` when stdin is a file; `readdir` gives `DT_UNKNOWN` for a FIFO.
+
 ## 2025.9.30-38: a memset into memory another thread's sbrk just grew can trap (-39, #1287)
 
 `test/r39.c` against npm -38 (ehpic variant, slicc-kernel 1.125.0, Node entry, 2026-10-19), in batches of 20 alternating with the patched libc: **5 of 320 runs** end `rc=134 r39: wasm trap in thread N: memory access out of bounds` (1/40, 1/40 and 1/40 in three single batches, then 2/200 alternating). With `dlmalloc-memory-view.patch`, the same harness gives **0 of 300**: first -38's libc.a with only dlmalloc.o swapped (0/100 and 0/200 alternating), then -39 built from source, which gives 0/40 in each of the five variants. The race is V8's lazy update of another thread's memory length (slicc-kernel#1172); the rate depends on load, and the canary in slicc-kernel#1173 sees about 8%.

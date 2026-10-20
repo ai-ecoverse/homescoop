@@ -679,14 +679,15 @@ new = ("\tint sigsetjmp(sigjmp_buf, int) __setjmp_attr;\n\t_Noreturn void siglon
        "\t/* homescoop (#1059): LLVM's wasm sjlj lowering rewrites only setjmp call\n"
        "\t * sites, so sigsetjmp records the mask and then is setjmp at the call site. */\n"
        "\tint __homescoop_sigsetjmp_save(sigjmp_buf, int);\n"
-       "#define sigsetjmp(env, save) (__homescoop_sigsetjmp_save((env), (save)) + setjmp(env))\n#endif\n")
+       "\t/* -40 (#1120): env once, as glibc's sigsetjmp evaluates it. */\n"
+       "#define sigsetjmp(env, save) __extension__ ({ __typeof__(&(env)[0]) __hs_env = (env); __homescoop_sigsetjmp_save(__hs_env, (save)) + setjmp(__hs_env); })\n#endif\n")
 if new in t:
     sys.exit(0)
 if t.count(old) != 1:
     sys.exit(f"{p}: no single sigsetjmp declaration in the EH branch")
 p.write_text(t.replace(old, new))
 PYHDR
-  grep -q '__homescoop_sigsetjmp_save((env)' "$PKG/$v/include/setjmp.h"
+  grep -q '__homescoop_sigsetjmp_save(__hs_env' "$PKG/$v/include/setjmp.h"
 done
 R36J="$WORK/r36j"
 rm -rf "$R36J" && mkdir -p "$R36J/static" "$R36J/pic"

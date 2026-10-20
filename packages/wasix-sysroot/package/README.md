@@ -41,6 +41,12 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-40:
+- **malloc uses the initial memory** (homescoop#1287). wasix-libc had turned off dlmalloc's `try_init_allocator`, so the pages between `__heap_base` and the initial memory size went unused and every allocation grew the memory, however large `--initial-memory` was. It's back: a static program gets the pages up to wasm-ld's `__heap_end`, and a PIE dynamic main (python) the pages from the loader's `__heap_base` to the memory size at the first malloc. A program linked with `--initial-memory` that stays under it never calls `memory.grow`.
+- **`sigsetjmp(env, save)` evaluates `env` once** in the EH trees (homescoop#1120), as glibc's does.
+- **`poll(POLLIN)`** on a pipe write end whose reader is gone gives `POLLERR`, and on an `O_WRONLY` regular file `POLLIN`, as on Linux (homescoop#1119).
+- **`readdir()` reports `DT_FIFO`** for a FIFO (homescoop#1124): when WASI says "unknown", libc asks `fstatat`.
+
 Since 2025.9.30-39: **malloc refreshes the thread's view of a grown shared memory** (homescoop#1287, slicc-kernel#1172). In threaded programs V8 updates another thread's memory length lazily, so a `memset`/`memcpy` (bulk `memory.fill`/`memory.copy`) into a block from pages another thread's `sbrk` just grew could trap with `memory access out of bounds`. `malloc`, `calloc`, `realloc`, `posix_memalign` and `aligned_alloc` now call `memory.grow(0)` before they return a block that ends above this thread's `memory.size`. calloc's zeroing and realloc's copy run after that check. The common case costs one `memory.size` (`patches/dlmalloc-memory-view.patch`; the same file applies to wasi-libc).
 
 Since 2025.9.30-38: `poll(POLLIN)` on an empty pipe read end whose writers are gone gives `POLLHUP` alone, as on Linux, on slicc-kernel ≥ 1.125.0 (homescoop#1133). A socket at EOF still gives `POLLIN`.

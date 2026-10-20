@@ -1,0 +1,30 @@
+readdir/scandirat: ask fstatat for the type when fd_readdir says UNKNOWN
+(homescoop#1124). WASI has no FIFO filetype, so a FIFO came back DT_UNKNOWN;
+fstatat goes through slicc_fs path_mode (wasix-sysroot -37) and has the Linux
+type bits, so d_type is DT_FIFO as on Linux.
+
+--- a/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c
++++ b/libc-bottom-half/cloudlibc/src/libc/dirent/readdir.c
+@@ -99,7 +99,9 @@
+     // inode number.
+     off_t d_ino = entry.d_ino;
+     unsigned char d_type = entry.d_type;
+-    if (d_ino == 0 && strcmp(dirent->d_name, "..") != 0) {
++    // homescoop (#1124): WASI has no FIFO filetype, so fd_readdir says
++    // UNKNOWN for one; fstatat (slicc_fs path_mode) knows its type.
++    if ((d_ino == 0 || d_type == DT_UNKNOWN) && strcmp(dirent->d_name, "..") != 0) {
+       struct stat statbuf;
+       if (fstatat(dirp->fd, dirent->d_name, &statbuf, AT_SYMLINK_NOFOLLOW) != 0) {
+ 	if (errno == ENOENT) {
+--- a/libc-bottom-half/cloudlibc/src/libc/dirent/scandirat.c
++++ b/libc-bottom-half/cloudlibc/src/libc/dirent/scandirat.c
+@@ -101,7 +101,8 @@
+     // inode number.
+     off_t d_ino = entry.d_ino;
+     unsigned char d_type = entry.d_type;
+-    if (d_ino == 0) {
++    // homescoop (#1124): as readdir, an UNKNOWN type (a FIFO) from fstatat.
++    if (d_ino == 0 || d_type == DT_UNKNOWN) {
+       if (fstatat(fd, dirent->d_name, &statbuf, AT_SYMLINK_NOFOLLOW) != 0) {
+         return -1;
+       }
