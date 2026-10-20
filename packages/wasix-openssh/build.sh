@@ -31,9 +31,11 @@ ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 
 # Isolated toolchain with the pinned certified wasix-sysroot (until 10.6.0-5
 # this pinned -18 here, which is why it stayed behind).
-eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39
+export HOMESCOOP_WASIX_SYSROOT_SHA=6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934
+eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc-$HOMESCOOP_WASIX_SYSROOT_VERSION")"
 SYSROOT_VER="$(sed -n 's/.*sysroot=\([^ ]*\).*/\1/p' "$WASIXCC_PREFIX/.homescoop-toolchain" | head -1)"
-[[ -n "$SYSROOT_VER" ]] || { echo "homescoop wasix-openssh: no sysroot= in $WASIXCC_PREFIX/.homescoop-toolchain" >&2; exit 1; }
+[[ "$SYSROOT_VER" == "$HOMESCOOP_WASIX_SYSROOT_VERSION" ]] || { echo "homescoop wasix-openssh: $WASIXCC_PREFIX/.homescoop-toolchain has sysroot ${SYSROOT_VER:-none}, not $HOMESCOOP_WASIX_SYSROOT_VERSION" >&2; exit 1; }
 export PATH="${WASIXCC_PREFIX}/bin:${WASIXCC_LLVM_LOCATION}/bin:$HOME/.wasmer/bin:/opt/homebrew/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS=no
@@ -340,7 +342,7 @@ if (dest / "patches").is_dir():
 pkg = {
     "name": "@ai-ecoverse/wasix-openssh",
     "version": pkg_ver,
-    "description": f"OpenSSH {portable} client for slicc WASIX: " + ", ".join(sorted(cmds)),
+    "description": f"OpenSSH {portable}: the ssh, scp and sftp clients, with ssh-keygen and ssh-add.",
     "license": "SSH-OpenSSH",
     "engines": engines,
     "repository": {
