@@ -88,3 +88,12 @@ fnox() {
 ```
 
 1.39.0-5 names `/usr/bin/fnox` there. The `export` case with an `as_file` secret passes on 1.39.0-4 too: it fills a test gap and isn't a fix.
+
+## 1.39.0-6: exec with an as_file secret, activate and the exec bit (homescoop#945, #1129, 2026-10-20)
+
+The published 1.39.0-5 against -6's checklist (slicc-kernel 1.134.3, users enforce): **FAIL, 6 of 94 assertions.**
+- `fnox exec -- printenv LVL` in a project that also has an `as_file` secret fails with `fnox::seven × not available in seven: the value would be in a program (use a header rule)`.
+- With a mode-644 `/tmp/bin/fnox` ahead of `/usr/bin` on PATH, `fnox activate bash` pins `/tmp/bin/fnox` into the hook.
+
+A first -6 build that only dropped the file secrets from the plan still passed `CERT=pem-data` to the child: fnox's own environment held the resolved value. -6 removes the key from the child's environment.
+
