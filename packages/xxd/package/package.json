@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-xxd",
-  "version": "9.2.1192-3",
-  "description": "xxd (from vim 9.2.1192) for wasm / slicc (emscripten)",
+  "version": "9.2.1192-4",
+  "description": "xxd, which makes a hex dump of a file or turns one back into binary.",
   "license": "Vim",
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-rsync",
-  "version": "3.5.1-6",
+  "version": "3.5.1-7",
   "description": "rsync 3.5.1, for fast incremental file copies.",
   "license": "GPL-3.0-or-later",
   "engines": {

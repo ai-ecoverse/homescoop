@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-pkgconf",
-  "version": "3.0.9-4",
-  "description": "pkgconf / pkg-config for wasm (WASM / emscripten, SLICC homescoop ladder)",
+  "version": "3.0.9-5",
+  "description": "pkgconf and pkg-config, which give the compiler and linker flags of installed libraries.",
   "license": "ISC",
   "repository": {
     "type": "git",

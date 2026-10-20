@@ -58,3 +58,7 @@ AssertionError: a local git workflow asked the uplink
   The OPFS root has no hard links, and upstream copies only when `--local` wasn't given (#912).
 
 2.55.0-18 passes it, and every other spec. It has `engines >=1.130.2` (wasm-bash 5.3.0-22's floor), depends on wasm-sed 4.10.0-5, and carries `clone-local-no-hardlinks.patch`.
+
+## 2.55.0-19: shim drift (homescoop#1491; 2026-10-20)
+
+2.55.0-19 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 2.55.0-18 in `bin/git`, `bin/git-receive-pack`, `bin/git-receive-pack.wasm`, `bin/git-remote-http`, `bin/git-remote-http.wasm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

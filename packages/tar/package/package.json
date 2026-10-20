@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-tar",
-  "version": "1.35.0-8",
-  "description": "GNU tar 1.35 for wasm / slicc (fork + Asyncify for -z/-j/-J)",
+  "version": "1.35.0-9",
+  "description": "GNU tar, which creates and extracts archives, with -z, -j and -J compression.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

@@ -47,3 +47,6 @@ The published 5.4.1-3 also has 2 occurrence(s) of the CI build directory `/tmp/h
 
 There's no behaviour change, so the negative is the documentation: `cert/extensions.mjs` reads the package README and fails on 5.4.1-4's README, which doesn't mention `-i inplace`, `--disable-extensions` or `-M`. The messages it pins come from npm's 5.4.1-4 (slicc-kernel 1.30.0, users enforce) and are unchanged in this build.
 
+## 5.4.1-6: shim drift (homescoop#1491; 2026-10-20)
+
+5.4.1-6 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 5.4.1-5 in the binaries (5.4.1-5 was published before the shims changed), so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

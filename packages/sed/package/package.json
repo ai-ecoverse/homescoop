@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-sed",
-  "version": "4.10.0-5",
-  "description": "GNU sed for slicc (WASM / emscripten, SLICC homescoop)",
+  "version": "4.10.0-6",
+  "description": "GNU sed, a stream editor that filters and transforms text.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

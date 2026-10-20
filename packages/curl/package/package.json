@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-curl",
-  "version": "8.22.0-8",
+  "version": "8.22.0-9",
   "description": "curl 8.22, the command-line URL transfer tool, with libcurl.",
   "license": "curl",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-grep",
-  "version": "3.12.0-7",
+  "version": "3.12.0-8",
   "description": "GNU grep 3.12: search files for lines that match a pattern, with -P (PCRE2).",
   "license": "GPL-3.0-or-later",
   "repository": {

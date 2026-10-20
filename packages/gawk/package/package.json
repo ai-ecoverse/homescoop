@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-gawk",
-  "version": "5.4.1-5",
+  "version": "5.4.1-6",
   "description": "GNU awk 5.4: a pattern scanning and text processing language.",
   "license": "GPL-3.0-or-later",
   "repository": {

@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-poppler",
-  "version": "26.10.0-6",
-  "description": "poppler PDF utilities (pdftotext, pdftoppm, pdfinfo, …) for slicc (WASM / emscripten, SLICC homescoop)",
+  "version": "26.10.0-7",
+  "description": "Poppler's PDF tools: pdftotext, pdftoppm, pdfinfo, pdfimages and more.",
   "license": "GPL-2.0-only OR GPL-3.0-only",
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-git",
-  "version": "2.55.0-18",
+  "version": "2.55.0-19",
   "description": "Git version control: clone, commit, branch, merge, push and pull.",
   "engines": {
     "slicc-kernel": ">=1.130.2"

@@ -210,3 +210,7 @@ AssertionError [ERR_ASSERTION]: unzip -t of a zip64 archive whose locator says 0
 ```
 
 macOS's unzip 6.0 without Debian's `29` does the same on that archive ("reported length of central directory is -76 bytes too long", rc 2). With total disks 1 it passes everywhere. 3.0.0-9 carries `unzip-debian-29-handle-windows-zip64-files.patch` and passes every spec. `04` and `21` have no case here: 21 needs an archive past 2^40 bytes, and 04's bit only changes how external attributes are read.
+
+## 3.0.0-10: shim drift (homescoop#1491; 2026-10-20)
+
+3.0.0-10 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 3.0.0-9 in `THIRD-PARTY-NOTICES.md`, `bin/unzip`, `bin/zip` and `bin/zip.wasm`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

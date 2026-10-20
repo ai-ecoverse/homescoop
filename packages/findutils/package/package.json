@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-findutils",
-  "version": "4.11.0-4",
-  "description": "GNU findutils 4.11.0 (find + xargs) for wasm / slicc",
+  "version": "4.11.0-5",
+  "description": "GNU findutils: find, to search for files, and xargs.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

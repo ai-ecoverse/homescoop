@@ -83,3 +83,7 @@ The published 8.22.0-6 also has 26 occurrence(s) of the CI build directory `/tmp
 ## 8.22.0-8: curl -n without HOME (homescoop#724; 2026-10-20)
 
 `cert/netrc.mjs` against a build of main (the published 8.22.0-7's recipe), on slicc-kernel 1.102.6 under users enforce: FAIL, 1 of 3 assertions. `env -u HOME curl -n` gives `curl: (26) .netrc error: no such file`. A probe in the same session shows the cause: with `HOME` unset, a program's environment has `HOME=/home/web_user` (`env -u HOME bash -c 'echo $HOME'`), Emscripten's `getEnvStrings` placeholder, so curl never reached its `getpwuid_r` fallback. With `packages/coreutils/slicc-env.js` linked (#612's fix), all four specs pass.
+
+## 8.22.0-9: shim drift (homescoop#1491; 2026-10-20)
+
+8.22.0-9 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 8.22.0-8 in `bin/curl` and `bin/curl.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

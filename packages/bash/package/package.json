@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-bash",
-  "version": "5.3.0-22",
-  "description": "GNU bash 5.3, the shell for slicc: line editing, history, completion and job control",
+  "version": "5.3.0-23",
+  "description": "GNU bash 5.3, the shell, with line editing, history, completion and job control.",
   "license": "GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.130.2"

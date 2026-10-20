@@ -62,3 +62,7 @@ AssertionError: pgrep's flock(LOCK_SH|LOCK_NB) was granted while perl 1003 held 
 ```
 
 4.0.7-4 passes. pgrep's second open is refused with EWOULDBLOCK, so `pgrep -L -F` prints the holder's pid. After the holder exits, `pgrep -L -F` fails with "Locking check for pidfile failed".
+
+## 4.0.7-5: shim drift (homescoop#1491; 2026-10-20)
+
+4.0.7-5 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 4.0.7-4 in `THIRD-PARTY-NOTICES.md`, `bin/free`, `bin/kill`, `bin/pgrep`, `bin/pidof` and more, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

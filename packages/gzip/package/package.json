@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-gzip",
-  "version": "1.15.0-5",
-  "description": "GNU gzip 1.15 for wasm / slicc (emscripten)",
+  "version": "1.15.0-6",
+  "description": "GNU gzip: gzip, gunzip and zcat.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
