@@ -5,7 +5,6 @@
 # whose package gets the fields or stops being threaded: drop it then.
 jq #1287 wasixcc build; sized at its next build
 wasi-cargo #1287 Rust; the shared allocator refresh (g86d), then sizing
-wasi-impeccable #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-rustc #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-zig #1287 the shared allocator refresh (g86d), then sizing
 wasix-m4 #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
