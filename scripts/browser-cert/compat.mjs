@@ -323,20 +323,19 @@ export async function biosPins(ref, { gh = github, view = npmView } = {}) {
   const pins = async (dir) => lockPins(await file(`${dir}/package.json`), await file(`${dir}/package-lock.json`), `slicc-bios ${sha} ${dir}`);
   const base = await pins('src/packages');
   const optional = await exists('src/packages/optional/package.json');
-  if (optional) {
-    return {
-      sha,
-      base,
-      catalog: lockPins(optional, await file('src/packages/optional/package-lock.json'), `slicc-bios ${sha} src/packages/optional`),
-      files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/package.json', 'src/packages/optional/package-lock.json'],
-    };
-  }
-  return {
-    sha,
-    base,
-    catalog: catalogPins(await file('src/packages/optional/catalog.json'), view),
-    files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/catalog.json'],
-  };
+  const catalog = await exists('src/packages/optional/catalog.json');
+  if (!optional && !catalog) throw new Error(`slicc-bios ${sha} has neither src/packages/optional/package.json nor src/packages/optional/catalog.json`);
+  const files = ['src/packages/package.json', 'src/packages/package-lock.json'];
+  const pinned = optional ? lockPins(optional, await file('src/packages/optional/package-lock.json'), `slicc-bios ${sha} src/packages/optional`) : [];
+  if (optional) files.push('src/packages/optional/package.json', 'src/packages/optional/package-lock.json');
+  const wanted = catalog ? Object.keys(catalog).filter((name) => catalog[name]?.kind !== 'project') : [];
+  if (catalog) files.push('src/packages/optional/catalog.json');
+  const have = new Set(pinned.map((p) => p.name));
+  const latest = catalogPins(Object.fromEntries(wanted.filter((name) => !have.has(name)).map((name) => [name, catalog[name]])), view);
+  const all = [...pinned, ...latest].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const missing = wanted.filter((name) => !all.some((p) => p.name === name && p.version));
+  if (missing.length) throw new Error(`slicc-bios ${sha} catalog.json: ${missing.join(', ')} resolved to no version`);
+  return { sha, base, catalog: all, pinned: pinned.length, latest: latest.length, files };
 }
 
 function kernelInfo(file, extra) {
@@ -355,7 +354,7 @@ async function plan(args) {
   if (!kernelIn) throw new Error('--kernel is required');
   const homescoopSha = must('git', ['rev-parse', 'HEAD'], { cwd: root }).trim();
   const bios = await biosPins(biosRefIn);
-  console.log(`slicc-bios ${biosRefIn} = ${bios.sha}: base ${bios.base.length}, catalog ${bios.catalog.length}`);
+  console.log(`slicc-bios ${biosRefIn} = ${bios.sha}: base ${bios.base.length}, catalog ${bios.catalog.length} (${bios.pinned} pinned by optional/package-lock.json, ${bios.latest} from catalog.json at npm latest)`);
 
   const tmp = join(out, 'tmp');
   let candidate;
@@ -571,7 +570,7 @@ async function plan(args) {
     console.log(`shard ${k} (~${Math.round(b.seconds / 60)} min): ${[...b.units.map(label), ...b.sweeps.map((m) => `base-sweep:${m}`)].join(' ')}`);
   }
   for (const s of doc.skipped) console.log(`skip ${s.package}@${s.version ?? '-'} (${s.origin.join(',')}): ${s.reason}`);
-  args.gateSummary = `${units.length} items in ${n} shard(s), ${doc.skipped.length} skipped`;
+  args.gateSummary = `${units.length} items in ${n} shard(s), ${doc.skipped.length} skipped; slicc-bios base ${bios.base.length}, catalog ${bios.catalog.length} (${bios.pinned} pinned, ${bios.latest} at npm latest)`;
   output('tag', tag);
   output('artifact', `kernel-compat-${tag}`);
   output('shards', JSON.stringify(bins.map((_, k) => k)));
