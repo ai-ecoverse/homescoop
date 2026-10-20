@@ -1,6 +1,7 @@
 /**
  * homescoop#1127 stress loop (not a cert; .github/workflows/pnpm-agent-loop.yml).
- * Seven's agent install, as bios runs it: stress/agent/ is slicc-bios
+ * Seven's agent install, as bios runs it: agent/ (beside this file; moved
+ * out of packages/wasi-pnpm so a bump isn't a wasi-pnpm input) is slicc-bios
  * 4f83a49f's src/packages/agent (package.json, pnpm-lock.yaml with 66
  * resolutions, pnpm-workspace.yaml), installed with `pnpm install
  * --frozen-lockfile --trust-lockfile` against the real registry (fetched by
