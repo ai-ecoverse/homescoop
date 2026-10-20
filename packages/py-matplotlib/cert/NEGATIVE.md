@@ -1,5 +1,9 @@
 # py-matplotlib: negative proof
 
+## 3.11.2-13: the default backend is auto-resolved (3.11.2-14, #1115; 2026-10-20)
+
+`cert/backend.mjs` on npm 3.11.2-13: FAIL, `None False agg` (matplotlibrc has only the inert `##backend: Agg`, so the backend is auto-resolved to lowercase `agg`). 3.11.2-9 and 3.11.2-14 give `Agg True Agg`.
+
 ## 3.11.2-11: the first cp315 matplotlib (homescoop#761; 2026-10-19)
 
 npm's cp314 py-matplotlib 3.11.2-10 (`latest`) declares `@ai-ecoverse/wasix-python >=3.14.2-27 <3.14.3` and cp314 py-* ranges, so with wasix-python 3.15.0-1 at the top, npm nests a 3.14 python and the cp314 stack under it. `discovery.mjs`'s re-pin check ("brings a python of its own") fails, and its 8 `*.cpython-314-wasm32-wasix.so` don't import into python 3.15. 3.11.2-11 passes discovery, sidemods, constrained and notices on the published cp315 set (slicc-kernel 1.125.0).

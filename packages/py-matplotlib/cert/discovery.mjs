@@ -160,8 +160,19 @@ export default async function (ctx) {
     await write(`${old.replace(/py-oldbuild$/, 'wasix-python')}/package.json`, JSON.stringify({ name: `${S}/wasix-python`, version: '3.15.0-0' }));
     await sh(`mkdir -p ${G}/py-old/node_modules/${S} && ln -s ../.pnpm/${S}+py-oldbuild@1.0.0-1/node_modules/${S}/py-oldbuild ${G}/py-old/node_modules/${S}/py-oldbuild\nln -s python ${G}/0123abcdef`);
     await pythonGAt(`${G}/python/`);
-    r = await pyg(['-c', IMPORTS]);
-    assert.equal(r.status, 0, `global projects: ${r.stderr}`);
+    // homescoop#1358: one call per step, each well under the harness's 120 s
+    // per-call limit, with the durations logged: a cold discover() over the
+    // per-package projects first, then the imports in groups.
+    const steps = [['discover', 'pass'], ['numpy+pandas', 'import numpy, pandas'], ['scipy', 'import scipy.optimize'],
+      ['matplotlib', 'import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot, PIL, kiwisolver, contourpy'], ['all', IMPORTS]];
+    const took = [];
+    for (const [name, code] of steps) {
+      const t = performance.now();
+      r = await pyg(['-c', code]);
+      took.push(`${name} ${Math.round(performance.now() - t)} ms`);
+      assert.equal(r.status, 0, `global projects, ${name}: ${r.stderr}`);
+    }
+    console.log(`discovery: pnpm add -g steps: ${took.join(', ')}`);
     r = await pyg(['-c', 'import numpy, pandas; print(numpy.__file__, pandas.__file__)']);
     assert.ok(r.stdout.includes(`${G}/py-numpy/`) && r.stdout.includes(`${G}/py-pandas/`), `from ${r.stdout}`);
     console.log(`discovery: pnpm add -g, one project each: ${r.stdout.trim()}`);
