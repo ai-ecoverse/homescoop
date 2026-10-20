@@ -73,17 +73,14 @@ FLOOR="$(node --input-type=module -e "import { pythonRange } from '$ROOT/scripts
 CXXINC="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/include/c++/v1"
 test -f "$CXXINC/vector"
 
-echo "== py-numpy: OpenBLAS 0.3.28 (static PIC, f2c LAPACK, int ABI; tools/build-openblas.sh)"
-OB="$B/openblas"
-OBP="$B/openblas-prefix"
-rm -rf "$OB" "$OBP" && mkdir -p "$OB"
-fetch_src openblas
-cp "$SRC_FILE" "$OB/OpenBLAS-0.3.28.tar.gz"
-WASIXCC_PREFIX="$(dirname "$(dirname "$WASIXCC")")" WASIX_OPENBLAS_WORK="$OB" WASIX_OPENBLAS_PREFIX="$OBP" OPENBLAS_VERSION=0.3.28 \
-  HOSTCC="$(command -v cc)" AR="$(command -v wasixar)" bash "$PKG/tools/build-openblas.sh" >"$B/openblas.log" 2>&1 \
-  || { tail -80 "$B/openblas.log" >&2; exit 1; }
-test -f "$OBP/lib/libopenblas.a"
-tail -3 "$B/openblas.log"
+echo "== py-numpy: OpenBLAS from @ai-ecoverse/wasix-openblas (static PIC, C LAPACK, f2c int ABI)"
+fetch_src wasix_openblas
+OBDL="$B/wasix-openblas"
+rm -rf "$OBDL" && mkdir -p "$OBDL"
+tar xzf "$SRC_FILE" -C "$OBDL"
+OBP="$OBDL/package"
+OBVER="$(node -p "require('$OBP/package.json').version")"
+test -f "$OBP/lib/libopenblas.a" && test -f "$OBP/lib/pkgconfig/openblas.pc"
 
 fetch_src cython
 CYSITE="$B/cython-site"
@@ -218,6 +215,10 @@ python3 - "$SITE/numpy/__config__.py" "$B" "$WORK" "$ROOT" <<'PYCFG'
 import sys
 p, *roots = sys.argv[1:]
 t = open(p).read()
+import re
+# The prefix map itself carries no information once the paths are relative
+# (it read -ffile-prefix-map=.=. after the rewrite, homescoop#1088).
+t = re.sub(r",? ?-ffile-prefix-map=[^,\"]*", "", t)
 for r in sorted({x.rstrip("/") for x in roots if x}, key=len, reverse=True):
     t = t.replace(r + "/", "./").replace(r, ".")
 open(p, "w").write(t)
@@ -250,17 +251,38 @@ rows.append(f"{di}/RECORD,,")
 open(os.path.join(site, di, "RECORD"), "w").write("\n".join(rows) + "\n")
 PY
 cp "$SRC/LICENSE.txt" "$DEST/LICENSE"
-WORK="$B" homescoop_notices_begin "numpy/_core/_multiarray_umath, numpy/linalg/_umath_linalg and numpy/linalg/lapack_lite link OpenBLAS 0.3.28 statically (with its f2c netlib LAPACK; OpenBLAS is based on GotoBLAS2), and the umath loops compile in libdivide. numpy's own licence is LICENSE."
-WORK="$B" homescoop_notice "OpenBLAS 0.3.28 (BSD-3-Clause)" "$OB/OpenBLAS-0.3.28/LICENSE" -
-WORK="$B" homescoop_notice "LAPACK 3.12, OpenBLAS lapack-netlib (BSD-3-Clause)" "$OB/OpenBLAS-0.3.28/lapack-netlib/LICENSE" -
-WORK="$B" homescoop_notice "GotoBLAS2 (BSD-2-Clause)" "$OB/OpenBLAS-0.3.28/GotoBLAS_00License.txt" -
+# wasix-openblas' LICENSE is OpenBLAS', LAPACK's and GotoBLAS2's, each after a
+# "==> LICENSE <==" line.
+awk -v d="$B/oblic" '/^==> /{n++; next} {print > (d "." n)}' "$OBP/LICENSE"
+test -s "$B/oblic.3"
+# numpy.random's LICENSE.md files have markdown headings ("## The MIT
+# License"), which would split their THIRD-PARTY-NOTICES.md sections: plain text.
+R="$B/random-licences"
+rm -rf "$R" && mkdir -p "$R"
+for g in mt19937 pcg64 philox sfc64 splitmix64 distributions; do
+  mkdir -p "$R/$g" && sed -E 's/^#+ +//' "$SRC/numpy/random/src/$g/LICENSE.md" >"$R/$g/LICENSE.md"
+done
+WORK="$B" homescoop_notices_begin "numpy/_core/_multiarray_umath, numpy/linalg/_umath_linalg and numpy/linalg/lapack_lite link OpenBLAS $OBVER statically (@ai-ecoverse/wasix-openblas: OpenBLAS, its C translation of netlib LAPACK, and GotoBLAS2 code); the umath loops compile in libdivide and Highway, numpy.fft pocketfft, and numpy.random its bit generators and distributions. numpy's own licence is LICENSE."
+WORK="$B" homescoop_notice "OpenBLAS $OBVER (BSD-3-Clause)" "$B/oblic.1" -
+WORK="$B" homescoop_notice "LAPACK, OpenBLAS lapack-netlib (BSD-3-Clause)" "$B/oblic.2" -
+WORK="$B" homescoop_notice "GotoBLAS2 (BSD-2-Clause)" "$B/oblic.3" -
 WORK="$B" homescoop_notice "libdivide (Zlib)" "$SRC/numpy/_core/include/numpy/libdivide/LICENSE.txt" -
+WORK="$B" homescoop_notice "pocketfft (BSD-3-Clause; numpy.fft)" "$SRC/numpy/fft/pocketfft/LICENSE.md" -
+WORK="$B" homescoop_notice "Highway (Apache-2.0 OR BSD-3-Clause)" "$SRC/numpy/_core/src/highway/LICENSE" -
+WORK="$B" homescoop_notice "MT19937 (BSD-3-Clause; numpy.random)" "$R/mt19937/LICENSE.md" -
+WORK="$B" homescoop_notice "PCG64 (MIT; numpy.random)" "$R/pcg64/LICENSE.md" -
+WORK="$B" homescoop_notice "Philox (BSD-3-Clause; numpy.random)" "$R/philox/LICENSE.md" -
+WORK="$B" homescoop_notice "SFC64 (MIT; numpy.random)" "$R/sfc64/LICENSE.md" -
+WORK="$B" homescoop_notice "SplitMix64 (CC0-1.0; numpy.random)" "$R/splitmix64/LICENSE.md" -
+WORK="$B" homescoop_notice "numpy.random distributions (BSD-3-Clause and others)" "$R/distributions/LICENSE.md" -
 homescoop_compile_pyc "$SITE"
 
 mapfile -t SOS < <(find "$SITE" -name '*.cpython-315-wasm32-wasix.so' | sort)
 echo "== py-numpy: ${#SOS[@]} side modules"
 node "$PKG/tools/mismatch.mjs" "${SOS[@]}"
-node "$ROOT/packages/py-kiwisolver/test/wasm-call-signatures.mjs" "${SOS[@]}" || echo "py-numpy: call-signature mismatches above (see PRESTAGE.md)"
+# numpy-wasm-call-signatures.patch fixed the last five (homescoop#1083): any
+# mismatch is a wasm trap waiting, so it fails the build.
+node "$ROOT/packages/py-kiwisolver/test/wasm-call-signatures.mjs" "${SOS[@]}"
 for so in "$SITE/numpy/_core/_multiarray_umath.cpython-315-wasm32-wasix.so" "$SITE/numpy/linalg/_umath_linalg.cpython-315-wasm32-wasix.so"; do
   test -f "$so"
 done

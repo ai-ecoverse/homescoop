@@ -1,0 +1,54 @@
+--- file.c
++++ file.c
+@@ -5385,6 +5385,13 @@
+     struct timeval time;
+ 
+     op[1] = op1 = NUM2INT(operation);
++#if defined(__wasi__)
++    /* WASIX_FLOCK_NB (homescoop#869): a blocking flock waits inside
++     * slicc-kernel, where the thread's wakeup pipe can't reach it, so
++     * Thread#raise, Thread#kill and Timeout couldn't interrupt it. Try
++     * LOCK_NB and sleep interruptibly between tries. */
++    op[1] = op1 | LOCK_NB;
++#endif
+     GetOpenFile(obj, fptr);
+     op[0] = fptr->fd;
+ 
+@@ -5402,7 +5409,11 @@
+             if (op1 & LOCK_NB) return Qfalse;
+ 
+             time.tv_sec = 0;
++#if defined(__wasi__)
++            time.tv_usec = 20 * 1000;
++#else
+             time.tv_usec = 100 * 1000;	/* 0.1 sec */
++#endif
+             rb_thread_wait_for(time);
+             rb_io_check_closed(fptr);
+             continue;
+--- io.c
++++ io.c
+@@ -11558,6 +11558,23 @@
+     arg.cmd = cmd;
+     arg.narg = narg;
+ 
++#if defined(__wasi__) && defined(F_SETLKW)
++    /* WASIX_FLOCK_NB (homescoop#869): as File#flock in file.c, F_SETLKW
++     * waits in slicc-kernel, out of reach of Thread#raise and Timeout;
++     * retry F_SETLK with an interruptible sleep in between. */
++    if (cmd == F_SETLKW) {
++        arg.cmd = F_SETLK;
++        for (;;) {
++            struct timeval wait;
++            retval = (int)rb_io_blocking_region(io, nogvl_fcntl, &arg);
++            if (retval != -1 || (errno != EAGAIN && errno != EACCES)) return retval;
++            wait.tv_sec = 0;
++            wait.tv_usec = 20 * 1000;
++            rb_thread_wait_for(wait);
++            rb_io_check_closed(io);
++        }
++    }
++#endif
+     retval = (int)rb_io_blocking_region(io, nogvl_fcntl, &arg);
+     if (retval != -1) {
+         switch (cmd) {

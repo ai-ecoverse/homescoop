@@ -10,12 +10,8 @@ export default async function (ctx) {
   assert.equal(lines.at(-1), 'parent-rc=0', r.stdout);
   assert.equal(lines.at(-2), 'child-rc=0', r.stdout);
   const shown = lines.slice(0, -2).join('\n');
-  if (shown === '') {
-    console.log("siginherit: this kernel has no sliccKernel.sigInherited (homescoop#973), so the child starts with default dispositions and trap -p PIPE prints nothing; nothing traps");
-  } else {
-    assert.equal(shown, PIPE_IGNORED, `an inherited SIGPIPE ignore shows in the child's trap -p: ${r.stdout}`);
-    console.log(`siginherit: the child sees the inherited ignore: ${shown}`);
-  }
+  assert.equal(shown, PIPE_IGNORED, `an inherited SIGPIPE ignore shows in the child's trap -p (every kernel bash's engines allows has sliccKernel.sigInherited): ${r.stdout}`);
+  console.log(`siginherit: the child sees the inherited ignore: ${shown}`);
   const own = await run(['bash', '-c', "trap '' PIPE; trap -p PIPE"], { cwd: '/tmp' });
   assert.equal(own.status, 0, own.stderr);
   assert.equal(own.stdout.trim(), PIPE_IGNORED, 'a trap set in the same shell always shows');
