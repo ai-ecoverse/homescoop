@@ -47,5 +47,15 @@ export default async function (ctx) {
   );
   assert.equal(inherited.status, 0, `${inherited.stdout}${inherited.stderr}`);
   assert.equal(inherited.stdout, 't1\nrc=0\nt2\nrc=0\nh1\nrc=0\n', `a signal the parent ignores stays ignored in a child bash, trap - or not, and kill -SIG $$ returns (homescoop#1070): ${JSON.stringify(inherited.stdout)}`);
-  console.log('selfkill: kill -TERM/-KILL/-INT $$ end bash by the signal (sync.run status null + signal, wait 128+n + signal); exit 143 is an exit; a trapped or ignored TERM stays in bash; under an inherited TERM/HUP ignore a child bash survives kill -TERM/-HUP $$, also after trap -');
+  const int = await run(
+    [
+      'bash',
+      '-c',
+      `trap '' INT; for c in 'kill -INT $$; echo i1' 'trap - INT; kill -INT $$; echo i2'; do bash -c "$c" & p=$!; (sleep 20; kill -KILL $p) 2>/dev/null & w=$!; wait $p; echo rc=$?; kill $w 2>/dev/null; done`,
+    ],
+    { cwd: '/tmp' },
+  );
+  assert.equal(int.status, 0, `${int.stdout}${int.stderr}`);
+  assert.equal(int.stdout, 'i1\nrc=0\nrc=130\n', `under an inherited INT ignore a child bash survives kill -INT $$, and after trap - INT it ends by SIGINT, rc 130, as GNU bash on Linux; rc 137 is the 20 s timeout of a hang (homescoop#1113, slicc-kernel#1258): ${JSON.stringify(int.stdout)}`);
+  console.log('selfkill: kill -TERM/-KILL/-INT $$ end bash by the signal (sync.run status null + signal, wait 128+n + signal); exit 143 is an exit; a trapped or ignored TERM stays in bash; under an inherited TERM/HUP ignore a child bash survives kill -TERM/-HUP $$, also after trap -; under an inherited INT ignore kill -INT $$ is survived, and after trap - INT it ends the child with rc 130');
 }
