@@ -28,7 +28,7 @@ fetched by sha256. It follows Pyodide's scipy build.
   - **Project fixes:** `$F2C_FIXES` can name a Python file with
     `fix_f2c_input(path)`, `fix_f2c_output(path)` and `fix_args(args)` hooks,
     for scipy's f2c fixes.
-  - **Overrides:** `$F2C_PATH` sets the f2c to run, and `$F2C_INCLUDE` the
+  - **Overrides:** `$F2C_PATH` sets the f2c to run (an f2c on PATH isn't used unless named there), and `$F2C_INCLUDE` the
     directory for f2c.h.
 
 libf2c and f2c are under the AT&T/Lucent/Bellcore notice (SMLNJ), and

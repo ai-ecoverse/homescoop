@@ -18,6 +18,7 @@ print(json.dumps({
     "npoints": int(len(pts)),
     "nfill": len(fill[0]),
     "mpl2014": len(contourpy.contour_generator(x, y, z, name="mpl2014").lines(0.25)) > 0,
+    "pybind11": __import__("contourpy.util", fromlist=["build_config"]).build_config()["pybind11_version"],
 }))
 `;
 
@@ -35,5 +36,7 @@ export default async function (ctx) {
   assert.ok(out.npoints > 40, o);
   assert.equal(out.nfill, 1, o);
   assert.equal(out.mpl2014, true, o);
+  // homescoop#796: the @pybind11_version@ key has a digit; it's substituted.
+  assert.equal(out.pybind11, '3.0.1', o);
   console.log(`contourpy on wasix-python ${python}: serial lines of x^2 + y^2 at 0.25 are one closed circle (r ${out.radius.join('..')}, ${out.npoints} points), filled 0.25..0.5, mpl2014`);
 }

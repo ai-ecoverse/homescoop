@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/py-fonttools",
-  "version": "4.66.1-10",
-  "description": "fonttools for slicc WASIX CPython",
+  "version": "4.66.1-11",
+  "description": "fontTools, a library for manipulating fonts in Python.",
   "license": "MIT",
   "repository": {
     "type": "git",

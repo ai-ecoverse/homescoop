@@ -22,9 +22,11 @@
   "checklist": [
     "bin/gfortran with no host gfortran: bin/build-f2c.sh builds f2c 20240504 (hoodmane/f2c caa9abc) from the shipped source with the host cc; the .f is translated with f2c -R and compiled with wasixcc (PIC, legacy EH, dynamic-main); the link with libf2c.a passes -Wl,--fatal-warnings (no signature mismatch between f2c's output, f2c.h and libf2c)",
     "the program runs in slicc-kernel: list-directed WRITE of a SUBROUTINE's array result (saxpy 3 5 7 9), a REAL FUNCTION (snrm = sqrt(30)), DOUBLE PRECISION ** INTEGER (pow_di: 1024), CHARACTER concatenation and comparison (wasix-f2c), formatted WRITE, then 'fprobe ok'",
-    "build.sh: bin/gfortran answers meson's identity probes as GNU Fortran 13.2.0 for wasm32 without a host gfortran (--version, -dumpversion, -E -dM - with __GFORTRAN__ and __wasm32__); libf2c.a has s_wsle, e_wsle, do_lio, s_cat, s_copy, s_cmp, pow_dd, pow_di, z_div, i_len and main (__main_argc_argv); not c_abs/z_abs (0005: OpenBLAS's); arith.h is the wasm32 arithchk output and agrees with the host's except its LP64 and NaN lines (an x86_64 host's QNaN1 is 0xfff80000, wasm's 0x7ff80000); no build path"
+    "build.sh: bin/gfortran answers meson's identity probes as GNU Fortran 13.2.0 for wasm32 without a host gfortran (--version, -dumpversion, -E -dM - with __GFORTRAN__ and __wasm32__); libf2c.a has s_wsle, e_wsle, do_lio, s_cat, s_copy, s_cmp, pow_dd, pow_di, z_div, i_len and main (__main_argc_argv); not c_abs/z_abs (0005: OpenBLAS's); arith.h is the wasm32 arithchk output and agrees with the host's except its LP64 and NaN lines (an x86_64 host's QNaN1 is 0xfff80000, wasm's 0x7ff80000); no build path",
+    "3.2.1-2 (homescoop#1197): bin/gfortran runs the pinned f2c (bin/build-f2c.sh from share/f2c/src) unless F2C_PATH says otherwise; an f2c on PATH is never picked. test/f2c-path.sh puts a failing fake f2c first on PATH and compiles test/fprobe.f (ci)"
   ],
   "ci": [
-    "node scripts/wasix-lib-cert.mjs wasix-f2c --tarball .homescoop-out/package.tgz"
+    "node scripts/wasix-lib-cert.mjs wasix-f2c --tarball .homescoop-out/package.tgz",
+    "bash packages/wasix-f2c/test/f2c-path.sh .homescoop-out/package.tgz"
   ]
 }

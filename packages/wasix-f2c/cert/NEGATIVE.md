@@ -1,5 +1,9 @@
 # Negative proof (wasix-f2c)
 
+## 3.2.1-1: an f2c on PATH wins over the pinned one (3.2.1-2, #1197; 2026-10-20)
+
+`test/f2c-path.sh` on npm 3.2.1-1: FAIL, `gfortran -c failed` (bin/gfortran ran the failing fake `f2c` first on PATH). 3.2.1-2: PASS, the pinned hoodmane/f2c built by bin/build-f2c.sh translates.
+
 ## 3.2.1-1: a new build input (homescoop A6, 2026-10-18)
 
 There's no earlier wasix-f2c. These are the cases the spec and build.sh refuse, run locally on macOS (wasixcc 0.4.7, wasix-sysroot -38, slicc-kernel 1.124.2 Node entry).

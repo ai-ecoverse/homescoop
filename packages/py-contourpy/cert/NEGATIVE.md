@@ -1,5 +1,9 @@
 # py-contourpy: negative proof
 
+## 1.4.0-11: build_config()'s pybind11_version unsubstituted (1.4.0-12, #796; 2026-10-20)
+
+`cert/contourpy.mjs` on npm 1.4.0-11: FAIL on `pybind11`, `'@pybind11_version@'`. 1.4.0-12: `3.0.1`.
+
 ## 1.4.0-10: the first cp315 contourpy (homescoop#761; 2026-10-18)
 
 npm's cp314 py-contourpy 1.4.0-9 declares `@ai-ecoverse/wasix-python >=3.14.2-27 <3.14.3` and `@ai-ecoverse/py-numpy >=2.3.2-10 <2.3.3`, so with wasix-python 3.15.0-1 at the top, npm nests a 3.14 python and a cp314 numpy under it, and its `_contourpy.cpython-314-wasm32-wasix.so` doesn't import into python 3.15. 1.4.0-10 passes import, contourpy, errors and notices on 3.15.0-1 with py-numpy 2.5.4-1 (slicc-kernel 1.125.0).

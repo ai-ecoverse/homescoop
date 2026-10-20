@@ -12,7 +12,7 @@
     "@ai-ecoverse/wasix-python@3.15.0-1"
   ],
   "patches": {
-    "kiwisolver-wasm-call-signatures.patch": "the 17 METH_NOARGS methods and 4 strength getters get CPython's second parameter; cert/solver.mjs calls every one of them (1.5.1-6 traps at the first), cert/matplotlib.mjs runs constrained layout through them, and test/call-signatures.test.mjs checks the side module's method and getset tables"
+    "kiwisolver-wasm-call-signatures.patch": "the 17 METH_NOARGS methods and 4 strength getters get CPython's second parameter; cert/solver.mjs calls every one of them (1.5.1-6 traps at the first), py-matplotlib/cert/constrained.mjs runs constrained layout through them, and test/call-signatures.test.mjs checks the side module's method and getset tables"
   },
   "checklist": [
     "cert/import.mjs: import kiwisolver 1.5.1 from /node_modules/@ai-ecoverse/py-kiwisolver, found by discovery without PYTHONPATH, no nested python; its side module imports",
@@ -23,7 +23,8 @@
     "1.5.1-10 (homescoop#761, the cp315 wave; npm-tag python3.15): kiwisolver 1.5.1 from the sdist against wasix-python 3.15.0-1, wasix-sysroot -38 with the sysroot's libc++ headers (phase B); kiwisolver-wasm-call-signatures.patch unchanged. the cp314 line's matplotlib spec isn't carried over: no cp315 matplotlib exists yet, and py-matplotlib3.15's cert runs constrained layout on this package",
     "cert/notices.mjs (homescoop#815): THIRD-PARTY-NOTICES.md names cppy 1.3.1 (BSD-3-Clause), whose headers _cext compiles in, with its licence text",
     "1.5.1-11 (homescoop#761, the fold): packages/py-kiwisolver3.15 moved over packages/py-kiwisolver after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 1.5.1-10; every spec as before",
-    "cert kernel 1.125.0 (homescoop#1292): was 1.100.3, below the engines floor of the wasix-python it installs (3.15: >=1.120.0, >=1.122.3 from 3.15.0-2), so the kernel would refuse python; the cert-kernel-floor allowlist line goes"
+    "cert kernel 1.125.0 (homescoop#1292): was 1.100.3, below the engines floor of the wasix-python it installs (3.15: >=1.120.0, >=1.122.3 from 3.15.0-2), so the kernel would refuse python; the cert-kernel-floor allowlist line goes",
+    "1.5.1-12 (homescoop#1323): the patches map names py-matplotlib's cert/constrained.mjs for the constrained-layout run (the old kiwisolver matplotlib spec went with the cp315 dir); a meta and description change, same sources and build"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-kiwisolver"

@@ -15,6 +15,7 @@
     "cert/record.mjs (4.66.1-8, built in CI from PyPI's fonttools-*-py3-none-any.whl through scripts/stage-pure-wheel.sh): every dist-info RECORD file present with its sha256, none missing or unlisted, every .pyc unchecked-hash on its source; a flipped-byte self-test must be caught",
     "python-range.mjs --lock-only (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1; npm --package-lock-only with 3.15.0-1 resolves one python, at the top level",
     "4.66.1-9 (homescoop#761, the cp315 wave; npm-tag python3.15): the same PyPI wheel staged into lib/python3.15/site-packages by scripts/stage-pure-wheel.sh, with .pyc compiled by a host CPython 3.15.0; every cp314 spec",
-    "4.66.1-10 (homescoop#761, the fold): packages/py-fonttools3.15 moved over packages/py-fonttools after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 4.66.1-9; every spec as before"
+    "4.66.1-10 (homescoop#761, the fold): packages/py-fonttools3.15 moved over packages/py-fonttools after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 4.66.1-9; every spec as before",
+    "cert/woff2.mjs (homescoop#883): a FontBuilder font saves as WOFF (zlib) and reopens with its cmap; a WOFF2 save fails with an ImportError naming brotli, which homescoop doesn't ship (README 'Known limitations'). 4.66.1-11: the README section and the spec; same wheel"
   ]
 }
