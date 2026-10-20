@@ -1,7 +1,7 @@
 #!/bin/sh
 # homescoop wasi-rustc driver — default target + sysroot so `rustc hello.rs` works.
-# Linker: currently rust-lld (bundled in rustc.wasm). Next cut: -C linker=wasm-ld
-# from @ai-ecoverse/wasm-clang over WASIX spawn.
+# Linker: rust-lld, the LLD inside rustc.wasm (patches/0004); nothing is
+# spawned, so the package needs no wasm-ld (homescoop#1087).
 set -eu
 # The package root, found without forking: Cargo runs this driver dozens
 # of times per build, and every $(...) is a process. The realm passes the

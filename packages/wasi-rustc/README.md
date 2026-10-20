@@ -12,7 +12,7 @@ Default compile target: **wasm32-wasip1**.
 ## Environment
 
 - `RUST_MIN_STACK=16777216` recommended (large LLVM stack)
-- `slicc.dependencies` names `@ai-ecoverse/wasm-clang` (for a later wasm-ld spawn)
+- no `slicc.dependencies`: rustc links with the LLD inside `rustc.wasm` (since 1.98.1-7 it no longer pulls `@ai-ecoverse/wasm-clang`, homescoop#1087)
 
 ## Build (`build.sh`, ladder host build)
 
@@ -20,7 +20,7 @@ Default compile target: **wasm32-wasip1**.
 `recipe.yaml`; vendored crates, llvm-project and cargo included), so a ladder
 build is an attested root (#876). Steps:
 
-- apply `patches/0003-*` … `0015-*` to the Rust tree;
+- apply `patches/0003-*` … `0016-*` to the Rust tree;
 - install the wasi-sdk `scripts/install-wasi-sdk.sh` pins (34.0);
 - fetch `@ai-ecoverse/wasi-llvm` (LLVM/clang/lld 21.1.8 static for a
   wasm32-wasip1-threads host) by sha256 (`sources.wasi_llvm`) and check its

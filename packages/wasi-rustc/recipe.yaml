@@ -24,7 +24,7 @@ about:
   license: (MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception
   notes: |
     build.sh fetches rustc-1.98.1-src.tar.xz (vendored crates, llvm-project
-    and cargo included) by sha256, applies patches/0003-0015, installs
+    and cargo included) by sha256, applies patches/0003-0016, installs
     wasi-sdk 34.0 (pinned here, as wasi-llvm does) and fetches the published
     @ai-ecoverse/wasi-llvm by sha256 (#876). make-stable-config.py writes the
     bootstrap config: host wasm32-wasip1-threads against wasi-llvm's
