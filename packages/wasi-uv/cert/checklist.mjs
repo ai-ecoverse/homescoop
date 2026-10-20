@@ -131,6 +131,14 @@ export default async function (ctx) {
   await ok('uv tool uninstall charset-normalizer');
   await ok('test ! -e "$HOME/.local/bin/normalizer"');
 
+  // uvx (0.13.1-4, homescoop#771): upstream's alias for uv tool run, here
+  // the same uv.wasm with `tool uvx` in front. From the find-links only
+  // (homescoop#674: nothing asks PyPI).
+  assert.match((await ok('uvx --version')).stdout, /^uvx 0\.13\.1/m);
+  const uvx = await ok('uvx --from charset-normalizer normalizer --version');
+  assert.match(uvx.stdout, /Charset-Normalizer 3\.5\.2/, `uvx runs a package's command: ${uvx.stdout}`);
+  assert.doesNotMatch(uvx.stderr, /pypi\.org/, `uvx resolves from the find-links: ${uvx.stderr}`);
+
   // A version the links do not have: uv's own error, not a crash.
   const missing = await sh('uv pip install idna==0.1', '/home/u');
   assert.notEqual(missing.status, 0);

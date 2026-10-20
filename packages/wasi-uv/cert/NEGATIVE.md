@@ -10,3 +10,9 @@ What's still not excluded: locks are per kernel, so two browser tabs (two kernel
 
 The published 0.13.1-2 passes the new stress row's traps check: 6 rounds of 41 local wheels, 0 traps, on slicc-kernel 1.134.3. The trap is a V8 race (slicc-kernel#1172) seen at 5–12% of rounds under heavier allocation (azw9's canary, wasi-pnpm's loop), so the row is a guard, not a negative. 0.13.1-2's peak there is 17 MiB. A 200-wheel variant didn't finish: the harness's 120 s CDP answer limit ran out while writing 12,000 files, which isn't uv. The recorded heap is 64 MiB.
 
+## 0.13.1-4: uvx, ending uv (homescoop#771, #910, #911, 2026-10-20)
+
+- **uvx:** the published 0.13.1-3 has no `uvx` command, so the checklist's `uvx --version` exits 127 ("command not found"). -4's package.json (the same uv.wasm) passes the whole suite on slicc-kernel 1.134.3, users enforce.
+- **`cert/interrupt.mjs`** passes with 0.13.1-3 too on 1.134.3. Both cases were kernel problems, now fixed: on 1.100.4 a `kill -9` could be lost (slicc-kernel#755, fixed in 1.104.1, now the engines floor), and on 1.110.7 ^C didn't end uv (homescoop#911). The row keeps both from coming back.
+- **homescoop#674** (the config was written to the wrong HOME) was fixed in the spec by `UV_CONFIG_FILE` on every run. uvx's row also asserts that nothing asks pypi.org.
+

@@ -10,6 +10,7 @@ It replaces [`@ai-ecoverse/wasix-uv-shim`](https://www.npmjs.com/package/@ai-eco
 pnpm add -g @ai-ecoverse/wasi-uv
 uv venv && uv pip install requests && uv run python -c 'import requests'
 uv init demo && cd demo && uv add idna && uv run demo
+uvx ruff check .   # uvx is uv tool run, as upstream's
 ```
 
 PyPI is reached through the kernel's proxy (`HTTPS_PROXY`, CA in
@@ -34,6 +35,15 @@ Limits in seven:
   across browser tabs (slicc-kernel#675).
 - Files are copied from the cache into environments (`UV_LINK_MODE=copy`,
   set by the command).
+- **Ending uv:** ^C at a terminal and `kill -9` end a running uv, and the
+  kernel drops its locks, so the next uv on that cache or environment goes
+  ahead (slicc-kernel ≥ 1.104.1, the package's floor since 0.13.1-4; older
+  kernels could lose a `kill -9` and leave a lock held, homescoop#910).
+
+`uvx` (since 0.13.1-4, homescoop#771) is the same `uv.wasm` with `tool uvx`
+in front, as upstream's `uvx` binary does: `uvx <command>` and
+`uvx --from <package> <command>` run a package's command in a cached tool
+environment, and `uvx --version` prints `uvx 0.13.1`.
 
 Upstream is astral-sh/uv; homescoop's patches are in
 [`packages/wasi-uv`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-uv).
