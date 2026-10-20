@@ -20,7 +20,8 @@ nghttp2), so it does not replace `@ai-ecoverse/wasi-dig` on a machine
 without a resolver it can reach.
 
 - **UDP** reaches the network only through an uplink that carries UDP.
-  When it can't (the send fails with "network unreachable"), the query is
+  When it can't (setting up or sending fails with "network unreachable"),
+  the query is
   asked again over TCP at once, and dig prints
   `;; UDP network unreachable, retrying in TCP mode.` (the patch in
   `patches/`). Upstream BIND would wait for the read to time out instead.

@@ -53,3 +53,34 @@
  	}
  
  	if (l->ns_search_only && !l->trace_root) {
+@@ -3211,6 +3235,30 @@
+ 		lookup_detach(&l);
+ 		clear_current_lookup();
+ 		return;
++	}
++
++	if ((eresult == ISC_R_NETUNREACH || eresult == ISC_R_HOSTUNREACH) &&
++	    !l->ns_search_only)
++	{
++		/*
++		 * No UDP route to the server (slicc: an address no uplink
++		 * routes, or one whose uplink carries no UDP): ask over TCP.
++		 */
++		dig_lookup_t *n = NULL;
++
++		debug("udp setup failed: %s", isc_result_totext(eresult));
++		dighost_comments(l, "UDP %s, retrying in TCP mode.",
++				 isc_result_totext(eresult));
++		n = requeue_lookup(l, true);
++		n->tcp_mode = true;
++		if (l->trace && l->trace_root) {
++			n->rdtype = l->qrdtype;
++		}
++		query_detach(&query);
++		cancel_lookup(l);
++		lookup_detach(&l);
++		clear_current_lookup();
++		return;
+ 	}
+ 
+ 	if (eresult != ISC_R_SUCCESS) {

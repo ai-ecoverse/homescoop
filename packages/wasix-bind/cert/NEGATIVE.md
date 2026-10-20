@@ -34,3 +34,15 @@ host example.test 100.100.100.100: rc=1
 
 The `+tcp`, `-v`/`-V`/`-version`, refused-server and bad-option cases pass on
 both builds; `users.mjs` (dig over UDP-then-TCP, host) fails on it too.
+
+## The send-only retry (#1370)
+
+The PR's first build retried over TCP only when the UDP *send* failed. For an
+address no uplink routes, UDP already fails at setup. That build against
+this checklist: FAIL, 3 of 89 assertions, all of them in the unrouted case:
+
+```text
+dig +tries=1 @192.0.2.53 example.test
+;; UDP setup with 192.0.2.53#53(192.0.2.53) for example.test failed: network unreachable.
+;; no servers could be reached          (no TCP retry)
+```

@@ -180,6 +180,15 @@ export default async function (ctx) {
   assert.match(full, /^;; SERVER: 100\.100\.100\.100#53\(100\.100\.100\.100\) \(TCP\)$/m);
   assert.ok((await uplinkLog()).dialled.some((d) => d.host === NS && d.port === 53), 'TCP dial to the tailnet resolver');
 
+  // An address no uplink routes fails at UDP setup, not at send (#1370):
+  // dig retries over TCP there too, at once, and reports that failure.
+  const t1 = Date.now();
+  const unrouted = await cmd(['dig', '+tries=1', '@192.0.2.53', 'example.test'], 9);
+  assert.ok(Date.now() - t1 < 4000, `dig @192.0.2.53 took ${Date.now() - t1} ms`);
+  assert.match(unrouted.stdout, /^;; UDP network unreachable, retrying in TCP mode\.$/m);
+  assert.match(unrouted.stdout, /^;; Connection to 192\.0\.2\.53#53\(192\.0\.2\.53\) for example\.test failed: /m);
+  assert.doesNotMatch(unrouted.stdout, /UDP setup with/);
+
   // +tcp asks over TCP from the start: no UDP line.
   const tcp = (await cmd(['dig', '+tcp', `@${NS}`, 'example.test'])).stdout;
   assert.doesNotMatch(tcp, /UDP/);
@@ -225,6 +234,13 @@ export default async function (ctx) {
   const ns = (await cmd(['nslookup', 'example.test', NS])).stdout;
   assert.match(ns, /^Server:\t\t100\.100\.100\.100\nAddress:\t100\.100\.100\.100#53\n\nNon-authoritative answer:\nName:\texample\.test\nAddress: 192\.0\.2\.10\n/m);
   assert.match((await cmd(['nslookup', '-type=mx', 'example.test', NS])).stdout, /^example\.test\tmail exchanger = 10 mail\.example\.test\.$/m);
+
+  // nslookup, interactive on stdin.
+  const session = await run(['nslookup'], { cwd, stdin: `server ${NS}\nset type=mx\nexample.test\nset type=a\nwww.example.test\nexit\n` });
+  assert.equal(session.status, 0, out(session));
+  assert.match(session.stdout, /^Default server: 100\.100\.100\.100\nAddress: 100\.100\.100\.100#53$/m, out(session));
+  assert.match(session.stdout, /^example\.test\tmail exchanger = 20 mx2\.example\.test\.$/m, out(session));
+  assert.match(session.stdout, /^www\.example\.test\tcanonical name = example\.test\.$/m, out(session));
 
   // Failures: a refusing server is rc 9 (dig) / 1 (host). As in BIND, a bad
   // type is a warning (rc 0) and a bad option a usage error (rc 1).

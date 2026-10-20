@@ -47,7 +47,7 @@ about:
     membarrier syscall is missing. wasix-openssl 3.5.9-4 by pkg-config.
     patches/bind-9.20.29-wasix.patch: configure allows the static build on
     WASI (there is no shared linking on this target, so no dlopen to lose)
-    and dighost.c retries a query over TCP when UDP can't leave the
-    machine (no route: the kernel carries UDP only on an uplink that
-    does). Off: DoH (nghttp2), libxml2, json-c, zlib, LMDB, GSS-API,
+    and dighost.c retries a query over TCP at once when UDP can't leave
+    the machine: ENETUNREACH/EHOSTUNREACH at UDP setup (an address no
+    uplink routes) or at send (an uplink that carries no UDP). Off: DoH (nghttp2), libxml2, json-c, zlib, LMDB, GSS-API,
     GeoIP, libidn2, jemalloc, readline, dnstap. New package, human cert.
