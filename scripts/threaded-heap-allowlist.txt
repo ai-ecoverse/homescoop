@@ -4,7 +4,6 @@
 # "<recipe> #<issue> <reason>". scripts/check-threaded-heap.mjs fails a line
 # whose package gets the fields or stops being threaded: drop it then.
 jq #1287 wasixcc build; sized at its next build
-wasi-biome #1287 Rust (rust-std's bundled wasi-libc); the shared allocator refresh (g86d), then sizing
 wasi-cargo #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-impeccable #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-rustc #1287 Rust; the shared allocator refresh (g86d), then sizing

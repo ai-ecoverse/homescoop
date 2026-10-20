@@ -80,3 +80,8 @@ Rust 1.98.1 builds its self-contained wasm32-wasip1-threads libc with
 the same at both tags, so only the heading and the URLs were wrong.
 `scripts/check-rust-wasi-sdk.mjs` now checks the table against that
 Dockerfile on every build.
+
+## 2.5.15-5: the allocator refresh and the initial heap (homescoop#1287, 2026-10-20)
+
+There's no published negative for the trap: the 2.5.15-4 stress probe (3 × biome check of 400 files and 1 × 3000 files, kernel 1.132.1) didn't trap, and the trap is a V8 race (slicc-kernel#1172) that azw9's canary and wasi-pnpm's loop showed at 5–12% of rounds under heavier allocation. The row fixes 0 traps in 8 rounds and the memory staying within the recorded initial heap. Probes: 400 files peak at 21 MB (VmSize), 3000 files at 98,496 kB, hence 128 MiB.
+
