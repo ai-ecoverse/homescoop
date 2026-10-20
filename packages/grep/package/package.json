@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-grep",
-  "version": "3.12.0-6",
-  "description": "GNU grep for slicc (WASM / emscripten, SLICC homescoop)",
+  "version": "3.12.0-7",
+  "description": "GNU grep 3.12: search files for lines that match a pattern, with -P (PCRE2).",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

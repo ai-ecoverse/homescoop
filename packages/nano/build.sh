@@ -86,7 +86,7 @@ SLICC_A="$WORK/libslicc-nano.a"
 homescoop_slicc_archive "$SLICC_A" less
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=2097152 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
+CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports) $(homescoop_slicc_wrap_pwd)"
 
 if [[ ! -f "$NANO_SRC/src/nano" && ! -f "$NANO_SRC/src/nano.js" || -n "${FORCE:-}" ]]; then
   echo "== nano: emconfigure + emmake"
@@ -129,7 +129,7 @@ path, ver = Path(sys.argv[1]), sys.argv[2]
 pkg = {
     "name": "@ai-ecoverse/wasm-nano",
     "version": f"{ver}-1",
-    "description": "GNU nano with static ncurses 6.5 for wasm / slicc (emscripten)",
+    "description": "GNU nano, a small and friendly text editor for the terminal.",
     "license": "GPL-3.0-or-later",
     "repository": {
         "type": "git",

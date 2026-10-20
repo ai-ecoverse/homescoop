@@ -130,6 +130,15 @@ zig build-obj "$ZSRC/lib/compiler_rt.zig" -target wasm32-wasi -mcpu generic+atom
   --global-cache-dir "$PKG_WORK/host-cache" -femit-bin="$OBJ/compiler_rt.o"
 "$SDK/bin/llvm-ar" rcs "$OBJ/libzigrt.a" "$OBJ/compiler_rt.o"
 "$SDK/bin/clang" "${TARGET_FLAGS[@]}" -O2 -c "$HOMESCOOP_PKG/llvm-shims.c" -o "$OBJ/llvm-shims.o"
+# homescoop#1287: LLVM's threads allocate through wasi-libc's malloc, which
+# can hand a thread a block in memory another thread just grew, above that
+# thread's view. scripts/wasm-refresh-malloc.c wraps the malloc family at the
+# link (-Wl,--wrap=...) and refreshes the view first. Zig's own code is
+# single-threaded and allocates with std.heap.wasm_allocator (BrkAllocator),
+# whose blocks come from memory it grew itself, so it needs no refresh.
+"$SDK/bin/clang" "${TARGET_FLAGS[@]}" -O2 -c "$ROOT/scripts/wasm-refresh-malloc.c" -o "$OBJ/wasm-refresh-malloc.o"
+REFRESH_WRAP=-Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=aligned_alloc,--wrap=posix_memalign,--wrap=memalign
+: "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
 
 echo "== wasi-zig (LLVM): prebuilt wasi-libc, libc++ and Zig runtimes for the native wasm32-wasi target (0025, 0026)"
 PRE="/tmp/homescoop-wasi-zig-$VERSION-prebuilt"
@@ -152,10 +161,10 @@ for f in crt1-command.o crt1-reactor.o libc.a libc++.a libc++abi.a libcompiler_r
 done
 
 echo "== wasi-zig (LLVM): link zig.wasm (wasi-sdk, threads, imported shared memory)"
-"$SDK/bin/clang++" "${TARGET_FLAGS[@]}" -O2 "$OBJ/zig-main.o" "$OBJ/llvm-shims.o" \
+"$SDK/bin/clang++" "${TARGET_FLAGS[@]}" -O2 "$OBJ/zig-main.o" "$OBJ/llvm-shims.o" "$OBJ/wasm-refresh-malloc.o" \
   "$OBJ/cmake/zigcpp/libzigcpp.a" "$LLVM_PREFIX"/lib/*.a "$OBJ/libzigrt.a" \
-  -ldl -lwasi-emulated-mman -Wl,--import-memory,--export-memory \
-  -Wl,--max-memory=4294967296 -Wl,-z,stack-size=48234496 -o "$OBJ/out/zig.wasm"
+  -ldl -lwasi-emulated-mman -Wl,--import-memory,--export-memory "$REFRESH_WRAP" \
+  -Wl,--initial-memory=$WASM_INITIAL_MEMORY -Wl,--max-memory=4294967296 -Wl,-z,stack-size=48234496 -o "$OBJ/out/zig.wasm"
 
 echo "== PRESTAGE: imports (WASI threads + WASIX process calls + shared env.memory)"
 node - "$OBJ/out/zig.wasm" <<'JS'

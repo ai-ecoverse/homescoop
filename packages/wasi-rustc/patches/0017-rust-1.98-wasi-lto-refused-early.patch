@@ -1,0 +1,22 @@
+--- a/compiler/rustc_codegen_ssa/src/back/write.rs
++++ b/compiler/rustc_codegen_ssa/src/back/write.rs
+@@ -418,6 +418,19 @@
+     tcx: TyCtxt<'_>,
+     allocator_module: Option<ModuleCodegen<B::Module>>,
+ ) -> OngoingCodegen<B> {
++    // homescoop#1237: this rustc's LLVM (wasi-llvm 21) can't read the
++    // standard library's bitcode, which Rust's own LLVM 22 wrote ("Unknown
++    // attribute kind (105)"), so cross-crate LTO fails on its first upstream
++    // module. Say so before codegen starts, on the main thread, instead of
++    // from a ThinLTO worker that can't report on WASI. Local ThinLTO (the
++    // default) only reads this crate's own modules and still runs.
++    #[cfg(target_os = "wasi")]
++    if matches!(tcx.sess.lto(), rustc_session::config::Lto::Fat | rustc_session::config::Lto::Thin) {
++        tcx.sess.dcx().fatal(
++            "-C lto=fat and -C lto=thin aren't available in this rustc: its LLVM 21 can't read the standard library's LLVM 22 bitcode; build without -C lto (Cargo: lto = false)",
++        );
++    }
++
+     let (coordinator_send, coordinator_receive) = channel();
+ 
+     let no_builtins = find_attr!(tcx, crate, NoBuiltins);

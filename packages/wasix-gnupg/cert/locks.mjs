@@ -144,6 +144,15 @@ export default async function (ctx) {
   ].join('\n'));
   assert.match(fresh2, /^gen=0$/m, `cone generates a key in the homedir root's gpg created a keybox in:\n${fresh2}`);
 
+  await sh('root', 'rm -rf /etc/poc; mkdir -p /etc/poc; : > /etc/poc/e; chmod 755 /etc/poc; chmod 644 /etc/poc/e');
+  await sh('cone', 'for n in 1 2; do rm -rf ~/p$n; mkdir -m 700 ~/p$n; done; ln -s /etc/poc/t ~/p1/trustdb.gpg; ln -s /etc/poc/e ~/p2/trustdb.gpg');
+  const trustLink = await sh('root', [
+    'for n in 1 2; do gpg --homedir /home/cone/p$n --batch --import /tmp/k1.asc > /dev/null 2>&1; echo "imp$n=$?"; gpgconf --homedir /home/cone/p$n --kill gpg-agent; done',
+    'for f in /etc/poc/*; do stat -c "poc %n %U" "$f"; done',
+  ].join('\n'));
+  assert.doesNotMatch(trustLink, /^poc \S+ cone$/m, `a trustdb.gpg that cone symlinks to a root path never gives the target to cone, whatever gpg's exit (homescoop#1111):\n${trustLink}`);
+  assert.match(trustLink, /^poc \/etc\/poc\/e root$/m, `the symlinked root file stays root's:\n${trustLink}`);
+
   // 3. gpgconf --lock / --unlock.
   const gl = await sh('cone', [
     `export GNUPGHOME=${h}`,
@@ -154,5 +163,5 @@ export default async function (ctx) {
   assert.match(gl, /--lock '[^']*pubring\.kbx': not supported on WASI/, `gpgconf --lock says it isn't supported:\n${gl}`);
   assert.match(gl, /--unlock '[^']*pubring\.kbx': not supported on WASI/, `gpgconf --unlock says it isn't supported:\n${gl}`);
   assert.doesNotMatch(gl, /^lock=0$/m, `gpgconf --lock fails:\n${gl}`);
-  console.log('locks: an empty keyring in a read-only directory lists with rc 0 (#955); after root uses cone\'s homedir its lock files are cone\'s and cone generates, signs and updates the trustdb, and an unlocked root-owned lock file is replaced (#888); after root imports a key into cone\'s keybox, pubring.kbx and its backup are cone\'s and cone generates and signs, and a keybox root creates in cone\'s empty homedir is cone\'s (#1031); gpgconf --lock/--unlock say they are not supported on WASI (#881)');
+  console.log('locks: an empty keyring in a read-only directory lists with rc 0 (#955); after root uses cone\'s homedir its lock files are cone\'s and cone generates, signs and updates the trustdb, and an unlocked root-owned lock file is replaced (#888); after root imports a key into cone\'s keybox, pubring.kbx and its backup are cone\'s and cone generates and signs, and a keybox root creates in cone\'s empty homedir is cone\'s (#1031), while a trustdb.gpg symlinked to a root path is never given away (#1111); gpgconf --lock/--unlock say they are not supported on WASI (#881)');
 }

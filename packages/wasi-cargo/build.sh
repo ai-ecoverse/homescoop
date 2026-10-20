@@ -89,6 +89,11 @@ cp -R "$SRC/src/tools/cargo" "$CARGO_SRC"
 mkdir -p "$CARGO_SRC/.cargo"
 sed "s|^directory = .*|directory = \"$SRC/vendor\"|" "$SRC/.cargo/config.toml" >> "$CARGO_SRC/.cargo/config.toml"
 (cd "$CARGO_SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check "$HOMESCOOP_PKG/patches/cargo.patch" && git apply "$HOMESCOOP_PKG/patches/cargo.patch")
+# homescoop#1287: cargo-refresh-alloc.patch includes the shared allocator
+# refresh on wasm; the initial heap is recipe.yaml's wasm.initial-memory.
+(cd "$CARGO_SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check "$HOMESCOOP_PKG/patches/cargo-refresh-alloc.patch" && git apply "$HOMESCOOP_PKG/patches/cargo-refresh-alloc.patch")
+homescoop_rust_wasm_refresh_alloc
+: "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
 cp -R "$HOMESCOOP_PKG/wasix-command" "$CARGO_SRC/crates/wasix-command"
 mkdir -p "$CARGO_SRC/slicc"
 for spec in git2:0.21.0 home:0.5.12 filetime:0.2.29 tar:0.4.46 jobserver:0.1.34; do
@@ -106,7 +111,7 @@ export CC_wasm32_wasip1_threads="$HOMESCOOP_PKG/wasi-compat/clang"
 export CFLAGS_wasm32_wasip1_threads="--target=$TARGET --sysroot=$WASI_SYSROOT -pthread -ffile-prefix-map=$PKG_WORK=/wasi-cargo -ffile-prefix-map=$SRC=/rustc"
 export AR_wasm32_wasip1_threads="$WASI_SDK_PATH/bin/llvm-ar"
 export CARGO_TARGET_WASM32_WASIP1_THREADS_LINKER="$WASI_SDK_PATH/bin/clang"
-export CARGO_TARGET_WASM32_WASIP1_THREADS_RUSTFLAGS="-C link-self-contained=no -C link-arg=$builtins -C link-arg=-lwasi-emulated-mman -C link-arg=-lwasi-emulated-getpid -C link-arg=-Wl,--max-memory=4294967296 --remap-path-prefix=$CARGO_SRC=/cargo --remap-path-prefix=$SRC=/rustc"
+export CARGO_TARGET_WASM32_WASIP1_THREADS_RUSTFLAGS="-C link-self-contained=no -C link-arg=$builtins -C link-arg=-lwasi-emulated-mman -C link-arg=-lwasi-emulated-getpid -C link-arg=-Wl,--max-memory=4294967296 -C link-arg=-Wl,--initial-memory=$WASM_INITIAL_MEMORY --remap-path-prefix=$CARGO_SRC=/cargo --remap-path-prefix=$SRC=/rustc"
 export CARGO_PROFILE_RELEASE_STRIP=false CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false
 export CARGO_HOME="$PKG_WORK/cargo-home"
 (cd "$CARGO_SRC" && "$STAGE0_CARGO" build --release --locked --offline --target "$TARGET" -p cargo --bin cargo --no-default-features)

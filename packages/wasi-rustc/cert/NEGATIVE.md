@@ -32,3 +32,13 @@ It also checks that an out-of-bounds panic reports the index, that a missing sou
 
 The published 1.98.1-5 against `test/notices.mjs`: **FAIL.** rustc.wasm carries LLVM Support code (its data holds `llvm_regexec() failed to match`; the function names are in wasi-rustc-names), but THIRD-PARTY-NOTICES.md has neither Henry Spencer's regex notice nor BLAKE3's or xxHash's. Those came only with wasi-llvm 21.1.8-2's share/licenses/llvm-support. 1.98.1-6 pins wasi-llvm 21.1.8-2 (same libraries, plus the notices) and adds them through `homescoop_notice_llvm_support`.
 
+## 1.98.1-7: what a compile leaves and says (homescoop#953, #1237, #1087, 2026-10-20)
+
+The published 1.98.1-6 against -7's `cert/hygiene.mjs` (slicc-kernel 1.134.3, users enforce): **FAIL, 7 of 11 assertions.**
+- **Leftovers:** a plain `rustc hi.rs -o hi.wasm` leaves `hi.*.rcgu.o` (×2) and a `rustcXXXXXX` dir, and every compile adds more. The cause is 0004's `std::process::exit(status)` straight after the in-process LLD call, which skips link_binary's cleanup and the TempDir drop.
+- **LTO:** `-C lto=fat` and `-C lto=thin` exit 1 with nothing on stdout or stderr.
+  - `RUSTC_LOG=info` shows fat LTO stopping at `linking "adler2-…rcgu.o"`: `LLVMRustLinkerAdd` failed, and rustc reports that as `LlvmError::LoadBitcode` through the shared emitter, on the main thread inside `catch_fatal_errors`.
+  - 0015's WASI `raise` ran the session's finish and exited without draining that emitter. 0016's finish drains it first, so the cause is printed.
+  - The same std bitcode (`.llvmbc` extracted from -6's rlibs) links natively with LLVM 21's llvm-link, so the root cause is in the wasm-hosted LLVM. -7's first CI build printed it: `failed to load bitcode of module "adler2-…": Unknown attribute kind (105) (Producer: 'LLVM22.1.8-rust-1.98.1-stable' Reader: 'LLVM 21.1.8')`. std was compiled by the stage rustc with Rust's in-tree LLVM 22, and rustc.wasm links wasi-llvm 21. `-C lto=thin` stayed silent, because ThinLTO's error comes from a worker thread. 0017 refuses fat and thin LTO on the main thread before codegen, naming the reason. A wasi-llvm 22 would make LTO work.
+- **Dependencies:** `slicc.dependencies` is `["@ai-ecoverse/wasm-clang"]`.
+

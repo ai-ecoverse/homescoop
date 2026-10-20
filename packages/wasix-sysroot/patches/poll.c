@@ -43,6 +43,7 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 		__wasi_subscription_t subs[2 * nfds + 1];
 		__wasi_size_t ns = 0;
 		int nval = 0;
+		int ready_now = 0;
 		for (nfds_t i = 0; i < nfds; i++) {
 			struct pollfd *p = &fds[i];
 			p->revents = 0;
@@ -70,12 +71,22 @@ static int poll_core(struct pollfd *fds, nfds_t nfds, int has_timeout, __wasi_ti
 					&& st.fs_filetype != __WASI_FILETYPE_SOCKET_STREAM && st.fs_filetype != __WASI_FILETYPE_SOCKET_DGRAM;
 				if (!write_only)
 					subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_READ, .u.u.fd_read.file_descriptor = p->fd };
+				else if (st.fs_filetype == __WASI_FILETYPE_REGULAR_FILE) {
+					/* -40 (homescoop#1119): a regular file is always ready on
+					 * Linux, whatever its open mode. */
+					p->revents |= POLLRDNORM;
+					ready_now++;
+				} else if (!(p->events & POLLWRNORM) && !skip_watch)
+					/* -40 (#1119): POLLIN alone on a pipe write end: Linux still
+					 * reports POLLERR when its readers are gone. Watch it as for
+					 * events 0 (a hangup gives POLLERR, writability nothing). */
+					subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p | WATCH, .u.tag = __WASI_EVENTTYPE_FD_WRITE, .u.u.fd_write.file_descriptor = p->fd };
 			}
 			if (p->events & POLLWRNORM)
 				subs[ns++] = (__wasi_subscription_t){ .userdata = (uintptr_t)p, .u.tag = __WASI_EVENTTYPE_FD_WRITE, .u.u.fd_write.file_descriptor = p->fd };
 		}
-		if (nval) {
-			if (ns == 0) return nval;
+		if (nval || ready_now) {
+			if (ns == 0) return nval + ready_now;
 			subs[ns++] = (__wasi_subscription_t){ .u.tag = __WASI_EVENTTYPE_CLOCK, .u.u.clock.id = __WASI_CLOCKID_MONOTONIC, .u.u.clock.timeout = 1 };
 		} else if (has_timeout || skip_watch) {
 			__wasi_timestamp_t left = RECHECK_NS;

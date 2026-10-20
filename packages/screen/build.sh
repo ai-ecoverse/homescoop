@@ -159,7 +159,7 @@ path, ver = Path(sys.argv[1]), sys.argv[2]
 pkg = {
     "name": "@ai-ecoverse/wasm-screen",
     "version": f"{ver}-1",
-    "description": "GNU screen for slicc (emscripten ABI; asyncify fork; PTY via musl+SLICC #3733)",
+    "description": "GNU screen, a terminal multiplexer: detach and reattach sessions with several windows.",
     "license": "GPL-3.0-or-later",
     "repository": {
         "type": "git",
@@ -169,7 +169,7 @@ pkg = {
     "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/screen",
     "keywords": ["wasm", "emscripten", "slicc", "homescoop", "screen", "pty"],
     "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "PRESTAGE.md"],
-    "publishConfig": {"access": "public", "tag": "next"},
+    "publishConfig": {"access": "public"},
     "homescoop": {"recipe": "screen", "upstream": ver, "pty": "emscripten+SLICC#3733"},
     "slicc": {
         "abi": "emscripten",

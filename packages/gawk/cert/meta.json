@@ -15,7 +15,8 @@
     "system()",
     "getline from pipe",
     "print | cmd",
-    "/inet/tcp via the socket shim (clinet): realm-proxy round trip on 127.0.0.1:3128, tailnet name via the uplink, Connection refused, Name does not resolve (cert/inet.mjs)"
+    "/inet/tcp via the socket shim (clinet): realm-proxy round trip on 127.0.0.1:3128, tailnet name via the uplink, Connection refused, Name does not resolve (cert/inet.mjs)",
+    "cert/extensions.mjs (5.4.1-5, homescoop#681): built --disable-extensions --disable-mpfr, as the README says; gawk -i inplace is rc 2 with \"cannot open source file `inplace'\" and leaves the file alone; -l filefuncs is rc 2 with \"cannot open shared library `filefuncs'\"; -M warns \"-M ignored: MPFR/GMP support not compiled in\"; the README's replacement (gawk … f > f.new && mv f.new f) doubles the file's numbers"
   ],
   "patches": {
     "emscripten-no-fork-popen.patch": "system / getline pipe / print|cmd in cert/checklist.mjs (PIPES_SIMULATED + musl popen)"

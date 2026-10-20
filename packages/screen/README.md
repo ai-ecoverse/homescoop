@@ -31,4 +31,11 @@ user's `screen -dmS` then failed silently.
   Detached for its original terminal.
 - A remote `screen -d <session>` does not detach a session that is attached
   in another terminal.
-- `screen -Q windows` on a detached session prints nothing.
+- `screen -Q windows` on a detached session prints nothing. Upstream 5.0.1
+  does the same natively: with no display, `ShowWindows(-1)` has no current
+  window to list from (homescoop#662). Pass a format instead:
+  `screen -Q windows '%n %t'`.
+
+## 5.0.1-14 (homescoop#1149, #662; 2026-10-20)
+
+`package.json` no longer sets `publishConfig.tag: next`, which disagreed with the `latest` channel it's published to. The description is one plain sentence. `cert/query.mjs` pins the `-Q windows` behaviour above.

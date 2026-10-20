@@ -42,3 +42,7 @@ The published 0.16.0-17 against -18's `cert/cimport.mjs` (slicc-kernel 1.134.3, 
 
 homescoop#1060 (the prebuilt archives' DWARF paths) was fixed by c56dc1ed, which builds the prebuilt runtimes at one fixed path. `reproducible (wasi-zig)` passed on #1234 (0.16.0-17).
 
+## 0.16.0-19: the malloc refresh and the initial heap (homescoop#1287, 2026-10-20)
+
+There's no published negative for the trap: the race (slicc-kernel#1172) didn't show in this row's rounds with 0.16.0-17/-18, and it hits 5–12% of rounds only under heavier allocation (azw9's canary, wasi-pnpm's loop). The row is a guard. Its measurement is new: `HOMESCOOP_WASM_PEAK` comes from the allocating thread, because zig's main-thread VmSize can be a stale view. A first -19 with a 256 MiB initial heap gave a 73 MiB malloc peak, with zig's 57 MiB of data and stack below it, hence 96 MiB.
+

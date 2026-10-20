@@ -83,10 +83,10 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-file`](https://www.npmjs.com/package/@ai-ecoverse/wasm-file) | [recipe](packages/file) | file 5.46 + magic.mgc for wasm / slicc |
 | [`@ai-ecoverse/wasm-findutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-findutils) | [recipe](packages/findutils) | GNU findutils 4.11.0 (find + xargs) for wasm / slicc |
 | [`@ai-ecoverse/wasm-freetype`](https://www.npmjs.com/package/@ai-ecoverse/wasm-freetype) | [recipe](packages/freetype) | FreeType font engine (WASM / emscripten, SLICC homescoop ladder) |
-| [`@ai-ecoverse/wasm-gawk`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gawk) | [recipe](packages/gawk) | GNU awk for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-gawk`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gawk) | [recipe](packages/gawk) | GNU awk 5.4: a pattern scanning and text processing language. |
 | [`@ai-ecoverse/wasm-git`](https://www.npmjs.com/package/@ai-ecoverse/wasm-git) | [recipe](packages/git) | Git version control: clone, commit, branch, merge, push and pull. |
 | [`@ai-ecoverse/wasm-gmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gmake) | [recipe](packages/gmake) | GNU make for slicc (rebuild sweep wasix-sysroot 2025.9.30-14; emscripten ABI) |
-| [`@ai-ecoverse/wasm-grep`](https://www.npmjs.com/package/@ai-ecoverse/wasm-grep) | [recipe](packages/grep) | GNU grep for slicc (WASM / emscripten, SLICC homescoop) |
+| [`@ai-ecoverse/wasm-grep`](https://www.npmjs.com/package/@ai-ecoverse/wasm-grep) | [recipe](packages/grep) | GNU grep 3.12: search files for lines that match a pattern, with -P (PCRE2). |
 | [`@ai-ecoverse/wasm-gzip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gzip) | [recipe](packages/gzip) | GNU gzip 1.15 for wasm / slicc (emscripten) |
 | [`@ai-ecoverse/wasm-imagemagick`](https://www.npmjs.com/package/@ai-ecoverse/wasm-imagemagick) | [recipe](packages/imagemagick) | Create, convert and edit images from the command line with ImageMagick: magick, convert, identify and mogrify. |
 | [`@ai-ecoverse/wasm-imagemagick-heif`](https://www.npmjs.com/package/@ai-ecoverse/wasm-imagemagick-heif) | [recipe](packages/imagemagick-heif) | ImageMagick with HEIC, HEIF and AVIF support, a drop-in for wasm-imagemagick that includes a patent-encumbered HEVC decoder. |
@@ -103,7 +103,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-libxml2`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libxml2) | [recipe](packages/libxml2) | libxml2 2.15.4 XML parser with GNU libiconv (WASM / emscripten) |
 | [`@ai-ecoverse/llvm-emscripten`](https://www.npmjs.com/package/@ai-ecoverse/llvm-emscripten) | [recipe](packages/llvm-emscripten) | LLVM/clang/lld 24 (llvm-project b158b0ae) built with emscripten 6.0.9: the objects, static libraries and link manifest @ai-ecoverse/wasm-clang links (a build input) |
 | [`@ai-ecoverse/wasm-mount`](https://www.npmjs.com/package/@ai-ecoverse/wasm-mount) | [recipe](packages/mount) | mount / umount for slicc (WASM / emscripten, SLICC homescoop) |
-| [`@ai-ecoverse/wasm-nano`](https://www.npmjs.com/package/@ai-ecoverse/wasm-nano) | [recipe](packages/nano) | GNU nano with static ncurses 6.5 for wasm / slicc (emscripten) |
+| [`@ai-ecoverse/wasm-nano`](https://www.npmjs.com/package/@ai-ecoverse/wasm-nano) | [recipe](packages/nano) | GNU nano, a small and friendly text editor for the terminal. |
 | [`@ai-ecoverse/wasm-ncurses-utils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-ncurses-utils) | [recipe](packages/ncurses-utils) | ncurses clear, tput, tset and reset for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-openjpeg`](https://www.npmjs.com/package/@ai-ecoverse/wasm-openjpeg) | [recipe](packages/openjpeg) | OpenJPEG JPEG 2000 codec (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-patch`](https://www.npmjs.com/package/@ai-ecoverse/wasm-patch) | [recipe](packages/patch) | GNU patch 2.8 for wasm / slicc (emscripten) |
@@ -127,7 +127,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-tzdata`](https://www.npmjs.com/package/@ai-ecoverse/py-tzdata) | [recipe](packages/py-tzdata) | tzdata for slicc WASIX CPython |
 | [`@ai-ecoverse/wasm-qpdf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-qpdf) | [recipe](packages/qpdf) | qpdf PDF merge/split/rotate/decrypt/linearize tool for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-rsync`](https://www.npmjs.com/package/@ai-ecoverse/wasm-rsync) | [recipe](packages/rsync) | rsync 3.5.1, for fast incremental file copies. |
-| [`@ai-ecoverse/wasm-screen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-screen) | [recipe](packages/screen) | GNU screen for slicc (emscripten ABI; asyncify fork; PTY via musl+SLICC #3733) |
+| [`@ai-ecoverse/wasm-screen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-screen) | [recipe](packages/screen) | GNU screen, a terminal multiplexer: detach and reattach sessions with several windows. |
 | [`@ai-ecoverse/wasm-sed`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sed) | [recipe](packages/sed) | GNU sed for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-sqlite3`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sqlite3) | [recipe](packages/sqlite3) | sqlite3 CLI 3.54.0 (amalgamation shell) for wasm / slicc (emscripten) |
 | [`@ai-ecoverse/wasm-tar`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tar) | [recipe](packages/tar) | GNU tar 1.35 for wasm / slicc (fork + Asyncify for -z/-j/-J) |
@@ -136,7 +136,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux rev, column, hexdump, colrm, look and getopt for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasi-biome`](https://www.npmjs.com/package/@ai-ecoverse/wasi-biome) | [recipe](packages/wasi-biome) | Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC. |
 | [`@ai-ecoverse/wasi-buf`](https://www.npmjs.com/package/@ai-ecoverse/wasi-buf) | [recipe](packages/wasi-buf) | buf 1.73 (Protocol Buffers CLI) for slicc WASI preview1 (command buf); buf.wasm built by homescoop from buf v1.73.0 with documented patches |
-| [`@ai-ecoverse/wasi-cargo`](https://www.npmjs.com/package/@ai-ecoverse/wasi-cargo) | [recipe](packages/wasi-cargo) | Cargo inside SLICC's WASI realm (offline path dependencies prototype) |
+| [`@ai-ecoverse/wasi-cargo`](https://www.npmjs.com/package/@ai-ecoverse/wasi-cargo) | [recipe](packages/wasi-cargo) | Cargo, the Rust package manager and build tool, for SLICC. |
 | [`@ai-ecoverse/wasi-dig`](https://www.npmjs.com/package/@ai-ecoverse/wasi-dig) | [recipe](packages/wasi-dig) | dig for slicc WASI: DNS over HTTPS through the realm proxy and DNS over TCP, with dig-style output |
 | [`@ai-ecoverse/wasi-esbuild`](https://www.npmjs.com/package/@ai-ecoverse/wasi-esbuild) | [recipe](packages/wasi-esbuild) | esbuild 0.28 for slicc WASI preview1 (command esbuild); esbuild.wasm built by homescoop from esbuild v0.28.2 with GOOS=wasip1 |
 | [`@ai-ecoverse/wasi-fnox`](https://www.npmjs.com/package/@ai-ecoverse/wasi-fnox) | [recipe](packages/wasi-fnox) | fnox, a secrets manager that keeps values in SLICC's sealed store and hands commands placeholders. |
@@ -149,7 +149,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasi-protoc-gen-go`](https://www.npmjs.com/package/@ai-ecoverse/wasi-protoc-gen-go) | [recipe](packages/wasi-protoc-gen-go) | protoc-gen-go 1.36 (Go protobuf plugin) for slicc WASI preview1 (command protoc-gen-go); a local plugin for @ai-ecoverse/wasi-buf in slicc-kernel |
 | [`@ai-ecoverse/wasi-protoc-gen-go-grpc`](https://www.npmjs.com/package/@ai-ecoverse/wasi-protoc-gen-go-grpc) | [recipe](packages/wasi-protoc-gen-go-grpc) | protoc-gen-go-grpc 1.6.2 (the gRPC code generator for Go) for slicc WASI preview1 (command protoc-gen-go-grpc); a local plugin for @ai-ecoverse/wasi-buf in slicc-kernel |
 | [`@ai-ecoverse/wasi-ripgrep`](https://www.npmjs.com/package/@ai-ecoverse/wasi-ripgrep) | [recipe](packages/wasi-ripgrep) | ripgrep 15 for slicc WASI preview1 (command rg) |
-| [`@ai-ecoverse/wasi-rustc`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc) | [recipe](packages/wasi-rustc) | rustc (LLVM-in-wasm) for slicc WASI — default target wasm32-wasip1 |
+| [`@ai-ecoverse/wasi-rustc`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc) | [recipe](packages/wasi-rustc) | The Rust compiler, to build Rust programs in SLICC. |
 | [`@ai-ecoverse/wasi-rustc-names`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc-names) | [recipe](packages/wasi-rustc-names) | Function names for @ai-ecoverse/wasi-rustc's rustc.wasm, for SLICC_WASM_BACKTRACE (optional) |
 | [`@ai-ecoverse/wasi-typescript`](https://www.npmjs.com/package/@ai-ecoverse/wasi-typescript) | [recipe](packages/wasi-typescript) | TypeScript 7 (the native tsc) for slicc WASI preview1 (command tsc); tsc.wasm built by homescoop from microsoft/typescript-go typescript/v7.0.2 with GOOS=wasip1 |
 | [`@ai-ecoverse/wasi-uv`](https://www.npmjs.com/package/@ai-ecoverse/wasi-uv) | [recipe](packages/wasi-uv) | Astral's uv 0.13 for slicc WASI: uv venv, pip, init, add, lock, sync and run against wasix-python |
@@ -159,7 +159,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-automake`](https://www.npmjs.com/package/@ai-ecoverse/wasix-automake) | [recipe](packages/wasix-automake) | GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4) |
 | [`@ai-ecoverse/wasix-bind`](https://www.npmjs.com/package/@ai-ecoverse/wasix-bind) | [recipe](packages/wasix-bind) | BIND 9.20 dig, host and nslookup for slicc WASIX |
 | [`@ai-ecoverse/wasix-f2c`](https://www.npmjs.com/package/@ai-ecoverse/wasix-f2c) | [recipe](packages/wasix-f2c) | Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc) |
-| [`@ai-ecoverse/wasix-gnupg`](https://www.npmjs.com/package/@ai-ecoverse/wasix-gnupg) | [recipe](packages/wasix-gnupg) | GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -34: user ids and signal masks from slicc-kernel) |
+| [`@ai-ecoverse/wasix-gnupg`](https://www.npmjs.com/package/@ai-ecoverse/wasix-gnupg) | [recipe](packages/wasix-gnupg) | GnuPG 2.4: OpenPGP encryption and signing with gpg, gpgv and gpg-agent. |
 | [`@ai-ecoverse/wasix-m4`](https://www.npmjs.com/package/@ai-ecoverse/wasix-m4) | [recipe](packages/wasix-m4) | GNU m4 1.4.20 for slicc WASIX |
 | [`@ai-ecoverse/wasix-openblas`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openblas) | [recipe](packages/wasix-openblas) | OpenBLAS 0.3.34 for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config |
 | [`@ai-ecoverse/wasix-openssh`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openssh) | [recipe](packages/wasix-openssh) | OpenSSH 10.6p1: the ssh, scp and sftp clients, with ssh-keygen and ssh-add. |

@@ -1,0 +1,33 @@
+--- a/src/grep.c
++++ b/src/grep.c
+@@ -2477,6 +2477,30 @@
+   exit_failure = EXIT_TROUBLE;
+   initialize_main (&argc, &argv);
+ 
++#ifdef __EMSCRIPTEN__
++  /* homescoop#645: slicc runs egrep and fgrep as this binary with argv[0]
++     "egrep" or "fgrep".  Do what upstream's egrep.sh and fgrep.sh do: warn,
++     then run grep -E or grep -F with the same arguments.  */
++  if (argv[0])
++    {
++      char const *slash = strrchr (argv[0], '/');
++      char const *base = slash ? slash + 1 : argv[0];
++      char const *option = (strcmp (base, "egrep") == 0 ? "-E"
++                            : strcmp (base, "fgrep") == 0 ? "-F" : nullptr);
++      if (option)
++        {
++          char **nargv = xnmalloc (argc + 2, sizeof *nargv);
++          fprintf (stderr, "%s: warning: %s is obsolescent; using grep %s\n",
++                   base, base, option);
++          nargv[0] = (char *) "grep";
++          nargv[1] = (char *) option;
++          memcpy (nargv + 2, argv + 1, argc * sizeof *nargv);
++          argv = nargv;
++          argc++;
++        }
++    }
++#endif
++
+   /* Which command-line options have been specified for filename output.
+      -1 for -h, 1 for -H, 0 for neither.  */
+   int filename_option = 0;
