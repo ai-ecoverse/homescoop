@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-screen",
-  "version": "5.0.1-13",
-  "description": "GNU screen for slicc (emscripten ABI; asyncify fork; PTY via musl+SLICC #3733)",
+  "version": "5.0.1-14",
+  "description": "GNU screen, a terminal multiplexer: detach and reattach sessions with several windows.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -25,8 +25,7 @@
     "PRESTAGE.md"
   ],
   "publishConfig": {
-    "access": "public",
-    "tag": "next"
+    "access": "public"
   },
   "homescoop": {
     "recipe": "screen",
