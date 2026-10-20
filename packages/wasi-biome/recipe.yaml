@@ -11,6 +11,8 @@ summary: "Biome 2.5 for slicc WASI preview1 (command biome)"
 source:
   url: "https://github.com/biomejs/biome/archive/refs/tags/@biomejs/biome@{{version}}.tar.gz"
   sha256: "0212a8f9e351e2d47580cf8371948dd477ceb01e0fef1a65f81061a2a4a39039"
+inputs:
+  - scripts/rust-wasm-refresh-alloc.rs
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
   initial-memory: 128MiB
