@@ -114,7 +114,7 @@ test('inputs that are not a list fail the detect job', () => {
   }
 });
 
-test('classify: rebuild for reproducible recipes, test for tests by layout, pool for runner: pool and pure repacks', () => {
+test('classify: rebuild for every built recipe unless it says reproducible: false (#808), test for tests by layout, pool for runner: pool and pure repacks', () => {
   const f = fixture({
     whole: { recipe: 'name: whole\nbuilder: host\nreproducible: true\n', files: { 'test/a.test.mjs': '' } },
     wasm: { recipe: 'name: wasm\nbuilder: host\nreproducible:\n  path: package/bin/x.wasm\n', files: { 'test/package.json': '{}' } },
@@ -132,7 +132,7 @@ test('classify: rebuild for reproducible recipes, test for tests by layout, pool
       all: ['built', 'cone', 'off', 'repack', 'smoked', 'tested', 'wasm', 'whole'],
       host: ['built', 'off', 'repack', 'smoked', 'tested', 'wasm', 'whole'],
       slicc: ['cone'],
-      rebuild: ['wasm', 'whole'],
+      rebuild: ['built', 'wasm', 'whole'],
       test: ['tested', 'wasm', 'whole'],
       pool: ['off', 'repack'],
     });
@@ -156,7 +156,7 @@ test('classify --all: every recipe but the retired ones, as if all were touched 
       all: ['hosted', 'pooled', 'repack'],
       host: ['hosted', 'pooled', 'repack'],
       slicc: [],
-      rebuild: [],
+      rebuild: ['hosted', 'pooled'],
       test: [],
       pool: ['pooled', 'repack'],
     });
