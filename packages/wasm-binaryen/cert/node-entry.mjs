@@ -17,7 +17,7 @@
 // enforce, as root and as kernel user cone.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -59,6 +59,12 @@ try {
     assert.equal(leak, null, `bin/${t}.wasm names a build path: ${leak?.[0]}`);
     assert.ok(cred && glue.includes('slicc_cred_js'), `bin/${t}.wasm lacks the slicc credential library (import slicc_cred_js, export slicc_cred_euid; homescoop#459): under users the kernel would show every file it writes as 1000:1000`);
   }
+  const noticesPath = join(pkg, 'THIRD-PARTY-NOTICES.md');
+  const notices = existsSync(noticesPath) ? readFileSync(noticesPath, 'utf8') : '';
+  for (const [name, text] of [['## Emscripten 6.0.9', 'musl'], ['## FP16', 'Permission is hereby granted']]) {
+    assert.ok(notices.includes(name) && notices.includes(text), `THIRD-PARTY-NOTICES.md lacks the ${name.slice(3)} notice (homescoop#1038, #844)`);
+  }
+  assert.ok(manifest.files.includes('THIRD-PARTY-NOTICES.md'), 'package.json files ships THIRD-PARTY-NOTICES.md');
   console.log(`== ${manifest.name}@${manifest.version}: ${tools.length} tools, every glue's runner guarded; ${kernelSpec}, users enforce`);
 
   const nm = join(work, 'nm');
