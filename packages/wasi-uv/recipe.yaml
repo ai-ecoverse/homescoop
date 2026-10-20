@@ -49,6 +49,8 @@ about:
            waker on WASI)
       0006 homescoop's allocator refresh (scripts/rust-wasm-refresh-alloc.rs)
            as the global allocator on wasm (#1287)
+    0.13.1-4 (no patch): the uvx command (uv.wasm, prefix tool uvx; #771)
+    and engines.slicc-kernel >= 1.104.1 (a lost kill -9 kept locks, #910).
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means

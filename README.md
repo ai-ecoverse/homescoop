@@ -152,7 +152,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasi-rustc`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc) | [recipe](packages/wasi-rustc) | The Rust compiler, to build Rust programs in SLICC. |
 | [`@ai-ecoverse/wasi-rustc-names`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc-names) | [recipe](packages/wasi-rustc-names) | Function names for @ai-ecoverse/wasi-rustc's rustc.wasm, for SLICC_WASM_BACKTRACE (optional) |
 | [`@ai-ecoverse/wasi-typescript`](https://www.npmjs.com/package/@ai-ecoverse/wasi-typescript) | [recipe](packages/wasi-typescript) | TypeScript 7 (the native tsc) for slicc WASI preview1 (command tsc); tsc.wasm built by homescoop from microsoft/typescript-go typescript/v7.0.2 with GOOS=wasip1 |
-| [`@ai-ecoverse/wasi-uv`](https://www.npmjs.com/package/@ai-ecoverse/wasi-uv) | [recipe](packages/wasi-uv) | Astral's uv 0.13 for slicc WASI: uv venv, pip, init, add, lock, sync and run against wasix-python |
+| [`@ai-ecoverse/wasi-uv`](https://www.npmjs.com/package/@ai-ecoverse/wasi-uv) | [recipe](packages/wasi-uv) | Astral's uv for SLICC, with uvx, to manage Python environments and packages. |
 | [`@ai-ecoverse/wasi-zig`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig) | [recipe](packages/wasi-zig) | The Zig compiler with LLVM, to build Zig, C and C++ programs in SLICC. |
 | [`@ai-ecoverse/wasi-zig-libc-src`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig-libc-src) | [recipe](packages/wasi-zig-libc-src) | wasi-libc's C sources for @ai-ecoverse/wasi-zig: zig cc for wasm32-wasi CPUs and modes beyond the prebuilt baseline |
 | [`@ai-ecoverse/wasix-autoconf`](https://www.npmjs.com/package/@ai-ecoverse/wasix-autoconf) | [recipe](packages/wasix-autoconf) | GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4) |
