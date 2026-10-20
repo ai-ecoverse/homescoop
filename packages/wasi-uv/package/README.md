@@ -31,8 +31,11 @@ Limits in seven:
   slicc-kernel (`slicc.fcntl_lock`, ≥ 1.100.0), so two uv processes on one
   cache or environment are serialised: the second says `Waiting to acquire
   exclusive lock`, and `uv cache clean` waits for running uv processes. Up
-  to 0.13.1-1 every lock was granted without one. Locks are per kernel, not
-  across browser tabs (slicc-kernel#675).
+  to 0.13.1-1 every lock was granted without one. Since slicc-kernel 1.119.0
+  the locks also exclude across browser tabs (slicc-kernel#944), and since
+  1.120.1 what's written under them is coherent across tabs
+  (slicc-kernel#949). On older kernels, don't rely on two tabs sharing a
+  cache or an environment.
 - Files are copied from the cache into environments (`UV_LINK_MODE=copy`,
   set by the command).
 - **Ending uv:** ^C at a terminal and `kill -9` end a running uv, and the

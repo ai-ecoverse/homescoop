@@ -4,7 +4,7 @@
 
 `cert/locks.mjs` against the published 0.13.1-1 (slicc-kernel 1.100.4, users enforce): FAIL at `B waited for A's lock on the venv`. The race went `a-held | a-running | b=0 | a=0`: A (`uv -vv pip install --no-binary six six`) logged `Acquired exclusive lock for .venv` and was still running when B (`uv -v pip install idna`) started. B never logged `Waiting to acquire`; it resolved, prepared and installed idna into the same site-packages while A was building six. In 0.13.1-1, 0003's `LockedFileMode::try_lock`/`lock` on WASI returned `Ok(())` without a lock. 0.13.1-2 takes them through `slicc.fcntl_lock`.
 
-What's still not excluded: locks are per kernel, so two browser tabs (two kernels) on one OPFS cache don't see each other's locks (slicc-kernel#675).
+Across browser tabs: when this was written, locks were per kernel, so two tabs on one OPFS cache didn't see each other's locks (slicc-kernel#675). That was fixed in 1.119.0 (slicc-kernel#944), and writes under the locks became coherent across tabs in 1.120.1 (slicc-kernel#949). homescoop#952 updated the README.
 
 ## 0.13.1-3: the allocator refresh and the initial heap (homescoop#1287, 2026-10-20)
 
