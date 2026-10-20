@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-xz",
-  "version": "5.8.4-4",
-  "description": "XZ Utils 5.8.4 (xz/lzma + liblzma) for wasm / slicc",
+  "version": "5.8.4-5",
+  "description": "XZ Utils: xz, unxz, xzcat and the lzma tools, with xzgrep, xzdiff and xzless.",
   "license": "0BSD AND GPL-2.0-or-later",
   "repository": {
     "type": "git",
@@ -21,7 +21,10 @@
       "xzcat": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "xzcat" },
       "lzma": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "lzma" },
       "unlzma": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "unlzma" },
-      "lzcat": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "lzcat" }
+      "lzcat": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "lzcat" },
+      "xzgrep": { "script": "bin/xzgrep" },
+      "xzdiff": { "script": "bin/xzdiff" },
+      "xzless": { "script": "bin/xzless" }
     }
   }
 }
