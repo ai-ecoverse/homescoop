@@ -50,3 +50,14 @@
 - **Executable path.** With llvm-emscripten 24.0.0-1, `sys::fs::getMainExecutable` returned "" under Emscripten, through the dladdr branch. clang then printed `InstalledDir:` empty and spawned `""` for `-cc1`, and every compile in slicc-kernel failed with `posix_spawn failed: No such file or directory`. 24.0.0-2 carries the patch that resolves argv[0] through PATH (manifest `llvm_patches`), and build.sh refuses an input without it. run-cc.mjs passes again: clang shows `InstalledDir: /usr/bin`, as -21 does.
 - **Notices.** -21 ships no THIRD-PARTY-NOTICES.md, though its llvm.wasm carries LLVM Support's regex, BLAKE3 and xxHash code. check-package-meta now refuses that. -22 ships Emscripten's runtime notices and llvm-emscripten's LLVM Support notices.
 - **Reproducible.** Two local builds in different work dirs gave byte-identical tarballs.
+
+## 24.0.0-23: deep nesting and the EH-encoding negative (homescoop#1248, #1229; 2026-10-20)
+
+- **#1248:** `test/cxx-eh.mjs` (current mode) against the published 24.0.0-22 fails at the new deep-nesting row:
+
+  ```text
+  FAIL AssertionError: cc -c p2000.c: rc=70 after 506 ms RuntimeError: divide by zero
+  ```
+
+  clang's parser recurses on the engine's own stack, and in slicc's realm that runs out near 1500 levels. clang's stack guard measures Emscripten's separate 8 MB stack, so it never warns. 24.0.0-21 hung instead. The cc driver now caps `-fbracket-depth` at 1024 (before the caller's flags, so a caller's own value wins). 2000 levels of parentheses or blocks now give clang's `bracket nesting level exceeded maximum of 1024`, rc 1, and 1000 still compiles.
+- **#1229:** with -22 the row's code is unchanged, so there's no package negative. The test now checks the encoding of each tree's program by validating it with the other EH feature off, so the `--expect old` row fails -21 in both legacy trees on any engine. Before, it passed sysroot-eh on Node 24, which runs mixed modules.

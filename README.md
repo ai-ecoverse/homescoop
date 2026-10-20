@@ -171,7 +171,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-websocat`](https://www.npmjs.com/package/@ai-ecoverse/wasix-websocat) | [recipe](packages/wasix-websocat) | websocat 4.0.0-alpha3 (WebSocket client and server, like netcat for ws://) for slicc WASIX |
 | [`@ai-ecoverse/wasix-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasix-zlib) | [recipe](packages/wasix-zlib) | zlib 1.3.1 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config |
 | [`@ai-ecoverse/wasm-binaryen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binaryen) | [recipe](packages/wasm-binaryen) | Binaryen 132 wasm tools for slicc (wasm-opt and friends) |
-| [`@ai-ecoverse/wasm-clang`](https://www.npmjs.com/package/@ai-ecoverse/wasm-clang) | [recipe](packages/wasm-clang) | Clang/LLD 24 for slicc (clang24 EH; asyncify via wasm-binaryen) |
+| [`@ai-ecoverse/wasm-clang`](https://www.npmjs.com/package/@ai-ecoverse/wasm-clang) | [recipe](packages/wasm-clang) | The Clang and LLD 24 compilers, to build C and C++ programs in slicc. |
 | [`@ai-ecoverse/wasm-emscripten`](https://www.npmjs.com/package/@ai-ecoverse/wasm-emscripten) | [recipe](packages/wasm-emscripten) | Emscripten 6.0.9 for slicc (emcc via wasix-python) |
 | [`@ai-ecoverse/wasm-go`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go) | [recipe](packages/wasm-go) | The Go 1.27 compiler, linker and assembler that slicc's go command runs. |
 | [`@ai-ecoverse/wasm-go-std-linux-amd64`](https://www.npmjs.com/package/@ai-ecoverse/wasm-go-std-linux-amd64) | [recipe](packages/wasm-go-std-linux-amd64) | The Go 1.27 standard library, prebuilt for cross-compiling Go programs to Linux on x86-64. |
