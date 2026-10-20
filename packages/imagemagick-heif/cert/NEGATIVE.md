@@ -207,3 +207,7 @@ The release itself only adds the README note on writing `.heic`/`.avif` (homesco
 - **#561, the cause:** openjpeg encodes an untiled image as a single tile, and at 48 MP that no longer fits the 2 GiB wasm heap. `jp2-tile-large.patch` encodes images above 16 MP in 1024x1024 tiles unless `-extract` sets a tile size. 64 MP and up is refused by the tab policy's area limit as before (`cache resources exhausted`).
 - **#1206:** fixed by the version scheme. 7.1.2-34-9.1 and this 9.2 sort above -9, per docs/versioning.md, and `npm-parity`/`sync-package-version` enforce it.
 - **#1258:** `atomic-write-users.mjs`, as cone, writes over root's 0666 `w.png`. On 9.1 it gives `rc=1 … Operation not permitted` in the sticky `/tmp/sk`. In the open `/tmp/op` the write succeeds, but the file becomes cone's. On 9.2, `write-temp-then-rename.patch` keeps upstream's in-place write for a target another user owns: rc 0 in both, and the file stays root's 0666.
+
+## 7.1.2-34-9.3: the delegate pins (2026-10-20)
+
+A pin-only release, with no ImageMagick change. The delegates move to their npm `latest` builds: libpng 1.6.59-4, libwebp 1.6.0-4, libtiff 4.7.2-4, libxml2 2.15.4-3, lcms2 2.19.1-4, freetype 2.13.3-4 and libiconv 1.19.0-3, plus libheif 1.23.6-7 for the heif build and the kits. Those builds fixed #941 (build paths), #925 (libwebp.pc lacked `Requires: libsharpyuv`) and #970 (libheif's plugin directory named the build dir). Their own NEGATIVE.md entries hold the before and after. Here, every spec passes as on 9.2, and `magick.wasm` names no build path.
