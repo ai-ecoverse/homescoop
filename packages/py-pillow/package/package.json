@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/py-pillow",
-  "version": "13.0.0-2",
-  "description": "Pillow for slicc WASIX CPython 3.15 (cp315-wasix_wasm32)",
+  "version": "13.0.0-3",
+  "description": "Pillow, the Python imaging library.",
   "license": "MIT-CMU",
   "repository": {
     "type": "git",
