@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-ruby",
-  "version": "3.4.11-20",
-  "description": "MRI Ruby for slicc WASIX (no epoll; asyncify spill 65536; date_core; wasix-sysroot 2025.9.30-34: user ids, traps, flock and times from slicc-kernel)",
+  "version": "3.4.11-21",
+  "description": "The Ruby 3.4 programming language, with gem, bundle, rake, irb and erb.",
   "engines": {
     "slicc-kernel": ">=1.120.0"
   },
@@ -29,7 +29,7 @@
     "asyncify_buf": 65536,
     "asyncify_note": "POSTLINK: wasm-opt --asyncify only (no asyncify-ignore-imports, no restricted import list). Spill macros WASM_{SETJMP,FIBER,SCAN}_STACK_BUFFER_SIZE=65536 (upstream default 6144). No RB_WASM_ASYNCIFY symbol.",
     "threads_note": "pthread + Asyncify trampoline (WASIX_WASM_THREAD_RT); TLS Asyncify state. Certify Thread/Mutex/Queue at real ipk path for -4+.",
-    "relocation_note": "configure --prefix=/nonexistent-ruby-prefix so baked-in load paths never match VFS. RUBYLIB lists site/vendor/api + arch (rbconfig). Certify at /shared/lib/node_modules/@ai-ecoverse/wasix-ruby with manifest env \u2014 never at /ruby.",
+    "relocation_note": "configure --prefix=/nonexistent-ruby-prefix so baked-in load paths never match VFS. WASIX_RUBY_PREFIX=${package} puts lib/ruby/<api> and its arch dir on the initial load path; no site or vendor dirs. Certify at /shared/lib/node_modules/@ai-ecoverse/wasix-ruby with manifest env \u2014 never at /ruby.",
     "slicc_pr_3735": "gem/bundle/rake use args: [\"${package}/bin/\u2026\"]; needs SLICC PR #3735 (absolute args). Until merged, those commands need a harness with the PR."
   },
   "slicc": {
@@ -39,7 +39,7 @@
         "wasm": "bin/ruby",
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
-          "RUBYLIB": "${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "WASIX_RUBY_PREFIX": "${package}",
           "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
           "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
         }
@@ -51,7 +51,7 @@
         ],
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
-          "RUBYLIB": "${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "WASIX_RUBY_PREFIX": "${package}",
           "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
           "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
         }
@@ -63,7 +63,7 @@
         ],
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
-          "RUBYLIB": "${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "WASIX_RUBY_PREFIX": "${package}",
           "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
           "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
         }
@@ -75,7 +75,7 @@
         ],
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
-          "RUBYLIB": "${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "WASIX_RUBY_PREFIX": "${package}",
           "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
           "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
         }
@@ -87,7 +87,7 @@
         ],
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
-          "RUBYLIB": "${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "WASIX_RUBY_PREFIX": "${package}",
           "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
           "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
         }
@@ -99,7 +99,7 @@
         ],
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
-          "RUBYLIB": "${package}/lib/ruby/3.4.0:${package}/lib/ruby/3.4.0/wasm32-wasi",
+          "WASIX_RUBY_PREFIX": "${package}",
           "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
           "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
         }

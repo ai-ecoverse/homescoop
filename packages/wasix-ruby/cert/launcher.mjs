@@ -38,6 +38,10 @@ export default async function (ctx) {
   const fromRuby = await sh(`ruby -e 'system(%q(${gems}/hello), "d"); a = $?.exitstatus; ENV["PATH"] = %q(${gems}:) + ENV["PATH"]; system("hello", "e"); print a, " ", $?.exitstatus'`);
   assert.equal(fromRuby, 'hello d\nhello e\n7 7', `gem executable from ruby: ${fromRuby}`);
   const loadPath = await sh(`ruby -e 'pkg = File.expand_path("..", RbConfig::CONFIG["bindir"]); mine = $LOAD_PATH.select { |d| d.start_with?(pkg + "/") }; print mine.size, " missing:", mine.reject { |d| File.directory?(d) }.join(",")'`);
-  assert.equal(loadPath, '2 missing:', `RUBYLIB names only the package's two library directories that exist (lib/ruby/3.4.0 and its wasm32-wasi), so a require probes no missing ones: ${loadPath}`);
+  assert.equal(loadPath, '2 missing:', `the load path has the package's two library directories (lib/ruby/3.4.0 and its wasm32-wasi): ${loadPath}`);
+  const probe = await sh(`ruby -e 'print $LOAD_PATH.reject { |d| File.directory?(d) }.join(","), "|", $LOAD_PATH.grep(/nonexistent/).size, "|", ENV.key?("RUBYLIB"), "|"; require "minitest"; print $LOAD_PATH.reject { |d| File.directory?(d) }.join(","), "|", $LOAD_PATH.index { |d| d.include?("/gems/minitest-") } < $LOAD_PATH.index { |d| d.end_with?("/lib/ruby/3.4.0") }'`);
+  assert.equal(probe, '|0|false||true', `no missing directory on $LOAD_PATH, before or after a gem require; the stdlib comes from WASIX_RUBY_PREFIX, not RUBYLIB, and an activated gem goes before it (homescoop#597): ${probe}`);
+  const callerLib = await sh(`RUBYLIB=/tmp/rl ruby -e 'print $LOAD_PATH.first, " ", $LOAD_PATH.size'`);
+  assert.match(callerLib, /^\/tmp\/rl 3$/, `a caller's RUBYLIB comes first: ${callerLib}`);
   console.log(`launcher: ${interp}; bin/ruby ${own}; gem bindir ${gems}; package load path ${loadPath.trim()}`);
 }

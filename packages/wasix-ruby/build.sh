@@ -16,7 +16,7 @@ VER="$VERSION"
 PKG_VER="$(node -p "require('$DEST/package.json').version")"
 [[ "$PKG_VER" == "$VER-"* ]] || { echo "homescoop: package.json version $PKG_VER does not start with $VER-" >&2; exit 1; }
 # Baked-in load paths must not match any real VFS path (ipk install, /ruby, /usr).
-# Manifest RUBYLIB is authoritative; see relocatable acceptance note in PRESTAGE.md.
+# The manifest sets WASIX_RUBY_PREFIX to the package (patches/load-path-prefix-wasi.patch).
 RUBY_PREFIX="${RUBY_PREFIX:-/nonexistent-ruby-prefix}"
 # MRI wasm asyncify spill buffers (setjmp / fiber / GC scan). Upstream default
 # is 6144. There is no RB_WASM_ASYNCIFY symbol — these three macros size the
@@ -38,14 +38,11 @@ ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 YAML_VER="0.2.5"
 YAML_SRC="$WORK/yaml-$YAML_VER"
 
-# No wasixcc on PATH (CI runners): install the pinned toolchain
-# (wasix-sysroot -17 since #180), as wasix-gnupg and wasix-perl do.
-if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
-  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
-fi
-SYSROOT_VER="$(sed -n 's/.*sysroot=\([^ ]*\).*/\1/p' "${WASIXCC_PREFIX:-$HOME/.wasixcc}/.homescoop-toolchain" 2>/dev/null)"
-[[ -n "$SYSROOT_VER" ]] || SYSROOT_VER="$(sed -n 's/^SYSROOT_VERSION="${HOMESCOOP_WASIX_SYSROOT_VERSION:-\([^}]*\)}"$/\1/p' "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
-[[ "$SYSROOT_VER" == 2025.9.30-* ]] || { echo "homescoop: cannot tell the wasix-sysroot version ($SYSROOT_VER)" >&2; exit 1; }
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39
+export HOMESCOOP_WASIX_SYSROOT_SHA=6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934
+eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc-$HOMESCOOP_WASIX_SYSROOT_VERSION")"
+SYSROOT_VER="$(node -p "require(process.argv[1]).version" "$WASIXCC_SYSROOT_PREFIX/package.json")"
+[[ "$SYSROOT_VER" == "$HOMESCOOP_WASIX_SYSROOT_VERSION" ]] || { echo "homescoop: installed wasix-sysroot $SYSROOT_VER, not $HOMESCOOP_WASIX_SYSROOT_VERSION" >&2; exit 1; }
 export SYSROOT_VER
 echo "== wasix-ruby: wasix-sysroot $SYSROOT_VER"
 WASM_OPT="${WASM_OPT:-${WASIXCC_BINARYEN_LOCATION:-$HOME/.wasixcc/binaryen}/bin/wasm-opt}"
@@ -132,42 +129,19 @@ if [[ ! -d "$SRC" || -n "${FORCE:-}" ]]; then
   tar xzf "$TARBALL" -C "$WORK"
 fi
 
-# Bundled gem *native* exts pull crt1.o / fail PIC; keep pure-Ruby gems.
-# date/openssl/zlib/psych/json live under ext/, not here.
-for gem_ext in \
-  "$SRC/.bundle/gems/debug-"*/ext \
-  "$SRC/.bundle/gems/nkf-"*/ext \
-  "$SRC/.bundle/gems/racc-"*/ext \
-  "$SRC/.bundle/gems/rbs-"*/ext \
-  "$SRC/.bundle/gems/syslog-"*/ext \
-  "$SRC/.bundle/gems/bigdecimal-"*/ext
-do
-  if [[ -d "$gem_ext" ]]; then
-    rm -rf "$gem_ext"
-    echo "== wasix-ruby: drop bundled native ext $gem_ext"
-  fi
+STATIC_GEM_EXTS=(bigdecimal:ext/bigdecimal nkf:ext/nkf syslog:ext/syslog racc:ext/racc/cparse debug:ext/debug rbs:ext/rbs_extension)
+for entry in "${STATIC_GEM_EXTS[@]}"; do
+  gem="${entry%%:*}" rel="${entry#*:}"
+  gemdir="$(ls -d "$SRC/.bundle/gems/$gem-"[0-9]* | head -1)"
+  [[ -d "$gemdir/$rel" ]] || { echo "homescoop wasix-ruby: no $rel in $gemdir" >&2; exit 1; }
+  dest="$SRC/ext/wasix-$gem"
+  rm -rf "$dest"
+  cp -R "$gemdir/$rel" "$dest"
+  python3 "$PKG/static-gem-extconf.py" "$dest/extconf.rb" "$gemdir" "$rel"
 done
-
-# rbinstall reads BIGDECIMAL_VERSION from bigdecimal.c; we dropped the ext.
-for gs in "$SRC"/.bundle/gems/bigdecimal-*/bigdecimal.gemspec; do
-  [[ -f "$gs" ]] || continue
-  python3 - "$gs" <<'PY'
-from pathlib import Path
-import re, sys
-p = Path(sys.argv[1])
-t = p.read_text()
-t2, n = re.subn(
-    r"source_version = \[.*?\]\.find do \|dir\|.*?end or raise .*?\n",
-    'source_version = "3.1.8"\n',
-    t,
-    count=1,
-    flags=re.S,
-)
-if n:
-    p.write_text(t2)
-    print("hardcoded bigdecimal gemspec version", p)
-PY
-done
+STATIC_GEM_NAMES="$(printf '%s\n' "${STATIC_GEM_EXTS[@]}" | cut -d: -f1 | paste -sd, -)"
+export WASIX_STATIC_BUNDLED_GEMS="$STATIC_GEM_NAMES"
+STATIC_GEM_WITHOUT="$(printf '%s\n' "${STATIC_GEM_EXTS[@]}" | cut -d: -f1 | sed 's/.*/&,&-*/' | paste -sd, -)"
 
 python3 - "$SRC/ext/psych/extconf.rb" <<'PY'
 from pathlib import Path
@@ -234,6 +208,9 @@ apply_wasix_patch io-console-wasix.patch "$SRC/ext/io/console/extconf.rb" WASIX_
 # Thread#kill/#raise/Timeout on a thread blocked in poll/select: a per-thread
 # wakeup pipe instead of pthread_kill(SIGVTALRM) (slicc-kernel#246).
 apply_wasix_patch thread-ubf-wake-pipe-wasi.patch "$SRC/thread_pthread.c" WASIX_UBF_PIPE
+apply_wasix_patch flock-interruptible-wasi.patch "$SRC/file.c" WASIX_FLOCK_NB
+apply_wasix_patch load-path-prefix-wasi.patch "$SRC/ruby.c" WASIX_LOAD_PATH
+apply_wasix_patch rbinstall-static-bundled-ext-wasi.patch "$SRC/tool/rbinstall.rb" WASIX_STATIC_BUNDLED_GEMS
 
 # OpenSSL 3 opaque structs: never compile the 1.0-era field-access fallbacks.
 python3 - "$SRC/ext/openssl/openssl_missing.c" <<'PY'
@@ -397,7 +374,7 @@ SITE
       --with-static-linked-ext \
       --without-gmp \
       --without-valgrind \
-      --with-out-ext=+,dbm,gdbm,readline,curses,tk,win32ole,fiddle,pty \
+      "--with-out-ext=+,dbm,gdbm,readline,curses,tk,win32ole,fiddle,pty,$STATIC_GEM_WITHOUT" \
       --with-libyaml-dir="$YAML_PREFIX" \
       "${OPENSSL_FLAGS[@]}" \
       "${ZLIB_FLAGS[@]}" \
@@ -725,6 +702,20 @@ conf.write_text(text.replace(old, new))
 print(f"RbConfig.ruby: the ruby on PATH, else bin/ruby ({conf.relative_to(Path(sys.argv[1]).parent.parent.parent)})")
 PY
 
+RBCONFIG="$(ls "$API_LIB"/*/rbconfig.rb)"
+python3 - "$RBCONFIG" "$WORK" "$HOMESCOOP_ROOT" <<'PY'
+import sys
+from pathlib import Path
+conf, work, root = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+t = conf.read_text()
+n = t.count(work)
+t = t.replace(work, "/nonexistent-ruby-build")
+if root in t or "/home/runner" in t:
+    raise SystemExit(f"homescoop wasix-ruby: {conf.name} still names a build path (homescoop#1114)")
+conf.write_text(t)
+print(f"rbconfig.rb: {n} build-tree paths now /nonexistent-ruby-build (homescoop#1114)")
+PY
+
 homescoop_stage_license "$SRC/COPYING" "$SRC/BSDL" 2>/dev/null || \
   homescoop_stage_license "$SRC/COPYING" "$SRC/LEGAL"
 homescoop_notices_begin "bin/ruby statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc)."
@@ -769,7 +760,7 @@ for ext in gems.glob("*/extensions/*"):
 for f in list(root.rglob("*.rb")) + list(root.rglob("*.gemspec")):
     # Code only: upstream doc comments use /usr/lib/ruby as an example path.
     t = "\n".join(l for l in f.read_text(errors="replace").splitlines() if not l.lstrip().startswith("#"))
-    pats = ("/var/lib/gems", "/usr/lib/ruby") if f.name == "rbconfig.rb" else ("/var/lib/gems", "/usr/lib/ruby", "/home/runner")
+    pats = ("/var/lib/gems", "/usr/lib/ruby", "/home/runner")
     for pat in pats:
         if pat in t:
             bad.append(f"{pat} in {f.relative_to(root)}")
@@ -780,7 +771,7 @@ print("host-artefact check: no ELF/Mach-O, no native gem platform/extension dirs
 PY
 
 python3 - "$DEST" "$VER" "$PKG_VER" "$OPENSSL_NOTE" "$ASYNCIFY_BUF" <<'PY'
-import json, os, sys
+import json, os, shutil, sys
 from pathlib import Path
 dest, ver, pkg_ver, openssl_note, asyncify_buf = (
     Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
@@ -797,7 +788,6 @@ if b"Date::Error" not in b and b"date_core" not in b and b"invalid date" not in 
 print("PRESTAGE static: no epoll_create rb_bug; asyncify ok; date strings present")
 # SLICC default PATH is /usr/bin:/workspace/... — not the npm package bin.
 # User gem bin first so gem/bundle executables are found by Ruby child processes.
-# RUBYLIB must list every dir MRI's built-in $LOAD_PATH would have under prefix.
 # Built-in paths use --prefix=/nonexistent-ruby-prefix and never match ipk install.
 user_gem_home = "${HOME}/.local/share/gem/ruby/3.4.0"
 path_env = f"{user_gem_home}/bin:" + "${package}/bin:${PATH}"
@@ -816,28 +806,24 @@ for d in (lib_ruby / api).iterdir():
         break
 if not arch_name:
     raise SystemExit(f"PRESTAGE fail: no rbconfig.rb under lib/ruby/{api}/<arch>/")
-rubylib_parts = []
-for rel in (
-    f"lib/ruby/site_ruby/{api}",
-    f"lib/ruby/site_ruby/{api}/{arch_name}",
-    f"lib/ruby/vendor_ruby/{api}",
-    f"lib/ruby/vendor_ruby/{api}/{arch_name}",
-    f"lib/ruby/{api}",
-    f"lib/ruby/{api}/{arch_name}",
-):
-    if (dest / rel).is_dir() and any(f.is_file() for f in (dest / rel).rglob("*")):
-        rubylib_parts.append("${package}/" + rel)
-rubylib = ":".join(rubylib_parts)
+for rel in (f"lib/ruby/{api}", f"lib/ruby/{api}/{arch_name}"):
+    if not (dest / rel / "rubygems.rb").is_file() and not (dest / rel / "rbconfig.rb").is_file():
+        raise SystemExit(f"PRESTAGE fail: {rel} is not the stdlib tree")
+for rel in ("lib/ruby/site_ruby", "lib/ruby/vendor_ruby"):
+    if any(f.is_file() for f in (dest / rel).rglob("*")):
+        raise SystemExit(f"PRESTAGE fail: {rel} has files, but the load path has no site or vendor directory (homescoop#597)")
+    if (dest / rel).exists():
+        shutil.rmtree(dest / rel)
 # User-writable gem home (SLICC HOME); package gems on GEM_PATH for bundled stdgems.
 base_env = {
     "PATH": path_env,
-    "RUBYLIB": rubylib,
+    "WASIX_RUBY_PREFIX": "${package}",
     "GEM_HOME": user_gem_home,
 }
 pkg = {
     "name": "@ai-ecoverse/wasix-ruby",
     "version": pkg_ver,
-    "description": f"MRI Ruby for slicc WASIX (no epoll; asyncify spill {asyncify_buf}; date_core; wasix-sysroot {os.environ['SYSROOT_VER']}: user ids, traps, flock and times from slicc-kernel)",
+    "description": "The Ruby 3.4 programming language, with gem, bundle, rake, irb and erb.",
     # wasix-sysroot -20 asks slicc-kernel for user ids, with no fallback (homescoop#207).
     "engines": {"slicc-kernel": ">=1.120.0"},
     "license": "Ruby",
@@ -861,7 +847,7 @@ pkg = {
         ),
         "relocation_note": (
             "configure --prefix=/nonexistent-ruby-prefix so baked-in load paths "
-            "never match VFS. RUBYLIB lists site/vendor/api + arch (rbconfig). "
+            "never match VFS. WASIX_RUBY_PREFIX=${package} puts lib/ruby/<api> and its arch dir on the initial load path; no site or vendor dirs. "
             "Certify at /shared/lib/node_modules/@ai-ecoverse/wasix-ruby with "
             "manifest env — never at /ruby."
         ),
@@ -885,7 +871,7 @@ for cand in (dest / "lib" / "ruby" / "gems").glob("*.*"):
         pkg["slicc"]["commands"]["ruby"]["env"]["GEM_PATH"] = f"{user_gem_home}:{package_gems}"
         break
 env = pkg["slicc"]["commands"]["ruby"]["env"]
-print("RUBYLIB=", env["RUBYLIB"])
+print("WASIX_RUBY_PREFIX=", env["WASIX_RUBY_PREFIX"])
 print("GEM_HOME=", env.get("GEM_HOME"))
 print("GEM_PATH=", env.get("GEM_PATH"))
 # Absolute script args — needs SLICC PR #3735 for ${package} expansion in args.
@@ -909,7 +895,7 @@ for \`epoll_create\`; MRI is compiled with \`USE_MN_THREADS=0\` and
 \`HAVE_SYS_EPOLL_H=0\` (also kqueue/eventfd/timerfd off) so it uses poll()/timer-thread.
 
 Configure \`--prefix=${RUBY_PREFIX}\` so baked-in \`\$LOAD_PATH\` never matches a real
-VFS path. Manifest \`RUBYLIB\` is authoritative.
+VFS path. The manifest's \`WASIX_RUBY_PREFIX=\${package}\` puts the package's stdlib on the initial load path.
 
 ## Asyncify (buffer sizing — priority over process/fork)
 
@@ -920,12 +906,12 @@ VFS path. Manifest \`RUBYLIB\` is authoritative.
 ## OpenSSL
 ${OPENSSL_NOTE}
 
-## Relocation / RUBYLIB
+## Relocation / WASIX_RUBY_PREFIX
 - Stdlib under \`lib/ruby/<API>\` (e.g. **3.4.0**), arch \`…/wasm32-wasi/rbconfig.rb\`.
-- \`RUBYLIB\` = api + \`/wasm32-wasi\` (and site_ruby, vendor_ruby when they hold files;
-  npm packs no empty directory), all \`\${package}/…\`.
+- The initial load path is \`\$WASIX_RUBY_PREFIX/lib/ruby/<API>\` and its \`/wasm32-wasi\`, with no
+  site or vendor directory (homescoop#597); the manifest sets no \`RUBYLIB\`, so a caller's goes first.
 - **Certify only** at \`/shared/lib/node_modules/@ai-ecoverse/wasix-ruby\` with
-  manifest env. Never at \`/ruby\` (hides missing RUBYLIB — -3 false pass).
+  manifest env. Never at \`/ruby\` (hides a missing load path — -3 false pass).
 
 ## Gems / flock / uid (-5)
 - \`GEM_HOME=\${HOME}/.local/share/gem/ruby/3.4.0\` (writable under SLICC HOME).
@@ -943,7 +929,7 @@ ${OPENSSL_NOTE}
 
 ## PRESTAGE (host)
 - no \`epoll_create (errno:\` in wasm; date_core linked; \`nt_start_wasm_trampoline\`
-- package.json \`RUBYLIB\` contains \`wasm32-wasi\` and \`lib/ruby/3.4.0\`
+- package.json \`WASIX_RUBY_PREFIX\` is \`\${package}\`, and it sets no \`RUBYLIB\`
 - package.json \`GEM_HOME\` is under \`\${HOME}/.local/share/gem\`, not \`\${package}\`
 
 ## PRESTAGE (SLICC — real install path)
