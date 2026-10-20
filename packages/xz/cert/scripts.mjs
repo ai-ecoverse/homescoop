@@ -19,6 +19,7 @@ export default async function (ctx) {
   assert.equal(d.status, 1, `xzdiff of different files: ${d.stderr}`);
   assert.match(d.stdout, /^< beta$/m);
   assert.match(d.stdout, /^> gamma$/m);
-  assert.equal((await ok('xzless a.txt.xz | cat')).stdout, 'alpha\nbeta\n');
-  console.log('scripts: xzgrep (match, -c, -H, no match rc 1), xzdiff (same rc 0, different rc 1 with the diff) and xzless (through a pipe) run as slicc commands (homescoop#537)');
+  const less = await sh('xzless a.txt.xz');
+  assert.equal(less.status, 127, 'xzless stays unregistered: wasm-less runs no LESSOPEN pipe');
+  console.log('scripts: xzgrep (match, -c, -H, no match rc 1), xzdiff (same rc 0, different rc 1 with the diff) run as slicc commands; xzless stays unregistered (homescoop#537)');
 }
