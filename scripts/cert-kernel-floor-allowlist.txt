@@ -4,16 +4,4 @@
 # "<recipe> #<issue> <npm name>[,<npm name>…] <reason>": a line exempts only
 # the needs it names. A named need, or a line, that no longer violates fails
 # the check: drop it when the kernel moves.
-git #1292 @ai-ecoverse/wasm-bash kernel 1.47.1; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-mount #1292 @ai-ecoverse/wasm-bash kernel 1.17.0; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-procps #1292 @ai-ecoverse/wasix-perl kernel 1.47.1; wasix-perl 5.42.0-19 needs >=1.120.0
 py-kiwisolver3.15 #1292 @ai-ecoverse/wasix-python kernel 1.100.3; wasix-python 3.15.0-1 needs >=1.120.0 (RM: cc7e next release)
-wasi-fnox #1292 @ai-ecoverse/wasm-bash kernel 1.83.0; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-wasi-ripgrep #1292 @ai-ecoverse/wasm-bash,@ai-ecoverse/wasm-coreutils kernel 1.34.1; wasm-bash (unpinned) needs >=1.130.2, wasm-coreutils >=1.44.0
-wasi-uv #1292 @ai-ecoverse/wasm-bash kernel 1.100.4; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-wasix-f2c #1292 @ai-ecoverse/wasm-bash kernel 1.124.2; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-wasix-openblas #1292 @ai-ecoverse/wasm-bash kernel 1.124.2; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-wasix-openssl #1292 @ai-ecoverse/wasm-bash,@ai-ecoverse/wasm-coreutils kernel 1.35.1; wasm-bash (unpinned) needs >=1.130.2, wasm-coreutils >=1.44.0
-wasix-perl #1292 @ai-ecoverse/wasm-bash kernel 1.120.2; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-wasix-ruby #1292 @ai-ecoverse/wasm-bash kernel 1.120.2; wasm-bash (unpinned, latest 5.3.0-21) needs >=1.130.2
-wasix-zlib #1292 @ai-ecoverse/wasm-bash,@ai-ecoverse/wasm-coreutils kernel 1.35.1; wasm-bash (unpinned) needs >=1.130.2, wasm-coreutils >=1.44.0

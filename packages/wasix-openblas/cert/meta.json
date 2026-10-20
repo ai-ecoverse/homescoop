@@ -1,6 +1,6 @@
 {
   "harness": "host-node",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.124.2",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.132.1",
   "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
   "host": "node scripts/wasix-lib-cert.mjs wasix-openblas --tarball <package.tgz>: links test/obprobe.c as a PIC dynamic-main program against lib/ with only pkg-config openblas's flags and -Wl,--fatal-warnings (the pinned wasixcc), then runs cert/probe.mjs on the kernel's Node entry. A build input has no commands of its own.",
   "probes": [{ "name": "obprobe", "src": "test/obprobe.c", "pkg": ["openblas"], "flavours": { "-pic": "lib" } }],
