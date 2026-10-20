@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-emscripten",
-  "version": "6.0.9-24",
+  "version": "6.0.9-25",
   "description": "Emscripten 6.0.9 for slicc (emcc via wasix-python)",
   "license": "MIT",
   "repository": {

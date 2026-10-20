@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-sed",
-  "version": "4.10.0-4",
+  "version": "4.10.0-5",
   "description": "GNU sed for slicc (WASM / emscripten, SLICC homescoop)",
   "license": "GPL-3.0-or-later",
   "repository": {

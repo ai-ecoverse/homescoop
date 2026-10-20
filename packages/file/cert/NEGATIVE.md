@@ -47,3 +47,7 @@ The published 5.46.0-6 also has 23 occurrence(s) of the CI build directory `/tmp
 ## 5.46.0-8: the cert under users enforce (homescoop#819; 2026-10-18)
 
 5.46.0-8 changes no code or build input. The bump exists because ladder-pr rebuilds the package for the cert change, and publish refuses same-version drift (#982). Until now cert/meta.json had no `"users"`, so ladder-pr booted the kernel with its default user mode, and the published 5.46.0-7 was certified that way. cert-coverage.test.mjs's #819 allowlist names file for exactly that. With `"users": "enforce"` the specs run with the kernel's credentials enforced. The same specs passed under enforce in #960's cert review, on the cert kernel and on slicc-kernel 1.122.2.
+
+## 5.46.0-9: the shim's posix_spawnp searches PATH (slicc-kernel#1165, homescoop#1264; 2026-10-19)
+
+5.46.0-9 links the updated `shims/slicc/slicc_spawn.c`. `posix_spawnp` was plain `posix_spawn`; it now searches PATH as execvp does. A candidate that isn't an executable regular file is skipped, and a bare name that isn't found anywhere still goes to the kernel catalog. On #1264, npm-parity found that the build differs from the published 5.46.0-8 in lib/libmagic.a, so this is a packaging bump. The package's own code is unchanged. The behaviour test is coreutils' `cert/spawnp-path.mjs` (`timeout`, the shim's one Emscripten caller that a cert drives).

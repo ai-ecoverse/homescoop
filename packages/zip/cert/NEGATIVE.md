@@ -194,3 +194,7 @@ AssertionError [ERR_ASSERTION]: rc 0, but an entry was written under another nam
 - **The other names:** went through the glue's lossy `UTF8ToString`, which replaces or eats the bytes after an invalid lead byte (`slicc-strict-paths.js`).
 
 3.0.0-7 exits 50 and names each refused entry ("Illegal byte sequence"), out/ holds only `ok.txt`, and every other spec passes. With only `slicc-strict-paths.js`, `rep\xff1.txt` was still written as `rep1.txt`, so both changes are needed.
+
+## 3.0.0-8: the shim's posix_spawnp searches PATH (slicc-kernel#1165, homescoop#1264; 2026-10-19)
+
+3.0.0-8 links the updated `shims/slicc/slicc_spawn.c`. `posix_spawnp` was plain `posix_spawn`; it now searches PATH as execvp does. A candidate that isn't an executable regular file is skipped, and a bare name that isn't found anywhere still goes to the kernel catalog. On #1264, npm-parity found that the build differs from the published 3.0.0-7 in bin/zip and bin/zip.wasm, so this is a packaging bump. The package's own code is unchanged. The behaviour test is coreutils' `cert/spawnp-path.mjs` (`timeout`, the shim's one Emscripten caller that a cert drives).
