@@ -10,6 +10,7 @@ export const REPO_URL = 'https://github.com/ai-ecoverse/homescoop';
 export const PUBLISH_WORKFLOWS = ['.github/workflows/ladder-build.yml'];
 export const MAIN = 'refs/heads/main';
 const SLSA = 'https://slsa.dev/provenance/v1';
+export const GITHUB_HOSTED = 'https://github.com/actions/runner/github-hosted';
 
 export const PREBUILT = [
   {
@@ -208,7 +209,7 @@ const integrityHex = (integrity) => {
   return m ? Buffer.from(m[1], 'base64').toString('hex') : '';
 };
 
-export function checkProvenance(doc, { npm, version, integrity }) {
+export function checkProvenance(doc, { npm, version, integrity, repo = REPO_URL, workflows = PUBLISH_WORKFLOWS, ref = MAIN, hosted = false }) {
   if (!doc) return { ok: false, reason: 'no npm provenance attestation' };
   const slsa = (doc.attestations || []).find((a) => a?.predicateType === SLSA);
   if (!slsa) return { ok: false, reason: 'no SLSA provenance among its attestations' };
@@ -225,13 +226,15 @@ export function checkProvenance(doc, { npm, version, integrity }) {
   if (!want || subj.digest?.sha512 !== want) return { ok: false, reason: "provenance for other bytes than the published tarball's" };
   const def = statement.predicate?.buildDefinition || {};
   const wf = def.externalParameters?.workflow || {};
-  if (wf.repository !== REPO_URL) return { ok: false, reason: `provenance from ${wf.repository || 'no repository'}, not ${REPO_URL}` };
-  if (!PUBLISH_WORKFLOWS.includes(wf.path)) return { ok: false, reason: `provenance from ${wf.path || 'no workflow'}, not ${PUBLISH_WORKFLOWS.join(' or ')}` };
-  if (wf.ref !== MAIN) return { ok: false, reason: `provenance from ${wf.ref || 'no ref'}, not ${MAIN}` };
-  const dep = (def.resolvedDependencies || []).find((d) => String(d?.uri || '').startsWith(`git+${REPO_URL}@`));
+  if (wf.repository !== repo) return { ok: false, reason: `provenance from ${wf.repository || 'no repository'}, not ${repo}` };
+  if (!workflows.includes(wf.path)) return { ok: false, reason: `provenance from ${wf.path || 'no workflow'}, not ${workflows.join(' or ')}` };
+  if (wf.ref !== ref) return { ok: false, reason: `provenance from ${wf.ref || 'no ref'}, not ${ref}` };
+  const builder = statement.predicate?.runDetails?.builder?.id;
+  if (hosted && builder !== GITHUB_HOSTED) return { ok: false, reason: `provenance from builder ${builder || 'none'}, not GitHub-hosted (${GITHUB_HOSTED})` };
+  const dep = (def.resolvedDependencies || []).find((d) => String(d?.uri || '').startsWith(`git+${repo}@`));
   const commit = dep?.digest?.gitCommit;
-  if (!/^[0-9a-f]{40}$/.test(commit || '')) return { ok: false, reason: 'provenance names no homescoop commit' };
-  return { ok: true, reason: '', commit, run: statement.predicate?.runDetails?.metadata?.invocationId };
+  if (!/^[0-9a-f]{40}$/.test(commit || '')) return { ok: false, reason: `provenance names no ${repo.split('/').pop()} commit` };
+  return { ok: true, reason: '', commit, run: statement.predicate?.runDetails?.metadata?.invocationId, builder };
 }
 
 export function sourceRule({ pkg, commit, readAt, recipe, label }) {
