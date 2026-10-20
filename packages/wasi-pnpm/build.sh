@@ -106,7 +106,9 @@ cp "$SRC/LICENSE" "$DEST/LICENSE"
 # commit's dist-various-2 Dockerfile, checked below).
 RUST_COMMIT=bff8e12ff5e6bcd53dfb1dbccdcec80a60a856ed
 [[ "$RUST" == nightly-2026-08-27 ]] || { echo "homescoop: pin the Rust commit and licence sha256s for $RUST" >&2; exit 1; }
-rustc "+$RUST" -vV | grep -qx "commit-hash: $RUST_COMMIT" || { echo "homescoop: $RUST is not commit $RUST_COMMIT" >&2; exit 1; }
+# Not grep -q on a pipe: under pipefail its early exit fails rustc with SIGPIPE.
+RUST_VV="$(rustc "+$RUST" -vV)"
+[[ "$RUST_VV" == *$'\n'"commit-hash: $RUST_COMMIT"$'\n'* ]] || { echo "homescoop: $RUST is not commit $RUST_COMMIT:" >&2; echo "$RUST_VV" >&2; exit 1; }
 HOMESCOOP_NOTICES="$DEST/THIRD-PARTY-NOTICES.md"
 mkdir -p "$WORK/notices"
 cp "$SRC/pnpm/npm/pnpm/THIRD-PARTY-NOTICES.md" "$HOMESCOOP_NOTICES"
