@@ -11,4 +11,4 @@ wasi-zig #1287 the shared allocator refresh (g86d), then sizing
 wasix-m4 #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
 wasix-perl #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
 wasix-ruby #1287 wasix-sysroot's malloc refresh (cc7e), then sizing
-wasix-websocat #1287 Rust on wasix; the shared allocator refresh, then sizing
+wasix-websocat #1287 has the shared allocator refresh (4.0.0-alpha3-6); not sized: wasix-libc v2026-07-03.1's dlmalloc doesn't use the pages between __heap_base and the initial size (try_init_allocator commented out), so a larger initial heap only adds (the alpha3-6 128 MiB build peaked at 167 MiB, alpha3-5 at 94)
