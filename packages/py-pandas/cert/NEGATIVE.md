@@ -1,35 +1,5 @@
-# py-pandas: negative proof
+# Negative proof (py-pandas, cp315 line)
 
-## 2.3.2-10 (published) fails the 2.3.2-11 cert (homescoop#702)
+## 3.0.6-1: the first cp315 pandas (homescoop#761; 2026-10-18)
 
-`node scripts/browser-cert/python-range.mjs py-pandas --tarball ai-ecoverse-py-pandas-2.3.2-10.tgz --lock-only`
-(npm's 2.3.2-10, which pins wasix-python 3.14.2-16 and py-numpy 2.3.2-9 exactly; this
-PR's `package/package.json` gives the floor 3.14.2-16, and `cert/meta.json` the
-newest, 3.14.2-24), rc 1:
-
-```
-python-range: FAIL … with @ai-ecoverse/wasix-python@3.14.2-24:
-  - a second python: node_modules/@ai-ecoverse/py-numpy/node_modules/@ai-ecoverse/wasix-python 3.14.2-16
-  - a second python: node_modules/@ai-ecoverse/py-pandas/node_modules/@ai-ecoverse/wasix-python 3.14.2-16
-```
-
-In that real npm tree (`npm install @ai-ecoverse/wasix-python@3.14.2-24
-@ai-ecoverse/py-pandas@2.3.2-10`, the whole tree in slicc-kernel 1.102.6's Node entry),
-`cert/import.mjs` fails with `py-pandas brings no python of its own: True`, and
-`cert/pandas.mjs` fails with `ModuleNotFoundError: No module named 'numpy'`:
-`_slicc_site.discover()` resolves py-pandas and py-numpy 2.3.2-9 to their nested
-3.14.2-16 and skips both.
-
-2.3.2-11 (a repack of 2.3.2-10 with `">=3.14.2-16 <3.14.3"` and py-numpy 2.3.2-10)
-passes the lockfile check on both pythons, and both specs on 3.14.2-24 and
-3.14.2-16.
-
-## Spec non-vacuous
-
-`cert/pandas.mjs` asserts exact results, not just that the import works.
-`cert/import.mjs` asserts where pandas was imported from, and that no nested
-python sits under the package.
-
-## 2.3.2-12: built from the PyPI sdist (homescoop#211, #730; 2026-10-17)
-
-`test/py-vs-sdist.mjs --tarball <npm 2.3.2-11>`: FAIL, `pandas/_version.py: differs from the sdist file`. -11 repacked -10, a local build that wasn't made from the published pandas-2.3.2.tar.gz, and the recipe's old sha256 matched no public archive (#730). -12 builds from the sdist itself, and every shipped .py file is the sdist's, or the sdist's with 0002-lazy-ctypes.patch applied.
+npm's cp314 py-pandas 2.3.2-12 declares `@ai-ecoverse/wasix-python >=3.14.2-27 <3.14.3` and `@ai-ecoverse/py-numpy >=2.3.2-11 <2.3.3`, so with wasix-python 3.15.0-1 at the top, npm nests a 3.14 python and a cp314 numpy under it. Its 44 `*.cpython-314-wasm32-wasix.so` don't import into python 3.15 (EXT_SUFFIX `.cpython-315-wasm32-wasix.so`). 3.0.6-1 passes `cert/import.mjs` (45 side modules) and `cert/pandas.mjs` on 3.15.0-1 with py-numpy 2.5.4-1 (slicc-kernel 1.125.0, Node entry). `pandas.mjs` now expects pandas 3's `str` dtype for text columns (2.x: `object`).

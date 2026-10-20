@@ -34,6 +34,6 @@ export default async function (ctx) {
   assert.deepEqual(out.req, ['Requests', ['security'], '<3,>=2.8.1', 'python_version >= "3.8"', true], o);
   assert.equal(out.marker, false, o);
   assert.equal(out.canon, 'foo-bar-baz', o);
-  assert.equal(out.tag, 'cp314', o);
+  assert.equal(out.tag, 'cp315', o);
   console.log(`packaging on wasix-python ${python}: Version ordering, SpecifierSet, Requirement + marker, canonicalize_name, sys_tags ${out.tag}`);
 }

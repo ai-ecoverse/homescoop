@@ -7,7 +7,6 @@ jq #1287 wasixcc build; sized at its next build
 wasi-biome #1287 Rust (rust-std's bundled wasi-libc); the shared allocator refresh (g86d), then sizing
 wasi-cargo #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-impeccable #1287 Rust; the shared allocator refresh (g86d), then sizing
-wasi-pnpm #1287 Rust; -15/-16 link a 256 MiB initial heap and the 0009 allocator refresh; the recipe fields come at its next build (g86d)
 wasi-rustc #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-uv #1287 Rust; the shared allocator refresh (g86d), then sizing
 wasi-zig #1287 the shared allocator refresh (g86d), then sizing

@@ -292,10 +292,7 @@ differs fails the run and opens, or comments on, one `pool-parity` issue;
 move it back to hosted, or fix the difference. Dispatch it whenever the
 runner-job image or the hosted image changes (#499).
 Some recipes stay hosted for reasons outside their bytes (#390 C2):
-`less`, because greenwoodsoftware.com answers the pool's egress with 403
-(its recipe now lists Debian's and MacPorts' byte-identical copies as
-`source.mirrors`, see [Source mirrors](#source-mirrors), so the pool can fetch
-it; the exception goes once pool-parity agrees); `qpdf`, whose
+`qpdf`, whose
 `qpdf.wasm` comes out differently on the pool in some runs (#804); and
 `wasix-python`, whose `build.sh` runs `sudo apt-get`.
 `cert`, `exact-pins`, `detect`,

@@ -17,5 +17,5 @@ dependencies:
 about:
   license: Apache-2.0 OR BSD-2-Clause
   notes: |
-    Pure-Python wheel staged into lib/python3.14/site-packages.
+    Pure-Python wheel staged into lib/python3.15/site-packages.
     slicc.python.sitePackages only (no abi/platform requires).

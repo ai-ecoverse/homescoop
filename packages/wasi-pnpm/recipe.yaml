@@ -22,6 +22,11 @@ toolchain:
   wabt: "1.0.42"
   wabt_sha256_linux_x64: "84895407a6bbb80e918f33b16b2fb2206021c150b6bc9ff6f761263a745ab131"
   wabt_sha256_macos_arm64: "3f654779b436c628db3ca4323c51538815f5fbc887a6d5f3bb1c18d36281e240"
+# homescoop#1287: the initial heap from the measured peak, with headroom.
+wasm:
+  initial-memory: 320MiB
+  measured-peak: 280MiB
+  measured-by: "pnpm-agent-loop run 39330831811: wasi-pnpm 12.9.1-16's PNPM_SLICC_PEAK_FILE over bios's cold-store agent install (kernel 1.124.2, hosted); warm installs peak at 96 MiB"
 dependencies:
   build: []
   host: []
@@ -68,4 +73,5 @@ about:
     thread's view of the shared memory (memory.grow(0)) before handing out
     memory above it (homescoop#1127: V8's bulk-memory bounds checks against a
     stale per-thread length), in pnpm's own source rather than a patched
-    sysroot.
+    sysroot. 12.9.1-17 links the initial heap from recipe.yaml's wasm
+    field (320 MiB, from a measured 280 MiB cold-install peak; #1287).

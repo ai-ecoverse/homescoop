@@ -26,13 +26,13 @@ KW_TGZ="$DL/$(basename "$SRC_URL")"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$KW_TGZ"
 
 HOSTPY="${WASIX_PYTHON_HOST_PY:-}"
-if [[ -z "$HOSTPY" ]] && command -v python3.14 >/dev/null 2>&1; then
-  HOSTPY="$(command -v python3.14)"
+if [[ -z "$HOSTPY" ]] && command -v python3.15 >/dev/null 2>&1; then
+  HOSTPY="$(command -v python3.15)"
 fi
 if [[ -z "$HOSTPY" ]]; then
-  HOSTPY="$B/host/bin/python3.14"
+  HOSTPY="$B/host/bin/python3.15"
   if [[ ! -x "$HOSTPY" ]]; then
-    echo "== py-kiwisolver: host CPython 3.14.2 (compileall)"
+    echo "== py-kiwisolver: host CPython 3.15.0 (compileall)"
     fetch_src cpython
     rm -rf "$B/host-src" && mkdir -p "$B/host-src"
     tar xzf "$SRC_FILE" -C "$B/host-src" --strip-components=1
@@ -46,9 +46,12 @@ if [[ -z "$HOSTPY" ]]; then
     ) || { tail -40 "$B"/host-*.log >&2; exit 1; }
   fi
 fi
-"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
+"$HOSTPY" -c 'import sys; assert sys.version_info[:2] == (3, 15), sys.version'
 export WASIX_PYTHON_HOST_PY="$HOSTPY"
 
+# wasix-sysroot -38, as wasix-python 3.15.0-1 (the cp315 wave, #761).
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-38
+export HOMESCOOP_WASIX_SYSROOT_SHA=1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 export WASIXCC_WASM_EXCEPTIONS=legacy WASIXCC_PIC=yes WASIXCC_MODULE_KIND=shared-library WASIXCC_RUN_WASM_OPT=no
 unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS
@@ -57,18 +60,15 @@ fetch_src wasix_python
 PYDEV="$B/wasix-python"
 rm -rf "$PYDEV" && mkdir -p "$PYDEV"
 tar xzf "$SRC_FILE" -C "$PYDEV" package/include package/package.json
-PYINC="$PYDEV/package/include/python3.14"
+PYINC="$PYDEV/package/include/python3.15"
 test -f "$PYINC/Python.h"
 PYVER="$(node -p "require('$PYDEV/package/package.json').version")"
 PIN="$(node -p "require('$DEST/package.json').dependencies['@ai-ecoverse/wasix-python']")"
-# The package takes any wasix-python 3.14.2 from the one whose headers it's built against (homescoop#702).
-[[ "$PIN" == ">=$PYVER <3.14.3" ]] || { echo "homescoop py-kiwisolver: headers from wasix-python $PYVER, package wants $PIN (expected >=$PYVER <3.14.3)" >&2; exit 1; }
+# The package takes any wasix-python 3.15.0 from the one whose headers it's built against (homescoop#702).
+[[ "$PIN" == ">=$PYVER <3.15.1" ]] || { echo "homescoop py-kiwisolver: headers from wasix-python $PYVER, package wants $PIN (expected >=$PYVER <3.15.1)" >&2; exit 1; }
 
-fetch_src cxxrt
-CXXRT="$B/cxxrt"
-rm -rf "$CXXRT" && mkdir -p "$CXXRT"
-tar xzf "$SRC_FILE" -C "$CXXRT" wasix-sysroot-ehpic/sysroot/include/c++
-CXXINC="$CXXRT/wasix-sysroot-ehpic/sysroot/include/c++/v1"
+# phase B: libc++ headers from the sysroot (-38)
+CXXINC="$WASIXCC_SYSROOT_PREFIX/sysroot-ehpic/include/c++/v1"
 test -f "$CXXINC/vector"
 
 fetch_src cppy
@@ -90,10 +90,10 @@ for f in kiwisolver constraint expression solver strength term variable; do
   echo "== py-kiwisolver: wasixcc++ py/src/$f.cpp"
   wasixcc++ "${CXXFLAGS[@]}" -c "$SRC/py/src/$f.cpp" -o "$OBJ/$f.o"
 done
-SO="_cext.cpython-314-wasm32-wasix.so"
+SO="_cext.cpython-315-wasm32-wasix.so"
 wasixcc++ -shared -fPIC -fvisibility=default -Wl,--allow-undefined -o "$OBJ/$SO" "$OBJ"/*.o
 
-SITE="$DEST/lib/python3.14/site-packages"
+SITE="$DEST/lib/python3.15/site-packages"
 rm -rf "$DEST/lib"
 mkdir -p "$SITE/kiwisolver"
 for f in __init__.py _cext.pyi exceptions.py py.typed; do
@@ -105,7 +105,7 @@ DI="$SITE/kiwisolver-$VERSION.dist-info"
 mkdir -p "$DI/licenses"
 cp "$SRC/PKG-INFO" "$DI/METADATA"
 cp "$SRC/LICENSE" "$DI/licenses/LICENSE"
-printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-kiwisolver/build.sh)\nRoot-Is-Purelib: false\nTag: cp314-cp314-wasix_wasm32\n\n' >"$DI/WHEEL"
+printf 'Wheel-Version: 1.0\nGenerator: homescoop (packages/py-kiwisolver/build.sh)\nRoot-Is-Purelib: false\nTag: cp315-cp315-wasix_wasm32\n\n' >"$DI/WHEEL"
 printf 'kiwisolver\n' >"$DI/top_level.txt"
 "$HOSTPY" - "$SITE" "kiwisolver-$VERSION.dist-info" <<'PY'
 import base64, hashlib, os, sys
@@ -125,6 +125,8 @@ rows.append(f"{di}/RECORD,,")
 open(os.path.join(site, di, "RECORD"), "w").write("\n".join(rows) + "\n")
 PY
 cp "$SRC/LICENSE" "$DEST/LICENSE"
+WORK="$B" homescoop_notices_begin "kiwisolver/_cext compiles in cppy 1.3.1's C++ helper headers (homescoop#815). kiwisolver's own licence is LICENSE."
+WORK="$B" homescoop_notice "cppy 1.3.1 (BSD-3-Clause)" "$CPPY/LICENSE" -
 homescoop_compile_pyc "$SITE"
 node "$PKG/test/wasm-call-signatures.mjs" "$SITE/kiwisolver/$SO"
 echo "== py-kiwisolver: staged $(du -sh "$DEST" | awk '{print $1}')"

@@ -9,21 +9,22 @@
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-13",
     "@ai-ecoverse/wasm-coreutils@9.12.0-4",
-    "@ai-ecoverse/wasix-python@3.14.2-28",
-    "@ai-ecoverse/py-numpy@2.3.2-12"
+    "@ai-ecoverse/wasix-python@3.15.0-1",
+    "@ai-ecoverse/py-numpy@2.5.4-1"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-scipy"
   ],
   "checklist": [
-    "cert/import.mjs: import scipy 1.18.1, and importlib.metadata.version('scipy') is 1.18.1 (scipy-1.18.1.dist-info; homescoop#731), from /node_modules/@ai-ecoverse/py-scipy, found by discovery without PYTHONPATH, no nested python; 94 of its 95 side modules import (scipy.linalg._matfuncs_sqrtm_triu is not imported on its own: a circular-import ImportError on every python; linalg.sqrtm works)",
+    "cert/import.mjs: import scipy 1.18.1, and importlib.metadata.version('scipy') is 1.18.1 (scipy-1.18.1.dist-info; homescoop#731), (cp315) from /node_modules/@ai-ecoverse/py-scipy, found by discovery without PYTHONPATH, no nested python; 94 of its 95 side modules import (scipy.linalg._matfuncs_sqrtm_triu is not imported on its own: a circular-import ImportError on every python; linalg.sqrtm works)",
     "cert/scipy.mjs: optimize.minimize BFGS on rosen -> [1, 1, 1]; quad(sin, 0, pi) 2; solve_ivp y' = -y -> e^-1; linalg lu/expm; sparse csr matvec [3, 3, 9]; special gamma(5) 24, erf(0.5); stats norm cdf/ppf, ttest_ind p 0.315334; CubicSpline of x^3 at 1.5 = 3.375; signal.butter(2, 0.5); fft [0, 2, 0, 2]",
     "cert/lapack.mjs (1.18.1-1, homescoop#211 A6): against wasix-openblas' C LAPACK (f2c int returns): linalg solve/eigh/svd/qr/cholesky/lstsq/schur, batched inv (_batched_linalg), det, blas.zdotc/cdotu (the g77-ABI wrappers), lapack.dgetrf/dgesv, cholesky of -I raises LinAlgError; sparse.linalg splu/spilu (SuperLU, 0006), eigsh/eigs/svds (ARPACK), optimize trust-krylov (trlib, 0009), linprog and milp (HiGHS)",
     "cert/uarray.mjs (homescoop#589): scipy._lib._uarray._Function's getters domain/arg_extractor/arg_replacer/default, set_backend's and skip_backend's _pickle, get_state()._pickle and a scipy.fft.fft pickle round trip; 1.18.0-12 traps (function signature mismatch, NEGATIVE.md); 0010-uarray-call-signatures.patch",
     "cert/notices.mjs (homescoop#729): THIRD-PARTY-NOTICES.md names OpenBLAS 0.3.28 (BSD-3-Clause), LAPACK (BSD-3-Clause), GotoBLAS2 (BSD-2-Clause) and pybind11 (BSD-3-Clause), which are linked or compiled in, and the code scipy bundles from its LICENSES_bundled.txt (SuperLU, ARPACK, Qhull, HiGHS, Boost, UNU.RAN and the others with a licence file in the sdist), each with its licence text; LICENSE is LICENSE.txt with LICENSES_bundled.txt appended, as scipy's wheels ship it",
-    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.14.2-28 <3.14.3 and py-numpy >=2.3.2-12 <2.3.3 (the headers it is built against)",
-    "1.18.1-1 (homescoop#211 A6): built in CI from the PyPI sdist (scipy-1.18.1.tar.gz, 52c4b742\u2026) with meson 1.9.1, Cython 3.2.4 and numpy's f2py on the host python, no Fortran (-D_without-fortran: scipy.odr goes), BLAS/LAPACK from @ai-ecoverse/wasix-openblas 0.3.28-1 linked statically (no libscipy_openblas.so). Patches 0001-0005 are Pyodide's, 0006-0010 homescoop's, each mapped in patches; tools/scipy_cfix.py declares scipy's BLAS/LAPACK prototypes int. Every side module links with -Wl,--fatal-warnings (no wasm signature mismatch) and wasm-call-signatures.mjs finds 0 mismatches",
-    "cert/coverage.mjs (homescoop#1242): spatial (Qhull ConvexHull/Delaunay/Voronoi, cKDTree, pdist), interpolate (FITPACK splrep/bisplrep, griddata, RBFInterpolator), ndimage (label, gaussian_filter), integrate (odeint, LSODA, vode, solve_bvp), io (savemat/loadmat, wavfile, mmwrite/mmread, arff, FortranFile), cluster (kmeans2, linkage), stats.sampling (UNU.RAN NumericalInversePolynomial), csgraph (shortest_path, minimum_spanning_tree), each against the native result"
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 and py-numpy >=2.5.4-1 <2.5.5 (the headers it is built against)",
+    "1.18.1-2 (homescoop#761, the cp315 wave; npm-tag python3.15): py-scipy's 1.18.1-1 recipe (homescoop#211 A6) for CPython 3.15: wasix-python 3.15.0-1, py-numpy 2.5.4-1 (its headers and f2py), Cython 3.3.0, the same patches 0001-0010, tools/scipy_cfix.py and static wasix-openblas 0.3.28-1; every side module links with -Wl,--fatal-warnings; every cp314 spec",
+    "cert/coverage.mjs (homescoop#1242): spatial (Qhull ConvexHull/Delaunay/Voronoi, cKDTree, pdist), interpolate (FITPACK splrep/bisplrep, griddata, RBFInterpolator), ndimage (label, gaussian_filter), integrate (odeint, LSODA, vode, solve_bvp), io (savemat/loadmat, wavfile, mmwrite/mmread, arff, FortranFile), cluster (kmeans2, linkage), stats.sampling (UNU.RAN NumericalInversePolynomial), csgraph (shortest_path, minimum_spanning_tree), each against the native result",
+    "1.18.1-3 (homescoop#761, the fold): packages/py-scipy3.15 moved over packages/py-scipy after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 1.18.1-2; every spec as before"
   ],
   "patches": {
     "0001-gemm_-no-const.patch": "Pyodide: SuperLU's gemm prototypes lose const (they must match the int-ABI BLAS); cert/lapack.mjs runs splu/spilu",

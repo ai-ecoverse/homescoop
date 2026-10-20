@@ -41,7 +41,8 @@ try {
   const pkg = join(work, 'pkg');
   execFileSync('mkdir', ['-p', pkg]);
   execFileSync('tar', ['xzf', tgz, '-C', pkg]);
-  const site = join(pkg, 'package/lib/python3.14/site-packages');
+  const libdir = join(pkg, 'package/lib');
+  const site = join(libdir, readdirSync(libdir).find((d) => /^python3\.\d+$/.test(d)), 'site-packages');
   const pys = (dir) => {
     const out = [];
     const walk = (d) => {

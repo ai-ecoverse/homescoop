@@ -777,6 +777,46 @@ Claude reviews every package a same-repo PR builds, after `ladder-pr` finishes, 
   - **Memory:** the step logs the runner's available memory before and after starting the pairs, and an `always()` step after the review stops every pair (the harness and its Chrome processes; `live-pairs.mjs stop-all`). The evidence artifact keeps live.json, plan.json and the prompt's note.
 - **Severity:** roll forward. FAIL only for security or secret exposure, data loss, a supply-chain mismatch, a licence violation, a crash, or a regression without a workaround; anything else certifies with `(known: …)`.
 
+## Certification exceptions: `certification-exceptions.json`
+
+bios's v2 gate (PM, 2026-10-20) accepts a changed homescoop pin only when its npm SLSA provenance is `ai-ecoverse/homescoop`'s `.github/workflows/ladder-build.yml` at `refs/heads/main`, on a hosted or a pool runner, and its `dist.integrity` equals bios's lockfile. It doesn't read dist-tags, and npm-deprecated versions fail. There's no accept list: a version without that provenance fails, with no way around it. Provenance alone isn't enough, though. Some versions with main provenance were ruled uncertified (py-pandas 2.3.2-11, a repack of an unverifiable build). And some are certified only under a condition (wasm-bash 5.3.0-20 needs slicc-kernel ≥ 1.130.2). Those go in `certification-exceptions.json` at the repo root.
+
+bios reads the file at a homescoop commit pinned in its own config, and a bios PR bumps that pin. So a change here reaches bios only through a reviewed bios PR, and every read is reproducible. A missing or unparseable file fails the gate closed.
+
+```json
+{
+  "schema": 1,
+  "entries": [
+    { "package": "@ai-ecoverse/py-pandas", "range": ">=2.3.2-5 <=2.3.2-11", "verdict": "fail",
+      "issue": "https://github.com/ai-ecoverse/homescoop/issues/730", "ruling": "cert lane 2026-10-17 03:45: …" },
+    { "package": "@ai-ecoverse/wasm-bash", "versions": ["5.3.0-20"], "verdict": "requires",
+      "requires": { "@ai-ecoverse/slicc-kernel": ">=1.130.2" },
+      "issue": "https://github.com/ai-ecoverse/homescoop/issues/1230", "ruling": "cert lane 2026-10-19 12:40 and 16:45: …" }
+  ]
+}
+```
+
+- **Top level:** exactly `schema` (1) and `entries`. Any other key fails closed.
+- **An entry:** `package` (`@ai-ecoverse/<name>`), exactly one of `versions` (a non-empty list of exact versions) or `range`, a `verdict`, an `issue` (`https://github.com/ai-ecoverse/<repo>/issues/<n>`, open or closed: the issue is the record), and a `ruling` (one line: who ruled, when, and why). Any other key, or any other verdict, fails closed.
+- **`range`** is read by node-semver with `includePrerelease: true`. This file uses only exact comparators (`=`, `<`, `<=`, `>`, `>=`, space-separated, `||` between alternatives), and the audit refuses anything else (`^`, `~`, x-ranges, hyphen ranges, a space after the operator). Version order on that subset is plain semver order, so the audit and node-semver agree. A version that one entry lists exactly and another entry's range also covers is an error.
+- **`verdict: "fail"`** rejects the pin.
+- **`verdict: "requires"`** rejects it unless every bios pin of each package named in `requires` satisfies that range. `requires` is allowed only with this verdict.
+- **What goes in:** every version that a ruling found uncertified or conditional, with or without main provenance. Versions without provenance fail at the gate anyway; their entries keep the record. The seed (cert lane, checked against its ledger) is: the #864 FAIL set in `scripts/cert-review/known-inputs.txt` (every line there must have a fail entry, and the test checks it); the 2026-10-17 rulings at 03:45 (#730), 04:10 (#826), 04:40 (#858/#859: each chain's root plus every version that repacks down to it, from git history; pkgconf, py-kiwisolver, wasix-autoconf and wasix-ruby stay certified), 05:05 (#864 group 1: the latests it ruled on, plus #864's rows for packages with no recipe), 05:55 (the #864 transitive FAIL list, plus wasix-sysroot 2025.9.30-28, whose lane line it withdrew) and 06:10 (wasix-python 3.14.2-16); and wasm-bash 5.3.0-20's `requires`. Deprecated versions stay out, because the gate rejects them on its own. Later CI builds that fix a ruling (py-cycler 0.12.1-8, wasm-git 2.55.0-16 and so on) stay out as well.
+- **Entries don't expire.** A published version never changes, so a fail or requires entry is permanent.
+
+`scripts/certification-exceptions.mjs` checks the file, and `scripts/test/certification-exceptions.test.mjs` tests it offline on fixtures:
+- `node scripts/certification-exceptions.mjs` checks the schema and that known-inputs.txt is covered.
+- `--check` also checks npm and GitHub: every package and listed version is published, a range matches at least one published version, the packages named in `requires` exist, and every issue exists. An unknown name is a typo.
+- `--audit <lockfile>…` (package-lock.json v2/v3 or pnpm-lock.yaml v9) does all of that, then prints one line per distinct homescoop pin. A pin counts as homescoop's when some `packages/*/package/package.json` here publishes its name, when an entry names it (entries outlive the tree), or when its provenance names homescoop's repository. The line reads `pin: PASS|DENY|FAIL <name>@<v> (<why>)`. The checks run in order:
+  1. FAIL when the version isn't on npm, the lockfile integrity is missing or differs from npm's `dist.integrity`, or npm has deprecated the version.
+  2. DENY when a fail entry covers the version, or a requires entry isn't met by bios's pins.
+  3. FAIL when the version has no ladder-build@main provenance for those bytes (`checkProvenance` in `scripts/cert-review/repack-input.mjs`), or when that provenance's builder is neither `…/actions/runner/github-hosted` (hosted) nor `…/actions/runner/self-hosted` (pool).
+  4. PASS otherwise. The line names the attested commit and the runner (`hosted` or `pool`), and any requires entry it met.
+
+  This audit never prints ACCEPT, because there's no accept list.
+- Every run ends with `certification-exceptions: PASS …` or `certification-exceptions: FAIL …` and exits 1 on any problem, or on any pin that isn't PASS. `--file` reads another exceptions file, `--known` reads another known list, and `--fixtures <dir>` replaces npm with repack-input.mjs's fixture layout (`packument/`, `attestations/`) and GitHub with `<dir>/issues.json`, a list of URLs.
+- The audit doesn't check the sigstore signature on the attestation bundle (see the cert review's "Not checked" above).
+
 ## Issue labels: `scripts/issue-labels.mjs`
 
 Every issue gets labels when it is filed, because `next-build` drives ladder-pr's known-issues comment: an unlabelled known issue never shows up on its package's next pull request. One script holds the mapping, and every filer uses it.

@@ -69,3 +69,8 @@ The published 12.9.1-13 against `cert/project-dir.mjs` (slicc-kernel 1.128.0, us
 - `pnpm init`, with a registry whose latest pnpm is 99.0.0, pins `packageManager: pnpm@99.0.0` and `devEngines.packageManager: {version: 99.0.0, onFail: download}`. The next `pnpm add tiny` fails with **`ERR_PNPM_UNSUPPORTED_RUNTIME` × This WebContainer runtime cannot install or switch to pnpm v99.0.0**, the live seven's error (there it was 12.14.0).
 
 A local build of 12.9.1-15 (macOS, the same patches) passes all 9. pnpm resolves its own pin, the running 12.9.1, from the default registry whatever `--registry` says, so the spec's stub answers registry.npmjs.org's `/pnpm` too (12.9.1 and 99.0.0). 0007 pins the running pnpm on wasm, and 0008 stops the prefix walk below `/` unless pnpm runs in `/`.
+
+## 12.9.1-17: the initial heap from the measured peak (homescoop#1287, 2026-10-20)
+
+This is a sizing change, so there's no behaviour to refuse. pnpm-agent-loop run 39330831811 (12.9.1-16, kernel 1.124.2, hosted, 120 rounds, 0 traps) recorded pnpm's peak memory with the host's PNPM_SLICC_PEAK_FILE: **280 MiB** on cold-store agent installs, above -16's 256 MiB initial heap, and 96 MiB warm. recipe.yaml now records `wasm: { initial-memory: 320MiB, measured-peak: 280MiB, measured-by: … }`. build.sh links `--initial-memory` from it (recipe-env's WASM_INITIAL_MEMORY) and checks it in pnpm.wasm's import section. scripts/check-threaded-heap.mjs (#1287's guard) checks the linked size against the recipe, and wasi-pnpm leaves its allowlist. 0009's allocator refresh stays as the backstop.
+
