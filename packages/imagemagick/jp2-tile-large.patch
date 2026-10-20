@@ -1,0 +1,23 @@
+--- a/coders/jp2.c
++++ b/coders/jp2.c
+@@ -1032,6 +1032,20 @@
+       parameters->numresolution=CalculateNumResolutions((size_t)
+         parameters->cp_tdx,(size_t) parameters->cp_tdy);
+     }
++  else
++    if (((MagickSizeType) image->columns*image->rows) > 16777216)
++      {
++        /*
++          homescoop#561: openjpeg encodes an untiled image as one tile, and
++          from about 48 MP that tile no longer fits a 2 GiB wasm heap
++          ("unable to encode image file"). Above 16 MP, without -extract,
++          encode 1024x1024 tiles.
++        */
++        parameters->cp_tdx=1024;
++        parameters->cp_tdy=1024;
++        parameters->tile_size_on=OPJ_TRUE;
++        parameters->numresolution=CalculateNumResolutions(1024,1024);
++      }
+   option=GetImageOption(image_info,"jp2:quality");
+   if (option != (const char *) NULL)
+     {
