@@ -35,7 +35,7 @@
    assert(exception != (ExceptionInfo *) NULL);
    write_info=CloneImageInfo(image_info);
    *write_info->magick='\0';
-@@ -1613,6 +1628,124 @@
+@@ -1613,6 +1628,132 @@
    sans_exception=DestroyExceptionInfo(sans_exception);
    if (*write_info->magick == '\0')
      (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
@@ -102,6 +102,14 @@
 +         ((access_utf8(atomic_path,F_OK) == 0) &&
 +          (access_utf8(atomic_path,W_OK) != 0))))
 +      atomic_ok=MagickFalse;
++    /*
++      homescoop#1258: a target someone else owns keeps upstream's in-place
++      write. Replacing it by rename fails in a sticky directory (/tmp), and
++      elsewhere would hand the file to the caller.
++    */
++    if ((atomic_ok != MagickFalse) && (lstat(atomic_path,&atomic_status) == 0) &&
++        (atomic_status.st_uid != geteuid()))
++      atomic_ok=MagickFalse;
 +    if ((atomic_ok != MagickFalse) &&
 +      (write_info->blob == (void *) NULL) && (write_info->file == (FILE *) NULL) &&
 +      ((GetImageListLength(images) == 1) || (write_info->adjoin != MagickFalse)) &&
@@ -160,7 +168,7 @@
    p=images;
    for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
    {
-@@ -1661,5 +1794,27 @@
+@@ -1661,5 +1802,30 @@
        }
    }
    write_info=DestroyImageInfo(write_info);
@@ -171,7 +179,10 @@
 +      if ((status != 0) && (exception->severity < ErrorException))
 +        {
 +          if (atomic_existed != MagickFalse)
-+            (void) chmod(atomic_tmp,atomic_status.st_mode & 07777);
++            {
++              (void) chown(atomic_tmp,(uid_t) -1,atomic_status.st_gid);
++              (void) chmod(atomic_tmp,atomic_status.st_mode & 07777);
++            }
 +          if (rename_utf8(atomic_tmp,atomic_path) != 0)
 +            {
 +              (void) remove_utf8(atomic_tmp);

@@ -205,9 +205,23 @@ jobs:
         with:
           name: ${{ inputs.kernel }}
           path: ${{ runner.temp }}/kernel-artifact
+      - id: cert-base
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --quiet --depth=300 origin main:refs/remotes/origin/main || true
+          git fetch --no-tags --quiet --deepen=300 origin "$(git rev-parse HEAD)" || true
+          base=$(git merge-base HEAD refs/remotes/origin/main 2>/dev/null || true)
+          [[ -n "$base" ]] || echo "::warning::kernel-compat: no merge base of $(git rev-parse HEAD) with main within 300 commits; every package runs this head's cert/"
+          if [[ -n "$base" && "$base" != "$(git rev-parse HEAD)" ]]; then
+            echo "cert base: $base (main at the fork of $(git rev-parse HEAD)); a package whose cert/ changed since runs its published tarballs with the base's cert/"
+            echo "sha=$base" >> "$GITHUB_OUTPUT"
+          else
+            echo "cert base: none (HEAD is on main)"
+          fi
       - id: plan
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          CERT_BASE: ${{ steps.cert-base.outputs.sha }}
           KERNEL: ${{ inputs.kernel }}
           SET: ${{ inputs.set || 'base,ci-certified' }}
           BIOS_REF: ${{ inputs.bios-ref || 'main' }}
@@ -222,6 +236,7 @@ jobs:
             --kernel "$KERNEL" --set "$SET" --bios-ref "$BIOS_REF" --homescoop-ref "$HOMESCOOP_REF" --shards "$SHARDS" \
             ${KERNEL_DIR:+--kernel-dir "$KERNEL_DIR"} \
             ${REFERENCE:+--reference "$REFERENCE"} \
+            ${CERT_BASE:+--cert-base "$CERT_BASE"} \
             --out "$RUNNER_TEMP/plan"
       - uses: actions/upload-artifact@v7
         id: plan-artifact

@@ -202,6 +202,17 @@ export function findLimit(limits, f) {
   );
 }
 
+function certFacts(certDir) {
+  const specs = existsSync(certDir) ? readdirSync(certDir).filter((f) => f.endsWith('.mjs')).sort() : [];
+  const meta = existsSync(join(certDir, 'meta.json')) ? readJson(join(certDir, 'meta.json')) : {};
+  const harness = meta.harness || (specs.length ? 'slicc-kernel' : 'smoke');
+  let skip = null;
+  if (!specs.length) skip = 'no cert/*.mjs';
+  else if (meta.blocked) skip = 'cert/meta.json is blocked';
+  else if (harness !== 'slicc-kernel') skip = `harness ${harness} (not run.mjs)`;
+  return { specs, meta, skip };
+}
+
 function recipes() {
   const out = [];
   for (const dir of readdirSync(join(root, 'packages')).sort()) {
@@ -209,17 +220,45 @@ function recipes() {
     if (!existsSync(pj)) continue;
     const npm = readJson(pj).name;
     const { tag, version, upstream, retired } = existsSync(join(root, 'packages', dir, 'recipe.yaml')) ? recipeOf(dir, root) : { tag: 'latest', version: readJson(pj).version, upstream: null, retired: false };
-    const certDir = join(root, 'packages', dir, 'cert');
-    const specs = existsSync(certDir) ? readdirSync(certDir).filter((f) => f.endsWith('.mjs')).sort() : [];
-    const meta = existsSync(join(certDir, 'meta.json')) ? readJson(join(certDir, 'meta.json')) : {};
-    const harness = meta.harness || (specs.length ? 'slicc-kernel' : 'smoke');
-    let skip = null;
-    if (!specs.length) skip = 'no cert/*.mjs';
-    else if (meta.blocked) skip = 'cert/meta.json is blocked';
-    else if (harness !== 'slicc-kernel') skip = `harness ${harness} (not run.mjs)`;
-    out.push({ dir, npm, tag, version, upstream, retired, specs, meta, skip });
+    out.push({ dir, npm, tag, version, upstream, retired, ...certFacts(join(root, 'packages', dir, 'cert')) });
   }
   return out;
+}
+
+export function certChanges(base, { cwd = root, git = (a) => must('git', a, { cwd }) } = {}) {
+  if (!base) return [];
+  const head = git(['rev-parse', 'HEAD']).trim();
+  if (git(['rev-parse', `${base}^{commit}`]).trim() === head) return [];
+  const dirs = new Set();
+  for (const f of git(['diff', '--name-only', `${base}`, head, '--', 'packages']).split('\n')) {
+    const m = /^packages\/([^/]+)\/cert\//.exec(f.trim());
+    if (m) dirs.add(m[1]);
+  }
+  return [...dirs].sort();
+}
+
+export function useBaseCerts(all, base, out, { cwd = root, git = (a) => must('git', a, { cwd }) } = {}) {
+  const changed = certChanges(base, { cwd, git });
+  const notes = [];
+  for (const dir of changed) {
+    const r = all.find((x) => x.dir === dir);
+    if (!r) continue;
+    const there = spawnSync('git', ['cat-file', '-e', `${base}:packages/${dir}/cert`], { cwd }).status === 0;
+    if (!there) {
+      Object.assign(r, { specs: [], meta: {}, skip: `cert/ is new in this change; its cert-review runs it on the new tarball` });
+      notes.push(`${dir}: cert/ is new here, skipped`);
+      continue;
+    }
+    const tarFile = join(out, `base-cert-${dir}.tar`);
+    git(['archive', '--format=tar', '-o', tarFile, base, `packages/${dir}/cert`]);
+    const dest = join(out, 'base-cert');
+    mkdirSync(dest, { recursive: true });
+    must('tar', ['-xf', tarFile, '-C', dest]);
+    rmSync(tarFile, { force: true });
+    Object.assign(r, certFacts(join(dest, 'packages', dir, 'cert')), { cert: `base-cert/packages/${dir}/cert`, certFrom: base });
+    notes.push(`${dir}: cert/ changed here, so the published tarballs run ${String(base).slice(0, 12)}'s cert/`);
+  }
+  return notes;
 }
 
 async function github(path, accept) {
@@ -235,26 +274,68 @@ async function github(path, accept) {
   }
 }
 
-async function biosPins(ref) {
-  const sha = (await github(`repos/${BIOS}/commits/${encodeURIComponent(ref)}`, 'application/vnd.github+json')).sha;
-  const file = async (path) =>
-    JSON.parse(await github(`repos/${BIOS}/contents/${path}?ref=${sha}`, 'application/vnd.github.raw'));
-  const pins = async (dir) => {
-    const pkg = await file(`${dir}/package.json`);
-    const lock = await file(`${dir}/package-lock.json`);
-    return Object.keys(pkg.dependencies || {})
-      .sort()
-      .map((name) => {
-        const e = lock.packages?.[`node_modules/${name}`];
-        if (!e?.version) throw new Error(`slicc-bios ${sha} ${dir}/package-lock.json has no ${name}`);
-        return { name, version: e.version, integrity: e.integrity || null };
-      });
+export function lockPins(pkg, lock, where) {
+  return Object.keys(pkg.dependencies || {})
+    .sort()
+    .map((name) => {
+      const e = lock.packages?.[`node_modules/${name}`];
+      if (!e?.version) throw new Error(`${where}/package-lock.json has no ${name}`);
+      return { name, version: e.version, integrity: e.integrity || null };
+    });
+}
+
+const coreOf = (v) => String(v).replace(/[-+].*$/, '');
+
+export function catalogPins(catalog, view = npmView) {
+  return Object.entries(catalog || {})
+    .filter(([, entry]) => entry?.kind !== 'project')
+    .map(([name]) => name)
+    .sort()
+    .map((name) => {
+      const entry = catalog[name];
+      const doc = view(name);
+      let version = doc?.['dist-tags']?.latest;
+      if (entry.range) {
+        const fits = [doc?.versions || []]
+          .flat()
+          .filter((v) => satisfies(coreOf(v), entry.range))
+          .sort(compareVersions);
+        version = fits.at(-1);
+        if (!version) throw new Error(`catalog.json ${name}: no published version satisfies range ${entry.range}`);
+      }
+      if (!version) throw new Error(`catalog.json ${name}: npm has no latest`);
+      const one = version === doc?.version && doc?.dist ? doc : view(`${name}@${version}`);
+      return { name, version, integrity: one?.dist?.integrity || null };
+    });
+}
+
+export async function biosPins(ref, { gh = github, view = npmView } = {}) {
+  const sha = (await gh(`repos/${BIOS}/commits/${encodeURIComponent(ref)}`, 'application/vnd.github+json')).sha;
+  const file = async (path) => JSON.parse(await gh(`repos/${BIOS}/contents/${path}?ref=${sha}`, 'application/vnd.github.raw'));
+  const exists = async (path) => {
+    try {
+      return await file(path);
+    } catch (err) {
+      if (/: 404 /.test(String(err?.message))) return null;
+      throw err;
+    }
   };
+  const pins = async (dir) => lockPins(await file(`${dir}/package.json`), await file(`${dir}/package-lock.json`), `slicc-bios ${sha} ${dir}`);
+  const base = await pins('src/packages');
+  const optional = await exists('src/packages/optional/package.json');
+  if (optional) {
+    return {
+      sha,
+      base,
+      catalog: lockPins(optional, await file('src/packages/optional/package-lock.json'), `slicc-bios ${sha} src/packages/optional`),
+      files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/package.json', 'src/packages/optional/package-lock.json'],
+    };
+  }
   return {
     sha,
-    base: await pins('src/packages'),
-    catalog: await pins('src/packages/optional'),
-    files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/package.json', 'src/packages/optional/package-lock.json'],
+    base,
+    catalog: catalogPins(await file('src/packages/optional/catalog.json'), view),
+    files: ['src/packages/package.json', 'src/packages/package-lock.json', 'src/packages/optional/catalog.json'],
   };
 }
 
@@ -320,6 +401,7 @@ async function plan(args) {
   }
 
   const all = recipes();
+  for (const note of useBaseCerts(all, (args['cert-base'] || '').trim(), out)) console.log(`compat: ${note}`);
   const byDir = new Map(all.map((r) => [r.dir, r]));
   const byNpm = { get: (name, version) => pickRecipe(all, name, version) };
   const ciCertified = readJson(join(root, 'scripts/ci-certified.json')).packages;
@@ -358,6 +440,7 @@ async function plan(args) {
         origin: [],
         users: r.meta.users || 'off',
         specs: r.specs,
+        ...(r.cert ? { cert: r.cert, certFrom: r.certFrom } : {}),
       };
     if (!e.origin.includes(origin)) e.origin.push(origin);
     entries.set(id, e);
@@ -504,8 +587,8 @@ export function repackPeer(peer, { dir = root } = {}) {
   return { kind: 'published', spec: `${pj.name}@${pj.version}` };
 }
 
-export function installNeeds(recipe, nm, work) {
-  const metaPath = join(root, 'packages', recipe, 'cert', 'meta.json');
+export function installNeeds(recipe, nm, work, certDir = join(root, 'packages', recipe, 'cert')) {
+  const metaPath = join(certDir, 'meta.json');
   const meta = existsSync(metaPath) ? readJson(metaPath) : {};
   const npmInstall = (specs) =>
     must('npm', ['install', '--prefix', nm, '--no-fund', '--no-audit', ...specs], { attempts: 3, cwd: root });
@@ -563,6 +646,40 @@ function certRun({ label, kernelFile, recipe, cert, tarballs, users, work, logs,
     : { status: 'fail', specs: [], error: r.error ? String(r.error) : `run.mjs exited ${r.status ?? r.signal} without a report` };
   if (r.status !== 0 && rep.status === 'pass') rep.status = 'fail';
   return { ...rep, exit: r.status, durationMs, log: relative(dirname(logs), log) };
+}
+
+export function enginesFloor(tarballs, nmDir) {
+  const ranges = [];
+  for (const t of tarballs) {
+    try {
+      const pj = JSON.parse(spawnSync('tar', ['-xzOf', t, 'package/package.json'], { encoding: 'utf8' }).stdout);
+      ranges.push({ who: `${pj.name}@${pj.version}`, range: pj.engines?.['slicc-kernel'] });
+    } catch {}
+  }
+  const scope = join(nmDir || '', '@ai-ecoverse');
+  if (nmDir && existsSync(scope)) {
+    for (const d of readdirSync(scope).sort()) {
+      const f = join(scope, d, 'package.json');
+      if (d === 'slicc-kernel' || !existsSync(f)) continue;
+      const pj = readJson(f);
+      ranges.push({ who: `${pj.name}@${pj.version}`, range: pj.engines?.['slicc-kernel'] });
+    }
+  }
+  let best = null;
+  for (const r of ranges) {
+    const m = /^\s*>=\s*(\d+\.\d+\.\d+)\s*$/.exec(String(r.range || ''));
+    if (m && (!best || compareVersions(m[1], best.version) > 0)) best = { version: m[1], who: r.who, range: r.range.trim() };
+  }
+  return best;
+}
+
+export function enginesRefusal(rep) {
+  const texts = [rep.error, ...(rep.specs || []).flatMap((sp) => [sp.error, sp.crash?.message, ...(sp.cases?.fail || []).map((c) => c.message)])];
+  for (const t of texts) {
+    const m = /(@ai-ecoverse\/[\w.-]+@[\w.+-]+) needs slicc-kernel (>=\s*[\d.]+)[^\n]*?this kernel is ([\d.]+)/.exec(String(t || ''));
+    if (m) return `${m[1]} needs slicc-kernel ${m[2]}, the reference is ${m[3]}`;
+  }
+  return null;
 }
 
 export const siteOf = (id) => String(id).replace(/#\d+$/, '');
@@ -640,7 +757,6 @@ function shard(args) {
   mkdirSync(logs, { recursive: true });
   const limits = loadLimits();
   const candidateFile = join(kdir, 'candidate.tgz');
-  const referenceFile = join(kdir, 'reference.tgz');
   const sameKernel = plan.kernel.sha256 === plan.reference.sha256;
   const startedAt = new Date();
   const results = [];
@@ -654,8 +770,21 @@ function shard(args) {
       const tgz = fetchTarball(e.package, e.version, e.integrity, join(work, 'tgz'));
       result.sha256 = tgz.sha256;
       result.integrity = tgz.integrity;
-      result.peers = installNeeds(e.recipe, join(work, 'nm'), work);
-      const base = { recipe: e.recipe, tarballs: [tgz.file], users: e.users, work, logs, logName: name, specs: u.specs };
+      const cert = e.cert ? join(kdir, e.cert) : null;
+      result.peers = installNeeds(e.recipe, join(work, 'nm'), work, cert || undefined);
+      const base = { recipe: e.recipe, cert, tarballs: [tgz.file], users: e.users, work, logs, logName: name, specs: u.specs };
+      const floor = enginesFloor([tgz.file], join(work, 'nm', 'node_modules'));
+      let referenceFile = join(kdir, 'reference.tgz');
+      if (floor && !sameKernel && compareVersions(plan.reference.version, floor.version) < 0) {
+        try {
+          const refAt = fetchTarball(KERNEL, floor.version, null, join(work, 'reference-kernel'));
+          referenceFile = refAt.file;
+          result.referenceAt = { version: floor.version, why: `${floor.who} needs slicc-kernel ${floor.range}; the plan's reference is ${plan.reference.version}` };
+          console.log(`compat: ${e.id}: reference slicc-kernel ${floor.version}, the engines floor (${result.referenceAt.why})`);
+        } catch (err) {
+          result.referenceAt = { version: null, why: `${floor.who} needs slicc-kernel ${floor.range}, and ${KERNEL}@${floor.version} could not be fetched: ${String(err.message).split('\n')[0]}` };
+        }
+      }
       const rerun = (list) => {
         const named = [...new Set(list.map((f) => f.spec))];
         return named.some((sp) => sp.startsWith('(')) ? u.specs : named;
@@ -715,8 +844,10 @@ function shard(args) {
             refAttempts.push(again.log);
             ref = { ...ref, other: again };
           }
-          result.reference = { status: ref.status, log: ref.log, attempts: refAttempts, error: ref.error || null };
-          for (const f of open) Object.assign(f, compareOnReference(f, ref));
+          result.reference = { status: ref.status, log: ref.log, attempts: refAttempts, error: ref.error || null, ...(result.referenceAt ? { at: result.referenceAt } : {}) };
+          const refused = enginesRefusal(ref);
+          if (refused) console.log(`compat: can't judge ${e.id} on the reference kernel: ${refused}`);
+          for (const f of open) Object.assign(f, refused ? { verdict: 'known', reference: 'engines', why: `can't judge: the reference kernel refuses it (${refused})` } : compareOnReference(f, ref));
         }
       }
       const bySpec = new Map();

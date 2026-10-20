@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-imagemagick",
-  "version": "7.1.2-34-9.1",
-  "description": "ImageMagick 7.1.2-34 magick CLI for wasm / slicc (emscripten)",
+  "version": "7.1.2-34-9.2",
+  "description": "Create, convert and edit images from the command line with ImageMagick: magick, convert, identify and mogrify.",
   "license": "ImageMagick",
   "repository": {
     "type": "git",

@@ -159,3 +159,19 @@ The release itself only adds the README note on writing `.heic`/`.avif` (homesco
 
   The patch now takes the temp-and-rename path only for single-file raster coders that have an encoder. They are named by the target's extension or by the same explicit prefix. The target must be one the user may write. Everything else keeps upstream's direct write. `atomic-write.mjs` adds the mpr: and unknown-prefix rows, and the heif package's `atomic-write-users.mjs` adds the read-only and HEIC rows as a non-root user. The published -9 behaves the same on all four, so they're parity rows, and the first 9.1 build failed the mpr: one.
 - **#819.** The cert now runs with `"users": "enforce"`, and every spec passes under it.
+
+## 7.1.2-34-9.2: the burn-down (homescoop#561, #586, #679, #1206, #1208, #1258; 2026-10-20)
+
+`defaults.mjs` runs each case below. The published 7.1.2-34-9.1, on slicc-kernel 1.110.1 under users enforce, gives:
+
+| case | 7.1.2-34-9.1 | 7.1.2-34-9.2 |
+|---|---|---|
+| `label:hi`, `-annotate` without `-font` (#586) | rc 1: `unable to read font `'` | rc 0: Nimbus Sans as Helvetica (etc/fonts, type.xml) |
+| `xc:red out.mpc` (#1208) | rc 1: `cache resources exhausted … unable to persist pixel cache` | rc 1: `not authorized by the security policy `MPC'`; magick-open writes and reads MPC |
+| `identify rose:` (#679) | `4294967295:10.000` | `0:00.0xx` |
+| `16000x3000 gradient: g16.jp2` (#561) | rc 1: `unable to encode image file` | rc 0, JP2 16000x3000 |
+
+- **#679, the cause:** ImageMagick's timer prefers `CLOCK_MONOTONIC_RAW`. Emscripten's `clock_gettime` accepts only the four WASI clocks and returns EINVAL for it, so the `timespec` was left uninitialized. `timer-monotonic-emscripten.patch` uses `CLOCK_MONOTONIC` there and returns 0 on failure.
+- **#561, the cause:** openjpeg encodes an untiled image as a single tile, and at 48 MP that no longer fits the 2 GiB wasm heap. `jp2-tile-large.patch` encodes images above 16 MP in 1024x1024 tiles unless `-extract` sets a tile size. 64 MP and up is refused by the tab policy's area limit as before (`cache resources exhausted`).
+- **#1206:** fixed by the version scheme. 7.1.2-34-9.1 and this 9.2 sort above -9, per docs/versioning.md, and `npm-parity`/`sync-package-version` enforce it.
+- **#1258** (a target another user owns is rewritten in place): its row is in wasm-imagemagick-heif's `atomic-write-users.mjs`, since that live pair has a shell for the second user. The patch is shared.

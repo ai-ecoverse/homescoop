@@ -13,7 +13,7 @@ TLS for [SLICC](https://github.com/ai-ecoverse/slicc): Mbed TLS 4.2.0 sessions o
 ## Client sessions
 
 - **The trust store is the caller's.** `tls_ca_new` makes an empty store. `tls_ca_add_der` adds one DER root, and `tls_ca_add_bundle` adds concatenated DER, such as the package's `roots.der`, returning how many roots it added. On an error (< 0) it may have added the roots before the bad one, so discard that store. The engine never loads roots by itself.
-- **Starting a session:** `tls_client_new(ca, servername, alpn, alpn_len, flags)` starts one. It takes the server name as a C string, an ALPN list in wire format (length-prefixed names; `0, 0` for none) and flags.
+- **Starting a session:** `tls_client_new(ca, servername, alpn, alpn_len, flags)` starts one. It takes the server name as a C string, an ALPN list in wire format (length-prefixed names; `0, 0` for none) and flags. `tls_client_new_name(ca, servername, servername_len, alpn, alpn_len, flags)` (since 4.2.0-6) is the same with the name's length given: a NUL byte inside the name is refused (`TLS_BADARG`), where the C-string form would end the name at it. Use it for names that come from JS.
   - **Verification is required.** The chain must reach a root in `ca`, the leaf must name the server, every certificate must be within its validity period by the clock, and the leaf must allow server use (extendedKeyUsage serverAuth and keyUsage).
   - Without a store, or with an empty server name, there's no session (`TLS_BADARG`).
   - **Flags:**
@@ -23,7 +23,7 @@ TLS for [SLICC](https://github.com/ai-ecoverse/slicc): Mbed TLS 4.2.0 sessions o
     - Only 0, 1, 2, 4, 1|2 and 2|4 are allowed. Any other combination, CHAIN_ONLY|INSECURE and unknown bits included, is refused.
 - **A client certificate (mTLS):** `tls_client_cert` takes the caller's own chain (concatenated DER, its leaf first) and private key before the first handshake.
   - The key is PEM, with the NUL counted, or DER: PKCS#8, SEC1 or PKCS#1, optionally encrypted with a passphrase.
-  - The key must match the leaf. It comes only from the caller; there's no default.
+  - The key must match the leaf: a key for another certificate is refused at `tls_client_cert` (`TLS_BADARG`), before any handshake. It comes only from the caller; there's no default.
   - The engine wipes the key and passphrase bytes it was given once they're parsed, and frees (zeroizes) its copy with the session.
 - **Cipher:** `tls_ciphersuite` gives the negotiated ciphersuite's IANA number.
 - **Alerts:** after a handshake or read fails with Mbed TLS's FATAL_ALERT_MESSAGE, `tls_last_alert` gives the description number of the alert the server sent: 116 (certificate_required) from a TLS 1.3 server that wanted a client certificate, 40 (handshake_failure) from a TLS 1.2 one. Otherwise, and for a server session, it's -1.
@@ -62,7 +62,7 @@ The default trust store a caller may load is `dist/roots.der`, also exported as 
   - `tls_write` takes plaintext in;
   - drain the ciphertext with `tls_out_take`.
 - **Entropy:** `crypto.getRandomValues` is the source of PSA's random generator (TF-PSA-Crypto), which makes every key and handshake. Without it, a call fails (`PSA - Insufficient entropy`) and never throws.
-- `tls_strerror` names TLS, X.509, PK, ASN.1 and PSA errors.
+- `tls_strerror` names the engine's own codes (`TLS_EOF`, `TLS_NOMEM`, `TLS_BADARG`, as "tls-engine - …") and TLS, X.509, PK, ASN.1 and PSA errors.
 - **Pages and workers only** (`-sENVIRONMENT=web,worker`): there's no Node branch, whose `import('module')` would land in a bundler's eager graph. In Node, pass the module's bytes: `createTlsEngine({ wasmBinary })`.
 
 Types: `index.d.ts`. Build: `packages/tls-engine/build.sh` in homescoop.

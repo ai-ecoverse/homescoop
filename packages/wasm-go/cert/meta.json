@@ -21,7 +21,8 @@
   "checklist": [
     "compile, link and asm -V print 'version go1.27.2', package.json slicc.go.version is goroot/VERSION (go1.27.2), and the wasm-go-std-wasip1 installed with it says the same (run by path in the kernel, as cone, users enforce; homescoop#746)",
     "with wasm-go-std-wasip1 of the same version (this run's peer artifact, else the registry's): compile and link a fmt/os program in the kernel; the wasip1 binary runs there and prints 'hello from go 42 3'",
-    "goroot/pkg/include ships Go's assembler headers (textflag.h, funcdata.h, asm_*.h): as gopher, asm -I goroot/pkg/include assembles a textflag.h NOSPLIT function (gensymabis and object), compile -symabis declares it, the object joins main's archive, and the linked program prints 'asm says 42'; asm without -I can't open textflag.h, as upstream Go's asm (homescoop#747). 1.26.5-2: no goroot/pkg/include (NEGATIVE.md)"
+    "goroot/pkg/include ships Go's assembler headers (textflag.h, funcdata.h, asm_*.h): as gopher, asm -I goroot/pkg/include assembles a textflag.h NOSPLIT function (gensymabis and object), compile -symabis declares it, the object joins main's archive, and the linked program prints 'asm says 42'; asm without -I can't open textflag.h, as upstream Go's asm (homescoop#747). 1.26.5-2: no goroot/pkg/include (NEGATIVE.md)",
+    "cert/licence.mjs (1.27.2-2, homescoop#897): the package ships Go's LICENSE (Copyright 2009 The Go Authors, BSD-3-Clause) and PATENTS (Additional IP Rights Grant (Patents)), both from the pinned go source tarball and both in package.json files[]. 1.27.2-1 shipped LICENSE only (NEGATIVE.md)"
   ],
   "users": "enforce"
 }

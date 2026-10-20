@@ -446,6 +446,79 @@ describe('client sessions (slicc-kernel#922)', () => {
     assert.equal(engine.ownCert(fresh(), [leaf], new Uint8Array(0)).ret, BADARG);
   });
 
+  test('an RSA client key in PKCS#8 (DER, PEM, encrypted PEM) and PKCS#1 is accepted and authenticates; a mismatched RSA key is refused at tls_client_cert with TLS_BADARG (homescoop#1121)', async () => {
+    const seen = [];
+    const srv = await server('client.test', {
+      tls: { requestCert: true, rejectUnauthorized: true, ca: ca.pem },
+      onSocket: (socket) => {
+        seen.push(socket.getPeerCertificate().subject?.CN);
+        socket.pipe(socket);
+      },
+    });
+    const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const leaf = ca.issue('rsa-client.test', publicKey.export({ type: 'spki', format: 'der' }), { eku: '1.3.6.1.5.5.7.3.2' });
+    const fresh = () => engine.client(trust, 'client.test');
+    const forms = {
+      'PKCS#8 DER': [privateKey.export({ type: 'pkcs8', format: 'der' })],
+      'PKCS#8 PEM': [privateKey.export({ type: 'pkcs8', format: 'pem' })],
+      'encrypted PKCS#8 PEM': [privateKey.export({ type: 'pkcs8', format: 'pem', cipher: 'aes-256-cbc', passphrase: 'rsa pass' }), 'rsa pass'],
+      'PKCS#1 PEM': [privateKey.export({ type: 'pkcs1', format: 'pem' })],
+      'PKCS#1 DER': [privateKey.export({ type: 'pkcs1', format: 'der' })],
+    };
+    for (const [form, [key, pass]] of Object.entries(forms)) {
+      const s = fresh();
+      const got = engine.ownCert(s, [leaf, ca.der], key, pass);
+      assert.deepEqual(got, { ret: 0, wiped: true }, `${form}: ${engine.strerror(got.ret)}`);
+      if (form === 'PKCS#8 PEM') {
+        const wire = new Wire(engine, s, srv.port);
+        const hs = await wire.handshake();
+        assert.equal(hs, 1, `${form} handshake: ${engine.strerror(hs)}`);
+        const back = wire.read(3);
+        await wire.write(Buffer.from('rsa'));
+        assert.equal((await back).toString(), 'rsa');
+        wire.close();
+      } else engine.m._tls_session_free(s);
+    }
+    assert.deepEqual(seen, ['rsa-client.test'], 'the server saw the PKCS#8 RSA client certificate');
+    const stranger = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+    for (const type of ['pkcs8', 'pkcs1']) {
+      const r = engine.ownCert(fresh(), [leaf], stranger.export({ type, format: 'pem' }));
+      assert.equal(r.ret, BADARG, `a ${type} RSA key for another certificate: ${r.ret} ${engine.strerror(r.ret)}`);
+      assert.equal(r.wiped, true);
+    }
+  });
+
+  test('a server name is its bytes: tls_client_new_name refuses one with a NUL inside, where tls_client_new ends it at the NUL (homescoop#1042)', async () => {
+    const named = (bytes, flags = 0) => engine.with(bytes, (p) => engine.m._tls_client_new_name(trust, p, bytes.length, 0, 0, flags)) || null;
+    const evil = Buffer.from('client.test\0evil');
+    assert.equal(named(evil), null, 'a NUL inside the name');
+    assert.equal(engine.m._tls_last_error(), BADARG);
+    assert.equal(named(Buffer.from('\0client.test')), null);
+    assert.equal(named(Buffer.alloc(0)), null, 'an empty name with verification required');
+    assert.equal(named(Buffer.from('x'.repeat(300))), null, 'a name too long for the session');
+    const srv = await server('client.test');
+    const s = named(Buffer.from('client.test'));
+    assert.ok(s, 'a plain name gives a session');
+    const wire = new Wire(engine, s, srv.port);
+    const hs = await wire.handshake();
+    assert.equal(hs, 1, engine.strerror(hs));
+    assert.equal(wire.verify, 0);
+    await srv.secure;
+    assert.equal(srv.seen.servername, 'client.test');
+    wire.close();
+    const cut = engine.with(evil, (p) => engine.m._tls_client_new(trust, p, 0, 0, 0));
+    assert.ok(cut, 'the C-string form sees "client.test" and starts a session (documented)');
+    engine.m._tls_session_free(cut);
+  });
+
+  test('tls_strerror names the engine\'s own codes, not the Mbed TLS HMAC_DRBG codes that share their values (homescoop#1091)', () => {
+    assert.equal(engine.strerror(BADARG), 'tls-engine - bad argument (TLS_BADARG)');
+    assert.equal(engine.strerror(-2), 'tls-engine - out of memory (TLS_NOMEM)');
+    assert.equal(engine.strerror(-1), 'tls-engine - the peer closed the connection (TLS_EOF)');
+    assert.equal(engine.client(0, 'client.test'), null);
+    assert.doesNotMatch(engine.strerror(engine.m._tls_last_error()), /HMAC_DRBG|UNKNOWN ERROR CODE/);
+  });
+
   test('TLS_CLIENT_NO_SNI sends no SNI and still refuses a leaf for another host (#1004)', async () => {
     const good = await server('client.test');
     const ok = await attempt(good.port, 'client.test', { flags: NO_SNI });

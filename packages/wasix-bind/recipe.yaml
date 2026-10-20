@@ -1,0 +1,53 @@
+# BIND 9's client tools for slicc WASIX (homescoop#1282): dig, host and
+# nslookup from ISC's bin/dig, linked statically against libuv (wasix-org's
+# WASIX port), userspace-rcu and wasix-openssl. No named, delv or zone tools.
+name: wasix-bind
+builder: host
+# Renovate: manual. 9.20 is ISC's stable branch (9.21 is development).
+version: "9.20.29"
+npm: "@ai-ecoverse/wasix-bind"
+summary: "BIND 9.20 dig, host and nslookup for slicc WASIX"
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
+source:
+  url: "https://downloads.isc.org/isc/bind9/{{version}}/bind-{{version}}.tar.xz"
+  sha256: "587029508b3b1b43229fae416c97e5543aba45809cefaca98a5004a02a5736c1"
+sources:
+  libuv:
+    version: "6fe6259894375cef3a7289d7dcc0a35e539191b3"
+    url: "https://github.com/wasix-org/libuv/archive/{{version}}.tar.gz"
+    sha256: "fe864c25e912c0a9c337c7744c439b6e537b6c7c290e693fe4fe4c52787ccfeb"
+  urcu:
+    version: "0.15.7"
+    url: "https://lttng.org/files/urcu/userspace-rcu-{{version}}.tar.bz2"
+    sha256: "2556b83adc0f9b3ac8024e613e17d014d04c4c49110604ce55fcb14eae32edd3"
+  wasix_openssl:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openssl/-/wasix-openssl-3.5.9-4.tgz"
+    sha256: "47629bd4e1f53ee1aa32e3ef150cd744c4eb242632f8bad2818c631aa6c645b7"
+toolchain:
+  wasix_sysroot: "2025.9.30-39"
+  wasix_sysroot_sha256: "6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.isc.org/bind/
+  license: MPL-2.0
+  notes: |
+    Built with wasixcc on wasix-sysroot 2025.9.30-39 (toolchain.wasix_sysroot:
+    dlmalloc refreshes a thread's view of a grown shared memory, #1287;
+    static-main, no wasm exceptions, no PIC). libuv is wasix-org/libuv's wasix-1.51.0
+    branch at 6fe62598 (libuv 1.51.0 plus the WASIX port: the posix poll
+    backend, posix_spawn, the WASIX socket quirks), built with its own
+    wasix-toolchain.cmake. userspace-rcu 0.15.7 with
+    patches/userspace-rcu-0.15.7-wasix.patch (wasm32 takes urcu's generic
+    arch with compiler atomic builtins; no syscall.h on WASI); BIND uses its
+    default memb flavour, which falls back to memory barriers when the
+    membarrier syscall is missing. wasix-openssl 3.5.9-4 by pkg-config.
+    patches/bind-9.20.29-wasix.patch: configure allows the static build on
+    WASI (there is no shared linking on this target, so no dlopen to lose)
+    and dighost.c retries a query over TCP at once when UDP can't leave
+    the machine: ENETUNREACH/EHOSTUNREACH at UDP setup (an address no
+    uplink routes) or at send (an uplink that carries no UDP). Off: DoH (nghttp2), libxml2, json-c, zlib, LMDB, GSS-API,
+    GeoIP, libidn2, jemalloc, readline, dnstap. New package, human cert.

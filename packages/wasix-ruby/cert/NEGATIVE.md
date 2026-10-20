@@ -43,3 +43,13 @@ The new pipe row of `cert/flock.mjs` against the published 3.4.11-17 on slicc-ke
 - **#1045:** the checklist's zlib and openssl rows name `wasix-zlib 1.3.1` / `wasix-openssl 3.5.9` without a build number. `package-meta.mjs` checks the build against the notices.
 - **#989:** fixed by 3.4.11-18. It raised `engines.slicc-kernel` to `>=1.120.0` and the cert kernel to 1.120.2, which has `slicc.flock`, and updated `sysroot28.mjs` to -34. `flock.mjs` passes on 3.4.11-18 and -19. What was left: `cert/meta.json` still had a `patches/flock-wasi-fcntl.patch` entry for a file that's gone, and `recipe.yaml`'s comment still described it. Both are removed.
 
+
+## 3.4.11-21: bundled C-extension gems, interruptible locks, load path, rbconfig (homescoop#596, #869, #597, #1114; 2026-10-20)
+
+Against the published 3.4.11-20 on the cert kernel slicc-kernel 1.132.1, users enforce, `--spec bundled-gems.mjs --spec flock-interrupt.mjs --spec launcher.mjs --spec package-meta.mjs --spec sysroot28.mjs`:
+- **#596, `bundled-gems.mjs`:** FAIL, 11 of 11 assertions. `require "bigdecimal"` warns `bigdecimal is not part of the default gems starting from Ruby 3.4.0` and raises `cannot load such file -- bigdecimal (LoadError)`. `gem list` has no bigdecimal, racc, nkf, syslog, debug or rbs, because build.sh deleted their `ext/` and rbinstall skipped each gem.
+- **#869, `flock-interrupt.mjs`:** on -20 the first row's `Timeout.timeout(1) { flock(LOCK_EX) }` doesn't return until the holder exits (3 s). A first draft of the spec left the timed-out handle open, and it then took the lock, so the next row waited for ever (the harness gave up after 120 s). The committed spec closes every handle, so -20 reports `late` for each interrupt row instead of hanging.
+- **#597, `launcher.mjs`:** -20's `$LOAD_PATH` has 8 missing `/nonexistent-ruby-prefix/...` directories (the issue's list). The new assertion expects none.
+- **#1114, `package-meta.mjs`:** -20's `RbConfig::CONFIG` has 9 values holding `/home/runner/work/homescoop/homescoop/packages/wasix-ruby/work/...` (`configure_args`, `CPPFLAGS`, `LDFLAGS`, `DLDFLAGS`, `MAINLIBS`, `LIBS`, `CC_VERSION_MESSAGE`, ...). -21's build.sh names the tree `/nonexistent-ruby-build` and fails if a build path is left.
+- **`sysroot28.mjs`:** expects wasix-sysroot 2025.9.30-39 from PRESTAGE.md and THIRD-PARTY-NOTICES.md. -20 says -34.
+- **#1013:** fixed in 3.4.11-18 and -20. `locks.mjs` asserts a floor of at least `>=1.100.0` by number, and `cert/meta.json` has no `flock-wasi-fcntl.patch` entry. -21 also rewrites the `cert/flock.mjs` row that still described fcntl record locks.

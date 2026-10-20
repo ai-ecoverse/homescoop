@@ -14,8 +14,8 @@ export default async function (ctx) {
   const r = await run(['ruby', '-e', TRAP], { cwd: '/tmp' });
   assert.equal(r.status, 0, `rc=${r.status} ${r.stdout}${r.stderr}`);
   assert.equal(r.stdout.trim(), 'trapped 20', `USR1 with three busy threads: ${r.stdout}`);
-  const s = await run(['ruby', '-e', 'pkg = File.expand_path("../..", RbConfig::CONFIG["bindir"] + "/x"); print JSON.parse(File.read(File.join(pkg, "package.json")))["description"][/wasix-sysroot [^:]+/], "|", File.read(File.join(pkg, "THIRD-PARTY-NOTICES.md"))[/wasix-sysroot [0-9.-]+/]', '-rjson'], { cwd: '/tmp' });
+  const s = await run(['ruby', '-e', 'pkg = File.expand_path("../..", RbConfig::CONFIG["bindir"] + "/x"); print File.read(File.join(pkg, "PRESTAGE.md"))[/wasix-sysroot \\*\\*[0-9.-]+/].delete("*"), "|", File.read(File.join(pkg, "THIRD-PARTY-NOTICES.md"))[/wasix-sysroot [0-9.-]+/]', '-rjson'], { cwd: '/tmp' });
   assert.equal(s.status, 0, `rc=${s.status} ${s.stdout}${s.stderr}`);
-  assert.equal(s.stdout.trim(), 'wasix-sysroot 2025.9.30-34|wasix-sysroot 2025.9.30-34', `toolchain record: ${s.stdout}`);
+  assert.equal(s.stdout.trim(), 'wasix-sysroot 2025.9.30-39|wasix-sysroot 2025.9.30-39', `toolchain record: ${s.stdout}`);
   console.log(`sysroot28: ${r.stdout.trim()}; ${s.stdout.trim()}`);
 }

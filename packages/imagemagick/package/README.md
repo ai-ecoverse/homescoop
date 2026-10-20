@@ -11,9 +11,11 @@ Delegates: zlib, jpeg, png, tiff, webp, openjpeg, lcms2, freetype, libxml2.
 
 Since 7.1.2-32-4 all of them are linked; 7.1.2-32-3 and older built without
 webp, freetype and libxml2 (no WebP, no `-annotate`/TTF, no MSL or internal
-SVG renderer), though this list named them. There is no fontconfig and no
-bundled font: give text commands a font file with `-font path/to/font.ttf`
-(or a Type 1 `.pfb`).
+SVG renderer), though this list named them. There is no fontconfig. Since
+7.1.2-34-9.2 the package has a default font, URW Nimbus Sans (Helvetica,
+regular, bold, oblique and bold oblique, from gsfonts in `etc/fonts`), so
+`label:`, `caption:` and `-annotate` work without `-font`. Other fonts need
+`-font path/to/font.ttf` (or a Type 1 `.pfb`).
 Configure XMLs ship under `etc/ImageMagick-7/`; the slicc manifest sets
 `MAGICK_CONFIGURE_PATH` so `colors.xml` / `policy.xml` resolve.
 SVG goes through the internal MSVG renderer: `delegates.xml` has no
@@ -66,6 +68,10 @@ the wasm heap tops out at 2 GiB and a runaway allocation can freeze the tab:
 | memory | 1536 MiB | a 48 MP RGB image in Q16HDRI is about 580 MiB; resizing holds the source and the result |
 | map | 256 MiB | in wasm the memory-mapped cache is heap too: memory + map is 1.75 GiB, under the build's 2 GiB maximum |
 | disk | 0 | no pixel cache on disk: in the browser that spills to storage and a 48 MP resize took minutes; anything over memory fails at once |
+
+With disk at 0, MPC (which persists the pixel cache to a disk file) is
+refused by policy: use `magick-open` for `.mpc`. JPEG 2000 above 16 MP is
+encoded in 1024x1024 tiles, so a 48 MP image fits the heap.
 
 Over a limit, magick exits 1 with `width or height exceeds limit` or
 `cache resources exhausted`, also for `identify -format`, which decodes the
