@@ -121,6 +121,17 @@ for name in "${TOOLS[@]}"; do
   chmod +x "$PKG/bin/$name" "$PKG/bin/$name.wasm"
 done
 cp "$SRC/LICENSE" "$PKG/LICENSE"
+test -f "$SRC/third_party/FP16/LICENSE"
+# THIRD-PARTY-NOTICES.md (homescoop#1038, #844): the Emscripten runtime the
+# tools link, and FP16 (MIT; src/wasm-interpreter.h includes its fp16.h).
+# third_party/llvm-project (DWARF) is Apache-2.0 WITH LLVM-exception, which
+# waives the notice for compiled forms.
+homescoop_notices_begin "The tools in bin/ statically link the following."
+homescoop_notice "Emscripten 6.0.9 (runtime and system libraries)" \
+  "$EMSCRIPTEN_TREE/LICENSE" - \
+  "$EMSCRIPTEN_TREE/system/lib/libc/musl/COPYRIGHT" - \
+  "$EMSCRIPTEN_TREE/system/lib/libcxx/LICENSE.TXT" -
+homescoop_notice "FP16 (third_party/FP16; MIT)" "$SRC/third_party/FP16/LICENSE" -
 du -sh "$PKG/bin"/wasm-opt.wasm
 node "$ROOT/scripts/smoke-binaryen.mjs"
 echo "OK wasm-binaryen $PKG_VER"

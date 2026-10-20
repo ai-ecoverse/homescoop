@@ -26,3 +26,13 @@ AssertionError: bin/wasm-opt.wasm lacks shims/slicc's inherited-ignore seed (imp
 ```
 
 Binaryen d03c25ea and the link flags are unchanged.
+
+## 132.0.0-5: notices (homescoop#1038, #844; 2026-10-20)
+
+`node-entry.mjs` fails on the published 132.0.0-4:
+
+```text
+AssertionError: THIRD-PARTY-NOTICES.md lacks the Emscripten 6.0.9 notice (homescoop#1038, #844)
+```
+
+132.0.0-4 ships only binaryen's LICENSE. 132.0.0-5 adds `THIRD-PARTY-NOTICES.md` with the Emscripten runtime's notices and FP16's MIT licence. binaryen's `third_party/llvm-project` is Apache-2.0 WITH LLVM-exception, which waives the notice for compiled forms. The tools are rebuilt with the same source and flags.
