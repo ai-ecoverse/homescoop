@@ -52,7 +52,9 @@ static int fail(const char *target, int err) {
     what = "not mounted";
     break;
   case EPERM:
-    what = "Operation not permitted (process mounts are disabled here)";
+    // homescoop#666: EPERM is also a user's mount over a directory that isn't
+    // theirs (users enforce), not only a kernel with process mounts off.
+    what = "Operation not permitted (not your mount point, or refused by the kernel's mount policy)";
     break;
   case ENOSYS:
     what = "umount2(2) is not available (needs a slicc-kernel with process mounts)";

@@ -25,3 +25,7 @@ listing format. Exit codes follow util-linux: 1 for usage, 32 for mount failure.
 
 Requires `@ai-ecoverse/slicc-kernel` ≥ 1.17.0 (process mounts, slicc-kernel#92);
 older kernels answer "mount(2) is not available".
+
+## 1.0.0-5 (homescoop#666; 2026-10-20)
+
+`EPERM` from mount or umount now reads `Operation not permitted (not your mount point, or refused by the kernel's mount policy)`. Under users enforce a user may mount only over their own directories, and the old `(process mounts are disabled here)` was wrong for that case.
