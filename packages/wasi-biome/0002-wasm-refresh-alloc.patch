@@ -1,0 +1,29 @@
+biome_cli (wasm): homescoop's allocator refresh as the global allocator (homescoop#1287)
+
+V8 checks a thread's memory.fill/memory.copy against that thread's cached
+memory length, which can lag a memory.grow another thread's malloc just
+did, so a memset into a fresh block traps "memory access out of bounds"
+(slicc-kernel#1172). On wasm the binary includes
+scripts/rust-wasm-refresh-alloc.rs (path in HOMESCOOP_WASM_ALLOC_RS, set
+by build.sh): System, refreshing the view with memory.grow(0) before a
+block above it is returned.
+
+Upstream: not filed (Lars decides).
+removeWhen: V8 refreshes other threads' memory length before a grown block
+can reach them, or the wasi-libc malloc Rust links does.
+
+--- a/crates/biome_cli/src/main.rs
++++ b/crates/biome_cli/src/main.rs
+@@ -32,6 +32,12 @@
+ #[global_allocator]
+ static GLOBAL: std::alloc::System = std::alloc::System;
+ 
++// homescoop#1287: threaded wasm takes homescoop's allocator refresh
++// (scripts/rust-wasm-refresh-alloc.rs) against V8's stale per-thread memory
++// length after another thread's memory.grow.
++#[cfg(target_family = "wasm")]
++include!(env!("HOMESCOOP_WASM_ALLOC_RS"));
++
+ fn main() -> ExitCode {
+     setup_panic_handler();
+     set_bottom_frame(main as *const () as usize);

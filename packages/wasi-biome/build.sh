@@ -32,6 +32,11 @@ fi
 (cd "$SRC_DIR" && rustup show active-toolchain >/dev/null 2>&1 || rustup toolchain install)
 (cd "$SRC_DIR" && rustup target add "$TARGET")
 
+# homescoop#1287: 0002 includes the shared allocator refresh on wasm, and the
+# initial heap comes from recipe.yaml's wasm.initial-memory (WASM_INITIAL_MEMORY).
+homescoop_rust_wasm_refresh_alloc
+: "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
+
 OUT="$WORK/wasi-biome-${VERSION}"
 mkdir -p "$OUT"
 echo "== wasi-biome: cargo build -p biome_cli ($TARGET)"
@@ -42,7 +47,7 @@ echo "== wasi-biome: cargo build -p biome_cli ($TARGET)"
   # Up to 4 GiB of memory (the kernel caps it at what the engine reserves).
   # Panic locations name source files: map the build machine's paths away.
   BIOME_VERSION="$VERSION" \
-  RUSTFLAGS="--cfg tokio_unstable -C strip=symbols -C codegen-units=1 -C link-arg=--max-memory=4294967296 --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$SRC_DIR=/biome" \
+  RUSTFLAGS="--cfg tokio_unstable -C strip=symbols -C codegen-units=1 -C link-arg=--max-memory=4294967296 -C link-arg=--initial-memory=$WASM_INITIAL_MEMORY --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$SRC_DIR=/biome" \
   CARGO_TARGET_DIR="$OUT/target" \
     cargo build --release --locked -p biome_cli --target "$TARGET"
 )
