@@ -436,3 +436,15 @@ The public wrappers call `memory.grow(0)`, which refreshes this thread's view, w
 - `realloc` is `dlrealloc_in_place`, else `malloc` (checked) + `memcpy` + `free` (dlrealloc's own move would copy before any check).
 
 `sbrk` is unchanged: the thread that grows sees its own grow. No upstream report (project rule).
+
+## `dlmalloc-init-heap.patch`: the initial heap (homescoop#1287)
+
+Upstream: `dlmalloc/src/malloc.c`. wasix-libc commented `try_init_allocator` out in bbb578df62 ("WIP: add DL"), together with its dynamic-linking work, and moved its call outside the malloc lock. This puts it back where upstream wasi-libc has it (under `PREACTION`), with the heap end per kind of main:
+- static (non-PIC) programs: wasm-ld's `__heap_end`, as upstream;
+- PIE dynamic mains (the PIC trees): `__heap_base` and `__heap_end` are weak, so they become GOT.mem imports. slicc-kernel's loader gives `__heap_base` (the top of the stack it places after the main's data) and resolves the unknown `__heap_end` to 0, so the end is the memory size at the first malloc. The loader grows the memory only for later dlopens, at its end, and the first malloc runs on the main thread before any other thread exists.
+
+Both are capped at the current memory size. `test/r40.c` links with `--initial-memory=64 MiB` and mallocs 40 MiB: no `memory.grow` on -40, 640 pages of growth on -39.
+
+## `readdir-dtype.patch`: DT_FIFO (homescoop#1124)
+
+Upstream: `libc-bottom-half/cloudlibc/src/libc/dirent/{readdir,scandirat}.c`. WASI has no FIFO filetype, so `fd_readdir` reports one as UNKNOWN. For an UNKNOWN entry readdir and scandirat now call `fstatat` (as they already did for a zero inode), and since -37 that answers through slicc_fs `path_mode` with Linux's type bits, so `d_type` is `DT_FIFO`.

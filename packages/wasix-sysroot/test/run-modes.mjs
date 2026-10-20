@@ -57,7 +57,7 @@ try {
   const pkg = join(work, `${probe}-pkg`);
   const spec = await import(pathToFileURL(join(here, `${probe}.mjs`)).href);
   const build = spec.build ?? {};
-  const env = { ...wasixcc(work), ...VARIANTS[variant] };
+  const env = { ...wasixcc(work), ...VARIANTS[variant], ...(build.env ?? {}) };
   command(env, prefix, probe, pkg, probe);
   if (build.asyncify) {
     keepSync(pkg, probe);

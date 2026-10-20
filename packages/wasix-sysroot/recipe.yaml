@@ -11,6 +11,8 @@ sources:
   llvm_project:
     url: "https://github.com/llvm/llvm-project/archive/6bb93a243f6d15855f485f5aec3810d9e2de150d.tar.gz"
     sha256: "b62854f0704e513f2a93a0955a41e08894c60bcf750ba32f26b3637e6fa14b05"
+    commit: "6bb93a243f6d15855f485f5aec3810d9e2de150d"
+    tree: "3cc01b435e0bd13baf445b3b84fb5e1614e63ec4"
   llvm_linux_x86_64:
     url: "https://github.com/wasix-org/llvm-project/releases/download/21.1.206/LLVM-Linux-x86_64-gnu.tar.gz"
     sha256: "ab32cf976226dc9478c9cb8331fa877163ff34d78b190fb201d6eac92cb7dab0"

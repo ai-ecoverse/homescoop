@@ -1,0 +1,171 @@
+dlmalloc: use the pages between __heap_base and the heap end again
+(homescoop#1287). wasix-libc commented try_init_allocator out with its
+dynamic-linking work (bbb578df62), so a larger --initial-memory never saved a
+memory.grow. Back under the lock, as upstream wasi-libc. For PIE mains
+__heap_end is a weak GOT.mem import; without it the end is memory.size at the
+first malloc (the loader grows memory only for later dlopens).
+
+--- a/dlmalloc/src/malloc.c
++++ b/dlmalloc/src/malloc.c
+@@ -4560,10 +4560,10 @@
+ 
+ #if !ONLY_MSPACES
+ 
+-// #if __wasilibc_unmodified_upstream // Forward declaration of try_init_allocator.
+-// #else
+-// static void try_init_allocator(void);
+-// #endif
++#if __wasilibc_unmodified_upstream // Forward declaration of try_init_allocator.
++#else
++static void try_init_allocator(void);
++#endif
+ 
+ void* dlmalloc(size_t bytes) {
+   /*
+@@ -4593,14 +4593,14 @@
+   ensure_initialization(); /* initialize in sys_alloc if not using locks */
+ #endif
+ 
+-// #if __wasilibc_unmodified_upstream // Try to initialize the allocator.
+-// #else
+-//   if (!is_initialized(gm)) {
+-//     try_init_allocator();
+-//   }
+-// #endif
+-
+   if (!PREACTION(gm)) {
++#if __wasilibc_unmodified_upstream // Try to initialize the allocator.
++#else
++    /* homescoop (#1287): under the lock, as upstream wasi-libc does. */
++    if (!is_initialized(gm)) {
++      try_init_allocator();
++    }
++#endif
+     void* mem;
+     size_t nb;
+     if (bytes <= MAX_SMALL_REQUEST) {
+@@ -5209,58 +5209,72 @@
+ }
+ #endif /* MALLOC_INSPECT_ALL */
+ 
+-// #ifdef __wasilibc_unmodified_upstream // Define a function that initializes the initial state of dlmalloc.
+-// #else
+-// /* ------------------ Exported try_init_allocator -------------------- */
+-
+-// /* Symbol marking the end of data, bss and explicit stack, provided by wasm-ld. */
+-// extern char __heap_base;
+-// extern char __heap_end __attribute__((__weak__));
+-
+-// /* Initialize the initial state of dlmalloc to be able to use free memory between __heap_base and initial. */
+-// static void try_init_allocator(void) {
+-//   /* Check that it is a first-time initialization. */
+-//   assert(!is_initialized(gm));
+-
+-//   /* Initialize mstate. */
+-//   ensure_initialization();
+-
+-//   char *base = &__heap_base;
+-//   // Try to use the linker pseudo-symbol `__heap_end` for the initial size of
+-//   // the heap, but if that's not defined due to LLVM being too old perhaps then
+-//   // round up `base` to the nearest `PAGESIZE`. The initial size of linear
+-//   // memory will be at least the heap base to this page boundary, and it's then
+-//   // assumed that the initial linear memory image was truncated at that point.
+-//   // While this reflects the default behavior of `wasm-ld` it is also possible
+-//   // for users to craft larger linear memories by passing options to extend
+-//   // beyond this threshold. In this situation the memory will not be used for
+-//   // dlmalloc.
+-//   //
+-//   // Note that `sbrk(0)`, or in dlmalloc-ese `CALL_MORECORE(0)`, is specifically
+-//   // not used here. That captures the current size of the heap but is only
+-//   // correct if the we're the first to try to grow the heap. If the heap has
+-//   // grown elsewhere, such as a different allocator in place, then this would
+-//   // incorrectly claim such memroy as our own.
+-//   char *end = &__heap_end;
+-//   if (end == NULL)
+-//     end = (char*) page_align((size_t) base);
+-//   size_t initial_heap_size = end - base;
+-
+-//   /* Check that initial heap is long enough to serve a minimal allocation request. */
+-//   if (initial_heap_size <= MIN_CHUNK_SIZE + TOP_FOOT_SIZE + MALLOC_ALIGNMENT) {
+-//     return;
+-//   }
+-
+-//   /* Initialize the dlmalloc internal state. */
+-//   gm->least_addr = base;
+-//   gm->seg.base = base;
+-//   gm->seg.size = initial_heap_size;
+-//   gm->magic = mparams.magic;
+-//   gm->release_checks = MAX_RELEASE_CHECK_RATE;
+-//   init_bins(gm);
+-//   init_top(gm, (mchunkptr)base, initial_heap_size - TOP_FOOT_SIZE);
+-// }
+-// #endif
++#ifdef __wasilibc_unmodified_upstream // Define a function that initializes the initial state of dlmalloc.
++#else
++/* ------------------ Exported try_init_allocator -------------------- */
++
++/* homescoop wasix-sysroot -40 (homescoop#1287): wasix-libc commented this out
++ * with its dynamic-linking work (bbb578df62, "WIP: add DL"), so malloc never
++ * used the pages between __heap_base and the initial memory size and a larger
++ * --initial-memory never saved a memory.grow. It's back, with the end of the
++ * free pages taken per kind of main:
++ * - static (non-PIC) mains: wasm-ld's __heap_end, as upstream wasi-libc;
++ * - PIE dynamic mains (__PIC__, sysroot-ehpic/-exnref-ehpic): wasm-ld gives
++ *   no __heap_end, and slicc-kernel's loader sets __heap_base (GOT.mem) to the
++ *   top of the stack it places after the main's data; __heap_end is a weak
++ *   GOT.mem import, which the loader resolves to 0 when it has none. Then the
++ *   end is the current memory size: the loader grows the memory only for
++ *   side modules (dlopen, memory.grow at its end, never before the program
++ *   runs), and this runs at the first malloc, on the main thread before any
++ *   other thread exists, so the pages from __heap_base to memory.size are free.
++ * Either way capped at the current memory size. */
++#ifdef __PIC__
++/* Weak: in a PIE link they become GOT.mem imports the loader resolves
++ * (__heap_base to its stack top, an unknown __heap_end to 0). */
++extern char __heap_base __attribute__((__weak__));
++extern char __heap_end __attribute__((__weak__));
++#else
++extern char __heap_base;
++extern char __heap_end;
++#endif
++
++static void try_init_allocator(void) {
++  /* Check that it is a first-time initialization. */
++  assert(!is_initialized(gm));
++
++  /* Initialize mstate. */
++  ensure_initialization();
++
++  char *base = &__heap_base;
++  if (base == NULL)
++    return;
++  size_t pages = __builtin_wasm_memory_size(0);
++  /* 65536 pages (4 GiB) don't fit a 32-bit size_t: keep the last page out. */
++  char *mem_end = (char *)(pages >= 65536 ? (size_t)-65536 : pages * 65536);
++  char *end = &__heap_end;
++  if (end == NULL || end > mem_end)
++    end = mem_end;
++  if (end <= base)
++    return;
++  size_t initial_heap_size = end - base;
++
++  /* Check that initial heap is long enough to serve a minimal allocation request. */
++  if (initial_heap_size <= MIN_CHUNK_SIZE + TOP_FOOT_SIZE + MALLOC_ALIGNMENT) {
++    return;
++  }
++
++  /* Initialize the dlmalloc internal state. */
++  gm->least_addr = base;
++  gm->seg.base = base;
++  gm->seg.size = initial_heap_size;
++  gm->footprint = initial_heap_size;
++  gm->max_footprint = initial_heap_size;
++  gm->magic = mparams.magic;
++  gm->release_checks = MAX_RELEASE_CHECK_RATE;
++  init_bins(gm);
++  init_top(gm, (mchunkptr)base, initial_heap_size - TOP_FOOT_SIZE);
++}
++#endif
+ 
+ /* ------------------ Exported realloc, memalign, etc -------------------- */
+ 
