@@ -253,7 +253,7 @@ open(os.path.join(site, di, "RECORD"), "w").write("\n".join(rows) + "\n")
 PY
 cp "$SRC/LICENSE" "$DEST/LICENSE"
 L="$SRC/LICENSES"
-WORK="$B" homescoop_notices_begin "pandas' side modules compile in code from klib (khash), ultrajson, numpy's datetime support and musl; its Python sources include code from the other projects below. pandas' own licence is LICENSE. The licence files are pandas 2.3.2's LICENSES/."
+WORK="$B" homescoop_notices_begin "pandas' side modules compile in code from klib (khash), ultrajson, numpy's datetime support and musl; its Python sources include code from the other projects below. pandas' own licence is LICENSE. The licence files are pandas $VERSION's LICENSES/."
 WORK="$B" homescoop_notice "klib (khash; MIT)" "$L/KLIB_LICENSE" -
 WORK="$B" homescoop_notice "ultrajson (BSD-3-Clause)" "$L/ULTRAJSON_LICENSE" -
 WORK="$B" homescoop_notice "numpy (datetime support; BSD-3-Clause)" "$L/NUMPY_LICENSE" -

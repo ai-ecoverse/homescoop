@@ -4,7 +4,7 @@
     "@ai-ecoverse/wasix-python"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-python@3.15.0-1"
+    "@ai-ecoverse/wasix-python@3.15.0-3"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-pillow"
@@ -17,10 +17,21 @@
     "THIRD-PARTY-NOTICES.md (12.3.0-9, homescoop#726): libjpeg-turbo's LICENSE.md and README.ijg and FreeType's LICENSE.TXT and FTL.TXT, for the static links",
     "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 (the headers it is built against)",
     "13.0.0-1 (homescoop#761, the cp315 wave; npm-tag python3.15): Pillow 13.0.0 from the PyPI sdist (cdcd1ba2\u2026) against wasix-python 3.15.0-1, wasix-sysroot -38; same side modules, libjpeg-turbo 3.1.2, FreeType 2.13.3; pillow-wasm-call-signatures.patch applies unchanged; every cp314 spec",
-    "13.0.0-2 (homescoop#761, the fold): packages/py-pillow3.15 moved over packages/py-pillow after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 13.0.0-1; every spec as before"
+    "13.0.0-2 (homescoop#761, the fold): packages/py-pillow3.15 moved over packages/py-pillow after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 13.0.0-1; every spec as before",
+    "cert/notices.mjs (homescoop#726): THIRD-PARTY-NOTICES.md names libjpeg-turbo (IJG and BSD-3-Clause: LICENSE.md and README.ijg; the zlib-licensed SIMD code isn't built, WITH_SIMD=OFF, and LICENSE.md subsumes it under BSD) and FreeType (FTL: LICENSE.TXT and FTL.TXT), linked statically into _imaging and _imagingft, each with its licence text; the README says they're static and zlib is python.wasm's. 13.0.0-3: the meta.json notices block and spec; same sources and build"
   ],
   "patches": {
     "pillow-wasm-call-signatures.patch": "ExportArrowSchemaPyCapsule and ExportArrowArrayPyCapsule (METH_VARARGS) get CPython's second parameter; cert/arrow.mjs calls both (12.3.0-8: wasm trap, rc 134, homescoop#588), and build.sh's wasm-call-signatures.mjs run finds 0 mismatches in every side module"
   },
-  "users": "enforce"
+  "users": "enforce",
+  "notices": [
+    {
+      "name": "libjpeg-turbo",
+      "license": "IJG AND BSD-3-Clause"
+    },
+    {
+      "name": "FreeType",
+      "license": "FTL"
+    }
+  ]
 }

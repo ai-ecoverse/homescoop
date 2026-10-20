@@ -1,5 +1,9 @@
 # py-pillow: negative proof
 
+## 13.0.0-2: no notices check (13.0.0-3, #726; 2026-10-20)
+
+13.0.0-2 already ships libjpeg-turbo's and FreeType's licences, but no `cert/meta.json` `notices` block checked them. 13.0.0-3 adds the block and `cert/notices.mjs`; npm 13.0.0-2's file passes the same checker, so this is coverage, not a fix of shipped bytes.
+
 ## 12.3.0-8 fails the 12.3.0-9 cert (homescoop#588, #211 A1)
 
 `cert/arrow.mjs` against npm's 12.3.0-8 (wasix-python 3.14.2-25, slicc-kernel 1.108.4 Node entry, 2026-10-16): FAIL with `rc=134 stderr=python3: wasm trap: function signature mismatch`. `wasm-call-signatures.mjs` on -8's `_imaging` finds `method __arrow_c_schema__ -> ExportArrowSchemaPyCapsule: 1 params, called with 2 (flags 0x1)`, and the same for `__arrow_c_array__`. 12.3.0-9 (from the sdist, with `pillow-wasm-call-signatures.patch`) passes, and the checker finds 0 mismatches in all four side modules.

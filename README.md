@@ -117,8 +117,8 @@ versions are on npm.
 | [`@ai-ecoverse/py-matplotlib`](https://www.npmjs.com/package/@ai-ecoverse/py-matplotlib) | [recipe](packages/py-matplotlib) | matplotlib Agg for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
 | [`@ai-ecoverse/py-numpy`](https://www.npmjs.com/package/@ai-ecoverse/py-numpy) | [recipe](packages/py-numpy) | NumPy, the fundamental package for array computing in Python. |
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |
-| [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | Pandas 3.0.6 for slicc WASIX CPython 3.15 (cp315-wasix_wasm32 side modules) |
-| [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow for slicc WASIX CPython 3.15 (cp315-wasix_wasm32) |
+| [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | pandas, data analysis and manipulation for Python. |
+| [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow, the Python imaging library. |
 | [`@ai-ecoverse/py-pyparsing`](https://www.npmjs.com/package/@ai-ecoverse/py-pyparsing) | [recipe](packages/py-pyparsing) | pyparsing for slicc WASIX CPython |
 | [`@ai-ecoverse/py-python-dateutil`](https://www.npmjs.com/package/@ai-ecoverse/py-python-dateutil) | [recipe](packages/py-python-dateutil) | python-dateutil for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pytz`](https://www.npmjs.com/package/@ai-ecoverse/py-pytz) | [recipe](packages/py-pytz) | pytz for slicc WASIX CPython |
