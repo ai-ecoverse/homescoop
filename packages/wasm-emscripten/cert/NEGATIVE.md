@@ -66,3 +66,7 @@ FAIL wasm-clang 24.0.0-21 ships no THIRD-PARTY-NOTICES.md; wasm-binaryen 132.0.0
 24.0.0-21 is the last wasm-clang relinked from a local slicc-emscripten tree. 132.0.0-3 predates #960's inherited-ignore shim. 6.0.9-23 pins wasm-clang 24.0.0-22 (stage F, built from llvm-emscripten) and wasm-binaryen 132.0.0-4, and passes. The emscripten tree, the patches and the lib/slicc objects are unchanged from 6.0.9-22.
 
 The same release moves wasix-python from the exact 3.14.2-16 to the range `>=3.15.0-2 <3.15.1`. That's the python3.15 flip; check-exact-pins now allows wasm-emscripten that range, as it allows py-*. It also gains `engines: slicc-kernel >=1.122.3`, because wasix-python 3.15.0-2 refuses older kernels. On the old cert kernel 1.110.7, run-paths fails at once: `python3: @ai-ecoverse/wasix-python@3.15.0-2 needs slicc-kernel >=1.122.3`. So the cert kernel moves to 1.132.0, where em-config, em-ensure-cache and `emcc -v` run through CPython 3.15 in the flat and pnpm layouts.
+
+## 6.0.9-24: a sorted musl walk (homescoop#1328; 2026-10-20)
+
+The new `test/files.test.mjs` row fails on the published 6.0.9-23: its `tools/system_libs.py` walks musl in filesystem order. Through embuilder that made libc's `_Exit.o` and `_exit.o` member names depend on the host (emscripten-cache's NEGATIVE.md). Patch 0013 sorts the walk. The other change is `scripts/emscripten-tree.sh`'s exact acorn pins. Apart from those, 6.0.9-24 equals -23.

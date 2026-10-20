@@ -9,7 +9,6 @@ source:
   sha256: "426911732c683c5940e3e089782d90d272ec2738c933e53593f9e9a65ff6aa96"
 inputs:
   - "packages/wasm-emscripten/patches/**"
-  - "packages/wasm-emscripten/package/package.json"
 dependencies:
   build: []
   host: []

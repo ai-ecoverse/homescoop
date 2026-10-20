@@ -1,0 +1,16 @@
+--- a/tools/system_libs.py
++++ b/tools/system_libs.py
+@@ -1310,8 +1310,12 @@
+       remove = [d for d in dirnames if d in ignore]
+       for r in remove:
+         dirnames.remove(r)
++      # Walk in name order: os.walk lists directories in filesystem order, and
++      # which of exit/_Exit.c and unistd/_exit.c comes first decides which
++      # object gets the __1 suffix in the archive (homescoop#1328).
++      dirnames.sort()
+ 
+-      for f in filenames:
++      for f in sorted(filenames):
+         if f.endswith('.c') and f not in ignore:
+           libc_files.append(os.path.join(musl_srcdir, dirpath, f))
+ 

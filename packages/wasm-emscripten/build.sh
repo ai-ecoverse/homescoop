@@ -237,6 +237,8 @@ grep -q '"esbuild-wasm": "0.28.2"' "$PKG/package.json"
 grep -q '"typescript": "6.0.3"' "$PKG/package.json"
 grep -q '"acorn"' "$PKG/package.json"
 grep -q '"acorn-import-phases"' "$PKG/package.json"
+grep -q '^ACORN=8.19.0$' "$ROOT/scripts/emscripten-tree.sh"
+node -e 'const d = require(process.argv[1]).dependencies; if (d.acorn !== "^8.18.0" || d["acorn-import-phases"] !== "^1.0.4") { console.error(`homescoop: package.json acorn ${d.acorn} / acorn-import-phases ${d["acorn-import-phases"]} no longer cover emscripten-tree.sh pins 8.19.0 / 1.0.4`); process.exit(1); }' "$PKG/package.json"
 ! grep -q 'SLICC_VFS_PRE_JS' "$PKG/package.json" || {
   echo "homescoop: package.json slicc.env must not set SLICC_VFS_PRE_JS" >&2
   exit 1
