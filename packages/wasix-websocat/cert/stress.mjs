@@ -20,12 +20,12 @@ for ((i = 0; i < $1 * 16; i++)); do printf '%s\n' "$b"; done
 `);
   const script = String.raw`
 peak() { local m=0 k v u; [ -r /proc/$1/status ] && while read -r k v u; do [ "$k" = VmSize: ] && m=$v; done < /proc/$1/status 2>/dev/null; echo $m; }
-websocat --global-timeout-ms 600000 --global-timeout-force-exit -s 18090 mirror: 2>/tmp/ws-srv-err & srv=$!
+websocat --global-timeout-ms 600000 --global-timeout-force-exit -s 18120 mirror: 2>/tmp/ws-srv-err & srv=$!
 sleep 1.5
 bash gen.sh $MIB > /tmp/ws-in
 want=$(wc -c < /tmp/ws-in)
 for round in 1 2 3 4 5 6; do
-  websocat -b ws://127.0.0.1:18090/ < /tmp/ws-in > /tmp/ws-out 2>/tmp/ws-err & pid=$!; m=0
+  websocat -b ws://127.0.0.1:18120/ < /tmp/ws-in > /tmp/ws-out 2>/tmp/ws-err & pid=$!; m=0
   while kill -0 $pid 2>/dev/null; do v=$(peak $pid); [ "$v" -gt "$m" ] && m=$v; done
   wait $pid; rc=$?
   t=0; while IFS= read -r l; do case $l in *"wasm trap"*) t=$((t+1));; esac; done < /tmp/ws-err
