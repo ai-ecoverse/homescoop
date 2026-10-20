@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasix-websocat`
 
-[websocat](https://github.com/vi/websocat) 4.0.0-alpha3, the WebSocket client and server ("netcat for `ws://`"), built for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel as a WASIX program. **This is an upstream alpha:** websocat v4 has no stable release yet. It's upstream's source with two WASIX patches (subprocesses fail cleanly; see below). The build also patches crate wiring and the WASIX fork of mio; see the recipe.
+[websocat](https://github.com/vi/websocat) 4.0.0-alpha3, the WebSocket client and server ("netcat for `ws://`"), built for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel as a WASIX program. **This is an upstream alpha:** websocat v4 has no stable release yet. It's upstream's source with two WASIX patches (subprocesses fail cleanly; see below) and a patch for exit codes and logs (see Exit codes and logs). The build also patches crate wiring and the WASIX fork of mio; see the recipe.
 
 ```bash
 pnpm add -g @ai-ecoverse/wasix-websocat
@@ -25,6 +25,16 @@ websocat v4 opens its own TCP connections and does its own TLS, with rustls and 
 ## Limits on WASIX
 
 - **No subprocesses** (homescoop#689, #709): websocat's process support doesn't work on this target. `exec:`, `cmd:` and `sh-c:` are refused at startup (`exec:, cmd: and sh-c: are not supported on WASIX`), and so is `--exec-after-listen`. In `-x` scenario scripts, `subprocess_new`, `subprocess_new_osstr` and `system` fail with `subprocesses are not supported on WASIX`. Every case exits non-zero, with no panic.
-- **A listener that can't bind** (for example, the port is in use) logs the error but exits 0. That's upstream v4's behaviour (homescoop#696).
+
+## Exit codes and logs
+
+Since 4.0.0-alpha3-7, a failure that upstream v4 only logged exits non-zero, and every log line goes to stderr, so `websocat … > out` and `websocat … | jq` carry only data (homescoop#868):
+
+| Exit | When |
+| --- | --- |
+| 14 | a connect is refused or fails (upstream's) |
+| 15 | a listener can't bind its address, for example the port is in use (homescoop#696; upstream exits 0) |
+| 16 | `readfile:`, `writefile:` or `appendfile:` can't open its file (homescoop#1023; upstream exits 0) |
+| 20, 21 | a hostname has no address, or its lookup fails (upstream's) |
 
 websocat 4 is upstream's current line but still a pre-release: options and specifiers differ from websocat 1.x (see `websocat --help`; for example, there's no `-1`).

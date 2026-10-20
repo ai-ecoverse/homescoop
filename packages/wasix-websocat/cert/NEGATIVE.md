@@ -83,3 +83,8 @@ Without WASIX epoll and eventfd (slicc-kernel#674, in 1.95.0), every invocation,
 The published 4.0.0-alpha3-5 passes the new stress row's traps check: 6 × 16 MiB and 6 × 32 MiB piped round trips, 0 traps, on slicc-kernel 1.134.3. The trap is a V8 race (slicc-kernel#1172) seen at 5–12% of rounds under heavier allocation (azw9's canary, wasi-pnpm's loop), so the row is a guard, not a negative.
 
 The package isn't sized. A first alpha3-6 linked a 128 MiB initial heap from alpha3-5's measured 20–94 MiB, and in CI (run 39373006444's successor) its client peaked at 156–170 MiB and its idle server at 128 MiB. wasix-libc v2026-07-03.1's dlmalloc has `try_init_allocator` commented out, so malloc never uses the pages between `__heap_base` and the initial size: on this sysroot a larger initial heap only adds memory. websocat stays on the threaded-heap allowlist for that reason.
+
+## 4.0.0-alpha3-7: exit codes and stderr logs (homescoop#696, #1023, #868, 2026-10-20)
+
+The published 4.0.0-alpha3-5 against -7's `cert/exit-codes.mjs` (slicc-kernel 1.134.3, users enforce): **FAIL, 10 of 14 assertions.** The bind failure, the missing `readfile:` and the read-only `writefile:` all exit 0, with their log lines on stdout. The refused connect exits 14, but its "Connection refused" is on stdout, not stderr. -6 differs from -5 only in 0004 (the allocator), so it behaves the same. A local -7 build (scripts/host-run.sh) passes the spec and the rest of the suite.
+
