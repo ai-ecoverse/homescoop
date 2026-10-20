@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-gnupg",
-  "version": "2.4.9-11",
-  "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -34: user ids and signal masks from slicc-kernel)",
+  "version": "2.4.9-12",
+  "description": "GnuPG 2.4: OpenPGP encryption and signing with gpg, gpgv and gpg-agent.",
   "engines": {
     "slicc-kernel": ">=1.117.2"
   },
@@ -42,7 +42,8 @@
         "wasm": "bin/gpgv.wasm"
       },
       "gpg-agent": {
-        "wasm": "bin/gpg-agent.wasm"
+        "wasm": "bin/gpg-agent.wasm",
+        "helper": true
       },
       "gpgconf": {
         "wasm": "bin/gpgconf.wasm"

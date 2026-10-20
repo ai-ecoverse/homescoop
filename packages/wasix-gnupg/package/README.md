@@ -22,6 +22,11 @@ git config --global gpg.program gpg && git commit -S -m signed
   when git runs it with its stdio piped. Without a terminal (the agent's
   `bash` tool), use unprotected keys or `--batch --passphrase-fd`.
 
+## 2.4.9-12
+
+- **Trustdb hand-off checks the name** (homescoop#1111). When root's gpg creates a `trustdb.gpg` in another user's homedir, it gives the file to the homedir's owner through the name itself: it reopens the name with `O_NOFOLLOW` and gives away that descriptor, and only if it's a regular file with one link. The keybox and lock-file paths already work this way. A `trustdb.gpg` that cone symlinks to a root file is never handed over. A `trustdb.gpg` that cone points at a root file stays root's.
+- **`gpg-agent` is a helper command** (`"helper": true`). gpg starts it, so it's no longer listed as something you run.
+
 ## Not included
 
 gpgsm (S/MIME), scdaemon (smartcards), dirmngr (keyservers, CRLs),
