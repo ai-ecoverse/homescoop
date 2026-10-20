@@ -42,6 +42,19 @@ try {
   });
   assert.deepEqual(leaks, [], `libraries name a build path in their DWARF (patch 0011 maps the cache and the llvm root): ${leaks.slice(0, 3).join(' | ')}`);
   console.log('== no library names a build path');
+  // homescoop#1030: the licences of what the libraries are compiled from.
+  // Like the member names, a row of this package's own ci (--member-order):
+  // wasm-emscripten's pinned-cache.mjs also runs this file on older pins.
+  const noticesFile = join(pkg, 'THIRD-PARTY-NOTICES.md');
+  const notices = existsSync(noticesFile) ? readFileSync(noticesFile, 'utf8') : '';
+  const missingNotices = (args.includes('--member-order') ? [['## musl', 'Rich Felker'], ['## LLVM libcxx', 'LLVM Exceptions'], ['## LLVM libcxxabi', 'LLVM Exceptions'], ['## LLVM libunwind', 'LLVM Exceptions'], ['## LLVM compiler-rt', 'LLVM Exceptions'], ['## dlmalloc', 'public domain'], ['## Emscripten', 'Emscripten authors']]
+   : []).filter(([h, t]) => !notices.includes(h) || !notices.includes(t))
+    .map(([h]) => h.slice(3));
+  assert.deepEqual(missingNotices, [], `THIRD-PARTY-NOTICES.md lacks: ${missingNotices.join(', ')} (homescoop#1030)`);
+  if (args.includes('--member-order')) {
+    assert.ok(manifest.files.includes('THIRD-PARTY-NOTICES.md'), 'package.json files ships THIRD-PARTY-NOTICES.md');
+    console.log('== THIRD-PARTY-NOTICES.md: musl, LLVM libc++/libc++abi/libunwind/compiler-rt, dlmalloc, Emscripten');
+  }
   // homescoop#1328: libc's musl sources are walked in name order (wasm-emscripten
   // patch 0013), so exit/_Exit.c is _Exit.o and unistd/_exit.c _exit__1.o on
   // every host; os.walk's filesystem order made it a coin flip between runners.

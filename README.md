@@ -79,7 +79,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-coreutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-coreutils) | [recipe](packages/coreutils) | GNU coreutils (single-binary) for slicc (WASM / emscripten, SLICC homescoop; user ids from slicc-kernel >= 1.44.0) |
 | [`@ai-ecoverse/wasm-curl`](https://www.npmjs.com/package/@ai-ecoverse/wasm-curl) | [recipe](packages/curl) | curl 8.22 + libcurl (Mbed TLS, zlib, HTTP/1.1) for wasm / slicc |
 | [`@ai-ecoverse/wasm-diffutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-diffutils) | [recipe](packages/diffutils) | GNU diffutils 3.12 (diff/cmp/diff3/sdiff) for wasm / slicc |
-| [`@ai-ecoverse/emscripten-cache`](https://www.npmjs.com/package/@ai-ecoverse/emscripten-cache) | [recipe](packages/emscripten-cache) | Prebuilt Emscripten 6.0.9 sysroot for slicc (read-only seed) |
+| [`@ai-ecoverse/emscripten-cache`](https://www.npmjs.com/package/@ai-ecoverse/emscripten-cache) | [recipe](packages/emscripten-cache) | Prebuilt system libraries for Emscripten 6.0.9, so emcc in slicc can compile without building them first. |
 | [`@ai-ecoverse/wasm-file`](https://www.npmjs.com/package/@ai-ecoverse/wasm-file) | [recipe](packages/file) | file 5.46 + magic.mgc for wasm / slicc |
 | [`@ai-ecoverse/wasm-findutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-findutils) | [recipe](packages/findutils) | GNU findutils 4.11.0 (find + xargs) for wasm / slicc |
 | [`@ai-ecoverse/wasm-freetype`](https://www.npmjs.com/package/@ai-ecoverse/wasm-freetype) | [recipe](packages/freetype) | FreeType font engine (WASM / emscripten, SLICC homescoop ladder) |
