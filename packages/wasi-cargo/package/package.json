@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-cargo",
-  "version": "0.99.0-3",
-  "description": "Cargo inside SLICC's WASI realm (offline path dependencies prototype)",
+  "version": "0.99.0-4",
+  "description": "Cargo, the Rust package manager and build tool, for SLICC.",
   "license": "(MIT OR Apache-2.0) AND GPL-2.0-only WITH GCC-exception-2.0 AND MPL-2.0 AND BSD-2-Clause AND BSD-3-Clause AND Unicode-3.0 AND Zlib AND blessing",
   "repository": {
     "type": "git",
@@ -41,7 +41,8 @@
         "wasm": "bin/cargo.wasm",
         "env": {
           "RUST_MIN_STACK": "16777216"
-        }
+        },
+        "helper": true
       }
     },
     "env": {

@@ -136,7 +136,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux rev, column, hexdump, colrm, look and getopt for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasi-biome`](https://www.npmjs.com/package/@ai-ecoverse/wasi-biome) | [recipe](packages/wasi-biome) | Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC. |
 | [`@ai-ecoverse/wasi-buf`](https://www.npmjs.com/package/@ai-ecoverse/wasi-buf) | [recipe](packages/wasi-buf) | buf 1.73 (Protocol Buffers CLI) for slicc WASI preview1 (command buf); buf.wasm built by homescoop from buf v1.73.0 with documented patches |
-| [`@ai-ecoverse/wasi-cargo`](https://www.npmjs.com/package/@ai-ecoverse/wasi-cargo) | [recipe](packages/wasi-cargo) | Cargo inside SLICC's WASI realm (offline path dependencies prototype) |
+| [`@ai-ecoverse/wasi-cargo`](https://www.npmjs.com/package/@ai-ecoverse/wasi-cargo) | [recipe](packages/wasi-cargo) | Cargo, the Rust package manager and build tool, for SLICC. |
 | [`@ai-ecoverse/wasi-dig`](https://www.npmjs.com/package/@ai-ecoverse/wasi-dig) | [recipe](packages/wasi-dig) | dig for slicc WASI: DNS over HTTPS through the realm proxy and DNS over TCP, with dig-style output |
 | [`@ai-ecoverse/wasi-esbuild`](https://www.npmjs.com/package/@ai-ecoverse/wasi-esbuild) | [recipe](packages/wasi-esbuild) | esbuild 0.28 for slicc WASI preview1 (command esbuild); esbuild.wasm built by homescoop from esbuild v0.28.2 with GOOS=wasip1 |
 | [`@ai-ecoverse/wasi-fnox`](https://www.npmjs.com/package/@ai-ecoverse/wasi-fnox) | [recipe](packages/wasi-fnox) | fnox, a secrets manager that keeps values in SLICC's sealed store and hands commands placeholders. |
