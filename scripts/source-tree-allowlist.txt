@@ -3,7 +3,6 @@ emscripten-cache #1267 GitHub archive pinned by sha256 only
 wasi-buf #1267 GitHub archive pinned by sha256 only
 wasi-gh #1267 GitHub archive pinned by sha256 only
 wasi-ntfy #1267 GitHub archive pinned by sha256 only
-wasi-pnpm #1267 GitHub archive pinned by sha256 only
 wasi-protoc-gen-connect-go #1267 GitHub archive pinned by sha256 only
 wasi-protoc-gen-go #1267 GitHub archive pinned by sha256 only
 wasi-protoc-gen-go-grpc #1267 GitHub archive pinned by sha256 only
