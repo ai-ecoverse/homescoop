@@ -64,14 +64,18 @@ export async function pyRecord(ctx, { pkg, minFiles = 1 }) {
   assert.equal(real.dist_info.length, 1, `one dist-info: ${o}`);
   assert.ok(real.ok >= minFiles, `${real.ok} files match the wheel's RECORD, at least ${minFiles}: ${o}`);
   assert.deepEqual([real.missing, real.mismatch, real.unlisted], [[], [], []], `every file is the wheel's, none missing or extra: ${o}`);
-  assert.ok(real.pyc > 0, o);
+  // A version-neutral package (lib/python3/site-packages, homescoop#1283)
+  // ships no .pyc: they're tied to one minor.
+  const neutral = pj.slicc.python.sitePackages === 'lib/python3/site-packages';
+  if (neutral) assert.equal(real.pyc, 0, `a version-neutral package ships no .pyc: ${o}`);
+  else assert.ok(real.pyc > 0, o);
   assert.deepEqual(real.pyc_bad, [], `every .pyc is unchecked-hash and matches its source: ${o}`);
   // The cache tag of the python line the package targets (lib/python3.X/site-packages).
   const minor = /^lib\/python3\.(\d+)\//.exec(pj.slicc.python.sitePackages)?.[1] ?? '14';
   const tag = `cpython-3${minor}`;
   const pyc = victim.replace(/([^/]+)\.py$/, `__pycache__/$1.${tag}.pyc`);
   assert.deepEqual(selftest.mismatch, [victim], `self-test: one flipped byte in ${victim} is a RECORD mismatch: ${o}`);
-  assert.deepEqual(selftest.pyc_bad, [pyc], `self-test: and its .pyc no longer matches its source: ${o}`);
+  assert.deepEqual(selftest.pyc_bad, neutral ? [] : [pyc], `self-test: and its .pyc no longer matches its source: ${o}`);
   console.log(`${pkg} ${pj.version}: ${real.dist_info[0]}: all ${real.ok} RECORD files match the wheel (none missing, none extra), ${real.pyc} .pyc unchecked-hash on their sources; self-test: a flipped byte in ${victim} is caught (RECORD and .pyc)`);
   return out;
 }

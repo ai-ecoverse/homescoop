@@ -15,5 +15,6 @@ dependencies:
 about:
   license: MIT
   notes: |
-    Pure-Python wheel staged into lib/python3.14/site-packages.
+    Pure-Python wheel staged into the version-neutral lib/python3/site-packages
+    (homescoop#1283), with no .pyc: one build serves every wasix-python line.
     slicc.python.sitePackages only (no abi/platform requires).

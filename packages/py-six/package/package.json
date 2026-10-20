@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-six",
-  "version": "1.17.0-4",
+  "version": "1.17.0-5",
   "description": "six for slicc WASIX CPython",
   "license": "MIT",
   "repository": {
@@ -32,7 +32,7 @@
   },
   "slicc": {
     "python": {
-      "sitePackages": "lib/python3.14/site-packages"
+      "sitePackages": "lib/python3/site-packages"
     }
   }
 }

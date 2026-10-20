@@ -1,5 +1,9 @@
 # py-python-dateutil: negative proof
 
+## The version-neutral release (homescoop#1283; 2026-10-20)
+
+The previous revision declares `lib/python3.14/site-packages` and ships `__pycache__/*.cpython-314.pyc`. On wasix-python 3.15 it imports only because discovery adds the declared path, and its .pyc are dead weight: 3.15 ignores them. The bios `.pth` writer lists the `python3.14` path explicitly. This release stages into `lib/python3/site-packages` with no .pyc. Every spec passes on wasix-python 3.14.2-28 and 3.15.0-3 (slicc-kernel 1.125.0), and cert/record.mjs asserts there's no .pyc.
+
 ## 2.9.0-post0.3 (homescoop#625): main couldn't build 2.9.0-post0.2, and its exact py-six pin nests a second six
 
 **Behaviour.** npm's 2.9.0-post0.2 is byte-equivalent in behaviour. Its files are the wheel's, by RECORD: `record.mjs` passes on it (24 files, 18 `.pyc`). `dateutil.mjs` passes too.
