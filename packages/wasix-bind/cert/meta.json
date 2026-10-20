@@ -1,8 +1,10 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.134.3",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.137.0",
   "users": "enforce",
-  "uplink": true,
+  "uplink": {
+    "nameserver": "100.100.100.100"
+  },
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
@@ -16,7 +18,7 @@
     "host: A, AAAA and MX by default, -t mx, reverse lookup, CNAME alias line, NXDOMAIN rc 1",
     "nslookup: one-shot answer with Server/Address and Non-authoritative answer; -type=mx; an interactive session on stdin (server, set type=, queries, exit)",
     "failures: refused server rc 9 (dig) / 1 (host); bad type is BIND's warning (rc 0); bad option rc 1",
-    "/etc/resolv.conf: without it BIND asks 127.0.0.1 (refused); with a nameserver line host, dig and nslookup use it",
+    "no server argument (9.20.29-2, homescoop#1282; slicc-kernel >= 1.137.0): /etc/resolv.conf is the kernel's (nameserver 127.0.0.53); host, dig +short and nslookup answer host.slicc.internal (10.0.2.2) and an uplink device name, laptop.slicc.internal (100.64.0.7), from the kernel's DNS stub, with nslookup's Server: 127.0.0.53; nobody.slicc.internal is NXDOMAIN; a public name (example.test A and MX) is forwarded to the uplink's nameserver 100.100.100.100 over TCP; with root's 'nameserver 100.100.100.100' in /etc/resolv.conf, host, dig and nslookup ask that instead (Server: 100.100.100.100)",
     "users enforce: root, alice and bob get the same answers from dig and host; only root writes /etc/resolv.conf; alice can't write dig's output into bob's 0755 directory; bob's own output is his",
     "+nssearch (9.20.29-2, homescoop#1379): dig +time=2 +tries=1 +nssearch @100.100.100.100 nss.test, whose NS is the resolver's own address, prints the server's SOA line ('SOA ns1.nss.test. hostmaster.nss.test. 2026102001 … from server 100.100.100.100 in N ms.') within 4 s and rc 0, with no 'timed out' or 'no servers could be reached'; +tcp +nssearch gives the same line; nss2.test with a refusing NS (100.64.9.9) first prints its 'Connection to 100.64.9.9#53(100.64.9.9) for nss2.test failed: connection refused.' and the other server's SOA, rc 0. 9.20.29-1: 'NS servers could not be reached', rc 9, with and without +tcp (NEGATIVE.md)"
   ],

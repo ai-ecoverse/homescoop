@@ -10,6 +10,7 @@
  * @property {(path: string) => Promise<Buffer|null>} readBytes the file's exact bytes (null if missing)
  * @property {(cfg: {names?: Record<string,string[]>, peers?: Record<string, {http?: {status?: number, headers?: [string,string][], body?: string}, tcp?: string, error?: string}>}) => Promise<void>} uplink
  *   (cert/meta.json "uplink": true) What the kernel's tailnet uplink answers: 100.64.0.0/10 routes to it.
+ *   "uplink": { "nameserver": "100.100.100.100" } also names the uplink's DNS server, where the kernel's DNS stub (slicc-kernel >= 1.137.0) forwards what it can't answer.
  *   A `tcp` peer is a self-contained function's source: it gets `{ tcp: Uint8Array, peer }` after
  *   every read and returns null (need more) or the reply, then the peer closes.
  * @property {() => Promise<{asked: object[], dialled: object[], requests: object[]}>} uplinkLog

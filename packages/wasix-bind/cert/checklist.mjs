@@ -166,6 +166,7 @@ export default async function (ctx) {
   };
   const NS = '100.100.100.100';
   await uplink({
+    names: { 'laptop.slicc.internal': ['100.64.0.7'] },
     peers: {
       [`${NS}:53`]: { tcp: dnsFake.toString() },
       '100.64.9.9:53': { error: 'ECONNREFUSED' },
@@ -271,15 +272,27 @@ export default async function (ctx) {
   assert.equal((await cmd(['dig', '+short', `@${NS}`, '-t', 'NOPE', 'example.test'])).stderr, ';; Warning, ignoring invalid type NOPE\n');
   assert.match((await cmd(['dig', '+nosuchoption', 'example.test'], 1)).stderr, /Invalid option: \+nosuchoption/);
 
-  // /etc/resolv.conf: no server argument. Without it BIND asks 127.0.0.1,
-  // and nothing listens there; with a nameserver line it asks that.
-  assert.match((await cmd(['host', '-W', '2', 'example.test'], 1)).stdout, /127\.0\.0\.1#53: connection refused/);
+  const conf = (await cmd(['cat', '/etc/resolv.conf'])).stdout;
+  assert.match(conf, /^nameserver 127\.0\.0\.53$/m, `the kernel's default /etc/resolv.conf (slicc-kernel >= 1.137.0): ${conf}`);
+  assert.equal((await cmd(['host', 'host.slicc.internal'])).stdout, 'host.slicc.internal has address 10.0.2.2\n');
+  assert.equal((await cmd(['host', 'laptop.slicc.internal'])).stdout, 'laptop.slicc.internal has address 100.64.0.7\n');
+  assert.equal((await cmd(['dig', '+short', 'laptop.slicc.internal'])).stdout, '100.64.0.7\n');
+  const nsl = (await cmd(['nslookup', 'host.slicc.internal'])).stdout;
+  assert.match(nsl, /^Server:\t\t127\.0\.0\.53$/m, nsl);
+  assert.match(nsl, /^Name:\thost\.slicc\.internal\nAddress: 10\.0\.2\.2$/m, nsl);
+  const nxd = await cmd(['host', 'nobody.slicc.internal'], 1);
+  assert.match(nxd.stdout, /^Host nobody\.slicc\.internal not found: 3\(NXDOMAIN\)$/m, out(nxd));
+  assert.equal((await cmd(['host', '-t', 'a', 'example.test'])).stdout, 'example.test has address 192.0.2.10\n');
+  assert.equal((await cmd(['dig', '+short', 'example.test', 'MX'])).stdout, '10 mail.example.test.\n20 mx2.example.test.\n');
+  const pub = (await cmd(['nslookup', 'example.test'])).stdout;
+  assert.match(pub, /^Server:\t\t127\.0\.0\.53$/m, pub);
+  assert.match(pub, /^Address: 192\.0\.2\.10$/m, pub);
   await cmd(['bash', '-c', `printf 'nameserver ${NS}\\n' > /etc/resolv.conf`]);
   try {
     assert.equal((await cmd(['host', '-t', 'a', 'example.test'])).stdout, 'example.test has address 192.0.2.10\n');
     assert.deepEqual((await cmd(['dig', '+short', 'example.test'])).stdout, '192.0.2.10\n');
     assert.match((await cmd(['nslookup', 'example.test'])).stdout, /^Server:\t\t100\.100\.100\.100$/m);
   } finally {
-    await cmd(['rm', '-f', '/etc/resolv.conf']);
+    await cmd(['bash', '-c', `printf '%s' '${conf.replace(/'/g, '')}' > /etc/resolv.conf`]);
   }
 }

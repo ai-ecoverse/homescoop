@@ -343,7 +343,12 @@ try {
   const page = await chrome.page(t);
   await page.goto('/');
   await page.until(() => typeof window.boot === 'function');
-  await page.evaluate((o) => window.boot(o), { uplink: meta.uplink === true, ...(users ? { users } : {}) });
+  const uplinkNameserver = typeof meta.uplink?.nameserver === 'string' ? meta.uplink.nameserver : undefined;
+  await page.evaluate((o) => window.boot(o), {
+    uplink: meta.uplink === true || uplinkNameserver !== undefined,
+    ...(uplinkNameserver ? { uplinkNameserver } : {}),
+    ...(users ? { users } : {}),
+  });
   // Peers first, package under test last so its slicc.commands win on name
   // collisions (e.g. wasm-coreutils advertises uptime/kill without those
   // multi-call applets; wasm-procps must own those names in its cert).

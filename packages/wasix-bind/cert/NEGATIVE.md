@@ -61,3 +61,7 @@ There were two causes:
 
 9.20.29-2 retries `+nssearch` over TCP, and calls `nssearch_next()` from `send_done()` only when there is a next query. This build passes checklist.mjs and users.mjs on the same kernel.
 
+## 9.20.29-2: the kernel's DNS stub, no server argument (homescoop#1282; 2026-10-20)
+
+The same 9.20.29-2 build on slicc-kernel 1.134.3 fails the no-server rows of `checklist.mjs` (19 of 116 assertions). `/etc/resolv.conf` doesn't exist there, and `host host.slicc.internal` is rc 1, because BIND asks 127.0.0.1, where nothing listens. On 1.137.0 (sk#1244, the stub on 127.0.0.53 and a default `/etc/resolv.conf`) all of checklist.mjs and users.mjs pass. The cert kernel moves to 1.137.0, and the harness passes the uplink's `nameserver` (`cert/meta.json` `"uplink": {"nameserver": "100.100.100.100"}`) so the stub forwards public names to the dnsFake. `engines` stays `>=1.96.0`, since an explicit server still works there.
+
