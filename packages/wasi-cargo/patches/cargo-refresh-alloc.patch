@@ -1,0 +1,21 @@
+cargo (wasm): homescoop's allocator refresh as the global allocator (homescoop#1287)
+
+--- a/src/bin/cargo/main.rs
++++ b/src/bin/cargo/main.rs
+@@ -12,6 +12,16 @@
+ use std::fs;
+ use std::path::{Path, PathBuf};
+ 
++// homescoop#1287: threaded wasm takes homescoop's allocator refresh
++// (scripts/rust-wasm-refresh-alloc.rs, path in HOMESCOOP_WASM_ALLOC_RS, set
++// by build.sh) against V8's stale per-thread memory length after another
++// thread's memory.grow.
++#[cfg(target_family = "wasm")]
++#[allow(unsafe_code)]
++mod homescoop_wasm_alloc {
++    include!(env!("HOMESCOOP_WASM_ALLOC_RS"));
++}
++
+ mod cli;
+ mod commands;
+ 

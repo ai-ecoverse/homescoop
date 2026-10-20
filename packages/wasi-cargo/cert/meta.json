@@ -1,6 +1,6 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.102.6",
+  "kernel": "@ai-ecoverse/slicc-kernel@1.134.3",
   "users": "enforce",
   "needs": [
     "@ai-ecoverse/wasm-bash",
@@ -10,7 +10,7 @@
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-19",
     "@ai-ecoverse/wasm-coreutils@9.12.0-8",
-    "@ai-ecoverse/wasi-rustc@1.98.1-4"
+    "@ai-ecoverse/wasi-rustc@1.98.1-6"
   ],
   "runTimeoutMs": 600000,
   "checklist": [
@@ -18,6 +18,7 @@
     "cargo build --offline --release of a two-crate path workspace with a build.rs (writes OUT_DIR/gen.rs, sets rustc-env): Compiling util and app, Finished, app.wasm prints count=12 triangle=78 by=build.rs and imports only wasi_snapshot_preview1",
     "a second build is fresh (no Compiling); changing count.txt (rerun-if-changed) reruns build.rs: cargo run prints count=20 triangle=210",
     "a type error fails with rc 101 and error[E0277]",
-    "users enforce: alice builds her crate (target/ owned by her); in bob's read-only crate cargo build fails with Permission denied and leaves nothing, and --target-dir elsewhere still fails rc 101 on bob's Cargo.lock"
+    "users enforce: alice builds her crate (target/ owned by her); in bob's read-only crate cargo build fails with Permission denied and leaves nothing, and --target-dir elsewhere still fails rc 101 on bob's Cargo.lock",
+    "cert/test.mjs (0.99.0-4): cargo new hello && cargo test --offline passes (\"test result: ok. 0 passed\"), and cargo test --lib -p b runs t::f3 ok (homescoop#1043: wasi-rustc 1.98.1-4, the cert's rustc up to -3, failed the link on pthread_join/pthread_detach; the cert now installs wasi-rustc 1.98.1-6); 4 clean cargo builds of a 3-crate workspace under SLICC_WASM_BACKTRACE=1 give 0 wasm traps, a.wasm prints \"6 10\", and cargo's VmSize stays within the 64 MiB initial heap (homescoop#1287: cargo-refresh-alloc.patch and recipe.yaml's wasm.initial-memory)"
   ]
 }
