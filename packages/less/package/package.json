@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-less",
-  "version": "668.0.0-6",
+  "version": "668.0.0-7",
   "description": "less, a pager that shows text one screen at a time.",
   "license": "GPL-3.0-or-later OR BSD-2-Clause",
   "repository": {

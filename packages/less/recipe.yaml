@@ -32,3 +32,5 @@ about:
     --disable-database --with-fallbacks=xterm-256color,xterm,vt100,dumb.
     Links slicc less profile (gaps + signals + jobs + select/poll).
     Packaging -1: slicc_select also overrides poll() for Asyncify-safe blocking.
+    Packaging -7: the cli profile (adds spawn, exec and popen, whole-archive)
+    and secure-lessopen.patch, so LESSOPEN and LESSCLOSE run (homescoop#1484).

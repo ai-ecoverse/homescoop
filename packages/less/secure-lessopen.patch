@@ -1,0 +1,25 @@
+--- a/main.c
++++ b/main.c
+@@ -208,7 +208,7 @@
+ static void init_secure(void)
+ {
+ #if SECURE
+-	secure_allow_features = 0;
++	secure_allow_features = SF_LESSOPEN;
+ #else
+ 	constant char *str = lgetenv("LESSSECURE");
+ 	if (isnullenv(str))
+--- a/search.c
++++ b/search.c
+@@ -1899,6 +1899,11 @@
+ 	FILE *hf;
+ 	static constant char *env_name_pfx = "LESS_OSC8_";
+ 
++	if (!secure_allow(SF_OSC8_OPEN))
++	{
++		error("Command not available", NULL_PARG);
++		return;
++	}
+ 	if (osc8_linepos == NULL_POSITION)
+ 	{
+ 		error("No OSC8 link selected", NULL_PARG);
