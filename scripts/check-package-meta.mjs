@@ -264,6 +264,15 @@ function* binaries(dir) {
   }
 }
 const pkgDir = join(root, 'packages', name, 'package');
+// No editing leftovers beside a recipe's patches (homescoop#1453: wasi-fnox
+// 1.39.0-6 committed 0016's .patch.head and .patch.new): apply scripts glob
+// *.patch, so a *.patch.* file is never applied and only drifts.
+{
+  const recipeDir = join(root, 'packages', name);
+  for (const d of [recipeDir, join(recipeDir, 'patches')].filter((d) => existsSync(d))) {
+    for (const f of readdirSync(d)) if (/\.patch\.[^/]+$/.test(f)) errors.push(`${d.slice(root.length + 1)}/${f}: a stray *.patch.* file beside the recipe's patches (homescoop#1453)`);
+  }
+}
 // package.json homescoop.patches, where a package keeps one, names exactly
 // the patches its build applies: the recipe dir's *.patch and patches/*.patch
 // (homescoop#1347: wasi-biome 2.5.15-5 left 0002 out).
