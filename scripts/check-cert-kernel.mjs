@@ -9,7 +9,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const KERNEL = '@ai-ecoverse/slicc-kernel';
 const REPO = 'ai-ecoverse/slicc-kernel';
 const REPO_URL = `https://github.com/${REPO}`;
-const WORKFLOW = '.github/workflows/release.yml';
+const WORKFLOWS = ['.github/workflows/ci.yml', '.github/workflows/release.yml'];
 const MAIN = 'refs/heads/main';
 const REGISTRY = 'https://registry.npmjs.org/';
 const TIMEOUT_MS = 120_000;
@@ -58,7 +58,7 @@ export async function checkCertKernel(pkg, fetchers = defaultFetchers) {
   } catch (e) {
     throw new Error(`${KERNEL}@${pin}: cannot read its npm attestations: ${e.message}`);
   }
-  const prov = checkProvenance(doc, { npm: KERNEL, version: pin, integrity, repo: REPO_URL, workflows: [WORKFLOW], ref: MAIN, hosted: true });
+  const prov = checkProvenance(doc, { npm: KERNEL, version: pin, integrity, repo: REPO_URL, workflows: WORKFLOWS, ref: MAIN, hosted: true });
   if (!prov.ok) throw new Error(`${KERNEL}@${pin} has no valid provenance: ${prov.reason}`);
   let cmp;
   try {
@@ -69,14 +69,14 @@ export async function checkCertKernel(pkg, fetchers = defaultFetchers) {
   if (!['ahead', 'identical'].includes(cmp?.status) || cmp?.merge_base_commit?.sha !== prov.commit) {
     throw new Error(`${KERNEL}@${pin}: provenance commit ${prov.commit} is not on ${REPO} main (compare: ${cmp?.status || 'no status'})`);
   }
-  return { pin, integrity, commit: prov.commit, run: prov.run || '' };
+  return { pin, integrity, commit: prov.commit, run: prov.run || '', workflow: prov.workflow };
 }
 
 async function main() {
   try {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-    const { pin, integrity, commit, run } = await checkCertKernel(pkg);
-    console.log(`check-cert-kernel: PASS ${KERNEL}@${pin} was built by ${REPO} ${WORKFLOW} on main from ${commit} (on main), GitHub-hosted, ${run}; npm provenance covers ${integrity}`);
+    const { pin, integrity, commit, run, workflow } = await checkCertKernel(pkg);
+    console.log(`check-cert-kernel: PASS ${KERNEL}@${pin} was built by ${REPO} ${workflow} on main from ${commit} (on main), GitHub-hosted, ${run}; npm provenance covers ${integrity}`);
   } catch (e) {
     console.log(`::error::check-cert-kernel: FAIL ${e.message}. Pin the cert kernel in package.json to a slicc-kernel release published from main.`);
     process.exit(1);

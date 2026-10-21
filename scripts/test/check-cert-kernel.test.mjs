@@ -68,7 +68,13 @@ function fetchers({ edit, doc, manifest, compare = { status: 'ahead', merge_base
 test('a pin with provenance from slicc-kernel release.yml on main, GitHub-hosted, for its bytes, from a commit on main passes', async () => {
   const f = fetchers();
   const r = await checkCertKernel(pkg('1.136.8'), f);
-  assert.deepEqual(r, { pin: '1.136.8', integrity, commit: COMMIT, run: 'https://github.com/ai-ecoverse/slicc-kernel/actions/runs/39435789511/attempts/1' });
+  assert.deepEqual(r, {
+    pin: '1.136.8',
+    integrity,
+    commit: COMMIT,
+    run: 'https://github.com/ai-ecoverse/slicc-kernel/actions/runs/39435789511/attempts/1',
+    workflow: '.github/workflows/release.yml',
+  });
   assert.deepEqual(f.calls, [
     ['manifest', '1.136.8'],
     ['attestations', '1.136.8'],
@@ -78,6 +84,23 @@ test('a pin with provenance from slicc-kernel release.yml on main, GitHub-hosted
   assert.equal(same.commit, COMMIT);
 });
 
+test('a pin published by slicc-kernel ci.yml (slicc-shared-web pipeline) on main passes, as release.yml ones still do', async () => {
+  const edit = (s) => (s.predicate.buildDefinition.externalParameters.workflow.path = '.github/workflows/ci.yml');
+  const r = await checkCertKernel(pkg('1.150.0'), fetchers({ edit }));
+  assert.equal(r.workflow, '.github/workflows/ci.yml');
+  assert.equal(r.commit, COMMIT);
+  const branch = (s) => {
+    edit(s);
+    s.predicate.buildDefinition.externalParameters.workflow.ref = 'refs/heads/x';
+  };
+  await assert.rejects(checkCertKernel(pkg('1.150.0'), fetchers({ edit: branch })), /refs\/heads\/x, not refs\/heads\/main/);
+  const selfHosted = (s) => {
+    edit(s);
+    s.predicate.runDetails.builder.id = 'https://github.com/actions/runner/self-hosted';
+  };
+  await assert.rejects(checkCertKernel(pkg('1.150.0'), fetchers({ edit: selfHosted })), /not GitHub-hosted/);
+});
+
 test('no attestation fails', async () => {
   await assert.rejects(checkCertKernel(pkg('1.136.8'), fetchers({ doc: null })), /has no valid provenance: no npm provenance attestation/);
   await assert.rejects(checkCertKernel(pkg('1.136.8'), fetchers({ doc: { attestations: [] } })), /no SLSA provenance among its attestations/);
@@ -85,7 +108,7 @@ test('no attestation fails', async () => {
 
 test('provenance from another workflow, repository or builder fails', async () => {
   const cases = [
-    [(s) => (s.predicate.buildDefinition.externalParameters.workflow.path = '.github/workflows/manual-publish.yml'), /manual-publish\.yml, not \.github\/workflows\/release\.yml/],
+    [(s) => (s.predicate.buildDefinition.externalParameters.workflow.path = '.github/workflows/manual-publish.yml'), /manual-publish\.yml, not \.github\/workflows\/ci\.yml or \.github\/workflows\/release\.yml/],
     [(s) => (s.predicate.buildDefinition.externalParameters.workflow.repository = 'https://github.com/someone/slicc-kernel'), /someone\/slicc-kernel, not https:\/\/github\.com\/ai-ecoverse\/slicc-kernel/],
     [(s) => (s.predicate.runDetails.builder.id = 'https://github.com/actions/runner/self-hosted'), /self-hosted, not GitHub-hosted/],
   ];
