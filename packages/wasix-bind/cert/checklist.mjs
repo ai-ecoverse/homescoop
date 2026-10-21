@@ -32,6 +32,17 @@ function dnsFake(req) {
       ['NS', 86400, '100.100.100.100'],
       ['SOA', 3600, ['ns1.nss2.test', 'hostmaster.nss2.test', 2026102002, 7200, 3600, 1209600, 300]],
     ],
+    'nss4.test': [
+      ['NS', 86400, '100.64.9.9'],
+      ['NS', 86400, '100.64.9.10'],
+      ['NS', 86400, '100.100.100.100'],
+      ['SOA', 3600, ['ns1.nss4.test', 'hostmaster.nss4.test', 2026102104, 7200, 3600, 1209600, 300]],
+    ],
+    'nss5.test': [
+      ['NS', 86400, '100.100.100.100'],
+      ['NS', 86400, '100.64.9.10'],
+      ['SOA', 3600, ['ns1.nss5.test', 'hostmaster.nss5.test', 2026102105, 7200, 3600, 1209600, 300]],
+    ],
     '10.2.0.192.in-addr.arpa': [['PTR', 300, 'example.test']],
     'a-very-long-owner-name-for-testing.example.test': [['A', 300, '192.0.2.20']],
     // homescoop#403: HTTPS (RFC 9460) and a type nobody knows (RFC 3597).
@@ -170,6 +181,7 @@ export default async function (ctx) {
     peers: {
       [`${NS}:53`]: { tcp: dnsFake.toString() },
       '100.64.9.9:53': { error: 'ECONNREFUSED' },
+      '100.64.9.10:53': { hang: true },
     },
   });
 
@@ -211,9 +223,24 @@ export default async function (ctx) {
   assert.doesNotMatch(nss.stdout + nss.stderr, /timed out|no servers could be reached/);
   const nssTcp = await cmd(['dig', '+time=2', '+tries=1', '+tcp', '+nssearch', `@${NS}`, 'nss.test']);
   assert.match(nssTcp.stdout, /^SOA ns1\.nss\.test\. .* from server 100\.100\.100\.100 in \d+ ms\.$/m);
-  const nss2 = await cmd(['dig', '+time=2', '+tries=1', '+nssearch', `@${NS}`, 'nss2.test']);
-  assert.match(nss2.stdout, /^SOA ns1\.nss2\.test\. hostmaster\.nss2\.test\. 2026102002 7200 3600 1209600 300 from server 100\.100\.100\.100 in \d+ ms\.$/m);
-  assert.match(nss2.stdout, /^;; Connection to 100\.64\.9\.9#53\(100\.64\.9\.9\) for nss2\.test failed: connection refused\.$/m);
+  const nssRounds = async (zone, serial, rounds, failed) => {
+    const soa = new RegExp(`^SOA ns1\\.${zone.replace('.', '\\.')}\\. hostmaster\\.${zone.replace('.', '\\.')}\\. ${serial} 7200 3600 1209600 300 from server 100\\.100\\.100\\.100 in \\d+ ms\\.$`, 'm');
+    for (let round = 1; round <= rounds; round++) {
+      const t = Date.now();
+      const r = await run(['timeout', '10', 'dig', '+time=1', '+tries=1', '+nssearch', `@${NS}`, zone], { cwd });
+      const ms = Date.now() - t;
+      assert.equal(r.status, 0, `${zone} round ${round}: ${out(r)}`);
+      assert.ok(ms < 4000, `${zone} round ${round} took ${ms} ms: ${out(r)}`);
+      assert.match(r.stdout, soa, `${zone} round ${round}: ${out(r)}`);
+      for (const f of failed) assert.match(r.stdout, f, `${zone} round ${round}: ${out(r)}`);
+    }
+  };
+  await nssRounds('nss2.test', 2026102002, 10, [/^;; Connection to 100\.64\.9\.9#53\(100\.64\.9\.9\) for nss2\.test failed: connection refused\.$/m]);
+  await nssRounds('nss5.test', 2026102105, 8, [/^;; Connection to 100\.64\.9\.10#53\(100\.64\.9\.10\) for nss5\.test failed: timed out\.$/m]);
+  await nssRounds('nss4.test', 2026102104, 8, [
+    /^;; Connection to 100\.64\.9\.9#53\(100\.64\.9\.9\) for nss4\.test failed: connection refused\.$/m,
+    /^;; Connection to 100\.64\.9\.10#53\(100\.64\.9\.10\) for nss4\.test failed: timed out\.$/m,
+  ]);
 
   const short = async (...args) => (await cmd(['dig', '+short', `@${NS}`, ...args])).stdout.trimEnd().split('\n');
   assert.deepEqual(await short('example.test'), ['192.0.2.10']);
@@ -287,12 +314,14 @@ export default async function (ctx) {
   const pub = (await cmd(['nslookup', 'example.test'])).stdout;
   assert.match(pub, /^Server:\t\t127\.0\.0\.53$/m, pub);
   assert.match(pub, /^Address: 192\.0\.2\.10$/m, pub);
+  await cmd(['cp', '/etc/resolv.conf', '/tmp/resolv.conf.kernel']);
   await cmd(['bash', '-c', `printf 'nameserver ${NS}\\n' > /etc/resolv.conf`]);
   try {
     assert.equal((await cmd(['host', '-t', 'a', 'example.test'])).stdout, 'example.test has address 192.0.2.10\n');
     assert.deepEqual((await cmd(['dig', '+short', 'example.test'])).stdout, '192.0.2.10\n');
     assert.match((await cmd(['nslookup', 'example.test'])).stdout, /^Server:\t\t100\.100\.100\.100$/m);
   } finally {
-    await cmd(['bash', '-c', `printf '%s' '${conf.replace(/'/g, '')}' > /etc/resolv.conf`]);
+    await cmd(['cp', '/tmp/resolv.conf.kernel', '/etc/resolv.conf']);
   }
+  assert.equal((await cmd(['cat', '/etc/resolv.conf'])).stdout, conf, 'the kernel\'s /etc/resolv.conf is back');
 }

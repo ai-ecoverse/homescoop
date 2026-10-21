@@ -36,12 +36,20 @@ export default async function (ctx) {
     assert.match(r.stdout, /^users\.test has address 192\.0\.2\.77$/m, `${who} host: ${out(r)}`);
   }
 
-  // Only root writes /etc/resolv.conf.
-  let r = await run(['bash', '-c', 'echo nameserver 100.100.100.100 > /etc/resolv.conf'], { cwd: '/home/alice', user: 'alice' });
-  assert.equal(r.status, 1, `alice writing /etc/resolv.conf: ${out(r)}`);
-  const conf = await read('etc/resolv.conf');
-  assert.match(conf ?? '', /^nameserver 127\.0\.0\.53$/m, `the kernel's default /etc/resolv.conf is unchanged: ${conf}`);
-  assert.doesNotMatch(conf ?? '', /100\.100\.100\.100/);
+  let r = await run(['bash', '-c', 'cp /etc/resolv.conf /tmp/resolv.conf.users && printf "nameserver 100.100.100.100\\n" > /etc/resolv.conf'], { cwd: '/root' });
+  assert.equal(r.status, 0, `root writing /etc/resolv.conf: ${out(r)}`);
+  try {
+    r = await run(['bash', '-c', 'echo nameserver 100.64.9.9 > /etc/resolv.conf'], { cwd: '/home/alice', user: 'alice' });
+    assert.equal(r.status, 1, `alice writing /etc/resolv.conf: ${out(r)}`);
+    assert.equal(await read('etc/resolv.conf'), 'nameserver 100.100.100.100\n', "root's /etc/resolv.conf is unchanged");
+    for (const user of ['alice', 'bob']) {
+      r = await run(['dig', '+short', 'users.test'], { cwd: `/home/${user}`, user });
+      assert.equal(r.stdout, '192.0.2.77\n', `${user} dig with root's /etc/resolv.conf: ${out(r)}`);
+    }
+  } finally {
+    r = await run(['cp', '/tmp/resolv.conf.users', '/etc/resolv.conf'], { cwd: '/root' });
+    assert.equal(r.status, 0, `restoring /etc/resolv.conf: ${out(r)}`);
+  }
 
   r = await run(['bash', '-c', 'dig +short @100.100.100.100 users.test > /home/bob/out/a.txt'], { cwd: '/home/alice', user: 'alice' });
   assert.equal(r.status, 1, `alice writing into bob's 0755 directory: ${out(r)}`);
