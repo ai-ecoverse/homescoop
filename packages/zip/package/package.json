@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-zip",
-  "version": "3.0.0-10",
+  "version": "3.0.0-11",
   "description": "zip, unzip and zipinfo (Info-ZIP), to make, list, test and extract .zip archives.",
   "license": "Info-ZIP",
   "repository": {

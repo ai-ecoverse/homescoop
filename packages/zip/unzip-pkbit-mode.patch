@@ -1,0 +1,20 @@
+unzip: a Unix entry with the PKWARE verification bit gets a default mode (homescoop#1401).
+Debian's 04 keeps only the low byte of the external attributes when
+internal attribute bit 2 is set, since the upper bytes then hold a
+checksum. For a Unix-made entry that left mode 0, so the file was
+extracted unreadable. The upper bytes are not a mode, so mapattr() now
+takes the DOS branch for such an entry: 0666 (0444 with the read-only
+bit, 0777 for a directory) less the umask, never a stored file type or
+setuid bit.
+
+--- a/unix/unix.c
++++ b/unix/unix.c
+@@ -378,6 +378,8 @@
+         case TANDEM_:
+             r = FALSE;
+             G.pInfo->file_attr = (unsigned)(tmp >> 16);
++            if (G.crec.internal_file_attributes & 0x0004)
++                r = TRUE;
+             if (G.pInfo->file_attr == 0 && G.extra_field) {
+                 /* Some (non-Info-ZIP) implementations of Zip for Unix and
+                  * VMS (and probably others ??) leave 0 in the upper 16-bit
