@@ -1,0 +1,11 @@
+--- a/main.c
++++ b/main.c
+@@ -208,7 +208,7 @@
+ static void init_secure(void)
+ {
+ #if SECURE
+-	secure_allow_features = 0;
++	secure_allow_features = SF_LESSOPEN;
+ #else
+ 	constant char *str = lgetenv("LESSSECURE");
+ 	if (isnullenv(str))

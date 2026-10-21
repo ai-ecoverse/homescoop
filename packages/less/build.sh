@@ -82,11 +82,12 @@ test -f "$WASM_PREFIX/lib/libncursesw.a"
 
 # --- less ---
 homescoop_extract "$LESS_TB" "$LESS_SRC"
-SLICC_A="$WORK/libslicc-less.a"
-homescoop_slicc_archive "$SLICC_A" less
+homescoop_apply_patches "$LESS_SRC"
+SLICC_A="$WORK/libslicc-cli.a"
+homescoop_slicc_archive "$SLICC_A" cli
 
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports)"
+CLI_LDFLAGS="$(homescoop_em_cli_ldflags)"
 
 if [[ ! -f "$LESS_SRC/less" && ! -f "$LESS_SRC/less.js" || -n "${FORCE:-}" ]]; then
   echo "== less: emconfigure + emmake"
@@ -101,7 +102,7 @@ if [[ ! -f "$LESS_SRC/less" && ! -f "$LESS_SRC/less.js" || -n "${FORCE:-}" ]]; t
         --with-regex=posix --with-secure
     homescoop_fix_darwin_ar Makefile
     emmake make -j"${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
-      LIBS="-lncursesw $SLICC_A $CLI_LDFLAGS" less
+      LIBS="-lncursesw $(homescoop_slicc_link_archive "$SLICC_A") $CLI_LDFLAGS" less
   )
 fi
 test -f "$LESS_SRC/less" || test -f "$LESS_SRC/less.js"
