@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-nano",
-  "version": "8.7.1-7",
+  "version": "8.7.1-8",
   "description": "GNU nano, a small and friendly text editor for the terminal.",
   "license": "GPL-3.0-or-later",
   "repository": {
