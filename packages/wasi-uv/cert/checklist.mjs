@@ -138,6 +138,10 @@ export default async function (ctx) {
   const uvx = await ok('uvx --from charset-normalizer normalizer --version');
   assert.match(uvx.stdout, /Charset-Normalizer 3\.5\.2/, `uvx runs a package's command: ${uvx.stdout}`);
   assert.doesNotMatch(uvx.stderr, /pypi\.org/, `uvx resolves from the find-links: ${uvx.stderr}`);
+  // homescoop#1486 (0.13.1-5): the README's uvx line, as written.
+  await write('/home/u/file.txt', 'plain ascii text\n');
+  const readme = await ok('uvx --from charset-normalizer normalizer file.txt', '/home/u');
+  assert.match(readme.stdout, /"encoding": "ascii"/, `the README's uvx example runs: ${readme.stdout}`);
 
   // A version the links do not have: uv's own error, not a crash.
   const missing = await sh('uv pip install idna==0.1', '/home/u');
