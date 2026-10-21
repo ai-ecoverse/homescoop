@@ -12,7 +12,7 @@
     "7.1.2-34-9.1 (homescoop#562, #624): the kits' objects carry write-temp-then-rename.patch (MagickCore/constitute.c) and mogrify-format-over-existing.patch (MagickWand/mogrify.c); relink-check.mjs relinks both kits as before",
     "7.1.2-34-9.2 (homescoop#561, #586, #679, #1208, #1258): the kits' objects carry timer-monotonic-emscripten.patch, jp2-tile-large.patch and the owner check in write-temp-then-rename.patch; relink-check.mjs relinks both kits as before",
     "7.1.2-34-9.3: built against wasm-libpng 1.6.59-4, wasm-libwebp 1.6.0-4, wasm-libtiff 4.7.2-4, wasm-libxml2 2.15.4-3, wasm-lcms2 2.19.1-4, wasm-freetype 2.13.3-4 and wasm-libiconv 1.19.0-3 and wasm-libheif 1.23.6-7; the kits carry those archives (npm latest; no build paths, libwebp.pc Requires libsharpyuv, homescoop#941, #925)",
-    "7.1.2-34-9.5 (homescoop#1381): the kits' objects carry mogrify-inplace-keep-mode-owner.patch and the metadata copy in write-temp-then-rename.patch, and the heif kit wasm-libheif 1.23.6-8's archives; relink-check.mjs relinks both kits as before"
+    "7.1.2-34-9.5 (homescoop#1381): the kits' objects carry mogrify-inplace-keep-mode-owner.patch and write-temp-then-rename.patch's HomescoopPrepareReplace/HomescoopReplaceFile, and the heif kit wasm-libheif 1.23.6-8's archives; relink-check.mjs relinks both kits as before"
   ],
   "ci": [
     "node packages/imagemagick-relink/cert/relink-check.mjs"
