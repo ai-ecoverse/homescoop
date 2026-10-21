@@ -1,0 +1,52 @@
+diff --git a/compiler/rustc_codegen_ssa/src/back/write.rs b/compiler/rustc_codegen_ssa/src/back/write.rs
+--- a/compiler/rustc_codegen_ssa/src/back/write.rs
++++ b/compiler/rustc_codegen_ssa/src/back/write.rs
+@@ -418,25 +418,6 @@ pub(crate) fn start_async_codegen<B: WriteBackendMethods>(
+     tcx: TyCtxt<'_>,
+     allocator_module: Option<ModuleCodegen<B::Module>>,
+ ) -> OngoingCodegen<B> {
+-    // homescoop#1237: this rustc's LLVM (wasi-llvm 21) can't read the
+-    // standard library's bitcode, which Rust's own LLVM 22 wrote ("Unknown
+-    // attribute kind (105)"), so cross-crate LTO fails on its first upstream
+-    // module. Say so before codegen starts, on the main thread, instead of
+-    // from a ThinLTO worker that can't report on WASI. Local ThinLTO (the
+-    // default) only reads this crate's own modules and still runs.
+-    // Only crate types that link upstream crates read their bitcode: an rlib
+-    // (or a proc macro) with -C lto builds as before (homescoop#1464).
+-    #[cfg(target_os = "wasi")]
+-    if matches!(tcx.sess.lto(), rustc_session::config::Lto::Fat | rustc_session::config::Lto::Thin)
+-        && tcx.crate_types().iter().any(|t| {
+-            matches!(t, CrateType::Executable | CrateType::Dylib | CrateType::Cdylib | CrateType::StaticLib)
+-        })
+-    {
+-        tcx.sess.dcx().fatal(
+-            "-C lto=fat and -C lto=thin aren't available in this rustc: its LLVM 21 can't read the standard library's LLVM 22 bitcode; build without -C lto (Cargo: lto = false)",
+-        );
+-    }
+-
+     let (coordinator_send, coordinator_receive) = channel();
+ 
+     let no_builtins = find_attr!(tcx, crate, NoBuiltins);
+diff --git a/compiler/rustc_interface/src/passes.rs b/compiler/rustc_interface/src/passes.rs
+--- a/compiler/rustc_interface/src/passes.rs
++++ b/compiler/rustc_interface/src/passes.rs
+@@ -1296,6 +1296,19 @@ pub(crate) fn start_codegen<'tcx>(
+ 
+     info!("Pre-codegen\n{:?}", tcx.debug_stats());
+ 
++    #[cfg(target_os = "wasi")]
++    if !tcx.sess.opts.unstable_opts.no_codegen
++        && tcx.sess.opts.output_types.should_codegen()
++        && matches!(tcx.sess.lto(), rustc_session::config::Lto::Fat | rustc_session::config::Lto::Thin)
++        && tcx.crate_types().iter().any(|t| {
++            matches!(t, CrateType::Executable | CrateType::Dylib | CrateType::Cdylib | CrateType::StaticLib)
++        })
++    {
++        tcx.sess.dcx().fatal(
++            "-C lto=fat and -C lto=thin aren't available in this rustc: its LLVM 21 can't read the standard library's LLVM 22 bitcode; build without -C lto (Cargo: lto = false)",
++        );
++    }
++
+     let metadata = rustc_metadata::fs::encode_and_write_metadata(tcx);
+ 
+     let codegen = tcx.sess.time("codegen_crate", || {

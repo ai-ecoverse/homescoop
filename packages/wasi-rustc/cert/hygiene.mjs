@@ -69,6 +69,12 @@ export default async function (ctx) {
   assert.match(rlib.stdout, /^lto\.rlib$/m, `#1464 the rlib is written: ${rlib.stdout}`);
   assert.doesNotMatch(rlib.stdout, /rcgu|^rustc|^rmeta/m, `#1464 and no temp files are left: ${rlib.stdout}`);
 
+  const mixed = await sh('mkdir -p mix && cp lib.rs mix/ && cd mix && rustc --crate-type rlib,cdylib -C lto=fat --crate-name lt lib.rs; echo "rc=$?"; ls -A');
+  assert.match(mixed.stdout, /^rc=1$/m, `#1543 --crate-type rlib,cdylib -C lto=fat exits 1: ${out(mixed)}`);
+  assert.match(mixed.stderr, /-C lto=fat and -C lto=thin aren't available/, `#1543 with the refusal on stderr: ${out(mixed)}`);
+  const leftMixed = mixed.stdout.split('\n').filter((l) => l && !/^rc=/.test(l)).sort();
+  assert.deepEqual(leftMixed, ['lib.rs'], `#1543 a refused rlib,cdylib build leaves only lib.rs: ${leftMixed.join(' ')}`);
+
   const pkg = JSON.parse((await run(['cat', '/node_modules/@ai-ecoverse/wasi-rustc/package.json'], { cwd: '/' })).stdout);
   assert.equal(pkg.slicc.dependencies, undefined, `#1087 no slicc.dependencies: ${JSON.stringify(pkg.slicc.dependencies)}`);
   console.log('hygiene: a compile leaves only its output; LTO builds or says why; no wasm-clang dependency');
