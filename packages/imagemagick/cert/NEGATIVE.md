@@ -183,3 +183,29 @@ A pin-only release, with no ImageMagick change. The delegates move to their npm 
 ## 7.1.2-34-9.4: shim drift (homescoop#1491; 2026-10-20)
 
 7.1.2-34-9.4 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 7.1.2-34-9.3 in `bin/magick` and `bin/magick.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 7.1.2-34-9.5: in-place mogrify keeps mode, group and owner; the gsfonts exception (homescoop#1381, #1382; 2026-10-21)
+
+- **#1381 (mogrify-inplace-keep-mode-owner.patch, write-temp-then-rename.patch).** `mogrify-users.mjs` against the published 7.1.2-34-9.4, slicc-kernel 1.110.1, `--users enforce`, fails 6 of 11 assertions:
+
+  | case | 7.1.2-34-9.4 | 7.1.2-34-9.5 |
+  |---|---|---|
+  | kim, `mogrify -resize 50%` over her own 0644 kim:users a.png and 0640 b.png | `kim kim 600`, `kim kim 600` | `kim users 644`, `kim kim 640` |
+  | root, over kim's 0644 a.png and 0664 kim:users c.jpg | `root root 600`, `root root 600` | `kim users 644`, `kim users 664` |
+  | kim, over root's 0666 w.png in a sticky /tmp/msk | rc 1, w.png unchanged, `w.png-df0894cd~` left behind | rc 0, resized, `root root 666`, no stray file |
+  | kim, over root's 0666 w.png in an open /tmp/mop | `kim kim 600` | rc 0, resized, `root root 666` |
+  | kim, a failing `magick … -depth 8` write over root's 0666 big.png | rc 1, big.png truncated (the #1258 in-place write) | rc 1, big.png byte-identical, `root root 666` |
+  | kim, `mogrify` over a symlink l.png -> real.png (0640 kim:users) | the link replaced by a 0600 regular file | the link kept; real.png resized, `kim users 640` |
+
+  A failed mogrify encode (`-limit memory 24MiB -limit map 0 -depth 8`, "cache resources exhausted") leaves kim's own file and root's file in both directories byte-identical on 9.5. 9.4 keeps the bytes there too (its backup is renamed only on success), so these are parity rows. Its row for root's file still fails, because the earlier sticky-dir backup is left in /tmp/msk.
+
+  The cause: upstream mogrify writes the new image to a `<file>-xxxxxxxx~` backup that it creates 0600, owned by the caller, and renames it over the file. The first head of this PR (499b5a82) gave the backup the file's metadata and fell back to writing the file in place when it couldn't. The Grok review (review 5604380547) found that that fallback, like #1258's in-place write in write-temp-then-rename.patch, opens the file with `O_TRUNC` before the new image exists, so a failed encode destroyed the only copy. 9.5 never writes the target before the new image is complete:
+  - `HomescoopPrepareReplace` (in constitute.c, used by both patches) gives the new temporary file the target's owner, group and mode (`fchown`, `fchmod` on the descriptor), and checks the result with `fstat`.
+  - `HomescoopReplaceFile` renames the finished file over the target only if that held, the target is still the same inode (`lstat` dev/ino) and it has one link. Otherwise (another user's file as non-root, a group or mode that can't be set, a hard-linked file, a symlink) the finished image is copied into the target. The target is opened without `O_TRUNC` (and `O_NOFOLLOW` unless it was a symlink), its dev/ino is checked with `fstat`, and then it's `ftruncate`d to the new size.
+- **#1382 (gsfonts' exception).** `cert/lib/wasm-check.mjs` against the published 7.1.2-34-9.4:
+
+  ```text
+  Error: @ai-ecoverse/wasm-imagemagick: etc/fonts has n019003l.pfb, n019004l.pfb, n019023l.pfb, n019024l.pfb but no README with gsfonts' font exception (homescoop#1382)
+  ```
+
+  9.5 ships gsfonts' README (which states the exception: "GPL with an exception that you can put these fonts in your own non-GPLed documents") as `etc/fonts/README` next to COPYING (GPL version 2), and the notice carries both. package.json `license` adds `GPL-2.0-only WITH Font-exception-2.0`, the nearest SPDX expression; README.md says the README's wording is the grant.

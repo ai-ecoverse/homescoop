@@ -119,6 +119,13 @@ those three.
 The libheif, libde265 and dav1d builds are the ones in
 [`@ai-ecoverse/wasm-libheif`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/libheif).
 
+The default font in `etc/fonts`, URW Nimbus Sans from gsfonts 8.11, is under
+the GNU GPL with gsfonts' font exception: you can put these fonts in your own
+non-GPLed documents. `etc/fonts/COPYING` is the GPL (version 2), and
+`etc/fonts/README` is gsfonts' README, which states the exception. The
+`license` field names it as `GPL-2.0-only WITH Font-exception-2.0`, the
+nearest SPDX expression; the README's wording is the grant.
+
 ## Relinking (LGPL)
 
 `bin/magick.wasm` links its libraries statically. The relink kit, which you

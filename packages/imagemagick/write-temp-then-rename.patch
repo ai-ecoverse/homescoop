@@ -8,7 +8,164 @@
  #include "MagickCore/string_.h"
  #include "MagickCore/string-private.h"
  #include "MagickCore/timer.h"
-@@ -1590,12 +1591,26 @@
+@@ -1561,6 +1562,156 @@
+ %    o exception: return any errors or warnings in this structure.
+ %
+ */
++MagickExport int HomescoopPrepareReplace(int file,const char *target,
++  struct stat *target_status)
++{
++  int
++    mode;
++
++  struct stat
++    link_status,
++    temp_status;
++
++  mode=0;
++  if (lstat(target,&link_status) != 0)
++    return(-1);
++  if (S_ISLNK(link_status.st_mode))
++    {
++      if (stat(target,target_status) != 0)
++        return(-1);
++      mode=2;
++    }
++  else
++    *target_status=link_status;
++  if (S_ISREG(target_status->st_mode) == 0)
++    return(-1);
++  if ((mode == 0) && (target_status->st_nlink > 1))
++    mode=1;
++  if (mode != 0)
++    return(mode);
++  if (fstat(file,&temp_status) != 0)
++    return(1);
++  if (((temp_status.st_uid != target_status->st_uid) ||
++       (temp_status.st_gid != target_status->st_gid)) &&
++      (fchown(file,target_status->st_uid,target_status->st_gid) != 0))
++    return(1);
++  if ((fchmod(file,target_status->st_mode & 07777) != 0) ||
++      (fstat(file,&temp_status) != 0) ||
++      (temp_status.st_uid != target_status->st_uid) ||
++      (temp_status.st_gid != target_status->st_gid) ||
++      ((temp_status.st_mode & 07777) != (target_status->st_mode & 07777)))
++    return(1);
++  return(0);
++}
++
++MagickExport int HomescoopReplaceFile(const char *temp,const char *target,
++  const struct stat *target_status,int mode)
++{
++  char
++    buffer[65536];
++
++  int
++    in,
++    out,
++    saved;
++
++  MagickOffsetType
++    total;
++
++  ssize_t
++    count,
++    done,
++    n;
++
++  struct stat
++    now;
++
++  if (mode == 0)
++    {
++      if ((lstat(target,&now) != 0) || (S_ISREG(now.st_mode) == 0) ||
++          (now.st_dev != target_status->st_dev) ||
++          (now.st_ino != target_status->st_ino))
++        {
++          (void) remove_utf8(temp);
++          errno=EBUSY;
++          return(-1);
++        }
++      if (rename_utf8(temp,target) != 0)
++        {
++          saved=errno;
++          (void) remove_utf8(temp);
++          errno=saved;
++          return(-1);
++        }
++      return(0);
++    }
++  in=open_utf8(temp,O_RDONLY | O_BINARY,0);
++  if (in < 0)
++    {
++      saved=errno;
++      (void) remove_utf8(temp);
++      errno=saved;
++      return(-1);
++    }
++  out=open_utf8(target,O_WRONLY | O_BINARY | (mode == 1 ? O_NOFOLLOW : 0),0);
++  if ((out < 0) || (fstat(out,&now) != 0) || (S_ISREG(now.st_mode) == 0) ||
++      (now.st_dev != target_status->st_dev) ||
++      (now.st_ino != target_status->st_ino))
++    {
++      saved=(out < 0) ? errno : EBUSY;
++      if (out >= 0)
++        (void) close_utf8(out);
++      (void) close_utf8(in);
++      (void) remove_utf8(temp);
++      errno=saved;
++      return(-1);
++    }
++  total=0;
++  saved=0;
++  for ( ; ; )
++  {
++    count=read(in,buffer,sizeof(buffer));
++    if (count < 0)
++      {
++        if (errno == EINTR)
++          continue;
++        saved=errno;
++        break;
++      }
++    if (count == 0)
++      break;
++    for (done=0; done < count; done+=n)
++    {
++      n=write(out,buffer+done,(size_t) (count-done));
++      if (n < 0)
++        {
++          if (errno == EINTR)
++            {
++              n=0;
++              continue;
++            }
++          saved=errno;
++          break;
++        }
++    }
++    if (saved != 0)
++      break;
++    total+=count;
++  }
++  if ((saved == 0) && (ftruncate(out,(off_t) total) != 0))
++    saved=errno;
++  if ((close_utf8(out) != 0) && (saved == 0))
++    saved=errno;
++  (void) close_utf8(in);
++  (void) remove_utf8(temp);
++  if (saved != 0)
++    {
++      errno=saved;
++      return(-1);
++    }
++  return(0);
++}
++
+ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
+   Image *images,const char *filename,ExceptionInfo *exception)
+ {
+@@ -1590,12 +1741,30 @@
    Image
      *p;
  
@@ -23,6 +180,9 @@
 +  MagickBooleanType
 +    atomic_existed;
 +
++  int
++    atomic_mode;
++
    assert(image_info != (const ImageInfo *) NULL);
    assert(image_info->signature == MagickCoreSignature);
    assert(images != (Image *) NULL);
@@ -32,10 +192,11 @@
 +  *atomic_tmp='\0';
 +  *atomic_name='\0';
 +  atomic_existed=MagickFalse;
++  atomic_mode=0;
    assert(exception != (ExceptionInfo *) NULL);
    write_info=CloneImageInfo(image_info);
    *write_info->magick='\0';
-@@ -1613,6 +1628,132 @@
+@@ -1613,6 +1782,135 @@
    sans_exception=DestroyExceptionInfo(sans_exception);
    if (*write_info->magick == '\0')
      (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
@@ -102,14 +263,6 @@
 +         ((access_utf8(atomic_path,F_OK) == 0) &&
 +          (access_utf8(atomic_path,W_OK) != 0))))
 +      atomic_ok=MagickFalse;
-+    /*
-+      homescoop#1258: a target someone else owns keeps upstream's in-place
-+      write. Replacing it by rename fails in a sticky directory (/tmp), and
-+      elsewhere would hand the file to the caller.
-+    */
-+    if ((atomic_ok != MagickFalse) && (lstat(atomic_path,&atomic_status) == 0) &&
-+        (atomic_status.st_uid != geteuid()))
-+      atomic_ok=MagickFalse;
 +    if ((atomic_ok != MagickFalse) &&
 +      (write_info->blob == (void *) NULL) && (write_info->file == (FILE *) NULL) &&
 +      ((GetImageListLength(images) == 1) || (write_info->adjoin != MagickFalse)) &&
@@ -117,7 +270,8 @@
 +      (*atomic_path != '|') && (strchr(atomic_path,'%') == (char *) NULL) &&
 +      (strlen(atomic_path) < (MagickPathExtent-16)) &&
 +      ((lstat(atomic_path,&atomic_status) != 0 && errno == ENOENT) ||
-+       (lstat(atomic_path,&atomic_status) == 0 && S_ISREG(atomic_status.st_mode))))
++       (lstat(atomic_path,&atomic_status) == 0 &&
++        (S_ISREG(atomic_status.st_mode) || S_ISLNK(atomic_status.st_mode)))))
 +    {
 +      RandomInfo
 +        *random_info;
@@ -152,6 +306,16 @@
 +          break;
 +      }
 +      random_info=DestroyRandomInfo(random_info);
++      if ((file >= 0) && (atomic_existed != MagickFalse))
++        {
++          atomic_mode=HomescoopPrepareReplace(file,atomic_path,&atomic_status);
++          if (atomic_mode < 0)
++            {
++              (void) close_utf8(file);
++              (void) remove_utf8(atomic_tmp);
++              file=(-1);
++            }
++        }
 +      if (file < 0)
 +        *atomic_tmp='\0';
 +      else
@@ -168,7 +332,7 @@
    p=images;
    for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
    {
-@@ -1661,5 +1802,30 @@
+@@ -1661,5 +1959,28 @@
        }
    }
    write_info=DestroyImageInfo(write_info);
@@ -178,12 +342,10 @@
 +        (void) CopyMagickString(p->filename,atomic_name,MagickPathExtent);
 +      if ((status != 0) && (exception->severity < ErrorException))
 +        {
-+          if (atomic_existed != MagickFalse)
-+            {
-+              (void) chown(atomic_tmp,(uid_t) -1,atomic_status.st_gid);
-+              (void) chmod(atomic_tmp,atomic_status.st_mode & 07777);
-+            }
-+          if (rename_utf8(atomic_tmp,atomic_path) != 0)
++          if ((atomic_existed != MagickFalse) ?
++              (HomescoopReplaceFile(atomic_tmp,atomic_path,&atomic_status,
++                atomic_mode) != 0) :
++              (rename_utf8(atomic_tmp,atomic_path) != 0))
 +            {
 +              (void) remove_utf8(atomic_tmp);
 +              ThrowFileException(exception,FileOpenError,"UnableToWriteFile",

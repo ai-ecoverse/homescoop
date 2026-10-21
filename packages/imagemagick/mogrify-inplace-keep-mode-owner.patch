@@ -1,0 +1,57 @@
+--- a/MagickWand/mogrify.c
++++ b/MagickWand/mogrify.c
+@@ -64,6 +64,10 @@
+ #include "MagickCore/thread-private.h"
+ #include "MagickCore/timer-private.h"
+ #include "MagickCore/utility-private.h"
++
++extern MagickExport int
++  HomescoopPrepareReplace(int,const char *,struct stat *),
++  HomescoopReplaceFile(const char *,const char *,const struct stat *,int);
+ 
+ /*
+   Constant declaration.
+@@ -3888,6 +3892,13 @@
+             (void) RemapImages(quantize_info,images,(Image *) NULL,exception);
+             quantize_info=DestroyQuantizeInfo(quantize_info);
+           }
++        int
++          backup_mode;
++
++        struct stat
++          backup_status;
++
++        backup_mode=(-1);
+         *backup_filename='\0';
+         *magic='\0';
+         GetPathComponent(filename,MagickPath,magic);
+@@ -3939,6 +3950,9 @@
+                 break;
+             }
+             random_info=DestroyRandomInfo(random_info);
++            if (file >= 0)
++              backup_mode=HomescoopPrepareReplace(file,image->filename,
++                &backup_status);
+             if (file < 0)
+               *backup_filename='\0';
+             else
+@@ -3989,8 +4003,17 @@
+             }
+             if (*backup_filename != '\0')
+               {
+-                if (rename_utf8(backup_filename,image->filename) != 0)
+-                  status=MagickFalse;
++                if (((backup_mode < 0) ?
++                     rename_utf8(backup_filename,image->filename) :
++                     HomescoopReplaceFile(backup_filename,image->filename,
++                       &backup_status,backup_mode)) != 0)
++                  {
++                    (void) ThrowMagickException(exception,GetMagickModule(),
++                      FileOpenError,"UnableToWriteFile","`%s': %s",
++                      image->filename,strerror(errno));
++                    (void) remove_utf8(backup_filename);
++                    status=MagickFalse;
++                  }
+               }
+           }
+         else

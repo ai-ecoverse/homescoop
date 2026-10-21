@@ -153,6 +153,7 @@ for f in n019003l n019004l n019023l n019024l; do
   cp "$GSFONTS_SRC/$f.pfb" "$GSFONTS_SRC/$f.afm" "$FONTS/"
 done
 cp "$GSFONTS_SRC/COPYING" "$FONTS/COPYING"
+cp "$GSFONTS_SRC/README" "$FONTS/README"
 for d in "$CFG_DEST" "$CFG_OPEN"; do
   cp "$HOMESCOOP_ROOT/packages/imagemagick/type-slicc.xml" "$d/type.xml"
   rm -f "$d"/type-*.xml
@@ -191,7 +192,7 @@ homescoop_notice "libwebp 1.6.0 (@ai-ecoverse/wasm-libwebp)" \
   https://raw.githubusercontent.com/webmproject/libwebp/v1.6.0/PATENTS cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c
 homescoop_notice "OpenJPEG 2.5.3 (@ai-ecoverse/wasm-openjpeg)" \
   https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.3/LICENSE a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6
-homescoop_notice "gsfonts 8.11 (URW Nimbus Sans Type 1 fonts in etc/fonts, the default font; GPL-2.0-or-later with the font exception)" "$FONTS/COPYING" -
+homescoop_notice "gsfonts 8.11 (URW Nimbus Sans Type 1 fonts in etc/fonts, the default font), GPL-2.0-only WITH Font-exception-2.0: the GNU GPL (etc/fonts/COPYING, version 2) with gsfonts' exception that you can put these fonts in your own non-GPLed documents (etc/fonts/README)" "$FONTS/README" - "$FONTS/COPYING" -
 homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the FreeType License" \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/LICENSE.TXT 2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1

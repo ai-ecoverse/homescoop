@@ -29,7 +29,7 @@ dependencies:
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/imagemagick
-  license: ImageMagick
+  license: ImageMagick AND GPL-2.0-only WITH Font-exception-2.0
   notes: |
     Port of slicc-emscripten harness/ladder.sh rung_magick. Links slicc cli
     profile. package.json slicc.commands maps magick/convert/identify/mogrify
