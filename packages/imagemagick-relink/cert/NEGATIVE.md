@@ -84,3 +84,7 @@ The kits ship wasm-imagemagick(-heif) 7.1.2-34-9.2's objects: the timer fix (#67
 ## 7.1.2-34-9.3: the delegate pins (2026-10-20)
 
 A pin-only release, with no ImageMagick change. The delegates move to their npm `latest` builds: libpng 1.6.59-4, libwebp 1.6.0-4, libtiff 4.7.2-4, libxml2 2.15.4-3, lcms2 2.19.1-4, freetype 2.13.3-4 and libiconv 1.19.0-3, plus libheif 1.23.6-7 for the heif build and the kits. Those builds fixed #941 (build paths), #925 (libwebp.pc lacked `Requires: libsharpyuv`) and #970 (libheif's plugin directory named the build dir). Their own NEGATIVE.md entries hold the before and after. Here, every spec passes as on 9.2, and `magick.wasm` names no build path.
+
+## 7.1.2-34-9.4: version kept with imagemagick (homescoop#1491; 2026-10-20)
+
+imagemagick and imagemagick-heif go to 7.1.2-34-9.4 for the shim drift on #1491, and imagemagick-relink's build.sh requires the same version (`bump them together`), so it moves with them. Its relink kit picks up the same updated `shims/slicc`. The package's own code is unchanged.

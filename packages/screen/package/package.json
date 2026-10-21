@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-screen",
-  "version": "5.0.1-14",
+  "version": "5.0.1-15",
   "description": "GNU screen, a terminal multiplexer: detach and reattach sessions with several windows.",
   "license": "GPL-3.0-or-later",
   "repository": {

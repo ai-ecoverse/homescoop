@@ -27,3 +27,6 @@ refuses the directories itself. 2.3.2-1 fails glue-by-path (0644 `bin/tree`).
 
 There's no behaviour change, so there's no failing negative to show. The README dropped `Certified on @ai-ecoverse/slicc-kernel 1.23.0`, while `cert/meta.json` says 1.102.6. `scripts/test/readme-cert-kernel.test.mjs` now checks every package with no STALE exceptions left.
 
+## 2.3.2-7: shim drift (homescoop#1491; 2026-10-21)
+
+2.3.2-7 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 2.3.2-6 in `bin/tree`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

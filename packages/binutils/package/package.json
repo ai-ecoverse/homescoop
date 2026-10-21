@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-binutils",
-  "version": "2.47.0-7",
-  "description": "GNU binutils strings, size and readelf for slicc (WASM / emscripten, SLICC homescoop)",
+  "version": "2.47.0-8",
+  "description": "GNU binutils strings, size and readelf, to inspect object files and binaries.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

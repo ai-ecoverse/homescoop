@@ -61,3 +61,7 @@
 
   clang's parser recurses on the engine's own stack, and in slicc's realm that runs out near 1500 levels. clang's stack guard measures Emscripten's separate 8 MB stack, so it never warns. 24.0.0-21 hung instead. The cc driver now caps `-fbracket-depth` at 1024 (before the caller's flags, so a caller's own value wins). 2000 levels of parentheses or blocks now give clang's `bracket nesting level exceeded maximum of 1024`, rc 1, and 1000 still compiles.
 - **#1229:** with -22 the row's code is unchanged, so there's no package negative. The test now checks the encoding of each tree's program by validating it with the other EH feature off, so the `--expect old` row fails -21 in both legacy trees on any engine. Before, it passed sysroot-eh on Node 24, which runs mixed modules.
+
+## 24.0.0-24: shim drift (homescoop#1491; 2026-10-20)
+
+24.0.0-24 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 24.0.0-23 in `bin/clang`, `bin/clang++`, `bin/ld.lld`, `bin/lld`, `bin/llvm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

@@ -21,3 +21,7 @@ The published 2.47.0-5 also has 90 occurrence(s) of the CI build directory `/tmp
 ## 2.47.0-7: the cert under users enforce (homescoop#819; 2026-10-18)
 
 2.47.0-7 changes no code or build input. The bump exists because ladder-pr rebuilds the package for the cert change, and publish refuses same-version drift (#982). Until now cert/meta.json had no `"users"`, so ladder-pr booted the kernel with its default user mode, and the published 2.47.0-6 was certified that way. cert-coverage.test.mjs's #819 allowlist names binutils for exactly that. With `"users": "enforce"` the specs run with the kernel's credentials enforced. The same specs passed under enforce in #960's cert review, on the cert kernel and on slicc-kernel 1.122.2.
+
+## 2.47.0-8: shim drift (homescoop#1491; 2026-10-20)
+
+2.47.0-8 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 2.47.0-7 in `THIRD-PARTY-NOTICES.md`, `bin/readelf`, `bin/size` and `bin/strings`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

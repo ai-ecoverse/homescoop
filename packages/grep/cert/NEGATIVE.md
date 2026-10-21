@@ -38,3 +38,6 @@ The `@ai-ecoverse/wasm-grep@3.12.0-6` tarball from npm, slicc-kernel 1.132.1, us
 
 This branch's build passes both, plus checklist.mjs, on the same kernel.
 
+## 3.12.0-8: shim drift (homescoop#1491; 2026-10-20)
+
+3.12.0-8 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 3.12.0-7 in `bin/grep` and `bin/grep.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

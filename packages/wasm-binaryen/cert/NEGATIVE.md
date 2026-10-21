@@ -36,3 +36,7 @@ AssertionError: THIRD-PARTY-NOTICES.md lacks the Emscripten 6.0.9 notice (homesc
 ```
 
 132.0.0-4 ships only binaryen's LICENSE. 132.0.0-5 adds `THIRD-PARTY-NOTICES.md` with the Emscripten runtime's notices and FP16's MIT licence. binaryen's `third_party/llvm-project` is Apache-2.0 WITH LLVM-exception, which waives the notice for compiled forms. The tools are rebuilt with the same source and flags.
+
+## 132.0.0-6: shim drift (homescoop#1491; 2026-10-21)
+
+132.0.0-6 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 132.0.0-5 in `bin/wasm-as`, `bin/wasm-as.wasm`, `bin/wasm-ctor-eval`, `bin/wasm-dis`, `bin/wasm-dis.wasm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

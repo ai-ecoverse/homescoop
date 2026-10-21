@@ -74,3 +74,7 @@ The new `test/files.test.mjs` row fails on the published 6.0.9-23: its `tools/sy
 ## 6.0.9-25: the shim's posix_spawnp searches PATH (slicc-kernel#1165, homescoop#1264; 2026-10-19)
 
 6.0.9-25 links the updated `shims/slicc/slicc_spawn.c`. `posix_spawnp` was plain `posix_spawn`; it now searches PATH as execvp does. A candidate that isn't an executable regular file is skipped, and a bare name that isn't found anywhere still goes to the kernel catalog. On #1264, npm-parity found that the build differs from the published 6.0.9-23 in lib/slicc/slicc_spawn.o (6.0.9-24, #1335, left the shim as it was), so this is a packaging bump. The package's own code is unchanged. The behaviour test is coreutils' `cert/spawnp-path.mjs` (`timeout`, the shim's one Emscripten caller that a cert drives).
+
+## 6.0.9-26: shim drift (homescoop#1491; 2026-10-20)
+
+6.0.9-26 ships the updated `shims/slicc` objects and JS libraries: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 6.0.9-25 in `lib/slicc/slicc-uname.js` and `lib/slicc/slicc_spawn.o`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn and uname tests. `shims/slicc/slicc-env.js` is not added to `lib/slicc` here: that would be a functional change and is left to the owner.

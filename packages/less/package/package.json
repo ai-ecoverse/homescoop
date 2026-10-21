@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-less",
-  "version": "668.0.0-5",
-  "description": "less 668 with static ncurses 6.5 for wasm / slicc (emscripten)",
+  "version": "668.0.0-6",
+  "description": "less, a pager that shows text one screen at a time.",
   "license": "GPL-3.0-or-later OR BSD-2-Clause",
   "repository": {
     "type": "git",

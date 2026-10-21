@@ -190,3 +190,7 @@ AssertionError [ERR_ASSERTION]: i=0; while ((i<50000000)); do ((i++)); done; ech
 ```
 
 The loop makes no kernel call, so the SIGINT stays pending until it ends. 5.3.0-22's `quit-signal-poll.patch` sleeps 0 ms through the shim every 1024 `QUIT`s; the kernel delivers the SIGINT on the way back, and bash throws to the top level. 5.3.0-22 passes every spec on 1.130.2.
+
+## 5.3.0-23: shim drift (homescoop#1491; 2026-10-20)
+
+5.3.0-23 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 5.3.0-22 in `THIRD-PARTY-NOTICES.md`, `bin/bash` and `bin/bash.wasm`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

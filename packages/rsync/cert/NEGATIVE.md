@@ -131,3 +131,7 @@ The published 3.5.1-4 also has 1 occurrence(s) of the CI build directory `/tmp/h
 ## 3.5.1-6: a deterministic -c row, no stale kernel line (homescoop#969, #847; 2026-10-20)
 
 No behaviour change, so there's no failing negative to show. #969 was a test race: `cs` and `cd`'s own mtimes came from the `echo >` writes, and `rsync -a -i` correctly reported `.d..t...... ./` when they straddled a second. The row now pins both directories with `touch -d @1643767322`. The README drops `Certified on @ai-ecoverse/slicc-kernel 1.30.0` (meta.json says 1.92.0). `scripts/test/readme-cert-kernel.test.mjs` fails any README whose kernel line differs from its cert/meta.json.
+
+## 3.5.1-7: shim drift (homescoop#1491; 2026-10-20)
+
+3.5.1-7 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 3.5.1-6 in `bin/rsync` and `bin/rsync.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

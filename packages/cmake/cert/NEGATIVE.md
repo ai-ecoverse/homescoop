@@ -29,3 +29,7 @@ On slicc-kernel 1.110.7, users enforce, the published 4.4.3-10 gives:
 
 - **#1278, the cause:** today's `shims/slicc` sends `uname()` to the kernel, which answers `Linux 6.0.0-slicc`. CMakeDetermineSystem also runs `uname -r`/`-m` after the patch's old position. The patch now runs after that detection, and maps both Emscripten and a Linux whose version names slicc to WASI.
 - **#1280, the cause:** cmake.wasm didn't link `slicc_socket.c`, so CMake's curl used Emscripten's WebSocket sockets, which go nowhere in slicc. It's linked now. https needs a TLS backend for CMake's bundled curl, which this package doesn't have; the README says so and gives the workaround.
+
+## 4.4.3-12: shim drift (homescoop#1491; 2026-10-20)
+
+4.4.3-12 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 4.4.3-11 in `bin/cmake` and `bin/cmake.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

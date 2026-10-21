@@ -41,3 +41,7 @@ The published 8.7.1-4 also has 13 occurrence(s) of the CI build directory `/tmp/
 ## 8.7.1-6: nano -G lock files (homescoop#866; 2026-10-20)
 
 `cert/locking.mjs`: wasm-nano 8.7.1-3, -4 and -5 link Emscripten's strong `getpwuid` stub, which never finds a user, so `nano -G` prints `[ Couldn't determine my identity for lock file ]` and writes no `.f.txt.swp` (#866's repro, slicc-kernel 1.110.5 and 1.26.6 under users enforce). On npm's 8.7.1-5 with slicc-kernel 1.132.1, `cert/locking.mjs` fails 2 of 5 assertions: the identity message, and no lock file. A local build of this branch with `$(homescoop_slicc_wrap_pwd)` passes, along with checklist.mjs, on slicc-kernel 1.132.1 under users enforce. The cert kernel moves there from 1.26.6, which has no users API for `addUser`.
+
+## 8.7.1-7: shim drift (homescoop#1491; 2026-10-20)
+
+8.7.1-7 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 8.7.1-6 in `THIRD-PARTY-NOTICES.md`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

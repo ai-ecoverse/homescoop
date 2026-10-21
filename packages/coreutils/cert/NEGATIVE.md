@@ -100,3 +100,7 @@ The time rows fail the same way: Emscripten's `tzset` and `localtime` read the b
 - **Fixes:** `slicc-env.js` builds the environment only from what the kernel passes. `slicc_tz.c` reads `TZ` on each call: POSIX rules in C, IANA names through `Intl`.
 - **Where:** both are linked only into coreutils (`scripts/build-gnu-cli.sh` takes a recipe's `slicc-*.js` and `slicc_*.c`).
 - **Left:** `HOSTNAME=slicc` that `env -i` still shows comes from the kernel's process environment.
+
+## 9.12.0-13: shim drift (homescoop#1491; 2026-10-20)
+
+9.12.0-13 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 9.12.0-12 in `THIRD-PARTY-NOTICES.md`, `bin/coreutils` and `bin/coreutils.wasm`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

@@ -54,3 +54,7 @@ AssertionError: poppler-multicall.wasm names a build path: /home/runner/.cache/e
 ```
 
 That string is POPPLER_DATADIR (CMAKE_INSTALL_FULL_DATADIR/poppler). emcmake had set CMAKE_INSTALL_PREFIX to the CI host's emsdk sysroot. 26.10.0-6 configures with `-DCMAKE_INSTALL_PREFIX=/usr/local`, so the datadir is `/usr/local/share/poppler`. build.sh fails if the wasm names any home, work or emsdk-cache path. Two local builds in different work dirs gave byte-identical tarballs, so the recipe opts into `reproducible: true`. The cert now runs with `"users": "enforce"` (#819), and checklist, inputs and datadir all pass under it.
+
+## 26.10.0-7: shim drift (homescoop#1491; 2026-10-20)
+
+26.10.0-7 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 26.10.0-6 in `THIRD-PARTY-NOTICES.md` and `bin/poppler-multicall`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
