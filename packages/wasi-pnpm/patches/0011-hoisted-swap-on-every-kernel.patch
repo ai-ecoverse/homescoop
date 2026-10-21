@@ -1,0 +1,55 @@
+deps-restorer: replace a hoisted package by renaming the old tree aside on every kernel (homescoop#1384)
+
+0010 kept upstream's remove-then-rename where the host says directory renames
+aren't cheap (slicc-kernel < 1.134.3). That path deletes the old tree file by
+file before the new one goes in, and a delete that fails partway (an entry
+pnpm can't unlink, such as a file in a read-only directory) left the package
+gutted: the deleted files were gone, and only node_modules/ was restored.
+Now every kernel renames the old tree aside, renames the staged one in, and
+puts the old tree back if that fails. On older kernels the rename copies the
+tree, which is slower but leaves the old package whole if anything fails.
+
+Upstream: not filed (Lars decides).
+
+--- a/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs
++++ b/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs
+@@ -77,34 +77,11 @@
+     //    the swap.
+     let preserved_modules = paths.preserve_modules(keep_modules_dir)?;
+ 
+-    if !pnpm_fs::directory_rename_is_cheap() {
+-        // homescoop#1128 gate: a kernel whose directory rename copies the
+-        // tree (slicc-kernel < 1.134.3 on OPFS) would pay it twice and could
+-        // time out on a large package, so take upstream's path there.
+-        //
+-        // 3. Remove the old contents. If this fails after step 2, the
+-        //    staged tree and any merge backup hold the preserved data. Try
+-        //    to move it back into place before bailing, and retain those
+-        //    temporary paths if restoration can't run.
+-        if let Err(error) = pnpm_fs::remove_dirent(dir_path) {
+-            paths.cleanup_after_failure(&preserved_modules);
+-            return Err(ImportIndexedDirError::RemoveExisting { path: dir_path.to_path_buf(), error });
+-        }
+-        // 4. Move the staged tree into place.
+-        if let Err(error) = pnpm_fs::rename_with_retry(&paths.stage, dir_path) {
+-            paths.rescue_or_leak(&preserved_modules, dir_path);
+-            return Err(ImportIndexedDirError::Swap {
+-                from: paths.stage,
+-                to: dir_path.to_path_buf(),
+-                error,
+-            });
+-        }
+-        discard_replaced_modules(&preserved_modules);
+-        return Ok(());
+-    }
+-
+-    // 3. Move the old contents aside with one rename (homescoop#1128).
+-    //    Removing them here instead, as upstream does, leaves a reader of
++    // 3. Move the old contents aside with one rename (homescoop#1128), on
++    //    every kernel (homescoop#1384): upstream removes them here, and a
++    //    remove that fails partway (an entry pnpm can't unlink) leaves the
++    //    package gutted, while a rename either happens or doesn't, and
++    //    is undone below if the swap fails. Removing them also leaves a reader of
+     //    the package (an agent restarting from a hoisted node_modules)
+     //    a directory that empties file by file for as long as the delete
+     //    takes, which on a slow filesystem (OPFS) is long. If this fails

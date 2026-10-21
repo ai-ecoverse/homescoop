@@ -89,3 +89,12 @@ The published 12.9.1-17 against 12.9.1-18's `cert/update-readers.mjs` (slicc-ker
 - **`cert/pinned-registry.mjs`** (homescoop#1256) documents upstream behaviour and passes on -18 too. That's not a fix but the README's "A private registry and the pin", checked: pnpm's own pin resolves from the user's registry settings only (pnpm-config's `build_package_manager_bootstrap` takes the trusted `.npmrc` files and `pnpm_config_*`; the CLI's `--registry` and the project's `.npmrc` don't reach it).
 - **Notices** (homescoop#1325): `grep -c tokio THIRD-PARTY-NOTICES.md` is 0 in 12.9.1-18, which ships upstream's Yarn notices only.
 
+## 12.9.1-20: a failed update keeps the old package; node-shebang bins (homescoop#1384, #1441, 2026-10-21)
+
+- **`cert/swap-edges.mjs`:** the published 12.9.1-19 on slicc-kernel 1.132.1 (below 0010's gate) **fails**.
+  - The update over a read-only entry exits 1 ("… prior to swap: Permission denied") and leaves `node_modules/big` as `0 1.0.0`: lib/ was deleted, and only package.json and the read-only directory are left.
+  - With -20, the update succeeds on 1.132.1 and 1.134.3 alike: the old tree is renamed aside. The aside copy can't be deleted (the read-only entry), so a `big_pacquet-stage_*` sibling holding the old tree stays in node_modules, with a warning.
+- **`cert/project-bins.mjs`:** 12.9.1-19 fails both new assertions.
+  - `pnpm exec jsbin` says only "could not start: ENOENT".
+  - `npx jsbin` gives "/usr/bin/env: bad interpreter" (126).
+
