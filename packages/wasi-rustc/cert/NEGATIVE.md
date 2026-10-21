@@ -54,3 +54,9 @@ The published 1.98.1-8 against -9's `cert/hygiene.mjs` (slicc-kernel 1.134.3, us
 
 0018 reports the link failure as a plain error, so link_binary cleans up before the driver aborts, and 0017 now refuses only crate types that link upstream bitcode (bin, dylib, cdylib, staticlib).
 
+
+## 1.98.1-10: a refused -C lto with an rlib among the crate types cleans up (homescoop#1543, 2026-10-21)
+
+The published 1.98.1-9 against -10's `cert/hygiene.mjs` (slicc-kernel 1.134.3, users enforce): **FAIL, 1 assertion.** `rustc --crate-type rlib,cdylib -C lto=fat --crate-name lt lib.rs` exits 1 with 0017's refusal (both pass), but `ls -A` shows `lib.rs rmetaKqZb8B`. With an rlib among the crate types, metadata is encoded into an `rmetaXXXXXX` temp dir in the output directory before codegen starts, and 0017's refusal came at the start of codegen; on WASI, 0015's fatal exit skips the temp dir's drop.
+
+0019 moves the refusal (same condition, same message) from `start_async_codegen` to `start_codegen`, before `encode_and_write_metadata`, so a refused build has written nothing. It applies only when codegen runs, as before (`--emit metadata` and `-Z no-codegen` aren't refused).
