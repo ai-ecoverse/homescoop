@@ -10,11 +10,12 @@ import {
   candidateProblems,
   certReview,
   certFor,
+  githubApi,
   parseArgs,
   parseCertLines,
   resolvePackage,
   touchingCommit,
-} from './ladder-merge-resolve.mjs';
+} from '../ladder-merge-resolve.mjs';
 
 const NAME = '@ai-ecoverse/wasi-impeccable';
 const VERSION = '0.1.14-1';
@@ -94,6 +95,9 @@ function fakeIo({
     },
     async jobs(id) {
       calls.push(['jobs', id]);
+      if (typeof jobs[id] === 'number') {
+        throw Object.assign(new Error(`GET /actions/runs/${id}/jobs?filter=latest&per_page=100 returned ${jobs[id]}`), { status: jobs[id] });
+      }
       return jobs[id] ?? [];
     },
     async download(a) {
@@ -379,6 +383,90 @@ describe('resolvePackage', () => {
   it('fails closed when a run cannot be read', async () => {
     const io = fakeIo({ artifacts: [artifact(1, 10, HEAD)], runs: {} });
     await assert.rejects(resolvePackage(ctx, io), /returned 404/);
+  });
+
+  it('publishes the newer artifact when an older run at the head returns 502 for its jobs', async () => {
+    const io = fakeIo({
+      artifacts: [artifact(2, 20, HEAD), artifact(1, 10, HEAD)],
+      runs: { 20: run(20, HEAD), 10: run(10, HEAD, 'failure') },
+      jobs: { 10: 502 },
+      tarballs: { 2: tarball(GOOD) },
+    });
+    const result = await resolvePackage(ctx, io);
+    assert.equal(result.decision, 'publish');
+    assert.equal(result.inputs.artifact_id, '2');
+    assert.equal(result.inputs.certified, GOOD);
+  });
+
+  it('rejects a superseded artifact at another head without fetching its run or jobs', async () => {
+    const io = fakeIo({
+      artifacts: [artifact(2, 20, HEAD), artifact(1, 10, STALE)],
+      runs: { 20: run(20, HEAD), 10: run(10, STALE) },
+      jobs: { 10: 502 },
+      tarballs: { 2: tarball(GOOD) },
+    });
+    const result = await resolvePackage(ctx, io);
+    assert.equal(result.inputs.artifact_id, '2');
+    assert.deepEqual(io.calls.filter(([c]) => c === 'run' || c === 'jobs'), [['run', 20], ['jobs', 20]]);
+  });
+
+  it('rejects a run whose own head is not the PR head without fetching its jobs', async () => {
+    const io = fakeIo({
+      artifacts: [artifact(2, 20, HEAD), artifact(1, 10, HEAD)],
+      runs: { 20: run(20, HEAD), 10: run(10, STALE) },
+      jobs: { 10: 502 },
+      tarballs: { 2: tarball(GOOD) },
+    });
+    const result = await resolvePackage(ctx, io);
+    assert.equal(result.inputs.artifact_id, '2');
+    assert.equal(io.calls.filter(([c, id]) => c === 'jobs' && id === 10).length, 0);
+  });
+
+  it('fails closed, naming every rejection, when every candidate errors or is superseded', async () => {
+    const io = fakeIo({
+      artifacts: [artifact(3, 30, HEAD), artifact(2, 20, HEAD), artifact(1, 10, STALE)],
+      runs: { 20: run(20, HEAD), 10: run(10, STALE) },
+      jobs: { 20: 502 },
+      tarballs: { 1: tarball(GOOD), 2: tarball(GOOD), 3: tarball(GOOD) },
+    });
+    await assert.rejects(
+      resolvePackage(ctx, io),
+      /no usable host-wasi-impeccable-pr336: artifact 3: GET \/actions\/runs\/30 returned 404 \| artifact 2: GET \/actions\/runs\/20\/jobs\?filter=latest&per_page=100 returned 502 \| artifact 1: run 10 is at 340364dd/,
+    );
+    assert.equal(io.calls.some(([c]) => c === 'download'), false);
+  });
+});
+
+describe('githubApi', () => {
+  const replies = (t, statuses) => {
+    const seen = [];
+    t.mock.method(globalThis, 'fetch', async (url, init) => {
+      seen.push(init.method);
+      return new Response('{}', { status: statuses[seen.length - 1] ?? 200 });
+    });
+    return seen;
+  };
+  const api = githubApi({ repo: 'ai-ecoverse/homescoop', token: 't', retryDelayMs: 1 });
+
+  it('retries a GET once after a 5xx', async (t) => {
+    const seen = replies(t, [502, 200]);
+    const res = await api('/actions/runs/1/jobs');
+    assert.equal(res.status, 200);
+    assert.equal(seen.length, 2);
+  });
+
+  it('throws when the retry also fails, and never retries a 4xx or a POST', async (t) => {
+    const twice = replies(t, [502, 503]);
+    await assert.rejects(api('/actions/runs/1/jobs'), (err) => err.status === 503);
+    assert.equal(twice.length, 2);
+    t.mock.restoreAll();
+    const notFound = replies(t, [404, 200]);
+    await assert.rejects(api('/actions/runs/1'), (err) => err.status === 404);
+    assert.equal(notFound.length, 1);
+    t.mock.restoreAll();
+    const post = replies(t, [502, 200]);
+    await assert.rejects(api('/statuses/x', { method: 'POST', body: {} }), (err) => err.status === 502);
+    assert.equal(post.length, 1);
   });
 });
 
