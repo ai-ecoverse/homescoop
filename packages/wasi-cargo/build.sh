@@ -92,6 +92,9 @@ sed "s|^directory = .*|directory = \"$SRC/vendor\"|" "$SRC/.cargo/config.toml" >
 # homescoop#1287: cargo-refresh-alloc.patch includes the shared allocator
 # refresh on wasm; the initial heap is recipe.yaml's wasm.initial-memory.
 (cd "$CARGO_SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check "$HOMESCOOP_PKG/patches/cargo-refresh-alloc.patch" && git apply "$HOMESCOOP_PKG/patches/cargo-refresh-alloc.patch")
+# homescoop#1463: wasi-rustc ships no rustdoc; cargo says so instead of
+# failing on a missing program.
+(cd "$CARGO_SRC" && export GIT_CEILING_DIRECTORIES="$PKG_WORK" && git apply --check "$HOMESCOOP_PKG/patches/cargo-rustdoc-missing.patch" && git apply "$HOMESCOOP_PKG/patches/cargo-rustdoc-missing.patch")
 homescoop_rust_wasm_refresh_alloc
 : "${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
 cp -R "$HOMESCOOP_PKG/wasix-command" "$CARGO_SRC/crates/wasix-command"

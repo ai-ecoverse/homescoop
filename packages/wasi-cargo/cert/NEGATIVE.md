@@ -19,3 +19,7 @@
 - **Doc tests** (not a regression): `cargo test` on a library runs rustdoc after the unit tests, and fails with "could not execute process `rustdoc`" because rustdoc isn't packaged. The README says to pass `--lib`/`--tests` or set `doctest = false`.
 - **#1287:** the published 0.99.0-3 gives 0 traps in the 4 builds and peaks at 52 MiB, so the row is a guard and the initial heap is sized from it.
 
+## 0.99.0-5: no rustdoc (homescoop#1463, 2026-10-21)
+
+The published 0.99.0-4 runs `cargo test` on a library with a doc test (wasi-rustc 1.98.1-6/-8): the unit test passes, then `could not execute process \`rustdoc …\` (never executed) … No such file or directory (os error 44)`, exit 101. `cargo test --doc` and `cargo doc` fail the same way, without saying that rustdoc isn't packaged. Packaging rustdoc (an optional wasi-rustdoc from the rustc tree) is filed as an unscheduled enhancement.
+

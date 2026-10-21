@@ -12,9 +12,11 @@ Cargo 0.99 (Rust 1.98.1) for SLICC's WASI realm. It uses the installed
   1.98.1-1 or later, which runs proc macros as child processes.
 - **`cargo test`** builds and runs unit and integration tests with
   wasi-rustc 1.98.1-5 or later (1.98.1-4's wasm32-wasip1 libc lacked the
-  pthread stubs libtest links, homescoop#1043). Doc tests run `rustdoc`, which
-  isn't packaged, so `cargo test` on a library fails after its unit tests:
-  pass `--lib`, `--bins` or `--tests`, or set `doctest = false` in `[lib]`.
+  pthread stubs libtest links, homescoop#1043). Doc tests need `rustdoc`,
+  which isn't packaged: `cargo test` skips them with
+  `warning: doc tests skipped: rustdoc isn't available in slicc` and exits
+  with the status of the tests that ran, and `cargo test --doc` and
+  `cargo doc` fail with that reason (since 0.99.0-5, homescoop#1463).
 - **Unsupported on WASI.** Git dependencies need a git network transport,
   and they fail with a message that names the realm.
 - **Untested.** `cargo search`, `publish`, `login`, `owner` and `yank` use
