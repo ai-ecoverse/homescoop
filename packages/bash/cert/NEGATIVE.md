@@ -194,3 +194,11 @@ The loop makes no kernel call, so the SIGINT stays pending until it ends. 5.3.0-
 ## 5.3.0-23: shim drift (homescoop#1491; 2026-10-20)
 
 5.3.0-23 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 5.3.0-22 in `THIRD-PARTY-NOTICES.md`, `bin/bash` and `bin/bash.wasm`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## slicc-kernel 1.135.1: kill -INT $$ after trap - INT under an inherited INT ignore (homescoop#1113)
+
+`cert/selfkill.mjs` (`--soft`) with the published 5.3.0-22 on slicc-kernel 1.135.1 (users enforce, 2026-10-20) fails 2 of its 20 assertions. Under `trap '' INT`, the child `bash -c 'trap - INT; kill -INT $$'` never returns, and the row's 20 s `kill -KILL` ends it, so the output is `i1\nrc=0\nrc=137\n` and not `i1\nrc=0\nrc=130\n`. The cause was in the kernel: the shim's reset of an inherited SIG_IGN never reached the kernel, which went on dropping the self-sent SIGINT (slicc-kernel#1258). slicc-kernel 1.136.8 (#1260) fixes it, and the same tarball passes there. It's the cert kernel now. GNU bash 5.3.15 prints `i1`, `rc=0`, `rc=130`.
+
+## 5.3.0-22: env -i bash gets Emscripten's default environment (homescoop#1418)
+
+`cert/env-i.mjs` (`--soft`) with the published 5.3.0-22 on slicc-kernel 1.136.8 (users enforce, 2026-10-21) fails 11 of its 16 assertions. `env -i bash -c 'echo "[$PATH] [$HOME] [$USER] [$LOGNAME] [$LANG]"'` prints `[/] [/home/web_user] [web_user] [web_user] [en_US.UTF-8]`, and `export -p` lists HOME, LANG, LOGNAME, PATH and USER besides HOSTNAME, OLDPWD, PWD and SHLVL: Emscripten's `getEnvStrings` defaults. 5.3.0-23 links `shims/slicc/slicc-env.js` (#1491), which builds the environment from the kernel's values only. It prints bash's own default PATH with the other four empty, and exports only HOSTNAME, OLDPWD, PWD and SHLVL.
