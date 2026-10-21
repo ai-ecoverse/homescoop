@@ -17,6 +17,6 @@
     "pty -S: long line chopped with reverse-video '>', q quits at (END)",
     "pty +/needle: starts at line 42 with the match highlighted, line 41 not shown",
     "pty secure build (--with-secure): '!' gives 'Command not available', q still quits",
-    "cert/lessopen.mjs (668.0.0-7, homescoop#1484): LESSOPEN '|cat %s' and '|tr a-z A-Z < %s' feed less through the shims' popen, an empty pipe falls back to the file, a LESSOPEN that prints a file name shows that file, '|xz -dc %s' shows an .xz file's text on a pty through less -F with no 'may be a binary file', LESSCLOSE runs after each ('closed <file> -'), and '!' is still 'Command not available'. 668.0.0-5 and -6 ignore LESSOPEN and LESSCLOSE (NEGATIVE.md)"
+    "cert/lessopen.mjs (668.0.0-7, homescoop#1484): LESSOPEN '|cat %s' and '|tr a-z A-Z < %s' feed less through the shims' popen, an empty pipe falls back to the file, a LESSOPEN that prints a file name shows that file, '|xz -dc %s' shows an .xz file's text on a pty through less -F with no 'may be a binary file', LESSCLOSE runs after each ('closed <file> -'), and '!' is still 'Command not available'; in the secure build an OSC 8 link with LESS_OSC8_file/LESS_OSC8_ANY set runs no handler, either by a second mouse click (--mouse) or by ^O^O, both say 'Command not available', and LESSOPEN still works afterwards. 668.0.0-5 and -6 ignore LESSOPEN and LESSCLOSE (NEGATIVE.md)"
   ]
 }
