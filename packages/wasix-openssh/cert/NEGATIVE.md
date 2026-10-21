@@ -45,3 +45,11 @@ Fill in commands and logs after the first passing CI/host-node run.
 
 - **#1050, `hostname.mjs`:** fails on the published 10.6.0-11. Its ssh-keygen writes `root@wasmer.sh` (the issue's repro, slicc-kernel 1.93.0 and 1.123.1), because wasix-sysroot -34's `gethostname()` answers Wasmer's built-in name. -12 is built on -39, where uname takes the node name from `HOSTNAME` and falls back to `slicc` (#1117).
 - **#1052, `crypto.mjs`:** this is coverage, not a fix. It passes on 10.6.0-10 and -11 as well (the issue's report), and it guards the openssl, zlib and sysroot paths from here on.
+
+## 10.6.0-13: a sized heap, one README, the right sysroot in the docs (homescoop#1425, #1446, #1426; 2026-10-21)
+
+`bash packages/wasix-openssh/cert/ci.sh --tarball ai-ecoverse-wasix-openssh-10.6.0-12.tgz` (macOS host sshd, slicc-kernel 1.93.0 on Node). 10.6.0-13's local build passes all ten specs on the same host.
+
+- **#1425, `heap.mjs`:** FAIL on its size check: `keygen: … VmSize peak 9216 kB`. -12 links an 8.75 MiB initial memory (8 MiB of it the stack) with no `wasm:` sizing, and its processes grow to 9-14 MiB: ssh-keygen -t rsa -b 4096 9 MiB, 50 MiB down 10 MiB, `ssh -C` 13.8 MiB, scp 11.3 MiB. Every grow in a threaded bulk-memory module is a chance at slicc-kernel#1172's trap. The run had 0 traps on -12 as well, since that trap is a race. -13 links 32 MiB on wasix-sysroot -40, whose malloc uses the initial pages, and every process stays at exactly 32,768 kB.
+- **#1446, `docs.mjs`:** FAIL: `the shipped README's "Built with" line names wasix-sysroot 2025.9.30-34, the package is built on 2025.9.30-39`. -12's build.sh copied the stale recipe-root README over `package/README.md`, so the tarball also had no `## 10.6.0-12` section.
+- **#1426:** `scripts/test/recipe-docs.test.mjs` fails on -12's recipe.yaml: its notes name wasix-sysroot 2025.9.30-34 and its build.sh pins -39. The test has a row with -12's exact text.

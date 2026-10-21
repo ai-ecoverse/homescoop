@@ -17,9 +17,9 @@ GIT_SSH_COMMAND=ssh git clone ssh://user@host/repo.git
 
 ## 10.6.0-13
 
-- **A sized initial heap** (homescoop#1425, #1287): `ssh`, `scp`, `sftp`, `ssh-add` and `ssh-keygen` are threaded wasm modules with bulk memory (a shared memory plus `memory.fill`/`memory.copy`). V8 can trap after a `memory.grow` in such a module (slicc-kernel#1172), so they now link a INITIAL_MIB MiB initial memory, above the measured peak, on wasix-sysroot -40, whose malloc uses the initial pages. A typical session never grows the memory. `cert/heap.mjs` checks that.
+- **A sized initial heap** (homescoop#1425, #1287): `ssh`, `scp`, `sftp`, `ssh-add` and `ssh-keygen` are threaded wasm modules with bulk memory (a shared memory plus `memory.fill`/`memory.copy`). V8 can trap after a `memory.grow` in such a module (slicc-kernel#1172), so they now link a 32 MiB initial memory (the measured peak is 14 MiB, 8 MiB of it the stack), above the measured peak, on wasix-sysroot -40, whose malloc uses the initial pages. A typical session never grows the memory. `cert/heap.mjs` checks that.
 - **The shipped README is this one** (homescoop#1446): 10.6.0-12's build copied a stale recipe-root README over it, so its tarball still said -34 and had no -12 notes. That copy is gone, and `cert/docs.mjs` checks that the tarball's README is the committed one and names the package's own sysroot and version.
-- **The docs name the right sysroot** (homescoop#1426): `recipe.yaml`'s notes said -34, and the -12 notes said the key comment's host was the exported `HOSTNAME`; it's the kernel's node name.
+- **The docs name the right sysroot** (homescoop#1426): `recipe.yaml`'s notes said -34, and the -12 notes said the key comment's host came from a caller-set `HOSTNAME`; it's the kernel's node name.
 
 ## 10.6.0-12
 

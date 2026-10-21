@@ -18,6 +18,10 @@ sources:
   wasix_openssl:
     url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openssl/-/wasix-openssl-3.5.9-4.tgz"
     sha256: "47629bd4e1f53ee1aa32e3ef150cd744c4eb242632f8bad2818c631aa6c645b7"
+wasm:
+  initial-memory: 32MiB
+  measured-peak: 14MiB
+  measured-by: "VmSize of each ssh, ssh-keygen, scp and sftp process polled from /proc/<pid>/status (one thread each, Threads: 1, so that is the allocating thread's own view) in cert/heap.mjs, on 10.6.0-13's build on wasix-sysroot 2025.9.30-40 at the unsized 8.75 MiB linked initial memory (8 MiB of it the stack), slicc-kernel 1.93.0 on Node: ssh -C of 50 MiB from the host sshd 13.9 MiB, plain 50 MiB down 10 MiB, scp 50 MiB up and down 10.6 MiB, sftp get 10.3 MiB, 50 MiB up 9.4 MiB, an mlkem768x25519 login 9.4 MiB, ssh-keygen -t rsa -b 4096 9 MiB. A measurement link with scripts/wasm-refresh-malloc.c (HOMESCOOP_WASM_PEAK) agrees: malloc's highest block end in the ssh -C run is 12.2 MiB, memory 12.3 MiB"
 dependencies:
   build: []
   host: []
