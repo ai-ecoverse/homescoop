@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-rustc-names",
-  "version": "1.98.1-9",
+  "version": "1.98.1-10",
   "description": "Function names for the Rust compiler's wasm, so SLICC can name the frames of a rustc crash.",
   "license": "(MIT OR Apache-2.0) AND Apache-2.0 WITH LLVM-exception",
   "repository": {
