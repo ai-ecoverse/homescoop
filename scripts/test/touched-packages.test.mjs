@@ -11,15 +11,19 @@ const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 function fixture(recipes) {
   const root = mkdtempSync(join(tmpdir(), 'homescoop-touched-'));
   mkdirSync(join(root, 'scripts'));
+  const written = [];
   for (const f of ['list-touched-packages.mjs', 'classify-touched-packages.mjs', 'read-recipe.mjs']) {
     copyFileSync(join(scripts, f), join(root, 'scripts', f));
+    written.push(`scripts/${f}`);
   }
   for (const [name, { recipe, files = {} }] of Object.entries(recipes)) {
     mkdirSync(join(root, 'packages', name), { recursive: true });
     writeFileSync(join(root, 'packages', name, 'recipe.yaml'), recipe);
+    written.push(`packages/${name}/recipe.yaml`);
     for (const [f, body] of Object.entries(files)) {
       mkdirSync(dirname(join(root, 'packages', name, f)), { recursive: true });
       writeFileSync(join(root, 'packages', name, f), body);
+      written.push(`packages/${name}/${f}`);
     }
   }
   const git = (...args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: root, encoding: 'utf8' });
@@ -31,13 +35,13 @@ function fixture(recipes) {
     });
   const classify = (paths) => {
     git('init', '-q');
-    git('add', '-A');
+    git('add', '--', ...written);
     git('commit', '-qm', 'base');
     for (const p of paths) {
       mkdirSync(dirname(join(root, p)), { recursive: true });
       writeFileSync(join(root, p), `${Math.random()}\n`);
     }
-    git('add', '-A');
+    git('add', '--', ...paths);
     git('commit', '-qm', 'head');
     return spawnSync(process.execPath, [join(root, 'scripts/classify-touched-packages.mjs'), '--base', 'HEAD~1', '--head', 'HEAD'], {
       cwd: root,

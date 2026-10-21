@@ -39,14 +39,20 @@ function repo() {
   g('config', 'user.email', 't@example.org');
   g('config', 'user.name', 't');
   mkdirSync(join(dir, 'scripts'));
-  for (const f of ['repack-inputs.mjs', 'read-recipe.mjs']) copyFileSync(join(scripts, f), join(dir, 'scripts', f));
+  const written = new Set();
+  for (const f of ['repack-inputs.mjs', 'read-recipe.mjs']) {
+    copyFileSync(join(scripts, f), join(dir, 'scripts', f));
+    written.add(`scripts/${f}`);
+  }
   const put = (p, text) => {
     mkdirSync(dirname(join(dir, p)), { recursive: true });
     writeFileSync(join(dir, p), text);
+    written.add(p);
   };
   const version = (v) => put('packages/fx/package/package.json', `${JSON.stringify({ name: '@ai-ecoverse/fx', version: v })}\n`);
   const commit = (m) => {
-    g('add', '-A');
+    if (written.size) g('add', '--', ...written);
+    written.clear();
     g('commit', '-q', '-m', m);
   };
   // 1.0-1: a real build.

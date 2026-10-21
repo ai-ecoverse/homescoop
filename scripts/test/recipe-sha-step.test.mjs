@@ -81,7 +81,7 @@ function pushStep(dirty, readme = false) {
     }
     writeFileSync(join(dir, 'README.md'), 'table\n');
     git('init', '-q');
-    git('add', '.');
+    git('add', '--', 'packages/pkg/recipe.yaml', 'packages/other/recipe.yaml', 'README.md');
     git('-c', 'user.name=t', '-c', 'user.email=t@invalid', 'commit', '-qm', 'base');
     if (dirty) writeFileSync(join(dir, 'packages', 'pkg', 'recipe.yaml'), 'version: 1\nsha256: abc\n');
     if (readme) writeFileSync(join(dir, 'README.md'), 'table v2\n');

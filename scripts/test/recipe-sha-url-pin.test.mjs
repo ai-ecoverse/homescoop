@@ -25,7 +25,7 @@ function upstream(dir, files, message = 'up') {
     mkdirSync(dirname(join(dir, p)), { recursive: true });
     writeFileSync(join(dir, p), c);
   }
-  git(dir, 'add', '-A', '-f');
+  git(dir, 'add', '-f', '--', ...Object.keys(files));
   git(dir, 'commit', '-q', '-m', message);
   const commit = git(dir, 'rev-parse', 'HEAD');
   const tree = git(dir, 'rev-parse', 'HEAD^{tree}');
@@ -48,11 +48,12 @@ function repo({ baseRecipe, headRecipe }) {
   mkdirSync(join(dir, 'packages/fx'), { recursive: true });
   git(dir, 'init', '-q');
   writeFileSync(join(dir, 'packages/fx/recipe.yaml'), baseRecipe);
-  git(dir, 'add', '-A');
+  git(dir, 'add', '--', 'scripts/refresh-recipe-sha.mjs', 'scripts/read-recipe.mjs', 'scripts/source-tree.mjs', 'packages/fx/recipe.yaml');
   git(dir, 'commit', '-qm', 'base');
   git(dir, 'checkout', '-qb', 'pr');
   writeFileSync(join(dir, 'packages/fx/recipe.yaml'), headRecipe);
-  git(dir, 'commit', '-q', '--allow-empty', '-am', 'head');
+  git(dir, 'add', '--', 'packages/fx/recipe.yaml');
+  git(dir, 'commit', '-q', '--allow-empty', '-m', 'head');
   const run = (...extra) =>
     spawnSync(process.execPath, [join(dir, 'scripts/refresh-recipe-sha.mjs'), 'fx', '--base', 'main', ...extra], { encoding: 'utf8', cwd: dir, env });
   const read = () => readFileSync(join(dir, 'packages/fx/recipe.yaml'), 'utf8');
@@ -137,7 +138,8 @@ function rerollFixture({ different = false, tamper = 'src/a.c', content = 'int a
   const oldSha = sha(readFileSync(served));
   if (different) {
     writeFileSync(join(up.dir, tamper), content);
-    git(up.dir, 'commit', '-qam', 'tamper');
+    git(up.dir, 'add', '--', tamper);
+    git(up.dir, 'commit', '-qm', 'tamper');
     up.archive(9, served, zip);
     git(up.dir, 'reset', '-q', '--hard', up.commit);
   } else {
@@ -270,7 +272,8 @@ test('NEGATIVE --ci-reroll: a pin this branch changed stays on the strict path',
   try {
     const moved = f.text.replace(f.oldSha, 'c'.repeat(64));
     writeFileSync(join(f.dir, 'packages/fx/recipe.yaml'), moved);
-    git(f.dir, 'commit', '-q', '-am', 'repin');
+    git(f.dir, 'add', '--', 'packages/fx/recipe.yaml');
+    git(f.dir, 'commit', '-q', '-m', 'repin');
     const r = ciRun(f);
     assert.notEqual(r.status, 0, r.stdout);
     assert.doesNotMatch(r.stdout, /recipe-sha: REROLL/);
