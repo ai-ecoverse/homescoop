@@ -1,5 +1,12 @@
 
 
+## 3.15.0-4: -I/-E honour a caller's PYTHONHOME; 40 MiB initial memory on -39 (3.15.0-5; #1504, #1287; 2026-10-21)
+
+npm 3.15.0-4 on slicc-kernel 1.125.0 (browser cert, users enforce), with the published py-* wave of cert/meta.json needsInstall:
+- `cert/isolated.mjs`: FAIL `PYTHONHOME=/tmp/fh python3 -I ran /tmp/fh's encodings.py: rc=1`. Its stderr has `FAKEHOME-LOADED`, `stdlib dir = '/tmp/fh/lib/python3.15'`, `sys.prefix = '/tmp/fh'` and `Fatal Python error: Failed to import encodings module`: -4's getpath took any PYTHONHOME under -I/-E.
+- `cert/heap-size.mjs`: FAIL `bin/python.wasm links an initial memory of 40.0 MiB, want recipe.yaml wasm.initial-memory 160.0 MiB; memory at start 59.2 MiB, want 160.0 MiB; 48 MiB of 256 KiB buffers grew the memory from 59.2 MiB to 91.0 MiB: malloc does not use the initial memory (after the imports: 118.6 MiB)`. On wasix-sysroot -39, dlmalloc ignores the initial pages, so even startup grows the memory.
+- `cert/ctypes.mjs` (its calibration now uses a 256 MiB malloc, since a 64 MiB one fits in -5's initial memory): passes on -4 too, `sbrk_grow_256m=268304384`.
+
 ## 3.15.0-3: -I/-E, copied venvs (3.15.0-4; #1144, #1269; 2026-10-20)
 
 On npm 3.15.0-3 (slicc-kernel 1.125.0, Node entry):

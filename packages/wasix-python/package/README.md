@@ -2,6 +2,21 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.0-5
+
+- **`python3 -I` and `-E` ignore a caller's `PYTHONHOME`** (homescoop#1504), as stock CPython does. In 3.15.0-4, `PYTHONHOME=/somewhere python3 -I` loaded its standard library, `encodings` included, from `/somewhere`. The slicc command now also sets `SLICC_PYTHONHOME` to this package, and only under `-I`/`-E` python takes its home from that variable (`patches/cpython-home-wasix.patch`). Without `-I`/`-E`, `PYTHONHOME` works as before. `SLICC_PYTHONHOME` is the command's own setting; tools that use `-I` to make the environment irrelevant (pip's build isolation, `#!/usr/bin/python3 -I` scripts) don't set it.
+- **A larger initial memory: 160 MiB, was 40 MiB** (homescoop#1287). See [Memory](#memory).
+- Built on **wasix-sysroot 2025.9.30-40** (3.15.0-4: -39), whose `malloc` uses the initial memory. -40 changes no libc++/libc++abi/libunwind file, so the published py-\* side modules (ranges `>=3.15.0-1 <3.15.1`) load as before.
+
+## Memory
+
+`bin/python.wasm` and `bin/python-fork.wasm` start with 160 MiB of shared memory and can grow to 4 GiB, the wasm32 limit (`recipe.yaml` `wasm:`).
+
+- **Why 160 MiB:** importing numpy, pandas, scipy and matplotlib takes the memory to about 116 MiB (measured on wasix-sysroot -40 with `sbrk(0)`). That covers python's data, its 16 MiB stack, the heap, and the side modules the loader places above it. 160 MiB holds that with room to spare, so a typical session starts without growing the memory. That matters for threads: a thread can trap while another thread grows the memory (slicc-kernel#1172).
+- **Since -40, malloc uses those pages.** Up to wasix-sysroot -39, dlmalloc ignored the pages between the heap base and the initial size and grew the memory for every allocation, so a larger initial memory only cost space. `cert/heap-size.mjs` checks that 48 MiB of allocations right after start don't grow the memory.
+- **Peak:** a numpy/pandas/scipy/matplotlib workload peaked at about 3,700 MiB. That fits under the 4 GiB maximum, but leaves little room, so very large arrays can fail with `MemoryError`.
+- **Cost:** every python process, including each `multiprocessing` worker and each `subprocess` python, reserves 160 MiB up front. On most hosts a page takes real memory only once it is touched.
+
 ## Since 3.15.0-4
 
 - **`python3 -I` and `-E` work** (homescoop#1144). They used to stop with `No module named 'encodings'`: they ignore `PYTHONHOME`, which the slicc command sets to this package, and nothing else could find the standard library. Python still ignores `PYTHONPATH` and the other variables under `-E`/`-I`.
@@ -33,7 +48,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Features
 
-- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-38's `sysroot-ehpic` (-34 up to 3.14.2-28) (legacy wasm EH), SOABI `cpython-315-wasm32-wasix` (3.14.2-N: `cpython-314-wasm32-wasix`); native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
+- PIE dynamic-main (`dylink.0`) on wasix-sysroot 2025.9.30-40's `sysroot-ehpic` (-38 in 3.15.0-1 to -3, -39 in -4, -34 up to 3.14.2-28) (legacy wasm EH), SOABI `cpython-315-wasm32-wasix` (3.14.2-N: `cpython-314-wasm32-wasix`); native side modules (py-numpy, py-scipy, py-pandas, …) load by `dlopen`
 - **File modes** (3.14.2-12, on slicc-kernel ≥ 1.35.1; older kernels keep the no-op modes): `os.umask`, `open()`/`os.mkdir` create modes, `os.chmod`, `tempfile.mkstemp` 600 / `mkdtemp` 700, pip console scripts 755
 - Built in: `ssl`/`hashlib` (OpenSSL 3.5.9, `@ai-ecoverse/wasix-openssl`), `zlib` 1.3.1, `bz2`, `lzma` (xz 5.8.4), `sqlite3` (3.54.0; FTS5, JSON, math, R*Tree; no WAL, no extensions), `readline` 8.3 (ncurses 6.5 terminfo compiled in: xterm, screen, tmux, vt100, linux), `ctypes` / `_ctypes` (wasix-org/libffi; needs slicc-kernel#306 step 1 for `call_dynamic` + `closure_{allocate,free}`), `mmap`, `fcntl`, `termios`, `resource`, `pwd`, `grp`, `select`
 - Two binaries (since 3.14.2-25): the default has no `fork`/`vfork`; `PYTHON_FORK=true` selects the fork-capable one (below). `subprocess` uses `os.posix_spawn` (`proc_spawn2`/`3`) in both

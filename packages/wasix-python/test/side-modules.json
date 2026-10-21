@@ -7,15 +7,15 @@
   "packages": [
     {
       "name": "@ai-ecoverse/py-numpy",
-      "version": "2.5.4-2",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.5.4-2.tgz",
-      "sha256": "c9f8f54d70eb138f19caa50965fcd7f8a11da5acf2ed51ad5b299acb46efe714"
+      "version": "2.5.4-4",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.5.4-4.tgz",
+      "sha256": "4712cdbe785cc1d783674f4bc3dce6f788f59554ba52c7f32ff0e3708c551fda"
     },
     {
       "name": "@ai-ecoverse/py-pandas",
-      "version": "3.0.6-3",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pandas/-/py-pandas-3.0.6-3.tgz",
-      "sha256": "7a1fff4ece341522e06d2ac78c748cfafe93ba3c37b4b92f78a69b8108691bd1"
+      "version": "3.0.6-4",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pandas/-/py-pandas-3.0.6-4.tgz",
+      "sha256": "5a6c4c2319a3860cfbdf4374b5e769e00b57f8402b9a178cfdcf4a189de33d95"
     },
     {
       "name": "@ai-ecoverse/py-scipy",
@@ -25,33 +25,33 @@
     },
     {
       "name": "@ai-ecoverse/py-matplotlib",
-      "version": "3.11.2-13",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-matplotlib/-/py-matplotlib-3.11.2-13.tgz",
-      "sha256": "1f306c02b091ede4116a0fb30adf17da2852b14ebe00dfd30abb0126e721df40"
+      "version": "3.11.2-14",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-matplotlib/-/py-matplotlib-3.11.2-14.tgz",
+      "sha256": "cd83e7ae4bc38bc648a444999b7297bb518450964b430958124e2d49418599d0"
     },
     {
       "name": "@ai-ecoverse/py-contourpy",
-      "version": "1.4.0-11",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-contourpy/-/py-contourpy-1.4.0-11.tgz",
-      "sha256": "24bbd152a8f928c0fae388345bf8ba57a1d0748556a736923cb1c45c72903e6b"
+      "version": "1.4.0-12",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-contourpy/-/py-contourpy-1.4.0-12.tgz",
+      "sha256": "fa580943694359f565fd15686a643c4cff2a361ff10aca6ee5cb06c6b43d7643"
     },
     {
       "name": "@ai-ecoverse/py-kiwisolver",
-      "version": "1.5.1-11",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-kiwisolver/-/py-kiwisolver-1.5.1-11.tgz",
-      "sha256": "7f92fdefb5d382406ef95b6c50605ef81c86c17be9242254809e0951cc98067c"
+      "version": "1.5.1-12",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-kiwisolver/-/py-kiwisolver-1.5.1-12.tgz",
+      "sha256": "6ced3ba5c974af160217b6d330c86f37945b0222d285966d31c65d8949db9251"
     },
     {
       "name": "@ai-ecoverse/py-pillow",
-      "version": "13.0.0-2",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pillow/-/py-pillow-13.0.0-2.tgz",
-      "sha256": "2ddef2814c793e954e1826b00bedd27a8aa0fd1ff69c493f22795dd1af597311"
+      "version": "13.0.0-3",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pillow/-/py-pillow-13.0.0-3.tgz",
+      "sha256": "0da071b790144692a5c1814b03102b11be138a46831c866a805b15c127ab568e"
     },
     {
       "name": "@ai-ecoverse/py-fonttools",
-      "version": "4.66.1-10",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-fonttools/-/py-fonttools-4.66.1-10.tgz",
-      "sha256": "39e4efeaa5108c311dbfdc083277e68afd6a7c1e8083390e5e4331ecce5f3ebf"
+      "version": "4.66.1-11",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-fonttools/-/py-fonttools-4.66.1-11.tgz",
+      "sha256": "ec1dbb43f55361a7aeccaf8316faeec9eb85c7e6348c84dd53a22d8738d352ad"
     },
     {
       "name": "@ai-ecoverse/py-cycler",
