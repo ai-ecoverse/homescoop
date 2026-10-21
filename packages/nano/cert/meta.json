@@ -17,6 +17,7 @@
     "pty, new file: type two lines, ^O + Enter ('Write to File: new.txt', '[ Wrote 2 lines ]'), ^X exits 0; bytes compared",
     "pty, existing file: '[ Read 2 lines ]', ^E + UTF-8 text, ^O + Enter, ^X; bytes compared",
     "pty, modified buffer: ^X asks 'Save modified buffer?', n discards, file unchanged",
-    "cert/locking.mjs (8.7.1-6, homescoop#866): as an added user ed, nano -G f.txt on a pty shows no \"Couldn't determine my identity for lock file\"; while it's open /home/ed/.f.txt.swp exists and holds 'ed' at nano's user-name offset 28; after ^X it's gone (build.sh links homescoop_slicc_wrap_pwd, so getpwuid is the slicc passwd shim's). 8.7.1-5: the identity message, no lock file (NEGATIVE.md)"
+    "cert/locking.mjs (8.7.1-6, homescoop#866): as an added user ed, nano -G f.txt on a pty shows no \"Couldn't determine my identity for lock file\"; while it's open /home/ed/.f.txt.swp exists and holds 'ed' at nano's user-name offset 28; after ^X it's gone (build.sh links homescoop_slicc_wrap_pwd, so getpwuid is the slicc passwd shim's). 8.7.1-5: the identity message, no lock file (NEGATIVE.md)",
+    "cert/locking.mjs (8.7.1-8, homescoop#1451): while ed has f.txt open with -G, a second nano -G f.txt shows \"being edited by ed (with nano 8.7.1, PID …)\"; ^R ~ed/f.txt in a new g.txt inserts f.txt (the ~user expansion goes through the getpwent wrap) and the saved bytes are compared. 8.7.1-5: neither (NEGATIVE.md)"
   ]
 }
