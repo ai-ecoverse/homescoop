@@ -7,6 +7,10 @@ summary: "GNU m4 for slicc WASIX (command m4)"
 source:
   url: "https://mirrors.kernel.org/gnu/m4/m4-{{version}}.tar.xz"
   sha256: "e236ea3a1ccf5f6c270b1c4bb60726f371fa49459a8eaaebc90b216b328daf2b"
+wasm:
+  initial-memory: 32MiB
+  measured-peak: 20MiB
+  measured-by: "VmSize polled from /proc/<pid>/status, 1.4.20-6's build on wasix-sysroot -40 (8.25 MiB linked initial memory) on slicc-kernel 1.142.0: autoconf 2.72's own m4 run (m4 --gnu -R autoconf/autoconf.m4f over a configure.ac with 120 AC_CHECK_HEADERS and 120 AC_CHECK_FUNCS, 197 kB of configure) 17.4 MiB; cert/stress.mjs's 2 MiB patsubst 19 MiB"
 inputs:
   - scripts/notices-common.sh
 dependencies:
