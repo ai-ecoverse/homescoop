@@ -33,6 +33,7 @@ mkdir -p "$WORK" "$OUT"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
 [[ -d "$SRC" ]] || tar -xjf "$TB" -C "$WORK"
+homescoop_apply_patches "$SRC"
 
 CRYPTO_CONFIG="$HERE/src/tls_engine_crypto_config.h"
 if [[ ! -f "$PREFIX/lib/libtfpsacrypto.a" || -n "${FORCE:-}" ]]; then
