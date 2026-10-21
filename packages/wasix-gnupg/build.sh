@@ -122,7 +122,7 @@ gpgerr_prep() {
   # The gpg-error-config self-test hangs cross-compiling; it checks nothing we ship.
   printf '#!/bin/sh\nexit 0\n' > src/gpg-error-config-test.sh.in
 }
-EXTRA=(--disable-doc --disable-tests --disable-languages --disable-nls --enable-threads=posix)
+EXTRA=(--sysconfdir=/etc --disable-doc --disable-tests --disable-languages --disable-nls --enable-threads=posix)
 build_lib libgpg-error 1.61 gpgerr_prep
 EXTRA=()
 build_lib npth 1.8 true
