@@ -65,15 +65,17 @@ another (homescoop#1126).
 
 ## Updates in place
 
-On slicc-kernel 1.134.3 or later, where renaming a directory is a cheap
-atomic move, replacing a package in a hoisted `node_modules` (a new version,
-or a changed one) never shows a reader a half-there package (12.9.1-18,
-homescoop#1128). pnpm stages the new copy in a sibling directory, renames the
-old one aside, renames the new one in, and only then deletes the old one.
-Between the two renames the directory is briefly absent. On older kernels a
-directory rename copies the whole tree: 12.9.1-11 and -12 did this
-everywhere and timed out on large packages, so there pnpm keeps its own
-remove-then-rename. A package new to `node_modules` is imported in place.
+Replacing a package in a hoisted `node_modules` (a new version, or a changed
+one) never shows a reader a half-there package, and a failed update leaves the
+old package whole (12.9.1-18, homescoop#1128; on every kernel since 12.9.1-20,
+homescoop#1384). pnpm stages the new copy in a sibling directory, renames the
+old one aside, renames the new one in, and only then deletes the old one;
+if the second rename fails, the old one goes back. Between the two renames the
+directory is briefly absent. On slicc-kernel before 1.134.3 a directory
+rename copies the tree, so an update there is slower. If the old copy can't
+be deleted afterwards (say, it holds a read-only directory), it stays as a
+`<name>_pacquet-stage_*` sibling, with a warning. A package new to
+`node_modules` is imported in place.
 
 ## Modes and the umask (12.9.1-12)
 
@@ -133,7 +135,9 @@ project with a `file:` dependency (homescoop#1247): pnpm's
 `host/pnpm-host.mjs` refused pnpm's spawns other than `sh` and `git`, so
 these failed with "Lifecycle scripts cannot run in slicc yet". Now the host
 starts pnpm as the `pnpm` command, and any other program as the file pnpm's
-`PATH` finds (`node` stays refused: slicc has none). Install-time lifecycle
+`PATH` finds (`node` stays refused: slicc has none). A bin that is a Node.js
+script (`#!/usr/bin/env node`, most npm bins) fails with that reason (since
+12.9.1-20, homescoop#1441; `npx` exits 126). Install-time lifecycle
 scripts still stay off (`ignore-scripts=true`).
 
 ## A private registry and the pin

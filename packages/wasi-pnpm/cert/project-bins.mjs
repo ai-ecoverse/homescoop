@@ -53,6 +53,24 @@ pnpm add file:../lib file:../tool`);
     assert.match(r.stdout, /^hello-out x y$/m, `#667 ${cmd} (in ${cwd}) runs node_modules/.bin/hello-bin: ${out(r)}`);
   }
 
+  // homescoop#1441 (12.9.1-20): a node-shebang bin (most npm bins) fails
+  // with a reason, not an unexplained ENOENT: slicc has no node.
+  const js = await sh(String.raw`set -e
+mkdir -p jstool/bin
+echo '{"name":"jsbin","version":"1.0.0","bin":{"jsbin":"bin/cli.js"}}' > jstool/package.json
+printf '#!/usr/bin/env node
+console.log("js")
+' > jstool/bin/cli.js
+chmod +x jstool/bin/cli.js
+cd app && pnpm add file:../jstool`);
+  assert.equal(js.status, 0, `pnpm add file:../jstool: ${out(js)}`);
+  const jsExec = await sh('pnpm exec jsbin', '/home/bob/app');
+  assert.notEqual(jsExec.status, 0, `#1441 pnpm exec of a node script fails: ${out(jsExec)}`);
+  assert.match((jsExec.stdout + jsExec.stderr).replace(/[\s│]+/g, ' '), /jsbin is a Node\.js program .*slicc has no node/, `#1441 pnpm exec says why: ${out(jsExec)}`);
+  const jsNpx = await sh('npx jsbin', '/home/bob/app');
+  assert.equal(jsNpx.status, 126, `#1441 npx of a node script exits 126: ${out(jsNpx)}`);
+  assert.match(jsNpx.stderr, /npx: jsbin is a Node\.js program .*slicc has no node/, `#1441 npx says why: ${out(jsNpx)}`);
+
   const missing = await sh('pnpm exec no-such-bin', '/home/bob/app');
   assert.notEqual(missing.status, 0, `pnpm exec of a missing command fails: ${out(missing)}`);
   assert.match(missing.stdout + missing.stderr, /no-such-bin/, `the error names the command: ${out(missing)}`);
