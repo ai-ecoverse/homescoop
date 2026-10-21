@@ -648,7 +648,7 @@ for v in "${VARIANTS[@]}"; do
   echo "  $v ($flavour)"
 done
 
-echo "== wasix-sysroot: -36 uname() nodename from HOSTNAME (slicc-kernel's node name), not wasmer.sh (homescoop#1050)"
+echo "== wasix-sysroot: -36 uname() nodename from /etc/hostname (-42, homescoop#1462), then HOSTNAME (slicc-kernel's node name), not wasmer.sh (homescoop#1050)"
 R36_OBJ="$WORK/r36"
 rm -rf "$R36_OBJ" && mkdir -p "$R36_OBJ/static" "$R36_OBJ/pic"
 compile_r18 uname "$R36_OBJ/static/uname.o"

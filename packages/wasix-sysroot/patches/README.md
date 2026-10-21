@@ -377,7 +377,7 @@ Linux and POSIX give ENOENT for an empty pathname. Up to -25 libc's path resolut
 - **#949, a ready fd wins over a pending signal:**
   - **The problem:** with an fd ready at entry and a pending signal that the call's temporary mask unblocks, Linux returns the ready count and leaves the signal pending, restoring the old mask unless the wait ends with EINTR. slicc-kernel's masked waits (`slicc.sigmask_poll`, `slicc.sigmask_epoll_wait`) deliver the signal first, so the call returned -1 EINTR.
   - **The fix:** `__slicc_poll_masked`, which serves `ppoll`, `pselect` and masked `poll_core`, first polls the same subscriptions without waiting, under the current mask, with clock subscriptions set to "now". If an fd is ready it returns those events and the masked wait never runs. `epoll_pwait` does the same with `epoll_wait(…, 0)`.
-- **#1050, `uname.c`:** replaces `uname.o`, whose nodename was a fixed `wasmer.sh`, so `gethostname()` named Wasmer's site.
+- **#1050, `uname.c`:** replaces `uname.o`, whose nodename was a fixed `wasmer.sh`, so `gethostname()` named Wasmer's site. The nodename was `HOSTNAME` (slicc-kernel sets it to its node name on every start), or `slicc` without it; -42 reads `/etc/hostname` first (below).
   - The nodename is now `HOSTNAME`, which slicc-kernel sets to its node name on every program start, or `slicc` when it's unset, too long or holds a `/`.
   - The other fields keep upstream's placeholders.
 - **#975, `poll.c`:**
@@ -457,3 +457,14 @@ Upstream's `__wasilibc_find_relpath_alloc` (which `chdir.c` defines) made every 
 - **`chdir`:** a relative path made only of `.` components (`.`, `./`, `./.`) goes to the host's `chdir` as `.`, never through `realpath` (whose answer for it is `getcwd`'s string, which names the replacement of a removed cwd); slicc-kernel gives ENOENT there and the cwd stays. Any other path `realpath` resolves keeps the physical-cwd behaviour (-18). A relative one it can't (ENOENT, e.g. `..` or `./..` once the host's `getcwd` is ENOENT in a removed cwd) goes to the host's `chdir` import with leading `./` dropped (slicc-kernel lets only a path whose first component is `..` out of a removed cwd); slicc-kernel resolves it against fd 3 and moves fd 3. The cached string is then re-read on its next use.
 - **`getcwd`** is unchanged: it asks the host every time.
 - **Tests:** `test/r41.c`. Live-cwd rows (relative create, `stat`, `fstatat`/`openat(AT_FDCWD)`, `access`, `mkdir`, `chdir` into a subdirectory and back with `..` and `./sub/../..`, `getcwd` after each, `realpath`, `readdir(".")`) on any kernel; with `R41_GONE=1` (slicc-kernel ≥ 1.135.6) the removed-cwd rows: `.`, `open`, `stat`, `fstatat`, `access`, `chdir` of a name and `chdir(".")`/`chdir("./.")` ENOENT with the cwd kept, `chdir("..")` and, in a second removed cwd, `chdir("./..")` work. `R41_KERNEL=1` also requires `getcwd` ENOENT there, once slicc-kernel#1227 ships.
+
+## -42: `/etc/hostname` first (`uname.c`; homescoop#1462)
+
+`uname()` fills `nodename` from, in order:
+1. the first line of `/etc/hostname`: up to 256 bytes are read (`O_NONBLOCK`, so a FIFO there can't block), cut at the first newline, and trimmed of spaces, tabs, CR, VT and FF at both ends;
+2. `HOSTNAME`;
+3. `slicc`.
+
+A candidate is skipped when it's empty, 65 characters or longer (`nodename` holds 64 plus the NUL), or contains a `/`, a space, a control character or DEL. A first line with no newline in the 256 bytes counts as too long. musl's `gethostname()` copies `uname().nodename`, so both change. `errno` is saved and restored, so a missing file leaves no ENOENT behind. slicc-kernel ≥ 1.140.0 serves a synthetic `/etc/hostname` with its node name to WASIX programs, and a real file written by root wins over it (slicc-kernel#1297). Once this sysroot is the floor, slicc-kernel can drop the `HOSTNAME` injection of slicc-kernel#1296 for modules with the -42 marker.
+
+**Tests:** `test/r42.c`, the kernel created with hostname `r42-node`. Each fallback step has a row: a file line (with and without a newline, 64 characters), then the rejected lines (empty, blank, 65 and 399 characters, `/`, an inner space) falling back to `HOSTNAME`, then no file giving `HOSTNAME`, and no file with `HOSTNAME` empty or unset giving `slicc`. It also checks that `errno` is untouched and that a 4-byte buffer truncates. `R42_KERNEL=1` (slicc-kernel ≥ 1.140.0) requires the kernel's own file: with `HOSTNAME` unset that gives `r42-node`.
