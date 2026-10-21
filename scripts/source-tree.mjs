@@ -37,7 +37,9 @@ const gitEnv = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/
  * @param {{ archive: string, repo: string, commit: string, tree: string }} o
  * @returns {{ ok: boolean, tree: string, subst: string[], ignored: string[], problems: string[] }}
  */
-export function checkArchiveTree({ archive, repo, commit, tree }) {
+export const SUBST_VALUE = /^[A-Za-z0-9._+~:/ -]{0,200}$/;
+
+export function checkArchiveTree({ archive, repo, commit, tree, allowSubst }) {
   const dir = mkdtempSync(join(tmpdir(), 'homescoop-tree-'));
   try {
     const gitDir = join(dir, 'git');
@@ -60,7 +62,7 @@ export function checkArchiveTree({ archive, repo, commit, tree }) {
       );
     git(['fetch', '-q', '--depth=1', '--no-tags', repo, commit]);
     const got = git(['rev-parse', `${commit}^{tree}`]).trim();
-    if (got !== tree) return { ok: false, tree: got, extracted: null, full: false, subst: [], ignored: [], problems: [`commit ${commit} has tree ${got}, not the pinned ${tree}`] };
+    if (got !== tree) return { ok: false, tree: got, subst: [], values: {}, ignored: [], problems: [`commit ${commit} has tree ${got}, not the pinned ${tree}`] };
 
     const magic = Buffer.alloc(4);
     const fd = openSync(archive, 'r');
@@ -95,20 +97,44 @@ export function checkArchiveTree({ archive, repo, commit, tree }) {
       else problems.push(`${diff[i]} ${diff[i + 1]}`);
     }
     const marked = attrs('export-subst', modified);
+    const narrow = Array.isArray(allowSubst);
+    const listed = new Set(narrow ? allowSubst : []);
     const subst = new Set();
+    const values = {};
     for (const p of marked) {
+      if (narrow && !listed.has(p)) continue;
       const blob = git(['cat-file', 'blob', `:${p}`]);
       const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp(`^${blob.split(/\$Format:[^$]*\$/).map(esc).join('[^\\n]*')}$`);
-      if (re.test(readFileSync(join(work, p), 'utf8'))) subst.add(p);
+      const re = new RegExp(`^${blob.split(/\$Format:[^$]*\$/).map(esc).join('([^\\n]*)')}$`);
+      const m = re.exec(readFileSync(join(work, p), 'utf8'));
+      if (!m) continue;
+      const found = m.slice(1);
+      if (narrow) {
+        const bad = found.find((v) => !SUBST_VALUE.test(v));
+        if (bad !== undefined) {
+          problems.push(`export-subst value in ${p} is not one line of [A-Za-z0-9._+~:/ -] up to 200 characters: ${JSON.stringify(bad.slice(0, 80))}`);
+          subst.add(p);
+          continue;
+        }
+      }
+      subst.add(p);
+      values[p] = found;
     }
     const ignore = attrs('export-ignore', deleted);
-    for (const p of modified) if (!subst.has(p)) problems.push(`differs from the tree: ${p}`);
+    for (const p of modified) if (!subst.has(p)) problems.push(`differs from the tree${narrow && marked.has(p) && !listed.has(p) ? ' (export-subst, not in source.tree_subst)' : ''}: ${p}`);
     for (const p of deleted) if (!ignore.has(p)) problems.push(`missing from the archive: ${p}`);
     for (const p of others) problems.push(`not in the tree: ${p}`);
-    git(['add', '-A', '-f', '--', '.'], work);
-    const extracted = git(['write-tree']).trim();
-    return { ok: problems.length === 0, tree: got, extracted, full: extracted === tree, subst: [...subst], ignored: [...ignore], problems };
+    if (narrow) {
+      const all = git(['ls-files', '-z']).split('\0').filter(Boolean);
+      const declared = new Set();
+      const out = execFileSync('git', [`--git-dir=${gitDir}`, 'check-attr', '--cached', '-z', '--stdin', 'export-ignore'], { input: all.join('\0'), encoding: 'utf8', maxBuffer: 1 << 28, env: { ...gitEnv, GIT_INDEX_FILE: join(dir, 'index') } }).split('\0');
+      for (let i = 0; i + 2 < out.length; i += 3) if (out[i + 2] === 'set') declared.add(out[i]);
+      const gone = new Set(deleted);
+      const inTree = new Set(all);
+      for (const p of declared) if (!gone.has(p)) problems.push(`export-ignore in the tree's .gitattributes but present in the archive: ${p}`);
+      for (const p of listed) if (!inTree.has(p)) problems.push(`source.tree_subst lists ${p}, which isn't in the tree`);
+    }
+    return { ok: problems.length === 0, tree: got, subst: [...subst], values, ignored: [...ignore], problems };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

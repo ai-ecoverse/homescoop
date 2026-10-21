@@ -378,25 +378,24 @@ script and older ones would take an argument as a package name. It prints `sourc
 A changed sha256 for an unchanged URL whose archive matches `tree:` is a re-roll.
 GitHub regenerates archives, and it can serve another gzip of the same commit on
 most runs (#1491's llvm-project archive).
-- **Build jobs:** ladder-pr's `host-build` and `rebuild` run
-  `refresh-recipe-sha.mjs <pkg> --ci-reroll`. A re-roll passes only when the
-  extracted archive, staged whole, writes a tree object equal to `tree:`. The
-  one exception is an export-subst file (llvm-project's
-  `clang/bindings/python/.git_archival.txt`, whose `describe-name` moves with
-  every new tag). It may differ only in its `$Format:…$` placeholders, and the
-  verdict line names it. A missing export-ignore path fails. Each accepted
-  re-roll prints `recipe-sha: REROLL <pkg> <old>→<new> sha256 tree=<tree>`, plus
-  ` export-subst=<paths>` when that exception applied. The step fails if a
-  re-roll has no such line, and it runs through `gate.mjs recipe-sha`. The new
-  pin is written to that job's checkout only, which has no push credentials;
-  nothing commits it.
-- **Strict jobs:** a recipe without `tree:` still fails. So do ladder-pr's
-  `recipe-sha` job, pool-parity, ladder-merge and ladder-build, none of which
-  gets the flag.
-- **Refreshing the committed pin:** do it explicitly with
-  `node scripts/refresh-recipe-sha.mjs <pkg> --reroll`, which logs the tree check
-  (export-subst and export-ignore differences allowed), and commit that log
-  line's verdict in the PR body. An archive that doesn't match the
+- **Where it applies:** with `refresh-recipe-sha.mjs <pkg> --ci-reroll`, a re-roll of a pin carried over unchanged from the base passes only when the archive matches `tree:` under the narrow rule:
+  - every path is byte-for-byte the committed tree;
+  - except files listed in the recipe's `tree_subst:` (e.g. `clang/bindings/python/.git_archival.txt` for llvm-project, whose `describe-name` moves with each new tag), which the tree's own `.gitattributes` marks `export-subst`. Those may differ only at their `$Format:…$` placeholders, and each substituted value is one line of `[A-Za-z0-9._+~:/ -]`, at most 200 characters;
+  - the paths missing from the archive are exactly the tree's `export-ignore` set;
+  - no extra paths.
+
+  Each accepted re-roll prints:
+  ```text
+  recipe-sha: REROLL <pkg> <old>→<new> sha256 tree=<tree> subst=<path>[<values>]
+  ```
+  The step runs through `gate.mjs recipe-sha` and fails if a re-roll has no such line. The jobs that run it:
+  - ladder-pr's `host-build` and `rebuild`, pool-parity, and ladder-build's `host-build` write the new pin into their own checkout only, which has no push credentials and no id-token;
+  - ladder-pr's `recipe-sha` job adds `--keep-pin`, so it passes with the REROLL line and writes nothing.
+
+  A changed pin or URL, a recipe without `tree:`, and a difference no `tree_subst:` covers all stay strict and fail. The source sha256 doesn't reach the package (llvm-emscripten's published tarball has the commit, not the archive sha), so a re-roll can't change the published bytes.
+- **The normal publish path downloads nothing.** ladder-merge passes `artifact_pr`, ladder-build fetches the certified PR artifact (`fetch-certified`), and its `host-build` is skipped. `host-build` runs only as the fallback (a manual dispatch, or an expired artifact), and its rebuild must still match the certified sha256.
+- **Local builds:** run `node scripts/refresh-recipe-sha.mjs <pkg> --ci-reroll` before `host-run.sh`. The pin it writes must never be committed.
+- **Refreshing the committed pin** is explicit: `node scripts/refresh-recipe-sha.mjs <pkg> --reroll` logs the tree check (the older rule: export-subst placeholders of any marked file, and export-ignore paths, allowed). Commit that log line's verdict in the PR body. homescoop_fetch stays strict. An archive that doesn't match the
 tree fails, with or without `--reroll`. ladder-pr's `recipe-sha` job also passes
 `--verify-tree`, so a pinned tree is checked on every PR that touches the package,
 even when the sha256 matches.
