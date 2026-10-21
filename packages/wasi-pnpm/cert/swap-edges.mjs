@@ -24,6 +24,8 @@ const add = (name, version, n) => {
 };
 add('big', '1.0.0', 40);
 add('big', '2.0.0', 50);
+add('x_pacquet-stage_1_2_3', '1.0.0', 3);
+add('x_pacquet-stage_1_2_3', '2.0.0', 3);
 
 const registry = {
   toString: () => `(req) => {
@@ -51,58 +53,69 @@ export default async function (ctx) {
   const out = (r) => `rc=${r.status}\n--- stdout\n${r.stdout.slice(-2000)}\n--- stderr\n${r.stderr.slice(-2000)}`;
   await serve(registry);
   await addUser({ name: 'bob' });
-  const app = '/home/bob/swap';
-  const manifest = (v) => JSON.stringify({ name: 'swap', version: '1.0.0', private: true, dependencies: { big: v } });
-  await write(`${app}/package.json`, manifest('1.0.0'));
-  await run(['chown', '-R', 'bob', app], { cwd: '/' });
-  const sh = (s) => run(['bash', '-c', s], { cwd: app, user: 'bob' });
-  const state = async () => {
-    const r = await sh('shopt -s nullglob; d=node_modules/big; f=("$d"/lib/*); v=; [ -f $d/package.json ] && { read -r v < $d/package.json; v=${v#*version?:?}; v=${v%%[!0-9.]*}; }; echo "${#f[@]} ${v:-nopj}"');
-    return r.stdout.trim();
+  const REAL = 'x_pacquet-stage_1_2_3';
+  const manifest = (v) => JSON.stringify({ name: 'swap', version: '1.0.0', private: true, dependencies: { big: v, [REAL]: v } });
+  const flow = async (app, md, flags) => {
+    const tag = `[${md}]`;
+    await write(`${app}/package.json`, manifest('1.0.0'));
+    await run(['chown', '-R', 'bob', app], { cwd: '/' });
+    const sh = (s) => run(['bash', '-c', s], { cwd: app, user: 'bob' });
+    const install = () => sh(`pnpm install --registry ${REGISTRY} ${flags}`);
+    const version = async (pkg) => {
+      const r = await sh(`shopt -s nullglob; d=${md}/${pkg}; f=("$d"/lib/*); v=; [ -f $d/package.json ] && { read -r v < $d/package.json; v=\${v#*version?:?}; v=\${v%%[!0-9.]*}; }; echo "\${#f[@]} \${v:-nopj}"`);
+      return r.stdout.trim();
+    };
+    const state = () => version('big');
+    const real = async () => (await version(REAL)).split(' ')[1];
+    const stages = async () => (await sh(`shopt -s nullglob; for f in ${md}/*_pacquet-stage_* ${md}/@*/*_pacquet-stage_*; do echo "\${f#${md}/}"; done`)).stdout.trim().split('\n').filter((n) => n && n !== REAL);
+    let r = await install();
+    assert.equal(r.status, 0, `${tag} install big@1.0.0: ${out(r)}`);
+    assert.equal(await state(), '40 1.0.0', `${tag} big@1.0.0 is installed`);
+    assert.equal(await real(), '1.0.0', `${tag} ${REAL}@1.0.0, a real package named like a stage directory, is installed`);
+    r = await sh(`mkdir ${md}/big/lockd && echo x > ${md}/big/lockd/x && chmod 500 ${md}/big/lockd`);
+    assert.equal(r.status, 0, out(r));
+    await write(`${app}/package.json`, manifest('2.0.0'));
+    await run(['chown', 'bob', `${app}/package.json`], { cwd: '/' });
+    r = await install();
+    const after = await state();
+    console.log(`swap-edges: ${tag} update over an unremovable entry: rc ${r.status}, big is "${after}"`);
+    assert.ok(after === '40 1.0.0' || after === '50 2.0.0', `#1384 ${tag} big is a complete 1.0.0 or 2.0.0 after the update (rc ${r.status}), not "${after}": ${out(r)}`);
+    if (after === '40 1.0.0') {
+      const x = await sh(`cat ${md}/big/lockd/x`);
+      assert.equal(x.stdout, 'x\n', `#1384 ${tag} the old tree is the old tree, read-only entry included`);
+    }
+    if (after === '50 2.0.0') {
+      const left = await stages();
+      console.log(`swap-edges: ${tag} leftovers after the update: ${left.join(' ') || 'none'}`);
+      assert.equal(left.length, 1, `${tag} the unremovable old tree is left once: ${left.join(' ')}`);
+      assert.match(r.stderr, new RegExp(`${md}/${left[0]}`), `#1532 ${tag} the update names the leftover ${left[0]} on stderr: ${out(r)}`);
+      assert.equal(await real(), '2.0.0', `#1532 ${tag} ${REAL} is updated, not taken for a leftover`);
+      r = await install();
+      assert.equal(r.status, 0, `${tag} an install while the leftover is still read-only: ${out(r)}`);
+      assert.match(r.stderr, new RegExp(`${md}/${left[0]}`), `#1532 ${tag} an install that still can't delete it names it again: ${out(r)}`);
+      assert.deepEqual(await stages(), left, `${tag} and leaves it`);
+    }
+    r = await sh(`chmod -R u+w . && pnpm install --registry ${REGISTRY} ${flags} && ls -A ${md}`);
+    assert.equal(r.status, 0, `${tag} the update after chmod -R u+w: ${out(r)}`);
+    assert.equal(await state(), '50 2.0.0', `${tag} big@2.0.0 is installed after the retry`);
+    console.log(`swap-edges: ${tag} after the retry: ${r.stdout.trim().split('\n').join(' ')}`);
+    assert.deepEqual(await stages(), [], `#1532 ${tag} the install after chmod -R u+w removes the leftover: ${out(r)}`);
+    r = await sh(`ls -A ${md}`);
+    assert.ok(!r.stdout.includes('.pacquet-stage-leftovers'), `#1532 ${tag} and its record: ${r.stdout}`);
+    assert.equal(await real(), '2.0.0', `#1532 ${tag} ${REAL} survives every install`);
+    return sh;
   };
-  let r = await sh(`pnpm install --registry ${REGISTRY}`);
-  assert.equal(r.status, 0, `install big@1.0.0: ${out(r)}`);
-  assert.equal(await state(), '40 1.0.0', 'big@1.0.0 is installed');
-  r = await sh('mkdir node_modules/big/lockd && echo x > node_modules/big/lockd/x && chmod 500 node_modules/big/lockd');
-  assert.equal(r.status, 0, out(r));
-  await write(`${app}/package.json`, manifest('2.0.0'));
-  await run(['chown', 'bob', `${app}/package.json`], { cwd: '/' });
-  r = await sh(`pnpm install --registry ${REGISTRY}`);
-  const after = await state();
-  console.log(`swap-edges: update over an unremovable entry: rc ${r.status}, node_modules/big is "${after}"`);
-  assert.ok(after === '40 1.0.0' || after === '50 2.0.0', `#1384 node_modules/big is a complete 1.0.0 or 2.0.0 after the update (rc ${r.status}), not "${after}": ${out(r)}`);
-  if (after === '40 1.0.0') {
-    const x = await sh('cat node_modules/big/lockd/x');
-    assert.equal(x.stdout, 'x\n', '#1384 the old tree is the old tree, read-only entry included');
-  }
-  const stages = async () => (await sh('shopt -s nullglob; for f in node_modules/*_pacquet-stage_* node_modules/@*/*_pacquet-stage_*; do echo "${f#node_modules/}"; done')).stdout.trim().split('\n').filter(Boolean);
-  if (after === '50 2.0.0') {
-    const left = await stages();
-    console.log(`swap-edges: leftovers after the update: ${left.join(' ') || 'none'}`);
-    assert.equal(left.length, 1, `the unremovable old tree is left once: ${left.join(' ')}`);
-    assert.match(r.stderr, new RegExp(`node_modules/${left[0]}`), `#1532 the update names the leftover ${left[0]} on stderr: ${out(r)}`);
-    r = await sh(`pnpm install --registry ${REGISTRY}`);
-    assert.equal(r.status, 0, `an install while the leftover is still read-only: ${out(r)}`);
-    assert.match(r.stderr, new RegExp(`node_modules/${left[0]}`), `#1532 an install that still can't delete it names it again: ${out(r)}`);
-    assert.deepEqual(await stages(), left, 'and leaves it');
-  }
-  r = await sh(`chmod -R u+w . && pnpm install --registry ${REGISTRY} && ls -A node_modules`);
-  assert.equal(r.status, 0, `the update after chmod -R u+w: ${out(r)}`);
-  assert.equal(await state(), '50 2.0.0', 'big@2.0.0 is installed after the retry');
-  console.log(`swap-edges: node_modules after the retry: ${r.stdout.trim().split('\n').join(' ')}`);
-  assert.deepEqual(await stages(), [], `#1532 the install after chmod -R u+w removes every *_pacquet-stage_* entry: ${out(r)}`);
-  r = await sh('ls -A node_modules');
-  assert.ok(!r.stdout.includes('.pacquet-stage-leftovers'), `#1532 and its record: ${r.stdout}`);
 
-  r = await sh([
-    'mkdir -p node_modules/old_pacquet-stage_1_2_3/lib node_modules/@s/pkg_pacquet-stage_1_2_4 node_modules/kept_pacquet-stage_1_2_5/node_modules/inner',
-    'echo x > node_modules/old_pacquet-stage_1_2_3/lib/a.js',
-    'echo x > node_modules/@s/pkg_pacquet-stage_1_2_4/index.js',
-  ].join(' && '));
+  const sh = await flow('/home/bob/swap', 'node_modules', '');
+  let r = await sh('mkdir -p node_modules/old_pacquet-stage_1_2_3/lib && echo x > node_modules/old_pacquet-stage_1_2_3/lib/a.js');
   assert.equal(r.status, 0, out(r));
   r = await sh(`pnpm install --registry ${REGISTRY}`);
-  assert.equal(r.status, 0, `an install over unrecorded leftovers: ${out(r)}`);
-  assert.deepEqual(await stages(), ['kept_pacquet-stage_1_2_5'], `#1532 unrecorded leftovers go, except the one holding a node_modules: ${out(r)}`);
-  assert.match(r.stderr, /node_modules\/kept_pacquet-stage_1_2_5/, `#1532 the one kept is named: ${out(r)}`);
-  assert.equal(await state(), '50 2.0.0', 'big@2.0.0 is untouched');
+  assert.equal(r.status, 0, `an install over an unrecorded stage-named directory: ${out(r)}`);
+  r = await sh('cat node_modules/old_pacquet-stage_1_2_3/lib/a.js');
+  assert.equal(r.stdout, 'x\n', '#1532 an unrecorded directory is never deleted, whatever its name');
+
+  const sh2 = await flow('/home/bob/swap2', 'www/mods', '--config.modules-dir=www/mods');
+  r = await sh2(`mkdir -p mods/y_pacquet-stage_1_2_3 && echo y > mods/y_pacquet-stage_1_2_3/a.js && pnpm install --registry ${REGISTRY} --config.modules-dir=www/mods && cat mods/y_pacquet-stage_1_2_3/a.js`);
+  assert.equal(r.status, 0, `#1532 a custom modulesDir: a stage-named directory outside it survives an install: ${out(r)}`);
+  assert.equal(r.stdout.trim().split('\n').pop(), 'y', `#1532 ${out(r)}`);
 }
