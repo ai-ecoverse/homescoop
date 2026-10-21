@@ -386,6 +386,9 @@ for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-sit
   patch -d "$SRCDIR" -p1 -F0 --no-backup-if-mismatch -s < "$PKG/patches/$p.patch"
   echo "  applied $p.patch"
 done
+grep -q -- '--initial-memory=41943040' "$SRCDIR/configure" \
+  || { echo "homescoop wasix-python: configure no longer appends --initial-memory=41943040 on WASI" >&2; exit 1; }
+perl -pi -e "s/--initial-memory=41943040/--initial-memory=$WASM_INITIAL_MEMORY/g" "$SRCDIR/configure"
 
 PY_CFLAGS="-O3 -flto -fPIC -matomics -mbulk-memory -mmutable-globals -pthread -mthread-model posix $EMU -include $STUBS/fcntl_wasix_extra.h -ffile-prefix-map=$B=."
 PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-memory -Wl,--import-memory -Wl,--max-memory=4294967296 -Wl,--stack-first -z stack-size=16777216 -Wl,--initial-memory=${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory} -ldl -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"

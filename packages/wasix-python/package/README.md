@@ -14,7 +14,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 - **Why 160 MiB:** importing numpy, pandas, scipy and matplotlib takes the memory to about 116 MiB (measured on wasix-sysroot -40 with `sbrk(0)`). That covers python's data, its 16 MiB stack, the heap, and the side modules the loader places above it. 160 MiB holds that with room to spare, so a typical session starts without growing the memory. That matters for threads: a thread can trap while another thread grows the memory (slicc-kernel#1172).
 - **Since -40, malloc uses those pages.** Up to wasix-sysroot -39, dlmalloc ignored the pages between the heap base and the initial size and grew the memory for every allocation, so a larger initial memory only cost space. `cert/heap-size.mjs` checks that 48 MiB of allocations right after start don't grow the memory.
-- **Peak:** a numpy/pandas/scipy/matplotlib workload peaked at about 3.7 GiB. That fits under the 4 GiB maximum, but leaves little room, so very large arrays can fail with `MemoryError`.
+- **Peak:** a numpy/pandas/scipy/matplotlib workload peaked at about 3,700 MiB. That fits under the 4 GiB maximum, but leaves little room, so very large arrays can fail with `MemoryError`.
 - **Cost:** every python process, including each `multiprocessing` worker and each `subprocess` python, reserves 160 MiB up front. On most hosts a page takes real memory only once it is touched.
 
 ## Since 3.15.0-4
