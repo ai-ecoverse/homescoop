@@ -117,8 +117,8 @@ function fetchBlob(url) {
 /**
  * The base commit: the merge-base of HEAD with the base ref. With `tip`, a
  * shallow checkout (ladder-pr's build jobs, pool-parity) that has no merge-base
- * fetches the base branch's tip (depth 1) and uses that instead; only the
- * mirror check asks for it, and a branch behind a base that changed the
+ * fetches the base branch's tip (depth 1) and uses that instead (the mirror
+ * check and the sha refresh), and a branch behind a base that changed the
  * source then fails closed until it merges the base.
  */
 let baseCommit;
@@ -369,7 +369,7 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
               'Renovate does not update checksums; wait for the recipe-sha job or run refresh-recipe-sha.mjs.')
         );
       }
-      const base = baseRecipe(name);
+      const base = baseRecipe(name, { tip: true });
       const baseJob = base && sourceJobs(base).find((j) => j.key === job.key);
       let baseUrl = null;
       if (baseJob) {

@@ -163,6 +163,32 @@ test('a re-rolled archive whose tree matches needs --reroll, then refreshes with
   }
 });
 
+test('a shallow checkout with no origin/main (ladder-pr build jobs) compares a re-roll against the base tip, not "can\'t resolve the base"', () => {
+  const f = rerollFixture();
+  const clone = mkdtempSync(join(tmpdir(), 'recipe-sha-shallow-'));
+  try {
+    git(clone, 'clone', '-q', '--depth=1', '--branch', 'pr', `file://${f.dir}`, 'c');
+    const cwd = join(clone, 'c');
+    const run = (...extra) => spawnSync(process.execPath, [join(cwd, 'scripts/refresh-recipe-sha.mjs'), 'fx', ...extra], { encoding: 'utf8', cwd, env });
+    const read = () => readFileSync(join(cwd, 'packages/fx/recipe.yaml'), 'utf8');
+    const plain = run();
+    assert.notEqual(plain.status, 0, plain.stdout);
+    assert.doesNotMatch(plain.stdout + plain.stderr, /can't resolve the base/);
+    assert.match(plain.stdout, /base: shallow checkout, comparing against the tip of main/);
+    assert.match(plain.stdout, /recipe-sha: FAIL fx: .*changed bytes for an unchanged URL .* Its tree matches source\.tree .*--reroll/);
+    assert.equal(read(), f.text);
+    const ok = run('--reroll');
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    assert.match(ok.stdout, new RegExp(`source-tree: PASS archive matches tree ${f.tree}`));
+    assert.match(ok.stdout, /re-roll: the archive matches source\.tree/);
+    assert.match(ok.stdout, /recipe-sha: PASS/);
+    assert.match(read(), new RegExp(`sha256: "${f.newSha}"`));
+  } finally {
+    rmSync(clone, { recursive: true, force: true });
+    f.cleanup();
+  }
+});
+
 test('a re-rolled archive with a different tree fails, even with --reroll', () => {
   const f = rerollFixture({ different: true });
   try {
