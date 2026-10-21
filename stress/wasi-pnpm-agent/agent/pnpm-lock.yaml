@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@ai-ecoverse/slicc-agent':
-        specifier: 6.19.2
-        version: 6.19.2(@ai-ecoverse/slicc-kernel@1.143.4)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)
+        specifier: 6.19.3
+        version: 6.19.3(@ai-ecoverse/slicc-kernel@1.143.4)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)
       '@ai-ecoverse/slicc-kernel':
         specifier: 1.143.4
         version: 1.143.4
@@ -23,8 +23,8 @@ packages:
   '@ai-ecoverse/jerk-oauth@1.2.1':
     resolution: {integrity: sha512-h2qTISPrq4ru8nOX8KJz1rSJDzrsVrRBm6hIBAID6iZmrLqo8u7c3covlwx7PGonOgWRHnTmO10egeLh0saKgw==}
 
-  '@ai-ecoverse/slicc-agent@6.19.2':
-    resolution: {integrity: sha512-3mR+o0Wyjptu7ntYzyXimO8HDOe+I9ka5JaqgK/FE3Uc7B7jaVGq3vj3L+n7AZPNs9/xJf85DM0p0NHeYilUFQ==}
+  '@ai-ecoverse/slicc-agent@6.19.3':
+    resolution: {integrity: sha512-qs+kR3qj5xTg6NPmKbSC1qiRJkdFDC4PsfMDU5/1dQ4ugrRFl1BQIg9Vs5eCwRXcZuXPjoEvJ7qB4O2dLQxkzw==}
     engines: {node: '>=24'}
     peerDependencies:
       '@ai-ecoverse/slicc-kernel': '>=1.110.0 <2'
@@ -33,8 +33,8 @@ packages:
       '@ai-ecoverse/slicc-spectrum':
         optional: true
 
-  '@ai-ecoverse/slicc-browsers@1.16.0':
-    resolution: {integrity: sha512-8dGyg2vFS5WyDoTkm9YDLEth9uongq+GfheXBJDUWKBk1zjyBMUiaQ4t1T5Yw7r2GyZD1+f68e+pNm5RZrjE7A==}
+  '@ai-ecoverse/slicc-browsers@1.16.1':
+    resolution: {integrity: sha512-lQ3r6fWIplXjIZCkaDLA6wiEXlUvC6xlnso+MQqJECWvMEhzBUJRfViVQ65Xtl/HLVbFLrgfZJEEBnnQfQbAbA==}
     engines: {node: '>=24'}
 
   '@ai-ecoverse/slicc-kernel@1.143.4':
@@ -333,9 +333,9 @@ snapshots:
 
   '@ai-ecoverse/jerk-oauth@1.2.1': {}
 
-  '@ai-ecoverse/slicc-agent@6.19.2(@ai-ecoverse/slicc-kernel@1.143.4)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)':
+  '@ai-ecoverse/slicc-agent@6.19.3(@ai-ecoverse/slicc-kernel@1.143.4)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)':
     dependencies:
-      '@ai-ecoverse/slicc-browsers': 1.16.0
+      '@ai-ecoverse/slicc-browsers': 1.16.1
       '@ai-ecoverse/slicc-kernel': 1.143.4
       '@ai-ecoverse/slicc-vault': 1.15.2
       '@aws-sdk/middleware-websocket': 3.972.54
@@ -356,7 +356,7 @@ snapshots:
       - ws
       - zod
 
-  '@ai-ecoverse/slicc-browsers@1.16.0': {}
+  '@ai-ecoverse/slicc-browsers@1.16.1': {}
 
   '@ai-ecoverse/slicc-kernel@1.143.4': {}
 
