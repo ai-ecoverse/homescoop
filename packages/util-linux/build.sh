@@ -21,7 +21,7 @@ SLICC_A="$WORK/libslicc-util-linux.a"
 # homescoop#977).
 homescoop_slicc_archive "$SLICC_A" spawn
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=262144 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
+CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags) -Wl,--whole-archive -Wl,$SLICC_A -Wl,--no-whole-archive"
 
 # --disable-all-programs also forces rev, colrm, look, getopt, column and flock off,
 # and they have no --enable-<name> to turn them back on (UL_BUILD_INIT with
@@ -81,6 +81,14 @@ fi
 
 for p in "${PROGS[@]}"; do
   if [[ -f "$SRC/$p.js" ]]; then mv "$SRC/$p.js" "$SRC/$p"; fi
+done
+for sym in slicc_execve_js slicc_spawn_capture_js; do
+  grep -q "$sym" "$SRC/flock" || {
+    echo "util-linux: flock does not link $sym from the slicc shims" >&2
+    exit 1
+  }
+done
+for p in "${PROGS[@]}"; do
   test -f "$SRC/$p.wasm"
   homescoop_stage_cli "$SRC" "$p"
 done
@@ -102,4 +110,19 @@ LIC="$WORK/util-linux-LICENSE"
 homescoop_stage_license "$LIC"
 homescoop_notices_begin "The wasm modules in bin/ statically link the following."
 homescoop_notice_emscripten
+PROG_SRCS=(text-utils/rev.c text-utils/column.c text-utils/hexdump.c text-utils/colrm.c misc-utils/look.c misc-utils/getopt.c sys-utils/flock.c)
+HEADERS=()
+for s in "${PROG_SRCS[@]}"; do
+  h="$WORK/notices/$(basename "$s").header"
+  {
+    printf '%s\n\n' "$s"
+    awk 'NR == 1 && !/^\/\*/ { exit } /\*\// { exit } NR > 1 { sub(/^ \*[ \t]?/, ""); print }' "$SRC/$s"
+  } > "$h"
+  grep -q 'Copyright' "$h" || {
+    echo "util-linux: no copyright line in the header of $s" >&2
+    exit 1
+  }
+  HEADERS+=("$h" -)
+done
+homescoop_notice "util-linux $VERSION: the copyright and permission notices of the program sources" "${HEADERS[@]}"
 echo "== util-linux: staged → $HOMESCOOP_PKG/package ($VERSION)"
