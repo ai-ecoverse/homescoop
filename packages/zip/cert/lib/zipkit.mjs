@@ -66,7 +66,8 @@ export function storedZip(entries, options = {}) {
       ch.writeUInt32LE(usize, 24);
       ch.writeUInt16LE(e.name.length, 28);
       ch.writeUInt16LE(extra.length, 30);
-      ch.writeUInt32LE((0o100644 << 16) >>> 0, 38);
+      ch.writeUInt16LE(e.internal ?? 0, 36);
+      ch.writeUInt32LE(e.external ?? (0o100644 << 16) >>> 0, 38);
       ch.writeUInt32LE(target(e.sameAs), 42);
       centrals.push(Buffer.concat([ch, e.name, extra]));
       continue;
@@ -98,7 +99,8 @@ export function storedZip(entries, options = {}) {
     ch.writeUInt32LE(usize, 24);
     ch.writeUInt16LE(e.name.length, 28);
     ch.writeUInt16LE(extra.length, 30);
-    ch.writeUInt32LE((0o100644 << 16) >>> 0, 38); // -rw-r--r--
+    ch.writeUInt16LE(e.internal ?? 0, 36);
+    ch.writeUInt32LE(e.external ?? (0o100644 << 16) >>> 0, 38);
     ch.writeUInt32LE(off, 42);
     centrals.push(Buffer.concat([ch, e.name, extra]));
     locals.push(local);

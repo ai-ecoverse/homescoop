@@ -1,0 +1,241 @@
+unzip: -% extracts an entry whose name is not UTF-8 under an escaped name (homescoop#1224).
+Off by default: without -% such an entry is still refused (EILSEQ,
+"cannot create", rc 50, homescoop#602). With -%, a name that is not
+valid UTF-8 (the realm's strict decoder: no overlongs, surrogates or
+code points past U+10FFFF) has each byte outside a valid sequence
+written as %XX and each % as %25; a name that is valid UTF-8 is left
+alone. An escaped entry is refused (rc 2) when its path exists already,
+on disk or from this run, under -o and -n too, and a later entry whose
+path an escaped entry took is refused the same way, so no mapped name
+ever replaces a file. Each escaped path is reported ("escaped: <path>").
+
+--- a/unzip.h
++++ b/unzip.h
+@@ -558,6 +558,7 @@
+ #endif
+ #ifdef UNIX
+     int cflxflag;       /* -^: allow control chars in extracted filenames */
++    int pctflag;
+ #endif
+ #endif /* !FUNZIP */
+ } UzpOpts;
+--- a/unzip.c
++++ b/unzip.c
+@@ -1828,6 +1828,13 @@
+                     } else
+                         ++uO.cflxflag;
+                     break;
++                case ('%'):
++                    if (negative) {
++                        uO.pctflag = FALSE;
++                        negative = 0;
++                    } else
++                        uO.pctflag = TRUE;
++                    break;
+ #endif /* UNIX */
+                 default:
+                     error = TRUE;
+@@ -2203,6 +2210,9 @@
+   "         directory, which can be a security problem.",
+   "  -^   [Unix] Allow control characters in names of extracted entries.  Usually",
+   "         this is not a good thing and should be avoided.",
++  "  -%   [Unix] Extract an entry whose name is not UTF-8 under an escaped name:",
++  "         each byte outside a valid UTF-8 sequence becomes %XX, and % becomes",
++  "         %25.  An escaped name never replaces a file or another entry.",
+   "  -2   [VMS] Force unconditional conversion of names to ODS-compatible names.",
+   "         Default is to exploit destination file system, preserving cases and",
+   "         extended name characters on ODS5 and applying ODS2 filtering on ODS2.",
+--- base/extract.c	2026-10-22 00:51:51.343770181 +0200
++++ unzip60/extract.c	2026-10-22 00:54:00.703608407 +0200
+@@ -113,6 +113,98 @@
+ #ifdef SET_DIR_ATTRIB
+    static int Cdecl dircomp OF((ZCONST zvoid *a, ZCONST zvoid *b));
+ #endif
++#ifdef UNIX
++static char **pct_names = (char **)NULL;
++static unsigned pct_count = 0;
++static unsigned pct_room = 0;
++
++static unsigned pct_utf8_seq(ZCONST uch *p)
++{
++    uch c = p[0], lo, hi;
++
++    if (c < 0x80)
++        return 1;
++    if (c >= 0xc2 && c <= 0xdf)
++        return (p[1] >= 0x80 && p[1] <= 0xbf) ? 2 : 0;
++    if (c >= 0xe0 && c <= 0xef) {
++        lo = (c == 0xe0) ? 0xa0 : 0x80;
++        hi = (c == 0xed) ? 0x9f : 0xbf;
++        return (p[1] >= lo && p[1] <= hi &&
++                p[2] >= 0x80 && p[2] <= 0xbf) ? 3 : 0;
++    }
++    if (c >= 0xf0 && c <= 0xf4) {
++        lo = (c == 0xf0) ? 0x90 : 0x80;
++        hi = (c == 0xf4) ? 0x8f : 0xbf;
++        return (p[1] >= lo && p[1] <= hi &&
++                p[2] >= 0x80 && p[2] <= 0xbf &&
++                p[3] >= 0x80 && p[3] <= 0xbf) ? 4 : 0;
++    }
++    return 0;
++}
++
++static int pct_escape(char *name)
++{
++    ZCONST uch *p = (ZCONST uch *)name;
++    char buf[FILNAMSIZ];
++    extent n = 0;
++    unsigned k;
++
++    while (*p && (k = pct_utf8_seq(p)) != 0)
++        p += k;
++    if (!*p)
++        return 0;
++    p = (ZCONST uch *)name;
++    while (*p) {
++        k = pct_utf8_seq(p);
++        if (k && *p != '%') {
++            if (n + k >= FILNAMSIZ)
++                return -1;
++            memcpy(buf + n, p, k);
++            n += k;
++            p += k;
++        } else {
++            if (n + 3 >= FILNAMSIZ)
++                return -1;
++            sprintf(buf + n, "%%%02X", (unsigned)*p);
++            n += 3;
++            ++p;
++        }
++    }
++    buf[n] = '\0';
++    strcpy(name, buf);
++    return 1;
++}
++
++static int pct_known(ZCONST char *name)
++{
++    unsigned i;
++
++    for (i = 0; i < pct_count; i++)
++        if (strcmp(pct_names[i], name) == 0)
++            return TRUE;
++    return FALSE;
++}
++
++static int pct_remember(ZCONST char *name)
++{
++    char *copy;
++
++    if (pct_count == pct_room) {
++        unsigned room = pct_room ? 2 * pct_room : 64;
++        char **grown = (char **)realloc(pct_names, room * sizeof(char *));
++
++        if (grown == (char **)NULL)
++            return -1;
++        pct_names = grown;
++        pct_room = room;
++    }
++    if ((copy = (char *)malloc(strlen(name) + 1)) == (char *)NULL)
++        return -1;
++    strcpy(copy, name);
++    pct_names[pct_count++] = copy;
++    return 0;
++}
++#endif /* UNIX */
+ 
+ 
+ 
+@@ -191,6 +283,17 @@
+    static ZCONST char Far BackslashPathSep[] =
+      "warning:  %s appears to use backslashes as path separators\n";
+ #endif
++#ifdef UNIX
++static ZCONST char Far PctTooLong[] =
++  "error:  %s:  name too long once escaped, not extracted\n";
++static ZCONST char Far PctExists[] =
++  "error:  %s:  escaped name already exists, not extracted (an escaped name never replaces a file or another entry)\n";
++static ZCONST char Far PctCollides[] =
++  "error:  %s:  an entry was already extracted under this escaped name, not extracted\n";
++static ZCONST char Far PctNoMem[] =
++  "error:  %s:  not enough memory to track escaped names, not extracted\n";
++static ZCONST char Far PctEscaped[] = "    escaped: %s\n";
++#endif
+ static ZCONST char Far AbsolutePathWarning[] =
+   "warning:  stripped absolute path spec from %s\n";
+ static ZCONST char Far SkipVolumeLabel[] =
+@@ -1191,6 +1294,9 @@
+ {
+     unsigned i;
+     int renamed, query;
++#ifdef UNIX
++    int escaped;
++#endif
+     int skip_entry;
+     zoff_t bufstart, inbuf_offset, request;
+     int error, errcode;
+@@ -1479,6 +1585,9 @@
+ startover:
+             query = FALSE;
+             skip_entry = SKIP_NO;
++#ifdef UNIX
++            escaped = FALSE;
++#endif
+             /* for files from DOS FAT, check for use of backslash instead
+              *  of slash as directory separator (bug in some zipper(s); so
+              *  far, not a problem in HPFS, NTFS or VFAT systems)
+@@ -1517,6 +1626,20 @@
+                        } while (*p++ != '\0');
+                    } while (G.filename[0] == '/');
+                }
++#ifdef UNIX
++               if (uO.pctflag) {
++                   int pr = pct_escape(G.filename);
++
++                   if (pr < 0) {
++                       Info(slide, 0x401, ((char *)slide,
++                            LoadFarString(PctTooLong), FnFilter1(G.filename)));
++                       if (error_in_archive < PK_ERR)
++                           error_in_archive = PK_ERR;
++                       continue;
++                   }
++                   escaped = (pr > 0);
++               }
++#endif
+             }
+ 
+             /* mapname can create dirs if not freshening or if renamed */
+@@ -1567,6 +1690,33 @@
+                 continue;   /* go on to next file */
+             }
+ 
++#ifdef UNIX
++            if (uO.pctflag && !renamed) {
++                struct stat pst;
++
++                if (pct_known(G.filename) ||
++                    (escaped && lstat(G.filename, &pst) == 0)) {
++                    Info(slide, 0x401, ((char *)slide,
++                         LoadFarString(escaped ? PctExists : PctCollides),
++                         FnFilter1(G.filename)));
++                    if (error_in_archive < PK_ERR)
++                        error_in_archive = PK_ERR;
++                    continue;
++                }
++                if (escaped) {
++                    if (pct_remember(G.filename) != 0) {
++                        Info(slide, 0x401, ((char *)slide,
++                             LoadFarString(PctNoMem), FnFilter1(G.filename)));
++                        if (error_in_archive < PK_MEM)
++                            error_in_archive = PK_MEM;
++                        continue;
++                    }
++                    if (!uO.qflag)
++                        Info(slide, 0, ((char *)slide,
++                             LoadFarString(PctEscaped), FnFilter1(G.filename)));
++                }
++            }
++#endif
+ #ifdef QDOS
+             QFilename(__G__ G.filename);
+ #endif
