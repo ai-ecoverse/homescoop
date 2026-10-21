@@ -161,7 +161,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-bind`](https://www.npmjs.com/package/@ai-ecoverse/wasix-bind) | [recipe](packages/wasix-bind) | BIND 9.20 dig, host and nslookup: DNS lookup tools. |
 | [`@ai-ecoverse/wasix-f2c`](https://www.npmjs.com/package/@ai-ecoverse/wasix-f2c) | [recipe](packages/wasix-f2c) | Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc) |
 | [`@ai-ecoverse/wasix-gnupg`](https://www.npmjs.com/package/@ai-ecoverse/wasix-gnupg) | [recipe](packages/wasix-gnupg) | GnuPG 2.4: OpenPGP encryption and signing with gpg, gpgv and gpg-agent. |
-| [`@ai-ecoverse/wasix-m4`](https://www.npmjs.com/package/@ai-ecoverse/wasix-m4) | [recipe](packages/wasix-m4) | GNU m4 1.4.20 for slicc WASIX |
+| [`@ai-ecoverse/wasix-m4`](https://www.npmjs.com/package/@ai-ecoverse/wasix-m4) | [recipe](packages/wasix-m4) | GNU m4, the macro processor autoconf runs. |
 | [`@ai-ecoverse/wasix-openblas`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openblas) | [recipe](packages/wasix-openblas) | OpenBLAS 0.3.34 for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config |
 | [`@ai-ecoverse/wasix-openssh`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openssh) | [recipe](packages/wasix-openssh) | OpenSSH 10.6p1: the ssh, scp and sftp clients, with ssh-keygen and ssh-add. |
 | [`@ai-ecoverse/wasix-openssl`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openssl) | [recipe](packages/wasix-openssl) | OpenSSL 3.5.9 for slicc WASIX: static (lib/) and PIC (lib-pic/) libcrypto.a and libssl.a, headers, pkg-config |

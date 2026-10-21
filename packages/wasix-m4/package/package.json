@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-m4",
-  "version": "1.4.20-6",
-  "description": "GNU m4 1.4.20 for slicc WASIX",
+  "version": "1.4.20-7",
+  "description": "GNU m4, the macro processor autoconf runs.",
   "license": "GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.44.0"
