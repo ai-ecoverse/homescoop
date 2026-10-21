@@ -54,5 +54,19 @@ export default async function (ctx) {
   r = await run([`${R}/x/e.wasm`], { cwd: `${R}/x` });
   assert.equal(r.status, 0, out(r));
   assert.equal(r.stdout, '1\n', `#1062 std::map::at works: ${out(r)}`);
-  console.log('cimport: @cImport and translate-c work; zig c++ links without -fno-exceptions');
+  // homescoop#1428 (0.16.0-20, README): with exceptions off by default,
+  // user code with throw doesn't compile (it doesn't abort at run time), and
+  // a throw inside libc++ (std::map::at out of range) aborts the program.
+  await write('home/zi/x/t.cpp', 'int main() { throw 1; }\n');
+  r = await detached('throw', 'zig c++ -target wasm32-wasi t.cpp -o t.wasm', `${R}/x`);
+  assert.notEqual(r.status, 0, `#1428 throw in user code doesn't compile: ${out(r)}`);
+  assert.match(r.stderr, /cannot use 'throw' with exceptions disabled/, `#1428 clang says why: ${out(r)}`);
+  await write('home/zi/x/at.cpp', '#include <map>\n#include <cstdio>\nint main() { std::map<int, int> m; std::printf("before\\n"); std::fflush(stdout); return m.at(1); }\n');
+  r = await detached('at', 'zig c++ -target wasm32-wasi -O2 at.cpp -o at.wasm', `${R}/x`);
+  assert.equal(r.status, 0, `#1428 std::map::at code compiles: ${out(r)}`);
+  r = await run([`${R}/x/at.wasm`], { cwd: `${R}/x` });
+  assert.notEqual(r.status, 0, `#1428 an exception inside libc++ aborts: ${out(r)}`);
+  assert.equal(r.stdout, 'before\n', `#1428 the program ran up to the throw: ${out(r)}`);
+
+  console.log('cimport: @cImport and translate-c work; zig c++ links without -fno-exceptions; throw doesn\'t compile, a libc++ throw aborts');
 }
