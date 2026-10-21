@@ -210,13 +210,13 @@ old = json.loads(committed.read_text()) if committed.exists() else {}
 parts = ver.split(".")
 npm_ver = old.get("version") or (f"{ver}.0-1" if len(parts) == 2 else f"{ver}-1")
 deps = old.get("dependencies") or {
-    "@ai-ecoverse/wasix-perl": "5.42.0-11",
-    "@ai-ecoverse/wasix-m4": "1.4.20-2",
+    "@ai-ecoverse/wasix-perl": "5.42.0-21",
+    "@ai-ecoverse/wasix-m4": "1.4.20-7",
 }
 pkg = {
     "name": "@ai-ecoverse/wasix-autoconf",
     "version": npm_ver,
-    "description": "GNU Autoconf for slicc (scripts; needs wasix-perl + wasix-m4)",
+    "description": "GNU Autoconf, which writes the configure scripts that build software.",
     "license": "GPL-3.0-or-later",
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-autoconf/package"},
     "files": ["README.md", "LICENSE", "bin", "share"],
