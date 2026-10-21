@@ -42,7 +42,23 @@ esac
 dir=$PWD
 while :; do
   if [ -f "$dir/node_modules/.bin/$name" ]; then
-    exec "$dir/node_modules/.bin/$name" "$@"
+    bin=$dir/node_modules/.bin/$name
+    # homescoop#1441: most npm bins are node scripts, and slicc has no node.
+    first=
+    IFS= read -r first < "$bin" 2>/dev/null
+    case $first in
+      '#!'*[/\ ]node|'#!'*[/\ ]node[\ ]*|'#!node'*)
+        # The kernel runs a node-shebang Emscripten program itself; anything
+        # else fails to start (126), and then says why.
+        "$bin" "$@"
+        rc=$?
+        if [ "$rc" = 126 ] && ! command -v node >/dev/null 2>&1; then
+          echo "npx: $name is a Node.js program ($bin starts with a node shebang), and slicc has no node to run it" >&2
+        fi
+        exit "$rc"
+        ;;
+    esac
+    exec "$bin" "$@"
   fi
   [ -z "$dir" ] || [ "$dir" = / ] && break
   dir=${dir%/*}

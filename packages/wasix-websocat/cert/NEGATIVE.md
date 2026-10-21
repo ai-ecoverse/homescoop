@@ -88,3 +88,7 @@ The package isn't sized. A first alpha3-6 linked a 128 MiB initial heap from alp
 
 The published 4.0.0-alpha3-5 against -7's `cert/exit-codes.mjs` (slicc-kernel 1.134.3, users enforce): **FAIL, 10 of 14 assertions.** The bind failure, the missing `readfile:` and the read-only `writefile:` all exit 0, with their log lines on stdout. The refused connect exits 14, but its "Connection refused" is on stdout, not stderr. -6 differs from -5 only in 0004 (the allocator), so it behaves the same. A local -7 build (scripts/host-run.sh) passes the spec and the rest of the suite.
 
+## 4.0.0-alpha3-8: RUST_LOG (homescoop#1421, 2026-10-21)
+
+The published 4.0.0-alpha3-7 against -8's `cert/exit-codes.mjs` (slicc-kernel 1.134.3, users enforce): **FAIL, 2 of 19 assertions.** `RUST_LOG=debug` logs no DEBUG line, and `RUST_LOG=off` still prints the WARN and ERROR lines of a failing `readfile:`. 0005's `fmt().with_writer(stderr).init()` dropped the RUST_LOG `Targets` filter that `fmt::init()` sets up without the env-filter feature. 0006 restores it beside the stderr writer.
+

@@ -1,0 +1,43 @@
+websocat: RUST_LOG chooses the log level again (homescoop#1421)
+
+0005's fmt().with_writer(stderr).init() dropped what fmt::init() does when
+tracing-subscriber is built without env-filter (this lockfile): a Targets
+filter parsed from RUST_LOG, INFO when it's unset. So RUST_LOG=debug showed
+nothing more and RUST_LOG=off still printed. This builds that filter beside
+the stderr writer.
+
+Upstream: not filed (Lars decides).
+
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -12,8 +12,28 @@
+     }
+     #[cfg(not(feature = "tokioconsole"))]
+     {
+-        // Log lines go to stderr, not into the data on stdout (homescoop#868).
+-        tracing_subscriber::fmt().with_writer(std::io::stderr).init();
++        // Log lines go to stderr, not into the data on stdout (homescoop#868),
++        // with RUST_LOG still choosing what's logged (homescoop#1421): what
++        // fmt::init() does without the env-filter feature, a Targets filter
++        // from RUST_LOG (INFO when unset), plus the writer.
++        use tracing_subscriber::{
++            filter::{LevelFilter, Targets},
++            layer::SubscriberExt,
++            util::SubscriberInitExt,
++        };
++        let targets = match std::env::var("RUST_LOG") {
++            Ok(var) => var.parse::<Targets>().unwrap_or_else(|e| {
++                eprintln!("Ignoring `RUST_LOG={var:?}`: {e}");
++                Targets::default()
++            }),
++            Err(_) => Targets::new().with_default(LevelFilter::INFO),
++        };
++        tracing_subscriber::fmt()
++            .with_max_level(LevelFilter::TRACE)
++            .with_writer(std::io::stderr)
++            .finish()
++            .with(targets)
++            .init();
+     }
+     let argv = std::env::args_os();
+     let stderr = std::io::stderr();

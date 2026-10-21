@@ -46,3 +46,7 @@ homescoop#1060 (the prebuilt archives' DWARF paths) was fixed by c56dc1ed, which
 
 There's no published negative for the trap: the race (slicc-kernel#1172) didn't show in this row's rounds with 0.16.0-17/-18, and it hits 5–12% of rounds only under heavier allocation (azw9's canary, wasi-pnpm's loop). The row is a guard. Its measurement is new: `HOMESCOOP_WASM_PEAK` comes from the allocating thread, because zig's main-thread VmSize can be a stale view. A first -19 with a 256 MiB initial heap gave a 73 MiB malloc peak, with zig's 57 MiB of data and stack below it, hence 96 MiB.
 
+## 0.16.0-20: the README on exceptions (homescoop#1428, 2026-10-21)
+
+A docs fix: zig.wasm is unchanged. 0.16.0-18/-19's README said that with the `-fno-exceptions` default, "code that throws aborts instead". In fact `throw`/`try` in user code doesn't compile ("cannot use 'throw' with exceptions disabled"), and only exceptions thrown inside libc++ abort at run time. The new rows in `cert/cimport.mjs` check both behaviours, which 0.16.0-19 already has, so the README now says what they check.
+

@@ -21,7 +21,10 @@ Zig 0.16.0 for slicc, built for wasm32-wasi with LLVM 21.1.8, clang and lld.
   while.
 - `zig c++` for wasm32-wasi compiles with `-fno-exceptions` by default
   (since 0.16.0-18, homescoop#1062): the bundled libc++ has no exception
-  support, as with wasi-sdk's clang. Code that throws aborts instead, and
-  `-fexceptions` turns them back on (and then fails to link).
+  support, as with wasi-sdk's clang. So code with `throw` or `try` doesn't
+  compile ("cannot use 'throw' with exceptions disabled"), and an exception
+  libc++ itself throws (`std::map::at` out of range, a failed `new`) aborts
+  the program. `-fexceptions` turns them back on, and the link then fails
+  (`__cxa_throw` undefined).
 
 LLVM is Apache-2.0 WITH LLVM-exception (LICENSE-LLVM.TXT); Zig is MIT (LICENSE).

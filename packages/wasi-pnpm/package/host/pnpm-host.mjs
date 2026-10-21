@@ -355,6 +355,21 @@ export function resolveCommand (ctx, program, path, cwd) {
   return undefined
 }
 
+// Whether `path` is a script whose shebang runs node (`#!/usr/bin/node`,
+// `#!/usr/bin/env node`, `#!/usr/bin/env -S node --flags`).
+export function nodeScript (ctx, path) {
+  try {
+    const head = new TextDecoder().decode(ctx.fs.readFile(path).slice(0, 256)).split('\n')[0]
+    if (!head.startsWith('#!')) return false
+    const words = head.slice(2).trim().split(/\s+/)
+    if (words[0]?.split('/').pop() === 'env') words.shift()
+    if (words[0] === '-S') words.shift()
+    return words[0]?.split('/').pop() === 'node'
+  } catch {
+    return false
+  }
+}
+
 export function spawnMessage (request) {
   const program = programName(request)
   return program === 'git' || program === 'ssh' ? GIT_UNSUPPORTED : SCRIPTS_UNSUPPORTED
@@ -604,6 +619,11 @@ function createHost (ctx) {
     try {
       child = ctx.spawn({ argv: [argv0, ...(request.args ?? []).map(String)], env, cwd, stdin: stdio('stdin'), stdout: stdio('stdout'), stderr: stdio('stderr') })
     } catch (error) {
+      // 12.9.1-20 (homescoop#1441): most npm bins are `#!/usr/bin/env node`
+      // scripts, and the kernel has no node to run them.
+      if (error?.code === 'ENOENT' && nodeScript(ctx, argv0)) {
+        return ctx.async.resolve(errorEnvelope(`${program} is a Node.js program (${argv0} starts with a node shebang), and slicc has no node to run it`, 'ENOENT'))
+      }
       return ctx.async.resolve(errorEnvelope(`${program} could not start: ${error?.code ?? error?.message ?? 'EIO'}`, error?.code ?? 'EIO'))
     }
     return ctx.async.resolve({ ok: true, value: { handle: procHandle(child.pid, child.stdin), pid: child.pid, stdout: fdHandle(child.stdout), stderr: fdHandle(child.stderr) } })

@@ -63,22 +63,42 @@ try {
   }
   check(!hasName, 'the published rustc.wasm ships without a name section');
   const total = imported + defined;
-  let p = 0, fnNames = 0, maxIndex = -1, sample = [];
-  while (p < names.length) {
-    const sub = names[p++];
-    let size; [size, p] = leb(names, p);
-    const end = p + size;
-    if (sub === 1) {
-      let count, q = p; [count, q] = leb(names, q);
-      for (let i = 0; i < count; i++) {
-        let idx, len; [idx, q] = leb(names, q); [len, q] = leb(names, q);
-        if (sample.length < 50000) sample.push(names.toString('utf8', q, q + len));
-        q += len; fnNames++; maxIndex = Math.max(maxIndex, idx);
+  // homescoop#1096: count and highest index alone pass a map that names one
+  // index twice and another not at all. Every index 0..total-1 exactly once,
+  // in increasing order, as the name section's spec requires. The negative
+  // cases run first, so the check itself can't pass vacuously.
+  const nameMap = (bytes) => {
+    let p = 0;
+    const indices = [];
+    const sample = [];
+    while (p < bytes.length) {
+      const sub = bytes[p++];
+      let size; [size, p] = leb(bytes, p);
+      const end = p + size;
+      if (sub === 1) {
+        let count, q = p; [count, q] = leb(bytes, q);
+        for (let i = 0; i < count; i++) {
+          let idx, len; [idx, q] = leb(bytes, q); [len, q] = leb(bytes, q);
+          if (sample.length < 50000) sample.push(bytes.toString('utf8', q, q + len));
+          q += len; indices.push(idx);
+        }
       }
+      p = end;
     }
-    p = end;
-  }
-  check(fnNames === total && maxIndex === total - 1, `one name per function: ${fnNames} names, highest index ${maxIndex}; rustc.wasm has ${total} functions (${imported} imported, ${defined} defined)`);
+    return { indices, sample };
+  };
+  const complete = (indices, n) => indices.length === n && indices.every((idx, i) => idx === i);
+  const synth = (idxs) => {
+    const entries = idxs.map((i) => Buffer.from([i, 1, 0x61]));
+    const body = Buffer.concat([Buffer.from([idxs.length]), ...entries]);
+    return Buffer.concat([Buffer.from([1, body.length]), body]);
+  };
+  check(complete(nameMap(synth([0, 1, 2])).indices, 3), 'self-test: a complete name map (0, 1, 2) passes');
+  check(!complete(nameMap(synth([0, 1, 1])).indices, 3), 'self-test: a duplicated index (0, 1, 1) with 2 missing fails');
+  check(!complete(nameMap(synth([0, 2, 1])).indices, 3), 'self-test: indices out of order (0, 2, 1) fail');
+  check(!complete(nameMap(synth([0, 1])).indices, 3), 'self-test: a missing last index fails');
+  const { indices, sample } = nameMap(names);
+  check(complete(indices, total), `one name per function, indices 0..${total - 1} each once and in order: ${indices.length} names; rustc.wasm has ${total} functions (${imported} imported, ${defined} defined)`);
   check(sample.some((n) => /rustc_driver/.test(n)) && sample.some((n) => /llvm/i.test(n)), 'names include rustc_driver and LLVM symbols');
   const whole = Buffer.concat([wasm, Buffer.from([0]), (() => { const body = Buffer.concat([Buffer.from([4]), Buffer.from('name'), names]); const out = []; let n = body.length; do { let b = n & 127; n = Math.floor(n / 128); out.push(n ? b | 128 : b); } while (n); return Buffer.concat([Buffer.from(out), body]); })()]);
   check(WebAssembly.validate(whole), `rustc.wasm with these names appended as its name section validates (${whole.length} bytes)`);

@@ -5,7 +5,8 @@
     "build (build.sh): the rebuilt, stripped rustc.wasm's sha256 equals the published wasi-rustc's (the same reproducible build), and the version is the same",
     "package.json: @ai-ecoverse/wasi-rustc-names at wasi-rustc's version, no scripts, no slicc.commands",
     "the published rustc.wasm ships without a name section; this package's function-name subsection names every function exactly once (count and highest index equal rustc.wasm's imported + defined functions), including rustc_driver and LLVM symbols",
-    "rustc.wasm with rustc.wasm.names appended as its `name` custom section validates (WebAssembly.validate)"
+    "rustc.wasm with rustc.wasm.names appended as its `name` custom section validates (WebAssembly.validate)",
+    "1.98.1-7 (homescoop#1096): test/check.mjs requires the function-name map to name every index 0..total-1 exactly once and in increasing order, with self-test negatives (a duplicated index, out of order, a missing last index) that must fail"
   ],
   "ci": [
     "node packages/wasi-rustc-names/test/check.mjs --tarball .homescoop-out/package.tgz"

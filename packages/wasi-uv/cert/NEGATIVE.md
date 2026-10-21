@@ -16,3 +16,9 @@ The published 0.13.1-2 passes the new stress row's traps check: 6 rounds of 41 l
 - **`cert/interrupt.mjs`** passes with 0.13.1-3 too on 1.134.3. Both cases were kernel problems, now fixed: on 1.100.4 a `kill -9` could be lost (slicc-kernel#755, fixed in 1.104.1, now the engines floor), and on 1.110.7 ^C didn't end uv (homescoop#911). The row keeps both from coming back.
 - **homescoop#674** (the config was written to the wrong HOME) was fixed in the spec by `UV_CONFIG_FILE` on every run. uvx's row also asserts that nothing asks pypi.org.
 
+## 0.13.1-5: the README's uvx example, the stress row's harness calls (homescoop#1486, #1489, 2026-10-21)
+
+- **The README example:** 0.13.1-4's README showed `uvx ruff check .`. ruff ships only native wheels and a Rust sdist, so in seven uv rejects it ("no wheels with a matching platform tag … wasi_0_0_0_wasm32"). The example is now `uvx --from charset-normalizer normalizer file.txt`, and the checklist runs it as written.
+- **The stress row:** 0.13.1-4's `cert/stress.mjs` ran each round in one harness call, which under users enforce on CI took about 246 s, past the 120 s limit. Since -5 rounds run detached and are polled. The published -4 passes the new row locally on 1.134.3 (users enforce): 35–43 s a round, 0 traps.
+- **uv.wasm is unchanged.**
+

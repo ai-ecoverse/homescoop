@@ -201,9 +201,28 @@ jobs:
       tgz-digest: ${{ steps.tgz.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '26'
+      - name: Refresh source sha256 in this checkout
+        env:
+          PKG: ${{ inputs.package }}
+        run: |
+          set -euo pipefail
+          log=$(mktemp)
+          if [[ -f scripts/gate.mjs ]] && grep -q 'recipe-sha: REROLL' scripts/refresh-recipe-sha.mjs; then
+            node scripts/gate.mjs recipe-sha -- node scripts/refresh-recipe-sha.mjs "$PKG" --ci-reroll | tee "$log"
+          else
+            node scripts/refresh-recipe-sha.mjs "$PKG" | tee "$log"
+          fi
+          rerolls=$(grep -c '^   re-roll: ' "$log" || true)
+          verdicts=$(grep -c '^recipe-sha: REROLL ' "$log" || true)
+          if [[ "$rerolls" != "$verdicts" ]]; then
+            echo "::error::recipe-sha: $rerolls re-roll(s) but $verdicts REROLL verdict line(s) for $PKG"
+            exit 1
+          fi
       - name: Sync npm version from recipe
         run: node scripts/sync-package-version.mjs "${{ inputs.package }}" --write
       - name: Host ladder run

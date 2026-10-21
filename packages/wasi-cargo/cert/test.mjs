@@ -31,6 +31,24 @@ export default async function (ctx) {
   assert.match(r.stdout, /test result: ok\. 0 passed/, `#1043 the (empty) test harness runs: ${out(r)}`);
   assert.doesNotMatch(r.stderr, /pthread_(join|detach)/, `#1043 ${out(r)}`);
 
+  // homescoop#1463 (0.99.0-5): wasi-rustc ships no rustdoc. cargo test on a
+  // library with a doc test runs its unit tests, skips the doc tests with
+  // one line on stderr and exits 0; cargo test --doc and cargo doc fail
+  // with the reason.
+  r = await sh('cargo new --vcs none --lib dl');
+  assert.equal(r.status, 0, `cargo new --lib: ${out(r)}`);
+  await write('home/dl/src/lib.rs', '/// ```\n/// assert_eq!(dl::two(), 2);\n/// ```\npub fn two() -> u32 { 2 }\n#[cfg(test)] mod t { #[test] fn two() { assert_eq!(super::two(), 2); } }\n');
+  r = await sh('cargo test --offline', '/home/dl');
+  assert.equal(r.status, 0, `#1463 cargo test on a library with a doc test: ${out(r)}`);
+  assert.match(r.stdout, /test t::two \.\.\. ok/, `#1463 its unit test runs: ${out(r)}`);
+  assert.match(r.stderr, /doc tests skipped: rustdoc isn't available in slicc/, `#1463 the doc tests are skipped with the reason: ${out(r)}`);
+  r = await sh('cargo test --offline --doc', '/home/dl');
+  assert.notEqual(r.status, 0, `#1463 cargo test --doc fails: ${out(r)}`);
+  assert.match(r.stderr, /cargo test --doc needs rustdoc: rustdoc isn't available in slicc/, `#1463 with the reason: ${out(r)}`);
+  r = await sh('cargo doc --offline', '/home/dl');
+  assert.notEqual(r.status, 0, `#1463 cargo doc fails: ${out(r)}`);
+  assert.match(r.stderr, /cargo doc needs rustdoc: rustdoc isn't available in slicc/, `#1463 with the reason: ${out(r)}`);
+
   for (const [path, text] of Object.entries(WS)) await write(`home/ws/${path}`, text);
   // --lib: doc tests run rustdoc, which the package doesn't ship (README).
   r = await sh('cargo test --offline --lib -p b', '/home/ws');
