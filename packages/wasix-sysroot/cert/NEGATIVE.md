@@ -1,5 +1,9 @@
 # Negative proof (wasix-sysroot)
 
+## 2025.9.30-40: relative paths in a removed cwd reach its replacement (-41; #1305; 2026-10-21)
+
+`test/r41.c` with `R41_GONE=1` against npm -40 (default variant, slicc-kernel 1.142.2, Node entry): FAIL. The live-cwd rows pass; after `rmdir` of the cwd and `rename n d`, -40 gives `gone: readdir .: 1 x`, `gone: open x: 0 new`, `gone: stat x: 0`, `gone: fstatat AT_FDCWD x: 0`, `gone: access x: 0` and `gone: chdir x: ENOTDIR`: every relative path was joined to the cached cwd string `/tmp/r41/d` and opened in the replacement. -41 gives ENOENT for all six, and `chdir("..")` lands in `/tmp/r41`, in every variant.
+
 ## 2025.9.30-39: the initial memory unused, sigsetjmp(bufs[i++]), poll, readdir (-40; #1287, #1120, #1119, #1124; 2026-10-20)
 
 `test/r40.c` against npm -39 (default and ehpic, slicc-kernel 1.132.1, Node entry):

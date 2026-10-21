@@ -41,6 +41,8 @@ Since 2025.9.30-18:
     `sleep` early with the seconds left.
   - `raise()` and `pthread_kill(pthread_self())` reach the handler.
 
+Since 2025.9.30-41: **relative paths go through the cwd descriptor** (homescoop#1305, slicc-kernel#1164). A relative path, and every `*at(AT_FDCWD, …)` call, is resolved by the host against fd 3 (the `.` preopen, which slicc-kernel keeps as the process's cwd), not joined to a cached cwd string and sent to the `/` preopen. In a cwd that was removed and replaced by a directory of the same name, relative lookups (`.` included) are ENOENT, as on Linux, instead of opening the replacement; `chdir("..")` still works there, since a relative `chdir` that `realpath` can't resolve goes to the host's `chdir` as is. `getcwd` always asks the host; slicc-kernel answers ENOENT in a removed cwd for programs whose `slicc.libc` marker is `wasix-sysroot 2025.9.30-41` or later (slicc-kernel#1227). The removed-cwd behaviour needs slicc-kernel ≥ 1.135.6; on older kernels relative lookups there still reach the replacement. A host without a `.` preopen at fd 3 gets the old string join.
+
 Since 2025.9.30-40:
 - **malloc uses the initial memory** (homescoop#1287). wasix-libc had turned off dlmalloc's `try_init_allocator`, so the pages between `__heap_base` and the initial memory size went unused and every allocation grew the memory, however large `--initial-memory` was. It's back: a static program gets the pages up to wasm-ld's `__heap_end`, and a PIE dynamic main (python) the pages from the loader's `__heap_base` to the memory size at the first malloc. A program linked with `--initial-memory` that stays under it never calls `memory.grow`.
 - **`sigsetjmp(env, save)` evaluates `env` once** in the EH trees (homescoop#1120), as glibc's does.
