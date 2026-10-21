@@ -7,6 +7,7 @@
  * pip / project path.
  */
 import { createHash } from 'node:crypto';
+import { detached } from './lib/detached.mjs';
 
 const FILES = 'https://files.pythonhosted.org/packages';
 const DISTS = [
@@ -91,7 +92,10 @@ export default async function (ctx) {
   // An sdist: a PEP 517 build in an isolated environment (setuptools),
   // its hooks run by wasix-python over pipes; and bytecode compilation
   // (a python worker fed over stdin/stdout).
-  const sdist = await ok('uv pip install --no-binary six six', '/home/u');
+  const slow = detached(ctx, { env });
+  const sdistCmd = 'uv pip install --no-binary six six';
+  const sdist = await slow(sdistCmd, '/home/u');
+  assert.equal(sdist.status, 0, `${sdistCmd}: rc=${sdist.status}\nstdout=${sdist.stdout}\nstderr=${sdist.stderr}`);
   assert.match(sdist.stderr, /Built six==1\.17\.0/);
   const pyc = await ok('uv pip install --reinstall --compile-bytecode idna', '/home/u');
   assert.match(pyc.stderr, /Bytecode compiled \d+ files/);

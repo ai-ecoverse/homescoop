@@ -22,3 +22,15 @@ The published 0.13.1-2 passes the new stress row's traps check: 6 rounds of 41 l
 - **The stress row:** 0.13.1-4's `cert/stress.mjs` ran each round in one harness call, which under users enforce on CI took about 246 s, past the 120 s limit. Since -5 rounds run detached and are polled. The published -4 passes the new row locally on 1.134.3 (users enforce): 35–43 s a round, 0 traps.
 - **uv.wasm is unchanged.**
 
+
+## Cert only: the six sdist builds run detached (homescoop#1541, 2026-10-21)
+
+- **What failed:** cert-review of #1518 on slicc-kernel 1.142.1 (users enforce) stopped at `uv pip install --no-binary six six` with `Runtime.evaluate: no answer in 120000 ms`, for 0.13.1-4 and -5 alike (the same uv.wasm). The build wasn't hung: on that runner, which also runs the live-pair Chromes and the review agent, it took 151 s on 1.134.3 and 181 s on 1.142.1. The same step took 27 s in ladder-pr's `cert (wasi-uv)` (run 39544921920) and 11–27 s locally.
+- **The change:** `checklist.mjs`'s sdist build and both `locks.mjs` races run detached (`cert/lib/detached.mjs`) and are polled with short calls, under a 300 s deadline each. A run past the deadline fails with `wasi-uv: FAIL <command>: no exit within 300 s (detached, polled; N s)` and kills the command. Each finished build logs `rc=<n> in <s> s (budget 300 s)`, so a slowdown shows up as a number.
+- **The old spec fails:** `scripts/test/wasi-uv-detached.test.mjs` fails on main's `checklist.mjs` and `locks.mjs` (the sdist build and the races are single blocking calls). Its host tests run the helper under real bash: a nonzero rc comes back as that rc, a command past the budget is a FAIL, and a runner that never reports is a FAIL too.
+- **Real failures still fail** (0.13.1-5, slicc-kernel 1.142.1, users enforce):
+  - `prove-negative.mjs` (every command's wasm emptied) fails 4 of 5 specs: checklist, interrupt, locks and stress;
+  - the published 0.13.1-1 fails the new `locks.mjs` at `B waited for A's lock on the venv`, after the detached race returned rc 0 in 12 s;
+  - `six==9.9` in place of `six` fails the checklist row with uv's rc 1 ("no version of six==9.9");
+  - a 5 s budget fails the checklist and locks with `no exit within 5 s`.
+- **Kernel timing:** no regression from 1.134.3 to 1.142.1. Twenty `--no-cache` six sdist builds (two runs of five on each kernel, local, users enforce) took a median of 17 s on 1.134.3 and 19 s on 1.142.1, with each kernel's spread (13–24 s and 14–27 s) wider than the gap. Full suites: stress rounds took 39–47 s on 1.134.3 and 35–39 s on 1.142.1.
