@@ -122,7 +122,7 @@ gpgerr_prep() {
   # The gpg-error-config self-test hangs cross-compiling; it checks nothing we ship.
   printf '#!/bin/sh\nexit 0\n' > src/gpg-error-config-test.sh.in
 }
-EXTRA=(--disable-doc --disable-tests --disable-languages --disable-nls --enable-threads=posix)
+EXTRA=(--sysconfdir=/etc --disable-doc --disable-tests --disable-languages --disable-nls --enable-threads=posix)
 build_lib libgpg-error 1.61 gpgerr_prep
 EXTRA=()
 build_lib npth 1.8 true
@@ -206,41 +206,17 @@ python3 - "$DEST" "$VER" "$PKG_VER" <<'PY'
 import json, sys
 from pathlib import Path
 dest, ver, pkg_ver = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
-cmds = {
-    "gpg": {"wasm": "bin/gpg.wasm"},
-    "gpg2": {"wasm": "bin/gpg.wasm", "argv0": "gpg"},
-    "gpgv": {"wasm": "bin/gpgv.wasm"},
-    "gpg-agent": {"wasm": "bin/gpg-agent.wasm"},
-    "gpgconf": {"wasm": "bin/gpgconf.wasm"},
-    "gpg-connect-agent": {"wasm": "bin/gpg-connect-agent.wasm"},
-}
+pkg = json.loads((dest / "package.json").read_text())
+assert pkg["name"] == "@ai-ecoverse/wasix-gnupg", pkg["name"]
+assert pkg["version"] == pkg_ver, (pkg["version"], pkg_ver)
+assert pkg["homescoop"]["upstream"] == ver, (pkg["homescoop"]["upstream"], ver)
+cmds = pkg["slicc"]["commands"]
+assert cmds, "no slicc.commands"
 for c in cmds.values():
     assert (dest / c["wasm"]).is_file(), c
-pkg = {
-    "name": "@ai-ecoverse/wasix-gnupg",
-    "version": pkg_ver,
-    "description": "GnuPG 2.4 for slicc WASIX: gpg, gpgv, gpg-agent, gpgconf, gpg-connect-agent (wasix-sysroot -34: user ids and signal masks from slicc-kernel)",
-    # wasix-sysroot -20 asks slicc-kernel for user ids (no fallback); the homedir
-    # owner check needs 1.47.1, which reports owners as the caller's ids;
-    # dotlock's fcntl locks need 1.100.0 (slicc.fcntl_lock, homescoop#712);
-    # the keybox's create-by-rename needs renames atomic for other processes,
-    # 1.117.2 (slicc-kernel#925).
-    "engines": {"slicc-kernel": ">=1.117.2"},
-    "license": "GPL-3.0-or-later",
-    "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-gnupg/package"},
-    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses", "patches"],
-    "publishConfig": {"access": "public"},
-    "homescoop": {
-        "recipe": "wasix-gnupg",
-        "upstream": ver,
-        "libraries": "libgpg-error 1.61, libgcrypt 1.12.4, libassuan 3.0.2, libksba 1.8.1, npth 1.8 (static)",
-    },
-    "slicc": {"abi": "wasi", "commands": cmds},
-}
-(dest / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
-print("package.json", pkg_ver, sorted(cmds))
+assert (dest / "README.md").is_file(), "package/README.md"
+print("package.json", pkg_ver, sorted(cmds), "(committed, unchanged)")
 PY
-cp "$PKG/README.md" "$DEST/README.md"
 
 echo "== wasix-gnupg staged $PKG_VER"
 ls -la "$DEST/bin"
