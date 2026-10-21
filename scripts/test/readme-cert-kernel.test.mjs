@@ -6,9 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const STALE = {
-  tree: '#847',
-};
+const STALE = {};
 
 export function readmeKernelErrors(name, readme, meta) {
   const errors = [];

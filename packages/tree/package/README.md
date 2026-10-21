@@ -11,4 +11,7 @@ tree -a -d -f
 tree -J > tree.json
 ```
 
-Certified on `@ai-ecoverse/slicc-kernel` 1.23.0.
+## 2.3.2-6: no cert kernel in the README (homescoop#847; 2026-10-20)
+
+The README no longer names a cert kernel, which went stale whenever `cert/meta.json` moved. The cert record is the source of truth. tree itself is unchanged.
+
