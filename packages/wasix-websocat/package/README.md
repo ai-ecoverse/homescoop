@@ -28,7 +28,7 @@ websocat v4 opens its own TCP connections and does its own TLS, with rustls and 
 
 ## Exit codes and logs
 
-Since 4.0.0-alpha3-7, a failure that upstream v4 only logged exits non-zero, and every log line goes to stderr, so `websocat … > out` and `websocat … | jq` carry only data (homescoop#868):
+Since 4.0.0-alpha3-7, a failure that upstream v4 only logged exits non-zero, and every log line goes to stderr, so `websocat … > out` and `websocat … | jq` carry only data (homescoop#868). `RUST_LOG` sets the level (`RUST_LOG=debug`, `RUST_LOG=off`; default INFO, homescoop#1421):
 
 | Exit | When |
 | --- | --- |

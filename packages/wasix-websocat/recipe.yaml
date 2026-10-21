@@ -65,3 +65,5 @@ about:
     0005: a listener that can't bind exits 15 and a file endpoint that
          can't open its file exits 16 (upstream v4 exited 0; #696, #1023);
          tracing's log lines go to stderr, not stdout (#868).
+    0006: RUST_LOG chooses the level again, alongside 0005's stderr
+         writer (#1421).
