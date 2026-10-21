@@ -194,8 +194,25 @@ export async function resolvePackage(ctx, io) {
   const rejected = [];
   const usable = [];
   for (const artifact of artifacts) {
-    const run = await io.run(artifact.workflow_run?.id);
-    const jobs = await io.jobs(run.id);
+    const runId = artifact.workflow_run?.id;
+    const artifactHead = artifact.workflow_run?.head_sha;
+    if (artifactHead !== pr.head) {
+      rejected.push(`artifact ${artifact.id}: run ${runId} is at ${artifactHead}, not the merged head ${pr.head}`);
+      continue;
+    }
+    let run;
+    let jobs;
+    try {
+      run = await io.run(runId);
+      if (run.head_sha !== pr.head) {
+        rejected.push(`artifact ${artifact.id}: run ${run.id} is at ${run.head_sha}, not the merged head ${pr.head}`);
+        continue;
+      }
+      jobs = await io.jobs(run.id);
+    } catch (err) {
+      rejected.push(`artifact ${artifact.id}: ${err.message}`);
+      continue;
+    }
     const problems = candidateProblems({ artifact, run, jobs, head: pr.head });
     if (problems.length) rejected.push(`artifact ${artifact.id}: ${problems.join('; ')}`);
     else usable.push({ artifact, run });
@@ -226,9 +243,9 @@ export function zipDigestProblem(artifact, bytes) {
   return got === artifact.digest ? '' : `artifact ${artifact.id} downloaded as ${got}, not its digest ${artifact.digest}`;
 }
 
-export function githubApi({ repo, token }) {
+export function githubApi({ repo, token, retryDelayMs = 2000 }) {
   return async (path, { method = 'GET', body } = {}) => {
-    const res = await fetch(`https://api.github.com/repos/${repo}${path}`, {
+    const send = () => fetch(`https://api.github.com/repos/${repo}${path}`, {
       method,
       headers: {
         accept: 'application/vnd.github+json',
@@ -238,6 +255,11 @@ export function githubApi({ repo, token }) {
       },
       body: body ? JSON.stringify(body) : undefined,
     });
+    let res = await send();
+    if (method === 'GET' && res.status >= 500) {
+      await new Promise((done) => setTimeout(done, retryDelayMs));
+      res = await send();
+    }
     if (!res.ok) throw Object.assign(new Error(`${method} ${path} returned ${res.status}`), { status: res.status });
     return res;
   };

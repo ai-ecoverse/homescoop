@@ -68,6 +68,14 @@ package red and dispatches nothing. Versions already on npm dispatch plain
 artifact by `artifact_id` and checks `certified` again; it publishes only
 when dispatched on `main`.
 
+Candidates are tried newest first. An artifact whose `workflow_run.head_sha`
+(or whose run's `head_sha`) is not the PR head is rejected before its jobs
+are fetched, so a superseded run is never read (#1491: a 250-job superseded
+run whose jobs listing always returned 502 blocked the publish). A candidate
+whose run or jobs request fails is rejected with that error, and the next
+one is tried. GET requests to the GitHub API are retried once after a 5xx.
+When no candidate is usable the package fails, listing every rejection.
+
 Dry run: `gh workflow run ladder-merge.yml -f sha=<full merge commit sha>` resolves
 and prints the decision without dispatching. `before`, `packages`,
 `assume_unpublished`, `message`, `pr_body`, `pr` and `head`
