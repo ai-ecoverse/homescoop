@@ -1,0 +1,34 @@
+--- a/compiler/rustc_codegen_ssa/src/back/link.rs
++++ b/compiler/rustc_codegen_ssa/src/back/link.rs
+@@ -1027,9 +1027,11 @@
+         let status = unsafe { RustRunLld(args.len() as std::ffi::c_int, argv.as_ptr()) };
+         // Back to link_binary, which removes the object files and the
+         // rustcXXXXXX temp dir (an exit here left both behind, homescoop#953).
+-        // LLD has printed its own errors to stderr.
++        // LLD has printed its own errors to stderr. A failure is an error,
++        // not a fatal one: 0015's fatal exit on WASI would skip that cleanup
++        // too (homescoop#1439); the driver aborts on it after link_binary.
+         if status != 0 {
+-            sess.dcx().fatal(format!("linking with rust-lld failed: exit status: {status}"));
++            sess.dcx().err(format!("linking with rust-lld failed: exit status: {status}"));
+         }
+         return;
+     }
+--- a/compiler/rustc_codegen_ssa/src/back/write.rs
++++ b/compiler/rustc_codegen_ssa/src/back/write.rs
+@@ -424,8 +424,14 @@
+     // module. Say so before codegen starts, on the main thread, instead of
+     // from a ThinLTO worker that can't report on WASI. Local ThinLTO (the
+     // default) only reads this crate's own modules and still runs.
++    // Only crate types that link upstream crates read their bitcode: an rlib
++    // (or a proc macro) with -C lto builds as before (homescoop#1464).
+     #[cfg(target_os = "wasi")]
+-    if matches!(tcx.sess.lto(), rustc_session::config::Lto::Fat | rustc_session::config::Lto::Thin) {
++    if matches!(tcx.sess.lto(), rustc_session::config::Lto::Fat | rustc_session::config::Lto::Thin)
++        && tcx.crate_types().iter().any(|t| {
++            matches!(t, CrateType::Executable | CrateType::Dylib | CrateType::Cdylib | CrateType::StaticLib)
++        })
++    {
+         tcx.sess.dcx().fatal(
+             "-C lto=fat and -C lto=thin aren't available in this rustc: its LLVM 21 can't read the standard library's LLVM 22 bitcode; build without -C lto (Cargo: lto = false)",
+         );

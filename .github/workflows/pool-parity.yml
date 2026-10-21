@@ -42,7 +42,10 @@ jobs:
             const only = [...new Set((process.env.ONLY || "").split(",").map((s) => s.trim()).filter(Boolean))];
             const off = only.filter((p) => !c.host.includes(p));
             if (off.length) { console.error(`not a host recipe: ${off.join(", ")}`); process.exit(1); }
-            console.log(JSON.stringify(only.length ? only : c.pool));
+            const held = require("fs").existsSync("scripts/pool-hold.json") ? JSON.parse(require("fs").readFileSync("scripts/pool-hold.json", "utf8")) : [];
+            const skip = only.filter((p) => held.includes(p));
+            if (skip.length) console.error(`::notice::skipped, held on ubuntu-latest by scripts/pool-hold.json: ${skip.join(", ")}`);
+            console.log(JSON.stringify(only.length ? only.filter((p) => !held.includes(p)) : c.pool));
           ' "$RUNNER_TEMP/class.json")
           echo "pool recipes at $(git rev-parse HEAD): $list"
           echo "packages=$list" >> "$GITHUB_OUTPUT"

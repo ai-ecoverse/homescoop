@@ -46,3 +46,11 @@ The published 1.98.1-6 against -7's `cert/hygiene.mjs` (slicc-kernel 1.134.3, us
 
 There's no published negative for the trap: the race (slicc-kernel#1172) didn't show in the row with 1.98.1-7, and it hits 5–12% of rounds only under heavier allocation (azw9's canary, wasi-pnpm's loop). The row is a guard. Its measurement is new: rustc.wasm's VmSize stays at its 11.5 MiB initial memory, because the main thread only waits while rustc works on a spawned thread, so the peak comes from `HOMESCOOP_WASM_PEAK` in the allocating thread. The first -8 CI build gave hello world 161 MiB, a 400-function `-O` 281 MiB, and a 1500-function one 675 MiB debug and 1.7 GB at `-O`. Hence 192 MiB, for small compiles; bigger ones grow under the refresh.
 
+## 1.98.1-9: a failed link cleans up; LTO on an rlib (homescoop#1439, #1464, 2026-10-21)
+
+The published 1.98.1-8 against -9's `cert/hygiene.mjs` (slicc-kernel 1.134.3, users enforce): **FAIL, 3 of 18 assertions.**
+- **A failed link:** a link that fails on an undefined extern leaves `link.*.rcgu.o` (×2) and a `rustcXXXXXX` dir. 0016 raised the link failure as fatal, and on WASI 0015's fatal exit skips link_binary's cleanup.
+- **LTO on an rlib:** `rustc -C lto=fat --crate-type rlib lib.rs` exits 1 with 0017's refusal (on -6 it built), and leaves an `rmetaXXXXXX` dir.
+
+0018 reports the link failure as a plain error, so link_binary cleans up before the driver aborts, and 0017 now refuses only crate types that link upstream bitcode (bin, dylib, cdylib, staticlib).
+

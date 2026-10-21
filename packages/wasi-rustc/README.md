@@ -20,7 +20,7 @@ Default compile target: **wasm32-wasip1**.
 `recipe.yaml`; vendored crates, llvm-project and cargo included), so a ladder
 build is an attested root (#876). Steps:
 
-- apply `patches/0003-*` … `0017-*` to the Rust tree;
+- apply `patches/0003-*` … `0018-*` to the Rust tree;
 - install the wasi-sdk `scripts/install-wasi-sdk.sh` pins (34.0);
 - fetch `@ai-ecoverse/wasi-llvm` (LLVM/clang/lld 21.1.8 static for a
   wasm32-wasip1-threads host) by sha256 (`sources.wasi_llvm`) and check its

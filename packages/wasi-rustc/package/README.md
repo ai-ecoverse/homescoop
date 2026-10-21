@@ -27,5 +27,7 @@ the recipe, against `@ai-ecoverse/wasi-llvm` 21.1.8 and wasi-sdk 34.
 
 ## LTO
 
-`-C lto=fat` and `-C lto=thin` (Cargo's `lto = true` / `"fat"` / `"thin"`) aren't available: rustc.wasm's LLVM (wasi-llvm 21) can't read the standard library's bitcode, which Rust's LLVM 22 wrote, so rustc says so and stops (homescoop#1237). Local ThinLTO, the default, works.
+`-C lto=fat` and `-C lto=thin` (Cargo's `lto = true` / `"fat"` / `"thin"`) aren't available: rustc.wasm's LLVM (wasi-llvm 21) can't read the standard library's bitcode, which Rust's LLVM 22 wrote, so rustc says so and stops (homescoop#1237). An rlib with `-C lto` builds as
+before: it reads no upstream bitcode (1.98.1-9, homescoop#1464). Local
+ThinLTO, the default, works.
 
