@@ -12,16 +12,16 @@ importers:
   .:
     dependencies:
       '@ai-ecoverse/slicc-agent':
-        specifier: 6.18.11
-        version: 6.18.11(@ai-ecoverse/slicc-kernel@1.142.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)
+        specifier: 6.18.14
+        version: 6.18.14(@ai-ecoverse/slicc-kernel@1.142.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)
       '@ai-ecoverse/slicc-kernel':
         specifier: 1.142.0
         version: 1.142.0
 
 packages:
 
-  '@ai-ecoverse/slicc-agent@6.18.11':
-    resolution: {integrity: sha512-afRVKGT8v8qxcYJ/mRvCxmfcO3/bV7gYjIqWBiGfrQqUtCeZksVaDGlm4qJR/0Kew6WEeH1VPtyXsiS0tKOMsA==}
+  '@ai-ecoverse/slicc-agent@6.18.14':
+    resolution: {integrity: sha512-J3vI4ysCFmkBa8XtcnJ0/I4+Z7kzw3NyX8jR0/QTsMv72CZN0covHs5bdsAfdRz5D0F/XSnCDNs7IYs8Mgp93A==}
     engines: {node: '>=24'}
     peerDependencies:
       '@ai-ecoverse/slicc-kernel': '>=1.110.0 <2'
@@ -30,8 +30,8 @@ packages:
       '@ai-ecoverse/slicc-spectrum':
         optional: true
 
-  '@ai-ecoverse/slicc-browsers@1.14.5':
-    resolution: {integrity: sha512-jlX0TbpX7zTxyMSdJJUlKyCNl9A+H+oxqRejK/39LK1ho3xmUY+nbEEHsQ3x3SjCCKsNyVj/0rerDRvPsfdJ3w==}
+  '@ai-ecoverse/slicc-browsers@1.14.8':
+    resolution: {integrity: sha512-/jFdRvGmIDENcL5VBVUkR0mH0ZrZcntqB2O29pbAQCU692HLkPKSVZ4Wc7i5DOOQsdD7qJF+KdRz4IYYi8o/mw==}
     engines: {node: '>=24'}
 
   '@ai-ecoverse/slicc-kernel@1.142.0':
@@ -324,9 +324,9 @@ packages:
 
 snapshots:
 
-  '@ai-ecoverse/slicc-agent@6.18.11(@ai-ecoverse/slicc-kernel@1.142.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)':
+  '@ai-ecoverse/slicc-agent@6.18.14(@ai-ecoverse/slicc-kernel@1.142.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)':
     dependencies:
-      '@ai-ecoverse/slicc-browsers': 1.14.5
+      '@ai-ecoverse/slicc-browsers': 1.14.8
       '@ai-ecoverse/slicc-kernel': 1.142.0
       '@ai-ecoverse/slicc-vault': 1.15.1
       '@aws-sdk/middleware-websocket': 3.972.54
@@ -347,7 +347,7 @@ snapshots:
       - ws
       - zod
 
-  '@ai-ecoverse/slicc-browsers@1.14.5': {}
+  '@ai-ecoverse/slicc-browsers@1.14.8': {}
 
   '@ai-ecoverse/slicc-kernel@1.142.0': {}
 
