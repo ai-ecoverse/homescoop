@@ -36,6 +36,15 @@ export default async function (ctx) {
   assert.match(refused.stderr, /Connection refused/, `#868 the connect error is on stderr: ${out(refused)}`);
   assert.equal(refused.stdout, '', `#868 stdout carries no log line: ${out(refused)}`);
 
+  // homescoop#1421 (4.0.0-alpha3-8, 0006): RUST_LOG still chooses the level.
+  const dbg = await run('echo hi | RUST_LOG=debug websocat ws://127.0.0.1:18130/');
+  assert.equal(dbg.status, 0, `RUST_LOG=debug: ${out(dbg)}`);
+  assert.equal(dbg.stdout, 'hi\n', `#868 the data is all of stdout with RUST_LOG=debug: ${out(dbg)}`);
+  assert.match(dbg.stderr, / DEBUG /, `#1421 RUST_LOG=debug logs DEBUG lines (to stderr): ${out(dbg)}`);
+  const quiet = await run('RUST_LOG=off websocat -b readfile:nope.bin ws://127.0.0.1:18130/');
+  assert.equal(quiet.status, 16, `RUST_LOG=off keeps the exit code: ${out(quiet)}`);
+  assert.equal(quiet.stderr, '', `#1421 RUST_LOG=off prints nothing: ${out(quiet)}`);
+
   const ok = await run('echo hello | websocat ws://127.0.0.1:18130/');
   assert.equal(ok.status, 0, `a good round trip still exits 0: ${out(ok)}`);
   assert.equal(ok.stdout, 'hello\n', `and its data is all of stdout: ${out(ok)}`);

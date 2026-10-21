@@ -84,3 +84,6 @@ about:
     project commands (#1247, #667), the npx shim looks in node_modules/.bin,
     and THIRD-PARTY-NOTICES.md adds the linked crates, Rust's std and
     wasi-libc (#1325).
+    12.9.1-20's 0011: the hoisted swap on every kernel (a failed update
+    leaves the old package whole, #1384); node-shebang bins fail with the
+    reason (#1441).
