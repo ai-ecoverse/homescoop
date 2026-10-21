@@ -1,5 +1,6 @@
 {
   "harness": "slicc-kernel",
+  "users": "enforce",
   "needs": [
     "@ai-ecoverse/wasix-python"
   ],
@@ -15,6 +16,7 @@
     "cert/numpy.mjs: linalg.solve [1,2,3] (residual < 1e-12), det 40, inv, eigvalsh [1,3] (OpenBLAS), matmul, einsum 506, fft [10, -2+2j, -2, -2-2j], default_rng(42).integers [89, 773, 654, 438, 433], int32 * float32 -> float64",
     "cert/patches.mjs: every patch's path (meta.json patches; #727, #1080)",
     "cert/numpy.mjs: importlib.metadata lists numpy 2.5.4's entry points (array_api, console_scripts f2py/numpy-config, pkg_config, pyinstaller40), as the sdist's pyproject.toml declares them (#1084)",
+    "cert/commands.mjs (homescoop#1405): numpy-config and f2py are slicc.commands (bin/ launchers for numpy's console_scripts, #!/usr/bin/env python3) and on PATH: numpy-config --version prints 2.5.4, numpy-config --cflags names this package's numpy/_core/include (arrayobject.h is there), f2py -v prints 2.5.4. 2.5.4-3: numpy-config: command not found, rc 127 (NEGATIVE.md)",
     "2.3.2-12 (homescoop#1082, refs #1081): cert/linalg-errors.mjs. A singular solve and inv raise LinAlgError('Singular matrix') for float64, float32, complex128 and one singular matrix in a batch; a non-PD cholesky raises LinAlgError('Matrix is not positive definite'). A good matrix solves to [2, 3], before and after a failure. -11 returns NaN for all of them (NEGATIVE.md)",
     "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 (it is built against 3.15.0-1's headers)",
     "2.5.4-1 (homescoop#761, the cp315 wave; npm-tag python3.15): numpy 2.5.4 from the PyPI sdist (9a94cf75\u2026) against wasix-python 3.15.0-1, Cython 3.3.0, wasix-sysroot -38 (libc++ headers from the sysroot, phase B). The wasm-cpu and fp-exceptions patches are upstream in 2.5.4 and drop. cblas-int-returns, no-backtrace and linalg-errors (#1082) carry over, all mapped in patches. Every cp314 spec, cert/linalg-errors.mjs included",
@@ -24,7 +26,8 @@
     "cert/signatures.mjs (homescoop#1083): the seven entry points that trapped (function signature mismatch) return: five private/test ones and two public ones, copy.copy() of a numpy scalar and setting ndarray.dtype; numpy-wasm-call-signatures.patch; build.sh's wasm-call-signatures.mjs run fails the build on a mismatch (was || echo)",
     "cert/numpy.mjs (homescoop#1088): np.show_config()'s compiler and linker args name no /tmp, /home or /Users path and no -ffile-prefix-map (build.sh drops the map from __config__.py)",
     "cert/linalg-large.mjs: eigh, svd and eigvalsh of 26x26, 64x64 and 200x200 matrices reconstruct (dsyevd/dgesdd divide and conquer, n > 25, the path wasix-openblas 0.3.34's laed3 int-ABI fix covers; 2.5.4-2's own 0.3.28 passes too, so this guards the switch)",
-    "2.5.4-3: OpenBLAS from @ai-ecoverse/wasix-openblas 0.3.34-1 (static PIC, C LAPACK, f2c int ABI; was a 0.3.28 build of tools/build-openblas.sh inside this recipe): wasix-openblas has 0.3.34's laed3 int-ABI fix, so dsyevd for n > 25 no longer traps, and no OS_EMBEDDED puts/printf/getenv/atoi stubs; certs on wasix-python 3.15.0-3. Same numpy sources"
+    "2.5.4-3: OpenBLAS from @ai-ecoverse/wasix-openblas 0.3.34-1 (static PIC, C LAPACK, f2c int ABI; was a 0.3.28 build of tools/build-openblas.sh inside this recipe): wasix-openblas has 0.3.34's laed3 int-ABI fix, so dsyevd for n > 25 no longer traps, and no OS_EMBEDDED puts/printf/getenv/atoi stubs; certs on wasix-python 3.15.0-3. Same numpy sources",
+    "2.5.4-4: numpy-config and f2py on PATH (cert/commands.mjs, #1405); PRESTAGE.md describes the cp315 build (#1178, scripts/test/recipe-docs.test.mjs). Same sources and build otherwise"
   ],
   "notices": [
     {
