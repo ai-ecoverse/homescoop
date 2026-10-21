@@ -18,3 +18,7 @@ The same spec passes on the 2.72.0-7 build (`host-run.sh wasix-autoconf`).
 ## 2.72.0-9: licence texts (homescoop#565, 2026-10-16)
 
 `cert/licence.mjs` against the published 2.72.0-8: FAIL, `package/LICENSE has no GPLv3 text, which 40 files name`. Its LICENSE was upstream's `COPYING` (GPLv2) alone, because `build.sh` passed `COPYING` and `COPYINGv3` to `homescoop_stage_license`, which copies only the first file that exists. The GPLv3 text and the Autoconf Configure Script Exception were missing, although package.json declares GPL-3.0-or-later. 2.72.0-9's LICENSE holds all three texts.
+
+## 2.72.0-11: pin bump, no NEGATIVE (homescoop#864, 2026-10-21)
+
+2.72.0-11 changes only the pins: wasix-m4 1.4.20-4 → 1.4.20-7 (homescoop#1557's rebuild on sysroot -40) and wasix-perl 5.42.0-18 → 5.42.0-21, plus a plain description. Autoconf's scripts and data are the same build as 2.72.0-10, and no behaviour changes, so there is no new negative: `cert/checklist.mjs` and `cert/licence.mjs` run unchanged against the new peers (cert/meta.json needsInstall, with wasix-automake 1.17.0-13).
