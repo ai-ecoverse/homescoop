@@ -22,9 +22,16 @@ git config --global gpg.program gpg && git commit -S -m signed
   when git runs it with its stdio piped. Without a terminal (the agent's
   `bash` tool), use unprotected keys or `--batch --passphrase-fd`.
 
+## 2.4.9-13
+
+- **Owner hand-offs go through one directory descriptor** (homescoop#1442). When root's gpg creates a file in another user's directory (a keybox, its backup, a trustdb, a lock file, `private-keys-v1.d`), it gives it to the directory's owner. Up to 2.4.9-12 it looked the directory up by name for the owner and the file up by name again for the hand-off, so a user who swapped a directory on the path for a symlink in between could make root give away a file in a root directory. Now it opens the directory once, takes the owner from that descriptor, checks the name relative to it with `fstatat(AT_SYMLINK_NOFOLLOW)`, opens it relative to it, and hands over only that same file (`st_dev`/`st_ino`), and only a regular file with one link (or the new directory). The check doesn't rely on `O_NOFOLLOW`: on slicc-kernel (1.124.1 to 1.143.5) `open` with `O_NOFOLLOW` opens a symlink's target instead of failing, so 2.4.9-12's reopen didn't refuse a symlink there. Lock files are created relative to that descriptor. A keybox update takes the owner of the keybox it replaces only when that keybox is a regular file in the same directory, never through a symlink: a keybox that replaces a symlinked `pubring.kbx` belongs to the directory's owner.
+- **The trustdb hand-off** (homescoop#1447) uses the same code. The 2.4.9-12 regression report came from an intermediate head of its PR (40b9ef7a); the published 2.4.9-12 hands the trustdb over. The cert row now requires the trustdb to exist, be the owner's, and work for the owner's `--clearsign`, `--list-keys` and `--check-trustdb`.
+- **The package ships its committed `package.json` and `README.md`** (homescoop#1448). build.sh used to write its own `package.json` and copy an older README, so 2.4.9-12's plain description, `"helper": true` on `gpg-agent` and the 2.4.9-12 notes never shipped. They do now.
+- **Reproducible builds** (homescoop#808): the package is rebuilt and compared in CI.
+
 ## 2.4.9-12
 
-- **Trustdb hand-off checks the name** (homescoop#1111). When root's gpg creates a `trustdb.gpg` in another user's homedir, it gives the file to the homedir's owner through the name itself: it reopens the name with `O_NOFOLLOW` and gives away that descriptor, and only if it's a regular file with one link. The keybox and lock-file paths already work this way. A `trustdb.gpg` that cone symlinks to a root file is never handed over. A `trustdb.gpg` that cone points at a root file stays root's.
+- **Trustdb hand-off checks the name** (homescoop#1111). When root's gpg creates a `trustdb.gpg` in another user's homedir, it gives the file to the homedir's owner through the name itself: it reopens the name with `O_NOFOLLOW` and gives away that descriptor, and only if it's a regular file with one link. A `trustdb.gpg` that cone symlinks to a root file is never handed over.
 - **`gpg-agent` is a helper command** (`"helper": true`). gpg starts it, so it's no longer listed as something you run.
 
 ## Not included
