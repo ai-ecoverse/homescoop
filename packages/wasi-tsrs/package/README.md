@@ -23,4 +23,14 @@ Certified: project type checking with cross-file errors, emit (JS and
 declarations), `--version`, and file permissions under slicc-kernel users.
 `--watch`, `--build`, `--lsp` and `--api` are not certified.
 
+**Deeply nested expressions** (homescoop#1498): tsrs's parser and checker
+recurse once per level of a nested expression. In a browser, that recursion
+runs on the worker's native call stack (about 1 MB in V8), not on tsrs's
+80 MiB wasm stack, so a chain of more than about 800 `+` terms, or more than
+about 550 nested parentheses, ends with `RangeError: Maximum call stack size
+exceeded` (exit 70). Hand-written code doesn't get near that; generated
+code (large string tables) can. Split such an expression into parts. The
+depth barely moves with the build's optimization level (measured: 815–831
+terms and 571–846 parentheses across `-Os`, `-O3`, `-Oz` and no wasm-opt).
+
 Apache-2.0; see `LICENSE`, `NOTICE` and `THIRD-PARTY-NOTICES.md`.

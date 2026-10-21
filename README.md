@@ -151,7 +151,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasi-ripgrep`](https://www.npmjs.com/package/@ai-ecoverse/wasi-ripgrep) | [recipe](packages/wasi-ripgrep) | ripgrep 15 for slicc WASI preview1 (command rg) |
 | [`@ai-ecoverse/wasi-rustc`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc) | [recipe](packages/wasi-rustc) | The Rust compiler, to build Rust programs in SLICC. |
 | [`@ai-ecoverse/wasi-rustc-names`](https://www.npmjs.com/package/@ai-ecoverse/wasi-rustc-names) | [recipe](packages/wasi-rustc-names) | Function names for the Rust compiler's wasm, so SLICC can name the frames of a rustc crash. |
-| [`@ai-ecoverse/wasi-tsrs`](https://www.npmjs.com/package/@ai-ecoverse/wasi-tsrs) | [recipe](packages/wasi-tsrs) | tsrs, the Rust port of TypeScript 7's tsc, for slicc WASI preview1 (command tsrs); tsrs.wasm built by homescoop from oxc-project/tsrs v0.18.0 |
+| [`@ai-ecoverse/wasi-tsrs`](https://www.npmjs.com/package/@ai-ecoverse/wasi-tsrs) | [recipe](packages/wasi-tsrs) | tsrs, the Rust port of the TypeScript compiler, to type-check and build TypeScript in SLICC. |
 | [`@ai-ecoverse/wasi-typescript`](https://www.npmjs.com/package/@ai-ecoverse/wasi-typescript) | [recipe](packages/wasi-typescript) | TypeScript 7 (the native tsc) for slicc WASI preview1 (command tsc); tsc.wasm built by homescoop from microsoft/typescript-go typescript/v7.0.2 with GOOS=wasip1 |
 | [`@ai-ecoverse/wasi-uv`](https://www.npmjs.com/package/@ai-ecoverse/wasi-uv) | [recipe](packages/wasi-uv) | Astral's uv for SLICC, with uvx, to manage Python environments and packages. |
 | [`@ai-ecoverse/wasi-zig`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig) | [recipe](packages/wasi-zig) | The Zig compiler with LLVM, to build Zig, C and C++ programs in SLICC. |
