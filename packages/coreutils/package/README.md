@@ -6,6 +6,31 @@ GNU coreutils (single-binary) for slicc.
 pnpm add -g @ai-ecoverse/wasm-coreutils
 ```
 
+## `nice` and time zone names (9.12.0-14)
+
+`nice` keeps a niceness per process, as on Linux: it starts at 0, `nice -n N`
+adds N (10 by default, at most 19), and children inherit it. Anyone may
+raise it; only root may lower it, and for anyone else `nice -n -1 cmd` warns
+`cannot set niceness` and runs `cmd` anyway. slicc-kernel has no scheduler
+priority, so the value changes nothing about how a program runs; it is
+there so that scripts reading `nice` see real numbers. Until 9.12.0-13 every
+niceness was 20 and every `nice -n` warned (homescoop#863).
+
+The kernel keeps no niceness, so the value travels to child processes in
+the environment variable `SLICC_NICE` (only while it isn't 0). `env` and
+`printenv` leave it out of their listings, but other programs (`export -p`
+in bash) see it, and `env -i` drops it: `nice -n 5 env -i nice` prints 0,
+where Linux prints 5.
+
+`date +%Z` names an IANA zone as the tz database does: `JST`, `GMT`/`BST` for
+London, `GMT`/`IST` for Dublin, `CET`/`CEST`, `AEST`/`AEDT`, `IST` for
+Kolkata, and a number such as `+04` where the database has no name (Dubai).
+Before, most zones outside the US were a number (`+09` for Tokyo). The names
+come from a table of the database's current names by zone and UTC offset,
+and from the browser's US names (`EST`, `PDT`, `AKST`); a few zones' older
+names (before about 2016, such as Istanbul's or Amman's `EET`) come out as
+numbers (homescoop#1417).
+
 ## Time zones and the environment (9.12.0-12)
 
 `date`, `touch`, `ls` and the rest honour `TZ`:

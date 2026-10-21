@@ -13,7 +13,6 @@ EM_JS(int, slicc_tz_intl, (const char *name, double t, char *abbr, int abbrlen),
   try {
     const zone = UTF8ToString(name);
     const fmt = new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric", timeZoneName: "short" });
-    const gb = new Intl.DateTimeFormat("en-GB", { timeZone: zone, timeZoneName: "short" });
     const at = (s) => {
       const parts = {};
       for (const p of fmt.formatToParts(new Date(s * 1000))) parts[p.type] = p.value;
@@ -21,12 +20,57 @@ EM_JS(int, slicc_tz_intl, (const char *name, double t, char *abbr, int abbrlen),
       return { off: Math.round(wall - s), name: parts.timeZoneName };
     };
     const now = at(t);
-    if (/^GMT[+-]/.test(now.name)) {
-      const other = gb.formatToParts(new Date(t * 1000)).find((p) => p.type === "timeZoneName");
-      if (other && !/^GMT/.test(other.value)) now.name = other.value;
+    if (!Module.sliccTzTable) {
+      const groups = [
+        ["Europe/London Europe/Belfast Europe/Guernsey Europe/Isle_of_Man Europe/Jersey GB GB-Eire", { 0: "GMT", 3600: "BST" }],
+        ["Europe/Dublin Eire", { 0: "GMT", 3600: "IST" }],
+        ["Europe/Lisbon Portugal Atlantic/Madeira Atlantic/Canary Atlantic/Faroe Atlantic/Faeroe WET", { 0: "WET", 3600: "WEST" }],
+        ["Europe/Amsterdam Europe/Andorra Europe/Belgrade Europe/Berlin Europe/Bratislava Europe/Brussels Europe/Budapest Europe/Busingen Europe/Copenhagen Europe/Gibraltar Europe/Ljubljana Europe/Luxembourg Europe/Madrid Europe/Malta Europe/Monaco Europe/Oslo Europe/Paris Europe/Podgorica Europe/Prague Europe/Rome Europe/San_Marino Europe/Sarajevo Europe/Skopje Europe/Stockholm Europe/Tirane Europe/Vaduz Europe/Vatican Europe/Vienna Europe/Warsaw Europe/Zagreb Europe/Zurich Africa/Ceuta Africa/Algiers Africa/Tunis Arctic/Longyearbyen Atlantic/Jan_Mayen Poland CET MET", { 3600: "CET", 7200: "CEST" }],
+        ["Europe/Athens Europe/Bucharest Europe/Chisinau Europe/Helsinki Europe/Kiev Europe/Kyiv Europe/Mariehamn Europe/Riga Europe/Sofia Europe/Tallinn Europe/Tiraspol Europe/Uzhgorod Europe/Vilnius Europe/Zaporozhye Europe/Nicosia Europe/Kaliningrad Asia/Beirut Asia/Famagusta Asia/Nicosia Asia/Gaza Asia/Hebron Africa/Cairo Africa/Tripoli Egypt Libya EET", { 7200: "EET", 10800: "EEST" }],
+        ["Europe/Moscow Europe/Simferopol Europe/Kirov Europe/Volgograd W-SU", { 10800: "MSK" }],
+        ["Asia/Jerusalem Asia/Tel_Aviv Israel", { 7200: "IST", 10800: "IDT" }],
+        ["Asia/Kolkata Asia/Calcutta", { 19800: "IST" }],
+        ["Asia/Karachi", { 18000: "PKT", 21600: "PKST" }],
+        ["Asia/Tokyo Japan", { 32400: "JST", 36000: "JDT" }],
+        ["Asia/Seoul Asia/Pyongyang ROK", { 32400: "KST", 36000: "KDT" }],
+        ["Asia/Shanghai Asia/Chongqing Asia/Chungking Asia/Harbin Asia/Taipei Asia/Macau Asia/Macao PRC ROC", { 28800: "CST", 32400: "CDT" }],
+        ["Asia/Manila", { 28800: "PST", 32400: "PDT" }],
+        ["Asia/Hong_Kong Hongkong", { 28800: "HKT", 32400: "HKST" }],
+        ["Asia/Jakarta Asia/Pontianak", { 25200: "WIB" }],
+        ["Asia/Makassar Asia/Ujung_Pandang", { 28800: "WITA" }],
+        ["Asia/Jayapura", { 32400: "WIT" }],
+        ["Australia/Sydney Australia/Melbourne Australia/Hobart Australia/Canberra Australia/ACT Australia/NSW Australia/Victoria Australia/Tasmania Australia/Currie Australia/Brisbane Australia/Lindeman Australia/Queensland Antarctica/Macquarie", { 36000: "AEST", 39600: "AEDT" }],
+        ["Australia/Adelaide Australia/Broken_Hill Australia/South Australia/Yancowinna Australia/Darwin Australia/North", { 34200: "ACST", 37800: "ACDT" }],
+        ["Australia/Perth Australia/West", { 28800: "AWST", 32400: "AWDT" }],
+        ["Pacific/Auckland Antarctica/McMurdo Antarctica/South_Pole NZ", { 43200: "NZST", 46800: "NZDT" }],
+        ["Pacific/Guam Pacific/Saipan", { 36000: "ChST" }],
+        ["Pacific/Pago_Pago Pacific/Midway Pacific/Samoa US/Samoa", { [-39600]: "SST" }],
+        ["America/Adak America/Atka US/Aleutian", { [-36000]: "HST", [-32400]: "HDT" }],
+        ["America/Hermosillo America/Mazatlan America/Chihuahua America/Ciudad_Juarez America/Ojinaga America/Dawson America/Whitehorse Mexico/BajaSur Canada/Yukon", { [-25200]: "MST", [-21600]: "MDT", intl: 1 }],
+        ["America/Havana Cuba", { [-18000]: "CST", [-14400]: "CDT" }],
+        ["Etc/GMT Etc/GMT0 Etc/GMT+0 Etc/GMT-0 Etc/Greenwich GMT GMT0 GMT+0 GMT-0 Greenwich", { 0: "GMT" }],
+        ["Antarctica/Troll", { 0: "+00", 7200: "+02" }],
+        ["America/St_Johns Canada/Newfoundland", { [-12600]: "NST", [-9000]: "NDT" }],
+        ["Africa/Johannesburg Africa/Maseru Africa/Mbabane", { 7200: "SAST" }],
+        ["Africa/Maputo Africa/Blantyre Africa/Bujumbura Africa/Gaborone Africa/Harare Africa/Kigali Africa/Lubumbashi Africa/Lusaka Africa/Windhoek", { 7200: "CAT" }],
+        ["Africa/Juba Africa/Khartoum", { 7200: "CAT", 10800: "EAT" }],
+        ["Africa/Nairobi Africa/Addis_Ababa Africa/Asmara Africa/Asmera Africa/Dar_es_Salaam Africa/Djibouti Africa/Kampala Africa/Mogadishu Indian/Antananarivo Indian/Comoro Indian/Mayotte", { 10800: "EAT" }],
+        ["Africa/Lagos Africa/Bangui Africa/Brazzaville Africa/Douala Africa/Kinshasa Africa/Libreville Africa/Luanda Africa/Malabo Africa/Niamey Africa/Porto-Novo Africa/Ndjamena", { 3600: "WAT" }],
+      ];
+      const table = {};
+      for (const [zones, names] of groups) for (const z of zones.split(" ")) table[z] = names;
+      Module.sliccTzTable = table;
     }
-    const m = /^GMT([+-])([0-9]+)(:([0-9][0-9]))?$/.exec(now.name);
-    const label = m ? m[1] + m[2].padStart(2, "0") + (m[4] && m[4] !== "00" ? m[4] : "") : now.name === "GMT" ? "UTC" : now.name;
+    const canon = fmt.resolvedOptions().timeZone;
+    const names = Module.sliccTzTable[zone] || Module.sliccTzTable[canon];
+    const fixed = names && names[now.off];
+    let label = fixed && !names.intl ? fixed : /^[A-Za-z]{3,5}$/.test(now.name) ? now.name : fixed;
+    if (!label) {
+      const a = Math.abs(now.off);
+      const hh = String(Math.floor(a / 3600)).padStart(2, "0");
+      const mm = Math.floor(a / 60) % 60;
+      label = (now.off < 0 ? "-" : "+") + hh + (mm ? String(mm).padStart(2, "0") : "");
+    }
     if (abbr) stringToUTF8(label, abbr, abbrlen);
     const year = new Date(t * 1000).getUTCFullYear();
     const jan = at(Date.UTC(year, 0, 1) / 1000).off;
