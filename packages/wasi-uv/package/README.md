@@ -10,7 +10,7 @@ It replaces [`@ai-ecoverse/wasix-uv-shim`](https://www.npmjs.com/package/@ai-eco
 pnpm add -g @ai-ecoverse/wasi-uv
 uv venv && uv pip install requests && uv run python -c 'import requests'
 uv init demo && cd demo && uv add idna && uv run demo
-uvx ruff check .   # uvx is uv tool run, as upstream's
+uvx --from charset-normalizer normalizer file.txt   # uvx is uv tool run, as upstream's
 ```
 
 PyPI is reached through the kernel's proxy (`HTTPS_PROXY`, CA in
@@ -46,7 +46,10 @@ Limits in seven:
 `uvx` (since 0.13.1-4, homescoop#771) is the same `uv.wasm` with `tool uvx`
 in front, as upstream's `uvx` binary does: `uvx <command>` and
 `uvx --from <package> <command>` run a package's command in a cached tool
-environment, and `uvx --version` prints `uvx 0.13.1`.
+environment, and `uvx --version` prints `uvx 0.13.1`. Only tools that are
+pure Python (or have a `wasi_0_0_0_wasm32` build) run: ruff, for example,
+ships native wheels and a Rust sdist only, so `uvx ruff` can't install it
+(homescoop#1486).
 
 Upstream is astral-sh/uv; homescoop's patches are in
 [`packages/wasi-uv`](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-uv).

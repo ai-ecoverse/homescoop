@@ -1,5 +1,5 @@
 /**
- * homescoop#1287's stress row for uv (0.13.1-3): `uv pip install` of 40
+ * homescoop#1287's stress row for uv (0.13.1-3; detached rounds since 0.13.1-5, homescoop#1489): `uv pip install` of 40
  * local wheels (60 modules each, plus a package needing all of them) into a
  * fresh venv, 6 times, with SLICC_WASM_BACKTRACE=1 and no cache. uv
  * resolves, unzips and links on threads, allocating while the shared memory
@@ -74,25 +74,40 @@ export default async function (ctx) {
   await write('/home/sdists/stressall-1.0-py3-none-any.whl.b64', wheel('stressall', deps, 1).toString('base64'));
   await ok('for f in *.b64; do base64 -d "$f" > "${f%.b64}" && rm "$f"; done', '/home/sdists');
   await write('/home/uvs.toml', 'no-index = true\nfind-links = ["/home/sdists"]\n');
+  // Each round runs detached and is polled with short runs (homescoop#1489:
+  // under users enforce a round took about 246 s on CI, past the harness's
+  // 120 s per call); the VmSize poll sleeps between reads.
   const script = [
-    'rm -rf .venv && uv venv -q || exit 9',
+    'rm -rf .venv /tmp/uv-round && uv venv -q || { echo "rc=9 peak_kb=0 traps=0 installed=0" > /tmp/uv-round; exit 0; }',
     'uv pip install --no-cache stressall >/tmp/uv-out 2>/tmp/uv-err & pid=$!; m=0',
     'while kill -0 $pid 2>/dev/null; do',
     '  if [ -r /proc/$pid/status ]; then while read -r k v u; do [ "$k" = VmSize: ] && [ "$v" -gt "$m" ] && m=$v; done < /proc/$pid/status 2>/dev/null; fi',
+    '  sleep 0.5',
     'done; wait $pid; rc=$?',
     't=0; while IFS= read -r l; do case $l in *"wasm trap"*) t=$((t+1));; esac; done < /tmp/uv-err',
     'n=0; for d in .venv/lib/python*/site-packages/stressdep*/; do [ -f "$d/m59.py" ] && n=$((n+1)); done',
-    'echo "rc=$rc peak_kb=$m traps=$t installed=$n"',
+    'echo "rc=$rc peak_kb=$m traps=$t installed=$n" > /tmp/uv-round.tmp && mv /tmp/uv-round.tmp /tmp/uv-round',
   ].join('\n');
+  await write('/home/s/round.sh', script);
   let traps = 0;
   let peak = 0;
   for (let round = 1; round <= 6; round++) {
-    const r = await run(['bash', '-c', script], { cwd: '/home/s', env });
-    const m = /rc=(\d+) peak_kb=(\d+) traps=(\d+) installed=(\d+)/.exec(r.stdout) ?? [];
+    const t0 = Date.now();
+    const start = await run(['bash', '-c', 'rm -f /tmp/uv-round; bash round.sh </dev/null >/dev/null 2>&1 &'], { cwd: '/home/s', env });
+    assert.equal(start.status, 0, start.stderr);
+    let line;
+    for (;;) {
+      await new Promise((res) => setTimeout(res, 2000));
+      const p = await run(['bash', '-c', '[ -s /tmp/uv-round ] && cat /tmp/uv-round; exit 0'], { cwd: '/home/s', env });
+      if (p.stdout.trim()) { line = p.stdout.trim(); break; }
+      assert.ok(Date.now() - t0 < 900000, `round ${round}: uv pip install finishes within 15 min`);
+    }
+    const m = /rc=(\d+) peak_kb=(\d+) traps=(\d+) installed=(\d+)/.exec(line) ?? [];
     traps += Number(m[3] ?? 1);
     peak = Math.max(peak, Number(m[2] ?? 0));
-    assert.equal(Number(m[1]), 0, `round ${round}: uv pip install: ${r.stdout} ${r.stderr}`);
-    assert.equal(Number(m[4]), 40, `round ${round}: all 40 packages installed: ${r.stdout}`);
+    console.log(`stress: round ${round}: ${line} in ${Math.round((Date.now() - t0) / 1000)} s`);
+    assert.equal(Number(m[1]), 0, `round ${round}: uv pip install: ${line} ${(await run(['bash', '-c', 'tail -c 1500 /tmp/uv-err'], { cwd: '/home/s' })).stdout}`);
+    assert.equal(Number(m[4]), 40, `round ${round}: all 40 packages installed: ${line}`);
   }
   console.log(`stress: 6 × uv pip install of 41 local wheels (2,400 modules): ${traps} traps, peak ${Math.round(peak / 1024)} MiB`);
   assert.equal(traps, 0, 'no wasm trap in 6 rounds');
