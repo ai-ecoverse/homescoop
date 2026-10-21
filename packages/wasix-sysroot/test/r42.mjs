@@ -24,7 +24,14 @@ export default async function (ctx) {
     'file 399 chars, no newline: 0 r42-env uname=same',
     'file with a slash: 0 r42-env uname=same',
     'file with a space inside: 0 r42-env uname=same',
-    'unlink /etc/hostname: 0',
+    ...(served ? ['mkfifo /etc/hostname: -1'] : [
+      'mkfifo /etc/hostname: 0',
+      'fifo, no writer: 0 r42-env',
+      'fifo writer: 1',
+      'fifo, a prefix then EAGAIN: 0 r42-env',
+      'fifo, a whole line: 0 r42-pipe',
+    ]),
+    `unlink /etc/hostname: ${served ? -1 : 0}`,
     `after unlink: /etc/hostname ${served ? 'present' : 'absent'}`,
     `no file: 0 ${gone ?? 'r42-env'} uname=same`,
     `no file, empty HOSTNAME: 0 ${gone ?? 'slicc'} uname=same`,
@@ -36,6 +43,6 @@ export default async function (ctx) {
   assert.deepEqual(lines, want, r.stdout);
   const rows = served
     ? 'the kernel serves /etc/hostname (r42-node) with HOSTNAME unset; a root-written file wins'
-    : 'no kernel /etc/hostname for WASIX; file missing gives HOSTNAME, both missing slicc';
+    : 'no kernel /etc/hostname for WASIX; a FIFO there with no writer or with a prefix and then EAGAIN gives HOSTNAME, a whole line in it is used; file missing gives HOSTNAME, both missing slicc';
   console.log(`r42 (${ctx.variant}, slicc-kernel ${ctx.kernelVersion}): gethostname()/uname().nodename take /etc/hostname's first line trimmed (with or without a newline, 64 chars kept); an empty, blank, 65-char, 399-char, slash or inner-space line falls back to HOSTNAME, then slicc; errno untouched; ${rows}`);
 }

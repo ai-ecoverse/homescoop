@@ -30,7 +30,11 @@ static int from_file(char *out, size_t cap)
 	while (n < sizeof b) {
 		ssize_t k = read(fd, b + n, sizeof b - n);
 		if (k < 0 && errno == EINTR) continue;
-		if (k <= 0) break;
+		if (k < 0) {
+			close(fd);
+			return 0;
+		}
+		if (k == 0) break;
 		n += k;
 		if (memchr(b + n - k, '\n', k)) break;
 	}

@@ -26,6 +26,13 @@ static void show(const char *what) {
   printf("%s: %d %s uname=%s%s\n", what, r, h, ur == 0 && !strcmp(u.nodename, h) ? "same" : u.nodename, e == 4321 ? "" : " errno-changed");
 }
 
+static void once(const char *what) {
+  char h[256];
+  errno = 4321;
+  int r = gethostname(h, sizeof h);
+  printf("%s: %d %s%s\n", what, r, h, errno == 4321 ? "" : " errno-changed");
+}
+
 static void line(const char *what, const char *text) {
   put(text, strlen(text));
   show(what);
@@ -54,6 +61,18 @@ int main(void) {
   line("file 399 chars, no newline", big);
   line("file with a slash", "r42/x\n");
   line("file with a space inside", "r42 x\n");
+  unlink("/etc/hostname");
+  int made = mkfifo("/etc/hostname", 0644);
+  printf("mkfifo /etc/hostname: %d\n", made);
+  if (made == 0) {
+    once("fifo, no writer");
+    int w = open("/etc/hostname", O_RDWR | O_NONBLOCK);
+    printf("fifo writer: %d\n", w >= 0 && write(w, "r42-part", 8) == 8);
+    once("fifo, a prefix then EAGAIN");
+    if (w >= 0) write(w, "r42-pipe\n", 9);
+    once("fifo, a whole line");
+    if (w >= 0) close(w);
+  }
   printf("unlink /etc/hostname: %d\n", unlink("/etc/hostname"));
   printf("after unlink: /etc/hostname %s\n", stat("/etc/hostname", &st) == 0 ? "present" : "absent");
   show("no file");
