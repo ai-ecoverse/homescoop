@@ -75,8 +75,34 @@ export default async function (ctx) {
     const x = await sh('cat node_modules/big/lockd/x');
     assert.equal(x.stdout, 'x\n', '#1384 the old tree is the old tree, read-only entry included');
   }
+  const stages = async () => (await sh('shopt -s nullglob; for f in node_modules/*_pacquet-stage_* node_modules/@*/*_pacquet-stage_*; do echo "${f#node_modules/}"; done')).stdout.trim().split('\n').filter(Boolean);
+  if (after === '50 2.0.0') {
+    const left = await stages();
+    console.log(`swap-edges: leftovers after the update: ${left.join(' ') || 'none'}`);
+    assert.equal(left.length, 1, `the unremovable old tree is left once: ${left.join(' ')}`);
+    assert.match(r.stderr, new RegExp(`node_modules/${left[0]}`), `#1532 the update names the leftover ${left[0]} on stderr: ${out(r)}`);
+    r = await sh(`pnpm install --registry ${REGISTRY}`);
+    assert.equal(r.status, 0, `an install while the leftover is still read-only: ${out(r)}`);
+    assert.match(r.stderr, new RegExp(`node_modules/${left[0]}`), `#1532 an install that still can't delete it names it again: ${out(r)}`);
+    assert.deepEqual(await stages(), left, 'and leaves it');
+  }
   r = await sh(`chmod -R u+w . && pnpm install --registry ${REGISTRY} && ls -A node_modules`);
   assert.equal(r.status, 0, `the update after chmod -R u+w: ${out(r)}`);
   assert.equal(await state(), '50 2.0.0', 'big@2.0.0 is installed after the retry');
   console.log(`swap-edges: node_modules after the retry: ${r.stdout.trim().split('\n').join(' ')}`);
+  assert.deepEqual(await stages(), [], `#1532 the install after chmod -R u+w removes every *_pacquet-stage_* entry: ${out(r)}`);
+  r = await sh('ls -A node_modules');
+  assert.ok(!r.stdout.includes('.pacquet-stage-leftovers'), `#1532 and its record: ${r.stdout}`);
+
+  r = await sh([
+    'mkdir -p node_modules/old_pacquet-stage_1_2_3/lib node_modules/@s/pkg_pacquet-stage_1_2_4 node_modules/kept_pacquet-stage_1_2_5/node_modules/inner',
+    'echo x > node_modules/old_pacquet-stage_1_2_3/lib/a.js',
+    'echo x > node_modules/@s/pkg_pacquet-stage_1_2_4/index.js',
+  ].join(' && '));
+  assert.equal(r.status, 0, out(r));
+  r = await sh(`pnpm install --registry ${REGISTRY}`);
+  assert.equal(r.status, 0, `an install over unrecorded leftovers: ${out(r)}`);
+  assert.deepEqual(await stages(), ['kept_pacquet-stage_1_2_5'], `#1532 unrecorded leftovers go, except the one holding a node_modules: ${out(r)}`);
+  assert.match(r.stderr, /node_modules\/kept_pacquet-stage_1_2_5/, `#1532 the one kept is named: ${out(r)}`);
+  assert.equal(await state(), '50 2.0.0', 'big@2.0.0 is untouched');
 }

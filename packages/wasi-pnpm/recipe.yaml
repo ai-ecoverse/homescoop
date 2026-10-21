@@ -87,3 +87,6 @@ about:
     12.9.1-20's 0011: the hoisted swap on every kernel (a failed update
     leaves the old package whole, #1384); node-shebang bins fail with the
     reason (#1441).
+    12.9.1-21's 0012: a replaced tree that can't be deleted after the swap
+    is named on stderr and recorded, and every later install removes it
+    once it can, or names it again (#1532).

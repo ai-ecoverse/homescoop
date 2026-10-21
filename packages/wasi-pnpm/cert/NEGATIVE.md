@@ -93,8 +93,18 @@ The published 12.9.1-17 against 12.9.1-18's `cert/update-readers.mjs` (slicc-ker
 
 - **`cert/swap-edges.mjs`:** the published 12.9.1-19 on slicc-kernel 1.132.1 (below 0010's gate) **fails**.
   - The update over a read-only entry exits 1 ("… prior to swap: Permission denied") and leaves `node_modules/big` as `0 1.0.0`: lib/ was deleted, and only package.json and the read-only directory are left.
-  - With -20, the update succeeds on 1.132.1 and 1.134.3 alike: the old tree is renamed aside. The aside copy can't be deleted (the read-only entry), so a `big_pacquet-stage_*` sibling holding the old tree stays in node_modules, with a warning.
+  - With -20, the update succeeds on 1.132.1 and 1.134.3 alike: the old tree is renamed aside. The aside copy can't be deleted (the read-only entry), so a `big_pacquet-stage_*` sibling holding the old tree stays in node_modules. (This said "with a warning"; there was none, and no later install removed it: homescoop#1532, fixed in 12.9.1-21.)
 - **`cert/project-bins.mjs`:** 12.9.1-19 fails both new assertions.
   - `pnpm exec jsbin` says only "could not start: ENOENT".
   - `npx jsbin` gives "/usr/bin/env: bad interpreter" (126).
 
+
+## 12.9.1-21: a leftover old tree is named and cleaned up (homescoop#1532, 2026-10-21)
+
+The published 12.9.1-20 (npm latest) against 12.9.1-21's `cert/swap-edges.mjs` (slicc-kernel 1.134.3, users enforce, `--soft`, slicc-heavy): **FAIL, 5 of 18 assertions.**
+- The update to big@2.0.0 succeeds (`50 2.0.0`), and `node_modules/big_pacquet-stage_1_…_3` is left. stderr is empty: nothing names it (`swap-edges.mjs:83`).
+- A second `pnpm install` while it's still read-only says "Already up to date" and nothing else (`:86`).
+- After `chmod -R u+w .`, `pnpm install` says "Already up to date" and the sibling is still there (`:93`).
+- Hand-made leftovers, `old_pacquet-stage_1_2_3` and `@s/pkg_pacquet-stage_1_2_4`, survive the next install along with the big one (`:105`), and the kept one holding a `node_modules` isn't named (`:106`).
+
+12.9.1-21's 0012 names the leftover on stderr (` WARN  Could not delete the replaced copy of …/node_modules/big (…). It stays at …/node_modules/big_pacquet-stage_…; a later pnpm install removes it once it can be deleted.`), records it in `node_modules/.pacquet-stage-leftovers`, and sweeps the root's and each project's node_modules at the start of every install that touches them, before the "Already up to date" check. pnpm's deps-restorer unit tests pass with it (634 of 634, host `cargo test -p pnpm-deps-restorer --lib`): the existing unremovable-tree test now also checks the record, a sweep that still can't delete (kept, still recorded) and one after the chmod (gone, record dropped); a new one checks unrecorded leftovers in node_modules and a scope directory, the kept one holding a node_modules, and that a record line leaving node_modules (`../…`, `/…`) or without the stage mark is never followed.

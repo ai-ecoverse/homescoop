@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-pnpm",
-  "version": "12.9.1-20",
+  "version": "12.9.1-21",
   "description": "The pnpm package manager for SLICC, with npm, npx and i commands, to install and run JavaScript packages.",
   "license": "MIT",
   "repository": {
@@ -45,7 +45,8 @@
       "0008-wasm-root-is-not-a-local-prefix.patch",
       "0009-wasm-alloc-refreshes-memory-view.patch",
       "0010-gated-hoisted-swap.patch",
-      "0011-hoisted-swap-on-every-kernel.patch"
+      "0011-hoisted-swap-on-every-kernel.patch",
+      "0012-leftover-stages-warn-and-sweep.patch"
     ]
   },
   "slicc": {
