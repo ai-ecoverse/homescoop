@@ -181,8 +181,8 @@ old = json.loads(committed.read_text()) if committed.exists() else {}
 parts = ver.split(".")
 npm_ver = old.get("version") or (f"{ver}.0-1" if len(parts) == 2 else f"{ver}-1")
 deps = old.get("dependencies") or {
-    "@ai-ecoverse/wasix-autoconf": "2.72.0-10",
-    "@ai-ecoverse/wasix-perl": "5.42.0-18",
+    "@ai-ecoverse/wasix-autoconf": "2.72.0-11",
+    "@ai-ecoverse/wasix-perl": "5.42.0-21",
 }
 am_env = {
     "AUTOMAKE_LIBDIR": f"${{package}}/share/automake-{ver}",
@@ -200,7 +200,7 @@ for cmd in ("automake", "aclocal"):
 pkg = {
     "name": "@ai-ecoverse/wasix-automake",
     "version": npm_ver,
-    "description": "GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4)",
+    "description": "GNU Automake, which writes the Makefile.in templates that build software.",
     "license": "GPL-2.0-or-later",
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-automake/package"},
     "files": ["README.md", "LICENSE", "bin", "share"],

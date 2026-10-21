@@ -157,7 +157,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasi-zig`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig) | [recipe](packages/wasi-zig) | The Zig compiler with LLVM, to build Zig, C and C++ programs in SLICC. |
 | [`@ai-ecoverse/wasi-zig-libc-src`](https://www.npmjs.com/package/@ai-ecoverse/wasi-zig-libc-src) | [recipe](packages/wasi-zig-libc-src) | wasi-libc's C sources for @ai-ecoverse/wasi-zig: zig cc for wasm32-wasi CPUs and modes beyond the prebuilt baseline |
 | [`@ai-ecoverse/wasix-autoconf`](https://www.npmjs.com/package/@ai-ecoverse/wasix-autoconf) | [recipe](packages/wasix-autoconf) | GNU Autoconf, which writes the configure scripts that build software. |
-| [`@ai-ecoverse/wasix-automake`](https://www.npmjs.com/package/@ai-ecoverse/wasix-automake) | [recipe](packages/wasix-automake) | GNU Automake for slicc (scripts; needs wasix-perl + wasix-autoconf + wasix-m4) |
+| [`@ai-ecoverse/wasix-automake`](https://www.npmjs.com/package/@ai-ecoverse/wasix-automake) | [recipe](packages/wasix-automake) | GNU Automake, which writes the Makefile.in templates that build software. |
 | [`@ai-ecoverse/wasix-bind`](https://www.npmjs.com/package/@ai-ecoverse/wasix-bind) | [recipe](packages/wasix-bind) | BIND 9.20 dig, host and nslookup: DNS lookup tools. |
 | [`@ai-ecoverse/wasix-f2c`](https://www.npmjs.com/package/@ai-ecoverse/wasix-f2c) | [recipe](packages/wasix-f2c) | Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc) |
 | [`@ai-ecoverse/wasix-gnupg`](https://www.npmjs.com/package/@ai-ecoverse/wasix-gnupg) | [recipe](packages/wasix-gnupg) | GnuPG 2.4: OpenPGP encryption and signing with gpg, gpgv and gpg-agent. |

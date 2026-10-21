@@ -24,3 +24,7 @@ AssertionError [ERR_ASSERTION]: bin/automake names /bin/sh, not the build host's
 ```
 
 Its line 41 is `$ENV{'SHELL'} = '/bin/bash' if exists $ENV{'DJDIR'};`. A macOS host-run of 1.17.0-13 (configure with `CONFIG_SHELL=/bin/sh SHELL=/bin/sh`) writes `'/bin/sh'` and passes.
+
+## 1.17.0-14: pin bump, no NEGATIVE (homescoop#864, 2026-10-21)
+
+1.17.0-14 changes only the pins: wasix-autoconf 2.72.0-10 → 2.72.0-11 (homescoop#1565) and wasix-perl 5.42.0-18 → 5.42.0-21, together, so an install still has one perl, plus a plain description. Automake's scripts and data are the same build as 1.17.0-13, and no behaviour changes, so there is no new negative: `cert/checklist.mjs` and `cert/paths.mjs` run unchanged against the new peers (cert/meta.json needsInstall, with wasix-m4 1.4.20-7). The cert kernel moves from slicc-kernel 1.100.4 to 1.132.1, because wasix-perl 5.42.0-21 declares engines.slicc-kernel >=1.120.0.
