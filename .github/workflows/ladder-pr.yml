@@ -135,8 +135,19 @@ jobs:
           else
             echo "::warning::recipe-sha: this branch's refresh-recipe-sha.mjs predates the verdict line (#1019); merge main to get the wrapped check"
           fi
+          reroll=()
+          if grep -q 'recipe-sha: REROLL' scripts/refresh-recipe-sha.mjs; then
+            reroll=(--ci-reroll --keep-pin)
+          fi
           node -e 'JSON.parse(process.env.HOST).forEach((p) => console.log(p))' | while read -r pkg; do
-            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack --verify-tree
+            log=$(mktemp)
+            ${gate[@]+"${gate[@]}"} node scripts/refresh-recipe-sha.mjs "$pkg" --verify-repack --verify-tree ${reroll[@]+"${reroll[@]}"} | tee "$log"
+            rerolls=$(grep -c '^   re-roll: ' "$log" || true)
+            verdicts=$(grep -c '^recipe-sha: REROLL ' "$log" || true)
+            if [[ "$rerolls" != "$verdicts" ]]; then
+              echo "::error::recipe-sha: $rerolls re-roll(s) but $verdicts REROLL verdict line(s) for $pkg"
+              exit 1
+            fi
           done
       # Renovate bumps only recipe.yaml; check-package-meta wants the
       # committed package.json version to be the one the build stages.
@@ -189,11 +200,27 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.recipe-sha.outputs.sha || '' }}
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '26'
       - name: Refresh source sha256 in this checkout
-        run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          log=$(mktemp)
+          if [[ -f scripts/gate.mjs ]] && grep -q 'recipe-sha: REROLL' scripts/refresh-recipe-sha.mjs; then
+            node scripts/gate.mjs recipe-sha -- node scripts/refresh-recipe-sha.mjs "$PKG" --ci-reroll | tee "$log"
+          else
+            node scripts/refresh-recipe-sha.mjs "$PKG" | tee "$log"
+          fi
+          rerolls=$(grep -c '^   re-roll: ' "$log" || true)
+          verdicts=$(grep -c '^recipe-sha: REROLL ' "$log" || true)
+          if [[ "$rerolls" != "$verdicts" ]]; then
+            echo "::error::recipe-sha: $rerolls re-roll(s) but $verdicts REROLL verdict line(s) for $PKG"
+            exit 1
+          fi
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
       - name: Build from the hosted workspace path
@@ -252,7 +279,22 @@ jobs:
         with:
           node-version: '26'
       - name: Refresh source sha256 in this checkout
-        run: node scripts/refresh-recipe-sha.mjs "${{ matrix.package }}"
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          log=$(mktemp)
+          if [[ -f scripts/gate.mjs ]] && grep -q 'recipe-sha: REROLL' scripts/refresh-recipe-sha.mjs; then
+            node scripts/gate.mjs recipe-sha -- node scripts/refresh-recipe-sha.mjs "$PKG" --ci-reroll | tee "$log"
+          else
+            node scripts/refresh-recipe-sha.mjs "$PKG" | tee "$log"
+          fi
+          rerolls=$(grep -c '^   re-roll: ' "$log" || true)
+          verdicts=$(grep -c '^recipe-sha: REROLL ' "$log" || true)
+          if [[ "$rerolls" != "$verdicts" ]]; then
+            echo "::error::recipe-sha: $rerolls re-roll(s) but $verdicts REROLL verdict line(s) for $PKG"
+            exit 1
+          fi
       - name: Sync npm version from recipe (Renovate bumps)
         run: node scripts/sync-package-version.mjs "${{ matrix.package }}" --write
       # Another directory (a real copy), WORK and user name than host-build's,

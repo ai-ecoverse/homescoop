@@ -46,7 +46,9 @@ const all = args.includes('--all');
 const checkOnly = args.includes('--check');
 const verifyRepack = args.includes('--verify-repack');
 const verifyTree = args.includes('--verify-tree');
-const reroll = args.includes('--reroll');
+const ciReroll = args.includes('--ci-reroll');
+const keepPin = args.includes('--keep-pin');
+const reroll = args.includes('--reroll') || ciReroll;
 const baseIdx = args.indexOf('--base');
 const baseRef = baseIdx >= 0 ? args[baseIdx + 1] : process.env.RECIPE_SHA_BASE || 'origin/main';
 const names = all
@@ -341,12 +343,13 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
       const digest = blob.digest;
       const oldSha = String(src.sha256 || '');
       const pinTree = src.tree ? String(src.tree) : '';
-      const treeOk = () => {
+      const treeOk = (narrow = false) => {
         const gh = githubArchive(url);
         const repo = String(src.git || gh?.repo || '');
         const commit = String(src.commit || gh?.commit || '');
         if (!repo || !commit) throw new Error(`${label}.tree needs a GitHub archive URL of a commit, or ${label}.git and ${label}.commit`);
-        const r = checkArchiveTree({ archive: blob.file, repo, commit, tree: pinTree });
+        const listed = Array.isArray(src.tree_subst) ? src.tree_subst.map(String) : [];
+        const r = checkArchiveTree({ archive: blob.file, repo, commit, tree: pinTree, ...(narrow ? { allowSubst: listed } : {}) });
         console.log(`   ${describeTree(r, pinTree)}`);
         return r;
       };
@@ -387,9 +390,13 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
               'Nothing was written; find out why before changing the pin.'
           );
         }
-        const r = treeOk();
+        const basePin = baseJob ? String(baseJob.src.sha256 || '') : '';
+        if (ciReroll && oldSha !== basePin) {
+          throw new Error(`${unchanged}, and the pin differs from ${baseRef}'s (${basePin || '(none)'}); --ci-reroll accepts a re-roll only of a pin carried over unchanged. Nothing was written.`);
+        }
+        const r = treeOk(ciReroll);
         if (!r.ok) {
-          throw new Error(`${unchanged}, and it does not match the pinned ${label}.tree ${pinTree} (${r.problems[0]}). Nothing was written.`);
+          throw new Error(`${unchanged}, and it does not match the pinned ${label}.tree ${pinTree}${ciReroll ? ` under --ci-reroll (source.tree_subst ${JSON.stringify(src.tree_subst || [])})` : ''} (${r.problems[0]}). Nothing was written.`);
         }
         if (!reroll) {
           throw new Error(
@@ -398,6 +405,9 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
           );
         }
         console.log(`   re-roll: the archive matches ${label}.tree ${pinTree}; sha256 ${oldSha} → ${digest} for the same URL`);
+        const shown = Object.entries(r.values || {}).map(([p, v]) => ` subst=${p}${JSON.stringify(v)}`).join('');
+        console.log(`recipe-sha: REROLL ${name}${job.key ? `/${job.key}` : ''} ${oldSha}→${digest} sha256 tree=${pinTree}${shown}${keepPin ? ' (pin kept)' : ''}`);
+        if (keepPin) continue;
       } else {
         const baseSha = baseJob ? String(baseJob.src.sha256 || '') : '';
         if (oldSha && oldSha !== baseSha) {

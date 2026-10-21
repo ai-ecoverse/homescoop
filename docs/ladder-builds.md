@@ -376,9 +376,26 @@ so a codeload zip URL without an extension works. ladder-pr passes the base as
 script and older ones would take an argument as a package name. It prints `source-tree: PASS|FAIL …`.
 
 A changed sha256 for an unchanged URL whose archive matches `tree:` is a re-roll.
-It still fails in CI. Refresh it explicitly with
-`node scripts/refresh-recipe-sha.mjs <pkg> --reroll`, which logs the tree check;
-commit that log line's verdict in the PR body. An archive that doesn't match the
+GitHub regenerates archives, and it can serve another gzip of the same commit on
+most runs (#1491's llvm-project archive).
+- **Where it applies:** with `refresh-recipe-sha.mjs <pkg> --ci-reroll`, a re-roll of a pin carried over unchanged from the base passes only when the archive matches `tree:` under the narrow rule:
+  - every path is byte-for-byte the committed tree;
+  - except files listed in the recipe's `tree_subst:` (e.g. `clang/bindings/python/.git_archival.txt` for llvm-project, whose `describe-name` moves with each new tag), which the tree's own `.gitattributes` marks `export-subst`. Those may differ only at their `$Format:…$` placeholders, and each substituted value is one line of `[A-Za-z0-9._+~:/ -]`, at most 200 characters;
+  - the paths missing from the archive are exactly the tree's `export-ignore` set;
+  - no extra paths.
+
+  Each accepted re-roll prints:
+  ```text
+  recipe-sha: REROLL <pkg> <old>→<new> sha256 tree=<tree> subst=<path>[<values>]
+  ```
+  The step runs through `gate.mjs recipe-sha` and fails if a re-roll has no such line. The jobs that run it:
+  - ladder-pr's `host-build` and `rebuild`, pool-parity, and ladder-build's `host-build` write the new pin into their own checkout only, which has no push credentials and no id-token;
+  - ladder-pr's `recipe-sha` job adds `--keep-pin`, so it passes with the REROLL line and writes nothing.
+
+  A changed pin or URL, a recipe without `tree:`, and a difference no `tree_subst:` covers all stay strict and fail. The source sha256 doesn't reach the package (llvm-emscripten's published tarball has the commit, not the archive sha), so a re-roll can't change the published bytes.
+- **The normal publish path downloads nothing.** ladder-merge passes `artifact_pr`, ladder-build fetches the certified PR artifact (`fetch-certified`), and its `host-build` is skipped. `host-build` runs only as the fallback (a manual dispatch, or an expired artifact), and its rebuild must still match the certified sha256.
+- **Local builds:** run `node scripts/refresh-recipe-sha.mjs <pkg> --ci-reroll` before `host-run.sh`. The pin it writes must never be committed.
+- **Refreshing the committed pin** is explicit: `node scripts/refresh-recipe-sha.mjs <pkg> --reroll` logs the tree check (the older rule: export-subst placeholders of any marked file, and export-ignore paths, allowed). Commit that log line's verdict in the PR body. homescoop_fetch stays strict. An archive that doesn't match the
 tree fails, with or without `--reroll`. ladder-pr's `recipe-sha` job also passes
 `--verify-tree`, so a pinned tree is checked on every PR that touches the package,
 even when the sha256 matches.
