@@ -234,7 +234,7 @@ export function checkProvenance(doc, { npm, version, integrity, repo = REPO_URL,
   const dep = (def.resolvedDependencies || []).find((d) => String(d?.uri || '').startsWith(`git+${repo}@`));
   const commit = dep?.digest?.gitCommit;
   if (!/^[0-9a-f]{40}$/.test(commit || '')) return { ok: false, reason: `provenance names no ${repo.split('/').pop()} commit` };
-  return { ok: true, reason: '', commit, run: statement.predicate?.runDetails?.metadata?.invocationId, builder };
+  return { ok: true, reason: '', commit, run: statement.predicate?.runDetails?.metadata?.invocationId, builder, workflow: wf.path };
 }
 
 export function sourceRule({ pkg, commit, readAt, recipe, label }) {

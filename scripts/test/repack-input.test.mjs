@@ -204,7 +204,7 @@ test('checkProvenance takes another repository, workflow and ref, and can requir
     return { attestations: [{ predicateType: 'https://slsa.dev/provenance/v1', bundle: { dsseEnvelope: { payload: Buffer.from(JSON.stringify(statement)).toString('base64') } } }] };
   };
   const opts = { npm: '@ai-ecoverse/slicc-kernel', version: '1.0.0', integrity, repo, workflows: ['.github/workflows/release.yml'], hosted: true };
-  assert.deepEqual(checkProvenance(doc(), opts), { ok: true, reason: '', commit: 'c'.repeat(40), run: 'run', builder: GITHUB_HOSTED });
+  assert.deepEqual(checkProvenance(doc(), opts), { ok: true, reason: '', commit: 'c'.repeat(40), run: 'run', builder: GITHUB_HOSTED, workflow: '.github/workflows/release.yml' });
   assert.match(checkProvenance(doc(), { ...opts, repo: undefined, workflows: undefined }).reason, /slicc-kernel, not https:\/\/github.com\/ai-ecoverse\/homescoop/);
   const selfHosted = doc((s) => (s.predicate.runDetails.builder.id = 'https://github.com/actions/runner/self-hosted'));
   assert.match(checkProvenance(selfHosted, opts).reason, /self-hosted, not GitHub-hosted/);
