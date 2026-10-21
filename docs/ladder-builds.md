@@ -297,6 +297,16 @@ and compares the two `package.tgz` sha256s, listing the entries that differ
 differs fails the run and opens, or comments on, one `pool-parity` issue;
 move it back to hosted, or fix the difference. Dispatch it whenever the
 runner-job image or the hosted image changes (#499).
+**`scripts/pool-hold.json` is a temporary hold:** a JSON array of
+`runner: pool` recipes that run `host-build`, `rebuild` and `test` on
+`ubuntu-latest` anyway, for a pool image that has lost a tool they need
+(October 2026: cmake and `/usr/bin/clang`, so freetype, openjpeg and
+tls-engine), without touching their recipes (which would rebuild, certify
+and publish them). `classify-touched-packages.mjs` leaves them out of `pool`,
+so pool-parity skips them too, also when its `packages` input names them;
+a name that is not a `runner: pool` recipe, or a file that is not an array
+of names, fails the classifier. Empty it (`[]`) once the pool image has
+cmake and clang again.
 Some recipes stay hosted for reasons outside their bytes (#390 C2):
 `qpdf`, whose
 `qpdf.wasm` comes out differently on the pool in some runs (#804); and

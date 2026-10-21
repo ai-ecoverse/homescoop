@@ -44,6 +44,8 @@ if (every) {
 }
 const pendingFile = join(root, 'scripts/reproducible-pending.json');
 const pending = existsSync(pendingFile) ? JSON.parse(readFileSync(pendingFile, 'utf8')) : {};
+const holdFile = join(root, 'scripts/pool-hold.json');
+const held = poolHold();
 const host = [];
 const slicc = [];
 const rebuild = [];
@@ -81,8 +83,30 @@ function reproducible(p, value, built) {
   process.exit(1);
 }
 
+function poolHold() {
+  if (!existsSync(holdFile)) return new Set();
+  let list;
+  try {
+    list = JSON.parse(readFileSync(holdFile, 'utf8'));
+  } catch (err) {
+    console.error(`scripts/pool-hold.json: ${err.message}`);
+    process.exit(1);
+  }
+  if (!Array.isArray(list) || !list.every((p) => typeof p === 'string' && /^[a-z0-9][a-z0-9._-]*$/.test(p))) {
+    console.error('scripts/pool-hold.json must be a JSON array of package names');
+    process.exit(1);
+  }
+  for (const p of list) {
+    if (!existsSync(join(root, 'packages', p, 'recipe.yaml')) || recipe(p).runner !== 'pool') {
+      console.error(`scripts/pool-hold.json: ${p} is not a runner: pool recipe`);
+      process.exit(1);
+    }
+  }
+  return new Set(list);
+}
+
 function onPool(p, r) {
-  if (r.runner === 'pool') return true;
+  if (r.runner === 'pool') return !held.has(p);
   if (r.runner !== undefined && r.runner !== null) {
     console.error(`packages/${p}/recipe.yaml: runner must be pool, or absent for ubuntu-latest`);
     process.exit(1);
