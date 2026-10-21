@@ -26,7 +26,7 @@
 -    if matches!(tcx.sess.lto(), rustc_session::config::Lto::Fat | rustc_session::config::Lto::Thin) {
 +    if matches!(tcx.sess.lto(), rustc_session::config::Lto::Fat | rustc_session::config::Lto::Thin)
 +        && tcx.crate_types().iter().any(|t| {
-+            matches!(t, CrateType::Executable | CrateType::Dylib | CrateType::Cdylib | CrateType::Staticlib)
++            matches!(t, CrateType::Executable | CrateType::Dylib | CrateType::Cdylib | CrateType::StaticLib)
 +        })
 +    {
          tcx.sess.dcx().fatal(
