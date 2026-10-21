@@ -131,7 +131,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-sed`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sed) | [recipe](packages/sed) | GNU sed for slicc (WASM / emscripten, SLICC homescoop) |
 | [`@ai-ecoverse/wasm-sqlite3`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sqlite3) | [recipe](packages/sqlite3) | sqlite3 CLI 3.54.0 (amalgamation shell) for wasm / slicc (emscripten) |
 | [`@ai-ecoverse/wasm-tar`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tar) | [recipe](packages/tar) | GNU tar 1.35 for wasm / slicc (fork + Asyncify for -z/-j/-J) |
-| [`@ai-ecoverse/wasm-tls-engine`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tls-engine) | [recipe](packages/tls-engine) | The TLS engine slicc uses for secure network connections, built on Mbed TLS 4.2.0. |
+| [`@ai-ecoverse/wasm-tls-engine`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tls-engine) | [recipe](packages/tls-engine) | Secure (TLS) network connections for slicc. |
 | [`@ai-ecoverse/wasm-tree`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tree) | [recipe](packages/tree) | tree: list the contents of directories as a tree. |
 | [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux text tools (rev, column, hexdump, colrm, look, getopt) and flock. |
 | [`@ai-ecoverse/wasi-biome`](https://www.npmjs.com/package/@ai-ecoverse/wasi-biome) | [recipe](packages/wasi-biome) | Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC. |

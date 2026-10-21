@@ -1,0 +1,11 @@
+--- a/tf-psa-crypto/include/psa/crypto_sizes.h
++++ b/tf-psa-crypto/include/psa/crypto_sizes.h
+@@ -202,7 +202,7 @@
+  *
+  * Note that an implementation may set different size limits for different
+  * operations, and does not need to accept all key sizes up to the limit. */
+-#define PSA_VENDOR_RSA_MAX_KEY_BITS 4096u
++#define PSA_VENDOR_RSA_MAX_KEY_BITS 8192u
+ 
+ /* The minimum size of an RSA key on this implementation, in bits.
+  * This is a vendor-specific macro.

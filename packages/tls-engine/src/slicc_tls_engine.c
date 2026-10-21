@@ -42,6 +42,7 @@
 #define TLS_EOF (-1)
 #define TLS_NOMEM (-2)
 #define TLS_BADARG (-3)
+#define TLS_RSA_TOO_LARGE (-0x10000)
 #define TLS_CLIENT_INSECURE_SKIP_VERIFY 1
 #define TLS_CLIENT_NO_SNI 2
 #define TLS_CLIENT_VERIFY_CHAIN_ONLY 4
@@ -112,6 +113,7 @@ static const char *crypto_strerror(int code) {
     case TLS_EOF: return "tls-engine - the peer closed the connection (TLS_EOF)";
     case TLS_NOMEM: return "tls-engine - out of memory (TLS_NOMEM)";
     case TLS_BADARG: return "tls-engine - bad argument (TLS_BADARG)";
+    case TLS_RSA_TOO_LARGE: return "tls-engine - RSA key larger than 8192 bits (TLS_RSA_TOO_LARGE)";
     case PSA_ERROR_GENERIC_ERROR: return "PSA - Generic error";
     case PSA_ERROR_NOT_PERMITTED: return "PSA - Not permitted";
     case PSA_ERROR_NOT_SUPPORTED: return "PSA - Not supported";
@@ -562,6 +564,43 @@ static int same_public_key(mbedtls_pk_context *cert, mbedtls_pk_context *key) {
   return same;
 }
 
+_Static_assert(PSA_VENDOR_RSA_MAX_KEY_BITS == 8192u, "rsa-max-key-bits-8192.patch");
+
+static size_t cert_rsa_bits(const unsigned char *der, size_t len) {
+  unsigned char *p = (unsigned char *)der, *end = p + len;
+  const int seq = MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE;
+  size_t n;
+  mbedtls_asn1_buf oid, params;
+  if (mbedtls_asn1_get_tag(&p, end, &n, seq) != 0) return 0;
+  end = p + n;
+  if (mbedtls_asn1_get_tag(&p, end, &n, seq) != 0) return 0;
+  end = p + n;
+  if (mbedtls_asn1_get_tag(&p, end, &n, MBEDTLS_ASN1_CONTEXT_SPECIFIC | MBEDTLS_ASN1_CONSTRUCTED) == 0)
+    p += n;
+  if (mbedtls_asn1_get_tag(&p, end, &n, MBEDTLS_ASN1_INTEGER) != 0) return 0;
+  p += n;
+  for (int i = 0; i < 4; i++) {
+    if (mbedtls_asn1_get_tag(&p, end, &n, seq) != 0) return 0;
+    p += n;
+  }
+  if (mbedtls_asn1_get_tag(&p, end, &n, seq) != 0) return 0;
+  end = p + n;
+  if (mbedtls_asn1_get_alg(&p, end, &oid, &params) != 0) return 0;
+  if (MBEDTLS_OID_CMP(MBEDTLS_OID_PKCS1 "\x01", &oid) != 0) return 0;
+  if (mbedtls_asn1_get_bitstring_null(&p, end, &n) != 0) return 0;
+  end = p + n;
+  if (mbedtls_asn1_get_tag(&p, end, &n, seq) != 0) return 0;
+  if (mbedtls_asn1_get_tag(&p, end, &n, MBEDTLS_ASN1_INTEGER) != 0) return 0;
+  while (n > 0 && *p == 0) {
+    p++;
+    n--;
+  }
+  if (n == 0) return 0;
+  size_t bits = (n - 1) * 8;
+  for (unsigned top = *p; top; top >>= 1) bits++;
+  return bits;
+}
+
 EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain, size_t chain_len,
                                          unsigned char *key, size_t key_len, unsigned char *pass,
                                          size_t pass_len) {
@@ -580,6 +619,7 @@ EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain,
     if (ret != 0) goto done;
     size_t whole = (size_t)(p - start) + body;
     ret = mbedtls_x509_crt_parse_der(&s->own_chain, start, whole);
+    if (ret != 0 && cert_rsa_bits(start, whole) > PSA_VENDOR_RSA_MAX_KEY_BITS) ret = TLS_RSA_TOO_LARGE;
     if (ret != 0) goto done;
     at += whole;
   }
