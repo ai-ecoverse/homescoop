@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasi-tsrs",
-  "version": "0.18.0-1",
-  "description": "tsrs, the Rust port of TypeScript 7's tsc, for slicc WASI preview1 (command tsrs); tsrs.wasm built by homescoop from oxc-project/tsrs v0.18.0",
+  "version": "0.18.0-2",
+  "description": "tsrs, the Rust port of the TypeScript compiler, to type-check and build TypeScript in SLICC.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

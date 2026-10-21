@@ -14,6 +14,7 @@
     "the same errors with emit → exit 2, output still written",
     "tsrs -p /home/nothere → exit 1, error TS5058",
     "users enforce: alice checking bob's project with a 0600 file gets TS2307 for it (rc 2, no secret printed), emitting into his project fails TS5033 Permission denied and writes nothing; bob is refused alice's 0700 home (TS5058); each user's output is theirs; root checks everything",
-    "cert/notices.mjs: THIRD-PARTY-NOTICES.md is installed, has the Rust 1.99.1 standard library section and exactly one wasi-libc section, headed wasi-sdk-33"
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md is installed, has the Rust 1.99.1 standard library section and exactly one wasi-libc section, headed wasi-sdk-33",
+    "cert/depth.mjs (0.18.0-2, homescoop#1498, documented in the README): a 500-term + chain and 400 nested parentheses type-check (rc 0), and a 3000-term chain ends with RangeError: Maximum call stack size exceeded (rc 70): tsrs recurses on the worker's native stack (~1 MB in V8), not its 80 MiB wasm stack; the limit (~815 terms, ~571 parentheses) barely moves with the optimization level"
   ]
 }
