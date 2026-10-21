@@ -47,8 +47,10 @@ export default async function platform(ctx) {
 
   const notices = await ctx.read('/node_modules/@ai-ecoverse/wasm-cmake/THIRD-PARTY-NOTICES.md');
   assert.ok(notices, 'THIRD-PARTY-NOTICES.md ships');
-  for (const name of ['Emscripten 6.0.9', 'cmcurl', 'cmlibuv', 'cmlibarchive', 'cmexpat', 'cmjsoncpp', 'cmzstd', 'cmbzip2', 'cmliblzma', 'cmnghttp2', 'cmlibrhash', 'cmzlib']) {
+  for (const name of ['Emscripten 6.0.9', 'cmcurl', 'cmlibuv', 'cmlibarchive', 'cmexpat', 'cmjsoncpp', 'cmzstd', 'cmbzip2', 'cmliblzma', 'cmnghttp2', 'cmlibrhash', 'cmzlib', 'cmllpkgc']) {
     assert.match(notices, new RegExp(`^## ${name}`, 'm'), `THIRD-PARTY-NOTICES.md names ${name} (homescoop#1279, #844)`);
   }
-  console.log('platform: the host is WASI; file(DOWNLOAD) over http with the right bytes, a 404 is 22, https is "Unsupported protocol"; THIRD-PARTY-NOTICES.md names Emscripten and the 11 bundled libraries');
+  assert.match(notices, /^## homescoop: .*\bslicc shims\b.*Apache-2\.0/m, 'THIRD-PARTY-NOTICES.md has the slicc shims section (homescoop#1533)');
+  assert.match(notices.slice(notices.search(/^## homescoop: .*slicc shims/m)), /Apache License\s+Version 2\.0/, 'the slicc shims section carries the Apache-2.0 text (homescoop#1533)');
+  console.log('platform: the host is WASI; file(DOWNLOAD) over http with the right bytes, a 404 is 22, https is "Unsupported protocol"; THIRD-PARTY-NOTICES.md names Emscripten, the 12 bundled libraries and the slicc shims (Apache-2.0)');
 }

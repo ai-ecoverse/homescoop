@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-cmake",
-  "version": "4.4.3-12",
+  "version": "4.4.3-13",
   "description": "CMake, the build system generator, to configure and build C and C++ projects.",
   "license": "BSD-3-Clause",
   "repository": {

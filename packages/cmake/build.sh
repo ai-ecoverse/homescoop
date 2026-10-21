@@ -74,6 +74,7 @@ REALM=(
   --js-library "$ROOT/shims/slicc/slicc-writev.js"
   --js-library "$ROOT/shims/slicc/slicc-linkat.js"
   --js-library "$ROOT/shims/slicc/slicc-uname.js"
+  --js-library "$ROOT/shims/slicc/slicc-env.js"
   -Wl,-u,slicc_raise -Wl,-u,slicc_sig_mask -Wl,-u,slicc_sigpipe -Wl,-u,slicc_cred_euid -Wl,--wrap=raise
   -Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture -Wl,-u,posix_spawn -Wl,-u,posix_spawnp
   -Wl,-u,popen -Wl,-u,pclose -Wl,-u,system
@@ -102,6 +103,7 @@ assert "CMAKE_ROOT" in t, "pre-js CMAKE_ROOT bridge missing from the glue"
 assert t.count("NODEFS") > 0, "missing -lnodefs.js"
 assert t.count("slicc_poll_js") > 0, "slicc_poll_js missing (libuv's poll must enter the kernel)"
 assert "slicc_cred_js" in t, "the credential library is missing"
+assert "web_user" not in t, "Emscripten's getEnvStrings placeholders are linked instead of slicc-env.js (homescoop#1501)"
 print("  glue QC OK")
 PY
 if LC_ALL=C grep -aEq '/(home|Users|__w|private/var)/|homescoop-work' "$OUT/cmake.wasm"; then
@@ -127,6 +129,7 @@ homescoop_notice "Emscripten 6.0.9 (runtime and system libraries)" \
   "$EMSCRIPTEN_TREE/LICENSE" - \
   "$EMSCRIPTEN_TREE/system/lib/libc/musl/COPYRIGHT" - \
   "$EMSCRIPTEN_TREE/system/lib/libcxx/LICENSE.TXT" -
+homescoop_notice_slicc_shims
 BUNDLED=()
 while IFS= read -r lib; do BUNDLED+=("$lib"); done < <(grep -ohE "Utilities/cm[a-z0-9]+" "$BLD/Source/CMakeFiles/cmake.dir/link.txt" "$BLD/Source/CMakeFiles/cmake.dir/linkLibs.rsp" | sed 's|Utilities/||' | sort -u)
 test "${#BUNDLED[@]}" -gt 5

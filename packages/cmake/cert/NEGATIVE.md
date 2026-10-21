@@ -33,3 +33,17 @@ On slicc-kernel 1.110.7, users enforce, the published 4.4.3-10 gives:
 ## 4.4.3-12: shim drift (homescoop#1491; 2026-10-20)
 
 4.4.3-12 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 4.4.3-11 in `bin/cmake` and `bin/cmake.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 4.4.3-13: the shims notice and slicc-env.js (homescoop#1533, #1501, #1281; 2026-10-21)
+
+On slicc-kernel 1.110.7, users enforce, the published 4.4.3-12 gives:
+
+| case | 4.4.3-12 | 4.4.3-13 |
+|---|---|---|
+| `env -i /usr/bin/cmake -E environment` (#1501, `cert/env-i.mjs`) | `USER=web_user`, `LOGNAME=web_user`, `PATH=/`, `PWD=/`, `HOME=/home/web_user`, `LANG=en_US.UTF-8`, `_=cmake`, plus the kernel's `CMAKE_ROOT` and `HOSTNAME` | only what the kernel passes: no web_user, `PATH=/`, HOME, USER, LOGNAME or LANG |
+| `THIRD-PARTY-NOTICES.md` shims section (#1533, `cert/platform.mjs`) | missing | `## homescoop: the slicc shims (shims/slicc, Apache-2.0)` with the Apache-2.0 text |
+| `cert/downloads.mjs` (#1281 coverage) | passes | passes |
+
+- **#1501, the cause:** build.sh passes its own `--js-library` list, and it named slicc-writev.js, slicc-linkat.js and slicc-uname.js but not `shims/slicc/slicc-env.js`, so Emscripten's stock `getEnvStrings` filled in its placeholders. The link now adds slicc-env.js itself (not wasm-emscripten's link.py default from its package-patches), and the glue QC fails if the glue still names `web_user`.
+- **#1533, the cause:** build.sh compiles the shims itself, outside `homescoop_slicc_archive`, so no shims section was written, and `KNOWN_WITHOUT_SHIM_NOTICE` let it through under the closed #844. build.sh now calls `homescoop_notice_slicc_shims`, and the entry is gone, so `scripts/test/shim-notice.test.mjs` fails if the call goes missing again.
+- **#1281, partly:** `platform.mjs` now checks all 12 bundled-library notices (adding `cmllpkgc`), and `downloads.mjs` covers a binary download with `EXPECTED_HASH`, a hash mismatch, a 302, `TIMEOUT` and the `-DCMAKE_SYSTEM_NAME=Linux` override. A real C/C++ project with wasm-clang is still open.
