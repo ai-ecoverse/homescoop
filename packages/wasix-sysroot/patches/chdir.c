@@ -75,8 +75,61 @@ int chdir_legacy(const char *path)
     return 0;
 }
 
+static int __slicc_cwd_fd = -2;
+
+static int slicc_cwd_fd(void) {
+    int fd = __slicc_cwd_fd;
+    if (fd != -2)
+        return fd;
+    fd = -1;
+    __wasi_prestat_t prestat;
+    if (__wasi_fd_prestat_get(3, &prestat) == __WASI_ERRNO_SUCCESS &&
+        prestat.tag == __WASI_PREOPENTYPE_DIR && prestat.u.dir.pr_name_len == 1) {
+        char name[2] = {0, 0};
+        if (__wasi_fd_prestat_dir_name(3, (uint8_t *)name, 1) == __WASI_ERRNO_SUCCESS && name[0] == '.')
+            fd = 3;
+    }
+    __slicc_cwd_fd = fd;
+    return fd;
+}
+
+static const char *slicc_skip_dot(const char *path) {
+    while (path[0] == '.' && path[1] == '/') {
+        path += 2;
+        while (path[0] == '/')
+            path++;
+    }
+    return path;
+}
+
+static int slicc_dot_only(const char *rel) {
+    if (rel[0] == '\0')
+        return 1;
+    if (rel[0] != '.')
+        return 0;
+    rel++;
+    while (rel[0] == '/')
+        rel++;
+    return rel[0] == '\0';
+}
+
+static int slicc_host_chdir(const char *rel) {
+    __wasi_errno_t error = __wasi_chdir(rel);
+    if (error != 0) {
+        errno = error;
+        return -1;
+    }
+    __wasilibc_cwd_lock();
+    __wasilibc_cwd_is_synced = 0;
+    __wasilibc_cwd_unlock();
+    return 0;
+}
+
 static const char *make_absolute(const char *path) {
-    // if the libc has not synced with the runtime yet, call into the runtime to get the cwd
+    if (path[0] == '/') {
+        return path;
+    }
+
     if (!__wasilibc_cwd_is_synced) {
         char cwd[256];
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -103,11 +156,6 @@ static const char *make_absolute(const char *path) {
     
     static char *make_absolute_buf = NULL;
     static size_t make_absolute_len = 0;
-
-    // If this path is absolute, then we return it as-is.
-    if (path[0] == '/') {
-        return path;
-    }
 
 #ifndef _REENTRANT
     // If the path is empty, or points to the current directory, then return
@@ -167,6 +215,31 @@ int __wasilibc_find_relpath_alloc(
         errno = ENOENT;
         return -1;
     }
+    if (path[0] != '/') {
+        int cwd_fd = slicc_cwd_fd();
+        if (cwd_fd >= 0) {
+            const char *rel = slicc_skip_dot(path);
+            if (rel[0] == '\0')
+                rel = ".";
+            size_t rel_len = strlen(rel);
+            if (*relative_buf_len < rel_len + 1) {
+                if (!can_realloc) {
+                    errno = ERANGE;
+                    return -1;
+                }
+                char *tmp = realloc(*relative_buf, rel_len + 1);
+                if (tmp == NULL) {
+                    errno = ENOMEM;
+                    return -1;
+                }
+                *relative_buf = tmp;
+                *relative_buf_len = rel_len + 1;
+            }
+            strcpy(*relative_buf, rel);
+            *abs_prefix = ".";
+            return cwd_fd;
+        }
+    }
     // First, make our path absolute taking the cwd into account.
     const char *abspath = make_absolute(path);
     if (abspath == NULL) {
@@ -208,9 +281,15 @@ int __wasilibc_find_relpath_alloc(
 // libc cache and the kernel.
 int chdir(const char *path)
 {
+    int via_fd = path[0] != '/' && path[0] != '\0' && slicc_cwd_fd() >= 0;
+    if (via_fd && slicc_dot_only(slicc_skip_dot(path)))
+        return slicc_host_chdir(".");
     char *real = realpath(path, NULL);
-    if (real == NULL)
-        return -1;
+    if (real == NULL) {
+        if (errno != ENOENT || !via_fd)
+            return -1;
+        return slicc_host_chdir(slicc_skip_dot(path));
+    }
     int r = 0;
     // we run the legacy chdir function that emulates real
     // current directory functionality for backwards compatibility reasons
