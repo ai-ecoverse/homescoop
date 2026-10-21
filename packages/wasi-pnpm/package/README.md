@@ -85,8 +85,10 @@ pnpm records it in `node_modules/.pacquet-stage-leftovers`, and every later
 `pnpm install` (even one that is otherwise "Already up to date") deletes it
 once it can, after `chmod -R u+w node_modules` for instance; until then each
 install names it again. The same install also removes the unrecorded
-`*_pacquet-stage_*` entries directly in `node_modules` or in a scope
-directory, which is what 12.9.1-20 and earlier left. An unrecorded one that
+entries named like pnpm's own stage directories
+(`<name>_pacquet-stage_<pid>_<nanos>_<n>`, all three numbers) directly in
+`node_modules` or in a scope directory, which is what 12.9.1-20 and earlier
+left. An unrecorded one that
 holds a `node_modules` is left alone and named, because a failed update may
 have set aside a package's own dependencies there: look at it and delete it
 by hand. Don't run two installs in the same project at once, because one
