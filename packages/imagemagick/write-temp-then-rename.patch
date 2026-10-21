@@ -35,7 +35,7 @@
    assert(exception != (ExceptionInfo *) NULL);
    write_info=CloneImageInfo(image_info);
    *write_info->magick='\0';
-@@ -1613,6 +1628,132 @@
+@@ -1613,6 +1628,147 @@
    sans_exception=DestroyExceptionInfo(sans_exception);
    if (*write_info->magick == '\0')
      (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
@@ -152,6 +152,21 @@
 +          break;
 +      }
 +      random_info=DestroyRandomInfo(random_info);
++      if ((file >= 0) && (atomic_existed != MagickFalse))
++        {
++          struct stat
++            atomic_tmp_status;
++
++          if ((fstat(file,&atomic_tmp_status) != 0) ||
++              ((atomic_tmp_status.st_gid != atomic_status.st_gid) &&
++               (fchown(file,(uid_t) -1,atomic_status.st_gid) != 0)) ||
++              (fchmod(file,atomic_status.st_mode & 07777) != 0))
++            {
++              (void) close_utf8(file);
++              (void) remove_utf8(atomic_tmp);
++              file=(-1);
++            }
++        }
 +      if (file < 0)
 +        *atomic_tmp='\0';
 +      else
@@ -168,7 +183,7 @@
    p=images;
    for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
    {
-@@ -1661,5 +1802,30 @@
+@@ -1661,5 +1817,30 @@
        }
    }
    write_info=DestroyImageInfo(write_info);

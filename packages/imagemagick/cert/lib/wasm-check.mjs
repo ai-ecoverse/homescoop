@@ -49,10 +49,21 @@ try {
   };
   walk(pkg);
   if (leaks.length) throw new Error(`${name}: build paths in the tarball (homescoop#937):\n  ${leaks.join('\n  ')}`);
+  const fontsDir = join(pkg, 'etc/fonts');
+  const pfb = existsSync(fontsDir) ? readdirSync(fontsDir).filter((f) => f.endsWith('.pfb')) : [];
+  const EXCEPTION = /GPL with an exception that you can put these fonts in your own non-GPLed\s+documents/;
+  if (!pfb.length) throw new Error(`${name}: etc/fonts has no .pfb, the default font (homescoop#586)`);
+  {
+    const fontReadme = join(fontsDir, 'README');
+    if (!existsSync(fontReadme) || !EXCEPTION.test(readFileSync(fontReadme, 'utf8'))) throw new Error(`${name}: etc/fonts has ${pfb.join(', ')} but no README with gsfonts' font exception (homescoop#1382)`);
+    if (!/GNU GENERAL PUBLIC LICENSE\s+Version 2, June 1991/.test(readFileSync(join(fontsDir, 'COPYING'), 'utf8'))) throw new Error(`${name}: etc/fonts/COPYING is not the GPL version 2 text (homescoop#1382)`);
+    if (!EXCEPTION.test(readFileSync(join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8'))) throw new Error(`${name}: THIRD-PARTY-NOTICES.md does not carry gsfonts' font exception (homescoop#1382)`);
+    if (!/\bGPL-2\.0-only WITH Font-exception-2\.0\b/.test(String(manifest.license))) throw new Error(`${name}: package.json license "${manifest.license}" does not name the fonts' GPL-2.0-only WITH Font-exception-2.0 (homescoop#1382)`);
+  }
   const cfg = readFileSync(join(pkg, 'etc/ImageMagick-7/configure.xml'), 'utf8');
   if (!/<configure name="LIBS" value="[^"]*-L\/prefix\/lib/.test(cfg)) throw new Error(`${name}: etc/ImageMagick-7/configure.xml LIBS doesn't name /prefix/lib (homescoop#937)`);
   const names = sec.find(([n]) => n === 'name')[1];
-  console.log(`wasm-check: ${name} bin/magick.wasm ${wasm.length} bytes, name section ${names} bytes, no DWARF; no share/; package.json and notices name ${KIT}@${version}; no build path (${needles.length} checked) in any file, configure.xml says /prefix`);
+  console.log(`wasm-check: ${name} bin/magick.wasm ${wasm.length} bytes, name section ${names} bytes, no DWARF; no share/; package.json and notices name ${KIT}@${version}; no build path (${needles.length} checked) in any file, configure.xml says /prefix; ${pfb.length} gsfonts .pfb with the font exception in etc/fonts/README, the notices and the licence`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

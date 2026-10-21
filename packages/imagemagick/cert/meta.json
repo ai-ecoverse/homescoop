@@ -3,10 +3,14 @@
   "kernel": "@ai-ecoverse/slicc-kernel@1.110.1",
   "users": "enforce",
   "needs": [
-    "@ai-ecoverse/wasm-poppler"
+    "@ai-ecoverse/wasm-poppler",
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-poppler@26.10.0-2"
+    "@ai-ecoverse/wasm-poppler@26.10.0-2",
+    "@ai-ecoverse/wasm-bash@5.3.0-19",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-9"
   ],
   "checklist": [
     "magick -version lists the built-in delegates freetype, jpeg, jp2, lcms, png, tiff, webp, xml, zlib (7.1.2-32-3: jng jp2 jpeg lcms png tiff only)",
@@ -28,7 +32,10 @@
     "defaults.mjs (homescoop#1208): the tab policy refuses MPC/CACHE (MPC persists the pixel cache to disk, which disk=0 forbids) with 'not authorized by the security policy `MPC''' and no out.mpc/out.cache; magick-open writes o.mpc and reads it back to a 30x30 PNG. 7.1.2-34-9.1: 'cache resources exhausted … unable to persist pixel cache' (NEGATIVE.md)",
     "defaults.mjs (homescoop#679, timer-monotonic-emscripten.patch): identify rose: logo: prints an elapsed time 0:ss.mmm; Emscripten's clock_gettime refuses CLOCK_MONOTONIC_RAW, so 7.1.2-34-9.1 printed an uninitialized timespec (4294967295:10.000)",
     "defaults.mjs (homescoop#561, jp2-tile-large.patch): a 16000x3000 (48 MP) gradient encodes to JP2 16000x3000; without -extract, images above 16 MP are encoded in 1024x1024 tiles. 7.1.2-34-9.1: 'unable to encode image file', rc 1",
-    "7.1.2-34-9.3: built against wasm-libpng 1.6.59-4, wasm-libwebp 1.6.0-4, wasm-libtiff 4.7.2-4, wasm-libxml2 2.15.4-3, wasm-lcms2 2.19.1-4, wasm-freetype 2.13.3-4 and wasm-libiconv 1.19.0-3 (npm latest; no build paths, libwebp.pc Requires libsharpyuv, homescoop#941, #925)"
+    "7.1.2-34-9.3: built against wasm-libpng 1.6.59-4, wasm-libwebp 1.6.0-4, wasm-libtiff 4.7.2-4, wasm-libxml2 2.15.4-3, wasm-lcms2 2.19.1-4, wasm-freetype 2.13.3-4 and wasm-libiconv 1.19.0-3 (npm latest; no build paths, libwebp.pc Requires libsharpyuv, homescoop#941, #925)",
+    "mogrify-users.mjs (7.1.2-34-9.5, homescoop#1381, mogrify-inplace-keep-mode-owner.patch): in-place mogrify -resize 50% keeps the file's mode, group and owner. As kim (groups kim, users) over her own 0644 kim:users a.png and 0640 b.png: kim users 644 and kim kim 640, resized; as root over kim's 0644 a.png and 0664 kim:users c.jpg: still kim users 644 and 664, resized; as kim over root's 0666 w.png in a sticky /tmp/msk and an open /tmp/mop: rewritten in place, root root 666; no stray files anywhere. mogrify gives its backup file the target's owner, group and mode (fchown, fchmod) before writing to it, and when it can't (a target another user owns, as non-root) or the target is not a regular file, it writes the target in place. 7.1.2-34-9.4: kim kim 600 and root root 600 (NEGATIVE.md)",
+    "wasm-check.mjs (7.1.2-34-9.5, homescoop#1382): etc/fonts holds gsfonts .pfb files, so etc/fonts/README (gsfonts' README: 'GPL with an exception that you can put these fonts in your own non-GPLed documents') and etc/fonts/COPYING (GPL version 2) ship, THIRD-PARTY-NOTICES.md carries the exception, and package.json license names GPL-2.0-only WITH Font-exception-2.0. 7.1.2-34-9.4: no README in etc/fonts (NEGATIVE.md)",
+    "write-temp-then-rename.patch (7.1.2-34-9.5, homescoop#1381): the temporary file gets the existing target's group and mode (fchown, fchmod) right after it is created; if that fails, the target is written in place, so a rename never hands over a file with other metadata"
   ],
   "ci": [
     "node packages/imagemagick/cert/lib/wasm-check.mjs"

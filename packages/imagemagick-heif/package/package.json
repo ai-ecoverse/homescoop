@@ -1,8 +1,8 @@
 {
   "name": "@ai-ecoverse/wasm-imagemagick-heif",
-  "version": "7.1.2-34-9.4",
+  "version": "7.1.2-34-9.5",
   "description": "ImageMagick with HEIC, HEIF and AVIF support, a drop-in for wasm-imagemagick that includes a patent-encumbered HEVC decoder.",
-  "license": "ImageMagick AND LGPL-3.0-or-later AND BSD-2-Clause",
+  "license": "ImageMagick AND LGPL-3.0-or-later AND BSD-2-Clause AND GPL-2.0-only WITH Font-exception-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
