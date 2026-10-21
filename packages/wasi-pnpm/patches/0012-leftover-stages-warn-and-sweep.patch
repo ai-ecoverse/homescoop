@@ -1,0 +1,341 @@
+deps-restorer, install: name a replaced tree that can't be deleted, and sweep it later (homescoop#1532)
+
+0010/0011 rename the old tree aside, rename the staged one in, and then
+delete the old one. When that delete fails (an entry pnpm can't unlink, such
+as a file in a read-only directory), the old tree stayed as a
+<name>_pacquet-stage_* sibling with only a tracing event no reporter shows,
+and no later install ever looked at it. Now the failure is named on stderr
+and the leftover's path is recorded in .pacquet-stage-leftovers in the
+outermost modules directory above it (the outermost one holding a
+.modules.yaml, else the outermost node_modules, else its parent). Every
+install that touches node_modules (not --lockfile-only or --dry-run) sweeps
+the records of the root's modules directory and of each project's (its
+modulesDir, and the node_modules the hoisted linker nests into): the full
+install before its repeat-install check, and the CLI's synchronous "Already
+up to date" fast path before it reports. Only recorded entries are deleted:
+a recorded line must be relative, plain (no `..`, no root), named like
+pick_stage_path's <name>_pacquet-stage_<pid>_<nanos>_<n>, and reached
+through real directories, not symlinks. An entry pnpm didn't record is
+never deleted, whatever its name (a real package may be called that). One
+that still can't be deleted is named again and stays recorded.
+
+Upstream: not filed (Lars decides).
+
+diff --git a/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs b/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs
+index a7176669..b18a1728 100644
+--- a/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs
++++ b/pnpm/crates/deps-restorer/src/import_indexed_dir/staging.rs
+@@ -114,6 +114,7 @@ pub(super) fn stage_and_swap<Reporter: self::Reporter>(
+     // 5. Delete the old tree, now out of every reader's way.
+     if let Err(error) = pnpm_fs::remove_dirent(&aside) {
+         tracing::warn!(?aside, %error, "could not remove a replaced package directory");
++        crate::leftover_stages::record_leftover_stage(&aside, dir_path, &error);
+     }
+     discard_replaced_modules(&preserved_modules);
+     Ok(())
+diff --git a/pnpm/crates/deps-restorer/src/import_indexed_dir/tests/runtimes.rs b/pnpm/crates/deps-restorer/src/import_indexed_dir/tests/runtimes.rs
+index e614b267..d76091ca 100644
+--- a/pnpm/crates/deps-restorer/src/import_indexed_dir/tests/runtimes.rs
++++ b/pnpm/crates/deps-restorer/src/import_indexed_dir/tests/runtimes.rs
+@@ -162,22 +162,80 @@ fn unremovable_replaced_tree_does_not_fail_the_swap() {
+     )
+     .expect("the swap succeeds even though the old tree can't be removed");
+ 
+-    let mut leftovers = Vec::new();
+-    for entry in walkdir::WalkDir::new(tmp.path()).max_depth(1) {
+-        let path = entry.unwrap().into_path();
+-        if path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.contains("pacquet-stage")) {
+-            let inner = path.join("locked_subdir");
+-            if inner.exists() {
+-                fs::set_permissions(&inner, fs::Permissions::from_mode(0o700)).unwrap();
+-            }
+-            leftovers.push(path);
+-        }
+-    }
++    let stage_entries = || -> Vec<std::path::PathBuf> {
++        walkdir::WalkDir::new(tmp.path())
++            .max_depth(1)
++            .into_iter()
++            .map(|entry| entry.unwrap().into_path())
++            .filter(|path| path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.contains("_pacquet-stage_")))
++            .collect()
++    };
++    let leftovers = stage_entries();
+     assert_eq!(fs::read(target.join("package.json")).unwrap(), b"new");
+     assert!(!target.join("stale.txt").exists(), "the old tree's files are not in the new package");
+     assert!(!target.join("locked_subdir").exists());
+     assert_eq!(fs::read(target.join("node_modules/inner/sentinel")).unwrap(), b"survivor", "preserved node_modules/ survives");
+     assert_eq!(leftovers.len(), 1, "the unremovable old tree is left beside the package: {leftovers:?}");
++
++    let record = tmp.path().join(crate::LEFTOVER_STAGES_RECORD);
++    let name = leftovers[0].file_name().unwrap().to_str().unwrap().to_string();
++    assert_eq!(fs::read_to_string(&record).unwrap(), format!("{name}\n"), "homescoop#1532: the leftover is recorded");
++
++    let left = crate::sweep_leftover_stages(&[tmp.path().to_path_buf()]);
++    assert_eq!(left, leftovers, "homescoop#1532: a sweep that can't delete it keeps it");
++    assert_eq!(fs::read_to_string(&record).unwrap(), format!("{name}\n"), "and keeps it recorded");
++
++    fs::set_permissions(leftovers[0].join("locked_subdir"), fs::Permissions::from_mode(0o700)).unwrap();
++    let left = crate::sweep_leftover_stages(&[tmp.path().to_path_buf()]);
++    assert!(left.is_empty(), "homescoop#1532: once deletable, the sweep removes it: {left:?}");
++    assert!(stage_entries().is_empty());
++    assert!(!record.exists(), "and drops the record");
++    assert_eq!(fs::read(target.join("package.json")).unwrap(), b"new");
++}
++#[test]
++fn sweep_removes_only_what_pnpm_recorded() {
++    let tmp = tempdir().unwrap();
++    let modules = tmp.path().join("node_modules");
++    let recorded = modules.join("big_pacquet-stage_1_2_3");
++    let nested = modules.join("a/node_modules/b_pacquet-stage_1_2_8");
++    let real = modules.join("x_pacquet-stage_1_2_3");
++    let scoped = modules.join("@s/pkg_pacquet-stage_1_2_4");
++    for dir in [&recorded, &nested, &real, &scoped] {
++        fs::create_dir_all(dir.join("lib")).unwrap();
++        fs::write(dir.join("lib/a.js"), b"old").unwrap();
++    }
++    fs::create_dir_all(recorded.join("node_modules/inner")).unwrap();
++    fs::create_dir_all(modules.join("big/lib")).unwrap();
++    fs::create_dir_all(tmp.path().join("outside_pacquet-stage_1_2_6")).unwrap();
++    fs::write(
++        modules.join(crate::LEFTOVER_STAGES_RECORD),
++        b"big_pacquet-stage_1_2_3\na/node_modules/b_pacquet-stage_1_2_8\n../outside_pacquet-stage_1_2_6\n/abs_pacquet-stage_1_2_7\nbig\n",
++    )
++    .unwrap();
++
++    let left = crate::sweep_leftover_stages(&[modules.clone(), tmp.path().join("other")]);
++    assert!(left.is_empty(), "{left:?}");
++    assert!(!recorded.exists(), "a recorded leftover goes, node_modules inside and all");
++    assert!(!nested.exists(), "a recorded nested leftover goes");
++    assert!(real.join("lib/a.js").exists(), "an unrecorded directory named like a stage (a real package) stays");
++    assert!(scoped.join("lib/a.js").exists(), "so does an unrecorded scoped one");
++    assert!(modules.join("big/lib").exists(), "a recorded name not shaped like a stage is never deleted");
++    assert!(tmp.path().join("outside_pacquet-stage_1_2_6").exists(), "a recorded path leaving node_modules is never followed");
++    assert!(!modules.join(crate::LEFTOVER_STAGES_RECORD).exists(), "the record goes with the last leftover");
++}
++#[test]
++#[cfg(unix)]
++fn sweep_does_not_follow_a_symlinked_directory_in_a_recorded_path() {
++    let tmp = tempdir().unwrap();
++    let modules = tmp.path().join("node_modules");
++    let elsewhere = tmp.path().join("elsewhere");
++    let victim = elsewhere.join("node_modules/v_pacquet-stage_1_2_3");
++    fs::create_dir_all(&victim).unwrap();
++    fs::create_dir_all(&modules).unwrap();
++    std::os::unix::fs::symlink(&elsewhere, modules.join("link")).unwrap();
++    fs::write(modules.join(crate::LEFTOVER_STAGES_RECORD), b"link/node_modules/v_pacquet-stage_1_2_3\n").unwrap();
++    crate::sweep_leftover_stages(&[modules.clone()]);
++    assert!(victim.exists());
+ }
+ /// `symlink_metadata` errors on the preserved `node_modules/` inspect
+ /// must surface as `InspectTarget`, not be swallowed as "nothing to
+diff --git a/pnpm/crates/deps-restorer/src/leftover_stages.rs b/pnpm/crates/deps-restorer/src/leftover_stages.rs
+new file mode 100644
+index 00000000..37fabb56
+--- /dev/null
++++ b/pnpm/crates/deps-restorer/src/leftover_stages.rs
+@@ -0,0 +1,118 @@
++use std::{
++    collections::BTreeSet,
++    fs,
++    io::{self, Write},
++    path::{Component, Path, PathBuf},
++    sync::Mutex,
++};
++
++pub const RECORD: &str = ".pacquet-stage-leftovers";
++const MARK: &str = "_pacquet-stage_";
++const MODULES_STATE: &str = ".modules.yaml";
++static RECORD_LOCK: Mutex<()> = Mutex::new(());
++
++fn record_root(aside: &Path) -> Option<&Path> {
++    let ancestors = || aside.ancestors().skip(1);
++    ancestors()
++        .filter(|a| a.join(MODULES_STATE).is_file())
++        .last()
++        .or_else(|| ancestors().filter(|a| a.file_name().is_some_and(|n| n == "node_modules")).last())
++        .or_else(|| aside.parent())
++}
++
++fn is_stage_name(name: &str) -> bool {
++    name.rsplit_once(MARK).is_some_and(|(base, suffix)| {
++        let parts: Vec<&str> = suffix.split('_').collect();
++        !base.is_empty()
++            && parts.len() == 3
++            && parts.iter().all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
++    })
++}
++
++fn warn(message: &str) {
++    eprintln!(" WARN  {message}");
++}
++
++pub fn record_leftover_stage(aside: &Path, package: &Path, error: &io::Error) {
++    let recorded = record_root(aside).and_then(|root| {
++        let relative = aside.strip_prefix(root).ok()?.to_str()?;
++        recorded_entry(relative)?;
++        let _guard = RECORD_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
++        let mut file =
++            fs::OpenOptions::new().create(true).append(true).open(root.join(RECORD)).ok()?;
++        file.write_all(format!("{relative}\n").as_bytes()).ok()
++    });
++    let later = if recorded.is_some() {
++        "a later pnpm install removes it once it can be deleted"
++    } else {
++        "pnpm could not record it, so delete it by hand"
++    };
++    warn(&format!(
++        "Could not delete the replaced copy of {} ({error}). It stays at {}; {later}.",
++        package.display(),
++        aside.display(),
++    ));
++}
++
++fn recorded_entry(line: &str) -> Option<PathBuf> {
++    let path = Path::new(line);
++    let plain = !line.is_empty() && path.components().all(|c| matches!(c, Component::Normal(_)));
++    let named = path.file_name().and_then(|n| n.to_str()).is_some_and(is_stage_name);
++    (plain && named).then(|| path.to_path_buf())
++}
++
++fn through_real_dirs(modules_dir: &Path, relative: &Path) -> bool {
++    let mut dir = modules_dir.to_path_buf();
++    let Some(parent) = relative.parent() else { return true };
++    parent.components().all(|component| {
++        dir.push(component);
++        fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir())
++    })
++}
++
++fn remove(path: &Path) -> io::Result<()> {
++    match pnpm_fs::remove_dirent(path) {
++        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
++        result => result,
++    }
++}
++
++pub fn sweep_leftover_stages(modules_dirs: &[PathBuf]) -> Vec<PathBuf> {
++    let mut left = Vec::new();
++    for modules_dir in modules_dirs {
++        sweep_one(modules_dir, &mut left);
++    }
++    left
++}
++
++fn sweep_one(modules_dir: &Path, left: &mut Vec<PathBuf>) {
++    let record = modules_dir.join(RECORD);
++    let Ok(text) = fs::read_to_string(&record) else { return };
++    let recorded: BTreeSet<PathBuf> = text.lines().filter_map(recorded_entry).collect();
++    let mut kept = Vec::new();
++    for relative in &recorded {
++        let path = modules_dir.join(relative);
++        if !through_real_dirs(modules_dir, relative) {
++            continue;
++        }
++        if let Err(error) = remove(&path) {
++            warn(&format!(
++                "Could not delete {}, a replaced package copy an earlier update left ({error}). \
++                 The next pnpm install tries again.",
++                path.display(),
++            ));
++            kept.push(relative.clone());
++            left.push(path);
++        }
++    }
++    let result = if kept.is_empty() {
++        remove(&record)
++    } else {
++        let text: String =
++            kept.iter().filter_map(|p| p.to_str()).map(|p| format!("{p}\n")).collect();
++        fs::write(&record, text)
++    };
++    if let Err(error) = result {
++        warn(&format!("Could not update {} ({error}).", record.display()));
++    }
++}
+diff --git a/pnpm/crates/deps-restorer/src/lib.rs b/pnpm/crates/deps-restorer/src/lib.rs
+index 4c9240de..fa98400a 100644
+--- a/pnpm/crates/deps-restorer/src/lib.rs
++++ b/pnpm/crates/deps-restorer/src/lib.rs
+@@ -20,6 +20,7 @@ pub mod install_frozen_lockfile;
+ pub mod install_package_by_snapshot;
+ pub mod install_package_from_registry;
+ pub mod installability;
++pub mod leftover_stages;
+ pub mod link_bins;
+ pub mod link_file;
+ pub mod link_hoisted_modules;
+@@ -70,6 +71,7 @@ pub use install_options::{
+ pub use install_package_by_snapshot::*;
+ pub use install_package_from_registry::*;
+ pub use installability::*;
++pub use leftover_stages::{RECORD as LEFTOVER_STAGES_RECORD, record_leftover_stage, sweep_leftover_stages};
+ pub use installed_hoisted_state::InstalledHoistedState;
+ pub use link_bins::*;
+ pub use link_file::*;
+diff --git a/pnpm/crates/package-manager/src/install/run/execution.rs b/pnpm/crates/package-manager/src/install/run/execution.rs
+index b2e0e2d6..6c691c30 100644
+--- a/pnpm/crates/package-manager/src/install/run/execution.rs
++++ b/pnpm/crates/package-manager/src/install/run/execution.rs
+@@ -29,6 +29,9 @@ impl<'a> RunExecution<'a> {
+     ) -> Result<InstallRunOutcome, InstallError> {
+         let mut scope = self.select_scope();
+         capture_time_machine_exclusions(&self, &scope, time_machine_exclusions);
++        if !self.mode.resolve_only {
++            self.sweep_leftover_stages(&scope);
++        }
+         let verdict = self.repeat_install_verdict(&scope).await?;
+         if verdict == RepeatInstallVerdict::Unchanged {
+             return Ok(report_already_up_to_date::<Reporter>(self.workspace.prefix));
+@@ -59,6 +62,13 @@ impl<'a> RunExecution<'a> {
+         self.install_settled::<Reporter>(&scope, &mut loaded, &project_manifests, &lockfiles).await
+     }
+ 
++    fn sweep_leftover_stages(&self, scope: &InstallScope<'_>) {
++        crate::install::workspace_state::sweep_leftover_stages(
++            self.install.context.config,
++            scope.project_manifests.iter().map(|(project_dir, manifest)| (project_dir.as_path(), *manifest)),
++        );
++    }
++
+     fn take_settled_outcome(&mut self) -> InstallRunOutcome {
+         InstallRunOutcome::LockfileSettled {
+             workspace_manifest_dir: std::mem::take(&mut self.workspace.dirs.workspace_manifest_dir),
+diff --git a/pnpm/crates/package-manager/src/install/workspace_state.rs b/pnpm/crates/package-manager/src/install/workspace_state.rs
+index 99d0f084..3844095e 100644
+--- a/pnpm/crates/package-manager/src/install/workspace_state.rs
++++ b/pnpm/crates/package-manager/src/install/workspace_state.rs
+@@ -122,6 +122,10 @@ pub fn install_already_up_to_date(check: &UpToDateFastPathCheck<'_>) -> Option<U
+         return None;
+     }
+     ensure_gvs_builds_complete(check, &lockfile, &lockfile_root)?;
++    sweep_leftover_stages(
++        check.config,
++        project_manifests.iter().map(|(project_dir, manifest)| (project_dir.as_path(), *manifest)),
++    );
+     super::run::register_workspace_in_store(check.config, &lockfile_root);
+     let project_count = workspace_projects.as_ref().map(Vec::len);
+     Some(UpToDateWorkspace { root: state_root, project_count })
+@@ -424,3 +428,22 @@ fn strict_dep_builds_blocks_fast_path(config: &Config) -> bool {
+         Err(_) => true,
+     }
+ }
++
++pub(crate) fn sweep_leftover_stages<'p>(
++    config: &Config,
++    projects: impl Iterator<Item = (&'p Path, &'p PackageManifest)>,
++) {
++    let mut dirs = vec![config.modules_dir.clone()];
++    for (project_dir, manifest) in projects {
++        let name = manifest_string_field(manifest, "name");
++        for dir in [
++            config.project_modules_dir(project_dir, name.as_deref()),
++            crate::optimistic_repeat_install::hoisted_project_modules_dir(project_dir),
++        ] {
++            if !dirs.contains(&dir) {
++                dirs.push(dir);
++            }
++        }
++    }
++    pnpm_deps_restorer::sweep_leftover_stages(&dirs);
++}

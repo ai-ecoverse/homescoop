@@ -74,8 +74,24 @@ if the second rename fails, the old one goes back. Between the two renames the
 directory is briefly absent. On slicc-kernel before 1.134.3 a directory
 rename copies the tree, so an update there is slower. If the old copy can't
 be deleted afterwards (say, it holds a read-only directory), it stays as a
-`<name>_pacquet-stage_*` sibling, with a warning. A package new to
-`node_modules` is imported in place.
+`<name>_pacquet-stage_*` sibling, and pnpm names it on stderr (since
+12.9.1-21, homescoop#1532; 12.9.1-20 said nothing):
+
+```text
+ WARN  Could not delete the replaced copy of /home/bob/app/node_modules/big (Permission denied (os error 2)). It stays at /home/bob/app/node_modules/big_pacquet-stage_1_…_3; a later pnpm install removes it once it can be deleted.
+```
+
+pnpm records it in `.pacquet-stage-leftovers` in the modules directory
+(`node_modules`, or your `modulesDir`), and every later `pnpm install` (even
+one that is otherwise "Already up to date") deletes it once it can, after
+`chmod -R u+w node_modules` for instance; until then each install names it
+again. Only what pnpm recorded is deleted, so a package that happens to be
+named like a stage directory is safe, and so are the unrecorded siblings
+12.9.1-20 and earlier left: delete those by hand
+(`chmod -R u+w node_modules && rm -rf node_modules/*_pacquet-stage_*`,
+once you've checked that none is a real package). Don't run two installs in
+the same project at once. `--lockfile-only` and `--dry-run` don't touch
+them. A package new to `node_modules` is imported in place.
 
 ## Modes and the umask (12.9.1-12)
 
