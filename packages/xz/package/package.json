@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-xz",
-  "version": "5.8.4-6",
-  "description": "XZ Utils: xz, unxz, xzcat and the lzma tools, with xzgrep and xzdiff.",
+  "version": "5.8.4-7",
+  "description": "XZ and LZMA compression tools, with xzgrep, xzdiff and xzless.",
   "license": "0BSD AND GPL-2.0-or-later",
   "repository": {
     "type": "git",
@@ -12,6 +12,14 @@
   "keywords": ["wasm", "emscripten", "slicc", "homescoop", "xz", "lzma"],
   "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "include"],
   "publishConfig": { "access": "public" },
+  "dependencies": {
+    "@ai-ecoverse/wasm-bash": "5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils": "9.12.0-13",
+    "@ai-ecoverse/wasm-grep": "3.12.0-8",
+    "@ai-ecoverse/wasm-sed": "4.10.0-6",
+    "@ai-ecoverse/wasm-diffutils": "3.12.0-4",
+    "@ai-ecoverse/wasm-less": "668.0.0-7"
+  },
   "homescoop": { "recipe": "xz", "upstream": "5.8.4" },
   "slicc": {
     "abi": "emscripten",
@@ -23,7 +31,8 @@
       "unlzma": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "unlzma" },
       "lzcat": { "glue": "bin/xz", "wasm": "bin/xz.wasm", "argv0": "lzcat" },
       "xzgrep": { "script": "bin/xzgrep" },
-      "xzdiff": { "script": "bin/xzdiff" }
+      "xzdiff": { "script": "bin/xzdiff" },
+      "xzless": { "script": "bin/xzless" }
     }
   }
 }

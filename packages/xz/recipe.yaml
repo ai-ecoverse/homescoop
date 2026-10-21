@@ -12,7 +12,13 @@ source:
 dependencies:
   build: []
   host: []
-  run: []
+  run:
+    - "@ai-ecoverse/wasm-bash@5.3.0-23"
+    - "@ai-ecoverse/wasm-coreutils@9.12.0-13"
+    - "@ai-ecoverse/wasm-grep@3.12.0-8"
+    - "@ai-ecoverse/wasm-sed@4.10.0-6"
+    - "@ai-ecoverse/wasm-diffutils@3.12.0-4"
+    - "@ai-ecoverse/wasm-less@668.0.0-7"
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/xz
   license: "0BSD AND GPL-2.0-or-later"
@@ -21,3 +27,5 @@ about:
     argv0 aliases: unxz xzcat lzma unlzma lzcat. Stages xzgrep/xzdiff/xzless.
     5.8.4-2: package/LICENSE is upstream's COPYING, COPYING.0BSD and
     COPYING.GPLv2; the scripts are GPL-2.0-or-later (homescoop#511).
+    5.8.4-7: xzless is a command; the scripts' tools are dependencies
+    (homescoop#1487).
