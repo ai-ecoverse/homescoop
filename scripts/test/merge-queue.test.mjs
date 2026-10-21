@@ -23,12 +23,15 @@ function repo() {
   git('config', 'user.name', 't');
   git('config', 'user.email', 't@example.com');
   git('config', 'commit.gpgsign', 'false');
+  const written = new Set();
   const put = (path, text) => {
     mkdirSync(dirname(join(dir, path)), { recursive: true });
     writeFileSync(join(dir, path), text);
+    written.add(path);
   };
   const commit = (msg) => {
-    git('add', '-A');
+    if (written.size) git('add', '--', ...written);
+    written.clear();
     git('commit', '-q', '-m', msg);
     return git('rev-parse', 'HEAD').trim();
   };

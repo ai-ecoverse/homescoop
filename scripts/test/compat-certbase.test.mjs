@@ -27,12 +27,12 @@ test('a package whose cert/ the change touches runs its published tarballs with 
   r.put('packages/pnpm/cert/install.mjs', 'export default async () => {};\n');
   r.put('packages/pnpm/cert/meta.json', JSON.stringify({ users: 'enforce' }));
   r.put('packages/zip/cert/roundtrip.mjs', 'export default async () => {};\n');
-  r.git('add', '-A');
+  r.git('add', '--', 'packages/pnpm/cert/install.mjs', 'packages/pnpm/cert/meta.json', 'packages/zip/cert/roundtrip.mjs');
   r.git('commit', '-qm', 'base');
   const base = r.git('rev-parse', 'HEAD');
   r.put('packages/pnpm/cert/update-readers.mjs', 'export default async () => {};\n');
   r.put('packages/fresh/cert/a.mjs', 'export default async () => {};\n');
-  r.git('add', '-A');
+  r.git('add', '--', 'packages/pnpm/cert/update-readers.mjs', 'packages/fresh/cert/a.mjs');
   r.git('commit', '-qm', 'head');
   const all = [
     { dir: 'pnpm', specs: ['install.mjs', 'update-readers.mjs'], meta: { users: 'enforce' }, skip: null },

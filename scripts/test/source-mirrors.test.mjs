@@ -77,11 +77,12 @@ function repo({ base, head }) {
   mkdirSync(join(dir, 'packages/fx'), { recursive: true });
   git(dir, 'init', '-q');
   writeFileSync(join(dir, 'packages/fx/recipe.yaml'), base);
-  git(dir, 'add', '-A');
+  git(dir, 'add', '--', 'scripts/refresh-recipe-sha.mjs', 'scripts/read-recipe.mjs', 'scripts/source-tree.mjs', 'scripts/recipe-env.mjs', 'scripts/build-common.sh', 'packages/fx/recipe.yaml');
   git(dir, 'commit', '-qm', 'base');
   git(dir, 'checkout', '-qb', 'pr');
   writeFileSync(join(dir, 'packages/fx/recipe.yaml'), head);
-  git(dir, 'commit', '-q', '--allow-empty', '-am', 'head');
+  git(dir, 'add', '--', 'packages/fx/recipe.yaml');
+  git(dir, 'commit', '-q', '--allow-empty', '-m', 'head');
   return {
     dir,
     refresh: (...extra) => run(process.execPath, [join(dir, 'scripts/refresh-recipe-sha.mjs'), 'fx', '--base', 'main', ...extra], { cwd: dir }),
