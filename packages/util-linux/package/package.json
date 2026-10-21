@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-util-linux",
-  "version": "2.42.4-5",
+  "version": "2.42.4-6",
   "description": "util-linux text tools (rev, column, hexdump, colrm, look, getopt) and flock.",
   "license": "GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND MIT",
   "repository": {

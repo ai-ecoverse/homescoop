@@ -52,3 +52,6 @@ The published 5.8.4-3 also has 76 occurrence(s) of the CI build directory `/tmp/
 - **Hidden behind that:** the scripts never worked. build.sh's sed left `@xz@`, `@PACKAGE_VERSION@` and `@PACKAGE_BUGREPORT@` in them. With the commands registered but that sed unchanged, `xzgrep` fails with `line 255: @xz@: command not found` (rc 2). 5.8.4-5 substitutes all of them, and build.sh fails if any `@VAR@` is left.
 - **xzless stays unregistered.** It sets `LESSOPEN='|xz -cdfqQ -- %s'`, and wasm-less 668.0.0-5 doesn't run that pipe: `less` on the `.xz` file asks `"a.txt.xz" may be a binary file.  See it anyway?`. The spec checks that it's still rc 127.
 
+## 5.8.4-6: shim drift (homescoop#1491; 2026-10-21)
+
+5.8.4-6 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 5.8.4-5 in `bin/xz`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.

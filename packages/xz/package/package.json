@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-xz",
-  "version": "5.8.4-5",
+  "version": "5.8.4-6",
   "description": "XZ Utils: xz, unxz, xzcat and the lzma tools, with xzgrep and xzdiff.",
   "license": "0BSD AND GPL-2.0-or-later",
   "repository": {

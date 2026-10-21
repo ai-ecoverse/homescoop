@@ -20,3 +20,6 @@
 - **While developing the patch:** with `gettime_monotonic()` (`CLOCK_MONOTONIC_RAW`, which fails under Emscripten), the `-w` deadline never passed. `flock -w 1` then got the lock at about 2 s, after the holder ended, with rc 0, and the spec failed. The patch uses `clock_gettime(CLOCK_MONOTONIC)`.
 - **This build on slicc-kernel 1.102.6** fails 5 of 12 assertions, starting with `flock -n` getting a held lock, because that kernel has no flock table. On 1.132.1 it passes along with checklist.mjs and users.mjs, under users enforce.
 
+## 2.42.4-6: shim drift (homescoop#1491; 2026-10-21)
+
+2.42.4-6 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 2.42.4-5 in `bin/colrm`, `bin/colrm.wasm`, `bin/column`, `bin/column.wasm`, `bin/flock` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
