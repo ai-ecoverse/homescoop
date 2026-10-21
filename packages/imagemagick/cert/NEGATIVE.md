@@ -183,3 +183,23 @@ A pin-only release, with no ImageMagick change. The delegates move to their npm 
 ## 7.1.2-34-9.4: shim drift (homescoop#1491; 2026-10-20)
 
 7.1.2-34-9.4 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 7.1.2-34-9.3 in `bin/magick` and `bin/magick.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 7.1.2-34-9.5: in-place mogrify keeps mode, group and owner; the gsfonts exception (homescoop#1381, #1382; 2026-10-21)
+
+- **#1381 (mogrify-inplace-keep-mode-owner.patch).** `mogrify-users.mjs` against the published 7.1.2-34-9.4, slicc-kernel 1.110.1, `--users enforce`, fails 3 of 5 assertions:
+
+  | case | 7.1.2-34-9.4 | 7.1.2-34-9.5 |
+  |---|---|---|
+  | kim, `mogrify -resize 50%` over her own 0644 kim:users a.png and 0640 b.png | `kim kim 600`, `kim kim 600` | `kim users 644`, `kim kim 640` |
+  | root, over kim's 0644 a.png and 0664 kim:users c.jpg | `root root 600`, `root root 600` | `kim users 644`, `kim users 664` |
+  | kim, over root's 0666 w.png in a sticky /tmp/msk | rc 1, w.png unchanged, `w.png-df0894cd~` left behind | rc 0, resized in place, `root root 666`, no stray file |
+  | kim, over root's 0666 w.png in an open /tmp/mop | `kim kim 600` | rc 0, resized in place, `root root 666` |
+
+  The cause: upstream mogrify writes the new image to a `<file>-xxxxxxxx~` backup that it creates 0600, owned by the caller, and renames it over the file. The patch gives the backup the file's owner, group and mode (`fchown`, `fchmod` on the open descriptor) before anything is written to it. When it can't (as a non-root user over a file someone else owns), or the file is not a regular file, the backup is removed and mogrify writes the file in place, as `magick … file` does for such a target since #1258. write-temp-then-rename.patch now also gives its own temporary file the target's group and mode right after creating it, and writes in place if that fails, so neither rename hands over a file with other metadata.
+- **#1382 (gsfonts' exception).** `cert/lib/wasm-check.mjs` against the published 7.1.2-34-9.4:
+
+  ```text
+  Error: @ai-ecoverse/wasm-imagemagick: etc/fonts has n019003l.pfb, n019004l.pfb, n019023l.pfb, n019024l.pfb but no README with gsfonts' font exception (homescoop#1382)
+  ```
+
+  9.5 ships gsfonts' README (which states the exception: "GPL with an exception that you can put these fonts in your own non-GPLed documents") as `etc/fonts/README` next to COPYING (GPL version 2), and the notice carries both. package.json `license` adds `GPL-2.0-only WITH Font-exception-2.0`, the nearest SPDX expression; README.md says the README's wording is the grant.

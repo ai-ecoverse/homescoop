@@ -88,3 +88,7 @@ A pin-only release, with no ImageMagick change. The delegates move to their npm 
 ## 7.1.2-34-9.4: version kept with imagemagick (homescoop#1491; 2026-10-20)
 
 imagemagick and imagemagick-heif go to 7.1.2-34-9.4 for the shim drift on #1491, and imagemagick-relink's build.sh requires the same version (`bump them together`), so it moves with them. Its relink kit picks up the same updated `shims/slicc`. The package's own code is unchanged.
+
+## 7.1.2-34-9.5: the kits follow wasm-imagemagick(-heif) 9.5 (homescoop#1381; 2026-10-21)
+
+The kits ship 9.5's objects: mogrify.o carries mogrify-inplace-keep-mode-owner.patch and constitute.o the metadata copy in write-temp-then-rename.patch, and the heif kit takes wasm-libheif 1.23.6-8's archives. relink-check.mjs checks that each kit's kit.json names this version's `bin/magick.wasm`, so a 9.4 kit can't pass for 9.5. The behaviour negatives are wasm-imagemagick's (NEGATIVE.md there).
