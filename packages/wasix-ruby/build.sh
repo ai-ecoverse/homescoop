@@ -38,8 +38,8 @@ ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 YAML_VER="0.2.5"
 YAML_SRC="$WORK/yaml-$YAML_VER"
 
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39
-export HOMESCOOP_WASIX_SYSROOT_SHA=6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-40
+export HOMESCOOP_WASIX_SYSROOT_SHA=9960846c81c78d40a8dfdd58009e66d5ad671a6469947517661b486a4a3d3336
 eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc-$HOMESCOOP_WASIX_SYSROOT_VERSION")"
 SYSROOT_VER="$(node -p "require(process.argv[1]).version" "$WASIXCC_SYSROOT_PREFIX/package.json")"
 [[ "$SYSROOT_VER" == "$HOMESCOOP_WASIX_SYSROOT_VERSION" ]] || { echo "homescoop: installed wasix-sysroot $SYSROOT_VER, not $HOMESCOOP_WASIX_SYSROOT_VERSION" >&2; exit 1; }
@@ -730,6 +730,53 @@ homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files fro
   "$WLIBC/libc-top-half/musl/COPYRIGHT" f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af \
   "$WLIBC/libc-bottom-half/cloudlibc/LICENSE" c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
 
+python3 - "$DEST" <<'PY'
+import re, sys
+from pathlib import Path
+dest = Path(sys.argv[1])
+own = {"gem", "bundle", "bundler", "rake", "irb", "erb"}
+want = {"rdbg": "debug", "rbs": "rbs", "racc": "racc", "typeprof": "typeprof", "rdoc": "rdoc", "ri": "rdoc", "syntax_suggest": "syntax_suggest"}
+found = {}
+for spec in sorted((dest / "lib/ruby/gems").glob("*/specifications/**/*.gemspec")):
+    t = spec.read_text(errors="replace")
+    name = re.search(r'^\s*s\.name = "([^"]+)"', t, re.M)
+    exes = re.search(r'^\s*s\.executables = \[([^\]]*)\]', t, re.M)
+    bindir = re.search(r'^\s*s\.bindir = "([^"]+)"', t, re.M)
+    version = re.search(r'^\s*s\.version = "([^"]+)"', t, re.M)
+    if not (name and exes):
+        continue
+    for exe in re.findall(r'"([^"]+)"', exes.group(1)):
+        found[exe] = (name.group(1), version.group(1) if version else "", bindir.group(1) if bindir else "bin")
+extra = sorted(set(found) - own)
+if extra != sorted(want):
+    raise SystemExit(f"homescoop wasix-ruby: gem executables FAIL: the gemspecs name {extra}, expected {sorted(want)} (homescoop#1390)")
+for exe in sorted(want):
+    gem, version, bindir = found[exe]
+    if gem != want[exe]:
+        raise SystemExit(f"homescoop wasix-ruby: gem executables FAIL: {exe} is from {gem}, expected {want[exe]}")
+    src = next((d / bindir / exe for d in (dest / "lib/ruby/gems").glob(f"*/gems/{gem}-{version}")), None)
+    if src is None or not src.is_file():
+        raise SystemExit(f"homescoop wasix-ruby: gem executables FAIL: no {gem}-{version}/{bindir}/{exe} under lib/ruby/gems")
+    stub = dest / "bin" / exe
+    stub.write_text(
+        "#!/usr/bin/env ruby\n\n"
+        "require 'rubygems'\n\n"
+        "Gem.use_gemdeps\n\n"
+        "version = \">= 0.a\"\n\n"
+        "str = ARGV.first\n"
+        "if str\n"
+        "  str = str.b[/\\A_(.*)_\\z/, 1]\n"
+        "  if str and Gem::Version.correct?(str)\n"
+        "    version = str\n"
+        "    ARGV.shift\n"
+        "  end\n"
+        "end\n\n"
+        f"load Gem.activate_bin_path('{gem}', '{exe}', version)\n"
+    )
+    stub.chmod(0o755)
+print(f"gem executables: PASS {len(want)} binstubs in bin/ ({', '.join(f'{e} from {want[e]}' for e in sorted(want))})")
+PY
+
 # The bundled gems were installed by the build machine's ruby: refuse
 # anything host-native in the package.
 python3 - "$DEST" <<'PY'
@@ -823,7 +870,7 @@ base_env = {
 pkg = {
     "name": "@ai-ecoverse/wasix-ruby",
     "version": pkg_ver,
-    "description": "The Ruby 3.4 programming language, with gem, bundle, rake, irb and erb.",
+    "description": "The Ruby 3.4 programming language, with gem, Bundler, rake, irb, the rdbg debugger and Ruby's other tools.",
     # wasix-sysroot -20 asks slicc-kernel for user ids, with no fallback (homescoop#207).
     "engines": {"slicc-kernel": ">=1.120.0"},
     "license": "Ruby",
@@ -875,14 +922,15 @@ print("WASIX_RUBY_PREFIX=", env["WASIX_RUBY_PREFIX"])
 print("GEM_HOME=", env.get("GEM_HOME"))
 print("GEM_PATH=", env.get("GEM_PATH"))
 # Absolute script args — needs SLICC PR #3735 for ${package} expansion in args.
-for cmd in ("gem", "bundle", "rake", "irb", "erb"):
+for cmd in ("gem", "bundle", "bundler", "rake", "irb", "erb", "rdbg", "rbs", "racc", "typeprof", "rdoc", "ri", "syntax_suggest"):
     script = dest / "bin" / cmd
-    if script.is_file():
-        pkg["slicc"]["commands"][cmd] = {
-            "wasm": "bin/ruby",
-            "args": ["${package}/bin/" + cmd],
-            "env": dict(env),
-        }
+    if not script.is_file():
+        raise SystemExit(f"PRESTAGE fail: bin/{cmd} is missing, so there would be no {cmd} command (homescoop#1390)")
+    pkg["slicc"]["commands"][cmd] = {
+        "wasm": "bin/ruby",
+        "args": ["${package}/bin/" + cmd],
+        "env": dict(env),
+    }
 (dest / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
 print("package.json", pkg["version"], "commands:", sorted(pkg["slicc"]["commands"]))
 PY

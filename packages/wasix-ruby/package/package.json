@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-ruby",
-  "version": "3.4.11-21",
-  "description": "The Ruby 3.4 programming language, with gem, bundle, rake, irb and erb.",
+  "version": "3.4.11-22",
+  "description": "The Ruby 3.4 programming language, with gem, Bundler, rake, irb, the rdbg debugger and Ruby's other tools.",
   "engines": {
     "slicc-kernel": ">=1.120.0"
   },
@@ -68,6 +68,18 @@
           "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
         }
       },
+      "bundler": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/bundler"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
       "rake": {
         "wasm": "bin/ruby",
         "args": [
@@ -96,6 +108,90 @@
         "wasm": "bin/ruby",
         "args": [
           "${package}/bin/erb"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "rdbg": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/rdbg"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "rbs": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/rbs"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "racc": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/racc"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "typeprof": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/typeprof"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "rdoc": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/rdoc"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "ri": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/ri"
+        ],
+        "env": {
+          "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",
+          "WASIX_RUBY_PREFIX": "${package}",
+          "GEM_HOME": "${HOME}/.local/share/gem/ruby/3.4.0",
+          "GEM_PATH": "${HOME}/.local/share/gem/ruby/3.4.0:${package}/lib/ruby/gems/3.4.0"
+        }
+      },
+      "syntax_suggest": {
+        "wasm": "bin/ruby",
+        "args": [
+          "${package}/bin/syntax_suggest"
         ],
         "env": {
           "PATH": "${HOME}/.local/share/gem/ruby/3.4.0/bin:${package}/bin:${PATH}",

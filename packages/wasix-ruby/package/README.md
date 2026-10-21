@@ -2,7 +2,7 @@
 
 MRI Ruby for slicc WASIX. No epoll (poll fallback). See PRESTAGE.md.
 
-Built on wasix-sysroot 2025.9.30-39 (the WASIX libc and headers; see
+Built on wasix-sysroot 2025.9.30-40 (the WASIX libc and headers; see
 PRESTAGE.md).
 
 ## The interpreter path (3.4.11-12)
@@ -20,7 +20,7 @@ command's environment: started from ruby (which passes its own `RUBYLIB` and
 `GEM_*` on) it works fully, but started from a shell without them ruby can't
 find RubyGems (`RubyGems were not loaded`). Use `ruby` or `/usr/bin/ruby` from a
 shell. The package's `gem`, `bundle`, `rake`, `irb` and `erb` scripts start
-with `#!/usr/bin/env ruby`, so they also run by path.
+with `#!/usr/bin/env ruby`, so they also run by path, as do the gem executables below.
 
 Up to 3.4.11-11 `bin/ruby` was a 7-byte `#!wasm` marker that the kernel
 can't exec: `system(Gem.ruby, …)` gave 127, and the executables RubyGems
@@ -36,6 +36,11 @@ rejects an exception set with ENOSYS, so `IO.select` with a third array still
 fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
+
+## 3.4.11-22: the gems' executables are commands
+
+- **Commands** (homescoop#1390): `rdbg` (the debug gem's debugger), `rbs`, `racc`, `typeprof`, `rdoc`, `ri`, `syntax_suggest` and `bundler` run by name, like `gem` and `rake`. Each is a RubyGems binstub in the package's `bin/` that loads the gem's own executable. Up to 3.4.11-21 the gems were installed but their executables weren't on PATH (`rdbg: command not found`); `ruby -rdebug` and `binding.break` worked.
+- **Sysroot:** wasix-sysroot 2025.9.30-40, whose `malloc` also allocates from the initial memory (homescoop#1287). The package keeps the default initial memory and grows from there: homescoop sizes a threaded package's initial heap from a peak measured in the allocating thread, and ruby's build has no such gauge yet.
 
 ## 3.4.11-21: bundled gems with C extensions, interruptible locks, a clean load path
 
