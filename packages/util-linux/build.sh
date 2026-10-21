@@ -68,8 +68,14 @@ if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
     jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
     # libtool drops emcc's -s… link flags from LDFLAGS (no callMain in the
     # glue); it keeps the compiler command whole, so link through CCLD.
-    emmake make -j"$jobs" V=1 "${PROGS[@]}" CCLD="emcc $CLI_LDFLAGS"
+    emmake make -j"$jobs" V=1 "${PROGS[@]}" CCLD="emcc $CLI_LDFLAGS" 2>&1 | tee "$WORK/make.log"
   )
+  grep -E '^libtool: link: emcc .* -o flock ' "$WORK/make.log" \
+    | grep -F -- "-Wl,--whole-archive -Wl,$SLICC_A -Wl,--no-whole-archive" >/dev/null || {
+    echo "util-linux: the flock link does not take $SLICC_A inside --whole-archive" >&2
+    exit 1
+  }
+  node "$HOMESCOOP_PKG/check-flock-imports.mjs" "$SRC/flock.wasm"
   # A disabled program still has a link rule, with no objects: catch that.
   for p in "${PROGS[@]}"; do
     grep -q "^S\\[\"BUILD_$(echo "$p" | tr a-z A-Z)_TRUE\"\\]=\"\"" "$SRC/config.status" || {
@@ -81,14 +87,6 @@ fi
 
 for p in "${PROGS[@]}"; do
   if [[ -f "$SRC/$p.js" ]]; then mv "$SRC/$p.js" "$SRC/$p"; fi
-done
-for sym in slicc_execve_js slicc_spawn_capture_js; do
-  grep -q "$sym" "$SRC/flock" || {
-    echo "util-linux: flock does not link $sym from the slicc shims" >&2
-    exit 1
-  }
-done
-for p in "${PROGS[@]}"; do
   test -f "$SRC/$p.wasm"
   homescoop_stage_cli "$SRC" "$p"
 done
