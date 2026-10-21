@@ -12,6 +12,7 @@
  * it has them, B starts on the same venv / cache, and must wait for A.
  */
 import { createHash } from 'node:crypto';
+import { detached } from './lib/detached.mjs';
 
 const FILES = 'https://files.pythonhosted.org/packages';
 const DISTS = [
@@ -49,6 +50,12 @@ export default async function (ctx) {
     assert.equal(r.status, 0, `${script}: rc=${r.status}\nstdout=${r.stdout}\nstderr=${r.stderr}`);
     return r;
   };
+  const slow = detached(ctx, { env });
+  const okSlow = async (script, cwd) => {
+    const r = await slow(script, cwd);
+    assert.equal(r.status, 0, `${script}: rc=${r.status}\nstdout=${r.stdout}\nstderr=${r.stderr}`);
+    return r;
+  };
 
   await ok('mkdir -p /home/ldists /home/l');
   for (const [name, sha, url] of DISTS) {
@@ -64,7 +71,7 @@ export default async function (ctx) {
   await ok('uv venv -q', '/home/l');
 
   // Two installs into one venv: B waits for A's exclusive lock on .venv/.lock.
-  const venv = await ok(
+  const venv = await okSlow(
     "bash /home/race.sh 'Acquired exclusive lock for `[^`]*\\.venv`' 'uv -v pip install idna' 'uv -vv pip install --no-binary six six'; cat b.log",
     '/home/l',
   );
@@ -77,7 +84,7 @@ export default async function (ctx) {
 
   // uv cache clean while an install uses the cache: it waits for the
   // install's shared lock on the cache root, and the install completes.
-  const cache = await ok(
+  const cache = await okSlow(
     "bash /home/race.sh 'Acquired shared lock for `[^`]*uv`' 'uv cache clean' 'uv -vv pip install --reinstall --refresh-package six --no-binary six six'; cat b.log",
     '/home/l',
   );
