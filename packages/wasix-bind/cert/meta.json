@@ -9,21 +9,29 @@
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils"
   ],
-  "network": "The cert uplink carries TCP and no UDP. Its 100.100.100.100:53 is a raw TCP peer answering with dnsFake (wasi-dig's zone, real DNS wire messages); 100.64.9.9:53 refuses. Every UDP send fails with network unreachable, so the checklist covers the patched dighost.c's retry over TCP. No DoH in this build.",
+  "network": "The cert uplink carries TCP and no UDP. Its 100.100.100.100:53 is a raw TCP peer answering with dnsFake (wasi-dig's zone, real DNS wire messages); 100.64.9.9:53 refuses and 100.64.9.10:53 never answers a dial (the fake uplink's hang). Every UDP send fails with network unreachable, so the checklist covers the patched dighost.c's retry over TCP. No DoH in this build.",
   "checklist": [
     "dig -v, host -V, nslookup -version print 9.20.29",
-    "UDP network unreachable, at send (an uplink without UDP) or at setup (an address no uplink routes, #1370): dig prints ';; UDP network unreachable, retrying in TCP mode.' and asks over TCP well within one +time (SERVER … (TCP)), the TCP dial in the uplink log; +tcp prints no UDP line",
+    "UDP network unreachable, at send (an uplink without UDP) or at setup (an address no uplink routes, #1370): dig prints ';; UDP network unreachable, retrying in TCP mode.' and asks over TCP well within one +time (SERVER \u2026 (TCP)), the TCP dial in the uplink log; +tcp prints no UDP line",
     "full dig output: banner, ->>HEADER<<- NOERROR, flags qr rd ra, ANSWER section, SERVER line",
     "dig +short for A, AAAA, MX, TXT (quoted, escaped), CNAME chain, NS, SOA, SRV, CAA, -x PTR, DNSKEY +nocrypto, HTTPS; +noall +answer; NXDOMAIN with the SOA in AUTHORITY",
     "host: A, AAAA and MX by default, -t mx, reverse lookup, CNAME alias line, NXDOMAIN rc 1",
     "nslookup: one-shot answer with Server/Address and Non-authoritative answer; -type=mx; an interactive session on stdin (server, set type=, queries, exit)",
     "failures: refused server rc 9 (dig) / 1 (host); bad type is BIND's warning (rc 0); bad option rc 1",
-    "no server argument (9.20.29-2, homescoop#1282; slicc-kernel >= 1.137.0): /etc/resolv.conf is the kernel's (nameserver 127.0.0.53); host, dig +short and nslookup answer host.slicc.internal (10.0.2.2) and an uplink device name, laptop.slicc.internal (100.64.0.7), from the kernel's DNS stub, with nslookup's Server: 127.0.0.53; nobody.slicc.internal is NXDOMAIN; a public name (example.test A and MX) is forwarded to the uplink's nameserver 100.100.100.100 over TCP; with root's 'nameserver 100.100.100.100' in /etc/resolv.conf, host, dig and nslookup ask that instead (Server: 100.100.100.100)",
-    "users enforce: root, alice and bob get the same answers from dig and host; only root writes /etc/resolv.conf; alice can't write dig's output into bob's 0755 directory; bob's own output is his",
-    "+nssearch (9.20.29-2, homescoop#1379): dig +time=2 +tries=1 +nssearch @100.100.100.100 nss.test, whose NS is the resolver's own address, prints the server's SOA line ('SOA ns1.nss.test. hostmaster.nss.test. 2026102001 … from server 100.100.100.100 in N ms.') within 4 s and rc 0, with no 'timed out' or 'no servers could be reached'; +tcp +nssearch gives the same line; nss2.test with a refusing NS (100.64.9.9) first prints its 'Connection to 100.64.9.9#53(100.64.9.9) for nss2.test failed: connection refused.' and the other server's SOA, rc 0. 9.20.29-1: 'NS servers could not be reached', rc 9, with and without +tcp (NEGATIVE.md)"
+    "no server argument (9.20.29-2, homescoop#1282; slicc-kernel >= 1.137.0): /etc/resolv.conf is the kernel's (nameserver 127.0.0.53); host, dig +short and nslookup answer host.slicc.internal (10.0.2.2) and an uplink device name, laptop.slicc.internal (100.64.0.7), from the kernel's DNS stub, with nslookup's Server: 127.0.0.53; nobody.slicc.internal is NXDOMAIN; a public name (example.test A and MX) is forwarded to the uplink's nameserver 100.100.100.100 over TCP; with root's 'nameserver 100.100.100.100' in /etc/resolv.conf, host, dig and nslookup ask that instead (Server: 100.100.100.100); the checklist copies the kernel's /etc/resolv.conf aside and puts it back byte for byte",
+    "users enforce: root, alice and bob get the same answers from dig and host; users.mjs sets up its own /etc/resolv.conf (root writes 'nameserver 100.100.100.100', alice can't overwrite it, alice and bob's dig with no server use it, then root puts the previous file back), so it doesn't depend on spec order (homescoop#1476); alice can't write dig's output into bob's 0755 directory; bob's own output is his",
+    "+nssearch (9.20.29-2, homescoop#1379): dig +time=2 +tries=1 +nssearch @100.100.100.100 nss.test, whose NS is the resolver's own address, prints the server's SOA line ('SOA ns1.nss.test. hostmaster.nss.test. 2026102001 \u2026 from server 100.100.100.100 in N ms.') within 4 s and rc 0, with no 'timed out' or 'no servers could be reached'; +tcp +nssearch gives the same line. 9.20.29-1: 'NS servers could not be reached', rc 9, with and without +tcp (NEGATIVE.md)",
+    "+nssearch with failing NS servers (9.20.29-3, homescoop#1475), each under timeout 10 with +time=1 +tries=1: nss2.test (refused + good) 10 rounds, nss5.test (good + a dial that never answers) 8 rounds and nss4.test (refused + never answers + good) 8 rounds. dig queries the servers in a random order; each round prints the good server's SOA line and every 'Connection to \u2026 failed: connection refused.' / 'timed out.' line, exits rc 0 and takes under 4 s, also when the failing server is the last to finish after the good one answered. 9.20.29-2 hangs there until timeout kills it (rc 124, NEGATIVE.md)"
   ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-21",
     "@ai-ecoverse/wasm-coreutils@9.12.0-11"
+  ],
+  "extra_kernels": [
+    {
+      "kernel": "@ai-ecoverse/slicc-kernel@1.143.4",
+      "why": "npm latest kernel at 9.20.29-3 (homescoop#1476): the DNS stub's default /etc/resolv.conf and the no-server rows on the kernel seven runs, not only on the 1.137.0 floor",
+      "specs": true
+    }
   ]
 }

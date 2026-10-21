@@ -49,5 +49,8 @@ about:
     WASI (there is no shared linking on this target, so no dlopen to lose)
     and dighost.c retries a query over TCP at once when UDP can't leave
     the machine: ENETUNREACH/EHOSTUNREACH at UDP setup (an address no
-    uplink routes) or at send (an uplink that carries no UDP). Off: DoH (nghttp2), libxml2, json-c, zlib, LMDB, GSS-API,
+    uplink routes) or at send (an uplink that carries no UDP). For +nssearch,
+    nssearch_next() cancels and clears the lookup once no query is pending,
+    also when an earlier server answered, so dig exits when the last server
+    to finish failed to connect (#1475). Off: DoH (nghttp2), libxml2, json-c, zlib, LMDB, GSS-API,
     GeoIP, libidn2, jemalloc, readline, dnstap. New package, human cert.
