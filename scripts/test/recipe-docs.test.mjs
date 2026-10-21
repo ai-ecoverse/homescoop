@@ -61,3 +61,33 @@ test('the checks catch py-numpy 2.5.4-3\'s PRESTAGE.md text', () => {
   assert.deepEqual(foreignSoabi('cp315', old), ['cpython-314']);
   assert.deepEqual(foreignSoabi('cp315', 'cpython-315-wasm32-wasix'), []);
 });
+
+export function foreignSysroot(buildSh, recipeYaml) {
+  const pin = /^export HOMESCOOP_WASIX_SYSROOT_VERSION=(\S+)$/m.exec(buildSh)?.[1];
+  if (!pin) return null;
+  return [...new Set([...recipeYaml.matchAll(/wasix-sysroot (2025\.\d+\.\d+-\d+)/g)].map((m) => m[1]))].filter((v) => v !== pin).sort();
+}
+
+test('recipe.yaml names only the wasix-sysroot its build.sh pins (homescoop#1426)', () => {
+  const bad = [];
+  let checked = 0;
+  for (const pkg of recipes) {
+    const build = join(packages, pkg, 'build.sh');
+    const recipe = join(packages, pkg, 'recipe.yaml');
+    if (!existsSync(build) || !existsSync(recipe)) continue;
+    const foreign = foreignSysroot(readFileSync(build, 'utf8'), readFileSync(recipe, 'utf8'));
+    if (foreign === null) continue;
+    checked++;
+    for (const v of foreign) bad.push(`${pkg}/recipe.yaml: wasix-sysroot ${v}, build.sh pins another`);
+  }
+  assert.ok(checked > 0, 'at least one recipe with a sysroot pin checked');
+  assert.deepEqual(bad, []);
+});
+
+test('the sysroot check catches wasix-openssh 10.6.0-12\'s notes', () => {
+  const build = 'export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39\n';
+  const notes = 'notes: |\n    Built with wasixcc on wasix-sysroot 2025.9.30-34 (select/pselect\n';
+  assert.deepEqual(foreignSysroot(build, notes), ['2025.9.30-34']);
+  assert.deepEqual(foreignSysroot(build, notes.replace('-34', '-39')), []);
+  assert.equal(foreignSysroot('', notes), null);
+});

@@ -31,8 +31,8 @@ ZLIB_PREFIX="${WASIX_ZLIB_PREFIX:-$DEPS/wasix-zlib/package}"
 
 # Isolated toolchain with the pinned certified wasix-sysroot (until 10.6.0-5
 # this pinned -18 here, which is why it stayed behind).
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39
-export HOMESCOOP_WASIX_SYSROOT_SHA=6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-40
+export HOMESCOOP_WASIX_SYSROOT_SHA=9960846c81c78d40a8dfdd58009e66d5ad671a6469947517661b486a4a3d3336
 eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc-$HOMESCOOP_WASIX_SYSROOT_VERSION")"
 SYSROOT_VER="$(sed -n 's/.*sysroot=\([^ ]*\).*/\1/p' "$WASIXCC_PREFIX/.homescoop-toolchain" | head -1)"
 [[ "$SYSROOT_VER" == "$HOMESCOOP_WASIX_SYSROOT_VERSION" ]] || { echo "homescoop wasix-openssh: $WASIXCC_PREFIX/.homescoop-toolchain has sysroot ${SYSROOT_VER:-none}, not $HOMESCOOP_WASIX_SYSROOT_VERSION" >&2; exit 1; }
@@ -367,12 +367,7 @@ pkg = {
 print("package.json", pkg_ver, sorted(cmds))
 PY
 
-# README lives in package/ already (DEST); keep a copy at the recipe root in sync.
-if [[ -f "$PKG/README.md" && "$PKG/README.md" -ef "$DEST/README.md" ]]; then
-  :
-elif [[ -f "$PKG/README.md" ]]; then
-  cp "$PKG/README.md" "$DEST/README.md"
-fi
+[[ ! -e "$PKG/README.md" ]] || { echo "homescoop wasix-openssh: $PKG/README.md exists; the package README is package/README.md only (homescoop#1446)" >&2; exit 1; }
 
 echo "== wasix-openssh staged $PKG_VER"
 ls -la "$DEST/bin"
