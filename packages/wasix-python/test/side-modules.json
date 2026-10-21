@@ -7,9 +7,9 @@
   "packages": [
     {
       "name": "@ai-ecoverse/py-numpy",
-      "version": "2.5.4-3",
-      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.5.4-3.tgz",
-      "sha256": "6685bd5f6fd65134662edfb1db45956c67e30796689f2145f74a2dd7257f04e4"
+      "version": "2.5.4-4",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-numpy/-/py-numpy-2.5.4-4.tgz",
+      "sha256": "4712cdbe785cc1d783674f4bc3dce6f788f59554ba52c7f32ff0e3708c551fda"
     },
     {
       "name": "@ai-ecoverse/py-pandas",

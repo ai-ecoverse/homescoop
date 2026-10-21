@@ -24,7 +24,7 @@
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-10",
     "@ai-ecoverse/wasm-coreutils@9.12.0-4",
-    "@ai-ecoverse/py-numpy@2.5.4-3",
+    "@ai-ecoverse/py-numpy@2.5.4-4",
     "@ai-ecoverse/py-pandas@3.0.6-4",
     "@ai-ecoverse/py-scipy@1.18.1-3",
     "@ai-ecoverse/py-matplotlib@3.11.2-14",
@@ -98,7 +98,7 @@
     "test/side-abi.mjs (3.15.0-4): test/side-modules.json pins the cp315 wave (numpy 2.5.4-2, pandas 3.0.6-3, scipy 1.18.1-3, matplotlib 3.11.2-13, pillow 13.0.0-2, contourpy/kiwisolver -11, the pure packages' version-neutral builds), so python.wasm and python-fork.wasm are checked against the stack a 3.15.0-N must keep loading: every non-weak import resolves (python exports mprotect, ENOSYS; weak undefined imports from dylink.0 import info need no definition)",
     "3.15.0-5 (homescoop#1504): cert/isolated.mjs also writes a fake /tmp/fh/lib/python3.15/encodings.py and runs PYTHONHOME=/tmp/fh python3 -I and -E: rc 0, sys.prefix the package, the fake module never runs; plain PYTHONHOME=/tmp/fh python3 still uses /tmp/fh. cpython-home-wasix.patch: under -I/-E getpath takes the home from SLICC_PYTHONHOME, which package.json's commands set to the package, and ignores PYTHONHOME as stock CPython does. 3.15.0-4: -I runs /tmp/fh's encodings.py (NEGATIVE.md)",
     "3.15.0-5 (homescoop#1287): wasix-sysroot 2025.9.30-40 (malloc uses the initial memory; no libc++/libc++abi/libunwind file changed from -39) and recipe.yaml wasm: initial-memory 160MiB, measured-peak 116MiB (cc7e on -40: sbrk(0) after importing numpy, pandas, scipy and matplotlib; a numpy/pandas/scipy/matplotlib workload peaks at about 3.7 GiB, under the 4 GiB --max-memory); scripts/threaded-heap-allowlist.txt drops wasix-python. cert/heap-size.mjs: bin/python.wasm links 160 MiB, the memory is 160 MiB at start and after 48 MiB of 256 KiB buffers, and numpy, pandas, scipy and matplotlib import (the size after them is logged). cert/ctypes.mjs calibrates sbrk(0) with a 256 MiB malloc. 3.15.0-4: 40 MiB linked, 59.2 MiB at start, grown to 91.0 MiB by the mallocs (NEGATIVE.md)",
-    "3.15.0-5: needsInstall and test/side-modules.json move to the py-* at npm latest (numpy 2.5.4-3, pandas 3.0.6-4, matplotlib 3.11.2-14, contourpy/kiwisolver -12, pillow 13.0.0-3, fonttools 4.66.1-11; scipy 1.18.1-3 and the pure packages unchanged), all with wasix-python ranges >=3.15.0-1 <3.15.1, so sidemods.mjs and side-abi.mjs show the published set still loads on the -40 build. wasix-python leaves scripts/reproducible-pending.json (fixed build root and .pyc paths since -4, #1310)"
+    "3.15.0-5: needsInstall and test/side-modules.json move to the py-* at npm latest (numpy 2.5.4-4, pandas 3.0.6-4, matplotlib 3.11.2-14, contourpy/kiwisolver -12, pillow 13.0.0-3, fonttools 4.66.1-11; scipy 1.18.1-3 and the pure packages unchanged), all with wasix-python ranges >=3.15.0-1 <3.15.1, so sidemods.mjs and side-abi.mjs show the published set still loads on the -40 build. wasix-python leaves scripts/reproducible-pending.json (fixed build root and .pyc paths since -4, #1310)"
   ],
   "network": "The cert kernel has no network: the spec fetches pinned wheels (sha256-checked) and pip installs them with PIP_NO_INDEX/PIP_FIND_LINKS.",
   "users": "enforce"
