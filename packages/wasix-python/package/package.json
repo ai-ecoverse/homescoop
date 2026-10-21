@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-python",
-  "version": "3.15.0-4",
-  "description": "The Python programming language (CPython 3.15), with pip.",
+  "version": "3.15.0-5",
+  "description": "The Python 3.15 programming language, with pip.",
   "license": "PSF-2.0 AND GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.122.3"
@@ -53,6 +53,7 @@
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
+          "SLICC_PYTHONHOME": "./",
           "PYTHONDONTWRITEBYTECODE": "1"
         }
       },
@@ -69,6 +70,7 @@
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
+          "SLICC_PYTHONHOME": "./",
           "PYTHONDONTWRITEBYTECODE": "1"
         }
       },
@@ -85,6 +87,7 @@
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
+          "SLICC_PYTHONHOME": "./",
           "PYTHONDONTWRITEBYTECODE": "1"
         },
         "argv0": "python3",
@@ -106,6 +109,7 @@
         "argv0Path": true,
         "env": {
           "PYTHONHOME": "./",
+          "SLICC_PYTHONHOME": "./",
           "PYTHONDONTWRITEBYTECODE": "1"
         },
         "argv0": "python3",

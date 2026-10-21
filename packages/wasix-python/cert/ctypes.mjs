@@ -7,7 +7,7 @@
  * `import ctypes` raises OSError (see NEGATIVE.md).
  *
  * "No second PIE": WASIX has no /proc for VmSize; use libc `sbrk(0)` (wasm
- * memory size). Calibrate with a 64 MiB malloc. Pattern from adq's #316 check.
+ * memory size). Calibrate with a 256 MiB malloc. Pattern from adq's #316 check.
  *
  * Fixture: cert/fixtures/libside-add.so (wasixcc PIC dylink side module,
  * `int side_add(int,int)`), embedded as base64 so the browser-cert write path
@@ -57,9 +57,8 @@ me.Py_IsInitialized.restype = ctypes.c_int
 out["by_path_Py_IsInitialized"] = me.Py_IsInitialized()
 out["sbrk_after_by_path"] = sbrk0()
 
-# Calibrate: sbrk(0) must track a real grow (64 MiB malloc).
-ctypes.create_string_buffer(64 << 20)
-out["sbrk_after_64m"] = sbrk0()
+ctypes.create_string_buffer(256 << 20)
+out["sbrk_after_256m"] = sbrk0()
 
 side = ctypes.CDLL("/home/libside-add.so")
 side.side_add.argtypes = [ctypes.c_int, ctypes.c_int]
@@ -101,16 +100,16 @@ export default async function (ctx) {
     growNone < 1 << 20,
     `CDLL(None)/PyDLL(python.wasm) grew sbrk(0) by ${growNone} B (want < 1 MiB)`,
   );
-  const growCal = o.sbrk_after_64m - o.sbrk_after_import;
+  const growCal = o.sbrk_after_256m - o.sbrk_after_import;
   assert.ok(
-    growCal >= 32 << 20,
-    `sbrk(0) calibration: 64 MiB malloc grew only ${growCal} B (want ≥ 32 MiB)`,
+    growCal >= 96 << 20,
+    `sbrk(0) calibration: 256 MiB malloc grew only ${growCal} B (want ≥ 96 MiB)`,
   );
   assert.equal(o.side_add, 7);
   assert.equal(o.cfunc, 42);
   console.log(
     `ctypes: ok Py_IsInitialized=${o.Py_IsInitialized} by_path=${o.by_path_Py_IsInitialized} ` +
-      `sbrk_grow_none=${growNone} sbrk_grow_64m=${growCal} ` +
+      `sbrk_grow_none=${growNone} sbrk_grow_256m=${growCal} ` +
       `strlen=${o.strlen} side_add=${o.side_add} cfunc=${o.cfunc}`,
   );
 }

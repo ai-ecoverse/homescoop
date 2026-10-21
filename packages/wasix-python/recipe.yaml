@@ -46,6 +46,10 @@ sources:
     sha256: "7097de0f66f458c2bd44e0e021e449a2572692067f7136791bdd4788330de978"
     commit: "09cbf7d66d232a01dbb0c88fd5ae65fa9c15f7c7"
     tree: "a83f4b7e97c78d8cdb9720cee275b1572a59bd93"
+wasm:
+  initial-memory: 160MiB
+  measured-peak: 116MiB
+  measured-by: "cc7e on wasix-sysroot 2025.9.30-40 (the first sysroot whose malloc uses the initial memory): the memory size (libc sbrk(0)) after python imports numpy, pandas, scipy and matplotlib is about 116 MiB, the main's data and 16 MiB stack, the heap and the side modules the loader places above it; a numpy/pandas/scipy/matplotlib workload peaks at about 3.7 GiB, which the 4 GiB --max-memory holds. cert/heap-size.mjs checks the linked size and that 48 MiB of mallocs after start stay in it"
 dependencies:
   build: []
   host: []
@@ -73,7 +77,7 @@ about:
     locks are --wrap stubs; user ids and pwd/grp come from the sysroot's libc
     (slicc-kernel process credentials, -20). The C++
     runtime side modules import (libc++/libc++abi/libunwind) is the pinned
-    wasix-sysroot's sysroot-ehpic (-38 since 3.15.0-1; the same globals as
+    wasix-sysroot's sysroot-ehpic (-38 since 3.15.0-1, -40 since -5; the same globals as
     upstream wasix-libc v2026-07-03.1's, which 3.14.2-N linked; README
     "Side modules").
     stdlib/ adds sys.executable from PATH and puts py-* packages from python's

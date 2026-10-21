@@ -108,14 +108,14 @@ fi
 "$HOSTPY" -c 'import platform, sys; assert platform.python_version() == sys.argv[1], (sys.version, sys.argv[1])' "$VER"
 
 # --- WASIX toolchain ---------------------------------------------------------
-# Pinned wasixcc + wasix-sysroot: -39 since 3.15.0-4 (-38 before), through the per-recipe
+# Pinned wasixcc + wasix-sysroot: -40 since 3.15.0-5 (-39 in -4, -38 before), through the per-recipe
 # override (-37's Linux S_IF* bits, -38's poll, -39's dlmalloc memory-view refresh,
-# homescoop#1287; install-wasixcc.sh's default
+# -40's malloc in the initial memory, homescoop#1287; install-wasixcc.sh's default
 # is still -34). sysroot-ehpic (legacy EH, PIC) has the setitimer →
 # proc_raise_interval2 and clock_nanosleep EINTR libc patches
 # (patches/README.md); flock, fcntl record locks and lockf are libc's.
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-39
-export HOMESCOOP_WASIX_SYSROOT_SHA=6e80095d7c05ac443e145264db07d84d6a0086da8040ebf85bc488f587c47934
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-40
+export HOMESCOOP_WASIX_SYSROOT_SHA=9960846c81c78d40a8dfdd58009e66d5ad671a6469947517661b486a4a3d3336
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 # C++ runtime ABI of the side modules (README "Side modules"): py-*
 # extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a plain
@@ -388,7 +388,7 @@ for p in cpython-configure-wasix cpython-platform-triplet-wasix cpython-user-sit
 done
 
 PY_CFLAGS="-O3 -flto -fPIC -matomics -mbulk-memory -mmutable-globals -pthread -mthread-model posix $EMU -include $STUBS/fcntl_wasix_extra.h -ffile-prefix-map=$B=."
-PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-memory -Wl,--import-memory -Wl,--max-memory=4294967296 -Wl,--stack-first -z stack-size=16777216 -Wl,--initial-memory=41943040 -ldl -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
+PY_LDFLAGS="-O3 -flto -fPIC -pthread -Wl,-pie -Wl,--export-dynamic -Wl,--shared-memory -Wl,--import-memory -Wl,--max-memory=4294967296 -Wl,--stack-first -z stack-size=16777216 -Wl,--initial-memory=${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory} -ldl -lwasi-emulated-getpid -lwasi-emulated-process-clocks -lwasi-emulated-mman"
 # Cross answers configure cannot run (wasm32: little endian, no fork, no
 # ptys), and probes that find a declaration WASIX does not back: the
 # netpacket header (no AF_PACKET) and memfd_create, both off as on -11.

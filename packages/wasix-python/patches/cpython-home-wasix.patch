@@ -1,27 +1,15 @@
-getpath: honour PYTHONHOME under -E/-I (homescoop#1144); venv: always
-symlink the interpreter on wasi (homescoop#1269).
+getpath: under -E/-I, find the home from SLICC_PYTHONHOME, which only the
+slicc command sets (homescoop#1504, #1144); venv: always symlink the
+interpreter on wasi (homescoop#1269).
 
 The slicc command runs python as /usr/bin/python3 (a registered copy) with
-PYTHONHOME set to the package; -I/-E ignored it ("No module named
-'encodings'"). A venv's copied bin/python runs as a bare wasm, without the
-command's env and with argv[0] reduced to its name, so it finds neither
-PYTHONHOME nor pyvenv.cfg; a symlink resolves to the registered command.
+PYTHONHOME and SLICC_PYTHONHOME set to the package. -I/-E ignore PYTHONHOME
+as stock CPython does, caller-set or not, and take the home from
+SLICC_PYTHONHOME instead, so the stdlib is still found. A venv's copied
+bin/python runs as a bare wasm, without the command's env and with argv[0]
+reduced to its name, so it finds neither PYTHONHOME nor pyvenv.cfg; a
+symlink resolves to the registered command.
 
---- a/Modules/getpath.py
-+++ b/Modules/getpath.py
-@@ -332,7 +332,11 @@
- 
- if home:
-     home_was_set = True
--elif use_environment and ENV_PYTHONHOME and not py_setpath:
-+elif ENV_PYTHONHOME and not py_setpath:
-+    # homescoop wasix-python (homescoop#1144): the slicc command sets
-+    # PYTHONHOME to the package (its 'env'); the executable is a registered
-+    # copy at /usr/bin/python3, so nothing else can find the stdlib. Honour
-+    # it under -E / -I too (they still ignore PYTHONPATH and the rest).
-     home = ENV_PYTHONHOME
- 
- 
 --- a/Lib/venv/__init__.py
 +++ b/Lib/venv/__init__.py
 @@ -52,6 +52,13 @@
@@ -38,3 +26,24 @@ PYTHONHOME nor pyvenv.cfg; a symlink resolves to the registered command.
          self.upgrade = upgrade
          self.with_pip = with_pip
          self.orig_prompt = prompt
+--- a/Modules/getpath.c
++++ b/Modules/getpath.c
+@@ -936,6 +936,7 @@
+         !wchar_to_dict(dict, "EXE_SUFFIX", EXE_SUFFIX) ||
+         !env_to_dict(dict, "ENV_PATH", 0) ||
+         !env_to_dict(dict, "ENV_PYTHONHOME", 0) ||
++        !env_to_dict(dict, "ENV_SLICC_PYTHONHOME", 0) ||
+         !env_to_dict(dict, "ENV_PYTHONEXECUTABLE", 0) ||
+         !env_to_dict(dict, "ENV___PYVENV_LAUNCHER__", 1) ||
+         !progname_to_dict(dict, "real_executable") ||
+--- a/Modules/getpath.py
++++ b/Modules/getpath.py
+@@ -334,6 +334,8 @@
+     home_was_set = True
+ elif use_environment and ENV_PYTHONHOME and not py_setpath:
+     home = ENV_PYTHONHOME
++elif ENV_SLICC_PYTHONHOME and not py_setpath:
++    home = ENV_SLICC_PYTHONHOME
+ 
+ 
+ # ******************************************************************************
