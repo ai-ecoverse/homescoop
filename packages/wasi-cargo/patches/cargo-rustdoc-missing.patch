@@ -1,0 +1,80 @@
+cargo (WASI): without rustdoc, cargo test skips doc tests with one line; cargo test --doc and cargo doc fail with the reason (homescoop#1463)
+
+--- a/src/cargo/util/mod.rs
++++ b/src/cargo/util/mod.rs
+@@ -213,3 +213,20 @@
+         );
+     }
+ }
++
++/// Whether rustdoc can't be run here: slicc's Rust (wasi-rustc) ships no
++/// rustdoc (homescoop#1463). The configured path, or `rustdoc` on PATH.
++#[cfg(target_os = "wasi")]
++pub fn rustdoc_unavailable(gctx: &crate::GlobalContext) -> bool {
++    let Ok(path) = gctx.rustdoc() else { return true };
++    if path.components().count() > 1 {
++        return !path.is_file();
++    }
++    let Some(paths) = std::env::var("PATH").ok() else { return true };
++    !paths.split(':').filter(|d| !d.is_empty()).any(|d| std::path::Path::new(d).join(path).is_file())
++}
++
++/// The reason, for `cargo doc`, `cargo test --doc` and skipped doc tests.
++#[cfg(target_os = "wasi")]
++pub const RUSTDOC_UNAVAILABLE: &str = "rustdoc isn't available in slicc (@ai-ecoverse/wasi-rustc ships no rustdoc)";
++
+--- a/src/cargo/ops/cargo_test.rs
++++ b/src/cargo/ops/cargo_test.rs
+@@ -75,8 +75,19 @@
+     }
+     let mut errors = run_unit_tests(ws, options, test_args, &compilation, TestKind::Test)?;
+ 
+-    let doctest_errors = run_doc_tests(ws, options, test_args, &compilation)?;
+-    errors.extend(doctest_errors);
++    // homescoop#1463: without rustdoc, doc tests are skipped with one line on
++    // stderr, and the exit status reflects the tests that ran.
++    #[cfg(target_os = "wasi")]
++    let skip_doc_tests = !compilation.to_doc_test.is_empty() && crate::util::rustdoc_unavailable(ws.gctx());
++    #[cfg(not(target_os = "wasi"))]
++    let skip_doc_tests = false;
++    if skip_doc_tests {
++        #[cfg(target_os = "wasi")]
++        ws.gctx().shell().warn(format!("doc tests skipped: {}", crate::util::RUSTDOC_UNAVAILABLE))?;
++    } else {
++        let doctest_errors = run_doc_tests(ws, options, test_args, &compilation)?;
++        errors.extend(doctest_errors);
++    }
+     no_fail_fast_err(ws, &options.compile_opts, &errors)
+ }
+ 
+--- a/src/bin/cargo/commands/test.rs
++++ b/src/bin/cargo/commands/test.rs
+@@ -94,6 +94,14 @@
+         if no_run {
+             return Err(anyhow::format_err!("can't skip running doc tests with --no-run").into());
+         }
++        #[cfg(target_os = "wasi")]
++        if cargo::util::rustdoc_unavailable(gctx) {
++            return Err(anyhow::format_err!(
++                "cargo test --doc needs rustdoc: {}",
++                cargo::util::RUSTDOC_UNAVAILABLE
++            )
++            .into());
++        }
+         compile_opts.build_config.intent = UserIntent::Doctest;
+         compile_opts.filter = ops::CompileFilter::lib_only();
+     } else if test_name.is_some() && !compile_opts.filter.is_specific() {
+--- a/src/bin/cargo/commands/doc.rs
++++ b/src/bin/cargo/commands/doc.rs
+@@ -52,6 +52,11 @@
+ 
+ pub fn exec(gctx: &mut GlobalContext, args: &ArgMatches) -> CliResult {
+     let ws = args.workspace(gctx)?;
++    // homescoop#1463.
++    #[cfg(target_os = "wasi")]
++    if cargo::util::rustdoc_unavailable(gctx) {
++        return Err(anyhow::format_err!("cargo doc needs rustdoc: {}", cargo::util::RUSTDOC_UNAVAILABLE).into());
++    }
+     let output_format = if let Some(output_format) = args._value_of("output-format") {
+         gctx.cli_unstable()
+             .fail_if_stable_opt("--output-format", 13283)?;
