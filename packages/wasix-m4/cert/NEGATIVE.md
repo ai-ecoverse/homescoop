@@ -36,3 +36,7 @@ AssertionError [ERR_ASSERTION]: package.json description names wasix-sysroot 202
 ```
 
 The same tarball with 1.4.20-6's description ("GNU m4 1.4.20 for slicc WASIX") passes `checklist.mjs` and `notices.mjs`. The notices, SOURCES.md and patch checks pass on -5 too; they guard against a later `files:` or `notices-common.sh` change dropping them.
+
+## 1.4.20-6: the heap grows (homescoop#1287; 2026-10-21)
+
+`cert/stress.mjs` (`--soft`) against the published 1.4.20-6 (users enforce, slicc-kernel 1.142.0) fails 3 of its 52 assertions. 1.4.20-6 links an 8.25 MiB initial memory on wasix-sysroot -34, so every workload grows the shared memory: VmSize peaks are table 17,856 kB, grow 19,136 kB and divert 17,856 kB, against the 32,768 kB that stays put. It had 0 traps in these 8 rounds; slicc-kernel#1172's trap is rare. 1.4.20-7 builds on -40, whose dlmalloc allocates from the initial pages, links `wasm.initial-memory` 32 MiB, and stays at 32,768 kB in all three workloads with 0 traps.

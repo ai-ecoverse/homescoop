@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-tls-engine",
-  "version": "4.2.0-6",
-  "description": "The TLS engine slicc uses for secure network connections, built on Mbed TLS 4.2.0.",
+  "version": "4.2.0-7",
+  "description": "Secure (TLS) network connections for slicc.",
   "license": "Apache-2.0 AND MPL-2.0",
   "type": "module",
   "exports": {

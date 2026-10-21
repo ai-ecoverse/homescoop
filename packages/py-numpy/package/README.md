@@ -6,6 +6,7 @@ NumPy **2.5.4** for slicc WASIX CPython 3.15 (`cp315-wasix_wasm32` side modules)
 - **OpenBLAS:** `@ai-ecoverse/wasix-openblas` 0.3.34-1, linked statically into `_multiarray_umath`, `_umath_linalg` and `lapack_lite` (OpenBLAS with its C LAPACK, single-threaded). Since 2.5.4-3; before, a 0.3.28 build inside this package.
 - **Python range:** `>=3.15.0-1 <3.15.1`.
 - **`numpy.linalg`:** raises `LinAlgError` for a failed factorisation (homescoop#1082).
+- **Commands:** `numpy-config` (`--version`, `--cflags`) and `f2py` are on PATH, as launchers for numpy's console scripts (homescoop#1405). f2py can't build an extension in slicc, since there is no Fortran compiler.
 - **Notices:** `THIRD-PARTY-NOTICES.md` carries OpenBLAS's, LAPACK's and GotoBLAS2's licences and those of the code numpy vendors (libdivide, pocketfft, Highway, the `numpy.random` generators).
 
 ## On wasm32

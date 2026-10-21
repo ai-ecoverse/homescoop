@@ -19,7 +19,19 @@ py-six, py-tzdata, py-pytz and py-python-dateutil serve both lines and don't cha
 ## Mixing the two lines
 
 - **A Python release runs only extensions built for it.** A cp314 extension (`*.cpython-314-wasm32-wasix.so`) doesn't load on 3.15: discovery skips the package, and `python -v` says why. Install the cp315 builds, which are now `latest`, together with wasix-python 3.15. npm installs one python for the whole set.
-- **The 3.14 builds stay on npm.** To stay on 3.14 for now, pin **every** package exactly at the top level of your project, for example `@ai-ecoverse/wasix-python@3.14.2-29 @ai-ecoverse/py-numpy@2.3.2-12 @ai-ecoverse/py-pandas@2.3.2-12 @ai-ecoverse/py-matplotlib@3.11.2-10 @ai-ecoverse/py-contourpy@1.4.0-9 @ai-ecoverse/py-kiwisolver@1.5.1-9 @ai-ecoverse/py-pillow@12.3.0-10 @ai-ecoverse/py-scipy@1.18.1-1` and the pure packages at their -8. The cp314 builds' ranges for some peers (`py-contourpy >=1.4.0-9 <1.4.1`, `py-kiwisolver >=1.5.1-9 <1.5.2`) also admit the cp315 builds, which are now `latest`, so npm would pick those unless the cp314 one is pinned at the top level (homescoop#1210).
+- **The 3.14 builds stay on npm.** To stay on 3.14 for now, install this exact set at the top level of your project (homescoop#1210):
+
+  ```sh
+  npm install --save-exact \
+    @ai-ecoverse/wasix-python@3.14.2-29 \
+    @ai-ecoverse/py-numpy@2.3.2-12 @ai-ecoverse/py-pandas@2.3.2-12 \
+    @ai-ecoverse/py-scipy@1.18.1-1 @ai-ecoverse/py-matplotlib@3.11.2-10 \
+    @ai-ecoverse/py-pillow@12.3.0-10 @ai-ecoverse/py-contourpy@1.4.0-9 @ai-ecoverse/py-kiwisolver@1.5.1-9 \
+    @ai-ecoverse/py-cycler@0.12.1-8 @ai-ecoverse/py-fonttools@4.66.1-8 \
+    @ai-ecoverse/py-packaging@26.3.0-8 @ai-ecoverse/py-pyparsing@3.3.3-8
+  ```
+
+  These are the last cp314 builds of each package. The pins that matter most are **py-contourpy 1.4.0-9 and py-kiwisolver 1.5.1-9**: cp314 matplotlib takes them as ranges (`>=1.4.0-9 <1.4.1`, `>=1.5.1-9 <1.5.2`) that also admit the cp315 builds, which are now `latest`, so without a top-level pin npm picks the cp315 ones. pandas 2.3.2-12 pins its date and timezone helpers (dateutil, six, pytz, tzdata) exactly itself, so they need nothing extra.
 
 ## What changes for your code
 

@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/py-numpy",
-  "version": "2.5.4-3",
+  "version": "2.5.4-4",
   "description": "NumPy, the fundamental package for array computing in Python.",
   "license": "BSD-3-Clause",
   "repository": {
@@ -22,6 +22,7 @@
     "README.md",
     "LICENSE",
     "THIRD-PARTY-NOTICES.md",
+    "bin",
     "lib"
   ],
   "publishConfig": {
@@ -35,6 +36,14 @@
     "upstream": "2.5.4"
   },
   "slicc": {
+    "commands": {
+      "f2py": {
+        "script": "bin/f2py"
+      },
+      "numpy-config": {
+        "script": "bin/numpy-config"
+      }
+    },
     "python": {
       "sitePackages": "lib/python3.15/site-packages",
       "requires": {

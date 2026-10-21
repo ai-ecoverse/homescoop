@@ -16,7 +16,8 @@ Cargo 0.99 (Rust 1.98.1) for SLICC's WASI realm. It uses the installed
   which isn't packaged: `cargo test` skips them with
   `warning: doc tests skipped: rustdoc isn't available in slicc` and exits
   with the status of the tests that ran, and `cargo test --doc` and
-  `cargo doc` fail with that reason (since 0.99.0-5, homescoop#1463).
+  `cargo doc` fail with that reason (since 0.99.0-5, homescoop#1463), as
+  does `cargo rustdoc` (since 0.99.0-6, homescoop#1540).
 - **Unsupported on WASI.** Git dependencies need a git network transport,
   and they fail with a message that names the realm.
 - **Untested.** `cargo search`, `publish`, `login`, `owner` and `yank` use

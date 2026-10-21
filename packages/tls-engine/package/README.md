@@ -23,6 +23,7 @@ TLS for [SLICC](https://github.com/ai-ecoverse/slicc): Mbed TLS 4.2.0 sessions o
     - Only 0, 1, 2, 4, 1|2 and 2|4 are allowed. Any other combination, CHAIN_ONLY|INSECURE and unknown bits included, is refused.
 - **A client certificate (mTLS):** `tls_client_cert` takes the caller's own chain (concatenated DER, its leaf first) and private key before the first handshake.
   - The key is PEM, with the NUL counted, or DER: PKCS#8, SEC1 or PKCS#1, optionally encrypted with a passphrase.
+  - **Key sizes** (4.2.0-7, homescoop#1376): RSA keys up to 8192 bits, and EC keys on the NIST curves. The build raises TF-PSA-Crypto's `PSA_VENDOR_RSA_MAX_KEY_BITS` from 4096 to 8192 (`rsa-max-key-bits-8192.patch`), the most its bignums hold (`MBEDTLS_MPI_MAX_SIZE`, 1024 bytes). A chain certificate with a larger RSA key is refused at `tls_client_cert` with `TLS_RSA_TOO_LARGE` (-0x10000, "tls-engine - RSA key larger than 8192 bits"). The 8192-bit limit is the whole engine's: a server certificate or a trust-store root with a larger RSA key fails to parse, with Mbed TLS's own error.
   - The key must match the leaf: a key for another certificate is refused at `tls_client_cert` (`TLS_BADARG`), before any handshake. It comes only from the caller; there's no default.
   - The engine wipes the key and passphrase bytes it was given once they're parsed, and frees (zeroizes) its copy with the session.
 - **Cipher:** `tls_ciphersuite` gives the negotiated ciphersuite's IANA number.
@@ -62,7 +63,7 @@ The default trust store a caller may load is `dist/roots.der`, also exported as 
   - `tls_write` takes plaintext in;
   - drain the ciphertext with `tls_out_take`.
 - **Entropy:** `crypto.getRandomValues` is the source of PSA's random generator (TF-PSA-Crypto), which makes every key and handshake. Without it, a call fails (`PSA - Insufficient entropy`) and never throws.
-- `tls_strerror` names the engine's own codes (`TLS_EOF`, `TLS_NOMEM`, `TLS_BADARG`, as "tls-engine - …") and TLS, X.509, PK, ASN.1 and PSA errors.
+- `tls_strerror` names the engine's own codes (`TLS_EOF`, `TLS_NOMEM`, `TLS_BADARG`, `TLS_RSA_TOO_LARGE`, as "tls-engine - …") and TLS, X.509, PK, ASN.1 and PSA errors.
 - **Pages and workers only** (`-sENVIRONMENT=web,worker`): there's no Node branch, whose `import('module')` would land in a bundler's eager graph. In Node, pass the module's bytes: `createTlsEngine({ wasmBinary })`.
 
 Types: `index.d.ts`. Build: `packages/tls-engine/build.sh` in homescoop.

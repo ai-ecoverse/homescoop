@@ -11,7 +11,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { X509Certificate, createHash, generateKeyPairSync } from 'node:crypto';
+import { X509Certificate, createHash, createPublicKey, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { connect as tcp } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -486,6 +486,55 @@ describe('client sessions (slicc-kernel#922)', () => {
       assert.equal(r.ret, BADARG, `a ${type} RSA key for another certificate: ${r.ret} ${engine.strerror(r.ret)}`);
       assert.equal(r.wiped, true);
     }
+  });
+
+  test('RSA client keys of 4096 and 8192 bits load and authenticate; a certificate with an RSA key over 8192 bits is refused with TLS_RSA_TOO_LARGE (homescoop#1376)', async () => {
+    const TOO_LARGE = -0x10000;
+    const seen = [];
+    const srv = await server('client.test', {
+      tls: { requestCert: true, rejectUnauthorized: true, ca: ca.pem },
+      onSocket: (socket) => {
+        seen.push(socket.getPeerCertificate().subject?.CN);
+        socket.pipe(socket);
+      },
+    });
+    const fresh = () => engine.client(trust, 'client.test');
+    for (const size of [4096, 8192]) {
+      const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: size });
+      const cn = `rsa${size}-client.test`;
+      const leaf = ca.issue(cn, publicKey.export({ type: 'spki', format: 'der' }), { eku: '1.3.6.1.5.5.7.3.2' });
+      for (const [form, key] of [['PKCS#1 DER', privateKey.export({ type: 'pkcs1', format: 'der' })], ['PKCS#8 PEM', privateKey.export({ type: 'pkcs8', format: 'pem' })]]) {
+        const s = fresh();
+        const got = engine.ownCert(s, [leaf, ca.der], key);
+        assert.deepEqual(got, { ret: 0, wiped: true }, `RSA-${size} ${form}: ${got.ret} ${engine.strerror(got.ret)}`);
+        if (form !== 'PKCS#8 PEM') {
+          engine.m._tls_session_free(s);
+          continue;
+        }
+        const wire = new Wire(engine, s, srv.port);
+        const hs = await wire.handshake();
+        assert.equal(hs, 1, `RSA-${size} handshake: ${engine.strerror(hs)}`);
+        const back = wire.read(3);
+        await wire.write(Buffer.from('rsa'));
+        assert.equal((await back).toString(), 'rsa');
+        wire.close();
+      }
+      const stranger = generateKeyPairSync('rsa', { modulusLength: size }).privateKey.export({ type: 'pkcs8', format: 'pem' });
+      assert.equal(engine.ownCert(fresh(), [leaf], stranger).ret, BADARG, `RSA-${size}: a key for another certificate`);
+    }
+    assert.deepEqual(seen, ['rsa4096-client.test', 'rsa8192-client.test'], 'the server saw both RSA client certificates');
+    const modulus = randomBytes(1025);
+    modulus[0] = 0x80;
+    modulus[1024] |= 1;
+    const huge = createPublicKey({ key: { kty: 'RSA', n: modulus.toString('base64url'), e: 'AQAB' }, format: 'jwk' });
+    const big = ca.issue('rsa8200-client.test', huge.export({ type: 'spki', format: 'der' }), { eku: '1.3.6.1.5.5.7.3.2' });
+    const key = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' });
+    for (const chain of [[big], [big, ca.der]]) {
+      const r = engine.ownCert(fresh(), chain, key);
+      assert.equal(r.ret, TOO_LARGE, `an 8200-bit RSA leaf: ${r.ret} ${engine.strerror(r.ret)}`);
+      assert.equal(r.wiped, true);
+    }
+    assert.equal(engine.strerror(TOO_LARGE), 'tls-engine - RSA key larger than 8192 bits (TLS_RSA_TOO_LARGE)');
   });
 
   test('a server name is its bytes: tls_client_new_name refuses one with a NUL inside, where tls_client_new ends it at the NUL (homescoop#1042)', async () => {

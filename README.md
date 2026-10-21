@@ -131,7 +131,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-sed`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sed) | [recipe](packages/sed) | GNU sed, a stream editor that filters and transforms text. |
 | [`@ai-ecoverse/wasm-sqlite3`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sqlite3) | [recipe](packages/sqlite3) | The sqlite3 command-line shell for SQLite databases. |
 | [`@ai-ecoverse/wasm-tar`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tar) | [recipe](packages/tar) | GNU tar, which creates and extracts archives, with -z, -j and -J compression. |
-| [`@ai-ecoverse/wasm-tls-engine`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tls-engine) | [recipe](packages/tls-engine) | The TLS engine slicc uses for secure network connections, built on Mbed TLS 4.2.0. |
+| [`@ai-ecoverse/wasm-tls-engine`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tls-engine) | [recipe](packages/tls-engine) | Secure (TLS) network connections for slicc. |
 | [`@ai-ecoverse/wasm-tree`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tree) | [recipe](packages/tree) | tree: list the contents of directories as a tree. |
 | [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux text tools (rev, column, hexdump, colrm, look, getopt) and flock. |
 | [`@ai-ecoverse/wasi-biome`](https://www.npmjs.com/package/@ai-ecoverse/wasi-biome) | [recipe](packages/wasi-biome) | Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC. |
@@ -161,7 +161,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-bind`](https://www.npmjs.com/package/@ai-ecoverse/wasix-bind) | [recipe](packages/wasix-bind) | BIND 9.20 dig, host and nslookup: DNS lookup tools. |
 | [`@ai-ecoverse/wasix-f2c`](https://www.npmjs.com/package/@ai-ecoverse/wasix-f2c) | [recipe](packages/wasix-f2c) | Fortran 77 for slicc WASIX via f2c: static PIC libf2c.a (CLAPACK 3.2.1, Pyodide's patches), f2c.h, the f2c source with bin/build-f2c.sh, and bin/gfortran (gfortran -> f2c -> wasixcc) |
 | [`@ai-ecoverse/wasix-gnupg`](https://www.npmjs.com/package/@ai-ecoverse/wasix-gnupg) | [recipe](packages/wasix-gnupg) | GnuPG 2.4: OpenPGP encryption and signing with gpg, gpgv and gpg-agent. |
-| [`@ai-ecoverse/wasix-m4`](https://www.npmjs.com/package/@ai-ecoverse/wasix-m4) | [recipe](packages/wasix-m4) | GNU m4 1.4.20 for slicc WASIX |
+| [`@ai-ecoverse/wasix-m4`](https://www.npmjs.com/package/@ai-ecoverse/wasix-m4) | [recipe](packages/wasix-m4) | GNU m4, the macro processor autoconf runs. |
 | [`@ai-ecoverse/wasix-openblas`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openblas) | [recipe](packages/wasix-openblas) | OpenBLAS 0.3.34 for slicc WASIX: static PIC libopenblas.a (BLAS, CBLAS, C netlib LAPACK; f2c int ABI, single-threaded), headers, pkg-config |
 | [`@ai-ecoverse/wasix-openssh`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openssh) | [recipe](packages/wasix-openssh) | OpenSSH 10.6p1: the ssh, scp and sftp clients, with ssh-keygen and ssh-add. |
 | [`@ai-ecoverse/wasix-openssl`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openssl) | [recipe](packages/wasix-openssl) | OpenSSL 3.5.9 for slicc WASIX: static (lib/) and PIC (lib-pic/) libcrypto.a and libssl.a, headers, pkg-config |

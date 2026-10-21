@@ -202,3 +202,18 @@ The 4.2.0-1 build also passes, unchanged:
 - **#1042:** the C-string API can't see a NUL. The new `tls_client_new_name` takes the length, so slicc-kernel's binding (zzy4) can switch to it, and refuses a NUL inside the name.
 
 All 32 client-api and 19 engine-api tests pass on 4.2.0-6.
+
+## 4.2.0-7: RSA client keys up to 8192 bits (homescoop#1376; 2026-10-21)
+
+The base is homescoop origin/main 184a0310, with a `host-run.sh` build.
+
+`node --test packages/tls-engine/cert/lib/client-api.mjs` against the published 4.2.0-6 fails the new test. RSA-4096 loads and authenticates there, and RSA-8192 is refused:
+
+```text
+✖ RSA client keys of 4096 and 8192 bits load and authenticate; a certificate with an RSA key over 8192 bits is refused with TLS_RSA_TOO_LARGE (homescoop#1376)
+  AssertionError [ERR_ASSERTION]: RSA-8192 PKCS#1 DER: -15104 PK - The pubkey tag or value is invalid (only RSA and EC are supported)
+```
+
+- **The cause:** TF-PSA-Crypto 4.2.0 defines `PSA_VENDOR_RSA_MAX_KEY_BITS` as 4096 in `include/psa/crypto_sizes.h`, with no `#ifndef`, so the user config can't raise it. Importing an RSA key above it fails, and PK reports that as an invalid public key. `rsa-max-key-bits-8192.patch` sets it to 8192. That's the most `MBEDTLS_MPI_MAX_SIZE` (1024 bytes) holds, so a larger key can't be parsed anyway. The engine asserts the value at compile time, so a build without the patch fails.
+- **Above 8192 bits,** a leaf whose RSA key is too large is refused at `tls_client_cert` with the engine's `TLS_RSA_TOO_LARGE`, not with PK's misleading text. The engine reads the modulus size from the certificate's SubjectPublicKeyInfo only after Mbed TLS refused it.
+- **4.2.0-7 as built:** client-api 33/33 and engine-api 19/19. The wasm grows by 539 bytes (315940 to 316479).

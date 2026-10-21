@@ -14,15 +14,12 @@ VER="$VERSION"
 WORK="${WASIX_M4_WORK:-$PKG/work}"
 SRC="$WORK/m4-$VER"
 
-# No wasixcc on PATH (CI runners): install the pinned toolchain
-# (scripts/install-wasixcc.sh).
-if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin/wasixcc" ]]; then
-  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
-fi
-WASIXCC_HOME="${WASIXCC_HOME:-$HOME/.wasixcc}"
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-40
+export HOMESCOOP_WASIX_SYSROOT_SHA=9960846c81c78d40a8dfdd58009e66d5ad671a6469947517661b486a4a3d3336
+eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "$WORK/wasixcc")"
 WASM_OPT="${WASM_OPT:-$WASIXCC_HOME/binaryen/bin/wasm-opt}"
 
-export PATH="${WASIXCC_PREFIX:-/tmp/wasix-python-build/wasixcc-prefix}/bin:/opt/homebrew/bin:$WASIXCC_HOME/binaryen/bin:$WASIXCC_HOME/llvm/bin:$PATH"
+export PATH="$WASIXCC_PREFIX/bin:/opt/homebrew/bin:$WASIXCC_HOME/binaryen/bin:$WASIXCC_HOME/llvm/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS="${WASIXCC_WASM_EXCEPTIONS:-no}"
 export WASIXCC_PIC=no

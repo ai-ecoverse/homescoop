@@ -24,10 +24,10 @@
     "trust:dry": "npx fledgling sync --dry-run -y --skip-publish"
   },
   "devDependencies": {
-    "@ai-ecoverse/slicc-kernel": "1.142.0",
-    "@ai-ecoverse/slicc-shared-web": "1.29.10",
+    "@ai-ecoverse/slicc-kernel": "1.143.2",
+    "@ai-ecoverse/slicc-shared-web": "1.29.16",
     "monocart-coverage-reports": "3.0.0",
-    "playwright-core": "1.64.0",
+    "playwright-core": "1.64.1",
     "slicc-kernel-negative": "npm:@ai-ecoverse/slicc-kernel@1.78.0"
   },
   "workspaces": [

@@ -12,8 +12,8 @@ sources:
     url: "https://registry.npmjs.org/@ai-ecoverse/wasi-llvm/-/wasi-llvm-21.1.8-2.tgz"
     sha256: "5181c65f743599b3eb13ebd878a4e8dc6e1e0e010cdb28bfbc036ce6a438312e"
   wasi_rustc:
-    url: "https://registry.npmjs.org/@ai-ecoverse/wasi-rustc/-/wasi-rustc-1.98.1-8.tgz"
-    sha256: "678c302eda369bc0ecefd0af9e64ec1145c87efdfd81cb589e563d67f0e6c2cd"
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasi-rustc/-/wasi-rustc-1.98.1-9.tgz"
+    sha256: "e280e48979369ec3a787e6350f825195215d46e802f4347e0539a6bbb3c7ee65"
 dependencies:
   build: []
   host: []
