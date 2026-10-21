@@ -23,3 +23,7 @@
 
 The published 0.99.0-4 runs `cargo test` on a library with a doc test (wasi-rustc 1.98.1-6/-8): the unit test passes, then `could not execute process \`rustdoc …\` (never executed) … No such file or directory (os error 44)`, exit 101. `cargo test --doc` and `cargo doc` fail the same way, without saying that rustdoc isn't packaged. Packaging rustdoc (an optional wasi-rustdoc from the rustc tree) is filed as an unscheduled enhancement.
 
+
+## 0.99.0-6: cargo rustdoc without rustdoc (homescoop#1540, 2026-10-21)
+
+The published 0.99.0-5 covers `cargo doc`, `cargo test --doc` and `cargo test`, but `cargo rustdoc --offline` in a `cargo new --lib` crate still fails with `could not execute process \`rustdoc …\` (never executed)` … `No such file or directory (os error 44)`, rc 101, without saying that rustdoc isn't packaged (0.99.0-4 fails the same way, so it isn't a regression). The new cert/test.mjs row expects "cargo rustdoc needs rustdoc: rustdoc isn't available in slicc" and no os error 44, so 0.99.0-5 fails it. doc, rustdoc and test are the only cargo subcommands that run rustdoc (src/bin/cargo/commands at 797e8a9bc).

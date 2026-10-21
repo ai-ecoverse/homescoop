@@ -48,6 +48,10 @@ export default async function (ctx) {
   r = await sh('cargo doc --offline', '/home/dl');
   assert.notEqual(r.status, 0, `#1463 cargo doc fails: ${out(r)}`);
   assert.match(r.stderr, /cargo doc needs rustdoc: rustdoc isn't available in slicc/, `#1463 with the reason: ${out(r)}`);
+  r = await sh('cargo rustdoc --offline', '/home/dl');
+  assert.notEqual(r.status, 0, `#1540 cargo rustdoc fails: ${out(r)}`);
+  assert.match(r.stderr, /cargo rustdoc needs rustdoc: rustdoc isn't available in slicc/, `#1540 with the reason: ${out(r)}`);
+  assert.doesNotMatch(r.stderr, /os error 44/, `#1540 not the raw error: ${out(r)}`);
 
   for (const [path, text] of Object.entries(WS)) await write(`home/ws/${path}`, text);
   // --lib: doc tests run rustdoc, which the package doesn't ship (README).

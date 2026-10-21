@@ -1,4 +1,4 @@
-cargo (WASI): without rustdoc, cargo test skips doc tests with one line; cargo test --doc and cargo doc fail with the reason (homescoop#1463)
+cargo (WASI): without rustdoc, cargo test skips doc tests with one line; cargo test --doc, cargo doc and cargo rustdoc fail with the reason (homescoop#1463, homescoop#1540)
 
 --- a/src/cargo/util/mod.rs
 +++ b/src/cargo/util/mod.rs
@@ -19,7 +19,7 @@ cargo (WASI): without rustdoc, cargo test skips doc tests with one line; cargo t
 +    !paths.split(':').filter(|d| !d.is_empty()).any(|d| std::path::Path::new(d).join(path).is_file())
 +}
 +
-+/// The reason, for `cargo doc`, `cargo test --doc` and skipped doc tests.
++/// The reason, for `cargo doc`, `cargo rustdoc`, `cargo test --doc` and skipped doc tests.
 +#[cfg(target_os = "wasi")]
 +pub const RUSTDOC_UNAVAILABLE: &str = "rustdoc isn't available in slicc (@ai-ecoverse/wasi-rustc ships no rustdoc)";
 +
@@ -78,3 +78,16 @@ cargo (WASI): without rustdoc, cargo test skips doc tests with one line; cargo t
      let output_format = if let Some(output_format) = args._value_of("output-format") {
          gctx.cli_unstable()
              .fail_if_stable_opt("--output-format", 13283)?;
+--- a/src/bin/cargo/commands/rustdoc.rs
++++ b/src/bin/cargo/commands/rustdoc.rs
+@@ -53,6 +53,10 @@
+ 
+ pub fn exec(gctx: &mut GlobalContext, args: &ArgMatches) -> CliResult {
+     let ws = args.workspace(gctx)?;
++    #[cfg(target_os = "wasi")]
++    if cargo::util::rustdoc_unavailable(gctx) {
++        return Err(anyhow::format_err!("cargo rustdoc needs rustdoc: {}", cargo::util::RUSTDOC_UNAVAILABLE).into());
++    }
+     let output_format = if let Some(output_format) = args._value_of("output-format") {
+         gctx.cli_unstable()
+             .fail_if_stable_opt("--output-format", 12103)?;
