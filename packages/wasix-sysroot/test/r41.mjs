@@ -32,21 +32,32 @@ export default async function (ctx) {
   const rest = lines.slice(live.length);
   let verdict = 'live cwd only (R41_GONE unset)';
   if (gone) {
-    const getcwdLine = rest[6];
-    assert.ok(kernelCwd ? getcwdLine === 'gone: getcwd: ENOENT' : ['gone: getcwd: ENOENT', 'gone: getcwd: /tmp/r41/d'].includes(getcwdLine), r.stdout);
+    const getcwdOk = (line, label) => kernelCwd ? line === `${label}: ENOENT` : [`${label}: ENOENT`, `${label}: /tmp/r41/d`].includes(line);
     assert.ok(['gone: readdir .: ENOENT', 'gone: readdir .: 0'].includes(rest[0]), r.stdout);
-    assert.deepEqual([...rest.slice(1, 6), ...rest.slice(7)], [
+    assert.ok(getcwdOk(rest[9], 'gone: getcwd'), r.stdout);
+    assert.ok(getcwdOk(rest[17], 'gone2: getcwd'), r.stdout);
+    assert.deepEqual([...rest.slice(1, 9), ...rest.slice(10, 17), ...rest.slice(18)], [
       'gone: open x: ENOENT',
       'gone: stat x: ENOENT',
       'gone: fstatat AT_FDCWD x: ENOENT',
       'gone: access x: ENOENT',
       'gone: chdir x: ENOENT',
+      'gone: chdir .: ENOENT',
+      'gone: chdir ./.: ENOENT',
+      'gone: open x after chdir .: ENOENT',
       'gone: chdir ..: 0',
       'getcwd: /tmp/r41',
       'open d/x: 0 new',
+      'chdir d: 0',
+      'rmdir /tmp/r41/d: 0',
+      'rename n d: 0',
+      'gone2: open y: ENOENT',
+      'gone2: chdir ./..: 0',
+      'getcwd: /tmp/r41',
+      'open d/y: 0 two',
       'r41 done',
     ], r.stdout);
-    verdict = `removed cwd: ${rest[0]}; x, stat, fstatat, access, chdir ENOENT; ${getcwdLine}; chdir("..") lands in /tmp/r41`;
+    verdict = `removed cwd: ${rest[0]}; x, stat, fstatat, access, chdir x, chdir . and ./. ENOENT (the cwd stays put); ${rest[9]}; chdir("..") and chdir("./..") land in /tmp/r41`;
   } else {
     assert.equal(rest.at(-1), 'r41 done', r.stdout);
   }

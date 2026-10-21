@@ -98,10 +98,25 @@ int main(void) {
   rc("gone: fstatat AT_FDCWD x", fstatat(AT_FDCWD, "x", &a, 0));
   rc("gone: access x", access("x", F_OK));
   rc("gone: chdir x", chdir("x"));
+  rc("gone: chdir .", chdir("."));
+  rc("gone: chdir ./.", chdir("./."));
+  opened("gone: open x after chdir .", open("x", O_RDONLY));
   cwd("gone: getcwd");
   rc("gone: chdir ..", chdir(".."));
   cwd("getcwd");
   opened("open d/x", open("d/x", O_RDONLY));
+
+  rc("chdir d", chdir("d"));
+  unlink("/tmp/r41/d/x");
+  rc("rmdir /tmp/r41/d", rmdir("/tmp/r41/d"));
+  mkdir("/tmp/r41/n", 0755);
+  make("/tmp/r41/n/y", "two");
+  rc("rename n d", rename("/tmp/r41/n", "/tmp/r41/d"));
+  opened("gone2: open y", open("y", O_RDONLY));
+  cwd("gone2: getcwd");
+  rc("gone2: chdir ./..", chdir("./.."));
+  cwd("getcwd");
+  opened("open d/y", open("d/y", O_RDONLY));
   printf("r41 done\n");
   return 0;
 }
