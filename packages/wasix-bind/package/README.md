@@ -26,7 +26,9 @@ without a resolver it can reach.
   `;; UDP network unreachable, retrying in TCP mode.` (the patch in
   `patches/`). Upstream BIND would wait for the read to time out instead.
   That includes `dig +nssearch`, both for the NS query and for each
-  server's SOA query (homescoop#1379).
+  server's SOA query (homescoop#1379). When one server answers and the
+  last one to finish can't be reached (refused, or a connect that times
+  out), dig prints the answer and the failure and exits 0 (homescoop#1475).
 - **TCP** to port 53 reaches a resolver through the uplink, such as
   Tailscale's `100.100.100.100`, or one on the kernel's loopback.
 - **No server argument** means the `nameserver` lines in `/etc/resolv.conf`.

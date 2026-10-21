@@ -65,3 +65,32 @@ There were two causes:
 
 The same 9.20.29-2 build on slicc-kernel 1.134.3 fails the no-server rows of `checklist.mjs` (19 of 116 assertions). `/etc/resolv.conf` doesn't exist there, and `host host.slicc.internal` is rc 1, because BIND asks 127.0.0.1, where nothing listens. On 1.137.0 (sk#1244, the stub on 127.0.0.53 and a default `/etc/resolv.conf`) all of checklist.mjs and users.mjs pass. The cert kernel moves to 1.137.0, and the harness passes the uplink's `nameserver` (`cert/meta.json` `"uplink": {"nameserver": "100.100.100.100"}`) so the stub forwards public names to the dnsFake. `engines` stays `>=1.96.0`, since an explicit server still works there.
 
+
+## 9.20.29-3: dig +nssearch exits when the last NS query fails after another answered (homescoop#1475; 2026-10-21)
+
+`checklist.mjs` on npm's `@ai-ecoverse/wasix-bind@9.20.29-2`, users enforce, `--soft`:
+
+- slicc-kernel 1.143.4 (npm `latest`, the new `extra_kernels` entry): FAIL, 40 of 228 assertions;
+- slicc-kernel 1.137.0 (the cert kernel): FAIL, 28 of 228 assertions.
+
+Every failure is in the new `+nssearch` rounds. dig queries the NS servers in a random order, so the count varies from run to run. Each failing round printed the good server's SOA line and then hung until `timeout 10` killed it:
+
+```text
+nss2.test round 4: rc=124
+SOA ns1.nss2.test. hostmaster.nss2.test. 2026102002 7200 3600 1209600 300 from server 100.100.100.100 in 1 ms.
+;; Connection to 100.64.9.9#53(100.64.9.9) for nss2.test failed: connection refused.
+nss2.test round 4 took 10065 ms
+nss5.test round 2: rc=124   (100.64.9.10 never answers the dial: "failed: timed out." after +time=1)
+```
+
+The cause is upstream's `nssearch_next()` (`bin/dig/dighost.c`). When the last query in the list fails to connect (`tcp_connected()`, or `udp_ready()`), and an earlier server has already answered (`ns_search_success`), it only detaches the query and the lookup. The earlier answer's `clear_current_lookup()` had returned early ("still have a worker"). So nobody clears the lookup and dig never exits. 9.20.29-3 handles this the way `recv_done()` does for a failed read: once no other query is pending, it cancels and clears the lookup either way, and it reports "NS servers could not be reached" (rc 9) only if no server answered. The same build passes `checklist.mjs` and `users.mjs` on 1.137.0 and on 1.143.4, where every round takes 90–130 ms (refused) or about 1.1 s (the dial that doesn't answer, `+time=1`).
+
+## 9.20.29-3: users.mjs sets up its own /etc/resolv.conf (homescoop#1476; 2026-10-21)
+
+The 1.137 rows of #1476 were fixed in PR #1470 before 9.20.29-2 was published (head ef38c0d2: the no-server rows assert the kernel's `nameserver 127.0.0.53`). What was left: `users.mjs` asserted that `/etc/resolv.conf` was the kernel's default, so it passed only if `checklist.mjs` had run first and restored the file. On slicc-kernel 1.143.4, with a spec before it that leaves root's `nameserver 100.100.100.100` in `/etc/resolv.conf` (what a checklist crash inside its try block would leave), the -2 `users.mjs` fails 2 of 22 assertions:
+
+```text
+users.mjs:43: the kernel's default /etc/resolv.conf is unchanged: nameserver 100.100.100.100
+```
+
+The new `users.mjs` passes that same run. Root writes its own `/etc/resolv.conf`, alice can't overwrite it, alice's and bob's `dig` with no server use it, and root then puts the previous file back. `checklist.mjs` now copies the kernel's file aside and restores it byte for byte, where it used to re-type it with `printf`.

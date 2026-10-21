@@ -22,7 +22,25 @@
  fi
 --- a/bin/dig/dighost.c
 +++ b/bin/dig/dighost.c
-@@ -2758,9 +2758,42 @@
+@@ -2696,10 +2696,13 @@
+ 		 * lookup, then treat the situation as an error,
+ 		 * cancel and clear the lookup.
+ 		 */
+-		if (check_if_queries_done(l, q) && !l->ns_search_success) {
+-			dighost_error("NS servers could not be reached");
+-			if (exitcode < 9) {
+-				exitcode = 9;
++		if (check_if_queries_done(l, q)) {
++			if (!l->ns_search_success) {
++				dighost_error(
++					"NS servers could not be reached");
++				if (exitcode < 9) {
++					exitcode = 9;
++				}
+ 			}
+ 
+ 			cancel_lookup(l);
+@@ -2758,9 +2761,42 @@
  		return;
  	} else if (eresult != ISC_R_SUCCESS) {
  		debug("send failed: %s", isc_result_totext(eresult));
@@ -66,7 +84,7 @@
  		nssearch_next(l, query);
  	} else {
  		query_detach(&query);
-@@ -3211,6 +3244,30 @@
+@@ -3211,6 +3247,30 @@
  		lookup_detach(&l);
  		clear_current_lookup();
  		return;
