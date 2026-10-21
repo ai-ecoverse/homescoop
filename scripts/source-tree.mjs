@@ -60,7 +60,7 @@ export function checkArchiveTree({ archive, repo, commit, tree }) {
       );
     git(['fetch', '-q', '--depth=1', '--no-tags', repo, commit]);
     const got = git(['rev-parse', `${commit}^{tree}`]).trim();
-    if (got !== tree) return { ok: false, tree: got, subst: [], ignored: [], problems: [`commit ${commit} has tree ${got}, not the pinned ${tree}`] };
+    if (got !== tree) return { ok: false, tree: got, extracted: null, full: false, subst: [], ignored: [], problems: [`commit ${commit} has tree ${got}, not the pinned ${tree}`] };
 
     const magic = Buffer.alloc(4);
     const fd = openSync(archive, 'r');
@@ -106,7 +106,9 @@ export function checkArchiveTree({ archive, repo, commit, tree }) {
     for (const p of modified) if (!subst.has(p)) problems.push(`differs from the tree: ${p}`);
     for (const p of deleted) if (!ignore.has(p)) problems.push(`missing from the archive: ${p}`);
     for (const p of others) problems.push(`not in the tree: ${p}`);
-    return { ok: problems.length === 0, tree: got, subst: [...subst], ignored: [...ignore], problems };
+    git(['add', '-A', '-f', '--', '.'], work);
+    const extracted = git(['write-tree']).trim();
+    return { ok: problems.length === 0, tree: got, extracted, full: extracted === tree, subst: [...subst], ignored: [...ignore], problems };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

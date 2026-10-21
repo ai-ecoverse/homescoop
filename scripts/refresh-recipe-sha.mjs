@@ -46,7 +46,8 @@ const all = args.includes('--all');
 const checkOnly = args.includes('--check');
 const verifyRepack = args.includes('--verify-repack');
 const verifyTree = args.includes('--verify-tree');
-const reroll = args.includes('--reroll');
+const ciReroll = args.includes('--ci-reroll');
+const reroll = args.includes('--reroll') || ciReroll;
 const baseIdx = args.indexOf('--base');
 const baseRef = baseIdx >= 0 ? args[baseIdx + 1] : process.env.RECIPE_SHA_BASE || 'origin/main';
 const names = all
@@ -397,7 +398,13 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
               'Nothing was written; refresh it explicitly with --reroll.'
           );
         }
+        if (ciReroll && !r.full && (r.ignored.length || !r.subst.length)) {
+          throw new Error(
+            `${unchanged}. The extracted archive's tree is ${r.extracted}, not ${label}.tree ${pinTree}${r.ignored.length ? `: ${r.ignored.length} export-ignore path(s) are missing` : ''}, and --ci-reroll accepts only the whole tree, where nothing but an export-subst file's $Format$ placeholders may differ. Nothing was written.`
+          );
+        }
         console.log(`   re-roll: the archive matches ${label}.tree ${pinTree}; sha256 ${oldSha} → ${digest} for the same URL`);
+        console.log(`recipe-sha: REROLL ${name}${job.key ? `/${job.key}` : ''} ${oldSha}→${digest} sha256 tree=${pinTree}${r.full ? '' : ` export-subst=${r.subst.join(',')}`}`);
       } else {
         const baseSha = baseJob ? String(baseJob.src.sha256 || '') : '';
         if (oldSha && oldSha !== baseSha) {

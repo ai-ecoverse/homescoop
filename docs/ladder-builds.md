@@ -376,9 +376,27 @@ so a codeload zip URL without an extension works. ladder-pr passes the base as
 script and older ones would take an argument as a package name. It prints `source-tree: PASS|FAIL …`.
 
 A changed sha256 for an unchanged URL whose archive matches `tree:` is a re-roll.
-It still fails in CI. Refresh it explicitly with
-`node scripts/refresh-recipe-sha.mjs <pkg> --reroll`, which logs the tree check;
-commit that log line's verdict in the PR body. An archive that doesn't match the
+GitHub regenerates archives, and it can serve another gzip of the same commit on
+most runs (#1491's llvm-project archive).
+- **Build jobs:** ladder-pr's `host-build` and `rebuild` run
+  `refresh-recipe-sha.mjs <pkg> --ci-reroll`. A re-roll passes only when the
+  extracted archive, staged whole, writes a tree object equal to `tree:`. The
+  one exception is an export-subst file (llvm-project's
+  `clang/bindings/python/.git_archival.txt`, whose `describe-name` moves with
+  every new tag). It may differ only in its `$Format:…$` placeholders, and the
+  verdict line names it. A missing export-ignore path fails. Each accepted
+  re-roll prints `recipe-sha: REROLL <pkg> <old>→<new> sha256 tree=<tree>`, plus
+  ` export-subst=<paths>` when that exception applied. The step fails if a
+  re-roll has no such line, and it runs through `gate.mjs recipe-sha`. The new
+  pin is written to that job's checkout only, which has no push credentials;
+  nothing commits it.
+- **Strict jobs:** a recipe without `tree:` still fails. So do ladder-pr's
+  `recipe-sha` job, pool-parity, ladder-merge and ladder-build, none of which
+  gets the flag.
+- **Refreshing the committed pin:** do it explicitly with
+  `node scripts/refresh-recipe-sha.mjs <pkg> --reroll`, which logs the tree check
+  (export-subst and export-ignore differences allowed), and commit that log
+  line's verdict in the PR body. An archive that doesn't match the
 tree fails, with or without `--reroll`. ladder-pr's `recipe-sha` job also passes
 `--verify-tree`, so a pinned tree is checked on every PR that touches the package,
 even when the sha256 matches.

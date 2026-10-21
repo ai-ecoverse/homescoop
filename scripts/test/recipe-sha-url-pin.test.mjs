@@ -125,9 +125,13 @@ test('a base the script cannot resolve fails closed on a mismatch', () => {
 });
 
 /** A re-rolled archive of one upstream commit, pinned by source.tree. */
-function rerollFixture({ different = false, tamper = 'src/a.c', content = 'int a = 1;\n', zip = false } = {}) {
+const ATTRS = { 'README': 'hello\n', 'src/a.c': 'int a;\n', 'crlf.txt': 'one\ntwo\n', 'ver.txt': 'describe: $Format:%H$\n', 'skip.txt': 'left out\n', 'ign.txt': 'committed but ignored\n', '.gitignore': 'ign.txt\n', '.gitattributes': 'crlf.txt text eol=crlf\nver.txt export-subst\nskip.txt export-ignore\n' };
+const SUBST = { 'README': 'hello\n', 'src/a.c': 'int a;\n', 'ver.txt': 'describe: $Format:%H$\n', '.gitattributes': 'ver.txt export-subst\n' };
+const PLAIN = { 'README': 'hello\n', 'src/a.c': 'int a;\n', 'crlf.txt': 'one\ntwo\n', 'ign.txt': 'committed but ignored\n', '.gitignore': 'ign.txt\n', '.gitattributes': 'crlf.txt text eol=crlf\n' };
+
+function rerollFixture({ different = false, tamper = 'src/a.c', content = 'int a = 1;\n', zip = false, files = ATTRS, tree = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-tree-'));
-  const up = upstream(join(dir, 'up'), { 'README': 'hello\n', 'src/a.c': 'int a;\n', 'crlf.txt': 'one\ntwo\n', 'ver.txt': 'describe: $Format:%H$\n', 'skip.txt': 'left out\n', 'ign.txt': 'committed but ignored\n', '.gitignore': 'ign.txt\n', '.gitattributes': 'crlf.txt text eol=crlf\nver.txt export-subst\nskip.txt export-ignore\n' });
+  const up = upstream(join(dir, 'up'), files);
   const served = join(dir, zip ? 'archive' : 'archive.tar.gz');
   up.archive(zip ? 0 : 1, served, zip);
   const oldSha = sha(readFileSync(served));
@@ -141,7 +145,7 @@ function rerollFixture({ different = false, tamper = 'src/a.c', content = 'int a
   }
   const newSha = sha(readFileSync(served));
   assert.notEqual(oldSha, newSha);
-  const text = recipe({ url: `file://${served}`, pin: oldSha, extra: [`  git: "file://${up.dir}"`, `  commit: "${up.commit}"`, `  tree: "${up.tree}"`] });
+  const text = recipe({ url: `file://${served}`, pin: oldSha, extra: [`  git: "file://${up.dir}"`, `  commit: "${up.commit}"`, ...(tree ? [`  tree: "${up.tree}"`] : [])] });
   const f = repo({ baseRecipe: text, headRecipe: text });
   return { ...f, text, oldSha, newSha, tree: up.tree, cleanup: () => { rmSync(f.dir, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); } };
 }
@@ -157,6 +161,7 @@ test('a re-rolled archive whose tree matches needs --reroll, then refreshes with
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
     assert.match(ok.stdout, new RegExp(`source-tree: PASS archive matches tree ${f.tree} \\(export-subst ver\\.txt; export-ignore 1\\)`));
     assert.match(ok.stdout, /re-roll: the archive matches source\.tree/);
+    assert.ok(ok.stdout.includes(`recipe-sha: REROLL fx ${f.oldSha}→${f.newSha} sha256 tree=${f.tree}`), ok.stdout);
     assert.match(f.read(), new RegExp(`sha256: "${f.newSha}"`));
   } finally {
     f.cleanup();
@@ -186,6 +191,59 @@ test('a shallow checkout with no origin/main (ladder-pr build jobs) compares a r
   } finally {
     rmSync(clone, { recursive: true, force: true });
     f.cleanup();
+  }
+});
+
+test('--ci-reroll (ladder-pr build jobs): a re-roll whose extracted tree hashes to source.tree passes with a REROLL verdict', () => {
+  const f = rerollFixture({ files: PLAIN });
+  try {
+    const r = f.run('--ci-reroll');
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(r.stdout.includes(`recipe-sha: REROLL fx ${f.oldSha}→${f.newSha} sha256 tree=${f.tree}`), r.stdout);
+    assert.match(r.stdout, /recipe-sha: PASS 1 recipe/);
+    assert.match(f.read(), new RegExp(`sha256: "${f.newSha}"`));
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('--ci-reroll: an export-subst file may differ only in its $Format$ placeholders (llvm-project .git_archival.txt), named in the REROLL line', () => {
+  const f = rerollFixture({ files: SUBST });
+  try {
+    const r = f.run('--ci-reroll');
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(r.stdout.includes(`recipe-sha: REROLL fx ${f.oldSha}→${f.newSha} sha256 tree=${f.tree} export-subst=ver.txt`), r.stdout);
+  } finally {
+    f.cleanup();
+  }
+  const g = rerollFixture({ files: SUBST, different: true, tamper: 'ver.txt', content: 'describe: $Format:%H$\nimport os; os.system("x")\n' });
+  try {
+    const r = g.run('--ci-reroll');
+    assert.notEqual(r.status, 0, r.stdout);
+    assert.match(r.stdout, /source-tree: FAIL .*differs from the tree: ver\.txt/);
+    assert.equal(g.read(), g.text);
+  } finally {
+    g.cleanup();
+  }
+});
+
+test('NEGATIVE --ci-reroll: a tree mismatch, an archive missing export-ignore paths, and a recipe without source.tree all fail and write nothing', () => {
+  const cases = [
+    [{ files: PLAIN, different: true }, /does not match the pinned source\.tree/],
+    [{ files: ATTRS }, /: 1 export-ignore path\(s\) are missing, and --ci-reroll accepts only the whole tree/],
+    [{ files: PLAIN, tree: false }, /changed bytes for an unchanged URL .*the upstream bytes moved under the pin/],
+  ];
+  for (const [opts, why] of cases) {
+    const f = rerollFixture(opts);
+    try {
+      const r = f.run('--ci-reroll');
+      assert.notEqual(r.status, 0, r.stdout);
+      assert.match(r.stdout, why);
+      assert.doesNotMatch(r.stdout, /recipe-sha: REROLL/);
+      assert.equal(f.read(), f.text);
+    } finally {
+      f.cleanup();
+    }
   }
 });
 
