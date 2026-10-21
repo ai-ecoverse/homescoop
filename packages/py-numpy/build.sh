@@ -251,6 +251,13 @@ rows.append(f"{di}/RECORD,,")
 open(os.path.join(site, di, "RECORD"), "w").write("\n".join(rows) + "\n")
 PY
 cp "$SRC/LICENSE.txt" "$DEST/LICENSE"
+rm -rf "$DEST/bin"
+mkdir -p "$DEST/bin"
+for ep in "f2py numpy.f2py.f2py2e" "numpy-config numpy._configtool"; do
+  read -r name mod <<<"$ep"
+  printf '#!/usr/bin/env python3\nimport sys\nfrom %s import main\nif __name__ == "__main__":\n    sys.exit(main())\n' "$mod" >"$DEST/bin/$name"
+  chmod 755 "$DEST/bin/$name"
+done
 # wasix-openblas' LICENSE is OpenBLAS', LAPACK's and GotoBLAS2's, each after a
 # "==> LICENSE <==" line.
 awk -v d="$B/oblic" '/^==> /{n++; next} {print > (d "." n)}' "$OBP/LICENSE"
