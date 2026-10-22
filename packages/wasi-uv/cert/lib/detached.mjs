@@ -10,6 +10,7 @@ export function detached (ctx, { env, budgetMs = 300000, pollMs = 5000, root = '
     assert.equal(mk.status, 0, `mkdir ${dir}: ${mk.stderr}`);
     await write(`${dir}/cmd.sh`, `${script}\n`);
     await write(`${dir}/runner.sh`, [
+      'set -m',
       `bash ${dir}/cmd.sh >${dir}/out 2>${dir}/err </dev/null & p=$!`,
       `echo $p >${dir}/pid`,
       'wait $p; r=$?',
@@ -31,7 +32,7 @@ export function detached (ctx, { env, budgetMs = 300000, pollMs = 5000, root = '
         return { status: Number(rc), stdout: out.stdout, stderr: err.stdout, seconds };
       }
       if (Date.now() - t0 >= budgetMs) {
-        const tail = await run(['bash', '-c', `kill -9 $(cat ${dir}/pid 2>/dev/null) 2>/dev/null; tail -c 1500 ${dir}/err 2>/dev/null; exit 0`], { cwd, env });
+        const tail = await run(['bash', '-c', `p=$(cat ${dir}/pid 2>/dev/null); [ -n "$p" ] && { kill -9 -- -$p 2>/dev/null; kill -9 $p 2>/dev/null; }; tail -c 1500 ${dir}/err 2>/dev/null; exit 0`], { cwd, env });
         const line = `wasi-uv: FAIL ${script}: no exit within ${budget} s (detached, polled; ${seconds} s)`;
         log(line);
         assert.fail(`${line}\nstderr tail=${tail.stdout}`);
