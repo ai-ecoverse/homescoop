@@ -47,6 +47,14 @@ if find "$PKG" -name '*.rej' -o -name '*.orig' | grep -q .; then
   echo "homescoop: patch leftovers in $PKG" >&2
   exit 1
 fi
+for p in "$HOMESCOOP_PKG"/package-patches/*.patch; do
+  echo "  package patch $(basename "$p")"
+  patch -d "$PKG" -p1 --batch --no-backup-if-mismatch < "$p"
+done
+if find "$PKG" -name '*.rej' -o -name '*.orig' | grep -q .; then
+  echo "homescoop: package patch leftovers in $PKG" >&2
+  exit 1
+fi
 grep -q 'SLICC_VFS_PRE_JS' "$PKG/tools/link.py"
 
 echo "== wasm-emscripten: entry points"
@@ -61,6 +69,13 @@ eval "$(bash "$ROOT/scripts/emscripten-tree.sh" "$WORK/em-host" "$TB")"
 HOST_EM="$EMSCRIPTEN_TREE"
 HOST_EM_CONFIG="$EMSCRIPTEN_TREE_CONFIG"
 HOST_CACHE="$EMSCRIPTEN_TREE_CACHE"
+for p in "$HOMESCOOP_PKG"/package-patches/*.patch; do
+  patch -d "$HOST_EM" -p1 --batch --no-backup-if-mismatch -s < "$p"
+done
+if find "$HOST_EM" -name '*.rej' -o -name '*.orig' | grep -q .; then
+  echo "homescoop: package patch leftovers in $HOST_EM" >&2
+  exit 1
+fi
 HOST_EMCC=(python3 "$HOST_EM/emcc.py")
 
 echo "== wasm-emscripten: libslicc objects for default executable links"
@@ -80,7 +95,7 @@ python3 -c "import pathlib,sys; d=pathlib.Path(sys.argv[1]).read_bytes(); sys.ex
   exit 1
 }
 echo "  PRESTAGE: slicc_signals.o has stride-140 encoding"
-for js in slicc-fork.js slicc-writev.js slicc-uname.js; do
+for js in slicc-fork.js slicc-writev.js slicc-uname.js slicc-env.js; do
   cp "$SLICC_SHIMS/$js" "$PKG/lib/slicc/$js"
 done
 grep -q "__syscall_linkat__sig: 'iipipi'" "$HOST_EM/src/lib/libsigs.js"
@@ -112,6 +127,52 @@ int main(void) {
   return 0;
 }
 C
+cat > "$PRE_WORK/envi.c" <<'C'
+#include <stdio.h>
+#include <stdlib.h>
+static void show(const char *k) { const char *v = getenv(k); printf("%s=%s\n", k, v ? v : "(unset)"); }
+int main(void) {
+  show("USER");
+  show("LOGNAME");
+  show("HOME");
+  show("PATH");
+  show("PWD");
+  return 0;
+}
+C
+cat > "$PRE_WORK/symloop.c" <<'C'
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+static int chain(const char *dir, int follows) {
+  char from[64], to[64];
+  mkdir(dir, 0755);
+  for (int i = 0; i < follows - 1; i++) {
+    snprintf(from, sizeof from, "%s/l%d", dir, i);
+    snprintf(to, sizeof to, "%s/l%d", dir, i + 1);
+    if (symlink(to, from) != 0) return -1;
+  }
+  snprintf(from, sizeof from, "%s/l%d", dir, follows - 1);
+  if (symlink("/target", from) != 0) return -1;
+  snprintf(from, sizeof from, "%s/l0", dir);
+  int fd = open(from, O_RDONLY);
+  int err = fd < 0 ? errno : 0;
+  if (fd >= 0) close(fd);
+  return err;
+}
+int main(void) {
+  int fd = open("/target", O_WRONLY | O_CREAT, 0644);
+  if (fd < 0) return 1;
+  close(fd);
+  int e40 = chain("/c40", 40);
+  int e41 = chain("/c41", 41);
+  printf("follows40 %s\n", e40 == 0 ? "ok" : e40 == ELOOP ? "ELOOP" : "other");
+  printf("follows41 %s\n", e41 == 0 ? "ok" : e41 == ELOOP ? "ELOOP" : "other");
+  return 0;
+}
+C
 chmod -R a-w "$HOST_EM"
 RO_CLEANUP() { chmod -R u+w "$HOST_EM" 2>/dev/null || true; }
 trap RO_CLEANUP EXIT
@@ -139,6 +200,17 @@ grep -q '^link 1$' <<<"$CALLS_OUT"
 grep -q '^rlimit 0$' <<<"$CALLS_OUT"
 grep -q '^usr1$' <<<"$CALLS_OUT"
 grep -q '^raise 0$' <<<"$CALLS_OUT"
+EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$PKG/lib/slicc" "${HOST_EMCC[@]}" "$PRE_WORK/envi.c" -o "$PRE_WORK/envi.js"
+ENVI_OUT="$(cd "$PRE_WORK" && env -i "$(command -v node)" envi.js)"
+printf '%s\n' "$ENVI_OUT"
+for k in USER LOGNAME HOME PATH PWD; do
+  grep -qx "$k=(unset)" <<<"$ENVI_OUT" || { echo "homescoop: under env -i, a default-linked program sees a placeholder $k (homescoop#1531)" >&2; exit 1; }
+done
+EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$PKG/lib/slicc" "${HOST_EMCC[@]}" "$PRE_WORK/symloop.c" -o "$PRE_WORK/symloop.js"
+SYMLOOP_OUT="$(node "$PRE_WORK/symloop.js")"
+printf '%s\n' "$SYMLOOP_OUT"
+grep -qx 'follows40 ok' <<<"$SYMLOOP_OUT" || { echo "homescoop: a path of 40 symlink follows is ELOOP in the default glue (homescoop#611)" >&2; exit 1; }
+grep -qx 'follows41 ELOOP' <<<"$SYMLOOP_OUT"
 if EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" "$PRE_WORK/hello.c" -o "$PRE_WORK/hello-cl.js" --closure=1 2>"$PRE_WORK/closure.err"; then
   echo "homescoop: --closure=1 should have failed" >&2
   exit 1
@@ -148,7 +220,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open and 41 are ELOOP (#611), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"
@@ -203,10 +275,12 @@ test -f "$PKG/lib/slicc-vfs-pre.js"
 for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs slicc_main_envp slicc_fork; do
   test -f "$PKG/lib/slicc/$obj.o"
 done
-for js in slicc-fork.js slicc-writev.js slicc-linkat.js slicc-uname.js; do
+for js in slicc-fork.js slicc-writev.js slicc-linkat.js slicc-uname.js slicc-env.js; do
   test -f "$PKG/lib/slicc/$js"
 done
 grep -q "slicc-uname.js" "$PKG/tools/link.py"
+grep -q "'slicc-uname.js', 'slicc-env.js'" "$PKG/tools/link.py"
+grep -q 'nlinks <= {{{ cDefs.SYMLOOP_MAX }}}' "$PKG/src/lib/libfs.js"
 grep -q 'Module.sliccPpid' "$PKG/lib/slicc/slicc-fork.js"
 grep -q '__syscall_getpid' "$PKG/lib/slicc/slicc_libc_gaps.o" || \
   llvm-nm "$PKG/lib/slicc/slicc_libc_gaps.o" 2>/dev/null | grep -q getpid || true
@@ -230,7 +304,7 @@ test -f "$PKG/emscripten-config"
   echo "homescoop: emscripten-config must not set SLICC_VFS_PRE_JS" >&2
   exit 1
 }
-grep -q '"@ai-ecoverse/emscripten-cache": "6.0.9-4"' "$PKG/package.json"
+grep -q '"@ai-ecoverse/emscripten-cache": "6.0.9-6"' "$PKG/package.json"
 grep -q '"@ai-ecoverse/wasm-binaryen": "132.0.0-4"' "$PKG/package.json"
 grep -q '"@ai-ecoverse/wasm-clang": "24.0.0-22"' "$PKG/package.json"
 grep -q '"esbuild-wasm": "0.28.2"' "$PKG/package.json"
@@ -253,4 +327,7 @@ homescoop_assert_no_package_links "$PKG"
 du -sh "$PKG" "$PKG/tools" "$PKG/src" "$PKG/system"
 find "$OUT_PKG" -mindepth 1 -maxdepth 1 ! -name package.json ! -name README.md -exec rm -rf {} +
 rsync -a --exclude=/package.json --exclude=/README.md "$PKG/" "$OUT_PKG/"
+homescoop_notices_begin "lib/slicc's objects and JS libraries, which emcc links into programs by default, are compiled from:"
+homescoop_notice_slicc_shims
+grep -q '^## homescoop: the slicc shims (shims/slicc, Apache-2.0)$' "$OUT_PKG/THIRD-PARTY-NOTICES.md"
 echo "OK wasm-emscripten $PKG_VER"
