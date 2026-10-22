@@ -211,6 +211,7 @@ apply_wasix_patch thread-ubf-wake-pipe-wasi.patch "$SRC/thread_pthread.c" WASIX_
 apply_wasix_patch flock-interruptible-wasi.patch "$SRC/file.c" WASIX_FLOCK_NB
 apply_wasix_patch load-path-prefix-wasi.patch "$SRC/ruby.c" WASIX_LOAD_PATH
 apply_wasix_patch rbinstall-static-bundled-ext-wasi.patch "$SRC/tool/rbinstall.rb" WASIX_STATIC_BUNDLED_GEMS
+apply_wasix_patch rdoc-ri-pack-wasi.patch "$SRC/lib/rdoc/store.rb" wasix_ri_pack
 
 # OpenSSL 3 opaque structs: never compile the 1.0-era field-access fallbacks.
 python3 - "$SRC/ext/openssl/openssl_missing.c" <<'PY'
@@ -290,6 +291,13 @@ if [[ -f "$OPENSSL_PREFIX/lib/libssl.a" ]]; then
   RUBY_LDFLAGS="-L${OPENSSL_PREFIX}/lib -L${ZLIB_PREFIX}/lib -L${YAML_PREFIX}/lib"
 fi
 
+RUBY_BASERUBY="${BASERUBY:-$(
+  if [[ -x /opt/homebrew/opt/ruby/bin/ruby ]]; then echo /opt/homebrew/opt/ruby/bin/ruby
+  elif command -v ruby3.4 >/dev/null; then command -v ruby3.4
+  elif command -v ruby3 >/dev/null; then command -v ruby3
+  else command -v ruby
+  fi
+)}"
 STAGE_ROOT="$STAGE$RUBY_PREFIX"
 if [[ ! -f "$STAGE_ROOT/bin/ruby" && ! -f "$STAGE_ROOT/bin/ruby.wasm" ]] || [[ -n "${FORCE:-}" ]]; then
   # ASYNCIFY_BUF is baked into jmp_buf layout — never reuse a build tree that
@@ -358,13 +366,7 @@ SITE
       --host=wasm32-wasi \
       --build="$BUILD_TRIPLE" \
       --with-gcc="$TARGET_CC" \
-      --with-baseruby="${BASERUBY:-$(
-        if [[ -x /opt/homebrew/opt/ruby/bin/ruby ]]; then echo /opt/homebrew/opt/ruby/bin/ruby
-        elif command -v ruby3.4 >/dev/null; then command -v ruby3.4
-        elif command -v ruby3 >/dev/null; then command -v ruby3
-        else command -v ruby
-        fi
-      )}" \
+      --with-baseruby="$RUBY_BASERUBY" \
       --disable-install-doc \
       --disable-install-rdoc \
       --disable-jit-support \
@@ -777,6 +779,80 @@ for exe in sorted(want):
 print(f"gem executables: PASS {len(want)} binstubs in bin/ ({', '.join(f'{e} from {want[e]}' for e in sorted(want))})")
 PY
 
+RI_SYSTEM="$DEST/share/ri/$(basename "$API_LIB")/system"
+rm -rf "$WORK/ri" "$DEST/share"
+(cd "$WORK" && "$RUBY_BASERUBY" "$SRC/tool/rdoc-srcdir" --ri --op "$WORK/ri" --encoding=UTF-8 --no-force-update --quiet .) > "$WORK/ri.log" 2>&1 || { tail -40 "$WORK/ri.log" >&2; echo "homescoop wasix-ruby: ri data FAIL: rdoc --ri exited non-zero" >&2; exit 1; }
+rm -f "$WORK/ri/created.rid"
+RI_BUILD_PATHS="$(grep -rlF -e "$WORK" -e "$HOMESCOOP_ROOT" "$WORK/ri" || true)"
+[[ -z "$RI_BUILD_PATHS" ]] || { echo "homescoop wasix-ruby: ri data FAIL: build paths in $(echo "$RI_BUILD_PATHS" | head -5)" >&2; exit 1; }
+mkdir -p "$RI_SYSTEM"
+"$RUBY_BASERUBY" - "$WORK/ri" "$RI_SYSTEM/ri.pack" <<'RB'
+dir, out = ARGV
+files = Dir.glob("**/*", base: dir).select { |f| File.file?(File.join(dir, f)) }.sort
+index = {}
+offset = 0
+blobs = files.map do |f|
+  b = File.binread(File.join(dir, f))
+  index[f] = [offset, b.bytesize]
+  offset += b.bytesize
+  b
+end
+head = Marshal.dump(index)
+File.open(out, "wb") do |io|
+  io.write([head.bytesize].pack("Q>"))
+  io.write(head)
+  blobs.each { |b| io.write(b) }
+end
+puts "ri pack: #{files.size} files, #{offset} bytes"
+RB
+"$RUBY_BASERUBY" -W0 -I "$SRC/lib" - "$RI_SYSTEM" "$(find "$WORK/ri" -type f | wc -l | tr -d ' ')" <<'RB'
+require "rdoc"
+dir, count = ARGV
+abort "homescoop wasix-ruby: ri data FAIL: #{dir} holds more than ri.pack" unless Dir.children(dir) == ["ri.pack"]
+store = RDoc::RI::Store.new(RDoc::Options.new, path: dir, type: :system)
+store.load_cache
+index = store.send(:wasix_ri_pack_index)
+abort "homescoop wasix-ruby: ri data FAIL: ri.pack has #{index[2].size} files, rdoc wrote #{count}" unless index[2].size == count.to_i
+up = store.load_method("String", "#upcase")
+abort "homescoop wasix-ruby: ri data FAIL: String#upcase has no documentation" unless RDoc::Markup::ToRdoc.new.convert(up.comment.parse).include?("upcased characters")
+json = store.load_method("JSON", "#parse")
+abort "homescoop wasix-ruby: ri data FAIL: JSON.parse has no documentation" unless RDoc::Markup::ToRdoc.new.convert(json.comment.parse).include?("Returns the Ruby objects")
+spec = store.load_class("Gem::Specification")
+abort "homescoop wasix-ruby: ri data FAIL: no Gem::Specification" unless spec.superclass.to_s == "Gem::BasicSpecification"
+page = store.load_page("README.md")
+abort "homescoop wasix-ruby: ri data FAIL: the README.md page is not read from ri.pack" unless RDoc::Markup::ToRdoc.new.convert(page.comment.parse).include?("What is Ruby?")
+begin
+  store.load_method("String", "#no_such_method_here")
+  abort "homescoop wasix-ruby: ri data FAIL: a missing method loaded"
+rescue RDoc::Store::MissingFileError
+end
+require "tmpdir"
+real = File.binread(File.join(dir, "ri.pack"))
+huge = Marshal.dump({"cache.ri" => [0, 1 << 40], "String/upcase-i.ri" => [0, 10]})
+spill = Marshal.dump({"cache.ri" => [0, 64], "String/upcase-i.ri" => [real.bytesize, 10]})
+bad = {
+  "truncated" => real.byteslice(0, 5000),
+  "huge-index" => [1 << 62].pack("Q>") + "x" * 32,
+  "huge-entry" => [huge.bytesize].pack("Q>") + huge + "x" * 64,
+  "past-end" => [spill.bytesize].pack("Q>") + spill + "x" * 64,
+  "not-a-hash" => [Marshal.dump([1, 2]).bytesize].pack("Q>") + Marshal.dump([1, 2]),
+}
+bad.each do |name, bytes|
+  Dir.mktmpdir do |d|
+    File.binwrite(File.join(d, "ri.pack"), bytes)
+    s = RDoc::RI::Store.new(RDoc::Options.new, path: d, type: :extra)
+    abort "homescoop wasix-ruby: ri data FAIL: a #{name} ri.pack was accepted" if s.send(:wasix_ri_pack_index)
+    s.load_cache
+    begin
+      s.load_method("String", "#upcase")
+      abort "homescoop wasix-ruby: ri data FAIL: a #{name} ri.pack loaded String#upcase"
+    rescue RDoc::Store::MissingFileError
+    end
+  end
+end
+puts "ri data: PASS #{count} files in share/ri/#{File.basename(File.dirname(dir))}/system/ri.pack, #{store.module_names.size} classes and modules, README.md page, #{bad.size} corrupt packs refused (homescoop#1622)"
+RB
+
 # The bundled gems were installed by the build machine's ruby: refuse
 # anything host-native in the package.
 python3 - "$DEST" <<'PY'
@@ -875,7 +951,7 @@ pkg = {
     "engines": {"slicc-kernel": ">=1.120.0"},
     "license": "Ruby",
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-ruby/package"},
-    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "PRESTAGE.md"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "share", "PRESTAGE.md"],
     "publishConfig": {"access": "public"},
     "homescoop": {
         "recipe": "wasix-ruby",

@@ -1,0 +1,54 @@
+--- lib/rdoc/store.rb
++++ lib/rdoc/store.rb
+@@ -979,9 +979,51 @@
+ 
+   private
+   def marshal_load(file)
++    packed = wasix_ri_pack_read(file)
++    return Marshal.load(packed, MarshalFilter) if packed
+     File.open(file, 'rb') {|io| Marshal.load(io, MarshalFilter)}
+   end
+ 
++  WASIX_RI_PACK_MAX_INDEX = 16 << 20
++  WASIX_RI_PACK_MAX_ENTRY = 16 << 20
++
++  def wasix_ri_pack_read(file)
++    @wasix_ri_pack = wasix_ri_pack_index unless defined?(@wasix_ri_pack)
++    return unless @wasix_ri_pack
++    pack, base, index, root = @wasix_ri_pack
++    full = File.expand_path(file)
++    return unless full.start_with?(root)
++    entry = index[full.delete_prefix(root)] or raise Errno::ENOENT, file
++    offset, length = entry
++    data = File.open(pack, 'rb') {|io| io.seek(base + offset); io.read(length)}
++    raise Errno::ENOENT, file unless data && data.bytesize == length
++    data
++  end
++
++  def wasix_ri_pack_index
++    pack = @path && File.join(@path, 'ri.pack')
++    return unless pack && File.file?(pack)
++    total = File.size(pack)
++    File.open(pack, 'rb') do |io|
++      head = io.read(8)
++      return unless head && head.bytesize == 8
++      size = head.unpack1('Q>')
++      return unless size <= WASIX_RI_PACK_MAX_INDEX && 8 + size <= total
++      raw = io.read(size)
++      return unless raw && raw.bytesize == size
++      index = Marshal.load(raw, MarshalFilter)
++      base = 8 + size
++      return unless index.is_a?(Hash) && index.all? {|k, v|
++        k.is_a?(String) && !k.empty? && !k.start_with?('/') && !k.split('/').include?('..') &&
++          v.is_a?(Array) && v.size == 2 && v.all? {|n| n.is_a?(Integer) && n >= 0} &&
++          v[1] <= WASIX_RI_PACK_MAX_ENTRY && base + v[0] + v[1] <= total
++      }
++      [pack, base, index, File.join(File.expand_path(@path), '')]
++    end
++  rescue StandardError
++    nil
++  end
++
+   MarshalFilter = proc do |obj|
+     case obj
+     when true, false, nil, Array, Class, Encoding, Hash, Integer, String, Symbol, RDoc::Text

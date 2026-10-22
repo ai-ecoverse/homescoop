@@ -33,8 +33,35 @@ const BROKEN = `def broken
 end
 `;
 
+const PROGRAM = `def add(a, b)
+  a + b
+end
+x = add(1, 2)
+puts x
+`;
+
 export default async function (ctx) {
-  const { run, write, assert } = ctx;
+  const { run, write, assert, addUser } = ctx;
+  for (const user of [undefined, 'cone']) {
+    if (user) await addUser({ name: user });
+    const cwd = user ? `/home/${user}` : '/tmp';
+    const as = (script) => run(['bash', '-lc', script], { cwd, ...(user && { user }) });
+    const who = user ?? 'root';
+    const mk = await as(`rm -rf tools && mkdir tools && printf '%s' '${PROGRAM}' > tools/a.rb && echo made`);
+    assert.match(mk.stdout, /made/, `${who}: ${mk.stdout}${mk.stderr}`);
+    const dbg = await as(`cd tools && printf 'b 5\\nc\\np x\\nc\\n' | rdbg a.rb 2>&1; echo "rc=$?"`);
+    const plain = dbg.stdout.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+    const dout = `${who}: rdbg: ${plain}${dbg.stderr}`;
+    assert.match(plain, /Stop by #\d+\s+BP - Line\s+.*a\.rb:5/, `rdbg stops at the breakpoint on line 5 (homescoop#1017): ${dout}`);
+    assert.match(plain, /^=> 3$/m, `rdbg's p x prints => 3: ${dout}`);
+    assert.match(plain, /rc=0/, dout);
+    const tp = await as('cd tools && typeprof a.rb');
+    assert.equal(tp.status, 0, `${who}: typeprof: rc=${tp.status} ${tp.stdout}${tp.stderr}`);
+    assert.match(tp.stdout, /def add: \(Integer, Integer\) -> Integer/, `${who}: typeprof infers add's signature: ${tp.stdout}${tp.stderr}`);
+    const rd = await as('cd tools && rdoc -q -o doc a.rb && test -s doc/Object.html && ruby -e \'print File.read("doc/Object.html")[/id="method-i-add"/]\'');
+    assert.equal(rd.status, 0, `${who}: rdoc -o doc a.rb writes doc/Object.html: rc=${rd.status} ${rd.stdout}${rd.stderr}`);
+    assert.equal(rd.stdout, 'id="method-i-add"', `${who}: doc/Object.html documents add: ${rd.stdout}${rd.stderr}`);
+  }
   const sh = (script) => run(['bash', '-lc', script], { cwd: '/tmp' });
   const lines = [];
   for (const [cmd, gem, want] of TOOLS) {
@@ -55,5 +82,5 @@ export default async function (ctx) {
   const rbs = await sh(`cd /tmp/gx && printf 'class Foo\\n  def bar: (Integer) -> String\\nend\\n' > foo.rbs && rbs -I . validate --silent && echo rbs-ok`);
   assert.equal(rbs.status, 0, `rbs validates a signature file: rc=${rbs.status} ${rbs.stdout}${rbs.stderr}`);
   assert.match(rbs.stdout, /rbs-ok/, `rbs validate: ${rbs.stdout}${rbs.stderr}`);
-  console.log(`gem executables: ${lines.join(' | ')}; racc 2+3*4=${racc.stdout}; syntax_suggest and rbs validate ok`);
+  console.log(`gem executables: ${lines.join(' | ')}; racc 2+3*4=${racc.stdout}; syntax_suggest and rbs validate ok; rdbg stops at a breakpoint and prints => 3, typeprof infers add, rdoc writes Object.html, as root and cone`);
 }
