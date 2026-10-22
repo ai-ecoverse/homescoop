@@ -168,21 +168,21 @@ export default async function (ctx) {
   const viaRef = await sh('root', [
     'gpg --homedir /home/cone/hr --batch --import /tmp/k2.asc > /dev/null 2>&1; echo "imp=$?"',
     'gpgconf --homedir /home/cone/hr --kill gpg-agent',
-    'for f in pubring.kbx pubring.kbx~ trustdb.gpg; do [ -e /home/cone/hr/$f ] && stat -c "ref %n %F %U" /home/cone/hr/$f; done',
+    'for f in pubring.kbx pubring.kbx~ trustdb.gpg; do [ -e /home/cone/hr/$f ] || [ -L /home/cone/hr/$f ] && stat -c "ref %n %F %U" /home/cone/hr/$f; done',
     'stat -c "kb %U %a" /srv/kb/pubring.kbx; echo "sum $(cksum < /srv/kb/pubring.kbx)"',
   ].join('\n'));
-  assert.match(viaRef, /^imp=0$/m, `root imports into cone's homedir whose pubring.kbx cone symlinked to root's keybox:\n${viaRef}`);
-  assert.match(viaRef, /^ref \/home\/cone\/hr\/pubring\.kbx regular file cone$/m, `the keybox that replaces cone's symlink is a regular file and cone's: its owner comes from the directory descriptor, not from the file the symlink names (homescoop#1442; 2.4.9-12: root):\n${viaRef}`);
-  assert.match(viaRef, /^ref \/home\/cone\/hr\/pubring\.kbx~ regular file cone$/m, `the backup root's gpg writes in cone's homedir is cone's (homescoop#1442; 2.4.9-12: root):\n${viaRef}`);
+  assert.match(viaRef, /^imp=[1-9]\d*$/m, `root's gpg refuses to read the pubring.kbx cone symlinked to root's keybox, so nothing of root's is copied into cone's homedir (homescoop#1654; 2.4.9-13 and 2.4.9-14: rc 0, a cone-owned copy):\n${viaRef}`);
+  assert.match(viaRef, /^ref \/home\/cone\/hr\/pubring\.kbx symbolic link cone$/m, `cone's symlink is left as it is (homescoop#1654; 2.4.9-13: replaced by a cone-owned keybox holding root's keys):\n${viaRef}`);
+  assert.doesNotMatch(viaRef, /^ref \/home\/cone\/hr\/pubring\.kbx~ /m, `no backup of root's keybox is written in cone's homedir (homescoop#1654; 2.4.9-13: a cone-owned copy):\n${viaRef}`);
+  assert.doesNotMatch(viaRef, /^ref \S+ \S+ \S+ (?!cone$)\S+$/m, `whatever root's gpg leaves in cone's homedir is cone's (homescoop#1442):\n${viaRef}`);
   assert.match(viaRef, /^kb root 644$/m, `root's own keybox stays root 644:\n${viaRef}`);
   assert.ok(kbSum && viaRef.includes(`sum ${kbSum}`), `root's own keybox is unchanged:\n${viaRef}`);
   const refOwn = await sh('cone', [
     'export GNUPGHOME=~/hr',
-    `${GEN('C6 <c6@example.org>')} 2>&1; echo "gen=$?"`,
-    'gpg --batch -k k2@example.org > /dev/null 2>&1; echo "k2=$?"',
+    'gpg --batch -k k1@example.org > /dev/null 2>&1; echo "k1=$?"',
     'gpgconf --kill gpg-agent',
   ].join('\n'));
-  for (const step of ['gen', 'k2']) assert.match(refOwn, new RegExp(`^${step}=0$`, 'm'), `cone's ${step} after root's import replaced the symlinked keybox (homescoop#1442):\n${refOwn}`);
+  assert.match(refOwn, /^k1=0$/m, `cone's own gpg still reads root's 644 keybox through cone's symlink (only root's gpg refuses it):\n${refOwn}`);
 
   await sh('root', 'rm -rf /srv/rh /srv/rm; mkdir -m 700 /srv/rh /srv/rm /srv/rm/g');
   await sh('cone', 'rm -rf ~/hs ~/hm ~/hm.old; ln -s /srv/rh ~/hs; mkdir -m 700 ~/hm ~/hm/g');
@@ -220,6 +220,28 @@ export default async function (ctx) {
   assert.doesNotMatch(trustLink, /^poc \S+ cone$/m, `a trustdb.gpg that cone symlinks to a root path never gives the target to cone, whatever gpg's exit (homescoop#1111):\n${trustLink}`);
   assert.match(trustLink, /^poc \/etc\/poc\/e root$/m, `the symlinked root file stays root's:\n${trustLink}`);
 
+  await addUser({ name: 'ctwo' });
+  await sh('root', 'rm -rf /srv/pk /srv/lk; mkdir -m 755 /srv/pk /srv/lk');
+  await sh('cone', 'rm -rf ~/q1 ~/q2 ~/rb; mkdir -m 700 ~/q1 ~/q2 ~/rb; ln -s /srv/pk ~/q1/private-keys-v1.d; ln -s /srv/lk/newfile ~/q2/pubring.kbx.lock');
+  await sh('cone', `export GNUPGHOME=~/rb; ${GEN('RB <rb@example.org>')} > /dev/null 2>&1; gpgconf --kill gpg-agent`);
+  const pk = await sh('root', [
+    `gpg --homedir /home/cone/q1 ${GEN('Q1 <q1@example.org>').replace(/^gpg /, '')} > /dev/null 2>&1; echo "q1=$?"`,
+    'gpgconf --homedir /home/cone/q1 --kill gpg-agent',
+    `gpg --homedir /home/cone/q2 ${GEN('Q2 <q2@example.org>').replace(/^gpg /, '')} > /dev/null 2>&1; echo "q2=$?"`,
+    'gpgconf --homedir /home/cone/q2 --kill gpg-agent',
+    'for f in /srv/pk /srv/pk/*; do [ -e "$f" ] && stat -c "pk %n %U" "$f"; done',
+    'ls -A /srv/lk | while read -r f; do echo "in-lk $f"; done',
+    'chown ctwo /home/cone/rb/pubring.kbx',
+    'gpg --homedir /home/cone/rb --batch --import /tmp/k2.asc > /dev/null 2>&1; echo "rb=$?"',
+    'gpgconf --homedir /home/cone/rb --kill gpg-agent',
+    'for f in pubring.kbx pubring.kbx~; do stat -c "rb $f %F %U" /home/cone/rb/$f; done',
+  ].join('\n'));
+  assert.match(pk, /^pk \/srv\/pk root$/m, `/srv/pk stays root's:\n${pk}`);
+  assert.doesNotMatch(pk, /^pk \S+ (?!root$)\S+$/m, `a private-keys-v1.d that cone symlinks to root's /srv/pk leaves everything there root's after root's --quick-gen-key (homescoop#1424):\n${pk}`);
+  assert.doesNotMatch(pk, /^in-lk /m, `a pubring.kbx.lock that cone symlinks to a missing /srv/lk/newfile makes root's gpg create nothing in /srv/lk (homescoop#1424):\n${pk}`);
+  assert.match(pk, /^rb=0$/m, `root imports into cone's keybox that root gave to ctwo:\n${pk}`);
+  for (const f of ['pubring.kbx', 'pubring.kbx~']) assert.ok(pk.includes(`rb ${f} regular file ctwo`), `a keybox update keeps the owner of the regular pubring.kbx it replaces, ctwo, not the directory's (homescoop#1424):\n${pk}`);
+
   // 3. gpgconf --lock / --unlock.
   const gl = await sh('cone', [
     `export GNUPGHOME=${h}`,
@@ -230,5 +252,5 @@ export default async function (ctx) {
   assert.match(gl, /--lock '[^']*pubring\.kbx': not supported on WASI/, `gpgconf --lock says it isn't supported:\n${gl}`);
   assert.match(gl, /--unlock '[^']*pubring\.kbx': not supported on WASI/, `gpgconf --unlock says it isn't supported:\n${gl}`);
   assert.doesNotMatch(gl, /^lock=0$/m, `gpgconf --lock fails:\n${gl}`);
-  console.log('locks: an empty keyring in a read-only directory lists with rc 0 (#955); after root uses cone\'s homedir its lock files are cone\'s and cone generates, signs and updates the trustdb, and an unlocked root-owned lock file is replaced (#888); after root imports a key into cone\'s keybox, pubring.kbx and its backup are cone\'s and cone generates and signs, and a keybox root creates in cone\'s empty homedir is cone\'s (#1031), while a trustdb.gpg symlinked to a root path is never given away (#1111); a fresh homedir\'s trustdb.gpg is cone\'s and cone signs, lists and checks the trustdb (#1447); a keybox root\'s gpg writes over cone\'s symlinked pubring.kbx is cone\'s, and a homedir or parent directory cone swaps for a symlink to a root directory gives nothing there away (#1442); gpgconf --lock/--unlock say they are not supported on WASI (#881)');
+  console.log('locks: an empty keyring in a read-only directory lists with rc 0 (#955); after root uses cone\'s homedir its lock files are cone\'s and cone generates, signs and updates the trustdb, and an unlocked root-owned lock file is replaced (#888); after root imports a key into cone\'s keybox, pubring.kbx and its backup are cone\'s and cone generates and signs, and a keybox root creates in cone\'s empty homedir is cone\'s (#1031), while a trustdb.gpg symlinked to a root path is never given away (#1111); a fresh homedir\'s trustdb.gpg is cone\'s and cone signs, lists and checks the trustdb (#1447); root\'s gpg refuses a pubring.kbx cone symlinked to root\'s keybox and leaves the symlink (#1654), and a homedir or parent directory cone swaps for a symlink to a root directory gives nothing there away (#1442); a private-keys-v1.d or pubring.kbx.lock that cone symlinks into a root directory gives nothing there away, and an update keeps the owner of the keybox it replaces (#1424); gpgconf --lock/--unlock say they are not supported on WASI (#881)');
 }

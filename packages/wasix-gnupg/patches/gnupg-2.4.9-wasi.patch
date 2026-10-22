@@ -1003,7 +1003,17 @@
  
 --- a/kbx/keybox-update.c
 +++ b/kbx/keybox-update.c
-@@ -76,6 +76,35 @@
+@@ -24,6 +24,9 @@
+ #include <errno.h>
+ #include <time.h>
+ #include <unistd.h>
++#ifdef __wasi__
++#include <fcntl.h>
++#endif
+ #include <assert.h>
+ 
+ #include "keybox-defs.h"
+@@ -76,6 +79,35 @@
    gpg_error_t err;
  
    err = keybox_tmp_names (template, 0, r_bakfname, r_tmpfname);
@@ -1039,7 +1049,7 @@
    if (!err)
      {
        err = _keybox_ll_open (r_fp, *r_tmpfname, KEYBOX_LL_OPEN_CREATE);
-@@ -92,6 +121,49 @@
+@@ -92,6 +124,55 @@
  }
  
  
@@ -1051,11 +1061,17 @@
 +  FILE *in, *out;
 +  char buf[8192];
 +  size_t n;
-+  int fd, rc = 0;
++  int fd, ifd, rc = 0;
 +
-+  in = fopen (src, "rb");
++  ifd = gnupg_wasi_open_file (src, O_RDONLY | O_CLOEXEC);
++  in = ifd == -1 ? NULL : fdopen (ifd, "rb");
 +  if (!in)
-+    return gpg_error_from_syserror ();
++    {
++      rc = gpg_error_from_syserror ();
++      if (ifd != -1)
++        close (ifd);
++      return rc;
++    }
 +  fd = gnupg_wasi_create_file (dst, 0666, GNUPG_WASI_CREATE_REPLACE);
 +  out = fd == -1 ? NULL : fdopen (fd, "wb");
 +  if (!out && fd != -1)
@@ -1089,7 +1105,7 @@
  static int
  rename_tmp_file (const char *bakfname, const char *tmpfname,
                   const char *fname, int secret )
-@@ -118,7 +190,22 @@
+@@ -118,8 +199,23 @@
  /*    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)fname ); */
  
    /* First make a backup file except for secret keyboxes. */
@@ -1098,8 +1114,8 @@
 +   * the keybox without the lock (keydb_search) often opens it between
 +   * the two renames below and fails with ENOENT. Copy the backup instead,
 +   * so that FNAME is always there and the rename replaces it.  */
-+  if (!secret)
-+    {
+   if (!secret)
+     {
 +      rc = copy_file_for_backup (fname, bakfname);
 +      if (rc)
 +        goto leave;
@@ -1107,12 +1123,13 @@
 +    }
 +  if (0)
 +#else
-   if (!secret)
++  if (!secret)
 +#endif
-     {
++    {
        block = 1;
        rc = gnupg_rename_file (fname, bakfname, &block);
-@@ -127,7 +214,12 @@
+       if (rc)
+@@ -127,7 +223,12 @@
      }
  
    /* Then rename the file. */
@@ -1125,7 +1142,7 @@
    if (block)
      {
        gnupg_unblock_all_signals ();
-@@ -181,6 +273,9 @@
+@@ -181,6 +282,9 @@
        rc = _keybox_ll_open (&newfp, fname, KEYBOX_LL_OPEN_CREATE);
        if (rc)
          return rc;
@@ -1135,7 +1152,7 @@
  
        rc = _keybox_write_header_blob (newfp, for_openpgp);
        if (rc)
-@@ -346,6 +441,10 @@
+@@ -346,6 +450,10 @@
    rc = rename_tmp_file (bakfname, tmpfname, fname, secret);
  
   leave:
@@ -1148,7 +1165,17 @@
    return rc;
 --- a/g10/keydb.c
 +++ b/g10/keydb.c
-@@ -210,6 +210,7 @@
+@@ -26,6 +26,9 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
++#ifdef __wasi__
++#include <fcntl.h>
++#endif
+ 
+ #include "gpg.h"
+ #include "../common/util.h"
+@@ -210,6 +213,7 @@
     the keyring or keybox will be created.
  
     Return 0 if it is okay to access the specified file.  */
@@ -1156,7 +1183,7 @@
  static gpg_error_t
  maybe_create_keyring_or_box (char *filename, int is_box, int force_create)
  {
-@@ -351,13 +352,73 @@
+@@ -351,13 +355,73 @@
  
    /* The file does not yet exist, create it now. */
    oldmask = umask (077);
@@ -1231,7 +1258,7 @@
    umask (oldmask);
    if (!iobuf)
      {
-@@ -372,6 +433,9 @@
+@@ -372,6 +436,9 @@
      }
  
    iobuf_close (iobuf);
@@ -1241,7 +1268,7 @@
    /* Must invalidate that ugly cache */
    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, filename);
  
-@@ -430,8 +494,78 @@
+@@ -430,16 +497,96 @@
     KEYDB_RESOURCE_TYPE_KEYBOX, KEYDB_RESOURCE_TYPE_KEYRING or
     KEYDB_RESOURCE_TYPE_KEYNONE.  If the file is a keybox and it has
     the OpenPGP flag set, then R_OPENPGP is also set.  */
@@ -1282,9 +1309,9 @@
 +  return ok;
 +}
 +
-+static KeydbResourceType
-+rt_from_file (const char *filename, int *r_found, int *r_openpgp)
-+{
+ static KeydbResourceType
+ rt_from_file (const char *filename, int *r_found, int *r_openpgp)
+ {
 +  struct stat st;
 +  KeydbResourceType rt;
 +  dotlock_t lockhd;
@@ -1314,12 +1341,30 @@
 +static KeydbResourceType
 +rt_from_file_1 (const char *filename, int *r_found, int *r_openpgp)
 +#else /*!__wasi__*/
- static KeydbResourceType
- rt_from_file (const char *filename, int *r_found, int *r_openpgp)
++static KeydbResourceType
++rt_from_file (const char *filename, int *r_found, int *r_openpgp)
 +#endif /*!__wasi__*/
- {
++{
    u32 magic;
    unsigned char verbuf[4];
+   estream_t fp;
+   KeydbResourceType rt = KEYDB_RESOURCE_TYPE_NONE;
+ 
+   *r_found = *r_openpgp = 0;
++#ifdef __wasi__
++  {
++    int fd = gnupg_wasi_open_file (filename, O_RDONLY | O_CLOEXEC);
++
++    fp = fd == -1 ? NULL : es_fdopen (fd, "rb");
++    if (!fp && fd != -1)
++      close (fd);
++  }
++#else
+   fp = es_fopen (filename, "rb");
++#endif
+   if (fp)
+     {
+       *r_found = 1;
 --- a/tools/gpgconf.c
 +++ b/tools/gpgconf.c
 @@ -655,6 +655,16 @@
@@ -1393,6 +1438,18 @@
    if (db_fd == -1 && (errno == EACCES
  #ifdef EROFS
                        || errno == EROFS
+@@ -791,7 +818,11 @@
+                       )
+       ) {
+       /* Take care of read-only trustdbs.  */
++#ifdef __wasi__
++      db_fd = gnupg_wasi_open_file (db_name, O_RDONLY | MY_O_BINARY);
++#else
+       db_fd = gnupg_open (db_name, O_RDONLY | MY_O_BINARY, 0);
++#endif
+       if (db_fd != -1 && !opt.quiet)
+           log_info (_("Note: trustdb not writable\n"));
+   }
 --- a/kbx/keybox-init.c
 +++ b/kbx/keybox-init.c
 @@ -20,8 +20,10 @@
@@ -1406,7 +1463,7 @@
  #include <assert.h>
  
  #include "keybox-defs.h"
-@@ -281,6 +283,36 @@
+@@ -281,12 +283,45 @@
  
    *rfp = NULL;
  
@@ -1425,11 +1482,14 @@
 +          errno = e;
 +        }
 +    }
-+  else if (mode == KEYBOX_LL_OPEN_UPDATE)
++  else
 +    {
-+      int fd = gnupg_wasi_open_file (fname, O_RDWR | O_CLOEXEC);
++      int up = mode == KEYBOX_LL_OPEN_UPDATE;
++      int fd = gnupg_wasi_open_file (fname, (up ? O_RDWR : O_RDONLY)
++                                            | O_CLOEXEC);
 +
-+      fp = fd == -1 ? NULL : es_fdopen (fd, "r+b,sequential");
++      fp = fd == -1 ? NULL : es_fdopen (fd, (up ? "r+b,sequential"
++                                                : "rb,sequential"));
 +      if (!fp && fd != -1)
 +        {
 +          int e = errno;
@@ -1438,11 +1498,17 @@
 +          errno = e;
 +        }
 +    }
-+  else
-+#endif
++#else
    fp = es_fopen (fname,
                   mode == KEYBOX_LL_OPEN_CREATE
                   ? "wb,sysopen,sequential" :
+                  mode == KEYBOX_LL_OPEN_UPDATE
+                  ? "r+b,sysopen,sequential" :
+                  "rb,sysopen,sequential");
++#endif
+   if (!fp)
+     return gpg_error_from_syserror ();
+ 
 --- a/g10/openfile.c
 +++ b/g10/openfile.c
 @@ -398,8 +398,14 @@
@@ -1505,7 +1571,46 @@
  
 --- a/g10/keyring.c
 +++ b/g10/keyring.c
-@@ -1321,7 +1321,23 @@
+@@ -24,6 +24,9 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <unistd.h>
++#ifdef __wasi__
++#include <fcntl.h>
++#endif
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ 
+@@ -368,6 +371,28 @@
+ 
+ 
+ 
++#ifdef __wasi__
++static iobuf_t
++wasi_keyring_open (const char *fname)
++{
++  iobuf_t a;
++  int e, fd;
++
++  fd = gnupg_wasi_open_file (fname, O_RDONLY | O_CLOEXEC);
++  if (fd == -1)
++    return NULL;
++  a = iobuf_fdopen (fd, "rb");
++  if (!a)
++    {
++      e = errno;
++      close (fd);
++      errno = e;
++    }
++  return a;
++}
++#define iobuf_open(fname) wasi_keyring_open (fname)
++#endif
++
+ /*
+  * Return the last found keyblock.  Caller must free it.
+  * The returned keyblock has the kbode flag bit 0 set for the node with
+@@ -1321,7 +1346,23 @@
        gpg_err_set_errno (EPERM);
      }
    else
@@ -1530,7 +1635,7 @@
    umask (oldmask);
    if (!*r_fp)
      {
-@@ -1352,6 +1368,9 @@
+@@ -1352,6 +1393,9 @@
    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)bakfname );
    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)fname );
  
@@ -1540,7 +1645,7 @@
    /* First make a backup file. */
    block = 1;
    rc = gnupg_rename_file (fname, bakfname, &block);
-@@ -1359,7 +1378,11 @@
+@@ -1359,7 +1403,11 @@
      goto fail;
  
    /* then rename the file */
@@ -1552,7 +1657,7 @@
    if (block)
      {
        gnupg_unblock_all_signals ();
-@@ -1378,7 +1401,12 @@
+@@ -1378,7 +1426,12 @@
  
      statbuf.st_mode=S_IRUSR | S_IWUSR;
  
@@ -1565,7 +1670,7 @@
        ;
      else
        log_error ("WARNING: unable to restore permissions to '%s': %s",
-@@ -1634,7 +1662,23 @@
+@@ -1634,7 +1687,23 @@
              gpg_err_set_errno (EPERM);
          }
          else
@@ -1589,7 +1694,7 @@
  	umask(oldmask);
  	if( !newfp )
  	  {
-@@ -1659,6 +1703,9 @@
+@@ -1659,6 +1728,9 @@
  	    log_error ("%s: close failed: %s\n", fname, strerror(errno));
  	    return rc;
  	}
