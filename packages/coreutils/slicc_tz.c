@@ -4,9 +4,6 @@
 #include <string.h>
 #include <time.h>
 
-void _localtime_js(time_t t, struct tm *tm);
-void _tzset_js(long *timezone, int *daylight, char *std_name, char *dst_name);
-time_t _mktime_js(struct tm *tm);
 void _gmtime_js(time_t t, struct tm *tm);
 
 EM_JS(int, slicc_tz_intl, (const char *name, double t, char *abbr, int abbrlen), {
@@ -110,7 +107,6 @@ struct zone {
 static char key[160];
 static int have_key;
 static struct zone cur;
-static char host_std[17], host_dst[17];
 static char abbr_buf[32];
 static char names[16][32];
 static int nnames;
@@ -255,22 +251,13 @@ static int in_dst(const struct zone *z, long long t) {
 static void load(void) {
   const char *tz = getenv("TZ");
   char want[sizeof key];
-  if (!tz) strcpy(want, "\001host");
-  else {
-    strncpy(want, tz, sizeof want - 1);
-    want[sizeof want - 1] = 0;
-  }
+  if (!tz) tz = "";
+  strncpy(want, tz, sizeof want - 1);
+  want[sizeof want - 1] = 0;
   if (have_key && !strcmp(want, key)) return;
   strcpy(key, want);
   have_key = 1;
   memset(&cur, 0, sizeof cur);
-  if (!tz) {
-    cur.kind = 0;
-    long tzv;
-    int dl;
-    _tzset_js(&tzv, &dl, host_std, host_dst);
-    return;
-  }
   if (!*tz) {
     cur.kind = 1;
     strcpy(cur.std, "UTC");
@@ -303,12 +290,6 @@ static void zone_at(long long t, long *gmt, int *dst, const char **name) {
 
 void tzset(void) {
   load();
-  if (cur.kind == 0) {
-    _tzset_js(&timezone, &daylight, host_std, host_dst);
-    tzname[0] = host_std;
-    tzname[1] = host_dst;
-    return;
-  }
   if (cur.kind == 1) {
     timezone = -cur.std_gmt;
     daylight = cur.has_dst;
@@ -328,11 +309,6 @@ void tzset(void) {
 
 struct tm *__localtime_r(const time_t *restrict t, struct tm *restrict tm) {
   tzset();
-  if (cur.kind == 0) {
-    _localtime_js(*t, tm);
-    tm->__tm_zone = tm->tm_isdst ? host_dst : host_std;
-    return tm;
-  }
   long gmt;
   int dst;
   const char *name;
@@ -349,7 +325,6 @@ struct tm *localtime_r(const time_t *restrict t, struct tm *restrict tm) { retur
 
 time_t mktime(struct tm *tm) {
   tzset();
-  if (cur.kind == 0) return _mktime_js(tm);
   int want = tm->tm_isdst;
   struct tm u = *tm;
   time_t wall = timegm(&u);
