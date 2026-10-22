@@ -20,6 +20,15 @@ tar -xzf "$TB" -C "$SRC" --strip-components=1
 grep -q 'project(binaryen LANGUAGES C CXX VERSION 132)' "$SRC/CMakeLists.txt"
 
 eval "$(bash "$ROOT/scripts/emscripten-tree.sh" "$WORK/binaryen-em")"
+for p in "$ROOT"/packages/wasm-emscripten/package-patches/*.patch; do
+  echo "  package patch $(basename "$p")"
+  patch -d "$EMSCRIPTEN_TREE" -p1 --batch --no-backup-if-mismatch -s < "$p"
+done
+if find "$EMSCRIPTEN_TREE" -name '*.rej' -o -name '*.orig' | grep -q .; then
+  echo "homescoop: package patch leftovers in $EMSCRIPTEN_TREE" >&2
+  exit 1
+fi
+grep -q 'nlinks <= {{{ cDefs.SYMLOOP_MAX }}}' "$EMSCRIPTEN_TREE/src/lib/libfs.js"
 export EM_CONFIG="$EMSCRIPTEN_TREE_CONFIG"
 EMCC=(python3 "$EMSCRIPTEN_TREE/emcc.py")
 EMXX=(python3 "$EMSCRIPTEN_TREE/em++.py")
@@ -69,6 +78,7 @@ LDFLAGS_REALM=(
   --js-library "$ROOT/shims/slicc/slicc-writev.js"
   --js-library "$ROOT/shims/slicc/slicc-linkat.js"
   --js-library "$ROOT/shims/slicc/slicc-uname.js"
+  --js-library "$ROOT/shims/slicc/slicc-env.js"
   "--extern-post-js=$POST_JS"
   -Wl,-u,slicc_cred_euid "$CRED"
 )
@@ -93,6 +103,12 @@ relink_one() {
   grep -q sliccKernel "$OUT/$name"
   grep -q "!Module\['noInitialRun'\]" "$OUT/$name"
   grep -q 'slicc_cred_js' "$OUT/$name"
+  if grep -Eq "USER['\"]?[[:space:]]*:[[:space:]]*['\"]web_user" "$OUT/$name"; then
+    echo "homescoop: $name links Emscripten's getEnvStrings placeholders instead of slicc-env.js (homescoop#1530)" >&2
+    exit 1
+  fi
+  grep -Eq 'ENV\[x\] ?!== ?undefined' "$OUT/$name"
+  grep -Eq 'nlinks <= ?40' "$OUT/$name"
   if LC_ALL=C grep -aEq '/(home|Users|__w|private/var)/' "$OUT/$name.wasm"; then
     echo "homescoop: $name.wasm names a build path" >&2
     exit 1
@@ -131,6 +147,7 @@ homescoop_notice "Emscripten 6.0.9 (runtime and system libraries)" \
   "$EMSCRIPTEN_TREE/LICENSE" - \
   "$EMSCRIPTEN_TREE/system/lib/libc/musl/COPYRIGHT" - \
   "$EMSCRIPTEN_TREE/system/lib/libcxx/LICENSE.TXT" -
+homescoop_notice_slicc_shims
 homescoop_notice "FP16 (third_party/FP16; MIT)" "$SRC/third_party/FP16/LICENSE" -
 du -sh "$PKG/bin"/wasm-opt.wasm
 node "$ROOT/scripts/smoke-binaryen.mjs"

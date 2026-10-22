@@ -67,6 +67,8 @@ test('shimNoticeErrors: a wasm with the shims needs the section, its Apache text
   assert.match(errs('bin/cmake.wasm', files, '# Third-party notices\n\n## Emscripten 6.0.9\n', 'cmake')[0], /no "## homescoop: … slicc shims/, 'cmake without the notice fails (homescoop#1533)');
   assert.ok(!('wasm-clang' in KNOWN_WITHOUT_SHIM_NOTICE), 'wasm-clang writes the shims notice since 24.0.0-25 (homescoop#1535)');
   assert.match(errs('bin/llvm.wasm', files, '# Third-party notices\n\n## Emscripten 6.0.9\n', 'wasm-clang')[0], /no "## homescoop: … slicc shims/, 'wasm-clang without the notice fails (homescoop#1535)');
+  assert.ok(!('wasm-binaryen' in KNOWN_WITHOUT_SHIM_NOTICE), 'wasm-binaryen writes the shims notice since 132.0.0-7 (homescoop#1534)');
+  assert.match(errs('bin/wasm-opt.wasm', files, '# Third-party notices\n\n## Emscripten 6.0.9\n', 'wasm-binaryen')[0], /no "## homescoop: … slicc shims/, 'wasm-binaryen without the notice fails (homescoop#1534)');
   assert.ok(Buffer.from('\0asm..slicc_sig_mask..').includes(SLICC_SHIM_MARK));
 });
 

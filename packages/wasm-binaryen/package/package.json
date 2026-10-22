@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-binaryen",
-  "version": "132.0.0-6",
+  "version": "132.0.0-7",
   "description": "Binaryen's wasm-opt and other WebAssembly tools, which Emscripten uses to optimize and finish its output.",
   "license": "Apache-2.0",
   "repository": {
