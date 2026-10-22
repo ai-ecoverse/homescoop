@@ -15,6 +15,13 @@
  * Peers each recipe's cert/meta.json `needs`, plus wasm-bash and
  * wasm-coreutils for a shell, come from npm and are installed first.
  *
+ * The pipeline runs it from the head's checkout for both sides
+ * (node "$GITHUB_WORKSPACE/scripts/review-browser.mjs"), in the side's tree
+ * as the working directory, so a base from before this script still gets
+ * its browsers: the side's tree (the cwd) gives the recipes' cert/meta.json
+ * and npm-tag and the cert kernel, and this script's own checkout gives the
+ * harness page and the spec context.
+ *
  * It starts a detached server (`review-browser.mjs serve <plan.json>`) that
  * serves the page, drives the browser over CDP, and then answers the cert
  * spec context (ctx.run, ctx.write, ctx.read, ctx.pty, …) over HTTP, as the
@@ -123,14 +130,15 @@ function modesOf(base, names) {
 }
 
 function npmTagOf(recipe, tree) {
-  const r = spawnSync('node', [join(tree, 'scripts/npm-tag.mjs'), recipe], { encoding: 'utf8', cwd: tree });
+  const own = existsSync(join(tree, 'scripts/npm-tag.mjs')) ? tree : root;
+  const r = spawnSync('node', [join(own, 'scripts/npm-tag.mjs'), recipe], { encoding: 'utf8', cwd: tree });
   return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : 'latest';
 }
 
 /** Everything the server needs, resolved in the hook (npm packs, untars). */
-export function planBrowser({ side, link, cdp, artifacts, tree = root, work }) {
+export function planBrowser({ side, link, cdp, artifacts, tree = process.cwd(), work }) {
   const built = builtPackages(artifacts);
-  const plan = { side, link, cdp, tree, work, packages: [], peers: [], skipped: [], kernel: null, users: null };
+  const plan = { side, link, cdp, tree, page: join(root, 'scripts', 'browser-cert', 'page'), work, packages: [], peers: [], skipped: [], kernel: null, users: null };
   if (!built.length) return { ...plan, none: `no host-<recipe>-prN artifact in ${artifacts || 'SLICC_ARTIFACTS (unset)'}` };
   const metas = [];
   const names = [];
@@ -268,7 +276,7 @@ async function serve(planFile) {
   const write = (more) => writeFileSync(statusFile, `${JSON.stringify(Object.assign(status, more), null, 2)}\n`);
   try {
     const installs = [...plan.peers, ...plan.packages].map((p) => ({ ...p, dir: `node_modules/${p.name}/` }));
-    const page = await staticServer([['/dist/', plan.kernel.dist], ...installs.map((p) => [`/${p.dir}`, p.root]), ['/', join(plan.tree, 'scripts', 'browser-cert', 'page')]]);
+    const page = await staticServer([['/dist/', plan.kernel.dist], ...installs.map((p) => [`/${p.dir}`, p.root]), ['/', plan.page]]);
     const { send } = await cdpSession(plan.cdp, log);
     const { targetId } = await send('Target.createTarget', { url: page });
     const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });

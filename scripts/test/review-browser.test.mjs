@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { ARTIFACT, builtPackages, kernelFor, locator, peerSpecs, SHELL } from '../review-browser.mjs';
+import { ARTIFACT, builtPackages, kernelFor, locator, peerSpecs, planBrowser, SHELL } from '../review-browser.mjs';
 
 const script = fileURLToPath(new URL('../review-browser.mjs', import.meta.url));
 const workflow = readFileSync(fileURLToPath(new URL('../../.github/workflows/ladder-build.yml', import.meta.url)), 'utf8');
@@ -71,6 +71,21 @@ test('the hook always exits 0 and reports what it could not do', () => {
 });
 
 test('ladder-build.yml hands the reviewers the tarballs and cert reports, and runs this hook', () => {
-  assert.match(workflow, /\n {6}review-browser: node scripts\/review-browser\.mjs\n/);
+  assert.match(workflow, /\n {6}review-browser: node "\$GITHUB_WORKSPACE\/scripts\/review-browser\.mjs"\n/, "the head's copy runs for both sides, so a base without the hook still gets its browsers");
   assert.match(workflow, /\n {6}artifacts: \$\{\{ github\.event_name == 'pull_request' && format\('@\(host\|cert\)-\*-pr\{0\}', github\.event\.pull_request\.number\) \|\| '' \}\}\n/);
+});
+
+test('the side tree is the cwd: a base without review-browser.mjs or npm-tag.mjs still plans, with the head copy\'s page', () => {
+  const base = mkdtempSync(join(tmpdir(), 'review-browser-base-'));
+  const work = mkdtempSync(join(tmpdir(), 'review-browser-work-'));
+  const cwd = process.cwd();
+  process.chdir(base);
+  try {
+    const plan = planBrowser({ side: 'base', link: 'extension', cdp: 'http://127.0.0.1:1', artifacts: join(base, 'none'), work });
+    assert.equal(plan.tree, realpathSync(base));
+    assert.equal(plan.page, fileURLToPath(new URL('../browser-cert/page', import.meta.url)));
+    assert.match(plan.none, /no host-<recipe>-prN artifact/);
+  } finally {
+    process.chdir(cwd);
+  }
 });

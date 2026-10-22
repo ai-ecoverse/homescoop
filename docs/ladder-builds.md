@@ -57,7 +57,7 @@ empty.
 **The reviewers run the new packages.** The pipeline's `artifacts` input
 (`@(host|cert)-*-pr<N>`) hands each reviewer this run's tarballs and cert
 reports in `$RUNNER_TEMP/review/artifacts/`. For each of the pipeline's four
-review browsers, `review-browser` (`node scripts/review-browser.mjs`) boots a
+review browsers, `review-browser` (the head's `scripts/review-browser.mjs`, run in each side's tree, so a base from before the hook still gets its browsers) boots a
 slicc-kernel page (the cert harness's `scripts/browser-cert/page`) and
 installs the packages: on the **head** side this PR's tarballs, on the
 **base** side the same names from npm (the recipe's `npm-tag:`, else

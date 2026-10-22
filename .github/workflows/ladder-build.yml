@@ -806,7 +806,7 @@ jobs:
   pipeline:
     needs: [detect, recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert, shims, emsdk-cache, crates-host, crates-kernel, crates-consumer, group]
     if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
-    uses: ai-ecoverse/slicc-shared-web/.github/workflows/pipeline.yml@4d2c85a1f435e5711c75ccdbf6d5b5badfc94b66
+    uses: ai-ecoverse/slicc-shared-web/.github/workflows/pipeline.yml@v2.10.1
     secrets: inherit
     permissions:
       contents: write
@@ -830,7 +830,7 @@ jobs:
       test-glob: scripts/test/*.test.mjs
       shards: 4
       artifacts: ${{ github.event_name == 'pull_request' && format('@(host|cert)-*-pr{0}', github.event.pull_request.number) || '' }}
-      review-browser: node scripts/review-browser.mjs
+      review-browser: node "$GITHUB_WORKSPACE/scripts/review-browser.mjs"
       review-renovate: '*'
       review-timeout-minutes: 150
       review-prompt: |
@@ -844,7 +844,7 @@ jobs:
 
         What's set up:
         - `$RUNNER_TEMP/review/artifacts/host-<recipe>-pr<n>/package.tgz` (with its `package.tgz.sha256`, and `packaging-only-diff.txt` for a repack): the exact bytes that get published. `$RUNNER_TEMP/review/artifacts/cert-<recipe>-pr<n>/browser-cert.json`: that package's cert run (each `packages/<recipe>/cert/*.mjs` spec in slicc-kernel on its `cert/meta.json` kernel), when it has one.
-        - The review browsers: `scripts/review-browser.mjs` loaded the built packages into a slicc-kernel page in each one. Head: this pull request's tarballs. Base: the same names from npm (the recipe's `npm-tag:`, else `latest`), the baseline; a new package has none. The extension browsers boot the cert kernel (root `package.json`'s `@ai-ecoverse/slicc-kernel`), the cli browsers slicc-kernel's npm `latest`. wasm-bash, wasm-coreutils and each recipe's `cert/meta.json` `needs` are installed from npm too. `$RUNNER_TEMP/review/homescoop/<side>-<link>.json` describes each (`state`, `packages` with sha256 and source, `kernel`, `skipped`, `page`, `log`), and `ctx` is its URL: `GET <ctx>` describes it; `POST <ctx>ctx/<call>` with a JSON array of arguments calls the same `ctx` the cert specs get, for example `curl -s <ctx>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/readBytes`, `ctx/pty` and `ctx/addUser` (see `scripts/browser-cert/context.mjs`). Run the same thing on head and base: what fails the same way on the baseline is pre-existing and never blocks. You can also drive the page over CDP (`window.kernel`) and screenshot it.
+        - The review browsers: `scripts/review-browser.mjs` (the head's copy, for both sides) loaded the built packages into a slicc-kernel page in each one. Head: this pull request's tarballs. Base: the same names from npm (the recipe's `npm-tag:`, else `latest`), the baseline; a new package has none. The extension browsers boot the cert kernel (root `package.json`'s `@ai-ecoverse/slicc-kernel`), the cli browsers slicc-kernel's npm `latest`. wasm-bash, wasm-coreutils and each recipe's `cert/meta.json` `needs` are installed from npm too. `$RUNNER_TEMP/review/homescoop/<side>-<link>.json` describes each (`state`, `packages` with sha256 and source, `kernel`, `skipped`, `page`, `log`), and `ctx` is its URL: `GET <ctx>` describes it; `POST <ctx>ctx/<call>` with a JSON array of arguments calls the same `ctx` the cert specs get, for example `curl -s <ctx>ctx/run -d '[["sqlite3", "--version"], {"cwd": "/home"}]'`, `ctx/write`, `ctx/read`, `ctx/readBytes`, `ctx/pty` and `ctx/addUser` (see `scripts/browser-cert/context.mjs`). Run the same thing on head and base: what fails the same way on the baseline is pre-existing and never blocks. You can also drive the page over CDP (`window.kernel`) and screenshot it.
         - A spec of your own: put it in a directory and run `node scripts/browser-cert/run.mjs --package <recipe> --tarball <package.tgz> --cert <dir> [--kernel @ai-ecoverse/slicc-kernel@<version>] [--users enforce] [--json <out.json>]` (`docs/ci-cert.md` and `scripts/browser-cert/README.md` have the spec API).
         - `npm view` and `npm pack` reach the registry, for the version on npm today and its tarball.
 
