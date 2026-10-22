@@ -35,15 +35,15 @@ test('no artifact of this run: the registry spec of the recipe version', () => {
   });
 });
 
-test('the ladder-pr artifact in .homescoop-out/peers, and cert-review\'s in RUNNER_TEMP/artifacts', () => {
+test('the cert job\'s peer in .homescoop-out/peers, and the reviewers\' in RUNNER_TEMP/review/artifacts', () => {
   fixture((base, art) => {
     const tgz = art(join(base, '.homescoop-out/peers'), 'host-wasm-go-std-wasip1-pr742', good);
     assert.equal(peerTarball('wasm-go-std-wasip1', { env: {}, base }), tgz);
   });
   fixture((base, art) => {
     const tmp = join(base, 'runner');
-    const tgz = art(join(tmp, 'artifacts'), 'host-wasm-go-std-wasip1-pr742', good);
-    art(join(tmp, 'artifacts'), 'host-wasm-go-pr742', { name: '@ai-ecoverse/wasm-go', version: '1.27.2-1' });
+    const tgz = art(join(tmp, 'review', 'artifacts'), 'host-wasm-go-std-wasip1-pr742', good);
+    art(join(tmp, 'review', 'artifacts'), 'host-wasm-go-pr742', { name: '@ai-ecoverse/wasm-go', version: '1.27.2-1' });
     assert.equal(peerTarball('wasm-go-std-wasip1', { env: { RUNNER_TEMP: tmp }, base }), tgz);
   });
 });

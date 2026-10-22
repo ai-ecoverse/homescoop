@@ -12,7 +12,7 @@ export function peerDirs(env = process.env, base = root) {
   return [
     env.HOMESCOOP_CERT_PEERS,
     join(base, '.homescoop-out/peers'),
-    env.RUNNER_TEMP && join(env.RUNNER_TEMP, 'artifacts'),
+    env.RUNNER_TEMP && join(env.RUNNER_TEMP, 'review', 'artifacts'),
   ].filter(Boolean).map((d) => resolve(d));
 }
 

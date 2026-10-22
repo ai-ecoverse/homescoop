@@ -245,7 +245,7 @@ export function useBaseCerts(all, base, out, { cwd = root, git = (a) => must('gi
     if (!r) continue;
     const there = spawnSync('git', ['cat-file', '-e', `${base}:packages/${dir}/cert`], { cwd }).status === 0;
     if (!there) {
-      Object.assign(r, { specs: [], meta: {}, skip: `cert/ is new in this change; its cert-review runs it on the new tarball` });
+      Object.assign(r, { specs: [], meta: {}, skip: `cert/ is new in this change; its PR's cert job runs it on the new tarball` });
       notes.push(`${dir}: cert/ is new here, skipped`);
       continue;
     }
@@ -262,7 +262,7 @@ export function useBaseCerts(all, base, out, { cwd = root, git = (a) => must('gi
 }
 
 async function github(path, accept) {
-  const headers = { Accept: accept, 'User-Agent': 'homescoop-kernel-compat', 'X-GitHub-Api-Version': '2022-11-28' };
+  const headers = { Accept: accept, 'User-Agent': 'homescoop-compat', 'X-GitHub-Api-Version': '2022-11-28' };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   for (let attempt = 1; ; attempt++) {
     const r = await fetch(`https://api.github.com/${path}`, { headers });
@@ -572,7 +572,6 @@ async function plan(args) {
   for (const s of doc.skipped) console.log(`skip ${s.package}@${s.version ?? '-'} (${s.origin.join(',')}): ${s.reason}`);
   args.gateSummary = `${units.length} items in ${n} shard(s), ${doc.skipped.length} skipped; slicc-bios base ${bios.base.length}, catalog ${bios.catalog.length} (${bios.pinned} pinned, ${bios.latest} at npm latest)`;
   output('tag', tag);
-  output('artifact', `kernel-compat-${tag}`);
   output('shards', JSON.stringify(bins.map((_, k) => k)));
   output('count', String(n));
   output('homescoop-sha', homescoopSha);
@@ -1171,7 +1170,7 @@ function report(args) {
 
   const k = plan.kernel;
   const md = [];
-  md.push(`## kernel-compat: ${k.name}@${k.version} ${ICON[verdict === 'regression' ? 'regression' : verdict]} ${verdict}`);
+  md.push(`## compat: ${k.name}@${k.version} ${ICON[verdict === 'regression' ? 'regression' : verdict]} ${verdict}`);
   md.push('');
   md.push(`- candidate: \`${k.spec}\` → ${k.name}@${k.version}, sha256 \`${k.sha256}\`${k.gitHead ? `, gitHead \`${k.gitHead}\`` : ''}`);
   md.push(plan.reference.origin === 'input'
@@ -1259,7 +1258,7 @@ function report(args) {
   console.log(text);
   const ran = results.filter((r) => r.verdict !== 'skip').length + sweepOut.filter((r) => r.verdict !== 'skip').length;
   if (!ran) {
-    console.log(`::error::kernel-compat: the report has 0 rows that ran (${results.length + sweepOut.length} skipped); a run that tested nothing is not a pass`);
+    console.log(`::error::compat: the report has 0 rows that ran (${results.length + sweepOut.length} skipped); a run that tested nothing is not a pass`);
     console.log('compat report: FAIL 0 rows');
     process.exit(1);
   }
@@ -1267,7 +1266,7 @@ function report(args) {
   output('verdict', verdict);
   output('regressions', String(regressions));
   if (errors.length) {
-    console.log(`::error::kernel-compat could not answer for ${errors.length} item(s): ${errors.join('; ').slice(0, 1000)}`);
+    console.log(`::error::compat could not answer for ${errors.length} item(s): ${errors.join('; ').slice(0, 1000)}`);
     process.exit(1);
   }
   if (expected.length) {

@@ -177,7 +177,7 @@ test('a re-rolled archive whose tree matches needs --reroll, then refreshes with
   }
 });
 
-test('a shallow checkout with no origin/main (ladder-pr build jobs) compares a re-roll against the base tip, not "can\'t resolve the base"', () => {
+test('a shallow checkout with no origin/main (ladder-build build jobs) compares a re-roll against the base tip, not "can\'t resolve the base"', () => {
   const f = rerollFixture();
   const clone = mkdtempSync(join(tmpdir(), 'recipe-sha-shallow-'));
   try {

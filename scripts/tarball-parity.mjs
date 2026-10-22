@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Compare two package tarballs entry by entry: path, type, mode, link and
- * content. Shared by npm-parity (a build against the published version) and
- * pool-parity (a pool build against its hosted twin).
+ * content. Shared by npm-parity (a build against the published version) and,
+ * by hand, a pool build against its hosted twin (docs/ladder-builds.md).
  *
  *   node scripts/tarball-parity.mjs <a.tgz> <b.tgz> [--labels <a>,<b>]
  *

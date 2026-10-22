@@ -81,7 +81,7 @@ test('NEGATIVE: a line that fails only on the candidate is a regression, whateve
 
 test('known-limits: wasix-gnupg concurrent.mjs has no known-limit any more (bios pins 2.4.9-10 since slicc-bios#496)', () => {
   // #926, #985, #1064 and #1100 covered bios's 2.4.9-5 pin, which predates the concurrent-import fixes. bios pins
-  // 2.4.9-10 since slicc-bios#496 (22fa913), so kernel-compat holds every wasix-gnupg version to the whole spec again.
+  // 2.4.9-10 since slicc-bios#496 (22fa913), so compat.mjs holds every wasix-gnupg version to the whole spec again.
   const limits = JSON.parse(readFileSync(new URL('../browser-cert/known-limits.json', import.meta.url), 'utf8')).limits;
   const facts = (version, text) => ({ package: '@ai-ecoverse/wasix-gnupg', recipe: 'wasix-gnupg', spec: 'concurrent.mjs', version, kernel: '1.124.2', users: 'off', text });
   for (const v of ['2.4.9-5', '2.4.9-8', '2.4.9-9', '2.4.9-10', '2.4.9-11']) {

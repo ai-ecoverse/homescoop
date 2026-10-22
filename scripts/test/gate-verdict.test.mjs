@@ -153,7 +153,7 @@ function compatReport(t, { skipped = [], sweepRows = null }) {
   return spawnSync(node, [gate, 'compat report', '--', node, join(root, 'scripts/browser-cert/compat.mjs'), 'report', '--plan', join(dir, 'plan', 'plan.json'), '--results', join(dir, 'results'), '--out', join(dir, 'out')], { encoding: 'utf8', env });
 }
 
-test('NEGATIVE: a kernel-compat report where nothing ran fails; one with only base-sweep rows passes', (t) => {
+test('NEGATIVE: a compat.mjs report where nothing ran fails; one with only base-sweep rows passes', (t) => {
   const none = compatReport(t, { skipped: [{ package: '@ai-ecoverse/wasm-x', recipe: 'x', version: '1.0.0-1', origin: ['base'], reason: 'no recipe' }] });
   assert.equal(none.status, 1, none.stdout + none.stderr);
   assert.match(none.stdout, /compat report: FAIL 0 rows/);

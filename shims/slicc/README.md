@@ -54,7 +54,7 @@ Keep `homescoop_em_cli_ldflags` (`ENVIRONMENT=web,worker,node`, `EXIT_RUNTIME`,
 ## Tests
 
 `test/` builds small programs against the shim profiles and runs them on
-slicc-kernel's headless Node entry (CI: `.github/workflows/slicc-shims.yml`):
+slicc-kernel's headless Node entry (CI: the `shims` job of `.github/workflows/ladder-build.yml`):
 
 ```bash
 cd shims/slicc/test && ./build.sh && npm ci && npm test

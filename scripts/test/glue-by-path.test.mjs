@@ -23,7 +23,7 @@ test('glueTargets: one entry per distinct glue file, none for wasm-only commands
   assert.deepEqual(glueTargets({}), []);
 });
 
-test('glueCheckPlan: ladder-pr runs it; kernel-compat (--soft), --live, old kernels, users off and an opt-out skip it', () => {
+test('glueCheckPlan: the ladder-build cert runs it; compat.mjs (--soft), --live, old kernels, users off and an opt-out skip it', () => {
   assert.equal(glueCheckPlan(ok).run, true);
   assert.equal(glueCheckPlan({ ...ok, users: '', kernelVersion: '1.74.0' }).run, true);
   for (const [over, why] of [

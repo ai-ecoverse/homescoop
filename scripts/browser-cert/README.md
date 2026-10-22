@@ -32,5 +32,36 @@ node scripts/browser-cert/run.mjs --package jq --tarball wasm-jq-1.8.2-2.tgz \
   --kernel @ai-ecoverse/slicc-kernel@1.81.0 --users off --json /tmp/jq.json
 ```
 
-`compat.mjs` (`plan`, `shard`, `report`) drives the
-kernel-compat jobs; see [docs/ci-cert.md](../../docs/ci-cert.md#kernel-compatibility-kernel-compatyml).
+## By hand: no workflow runs these any more
+
+The workflows that ran `compat.mjs`, `base-sweep/` and `selftest/` are gone
+since #1697; `ladder-build.yml` runs only `run.mjs` and `cert-leg.mjs` (a PR's
+own packages on the cert kernel) and the reviewers' browsers. These stay
+because they still work by hand.
+
+**Kernel compatibility** (do the published packages still pass their cert
+specs on kernel X?): `compat.mjs` plans the published packages of slicc-bios's
+base set and the `scripts/ci-certified.json` set (`--set`, default
+`base,ci-certified`), runs each shard of the plan (the specs, and the base
+sweep `base-sweep/` under users `report` and `enforce`), and writes one
+report. `known-limits.json` and `timings.json` are its inputs. `--soft` is how
+it calls `run.mjs`: published packages that still ship 0644 glue skip the
+glue-by-path check. See [docs/ci-cert.md](../../docs/ci-cert.md#kernel-compatibility-scriptsbrowser-certcompatmjs).
+
+```sh
+node scripts/browser-cert/compat.mjs plan --kernel @ai-ecoverse/slicc-kernel@<version> --out /tmp/kc/plan
+for i in $(node -e 'console.log(JSON.parse(require("fs").readFileSync("/tmp/kc/plan/plan.json","utf8")).shards.map((_, i) => i).join(" "))'); do
+  node scripts/browser-cert/compat.mjs shard --plan /tmp/kc/plan/plan.json --index "$i" --out /tmp/kc/out
+done
+node scripts/browser-cert/compat.mjs report --plan /tmp/kc/plan/plan.json --results /tmp/kc/out --out /tmp/kc/report
+```
+
+**The harness's own specs** (`selftest/`: `ctx.serveWs`, `ctx.write` and
+`ctx.readBytes`), after a change to `context.mjs`, `run.mjs` or `page/`, on
+npm `latest` of wasm-curl with `selftest/meta.json`'s `needs` installed in
+`$HOMESCOOP_CERT_NODE_MODULES`:
+
+```sh
+npm pack @ai-ecoverse/wasm-curl --pack-destination /tmp/curl
+node scripts/browser-cert/run.mjs --package curl --tarball /tmp/curl/*.tgz --cert scripts/browser-cert/selftest
+```

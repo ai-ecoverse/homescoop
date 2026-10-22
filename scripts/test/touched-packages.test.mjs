@@ -145,7 +145,7 @@ test('classify: rebuild for every built recipe unless it says reproducible: fals
   }
 });
 
-test('classify --all: every recipe but the retired ones, as if all were touched (pool-parity)', () => {
+test('classify --all: every recipe but the retired ones, as if all were touched', () => {
   const f = fixture({
     pooled: { recipe: 'name: pooled\nbuilder: host\nrunner: pool\n' },
     repack: { recipe: 'name: repack\nbuilder: host\nrepack:\n  from: "1.0.0-1"\n' },

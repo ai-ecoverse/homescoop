@@ -20,7 +20,7 @@ export function glueCheckPlan({ soft, live, modes, users, kernelVersion, meta, m
   const targets = glueTargets(manifest);
   const skip = (why) => ({ run: false, why, targets });
   if (live) return skip('--live');
-  if (soft) return skip('--soft (kernel-compat runs published packages, some still ship 0644 glue)');
+  if (soft) return skip('--soft (compat.mjs runs published packages, some still ship 0644 glue)');
   if (meta?.glueByPath === false) return skip('cert/meta.json glueByPath: false');
   if (!targets.length) return skip('no slicc.commands glue');
   if (modes !== 'tarball') return skip('the kernel keeps its default modes (no kernel.chmod before slicc-kernel 1.86.0)');

@@ -7,98 +7,12 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { discover, pick } from '../cert-review/artifacts.mjs';
 import { LADDER, githubIo, resolvePackage, tarballProblem, zipDigestProblem } from '../ladder-merge-resolve.mjs';
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 const workflows = join(scripts, '..', '.github', 'workflows');
-const RUN = 39060484635;
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const D = (s) => `sha256:${sha(s)}`;
-const art = (id, name, digest = D(name), extra = {}) => ({ id, name, digest, expired: false, workflow_run: { id: RUN }, ...extra });
-
-test('the normal single artifact passes, by its producer id and digest', () => {
-  const artifacts = [art(1, 'host-grep-pr7'), art(2, 'rebuild-grep-pr7')];
-  const r = pick({ artifacts, run: RUN, expect: [{ name: 'host-grep-pr7', id: '1', digest: sha('host-grep-pr7') }], guard: '^host-.+-pr7$' });
-  assert.deepEqual(r.problems, []);
-  assert.equal(r.ids, '1');
-});
-
-test('a planted extra artifact with a matching name fails the consumer', () => {
-  const artifacts = [art(1, 'host-grep-pr7'), art(9, 'host-wasix-gnupg-pr7')];
-  const r = pick({ artifacts, run: RUN, expect: [{ name: 'host-grep-pr7', id: 1, digest: D('host-grep-pr7') }], guard: '^host-.+-pr7$' });
-  assert.match(r.problems.join('\n'), /unexpected artifact host-wasix-gnupg-pr7 \(id 9\)/);
-});
-
-test('a digest mismatch fails', () => {
-  const artifacts = [art(1, 'cert-review-verdict-7', D('forged'))];
-  const r = pick({ artifacts, run: RUN, expect: [{ name: 'cert-review-verdict-7', id: 1, digest: sha('real') }] });
-  assert.match(r.problems.join('\n'), /digest sha256:[0-9a-f]+ is not the producer's sha256:/);
-});
-
-test("an artifact under the producer's name but another id (an overwrite) fails", () => {
-  const r = pick({ artifacts: [art(5, 'kc-plan')], run: RUN, expect: [{ name: 'kc-plan', id: 4, digest: D('kc-plan') }] });
-  assert.match(r.problems.join('\n'), /artifact 5 is not the producer's 4/);
-});
-
-test('an artifact whose producer reported no upload fails; a missing optional one does not', () => {
-  const planted = pick({ artifacts: [art(5, 'kc-shard-3')], run: RUN, expect: [{ name: 'kc-shard-3', optional: true }] });
-  assert.match(planted.problems.join('\n'), /exists, but its producer reported none/);
-  const missing = pick({ artifacts: [], run: RUN, expect: [{ name: 'kc-shard-3', optional: true }] });
-  assert.deepEqual(missing.problems, []);
-  assert.equal(missing.ids, '');
-});
-
-test('a producer id with no digest fails closed, and so does an artifact from another run', () => {
-  assert.match(pick({ artifacts: [art(1, 'x')], run: RUN, expect: [{ name: 'x', id: 1 }] }).problems.join('\n'), /no digest/);
-  const other = [art(1, 'x', D('x'), { workflow_run: { id: 1 } })];
-  assert.match(pick({ artifacts: other, run: RUN, expect: [{ name: 'x', id: 1, digest: D('x') }] }).problems.join('\n'), /from run 1/);
-});
-
-test('byName (a dynamic matrix, no producer ids): exactly one, and extras still fail', () => {
-  const ok = pick({ artifacts: [art(1, 'verdict-grep'), art(2, 'verdict-sed')], run: RUN, guard: '^verdict-', expect: ['grep', 'sed'].map((p) => ({ name: `verdict-${p}`, byName: true, optional: true })) });
-  assert.deepEqual(ok.problems, []);
-  assert.equal(ok.ids, '1,2');
-  const extra = pick({ artifacts: [art(1, 'verdict-grep'), art(3, 'verdict-evil')], run: RUN, guard: '^verdict-', expect: [{ name: 'verdict-grep', byName: true }] });
-  assert.match(extra.problems.join('\n'), /unexpected artifact verdict-evil/);
-});
-
-test('discover: one artifact per name with a digest, or it fails', () => {
-  const ok = discover({ artifacts: [art(1, 'host-grep-pr7'), art(2, 'rebuild-grep-pr7'), art(3, 'host-sed-pr7', D('x'), { expired: true })], pattern: '^host-(.+)-pr7$' });
-  assert.deepEqual(ok.problems, []);
-  assert.deepEqual(ok.found.map((f) => [f.name, f.id, f.match[1]]), [['host-grep-pr7', 1, 'grep']]);
-  const dup = discover({ artifacts: [art(1, 'host-grep-pr7'), art(2, 'host-grep-pr7')], pattern: '^host-(.+)-pr7$' });
-  assert.match(dup.problems.join('\n'), /2 artifacts with that name/);
-  const bare = discover({ artifacts: [art(1, 'host-grep-pr7', '')], pattern: '^host-(.+)-pr7$' });
-  assert.match(bare.problems.join('\n'), /no sha256 digest/);
-});
-
-test('artifacts.mjs prints its verdict line: FAIL on a planted extra (a fake API)', async (t) => {
-  const server = createServer((req, res) => {
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ total_count: 2, artifacts: [art(1, 'host-grep-pr7'), art(9, 'host-evil-pr7')] }));
-  });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  t.after(() => server.close());
-  const { port } = server.address();
-  const loader = `data:text/javascript,${encodeURIComponent(`const f=globalThis.fetch;globalThis.fetch=(u,o)=>f(String(u).replace('https://api.github.com','http://127.0.0.1:${port}'),o);`)}`;
-  const expect = JSON.stringify([{ name: 'host-grep-pr7', id: 1, digest: D('host-grep-pr7') }]);
-  const go = (guard) =>
-    new Promise((resolve) => {
-      const args = [join(scripts, 'cert-review', 'artifacts.mjs'), '--repo', 'o/r', '--run', String(RUN), '--expect', expect, ...(guard ? ['--guard', guard] : [])];
-      const p = spawn(process.execPath, ['--import', loader, join(scripts, 'gate.mjs'), 'artifact-pick', '--', process.execPath, '--import', loader, ...args], { env: { ...process.env, GH_TOKEN: 'x', GITHUB_OUTPUT: '' } });
-      let out = '';
-      p.stdout.on('data', (d) => (out += d));
-      p.stderr.on('data', (d) => (out += d));
-      p.on('close', (code) => resolve({ code, out }));
-    });
-  const bad = await go('^host-.+-pr7$');
-  assert.equal(bad.code, 1, bad.out);
-  assert.match(bad.out, /artifact-pick: FAIL .*unexpected artifact host-evil-pr7/);
-  const good = await go('');
-  assert.equal(good.code, 0, good.out);
-  assert.match(good.out, /artifact-pick: PASS run \d+: 1 artifact/);
-});
 
 const NAME = '@ai-ecoverse/wasm-grep';
 const VERSION = '3.12.0-2';
@@ -202,7 +116,7 @@ test('every artifact download in the workflows is by id, or listed here with its
       if (how[0] === 'artifact-ids') return;
       const key = `${file} ${how[0]}: ${how[1]}`;
       seen.push(key);
-      assert.ok(BY_NAME_OK.has(key), `${file}:${i + 1}: ${how[0]}: ${how[1]} is not by id; download by artifact-ids (scripts/cert-review/artifacts.mjs) or list it in BY_NAME_OK with why it is safe`);
+      assert.ok(BY_NAME_OK.has(key), `${file}:${i + 1}: ${how[0]}: ${how[1]} is not by id; download by artifact-ids or list it in BY_NAME_OK with why it is safe`);
     });
   }
   for (const key of BY_NAME_OK.keys()) assert.ok(seen.includes(key), `BY_NAME_OK lists ${key}, which no workflow has any more; drop it`);

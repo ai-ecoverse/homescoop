@@ -1,4 +1,4 @@
-// ladder-pr's rebuild builds in another directory, WORK and user name than
+// ladder-build's rebuild builds in another directory, WORK and user name than
 // host-build, so `reproducible` proves path independence (#668).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

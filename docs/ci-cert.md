@@ -76,7 +76,7 @@ Do **not** add `packages/<name>/cert/` stubs for blocked packages — any path u
 | findutils | 4.11.0 / gnulib getlocalename under emscripten; need `-exec`/`xargs -P` + wasm-coreutils |
 | py-numpy / py-scipy / py-pandas | wasix stage/release 404 on Renovate bumps; import/numeric smoke under wasix-python once artifacts exist |
 
-CI-certified set (automerge non-majors and kernel-compat's `ci-certified` set, not a publish gate): see `scripts/ci-certified.json`
+CI-certified set (automerge non-majors and `compat.mjs`'s `ci-certified` set, not a publish gate): see `scripts/ci-certified.json`
 (jq, xz, pkgconf, xxd, coreutils, gawk, sed, gzip, git, grep, procps, which).
 
 ## py-* python range
@@ -178,8 +178,8 @@ package is checked the way coreutils' and tar's `glue-mode.mjs` check theirs,
 without a spec of its own. It runs only where the answer means something:
 users `enforce` (the `meta.json` value, `--users`, or the kernel default from
 1.74), a kernel that stamps tarball modes (`modes: tarball`, slicc-kernel ≥
-1.86.0), and not under `--soft` (kernel-compat runs published packages, some
-of which still ship 0644 glue) or `--live`. `"glueByPath": false` in
+1.86.0), and not under `--soft` (`compat.mjs`, run by hand, runs published packages,
+some of which still ship 0644 glue) or `--live`. `"glueByPath": false` in
 `cert/meta.json` turns it off for one package. `@ai-ecoverse/wasm-tar@1.35.0-5`
 (0644 `bin/tar`) fails it on slicc-kernel 1.88.0 with
 `EACCES: /node_modules/@ai-ecoverse/wasm-tar/bin/tar`; 1.35.0-6 passes.
@@ -292,8 +292,8 @@ outer world only through an uplink (`ctx.uplink`), whose scripted peers
 answer once and close. websocat's outer `ws:`/`wss:` cert runs on the Node
 entry with host-side echo servers (`packages/wasix-websocat/test/uplink.mjs`).
 [`scripts/browser-cert/selftest/websocket.mjs`](../scripts/browser-cert/selftest/websocket.mjs)
-is the harness's own spec. `compat.mjs` runs it on npm `latest` of
-wasm-curl: curl's `ws:`/`wss:` receive side, plus bash speaking the frames
+is the harness's own spec. No workflow runs it; run it by hand on npm `latest` of
+wasm-curl ([scripts/browser-cert/README.md](../scripts/browser-cert/README.md#by-hand-no-workflow-runs-these-any-more)): curl's `ws:`/`wss:` receive side, plus bash speaking the frames
 by hand on `127.0.0.1:3128` for the send side.
 
 ### Tailnet: `ctx.uplink(config)`
@@ -318,14 +318,16 @@ const { asked, dialled, requests } = await ctx.uplinkLog(); // requests[i].head:
 
 ## Kernel compatibility: `scripts/browser-cert/compat.mjs`
 
-The `kernel-compat.yml` workflow (and its merge-queue proof) is retired with
-the move to one workflow. The question it asked, whether the **published**
-packages still pass their cert specs on kernel X, is still answered by
-`scripts/browser-cert/compat.mjs` (`plan`, `shard`, `report`), run by hand
-with the cert harness installed (`scripts/cert-review/harness.sh`); its
-`known-limits.json`, base sweep and self-test stay in `scripts/browser-cert/`.
-A PR's own packages are checked on the cert kernel by the `cert` job, and on
-slicc-kernel `latest` by the reviewers' cli browsers.
+Since #1697 no workflow checks a kernel against the **published** packages:
+`ladder-build.yml` is the only workflow. A PR's own packages are checked on
+the cert kernel by the `cert` job, and on slicc-kernel `latest` by the
+reviewers' cli browsers. Whether the published packages still pass their
+cert specs on kernel X is answered by hand with
+`scripts/browser-cert/compat.mjs` (`plan`, `shard`, `report`; the commands are
+in [scripts/browser-cert/README.md](../scripts/browser-cert/README.md#by-hand-no-workflow-runs-these-any-more)),
+for example before a cert-kernel bump in the root `package.json`; its
+`known-limits.json`, `timings.json` and base sweep stay in
+`scripts/browser-cert/`.
 
 ## Gate verdict lines
 
@@ -342,9 +344,7 @@ takes the PR's `host-<pkg>-prN` artifacts, keeps only those from a
 `ladder-build.yml` `pull_request` run at the merged head that concluded
 `success`, downloads the zip by artifact id, checks it against the
 artifact's digest, and checks `package.tgz` against its `package.tgz.sha256`
-and the merged package.json's name and version. `scripts/cert-review/artifacts.mjs`
-(gate `artifact-pick`) keeps the by-id-and-digest check for any future
-consumer. `scripts/test/artifact-consumers.test.mjs` fails on a `gh run download`
+and the merged package.json's name and version. `scripts/test/artifact-consumers.test.mjs` fails on a `gh run download`
 and on `merge-multiple: true` in the workflow.
 
 ## Review: slicc-shared-web's pipeline
