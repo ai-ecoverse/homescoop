@@ -53,6 +53,7 @@ out=
 # without any, the driver adds no link libraries, so `cc -v` doesn't run a
 # link of nothing over an a.out (homescoop#711).
 no_output=0
+no_link=0
 link_inputs=0
 takes_value=
 want_out=0
@@ -123,7 +124,8 @@ scan_arg() {
   esac
   case "$_a" in
     -c|-E|-S|-M|-MM) compile_only=1 ;;
-    -fsyntax-only | '-###' | --analyze | -emit-ast | -fdriver-only) no_output=1 ;;
+    -fsyntax-only | --analyze | -emit-ast) no_output=1; no_link=1 ;;
+    '-###' | -fdriver-only) no_output=1 ;;
     -shared) shared=1; PIC=yes ;;
     -fPIC|-fpic) PIC=yes ;;
     -rdynamic|-Wl,-rdynamic) rdynamic=1; PIC=yes ;;
@@ -373,7 +375,7 @@ trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
       "-D_WASI_EMULATED_MMAN" \
       "-D_WASI_EMULATED_SIGNAL" \
       "-D_WASI_EMULATED_PROCESS_CLOCKS"
-  elif [ "$compile_only" -eq 0 ]; then
+  elif [ "$compile_only" -eq 0 ] && [ "$no_link" -eq 0 ]; then
     printf '%s\n' "-pthread"
   fi
 
@@ -410,7 +412,7 @@ trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
     printf '%s\n' "$a"
   done
 
-  if [ "$compile_only" -eq 0 ] && [ "$link_inputs" -eq 1 ]; then
+  if [ "$compile_only" -eq 0 ] && [ "$no_link" -eq 0 ] && [ "$link_inputs" -eq 1 ]; then
     # Shared side module: no libc (resolve against the PIE main at dlopen).
     if [ "$shared" -eq 1 ]; then
       printf '%s\n' \

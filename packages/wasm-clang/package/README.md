@@ -35,6 +35,13 @@ no extra WASI/EH flags needed for typical builds.
   (`-D_WASI_EMULATED_*`, `-pthread` when not linking, `-mthread-model`,
   `-fno-trapping-math`, `-fbracket-depth`, `-ftls-model`, `-fvisibility`), so
   `cc -Werror -c foo.s` works. `.S` and mixed C and assembly keep them.
+- **No link, no link flags**: with `-fsyntax-only`, `-emit-ast` or
+  `--analyze` (as with `-c`, `-S`, `-E` and `-M`), the driver leaves out its
+  link libraries and `-Wl,` flags, so `cc -Werror -fsyntax-only foo.c`
+  (configure and CMake checks, editors) works. A `.s` under `-fsyntax-only`
+  still gets clang's own `'assembler' input unused`, as upstream clang does.
+  `-###` and `-fdriver-only` keep them, since they show or check the full
+  link plan.
 
 ## One module for every tool
 

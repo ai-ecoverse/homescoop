@@ -170,6 +170,7 @@ try {
     const block = (n) => `int g(int x){${'{'.repeat(n)}x++;${'}'.repeat(n)}return x;}\n`;
     for (const [name, src, want] of [
       ['p1000.c', deep(1000, '(', 'x', ')'), 0],
+      ['p1100.c', deep(1100, '(', 'x', ')'), 1],
       ['p2000.c', deep(2000, '(', 'x', ')'), 1],
       ['b2000.c', block(2000), 1],
     ]) {
@@ -183,7 +184,16 @@ try {
     }
     const own = await run(['cc', '-fbracket-depth=2048', '-fsyntax-only', 'p1000.c'], { env: ccEnv });
     assert.equal(own.status, 0, `a caller's own -fbracket-depth still wins: ${own.stderr.slice(0, 200)}`);
-    console.log('== deep nesting: 1000 parens compile; 2000 parens and 2000 nested blocks stop with "bracket nesting level exceeded maximum of 1024", rc 1');
+    await k.writeFile('/home/p300.c', deep(300, '(', 'x', ')'));
+    const low = await run(['cc', '-fbracket-depth=256', '-fsyntax-only', 'p300.c'], { env: ccEnv });
+    assert.equal(low.status, 1, `a caller's lower -fbracket-depth=256 wins over the driver's 1024: rc=${low.status} ${low.stderr.slice(0, 200)}`);
+    assert.match(low.stderr, /bracket nesting level exceeded maximum of 256/, `p300.c: ${low.stderr.slice(0, 300)}`);
+    for (const tool of ['wasm-ld', 'ld.lld', 'lld', 'llvm-symbolizer']) {
+      const argv = tool === 'lld' ? ['lld', '-flavor', 'wasm', '--version'] : [tool, '--version'];
+      const r = await run(argv, { env: ccEnv });
+      assert.equal(r.status, 0, `helper command ${tool} runs by name: rc=${r.status} ${`${r.stderr}`.slice(0, 200)}`);
+    }
+    console.log('== deep nesting: 1000 parens compile; 1100 and 2000 parens and 2000 nested blocks stop with "bracket nesting level exceeded maximum of 1024", rc 1; a caller-set -fbracket-depth=256 and =2048 win; wasm-ld, ld.lld, lld and llvm-symbolizer run by name');
     console.log(`PASS ${cpkg.name}@${cpkg.version}: C++ exceptions (${WANT}) and std::terminate through a handler in all ${built.length} EH trees of wasix-sysroot ${sysVer}, env vars only: ${built.join(', ')}`);
   } else {
     for (const tree of ['sysroot-eh', 'sysroot-ehpic']) {
