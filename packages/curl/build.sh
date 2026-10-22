@@ -67,7 +67,7 @@ emcc -O2 -c "$ROOT/shims/slicc/webcrypto-entropy.c" -o "$ENTROPY_O"
 SLICC_A="$WORK/libslicc-net.a"
 homescoop_slicc_archive "$SLICC_A" net
 
-export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -lnodefs.js --js-library $ROOT/packages/coreutils/slicc-env.js"
+export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -lnodefs.js"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags)"
 LINK_FLAGS="$ENTROPY_O $EVEREST_A $P256M_A $(homescoop_slicc_link_archive "$SLICC_A") $CLI_LDFLAGS"
 
@@ -148,6 +148,11 @@ if [[ -f "$CURL_OUT/src/curl.js" && ! -f "$CURL_OUT/src/curl" ]]; then
   CURL_BIN="$CURL_OUT/src/curl"
 fi
 test -f "$CURL_OUT/src/curl.wasm" || test -f "$CURL_BIN"
+if grep -aEq "USER[[:space:]]*:[[:space:]]*[\"']web_user" "$CURL_BIN"; then
+  echo "homescoop: curl glue links Emscripten's getEnvStrings placeholders, not shims/slicc/slicc-env.js (homescoop#1625)" >&2
+  exit 1
+fi
+echo "== curl: glue env PASS (no web_user placeholders)"
 
 LIBCURL_A=""
 for a in "$CURL_OUT/lib/libcurl.a" "$CURL_OUT/libcurl.a" "$CURL_OUT/lib/libcurl.a"; do
