@@ -1,0 +1,29 @@
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -870,6 +870,7 @@
+     slicc_lib = os.environ.get('SLICC_EM_LIBDIR') or utils.path_from_root('lib', 'slicc')
+     # cli profile (not main_envp — that renames main→slicc_tool_main for make).
+     # slicc_main_envp.o / slicc_fork.o are shipped under lib/slicc/ for opt-in.
++    linkable = settings.MAIN_MODULE == 1 or settings.LINKABLE
+     for obj in (
+         'slicc_spawn.o',
+         'slicc_exec.o',
+@@ -879,11 +880,15 @@
+         'slicc_jobs.o',
+     ):
+       path = os.path.join(slicc_lib, obj)
++      linkable_path = os.path.join(slicc_lib, 'linkable', obj)
++      if linkable and os.path.isfile(linkable_path):
++        path = linkable_path
+       if os.path.isfile(path) and path not in linker_args:
+         linker_args.append(path)
+-    realpath_lib = os.path.join(slicc_lib, 'libslicc_realpath.a')
+-    if os.path.isfile(realpath_lib) and realpath_lib not in linker_args:
+-      linker_args.append(realpath_lib)
++    for lib in ('libslicc_jobs.a', 'libslicc_realpath.a'):
++      path = os.path.join(slicc_lib, lib)
++      if not linkable and os.path.isfile(path) and path not in linker_args:
++        linker_args.append(path)
+     # The JS halves of slicc_libc_gaps.o (writev, linkat, uname) and the
+     # exports and raise wrap of homescoop_slicc_keep_exports.
+     for js in ('slicc-writev.js', 'slicc-linkat.js', 'slicc-uname.js', 'slicc-env.js'):

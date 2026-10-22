@@ -152,3 +152,39 @@ Row 11 reads the wasm `linking` section of every object in `tools/link.py`'s def
 - (b) `symloop.c` calls libc's `realpath`: 40 follows resolve and 41 are `ELOOP`, absolute and relative, and without the archive it is `ELOOP` at 40;
 - (c) `rp-caller.c` calls `realpath`, and the definition comes from a later object (`rp-def.o`), an archive (`librpdef.a`) or `-L… -lrpdef`: each links and prints `realpath /own`;
 - NEGATIVE: `own-rp.c` linked beside `slicc_realpath.o` as a plain object (6.0.9-28's link line) must fail with `duplicate symbol: realpath`, so the rows keep testing #1664.
+
+## 6.0.9-30: -sMAIN_MODULE=1 with the slicc defaults, and a program's own tcsetpgrp (homescoop#1678; 2026-10-22)
+
+`-sMAIN_MODULE=1` (and `-sLINKABLE=1`) wraps the whole link line in `--whole-archive`, so all of `libc.a` is linked. With 6.0.9-29's defaults the link fails: the plain objects are not `-fPIC` (`relocation R_WASM_MEMORY_ADDR_SLEB cannot be used against symbol slicc_fork_tty_sig; recompile with -fPIC`), and 15 of their definitions are libc's own, all reported as duplicates:
+
+```text
+wasm-ld: error: duplicate symbol: kill            (slicc_signals.o)
+wasm-ld: error: duplicate symbol: nanosleep       (slicc_libc_gaps.o)
+wasm-ld: error: duplicate symbol: poll            (slicc_select.o)
+wasm-ld: error: duplicate symbol: pselect         (slicc_select.o)
+wasm-ld: error: duplicate symbol: realpath        (libslicc_realpath.a)
+wasm-ld: error: duplicate symbol: setegid, seteuid, setgid, setregid, setresgid, setresuid, setreuid, setuid   (slicc_libc_gaps.o)
+wasm-ld: error: duplicate symbol: tcgetpgrp, tcsetpgrp   (slicc_jobs.o)
+```
+
+The issue named only `tcsetpgrp`; a host link with `-Wl,--error-limit=0` shows all 15. A normal link has a smaller form of the same fault: `slicc_jobs.o` is always linked, so a program that defines its own `tcsetpgrp` gets `duplicate symbol: tcsetpgrp`, as `realpath` did before 6.0.9-29.
+
+6.0.9-30 compiles `slicc_jobs.o` without `tcgetpgrp`/`tcsetpgrp` and ships them as the two members of `lib/slicc/libslicc_jobs.a`, pulled only while undefined. Package patch 0018 adds that archive beside `libslicc_realpath.a`, and for `-sMAIN_MODULE=1` and `-sLINKABLE` links takes `lib/slicc/linkable/*.o` (`-fPIC`, with the 14 that are not `realpath` renamed out) and leaves both archives out. libc's `tcsetpgrp` can't replace the shim: emscripten's `TIOCSPGRP` ioctl is `EINVAL` on every terminal.
+
+`test/files.test.mjs` fails three rows on the published 6.0.9-29 (the other ten pass):
+
+```text
+not ok 10 - realpath() follows 40 symlinks … the default link adds lib/slicc/libslicc_realpath.a …
+  AssertionError [ERR_ASSERTION]: tools/link.py's default link does not add lib/slicc/libslicc_realpath.a
+not ok 12 - a program's own tcgetpgrp and tcsetpgrp win: no object the default link always adds defines them … (homescoop#1678, package patch 0018)
+  AssertionError [ERR_ASSERTION]: the default link always adds slicc_jobs.o (tcgetpgrp), slicc_jobs.o (tcsetpgrp), so a program that defines it gets duplicate symbol
+not ok 13 - -sMAIN_MODULE=1 and -sLINKABLE links take lib/slicc/linkable … (homescoop#1678, package patch 0018)
+  AssertionError [ERR_ASSERTION]: tools/link.py does not tell -sMAIN_MODULE=1 and -sLINKABLE links apart
+```
+
+Row 10 now matches 0018's archive loop, which -29's `tools/link.py` lacks: -29 adds `libslicc_realpath.a` to `-sMAIN_MODULE=1` links too. build.sh's PRESTAGE links and runs:
+
+- `jobs.c` with the default link: `hello realpath /tmp uname 0` and `tcgetpgrp self tcsetpgrp 0 ok` (the shim's single-process answers under host node); without `libslicc_jobs.a` it is libc's `tcgetpgrp 0 tcsetpgrp -1 EINVAL`, so the row keeps testing the override;
+- `own-tc.c`, which defines its own `tcsetpgrp` and calls `tcgetpgrp`: it links and prints `own tcsetpgrp 7 tcgetpgrp self`;
+- `jobs.c` with `-sMAIN_MODULE=1` and with `-sLINKABLE=1`: both link and print `hello realpath /tmp uname 0` and libc's `tcgetpgrp 0 tcsetpgrp -1 EINVAL`, and both wasm export `lib/slicc/linkable`'s `slicc_linkable_kill` (`--export-dynamic`). The default link's `jobs.wasm` must not have that name, and it prints `tcgetpgrp self`, so an ignored `-sLINKABLE=1` fails the row (Grok review of #1696);
+- NEGATIVE: with 6.0.9-29's `lib/slicc` (the plain `slicc_jobs.o`, no `linkable/`, no `libslicc_jobs.a`), `own-tc.c` gives `duplicate symbol: tcsetpgrp`, the `-sMAIN_MODULE=1` link fails with `duplicate symbol:`, and the `-sLINKABLE=1` link fails with `duplicate symbol: tcsetpgrp`.
