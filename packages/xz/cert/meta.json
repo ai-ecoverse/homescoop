@@ -6,20 +6,23 @@
     "corrupt input rejected",
     "xz -T0 and -T2 compress+decompress 4 MiB (mythread_sigmask, upstream since 5.8.4)",
     "cert/licence.mjs (5.8.4-2, homescoop#511): the tarball's SPDX-License-Identifier lines are 0BSD (liblzma headers, ...) and GPL-2.0-or-later (exactly bin/xzgrep, bin/xzdiff, bin/xzless); both are in package.json's license \"0BSD AND GPL-2.0-or-later\", and package/LICENSE holds upstream's COPYING summary, COPYING.0BSD and COPYING.GPLv2. 5.8.4-1: license \"0BSD\" and only the COPYING summary (NEGATIVE.md)",
-    "cert/scripts.mjs (5.8.4-5, homescoop#537): xzgrep and xzdiff are slicc.commands (script entries; #!/bin/sh) and run with wasm-bash, coreutils, grep, sed and diffutils installed: xzgrep beta / -c / -H and a no-match rc 1; xzdiff of equal files rc 0 with no output, of different ones rc 1 with '< beta' and '> gamma'; xzless is still not a command (rc 127): it relies on less running its LESSOPEN '|xz -cdfqQ -- %s' pipe, which wasm-less 668.0.0-5 doesn't do (it shows '\"a.txt.xz\" may be a binary file'). 5.8.4-4: 'xzgrep: command not found', rc 127 (NEGATIVE.md)"
+    "cert/scripts.mjs (5.8.4-5, homescoop#537; xzless 5.8.4-7, homescoop#1487): xzgrep, xzdiff and xzless are slicc.commands (script entries; #!/bin/sh) and run with only the package's declared dependencies installed: xzgrep beta / -c / -H and a no-match rc 1; xzdiff of equal files rc 0 with no output, of different ones rc 1 with '< beta' and '> gamma'; xzless a.txt.xz prints 'alpha\\nbeta\\n' through wasm-less 668.0.0-7's LESSOPEN pipe, two files back to back, an empty .xz as nothing, and xzless -F -X on a pty shows the text with no 'may be a binary file'. 5.8.4-4: 'xzgrep: command not found', rc 127; 5.8.4-6: 'xzless: command not found', rc 127 (NEGATIVE.md)",
+    "cert/deps.mjs (5.8.4-7, homescoop#1487): package.json's dependencies pin exactly (X.Y.Z-N) wasm-bash, wasm-coreutils, wasm-grep, wasm-sed, wasm-diffutils and wasm-less, which cover every tool xzgrep, xzdiff and xzless call; cert/meta.json's needs and needsInstall are exactly those pins, so the scripts are certified with only what a user's install pulls in; bash, grep, sed, diff, less, mktemp and expr are on PATH. 5.8.4-6 declares no dependencies (NEGATIVE.md)"
   ],
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
     "@ai-ecoverse/wasm-grep",
     "@ai-ecoverse/wasm-sed",
-    "@ai-ecoverse/wasm-diffutils"
+    "@ai-ecoverse/wasm-diffutils",
+    "@ai-ecoverse/wasm-less"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasm-bash@5.3.0-22",
-    "@ai-ecoverse/wasm-coreutils@9.12.0-12",
-    "@ai-ecoverse/wasm-grep@3.12.0-6",
-    "@ai-ecoverse/wasm-sed@4.10.0-5",
-    "@ai-ecoverse/wasm-diffutils@3.12.0-3"
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-13",
+    "@ai-ecoverse/wasm-grep@3.12.0-8",
+    "@ai-ecoverse/wasm-sed@4.10.0-6",
+    "@ai-ecoverse/wasm-diffutils@3.12.0-4",
+    "@ai-ecoverse/wasm-less@668.0.0-7"
   ]
 }

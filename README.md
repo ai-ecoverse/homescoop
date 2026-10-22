@@ -180,7 +180,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-webrtc-audio-processing`](https://www.npmjs.com/package/@ai-ecoverse/wasm-webrtc-audio-processing) | [recipe](packages/webrtc-audio-processing) | WebRTC AEC3 echo cancellation from webrtc-audio-processing 2.1, compiled to wasm, with a synchronous JS wrapper for AudioWorklet and Node |
 | [`@ai-ecoverse/wasm-which`](https://www.npmjs.com/package/@ai-ecoverse/wasm-which) | [recipe](packages/which) | GNU which, which shows the full path of a command. |
 | [`@ai-ecoverse/wasm-xxd`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xxd) | [recipe](packages/xxd) | xxd, which makes a hex dump of a file or turns one back into binary. |
-| [`@ai-ecoverse/wasm-xz`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xz) | [recipe](packages/xz) | XZ Utils: xz, unxz, xzcat and the lzma tools, with xzgrep and xzdiff. |
+| [`@ai-ecoverse/wasm-xz`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xz) | [recipe](packages/xz) | XZ and LZMA compression tools, with xzgrep, xzdiff and xzless. |
 | [`@ai-ecoverse/wasm-zip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zip) | [recipe](packages/zip) | zip, unzip and zipinfo (Info-ZIP), to make, list, test and extract .zip archives. |
 | [`@ai-ecoverse/wasm-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zlib) | [recipe](packages/zlib) | zlib 1.3.1 static library for WebAssembly / emscripten (SLICC homescoop ladder) |
 

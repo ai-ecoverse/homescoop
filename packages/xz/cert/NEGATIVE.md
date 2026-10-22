@@ -55,3 +55,9 @@ The published 5.8.4-3 also has 76 occurrence(s) of the CI build directory `/tmp/
 ## 5.8.4-6: shim drift (homescoop#1491; 2026-10-21)
 
 5.8.4-6 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 5.8.4-5 in `bin/xz`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 5.8.4-7: declared dependencies and xzless (homescoop#1487; 2026-10-21)
+
+- **5.8.4-6 from npm** fails `cert/deps.mjs`: `@ai-ecoverse/wasm-bash` is not in package.json's dependencies (`null`), so a user who installs only wasm-xz gets `xzgrep` and `xzdiff` without the shell, grep, sed, diff, mktemp and expr they call. 5.8.4-7 pins wasm-bash 5.3.0-23, wasm-coreutils 9.12.0-13, wasm-grep 3.12.0-8, wasm-sed 4.10.0-6, wasm-diffutils 3.12.0-4 and wasm-less 668.0.0-7, and `cert/meta.json` installs exactly those, so the scripts are certified with only what an install pulls in.
+- **5.8.4-6 from npm** also fails `cert/scripts.mjs`: `xzless a.txt.xz` gives `bash: line 1: xzless: command not found`, rc 127. It became possible with wasm-less 668.0.0-7, which runs the `LESSOPEN` pipe (homescoop#1484); with 668.0.0-5 or -6, `less` shows `"a.txt.xz" may be a binary file`.
+- **xzmore stays out:** it pipes into `more`, and no homescoop package provides `more`. build.sh doesn't stage it.

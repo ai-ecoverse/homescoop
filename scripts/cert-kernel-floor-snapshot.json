@@ -118,7 +118,7 @@
       }
     },
     "@ai-ecoverse/wasi-rustc": {
-      "tags": {"latest":"1.98.1-9"},
+      "tags": {"latest":"1.98.1-10"},
       "versions": {
         "0.0.0-stage": {},
         "1.83.0-0": {},
@@ -133,11 +133,12 @@
         "1.98.1-6": {},
         "1.98.1-7": {},
         "1.98.1-8": {},
-        "1.98.1-9": {}
+        "1.98.1-9": {},
+        "1.98.1-10": {}
       }
     },
     "@ai-ecoverse/wasix-autoconf": {
-      "tags": {"latest":"2.72.0-10"},
+      "tags": {"latest":"2.72.0-11"},
       "versions": {
         "0.0.0-stage": {},
         "2.72.0-1": {},
@@ -149,11 +150,12 @@
         "2.72.0-7": {"dependencies":{"@ai-ecoverse/wasix-m4":"1.4.20-2","@ai-ecoverse/wasix-perl":"5.42.0-11"}},
         "2.72.0-8": {"dependencies":{"@ai-ecoverse/wasix-m4":"1.4.20-2","@ai-ecoverse/wasix-perl":"5.42.0-13"}},
         "2.72.0-9": {"dependencies":{"@ai-ecoverse/wasix-m4":"1.4.20-2","@ai-ecoverse/wasix-perl":"5.42.0-13"}},
-        "2.72.0-10": {"dependencies":{"@ai-ecoverse/wasix-m4":"1.4.20-4","@ai-ecoverse/wasix-perl":"5.42.0-18"}}
+        "2.72.0-10": {"dependencies":{"@ai-ecoverse/wasix-m4":"1.4.20-4","@ai-ecoverse/wasix-perl":"5.42.0-18"}},
+        "2.72.0-11": {"dependencies":{"@ai-ecoverse/wasix-m4":"1.4.20-7","@ai-ecoverse/wasix-perl":"5.42.0-21"}}
       }
     },
     "@ai-ecoverse/wasix-automake": {
-      "tags": {"latest":"1.17.0-13"},
+      "tags": {"latest":"1.17.0-14"},
       "versions": {
         "0.0.0-stage": {},
         "1.17.0-1": {},
@@ -168,7 +170,8 @@
         "1.17.0-10": {"dependencies":{"@ai-ecoverse/wasix-perl":"5.42.0-13","@ai-ecoverse/wasix-autoconf":"2.72.0-8"}},
         "1.17.0-11": {"dependencies":{"@ai-ecoverse/wasix-perl":"5.42.0-13","@ai-ecoverse/wasix-autoconf":"2.72.0-8"}},
         "1.17.0-12": {"dependencies":{"@ai-ecoverse/wasix-perl":"5.42.0-18","@ai-ecoverse/wasix-autoconf":"2.72.0-10"}},
-        "1.17.0-13": {"dependencies":{"@ai-ecoverse/wasix-perl":"5.42.0-18","@ai-ecoverse/wasix-autoconf":"2.72.0-10"}}
+        "1.17.0-13": {"dependencies":{"@ai-ecoverse/wasix-perl":"5.42.0-18","@ai-ecoverse/wasix-autoconf":"2.72.0-10"}},
+        "1.17.0-14": {"dependencies":{"@ai-ecoverse/wasix-perl":"5.42.0-21","@ai-ecoverse/wasix-autoconf":"2.72.0-11"}}
       }
     },
     "@ai-ecoverse/wasix-m4": {
@@ -209,7 +212,7 @@
       }
     },
     "@ai-ecoverse/wasix-python": {
-      "tags": {"latest":"3.15.0-4"},
+      "tags": {"latest":"3.15.0-5"},
       "versions": {
         "3.14.2-2": {},
         "3.14.2-3": {},
@@ -241,7 +244,8 @@
         "3.15.0-1": {"engines":">=1.120.0"},
         "3.15.0-2": {"engines":">=1.122.3"},
         "3.15.0-3": {"engines":">=1.122.3"},
-        "3.15.0-4": {"engines":">=1.122.3"}
+        "3.15.0-4": {"engines":">=1.122.3"},
+        "3.15.0-5": {"engines":">=1.122.3"}
       }
     },
     "@ai-ecoverse/wasix-ruby": {
@@ -271,7 +275,7 @@
       }
     },
     "@ai-ecoverse/wasm-bash": {
-      "tags": {"latest":"5.3.0-22"},
+      "tags": {"latest":"5.3.0-23"},
       "versions": {
         "0.0.0": {},
         "5.3.0-1": {},
@@ -294,21 +298,23 @@
         "5.3.0-19": {"engines":">=1.48.3"},
         "5.3.0-20": {"engines":">=1.48.3"},
         "5.3.0-21": {"engines":">=1.130.2"},
-        "5.3.0-22": {"engines":">=1.130.2"}
+        "5.3.0-22": {"engines":">=1.130.2"},
+        "5.3.0-23": {"engines":">=1.130.2"}
       }
     },
     "@ai-ecoverse/wasm-bzip2": {
-      "tags": {"latest":"1.0.8-5"},
+      "tags": {"latest":"1.0.8-6"},
       "versions": {
         "1.0.8-1": {},
         "1.0.8-2": {},
         "1.0.8-3": {},
         "1.0.8-4": {},
-        "1.0.8-5": {}
+        "1.0.8-5": {},
+        "1.0.8-6": {}
       }
     },
     "@ai-ecoverse/wasm-coreutils": {
-      "tags": {"latest":"9.12.0-12"},
+      "tags": {"latest":"9.12.0-13"},
       "versions": {
         "0.0.0": {},
         "9.7.0-1": {},
@@ -325,11 +331,12 @@
         "9.12.0-9": {"engines":">=1.44.0"},
         "9.12.0-10": {"engines":">=1.44.0"},
         "9.12.0-11": {"engines":">=1.44.0"},
-        "9.12.0-12": {"engines":">=1.44.0"}
+        "9.12.0-12": {"engines":">=1.44.0"},
+        "9.12.0-13": {"engines":">=1.44.0"}
       }
     },
     "@ai-ecoverse/wasm-curl": {
-      "tags": {"latest":"8.22.0-8"},
+      "tags": {"latest":"8.22.0-9"},
       "versions": {
         "8.22.0-1": {},
         "8.22.0-2": {},
@@ -338,30 +345,23 @@
         "8.22.0-5": {},
         "8.22.0-6": {},
         "8.22.0-7": {},
-        "8.22.0-8": {}
-      }
-    },
-    "@ai-ecoverse/wasm-diffutils": {
-      "tags": {"latest":"3.12.0-3"},
-      "versions": {
-        "3.12.0-1": {},
-        "3.12.0-2": {},
-        "3.12.0-3": {},
-        "3.12.0": {}
+        "8.22.0-8": {},
+        "8.22.0-9": {}
       }
     },
     "@ai-ecoverse/wasm-findutils": {
-      "tags": {"latest":"4.11.0-4"},
+      "tags": {"latest":"4.11.0-5"},
       "versions": {
         "4.10.0-1": {},
         "4.11.0-1": {},
         "4.11.0-2": {},
         "4.11.0-3": {},
-        "4.11.0-4": {}
+        "4.11.0-4": {},
+        "4.11.0-5": {}
       }
     },
     "@ai-ecoverse/wasm-gawk": {
-      "tags": {"latest":"5.4.1-5"},
+      "tags": {"latest":"5.4.1-6"},
       "versions": {
         "0.0.0": {},
         "5.3.2-1": {},
@@ -371,11 +371,12 @@
         "5.4.1-2": {},
         "5.4.1-3": {},
         "5.4.1-4": {},
-        "5.4.1-5": {}
+        "5.4.1-5": {},
+        "5.4.1-6": {}
       }
     },
     "@ai-ecoverse/wasm-git": {
-      "tags": {"latest":"2.55.0-18"},
+      "tags": {"latest":"2.55.0-19"},
       "versions": {
         "2.55.0-1": {},
         "2.55.0-2": {},
@@ -394,11 +395,12 @@
         "2.55.0-15": {"engines":">=1.47.1","dependencies":{"@ai-ecoverse/wasm-bash":"5.3.0-13"}},
         "2.55.0-16": {"engines":">=1.47.1","dependencies":{"@ai-ecoverse/wasm-bash":"5.3.0-19"}},
         "2.55.0-17": {"engines":">=1.47.1","dependencies":{"@ai-ecoverse/wasm-bash":"5.3.0-19"}},
-        "2.55.0-18": {"engines":">=1.130.2","dependencies":{"@ai-ecoverse/wasm-sed":"4.10.0-5","@ai-ecoverse/wasm-bash":"5.3.0-22"}}
+        "2.55.0-18": {"engines":">=1.130.2","dependencies":{"@ai-ecoverse/wasm-sed":"4.10.0-5","@ai-ecoverse/wasm-bash":"5.3.0-22"}},
+        "2.55.0-19": {"engines":">=1.130.2","dependencies":{"@ai-ecoverse/wasm-sed":"4.10.0-5","@ai-ecoverse/wasm-bash":"5.3.0-22"}}
       }
     },
     "@ai-ecoverse/wasm-gmake": {
-      "tags": {"latest":"4.4.1-8"},
+      "tags": {"latest":"4.4.1-9"},
       "versions": {
         "0.0.0": {},
         "4.4.1-1": {},
@@ -408,11 +410,12 @@
         "4.4.1-5": {},
         "4.4.1-6": {},
         "4.4.1-7": {},
-        "4.4.1-8": {}
+        "4.4.1-8": {},
+        "4.4.1-9": {}
       }
     },
     "@ai-ecoverse/wasm-grep": {
-      "tags": {"latest":"3.12.0-7"},
+      "tags": {"latest":"3.12.0-8"},
       "versions": {
         "0.0.0": {},
         "3.12.0-1": {},
@@ -421,11 +424,12 @@
         "3.12.0-4": {},
         "3.12.0-5": {},
         "3.12.0-6": {},
-        "3.12.0-7": {}
+        "3.12.0-7": {},
+        "3.12.0-8": {}
       }
     },
     "@ai-ecoverse/wasm-gzip": {
-      "tags": {"latest":"1.15.0-5"},
+      "tags": {"latest":"1.15.0-6"},
       "versions": {
         "1.13.0-1": {},
         "1.13.0-2": {},
@@ -433,11 +437,12 @@
         "1.15.0-2": {},
         "1.15.0-3": {},
         "1.15.0-4": {},
-        "1.15.0-5": {}
+        "1.15.0-5": {},
+        "1.15.0-6": {}
       }
     },
     "@ai-ecoverse/wasm-imagemagick": {
-      "tags": {"latest":"7.1.2-34-9.3"},
+      "tags": {"latest":"7.1.2-34-9.5"},
       "versions": {
         "0.0.0": {},
         "7.1.2-31": {},
@@ -457,7 +462,9 @@
         "7.1.2-34-9": {"engines":">=1.44.0"},
         "7.1.2-34-9.1": {"engines":">=1.44.0"},
         "7.1.2-34-9.2": {"engines":">=1.44.0"},
-        "7.1.2-34-9.3": {"engines":">=1.44.0"}
+        "7.1.2-34-9.3": {"engines":">=1.44.0"},
+        "7.1.2-34-9.4": {"engines":">=1.44.0"},
+        "7.1.2-34-9.5": {"engines":">=1.44.0"}
       }
     },
     "@ai-ecoverse/wasm-mount": {
@@ -472,7 +479,7 @@
       }
     },
     "@ai-ecoverse/wasm-poppler": {
-      "tags": {"latest":"26.10.0-6"},
+      "tags": {"latest":"26.10.0-7"},
       "versions": {
         "0.0.0-stage": {},
         "26.10.0-1": {},
@@ -480,11 +487,12 @@
         "26.10.0-3": {},
         "26.10.0-4": {},
         "26.10.0-5": {},
-        "26.10.0-6": {}
+        "26.10.0-6": {},
+        "26.10.0-7": {}
       }
     },
     "@ai-ecoverse/wasm-procps": {
-      "tags": {"latest":"4.0.7-4"},
+      "tags": {"latest":"4.0.7-5"},
       "versions": {
         "0.0.0-stage": {},
         "4.0.5-1": {},
@@ -493,11 +501,12 @@
         "4.0.7-1": {"engines":">=1.44.0"},
         "4.0.7-2": {"engines":">=1.44.0"},
         "4.0.7-3": {"engines":">=1.44.0"},
-        "4.0.7-4": {"engines":">=1.44.0"}
+        "4.0.7-4": {"engines":">=1.44.0"},
+        "4.0.7-5": {"engines":">=1.44.0"}
       }
     },
     "@ai-ecoverse/wasm-sed": {
-      "tags": {"latest":"4.10.0-5"},
+      "tags": {"latest":"4.10.0-6"},
       "versions": {
         "0.0.0": {},
         "4.9.0-1": {},
@@ -507,11 +516,12 @@
         "4.10.0-2": {},
         "4.10.0-3": {},
         "4.10.0-4": {},
-        "4.10.0-5": {}
+        "4.10.0-5": {},
+        "4.10.0-6": {}
       }
     },
     "@ai-ecoverse/wasm-sqlite3": {
-      "tags": {"latest":"3.54.0-6"},
+      "tags": {"latest":"3.54.0-7"},
       "versions": {
         "3.53.4": {},
         "3.54.0-1": {},
@@ -519,7 +529,8 @@
         "3.54.0-3": {},
         "3.54.0-4": {},
         "3.54.0-5": {},
-        "3.54.0-6": {}
+        "3.54.0-6": {},
+        "3.54.0-7": {}
       }
     },
     "@ai-ecoverse/wasm-tls-engine": {
@@ -537,14 +548,15 @@
       }
     },
     "@ai-ecoverse/wasm-xz": {
-      "tags": {"latest":"5.8.4-5"},
+      "tags": {"latest":"5.8.4-6"},
       "versions": {
         "5.8.1-1": {},
         "5.8.4-1": {},
         "5.8.4-2": {},
         "5.8.4-3": {},
         "5.8.4-4": {},
-        "5.8.4-5": {}
+        "5.8.4-5": {},
+        "5.8.4-6": {}
       }
     }
   }
