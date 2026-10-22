@@ -129,6 +129,30 @@ export default async function (ctx) {
   for (const n of ['k', 'k2']) assert.match(krList, new RegExp(`^list-${n}=0$`, 'm'), `cone lists the keyring root's gpg wrote in ~/${n}:\n${krList}`);
   for (const uid of ['L1 <l1@example.org>', 'F <f@example.org>']) assert.equal(krList.split(uid).length - 1, 2, `both keyrings hold ${uid}:\n${krList}`);
 
+  const own = await sh('root', [
+    'gpg --homedir /root/lk --batch --with-colons -k l1@example.org | while IFS=: read -r t _ _ _ _ _ _ _ _ v _; do [ "$t" = fpr ] && echo "lfpr $v"; done',
+    'for f in pubring.kbx trustdb.gpg; do echo "sum $f $(cksum < /root/lk/$f)"; stat -c "own $f %U %a" /root/lk/$f; done',
+  ].join('\n'));
+  const lfpr = /^lfpr (\S+)$/m.exec(own)?.[1];
+  const ownSums = Object.fromEntries([...own.matchAll(/^sum (\S+) (.+)$/gm)].map((m) => [m[1], m[2]]));
+  assert.ok(lfpr && ownSums['pubring.kbx'] && ownSums['trustdb.gpg'], `root's own keybox and trustdb in /root/lk:\n${own}`);
+  await sh('cone', 'rm -rf ~/dk ~/dt; mkdir -m 700 ~/dk ~/dt; ln -s /root/lk/pubring.kbx ~/dk/pubring.kbx; ln -s /root/lk/trustdb.gpg ~/dt/trustdb.gpg');
+  const inplace = await sh('root', [
+    `gpg --homedir /home/cone/dk --batch --yes --delete-key ${lfpr} 2>&1; echo "del=$?"`,
+    'gpgconf --homedir /home/cone/dk --kill gpg-agent',
+    `echo "${fpr}:4:" | gpg --homedir /home/cone/dt --batch --import-ownertrust 2>&1; echo "trust=$?"`,
+    'gpgconf --homedir /home/cone/dt --kill gpg-agent',
+    'for f in pubring.kbx trustdb.gpg; do echo "sum $f $(cksum < /root/lk/$f)"; stat -c "own $f %U %a" /root/lk/$f; done',
+    'gpg --homedir /root/lk --batch -k l1@example.org > /dev/null 2>&1; echo "still=$?"',
+    'gpgconf --homedir /root/lk --kill gpg-agent',
+  ].join('\n'));
+  for (const f of ['pubring.kbx', 'trustdb.gpg']) {
+    assert.ok(inplace.includes(`sum ${f} ${ownSums[f]}`), `root's own /root/lk/${f}, the target of cone's symlink, is byte-identical after root's in-place edit of cone's homedir (--delete-key, --import-ownertrust; 2.4.9-13: edited):\n${inplace}`);
+    const mode = new RegExp(`^own ${f.replace('.', '\\.')} root \\d+$`, 'm').exec(own)?.[0];
+    assert.ok(mode && inplace.includes(mode), `/root/lk/${f} keeps its owner and mode (${mode}):\n${inplace}`);
+  }
+  assert.match(inplace, /^still=0$/m, `root's own keybox still holds its key:\n${inplace}`);
+
   if (process.env.GNUPG_NOFOLLOW === '1') {
     const nf = await sh('root', [
       'rm -rf /srv/nf; mkdir -p /srv/nf; echo target > /srv/nf/t; ln -s /srv/nf/t /srv/nf/l; ln -s /srv/nf/none /srv/nf/d',
@@ -137,5 +161,5 @@ export default async function (ctx) {
     assert.match(nf, /^l refused Errno::ELOOP$/m, `slicc-kernel refuses a final symlink under O_NOFOLLOW (homescoop#1603; 1.124.1: opens the target):\n${nf}`);
     assert.match(nf, /^d refused Errno::E(LOOP|NOENT)$/m, `a dangling final symlink under O_NOFOLLOW is refused:\n${nf}`);
   }
-  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602)${process.env.GNUPG_NOFOLLOW === '1' ? '; the kernel refuses a final symlink under O_NOFOLLOW (#1603)' : ''}`);
+  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; a pubring.kbx or trustdb.gpg that cone symlinks to root's own leaves it byte-identical after root's --delete-key or --import-ownertrust there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602)${process.env.GNUPG_NOFOLLOW === '1' ? '; the kernel refuses a final symlink under O_NOFOLLOW (#1603)' : ''}`);
 }

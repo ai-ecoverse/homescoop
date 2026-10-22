@@ -1,6 +1,6 @@
 --- a/common/sysutils.h
 +++ b/common/sysutils.h
-@@ -95,6 +95,15 @@
+@@ -95,6 +95,16 @@
  int gnupg_stat (const char *name, struct stat *statbuf);
  #endif /*HAVE_STAT*/
  int gnupg_open (const char *name, int flags, unsigned int mode);
@@ -12,13 +12,14 @@
 +int gnupg_wasi_create_file (const char *path, unsigned int mode, int flags);
 +int gnupg_wasi_rename_file (const char *from, const char *to);
 +int gnupg_wasi_chmod_file (const char *path, unsigned int mode);
++int gnupg_wasi_open_file (const char *path, int flags);
 +#endif
  
  gnupg_dir_t gnupg_opendir (const char *name);
  gnupg_dirent_t gnupg_readdir (gnupg_dir_t gdir);
 --- a/common/sysutils.c
 +++ b/common/sysutils.c
-@@ -1324,6 +1324,271 @@
+@@ -1324,6 +1324,318 @@
  }
  
  
@@ -244,6 +245,53 @@
 +  close (dfd);
 +  errno = e;
 +  return rc;
++}
++
++int
++gnupg_wasi_open_file (const char *path, int flags)
++{
++  struct stat st, lst, dst;
++  const char *base;
++  char *dir;
++  int dfd, fd, e;
++
++  if (geteuid ())
++    return open (path, flags);
++  if (wasi_split (path, &dir, &base))
++    return -1;
++  dfd = open (dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  xfree (dir);
++  if (dfd == -1)
++    return -1;
++  if (!fstat (dfd, &dst) && S_ISDIR (dst.st_mode) && !dst.st_uid
++      && !(dst.st_mode & (S_IWGRP | S_IWOTH)))
++    {
++      fd = openat (dfd, base, flags);
++      goto leave;
++    }
++  fd = -1;
++  if (fstatat (dfd, base, &lst, AT_SYMLINK_NOFOLLOW))
++    goto leave;
++  if (!S_ISREG (lst.st_mode) || lst.st_nlink != 1)
++    {
++      errno = ELOOP;
++      goto leave;
++    }
++  fd = openat (dfd, base, flags | O_NOFOLLOW);
++  if (fd == -1)
++    goto leave;
++  if (fstat (fd, &st) || !S_ISREG (st.st_mode) || st.st_nlink != 1
++      || st.st_dev != lst.st_dev || st.st_ino != lst.st_ino)
++    {
++      close (fd);
++      fd = -1;
++      errno = ELOOP;
++    }
++ leave:
++  e = errno;
++  close (dfd);
++  errno = e;
++  return fd;
 +}
 +
 +int
@@ -1293,8 +1341,38 @@
  
 --- a/g10/tdbio.c
 +++ b/g10/tdbio.c
-@@ -742,6 +742,9 @@
+@@ -733,15 +733,38 @@
+           gpg_err_set_errno (EPERM);
+         }
+       else
+-        fp = es_fopen (fname, "wb");
++        {
++#ifdef __wasi__
++          int cfd = gnupg_wasi_create_file (fname, 0666,
++                                            GNUPG_WASI_CREATE_REPLACE);
++
++          fp = cfd == -1 ? NULL : es_fdopen (cfd, "wb");
++          if (!fp && cfd != -1)
++            {
++              int e = errno;
++
++              close (cfd);
++              errno = e;
++            }
++#else
++          fp = es_fopen (fname, "wb");
++#endif
++        }
+       umask(oldmask);
+       if (!fp)
+         log_fatal (_("can't create '%s': %s\n"), fname, strerror (errno));
+       es_fclose (fp);
+ 
++#ifdef __wasi__
++      db_fd = gnupg_wasi_open_file (db_name, O_RDWR | MY_O_BINARY);
++#else
        db_fd = gnupg_open (db_name, O_RDWR | MY_O_BINARY, 0);
++#endif
        if (db_fd == -1)
          log_fatal (_("can't open '%s': %s\n"), db_name, strerror (errno));
 +#ifdef __wasi__
@@ -1303,17 +1381,32 @@
  
        rc = create_version_record (ctrl);
        if (rc)
+@@ -783,7 +806,11 @@
+ 
+   log_assert( db_fd == -1 );
+ 
++#ifdef __wasi__
++  db_fd = gnupg_wasi_open_file (db_name, O_RDWR | MY_O_BINARY);
++#else
+   db_fd = gnupg_open (db_name, O_RDWR | MY_O_BINARY, 0);
++#endif
+   if (db_fd == -1 && (errno == EACCES
+ #ifdef EROFS
+                       || errno == EROFS
 --- a/kbx/keybox-init.c
 +++ b/kbx/keybox-init.c
-@@ -20,6 +20,7 @@
+@@ -20,8 +20,10 @@
  #include <config.h>
  #include <stdlib.h>
  #include <stdio.h>
 +#include <errno.h>
  #include <string.h>
  #include <unistd.h>
++#include <fcntl.h>
  #include <assert.h>
-@@ -281,6 +282,23 @@
+ 
+ #include "keybox-defs.h"
+@@ -281,6 +283,36 @@
  
    *rfp = NULL;
  
@@ -1324,6 +1417,19 @@
 +                                       GNUPG_WASI_CREATE_REPLACE);
 +
 +      fp = fd == -1 ? NULL : es_fdopen (fd, "wb,sequential");
++      if (!fp && fd != -1)
++        {
++          int e = errno;
++
++          close (fd);
++          errno = e;
++        }
++    }
++  else if (mode == KEYBOX_LL_OPEN_UPDATE)
++    {
++      int fd = gnupg_wasi_open_file (fname, O_RDWR | O_CLOEXEC);
++
++      fp = fd == -1 ? NULL : es_fdopen (fd, "r+b,sequential");
 +      if (!fp && fd != -1)
 +        {
 +          int e = errno;
