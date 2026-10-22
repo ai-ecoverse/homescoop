@@ -78,3 +78,18 @@ libexec/git-core/git-remote-https.wasm: homescoop-work/mbedtls-3.6.5/library/ssl
 ```
 
 wasm-curl 8.22.0-9's archives name none, and 2.55.0-20 links them. build.sh now refuses a build path in any staged wasm, not only `git.wasm`. `cert/clone-ro.mjs` is coverage (#1432): 2.55.0-18 and -19 pass it too.
+
+## 2.55.0-21: the cross-tab README and https (homescoop#952, #1432; 2026-10-22)
+
+2.55.0-21 is a packaging -N: only the README (which ships in the tarball) changes. `cert/tabs.mjs` against the published 2.55.0-20 (slicc-kernel 1.132.1, users enforce) fails 6 of its 10 assertions, every README row:
+
+```text
+tabs.mjs:6: README: slicc-kernel#949 is fixed since 1.120.1, so no "until #949 is fixed" line (homescoop#952)
+tabs.mjs:7: README: the cross-process lock floor
+tabs.mjs:8: README: the cross-tab lock floor
+tabs.mjs:9: README: cross-tab coherence (homescoop#952)
+tabs.mjs:10: README: cross-tab opens
+tabs.mjs:11: README: one process per repository on older kernels
+```
+
+Its `index.lock` row passes on 2.55.0-20 too. `cert/https.mjs` is coverage (#1432): 2.55.0-20 passes it as well.
