@@ -32,15 +32,24 @@ slicc-kernel's `/etc/passwd` for the process's uid: `root` by default, or a
 `kernel.users.add` user's name. Repository ownership checks (`safe.directory`)
 use the file owners the kernel reports (≥ 1.47.1: the calling user's ids).
 
-## Two browser tabs (2.55.0-20)
+## Several processes and tabs on one repository (2.55.0-21)
 
 git guards the index and refs with lock files (`index.lock`, ref `.lock`
-files), not `flock`. Files written in one browser tab may still read stale or
-corrupted in another until
-[slicc-kernel#949](https://github.com/ai-ecoverse/slicc-kernel/issues/949) is
-fixed, so a lock file or a ref one tab wrote may not be seen by the other.
-Work on one repository from one tab at a time; several git processes in one
-tab are unaffected.
+files), created with `O_EXCL`, not `fcntl` or `flock`. A second git process on
+a locked repository fails with `Unable to create '….lock': File exists`
+instead of writing over the first, as on any system. git itself takes no
+`fcntl` locks, so the kernel floors for those (slicc-kernel 1.100.0 between
+processes, homescoop#513; 1.119.0 across tabs, slicc-kernel#944) matter only
+to tools you run on the repository that use them.
+
+Across browser tabs, files one tab writes, lock files included, are coherent
+in the other tab since slicc-kernel 1.120.1 (slicc-kernel#949), and opens
+from two tabs no longer fail at random since 1.122.3 (slicc-kernel#950). So
+two tabs on one repository are safe on slicc-kernel 1.122.3 or later, and
+this package's floor (1.130.2) is above all of these.
+
+On older kernels, use one process per repository at a time: a tab can miss
+the other's lock file, and two tabs can lose or corrupt what the other wrote.
 
 ## Build paths (2.55.0-20)
 

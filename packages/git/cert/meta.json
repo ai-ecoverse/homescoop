@@ -6,7 +6,8 @@
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
-    "@ai-ecoverse/wasm-sed"
+    "@ai-ecoverse/wasm-sed",
+    "@ai-ecoverse/wasm-tls-engine"
   ],
   "checklist": [
     "local bare-repo init",
@@ -19,7 +20,9 @@
     "cert/users.mjs (2.55.0-14, H1 homescoop#207): as root and as kernel.users.add({name:'cone'}), git init + commit in ~ with only user.email set: no 'dubious ownership', author 'root <root@slicc.test>' / 'cone <cone@slicc.test>' (name from /etc/passwd via getpwuid), clean status, toplevel /root/repo and /home/cone/repo. A real rebuild (2.55.0-12/-13 were repacks of -11) on shims/slicc with process credentials",
     "cert/burndown.mjs (2.55.0-18), users enforce: (homescoop#887) alice runs git status in root's chmod a+rwX repository and gets \"detected dubious ownership\", rc 128, since every kernel engines (>=1.130.2) allows reports real owners; (homescoop#903) git submodule add of a local repository works and git submodule status shows sub (heads/main): package.json depends on @ai-ecoverse/wasm-sed, which git-sh-setup calls; (homescoop#912) git clone --local copies when link() fails with EMLINK, as on the OPFS root (clone-local-no-hardlinks.patch), and fsck is clean. 2.55.0-17 fails the submodule and --local rows (NEGATIVE.md)",
     "cert/paths.mjs (2.55.0-20, homescoop#1008): no wasm in the package names a build path (/home/…, /Users/…, homescoop-work, .homescoop-out), the libcurl and Mbed TLS ones (git-remote-http(s), git-http-fetch, git-remote-ftp(s)) included; git links wasm-curl 8.22.0-9, whose archives have no build paths. 2.55.0-19 fails it (NEGATIVE.md)",
-    "cert/clone-ro.mjs (2.55.0-20, homescoop#1432), users enforce: dora runs git clone --local into her own 0555 directory and it still dies, rc 128, Permission denied, nothing made; clone-local-no-hardlinks.patch falls back to copying only where link() cannot be made"
+    "cert/clone-ro.mjs (2.55.0-20, homescoop#1432), users enforce: dora runs git clone --local into her own 0555 directory and it still dies, rc 128, Permission denied, nothing made; clone-local-no-hardlinks.patch falls back to copying only where link() cannot be made",
+    "cert/tabs.mjs (2.55.0-21, homescoop#952): the README gives the kernel floors for several processes and tabs on one repository (homescoop#513 1.100.0, slicc-kernel#944 1.119.0, #949 1.120.1, #950 1.122.3), one process per repository on older kernels, and no 'until #949 is fixed' line; a held index.lock makes git add fail, rc 128, File exists, and the repository commits once it is gone. 2.55.0-20 fails the README rows (NEGATIVE.md)",
+    "cert/https.mjs (2.55.0-21, homescoop#1432), users enforce: erin runs git ls-remote and git clone https://cert.test/repo.git (a dumb-HTTP bare repository the responder serves from OPFS, CONNECT and TLS through the kernel proxy with wasm-tls-engine, git-remote-https's Mbed TLS against the kernel CA): HEAD matches, fsck --strict clean, files are erin's; a 404 repository gives rc 128; GIT_SSL_CAINFO set to a decoy CA fails verification, rc 128"
   ],
   "patches": {
     "clone-local-no-hardlinks.patch": "burndown.mjs: git clone --local copies instead of 'failed to create link … Too many links' (NEGATIVE.md: 2.55.0-17); clone-ro.mjs: a clone into a 0555 directory still dies"
