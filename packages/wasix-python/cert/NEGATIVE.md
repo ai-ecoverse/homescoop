@@ -1,3 +1,11 @@
+## discovery.mjs's cost bounds catch a start that rescans (3.15.0-6; #1153; 2026-10-22)
+
+`cert/discovery.mjs` now measures discovery against itself without its cache, in the same run, instead of against PYTHONPATH with a 1.1 slack. On npm 3.15.0-5 (slicc-kernel 1.125.0, users enforce, local browser cert) it passes: `a start pays 57 ms for discovery (0.25 of its cost without the cache), 227 ms without its cache`. In earlier local runs the ratio was 0.17 to 0.28.
+
+Proof that it fails a slow discovery: the same 3.15.0-5 tarball with `_slicc_site._cache_path` patched to `return None` (no cache, so every start rescans; repacked locally, `run.mjs --spec discovery.mjs`) fails with `warm discover() 68.4 ms is more than half a cold scan (68.1 ms): the cache does not hit`. Its log has `a start pays 154 ms for discovery (0.98 of its cost without the cache)`, so the start-cost bound (at most 0.5) fails as well.
+
+The old bound, `on <= 1.1 x PYTHONPATH`, failed all three ladder-pr attempts of #1652 run 39729099801 with nothing wrong: on/PYTHONPATH was 1789/1588, 803/710 and 418/378 ms. In those runs discovery's start cost (on minus off) was 583, 138 and 88 ms, against cold scans of 2290, 454 and 296 ms: 0.25 to 0.30 of a scan, so no start rescanned. Those runs didn't measure the new cacheless start.
+
 ## 3.15.0-5: -I/-E take the home from a caller's SLICC_PYTHONHOME and the venv from a caller's PATH; memory numbers (3.15.0-6; #1572, #1573; 2026-10-22)
 
 npm 3.15.0-5 on slicc-kernel 1.125.0 (browser cert, users enforce, `run.mjs --spec isolated.mjs`): FAIL. All of it in one assertion:
