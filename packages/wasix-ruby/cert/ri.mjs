@@ -25,6 +25,25 @@ export default async function (ctx) {
     assert.match(r.stdout, body, `ri ${name} prints its documentation: ${out}`);
     seen.push(name);
   }
+  const page = await sh(`ri -T -f rdoc 'ruby:README.md'`);
+  const pageOut = `ri ruby:README.md: rc=${page.status} ${page.stdout.slice(0, 400)}${page.stderr}`;
+  assert.equal(page.status, 0, pageOut);
+  assert.match(page.stdout, /What is Ruby\?/, `ri reads a root page (README.md) from ri.pack: ${pageOut}`);
+  seen.push('ruby:README.md');
+  const corrupt = await sh(`ruby -e '
+    real = File.binread(ARGV[0])
+    huge = Marshal.dump({"cache.ri" => [0, 1 << 40], "String/upcase-i.ri" => [0, 10]})
+    spill = Marshal.dump({"cache.ri" => [0, 64], "String/upcase-i.ri" => [real.bytesize, 10]})
+    { "truncated" => real.byteslice(0, 5000), "huge-index" => [1 << 62].pack("Q>") + "x" * 32,
+      "huge-entry" => [huge.bytesize].pack("Q>") + huge + "x" * 64, "past-end" => [spill.bytesize].pack("Q>") + spill + "x" * 64 }.each do |n, b|
+      Dir.mkdir("/tmp/badri-#{n}") unless Dir.exist?("/tmp/badri-#{n}")
+      File.binwrite("/tmp/badri-#{n}/ri.pack", b)
+    end' '${system}/ri.pack' && for n in truncated huge-index huge-entry past-end; do ri --no-standard-docs -d /tmp/badri-$n -T String 2>&1; echo "$n rc=$?"; done`);
+  const cOut = `corrupt packs: rc=${corrupt.status} ${corrupt.stdout}${corrupt.stderr}`;
+  for (const n of ['truncated', 'huge-index', 'huge-entry', 'past-end']) {
+    assert.match(corrupt.stdout, new RegExp(`Nothing known about String\\n${n} rc=1`), `a ${n} ri.pack is refused and ri reports nothing known, without reading outside the pack: ${cOut}`);
+  }
+  assert.doesNotMatch(corrupt.stdout + corrupt.stderr, /NoMemoryError|RangeError|ArgumentError|TypeError|Error\)/, `a corrupt ri.pack raises nothing: ${cOut}`);
   const list = await sh('ri --list');
   const names = list.stdout.split('\n');
   for (const n of ['String', 'Integer', 'JSON', 'Gem::Specification', 'OpenSSL::Digest', 'Bundler']) {
@@ -34,5 +53,5 @@ export default async function (ctx) {
   const miss = await sh(`ri -T NoSuchThingHere; echo "rc=$?"`);
   assert.match(miss.stdout + miss.stderr, /Nothing known about NoSuchThingHere/, `an unknown name is still reported: ${miss.stdout}${miss.stderr}`);
   assert.match(miss.stdout, /rc=1/, `an unknown name exits 1: ${miss.stdout}${miss.stderr}`);
-  console.log(`ri: system ${system}; ${seen.join(', ')} documented; --list ${names.length} lines; unknown name rc 1`);
+  console.log(`ri: system ${system}; ${seen.join(', ')} documented; --list ${names.length} lines; unknown name rc 1; 4 corrupt packs refused`);
 }

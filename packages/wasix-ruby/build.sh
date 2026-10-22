@@ -819,12 +819,38 @@ json = store.load_method("JSON", "#parse")
 abort "homescoop wasix-ruby: ri data FAIL: JSON.parse has no documentation" unless RDoc::Markup::ToRdoc.new.convert(json.comment.parse).include?("Returns the Ruby objects")
 spec = store.load_class("Gem::Specification")
 abort "homescoop wasix-ruby: ri data FAIL: no Gem::Specification" unless spec.superclass.to_s == "Gem::BasicSpecification"
+page = store.load_page("README.md")
+abort "homescoop wasix-ruby: ri data FAIL: the README.md page is not read from ri.pack" unless RDoc::Markup::ToRdoc.new.convert(page.comment.parse).include?("What is Ruby?")
 begin
   store.load_method("String", "#no_such_method_here")
   abort "homescoop wasix-ruby: ri data FAIL: a missing method loaded"
 rescue RDoc::Store::MissingFileError
 end
-puts "ri data: PASS #{count} files in share/ri/#{File.basename(File.dirname(dir))}/system/ri.pack, #{store.module_names.size} classes and modules (homescoop#1622)"
+require "tmpdir"
+real = File.binread(File.join(dir, "ri.pack"))
+huge = Marshal.dump({"cache.ri" => [0, 1 << 40], "String/upcase-i.ri" => [0, 10]})
+spill = Marshal.dump({"cache.ri" => [0, 64], "String/upcase-i.ri" => [real.bytesize, 10]})
+bad = {
+  "truncated" => real.byteslice(0, 5000),
+  "huge-index" => [1 << 62].pack("Q>") + "x" * 32,
+  "huge-entry" => [huge.bytesize].pack("Q>") + huge + "x" * 64,
+  "past-end" => [spill.bytesize].pack("Q>") + spill + "x" * 64,
+  "not-a-hash" => [Marshal.dump([1, 2]).bytesize].pack("Q>") + Marshal.dump([1, 2]),
+}
+bad.each do |name, bytes|
+  Dir.mktmpdir do |d|
+    File.binwrite(File.join(d, "ri.pack"), bytes)
+    s = RDoc::RI::Store.new(RDoc::Options.new, path: d, type: :extra)
+    abort "homescoop wasix-ruby: ri data FAIL: a #{name} ri.pack was accepted" if s.send(:wasix_ri_pack_index)
+    s.load_cache
+    begin
+      s.load_method("String", "#upcase")
+      abort "homescoop wasix-ruby: ri data FAIL: a #{name} ri.pack loaded String#upcase"
+    rescue RDoc::Store::MissingFileError
+    end
+  end
+end
+puts "ri data: PASS #{count} files in share/ri/#{File.basename(File.dirname(dir))}/system/ri.pack, #{store.module_names.size} classes and modules, README.md page, #{bad.size} corrupt packs refused (homescoop#1622)"
 RB
 
 # The bundled gems were installed by the build machine's ruby: refuse
