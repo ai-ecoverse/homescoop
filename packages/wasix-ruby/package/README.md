@@ -37,6 +37,13 @@ fails. `io/console` is built, so `irb` and reline work.
 
 `TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
 
+## 3.4.11-23: ri has Ruby's documentation
+
+- **ri** (homescoop#1622): `ri String#upcase`, `ri JSON.parse`, `ri Gem::Specification` and `ri --list` cover the core classes and the standard library, including RubyGems and Bundler (1,387 classes and modules). build.sh generates the ri data from Ruby's source with Ruby's own rdoc 6.14.0, as `make install-rdoc` would. Up to 3.4.11-22 the package was built without it, so `ri` printed `Nothing known about String` for everything.
+- **One file, not 15,000:** rdoc writes one file per class and method, about 15,400 files and 12 MB, which would be most of the package's files, and on slicc each one is a separate write at install time (a cert run's install went from about 30 s to over 4 min). The package ships them as one file, `share/ri/<API version>/system/ri.pack`: an index (8 bytes of big-endian length, then a Marshal hash of each path to its offset and length) followed by the files' bytes. `patches/rdoc-ri-pack-wasi.patch` makes rdoc's `RDoc::Store` read a store's files from its `ri.pack` when there is one, and from the directory otherwise, so ri data that `rdoc --ri` or `gem install --document ri` writes works as usual. The cost is 12 MB of disk and about 2.4 MB of download (the tarball goes from 13.1 to 15.5 MB).
+- **Limits:** a newer rdoc installed with `gem install rdoc` doesn't have the patch, so its `ri` finds no documentation for core and stdlib. ri doesn't cover gems installed later unless they were installed with `--document ri`. In a terminal, ri uses a pager when it finds one; `ri -T` never does.
+- **Tests** (homescoop#1017): `cert/gem-executables.mjs` drives a real `rdbg` session (a breakpoint, `p x`), `typeprof` and `rdoc`; `cert/bundled-gems.mjs` runs `bundle install --local` and `bundle exec` with bigdecimal, racc and nkf; `cert/flock-interrupt.mjs` interrupts a blocking `LOCK_SH` and raises into threads blocked in `File#flock` and `F_SETLKW`. No behaviour change there.
+
 ## 3.4.11-22: the gems' executables are commands
 
 - **Commands** (homescoop#1390): `rdbg` (the debug gem's debugger), `rbs`, `racc`, `typeprof`, `rdoc`, `ri`, `syntax_suggest` and `bundler` run by name, like `gem` and `rake`. Each is a RubyGems binstub in the package's `bin/` that loads the gem's own executable. Up to 3.4.11-21 the gems were installed but their executables weren't on PATH (`rdbg: command not found`); `ruby -rdebug` and `binding.break` worked.

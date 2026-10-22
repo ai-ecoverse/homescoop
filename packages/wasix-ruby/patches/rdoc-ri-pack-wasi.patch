@@ -1,0 +1,33 @@
+--- lib/rdoc/store.rb
++++ lib/rdoc/store.rb
+@@ -979,9 +979,30 @@
+ 
+   private
+   def marshal_load(file)
++    packed = wasix_ri_pack_read(file)
++    return Marshal.load(packed, MarshalFilter) if packed
+     File.open(file, 'rb') {|io| Marshal.load(io, MarshalFilter)}
+   end
+ 
++  def wasix_ri_pack_read(file)
++    @wasix_ri_pack = wasix_ri_pack_index unless defined?(@wasix_ri_pack)
++    return unless @wasix_ri_pack
++    pack, base, index = @wasix_ri_pack
++    prefix = File.join(@path, '')
++    return unless file.start_with?(prefix)
++    entry = index[file.delete_prefix(prefix)] or raise Errno::ENOENT, file
++    File.open(pack, 'rb') {|io| io.seek(base + entry[0]); io.read(entry[1])}
++  end
++
++  def wasix_ri_pack_index
++    pack = @path && File.join(@path, 'ri.pack')
++    return unless pack && File.file?(pack)
++    File.open(pack, 'rb') do |io|
++      size = io.read(8).unpack1('Q>')
++      [pack, 8 + size, Marshal.load(io.read(size), MarshalFilter)]
++    end
++  end
++
+   MarshalFilter = proc do |obj|
+     case obj
+     when true, false, nil, Array, Class, Encoding, Hash, Integer, String, Symbol, RDoc::Text
