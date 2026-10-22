@@ -224,16 +224,13 @@ test -f "$TEMPLATES_DST/description"
 test -f "$TEMPLATES_DST/info/exclude"
 
 # Refuse build-machine absolute paths in the wasm (prefix=/usr is OK).
-if strings "$HOMESCOOP_PKG/package/bin/git.wasm" | grep -E '/Users/|/home/|/var/folders/|/tmp/homescoop'
-then
-  echo "homescoop: host path leaked into git.wasm" >&2
-  exit 1
-fi
-if strings "$LIBEXEC/git-sh-i18n--envsubst.wasm" | grep -E '/Users/|/home/'
-then
-  echo "homescoop: host path leaked into git-sh-i18n--envsubst.wasm" >&2
-  exit 1
-fi
+for w in "$HOMESCOOP_PKG"/package/bin/*.wasm "$LIBEXEC"/*.wasm; do
+  if strings "$w" | grep -E '/Users/|/home/|/var/folders/|/tmp/homescoop|homescoop-work|/__w/'
+  then
+    echo "homescoop: host path leaked into ${w#"$HOMESCOOP_PKG"/package/} (homescoop#1008)" >&2
+    exit 1
+  fi
+done
 
 homescoop_stage_license "$SRC"/COPYING "$SRC"/LICENSE
 homescoop_notices_begin "The git wasm modules statically link the following."

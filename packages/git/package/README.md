@@ -31,3 +31,22 @@ git runs as the kernel's user. Without `user.name`, the author name comes from
 slicc-kernel's `/etc/passwd` for the process's uid: `root` by default, or a
 `kernel.users.add` user's name. Repository ownership checks (`safe.directory`)
 use the file owners the kernel reports (≥ 1.47.1: the calling user's ids).
+
+## Two browser tabs (2.55.0-20)
+
+git guards the index and refs with lock files (`index.lock`, ref `.lock`
+files), not `flock`. Files written in one browser tab may still read stale or
+corrupted in another until
+[slicc-kernel#949](https://github.com/ai-ecoverse/slicc-kernel/issues/949) is
+fixed, so a lock file or a ref one tab wrote may not be seen by the other.
+Work on one repository from one tab at a time; several git processes in one
+tab are unaffected.
+
+## Build paths (2.55.0-20)
+
+No wasm in this package names the machine it was built on. git-remote-http(s),
+git-http-fetch and git-remote-ftp(s) link libcurl and Mbed TLS from
+`@ai-ecoverse/wasm-curl`; up to 2.55.0-19 they were built against
+wasm-curl 8.22.0-6, whose Mbed TLS archive still named
+`/tmp/homescoop-work/mbedtls-3.6.5/…` (homescoop#1008). 2.55.0-20 links
+wasm-curl 8.22.0-9, and the build refuses any wasm that names a build path.

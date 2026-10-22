@@ -62,3 +62,19 @@ AssertionError: a local git workflow asked the uplink
 ## 2.55.0-19: shim drift (homescoop#1491; 2026-10-20)
 
 2.55.0-19 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 2.55.0-18 in `bin/git`, `bin/git-receive-pack`, `bin/git-receive-pack.wasm`, `bin/git-remote-http`, `bin/git-remote-http.wasm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 2.55.0-20: build paths and the read-only clone (homescoop#1008, #1432; 2026-10-21)
+
+`cert/paths.mjs` against the published 2.55.0-19 fails: 7 of its 18 wasm name the CI build directory through Mbed TLS's `__FILE__` strings, which came in with wasm-curl 8.22.0-6's `libmbedtls.a`:
+
+```text
+bin/git-remote-http.wasm: homescoop-work/mbedtls-3.6.5/library/ssl_misc.h
+bin/git-remote-https.wasm: homescoop-work/mbedtls-3.6.5/library/ssl_misc.h
+libexec/git-core/git-http-fetch.wasm: homescoop-work/mbedtls-3.6.5/library/ssl_misc.h
+libexec/git-core/git-remote-ftp.wasm: homescoop-work/mbedtls-3.6.5/library/ssl_misc.h
+libexec/git-core/git-remote-ftps.wasm: homescoop-work/mbedtls-3.6.5/library/ssl_misc.h
+libexec/git-core/git-remote-http.wasm: homescoop-work/mbedtls-3.6.5/library/ssl_misc.h
+libexec/git-core/git-remote-https.wasm: homescoop-work/mbedtls-3.6.5/library/ssl_misc.h
+```
+
+wasm-curl 8.22.0-9's archives name none, and 2.55.0-20 links them. build.sh now refuses a build path in any staged wasm, not only `git.wasm`. `cert/clone-ro.mjs` is coverage (#1432): 2.55.0-18 and -19 pass it too.

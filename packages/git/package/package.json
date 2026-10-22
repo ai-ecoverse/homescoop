@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-git",
-  "version": "2.55.0-19",
+  "version": "2.55.0-20",
   "description": "Git version control: clone, commit, branch, merge, push and pull.",
   "engines": {
     "slicc-kernel": ">=1.130.2"
@@ -28,8 +28,8 @@
     "share"
   ],
   "dependencies": {
-    "@ai-ecoverse/wasm-bash": "5.3.0-22",
-    "@ai-ecoverse/wasm-sed": "4.10.0-5"
+    "@ai-ecoverse/wasm-bash": "5.3.0-23",
+    "@ai-ecoverse/wasm-sed": "4.10.0-6"
   },
   "publishConfig": {
     "access": "public"
