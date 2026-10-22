@@ -1,17 +1,22 @@
 getpath: take the home from the slicc command's own argv, never from a
-variable a caller can set, and under -E/-I find the executable on a fixed
-PATH (homescoop#1572, #1504, #1144); venv: always symlink the interpreter
-on wasi (homescoop#1269).
+variable a caller can set, and under -E/-I take nothing else from the
+environment or the cwd either (homescoop#1572, #1504, #1144); venv: always
+symlink the interpreter on wasi (homescoop#1269).
 
 The slicc command runs python as /usr/bin/python3 (a registered copy) with
 PYTHONHOME set to the package and its argv prefixed by
 "-X slicc_home=<package>/" (package.json args). A caller's environment
 overrides the command's env, but not its argv prefix, so getpath takes
 the home from orig_argv[1:3] when PYTHONHOME is not used: always under
--I/-E, which ignore PYTHONHOME as stock CPython does. Under -I/-E getpath
-also searches only /usr/bin:/bin for a bare argv[0], since slicc starts
-a #!/usr/bin/python3 script with argv[0] "python3" and a caller's PATH
-could otherwise pick the executable and with it a pyvenv.cfg.
+-I/-E, which ignore PYTHONHOME as stock CPython does. That home counts as
+set by the embedder (home_was_set), so no ._pth file replaces it.
+Under -I/-E getpath also ignores PATH, PYTHONEXECUTABLE and
+__PYVENV_LAUNCHER__, takes the executable only from an absolute argv[0]
+(slicc-kernel's argv0Path, how a venv's bin/python starts), never from a
+cwd-relative one, and without an executable looks for pyvenv.cfg only in
+the home's bin/ and the home, never in the cwd. slicc starts a
+#!/usr/bin/python3 -I script with argv[0] "python3", so a caller's PATH or
+cwd could otherwise pick a pyvenv.cfg and run its site-packages' .pth.
 A venv's copied bin/python runs as a bare wasm, without the command's env
 and with argv[0] reduced to its name, so it finds neither PYTHONHOME nor
 pyvenv.cfg; a symlink resolves to the registered command.
@@ -34,23 +39,54 @@ pyvenv.cfg; a symlink resolves to the registered command.
          self.orig_prompt = prompt
 --- a/Modules/getpath.py
 +++ b/Modules/getpath.py
-@@ -230,6 +230,10 @@
+@@ -230,6 +230,13 @@
  pythonpath_was_set = config.get('module_search_paths_set')
  stdlib_dir = config.get('stdlib_dir')
  stdlib_dir_was_set_in_config = bool(stdlib_dir)
 +slicc_argv = config.get('orig_argv', [])
 +SLICC_HOME = slicc_argv[2][11:] if len(slicc_argv) > 2 and slicc_argv[1] == '-X' and slicc_argv[2].startswith('slicc_home=') else None
-+if not use_environment:
-+    ENV_PATH = '/usr/bin:/bin'
++slicc_strict = not use_environment
++if slicc_strict:
++    ENV_PATH = None
++    ENV_PYTHONEXECUTABLE = None
++    ENV___PYVENV_LAUNCHER__ = None
  
  real_executable_dir = None
  platstdlib_dir = None
-@@ -334,6 +338,8 @@
+@@ -262,7 +269,7 @@
+     if not executable:
+         executable = real_executable
+ 
+-if not executable and SEP in program_name:
++if not executable and SEP in program_name and not (slicc_strict and not program_name.startswith(SEP)):
+     # Resolve partial path program_name against current directory
+     executable = abspath(program_name)
+ 
+@@ -294,6 +301,8 @@
+     # look in the current working directory. Here, we emulate that
+     # (the former getpath.c would do it apparently by accident).
+     executable_dir = abspath('.')
++    if slicc_strict:
++        executable_dir = joinpath(SLICC_HOME, 'bin') if SLICC_HOME else None
+     # Also need to set this fallback in case we are running from a
+     # build directory with an invalid argv0 (i.e. test_sys.test_executable)
+     real_executable_dir = executable_dir
+@@ -334,6 +343,9 @@
      home_was_set = True
  elif use_environment and ENV_PYTHONHOME and not py_setpath:
      home = ENV_PYTHONHOME
 +elif SLICC_HOME and not py_setpath:
 +    home = SLICC_HOME
++    home_was_set = True
  
  
  # ******************************************************************************
+@@ -345,7 +357,7 @@
+ # Calling Py_SetPath() will override venv detection.
+ # Calling Py_SetPythonHome() or setting $PYTHONHOME will override the 'home' key
+ # specified in pyvenv.cfg.
+-if not py_setpath:
++if not py_setpath and (executable_dir or executable):
+     try:
+         # prefix2 is just to avoid calculating dirname again later,
+         # as the path in venv_prefix is the more common case.

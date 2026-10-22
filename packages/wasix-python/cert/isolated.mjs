@@ -13,14 +13,20 @@ export default async function (ctx) {
   assert.equal(pp.stdout.trim(), 'False', `-E still ignores PYTHONPATH: ${pp.stdout}${pp.stderr}`);
   const m = await run(['python3', '-Im', 'json.tool', '--help'], { cwd: '/tmp' });
   assert.equal(m.status, 0, `python3 -Im json.tool: ${m.stderr}`);
-  const md = await run(['mkdir', '-p', '/tmp/fh/lib/python3.15', '/tmp/ev/bin', '/tmp/ev/lib/python3.15/site-packages', '/tmp/xc'], { cwd: '/tmp' });
+  const md = await run(['mkdir', '-p', '/tmp/fh/lib/python3.15', '/tmp/ev/bin', '/tmp/ev/lib/python3.15/site-packages', '/tmp/xc', '/tmp/cv/bin', '/tmp/cv/lib/python3.15/site-packages', '/tmp/pt/bin/lib/python3.15'], { cwd: '/tmp' });
   assert.equal(md.status, 0, `mkdir: ${md.stderr}`);
   await write('/tmp/fh/lib/python3.15/encodings.py', 'import sys\nsys.stderr.write("FAKEHOME-LOADED\\n")\nraise SystemExit(3)\n');
   await write('/tmp/ev/bin/python3', '#!/bin/sh\necho EVIL-EXE\n');
   await write('/tmp/ev/pyvenv.cfg', 'home = /usr/bin\ninclude-system-site-packages = false\n');
   await write('/tmp/ev/lib/python3.15/site-packages/evil.pth', 'import sys; sys.stderr.write("EVIL-PTH\\n")\n');
   await write('/tmp/iso.py', '#!/usr/bin/python3 -I\nimport sys\nprint(sys.prefix, sys.executable)\n');
-  const cm = await run(['chmod', '755', '/tmp/ev/bin/python3', '/tmp/iso.py'], { cwd: '/tmp' });
+  await write('/tmp/cv/pyvenv.cfg', 'home = /usr/bin\ninclude-system-site-packages = false\n');
+  await write('/tmp/cv/bin/pyvenv.cfg', 'home = /usr/bin\ninclude-system-site-packages = false\n');
+  await write('/tmp/cv/lib/python3.15/site-packages/cwd.pth', 'import sys; sys.stderr.write("EVIL-PTH\\n")\n');
+  await write('/tmp/pt/bin/python3', '#!/bin/sh\necho EVIL-EXE\n');
+  await write('/tmp/pt/bin/python3._pth', 'lib/python3.15\nimport site\n');
+  await write('/tmp/pt/bin/lib/python3.15/encodings.py', 'import sys\nsys.stderr.write("EVIL-PTH\\n")\nraise SystemExit(3)\n');
+  const cm = await run(['chmod', '755', '/tmp/ev/bin/python3', '/tmp/pt/bin/python3', '/tmp/iso.py'], { cwd: '/tmp' });
   assert.equal(cm.status, 0, `chmod: ${cm.stderr}`);
   const problems = [];
   const homes = [];
@@ -34,15 +40,27 @@ export default async function (ctx) {
       else if (h.stdout.trim() !== prefix) problems.push(`${label}: sys.prefix ${h.stdout.trim()}, want the package ${prefix}`);
     }
   }
+  const q = 'import sys; print(sys.prefix, sys.executable)';
   const viaPath = [
-    ['python3 -I', ['python3', '-I', '-c', 'import sys; print(sys.prefix, sys.executable)']],
-    ['python3 -E', ['python3', '-E', '-c', 'import sys; print(sys.prefix, sys.executable)']],
+    ['python3 -I', ['python3', '-I', '-c', q]],
+    ['python3 -E', ['python3', '-E', '-c', q]],
     ['#!/usr/bin/python3 -I', ['/tmp/iso.py']],
   ];
-  for (const [name, argv] of viaPath) {
-    const v = await run(argv, { cwd: '/tmp', env: { PATH: '/tmp/ev/bin:/usr/bin:/bin' } });
-    const label = `PATH=/tmp/ev/bin:/usr/bin:/bin ${name}`;
-    if (`${v.stdout}${v.stderr}`.includes('EVIL-PTH')) problems.push(`${label} ran /tmp/ev's .pth (sys.prefix, sys.executable: ${v.stdout.trim()})`);
+  const vectors = [];
+  for (const [name, argv] of viaPath) vectors.push([`PATH=/tmp/ev/bin:/usr/bin:/bin ${name}`, argv, '/tmp', { PATH: '/tmp/ev/bin:/usr/bin:/bin' }]);
+  for (const cwd of ['/tmp/cv', '/tmp/cv/bin']) {
+    for (const flag of ['-I', '-E']) vectors.push([`cwd ${cwd} (a pyvenv.cfg), PATH=/tmp/nowhere /usr/bin/python3 ${flag}`, ['/usr/bin/python3', flag, '-c', q], cwd, { PATH: '/tmp/nowhere' }]);
+    vectors.push([`cwd ${cwd} (a pyvenv.cfg) #!/usr/bin/python3 -I`, ['/tmp/iso.py'], cwd, {}]);
+  }
+  for (const name of ['PYTHONEXECUTABLE', '__PYVENV_LAUNCHER__']) {
+    for (const [exe, what] of [['/tmp/ev/bin/python3', 'a pyvenv.cfg'], ['/tmp/pt/bin/python3', 'a python3._pth']]) {
+      for (const flag of ['-I', '-E']) vectors.push([`${name}=${exe} (${what}) python3 ${flag}`, ['python3', flag, '-c', q], '/tmp', { [name]: exe }]);
+      vectors.push([`${name}=${exe} (${what}) #!/usr/bin/python3 -I`, ['/tmp/iso.py'], '/tmp', { [name]: exe }]);
+    }
+  }
+  for (const [label, argv, cwd, env] of vectors) {
+    const v = await run(argv, { cwd, env });
+    if (`${v.stdout}${v.stderr}`.includes('EVIL-PTH')) problems.push(`${label} ran the caller's .pth or ._pth home (rc ${v.status}, ${v.stdout.trim()})`);
     else if (v.status !== 0) problems.push(`${label}: rc ${v.status} ${v.stderr.slice(-300)}`);
     else if (v.stdout.trim() !== `${prefix} /usr/bin/python3`) problems.push(`${label}: sys.prefix, sys.executable ${v.stdout.trim()}, want ${prefix} /usr/bin/python3`);
   }
@@ -62,5 +80,5 @@ export default async function (ctx) {
   assert.equal(env.status, 0, `python3 with XDG_CACHE_HOME=/tmp/xc: rc=${env.status} ${env.stderr}`);
   const used = await run(['python3', '-c', ls, '/tmp/xc'], { cwd: '/tmp' });
   assert.ok(used.stdout.includes('slicc-site/'), `plain python3 keeps its discovery cache in XDG_CACHE_HOME: ${used.stdout}${used.stderr}`);
-  console.log(`isolated: python3 -I and -E start with sys.prefix ${prefix} (encodings found), -E still ignores PYTHONPATH, python3 -Im runs a module; ${homes.join(', ')} keep ${prefix} and never run /tmp/fh's encodings.py, and plain python3 uses PYTHONHOME=/tmp/fh (rc ${plain.status}); with PATH=/tmp/ev/bin:/usr/bin:/bin (a python3, a pyvenv.cfg and a .pth) ${viaPath.map(([l]) => l).join(', ')} keep ${prefix} and /usr/bin/python3 and never run the .pth; python3 -I keeps no discovery cache under a caller's XDG_CACHE_HOME/HOME, plain python3 does; the command's argv starts with -X slicc_home=${prefix}`);
+  console.log(`isolated: python3 -I and -E start with sys.prefix ${prefix} (encodings found), -E still ignores PYTHONPATH, python3 -Im runs a module; ${homes.join(', ')} keep ${prefix} and never run /tmp/fh's encodings.py, and plain python3 uses PYTHONHOME=/tmp/fh (rc ${plain.status}); ${vectors.length} caller-chosen PATH, cwd, PYTHONEXECUTABLE and __PYVENV_LAUNCHER__ cases (${vectors.map(([l]) => l).join('; ')}) keep ${prefix} and /usr/bin/python3 and never run the caller's .pth or ._pth home; python3 -I keeps no discovery cache under a caller's XDG_CACHE_HOME/HOME, plain python3 does; the command's argv starts with -X slicc_home=${prefix}`);
 }

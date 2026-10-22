@@ -3,7 +3,10 @@
 npm 3.15.0-5 on slicc-kernel 1.125.0 (browser cert, users enforce, `run.mjs --spec isolated.mjs`): FAIL. All of it in one assertion:
 
 - `SLICC_PYTHONHOME=/tmp/fh python3 -I ran /tmp/fh's encodings.py (rc 1)`, and the same for `-E`: -5's getpath took the home from that variable under -I/-E, and a caller's value wins over the command's `env`.
-- `PATH=/tmp/ev/bin:/usr/bin:/bin python3 -I ran /tmp/ev's .pth (sys.prefix, sys.executable: /tmp/ev /tmp/ev/bin/python3)`, and the same for `python3 -E` and for a `#!/usr/bin/python3 -I` script. slicc starts python with `argv[0]` `python3`, so getpath looked it up on the caller's `PATH`, read `/tmp/ev/pyvenv.cfg` and made `/tmp/ev` the venv, whose site-packages `.pth` ran.
+- `PATH=/tmp/ev/bin:/usr/bin:/bin python3 -I ran the caller's .pth or ._pth home (rc 0, /tmp/ev /tmp/ev/bin/python3)`, and the same for `python3 -E` and for a `#!/usr/bin/python3 -I` script. slicc starts python with `argv[0]` `python3`, so getpath looked it up on the caller's `PATH`, read `/tmp/ev/pyvenv.cfg` and made `/tmp/ev` the venv, whose site-packages `.pth` ran.
+- `cwd /tmp/cv (a pyvenv.cfg), PATH=/tmp/nowhere /usr/bin/python3 -I ran the caller's .pth or ._pth home (rc 0, /tmp/cv)`, and the same for `-E` and for a cwd of `/tmp/cv/bin` (the parent's pyvenv.cfg). With no executable found, getpath looked for `pyvenv.cfg` in the cwd and its parent. The `#!/usr/bin/python3 -I` script from that cwd with the default PATH passes on -5, since -5 then found an executable on PATH.
+- `PYTHONEXECUTABLE=/tmp/ev/bin/python3 (a pyvenv.cfg) python3 -I ran the caller's .pth or ._pth home (rc 0, /tmp/ev /tmp/ev/bin/python3)`, and the same for `-E`, the script, and `__PYVENV_LAUNCHER__`: getpath took either variable as the executable without checking -E.
+- `PYTHONEXECUTABLE=/tmp/pt/bin/python3 (a python3._pth) python3 -I ran the caller's .pth or ._pth home (rc 1, )`, and the same for `-E`, the script, and `__PYVENV_LAUNCHER__`: the `python3._pth` next to that path became the home, and its fake `encodings.py` ran.
 - `python3 -I keeps its discovery cache under a caller's XDG_CACHE_HOME/HOME: ['slicc-site', 'slicc-site/node_modules%@ai-ecoverse%wasix-python']`.
 - `the command's argv prefix is ['-c', …], want ['-X', 'slicc_home=/node_modules/@ai-ecoverse/wasix-python/']`.
 
