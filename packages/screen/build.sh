@@ -7,6 +7,7 @@ ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe screen
 homescoop_load_recipe screen --source ncurses
+[[ ! -e "$HOMESCOOP_PKG/README.md" ]] || { echo "homescoop screen: $HOMESCOOP_PKG/README.md exists; the package README is package/README.md only (homescoop#1600)" >&2; exit 1; }
 
 SRC_DIR="$WORK/screen-$VERSION"
 TARBALL="$WORK/screen-$VERSION.tar.gz"
@@ -193,9 +194,6 @@ path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(json.dumps(pkg, indent=2) + "\n")
 print("package.json", pkg["version"])
 PY
-
-# README: packages/screen/README.md is the source (usage and known limits).
-cp "$HOMESCOOP_PKG/README.md" "$HOMESCOOP_PKG/package/README.md"
 
 cat > "$HOMESCOOP_PKG/package/PRESTAGE.md" <<EOF
 # wasm-screen ${VERSION}

@@ -39,3 +39,5 @@ about:
     build date, so the build is byte-reproducible (reproducible: true).
     5.0.1-12 (homescoop#849): packaging-only, publishes main's build (npm's
     5.0.1-11 orders the emscripten_stack_* exports differently).
+    5.0.1-16 (homescoop#1600): package/README.md is the only README; build.sh
+    no longer copies a recipe-root one over it and fails if one comes back.

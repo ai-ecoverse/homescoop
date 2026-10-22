@@ -109,3 +109,15 @@ AssertionError [ERR_ASSERTION]: BUILD_DATE comes from source.epoch (SOURCE_DATE_
 ## 5.0.1-15: shim drift (homescoop#1491; 2026-10-21)
 
 5.0.1-15 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 5.0.1-14 in `bin/screen` and `bin/screen.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 5.0.1-16: one README, and a window driven from outside (homescoop#1600, #1485; 2026-10-22)
+
+- **#1600:** build.sh copied the recipe-root `packages/screen/README.md` over `package/README.md`, so the tarball shipped that copy instead of the committed package README. 5.0.1-16 deletes the root copy and the `cp`, and build.sh fails if a root README comes back. `cert/docs.mjs` on the published 5.0.1-15 (slicc-kernel 1.69.0, users enforce, 2026-10-22) fails, because its README has no section for the version it ships:
+
+  ```text
+  browser-cert: FAIL packages/screen/cert/docs.mjs
+  AssertionError [ERR_ASSERTION]: the shipped README has a ## 5.0.1-15 section (homescoop#1600)
+    expected: /^## 5\.0\.1-15 /m
+  ```
+
+- **#1485:** `cert/stuff-log.mjs` is coverage, not a defect fix: it passes on the published 5.0.1-15 as well. `prove-negative.mjs --spec stuff-log.mjs` (the same tarball with an empty wasm) fails it: `prove-negative: ok — cert failed on bad screen tarball (status 1; 1 of 2 spec(s) failed: stuff-log.mjs)`.
