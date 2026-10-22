@@ -22,7 +22,7 @@
  *
  * Repack recipes (repack.from) never fetch their source, so a wrong sha256
  * would never fail a build (#730). Builds skip them (their bytes come from
- * npm, not the source); with --verify-repack (ladder-pr's recipe-sha job)
+ * npm, not the source); with --verify-repack (the PR run's recipe-sha job)
  * they are verified, never rewritten, and a mismatch fails.
  *
  * scripts/recipe-sha-allowlist.txt lists the known mismatches, one
@@ -118,7 +118,7 @@ function fetchBlob(url) {
 
 /**
  * The base commit: the merge-base of HEAD with the base ref. With `tip`, a
- * shallow checkout (ladder-pr's build jobs, pool-parity) that has no merge-base
+ * shallow checkout (the PR run's build jobs) that has no merge-base
  * fetches the base branch's tip (depth 1) and uses that instead (the mirror
  * check and the sha refresh), and a branch behind a base that changed the
  * source then fails closed until it merges the base.

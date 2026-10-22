@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { LABELS, TRIAGE, areaOf, glob, labelsFor, listPackages, packagesIn, unlabelled } from '../issue-labels.mjs';
+import { job, text } from './ladder-workflow.mjs';
 
 const packages = listPackages();
 
@@ -94,30 +94,20 @@ describe('the filers', () => {
     for (const [title] of TABLE) for (const l of labelsFor(title, packages)) assert.ok(LABELS.includes(l), l);
   });
 
-  it('pool-parity labels its issue', () => {
-    const yml = readFileSync(new URL('../../.github/workflows/pool-parity.yml', import.meta.url), 'utf8');
-    assert.match(yml, /issues\.create\(\{[^}]*labels: \[label, 'repro', 'ci'\]/);
+  it('the pipeline reviewers are told to title what they file as [cert] <recipe>: …', () => {
+    const prompt = job('pipeline');
+    assert.match(prompt, /titled `\[cert\] <recipe>: …`/);
+    assert.match(prompt, /`\[cert\] <recipe>: cert coverage gaps`/);
   });
 
-  it('cert-review tells its reviewer to label what it files', () => {
-    const yml = readFileSync(new URL('../../.github/workflows/cert-review.yml', import.meta.url), 'utf8');
-    const prompt = yml.slice(yml.indexOf('gh issue create'), yml.indexOf('YOUR ANSWER'));
-    for (const l of ['next-build', 'area:kernel', 'area:python', 'area:sysroot', 'area:toolchain', 'repro', 'license', 'supply-chain', 'data-integrity', 'cert-coverage']) assert.ok(prompt.includes(`\`${l}\``), l);
-    assert.match(prompt, /`--label`/);
-    assert.match(prompt, /\[cert\] <package>: …/);
-  });
-
-  it('the fallback (issues opened, plus an hourly sweep for GITHUB_TOKEN filers) runs this script with issues: write only', () => {
-    const yml = readFileSync(new URL('../../.github/workflows/issue-labels.yml', import.meta.url), 'utf8');
-    assert.match(yml, /issues:\s*\n\s*types: \[opened\]/);
-    assert.match(yml, /schedule:\s*\n\s*- cron:/);
-    assert.match(yml, /node scripts\/issue-labels\.mjs --backlog --apply/);
-    const lines = yml.split('\n');
-    const at = lines.indexOf('permissions:');
-    const block = [];
-    for (let i = at + 1; i < lines.length && /^\s+\S/.test(lines[i]); i++) block.push(lines[i].trim());
-    assert.deepEqual(block, ['issues: write']);
-    assert.equal(lines.filter((l) => /^\s*permissions:/.test(l)).length, 1);
-    assert.match(yml, /node scripts\/issue-labels\.mjs --event/);
+  it('the labeller (issues opened, plus an hourly sweep for GITHUB_TOKEN filers) runs this script with issues: write only', () => {
+    assert.match(text, /\n {2}issues:\n {4}types: \[opened\]\n/);
+    assert.match(text, /\n {2}schedule:\n {4}- cron: '[^']+'\n/);
+    const labels = job('issue-labels');
+    assert.match(labels, /if: github\.event_name == 'issues' \|\| github\.event_name == 'schedule'/);
+    assert.match(labels, /node scripts\/issue-labels\.mjs --backlog --apply/);
+    assert.match(labels, /node scripts\/issue-labels\.mjs --event/);
+    assert.match(labels, /\n {4}permissions:\n {6}contents: read\n {6}issues: write\n {4}steps:/);
+    assert.match(text, /\npermissions:\n {2}contents: read\n\n/);
   });
 });

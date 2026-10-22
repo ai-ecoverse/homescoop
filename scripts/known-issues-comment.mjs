@@ -2,7 +2,7 @@
 /**
  * Known issues for touched packages: list the open `next-build` issues that
  * name each package a PR touches, so per-recipe known issues get fixed when the
- * recipe is next built. ladder-pr's known-issues job runs it; it informs and
+ * recipe is next built. the PR run's known-issues job runs it; it informs and
  * never fails the PR.
  *
  *   node scripts/known-issues-comment.mjs --packages sed,curl --issues issues.json

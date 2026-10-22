@@ -48,7 +48,7 @@ Never publish `X.Y-N` — `npm pack` may accept it, but `npm publish` rejects
 it as an invalid version (caught on which 2.23-1). Keep `homescoop.upstream`
 as the true upstream string.
 
-`host-run.sh` and `ladder-pr` validate the **packed** tarball with
+`host-run.sh` and the PR build validate the **packed** tarball with
 `sync-package-version.mjs --assert-tarball` so non-semver versions fail in
 CI before certification, not at publish.
 The same check refuses tarballs that contain hard links or symlinks: `npm pack`
@@ -85,7 +85,7 @@ matches the recipe. An allowed spelling (`10.6p1` for 10.6.0) or padding
 re-serialised. `--from <old>` rewrites text from an explicit old version
 when the version fields are already right (jq 1.8.1 → 1.8.2 text).
 
-`check-package-meta.mjs <pkg>` (run by `host-run.sh`, so by ladder-pr and
+`check-package-meta.mjs <pkg>` (run by `host-run.sh`, so by the PR build and
 ladder-build) fails on drift, and `check-package-meta.mjs --drift --all`
 runs only that rule over every non-retired package:
 
@@ -145,7 +145,7 @@ doesn't nest an old copy under each dependent. No other `@ai-ecoverse` pin may
 be a range.
 
 `scripts/check-exact-pins.mjs` enforces it: the `exact-pins` job in
-`ladder-pr` checks every package, and `host-run.sh` checks the package it
+The PR build checks every package, and `host-run.sh` checks the package it
 packs. Its `PENDING` set (empty now) is for a package whose exact-pin
 re-release is still in flight; an entry that is already exact fails.
 

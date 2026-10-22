@@ -109,11 +109,23 @@ export default async function (ctx) {
   console.log(`discovery: flat /node_modules: ${r.stdout.trim()}`);
 
   const pp = (await py(['-c', 'import sys; print(":".join(p for p in sys.path if "/py-" in p))'])).stdout.trim();
-  const cold = await py(['-c', 'import os, time, _slicc_site as s\nc = os.path.join(os.path.realpath(__import__("sys").base_prefix), ".slicc-site-cache")\nos.path.exists(c) and os.remove(c)\nt = time.perf_counter(); s.discover(); a = time.perf_counter() - t\nt = time.perf_counter(); s.discover(); b = time.perf_counter() - t\nprint(f"{a*1000:.1f} {b*1000:.1f}")']);
+  const timing = String.raw`
+import os, sys, time, _slicc_site as s
+c = s._cache_path(os.path.realpath(sys.base_prefix))
+cold, warm = [], []
+for _ in range(3):
+    c and os.path.exists(c) and os.remove(c)
+    t = time.perf_counter(); s.discover(); cold.append(time.perf_counter() - t)
+for _ in range(5):
+    t = time.perf_counter(); s.discover(); warm.append(time.perf_counter() - t)
+m = lambda xs: sorted(xs)[len(xs) // 2] * 1000
+print(f"{m(cold):.1f} {m(warm):.1f}")
+`;
+  const cold = await py(['-c', timing]);
   assert.equal(cold.status, 0, cold.stderr);
   const [coldMs, warmMs] = cold.stdout.trim().split(' ').map(Number);
-  const times = { on: [], off: [], pythonpath: [] };
-  const modes = [['on', {}], ['off', { SLICC_PYTHON_DISCOVER: '0' }], ['pythonpath', { SLICC_PYTHON_DISCOVER: '0', PYTHONPATH: pp }]];
+  const times = { on: [], off: [], pythonpath: [], nocache: [] };
+  const modes = [['on', {}], ['off', { SLICC_PYTHON_DISCOVER: '0' }], ['pythonpath', { SLICC_PYTHON_DISCOVER: '0', PYTHONPATH: pp }], ['nocache', { XDG_CACHE_HOME: '/dev/null/slicc-no-cache' }]];
   for (let i = 0; i < 9; i++) {
     for (const [m, env] of i % 2 ? modes : [...modes].reverse()) {
       const t = performance.now();
@@ -122,12 +134,16 @@ export default async function (ctx) {
     }
   }
   const med = (xs) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
+  const onCost = med(times.on) - med(times.off);
+  const noCacheCost = med(times.nocache) - med(times.off);
   console.log(
-    `discovery: discover() cold ${coldMs} ms, warm ${warmMs} ms; python -c pass median of 9: ` +
-      `on ${med(times.on).toFixed(0)} ms, off ${med(times.off).toFixed(0)} ms, off + same PYTHONPATH ${med(times.pythonpath).toFixed(0)} ms`,
+    `discovery: discover() median cold ${coldMs} ms, warm ${warmMs} ms; python -c pass median of 9: ` +
+      `on ${med(times.on).toFixed(0)} ms, off ${med(times.off).toFixed(0)} ms, off + same PYTHONPATH ${med(times.pythonpath).toFixed(0)} ms, on without a cache ${med(times.nocache).toFixed(0)} ms; ` +
+      `a start pays ${onCost.toFixed(0)} ms for discovery (${(onCost / noCacheCost).toFixed(2)} of its cost without the cache), ${noCacheCost.toFixed(0)} ms without its cache`,
   );
-  assert.ok(warmMs <= 0.2 * med(times.off), `warm discover() took ${warmMs} ms of a ${med(times.off).toFixed(0)} ms start`);
-  assert.ok(med(times.on) <= med(times.pythonpath) * 1.1, 'discovery costs more than the same PYTHONPATH');
+  assert.ok(warmMs <= 0.5 * coldMs, `warm discover() ${warmMs} ms is more than half a cold scan (${coldMs} ms): the cache does not hit`);
+  assert.ok(noCacheCost >= 0.5 * coldMs, `without its cache discovery costs a start only ${noCacheCost.toFixed(0)} ms of a ${coldMs} ms cold scan: the comparison measures nothing`);
+  assert.ok(onCost <= 0.5 * noCacheCost, `discovery costs a start ${onCost.toFixed(0)} ms, more than half of the ${noCacheCost.toFixed(0)} ms it costs without its cache: the start rescans`);
   }
 
   try {

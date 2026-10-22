@@ -84,3 +84,18 @@
 - **The package patches:** wasm-emscripten 6.0.9-27 keeps 0014 (libfs symloop) and 0015 (slicc-env.js in link.py's default link) in `package-patches/`, which `scripts/emscripten-tree.sh` doesn't apply. build.sh now applies them to the tree after emscripten-tree.sh, as wasm-emscripten's build.sh does, and the recipe lists `package-patches/**` as an input. 0015 changes nothing here (this link names its libraries itself), and 0014 gives the glue the 40-follow bound. build.sh checks for `nlinks<=40`.
 - **#1535, the cause:** build.sh compiles the shims itself, outside `homescoop_slicc_archive`, so no shims section was written, and `KNOWN_WITHOUT_SHIM_NOTICE` let it through under the closed #844. build.sh now calls `homescoop_notice_slicc_shims`, and the entry is gone, so `scripts/test/shim-notice.test.mjs` fails if the call goes missing.
 
+
+## 24.0.0-26: no link flags without a link (homescoop#1647; 2026-10-22)
+
+`test/tools.mjs --expect old` on slicc-kernel 1.100.0, users enforce, against the published 24.0.0-25:
+
+| case | 24.0.0-25 | 24.0.0-26 |
+|---|---|---|
+| `cc -Werror -fsyntax-only c.c` (#1647; also `c++ x.cpp`, `-fPIC`, `-rdynamic`, `WASIXCC_PIC=yes`, `-emit-ast`) | rc 1: `-lclang_rt.builtins-wasm32`, `-lpthread`, `-Wl,-z,stack-size=8388608: 'linker' input unused [-Werror,-Wunused-command-line-argument]` (c++: `-lc++`, `-lc++abi`, `-lunwind`) | rc 0, nothing unused |
+| `cc -Werror -fsyntax-only a.s` | rc 1, the same `'linker' input unused` errors | rc 1 with only clang's own `a.s: 'assembler' input unused`, as upstream clang 21 gives for `--target=wasm32-wasip1 -Werror -fsyntax-only a.s` |
+| `cc -fsyntax-only a.s` | rc 0 with `'linker' input unused` warnings | rc 0, no `'linker' input unused` |
+
+Every other row of tools.mjs (the static rows, #1408's assembly rows, #1502's env -i row, the symlink rows and the new #1249 build-and-run rows) passes on 24.0.0-25, so the negative is exactly #1647.
+
+- **The cause:** the driver added its link libraries and `-Wl,` flags whenever the call wasn't `-c`/`-S`/`-E`/`-M` and had link inputs. `-fsyntax-only` only set `no_output` (no a.out, no post-link, #710), so its link flags went to a clang that never links. 24.0.0-26 sets `no_link` for `-fsyntax-only`, `-emit-ast` and `--analyze`, and leaves out the link flags (and the asm-only `-pthread`) then. `-###` and `-fdriver-only` keep them, since they show or check the full link plan.
+- **#1249 coverage (not a fix):** C → `cc -S` → `cc -Werror -c` → link → run with TLS, atomics and 4 pthreads; the asm-only link `cc ts.s a.s`; two TUs with `-g` → `llvm-ar rcs` → `llvm-nm` → `-lab` → `llvm-strip` and `llvm-objcopy --strip-debug` → run, and `-flto`; in cxx-eh.mjs 1100 nested parens, a caller's `-fbracket-depth=256`, and the helper commands by name. They pass on 24.0.0-25 as well.

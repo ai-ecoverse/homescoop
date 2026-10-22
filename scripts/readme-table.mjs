@@ -6,7 +6,7 @@
  * row would make every bump edit README.md, so concurrent bumps of neighbouring
  * rows conflict. One row per recipe dir; a dir with a recipe.yaml `npm-tag:`
  * (a wave beside the latest dir) shows its dist-tag. Descriptions can carry upstream versions, which
- * sync-package-version rewrites on an upstream bump, so ladder-pr's recipe-sha
+ * sync-package-version rewrites on an upstream bump, so the PR run's recipe-sha
  * job regenerates the table too. Private packages are left out. The table lives between the
  * `<!-- packages:start -->` and `<!-- packages:end -->` markers (#639, #647, #659).
  *
@@ -14,7 +14,7 @@
  *   node scripts/readme-table.mjs --write    # rewrite README.md in place
  *   node scripts/readme-table.mjs --check    # exit 1 if README.md differs
  *
- * scripts/test/readme-table.test.mjs runs --check in ladder-pr.
+ * scripts/test/readme-table.test.mjs runs --check in the PR run.
  */
 import { readFileSync, writeFileSync, readdirSync, existsSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';

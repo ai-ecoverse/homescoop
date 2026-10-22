@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-clang",
-  "version": "24.0.0-25",
+  "version": "24.0.0-26",
   "description": "The Clang and LLD 24 compilers, to build C and C++ programs in slicc.",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
