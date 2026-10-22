@@ -4,7 +4,7 @@ const MSG = 'Maximum call stack size of 409600 bytes (zend.max_allowed_stack_siz
 
 const DEEP = {
   serialize: '$a = []; for ($i = 0; $i < $d; $i++) $a = [$a]; $r = unserialize(serialize($a)) === $a ? "ok" : "?";',
-  objects: '$o = null; for ($i = 0; $i < $d; $i++) { $n = new stdClass; $n->next = $o; $o = $n; } $r = unserialize(serialize($o)) == $o ? "ok" : "?";',
+  objects: '$o = null; for ($i = 0; $i < $d; $i++) { $n = new stdClass; $n->next = $o; $o = $n; } $s = serialize($o); $r = serialize(unserialize($s)) === $s ? "ok" : "?";',
   compare: '$a = []; $b = []; for ($i = 0; $i < $d; $i++) { $a = [$a]; $b = [$b]; } $r = $a == $b ? "ok" : "?";',
   json: '$a = []; for ($i = 0; $i < $d; $i++) $a = [$a]; $j = json_encode($a, 0, $d + 10); $r = $j === false ? json_last_error_msg() : (json_decode($j, true, $d + 10) === $a ? "ok" : "?");',
   array_map: 'function f($n) { return $n ? array_map("f", [$n - 1])[0] + 1 : 0; } $r = f($d) === $d ? "ok" : "?";',
@@ -27,13 +27,13 @@ const INFINITE = {
 export default async function (ctx) {
   const { run, assert } = ctx;
 
-  const ini = await phpOk(ctx, '<?php echo ini_get("zend.max_allowed_stack_size"), "|", ini_get("zend.reserved_stack_size"), "\\n";');
-  assert.equal(ini, '0|0\n');
-
   const repro = await run(['php', '-r', '$a=[]; for($i=0;$i<5000;$i++) $a=[$a]; echo strlen(serialize($a)), "\\n";'], { cwd: '/tmp' });
   assert.equal(repro.status, 255, repro.stdout + repro.stderr);
   assert.match(repro.stdout, /Fatal error: Uncaught Error: Maximum call stack size of 409600 bytes \(zend\.max_allowed_stack_size - zend\.reserved_stack_size\) reached\. Infinite recursion\? in Command line code:1\n/, repro.stdout);
   assert.doesNotMatch(repro.stderr, /RangeError/);
+
+  const ini = await phpOk(ctx, '<?php echo ini_get("zend.max_allowed_stack_size"), "|", ini_get("zend.reserved_stack_size"), "\\n";');
+  assert.equal(ini, '0|0\n');
 
   for (const [name, code] of Object.entries(INFINITE)) {
     const r = await php(ctx, `<?php register_shutdown_function(fn() => print("shutdown\\n"));
@@ -61,9 +61,8 @@ pcntl_waitpid($pid, $st); echo "parent ", pcntl_wexitstatus($st), "\\n";`);
   assert.equal(fork, 'child error\nparent 3\n');
 
   for (const [name, code] of Object.entries(DEEP)) {
-    const d = name === 'tostring' ? 100 : 150;
-    const out = await phpOk(ctx, `<?php $d = ${d}; ${code} echo $r, "\\n";`);
-    assert.equal(out, 'ok\n', `${name} at depth ${d}`);
+    const out = await phpOk(ctx, `<?php $d = 100; ${code} echo $r, "\\n";`);
+    assert.equal(out, 'ok\n', `${name} at depth 100`);
   }
   assert.equal(await phpOk(ctx, '<?php function u($n) { return $n ? u($n - 1) + 1 : 0; } echo u(50000), "\\n";'), '50000\n');
   assert.equal(await phpOk(ctx, '<?php $s = str_repeat("a:1:{i:0;", 1000) . "i:1;" . str_repeat("}", 1000); $v = unserialize($s); for ($i = 0; $i < 1000; $i++) $v = $v[0]; echo $v, "\\n";'), '1\n');

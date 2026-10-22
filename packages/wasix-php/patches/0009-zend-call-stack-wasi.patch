@@ -10,8 +10,8 @@ config.site turns it on), and zend_call_stack_get() knew no WASI stack.
 What overflows first in slicc is not wasm's 8 MiB shadow stack in linear
 memory but the browser's native stack, where every wasm frame of the
 asyncified build sits too. V8 allows about 330 (usort calling itself) to
-1130 (json_encode) nested levels, and those frames barely touch the
-shadow stack (40 bytes a level for ==, 1.2 KiB for serialize), so no
+1130 (json_encode) nested levels, while their use of the shadow stack
+differs 30-fold (40 bytes a level for ==, 1.2 KiB for serialize), so no
 single byte budget fits every path. So:
 
 - zend_call_stack_get() reports the shadow stack's top (__stack_high) as
@@ -19,8 +19,9 @@ single byte budget fits every path. So:
 - every frame that runs the check takes 2 KiB of shadow stack
   (ZEND_WASI_CALL_STACK_FRAME), so each checked level costs about what it
   costs V8, and the 448 KiB (less zend.reserved_stack_size's 48 KiB) runs
-  out after about 200 levels of any of these paths: two thirds of what
-  V8 allows usort, a fifth of serialize and ==.
+  out after 94 (== on objects) to 188 (== on arrays) levels: about half
+  of what V8 allows usort, a fifth of serialize, array_map and == on
+  arrays.
 
 zend.max_allowed_stack_size still sets a different size (-d or php.ini),
 and -1 turns the check off.
