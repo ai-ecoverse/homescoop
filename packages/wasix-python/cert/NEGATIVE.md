@@ -1,3 +1,16 @@
+## 3.15.0-5: -I/-E take the home from a caller's SLICC_PYTHONHOME and the venv from a caller's PATH; memory numbers (3.15.0-6; #1572, #1573; 2026-10-22)
+
+npm 3.15.0-5 on slicc-kernel 1.125.0 (browser cert, users enforce, `run.mjs --spec isolated.mjs`): FAIL. All of it in one assertion:
+
+- `SLICC_PYTHONHOME=/tmp/fh python3 -I ran /tmp/fh's encodings.py (rc 1)`, and the same for `-E`: -5's getpath took the home from that variable under -I/-E, and a caller's value wins over the command's `env`.
+- `PATH=/tmp/ev/bin:/usr/bin:/bin python3 -I ran /tmp/ev's .pth (sys.prefix, sys.executable: /tmp/ev /tmp/ev/bin/python3)`, and the same for `python3 -E` and for a `#!/usr/bin/python3 -I` script. slicc starts python with `argv[0]` `python3`, so getpath looked it up on the caller's `PATH`, read `/tmp/ev/pyvenv.cfg` and made `/tmp/ev` the venv, whose site-packages `.pth` ran.
+- `python3 -I keeps its discovery cache under a caller's XDG_CACHE_HOME/HOME: ['slicc-site', 'slicc-site/node_modules%@ai-ecoverse%wasix-python']`.
+- `the command's argv prefix is ['-c', …], want ['-X', 'slicc_home=/node_modules/@ai-ecoverse/wasix-python/']`.
+
+`PYTHONHOME=/tmp/fh python3 -I`/`-E` already kept the package's prefix on -5 (#1504).
+
+`cert/heap-size.mjs`'s new bound passes on -5 as well: `importing numpy, pandas, scipy and matplotlib takes it to 170.5 MiB: 10.5 MiB of growth for the 10.5 MiB of data of 114 side modules …, and 79.0 MiB more of 1 MiB buffers fit before the memory grows (81.0 MiB in use)`. #1573 changes no code: -5 behaves the same, and what it got wrong was its README ("about 116 MiB … starts without growing the memory") and recipe.yaml's `measured-peak: 116MiB`. The bound fails on 3.15.0-4, where the initial memory was 40 MiB and dlmalloc grew the memory for every allocation, so the same run (`--spec heap-size.mjs`, same kernel) fails with `the imports grew the memory from 59.3 MiB to 118.6 MiB, more than the 10.5 MiB of the 114 side modules' data the loader places above it: the heap did not stay in the initial memory; after the imports -1.0 MiB of 1 MiB buffers fit before the memory grows, want at least 48 MiB` (next to its 40 MiB linked size, as in the -4 entry below).
+
 
 
 ## 3.15.0-4: -I/-E honour a caller's PYTHONHOME; 40 MiB initial memory on -39 (3.15.0-5; #1504, #1287; 2026-10-21)

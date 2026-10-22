@@ -49,7 +49,8 @@ def fix():
         return
     argv0 = sys.orig_argv[0] if sys.orig_argv else ""
     name = os.path.basename(argv0) or "python3"
-    for d in os.environ.get("PATH", "/usr/bin:/bin").split(os.pathsep):
+    path = "/usr/bin:/bin" if sys.flags.ignore_environment else os.environ.get("PATH", "/usr/bin:/bin")
+    for d in path.split(os.pathsep):
         p = os.path.abspath(os.path.join(d or ".", name))
         if os.path.isfile(p):
             sys.executable = p
@@ -253,7 +254,21 @@ def discover():
         pass
 
 
+def _user_home():
+    try:
+        import pwd
+
+        return pwd.getpwuid(os.geteuid()).pw_dir
+    except (ImportError, KeyError, OSError):
+        return None
+
+
 def _cache_path(real):
+    if sys.flags.ignore_environment:
+        home = _user_home()
+        if not home:
+            return None
+        return os.path.join(home, ".cache", "slicc-site", real.strip("/").replace("/", "%") or "%")
     base = os.environ.get("XDG_CACHE_HOME")
     if not base:
         home = os.environ.get("HOME")
