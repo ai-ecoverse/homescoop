@@ -1,10 +1,12 @@
 --- a/tools/link.py
 +++ b/tools/link.py
-@@ -877,6 +877,7 @@
-         'slicc_select.o',
-         'slicc_libc_gaps.o',
-         'slicc_jobs.o',
-+        'slicc_realpath.o',
-     ):
+@@ -881,6 +881,9 @@
        path = os.path.join(slicc_lib, obj)
        if os.path.isfile(path) and path not in linker_args:
+         linker_args.append(path)
++    realpath_lib = os.path.join(slicc_lib, 'libslicc_realpath.a')
++    if os.path.isfile(realpath_lib) and realpath_lib not in linker_args:
++      linker_args.append(realpath_lib)
+     # The JS halves of slicc_libc_gaps.o (writev, linkat, uname) and the
+     # exports and raise wrap of homescoop_slicc_keep_exports.
+     for js in ('slicc-writev.js', 'slicc-linkat.js', 'slicc-uname.js', 'slicc-env.js'):

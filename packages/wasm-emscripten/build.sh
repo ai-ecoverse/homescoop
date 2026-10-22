@@ -95,14 +95,20 @@ for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps sli
 done
 grep -q 'if (++cnt == SYMLOOP_MAX) {' "$HOST_EM/system/lib/libc/musl/src/misc/realpath.c"
 grep -q 'if (cnt++ == SYMLOOP_MAX) {' "$PKG/system/lib/libc/musl/src/misc/realpath.c"
-echo "  emcc -c slicc_realpath.o (musl realpath.c with package libc patch 0017)"
+echo "  emcc -c slicc_realpath.o (musl realpath.c with package libc patch 0017) into lib/slicc/libslicc_realpath.a"
+RP_OBJ="$WORK/wasm-emscripten-realpath/slicc_realpath.o"
+rm -rf "$(dirname "$RP_OBJ")"
+mkdir -p "$(dirname "$RP_OBJ")"
 (cd "$PKG" && EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -Os -fno-inline-functions -fno-builtin -std=c99 -D_XOPEN_SOURCE=700 \
   -Wno-unused-result -Wno-ignored-attributes \
   -Isystem/lib/libc/musl/arch/emscripten -Isystem/lib/libc/musl/arch/generic \
   -Isystem/lib/libc/musl/src/internal -Isystem/lib/libc/musl/src/include \
   -Isystem/lib/libc/musl/include -Isystem/lib/libc -Isystem/lib/pthread \
-  -c system/lib/libc/musl/src/misc/realpath.c -o lib/slicc/slicc_realpath.o)
-test -f "$PKG/lib/slicc/slicc_realpath.o"
+  -c system/lib/libc/musl/src/misc/realpath.c -o "$RP_OBJ")
+test -f "$RP_OBJ"
+rm -f "$PKG/lib/slicc/libslicc_realpath.a"
+(cd "$(dirname "$RP_OBJ")" && EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emar.py" rcsD "$PKG/lib/slicc/libslicc_realpath.a" slicc_realpath.o)
+test -f "$PKG/lib/slicc/libslicc_realpath.a"
 grep -q '__bits\[128/sizeof(long)\]' "$HOST_CACHE/sysroot/include/bits/alltypes.h"
 python3 -c "import pathlib,sys; d=pathlib.Path(sys.argv[1]).read_bytes(); sys.exit(0 if b'\\x41\\x8c\\x01' in d else 1)" "$PKG/lib/slicc/slicc_signals.o" || {
   echo "homescoop: slicc_signals.o missing i32.const 140 (sigaction stride)" >&2
@@ -200,6 +206,39 @@ int main(void) {
   return 0;
 }
 C
+cat > "$PRE_WORK/own-rp.c" <<'C'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+char *realpath(const char *restrict path, char *restrict resolved) {
+  (void)path;
+  if (resolved) return strcpy(resolved, "/own");
+  return strdup("/own");
+}
+int main(void) {
+  char *r = realpath("/no-such-path", NULL);
+  printf("realpath %s\n", r ? r : "(null)");
+  return 0;
+}
+C
+cat > "$PRE_WORK/rp-caller.c" <<'C'
+#include <stdio.h>
+#include <stdlib.h>
+int main(void) {
+  char *r = realpath("/no-such-path", NULL);
+  printf("realpath %s\n", r ? r : "(null)");
+  return 0;
+}
+C
+cat > "$PRE_WORK/rp-def.c" <<'C'
+#include <stdlib.h>
+#include <string.h>
+char *realpath(const char *restrict path, char *restrict resolved) {
+  (void)path;
+  if (resolved) return strcpy(resolved, "/own");
+  return strdup("/own");
+}
+C
 chmod -R a-w "$HOST_EM"
 RO_CLEANUP() { chmod -R u+w "$HOST_EM" 2>/dev/null || true; }
 trap RO_CLEANUP EXIT
@@ -243,10 +282,26 @@ done
 NO_RP="$PRE_WORK/libslicc-no-realpath"
 mkdir -p "$NO_RP"
 cp "$PKG"/lib/slicc/* "$NO_RP/"
-rm "$NO_RP/slicc_realpath.o"
+rm "$NO_RP/libslicc_realpath.a"
 EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$NO_RP" "${HOST_EMCC[@]}" "$PRE_WORK/symloop.c" -o "$PRE_WORK/symloop-no-rp.js"
 NO_RP_OUT="$(node "$PRE_WORK/symloop-no-rp.js")"
 grep -qx 'abs40 open ok stat ok realpath ELOOP' <<<"$NO_RP_OUT" || { printf '%s\n' "$NO_RP_OUT" >&2; echo "homescoop: without slicc_realpath.o the host libc should keep musl's 39-follow realpath; PRESTAGE no longer tests the override" >&2; exit 1; }
+RP_EMCC=(env EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$PKG/lib/slicc" "${HOST_EMCC[@]}")
+"${RP_EMCC[@]}" "$PRE_WORK/own-rp.c" -o "$PRE_WORK/own-rp.js" 2>"$PRE_WORK/own-rp.err" || { cat "$PRE_WORK/own-rp.err" >&2; echo "homescoop: a program that defines its own realpath does not link under the default link (homescoop#1664)" >&2; exit 1; }
+grep -qx 'realpath /own' <<<"$(node "$PRE_WORK/own-rp.js")" || { echo "homescoop: a program that defines its own realpath runs another one under the default link (homescoop#1664)" >&2; exit 1; }
+"${RP_EMCC[@]}" -c "$PRE_WORK/rp-def.c" -o "$PRE_WORK/rp-def.o"
+rm -f "$PRE_WORK/librpdef.a"
+(cd "$PRE_WORK" && EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emar.py" rcs librpdef.a rp-def.o)
+for mixed in "$PRE_WORK/rp-def.o" "$PRE_WORK/librpdef.a" "-L$PRE_WORK -lrpdef"; do
+  read -ra mixed_args <<<"$mixed"
+  "${RP_EMCC[@]}" "$PRE_WORK/rp-caller.c" "${mixed_args[@]}" -o "$PRE_WORK/rp-mixed.js" 2>"$PRE_WORK/rp-mixed.err" || { cat "$PRE_WORK/rp-mixed.err" >&2; echo "homescoop: a program whose realpath is in $mixed does not link under the default link (homescoop#1664)" >&2; exit 1; }
+  grep -qx 'realpath /own' <<<"$(cd "$PRE_WORK" && node rp-mixed.js)" || { echo "homescoop: a program whose realpath is in $mixed runs another one under the default link (homescoop#1664)" >&2; exit 1; }
+done
+if env EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$NO_RP" "${HOST_EMCC[@]}" "$PRE_WORK/own-rp.c" "$RP_OBJ" -o "$PRE_WORK/own-rp-obj.js" 2>"$PRE_WORK/own-rp-obj.err"; then
+  echo "homescoop: own-rp.c links beside slicc_realpath.o as a plain object (6.0.9-28's default link); PRESTAGE no longer tests homescoop#1664" >&2
+  exit 1
+fi
+grep -q 'duplicate symbol: realpath' "$PRE_WORK/own-rp-obj.err"
 if EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" "$PRE_WORK/hello.c" -o "$PRE_WORK/hello-cl.js" --closure=1 2>"$PRE_WORK/closure.err"; then
   echo "homescoop: --closure=1 should have failed" >&2
   exit 1
@@ -256,7 +311,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without slicc_realpath.o realpath is ELOOP at 40 (#611, #1631), --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without libslicc_realpath.a realpath is ELOOP at 40 (#611, #1631), a program's own realpath (in its own source, a later object, an archive or -l) links and runs, not the archive's, and 6.0.9-28's plain slicc_realpath.o gives duplicate symbol: realpath (#1664), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"
@@ -308,10 +363,13 @@ grep -q "except ImportError" "$PKG/tools/file_packager.py"
   exit 1
 }
 test -f "$PKG/lib/slicc-vfs-pre.js"
-for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs slicc_main_envp slicc_fork slicc_realpath; do
+for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs slicc_main_envp slicc_fork; do
   test -f "$PKG/lib/slicc/$obj.o"
 done
-grep -q "'slicc_realpath.o'," "$PKG/tools/link.py"
+test -f "$PKG/lib/slicc/libslicc_realpath.a"
+test ! -e "$PKG/lib/slicc/slicc_realpath.o"
+grep -q "realpath_lib = os.path.join(slicc_lib, 'libslicc_realpath.a')" "$PKG/tools/link.py"
+! grep -q "'slicc_realpath.o'," "$PKG/tools/link.py"
 grep -q 'if (cnt++ == SYMLOOP_MAX) {' "$PKG/system/lib/libc/musl/src/misc/realpath.c"
 for js in slicc-fork.js slicc-writev.js slicc-linkat.js slicc-uname.js slicc-env.js; do
   test -f "$PKG/lib/slicc/$js"
