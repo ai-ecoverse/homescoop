@@ -54,3 +54,27 @@ test('repackPeer: a repack recipe repacks, one built from source installs its pu
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+function unmountedInstalls(meta) {
+  const needs = new Set(meta.needs || []);
+  return (meta.needsInstall || []).map((spec) => spec.replace(/(.)@[^@]*$/, '$1')).filter((name) => !needs.has(name));
+}
+
+test('every needsInstall package of a py-* cert is in needs, so run.mjs mounts it (#1190)', () => {
+  const bad = [];
+  for (const { pkg, meta } of metas()) {
+    if (!pkg.startsWith('py-')) continue;
+    for (const name of unmountedInstalls(meta)) bad.push(`packages/${pkg}/cert/meta.json: ${name} is in needsInstall but not in needs`);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test('unmountedInstalls flags py-pandas3.15 3.0.6-1 as cert-review saw it on #1188: py-six installed, not mounted (#1190)', () => {
+  const seen = {
+    needs: ['@ai-ecoverse/wasix-python', '@ai-ecoverse/py-numpy', '@ai-ecoverse/py-python-dateutil', '@ai-ecoverse/py-tzdata'],
+    needsInstall: ['@ai-ecoverse/wasix-python@3.15.0-1', '@ai-ecoverse/py-numpy@2.5.4-1', '@ai-ecoverse/py-python-dateutil@2.9.0-post0.3', '@ai-ecoverse/py-tzdata@2026.4.0-3', '@ai-ecoverse/py-six@1.17.0-3'],
+  };
+  assert.deepEqual(unmountedInstalls(seen), ['@ai-ecoverse/py-six']);
+  assert.deepEqual(unmountedInstalls({ ...seen, needs: [...seen.needs, '@ai-ecoverse/py-six'] }), []);
+  assert.deepEqual(unmountedInstalls({ needs: ['@ai-ecoverse/wasm-bash'], needsInstall: ['@ai-ecoverse/wasm-bash'] }), []);
+});

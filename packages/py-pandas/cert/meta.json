@@ -20,13 +20,15 @@
   ],
   "checklist": [
     "cert/import.mjs: import pandas from /node_modules/@ai-ecoverse/py-pandas, found by discovery without PYTHONPATH, no nested python; its 44 side modules import",
-    "cert/pandas.mjs: read_csv, groupby agg, merge, a tz-aware Europe/Berlin date_range across the 2026-03-29 DST change (tzdata/pytz), interpolate, resample 3h, pivot_table, to_csv, dateutil-parsed Timestamp",
+    "cert/pandas.mjs: read_csv, groupby agg, merge, a tz-aware Europe/Berlin date_range across the 2026-03-29 DST change (tzdata/pytz), interpolate, resample 3h, pivot_table, to_csv, dateutil-parsed Timestamp; ultrajson to_json(orient=records) and read_json back (homescoop#1192), to_datetime(format=\"mixed\"), rolling(3).mean, pandas.io.clipboard imports and from_dataframe(__dataframe__()) round-trips (the ctypes paths without 0002-lazy-ctypes, homescoop#1192)",
+    "cert/users.mjs (homescoop#1333; users enforce): as an addUser account, pandas writes CSV, JSON and a pickle of a tz-aware frame under ~ and reads them back; the files belong to the user",
     "cert/notices.mjs: THIRD-PARTY-NOTICES.md carries klib, ultrajson, numpy and musl (compiled in), and the LICENSES/ files of the vendored Python code (homescoop#726)",
     "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 and py-numpy >=2.5.4-1 <2.5.5 (the headers it is built against)",
     "3.0.6-1 (homescoop#761, the cp315 wave; npm-tag python3.15): pandas 3.0.6 from the PyPI sdist (66b07ef7\u2026) against wasix-python 3.15.0-1 and py-numpy 2.5.4-1, Cython 3.3.0, wasix-sysroot -38 (libc++ headers from the sysroot). No patches: wasix-python has ctypes, so 0002-lazy-ctypes goes. pytz is no longer a pandas dependency (pandas 3). test/py-vs-sdist.mjs: every shipped .py is the sdist's",
     "3.0.6-2 (homescoop#761, the fold): packages/py-pandas3.15 moved over packages/py-pandas after the python3.15 -> latest flip; no npm-tag, the recipe and package name lose the 3.15 suffix (package.json homescoop.recipe, repository.directory), so the revision moves on; same sources and build as 3.0.6-1; every spec as before; py-python-dateutil is pinned at 2.9.0-post0.4 (a post-release revision can't be a range) and py-tzdata becomes the range >=2026.4.0-4 <2026.4.1, so npm nests no second copy",
     "3.0.6-3 (homescoop#1283, #1337): the pure-Python dependencies as ranges from their version-neutral builds (py-python-dateutil 2.9.0-post0.4 -> >=2.9.0-post0.5 <2.9.1, py-tzdata >=2026.4.0-4 <2026.4.1 -> >=2026.4.0-5 <2026.4.1), so npm installs the current one of each and nests no second copy; same sources and build as 3.0.6-2; every spec as before",
-    "3.0.6-4 (homescoop#1191): THIRD-PARTY-NOTICES.md's preamble names this version's LICENSES/ ('pandas 3.0.6's LICENSES/'; it said 'pandas 2.3.2's' since the cp315 copy); cert/notices-preamble.mjs. Same sources and build"
+    "3.0.6-4 (homescoop#1191): THIRD-PARTY-NOTICES.md's preamble names this version's LICENSES/ ('pandas 3.0.6's LICENSES/'; it said 'pandas 2.3.2's' since the cp315 copy); cert/notices-preamble.mjs. Same sources and build",
+    "cert-only on 3.0.6-4 (homescoop#1190, #1192, #1333): \"users\": \"enforce\"; the pandas.mjs rows and cert/users.mjs; scripts/test/cert-needs.test.mjs fails a py-* meta whose needsInstall names a package that needs leaves unmounted (py-six, #1190). No package change, so no new revision"
   ],
   "notices": [
     {
@@ -46,5 +48,6 @@
       "license": "MIT"
     }
   ],
-  "patches": {}
+  "patches": {},
+  "users": "enforce"
 }

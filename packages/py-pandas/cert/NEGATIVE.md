@@ -1,5 +1,9 @@
 # Negative proof (py-pandas, cp315 line)
 
+## cert-only on 3.0.6-4: a needsInstall peer left out of needs (#1190; 2026-10-22)
+
+`scripts/test/cert-needs.test.mjs` fails a py-* meta.json that installs a package without mounting it: with `@ai-ecoverse/py-six` taken out of `needs` here, it fails with `packages/py-pandas/cert/meta.json: @ai-ecoverse/py-six is in needsInstall but not in needs`, and its fixture of py-pandas3.15 3.0.6-1's meta as cert-review saw it on #1188 is flagged the same way (there `cert/import.mjs` failed with `ModuleNotFoundError: No module named 'six'`). The current meta passes. The new pandas.mjs rows (#1192) and cert/users.mjs (#1333) are coverage: npm 3.0.6-4 passes them, so no version change.
+
 ## 3.0.6-3: the notices preamble names pandas 2.3.2 (3.0.6-4, #1191; 2026-10-20)
 
 `cert/notices-preamble.mjs` on npm 3.0.6-3: FAIL, `preamble names pandas 3.0.6's LICENSES/` (it says "pandas 2.3.2's LICENSES/"). 3.0.6-4 passes.
