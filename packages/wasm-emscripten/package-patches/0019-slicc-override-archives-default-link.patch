@@ -1,0 +1,11 @@
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -886,7 +886,7 @@
+         path = linkable_path
+       if os.path.isfile(path) and path not in linker_args:
+         linker_args.append(path)
+-    for lib in ('libslicc_jobs.a', 'libslicc_realpath.a'):
++    for lib in ('libslicc_signals.a', 'libslicc_select.a', 'libslicc_libc_gaps.a', 'libslicc_jobs.a', 'libslicc_realpath.a'):
+       path = os.path.join(slicc_lib, lib)
+       if not linkable and os.path.isfile(path) and path not in linker_args:
+         linker_args.append(path)

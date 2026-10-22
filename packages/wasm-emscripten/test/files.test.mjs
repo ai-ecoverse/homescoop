@@ -116,7 +116,7 @@ test("a program's own realpath wins: no object the default link always adds defi
   assert.ok(!paths.includes('package/lib/slicc/slicc_realpath.o'), 'the tarball still ships lib/slicc/slicc_realpath.o as a plain object');
 });
 
-const ARCHIVES = /for lib in \('libslicc_jobs\.a', 'libslicc_realpath\.a'\):\n {6}path = os\.path\.join\(slicc_lib, lib\)\n {6}if not linkable and os\.path\.isfile\(path\) and path not in linker_args:\n {8}linker_args\.append\(path\)\n/;
+const ARCHIVES = /for lib in \('libslicc_signals\.a', 'libslicc_select\.a', 'libslicc_libc_gaps\.a', 'libslicc_jobs\.a', 'libslicc_realpath\.a'\):\n {6}path = os\.path\.join\(slicc_lib, lib\)\n {6}if not linkable and os\.path\.isfile\(path\) and path not in linker_args:\n {8}linker_args\.append\(path\)\n/;
 const LIBC_OWN = ['kill', 'nanosleep', 'poll', 'pselect', 'realpath', 'setegid', 'seteuid', 'setgid', 'setregid', 'setresgid', 'setresuid', 'setreuid', 'setuid', 'tcgetpgrp', 'tcsetpgrp'];
 
 function defaultLink() {
@@ -150,6 +150,28 @@ test('-sMAIN_MODULE=1 and -sLINKABLE links take lib/slicc/linkable, which define
   assert.deepEqual(missing, [], `the tarball lacks lib/slicc/linkable/${missing.join(', ')}, so -sMAIN_MODULE=1 links the plain objects, which libc.a duplicates`);
   const dup = objs.flatMap((o) => defines(execFileSync('tar', ['-xzOf', tgz, `package/lib/slicc/linkable/${o}`], { maxBuffer: 1 << 26 }), LIBC_OWN).map((s) => `${o} (${s})`));
   assert.deepEqual(dup, [], `lib/slicc/linkable defines libc.a's own ${dup.join(', ')}, so -sMAIN_MODULE=1 gets duplicate symbol`);
+});
+
+const OVERRIDE_ARCHIVES = {
+  'libslicc_signals.a': ['kill'],
+  'libslicc_select.a': ['poll', 'pselect'],
+  'libslicc_libc_gaps.a': ['nanosleep', 'setuid', 'setgid', 'seteuid', 'setegid', 'setreuid', 'setregid', 'setresuid', 'setresgid'],
+};
+
+test("a program's own kill, poll, pselect, nanosleep and set*id win: no object the default link always adds defines a libc symbol the slicc defaults override, and each is one member of an override archive (homescoop#1724, package patch 0019)", () => {
+  const { paths } = tarball();
+  const { link, objs } = defaultLink();
+  const always = objs.filter((o) => paths.includes(`package/lib/slicc/${o}`)).flatMap((o) => defines(execFileSync('tar', ['-xzOf', tgz, `package/lib/slicc/${o}`], { maxBuffer: 1 << 26 }), LIBC_OWN).map((s) => `${o} (${s})`));
+  assert.deepEqual(always, [], `the default link always adds ${always.join(', ')}, so a program that defines it gets duplicate symbol`);
+  for (const [lib, syms] of Object.entries(OVERRIDE_ARCHIVES)) {
+    assert.ok(paths.includes(`package/lib/slicc/${lib}`), `the tarball lacks package/lib/slicc/${lib}`);
+    const members = arMembers(execFileSync('tar', ['-xzOf', tgz, `package/lib/slicc/${lib}`], { maxBuffer: 1 << 26 }));
+    const globals = members.map((m) => [m.name, wasmSymbols(m.data).filter((x) => x.defined && x.binding !== 'local' && x.name).map((x) => x.name)]);
+    assert.deepEqual(globals, syms.map((s) => [`slicc_${s}.o`, [s]]), `lib/slicc/${lib} is not one member per override, each defining only its own symbol`);
+  }
+  const covered = [...Object.values(OVERRIDE_ARCHIVES).flat(), 'tcgetpgrp', 'tcsetpgrp', 'realpath'].sort();
+  assert.deepEqual(covered, [...LIBC_OWN].sort(), 'every libc symbol the slicc defaults override is an archive member');
+  assert.match(link, ARCHIVES, "tools/link.py's default link does not add the override archives");
 });
 
 function arMembers(buf) {

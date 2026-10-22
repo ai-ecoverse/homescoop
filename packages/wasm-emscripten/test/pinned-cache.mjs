@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { peerTarball } from '../../../scripts/peer-tarball.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = process.argv.slice(2);
@@ -31,7 +32,10 @@ try {
   const pin = manifest.dependencies?.['@ai-ecoverse/emscripten-cache'];
   if (!/^\d+\.\d+\.\d+-\d+$/.test(pin || '')) throw new Error(`${manifest.name}@${manifest.version} does not pin @ai-ecoverse/emscripten-cache exactly: ${pin}`);
   console.log(`== ${manifest.name}@${manifest.version} pins @ai-ecoverse/emscripten-cache@${pin}`);
-  const r = spawnSync(process.execPath, [join(root, 'packages/emscripten-cache/cert/check.mjs'), '--tarball', `@ai-ecoverse/emscripten-cache@${pin}`, '--member-order'], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const recipe = JSON.parse(readFileSync(join(root, 'packages/emscripten-cache/package/package.json'), 'utf8')).version;
+  const cacheSpec = pin === recipe ? peerTarball('emscripten-cache') : `@ai-ecoverse/emscripten-cache@${pin}`;
+  console.log(`   checking ${cacheSpec}`);
+  const r = spawnSync(process.execPath, [join(root, 'packages/emscripten-cache/cert/check.mjs'), '--tarball', cacheSpec, '--member-order'], { stdio: ['ignore', 'pipe', 'inherit'] });
   const out = r.stdout.toString();
   process.stdout.write(out);
   if (r.status !== 0 || !/^PASS /m.test(out)) throw new Error(`the pinned emscripten-cache ${pin} fails its cert against this tree`);

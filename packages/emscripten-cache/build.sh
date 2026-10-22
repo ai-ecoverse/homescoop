@@ -26,6 +26,15 @@ for l in "${LIBS[@]}"; do
     *) test -f "$LIBDIR/$l.a" ;;
   esac
 done
+echo "== emscripten-cache: embuilder build --pic the same ${#LIBS[@]} libraries, for -sMAIN_MODULE and -sSIDE_MODULE links (homescoop#1699)"
+EM_CONFIG="$CFG" EMCC_CORES="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}" \
+  python3 "$EM/embuilder.py" build --pic "${LIBS[@]}"
+for l in "${LIBS[@]}"; do
+  case "$l" in
+    crt1 | crt1_reactor) test -f "$LIBDIR/pic/$l.o" ;;
+    *) test -f "$LIBDIR/pic/$l.a" ;;
+  esac
+done
 test -f "$CACHE/sysroot_install.stamp"
 grep -q '__bits\[128/sizeof(long)\]' "$CACHE/sysroot/include/bits/alltypes.h"
 
