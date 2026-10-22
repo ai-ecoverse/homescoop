@@ -256,3 +256,34 @@ magick: cache resources exhausted `/tmp/rd/big2.png' @ error/cache.c/OpenPixelCa
 ```
 
 Neither failed write keeps the file: with no temporary file possible beside the target, both patches fell back to upstream's in-place write. The 9.6 change (a temporary file in `$MAGICK_TEMPORARY_PATH`, `$TMPDIR` or `/tmp`, copied in only after a complete encode, or a refusal when none can be created) and the full table are in packages/imagemagick/cert/NEGATIVE.md.
+
+## 7.1.2-34-9.7: mogrify goes on after a failed file, and the temporary file tries each directory (homescoop#1655, #1656; 2026-10-22)
+
+Against the published `@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-34-9.6 (npm `latest`), slicc-kernel 1.110.1, `--users enforce`, both new rows fail.
+
+- **#1655, `mogrify.mjs`.** `mogrify -resize 50% missing.png o1.png o2.png` exits 1 and reports only missing.png, and o1.png and o2.png are left as they were:
+
+  ```text
+  AssertionError [ERR_ASSERTION]: mogrify goes on after a missing first file: o1.png and o2.png resized (homescoop#1655): mogrify: unable to open image 'missing.png': No such file or directory @ error/blob.c/OpenBlob/3684.
+  +   'PNG 40 20',
+  +   'PNG 40 20'
+  -   'PNG 20 10',
+  -   'PNG 20 10'
+  ```
+
+  The cause: MogrifyImageCommand's `status` is cumulative (`status&=`), and every later file's rename of its finished temporary file runs only `if (status != MagickFalse)`, so after one failure each later file was encoded and then thrown away without a word (upstream behaviour). `mogrify-per-file-status.patch` starts each file with its own status: before a file is read, a failed status or a pending error is remembered for the exit code (`mogrify_failed`), the errors are printed (`CatchException`, which also clears the severity that write-temp-then-rename.patch checks), and the status is reset. Each failed file is reported where it fails, the rest are written, and the command still exits 1.
+
+- **#1656, `mogrify-users.mjs`.** As kim in root's 0755 /tmp/rd, the good writes with `MAGICK_TEMPORARY_PATH=/nonexistent` (mogrify), `TMPDIR=/tmp/rd` (magick) and `MAGICK_TEMPORARY_PATH=/tmp/rd TMPDIR=/nonexistent` (mogrify) are all refused, though `/tmp` would take the temporary file:
+
+  ```text
+  AssertionError [ERR_ASSERTION]: with $MAGICK_TEMPORARY_PATH or $TMPDIR missing or unwritable, the temporary file goes to the next of $MAGICK_TEMPORARY_PATH, $TMPDIR, /tmp: ... (homescoop#1656): rc=1
+  mogrify: unable to create temporary file `/tmp/rd/w.png': No such file or directory @ error/mogrify.c/MogrifyImageCommand/3971.
+  magick: unable to create temporary file '/tmp/rd/w.png': Permission denied @ error/constitute.c/WriteImages/1986.
+  mogrify: unable to create temporary file `/tmp/rd/w.png': Permission denied @ error/mogrify.c/MogrifyImageCommand/3971.
+  + 'rc=1\nsame\nrc=1\n20 20\nroot root 666\nrc=1\n20 20\nroot root 666\nrc=1\n20 20\nroot root 666\n...'
+  - 'rc=1\nsame\nrc=0\n10 10\nroot root 666\nrc=0\n5 5\nroot root 666\nrc=0\n10 10\nroot root 666\n...'
+  ```
+
+  The cause: 9.6's `HomescoopFallbackTemp` used only the first of `$MAGICK_TEMPORARY_PATH`, `$TMPDIR` and `/tmp` that was set. In 9.7 it tries each in turn (skipping unset, empty and repeated ones), and when none takes the file the refusal names each directory and its error: `unable to create temporary file '/tmp/rd/w.png': tried /nonexistent (No such file or directory), /tmp/rd (Permission denied), /tmp (Permission denied)`. The row that makes all three unwritable (as root, `chmod 755 /tmp` for the duration of one command, restored in a `finally`) also checks that the refused file doesn't stop the other files of the same mogrify.
+
+- **Coverage rows (#1209, #1383).** kim's own 0600 file in /tmp/rd keeps `kim kim 600` (9.6 fails it, because `TMPDIR=/tmp/rd` was refused and the next file skipped); a two-frame GIF keeps both frames through mogrify and magick on the copy path; magick keeps kim's group `users` on her own 0640 file, and root's magick leaves it kim's; wasm-check.mjs finds no libheif plugin directory in `bin/magick.wasm`. The last three pass on 9.6 too (parity rows).

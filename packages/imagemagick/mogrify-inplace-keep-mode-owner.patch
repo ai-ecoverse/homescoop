@@ -6,7 +6,7 @@
  #include "MagickCore/utility-private.h"
 +
 +extern MagickExport int
-+  HomescoopFallbackTemp(const char *,const char *,char *),
++  HomescoopFallbackTemp(const char *,const char *,char *,char *),
 +  HomescoopPrepareReplace(int,const char *,struct stat *),
 +  HomescoopReplaceKind(const char *,struct stat *),
 +  HomescoopReplaceFile(const char *,const char *,const struct stat *,int);
@@ -27,7 +27,7 @@
          *backup_filename='\0';
          *magic='\0';
          GetPathComponent(filename,MagickPath,magic);
-@@ -3939,6 +3952,31 @@
+@@ -3939,6 +3952,34 @@
                  break;
              }
              random_info=DestroyRandomInfo(random_info);
@@ -42,14 +42,17 @@
 +                  {
 +                    if (backup_mode == 0)
 +                      backup_mode=1;
++                    char
++                      backup_failed[MagickPathExtent];
++
 +                    file=HomescoopFallbackTemp(image->filename,"-",
-+                      backup_filename);
++                      backup_filename,backup_failed);
 +                    if (file < 0)
 +                      {
 +                        (void) ThrowMagickException(exception,
 +                          GetMagickModule(),FileOpenError,
 +                          "UnableToCreateTemporaryFile","`%s': %s",
-+                          image->filename,strerror(errno));
++                          image->filename,backup_failed);
 +                        status=MagickFalse;
 +                        RemoveAllImageStack();
 +                        continue;
@@ -59,7 +62,7 @@
              if (file < 0)
                *backup_filename='\0';
              else
-@@ -3989,8 +4027,17 @@
+@@ -3989,8 +4030,17 @@
              }
              if (*backup_filename != '\0')
                {

@@ -31,5 +31,26 @@ export default async function mogrify(ctx) {
   }
   const ls2 = await run(['magick', 'identify', '-format', '%f\n', '*']);
   assert.deepEqual(ls2.stdout.trim().split('\n').sort(), ['a.png', 'b.jpg', 's.jpg', 's.png', 's.webp'], `no stray files after -format: ${ls2.stdout}`);
-  console.log('mogrify: in place without -format/-path (a.png, b.jpg 400x300 -> 200x150); -format webp/jpg over existing targets writes WEBP/JPEG bytes (homescoop#624)');
+  for (const f of ['o1.png', 'o2.png', 'o3.png']) {
+    const mkO = await run(['magick', '-size', '40x20', 'xc:red', f]);
+    assert.equal(mkO.status, 0, mkO.stderr);
+  }
+  const after = await run(['mogrify', '-resize', '50%', 'missing.png', 'o1.png', 'o2.png']);
+  assert.equal(after.status, 1, `mogrify over missing.png o1.png o2.png exits 1: rc ${after.status} ${after.stderr}`);
+  assert.match(after.stderr, /missing\.png/, `the failure names missing.png (homescoop#1655): ${after.stderr}`);
+  assert.deepEqual([await size('o1.png'), await size('o2.png')], ['PNG 20 10', 'PNG 20 10'], `mogrify goes on after a missing first file: o1.png and o2.png resized (homescoop#1655): ${after.stderr}`);
+  const mid = await run(['mogrify', '-resize', '50%', 'o1.png', 'missing.png', 'o3.png']);
+  assert.equal(mid.status, 1, `mogrify over o1.png missing.png o3.png exits 1: rc ${mid.status} ${mid.stderr}`);
+  assert.deepEqual([await size('o1.png'), await size('o3.png')], ['PNG 10 5', 'PNG 20 10'], `a missing file in the middle: o1.png and o3.png both resized (homescoop#1655): ${mid.stderr}`);
+  const mkBig = await run(['magick', '-size', '1400x1000', 'gradient:', 'big.png']);
+  assert.equal(mkBig.status, 0, mkBig.stderr);
+  const bigBefore = await ctx.readBytes('/tmp/mog/big.png');
+  const enc = await run(['mogrify', '-limit', 'memory', '24MiB', '-limit', 'map', '0', '-depth', '8', '-rotate', '90', 'big.png', 'o2.png', 'o3.png']);
+  assert.equal(enc.status, 1, `mogrify with a failing encode first exits 1: rc ${enc.status} ${enc.stderr}`);
+  assert.match(enc.stderr, /cache resources exhausted.*big\.png/, `the failure names big.png (homescoop#1655): ${enc.stderr}`);
+  assert.ok(Buffer.compare(await ctx.readBytes('/tmp/mog/big.png'), bigBefore) === 0, 'big.png is unchanged after its failed encode');
+  assert.deepEqual([await size('o2.png'), await size('o3.png')], ['PNG 10 20', 'PNG 10 20'], `mogrify goes on after a failed encode: o2.png and o3.png rotated (homescoop#1655): ${enc.stderr}`);
+  const ls3 = await run(['magick', 'identify', '-format', '%f\n', '*']);
+  assert.deepEqual(ls3.stdout.trim().split('\n').sort(), ['a.png', 'b.jpg', 'big.png', 'o1.png', 'o2.png', 'o3.png', 's.jpg', 's.png', 's.webp'], `no stray files after the failed files: ${ls3.stdout}`);
+  console.log('mogrify: in place without -format/-path (a.png, b.jpg 400x300 -> 200x150); -format webp/jpg over existing targets writes WEBP/JPEG bytes (homescoop#624); after a missing or failed file mogrify goes on with the rest and exits 1 naming it (homescoop#1655)');
 }

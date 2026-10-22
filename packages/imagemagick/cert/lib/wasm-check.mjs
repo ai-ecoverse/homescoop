@@ -60,10 +60,12 @@ try {
     if (!EXCEPTION.test(readFileSync(join(pkg, 'THIRD-PARTY-NOTICES.md'), 'utf8'))) throw new Error(`${name}: THIRD-PARTY-NOTICES.md does not carry gsfonts' font exception (homescoop#1382)`);
     if (!/\bGPL-2\.0-only WITH Font-exception-2\.0\b/.test(String(manifest.license))) throw new Error(`${name}: package.json license "${manifest.license}" does not name the fonts' GPL-2.0-only WITH Font-exception-2.0 (homescoop#1382)`);
   }
+  const plugin = wasm.toString('latin1').match(/[\x20-\x7e]*\/lib\/libheif\b[\x20-\x7e]*|LIBHEIF_PLUGIN_PATH/);
+  if (plugin) throw new Error(`${name}: bin/magick.wasm names a libheif plugin directory, ${plugin[0]} (homescoop#970, #1383)`);
   const cfg = readFileSync(join(pkg, 'etc/ImageMagick-7/configure.xml'), 'utf8');
   if (!/<configure name="LIBS" value="[^"]*-L\/prefix\/lib/.test(cfg)) throw new Error(`${name}: etc/ImageMagick-7/configure.xml LIBS doesn't name /prefix/lib (homescoop#937)`);
   const names = sec.find(([n]) => n === 'name')[1];
-  console.log(`wasm-check: ${name} bin/magick.wasm ${wasm.length} bytes, name section ${names} bytes, no DWARF; no share/; package.json and notices name ${KIT}@${version}; no build path (${needles.length} checked) in any file, configure.xml says /prefix; ${pfb.length} gsfonts .pfb with the font exception in etc/fonts/README, the notices and the licence`);
+  console.log(`wasm-check: ${name} bin/magick.wasm ${wasm.length} bytes, name section ${names} bytes, no DWARF; no share/; package.json and notices name ${KIT}@${version}; no build path (${needles.length} checked) in any file, configure.xml says /prefix; ${pfb.length} gsfonts .pfb with the font exception in etc/fonts/README, the notices and the licence; no libheif plugin directory in bin/magick.wasm`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

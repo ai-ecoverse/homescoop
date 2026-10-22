@@ -1,0 +1,42 @@
+--- a/MagickWand/mogrify.c
++++ b/MagickWand/mogrify.c
+@@ -3766,6 +3766,7 @@
+ 
+   MagickBooleanType
+     fire,
++    mogrify_failed,
+     pend,
+     respect_parentheses;
+ 
+@@ -3815,6 +3816,7 @@
+   option=(char *) NULL;
+   pend=MagickFalse;
+   respect_parentheses=MagickFalse;
++  mogrify_failed=MagickFalse;
+   status=MagickTrue;
+   /*
+     Parse command line.
+@@ -3860,6 +3862,14 @@
+         /*
+           Option is a file name: begin by reading image from specified file.
+         */
++        if ((status == MagickFalse) ||
++            (exception->severity >= ErrorException))
++          {
++            mogrify_failed=MagickTrue;
++            if (exception->severity >= ErrorException)
++              CatchException(exception);
++            status=MagickTrue;
++          }
+         FireImageStack(MagickFalse,MagickFalse,pend);
+         filename=argv[i];
+         if ((LocaleCompare(filename,"--") == 0) && (i < ((ssize_t) argc-1)))
+@@ -6695,6 +6705,8 @@
+     ThrowMogrifyException(OptionError,"UnbalancedParenthesis",argv[i]);
+   if (i != (ssize_t) argc)
+     ThrowMogrifyException(OptionError,"MissingAnImageFilename",argv[i]);
++  if (mogrify_failed != MagickFalse)
++    status=MagickFalse;
+   DestroyMogrify();
+   return(status != 0 ? MagickTrue : MagickFalse);
+ }
