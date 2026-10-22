@@ -57,3 +57,13 @@ that the hand-edited QDF file draws warnings before `fix-qdf` and none after.
 ## 12.4.2-7: shim drift (homescoop#1491; 2026-10-21)
 
 12.4.2-7 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 12.4.2-6 in `bin/fix-qdf`, `bin/qpdf` and `bin/zlib-flate`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 12.4.2-8: off the reproducible-pending list; foreign-page, manifest and link-gate coverage (homescoop#1354 C2, #808, #918; 2026-10-22)
+
+**Reproducible (#1354 C2, #808):** qpdf is off `scripts/reproducible-pending.json`, so ladder-pr's `reproducible` job builds qpdf twice and compares the tarballs. A later 14-byte CFGStackify flip (emsdk 4.0.23) fails that job and is reported on #1354; qpdf is never re-listed. `scripts/test/reproducible-optin.test.mjs`'s new qpdf test fails on main before this change (`qpdf is still in scripts/reproducible-pending.json`: 0 pass, 1 fail).
+
+**cert/manifest.mjs (#918):** the published 12.4.2-5 fails it on slicc-kernel 1.110.1, users enforce (`fix-qdf is a helper command`: `undefined` vs `true`). 12.4.2-7 passes it.
+
+**cert/foreign.mjs (#918):** the foreign-page copier: interleaved and repeated `--pages` (one copied font per source file), a dangling reference, a damaged, a garbage and a missing source (rc 3, 2, 2, no trap), and `/FlateDecode` output from qpdf.wasm. The published 12.4.2-7 passes it, since qpdf's code is unchanged; with every wasm emptied, `prove-negative.mjs --spec foreign.mjs` fails (`WebAssembly.compile(): BufferSource argument is empty`).
+
+**build.sh's qpdf-deps gate (#918, #1354):** after configure, build.sh fails unless `CMakeCache.txt` has no `pc_zlib_FOUND`/`pc_libjpeg_FOUND` set to 1 and each program's `linkLibs.rsp` names `$PREFIX/lib/libz.a` and `$PREFIX/lib/libjpeg.a`; it prints `qpdf-deps: PASS …`. Checked on macOS, emsdk 4.0.23, whose cache has the zlib port's `zlib.pc`: the 12.4.2-8 configure gives `qpdf-deps: PASS`. 12.4.2-5's configure (no `-DPKG_CONFIG_EXECUTABLE=/usr/bin/false`) logs `Found PkgConfig` and `Found zlib, version 1.3.1`, sets `pc_zlib_FOUND:INTERNAL=1`, and its qpdf `linkLibs.rsp` has libjpeg.a but no libz.a. The gate fails it: `qpdf-deps: FAIL pkg-config found pc_zlib_FOUND:INTERNAL=1`.
