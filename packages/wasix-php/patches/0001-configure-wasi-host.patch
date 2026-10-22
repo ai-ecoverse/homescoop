@@ -1,0 +1,116 @@
+configure for a wasm32-unknown-wasi host (wasix-php).
+
+- Fibers: PHP needs boost.context assembly or <ucontext.h> to switch fiber
+  stacks, and fails configure without either. WASI has neither (a wasm call
+  stack can't be switched), so a wasi* host defines ZEND_FIBER_UNAVAILABLE
+  instead (patches/0002 makes Fiber::start throw).
+- PHP_OS was `uname` on the build machine (Darwin, Linux). A wasi* host gets
+  PHP_OS "WASI"; PHP_OS_FAMILY stays "Unknown".
+
+configure.ac and main/php_config.h.in carry the same change as the shipped
+configure, so a buildconf regenerates it.
+
+--- a/configure
++++ b/configure
+@@ -81000,10 +81000,18 @@
+ printf "%s\n" "#define ZEND_FIBER_UCONTEXT 1" >>confdefs.h
+ 
+ else $as_nop
++  case $host_os in #(
++  wasi*) :
++    # WASIX: no ucontext and no stack switching; Fiber::start throws FiberError.
++
++printf "%s\n" "#define ZEND_FIBER_UNAVAILABLE 1" >>confdefs.h
++ ;; #(
++  *) :
+   { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
+ as_fn_error $? "fibers not available on this platform
+-See \`config.log' for more details" "$LINENO" 5; }
++See \`config.log' for more details" "$LINENO" 5; } ;;
++esac
+ fi
+ 
+ fi
+@@ -82780,7 +82788,13 @@
+ printf "%s\n" "#define PHP_UNAME \"$PHP_UNAME\"" >>confdefs.h
+ 
+ 
+-PHP_OS=$(uname | xargs)
++case $host_os in #(
++  wasi*) :
++    # A cross build for WASI: PHP_OS names the target, not the build machine.
++    PHP_OS=WASI ;; #(
++  *) :
++    PHP_OS=$(uname | xargs) ;;
++esac
+ 
+ printf "%s\n" "#define PHP_OS \"$PHP_OS\"" >>confdefs.h
+ 
+--- a/configure.ac
++++ b/configure.ac
+@@ -1300,7 +1300,10 @@
+   AC_CHECK_HEADER([ucontext.h],
+     [AC_DEFINE([ZEND_FIBER_UCONTEXT], [1],
+       [Define to 1 if Zend fiber uses ucontext instead of boost context.])],
+-    [AC_MSG_FAILURE([fibers not available on this platform])])
++    [AS_CASE([$host_os],
++      [wasi*], [AC_DEFINE([ZEND_FIBER_UNAVAILABLE], [1],
++        [Define to 1 if the platform has no way to switch fiber stacks.])],
++      [AC_MSG_FAILURE([fibers not available on this platform])])])
+ fi
+ 
+ ZEND_INIT
+@@ -1423,7 +1426,10 @@
+ AS_VAR_IF([PHP_UNAME],, [PHP_UNAME=$(uname -a | xargs)])
+ AC_DEFINE_UNQUOTED([PHP_UNAME], ["$PHP_UNAME"], [The 'uname -a' output.])
+ 
+-PHP_OS=$(uname | xargs)
++dnl A cross build for WASI: PHP_OS names the target, not the build machine.
++AS_CASE([$host_os],
++  [wasi*], [PHP_OS=WASI],
++  [PHP_OS=$(uname | xargs)])
+ AC_DEFINE_UNQUOTED([PHP_OS], ["$PHP_OS"], [The 'uname' output.])
+ 
+ AC_ARG_VAR([PHP_BUILD_SYSTEM],
+--- a/main/php_config.h.in
++++ b/main/php_config.h.in
+@@ -1852,22 +1852,22 @@
+ #undef NDBM_INCLUDE_FILE
+ 
+ /* Define to the address where bug reports for this package should be sent. */
+-#undef PACKAGE_BUGREPORT
++/* #undef PACKAGE_BUGREPORT */
+ 
+ /* Define to the full name of this package. */
+-#undef PACKAGE_NAME
++/* #undef PACKAGE_NAME */
+ 
+ /* Define to the full name and version of this package. */
+-#undef PACKAGE_STRING
++/* #undef PACKAGE_STRING */
+ 
+ /* Define to the one symbol short name of this package. */
+-#undef PACKAGE_TARNAME
++/* #undef PACKAGE_TARNAME */
+ 
+ /* Define to the home page for this package. */
+-#undef PACKAGE_URL
++/* #undef PACKAGE_URL */
+ 
+ /* Define to the version of this package. */
+-#undef PACKAGE_VERSION
++/* #undef PACKAGE_VERSION */
+ 
+ /* Number of bits in non-UTF mode for PCRE library. */
+ #undef PCRE2_CODE_UNIT_WIDTH
+@@ -2188,6 +2188,9 @@
+ /* Define to 1 if Zend fiber uses ucontext instead of boost context. */
+ #undef ZEND_FIBER_UCONTEXT
+ 
++/* Define to 1 if the platform has no way to switch fiber stacks. */
++#undef ZEND_FIBER_UNAVAILABLE
++
+ /* Define to 1 if Zend max execution timers are supported and enabled. */
+ #undef ZEND_MAX_EXECUTION_TIMERS
+ 

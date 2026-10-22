@@ -1,0 +1,20 @@
+sys_get_temp_dir() is /tmp on WASI (wasix-php).
+
+wasi-libc's <stdio.h> leaves P_tmpdir out ("WASI has no temp directories"),
+so PHP's fallback defined it as "" and, with no TMPDIR and no sys_temp_dir,
+sys_get_temp_dir() returned "" and tempnam(), tmpfile() and Phar's temporary
+files failed. slicc has /tmp.
+
+--- a/main/php_open_temporary_file.c
++++ b/main/php_open_temporary_file.c
+@@ -46,6 +46,10 @@
+ #include <sys/file.h>
+ #endif
+ 
++/* wasi-libc's <stdio.h> leaves P_tmpdir out ("WASI has no temp directories"). */
++#if !defined(P_tmpdir) && defined(__wasi__)
++#define P_tmpdir "/tmp"
++#endif
+ #if !defined(P_tmpdir)
+ #define P_tmpdir ""
+ #endif
