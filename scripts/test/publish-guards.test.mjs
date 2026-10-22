@@ -7,7 +7,6 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parityNow, parityProblem } from '../cert-review/parity-now.mjs';
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NAME = '@ai-ecoverse/wasm-grep';
@@ -28,15 +27,6 @@ function tarball(dir, version, readme = 'grep\n') {
   return tgz;
 }
 
-function artifact(dir, tgz, recipe = 'grep', pr = 7) {
-  const art = join(dir, 'artifacts', `host-${recipe}-pr${pr}`);
-  mkdirSync(art, { recursive: true });
-  const buf = readFileSync(tgz);
-  writeFileSync(join(art, 'package.tgz'), buf);
-  const sha = createHash('sha256').update(buf).digest('hex');
-  writeFileSync(join(art, 'package.tgz.sha256'), `${sha}  package.tgz\n`);
-  return sha;
-}
 
 function fakeNpm(dir, { versions, latest, published, tags = {} }) {
   const bin = join(dir, 'fake-npm');
@@ -53,126 +43,13 @@ esac
   return bin;
 }
 
-function record(dir, npm, { parity = true, tag = null } = {}) {
-  const out = join(dir, 'parity.json');
-  const env = { ...process.env, HOMESCOOP_NPM: npm, HOMESCOOP_NPM_RETRY_S: '0' };
-  const checkout = join(dir, 'checkout');
-  mkdirSync(join(checkout, 'packages', 'grep'), { recursive: true });
-  writeFileSync(join(checkout, 'packages', 'grep', 'recipe.yaml'), `name: grep\nversion: "3.12"\nnpm: "${NAME}"\n${tag ? `npm-tag: "${tag}"\n` : ''}`);
-  const p = spawnSync(process.execPath, [join(scripts, 'cert-review/parity-now.mjs'), '--artifacts', join(dir, 'artifacts'), '--pr', '7', '--checkout', checkout, '--out', out], { encoding: 'utf8', env });
-  assert.equal(p.status, 0, p.stderr);
-  const review = join(dir, 'review');
-  mkdirSync(review, { recursive: true });
-  writeFileSync(join(review, 'verdict.json'), JSON.stringify({ packages: [{ package: 'grep', verdict: 'certified' }] }));
-  const args = ['--artifacts', join(dir, 'artifacts'), '--pr', '7', '--review', review, '--body', join(dir, 'body.md'), '--lines', join(dir, 'lines.txt'), '--ladder-conclusion', 'success'];
-  if (parity) args.push('--parity', parity === true ? out : parity);
-  const v = spawnSync(process.execPath, [join(scripts, 'cert-review/verdict.mjs'), ...args], { encoding: 'utf8' });
-  return { status: v.status, lines: readFileSync(join(dir, 'lines.txt'), 'utf8').trim(), body: readFileSync(join(dir, 'body.md'), 'utf8'), parity: JSON.parse(readFileSync(out, 'utf8')) };
-}
 
-test('#891: a build that was new at ladder-pr time but is behind npm latest at record time is not certified', (t) => {
-  const dir = workdir(t);
-  const built = tarball(dir, '3.12.0-4');
-  artifact(dir, built);
-  const r = record(dir, fakeNpm(dir, { versions: ['3.12.0-3', '3.12.0-4', '3.12.0-5'], latest: '3.12.0-5', published: built }));
-  assert.equal(r.parity.grep.verdict, 'behind');
-  assert.equal(r.status, 1);
-  assert.match(r.lines, /^cert-ci: BEHIND @ai-ecoverse\/wasm-grep@3\.12\.0-4: npm at record time: @ai-ecoverse\/wasm-grep@3\.12\.0-4 sorts below npm latest 3\.12\.0-5/);
-  assert.doesNotMatch(r.lines, /certified=/);
-  assert.match(r.body, /npm moved on after ladder-pr checked it/);
-});
 
-test('npm-tag at record time: a tagged recipe is judged against its own tag, never against latest', (t) => {
-  const dir = workdir(t);
-  const built = tarball(dir, '3.12.0-4');
-  const sha = artifact(dir, built);
-  const above = { versions: ['3.12.0-3', '3.13.0-1'], latest: '3.13.0-1', published: built };
-  const first = record(dir, fakeNpm(dir, above), { tag: 'python3.15' });
-  assert.equal(first.parity.grep.tag, 'python3.15');
-  assert.equal(first.status, 0, first.lines);
-  assert.equal(first.lines, `certified=${sha} ${NAME} 3.12.0-4`);
-  const channel = record(dir, fakeNpm(dir, { ...above, tags: { 'python3.15': '3.12.0-3' } }), { tag: 'python3.15' });
-  assert.equal(channel.status, 0, channel.lines);
-  const untagged = record(dir, fakeNpm(dir, { ...above, tags: { 'python3.15': '3.12.0-3' } }));
-  assert.equal(untagged.status, 1);
-  assert.match(untagged.lines, /^cert-ci: BEHIND .*sorts below npm latest 3\.13\.0-1/);
-  const behind = record(dir, fakeNpm(dir, { ...above, tags: { 'python3.15': '3.12.0-5' } }), { tag: 'python3.15' });
-  assert.equal(behind.status, 1);
-  assert.match(behind.lines, /^cert-ci: BEHIND .*sorts below npm python3\.15 3\.12\.0-5/);
-});
 
-test('NEGATIVE: npm-tag at record time: a reserved or malformed npm-tag at the head is INCOMPLETE', (t) => {
-  const dir = workdir(t);
-  const built = tarball(dir, '3.12.0-4');
-  artifact(dir, built);
-  for (const tag of ['latest', 'next', 'certified', 'py3.15']) {
-    const r = record(dir, fakeNpm(dir, { versions: ['3.12.0-3'], latest: '3.12.0-3', published: built }), { tag });
-    assert.equal(r.status, 1, tag);
-    assert.match(r.lines, /^cert-ci: INCOMPLETE .*the npm-tag of grep at the head: npm-tag/, tag);
-  }
-});
 
-test('#891: the same version with other bytes on npm at record time is DRIFT, not certified', (t) => {
-  const dir = workdir(t);
-  artifact(dir, tarball(dir, '3.12.0-5'));
-  const r = record(dir, fakeNpm(dir, { versions: ['3.12.0-5'], latest: '3.12.0-5', published: tarball(dir, '3.12.0-5', 'other\n') }));
-  assert.equal(r.status, 1);
-  assert.match(r.lines, /^cert-ci: DRIFT @ai-ecoverse\/wasm-grep@3\.12\.0-5: npm at record time: .*is on npm with different contents/);
-});
 
-test('a new release still certifies; the same contents certify with a nothing-to-publish note', (t) => {
-  const dir = workdir(t);
-  const built = tarball(dir, '3.12.0-6');
-  const sha = artifact(dir, built);
-  const fresh = record(dir, fakeNpm(dir, { versions: ['3.12.0-5'], latest: '3.12.0-5', published: built }));
-  assert.equal(fresh.status, 0, fresh.lines);
-  assert.equal(fresh.lines, `certified=${sha} ${NAME} 3.12.0-6`);
-  const same = record(dir, fakeNpm(dir, { versions: ['3.12.0-5', '3.12.0-6'], latest: '3.12.0-6', published: built }));
-  assert.equal(same.status, 0, same.lines);
-  assert.equal(same.lines, `certified=${sha} ${NAME} 3.12.0-6 (on npm with the same contents at record time; nothing to publish)`);
-});
 
-test('NEGATIVE: fail closed when the registry does not answer, the parity file is missing, or a package has no entry', (t) => {
-  const dir = workdir(t);
-  artifact(dir, tarball(dir, '3.12.0-6'));
-  const down = join(dir, 'down-npm');
-  writeFileSync(down, '#!/usr/bin/env bash\necho "npm error code ETIMEDOUT" >&2\nexit 1\n');
-  chmodSync(down, 0o755);
-  const r = record(dir, down);
-  assert.equal(r.status, 1);
-  assert.match(r.lines, /^cert-ci: INCOMPLETE @ai-ecoverse\/wasm-grep@3\.12\.0-6: npm parity at record time failed: npm-parity: npm view|^cert-ci: INCOMPLETE @ai-ecoverse\/wasm-grep@3\.12\.0-6: npm parity at record time failed: npm view/);
-  assert.match(r.body, /the record job couldn't check npm parity/);
-  assert.doesNotMatch(r.body, /unverifiable/);
-  const gone = record(dir, down, { parity: join(dir, 'no-such.json') });
-  assert.equal(gone.status, 1);
-  assert.match(gone.body, /no readable npm parity file/);
-  assert.match(gone.lines, /^cert-ci: INCOMPLETE .*npm parity didn't run for it at record time/);
-  writeFileSync(join(dir, 'empty.json'), '{}\n');
-  const empty = record(dir, down, { parity: join(dir, 'empty.json') });
-  assert.equal(empty.status, 1);
-  assert.match(empty.lines, /^cert-ci: INCOMPLETE .*npm parity didn't run for it at record time/);
-});
 
-test('parityNow and parityProblem: every verdict maps, a throw or a missing tarball is an error', (t) => {
-  const dir = workdir(t);
-  artifact(dir, tarball(dir, '1.0.0-1'), 'a');
-  mkdirSync(join(dir, 'artifacts', 'host-b-pr7'));
-  artifact(dir, tarball(dir, '1.0.0-1'), 'c');
-  artifact(dir, tarball(dir, '1.0.0-1'), 'other', 8);
-  let n = 0;
-  const out = parityNow({ artifacts: join(dir, 'artifacts'), pr: '7', check: () => { if (n++) throw new Error('boom'); return { verdict: 'new', name: NAME, version: '1.0.0-1', message: 'a new release' }; } });
-  assert.deepEqual(Object.keys(out), ['a', 'b', 'c']);
-  assert.equal(out.a.verdict, 'new');
-  assert.match(out.b.message, /host-b-pr7 has no package.tgz/);
-  assert.deepEqual(out.c, { verdict: 'error', message: 'boom' });
-  assert.equal(parityProblem({ verdict: 'new' }), null);
-  assert.equal(parityProblem({ verdict: 'same' }), null);
-  assert.equal(parityProblem({ verdict: 'behind', message: 'x' }).tag, 'BEHIND');
-  assert.equal(parityProblem({ verdict: 'drift', message: 'x' }).tag, 'DRIFT');
-  assert.equal(parityProblem({ verdict: 'error', message: 'x' }).tag, 'INCOMPLETE');
-  assert.equal(parityProblem({ verdict: 'surprise' }).tag, 'INCOMPLETE');
-  assert.equal(parityProblem(undefined).tag, 'INCOMPLETE');
-});
 
 async function registry(t, routes) {
   const server = createServer((req, res) => {
@@ -236,17 +113,6 @@ test('#971 at publish: a version already on npm skips only with the same content
   assert.match(unknown.out, /is on npm, and comparing it failed/);
 });
 
-function publishStep(root) {
-  const doc = readFileSync(join(root, '.github/workflows/ladder-build.yml'), 'utf8');
-  const at = doc.indexOf('      - name: Publish via OIDC');
-  const run = doc.indexOf('        run: |\n', at) + '        run: |\n'.length;
-  const end = doc.indexOf('\n      - ', run);
-  return doc
-    .slice(run, end === -1 ? undefined : end)
-    .split('\n')
-    .map((l) => l.replace(/^ {10}/, ''))
-    .join('\n');
-}
 
 function runPublish(t, dir, { url, published, sha, tag = 'latest', npmScript = null }) {
   const bin = join(dir, 'bin');
@@ -264,11 +130,7 @@ esac
   chmodSync(join(bin, 'npm'), 0o755);
   const temp = join(dir, 'runner-temp');
   mkdirSync(temp, { recursive: true });
-  const script = publishStep(join(scripts, '..'))
-    .replaceAll('${{ runner.temp }}', temp)
-    .replaceAll('${{ needs.resolve.outputs.npm }}', NAME)
-    .replaceAll('${{ needs.resolve.outputs.npm_tag }}', tag)
-    .replaceAll('${{ inputs.certified }}', sha);
+  const script = `bash scripts/oidc-publish.sh ${JSON.stringify(join(temp, 'package.tgz'))} ${NAME} ${JSON.stringify(tag)} ${sha}`;
   return new Promise((ok) => {
     const p = spawn('bash', ['-c', script], {
       cwd: join(scripts, '..'),

@@ -58,6 +58,10 @@ try {
     const leak = readFileSync(join(pkg, manifest.slicc.commands[t].wasm), 'latin1').match(/\/(?:home|Users|__w|private\/var)\/[\x21-\x7e]{0,80}/);
     assert.equal(leak, null, `bin/${t}.wasm names a build path: ${leak?.[0]}`);
     assert.ok(cred && glue.includes('slicc_cred_js'), `bin/${t}.wasm lacks the slicc credential library (import slicc_cred_js, export slicc_cred_euid; homescoop#459): under users the kernel would show every file it writes as 1000:1000`);
+    const placeholder = glue.match(/['"]?USER['"]?\s*:\s*['"]web_user['"]/);
+    assert.equal(placeholder, null, `bin/${t}: Emscripten's getEnvStrings placeholders (${placeholder?.[0]}) instead of shims/slicc/slicc-env.js, so env -i leaves USER=web_user, HOME=/home/web_user and PATH=/ (homescoop#1530)`);
+    assert.ok(/ENV\[x\]\s*!==\s*undefined/.test(glue), `bin/${t}: getEnvStrings is not slicc-env.js's kernel-only body (homescoop#1530)`);
+    assert.ok(/nlinks\s*<=\s*40\b/.test(glue), `bin/${t}: libfs lookupPath stops at 39 symlinks, not SYMLOOP_MAX 40 (wasm-emscripten package-patches/0014-libfs-symloop.patch)`);
   }
   const noticesPath = join(pkg, 'THIRD-PARTY-NOTICES.md');
   const notices = existsSync(noticesPath) ? readFileSync(noticesPath, 'utf8') : '';
@@ -65,6 +69,10 @@ try {
     assert.ok(notices.includes(name) && notices.includes(text), `THIRD-PARTY-NOTICES.md lacks the ${name.slice(3)} notice (homescoop#1038, #844)`);
   }
   assert.ok(manifest.files.includes('THIRD-PARTY-NOTICES.md'), 'package.json files ships THIRD-PARTY-NOTICES.md');
+  const shims = notices.search(/^## homescoop: .*\bslicc shims\b.*Apache-2\.0/m);
+  assert.ok(shims >= 0, 'THIRD-PARTY-NOTICES.md has no "## homescoop: the slicc shims (shims/slicc, Apache-2.0)" section (homescoop#1534)');
+  assert.match(notices.slice(shims), /Apache License\s+Version 2\.0/, 'the slicc shims section lacks the Apache-2.0 text (homescoop#1534)');
+  console.log(`== ${manifest.name}@${manifest.version}: every glue links slicc-env.js (no web_user) and libfs follows 40 symlinks; THIRD-PARTY-NOTICES.md has the slicc shims section`);
   console.log(`== ${manifest.name}@${manifest.version}: ${tools.length} tools, every glue's runner guarded; ${kernelSpec}, users enforce`);
 
   const nm = join(work, 'nm');

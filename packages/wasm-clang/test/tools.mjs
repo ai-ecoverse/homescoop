@@ -37,6 +37,26 @@ function unpack(spec, dir, members = []) {
 
 const ASM = '\t.globl\tfoo\n\t.type\tfoo,@function\nfoo:\n\t.functype\tfoo () -> (i32)\n\ti32.const\t7\n\tend_function\n';
 const ASM_CPP = '#ifndef _WASI_EMULATED_MMAN\n#error no driver defines\n#endif\n' + ASM.replaceAll('foo', 'bar');
+const CXX_SRC = 'template <class T> T id(T x) { return x; }\nint n() { return id(static_cast<int>(sizeof(bool))); }\n';
+const TS_SRC = [
+  '#include <pthread.h>',
+  '#include <stdatomic.h>',
+  '#include <stdio.h>',
+  'static _Thread_local int tl = 1;',
+  'static atomic_int sum;',
+  'static void *work(void *p) { tl = (int)(long)p; atomic_fetch_add(&sum, tl); return 0; }',
+  'int main(void) {',
+  '  pthread_t t[4];',
+  '  for (long i = 0; i < 4; i++) pthread_create(&t[i], 0, work, (void *)(i + 1));',
+  '  for (int i = 0; i < 4; i++) pthread_join(t[i], 0);',
+  '  printf("sum=%d tl=%d\\n", atomic_load(&sum), tl);',
+  '  return 0;',
+  '}',
+  '',
+].join('\n');
+const LIB_A = 'int twice(int x) { return 2 * x; }\n';
+const LIB_B = 'int twice(int);\nint quad(int x) { return twice(twice(x)); }\n';
+const LIB_MAIN = '#include <stdio.h>\nint quad(int);\nint main(void) { printf("quad=%d\\n", quad(5)); return 0; }\n';
 const C_SRC = '#ifndef _WASI_EMULATED_MMAN\n#error no driver defines\n#endif\nint baz(void) { return 3; }\n';
 
 const work = mkdtempSync(join(tmpdir(), 'wasm-clang-tools-'));
@@ -97,6 +117,12 @@ try {
   await k.writeFile('/home/t/raw.asm', ASM.replaceAll('foo', 'qux'));
   await k.writeFile('/home/t/c.c', C_SRC);
 
+  await k.writeFile('/home/t/x.cpp', CXX_SRC);
+  await k.writeFile('/home/t/ts.c', TS_SRC);
+  await k.writeFile('/home/t/la.c', LIB_A);
+  await k.writeFile('/home/t/lb.c', LIB_B);
+  await k.writeFile('/home/t/lmain.c', LIB_MAIN);
+
   const tail = (r) => `rc=${r.status} ${`${r.stderr}`.trim().split('\n').slice(-3).join(' | ')}`;
   const syms = async (obj) => (await run(['llvm-nm', obj], { env: ccEnv })).stdout;
   const asmRows = [
@@ -106,22 +132,92 @@ try {
     ['cc -Werror -c raw.asm (no -x)', ['cc', '-Werror', '-c', 'raw.asm', '-o', 'rawx.o'], {}, 'rawx.o', /T qux/],
     ['c++ -Werror -c a.s', ['c++', '-Werror', '-c', 'a.s', '-o', 'axx.o'], {}, 'axx.o', /T foo/],
   ];
-  const asmGot = [];
   for (const [name, argv, env, obj, sym] of asmRows) {
     const r = await run(argv, { env: { ...ccEnv, ...env } });
     const ok = r.status === 0 && sym.test(await syms(obj));
-    asmGot.push(ok);
-    if (expect === 'current') row(name, ok, ok ? '' : tail(r));
-    else console.log(`     ${name}: ${tail(r)}`);
+    row(name, ok, ok ? '' : tail(r));
   }
-  if (expect === 'old') row('negative: cc -Werror -c a.s fails on the driver\'s unused compile flags (homescoop#1408)', !asmGot[0], `${asmGot}`);
-  if (expect === 'current') {
+  {
     const cpp = await run(['cc', '-Werror', '-c', 'p.S', '-o', 'p.o'], { env: ccEnv });
     row('cc -Werror -c p.S keeps the driver defines', cpp.status === 0 && /T bar/.test(await syms('p.o')), tail(cpp));
     const mixed = await run(['cc', '-Werror', '-c', 'a.s', 'c.c'], { env: ccEnv });
     row('cc -Werror -c a.s c.c keeps the driver defines for c.c', mixed.status === 0 && /T baz/.test(await syms('c.o')) && /T foo/.test(await syms('a.o')), tail(mixed));
     const unused = await run(['cc', '-Werror', '-DUSER_FLAG', '-c', 'a.s', '-o', 'u.o'], { env: ccEnv });
     row('cc -Werror -DUSER_FLAG -c a.s still reports the caller\'s own unused flag', unused.status !== 0 && /unused during compilation: '-D USER_FLAG'/.test(unused.stderr) && !/_WASI_EMULATED/.test(unused.stderr), tail(unused));
+  }
+
+  const LINKER_UNUSED = /'linker' input unused/;
+  const syntaxRows = [
+    ['cc -Werror -fsyntax-only c.c (homescoop#1647)', ['cc', '-Werror', '-fsyntax-only', 'c.c'], {}, 0],
+    ['cc -Werror -fsyntax-only a.s: only clang\'s own \'assembler\' input unused, as upstream clang', ['cc', '-Werror', '-fsyntax-only', 'a.s'], {}, 1],
+    ['cc -fsyntax-only a.s: no \'linker\' input unused', ['cc', '-fsyntax-only', 'a.s'], {}, -1],
+    ['c++ -Werror -fsyntax-only x.cpp', ['c++', '-Werror', '-fsyntax-only', 'x.cpp'], {}, 0],
+    ['cc -Werror -fsyntax-only -fPIC c.c', ['cc', '-Werror', '-fsyntax-only', '-fPIC', 'c.c'], {}, 0],
+    ['cc -Werror -fsyntax-only -rdynamic c.c', ['cc', '-Werror', '-fsyntax-only', '-rdynamic', 'c.c'], {}, 0],
+    ['cc -Werror -fsyntax-only c.c with WASIXCC_PIC=yes', ['cc', '-Werror', '-fsyntax-only', 'c.c'], { WASIXCC_PIC: 'yes' }, 0],
+    ['cc -Werror -emit-ast c.c', ['cc', '-Werror', '-emit-ast', 'c.c', '-o', 'c.ast'], {}, 0],
+  ];
+  const syntaxGot = [];
+  for (const [name, argv, env, want] of syntaxRows) {
+    const r = await run(argv, { env: { ...ccEnv, ...env } });
+    const err = `${r.stderr}`;
+    const clean = want === 0 ? !/unused/.test(err) : want === -1 || err.trim().split('\n').every((l) => /'assembler' input unused/.test(l));
+    const ok = r.status === Math.max(want, 0) && !LINKER_UNUSED.test(err) && clean;
+    syntaxGot.push(ok);
+    if (expect === 'current') row(name, ok, ok ? '' : tail(r));
+    else console.log(`     ${name}: ${tail(r)}`);
+  }
+  if (expect === 'old') row('negative: cc -Werror -fsyntax-only c.c fails on the driver\'s link flags (homescoop#1647)', !syntaxGot[0] && !syntaxGot[1], `${syntaxGot}`);
+
+  const runOut = async (prog) => {
+    const r = await run(['bash', '-c', `${prog}; echo rc=$?`], { env: ccEnv });
+    return `${r.stdout}`.trim();
+  };
+  {
+    const steps = [
+      ['cc -O2 -S ts.c', ['cc', '-O2', '-S', 'ts.c', '-o', 'ts.s']],
+      ['cc -Werror -c ts.s', ['cc', '-Werror', '-c', 'ts.s', '-o', 'ts.o']],
+      ['cc -Werror ts.o -o ts.wasm', ['cc', '-Werror', 'ts.o', '-o', 'ts.wasm']],
+    ];
+    let failed = '';
+    for (const [name, argv] of steps) {
+      const r = await run(argv, { env: ccEnv });
+      if (r.status !== 0) { failed = `${name}: ${tail(r)}`; break; }
+    }
+    const tsOut = failed ? '' : await runOut('/home/t/ts.wasm');
+    row('C -> cc -S -> cc -Werror -c .s -> link -> run: TLS, atomics, 4 pthreads (homescoop#1249)', !failed && tsOut === 'sum=10 tl=1\nrc=0', failed || JSON.stringify(tsOut));
+    const asmLink = await run(['cc', '-Werror', 'ts.s', 'a.s', '-o', 'tsa.wasm'], { env: ccEnv });
+    const tsaOut = asmLink.status === 0 ? await runOut('/home/t/tsa.wasm') : '';
+    row('cc -Werror ts.s a.s -o tsa.wasm: an asm-only link runs (homescoop#1249)', asmLink.status === 0 && tsaOut === 'sum=10 tl=1\nrc=0', asmLink.status === 0 ? JSON.stringify(tsaOut) : tail(asmLink));
+
+    const libSteps = [
+      ['cc -g -c la.c lb.c', ['cc', '-Werror', '-O2', '-g', '-c', 'la.c', 'lb.c']],
+      ['llvm-ar rcs libab.a', ['llvm-ar', 'rcs', 'libab.a', 'la.o', 'lb.o']],
+      ['cc lmain.c -L. -lab', ['cc', '-Werror', '-O2', 'lmain.c', '-L.', '-lab', '-o', 'lab.wasm']],
+      ['llvm-strip lab.wasm', ['llvm-strip', 'lab.wasm', '-o', 'labs.wasm']],
+      ['llvm-objcopy --strip-debug lab.wasm', ['llvm-objcopy', '--strip-debug', 'lab.wasm', 'labo.wasm']],
+    ];
+    failed = '';
+    for (const [name, argv] of libSteps) {
+      const r = await run(argv, { env: ccEnv });
+      if (r.status !== 0) { failed = `${name}: ${tail(r)}`; break; }
+    }
+    const arSyms = failed ? '' : await syms('libab.a');
+    const labOut = failed ? '' : await runOut('/home/t/labs.wasm');
+    const laboOut = failed ? '' : await runOut('/home/t/labo.wasm');
+    const debugSize = failed ? 0 : (await k.readFile('/home/t/lab.wasm')).length - (await k.readFile('/home/t/labo.wasm')).length;
+    row('two TUs -g -> llvm-ar rcs -> llvm-nm -> cc -lab -> llvm-strip / llvm-objcopy --strip-debug -> run (homescoop#1249)', !failed && /T twice/.test(arSyms) && /T quad/.test(arSyms) && labOut === 'quad=20\nrc=0' && laboOut === labOut && debugSize > 0, failed || `${JSON.stringify(labOut)} ${JSON.stringify(laboOut)} debug ${debugSize} bytes, nm ${arSyms.split('\n').filter((l) => / T /.test(l)).join(', ')}`);
+
+    failed = '';
+    for (const [name, argv] of [
+      ['cc -flto -c la.c lb.c', ['cc', '-Werror', '-O2', '-flto', '-c', 'la.c', 'lb.c']],
+      ['cc -flto lmain.c la.o lb.o', ['cc', '-Werror', '-O2', '-flto', 'lmain.c', 'la.o', 'lb.o', '-o', 'lto.wasm']],
+    ]) {
+      const r = await run(argv, { env: ccEnv });
+      if (r.status !== 0) { failed = `${name}: ${tail(r)}`; break; }
+    }
+    const ltoOut = failed ? '' : await runOut('/home/t/lto.wasm');
+    row('cc -flto: two TUs and a main link and run (homescoop#1249)', !failed && ltoOut === 'quad=20\nrc=0', failed || JSON.stringify(ltoOut));
   }
 
   await k.writeFile('/wasm-opt', '#!/bin/sh\nexit 0\n');
@@ -131,11 +227,7 @@ try {
   const plan = await run(envLink);
   const plan2 = `${plan.stdout}${plan.stderr}`;
   const usesRootPath = /"\/wasm-opt"/.test(plan2);
-  if (expect === 'current') {
-    row('env -i clang -O2 link: no PATH=/, so no /wasm-opt from the root (homescoop#1502)', plan.status === 0 && !usesRootPath, plan2.split('\n').filter((l) => /wasm-opt|error/.test(l)).join(' | ') || 'no wasm-opt step');
-  } else {
-    row('negative: env -i clang -O2 link picks /wasm-opt through Emscripten\'s PATH=/ (homescoop#1502)', usesRootPath, plan2.split('\n').filter((l) => /wasm-opt/.test(l)).join(' | '));
-  }
+  row('env -i clang -O2 link: no PATH=/, so no /wasm-opt from the root (homescoop#1502)', plan.status === 0 && !usesRootPath, plan2.split('\n').filter((l) => /wasm-opt|error/.test(l)).join(' | ') || 'no wasm-opt step');
 
   const chain = async (n) => {
     const dir = `/tmp/l${n}`;
@@ -147,22 +239,13 @@ try {
   const via41 = await chain(41);
   const s40 = await run(['clang', '--target=wasm32-wasip1', '-D_WASI_EMULATED_MMAN', '-fsyntax-only', '-x', 'c', via40], { env: ccEnv });
   const s41 = await run(['clang', '--target=wasm32-wasip1', '-D_WASI_EMULATED_MMAN', '-fsyntax-only', '-x', 'c', via41], { env: ccEnv });
-  if (expect === 'current') {
-    row('clang reads a source through 40 symlinks (package patch 0014, homescoop#611)', s40.status === 0, tail(s40));
-    row('clang refuses 41 symlinks', s41.status !== 0, tail(s41));
-  } else {
-    row('negative: clang fails on 40 symlinks (nlinks<40)', s40.status !== 0, tail(s40));
-  }
+  row('clang reads a source through 40 symlinks (package patch 0014, homescoop#611)', s40.status === 0, tail(s40));
+  row('clang refuses 41 symlinks', s41.status !== 0, tail(s41));
 
-  if (expect === 'old') {
-    const old = failures.filter((f) => f.startsWith('static: '));
-    failures.splice(0, failures.length, ...failures.filter((f) => !f.startsWith('static: ')));
-    assert.equal(old.length, 3, `the old package should fail all three static rows: ${old.join('; ')}`);
-  }
   assert.deepEqual(failures, [], `${failures.length} row(s) failed`);
   console.log(expect === 'current'
-    ? `PASS ${cpkg.name}@${cpkg.version}: shims notice, slicc-env.js and nlinks<=40 in the glue; .s compiles under -Werror, env -i has no PATH=/, 40 symlinks resolve`
-    : `PASS negative: ${cpkg.name}@${cpkg.version} fails the static, .s, env -i and symlink rows`);
+    ? `PASS ${cpkg.name}@${cpkg.version}: shims notice, slicc-env.js and nlinks<=40 in the glue; .s compiles under -Werror, -fsyntax-only passes no link flags, programs built through .s, ar and -flto run, env -i has no PATH=/, 40 symlinks resolve`
+    : `PASS negative: ${cpkg.name}@${cpkg.version} fails cc -Werror -fsyntax-only on its link flags and passes every other row`);
 } catch (e) {
   process.exitCode = 1;
   console.log(`FAIL ${e.stack}`);

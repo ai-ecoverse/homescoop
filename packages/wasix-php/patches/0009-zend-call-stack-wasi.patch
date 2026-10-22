@@ -1,0 +1,97 @@
+A call stack limit on WASI (wasix-php).
+
+PHP checks its C stack against zend.max_allowed_stack_size and throws
+"Maximum call stack size of N bytes reached" before a deep recursion in C
+(serialize, json_encode, ==, array_map or usort calling back into PHP,
+__get, __toString) overflows. configure can't run its test when cross
+compiling, so it was off (php_cv_have_stack_limit=yes in build.sh's
+config.site turns it on), and zend_call_stack_get() knew no WASI stack.
+
+What overflows first in slicc is not wasm's 8 MiB shadow stack in linear
+memory but the browser's native stack, where every wasm frame of the
+asyncified build sits too. V8 allows about 330 (usort calling itself) to
+1130 (json_encode) nested levels, while their use of the shadow stack
+differs 30-fold (40 bytes a level for ==, 1.2 KiB for serialize), so no
+single byte budget fits every path. So:
+
+- zend_call_stack_get() reports the shadow stack's top (__stack_high) as
+  the base and at most 448 KiB as its size;
+- every frame that runs the check takes 2 KiB of shadow stack
+  (ZEND_WASI_CALL_STACK_FRAME), so each checked level costs about what it
+  costs V8, and the 448 KiB (less zend.reserved_stack_size's 48 KiB) runs
+  out after 94 (== on objects) to 188 (== on arrays) levels: about half
+  of what V8 allows usort, a fifth of serialize, array_map and == on
+  arrays.
+
+zend.max_allowed_stack_size still sets a different size (-d or php.ini),
+and -1 turns the check off.
+
+--- a/Zend/zend_call_stack.c
++++ b/Zend/zend_call_stack.c
+@@ -79,6 +79,10 @@
+ 
+ #ifdef ZEND_CHECK_STACK_LIMIT
+ 
++#ifdef __wasi__
++# define ZEND_WASI_CALL_STACK_SIZE (448 * 1024)
++#endif
++
+ /* Called once per process or thread */
+ ZEND_API void zend_call_stack_init(void) {
+ 	if (!zend_call_stack_get(&EG(call_stack))) {
+@@ -574,6 +578,26 @@
+ }
+ #endif /* defined(__HAIKU__) */
+ 
++#if defined(__wasi__)
++extern unsigned char __stack_low;
++extern unsigned char __stack_high;
++
++static bool zend_call_stack_get_wasi(zend_call_stack *stack)
++{
++	size_t size = (size_t)(&__stack_high - &__stack_low);
++
++	stack->base = &__stack_high;
++	stack->max_size = size < ZEND_WASI_CALL_STACK_SIZE ? size : ZEND_WASI_CALL_STACK_SIZE;
++
++	return true;
++}
++#else
++static bool zend_call_stack_get_wasi(zend_call_stack *stack)
++{
++	return false;
++}
++#endif
++
+ #if defined(__NetBSD__)
+ # ifdef HAVE_PTHREAD_GETATTR_NP
+ static bool zend_call_stack_get_netbsd_pthread(zend_call_stack *stack)
+@@ -824,6 +848,10 @@
+ 		return true;
+ 	}
+ 
++	if (zend_call_stack_get_wasi(stack)) {
++		return true;
++	}
++
+ 	return false;
+ }
+ 
+--- a/Zend/zend_call_stack.h
++++ b/Zend/zend_call_stack.h
+@@ -56,7 +56,15 @@
+ #endif
+ }
+ 
++#ifdef __wasi__
++# define ZEND_WASI_CALL_STACK_FRAME 2048
++#endif
++
+ static zend_always_inline bool zend_call_stack_overflowed(void *stack_limit) {
++#ifdef __wasi__
++	char frame[ZEND_WASI_CALL_STACK_FRAME];
++	__asm__ volatile("" : : "r"(frame));
++#endif
+ 	return (uintptr_t) zend_call_stack_position() <= (uintptr_t) stack_limit;
+ }
+ 

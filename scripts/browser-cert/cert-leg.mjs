@@ -29,8 +29,8 @@ const SPEC_FILE = /^[\w.-]+\.mjs$/;
 const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
 
 // cert/meta.json "extra_kernels" (homescoop#663). A string entry documents
-// a kernel the specs were checked on by hand; ladder-pr does not run it. An
-// object entry is run by ladder-pr's cert leg:
+// a kernel the specs were checked on by hand; the PR run does not run it. An
+// object entry is run by the PR run's cert leg:
 //   { "kernel": "@ai-ecoverse/slicc-kernel@x.y.z", "why": "...",
 //     "specs": true | ["a.mjs", ...],  // browser specs on that kernel
 //     "cert": "k108",                  // optional: a cert/ subdirectory
@@ -84,7 +84,7 @@ export function readExtraKernels(dir, pkg, meta) {
 const RECIPE = /^[a-z0-9][a-z0-9._-]*$/;
 
 // cert/meta.json "peers": other recipes whose host-<peer>-prN artifacts of the
-// same ladder-pr run the cert job downloads into .homescoop-out/peers, for ci
+// same the PR run run the cert job downloads into .homescoop-out/peers, for ci
 // commands that check this package against them (homescoop#678).
 export function readPeers(dir, pkg, meta) {
   if (meta.peers === undefined) return [];

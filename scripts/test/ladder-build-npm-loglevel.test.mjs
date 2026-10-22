@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const workflow = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.github', 'workflows', 'ladder-build.yml');
+const publishScript = join(dirname(fileURLToPath(import.meta.url)), '..', 'oidc-publish.sh');
 const text = readFileSync(workflow, 'utf8');
 const lines = text.split('\n');
 const indentOf = (l) => l.length - l.trimStart().length;
@@ -59,18 +60,6 @@ function publishStep() {
   return { env, run: run.map((l) => l.slice(ri)).join('\n') + '\n' };
 }
 
-function stepEnv(stepEnvMap, input) {
-  const env = {};
-  for (const [k, v] of Object.entries(stepEnvMap)) {
-    env[k] = v
-      .replace(/\$\{\{\s*inputs\.npm_loglevel\s*\}\}/g, input)
-      .replace(/\$\{\{\s*inputs\.certified\s*\}\}/g, 'c'.repeat(64))
-      .replace(/\$\{\{\s*needs\.resolve\.outputs\.npm\s*\}\}/g, '@ai-ecoverse/wasm-x')
-      .replace(/\$\{\{\s*needs\.resolve\.outputs\.npm_tag\s*\}\}/g, 'latest');
-  }
-  return env;
-}
-
 function runStep(t, input, { declared = true } = {}) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'ladder-build-loglevel-')));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -88,11 +77,11 @@ function runStep(t, input, { declared = true } = {}) {
   chmodSync(join(bin, 'node'), 0o755);
   chmodSync(join(bin, 'npm'), 0o755);
   const { env: stepMap, run } = publishStep();
-  const script = run.replace(/\$\{\{\s*runner\.temp\s*\}\}/g, dir);
-  assert.doesNotMatch(script, /\$\{\{/, 'the run block interpolates no expression the test does not know');
+  assert.match(run, /bash scripts\/oidc-publish\.sh "\$RUNNER_TEMP\/release\/package\.tgz" "\$NPM" "\$TAG" "\$CERTIFIED"/);
+  assert.equal(stepMap.HOMESCOOP_NPM_LOGLEVEL, '${{ inputs.npm_loglevel }}');
+  const script = `bash ${JSON.stringify(publishScript)} ${JSON.stringify(join(dir, 'package.tgz'))} @ai-ecoverse/wasm-x latest ${'c'.repeat(64)}`;
   const base = { PATH: `${bin}:/usr/bin:/bin`, HOME: home, ACTIONS_ID_TOKEN_REQUEST_URL: 'https://example.invalid/oidc' };
-  const env = { ...base, ...stepEnv(stepMap, input) };
-  if (!declared) for (const [k, v] of Object.entries(stepMap)) if (/inputs\.npm_loglevel/.test(v)) delete env[k];
+  const env = declared ? { ...base, HOMESCOOP_NPM_LOGLEVEL: input } : base;
   const r = spawnSync('bash', ['-c', script], { env, cwd: dir, encoding: 'utf8' });
   const seen = existsSync(dump) ? JSON.parse(readFileSync(dump, 'utf8')) : null;
   if (seen) {

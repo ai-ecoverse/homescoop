@@ -2,9 +2,7 @@ export const SLICC_SHIM_MARK = Buffer.from('slicc_sig_mask');
 
 export const SHIM_HEADING = /^## homescoop: .*\bslicc shims\b.*Apache-2\.0/m;
 
-export const KNOWN_WITHOUT_SHIM_NOTICE = {
-  'wasm-binaryen': '#844',
-};
+export const KNOWN_WITHOUT_SHIM_NOTICE = {};
 
 export function shimNoticeErrors(wasm, pkg, notices, name) {
   const errors = [];

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # host-smoke.sh <package> — emcc-link packages/<name>/smoke.c against PREFIX.
-# No-op when smoke.c is absent. Used by ladder-pr after host-run.
+# No-op when smoke.c is absent. Used by the PR run after host-run.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
