@@ -1,5 +1,16 @@
 # py-matplotlib: negative proof
 
+## cert only on 3.11.2-14: render.mjs (#1263) and the sidemods needs check (#1261; 2026-10-22)
+
+No -N: the published 3.11.2-14 passes `cert/render.mjs` (slicc-kernel 1.144.1, `--users enforce`). #1261's missing py-pytz was fixed in #1259 before it merged (`needs` and `needsInstall` list `@ai-ecoverse/py-pytz`, now `@2026.4.0-5`, npm `latest`), so only the check is new.
+
+- `scripts/test/cert-needs.test.mjs` with py-pytz taken out of `cert/meta.json` (what #1261 saw): FAIL, `packages/py-matplotlib/cert/meta.json: needs py-pytz`, `… needsInstall py-pytz`. The test also runs that case itself on a copy of the meta.
+- `cert/render.mjs` on 3.11.2-14 tarballs with one part taken out, each FAIL (rc 1):
+  - without `_qhull.cpython-315-wasm32-wasix.so`: `ImportError: cannot import name '_qhull' from 'matplotlib'`;
+  - without `backends/backend_ps.py`: `ModuleNotFoundError: No module named 'matplotlib.backends.backend_ps'`;
+  - without the `cm*.ttf` and `DejaVuSans*.ttf` fonts: `ValueError: Failed to find font DejaVu Sans…`.
+- `prove-negative.mjs` doesn't apply: py-matplotlib has no commands and no `bin/*.wasm`, only side modules.
+
 ## 3.11.2-13: the default backend is auto-resolved (3.11.2-14, #1115; 2026-10-20)
 
 `cert/backend.mjs` on npm 3.11.2-13: FAIL, `None False agg` (matplotlibrc has only the inert `##backend: Agg`, so the backend is auto-resolved to lowercase `agg`). 3.11.2-9 and 3.11.2-14 give `Agg True Agg`.
