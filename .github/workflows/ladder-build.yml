@@ -41,6 +41,11 @@ on:
         required: false
         default: ''
         type: string
+      npm_loglevel:
+        description: 'Trace the npm publish: http, timing (http plus npm timing lines) or verbose. Empty (the default) leaves npm at its own log level.'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -341,8 +346,16 @@ jobs:
           NPM: ${{ needs.resolve.outputs.npm }}
           TAG: ${{ needs.resolve.outputs.npm_tag }}
           CERTIFIED: ${{ inputs.certified }}
+          HOMESCOOP_NPM_LOGLEVEL: ${{ inputs.npm_loglevel }}
         run: |
           set -euo pipefail
+          case "${HOMESCOOP_NPM_LOGLEVEL:-}" in
+            '') ;;
+            http|verbose) export NPM_CONFIG_LOGLEVEL="$HOMESCOOP_NPM_LOGLEVEL" ;;
+            timing) export NPM_CONFIG_LOGLEVEL=http NPM_CONFIG_TIMING=true ;;
+            *) echo "::error::npm_loglevel must be empty, http, timing or verbose" >&2; exit 2 ;;
+          esac
+          unset HOMESCOOP_NPM_LOGLEVEL
           unset NODE_AUTH_TOKEN NPM_TOKEN NPM_CONFIG_TOKEN || true
           TGZ="${{ runner.temp }}/package.tgz"
           ls -la "$TGZ"
