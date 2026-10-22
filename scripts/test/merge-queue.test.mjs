@@ -333,6 +333,25 @@ test('ladder-build on a merge group builds, uploads and publishes nothing', () =
   }
 });
 
+test('NEGATIVE: a ladder-build dispatch with agent_loop_rounds set publishes nothing; the stress loop never publishes', () => {
+  const yaml = readFileSync(join(ROOT, '.github/workflows/ladder-build.yml'), 'utf8');
+  const body = yaml.slice(yaml.indexOf('\njobs:\n'));
+  const jobs = body.split(/\n(?= {2}[a-z][a-z0-9-]*:\n)/).slice(1);
+  const named = (n) => jobs.find((j) => j.startsWith(`  ${n}:\n`));
+  assert.match(yaml, /^ {6}agent_loop_rounds:$/m);
+  const publish = named('publish').match(/^ {4}if: (.+)$/m)[1];
+  assert.match(publish, / && !inputs\.agent_loop_rounds$/, `publish's if (${publish}) must refuse a stress dispatch`);
+  for (const job of jobs) {
+    const name = job.match(/^ {2}([a-z0-9-]+):/)[1];
+    if (!/id-token: write|npm publish|oidc-publish|npm-publish\.mjs/.test(job)) continue;
+    const cond = job.match(/^ {4}if: (.+)$/m)?.[1] ?? '';
+    assert.ok(cond.includes("github.event_name == 'pull_request'") && !cond.includes('workflow_dispatch') || cond.includes('!inputs.agent_loop_rounds'), `${name} can publish on a stress dispatch (if: ${cond || 'none'})`);
+  }
+  const loop = named('agent-loop');
+  assert.doesNotMatch(loop, /^ {4}needs:/m, 'agent-loop waits on nothing, publish included');
+  assert.doesNotMatch(loop, /id-token|contents: write|npm publish|oidc-publish/);
+});
+
 for (const moves of [true, false]) {
   test(`${moves ? 'NEGATIVE: ' : ''}a toolchain file main ${moves ? 'changed' : 'left alone'} under a member's artifact ${moves ? 'fails' : 'passes'} the group (toolchain default inputs, #857)`, async () => {
     const r = repo();

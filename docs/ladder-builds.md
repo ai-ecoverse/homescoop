@@ -140,10 +140,9 @@ has two jobs outside `ci`'s needs. `stress-lockfile` runs on a pull request
 that touches the fixture and checks its lockfile against its manifest with
 upstream pnpm (`pnpm install --frozen-lockfile --lockfile-only`). `agent-loop`
 runs `agent-loop.mjs` once a day (8 installs) and on a dispatch with
-`agent_loop_rounds` set. A dispatch on `main` also does the usual dispatch
-publish of the packages the dispatched commit touched (a skip for each one
-already on npm), so dispatch the loop with `packages` empty, or from another
-branch, where nothing publishes. `scripts/test/stress-agent-fixture.test.mjs`
+`agent_loop_rounds` set. A dispatch with `agent_loop_rounds` set never
+publishes: `publish`'s `if` refuses it (`merge-queue.test.mjs` checks this).
+`scripts/test/stress-agent-fixture.test.mjs`
 checks the lockfile's importers on every pull request, inside `ci`.
 
 `scripts/list-touched-packages.mjs` maps changed paths → recipe names.

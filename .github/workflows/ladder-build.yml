@@ -907,7 +907,7 @@ jobs:
   # it, the bytes the reviewers saw. OIDC: npm trusts this file.
   publish:
     needs: detect
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && needs.detect.outputs.release != '[]'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && needs.detect.outputs.release != '[]' && !inputs.agent_loop_rounds
     strategy:
       fail-fast: false
       max-parallel: 3

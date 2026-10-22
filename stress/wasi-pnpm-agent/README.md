@@ -27,9 +27,9 @@ needs.
   39360271290), so the daily run takes about half an hour. Every fourth
   round starts from a cold store. The job log ends with `rounds.jsonl`, the
   kernel's wasm-memory admission at the start, and each failed round's whole
-  log (no artifact: nothing but a pull request or `main` uploads one). A dispatch on `main` also
-  runs the usual dispatch publish, so leave `packages` empty (a package
-  already on npm is skipped) or dispatch from another branch.
+  log (no artifact: nothing but a pull request or `main` uploads one). A
+  dispatch with `agent_loop_rounds` set never publishes: the `publish` job's
+  `if` refuses it.
 
 `scripts/test/stress-agent-fixture.test.mjs` also checks, on every pull
 request and inside `ci`, that the lockfile's importers name the
