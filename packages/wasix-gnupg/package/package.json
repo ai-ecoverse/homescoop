@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-gnupg",
-  "version": "2.4.9-13",
+  "version": "2.4.9-14",
   "description": "GnuPG 2.4: OpenPGP encryption and signing with gpg, gpgv and gpg-agent.",
   "engines": {
     "slicc-kernel": ">=1.117.2"

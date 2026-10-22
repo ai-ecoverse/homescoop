@@ -1,18 +1,25 @@
 --- a/common/sysutils.h
 +++ b/common/sysutils.h
-@@ -95,6 +95,9 @@
+@@ -95,6 +95,16 @@
  int gnupg_stat (const char *name, struct stat *statbuf);
  #endif /*HAVE_STAT*/
  int gnupg_open (const char *name, int flags, unsigned int mode);
 +#ifdef __wasi__
 +void gnupg_wasi_give_to_owner (const char *path, const char *ref, int isdir);
++#define GNUPG_WASI_CREATE_REPLACE 1
++#define GNUPG_WASI_CREATE_REAL_DIR 2
++#define GNUPG_WASI_CREATE_GIVE 4
++int gnupg_wasi_create_file (const char *path, unsigned int mode, int flags);
++int gnupg_wasi_rename_file (const char *from, const char *to);
++int gnupg_wasi_chmod_file (const char *path, unsigned int mode);
++int gnupg_wasi_open_file (const char *path, int flags);
 +#endif
  
  gnupg_dir_t gnupg_opendir (const char *name);
  gnupg_dirent_t gnupg_readdir (gnupg_dir_t gdir);
 --- a/common/sysutils.c
 +++ b/common/sysutils.c
-@@ -1324,6 +1324,72 @@
+@@ -1324,6 +1324,318 @@
  }
  
  
@@ -78,6 +85,252 @@
 +  close (fd);
 + leave:
 +  close (dfd);
++}
++
++static int
++wasi_split (const char *path, char **r_dir, const char **r_base)
++{
++  const char *base;
++  char *dir;
++  size_t dlen;
++
++  base = strrchr (path, '/');
++  dlen = base ? (size_t)(base - path) : 0;
++  base = base ? base + 1 : path;
++  if (!*base || !strcmp (base, ".") || !strcmp (base, ".."))
++    {
++      errno = EINVAL;
++      return -1;
++    }
++  dir = xtrymalloc (dlen + 2);
++  if (!dir)
++    return -1;
++  if (base == path)
++    strcpy (dir, ".");
++  else if (!dlen)
++    strcpy (dir, "/");
++  else
++    {
++      memcpy (dir, path, dlen);
++      dir[dlen] = 0;
++    }
++  *r_dir = dir;
++  *r_base = base;
++  return 0;
++}
++
++static int
++wasi_open_dir (const char *dir, int real)
++{
++  struct stat lst, st;
++  const char *base;
++  char *parent;
++  int pfd, dfd, e;
++
++  if (!real)
++    return open (dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  if (wasi_split (dir, &parent, &base))
++    return -1;
++  pfd = open (parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  xfree (parent);
++  if (pfd == -1)
++    return -1;
++  dfd = -1;
++  if (fstatat (pfd, base, &lst, AT_SYMLINK_NOFOLLOW) || !S_ISDIR (lst.st_mode))
++    {
++      errno = ENOTDIR;
++      goto leave;
++    }
++  dfd = openat (pfd, base, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
++  if (dfd == -1)
++    goto leave;
++  if (fstat (dfd, &st) || !S_ISDIR (st.st_mode)
++      || st.st_dev != lst.st_dev || st.st_ino != lst.st_ino)
++    {
++      close (dfd);
++      dfd = -1;
++      errno = ENOTDIR;
++    }
++ leave:
++  e = errno;
++  close (pfd);
++  errno = e;
++  return dfd;
++}
++
++int
++gnupg_wasi_create_file (const char *path, unsigned int mode, int flags)
++{
++  struct stat st, lst, dst;
++  const char *base;
++  char *dir;
++  int dfd, fd, e;
++
++  if (wasi_split (path, &dir, &base))
++    return -1;
++  dfd = wasi_open_dir (dir, !!(flags & GNUPG_WASI_CREATE_REAL_DIR));
++  xfree (dir);
++  if (dfd == -1)
++    return -1;
++  fd = -1;
++  if ((flags & GNUPG_WASI_CREATE_REPLACE)
++      && unlinkat (dfd, base, 0) && errno != ENOENT)
++    goto leave;
++  fd = openat (dfd, base, (O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW
++                           | O_CLOEXEC), mode);
++  if (fd == -1)
++    goto leave;
++  if (fstat (fd, &st) || fstatat (dfd, base, &lst, AT_SYMLINK_NOFOLLOW)
++      || !S_ISREG (st.st_mode) || !S_ISREG (lst.st_mode)
++      || st.st_nlink != 1 || lst.st_nlink != 1
++      || st.st_dev != lst.st_dev || st.st_ino != lst.st_ino)
++    {
++      close (fd);
++      fd = -1;
++      errno = EEXIST;
++      goto leave;
++    }
++  if ((flags & GNUPG_WASI_CREATE_GIVE) && !geteuid ()
++      && !fstat (dfd, &dst) && S_ISDIR (dst.st_mode)
++      && (st.st_uid != dst.st_uid || st.st_gid != dst.st_gid)
++      && fchown (fd, dst.st_uid, dst.st_gid))
++    {
++      e = errno;
++      close (fd);
++      unlinkat (dfd, base, 0);
++      fd = -1;
++      errno = e;
++    }
++ leave:
++  e = errno;
++  close (dfd);
++  errno = e;
++  return fd;
++}
++
++int
++gnupg_wasi_rename_file (const char *from, const char *to)
++{
++  struct stat lst;
++  const char *fbase, *tbase;
++  char *fdir, *tdir;
++  int dfd, rc, e;
++
++  if (wasi_split (from, &fdir, &fbase))
++    return -1;
++  if (wasi_split (to, &tdir, &tbase))
++    {
++      xfree (fdir);
++      return -1;
++    }
++  rc = strcmp (fdir, tdir);
++  xfree (tdir);
++  if (rc)
++    {
++      xfree (fdir);
++      errno = EXDEV;
++      return -1;
++    }
++  dfd = open (fdir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  xfree (fdir);
++  if (dfd == -1)
++    return -1;
++  rc = -1;
++  if (fstatat (dfd, fbase, &lst, AT_SYMLINK_NOFOLLOW)
++      || !S_ISREG (lst.st_mode) || lst.st_nlink != 1)
++    errno = EINVAL;
++  else
++    rc = renameat (dfd, fbase, dfd, tbase);
++  e = errno;
++  close (dfd);
++  errno = e;
++  return rc;
++}
++
++int
++gnupg_wasi_open_file (const char *path, int flags)
++{
++  struct stat st, lst, dst;
++  const char *base;
++  char *dir;
++  int dfd, fd, e;
++
++  if (geteuid ())
++    return open (path, flags);
++  if (wasi_split (path, &dir, &base))
++    return -1;
++  dfd = open (dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  xfree (dir);
++  if (dfd == -1)
++    return -1;
++  if (!fstat (dfd, &dst) && S_ISDIR (dst.st_mode) && !dst.st_uid
++      && !(dst.st_mode & (S_IWGRP | S_IWOTH)))
++    {
++      fd = openat (dfd, base, flags);
++      goto leave;
++    }
++  fd = -1;
++  if (fstatat (dfd, base, &lst, AT_SYMLINK_NOFOLLOW))
++    goto leave;
++  if (!S_ISREG (lst.st_mode) || lst.st_nlink != 1)
++    {
++      errno = ELOOP;
++      goto leave;
++    }
++  fd = openat (dfd, base, flags | O_NOFOLLOW);
++  if (fd == -1)
++    goto leave;
++  if (fstat (fd, &st) || !S_ISREG (st.st_mode) || st.st_nlink != 1
++      || st.st_dev != lst.st_dev || st.st_ino != lst.st_ino)
++    {
++      close (fd);
++      fd = -1;
++      errno = ELOOP;
++    }
++ leave:
++  e = errno;
++  close (dfd);
++  errno = e;
++  return fd;
++}
++
++int
++gnupg_wasi_chmod_file (const char *path, unsigned int mode)
++{
++  struct stat st, lst;
++  const char *base;
++  char *dir;
++  int dfd, fd, rc, e;
++
++  if (wasi_split (path, &dir, &base))
++    return -1;
++  dfd = open (dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  xfree (dir);
++  if (dfd == -1)
++    return -1;
++  rc = -1;
++  fd = -1;
++  if (fstatat (dfd, base, &lst, AT_SYMLINK_NOFOLLOW)
++      || !S_ISREG (lst.st_mode) || lst.st_nlink != 1)
++    {
++      errno = EINVAL;
++      goto leave;
++    }
++  fd = openat (dfd, base, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
++  if (fd == -1)
++    goto leave;
++  if (fstat (fd, &st) || !S_ISREG (st.st_mode) || st.st_nlink != 1
++      || st.st_dev != lst.st_dev || st.st_ino != lst.st_ino)
++    errno = EINVAL;
++  else
++    rc = fchmod (fd, mode);
++ leave:
++  e = errno;
++  if (fd != -1)
++    close (fd);
++  close (dfd);
++  errno = e;
++  return rc;
 +}
 +#endif
 +
@@ -786,7 +1039,7 @@
    if (!err)
      {
        err = _keybox_ll_open (r_fp, *r_tmpfname, KEYBOX_LL_OPEN_CREATE);
-@@ -92,6 +121,43 @@
+@@ -92,6 +121,49 @@
  }
  
  
@@ -798,14 +1051,20 @@
 +  FILE *in, *out;
 +  char buf[8192];
 +  size_t n;
-+  int rc = 0;
++  int fd, rc = 0;
 +
 +  in = fopen (src, "rb");
 +  if (!in)
 +    return gpg_error_from_syserror ();
-+  out = fopen (dst, "wb");
-+  if (!out && errno == EACCES && !gnupg_remove (dst))
-+    out = fopen (dst, "wb");
++  fd = gnupg_wasi_create_file (dst, 0666, GNUPG_WASI_CREATE_REPLACE);
++  out = fd == -1 ? NULL : fdopen (fd, "wb");
++  if (!out && fd != -1)
++    {
++      rc = gpg_error_from_syserror ();
++      close (fd);
++      fclose (in);
++      return rc;
++    }
 +  if (!out)
 +    {
 +      rc = gpg_error_from_syserror ();
@@ -830,7 +1089,7 @@
  static int
  rename_tmp_file (const char *bakfname, const char *tmpfname,
                   const char *fname, int secret )
-@@ -118,7 +184,22 @@
+@@ -118,7 +190,22 @@
  /*    iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)fname ); */
  
    /* First make a backup file except for secret keyboxes. */
@@ -853,17 +1112,20 @@
      {
        block = 1;
        rc = gnupg_rename_file (fname, bakfname, &block);
-@@ -127,6 +208,9 @@
+@@ -127,7 +214,12 @@
      }
  
    /* Then rename the file. */
 +#ifdef __wasi__
 +  gnupg_wasi_give_to_owner (tmpfname, fname, 0);
-+#endif
++  rc = gnupg_wasi_rename_file (tmpfname, fname) ? gpg_error_from_syserror () : 0;
++#else
    rc = gnupg_rename_file (tmpfname, fname, NULL);
++#endif
    if (block)
      {
-@@ -181,6 +265,9 @@
+       gnupg_unblock_all_signals ();
+@@ -181,6 +273,9 @@
        rc = _keybox_ll_open (&newfp, fname, KEYBOX_LL_OPEN_CREATE);
        if (rc)
          return rc;
@@ -873,7 +1135,7 @@
  
        rc = _keybox_write_header_blob (newfp, for_openpgp);
        if (rc)
-@@ -346,6 +433,10 @@
+@@ -346,6 +441,10 @@
    rc = rename_tmp_file (bakfname, tmpfname, fname, secret);
  
   leave:
@@ -894,7 +1156,7 @@
  static gpg_error_t
  maybe_create_keyring_or_box (char *filename, int is_box, int force_create)
  {
-@@ -351,6 +352,43 @@
+@@ -351,13 +352,73 @@
  
    /* The file does not yet exist, create it now. */
    oldmask = umask (077);
@@ -906,9 +1168,15 @@
 +   * appears complete (renames are atomic in slicc-kernel >= 1.117.2).  */
 +  if (is_box && !is_secured_filename (filename))
 +    {
-+      estream_t fp = es_fopen (tmp_fname, "wb");
++      int fd = gnupg_wasi_create_file (tmp_fname, 0666,
++                                       GNUPG_WASI_CREATE_REPLACE);
++      estream_t fp = fd == -1 ? NULL : es_fdopen (fd, "wb");
 +      if (!fp)
-+        rc = gpg_error_from_syserror ();
++        {
++          rc = gpg_error_from_syserror ();
++          if (fd != -1)
++            close (fd);
++        }
 +      else
 +        {
 +          rc = _keybox_write_header_blob (fp, 1);
@@ -918,7 +1186,8 @@
 +      if (!rc)
 +        {
 +          gnupg_wasi_give_to_owner (tmp_fname, NULL, 0);
-+          rc = gnupg_rename_file (tmp_fname, filename, NULL);
++          if (gnupg_wasi_rename_file (tmp_fname, filename))
++            rc = gpg_error_from_syserror ();
 +        }
 +      umask (oldmask);
 +      if (rc)
@@ -938,7 +1207,41 @@
    if (is_secured_filename (filename))
      {
        iobuf = NULL;
-@@ -430,8 +468,78 @@
+       gpg_err_set_errno (EPERM);
+     }
+   else
+-    iobuf = iobuf_create (filename, 0);
++    {
++#ifdef __wasi__
++      int fd = gnupg_wasi_create_file (filename, 0666,
++                                       GNUPG_WASI_CREATE_REPLACE);
++
++      iobuf = fd == -1 ? NULL : iobuf_fdopen (fd, "wb");
++      if (!iobuf && fd != -1)
++        {
++          int e = errno;
++
++          close (fd);
++          errno = e;
++        }
++#else
++      iobuf = iobuf_create (filename, 0);
++#endif
++    }
+   umask (oldmask);
+   if (!iobuf)
+     {
+@@ -372,6 +433,9 @@
+     }
+ 
+   iobuf_close (iobuf);
++#ifdef __wasi__
++  gnupg_wasi_give_to_owner (filename, NULL, 0);
++#endif
+   /* Must invalidate that ugly cache */
+   iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, filename);
+ 
+@@ -430,8 +494,78 @@
     KEYDB_RESOURCE_TYPE_KEYBOX, KEYDB_RESOURCE_TYPE_KEYRING or
     KEYDB_RESOURCE_TYPE_KEYNONE.  If the file is a keybox and it has
     the OpenPGP flag set, then R_OPENPGP is also set.  */
@@ -1038,8 +1341,38 @@
  
 --- a/g10/tdbio.c
 +++ b/g10/tdbio.c
-@@ -742,6 +742,9 @@
+@@ -733,15 +733,38 @@
+           gpg_err_set_errno (EPERM);
+         }
+       else
+-        fp = es_fopen (fname, "wb");
++        {
++#ifdef __wasi__
++          int cfd = gnupg_wasi_create_file (fname, 0666,
++                                            GNUPG_WASI_CREATE_REPLACE);
++
++          fp = cfd == -1 ? NULL : es_fdopen (cfd, "wb");
++          if (!fp && cfd != -1)
++            {
++              int e = errno;
++
++              close (cfd);
++              errno = e;
++            }
++#else
++          fp = es_fopen (fname, "wb");
++#endif
++        }
+       umask(oldmask);
+       if (!fp)
+         log_fatal (_("can't create '%s': %s\n"), fname, strerror (errno));
+       es_fclose (fp);
+ 
++#ifdef __wasi__
++      db_fd = gnupg_wasi_open_file (db_name, O_RDWR | MY_O_BINARY);
++#else
        db_fd = gnupg_open (db_name, O_RDWR | MY_O_BINARY, 0);
++#endif
        if (db_fd == -1)
          log_fatal (_("can't open '%s': %s\n"), db_name, strerror (errno));
 +#ifdef __wasi__
@@ -1048,3 +1381,221 @@
  
        rc = create_version_record (ctrl);
        if (rc)
+@@ -783,7 +806,11 @@
+ 
+   log_assert( db_fd == -1 );
+ 
++#ifdef __wasi__
++  db_fd = gnupg_wasi_open_file (db_name, O_RDWR | MY_O_BINARY);
++#else
+   db_fd = gnupg_open (db_name, O_RDWR | MY_O_BINARY, 0);
++#endif
+   if (db_fd == -1 && (errno == EACCES
+ #ifdef EROFS
+                       || errno == EROFS
+--- a/kbx/keybox-init.c
++++ b/kbx/keybox-init.c
+@@ -20,8 +20,10 @@
+ #include <config.h>
+ #include <stdlib.h>
+ #include <stdio.h>
++#include <errno.h>
+ #include <string.h>
+ #include <unistd.h>
++#include <fcntl.h>
+ #include <assert.h>
+ 
+ #include "keybox-defs.h"
+@@ -281,6 +283,36 @@
+ 
+   *rfp = NULL;
+ 
++#ifdef __wasi__
++  if (mode == KEYBOX_LL_OPEN_CREATE)
++    {
++      int fd = gnupg_wasi_create_file (fname, 0666,
++                                       GNUPG_WASI_CREATE_REPLACE);
++
++      fp = fd == -1 ? NULL : es_fdopen (fd, "wb,sequential");
++      if (!fp && fd != -1)
++        {
++          int e = errno;
++
++          close (fd);
++          errno = e;
++        }
++    }
++  else if (mode == KEYBOX_LL_OPEN_UPDATE)
++    {
++      int fd = gnupg_wasi_open_file (fname, O_RDWR | O_CLOEXEC);
++
++      fp = fd == -1 ? NULL : es_fdopen (fd, "r+b,sequential");
++      if (!fp && fd != -1)
++        {
++          int e = errno;
++
++          close (fd);
++          errno = e;
++        }
++    }
++  else
++#endif
+   fp = es_fopen (fname,
+                  mode == KEYBOX_LL_OPEN_CREATE
+                  ? "wb,sysopen,sequential" :
+--- a/g10/openfile.c
++++ b/g10/openfile.c
+@@ -398,8 +398,14 @@
+       if (gnupg_mkdir (fname, "-rwx"))
+         log_error (_("can't create directory '%s': %s\n"),
+                    fname, strerror (errno) );
+-      else if (!opt.quiet)
+-        log_info (_("directory '%s' created\n"), fname);
++      else
++        {
++#ifdef __wasi__
++          gnupg_wasi_give_to_owner (fname, NULL, 1);
++#endif
++          if (!opt.quiet)
++            log_info (_("directory '%s' created\n"), fname);
++        }
+     }
+   return fname;
+ }
+--- a/g10/revoke.c
++++ b/g10/revoke.c
+@@ -23,6 +23,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <errno.h>
++#include <unistd.h>
+ #include <ctype.h>
+ 
+ #include "gpg.h"
+@@ -464,6 +465,30 @@
+ 
+   afx = new_armor_context ();
+ 
++#ifdef __wasi__
++  if (suffix == 3 && filename && !opt.outfile && !opt.dry_run)
++    {
++      char *revname = strconcat (filename, ".rev", NULL);
++      int fd = revname ? gnupg_wasi_create_file (revname, 0600,
++                                                 (GNUPG_WASI_CREATE_REAL_DIR
++                                                  | GNUPG_WASI_CREATE_GIVE))
++                       : -1;
++
++      out = fd == -1 ? NULL : iobuf_fdopen (fd, "wb");
++      if (!out)
++        {
++          rc = gpg_error_from_syserror ();
++          if (fd != -1)
++            close (fd);
++          log_error (_("can't create '%s': %s\n"),
++                     revname ? revname : filename, gpg_strerror (rc));
++          xfree (revname);
++          goto leave;
++        }
++      xfree (revname);
++    }
++  else
++#endif
+   if ((rc = open_outfile (-1, filename, suffix, 1, &out)))
+     goto leave;
+ 
+--- a/g10/keyring.c
++++ b/g10/keyring.c
+@@ -1321,7 +1321,23 @@
+       gpg_err_set_errno (EPERM);
+     }
+   else
+-    *r_fp = iobuf_create (*r_tmpfname, 1);
++    {
++#ifdef __wasi__
++      int fd = gnupg_wasi_create_file (*r_tmpfname, 0600,
++                                       GNUPG_WASI_CREATE_REPLACE);
++
++      *r_fp = fd == -1 ? NULL : iobuf_fdopen (fd, "wb");
++      if (!*r_fp && fd != -1)
++        {
++          int e = errno;
++
++          close (fd);
++          errno = e;
++        }
++#else
++      *r_fp = iobuf_create (*r_tmpfname, 1);
++#endif
++    }
+   umask (oldmask);
+   if (!*r_fp)
+     {
+@@ -1352,6 +1368,9 @@
+   iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)bakfname );
+   iobuf_ioctl (NULL, IOBUF_IOCTL_INVALIDATE_CACHE, 0, (char*)fname );
+ 
++#ifdef __wasi__
++  gnupg_wasi_give_to_owner (tmpfname, fname, 0);
++#endif
+   /* First make a backup file. */
+   block = 1;
+   rc = gnupg_rename_file (fname, bakfname, &block);
+@@ -1359,7 +1378,11 @@
+     goto fail;
+ 
+   /* then rename the file */
++#ifdef __wasi__
++  rc = gnupg_wasi_rename_file (tmpfname, fname) ? gpg_error_from_syserror () : 0;
++#else
+   rc = gnupg_rename_file (tmpfname, fname, NULL);
++#endif
+   if (block)
+     {
+       gnupg_unblock_all_signals ();
+@@ -1378,7 +1401,12 @@
+ 
+     statbuf.st_mode=S_IRUSR | S_IWUSR;
+ 
++#ifdef __wasi__
++    if (!gnupg_stat (bakfname, &statbuf)
++        && !gnupg_wasi_chmod_file (fname, statbuf.st_mode & 07777))
++#else
+     if (!gnupg_stat (bakfname, &statbuf) && !chmod (fname, statbuf.st_mode))
++#endif
+       ;
+     else
+       log_error ("WARNING: unable to restore permissions to '%s': %s",
+@@ -1634,7 +1662,23 @@
+             gpg_err_set_errno (EPERM);
+         }
+         else
++          {
++#ifdef __wasi__
++            int fd = gnupg_wasi_create_file (fname, 0600,
++                                             GNUPG_WASI_CREATE_REPLACE);
++
++            newfp = fd == -1 ? NULL : iobuf_fdopen (fd, "wb");
++            if (!newfp && fd != -1)
++              {
++                int e = errno;
++
++                close (fd);
++                errno = e;
++              }
++#else
+             newfp = iobuf_create (fname, 1);
++#endif
++          }
+ 	umask(oldmask);
+ 	if( !newfp )
+ 	  {
+@@ -1659,6 +1703,9 @@
+ 	    log_error ("%s: close failed: %s\n", fname, strerror(errno));
+ 	    return rc;
+ 	}
++#ifdef __wasi__
++	gnupg_wasi_give_to_owner (fname, NULL, 0);
++#endif
+ 	return 0; /* ready */
+     }
+ 
