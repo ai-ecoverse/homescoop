@@ -12,6 +12,11 @@ export default async function (ctx) {
     ['nice -n 5 true; echo rc=$?', 'rc=0\n'],
     ['nice -n 5 false; echo rc=$?', 'rc=1\n'],
     ['env -i nice -n 4 nice', '4\n'],
+    ['SLICC_NICE=5abc nice', '0\n'],
+    ['SLICC_NICE= nice', '0\n'],
+    ['SLICC_NICE=100 nice', '19\n'],
+    ['SLICC_NICE=-100 nice', '-20\n'],
+    ['SLICC_NICE=7 nice', '7\n'],
   ];
   for (const user of ['root', 'cone']) {
     const sh = (cmd) => run(['bash', '-c', cmd], { cwd: '/tmp', ...(user === 'cone' && { user }) });

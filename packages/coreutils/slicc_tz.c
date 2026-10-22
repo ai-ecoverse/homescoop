@@ -22,37 +22,39 @@ EM_JS(int, slicc_tz_intl, (const char *name, double t, char *abbr, int abbrlen),
     const now = at(t);
     if (!Module.sliccTzTable) {
       const groups = [
-        ["Europe/London Europe/Belfast Europe/Guernsey Europe/Isle_of_Man Europe/Jersey GB GB-Eire", { 0: "GMT", 3600: "BST" }],
-        ["Europe/Dublin Eire", { 0: "GMT", 3600: "IST" }],
-        ["Europe/Lisbon Portugal Atlantic/Madeira Atlantic/Canary Atlantic/Faroe Atlantic/Faeroe WET", { 0: "WET", 3600: "WEST" }],
-        ["Europe/Amsterdam Europe/Andorra Europe/Belgrade Europe/Berlin Europe/Bratislava Europe/Brussels Europe/Budapest Europe/Busingen Europe/Copenhagen Europe/Gibraltar Europe/Ljubljana Europe/Luxembourg Europe/Madrid Europe/Malta Europe/Monaco Europe/Oslo Europe/Paris Europe/Podgorica Europe/Prague Europe/Rome Europe/San_Marino Europe/Sarajevo Europe/Skopje Europe/Stockholm Europe/Tirane Europe/Vaduz Europe/Vatican Europe/Vienna Europe/Warsaw Europe/Zagreb Europe/Zurich Africa/Ceuta Africa/Algiers Africa/Tunis Arctic/Longyearbyen Atlantic/Jan_Mayen Poland CET MET", { 3600: "CET", 7200: "CEST" }],
-        ["Europe/Athens Europe/Bucharest Europe/Chisinau Europe/Helsinki Europe/Kiev Europe/Kyiv Europe/Mariehamn Europe/Riga Europe/Sofia Europe/Tallinn Europe/Tiraspol Europe/Uzhgorod Europe/Vilnius Europe/Zaporozhye Europe/Nicosia Europe/Kaliningrad Asia/Beirut Asia/Famagusta Asia/Nicosia Asia/Gaza Asia/Hebron Africa/Cairo Africa/Tripoli Egypt Libya EET", { 7200: "EET", 10800: "EEST" }],
+        ["Europe/London Europe/Belfast Europe/Guernsey Europe/Isle_of_Man Europe/Jersey GB GB-Eire", { 0: "GMT", "d3600": "BST" }],
+        ["Europe/Dublin Eire", { 0: "GMT", "d3600": "IST" }],
+        ["Europe/Lisbon Portugal Atlantic/Madeira Atlantic/Canary Atlantic/Faroe Atlantic/Faeroe WET", { 0: "WET", "d3600": "WEST" }],
+        ["Europe/Amsterdam Europe/Andorra Europe/Belgrade Europe/Berlin Europe/Bratislava Europe/Brussels Europe/Budapest Europe/Busingen Europe/Copenhagen Europe/Gibraltar Europe/Ljubljana Europe/Luxembourg Europe/Madrid Europe/Malta Europe/Monaco Europe/Oslo Europe/Paris Europe/Podgorica Europe/Prague Europe/Rome Europe/San_Marino Europe/Sarajevo Europe/Skopje Europe/Stockholm Europe/Tirane Europe/Vaduz Europe/Vatican Europe/Vienna Europe/Warsaw Europe/Zagreb Europe/Zurich Africa/Ceuta Africa/Algiers Africa/Tunis Arctic/Longyearbyen Atlantic/Jan_Mayen Poland CET MET", { 3600: "CET", "d7200": "CEST" }],
+        ["Europe/Athens Europe/Bucharest Europe/Chisinau Europe/Helsinki Europe/Kiev Europe/Kyiv Europe/Mariehamn Europe/Riga Europe/Sofia Europe/Tallinn Europe/Tiraspol Europe/Uzhgorod Europe/Vilnius Europe/Zaporozhye Europe/Nicosia Europe/Kaliningrad Asia/Beirut Asia/Nicosia Africa/Cairo Egypt EET", { 7200: "EET", "d10800": "EEST" }],
         ["Europe/Moscow Europe/Simferopol Europe/Kirov Europe/Volgograd W-SU", { 10800: "MSK" }],
-        ["Asia/Jerusalem Asia/Tel_Aviv Israel", { 7200: "IST", 10800: "IDT" }],
+        ["Asia/Jerusalem Asia/Tel_Aviv Israel", { 7200: "IST", "d10800": "IDT" }],
         ["Asia/Kolkata Asia/Calcutta", { 19800: "IST" }],
-        ["Asia/Karachi", { 18000: "PKT", 21600: "PKST" }],
-        ["Asia/Tokyo Japan", { 32400: "JST", 36000: "JDT" }],
-        ["Asia/Seoul Asia/Pyongyang ROK", { 32400: "KST", 36000: "KDT" }],
-        ["Asia/Shanghai Asia/Chongqing Asia/Chungking Asia/Harbin Asia/Taipei Asia/Macau Asia/Macao PRC ROC", { 28800: "CST", 32400: "CDT" }],
-        ["Asia/Manila", { 28800: "PST", 32400: "PDT" }],
-        ["Asia/Hong_Kong Hongkong", { 28800: "HKT", 32400: "HKST" }],
+        ["Asia/Karachi", { 18000: "PKT", "d21600": "PKST", since: 31536000 }],
+        ["Asia/Tokyo Japan", { 32400: "JST", "d36000": "JDT" }],
+        ["Asia/Seoul Asia/Pyongyang ROK", { 32400: "KST", "d36000": "KDT" }],
+        ["Asia/Shanghai Asia/Chongqing Asia/Chungking Asia/Harbin Asia/Taipei Asia/Macau Asia/Macao PRC ROC", { 28800: "CST", "d32400": "CDT" }],
+        ["Asia/Manila", { 28800: "PST", "d32400": "PDT" }],
+        ["Asia/Hong_Kong Hongkong", { 28800: "HKT", "d32400": "HKST" }],
         ["Asia/Jakarta Asia/Pontianak", { 25200: "WIB" }],
         ["Asia/Makassar Asia/Ujung_Pandang", { 28800: "WITA" }],
         ["Asia/Jayapura", { 32400: "WIT" }],
-        ["Australia/Sydney Australia/Melbourne Australia/Hobart Australia/Canberra Australia/ACT Australia/NSW Australia/Victoria Australia/Tasmania Australia/Currie Australia/Brisbane Australia/Lindeman Australia/Queensland Antarctica/Macquarie", { 36000: "AEST", 39600: "AEDT" }],
-        ["Australia/Adelaide Australia/Broken_Hill Australia/South Australia/Yancowinna Australia/Darwin Australia/North", { 34200: "ACST", 37800: "ACDT" }],
-        ["Australia/Perth Australia/West", { 28800: "AWST", 32400: "AWDT" }],
-        ["Pacific/Auckland Antarctica/McMurdo Antarctica/South_Pole NZ", { 43200: "NZST", 46800: "NZDT" }],
-        ["Pacific/Guam Pacific/Saipan", { 36000: "ChST" }],
+        ["Australia/Sydney Australia/Melbourne Australia/Hobart Australia/Canberra Australia/ACT Australia/NSW Australia/Victoria Australia/Tasmania Australia/Currie Australia/Brisbane Australia/Lindeman Australia/Queensland Antarctica/Macquarie", { 36000: "AEST", "d39600": "AEDT" }],
+        ["Australia/Adelaide Australia/Broken_Hill Australia/South Australia/Yancowinna Australia/Darwin Australia/North", { 34200: "ACST", "d37800": "ACDT" }],
+        ["Australia/Perth Australia/West", { 28800: "AWST", "d32400": "AWDT" }],
+        ["Pacific/Auckland Antarctica/McMurdo Antarctica/South_Pole NZ", { 43200: "NZST", "d46800": "NZDT" }],
+        ["Pacific/Guam Pacific/Saipan", { 36000: "ChST", since: 977493600 }],
+        ["Africa/Windhoek", { 7200: "CAT", since: 637365600 }],
+        ["Asia/Gaza Asia/Hebron", { 7200: "EET", "d10800": "EEST", since: 820454400 }],
         ["Pacific/Pago_Pago Pacific/Midway Pacific/Samoa US/Samoa", { [-39600]: "SST" }],
-        ["America/Adak America/Atka US/Aleutian", { [-36000]: "HST", [-32400]: "HDT" }],
-        ["America/Hermosillo America/Mazatlan America/Chihuahua America/Ciudad_Juarez America/Ojinaga America/Dawson America/Whitehorse Mexico/BajaSur Canada/Yukon", { [-25200]: "MST", [-21600]: "MDT", intl: 1 }],
-        ["America/Havana Cuba", { [-18000]: "CST", [-14400]: "CDT" }],
+        ["America/Adak America/Atka US/Aleutian", { [-36000]: "HST", "d-32400": "HDT" }],
+        ["America/Hermosillo America/Mazatlan America/Chihuahua America/Ciudad_Juarez America/Ojinaga America/Dawson America/Whitehorse Mexico/BajaSur Canada/Yukon", { [-25200]: "MST", "d-21600": "MDT", intl: 1 }],
+        ["America/Havana Cuba", { [-18000]: "CST", "d-14400": "CDT" }],
         ["Etc/GMT Etc/GMT0 Etc/GMT+0 Etc/GMT-0 Etc/Greenwich GMT GMT0 GMT+0 GMT-0 Greenwich", { 0: "GMT" }],
-        ["Antarctica/Troll", { 0: "+00", 7200: "+02" }],
-        ["America/St_Johns Canada/Newfoundland", { [-12600]: "NST", [-9000]: "NDT" }],
+        ["Antarctica/Troll", { 0: "+00", "d7200": "+02" }],
+        ["America/St_Johns Canada/Newfoundland", { [-12600]: "NST", "d-9000": "NDT" }],
         ["Africa/Johannesburg Africa/Maseru Africa/Mbabane", { 7200: "SAST" }],
-        ["Africa/Maputo Africa/Blantyre Africa/Bujumbura Africa/Gaborone Africa/Harare Africa/Kigali Africa/Lubumbashi Africa/Lusaka Africa/Windhoek", { 7200: "CAT" }],
+        ["Africa/Maputo Africa/Blantyre Africa/Bujumbura Africa/Gaborone Africa/Harare Africa/Kigali Africa/Lubumbashi Africa/Lusaka", { 7200: "CAT" }],
         ["Africa/Juba Africa/Khartoum", { 7200: "CAT", 10800: "EAT" }],
         ["Africa/Nairobi Africa/Addis_Ababa Africa/Asmara Africa/Asmera Africa/Dar_es_Salaam Africa/Djibouti Africa/Kampala Africa/Mogadishu Indian/Antananarivo Indian/Comoro Indian/Mayotte", { 10800: "EAT" }],
         ["Africa/Lagos Africa/Bangui Africa/Brazzaville Africa/Douala Africa/Kinshasa Africa/Libreville Africa/Luanda Africa/Malabo Africa/Niamey Africa/Porto-Novo Africa/Ndjamena", { 3600: "WAT" }],
@@ -63,7 +65,20 @@ EM_JS(int, slicc_tz_intl, (const char *name, double t, char *abbr, int abbrlen),
     }
     const canon = fmt.resolvedOptions().timeZone;
     const names = Module.sliccTzTable[zone] || Module.sliccTzTable[canon];
-    const fixed = names && names[now.off];
+    const memo = (Module.sliccTzLow ||= new Map());
+    const key = zone + "|" + Math.floor(t / 86400);
+    let low = memo.get(key);
+    if (!low) {
+      low = [Infinity, Infinity];
+      for (let m = 1; m <= 12; m++) {
+        low[0] = Math.min(low[0], at(t - m * 2629800).off);
+        low[1] = Math.min(low[1], at(t + m * 2629800).off);
+      }
+      if (memo.size > 4096) memo.clear();
+      memo.set(key, low);
+    }
+    const dst = now.off > low[0] && now.off > low[1] ? 1 : 0;
+    const fixed = names && !(t < names.since) && names[(dst ? "d" : "") + now.off];
     let label = fixed && !names.intl ? fixed : /^[A-Za-z]{3,5}$/.test(now.name) ? now.name : fixed;
     if (!label) {
       const a = Math.abs(now.off);
@@ -72,10 +87,6 @@ EM_JS(int, slicc_tz_intl, (const char *name, double t, char *abbr, int abbrlen),
       label = (now.off < 0 ? "-" : "+") + hh + (mm ? String(mm).padStart(2, "0") : "");
     }
     if (abbr) stringToUTF8(label, abbr, abbrlen);
-    const year = new Date(t * 1000).getUTCFullYear();
-    const jan = at(Date.UTC(year, 0, 1) / 1000).off;
-    const jul = at(Date.UTC(year, 6, 1) / 1000).off;
-    const dst = jan !== jul && now.off === Math.max(jan, jul) ? 1 : 0;
     return now.off * 2 + dst;
   } catch (e) {
     return 0x7fffffff;

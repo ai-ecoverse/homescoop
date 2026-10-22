@@ -56,6 +56,10 @@ export default async function (ctx) {
     ['Asia/Kathmandu', 1720000000, '+0545 +0545'],
     ['America/Sao_Paulo', 1720000000, '-03 -0300'],
     ['Etc/GMT-9', 0, '+09 +0900'],
+    ['Europe/Kaliningrad', 1325376000, '+03 +0300'],
+    ['Europe/Kaliningrad', 1310000000, '+03 +0300'],
+    ['Europe/Kaliningrad', 1720000000, 'EET +0200'],
+    ['Asia/Famagusta', 1500120000, '+03 +0300'],
   ];
   for (const [zone, t, want] of abbr) {
     const cmd = `TZ=${zone} date -d @${t} '+%Z %z'`;

@@ -17,19 +17,28 @@ there so that scripts reading `nice` see real numbers. Until 9.12.0-13 every
 niceness was 20 and every `nice -n` warned (homescoop#863).
 
 The kernel keeps no niceness, so the value travels to child processes in
-the environment variable `SLICC_NICE` (only while it isn't 0). `env` and
-`printenv` leave it out of their listings, but other programs (`export -p`
-in bash) see it, and `env -i` drops it: `nice -n 5 env -i nice` prints 0,
-where Linux prints 5.
+the environment variable `SLICC_NICE` (only while it isn't 0). A value that
+isn't a whole number counts as 0, and one outside -20..19 is clamped.
+Because it is an environment variable, anyone can set it (`SLICC_NICE=-5
+nice` prints -5 for any user); that changes nothing, since the kernel
+schedules every process alike. Known limits:
+- `env` and bare `printenv` leave it out of their listings, but
+  `printenv SLICC_NICE` prints it, and other programs (`export -p` in bash)
+  see it;
+- `env -i` drops it: `nice -n 5 env -i nice` prints 0, where Linux prints 5.
 
 `date +%Z` names an IANA zone as the tz database does: `JST`, `GMT`/`BST` for
 London, `GMT`/`IST` for Dublin, `CET`/`CEST`, `AEST`/`AEDT`, `IST` for
 Kolkata, and a number such as `+04` where the database has no name (Dubai).
 Before, most zones outside the US were a number (`+09` for Tokyo). The names
-come from a table of the database's current names by zone and UTC offset,
-and from the browser's US names (`EST`, `PDT`, `AKST`); a few zones' older
-names (before about 2016, such as Istanbul's or Amman's `EET`) come out as
-numbers (homescoop#1417).
+come from a table of the database's names by zone, UTC offset and whether
+daylight saving time is on (it is when the offset is above the lowest one
+both in the year before and in the year after), and from the browser's US
+names (`EST`, `PDT`, `AKST`). The table never gives letters where the
+database has a number: Kaliningrad in 2011–2014 is `+03`. Where it can't
+tell, the number is printed, so some zones' older names come out as numbers
+(Istanbul's, Amman's or Tripoli's `EET`, Moscow's `MSK` at +04 in
+2011–2014, London's `BST` of 1968–1971) (homescoop#1417).
 
 ## Time zones and the environment (9.12.0-12)
 
