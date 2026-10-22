@@ -31,6 +31,14 @@ export default async function (ctx) {
     ['TZ= date -d @0 +%Z%H', 'UTC00\n'],
   ];
   for (const [cmd, want] of rows) assert.equal(await out(cmd), want, `${cmd} (homescoop#535)`);
+  const unsetRows = [
+    ['env -u TZ date -d @0', 'Thu Jan  1 00:00:00 UTC 1970\n'],
+    ['env -u TZ date -d @0 +%Z%z', 'UTC+0000\n'],
+    ['env -u TZ date -d @1720000000 +%H%Z', '09UTC\n'],
+    ["env -u TZ date -d '1970-01-02 00:00' +%s", '86400\n'],
+    ["env -u TZ touch -d '2026-01-15 10:00' /tmp/tzu && TZ=UTC0 ls -l --time-style=+%H:%M /tmp/tzu | cut -d' ' -f6", '10:00\n'],
+  ];
+  for (const [cmd, want] of unsetRows) assert.equal(await out(cmd), want, `${cmd}: with TZ unset the zone is UTC, named UTC, as GNU date prints it on a UTC host, whatever the browser's zone (homescoop#1626)`);
   const abbr = [
     ['Asia/Tokyo', 0, 'JST +0900'],
     ['Europe/London', 1735000000, 'GMT +0000'],
@@ -66,5 +74,5 @@ export default async function (ctx) {
     assert.equal(await out(cmd), `${want}\n`, `${cmd}: %Z is the tz database's abbreviation, as GNU date with glibc prints it, and a number only where the database has none (homescoop#1417)`);
   }
   assert.equal(await out("TZ=EST5EDT touch -d '2026-01-15 10:00' /tmp/tzf && TZ=UTC0 ls -l --time-style=+%H:%M /tmp/tzf | cut -d' ' -f6"), '15:00\n', 'touch -d reads its time in TZ');
-  console.log('env-tz: env -i and env -u leave only what they say (no web_user/PATH=/ defaults); date, touch and ls honour TZ: POSIX rules (EST5EDT, JST-9, UTC0, <+0330>-3:30) with US DST rules by default, IANA names (America/New_York, Europe/Berlin) with the tz database abbreviations (JST, GMT/BST, IST, CET/CEST, AEST/AEDT, +04 where it has none), an unknown or empty TZ is UTC, date -u is UTC');
+  console.log('env-tz: env -i and env -u leave only what they say (no web_user/PATH=/ defaults); date, touch and ls honour TZ: POSIX rules (EST5EDT, JST-9, UTC0, <+0330>-3:30) with US DST rules by default, IANA names (America/New_York, Europe/Berlin) with the tz database abbreviations (JST, GMT/BST, IST, CET/CEST, AEST/AEDT, +04 where it has none), an unknown, empty or unset TZ is UTC (named UTC), date -u is UTC');
 }

@@ -6,6 +6,16 @@ GNU coreutils (single-binary) for slicc.
 pnpm add -g @ai-ecoverse/wasm-coreutils
 ```
 
+## No `TZ` means UTC (9.12.0-15)
+
+With `TZ` unset, as in seven's default environment, `date`, `touch`, `ls`
+and the rest use UTC and name it `UTC`, as GNU date does on a Linux host
+with no `/etc/localtime`: `date -d @0` prints
+`Thu Jan  1 00:00:00 UTC 1970`. Until 9.12.0-14 an unset `TZ` meant the
+browser's own time zone, named as Emscripten names it (`UTC-0000` on a UTC
+browser, homescoop#1626). Set `TZ` (`TZ=Europe/Berlin`, `TZ=EST5EDT`) for
+local time.
+
 ## `nice` and time zone names (9.12.0-14)
 
 `nice` keeps a niceness per process, as on Linux: it starts at 0, `nice -n N`
@@ -26,6 +36,10 @@ schedules every process alike. Known limits:
   `printenv SLICC_NICE` prints it, and other programs (`export -p` in bash)
   see it;
 - `env -i` drops it: `nice -n 5 env -i nice` prints 0, where Linux prints 5.
+
+These limits stay until slicc-kernel keeps a niceness per process (an
+answer to getpriority/setpriority, as it answers uname); no change inside
+coreutils can lift them (homescoop#1627).
 
 `date +%Z` names an IANA zone as the tz database does: `JST`, `GMT`/`BST` for
 London, `GMT`/`IST` for Dublin, `CET`/`CEST`, `AEST`/`AEDT`, `IST` for
@@ -48,7 +62,8 @@ tell, the number is printed, so some zones' older names come out as numbers
 - **IANA names:** `America/New_York`, `Europe/Berlin`, from the browser's
   time zone data.
 - **Defaults:** an empty or unknown `TZ` is UTC, and `date -u` is UTC. With
-  no `TZ` at all, the browser's own time zone applies, as before.
+  no `TZ` at all, the browser's own time zone applied until 9.12.0-14; since
+  9.12.0-15 that is UTC too.
 
 `env -i` and `env -u` leave exactly the environment they say. Before, the
 program filled in Emscripten's placeholders (`USER=web_user`, `PATH=/`,

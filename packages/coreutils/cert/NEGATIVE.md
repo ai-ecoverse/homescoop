@@ -115,3 +115,11 @@ The time rows fail the same way: Emscripten's `tzset` and `localtime` read the b
 - **Without `printenv-slicc-nice.patch`** (an earlier 9.12.0-14 build): `env-i.mjs` fails 4 rows, `env -i FOO=1 nice env` prints `FOO=1`, `HOSTNAME=slicc` and `SLICC_NICE=10`.
 
 The `%Z` table was checked against the tz database (macOS `date`, TZ set) for every zone `Intl.supportedValuesOf('timeZone')` lists, four times a year from 2011 to 2024 (23,744 labels), and at six times from 1970 to 2008 (2,544): it never gives letters where tzdata has a number or other letters. Grok's review of #1623 found that the first cut did (Europe/Kaliningrad 2011–2014 was `EEST`, tzdata `+03`; Asia/Famagusta 2016–2017 the same; Tripoli, Gaza, Guam, Karachi and Windhoek before their current names), so the table now keys daylight names on DST and has start dates. Where it can't tell, it prints the number: 334 of the 2011–2024 labels and 115 of the older ones are numeric where tzdata has letters (Tripoli, Famagusta, Amman, Damascus, Istanbul, Moscow's +04 years and the like).
+
+## 9.12.0-15: an unset TZ is UTC, named UTC (homescoop#1626; 2026-10-22)
+
+`cert/env-tz.mjs` (`--soft`, slicc-kernel 1.100.4, users enforce) against the published 9.12.0-14, whose `slicc_tz.c` handed an unset `TZ` to Emscripten's `_tzset_js`/`_localtime_js`/`_mktime_js` (the browser's zone):
+
+- **Browser at UTC** (Chrome run with `TZ=UTC`, as on CI): 3 of the 5 `env -u TZ` rows fail. `date -d @0` is `Thu Jan  1 00:00:00 UTC-0000 1970`, `+%Z%z` is `UTC-0000+0000`, `@1720000000 +%H%Z` is `09UTC-0000`; mktime and `touch -d` are right.
+- **Browser at Europe/Berlin** (this Mac): all 5 fail. `date -d @0` is `01:00:00 UTC+0100`, `+%Z%z` `UTC+0100+0100`, `+%H%Z` `11UTC+0200`, `date -d '1970-01-02 00:00' +%s` is `82800` (86400), and `touch -d '2026-01-15 10:00'` reads back `09:00` in UTC0.
+- **9.12.0-15 as built** (`scripts/host-run.sh coreutils`, package.tgz sha256 `da7f9523…1c63`): the full checklist passes with Chrome's zone at Europe/Berlin, and `env-tz.mjs` with it at UTC and at America/New_York.
