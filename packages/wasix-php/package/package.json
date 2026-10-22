@@ -1,0 +1,52 @@
+{
+  "name": "@ai-ecoverse/wasix-php",
+  "version": "8.5.12-1",
+  "description": "The PHP 8.5 programming language, with its built-in web server, SQLite, XML, OpenSSL and Phar.",
+  "engines": {
+    "slicc-kernel": ">=1.120.0"
+  },
+  "license": "PHP-3.01 AND Zend-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-php/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-php",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "php"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "SOURCES.md",
+    "bin",
+    "licenses",
+    "patches"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-php",
+    "upstream": "8.5.12",
+    "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-43",
+    "zlib": "@ai-ecoverse/wasix-zlib@1.3.1-3",
+    "openssl": "@ai-ecoverse/wasix-openssl@3.5.9-4",
+    "libxml2": "2.15.4",
+    "sqlite": "3.54.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "php": {
+        "wasm": "bin/php.wasm"
+      }
+    }
+  }
+}

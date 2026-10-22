@@ -1,0 +1,17 @@
+php://fd/N without getdtablesize() on WASI (wasix-php).
+
+wasi-libc declares no getdtablesize(), so php://fd/ doesn't compile. Bound
+the fd by INT_MAX, as on systems without unistd.h; a closed fd still fails
+at dup().
+
+--- a/ext/standard/php_fopen_wrapper.c
++++ b/ext/standard/php_fopen_wrapper.c
+@@ -317,7 +317,7 @@
+ 			return NULL;
+ 		}
+ 
+-#ifdef HAVE_UNISTD_H
++#if defined(HAVE_UNISTD_H) && !defined(__wasi__)
+ 		dtablesize = getdtablesize();
+ #else
+ 		dtablesize = INT_MAX;

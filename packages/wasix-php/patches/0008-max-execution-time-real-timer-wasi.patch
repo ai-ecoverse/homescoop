@@ -1,0 +1,29 @@
+max_execution_time with a wall-clock timer on WASI (wasix-php).
+
+zend_set_timeout arms setitimer(ITIMER_PROF) and waits for SIGPROF, but
+WASIX has no CPU-time clocks: wasix-sysroot's setitimer answers EINVAL for
+ITIMER_VIRTUAL and ITIMER_PROF, so set_time_limit() and max_execution_time
+never fired. Use ITIMER_REAL and SIGALRM, as upstream does on Cygwin, PASE
+and Apple Silicon: the limit counts wall-clock time (sleep included), and
+it shares SIGALRM with pcntl_alarm(), as on those systems.
+
+--- a/Zend/zend_execute_API.c
++++ b/Zend/zend_execute_API.c
+@@ -1644,7 +1644,7 @@
+ 			t_r.it_value.tv_sec = seconds;
+ 			t_r.it_value.tv_usec = t_r.it_interval.tv_sec = t_r.it_interval.tv_usec = 0;
+ 
+-# if defined(__CYGWIN__) || defined(__PASE__) || (defined(__aarch64__) && defined(__APPLE__))
++# if defined(__CYGWIN__) || defined(__PASE__) || (defined(__aarch64__) && defined(__APPLE__)) || defined(__wasi__)
+ 			// ITIMER_PROF is broken in Apple Silicon system with MacOS >= 14
+ 			// See https://openradar.appspot.com/radar?id=5583058442911744.
+ 			setitimer(ITIMER_REAL, &t_r, NULL);
+@@ -1712,7 +1712,7 @@
+ 
+ 		no_timeout.it_value.tv_sec = no_timeout.it_value.tv_usec = no_timeout.it_interval.tv_sec = no_timeout.it_interval.tv_usec = 0;
+ 
+-# if defined(__CYGWIN__) || defined(__PASE__) || (defined(__aarch64__) && defined(__APPLE__))
++# if defined(__CYGWIN__) || defined(__PASE__) || (defined(__aarch64__) && defined(__APPLE__)) || defined(__wasi__)
+ 		setitimer(ITIMER_REAL, &no_timeout, NULL);
+ # else
+ 		setitimer(ITIMER_PROF, &no_timeout, NULL);

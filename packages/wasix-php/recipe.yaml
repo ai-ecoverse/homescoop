@@ -1,0 +1,61 @@
+# PHP 8.5 for slicc WASIX: the CLI SAPI (php, php -S), cross-built with
+# wasixcc on wasix-sysroot's asyncify tree (real fork: pcntl_fork, proc_open),
+# statically linked with zlib, OpenSSL, libxml2 and SQLite.
+name: wasix-php
+builder: host
+# renovate: datasource=github-tags depName=php/php-src extractVersion=^php-(?<version>8\.5\.\d+)$
+version: "8.5.12"
+npm: "@ai-ecoverse/wasix-php"
+summary: "PHP 8.5 for slicc WASIX (command php)"
+# ladder-pr builds it twice and compares the package.tgz sha256.
+reproducible: true
+source:
+  url: "https://www.php.net/distributions/php-{{version}}.tar.xz"
+  sha256: "08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209"
+sources:
+  # Build-time WASIX dev packages (static lib/ flavour), pinned by the
+  # certified tarball sha.
+  wasix_zlib:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-zlib/-/wasix-zlib-1.3.1-3.tgz"
+    sha256: "f55d56c0837722e5d1e309f4344f723c95c7f68cd3ddb3089d6b4c025aaf14c7"
+  wasix_openssl:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-openssl/-/wasix-openssl-3.5.9-4.tgz"
+    sha256: "47629bd4e1f53ee1aa32e3ef150cd744c4eb242632f8bad2818c631aa6c645b7"
+  # Built inside this recipe as static archives; the same upstream pins as
+  # packages/libxml2 and packages/sqlite3 (and wasix-python's sqlite).
+  libxml2:
+    version: "2.15.4"
+    url: "https://download.gnome.org/sources/libxml2/2.15/libxml2-{{version}}.tar.xz"
+    sha256: "98087fd181d9070724f3fbc65c7377db03038eb92bd882374daff44940138821"
+  sqlite:
+    url: "https://www.sqlite.org/2026/sqlite-amalgamation-3540000.zip"
+    sha256: "68e913b0fe8ec6b4e5f391c594a28872884e80d6cd042a1e50c957be46b5aa4d"
+toolchain:
+  wasix_sysroot: "2025.9.30-43"
+  wasix_sysroot_sha256: "e5ecaf322715916aa0f2fc5cc873ead73e9258b13b22aac9ffc9660c9a1e3668"
+inputs:
+  - scripts/install-wasixcc.sh
+wasm:
+  initial-memory: 128MiB
+  measured-peak: 95MiB
+  measured-by: "cert/heap.mjs on 8.5.12-1's build relinked with a 32 MiB initial memory (wasix-sysroot 2025.9.30-43, slicc-kernel 1.144.1): VmSize of each php process polled from /proc/<pid>/status (php is single-threaded, so that is the allocating thread's view): a 40000-record json_encode/json_decode 94.1 MiB, a shuffled and sorted range(1, 1000000) with array_flip 86.1 MiB, 200000 lines through preg_replace 60.1 MiB, a 40000-element DOM with XPath 48.1 MiB, a fork child's str_replace over 8 MiB 45.1 MiB, 100000 PDO SQLite inserts 35.1 MiB, hello 33.1 MiB (15 MiB of data and the 8 MiB stack). A 400000-entry array of arrays (memory_get_usage(true) 120 MiB, near memory_limit 128M) peaks at 162 MiB and grows past the initial heap, which the -39 allocator refresh covers"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.php.net
+  license: PHP-3.01 AND Zend-2.0
+  notes: |
+    PHP's own configure with --host=wasm32-unknown-wasi and wasixcc
+    (static-main, no wasm exceptions, no PIC), then wasm-opt --asyncify for
+    WASIX fork and setjmp (zend_try/zend_bailout). Only the CLI SAPI.
+    Extensions: Core, date, hash, json, pcre (bundled PCRE2, no JIT), random,
+    Reflection, SPL, standard, lexbor, uri, Zend OPcache (no JIT, no shared
+    memory), bcmath, calendar, ctype, dom, exif, fileinfo, filter, iconv,
+    libxml, mbstring (no mbregex), openssl, pcntl, PDO, pdo_sqlite, Phar,
+    posix, session, SimpleXML, sqlite3, tokenizer, xml, xmlreader,
+    xmlwriter, zlib. Off: sockets (WASIX has no ancillary data or interface
+    ioctls), readline (php -a), curl, gd, intl, sodium, zip, ffi.
+    Fibers are unavailable: a wasm call stack can't be switched, so
+    Fiber::start throws FiberError (patches/0002).

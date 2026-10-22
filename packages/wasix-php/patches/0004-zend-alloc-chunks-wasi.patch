@@ -1,0 +1,201 @@
+Zend MM chunks and huge blocks from a pool of aligned arenas on WASI (wasix-php).
+
+The memory manager maps 2 MiB chunks with mmap and trims the slack to align
+them with partial munmaps; huge blocks shrink with munmap and grow with
+mremap or a fixed mmap. On WASI, mmap is wasi-libc's emulation over malloc:
+its munmap only takes a whole mapping (EINVAL otherwise), so every trim
+failed and leaked up to a chunk, and nothing could grow in place.
+
+Chunks and huge blocks (rounded up to whole chunks, as on Windows) come from
+a pool of 2 MiB-aligned arenas instead, taken from libc with posix_memalign
+(8 MiB, then about the pool's size, at most 32 MiB). Free space is an
+address-ordered, coalesced list of chunk runs: a huge block shrinks by
+giving its tail back and grows in place when the run after it is free
+(otherwise zend_mm_realloc_huge copies, as upstream does when mremap
+fails). Memory freed back to the pool serves later chunks; a wasm memory
+never shrinks, so arenas aren't returned to libc. A chunk is zeroed when
+it is handed out, as a fresh mapping is.
+
+With posix_memalign per chunk instead, each chunk cost about 4 MiB of wasm
+memory (its alignment slack), so a script with a 120 MiB heap grew the
+memory to 252 MiB.
+
+--- a/Zend/zend_alloc.c
++++ b/Zend/zend_alloc.c
+@@ -879,8 +879,131 @@
+ #endif
+ }
+ 
++#ifdef __wasi__
++/* WASIX: mmap is wasi-libc's emulation over malloc, and its munmap takes
++ * only a whole mapping, so the trim to alignment below can't work (the
++ * partial munmaps fail and the slack leaks), and a mapping can't grow in
++ * place. Chunks and huge blocks come instead from a pool of
++ * ZEND_MM_CHUNK_SIZE-aligned arenas taken from libc with posix_memalign.
++ * Free space is a list of runs of whole chunks, address-ordered and
++ * coalesced, so an alignment's slack is paid once per arena (not once per
++ * chunk, which doubled the memory a script used), a huge block can shrink,
++ * and it can grow in place when the run after it is free. Arenas are never
++ * given back: a wasm memory can't shrink. Single-threaded (NTS).
++ */
++typedef struct _zend_mm_wasi_run zend_mm_wasi_run;
++struct _zend_mm_wasi_run {
++	zend_mm_wasi_run *next;
++	size_t size;
++};
++
++static zend_mm_wasi_run *zend_mm_wasi_runs;
++static size_t zend_mm_wasi_arenas;
++
++#define ZEND_MM_WASI_ROUND(size) ZEND_MM_ALIGNED_SIZE_EX(size, ZEND_MM_CHUNK_SIZE)
++#define ZEND_MM_WASI_ARENA_MIN (4 * ZEND_MM_CHUNK_SIZE)
++#define ZEND_MM_WASI_ARENA_MAX (16 * ZEND_MM_CHUNK_SIZE)
++
++static void zend_mm_wasi_release(void *addr, size_t size)
++{
++	zend_mm_wasi_run **pp = &zend_mm_wasi_runs, *prev = NULL, *run = (zend_mm_wasi_run *) addr;
++
++	while (*pp && (char *) *pp < (char *) addr) {
++		prev = *pp;
++		pp = &(*pp)->next;
++	}
++	run->size = size;
++	run->next = *pp;
++	if (run->next && (char *) run + run->size == (char *) run->next) {
++		run->size += run->next->size;
++		run->next = run->next->next;
++	}
++	if (prev && (char *) prev + prev->size == (char *) run) {
++		prev->size += run->size;
++		prev->next = run->next;
++	} else {
++		*pp = run;
++	}
++}
++
++static void *zend_mm_wasi_take(size_t size)
++{
++	zend_mm_wasi_run **pp;
++	size_t arena;
++	void *ptr = NULL;
++
++	for (pp = &zend_mm_wasi_runs; *pp; pp = &(*pp)->next) {
++		zend_mm_wasi_run *run = *pp;
++		if (run->size >= size) {
++			if (run->size == size) {
++				*pp = run->next;
++			} else {
++				zend_mm_wasi_run *rest = (zend_mm_wasi_run *) ((char *) run + size);
++				rest->size = run->size - size;
++				rest->next = run->next;
++				*pp = rest;
++			}
++			return run;
++		}
++	}
++	/* A new arena: about the size of the ones before it, within bounds. */
++	arena = MAX(size, MIN(MAX(zend_mm_wasi_arenas, ZEND_MM_WASI_ARENA_MIN), ZEND_MM_WASI_ARENA_MAX));
++	if (posix_memalign(&ptr, ZEND_MM_CHUNK_SIZE, arena) != 0) {
++		arena = size;
++		if (posix_memalign(&ptr, ZEND_MM_CHUNK_SIZE, arena) != 0) {
++			return NULL;
++		}
++	}
++	zend_mm_wasi_arenas += arena;
++	if (arena > size) {
++		zend_mm_wasi_release((char *) ptr + size, arena - size);
++	}
++	return ptr;
++}
++
++static bool zend_mm_wasi_extend(void *addr, size_t old_size, size_t new_size)
++{
++	zend_mm_wasi_run **pp;
++	size_t need;
++
++	old_size = ZEND_MM_WASI_ROUND(old_size);
++	new_size = ZEND_MM_WASI_ROUND(new_size);
++	if (new_size <= old_size) {
++		return true;
++	}
++	need = new_size - old_size;
++	for (pp = &zend_mm_wasi_runs; *pp && (char *) *pp <= (char *) addr + old_size; pp = &(*pp)->next) {
++		zend_mm_wasi_run *run = *pp;
++		if ((char *) run == (char *) addr + old_size && run->size >= need) {
++			if (run->size == need) {
++				*pp = run->next;
++			} else {
++				zend_mm_wasi_run *rest = (zend_mm_wasi_run *) ((char *) run + need);
++				rest->size = run->size - need;
++				rest->next = run->next;
++				*pp = rest;
++			}
++			return true;
++		}
++	}
++	return false;
++}
++#endif
++
+ static void *zend_mm_chunk_alloc_int(size_t size, size_t alignment)
+ {
++#ifdef __wasi__
++	void *ptr;
++
++	ZEND_ASSERT(alignment <= ZEND_MM_CHUNK_SIZE && ZEND_MM_CHUNK_SIZE % alignment == 0);
++	ptr = zend_mm_wasi_take(ZEND_MM_WASI_ROUND(size));
++	/* A chunk's header must start zeroed, as mmap memory is (pool memory
++	 * is reused); a huge block's contents are the caller's to set. */
++	if (ptr && size == ZEND_MM_CHUNK_SIZE) {
++		memset(ptr, 0, size);
++	}
++	return ptr;
++#else
+ 	void *ptr = zend_mm_mmap(size);
+ 
+ 	if (ptr == NULL) {
+@@ -937,6 +1060,7 @@
+ #endif
+ 		return ptr;
+ 	}
++#endif
+ }
+ 
+ static void *zend_mm_chunk_alloc(zend_mm_heap *heap, size_t size, size_t alignment)
+@@ -959,7 +1083,11 @@
+ 		return;
+ 	}
+ #endif
++#ifdef __wasi__
++	zend_mm_wasi_release(addr, ZEND_MM_WASI_ROUND(size));
++#else
+ 	zend_mm_munmap(addr, size);
++#endif
+ }
+ 
+ static int zend_mm_chunk_truncate(zend_mm_heap *heap, void *addr, size_t old_size, size_t new_size)
+@@ -973,7 +1101,12 @@
+ 		}
+ 	}
+ #endif
+-#ifndef _WIN32
++#if defined(__wasi__)
++	if (ZEND_MM_WASI_ROUND(new_size) < ZEND_MM_WASI_ROUND(old_size)) {
++		zend_mm_wasi_release((char*)addr + ZEND_MM_WASI_ROUND(new_size), ZEND_MM_WASI_ROUND(old_size) - ZEND_MM_WASI_ROUND(new_size));
++	}
++	return 1;
++#elif !defined(_WIN32)
+ 	zend_mm_munmap((char*)addr + new_size, old_size - new_size);
+ 	return 1;
+ #else
+@@ -992,7 +1125,9 @@
+ 		}
+ 	}
+ #endif
+-#ifdef HAVE_MREMAP
++#if defined(__wasi__)
++	return zend_mm_wasi_extend(addr, old_size, new_size);
++#elif defined(HAVE_MREMAP)
+ 	/* We don't use MREMAP_MAYMOVE due to alignment requirements. */
+ 	void *ptr = mremap(addr, old_size, new_size, 0);
+ 	if (ptr == MAP_FAILED) {

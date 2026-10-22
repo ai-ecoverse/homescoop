@@ -1,0 +1,51 @@
+Zend fibers without a context switch (ZEND_FIBER_UNAVAILABLE, wasix-php).
+
+With no boost.context assembly and no ucontext, zend_fiber_init_context()
+throws FiberError "Fibers are not available on this platform (WASIX can't
+switch stacks)" and fails, so Fiber::start() (and every internal
+zend_fiber_start) throws instead of linking against make_fcontext /
+jump_fcontext, which don't exist. The stubs below are never reached.
+
+--- a/Zend/zend_fibers.c
++++ b/Zend/zend_fibers.c
+@@ -172,10 +172,27 @@
+ 	zend_fiber_transfer *transfer;
+ } boost_context_data;
+ 
++#ifdef ZEND_FIBER_UNAVAILABLE
++/* No boost.context assembly and no ucontext (WASIX: a wasm call stack can't
++ * be switched). zend_fiber_init_context() fails with a FiberError, so these
++ * are never reached. */
++static void *make_fcontext(void *sp, size_t size, void (*fn)(boost_context_data))
++{
++	(void) sp; (void) size; (void) fn;
++	return NULL;
++}
++
++static ZEND_NORETURN boost_context_data jump_fcontext(void *to, zend_fiber_transfer *transfer)
++{
++	(void) to; (void) transfer;
++	abort();
++}
++#else
+ /* These functions are defined in assembler files provided by boost.context (located in "Zend/asm"). */
+ extern void *make_fcontext(void *sp, size_t size, void (*fn)(boost_context_data));
+ extern ZEND_INDIRECT_RETURN boost_context_data jump_fcontext(void *to, zend_fiber_transfer *transfer);
+ #endif
++#endif
+ 
+ ZEND_API zend_class_entry *zend_ce_fiber;
+ static zend_class_entry *zend_ce_fiber_error;
+@@ -417,6 +434,12 @@
+ 
+ ZEND_API zend_result zend_fiber_init_context(zend_fiber_context *context, void *kind, zend_fiber_coroutine coroutine, size_t stack_size)
+ {
++#ifdef ZEND_FIBER_UNAVAILABLE
++	(void) context; (void) kind; (void) coroutine; (void) stack_size;
++	zend_throw_error(zend_ce_fiber_error, "Fibers are not available on this platform (WASIX can't switch stacks)");
++	return FAILURE;
++#endif
++
+ 	context->stack = zend_fiber_stack_allocate(stack_size);
+ 
+ 	if (UNEXPECTED(!context->stack)) {

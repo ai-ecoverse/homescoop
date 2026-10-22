@@ -1,0 +1,21 @@
+zend_try/zend_bailout with setjmp/longjmp on WASI (wasix-php).
+
+On wasix-sysroot's asyncify tree, setjmp is a WASIX stack snapshot that has
+to be taken in the calling function's frame, and <setjmp.h> declares no
+sigsetjmp/siglongjmp (libc.a has wrappers, but a wrapper's frame is gone
+when longjmp comes back). SETJMP/LONGJMP use setjmp/longjmp directly, as
+on Windows; the signal mask was never saved (sigsetjmp(a, 0)).
+
+--- a/Zend/zend_portability.h
++++ b/Zend/zend_portability.h
+@@ -424,7 +424,9 @@
+ # define XtOffsetOf(s_type, field) offsetof(s_type, field)
+ #endif
+ 
+-#ifndef ZEND_WIN32
++/* WASIX (asyncify sysroot): setjmp is a stack snapshot that must be taken in
++ * the caller's own frame, and <setjmp.h> declares no sigsetjmp there. */
++#if !defined(ZEND_WIN32) && !defined(__wasi__)
+ # define SETJMP(a) sigsetjmp(a, 0)
+ # define LONGJMP(a,b) siglongjmp(a, b)
+ # define JMP_BUF sigjmp_buf

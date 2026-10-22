@@ -1,0 +1,217 @@
+http:// and https:// streams use the environment's proxy on WASI (wasix-php).
+
+On slicc the network is the kernel's HTTP proxy, named in http_proxy and
+https_proxy, and a direct connection to a remote host has no route. PHP's
+http wrapper only uses a proxy from the stream context, so
+file_get_contents("https://...") failed to resolve the host. When the
+context sets no "proxy", the wrapper now takes it from the environment, as
+curl does: http_proxy for http (not HTTP_PROXY, httpoxy), https_proxy or
+HTTPS_PROXY for https, then all_proxy/ALL_PROXY; a host in no_proxy/NO_PROXY
+("*", a name or .suffix, an IPv4 address or CIDR) connects directly. Only an
+http:// proxy (or a bare host:port) is used. A plain http request through
+the proxy sends the absolute URL (request_fulluri) unless the context says
+otherwise; https goes through CONNECT, as with a context proxy.
+
+--- a/ext/standard/http_fopen_wrapper.c
++++ b/ext/standard/http_fopen_wrapper.c
+@@ -397,6 +397,185 @@
+ 	return NULL;
+ }
+ 
++#ifdef __wasi__
++/* wasix-php: the http:// and https:// wrappers take their proxy from the
++ * environment, as curl does, when the stream context sets none. On slicc the
++ * network is the kernel's HTTP proxy (http_proxy/https_proxy), and a direct
++ * connection has no route. http uses http_proxy, https uses https_proxy or
++ * HTTPS_PROXY, either falls back to all_proxy/ALL_PROXY, and a host matching
++ * no_proxy/NO_PROXY ("*", a name or .suffix, an IPv4 address or CIDR) goes
++ * direct. Only http:// proxies (or a bare host:port) are used. */
++static const char *php_wasix_getenv2(const char *a, const char *b)
++{
++	const char *v = getenv(a);
++	if ((!v || !*v) && b) {
++		v = getenv(b);
++	}
++	return (v && *v) ? v : NULL;
++}
++
++static bool php_wasix_parse_ipv4(const char *s, size_t len, uint32_t *out)
++{
++	uint32_t addr = 0;
++	int parts = 0;
++	size_t i = 0;
++	while (parts < 4) {
++		uint32_t n = 0;
++		size_t start = i;
++		while (i < len && s[i] >= '0' && s[i] <= '9' && i - start < 3) {
++			n = n * 10 + (uint32_t) (s[i] - '0');
++			i++;
++		}
++		if (i == start || n > 255) {
++			return false;
++		}
++		addr = (addr << 8) | n;
++		parts++;
++		if (parts < 4) {
++			if (i >= len || s[i] != '.') {
++				return false;
++			}
++			i++;
++		}
++	}
++	if (i != len) {
++		return false;
++	}
++	*out = addr;
++	return true;
++}
++
++static bool php_wasix_no_proxy(const char *host)
++{
++	const char *list = php_wasix_getenv2("no_proxy", "NO_PROXY");
++	size_t hlen;
++	uint32_t hip = 0;
++	bool host_is_ip;
++
++	if (!list) {
++		return false;
++	}
++	if (*host == '[') {
++		host++;
++	}
++	hlen = strlen(host);
++	if (hlen && host[hlen - 1] == ']') {
++		hlen--;
++	}
++	if (hlen && host[hlen - 1] == '.') {
++		hlen--;
++	}
++	host_is_ip = php_wasix_parse_ipv4(host, hlen, &hip);
++
++	while (*list) {
++		const char *e, *end;
++		size_t elen;
++		while (*list == ',' || *list == ' ' || *list == '\t') {
++			list++;
++		}
++		e = list;
++		while (*list && *list != ',') {
++			list++;
++		}
++		end = list;
++		while (end > e && (end[-1] == ' ' || end[-1] == '\t')) {
++			end--;
++		}
++		elen = (size_t) (end - e);
++		if (elen == 0) {
++			continue;
++		}
++		if (elen == 1 && *e == '*') {
++			return true;
++		}
++		{
++			const char *slash = memchr(e, '/', elen);
++			uint32_t eip;
++			if (slash) {
++				char *num_end;
++				long bits = strtol(slash + 1, &num_end, 10);
++				if (host_is_ip && num_end == end && bits >= 0 && bits <= 32 &&
++						php_wasix_parse_ipv4(e, (size_t) (slash - e), &eip)) {
++					uint32_t mask = bits == 0 ? 0 : 0xffffffffu << (32 - bits);
++					if ((hip & mask) == (eip & mask)) {
++						return true;
++					}
++				}
++				continue;
++			}
++			if (host_is_ip && php_wasix_parse_ipv4(e, elen, &eip)) {
++				if (eip == hip) {
++					return true;
++				}
++				continue;
++			}
++		}
++		if (*e == '.') {
++			e++;
++			elen--;
++		}
++		if (elen && e[elen - 1] == '.') {
++			elen--;
++		}
++		if (elen == 0) {
++			continue;
++		}
++		if (hlen == elen && strncasecmp(host, e, elen) == 0) {
++			return true;
++		}
++		if (hlen > elen && host[hlen - elen - 1] == '.' && strncasecmp(host + hlen - elen, e, elen) == 0) {
++			return true;
++		}
++	}
++	return false;
++}
++
++static zend_string *php_wasix_env_proxy(const char *host, bool use_ssl)
++{
++	const char *v = use_ssl ? php_wasix_getenv2("https_proxy", "HTTPS_PROXY") : php_wasix_getenv2("http_proxy", NULL);
++	const char *hp, *end, *at;
++
++	if (!v) {
++		v = php_wasix_getenv2("all_proxy", "ALL_PROXY");
++	}
++	if (!v || php_wasix_no_proxy(host)) {
++		return NULL;
++	}
++	hp = strstr(v, "://");
++	if (hp) {
++		if ((size_t) (hp - v) != 4 || strncasecmp(v, "http", 4) != 0) {
++			return NULL;
++		}
++		hp += 3;
++	} else {
++		hp = v;
++	}
++	end = hp + strcspn(hp, "/?#");
++	at = memchr(hp, '@', (size_t) (end - hp));
++	if (at) {
++		hp = at + 1;
++	}
++	if (end == hp) {
++		return NULL;
++	}
++	{
++		/* host:port, [v6]:port or a bare host (curl's default port 1080) */
++		const char *colon = NULL, *q;
++		for (q = hp; q < end; q++) {
++			if (*q == ']') {
++				colon = NULL;
++			} else if (*q == ':') {
++				colon = q;
++			}
++		}
++		if (colon) {
++			return zend_strpprintf(0, "tcp://%.*s", (int) (end - hp), hp);
++		}
++		return zend_strpprintf(0, "tcp://%.*s:1080", (int) (end - hp), hp);
++	}
++}
++#endif
++
+ static php_stream *php_stream_url_wrap_http_ex(php_stream_wrapper *wrapper,
+ 		const char *path, const char *mode, int options, zend_string **opened_path,
+ 		php_stream_context *context, int redirect_max, int flags,
+@@ -488,6 +667,14 @@
+ 			Z_STRLEN_P(tmpzval) > 0) {
+ 			use_proxy = 1;
+ 			transport_string = zend_string_copy(Z_STR_P(tmpzval));
++#ifdef __wasi__
++		} else if ((transport_string = php_wasix_env_proxy(ZSTR_VAL(resource->host), use_ssl)) != NULL) {
++			use_proxy = 1;
++			/* A plain http request through a proxy names the whole URL. */
++			if (!use_ssl && !(context && php_stream_context_get_option(context, "http", "request_fulluri") != NULL)) {
++				request_fulluri = true;
++			}
++#endif
+ 		} else {
+ 			transport_string = zend_strpprintf(0, "%s://%s:" ZEND_LONG_FMT, use_ssl ? "ssl" : "tcp", ZSTR_VAL(resource->host), resource->port);
+ 		}
