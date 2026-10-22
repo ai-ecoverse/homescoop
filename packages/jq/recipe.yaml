@@ -9,6 +9,10 @@ summary: "jq JSON processor with oniguruma regex for slicc"
 source:
   url: "https://github.com/jqlang/jq/releases/download/jq-{{version}}/jq-{{version}}.tar.gz"
   sha256: "71b8d6e8f5fe81f6c6d0d110e3892251f6ce76ed095abd315e26e6e1193af3af"
+wasm:
+  initial-memory: 64MiB
+  measured-peak: 48MiB
+  measured-by: "cert/heap.mjs on the published 1.8.2-5 (16 MiB initial memory) on slicc-kernel 1.143.5, VmSize of the jq process polled from /proc/<pid>/status over 4 rounds: jq -n generating 25,000 objects (2.7 MB of JSON) 28 MiB, select 40 MiB, group_by and sort_by 48 MiB, --stream 17 MiB. The same workload at 100,000 objects (11 MB) peaks at 172 MiB, which emscripten's memory growth covers"
 dependencies:
   build: []
   host: []

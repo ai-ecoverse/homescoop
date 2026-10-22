@@ -16,7 +16,7 @@ homescoop_apply_patches "$SRC"
 SLICC_A="$WORK/libslicc-cli.a"
 homescoop_slicc_archive "$SLICC_A" cli
 
-export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=2097152 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -lnodefs.js"
+export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=2097152 -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -lnodefs.js -sINITIAL_MEMORY=${WASM_INITIAL_MEMORY:?recipe.yaml wasm.initial-memory}"
 CLI_LDFLAGS="$(homescoop_em_cli_ldflags) $(homescoop_slicc_keep_exports) $SLICC_A"
 
 if [[ ! -f "$SRC/jq" && ! -f "$SRC/jq.js" || -n "${FORCE:-}" ]]; then
