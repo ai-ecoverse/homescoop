@@ -153,6 +153,91 @@ export default async function (ctx) {
   }
   assert.match(inplace, /^still=0$/m, `root's own keybox still holds its key:\n${inplace}`);
 
+  const ro = await sh('root', [
+    'rm -rf /root/ro /root/rs /srv/sk; mkdir -m 700 /root/ro /root/rs; mkdir -m 755 /srv/sk',
+    `${GEN('/root/ro', 'RootOnly <ro@example.org>')} > /dev/null 2>&1; echo "rgen=$?"`,
+    'gpg --homedir /root/ro --batch --with-colons -k ro@example.org | while IFS=: read -r t _ _ _ _ _ _ _ _ v _; do [ "$t" = fpr ] && echo "rfpr $v"; done',
+    'gpgconf --homedir /root/ro --kill gpg-agent',
+    'cp /root/ro/pubring.kbx /srv/sk/pubring.kbx; gpg --homedir /root/ro --batch --export ro@example.org > /srv/sk/ring.gpg; chmod 600 /srv/sk/pubring.kbx /srv/sk/ring.gpg',
+    'for f in pubring.kbx ring.gpg; do echo "sum $f $(cksum < /srv/sk/$f)"; done',
+  ].join('\n'));
+  assert.match(ro, /^rgen=0$/m, `root generates a RootOnly key:\n${ro}`);
+  const rfpr = /^rfpr (\S+)$/m.exec(ro)?.[1];
+  const skSums = Object.fromEntries([...ro.matchAll(/^sum (\S+) (.+)$/gm)].map((m) => [m[1], m[2]]));
+  assert.ok(rfpr && skSums['pubring.kbx'] && skSums['ring.gpg'], `root's 600 keybox and keyring in /srv/sk:\n${ro}`);
+  const plantSk = await sh('cone', [
+    'rm -rf ~/s1 ~/s2 ~/s3; mkdir -m 700 ~/s1 ~/s2 ~/s3',
+    'ln -s /srv/sk/pubring.kbx ~/s1/pubring.kbx; ln -s /srv/sk/pubring.kbx ~/s2/pubring.kbx; ln -s /srv/sk/ring.gpg ~/s3/pub.gpg',
+    'cat ~/s1/pubring.kbx > /dev/null 2>&1; echo "cat=$?"',
+  ].join('\n'));
+  assert.match(plantSk, /^cat=[1-9]\d*$/m, `cone can't read root's 600 keybox through its own symlink:\n${plantSk}`);
+  const viaSk = await sh('root', [
+    'gpg --homedir /home/cone/s1 --batch --import /tmp/l1.asc 2>&1; echo "s1=$?"',
+    'gpgconf --homedir /home/cone/s1 --kill gpg-agent',
+    `${GEN('/home/cone/s2', 'S2 <s2@example.org>')} 2>&1; echo "s2=$?"`,
+    'gpgconf --homedir /home/cone/s2 --kill gpg-agent',
+    'gpg --homedir /home/cone/s3 --batch --no-default-keyring --keyring gnupg-ring:/home/cone/s3/pub.gpg --import /tmp/l1.asc 2>&1; echo "s3=$?"',
+    'gpgconf --homedir /home/cone/s3 --kill gpg-agent',
+    'for f in pubring.kbx ring.gpg; do echo "sum $f $(cksum < /srv/sk/$f)"; stat -c "own $f %U %a" /srv/sk/$f; done',
+    'for f in s1/pubring.kbx s2/pubring.kbx s3/pub.gpg; do stat -c "link $f %F" /home/cone/$f; done',
+  ].join('\n'));
+  for (const n of ['s1', 's2', 's3']) assert.match(viaSk, new RegExp(`^${n}=[1-9]\\d*$`, 'm'), `root's gpg refuses to read a keybox or keyring that cone symlinked to root's 600 file in ~/${n} (homescoop#1654; 2.4.9-14: rc 0, the content copied into cone's files):\n${viaSk}`);
+  for (const f of ['pubring.kbx', 'ring.gpg']) {
+    assert.ok(viaSk.includes(`sum ${f} ${skSums[f]}`), `root's /srv/sk/${f} is byte-identical:\n${viaSk}`);
+    assert.match(viaSk, new RegExp(`^own ${f.replace('.', '\\.')} root 600$`, 'm'), `/srv/sk/${f} stays root 600:\n${viaSk}`);
+  }
+  for (const f of ['s1/pubring.kbx', 's2/pubring.kbx', 's3/pub.gpg']) assert.ok(viaSk.includes(`link ${f} symbolic link`), `cone's ~/${f} is still cone's symlink:\n${viaSk}`);
+  const scan = await sh('cone', [
+    `ruby -e 'n = 0; Dir.glob(ARGV.map { |d| File.join(d, "**", "*") }, File::FNM_DOTMATCH).each { |f| next if File.symlink?(f) || !File.file?(f); n += 1; begin; b = File.binread(f); puts "leak #{f}" if b.include?("RootOnly") || b.include?("ro@example.org"); rescue SystemCallError => e; puts "unread #{f} #{e.class}"; end }; puts "scanned #{n}"' ~/s1 ~/s2 ~/s3`,
+    'gpg --homedir ~/s1 --batch -k ro@example.org > /dev/null 2>&1; echo "ks1=$?"; gpgconf --homedir ~/s1 --kill gpg-agent',
+    'gpg --homedir ~/s3 --batch --no-default-keyring --keyring gnupg-ring:$HOME/s3/pub.gpg -k ro@example.org > /dev/null 2>&1; echo "ks3=$?"; gpgconf --homedir ~/s3 --kill gpg-agent',
+  ].join('\n'));
+  assert.match(scan, /^scanned \d+$/m, `cone scanned its homedirs:\n${scan}`);
+  assert.doesNotMatch(scan, /^leak /m, `no file cone can read in ~/s1, ~/s2 or ~/s3 holds root's RootOnly key after root's gpg ran there (homescoop#1654; 2.4.9-14: pubring.kbx, pubring.kbx~ and pub.gpg are byte copies or updates of root's 600 files):\n${scan}`);
+  for (const n of ['ks1', 'ks3']) assert.match(scan, new RegExp(`^${n}=[1-9]\\d*$`, 'm'), `cone's gpg can't list root's RootOnly key (homescoop#1654; 2.4.9-14: it lists it):\n${scan}`);
+
+  await sh('root', 'ln -s /root/ro/pubring.kbx /root/rs/pubring.kbx; ln -s /root/ro/trustdb.gpg /root/rs/trustdb.gpg');
+  const trSum = /^sum (.+)$/m.exec(await sh('root', 'echo "sum $(cksum < /root/ro/trustdb.gpg)"'))?.[1];
+  const rootDir = await sh('root', [
+    'gpg --homedir /root/rs --batch -k ro@example.org > /dev/null 2>&1; echo "rlist=$?"',
+    `echo "${fpr}:4:" | gpg --homedir /root/rs --batch --import-ownertrust 2>&1; echo "rtrust=$?"`,
+    `gpg --homedir /root/rs --batch --yes --delete-key ${rfpr} 2>&1; echo "rdel=$?"`,
+    'gpgconf --homedir /root/rs --kill gpg-agent',
+    'gpg --homedir /root/ro --batch -k ro@example.org > /dev/null 2>&1; echo "rgone=$?"',
+    'gpg --homedir /root/ro --batch --export-ownertrust 2>&1',
+    'gpgconf --homedir /root/ro --kill gpg-agent',
+    'echo "sum $(cksum < /root/ro/trustdb.gpg)"',
+  ].join('\n'));
+  for (const step of ['rlist', 'rtrust', 'rdel']) assert.match(rootDir, new RegExp(`^${step}=0$`, 'm'), `root's ${step} through root's own symlinks in its 700 /root/rs works (the root-only directory exception):\n${rootDir}`);
+  assert.match(rootDir, /^rgone=[1-9]\d*$/m, `root's --delete-key in /root/rs edits /root/ro/pubring.kbx through the link:\n${rootDir}`);
+  assert.ok(rootDir.includes(`${fpr}:4:`) && trSum && !rootDir.includes(`sum ${trSum}`), `root's --import-ownertrust in /root/rs writes /root/ro/trustdb.gpg through the link:\n${rootDir}`);
+
+  const reg = await sh('cone', [
+    'rm -rf ~/rg; mkdir -m 700 ~/rg',
+    `${GEN('~/rg', 'RG <rg@example.org>')} > /dev/null 2>&1; echo "cgen=$?"`,
+    'gpg --homedir ~/rg --batch --with-colons -k rg@example.org | while IFS=: read -r t _ _ _ _ _ _ _ _ v _; do [ "$t" = fpr ] && echo "cfpr $v"; done',
+    'gpgconf --homedir ~/rg --kill gpg-agent',
+  ].join('\n'));
+  assert.match(reg, /^cgen=0$/m, `cone generates a key in ~/rg:\n${reg}`);
+  const cfpr = /^cfpr (\S+)$/m.exec(reg)?.[1];
+  assert.ok(cfpr, `cone's fingerprint:\n${reg}`);
+  const edits = await sh('root', [
+    'gpg --homedir /home/cone/rg --batch -k rg@example.org > /dev/null 2>&1; echo "list=$?"',
+    `echo "${fpr}:4:" | gpg --homedir /home/cone/rg --batch --import-ownertrust 2>&1; echo "trust=$?"`,
+    `gpg --homedir /home/cone/rg --batch --yes --delete-secret-and-public-key ${cfpr} 2>&1; echo "del=$?"`,
+    'gpgconf --homedir /home/cone/rg --kill gpg-agent',
+    'for f in pubring.kbx trustdb.gpg; do stat -c "rg $f %F %U" /home/cone/rg/$f; done',
+  ].join('\n'));
+  for (const step of ['list', 'trust', 'del']) assert.match(edits, new RegExp(`^${step}=0$`, 'm'), `root's ${step} on cone's regular keybox and trustdb works (homescoop#1424):\n${edits}`);
+  for (const f of ['pubring.kbx', 'trustdb.gpg']) assert.ok(edits.includes(`rg ${f} regular file cone`), `cone's ~/rg/${f} is still a regular file of cone's:\n${edits}`);
+  const after = await sh('cone', [
+    'gpg --homedir ~/rg --batch -k rg@example.org > /dev/null 2>&1; echo "gone=$?"',
+    'gpg --homedir ~/rg --batch --export-ownertrust 2>&1',
+    'gpgconf --homedir ~/rg --kill gpg-agent',
+  ].join('\n'));
+  assert.match(after, /^gone=[1-9]\d*$/m, `root's --delete-secret-and-public-key removed cone's key (homescoop#1424):\n${after}`);
+  assert.ok(after.includes(`${fpr}:4:`), `root's --import-ownertrust wrote cone's trustdb (homescoop#1424):\n${after}`);
+
   if (process.env.GNUPG_NOFOLLOW === '1') {
     const nf = await sh('root', [
       'rm -rf /srv/nf; mkdir -p /srv/nf; echo target > /srv/nf/t; ln -s /srv/nf/t /srv/nf/l; ln -s /srv/nf/none /srv/nf/d',
@@ -161,5 +246,5 @@ export default async function (ctx) {
     assert.match(nf, /^l refused Errno::ELOOP$/m, `slicc-kernel refuses a final symlink under O_NOFOLLOW (homescoop#1603; 1.124.1: opens the target):\n${nf}`);
     assert.match(nf, /^d refused Errno::E(LOOP|NOENT)$/m, `a dangling final symlink under O_NOFOLLOW is refused:\n${nf}`);
   }
-  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; a pubring.kbx or trustdb.gpg that cone symlinks to root's own leaves it byte-identical after root's --delete-key or --import-ownertrust there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602)${process.env.GNUPG_NOFOLLOW === '1' ? '; the kernel refuses a final symlink under O_NOFOLLOW (#1603)' : ''}`);
+  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; a pubring.kbx or trustdb.gpg that cone symlinks to root's own leaves it byte-identical after root's --delete-key or --import-ownertrust there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602); root's gpg refuses a keybox or gnupg-ring: keyring that cone symlinked to root's 600 files, and no file cone can read holds their content (#1654); root's own symlinks in its 700 directory are still read and edited, and so are cone's regular keybox and trustdb (#1424)${process.env.GNUPG_NOFOLLOW === '1' ? '; the kernel refuses a final symlink under O_NOFOLLOW (#1603)' : ''}`);
 }
