@@ -1,0 +1,11 @@
+--- a/src/printenv.h
++++ b/src/printenv.h
+@@ -20,6 +20,8 @@
+ static inline void
+ print_envvar (char const *entry, char terminator, bool quoted)
+ {
++  if (strncmp (entry, "SLICC_NICE=", 11) == 0)
++    return;
+   if (! quoted)
+     fputs (entry, stdout);
+   else
