@@ -44,3 +44,13 @@ AssertionError: THIRD-PARTY-NOTICES.md lacks: musl, LLVM libcxx, LLVM libcxxabi,
 ```
 
 Emscripten's LICENSE says musl is MIT ("see system/lib/libc/musl/COPYRIGHT") and names the LLVM runtimes' licences, but the package shipped neither file. 6.0.9-6 writes `THIRD-PARTY-NOTICES.md` from the same tree. The libraries are unchanged.
+
+## 6.0.9-7: the pic libraries (homescoop#1699; 2026-10-22)
+
+A `-sMAIN_MODULE` link takes its system libraries from `sysroot/lib/wasm32-emscripten/pic`. 6.0.9-6 ships none, so emcc tries to build them there. That fails in a read-only global install (wasm-emscripten 6.0.9-30 gives `PermissionError: [Errno 13] Permission denied: '<cache>/sysroot/lib/wasm32-emscripten/pic'`). In a writable one, emcc changes the published package's files. `check.mjs --member-order` fails on the published 6.0.9-6:
+
+```text
+AssertionError [ERR_ASSERTION]: libraries in libs.txt missing from sysroot/lib/wasm32-emscripten/pic, so a -sMAIN_MODULE link against this read-only sysroot tries to build them (homescoop#1699): crt1 crt1_reactor libGL-getprocaddr libGL libal …
+```
+
+With only the 25 pic libraries that a few probe links had built, the `-sMAIN_MODULE=1` row still failed: `FROZEN_CACHE is set, but cache file is missing: "sysroot/lib/wasm32-emscripten/pic/libnoexit.a"`. So 6.0.9-7 builds all of `libs.txt` with `embuilder build --pic`, which adds 78 MB unpacked and about 25 MB to the tarball. The non-pic libraries are unchanged. 6.0.9-7 passes. With the sysroot read-only and `FROZEN_CACHE`, these link and run: `-sMAIN_MODULE=1` C at -O0 and -O2, `-sMAIN_MODULE=2` C, `-sMAIN_MODULE=1` C++ with wasm and with JS exceptions, and a `-sMAIN_MODULE=1` dlopen of a `-sSIDE_MODULE` (`side 42`). Two local builds in different work dirs gave byte-identical tarballs (`4639dd6b…`).

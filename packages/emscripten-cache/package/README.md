@@ -4,7 +4,7 @@ Prebuilt Emscripten **sysroot** (headers + libs) for SLICC's `emcc`.
 
 ## Layout
 
-- `sysroot/` — read-only package content (~99MB)
+- `sysroot/` — read-only package content (~177MB): headers, the libraries in `libs.txt` under `lib/wasm32-emscripten/`, and the same libraries built `--pic` under `lib/wasm32-emscripten/pic/` (since 6.0.9-7, homescoop#1699), which every `-sMAIN_MODULE` link uses, so those links build nothing in the read-only package
 - `stamps/sysroot_install.stamp` — copied into the writable user `EM_CACHE` by
   `em-ensure-cache` so emcc never reinstalls headers through the sysroot symlink
 

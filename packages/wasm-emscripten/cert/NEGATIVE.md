@@ -188,3 +188,31 @@ Row 10 now matches 0018's archive loop, which -29's `tools/link.py` lacks: -29 a
 - `own-tc.c`, which defines its own `tcsetpgrp` and calls `tcgetpgrp`: it links and prints `own tcsetpgrp 7 tcgetpgrp self`;
 - `jobs.c` with `-sMAIN_MODULE=1` and with `-sLINKABLE=1`: both link and print `hello realpath /tmp uname 0` and libc's `tcgetpgrp 0 tcsetpgrp -1 EINVAL`, and both wasm export `lib/slicc/linkable`'s `slicc_linkable_kill` (`--export-dynamic`). The default link's `jobs.wasm` must not have that name, and it prints `tcgetpgrp self`, so an ignored `-sLINKABLE=1` fails the row (Grok review of #1696);
 - NEGATIVE: with 6.0.9-29's `lib/slicc` (the plain `slicc_jobs.o`, no `linkable/`, no `libslicc_jobs.a`), `own-tc.c` gives `duplicate symbol: tcsetpgrp`, the `-sMAIN_MODULE=1` link fails with `duplicate symbol:`, and the `-sLINKABLE=1` link fails with `duplicate symbol: tcsetpgrp`.
+
+## 6.0.9-31: pic libraries in the pinned cache, and the other 12 overrides as archive members (homescoop#1699, #1724; 2026-10-22)
+
+**#1699, `-sMAIN_MODULE=1` from a read-only install.** A `-sMAIN_MODULE` link takes its system libraries from `sysroot/lib/wasm32-emscripten/pic`. The pinned emscripten-cache 6.0.9-6 has no `pic/`, and `em-ensure-cache` makes `$EM_CACHE/sysroot` a symlink into that package, so emcc (with the package's own `FROZEN_CACHE = False`) tries to build them inside the read-only package. `test/main-module.mjs --expect old` against the published 6.0.9-30 is a `ci` row:
+
+```text
+== @ai-ecoverse/wasm-emscripten@6.0.9-30 with its pinned emscripten-cache 6.0.9-6 (@ai-ecoverse/emscripten-cache@6.0.9-6), installed read-only, expect old
+   -sMAIN_MODULE=1 rc=1: PermissionError: [Errno 13] Permission denied: '…/home/.cache/emscripten/sysroot/lib/wasm32-emscripten/pic'
+PASS negative: … has no sysroot/lib/wasm32-emscripten/pic, so -sMAIN_MODULE=1 tries to build pic libraries into the read-only package
+```
+
+6.0.9-31 pins emscripten-cache 6.0.9-7, which ships every library of its `libs.txt` built `--pic` as well. With it, `main-module.mjs` passes: the default hello, a `-sMAIN_MODULE=1` hello, and a `-sMAIN_MODULE=1` program that dlopens a `-sSIDE_MODULE` (`side 42`) link with the slicc defaults and run. The cache stays read-only, and nothing is built.
+
+**#1724, a program's own `kill`, `poll`, `pselect`, `nanosleep` or `set*id`.** On 6.0.9-30 these 12 are strong definitions in `slicc_signals.o`, `slicc_select.o` and `slicc_libc_gaps.o`, which every default link adds. `test/files.test.mjs` row 14 fails on the published 6.0.9-30:
+
+```text
+not ok 14 - a program's own kill, poll, pselect, nanosleep and set*id win: … (homescoop#1724, package patch 0019)
+  AssertionError [ERR_ASSERTION]: the default link always adds slicc_signals.o (kill), slicc_select.o (pselect), slicc_select.o (poll), slicc_libc_gaps.o (nanosleep), slicc_libc_gaps.o (setresuid), slicc_libc_gaps.o (setresgid), slicc_libc_gaps.o (seteuid), slicc_libc_gaps.o (setegid), slicc_libc_gaps.o (setuid), slicc_libc_gaps.o (setgid), slicc_libc_gaps.o (setreuid), slicc_libc_gaps.o (setregid), so a program that defines it gets duplicate symbol
+```
+
+Rows 10, 12 and 13 also fail on 6.0.9-30, because they match 0019's archive tuple. All 14 rows pass on 6.0.9-31.
+
+PRESTAGE's `own-libc.c` calls all 12, with a `--pre-js` stand-in kernel (`select` answers 42, `kill` and `setcred` 0). For each one it prints whether the slicc version answered, libc's, or the program's own (77):
+
+- default link: `slicc` for all 12. Without the three new archives, it's `libc` for all 12, so each row tells the versions apart;
+- `-DOWN_<name>` for each of the 12 (the program's own definition): links, `own` for that one and `slicc` for the other 11;
+- `poll` and `nanosleep` in the program's own `-l` archive: `own` for those two, `slicc` for the rest;
+- NEGATIVE: with 6.0.9-30's plain objects, each `-DOWN_<name>` link fails with `wasm-ld: error: duplicate symbol: <name>`, all 12 of them. The published 6.0.9-30 `lib/slicc` gives the same result by hand (`-DOWN_poll`: `duplicate symbol: poll`, `-DOWN_setuid`: `duplicate symbol: setuid`).
