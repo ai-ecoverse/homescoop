@@ -26,3 +26,7 @@ zlib and libjpeg-turbo from homescoop.
 
 `qpdf.wasm` can still come out in one of two 14-byte variants. That comes from emsdk 4.0.23's LLVM: its WebAssembly CFG Stackify pass iterates a pointer-keyed map, and the nesting of one try/delegate pair varies. Both variants behave the same. The fix arrives with an emsdk at or after 6.0.2 (llvm-project#205184). See cert/NEGATIVE.md.
 
+
+## 12.4.2-8: checked for reproducible builds (homescoop#1354, #808, #918; 2026-10-22)
+
+homescoop's CI now builds qpdf twice and compares the two packages. The build stops unless `qpdf`, `fix-qdf` and `zlib-flate` link the zlib and libjpeg-turbo from homescoop, with no pkg-config module. New cert specs cover pages copied between files (`cert/foreign.mjs`) and the package's command list (`cert/manifest.mjs`). The tools behave as in 12.4.2-7.

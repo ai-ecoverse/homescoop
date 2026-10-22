@@ -50,6 +50,23 @@ if [[ ! -f "$BLD/qpdf/qpdf.wasm" || -n "${FORCE:-}" ]]; then
   emmake make -C "$BLD" -j"$JOBS" "${PROGS[@]}"
 fi
 
+QPDF_CACHE="$BLD/CMakeCache.txt"
+test -f "$QPDF_CACHE" || { echo "qpdf-deps: FAIL no $QPDF_CACHE" >&2; exit 1; }
+if grep -Eq '^pc_(zlib|libjpeg)_FOUND:INTERNAL=1$' "$QPDF_CACHE"; then
+  echo "qpdf-deps: FAIL pkg-config found $(grep -Eo '^pc_(zlib|libjpeg)_FOUND:INTERNAL=1' "$QPDF_CACHE" | tr '\n' ' ')in $QPDF_CACHE (homescoop#1354)" >&2
+  exit 1
+fi
+for p in "${PROGS[@]}"; do
+  dir="$BLD/qpdf"
+  [[ "$p" == zlib-flate ]] && dir="$BLD/zlib-flate"
+  rsp="$dir/CMakeFiles/$p.dir/linkLibs.rsp"
+  test -f "$rsp" || { echo "qpdf-deps: FAIL no $rsp" >&2; exit 1; }
+  for lib in libz.a libjpeg.a; do
+    grep -Fq "$PREFIX/lib/$lib" "$rsp" || { echo "qpdf-deps: FAIL $p links no $PREFIX/lib/$lib (homescoop#1354, #918)" >&2; exit 1; }
+  done
+done
+echo "qpdf-deps: PASS ${PROGS[*]} link $PREFIX/lib/libz.a and $PREFIX/lib/libjpeg.a, no pkg-config module"
+
 for p in "${PROGS[@]}"; do
   dir="$BLD/qpdf"
   [[ "$p" == zlib-flate ]] && dir="$BLD/zlib-flate"
