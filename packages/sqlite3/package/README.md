@@ -24,9 +24,26 @@ corruption. Switch it back on the host before copying it in:
 sqlite3 file.db 'pragma journal_mode=delete'
 ```
 
-Use one process per database at a time: with the current slicc-kernel,
-concurrent writers from different processes can lose committed updates
-(slicc-kernel#665).
+## Several processes and tabs on one database
+
+SQLite's file locks work between processes: two `sqlite3` processes, or
+`sqlite3` and wasix-python's `sqlite3` module, on one database exclude each
+other. A writer that finds the database locked gets `database is locked`
+(rc 1 in the shell, unless you set `.timeout`), and the holder's commit
+keeps its rows. That needs slicc-kernel 1.100.0 or later (homescoop#513;
+wasix-python 3.14.2-22 or later on the Python side).
+
+Across browser tabs, the locks exclude since slicc-kernel 1.119.0
+(slicc-kernel#944), what's written under them is coherent in the other tab
+since 1.120.1 (slicc-kernel#949), and opens no longer fail with `unable to
+open database file` since 1.122.3 (slicc-kernel#950). So two tabs on one
+database are safe on slicc-kernel 1.122.3 or later.
+
+On older kernels, use one process per database at a time: concurrent
+writers can lose committed updates (slicc-kernel#665), and two tabs can
+lose or corrupt what the other wrote.
+
+## The prompt
 
 The interactive prompt is SQLite 3.54's new one (`SQLite-3.54 memory-> `,
 naming the open database). Set `SQLITE_PS1='sqlite> '` for the old prompt.

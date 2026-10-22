@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-sqlite3",
-  "version": "3.54.0-7",
+  "version": "3.54.0-8",
   "description": "The sqlite3 command-line shell for SQLite databases.",
   "license": "blessing",
   "repository": {
