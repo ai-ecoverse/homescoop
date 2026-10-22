@@ -10,6 +10,7 @@ No -N: the published 3.11.2-14 passes `cert/render.mjs` (slicc-kernel 1.144.1, `
   - without `backends/backend_ps.py`: `ModuleNotFoundError: No module named 'matplotlib.backends.backend_ps'`;
   - without the `cm*.ttf` and `DejaVuSans*.ttf` fonts: `ValueError: Failed to find font DejaVu Sans…`.
 - `prove-negative.mjs` doesn't apply: py-matplotlib has no commands and no `bin/*.wasm`, only side modules.
+- `cert/discovery.mjs` takes wasix-python's #1153 bounds (#1652): discovery's start cost is measured against its own cost without the cache in the same run, not against `PYTHONPATH` x 1.1. The old bound failed #1672's ladder-pr twice with nothing wrong: on/PYTHONPATH 1726/894 ms, and warm discover() 278.8 ms of a 708 ms start on a slowed runner. On 3.11.2-14 at a load average of 128 it passes: `a start pays 48 ms for discovery (0.23 of its cost without the cache), 206 ms without its cache`. With the cert's wasix-python 3.15.0-3 `_slicc_site._cache_path` patched to `return None` (no cache, so every start rescans; .pyc removed), it fails with `warm discover() 80.2 ms is more than half a cold scan (74.4 ms): the cache does not hit`, and the start cost is 0.86 of the cacheless cost, so the 0.5 bound fails as well.
 
 ## 3.11.2-13: the default backend is auto-resolved (3.11.2-14, #1115; 2026-10-20)
 
