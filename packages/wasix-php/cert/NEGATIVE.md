@@ -61,6 +61,22 @@ RangeError):
   `usort()`, 177 of `array_map()`, 181 of `serialize()` and 188 of `==`
   on arrays.
 
+- **The frame check in build.sh:** after `wasm-opt`, build.sh reads
+  php.wasm's name section and fails unless `execute_ex`,
+  `zend_hash_compare`, `zend_std_compare_objects` and
+  `php_var_serialize_intern` each subtract at least 2048 from
+  `__stack_pointer` (a later LLVM that dropped the frame would leave the
+  check counting bytes again). On this build it prints
+  `php.wasm: patches/0009's 2 KiB stack check frame in execute_ex 2048, zend_hash_compare 2048, zend_std_compare_objects 2064, php_var_serialize_intern 2128`.
+  On 8.5.12-1's php.wasm, built without patches/0009, it fails:
+
+  ```text
+  homescoop wasix-php: execute_ex takes 0 bytes of shadow stack, not patches/0009's 2048-byte ZEND_WASI_CALL_STACK_FRAME, so the stack check no longer counts its levels
+  ```
+
+  (8.5.12-1's `zend_hash_compare` and `execute_ex` have no shadow frame,
+  and `php_var_serialize_intern`'s is 1168 bytes.)
+
 prove-negative on the 8.5.12-2 build:
 `prove-negative: emptied 1 module(s): bin/php.wasm`, then
 `prove-negative: ok — cert failed on bad wasix-php tarball (status 1; 15 of 18 spec(s) failed: bailout.mjs, checklist.mjs, fd.mjs, fibers.mjs, heap.mjs, http.mjs, memory.mjs, openssl.mjs, process.mjs, server.mjs, sqlite.mjs, stack.mjs, tmp-phar.mjs, users.mjs, xml.mjs)`.

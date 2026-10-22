@@ -337,6 +337,100 @@ if pages is None or pages * 65536 != initial:
 print(f"php.wasm: no build paths, slicc.libc wasix-sysroot {sysroot}, asyncify, {pages} initial pages")
 PY
 
+python3 - "$DEST/bin/php.wasm" <<'PY'
+import sys
+from pathlib import Path
+d = Path(sys.argv[1]).read_bytes()
+checked = ("execute_ex", "zend_hash_compare", "zend_std_compare_objects", "php_var_serialize_intern")
+pad = 2048
+def uleb(buf, i):
+    r = s = 0
+    while True:
+        b = buf[i]; i += 1; r |= (b & 0x7F) << s; s += 7
+        if b < 0x80:
+            return r, i
+def sleb(buf, i):
+    r = s = 0
+    while True:
+        b = buf[i]; i += 1; r |= (b & 0x7F) << s; s += 7
+        if b < 0x80:
+            return (r - (1 << s) if b & 0x40 else r), i
+imports = 0
+code = None
+funcs = {}
+globs = {}
+p = 8
+while p < len(d):
+    sid = d[p]; p += 1
+    n, p = uleb(d, p); end = p + n
+    if sid == 2:
+        cnt, p = uleb(d, p)
+        for _ in range(cnt):
+            for _ in range(2):
+                ln, p = uleb(d, p); p += ln
+            kind = d[p]; p += 1
+            if kind == 0:
+                _, p = uleb(d, p); imports += 1
+            elif kind in (1, 2):
+                if kind == 1:
+                    p += 1
+                flags = d[p]; p += 1; _, p = uleb(d, p)
+                if flags & 1:
+                    _, p = uleb(d, p)
+            elif kind == 3:
+                p += 2
+            else:
+                raise SystemExit(f"homescoop wasix-php: php.wasm has an import of kind {kind}")
+    elif sid == 10:
+        code = (p, end)
+    elif sid == 0:
+        ln, q = uleb(d, p)
+        if d[q:q + ln] == b"name":
+            q += ln
+            while q < end:
+                sub = d[q]; q += 1
+                sl, q = uleb(d, q); se = q + sl
+                if sub in (1, 7):
+                    cnt, q = uleb(d, q)
+                    for _ in range(cnt):
+                        idx, q = uleb(d, q)
+                        ln2, q = uleb(d, q)
+                        (funcs if sub == 1 else globs)[d[q:q + ln2].decode()] = idx
+                        q += ln2
+                q = se
+    p = end
+if code is None or "__stack_pointer" not in globs or globs["__stack_pointer"] >= 0x80:
+    raise SystemExit("homescoop wasix-php: php.wasm has no code section, or no __stack_pointer among the first 128 globals of its name section")
+get = bytes([0x23, globs["__stack_pointer"]])
+p = code[0]
+cnt, p = uleb(d, p)
+bodies = []
+for _ in range(cnt):
+    sz, p = uleb(d, p)
+    bodies.append((p, p + sz)); p += sz
+report = []
+for name in checked:
+    if name not in funcs:
+        raise SystemExit(f"homescoop wasix-php: php.wasm's name section has no {name}")
+    s, e = bodies[funcs[name] - imports]
+    b = d[s:e]
+    frames = []
+    i = b.find(get)
+    while i >= 0:
+        j = i + 2
+        if b[j] in (0x21, 0x22):
+            _, j = uleb(b, j + 1)
+        if b[j] == 0x41:
+            v, k = sleb(b, j + 1)
+            if b[k] == 0x6B:
+                frames.append(v)
+        i = b.find(get, i + 1)
+    if not frames or max(frames) < pad:
+        raise SystemExit(f"homescoop wasix-php: {name} takes {max(frames) if frames else 0} bytes of shadow stack, not patches/0009's {pad}-byte ZEND_WASI_CALL_STACK_FRAME, so the stack check no longer counts its levels")
+    report.append(f"{name} {max(frames)}")
+print("php.wasm: patches/0009's 2 KiB stack check frame in " + ", ".join(report))
+PY
+
 # --- licences, notices, sources ----------------------------------------------
 homescoop_stage_licenses "$SRC/LICENSE" "$SRC/Zend/LICENSE"
 cp "$SRC/LICENSE" "$DEST/licenses/php-LICENSE"
