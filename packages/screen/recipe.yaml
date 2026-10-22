@@ -29,12 +29,14 @@ about:
     Emscripten only — WASIX cannot surface TIOCGPTN/TIOCSPTLCK/TIOCSCTTY.
     Uses musl posix_openpt/openpty + SLICC ioctl wrap (PR #3733).
     Default configure: --disable-socket-dir (sockets under $SCREENDIR or
-    $HOME/.screen); package sets SCREENDIR=/tmp/screens; screen -ls lists
-    them. SLICC PR #3733 (pseudo-terminals) has merged — PTY ioctls available.
-    Reattach from a different terminal fails until slicc-kernel#192 (other
-    terminals' /dev/ttyN are not visible; no SCM_RIGHTS on kernel sockets);
-    cert/reattach.mjs measures it and flips to requiring the attach once the
-    attacher's tty is visible from the session.
+    $HOME/.screen). Since 5.0.1-10 the package no longer sets SCREENDIR, so
+    each user's sockets live in ~/.screen (mode 700) and screen -ls lists
+    only that user's sessions (cert/users.mjs; see package/README.md).
+    SLICC PR #3733 (pseudo-terminals) has merged — PTY ioctls available.
+    Reattach from a different terminal needs slicc-kernel >= 1.35.1
+    (slicc-kernel#192, fixed by #210: other terminals' /dev/ttyN are
+    visible; the server opens the attacher's tty by path, since kernel
+    sockets carry no SCM_RIGHTS). cert/reattach.mjs requires the attach.
     5.0.1-11 (#497): SOURCE_DATE_EPOCH from source.epoch pins screen -v's
     build date, so the build is byte-reproducible (reproducible: true).
     5.0.1-12 (homescoop#849): packaging-only, publishes main's build (npm's
