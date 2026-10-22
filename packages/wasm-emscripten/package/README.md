@@ -27,7 +27,8 @@ pointing at this package's config.
 Executable links (not `-c` / `-r` / `-shared`) inject `homescoop_em_cli_ldflags`
 (`-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1
 -sFORCE_FILESYSTEM=1`) and
-`lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs,slicc_realpath}.o`,
+`lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs}.o`
+and the archive `lib/slicc/libslicc_realpath.a`,
 with the JS libraries `lib/slicc/{slicc-writev,slicc-linkat,slicc-uname,slicc-env}.js`.
 `slicc-env.js` (since 6.0.9-27) gives a program only the environment the
 kernel passes: none of Emscripten's placeholders (`USER`/`LOGNAME=web_user`,
@@ -81,12 +82,18 @@ without their own release:
 - **0015, `slicc-env.js` in the default link** (homescoop#1531), as
   `homescoop_em_cli_ldflags` has it.
 
-- **0016, `slicc_realpath.o` in the default link** (homescoop#1631): the
-  default link adds `lib/slicc/slicc_realpath.o`, musl's `realpath.c` with
-  libc patch 0017, compiled with libc's flags. Because it is an object on the
-  link line, `libc.a`'s own `realpath` member is never pulled in, so
-  emscripten-cache's prebuilt `libc.a` stays as it is. `SLICC_EMCC_PLAIN=1`
-  links skip it and get musl's bound.
+- **0016, `libslicc_realpath.a` in the default link** (homescoop#1631,
+  #1664): the default link adds `lib/slicc/libslicc_realpath.a`, an archive
+  whose one member, `slicc_realpath.o`, is musl's `realpath.c` with libc
+  patch 0017, compiled with libc's flags. It comes after the program's own
+  inputs and before `libc.a`, so the linker pulls it only when `realpath`
+  is still undefined, and then `libc.a`'s own `realpath` member is never
+  pulled in; emscripten-cache's prebuilt `libc.a` stays as it is. A program
+  that defines its own `realpath` (in its sources, an object or an archive
+  or `-l` on its command line) keeps it, as it did before 6.0.9-28. 6.0.9-28
+  added `slicc_realpath.o` as a plain object, which is always linked, so such
+  a program got `duplicate symbol: realpath` (#1664). `SLICC_EMCC_PLAIN=1` links skip
+  the archive and get musl's bound.
 - **libc/0017, musl's realpath bound** (homescoop#1631): musl stops at
   `++cnt == SYMLOOP_MAX`, so `realpath()` of a path of exactly 40 symlink
   follows was `ELOOP` even after 0014 fixed `open()` and `stat()`. 0017 makes
@@ -98,8 +105,15 @@ PRESTAGE programs with. `package-patches/libc/` is applied to the shipped
 tree only, so the PRESTAGE host tree builds the same upstream `libc.a` that
 emscripten-cache ships; PRESTAGE then checks open, stat and realpath at 40
 and 41 follows (absolute and relative chains) with the default link, and
-that without `slicc_realpath.o` realpath is still `ELOOP` at 40. wasm-clang, wasm-binaryen and cmake pick them up at
+that without `libslicc_realpath.a` realpath is still `ELOOP` at 40. wasm-clang, wasm-binaryen and cmake pick them up at
 their own next release, or a later wave folds them into `patches/`.
+
+Since 6.0.9-29 PRESTAGE also links programs that define their own
+`realpath`: in the program's source, in a later object, in an archive and
+through `-l`. Each must link with the default link and run its own
+`realpath`. It also checks that 6.0.9-28's shape, `slicc_realpath.o` as a plain object
+beside a program's own `realpath`, still gives `duplicate symbol: realpath`
+(homescoop#1664).
 
 ## Commands
 

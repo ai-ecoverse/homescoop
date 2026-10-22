@@ -89,14 +89,102 @@ test('THIRD-PARTY-NOTICES.md carries the slicc shims notice for lib/slicc (homes
   assert.match(notices, /Apache License\s+Version 2\.0/);
 });
 
-test('realpath() follows 40 symlinks, as glibc does: the default link adds slicc_realpath.o, musl realpath.c with the <= bound (homescoop#1631, package patches 0016 and libc/0017)', () => {
+test('realpath() follows 40 symlinks, as glibc does: the default link adds lib/slicc/libslicc_realpath.a, musl realpath.c with the <= bound (homescoop#1631, package patches 0016 and libc/0017)', () => {
   const { paths } = tarball();
   const src = execFileSync('tar', ['-xzOf', tgz, 'package/system/lib/libc/musl/src/misc/realpath.c'], { encoding: 'utf8' });
   assert.match(src, /if \(cnt\+\+ == SYMLOOP_MAX\) \{/, "musl's realpath.c stops at 39 symlink follows");
-  assert.ok(paths.includes('package/lib/slicc/slicc_realpath.o'), 'the tarball lacks package/lib/slicc/slicc_realpath.o');
-  const obj = execFileSync('tar', ['-xzOf', tgz, 'package/lib/slicc/slicc_realpath.o'], { maxBuffer: 1 << 26 });
-  assert.equal(obj.subarray(0, 4).toString('latin1'), '\0asm', 'lib/slicc/slicc_realpath.o is not a wasm object');
-  assert.match(obj.toString('latin1'), /realpath/, 'lib/slicc/slicc_realpath.o does not define realpath');
+  assert.ok(paths.includes('package/lib/slicc/libslicc_realpath.a'), 'the tarball lacks package/lib/slicc/libslicc_realpath.a');
+  const members = arMembers(execFileSync('tar', ['-xzOf', tgz, 'package/lib/slicc/libslicc_realpath.a'], { maxBuffer: 1 << 26 }));
+  const defs = members.filter((m) => m.data.subarray(0, 4).toString('latin1') === '\0asm' && wasmSymbols(m.data).some((s) => s.name === 'realpath' && s.defined && s.binding === 'global'));
+  assert.deepEqual(defs.map((m) => m.name), ['slicc_realpath.o'], 'lib/slicc/libslicc_realpath.a has no wasm member slicc_realpath.o that defines realpath');
   const link = execFileSync('tar', ['-xzOf', tgz, 'package/tools/link.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
-  assert.match(link, /'slicc_jobs\.o',\n {8}'slicc_realpath\.o',\n {4}\):/, "tools/link.py's default link does not add slicc_realpath.o");
+  assert.match(link, /realpath_lib = os\.path\.join\(slicc_lib, 'libslicc_realpath\.a'\)\n {4}if os\.path\.isfile\(realpath_lib\) and realpath_lib not in linker_args:\n {6}linker_args\.append\(realpath_lib\)\n/, "tools/link.py's default link does not add lib/slicc/libslicc_realpath.a");
 });
+
+test("a program's own realpath wins: no object the default link always adds defines realpath, which is only an archive member (homescoop#1664, package patch 0016)", () => {
+  const { paths } = tarball();
+  const link = execFileSync('tar', ['-xzOf', tgz, 'package/tools/link.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  const tuple = link.match(/for obj in \(([^)]*'slicc_spawn\.o'[^)]*)\):/);
+  assert.ok(tuple, "tools/link.py has no default-link object tuple");
+  const objs = [...tuple[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  assert.ok(objs.includes('slicc_spawn.o') && objs.every((o) => o.endsWith('.o')), `the default-link tuple is not a list of objects: ${objs.join(', ')}`);
+  const strong = objs.filter((o) => paths.includes(`package/lib/slicc/${o}`)).filter((o) => {
+    const data = execFileSync('tar', ['-xzOf', tgz, `package/lib/slicc/${o}`], { maxBuffer: 1 << 26 });
+    return wasmSymbols(data).some((s) => s.name === 'realpath' && s.defined && s.binding !== 'local');
+  });
+  assert.deepEqual(strong, [], `the default link always adds ${strong.join(', ')}, which defines realpath, so a program that defines realpath gets duplicate symbol: realpath`);
+  assert.ok(!paths.includes('package/lib/slicc/slicc_realpath.o'), 'the tarball still ships lib/slicc/slicc_realpath.o as a plain object');
+});
+
+function arMembers(buf) {
+  assert.equal(buf.subarray(0, 8).toString('latin1'), '!<arch>\n', 'not an ar archive');
+  const out = [];
+  let longNames = '';
+  for (let off = 8; off + 60 <= buf.length;) {
+    const head = buf.subarray(off, off + 60).toString('latin1');
+    const size = Number.parseInt(head.slice(48, 58).trim(), 10);
+    const data = buf.subarray(off + 60, off + 60 + size);
+    let name = head.slice(0, 16).trim();
+    if (name === '//') longNames = data.toString('latin1');
+    else if (name !== '/' && name !== '/SYM64/') {
+      if (/^\/\d+$/.test(name)) name = longNames.slice(Number(name.slice(1))).split('\n')[0];
+      out.push({ name: name.replace(/\/$/, ''), data });
+    }
+    off += 60 + size + (size % 2);
+  }
+  return out;
+}
+
+function wasmSymbols(buf) {
+  let pos = 8;
+  const u = () => {
+    let r = 0;
+    let shift = 0;
+    for (;;) {
+      const b = buf[pos++];
+      r += (b & 0x7f) * 2 ** shift;
+      shift += 7;
+      if (!(b & 0x80)) return r;
+    }
+  };
+  const str = () => {
+    const n = u();
+    const s = buf.subarray(pos, pos + n).toString('utf8');
+    pos += n;
+    return s;
+  };
+  const syms = [];
+  while (pos < buf.length) {
+    const id = buf[pos++];
+    const size = u();
+    const end = pos + size;
+    if (id === 0 && str() === 'linking') {
+      u();
+      while (pos < end) {
+        const sub = buf[pos++];
+        const subEnd = pos + u();
+        if (sub === 8) {
+          for (let n = u(); n > 0; n--) {
+            const kind = buf[pos++];
+            const flags = u();
+            const defined = !(flags & 0x10);
+            let name = '';
+            if (kind === 1) {
+              name = str();
+              if (defined) { u(); u(); u(); }
+            } else if (kind === 3) {
+              u();
+            } else {
+              u();
+              if (defined || flags & 0x40) name = str();
+            }
+            syms.push({ name, defined, binding: ['global', 'weak', 'local'][flags & 3] });
+          }
+        }
+        pos = subEnd;
+      }
+    }
+    pos = end;
+  }
+  return syms;
+}

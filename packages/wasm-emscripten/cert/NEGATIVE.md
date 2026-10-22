@@ -124,3 +124,31 @@ rel41 open ELOOP stat ELOOP realpath ELOOP
 ```
 
 The same program linked with a `lib/slicc` without `slicc_realpath.o` (6.0.9-27's defaults; the host tree's `libc.a` is upstream musl, as emscripten-cache ships) must print `abs40 open ok stat ok realpath ELOOP`, and PRESTAGE fails if it doesn't, so the row keeps testing the override.
+
+## 6.0.9-29: a program's own realpath wins again (homescoop#1664; 2026-10-22)
+
+6.0.9-28 put `lib/slicc/slicc_realpath.o`, a strong `realpath`, on every default link as a plain object. A program that defines its own `realpath` then failed to link:
+
+```text
+wasm-ld: error: duplicate symbol: realpath
+>>> defined in …/own-rp.o
+>>> defined in …/lib/slicc/slicc_realpath.o
+```
+
+6.0.9-29 ships the same object as the one member of `lib/slicc/libslicc_realpath.a`, and package patch 0016 adds the archive after the program's inputs and before `libc.a`. The linker pulls it only while `realpath` is still undefined, so a program's own definition wins, as it did with `libc.a` before 6.0.9-28, and a program that calls libc's `realpath` still gets the 40-follow bound (#1631).
+
+`test/files.test.mjs` fails two rows on the published 6.0.9-28 (the other nine pass):
+
+```text
+not ok 10 - realpath() follows 40 symlinks … the default link adds lib/slicc/libslicc_realpath.a …
+  AssertionError [ERR_ASSERTION]: the tarball lacks package/lib/slicc/libslicc_realpath.a
+not ok 11 - a program's own realpath wins: no object the default link always adds defines realpath … (homescoop#1664, package patch 0016)
+  AssertionError [ERR_ASSERTION]: the default link always adds slicc_realpath.o, which defines realpath, so a program that defines realpath gets duplicate symbol: realpath
+```
+
+Row 11 reads the wasm `linking` section of every object in `tools/link.py`'s default-link tuple and fails if one defines `realpath`. build.sh's PRESTAGE links and runs the cases:
+
+- (a) `own-rp.c` defines `realpath` and calls it: it links with the default link and prints `realpath /own`;
+- (b) `symloop.c` calls libc's `realpath`: 40 follows resolve and 41 are `ELOOP`, absolute and relative, and without the archive it is `ELOOP` at 40;
+- (c) `rp-caller.c` calls `realpath`, and the definition comes from a later object (`rp-def.o`), an archive (`librpdef.a`) or `-L… -lrpdef`: each links and prints `realpath /own`;
+- NEGATIVE: `own-rp.c` linked beside `slicc_realpath.o` as a plain object (6.0.9-28's link line) must fail with `duplicate symbol: realpath`, so the rows keep testing #1664.
