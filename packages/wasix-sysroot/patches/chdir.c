@@ -20,10 +20,10 @@ void __wasilibc_cwd_unlock(void);
 #endif
 extern char *__wasilibc_cwd;
 static int __wasilibc_cwd_mallocd = 0;
-extern int __slicc_cwd_synced;
+int __wasilibc_cwd_is_synced = 0;
 int __slicc_cwd_fd_live(void);
 
-static char *slicc_legacy_cwd(const char *path)
+int chdir_legacy(const char *path)
 {
     static char *relative_buf = NULL;
     static size_t relative_buf_len = 0;
@@ -32,15 +32,15 @@ static char *slicc_legacy_cwd(const char *path)
     const char *abs;
     int parent_fd = __wasilibc_find_relpath_alloc(path, &abs, &relative_buf, &relative_buf_len, 1);
     if (parent_fd == -1)
-        return NULL;
+        return -1;
     // Make sure that this directory we're accessing is indeed a directory.
     struct stat dirinfo;
     int ret = fstatat(parent_fd, relative_buf, &dirinfo, 0);
     if (ret == -1)
-        return NULL;
+        return -1;
     if (!S_ISDIR(dirinfo.st_mode)) {
         errno = ENOTDIR;
-        return NULL;
+        return -1;
     }
         
     // Create a string that looks like:
@@ -55,7 +55,7 @@ static char *slicc_legacy_cwd(const char *path)
     char *new_cwd = malloc(1 + abs_len + mid + (copy_relative ? strlen(relative_buf) : 0) + 1);
     if (new_cwd == NULL) {
         errno = ENOMEM;
-        return NULL;
+        return -1;
     }
     new_cwd[0] = '/';
     strcpy(new_cwd + 1, abs);
@@ -63,7 +63,17 @@ static char *slicc_legacy_cwd(const char *path)
         new_cwd[1 + abs_len] = '/';
     if (copy_relative)
         strcpy(new_cwd + 1 + abs_len + mid, relative_buf);
-    return new_cwd;
+
+    __wasilibc_cwd_lock();
+    char *prev_cwd = __wasilibc_cwd;
+    __wasilibc_cwd = new_cwd;
+
+    if (__wasilibc_cwd_mallocd)
+        free(prev_cwd);
+
+    __wasilibc_cwd_mallocd = 1;
+    __wasilibc_cwd_unlock();
+    return 0;
 }
 
 static void slicc_set_cwd(char *new_cwd, int synced)
@@ -75,17 +85,8 @@ static void slicc_set_cwd(char *new_cwd, int synced)
         free(prev_cwd);
     __wasilibc_cwd_mallocd = 1;
     if (synced)
-        __slicc_cwd_synced = 1;
+        __wasilibc_cwd_is_synced = 1;
     __wasilibc_cwd_unlock();
-}
-
-int chdir_legacy(const char *path)
-{
-    char *new_cwd = slicc_legacy_cwd(path);
-    if (new_cwd == NULL)
-        return -1;
-    slicc_set_cwd(new_cwd, 0);
-    return 0;
 }
 
 static int slicc_cwd_fd(void) {
@@ -134,7 +135,7 @@ static const char *make_absolute(const char *path) {
         return path;
     }
 
-    if (!__slicc_cwd_synced && slicc_sync_cwd() != 0)
+    if (!__wasilibc_cwd_is_synced && slicc_sync_cwd() != 0)
         return NULL;
 
     
@@ -275,15 +276,22 @@ int chdir(const char *path)
         return slicc_host_chdir(slicc_skip_dot(path));
     }
     int r = -1;
-    char *new_cwd = slicc_legacy_cwd(real);
-    if (new_cwd != NULL) {
-        __wasi_errno_t error = __wasi_chdir(real);
-        if (error != 0) {
-            errno = error;
-            free(new_cwd);
+    struct stat dirinfo;
+    if (stat(real, &dirinfo) == 0) {
+        if (!S_ISDIR(dirinfo.st_mode)) {
+            errno = ENOTDIR;
         } else {
-            slicc_set_cwd(new_cwd, 1);
-            r = 0;
+            __wasi_errno_t error = __wasi_chdir(real);
+            if (error != 0) {
+                errno = error;
+            } else if (chdir_legacy(real) == 0) {
+                __wasilibc_cwd_lock();
+                __wasilibc_cwd_is_synced = 1;
+                __wasilibc_cwd_unlock();
+                r = 0;
+            } else {
+                r = slicc_sync_cwd();
+            }
         }
     }
     free(real);

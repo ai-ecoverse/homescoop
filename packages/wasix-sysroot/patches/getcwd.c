@@ -6,7 +6,7 @@
 #include "lock.h"
 
 char *__wasilibc_cwd = "/";
-int __slicc_cwd_synced = 0;
+extern int __wasilibc_cwd_is_synced __attribute__((__weak__));
 
 #ifdef _REENTRANT
 static volatile int lock[1];
@@ -18,6 +18,12 @@ void __wasilibc_cwd_unlock(void) { UNLOCK(lock); }
 #endif
 
 static int __slicc_cwd_fd_named = 0;
+
+static int __slicc_synced(void)
+{
+    int *flag = &__wasilibc_cwd_is_synced;
+    return flag != NULL && *flag;
+}
 
 int __slicc_cwd_fd_live(void)
 {
@@ -58,7 +64,7 @@ char *getcwd(char *buf, size_t size)
         errno = EINVAL;
         return NULL;
     }
-    if (__slicc_cwd_synced && !__slicc_cwd_fd_live()) {
+    if (__slicc_synced() && !__slicc_cwd_fd_live()) {
         if (buf != NULL || size == 0)
             return getcwd_legacy(buf, size);
         char *m = malloc(size);
