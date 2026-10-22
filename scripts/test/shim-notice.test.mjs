@@ -56,10 +56,15 @@ test('shimNoticeErrors: a wasm with the shims needs the section, its Apache text
   assert.match(errs('bin/a.wasm', files, '# Third-party notices\n\n## Emscripten 5.0.0\n')[0], /no "## homescoop: … slicc shims/);
   assert.match(errs('bin/a.wasm', files, '## homescoop: the slicc shims (Apache-2.0)\n\nsee LICENSE\n')[0], /lacks the Apache-2\.0 text/);
   assert.match(errs('bin/a.wasm', { files: ['LICENSE'] }, ok)[0], /files\[\] must include/);
-  const known = shimNoticeErrors('bin/cmake.wasm', { files: [] }, null, 'cmake');
-  assert.deepEqual(known.errors, [], 'a known package reports, never fails');
-  assert.match(known.known, /^#844: bin\/cmake\.wasm links/);
-  assert.match(errs('bin/cmake.wasm', files, ok, 'cmake')[0], /delete its KNOWN_WITHOUT_SHIM_NOTICE entry/, 'a fixed known entry fails until removed');
+  const name = Object.keys(KNOWN_WITHOUT_SHIM_NOTICE)[0];
+  if (name) {
+    const known = shimNoticeErrors('bin/k.wasm', { files: [] }, null, name);
+    assert.deepEqual(known.errors, [], 'a known package reports, never fails');
+    assert.match(known.known, new RegExp(`^${KNOWN_WITHOUT_SHIM_NOTICE[name]}: bin/k\\.wasm links`));
+    assert.match(errs('bin/k.wasm', files, ok, name)[0], /delete its KNOWN_WITHOUT_SHIM_NOTICE entry/, 'a fixed known entry fails until removed');
+  }
+  assert.ok(!('cmake' in KNOWN_WITHOUT_SHIM_NOTICE), 'cmake writes the shims notice since 4.4.3-13 (homescoop#1533)');
+  assert.match(errs('bin/cmake.wasm', files, '# Third-party notices\n\n## Emscripten 6.0.9\n', 'cmake')[0], /no "## homescoop: … slicc shims/, 'cmake without the notice fails (homescoop#1533)');
   assert.ok(Buffer.from('\0asm..slicc_sig_mask..').includes(SLICC_SHIM_MARK));
 });
 

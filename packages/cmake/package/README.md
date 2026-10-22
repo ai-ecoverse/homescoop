@@ -32,4 +32,11 @@ point CMake at the local file or directory (`URL file://…`,
 `LICENSE` is CMake's. `THIRD-PARTY-NOTICES.md` covers the Emscripten runtime
 and the libraries CMake bundles and `cmake.wasm` links: curl, libuv,
 libarchive, expat, jsoncpp, zstd, bzip2, liblzma, nghttp2, librhash, zlib and
-llpkgc.
+llpkgc, plus homescoop's own slicc shims (Apache-2.0).
+
+## Environment
+
+`cmake.wasm` links `shims/slicc/slicc-env.js`: its environment is only what
+the kernel passes, with none of Emscripten's placeholders (`USER=web_user`,
+`HOME=/home/web_user`, `PATH=/`). After `env -i`, `cmake -E environment`
+shows no `HOME`, `USER`, `LOGNAME`, `PATH` or `LANG`.
