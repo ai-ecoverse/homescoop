@@ -22,3 +22,7 @@ The same spec passes on the 2.72.0-7 build (`host-run.sh wasix-autoconf`).
 ## 2.72.0-11: pin bump, no NEGATIVE (homescoop#864, 2026-10-21)
 
 2.72.0-11 changes only the pins: wasix-m4 1.4.20-4 → 1.4.20-7 (homescoop#1557's rebuild on sysroot -40) and wasix-perl 5.42.0-18 → 5.42.0-21, plus a plain description. Autoconf's scripts and data are the same build as 2.72.0-10, and no behaviour changes, so there is no new negative: `cert/checklist.mjs` and `cert/licence.mjs` run unchanged against the new peers (cert/meta.json needsInstall, with wasix-automake 1.17.0-13). The cert kernel moves from slicc-kernel 1.100.4 to 1.132.1, because wasix-perl 5.42.0-21 declares engines.slicc-kernel >=1.120.0 (wasix-perl's own cert runs on 1.132.1).
+
+## 2.72.0-12: pin bump, no NEGATIVE (homescoop#864, 2026-10-22)
+
+2.72.0-12 changes only the wasix-perl pin: 5.42.0-21 → 5.42.0-22 (homescoop#1632's rebuild on wasix-sysroot -42, a sized heap). wasix-m4 stays at 1.4.20-7. Autoconf's scripts and data are the same build as 2.72.0-10, and no behaviour changes, so there is no new negative: `cert/checklist.mjs` and `cert/licence.mjs` run unchanged against the new peers (cert/meta.json needsInstall, with wasix-automake 1.17.0-14). The cert kernel stays at slicc-kernel 1.132.1: wasix-perl 5.42.0-22 still declares engines.slicc-kernel >=1.120.0, and its own cert runs on 1.132.1.
