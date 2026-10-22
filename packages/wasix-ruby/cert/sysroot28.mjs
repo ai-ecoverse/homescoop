@@ -16,6 +16,6 @@ export default async function (ctx) {
   assert.equal(r.stdout.trim(), 'trapped 20', `USR1 with three busy threads: ${r.stdout}`);
   const s = await run(['ruby', '-e', 'pkg = File.expand_path("../..", RbConfig::CONFIG["bindir"] + "/x"); print File.read(File.join(pkg, "PRESTAGE.md"))[/wasix-sysroot \\*\\*[0-9.-]+/].delete("*"), "|", File.read(File.join(pkg, "THIRD-PARTY-NOTICES.md"))[/wasix-sysroot [0-9.-]+/]', '-rjson'], { cwd: '/tmp' });
   assert.equal(s.status, 0, `rc=${s.status} ${s.stdout}${s.stderr}`);
-  assert.equal(s.stdout.trim(), 'wasix-sysroot 2025.9.30-39|wasix-sysroot 2025.9.30-39', `toolchain record: ${s.stdout}`);
+  assert.equal(s.stdout.trim(), 'wasix-sysroot 2025.9.30-40|wasix-sysroot 2025.9.30-40', `toolchain record: ${s.stdout}`);
   console.log(`sysroot28: ${r.stdout.trim()}; ${s.stdout.trim()}`);
 }

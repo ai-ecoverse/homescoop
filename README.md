@@ -167,7 +167,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-openssl`](https://www.npmjs.com/package/@ai-ecoverse/wasix-openssl) | [recipe](packages/wasix-openssl) | OpenSSL 3.5.9 for slicc WASIX: static (lib/) and PIC (lib-pic/) libcrypto.a and libssl.a, headers, pkg-config |
 | [`@ai-ecoverse/wasix-perl`](https://www.npmjs.com/package/@ai-ecoverse/wasix-perl) | [recipe](packages/wasix-perl) | The Perl 5.42 programming language, with prove, perldoc, pod2man and cpan. |
 | [`@ai-ecoverse/wasix-python`](https://www.npmjs.com/package/@ai-ecoverse/wasix-python) | [recipe](packages/wasix-python) | The Python 3.15 programming language, with pip. |
-| [`@ai-ecoverse/wasix-ruby`](https://www.npmjs.com/package/@ai-ecoverse/wasix-ruby) | [recipe](packages/wasix-ruby) | The Ruby 3.4 programming language, with gem, bundle, rake, irb and erb. |
+| [`@ai-ecoverse/wasix-ruby`](https://www.npmjs.com/package/@ai-ecoverse/wasix-ruby) | [recipe](packages/wasix-ruby) | The Ruby 3.4 programming language, with gem, Bundler, rake, irb, the rdbg debugger and Ruby's other tools. |
 | [`@ai-ecoverse/wasix-sysroot`](https://www.npmjs.com/package/@ai-ecoverse/wasix-sysroot) | [recipe](packages/wasix-sysroot) | C and C++ system libraries for building WASIX programs that run on slicc. |
 | [`@ai-ecoverse/wasix-websocat`](https://www.npmjs.com/package/@ai-ecoverse/wasix-websocat) | [recipe](packages/wasix-websocat) | websocat, a WebSocket client and server like netcat for ws:// URLs, for SLICC. |
 | [`@ai-ecoverse/wasix-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasix-zlib) | [recipe](packages/wasix-zlib) | zlib 1.3.1 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config |
