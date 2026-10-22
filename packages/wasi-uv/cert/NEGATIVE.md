@@ -34,3 +34,11 @@ The published 0.13.1-2 passes the new stress row's traps check: 6 rounds of 41 l
   - `six==9.9` in place of `six` fails the checklist row with uv's rc 1 ("no version of six==9.9");
   - a 5 s budget fails the checklist and locks with `no exit within 5 s`.
 - **Kernel timing:** no regression from 1.134.3 to 1.142.1. Twenty `--no-cache` six sdist builds (two runs of five on each kernel, local, users enforce) took a median of 17 s on 1.134.3 and 19 s on 1.142.1, with each kernel's spread (13–24 s and 14–27 s) wider than the gap. Full suites: stress rounds took 39–47 s on 1.134.3 and 35–39 s on 1.142.1.
+
+## Cert only: a timeout kills the whole process group (homescoop#1578, 2026-10-21)
+
+- **What was wrong:** `cert/lib/detached.mjs` (#1541) killed only the wrapper `bash cmd.sh` on a timeout. uv, its child, was reparented to init and kept running, so a hung uv could outlive its case and hold its locks.
+- **The change:** the runner starts with `set -m`, so the wrapper is a process-group leader (its pid is the group id), and a timeout runs `kill -9 -- -<pgid>` before killing the wrapper itself.
+- **The new row, `cert/timeout.mjs`:** a `uv run --no-project python -c '…time.sleep(600)'` runs detached under a 15 s budget. The spec checks that uv is running, that the case fails with `wasi-uv: FAIL … no exit within 15 s`, and that afterwards `/proc/*/stat` lists no `uv` or `python` process.
+- **The old helper fails it** (0.13.1-5, slicc-kernel 1.134.3, users enforce): `a timed-out detached uv leaves no uv or python behind (homescoop#1578): 1017 (uv) S 1 1007 … | 1021 (python) S 1017 1007 …`, so uv (parent now 1) and its python were still there. With the new helper the row passes: uv and python, 2 processes, are gone.
+- **Host test:** `scripts/test/wasi-uv-detached.test.mjs` has a case where the command forks `sleep 30` and waits; after the timeout the sleep must be dead. It fails with the old helper (1 of 7), since only the wrapper died.

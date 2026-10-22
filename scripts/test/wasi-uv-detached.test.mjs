@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,6 +67,32 @@ test('detached: a command past the budget is a FAIL with a clear line, not a pas
   assert.match(lines.at(-1), /^wasi-uv: FAIL exec sleep 30: no exit within 2 s/);
   const pid = readFileSync(join(dir, '.uv-detached-1', 'pid'), 'utf8').trim();
   assert.notEqual(spawnSync('kill', ['-0', pid]).status, 0, 'the timed-out command was killed');
+});
+
+test('detached: a timeout kills the whole process group, not only the wrapper (homescoop#1578)', async (t) => {
+  const dir = scratch(t);
+  const slow = detached(hostCtx(), { root: dir, pollMs: 1000, budgetMs: 2000, log: () => {} });
+  const child = join(dir, 'child');
+  t.after(() => {
+    if (existsSync(child)) spawnSync('kill', ['-9', readFileSync(child, 'utf8').trim()]);
+  });
+  await assert.rejects(slow(`sleep 30 & echo $! > ${child}; wait`, dir), /no exit within 2 s/);
+  const pid = readFileSync(child, 'utf8').trim();
+  assert.match(pid, /^\d+$/);
+  let alive = true;
+  for (let i = 0; i < 20 && alive; i++) {
+    alive = spawnSync('kill', ['-0', pid]).status === 0;
+    if (alive) await new Promise((res) => setTimeout(res, 100));
+  }
+  assert.equal(alive, false, `the wrapper's child ${pid} was killed with its process group`);
+  const runner = readFileSync(join(dir, '.uv-detached-1', 'runner.sh'), 'utf8');
+  assert.match(runner, /^set -m$/m, 'the wrapper starts as a process-group leader');
+});
+
+test('wasi-uv cert: timeout.mjs times out a hung uv on purpose and checks no uv is left (homescoop#1578)', () => {
+  const spec = readFileSync(join(cert, 'timeout.mjs'), 'utf8');
+  assert.match(spec, /import \{ detached \} from '\.\/lib\/detached\.mjs';/);
+  assert.match(spec, /a timed-out detached uv leaves no uv or python behind \(homescoop#1578\)/);
 });
 
 test('detached: a runner that never writes its rc times out as a FAIL', async (t) => {
