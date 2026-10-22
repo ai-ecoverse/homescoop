@@ -7,7 +7,7 @@
     "Homescoope recipes pin upstream library versions in packages/*/recipe.yaml.",
     "A custom regex manager reads `# renovate: …` comments above `version:` and opens one PR per package when upstream cuts a release.",
     "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof); the merge queue requires ci, which needs both reviewers' approval, and every publish is the reviewed PR artifact. Majors and new packages stay manual.",
-    "Extends the shared SLICC preset, which turns automerge on globally. Here, any merged change under packages/** can publish, so the rules below turn automerge off for packages/**, @ai-ecoverse re-pins and the publish-path workflows; only the CI-certified non-major recipe rule turns it back on."
+    "Extends the shared SLICC preset, which turns automerge on globally. Here, any merged change under packages/** can publish, so the rules below turn automerge off for packages/** majors and the publish-path workflows, and turn off @ai-ecoverse re-pins in shipped manifests entirely (they ride each package's next -N)."
   ],
   "semanticCommits": "enabled",
   "platformAutomerge": true,
@@ -136,7 +136,7 @@
       ]
     },
     {
-      "description": "@ai-ecoverse pins in a shipped package.json are packaging releases: they automerge once the required ci (with the dual review) is green on the PR head.",
+      "description": "@ai-ecoverse dependencies in a shipped manifest (packages/*/package/package.json) are never updated by Renovate. Until #1698 the root workspaces made them internal workspace packages, which Renovate skips. A re-pin changes a shipped manifest without a new packaging revision, so npm-parity fails it (the package is on npm with different contents: #1702, #1703, #1707, #1708, #1709). Re-pins ride each package's next -N, made by its builder. This also covers every >=X.Y.Z-N <X.Y.Z+1 range, which Renovate's npm versioning rewrites wrongly. scripts/test/renovate-ranges.test.mjs checks it.",
       "matchManagers": [
         "npm"
       ],
@@ -146,13 +146,10 @@
       "matchPackageNames": [
         "@ai-ecoverse/**"
       ],
-      "automerge": true,
-      "addLabels": [
-        "homescoop-repin"
-      ]
+      "enabled": false
     },
     {
-      "description": "Shipped manifests (packages/*/package/package.json) keep their dependency ranges, such as py-contourpy's >=1.4.0-10 <1.4.1: consumers resolve within them, and a pin would turn every dependency bump into a -N release. The shared preset pins npm dependencies and devDependencies. These dependencies used to be internal workspace packages, which Renovate skips, so that pin reached them only once #1698 removed the root workspaces (#1700). replace leaves a range alone while the new version is inside it and bumps an exact pin to the new version. scripts/test/renovate-ranges.test.mjs checks it.",
+      "description": "Shipped manifests (packages/*/package/package.json) keep the ranges of their other dependencies, such as wasm-emscripten's acorn ^8.18.0 (disabled today, rule below): consumers resolve within them, and the shared preset's pin would turn every bump into a -N release (#1700). replace leaves a range alone while the new version is inside it and bumps an exact pin to the new version. scripts/test/renovate-ranges.test.mjs checks it.",
       "matchManagers": [
         "npm"
       ],
@@ -160,17 +157,6 @@
         "packages/*/package/package.json"
       ],
       "rangeStrategy": "replace"
-    },
-    {
-      "description": "A >=X.Y.Z-N <X.Y.Z+1 range in a shipped manifest gets an update only when a new version falls outside it, and Renovate's npm versioning rewrites such a range wrongly (>=3.14.2-1 <3.14.3 becomes <3.15.0, which drops the floor and excludes 3.15.0-6). Such a PR never automerges: fix the range by hand.",
-      "matchManagers": [
-        "npm"
-      ],
-      "matchFileNames": [
-        "packages/*/package/package.json"
-      ],
-      "matchCurrentValue": "/^>=\\S+ <\\S+$/",
-      "automerge": false
     },
     {
       "description": "libpng 1.7 is a parallel beta line; stay on the 1.6.x stable series.",

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const renovate = JSON.parse(readFileSync(join(root, 'renovate.json'), 'utf8'));
+const before = JSON.parse(readFileSync(join(root, 'scripts/test/fixtures/renovate/main-b3c71d32.json'), 'utf8'));
 
 const PRESET_NPM_RANGE_STRATEGY = 'pin';
 const MODELLED = new Set([
@@ -60,15 +61,29 @@ function matches(rule, dep) {
   return true;
 }
 
-function resolve(dep) {
+function resolve(dep, config = renovate) {
   let rangeStrategy = PRESET_NPM_RANGE_STRATEGY;
   let automerge = true;
-  for (const rule of renovate.packageRules) {
+  let enabled = true;
+  for (const rule of config.packageRules) {
     if (!matches(rule, dep)) continue;
     if ('rangeStrategy' in rule) rangeStrategy = rule.rangeStrategy;
     if ('automerge' in rule) automerge = rule.automerge;
+    if ('enabled' in rule) enabled = rule.enabled;
   }
-  return { rangeStrategy, automerge };
+  return { rangeStrategy, automerge, enabled };
+}
+
+const UPDATE_TYPES = ['patch', 'minor', 'major', 'pin', 'bump'];
+
+function updated(config) {
+  const out = [];
+  for (const d of deps.filter((x) => x.name.startsWith('@ai-ecoverse/'))) {
+    for (const updateType of UPDATE_TYPES) {
+      if (resolve({ ...d, updateType }, config).enabled) out.push(`${d.file} ${d.name} ${d.value} ${updateType}`);
+    }
+  }
+  return out;
 }
 
 const EXACT = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
@@ -90,44 +105,59 @@ const deps = shipped();
 const ranges = deps.filter((d) => /^>=\S+ <\S+$/.test(d.value));
 const pins = deps.filter((d) => d.name.startsWith('@ai-ecoverse/') && EXACT.test(d.value));
 
-test('the shipped manifests have both >= < ranges and exact @ai-ecoverse pins to check', () => {
-  assert.ok(ranges.length > 0, 'no >= < range in packages/*/package/package.json');
+const ours = deps.filter((d) => d.name.startsWith('@ai-ecoverse/'));
+const others = deps.filter((d) => !d.name.startsWith('@ai-ecoverse/'));
+
+test('the shipped manifests have exact @ai-ecoverse pins, >= < ranges and other dependencies to check', () => {
   assert.ok(pins.length > 0, 'no exact @ai-ecoverse pin in packages/*/package/package.json');
+  assert.ok(ranges.length > 0, 'no >= < range in packages/*/package/package.json');
+  assert.ok(others.length > 0, 'no non-@ai-ecoverse dependency in packages/*/package/package.json');
 });
 
-test('no shipped manifest dependency gets the shared preset\'s pin (#1700): rangeStrategy is replace', () => {
-  for (const d of deps) {
+test('Renovate never updates an @ai-ecoverse dependency in a shipped manifest: a re-pin without a new -N fails npm-parity', () => {
+  assert.deepEqual(updated(renovate), []);
+});
+
+const CLOSED = [
+  ['wasm-clang', '@ai-ecoverse/wasix-sysroot', 1702],
+  ['wasm-clang', '@ai-ecoverse/wasm-binaryen', 1703],
+  ['wasm-emscripten', '@ai-ecoverse/wasm-binaryen', 1703],
+  ['wasm-emscripten', '@ai-ecoverse/wasm-clang', 1707],
+  ['xz', '@ai-ecoverse/wasm-coreutils', 1708],
+  ['wasi-uv', '@ai-ecoverse/wasix-python', 1709],
+];
+
+test('NEGATIVE: main\'s renovate.json before this change lets the closed re-pins through, and this one does not', () => {
+  assert.ok(updated(before).length > 0);
+  for (const [pkg, name, pr] of CLOSED) {
+    const file = `packages/${pkg}/package/package.json`;
+    const d = deps.find((x) => x.file === file && x.name === name);
+    assert.ok(d, `#${pr}: ${file} no longer depends on ${name}`);
+    const old = resolve({ ...d, updateType: 'patch' }, before);
+    assert.equal(old.enabled, true, `#${pr} ${file} ${name}`);
+    assert.equal(old.automerge, true, `#${pr} ${file} ${name}`);
+    assert.equal(resolve({ ...d, updateType: 'patch' }).enabled, false, `#${pr} ${file} ${name}`);
+  }
+});
+
+test('the other dependencies of a shipped manifest never get the shared preset\'s pin (#1700): rangeStrategy is replace', () => {
+  for (const d of others) {
     for (const updateType of ['patch', 'minor', 'major']) {
       assert.equal(resolve({ ...d, updateType }).rangeStrategy, 'replace', `${d.file} ${d.name} ${d.value}`);
     }
   }
 });
 
-test('a >= < range is only rewritten when a version falls outside it, so that PR never automerges', () => {
-  for (const d of ranges) {
-    for (const updateType of ['patch', 'minor']) {
-      assert.equal(resolve({ ...d, updateType }).automerge, false, `${d.file} ${d.name} ${d.value} ${updateType}`);
-    }
-  }
-});
-
-test('an exact @ai-ecoverse pin in a shipped manifest still bumps and automerges below a major', () => {
-  for (const d of pins) {
-    for (const updateType of ['patch', 'minor']) {
-      const r = resolve({ ...d, updateType });
-      assert.equal(r.rangeStrategy, 'replace', `${d.file} ${d.name}`);
-      assert.equal(r.automerge, true, `${d.file} ${d.name} ${updateType}`);
-    }
-    assert.equal(resolve({ ...d, updateType: 'major' }).automerge, false, `${d.file} ${d.name} major`);
-  }
-});
-
-test('the root package.json devDependencies keep the shared preset\'s pin', () => {
+test('the root package.json devDependencies keep updating with the shared preset\'s pin and automerge', () => {
   const m = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-  const names = Object.keys(m.devDependencies || {});
-  assert.ok(names.length > 0);
+  const names = Object.keys(m.devDependencies || {}).filter((n) => n !== 'slicc-kernel-negative');
+  assert.ok(names.some((n) => n.startsWith('@ai-ecoverse/')), 'no @ai-ecoverse devDependency in the root package.json');
   for (const name of names) {
-    const r = resolve({ manager: 'npm', file: 'package.json', name, value: m.devDependencies[name], updateType: 'patch' });
-    assert.equal(r.rangeStrategy, PRESET_NPM_RANGE_STRATEGY, name);
+    for (const updateType of ['patch', 'minor']) {
+      const r = resolve({ manager: 'npm', file: 'package.json', name, value: m.devDependencies[name], updateType });
+      assert.equal(r.enabled, true, `${name} ${updateType}`);
+      assert.equal(r.rangeStrategy, PRESET_NPM_RANGE_STRATEGY, name);
+      assert.equal(r.automerge, true, `${name} ${updateType}`);
+    }
   }
 });
