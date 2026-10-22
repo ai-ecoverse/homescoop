@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync, copyFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -31,13 +31,21 @@ try {
     const head = readFileSync(join(libdir, `${l}.a`)).subarray(0, 8).toString('latin1');
     assert.equal(head, '!<arch>\n', `${l}.a is an archive`);
   }
+  const picMissing = want.filter((l) => !existsSync(join(libdir, 'pic', /^crt1/.test(l) ? `${l}.o` : `${l}.a`)));
+  assert.deepEqual(picMissing, [], `libraries in libs.txt missing from sysroot/lib/wasm32-emscripten/pic, so a -sMAIN_MODULE link against this read-only sysroot tries to build them (homescoop#1699): ${picMissing.join(' ')}`);
+  for (const l of want.filter((x) => !/^crt1/.test(x))) {
+    const head = readFileSync(join(libdir, 'pic', `${l}.a`)).subarray(0, 8).toString('latin1');
+    assert.equal(head, '!<arch>\n', `pic/${l}.a is an archive`);
+  }
+  console.log(`== the same ${want.length} libraries in sysroot/lib/wasm32-emscripten/pic`);
   const alltypes = readFileSync(join(pkg, 'sysroot/include/bits/alltypes.h'), 'utf8');
   assert.match(alltypes, /typedef struct __sigset_t \{ unsigned long __bits\[128\/sizeof\(long\)\]; \} sigset_t;/, 'the 128-byte musl sigset_t (patch 0007)');
   assert.ok(existsSync(join(pkg, 'stamps/sysroot_install.stamp')), 'stamps/sysroot_install.stamp');
   assert.equal(readFileSync(join(pkg, 'EMSCRIPTEN_VERSION'), 'utf8').trim(), '6.0.9-git');
   console.log(`== ${want.length} libraries, 128-byte sigset_t, stamp and version`);
-  const leaks = want.flatMap((l) => {
-    const m = readFileSync(join(pkg, 'sysroot/lib/wasm32-emscripten', /^crt1/.test(l) ? `${l}.o` : `${l}.a`), 'latin1').match(/\/(?:home|Users|__w|private\/var)\/[\x21-\x7e]{0,80}/);
+  const files = want.map((l) => (/^crt1/.test(l) ? `${l}.o` : `${l}.a`));
+  const leaks = [...files, ...files.map((f) => `pic/${f}`)].flatMap((l) => {
+    const m = readFileSync(join(libdir, l), 'latin1').match(/\/(?:home|Users|__w|private\/var)\/[\x21-\x7e]{0,80}/);
     return m ? [`${l}: ${m[0]}`] : [];
   });
   assert.deepEqual(leaks, [], `libraries name a build path in their DWARF (patch 0011 maps the cache and the llvm root): ${leaks.slice(0, 3).join(' | ')}`);
@@ -112,10 +120,30 @@ try {
   assert.equal(sh(process.execPath, ['eh.js'], { cwd: run }), 'caught boom y\n', 'C++ with wasm exceptions (libc++/libc++abi/libunwind -wasmexcept)');
   sh('python3', [join(t.EM, 'em++.py'), '-O2', '-fexceptions', 'eh.cpp', '-o', 'eh2.js'], { cwd: run, env });
   assert.equal(sh(process.execPath, ['eh2.js'], { cwd: run }), 'caught boom y\n', 'C++ with JS exceptions (-legacyexcept)');
-  console.log(`PASS ${manifest.name}@${manifest.version}: every library in libs.txt, and C and C++ (wasm and JS exceptions) link against the frozen sysroot and run`);
+  sh('chmod', ['-R', 'a-w', join(pkg, 'sysroot')]);
+  writeFileSync(join(run, 'side.c'), 'int side_answer(void) { return 42; }\n');
+  writeFileSync(join(run, 'dl.c'), '#include <dlfcn.h>\n#include <stdio.h>\nint main(void) {\n  void *h = dlopen("/side.wasm", RTLD_NOW);\n  if (!h) { printf("dlopen %s\\n", dlerror()); return 1; }\n  int (*f)(void) = (int (*)(void))dlsym(h, "side_answer");\n  printf("side %d\\n", f ? f() : -1);\n  return 0;\n}\n');
+  const mainModule = (what, tool, argv, out, want) => {
+    try {
+      sh('python3', [join(t.EM, tool), ...argv, '-o', out], { cwd: run, env });
+    } catch (e) {
+      throw new Error(`${what} does not link against the read-only frozen sysroot (homescoop#1699): ${`${e.stderr}`.split('\n').filter((l) => /error|pic|Permission/i.test(l)).slice(0, 4).join(' | ')}`);
+    }
+    assert.equal(sh(process.execPath, [out], { cwd: run }), want, what);
+  };
+  mainModule('-sMAIN_MODULE=1 C at -O0', 'emcc.py', ['-sMAIN_MODULE=1', 'hello.c'], 'main0.js', 'hello 42 140\n');
+  mainModule('-sMAIN_MODULE=1 C at -O2', 'emcc.py', ['-O2', '-sMAIN_MODULE=1', 'hello.c'], 'main2.js', 'hello 42 140\n');
+  mainModule('-sMAIN_MODULE=2 C at -O2', 'emcc.py', ['-O2', '-sMAIN_MODULE=2', 'hello.c'], 'mainb.js', 'hello 42 140\n');
+  mainModule('-sMAIN_MODULE=1 C++ with wasm exceptions', 'em++.py', ['-sMAIN_MODULE=1', '-fwasm-exceptions', 'eh.cpp'], 'maineh.js', 'caught boom y\n');
+  mainModule('-sMAIN_MODULE=1 C++ with JS exceptions at -O2', 'em++.py', ['-O2', '-sMAIN_MODULE=1', '-fexceptions', 'eh.cpp'], 'maineh2.js', 'caught boom y\n');
+  sh('python3', [join(t.EM, 'emcc.py'), '-O2', '-sSIDE_MODULE=1', 'side.c', '-o', 'side.wasm'], { cwd: run, env });
+  mainModule('-sMAIN_MODULE=1 dlopen of a -sSIDE_MODULE', 'emcc.py', ['-sMAIN_MODULE=1', 'dl.c', '--embed-file', 'side.wasm@/side.wasm'], 'dl.js', 'side 42\n');
+  console.log('== read-only sysroot: -sMAIN_MODULE=1 (-O0, -O2) and =2 C, C++ with wasm and JS exceptions, and a dlopen of a -sSIDE_MODULE link with nothing built and run');
+  console.log(`PASS ${manifest.name}@${manifest.version}: every library in libs.txt, also as pic, and C and C++ (wasm and JS exceptions) link against the frozen sysroot and run, as -sMAIN_MODULE too`);
 } catch (e) {
   process.exitCode = 1;
   console.log(`FAIL ${e.stack}${e.stderr ? `\n${e.stderr}` : ''}`);
 } finally {
+  spawnSync('chmod', ['-R', 'u+w', work]);
   rmSync(work, { recursive: true, force: true });
 }

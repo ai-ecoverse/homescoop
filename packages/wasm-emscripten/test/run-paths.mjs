@@ -31,6 +31,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } f
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { peerTarball } from '../../../scripts/peer-tarball.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const meta = JSON.parse(readFileSync(join(here, '../cert/meta.json'), 'utf8'));
@@ -60,7 +61,12 @@ try {
   const nmRoot = join(work, 'nm');
   mkdirSync(nmRoot, { recursive: true });
   const tarball = statSync(resolve(arg('--tarball')), { throwIfNoEntry: false }) ? resolve(arg('--tarball')) : arg('--tarball');
-  sh('npm', ['install', '--prefix', nmRoot, '--no-fund', '--no-audit', '--silent', tarball, kernelSpec, ...meta.needsInstall]);
+  const emTgz = statSync(tarball, { throwIfNoEntry: false }) ? tarball : join(work, sh('npm', ['pack', '--silent', '--pack-destination', work, tarball]).trim().split('\n').pop());
+  const cachePin = JSON.parse(execFileSync('tar', ['-xzOf', emTgz, 'package/package.json']).toString()).dependencies?.['@ai-ecoverse/emscripten-cache'];
+  const cacheRecipe = JSON.parse(readFileSync(join(here, '../../emscripten-cache/package/package.json'), 'utf8')).version;
+  const cachePeer = cachePin === cacheRecipe ? peerTarball('emscripten-cache') : null;
+  const peers = cachePeer && statSync(cachePeer, { throwIfNoEntry: false }) ? [cachePeer] : [];
+  sh('npm', ['install', '--prefix', nmRoot, '--no-fund', '--no-audit', '--silent', emTgz, ...peers, kernelSpec, ...meta.needsInstall]);
   const nm = join(nmRoot, 'node_modules');
   const man = (n) => JSON.parse(readFileSync(join(nm, S, n, 'package.json'), 'utf8'));
   const em = man('wasm-emscripten');

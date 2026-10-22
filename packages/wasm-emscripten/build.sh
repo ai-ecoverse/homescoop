@@ -88,11 +88,6 @@ mkdir -p "$PKG/lib/slicc"
 PKG_ALLTYPES="$PKG/system/lib/libc/musl/arch/emscripten/bits/alltypes.h"
 grep -q '__bits\[128/sizeof(long)\]' "$PKG_ALLTYPES"
 ! grep -qE 'typedef struct __sigset_t \{ unsigned long __bits\[2\]; \}' "$PKG_ALLTYPES"
-for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_main_envp slicc_fork; do
-  echo "  emcc -c $obj.c"
-  EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -O2 -c "$SLICC_SHIMS/$obj.c" -o "$PKG/lib/slicc/$obj.o"
-  test -f "$PKG/lib/slicc/$obj.o"
-done
 SLICC_NM="$EMSDK_RELEASE_LLVM/llvm-nm"
 slicc_renames() {
   local prefix=$1 sym out=()
@@ -108,6 +103,14 @@ slicc_libc_overrides() {
     slicc_jobs) echo tcgetpgrp tcsetpgrp ;;
   esac
 }
+SLICC_OVERRIDE_OBJS=(slicc_signals slicc_select slicc_libc_gaps)
+for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_main_envp slicc_fork; do
+  read -ra overrides <<<"$(slicc_libc_overrides "$obj")"
+  read -ra flags <<<"$(slicc_renames "$obj" "${overrides[@]}")"
+  echo "  emcc -c $obj.c${overrides[*]:+ with ${overrides[*]} renamed ${obj}_<name>}"
+  EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -O2 "${flags[@]}" -c "$SLICC_SHIMS/$obj.c" -o "$PKG/lib/slicc/$obj.o"
+  test -f "$PKG/lib/slicc/$obj.o"
+done
 slicc_globals() {
   "$SLICC_NM" --defined-only --extern-only "$@" | awk '$2 ~ /^[A-Z]$/ && $3 !~ /^__em_js/ {print $3}'
 }
@@ -135,6 +138,47 @@ done
 rm -f "$PKG/lib/slicc/libslicc_jobs.a"
 (cd "$JOBS_MEMBERS" && EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emar.py" rcsD "$PKG/lib/slicc/libslicc_jobs.a" slicc_tcgetpgrp.o slicc_tcsetpgrp.o)
 test -f "$PKG/lib/slicc/libslicc_jobs.a"
+echo "  lib/slicc/libslicc_signals.a, libslicc_select.a and libslicc_libc_gaps.a: one member per libc override, which calls the plain object's renamed definition"
+OVR_MEMBERS="$WORK/wasm-emscripten-overrides"
+rm -rf "$OVR_MEMBERS"
+mkdir -p "$OVR_MEMBERS"
+slicc_forwarder() {
+  case "$1" in
+    kill) echo 'signal.h|pid_t pid, int sig|pid, sig' ;;
+    poll) echo 'poll.h|struct pollfd *fds, nfds_t n, int timeout|fds, n, timeout' ;;
+    pselect) echo 'sys/select.h|int n, fd_set *rfds, fd_set *wfds, fd_set *efds, const struct timespec *ts, const sigset_t *mask|n, rfds, wfds, efds, ts, mask' ;;
+    nanosleep) echo 'time.h|const struct timespec *req, struct timespec *rem|req, rem' ;;
+    setuid | seteuid) echo 'unistd.h|uid_t id|id' ;;
+    setgid | setegid) echo 'unistd.h|gid_t id|id' ;;
+    setreuid) echo 'unistd.h|uid_t r, uid_t e|r, e' ;;
+    setregid) echo 'unistd.h|gid_t r, gid_t e|r, e' ;;
+    setresuid) echo 'unistd.h|uid_t r, uid_t e, uid_t s|r, e, s' ;;
+    setresgid) echo 'unistd.h|gid_t r, gid_t e, gid_t s|r, e, s' ;;
+    *) echo "homescoop: no forwarder signature for $1; add it to slicc_forwarder" >&2; return 1 ;;
+  esac
+}
+for obj in "${SLICC_OVERRIDE_OBJS[@]}"; do
+  read -ra overrides <<<"$(slicc_libc_overrides "$obj")"
+  plain_defs="$(slicc_globals "$PKG/lib/slicc/$obj.o")"
+  members=()
+  for sym in "${overrides[@]}"; do
+    if grep -qx "$sym" <<<"$plain_defs"; then
+      echo "homescoop: lib/slicc/$obj.o still defines $sym, so a program's own $sym gets duplicate symbol (homescoop#1724)" >&2
+      exit 1
+    fi
+    grep -qx "${obj}_$sym" <<<"$plain_defs" || { echo "homescoop: lib/slicc/$obj.o does not define ${obj}_$sym, which lib$obj.a's slicc_$sym.o calls" >&2; exit 1; }
+    sig="$(slicc_forwarder "$sym")"
+    IFS='|' read -r header params args <<<"$sig"
+    printf '#define _GNU_SOURCE\n#include <%s>\nint %s_%s(%s);\nint %s(%s) { return %s_%s(%s); }\n' "$header" "$obj" "$sym" "$params" "$sym" "$params" "$obj" "$sym" "$args" > "$OVR_MEMBERS/slicc_$sym.c"
+    EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -O2 -Werror -c "$OVR_MEMBERS/slicc_$sym.c" -o "$OVR_MEMBERS/slicc_$sym.o"
+    defs="$(slicc_globals "$OVR_MEMBERS/slicc_$sym.o")"
+    [[ "$defs" == "$sym" ]] || { echo "homescoop: lib$obj.a's slicc_$sym.o defines $(tr '\n' ' ' <<<"$defs")rather than just $sym" >&2; exit 1; }
+    members+=("slicc_$sym.o")
+  done
+  rm -f "$PKG/lib/slicc/lib$obj.a"
+  (cd "$OVR_MEMBERS" && EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emar.py" rcsD "$PKG/lib/slicc/lib$obj.a" "${members[@]}")
+  test -f "$PKG/lib/slicc/lib$obj.a"
+done
 echo "  emcc -fPIC -c lib/slicc/linkable/*.o for -sMAIN_MODULE=1 and -sLINKABLE links, without the overrides of libc's own symbols"
 mkdir -p "$PKG/lib/slicc/linkable"
 for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs; do
@@ -142,13 +186,13 @@ for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps sli
   read -ra flags <<<"$(slicc_renames slicc_linkable "${overrides[@]}")"
   EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -O2 -fPIC "${flags[@]}" -c "$SLICC_SHIMS/$obj.c" -o "$PKG/lib/slicc/linkable/$obj.o"
   linkable_defs="$(slicc_globals "$PKG/lib/slicc/linkable/$obj.o")"
-  link_defs="$(slicc_globals "$PKG/lib/slicc/$obj.o" "$JOBS_MEMBERS"/*.o)"
+  link_defs="$(slicc_globals "$PKG/lib/slicc/$obj.o" "$JOBS_MEMBERS"/*.o "$OVR_MEMBERS"/*.o)"
   for sym in "${overrides[@]}"; do
     if grep -qx "$sym" <<<"$linkable_defs"; then
       echo "homescoop: lib/slicc/linkable/$obj.o defines $sym, which libc.a also defines, so -sMAIN_MODULE=1 gets duplicate symbol: $sym (homescoop#1678)" >&2
       exit 1
     fi
-    grep -qx "$sym" <<<"$link_defs" || { echo "homescoop: lib/slicc/$obj.o no longer defines $sym; update slicc_libc_overrides" >&2; exit 1; }
+    grep -qx "$sym" <<<"$link_defs" || { echo "homescoop: neither lib/slicc/$obj.o nor its archive members define $sym; update slicc_libc_overrides" >&2; exit 1; }
   done
 done
 grep -q 'if (++cnt == SYMLOOP_MAX) {' "$HOST_EM/system/lib/libc/musl/src/misc/realpath.c"
@@ -326,6 +370,108 @@ int main(void) {
   return 0;
 }
 C
+cat > "$PRE_WORK/own-libc.c" <<'C'
+#define _GNU_SOURCE
+#include <poll.h>
+#include <signal.h>
+#include <stdio.h>
+#include <sys/select.h>
+#include <time.h>
+#include <unistd.h>
+#ifdef OWN_kill
+int kill(pid_t pid, int sig) { (void)pid; (void)sig; return 77; }
+#endif
+#ifdef OWN_poll
+int poll(struct pollfd *fds, nfds_t n, int timeout) { (void)fds; (void)n; (void)timeout; return 77; }
+#endif
+#ifdef OWN_pselect
+int pselect(int n, fd_set *restrict r, fd_set *restrict w, fd_set *restrict e, const struct timespec *restrict ts, const sigset_t *restrict mask) { (void)n; (void)r; (void)w; (void)e; (void)ts; (void)mask; return 77; }
+#endif
+#ifdef OWN_nanosleep
+int nanosleep(const struct timespec *req, struct timespec *rem) { (void)req; (void)rem; return 77; }
+#endif
+#ifdef OWN_setuid
+int setuid(uid_t id) { (void)id; return 77; }
+#endif
+#ifdef OWN_setgid
+int setgid(gid_t id) { (void)id; return 77; }
+#endif
+#ifdef OWN_seteuid
+int seteuid(uid_t id) { (void)id; return 77; }
+#endif
+#ifdef OWN_setegid
+int setegid(gid_t id) { (void)id; return 77; }
+#endif
+#ifdef OWN_setreuid
+int setreuid(uid_t r, uid_t e) { (void)r; (void)e; return 77; }
+#endif
+#ifdef OWN_setregid
+int setregid(gid_t r, gid_t e) { (void)r; (void)e; return 77; }
+#endif
+#ifdef OWN_setresuid
+int setresuid(uid_t r, uid_t e, uid_t s) { (void)r; (void)e; (void)s; return 77; }
+#endif
+#ifdef OWN_setresgid
+int setresgid(gid_t r, gid_t e, gid_t s) { (void)r; (void)e; (void)s; return 77; }
+#endif
+#ifndef NO_MAIN
+static void row(const char *name, int r, int slicc) { printf("%s %s\n", name, r == 77 ? "own" : r == slicc ? "slicc" : "libc"); }
+int main(void) {
+  struct pollfd p = {0, POLLIN, 0};
+  fd_set rd;
+  struct timespec zero = {0, 0}, req = {0, 1000}, rem = {9, 9};
+  FD_ZERO(&rd);
+  FD_SET(0, &rd);
+  row("kill", kill(4242, 0), 0);
+  row("poll", poll(&p, 1, 0), 42);
+  row("pselect", pselect(1, &rd, NULL, NULL, &zero, NULL), 42);
+  int ns = nanosleep(&req, &rem);
+  row("nanosleep", ns == 77 ? 77 : (int)rem.tv_sec, 0);
+  row("setuid", setuid(5), 0);
+  row("setgid", setgid(5), 0);
+  row("seteuid", seteuid(5), 0);
+  row("setegid", setegid(5), 0);
+  row("setreuid", setreuid(5, 5), 0);
+  row("setregid", setregid(5, 5), 0);
+  row("setresuid", setresuid(5, 5, 5), 0);
+  row("setresgid", setresgid(5, 5, 5), 0);
+  return 0;
+}
+#endif
+C
+cat > "$PRE_WORK/priv.c" <<'C'
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+int main(void) {
+  uid_t r, e, s;
+  printf("start %d %d %d %d\n", (int)getuid(), (int)geteuid(), (int)getgid(), (int)getegid());
+  int g = setgid(5);
+  printf("setgid %d getgid %d getegid %d\n", g, (int)getgid(), (int)getegid());
+  int rs = setresuid(6, 0, 6);
+  getresuid(&r, &e, &s);
+  printf("setresuid %d getresuid %d %d %d\n", rs, (int)r, (int)e, (int)s);
+  int u = setuid(5);
+  getresuid(&r, &e, &s);
+  printf("setuid %d getuid %d geteuid %d getresuid %d %d %d\n", u, (int)getuid(), (int)geteuid(), (int)r, (int)e, (int)s);
+  return 0;
+}
+C
+cat > "$PRE_WORK/kernel-root.js" <<'JS'
+const sliccCred = { ruid: 0, euid: 0, suid: 0, rgid: 0, egid: 0, sgid: 0, groups: [] };
+Module['sliccKernel'] = {
+  cred: () => ({ ...sliccCred, groups: [...sliccCred.groups] }),
+  setcred: (change) => { Object.assign(sliccCred, change); return 0; },
+};
+JS
+cat > "$PRE_WORK/kernel.js" <<'JS'
+Module['sliccKernel'] = {
+  select: () => 42,
+  kill: () => 0,
+  cred: () => ({ ruid: 5, euid: 5, suid: 5, rgid: 5, egid: 5, sgid: 5, groups: [] }),
+  setcred: () => 0,
+};
+JS
 chmod -R a-w "$HOST_EM"
 RO_CLEANUP() { chmod -R u+w "$HOST_EM" 2>/dev/null || true; }
 trap RO_CLEANUP EXIT
@@ -402,6 +548,70 @@ env EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$NO_JOBS" "${HOST_EMCC[@]}" "$P
 grep -qx 'tcgetpgrp 0 tcsetpgrp -1 EINVAL' <<<"$(cd "$PRE_WORK" && node jobs-no-archive.js)" || { echo "homescoop: without libslicc_jobs.a, libc's tcgetpgrp/tcsetpgrp should answer 0 and EINVAL; PRESTAGE no longer tests the override" >&2; exit 1; }
 "${RP_EMCC[@]}" "$PRE_WORK/own-tc.c" -o "$PRE_WORK/own-tc.js" 2>"$PRE_WORK/own-tc.err" || { cat "$PRE_WORK/own-tc.err" >&2; echo "homescoop: a program that defines its own tcsetpgrp does not link under the default link (homescoop#1678)" >&2; exit 1; }
 grep -qx 'own tcsetpgrp 7 tcgetpgrp self' <<<"$(cd "$PRE_WORK" && node own-tc.js)" || { echo "homescoop: a program that defines its own tcsetpgrp runs another one, or loses the slicc tcgetpgrp (homescoop#1678)" >&2; exit 1; }
+OWN_SYMS=(kill poll pselect nanosleep setuid setgid seteuid setegid setreuid setregid setresuid setresgid)
+own_libc_want() {
+  local others=$1 s
+  shift
+  for s in "${OWN_SYMS[@]}"; do
+    if [[ " $* " == *" $s "* ]]; then echo "$s own"; else echo "$s $others"; fi
+  done
+}
+own_libc_run() {
+  local libdir=$1 out=$2
+  shift 2
+  env EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$libdir" "${HOST_EMCC[@]}" --pre-js "$PRE_WORK/kernel.js" "$@" -o "$PRE_WORK/$out.js" 2>"$PRE_WORK/$out.err" || { cat "$PRE_WORK/$out.err" >&2; return 1; }
+  (cd "$PRE_WORK" && node "$out.js")
+}
+OWN_OUT="$(own_libc_run "$PKG/lib/slicc" own-libc-none "$PRE_WORK/own-libc.c")"
+printf '%s\n' "$OWN_OUT"
+[[ "$OWN_OUT" == "$(own_libc_want slicc)" ]] || { echo "homescoop: a default-linked program does not get the slicc kill, poll, pselect, nanosleep and set*id from lib/slicc's override archives (homescoop#1724)" >&2; exit 1; }
+for sym in "${OWN_SYMS[@]}"; do
+  out="$(own_libc_run "$PKG/lib/slicc" "own-libc-$sym" "-DOWN_$sym" "$PRE_WORK/own-libc.c")" || { echo "homescoop: a program that defines its own $sym does not link under the default link (homescoop#1724)" >&2; exit 1; }
+  [[ "$out" == "$(own_libc_want slicc "$sym")" ]] || { printf '%s\n' "$out" >&2; echo "homescoop: a program that defines its own $sym runs another one, or loses the slicc version of the other overrides (homescoop#1724)" >&2; exit 1; }
+done
+env EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -DOWN_poll -DOWN_nanosleep -DNO_MAIN -c "$PRE_WORK/own-libc.c" -o "$PRE_WORK/own-libc-defs.o"
+rm -f "$PRE_WORK/libowndefs.a"
+(cd "$PRE_WORK" && EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emar.py" rcs libowndefs.a own-libc-defs.o)
+out="$(own_libc_run "$PKG/lib/slicc" own-libc-lib "$PRE_WORK/own-libc.c" "-L$PRE_WORK" -lowndefs)" || { echo "homescoop: a program whose poll and nanosleep are in its own -l archive does not link under the default link (homescoop#1724)" >&2; exit 1; }
+[[ "$out" == "$(own_libc_want slicc poll nanosleep)" ]] || { printf '%s\n' "$out" >&2; echo "homescoop: a program whose poll and nanosleep are in its own -l archive runs other ones (homescoop#1724)" >&2; exit 1; }
+NO_OVR="$PRE_WORK/libslicc-no-overrides"
+mkdir -p "$NO_OVR"
+cp -R "$PKG"/lib/slicc/. "$NO_OVR/"
+for obj in "${SLICC_OVERRIDE_OBJS[@]}"; do rm "$NO_OVR/lib$obj.a"; done
+out="$(own_libc_run "$NO_OVR" own-libc-no-archives "$PRE_WORK/own-libc.c")"
+[[ "$out" == "$(own_libc_want libc)" ]] || { printf '%s\n' "$out" >&2; echo "homescoop: without the override archives a default link should get libc's kill, poll, pselect, nanosleep and set*id; PRESTAGE no longer tells them apart" >&2; exit 1; }
+PRIV_WANT=$'start 0 0 0 0\nsetgid 0 getgid 5 getegid 5\nsetresuid 0 getresuid 6 0 6\nsetuid 0 getuid 5 geteuid 5 getresuid 5 5 5'
+priv_run() {
+  local libdir=$1 out=$2
+  env EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$libdir" "${HOST_EMCC[@]}" --pre-js "$PRE_WORK/kernel-root.js" "$PRE_WORK/priv.c" -o "$PRE_WORK/$out.js" 2>"$PRE_WORK/$out.err" || { cat "$PRE_WORK/$out.err" >&2; return 1; }
+  (cd "$PRE_WORK" && node "$out.js")
+}
+PRIV_OUT="$(priv_run "$PKG/lib/slicc" priv)"
+printf '%s\n' "$PRIV_OUT"
+[[ "$PRIV_OUT" == "$PRIV_WANT" ]] || { echo "homescoop: as root, a default-linked program's setgid(5), setresuid(6, 0, 6) and setuid(5) do not reach the kernel's credentials (getgid, getresuid, getuid and geteuid after them), so a privilege drop would be a no-op (homescoop#1724)" >&2; exit 1; }
+NO_GAPS="$PRE_WORK/libslicc-no-libc-gaps-archive"
+mkdir -p "$NO_GAPS"
+cp -R "$PKG"/lib/slicc/. "$NO_GAPS/"
+rm "$NO_GAPS/libslicc_libc_gaps.a"
+PRIV_NO="$(priv_run "$NO_GAPS" priv-no-archive)"
+if [[ "$PRIV_NO" == "$PRIV_WANT" ]] || ! grep -q '^setuid -1 getuid 0 geteuid 0 ' <<<"$PRIV_NO"; then
+  printf '%s\n' "$PRIV_NO" >&2
+  echo "homescoop: without libslicc_libc_gaps.a libc's set*id stubs should leave the credentials at root; PRESTAGE no longer tests the privilege drop" >&2
+  exit 1
+fi
+OLD_OVR="$PRE_WORK/libslicc-6.0.9-30"
+mkdir -p "$OLD_OVR"
+cp -R "$NO_OVR"/. "$OLD_OVR/"
+for obj in "${SLICC_OVERRIDE_OBJS[@]}"; do
+  EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -O2 -c "$SLICC_SHIMS/$obj.c" -o "$OLD_OVR/$obj.o"
+done
+for sym in "${OWN_SYMS[@]}"; do
+  if own_libc_run "$OLD_OVR" "own-libc-old-$sym" "-DOWN_$sym" "$PRE_WORK/own-libc.c" >/dev/null 2>&1; then
+    echo "homescoop: a program defining its own $sym links with 6.0.9-30's lib/slicc (plain objects that define it); PRESTAGE no longer tests homescoop#1724" >&2
+    exit 1
+  fi
+  grep -qE "duplicate symbol: $sym\$" "$PRE_WORK/own-libc-old-$sym.err"
+done
 "${RP_EMCC[@]}" -sMAIN_MODULE=1 "$PRE_WORK/jobs.c" -o "$PRE_WORK/jobs-main.js" 2>"$PRE_WORK/jobs-main.err" || { cat "$PRE_WORK/jobs-main.err" >&2; echo "homescoop: -sMAIN_MODULE=1 does not link with the slicc defaults (homescoop#1678)" >&2; exit 1; }
 grep -q sliccKernel "$PRE_WORK/jobs-main.js"
 MAIN_OUT="$(cd "$PRE_WORK" && node jobs-main.js)"
@@ -450,7 +660,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without libslicc_realpath.a realpath is ELOOP at 40 (#611, #1631), a program's own realpath (in its own source, a later object, an archive or -l) links and runs, not the archive's, and 6.0.9-28's plain slicc_realpath.o gives duplicate symbol: realpath (#1664), a default link gets the slicc tcgetpgrp/tcsetpgrp from libslicc_jobs.a and a program's own tcsetpgrp wins, -sMAIN_MODULE=1 and -sLINKABLE=1 links with the slicc defaults take lib/slicc/linkable (slicc_linkable_kill exported, libc's tcgetpgrp/tcsetpgrp, which the default link does not have) and run, and 6.0.9-29's lib/slicc gives duplicate symbol: tcsetpgrp and fails -sMAIN_MODULE=1 and -sLINKABLE=1 (#1678), --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without libslicc_realpath.a realpath is ELOOP at 40 (#611, #1631), a program's own realpath (in its own source, a later object, an archive or -l) links and runs, not the archive's, and 6.0.9-28's plain slicc_realpath.o gives duplicate symbol: realpath (#1664), a default link gets the slicc tcgetpgrp/tcsetpgrp from libslicc_jobs.a and a program's own tcsetpgrp wins, -sMAIN_MODULE=1 and -sLINKABLE=1 links with the slicc defaults take lib/slicc/linkable (slicc_linkable_kill exported, libc's tcgetpgrp/tcsetpgrp, which the default link does not have) and run, and 6.0.9-29's lib/slicc gives duplicate symbol: tcsetpgrp and fails -sMAIN_MODULE=1 and -sLINKABLE=1 (#1678), a default link gets the slicc kill, poll, pselect, nanosleep and 8 set*id from libslicc_signals.a, libslicc_select.a and libslicc_libc_gaps.a (libc's without them), a program's own definition of each of the 12 (in its source, or poll and nanosleep in its own -l archive) links and runs its own while the other 11 stay slicc's, and 6.0.9-30's plain objects give duplicate symbol for each, and as root setgid(5), setresuid(6, 0, 6) and setuid(5) change what getgid, getresuid, getuid and geteuid report, which libc's stubs (without libslicc_libc_gaps.a) do not (#1724), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"
@@ -508,10 +718,13 @@ done
 test -f "$PKG/lib/slicc/libslicc_realpath.a"
 test ! -e "$PKG/lib/slicc/slicc_realpath.o"
 test -f "$PKG/lib/slicc/libslicc_jobs.a"
+for obj in "${SLICC_OVERRIDE_OBJS[@]}"; do
+  test -f "$PKG/lib/slicc/lib$obj.a"
+done
 for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs; do
   test -f "$PKG/lib/slicc/linkable/$obj.o"
 done
-grep -q "for lib in ('libslicc_jobs.a', 'libslicc_realpath.a'):" "$PKG/tools/link.py"
+grep -q "for lib in ('libslicc_signals.a', 'libslicc_select.a', 'libslicc_libc_gaps.a', 'libslicc_jobs.a', 'libslicc_realpath.a'):" "$PKG/tools/link.py"
 grep -q "linkable = settings.MAIN_MODULE == 1 or settings.LINKABLE" "$PKG/tools/link.py"
 ! grep -q "'slicc_realpath.o'," "$PKG/tools/link.py"
 grep -q 'if (cnt++ == SYMLOOP_MAX) {' "$PKG/system/lib/libc/musl/src/misc/realpath.c"
@@ -544,7 +757,7 @@ test -f "$PKG/emscripten-config"
   echo "homescoop: emscripten-config must not set SLICC_VFS_PRE_JS" >&2
   exit 1
 }
-grep -q '"@ai-ecoverse/emscripten-cache": "6.0.9-6"' "$PKG/package.json"
+grep -q '"@ai-ecoverse/emscripten-cache": "6.0.9-7"' "$PKG/package.json"
 grep -q '"@ai-ecoverse/wasm-binaryen": "132.0.0-4"' "$PKG/package.json"
 grep -q '"@ai-ecoverse/wasm-clang": "24.0.0-22"' "$PKG/package.json"
 grep -q '"esbuild-wasm": "0.28.2"' "$PKG/package.json"

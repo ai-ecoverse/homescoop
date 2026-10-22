@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/emscripten-cache",
-  "version": "6.0.9-6",
+  "version": "6.0.9-7",
   "description": "Prebuilt system libraries for Emscripten 6.0.9, so emcc in slicc can compile without building them first.",
   "license": "MIT",
   "repository": {

@@ -28,7 +28,10 @@ Executable links (not `-c` / `-r` / `-shared`) inject `homescoop_em_cli_ldflags`
 (`-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1
 -sFORCE_FILESYSTEM=1`) and
 `lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs}.o`
-and the archives `lib/slicc/libslicc_jobs.a` (`tcgetpgrp`, `tcsetpgrp`) and
+and the archives `lib/slicc/libslicc_signals.a` (`kill`),
+`lib/slicc/libslicc_select.a` (`poll`, `pselect`),
+`lib/slicc/libslicc_libc_gaps.a` (`nanosleep` and the 8 `set*id`),
+`lib/slicc/libslicc_jobs.a` (`tcgetpgrp`, `tcsetpgrp`) and
 `lib/slicc/libslicc_realpath.a`,
 with the JS libraries `lib/slicc/{slicc-writev,slicc-linkat,slicc-uname,slicc-env}.js`.
 `slicc-env.js` (since 6.0.9-27) gives a program only the environment the
@@ -44,7 +47,7 @@ with `-fPIC` (a main module needs it), with `kill`, `poll`, `pselect`,
 `nanosleep`, `setuid`, `setgid`, `seteuid`, `setegid`, `setreuid`,
 `setregid`, `setresuid`, `setresgid`, `tcgetpgrp` and `tcsetpgrp` renamed
 out (`-D<name>=slicc_linkable_<name>`, so the shim's own calls inside an
-object still reach its version), and without the two archives. Those links
+object still reach its version), and without the override archives. Those links
 get libc's versions of these functions and musl's `realpath` (`ELOOP` at 40
 symlink follows): no kernel signals through `kill`, no kernel `poll`,
 `pselect` or credentials, and `tcgetpgrp`/`tcsetpgrp` answer 0 and
@@ -52,7 +55,11 @@ symlink follows): no kernel signals through `kill`, no kernel `poll`,
 the signal mask and `raise`, uname, the environment, the kernel's process
 groups and sessions) stays. `-sMAIN_MODULE=2` and `-sSIDE_MODULE` are not
 affected: the first links like any executable, the second gets no slicc
-defaults.
+defaults. Every `-sMAIN_MODULE` link needs the `-fPIC` system libraries in `sysroot/lib/wasm32-emscripten/pic`; emscripten-cache
+ships them from 6.0.9-7 (homescoop#1699), so these links need nothing built
+and work from a read-only global install. With emscripten-cache 6.0.9-6
+(wasm-emscripten 6.0.9-30) emcc tried to build them into the package and
+failed with `PermissionError`.
 `lib/slicc` is compiled from homescoop's slicc shims (`shims/slicc`,
 Apache-2.0); `THIRD-PARTY-NOTICES.md` carries that licence.
 `lib/slicc/slicc_main_envp.o` (make: `-Dmain=slicc_tool_main`) and
@@ -90,7 +97,7 @@ Root `$PKG/emcc` (cmake toolchain) and `$PKG/bin/emcc` are the same self-suffici
 
 On top of the shared `patches/` (which `scripts/emscripten-tree.sh` also
 applies for emscripten-cache, llvm-emscripten, wasm-clang, wasm-binaryen and
-cmake), this package ships four patches from `package-patches/` and one from
+cmake), this package ships five patches from `package-patches/` and one from
 `package-patches/libc/`. They are kept
 out of `patches/` so they don't change the published glue of those packages
 without their own release:
@@ -126,13 +133,30 @@ without their own release:
   ioctl, which is `EINVAL` on every terminal and never reaches the kernel.
   build.sh fails if a member defines a global the base object also
   defines, or if a `linkable` object still defines one of libc's.
+- **0019, the other override archives** (homescoop#1724): the default link
+  also adds `lib/slicc/libslicc_signals.a`, `libslicc_select.a` and
+  `libslicc_libc_gaps.a`. `slicc_signals.o`, `slicc_select.o` and
+  `slicc_libc_gaps.o` are compiled with the 12 libc functions they override
+  renamed `<object>_<name>` (`slicc_signals_kill`, `slicc_select_poll`,
+  `slicc_libc_gaps_setuid`, …). Each archive member, `slicc_<name>.o`, is a
+  one-line function `<name>` that calls that renamed definition, so the
+  linker pulls a member only while the program leaves `<name>` undefined,
+  and a program that defines its own `kill`, `poll`, `pselect`,
+  `nanosleep` or `set*id` links and runs its own; until 6.0.9-30 those 12
+  were strong definitions in the always-linked objects, so it got
+  `duplicate symbol`. The members depend only on the always-linked objects,
+  never on each other, so a program's own `poll` leaves the slicc
+  `pselect` in place. The shims' own calls (`slicc_exec.o` calls `kill`)
+  go through the symbol, so they reach the program's version when it has
+  one. build.sh fails if a plain object still defines an override, or a
+  member defines anything but its own symbol.
 - **libc/0017, musl's realpath bound** (homescoop#1631): musl stops at
   `++cnt == SYMLOOP_MAX`, so `realpath()` of a path of exactly 40 symlink
   follows was `ELOOP` even after 0014 fixed `open()` and `stat()`. 0017 makes
   it `cnt++ == SYMLOOP_MAX`: 40 follows resolve and the 41st is `ELOOP`, as
   in glibc.
 
-build.sh applies 0014-0016 and 0018 to the shipped tree and to the tree it links its
+build.sh applies 0014-0016, 0018 and 0019 to the shipped tree and to the tree it links its
 PRESTAGE programs with. `package-patches/libc/` is applied to the shipped
 tree only, so the PRESTAGE host tree builds the same upstream `libc.a` that
 emscripten-cache ships; PRESTAGE then checks open, stat and realpath at 40
@@ -157,6 +181,21 @@ own `tcsetpgrp`, and runs its own. 6.0.9-29's `lib/slicc` (`slicc_jobs.o`
 with both overrides, no `linkable/`) must give `duplicate symbol: tcsetpgrp`
 for `own-tc.c` and fail the `-sMAIN_MODULE=1` and `-sLINKABLE=1` links
 (homescoop#1678).
+
+Since 6.0.9-31 PRESTAGE links `own-libc.c`, which calls all 12 of `kill`,
+`poll`, `pselect`, `nanosleep` and the 8 `set*id`, with a `--pre-js`
+stand-in kernel, and prints for each whether the slicc, libc or the
+program's own version answered. The default link must print `slicc` for
+all 12 (and `libc` for all 12 without the three archives). Defining any
+one of them in the program's source, or `poll` and `nanosleep` in its own
+`-l` archive, must link and print `own` for those and `slicc` for the rest.
+With 6.0.9-30's plain objects each of the 12 gives `duplicate symbol:
+<name>` (homescoop#1724).
+`priv.c` checks that the privilege drop really happens: as root, with a
+stand-in kernel that keeps credentials, `setgid(5)`, `setresuid(6, 0, 6)`
+and `setuid(5)` must change what `getgid`, `getresuid`, `getuid` and
+`geteuid` report. Without `libslicc_libc_gaps.a`, libc's stubs return -1
+and leave every id at 0, so the row fails.
 
 ## Commands
 
