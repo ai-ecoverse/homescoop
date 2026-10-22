@@ -28,12 +28,31 @@ Executable links (not `-c` / `-r` / `-shared`) inject `homescoop_em_cli_ldflags`
 (`-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1
 -sFORCE_FILESYSTEM=1`) and
 `lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs}.o`
-and the archive `lib/slicc/libslicc_realpath.a`,
+and the archives `lib/slicc/libslicc_jobs.a` (`tcgetpgrp`, `tcsetpgrp`) and
+`lib/slicc/libslicc_realpath.a`,
 with the JS libraries `lib/slicc/{slicc-writev,slicc-linkat,slicc-uname,slicc-env}.js`.
 `slicc-env.js` (since 6.0.9-27) gives a program only the environment the
 kernel passes: none of Emscripten's placeholders (`USER`/`LOGNAME=web_user`,
 `HOME=/home/web_user`, `PATH=/`, `PWD=/`), so under `env -i` they are unset.
 Opt out with **`SLICC_EMCC_PLAIN=1`** for plain web glue.
+
+`-sMAIN_MODULE=1` and `-sLINKABLE=1` links (since 6.0.9-30, homescoop#1678)
+wrap every input in `--whole-archive`, so all of `libc.a` is linked, and
+every slicc override of a libc function would be a duplicate symbol. Those
+links take `lib/slicc/linkable/*.o` instead: the same six objects compiled
+with `-fPIC` (a main module needs it), with `kill`, `poll`, `pselect`,
+`nanosleep`, `setuid`, `setgid`, `seteuid`, `setegid`, `setreuid`,
+`setregid`, `setresuid`, `setresgid`, `tcgetpgrp` and `tcsetpgrp` renamed
+out (`-D<name>=slicc_linkable_<name>`, so the shim's own calls inside an
+object still reach its version), and without the two archives. Those links
+get libc's versions of these functions and musl's `realpath` (`ELOOP` at 40
+symlink follows): no kernel signals through `kill`, no kernel `poll`,
+`pselect` or credentials, and `tcgetpgrp`/`tcsetpgrp` answer 0 and
+`EINVAL` on a terminal. Everything else in the slicc defaults (spawn, exec,
+the signal mask and `raise`, uname, the environment, the kernel's process
+groups and sessions) stays. `-sMAIN_MODULE=2` and `-sSIDE_MODULE` are not
+affected: the first links like any executable, the second gets no slicc
+defaults.
 `lib/slicc` is compiled from homescoop's slicc shims (`shims/slicc`,
 Apache-2.0); `THIRD-PARTY-NOTICES.md` carries that licence.
 `lib/slicc/slicc_main_envp.o` (make: `-Dmain=slicc_tool_main`) and
@@ -71,7 +90,7 @@ Root `$PKG/emcc` (cmake toolchain) and `$PKG/bin/emcc` are the same self-suffici
 
 On top of the shared `patches/` (which `scripts/emscripten-tree.sh` also
 applies for emscripten-cache, llvm-emscripten, wasm-clang, wasm-binaryen and
-cmake), this package ships three patches from `package-patches/` and one from
+cmake), this package ships four patches from `package-patches/` and one from
 `package-patches/libc/`. They are kept
 out of `patches/` so they don't change the published glue of those packages
 without their own release:
@@ -94,13 +113,26 @@ without their own release:
   added `slicc_realpath.o` as a plain object, which is always linked, so such
   a program got `duplicate symbol: realpath` (#1664). `SLICC_EMCC_PLAIN=1` links skip
   the archive and get musl's bound.
+- **0018, the override archives and `-sMAIN_MODULE=1`** (homescoop#1678):
+  the default link adds `lib/slicc/libslicc_jobs.a` beside
+  `libslicc_realpath.a`, and for `-sMAIN_MODULE=1` and `-sLINKABLE` links
+  takes `lib/slicc/linkable/<obj>` for each default object and leaves both
+  archives out. `slicc_jobs.o` is compiled with `tcgetpgrp` and
+  `tcsetpgrp` renamed out; `libslicc_jobs.a` has one member per override,
+  `slicc_tcgetpgrp.o` and `slicc_tcsetpgrp.o`, each `slicc_jobs.c` with
+  every other global renamed, so the linker pulls each only while its
+  symbol is undefined, and a program's own `tcsetpgrp` wins. libc's
+  `tcsetpgrp` is not enough: it goes through emscripten's `TIOCSPGRP`
+  ioctl, which is `EINVAL` on every terminal and never reaches the kernel.
+  build.sh fails if a member defines a global the base object also
+  defines, or if a `linkable` object still defines one of libc's.
 - **libc/0017, musl's realpath bound** (homescoop#1631): musl stops at
   `++cnt == SYMLOOP_MAX`, so `realpath()` of a path of exactly 40 symlink
   follows was `ELOOP` even after 0014 fixed `open()` and `stat()`. 0017 makes
   it `cnt++ == SYMLOOP_MAX`: 40 follows resolve and the 41st is `ELOOP`, as
   in glibc.
 
-build.sh applies 0014-0016 to the shipped tree and to the tree it links its
+build.sh applies 0014-0016 and 0018 to the shipped tree and to the tree it links its
 PRESTAGE programs with. `package-patches/libc/` is applied to the shipped
 tree only, so the PRESTAGE host tree builds the same upstream `libc.a` that
 emscripten-cache ships; PRESTAGE then checks open, stat and realpath at 40
@@ -114,6 +146,15 @@ through `-l`. Each must link with the default link and run its own
 `realpath`. It also checks that 6.0.9-28's shape, `slicc_realpath.o` as a plain object
 beside a program's own `realpath`, still gives `duplicate symbol: realpath`
 (homescoop#1664).
+
+Since 6.0.9-30 PRESTAGE links `jobs.c` (realpath, uname, `tcgetpgrp(0)` and
+`tcsetpgrp(0, getpid())`) with the default link (`tcgetpgrp self tcsetpgrp
+0 ok`; without `libslicc_jobs.a` it is libc's `0` and `EINVAL`), with
+`-sMAIN_MODULE=1` and with `-sLINKABLE=1`, and runs each; it links
+`own-tc.c`, which defines its own `tcsetpgrp`, and runs its own. 6.0.9-29's
+`lib/slicc` (`slicc_jobs.o` with both overrides, no `linkable/`) must give
+`duplicate symbol: tcsetpgrp` for `own-tc.c` and fail the `-sMAIN_MODULE=1`
+link (homescoop#1678).
 
 ## Commands
 

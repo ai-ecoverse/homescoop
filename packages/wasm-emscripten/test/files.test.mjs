@@ -98,7 +98,7 @@ test('realpath() follows 40 symlinks, as glibc does: the default link adds lib/s
   const defs = members.filter((m) => m.data.subarray(0, 4).toString('latin1') === '\0asm' && wasmSymbols(m.data).some((s) => s.name === 'realpath' && s.defined && s.binding === 'global'));
   assert.deepEqual(defs.map((m) => m.name), ['slicc_realpath.o'], 'lib/slicc/libslicc_realpath.a has no wasm member slicc_realpath.o that defines realpath');
   const link = execFileSync('tar', ['-xzOf', tgz, 'package/tools/link.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
-  assert.match(link, /realpath_lib = os\.path\.join\(slicc_lib, 'libslicc_realpath\.a'\)\n {4}if os\.path\.isfile\(realpath_lib\) and realpath_lib not in linker_args:\n {6}linker_args\.append\(realpath_lib\)\n/, "tools/link.py's default link does not add lib/slicc/libslicc_realpath.a");
+  assert.match(link, ARCHIVES, "tools/link.py's default link does not add lib/slicc/libslicc_realpath.a");
 });
 
 test("a program's own realpath wins: no object the default link always adds defines realpath, which is only an archive member (homescoop#1664, package patch 0016)", () => {
@@ -114,6 +114,42 @@ test("a program's own realpath wins: no object the default link always adds defi
   });
   assert.deepEqual(strong, [], `the default link always adds ${strong.join(', ')}, which defines realpath, so a program that defines realpath gets duplicate symbol: realpath`);
   assert.ok(!paths.includes('package/lib/slicc/slicc_realpath.o'), 'the tarball still ships lib/slicc/slicc_realpath.o as a plain object');
+});
+
+const ARCHIVES = /for lib in \('libslicc_jobs\.a', 'libslicc_realpath\.a'\):\n {6}path = os\.path\.join\(slicc_lib, lib\)\n {6}if not linkable and os\.path\.isfile\(path\) and path not in linker_args:\n {8}linker_args\.append\(path\)\n/;
+const LIBC_OWN = ['kill', 'nanosleep', 'poll', 'pselect', 'realpath', 'setegid', 'seteuid', 'setgid', 'setregid', 'setresgid', 'setresuid', 'setreuid', 'setuid', 'tcgetpgrp', 'tcsetpgrp'];
+
+function defaultLink() {
+  const link = execFileSync('tar', ['-xzOf', tgz, 'package/tools/link.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  const tuple = link.match(/for obj in \(([^)]*'slicc_spawn\.o'[^)]*)\):/);
+  assert.ok(tuple, 'tools/link.py has no default-link object tuple');
+  return { link, objs: [...tuple[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) };
+}
+
+const defines = (data, names) => wasmSymbols(data).filter((s) => names.includes(s.name) && s.defined && s.binding !== 'local').map((s) => s.name);
+
+test("a program's own tcgetpgrp and tcsetpgrp win: no object the default link always adds defines them, and lib/slicc/libslicc_jobs.a has one member per override (homescoop#1678, package patch 0018)", () => {
+  const { paths } = tarball();
+  const { link, objs } = defaultLink();
+  const tc = ['tcgetpgrp', 'tcsetpgrp'];
+  const always = objs.filter((o) => paths.includes(`package/lib/slicc/${o}`)).flatMap((o) => defines(execFileSync('tar', ['-xzOf', tgz, `package/lib/slicc/${o}`], { maxBuffer: 1 << 26 }), tc).map((s) => `${o} (${s})`));
+  assert.deepEqual(always, [], `the default link always adds ${always.join(', ')}, so a program that defines it gets duplicate symbol`);
+  assert.ok(paths.includes('package/lib/slicc/libslicc_jobs.a'), 'the tarball lacks package/lib/slicc/libslicc_jobs.a');
+  const members = arMembers(execFileSync('tar', ['-xzOf', tgz, 'package/lib/slicc/libslicc_jobs.a'], { maxBuffer: 1 << 26 }));
+  assert.deepEqual(members.map((m) => [m.name, defines(m.data, tc)]), [['slicc_tcgetpgrp.o', ['tcgetpgrp']], ['slicc_tcsetpgrp.o', ['tcsetpgrp']]], 'lib/slicc/libslicc_jobs.a is not one member per override');
+  assert.match(link, ARCHIVES, "tools/link.py's default link does not add lib/slicc/libslicc_jobs.a");
+});
+
+test('-sMAIN_MODULE=1 and -sLINKABLE links take lib/slicc/linkable, which defines none of libc.a\'s own symbols, and leave the override archives out (homescoop#1678, package patch 0018)', () => {
+  const { paths } = tarball();
+  const { link, objs } = defaultLink();
+  assert.match(link, /linkable = settings\.MAIN_MODULE == 1 or settings\.LINKABLE\n/, 'tools/link.py does not tell -sMAIN_MODULE=1 and -sLINKABLE links apart');
+  assert.match(link, /linkable_path = os\.path\.join\(slicc_lib, 'linkable', obj\)\n {6}if linkable and os\.path\.isfile\(linkable_path\):\n {8}path = linkable_path\n/, 'tools/link.py does not take lib/slicc/linkable for -sMAIN_MODULE=1 and -sLINKABLE links');
+  assert.match(link, ARCHIVES, 'tools/link.py adds the override archives to -sMAIN_MODULE=1 links, which wrap them in --whole-archive');
+  const missing = objs.filter((o) => !paths.includes(`package/lib/slicc/linkable/${o}`));
+  assert.deepEqual(missing, [], `the tarball lacks lib/slicc/linkable/${missing.join(', ')}, so -sMAIN_MODULE=1 links the plain objects, which libc.a duplicates`);
+  const dup = objs.flatMap((o) => defines(execFileSync('tar', ['-xzOf', tgz, `package/lib/slicc/linkable/${o}`], { maxBuffer: 1 << 26 }), LIBC_OWN).map((s) => `${o} (${s})`));
+  assert.deepEqual(dup, [], `lib/slicc/linkable defines libc.a's own ${dup.join(', ')}, so -sMAIN_MODULE=1 gets duplicate symbol`);
 });
 
 function arMembers(buf) {
