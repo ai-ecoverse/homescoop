@@ -124,6 +124,13 @@ other than `main` never reaches the publish job, whatever `publish` says.
 `publish=false`, skip-if-already-published is ignored so a rebuild can still
 emit a tarball for recert.
 
+`workflow_dispatch` input `npm_loglevel` (default empty) traces one publish:
+`http` or `verbose` sets `NPM_CONFIG_LOGLEVEL` for the publish step, and
+`timing` sets `NPM_CONFIG_LOGLEVEL=http` plus `NPM_CONFIG_TIMING=true` (npm 11
+has no `timing` log level). Any other value fails the step before npm runs.
+Empty leaves the publish env unchanged
+(`scripts/test/ladder-build-npm-loglevel.test.mjs`).
+
 If `pkg@version` is **not** on npm, OIDC publish is refused unless dispatch
 sets `certified=<sha256>` and that digest matches the built tarball
 (`scripts/assert-certified-publish.mjs`). Land-before-publish therefore
