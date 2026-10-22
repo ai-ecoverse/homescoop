@@ -1,5 +1,17 @@
 # py-matplotlib: negative proof
 
+## cert only on 3.11.2-14: render.mjs (#1263) and the sidemods needs check (#1261; 2026-10-22)
+
+No -N: the published 3.11.2-14 passes `cert/render.mjs` (slicc-kernel 1.144.1, `--users enforce`). #1261's missing py-pytz was fixed in #1259 before it merged (`needs` and `needsInstall` list `@ai-ecoverse/py-pytz`, now `@2026.4.0-5`, npm `latest`), so only the check is new.
+
+- `scripts/test/cert-needs.test.mjs` with py-pytz taken out of `cert/meta.json` (what #1261 saw): FAIL, `packages/py-matplotlib/cert/meta.json: needs py-pytz`, `… needsInstall py-pytz`. The test also runs that case itself on a copy of the meta.
+- `cert/render.mjs` on 3.11.2-14 tarballs with one part taken out, each FAIL (rc 1):
+  - without `_qhull.cpython-315-wasm32-wasix.so`: `ImportError: cannot import name '_qhull' from 'matplotlib'`;
+  - without `backends/backend_ps.py`: `ModuleNotFoundError: No module named 'matplotlib.backends.backend_ps'`;
+  - without the `cm*.ttf` and `DejaVuSans*.ttf` fonts: `ValueError: Failed to find font DejaVu Sans…`.
+- `prove-negative.mjs` doesn't apply: py-matplotlib has no commands and no `bin/*.wasm`, only side modules.
+- `cert/discovery.mjs` takes wasix-python's #1153 bounds (#1652): discovery's start cost is measured against its own cost without the cache in the same run, not against `PYTHONPATH` x 1.1. The old bound failed #1672's ladder-pr twice with nothing wrong: on/PYTHONPATH 1726/894 ms, and warm discover() 278.8 ms of a 708 ms start on a slowed runner. On 3.11.2-14 at a load average of 128 it passes: `a start pays 48 ms for discovery (0.23 of its cost without the cache), 206 ms without its cache`. With the cert's wasix-python 3.15.0-3 `_slicc_site._cache_path` patched to `return None` (no cache, so every start rescans; .pyc removed), it fails with `warm discover() 80.2 ms is more than half a cold scan (74.4 ms): the cache does not hit`, and the start cost is 0.86 of the cacheless cost, so the 0.5 bound fails as well.
+
 ## 3.11.2-13: the default backend is auto-resolved (3.11.2-14, #1115; 2026-10-20)
 
 `cert/backend.mjs` on npm 3.11.2-13: FAIL, `None False agg` (matplotlibrc has only the inert `##backend: Agg`, so the backend is auto-resolved to lowercase `agg`). 3.11.2-9 and 3.11.2-14 give `Agg True Agg`.

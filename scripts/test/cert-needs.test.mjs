@@ -78,3 +78,35 @@ test('unmountedInstalls flags py-pandas3.15 3.0.6-1 as cert-review saw it on #11
   assert.deepEqual(unmountedInstalls({ ...seen, needs: [...seen.needs, '@ai-ecoverse/py-six'] }), []);
   assert.deepEqual(unmountedInstalls({ needs: ['@ai-ecoverse/wasm-bash'], needsInstall: ['@ai-ecoverse/wasm-bash'] }), []);
 });
+
+function sidemodsPure(src) {
+  const pkgs = [...src.match(/const PKGS = \[([^\]]*)\]/)[1].matchAll(/'(py-[a-z0-9-]+)'/g)].map((m) => m[1]);
+  const blocks = new Set([...src.matchAll(/^  '(py-[a-z0-9-]+)': String\.raw`/gm)].map((m) => m[1]));
+  return pkgs.filter((p) => !blocks.has(p));
+}
+
+function sidemodsGaps(meta, pure) {
+  const listed = (list) => new Set((list || []).map((n) => n.replace(/^(@ai-ecoverse\/[^@]+)@.*$/, '$1')));
+  const needs = listed(meta.needs);
+  const install = listed(meta.needsInstall);
+  return pure.flatMap((p) => [
+    ...(needs.has(`@ai-ecoverse/${p}`) ? [] : [`needs ${p}`]),
+    ...(meta.needsInstall && !install.has(`@ai-ecoverse/${p}`) ? [`needsInstall ${p}`] : []),
+  ]);
+}
+
+test('a cert that runs wasix-python cert/sidemods.mjs installs every pure py-* its script imports (#1261)', () => {
+  const src = readFileSync(join(root, 'packages', 'wasix-python', 'cert', 'sidemods.mjs'), 'utf8');
+  const pure = sidemodsPure(src);
+  assert.ok(pure.includes('py-pytz') && pure.includes('py-python-dateutil') && pure.includes('py-tzdata'), `sidemods.mjs pure imports: ${pure.join(' ')}`);
+  const users = readdirSync(join(root, 'packages')).filter((p) => {
+    const dir = join(root, 'packages', p, 'cert');
+    return existsSync(join(dir, 'sidemods.mjs')) && (p === 'wasix-python' || /from '\.\.\/\.\.\/wasix-python\/cert\/sidemods\.mjs'/.test(readFileSync(join(dir, 'sidemods.mjs'), 'utf8')));
+  });
+  assert.ok(users.includes('py-matplotlib'), `users of sidemods.mjs: ${users.join(' ')}`);
+  const bad = users.flatMap((p) => sidemodsGaps(JSON.parse(readFileSync(join(root, 'packages', p, 'cert', 'meta.json'), 'utf8')), pure).map((g) => `packages/${p}/cert/meta.json: ${g}`));
+  assert.deepEqual(bad, []);
+  const mpl = JSON.parse(readFileSync(join(root, 'packages', 'py-matplotlib', 'cert', 'meta.json'), 'utf8'));
+  const withoutPytz = { ...mpl, needs: mpl.needs.filter((n) => n !== '@ai-ecoverse/py-pytz'), needsInstall: mpl.needsInstall.filter((n) => !n.startsWith('@ai-ecoverse/py-pytz@')) };
+  assert.deepEqual(sidemodsGaps(withoutPytz, pure), ['needs py-pytz', 'needsInstall py-pytz']);
+});
