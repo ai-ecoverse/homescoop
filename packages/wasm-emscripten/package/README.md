@@ -27,7 +27,7 @@ pointing at this package's config.
 Executable links (not `-c` / `-r` / `-shared`) inject `homescoop_em_cli_ldflags`
 (`-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1
 -sFORCE_FILESYSTEM=1`) and
-`lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs}.o`,
+`lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs,slicc_realpath}.o`,
 with the JS libraries `lib/slicc/{slicc-writev,slicc-linkat,slicc-uname,slicc-env}.js`.
 `slicc-env.js` (since 6.0.9-27) gives a program only the environment the
 kernel passes: none of Emscripten's placeholders (`USER`/`LOGNAME=web_user`,
@@ -70,7 +70,8 @@ Root `$PKG/emcc` (cmake toolchain) and `$PKG/bin/emcc` are the same self-suffici
 
 On top of the shared `patches/` (which `scripts/emscripten-tree.sh` also
 applies for emscripten-cache, llvm-emscripten, wasm-clang, wasm-binaryen and
-cmake), this package ships two patches from `package-patches/`. They are kept
+cmake), this package ships three patches from `package-patches/` and one from
+`package-patches/libc/`. They are kept
 out of `patches/` so they don't change the published glue of those packages
 without their own release:
 
@@ -80,8 +81,24 @@ without their own release:
 - **0015, `slicc-env.js` in the default link** (homescoop#1531), as
   `homescoop_em_cli_ldflags` has it.
 
-build.sh applies both to the shipped tree and to the tree it links its
-PRESTAGE programs with. wasm-clang, wasm-binaryen and cmake pick them up at
+- **0016, `slicc_realpath.o` in the default link** (homescoop#1631): the
+  default link adds `lib/slicc/slicc_realpath.o`, musl's `realpath.c` with
+  libc patch 0017, compiled with libc's flags. Because it is an object on the
+  link line, `libc.a`'s own `realpath` member is never pulled in, so
+  emscripten-cache's prebuilt `libc.a` stays as it is. `SLICC_EMCC_PLAIN=1`
+  links skip it and get musl's bound.
+- **libc/0017, musl's realpath bound** (homescoop#1631): musl stops at
+  `++cnt == SYMLOOP_MAX`, so `realpath()` of a path of exactly 40 symlink
+  follows was `ELOOP` even after 0014 fixed `open()` and `stat()`. 0017 makes
+  it `cnt++ == SYMLOOP_MAX`: 40 follows resolve and the 41st is `ELOOP`, as
+  in glibc.
+
+build.sh applies 0014-0016 to the shipped tree and to the tree it links its
+PRESTAGE programs with. `package-patches/libc/` is applied to the shipped
+tree only, so the PRESTAGE host tree builds the same upstream `libc.a` that
+emscripten-cache ships; PRESTAGE then checks open, stat and realpath at 40
+and 41 follows (absolute and relative chains) with the default link, and
+that without `slicc_realpath.o` realpath is still `ELOOP` at 40. wasm-clang, wasm-binaryen and cmake pick them up at
 their own next release, or a later wave folds them into `patches/`.
 
 ## Commands

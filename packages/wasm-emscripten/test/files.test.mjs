@@ -88,3 +88,15 @@ test('THIRD-PARTY-NOTICES.md carries the slicc shims notice for lib/slicc (homes
   assert.match(notices, /^## homescoop: the slicc shims \(shims\/slicc, Apache-2\.0\)$/m);
   assert.match(notices, /Apache License\s+Version 2\.0/);
 });
+
+test('realpath() follows 40 symlinks, as glibc does: the default link adds slicc_realpath.o, musl realpath.c with the <= bound (homescoop#1631, package patches 0016 and libc/0017)', () => {
+  const { paths } = tarball();
+  const src = execFileSync('tar', ['-xzOf', tgz, 'package/system/lib/libc/musl/src/misc/realpath.c'], { encoding: 'utf8' });
+  assert.match(src, /if \(cnt\+\+ == SYMLOOP_MAX\) \{/, "musl's realpath.c stops at 39 symlink follows");
+  assert.ok(paths.includes('package/lib/slicc/slicc_realpath.o'), 'the tarball lacks package/lib/slicc/slicc_realpath.o');
+  const obj = execFileSync('tar', ['-xzOf', tgz, 'package/lib/slicc/slicc_realpath.o'], { maxBuffer: 1 << 26 });
+  assert.equal(obj.subarray(0, 4).toString('latin1'), '\0asm', 'lib/slicc/slicc_realpath.o is not a wasm object');
+  assert.match(obj.toString('latin1'), /realpath/, 'lib/slicc/slicc_realpath.o does not define realpath');
+  const link = execFileSync('tar', ['-xzOf', tgz, 'package/tools/link.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  assert.match(link, /'slicc_jobs\.o',\n {8}'slicc_realpath\.o',\n {4}\):/, "tools/link.py's default link does not add slicc_realpath.o");
+});
