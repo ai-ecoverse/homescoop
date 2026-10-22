@@ -128,13 +128,13 @@ if (metaError) {
   process.exit(1);
 }
 if (harness === 'host-smoke' || harness === 'host-node') {
-  console.log(`browser-cert: ${pkgName} harness=${harness} — delegated to ladder-pr host steps`);
+  console.log(`browser-cert: ${pkgName} harness=${harness} — delegated to the PR run host steps`);
   writeReport('skip');
   process.exit(0);
 }
 if (harness === 'slicc-realm') {
   console.error(
-    `browser-cert: ${pkgName} requires full SLICC realm (cert/meta.json). Not wired in ladder-pr yet.`,
+    `browser-cert: ${pkgName} requires full SLICC realm (cert/meta.json). Not wired in the PR run yet.`,
   );
   report.error = 'harness slicc-realm is not wired';
   writeReport('fail');

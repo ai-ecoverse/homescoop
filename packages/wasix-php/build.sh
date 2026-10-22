@@ -187,6 +187,8 @@ if [[ -z "$REUSE" ]]; then
   grep -q 'defined(HAVE_UNISTD_H) && !defined(__wasi__)' "$SRC/ext/standard/php_fopen_wrapper.c"
   grep -q 'php_wasix_env_proxy' "$SRC/ext/standard/http_fopen_wrapper.c"
   grep -q '(defined(__aarch64__) && defined(__APPLE__)) || defined(__wasi__)' "$SRC/Zend/zend_execute_API.c"
+  grep -q 'zend_call_stack_get_wasi' "$SRC/Zend/zend_call_stack.c"
+  grep -q 'ZEND_WASI_CALL_STACK_FRAME' "$SRC/Zend/zend_call_stack.h"
 fi
 SOURCE_DATE_EPOCH="$(cat "$BUILD/source-date-epoch")"
 export SOURCE_DATE_EPOCH
@@ -202,6 +204,7 @@ php_cv_func_pread=yes
 php_cv_func_pwrite=yes
 # wasix-libc is musl.
 php_cv_c_standard_library=musl
+php_cv_have_stack_limit=yes
 SITE
 
 if [[ -z "$REUSE" ]]; then
@@ -237,6 +240,7 @@ cfg = (src / "main/php_config.h").read_text()
 want = {
     "ZEND_FIBER_UNAVAILABLE": "1", "PHP_OS": '"WASI"', "HAVE_GETADDRINFO": "1",
     "PHP_WRITE_STDOUT": "1", "HAVE_FORK": "1", "HAVE_LIBXML": "1",
+    "ZEND_CHECK_STACK_LIMIT": "1",
 }
 for k, v in want.items():
     if not re.search(rf"^#define {k} {re.escape(v)}$", cfg, re.M):
@@ -273,8 +277,8 @@ echo "== wasix-php: wasm-opt --asyncify (fork, setjmp)"
 # opcode handlers and internal functions indirectly, and a bailout (setjmp)
 # or fork can be below any of them. --strip-dwarf keeps the name section,
 # so a trap's backtrace names its functions.
-rm -rf "$DEST/bin" "$DEST/licenses" "$DEST/patches"
-mkdir -p "$DEST/bin" "$DEST/licenses" "$DEST/patches"
+rm -rf "$DEST/bin" "$DEST/etc" "$DEST/licenses" "$DEST/patches"
+mkdir -p "$DEST/bin" "$DEST/etc" "$DEST/licenses" "$DEST/patches"
 "$WASM_OPT" --asyncify -O1 -g --strip-dwarf \
   --pass-arg=asyncify-imports@wasix_32v1.proc_fork,wasix_32v1.stack_checkpoint,wasix_32v1.stack_restore \
   "$SRC/sapi/cli/php" -o "$DEST/bin/php.wasm" 2>&1 | tee "$BUILD/asyncify.log" | tail -20
@@ -291,7 +295,7 @@ for needle in (work.encode(), root.encode(), b"/opt/homebrew/", b"/home/runner/"
         raise SystemExit(f"homescoop wasix-php: php.wasm names a build path: {needle!r}")
 if f"wasix-sysroot {sysroot}".encode() not in d:
     raise SystemExit(f"homescoop wasix-php: php.wasm lacks the slicc.libc marker for wasix-sysroot {sysroot}")
-for s in (b"asyncify_start_unwind", b"Fibers are not available on this platform"):
+for s in (b"asyncify_start_unwind", b"Fibers are not available on this platform", b"zend.max_allowed_stack_size"):
     if s not in d:
         raise SystemExit(f"homescoop wasix-php: php.wasm lacks {s!r}")
 # The imported memory's initial page count is the recipe's.
@@ -333,6 +337,100 @@ if pages is None or pages * 65536 != initial:
 print(f"php.wasm: no build paths, slicc.libc wasix-sysroot {sysroot}, asyncify, {pages} initial pages")
 PY
 
+python3 - "$DEST/bin/php.wasm" <<'PY'
+import sys
+from pathlib import Path
+d = Path(sys.argv[1]).read_bytes()
+checked = ("execute_ex", "zend_hash_compare", "zend_std_compare_objects", "php_var_serialize_intern")
+pad = 2048
+def uleb(buf, i):
+    r = s = 0
+    while True:
+        b = buf[i]; i += 1; r |= (b & 0x7F) << s; s += 7
+        if b < 0x80:
+            return r, i
+def sleb(buf, i):
+    r = s = 0
+    while True:
+        b = buf[i]; i += 1; r |= (b & 0x7F) << s; s += 7
+        if b < 0x80:
+            return (r - (1 << s) if b & 0x40 else r), i
+imports = 0
+code = None
+funcs = {}
+globs = {}
+p = 8
+while p < len(d):
+    sid = d[p]; p += 1
+    n, p = uleb(d, p); end = p + n
+    if sid == 2:
+        cnt, p = uleb(d, p)
+        for _ in range(cnt):
+            for _ in range(2):
+                ln, p = uleb(d, p); p += ln
+            kind = d[p]; p += 1
+            if kind == 0:
+                _, p = uleb(d, p); imports += 1
+            elif kind in (1, 2):
+                if kind == 1:
+                    p += 1
+                flags = d[p]; p += 1; _, p = uleb(d, p)
+                if flags & 1:
+                    _, p = uleb(d, p)
+            elif kind == 3:
+                p += 2
+            else:
+                raise SystemExit(f"homescoop wasix-php: php.wasm has an import of kind {kind}")
+    elif sid == 10:
+        code = (p, end)
+    elif sid == 0:
+        ln, q = uleb(d, p)
+        if d[q:q + ln] == b"name":
+            q += ln
+            while q < end:
+                sub = d[q]; q += 1
+                sl, q = uleb(d, q); se = q + sl
+                if sub in (1, 7):
+                    cnt, q = uleb(d, q)
+                    for _ in range(cnt):
+                        idx, q = uleb(d, q)
+                        ln2, q = uleb(d, q)
+                        (funcs if sub == 1 else globs)[d[q:q + ln2].decode()] = idx
+                        q += ln2
+                q = se
+    p = end
+if code is None or "__stack_pointer" not in globs or globs["__stack_pointer"] >= 0x80:
+    raise SystemExit("homescoop wasix-php: php.wasm has no code section, or no __stack_pointer among the first 128 globals of its name section")
+get = bytes([0x23, globs["__stack_pointer"]])
+p = code[0]
+cnt, p = uleb(d, p)
+bodies = []
+for _ in range(cnt):
+    sz, p = uleb(d, p)
+    bodies.append((p, p + sz)); p += sz
+report = []
+for name in checked:
+    if name not in funcs:
+        raise SystemExit(f"homescoop wasix-php: php.wasm's name section has no {name}")
+    s, e = bodies[funcs[name] - imports]
+    b = d[s:e]
+    frames = []
+    i = b.find(get)
+    while i >= 0:
+        j = i + 2
+        if b[j] in (0x21, 0x22):
+            _, j = uleb(b, j + 1)
+        if b[j] == 0x41:
+            v, k = sleb(b, j + 1)
+            if b[k] == 0x6B:
+                frames.append(v)
+        i = b.find(get, i + 1)
+    if not frames or max(frames) < pad:
+        raise SystemExit(f"homescoop wasix-php: {name} takes {max(frames) if frames else 0} bytes of shadow stack, not patches/0009's {pad}-byte ZEND_WASI_CALL_STACK_FRAME, so the stack check no longer counts its levels")
+    report.append(f"{name} {max(frames)}")
+print("php.wasm: patches/0009's 2 KiB stack check frame in " + ", ".join(report))
+PY
+
 # --- licences, notices, sources ----------------------------------------------
 homescoop_stage_licenses "$SRC/LICENSE" "$SRC/Zend/LICENSE"
 cp "$SRC/LICENSE" "$DEST/licenses/php-LICENSE"
@@ -348,6 +446,7 @@ cp "$SRC/ext/uri/uriparser/COPYING.BSD-3-Clause" "$DEST/licenses/uriparser-COPYI
 cp "$SRC/ext/standard/libavifinfo/LICENSE" "$DEST/licenses/libavifinfo-LICENSE"
 cp "$XML_SRC/Copyright" "$DEST/licenses/libxml2-Copyright"
 cp "$PKG"/patches/*.patch "$DEST/patches/"
+cp "$PKG/openssl.cnf" "$DEST/etc/openssl.cnf"
 SQ_BLESSING="$BUILD/sqlite-blessing.txt"
 sed -n '1,/May you share freely/p' "$DEPS/include/sqlite3.h" >"$SQ_BLESSING"
 grep -q 'May you share freely' "$SQ_BLESSING"
@@ -410,7 +509,7 @@ pkg = {
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-php/package"},
     "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-php",
     "keywords": ["wasm", "wasi", "wasix", "slicc", "homescoop", "php"],
-    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "licenses", "patches"],
+    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "SOURCES.md", "bin", "etc", "licenses", "patches"],
     "publishConfig": {"access": "public"},
     "homescoop": {
         "recipe": "wasix-php",
@@ -421,7 +520,7 @@ pkg = {
         "libxml2": libxml2,
         "sqlite": sqlite,
     },
-    "slicc": {"abi": "wasi", "commands": {"php": {"wasm": "bin/php.wasm"}}},
+    "slicc": {"abi": "wasi", "commands": {"php": {"wasm": "bin/php.wasm", "env": {"OPENSSL_CONF": "${package}/etc/openssl.cnf"}}}},
 }
 if old.get("slicc") != pkg["slicc"]:
     raise SystemExit(f"homescoop wasix-php: the committed package.json's slicc block {old.get('slicc')} isn't the build's {pkg['slicc']}")
@@ -429,6 +528,7 @@ if old.get("slicc") != pkg["slicc"]:
 print("package.json", pkg_ver, sorted(pkg["slicc"]["commands"]))
 PY
 
+test -s "$DEST/etc/openssl.cnf"
 echo "== wasix-php staged $PKG_VER"
 ls -la "$DEST/bin"
 du -sh "$DEST/bin/php.wasm"

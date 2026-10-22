@@ -66,14 +66,7 @@ export default async function (ctx) {
   const exc = await php(ctx, '<?php try { throw new RuntimeException("boom", 3); } catch (RuntimeException $e) { echo get_class($e), " ", $e->getMessage(), " ", $e->getCode(), "\\n"; } finally { echo "finally\\n"; }');
   assert.equal(exc.stdout, 'RuntimeException boom 3\nfinally\n');
 
-  // openssl_pkey_new() reads OpenSSL's config file, which slicc doesn't
-  // have (/etc/ssl/openssl.cnf): without one it fails, as upstream does;
-  // any file (even empty) through "config" or OPENSSL_CONF will do.
-  await ctx.write('/tmp/php-cert/openssl.cnf', '# empty\n');
-  const nocnf = await phpOk(ctx, '<?php var_dump(openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "prime256v1"])); $e = []; while ($m = openssl_error_string()) $e[] = $m; echo implode("|", array_unique($e)), "\\n";');
-  assert.match(nocnf, /^bool\(false\)\n.*configuration file routines::no such file/s, nocnf);
-  const envcnf = await run(['php', '-r', 'var_dump(openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "prime256v1"]) instanceof OpenSSLAsymmetricKey);'], { cwd: '/tmp', env: { OPENSSL_CONF: '/tmp/php-cert/openssl.cnf' } });
-  assert.equal(envcnf.stdout, 'bool(true)\n', envcnf.stderr);
+  await ctx.write('/tmp/php-cert/openssl.cnf', '');
 
   // Core extensions at work.
   const out = await phpOk(ctx, `<?php

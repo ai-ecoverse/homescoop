@@ -21,7 +21,6 @@ import { KNOWN_INPUTS, buildFileInputs, fixtureReader, fixtureRegistry, parseKno
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, 'fixtures/build-input');
 const script = join(here, '../cert-review/repack-input.mjs');
-const verdictScript = join(here, '../cert-review/verdict.mjs');
 const SHA = 'a'.repeat(64);
 const COMMON = 'homescoop_fetch() {\n  curl -fsSL "$1" -o "$3"\n  echo "$2  $3" | sha256sum -c -\n}\n';
 const HEAD = '#!/usr/bin/env bash\nset -euo pipefail\nROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"\nsource "$ROOT/scripts/build-common.sh"\n';
@@ -44,32 +43,12 @@ function plant(t, files) {
 const known = (...lines) => parseKnownInputs(lines.join('\n'));
 const judge = (dir, list = new Map()) => repackInput({ pkg: 'demo', ref: 'HEAD', readAt: fixtureReader(dir), registry: fixtureRegistry(dir), known: list });
 
-function verdict(t, input, reviewerKnown = []) {
-  const dir = mkdtempSync(join(tmpdir(), 'build-input-verdict-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const art = join(dir, 'artifacts', 'host-demo-pr1');
-  mkdirSync(join(dir, 'pkg', 'package'), { recursive: true });
-  mkdirSync(art, { recursive: true });
-  writeFileSync(join(dir, 'pkg', 'package', 'package.json'), '{"name":"@ai-ecoverse/wasm-demo","version":"1.0.0-1"}\n');
-  execFileSync('tar', ['-czf', join(art, 'package.tgz'), '-C', join(dir, 'pkg'), 'package']);
-  const sha = execFileSync(process.execPath, ['-e', `process.stdout.write(require('crypto').createHash('sha256').update(require('fs').readFileSync(${JSON.stringify(join(art, 'package.tgz'))})).digest('hex'))`], { encoding: 'utf8' });
-  writeFileSync(join(art, 'package.tgz.sha256'), `${sha}  package.tgz\n`);
-  const review = join(dir, 'review');
-  mkdirSync(review);
-  writeFileSync(join(review, 'verdict.json'), JSON.stringify({ packages: [{ package: 'demo', verdict: 'certified', known: reviewerKnown }] }));
-  writeFileSync(join(dir, 'repack-input.json'), JSON.stringify({ demo: input }));
-  const r = spawnSync(process.execPath, [verdictScript, '--artifacts', join(dir, 'artifacts'), '--pr', '1', '--review', review, '--body', join(dir, 'body.md'), '--lines', join(dir, 'lines.txt'), '--ladder-conclusion', 'success', '--repack-input', join(dir, 'repack-input.json')], { encoding: 'utf8' });
-  return { status: r.status, sha, lines: readFileSync(join(dir, 'lines.txt'), 'utf8').trim() };
-}
 
 test('an unlisted unattested input is INCOMPLETE', async (t) => {
   const dir = plant(t, { 'packages/demo/recipe.yaml': recipe({ build: ['@ai-ecoverse/wasm-zlib@1.3.1-2'] }) });
   const r = await judge(dir);
   assert.equal(r.attested, false);
   assert.match(r.reason, /^build input @ai-ecoverse\/wasm-zlib@1\.3\.1-2: 1\.3\.1-2 has no provenance .*\(packages\/demo\/recipe\.yaml:\d+\)$/);
-  const v = verdict(t, r);
-  assert.equal(v.status, 1);
-  assert.match(v.lines, /^cert-ci: INCOMPLETE @ai-ecoverse\/wasm-demo@1\.0\.0-1: unverifiable input: build input @ai-ecoverse\/wasm-zlib@1\.3\.1-2/);
 });
 
 test('NEGATIVE: every dependency list host-run.sh installs is an input, run: included', async (t) => {
@@ -87,13 +66,6 @@ test('a listed input stays certified, with the known note forced into the line w
   const r = await judge(dir, known('@ai-ecoverse/wasm-zlib@1.3.1-2 #864 no provenance'));
   assert.equal(r.attested, true, r.reason);
   assert.deepEqual(r.known, ['links unattested @ai-ecoverse/wasm-zlib@1.3.1-2 (homescoop#864)']);
-  const v = verdict(t, r);
-  assert.equal(v.status, 0, v.lines);
-  assert.equal(v.lines, `certified=${v.sha} @ai-ecoverse/wasm-demo 1.0.0-1 (known: links unattested @ai-ecoverse/wasm-zlib@1.3.1-2 (homescoop#864))`);
-  const both = verdict(t, r, ['#900']);
-  assert.match(both.lines, /\(known: links unattested @ai-ecoverse\/wasm-zlib@1\.3\.1-2 \(homescoop#864\), #900\)$/);
-  const bad = verdict(t, { ...r, known: 'links unattested x' });
-  assert.equal(bad.status, 1, 'a known that is not a list fails closed');
 });
 
 test('NEGATIVE: a listed input with an attested successor has expired: INCOMPLETE until the dependent bumps', async (t) => {

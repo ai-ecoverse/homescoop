@@ -6,7 +6,7 @@ Token-less publishes from GitHub Actions on `ai-ecoverse/homescoop`.
 
 | Workflow | Role |
 | --- | --- |
-| [`ladder-build.yml`](../.github/workflows/ladder-build.yml) | Sole CI publisher — host or SLICC build, pack, `npm publish` with OIDC. First publish of a version still happens from a laptop (certified tarball); CI may OIDC-publish an unpublished version only when `certified=<sha256>` matches the built tarball. |
+| [`ladder-build.yml`](../.github/workflows/ladder-build.yml) | The one workflow, and the sole CI publisher: its `publish` job (`id-token: write`, GitHub-hosted) publishes on a push to `main` the `host-<pkg>-prN` artifact of the PR's green, reviewed run, with OIDC. It calls slicc-shared-web's pipeline as a reusable workflow for lint, tests and review; npm checks the *calling* workflow, so the trust stays on this file. |
 
 Fledgling’s `"workflow"` is `ladder-build.yml`. Re-run `npm run trust` after
 changing it. The root `package.json` has no `workspaces` (CI's `npm ci` needs a
