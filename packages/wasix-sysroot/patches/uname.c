@@ -21,10 +21,32 @@ static int usable(const char *s, size_t n, size_t cap)
 	return 1;
 }
 
+static int pick(const char *b, size_t n, int eof, size_t *ps, size_t *pe)
+{
+	size_t i = 0;
+	while (i < n) {
+		const char *nl = memchr(b + i, '\n', n - i);
+		if (!nl && !eof) return 0;
+		size_t end = nl ? (size_t)(nl - b) : n;
+		size_t start = i;
+		size_t stop = end;
+		while (start < stop && blank(b[start])) start++;
+		while (stop > start && blank(b[stop - 1])) stop--;
+		if (stop > start && b[start] != '#') {
+			*ps = start;
+			*pe = stop;
+			return 1;
+		}
+		i = end + 1;
+	}
+	return eof ? -1 : 0;
+}
+
 static int from_file(char *out, size_t cap)
 {
-	char b[256];
-	size_t n = 0;
+	char b[1024];
+	size_t n = 0, start = 0, end = 0;
+	int got = 0;
 	int fd = open("/etc/hostname", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 	if (fd < 0) return 0;
 	while (n < sizeof b) {
@@ -34,18 +56,19 @@ static int from_file(char *out, size_t cap)
 			close(fd);
 			return 0;
 		}
-		if (k == 0) break;
 		n += k;
-		if (memchr(b + n - k, '\n', k)) break;
+		got = pick(b, n, k == 0, &start, &end);
+		if (got || k == 0) break;
+	}
+	while (!got && n == sizeof b) {
+		char extra;
+		ssize_t k = read(fd, &extra, 1);
+		if (k < 0 && errno == EINTR) continue;
+		if (k == 0) got = pick(b, n, 1, &start, &end);
+		break;
 	}
 	close(fd);
-	char *nl = memchr(b, '\n', n);
-	if (!nl && n == sizeof b) return 0;
-	size_t end = nl ? (size_t)(nl - b) : n;
-	size_t start = 0;
-	while (start < end && blank(b[start])) start++;
-	while (end > start && blank(b[end - 1])) end--;
-	if (!usable(b + start, end - start, cap)) return 0;
+	if (got != 1 || !usable(b + start, end - start, cap)) return 0;
 	memcpy(out, b + start, end - start);
 	out[end - start] = 0;
 	return 1;

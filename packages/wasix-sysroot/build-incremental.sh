@@ -126,7 +126,7 @@ done
 # #193), and socketpair() honours SOCK_NONBLOCK/SOCK_CLOEXEC (upstream
 # 2025b44a5d); sigaction reports dispositions to the kernel through
 # slicc.sigaction_set (ENOSYS on older kernels, ignored). See patches/README.md.
-echo "== wasix-sysroot: -18 members (pselect, chdir, __tz, socketpair, sigaction; -32: sigaction seeds inherited SIG_IGN from slicc.sigaction_inherited)"
+echo "== wasix-sysroot: -18 members (pselect, chdir, __tz, socketpair, sigaction; -32: sigaction seeds inherited SIG_IGN from slicc.sigaction_inherited; -43: getcwd, chdir revalidates the fd 3 cwd, homescoop#1571)"
 LIBC_TGZ="$WORK/$(basename "$SRC_URL")"
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$LIBC_TGZ"
 LIBC_SRC="$WORK/wasix-libc-src"
@@ -153,6 +153,7 @@ for flavour in static pic; do
   done
   compile_r18 __tz "$R18_OBJ/$flavour/__tz.o" "${MUSL_INC[@]}" "${extra[@]}"
   compile_r18 sigaction "$R18_OBJ/$flavour/sigaction.o" "${MUSL_INC[@]}" "${extra[@]}"
+  compile_r18 getcwd "$R18_OBJ/$flavour/getcwd.o" "${MUSL_INC[@]}" "${extra[@]}"
 done
 for v in "${VARIANTS[@]}"; do
   lib="$PKG/$v/lib/wasm32-wasip1/libc.a"
@@ -160,15 +161,15 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R18_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && arx "$lib" pselect.o chdir.o __tz.o socketpair.o sigaction.o)
-  for m in pselect chdir __tz socketpair sigaction; do
+  (cd "$old" && arx "$lib" pselect.o chdir.o __tz.o socketpair.o sigaction.o getcwd.o)
+  for m in pselect chdir __tz socketpair sigaction getcwd; do
     missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R18_OBJ/$flavour/$m.o"))"
     if [[ -n "$missing" ]]; then
       echo "homescoop: $v $m.o: patched source lacks: $missing" >&2
       exit 1
     fi
   done
-  "$LLVM_AR" r "$lib" "$R18_OBJ/$flavour/pselect.o" "$R18_OBJ/$flavour/chdir.o" "$R18_OBJ/$flavour/__tz.o" "$R18_OBJ/$flavour/socketpair.o" "$R18_OBJ/$flavour/sigaction.o"
+  "$LLVM_AR" r "$lib" "$R18_OBJ/$flavour/pselect.o" "$R18_OBJ/$flavour/chdir.o" "$R18_OBJ/$flavour/__tz.o" "$R18_OBJ/$flavour/socketpair.o" "$R18_OBJ/$flavour/sigaction.o" "$R18_OBJ/$flavour/getcwd.o"
   grep -q __slicc_sigaction_set <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigaction_set" >&2; exit 1; }
   grep -q __slicc_sigaction_inherited <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc.sigaction_inherited" >&2; exit 1; }
   echo "  $v ($flavour)"
