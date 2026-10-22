@@ -55,13 +55,18 @@ export default async function (ctx) {
     assert.doesNotMatch(none.stdout, /Installing ri documentation/, noneOut);
     assert.match(none.stdout, /Nothing known about Frob/, noneOut);
     assert.match(none.stdout, /^rc=1$/m, noneOut);
-    const plain = await as('cd gemri && gem uninstall -x frob 2>&1 && gem install --local frob-0.1.gem 2>&1 && test -s "$(gem env gemdir)/doc/frob-0.1/ri/Frob/twiddle-i.ri" && echo "doc written"');
+    const plain = await as('cd gemri && gem uninstall -x frob 2>&1 && d="$(gem env gemdir)/doc/frob-0.1" && rm -rf "$d" && gem install --local frob-0.1.gem 2>&1 && { test -e "$d" && echo "doc written" || echo "no doc"; }');
     const plainOut = `${who}: gem install without --document: rc=${plain.status} ${plain.stdout}${plain.stderr}`;
-    assert.match(plain.stdout, /^Installing ri documentation for frob-0\.1$/m, `${who}: gem install writes ri data by default, as RubyGems does: ${plainOut}`);
-    assert.match(plain.stdout, /^doc written$/m, plainOut);
+    assert.match(plain.stdout, /^Successfully installed frob-0\.1$/m, plainOut);
+    assert.doesNotMatch(plain.stdout, /Installing ri documentation/, `${who}: a plain gem install writes no ri data, the package's default gem: --no-document (rubygems/defaults/operating_system.rb): ${plainOut}`);
+    assert.match(plain.stdout, /^no doc$/m, plainOut);
+    const rc = await as(`cd gemri && printf 'gem: --document ri\\n' > ~/.gemrc && gem uninstall -x frob 2>&1 && gem install --local frob-0.1.gem 2>&1 && test -s "$(gem env gemdir)/doc/frob-0.1/ri/Frob/twiddle-i.ri" && echo "doc written"; rm -f ~/.gemrc`);
+    const rcOut = `${who}: gem install with gem: --document ri in ~/.gemrc: rc=${rc.status} ${rc.stdout}${rc.stderr}`;
+    assert.match(rc.stdout, /^Installing ri documentation for frob-0\.1$/m, `${who}: a user's ~/.gemrc gem: line replaces the package's --no-document default: ${rcOut}`);
+    assert.match(rc.stdout, /^doc written$/m, rcOut);
     const clean = await as('gem uninstall -x frob 2>&1 && rm -rf "$(gem env gemdir)/doc/frob-0.1" gemri');
     assert.equal(clean.status, 0, `${who}: gem uninstall: ${clean.stdout}${clean.stderr}`);
     seen.push(who);
   }
-  console.log(`gem-ri: gem install --document ri writes doc/frob-0.1/ri and ri reads it beside the system ri.pack; --no-document writes none; a plain gem install writes ri; as ${seen.join(' and ')}`);
+  console.log(`gem-ri: gem install --document ri writes doc/frob-0.1/ri and ri reads it beside the system ri.pack; --no-document and a plain gem install write none; ~/.gemrc gem: --document ri does; as ${seen.join(' and ')}`);
 }
