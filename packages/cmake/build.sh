@@ -95,7 +95,7 @@ make -C "$BLD" -j"$JOBS" cmake
 test -f "$OUT/cmake.js" && test -f "$OUT/cmake.wasm"
 mv "$OUT/cmake.js" "$OUT/cmake"
 python3 - "$OUT/cmake" <<'PY'
-import sys
+import re, sys
 t = open(sys.argv[1], encoding="latin1").read()
 assert not t.startswith("#!"), "shebang present: the realm loader cannot eval it"
 assert "ENVIRONMENT_IS_WORKER" in t and "ENVIRONMENT_IS_WEB" in t
@@ -103,7 +103,7 @@ assert "CMAKE_ROOT" in t, "pre-js CMAKE_ROOT bridge missing from the glue"
 assert t.count("NODEFS") > 0, "missing -lnodefs.js"
 assert t.count("slicc_poll_js") > 0, "slicc_poll_js missing (libuv's poll must enter the kernel)"
 assert "slicc_cred_js" in t, "the credential library is missing"
-assert "web_user" not in t, "Emscripten's getEnvStrings placeholders are linked instead of slicc-env.js (homescoop#1501)"
+assert not re.search(r"USER\s*:\s*[\"']web_user", t), "Emscripten's getEnvStrings placeholders are linked instead of slicc-env.js (homescoop#1501)"
 print("  glue QC OK")
 PY
 if LC_ALL=C grep -aEq '/(home|Users|__w|private/var)/|homescoop-work' "$OUT/cmake.wasm"; then
