@@ -61,8 +61,13 @@ export default async function sqlite3(ctx) {
   assert.match(flat, /WAL-format database made on a host/, 'README: host WAL databases');
   assert.match(flat, /file is not a database \(26\)/, 'README: the exact error');
   assert.match(flat, /pragma journal_mode=delete/, 'README: the host-side fix');
-  assert.match(flat, /Use one process per database at a time/, 'README: one process per database');
-  assert.match(flat, /slicc-kernel#665/, 'README: the kernel issue');
+  assert.match(flat, /SQLite's file locks work between processes/, 'README: cross-process locks (homescoop#762)');
+  assert.match(flat, /slicc-kernel 1\.100\.0 or later \(homescoop#513/, 'README: the cross-process lock floor');
+  assert.match(flat, /locks exclude since slicc-kernel 1\.119\.0 \(slicc-kernel#944\)/, 'README: cross-tab locks');
+  assert.match(flat, /coherent in the other tab since 1\.120\.1 \(slicc-kernel#949\)/, 'README: cross-tab coherence (homescoop#952)');
+  assert.match(flat, /since 1\.122\.3 \(slicc-kernel#950\)/, 'README: cross-tab opens');
+  assert.match(flat, /On older kernels, use one process per database at a time/, 'README: one process per database on older kernels');
+  assert.match(flat, /slicc-kernel#665/, 'README: the old kernel issue');
 
   const syn = await run(['sqlite3', ':memory:', 'selec 1;']);
   assert.equal(syn.status, 1);
