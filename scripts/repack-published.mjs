@@ -30,7 +30,7 @@
  * filesystems. diff-published.mjs then checks the result: only package.json
  * "version" and @ai-ecoverse/* pins may differ from the base. host-run.sh
  * takes this path instead of build.sh when recipe.repack.from is set, so
- * ladder-pr / ladder-build produce the same tarball. Remove `repack:` when
+ * the PR run and the publish produce the same tarball. Remove `repack:` when
  * the next release really rebuilds.
  *
  * Refuses first when a build input changed since the bytes it reuses were

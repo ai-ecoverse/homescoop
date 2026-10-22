@@ -39,4 +39,24 @@ AssertionError: THIRD-PARTY-NOTICES.md lacks the Emscripten 6.0.9 notice (homesc
 
 ## 132.0.0-6: shim drift (homescoop#1491; 2026-10-21)
 
-132.0.0-6 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 132.0.0-5 in `bin/wasm-as`, `bin/wasm-as.wasm`, `bin/wasm-ctor-eval`, `bin/wasm-dis`, `bin/wasm-dis.wasm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+132.0.0-6 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only (not true of this package: its link didn't name slicc-env.js until 132.0.0-7, #1530), and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 132.0.0-5 in `bin/wasm-as`, `bin/wasm-as.wasm`, `bin/wasm-ctor-eval`, `bin/wasm-dis`, `bin/wasm-dis.wasm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 132.0.0-7: slicc-env.js, the shims notice and the package patches (homescoop#1530, #1534; 2026-10-22)
+
+`node-entry.mjs` fails on the published 132.0.0-6:
+
+```text
+AssertionError [ERR_ASSERTION]: bin/wasm-opt: Emscripten's getEnvStrings placeholders ('USER': 'web_user') instead of shims/slicc/slicc-env.js, so env -i leaves USER=web_user, HOME=/home/web_user and PATH=/ (homescoop#1530)
+```
+
+| check | 132.0.0-6 | 132.0.0-7 |
+|---|---|---|
+| each of the 8 glues: `'USER': 'web_user'` placeholder (#1530) | present | absent; build.sh fails the link if it comes back |
+| each glue: slicc-env.js's `ENV[x] !== undefined` body (#1530) | absent | present |
+| each glue: libfs `lookupPath` loop `nlinks <= 40` (package-patches 0014) | `nlinks < 40` | `nlinks <= 40` |
+| `THIRD-PARTY-NOTICES.md`: `## homescoop: the slicc shims (shims/slicc, Apache-2.0)` (#1534) | missing | present, with the Apache-2.0 text |
+| `scripts/test/shim-notice.test.mjs` | `wasm-binaryen` on `KNOWN_WITHOUT_SHIM_NOTICE` (closed #844) | entry gone; the package guard fails if the section goes missing |
+
+- **#1530, the cause:** build.sh passes its own `--js-library` list, which named slicc-writev.js, slicc-linkat.js and slicc-uname.js but not `shims/slicc/slicc-env.js`, so Emscripten's stock `getEnvStrings` filled in its placeholders. The -6 entry above claimed slicc-env.js for this package; it did not apply. The link now adds slicc-env.js itself.
+- **#1534, the cause:** build.sh compiles the shims itself, outside `homescoop_slicc_archive`, so no shims section was written. build.sh now calls `homescoop_notice_slicc_shims`.
+- **Package patches:** build.sh now applies `packages/wasm-emscripten/package-patches/*.patch` to the emscripten-tree.sh tree, as wasm-emscripten's build.sh does for its host emcc, and the recipe lists them as inputs. 0014 makes the glue's file system follow `SYMLOOP_MAX` (40) consecutive symlinks instead of 39. 0015 and 0016 add slicc-env.js and `libslicc_realpath.a` to link.py's default slicc link from the packaged `lib/slicc`, which is a no-op here: the emscripten-tree.sh tree has no `lib/slicc`, and the explicit `--js-library` list already has slicc-env.js. `package-patches/libc/0017` (musl realpath's 40th follow) is not applied: wasm-emscripten applies it only to the musl sources it ships and links it from `libslicc_realpath.a`, and this link keeps the sysroot's stock realpath (a later -N can link it).

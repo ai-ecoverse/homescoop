@@ -6,7 +6,7 @@
   "description": [
     "Homescoope recipes pin upstream library versions in packages/*/recipe.yaml.",
     "A custom regex manager reads `# renovate: …` comments above `version:` and opens one PR per package when upstream cuts a release.",
-    "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof); the merge queue still requires cert-review, and every publish needs its certified= line. Majors and new packages stay manual.",
+    "Recipe automerge only for packages listed in scripts/ci-certified.json (full cert/*.mjs checklist + negative proof); the merge queue requires ci, which needs both reviewers' approval, and every publish is the reviewed PR artifact. Majors and new packages stay manual.",
     "Extends the shared SLICC preset, which turns automerge on globally. Here, any merged change under packages/** can publish, so the rules below turn automerge off for packages/**, @ai-ecoverse re-pins and the publish-path workflows; only the CI-certified non-major recipe rule turns it back on."
   ],
   "semanticCommits": "enabled",
@@ -75,14 +75,14 @@
   ],
   "packageRules": [
     {
-      "description": "Anything under packages/** can publish once merged, so it may only merge through the merge queue, which requires ci and cert-review on the PR head, and every publish needs cert-review's certified= line for its bytes (#1085). So recipe bumps automerge like everything else (platformAutomerge); majors stay human (rules below).",
+      "description": "Anything under packages/** can publish once merged, so it may only merge through the merge queue, which requires ci on the PR head (every build job and both reviewers' approval), and every publish is that PR's reviewed artifact (#1085). So recipe bumps automerge like everything else (platformAutomerge); majors stay human (rules below).",
       "matchFileNames": [
         "packages/**"
       ],
       "automerge": true
     },
     {
-      "description": "Recipe bumps automerge (non-major): the queue's required cert-review certifies them, and an uncertified head can't merge.",
+      "description": "Recipe bumps automerge (non-major): the queue's required ci includes the dual review, and an unapproved head can't merge.",
       "matchFileNames": [
         "packages/**/recipe.yaml"
       ],
@@ -92,7 +92,7 @@
       ]
     },
     {
-      "description": "Semver majors on recipes don't automerge: the homescoop coordinator's lane owns them. A worker checks the breaking changes, then merges on green ci plus a certified cert-review. The weekly sweep picks up any major left waiting.",
+      "description": "Semver majors on recipes don't automerge: the homescoop coordinator's lane owns them. A worker checks the breaking changes, then merges on green ci (which includes the dual review). The weekly sweep picks up any major left waiting.",
       "matchFileNames": [
         "packages/**/recipe.yaml"
       ],
@@ -136,7 +136,7 @@
       ]
     },
     {
-      "description": "@ai-ecoverse pins in a shipped package.json are packaging releases: they automerge once the required cert-review has certified the PR head.",
+      "description": "@ai-ecoverse pins in a shipped package.json are packaging releases: they automerge once the required ci (with the dual review) is green on the PR head.",
       "matchManagers": [
         "npm"
       ],
@@ -150,6 +150,27 @@
       "addLabels": [
         "homescoop-repin"
       ]
+    },
+    {
+      "description": "Shipped manifests (packages/*/package/package.json) keep their dependency ranges, such as py-contourpy's >=1.4.0-10 <1.4.1: consumers resolve within them, and a pin would turn every dependency bump into a -N release. The shared preset pins npm dependencies and devDependencies. These dependencies used to be internal workspace packages, which Renovate skips, so that pin reached them only once #1698 removed the root workspaces (#1700). replace leaves a range alone while the new version is inside it and bumps an exact pin to the new version. scripts/test/renovate-ranges.test.mjs checks it.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        "packages/*/package/package.json"
+      ],
+      "rangeStrategy": "replace"
+    },
+    {
+      "description": "A >=X.Y.Z-N <X.Y.Z+1 range in a shipped manifest gets an update only when a new version falls outside it, and Renovate's npm versioning rewrites such a range wrongly (>=3.14.2-1 <3.14.3 becomes <3.15.0, which drops the floor and excludes 3.15.0-6). Such a PR never automerges: fix the range by hand.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        "packages/*/package/package.json"
+      ],
+      "matchCurrentValue": "/^>=\\S+ <\\S+$/",
+      "automerge": false
     },
     {
       "description": "libpng 1.7 is a parallel beta line; stay on the 1.6.x stable series.",
@@ -169,7 +190,7 @@
       "enabled": false
     },
     {
-      "description": "Workflow action pins get their own branches (renovate/actions-…). Renovate names a branch after the sanitized dependency name, so the action ai-ecoverse/slicc-shared-web and the npm devDependency @ai-ecoverse/slicc-shared-web both landed on renovate/ai-ecoverse-slicc-shared-web-1.x, one PR (#1270). A branch automerges only if every update in it does, so the ladder-pr.yml action bump (manual, publish path) kept the root devDependency bump from automerging. scripts/test/renovate-branches.test.mjs checks no two managers share a branch.",
+      "description": "Workflow action pins get their own branches (renovate/actions-…). Renovate names a branch after the sanitized dependency name, so the action ai-ecoverse/slicc-shared-web and the npm devDependency @ai-ecoverse/slicc-shared-web both landed on renovate/ai-ecoverse-slicc-shared-web-1.x, one PR (#1270). A branch automerges only if every update in it does, so the ladder-build.yml action bump (manual, publish path) kept the root devDependency bump from automerging. scripts/test/renovate-branches.test.mjs checks no two managers share a branch.",
       "matchManagers": [
         "github-actions"
       ],
@@ -189,15 +210,14 @@
       "automerge": true
     },
     {
-      "description": "The publish path (ladder-*.yml) and cert-review.yml, whose status feeds the publish gate: action and pin bumps there are reviewed by hand, never automerged.",
+      "description": "The publish path (ladder-build.yml, the one workflow, including its slicc-shared-web pipeline pin): action and pin bumps there are reviewed by hand, never automerged.",
       "matchFileNames": [
-        ".github/workflows/ladder-*.yml",
-        ".github/workflows/cert-review.yml"
+        ".github/workflows/ladder-*.yml"
       ],
       "automerge": false
     },
     {
-      "description": "github-script major bumps can break ladder-merge; review by hand.",
+      "description": "github-script major bumps can break the workflow; review by hand.",
       "matchPackageNames": [
         "actions/github-script"
       ],
@@ -246,14 +266,14 @@
       "automerge": false
     },
     {
-      "description": "crates/** (the shared Rust crates): ladder-pr builds no dependent package for a crates-only PR, so CI would not test what a bump affects. Never automerge.",
+      "description": "crates/** (the shared Rust crates): a crates-only PR runs the crates checks but builds no dependent package, so CI would not test what a bump affects. Never automerge.",
       "matchFileNames": [
         "crates/**"
       ],
       "automerge": false
     },
     {
-      "description": "Root package.json devDependencies are our own test pins (cert kernel, shared harness, playwright). They automerge like the rest (Lars, 10-19): the queue requires ci plus a certified cert-review on the bump, and the kernel and shared-web are certified at latest. Majors stay human; slicc-kernel-negative stays disabled (rule below).",
+      "description": "Root package.json devDependencies are our own test pins (cert kernel, shared harness, playwright). They automerge like the rest (Lars, 10-19): the queue requires ci (with the dual review) on the bump, and the kernel and shared-web are certified at latest. Majors stay human; slicc-kernel-negative stays disabled (rule below).",
       "matchFileNames": [
         "package.json"
       ],

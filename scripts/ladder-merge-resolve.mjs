@@ -1,43 +1,32 @@
 #!/usr/bin/env node
+/**
+ * The publish gate. For a package a push to main touched, find the PR merged
+ * as the newest first-parent commit that touched it, and that PR's
+ * host-<pkg>-prN artifact from a ladder-build.yml pull_request run at the
+ * merged head that concluded success: every job green, so the builds, the
+ * cert specs and both reviewers' approval (slicc-shared-web's pipeline) are
+ * all behind it. Those bytes, and only those, get published.
+ *
+ *   node scripts/ladder-merge-resolve.mjs --package <recipe> --sha <pushed head> [--base <sha>] [--out <dir>]
+ *   … --dry-run [--pr <n>] [--head <sha>] [--assume-unpublished]
+ *
+ * --out copies the checked package.tgz to <dir>/package.tgz. It writes
+ * decision=publish|skip and certified=<sha256> to GITHUB_OUTPUT.
+ */
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const LADDER_PR = '.github/workflows/ladder-pr.yml';
-export const CERT_REVIEW = '.github/workflows/cert-review.yml';
-const SHA256 = /^[0-9a-f]{64}$/;
-
-export function parseCertLines(message) {
-  const lines = [];
-  for (const raw of String(message ?? '').split(/\r?\n/)) {
-    const m = raw.trim().match(/^certified=(\S*)\s+(\S+)\s+(\S+)/);
-    if (m) lines.push({ sha: m[1], name: m[2], version: m[3] });
-  }
-  return lines;
-}
-
-export function certFor(text, name, version, siblings = []) {
-  const named = parseCertLines(text).filter((l) => l.name === name && (l.version === version || !siblings.includes(l.version)));
-  const exact = named.filter((l) => l.version === version);
-  if (exact.length === 0) return null;
-  const stale = named.filter((l) => l.version !== version).map((l) => l.version);
-  if (stale.length) {
-    throw new Error(`the certified= lines name ${name} ${version} and also ${name} ${stale.join(', ')}`);
-  }
-  const bad = exact.find((l) => !SHA256.test(l.sha));
-  if (bad) throw new Error(`the certified= line for ${name} ${version} has a malformed sha256 '${bad.sha}'`);
-  const shas = [...new Set(exact.map((l) => l.sha))];
-  if (shas.length > 1) throw new Error(`conflicting certified= lines for ${name} ${version}: ${shas.join(', ')}`);
-  return shas[0];
-}
+export const LADDER = '.github/workflows/ladder-build.yml';
 
 export function candidateProblems({ artifact, run, jobs, head }) {
   const problems = [];
   if (artifact.expired) problems.push('the artifact has expired');
-  if (run.path !== LADDER_PR) problems.push(`run ${run.id} is ${run.path}, not ${LADDER_PR}`);
+  if (run.path !== LADDER) problems.push(`run ${run.id} is ${run.path}, not ${LADDER}`);
+  if (run.event !== 'pull_request') problems.push(`run ${run.id} is a ${run.event} run, not a pull_request run`);
   if (artifact.workflow_run?.head_sha !== head || run.head_sha !== head) {
     problems.push(`run ${run.id} is at ${run.head_sha}, not the merged head ${head}`);
   }
@@ -51,122 +40,14 @@ export function candidateProblems({ artifact, run, jobs, head }) {
   return problems;
 }
 
-export function tarballProblem(got, { name, version, certified }) {
+export function tarballProblem(got, { name, version }) {
   if (got.digestProblem) return got.digestProblem;
   if (!got.sha) return 'the artifact has no package.tgz';
   if (got.recorded !== got.sha) return `package.tgz is ${got.sha}, but package.tgz.sha256 says ${got.recorded ?? 'nothing'}`;
-  if (certified && got.sha !== certified) {
-    return `package.tgz sha256 ${got.sha} does not match the certified= line ${certified}`;
-  }
   if (got.name !== name || got.version !== version) {
     return `package.tgz is ${got.name}@${got.version}, not ${name}@${version}`;
   }
   return '';
-}
-
-function runProblems(run) {
-  const problems = [];
-  if (run.path !== CERT_REVIEW) problems.push(`run ${run.id} is ${run.path}, not ${CERT_REVIEW}`);
-  if (run.event !== 'workflow_run' && run.event !== 'workflow_dispatch') problems.push(`run ${run.id} is a ${run.event} run`);
-  if (run.head_branch !== 'main') problems.push(`run ${run.id} ran on ${run.head_branch}, not main`);
-  if (run.status !== 'completed' || run.conclusion !== 'success') {
-    problems.push(`run ${run.id} concluded ${run.conclusion || run.status}`);
-  }
-  return problems;
-}
-
-function recordProblems({ run, artifact, pr }, record) {
-  const problems = [];
-  if (artifact.name !== `cert-review-record-${pr.number}`) {
-    problems.push(`artifact ${artifact.id} is ${artifact.name}, not cert-review-record-${pr.number}`);
-  }
-  if (artifact.workflow_run?.id !== run.id) problems.push(`artifact ${artifact.id} is from run ${artifact.workflow_run?.id}, not ${run.id}`);
-  if (artifact.expired) problems.push(`artifact ${artifact.id} has expired`);
-  if (problems.length || record === undefined) return problems;
-  if (!record) return [`artifact ${artifact.id} has no record.json`];
-  if (record.pr !== pr.number) problems.push(`its record is for PR #${record.pr}, not #${pr.number}`);
-  if (record.head !== pr.head) problems.push(`its record is for ${record.head}, not the merged head ${pr.head}`);
-  if (record.cert_review_run !== run.id) problems.push(`its record names run ${record.cert_review_run}, not ${run.id}`);
-  if (!Array.isArray(record.lines)) problems.push('its record has no lines');
-  return problems;
-}
-
-async function unlessGone(request) {
-  try {
-    return await request;
-  } catch (err) {
-    if (err.status === 404) return undefined;
-    throw err;
-  }
-}
-
-export async function certReview(pr, io) {
-  const status = (await io.statuses(pr.head)).find(
-    (st) => st.context === 'cert-review' && st.creator?.login === 'github-actions[bot]',
-  );
-  if (!status) return { state: 'absent' };
-  const url = status.target_url ?? '';
-  const target = url.match(/\/actions\/runs\/(\d+)\/artifacts\/(\d+)$/);
-  if (status.state !== 'success') return { state: status.state, url, runId: target ? Number(target[1]) : undefined };
-  const said = String(status.description ?? '').match(/\brun (\d+), record artifact (\d+)$/);
-  if (!target || !said || said[1] !== target[1] || said[2] !== target[2]) {
-    const problem = `its target_url '${url}' and description '${status.description}' don't name the same run and record artifact`;
-    return { state: 'invalid', url, problem };
-  }
-  const runId = Number(target[1]);
-  const found = { run: await unlessGone(io.run(runId)), artifact: await unlessGone(io.artifact(Number(target[2]))), pr };
-  if (!found.run || !found.artifact) {
-    const gone = !found.run ? `run ${runId}` : `record artifact ${target[2]}`;
-    return { state: 'invalid', url, problem: `${gone} no longer exists` };
-  }
-  let problems = [...runProblems(found.run), ...recordProblems(found)];
-  let record;
-  if (!problems.length) {
-    record = await unlessGone(io.record(found.artifact));
-    if (record === undefined) return { state: 'invalid', url, problem: `record artifact ${target[2]} no longer exists` };
-    problems = recordProblems(found, record);
-  }
-  if (problems.length) return { state: 'invalid', url, problem: problems.join('; ') };
-  return { state: 'success', url, runId, text: record.lines.join('\n') };
-}
-
-function describeReview(review, name, version) {
-  if (review.state === 'absent') return 'there is no cert-review status on the merged head';
-  if (review.state === 'success') return `cert-review run ${review.runId} has no line for ${name} ${version}`;
-  const problem = review.problem ? `: ${review.problem}` : '';
-  return `the cert-review status is ${review.state}${problem} (${review.url})`;
-}
-
-export async function certifiedSha({ name, version, message, siblings = [] }, pr, io) {
-  const human = [
-    { source: 'merge commit', text: message },
-    { source: `PR #${pr.number} body`, text: pr.body },
-  ];
-  const named = human.some(({ text }) => parseCertLines(text).some((l) => l.name === name));
-  const ignored =
-    named && !(await io.canWrite(pr.author))
-      ? `PR #${pr.number} is by ${pr.author}, who cannot write to this repository`
-      : undefined;
-  const sources = ignored ? [] : human;
-  for (const { source, text } of sources) {
-    const certified = certFor(text, name, version, siblings);
-    if (certified) return { certified, source };
-  }
-  const review = await certReview(pr, io);
-  if (review.text !== undefined) {
-    const certified = certFor(review.text, name, version, siblings);
-    if (certified) return { certified, source: `cert-review run ${review.runId}`, review };
-    sources.push({ source: `cert-review run ${review.runId}`, text: review.text });
-  }
-  const stale = sources.flatMap(({ source, text }) =>
-    parseCertLines(text)
-      .filter((l) => l.name === name && !siblings.includes(l.version))
-      .map((l) => `${l.version} in the ${source}`),
-  );
-  if (stale.length) {
-    throw new Error(`the certified= lines name ${name} ${stale.join(', ')}, but the merged package.json is ${name} ${version}`);
-  }
-  return { certified: null, ignored, review };
 }
 
 export async function resolvePackage(ctx, io) {
@@ -175,17 +56,7 @@ export async function resolvePackage(ctx, io) {
     return { decision: 'skip', reason: `${name}@${version} is already on npm`, inputs: { package: pkg } };
   }
   const pr = await io.pullRequest();
-  if (!pr) throw new Error('no merged PR for this commit, so there is no ladder-pr artifact to publish');
-  const { certified, source, ignored, review } = await certifiedSha(ctx, pr, io);
-  if (!certified) {
-    const why = ignored
-      ? `the merge commit's and PR body's certified= lines don't count because ${ignored}`
-      : `neither the merge commit nor the PR body has a certified=<sha256> ${name} ${version} line`;
-    throw new Error(
-      `${name}@${version} is not on npm, ${why}, and ${describeReview(review, name, version)}: ` +
-        'every publish needs a certified= line bound to its bytes',
-    );
-  }
+  if (!pr) throw new Error('no merged PR for this commit, so there is no reviewed artifact to publish');
   const artifactName = `host-${pkg}-pr${pr.number}`;
   const artifacts = (await io.artifacts(artifactName))
     .filter((a) => a.name === artifactName)
@@ -217,24 +88,24 @@ export async function resolvePackage(ctx, io) {
     if (problems.length) rejected.push(`artifact ${artifact.id}: ${problems.join('; ')}`);
     else usable.push({ artifact, run });
   }
-  const note = ignored ? ` (certified= lines ignored: ${ignored})` : '';
-  if (usable.length === 0) throw new Error(`no usable ${artifactName}${note}: ${rejected.join(' | ')}`);
+  if (usable.length === 0) throw new Error(`no usable ${artifactName}: ${rejected.join(' | ')}`);
   const mismatches = [];
   for (const { artifact, run } of usable) {
     const got = await io.download(artifact);
-    const problem = tarballProblem(got, { name, version, certified });
+    const problem = tarballProblem(got, { name, version });
     if (problem) {
       mismatches.push(`artifact ${artifact.id}: ${problem}`);
       continue;
     }
     return {
       decision: 'publish',
-      gate: `certified= line in the ${source}`,
+      gate: `green ladder-build run ${run.id} of PR #${pr.number}`,
       reason: `${name}@${version} is not on npm; ${artifactName} artifact ${artifact.id} from run ${run.id} at ${pr.head} has sha256 ${got.sha}`,
-      inputs: { package: pkg, certified: got.sha, artifact_pr: String(pr.number), artifact_id: String(artifact.id) },
+      tarball: got.tgz,
+      inputs: { package: pkg, certified: got.sha, artifact_pr: String(pr.number), artifact_id: String(artifact.id), run: String(run.id) },
     };
   }
-  throw new Error(`${artifactName}${note}: ${mismatches.join(' | ')}`);
+  throw new Error(`${artifactName}: ${mismatches.join(' | ')}`);
 }
 
 export function zipDigestProblem(artifact, bytes) {
@@ -265,7 +136,7 @@ export function githubApi({ repo, token, retryDelayMs = 2000 }) {
   };
 }
 
-export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
+export function githubIo({ repo, token, sha, head, prNumber }) {
   const api = githubApi({ repo, token });
   const unzip = async (artifact) => {
     const res = await api(`/actions/artifacts/${artifact.id}/zip`);
@@ -289,15 +160,7 @@ export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
       const prs = prNumber ? [await (await api(`/pulls/${prNumber}`)).json()] : await (await api(`/commits/${sha}/pulls`)).json();
       const pr = prs.find((p) => prNumber || (p.merged_at && p.merge_commit_sha === sha));
       if (!pr) return null;
-      return { number: pr.number, head: head || pr.head.sha, body: prBody ?? pr.body ?? '', author: pr.user.login };
-    },
-    async canWrite(login) {
-      const res = await fetch(`https://api.github.com/repos/${repo}/collaborators/${encodeURIComponent(login)}/permission`, {
-        headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}` },
-      });
-      if (res.status === 404) return false;
-      if (!res.ok) throw new Error(`GET collaborators/${login}/permission returned ${res.status}`);
-      return ['admin', 'write'].includes((await res.json()).permission);
+      return { number: pr.number, head: head || pr.head.sha, author: pr.user.login };
     },
     async artifacts(name) {
       const q = new URLSearchParams({ name, per_page: '100' });
@@ -309,18 +172,6 @@ export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
     async jobs(id) {
       return (await (await api(`/actions/runs/${id}/jobs?filter=latest&per_page=100`)).json()).jobs ?? [];
     },
-    async statuses(ref) {
-      return (await api(`/commits/${ref}/statuses?per_page=100`)).json();
-    },
-    async artifact(id) {
-      return (await api(`/actions/artifacts/${id}`)).json();
-    },
-    async record(artifact) {
-      const { dir, digestProblem } = await unzip(artifact);
-      if (digestProblem) throw new Error(digestProblem);
-      const file = join(dir, 'record.json');
-      return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
-    },
     async download(artifact) {
       const { dir, digestProblem } = await unzip(artifact);
       if (digestProblem) return { digestProblem };
@@ -330,7 +181,7 @@ export function githubIo({ repo, token, sha, head, prBody, prNumber }) {
       const recorded = existsSync(shaFile) ? readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0] : undefined;
       const pkgJson = execFileSync('tar', ['-xzOf', tgz, 'package/package.json'], { encoding: 'utf8' });
       const { name, version } = JSON.parse(pkgJson);
-      return { sha: createHash('sha256').update(readFileSync(tgz)).digest('hex'), recorded, name, version };
+      return { sha: createHash('sha256').update(readFileSync(tgz)).digest('hex'), recorded, name, version, tgz };
     },
   };
 }
@@ -342,29 +193,22 @@ export function parseArgs(argv) {
     if (a === '--package') args.pkg = argv[++i];
     else if (a === '--sha') args.sha = argv[++i];
     else if (a === '--base') args.base = argv[++i];
+    else if (a === '--out') args.out = argv[++i];
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--head') args.head = argv[++i];
-    else if (a === '--message') args.message = argv[++i];
-    else if (a === '--pr-body') args.prBody = argv[++i];
     else if (a === '--pr') args.prNumber = argv[++i];
     else if (a === '--assume-unpublished') args.assumeUnpublished = true;
     else throw new Error(`unknown argument ${a}`);
   }
   const hex40 = /^[0-9a-f]{40}$/;
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(args.pkg ?? '') || !hex40.test(args.sha ?? '') || (args.base && !hex40.test(args.base))) {
-    throw new Error('usage: ladder-merge-resolve.mjs --package <name> --sha <40-hex pushed head> [--base <40-hex>] [--dry-run ...]');
+    throw new Error('usage: ladder-merge-resolve.mjs --package <name> --sha <40-hex pushed head> [--base <40-hex>] [--out <dir>] [--dry-run ...]');
   }
-  const overrides =
-    args.head ||
-    args.prNumber ||
-    args.message !== undefined ||
-    args.prBody !== undefined ||
-    args.assumeUnpublished;
-  if (overrides && !args.dryRun) {
-    throw new Error('--head, --pr, --message, --pr-body and --assume-unpublished need --dry-run');
+  if ((args.head || args.prNumber || args.assumeUnpublished) && !args.dryRun) {
+    throw new Error('--head, --pr and --assume-unpublished need --dry-run');
   }
   if (args.prNumber && !/^[1-9][0-9]*$/.test(args.prNumber)) throw new Error('--pr needs a PR number');
-  if (args.head && !/^[0-9a-f]{40}$/.test(args.head)) throw new Error('--head needs a 40-hex commit sha');
+  if (args.head && !hex40.test(args.head)) throw new Error('--head needs a 40-hex commit sha');
   return args;
 }
 
@@ -380,33 +224,9 @@ export function touchingCommit(pkg, base, head) {
   return head;
 }
 
-const quietShow = (commit) => (path) => execFileSync('git', ['show', `${commit}:${path}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-
-export function siblingVersions(pkg, name, commit, show = quietShow(commit), list = () => git('ls-tree', '--name-only', `${commit}:packages`)) {
-  const out = [];
-  for (const dir of list().split('\n').filter(Boolean)) {
-    if (dir === pkg) continue;
-    let other;
-    try {
-      other = JSON.parse(show(`packages/${dir}/package/package.json`));
-    } catch {
-      continue;
-    }
-    if (other.name === name && other.version) out.push(other.version);
-  }
-  return out;
-}
-
 export function readContext(args, commit) {
   const { name, version } = JSON.parse(git('show', `${commit}:packages/${args.pkg}/package/package.json`));
-  return {
-    pkg: args.pkg,
-    name,
-    version,
-    siblings: siblingVersions(args.pkg, name, commit).filter((v) => v !== version),
-    message: args.message ?? git('log', '-1', '--format=%B', commit),
-    assumeUnpublished: Boolean(args.assumeUnpublished),
-  };
+  return { pkg: args.pkg, name, version, assumeUnpublished: Boolean(args.assumeUnpublished) };
 }
 
 async function main(argv) {
@@ -421,15 +241,18 @@ async function main(argv) {
       token: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
       sha: commit,
       head: args.head,
-      prBody: args.prBody,
       prNumber: args.prNumber,
     });
     const result = await resolvePackage(ctx, io);
     const via = result.gate ? ` via ${result.gate}` : '';
     console.log(`${label}: ${result.decision}${via}: ${result.reason}`);
-    console.log(`ladder-build inputs ${JSON.stringify(result.inputs)}`);
+    console.log(`publish inputs ${JSON.stringify(result.inputs)}`);
+    if (result.decision === 'publish' && args.out) {
+      mkdirSync(args.out, { recursive: true });
+      copyFileSync(result.tarball, join(args.out, 'package.tgz'));
+    }
     if (process.env.GITHUB_OUTPUT) {
-      appendFileSync(process.env.GITHUB_OUTPUT, `inputs=${JSON.stringify(result.inputs)}\n`);
+      appendFileSync(process.env.GITHUB_OUTPUT, `decision=${result.decision}\ncertified=${result.inputs.certified ?? ''}\n`);
     }
     console.log(`ladder-merge-resolve: PASS ${label}: ${result.decision}`);
   } catch (err) {

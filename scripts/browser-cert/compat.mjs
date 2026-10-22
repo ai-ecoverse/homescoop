@@ -23,7 +23,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
 const KERNEL = '@ai-ecoverse/slicc-kernel';
 const BIOS = 'ai-ecoverse/slicc-bios';
-const HARNESS = ['@ai-ecoverse/slicc-shared-web', 'monocart-coverage-reports', 'playwright-core'].map((name) => devPin(name));
+const HARNESS = ['slicc-shared-web-cert', 'monocart-coverage-reports', 'playwright-core'].map((name) => devPin(name));
 const MAX_SHARDS = 10;
 const ESTIMATE = { entry: 10, spec: 4, sweep: 150, shard: 900, limit: 1200 };
 const SWEEP_MODES = ['report', 'enforce'];

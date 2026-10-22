@@ -10,3 +10,22 @@ Ships the Emscripten-facing tool set:
 
 Used by `@ai-ecoverse/wasm-emscripten` (as `BINARYEN_ROOT`) and by
 `@ai-ecoverse/wasm-clang` drivers for fork Asyncify (`wasm-opt --asyncify`).
+
+## Environment
+
+Every tool links homescoop's `shims/slicc/slicc-env.js`: its environment is
+only what the kernel passes, with none of Emscripten's placeholders
+(`USER=web_user`, `LOGNAME=web_user`, `HOME=/home/web_user`, `PATH=/`). After
+`env -i`, a tool sees an empty environment.
+
+## Emscripten runtime
+
+The tools are linked with the same patched Emscripten 6.0.9 tree as
+`@ai-ecoverse/wasm-emscripten`, including its package patches: the
+JavaScript file system follows up to 40 consecutive symlinks (`SYMLOOP_MAX`),
+not 39.
+
+## Licences
+
+`LICENSE` is Binaryen's. `THIRD-PARTY-NOTICES.md` covers the Emscripten
+runtime, FP16 (MIT) and homescoop's own slicc shims (Apache-2.0).

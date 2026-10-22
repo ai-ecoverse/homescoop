@@ -27,7 +27,7 @@ if [ -f scripts/browser-cert/cert-kernel.mjs ] && [ -f scripts/dev-pin.mjs ]; th
     if [ -f scripts/gate.mjs ]; then node scripts/gate.mjs "$g" -- "$@"; else "$@"; fi
   }
   kernel=$(gated cert-kernel node scripts/browser-cert/cert-kernel.mjs "$pkg")
-  shared=$(gated dev-pin node scripts/dev-pin.mjs @ai-ecoverse/slicc-shared-web)
+  shared=$(gated dev-pin node scripts/dev-pin.mjs slicc-shared-web-cert)
   playwright=$(gated dev-pin node scripts/dev-pin.mjs playwright-core)
   monocart=$(gated dev-pin node scripts/dev-pin.mjs monocart-coverage-reports 2>/dev/null || true)
   if [ -z "$monocart" ]; then

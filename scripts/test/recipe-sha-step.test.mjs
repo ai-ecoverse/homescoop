@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +22,7 @@ function stepRun(file, name) {
   return body.join('\n');
 }
 
-const STEP = stepRun('ladder-pr.yml', 'Download expanded source URLs and write sha256');
+const STEP = stepRun('ladder-build.yml', 'Download expanded source URLs and write sha256');
 
 function runWith(refresh) {
   const dir = mkdtempSync(join(tmpdir(), 'recipe-sha-step-'));
@@ -67,7 +67,7 @@ test('a pre-#1267 head, whose script takes every non-flag argument as a package,
 });
 
 const PUSH = stepRun(
-  'ladder-pr.yml',
+  'ladder-build.yml',
   'The PR branch already carries its sha256 and package version, or the check fails with the command that writes them'
 );
 
@@ -91,7 +91,7 @@ function pushStep(dirty, readme = false) {
       encoding: 'utf8',
       env: { ...process.env, HOST: '["pkg","other"]', GITHUB_OUTPUT: out },
     });
-    return { ...r, outputs: readFileSync(out, 'utf8'), log: git('log', '--oneline').stdout };
+    return { ...r, outputs: existsSync(out) ? readFileSync(out, 'utf8') : '', log: git('log', '--oneline').stdout };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -106,8 +106,7 @@ test('recipe-sha never pushes: a stale branch fails with one machine-readable re
   );
   assert.doesNotMatch(r.stdout, /recipe-sha: FAIL other:/);
   assert.equal(r.log.trim().split('\n').length, 1, 'no commit was made');
-  assert.match(r.outputs, /^changed=false$/m);
-  assert.doesNotMatch(r.outputs, /^sha=/m);
+  assert.equal(r.outputs, '', 'the step writes no outputs: nothing downstream builds a pushed commit');
 });
 
 test('recipe-sha passes a branch that already carries its sha256, with its verdict line', () => {
@@ -117,7 +116,7 @@ test('recipe-sha passes a branch that already carries its sha256, with its verdi
 });
 
 test('the recipe-sha job holds a read-only token and no persisted credentials, and runs no git push', () => {
-  const yml = readFileSync(join(root, '.github', 'workflows', 'ladder-pr.yml'), 'utf8');
+  const yml = readFileSync(join(root, '.github', 'workflows', 'ladder-build.yml'), 'utf8');
   const job = yml.slice(yml.indexOf('\n  recipe-sha:'), yml.indexOf('\n  host-build:'));
   assert.match(job, /\n {4}permissions:\n {6}contents: read\n/);
   assert.match(job, /\n {10}persist-credentials: false\n/);

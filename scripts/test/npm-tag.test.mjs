@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { channelProblems, parseAllowlist, pickRecipe, recipeOf, recipeTag, tagProblem } from '../npm-tag.mjs';
 import { classify, npmParity } from '../npm-parity.mjs';
 import { classify as cleanup } from '../list-semver-cleanup.mjs';
-import { certFor, siblingVersions } from '../ladder-merge-resolve.mjs';
 import { peerTarball } from '../peer-tarball.mjs';
 import { renderTable } from '../readme-table.mjs';
 import { sameChannel } from '../cert-review/repack-input.mjs';
@@ -155,20 +154,6 @@ test('5: name+version lookups pick the right dir when one name has two', (t) => 
   assert.equal(pickRecipe(list, NAME).dir, 'wasix-python');
   assert.equal(pickRecipe(list, NAME, 'latest').dir, 'wasix-python');
   assert.equal(pickRecipe(list, '@ai-ecoverse/nope', '1.0.0-1'), null);
-});
-
-test('5: ladder-merge-resolve: a sibling dir\'s certified= line is not a stale line for this dir', () => {
-  const text = `certified=${'a'.repeat(64)} ${NAME} 3.14.2-29\ncertified=${'b'.repeat(64)} ${NAME} 3.15.0-1`;
-  assert.equal(certFor(text, NAME, '3.15.0-1', ['3.14.2-29']), 'b'.repeat(64));
-  assert.equal(certFor(text, NAME, '3.14.2-29', ['3.15.0-1']), 'a'.repeat(64));
-  assert.throws(() => certFor(text, NAME, '3.15.0-1'), /also @ai-ecoverse\/wasix-python 3\.14\.2-29/);
-  assert.throws(() => certFor(`${text}\ncertified=${'c'.repeat(64)} ${NAME} 3.15.0-0`, NAME, '3.15.0-1', ['3.14.2-29']), /also .* 3\.15\.0-0/);
-  const files = { 'packages/wasix-python/package/package.json': { name: NAME, version: '3.14.2-29' }, 'packages/wasix-python3.15/package/package.json': { name: NAME, version: '3.15.0-1' }, 'packages/zlib/package/package.json': { name: '@ai-ecoverse/wasm-zlib', version: '1.3.1-2' } };
-  const show = (p) => {
-    if (!files[p]) throw new Error('missing');
-    return JSON.stringify(files[p]);
-  };
-  assert.deepEqual(siblingVersions('wasix-python3.15', NAME, 'HEAD', show, () => 'wasix-python\nwasix-python3.15\nzlib\nempty\n'), ['3.14.2-29']);
 });
 
 test('5: peer-tarball: a flat package.tgz of the sibling dir falls through to the registry; a stale one of this dir still fails', (t) => {
