@@ -20,8 +20,8 @@
     "refresh-sha": "node scripts/refresh-recipe-sha.mjs",
     "browser-cert": "node scripts/browser-cert/run.mjs",
     "check-meta": "node scripts/check-package-meta.mjs",
-    "trust": "npx fledgling sync -y --skip-publish",
-    "trust:dry": "npx fledgling sync --dry-run -y --skip-publish"
+    "trust": "node scripts/trust.mjs -y --skip-publish",
+    "trust:dry": "node scripts/trust.mjs --dry-run -y --skip-publish"
   },
   "devDependencies": {
     "@ai-ecoverse/slicc-kernel": "1.146.1",
@@ -30,8 +30,5 @@
     "playwright-core": "1.64.1",
     "slicc-kernel-negative": "npm:@ai-ecoverse/slicc-kernel@1.78.0"
   },
-  "workspaces": [
-    "packages/*/package"
-  ],
   "license": "Apache-2.0"
 }

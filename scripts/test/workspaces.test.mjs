@@ -5,7 +5,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const rootJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+import { WORKSPACES, withWorkspaces } from '../trust.mjs';
+
+// The root package.json has none (the pipeline's npm ci); scripts/trust.mjs adds WORKSPACES for fledgling.
+const rootJson = { workspaces: WORKSPACES };
 
 const matcher = (glob) => new RegExp(`^${glob.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')}$`);
 
@@ -49,4 +52,11 @@ test('root workspace package names are unique, so npm ci in a test/ dir resolves
 test('a later negation wins over the include, as in npm', () => {
   assert.deepEqual(workspaceDirs(['packages/*/package', '!packages/*3.15/package'], ['packages/a/package', 'packages/a3.15/package']), ['packages/a/package']);
   assert.deepEqual(workspaceDirs(['packages/*/package'], ['packages/a3.15/package']), ['packages/a3.15/package']);
+});
+
+test('the root package.json has no workspaces; trust.mjs adds them for fledgling only', () => {
+  const text = readFileSync(join(root, 'package.json'), 'utf8');
+  assert.equal(JSON.parse(text).workspaces, undefined);
+  assert.deepEqual(JSON.parse(withWorkspaces(text)).workspaces, WORKSPACES);
+  assert.throws(() => withWorkspaces(JSON.stringify({ workspaces: ['x'] })), /already has workspaces/);
 });
