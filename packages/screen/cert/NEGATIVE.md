@@ -121,3 +121,13 @@ AssertionError [ERR_ASSERTION]: BUILD_DATE comes from source.epoch (SOURCE_DATE_
   ```
 
 - **#1485:** `cert/stuff-log.mjs` is coverage, not a defect fix: it passes on the published 5.0.1-15 as well. `prove-negative.mjs --spec stuff-log.mjs` (the same tarball with an empty wasm) fails it: `prove-negative: ok — cert failed on bad screen tarball (status 1; 1 of 2 spec(s) failed: stuff-log.mjs)`.
+
+## Stale recipe notes (homescoop#1661; 2026-10-22, docs only, still 5.0.1-16)
+
+`cert/docs.mjs` also reads `packages/screen/recipe.yaml`. With main's notes before #1661 (3c464d0) it fails on the first stale line:
+
+```text
+AssertionError [ERR_ASSERTION]: recipe.yaml notes say the package sets SCREENDIR=/tmp/screens; since 5.0.1-10 sockets live in ~/.screen (homescoop#1661)
+```
+
+The notes are not in the tarball, so this is not a packaging revision.
