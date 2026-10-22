@@ -73,10 +73,13 @@ fi
 for p in "${PROGS[@]}"; do
   dir="$BLD/qpdf"
   [[ "$p" == zlib-flate ]] && dir="$BLD/zlib-flate"
-  rsp="$dir/CMakeFiles/$p.dir/linkLibs.rsp"
-  test -f "$rsp" || { echo "qpdf-deps: FAIL no $rsp" >&2; exit 1; }
+  rsp=()
+  for f in "$dir/CMakeFiles/$p.dir/link.txt" "$dir/CMakeFiles/$p.dir/linkLibs.rsp"; do
+    [[ -f "$f" ]] && rsp+=("$f")
+  done
+  [[ "${#rsp[@]}" -gt 0 ]] || { echo "qpdf-deps: FAIL no $dir/CMakeFiles/$p.dir/link.txt" >&2; exit 1; }
   for lib in libz.a libjpeg.a; do
-    grep -Fq "$PREFIX/lib/$lib" "$rsp" || { echo "qpdf-deps: FAIL $p links no $PREFIX/lib/$lib (homescoop#1354, #918)" >&2; exit 1; }
+    grep -Fq "$PREFIX/lib/$lib" "${rsp[@]}" || { echo "qpdf-deps: FAIL $p links no $PREFIX/lib/$lib (homescoop#1354, #918)" >&2; exit 1; }
   done
 done
 echo "qpdf-deps: PASS ${PROGS[*]} link $PREFIX/lib/libz.a and $PREFIX/lib/libjpeg.a, no pkg-config module"
