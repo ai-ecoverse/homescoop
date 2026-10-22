@@ -17,6 +17,10 @@ sources:
   perl_cross:
     url: "https://github.com/arsv/perl-cross/releases/download/1.6.5/perl-cross-1.6.5.tar.gz"
     sha256: "81130cd4b8c6d9eb2a1959f37d44391a46ad6a6794fc41fed5441f74e85e3dd0"
+wasm:
+  initial-memory: 64MiB
+  measured-peak: 44MiB
+  measured-by: "cert/heap.mjs on 5.42.0-22's first CI build (run 39702590579, wasix-sysroot 2025.9.30-42, 13.3 MiB linked initial memory) on slicc-kernel 1.132.1: VmSize of each perl process polled from /proc/<pid>/status (perl is single-threaded, so that is the allocating thread's view): a 100000-key hash 43.8 MiB, an automake-style parse of 30000 Makefile.am lines 27.5 MiB, loading 14 core modules 21.9 MiB, a fork child's 4 MiB s///g 17.4 MiB. A 4.5 MiB configure-script rewrite peaks at 84 MiB and grows past the initial heap, which the -39 allocator refresh covers"
 dependencies:
   build: []
   host: []

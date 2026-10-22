@@ -15,4 +15,9 @@ export default async function (ctx) {
     assert.equal(r.status, 0, `${user}: ${r.stdout}${r.stderr}`);
     assert.equal(r.stdout.trim(), want[user], `${user}: ${r.stdout}`);
   }
+  const w = await run(['perl', '-e', String.raw`if (open my $f, ">", "/root/cone-was-here") { print "granted\n" } else { print "denied: $!\n" } print -w "/root" ? "w\n" : "nw\n"`], { cwd: '/tmp', user: 'cone' });
+  assert.equal(w.status, 0, `cone: ${w.stdout}${w.stderr}`);
+  assert.equal(w.stdout.trim(), 'denied: Permission denied\nnw', `cone writing into /root: ${w.stdout}`);
+  const own = await run(['perl', '-e', String.raw`open my $f, ">", "/home/cone/mine" or die "open: $!"; print $f "x"; close $f; my @s = stat "/home/cone/mine"; print "$s[4]\n"`], { cwd: '/tmp', user: 'cone' });
+  assert.equal(own.stdout.trim(), '1000', `cone writing into its home: ${own.stdout}${own.stderr}`);
 }
