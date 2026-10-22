@@ -191,6 +191,11 @@ one of them in the program's source, or `poll` and `nanosleep` in its own
 `-l` archive, must link and print `own` for those and `slicc` for the rest.
 With 6.0.9-30's plain objects each of the 12 gives `duplicate symbol:
 <name>` (homescoop#1724).
+`priv.c` checks that the privilege drop really happens: as root, with a
+stand-in kernel that keeps credentials, `setgid(5)`, `setresuid(6, 0, 6)`
+and `setuid(5)` must change what `getgid`, `getresuid`, `getuid` and
+`geteuid` report. Without `libslicc_libc_gaps.a`, libc's stubs return -1
+and leave every id at 0, so the row fails.
 
 ## Commands
 

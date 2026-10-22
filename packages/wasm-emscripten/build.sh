@@ -439,6 +439,31 @@ int main(void) {
 }
 #endif
 C
+cat > "$PRE_WORK/priv.c" <<'C'
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <unistd.h>
+int main(void) {
+  uid_t r, e, s;
+  printf("start %d %d %d %d\n", (int)getuid(), (int)geteuid(), (int)getgid(), (int)getegid());
+  int g = setgid(5);
+  printf("setgid %d getgid %d getegid %d\n", g, (int)getgid(), (int)getegid());
+  int rs = setresuid(6, 0, 6);
+  getresuid(&r, &e, &s);
+  printf("setresuid %d getresuid %d %d %d\n", rs, (int)r, (int)e, (int)s);
+  int u = setuid(5);
+  getresuid(&r, &e, &s);
+  printf("setuid %d getuid %d geteuid %d getresuid %d %d %d\n", u, (int)getuid(), (int)geteuid(), (int)r, (int)e, (int)s);
+  return 0;
+}
+C
+cat > "$PRE_WORK/kernel-root.js" <<'JS'
+const sliccCred = { ruid: 0, euid: 0, suid: 0, rgid: 0, egid: 0, sgid: 0, groups: [] };
+Module['sliccKernel'] = {
+  cred: () => ({ ...sliccCred, groups: [...sliccCred.groups] }),
+  setcred: (change) => { Object.assign(sliccCred, change); return 0; },
+};
+JS
 cat > "$PRE_WORK/kernel.js" <<'JS'
 Module['sliccKernel'] = {
   select: () => 42,
@@ -555,6 +580,25 @@ cp -R "$PKG"/lib/slicc/. "$NO_OVR/"
 for obj in "${SLICC_OVERRIDE_OBJS[@]}"; do rm "$NO_OVR/lib$obj.a"; done
 out="$(own_libc_run "$NO_OVR" own-libc-no-archives "$PRE_WORK/own-libc.c")"
 [[ "$out" == "$(own_libc_want libc)" ]] || { printf '%s\n' "$out" >&2; echo "homescoop: without the override archives a default link should get libc's kill, poll, pselect, nanosleep and set*id; PRESTAGE no longer tells them apart" >&2; exit 1; }
+PRIV_WANT=$'start 0 0 0 0\nsetgid 0 getgid 5 getegid 5\nsetresuid 0 getresuid 6 0 6\nsetuid 0 getuid 5 geteuid 5 getresuid 5 5 5'
+priv_run() {
+  local libdir=$1 out=$2
+  env EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$libdir" "${HOST_EMCC[@]}" --pre-js "$PRE_WORK/kernel-root.js" "$PRE_WORK/priv.c" -o "$PRE_WORK/$out.js" 2>"$PRE_WORK/$out.err" || { cat "$PRE_WORK/$out.err" >&2; return 1; }
+  (cd "$PRE_WORK" && node "$out.js")
+}
+PRIV_OUT="$(priv_run "$PKG/lib/slicc" priv)"
+printf '%s\n' "$PRIV_OUT"
+[[ "$PRIV_OUT" == "$PRIV_WANT" ]] || { echo "homescoop: as root, a default-linked program's setgid(5), setresuid(6, 0, 6) and setuid(5) do not reach the kernel's credentials (getgid, getresuid, getuid and geteuid after them), so a privilege drop would be a no-op (homescoop#1724)" >&2; exit 1; }
+NO_GAPS="$PRE_WORK/libslicc-no-libc-gaps-archive"
+mkdir -p "$NO_GAPS"
+cp -R "$PKG"/lib/slicc/. "$NO_GAPS/"
+rm "$NO_GAPS/libslicc_libc_gaps.a"
+PRIV_NO="$(priv_run "$NO_GAPS" priv-no-archive)"
+if [[ "$PRIV_NO" == "$PRIV_WANT" ]] || ! grep -q '^setuid -1 getuid 0 geteuid 0 ' <<<"$PRIV_NO"; then
+  printf '%s\n' "$PRIV_NO" >&2
+  echo "homescoop: without libslicc_libc_gaps.a libc's set*id stubs should leave the credentials at root; PRESTAGE no longer tests the privilege drop" >&2
+  exit 1
+fi
 OLD_OVR="$PRE_WORK/libslicc-6.0.9-30"
 mkdir -p "$OLD_OVR"
 cp -R "$NO_OVR"/. "$OLD_OVR/"
@@ -616,7 +660,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without libslicc_realpath.a realpath is ELOOP at 40 (#611, #1631), a program's own realpath (in its own source, a later object, an archive or -l) links and runs, not the archive's, and 6.0.9-28's plain slicc_realpath.o gives duplicate symbol: realpath (#1664), a default link gets the slicc tcgetpgrp/tcsetpgrp from libslicc_jobs.a and a program's own tcsetpgrp wins, -sMAIN_MODULE=1 and -sLINKABLE=1 links with the slicc defaults take lib/slicc/linkable (slicc_linkable_kill exported, libc's tcgetpgrp/tcsetpgrp, which the default link does not have) and run, and 6.0.9-29's lib/slicc gives duplicate symbol: tcsetpgrp and fails -sMAIN_MODULE=1 and -sLINKABLE=1 (#1678), a default link gets the slicc kill, poll, pselect, nanosleep and 8 set*id from libslicc_signals.a, libslicc_select.a and libslicc_libc_gaps.a (libc's without them), a program's own definition of each of the 12 (in its source, or poll and nanosleep in its own -l archive) links and runs its own while the other 11 stay slicc's, and 6.0.9-30's plain objects give duplicate symbol for each (#1724), --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without libslicc_realpath.a realpath is ELOOP at 40 (#611, #1631), a program's own realpath (in its own source, a later object, an archive or -l) links and runs, not the archive's, and 6.0.9-28's plain slicc_realpath.o gives duplicate symbol: realpath (#1664), a default link gets the slicc tcgetpgrp/tcsetpgrp from libslicc_jobs.a and a program's own tcsetpgrp wins, -sMAIN_MODULE=1 and -sLINKABLE=1 links with the slicc defaults take lib/slicc/linkable (slicc_linkable_kill exported, libc's tcgetpgrp/tcsetpgrp, which the default link does not have) and run, and 6.0.9-29's lib/slicc gives duplicate symbol: tcsetpgrp and fails -sMAIN_MODULE=1 and -sLINKABLE=1 (#1678), a default link gets the slicc kill, poll, pselect, nanosleep and 8 set*id from libslicc_signals.a, libslicc_select.a and libslicc_libc_gaps.a (libc's without them), a program's own definition of each of the 12 (in its source, or poll and nanosleep in its own -l archive) links and runs its own while the other 11 stay slicc's, and 6.0.9-30's plain objects give duplicate symbol for each, and as root setgid(5), setresuid(6, 0, 6) and setuid(5) change what getgid, getresuid, getuid and geteuid report, which libc's stubs (without libslicc_libc_gaps.a) do not (#1724), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"

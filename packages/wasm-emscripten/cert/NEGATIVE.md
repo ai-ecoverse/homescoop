@@ -216,3 +216,14 @@ PRESTAGE's `own-libc.c` calls all 12, with a `--pre-js` stand-in kernel (`select
 - `-DOWN_<name>` for each of the 12 (the program's own definition): links, `own` for that one and `slicc` for the other 11;
 - `poll` and `nanosleep` in the program's own `-l` archive: `own` for those two, `slicc` for the rest;
 - NEGATIVE: with 6.0.9-30's plain objects, each `-DOWN_<name>` link fails with `wasm-ld: error: duplicate symbol: <name>`, all 12 of them. The published 6.0.9-30 `lib/slicc` gives the same result by hand (`-DOWN_poll`: `duplicate symbol: poll`, `-DOWN_setuid`: `duplicate symbol: setuid`).
+
+The privilege drop is a behavioural row too (coordinator's review of #1740). PRESTAGE `priv.c` starts as root under a `--pre-js` stand-in kernel that keeps credentials. It calls `setgid(5)`, `setresuid(6, 0, 6)` and `setuid(5)`, and after each one reads back `getgid`/`getegid`, `getresuid`, and `getuid`/`geteuid`. The default link must print:
+
+```text
+start 0 0 0 0
+setgid 0 getgid 5 getegid 5
+setresuid 0 getresuid 6 0 6
+setuid 0 getuid 5 geteuid 5 getresuid 5 5 5
+```
+
+NEGATIVE: with `libslicc_libc_gaps.a` left out, libc's stubs resolve the set*id calls. The row then fails, because every call returns -1 and the ids stay at 0 (`setuid -1 getuid 0 geteuid 0 getresuid 0 0 0`). A link order that let libc win would make a daemon's privilege drop a silent no-op, and this row catches that.
