@@ -20,7 +20,8 @@ void __wasilibc_cwd_unlock(void);
 #endif
 extern char *__wasilibc_cwd;
 static int __wasilibc_cwd_mallocd = 0;
-static int __wasilibc_cwd_is_synced = 0;
+extern int __slicc_cwd_synced;
+int __slicc_cwd_fd_live(void);
 
 int chdir_legacy(const char *path)
 {
@@ -75,22 +76,24 @@ int chdir_legacy(const char *path)
     return 0;
 }
 
-static int __slicc_cwd_fd = -2;
-
 static int slicc_cwd_fd(void) {
-    int fd = __slicc_cwd_fd;
-    if (fd != -2)
-        return fd;
-    fd = -1;
-    __wasi_prestat_t prestat;
-    if (__wasi_fd_prestat_get(3, &prestat) == __WASI_ERRNO_SUCCESS &&
-        prestat.tag == __WASI_PREOPENTYPE_DIR && prestat.u.dir.pr_name_len == 1) {
-        char name[2] = {0, 0};
-        if (__wasi_fd_prestat_dir_name(3, (uint8_t *)name, 1) == __WASI_ERRNO_SUCCESS && name[0] == '.')
-            fd = 3;
+    return __slicc_cwd_fd_live() ? 3 : -1;
+}
+
+static int slicc_sync_cwd(void) {
+    char cwd[PATH_MAX];
+    char *copy = getcwd(cwd, sizeof cwd) ? strdup(cwd) : NULL;
+    __wasilibc_cwd_lock();
+    if (copy != NULL) {
+        char *prev_cwd = __wasilibc_cwd;
+        __wasilibc_cwd = copy;
+        if (__wasilibc_cwd_mallocd)
+            free(prev_cwd);
+        __wasilibc_cwd_mallocd = 1;
     }
-    __slicc_cwd_fd = fd;
-    return fd;
+    __slicc_cwd_synced = copy != NULL;
+    __wasilibc_cwd_unlock();
+    return copy != NULL ? 0 : -1;
 }
 
 static const char *slicc_skip_dot(const char *path) {
@@ -119,9 +122,7 @@ static int slicc_host_chdir(const char *rel) {
         errno = error;
         return -1;
     }
-    __wasilibc_cwd_lock();
-    __wasilibc_cwd_is_synced = 0;
-    __wasilibc_cwd_unlock();
+    slicc_sync_cwd();
     return 0;
 }
 
@@ -130,28 +131,8 @@ static const char *make_absolute(const char *path) {
         return path;
     }
 
-    if (!__wasilibc_cwd_is_synced) {
-        char cwd[256];
-        if (getcwd(cwd, sizeof(cwd)) != NULL) {
-            char *new_cwd = malloc(strlen(cwd) + 1);
-            if (new_cwd != NULL) {
-                strcpy(new_cwd, cwd);
-            }
-
-            __wasilibc_cwd_lock();
-            char *prev_cwd = __wasilibc_cwd;
-            __wasilibc_cwd = new_cwd;
-
-            if (__wasilibc_cwd_mallocd)
-                free(prev_cwd);
-
-            __wasilibc_cwd_is_synced = 1; // we synced the cwd
-            __wasilibc_cwd_mallocd = 1; // we allocated so next time, prev_cwd must be freed.
-            __wasilibc_cwd_unlock();
-        } else {
-            return NULL;
-        }
-    }
+    if (!__slicc_cwd_synced && slicc_sync_cwd() != 0)
+        return NULL;
 
     
     static char *make_absolute_buf = NULL;
@@ -303,6 +284,9 @@ int chdir(const char *path)
             errno = error;
             r = -1;
         }
+        __wasilibc_cwd_lock();
+        __slicc_cwd_synced = r == 0;
+        __wasilibc_cwd_unlock();
     }
     free(real);
     return r;

@@ -19,7 +19,13 @@ export default async function (ctx) {
     'file without newline: 0 r42-nonl uname=same',
     `file 64 chars: 0 ${LONG} uname=same`,
     'empty file: 0 r42-env uname=same',
-    'blank line: 0 r42-env uname=same',
+    'blank line: 0 r42-second uname=same',
+    'comment line: 0 r42-after uname=same',
+    'comment only: 0 r42-env uname=same',
+    'comment, no newline: 0 r42-env uname=same',
+    'indented comment and blank lines: 0 r42-third uname=same',
+    'comment then a bad line: 0 r42-env uname=same',
+    '700-byte file, comment first: 0 r42-long uname=same',
     'file 65 chars: 0 r42-env uname=same',
     'file 399 chars, no newline: 0 r42-env uname=same',
     'file with a slash: 0 r42-env uname=same',
@@ -29,7 +35,9 @@ export default async function (ctx) {
       'fifo, no writer: 0 r42-env',
       'fifo writer: 1',
       'fifo, a prefix then EAGAIN: 0 r42-env',
+      'fifo, a comment then EAGAIN: 0 r42-env',
       'fifo, a whole line: 0 r42-pipe',
+      'fifo, a comment then a line: 0 r42-pipe2',
     ]),
     `unlink /etc/hostname: ${served ? -1 : 0}`,
     `after unlink: /etc/hostname ${served ? 'present' : 'absent'}`,
@@ -44,5 +52,5 @@ export default async function (ctx) {
   const rows = served
     ? 'the kernel serves /etc/hostname (r42-node) with HOSTNAME unset; a root-written file wins'
     : 'no kernel /etc/hostname for WASIX; a FIFO there with no writer or with a prefix and then EAGAIN gives HOSTNAME, a whole line in it is used; file missing gives HOSTNAME, both missing slicc';
-  console.log(`r42 (${ctx.variant}, slicc-kernel ${ctx.kernelVersion}): gethostname()/uname().nodename take /etc/hostname's first line trimmed (with or without a newline, 64 chars kept); an empty, blank, 65-char, 399-char, slash or inner-space line falls back to HOSTNAME, then slicc; errno untouched; ${rows}`);
+  console.log(`r42 (${ctx.variant}, slicc-kernel ${ctx.kernelVersion}): gethostname()/uname().nodename take /etc/hostname's first line that isn't blank or a '#' comment, trimmed (with or without a newline, 64 chars kept, comments up to 1024 bytes skipped); a comment-only file, an empty, 65-char, 399-char, slash or inner-space line falls back to HOSTNAME, then slicc; errno untouched; ${rows}`);
 }

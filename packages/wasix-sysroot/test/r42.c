@@ -54,6 +54,17 @@ int main(void) {
   setenv("HOSTNAME", "r42-env", 1);
   line("empty file", "");
   line("blank line", "  \t\nr42-second\n");
+  line("comment line", "#c\nr42-after\n");
+  line("comment only", "#only\n");
+  line("comment, no newline", "#only");
+  line("indented comment and blank lines", "\n  # x\n\t\n\nr42-third\n#tail\n");
+  line("comment then a bad line", "#c\nr42 x\nr42-later\n");
+  char note[700];
+  memset(note, 'c', sizeof note);
+  note[0] = '#';
+  memcpy(note + sizeof note - 10, "\nr42-long\n", 10);
+  put(note, sizeof note);
+  show("700-byte file, comment first");
   line("file 65 chars", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklm\n");
   char big[400];
   memset(big, 'a', sizeof big - 1);
@@ -69,8 +80,12 @@ int main(void) {
     int w = open("/etc/hostname", O_RDWR | O_NONBLOCK);
     printf("fifo writer: %d\n", w >= 0 && write(w, "r42-part", 8) == 8);
     once("fifo, a prefix then EAGAIN");
+    if (w >= 0) write(w, "#c\n", 3);
+    once("fifo, a comment then EAGAIN");
     if (w >= 0) write(w, "r42-pipe\n", 9);
     once("fifo, a whole line");
+    if (w >= 0) write(w, "#c\n\nr42-pipe2\n", 14);
+    once("fifo, a comment then a line");
     if (w >= 0) close(w);
   }
   printf("unlink /etc/hostname: %d\n", unlink("/etc/hostname"));

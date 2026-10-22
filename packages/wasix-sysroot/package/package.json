@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-sysroot",
-  "version": "2025.9.30-42",
+  "version": "2025.9.30-43",
   "description": "C and C++ system libraries for building WASIX programs that run on slicc.",
   "license": "Apache-2.0 WITH LLVM-exception",
   "repository": {
