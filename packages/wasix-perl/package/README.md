@@ -48,6 +48,12 @@ were wasix-libc's values (`0140000` for a FIFO, `0160000` for a socket,
 wrong. `-p` and `-S` are unchanged. The build checks that `package.json`'s
 description names the wasix-sysroot it was built on (homescoop#752).
 
+## 5.42.0-22: a 64 MiB initial heap; wasix-sysroot -42
+
+- **Sysroot:** built on wasix-sysroot 2025.9.30-42. Since -40 its `malloc` allocates from the initial memory, since -41 relative paths and `getcwd` go through the process's cwd descriptor (a removed cwd gives ENOENT, as on Linux, on slicc-kernel ≥ 1.135.6), and since -42 `gethostname`/`uname` read `/etc/hostname` first (homescoop#1462).
+- **Initial heap:** `perl.wasm` links a 64 MiB initial memory (homescoop#1287, slicc-kernel#1172). Loading core modules, a 100000-key hash and an automake-style parse peak at 22-44 MiB, so they never grow the shared memory; bigger jobs grow past it, which -39's allocator refresh keeps safe. Up to 5.42.0-21 perl started at 13 MiB and grew for each of them.
+- **Kernel floor:** `engines` asks for slicc-kernel ≥ 1.120.0. Kernels from 1.106.2 on refuse to install the package on an older kernel (slicc-kernel#797); older kernels install it without a warning, and there flock, mkfifo and the signal features above aren't real (homescoop#651).
+
 ## 5.42.0-21: both licence texts; wasix-sysroot -39
 
 - **Licence:** perl is `Artistic-1.0-Perl OR GPL-1.0-or-later`, and `LICENSE` now carries both texts, perl's `Artistic` and `Copying` (GPL version 1). Up to 5.42.0-20 it held the Artistic text only (homescoop#995).

@@ -116,3 +116,9 @@ Against the published 5.42.0-20 on slicc-kernel 1.132.1 (the cert kernel), users
 - **#1024, `flock-lifetime.mjs`:** passes on -20 (`ofd:ex,refused dup:shares | childexit:refused | close:granted | held:refused | kill9:granted | eintr:EINTR`). It guards the behaviour -19 introduced. -18's fcntl emulation granted the second in-process open (`ofd:ex,granted`, the #1024 probes).
 - **#848, `config-paths.mjs`:** passes on -20. The fix landed in -19 (#850). On 5.42.0-18, `Config{ccflags}` held `-include /home/runner/work/homescoop/homescoop/packages/wasix-perl/wasix-posix-stubs.h` (#848's diff).
 - **Description:** -21's `package.json` description is one plain sentence for bios (Install/Update shows it word for word). The #752 check that the build names its wasix-sysroot moves from the description to the README's `- Built on wasix-sysroot <version> …` line.
+
+## 5.42.0-22: a sized 64 MiB initial heap on wasix-sysroot -42 (homescoop#1287, #819; 2026-10-22)
+
+Against the published 5.42.0-21 on slicc-kernel 1.132.1 (the cert kernel), users enforce, `--spec heap.mjs --spec users.mjs`:
+- **#1287, `heap.mjs`:** FAIL, `modules: the wasm memory stays at the 64 MiB initial heap … VmSize peak 22464 kB` (expected 65536). -21 links a 13 MiB initial memory on wasix-sysroot -39, whose dlmalloc ignores the initial pages, so every workload grows the memory: 17.4 MiB (fork), 21.9 (modules), 27.5 (automake-style parse), 43.8 (hash), 84 (the text rewrite). 0 traps there too, since perl is single-threaded; the spec pins that the sized build never calls `memory.grow` in typical use.
+- **#819, `users.mjs`:** passes on -21 under enforce (the permission-denial case is new coverage, not a regression). meta.json's new `users: enforce` runs every spec with permission checks; the full -21 suite passes under it except `heap.mjs`.
