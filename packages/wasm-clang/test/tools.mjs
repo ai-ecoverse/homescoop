@@ -103,6 +103,7 @@ try {
     ['cc -Werror -c a.s (homescoop#1408)', ['cc', '-Werror', '-c', 'a.s', '-o', 'a.o'], {}, 'a.o', /T foo/],
     ['cc -Werror -c a.s with WASIXCC_PIC=yes', ['cc', '-Werror', '-c', 'a.s', '-o', 'apic.o'], { WASIXCC_PIC: 'yes' }, 'apic.o', /T foo/],
     ['cc -Werror -x assembler -c raw.asm', ['cc', '-Werror', '-x', 'assembler', '-c', 'raw.asm', '-o', 'raw.o'], {}, 'raw.o', /T qux/],
+    ['cc -Werror -c raw.asm (no -x)', ['cc', '-Werror', '-c', 'raw.asm', '-o', 'rawx.o'], {}, 'rawx.o', /T qux/],
     ['c++ -Werror -c a.s', ['c++', '-Werror', '-c', 'a.s', '-o', 'axx.o'], {}, 'axx.o', /T foo/],
   ];
   const asmGot = [];

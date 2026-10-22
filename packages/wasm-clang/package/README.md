@@ -30,8 +30,8 @@ no extra WASI/EH flags needed for typical builds.
 - **CMake**: `CC=cc CXX=c++ cmake …` — Clang 24 is identified; `pthread.h`
   and the sysroot resolve under SLICC.
 
-- **Assembly**: for input that is only plain assembly (`.s`, or
-  `-x assembler`), the driver leaves out the C flags clang ignores there
+- **Assembly**: for input that is only plain assembly (`.s`, `.asm`,
+  or `-x assembler`), the driver leaves out the C flags clang ignores there
   (`-D_WASI_EMULATED_*`, `-pthread` when not linking, `-mthread-model`,
   `-fno-trapping-math`, `-fbracket-depth`, `-ftls-model`, `-fvisibility`), so
   `cc -Werror -c foo.s` works. `.S` and mixed C and assembly keep them.

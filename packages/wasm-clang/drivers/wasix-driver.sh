@@ -64,7 +64,7 @@ note_input() {
     assembler) asm_in=1 ;;
     '' | none)
       case "$1" in
-        *.s) asm_in=1 ;;
+        *.s | *.asm) asm_in=1 ;;
         *.o | *.a | *.so | *.lo | *.obj | *.wasm | -l?*) ;;
         *) other_src=1 ;;
       esac
