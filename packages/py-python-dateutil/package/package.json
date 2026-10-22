@@ -26,7 +26,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@ai-ecoverse/py-six": ">=1.17.0-3 <1.17.1"
+    "@ai-ecoverse/py-six": "1.17.0-5"
   },
   "homescoop": {
     "recipe": "py-python-dateutil",
