@@ -6,7 +6,6 @@ export const KNOWN_WITHOUT_SHIM_NOTICE = {
   cmake: '#844',
   'wasm-binaryen': '#844',
   'wasm-clang': '#844',
-  'wasm-emscripten': '#844',
 };
 
 export function shimNoticeErrors(wasm, pkg, notices, name) {

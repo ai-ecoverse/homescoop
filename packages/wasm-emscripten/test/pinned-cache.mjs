@@ -31,7 +31,7 @@ try {
   const pin = manifest.dependencies?.['@ai-ecoverse/emscripten-cache'];
   if (!/^\d+\.\d+\.\d+-\d+$/.test(pin || '')) throw new Error(`${manifest.name}@${manifest.version} does not pin @ai-ecoverse/emscripten-cache exactly: ${pin}`);
   console.log(`== ${manifest.name}@${manifest.version} pins @ai-ecoverse/emscripten-cache@${pin}`);
-  const r = spawnSync(process.execPath, [join(root, 'packages/emscripten-cache/cert/check.mjs'), '--tarball', `@ai-ecoverse/emscripten-cache@${pin}`], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const r = spawnSync(process.execPath, [join(root, 'packages/emscripten-cache/cert/check.mjs'), '--tarball', `@ai-ecoverse/emscripten-cache@${pin}`, '--member-order'], { stdio: ['ignore', 'pipe', 'inherit'] });
   const out = r.stdout.toString();
   process.stdout.write(out);
   if (r.status !== 0 || !/^PASS /m.test(out)) throw new Error(`the pinned emscripten-cache ${pin} fails its cert against this tree`);

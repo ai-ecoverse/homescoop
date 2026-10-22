@@ -1,0 +1,11 @@
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -883,7 +883,7 @@
+         linker_args.append(path)
+     # The JS halves of slicc_libc_gaps.o (writev, linkat, uname) and the
+     # exports and raise wrap of homescoop_slicc_keep_exports.
+-    for js in ('slicc-writev.js', 'slicc-linkat.js', 'slicc-uname.js'):
++    for js in ('slicc-writev.js', 'slicc-linkat.js', 'slicc-uname.js', 'slicc-env.js'):
+       path = os.path.join(slicc_lib, js)
+       if os.path.isfile(path) and path not in settings.JS_LIBRARIES:
+         settings.JS_LIBRARIES.append(path)

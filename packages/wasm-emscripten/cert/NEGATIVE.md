@@ -78,3 +78,27 @@ The new `test/files.test.mjs` row fails on the published 6.0.9-23: its `tools/sy
 ## 6.0.9-26: shim drift (homescoop#1491; 2026-10-20)
 
 6.0.9-26 ships the updated `shims/slicc` objects and JS libraries: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 6.0.9-25 in `lib/slicc/slicc-uname.js` and `lib/slicc/slicc_spawn.o`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn and uname tests. `shims/slicc/slicc-env.js` is not added to `lib/slicc` here: that would be a functional change and is left to the owner.
+
+## 6.0.9-27: slicc-env.js, the symlink bound, the shims notice and the cache pin (homescoop#1531, #611, #1536, #840, #1295; 2026-10-22)
+
+`test/files.test.mjs` (the package's `test` job, `HOMESCOOP_TGZ=<tarball>`) fails four rows on the published 6.0.9-26:
+
+```text
+not ok 1 - build.sh files entries name the tarball exactly (case-sensitive)       THIRD-PARTY-NOTICES.md (there: nothing)
+not ok 7 - lib/slicc ships slicc-env.js and the default link adds it, …           the tarball lacks package/lib/slicc/slicc-env.js
+not ok 8 - FS.lookupPath follows 40 symlinks, as Linux does …                      src/lib/libfs.js stops at 39 symlink follows
+not ok 9 - THIRD-PARTY-NOTICES.md carries the slicc shims notice for lib/slicc …  the tarball has no THIRD-PARTY-NOTICES.md
+```
+
+- **slicc-env.js (#1531).** 6.0.9-26's default link added `slicc-writev.js`, `slicc-linkat.js` and `slicc-uname.js`, but not `slicc-env.js`, which `homescoop_em_cli_ldflags` has had since #1491. So a program a user linked with this emcc saw Emscripten's placeholders: `USER`/`LOGNAME=web_user`, `HOME=/home/web_user`, `PATH=/`, `PWD=/`. 6.0.9-27 ships `lib/slicc/slicc-env.js`, and package patch 0015 adds it to `tools/link.py`'s tuple. build.sh's PRESTAGE links `envi.c` with the packaged defaults and runs it under `env -i node`: all five are `(unset)`. Without 0015 it prints `USER=web_user`.
+- **The symlink bound (#611).** 6.0.9's `FS.lookupPath` ran `nlinks < SYMLOOP_MAX` passes, and pass 0 follows no link, so 40 follows were `ELOOP` (scripts/emsdk-patches/libfs-symloop.patch is the 4.0.23 form and doesn't apply to 6.0.9). Package patch 0014 makes it `<=`. PRESTAGE's `symloop.c` builds a 40-link and a 41-link chain in MEMFS: `follows40 ok`, `follows41 ELOOP`. Without 0014 it prints `follows40 ELOOP`.
+- **The shims notice (#1536).** `lib/slicc` is compiled from `shims/slicc` (Apache-2.0), but 6.0.9-26 shipped no notice for it; `scripts/shim-notice.mjs` let it through as the closed #844. build.sh now writes `THIRD-PARTY-NOTICES.md` with `homescoop_notice_slicc_shims`, and the KNOWN_WITHOUT_SHIM_NOTICE entry is gone: `scripts/test/shim-notice.test.mjs` fails on 6.0.9-26's build.sh with `wasm-emscripten: links the slicc shims but writes no notice for them`.
+- **The cache pin.** `test/pinned-cache.mjs` now runs emscripten-cache's check with `--member-order` (name-ordered libc members, #1328, and the runtime notices, #1030). 6.0.9-26 pins emscripten-cache 6.0.9-4, which fails it:
+
+  ```text
+  FAIL AssertionError [ERR_ASSERTION]: THIRD-PARTY-NOTICES.md lacks: musl, LLVM libcxx, LLVM libcxxabi, LLVM libunwind, LLVM compiler-rt, dlmalloc, Emscripten (homescoop#1030)
+  ```
+
+  (its libc members are not name-ordered either). 6.0.9-27 pins 6.0.9-6, which passes.
+- **#840.** AUTHORS and SECURITY.md have shipped since the first real build (6.0.9-20), and row 4 (every file LICENSE cites is in the tarball) passes on 6.0.9-27; the published 6.0.9-19 fails it.
+- **source.tree (#1295).** The recipe pins the emscripten 6.0.9 commit's tree, `d3967f07…`, and its line leaves `scripts/source-tree-allowlist.txt`. emscripten-cache, which takes the same archive, keeps its line until its own next build.

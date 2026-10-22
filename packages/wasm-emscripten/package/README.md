@@ -27,8 +27,14 @@ pointing at this package's config.
 Executable links (not `-c` / `-r` / `-shared`) inject `homescoop_em_cli_ldflags`
 (`-sENVIRONMENT=web,worker,node -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1
 -sFORCE_FILESYSTEM=1`) and
-`lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs}.o`.
+`lib/slicc/{slicc_spawn,slicc_exec,slicc_signals,slicc_select,slicc_libc_gaps,slicc_jobs}.o`,
+with the JS libraries `lib/slicc/{slicc-writev,slicc-linkat,slicc-uname,slicc-env}.js`.
+`slicc-env.js` (since 6.0.9-27) gives a program only the environment the
+kernel passes: none of Emscripten's placeholders (`USER`/`LOGNAME=web_user`,
+`HOME=/home/web_user`, `PATH=/`, `PWD=/`), so under `env -i` they are unset.
 Opt out with **`SLICC_EMCC_PLAIN=1`** for plain web glue.
+`lib/slicc` is compiled from homescoop's slicc shims (`shims/slicc`,
+Apache-2.0); `THIRD-PARTY-NOTICES.md` carries that licence.
 `lib/slicc/slicc_main_envp.o` (make: `-Dmain=slicc_tool_main`) and
 `lib/slicc/slicc_fork.o` + `lib/slicc/slicc-fork.js` (needs ASYNCIFY) are
 shipped but not auto-linked. Fork opt-in:
@@ -59,6 +65,24 @@ Root `$PKG/emcc` (cmake toolchain) and `$PKG/bin/emcc` are the same self-suffici
 4. **Closure unsupported** — `-sCLOSURE=1` / `--closure` fail with: *Closure Compiler is not available in SLICC's Emscripten package*
 5. **Cache erase** — will not delete a symlinked `sysroot`
 6. **`execvpe`** — `tools/utils.py` passes `os.environ` so emconfigure/`emmake` keep `CC=emcc`
+
+### Package-only patches (`package-patches/`, since 6.0.9-27)
+
+On top of the shared `patches/` (which `scripts/emscripten-tree.sh` also
+applies for emscripten-cache, llvm-emscripten, wasm-clang, wasm-binaryen and
+cmake), this package ships two patches from `package-patches/`. They are kept
+out of `patches/` so they don't change the published glue of those packages
+without their own release:
+
+- **0014, the symlink bound** (homescoop#611): `FS.lookupPath` allows 40
+  symlink follows, as Linux does, and the 41st is `ELOOP`. Before it, a path
+  of exactly 40 follows was `ELOOP` in every program this emcc linked.
+- **0015, `slicc-env.js` in the default link** (homescoop#1531), as
+  `homescoop_em_cli_ldflags` has it.
+
+build.sh applies both to the shipped tree and to the tree it links its
+PRESTAGE programs with. wasm-clang, wasm-binaryen and cmake pick them up at
+their own next release, or a later wave folds them into `patches/`.
 
 ## Commands
 

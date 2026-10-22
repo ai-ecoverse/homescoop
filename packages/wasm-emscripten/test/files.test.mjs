@@ -66,3 +66,25 @@ test('tools/system_libs.py walks musl in name order, so libc member names are th
   const src = execFileSync('tar', ['-xzOf', tgz, 'package/tools/system_libs.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
   assert.match(src, /dirnames\.sort\(\)\n\n {6}for f in sorted\(filenames\):/, 'libc.get_files walks os.walk in filesystem order');
 });
+
+test('lib/slicc ships slicc-env.js and the default link adds it, so a program sees only the environment the kernel passes (homescoop#1531, package patch 0015)', () => {
+  const { paths } = tarball();
+  assert.ok(paths.includes('package/lib/slicc/slicc-env.js'), 'the tarball lacks package/lib/slicc/slicc-env.js');
+  const env = execFileSync('tar', ['-xzOf', tgz, 'package/lib/slicc/slicc-env.js'], { encoding: 'utf8' });
+  assert.match(env, /\$getEnvStrings:/, 'lib/slicc/slicc-env.js does not replace $getEnvStrings');
+  const link = execFileSync('tar', ['-xzOf', tgz, 'package/tools/link.py'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  assert.match(link, /for js in \('slicc-writev\.js', 'slicc-linkat\.js', 'slicc-uname\.js', 'slicc-env\.js'\):/, "tools/link.py's default link does not add slicc-env.js");
+});
+
+test('FS.lookupPath follows 40 symlinks, as Linux does (homescoop#611, package patch 0014)', () => {
+  const src = execFileSync('tar', ['-xzOf', tgz, 'package/src/lib/libfs.js'], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  assert.match(src, /linkloop: for \(var nlinks = 0; nlinks <= \{\{\{ cDefs\.SYMLOOP_MAX \}\}\}; nlinks\+\+\)/, 'src/lib/libfs.js stops at 39 symlink follows');
+});
+
+test('THIRD-PARTY-NOTICES.md carries the slicc shims notice for lib/slicc (homescoop#1536)', () => {
+  const { paths } = tarball();
+  assert.ok(paths.includes('package/THIRD-PARTY-NOTICES.md'), 'the tarball has no THIRD-PARTY-NOTICES.md');
+  const notices = execFileSync('tar', ['-xzOf', tgz, 'package/THIRD-PARTY-NOTICES.md'], { encoding: 'utf8' });
+  assert.match(notices, /^## homescoop: the slicc shims \(shims\/slicc, Apache-2\.0\)$/m);
+  assert.match(notices, /Apache License\s+Version 2\.0/);
+});

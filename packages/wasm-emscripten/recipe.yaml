@@ -7,6 +7,8 @@ summary: "Emscripten 6.0.9 (emcc) for slicc via wasix-python"
 source:
   url: "https://github.com/emscripten-core/emscripten/archive/4e4223852a0835923411059a3929907d7df1232e.tar.gz"
   sha256: "426911732c683c5940e3e089782d90d272ec2738c933e53593f9e9a65ff6aa96"
+  commit: "4e4223852a0835923411059a3929907d7df1232e"
+  tree: "d3967f072c02d7c0779fc64e7e19e01002de65c3"
 dependencies:
   build: []
   host: []
