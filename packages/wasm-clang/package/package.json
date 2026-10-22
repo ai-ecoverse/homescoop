@@ -33,7 +33,7 @@
     "upstream": "24.0.0"
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-sysroot": "2025.9.30-38",
+    "@ai-ecoverse/wasix-sysroot": "2025.9.30-43",
     "@ai-ecoverse/wasm-binaryen": "132.0.0-4"
   },
   "engines": {
