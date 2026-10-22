@@ -1,6 +1,6 @@
 --- a/sys-utils/flock.c
 +++ b/sys-utils/flock.c
-@@ -49,6 +49,15 @@
+@@ -49,6 +49,27 @@
  #include "timer.h"
  #include "default_shell.h"
  
@@ -11,12 +11,24 @@
 +# include <spawn.h>
 +# include <time.h>
 +extern char **environ;
++
++static int slicc_gettime_monotonic(struct timeval *tv)
++{
++	struct timespec ts;
++
++	if (clock_gettime(CLOCK_MONOTONIC, &ts))
++		return -1;
++	tv->tv_sec = ts.tv_sec;
++	tv->tv_usec = ts.tv_nsec / 1000;
++	return 0;
++}
++# define gettime_monotonic slicc_gettime_monotonic
 +#endif
 +
  #ifndef F_OFD_GETLK
  #define F_OFD_GETLK	36
  #define F_OFD_SETLK	37
-@@ -349,6 +358,10 @@
+@@ -349,6 +370,10 @@
  		errx(EX_USAGE, _("requires file descriptor, file or directory"));
  	}
  
@@ -27,7 +39,7 @@
  	if (have_timeout) {
  		if (timeout.it_value.tv_sec == 0 &&
  		    timeout.it_value.tv_usec == 0) {
-@@ -358,9 +371,23 @@
+@@ -358,9 +383,23 @@
  			 */
  			have_timeout = 0;
  			block = LOCK_NB;
@@ -52,7 +64,7 @@
  	}
  
  	if (verbose)
-@@ -374,6 +401,22 @@
+@@ -374,6 +413,22 @@
  			 * EAGAIN/EWOULDBLOCK.
  			 */
  		case EACCES:
@@ -75,7 +87,7 @@
  			/* -n option set and failed to lock. */
  			if (verbose)
  				warnx(_("failed to get lock"));
-@@ -439,9 +482,26 @@
+@@ -439,9 +494,26 @@
  			printf(_("%s: executing %s\n"), program_invocation_short_name, cmd_argv[0]);
  
  		if (!no_fork) {

@@ -33,5 +33,28 @@ export default async function (ctx) {
   assert.equal(rc.status, 7, "flock returns the command's status");
   const w0 = await go(['flock', '-w', '0', '/tmp/l', 'true']);
   assert.equal(w0.status, 0);
-  console.log(`flock: -n is rc 1 (and -E 9) while held, -w 1 times out after ${wait1.ms} ms, a blocking -s waits ${blocked.ms} ms then runs -c, rc passes through, and the lock is free after release`);
+
+  const nfRc = await go(['flock', '-F', '/tmp/l', 'bash', '-c', 'exit 7']);
+  assert.equal(nfRc.status, 7, `flock -F returns the command's status: rc ${nfRc.status} ${nfRc.stderr}`);
+  const nfC = await go(['flock', '-F', '/tmp/l', '-c', 'echo f']);
+  assert.equal(nfC.status, 0, `flock -F -c runs the string: ${nfC.stderr}`);
+  assert.equal(nfC.stdout, 'f\n');
+  const nfHolder = go(['flock', '-F', '-x', '/tmp/l', 'sleep', '3']);
+  await sleep(1000);
+  const nfBusy = await go(['flock', '-n', '/tmp/l', 'true']);
+  assert.equal(nfBusy.status, 1, `flock -n while flock -F holds it: rc ${nfBusy.status} ${nfBusy.stderr}`);
+  const nfHeld = await nfHolder;
+  assert.equal(nfHeld.status, 0, `flock -F holder: ${nfHeld.stderr}`);
+  const nfAfter = await go(['flock', '-n', '/tmp/l', 'true']);
+  assert.equal(nfAfter.status, 0, `flock -n after the -F holder ends: ${nfAfter.stderr}`);
+
+  const vHolder = go(['flock', '-x', '/tmp/l', 'sleep', '3']);
+  await sleep(500);
+  const verbose = await go(['flock', '--verbose', '/tmp/l', 'true']);
+  await vHolder;
+  assert.equal(verbose.status, 0, `flock --verbose: ${verbose.stderr}`);
+  const took = /getting lock took (\d+\.\d+) seconds/.exec(verbose.stdout);
+  assert.ok(took, `flock --verbose reports the wait: ${JSON.stringify(verbose.stdout)}`);
+  assert.ok(Number(took[1]) >= 1.0, `flock --verbose reports ${took[1]} s for a wait of about 2.5 s`);
+  console.log(`flock: -n is rc 1 (and -E 9) while held, -w 1 times out after ${wait1.ms} ms, a blocking -s waits ${blocked.ms} ms then runs -c, rc passes through, the lock is free after release, -F runs the command in place and holds the lock while it runs, and --verbose reports a ${took[1]} s wait`);
 }

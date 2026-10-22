@@ -21,7 +21,7 @@ SLICC_A="$WORK/libslicc-util-linux.a"
 # homescoop#977).
 homescoop_slicc_archive "$SLICC_A" spawn
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=262144 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain"
-CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags) -Wl,--whole-archive $SLICC_A -Wl,--no-whole-archive"
+CLI_LDFLAGS="$(homescoop_slicc_keep_exports) $(homescoop_slicc_keep_spawn) $(homescoop_em_cli_ldflags) -Wl,--whole-archive -Wl,$SLICC_A -Wl,--no-whole-archive"
 
 # --disable-all-programs also forces rev, colrm, look, getopt, column and flock off,
 # and they have no --enable-<name> to turn them back on (UL_BUILD_INIT with
@@ -68,8 +68,14 @@ if [[ ! -f "$SRC/rev.wasm" || -n "${FORCE:-}" ]]; then
     jobs="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
     # libtool drops emcc's -s… link flags from LDFLAGS (no callMain in the
     # glue); it keeps the compiler command whole, so link through CCLD.
-    emmake make -j"$jobs" V=1 "${PROGS[@]}" CCLD="emcc $CLI_LDFLAGS"
+    emmake make -j"$jobs" V=1 "${PROGS[@]}" CCLD="emcc $CLI_LDFLAGS" 2>&1 | tee "$WORK/make.log"
   )
+  grep -E '^libtool: link: emcc .* -o flock ' "$WORK/make.log" \
+    | grep -F -- "-Wl,--whole-archive -Wl,$SLICC_A -Wl,--no-whole-archive" >/dev/null || {
+    echo "util-linux: the flock link does not take $SLICC_A inside --whole-archive" >&2
+    exit 1
+  }
+  node "$HOMESCOOP_PKG/check-flock-imports.mjs" "$SRC/flock.wasm"
   # A disabled program still has a link rule, with no objects: catch that.
   for p in "${PROGS[@]}"; do
     grep -q "^S\\[\"BUILD_$(echo "$p" | tr a-z A-Z)_TRUE\"\\]=\"\"" "$SRC/config.status" || {
@@ -102,4 +108,19 @@ LIC="$WORK/util-linux-LICENSE"
 homescoop_stage_license "$LIC"
 homescoop_notices_begin "The wasm modules in bin/ statically link the following."
 homescoop_notice_emscripten
+PROG_SRCS=(text-utils/rev.c text-utils/column.c text-utils/hexdump.c text-utils/colrm.c misc-utils/look.c misc-utils/getopt.c sys-utils/flock.c)
+HEADERS=()
+for s in "${PROG_SRCS[@]}"; do
+  h="$WORK/notices/$(basename "$s").header"
+  {
+    printf '%s\n\n' "$s"
+    awk 'NR == 1 && !/^\/\*/ { exit } /\*\// { exit } NR > 1 { sub(/^ \*[ \t]?/, ""); print }' "$SRC/$s"
+  } > "$h"
+  grep -q 'Copyright' "$h" || {
+    echo "util-linux: no copyright line in the header of $s" >&2
+    exit 1
+  }
+  HEADERS+=("$h" -)
+done
+homescoop_notice "util-linux $VERSION: the copyright and permission notices of the program sources" "${HEADERS[@]}"
 echo "== util-linux: staged → $HOMESCOOP_PKG/package ($VERSION)"
