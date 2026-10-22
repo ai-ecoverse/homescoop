@@ -109,6 +109,7 @@ function io({ artifacts, tarballs = {}, conclusions = {} }) {
   return {
     published: async () => false,
     pullRequest: async () => PR,
+    changedFiles: async () => ['packages/grep/recipe.yaml'],
     artifacts: async () => artifacts,
     run: async (id) => ({ id, path: LADDER, event: 'pull_request', head_sha: HEAD, status: 'completed', conclusion: conclusions[id] ?? 'success' }),
     jobs: async () => [{ name: 'ci', conclusion: 'success' }],

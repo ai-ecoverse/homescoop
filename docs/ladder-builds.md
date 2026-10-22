@@ -87,6 +87,19 @@ fails is rejected with that reason, and the next one is tried (GET requests
 are retried once after a 5xx). Anything else fails the package red and
 publishes nothing.
 
+**A publish-path change publishes nothing (#1712).** A PR's `pull_request`
+run executes that PR's own copy of the workflow and the gate scripts, so its
+green run says nothing about a gate it replaces. When the PR's `base...head`
+range touches the publish path (`PUBLISH_PATH` in
+`scripts/ladder-merge-resolve.mjs`: `ladder-build.yml`, the resolve and
+merge-group scripts, everything the `publish` and `group` jobs run and load,
+and `scripts/review-browser.mjs`) and the PR would release a package, the
+resolve refuses it, and so does the merge-group check, which resolves each
+member the same way. Land the publish-path change in a PR that releases no
+package (it merges normally and publishes nothing), then release the package
+from a later PR. `scripts/test/ladder-merge-resolve.test.mjs` checks that the
+list covers every script those jobs run.
+
 There is no other path: no `certified=` lines, no cert-review record, no
 dispatch to another workflow. The bytes that ship are the bytes the reviewers
 had in their browsers.

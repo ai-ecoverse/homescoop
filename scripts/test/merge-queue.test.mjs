@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LADDER, githubIo, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
+import { LADDER, changedFiles, githubIo, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
 import { checkGroup, gitIn, groupMembers, treeDigester } from '../merge-group-check.mjs';
 import { globRegExp, toolchainInputs } from '../list-touched-packages.mjs';
 
@@ -62,9 +62,13 @@ function queueMerge(r, onto, head, number, name) {
   return sha;
 }
 
-function twoPrGroup(r, { samepackage = false } = {}) {
+function twoPrGroup(r, { samepackage = false, gate = false, gateOnly = false } = {}) {
   const a = branch(r, 'bb/a', r.base, () => r.pkg('alpha', '1.0.0-2'));
-  const b = branch(r, 'bb/b', r.base, () => (samepackage ? r.put('packages/alpha/build.sh', 'make\n') : r.pkg('beta', '2.0.0-2')));
+  const b = branch(r, 'bb/b', r.base, () => {
+    if (gate || gateOnly) r.put(LADDER, 'name: ladder-build\n');
+    if (samepackage) r.put('packages/alpha/build.sh', 'make\n');
+    else if (!gateOnly) r.pkg('beta', '2.0.0-2');
+  });
   const m1 = queueMerge(r, r.base, a, 11, 'bb/a');
   const m2 = queueMerge(r, m1, b, 12, 'bb/b');
   return { a, b, m1, m2 };
@@ -85,12 +89,13 @@ function touchedOf(r) {
 }
 
 // One PR's ladder-build pull_request run and artifact, as ladder-merge-resolve reads them.
-function memberIo({ number, head, sha, pkg, version, author = 'trieloff', conclusion = 'success' }) {
+function memberIo({ number, head, sha, pkg, version, author = 'trieloff', conclusion = 'success', files = [`packages/${pkg}/recipe.yaml`] }) {
   const runId = 1000 + number;
   const artifact = { id: 2000 + number, name: `host-${pkg}-pr${number}`, expired: false, created_at: '2026-10-17T00:00:00Z', workflow_run: { id: runId, head_sha: head } };
   return {
     published: async () => false,
     pullRequest: async () => ({ number, head, author }),
+    changedFiles: async () => files,
     run: async (id) => ({ id, path: LADDER, event: 'pull_request', head_sha: head, status: 'completed', conclusion }),
     artifacts: async () => [artifact],
     jobs: async () => [{ name: 'ci', conclusion: conclusion === 'success' ? 'success' : 'failure' }, { name: 'pipeline / review', conclusion }],
@@ -104,7 +109,7 @@ function groupIo(r, g, over = {}) {
     11: memberIo({ number: 11, head: g.a, sha: SHA_A, pkg: 'alpha', version: '1.0.0-2', ...over[11] }),
     12: memberIo({ number: 12, head: g.b, sha: SHA_B, pkg: 'beta', version: '2.0.0-2', ...over[12] }),
   };
-  return { pull: async (n) => prs[n], member: (m) => ios[m.number] };
+  return { pull: async (n) => prs[n], member: (m) => ({ ...ios[m.number], changedFiles: async (pr) => changedFiles(`${m.commit}^1`, pr.head, r.git) }) };
 }
 
 async function check(r, g, over) {
@@ -194,6 +199,34 @@ test('the group check passes a clean two-PR group without building anything', as
     assert.deepEqual(problems, []);
     assert.ok(notes.some((n) => /^alpha: the push would publish: .*host-alpha-pr11 artifact 2011/.test(n)), notes.join('\n'));
     assert.ok(notes.some((n) => /^beta: the push would publish: .*host-beta-pr12 artifact 2012/.test(n)), notes.join('\n'));
+  } finally {
+    r.cleanup();
+  }
+});
+
+test('NEGATIVE: a queued PR that changes the publish path and releases a package fails the group (homescoop#1712)', async () => {
+  const r = repo();
+  try {
+    const g = twoPrGroup(r, { gate: true });
+    const { problems, notes } = await check(r, g);
+    assert.deepEqual(problems, [
+      'beta: the push would refuse to publish #12: PR #12 changes the publish path (.github/workflows/ladder-build.yml) and releases @ai-ecoverse/beta@2.0.0-2. '
+        + "Its green pull_request run ran that PR's own copy of the gate, so it vouches for nothing (homescoop#1712). "
+        + 'A publish-path change merges without publishing anything: land it in a PR that releases no package, and release @ai-ecoverse/beta from a later PR',
+    ]);
+    assert.ok(notes.some((n) => /^alpha: the push would publish: /.test(n)), notes.join('\n'));
+  } finally {
+    r.cleanup();
+  }
+});
+
+test('a queued PR that changes only the publish path releases nothing and passes the group', async () => {
+  const r = repo();
+  try {
+    const g = twoPrGroup(r, { gateOnly: true });
+    const { problems, notes } = await check(r, g);
+    assert.deepEqual(problems, []);
+    assert.ok(notes.includes(`#12 at ${g.b} (merge ${g.m2}): no package`), notes.join('\n'));
   } finally {
     r.cleanup();
   }

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { LADDER, candidateProblems, githubApi, parseArgs, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
+import { LADDER, PUBLISH_PATH, candidateProblems, changedFiles, githubApi, parseArgs, publishPathProblem, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
+import { job } from './ladder-workflow.mjs';
 
 const NAME = '@ai-ecoverse/wasi-impeccable';
 const VERSION = '0.1.14-1';
@@ -30,7 +31,7 @@ function run(id, head, conclusion = 'success', extra = {}) {
 
 const PR = { number: 336, head: HEAD, author: 'trieloff' };
 
-function fakeIo({ published = false, pr = PR, artifacts = [], runs = {}, jobs = {}, tarballs = {} } = {}) {
+function fakeIo({ published = false, pr = PR, files = ['packages/wasi-impeccable/recipe.yaml'], artifacts = [], runs = {}, jobs = {}, tarballs = {} } = {}) {
   const calls = [];
   return {
     calls,
@@ -41,6 +42,10 @@ function fakeIo({ published = false, pr = PR, artifacts = [], runs = {}, jobs = 
     async pullRequest() {
       calls.push(['pullRequest']);
       return pr;
+    },
+    async changedFiles(p) {
+      calls.push(['changedFiles', p.number, p.head]);
+      return files;
     },
     async artifacts(name) {
       calls.push(['artifacts', name]);
@@ -250,6 +255,112 @@ describe('resolvePackage', () => {
       /no usable host-wasi-impeccable-pr336: artifact 3: GET \/actions\/runs\/30 returned 404 \| artifact 2: GET \/actions\/runs\/20\/jobs\?filter=latest&per_page=100 returned 502 \| artifact 1: run 10 is at 340364dd/,
     );
     assert.equal(io.calls.some(([c]) => c === 'download'), false);
+  });
+});
+
+describe('a PR that changes the publish path (homescoop#1712)', () => {
+  const green = {
+    artifacts: [artifact(2, 20, HEAD)],
+    runs: { 20: run(20, HEAD) },
+    tarballs: { 2: tarball(GOOD) },
+  };
+  const pkgFiles = ['packages/wasi-impeccable/recipe.yaml', 'packages/wasi-impeccable/package/package.json'];
+
+  it('NEGATIVE: one that also releases a package is refused before any artifact is read', async () => {
+    const io = fakeIo({ ...green, files: [...pkgFiles, LADDER, 'scripts/merge-group-check.mjs'] });
+    await assert.rejects(resolvePackage(ctx, io), (err) => {
+      assert.match(err.message, /^PR #336 changes the publish path \(\.github\/workflows\/ladder-build\.yml, scripts\/merge-group-check\.mjs\) and releases @ai-ecoverse\/wasi-impeccable@0\.1\.14-1\./);
+      assert.match(err.message, /homescoop#1712/);
+      assert.match(err.message, /merges without publishing anything: land it in a PR that releases no package, and release @ai-ecoverse\/wasi-impeccable from a later PR$/);
+      return true;
+    });
+    assert.deepEqual(io.calls.map(([c]) => c), ['published', 'pullRequest', 'changedFiles']);
+    assert.deepEqual(io.calls[2], ['changedFiles', 336, HEAD]);
+  });
+
+  it('NEGATIVE: every publish-path file alone is enough to refuse', async () => {
+    for (const file of PUBLISH_PATH) {
+      await assert.rejects(resolvePackage(ctx, fakeIo({ ...green, files: [...pkgFiles, file] })), new RegExp(`changes the publish path \\(${file.replace(/[.]/g, '\\.')}\\)`), file);
+    }
+  });
+
+  it('a package-only PR publishes, next to scripts outside the publish path', async () => {
+    const io = fakeIo({ ...green, files: [...pkgFiles, 'scripts/host-run.sh', 'scripts/browser-cert/run.mjs', 'docs/ladder-builds.md'] });
+    const result = await resolvePackage(ctx, io);
+    assert.equal(result.decision, 'publish');
+    assert.equal(result.inputs.certified, GOOD);
+  });
+
+  it('a publish-path PR whose package version is already on npm releases nothing and skips', async () => {
+    const io = fakeIo({ ...green, published: true, files: [...pkgFiles, LADDER] });
+    assert.equal((await resolvePackage(ctx, io)).decision, 'skip');
+  });
+
+  it('fails closed when the changed files cannot be read', async () => {
+    const io = fakeIo(green);
+    io.changedFiles = async () => {
+      throw new Error('fatal: bad revision');
+    };
+    await assert.rejects(resolvePackage(ctx, io), /bad revision/);
+  });
+
+  it('publishPathProblem names only the publish-path files', () => {
+    const who = { number: 7, name: NAME, version: VERSION };
+    assert.equal(publishPathProblem(['packages/x/recipe.yaml', 'scripts/ladder-merge-resolve.mjs.bak', 'xscripts/gate.mjs'], who), '');
+    assert.match(publishPathProblem(['scripts/gate.mjs', 'scripts/oidc-publish.sh', 'README.md'], who), /^PR #7 changes the publish path \(scripts\/gate\.mjs, scripts\/oidc-publish\.sh\) and/);
+  });
+
+  it('the list covers every script the publish and group jobs run, and the scripts those load', () => {
+    const root = join(import.meta.dirname, '..', '..');
+    const entries = [job('publish'), job('group')].flatMap((t) => [...t.matchAll(/scripts\/([a-z0-9-]+\.(?:mjs|sh))/g)].map((m) => m[1]));
+    assert.ok(entries.includes('ladder-merge-resolve.mjs') && entries.includes('oidc-publish.sh') && entries.includes('merge-group-check.mjs'), entries.join());
+    const loads = /(?:from '\.\/|join\(\w+, '(?:scripts\/)?|node\('|"\$\(dirname "\$0"\)\/)([a-z0-9-]+\.mjs)/g;
+    const seen = new Set();
+    const todo = [...entries, 'list-touched-packages.mjs'];
+    while (todo.length) {
+      const f = todo.pop();
+      if (seen.has(f)) continue;
+      seen.add(f);
+      for (const m of readFileSync(join(root, 'scripts', f), 'utf8').matchAll(loads)) todo.push(m[1]);
+    }
+    const missing = [...seen].map((f) => `scripts/${f}`).filter((f) => !PUBLISH_PATH.includes(f));
+    assert.deepEqual(missing, []);
+    for (const f of [LADDER, 'scripts/review-browser.mjs']) assert.ok(PUBLISH_PATH.includes(f), f);
+  });
+
+  it('changedFiles is the PR range base...head, with both sides of a rename', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ladder-merge-files-'));
+    const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' });
+    const put = (path, text) => {
+      mkdirSync(join(dir, path, '..'), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    };
+    try {
+      git('init', '-q', '-b', 'main');
+      git('config', 'user.name', 'test');
+      git('config', 'user.email', 'test@example.com');
+      git('config', 'commit.gpgsign', 'false');
+      put(LADDER, 'name: ladder-build\non: push\njobs: {}\n');
+      put('README.md', 'a\n');
+      git('add', '-A');
+      git('commit', '-q', '-m', 'base');
+      git('checkout', '-q', '-b', 'pr');
+      git('mv', LADDER, '.github/workflows/other.yml');
+      put('packages/a/recipe.yaml', 'v2\n');
+      git('add', '-A');
+      git('commit', '-q', '-m', 'pr');
+      const head = git('rev-parse', 'HEAD').trim();
+      git('checkout', '-q', 'main');
+      put('README.md', 'b\n');
+      git('add', '-A');
+      git('commit', '-q', '-m', 'main moves');
+      git('merge', '-q', '--no-ff', '-m', 'Merge pull request #9 from x/pr', 'pr');
+      const merge = git('rev-parse', 'HEAD').trim();
+      assert.deepEqual(changedFiles(`${merge}^1`, head, git).sort(), ['.github/workflows/ladder-build.yml', '.github/workflows/other.yml', 'packages/a/recipe.yaml']);
+      assert.throws(() => changedFiles(`${merge}^1`, 'f'.repeat(40), git));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
