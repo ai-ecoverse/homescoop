@@ -241,3 +241,18 @@ A pin-only release, with no ImageMagick change. The delegates move to their npm 
   ```
 
   9.5 ships gsfonts' README (which states the exception: "GPL with an exception that you can put these fonts in your own non-GPLed documents") as `etc/fonts/README` next to COPYING (GPL version 2), and the notice carries both. package.json `license` adds `GPL-2.0-only WITH Font-exception-2.0`, the nearest SPDX expression; README.md says the README's wording is the grant.
+
+## 7.1.2-34-9.6: a failed write in a directory the caller can't write leaves the file (homescoop#1608; 2026-10-22)
+
+`mogrify-users.mjs` (shared with imagemagick) against the published 7.1.2-34-9.5, slicc-kernel 1.110.1, `--users enforce`, fails at its new #1608 row exactly as wasm-imagemagick 9.5 does. As kim, over root's 0666 big.png, big2.png and w.png in root's 0755 /tmp/rd:
+
+```text
+AssertionError [ERR_ASSERTION]: kim over root's 0666 files in root's 0755 /tmp/rd, where no temporary file can go beside the target (homescoop#1608): ...
+mogrify: cache resources exhausted `/tmp/rd/big.png' @ error/cache.c/OpenPixelCache/4044.
+mogrify: No IDATs written into file `/tmp/rd/big.png' @ error/png.c/MagickPNGError/1308.
+magick: cache resources exhausted `/tmp/rd/big2.png' @ error/cache.c/OpenPixelCache/4044.
++ 'rc=1\nroot root 666\nrc=1\nroot root 666\nrc=0\n20 20\nroot root 666\nbig.png\nbig2.png\nw.png\n0\n'
+- 'rc=1\nsame\nroot root 666\nrc=1\nsame\nroot root 666\nrc=0\n20 20\nroot root 666\nbig.png\nbig2.png\nw.png\n0\n'
+```
+
+Neither failed write keeps the file: with no temporary file possible beside the target, both patches fell back to upstream's in-place write. The 9.6 change (a temporary file in `$MAGICK_TEMPORARY_PATH`, `$TMPDIR` or `/tmp`, copied in only after a complete encode, or a refusal when none can be created) and the full table are in packages/imagemagick/cert/NEGATIVE.md.
