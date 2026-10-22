@@ -14,6 +14,8 @@ static const char *en(int e) {
     case ENOTDIR: return "ENOTDIR";
     case EBADF: return "EBADF";
     case EACCES: return "EACCES";
+    case ERANGE: return "ERANGE";
+    case EINVAL: return "EINVAL";
     default: return strerror(e);
   }
 }
@@ -36,6 +38,24 @@ static void opened(const char *what, int fd) {
   if (k > 0) b[k] = 0;
   close(fd);
   printf("%s: 0 %s\n", what, b);
+}
+
+static void sized(const char *what, size_t size) {
+  char b[16];
+  memset(b, 'x', sizeof b);
+  b[sizeof b - 1] = 0;
+  errno = 0;
+  char *r = getcwd(b, size);
+  if (!r) printf("%s: %s\n", what, en(errno));
+  else printf("%s: %s\n", what, b);
+}
+
+static void heap(const char *what, size_t size) {
+  errno = 0;
+  char *r = getcwd(NULL, size);
+  if (!r) { printf("%s: %s\n", what, en(errno)); return; }
+  printf("%s: %s %zu\n", what, r, strlen(r));
+  free(r);
 }
 
 static void make(const char *path, const char *text) {
@@ -79,6 +99,28 @@ static void rows(const char *tag) {
   cwd(w);
   snprintf(w, sizeof w, "%s: open real/f again", tag);
   opened(w, open("real/f", O_RDONLY));
+  snprintf(w, sizeof w, "%s: chdir missing", tag);
+  rc(w, chdir("missing"));
+  snprintf(w, sizeof w, "%s: chdir real/f", tag);
+  rc(w, chdir("real/f"));
+  snprintf(w, sizeof w, "%s: chdir /tmp/r43/missing", tag);
+  rc(w, chdir("/tmp/r43/missing"));
+  snprintf(w, sizeof w, "%s: getcwd after failed chdir", tag);
+  cwd(w);
+  snprintf(w, sizeof w, "%s: open real/f after failed chdir", tag);
+  opened(w, open("real/f", O_RDONLY));
+  snprintf(w, sizeof w, "%s: getcwd(NULL, 0)", tag);
+  heap(w, 0);
+  snprintf(w, sizeof w, "%s: getcwd(NULL, 9)", tag);
+  heap(w, 9);
+  snprintf(w, sizeof w, "%s: getcwd(NULL, 8)", tag);
+  heap(w, 8);
+  snprintf(w, sizeof w, "%s: getcwd 9 bytes", tag);
+  sized(w, 9);
+  snprintf(w, sizeof w, "%s: getcwd 8 bytes", tag);
+  sized(w, 8);
+  snprintf(w, sizeof w, "%s: getcwd 0 bytes", tag);
+  sized(w, 0);
 }
 
 int main(int argc, char **argv) {

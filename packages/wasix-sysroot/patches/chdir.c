@@ -23,7 +23,7 @@ static int __wasilibc_cwd_mallocd = 0;
 extern int __slicc_cwd_synced;
 int __slicc_cwd_fd_live(void);
 
-int chdir_legacy(const char *path)
+static char *slicc_legacy_cwd(const char *path)
 {
     static char *relative_buf = NULL;
     static size_t relative_buf_len = 0;
@@ -32,15 +32,15 @@ int chdir_legacy(const char *path)
     const char *abs;
     int parent_fd = __wasilibc_find_relpath_alloc(path, &abs, &relative_buf, &relative_buf_len, 1);
     if (parent_fd == -1)
-        return -1;
+        return NULL;
     // Make sure that this directory we're accessing is indeed a directory.
     struct stat dirinfo;
     int ret = fstatat(parent_fd, relative_buf, &dirinfo, 0);
     if (ret == -1)
-        return -1;
+        return NULL;
     if (!S_ISDIR(dirinfo.st_mode)) {
         errno = ENOTDIR;
-        return -1;
+        return NULL;
     }
         
     // Create a string that looks like:
@@ -55,7 +55,7 @@ int chdir_legacy(const char *path)
     char *new_cwd = malloc(1 + abs_len + mid + (copy_relative ? strlen(relative_buf) : 0) + 1);
     if (new_cwd == NULL) {
         errno = ENOMEM;
-        return -1;
+        return NULL;
     }
     new_cwd[0] = '/';
     strcpy(new_cwd + 1, abs);
@@ -63,16 +63,28 @@ int chdir_legacy(const char *path)
         new_cwd[1 + abs_len] = '/';
     if (copy_relative)
         strcpy(new_cwd + 1 + abs_len + mid, relative_buf);
+    return new_cwd;
+}
 
+static void slicc_set_cwd(char *new_cwd, int synced)
+{
     __wasilibc_cwd_lock();
     char *prev_cwd = __wasilibc_cwd;
     __wasilibc_cwd = new_cwd;
-
     if (__wasilibc_cwd_mallocd)
         free(prev_cwd);
-
     __wasilibc_cwd_mallocd = 1;
+    if (synced)
+        __slicc_cwd_synced = 1;
     __wasilibc_cwd_unlock();
+}
+
+int chdir_legacy(const char *path)
+{
+    char *new_cwd = slicc_legacy_cwd(path);
+    if (new_cwd == NULL)
+        return -1;
+    slicc_set_cwd(new_cwd, 0);
     return 0;
 }
 
@@ -81,19 +93,11 @@ static int slicc_cwd_fd(void) {
 }
 
 static int slicc_sync_cwd(void) {
-    char cwd[PATH_MAX];
-    char *copy = getcwd(cwd, sizeof cwd) ? strdup(cwd) : NULL;
-    __wasilibc_cwd_lock();
-    if (copy != NULL) {
-        char *prev_cwd = __wasilibc_cwd;
-        __wasilibc_cwd = copy;
-        if (__wasilibc_cwd_mallocd)
-            free(prev_cwd);
-        __wasilibc_cwd_mallocd = 1;
-    }
-    __slicc_cwd_synced = copy != NULL;
-    __wasilibc_cwd_unlock();
-    return copy != NULL ? 0 : -1;
+    char *copy = getcwd(NULL, 0);
+    if (copy == NULL)
+        return -1;
+    slicc_set_cwd(copy, 1);
+    return 0;
 }
 
 static const char *slicc_skip_dot(const char *path) {
@@ -122,8 +126,7 @@ static int slicc_host_chdir(const char *rel) {
         errno = error;
         return -1;
     }
-    slicc_sync_cwd();
-    return 0;
+    return slicc_sync_cwd();
 }
 
 static const char *make_absolute(const char *path) {
@@ -271,22 +274,17 @@ int chdir(const char *path)
             return -1;
         return slicc_host_chdir(slicc_skip_dot(path));
     }
-    int r = 0;
-    // we run the legacy chdir function that emulates real
-    // current directory functionality for backwards compatibility reasons
-    if (chdir_legacy(real) != 0) {
-        // chdir_legacy already sets errno
-        r = -1;
-    } else {
-        // otherwise we let the operating system know we are changing the current path
+    int r = -1;
+    char *new_cwd = slicc_legacy_cwd(real);
+    if (new_cwd != NULL) {
         __wasi_errno_t error = __wasi_chdir(real);
         if (error != 0) {
             errno = error;
-            r = -1;
+            free(new_cwd);
+        } else {
+            slicc_set_cwd(new_cwd, 1);
+            r = 0;
         }
-        __wasilibc_cwd_lock();
-        __slicc_cwd_synced = r == 0;
-        __wasilibc_cwd_unlock();
     }
     free(real);
     return r;

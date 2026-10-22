@@ -60,6 +60,13 @@ static int from_file(char *out, size_t cap)
 		got = pick(b, n, k == 0, &start, &end);
 		if (got || k == 0) break;
 	}
+	while (!got && n == sizeof b) {
+		char extra;
+		ssize_t k = read(fd, &extra, 1);
+		if (k < 0 && errno == EINTR) continue;
+		if (k == 0) got = pick(b, n, 1, &start, &end);
+		break;
+	}
 	close(fd);
 	if (got != 1 || !usable(b + start, end - start, cap)) return 0;
 	memcpy(out, b + start, end - start);

@@ -7,7 +7,6 @@
 
 char *__wasilibc_cwd = "/";
 int __slicc_cwd_synced = 0;
-void *__libc_malloc(size_t);
 
 #ifdef _REENTRANT
 static volatile int lock[1];
@@ -37,25 +36,70 @@ int __slicc_cwd_fd_live(void)
 
 char *getcwd_legacy(char *buf, size_t size);
 
+static char *slicc_host_getcwd(char *buf, size_t size)
+{
+    __wasi_pointersize_t len = size;
+    __wasi_errno_t error = __wasi_getcwd((uint8_t *)buf, &len);
+    if (error != 0) {
+        errno = error;
+        return NULL;
+    }
+    if (len >= size) {
+        errno = ERANGE;
+        return NULL;
+    }
+    buf[len] = 0;
+    return buf;
+}
+
 char *getcwd(char *buf, size_t size)
 {
-    if (__slicc_cwd_synced && !__slicc_cwd_fd_live())
-        return getcwd_legacy(buf, size);
-    __wasi_pointersize_t bufsize = size;
-    __wasi_errno_t error = __wasi_getcwd((uint8_t *)buf, &bufsize);
-    if (error == ERANGE && buf == NULL) {
-        buf = (char *)__libc_malloc(bufsize);
-        if (buf == NULL) {
+    if (buf != NULL && size == 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+    if (__slicc_cwd_synced && !__slicc_cwd_fd_live()) {
+        if (buf != NULL || size == 0)
+            return getcwd_legacy(buf, size);
+        char *m = malloc(size);
+        if (m == NULL) {
+            errno = ENOMEM;
             return NULL;
         }
-        error = __wasi_getcwd((uint8_t *)buf, &bufsize);
+        if (getcwd_legacy(m, size) == NULL) {
+            free(m);
+            errno = ERANGE;
+            return NULL;
+        }
+        return m;
     }
-
-    if (error != 0) {
-      errno = error;
-      return NULL;
+    if (buf != NULL)
+        return slicc_host_getcwd(buf, size);
+    for (int tries = 0; tries < 4; tries++) {
+        __wasi_pointersize_t len = size;
+        if (size == 0) {
+            __wasi_errno_t error = __wasi_getcwd(NULL, &len);
+            if (error != 0 && error != ERANGE) {
+                errno = error;
+                return NULL;
+            }
+            len++;
+        }
+        char *m = malloc(len);
+        if (m == NULL) {
+            errno = ENOMEM;
+            return NULL;
+        }
+        if (slicc_host_getcwd(m, len) != NULL)
+            return m;
+        int e = errno;
+        free(m);
+        errno = e;
+        if (e != ERANGE || size != 0)
+            return NULL;
     }
-    return buf;
+    errno = ERANGE;
+    return NULL;
 }
 
 char *getcwd_legacy(char *buf, size_t size)

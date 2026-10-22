@@ -14,6 +14,17 @@ const ROW = [
   ['chdir ..', '0'],
   ['getcwd', '/tmp/r43'],
   ['open real/f again', '0 abc'],
+  ['chdir missing', 'ENOENT'],
+  ['chdir real/f', 'ENOTDIR'],
+  ['chdir /tmp/r43/missing', 'ENOENT'],
+  ['getcwd after failed chdir', '/tmp/r43'],
+  ['open real/f after failed chdir', '0 abc'],
+  ['getcwd(NULL, 0)', '/tmp/r43 8'],
+  ['getcwd(NULL, 9)', '/tmp/r43 8'],
+  ['getcwd(NULL, 8)', 'ERANGE'],
+  ['getcwd 9 bytes', '/tmp/r43'],
+  ['getcwd 8 bytes', 'ERANGE'],
+  ['getcwd 0 bytes', 'EINVAL'],
 ];
 
 const rows = (tag) => ROW.map(([what, want]) => `${tag}: ${what}: ${want ?? `0 ${tag}`}`);
@@ -41,5 +52,5 @@ export default async function (ctx) {
     ...rows('fresh'),
     'r43 fresh done',
   ], f.stdout);
-  console.log(`r43 (${ctx.variant}, slicc-kernel ${ctx.kernelVersion}): after dup2(file, 3), close(3) and a new file landing on fd 3, relative open/openat/stat/fstatat/access/create, realpath, chdir real and back with '..', and getcwd resolve against the cwd (/tmp/r43) through the libc cwd string instead of fd 3; also with fd 3 replaced before the first chdir in a program started in /tmp/r43`);
+  console.log(`r43 (${ctx.variant}, slicc-kernel ${ctx.kernelVersion}): after dup2(file, 3), close(3) and a new file landing on fd 3, relative open/openat/stat/fstatat/access/create, realpath, chdir real and back with '..', failed chdirs (ENOENT, ENOTDIR) that keep the cwd, and getcwd (NULL with size 0, 9 and 8; 9-, 8- and 0-byte buffers: ERANGE when the NUL doesn't fit, EINVAL for 0) resolve against the cwd (/tmp/r43) through the libc cwd string instead of fd 3; also with fd 3 replaced before the first chdir in a program started in /tmp/r43`);
 }
