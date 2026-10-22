@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-perl",
-  "version": "5.42.0-21",
+  "version": "5.42.0-22",
   "description": "The Perl 5.42 programming language, with prove, perldoc, pod2man and cpan.",
   "engines": {
     "slicc-kernel": ">=1.120.0"
