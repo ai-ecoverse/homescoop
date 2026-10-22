@@ -45,6 +45,15 @@ for (const t of process.argv.slice(2)) if (!m.tools[t]) { console.error(`homesco
 
 eval "$(bash "$ROOT/scripts/emscripten-tree.sh" "$WORK/wasm-clang-em")"
 export EM_CONFIG="$EMSCRIPTEN_TREE_CONFIG"
+for p in "$ROOT"/packages/wasm-emscripten/package-patches/*.patch; do
+  echo "  emscripten package patch $(basename "$p")"
+  patch -d "$EMSCRIPTEN_TREE" -p1 --batch --no-backup-if-mismatch -s < "$p"
+done
+if find "$EMSCRIPTEN_TREE" -name '*.rej' -o -name '*.orig' | grep -q .; then
+  echo "homescoop: emscripten package patch leftovers in $EMSCRIPTEN_TREE" >&2
+  exit 1
+fi
+grep -q 'nlinks <= {{{ cDefs.SYMLOOP_MAX }}}' "$EMSCRIPTEN_TREE/src/lib/libfs.js"
 EMCC=(python3 "$EMSCRIPTEN_TREE/emcc.py")
 EMXX=(python3 "$EMSCRIPTEN_TREE/em++.py")
 EMAR=(python3 "$EMSCRIPTEN_TREE/emar.py")
@@ -142,6 +151,7 @@ extra = [
     f"--js-library={shims}/slicc-writev.js",
     f"--js-library={shims}/slicc-linkat.js",
     f"--js-library={shims}/slicc-uname.js",
+    f"--js-library={shims}/slicc-env.js",
     f"--extern-post-js={post_js}",
     "-Wl,-u,slicc_raise",
     "-Wl,-u,slicc_sig_mask",
@@ -169,6 +179,11 @@ grep -q "!Module\['noInitialRun'\]" "$OUT_DIR/llvm"
 grep -q 'slicc_cred_js' "$OUT_DIR/llvm"
 grep -q sliccKernel "$OUT_DIR/llvm"
 grep -qE "locateFile\\([\"']llvm\\.wasm[\"']\\)" "$OUT_DIR/llvm"
+if grep -qE "USER\\s*:\\s*[\"']web_user" "$OUT_DIR/llvm"; then
+  echo "homescoop: bin/llvm links Emscripten's getEnvStrings placeholders, not slicc-env.js (homescoop#1502)" >&2
+  exit 1
+fi
+grep -q 'nlinks<=40;' "$OUT_DIR/llvm" || { echo "homescoop: bin/llvm's FS.lookupPath lacks the 40-follow bound (package patch 0014)" >&2; exit 1; }
 if LC_ALL=C grep -aEq '/(home|Users|__w|private/var)/' "$OUT_DIR/llvm.wasm"; then
   echo "homescoop: llvm.wasm names a build path" >&2
   exit 1
@@ -219,6 +234,7 @@ homescoop_notice "Emscripten 6.0.9 (runtime and system libraries)" \
   "$EMSCRIPTEN_TREE/LICENSE" - \
   "$EMSCRIPTEN_TREE/system/lib/libc/musl/COPYRIGHT" - \
   "$EMSCRIPTEN_TREE/system/lib/libcxx/LICENSE.TXT" -
+homescoop_notice_slicc_shims
 awk '/^## compiler-rt /{p=1; print; next} /^## /{p=0} p' "$SYS_X/package/THIRD-PARTY-NOTICES.md" | sed -e '1d' -e '/^```/d' > "$WORK/wasix-sysroot-compiler-rt.txt"
 grep -q 'Apache License' "$WORK/wasix-sysroot-compiler-rt.txt"
 homescoop_notice "wasix-sysroot $SYSROOT_VER (@ai-ecoverse/wasix-sysroot): compiler-rt builtins, lib/clang/24/lib/*/libclang_rt.builtins.a (Apache-2.0 WITH LLVM-exception)" \

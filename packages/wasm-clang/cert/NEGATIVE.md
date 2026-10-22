@@ -64,4 +64,23 @@
 
 ## 24.0.0-24: shim drift (homescoop#1491; 2026-10-20)
 
-24.0.0-24 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 24.0.0-23 in `bin/clang`, `bin/clang++`, `bin/ld.lld`, `bin/lld`, `bin/llvm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+24.0.0-24 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 24.0.0-23 in `bin/clang`, `bin/clang++`, `bin/ld.lld`, `bin/lld`, `bin/llvm` and more, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests. (This entry first also said `slicc-env.js` was linked. It wasn't: see 24.0.0-25 and #1502.)
+
+## 24.0.0-25: assembly under -Werror, slicc-env.js, the symlink bound and the shims notice (homescoop#1408, #1502, #611, #1535; 2026-10-22)
+
+`test/tools.mjs --expect old` on slicc-kernel 1.100.0, users enforce, against the published 24.0.0-24:
+
+| case | 24.0.0-24 | 24.0.0-25 |
+|---|---|---|
+| `cc -Werror -c a.s -o a.o` (#1408; also `WASIXCC_PIC=yes`, `raw.asm` with and without `-x assembler`, `c++`) | rc 1: `argument unused during compilation: '-D _WASI_EMULATED_PROCESS_CLOCKS'`, `'-fbracket-depth=1024'`, `'-ftls-model=local-exec'` (PIC: `-ftls-model=global-dynamic`, `-fvisibility=default`) | rc 0, `llvm-nm` shows `T foo` |
+| `cc -Werror -c p.S`, `cc -Werror -c a.s c.c`, `cc -Werror -DUSER_FLAG -c a.s` | | the defines still reach `.S` and `.c`; the caller's own unused `-D USER_FLAG` still fails |
+| `env -i /usr/bin/clang -### -O2 … l.o -o l.wasm`, an executable `/wasm-opt` present (#1502) | plans `"/wasm-opt" "l.wasm" "-O2" "-o" "l.wasm"`: Emscripten's `PATH=/` | no wasm-opt step: no `PATH` |
+| glue `getEnvStrings` (#1502) | `USER:"web_user",LOGNAME:"web_user",PATH:"/",PWD:"/",HOME:"/home/web_user"` | slicc-env.js's body, kernel values only |
+| `clang -fsyntax-only -x c` through 40 symlinks (package patch 0014) | `no such file or directory` (`nlinks<40`) | rc 0; 41 symlinks still fail |
+| `THIRD-PARTY-NOTICES.md` shims section (#1535) | missing | `## homescoop: the slicc shims (shims/slicc, Apache-2.0)` with the Apache-2.0 text |
+
+- **#1408, the cause:** the driver added its C compile flags to every compile, and clang reports each one it doesn't use for a plain assembly input. The driver now records each input's language (`-x`, or the `.s` and `.asm` suffixes, clang's plain assembly) and leaves those flags out when every source is plain assembly. `-fPIC`, the target features and the EH flags stay, since the assembler uses them.
+- **#1502, the cause:** build.sh passes its own `--js-library` list, which had slicc-writev.js, slicc-linkat.js and slicc-uname.js but not `shims/slicc/slicc-env.js`. The link now adds it, and build.sh fails if the glue still has Emscripten's `USER: "web_user"` default.
+- **The package patches:** wasm-emscripten 6.0.9-27 keeps 0014 (libfs symloop) and 0015 (slicc-env.js in link.py's default link) in `package-patches/`, which `scripts/emscripten-tree.sh` doesn't apply. build.sh now applies them to the tree after emscripten-tree.sh, as wasm-emscripten's build.sh does, and the recipe lists `package-patches/**` as an input. 0015 changes nothing here (this link names its libraries itself), and 0014 gives the glue the 40-follow bound. build.sh checks for `nlinks<=40`.
+- **#1535, the cause:** build.sh compiles the shims itself, outside `homescoop_slicc_archive`, so no shims section was written, and `KNOWN_WITHOUT_SHIM_NOTICE` let it through under the closed #844. build.sh now calls `homescoop_notice_slicc_shims`, and the entry is gone, so `scripts/test/shim-notice.test.mjs` fails if the call goes missing.
+

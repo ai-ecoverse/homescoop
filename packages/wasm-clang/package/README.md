@@ -30,6 +30,12 @@ no extra WASI/EH flags needed for typical builds.
 - **CMake**: `CC=cc CXX=c++ cmake …` — Clang 24 is identified; `pthread.h`
   and the sysroot resolve under SLICC.
 
+- **Assembly**: for input that is only plain assembly (`.s`, `.asm`,
+  or `-x assembler`), the driver leaves out the C flags clang ignores there
+  (`-D_WASI_EMULATED_*`, `-pthread` when not linking, `-mthread-model`,
+  `-fno-trapping-math`, `-fbracket-depth`, `-ftls-model`, `-fvisibility`), so
+  `cc -Werror -c foo.s` works. `.S` and mixed C and assembly keep them.
+
 ## One module for every tool
 
 `bin/llvm.wasm` holds clang, lld, llvm-ar, llvm-nm, llvm-objcopy and
@@ -54,3 +60,19 @@ c++ -O2 t.cpp -o t              # iostream + exceptions + threads
 CC=cc CXX=c++ cmake -S . -B build
 cmake --build build
 ```
+
+## Environment and paths
+
+`bin/llvm` links `shims/slicc/slicc-env.js`: the tools' environment is only
+what the kernel passes, with none of Emscripten's placeholders
+(`USER=web_user`, `HOME=/home/web_user`, `PATH=/`). After `env -i`, clang has
+no `PATH`, so it doesn't look for helpers such as `wasm-opt` in `/`.
+
+The glue is linked with wasm-emscripten's package patches (0014: a path may
+go through 40 symbolic links, as on Linux, and the 41st is `ELOOP`).
+
+## Notices
+
+`THIRD-PARTY-NOTICES.md` covers the Emscripten runtime, the wasix-sysroot
+compiler-rt builtins, llvm-project's LLVM Support notices and homescoop's own
+slicc shims (Apache-2.0).
