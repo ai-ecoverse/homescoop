@@ -217,3 +217,25 @@ The base is homescoop origin/main 184a0310, with a `host-run.sh` build.
 - **The cause:** TF-PSA-Crypto 4.2.0 defines `PSA_VENDOR_RSA_MAX_KEY_BITS` as 4096 in `include/psa/crypto_sizes.h`, with no `#ifndef`, so the user config can't raise it. Importing an RSA key above it fails, and PK reports that as an invalid public key. `rsa-max-key-bits-8192.patch` sets it to 8192. That's the most `MBEDTLS_MPI_MAX_SIZE` (1024 bytes) holds, so a larger key can't be parsed anyway. The engine asserts the value at compile time, so a build without the patch fails.
 - **Above 8192 bits,** a leaf whose RSA key is too large is refused at `tls_client_cert` with the engine's `TLS_RSA_TOO_LARGE`, not with PK's misleading text. The engine reads the modulus size from the certificate's SubjectPublicKeyInfo only after Mbed TLS refused it.
 - **4.2.0-7 as built:** client-api 33/33 and engine-api 19/19. The wasm grows by 539 bytes (315940 to 316479).
+
+## 4.2.0-8: server sessions with the caller's key, chain, ALPN and client certificates (homescoop#1638; 2026-10-22)
+
+The base is homescoop origin/main 2aa7669c, with `host-run.sh` builds (emsdk 4.0.23).
+
+- **The published 4.2.0-7** (`npm pack @ai-ecoverse/wasm-tls-engine@4.2.0-7`) has none of the new calls. `lib/server-api.mjs` fails in its `before` hook, so all 14 cases are cancelled and `node --test` exits 1:
+
+```text
+AssertionError [ERR_ASSERTION]: 4.2.0-7 has no _tls_leaf_import
+ℹ tests 14  ℹ pass 0  ℹ fail 0  ℹ cancelled 14
+```
+
+- **A build with `TLS_SERVER_REQUIRE_CERT` mapped to Mbed TLS's `VERIFY_OPTIONAL`** (a server that asks for a certificate but takes a handshake without one) fails both client-certificate cases, on TLS 1.3 and 1.2:
+
+```text
+✖ client certificates over TLSv1.3: REQUIRE_CERT refuses a client without one, …
+  AssertionError [ERR_ASSERTION]: REQUIRE_CERT with no certificate was served
+✖ client certificates over TLSv1.2: REQUIRE_CERT refuses a client without one, …
+ℹ pass 12  ℹ fail 2
+```
+
+- **4.2.0-8 as built:** server-api 14/14, and engine-api 19/19 and client-api 33/33 unchanged (the MITM `tls_leaf_new`/`tls_session_new` path and the client sessions behave as before; `tls_client_cert` now shares its parsing and key-match code with `tls_leaf_import`). The wasm grows by 663 bytes (316479 to 317142).

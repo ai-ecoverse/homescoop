@@ -47,6 +47,8 @@
 #define TLS_CLIENT_NO_SNI 2
 #define TLS_CLIENT_VERIFY_CHAIN_ONLY 4
 #define TLS_CLIENT_FLAGS (TLS_CLIENT_INSECURE_SKIP_VERIFY | TLS_CLIENT_NO_SNI | TLS_CLIENT_VERIFY_CHAIN_ONLY)
+#define TLS_SERVER_REQUEST_CERT 1
+#define TLS_SERVER_REQUIRE_CERT 2
 #define ALPN_MAX 8
 
 static const char *const alpn_protocols[] = {"http/1.1", NULL};
@@ -300,6 +302,8 @@ typedef struct {
   char alpn_buf[256];
   const char *alpn[ALPN_MAX + 1];
   char host[256];
+  char sni[256];
+  size_t sni_len;
   int flags;
   int started;
   int name_mismatch;
@@ -339,6 +343,17 @@ static int on_sni(void *ctx, mbedtls_ssl_context *ssl, const unsigned char *name
   if (strlen(s->host) != len) return -1;
   for (size_t i = 0; i < len; i++)
     if (tolower(name[i]) != tolower((unsigned char)s->host[i])) return -1;
+  memcpy(s->sni, name, len);
+  s->sni_len = len;
+  return 0;
+}
+
+static int on_any_sni(void *ctx, mbedtls_ssl_context *ssl, const unsigned char *name, size_t len) {
+  (void)ssl;
+  session *s = ctx;
+  if (len >= sizeof s->sni) return -1;
+  memcpy(s->sni, name, len);
+  s->sni_len = len;
   return 0;
 }
 
@@ -601,6 +616,32 @@ static size_t cert_rsa_bits(const unsigned char *der, size_t len) {
   return bits;
 }
 
+static int load_own(mbedtls_x509_crt *own_chain, mbedtls_pk_context *own_key, int *count,
+                    const unsigned char *chain, size_t chain_len, unsigned char *key,
+                    size_t key_len, unsigned char *pass, size_t pass_len) {
+  if (!chain || !key || chain_len == 0 || key_len == 0) return TLS_BADARG;
+  int ret;
+  for (size_t at = 0; at < chain_len;) {
+    unsigned char *p = (unsigned char *)chain + at;
+    unsigned char *start = p;
+    size_t body;
+    ret = mbedtls_asn1_get_tag(&p, (unsigned char *)chain + chain_len, &body,
+                               MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
+    if (ret != 0) return ret;
+    size_t whole = (size_t)(p - start) + body;
+    ret = mbedtls_x509_crt_parse_der(own_chain, start, whole);
+    if (ret != 0 && cert_rsa_bits(start, whole) > PSA_VENDOR_RSA_MAX_KEY_BITS) ret = TLS_RSA_TOO_LARGE;
+    if (ret != 0) return ret;
+    if (count) (*count)++;
+    at += whole;
+  }
+  ret = mbedtls_pk_parse_key(own_key, key, key_len, pass_len ? pass : NULL, pass_len);
+  if (ret == 0 && mbedtls_pk_check_pair(&own_chain->pk, own_key) != 0 &&
+      !same_public_key(&own_chain->pk, own_key))
+    ret = TLS_BADARG;
+  return ret;
+}
+
 EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain, size_t chain_len,
                                          unsigned char *key, size_t key_len, unsigned char *pass,
                                          size_t pass_len) {
@@ -610,23 +651,7 @@ EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain,
   mbedtls_x509_crt_init(&s->own_chain);
   mbedtls_pk_init(&s->own_key);
   s->own_set = mine = 1;
-  for (size_t at = 0; at < chain_len;) {
-    unsigned char *p = (unsigned char *)chain + at;
-    unsigned char *start = p;
-    size_t body;
-    ret = mbedtls_asn1_get_tag(&p, (unsigned char *)chain + chain_len, &body,
-                               MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
-    if (ret != 0) goto done;
-    size_t whole = (size_t)(p - start) + body;
-    ret = mbedtls_x509_crt_parse_der(&s->own_chain, start, whole);
-    if (ret != 0 && cert_rsa_bits(start, whole) > PSA_VENDOR_RSA_MAX_KEY_BITS) ret = TLS_RSA_TOO_LARGE;
-    if (ret != 0) goto done;
-    at += whole;
-  }
-  ret = mbedtls_pk_parse_key(&s->own_key, key, key_len, pass_len ? pass : NULL, pass_len);
-  if (ret == 0 && mbedtls_pk_check_pair(&s->own_chain.pk, &s->own_key) != 0 &&
-      !same_public_key(&s->own_chain.pk, &s->own_key))
-    ret = TLS_BADARG;
+  ret = load_own(&s->own_chain, &s->own_key, NULL, chain, chain_len, key, key_len, pass, pass_len);
   if (ret == 0) ret = mbedtls_ssl_conf_own_cert(&s->config, &s->own_chain, &s->own_key);
 done:
   if (key) mbedtls_platform_zeroize(key, key_len);
@@ -640,6 +665,87 @@ done:
     return last_error = ret;
   }
   return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE leaf *tls_leaf_import(const unsigned char *chain, size_t chain_len,
+                                           unsigned char *key, size_t key_len, unsigned char *pass,
+                                           size_t pass_len) {
+  leaf *l = NULL;
+  int ret = init();
+  if (ret != 0) goto done;
+  l = calloc(1, sizeof *l);
+  if (!l) {
+    ret = TLS_NOMEM;
+    goto done;
+  }
+  l->refs = 1;
+  mbedtls_pk_init(&l->key);
+  mbedtls_x509_crt_init(&l->chain);
+  ret = load_own(&l->chain, &l->key, &l->certs, chain, chain_len, key, key_len, pass, pass_len);
+done:
+  if (key) mbedtls_platform_zeroize(key, key_len);
+  if (pass) mbedtls_platform_zeroize(pass, pass_len);
+  if (ret != 0) {
+    if (l) leaf_release(l);
+    last_error = ret;
+    return NULL;
+  }
+  return l;
+}
+
+EMSCRIPTEN_KEEPALIVE session *tls_server_new(leaf *l, const unsigned char *alpn, size_t alpn_len,
+                                             ca *client_ca, int flags) {
+  if (init() != 0) return NULL;
+  if (!l || l->certs == 0 || (alpn_len > 0 && !alpn) ||
+      (flags != 0 && flags != TLS_SERVER_REQUEST_CERT && flags != TLS_SERVER_REQUIRE_CERT) ||
+      (flags != 0 && !client_ca)) {
+    last_error = TLS_BADARG;
+    return NULL;
+  }
+  session *s = calloc(1, sizeof *s);
+  if (!s) {
+    last_error = TLS_NOMEM;
+    return NULL;
+  }
+  mbedtls_ssl_init(&s->ssl);
+  mbedtls_ssl_config_init(&s->config);
+  s->leaf = l;
+  l->refs++;
+  if (flags != 0) {
+    s->trust = client_ca;
+    client_ca->refs++;
+  }
+  int ret = parse_alpn(s, alpn, alpn_len);
+  if (ret >= 0)
+    ret = mbedtls_ssl_config_defaults(&s->config, MBEDTLS_SSL_IS_SERVER,
+                                      MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
+  if (ret == 0) {
+    mbedtls_ssl_conf_sni(&s->config, on_any_sni, s);
+    if (flags != 0) {
+      mbedtls_ssl_conf_authmode(&s->config, flags == TLS_SERVER_REQUIRE_CERT
+                                                ? MBEDTLS_SSL_VERIFY_REQUIRED
+                                                : MBEDTLS_SSL_VERIFY_OPTIONAL);
+      mbedtls_ssl_conf_ca_chain(&s->config, &client_ca->roots, NULL);
+    } else {
+      mbedtls_ssl_conf_authmode(&s->config, MBEDTLS_SSL_VERIFY_NONE);
+    }
+    ret = mbedtls_ssl_conf_own_cert(&s->config, &l->chain, &l->key);
+  }
+  if (ret == 0 && alpn_len > 0) ret = mbedtls_ssl_conf_alpn_protocols(&s->config, s->alpn);
+  if (ret == 0) ret = mbedtls_ssl_setup(&s->ssl, &s->config);
+  if (ret != 0) {
+    last_error = ret;
+    session_free(s);
+    return NULL;
+  }
+  mbedtls_ssl_set_bio(&s->ssl, s, bio_send, bio_recv, NULL);
+  return s;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_sni(session *s, char *out, size_t max) {
+  if (s->sni_len > max) return TLS_BADARG;
+  if (s->sni_len > 0) memcpy(out, s->sni, s->sni_len);
+  return (int)s->sni_len;
 }
 
 /* 1 when the leaf did not match the server name. Under TLS_CLIENT_VERIFY_CHAIN_ONLY

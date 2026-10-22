@@ -55,6 +55,8 @@ function time(date) {
 }
 
 const ECDSA_SHA256 = seq(oid('1.2.840.10045.4.3.2'));
+const RSA_SHA256 = seq(oid('1.2.840.113549.1.1.11'), tlv(0x05));
+const signatureAlgorithm = (key) => (key.asymmetricKeyType === 'rsa' ? RSA_SHA256 : ECDSA_SHA256);
 
 function name(dn) {
   const rdns = [];
@@ -102,14 +104,42 @@ function certificate({ issuer, subject, notBefore, notAfter, spki, issuerSpki, c
   const tbs = seq(
     tlv(0xa0, integer(Buffer.of(2))),
     integer(serial),
-    ECDSA_SHA256,
+    signatureAlgorithm(key),
     name(issuer),
     seq(time(notBefore), time(notAfter)),
     name(subject),
     Buffer.from(spki),
     tlv(0xa3, seq(...list)),
   );
-  return seq(tbs, ECDSA_SHA256, bits(sign('sha256', tbs, key)));
+  return seq(tbs, signatureAlgorithm(key), bits(sign('sha256', tbs, key)));
+}
+
+export function selfSigned(host, keyOptions = { type: 'ec', namedCurve: 'P-256' }) {
+  const { type, ...options } = keyOptions;
+  const { privateKey, publicKey } = generateKeyPairSync(type, options);
+  const spki = publicKey.export({ type: 'spki', format: 'der' });
+  const id = createHash('sha1').update(spki).digest();
+  const now = Date.now();
+  const dn = { commonName: host };
+  const tbs = seq(
+    tlv(0xa0, integer(Buffer.of(2))),
+    integer(Buffer.concat([Buffer.of(0x01), randomBytes(15)])),
+    signatureAlgorithm(privateKey),
+    name(dn),
+    seq(time(new Date(now - 3600_000)), time(new Date(now + 7 * DAY))),
+    name(dn),
+    spki,
+    tlv(0xa3, seq(
+      extension('2.5.29.14', false, octets(id)),
+      extension('2.5.29.35', false, seq(tlv(0x80, id))),
+      extension('2.5.29.19', true, seq(TRUE)),
+      extension('2.5.29.15', true, bits(Buffer.of(0x84), 2)),
+      extension('2.5.29.37', false, seq(oid('1.3.6.1.5.5.7.3.1'))),
+      extension('2.5.29.17', false, seq(tlv(0x82, Buffer.from(host)))),
+    )),
+  );
+  const der = seq(tbs, signatureAlgorithm(privateKey), bits(sign('sha256', tbs, privateKey)));
+  return { der, pem: pem(der), key: privateKey, spki };
 }
 
 export function pem(der) {
