@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@ai-ecoverse/wasix-sysroot": "2025.9.30-38",
-    "@ai-ecoverse/wasm-binaryen": "132.0.0-4"
+    "@ai-ecoverse/wasm-binaryen": "132.0.0-7"
   },
   "engines": {
     "slicc-kernel": ">=1.44.0"
