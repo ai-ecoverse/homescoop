@@ -1,10 +1,15 @@
 {
   "harness": "slicc-kernel",
   "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
   "checklist": [
     "jq -n arithmetic",
     "stdin filter",
     "invalid JSON non-zero",
-    "--version identifies jq"
+    "--version identifies jq",
+    "cert/heap.mjs (1.8.2-6, homescoop#1287, slicc-kernel#1172): jq.wasm is a threaded bulk-memory module (an Emscripten -pthread build: 58 memory.fill, 82 memory.copy), linked with recipe.yaml wasm.initial-memory 64MiB (measured peak 48 MiB). 4 rounds of jq -n generating 25,000 objects (2.7 MB), select, group_by, sort_by and --stream over them: rc 0, the right output, 0 wasm traps, and VmSize stays at 65,536 kB, with no memory.grow. 1.8.2-5 grows from 16 MiB to 48 MiB (NEGATIVE.md). check-threaded-heap: PASS; off scripts/threaded-heap-allowlist.txt"
   ]
 }

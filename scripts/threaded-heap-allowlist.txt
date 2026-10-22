@@ -3,7 +3,6 @@
 # measured-peak, measured-by } yet (homescoop#1287, slicc-kernel#1172).
 # "<recipe> #<issue> <reason>". scripts/check-threaded-heap.mjs fails a line
 # whose package gets the fields or stops being threaded: drop it then.
-jq #1287 wasixcc build; wasix-sysroot dlmalloc ignores the initial pages until -40; refresh only, size after -40
 wasix-bind #1287 wasixcc build on wasix-sysroot -39 (the dlmalloc refresh); dlmalloc ignores the initial pages until -40; refresh only, size after -40
 wasix-gnupg #1287 wasixcc build on wasix-sysroot -34 (no allocator refresh); refresh at its next sysroot move, size after -40
 wasix-openssh #1287 wasixcc build on wasix-sysroot -39 (the dlmalloc refresh); dlmalloc ignores the initial pages until -40; refresh only, size after -40
