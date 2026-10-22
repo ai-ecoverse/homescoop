@@ -96,3 +96,7 @@ The kits ship 9.5's objects: mogrify.o carries mogrify-inplace-keep-mode-owner.p
 ## 7.1.2-34-9.6: the kits follow wasm-imagemagick(-heif) 9.6 (homescoop#1608; 2026-10-22)
 
 The kits ship 9.6's objects: constitute.o carries write-temp-then-rename.patch's `HomescoopReplaceKind` and `HomescoopFallbackTemp`, and mogrify.o their use in mogrify-inplace-keep-mode-owner.patch. relink-check.mjs checks that each kit's kit.json names this version's `bin/magick.wasm`, so a 9.5 kit can't pass for 9.6. The behaviour negatives are wasm-imagemagick's (NEGATIVE.md there).
+
+## 7.1.2-34-9.7: the kits follow wasm-imagemagick(-heif) 9.7 (homescoop#1655, #1656; 2026-10-22)
+
+The kits ship 9.7's objects: constitute.o carries write-temp-then-rename.patch's `HomescoopFallbackTemp` that tries each temporary directory, and mogrify.o mogrify-per-file-status.patch. relink-check.mjs checks that each kit's kit.json names this version's `bin/magick.wasm`, so a 9.6 kit can't pass for 9.7. The behaviour negatives are wasm-imagemagick's (NEGATIVE.md there).

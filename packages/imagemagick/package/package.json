@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-imagemagick",
-  "version": "7.1.2-34-9.6",
+  "version": "7.1.2-34-9.7",
   "description": "Create, convert and edit images from the command line with ImageMagick: magick, convert, identify and mogrify.",
   "license": "ImageMagick AND GPL-2.0-only WITH Font-exception-2.0",
   "repository": {

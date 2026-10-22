@@ -51,12 +51,20 @@ A write over an existing file (`magick … out.png`, `mogrify`) is encoded to a
 temporary file and replaces the target only once the image is complete, so a
 failed encode leaves the file as it was. The temporary file goes beside the
 target; when that directory isn't writable (a file you may write in a
-directory you may not), it goes in `$MAGICK_TEMPORARY_PATH`, else `$TMPDIR`,
-else `/tmp`, and the finished image is copied into the file. When no
-temporary file can be created anywhere, the write is refused (`unable to
-create temporary file`, rc 1) and the file is left as it was
-(homescoop#1608; until 7.1.2-34-9.5 it was written in place, and a failed
-encode truncated it).
+directory you may not), it goes in the first of `$MAGICK_TEMPORARY_PATH`,
+`$TMPDIR` and `/tmp` that takes it, and the finished image is copied into
+the file (homescoop#1656; 7.1.2-34-9.6 tried only the first of them that was
+set). When no temporary file can be created anywhere, the write is refused
+with the directories it tried (`unable to create temporary file 'f.png':
+tried /nonexistent (No such file or directory), /tmp (Permission denied)`,
+rc 1) and the file is left as it was (homescoop#1608; until 7.1.2-34-9.5 it
+was written in place, and a failed encode truncated it).
+
+`mogrify` over several files goes on with the rest when one fails (missing,
+undecodable, a failed encode, or a refused write), reports each failure and
+exits 1; the failed file is left as it was (homescoop#1655; until
+7.1.2-34-9.6, as upstream, every file after the first failure was silently
+left unchanged).
 
 ## Switching
 

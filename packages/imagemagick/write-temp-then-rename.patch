@@ -8,7 +8,7 @@
  #include "MagickCore/string_.h"
  #include "MagickCore/string-private.h"
  #include "MagickCore/timer.h"
-@@ -1561,6 +1562,229 @@
+@@ -1561,6 +1562,258 @@
  %    o exception: return any errors or warnings in this structure.
  %
  */
@@ -40,63 +40,92 @@
 +}
 +
 +MagickExport int HomescoopFallbackTemp(const char *target,const char *separator,
-+  char *path)
++  char *path,char *failed)
 +{
 +  char
 +    tail[MagickPathExtent];
 +
 +  const char
++    *candidates[3],
 +    *directory;
 +
 +  int
-+    file;
++    file,
++    saved;
 +
 +  RandomInfo
 +    *random_info;
 +
++  size_t
++    length;
++
 +  ssize_t
-+    j;
++    c,
++    j,
++    n;
 +
 +  *path='\0';
-+  directory=getenv("MAGICK_TEMPORARY_PATH");
-+  if ((directory == (const char *) NULL) || (*directory == '\0'))
-+    directory=getenv("TMPDIR");
-+  if ((directory == (const char *) NULL) || (*directory == '\0'))
-+    directory="/tmp";
++  *failed='\0';
++  candidates[0]=getenv("MAGICK_TEMPORARY_PATH");
++  candidates[1]=getenv("TMPDIR");
++  candidates[2]="/tmp";
 +  GetPathComponent(target,TailPath,tail);
-+  if ((*tail == '\0') ||
-+      ((strlen(directory)+strlen(tail)+16) >= MagickPathExtent))
-+    {
-+      errno=ENAMETOOLONG;
-+      return(-1);
-+    }
 +  file=(-1);
-+  errno=EEXIST;
++  saved=ENOENT;
 +  random_info=AcquireRandomInfo();
-+  for (j=0; j < 64; j++)
++  for (c=0; c < 3; c++)
 +  {
-+    StringInfo
-+      *key_info;
++    directory=candidates[c];
++    if ((directory == (const char *) NULL) || (*directory == '\0'))
++      continue;
++    for (n=0; n < c; n++)
++      if ((candidates[n] != (const char *) NULL) &&
++          (strcmp(candidates[n],directory) == 0))
++        break;
++    if (n < c)
++      continue;
++    if ((*tail == '\0') ||
++        ((strlen(directory)+strlen(tail)+16) >= MagickPathExtent))
++      errno=ENAMETOOLONG;
++    else
++      {
++        errno=EEXIST;
++        for (j=0; j < 64; j++)
++        {
++          StringInfo
++            *key_info;
 +
-+    unsigned char
-+      *key_bytes;
++          unsigned char
++            *key_bytes;
 +
-+    key_info=GetRandomKey(random_info,4);
-+    if (key_info == (StringInfo *) NULL)
-+      break;
-+    key_bytes=GetStringInfoDatum(key_info);
-+    (void) FormatLocaleString(path,MagickPathExtent,"%s/%s%s%02x%02x%02x%02x~",
-+      directory,tail,separator,key_bytes[0],key_bytes[1],key_bytes[2],
-+      key_bytes[3]);
-+    key_info=DestroyStringInfo(key_info);
-+    file=open_utf8(path,O_RDWR | O_CLOEXEC | O_CREAT | O_EXCL | O_BINARY |
-+      O_NOFOLLOW,S_MODE);
-+    if ((file >= 0) || (errno != EEXIST))
-+      break;
++          key_info=GetRandomKey(random_info,4);
++          if (key_info == (StringInfo *) NULL)
++            break;
++          key_bytes=GetStringInfoDatum(key_info);
++          (void) FormatLocaleString(path,MagickPathExtent,
++            "%s/%s%s%02x%02x%02x%02x~",directory,tail,separator,key_bytes[0],
++            key_bytes[1],key_bytes[2],key_bytes[3]);
++          key_info=DestroyStringInfo(key_info);
++          file=open_utf8(path,O_RDWR | O_CLOEXEC | O_CREAT | O_EXCL |
++            O_BINARY | O_NOFOLLOW,S_MODE);
++          if ((file >= 0) || (errno != EEXIST))
++            break;
++        }
++        if (file >= 0)
++          break;
++      }
++    saved=errno;
++    *path='\0';
++    length=strlen(failed);
++    (void) FormatLocaleString(failed+length,MagickPathExtent-length,
++      "%s%s (%s)",length == 0 ? "tried " : ", ",directory,strerror(saved));
 +  }
 +  random_info=DestroyRandomInfo(random_info);
 +  if (file < 0)
-+    *path='\0';
++    {
++      *path='\0';
++      errno=saved;
++    }
 +  return(file);
 +}
 +
@@ -238,12 +267,13 @@
  MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
    Image *images,const char *filename,ExceptionInfo *exception)
  {
-@@ -1590,12 +1814,30 @@
+@@ -1590,12 +1843,31 @@
    Image
      *p;
  
 +  char
 +    atomic_path[MagickPathExtent],
++    atomic_failed[MagickPathExtent],
 +    atomic_tmp[MagickPathExtent],
 +    atomic_name[MagickPathExtent];
 +
@@ -269,7 +299,7 @@
    assert(exception != (ExceptionInfo *) NULL);
    write_info=CloneImageInfo(image_info);
    *write_info->magick='\0';
-@@ -1613,6 +1855,153 @@
+@@ -1613,6 +1885,155 @@
    sans_exception=DestroyExceptionInfo(sans_exception);
    if (*write_info->magick == '\0')
      (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
@@ -397,11 +427,13 @@
 +              {
 +                if (atomic_mode == 0)
 +                  atomic_mode=1;
-+                file=HomescoopFallbackTemp(atomic_path,".",atomic_tmp);
++                file=HomescoopFallbackTemp(atomic_path,".",atomic_tmp,
++                  atomic_failed);
 +                if (file < 0)
 +                  {
-+                    ThrowFileException(exception,FileOpenError,
-+                      "UnableToCreateTemporaryFile",atomic_path);
++                    (void) ThrowMagickException(exception,GetMagickModule(),
++                      FileOpenError,"UnableToCreateTemporaryFile","`%s': %s",
++                      atomic_path,atomic_failed);
 +                    write_info=DestroyImageInfo(write_info);
 +                    return(MagickFalse);
 +                  }
@@ -423,7 +455,7 @@
    p=images;
    for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
    {
-@@ -1661,5 +2050,28 @@
+@@ -1661,5 +2082,28 @@
        }
    }
    write_info=DestroyImageInfo(write_info);
