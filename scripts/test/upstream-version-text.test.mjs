@@ -146,3 +146,53 @@ test('a dashed upstream (7.1.2-34) takes -1 … -9, then -9.N, in check-package-
   assert.match(meta('7.1.2-34-10').join('\n'), /7\.1\.2-34-10" sorts below 7\.1\.2-34-9 .*-9\.1, -9\.2/);
   assert.match(meta('7.1.2-33-9.1').join('\n'), /is not a packaging revision of recipe version 7\.1\.2-34/);
 });
+
+test('a measurement with a unit is not a stale version (#1684): 3.7 GiB in a Python 3.15.0 README', () => {
+  const readme = 'The full stdlib build needs about 3.7 GiB of memory; peak RSS was 3.2 GB.\n';
+  assert.deepEqual(staleVersions(readme, '3.15.0', { allow, name: 'wasix-python' }), []);
+  const pkg = { version: '3.15.0-1', homescoop: { upstream: '3.15.0' } };
+  assert.deepEqual(driftErrors({ name: 'wasix-python', upstream: '3.15.0', pkg, summary: 'Python 3.15.0 for slicc', readme, allow }), []);
+});
+
+test('a timing with a unit is not a stale version (#1679, #1684): minitest 3.1 s in a Ruby 3.4.11 README', () => {
+  const readme = '| suite | time |\n|---|---|\n| minitest | 3.1 s |\n| csv | 3.5 s |\n| rexml | 3.2 s |\n\nA 3.3x speedup, 3.0% overhead, 3.6\u00a0ms per call, 3.8 min total.\n';
+  assert.deepEqual(staleVersions(readme, '3.4.11', { allow, name: 'wasix-ruby' }), []);
+});
+
+test('units do not hide a real stale version: Ruby 3.3.0 in a 3.4.11 README still fails', () => {
+  const readme = 'Ruby 3.3.0 for slicc. Ruby 3.3 ships minitest. See 3.2 secondary notes, 3.1 sub, 3.0 xs.\n';
+  assert.deepEqual(staleVersions(readme, '3.4.11', { allow, name: 'wasix-ruby' }).map((s) => s.version), ['3.3.0', '3.3', '3.2', '3.1', '3.0']);
+});
+
+test('check-package-meta --drift passes unit measurements and fails a stale version (#1684)', () => {
+  const pkg = (readme) => fixture('wasix-ruby', {
+    recipeVersion: '3.4.11',
+    summary: 'Ruby 3.4.11 for slicc',
+    pkg: `{
+  "name": "@ai-ecoverse/wasix-ruby",
+  "version": "3.4.11-1",
+  "description": "Ruby 3.4.11 for slicc",
+  "repository": { "type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-ruby/package" },
+  "homescoop": { "recipe": "wasix-ruby", "upstream": "3.4.11" }
+}
+`,
+    readme,
+  });
+  const good = pkg('# wasix-ruby\n\nRuby 3.4.11. minitest 3.1 s, csv 3.5 s, rexml 3.2 s; the image is 3.7 GiB.\n');
+  try {
+    const c = good.node('check-package-meta.mjs', '--drift', 'wasix-ruby');
+    assert.equal(c.status, 0, c.stderr);
+    assert.match(c.stdout, /package-meta: PASS 1 packages match their recipe/);
+  } finally {
+    good.cleanup();
+  }
+  const bad = pkg('# wasix-ruby\n\nRuby 3.3.0. minitest 3.1 s.\n');
+  try {
+    const c = bad.node('check-package-meta.mjs', '--drift', 'wasix-ruby');
+    assert.equal(c.status, 1);
+    assert.match(c.stderr, /package\/README\.md:3 names 3\.3\.0, not recipe version 3\.4\.11/);
+    assert.doesNotMatch(c.stderr, /names 3\.1,/);
+  } finally {
+    bad.cleanup();
+  }
+});
