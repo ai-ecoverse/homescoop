@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-php",
-  "version": "8.5.12-1",
+  "version": "8.5.12-2",
   "description": "The PHP 8.5 programming language, with its built-in web server, SQLite, XML, OpenSSL and Phar.",
   "engines": {
     "slicc-kernel": ">=1.120.0"
@@ -26,6 +26,7 @@
     "THIRD-PARTY-NOTICES.md",
     "SOURCES.md",
     "bin",
+    "etc",
     "licenses",
     "patches"
   ],
@@ -45,7 +46,10 @@
     "abi": "wasi",
     "commands": {
       "php": {
-        "wasm": "bin/php.wasm"
+        "wasm": "bin/php.wasm",
+        "env": {
+          "OPENSSL_CONF": "${package}/etc/openssl.cnf"
+        }
       }
     }
   }

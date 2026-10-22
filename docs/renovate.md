@@ -11,16 +11,15 @@ version: "1.3.1"
 When upstream cuts a release, Renovate opens a PR labeled `homescoop-recipe`
 (no automerge). CI:
 
-1. **`ladder-pr`** — host-builds each touched `packages/<name>` on the PR
-   (no publish). Slicc builders are noted and skipped.
-2. **`ladder-merge`** — after merge to `main`, dispatches `ladder-build` for
-   each touched package (`createWorkflowDispatch`, not a reusable
-   `workflow_call` — npm OIDC trusts the calling workflow filename).
-   `package.json` must already match the new recipe version (the
-   `recipe-sha` job below checks that); `ladder-build` fails on a
-   mismatch instead of syncing.
+1. **The PR's `ladder-build` run** host-builds each touched `packages/<name>`
+   (no publish), certifies it and has Claude and Codex review it; `ci`, the
+   required check, needs both approvals.
+2. **The push to `main`** publishes each touched package from that run's
+   artifact (OIDC, the same workflow file). `package.json` must already
+   match the new recipe version (the `recipe-sha` job below checks that);
+   the publish fails on a mismatch instead of syncing.
 
-`ladder-pr`'s `recipe-sha` job runs `refresh-recipe-sha.mjs` and
+The `recipe-sha` job runs `refresh-recipe-sha.mjs` and
 `sync-package-version.mjs --write` (which also rewrites the old upstream
 version in `description`, the recipe `summary` and `package/README.md`)
 and `readme-table.mjs --write` in its checkout, and **only checks**: CI
@@ -31,12 +30,12 @@ machine-readable line per package,
 plus `recipe-sha: FAIL README.md: needs refresh: node scripts/readme-table.mjs --write`
 when only the root table is stale. For a Renovate PR the homescoop
 coordinator's automation acts on those lines: it runs main's scripts on the
-branch and pushes as a user, so ladder-pr runs normally; anyone else runs the
+branch and pushes as a user, so the PR's run starts normally; anyone else runs the
 printed command and pushes. A refreshed PR then carries the new version
 everywhere; `check-package-meta.mjs` fails the build when any text still names
 the old one (docs/versioning.md, "Upstream versions in text").
 
-Manual: `gh workflow run ladder-build.yml -f package=zlib`.
+Manual publish of a merged recipe whose push published nothing: `gh workflow run ladder-build.yml -f packages=zlib`.
 
 Renovate only rewrites `version:` lines. Recipe `source.url` (and
 `sources.*.url`) must use `{{version}}` / `{{major}}` / `{{minor}}`
@@ -46,7 +45,7 @@ placeholders so the tarball URL tracks the bump (libxml2's GNOME path is
 versions in `build.sh` — `homescoop_load_recipe` sets them from the
 recipe.
 
-`ladder-pr` downloads the expanded URL and checks the PR branch's `sha256`
+The PR run downloads the expanded URL and checks the PR branch's `sha256`
 (see above), and also refreshes sha256 in the host-build checkout. A bump whose patches no
 longer apply fails at `homescoop_apply_patches` with a patch error, not
 a checksum error. It rewrites a sha256 only when the source URL changed
@@ -65,15 +64,14 @@ Recipe bumps automerge **only** for packages in
 [`scripts/ci-certified.json`](../scripts/ci-certified.json) (full
 `packages/<name>/cert/*.mjs` checklist + recorded negative proof; sync into
 `renovate.json` via `node scripts/sync-ci-certified-renovate.mjs`). The list
-only scopes automerge; the merge queue still requires cert-review, and the
-publish still needs cert-review's `certified=` line. Semver
+only scopes automerge; the merge queue still requires `ci`, which needs both
+reviewers' approval. Semver
 **majors** and packages not on that list stay manual (`homescoop-major` /
 `homescoop-recipe`). See [ci-cert.md](ci-cert.md).
 
-Publish still uses the exact PR artifact (`certified=<sha256>` / `artifact_pr`
-/ `artifact_id`). An automerge carries no `certified=` line, so `ladder-merge`
-publishes it only from a ladder-pr run at the merged head whose `ci` job is
-green ([ladder-builds.md](ladder-builds.md#flow-ladder-buildyml)).
+Publish uses the exact PR artifact, from a green (built, certified and
+reviewed) run at the merged head
+([ladder-builds.md](ladder-builds.md#ci-one-workflow-ladder-buildyml)).
 
 `build.sh` loads version/URL/sha via `homescoop_load_recipe`. Secondary
 tarballs (ncurses, mbedtls, unzip) live under `sources:` in the same recipe.
