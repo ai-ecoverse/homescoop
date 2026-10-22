@@ -39,3 +39,11 @@ user's `screen -dmS` then failed silently.
 ## 5.0.1-14 (homescoop#1149, #662; 2026-10-20)
 
 `package.json` no longer sets `publishConfig.tag: next`, which disagreed with the `latest` channel it's published to. The description is one plain sentence. `cert/query.mjs` pins the `-Q windows` behaviour above.
+
+## 5.0.1-15 (homescoop#1491; 2026-10-21)
+
+A packaging bump for the updated `shims/slicc` (posix_spawn errno, `/etc/hosts` first, kernel-only environment, node name). screen's own code is unchanged.
+
+## 5.0.1-16 (homescoop#1600, #1485; 2026-10-22)
+
+This README is the only one: the recipe-root copy that build.sh used to copy over it is gone, and build.sh fails if one comes back. `cert/docs.mjs` checks that the tarball ships this file. `cert/stuff-log.mjs` drives a window from outside with `-X stuff`, `-X hardcopy` and `-L -Logfile`.
