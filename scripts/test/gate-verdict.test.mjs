@@ -24,8 +24,6 @@ const GATES = {
   'package-meta': 'scripts/check-package-meta.mjs',
   'cert-leg': 'scripts/browser-cert/cert-leg.mjs',
   'certified-publish': 'scripts/assert-certified-publish.mjs',
-  'cert-verdict': 'scripts/cert-review/verdict.mjs',
-  'issue-dedupe': 'scripts/cert-review/issue-dedupe.mjs',
   'threaded-heap': 'scripts/check-threaded-heap.mjs',
 };
 if (existsSync(join(root, 'scripts/check-no-debug.mjs'))) GATES['check-no-debug'] = 'scripts/check-no-debug.mjs';
@@ -112,6 +110,7 @@ test('every gate script prints "<gate>: PASS", and every caller in the workflows
     ...readdirSync(join(root, '.github/workflows')).filter((f) => f.endsWith('.yml')).map((f) => join('.github/workflows', f)),
     'scripts/host-run.sh',
     'scripts/cert-review/harness.sh',
+    'scripts/oidc-publish.sh',
   ];
   const bad = [];
   for (const rel of callers) {
@@ -121,7 +120,7 @@ test('every gate script prints "<gate>: PASS", and every caller in the workflows
         const call = new RegExp(`node\\s+("?\\$[A-Z_]+/)?"?scripts/${base.replace(/[.]/g, '\\.')}`);
         if (!call.test(line)) continue;
         if (/gate\.mjs|gated |"\$\{gate\[@\]\}"/.test(line)) continue;
-        if (/^\s*#|^\s*-\s*'scripts\//.test(line) || /pr-review\.yml$/.test(rel)) continue;
+        if (/^\s*#|^\s*-\s*'scripts\//.test(line)) continue;
         bad.push(`${rel}:${i + 1}: ${line.trim()}`);
       }
     }
@@ -166,7 +165,7 @@ test('NEGATIVE: a kernel-compat report where nothing ran fails; one with only ba
 test('run.mjs (cert-run) and refresh-recipe-sha (recipe-sha) print their verdicts, and their gate calls go through gate.mjs', () => {
   assert.match(readFileSync(join(root, 'scripts/browser-cert/run.mjs'), 'utf8'), /cert-run: PASS/);
   assert.match(readFileSync(join(root, 'scripts/refresh-recipe-sha.mjs'), 'utf8'), /recipe-sha: PASS/);
-  const pr = readFileSync(join(root, '.github/workflows/ladder-pr.yml'), 'utf8');
+  const pr = readFileSync(join(root, '.github/workflows/ladder-build.yml'), 'utf8');
   // recipe-sha runs the PR head's script (its job checks out the head to push): it is wrapped
   // whenever that script prints the verdict, and only a pre-#1019 branch runs it unwrapped, with a warning.
   assert.match(pr, /grep -q 'recipe-sha: PASS' scripts\/refresh-recipe-sha\.mjs; then\n\s*gate=\(node scripts\/gate\.mjs recipe-sha --\)/);
@@ -174,7 +173,7 @@ test('run.mjs (cert-run) and refresh-recipe-sha (recipe-sha) print their verdict
   assert.match(pr, /::warning::recipe-sha: this branch's refresh-recipe-sha\.mjs predates the verdict line/);
   assert.match(pr, /node scripts\/gate\.mjs cert-run -- node scripts\/browser-cert\/run\.mjs/);
   assert.match(pr, /node scripts\/gate\.mjs host-smoke -- bash scripts\/host-smoke\.sh/);
-  assert.match(readFileSync(join(root, '.github/workflows/kernel-compat-proof.yml'), 'utf8'), /node scripts\/gate\.mjs cert-run -- node scripts\/browser-cert\/run\.mjs/);
+  assert.match(readFileSync(join(root, 'scripts/oidc-publish.sh'), 'utf8'), /node "\$\(dirname "\$0"\)\/gate\.mjs" publish -- node "\$\(dirname "\$0"\)\/npm-publish\.mjs"/);
   assert.match(readFileSync(join(root, 'scripts/browser-cert/cert-leg.mjs'), 'utf8'), /'scripts\/gate\.mjs'\), 'cert-run', '--'/);
 });
 

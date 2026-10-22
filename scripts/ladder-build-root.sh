@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ladder-build-root.sh <host|rebuild> <package> — pick where ladder-pr builds.
+# ladder-build-root.sh <host|rebuild> <package> — pick where the PR run builds.
 #
 # host: the hosted workspace path /home/runner/work/<repo>/<repo> (linked to
 #   $GITHUB_WORKSPACE on the pool), the default WORK, so the pool ships

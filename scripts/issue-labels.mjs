@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Labels for a homescoop issue, from its title: the one mapping that
- * cert-review, pool-parity, publish-failure and the issues-opened fallback
- * (.github/workflows/issue-labels.yml) share. docs/ci-cert.md, Issue labels.
+ * Labels for a homescoop issue, from its title: the one mapping every filer
+ * shares, applied by ladder-build.yml's issue-labels job (on issues opened,
+ * and hourly for issues the reviewers file with GITHUB_TOKEN).
+ * docs/ci-cert.md, Issue labels.
  *
  *   node scripts/issue-labels.mjs --title '<title>'      print the labels, one per line
  *   node scripts/issue-labels.mjs --event                label the issue in $GITHUB_EVENT_PATH if it has none

@@ -1,16 +1,14 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
+import { appendFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { globRegExp, toolchainInputs } from './list-touched-packages.mjs';
-import { CONTEXT, groupStatus } from './cert-review/status.mjs';
-import { certReview, githubApi, githubIo, readContext, resolvePackage, touchingCommit } from './ladder-merge-resolve.mjs';
+import { githubApi, githubIo, readContext, resolvePackage, touchingCommit } from './ladder-merge-resolve.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const MERGE = /^Merge pull request #(\d+) from \S+/;
-export const PROOF = '.github/workflows/kernel-compat-proof.yml';
 
 export function gitIn(cwd) {
   return (...argv) => execFileSync('git', argv, { cwd, encoding: 'utf8', maxBuffer: 64 << 20 });
@@ -49,20 +47,6 @@ export function treeDigester(git, inputsOf = () => []) {
   };
 }
 
-export function proofPaths(yaml) {
-  const lines = String(yaml).split('\n');
-  const start = lines.findIndex((l) => /^\s+paths:\s*$/.test(l));
-  if (start < 0) throw new Error(`${PROOF} has no paths: list`);
-  const out = [];
-  for (const l of lines.slice(start + 1)) {
-    const m = l.match(/^\s+-\s+'([^']+)'\s*$/);
-    if (!m) break;
-    out.push(m[1]);
-  }
-  if (!out.length) throw new Error(`${PROOF}'s paths: list is empty`);
-  return out;
-}
-
 export async function checkGroup({ head, members, touched, digest, owners: ownerOf, context }, io) {
   const problems = [];
   const notes = [];
@@ -77,36 +61,28 @@ export async function checkGroup({ head, members, touched, digest, owners: owner
   }
   for (const [pkg, ms] of owners) {
     if (ms.length > 1) {
-      problems.push(`${pkg}: touched by ${ms.map((m) => `#${m.number}`).join(' and ')} in one group, so no artifact was built from the combined tree; dequeue one, rebase it onto main and let ladder-pr rebuild`);
+      problems.push(`${pkg}: touched by ${ms.map((m) => `#${m.number}`).join(' and ')} in one group, so no artifact was built from the combined tree; dequeue one, rebase it onto main and let its pull request run rebuild`);
       continue;
     }
     const [m] = ms;
     const [group, built] = [digest(head, pkg), digest(m.head, pkg)];
     if (group !== built) {
-      problems.push(`${pkg}: its tree in the group head (${group.slice(0, 12)}) is not the tree #${m.number}'s artifact was built from at ${m.head} (${built.slice(0, 12)}); main changed it since, so rebase #${m.number} and let ladder-pr rebuild`);
+      problems.push(`${pkg}: its tree in the group head (${group.slice(0, 12)}) is not the tree #${m.number}'s artifact was built from at ${m.head} (${built.slice(0, 12)}); main changed it since, so rebase #${m.number} and let its pull request run rebuild`);
     }
-  }
-  for (const m of members) {
-    if (!m.touched.host.length) continue;
-    const review = await certReview({ number: m.number, head: m.head }, io.member(m));
-    if (review.state !== 'success') {
-      const why = review.problem ? `: ${review.problem}` : '';
-      problems.push(`#${m.number}: the cert-review status on its head ${m.head} is ${review.state}${why}`);
-    } else notes.push(`#${m.number}: cert-review run ${review.runId} on ${m.head} is green`);
   }
   for (const m of members) {
     for (const pkg of m.touched.publishable) {
       if (owners.get(pkg)?.length !== 1) continue;
       const lands = ownerOf(pkg);
       if (lands !== m.commit) {
-        problems.push(`${pkg}: ladder-merge would resolve it at ${lands}, not at #${m.number}'s merge ${m.commit}`);
+        problems.push(`${pkg}: the push would publish it from ${lands}, not at #${m.number}'s merge ${m.commit}`);
         continue;
       }
       try {
         const r = await resolvePackage(context(pkg, m), io.member(m));
-        notes.push(`${pkg}: ladder-merge would ${r.decision}: ${r.reason}`);
+        notes.push(`${pkg}: the push would ${r.decision}: ${r.reason}`);
       } catch (err) {
-        problems.push(`${pkg}: ladder-merge would refuse to publish #${m.number}: ${err.message}`);
+        problems.push(`${pkg}: the push would refuse to publish #${m.number}: ${err.message}`);
       }
     }
   }
@@ -127,40 +103,23 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--base') args.base = argv[++i];
     else if (argv[i] === '--head') args.head = argv[++i];
-    else if (argv[i] === '--post-status') args.post = true;
     else throw new Error(`unknown argument ${argv[i]}`);
   }
   if (!args.base || !/^[0-9a-f]{40}$/.test(args.head ?? '')) {
-    throw new Error('usage: merge-group-check.mjs --base <main ref> --head <40-hex group head> [--post-status]');
+    throw new Error('usage: merge-group-check.mjs --base <main ref> --head <40-hex group head>');
   }
   return args;
 }
 
-export async function reportStatus({ head, post, decision, runUrl }, send) {
-  const line = `${CONTEXT}=${decision.state} on ${head}: ${decision.description}`;
-  if (!post) return `dry run, would post ${line}`;
-  await send(`/statuses/${head}`, {
-    method: 'POST',
-    body: { state: decision.state, context: CONTEXT, description: decision.description, ...(runUrl ? { target_url: runUrl } : {}) },
-  });
-  return `posted ${line}`;
-}
-
 async function main(argv) {
-  const out = (k, v) => process.env.GITHUB_OUTPUT && appendFileSync(process.env.GITHUB_OUTPUT, `${k}=${v}\n`);
-  const summary = (s) => process.env.GITHUB_STEP_SUMMARY && appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${s}\n`);
+  const summary = (line) => process.env.GITHUB_STEP_SUMMARY && appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n`);
   const repo = process.env.GITHUB_REPOSITORY || 'ai-ecoverse/homescoop';
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   const api = githubApi({ repo, token });
-  const { GITHUB_SERVER_URL: server, GITHUB_RUN_ID: runId } = process.env;
-  const runUrl = server && runId ? `${server}/${repo}/actions/runs/${runId}` : undefined;
-  let args = {};
-  let decision;
   let members = [];
   let problems = [];
   try {
-    args = parseArgs(argv);
-    const { base, head } = args;
+    const { base, head } = parseArgs(argv);
     const git = gitIn(root);
     const from = git('merge-base', base, head).trim();
     members = groupMembers(from, head, git);
@@ -184,40 +143,25 @@ async function main(argv) {
       io,
     );
     problems = checked.problems;
-    const changed = git('diff', '--name-only', from, head).split('\n').filter(Boolean);
-    const res = proofPaths(readFileSync(join(root, PROOF), 'utf8')).map(globRegExp);
-    const compat = changed.some((p) => res.some((re) => re.test(p)));
-    out('compat', String(compat));
     summary(`### merge group ${head} on ${from}`);
     for (const n of checked.notes) {
       console.log(n);
       summary(`- ${n}`);
     }
-    console.log(`kernel-compat proof: ${compat ? 'the group touches its paths, it runs' : 'not touched'}`);
     for (const p of problems) {
       console.log(`::error::merge group: ${p}`);
       summary(`- **refused:** ${p}`);
     }
-    decision = groupStatus({ problems, members });
   } catch (err) {
     const message = String(err.message).replace(/\s*\n\s*/g, ' ');
     console.log(`::error::merge group check failed closed: ${message}`);
     problems = [message];
-    decision = groupStatus({ error: message });
   }
-  if (/^[0-9a-f]{40}$/.test(args.head ?? '')) {
-    try {
-      const said = await reportStatus({ head: args.head, post: args.post, decision, runUrl }, api);
-      if (args.post) out('posted', 'true');
-      console.log(said);
-      summary(`- ${said}`);
-    } catch (err) {
-      console.log(`::error::merge group: posting the ${CONTEXT} status failed: ${err.message}`);
-      process.exit(1);
-    }
+  if (problems.length) {
+    console.log(`merge-group: FAIL ${problems.length} problem(s)`);
+    process.exit(1);
   }
-  if (problems.length) process.exit(1);
-  console.log(`merge group of ${members.map((m) => `#${m.number}`).join(', ')}: every member's artifact and cert binds to the group head`);
+  console.log(`merge-group: PASS ${members.map((m) => `#${m.number}`).join(', ')}: every member's artifact binds to the group head`);
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {

@@ -1,6 +1,6 @@
 // A repack's input must be attested (cert lane rule, 2026-10-16, from #730):
 // scripts/cert-review/repack-input.mjs on recorded registry fixtures (no
-// network), and verdict.mjs turning an unverifiable input into INCOMPLETE.
+// network); an unverifiable input fails the npm-parity job.
 //
 // Fixtures (scripts/test/fixtures/repack-input/):
 //   attested/    pkgconf 3.0.9-1 as recorded from npm: real SLSA provenance from
@@ -26,7 +26,6 @@ import { GITHUB_HOSTED, MAX_DEPTH, buildFiles, checkProvenance, fetchesPinnedSou
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, 'fixtures/repack-input');
 const script = join(here, '../cert-review/repack-input.mjs');
-const verdictScript = join(here, '../cert-review/verdict.mjs');
 
 const run = (dir, pkg, extra = {}) =>
   repackInput({ pkg, ref: 'HEAD', readAt: fixtureReader(dir), registry: fixtureRegistry(dir), ...extra });
@@ -243,59 +242,3 @@ test('an unattested root counts once a reproducible rebuild matched its bytes', 
   assert.match(other.reason, /a rebuild gave other bytes/);
 });
 
-test('verdict.mjs: an unverifiable input is INCOMPLETE whatever the reviewer says', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'repack-verdict-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const art = join(dir, 'artifacts', 'host-py-pandas-pr1');
-  mkdirSync(join(dir, 'pkg', 'package'), { recursive: true });
-  mkdirSync(art, { recursive: true });
-  writeFileSync(join(dir, 'pkg', 'package', 'package.json'), '{"name":"@ai-ecoverse/py-pandas","version":"2.3.2-12"}\n');
-  execFileSync('tar', ['-czf', join(art, 'package.tgz'), '-C', join(dir, 'pkg'), 'package']);
-  const sha = execFileSync(process.execPath, ['-e', `process.stdout.write(require('crypto').createHash('sha256').update(require('fs').readFileSync(${JSON.stringify(join(art, 'package.tgz'))})).digest('hex'))`], { encoding: 'utf8' });
-  writeFileSync(join(art, 'package.tgz.sha256'), `${sha}  package.tgz\n`);
-  const review = join(dir, 'review');
-  mkdirSync(review);
-  const verdict = (v, input) => {
-    writeFileSync(join(review, 'verdict.json'), JSON.stringify({ packages: [{ package: 'py-pandas', verdict: v, reason: 'broken' }] }));
-    const args = ['--artifacts', join(dir, 'artifacts'), '--pr', '1', '--review', review, '--body', join(dir, 'body.md'), '--lines', join(dir, 'lines.txt'), '--ladder-conclusion', 'success'];
-    if (input !== undefined) {
-      writeFileSync(join(dir, 'repack-input.json'), JSON.stringify(input));
-      args.push('--repack-input', join(dir, 'repack-input.json'));
-    }
-    const r = spawnSync(process.execPath, [verdictScript, ...args], { encoding: 'utf8' });
-    return { status: r.status, lines: readFileSync(join(dir, 'lines.txt'), 'utf8').trim(), body: readFileSync(join(dir, 'body.md'), 'utf8') };
-  };
-  const unattested = await run(join(fixtures, 'unattested'), 'py-pandas');
-  const attested = { ...(await run(join(fixtures, 'attested'), 'pkgconf')), package: 'py-pandas' };
-
-  const incomplete = verdict('certified', { 'py-pandas': unattested });
-  assert.equal(incomplete.status, 1);
-  assert.equal(incomplete.lines, `cert-ci: INCOMPLETE @ai-ecoverse/py-pandas@2.3.2-12: unverifiable input: ${unattested.reason}`);
-  assert.doesNotMatch(incomplete.lines, /certified=/);
-  assert.match(incomplete.body, /Not certified, whatever the review says/);
-
-  const pass = verdict('certified', { 'py-pandas': attested });
-  assert.equal(pass.status, 0, pass.lines);
-  assert.equal(pass.lines, `certified=${sha} @ai-ecoverse/py-pandas 2.3.2-12`);
-
-  // A built recipe passes only with attested: true (#864); the old
-  // { repack: false, attested: null } shape now fails closed.
-  const notRepack = verdict('certified', { 'py-pandas': { package: 'py-pandas', repack: false, attested: null } });
-  assert.equal(notRepack.status, 1);
-  assert.match(notRepack.lines, /^cert-ci: INCOMPLETE .*unverifiable input: no reason given$/);
-  const built = verdict('certified', { 'py-pandas': { package: 'py-pandas', repack: false, built: true, attested: true, reason: 'ok' } });
-  assert.equal(built.status, 0, built.lines);
-
-  const missing = verdict('certified', {});
-  assert.equal(missing.status, 1);
-  assert.match(missing.lines, /INCOMPLETE .*repack-input\.mjs didn't run for it/);
-
-  const errored = verdict('certified', { 'py-pandas': { package: 'py-pandas', error: 'HTTP 502' } });
-  assert.match(errored.lines, /INCOMPLETE .*couldn't trace it \(HTTP 502\)/);
-
-  const failed = verdict('fail', { 'py-pandas': unattested });
-  assert.match(failed.lines, /^cert-ci: FAIL .*: broken; also unverifiable input: /);
-
-  const without = verdict('certified', undefined);
-  assert.equal(without.status, 0, 'no --repack-input: verdict.mjs as before');
-});
