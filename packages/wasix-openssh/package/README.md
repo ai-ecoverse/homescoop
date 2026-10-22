@@ -4,8 +4,8 @@
 [slicc](https://github.com/ai-ecoverse/slicc) WASIX realm: `ssh`, `ssh-keygen`,
 `scp`, `sftp`, and `ssh-add`.
 
-Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-39** (since
-10.6.0-12; -11 was on -34, -8 to -10 were on -29, -7 on -28, -6 on -22, -5 on -18), linking
+Built with the pinned wasixcc on **wasix-sysroot 2025.9.30-40** (since
+10.6.0-13; -12 was on -39, -11 on -34, -8 to -10 on -29, -7 on -28, -6 on -22, -5 on -18), linking
 **wasix-openssl 3.5.9-4** and **wasix-zlib 1.3.1-3** via pkg-config only
 (`-Wl,--fatal-warnings`). No `sshd` in this package.
 
@@ -15,9 +15,15 @@ ssh -o StrictHostKeyChecking=accept-new user@host true
 GIT_SSH_COMMAND=ssh git clone ssh://user@host/repo.git
 ```
 
+## 10.6.0-13
+
+- **A sized initial heap** (homescoop#1425, #1287): `ssh`, `scp`, `sftp`, `ssh-add` and `ssh-keygen` are threaded wasm modules with bulk memory (a shared memory plus `memory.fill`/`memory.copy`). V8 can trap after a `memory.grow` in such a module (slicc-kernel#1172), so they now link a 32 MiB initial memory (the measured peak is 14 MiB, 8 MiB of it the stack), above the measured peak, on wasix-sysroot -40, whose malloc uses the initial pages. A typical session never grows the memory. `cert/heap.mjs` checks that.
+- **The shipped README is this one** (homescoop#1446): 10.6.0-12's build copied a stale recipe-root README over it, so its tarball still said -34 and had no -12 notes. That copy is gone, and `cert/docs.mjs` checks that the tarball's README is the committed one and names the package's own sysroot and version.
+- **The docs name the right sysroot** (homescoop#1426): `recipe.yaml`'s notes said -34, and the -12 notes said the key comment's host came from a caller-set `HOSTNAME`; it's the kernel's node name.
+
 ## 10.6.0-12
 
-- **Key comments name this machine** (homescoop#1050): ssh-keygen's default comment is `user@host`, where the host comes from `gethostname()`. Since wasix-sysroot -36 that's the exported `HOSTNAME`, or `slicc` if there isn't one. Up to 10.6.0-11 every key said `root@wasmer.sh`, Wasmer's built-in name.
+- **Key comments name this machine** (homescoop#1050): ssh-keygen's default comment is `user@host`, where the host comes from `gethostname()`. Since wasix-sysroot -36 that's the kernel's node name (`slicc` by default). slicc-kernel sets `HOSTNAME` to it when a program starts, whatever the caller passed, so `HOSTNAME=x ssh-keygen` still writes `root@slicc` (homescoop#1426). Up to 10.6.0-11 every key said `root@wasmer.sh`, Wasmer's built-in name.
 - **More coverage** (homescoop#1052): `cert/crypto.mjs` covers RSA-3072, ECDSA-384 and passphrase-encrypted keys, `-Y sign`/`verify`, the cipher, MAC and kex matrix (with ML-KEM and sntrup), `ssh -C` both ways, and early-closing pipes.
 
 ## Identity and `~/.ssh`
@@ -75,7 +81,7 @@ backs up `known_hosts` with a copy when `link()` is unavailable (patch
 
 ## Sysroot
 
-**wasix-sysroot 2025.9.30-34**: select/pselect timeouts and socketpair
+**wasix-sysroot 2025.9.30-40**: malloc that uses the initial memory (-40), select/pselect timeouts and socketpair
 flags (-18), signals and EINTR (-19), the kernel's users (-20), per-fd
 terminals (-21), the `slicc.libc` marker in every binary (-22), so
 slicc-kernel gives it EINTR semantics, real signal masks (-28,
