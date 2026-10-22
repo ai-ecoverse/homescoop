@@ -1,3 +1,27 @@
+## discovery.mjs's cost bounds catch a start that rescans (3.15.0-6; #1153; 2026-10-22)
+
+`cert/discovery.mjs` now measures discovery against itself without its cache, in the same run, instead of against PYTHONPATH with a 1.1 slack. On npm 3.15.0-5 (slicc-kernel 1.125.0, users enforce, local browser cert) it passes: `a start pays 57 ms for discovery (0.25 of its cost without the cache), 227 ms without its cache`. In earlier local runs the ratio was 0.17 to 0.28.
+
+Proof that it fails a slow discovery: the same 3.15.0-5 tarball with `_slicc_site._cache_path` patched to `return None` (no cache, so every start rescans; repacked locally, `run.mjs --spec discovery.mjs`) fails with `warm discover() 68.4 ms is more than half a cold scan (68.1 ms): the cache does not hit`. Its log has `a start pays 154 ms for discovery (0.98 of its cost without the cache)`, so the start-cost bound (at most 0.5) fails as well.
+
+The old bound, `on <= 1.1 x PYTHONPATH`, failed all three ladder-pr attempts of #1652 run 39729099801 with nothing wrong: on/PYTHONPATH was 1789/1588, 803/710 and 418/378 ms. In those runs discovery's start cost (on minus off) was 583, 138 and 88 ms, against cold scans of 2290, 454 and 296 ms: 0.25 to 0.30 of a scan, so no start rescanned. Those runs didn't measure the new cacheless start.
+
+## 3.15.0-5: -I/-E take the home from a caller's SLICC_PYTHONHOME and the venv from a caller's PATH; memory numbers (3.15.0-6; #1572, #1573; 2026-10-22)
+
+npm 3.15.0-5 on slicc-kernel 1.125.0 (browser cert, users enforce, `run.mjs --spec isolated.mjs`): FAIL. All of it in one assertion:
+
+- `SLICC_PYTHONHOME=/tmp/fh python3 -I ran /tmp/fh's encodings.py (rc 1)`, and the same for `-E`: -5's getpath took the home from that variable under -I/-E, and a caller's value wins over the command's `env`.
+- `PATH=/tmp/ev/bin:/usr/bin:/bin python3 -I ran the caller's .pth or ._pth home (rc 0, /tmp/ev /tmp/ev/bin/python3)`, and the same for `python3 -E` and for a `#!/usr/bin/python3 -I` script. slicc starts python with `argv[0]` `python3`, so getpath looked it up on the caller's `PATH`, read `/tmp/ev/pyvenv.cfg` and made `/tmp/ev` the venv, whose site-packages `.pth` ran.
+- `cwd /tmp/cv (a pyvenv.cfg), PATH=/tmp/nowhere /usr/bin/python3 -I ran the caller's .pth or ._pth home (rc 0, /tmp/cv)`, and the same for `-E` and for a cwd of `/tmp/cv/bin` (the parent's pyvenv.cfg). With no executable found, getpath looked for `pyvenv.cfg` in the cwd and its parent. The `#!/usr/bin/python3 -I` script from that cwd with the default PATH passes on -5, since -5 then found an executable on PATH.
+- `PYTHONEXECUTABLE=/tmp/ev/bin/python3 (a pyvenv.cfg) python3 -I ran the caller's .pth or ._pth home (rc 0, /tmp/ev /tmp/ev/bin/python3)`, and the same for `-E`, the script, and `__PYVENV_LAUNCHER__`: getpath took either variable as the executable without checking -E.
+- `PYTHONEXECUTABLE=/tmp/pt/bin/python3 (a python3._pth) python3 -I ran the caller's .pth or ._pth home (rc 1, )`, and the same for `-E`, the script, and `__PYVENV_LAUNCHER__`: the `python3._pth` next to that path became the home, and its fake `encodings.py` ran.
+- `python3 -I keeps its discovery cache under a caller's XDG_CACHE_HOME/HOME: ['slicc-site', 'slicc-site/node_modules%@ai-ecoverse%wasix-python']`.
+- `the command's argv prefix is ['-c', …], want ['-X', 'slicc_home=/node_modules/@ai-ecoverse/wasix-python/']`.
+
+`PYTHONHOME=/tmp/fh python3 -I`/`-E` already kept the package's prefix on -5 (#1504).
+
+`cert/heap-size.mjs`'s new bound passes on -5 as well: `importing numpy, pandas, scipy and matplotlib takes it to 170.5 MiB: 10.5 MiB of growth for the 10.5 MiB of data of 114 side modules …, and 79.0 MiB more of 1 MiB buffers fit before the memory grows (81.0 MiB in use)`. #1573 changes no code: -5 behaves the same, and what it got wrong was its README ("about 116 MiB … starts without growing the memory") and recipe.yaml's `measured-peak: 116MiB`. The bound fails on 3.15.0-4, where the initial memory was 40 MiB and dlmalloc grew the memory for every allocation, so the same run (`--spec heap-size.mjs`, same kernel) fails with `the imports grew the memory from 59.3 MiB to 118.6 MiB, more than the 10.5 MiB of the 114 side modules' data the loader places above it: the heap did not stay in the initial memory; after the imports -1.0 MiB of 1 MiB buffers fit before the memory grows, want at least 48 MiB` (next to its 40 MiB linked size, as in the -4 entry below).
+
 
 
 ## 3.15.0-4: -I/-E honour a caller's PYTHONHOME; 40 MiB initial memory on -39 (3.15.0-5; #1504, #1287; 2026-10-21)

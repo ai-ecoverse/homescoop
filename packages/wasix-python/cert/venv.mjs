@@ -20,5 +20,8 @@ export default async function (ctx) {
     out[name] = r.stdout.trim();
     assert.equal(out[name], `${dir} ${base} True`, `${name}: ${out[name]}`);
   }
-  console.log(`venv: venv.create(), --copies and the CLI default each give a symlinked bin/python, run from bash, whose sys.prefix is the venv and base_prefix ${base}`);
+  const iso = await sh(`/tmp/vlinks/bin/python -I -c 'import sys, encodings; print(sys.prefix, sys.base_prefix)'`);
+  assert.equal(iso.status, 0, `/tmp/vlinks/bin/python -I: rc=${iso.status} ${iso.stdout}${iso.stderr}`);
+  assert.equal(iso.stdout.trim(), `/tmp/vlinks ${base}`, `/tmp/vlinks/bin/python -I: ${iso.stdout}`);
+  console.log(`venv: venv.create(), --copies and the CLI default each give a symlinked bin/python, run from bash, whose sys.prefix is the venv and base_prefix ${base}; the venv's bin/python -I runs in the venv too`);
 }

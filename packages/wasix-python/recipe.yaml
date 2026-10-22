@@ -48,8 +48,8 @@ sources:
     tree: "a83f4b7e97c78d8cdb9720cee275b1572a59bd93"
 wasm:
   initial-memory: 160MiB
-  measured-peak: 116MiB
-  measured-by: "cc7e on wasix-sysroot 2025.9.30-40 (the first sysroot whose malloc uses the initial memory): the memory size (libc sbrk(0)) after python imports numpy, pandas, scipy and matplotlib is about 116 MiB, the main's data and 16 MiB stack, the heap and the side modules the loader places above it; a numpy/pandas/scipy/matplotlib workload peaks at about 3.7 GiB, which the 4 GiB --max-memory holds. cert/heap-size.mjs checks the linked size and that 48 MiB of mallocs after start stay in it"
+  measured-peak: 81MiB
+  measured-by: "thr_qs2r6rukqt on 3.15.0-5 (wasix-sysroot 2025.9.30-40, slicc-kernel 1.125.0, users enforce), in the importing thread: after python imports numpy, pandas, scipy and matplotlib, 79 MiB more of 1 MiB buffers fit before sbrk(0) moves, so python's data, its 16 MiB stack and the heap use 81 MiB of the 160 MiB. The memory itself grows from 160 to 170.5 MiB during the imports, exactly the 10.5 MiB of data of the 114 side modules, which slicc-kernel's loader places by memory.grow above the current size whatever the initial size (homescoop#1573). A numpy/pandas/scipy/matplotlib workload peaks at about 3.7 GiB, which the 4 GiB --max-memory holds. cert/heap-size.mjs checks the linked size, that 48 MiB of mallocs after start stay in it, that the imports grow the memory by no more than the side modules' data, and that 48 MiB more fit after them"
 dependencies:
   build: []
   host: []
