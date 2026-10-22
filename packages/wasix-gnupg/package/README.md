@@ -22,6 +22,18 @@ git config --global gpg.program gpg && git commit -S -m signed
   when git runs it with its stdio piped. Without a terminal (the agent's
   `bash` tool), use unprotected keys or `--batch --passphrase-fd`.
 
+## 2.4.9-16
+
+- **Root's refusal of a symlinked keybox says why** (homescoop#1674). Since 2.4.9-15, root's gpg follows a symlinked keybox, keyring or trustdb only in a directory that root owns and that neither its group nor others can write. Elsewhere it refused with `Symbolic link loop`, which read like a filesystem bug. It now says which file it refused, why, and what to do, once per file and run, and the error that follows is `Operation not permitted`:
+
+  ```text
+  gpg: refusing to open '/tmp/gw/pubring.kbx' as root: it is a symbolic link, and its directory '/tmp/gw' is group-writable (gid 0), so another user could have put it there; make the directory writable only by root (chmod go-w '/tmp/gw') or use a regular file with one link
+  ```
+
+  In a directory root doesn't own, the hint is to use a regular file, or keep the link in a directory only root can write. A file with more than one hard link, or one that changes while gpg opens it, is refused the same way.
+- **The refusal itself stays.** A group-writable homedir lets any member of its group remove root's link and put their own in its place, and root's gpg can't tell the two apart when it opens the file. The cert shows what that leads to on 2.4.9-14: a user who joined the `root` group after root made a setgid `root:root` 2775 directory, and a member of `users` in a `root:users` 2775 one, each symlinked `pubring.kbx` to a keybox only root can read, root imported a key there, and the user then read root's keys from the 644 `pubring.kbx` and `pubring.kbx~` it wrote. "The group has only root" is no exception either: group members can be added at any time (slicc-kernel's `groups.addMember`, or `users.add` with `groups`), and setgid only sets the group of new files, not who may write. So keep root's homedirs `chmod 700` (or at least `go-w`), or use regular files there.
+- **More cert rows** (homescoop#1424): a homedir whose default legacy `pubring.gpg` (no `pubring.kbx`) a user symlinks to root's 600 keyring: after root's import there, nothing the user can read holds root's key and root's keyring is byte-identical.
+
 ## 2.4.9-15
 
 - **Root's gpg no longer reads a keybox, keyring or trustdb through a user's symlink** (homescoop#1654). 2.4.9-14 refused to write through a planted name, but it still read through one: when root's gpg ran on another user's homedir whose `pubring.kbx` was a symlink to a file only root could read, it read that file, and the copy it makes for the backup (`pubring.kbx~`) and the updated keybox were the user's files afterwards, so the user could read root's keybox. The same held for a `gnupg-ring:` keyring. Now every read open of a keybox, a keyring and a trustdb goes through the same check as the in-place edits: for root, the name must be a regular file with one link, checked with `fstatat(AT_SYMLINK_NOFOLLOW)` on the directory's descriptor and opened with `openat(O_NOFOLLOW)` as that same `st_dev`/`st_ino`. That covers the keybox's read opens (searches, listings, the source of every update), the source of the backup copy, the probe that tells a keybox from a keyring, a keyring's read opens and the read-only trustdb. A symlinked keybox or keyring in a user's directory makes root's gpg fail (`Too many levels of symbolic links`) and leaves the symlink and its target as they are; up to 2.4.9-14 it replaced the symlink with a copy that the user owned. In a directory that root owns and only root can write, root's own symlinks are followed as before, and other users' gpg follows links as before.
@@ -64,6 +76,12 @@ decrypt yet).
   next gpg starts a new one).
 - `gpg-agent --daemon PROGRAM` (run a program under the agent) needs fork
   and is not supported.
+- Root and symlinks (2.4.9-15, homescoop#1654, #1674): root's gpg follows
+  a symlinked `pubring.kbx`, keyring or `trustdb.gpg` only in a directory
+  that root owns and that neither its group nor others can write (`chmod
+  700` or `go-w`). Anywhere else it refuses the file and logs
+  `refusing to open '<file>' as root: …` with the reason and the fix.
+  Regular files with one link work everywhere.
 - Lock files (2.4.9-8, homescoop#712): gpg's dotlock holds an `fcntl` write
   lock on `<file>.lock` (`pubring.kbx.lock`, `trustdb.gpg.lock`), which
   slicc-kernel (≥ 1.100.0) enforces between processes and drops when the

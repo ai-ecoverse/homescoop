@@ -19,7 +19,7 @@
  gnupg_dirent_t gnupg_readdir (gnupg_dir_t gdir);
 --- a/common/sysutils.c
 +++ b/common/sysutils.c
-@@ -1324,6 +1324,318 @@
+@@ -1324,6 +1324,374 @@
  }
  
  
@@ -247,24 +247,70 @@
 +  return rc;
 +}
 +
++static void
++wasi_refuse_note (const char *path, const char *dir, int dok,
++                  const struct stat *dst, const struct stat *lst)
++{
++  static char *last;
++  char what[64], why[64];
++
++  if (last && !strcmp (last, path))
++    return;
++  xfree (last);
++  last = xtrystrdup (path);
++  if (!lst)
++    strcpy (what, "it changed while it was being opened");
++  else if (S_ISLNK (lst->st_mode))
++    strcpy (what, "it is a symbolic link");
++  else if (S_ISREG (lst->st_mode))
++    snprintf (what, sizeof what, "it has %lu hard links",
++              (unsigned long)lst->st_nlink);
++  else
++    strcpy (what, "it is not a regular file");
++  if (!dok)
++    strcpy (why, "could not be checked");
++  else if (dst->st_uid)
++    snprintf (why, sizeof why, "is owned by uid %lu, not by root",
++              (unsigned long)dst->st_uid);
++  else if (dst->st_mode & S_IWOTH)
++    strcpy (why, "is world-writable");
++  else
++    snprintf (why, sizeof why, "is group-writable (gid %lu)",
++              (unsigned long)dst->st_gid);
++  if (dok && !dst->st_uid)
++    log_info ("refusing to open '%s' as root: %s, and its directory '%s'"
++              " %s, so another user could have put it there; make the"
++              " directory writable only by root (chmod go-w '%s') or use"
++              " a regular file with one link\n", path, what, dir, why, dir);
++  else
++    log_info ("refusing to open '%s' as root: %s, and its directory '%s'"
++              " %s, so another user could have put it there; use a regular"
++              " file with one link, or keep the link in a directory that"
++              " root owns and only root can write\n", path, what, dir, why);
++}
++
 +int
 +gnupg_wasi_open_file (const char *path, int flags)
 +{
 +  struct stat st, lst, dst;
 +  const char *base;
 +  char *dir;
-+  int dfd, fd, e;
++  int dfd, fd, e, dok;
 +
 +  if (geteuid ())
 +    return open (path, flags);
 +  if (wasi_split (path, &dir, &base))
 +    return -1;
 +  dfd = open (dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-+  xfree (dir);
 +  if (dfd == -1)
-+    return -1;
-+  if (!fstat (dfd, &dst) && S_ISDIR (dst.st_mode) && !dst.st_uid
-+      && !(dst.st_mode & (S_IWGRP | S_IWOTH)))
++    {
++      e = errno;
++      xfree (dir);
++      errno = e;
++      return -1;
++    }
++  dok = !fstat (dfd, &dst) && S_ISDIR (dst.st_mode);
++  if (dok && !dst.st_uid && !(dst.st_mode & (S_IWGRP | S_IWOTH)))
 +    {
 +      fd = openat (dfd, base, flags);
 +      goto leave;
@@ -274,22 +320,32 @@
 +    goto leave;
 +  if (!S_ISREG (lst.st_mode) || lst.st_nlink != 1)
 +    {
-+      errno = ELOOP;
++      wasi_refuse_note (path, dir, dok, &dst, &lst);
++      errno = EPERM;
 +      goto leave;
 +    }
 +  fd = openat (dfd, base, flags | O_NOFOLLOW);
 +  if (fd == -1)
-+    goto leave;
++    {
++      if (errno == ELOOP)
++        {
++          wasi_refuse_note (path, dir, dok, &dst, NULL);
++          errno = EPERM;
++        }
++      goto leave;
++    }
 +  if (fstat (fd, &st) || !S_ISREG (st.st_mode) || st.st_nlink != 1
 +      || st.st_dev != lst.st_dev || st.st_ino != lst.st_ino)
 +    {
 +      close (fd);
 +      fd = -1;
-+      errno = ELOOP;
++      wasi_refuse_note (path, dir, dok, &dst, NULL);
++      errno = EPERM;
 +    }
 + leave:
 +  e = errno;
 +  close (dfd);
++  xfree (dir);
 +  errno = e;
 +  return fd;
 +}
