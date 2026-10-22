@@ -7,6 +7,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TOKEN = /(?<![\w.@])(v?)(\d+(?:\.\d+)+(?:-\d+)?(?:p\d+)?(?:\.post\d+)?)(?!\w|[.-]\w)/g;
 const PACKAGING_REV = /^\d+\.\d+\.\d+-\d+$/;
 const PLAIN = /^\d+\.\d+\.\d+$/;
+const UNIT = /^[ \u00a0\u202f]?(?:[%×]|(?:[nµu]?s|ms|sec|secs|seconds?|min|mins|minutes?|h|hrs?|hours?|[KMGTP]i?B|kB|kiB|B|bytes?|x|fps|[kMG]?Hz)(?!\w))/;
 
 export function loadAllow(file = join(root, 'scripts/package-meta-versions.json')) {
   const allow = JSON.parse(readFileSync(file, 'utf8'));
@@ -137,6 +138,7 @@ export function staleVersions(text, upstream, { allow, name }) {
     if (ok.some((o) => sameVersion(tok, o))) continue;
     if (componentPrefix(tok, up)) continue;
     if (PACKAGING_REV.test(tok) && !up.includes('-')) continue;
+    if (UNIT.test(text.slice(m.index + m[0].length))) continue;
     if (historicalCue(sentenceAt(text, m.index), allow)) continue;
     if (afterLead(text, m.index, leads)) continue;
     const ln = lineAt(text, m.index);
