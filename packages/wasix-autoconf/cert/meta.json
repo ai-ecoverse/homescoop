@@ -14,11 +14,11 @@
     "@ai-ecoverse/wasm-gawk"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-perl@5.42.0-21",
+    "@ai-ecoverse/wasix-perl@5.42.0-22",
     "@ai-ecoverse/wasix-m4@1.4.20-7",
     "@ai-ecoverse/wasm-bash@5.3.0-18",
     "@ai-ecoverse/wasm-coreutils@9.12.0-7",
-    "@ai-ecoverse/wasix-automake@1.17.0-13",
+    "@ai-ecoverse/wasix-automake@1.17.0-14",
     "@ai-ecoverse/wasm-grep@3.12.0-3",
     "@ai-ecoverse/wasm-sed@4.10.0-1",
     "@ai-ecoverse/wasm-gawk@5.4.1-2"
@@ -32,6 +32,7 @@
     "2.72.0-8 (packaging-only, -7's bytes): the same checklist.mjs with the wasix-perl it now pins, 5.42.0-13 (cert/meta.json needsInstall)",
     "2.72.0-10 (a CI build from the pinned source, the same bytes as -7/-9 but package.json): the same checklist.mjs and licence.mjs with the peers it now pins, wasix-perl 5.42.0-18 and wasix-m4 1.4.20-4, and wasix-automake 1.17.0-11 (cert/meta.json needsInstall, homescoop#964)",
     "2.72.0-11 (a pin bump, the same build as -10 but package.json): the same checklist.mjs and licence.mjs with the peers it now pins, wasix-perl 5.42.0-21 and wasix-m4 1.4.20-7 (homescoop#1557), and wasix-automake 1.17.0-13 (cert/meta.json needsInstall, homescoop#864), on slicc-kernel 1.132.1, the floor wasix-perl 5.42.0-21 needs (engines.slicc-kernel >=1.120.0)",
+    "2.72.0-12 (a pin bump, the same build as -10 but package.json): the same checklist.mjs and licence.mjs with the wasix-perl it now pins, 5.42.0-22 (homescoop#1632, wasix-sysroot -42, a sized heap), wasix-m4 1.4.20-7 unchanged, and wasix-automake 1.17.0-14 (cert/meta.json needsInstall, homescoop#864), on slicc-kernel 1.132.1, the kernel wasix-perl 5.42.0-22's own cert uses (engines.slicc-kernel >=1.120.0, unchanged)",
     "cert/licence.mjs (2.72.0-9, homescoop#565): package.json says GPL-3.0-or-later; the tarball's files name GPLv3 ('version 3 of the License'), GPLv2 (the Autom4te modules' 'either version 2') and the Autoconf Configure Script Exception, and package/LICENSE carries each text (sections COPYINGv3, COPYING.EXCEPTION, COPYING); the README has a Licence section; autoconf --version says 'License GPLv3+/Autoconf'. 2.72.0-8: LICENSE is GPLv2 only (NEGATIVE.md)"
   ]
 }

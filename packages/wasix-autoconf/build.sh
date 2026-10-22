@@ -210,7 +210,7 @@ old = json.loads(committed.read_text()) if committed.exists() else {}
 parts = ver.split(".")
 npm_ver = old.get("version") or (f"{ver}.0-1" if len(parts) == 2 else f"{ver}-1")
 deps = old.get("dependencies") or {
-    "@ai-ecoverse/wasix-perl": "5.42.0-21",
+    "@ai-ecoverse/wasix-perl": "5.42.0-22",
     "@ai-ecoverse/wasix-m4": "1.4.20-7",
 }
 pkg = {

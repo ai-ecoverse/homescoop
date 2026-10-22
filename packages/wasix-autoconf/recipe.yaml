@@ -23,7 +23,8 @@ about:
     Shebang #!/usr/bin/perl; slicc resolves via wasix-perl. Needs wasix-m4 on PATH.
     2.72.0-7: a real rebuild again (-4..-6 were packaging-only repacks of -3);
     2.72.0-10 too, a CI build with provenance (-8/-9 were repacks of -7);
-    2.72.0-11 bumps the pins to wasix-m4 1.4.20-7 and wasix-perl 5.42.0-21.
+    2.72.0-11 bumps the pins to wasix-m4 1.4.20-7 and wasix-perl 5.42.0-21;
+    2.72.0-12 bumps wasix-perl to 5.42.0-22.
     autom4te's GNU m4 probe matches m4 --help in Perl, not through grep, so
     autoconf / aclocal run without grep (homescoop#470); the README says what
     a generated configure needs (grep, sed, awk).
