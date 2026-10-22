@@ -212,6 +212,8 @@ apply_wasix_patch flock-interruptible-wasi.patch "$SRC/file.c" WASIX_FLOCK_NB
 apply_wasix_patch load-path-prefix-wasi.patch "$SRC/ruby.c" WASIX_LOAD_PATH
 apply_wasix_patch rbinstall-static-bundled-ext-wasi.patch "$SRC/tool/rbinstall.rb" WASIX_STATIC_BUNDLED_GEMS
 apply_wasix_patch rdoc-ri-pack-wasi.patch "$SRC/lib/rdoc/store.rb" wasix_ri_pack
+apply_wasix_patch rubygems-rdoc-hook-wasi.patch "$SRC/lib/rubygems/rdoc.rb" wasix_rdoc_default_gem_hook
+apply_wasix_patch rubygems-no-document-default-wasi.patch "$SRC/lib/rubygems/defaults/operating_system.rb" operating_system_defaults
 
 # OpenSSL 3 opaque structs: never compile the 1.0-era field-access fallbacks.
 python3 - "$SRC/ext/openssl/openssl_missing.c" <<'PY'

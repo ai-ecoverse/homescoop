@@ -1,0 +1,8 @@
+--- /dev/null
++++ lib/rubygems/defaults/operating_system.rb
+@@ -0,0 +1,5 @@
++module Gem
++  def self.operating_system_defaults
++    { "gem" => "--no-document" }
++  end
++end

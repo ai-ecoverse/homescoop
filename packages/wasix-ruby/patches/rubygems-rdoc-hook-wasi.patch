@@ -1,0 +1,15 @@
+--- lib/rubygems/rdoc.rb
++++ lib/rubygems/rdoc.rb
+@@ -16,6 +16,12 @@
+ 
+     if rdoc_hooks_defined_via_plugin?
+       RDoc = ::RDoc::RubyGemsHook
++
++      def self.wasix_rdoc_default_gem_hook?
++        ::RDoc::RubygemsHook.respond_to?(:default_gem?) && ::RDoc::RubygemsHook.default_gem?
++      end
++
++      Gem.done_installing(&::RDoc::RubygemsHook.method(:generation_hook)) if wasix_rdoc_default_gem_hook?
+     else
+       RDoc = ::RDoc::RubygemsHook
+ 
