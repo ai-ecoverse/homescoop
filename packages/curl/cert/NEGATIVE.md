@@ -87,3 +87,13 @@ The published 8.22.0-6 also has 26 occurrence(s) of the CI build directory `/tmp
 ## 8.22.0-9: shim drift (homescoop#1491; 2026-10-20)
 
 8.22.0-9 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 8.22.0-8 in `bin/curl` and `bin/curl.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 8.22.0-10: the shared slicc-env.js (homescoop#1625), env and /etc/hosts specs (homescoop#1434; 2026-10-21)
+
+The build change is in `build.sh` and `recipe.yaml`: curl stops naming `packages/coreutils/slicc-env.js` and links `shims/slicc/slicc-env.js` through `homescoop_em_cli_ldflags`. The published 8.22.0-9 already links an identical environment library, so its behaviour matches and it passes both new specs. The negative for the build change is `scripts/test/recipe-inputs.test.mjs`: on main it fails with `packages/curl/build.sh: packages/coreutils/slicc-env.js` and `packages/curl/recipe.yaml: packages/coreutils/slicc-env.js`. With coreutils' copy removed, it also fails because that recipe input is missing. `build.sh` also fails a glue that has Emscripten's `USER:"web_user"` table. 8.22.0-7's `bin/curl` has it (`var env={USER:"web_user",LOGNAME:"web_user",PATH:"/",PWD:"/",HO…`) and 8.22.0-9's doesn't.
+
+Local runs with `run.mjs --users enforce --soft --spec envhome.mjs --spec hosts.mjs` on slicc-kernel 1.102.6, against the published tarballs:
+
+- 8.22.0-9: both pass.
+- 8.22.0-7, `envhome.mjs`: FAIL, 6 of 11 assertions. `env -u HOME curl` sends `X-Rc: web_user` from root's decoy `/home/web_user/.curlrc`. `env -i curl -n` sends `Authorization: Basic dzp3` (w:w, the decoy `.netrc`). `env -i curl` sees `HOME=/home/web_user`. bob's `env -u HOME curl -n` gets rc 0 and sends `Basic dzp3`.
+- 8.22.0-8, `hosts.mjs`: FAIL, 10 of 19 assertions. `alias.review.test.` and `ALIAS.test` give `curl: (6) Could not resolve` and dial nothing, because that build's getaddrinfo doesn't read `/etc/hosts` (#580 came with 8.22.0-9's shims). 8.22.0-7 fails it the same way. 8.22.0-8 passes `envhome.mjs`.
