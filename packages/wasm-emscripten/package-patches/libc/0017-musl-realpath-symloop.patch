@@ -1,0 +1,11 @@
+--- a/system/lib/libc/musl/src/misc/realpath.c
++++ b/system/lib/libc/musl/src/misc/realpath.c
+@@ -111,7 +111,7 @@
+ 			check_dir = stack[p];
+ 			continue;
+ 		}
+-		if (++cnt == SYMLOOP_MAX) {
++		if (cnt++ == SYMLOOP_MAX) {
+ 			errno = ELOOP;
+ 			return 0;
+ 		}

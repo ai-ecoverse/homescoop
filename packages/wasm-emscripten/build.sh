@@ -51,6 +51,10 @@ for p in "$HOMESCOOP_PKG"/package-patches/*.patch; do
   echo "  package patch $(basename "$p")"
   patch -d "$PKG" -p1 --batch --no-backup-if-mismatch < "$p"
 done
+for p in "$HOMESCOOP_PKG"/package-patches/libc/*.patch; do
+  echo "  package libc patch $(basename "$p")"
+  patch -d "$PKG" -p1 --batch --no-backup-if-mismatch < "$p"
+done
 if find "$PKG" -name '*.rej' -o -name '*.orig' | grep -q .; then
   echo "homescoop: package patch leftovers in $PKG" >&2
   exit 1
@@ -89,6 +93,16 @@ for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps sli
   EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -O2 -c "$SLICC_SHIMS/$obj.c" -o "$PKG/lib/slicc/$obj.o"
   test -f "$PKG/lib/slicc/$obj.o"
 done
+grep -q 'if (++cnt == SYMLOOP_MAX) {' "$HOST_EM/system/lib/libc/musl/src/misc/realpath.c"
+grep -q 'if (cnt++ == SYMLOOP_MAX) {' "$PKG/system/lib/libc/musl/src/misc/realpath.c"
+echo "  emcc -c slicc_realpath.o (musl realpath.c with package libc patch 0017)"
+(cd "$PKG" && EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" -Os -fno-inline-functions -fno-builtin -std=c99 -D_XOPEN_SOURCE=700 \
+  -Wno-unused-result -Wno-ignored-attributes \
+  -Isystem/lib/libc/musl/arch/emscripten -Isystem/lib/libc/musl/arch/generic \
+  -Isystem/lib/libc/musl/src/internal -Isystem/lib/libc/musl/src/include \
+  -Isystem/lib/libc/musl/include -Isystem/lib/libc -Isystem/lib/pthread \
+  -c system/lib/libc/musl/src/misc/realpath.c -o lib/slicc/slicc_realpath.o)
+test -f "$PKG/lib/slicc/slicc_realpath.o"
 grep -q '__bits\[128/sizeof(long)\]' "$HOST_CACHE/sysroot/include/bits/alltypes.h"
 python3 -c "import pathlib,sys; d=pathlib.Path(sys.argv[1]).read_bytes(); sys.exit(0 if b'\\x41\\x8c\\x01' in d else 1)" "$PKG/lib/slicc/slicc_signals.o" || {
   echo "homescoop: slicc_signals.o missing i32.const 140 (sigaction stride)" >&2
@@ -143,33 +157,46 @@ C
 cat > "$PRE_WORK/symloop.c" <<'C'
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-static int chain(const char *dir, int follows) {
+static const char *verdict(int err) { return err == 0 ? "ok" : err == ELOOP ? "ELOOP" : "other"; }
+static int chain(const char *dir, int follows, int relative) {
   char from[64], to[64];
   mkdir(dir, 0755);
   for (int i = 0; i < follows - 1; i++) {
     snprintf(from, sizeof from, "%s/l%d", dir, i);
-    snprintf(to, sizeof to, "%s/l%d", dir, i + 1);
+    if (relative) snprintf(to, sizeof to, "l%d", i + 1);
+    else snprintf(to, sizeof to, "%s/l%d", dir, i + 1);
     if (symlink(to, from) != 0) return -1;
   }
   snprintf(from, sizeof from, "%s/l%d", dir, follows - 1);
-  if (symlink("/target", from) != 0) return -1;
-  snprintf(from, sizeof from, "%s/l0", dir);
-  int fd = open(from, O_RDONLY);
-  int err = fd < 0 ? errno : 0;
+  return symlink("/target", from);
+}
+static void row(const char *name, const char *path) {
+  struct stat st;
+  char buf[PATH_MAX];
+  int fd = open(path, O_RDONLY);
+  int eo = fd < 0 ? errno : 0;
   if (fd >= 0) close(fd);
-  return err;
+  int es = stat(path, &st) == 0 ? 0 : errno;
+  char *r = realpath(path, buf);
+  int er = r ? (strcmp(r, "/target") == 0 ? 0 : -1) : errno;
+  printf("%s open %s stat %s realpath %s\n", name, verdict(eo), verdict(es), verdict(er));
 }
 int main(void) {
   int fd = open("/target", O_WRONLY | O_CREAT, 0644);
   if (fd < 0) return 1;
   close(fd);
-  int e40 = chain("/c40", 40);
-  int e41 = chain("/c41", 41);
-  printf("follows40 %s\n", e40 == 0 ? "ok" : e40 == ELOOP ? "ELOOP" : "other");
-  printf("follows41 %s\n", e41 == 0 ? "ok" : e41 == ELOOP ? "ELOOP" : "other");
+  if (chain("/a40", 40, 0) || chain("/a41", 41, 0) || chain("/r40", 40, 1) || chain("/r41", 41, 1)) return 1;
+  if (chdir("/") != 0) return 1;
+  row("abs40", "/a40/l0");
+  row("abs41", "/a41/l0");
+  row("rel40", "r40/l0");
+  row("rel41", "r41/l0");
   return 0;
 }
 C
@@ -209,8 +236,17 @@ done
 EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$PKG/lib/slicc" "${HOST_EMCC[@]}" "$PRE_WORK/symloop.c" -o "$PRE_WORK/symloop.js"
 SYMLOOP_OUT="$(node "$PRE_WORK/symloop.js")"
 printf '%s\n' "$SYMLOOP_OUT"
-grep -qx 'follows40 ok' <<<"$SYMLOOP_OUT" || { echo "homescoop: a path of 40 symlink follows is ELOOP in the default glue (homescoop#611)" >&2; exit 1; }
-grep -qx 'follows41 ELOOP' <<<"$SYMLOOP_OUT"
+for kind in abs rel; do
+  grep -qx "${kind}40 open ok stat ok realpath ok" <<<"$SYMLOOP_OUT" || { echo "homescoop: a $kind path of 40 symlink follows is ELOOP in open, stat or realpath under the default link (homescoop#611, #1631)" >&2; exit 1; }
+  grep -qx "${kind}41 open ELOOP stat ELOOP realpath ELOOP" <<<"$SYMLOOP_OUT" || { echo "homescoop: a $kind path of 41 symlink follows is not ELOOP in open, stat and realpath (homescoop#611, #1631)" >&2; exit 1; }
+done
+NO_RP="$PRE_WORK/libslicc-no-realpath"
+mkdir -p "$NO_RP"
+cp "$PKG"/lib/slicc/* "$NO_RP/"
+rm "$NO_RP/slicc_realpath.o"
+EM_CONFIG="$HOST_EM_CONFIG" SLICC_EM_LIBDIR="$NO_RP" "${HOST_EMCC[@]}" "$PRE_WORK/symloop.c" -o "$PRE_WORK/symloop-no-rp.js"
+NO_RP_OUT="$(node "$PRE_WORK/symloop-no-rp.js")"
+grep -qx 'abs40 open ok stat ok realpath ELOOP' <<<"$NO_RP_OUT" || { printf '%s\n' "$NO_RP_OUT" >&2; echo "homescoop: without slicc_realpath.o the host libc should keep musl's 39-follow realpath; PRESTAGE no longer tests the override" >&2; exit 1; }
 if EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" "$PRE_WORK/hello.c" -o "$PRE_WORK/hello-cl.js" --closure=1 2>"$PRE_WORK/closure.err"; then
   echo "homescoop: --closure=1 should have failed" >&2
   exit 1
@@ -220,7 +256,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open and 41 are ELOOP (#611), --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without slicc_realpath.o realpath is ELOOP at 40 (#611, #1631), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"
@@ -272,9 +308,11 @@ grep -q "except ImportError" "$PKG/tools/file_packager.py"
   exit 1
 }
 test -f "$PKG/lib/slicc-vfs-pre.js"
-for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs slicc_main_envp slicc_fork; do
+for obj in slicc_spawn slicc_exec slicc_signals slicc_select slicc_libc_gaps slicc_jobs slicc_main_envp slicc_fork slicc_realpath; do
   test -f "$PKG/lib/slicc/$obj.o"
 done
+grep -q "'slicc_realpath.o'," "$PKG/tools/link.py"
+grep -q 'if (cnt++ == SYMLOOP_MAX) {' "$PKG/system/lib/libc/musl/src/misc/realpath.c"
 for js in slicc-fork.js slicc-writev.js slicc-linkat.js slicc-uname.js slicc-env.js; do
   test -f "$PKG/lib/slicc/$js"
 done

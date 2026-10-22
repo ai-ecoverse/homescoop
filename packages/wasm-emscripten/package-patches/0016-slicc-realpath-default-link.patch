@@ -1,0 +1,10 @@
+--- a/tools/link.py
++++ b/tools/link.py
+@@ -877,6 +877,7 @@
+         'slicc_select.o',
+         'slicc_libc_gaps.o',
+         'slicc_jobs.o',
++        'slicc_realpath.o',
+     ):
+       path = os.path.join(slicc_lib, obj)
+       if os.path.isfile(path) and path not in linker_args:

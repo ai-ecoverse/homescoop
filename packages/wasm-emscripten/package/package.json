@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-emscripten",
-  "version": "6.0.9-27",
+  "version": "6.0.9-28",
   "description": "Emscripten 6.0.9, the C and C++ to WebAssembly compiler (emcc), run on wasix-python.",
   "license": "MIT",
   "repository": {

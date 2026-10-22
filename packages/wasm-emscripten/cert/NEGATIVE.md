@@ -102,3 +102,25 @@ not ok 9 - THIRD-PARTY-NOTICES.md carries the slicc shims notice for lib/slicc �
   (its libc members are not name-ordered either). 6.0.9-27 pins 6.0.9-6, which passes.
 - **#840.** AUTHORS and SECURITY.md have shipped since the first real build (6.0.9-20), and row 4 (every file LICENSE cites is in the tarball) passes on 6.0.9-27; the published 6.0.9-19 fails it.
 - **source.tree (#1295).** The recipe pins the emscripten 6.0.9 commit's tree, `d3967f07…`, and its line leaves `scripts/source-tree-allowlist.txt`. emscripten-cache, which takes the same archive, keeps its line until its own next build.
+
+## 6.0.9-28: realpath() at 40 symlink follows (homescoop#1631; 2026-10-22)
+
+`test/files.test.mjs` fails its new row on the published 6.0.9-27 (the other nine pass):
+
+```text
+not ok 10 - realpath() follows 40 symlinks, as glibc does: the default link adds slicc_realpath.o, musl realpath.c with the <= bound (homescoop#1631, package patches 0016 and libc/0017)
+  AssertionError [ERR_ASSERTION]: musl's realpath.c stops at 39 symlink follows
+```
+
+6.0.9-27's 0014 fixed `FS.lookupPath`, so `open()` and `stat()` of a 40-follow chain work, but `realpath(3)` is musl's `src/misc/realpath.c` in emscripten-cache's `libc.a`, which stops at `if (++cnt == SYMLOOP_MAX)`, after 39 follows. Package libc patch 0017 makes it `cnt++ == SYMLOOP_MAX`, and build.sh compiles that file with libc's flags into `lib/slicc/slicc_realpath.o`, which package patch 0016 adds to the default link. An object on the link line keeps `libc.a`'s `realpath` member out, so emscripten-cache is unchanged.
+
+build.sh's PRESTAGE `symloop.c` builds 40- and 41-follow chains, absolute (`/a40/l0 -> /a40/l1 …`) and relative (`l0 -> l1 …`, opened as `r40/l0`), and prints open, stat and realpath for each:
+
+```text
+abs40 open ok stat ok realpath ok
+abs41 open ELOOP stat ELOOP realpath ELOOP
+rel40 open ok stat ok realpath ok
+rel41 open ELOOP stat ELOOP realpath ELOOP
+```
+
+The same program linked with a `lib/slicc` without `slicc_realpath.o` (6.0.9-27's defaults; the host tree's `libc.a` is upstream musl, as emscripten-cache ships) must print `abs40 open ok stat ok realpath ELOOP`, and PRESTAGE fails if it doesn't, so the row keeps testing the override.
