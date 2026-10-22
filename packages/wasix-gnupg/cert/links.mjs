@@ -238,6 +238,73 @@ export default async function (ctx) {
   assert.match(after, /^gone=[1-9]\d*$/m, `root's --delete-secret-and-public-key removed cone's key (homescoop#1424):\n${after}`);
   assert.ok(after.includes(`${fpr}:4:`), `root's --import-ownertrust wrote cone's trustdb (homescoop#1424):\n${after}`);
 
+  const gw = await sh('root', [
+    'rm -rf /root/dot /tmp/gw; mkdir -m 700 /root/dot; mkdir /tmp/gw',
+    `${GEN('/root/dot', 'GW <gw@example.org>')} > /dev/null 2>&1; echo "wgen=$?"`,
+    'gpgconf --homedir /root/dot --kill gpg-agent',
+    'echo "sum $(cksum < /root/dot/pubring.kbx)"',
+    'ln -s /root/dot/pubring.kbx /tmp/gw/pubring.kbx',
+    'for m in 775 777 755; do chmod $m /tmp/gw; gpg --homedir /tmp/gw --batch -k gw@example.org > /tmp/gw.out 2>&1; echo "gw$m=$?"; while IFS= read -r l; do echo "$m: $l"; done < /tmp/gw.out; gpgconf --homedir /tmp/gw --kill gpg-agent; done',
+    'echo "sum $(cksum < /root/dot/pubring.kbx)"; stat -c "gwlink %F" /tmp/gw/pubring.kbx',
+  ].join('\n'));
+  assert.match(gw, /^wgen=0$/m, `root generates a key in its 700 /root/dot:\n${gw}`);
+  const gwSums = [...gw.matchAll(/^sum (.+)$/gm)].map((m) => m[1]);
+  assert.ok(gwSums.length === 2 && gwSums[0] === gwSums[1], `root's /root/dot/pubring.kbx is byte-identical after the listings:\n${gw}`);
+  assert.match(gw, /^gwlink symbolic link$/m, `root's symlink /tmp/gw/pubring.kbx stays a symlink:\n${gw}`);
+  const gwWhy = { 775: "group-writable \\(gid 0\\)", 777: 'world-writable' };
+  for (const m of ['775', '777']) {
+    assert.match(gw, new RegExp(`^gw${m}=[1-9]\\d*$`, 'm'), `root's gpg refuses root's own symlinked keybox in a root ${m} homedir, where another user could have planted or swapped the link (homescoop#1674):\n${gw}`);
+    assert.match(gw, new RegExp(`^${m}: gpg: refusing to open '/tmp/gw/pubring\\.kbx' as root: it is a symbolic link, and its directory '/tmp/gw' is ${gwWhy[m]}, so another user could have put it there; make the directory writable only by root \\(chmod go-w '/tmp/gw'\\) or use a regular file with one link$`, 'm'), `the refusal names the file, the reason and the fix (homescoop#1674; 2.4.9-15: keydb_search failed: Symbolic link loop):\n${gw}`);
+  }
+  assert.doesNotMatch(gw, /Symbolic link loop|Too many levels of symbolic links/, `no refusal reads as a filesystem loop (homescoop#1674):\n${gw}`);
+  assert.match(gw, /^gw755=0$/m, `after chmod go-w, root's gpg lists the key through root's own link (homescoop#1674):\n${gw}`);
+  assert.match(gw, /^755: uid .*GW <gw@example\.org>$/m, `the 755 listing shows root's key:\n${gw}`);
+
+  const grp = await sh('root', [
+    'rm -rf /srv/gr /srv/gu; mkdir /srv/gr /srv/gu; chgrp users /srv/gu; chmod 2775 /srv/gr /srv/gu',
+    'stat -c "dir %n %U %g %a" /srv/gr /srv/gu',
+    'while IFS= read -r l; do case "$l" in root:*) echo "group $l";; esac; done < /etc/group',
+  ].join('\n'));
+  assert.match(grp, /^dir \/srv\/gr root 0 2775$/m, `root's setgid /srv/gr is root:root 2775:\n${grp}`);
+  assert.match(grp, /^dir \/srv\/gu root 100 2775$/m, `root's setgid /srv/gu is root:users 2775:\n${grp}`);
+  assert.match(grp, /^group root:x:0:$/m, `the root group has no member but root when /srv/gr is made:\n${grp}`);
+  await addUser({ name: 'cg', groups: ['root'] });
+  const plantGr = await sh('cg', 'ln -s /srv/sk/pubring.kbx /srv/gr/pubring.kbx; echo "lgr=$?"');
+  const plantGu = await sh('cone', 'ln -s /srv/sk/pubring.kbx /srv/gu/pubring.kbx; echo "lgu=$?"');
+  assert.match(plantGr, /^lgr=0$/m, `cg, who joined the root group later, plants a link in root's root:root 2775 /srv/gr:\n${plantGr}`);
+  assert.match(plantGu, /^lgu=0$/m, `cone, a member of users, plants a link in root's root:users 2775 /srv/gu:\n${plantGu}`);
+  const viaGrp = await sh('root', [
+    'for n in gr gu; do gpg --homedir /srv/$n --batch --import /tmp/l1.asc > /tmp/g$n.out 2>&1; echo "$n=$?"; while IFS= read -r l; do echo "$n: $l"; done < /tmp/g$n.out; gpgconf --homedir /srv/$n --kill gpg-agent; done',
+    'echo "sum pubring.kbx $(cksum < /srv/sk/pubring.kbx)"; stat -c "own %U %a" /srv/sk/pubring.kbx',
+    'for n in gr gu; do stat -c "link $n %F" /srv/$n/pubring.kbx; done',
+  ].join('\n'));
+  for (const [n, gid] of [['gr', 0], ['gu', 100]]) {
+    assert.match(viaGrp, new RegExp(`^${n}=[1-9]\\d*$`, 'm'), `root's import into the setgid group-writable /srv/${n} refuses the keybox a group member symlinked to root's 600 /srv/sk/pubring.kbx (homescoop#1674, #1654):\n${viaGrp}`);
+    assert.match(viaGrp, new RegExp(`^${n}: gpg: refusing to open '/srv/${n}/pubring\\.kbx' as root: it is a symbolic link, and its directory '/srv/${n}' is group-writable \\(gid ${gid}\\)`, 'm'), `the refusal names /srv/${n}/pubring.kbx and its group-writable directory:\n${viaGrp}`);
+    assert.match(viaGrp, new RegExp(`^link ${n} symbolic link$`, 'm'), `the planted /srv/${n}/pubring.kbx stays a symlink:\n${viaGrp}`);
+  }
+  assert.ok(viaGrp.includes(`sum pubring.kbx ${skSums['pubring.kbx']}`), `root's /srv/sk/pubring.kbx is byte-identical:\n${viaGrp}`);
+  assert.match(viaGrp, /^own root 600$/m, `/srv/sk/pubring.kbx stays root 600:\n${viaGrp}`);
+  const RSCAN = (dir) => `ruby -e 'n = 0; Dir.glob(File.join(ARGV[0], "**", "*"), File::FNM_DOTMATCH).each { |f| next if File.symlink?(f) || !File.file?(f); n += 1; begin; b = File.binread(f); puts "leak #{f}" if b.include?("RootOnly") || b.include?("ro@example.org"); rescue SystemCallError => e; puts "unread #{f} #{e.class}"; end }; puts "scanned #{n}"' ${dir}`;
+  for (const [user, n] of [['cg', 'gr'], ['cone', 'gu']]) {
+    const gscan = await sh(user, RSCAN(`/srv/${n}`));
+    assert.match(gscan, /^scanned \d+$/m, `${user} scanned /srv/${n}:\n${gscan}`);
+    assert.doesNotMatch(gscan, /^leak /m, `no file ${user} can read in /srv/${n} holds root's RootOnly key after root's import there (homescoop#1674; 2.4.9-14: pubring.kbx and pubring.kbx~ are 644 copies of root's 600 keybox):\n${gscan}`);
+  }
+
+  await sh('cone', 'rm -rf ~/s4; mkdir -m 700 ~/s4; ln -s /srv/sk/ring.gpg ~/s4/pubring.gpg');
+  const viaS4 = await sh('root', [
+    'gpg --homedir /home/cone/s4 --batch --import /tmp/l1.asc 2>&1; echo "s4=$?"',
+    'gpgconf --homedir /home/cone/s4 --kill gpg-agent',
+    'echo "sum ring.gpg $(cksum < /srv/sk/ring.gpg)"; stat -c "own4 %U %a" /srv/sk/ring.gpg; stat -c "link4 %F" /home/cone/s4/pubring.gpg',
+  ].join('\n'));
+  assert.ok(viaS4.includes(`sum ring.gpg ${skSums['ring.gpg']}`), `root's /srv/sk/ring.gpg, the target of cone's default legacy ~/s4/pubring.gpg, is byte-identical after root's import there (homescoop#1424):\n${viaS4}`);
+  assert.match(viaS4, /^own4 root 600$/m, `/srv/sk/ring.gpg stays root 600:\n${viaS4}`);
+  assert.match(viaS4, /^link4 symbolic link$/m, `cone's ~/s4/pubring.gpg is still cone's symlink:\n${viaS4}`);
+  const s4scan = await sh('cone', RSCAN('/home/cone/s4'));
+  assert.match(s4scan, /^scanned \d+$/m, `cone scanned ~/s4:\n${s4scan}`);
+  assert.doesNotMatch(s4scan, /^leak /m, `no file cone can read in ~/s4 holds root's RootOnly key after root's import into a homedir whose default legacy pubring.gpg cone symlinked to root's 600 keyring (homescoop#1424; 2.4.9-14: ~/s4's keyring holds RootOnly):\n${s4scan}`);
+
   if (process.env.GNUPG_NOFOLLOW === '1') {
     const nf = await sh('root', [
       'rm -rf /srv/nf; mkdir -p /srv/nf; echo target > /srv/nf/t; ln -s /srv/nf/t /srv/nf/l; ln -s /srv/nf/none /srv/nf/d',
@@ -246,5 +313,5 @@ export default async function (ctx) {
     assert.match(nf, /^l refused Errno::ELOOP$/m, `slicc-kernel refuses a final symlink under O_NOFOLLOW (homescoop#1603; 1.124.1: opens the target):\n${nf}`);
     assert.match(nf, /^d refused Errno::E(LOOP|NOENT)$/m, `a dangling final symlink under O_NOFOLLOW is refused:\n${nf}`);
   }
-  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; a pubring.kbx or trustdb.gpg that cone symlinks to root's own leaves it byte-identical after root's --delete-key or --import-ownertrust there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602); root's gpg refuses a keybox or gnupg-ring: keyring that cone symlinked to root's 600 files, and no file cone can read holds their content (#1654); root's own symlinks in its 700 directory are still read and edited, and so are cone's regular keybox and trustdb (#1424)${process.env.GNUPG_NOFOLLOW === '1' ? '; the kernel refuses a final symlink under O_NOFOLLOW (#1603)' : ''}`);
+  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; a pubring.kbx or trustdb.gpg that cone symlinks to root's own leaves it byte-identical after root's --delete-key or --import-ownertrust there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602); root's gpg refuses a keybox or gnupg-ring: keyring that cone symlinked to root's 600 files, and no file cone can read holds their content (#1654); root's own symlinks in its 700 directory are still read and edited, and so are cone's regular keybox and trustdb (#1424); root's own symlinked keybox in a root 775 or 777 homedir is refused with a line naming the file, the reason and chmod go-w, and is listed once the directory is 755, and a link that a member of the directory's group plants in a setgid root:root or root:users 2775 directory is refused with nothing of root's leaked (#1674); a default legacy pubring.gpg that cone symlinks to root's 600 keyring leaks nothing to cone (#1424)${process.env.GNUPG_NOFOLLOW === '1' ? '; the kernel refuses a final symlink under O_NOFOLLOW (#1603)' : ''}`);
 }
