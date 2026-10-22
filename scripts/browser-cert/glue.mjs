@@ -68,7 +68,7 @@ export async function glueByPath(ctx, { installDir, targets, log = console.log }
 const kernelVersionOf = (spec) => /@(\d+\.\d+\.\d+[^@\s]*)$/.exec(spec || '')?.[1] || '';
 
 /**
- * homescoop#628: ladder-pr runs a package's specs on its cert/meta.json
+ * homescoop#628: the PR run runs a package's specs on its cert/meta.json
  * kernel only, so a package whose cert kernel cannot run glue by path (no
  * kernel.chmod before slicc-kernel 1.86.0, or users not enforce) never got
  * the check. Returns null when the main run checks the glue itself, else

@@ -1,6 +1,6 @@
-// Merge queue (homescoop main): ladder-pr's merge_group path binds each queued
-// PR's artifact and cert to the group head without building, and ladder-merge
-// still finds each PR's certified artifact when several PRs land in one push.
+// Merge queue (homescoop main): ladder-build's merge_group path binds each queued
+// PR's artifact to the group head without building, and the push's publish
+// still finds each PR's reviewed artifact when several PRs land in one push.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -8,8 +8,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LADDER_PR, githubIo, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
-import { checkGroup, gitIn, groupMembers, proofPaths, treeDigester } from '../merge-group-check.mjs';
+import { LADDER, githubIo, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
+import { checkGroup, gitIn, groupMembers, treeDigester } from '../merge-group-check.mjs';
 import { globRegExp, toolchainInputs } from '../list-touched-packages.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -84,31 +84,16 @@ function touchedOf(r) {
   };
 }
 
-// One PR's ladder-pr run and artifact, as ladder-merge-resolve reads them.
-function memberIo({ number, head, sha, pkg, version, author = 'trieloff', reviewState = 'success' }) {
+// One PR's ladder-build pull_request run and artifact, as ladder-merge-resolve reads them.
+function memberIo({ number, head, sha, pkg, version, author = 'trieloff', conclusion = 'success' }) {
   const runId = 1000 + number;
   const artifact = { id: 2000 + number, name: `host-${pkg}-pr${number}`, expired: false, created_at: '2026-10-17T00:00:00Z', workflow_run: { id: runId, head_sha: head } };
   return {
     published: async () => false,
-    pullRequest: async () => ({ number, head, body: `certified=${sha} @ai-ecoverse/${pkg} ${version}`, author }),
-    canWrite: async (login) => login === 'trieloff',
-    statuses: async () => [
-      {
-        context: 'cert-review',
-        state: reviewState,
-        creator: { login: 'github-actions[bot]' },
-        target_url: `https://github.com/x/y/actions/runs/${runId + 1}/artifacts/${artifact.id + 1}`,
-        description: `certified, run ${runId + 1}, record artifact ${artifact.id + 1}`,
-      },
-    ],
-    run: async (id) =>
-      id === runId
-        ? { id, path: LADDER_PR, head_sha: head, status: 'completed', conclusion: 'success' }
-        : { id, path: '.github/workflows/cert-review.yml', event: 'workflow_run', head_branch: 'main', status: 'completed', conclusion: 'success' },
-    artifact: async (id) => ({ id, name: `cert-review-record-${number}`, expired: false, workflow_run: { id: runId + 1 } }),
-    record: async () => ({ pr: number, head, cert_review_run: runId + 1, lines: [`certified=${sha} @ai-ecoverse/${pkg} ${version}`] }),
+    pullRequest: async () => ({ number, head, author }),
+    run: async (id) => ({ id, path: LADDER, event: 'pull_request', head_sha: head, status: 'completed', conclusion }),
     artifacts: async () => [artifact],
-    jobs: async () => [{ name: 'ci', conclusion: 'success' }],
+    jobs: async () => [{ name: 'ci', conclusion: conclusion === 'success' ? 'success' : 'failure' }, { name: 'pipeline / review', conclusion }],
     download: async () => ({ sha, recorded: sha, name: `@ai-ecoverse/${pkg}`, version }),
   };
 }
@@ -159,7 +144,7 @@ test('a two-PR group: each queue-made merge commit names its PR, with the PR hea
   }
 });
 
-test('ladder-merge on a two-PR group push: each package resolves at its own PR\'s merge, and publishes that PR\'s certified artifact', async () => {
+test('the publish on a two-PR group push: each package resolves at its own PR\'s merge, and publishes that PR\'s reviewed artifact', async () => {
   const r = repo();
   const cwd = process.cwd();
   try {
@@ -169,8 +154,8 @@ test('ladder-merge on a two-PR group push: each package resolves at its own PR\'
     assert.equal(touchingCommit('beta', r.base, g.m2), g.m2);
     const alpha = await resolvePackage(readCtx(r, 'alpha', g.m1), memberIo({ number: 11, head: g.a, sha: SHA_A, pkg: 'alpha', version: '1.0.0-2' }));
     const beta = await resolvePackage(readCtx(r, 'beta', g.m2), memberIo({ number: 12, head: g.b, sha: SHA_B, pkg: 'beta', version: '2.0.0-2' }));
-    assert.deepEqual(alpha.inputs, { package: 'alpha', certified: SHA_A, artifact_pr: '11', artifact_id: '2011' });
-    assert.deepEqual(beta.inputs, { package: 'beta', certified: SHA_B, artifact_pr: '12', artifact_id: '2012' });
+    assert.deepEqual(alpha.inputs, { package: 'alpha', certified: SHA_A, artifact_pr: '11', artifact_id: '2011', run: '1011' });
+    assert.deepEqual(beta.inputs, { package: 'beta', certified: SHA_B, artifact_pr: '12', artifact_id: '2012', run: '1012' });
   } finally {
     process.chdir(cwd);
     r.cleanup();
@@ -194,7 +179,7 @@ test('githubIo finds the PR of a queue-made merge commit whose first parent is a
   try {
     for (const [sha, [pr]] of Object.entries(pulls)) {
       const got = await githubIo({ repo: 'x/y', token: 't', sha }).pullRequest();
-      assert.deepEqual(got, { number: pr.number, head: pr.head.sha, body: '', author: 'trieloff' });
+      assert.deepEqual(got, { number: pr.number, head: pr.head.sha, author: 'trieloff' });
     }
   } finally {
     globalThis.fetch = real;
@@ -207,8 +192,8 @@ test('the group check passes a clean two-PR group without building anything', as
     const g = twoPrGroup(r);
     const { problems, notes } = await check(r, g);
     assert.deepEqual(problems, []);
-    assert.ok(notes.some((n) => /^alpha: ladder-merge would publish: .*host-alpha-pr11 artifact 2011/.test(n)), notes.join('\n'));
-    assert.ok(notes.some((n) => /^beta: ladder-merge would publish: .*host-beta-pr12 artifact 2012/.test(n)), notes.join('\n'));
+    assert.ok(notes.some((n) => /^alpha: the push would publish: .*host-alpha-pr11 artifact 2011/.test(n)), notes.join('\n'));
+    assert.ok(notes.some((n) => /^beta: the push would publish: .*host-beta-pr12 artifact 2012/.test(n)), notes.join('\n'));
   } finally {
     r.cleanup();
   }
@@ -268,12 +253,12 @@ test('NEGATIVE: a PR whose head moved after it was queued fails the group', asyn
   }
 });
 
-test('NEGATIVE: a queued package PR whose cert-review is not green fails the group', async () => {
+test('NEGATIVE: a queued package PR whose run is red (a denied review) fails the group', async () => {
   const r = repo();
   try {
     const g = twoPrGroup(r);
-    const { problems } = await check(r, g, { 12: { reviewState: 'failure' } });
-    assert.ok(problems.some((p) => p.startsWith(`#12: the cert-review status on its head ${g.b} is failure`)), problems.join('\n'));
+    const { problems } = await check(r, g, { 12: { conclusion: 'failure' } });
+    assert.ok(problems.some((p) => p.startsWith('beta: the push would refuse to publish #12: ') && /run 1012 concluded failure \(ci: failure, pipeline \/ review: failure\)/.test(p)), problems.join('\n'));
   } finally {
     r.cleanup();
   }
@@ -290,35 +275,28 @@ test('NEGATIVE: a commit that is not a queue merge commit fails closed', () => {
   }
 });
 
-test('the group runs the kernel-compat proof exactly when the proof workflow\'s own paths are touched', () => {
-  const paths = proofPaths(readFileSync(join(ROOT, '.github/workflows/kernel-compat-proof.yml'), 'utf8'));
-  assert.ok(paths.includes('package.json') && paths.includes('scripts/browser-cert/page/**'), paths.join(', '));
-  const res = paths.map(globRegExp);
-  assert.ok(res.some((re) => re.test('scripts/browser-cert/page/x/y.mjs')));
-  assert.ok(!res.some((re) => re.test('packages/alpha/recipe.yaml')));
-});
-
-test('ladder-pr on a merge group publishes, pushes and uploads nothing', () => {
-  const yaml = readFileSync(join(ROOT, '.github/workflows/ladder-pr.yml'), 'utf8');
-  assert.match(yaml, /^on:\n {2}pull_request:\n {2}merge_group:\n/m);
+test('ladder-build on a merge group builds, uploads and publishes nothing', () => {
+  const yaml = readFileSync(join(ROOT, '.github/workflows/ladder-build.yml'), 'utf8');
+  assert.match(yaml, /^on:\n {2}pull_request:\n {2}merge_group:\n {2}push:\n {4}branches: \[main\]\n/m);
   const body = yaml.slice(yaml.indexOf('\njobs:\n'));
   const jobs = body.split(/\n(?= {2}[a-z][a-z0-9-]*:\n)/).slice(1);
-  assert.ok(jobs.length > 10, 'parsed the jobs');
+  assert.ok(jobs.length > 15, 'parsed the jobs');
+  const named = (n) => jobs.find((j) => j.startsWith(`  ${n}:\n`));
   for (const job of jobs) {
     const name = job.match(/^ {2}([a-z0-9-]+):/)[1];
-    if (/upload-artifact|git push|contents: write|id-token|npm publish/.test(job)) {
+    if (name === 'pipeline') continue;
+    if (/upload-artifact|git push|contents: write|id-token|npm publish|oidc-publish/.test(job)) {
       const cond = job.match(/^ {4}if: (.+)$/m)?.[1] ?? '';
-      const gated = cond.includes("github.event_name == 'pull_request'") || /needs\.(recipe-sha|host-build)\.result == 'success'/.test(cond);
-      assert.ok(gated, `${name} writes something but its if (${cond || 'none'}) does not keep it to pull_request`);
+      const gated = cond.includes("github.event_name == 'pull_request'") || /needs\.(recipe-sha|host-build)\.result == 'success'/.test(cond) || cond.includes("github.ref == 'refs/heads/main'");
+      assert.ok(gated, `${name} writes something but its if (${cond || 'none'}) keeps it neither to pull_request nor to main`);
     }
   }
-  const ci = jobs.find((j) => j.startsWith('  ci:'));
-  assert.match(ci, /^ {4}name: \$\{\{ github\.event_name == 'workflow_dispatch' && 'ci \(group dry run\)' \|\| 'ci' \}\}$/m, 'a dry run never reports under the required ci name');
-  const compat = jobs.find((j) => j.startsWith('  kernel-compat:'));
-  assert.match(compat, /^ {4}if: github\.event_name == 'merge_group' && /m, 'only a real merge group sends its head to kernel-compat (whose pool gate trusts dispatches on main)');
+  assert.match(named('publish'), /^ {4}if: \(github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'\) && github\.ref == 'refs\/heads\/main' && /m, 'only main publishes');
+  assert.match(named('pipeline'), /^ {4}if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group'\) \}\}$/m, 'the pipeline (whose release job is push-only) never runs on a push');
+  assert.match(named('ci'), /^ {4}name: ci$/m, 'the required check is ci');
+  assert.match(named('group'), /^ {4}if: github\.event_name == 'merge_group'$/m);
   for (const writer of ['recipe-sha', 'host-build', 'rebuild']) {
-    const job = jobs.find((j) => j.startsWith(`  ${writer}:`));
-    assert.match(job, /^ {4}if: github\.event_name == 'pull_request' && /m, `${writer} runs only on pull_request`);
+    assert.match(named(writer), /^ {4}if: github\.event_name == 'pull_request' && /m, `${writer} runs only on pull_request`);
   }
 });
 

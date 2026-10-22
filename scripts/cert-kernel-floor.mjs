@@ -9,7 +9,7 @@
  *   node scripts/cert-kernel-floor.mjs --refresh   # rewrite the snapshot from npm
  *
  * What it resolves, as the harness installs it (scripts/cert-review/harness.sh,
- * ladder-pr's cert job, scripts/wasix-lib-cert.mjs): `needsInstall || needs`
+ * the PR run's cert job, scripts/wasix-lib-cert.mjs): `needsInstall || needs`
  * (a pinned version, a dist-tag, a range, or a bare name for npm latest), then
  * each one's dependencies (npm's highest match), and needsRepack peers at this
  * checkout's package/package.json. needsTarballScripts tarballs are built by
@@ -24,7 +24,7 @@
  * unrelated PR red. A published version's manifest never changes, so the
  * snapshot is exact for pins. For a bare name the snapshot's latest can lag,
  * so the check also resolves it to this checkout's recipe version (the one
- * ladder-merge publishes as latest): a PR that raises a package's
+ * the publish puts under latest): a PR that raises a package's
  * engines.slicc-kernel fails here, before npm has the version. A pin the
  * snapshot doesn't know fails with the --refresh command.
  *

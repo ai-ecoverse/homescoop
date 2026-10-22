@@ -3,7 +3,7 @@
 // that isn't a repack to the same static rule a repack's root must meet, at
 // the reviewed head itself. Its build must fetch the recipe's pinned source
 // with the recipe's sha (or build a verified in-tree source), with no stage
-// or prebuilt path; otherwise verdict.mjs makes it INCOMPLETE ("unverifiable
+// or prebuilt path; otherwise repack-input.mjs fails the npm-parity job ("unverifiable
 // input: <reason>"), whatever the reviewer says.
 //
 // Every tree here is planted in a temp dir (fixtureReader, no network, no git).
@@ -18,7 +18,6 @@ import { expandLoopVars, fixtureReader, fixtureRegistry, loopWords, repackInput,
 
 const here = dirname(fileURLToPath(import.meta.url));
 const script = join(here, '../cert-review/repack-input.mjs');
-const verdictScript = join(here, '../cert-review/verdict.mjs');
 const SHA = 'a'.repeat(64);
 const OTHER = 'b'.repeat(64);
 
@@ -193,44 +192,6 @@ test('helper references: packages/$r/build.sh over a for-loop is followed; an un
   assert.deepEqual(unpinnedFetches([{ path: 'scripts/install-x.sh', text: 'curl -fsSL "$URL"\n' }]), [], 'shared helpers are not scanned');
 });
 
-test('verdict.mjs: a built recipe that fails the rule is INCOMPLETE whatever the reviewer says; a clean one certifies', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'built-verdict-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const art = join(dir, 'artifacts', 'host-demo-pr7');
-  mkdirSync(join(dir, 'pkg', 'package'), { recursive: true });
-  mkdirSync(art, { recursive: true });
-  writeFileSync(join(dir, 'pkg', 'package', 'package.json'), '{"name":"@ai-ecoverse/wasm-demo","version":"1.0.0-1"}\n');
-  execFileSync('tar', ['-czf', join(art, 'package.tgz'), '-C', join(dir, 'pkg'), 'package']);
-  const { createHash } = await import('node:crypto');
-  const sha = createHash('sha256').update(readFileSync(join(art, 'package.tgz'))).digest('hex');
-  writeFileSync(join(art, 'package.tgz.sha256'), `${sha}  package.tgz\n`);
-  const review = join(dir, 'review');
-  mkdirSync(review);
-  writeFileSync(join(review, 'verdict.json'), JSON.stringify({ packages: [{ package: 'demo', verdict: 'certified' }] }));
-  const verdict = (input) => {
-    writeFileSync(join(dir, 'input.json'), JSON.stringify({ demo: input }));
-    const args = ['--artifacts', join(dir, 'artifacts'), '--pr', '7', '--review', review, '--body', join(dir, 'body.md'), '--lines', join(dir, 'lines.txt'), '--ladder-conclusion', 'success', '--repack-input', join(dir, 'input.json')];
-    const r = spawnSync(process.execPath, [verdictScript, ...args], { encoding: 'utf8' });
-    return { status: r.status, lines: readFileSync(join(dir, 'lines.txt'), 'utf8').trim(), body: readFileSync(join(dir, 'body.md'), 'utf8') };
-  };
-  const staged = plant(t, { 'packages/demo/recipe.yaml': recipe(PINNED), 'packages/demo/build.sh': `${CLEAN}X="\${DEMO_STAGE:-y}"\n` });
-  const bad = await judge(staged);
-  const out = verdict(bad);
-  assert.equal(out.status, 1);
-  assert.equal(out.lines, `cert-ci: INCOMPLETE @ai-ecoverse/wasm-demo@1.0.0-1: unverifiable input: ${bad.reason}`);
-  assert.match(out.body, /Not certified, whatever the review says: an input is unverifiable/);
-
-  const clean = plant(t, { 'packages/demo/recipe.yaml': recipe(PINNED), 'packages/demo/build.sh': CLEAN });
-  const ok = verdict(await judge(clean));
-  assert.equal(ok.status, 0, ok.lines);
-  assert.equal(ok.lines, `certified=${sha} @ai-ecoverse/wasm-demo 1.0.0-1`);
-
-  // Fail closed: a trace that errored is INCOMPLETE, too.
-  const broken = plant(t, { 'packages/demo/build.sh': CLEAN });
-  const run = cli(broken);
-  assert.equal(run.status, 2);
-  assert.match(verdict(JSON.parse(run.stdout)).lines, /INCOMPLETE .*couldn't trace it \(no packages\/demo\/recipe\.yaml at HEAD\)/);
-});
 
 test('NEGATIVE: a followed package build fetches its own recipe sha, which only counts for that recipe', async (t) => {
   // The top recipe pins A; its build.sh only runs packages/b/build.sh, whose

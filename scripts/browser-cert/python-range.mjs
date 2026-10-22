@@ -118,7 +118,7 @@ function main(argv) {
       console.error(`::error::${pkg}: the specs fail on ${PYTHON}@${range.floor} (${r.status ?? r.signal})`);
       return r.status || 1;
     }
-    console.log(`python-range: ok, ${pkg}'s specs pass on ${PYTHON}@${range.floor} and (ladder-pr's browser cert) ${newest}`);
+    console.log(`python-range: ok, ${pkg}'s specs pass on ${PYTHON}@${range.floor} and (the PR run's browser cert) ${newest}`);
     return 0;
   } finally {
     if (!argv.includes('--keep')) rmSync(work, { recursive: true, force: true });

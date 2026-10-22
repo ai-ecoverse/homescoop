@@ -8,7 +8,7 @@
  *   echo 'packages/zlib/recipe.yaml' | node scripts/list-touched-packages.mjs --stdin
  *
  * --publishable: only recipe.yaml or package/ (not build.sh, patches, docs).
- * ladder-merge uses that so a tooling-only change cannot dispatch publish.
+ * The publish uses that so a tooling-only change cannot publish.
  *
  * Prints one package name per line. Exits 0 even when empty (caller decides).
  */
