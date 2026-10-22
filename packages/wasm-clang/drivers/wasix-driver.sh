@@ -57,6 +57,21 @@ link_inputs=0
 takes_value=
 want_out=0
 lang=
+asm_in=0
+other_src=0
+note_input() {
+  case "$lang" in
+    assembler) asm_in=1 ;;
+    '' | none)
+      case "$1" in
+        *.s) asm_in=1 ;;
+        *.o | *.a | *.so | *.lo | *.obj | *.wasm | -l?*) ;;
+        *) other_src=1 ;;
+      esac
+      ;;
+    *) other_src=1 ;;
+  esac
+}
 # An object or library handed to the linker directly (-Xlinker foo.o,
 # -Wl,foo.o,bar.a) is a link input too.
 linker_arg() {
@@ -86,7 +101,7 @@ scan_arg() {
       -z | -u | -e | -working-directory | -resource-dir)
       takes_value=$_a; return 0 ;;
     -x?*) lang=${_a#-x} ;;
-    -) link_inputs=1 ;;
+    -) link_inputs=1; note_input - ;;
     # Libraries are linker inputs, as for clang (`cc -lfoo` links).
     -l?*) link_inputs=1 ;;
     -Wl,*)
@@ -101,10 +116,10 @@ scan_arg() {
       # compiled as a header (no -x, or -x c-header) makes a PCH.
       case "$lang" in
         '' | none | *-header | *header-unit) ;;
-        *) link_inputs=1 ;;
+        *) link_inputs=1; other_src=1 ;;
       esac
       ;;
-    *) link_inputs=1 ;;
+    *) link_inputs=1; note_input "$_a" ;;
   esac
   case "$_a" in
     -c|-E|-S|-M|-MM) compile_only=1 ;;
@@ -335,6 +350,11 @@ case "$prog" in
   *) FRONTEND=clang; IS_CXX=0 ;;
 esac
 
+asm_only=0
+if [ "$asm_in" -eq 1 ] && [ "$other_src" -eq 0 ]; then
+  asm_only=1
+fi
+
 # Defaults → user args → link flags via clang @response-file (one argv per line).
 rsp=$(mktemp "${TMPDIR:-/tmp}/wasix-driver.XXXXXX")
 marker=
@@ -345,19 +365,24 @@ trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
     "--target=wasm32-wasip1" \
     "--sysroot=$SYSROOT" \
     "-resource-dir=$RESOURCE" \
-    "-matomics" "-mbulk-memory" "-mmutable-globals" \
-    "-mthread-model" "posix" "-pthread" \
-    "-fno-trapping-math" \
-    "-D_WASI_EMULATED_MMAN" \
-    "-D_WASI_EMULATED_SIGNAL" \
-    "-D_WASI_EMULATED_PROCESS_CLOCKS"
+    "-matomics" "-mbulk-memory" "-mmutable-globals"
+  if [ "$asm_only" -eq 0 ]; then
+    printf '%s\n' \
+      "-mthread-model" "posix" "-pthread" \
+      "-fno-trapping-math" \
+      "-D_WASI_EMULATED_MMAN" \
+      "-D_WASI_EMULATED_SIGNAL" \
+      "-D_WASI_EMULATED_PROCESS_CLOCKS"
+  elif [ "$compile_only" -eq 0 ]; then
+    printf '%s\n' "-pthread"
+  fi
 
   if [ "$do_compile" -eq 1 ]; then
     # Deep nesting recurses in clang's parser on the engine's own stack, which
     # in slicc's realm runs out near 1500 levels (a wasm trap, homescoop#1248).
     # Cap brackets below that so clang stops with its own diagnostic; a later
     # -fbracket-depth from the caller still wins.
-    printf '%s\n' "-fbracket-depth=1024"
+    [ "$asm_only" -eq 1 ] || printf '%s\n' "-fbracket-depth=1024"
     case "$EXCEPTIONS" in
       no|off|none)
         printf '%s\n' "-fno-exceptions"
@@ -371,8 +396,9 @@ trap 'rm -f "$rsp" ${marker:+"$marker"}' EXIT
     esac
 
     if [ "$PIC" = yes ] || [ "$PIC" = true ]; then
-      printf '%s\n' "-fPIC" "-ftls-model=global-dynamic" "-fvisibility=default"
-    else
+      printf '%s\n' "-fPIC"
+      [ "$asm_only" -eq 1 ] || printf '%s\n' "-ftls-model=global-dynamic" "-fvisibility=default"
+    elif [ "$asm_only" -eq 0 ]; then
       printf '%s\n' "-ftls-model=local-exec"
     fi
   fi

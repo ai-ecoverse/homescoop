@@ -14,6 +14,7 @@ sources:
     sha256: "1fb57c95d84e7b33a5a535561a0d536c943c40fefd70991f9570db8e27994574"
 inputs:
   - "packages/wasm-emscripten/patches/**"
+  - "packages/wasm-emscripten/package-patches/**"
   - "scripts/slicc-node-main.js"
 dependencies:
   build: []
@@ -30,7 +31,8 @@ about:
     linked in CI from @ai-ecoverse/llvm-emscripten 24.0.0-2 (llvm-project
     b158b0ae, compiled by the patched emscripten 6.0.9 tree; homescoop#859
     stage E) against today's shims/slicc, with the patched emscripten 6.0.9
-    tree on emsdk 6.0.9's prebuilt compilers (scripts/emscripten-tree.sh).
+    tree on emsdk 6.0.9's prebuilt compilers (scripts/emscripten-tree.sh)
+    plus wasm-emscripten's package-patches (0014 libfs symloop, 0015).
     The resource dir is llvm-emscripten's lib/clang/24 plus the pinned
     wasix-sysroot's libclang_rt.builtins for wasip1/wasi. Drivers are
     #!/bin/sh wasixcc-compatible wrappers; the sysroot is wasix-sysroot, and

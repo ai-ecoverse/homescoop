@@ -4,7 +4,6 @@ export const SHIM_HEADING = /^## homescoop: .*\bslicc shims\b.*Apache-2\.0/m;
 
 export const KNOWN_WITHOUT_SHIM_NOTICE = {
   'wasm-binaryen': '#844',
-  'wasm-clang': '#844',
 };
 
 export function shimNoticeErrors(wasm, pkg, notices, name) {
