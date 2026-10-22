@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-automake",
-  "version": "1.17.0-14",
+  "version": "1.17.0-15",
   "description": "GNU Automake, which writes the Makefile.in templates that build software.",
   "license": "GPL-2.0-or-later",
   "repository": {
@@ -59,7 +59,7 @@
     }
   },
   "dependencies": {
-    "@ai-ecoverse/wasix-autoconf": "2.72.0-11",
-    "@ai-ecoverse/wasix-perl": "5.42.0-21"
+    "@ai-ecoverse/wasix-autoconf": "2.72.0-12",
+    "@ai-ecoverse/wasix-perl": "5.42.0-22"
   }
 }

@@ -14,9 +14,9 @@
     "@ai-ecoverse/wasm-gawk"
   ],
   "needsInstall": [
-    "@ai-ecoverse/wasix-perl@5.42.0-21",
+    "@ai-ecoverse/wasix-perl@5.42.0-22",
     "@ai-ecoverse/wasix-m4@1.4.20-7",
-    "@ai-ecoverse/wasix-autoconf@2.72.0-11",
+    "@ai-ecoverse/wasix-autoconf@2.72.0-12",
     "@ai-ecoverse/wasm-bash@5.3.0-18",
     "@ai-ecoverse/wasm-coreutils@9.12.0-7",
     "@ai-ecoverse/wasm-grep@3.12.0-3",
@@ -24,11 +24,12 @@
     "@ai-ecoverse/wasm-gawk@5.4.1-2"
   ],
   "checklist": [
-    "cert/checklist.mjs (1.17.0-9, homescoop#470), users enforce, as root: the realm's wasix-autoconf (needsInstall) is the version the tarball depends on (2.72.0-8 since 1.17.0-10, 2.72.0-10 since 1.17.0-12, 2.72.0-11 since 1.17.0-14); on a PATH of links to every realm command but grep, sed and awk, automake --version and aclocal --version print 1.17, and aclocal && autoconf && automake --add-missing on a two-line configure.ac / Makefile.am write Makefile.in (VERSION = @VERSION@) and install install-sh and missing, with no error; with wasm-grep, wasm-sed and wasm-gawk, sh ./configure writes a Makefile with VERSION = 1.0",
+    "cert/checklist.mjs (1.17.0-9, homescoop#470), users enforce, as root: the realm's wasix-autoconf (needsInstall) is the version the tarball depends on (2.72.0-8 since 1.17.0-10, 2.72.0-10 since 1.17.0-12, 2.72.0-11 since 1.17.0-14, 2.72.0-12 since 1.17.0-15); on a PATH of links to every realm command but grep, sed and awk, automake --version and aclocal --version print 1.17, and aclocal && autoconf && automake --add-missing on a two-line configure.ac / Makefile.am write Makefile.in (VERSION = @VERSION@) and install install-sh and missing, with no error; with wasm-grep, wasm-sed and wasm-gawk, sh ./configure writes a Makefile with VERSION = 1.0",
     "1.17.0-8 pins wasix-autoconf 2.72.0-6 (autom4te's probe needs grep), so its first check fails; with 2.72.0-6 in the realm, aclocal without grep fails with 'need GNU m4 1.4 or later: m4' (NEGATIVE.md)",
     "1.17.0-10 (packaging-only, homescoop#634): the same checklist.mjs on the wasix-autoconf (2.72.0-8) and wasix-perl (5.42.0-13) it now pins, so an install of both packages has one perl",
     "one perl (homescoop#656): cert/checklist.mjs checks that the tarball's @ai-ecoverse/wasix-perl pin equals the pinned wasix-autoconf's wasix-perl dependency and the realm's wasix-perl (needsInstall), so the skew 1.17.0-9 had (5.42.0-11 beside autoconf's 5.42.0-13, two perls in node_modules) fails the cert",
     "1.17.0-14 (a pin bump, the same build as -13 but package.json): the same checklist.mjs and paths.mjs with the peers it now pins, wasix-autoconf 2.72.0-11 and wasix-perl 5.42.0-21 (one perl: autoconf -11 pins perl -21), and wasix-m4 1.4.20-7 (cert/meta.json needsInstall, homescoop#864), on slicc-kernel 1.132.1, the floor wasix-perl 5.42.0-21 needs (engines.slicc-kernel >=1.120.0)",
+    "1.17.0-15 (a pin bump, the same build as -14 but package.json): the same checklist.mjs and paths.mjs with the peers it now pins, wasix-autoconf 2.72.0-12 and wasix-perl 5.42.0-22 (one perl: autoconf -12 pins perl -22), and wasix-m4 1.4.20-7, on slicc-kernel 1.132.1, above the floor wasix-perl 5.42.0-22 needs (engines.slicc-kernel >=1.120.0)",
     "cert/paths.mjs (1.17.0-13, homescoop#909): bin/automake, automake-1.17, aclocal and aclocal-1.17 name /bin/sh in the DJGPP $ENV{'SHELL'} line and carry no build-host path (/bin/bash, /home/runner, homescoop-work, .homescoop-out, /Users/, /opt/homebrew); build.sh runs configure with CONFIG_SHELL=/bin/sh SHELL=/bin/sh, so every host writes the same bytes (1.17.0-12, built on ubuntu, names /bin/bash: NEGATIVE.md)"
   ]
 }
