@@ -209,3 +209,25 @@ A pin-only release, with no ImageMagick change. The delegates move to their npm 
   ```
 
   9.5 ships gsfonts' README (which states the exception: "GPL with an exception that you can put these fonts in your own non-GPLed documents") as `etc/fonts/README` next to COPYING (GPL version 2), and the notice carries both. package.json `license` adds `GPL-2.0-only WITH Font-exception-2.0`, the nearest SPDX expression; README.md says the README's wording is the grant.
+
+## 7.1.2-34-9.6: a failed write in a directory the caller can't write leaves the file (homescoop#1608; 2026-10-22)
+
+`mogrify-users.mjs` against the published 7.1.2-34-9.5, slicc-kernel 1.110.1, `--users enforce`, fails at its new #1608 row. As kim, over root's 0666 big.png, big2.png and w.png in root's 0755 /tmp/rd:
+
+```text
+AssertionError [ERR_ASSERTION]: kim over root's 0666 files in root's 0755 /tmp/rd, where no temporary file can go beside the target (homescoop#1608): ...
+mogrify: cache resources exhausted `/tmp/rd/big.png' @ error/cache.c/OpenPixelCache/4044.
+mogrify: No IDATs written into file `/tmp/rd/big.png' @ error/png.c/MagickPNGError/1308.
+magick: cache resources exhausted `/tmp/rd/big2.png' @ error/cache.c/OpenPixelCache/4044.
++ 'rc=1\nroot root 666\nrc=1\nroot root 666\nrc=0\n20 20\nroot root 666\nbig.png\nbig2.png\nw.png\n0\n'
+- 'rc=1\nsame\nroot root 666\nrc=1\nsame\nroot root 666\nrc=0\n20 20\nroot root 666\nbig.png\nbig2.png\nw.png\n0\n'
+```
+
+| case | 7.1.2-34-9.5 | 7.1.2-34-9.6 |
+|---|---|---|
+| failed `mogrify -limit memory 24MiB -limit map 0 -depth 8` over big.png | rc 1, big.png truncated to 260 bytes ("No IDATs written") | rc 1, big.png byte-identical, `root root 666` |
+| failed `magick … -depth 8` write over big2.png | rc 1, big2.png rewritten in place (cksum differs, 4512 bytes) | rc 1, byte-identical, `root root 666` |
+| good `mogrify -resize 50%` over w.png | rc 0, 20 20, `root root 666` (written in place) | rc 0, 20 20, `root root 666` (encoded in $TMPDIR, copied in) |
+| the failed `magick` write with `TMPDIR=/tmp/rd` (no temporary file possible anywhere) | rc 1, big2.png rewritten in place again | rc 1, byte-identical, "unable to create temporary file" |
+
+The cause: write-temp-then-rename.patch (magick) and mogrify-inplace-keep-mode-owner.patch (mogrify) create their temporary file beside the target. In a directory the caller can't write, that `open` fails, and both fell back to upstream's direct write, which truncates the target before the encode. 9.6 then creates the temporary file in `$MAGICK_TEMPORARY_PATH`, `$TMPDIR` or `/tmp` (`HomescoopFallbackTemp`: `O_CREAT | O_EXCL | O_NOFOLLOW`, 0600) and always takes `HomescoopReplaceFile`'s copy path for it (the target opened without `O_TRUNC`, `fstat` dev/ino checked against the `lstat`/`stat` taken before the encode, `ftruncate` to the new size at the end), so the target is written only after a complete encode. If no temporary file can be created there either, the write is refused with "unable to create temporary file" (rc 1) before anything is encoded. A target that isn't a regular file (or a symlink to one) keeps upstream's direct write, as before.

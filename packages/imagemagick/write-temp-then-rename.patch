@@ -8,19 +8,18 @@
  #include "MagickCore/string_.h"
  #include "MagickCore/string-private.h"
  #include "MagickCore/timer.h"
-@@ -1561,6 +1562,156 @@
+@@ -1561,6 +1562,229 @@
  %    o exception: return any errors or warnings in this structure.
  %
  */
-+MagickExport int HomescoopPrepareReplace(int file,const char *target,
++MagickExport int HomescoopReplaceKind(const char *target,
 +  struct stat *target_status)
 +{
 +  int
 +    mode;
 +
 +  struct stat
-+    link_status,
-+    temp_status;
++    link_status;
 +
 +  mode=0;
 +  if (lstat(target,&link_status) != 0)
@@ -37,6 +36,80 @@
 +    return(-1);
 +  if ((mode == 0) && (target_status->st_nlink > 1))
 +    mode=1;
++  return(mode);
++}
++
++MagickExport int HomescoopFallbackTemp(const char *target,const char *separator,
++  char *path)
++{
++  char
++    tail[MagickPathExtent];
++
++  const char
++    *directory;
++
++  int
++    file;
++
++  RandomInfo
++    *random_info;
++
++  ssize_t
++    j;
++
++  *path='\0';
++  directory=getenv("MAGICK_TEMPORARY_PATH");
++  if ((directory == (const char *) NULL) || (*directory == '\0'))
++    directory=getenv("TMPDIR");
++  if ((directory == (const char *) NULL) || (*directory == '\0'))
++    directory="/tmp";
++  GetPathComponent(target,TailPath,tail);
++  if ((*tail == '\0') ||
++      ((strlen(directory)+strlen(tail)+16) >= MagickPathExtent))
++    {
++      errno=ENAMETOOLONG;
++      return(-1);
++    }
++  file=(-1);
++  errno=EEXIST;
++  random_info=AcquireRandomInfo();
++  for (j=0; j < 64; j++)
++  {
++    StringInfo
++      *key_info;
++
++    unsigned char
++      *key_bytes;
++
++    key_info=GetRandomKey(random_info,4);
++    if (key_info == (StringInfo *) NULL)
++      break;
++    key_bytes=GetStringInfoDatum(key_info);
++    (void) FormatLocaleString(path,MagickPathExtent,"%s/%s%s%02x%02x%02x%02x~",
++      directory,tail,separator,key_bytes[0],key_bytes[1],key_bytes[2],
++      key_bytes[3]);
++    key_info=DestroyStringInfo(key_info);
++    file=open_utf8(path,O_RDWR | O_CLOEXEC | O_CREAT | O_EXCL | O_BINARY |
++      O_NOFOLLOW,S_MODE);
++    if ((file >= 0) || (errno != EEXIST))
++      break;
++  }
++  random_info=DestroyRandomInfo(random_info);
++  if (file < 0)
++    *path='\0';
++  return(file);
++}
++
++MagickExport int HomescoopPrepareReplace(int file,const char *target,
++  struct stat *target_status)
++{
++  int
++    mode;
++
++  struct stat
++    temp_status;
++
++  mode=HomescoopReplaceKind(target,target_status);
 +  if (mode != 0)
 +    return(mode);
 +  if (fstat(file,&temp_status) != 0)
@@ -165,7 +238,7 @@
  MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
    Image *images,const char *filename,ExceptionInfo *exception)
  {
-@@ -1590,12 +1741,30 @@
+@@ -1590,12 +1814,30 @@
    Image
      *p;
  
@@ -196,7 +269,7 @@
    assert(exception != (ExceptionInfo *) NULL);
    write_info=CloneImageInfo(image_info);
    *write_info->magick='\0';
-@@ -1613,6 +1782,135 @@
+@@ -1613,6 +1855,153 @@
    sans_exception=DestroyExceptionInfo(sans_exception);
    if (*write_info->magick == '\0')
      (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
@@ -316,6 +389,24 @@
 +              file=(-1);
 +            }
 +        }
++      else
++        if ((file < 0) && (atomic_existed != MagickFalse))
++          {
++            atomic_mode=HomescoopReplaceKind(atomic_path,&atomic_status);
++            if (atomic_mode >= 0)
++              {
++                if (atomic_mode == 0)
++                  atomic_mode=1;
++                file=HomescoopFallbackTemp(atomic_path,".",atomic_tmp);
++                if (file < 0)
++                  {
++                    ThrowFileException(exception,FileOpenError,
++                      "UnableToCreateTemporaryFile",atomic_path);
++                    write_info=DestroyImageInfo(write_info);
++                    return(MagickFalse);
++                  }
++              }
++          }
 +      if (file < 0)
 +        *atomic_tmp='\0';
 +      else
@@ -332,7 +423,7 @@
    p=images;
    for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
    {
-@@ -1661,5 +1959,28 @@
+@@ -1661,5 +2050,28 @@
        }
    }
    write_info=DestroyImageInfo(write_info);
