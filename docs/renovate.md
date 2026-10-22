@@ -134,4 +134,13 @@ Intentionally untracked: `ffmpeg` (retired), `zip` (Info-ZIP 3.0 frozen),
 `magick-native` (removed — ABI mismatch with `@imagemagick/magick-wasm`;
 npm name deprecated).
 
+**Shipped manifests.** Renovate doesn't update `@ai-ecoverse/*`
+dependencies in `packages/*/package/package.json`. A re-pin there changes a
+shipped manifest without a new packaging revision, so `npm-parity` fails it
+(#1702, #1703, #1707, #1708, #1709); the builder re-pins at the package's
+next `-N`. Their other dependencies keep their ranges (`rangeStrategy:
+replace`). The root `package.json` test pins (cert kernel, shared-web,
+playwright) keep updating. `scripts/test/renovate-ranges.test.mjs` checks
+both.
+
 The Renovate GitHub App is installed org-wide on `ai-ecoverse`.
