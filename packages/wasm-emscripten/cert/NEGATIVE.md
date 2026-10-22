@@ -186,5 +186,5 @@ Row 10 now matches 0018's archive loop, which -29's `tools/link.py` lacks: -29 a
 
 - `jobs.c` with the default link: `hello realpath /tmp uname 0` and `tcgetpgrp self tcsetpgrp 0 ok` (the shim's single-process answers under host node); without `libslicc_jobs.a` it is libc's `tcgetpgrp 0 tcsetpgrp -1 EINVAL`, so the row keeps testing the override;
 - `own-tc.c`, which defines its own `tcsetpgrp` and calls `tcgetpgrp`: it links and prints `own tcsetpgrp 7 tcgetpgrp self`;
-- `jobs.c` with `-sMAIN_MODULE=1` and with `-sLINKABLE=1`: both link and print `hello realpath /tmp uname 0`; the main module answers libc's `tcgetpgrp 0 tcsetpgrp -1 EINVAL`;
-- NEGATIVE: with 6.0.9-29's `lib/slicc` (the plain `slicc_jobs.o`, no `linkable/`, no `libslicc_jobs.a`), `own-tc.c` gives `duplicate symbol: tcsetpgrp` and the `-sMAIN_MODULE=1` link fails with `duplicate symbol:`.
+- `jobs.c` with `-sMAIN_MODULE=1` and with `-sLINKABLE=1`: both link and print `hello realpath /tmp uname 0` and libc's `tcgetpgrp 0 tcsetpgrp -1 EINVAL`, and both wasm export `lib/slicc/linkable`'s `slicc_linkable_kill` (`--export-dynamic`). The default link's `jobs.wasm` must not have that name, and it prints `tcgetpgrp self`, so an ignored `-sLINKABLE=1` fails the row (Grok review of #1696);
+- NEGATIVE: with 6.0.9-29's `lib/slicc` (the plain `slicc_jobs.o`, no `linkable/`, no `libslicc_jobs.a`), `own-tc.c` gives `duplicate symbol: tcsetpgrp`, the `-sMAIN_MODULE=1` link fails with `duplicate symbol:`, and the `-sLINKABLE=1` link fails with `duplicate symbol: tcsetpgrp`.

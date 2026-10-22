@@ -150,11 +150,13 @@ beside a program's own `realpath`, still gives `duplicate symbol: realpath`
 Since 6.0.9-30 PRESTAGE links `jobs.c` (realpath, uname, `tcgetpgrp(0)` and
 `tcsetpgrp(0, getpid())`) with the default link (`tcgetpgrp self tcsetpgrp
 0 ok`; without `libslicc_jobs.a` it is libc's `0` and `EINVAL`), with
-`-sMAIN_MODULE=1` and with `-sLINKABLE=1`, and runs each; it links
-`own-tc.c`, which defines its own `tcsetpgrp`, and runs its own. 6.0.9-29's
-`lib/slicc` (`slicc_jobs.o` with both overrides, no `linkable/`) must give
-`duplicate symbol: tcsetpgrp` for `own-tc.c` and fail the `-sMAIN_MODULE=1`
-link (homescoop#1678).
+`-sMAIN_MODULE=1` and with `-sLINKABLE=1`, and runs each; the last two must
+answer libc's `0` and `EINVAL` and export `slicc_linkable_kill`, which the
+default link's wasm must not have. It links `own-tc.c`, which defines its
+own `tcsetpgrp`, and runs its own. 6.0.9-29's `lib/slicc` (`slicc_jobs.o`
+with both overrides, no `linkable/`) must give `duplicate symbol: tcsetpgrp`
+for `own-tc.c` and fail the `-sMAIN_MODULE=1` and `-sLINKABLE=1` links
+(homescoop#1678).
 
 ## Commands
 

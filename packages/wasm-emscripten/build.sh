@@ -409,7 +409,17 @@ printf '%s\n' "$MAIN_OUT"
 grep -qx 'hello realpath /tmp uname 0' <<<"$MAIN_OUT" || { echo "homescoop: a -sMAIN_MODULE=1 program with the slicc defaults does not run (homescoop#1678)" >&2; exit 1; }
 grep -qx 'tcgetpgrp 0 tcsetpgrp -1 EINVAL' <<<"$MAIN_OUT"
 "${RP_EMCC[@]}" -sLINKABLE=1 -Wno-deprecated "$PRE_WORK/jobs.c" -o "$PRE_WORK/jobs-linkable.js" 2>"$PRE_WORK/jobs-linkable.err" || { cat "$PRE_WORK/jobs-linkable.err" >&2; echo "homescoop: -sLINKABLE=1 does not link with the slicc defaults (homescoop#1678)" >&2; exit 1; }
-grep -qx 'hello realpath /tmp uname 0' <<<"$(cd "$PRE_WORK" && node jobs-linkable.js)"
+LINKABLE_OUT="$(cd "$PRE_WORK" && node jobs-linkable.js)"
+printf '%s\n' "$LINKABLE_OUT"
+grep -qx 'hello realpath /tmp uname 0' <<<"$LINKABLE_OUT" || { echo "homescoop: a -sLINKABLE=1 program with the slicc defaults does not run (homescoop#1678)" >&2; exit 1; }
+grep -qx 'tcgetpgrp 0 tcsetpgrp -1 EINVAL' <<<"$LINKABLE_OUT" || { echo "homescoop: a -sLINKABLE=1 link still gets libslicc_jobs.a's tcgetpgrp/tcsetpgrp, so 0018 did not take lib/slicc/linkable and drop the archives (homescoop#1678)" >&2; exit 1; }
+for mode in main linkable; do
+  grep -q slicc_linkable_kill "$PRE_WORK/jobs-$mode.wasm" || { echo "homescoop: jobs-$mode.wasm does not export lib/slicc/linkable's slicc_linkable_kill, so the $mode link did not take lib/slicc/linkable (homescoop#1678)" >&2; exit 1; }
+done
+if grep -q slicc_linkable_kill "$PRE_WORK/jobs.wasm"; then
+  echo "homescoop: the default link's jobs.wasm has slicc_linkable_kill; PRESTAGE no longer tells the linkable objects apart (homescoop#1678)" >&2
+  exit 1
+fi
 OLD_JOBS="$PRE_WORK/libslicc-6.0.9-29"
 mkdir -p "$OLD_JOBS"
 cp -R "$PKG"/lib/slicc/. "$OLD_JOBS/"
@@ -426,6 +436,11 @@ if "${OLD_EMCC[@]}" -sMAIN_MODULE=1 "$PRE_WORK/jobs.c" -o "$PRE_WORK/jobs-main-o
   exit 1
 fi
 grep -q 'duplicate symbol: ' "$PRE_WORK/jobs-main-old.err"
+if "${OLD_EMCC[@]}" -sLINKABLE=1 -Wno-deprecated "$PRE_WORK/jobs.c" -o "$PRE_WORK/jobs-linkable-old.js" 2>"$PRE_WORK/jobs-linkable-old.err"; then
+  echo "homescoop: -sLINKABLE=1 links with 6.0.9-29's lib/slicc; PRESTAGE no longer tests homescoop#1678" >&2
+  exit 1
+fi
+grep -q 'duplicate symbol: tcsetpgrp' "$PRE_WORK/jobs-linkable-old.err"
 if EM_CONFIG="$HOST_EM_CONFIG" "${HOST_EMCC[@]}" "$PRE_WORK/hello.c" -o "$PRE_WORK/hello-cl.js" --closure=1 2>"$PRE_WORK/closure.err"; then
   echo "homescoop: --closure=1 should have failed" >&2
   exit 1
@@ -435,7 +450,7 @@ CC_OUT=$(EM_CONFIG="$HOST_EM_CONFIG" python3 "$HOST_EM/emconfigure.py" sh -c 'pr
 echo "$CC_OUT" | grep -q 'emcc'
 RO_CLEANUP
 trap - EXIT
-echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without libslicc_realpath.a realpath is ELOOP at 40 (#611, #1631), a program's own realpath (in its own source, a later object, an archive or -l) links and runs, not the archive's, and 6.0.9-28's plain slicc_realpath.o gives duplicate symbol: realpath (#1664), a default link gets the slicc tcgetpgrp/tcsetpgrp from libslicc_jobs.a and a program's own tcsetpgrp wins, -sMAIN_MODULE=1 and -sLINKABLE=1 links with the slicc defaults (lib/slicc/linkable, without the archives) link and run, and 6.0.9-29's lib/slicc gives duplicate symbol: tcsetpgrp and fails -sMAIN_MODULE=1 (#1678), --closure is refused, emconfigure sets CC"
+echo "  PRESTAGE: hello links with the slicc defaults, a program calling uname, link, getuid, getrlimit and raise links with -Werror and runs (#1056, #1069), under env -i a default-linked program sees no placeholder USER, LOGNAME, HOME, PATH or PWD (#1531), 40 symlink follows open, stat and realpath and 41 are ELOOP, absolute and relative, and without libslicc_realpath.a realpath is ELOOP at 40 (#611, #1631), a program's own realpath (in its own source, a later object, an archive or -l) links and runs, not the archive's, and 6.0.9-28's plain slicc_realpath.o gives duplicate symbol: realpath (#1664), a default link gets the slicc tcgetpgrp/tcsetpgrp from libslicc_jobs.a and a program's own tcsetpgrp wins, -sMAIN_MODULE=1 and -sLINKABLE=1 links with the slicc defaults take lib/slicc/linkable (slicc_linkable_kill exported, libc's tcgetpgrp/tcsetpgrp, which the default link does not have) and run, and 6.0.9-29's lib/slicc gives duplicate symbol: tcsetpgrp and fails -sMAIN_MODULE=1 and -sLINKABLE=1 (#1678), --closure is refused, emconfigure sets CC"
 
 
 echo "== wasm-emscripten: config + launchers (+ optional vfs pre-js)"
