@@ -8,7 +8,7 @@
     "@ai-ecoverse/wasm-tls-engine"
   ],
   "checklist": [
-    "the harness's own regression test, run by kernel-compat-proof against npm latest of @ai-ecoverse/wasm-curl",
+    "the harness's own regression test, run by hand against npm latest of @ai-ecoverse/wasm-curl (scripts/browser-cert/README.md)",
     "websocket.mjs (#458): ctx.serveWs is the far end of a program's WebSocket through the kernel's proxy. curl ws:// gets the far end's text and binary messages and close code; wss:// goes through the kernel's TLS termination; a refused open is 502; a raw client (bash on 127.0.0.1:3128) gets 101 with RFC 6455's accept, its masked frames reach the far end and come back, and its close reaches the far end; ctx.wsLog() records each socket",
     "binary.mjs (#591, #738): ctx.write(Uint8Array | Buffer | ArrayBuffer) and ctx.readBytes carry bytes exactly: all 256 byte values written from the host read back the same in the kernel (base64, wc -c), bytes the kernel writes read back the same on the host, 1 MiB of random bytes round-trips, a typed-array view writes only its window, strings stay UTF-8 text, and a missing file is null"
   ]

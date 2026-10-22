@@ -10,7 +10,7 @@
     "every command in the slicc.commands of the tarballs under test (bios's base set, slicc-kernel itself left out) runs its invocation below, --version by default, as root (cwd /root) and as kernel.users.add({name:'cone'}) (cwd /home/cone), with empty stdin, and exits with the expected status (0 unless rc says otherwise) within commandTimeoutMs",
     "a command name two packages define is run once, for the package whose name sorts first (the kernel's rule since 1.74)",
     "real use, each in a fresh mktemp -d as both users: grep -c / -n / egrep / fgrep, sed -i and sed -n, xz -k and xz -dc, jq -c, find -type f piped to xargs, diff -u (rc 1) and cmp, patch applying a unified diff",
-    "kernel-compat runs it under users report and enforce; HOMESCOOP_SWEEP_OUT gets one row per user and command, HOMESCOOP_SWEEP_ONLY (a JSON list of command names, real:<tool> for the real-use cases) limits the run to those"
+    "compat.mjs (run by hand) runs it under users report and enforce; HOMESCOOP_SWEEP_OUT gets one row per user and command, HOMESCOOP_SWEEP_ONLY (a JSON list of command names, real:<tool> for the real-use cases) limits the run to those"
   ],
   "invocations": {
     "[": {

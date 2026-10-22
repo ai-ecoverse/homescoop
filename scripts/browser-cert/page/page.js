@@ -1,5 +1,5 @@
 /**
- * Minimal slicc-kernel boot page for homescoop ladder-pr browser cert.
+ * Minimal slicc-kernel boot page for homescoop ladder-build browser cert.
  * Served with COOP/COEP by @ai-ecoverse/slicc-shared-web/harness.
  */
 import { createKernel } from '/dist/index.js';

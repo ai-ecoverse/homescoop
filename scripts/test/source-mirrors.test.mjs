@@ -152,7 +152,7 @@ test('a pin the branch set to a mirror\'s bytes is refused', async () => {
   }
 });
 
-test('a shallow checkout (ladder-pr build jobs, pool-parity) compares against the base tip', async () => {
+test('a shallow checkout (ladder-build build jobs) compares against the base tip', async () => {
   const text = recipe({ pin: sha(good()) });
   const f = repo({ base: text, head: text });
   const clone = mkdtempSync(join(tmpdir(), 'source-mirrors-shallow-'));

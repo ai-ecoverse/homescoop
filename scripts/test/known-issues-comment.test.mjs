@@ -1,4 +1,4 @@
-// ladder-pr's known-issues job: open next-build issues that name a touched package.
+// ladder-build's known-issues job: open next-build issues that name a touched package.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';

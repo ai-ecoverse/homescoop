@@ -61,7 +61,7 @@ test('wasi-uv (#675) and py-kiwisolver (#569) opt in', () => {
   for (const p of ['wasi-uv', 'py-kiwisolver']) assert.ok(optedIn(recipes.get(p).reproducible), p);
 });
 
-test('qpdf is off the pending list and ladder-pr rebuilds and compares it (homescoop#1354, #808)', () => {
+test('qpdf is off the pending list and ladder-build rebuilds and compares it (homescoop#1354, #808)', () => {
   assert.ok(!Object.hasOwn(pending, 'qpdf'), 'qpdf is still in scripts/reproducible-pending.json');
   const r = spawnSync(process.execPath, [join(root, 'scripts/classify-touched-packages.mjs'), '--all'], { cwd: root, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);

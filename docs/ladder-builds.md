@@ -100,7 +100,7 @@ package (it merges normally and publishes nothing), then release the package
 from a later PR. `scripts/test/ladder-merge-resolve.test.mjs` checks that the
 list covers every script those jobs run.
 
-There is no other path: no `certified=` lines, no cert-review record, no
+There is no other path: no certification record from another workflow, no
 dispatch to another workflow. The bytes that ship are the bytes the reviewers
 had in their browsers.
 
@@ -256,9 +256,8 @@ recipe sets `reproducible.same_path`. **A recipe
 moves to the pool only with evidence of equal bytes:** in the PR that adds
 `runner: pool`, its `host-<pkg>-prN` tarball from the pool must have the same
 sha256 as a hosted twin built from the same tree (`host-run.sh` on
-`ubuntu-latest`), and the PR body says so. The weekly pool-parity workflow
-that rebuilt every pool recipe on both runners is retired with the move to one
-workflow; when the runner-job image or the hosted image changes (#499), compare
+`ubuntu-latest`), and the PR body says so. Since #1697 no workflow rebuilds every pool
+recipe on both runners; when the runner-job image or the hosted image changes (#499), compare
 a pool build with a hosted twin by hand with `scripts/tarball-parity.mjs`
 (npm-parity's comparison), and move a recipe that differs back to hosted.
 **`scripts/pool-hold.json` is a temporary hold:** a JSON array of
@@ -539,7 +538,7 @@ under its own tag, never against other tags:
 **Lookups.** Everything that goes from a package to its recipe does it by
 dir (`host-<dir>-prN` artifacts, `ladder-build -f packages=<dir>`,
 `repository.directory` in the published package.json) or by `name@version`
-(kernel-compat's bios pins via `pickRecipe`), so both dirs
+(`compat.mjs`'s bios pins via `pickRecipe`), so both dirs
 of one name resolve. The README table has one row per dir and shows the tag.
 
 **The flip.** When the whole wave is certified, the coordinator moves

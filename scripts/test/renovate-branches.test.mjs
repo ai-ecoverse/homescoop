@@ -1,7 +1,7 @@
 // Renovate names an update's branch renovate/<additionalBranchPrefix><depNameSanitized>-<major>.x,
 // and updates that land on the same branch become one PR, which automerges only if every
-// update in it does. The github-actions pin ai-ecoverse/slicc-shared-web (ladder-pr.yml,
-// manual: publish path) and the npm devDependency @ai-ecoverse/slicc-shared-web (automerge)
+// update in it does. The github-actions pin ai-ecoverse/slicc-shared-web (the workflow's
+// pipeline, manual: publish path) and the npm devDependency @ai-ecoverse/slicc-shared-web (automerge)
 // sanitize to the same name, so they shared renovate/ai-ecoverse-slicc-shared-web-1.x and
 // #1270 never automerged. This check models that naming for every dependency the repo's
 // managers read and fails when two managers would share a branch.

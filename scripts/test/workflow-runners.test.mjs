@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 // Runner pools come and go (cloud-run-bench and cloud-run retire after the move to cloud-run-job), so no
 // workflow may name a pool itself: pools are chosen by the repo variables, and an unset variable falls back
-// to a GitHub-hosted label. #789 made this so in cert-review.yml; #790's stale branch reverted it (#800).
+// to a GitHub-hosted label. #789 made this so in a workflow since retired; #790's stale branch reverted it (#800).
 const workflows = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '.github', 'workflows');
 const hosted = /^(ubuntu|windows|macos)-[\w.-]+$/;
 

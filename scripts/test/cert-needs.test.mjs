@@ -69,7 +69,7 @@ test('every needsInstall package of a py-* cert is in needs, so run.mjs mounts i
   assert.deepEqual(bad, []);
 });
 
-test('unmountedInstalls flags py-pandas3.15 3.0.6-1 as cert-review saw it on #1188: py-six installed, not mounted (#1190)', () => {
+test('unmountedInstalls flags py-pandas3.15 3.0.6-1 as the review saw it on #1188: py-six installed, not mounted (#1190)', () => {
   const seen = {
     needs: ['@ai-ecoverse/wasix-python', '@ai-ecoverse/py-numpy', '@ai-ecoverse/py-python-dateutil', '@ai-ecoverse/py-tzdata'],
     needsInstall: ['@ai-ecoverse/wasix-python@3.15.0-1', '@ai-ecoverse/py-numpy@2.5.4-1', '@ai-ecoverse/py-python-dateutil@2.9.0-post0.3', '@ai-ecoverse/py-tzdata@2026.4.0-3', '@ai-ecoverse/py-six@1.17.0-3'],
