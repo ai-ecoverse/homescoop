@@ -82,3 +82,21 @@ py-inserted py-try
 ```
 
 `users.mjs` (homescoop#1215) is coverage: it also holds on 3.54.0-7.
+
+## 3.54.1-1: the version check reads the package (homescoop#1791; 2026-10-23)
+
+Upstream 3.54.1 (Renovate #1788). The checklist used to assert the literal
+`3.54.0` for `sqlite3 -version` and `sqlite_version()`, so every upstream bump
+failed the cert on a correct build. `builtVersion()` now takes the expected
+version from the installed `package.json`'s `homescoop.upstream` (which
+check-package-meta keeps equal to recipe.yaml's `version`) and asserts that
+the binary reports exactly that: the `-version` line starts with it and a
+date, and `sqlite_version()` is it. The spec names no version, so the compat
+sweep can also run it on older published tarballs.
+
+`scripts/test/sqlite3-cert-version.test.mjs` is the negative: a deliberately
+wrong expected version (`3.54.0` or `3.5.1` against a 3.54.1 binary) fails,
+a binary reporting `3.54.0` or `3.54.10` under a package naming 3.54.1 fails,
+a `sqlite_version()` that disagrees with `-version` fails, and a package with
+no `homescoop.upstream` fails. On the old checklist the test fails at import
+(no `builtVersion` export), and its source check finds the version literal.

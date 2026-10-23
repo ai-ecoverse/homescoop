@@ -1,5 +1,29 @@
 import { readFileSync } from 'node:fs';
 
+export async function upstreamOf(ctx) {
+  const text = await ctx.read(`/node_modules/${ctx.npmName}/package.json`);
+  ctx.assert.ok(text, `the installed ${ctx.npmName} has a package.json`);
+  const upstream = JSON.parse(text).homescoop?.upstream;
+  ctx.assert.match(String(upstream), /^\d+\.\d+\.\d+$/, `the installed package.json names the upstream it was built from: ${upstream}`);
+  return upstream;
+}
+
+export async function builtVersion(ctx, expected) {
+  const { assert } = ctx;
+  const want = expected ?? (await upstreamOf(ctx));
+  const opts = { cwd: '/home' };
+  const cli = await ctx.run(['sqlite3', '-version'], opts);
+  assert.equal(cli.status, 0, `sqlite3 -version: rc ${cli.status}\n${cli.stderr}`);
+  assert.equal(cli.stderr, '', `sqlite3 -version: stderr ${cli.stderr}`);
+  const esc = want.replaceAll('.', '\\.');
+  assert.match(cli.stdout, new RegExp(`^${esc} \\d{4}-\\d\\d-\\d\\d `), `sqlite3 -version reports ${want}, the upstream it was built from`);
+  const sql = await ctx.run(['sqlite3', ':memory:', 'select sqlite_version();'], opts);
+  assert.equal(sql.status, 0, `sqlite_version(): rc ${sql.status}\n${sql.stderr}`);
+  assert.equal(sql.stderr, '', `sqlite_version(): stderr ${sql.stderr}`);
+  assert.equal(sql.stdout, `${want}\n`, `sqlite_version() is ${want}, the upstream it was built from`);
+  return want;
+}
+
 export default async function sqlite3(ctx) {
   const { assert } = ctx;
   const cwd = '/home/sq';
@@ -12,8 +36,7 @@ export default async function sqlite3(ctx) {
     return r.stdout;
   };
 
-  assert.match(await ok(['sqlite3', '-version']), /^3\.54\.0 \d{4}-\d\d-\d\d /);
-  assert.equal(await ok(['sqlite3', ':memory:', 'select sqlite_version();']), '3.54.0\n');
+  await builtVersion(ctx);
 
   await ok(['sqlite3', 't.db', 'create table t(id integer primary key, name text, n real); insert into t(name, n) values (\'a\', 1.5), (\'b\', 2.5), (\'c\', 4);']);
   assert.equal(await ok(['sqlite3', 't.db', 'select count(*), sum(n) from t;']), '3|8.0\n', 'a second process reads what the first wrote');
