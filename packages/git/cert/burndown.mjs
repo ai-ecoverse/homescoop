@@ -2,7 +2,7 @@ export default async function (ctx) {
   const { run, assert, addUser, installed } = ctx;
   const pkg = installed[0];
   assert.equal(pkg.engines?.['slicc-kernel'], '>=1.130.2', `engines: a kernel before 1.57.0 reports every file as the caller's, so safe.directory never fired (homescoop#887): ${JSON.stringify(pkg.engines)}`);
-  assert.ok(pkg.dependencies?.['@ai-ecoverse/wasm-sed'], `package.json depends on wasm-sed, which git-sh-setup runs (homescoop#903): ${JSON.stringify(pkg.dependencies)}`);
+  assert.ok(pkg.peerDependencies?.['@ai-ecoverse/wasm-sed'], `package.json names wasm-sed, which git-sh-setup runs, as a peer (homescoop#903, bios#939): ${JSON.stringify(pkg.peerDependencies)}`);
   await addUser({ name: 'alice' });
   const sh = (cmd, o = {}) => run(['bash', '-c', cmd], { cwd: '/tmp', ...o });
 
