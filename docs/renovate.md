@@ -143,4 +143,15 @@ replace`). The root `package.json` test pins (cert kernel, shared-web,
 playwright) keep updating. `scripts/test/renovate-ranges.test.mjs` checks
 both.
 
+**Workflow actions.** Action and pin bumps in `.github/workflows/ladder-*.yml`
+(the publish path) stay manual, with one exception: minors and patches of the
+`ai-ecoverse/slicc-shared-web/.github/actions/memory-peak` steps in
+`ladder-build.yml` automerge. Every memory-peak step is `if: always()` +
+`continue-on-error: true` and only prints the memory peak (#1715, #1734,
+#1742, #1745, #1753 were armed by hand). Renovate names those steps and the
+`pipeline.yml` reusable-workflow pin both `ai-ecoverse/slicc-shared-web`; the
+rule matches `depType: action` (a step), never `workflow` (the pipeline pin),
+so the pipeline pin stays manual, and a `slicc-shared-web` branch that moves
+both stays manual too. `scripts/test/renovate-ranges.test.mjs` checks it.
+
 The Renovate GitHub App is installed org-wide on `ai-ecoverse`.

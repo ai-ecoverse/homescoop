@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const renovate = JSON.parse(readFileSync(join(root, 'renovate.json'), 'utf8'));
 const before = JSON.parse(readFileSync(join(root, 'scripts/test/fixtures/renovate/main-b3c71d32.json'), 'utf8'));
+const mainBeforeMemoryPeak = JSON.parse(readFileSync(join(root, 'scripts/test/fixtures/renovate/main-84494621.json'), 'utf8'));
 
 const PRESET_NPM_RANGE_STRATEGY = 'pin';
 const MODELLED = new Set([
@@ -17,6 +18,7 @@ const MODELLED = new Set([
   'matchUpdateTypes',
   'matchCurrentValue',
   'matchDatasources',
+  'matchDepTypes',
 ]);
 
 function glob(pattern) {
@@ -52,7 +54,8 @@ function matches(rule, dep) {
     if (!MODELLED.has(key)) throw new Error(`renovate-ranges: ${key} is not modelled; teach this test`);
   }
   if (rule.matchManagers && !rule.matchManagers.includes(dep.manager)) return false;
-  if (rule.matchDatasources && !rule.matchDatasources.includes('npm')) return false;
+  if (rule.matchDatasources && !rule.matchDatasources.includes(dep.datasource ?? 'npm')) return false;
+  if (rule.matchDepTypes && !rule.matchDepTypes.includes(dep.depType)) return false;
   if (rule.matchFileNames && !rule.matchFileNames.some((p) => glob(p).test(dep.file))) return false;
   if (rule.matchPackageNames && !matchList(rule.matchPackageNames, dep.name)) return false;
   if (rule.matchDepNames && !matchList(rule.matchDepNames, dep.name)) return false;
@@ -158,6 +161,90 @@ test('the root package.json devDependencies keep updating with the shared preset
       assert.equal(r.enabled, true, `${name} ${updateType}`);
       assert.equal(r.rangeStrategy, PRESET_NPM_RANGE_STRATEGY, name);
       assert.equal(r.automerge, true, `${name} ${updateType}`);
+    }
+  }
+});
+
+const LADDER_BUILD = '.github/workflows/ladder-build.yml';
+const MEMORY_PEAK = 'ai-ecoverse/slicc-shared-web/.github/actions/memory-peak';
+const PIPELINE = 'ai-ecoverse/slicc-shared-web/.github/workflows/pipeline.yml';
+
+function workflowDeps() {
+  const out = [];
+  for (const name of readdirSync(join(root, '.github/workflows')).filter((f) => /^ladder-.*\.ya?ml$/.test(f)).sort()) {
+    const file = `.github/workflows/${name}`;
+    const text = readFileSync(join(root, file), 'utf8');
+    for (const [, ref] of text.matchAll(/^\s*-?\s*uses:\s*['"]?([^\s'"#]+)/gm)) {
+      if (ref.startsWith('./') || ref.startsWith('docker://') || !ref.includes('@')) continue;
+      const [target, value] = ref.split('@');
+      const [owner, repo, ...rest] = target.split('/');
+      const path = rest.join('/');
+      const depType = /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path) ? 'workflow' : 'action';
+      out.push({ manager: 'github-actions', datasource: 'github-tags', file, name: `${owner}/${repo}`, target, value, depType });
+    }
+  }
+  return out;
+}
+
+const actions = workflowDeps();
+const memoryPeak = actions.filter((d) => d.target === MEMORY_PEAK);
+const pipeline = actions.filter((d) => d.target === PIPELINE);
+
+function branchAutomerges(updates, config) {
+  return updates.every((u) => resolve(u, config).automerge);
+}
+
+test('ladder-build.yml has memory-peak steps and the pipeline.yml pin, both named ai-ecoverse/slicc-shared-web', () => {
+  assert.ok(memoryPeak.length > 0, `no ${MEMORY_PEAK} step in ${LADDER_BUILD}`);
+  assert.ok(memoryPeak.every((d) => d.file === LADDER_BUILD && d.depType === 'action' && d.name === 'ai-ecoverse/slicc-shared-web'));
+  assert.equal(pipeline.length, 1, `${PIPELINE} pin in ${LADDER_BUILD}`);
+  assert.equal(pipeline[0].depType, 'workflow');
+  assert.equal(pipeline[0].name, 'ai-ecoverse/slicc-shared-web');
+});
+
+test('memory-peak minors and patches automerge; its majors stay manual', () => {
+  for (const d of memoryPeak) {
+    for (const updateType of ['minor', 'patch']) {
+      const r = resolve({ ...d, updateType });
+      assert.equal(r.enabled, true, `${d.target}@${d.value} ${updateType}`);
+      assert.equal(r.automerge, true, `${d.target}@${d.value} ${updateType}`);
+    }
+    assert.equal(resolve({ ...d, updateType: 'major' }).automerge, false, `${d.target}@${d.value} major`);
+    assert.equal(resolve({ ...d, updateType: 'digest' }).automerge, false, `${d.target}@${d.value} digest`);
+  }
+});
+
+test('every other action and pin in the ladder workflows stays manual, the pipeline.yml pin included', () => {
+  const others = actions.filter((d) => d.target !== MEMORY_PEAK);
+  assert.ok(others.some((d) => d.target === PIPELINE));
+  assert.ok(others.some((d) => d.name === 'actions/checkout'));
+  const armed = [];
+  for (const d of others) {
+    for (const updateType of ['patch', 'minor', 'major', 'digest']) {
+      if (resolve({ ...d, updateType }).automerge) armed.push(`${d.file} ${d.target}@${d.value} ${updateType}`);
+    }
+  }
+  assert.deepEqual(armed, []);
+});
+
+test('the slicc-shared-web group branch stays manual when it also moves the pipeline.yml pin', () => {
+  for (const updateType of ['minor', 'patch']) {
+    assert.equal(branchAutomerges(memoryPeak.map((d) => ({ ...d, updateType })), renovate), true, updateType);
+    assert.equal(branchAutomerges([...memoryPeak, ...pipeline].map((d) => ({ ...d, updateType })), renovate), false, updateType);
+  }
+});
+
+test('NEGATIVE: main\'s renovate.json before this change leaves memory-peak manual (#1715, #1734, #1742, #1745, #1753), and the pipeline.yml pin stays manual on both', () => {
+  for (const d of memoryPeak) {
+    for (const updateType of ['minor', 'patch']) {
+      assert.equal(resolve({ ...d, updateType }, mainBeforeMemoryPeak).automerge, false, `${d.target}@${d.value} ${updateType}`);
+      assert.equal(resolve({ ...d, updateType }).automerge, true, `${d.target}@${d.value} ${updateType}`);
+    }
+  }
+  for (const d of pipeline) {
+    for (const updateType of ['minor', 'patch']) {
+      assert.equal(resolve({ ...d, updateType }, mainBeforeMemoryPeak).automerge, false, `${d.target}@${d.value} ${updateType}`);
+      assert.equal(resolve({ ...d, updateType }).automerge, false, `${d.target}@${d.value} ${updateType}`);
     }
   }
 });

@@ -203,6 +203,26 @@
       "automerge": false
     },
     {
+      "description": "The memory-peak step action in ladder-build.yml (ai-ecoverse/slicc-shared-web/.github/actions/memory-peak) automerges its minors and patches: every step is if: always() + continue-on-error: true and only prints the memory peak, so it can't change a build or a publish (#1715, #1734, #1742, #1745, #1753 were armed by hand). Renovate names it after the repo, like the pipeline.yml pin; depType action (a step) vs workflow (the reusable pipeline) tells them apart, so the pipeline pin and every other action there stay manual, and a slicc-shared-web branch that also moves the pipeline pin stays manual. scripts/test/renovate-ranges.test.mjs checks it.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchFileNames": [
+        ".github/workflows/ladder-build.yml"
+      ],
+      "matchPackageNames": [
+        "ai-ecoverse/slicc-shared-web"
+      ],
+      "matchDepTypes": [
+        "action"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true
+    },
+    {
       "description": "github-script major bumps can break the workflow; review by hand.",
       "matchPackageNames": [
         "actions/github-script"
