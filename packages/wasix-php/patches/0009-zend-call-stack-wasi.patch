@@ -1,30 +1,41 @@
-A call stack limit on WASI (wasix-php).
+A call stack limit on WASI (wasix-php), with a shadow-stack pad per path.
 
 PHP checks its C stack against zend.max_allowed_stack_size and throws
 "Maximum call stack size of N bytes reached" before a deep recursion in C
-(serialize, json_encode, ==, array_map or usort calling back into PHP,
-__get, __toString) overflows. configure can't run its test when cross
-compiling, so it was off (php_cv_have_stack_limit=yes in build.sh's
-config.site turns it on), and zend_call_stack_get() knew no WASI stack.
+(serialize, json_encode, ==, var_dump, array_map or usort calling back
+into PHP, __get, __toString, the compiler) overflows. configure can't run
+its test when cross compiling, so it was off (php_cv_have_stack_limit=yes
+in build.sh's config.site turns it on), and zend_call_stack_get() knew no
+WASI stack.
 
 What overflows first in slicc is not wasm's 8 MiB shadow stack in linear
-memory but the browser's native stack, where every wasm frame of the
-asyncified build sits too. V8 allows about 330 (usort calling itself) to
-1130 (json_encode) nested levels, while their use of the shadow stack
-differs 30-fold (40 bytes a level for ==, 1.2 KiB for serialize), so no
-single byte budget fits every path. So:
+memory but the browser's native stack, where every wasm frame sits too.
+The check only sees the shadow stack, and the two disagree by path: V8
+allows about 330 nested levels of usort calling itself and 2600 of
+array_walk_recursive, while most C frames take a few bytes of shadow stack
+or none. So:
 
 - zend_call_stack_get() reports the shadow stack's top (__stack_high) as
-  the base and at most 448 KiB as its size;
-- every frame that runs the check takes 2 KiB of shadow stack
-  (ZEND_WASI_CALL_STACK_FRAME), so each checked level costs about what it
-  costs V8, and the 448 KiB (less zend.reserved_stack_size's 48 KiB) runs
-  out after 94 (== on objects) to 188 (== on arrays) levels: about half
-  of what V8 allows usort, a fifth of serialize, array_map and == on
-  arrays.
+  the base and at most 2 MiB as its size (2048000 bytes once
+  zend.reserved_stack_size's 48 KiB is taken off);
+- the C functions on each recursive path take a fixed pad of shadow stack
+  (ZEND_WASI_STACK_PAD, a char array passed to an empty asm statement so
+  clang keeps it), sized from that path's measured limit in V8 (Liftoff
+  frames, the deepest the browser allows): the 2048000 bytes then run out
+  at about 65% of the levels V8 allows on that path. execute_ex (every
+  call from C back into PHP) takes 3600 bytes, sized for array_map; the
+  heavier callers on top of it take their own (user sort callbacks 5744,
+  preg_replace_callback 4544, SplHeap::compare 3088, __toString 2192,
+  getIterator 1920, ArrayAccess 1392, __get/__set/__isset/__unset 1104,
+  __destruct 864); and each check site of a recursion without a callback
+  takes its own (serialize 2032, json_encode 1984, == on arrays 3280 and
+  on objects 1696, var_dump 1136, debug_zval_dump 1680, count 800,
+  array_walk 1040, compact 1232, array_replace_recursive 1424,
+  http_build_query 2400, mbstring 1232, DOM 1552, the compiler 1504 and
+  its constant folding 2048).
 
 zend.max_allowed_stack_size still sets a different size (-d or php.ini),
-and -1 turns the check off.
+and -1 turns the check off. The README has the levels each path reaches.
 
 --- a/Zend/zend_call_stack.c
 +++ b/Zend/zend_call_stack.c
@@ -33,7 +44,7 @@ and -1 turns the check off.
  #ifdef ZEND_CHECK_STACK_LIMIT
  
 +#ifdef __wasi__
-+# define ZEND_WASI_CALL_STACK_SIZE (448 * 1024)
++# define ZEND_WASI_CALL_STACK_SIZE (2048 * 1024)
 +#endif
 +
  /* Called once per process or thread */
@@ -79,19 +90,402 @@ and -1 turns the check off.
  
 --- a/Zend/zend_call_stack.h
 +++ b/Zend/zend_call_stack.h
-@@ -56,7 +56,15 @@
+@@ -32,6 +32,38 @@
+ #include <intrin.h>
  #endif
- }
  
-+#ifdef __wasi__
-+# define ZEND_WASI_CALL_STACK_FRAME 2048
++#if defined(__wasi__) && defined(ZEND_CHECK_STACK_LIMIT)
++# define ZEND_WASI_PAD_EXECUTE 3600
++# define ZEND_WASI_PAD_SERIALIZE 2032
++# define ZEND_WASI_PAD_JSON 1984
++# define ZEND_WASI_PAD_HASH_COMPARE 3280
++# define ZEND_WASI_PAD_OBJECT_COMPARE 1696
++# define ZEND_WASI_PAD_VAR_DUMP 1136
++# define ZEND_WASI_PAD_ZVAL_DUMP 1680
++# define ZEND_WASI_PAD_COUNT 800
++# define ZEND_WASI_PAD_WALK 1040
++# define ZEND_WASI_PAD_COMPACT 1232
++# define ZEND_WASI_PAD_REPLACE 1424
++# define ZEND_WASI_PAD_HTTP_QUERY 2400
++# define ZEND_WASI_PAD_MBSTRING 1232
++# define ZEND_WASI_PAD_DOM 1552
++# define ZEND_WASI_PAD_COMPILE 1504
++# define ZEND_WASI_PAD_CONST_EXPR 2048
++# define ZEND_WASI_PAD_USER_COMPARE 5744
++# define ZEND_WASI_PAD_PREG_CALLBACK 4544
++# define ZEND_WASI_PAD_MAGIC 1104
++# define ZEND_WASI_PAD_DIMENSION 1392
++# define ZEND_WASI_PAD_TOSTRING 2192
++# define ZEND_WASI_PAD_DESTRUCT 864
++# define ZEND_WASI_PAD_HEAP_COMPARE 3088
++# define ZEND_WASI_PAD_ITERATOR 1920
++# define ZEND_WASI_STACK_PAD(size) \
++	char zend_wasi_stack_pad[size]; \
++	__asm__ volatile("" : : "r"(zend_wasi_stack_pad))
++#else
++# define ZEND_WASI_STACK_PAD(size) do { } while (0)
 +#endif
 +
- static zend_always_inline bool zend_call_stack_overflowed(void *stack_limit) {
-+#ifdef __wasi__
-+	char frame[ZEND_WASI_CALL_STACK_FRAME];
-+	__asm__ volatile("" : : "r"(frame));
-+#endif
- 	return (uintptr_t) zend_call_stack_position() <= (uintptr_t) stack_limit;
- }
+ #ifdef ZEND_CHECK_STACK_LIMIT
+ 
+ typedef struct _zend_call_stack {
+--- a/Zend/zend_compile.c
++++ b/Zend/zend_compile.c
+@@ -11949,6 +11949,7 @@
+ 
+ static void zend_compile_expr(znode *result, zend_ast *ast)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_COMPILE);
+ 	zend_check_stack_limit();
+ 
+ 	uint32_t checkpoint = zend_short_circuiting_checkpoint();
+@@ -12011,6 +12012,7 @@
+ 
+ static zend_op *zend_compile_var(znode *result, zend_ast *ast, uint32_t type, bool by_ref) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_COMPILE);
+ 	zend_check_stack_limit();
+ 
+ 	uint32_t checkpoint = zend_short_circuiting_checkpoint();
+@@ -12021,6 +12023,7 @@
+ 
+ static zend_op *zend_delayed_compile_var(znode *result, zend_ast *ast, uint32_t type, bool by_ref) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_COMPILE);
+ 	zend_check_stack_limit();
+ 
+ 	switch (ast->kind) {
+@@ -12082,6 +12085,7 @@
+ 
+ static void zend_eval_const_expr(zend_ast **ast_ptr) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_CONST_EXPR);
+ 	zend_ast *ast = *ast_ptr;
+ 	zval result;
+ 
+--- a/Zend/zend_hash.c
++++ b/Zend/zend_hash.c
+@@ -3421,6 +3421,7 @@
+ 
+ ZEND_API int zend_hash_compare(HashTable *ht1, HashTable *ht2, compare_func_t compar, bool ordered)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_HASH_COMPARE);
+ 	int result;
+ 	IS_CONSISTENT(ht1);
+ 	IS_CONSISTENT(ht2);
+--- a/Zend/zend_interfaces.c
++++ b/Zend/zend_interfaces.c
+@@ -235,6 +235,7 @@
+ /* by_ref is int due to Iterator API */
+ ZEND_API zend_object_iterator *zend_user_it_get_new_iterator(zend_class_entry *ce, zval *object, int by_ref)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_ITERATOR);
+ 	zval iterator;
+ 	zend_object_iterator *new_iterator;
+ 	zend_class_entry *ce_it;
+--- a/Zend/zend_object_handlers.c
++++ b/Zend/zend_object_handlers.c
+@@ -238,6 +238,7 @@
+ 
+ static void zend_std_call_getter(zend_object *zobj, zend_string *prop_name, zval *retval) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_MAGIC);
+ 	zval member;
+ 	ZVAL_STR(&member, prop_name);
+ 	zend_call_known_instance_method_with_1_params(zobj->ce->__get, zobj, retval, &member);
+@@ -246,6 +247,7 @@
+ 
+ static void zend_std_call_setter(zend_object *zobj, zend_string *prop_name, zval *value) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_MAGIC);
+ 	zval args[2];
+ 	ZVAL_STR(&args[0], prop_name);
+ 	ZVAL_COPY_VALUE(&args[1], value);
+@@ -255,6 +257,7 @@
+ 
+ static void zend_std_call_unsetter(zend_object *zobj, zend_string *prop_name) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_MAGIC);
+ 	zval member;
+ 	ZVAL_STR(&member, prop_name);
+ 	zend_call_known_instance_method_with_1_params(zobj->ce->__unset, zobj, NULL, &member);
+@@ -263,6 +266,7 @@
+ 
+ static void zend_std_call_issetter(zend_object *zobj, zend_string *prop_name, zval *retval) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_MAGIC);
+ 	zval member;
+ 	ZVAL_STR(&member, prop_name);
+ 	zend_call_known_instance_method_with_1_params(zobj->ce->__isset, zobj, retval, &member);
+@@ -1320,6 +1324,7 @@
+ 
+ ZEND_API zval *zend_std_read_dimension(zend_object *object, zval *offset, int type, zval *rv) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DIMENSION);
+ 	zend_class_entry *ce = object->ce;
+ 	zval tmp_offset;
+ 
+@@ -1371,6 +1376,7 @@
+ 
+ ZEND_API void zend_std_write_dimension(zend_object *object, zval *offset, zval *value) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DIMENSION);
+ 	zend_class_entry *ce = object->ce;
+ 	zval tmp_offset;
+ 
+@@ -1394,6 +1400,7 @@
+ // todo: make zend_std_has_dimension return bool as well
+ ZEND_API int zend_std_has_dimension(zend_object *object, zval *offset, int check_empty) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DIMENSION);
+ 	zend_class_entry *ce = object->ce;
+ 	zval retval, tmp_offset;
+ 	bool result;
+@@ -1697,6 +1704,7 @@
+ 
+ ZEND_API void zend_std_unset_dimension(zend_object *object, zval *offset) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DIMENSION);
+ 	zend_class_entry *ce = object->ce;
+ 	zval tmp_offset;
+ 
+@@ -2226,6 +2234,7 @@
+ 
+ ZEND_API int zend_std_compare_objects(zval *o1, zval *o2) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_OBJECT_COMPARE);
+ 	zend_object *zobj1, *zobj2;
+ 
+ 	if (zend_objects_check_stack_limit()) {
+@@ -2557,6 +2566,7 @@
+ 
+ ZEND_API zend_result zend_std_cast_object_tostring(zend_object *readobj, zval *writeobj, int type) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_TOSTRING);
+ 	switch (type) {
+ 		case IS_STRING: {
+ 			zend_class_entry *ce = readobj->ce;
+--- a/Zend/zend_objects.c
++++ b/Zend/zend_objects.c
+@@ -113,6 +113,7 @@
+ 
+ ZEND_API void zend_objects_destroy_object(zend_object *object)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DESTRUCT);
+ 	zend_function *destructor = object->ce->destructor;
+ 
+ 	if (destructor) {
+--- a/Zend/zend_vm_execute.h
++++ b/Zend/zend_vm_execute.h
+@@ -112762,6 +112762,7 @@
+ #endif
+ {
+ 	DCL_OPLINE
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_EXECUTE);
+ 
+ #if defined(__GNUC__) && defined(__aarch64__)
+ 	__asm__ __volatile__ (""::: "v8","v9","v10","v11","v12","v13","v14","v15");
+--- a/ext/dom/node.c
++++ b/ext/dom/node.c
+@@ -1744,6 +1744,7 @@
+ 
+ static bool php_dom_node_is_equal_node(const xmlNode *this, const xmlNode *other, bool spec_compliant)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DOM);
+ 	ZEND_ASSERT(this != NULL);
+ 	ZEND_ASSERT(other != NULL);
+ 
+--- a/ext/dom/php_dom.c
++++ b/ext/dom/php_dom.c
+@@ -1919,6 +1919,7 @@
+ /* {{{ void php_dom_normalize_legacy(xmlNodePtr nodep) */
+ void php_dom_normalize_legacy(xmlNodePtr nodep)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DOM);
+ 	if (UNEXPECTED(dom_normalize_check_stack_limit())) {
+ 		return;
+ 	}
+@@ -1955,6 +1956,7 @@
+ /* https://dom.spec.whatwg.org/#dom-node-normalize */
+ void php_dom_normalize_modern(xmlNodePtr this)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DOM);
+ 	if (UNEXPECTED(dom_normalize_check_stack_limit())) {
+ 		return;
+ 	}
+--- a/ext/dom/xml_serializer.c
++++ b/ext/dom/xml_serializer.c
+@@ -1270,6 +1270,7 @@
+ 	bool require_well_formed
+ )
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_DOM);
+ 	if (UNEXPECTED(dom_xml_serialize_check_stack_limit())) {
+ 		zend_throw_error(NULL, "Maximum call stack size reached. Infinite recursion?");
+ 		return -1;
+--- a/ext/json/json_encoder.c
++++ b/ext/json/json_encoder.c
+@@ -108,6 +108,7 @@
+ 
+ static zend_result php_json_encode_array(smart_str *buf, zval *val, int options, php_json_encoder *encoder) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_JSON);
+ 	bool encode_as_object = options & PHP_JSON_FORCE_OBJECT;
+ 	bool need_comma = false;
+ 	HashTable *myht, *prop_ht;
+--- a/ext/mbstring/mbstring.c
++++ b/ext/mbstring/mbstring.c
+@@ -3751,6 +3751,7 @@
+ 
+ static unsigned int mb_recursive_count_strings(zval *var)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_MBSTRING);
+ 	unsigned int count = 0;
+ 	ZVAL_DEREF(var);
+ 
+@@ -3786,6 +3787,7 @@
+ 
+ static bool mb_recursive_find_strings(zval *var, const unsigned char **val_list, size_t *len_list, unsigned int *count)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_MBSTRING);
+ 	ZVAL_DEREF(var);
+ 
+ 	if (mb_check_stack_limit()) {
+@@ -3827,6 +3829,7 @@
+ 
+ static bool mb_recursive_convert_variable(zval *var, const mbfl_encoding* from_encoding, const mbfl_encoding* to_encoding)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_MBSTRING);
+ 	zval *entry, *orig_var;
+ 
+ 	if (mb_check_stack_limit()) {
+--- a/ext/pcre/php_pcre.c
++++ b/ext/pcre/php_pcre.c
+@@ -1631,6 +1631,7 @@
+ /* Return NULL if an exception has occurred */
+ static zend_string *preg_do_repl_func(zend_fcall_info *fci, zend_fcall_info_cache *fcc, const char *subject, PCRE2_SIZE *offsets, zend_string **subpat_names, uint32_t num_subpats, int count, const PCRE2_SPTR mark, zend_long flags)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_PREG_CALLBACK);
+ 	zend_string *result_str = NULL;
+ 	zval		 retval;			/* Function return value */
+ 	zval	     arg;				/* Argument to pass to function */
+--- a/ext/spl/spl_heap.c
++++ b/ext/spl/spl_heap.c
+@@ -121,6 +121,7 @@
+ /* }}} */
+ 
+ static zend_result spl_ptr_heap_cmp_cb_helper(zval *object, spl_heap_object *heap_object, zval *a, zval *b, zend_long *result) { /* {{{ */
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_HEAP_COMPARE);
+ 	zval zresult;
+ 
+ 	zend_call_method_with_2_params(Z_OBJ_P(object), heap_object->std.ce, &heap_object->fptr_cmp, "compare", &zresult, a, b);
+--- a/ext/standard/array.c
++++ b/ext/standard/array.c
+@@ -608,6 +608,7 @@
+ 
+ PHPAPI zend_long php_count_recursive(HashTable *ht) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_COUNT);
+ 	zend_long cnt = 0;
+ 	zval *element;
+ 
+@@ -836,6 +837,7 @@
+ 
+ static inline int php_array_user_compare_unstable(Bucket *f, Bucket *s) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_USER_COMPARE);
+ 	zval args[2];
+ 	zval retval;
+ 
+@@ -941,6 +943,7 @@
+ 
+ static inline int php_array_user_key_compare_unstable(Bucket *f, Bucket *s) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_USER_COMPARE);
+ 	zval args[2];
+ 	zval retval;
+ 
+@@ -1454,6 +1457,7 @@
+ static zend_result php_array_walk(
+ 	php_array_walk_context *context, zval *array, zval *userdata, bool recursive)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_WALK);
+ 	zval args[3],		/* Arguments to userland function */
+ 		 retval,		/* Return value - unused */
+ 		 *zv;
+@@ -2702,6 +2706,7 @@
+ 
+ static zend_result php_compact_var(HashTable *eg_active_symbol_table, zval *return_value, zval *entry, uint32_t pos) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_COMPACT);
+ 	zval *value_ptr, data;
+ 
+ 	ZVAL_DEREF(entry);
+@@ -4197,6 +4202,7 @@
+ 
+ PHPAPI int php_array_replace_recursive(HashTable *dest, HashTable *src) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_REPLACE);
+ 	zval *src_entry, *dest_entry, *src_zval, *dest_zval;
+ 	zend_string *string_key;
+ 	zend_ulong num_key;
+@@ -5177,6 +5183,7 @@
+ 
+ static int zval_user_compare(zval *a, zval *b) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_USER_COMPARE);
+ 	zval args[2];
+ 	zval retval;
+ 
+--- a/ext/standard/http.c
++++ b/ext/standard/http.c
+@@ -98,6 +98,7 @@
+ 				const zend_string *key_prefix,
+ 				zval *type, const zend_string *arg_sep, int enc_type)
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_HTTP_QUERY);
+ 	zend_string *key = NULL;
+ 	const char *prop_name;
+ 	size_t prop_len;
+--- a/ext/standard/var.c
++++ b/ext/standard/var.c
+@@ -44,6 +44,7 @@
+ 
+ static void php_array_element_dump(zval *zv, zend_ulong index, zend_string *key, int level) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_VAR_DUMP);
+ #ifdef ZEND_CHECK_STACK_LIMIT
+ 	if (UNEXPECTED(zend_call_stack_overflowed(EG(stack_limit)))) {
+ 		php_printf("%*cnesting level too deep", level + 1, ' ');
+@@ -63,6 +64,7 @@
+ 
+ static void php_object_property_dump(zend_property_info *prop_info, zval *zv, zend_ulong index, zend_string *key, int level) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_VAR_DUMP);
+ 	const char *prop_name, *class_name;
+ 
+ #ifdef ZEND_CHECK_STACK_LIMIT
+@@ -264,6 +266,7 @@
+ 
+ static void zval_array_element_dump(zval *zv, zend_ulong index, zend_string *key, int level) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_ZVAL_DUMP);
+ #ifdef ZEND_CHECK_STACK_LIMIT
+ 	if (UNEXPECTED(zend_call_stack_overflowed(EG(stack_limit)))) {
+ 		php_printf("%*cnesting level too deep", level + 1, ' ');
+@@ -283,6 +286,7 @@
+ 
+ static void zval_object_property_dump(zend_property_info *prop_info, zval *zv, zend_ulong index, zend_string *key, int level) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_ZVAL_DUMP);
+ 	const char *prop_name, *class_name;
+ 
+ #ifdef ZEND_CHECK_STACK_LIMIT
+@@ -1119,6 +1123,7 @@
+ 
+ static void php_var_serialize_intern(smart_str *buf, zval *struc, php_serialize_data_t var_hash, bool in_rcn_array, bool is_root) /* {{{ */
+ {
++	ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_SERIALIZE);
+ 	zend_long var_already;
+ 	HashTable *myht;
  

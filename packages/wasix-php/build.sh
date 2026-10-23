@@ -188,7 +188,7 @@ if [[ -z "$REUSE" ]]; then
   grep -q 'php_wasix_env_proxy' "$SRC/ext/standard/http_fopen_wrapper.c"
   grep -q '(defined(__aarch64__) && defined(__APPLE__)) || defined(__wasi__)' "$SRC/Zend/zend_execute_API.c"
   grep -q 'zend_call_stack_get_wasi' "$SRC/Zend/zend_call_stack.c"
-  grep -q 'ZEND_WASI_CALL_STACK_FRAME' "$SRC/Zend/zend_call_stack.h"
+  grep -q 'ZEND_WASI_STACK_PAD' "$SRC/Zend/zend_call_stack.h"
 fi
 SOURCE_DATE_EPOCH="$(cat "$BUILD/source-date-epoch")"
 export SOURCE_DATE_EPOCH
@@ -337,12 +337,41 @@ if pages is None or pages * 65536 != initial:
 print(f"php.wasm: no build paths, slicc.libc wasix-sysroot {sysroot}, asyncify, {pages} initial pages")
 PY
 
-python3 - "$DEST/bin/php.wasm" <<'PY'
-import sys
+python3 - "$DEST/bin/php.wasm" "$SRC" <<'PY'
+import re, sys
 from pathlib import Path
 d = Path(sys.argv[1]).read_bytes()
-checked = ("execute_ex", "zend_hash_compare", "zend_std_compare_objects", "php_var_serialize_intern")
-pad = 2048
+src = Path(sys.argv[2])
+inlined = {
+    "zend_compile_var": ("zend_delayed_compile_var",),
+    "php_array_element_dump": ("php_var_dump",),
+    "php_object_property_dump": ("php_var_dump",),
+    "preg_do_repl_func": ("php_pcre_replace_func_impl",),
+    "spl_ptr_heap_cmp_cb_helper": ("spl_ptr_heap_zval_max_cmp", "spl_ptr_heap_zval_min_cmp"),
+}
+pads = {k: int(v) for k, v in re.findall(r"^# define ZEND_WASI_PAD_(\w+) (\d+)$", (src / "Zend/zend_call_stack.h").read_text(), re.M)}
+if not pads:
+    raise SystemExit("homescoop wasix-php: Zend/zend_call_stack.h defines no ZEND_WASI_PAD_* (patches/0009)")
+sites = {}
+for path in sorted(list(src.glob("Zend/*.[ch]")) + list(src.glob("ext/*/*.[ch]"))):
+    text = path.read_text(errors="replace")
+    if "ZEND_WASI_STACK_PAD(ZEND_WASI_PAD_" not in text:
+        continue
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        m = re.fullmatch(r"\tZEND_WASI_STACK_PAD\(ZEND_WASI_PAD_(\w+)\);", line)
+        if not m:
+            continue
+        j = i
+        while j >= 0 and not re.match(r"^[A-Za-z][^(;]*?(\w+)\(", lines[j]):
+            j -= 1
+        fn = re.match(r"^[A-Za-z][^(;]*?(\w+)\(", lines[j]).group(1)
+        if m.group(1) not in pads:
+            raise SystemExit(f"homescoop wasix-php: {fn} pads ZEND_WASI_PAD_{m.group(1)}, which zend_call_stack.h doesn't define")
+        sites[fn] = (m.group(1), pads[m.group(1)])
+unused = sorted(set(pads) - {k for k, _ in sites.values()})
+if unused or len(sites) < 41:
+    raise SystemExit(f"homescoop wasix-php: patches/0009 pads {len(sites)} functions (41 expected), and no function uses ZEND_WASI_PAD_{unused}")
 def uleb(buf, i):
     r = s = 0
     while True:
@@ -408,13 +437,10 @@ bodies = []
 for _ in range(cnt):
     sz, p = uleb(d, p)
     bodies.append((p, p + sz)); p += sz
-report = []
-for name in checked:
-    if name not in funcs:
-        raise SystemExit(f"homescoop wasix-php: php.wasm's name section has no {name}")
+def frame(name):
     s, e = bodies[funcs[name] - imports]
     b = d[s:e]
-    frames = []
+    frames = [0]
     i = b.find(get)
     while i >= 0:
         j = i + 2
@@ -425,10 +451,19 @@ for name in checked:
             if b[k] == 0x6B:
                 frames.append(v)
         i = b.find(get, i + 1)
-    if not frames or max(frames) < pad:
-        raise SystemExit(f"homescoop wasix-php: {name} takes {max(frames) if frames else 0} bytes of shadow stack, not patches/0009's {pad}-byte ZEND_WASI_CALL_STACK_FRAME, so the stack check no longer counts its levels")
-    report.append(f"{name} {max(frames)}")
-print("php.wasm: patches/0009's 2 KiB stack check frame in " + ", ".join(report))
+    return max(frames)
+problems = []
+for fn, (name, pad) in sorted(sites.items()):
+    holders = (fn,) if fn in funcs else inlined.get(fn, ())
+    if not holders or any(h not in funcs for h in holders):
+        problems.append(f"no {fn} in php.wasm's name section, and build.sh names no function it is inlined into (ZEND_WASI_PAD_{name})")
+        continue
+    for h in holders:
+        if frame(h) < pad:
+            problems.append(f"{h} takes {frame(h)} bytes of shadow stack, under {fn}'s {pad}-byte ZEND_WASI_PAD_{name}")
+if problems:
+    raise SystemExit(f"homescoop wasix-php: patches/0009's stack pads are missing from php.wasm, so the stack check no longer counts the browser's stack ({len(problems)} problems): " + "; ".join(problems))
+print(f"php.wasm: patches/0009's stack pads in {len(sites)} functions ({len(pads)} sizes), each frame at least its pad: execute_ex {frame('execute_ex')}, php_var_serialize_intern {frame('php_var_serialize_intern')}, zend_hash_compare {frame('zend_hash_compare')}, php_array_user_compare_unstable {frame('php_array_user_compare_unstable')}")
 PY
 
 # --- licences, notices, sources ----------------------------------------------
