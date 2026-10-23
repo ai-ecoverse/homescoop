@@ -13,7 +13,7 @@
     "@ai-ecoverse/wasix-python@3.15.0-4"
   ],
   "checklist": [
-    "sqlite3 -version and sqlite_version() are 3.54.0",
+    "sqlite3 -version and sqlite_version() report the upstream the installed package.json homescoop.upstream names, the version it was built from (3.54.1-1, homescoop#1791: no version literal in the spec, so an upstream bump needs no cert edit)",
     "a file database written by one sqlite3 process is read by the next (count, sum)",
     "-csv -header and -json output, a dot-command script on stdin (list mode, separator, group_concat, a window function), .import --csv",
     "compiled-in FTS5, RTREE, math functions and JSON",
