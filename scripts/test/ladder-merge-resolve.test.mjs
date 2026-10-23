@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix, sep } from 'node:path';
 import { describe, it } from 'node:test';
 import { LADDER, PUBLISH_PATH, candidateProblems, changedFiles, githubApi, parseArgs, publishPathProblem, resolvePackage, touchingCommit } from '../ladder-merge-resolve.mjs';
 import { job } from './ladder-workflow.mjs';
@@ -279,7 +279,8 @@ describe('a PR that changes the publish path (homescoop#1712)', () => {
   });
 
   it('NEGATIVE: every publish-path file alone is enough to refuse', async () => {
-    for (const file of PUBLISH_PATH) {
+    for (const entry of PUBLISH_PATH) {
+      const file = entry.endsWith('/') ? `${entry}page.js` : entry;
       await assert.rejects(resolvePackage(ctx, fakeIo({ ...green, files: [...pkgFiles, file] })), new RegExp(`changes the publish path \\(${file.replace(/[.]/g, '\\.')}\\)`), file);
     }
   });
@@ -310,22 +311,56 @@ describe('a PR that changes the publish path (homescoop#1712)', () => {
     assert.match(publishPathProblem(['scripts/gate.mjs', 'scripts/oidc-publish.sh', 'README.md'], who), /^PR #7 changes the publish path \(scripts\/gate\.mjs, scripts\/oidc-publish\.sh\) and/);
   });
 
-  it('the list covers every script the publish and group jobs run, and the scripts those load', () => {
+  it('the list covers every script the publish and group jobs run, the review browser, and every file those load', () => {
     const root = join(import.meta.dirname, '..', '..');
-    const entries = [job('publish'), job('group')].flatMap((t) => [...t.matchAll(/scripts\/([a-z0-9-]+\.(?:mjs|sh))/g)].map((m) => m[1]));
-    assert.ok(entries.includes('ladder-merge-resolve.mjs') && entries.includes('oidc-publish.sh') && entries.includes('merge-group-check.mjs'), entries.join());
-    const loads = /(?:from '\.\/|join\(\w+, '(?:scripts\/)?|node\('|"\$\(dirname "\$0"\)\/)([a-z0-9-]+\.mjs)/g;
+    const entries = [job('publish'), job('group')].flatMap((t) => [...t.matchAll(/scripts\/([a-z0-9-]+\.(?:mjs|sh))/g)].map((m) => `scripts/${m[1]}`));
+    assert.ok(entries.includes('scripts/ladder-merge-resolve.mjs') && entries.includes('scripts/oidc-publish.sh') && entries.includes('scripts/merge-group-check.mjs'), entries.join());
+    const review = readFileSync(join(root, LADDER), 'utf8').match(/review-browser: node "\$GITHUB_WORKSPACE\/(scripts\/[a-z0-9/-]+\.mjs)"/);
+    assert.ok(review, 'ladder-build.yml passes the pipeline a review-browser script');
+    const flat = /(?:join\(\w+, '(?:scripts\/)?|node\('|"\$\(dirname "\$0"\)\/)([a-z0-9-]+\.mjs)/g;
+    const relative = /(?:from |import\()'(\.\.?\/[a-z0-9./-]+)'/g;
+    const joined = /join\((\w+)((?:, '[a-z0-9.-]+'){2,})\)/g;
+    const loadsOf = (f, text) => [
+      ...[...text.matchAll(flat)].map((m) => `scripts/${m[1]}`),
+      ...[...text.matchAll(relative)].map((m) => posix.join(posix.dirname(f), m[1])),
+      ...[...text.matchAll(joined)].flatMap((m) => {
+        const parts = [...m[2].matchAll(/'([^']+)'/g)].map((q) => q[1]);
+        if (parts[0] === 'scripts') return [posix.join(...parts)];
+        if (m[1] === 'here') return [posix.join(posix.dirname(f), ...parts)];
+        return [];
+      }).filter((p) => existsSync(join(root, p))),
+    ];
     const seen = new Set();
-    const todo = [...entries, 'list-touched-packages.mjs'];
+    const dirs = new Set();
+    const todo = [...entries, 'scripts/list-touched-packages.mjs', review[1]];
     while (todo.length) {
       const f = todo.pop();
-      if (seen.has(f)) continue;
+      if (seen.has(f) || dirs.has(f)) continue;
+      if (statSync(join(root, f)).isDirectory()) {
+        dirs.add(f);
+        for (const name of readdirSync(join(root, f), { recursive: true })) {
+          if (statSync(join(root, f, name)).isFile()) todo.push(posix.join(f, name.split(sep).join('/')));
+        }
+        continue;
+      }
       seen.add(f);
-      for (const m of readFileSync(join(root, 'scripts', f), 'utf8').matchAll(loads)) todo.push(m[1]);
+      if (/\.(?:mjs|js|sh)$/.test(f)) todo.push(...loadsOf(f, readFileSync(join(root, f), 'utf8')));
     }
-    const missing = [...seen].map((f) => `scripts/${f}`).filter((f) => !PUBLISH_PATH.includes(f));
-    assert.deepEqual(missing, []);
-    for (const f of [LADDER, 'scripts/review-browser.mjs']) assert.ok(PUBLISH_PATH.includes(f), f);
+    for (const f of ['scripts/review-browser.mjs', 'scripts/browser-cert/context.mjs', 'scripts/browser-cert/page/page.js', 'scripts/browser-cert/page/index.html', 'scripts/npm-publish.mjs']) assert.ok(seen.has(f), `the closure reaches ${f}`);
+    assert.ok(dirs.has('scripts/browser-cert/page'), 'the closure reaches the review page directory');
+    const gated = (f) => publishPathProblem([f], { number: 1, name: NAME, version: VERSION }) !== '';
+    assert.deepEqual([...seen].filter((f) => !gated(f)), []);
+    assert.deepEqual([...dirs].filter((d) => !gated(`${d}/a-file-added-later.js`)), []);
+    assert.ok(gated(LADDER));
+  });
+
+  it('NEGATIVE: a PR that edits the review page and releases a package is refused', async () => {
+    for (const file of ['scripts/browser-cert/page/page.js', 'scripts/browser-cert/page/index.html', 'scripts/browser-cert/page/new.js', 'scripts/browser-cert/context.mjs']) {
+      const problem = publishPathProblem([...pkgFiles, file], { number: 336, name: NAME, version: VERSION });
+      assert.match(problem, new RegExp(`^PR #336 changes the publish path \\(${file.replace(/[.]/g, '\\.')}\\) and releases`), file);
+      await assert.rejects(resolvePackage(ctx, fakeIo({ ...green, files: [...pkgFiles, file] })), /homescoop#1712/, file);
+    }
+    assert.equal(publishPathProblem(['scripts/browser-cert/pages.js', 'scripts/browser-cert/run.mjs', 'scripts/browser-cert/page'], { number: 336, name: NAME, version: VERSION }), '');
   });
 
   it('changedFiles is the PR range base...head, with both sides of a rename', () => {

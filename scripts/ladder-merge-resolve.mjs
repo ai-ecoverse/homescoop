@@ -41,10 +41,16 @@ export const PUBLISH_PATH = [
   'scripts/diff-published.mjs',
   'scripts/check-exact-pins.mjs',
   'scripts/review-browser.mjs',
+  'scripts/browser-cert/context.mjs',
+  'scripts/browser-cert/page/',
 ];
 
+function onPublishPath(file) {
+  return PUBLISH_PATH.some((p) => (p.endsWith('/') ? file.startsWith(p) : file === p));
+}
+
 export function publishPathProblem(files, { number, name, version }) {
-  const gate = files.filter((f) => PUBLISH_PATH.includes(f));
+  const gate = files.filter(onPublishPath);
   if (!gate.length) return '';
   return `PR #${number} changes the publish path (${gate.join(', ')}) and releases ${name}@${version}. Its green pull_request run ran that PR's own copy of the gate, so it vouches for nothing (homescoop#1712). A publish-path change merges without publishing anything: land it in a PR that releases no package, and release ${name} from a later PR`;
 }

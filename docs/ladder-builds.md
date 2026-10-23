@@ -94,12 +94,16 @@ green run says nothing about a gate it replaces. When the PR's `base...head`
 range touches the publish path (`PUBLISH_PATH` in
 `scripts/ladder-merge-resolve.mjs`: `ladder-build.yml`, the resolve and
 merge-group scripts, everything the `publish` and `group` jobs run and load,
-and `scripts/review-browser.mjs`) and the PR would release a package, the
+and the review browser: `scripts/review-browser.mjs`, which the pipeline runs
+from the PR's own checkout for both sides, with what it loads,
+`scripts/browser-cert/context.mjs` and every file under
+`scripts/browser-cert/page/`, matched by prefix) and the PR would release a package, the
 resolve refuses it, and so does the merge-group check, which resolves each
 member the same way. Land the publish-path change in a PR that releases no
 package (it merges normally and publishes nothing), then release the package
 from a later PR. `scripts/test/ladder-merge-resolve.test.mjs` checks that the
-list covers every script those jobs run.
+list covers every script those jobs and the review browser run, following
+relative imports and directory loads such as the page directory (#1739).
 
 There is no other path: no certification record from another workflow, no
 dispatch to another workflow. The bytes that ship are the bytes the reviewers
