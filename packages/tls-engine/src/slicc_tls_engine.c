@@ -937,6 +937,11 @@ EMSCRIPTEN_KEEPALIVE int tls_server_select(session *s, leaf *l, const unsigned c
       (alpn_len > 0 && (!alpn || alpn_len >= sizeof s->alpn_buf || memchr(alpn, 0, alpn_len) ||
                         !alpn_offered(s, alpn, alpn_len))))
     return last_error = TLS_BADARG;
+  if (chosen != s->leaf) {
+    chosen->refs++;
+    if (s->leaf) leaf_release(s->leaf);
+    s->leaf = chosen;
+  }
   int ret = mbedtls_ssl_conf_own_cert(&s->config, &chosen->chain, &chosen->key);
   if (ret == 0 && alpn_len > 0) {
     memcpy(s->alpn_buf, alpn, alpn_len);
@@ -946,11 +951,6 @@ EMSCRIPTEN_KEEPALIVE int tls_server_select(session *s, leaf *l, const unsigned c
     ret = mbedtls_ssl_conf_alpn_protocols(&s->config, s->alpn);
   }
   if (ret != 0) return refuse(s, MBEDTLS_SSL_ALERT_MSG_INTERNAL_ERROR);
-  if (chosen != s->leaf) {
-    chosen->refs++;
-    if (s->leaf) leaf_release(s->leaf);
-    s->leaf = chosen;
-  }
   s->select = SELECT_DONE;
   return 0;
 }
@@ -962,9 +962,12 @@ EMSCRIPTEN_KEEPALIVE int tls_server_refuse(session *s, int alert) {
     case MBEDTLS_SSL_ALERT_MSG_ACCESS_DENIED:
     case MBEDTLS_SSL_ALERT_MSG_INTERNAL_ERROR:
     case MBEDTLS_SSL_ALERT_MSG_UNRECOGNIZED_NAME:
-    case MBEDTLS_SSL_ALERT_MSG_NO_APPLICATION_PROTOCOL:
+    case MBEDTLS_SSL_ALERT_MSG_NO_APPLICATION_PROTOCOL: {
+      int before = last_error;
       refuse(s, alert);
+      last_error = before;
       return 0;
+    }
   }
   return last_error = TLS_BADARG;
 }

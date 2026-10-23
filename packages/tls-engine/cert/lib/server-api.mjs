@@ -866,7 +866,20 @@ describe('SELECT: the leaf and ALPN chosen after the ClientHello (homescoop#1766
     test(`over ${version}: tls_server_refuse sends unrecognized_name (112) and no_application_protocol (120), which the client reads`, async () => {
       for (const alert of [112, 120, 40]) {
         const s = selectServer();
-        const r = await serve(s, { servername: 'nobody.test', ca: aCert.pem, ALPNProtocols: ['h2'], minVersion: version, maxVersion: version, onSelect: (session) => assert.equal(session.refuse(alert), 0) });
+        let errorAfter;
+        const r = await serve(s, {
+          servername: 'nobody.test',
+          ca: aCert.pem,
+          ALPNProtocols: ['h2'],
+          minVersion: version,
+          maxVersion: version,
+          onSelect(session) {
+            assert.equal(engine.with(Buffer.from('x'), (p) => engine.m._tls_client_new(0, p, 0, 0, 99)), 0);
+            assert.equal(session.refuse(alert), 0);
+            errorAfter = engine.error;
+          },
+        });
+        assert.equal(errorAfter, BADARG, 'a successful tls_server_refuse leaves tls_last_error alone');
         assert.equal(r.ok, false);
         assert.match(String(r.err?.message), new RegExp(`SSL alert number ${alert}\\b`), `${r.err?.code} ${r.err?.message}`);
         assert.ok(s.handshake() < 0, 'a refused session stays refused');
