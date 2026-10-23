@@ -239,3 +239,31 @@ AssertionError [ERR_ASSERTION]: 4.2.0-7 has no _tls_leaf_import
 ```
 
 - **4.2.0-8 as built:** server-api 14/14, and engine-api 19/19 and client-api 33/33 unchanged (the MITM `tls_leaf_new`/`tls_session_new` path and the client sessions behave as before; `tls_client_cert` now shares its parsing and key-match code with `tls_leaf_import`). The wasm grows by 663 bytes (316479 to 317142).
+
+## 4.2.0-9: refusal alerts (homescoop#1765) and SELECT after the ClientHello (homescoop#1766; 2026-10-23)
+
+The base is homescoop origin/main ec2b7f3d, with `host-run.sh` builds (emsdk 4.0.23), Node 26 and OpenSSL 4.0.3's `openssl s_client`.
+
+- **The published 4.2.0-8** (`npm pack @ai-ecoverse/wasm-tls-engine@4.2.0-8`, sha256 beb44dc7…) fails every #1765 case but the six whose alert it already sent (TLS 1.2 with a bad certificate, to s_client and Node, and the ALPN mismatches), and the #1766 block in its `before` hook (no `_tls_server_select`), so `node --test packages/tls-engine/cert/lib/server-api.mjs` exits 1:
+
+```text
+✖ REQUIRE_CERT over TLSv1.3, no certificate: openssl s_client reads alert 116, never a bad record MAC
+  807F2EFD01000000:error:0A000119:SSL routines:tls_get_more_records:decryption failed or bad record mac
+✖ REQUIRE_CERT over TLSv1.3, no certificate: Node's tls.connect fails with alert 116
+  ERR_SSL_DECRYPTION_FAILED_OR_BAD_RECORD_MAC
+✖ REQUIRE_CERT over TLSv1.2, no certificate: openssl s_client reads alert 40, never a bad record MAC
+  error:0A000126:SSL routines::unexpected eof while reading
+✖ REQUIRE_CERT over TLSv1.2, no certificate: Node's tls.connect fails with alert 40
+  ECONNRESET
+✖ the engine's own client: tls_last_alert is 116 on the read after a TLS 1.3 handshake without a certificate, …
+✖ SELECT: the leaf and ALPN chosen after the ClientHello (homescoop#1766)
+  AssertionError [ERR_ASSERTION]: no _tls_server_select
+ℹ tests 40  ℹ pass 20  ℹ fail 9  ℹ cancelled 11
+```
+
+- **The 4.2.0-9 engine without `server-refusal-alerts.patch`** fails the same eight #1765 cases and the engine-client one, plus SELECT|REQUIRE_CERT (its 116), so the patch is what fixes them: `ℹ tests 40  ℹ pass 30  ℹ fail 10`.
+- **The causes:**
+  - **TLS 1.3:** Mbed TLS 4.2.0's server switches its outbound keys to the application traffic keys only at the handshake's end, after the client's Finished. RFC 8446 §7.1 has it send under them from its own Finished on, and the client reads them from there, so an alert refusing the client's Certificate, CertificateVerify or Finished was undecryptable. The patch switches them in `ssl_tls13_write_server_finished` and skips the second switch in `mbedtls_ssl_tls13_handshake_wrapup`, which would reset the record sequence number. A missing certificate was also alert 41 (no_certificate, SSL 3 only); it's 116 now.
+  - **TLS 1.2:** `mbedtls_ssl_parse_certificate` returned `NO_CLIENT_CERTIFICATE` without pending an alert; the patch pends 40 (handshake_failure).
+- **#1766:** 4.2.0-8 has no `tls_server_select`, `tls_server_refuse` or `tls_client_alpn`, and `tls_server_new` refuses flags 4. The refused-flags case of #1638 now tries 7, 8 and `REQUIRE_CERT | 4` without `client_ca` instead of 4.
+- **4.2.0-9 as built:** server-api 40/40 (14 from 4.2.0-8, 15 for #1765, 11 for #1766), client-api 33/33, engine-api 19/19. The wasm grows by 2306 bytes (317142 to 319448).
