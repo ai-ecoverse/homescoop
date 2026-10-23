@@ -145,21 +145,30 @@ export default async function (ctx) {
   }
 
   await write('home/v140/.env', 'FROMFILE=from-the-file\n');
+  await write('home/v140/conf/secrets.json', '{"FROMJSON": "from-the-json-file"}\n');
+  await write('home/v140/sub/dir/.keep', '');
   await write(
     'home/v140/fnox.toml',
     [
       '[providers.k8s]', 'type = "kubernetes"', '',
       '[providers.lua]', 'type = "lua"', 'plugin = "my-plugin"', '',
       '[providers.envfile]', 'type = "plain"', 'file = "/home/v140/.env"', 'format = "env"', '',
+      '[providers.jsonfile]', 'type = "plain"', 'file = "conf/secrets.json"', 'format = "json"', '',
       '[secrets]',
       'K8S = { provider = "k8s", value = "app-secret" }',
       'LUA = { provider = "lua", value = "app-secret" }',
-      'FROMFILE = { provider = "envfile", value = "FROMFILE" }', '',
+      'FROMFILE = { provider = "envfile", value = "FROMFILE" }',
+      'FROMJSON = { provider = "jsonfile", value = "FROMJSON" }', '',
     ].join('\n'),
   );
   const fromFile = await run(['fnox', 'get', 'FROMFILE'], { cwd: '/home/v140', env });
   assert.equal(fromFile.status, 0, `1.40.0 plain provider with a file: ${fromFile.stderr}`);
   assert.equal(fromFile.stdout.trim(), 'from-the-file', `1.40.0 plain provider reads the value from its file: ${fromFile.stdout}`);
+  for (const cwd of ['/home/v140', '/home/v140/sub/dir']) {
+    const rel = await run(['fnox', 'get', 'FROMJSON'], { cwd, env: { ...env, PWD: cwd } });
+    assert.equal(rel.status, 0, `1.40.0 plain provider with a relative json file, from ${cwd}: ${rel.stderr}`);
+    assert.equal(rel.stdout.trim(), 'from-the-json-file', `1.40.0 a relative plain file is read from the config's directory, not the cwd (${cwd}): ${rel.stdout}`);
+  }
   for (const [key, type] of [['K8S', 'kubernetes'], ['LUA', 'lua']]) {
     const r = await run(['fnox', 'get', key], { cwd: '/home/v140', env });
     assert.notEqual(r.status, 0, `1.40.0 ${type} provider must fail in the WASI build`);
@@ -176,16 +185,23 @@ export default async function (ctx) {
       '[providers.seven]', 'type = "sealed"', '',
       '[providers.k8s]', 'type = "kubernetes"', '',
       '[providers.lua]', 'type = "lua"', 'plugin = "my-plugin"', '',
+      '[providers.azsm]', 'type = "azure-sm"', 'vault_url = "https://example.vault.azure.net"', '',
       '[secrets]', 'GH = { provider = "seven", value = "seven_ph_gh_0001" }', '',
       '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', 'env = "GITHUB_TOKEN"', '',
     ].join('\n'),
   );
-  const k8sCreds = { FNOX_K8S_CONTEXT: 'k8s_context_ambient', KUBECONFIG: '/home/v140scrub/kubeconfig' };
+  const k8sCreds = {
+    FNOX_K8S_CONTEXT: 'k8s_context_ambient',
+    KUBECONFIG: '/home/v140scrub/kubeconfig',
+    AZURE_TENANT_ID: 'az_tenant_ambient',
+    AZURE_CLIENT_ID: 'az_client_ambient',
+    AZURE_CLIENT_SECRET: 'az_secret_ambient',
+  };
   const scrub140 = await run(['fnox', 'proxy', 'run', '--', 'printenv'], { cwd: '/home/v140scrub', env: { ...env, ...k8sCreds } });
-  assert.equal(scrub140.status, 0, `1.40.0 proxy run with a kubernetes and a lua provider: ${scrub140.stderr}`);
+  assert.equal(scrub140.status, 0, `1.40.0 proxy run with kubernetes, lua and azure-sm providers: ${scrub140.stderr}`);
   assert.match(scrub140.stdout, /^GITHUB_TOKEN=seven_ph_gh_0001$/m);
   for (const name of Object.keys(k8sCreds)) {
-    assert.doesNotMatch(scrub140.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed the kubernetes provider's ${name} to the child (homescoop#401)`);
+    assert.doesNotMatch(scrub140.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed a configured provider's ${name} to the child (homescoop#401)`);
   }
 
   await write('home/plain/fnox.toml', '[providers.plain]\ntype = "plain"\n\n[secrets]\nLOG_LEVEL = { provider = "plain", value = "debug" }\n');

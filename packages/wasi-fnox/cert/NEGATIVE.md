@@ -100,9 +100,9 @@ A first -6 build that only dropped the file secrets from the plan still passed `
 
 ## 1.40.0-1: the series on v1.40.0 (2026-10-23)
 
-The published 1.39.0-6 against 1.40.0-1's checklist (slicc-kernel 1.134.3, users kernel default): **FAIL, 7 of 111 assertions.**
+The published 1.39.0-6 against 1.40.0-1's checklist (slicc-kernel 1.134.3, users kernel default): **FAIL, 11 of 118 assertions.**
 - `fnox --version` prints 1.39.0.
-- A `fnox.toml` with a `kubernetes` or a `lua` provider, or a `plain` provider with `file` and `format`, doesn't parse (`unknown variant 'kubernetes'`). So `get` of the file-backed plain secret, the kubernetes provider's "not available in the WASI build" error and `proxy run` with those providers configured all fail.
+- A `fnox.toml` with a `kubernetes` or a `lua` provider, or a `plain` provider with `file` and `format`, doesn't parse (`unknown variant 'kubernetes'`). So `get` of the file-backed plain secrets (absolute and relative), the kubernetes provider's "not available in the WASI build" error and `proxy run` with those providers configured all fail.
 
 ## 1.40.0-1 without 0017: a plain provider with a file traps
 
@@ -118,3 +118,15 @@ fnox: wasm trap: unreachable
 ```
 
 With 0017 the checklist and `test/sealed.mjs` pass (slicc-kernel 1.134.3 and 1.83.0, macOS arm64).
+
+## 1.40.0-1: Azure's SERVICE_PRINCIPAL_ENV_VARS through 0002's const_list
+
+From v1.40.0, the Azure providers' `env_dependencies()` returns the constant `SERVICE_PRINCIPAL_ENV_VARS` (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`) instead of a literal list. 0002's build-time reader resolves that constant from azure_shared.rs. The checklist configures an `azure-sm` provider in `v140scrub` and asserts that `proxy run` keeps all three variables from the child.
+
+**No runtime leak can be shown.** A 1.40.0-1 build whose const_list returns `&[]` for every named constant was checked: the generated `env_dependencies()` had no AZURE name for azure-sm, azure-kms or azure-ac. That build still passes the checklist, all 118 assertions (slicc-kernel 1.134.3, 2026-10-23). The three names are also in `proxy run`'s fixed `AMBIENT_CREDENTIAL_ENV_VARS`, so the child never gets them either way. The row guards against upstream renaming the constant or the fixed list; it can't catch const_list alone.
+
+A const_list that is missing or broken fails the build instead. The 1.39.0 series' 0002 on v1.40.0 panics in build.rs with `src/providers/azure_kms.rs: env_dependencies() is not a literal list: SERVICE_PRINCIPAL_ENV_VARS`. A constant no provider module defines panics with `env_dependencies() names <X>, which no provider module defines`.
+
+## 1.40.0-1: a relative plain `file`
+
+`file = "conf/secrets.json"` (`format = "json"`) resolves against the config file's directory: `fnox get` prints the file's value from the project root and from `sub/dir`, with PWD set to each (0004's cwd). 1.39.0-6 fails both, because a `plain` provider with `file` doesn't parse.
