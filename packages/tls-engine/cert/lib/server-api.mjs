@@ -528,7 +528,7 @@ describe('tls_server_new: ALPN, SNI, client certificates (homescoop#1638)', () =
 
   test('refused: flags other than 0, REQUEST_CERT, REQUIRE_CERT and SELECT, a cert flag without client_ca, a leaf without a chain; tls_client_cert on a server session', () => {
     const leaf = imported(ecLeaf);
-    for (const [flags, ca] of [[3, clientStore], [7, clientStore], [8, clientStore], [-1, clientStore], [REQUEST_CERT, 0], [REQUIRE_CERT, 0], [REQUIRE_CERT | 4, 0]]) {
+    for (const [flags, ca] of [[3, clientStore], [7, clientStore], [16, clientStore], [-1, clientStore], [REQUEST_CERT, 0], [REQUIRE_CERT, 0], [REQUIRE_CERT | 4, 0]]) {
       assert.equal(engine.m._tls_server_new(leaf, 0, 0, ca, flags), 0, `flags ${flags} ca ${ca}`);
       assert.equal(engine.error, BADARG);
     }

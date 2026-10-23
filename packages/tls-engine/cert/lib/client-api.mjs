@@ -629,7 +629,7 @@ describe('client sessions (slicc-kernel#922)', () => {
     const expired = await attempt(old.port, 'client.test', { flags: CHAIN_ONLY });
     assert.equal(expired.result, VERIFY_FAILED);
     expired.wire.close();
-    for (const flags of [CHAIN_ONLY | INSECURE, CHAIN_ONLY | INSECURE | NO_SNI, 8, 16 | NO_SNI]) {
+    for (const flags of [CHAIN_ONLY | INSECURE, CHAIN_ONLY | INSECURE | NO_SNI, 16, 32 | NO_SNI]) {
       assert.equal(engine.client(trust, 'client.test', { flags }), null, `flags ${flags}`);
       assert.equal(engine.m._tls_last_error(), BADARG);
     }
@@ -722,7 +722,7 @@ describe('client sessions (slicc-kernel#922)', () => {
   });
 
   test('no session without a store or a server name while verification is required, nor with unknown flags', () => {
-    for (const [store, name, flags] of [[0, 'client.test', 0], [trust, '', 0], [trust, 'client.test', 8]]) {
+    for (const [store, name, flags] of [[0, 'client.test', 0], [trust, '', 0], [trust, 'client.test', 16]]) {
       assert.equal(engine.client(store, name, { flags }), null);
       assert.equal(engine.m._tls_last_error(), BADARG);
     }

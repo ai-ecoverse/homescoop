@@ -23,6 +23,10 @@ export interface TlsEngineModule {
   _tls_server_select(session: number, leaf: number, alpn: number, alpnLen: number): number;
   _tls_server_refuse(session: number, alert: number): number;
   _tls_client_alpn(session: number, out: number, max: number): number;
+  _tls_keylog(session: number, out: number, max: number): number;
+  _tls_test_keylog_armed(session: number): number;
+  _tls_test_keylog_residue(session: number): number;
+  _tls_test_keylog_cap(session: number, cap: number): number;
   /** Ciphertext from the client: how many bytes were taken. */
   _tls_feed(session: number, bytes: number, len: number): number;
   _tls_feed_eof(session: number): void;
