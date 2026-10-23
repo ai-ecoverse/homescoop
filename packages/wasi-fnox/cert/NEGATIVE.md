@@ -97,3 +97,24 @@ The published 1.39.0-5 against -6's checklist (slicc-kernel 1.134.3, users enfor
 
 A first -6 build that only dropped the file secrets from the plan still passed `CERT=pem-data` to the child: fnox's own environment held the resolved value. -6 removes the key from the child's environment.
 
+
+## 1.40.0-1: the series on v1.40.0 (2026-10-23)
+
+The published 1.39.0-6 against 1.40.0-1's checklist (slicc-kernel 1.134.3, users kernel default): **FAIL, 7 of 111 assertions.**
+- `fnox --version` prints 1.39.0.
+- A `fnox.toml` with a `kubernetes` or a `lua` provider, or a `plain` provider with `file` and `format`, doesn't parse (`unknown variant 'kubernetes'`). So `get` of the file-backed plain secret, the kubernetes provider's "not available in the WASI build" error and `proxy run` with those providers configured all fail.
+
+## 1.40.0-1 without 0017: a plain provider with a file traps
+
+The series on v1.40.0 without 0017 passes the checklist up to the new `file` case, where `fnox get FROMFILE` traps. v1.40.0's plain provider reads the file with tokio::fs, on a blocking-pool thread WASI can't spawn:
+
+```text
+AssertionError [ERR_ASSERTION]: 1.40.0 plain provider with a file: Error:   × Main thread panicked.
+  ├─▶ at /cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.2/
+  │   src/fs/mod.rs:317:11
+  ╰─▶ OS can't spawn worker thread: Not supported (os error 58)
+fnox: wasm trap: unreachable
+134 !== 0
+```
+
+With 0017 the checklist and `test/sealed.mjs` pass (slicc-kernel 1.134.3 and 1.83.0, macOS arm64).

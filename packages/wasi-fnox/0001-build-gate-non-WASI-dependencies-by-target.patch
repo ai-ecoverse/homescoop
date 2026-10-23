@@ -5,7 +5,9 @@ Subject: [PATCH 01/13] build: gate non-WASI dependencies by target
 
 Move dependencies that do not build for wasm32-wasip1 (cloud SDKs,
 reqwest, rustls/rcgen with aws-lc, keyring, TUI, prompts, signal
-handling, file locking, keepass, enpass) under
+handling, file locking, keepass, enpass, and since 1.40.0 the
+Kubernetes client (kube, k8s-openapi) and the vendored Lua 5.4 of the
+Lua plugin provider (mlua), which would need a C toolchain) under
 cfg(not(target_os = "wasi")). On WASI, age is built with ssh only and
 tokio with rt, macros, sync, time, io-util, fs and io-std. chrono's
 serde feature is now requested directly instead of through
@@ -14,7 +16,7 @@ feature unification.
 Native targets keep the same dependency set and features.
 
 diff --git a/Cargo.toml b/Cargo.toml
-index 8fbcd95..26f6f28 100644
+index 8976d8a6..a6003039 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -16,7 +16,7 @@ rust-version = "1.91.1"
@@ -26,16 +28,16 @@ index 8fbcd95..26f6f28 100644
  aho-corasick = "1"
  anyhow = "1"
  arboard = "3"
-@@ -35,7 +35,7 @@ azure_security_keyvault_secrets = { version = "1" }
+@@ -36,7 +36,7 @@ azure_security_keyvault_secrets = { version = "1" }
  base64 = "0.23"
  blake3 = "1"
  bytes = "1"
 -chrono = "0.4"
 +chrono = { version = "0.4", features = ["serde"] }
  ci_info = "0.14"
- usage-rs = { version = "6", features = ["diagnostics", "completions", "config"] }
+ usage-rs = { version = "7", features = ["diagnostics", "completions", "config"] }
  console = "0.16"
-@@ -99,7 +99,7 @@ tempfile = "3"
+@@ -104,7 +104,7 @@ tempfile = "3"
  tera = { version = "2", default-features = false }
  terminal_size = "0.4"
  thiserror = "2"
@@ -44,7 +46,7 @@ index 8fbcd95..26f6f28 100644
  tokio-rustls = "0.26"
  toml_edit = { version = "0.25", features = ["serde"] }
  tracing = "0.1"
-@@ -133,7 +133,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
+@@ -138,7 +138,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
  # transitively via fnox-core and are not listed here.
  aho-corasick = { workspace = true }
  anyhow = { workspace = true }
@@ -52,7 +54,7 @@ index 8fbcd95..26f6f28 100644
  atty = { workspace = true }
  base64 = { workspace = true }
  blake3 = { workspace = true }
-@@ -141,39 +140,45 @@ chrono = { workspace = true }
+@@ -146,39 +145,45 @@ chrono = { workspace = true }
  ci_info = { workspace = true }
  usage-rs = { workspace = true }
  console = { workspace = true }
@@ -111,10 +113,10 @@ index 8fbcd95..26f6f28 100644
  [dev-dependencies]
  tempfile = { workspace = true }
 diff --git a/crates/fnox-core/Cargo.toml b/crates/fnox-core/Cargo.toml
-index e5ed5eb..b17fd49 100644
+index 09af130f..24959bba 100644
 --- a/crates/fnox-core/Cargo.toml
 +++ b/crates/fnox-core/Cargo.toml
-@@ -11,47 +11,25 @@ readme = "../../README.md"
+@@ -11,50 +11,25 @@ readme = "../../README.md"
  
  [dependencies]
  aes-gcm = { workspace = true }
@@ -148,10 +150,13 @@ index e5ed5eb..b17fd49 100644
  hmac = { workspace = true }
  indexmap = { workspace = true }
 -jsonwebtoken = { workspace = true }
+-k8s-openapi = { workspace = true }
 -keepass = { workspace = true }
 -keeper-secrets-manager-core = { workspace = true }
 -keyring-core = { workspace = true }
+-kube = { workspace = true }
 -libloading = { workspace = true }
+-mlua = { workspace = true }
  miette = { workspace = true }
  pluralizer = { workspace = true }
  rand = { workspace = true }
@@ -162,7 +167,7 @@ index e5ed5eb..b17fd49 100644
  schemars = { workspace = true }
  serde = { workspace = true }
  serde_json = { workspace = true }
-@@ -64,16 +42,44 @@ strum = { workspace = true }
+@@ -68,16 +43,47 @@ strum = { workspace = true }
  tempfile = { workspace = true }
  tera = { workspace = true }
  thiserror = { workspace = true }
@@ -186,10 +191,13 @@ index e5ed5eb..b17fd49 100644
 +google-cloud-kms = { workspace = true }
 +google-cloud-secretmanager-v1 = { workspace = true }
 +jsonwebtoken = { workspace = true }
++k8s-openapi = { workspace = true }
 +keepass = { workspace = true }
 +keeper-secrets-manager-core = { workspace = true }
 +keyring-core = { workspace = true }
++kube = { workspace = true }
 +libloading = { workspace = true }
++mlua = { workspace = true }
 +reqwest = { workspace = true }
 +rusqlite = { workspace = true }
  xx = { workspace = true }

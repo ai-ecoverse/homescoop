@@ -3,7 +3,8 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Mon, 12 Oct 2026 14:38:10 +0200
 Subject: [PATCH 03/13] cli: compile out modules that cannot run on WASI
 
-On WASI the mcp, proxy, tui and daemon commands, the lease backend
+On WASI the mcp, proxy, tui, daemon and plugin commands (fnox-core's
+plugins module, which installs Lua plugins with git, since 1.40.0), the lease backend
 implementations, the shared HTTP client, the keyring store, credential
 commands and the interactive prompts (init wizard, auth retry, lease
 and secret value prompts) are not built. Leases fail with "leases are
@@ -12,7 +13,7 @@ asks for an argument or stdin, `fnox init` writes a minimal
 configuration, and the daemon is never started in the background.
 
 diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_prompt.rs
-index afc0f15..5d82beb 100644
+index afc0f153..5d82beb3 100644
 --- a/crates/fnox-core/src/auth_prompt.rs
 +++ b/crates/fnox-core/src/auth_prompt.rs
 @@ -6,6 +6,7 @@
@@ -44,7 +45,7 @@ index afc0f15..5d82beb 100644
          return Ok(false);
      }
 diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
-index 2484211..67a5450 100644
+index 24842115..67a54509 100644
 --- a/crates/fnox-core/src/http.rs
 +++ b/crates/fnox-core/src/http.rs
 @@ -9,6 +9,7 @@ fn configured_timeout(value: &str) -> Option<Duration> {
@@ -56,7 +57,7 @@ index 2484211..67a5450 100644
      let settings = crate::settings::Settings::get();
      let user_agent = format!("fnox/{}", env!("CARGO_PKG_VERSION"));
 diff --git a/crates/fnox-core/src/lease.rs b/crates/fnox-core/src/lease.rs
-index 829fc9a..06c8380 100644
+index 829fc9ad..06c83806 100644
 --- a/crates/fnox-core/src/lease.rs
 +++ b/crates/fnox-core/src/lease.rs
 @@ -42,6 +42,7 @@ pub struct LeaseLedger {
@@ -93,7 +94,7 @@ index 829fc9a..06c8380 100644
  
      /// Load the lease ledger from disk, creating an empty one if it doesn't exist.
 diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/src/lease_backends/aws_sts.rs
-index 58585fa..7742d79 100644
+index 58585fa6..7742d795 100644
 --- a/crates/fnox-core/src/lease_backends/aws_sts.rs
 +++ b/crates/fnox-core/src/lease_backends/aws_sts.rs
 @@ -1,7 +1,9 @@
@@ -139,19 +140,23 @@ index 58585fa..7742d79 100644
      let sanitized: String = name
          .chars()
 diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-core/src/lease_backends/azure_token.rs
-index 296a2fd..a63003e 100644
+index 4af1f536..9b154434 100644
 --- a/crates/fnox-core/src/lease_backends/azure_token.rs
 +++ b/crates/fnox-core/src/lease_backends/azure_token.rs
-@@ -1,6 +1,7 @@
+@@ -1,7 +1,10 @@
  use crate::error::{FnoxError, Result};
  use crate::lease_backends::{Lease, LeaseBackend};
+-use crate::providers::azure_shared::{self, AzureAuth};
++use crate::providers::azure_shared;
++#[cfg(not(target_os = "wasi"))]
++use crate::providers::azure_shared::AzureAuth;
  use async_trait::async_trait;
 +#[cfg(not(target_os = "wasi"))]
  use azure_core::credentials::TokenCredential;
  use indexmap::IndexMap;
  use std::sync::Arc;
-@@ -19,6 +20,9 @@ pub fn check_prerequisites() -> Option<String> {
-     if has_sp {
+@@ -16,6 +19,9 @@ pub fn check_prerequisites() -> Option<String> {
+     if azure_shared::service_principal_env().is_some() {
          return None;
      }
 +    #[cfg(target_os = "wasi")]
@@ -160,7 +165,7 @@ index 296a2fd..a63003e 100644
      let has_az = which::which("az").is_ok();
      if has_az {
          None
-@@ -35,11 +39,13 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+@@ -32,11 +38,13 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      ]
  }
  
@@ -174,7 +179,7 @@ index 296a2fd..a63003e 100644
  impl AzureTokenBackend {
      pub fn new(scope: String, env_var: String) -> Self {
          Self { scope, env_var }
-@@ -81,6 +87,7 @@ impl AzureTokenBackend {
+@@ -47,6 +55,7 @@ impl AzureTokenBackend {
      }
  }
  
@@ -183,7 +188,7 @@ index 296a2fd..a63003e 100644
  impl LeaseBackend for AzureTokenBackend {
      async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/cloudflare.rs b/crates/fnox-core/src/lease_backends/cloudflare.rs
-index 0430a13..bc1bd11 100644
+index 0430a134..bc1bd116 100644
 --- a/crates/fnox-core/src/lease_backends/cloudflare.rs
 +++ b/crates/fnox-core/src/lease_backends/cloudflare.rs
 @@ -74,6 +74,7 @@ pub struct CloudflarePermissionGroup {
@@ -203,7 +208,7 @@ index 0430a13..bc1bd11 100644
  impl LeaseBackend for CloudflareBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/command.rs b/crates/fnox-core/src/lease_backends/command.rs
-index 2384644..9cc671e 100644
+index 23846442..9cc671e0 100644
 --- a/crates/fnox-core/src/lease_backends/command.rs
 +++ b/crates/fnox-core/src/lease_backends/command.rs
 @@ -3,6 +3,7 @@ use crate::lease_backends::{Lease, LeaseBackend};
@@ -238,7 +243,7 @@ index 2384644..9cc671e 100644
  impl LeaseBackend for CommandBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/gcp_iam.rs b/crates/fnox-core/src/lease_backends/gcp_iam.rs
-index eddfb30..504d879 100644
+index eddfb30e..504d879a 100644
 --- a/crates/fnox-core/src/lease_backends/gcp_iam.rs
 +++ b/crates/fnox-core/src/lease_backends/gcp_iam.rs
 @@ -33,12 +33,14 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
@@ -265,7 +270,7 @@ index eddfb30..504d879 100644
  impl LeaseBackend for GcpIamBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/github_app.rs b/crates/fnox-core/src/lease_backends/github_app.rs
-index 14833e4..44d194b 100644
+index 14833e46..44d194b6 100644
 --- a/crates/fnox-core/src/lease_backends/github_app.rs
 +++ b/crates/fnox-core/src/lease_backends/github_app.rs
 @@ -40,6 +40,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
@@ -293,7 +298,7 @@ index 14833e4..44d194b 100644
  impl LeaseBackend for GitHubAppBackend {
      async fn create_lease(&self, _duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-core/src/lease_backends/github_oauth.rs
-index 45fd416..c6bd4cc 100644
+index 45fd4168..c6bd4cc3 100644
 --- a/crates/fnox-core/src/lease_backends/github_oauth.rs
 +++ b/crates/fnox-core/src/lease_backends/github_oauth.rs
 @@ -2,6 +2,7 @@ use crate::error::{FnoxError, Result};
@@ -412,7 +417,7 @@ index 45fd416..c6bd4cc 100644
      #[cfg(target_os = "macos")]
      {
 diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/lease_backends/mod.rs
-index 8da8d03..1211d21 100644
+index 8da8d034..1211d21c 100644
 --- a/crates/fnox-core/src/lease_backends/mod.rs
 +++ b/crates/fnox-core/src/lease_backends/mod.rs
 @@ -325,6 +325,15 @@ impl LeaseBackendConfig {
@@ -432,7 +437,7 @@ index 8da8d03..1211d21 100644
          match self {
              LeaseBackendConfig::AwsSts {
 diff --git a/crates/fnox-core/src/lease_backends/vault.rs b/crates/fnox-core/src/lease_backends/vault.rs
-index 7bcf100..88f642d 100644
+index 7bcf1009..88f642d4 100644
 --- a/crates/fnox-core/src/lease_backends/vault.rs
 +++ b/crates/fnox-core/src/lease_backends/vault.rs
 @@ -64,6 +64,7 @@ pub fn required_env_vars(
@@ -460,10 +465,10 @@ index 7bcf100..88f642d 100644
  impl LeaseBackend for VaultBackend {
      async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
-index 0f6dff8..40185d1 100644
+index 49823237..9ec8c1ff 100644
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
-@@ -11,10 +11,12 @@
+@@ -11,14 +11,17 @@
  pub mod auth_prompt;
  pub mod config;
  pub mod config_path;
@@ -476,8 +481,13 @@ index 0f6dff8..40185d1 100644
  pub(crate) mod keyring_store;
  pub mod lease;
  pub mod lease_backends;
+ pub mod library;
++#[cfg(not(target_os = "wasi"))]
+ pub mod plugins;
+ pub mod providers;
+ pub mod secret_file;
 diff --git a/src/commands/activate.rs b/src/commands/activate.rs
-index 10d7027..c94ce9a 100644
+index 10d70274..c94ce9a2 100644
 --- a/src/commands/activate.rs
 +++ b/src/commands/activate.rs
 @@ -27,9 +27,12 @@ impl ActivateCommand {
@@ -494,7 +504,7 @@ index 10d7027..c94ce9a 100644
          let opts = ActivateOptions {
              exe,
 diff --git a/src/commands/init.rs b/src/commands/init.rs
-index 3983cf4..4b5464d 100644
+index 3983cf47..4b5464df 100644
 --- a/src/commands/init.rs
 +++ b/src/commands/init.rs
 @@ -1,8 +1,11 @@
@@ -568,7 +578,7 @@ index 3983cf4..4b5464d 100644
          &self,
          provider_name: &str,
 diff --git a/src/commands/lease.rs b/src/commands/lease.rs
-index f148214..27a0fe6 100644
+index c663af6b..a8c13b74 100644
 --- a/src/commands/lease.rs
 +++ b/src/commands/lease.rs
 @@ -254,6 +254,12 @@ impl LeaseCreateCommand {
@@ -585,7 +595,7 @@ index f148214..27a0fe6 100644
                              .placeholder("paste value here")
                              .run()
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 7013233..406d24e 100644
+index dd6c46c2..b7ad93cf 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
 @@ -9,6 +9,7 @@ pub mod check;
@@ -596,19 +606,21 @@ index 7013233..406d24e 100644
  pub mod daemon;
  pub mod deactivate;
  pub mod doctor;
-@@ -22,9 +23,11 @@ pub mod import;
+@@ -22,10 +23,13 @@ pub mod import;
  pub mod init;
  pub mod lease;
  pub mod list;
 +#[cfg(not(target_os = "wasi"))]
  pub mod mcp;
++#[cfg(not(target_os = "wasi"))]
+ pub mod plugin;
  pub mod profiles;
  pub mod provider;
 +#[cfg(not(target_os = "wasi"))]
  pub mod proxy;
  pub mod reencrypt;
  pub mod remove;
-@@ -33,6 +36,7 @@ pub mod schema;
+@@ -34,6 +38,7 @@ pub mod schema;
  pub mod set;
  pub mod sponsors;
  pub mod sync;
@@ -616,7 +628,7 @@ index 7013233..406d24e 100644
  pub mod tui;
  pub mod usage;
  pub mod version;
-@@ -108,6 +112,7 @@ pub enum Commands {
+@@ -109,6 +114,7 @@ pub enum Commands {
      ConfigFiles(config_files::ConfigFilesCommand),
  
      /// Manage the per-user daemon
@@ -624,15 +636,19 @@ index 7013233..406d24e 100644
      Daemon(daemon::DaemonCommand),
  
      /// Disable fnox shell integration in the current shell session
-@@ -148,6 +153,7 @@ pub enum Commands {
+@@ -149,9 +155,11 @@ pub enum Commands {
      List(list::ListCommand),
  
      /// Start an MCP server that brokers secrets to AI agents
 +    #[cfg(not(target_os = "wasi"))]
      Mcp(mcp::McpCommand),
  
+     /// Manage Lua provider plugins
++    #[cfg(not(target_os = "wasi"))]
+     Plugin(plugin::PluginCommand),
+ 
      /// List available profiles
-@@ -157,6 +163,7 @@ pub enum Commands {
+@@ -161,6 +169,7 @@ pub enum Commands {
      Provider(provider::ProviderCommand),
  
      /// Broker credentials into destination-scoped HTTPS requests
@@ -640,7 +656,7 @@ index 7013233..406d24e 100644
      Proxy(proxy::ProxyCommand),
  
      /// Re-encrypt secrets with current provider configuration
-@@ -182,6 +189,7 @@ pub enum Commands {
+@@ -186,6 +195,7 @@ pub enum Commands {
      Sync(sync::SyncCommand),
  
      /// Interactive TUI dashboard for managing secrets
@@ -648,7 +664,7 @@ index 7013233..406d24e 100644
      Tui(tui::TuiCommand),
  
      /// Generate usage specification
-@@ -297,6 +305,7 @@ impl Commands {
+@@ -301,9 +311,11 @@ impl Commands {
              Commands::Init(cmd) => cmd.run(cli).await,
              Commands::Completion(cmd) => cmd.run(cli).await,
              Commands::ConfigFiles(cmd) => cmd.run(cli).await,
@@ -656,7 +672,11 @@ index 7013233..406d24e 100644
              Commands::Daemon(cmd) => cmd.run(cli).await,
              Commands::Schema(cmd) => cmd.run(cli).await,
              Commands::Sponsors(cmd) => cmd.run(cli).await,
-@@ -324,6 +333,7 @@ impl Commands {
++            #[cfg(not(target_os = "wasi"))]
+             Commands::Plugin(cmd) => cmd.run(cli).await,
+             Commands::Usage(cmd) => cmd.run(cli).await,
+             Commands::Activate(cmd) => cmd
+@@ -329,6 +341,7 @@ impl Commands {
              Commands::Import(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Lease(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::List(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -664,7 +684,7 @@ index 7013233..406d24e 100644
              Commands::Mcp(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Profiles(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Provider(cmd)
-@@ -332,6 +342,7 @@ impl Commands {
+@@ -337,6 +350,7 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -672,7 +692,7 @@ index 7013233..406d24e 100644
              Commands::Proxy(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
-@@ -340,6 +351,7 @@ impl Commands {
+@@ -345,6 +359,7 @@ impl Commands {
              Commands::Set(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Sync(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Scan(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -681,12 +701,12 @@ index 7013233..406d24e 100644
          }
      }
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index ae11999..cac7861 100644
+index 407eff51..5dd04d8f 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -148,12 +148,18 @@ impl SetCommand {
-                 .map_err(|source| FnoxError::StdinReadFailed { source })?;
-             Some(buffer.trim().to_string())
+@@ -154,12 +154,18 @@ impl SetCommand {
+             // Only metadata is being set, no secret value needed
+             None
          } else {
 +            #[cfg(target_os = "wasi")]
 +            return Err(FnoxError::Config(
@@ -704,10 +724,10 @@ index ae11999..cac7861 100644
          };
  
 diff --git a/src/daemon.rs b/src/daemon.rs
-index abd2895..a467d7a 100644
+index 6a4cac6c..d2a1f2e1 100644
 --- a/src/daemon.rs
 +++ b/src/daemon.rs
-@@ -464,6 +464,15 @@ pub async fn start_background(cli: &Cli, config: Option<&Config>) -> Result<bool
+@@ -468,6 +468,15 @@ pub async fn start_background(cli: &Cli, config: Option<&Config>) -> Result<bool
      start_background_for_context(&ResolveContext::from_cli(cli), config).await
  }
  
@@ -724,10 +744,24 @@ index abd2895..a467d7a 100644
      ctx: &ResolveContext,
      config: Option<&Config>,
 diff --git a/src/lib.rs b/src/lib.rs
-index c394301..2681b47 100644
+index ebbf403c..c4351624 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -15,9 +15,12 @@ pub mod child_env;
+@@ -6,19 +6,23 @@
+ // consumers and for our own modules.
+ 
+ pub use fnox_core::{
+-    auth_prompt, config, config_path, env, error, http, lease, lease_backends, library, plugins,
+-    providers, secret_file, secret_resolver, settings, source_registry, spanned, suggest,
+-    temp_file_secrets,
++    auth_prompt, config, config_path, env, error, http, lease, lease_backends, library, providers,
++    secret_file, secret_resolver, settings, source_registry, spanned, suggest, temp_file_secrets,
+ };
++#[cfg(not(target_os = "wasi"))]
++pub use fnox_core::plugins;
+ 
+ // CLI-only modules — depend on fnox-core for everything else.
+ pub mod child_env;
  pub mod commands;
  pub mod daemon;
  pub mod hook_env;
@@ -741,7 +775,7 @@ index c394301..2681b47 100644
  
  // Re-export commonly used items
 diff --git a/src/main.rs b/src/main.rs
-index 555a249..fbc65cb 100644
+index 555a249e..fbc65cbb 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -39,6 +39,7 @@ async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
