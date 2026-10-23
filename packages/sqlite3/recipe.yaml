@@ -5,10 +5,10 @@ runner: pool
 # renovate: datasource=github-tags depName=sqlite/sqlite extractVersion=^version-(?<version>.*)$
 version: "3.54.1"
 npm: "@ai-ecoverse/wasm-sqlite3"
-summary: "sqlite3 CLI 3.54.0 for slicc wasm realm"
+summary: "sqlite3 CLI 3.54.1 for slicc wasm realm"
 source:
   url: "https://www.sqlite.org/{{year}}/sqlite-amalgamation-{{amal}}.zip"
-  sha256: "68e913b0fe8ec6b4e5f391c594a28872884e80d6cd042a1e50c957be46b5aa4d"
+  sha256: "0a9c8e34352dad46006aa82836d5383bff9dc6bc9ce5a60553c05aa30e6ad1f9"
   year: "2026"
 dependencies:
   build: []

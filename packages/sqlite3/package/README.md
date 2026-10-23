@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-sqlite3`
 
-[SQLite](https://www.sqlite.org/) 3.54.0 command-line shell (`sqlite3.c` +
+[SQLite](https://www.sqlite.org/) 3.54.1 command-line shell (`sqlite3.c` +
 `shell.c` amalgamation) linked for [slicc](https://github.com/ai-ecoverse/slicc)'s
 wasm realm.
 
