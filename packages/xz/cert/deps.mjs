@@ -30,25 +30,35 @@ const TOOLS = {
   xzless: ['@ai-ecoverse/wasm-bash', '@ai-ecoverse/wasm-less'],
 };
 
+const SCOPE = '@ai-ecoverse/';
+
 export default async function (ctx) {
   const { run, assert } = ctx;
   const pkg = manifest(tarball());
   const meta = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'meta.json'), 'utf8'));
-  const deps = pkg.dependencies ?? {};
+  const peers = pkg.peerDependencies ?? {};
   const commands = pkg.slicc?.commands ?? {};
+  const nested = Object.entries(pkg.dependencies ?? {}).filter(([name]) => name.startsWith(SCOPE));
+  assert.deepEqual(nested, [], `package.json's dependencies name homescoop command packages, so npm nests its own copies under wasm-xz next to the top-level ones (slicc-bios#939): ${JSON.stringify(Object.fromEntries(nested))}`);
   for (const [cmd, tools] of Object.entries(TOOLS)) {
     assert.deepEqual(commands[cmd], { script: `bin/${cmd}` }, `${cmd} is a slicc.commands script entry: ${JSON.stringify(commands[cmd])}`);
-    for (const tool of tools) assert.ok(deps[tool], `${cmd} needs ${tool}, but package.json's dependencies are ${JSON.stringify(pkg.dependencies ?? null)}`);
+    for (const tool of tools) assert.ok(peers[tool], `${cmd} needs ${tool}, but package.json's peerDependencies are ${JSON.stringify(pkg.peerDependencies ?? null)}`);
   }
-  for (const [name, spec] of Object.entries(deps)) {
-    assert.match(spec, /^\d+\.\d+\.\d+-\d+$/, `${name} is pinned exactly, not ${spec}`);
+  const wanted = [...new Set(Object.values(TOOLS).flat())].sort();
+  assert.deepEqual(Object.keys(peers).sort(), wanted, 'the peers are exactly the packages the scripts call');
+  for (const [name, spec] of Object.entries(peers)) {
+    assert.equal(spec, '*', `${name} is peer "*", not ${JSON.stringify(spec)}: npm matches a range against a prerelease-style X.Y.Z-N only on the same X.Y.Z, so any other range rejects the next upstream's -1 with ERESOLVE`);
   }
-  const declared = Object.entries(deps).map(([name, spec]) => `${name}@${spec}`).sort();
-  assert.deepEqual([...meta.needsInstall].sort(), declared, "the cert installs exactly package.json's dependencies, so the scripts run with only what a user gets");
-  assert.deepEqual([...meta.needs].sort(), Object.keys(deps).sort(), "cert/meta.json's needs are package.json's dependencies");
+  for (const [name, m] of Object.entries(pkg.peerDependenciesMeta ?? {})) {
+    assert.notEqual(m?.optional, true, `${name} is an optional peer, so an install of wasm-xz alone leaves xzgrep, xzdiff or xzless without it`);
+  }
+  const pins = new Map(meta.needsInstall.map((s) => [s.slice(0, s.lastIndexOf('@')), s.slice(s.lastIndexOf('@') + 1)]));
+  assert.deepEqual([...pins.keys()].sort(), wanted, 'cert/meta.json installs each peer once');
+  for (const [name, v] of pins) assert.match(v, /^\d+\.\d+\.\d+-\d+$/, `cert/meta.json pins ${name} exactly, not ${v}`);
+  assert.deepEqual([...meta.needs].sort(), wanted, "cert/meta.json's needs are package.json's peerDependencies");
   for (const tool of ['bash', 'grep', 'sed', 'diff', 'less', 'mktemp', 'expr']) {
     const r = await run(['bash', '--norc', '-c', `command -v ${tool}`], { cwd: '/tmp' });
-    assert.equal(r.status, 0, `${tool} is on PATH with only the declared dependencies installed: ${r.stderr}`);
+    assert.equal(r.status, 0, `${tool} is on PATH with only the peers installed: ${r.stderr}`);
   }
-  console.log(`deps: xzgrep, xzdiff and xzless are script commands; package.json pins ${declared.join(', ')}, and the cert installs exactly those (homescoop#1487)`);
+  console.log(`deps: xzgrep, xzdiff and xzless are script commands; package.json has peers ${wanted.map((n) => `${n}@*`).join(', ')} and no @ai-ecoverse dependencies; the cert installs ${[...pins].map(([n, v]) => `${n}@${v}`).join(', ')} (slicc-bios#939)`);
 }
