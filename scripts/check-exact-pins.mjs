@@ -66,6 +66,7 @@ export function inPythonRange(version, spec) {
 export const PYTHON_CONSUMERS = new Set(['@ai-ecoverse/wasm-emscripten']);
 
 export function rangeAllowed(pkg, field, dep, spec) {
+  if (field === 'peerDependencies' && spec === '*' && typeof dep === 'string' && dep.startsWith(SCOPE)) return true;
   if (field !== 'dependencies' || typeof pkg.name !== 'string' || pythonRange(spec) === null) return false;
   if (pkg.name.startsWith(PY_SCOPE)) return dep === PYTHON || dep.startsWith(PY_SCOPE);
   return PYTHON_CONSUMERS.has(pkg.name) && dep === PYTHON;
