@@ -9,7 +9,7 @@ proxy (`http_proxy` / `https_proxy`, CA via `GIT_SSL_CAINFO`).
 Git runs some things through `/bin/sh`: local and `file://` remotes (it starts
 `git-upload-pack` / `git-receive-pack` with `sh -c`), ssh remotes, hooks and
 `!` aliases. SLICC and slicc-kernel resolve `sh` to GNU bash, so this package
-depends on `@ai-ecoverse/wasm-bash`; without it, `git clone /path/to/repo`
+needs `@ai-ecoverse/wasm-bash`; without it, `git clone /path/to/repo`
 fails with `cannot exec 'git-upload-pack …'`.
 
 ```bash
@@ -20,10 +20,25 @@ git init && git add . && git commit -m ok
 ## Shell subcommands and local clones (2.55.0-18)
 
 `git submodule`, `git mergetool` and the other shell-script subcommands run
-through `git-sh-setup`, which needs `sed`, so this package depends on
+through `git-sh-setup`, which needs `sed`, so this package also needs
 `@ai-ecoverse/wasm-sed`. `git clone --local` copies the objects when the file
 system has no hard links (slicc's OPFS root), as `--no-hardlinks` does. It
 needs slicc-kernel 1.130.2 or later.
+
+## bash and sed are peers (2.55.0-22)
+
+git runs `sh` and `sed` as commands and imports none of their files, so
+`@ai-ecoverse/wasm-bash` and `@ai-ecoverse/wasm-sed` are required
+`peerDependencies` with the range `"*"`, not exact `dependencies`. Up to
+2.55.0-21 they were exact pins (5.3.0-23 and 4.10.0-6), and npm nested a
+second copy under wasm-git whenever your own top-level version differed
+(bios#939). Now npm uses the copy you have, whatever its version, and
+installs the latest one when it's missing. A floor such as `>=4.10.0-6`
+wouldn't do: npm's semver lets a prerelease-style version like `4.11.0-1`
+match only a range that names the same `4.11.0`, so the next upstream's
+first release would fail with `ERESOLVE`. SLICC's `ipk` doesn't install
+peers: `ipk install @ai-ecoverse/wasm-git` alone doesn't bring bash and
+sed, so install them too unless your image has them already.
 
 ## Users (2.55.0-14, slicc-kernel ≥ 1.47.1)
 

@@ -93,3 +93,23 @@ tabs.mjs:11: README: one process per repository on older kernels
 ```
 
 Its `index.lock` row passes on 2.55.0-20 too. `cert/https.mjs` is coverage (#1432): 2.55.0-20 passes it as well.
+
+## 2.55.0-22: bash and sed as peers (bios#939; 2026-10-23)
+
+`cert/peers.mjs` against the published 2.55.0-20 fails its first assertion:
+
+```text
+dependencies names homescoop command packages, so npm nests its own copy under wasm-git whenever the user's top-level version differs (bios#939): {"@ai-ecoverse/wasm-sed":"4.10.0-6","@ai-ecoverse/wasm-bash":"5.3.0-23"}
+```
+
+`npm install` (npm 11.20.0) of the published 2.55.0-20 next to top-level wasm-bash 5.3.0-22 and wasm-sed 4.10.0-5 nests a second copy of each:
+
+```text
++-- @ai-ecoverse/wasm-bash@5.3.0-22
++-- @ai-ecoverse/wasm-git@2.55.0-20
+| +-- @ai-ecoverse/wasm-bash@5.3.0-23
+| `-- @ai-ecoverse/wasm-sed@4.10.0-6
+`-- @ai-ecoverse/wasm-sed@4.10.0-5
+```
+
+2.55.0-22's manifest next to the same versions, and next to today's latest (wasm-bash 5.3.0-23, wasm-sed 4.10.0-6, wasm-coreutils 9.12.0-15), has none (`deduped`); installed alone, npm adds the latest wasm-bash and wasm-sed. A floor range was ruled out: a peer `>=1.0.0-5` against an installed `1.1.0-1` gives `ERESOLVE unable to resolve dependency tree`, while `"*"` dedupes it.
