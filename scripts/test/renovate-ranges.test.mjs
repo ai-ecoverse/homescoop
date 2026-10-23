@@ -91,17 +91,31 @@ function updated(config) {
 
 const EXACT = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
 
+function entries(file, m) {
+  const out = [];
+  for (const type of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+    for (const [name, value] of Object.entries(m[type] || {})) out.push({ manager: 'npm', file, name, value });
+  }
+  return out;
+}
+
 function shipped() {
   const out = [];
   for (const dir of readdirSync(join(root, 'packages')).sort()) {
     const file = `packages/${dir}/package/package.json`;
     if (!existsSync(join(root, file))) continue;
-    const m = JSON.parse(readFileSync(join(root, file), 'utf8'));
-    for (const type of ['dependencies', 'devDependencies', 'optionalDependencies']) {
-      for (const [name, value] of Object.entries(m[type] || {})) out.push({ manager: 'npm', file, name, value });
-    }
+    out.push(...entries(file, JSON.parse(readFileSync(join(root, file), 'utf8'))));
   }
   return out;
+}
+
+const FROZEN = {
+  'packages/xz/package/package.json': 'scripts/test/fixtures/renovate/xz-5.8.4-7-package.json',
+};
+
+function closedDeps(file) {
+  if (!FROZEN[file]) return deps;
+  return entries(file, JSON.parse(readFileSync(join(root, FROZEN[file]), 'utf8')));
 }
 
 const deps = shipped();
@@ -134,7 +148,7 @@ test('NEGATIVE: main\'s renovate.json before this change lets the closed re-pins
   assert.ok(updated(before).length > 0);
   for (const [pkg, name, pr] of CLOSED) {
     const file = `packages/${pkg}/package/package.json`;
-    const d = deps.find((x) => x.file === file && x.name === name);
+    const d = closedDeps(file).find((x) => x.file === file && x.name === name);
     assert.ok(d, `#${pr}: ${file} no longer depends on ${name}`);
     const old = resolve({ ...d, updateType: 'patch' }, before);
     assert.equal(old.enabled, true, `#${pr} ${file} ${name}`);
