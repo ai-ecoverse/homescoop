@@ -23,9 +23,9 @@ needs.
   GitHub-hosted runner, with npm's `@ai-ecoverse/wasi-pnpm` at
   `packages/wasi-pnpm`'s version, on the `@ai-ecoverse/slicc-kernel` that
   `agent/package.json` pins, under `users enforce`. A round takes about 2.5
-  minutes warm and 4.5 cold (pnpm-agent-loop runs 39330831811 and
-  39360271290), so the daily run takes about half an hour. Every fourth
-  round starts from a cold store. The job log ends with `rounds.jsonl`, the
+  minutes warm and 4.5 cold (runs 39330831811 and 39360271290 of the
+  agent-loop workflow #1697 retired), so the daily run takes about half an
+  hour. Every fourth round starts from a cold store. The job log ends with `rounds.jsonl`, the
   kernel's wasm-memory admission at the start, and each failed round's whole
   log (no artifact: nothing but a pull request or `main` uploads one). A
   dispatch with `agent_loop_rounds` set never publishes: the `publish` job's

@@ -125,7 +125,7 @@ test('ladder-build.yml runs agent-loop.mjs daily and on workflow_dispatch (agent
   assert.ok(existsSync(join(fixture, 'agent-loop.mjs')));
 });
 
-test("NEGATIVE: stress/wasi-pnpm-agent/meta.json names only workflows and jobs that exist (main's named the deleted pnpm-agent-loop.yml)", () => {
+test("NEGATIVE: stress/wasi-pnpm-agent/meta.json names only workflows and jobs that exist (main's named the agent-loop workflow #1697 deleted)", () => {
   const meta = readFileSync(join(fixture, 'meta.json'), 'utf8');
   for (const [, wf] of meta.matchAll(/([\w.-]+\.ya?ml)\b/g)) {
     if (wf === 'pnpm-lock.yaml' || wf === 'pnpm-workspace.yaml') continue;
