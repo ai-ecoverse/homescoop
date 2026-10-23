@@ -1,0 +1,49 @@
+--- a/library/ssl_tls.c
++++ b/library/ssl_tls.c
+@@ -7132,6 +7132,8 @@
+         ssl->session_negotiate->verify_result = MBEDTLS_X509_BADCERT_MISSING;
+ 
+         if (authmode != MBEDTLS_SSL_VERIFY_OPTIONAL) {
++            MBEDTLS_SSL_PEND_FATAL_ALERT(MBEDTLS_SSL_ALERT_MSG_HANDSHAKE_FAILURE,
++                                         MBEDTLS_ERR_SSL_NO_CLIENT_CERTIFICATE);
+             ret = MBEDTLS_ERR_SSL_NO_CLIENT_CERTIFICATE;
+         }
+ 
+--- a/library/ssl_tls13_generic.c
++++ b/library/ssl_tls13_generic.c
+@@ -685,7 +685,7 @@
+                 return 0;
+             } else {
+                 MBEDTLS_SSL_PEND_FATAL_ALERT(
+-                    MBEDTLS_SSL_ALERT_MSG_NO_CERT,
++                    MBEDTLS_SSL_ALERT_MSG_CERT_REQUIRED,
+                     MBEDTLS_ERR_SSL_NO_CLIENT_CERTIFICATE);
+                 return MBEDTLS_ERR_SSL_NO_CLIENT_CERTIFICATE;
+             }
+@@ -1254,8 +1254,10 @@
+     MBEDTLS_SSL_DEBUG_MSG(1, ("Switch to application keys for inbound traffic"));
+     mbedtls_ssl_set_inbound_transform(ssl, ssl->transform_application);
+ 
+-    MBEDTLS_SSL_DEBUG_MSG(1, ("Switch to application keys for outbound traffic"));
+-    mbedtls_ssl_set_outbound_transform(ssl, ssl->transform_application);
++    if (ssl->transform_out != ssl->transform_application) {
++        MBEDTLS_SSL_DEBUG_MSG(1, ("Switch to application keys for outbound traffic"));
++        mbedtls_ssl_set_outbound_transform(ssl, ssl->transform_application);
++    }
+ 
+     /*
+      * Free the previous session and switch to the current one.
+--- a/library/ssl_tls13_server.c
++++ b/library/ssl_tls13_server.c
+@@ -2905,6 +2905,11 @@
+             "( K_recv = handshake )"));
+     mbedtls_ssl_set_inbound_transform(ssl, ssl->handshake->transform_handshake);
+ 
++    MBEDTLS_SSL_DEBUG_MSG(
++        1, ("Switch to application keys for outbound traffic "
++            "( K_send = application )"));
++    mbedtls_ssl_set_outbound_transform(ssl, ssl->transform_application);
++
+     ssl_tls13_prepare_for_handshake_second_flight(ssl);
+ 
+     return 0;

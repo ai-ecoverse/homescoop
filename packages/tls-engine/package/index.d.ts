@@ -20,6 +20,9 @@ export interface TlsEngineModule {
   _tls_leaf_import(chain: number, chainLen: number, key: number, keyLen: number, pass: number, passLen: number): number;
   _tls_server_new(leaf: number, alpn: number, alpnLen: number, clientCa: number, flags: number): number;
   _tls_sni(session: number, out: number, max: number): number;
+  _tls_server_select(session: number, leaf: number, alpn: number, alpnLen: number): number;
+  _tls_server_refuse(session: number, alert: number): number;
+  _tls_client_alpn(session: number, out: number, max: number): number;
   /** Ciphertext from the client: how many bytes were taken. */
   _tls_feed(session: number, bytes: number, len: number): number;
   _tls_feed_eof(session: number): void;

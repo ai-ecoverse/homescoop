@@ -42,6 +42,7 @@
 #define TLS_EOF (-1)
 #define TLS_NOMEM (-2)
 #define TLS_BADARG (-3)
+#define TLS_SELECT_PENDING (-4)
 #define TLS_RSA_TOO_LARGE (-0x10000)
 #define TLS_CLIENT_INSECURE_SKIP_VERIFY 1
 #define TLS_CLIENT_NO_SNI 2
@@ -49,6 +50,13 @@
 #define TLS_CLIENT_FLAGS (TLS_CLIENT_INSECURE_SKIP_VERIFY | TLS_CLIENT_NO_SNI | TLS_CLIENT_VERIFY_CHAIN_ONLY)
 #define TLS_SERVER_REQUEST_CERT 1
 #define TLS_SERVER_REQUIRE_CERT 2
+#define TLS_SERVER_SELECT 4
+#define TLS_SELECT 2
+#define SELECT_WAIT 1
+#define SELECT_PAUSED 2
+#define SELECT_DONE 3
+#define SELECT_REFUSED 4
+#define HELLO_MAX (32 * 1024)
 #define ALPN_MAX 8
 
 static const char *const alpn_protocols[] = {"http/1.1", NULL};
@@ -115,6 +123,7 @@ static const char *crypto_strerror(int code) {
     case TLS_EOF: return "tls-engine - the peer closed the connection (TLS_EOF)";
     case TLS_NOMEM: return "tls-engine - out of memory (TLS_NOMEM)";
     case TLS_BADARG: return "tls-engine - bad argument (TLS_BADARG)";
+    case TLS_SELECT_PENDING: return "tls-engine - the server session waits for tls_server_select (TLS_SELECT_PENDING)";
     case TLS_RSA_TOO_LARGE: return "tls-engine - RSA key larger than 8192 bits (TLS_RSA_TOO_LARGE)";
     case PSA_ERROR_GENERIC_ERROR: return "PSA - Generic error";
     case PSA_ERROR_NOT_PERMITTED: return "PSA - Not permitted";
@@ -311,6 +320,11 @@ typedef struct {
   int own_set;
   mbedtls_x509_crt own_chain;
   mbedtls_pk_context own_key;
+  int server;
+  int select;
+  int refused;
+  unsigned char *client_alpn;
+  size_t client_alpn_len;
   unsigned char in[IN_CAP], out[OUT_CAP];
   size_t in_len, out_len;
   int in_eof;
@@ -366,6 +380,7 @@ static void session_free(session *s) {
   }
   if (s->leaf) leaf_release(s->leaf);
   if (s->trust) ca_release(s->trust);
+  free(s->client_alpn);
   free(s);
 }
 
@@ -382,6 +397,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_session_new(leaf *l, const char *host) {
     return NULL;
   }
   strcpy(s->host, host);
+  s->server = 1;
   mbedtls_ssl_init(&s->ssl);
   mbedtls_ssl_config_init(&s->config);
   s->leaf = l;
@@ -647,7 +663,7 @@ EMSCRIPTEN_KEEPALIVE int tls_client_cert(session *s, const unsigned char *chain,
                                          size_t pass_len) {
   int ret = TLS_BADARG;
   int mine = 0;
-  if (s->own_set || s->leaf || s->started || chain_len == 0 || key_len == 0) goto done;
+  if (s->own_set || s->server || s->started || chain_len == 0 || key_len == 0) goto done;
   mbedtls_x509_crt_init(&s->own_chain);
   mbedtls_pk_init(&s->own_key);
   s->own_set = mine = 1;
@@ -693,12 +709,28 @@ done:
   return l;
 }
 
+static int on_selected(mbedtls_ssl_context *ssl) {
+  session *s = mbedtls_ssl_get_user_data_p(ssl);
+  size_t n = 0;
+  const unsigned char *name = mbedtls_ssl_get_hs_sni(ssl, &n);
+  const char *agreed = mbedtls_ssl_get_alpn_protocol(ssl);
+  const char *chosen = s->alpn[0];
+  int same_name = n == s->sni_len && (n == 0 || (name && memcmp(name, s->sni, n) == 0));
+  int same_alpn = chosen ? agreed && strcmp(agreed, chosen) == 0 : agreed == NULL;
+  if (s->select == SELECT_DONE && same_name && same_alpn) return 0;
+  mbedtls_ssl_send_alert_message(ssl, MBEDTLS_SSL_ALERT_LEVEL_FATAL,
+                                 MBEDTLS_SSL_ALERT_MSG_HANDSHAKE_FAILURE);
+  return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+}
+
 EMSCRIPTEN_KEEPALIVE session *tls_server_new(leaf *l, const unsigned char *alpn, size_t alpn_len,
                                              ca *client_ca, int flags) {
   if (init() != 0) return NULL;
-  if (!l || l->certs == 0 || (alpn_len > 0 && !alpn) ||
-      (flags != 0 && flags != TLS_SERVER_REQUEST_CERT && flags != TLS_SERVER_REQUIRE_CERT) ||
-      (flags != 0 && !client_ca)) {
+  int select = (flags & TLS_SERVER_SELECT) != 0;
+  int auth = flags & (TLS_SERVER_REQUEST_CERT | TLS_SERVER_REQUIRE_CERT);
+  if ((!l && !select) || (l && l->certs == 0) || (alpn_len > 0 && (!alpn || select)) ||
+      (flags & ~(TLS_SERVER_REQUEST_CERT | TLS_SERVER_REQUIRE_CERT | TLS_SERVER_SELECT)) != 0 ||
+      auth == (TLS_SERVER_REQUEST_CERT | TLS_SERVER_REQUIRE_CERT) || (auth != 0 && !client_ca)) {
     last_error = TLS_BADARG;
     return NULL;
   }
@@ -707,11 +739,15 @@ EMSCRIPTEN_KEEPALIVE session *tls_server_new(leaf *l, const unsigned char *alpn,
     last_error = TLS_NOMEM;
     return NULL;
   }
+  s->server = 1;
+  s->select = select ? SELECT_WAIT : 0;
   mbedtls_ssl_init(&s->ssl);
   mbedtls_ssl_config_init(&s->config);
-  s->leaf = l;
-  l->refs++;
-  if (flags != 0) {
+  if (l) {
+    s->leaf = l;
+    l->refs++;
+  }
+  if (auth != 0) {
     s->trust = client_ca;
     client_ca->refs++;
   }
@@ -720,16 +756,17 @@ EMSCRIPTEN_KEEPALIVE session *tls_server_new(leaf *l, const unsigned char *alpn,
     ret = mbedtls_ssl_config_defaults(&s->config, MBEDTLS_SSL_IS_SERVER,
                                       MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
   if (ret == 0) {
-    mbedtls_ssl_conf_sni(&s->config, on_any_sni, s);
-    if (flags != 0) {
-      mbedtls_ssl_conf_authmode(&s->config, flags == TLS_SERVER_REQUIRE_CERT
+    if (select) mbedtls_ssl_conf_cert_cb(&s->config, on_selected);
+    else mbedtls_ssl_conf_sni(&s->config, on_any_sni, s);
+    if (auth != 0) {
+      mbedtls_ssl_conf_authmode(&s->config, auth == TLS_SERVER_REQUIRE_CERT
                                                 ? MBEDTLS_SSL_VERIFY_REQUIRED
                                                 : MBEDTLS_SSL_VERIFY_OPTIONAL);
       mbedtls_ssl_conf_ca_chain(&s->config, &client_ca->roots, NULL);
     } else {
       mbedtls_ssl_conf_authmode(&s->config, MBEDTLS_SSL_VERIFY_NONE);
     }
-    ret = mbedtls_ssl_conf_own_cert(&s->config, &l->chain, &l->key);
+    if (!select) ret = mbedtls_ssl_conf_own_cert(&s->config, &l->chain, &l->key);
   }
   if (ret == 0 && alpn_len > 0) ret = mbedtls_ssl_conf_alpn_protocols(&s->config, s->alpn);
   if (ret == 0) ret = mbedtls_ssl_setup(&s->ssl, &s->config);
@@ -738,8 +775,207 @@ EMSCRIPTEN_KEEPALIVE session *tls_server_new(leaf *l, const unsigned char *alpn,
     session_free(s);
     return NULL;
   }
+  mbedtls_ssl_set_user_data_p(&s->ssl, s);
   mbedtls_ssl_set_bio(&s->ssl, s, bio_send, bio_recv, NULL);
   return s;
+}
+
+static unsigned char hello[HELLO_MAX];
+
+static size_t be16(const unsigned char *p) { return ((size_t)p[0] << 8) | p[1]; }
+
+static int hello_assemble(session *s, size_t *len) {
+  size_t at = 0, have = 0;
+  for (;;) {
+    if (have >= 4) {
+      if (hello[0] != MBEDTLS_SSL_HS_CLIENT_HELLO) return -MBEDTLS_SSL_ALERT_MSG_UNEXPECTED_MESSAGE;
+      size_t need = 4 + (((size_t)hello[1] << 16) | ((size_t)hello[2] << 8) | hello[3]);
+      if (need > HELLO_MAX) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+      if (have >= need) {
+        *len = need;
+        return 1;
+      }
+    }
+    if (s->in_len - at < 5) break;
+    const unsigned char *rec = s->in + at;
+    if (rec[0] != MBEDTLS_SSL_MSG_HANDSHAKE) return -MBEDTLS_SSL_ALERT_MSG_UNEXPECTED_MESSAGE;
+    if (rec[1] != 3) return -MBEDTLS_SSL_ALERT_MSG_PROTOCOL_VERSION;
+    size_t body = be16(rec + 3);
+    if (body == 0) return -MBEDTLS_SSL_ALERT_MSG_UNEXPECTED_MESSAGE;
+    if (body > 16384) return -MBEDTLS_SSL_ALERT_MSG_RECORD_OVERFLOW;
+    if (s->in_len - at - 5 < body) break;
+    if (have + body > HELLO_MAX) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+    memcpy(hello + have, rec + 5, body);
+    have += body;
+    at += 5 + body;
+  }
+  if (s->in_len == IN_CAP) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+  return 0;
+}
+
+static int hello_sni(session *s, const unsigned char *p, size_t len) {
+  if (len < 2 || be16(p) != len - 2) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+  for (size_t at = 2; at < len;) {
+    if (len - at < 3) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+    size_t n = be16(p + at + 1);
+    if (len - at - 3 < n) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+    if (p[at] == MBEDTLS_TLS_EXT_SERVERNAME_HOSTNAME) {
+      if (n == 0) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+      if (n >= sizeof s->sni) return -MBEDTLS_SSL_ALERT_MSG_UNRECOGNIZED_NAME;
+      memcpy(s->sni, p + at + 3, n);
+      s->sni_len = n;
+      return 0;
+    }
+    at += 3 + n;
+  }
+  return 0;
+}
+
+static int hello_alpn(session *s, const unsigned char *p, size_t len) {
+  if (len < 4 || be16(p) != len - 2) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+  for (size_t at = 2; at < len; at += 1 + p[at])
+    if (p[at] == 0 || len - at - 1 < p[at]) return -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+  s->client_alpn = malloc(len - 2);
+  if (!s->client_alpn) return -MBEDTLS_SSL_ALERT_MSG_INTERNAL_ERROR;
+  memcpy(s->client_alpn, p + 2, len - 2);
+  s->client_alpn_len = len - 2;
+  return 0;
+}
+
+static int hello_parse(session *s, const unsigned char *p, size_t len) {
+  const int bad = -MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR;
+  size_t at = 2 + 32;
+  if (len < at + 1 || p[at] > 32) return bad;
+  at += 1 + p[at];
+  if (len < at + 2) return bad;
+  size_t suites = be16(p + at);
+  if (suites < 2 || (suites & 1) || len - at - 2 < suites) return bad;
+  at += 2 + suites;
+  if (len < at + 1 || p[at] == 0 || len - at - 1 < p[at]) return bad;
+  at += 1 + p[at];
+  if (at == len) return 0;
+  if (len - at < 2 || be16(p + at) != len - at - 2) return bad;
+  int seen_sni = 0, seen_alpn = 0;
+  for (at += 2; at < len;) {
+    if (len - at < 4) return bad;
+    size_t type = be16(p + at), n = be16(p + at + 2);
+    if (len - at - 4 < n) return bad;
+    const unsigned char *ext = p + at + 4;
+    int ret = 0;
+    if (type == MBEDTLS_TLS_EXT_SERVERNAME) {
+      if (seen_sni++) return -MBEDTLS_SSL_ALERT_MSG_ILLEGAL_PARAMETER;
+      ret = hello_sni(s, ext, n);
+    } else if (type == MBEDTLS_TLS_EXT_ALPN) {
+      if (seen_alpn++) return -MBEDTLS_SSL_ALERT_MSG_ILLEGAL_PARAMETER;
+      ret = hello_alpn(s, ext, n);
+    }
+    if (ret != 0) return ret;
+    at += 4 + n;
+  }
+  return 0;
+}
+
+static int alert_error(int alert) {
+  switch (alert) {
+    case MBEDTLS_SSL_ALERT_MSG_UNRECOGNIZED_NAME: return MBEDTLS_ERR_SSL_UNRECOGNIZED_NAME;
+    case MBEDTLS_SSL_ALERT_MSG_NO_APPLICATION_PROTOCOL: return MBEDTLS_ERR_SSL_NO_APPLICATION_PROTOCOL;
+    case MBEDTLS_SSL_ALERT_MSG_DECODE_ERROR: return MBEDTLS_ERR_SSL_DECODE_ERROR;
+    case MBEDTLS_SSL_ALERT_MSG_ILLEGAL_PARAMETER: return MBEDTLS_ERR_SSL_ILLEGAL_PARAMETER;
+    case MBEDTLS_SSL_ALERT_MSG_UNEXPECTED_MESSAGE: return MBEDTLS_ERR_SSL_UNEXPECTED_MESSAGE;
+    case MBEDTLS_SSL_ALERT_MSG_PROTOCOL_VERSION: return MBEDTLS_ERR_SSL_BAD_PROTOCOL_VERSION;
+    case MBEDTLS_SSL_ALERT_MSG_INTERNAL_ERROR: return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
+  }
+  return MBEDTLS_ERR_SSL_HANDSHAKE_FAILURE;
+}
+
+static int refuse(session *s, int alert) {
+  if (OUT_CAP - s->out_len >= 7) {
+    const unsigned char record[7] = {MBEDTLS_SSL_MSG_ALERT, 3, 3, 0, 2, MBEDTLS_SSL_ALERT_LEVEL_FATAL,
+                                     (unsigned char)alert};
+    memcpy(s->out + s->out_len, record, sizeof record);
+    s->out_len += sizeof record;
+  }
+  s->select = SELECT_REFUSED;
+  s->refused = alert_error(alert);
+  return last_error = s->refused;
+}
+
+static int select_gate(session *s) {
+  if (s->select == 0 || s->select == SELECT_DONE) return 1;
+  if (s->select == SELECT_REFUSED) return last_error = s->refused;
+  if (s->select == SELECT_WAIT) {
+    size_t len = 0;
+    int ret = hello_assemble(s, &len);
+    if (ret == 0) return s->in_eof ? (last_error = MBEDTLS_ERR_SSL_CONN_EOF) : 0;
+    if (ret > 0) {
+      s->sni_len = 0;
+      ret = hello_parse(s, hello + 4, len - 4);
+      mbedtls_platform_zeroize(hello, len);
+    }
+    if (ret < 0) {
+      free(s->client_alpn);
+      s->client_alpn = NULL;
+      s->client_alpn_len = 0;
+      s->sni_len = 0;
+      return refuse(s, -ret);
+    }
+    s->select = SELECT_PAUSED;
+  }
+  return TLS_SELECT;
+}
+
+static int alpn_offered(session *s, const unsigned char *name, size_t len) {
+  for (size_t at = 0; at < s->client_alpn_len; at += 1 + s->client_alpn[at])
+    if (s->client_alpn[at] == len && memcmp(s->client_alpn + at + 1, name, len) == 0) return 1;
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_server_select(session *s, leaf *l, const unsigned char *alpn,
+                                           size_t alpn_len) {
+  leaf *chosen = l ? l : s->leaf;
+  if (s->select != SELECT_PAUSED || !chosen || chosen->certs == 0 ||
+      (alpn_len > 0 && (!alpn || alpn_len >= sizeof s->alpn_buf || memchr(alpn, 0, alpn_len) ||
+                        !alpn_offered(s, alpn, alpn_len))))
+    return last_error = TLS_BADARG;
+  if (chosen != s->leaf) {
+    chosen->refs++;
+    if (s->leaf) leaf_release(s->leaf);
+    s->leaf = chosen;
+  }
+  int ret = mbedtls_ssl_conf_own_cert(&s->config, &chosen->chain, &chosen->key);
+  if (ret == 0 && alpn_len > 0) {
+    memcpy(s->alpn_buf, alpn, alpn_len);
+    s->alpn_buf[alpn_len] = 0;
+    s->alpn[0] = s->alpn_buf;
+    s->alpn[1] = NULL;
+    ret = mbedtls_ssl_conf_alpn_protocols(&s->config, s->alpn);
+  }
+  if (ret != 0) return refuse(s, MBEDTLS_SSL_ALERT_MSG_INTERNAL_ERROR);
+  s->select = SELECT_DONE;
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_server_refuse(session *s, int alert) {
+  if (s->select != SELECT_PAUSED) return last_error = TLS_BADARG;
+  switch (alert) {
+    case MBEDTLS_SSL_ALERT_MSG_HANDSHAKE_FAILURE:
+    case MBEDTLS_SSL_ALERT_MSG_ACCESS_DENIED:
+    case MBEDTLS_SSL_ALERT_MSG_INTERNAL_ERROR:
+    case MBEDTLS_SSL_ALERT_MSG_UNRECOGNIZED_NAME:
+    case MBEDTLS_SSL_ALERT_MSG_NO_APPLICATION_PROTOCOL: {
+      int before = last_error;
+      refuse(s, alert);
+      last_error = before;
+      return 0;
+    }
+  }
+  return last_error = TLS_BADARG;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_client_alpn(session *s, unsigned char *out, size_t max) {
+  if (s->client_alpn_len > max) return TLS_BADARG;
+  if (s->client_alpn_len > 0) memcpy(out, s->client_alpn, s->client_alpn_len);
+  return (int)s->client_alpn_len;
 }
 
 EMSCRIPTEN_KEEPALIVE int tls_sni(session *s, char *out, size_t max) {
@@ -763,7 +999,7 @@ EMSCRIPTEN_KEEPALIVE int tls_ciphersuite(session *s) {
  * certificate_required, 40 handshake_failure, ...), -1 when none was received
  * and for a server session. Mbed TLS's public mbedtls_ssl_get_fatal_alert(). */
 EMSCRIPTEN_KEEPALIVE int tls_last_alert(session *s) {
-  if (s->leaf) return -1;
+  if (s->server) return -1;
   int alert = mbedtls_ssl_get_fatal_alert(&s->ssl);
   return alert < 0 ? -1 : alert;
 }
@@ -773,6 +1009,8 @@ EMSCRIPTEN_KEEPALIVE int tls_last_alert(session *s) {
  * MBEDTLS_ERR_X509_CERT_VERIFY_FAILED; tls_verify_result says why). */
 EMSCRIPTEN_KEEPALIVE int tls_handshake(session *s) {
   s->started = 1;
+  int gate = select_gate(s);
+  if (gate != 1) return gate;
   for (;;) {
     if (mbedtls_ssl_is_handshake_over(&s->ssl)) return 1;
     int ret = mbedtls_ssl_handshake(&s->ssl);
@@ -847,6 +1085,10 @@ static int want(int ret) {
 /* Plaintext from the peer: > 0 bytes, 0 when more ciphertext is needed, TLS_EOF, or an error. */
 EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
   s->started = 1;
+  int gate = select_gate(s);
+  if (gate == TLS_SELECT) return TLS_SELECT_PENDING;
+  if (gate == MBEDTLS_ERR_SSL_CONN_EOF) return TLS_EOF;
+  if (gate != 1) return gate;
   for (int spins = 0;; spins++) {
     int ret;
     if (!mbedtls_ssl_is_handshake_over(&s->ssl)) {
@@ -871,6 +1113,9 @@ EMSCRIPTEN_KEEPALIVE int tls_read(session *s, unsigned char *out, size_t max) {
 /* Encrypt up to `len` bytes of plaintext: how many were taken (0: drain tls_out and retry), or an error. */
 EMSCRIPTEN_KEEPALIVE int tls_write(session *s, const unsigned char *bytes, size_t len) {
   s->started = 1;
+  int gate = select_gate(s);
+  if (gate == TLS_SELECT) return TLS_SELECT_PENDING;
+  if (gate != 1) return gate;
   int ret = mbedtls_ssl_write(&s->ssl, bytes, len);
   if (ret >= 0) return ret;
   if (want(ret)) return 0;
