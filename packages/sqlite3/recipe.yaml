@@ -3,7 +3,7 @@ name: sqlite3
 builder: host
 runner: pool
 # renovate: datasource=github-tags depName=sqlite/sqlite extractVersion=^version-(?<version>.*)$
-version: "3.54.0"
+version: "3.54.1"
 npm: "@ai-ecoverse/wasm-sqlite3"
 summary: "sqlite3 CLI 3.54.0 for slicc wasm realm"
 source:
