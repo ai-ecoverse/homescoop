@@ -69,6 +69,8 @@ except compiling a constant array (0.81: its limit had moved from 1858 to
 `ReflectionFunction::invoke()`, with no pad of its own, stops at 535 of 690
 levels (0.78).
 
+All of this is Chrome's V8 (the review browsers of homescoop's CI are Chromium as well, extension and cli kernel); Firefox and Safari are unmeasured.
+
 prove-negative on the 8.5.12-3 build:
 `prove-negative: emptied 1 module(s): bin/php.wasm`, then
 `prove-negative: ok — cert failed on bad wasix-php tarball (status 1; 15 of 18 spec(s) failed: bailout.mjs, checklist.mjs, fd.mjs, fibers.mjs, heap.mjs, http.mjs, memory.mjs, openssl.mjs, process.mjs, server.mjs, sqlite.mjs, stack.mjs, tmp-phar.mjs, users.mjs, xml.mjs)`.

@@ -50,6 +50,7 @@ What runs out first is the browser's native stack, where every wasm frame sits, 
 | `array_walk()` callbacks | 659 | 91 | 412 |
 | `ReflectionFunction::invoke()` | 690 | 176 | 535 |
 
+- The margins are measured against Chrome's V8 with its baseline compiler (Liftoff), on slicc-kernel 1.146.5. slicc drives Chromium-based browsers, and the four review browsers of homescoop's CI are Chromium too: the pull request's and npm's package, each with the extension and the cli kernel. Firefox (SpiderMonkey) and Safari (JavaScriptCore) size their stacks and frames differently and are unmeasured, so none of the depths above, the deepest row (`count(…, COUNT_RECURSIVE)` at 2538) included, says anything about them.
 - Every call from C back into PHP passes `execute_ex`, whose pad is sized for `array_map()`; the heavier paths above have pads of their own on top. A path that isn't listed and costs the browser's stack much more per level than `array_map()` (`ReflectionFunction::invoke()` stops at 78% of its limit, with no pad of its own) could still reach the RangeError.
 - `-d zend.max_allowed_stack_size=<bytes>` sets a different budget, and the depths scale with it. Above 2 MiB, paths reach the RangeError again. `-1` turns the check off: then a path goes as deep as the browser allows and ends in the RangeError, as on 8.5.12-1 (the pads stay within the 8 MiB shadow stack: the most a path takes on the way, `__serialize()` at 1974 levels, is about 6 MiB).
 
