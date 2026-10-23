@@ -5,9 +5,9 @@
     "@ai-ecoverse/wasm-coreutils",
     "@ai-ecoverse/wasm-bash"
   ],
-  "source": "jdx/fnox v1.39.0 + packages/wasi-fnox/NNNN-*.patch (apply.sh); each patch maps to cert cases below",
+  "source": "jdx/fnox v1.40.0 + packages/wasi-fnox/NNNN-*.patch (apply.sh); each patch maps to cert cases below",
   "checklist": [
-    "fnox --version → fnox 1.39.0; --help lists exec/get/set/proxy and no daemon, tui, mcp; provider add --help offers sealed",
+    "fnox --version → fnox 1.40.0; --help lists exec/get/set/proxy and no daemon, tui, mcp, plugin; provider add --help offers sealed",
     "with /etc/fnox/config.toml (default_provider seven, type sealed) via FNOX_CONFIG_DIR: get, export and env print the stored placeholder; no device needed",
     "discovery from a subdirectory of the project (cwd from PWD)",
     "without a vault: set from a pipe, exec with a sealed secret and check --all fail closed (`not running in seven: /dev/sealed is missing` on kernels without the device; `ENOTCONN: no vault is connected` from 1.68.0 without the sealed hook)",
@@ -28,12 +28,13 @@
     "bios real setup (B18's seven row, slicc-bios #355): /etc/fnox/config.toml root-owned: a cone reads and resolves it, its writes fail with EACCES, sudo succeeds through the approval, no secret in any cone-readable file",
     "test/sealed.mjs case 14 (KS-8): exec --shell-grants -- /bin/bash -c CMD → materialize {shellGrants: true, path, argv, cwd} with no names → the shell = true secret's placeholder via `placeholder {name}` → real in the bash; the config's own sealed secrets keep placeholders; output scrubbed",
     "test/sealed.mjs case 15 (KS-8, interpreter chain): fnox never claims `interpreter`; an npm-style `#!/usr/bin/env bash` script is reported as /usr/bin/bash; under an { argv } grant it gets the value when trusted (root-owned, 0755, root-owned dirs), is refused when untrusted (world-writable dir), and is refused under exec = true",
-    "1.39.0-6 (0016): fnox exec -- printenv LVL in a project that also has an as_file secret exits 0 and prints debug, warning \"CERT is not set: it is an as_file secret\" instead of refusing the command, and CERT isn't in the child's environment (homescoop#945); with a mode-644 /tmp/bin/fnox first on PATH, activate names /usr/bin/fnox (slicc_fs.path_access X_OK), and with it 755 names /tmp/bin/fnox (homescoop#1129). 1.39.0-5 fails 6 of these assertions"
+    "1.39.0-6 (0016): fnox exec -- printenv LVL in a project that also has an as_file secret exits 0 and prints debug, warning \"CERT is not set: it is an as_file secret\" instead of refusing the command, and CERT isn't in the child's environment (homescoop#945); with a mode-644 /tmp/bin/fnox first on PATH, activate names /usr/bin/fnox (slicc_fs.path_access X_OK), and with it 755 names /tmp/bin/fnox (homescoop#1129). 1.39.0-5 fails 6 of these assertions",
+    "1.40.0-1 (the series on v1.40.0): a plain provider with file and format reads the value from that file, an absolute env file and a relative json file (resolved against the config's directory from the project root and from a subdirectory, PWD as cwd); get of a kubernetes or a lua secret fails with \"provider type '<type>' is not available in the WASI build of fnox\", no trap; fnox plugin is not built; proxy run with kubernetes, lua and azure-sm providers configured keeps FNOX_K8S_CONTEXT, KUBECONFIG and azure's SERVICE_PRINCIPAL_ENV_VARS (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, read through 0002's const_list) from the child (homescoop#401). 1.39.0-6 fails these (NEGATIVE.md)"
   ],
   "patches": {
-    "0001-build-gate-non-WASI-dependencies-by-target.patch": "the build: wasm32-wasip1 links at all (no cloud SDKs, reqwest, keyring, TUI)",
-    "0002-providers-build-only-age-and-plain-for-WASI.patch": "age set encrypts; provider types outside the allowlist fail when used; proxy run removes a configured disabled provider's env_dependencies() from the child (NEGATIVE.md: 1.39.0-2 hands FNOX_OP_SERVICE_ACCOUNT_TOKEN through)",
-    "0003-cli-compile-out-modules-that-cannot-run-on-WASI.patch": "--help lists no daemon, tui or mcp",
+    "0001-build-gate-non-WASI-dependencies-by-target.patch": "the build: wasm32-wasip1 links at all (no cloud SDKs, reqwest, keyring, TUI, and from 1.40.0 no kube or mlua's vendored Lua)",
+    "0002-providers-build-only-age-and-plain-for-WASI.patch": "age set encrypts; provider types outside the allowlist fail when used; proxy run removes a configured disabled provider's env_dependencies() from the child (NEGATIVE.md: 1.39.0-2 hands FNOX_OP_SERVICE_ACCOUNT_TOKEN through); 1.40.0's kubernetes and lua providers fail when used and proxy run removes FNOX_K8S_CONTEXT and KUBECONFIG",
+    "0003-cli-compile-out-modules-that-cannot-run-on-WASI.patch": "--help lists no daemon, tui, mcp or plugin; fnox plugin list fails without a trap",
     "0004-wasi-take-the-working-directory-and-home-from-the-en.patch": "get from a subdirectory of the project (cwd from PWD)",
     "0005-wasi-spawn-fnox-exec-children-through-wasix-command.patch": "plain exec: the child runs and gets the value",
     "0006-providers-add-the-sealed-provider-for-seven-s-vault.patch": "get/export print the stored placeholder; the missing-device error; test/sealed.mjs: seal, rotation, placeholder {name}, the caller stamp; provider add --help offers sealed",
@@ -45,7 +46,8 @@
     "0012-exec-shell-grants-and-run-the-child-in-the-cwd-sent-.patch": "exec --shell-grants without the device fails; test/sealed.mjs cases 9 and 14 (NEGATIVE.md: without 0012, case 9 fails)",
     "0013-set-detect-a-terminal-on-WASI-refuse-an-empty-sealed.patch": "test/sealed.mjs cases 6–8: set on a terminal reaches the vault dialog (request/status/cancel); empty stdin refused before any seal (NEGATIVE.md: without 0013, case 6 fails)",
     "0014-edit-refuse-fnox-edit-on-WASI-instead-of-panicking.patch": "checklist: fnox edit fails with \"fnox edit is not available in seven: use fnox set\", not the 134 trap (NEGATIVE.md: 1.39.0-1 traps)",
-    "0015-hook-env-and-activate-the-shell-integration-on-WASI.patch": "checklist: hook-env exits 0 with the exports (NEGATIVE.md: 1.39.0-3 traps with 134, \"no pids on this platform\"); activate names /usr/bin/fnox and works in bash, also with no fnox on PATH (NEGATIVE.md: 1.39.0-4 prints a bare fnox, homescoop#554); as_file refused in hook-env and get; export prints an as_file value"
+    "0015-hook-env-and-activate-the-shell-integration-on-WASI.patch": "checklist: hook-env exits 0 with the exports (NEGATIVE.md: 1.39.0-3 traps with 134, \"no pids on this platform\"); activate names /usr/bin/fnox and works in bash, also with no fnox on PATH (NEGATIVE.md: 1.39.0-4 prints a bare fnox, homescoop#554); as_file refused in hook-env and get; export prints an as_file value",
+    "0017-plain-read-the-secrets-file-in-place-on-WASI.patch": "checklist: get of a plain secret with file and format prints the value from the file (NEGATIVE.md: without 0017 it traps with 134, \"OS can't spawn worker thread\")"
   },
   "sealedKernel": "@ai-ecoverse/slicc-kernel@1.83.0",
   "ci": [
@@ -55,5 +57,5 @@
     "@ai-ecoverse/wasm-bash@5.3.0-18",
     "@ai-ecoverse/wasm-coreutils@9.12.0-5"
   ],
-  "reproducible": "build.sh sets SOURCE_DATE_EPOCH to the v1.39.0 tag's commit time (recipe source.epoch), so rust-embed's per-file times for age's i18n files no longer carry the machine's crate-unpack time (homescoop#364); two CI runs of the same head give the same fnox.wasm and package.tgz sha256"
+  "reproducible": "build.sh sets SOURCE_DATE_EPOCH to the v1.40.0 tag's commit time (recipe source.epoch), so rust-embed's per-file times for age's i18n files no longer carry the machine's crate-unpack time (homescoop#364); two CI runs of the same head give the same fnox.wasm and package.tgz sha256"
 }

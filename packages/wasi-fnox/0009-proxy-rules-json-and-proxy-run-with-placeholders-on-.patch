@@ -14,18 +14,18 @@ whose secret is not sealed is refused. Rule validation no longer needs
 reqwest on WASI.
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 406d24e..21692c5 100644
+index b7ad93cf..7ccc8bad 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -27,7 +27,6 @@ pub mod list;
- pub mod mcp;
+@@ -29,7 +29,6 @@ pub mod mcp;
+ pub mod plugin;
  pub mod profiles;
  pub mod provider;
 -#[cfg(not(target_os = "wasi"))]
  pub mod proxy;
  pub mod reencrypt;
  pub mod remove;
-@@ -163,7 +162,6 @@ pub enum Commands {
+@@ -169,7 +168,6 @@ pub enum Commands {
      Provider(provider::ProviderCommand),
  
      /// Broker credentials into destination-scoped HTTPS requests
@@ -33,7 +33,7 @@ index 406d24e..21692c5 100644
      Proxy(proxy::ProxyCommand),
  
      /// Re-encrypt secrets with current provider configuration
-@@ -342,7 +340,6 @@ impl Commands {
+@@ -350,7 +348,6 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -42,7 +42,7 @@ index 406d24e..21692c5 100644
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
 diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
-index 126492d..b281480 100644
+index 126492d3..b2814809 100644
 --- a/src/commands/proxy.rs
 +++ b/src/commands/proxy.rs
 @@ -1,8 +1,10 @@
@@ -191,10 +191,10 @@ index 126492d..b281480 100644
          if self.command.is_empty() {
              return Err(FnoxError::CommandNotSpecified);
 diff --git a/src/lib.rs b/src/lib.rs
-index c3438c1..afa9815 100644
+index 6cd383f1..d0677de4 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -17,7 +17,6 @@ pub mod daemon;
+@@ -19,7 +19,6 @@ pub mod daemon;
  pub mod hook_env;
  #[cfg(not(target_os = "wasi"))]
  pub mod mcp_server;
@@ -203,7 +203,7 @@ index c3438c1..afa9815 100644
  pub mod seven;
  pub mod shell;
 diff --git a/src/proxy.rs b/src/proxy.rs
-index b05330e..35b2c7d 100644
+index b05330ec..35b2c7d7 100644
 --- a/src/proxy.rs
 +++ b/src/proxy.rs
 @@ -1,28 +1,47 @@

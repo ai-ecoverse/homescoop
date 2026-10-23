@@ -14,7 +14,7 @@ value given as an argument, which other processes can read from
 /proc, and --key-name are refused for sealed secrets.
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index cac7861..7a1f1da 100644
+index 5dd04d8f..ef24cc37 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
 @@ -125,6 +125,8 @@ impl SetCommand {
@@ -26,8 +26,8 @@ index cac7861..7a1f1da 100644
          // Get the secret value if provided
          let secret_value = if let Some(ref path) = self.from_file {
              Some(std::fs::read_to_string(path).map_err(|source| {
-@@ -149,9 +151,10 @@ impl SetCommand {
-             Some(buffer.trim().to_string())
+@@ -155,9 +157,10 @@ impl SetCommand {
+             None
          } else {
              #[cfg(target_os = "wasi")]
 -            return Err(FnoxError::Config(
@@ -40,7 +40,7 @@ index cac7861..7a1f1da 100644
              // Interactive terminal - prompt for value
              #[cfg(not(target_os = "wasi"))]
              let value = demand::Input::new("Enter secret value")
-@@ -183,6 +186,35 @@ impl SetCommand {
+@@ -189,6 +192,35 @@ impl SetCommand {
              config.get_default_provider(&write_profile_stack)?
          };
  
@@ -76,7 +76,7 @@ index cac7861..7a1f1da 100644
          // Check if secret should be base64 encoded
          let secret_value = if self.base64_encode {
              secret_value
-@@ -243,12 +275,16 @@ impl SetCommand {
+@@ -249,12 +281,16 @@ impl SetCommand {
                              provider_name
                          );
  
@@ -99,7 +99,7 @@ index cac7861..7a1f1da 100644
  
                          if self.dry_run {
                              // In dry-run mode, skip actual remote storage
-@@ -315,6 +351,11 @@ impl SetCommand {
+@@ -321,6 +357,11 @@ impl SetCommand {
              secret_config.set_provider(provider_name_to_use.clone());
          }
  
@@ -112,10 +112,10 @@ index cac7861..7a1f1da 100644
              // Priority order: remote key name, encrypted value, then plaintext
              if let Some(remote_key) = remote_key_name {
 diff --git a/src/lib.rs b/src/lib.rs
-index 2681b47..c3438c1 100644
+index c4351624..6cd383f1 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -19,6 +19,7 @@ pub mod hook_env;
+@@ -21,6 +21,7 @@ pub mod hook_env;
  pub mod mcp_server;
  #[cfg(not(target_os = "wasi"))]
  pub mod proxy;
@@ -125,7 +125,7 @@ index 2681b47..c3438c1 100644
  pub mod tui;
 diff --git a/src/seven.rs b/src/seven.rs
 new file mode 100644
-index 0000000..f05862d
+index 00000000..f05862d4
 --- /dev/null
 +++ b/src/seven.rs
 @@ -0,0 +1,101 @@

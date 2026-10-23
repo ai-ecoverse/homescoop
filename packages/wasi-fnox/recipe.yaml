@@ -1,18 +1,18 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.39.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.40.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
 # (/dev/sealed and exec tickets).
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
-version: "1.39.0"
+version: "1.40.0"
 npm: "@ai-ecoverse/wasi-fnox"
-summary: "fnox 1.39 for slicc WASI preview1 (command fnox; seven's sealed store)"
+summary: "fnox 1.40 for slicc WASI preview1 (command fnox; seven's sealed store)"
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
-  sha256: "21669929b2517e7b5425263c75c5f055220126cac1720b40549c316c92db77a9"
-  epoch: "1791301147"
+  sha256: "9e3853e884f59591bd136d954d921a0910c14d5d336d7ab622771e9e13f7dc4b"
+  epoch: "1792160117"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.39.0; the patches live here, are not
+    Upstream is jdx/fnox v1.40.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -34,13 +34,20 @@ about:
     homescoop's crates/wasix-command, the path dependency 0005 names.
     (a) building for WASI:
       0001 gate non-WASI dependencies (cloud SDKs, reqwest, rustls,
-           keyring, TUI, prompts, signals, locks, keepass) by target
+           keyring, TUI, prompts, signals, locks, keepass, and from
+           1.40.0 kube, k8s-openapi and mlua's vendored Lua) by target
       0002 build only the age and plain providers on WASI; others keep
            their config variants and fail when used, and keep their
            env_dependencies() (read from the module source at build
-           time), so proxy run scrubs their credentials (homescoop#401)
-      0003 compile out mcp, proxy, tui, daemon, leases, prompts on WASI
-      0004 cwd from PWD, HOME from the environment, current_thread
+           time), so proxy run scrubs their credentials (homescoop#401);
+           from 1.40.0 also the kubernetes and lua providers, a module
+           directory (lua/mod.rs), and a list named by a constant (the
+           Azure providers' SERVICE_PRINCIPAL_ENV_VARS; azure_shared stays
+           built without its Azure SDK credential code)
+      0003 compile out mcp, proxy, tui, daemon, leases, prompts on WASI,
+           and from 1.40.0 the plugin command and fnox-core's plugins
+      0004 cwd from PWD, HOME from the environment, current_thread; the
+           XDG defaults (config, state, and 1.40.0's data dir) as on unix
       0005 spawn `fnox exec` children through wasix-command
       0011 allow the lints that WASI-gated code leaves behind
       0013 set: std IsTerminal on WASI (atty is always false on wasm);
@@ -49,6 +56,9 @@ about:
            editor's std Command can't run there; it trapped with 134,
            homescoop#376): "fnox edit is not available in seven: use
            fnox set"
+      0017 plain: read a `file` provider's secrets file with std::fs on
+           WASI (1.40.0's tokio::fs read needs a blocking-pool thread
+           and trapped with 134)
     (b) seven (secrets-tokens-design.md; /dev/sealed is §3.7):
       0006 the sealed provider and fnox_core::sealed, the device client
       0007 set: seal a piped value; on a terminal ask the vault dialog
@@ -65,9 +75,12 @@ about:
            activate names fnox by its PATH entry (/usr/bin/fnox), not a
            bare fnox its fnox() wrapper calls recursively; as_file files
            are refused with exec's message (temp_dir() panicked too)
+      0016 exec leaves an as_file secret unset with a warning instead of
+           refusing the command (homescoop#945); activate skips a fnox
+           on PATH the kernel won't execute (homescoop#1129)
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.39.0 commit time (source.epoch, 2026-10-06T15:39:07Z), so the
+    v1.40.0 commit time (source.epoch, 2026-10-16T14:15:17Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -76,4 +89,8 @@ about:
     adds 0015; 1.39.0-5 puts tokio in 0005's Cargo.lock entry for
     wasix-command (its optional tokio feature), so --locked builds again,
     and 0015's activate names /usr/bin/fnox when PATH has none
-    (homescoop#554).
+    (homescoop#554); 1.39.0-6 adds 0016. 1.40.0-1 rebases the series
+    onto v1.40.0: 0001-0004, 0006, 0007, 0009 and 0013 are refreshed
+    (contexts, the new kubernetes and lua providers, plugins,
+    azure_shared, set's --from-file order); no patch is dropped, since
+    upstream does none of them itself; 0017 is new.

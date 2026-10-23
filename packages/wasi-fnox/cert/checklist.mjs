@@ -43,11 +43,11 @@ export default async function (ctx) {
 
   const ver = await fnox(['--version']);
   assert.equal(ver.status, 0, `--version: ${ver.stderr}`);
-  assert.match(ver.stdout, /^fnox 1\.39\.0/);
+  assert.match(ver.stdout, /^fnox 1\.40\.0/);
   const help = await fnox(['--help']);
   assert.equal(help.status, 0);
   for (const cmd of ['exec', 'get', 'set', 'proxy']) assert.match(help.stdout, new RegExp(`\\n  ${cmd} `));
-  for (const cmd of ['daemon', 'tui', 'mcp']) assert.doesNotMatch(help.stdout, new RegExp(`\\n  ${cmd} `));
+  for (const cmd of ['daemon', 'tui', 'mcp', 'plugin']) assert.doesNotMatch(help.stdout, new RegExp(`\\n  ${cmd} `));
   const add = await fnox(['provider', 'add', '--help']);
   assert.equal(add.status, 0, `provider add --help: ${add.stderr}`);
   assert.match(add.stdout, /\bsealed\b/, 'provider add offers sealed on WASI');
@@ -142,6 +142,66 @@ export default async function (ctx) {
   assert.match(scrub.stdout, /^GITHUB_TOKEN=seven_ph_gh_0001$/m);
   for (const name of Object.keys(creds)) {
     assert.doesNotMatch(scrub.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed ${name} to the child (homescoop#401)`);
+  }
+
+  await write('home/v140/.env', 'FROMFILE=from-the-file\n');
+  await write('home/v140/conf/secrets.json', '{"FROMJSON": "from-the-json-file"}\n');
+  await write('home/v140/sub/dir/.keep', '');
+  await write(
+    'home/v140/fnox.toml',
+    [
+      '[providers.k8s]', 'type = "kubernetes"', '',
+      '[providers.lua]', 'type = "lua"', 'plugin = "my-plugin"', '',
+      '[providers.envfile]', 'type = "plain"', 'file = "/home/v140/.env"', 'format = "env"', '',
+      '[providers.jsonfile]', 'type = "plain"', 'file = "conf/secrets.json"', 'format = "json"', '',
+      '[secrets]',
+      'K8S = { provider = "k8s", value = "app-secret" }',
+      'LUA = { provider = "lua", value = "app-secret" }',
+      'FROMFILE = { provider = "envfile", value = "FROMFILE" }',
+      'FROMJSON = { provider = "jsonfile", value = "FROMJSON" }', '',
+    ].join('\n'),
+  );
+  const fromFile = await run(['fnox', 'get', 'FROMFILE'], { cwd: '/home/v140', env });
+  assert.equal(fromFile.status, 0, `1.40.0 plain provider with a file: ${fromFile.stderr}`);
+  assert.equal(fromFile.stdout.trim(), 'from-the-file', `1.40.0 plain provider reads the value from its file: ${fromFile.stdout}`);
+  for (const cwd of ['/home/v140', '/home/v140/sub/dir']) {
+    const rel = await run(['fnox', 'get', 'FROMJSON'], { cwd, env: { ...env, PWD: cwd } });
+    assert.equal(rel.status, 0, `1.40.0 plain provider with a relative json file, from ${cwd}: ${rel.stderr}`);
+    assert.equal(rel.stdout.trim(), 'from-the-json-file', `1.40.0 a relative plain file is read from the config's directory, not the cwd (${cwd}): ${rel.stdout}`);
+  }
+  for (const [key, type] of [['K8S', 'kubernetes'], ['LUA', 'lua']]) {
+    const r = await run(['fnox', 'get', key], { cwd: '/home/v140', env });
+    assert.notEqual(r.status, 0, `1.40.0 ${type} provider must fail in the WASI build`);
+    assert.notEqual(r.status, 134, `1.40.0 ${type} provider trapped: ${r.stderr}`);
+    assert.ok(flat(r.stderr).includes(`provider type '${type}' is not available in the WASI build of fnox`), `1.40.0 ${type} provider: ${r.stderr}`);
+    assert.doesNotMatch(r.stderr, /panicked|wasm trap/);
+  }
+  const pluginCmd = await run(['fnox', 'plugin', 'list'], { cwd: '/home/v140', env });
+  assert.notEqual(pluginCmd.status, 0, 'fnox plugin is not built on WASI');
+  assert.notEqual(pluginCmd.status, 134, `fnox plugin trapped: ${pluginCmd.stderr}`);
+  await write(
+    'home/v140scrub/fnox.toml',
+    [
+      '[providers.seven]', 'type = "sealed"', '',
+      '[providers.k8s]', 'type = "kubernetes"', '',
+      '[providers.lua]', 'type = "lua"', 'plugin = "my-plugin"', '',
+      '[providers.azsm]', 'type = "azure-sm"', 'vault_url = "https://example.vault.azure.net"', '',
+      '[secrets]', 'GH = { provider = "seven", value = "seven_ph_gh_0001" }', '',
+      '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', 'env = "GITHUB_TOKEN"', '',
+    ].join('\n'),
+  );
+  const k8sCreds = {
+    FNOX_K8S_CONTEXT: 'k8s_context_ambient',
+    KUBECONFIG: '/home/v140scrub/kubeconfig',
+    AZURE_TENANT_ID: 'az_tenant_ambient',
+    AZURE_CLIENT_ID: 'az_client_ambient',
+    AZURE_CLIENT_SECRET: 'az_secret_ambient',
+  };
+  const scrub140 = await run(['fnox', 'proxy', 'run', '--', 'printenv'], { cwd: '/home/v140scrub', env: { ...env, ...k8sCreds } });
+  assert.equal(scrub140.status, 0, `1.40.0 proxy run with kubernetes, lua and azure-sm providers: ${scrub140.stderr}`);
+  assert.match(scrub140.stdout, /^GITHUB_TOKEN=seven_ph_gh_0001$/m);
+  for (const name of Object.keys(k8sCreds)) {
+    assert.doesNotMatch(scrub140.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed a configured provider's ${name} to the child (homescoop#401)`);
   }
 
   await write('home/plain/fnox.toml', '[providers.plain]\ntype = "plain"\n\n[secrets]\nLOG_LEVEL = { provider = "plain", value = "debug" }\n');

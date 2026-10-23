@@ -6,11 +6,12 @@ Subject: [PATCH 04/13] wasi: take the working directory and home from the
 
 wasi-libc starts every program in "/", so fnox changes to $PWD before
 anything else and reads HOME from the environment, which dirs has no
-WASI backend for. XDG-style defaults apply to WASI as on unix. The
+WASI backend for. XDG-style defaults apply to WASI as on unix
+(config, state, and the data directory 1.40.0 added for plugins). The
 tokio runtime is current_thread on WASI.
 
 diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
-index d8fd5aa..5cbc184 100644
+index 560735a1..38194e43 100644
 --- a/crates/fnox-core/src/env.rs
 +++ b/crates/fnox-core/src/env.rs
 @@ -40,12 +40,18 @@ pub fn remove_var<K: AsRef<OsStr>>(key: K) {
@@ -43,8 +44,17 @@ index d8fd5aa..5cbc184 100644
                  return HOME_DIR.join(".local").join("state");
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
+@@ -71,7 +77,7 @@ pub static FNOX_DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+     var_path("FNOX_DATA_DIR").unwrap_or_else(|| {
+         var_path("XDG_DATA_HOME")
+             .unwrap_or_else(|| {
+-                #[cfg(unix)]
++                #[cfg(any(unix, target_os = "wasi"))]
+                 return HOME_DIR.join(".local").join("share");
+                 #[cfg(windows)]
+                 return HOME_DIR.join("AppData").join("Local");
 diff --git a/src/main.rs b/src/main.rs
-index fbc65cb..a973b03 100644
+index fbc65cbb..a973b032 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -3,6 +3,10 @@ use fnox::settings;
