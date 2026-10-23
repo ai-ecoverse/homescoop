@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-php",
-  "version": "8.5.12-2",
+  "version": "8.5.12-3",
   "description": "The PHP 8.5 programming language, with its built-in web server, SQLite, XML, OpenSSL and Phar.",
   "engines": {
     "slicc-kernel": ">=1.120.0"

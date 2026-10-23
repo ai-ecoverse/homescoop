@@ -1,8 +1,81 @@
-# Negative proof (wasix-php 8.5.12-2)
+# Negative proof (wasix-php 8.5.12-3)
 
-**Date:** 2026-10-22
+**Date:** 2026-10-23
+
+## 8.5.12-3: the published 8.5.12-2 fails the depth rows (#1705)
+
+The published `@ai-ecoverse/wasix-php@8.5.12-2` against this tree's
+`cert/stack.mjs` (slicc-kernel 1.146.5, users enforce) stops at its first
+depth row:
+
+```text
+browser-cert: FAIL packages/wasix-php/cert/stack.mjs
+AssertionError [ERR_ASSERTION]: serialize at depth 500: rc 0
+Error: Maximum call stack size of 409600 bytes (zend.max_allowed_stack_size - zend.reserved_stack_size) reached. Infinite recursion?
+```
+
+Every depth row, run one by one on 8.5.12-2 (8.5.12-3 prints `ok` for each):
+
+| row | 8.5.12-2 |
+| --- | --- |
+| `serialize` 500, arrays and objects | `Error: Maximum call stack size of 409600 bytes … reached. Infinite recursion?` |
+| `==` on arrays 500, on `stdClass` objects 200 | `Error: Maximum call stack size reached during comparison` |
+| `==` on objects with declared properties 500 | `Error: Maximum call stack size reached during object comparison` |
+| `json_encode` 500, arrays and objects | false, `Maximum stack depth exceeded` |
+| `array_map` 500, `array_walk_recursive` 500, `count(COUNT_RECURSIVE)` 500 | the 409600-byte Error |
+| `var_dump` 200 | `nesting level too deep` in the output |
+| `__toString` 200, `__get` 300, `preg_replace_callback` 200, `ArrayAccess` 300 | the 409600-byte Error |
+| `http_build_query` 500 | `Error: Maximum call stack size reached.` |
+| `usort` 150, `DOMDocument::saveXML` 500 | ok |
+
+Compiling a 2000-deep constant array, a checked path, still ended `php` with
+rc 70 on 8.5.12-2: its check is in `zend_check_stack_limit()`, which clang
+didn't inline into `zend_eval_const_expr()`, so the 2 KiB frame was gone by
+the time the recursion went on:
+
+```text
+RangeError: Maximum call stack size exceeded
+    at php.zend_eval_const_expr (wasm://wasm/php-0887909e:wasm-function[10491]:0x7f7401)
+    at php.zend_try_ct_eval_array (wasm://wasm/php-0887909e:wasm-function[10496]:0x7f97d6)
+```
+
+8.5.12-3 puts each pad in the frame of the function on the recursive path
+(the README has the levels per path).
+
+### The pad check in build.sh
+
+build.sh reads the pads from the patched `Zend/zend_call_stack.h` and the
+41 functions that take one from the patched sources, and fails unless each
+function, or the one build.sh names it inlined into, subtracts at least its
+pad from `__stack_pointer` in php.wasm. On this build it prints
+`php.wasm: patches/0009's stack pads in 41 functions (24 sizes), each frame at least its pad: execute_ex 3600, php_var_serialize_intern 3200, zend_hash_compare 3280, php_array_user_compare_unstable 5792`.
+Run on 8.5.12-2's php.wasm, it fails:
+
+```text
+homescoop wasix-php: patches/0009's stack pads are missing from php.wasm, so the stack check no longer counts the browser's stack (21 problems): execute_ex takes 2048 bytes of shadow stack, under execute_ex's 3600-byte ZEND_WASI_PAD_EXECUTE; php_array_user_compare_unstable takes 48 bytes of shadow stack, under php_array_user_compare_unstable's 5744-byte ZEND_WASI_PAD_USER_COMPARE; …; zend_eval_const_expr takes 32 bytes of shadow stack, under zend_eval_const_expr's 2048-byte ZEND_WASI_PAD_CONST_EXPR; zend_hash_compare takes 2048 bytes of shadow stack, under zend_hash_compare's 3280-byte ZEND_WASI_PAD_HASH_COMPARE; …
+```
+
+### Sizing the pads
+
+Measured on builds of this tree with V8's baseline compiler only
+(`--js-flags=--no-wasm-tier-up`, the shallowest the browser allows; with
+tier-up the same paths go deeper). A first build sized every pad from
+8.5.12-2's numbers and stopped `serialize()` at 462 levels:
+`php_var_serialize_intern`'s 1080-byte buffer had shared the inlined 2 KiB
+frame in 8.5.12-2 and now sits beside its pad, so the pad shrank by that
+much. A second build put every measured path at 0.60 to 0.68 of its limit,
+except compiling a constant array (0.81: its limit had moved from 1858 to
+1499 levels between builds), whose pad grew from 1632 to 2048 bytes.
+`ReflectionFunction::invoke()`, with no pad of its own, stops at 535 of 690
+levels (0.78).
+
+prove-negative on the 8.5.12-3 build:
+`prove-negative: emptied 1 module(s): bin/php.wasm`, then
+`prove-negative: ok — cert failed on bad wasix-php tarball (status 1; 15 of 18 spec(s) failed: bailout.mjs, checklist.mjs, fd.mjs, fibers.mjs, heap.mjs, http.mjs, memory.mjs, openssl.mjs, process.mjs, server.mjs, sqlite.mjs, stack.mjs, tmp-phar.mjs, users.mjs, xml.mjs)`.
 
 ## 8.5.12-2: the published 8.5.12-1 fails the new specs
+
+(Recorded for 8.5.12-2 on 2026-10-22; 8.5.12-3 replaced its single 2 KiB frame and 448 KiB budget.)
 
 The published `@ai-ecoverse/wasix-php@8.5.12-1` against this tree's
 `cert/` (slicc-kernel 1.145.0, users enforce):
