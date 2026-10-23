@@ -52,6 +52,8 @@
 #define TLS_SERVER_REQUIRE_CERT 2
 #define TLS_SERVER_SELECT 4
 #define TLS_SELECT 2
+#define TLS_KEYLOG 8
+#define KEYLOG_CAP 4096
 #define SELECT_WAIT 1
 #define SELECT_PAUSED 2
 #define SELECT_DONE 3
@@ -325,6 +327,9 @@ typedef struct {
   int refused;
   unsigned char *client_alpn;
   size_t client_alpn_len;
+  size_t keylog_len;
+  size_t keylog_cap;
+  char keylog[KEYLOG_CAP];
   unsigned char in[IN_CAP], out[OUT_CAP];
   size_t in_len, out_len;
   int in_eof;
@@ -381,7 +386,85 @@ static void session_free(session *s) {
   if (s->leaf) leaf_release(s->leaf);
   if (s->trust) ca_release(s->trust);
   free(s->client_alpn);
+  mbedtls_platform_zeroize(s->keylog, sizeof s->keylog);
   free(s);
+}
+
+static const char *keylog_label(mbedtls_ssl_key_export_type type) {
+  switch (type) {
+    case MBEDTLS_SSL_KEY_EXPORT_TLS12_MASTER_SECRET: return "CLIENT_RANDOM";
+    case MBEDTLS_SSL_KEY_EXPORT_TLS1_3_CLIENT_HANDSHAKE_TRAFFIC_SECRET: return "CLIENT_HANDSHAKE_TRAFFIC_SECRET";
+    case MBEDTLS_SSL_KEY_EXPORT_TLS1_3_SERVER_HANDSHAKE_TRAFFIC_SECRET: return "SERVER_HANDSHAKE_TRAFFIC_SECRET";
+    case MBEDTLS_SSL_KEY_EXPORT_TLS1_3_CLIENT_APPLICATION_TRAFFIC_SECRET: return "CLIENT_TRAFFIC_SECRET_0";
+    case MBEDTLS_SSL_KEY_EXPORT_TLS1_3_SERVER_APPLICATION_TRAFFIC_SECRET: return "SERVER_TRAFFIC_SECRET_0";
+    default: return NULL;
+  }
+}
+
+static char *keylog_hex(char *p, const unsigned char *bytes, size_t len) {
+  static const char digits[] = "0123456789abcdef";
+  for (size_t i = 0; i < len; i++) {
+    *p++ = digits[bytes[i] >> 4];
+    *p++ = digits[bytes[i] & 15];
+  }
+  return p;
+}
+
+static void on_export_keys(void *ctx, mbedtls_ssl_key_export_type type, const unsigned char *secret,
+                           size_t secret_len, const unsigned char client_random[32],
+                           const unsigned char server_random[32], mbedtls_tls_prf_types prf) {
+  (void)server_random;
+  (void)prf;
+  session *s = ctx;
+  const char *label = keylog_label(type);
+  if (!label || secret_len == 0 || secret_len > 64) return;
+  size_t label_len = strlen(label);
+  size_t need = label_len + 1 + 64 + 1 + 2 * secret_len + 1;
+  if (s->keylog_len > s->keylog_cap || s->keylog_cap - s->keylog_len < need) return;
+  char *p = s->keylog + s->keylog_len;
+  memcpy(p, label, label_len);
+  p += label_len;
+  *p++ = ' ';
+  p = keylog_hex(p, client_random, 32);
+  *p++ = ' ';
+  p = keylog_hex(p, secret, secret_len);
+  *p = '\n';
+  s->keylog_len += need;
+}
+
+static void keylog_arm(session *s, int flags) {
+  if (!(flags & TLS_KEYLOG)) return;
+  s->keylog_cap = KEYLOG_CAP;
+  mbedtls_ssl_set_export_keys_cb(&s->ssl, on_export_keys, s);
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_keylog(session *s, char *out, size_t max) {
+  if (s->keylog_len == 0) return 0;
+  size_t n = 0;
+  for (size_t at = 0; at < s->keylog_len && at < max; at++)
+    if (s->keylog[at] == '\n') n = at + 1;
+  if (n == 0) return TLS_BADARG;
+  memcpy(out, s->keylog, n);
+  memmove(s->keylog, s->keylog + n, s->keylog_len - n);
+  mbedtls_platform_zeroize(s->keylog + s->keylog_len - n, n);
+  s->keylog_len -= n;
+  return (int)n;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_test_keylog_armed(session *s) {
+  return s->ssl.MBEDTLS_PRIVATE(f_export_keys) != NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_test_keylog_residue(session *s) {
+  int n = 0;
+  for (size_t i = 0; i < sizeof s->keylog; i++) n += s->keylog[i] != 0;
+  return n + (int)s->keylog_len;
+}
+
+EMSCRIPTEN_KEEPALIVE int tls_test_keylog_cap(session *s, size_t cap) {
+  if (s->started || s->keylog_cap == 0 || cap > KEYLOG_CAP) return TLS_BADARG;
+  s->keylog_cap = cap;
+  return 0;
 }
 
 /* A server session for `host` presenting `l`'s chain; 0 on failure. */
@@ -516,7 +599,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new_name(ca *trust, const unsigned char
   int chain_only = (flags & TLS_CLIENT_VERIFY_CHAIN_ONLY) != 0;
   /* The name is servername_len bytes, not a C string: a NUL inside it is
    * refused, never cut at (homescoop#1042). */
-  if ((flags & ~TLS_CLIENT_FLAGS) != 0 || (insecure && chain_only) ||
+  if ((flags & ~(TLS_CLIENT_FLAGS | TLS_KEYLOG)) != 0 || (insecure && chain_only) ||
       (servername_len > 0 && !servername) || servername_len >= sizeof(((session *)0)->host) ||
       (servername_len > 0 && memchr(servername, 0, servername_len) != NULL) ||
       (!insecure && (!trust || servername_len == 0))) {
@@ -561,6 +644,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_client_new_name(ca *trust, const unsigned char
     return NULL;
   }
   mbedtls_ssl_set_bio(&s->ssl, s, bio_send, bio_recv, NULL);
+  keylog_arm(s, flags);
   return s;
 }
 
@@ -729,7 +813,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_server_new(leaf *l, const unsigned char *alpn,
   int select = (flags & TLS_SERVER_SELECT) != 0;
   int auth = flags & (TLS_SERVER_REQUEST_CERT | TLS_SERVER_REQUIRE_CERT);
   if ((!l && !select) || (l && l->certs == 0) || (alpn_len > 0 && (!alpn || select)) ||
-      (flags & ~(TLS_SERVER_REQUEST_CERT | TLS_SERVER_REQUIRE_CERT | TLS_SERVER_SELECT)) != 0 ||
+      (flags & ~(TLS_SERVER_REQUEST_CERT | TLS_SERVER_REQUIRE_CERT | TLS_SERVER_SELECT | TLS_KEYLOG)) != 0 ||
       auth == (TLS_SERVER_REQUEST_CERT | TLS_SERVER_REQUIRE_CERT) || (auth != 0 && !client_ca)) {
     last_error = TLS_BADARG;
     return NULL;
@@ -777,6 +861,7 @@ EMSCRIPTEN_KEEPALIVE session *tls_server_new(leaf *l, const unsigned char *alpn,
   }
   mbedtls_ssl_set_user_data_p(&s->ssl, s);
   mbedtls_ssl_set_bio(&s->ssl, s, bio_send, bio_recv, NULL);
+  keylog_arm(s, flags);
   return s;
 }
 

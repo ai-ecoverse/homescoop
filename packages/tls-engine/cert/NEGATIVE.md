@@ -267,3 +267,19 @@ The base is homescoop origin/main ec2b7f3d, with `host-run.sh` builds (emsdk 4.0
   - **TLS 1.2:** `mbedtls_ssl_parse_certificate` returned `NO_CLIENT_CERTIFICATE` without pending an alert; the patch pends 40 (handshake_failure).
 - **#1766:** 4.2.0-8 has no `tls_server_select`, `tls_server_refuse` or `tls_client_alpn`, and `tls_server_new` refuses flags 4. The refused-flags case of #1638 now tries 7, 8 and `REQUIRE_CERT | 4` without `client_ca` instead of 4.
 - **4.2.0-9 as built:** server-api 40/40 (14 from 4.2.0-8, 15 for #1765, 11 for #1766), client-api 33/33, engine-api 19/19. The wasm grows by 2314 bytes (317142 to 319456).
+
+## 4.2.0-10: NSS key log lines (homescoop#1774; 2026-10-23)
+
+The base is homescoop origin/main 3617e1e0, with `host-run.sh` builds (emsdk 4.0.23), Node 26.11.1 and OpenSSL 4.0.3's `openssl s_client`.
+
+- **The published 4.2.0-9** (`npm pack @ai-ecoverse/wasm-tls-engine@4.2.0-9`, sha256 08365fdc5b06ea75230d40d4a5a5af456dafc57c152a1cd6c6dc8eded8f594c3) fails `keylog.mjs` in its `before` hook, so all 12 cases are cancelled and `node --test packages/tls-engine/cert/lib/keylog.mjs` exits 1:
+
+```text
+AssertionError [ERR_ASSERTION]: 4.2.0-9 has no _tls_keylog
+ℹ tests 12  ℹ pass 0  ℹ fail 0  ℹ cancelled 12
+```
+
+  Flag 8 isn't ignored there either: `tls_client_new(…, 8)` and `tls_server_new(0, 0, 0, 0, SELECT | 8)` return 0 with `TLS_BADARG`.
+- **The 4.2.0-10 engine without the zeroing on drain** (the tail of the buffer left as it was) fails the drain case: `the buffer is zero after a drain`. **Without the zeroing in `tls_session_free`** it fails the same case at `no copy left: the drain zeroed the client's lines and tls_session_free the server's` (the freed session's lines are still in the heap). `ℹ pass 11  ℹ fail 1` each.
+- **Refused-flag cases:** 8 is now `TLS_KEYLOG`, so the unknown-bit cases of `client-api.mjs` try 16 and `32 | NO_SNI` (was 8 and `16 | NO_SNI`) and 16 (was 8), and `server-api.mjs`'s #1638 case tries 16 (was 8).
+- **4.2.0-10 as built:** keylog 12/12, server-api 40/40, client-api 33/33, engine-api 19/19. The wasm grows by 850 bytes (319456 to 320306).
