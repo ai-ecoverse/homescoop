@@ -283,3 +283,23 @@ AssertionError [ERR_ASSERTION]: 4.2.0-9 has no _tls_keylog
 - **The 4.2.0-10 engine without the zeroing on drain** (the tail of the buffer left as it was) fails the drain case: `the buffer is zero after a drain`. **Without the zeroing in `tls_session_free`** it fails the same case at `no copy left: the drain zeroed the client's lines and tls_session_free the server's` (the freed session's lines are still in the heap). `ℹ pass 11  ℹ fail 1` each.
 - **Refused-flag cases:** 8 is now `TLS_KEYLOG`, so the unknown-bit cases of `client-api.mjs` try 16 and `32 | NO_SNI` (was 8 and `16 | NO_SNI`) and 16 (was 8), and `server-api.mjs`'s #1638 case tries 16 (was 8).
 - **4.2.0-10 as built:** keylog 12/12, server-api 40/40, client-api 33/33, engine-api 19/19. The wasm grows by 850 bytes (319456 to 320306).
+
+## 4.2.0-11: EXPORTER_SECRET in the TLS 1.3 key log (homescoop#1799; 2026-10-24)
+
+The base is homescoop origin/main c1d78bca, with a `host-run.sh` build (emsdk 4.0.23), Node 26.11.1 and OpenSSL 4.0.3's `openssl s_client`.
+
+- **The published 4.2.0-10** (`npm pack @ai-ecoverse/wasm-tls-engine@4.2.0-10`, sha256 57be199745fe413c42c20b50b16ca351ee29850e03efda01909d7487684d0b29) logs four lines on TLS 1.3, where OpenSSL and Node log five. `node --test packages/tls-engine/cert/lib/keylog.mjs` fails every TLS 1.3 case, 14 of 19, and exits 1; the 5 that pass are TLS 1.2, the no-flag case and the flags case:
+
+```text
+✖ a server session over TLSv1.3: its lines are openssl s_client -keylogfile's for the same session
+  AssertionError [ERR_ASSERTION]: one line per secret
+  -   'EXPORTER_SECRET',
+✖ a server session, TLS_AES_128_GCM_SHA256: five lines, each one Node tls.connect's keylog line
+  AssertionError [ERR_ASSERTION]: the engine logs five lines on TLS 1.3 (TLS_AES_128_GCM_SHA256):
+ℹ tests 19  ℹ pass 5  ℹ fail 14
+```
+
+- **The spec compares every line now:** `agree` used to drop the peer's lines with labels the engine didn't log, which is how 4.2.0-10 passed with OpenSSL's `EXPORTER_SECRET` left out. It now wants the engine's lines and the peer's to be the same set.
+- **The cause:** Mbed TLS 4.2.0's export callback has no type for the exporter master secret. It derives it in the same step as the application traffic secrets, then exports those two. The engine now reads it from `session_negotiate->app_secrets` when the callback reports the server's application traffic secret (README, Key log lines), without patching Mbed TLS.
+- **The #1041 rows** in `client-api.mjs` (a 255/256-byte name, an intermediate chain, FUTURE, trailing bytes, a 256-byte hostname for `tls_chain_verify`) are coverage: they pass on 4.2.0-10 too.
+- **4.2.0-11 as built:** keylog 19/19, server-api 40/40, client-api 36/36, engine-api 19/19. The wasm grows by 83 bytes (320306 to 320389).
