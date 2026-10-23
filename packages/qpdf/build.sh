@@ -20,6 +20,20 @@ test -f "$PREFIX/include/zlib.h" || { echo "missing zlib in PREFIX=$PREFIX" >&2;
 test -f "$PREFIX/include/jpeglib.h" || { echo "missing jpeg in PREFIX=$PREFIX" >&2; exit 1; }
 
 SLICC_A="$WORK/libslicc-qpdf.a"
+eval "$(bash "$ROOT/scripts/emscripten-tree.sh" "$WORK/qpdf-em")"
+patch -d "$EMSCRIPTEN_TREE" -p1 --batch --no-backup-if-mismatch -s < "$ROOT/packages/wasm-emscripten/package-patches/0014-libfs-symloop.patch"
+if find "$EMSCRIPTEN_TREE" -name '*.rej' -o -name '*.orig' | grep -q .; then
+  echo "qpdf: package patch leftovers in $EMSCRIPTEN_TREE" >&2
+  exit 1
+fi
+grep -q 'nlinks <= {{{ cDefs.SYMLOOP_MAX }}}' "$EMSCRIPTEN_TREE/src/lib/libfs.js"
+export EM_CONFIG="$EMSCRIPTEN_TREE_CONFIG"
+unset EM_CACHE
+export PATH="$EMSCRIPTEN_TREE:$PATH"
+[[ "$(command -v emcc)" == "$EMSCRIPTEN_TREE/emcc" && "$(command -v emcmake)" == "$EMSCRIPTEN_TREE/emcmake" ]] || { echo "qpdf-toolchain: FAIL emcc is $(command -v emcc), not $EMSCRIPTEN_TREE/emcc" >&2; exit 1; }
+EMV="$(emcc -dumpversion)"
+[[ "$EMV" == 6.0.9* ]] || { echo "qpdf-toolchain: FAIL emcc -dumpversion is $EMV, not 6.0.9 (homescoop#1354)" >&2; exit 1; }
+echo "qpdf-toolchain: PASS emscripten $EMV on $("$EMSDK_RELEASE_LLVM/clang" --version | head -1)"
 homescoop_slicc_archive "$SLICC_A" gaps
 # qpdf recurses deeply on nested PDF objects; 1 MiB matches binutils.
 export HOMESCOOP_EM_CLI_LDFLAGS_EXTRA="-sSTACK_SIZE=1048576 -sINVOKE_RUN=0 -sEXPORTED_RUNTIME_METHODS=FS,callMain -lnodefs.js"
@@ -59,10 +73,13 @@ fi
 for p in "${PROGS[@]}"; do
   dir="$BLD/qpdf"
   [[ "$p" == zlib-flate ]] && dir="$BLD/zlib-flate"
-  rsp="$dir/CMakeFiles/$p.dir/linkLibs.rsp"
-  test -f "$rsp" || { echo "qpdf-deps: FAIL no $rsp" >&2; exit 1; }
+  rsp=()
+  for f in "$dir/CMakeFiles/$p.dir/link.txt" "$dir/CMakeFiles/$p.dir/linkLibs.rsp"; do
+    [[ -f "$f" ]] && rsp+=("$f")
+  done
+  [[ "${#rsp[@]}" -gt 0 ]] || { echo "qpdf-deps: FAIL no $dir/CMakeFiles/$p.dir/link.txt" >&2; exit 1; }
   for lib in libz.a libjpeg.a; do
-    grep -Fq "$PREFIX/lib/$lib" "$rsp" || { echo "qpdf-deps: FAIL $p links no $PREFIX/lib/$lib (homescoop#1354, #918)" >&2; exit 1; }
+    grep -Fq "$PREFIX/lib/$lib" "${rsp[@]}" || { echo "qpdf-deps: FAIL $p links no $PREFIX/lib/$lib (homescoop#1354, #918)" >&2; exit 1; }
   done
 done
 echo "qpdf-deps: PASS ${PROGS[*]} link $PREFIX/lib/libz.a and $PREFIX/lib/libjpeg.a, no pkg-config module"

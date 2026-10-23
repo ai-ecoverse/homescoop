@@ -8,6 +8,9 @@ summary: "qpdf PDF transformation tool for slicc"
 source:
   url: "https://github.com/qpdf/qpdf/releases/download/v{{version}}/qpdf-{{version}}.tar.gz"
   sha256: "8a58af5b6141319287c1883bec8bd1bd545b7567b7fc5e6ce5d25a1c85f36397"
+inputs:
+  - "packages/wasm-emscripten/patches/**"
+  - "packages/wasm-emscripten/package-patches/0014-libfs-symloop.patch"
 dependencies:
   build:
     - "@ai-ecoverse/wasm-zlib@1.3.1-4"
@@ -21,4 +24,8 @@ about:
     qpdf, fix-qdf and zlib-flate (homescoop#96, replaces slicc 6's pdftk).
     emcmake, static libqpdf, native crypto only (no OpenSSL/GnuTLS),
     zlib + libjpeg from homescoop, wasm exceptions. Links the slicc gaps
-    profile. New package → human cert.
+    profile. Since 12.4.2-9 it builds with the patched emscripten 6.0.9
+    tree on emsdk 6.0.9's prebuilt compilers (scripts/emscripten-tree.sh,
+    plus wasm-emscripten's package patch 0014-libfs-symloop), whose LLVM
+    has fd76c9bdf103: emsdk 4.0.23's WebAssembly CFG Stackify walked a
+    pointer-keyed map, so qpdf.wasm came out in two variants (homescoop#1354).

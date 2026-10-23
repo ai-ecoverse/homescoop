@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-qpdf",
-  "version": "12.4.2-8",
+  "version": "12.4.2-9",
   "description": "qpdf 12.4: inspect, merge, split, rotate, encrypt, decrypt and linearize PDF files.",
   "license": "Apache-2.0",
   "repository": {
