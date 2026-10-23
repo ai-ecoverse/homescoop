@@ -38,6 +38,7 @@ merge_group
 push to main
   detect (list-touched-packages.mjs --publishable) → publish × package (OIDC) · close-listed-issues
 workflow_dispatch (main): publish named packages · issues / hourly: issue-labels
+daily 05:47 UTC, or workflow_dispatch with agent_loop_rounds: agent-loop (stress/wasi-pnpm-agent)
 ```
 
 **The one required check is `ci`.** It needs every job of the run, the
@@ -133,6 +134,16 @@ enable GitHub's native auto-merge right away with
 app token): an enqueue by `GITHUB_TOKEN` starts no `merge_group` run.
 `close-listed-issues` closes the issues a merged PR lists after a closing
 keyword, since a queue merge doesn't.
+
+**The pnpm agent stress fixture** ([`stress/wasi-pnpm-agent/`](../stress/wasi-pnpm-agent/README.md))
+has two jobs outside `ci`'s needs. `stress-lockfile` runs on a pull request
+that touches the fixture and checks its lockfile against its manifest with
+upstream pnpm (`pnpm install --frozen-lockfile --lockfile-only`). `agent-loop`
+runs `agent-loop.mjs` once a day (8 installs) and on a dispatch with
+`agent_loop_rounds` set. A dispatch with `agent_loop_rounds` set never
+publishes: `publish`'s `if` refuses it (`merge-queue.test.mjs` checks this).
+`scripts/test/stress-agent-fixture.test.mjs`
+checks the lockfile's importers on every pull request, inside `ci`.
 
 `scripts/list-touched-packages.mjs` maps changed paths → recipe names.
 `host-build` uploads `package.tgz` + sha256 as `host-<pkg>-prN`, runs

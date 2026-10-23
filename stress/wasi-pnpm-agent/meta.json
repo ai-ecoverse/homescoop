@@ -1,9 +1,11 @@
 {
   "harness": "slicc-kernel",
-  "kernel": "@ai-ecoverse/slicc-kernel@1.124.2",
   "users": "enforce",
   "needs": ["@ai-ecoverse/wasm-bash", "@ai-ecoverse/wasm-coreutils"],
   "runTimeoutMs": 14400000,
   "network": "registry.npmjs.org only, fetched by the page (CORS); every other host answers 502",
-  "checklist": ["not a cert: .github/workflows/pnpm-agent-loop.yml's stress loop for homescoop#1127"]
+  "checklist": [
+    "not a cert: the stress loop for homescoop#1127, run by ladder-build.yml's agent-loop job once a day (8 rounds) and on workflow_dispatch with agent_loop_rounds, with npm's @ai-ecoverse/wasi-pnpm at packages/wasi-pnpm's version on the slicc-kernel that agent/package.json pins",
+    "agent/pnpm-lock.yaml matches agent/package.json: ladder-build.yml's stress-lockfile job (pnpm install --frozen-lockfile --lockfile-only with upstream pnpm at wasi-pnpm's upstream version) on pull requests that touch stress/wasi-pnpm-agent/**, and scripts/test/stress-agent-fixture.test.mjs on every pull request"
+  ]
 }

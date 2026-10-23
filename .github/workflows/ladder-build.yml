@@ -31,6 +31,7 @@ on:
     types: [opened]
   schedule:
     - cron: '23 * * * *'
+    - cron: '47 5 * * *'
   workflow_dispatch:
     inputs:
       packages:
@@ -40,6 +41,11 @@ on:
         type: string
       npm_loglevel:
         description: 'Trace the npm publish: http, timing (http plus npm timing lines) or verbose. Empty leaves npm at its own log level.'
+        required: false
+        default: ''
+        type: string
+      agent_loop_rounds:
+        description: 'Run the stress/wasi-pnpm-agent loop (agent-loop job) with this many pnpm installs; the daily run does 8. Empty: no loop.'
         required: false
         default: ''
         type: string
@@ -901,7 +907,7 @@ jobs:
   # it, the bytes the reviewers saw. OIDC: npm trusts this file.
   publish:
     needs: detect
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && needs.detect.outputs.release != '[]'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && needs.detect.outputs.release != '[]' && !inputs.agent_loop_rounds
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -1010,3 +1016,98 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/issue-labels.mjs --backlog --apply
+
+  stress-lockfile:
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ github.event.pull_request.head.repo.full_name == github.repository && vars.CERT_LIGHT_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: touched
+        name: Does the change touch stress/wasi-pnpm-agent?
+        run: |
+          set -euo pipefail
+          if git diff --quiet HEAD^1 HEAD -- stress/wasi-pnpm-agent; then
+            echo "stress-lockfile: SKIP stress/wasi-pnpm-agent untouched"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only HEAD^1 HEAD -- stress/wasi-pnpm-agent
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.touched.outputs.run == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+      - name: agent/pnpm-lock.yaml matches agent/package.json
+        if: steps.touched.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          V=$(node -p "require('./packages/wasi-pnpm/package/package.json').version.replace(/-\\d+$/, '')")
+          [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::stress-lockfile: FAIL no pnpm version from packages/wasi-pnpm ($V)"; exit 1; }
+          npm install --prefix "$RUNNER_TEMP/pnpm" --no-fund --no-audit "pnpm@$V"
+          if ! "$RUNNER_TEMP/pnpm/node_modules/.bin/pnpm" install --frozen-lockfile --lockfile-only --dir stress/wasi-pnpm-agent/agent; then
+            echo "::error::stress-lockfile: FAIL stress/wasi-pnpm-agent/agent/pnpm-lock.yaml is out of date; run pnpm $V install --lockfile-only there (stress/wasi-pnpm-agent/README.md)"
+            exit 1
+          fi
+          echo "stress-lockfile: PASS pnpm $V install --frozen-lockfile --lockfile-only"
+
+  agent-loop:
+    if: (github.event_name == 'schedule' && github.event.schedule == '47 5 * * *') || (github.event_name == 'workflow_dispatch' && inputs.agent_loop_rounds != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+      - name: Harness (wasi-pnpm's cert pins) and Chromium
+        run: bash scripts/cert-review/harness.sh wasi-pnpm "$RUNNER_TEMP/nm"
+      - id: pins
+        name: wasi-pnpm at packages/wasi-pnpm's version, the kernel agent/package.json pins
+        run: |
+          set -euo pipefail
+          PNPM=$(node -p "require('./packages/wasi-pnpm/package/package.json').version")
+          KERNEL=$(node -p "require('./stress/wasi-pnpm-agent/agent/package.json').dependencies['@ai-ecoverse/slicc-kernel']")
+          mkdir -p "$RUNNER_TEMP/pnpm"
+          npm pack "@ai-ecoverse/wasi-pnpm@$PNPM" --pack-destination "$RUNNER_TEMP/pnpm" --silent
+          sha256sum "$RUNNER_TEMP"/pnpm/*.tgz
+          echo "kernel=@ai-ecoverse/slicc-kernel@$KERNEL" >> "$GITHUB_OUTPUT"
+      - name: Loop the agent install
+        env:
+          KERNEL: ${{ steps.pins.outputs.kernel }}
+          AGENT_LOOP_ROUNDS: ${{ inputs.agent_loop_rounds || '8' }}
+          AGENT_LOOP_OUT: ${{ runner.temp }}/agent-loop
+        run: |
+          set -euo pipefail
+          [[ "$AGENT_LOOP_ROUNDS" =~ ^[1-9][0-9]?$ ]] || { echo "::error::agent-loop: rounds must be 1 to 99, not $AGENT_LOOP_ROUNDS"; exit 1; }
+          HOMESCOOP_CERT_NODE_MODULES="$RUNNER_TEMP/nm/node_modules" node scripts/gate.mjs cert-run -- node scripts/browser-cert/run.mjs \
+            --package wasi-pnpm --cert stress/wasi-pnpm-agent --spec agent-loop.mjs --kernel "$KERNEL" \
+            --tarball "$RUNNER_TEMP"/pnpm/*.tgz --users enforce --soft
+      - name: Summary
+        if: always()
+        env:
+          OUT: ${{ runner.temp }}/agent-loop
+        run: |
+          f="$OUT/rounds.jsonl"
+          [ -f "$f" ] || { echo "agent-loop: FAIL no rounds ran" | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; }
+          node -e '
+            const rows = require("fs").readFileSync(process.argv[1], "utf8").trim().split("\n").map(JSON.parse);
+            const bad = rows.filter((r) => r.trapped || r.status);
+            console.log("agent-loop: " + (bad.length ? "FAIL " : "PASS ") + rows.length + " rounds, " + bad.length + " trapped or failed" + (bad.length ? ": " + bad.map((r) => r.round).join(",") : ""));
+          ' "$f" | tee -a "$GITHUB_STEP_SUMMARY"
+          cat "$f"
+          for r in "$OUT"/wasm-memories-start.txt "$OUT"/round-*.txt; do
+            [ -f "$r" ] || continue
+            echo "::group::$(basename "$r")"
+            cat "$r"
+            echo "::endgroup::"
+          done
