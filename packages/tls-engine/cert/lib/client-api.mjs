@@ -29,7 +29,7 @@ const CHAIN_ONLY = 4;
 const SUITES = { TLS_AES_128_GCM_SHA256: 0x1301, TLS_AES_256_GCM_SHA384: 0x1302, TLS_CHACHA20_POLY1305_SHA256: 0x1303, 'ECDHE-ECDSA-AES128-GCM-SHA256': 0xc02b, 'ECDHE-ECDSA-AES256-GCM-SHA384': 0xc02c, 'ECDHE-ECDSA-CHACHA20-POLY1305': 0xcca9 };
 const VERIFY_FAILED = -0x2700;
 const BAD_CERTIFICATE = -0x7a00;
-const BADCERT = { EXPIRED: 0x01, CN_MISMATCH: 0x04, NOT_TRUSTED: 0x08, EXT_KEY_USAGE: 0x1000 };
+const BADCERT = { EXPIRED: 0x01, CN_MISMATCH: 0x04, NOT_TRUSTED: 0x08, FUTURE: 0x0200, EXT_KEY_USAGE: 0x1000 };
 
 let work;
 function packageDir() {
@@ -560,6 +560,20 @@ describe('client sessions (slicc-kernel#922)', () => {
     engine.m._tls_session_free(cut);
   });
 
+  test('tls_client_new_name: a 255-byte name makes a session, 256 bytes and a NULL name with a length are TLS_BADARG (homescoop#1041)', () => {
+    const named = (bytes) => engine.with(bytes, (p) => engine.m._tls_client_new_name(trust, p, bytes.length, 0, 0, 0));
+    const label = 'a'.repeat(63);
+    const longest = Buffer.from([label, label, label, label].join('.'));
+    assert.equal(longest.length, 255);
+    const s = named(longest);
+    assert.ok(s, `255 bytes: ${engine.strerror(engine.m._tls_last_error())}`);
+    engine.m._tls_session_free(s);
+    assert.equal(named(Buffer.concat([longest, Buffer.from('a')])), 0, '256 bytes');
+    assert.equal(engine.m._tls_last_error(), BADARG);
+    assert.equal(engine.m._tls_client_new_name(trust, 0, 11, 0, 0, 0), 0, 'a NULL name with a length');
+    assert.equal(engine.m._tls_last_error(), BADARG);
+  });
+
   test('tls_strerror names the engine\'s own codes, not the Mbed TLS HMAC_DRBG codes that share their values (homescoop#1091)', () => {
     assert.equal(engine.strerror(BADARG), 'tls-engine - bad argument (TLS_BADARG)');
     assert.equal(engine.strerror(-2), 'tls-engine - out of memory (TLS_NOMEM)');
@@ -869,6 +883,40 @@ describe('tls_chain_verify, a chain checked without a handshake (4.2.0-5, slicc-
     assert.equal(oom.flags, UNVERIFIED);
     assert.deepEqual(verify([leaf], 'chain.test'), { ret: 0, flags: 0 });
     assert.equal(engine.m._tls_chain_verify(trust, 0, 0, 0, 0), BADARG);
+  });
+
+  test('through an intermediate: leaf plus intermediate verifies, the leaf alone is NOT_TRUSTED, the reverse order is not verified (homescoop#1041)', () => {
+    const root = makeCa('homescoop tls-engine chain root', { pathLen: 1 });
+    const inter = makeCa('homescoop tls-engine chain intermediate', { parent: root });
+    const store = engine.store([root.der]);
+    try {
+      const leaf = serverCert(inter, 'chain.test').der;
+      assert.deepEqual(verify([leaf, inter.der], 'chain.test', store), { ret: 0, flags: 0 });
+      const alone = verify([leaf], 'chain.test', store);
+      assert.equal(alone.ret, 1);
+      assert.equal(alone.flags & BADCERT.NOT_TRUSTED, BADCERT.NOT_TRUSTED);
+      assert.notEqual(verify([inter.der, leaf], 'chain.test', store).ret, 0);
+    } finally {
+      engine.m._tls_ca_free(store);
+    }
+  });
+
+  test('a not-yet-valid leaf is FUTURE; trailing bytes after the last certificate and a 256-byte hostname fail closed; 255 bytes is checked (homescoop#1041)', () => {
+    const day = 86400_000;
+    const future = verify([leafFor('chain.test', { notBefore: new Date(Date.now() + day), notAfter: new Date(Date.now() + 3 * day) })], 'chain.test');
+    assert.equal(future.ret, 1);
+    assert.equal(future.flags & BADCERT.FUTURE, BADCERT.FUTURE);
+    const leaf = Buffer.from(leafFor('chain.test'));
+    assert.deepEqual(verify([leaf], 'chain.test'), { ret: 0, flags: 0 });
+    const trailing = verify([leaf, Buffer.from([0x30, 0x03, 0x01])], 'chain.test');
+    assert.ok(trailing.ret < 0, JSON.stringify(trailing));
+    assert.equal(trailing.flags, UNVERIFIED);
+    const label = 'a'.repeat(63);
+    const longest = [label, label, label, label].join('.');
+    assert.deepEqual(verify([leaf], longest), { ret: 1, flags: BADCERT.CN_MISMATCH });
+    const tooLong = verify([leaf], `${longest}a`);
+    assert.equal(tooLong.ret, BADARG);
+    assert.equal(tooLong.flags, UNVERIFIED);
   });
 
   test('keeps nothing: 2000 verifications leave the heap where it was', () => {

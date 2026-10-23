@@ -57,7 +57,9 @@ export interface TlsEngineModule {
    * 2 (TLS_CLIENT_NO_SNI) to send no SNI (the name is still checked, exactly as with SNI), 4
    * (TLS_CLIENT_VERIFY_CHAIN_ONLY): SKIPS THE HOSTNAME CHECK; the caller MUST check the
    * server's identity itself (e.g. Node's checkServerIdentity), and tls_name_mismatch says
-   * what the skipped check found. Every other combination than 0, 1, 2, 4, 1|2 and 2|4 is refused.
+   * what the skipped check found. Each of 0, 1, 2, 4, 1|2 and 2|4 may add 8 (TLS_KEYLOG, since
+   * 4.2.0-10) to collect the session's NSS key log lines for _tls_keylog. Every other combination
+   * is refused with TLS_BADARG.
    */
   _tls_client_new(ca: number, servername: number, alpn: number, alpnLen: number, flags: number): number;
   /**

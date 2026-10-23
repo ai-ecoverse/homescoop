@@ -1,16 +1,3 @@
-/**
- * The engine's own API, driven as SLICC's realm proxy drives it
- * (slicc-kernel src/kernel/net/tls-engine.ts, tls-tunnel.ts), with Node's
- * TLS client on the other side of the memory buffers: a leaf key the engine
- * makes, a chain a CA outside it signs (cert/lib/x509.mjs), server sessions
- * fed and drained by hand.
- *
- *   node --test packages/tls-engine/cert/lib/engine-api.mjs   # from the repo root
- *
- * The package comes from TLS_ENGINE_PACKAGE (an unpacked package/ directory)
- * or TLS_ENGINE_TGZ (default: .homescoop-out/package.tgz, where ladder-pr's
- * cert job puts the tarball under test).
- */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { X509Certificate, createHash, createPublicKey } from 'node:crypto';

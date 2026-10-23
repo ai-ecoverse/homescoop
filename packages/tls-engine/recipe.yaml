@@ -4,7 +4,6 @@
 name: tls-engine
 builder: host
 runner: pool
-# The engine's tarball is byte-stable (#598): ladder-pr builds it twice.
 reproducible: true
 # renovate: datasource=github-releases depName=Mbed-TLS/mbedtls extractVersion=^mbedtls-(?<version>.*)$
 version: "4.2.0"

@@ -410,14 +410,9 @@ static char *keylog_hex(char *p, const unsigned char *bytes, size_t len) {
   return p;
 }
 
-static void on_export_keys(void *ctx, mbedtls_ssl_key_export_type type, const unsigned char *secret,
-                           size_t secret_len, const unsigned char client_random[32],
-                           const unsigned char server_random[32], mbedtls_tls_prf_types prf) {
-  (void)server_random;
-  (void)prf;
-  session *s = ctx;
-  const char *label = keylog_label(type);
-  if (!label || secret_len == 0 || secret_len > 64) return;
+static void keylog_line(session *s, const char *label, const unsigned char client_random[32],
+                        const unsigned char *secret, size_t secret_len) {
+  if (!label || !secret || secret_len == 0 || secret_len > 64) return;
   size_t label_len = strlen(label);
   size_t need = label_len + 1 + 64 + 1 + 2 * secret_len + 1;
   if (s->keylog_len > s->keylog_cap || s->keylog_cap - s->keylog_len < need) return;
@@ -430,6 +425,20 @@ static void on_export_keys(void *ctx, mbedtls_ssl_key_export_type type, const un
   p = keylog_hex(p, secret, secret_len);
   *p = '\n';
   s->keylog_len += need;
+}
+
+static void on_export_keys(void *ctx, mbedtls_ssl_key_export_type type, const unsigned char *secret,
+                           size_t secret_len, const unsigned char client_random[32],
+                           const unsigned char server_random[32], mbedtls_tls_prf_types prf) {
+  (void)server_random;
+  (void)prf;
+  session *s = ctx;
+  keylog_line(s, keylog_label(type), client_random, secret, secret_len);
+  if (type != MBEDTLS_SSL_KEY_EXPORT_TLS1_3_SERVER_APPLICATION_TRAFFIC_SECRET) return;
+  const mbedtls_ssl_session *negotiated = s->ssl.MBEDTLS_PRIVATE(session_negotiate);
+  if (!negotiated || secret_len > sizeof negotiated->MBEDTLS_PRIVATE(app_secrets).exporter_master_secret) return;
+  keylog_line(s, "EXPORTER_SECRET", client_random,
+              negotiated->MBEDTLS_PRIVATE(app_secrets).exporter_master_secret, secret_len);
 }
 
 static void keylog_arm(session *s, int flags) {

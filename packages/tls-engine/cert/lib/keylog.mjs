@@ -18,7 +18,7 @@ const REQUEST_CERT = 1;
 const SELECT = 4;
 const KEYLOG = 8;
 const CLIENT = { INSECURE: 1, NO_SNI: 2, CHAIN_ONLY: 4 };
-const TLS13 = ['CLIENT_HANDSHAKE_TRAFFIC_SECRET', 'SERVER_HANDSHAKE_TRAFFIC_SECRET', 'CLIENT_TRAFFIC_SECRET_0', 'SERVER_TRAFFIC_SECRET_0'];
+const TLS13 = ['CLIENT_HANDSHAKE_TRAFFIC_SECRET', 'SERVER_HANDSHAKE_TRAFFIC_SECRET', 'CLIENT_TRAFFIC_SECRET_0', 'SERVER_TRAFFIC_SECRET_0', 'EXPORTER_SECRET'];
 const TLS12 = ['CLIENT_RANDOM'];
 const LINE = /^([A-Z_0-9]+) ([0-9a-f]{64}) ([0-9a-f]{64}|[0-9a-f]{96})$/;
 
@@ -103,8 +103,7 @@ function checkShape(ls, labels) {
 
 function agree(engineLines, peerLines, labels) {
   checkShape(engineLines, labels);
-  const peer = peerLines.filter((l) => labels.includes(l.split(' ')[0]));
-  assert.deepEqual([...engineLines].sort(), [...peer].sort(), `engine:\n${engineLines.join('\n')}\npeer:\n${peerLines.join('\n')}`);
+  assert.deepEqual([...engineLines].sort(), [...peerLines].sort(), `engine:\n${engineLines.join('\n')}\npeer:\n${peerLines.join('\n')}`);
 }
 
 function attach(s, { greet, onSelect, keylog = true } = {}) {
@@ -226,10 +225,10 @@ async function sClient(makeSession, version, { onSelect } = {}) {
   }
 }
 
-function nodeServer(s, version, { keylog = true } = {}) {
+function nodeServer(s, version, { keylog = true, ciphers } = {}) {
   const a = attach(s, { greet: 'ping', keylog });
   const peer = [];
-  const socket = new TLSSocket(a.wire, { isServer: true, secureContext: createSecureContext({ cert: cert.pem, key: cert.key.export({ type: 'pkcs8', format: 'pem' }), minVersion: version, maxVersion: version }) });
+  const socket = new TLSSocket(a.wire, { isServer: true, secureContext: createSecureContext({ cert: cert.pem, key: cert.key.export({ type: 'pkcs8', format: 'pem' }), minVersion: version, maxVersion: version, ...(ciphers ? { ciphers } : {}) }) });
   socket.on('keylog', (line) => peer.push(line.toString().trim()));
   socket.on('data', (d) => socket.write(d));
   socket.on('error', () => {});
@@ -246,10 +245,10 @@ function nodeServer(s, version, { keylog = true } = {}) {
   });
 }
 
-function nodeClient(s, version, { onSelect } = {}) {
+function nodeClient(s, version, { onSelect, ciphers } = {}) {
   const a = attach(s, { onSelect });
   const peer = [];
-  const socket = connect({ socket: a.wire, servername: 'server.test', ca: cert.pem, minVersion: version, maxVersion: version });
+  const socket = connect({ socket: a.wire, servername: 'server.test', ca: cert.pem, minVersion: version, maxVersion: version, ...(ciphers ? { ciphers } : {}) });
   socket.on('keylog', (line) => peer.push(line.toString().trim()));
   return new Promise((done) => {
     socket.once('secureConnect', () => socket.write('ping'));
@@ -415,7 +414,7 @@ describe('TLS_KEYLOG: NSS key log lines per session (homescoop#1774)', () => {
     }
     m.HEAPU8.fill(0, scratch, scratch + SCRATCH);
     const held = m._tls_test_keylog_residue(client);
-    assert.ok(held > 4 * 150, `the client holds its 4 lines: ${held}`);
+    assert.ok(held > 5 * 150, `the client holds its 5 lines: ${held}`);
     assert.equal(m._tls_keylog(client, scratch, 100), BADARG, 'no room for one whole line');
     assert.equal(m._tls_test_keylog_residue(client), held, 'a refused drain keeps the lines');
     const first = drain(client, 250);
@@ -485,5 +484,76 @@ describe('TLS_KEYLOG: NSS key log lines per session (homescoop#1774)', () => {
       assert.equal(m._tls_server_new(leaf, 0, 0, ca, flags), 0, `server flags ${flags}`);
       assert.equal(m._tls_last_error(), BADARG);
     }
+  });
+});
+
+describe('TLS 1.3 EXPORTER_SECRET, as OpenSSL logs it (homescoop#1799)', () => {
+  const suites = [['TLS_AES_128_GCM_SHA256', 0x1301, 64], ['TLS_AES_256_GCM_SHA384', 0x1302, 96]];
+  const exporter = (ls) => ls.filter((l) => l.startsWith('EXPORTER_SECRET '));
+
+  function five(engineLines, peerLines, suite, hexLen) {
+    assert.equal(engineLines.length, 5, `the engine logs five lines on TLS 1.3 (${suite}):\n${engineLines.join('\n')}`);
+    assert.equal(peerLines.length, 5, `the peer logs five lines on TLS 1.3 (${suite}):\n${peerLines.join('\n')}`);
+    agree(engineLines, peerLines, TLS13);
+    assert.equal(exporter(engineLines).length, 1, 'one EXPORTER_SECRET line');
+    const want = hexLen ?? engineLines[0].split(' ')[2].length;
+    for (const l of engineLines) assert.equal(l.split(' ')[2].length, want, `${suite}: ${l.split(' ')[0]} has the suite's hash length`);
+    const [, , exp] = exporter(engineLines)[0].split(' ');
+    for (const l of engineLines.filter((x) => !x.startsWith('EXPORTER_SECRET '))) assert.notEqual(l.split(' ')[2], exp, 'the exporter secret is its own secret');
+  }
+
+  for (const [suite, iana, hexLen] of suites) {
+    test(`a server session, ${suite}: five lines, each one Node tls.connect's keylog line`, async () => {
+      const s = serverSession();
+      const r = await nodeClient(s, 'TLSv1.3', { ciphers: suite });
+      assert.ifError(r.err);
+      assert.equal(m._tls_ciphersuite(s), iana, 'the suite Node was pinned to');
+      five(r.engine, r.peer, suite, hexLen);
+      m._tls_session_free(s);
+    });
+
+    test(`a client session, ${suite}: five lines, each one a Node server's keylog line`, async () => {
+      const s = clientSession();
+      const r = await nodeServer(s, 'TLSv1.3', { ciphers: suite });
+      assert.equal(r.state.got, 'ping', `the session: ${r.state.error}`);
+      assert.equal(m._tls_ciphersuite(s), iana, 'the suite Node was pinned to');
+      five(r.engine, r.peer, suite, hexLen);
+      m._tls_session_free(s);
+    });
+  }
+
+  test('a server session: five lines, each one openssl s_client -keylogfile\'s, EXPORTER_SECRET included', async () => {
+    const r = await sClient(() => serverSession(), 'TLSv1.3');
+    assert.equal(r.state.got, 'ping\n', `the engine read s_client's data: ${r.out}`);
+    five(r.engine, r.peer, 's_client\'s suite', null);
+  });
+
+  test('an engine client and server log the same EXPORTER_SECRET line; TLS 1.2 logs none', async () => {
+    const client = clientSession();
+    const server = serverSession();
+    const got = converse(client, server);
+    assert.equal(exporter(got.client).length, 1, got.client.join('\n'));
+    assert.deepEqual(exporter(got.client), exporter(got.server));
+    m._tls_session_free(client);
+    m._tls_session_free(server);
+    const s = serverSession();
+    const r = await nodeClient(s, 'TLSv1.2');
+    assert.ifError(r.err);
+    assert.deepEqual(r.engine.map((l) => l.split(' ')[0]), ['CLIENT_RANDOM'], 'TLS 1.2: one CLIENT_RANDOM line');
+    assert.deepEqual(exporter(r.peer), [], 'Node logs no EXPORTER_SECRET on TLS 1.2 either');
+    m._tls_session_free(s);
+  });
+
+  test('the EXPORTER_SECRET line is drained and wiped like the others', () => {
+    const client = clientSession();
+    const server = serverSession();
+    const got = converse(client, server);
+    const [line] = exporter(got.client);
+    assert.ok(line, 'an EXPORTER_SECRET line');
+    assert.deepEqual(heapHas([line.split(' ')[2]]), [], 'no copy of its hex after the drain');
+    assert.equal(m._tls_test_keylog_residue(client), 0);
+    assert.equal(m._tls_test_keylog_residue(server), 0);
+    m._tls_session_free(client);
+    m._tls_session_free(server);
   });
 });
