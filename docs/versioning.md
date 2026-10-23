@@ -141,8 +141,21 @@ certified on the floor and on the newest python
 ([ci-cert.md](ci-cert.md#py-python-range)). A py-\* takes another py-\* the
 same way, e.g. py-python-dateutil's `"@ai-ecoverse/py-six": ">=1.17.0-3 <1.17.1"`
 (#625, with the #211 wave for the rest), so a newer release of a dependency
-doesn't nest an old copy under each dependent. No other `@ai-ecoverse` pin may
-be a range.
+doesn't nest an old copy under each dependent.
+
+**The one peer: `"*"`** ([bios#939](https://github.com/ai-ecoverse/slicc-bios/pull/939)).
+A package that runs other `@ai-ecoverse` command packages at runtime (wasm-xz,
+wasm-git) may list them in `peerDependencies` as exactly `"*"`. An exact
+dependency nested an older wasm-coreutils in seven's base set, and an exact
+peer fails with ERESOLVE. npm 11's arborist treats a `"*"` peer as satisfied
+by prereleases, while any finite range excludes other `X.Y.Z-N` lines, so
+only `"*"` dedupes against both 9.12.0-15 and a future 9.13.0-1. Only that
+literal, only in `peerDependencies`: `dependencies` and
+`optionalDependencies` stay exact, and a peer `">=1.0.0"`, `"^…"` or
+`"latest"` fails. `diff-published.mjs` accepts an exact peer becoming `"*"`
+in a packaging-only repack through the same `rangeAllowed`.
+
+No other `@ai-ecoverse` pin may be a range.
 
 `scripts/check-exact-pins.mjs` enforces it: the `exact-pins` job in
 The PR build checks every package, and `host-run.sh` checks the package it
