@@ -289,7 +289,7 @@ jobs:
           retention-days: 14
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.5
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.6
 
   rebuild:
     needs: [detect, recipe-sha]
@@ -348,7 +348,7 @@ jobs:
           retention-days: 3
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.5
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.6
 
   reproducible:
     needs: [detect, recipe-sha, host-build, rebuild]
@@ -488,7 +488,7 @@ jobs:
           fi
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.5
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.6
 
   cert:
     needs: [detect, recipe-sha, host-build]
@@ -632,7 +632,7 @@ jobs:
           retention-days: 14
       - if: always()
         continue-on-error: true
-        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.5
+        uses: ai-ecoverse/slicc-shared-web/.github/actions/memory-peak@v1.29.6
 
   # shims/slicc and the emsdk pin: the libc shims' own tests in the kernel.
   shims:
