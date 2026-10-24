@@ -303,3 +303,23 @@ The base is homescoop origin/main c1d78bca, with a `host-run.sh` build (emsdk 4.
 - **The cause:** Mbed TLS 4.2.0's export callback has no type for the exporter master secret. It derives it in the same step as the application traffic secrets, then exports those two. The engine now reads it from `session_negotiate->app_secrets` when the callback reports the server's application traffic secret (README, Key log lines), without patching Mbed TLS.
 - **The #1041 rows** in `client-api.mjs` (a 255/256-byte name, an intermediate chain, FUTURE, trailing bytes, a 256-byte hostname for `tls_chain_verify`) are coverage: they pass on 4.2.0-10 too.
 - **4.2.0-11 as built:** keylog 19/19, server-api 40/40, client-api 36/36, engine-api 19/19. The wasm grows by 83 bytes (320306 to 320389).
+
+## 4.2.0-12: PKCS#8 keys encrypted with Camellia or ARIA (homescoop#1811; 2026-10-24)
+
+The base is homescoop origin/main 578f69bf, with a `host-run.sh` build (emsdk 4.0.23), Node 26.11.1 and OpenSSL 4.0.3. The test keys in `cert/keys/` are throwaway keys made for this cert with `openssl genpkey` and `openssl pkcs8 -topk8 -v2 <cipher> -passout pass:'homescoop <cipher>'` (`homescoop rsa <cipher>` for the RSA ones); the plain keys weren't kept.
+
+- **The published 4.2.0-11** (`npm pack @ai-ecoverse/wasm-tls-engine@4.2.0-11`, sha256 345080de593614a430bdbded81c3ccf9e01cbf35206b4ec0d23b80dea6f3c3a0) refuses every Camellia and ARIA key, with the right passphrase too, at `tls_leaf_import` and `tls_client_cert`, so `node --test packages/tls-engine/cert/lib/pkcs8.mjs` fails 20 of 29 and exits 1:
+
+```text
+✖ EC P-256, openssl pkcs8 -topk8 -v2 camellia128 (new): tls_leaf_import loads cert/keys/ec-camellia128.pem with its passphrase, …
+  AssertionError [ERR_ASSERTION]: tls_leaf_import: -11904 PKCS5 - Requested encryption or digest alg not available
+✖ EC P-256, openssl pkcs8 -topk8 -v2 camellia128 (new): tls_client_cert takes cert/keys/ec-camellia128.pem and a Node server requiring a client certificate verifies it
+  AssertionError [ERR_ASSERTION]: tls_client_cert: -11904 PKCS5 - Requested encryption or digest alg not available
+ℹ tests 29  ℹ pass 9  ℹ fail 20
+```
+
+  The 20 are the two rows of each of the eight Camellia and ARIA keys, the encrypted DER key (-15616 PK - Invalid key tag or value: the DER path tries the key as unencrypted after PBES2 refuses it), the wrong-passphrase row and the 1-in-256 row (the Camellia and ARIA keys give FEATURE_UNAVAILABLE, not PASSWORD_MISMATCH or the ASN.1 error), and the #1041 cross-type row (the keys don't parse, so it isn't TLS_BADARG). The 9 that pass are the six AES rows, the des3 row and the two configuration rows.
+- **The configuration rows aren't vacuous:** the lists they pin were read from 4.2.0-11 (a client ClientHello's 40 suites, 13 groups and 9 signature algorithms; 24 suites a server session with an EC leaf accepts and 20 with an RSA leaf, out of 1279 codes offered one at a time), and 4.2.0-12 gives the same lists, so the patch changes no suite. They include Mbed TLS's Camellia and ARIA TLS 1.2 suites (0xc072, 0xc05c, …), which the patch doesn't touch.
+- **The des3 row** passes on 4.2.0-11 too: 3DES stays unsupported (README), refused before decryption with the same error for the right and the wrong passphrase.
+- **The cause:** PBES2's encryption-scheme table (`oid_cipher_alg` in `tf-psa-crypto/utilities/oid.c`) has only the AES-CBC OIDs. `mbedtls_cipher_info_from_type` returns Camellia's and ARIA's CBC ciphers in this build (`MBEDTLS_CAMELLIA_C` and `MBEDTLS_ARIA_C` follow from `PSA_WANT_KEY_TYPE_CAMELLIA`/`ARIA`, which TF-PSA-Crypto's default config sets, and `MBEDTLS_CIPHER_MODE_CBC` from `PSA_WANT_ALG_CBC_NO_PADDING`), and `pkcs5.c` decrypts with them through the same CBC/PKCS#7 path as AES: the rows with the right passphrase show it. `pbes2-camellia-aria.patch` adds the six OIDs.
+- **4.2.0-12 as built:** pkcs8 29/29, and engine-api 19/19, client-api 36/36, server-api 40/40 and keylog 19/19 unchanged. The wasm grows by 136 bytes (320389 to 320525).

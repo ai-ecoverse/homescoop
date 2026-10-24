@@ -1,0 +1,51 @@
+--- a/tf-psa-crypto/utilities/crypto_oid.h
++++ b/tf-psa-crypto/utilities/crypto_oid.h
+@@ -154,6 +154,15 @@
+ #define MBEDTLS_OID_AES_192_CBC                 MBEDTLS_OID_AES "\x16" /** aes192-cbc-pad OBJECT IDENTIFIER ::= { joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101) csor(3) nistAlgorithms(4) aes(1) aes192-CBC-PAD(22) } */
+ #define MBEDTLS_OID_AES_256_CBC                 MBEDTLS_OID_AES "\x2a" /** aes256-cbc-pad OBJECT IDENTIFIER ::= { joint-iso-itu-t(2) country(16) us(840) organization(1) gov(101) csor(3) nistAlgorithms(4) aes(1) aes256-CBC-PAD(42) } */
+ 
++#define MBEDTLS_OID_CAMELLIA_CBC                "\x2a\x83\x08\x8c\x9a\x4b\x3d\x01\x01\x01"
++#define MBEDTLS_OID_CAMELLIA_128_CBC            MBEDTLS_OID_CAMELLIA_CBC "\x02"
++#define MBEDTLS_OID_CAMELLIA_192_CBC            MBEDTLS_OID_CAMELLIA_CBC "\x03"
++#define MBEDTLS_OID_CAMELLIA_256_CBC            MBEDTLS_OID_CAMELLIA_CBC "\x04"
++#define MBEDTLS_OID_ARIA                        "\x2a\x83\x1a\x8c\x9a\x6e\x01\x01"
++#define MBEDTLS_OID_ARIA_128_CBC                MBEDTLS_OID_ARIA "\x02"
++#define MBEDTLS_OID_ARIA_192_CBC                MBEDTLS_OID_ARIA "\x07"
++#define MBEDTLS_OID_ARIA_256_CBC                MBEDTLS_OID_ARIA "\x0c"
++
+ /*
+  * PKCS#5 OIDs
+  */
+--- a/tf-psa-crypto/utilities/oid.c
++++ b/tf-psa-crypto/utilities/oid.c
+@@ -364,6 +364,30 @@
+         MBEDTLS_CIPHER_AES_256_CBC,
+     },
+     {
++        OID_DESCRIPTOR(MBEDTLS_OID_CAMELLIA_128_CBC, "camellia128-cbc", "CAMELLIA128-CBC"),
++        MBEDTLS_CIPHER_CAMELLIA_128_CBC,
++    },
++    {
++        OID_DESCRIPTOR(MBEDTLS_OID_CAMELLIA_192_CBC, "camellia192-cbc", "CAMELLIA192-CBC"),
++        MBEDTLS_CIPHER_CAMELLIA_192_CBC,
++    },
++    {
++        OID_DESCRIPTOR(MBEDTLS_OID_CAMELLIA_256_CBC, "camellia256-cbc", "CAMELLIA256-CBC"),
++        MBEDTLS_CIPHER_CAMELLIA_256_CBC,
++    },
++    {
++        OID_DESCRIPTOR(MBEDTLS_OID_ARIA_128_CBC,     "aria128-cbc", "ARIA128-CBC"),
++        MBEDTLS_CIPHER_ARIA_128_CBC,
++    },
++    {
++        OID_DESCRIPTOR(MBEDTLS_OID_ARIA_192_CBC,     "aria192-cbc", "ARIA192-CBC"),
++        MBEDTLS_CIPHER_ARIA_192_CBC,
++    },
++    {
++        OID_DESCRIPTOR(MBEDTLS_OID_ARIA_256_CBC,     "aria256-cbc", "ARIA256-CBC"),
++        MBEDTLS_CIPHER_ARIA_256_CBC,
++    },
++    {
+         NULL_OID_DESCRIPTOR,
+         MBEDTLS_CIPHER_NONE,
+     },
