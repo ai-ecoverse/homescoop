@@ -424,7 +424,7 @@ describe('PKCS#8 PBES2 keys encrypted with AES, Camellia and ARIA (homescoop#181
     assert.equal(engine.strerror(PK_PASSWORD_MISMATCH), 'PK - Given private key password does not allow for correct decryption');
   });
 
-  test('about 1 wrong passphrase in 256 passes the PKCS#7 padding check: these fixed ones (AES, Camellia, ARIA) are refused with the ASN.1 error of the garbage they decrypt to (MBEDTLS_ERR_ASN1_UNEXPECTED_TAG), not accepted and not PASSWORD_MISMATCH, and Node refuses them with an ASN.1 error too', () => {
+  test('about 1 wrong passphrase in 256 passes the PKCS#7 padding check: these fixed ones (AES, Camellia, ARIA) are refused with the ASN.1 error of the garbage they decrypt to (MBEDTLS_ERR_ASN1_UNEXPECTED_TAG), not accepted and not PASSWORD_MISMATCH, and Node refuses them with a decoder or ASN.1 error (ERR_OSSL_UNSUPPORTED or ERR_OSSL_ASN1_*, by OpenSSL version), never ERR_OSSL_BAD_DECRYPT', () => {
     for (const { file, pass } of LUCKY) {
       const right = FILES.find((f) => f.file === file);
       const leaf = ca.issue('server.test', createPublicKey(nodeKey(file, right.pass)).export({ type: 'spki', format: 'der' }));
@@ -432,7 +432,10 @@ describe('PKCS#8 PBES2 keys encrypted with AES, Camellia and ARIA (homescoop#181
       assert.equal(r.leaf, 0, `${file} with '${pass}' was accepted`);
       assert.notEqual(r.error, PK_PASSWORD_MISMATCH, `${file} with '${pass}': the padding check should have passed`);
       assert.deepEqual([r.error, engine.strerror(r.error)], [ASN1_UNEXPECTED_TAG, 'ASN1 - ASN1 tag was of an unexpected value'], `${file} with '${pass}'`);
-      assert.match(nodeRefusal(file, pass), /^ERR_OSSL_ASN1_/, file);
+      const node = nodeRefusal(file, pass);
+      assert.notEqual(node, 'accepted', `Node accepted ${file} with '${pass}'`);
+      assert.notEqual(node, 'ERR_OSSL_BAD_DECRYPT', file);
+      assert.match(node, /^ERR_OSSL_(ASN1_[A-Z_]+|UNSUPPORTED)$/, file);
     }
   });
 
