@@ -142,7 +142,8 @@ export function staleVersions(text, upstream, { allow, name }) {
     if (historicalCue(sentenceAt(text, m.index), allow)) continue;
     if (afterLead(text, m.index, leads)) continue;
     const ln = lineAt(text, m.index);
-    out.push({ line: ln.line, version: `${m[1]}${tok}`, excerpt: ln.text.trim() });
+    const lead = /(\S+\s+)$/.exec(text.slice(ln.start, m.index).replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'))?.[1];
+    out.push({ line: ln.line, version: `${m[1]}${tok}`, excerpt: ln.text.trim(), lead });
   }
   return out;
 }
@@ -203,7 +204,8 @@ export function driftErrors({ name, upstream, pkg, summary, readme, allow = load
   ];
   for (const [label, text] of texts) {
     for (const s of staleVersions(text, up, { allow, name })) {
-      errors.push(`${label}:${s.line} names ${s.version}, not recipe version ${up}: ${s.excerpt.slice(0, 120)}`);
+      const hint = s.lead ? `the text before it, ${JSON.stringify(s.lead)},` : 'the text before it';
+      errors.push(`${label}:${s.line} names ${s.version}, not recipe version ${up}: ${s.excerpt.slice(0, 120)} (another project's version? add ${hint} to leads[${JSON.stringify(name)}] in scripts/package-meta-versions.json)`);
     }
   }
   return errors;

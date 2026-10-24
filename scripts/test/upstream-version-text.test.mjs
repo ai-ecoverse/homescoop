@@ -196,3 +196,22 @@ test('check-package-meta --drift passes unit measurements and fails a stale vers
     bad.cleanup();
   }
 });
+
+const tlsReadme = '# tls-engine\n\nMbed TLS 4.2.0.\n\nNode 26 bundles OpenSSL 3.5; OpenSSL 4.0 throws another error.\n';
+const tlsPkg = { version: '4.2.0-12', homescoop: { upstream: '4.2.0' } };
+
+test('a third-party version after a lead passes (#1817): OpenSSL 4.0 in tls-engine (Mbed TLS 4.2.0)', () => {
+  assert.deepEqual(staleVersions(tlsReadme, '4.2.0', { allow, name: 'tls-engine' }), []);
+  assert.deepEqual(driftErrors({ name: 'tls-engine', upstream: '4.2.0', pkg: tlsPkg, summary: 'Mbed TLS 4.2.0 for slicc', readme: tlsReadme, allow }), []);
+});
+
+test('without the lead, the error says how to allow it: the text before it, the key and the leads file (#1817)', () => {
+  const bare = { ...allow, leads: Object.fromEntries(Object.entries(allow.leads).filter(([k]) => k !== 'tls-engine')) };
+  const errors = driftErrors({ name: 'tls-engine', upstream: '4.2.0', pkg: tlsPkg, summary: 'Mbed TLS 4.2.0 for slicc', readme: tlsReadme, allow: bare });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^package\/README\.md:5 names 4\.0, not recipe version 4\.2\.0: /);
+  assert.ok(errors[0].endsWith(`(another project's version? add the text before it, "OpenSSL ", to leads["tls-engine"] in scripts/package-meta-versions.json)`), errors[0]);
+  const own = driftErrors({ name: 'openssl', upstream: '3.6.0', pkg: { version: '3.6.0-1' }, summary: 'OpenSSL 3.6.0', readme: 'OpenSSL 3.5 is older.\n', allow });
+  assert.equal(own.length, 1, 'no lead under * hides a recipe\'s own stale version');
+  assert.match(own[0], /names 3\.5, not recipe version 3\.6\.0.*add the text before it, "OpenSSL ", to leads\["openssl"\]/);
+});
