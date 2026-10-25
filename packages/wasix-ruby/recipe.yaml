@@ -19,6 +19,10 @@ sources:
   libyaml:
     url: "https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz"
     sha256: "c642ae9b75fee120b2d96c712538bd2cf283228d2337df2cf2988e3c02678ef4"
+wasm:
+  initial-memory: 96MiB
+  measured-peak: 80MiB
+  measured-by: "malloc's highest block end (HOMESCOOP_WASM_PEAK, measured in the allocating thread, in 4 MiB steps) from measurement links of 3.4.11-25 with scripts/wasm-refresh-malloc.c, slicc-kernel 1.132.1 in Chromium, users enforce, 2 rounds of cert/stress.mjs's rows on a 128 MiB initial memory: ruby -e 24 MiB, 19 stdlib libraries with JSON, YAML, zlib and OpenSSL round trips and 200,000 objects 76.1 MiB (so below 80), gem install --local of a built gem 40.5 MiB, ri String#upcase 44.3 MiB, irb from stdin 28 MiB. Ruby's own mmap regions (wasi-emulated-mman takes them with sbrk, above the initial memory, 30.75 MiB at startup) are not malloc's and not in these numbers: VmSize is 158.75 MiB on that build and on the unsized 12.75 MiB build ruby -e grows to 56.9 MiB and the stdlib row to 107.4 MiB"
 # File#flock is libc's flock(2) (wasix-sysroot -34, slicc.flock) since
 # 3.4.11-18; -17's patches/flock-wasi-fcntl.patch is gone (homescoop#989).
 dependencies:
