@@ -1,0 +1,42 @@
+name: wasi-html-to-markdown
+builder: host
+runner: pool
+reproducible: true
+# renovate: datasource=github-tags depName=JohannesKaufmann/html-to-markdown extractVersion=^v(?<version>2\..*)$
+version: "2.5.2"
+npm: "@ai-ecoverse/wasi-html-to-markdown"
+summary: "html-to-markdown 2.5.2 (html2markdown) for slicc WASI preview1 (commands html-to-markdown, html2markdown)"
+source:
+  url: "https://github.com/JohannesKaufmann/html-to-markdown/archive/290df46a279e3d7d9011dbbb199658dfcb5ec272.tar.gz"
+  sha256: "e892b31ec2cbed8f00b5b146f71a6a7b9e43c2c23cdb602dc9f2b5b870f1a56c"
+  commit: "290df46a279e3d7d9011dbbb199658dfcb5ec272"
+  tree: "74e3aec9b7a44225010193bce8056cf46c981114"
+toolchain:
+  go: "1.27.3"
+  go_sha256_linux_x64: "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
+  go_sha256_macos_arm64: "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"
+build:
+  date: "2026-06-07T12:48:53Z"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/JohannesKaufmann/html-to-markdown
+  license: MIT
+  notes: |
+    html-to-markdown v2.5.2 (tag v2.5.2, commit 290df46, Go, MIT). build.sh
+    fetches the pinned source and Go 1.27.3, checks that the tag v<version>
+    still names the pinned commit (so a version-only bump fails closed),
+    vendors the modules (go.sum checked), applies 0001-termenv-wasip1.patch
+    and builds the CLI ./cli/html2markdown with GOOS=wasip1 GOARCH=wasm
+    CGO_ENABLED=0 -trimpath -buildvcs=false -mod=vendor, main.version,
+    main.commit and main.date set as upstream's goreleaser does (build.date
+    is the tag commit's time), so the build is reproducible.
+    0001-termenv-wasip1.patch: termenv (the CLI's coloured error prefix) has
+    no wasip1 build; its js/plan9/aix fallback (no colours) builds for
+    wasip1 too. The same one-line patch is in wasi-gh.
+    build.sh also builds the same tree natively and checks its output on
+    test/fixtures (a Node.js docs page, invalid HTML, the generated large
+    page, empty input) against the committed goldens, which the cert
+    compares the wasm's output with.

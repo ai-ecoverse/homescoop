@@ -1,0 +1,71 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-curl"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15",
+    "@ai-ecoverse/wasm-curl@8.22.0-10"
+  ],
+  "extra_kernels": [
+    "@ai-ecoverse/slicc-kernel@1.132.1 (the engines floor): all three specs pass, by hand on 2026-10-25"
+  ],
+  "checklist": [
+    "cert/checklist.mjs: html-to-markdown --version and html2markdown --version are 2.5.2, commit 290df46, 2026-06-07T12:48:53Z; the search skill's use, curl -sL <page> | html-to-markdown on a real page (test/fixtures/tty.html, nodejs.org/api/tty.html of Node.js v26.12.1: headings, lists, links, code blocks, history tables, a script) served through ctx.serve, gives test/fixtures/tty.md byte for byte, the output of a native html2markdown built from the same commit (build.sh checks the goldens with that native build), and --plugin-table gives tty.table.md with the tables as Markdown tables; on stdin: the page (default and --plugin-table), invalid HTML (test/fixtures/invalid.html: unclosed and misnested tags, stray end tags, bad entities, unterminated pre) gives invalid.md, a generated 3 MB page gives the native output's sha256 (test/fixtures/large.json), also through < large.html | sha256sum, and an empty input gives one newline (rc 0); the file argument is --input: --input tty.html and an absolute --input give the goldens, --output out/tty.md writes them (without stdout's last newline) and refuses to overwrite (rc 1), --input '*.html' --output all/ converts both pages; a positional file is rc 1 'unknown arguments' as upstream, --input missing.html is rc 1 'no files found', no stdin and < /dev/null are rc 1 with the usage error and no colour codes (0001), just-bash's -b is rc 1 'unknown flag: -b', --exclude-selector footer,nav and --domain work",
+    "cert/users.mjs (users enforce): alice converts (--input), pipes and writes (--output, owned by her) her own 0600 page in her 0700 home; bob gets rc 1 for --input on it ('no files found'), Permission denied for < on it, rc 1 for --output into her home and nothing is written; bob's own --output is his; root reads her page",
+    "cert/notices.mjs: LICENSE is html-to-markdown's MIT licence; THIRD-PARTY-NOTICES.md has Go 1.27.3 (BSD-3-Clause) and exactly the ten modules html2markdown.wasm links, each with its licence (noticesSpec)"
+  ],
+  "notices": [
+    {
+      "name": "Go",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "github.com/JohannesKaufmann/dom",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/agnivade/levenshtein",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/andybalholm/cascadia",
+      "license": "BSD-2-Clause"
+    },
+    {
+      "name": "github.com/aymanbagabas/go-osc52/v2",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/bmatcuk/doublestar/v4",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/lucasb-eyer/go-colorful",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/mattn/go-isatty",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/muesli/termenv",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/rivo/uniseg",
+      "license": "MIT"
+    },
+    {
+      "name": "golang.org/x/net",
+      "license": "BSD-3-Clause"
+    }
+  ],
+  "patches": {
+    "0001-termenv-wasip1.patch": "without it the CLI does not build for wasip1 (termenv has no wasip1 file: o.foregroundColor, o.backgroundColor, ColorProfile undefined); with termenv's js fallback instead (always ANSI256) the usage error on a pipe carries colour codes, which the error cases of cert/checklist.mjs (unknown arguments, no stdin, < /dev/null) reject (NEGATIVE.md)"
+  }
+}

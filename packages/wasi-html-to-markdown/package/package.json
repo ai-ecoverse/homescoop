@@ -1,0 +1,50 @@
+{
+  "name": "@ai-ecoverse/wasi-html-to-markdown",
+  "version": "2.5.2-1",
+  "description": "Convert HTML to Markdown in SLICC.",
+  "license": "MIT",
+  "engines": {
+    "slicc-kernel": ">=1.132.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-html-to-markdown/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-html-to-markdown",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "html",
+    "markdown",
+    "html-to-markdown"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-html-to-markdown",
+    "upstream": "2.5.2"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "html-to-markdown": {
+        "wasm": "bin/html2markdown.wasm",
+        "preopenRoot": true
+      },
+      "html2markdown": {
+        "wasm": "bin/html2markdown.wasm",
+        "preopenRoot": true
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><title>Broken & unclosed</title>
+<body>
+<h1>Release notes <em>draft</h2>
+<p>First paragraph <b>bold <i>both</b> italic</i> plain
+<p>Second paragraph with a <a href=/docs?a=1&b=2>bare &amp attribute</a> and &bogus; &#xZZ; &#128512; entities.
+</div></span></section>
+<ul><li>one<li>two <ul><li>nested</ul><li>three</ol>
+<table><tr><td>cell 1<td>cell 2<tr><td colspan=2>wide</table>
+<pre><code class=language-sh>echo "<not a tag>" && exit 0
+</pre>
+<p>Stray < and > and a <br/ > self-closing <img src="x.png" alt="pic"/>.
+<blockquote><p>quoted<blockquote>deeper</blockquote>
+<a href="javascript:alert(1)">bad link</a> <a>no href</a> <a href="">empty</a>
+<h3 id=x>Trailing heading without end
