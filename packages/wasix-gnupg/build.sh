@@ -38,12 +38,15 @@ LIBS=(
   "libksba 1.8.1 c2f84393011827219ae117131dba8e7684c2bed0961eed11b0642c2acba440b5"
 )
 
-# No wasixcc on PATH (CI runners): install the pinned toolchain, which
-# brings wasix-sysroot 2025.9.30-17 (slicc_stat_owner, slicc_fs).
-if ! command -v wasixcc >/dev/null && [[ ! -x "${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin/wasixcc" ]]; then
-  eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh")"
-fi
-export PATH="$PREFIX/bin:${WASIXCC_PREFIX:-$HOME/.wasixcc}/bin:$HOME/.wasixcc/llvm/bin:$HOME/.wasmer/bin:/opt/homebrew/bin:$PATH"
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-43
+export HOMESCOOP_WASIX_SYSROOT_SHA=e5ecaf322715916aa0f2fc5cc873ead73e9258b13b22aac9ffc9660c9a1e3668
+field() { node "$HOMESCOOP_ROOT/scripts/read-recipe.mjs" wasix-gnupg --field "$1"; }
+[[ "$HOMESCOOP_WASIX_SYSROOT_VERSION" == "$(field toolchain.wasix_sysroot)" && "$HOMESCOOP_WASIX_SYSROOT_SHA" == "$(field toolchain.wasix_sysroot_sha256)" ]] \
+  || { echo "homescoop wasix-gnupg: build.sh's wasix-sysroot pin isn't recipe.yaml's toolchain.wasix_sysroot" >&2; exit 1; }
+eval "$(bash "$HOMESCOOP_ROOT/scripts/install-wasixcc.sh" "${WASIX_GNUPG_WASIXCC:-$WORK/wasixcc-$HOMESCOOP_WASIX_SYSROOT_VERSION}")"
+SYSROOT_VER="$(node -p "require(process.argv[1]).version" "$WASIXCC_SYSROOT_PREFIX/package.json")"
+[[ "$SYSROOT_VER" == "$HOMESCOOP_WASIX_SYSROOT_VERSION" ]] || { echo "homescoop wasix-gnupg: installed wasix-sysroot $SYSROOT_VER, not $HOMESCOOP_WASIX_SYSROOT_VERSION" >&2; exit 1; }
+export PATH="$PREFIX/bin:${WASIXCC_PREFIX}/bin:${WASIXCC_LLVM_LOCATION}/bin:$PATH"
 export WASIXCC_RUN_WASM_OPT=no
 export WASIXCC_WASM_EXCEPTIONS=no
 export WASIXCC_PIC=no
@@ -54,7 +57,7 @@ export GPGRT_CONFIG="$PREFIX/bin/gpgrt-config"
 unset CFLAGS CPPFLAGS LDFLAGS CXX PKG_CONFIG_LIBDIR
 
 command -v wasixcc >/dev/null || { echo "homescoop wasix-gnupg: wasixcc not on PATH" >&2; exit 1; }
-SYSROOT_LIBC="${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/sysroot/lib/wasm32-wasi/libc.a"
+SYSROOT_LIBC="${WASIXCC_SYSROOT_PREFIX}/sysroot/lib/wasm32-wasi/libc.a"
 llvm-ar t "$SYSROOT_LIBC" | grep -qx slicc_stat_owner.o || {
   echo "homescoop wasix-gnupg: $SYSROOT_LIBC predates wasix-sysroot 2025.9.30-15 (no slicc_stat_owner.o)" >&2
   exit 1
@@ -179,7 +182,7 @@ cp "$PKG"/patches/* "$DEST/patches/"
 # snapshot of wasix-libc, so this is the nearest earlier tag).
 homescoop_notices_begin "The gpg, gpgv, gpg-agent, gpgconf and gpg-connect-agent wasm modules statically link libgpg-error 1.61, libgcrypt 1.12.4, libassuan 3.0.2, libksba 1.8.1 and npth 1.8 (licences in licenses/, sources in SOURCES.md) and the following."
 WLIBC=https://raw.githubusercontent.com/wasix-org/wasix-libc/v2026-07-03.1
-homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $(node -p "require('${WASIXCC_SYSROOT_PREFIX:-$HOME/.wasixcc/sysroot}/package.json').version"); files from tag v2026-07-03.1)" \
+homescoop_notice "wasix-libc (@ai-ecoverse/wasix-sysroot $SYSROOT_VER; files from tag v2026-07-03.1)" \
   "$WLIBC/LICENSE" da1128117561950db9e04201ce9ac3f0bd9e3baf852289211608b73098d51ac0 \
   "$WLIBC/LICENSE-APACHE-LLVM" 268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5 \
   "$WLIBC/LICENSE-MIT" 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3 \

@@ -4,5 +4,4 @@
 # "<recipe> #<issue> <reason>". scripts/check-threaded-heap.mjs fails a line
 # whose package gets the fields or stops being threaded: drop it then.
 wasix-bind #1287 wasixcc build on wasix-sysroot -39 (the dlmalloc refresh); dlmalloc ignores the initial pages until -40; refresh only, size after -40
-wasix-gnupg #1287 wasixcc build on wasix-sysroot -34 (no allocator refresh); refresh at its next sysroot move, size after -40
 wasix-websocat #1287 has the shared allocator refresh (4.0.0-alpha3-6); not sized: wasix-libc v2026-07-03.1's dlmalloc doesn't use the pages between __heap_base and the initial size (try_init_allocator commented out), so a larger initial heap only adds (the alpha3-6 128 MiB build peaked at 167 MiB, alpha3-5 at 94)
