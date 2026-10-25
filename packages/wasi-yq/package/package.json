@@ -1,0 +1,48 @@
+{
+  "name": "@ai-ecoverse/wasi-yq",
+  "version": "4.54.1-1",
+  "description": "Query and edit YAML, JSON, TOML and XML in SLICC.",
+  "license": "MIT",
+  "engines": {
+    "slicc-kernel": ">=1.132.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-yq/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-yq",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "yq",
+    "yaml",
+    "json",
+    "toml",
+    "xml"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-yq",
+    "upstream": "4.54.1"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "yq": {
+        "wasm": "bin/yq.wasm",
+        "preopenRoot": true
+      }
+    }
+  }
+}

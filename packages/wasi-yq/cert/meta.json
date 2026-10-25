@@ -1,0 +1,128 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "runTimeoutMs": 300000,
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15"
+  ],
+  "extra_kernels": [
+    "@ai-ecoverse/slicc-kernel@1.132.1 (the engines floor): all three specs pass, by hand on 2026-10-26"
+  ],
+  "checklist": [
+    "cert/checklist.mjs: the 41 cases of test/goldens.mjs, each in its own directory, compared byte for byte (stdout, stderr, exit status and, for -i, the edited file and the temp files left in $TMPDIR; the 4 MB cases by sha256 and size) with test/fixtures/expected.json, the output of a native yq built from the same commit (build.sh checks the goldens with that native build): --version; a GitHub Actions workflow (.jobs.*.steps[0], keys, the matrix as one-line JSON, .on from stdin, -i keeping comments); a k8s manifest of three documents (select by kind, document_index, - for stdin, -i on one document); front matter (--front-matter=extract, process, -i -f process leaving the Markdown as it is); YAML to JSON, JSON to YAML, a JSON query and -i on package.json; TOML query, to JSON, on stdin to YAML, YAML to TOML, -i on Cargo.toml; XML query, to JSON, YAML to XML, -i on pom.xml; eval-all (ireduce merge, fi and filename, collecting documents); env(), strenv() (1.20 as a number and as a string), strenv in -i, envsubst; errors: a bad expression (rc 1, the message on stderr, nothing on stdout), a bad expression with -i (the file unchanged), a missing file, bad YAML on stdin, -e with no match; a generated 4 MB inventory (length, select, -o json, -i on every item). The one allowed difference is Go wasip1's errno text (No such file or directory, Permission denied; native writes them lower case; test/wasip1.mjs). Then through bash: cat ci.yml | yq, TAG=1.20 yq -n with env and strenv, yq -o json large.yaml | sha256sum, and a successful -i leaves no temp file in /tmp",
+    "cert/users.mjs (users enforce): alice edits her 0644 workflow in place (it stays hers and 0644, comments kept) and reads her 0700 manifest; bob reads her workflow but his -i on it is refused (rc 1, Permission denied, the file unchanged), and her private manifest is closed to him for reading and -i; bob's own output is his; root reads her manifest, and root's -i on her workflow leaves it owned by root (wasip1 has no chown, as native yq on macOS; README)",
+    "cert/notices.mjs: LICENSE is yq's MIT licence; THIRD-PARTY-NOTICES.md has Go 1.27.3 (BSD-3-Clause) and exactly the 25 modules yq.wasm links, each with its licence (noticesSpec); go.yaml.in/yaml/v4 with its Apache-2.0 LICENSE, its NOTICE and the libyaml MIT text"
+  ],
+  "notices": [
+    {
+      "name": "Go",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "github.com/a8m/envsubst",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/agext/levenshtein",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "github.com/alecthomas/participle/v2",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/apparentlymart/go-textseg/v17",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/dimchansky/utfbom",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "github.com/elliotchance/orderedmap",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/fatih/color",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/go-ini/ini",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "github.com/goccy/go-json",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/goccy/go-yaml",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/google/go-cmp",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "github.com/hashicorp/hcl/v2",
+      "license": "MPL-2.0",
+      "text": "means each individual or legal entity that creates, contributes to the creation of, or owns Covered Software"
+    },
+    {
+      "name": "github.com/jinzhu/copier",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/magiconair/properties",
+      "license": "BSD-2-Clause"
+    },
+    {
+      "name": "github.com/mattn/go-colorable",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/mattn/go-isatty",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/mitchellh/go-wordwrap",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/pelletier/go-toml/v2",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/spf13/cobra",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "github.com/spf13/pflag",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "github.com/yuin/gopher-lua",
+      "license": "MIT"
+    },
+    {
+      "name": "github.com/zclconf/go-cty",
+      "license": "MIT"
+    },
+    {
+      "name": "go.yaml.in/yaml/v4",
+      "license": "Apache-2.0 AND MIT"
+    },
+    {
+      "name": "golang.org/x/net",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "golang.org/x/text",
+      "license": "BSD-3-Clause"
+    }
+  ]
+}

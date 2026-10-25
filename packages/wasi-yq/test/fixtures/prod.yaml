@@ -1,0 +1,5 @@
+server:
+  hosts: [b.example, c.example]
+logging:
+  level: warn # quieter in prod
+replicas: 3
