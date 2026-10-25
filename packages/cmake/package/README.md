@@ -95,7 +95,7 @@ shows no `HOME`, `USER`, `LOGNAME`, `PATH` or `LANG`.
 `@ai-ecoverse/wasm-curl@8.22.0-10` and `@ai-ecoverse/wasm-zlib@1.3.1-4` as host
 dependencies, and host-run unpacks their `lib/` and `include/` into `PREFIX`.
 
-Those archives are built with emsdk 4.0.23, not the 6.0.9 tree. They link
+Those archives are built with host-run's pinned emsdk (`scripts/install-emsdk.sh`), not the 6.0.9 tree. They link
 because they hold plain C objects for the same wasm32-emscripten libc. sizeof,
 alignment and the field offsets of the structs libcurl passes across
 (`stat`, `timeval`/`timespec`, `fd_set`, `pollfd`, `addrinfo`, the
@@ -104,7 +104,7 @@ types, `tm`, `ifaddrs`, `jmp_buf`) are the same in both toolchains.
 libcurl's alarm-based resolver timeout uses Emscripten's JS setjmp/longjmp
 (`invoke_*`, `__wasm_setjmp`), which is what cmake.wasm already links (it
 uses `-fexceptions`, not Wasm exceptions). qpdf links wasm-zlib and
-libjpeg-turbo from 4.0.23 into a 6.0.9-tree build the same way.
+libjpeg-turbo from that emsdk into a 6.0.9-tree build the same way.
 
 Mbed TLS's entropy source, `shims/slicc/webcrypto-entropy.c`, is compiled
 with the tree into libslicc instead of using wasm-curl's prebuilt `.o`. The
