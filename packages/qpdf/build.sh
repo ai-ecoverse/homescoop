@@ -90,8 +90,24 @@ for p in "${PROGS[@]}"; do
   test -f "$dir/$p.wasm"
   homescoop_stage_cli "$dir" "$p"
 done
-homescoop_stage_license "$SRC"/LICENSE.txt "$SRC"/NOTICE.md
+homescoop_stage_license "$SRC"/LICENSE.txt
+cp "$SRC/NOTICE.md" "$HOMESCOOP_PKG/package/NOTICE.md"
+mkdir -p "$WORK/notices"
+sed -n '/(LICENSE BEGIN)/,/(LICENSE END)/{/(LICENSE/d;s/^ \* \{0,1\}//;s/^ \*$//;s/[[:space:]]*$//;p;}' "$SRC/libqpdf/sha2.c" | sed '/./,$!d' >"$WORK/notices/qpdf-sphlib"
+awk '/^\/\/\/\/\/\/\/\/\/\// { n++; next } n == 1 { sub(/^\/\/ ?/, ""); print } n == 2 { exit }' "$SRC/libqpdf/MD5_native.cc" | sed '/./,$!d' >"$WORK/notices/qpdf-md5"
+grep -q 'Projet RNRT SAPHIR' "$HOMESCOOP_PKG/package/NOTICE.md" \
+  && grep -q 'The above copyright notice and this permission notice shall be included' "$HOMESCOOP_PKG/package/NOTICE.md" \
+  && grep -q '^Copyright (c) 2007-2010  Projet RNRT SAPHIR$' "$WORK/notices/qpdf-sphlib" \
+  && grep -q '^SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.$' "$WORK/notices/qpdf-sphlib" \
+  && grep -q '^Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All$' "$WORK/notices/qpdf-md5" \
+  && grep -q '^documentation and/or software.$' "$WORK/notices/qpdf-md5" \
+  || { echo "qpdf-notices: FAIL NOTICE.md, sha2.c or MD5_native.cc lacks its notice (homescoop#1750)" >&2; exit 1; }
+echo "qpdf-notices: PASS NOTICE.md, sphlib (sha2.c) and RSA MD5 (MD5_native.cc) notices"
 homescoop_notices_begin "The qpdf, fix-qdf and zlib-flate wasm modules statically link the following."
+homescoop_notice "sphlib 3.0 SHA-2 (Projet RNRT SAPHIR, MIT; qpdf's libqpdf/sha2.c, sha2big.c and sph/; see also NOTICE.md)" \
+  "$WORK/notices/qpdf-sphlib" -
+homescoop_notice "RSA Data Security, Inc. MD5 Message-Digest Algorithm (qpdf's libqpdf/MD5_native.cc is derived from it)" \
+  "$WORK/notices/qpdf-md5" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
   https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
 homescoop_notice "libjpeg-turbo 3.1.2 (@ai-ecoverse/wasm-libjpeg-turbo)" \
