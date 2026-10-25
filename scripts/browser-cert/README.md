@@ -57,11 +57,19 @@ node scripts/browser-cert/compat.mjs report --plan /tmp/kc/plan/plan.json --resu
 ```
 
 **The harness's own specs** (`selftest/`: `ctx.serveWs`, `ctx.write` and
-`ctx.readBytes`), after a change to `context.mjs`, `run.mjs` or `page/`, on
-npm `latest` of wasm-curl with `selftest/meta.json`'s `needs` installed in
-`$HOMESCOOP_CERT_NODE_MODULES`:
+`ctx.readBytes`, and the fs notice `ctx.write` posts), after a change to
+`context.mjs`, `run.mjs` or `page/`, on npm `latest` of wasm-curl with
+`selftest/meta.json`'s `needs` installed in `$HOMESCOOP_CERT_NODE_MODULES`:
 
 ```sh
 npm pack @ai-ecoverse/wasm-curl --pack-destination /tmp/curl
 node scripts/browser-cert/run.mjs --package curl --tarball /tmp/curl/*.tgz --cert scripts/browser-cert/selftest
+```
+
+`fs-notice.mjs` once more on a kernel without `postFsNotice`, for the 100 ms
+fallback (slicc-kernel-negative 1.78.0, from the root `npm ci`):
+
+```sh
+node scripts/browser-cert/run.mjs --package curl --tarball /tmp/curl/*.tgz --cert scripts/browser-cert/selftest \
+  --spec fs-notice.mjs --kernel node_modules/slicc-kernel-negative
 ```
