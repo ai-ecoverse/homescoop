@@ -5,12 +5,14 @@
   "needs": [
     "@ai-ecoverse/wasm-bash",
     "@ai-ecoverse/wasm-coreutils",
-    "@ai-ecoverse/wasm-gmake"
+    "@ai-ecoverse/wasm-gmake",
+    "@ai-ecoverse/wasm-tls-engine"
   ],
   "needsInstall": [
     "@ai-ecoverse/wasm-bash@5.3.0-20",
     "@ai-ecoverse/wasm-coreutils@9.12.0-10",
-    "@ai-ecoverse/wasm-gmake@4.4.1-7"
+    "@ai-ecoverse/wasm-gmake@4.4.1-7",
+    "@ai-ecoverse/wasm-tls-engine@3.6.7-1"
   ],
   "checklist": [
     "cmake --version is cmake version 4.4.3; cmake -E echo prints its argument (cert/cmake.mjs, as a non-root user under users enforce)",
@@ -19,9 +21,11 @@
     "cmake.wasm imports slicc_cred_js, slicc_sig_inherited_js and slicc_poll_js: it links today's shims/slicc (credentials #459, inherited ignores #973, libuv's poll in the kernel). 4.4.3-9 imports none of the first two (NEGATIVE.md)",
     "4.4.3-10 (homescoop#859 stage G): built in CI from the cmake 4.4.3 release tarball (sha256) with emcmake from the patched emscripten 6.0.9 tree (scripts/emscripten-tree.sh), libuv-emscripten.patch, cmake-root-env.patch and host-emscripten-is-wasi.patch; no build path in cmake.wasm; reproducible",
     "platform.mjs (4.4.3-11, homescoop#1278): a LANGUAGES NONE project configures with CMAKE_SYSTEM_NAME WASI, CMAKE_HOST_SYSTEM_NAME WASI, processor wasm32, WASI=1 and no UNIX: host-emscripten-is-wasi.patch now also maps the kernel's uname (Linux 6.0.0-slicc), after CMakeDetermineSystem reads it. 4.4.3-10: Linux, UNIX=1, no WASI (NEGATIVE.md)",
-    "platform.mjs (homescoop#1280): file(DOWNLOAD http://cert.test/f.txt) returns 0 and the served bytes (SHA256 checked) through the kernel's sockets (slicc_socket.c is now linked), a 404 returns curl's 22, and https:// returns 1;\"Unsupported protocol\" (no TLS backend in CMake's bundled curl; README, Downloads). 4.4.3-10's http download never returned (NEGATIVE.md)",
-    "platform.mjs (homescoop#1279, #844): THIRD-PARTY-NOTICES.md (in files) names the Emscripten 6.0.9 runtime and every bundled library cmake.wasm links (cmbzip2, cmcurl, cmexpat, cmjsoncpp, cmlibarchive, cmliblzma, cmlibrhash, cmlibuv, cmllpkgc, cmnghttp2, cmzlib, cmzstd), each with its licence file, and (4.4.3-13, homescoop#1533) the homescoop slicc shims section with the Apache-2.0 text (build.sh calls homescoop_notice_slicc_shims; cmake is off KNOWN_WITHOUT_SHIM_NOTICE). 4.4.3-12 has no shims section (NEGATIVE.md); build.sh fails on a linked library without one. 4.4.3-10 ships no THIRD-PARTY-NOTICES.md",
-    "env-i.mjs (4.4.3-13, homescoop#1501): cmake.wasm links shims/slicc/slicc-env.js, so env -i /usr/bin/cmake -E environment has no web_user, no PATH=/ and no HOME, USER, LOGNAME, PATH or LANG; env -i ONLY=this passes ONLY=this; cmake as builder sees no web_user. 4.4.3-12 prints USER=LOGNAME=web_user, PATH=/, HOME=/home/web_user and LANG (NEGATIVE.md)",
-    "downloads.mjs (4.4.3-13, homescoop#1281): file(DOWNLOAD) of a 3 MiB binary with EXPECTED_HASH SHA256 returns 0 and the served bytes, a wrong EXPECTED_HASH fails the script with HASH mismatch, a 302 is followed, TIMEOUT 3 on a stalled server returns curl's 28, and -DCMAKE_SYSTEM_NAME=Linux gives UNIX=1 and no WASI (the README's override). Coverage: 4.4.3-12 passes it too"
-  ]
+    "platform.mjs (homescoop#1280): file(DOWNLOAD http://cert.test/f.txt) returns 0 and the served bytes (SHA256 checked) through the kernel's sockets (slicc_socket.c is linked), and a 404 returns curl's 22. 4.4.3-10's http download never returned (NEGATIVE.md)",
+    "platform.mjs (homescoop#1279, #844): THIRD-PARTY-NOTICES.md (in files) names the Emscripten 6.0.9 runtime and every bundled library cmake.wasm links (cmbzip2, cmexpat, cmjsoncpp, cmlibarchive, cmliblzma, cmlibrhash, cmlibuv, cmllpkgc, cmzstd; since 4.4.3-14 no cmcurl, cmnghttp2 or cmzlib, but curl / libcurl 8.22.0 and Mbed TLS 3.6.5 from wasm-curl and zlib 1.3.1 from wasm-zlib), each with its licence file, and (4.4.3-13, homescoop#1533) the homescoop slicc shims section with the Apache-2.0 text (build.sh calls homescoop_notice_slicc_shims; cmake is off KNOWN_WITHOUT_SHIM_NOTICE). 4.4.3-12 has no shims section (NEGATIVE.md); build.sh fails on a linked library without one. 4.4.3-10 ships no THIRD-PARTY-NOTICES.md",
+    "env-i.mjs (4.4.3-13, homescoop#1501): cmake.wasm links shims/slicc/slicc-env.js, so env -i /usr/bin/cmake -E environment has no web_user, no PATH=/ and no HOME, USER, LOGNAME, PATH or LANG; env -i ONLY=this passes ONLY=this; cmake as builder sees no web_user; (4.4.3-14, homescoop#1281) cmake -P as builder gets HOME=/home/builder, USER=builder and the kernel's PATH (printenv PATH), and file(REAL_PATH \"~\" EXPAND_TILDE) is /home/builder. 4.4.3-12 prints USER=LOGNAME=web_user, PATH=/, HOME=/home/web_user and LANG (NEGATIVE.md)",
+    "downloads.mjs (4.4.3-13, homescoop#1281): file(DOWNLOAD) of a 3 MiB binary with EXPECTED_HASH SHA256 returns 0 and the served bytes, a wrong EXPECTED_HASH fails the script with HASH mismatch, a 302 is followed, TIMEOUT 3 on a stalled server returns curl's 28, and -DCMAKE_SYSTEM_NAME=Linux gives UNIX=1 and no WASI (the README's override). Coverage: 4.4.3-12 passes it too",
+    "https.mjs (4.4.3-14, homescoop#1280): cmake.wasm links wasm-curl's libcurl 8.22.0 with Mbed TLS 3.6.5 (CMAKE_USE_SYSTEM_CURL). With no TLS setting (CMAKE_TLS_VERIFY and CMAKE_TLS_CAINFO unset, so CMake's default: verification on), file(DOWNLOAD https://cert.test/f.txt) returns 0 with the served bytes, verified against the kernel CA through the SSL_CERT_FILE the kernel sets, and FetchContent_MakeAvailable with URL https://cert.test/dep.tar and URL_HASH SHA256 fetches, unpacks and adds the project; a CA that did not sign the server's certificate (TLS_CAINFO, TLS_VERIFY ON with TLS_CAINFO, set(CMAKE_TLS_CAINFO), or SSL_CERT_FILE) gives 60 'SSL peer certificate or SSH remote key was not OK' and fails FetchContent's configure, TLS_VERIFY OFF accepts it, -DCMAKE_TLS_CAINFO wins over SSL_CERT_FILE, and CURL_CA_BUNDLE alone (SSL_CERT_FILE empty) trusts nothing, as upstream CMake reads only SSL_CERT_FILE and SSL_CERT_DIR. 4.4.3-12 (npm latest; 4.4.3-13 never published) returns 1;\"Unsupported protocol\" (NEGATIVE.md)"
+  ],
+  "network": "ctx.serve() responder behind the kernel's realm proxy (http_proxy/https_proxy, 127.0.0.1:3128); wasm-tls-engine lets the proxy terminate CONNECT with the kernel CA, which cmake's libcurl (Mbed TLS) verifies through the SSL_CERT_FILE the kernel sets"
 }

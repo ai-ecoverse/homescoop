@@ -47,3 +47,28 @@ On slicc-kernel 1.110.7, users enforce, the published 4.4.3-12 gives:
 - **#1501, the cause:** build.sh passes its own `--js-library` list, and it named slicc-writev.js, slicc-linkat.js and slicc-uname.js but not `shims/slicc/slicc-env.js`, so Emscripten's stock `getEnvStrings` filled in its placeholders. The link now adds slicc-env.js itself (not wasm-emscripten's link.py default from its package-patches), and the glue QC fails if the glue still names `web_user`.
 - **#1533, the cause:** build.sh compiles the shims itself, outside `homescoop_slicc_archive`, so no shims section was written, and `KNOWN_WITHOUT_SHIM_NOTICE` let it through under the closed #844. build.sh now calls `homescoop_notice_slicc_shims`, and the entry is gone, so `scripts/test/shim-notice.test.mjs` fails if the call goes missing again.
 - **#1281, partly:** `platform.mjs` now checks all 12 bundled-library notices (adding `cmllpkgc`), and `downloads.mjs` covers a binary download with `EXPECTED_HASH`, a hash mismatch, a 302, `TIMEOUT` and the `-DCMAKE_SYSTEM_NAME=Linux` override. A real C/C++ project with wasm-clang is still open.
+
+## 4.4.3-14: https through wasm-curl's libcurl (homescoop#1280, #1281; 2026-10-25)
+
+4.4.3-13 merged (#1624), but it was never published: ladder-merge run 39710872428 got a 503 from the registry and refused to publish. npm latest is 4.4.3-12, and its curl is the same bundled TLS-less cmcurl as 4.4.3-13's. Run with `node scripts/browser-cert/run.mjs --package cmake --kernel @ai-ecoverse/slicc-kernel@1.110.7 --users enforce` on darwin-arm64:
+
+| case | 4.4.3-12 (npm latest) | 4.4.3-14 |
+|---|---|---|
+| `file(DOWNLOAD https://cert.test/f.txt …)` with no TLS setting (`cert/https.mjs`) | `1;"Unsupported protocol"`, an empty file | `0;"No error"`, the served bytes, verified against the kernel CA through `SSL_CERT_FILE` |
+| `FetchContent_MakeAvailable` with `URL https://cert.test/dep.tar` and `URL_HASH` | not reached (the row above fails first) | fetched, unpacked and added |
+| a CA that did not sign the certificate, through `TLS_CAINFO`, `TLS_VERIFY ON`, `CMAKE_TLS_CAINFO` or `SSL_CERT_FILE` | — | `60;"SSL peer certificate or SSH remote key was not OK…"`; FetchContent's configure fails |
+| `TLS_VERIFY OFF` with that CA | — | `0`, the served bytes |
+| `CURL_CA_BUNDLE` only (`SSL_CERT_FILE` empty) | — | `60` (CMake reads only `SSL_CERT_FILE` and `SSL_CERT_DIR`) |
+| `cert/env-i.mjs`: `cmake -P` as builder prints `HOME`, `USER`, `PATH` and `~` (#1281, coverage) | fails earlier, on 4.4.3-13's row (`USER=web_user`, #1501) | passes |
+| `cert/platform.mjs`: the notices name curl, Mbed TLS and zlib from wasm-curl/wasm-zlib, and no `cmcurl`, `cmnghttp2` or `cmzlib` | fails (`## curl / libcurl 8.22.0` missing) | passes |
+
+4.4.3-12's failure on `cert/https.mjs`:
+
+```text
+AssertionError [ERR_ASSERTION]: file(DOWNLOAD https://…) with verification on, through SSL_CERT_FILE (homescoop#1280): -- verify [] [] cainfo []
+-- https 1;"Unsupported protocol" e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+- **#1280, the cause:** build.sh configured with `-DCMAKE_USE_OPENSSL=OFF`, so the bundled cmcurl had no TLS backend. 4.4.3-14 configures with `-DCMAKE_USE_SYSTEM_CURL=ON` against wasm-curl 8.22.0-10's `libcurl.a` and Mbed TLS archives. That forces `CMAKE_USE_SYSTEM_ZLIB`, so wasm-zlib 1.3.1-4 is linked too. It links `shims/slicc/webcrypto-entropy.c` for Mbed TLS's entropy. The build fails if `Utilities/cmcurl` is still linked.
+- **TLS behaviour** is CMake 4.4.3's own. Verification is on, TLS 1.2 is the minimum, and the CA comes from `TLS_CAINFO`, then `CMAKE_TLS_CAINFO`, then `SSL_CERT_FILE`, then `SSL_CERT_DIR`. The README has the details.
+- All five specs (`cmake.mjs`, `downloads.mjs`, `env-i.mjs`, `https.mjs`, `platform.mjs`) pass on 4.4.3-14 on slicc-kernel 1.110.7. `https.mjs` also passes on 1.166.4, the root devDependency.

@@ -15,5 +15,11 @@ export default async function envI(ctx) {
   const user = await run(['cmake', '-E', 'environment']);
   assert.equal(user.status, 0, user.stderr);
   assert.doesNotMatch(user.stdout, /web_user/, `cmake as builder sees the kernel's environment, not web_user: ${user.stdout}`);
-  console.log(`env-i: env -i cmake -E environment gives [${vars(empty.stdout).join(' ')}], no web_user, PATH=/, HOME, USER, LOGNAME or LANG; env -i ONLY=this passes ONLY; cmake as builder has no web_user`);
+  await ctx.write('/home/builder/who.cmake', 'file(REAL_PATH "~" t EXPAND_TILDE)\nmessage(STATUS "home=$ENV{HOME}|user=$ENV{USER}|path=$ENV{PATH}|tilde=${t}")\n');
+  const path = await run(['printenv', 'PATH']);
+  assert.equal(path.status, 0, path.stderr);
+  const who = await run(['cmake', '-P', 'who.cmake']);
+  assert.equal(who.status, 0, `cmake -P who.cmake: ${who.stdout}${who.stderr}`);
+  assert.equal((who.stdout.match(/-- (home=.*)\n/) || [])[1], `home=/home/builder|user=builder|path=${path.stdout.trim()}|tilde=/home/builder`, `cmake as builder gets the kernel's HOME, USER and PATH, and ~ is builder's home (homescoop#1281): ${who.stdout}`);
+  console.log(`env-i: env -i cmake -E environment gives [${vars(empty.stdout).join(' ')}], no web_user, PATH=/, HOME, USER, LOGNAME or LANG; env -i ONLY=this passes ONLY; cmake as builder has no web_user, and HOME=/home/builder, USER=builder, the kernel's PATH and ~ = /home/builder`);
 }

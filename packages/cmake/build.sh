@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
-# @ai-ecoverse/wasm-cmake: CMake built in CI from the pinned release tarball
-# (homescoop#859 stage G) with emcmake from the patched emscripten 6.0.9 tree
-# on emsdk 6.0.9's prebuilt compilers (scripts/emscripten-tree.sh), linked
-# against today's shims/slicc for the wasm realm (Module.sliccKernel spawn,
-# slicc_poll for libuv's waitpid/SIGCHLD, kernel credentials).
 set -euo pipefail
 ROOT="${HOMESCOOP_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 export HOMESCOOP_ROOT="$ROOT"
-# shellcheck source=../../scripts/build-common.sh
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe cmake
 PKG="$HOMESCOOP_PKG/package"
@@ -18,6 +12,12 @@ SRC="$WORK/cmake-$VERSION-src"
 BLD="$WORK/cmake-$VERSION-build"
 PRERUN="$HOMESCOOP_PKG/cmake-env-prerun.js"
 JOBS="${HOMESCOOP_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
+CURL_LIBS=(libcurl.a libmbedtls.a libmbedx509.a libmbedcrypto.a libeverest.a libp256m.a libz.a)
+for lib in "${CURL_LIBS[@]}"; do
+  test -f "$PREFIX/lib/$lib" || { echo "homescoop: missing $PREFIX/lib/$lib (host-run unpacks wasm-curl and wasm-zlib)" >&2; exit 1; }
+done
+test -f "$PREFIX/include/curl/curl.h" && test -f "$PREFIX/include/zlib.h"
+grep -q 'define LIBCURL_VERSION "8.22.0"' "$PREFIX/include/curl/curlver.h"
 
 homescoop_fetch "$SRC_URL" "$SRC_SHA" "$TB"
 rm -rf "$SRC"
@@ -36,12 +36,12 @@ EMXX=(python3 "$EMSCRIPTEN_TREE/em++.py")
 EMAR=(python3 "$EMSCRIPTEN_TREE/emar.py")
 MAPS="-ffile-prefix-map=$SRC=/cmake -ffile-prefix-map=$BLD=/cmake/build"
 
-echo "== cmake: libslicc (spawn, exec, signals, libc gaps with credentials, select/poll, sockets for file(DOWNLOAD))"
+echo "== cmake: libslicc (spawn, exec, signals, libc gaps with credentials, select/poll, sockets and WebCrypto entropy for file(DOWNLOAD))"
 ODIR="$WORK/cmake-slicc-objs"
 rm -rf "$ODIR"
 mkdir -p "$ODIR"
 objs=()
-for src in slicc_spawn slicc_exec slicc_libc_gaps slicc_signals slicc_select slicc_socket; do
+for src in slicc_spawn slicc_exec slicc_libc_gaps slicc_signals slicc_select slicc_socket webcrypto-entropy; do
   "${EMCC[@]}" -O2 -c "$ROOT/shims/slicc/${src}.c" -o "$ODIR/${src}.o"
   objs+=("$ODIR/${src}.o")
 done
@@ -49,18 +49,29 @@ SLICC_A="$ODIR/libslicc-cmake.a"
 "${EMAR[@]}" rcs "$SLICC_A" "${objs[@]}"
 grep -q sliccKernel "$ODIR/slicc_spawn.o"
 
-echo "== cmake: emcmake (Release, no OpenSSL, no dialogs, no tests)"
+echo "== cmake: emcmake (Release, wasm-curl's libcurl with Mbed TLS and wasm-zlib, no dialogs, no tests)"
 rm -rf "$BLD"
 python3 "$EMSCRIPTEN_TREE/emcmake.py" cmake -S "$SRC" -B "$BLD" -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTING=OFF \
-  -DCMAKE_USE_OPENSSL=OFF \
+  -DCMAKE_USE_SYSTEM_CURL=ON \
+  -DCMAKE_USE_SYSTEM_ZLIB=ON \
+  "-DCURL_INCLUDE_DIR=$PREFIX/include" \
+  "-DCURL_LIBRARY=$PREFIX/lib/libcurl.a" \
+  "-DZLIB_INCLUDE_DIR=$PREFIX/include" \
+  "-DZLIB_LIBRARY=$PREFIX/lib/libz.a" \
+  -DCURL_NO_CURL_CMAKE=ON \
   -DBUILD_CursesDialog=OFF \
   -DBUILD_QtDialog=OFF \
   "-DCMAKE_C_FLAGS=$MAPS" \
   "-DCMAKE_CXX_FLAGS=-fexceptions $MAPS" \
   "-DCMAKE_EXE_LINKER_FLAGS=-fexceptions -sDISABLE_EXCEPTION_CATCHING=0"
 test -f "$BLD/Source/CMakeFiles/cmake.dir/link.txt"
+grep -qx 'CMAKE_USE_SYSTEM_CURL:BOOL=ON' "$BLD/CMakeCache.txt"
+if grep -q 'Utilities/cmcurl' "$BLD/Source/CMakeFiles/cmake.dir/link.txt" "$BLD/Source/CMakeFiles/cmake.dir/linkLibs.rsp" 2>/dev/null; then
+  echo "homescoop: cmake still links the bundled TLS-less cmcurl (homescoop#1280)" >&2
+  exit 1
+fi
 
 OUT="$WORK/cmake-link"
 rm -rf "$OUT"
@@ -79,6 +90,8 @@ REALM=(
   -Wl,-u,__syscall_wait4 -Wl,-u,execve -Wl,-u,slicc_spawn_capture -Wl,-u,posix_spawn -Wl,-u,posix_spawnp
   -Wl,-u,popen -Wl,-u,pclose -Wl,-u,system
   -Wl,--whole-archive "$SLICC_A" -Wl,--no-whole-archive
+  "$PREFIX/lib/libmbedtls.a" "$PREFIX/lib/libmbedx509.a" "$PREFIX/lib/libmbedcrypto.a"
+  "$PREFIX/lib/libeverest.a" "$PREFIX/lib/libp256m.a" "$PREFIX/lib/libz.a"
 )
 python3 - "$BLD/Source/CMakeFiles/cmake.dir/link.txt" "$OUT/cmake.js" "${REALM[@]}" <<'PY'
 import shlex, sys
@@ -121,9 +134,6 @@ cp -R "$SRC/Modules" "$PKG/share/cmake-$SERIES/Modules"
 cp -R "$SRC/Templates" "$PKG/share/cmake-$SERIES/Templates"
 cp "$SRC/LICENSE.rst" "$PKG/LICENSE"
 
-# THIRD-PARTY-NOTICES.md (homescoop#844, #1279): the Emscripten runtime and
-# every CMake-bundled library the cmake target links (Utilities/cm*, from
-# link.txt and linkLibs.rsp), each with its licence file from the source tree.
 homescoop_notices_begin "cmake.wasm statically links the following."
 homescoop_notice "Emscripten 6.0.9 (runtime and system libraries)" \
   "$EMSCRIPTEN_TREE/LICENSE" - \
@@ -147,7 +157,21 @@ for lib in "${BUNDLED[@]}"; do
   fi
   homescoop_notice "$lib (CMake's bundled copy, Utilities/$lib)" "${files[@]}"
 done
-echo "== cmake: notices for the Emscripten runtime and ${#BUNDLED[@]} bundled libraries: ${BUNDLED[*]}"
+for lib in cmcurl cmnghttp2 cmzlib; do
+  if [[ " ${BUNDLED[*]} " == *" $lib "* ]]; then
+    echo "homescoop: cmake.wasm links the bundled $lib; wasm-curl and wasm-zlib replace it (homescoop#1280)" >&2
+    exit 1
+  fi
+done
+homescoop_notice "curl / libcurl 8.22.0 (@ai-ecoverse/wasm-curl)" \
+  https://raw.githubusercontent.com/curl/curl/curl-8_22_0/COPYING 82f2f4427d6545ee5aaac4f0b80428da6cc8ba41c2cf5da3a03680ec327b9681
+homescoop_notice "Mbed TLS 3.6.5 (via @ai-ecoverse/wasm-curl; with Everest and p256-m)" \
+  https://raw.githubusercontent.com/Mbed-TLS/mbedtls/mbedtls-3.6.5/LICENSE 9b405ef4c89342f5eae1dd828882f931747f71001cfba7d114801039b52ad09b \
+  https://raw.githubusercontent.com/Mbed-TLS/mbedtls/mbedtls-3.6.5/3rdparty/everest/README.md 96a16739f1453480c84b1c787f0d48ea15c1d307af0a2e9baea4d98b0f1d83f2 \
+  https://raw.githubusercontent.com/Mbed-TLS/mbedtls/mbedtls-3.6.5/3rdparty/p256-m/README.md 9708f7be7a7775254eacf8d7b3b2961e0905d203bda67c8be95e61c471664e39
+homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasm-zlib)" \
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/LICENSE 845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243
+echo "== cmake: notices for the Emscripten runtime, ${#BUNDLED[@]} bundled libraries (${BUNDLED[*]}), wasm-curl's curl and Mbed TLS, and wasm-zlib"
 node -e '
 const j = require(process.argv[1]);
 const want = "${package}/share/cmake-" + process.argv[2];
