@@ -45,10 +45,54 @@ window.installTree = async (dir, names, modes = {}) => {
   return { files: names.length, stamped };
 };
 
-async function file(path, create = false) {
+async function file(path) {
   const parts = path.split('/').filter(Boolean);
   const name = parts.pop();
-  return (await walk(parts.join('/'), create)).getFileHandle(name, { create });
+  return (await walk(parts.join('/'))).getFileHandle(name);
+}
+
+async function created(path) {
+  const parts = path.split('/').filter(Boolean);
+  const name = parts.pop();
+  let dir = await navigator.storage.getDirectory();
+  let at = '';
+  const made = [];
+  for (const part of parts) {
+    at += `/${part}`;
+    try {
+      dir = await dir.getDirectoryHandle(part);
+    } catch {
+      dir = await dir.getDirectoryHandle(part, { create: true });
+      made.push(at);
+    }
+  }
+  return { handle: await dir.getFileHandle(name, { create: true }), made, path: `${at}/${name}` };
+}
+
+const parentOf = (path) => path.slice(0, path.lastIndexOf('/')) || '/';
+
+let fsNotice;
+async function noticed(path, made) {
+  fsNotice ??= import('/dist/meta.js').then(
+    (meta) => (typeof meta.postFsNotice === 'function' ? meta.postFsNotice : null),
+    () => null,
+  );
+  const post = await fsNotice;
+  if (!post) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    window.certFsNotice = 'waited';
+    return;
+  }
+  post({ paths: [...new Set([path, parentOf(path), ...made.flatMap((dir) => [dir, parentOf(dir)])])] });
+  window.certFsNotice = 'posted';
+}
+
+async function writeFile(path, data) {
+  const target = await created(path);
+  const writable = await target.handle.createWritable();
+  await writable.write(data);
+  await writable.close();
+  await noticed(target.path, target.made);
 }
 
 window.opfs = {
@@ -60,9 +104,7 @@ window.opfs = {
     }
   },
   async write(path, text) {
-    const writable = await (await file(path, true)).createWritable();
-    await writable.write(text);
-    await writable.close();
+    await writeFile(path, text);
   },
   // Bytes cross the CDP boundary as base64: a string handed to
   // FileSystemWritableFileStream.write() is UTF-8 encoded (#591), and
@@ -71,9 +113,7 @@ window.opfs = {
     const raw = atob(b64);
     const bytes = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-    const writable = await (await file(path, true)).createWritable();
-    await writable.write(bytes);
-    await writable.close();
+    await writeFile(path, bytes);
   },
   async readBase64(path) {
     let bytes;

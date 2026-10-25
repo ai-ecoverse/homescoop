@@ -134,6 +134,18 @@ as a `Buffer`. Both return `null` for a missing file. Bytes cross to the
 page as base64; `scripts/browser-cert/selftest/binary.mjs` round-trips all
 256 byte values both ways (#591, #738).
 
+`write` goes straight into OPFS, beside the kernel, so the page then tells the
+kernel what changed: the file, each directory the write created, and the
+parent of each, with `postFsNotice` from the kernel's `/dist/meta.js` (on the
+default metadata channel, the one the cert page boots the kernel with). Since
+slicc-kernel 1.148.0 the kernel keeps a name it found missing missing for its
+next 256 lookups, at most 100 ms (slicc-kernel#1425); without the notice, a
+spec that runs a program on a path, writes it and runs again at once got
+`ENOENT` although `ls` listed the file (slicc-kernel#1693). A kernel whose
+`/dist/meta.js` has no `postFsNotice` (slicc-kernel-negative 1.78.0 has no
+`meta.js` at all) gets a 100 ms wait after the write instead.
+`scripts/browser-cert/selftest/fs-notice.mjs` checks it.
+
 ### Terminal: `ctx.pty(argv, { cols, rows, env, cwd, steps, timeoutMs })`
 
 This runs `argv` as the session leader of a real pty (`kernel.openTerminal`; the kernel adds
