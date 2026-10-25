@@ -26,7 +26,7 @@
     "test": "node --test 'scripts/test/*.test.mjs'"
   },
   "devDependencies": {
-    "@ai-ecoverse/slicc-kernel": "1.166.0",
+    "@ai-ecoverse/slicc-kernel": "1.166.4",
     "@ai-ecoverse/slicc-shared-web": "2.12.3",
     "monocart-coverage-reports": "3.0.0",
     "playwright-core": "1.64.1",
