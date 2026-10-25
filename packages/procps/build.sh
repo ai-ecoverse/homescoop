@@ -90,7 +90,17 @@ for c in free pgrep pkill kill uptime pidof; do
   stage_one "$SRC/src" "$c"
 done
 
-homescoop_stage_license "$SRC"/COPYING "$SRC"/COPYING.LIB "$SRC"/LICENSE
+homescoop_stage_licenses "$SRC"/COPYING
+test -s "$SRC/COPYING.LIB" || { echo "procps-licences: FAIL the source has no COPYING.LIB (homescoop#1878)" >&2; exit 1; }
+cp "$SRC/COPYING.LIB" "$HOMESCOOP_PKG/package/COPYING.LIB"
+grep -q '^ *GNU GENERAL PUBLIC LICENSE$' "$HOMESCOOP_PKG/package/LICENSE" \
+  && grep -q '^ *Version 2, June 1991$' "$HOMESCOOP_PKG/package/LICENSE" \
+  && grep -q '^ *GNU LIBRARY GENERAL PUBLIC LICENSE$' "$HOMESCOOP_PKG/package/COPYING.LIB" \
+  && grep -q '^ *Version 2, June 1991$' "$HOMESCOOP_PKG/package/COPYING.LIB" \
+  && grep -q 'GNU Lesser General Public' "$SRC/library/readproc.c" \
+  && grep -q 'version 2.1 of the License, or (at your option) any later version' "$SRC/library/readproc.c" \
+  || { echo "procps-licences: FAIL LICENSE is not COPYING (GPL-2.0), COPYING.LIB is not the LGPL text, or libproc2 is no longer LGPL-2.1-or-later (homescoop#1878)" >&2; exit 1; }
+echo "procps-licences: PASS LICENSE (COPYING, GPL-2.0) and COPYING.LIB (libproc2, LGPL)"
 homescoop_notices_begin "The wasm modules in bin/ statically link the following."
 homescoop_notice_emscripten
 homescoop_notice "homescoop: wasm-stubs.c and the slicc shims (Apache-2.0)" "$ROOT/LICENSE" -

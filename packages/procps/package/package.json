@@ -1,11 +1,11 @@
 {
   "name": "@ai-ecoverse/wasm-procps",
-  "version": "4.0.7-5",
+  "version": "4.0.7-6",
   "description": "procps-ng: ps, free, pgrep, pkill, kill, uptime and pidof.",
   "engines": {
     "slicc-kernel": ">=1.44.0"
   },
-  "license": "GPL-2.0-or-later",
+  "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ai-ecoverse/homescoop.git",
@@ -23,6 +23,7 @@
   "files": [
     "README.md",
     "LICENSE",
+    "COPYING.LIB",
     "THIRD-PARTY-NOTICES.md",
     "bin"
   ],
