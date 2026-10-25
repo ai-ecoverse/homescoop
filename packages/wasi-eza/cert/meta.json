@@ -1,0 +1,21 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15"
+  ],
+  "checklist": [
+    "cert/checklist.mjs: eza --version is 0.23.5 [-git]; with no file arguments eza lists the working directory with no stdin, < /dev/null, names piped in and a pipe still open (sleep 2 | eza), and reads names only with --stdin; -l shows 0600, 0755, a fifo (|), symlinks with targets and a 1777 directory (t), sizes and root as owner; -lad -o -g -n gives octal modes and uid/gid 0; -aa adds . and ..; -T draws the tree; --total-size sums a directory (3); -X dereferences a link; /dev/null is a character device; -li inodes are distinct and --sort=inode orders by them, -H counts 1 link; eza / lists the root (dev, etc, home, tmp), not the working directory, and -d resolves /, /tmp, ../eza, sub/.. and ./sub/deep; /tmp is drwxrwxrwt; a missing file is rc 2 'No such file or directory (os error 44)'; --git is rc 3 (no git feature); on a pty the grid fits 30 and 200 columns (slicc_tty.winsize), the executable is bold green, root's own user bold yellow, a directory bold blue",
+    "cert/users.mjs (users enforce): root sees bob, alice and their groups by name, alice sees them by number (-n); the caller's own user and group are bold yellow (cred_get), others plain; --smart-group shows ':' for a group named as the owner; bob is refused alice's 0700 home ('Permission denied: /home/alice') and a file in it (rc 2, 'Permission denied (os error 2)'), which alice lists",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md is installed with the Rust 1.99.1 standard library section and exactly one wasi-libc section (wasi-sdk-33), and no git2/libgit2-sys; LICENSE has the EUPL-1.2 and MIT texts"
+  ],
+  "patches": {
+    "0001-wasi-eza-for-slicc-WASI-preview1.patch": "without it eza 0.23.5 does not build for wasm32-wasip1 (18 errors: Column::Permissions, changed_time, size, type_char, ...); its slicc_fs, cred_get and winsize paths are the -l, -o, -n, users and pty cases, its start() the eza / case (NEGATIVE.md)",
+    "0002-stdin-read-file-names-from-stdin-only-with-stdin.patch": "the no-stdin, < /dev/null, piped-names and open-pipe cases of cert/checklist.mjs (without it eza -1 prints nothing; NEGATIVE.md)"
+  }
+}

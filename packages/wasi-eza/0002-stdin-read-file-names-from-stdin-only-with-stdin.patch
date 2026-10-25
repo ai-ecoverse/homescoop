@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Sun, 25 Oct 2026 21:04:36 +0100
+Subject: [PATCH 2/2] stdin: read file names from stdin only with --stdin
+
+eza 0.23 reads names from stdin whenever it isn't a terminal, so with no
+arguments `eza < /dev/null` lists nothing (eza#1725) and `eza` in a
+pipeline nobody closes waits for EOF (eza#1568). A slicc command's stdin is
+/dev/null or a pipe. As eza#1923 proposes, and as ls and exa do, names come
+from stdin only with --stdin.
+
+Signed-off-by: Lars Trieloff <lars@trieloff.net>
+---
+ src/options/stdin.rs | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/src/options/stdin.rs b/src/options/stdin.rs
+index a73f837..68d97a0 100644
+--- a/src/options/stdin.rs
++++ b/src/options/stdin.rs
+@@ -9,8 +9,6 @@ use clap::ArgMatches;
+ use crate::options::Vars;
+ use crate::options::vars::EZA_STDIN_SEPARATOR;
+ use std::ffi::OsString;
+-use std::io;
+-use std::io::IsTerminal;
+ 
+ #[derive(Debug, PartialEq)]
+ pub enum FilesInput {
+@@ -19,8 +17,11 @@ pub enum FilesInput {
+ }
+ 
+ impl FilesInput {
++    /// File names come from stdin only with `--stdin` (eza#1923): reading
++    /// it whenever it isn't a terminal listed nothing for `eza < /dev/null`
++    /// (eza#1725) and waited forever on a pipe nobody closes (eza#1568).
+     pub fn deduce<V: Vars>(matches: &ArgMatches, vars: &V) -> Self {
+-        if matches.get_flag("stdin") || !io::stdin().is_terminal() {
++        if matches.get_flag("stdin") {
+             let separator = vars
+                 .get(EZA_STDIN_SEPARATOR)
+                 .unwrap_or(OsString::from("\n"));

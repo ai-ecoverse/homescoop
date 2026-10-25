@@ -1,0 +1,45 @@
+{
+  "name": "@ai-ecoverse/wasi-eza",
+  "version": "0.23.5-1",
+  "description": "eza, a modern replacement for ls, to list files with colours, icons, trees and long views in SLICC.",
+  "license": "EUPL-1.2 AND MIT",
+  "engines": {
+    "slicc-kernel": ">=1.132.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-eza/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-eza",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "eza",
+    "ls"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-eza",
+    "upstream": "0.23.5"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "eza": {
+        "wasm": "bin/eza.wasm",
+        "preopenRoot": true
+      }
+    }
+  }
+}

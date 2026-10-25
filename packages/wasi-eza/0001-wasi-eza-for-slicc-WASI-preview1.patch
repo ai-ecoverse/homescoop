@@ -1,0 +1,1560 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Sun, 25 Oct 2026 21:04:36 +0100
+Subject: [PATCH 1/2] wasi: eza for slicc WASI preview1
+
+eza's Unix code (the long view's permissions, owners, links, inodes,
+blocks, --total-size, the inode sort) builds for target_os = "wasi" too,
+over src/fs/wasi.rs. WASI's filestat has no mode, owner or block count, and
+std::os::wasi::fs is unstable, so that module asks slicc-kernel:
+
+- slicc_fs.path_filestat_owner: the filestat and the owner in one call;
+  ENOTSUP with users off, then path_filestat_get and the caller's ids, as
+  the kernel reports a file without an owner;
+- slicc_fs.path_mode: the permission bits and S_IFIFO; ENOSYS on an old
+  kernel, then 0755/0777/0644 by type;
+- slicc.cred_get: the caller's ids, for the "you" styles;
+- slicc_tty.winsize: the pty's width for the grid (terminal_size has no
+  WASI backend).
+
+User and group names come from /etc/passwd and /etc/group, which uzers
+(Unix only, through libc) would read. WASI has no device numbers (devices
+show no size) or block counts (blocks are the size rounded up to 512).
+
+main() starts in $PWD (wasi-libc starts at /) and, when the kernel
+preopened both / and ./ (preopenRoot), closes ./: wasi-libc resolves / to
+the last preopen with an empty prefix, which was ./, the working directory.
+
+Signed-off-by: Lars Trieloff <lars@trieloff.net>
+---
+ src/fs/fields.rs                      |  24 +-
+ src/fs/file.rs                        | 109 ++++--
+ src/fs/filter.rs                      |   6 +-
+ src/fs/mod.rs                         |   2 +
+ src/fs/wasi.rs                        | 458 ++++++++++++++++++++++++++
+ src/main.rs                           |   5 +
+ src/options/parser.rs                 |   4 +-
+ src/output/file_name.rs               |  12 +-
+ src/output/mod.rs                     |   3 +
+ src/output/render/groups.rs           |   4 +
+ src/output/render/links.rs            |  20 +-
+ src/output/render/mod.rs              |  22 +-
+ src/output/render/permissions_unix.rs |   4 +-
+ src/output/render/users.rs            |   3 +
+ src/output/table.rs                   |  84 ++---
+ src/theme/mod.rs                      |   8 +-
+ 16 files changed, 646 insertions(+), 122 deletions(-)
+ create mode 100644 src/fs/wasi.rs
+
+diff --git a/src/fs/fields.rs b/src/fs/fields.rs
+index bb2e182..38ebdb7 100644
+--- a/src/fs/fields.rs
++++ b/src/fs/fields.rs
+@@ -21,19 +21,19 @@
+ #![allow(clippy::struct_excessive_bools)]
+ 
+ /// The type of a file’s group ID.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub type gid_t = u32;
+ 
+ /// The type of a file’s inode.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub type ino_t = u64;
+ 
+ /// The type of a file’s number of links.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub type nlink_t = u64;
+ 
+ /// The type of a file’s user ID.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub type uid_t = u32;
+ 
+ /// The type of user file flags
+@@ -69,7 +69,7 @@ impl Type {
+ /// The file’s Unix permission bitfield, with one entry per bit.
+ #[derive(Copy, Clone)]
+ #[rustfmt::skip]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub struct Permissions {
+     pub user_read:      bool,
+     pub user_write:     bool,
+@@ -108,7 +108,7 @@ pub struct Attributes {
+ pub struct PermissionsPlus {
+     #[allow(unused)]
+     pub file_type: Type,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub permissions: Permissions,
+     #[cfg(windows)]
+     pub attributes: Attributes,
+@@ -118,7 +118,7 @@ pub struct PermissionsPlus {
+ 
+ /// The permissions encoded as octal values
+ #[derive(Copy, Clone)]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub struct OctalPermissions {
+     pub permissions: Permissions,
+ }
+@@ -129,7 +129,7 @@ pub struct OctalPermissions {
+ /// multiple directories. However, it’s rare (but occasionally useful!) for a
+ /// regular file to have a link count greater than 1, so we highlight the
+ /// block count specifically for this case.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ #[derive(Copy, Clone)]
+ pub struct Links {
+     /// The actual link count.
+@@ -142,13 +142,13 @@ pub struct Links {
+ /// A file’s inode. Every directory entry on a Unix filesystem has an inode,
+ /// including directories and links, so this is applicable to everything exa
+ /// can deal with.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ #[derive(Copy, Clone)]
+ pub struct Inode(pub ino_t);
+ 
+ /// A file's size of allocated file system blocks.
+ #[derive(Copy, Clone)]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub enum Blocksize {
+     /// This file has the given number of blocks.
+     Some(u64),
+@@ -159,12 +159,12 @@ pub enum Blocksize {
+ 
+ /// The ID of the user that owns a file. This will only ever be a number;
+ /// looking up the username is done in the `display` module.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ #[derive(Copy, Clone)]
+ pub struct User(pub uid_t);
+ 
+ /// The ID of the group that a file belongs to.
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ #[derive(Copy, Clone)]
+ pub struct Group(pub gid_t);
+ 
+diff --git a/src/fs/file.rs b/src/fs/file.rs
+index 0760bd3..240a939 100644
+--- a/src/fs/file.rs
++++ b/src/fs/file.rs
+@@ -6,18 +6,22 @@
+ // SPDX-License-Identifier: MIT
+ //! Files, and methods and fields to access their metadata.
+ 
+-#[cfg(unix)]
++#[cfg(target_os = "wasi")]
++use crate::fs::wasi::{Metadata, MetadataExt};
++#[cfg(any(unix, target_os = "wasi"))]
+ use std::collections::HashMap;
+ use std::fs::FileType;
++#[cfg(not(target_os = "wasi"))]
++use std::fs::Metadata;
+ use std::io;
+ #[cfg(unix)]
+-use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
++use std::os::unix::fs::{FileTypeExt, MetadataExt};
+ #[cfg(windows)]
+ use std::os::windows::fs::MetadataExt;
+ use std::path::{Path, PathBuf};
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use std::str;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use std::sync::Mutex;
+ use std::sync::OnceLock;
+ use std::time::SystemTime;
+@@ -25,7 +29,7 @@ use std::time::SystemTime;
+ use chrono::prelude::*;
+ 
+ use log::{debug, error, trace};
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use std::sync::LazyLock;
+ 
+ use crate::fs::dir::Dir;
+@@ -42,7 +46,7 @@ use super::mounts::all_mounts;
+ // Mutex::new is const but HashMap::new is not const requiring us to use lazy
+ // initialization.
+ #[allow(clippy::type_complexity)]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ static DIRECTORY_SIZE_CACHE: LazyLock<Mutex<HashMap<(u64, u64), (u64, u64)>>> =
+     LazyLock::new(|| Mutex::new(HashMap::new()));
+ 
+@@ -82,7 +86,7 @@ pub struct File<'dir> {
+     /// This too is queried multiple times, and is *not* cached by the OS, as
+     /// it could easily change between invocations — but exa is so short-lived
+     /// it’s better to just cache it.
+-    pub metadata: OnceLock<io::Result<std::fs::Metadata>>,
++    pub metadata: OnceLock<io::Result<Metadata>>,
+ 
+     /// A reference to the directory that contains this file, if any.
+     ///
+@@ -277,10 +281,13 @@ impl<'dir> File<'dir> {
+             .as_ref()
+     }
+ 
+-    pub fn metadata(&self) -> Result<&std::fs::Metadata, &io::Error> {
++    pub fn metadata(&self) -> Result<&Metadata, &io::Error> {
+         self.metadata
+             .get_or_init(|| {
+                 debug!("Statting file {:?}", &self.path);
++                #[cfg(target_os = "wasi")]
++                return crate::fs::wasi::symlink_metadata(&self.path);
++                #[cfg(not(target_os = "wasi"))]
+                 std::fs::symlink_metadata(&self.path)
+             })
+             .as_ref()
+@@ -360,7 +367,7 @@ impl<'dir> File<'dir> {
+     /// Whether this file is both a regular file *and* executable for the
+     /// current user. An executable file has a different purpose from an
+     /// executable directory, so they should be highlighted differently.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn is_executable_file(&self) -> bool {
+         let bit = modes::USER_EXECUTE;
+         if !self.is_file() {
+@@ -369,7 +376,7 @@ impl<'dir> File<'dir> {
+         let Ok(md) = self.metadata() else {
+             return false;
+         };
+-        (md.permissions().mode() & bit) == bit
++        (md.mode() & bit) == bit
+     }
+ 
+     /// Whether this file is a symlink on the filesystem.
+@@ -383,24 +390,44 @@ impl<'dir> File<'dir> {
+         self.filetype().is_some_and(FileTypeExt::is_fifo)
+     }
+ 
++    #[cfg(target_os = "wasi")]
++    pub fn is_pipe(&self) -> bool {
++        self.metadata().is_ok_and(Metadata::is_fifo)
++    }
++
+     /// Whether this file is a char device on the filesystem.
+     #[cfg(unix)]
+     pub fn is_char_device(&self) -> bool {
+         self.filetype().is_some_and(FileTypeExt::is_char_device)
+     }
+ 
++    #[cfg(target_os = "wasi")]
++    pub fn is_char_device(&self) -> bool {
++        self.metadata().is_ok_and(Metadata::is_char_device)
++    }
++
+     /// Whether this file is a block device on the filesystem.
+     #[cfg(unix)]
+     pub fn is_block_device(&self) -> bool {
+         self.filetype().is_some_and(FileTypeExt::is_block_device)
+     }
+ 
++    #[cfg(target_os = "wasi")]
++    pub fn is_block_device(&self) -> bool {
++        self.metadata().is_ok_and(Metadata::is_block_device)
++    }
++
+     /// Whether this file is a socket on the filesystem.
+     #[cfg(unix)]
+     pub fn is_socket(&self) -> bool {
+         self.filetype().is_some_and(FileTypeExt::is_socket)
+     }
+ 
++    #[cfg(target_os = "wasi")]
++    pub fn is_socket(&self) -> bool {
++        self.metadata().is_ok_and(Metadata::is_socket)
++    }
++
+     /// Determine the full path resolving all symbolic links on demand.
+     pub fn absolute_path(&self) -> Option<&PathBuf> {
+         self.absolute_path
+@@ -477,7 +504,11 @@ impl<'dir> File<'dir> {
+ 
+         // Use plain `metadata` instead of `symlink_metadata` - we *want* to
+         // follow links.
+-        match std::fs::metadata(&absolute_path) {
++        #[cfg(target_os = "wasi")]
++        let metadata = crate::fs::wasi::metadata(&absolute_path);
++        #[cfg(not(target_os = "wasi"))]
++        let metadata = std::fs::metadata(&absolute_path);
++        match metadata {
+             Ok(metadata) => {
+                 let ext = File::ext(&path);
+                 let name = File::filename(&path);
+@@ -533,7 +564,7 @@ impl<'dir> File<'dir> {
+     /// is uncommon, while you come across directories and other types
+     /// with multiple links much more often. Thus, it should get highlighted
+     /// more attentively.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn links(&self) -> f::Links {
+         let count = self.metadata().map_or(0, MetadataExt::nlink);
+ 
+@@ -544,13 +575,13 @@ impl<'dir> File<'dir> {
+     }
+ 
+     /// This file’s inode.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn inode(&self) -> f::Inode {
+         f::Inode(self.metadata().map_or(0, MetadataExt::ino))
+     }
+ 
+     /// This actual size the file takes up on disk, in bytes.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn blocksize(&self) -> f::Blocksize {
+         if self.deref_links && self.is_link() {
+             match self.link_target() {
+@@ -574,7 +605,7 @@ impl<'dir> File<'dir> {
+ 
+     /// The ID of the user that own this file. If dereferencing links, the links
+     /// may be broken, in which case `None` will be returned.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn user(&self) -> Option<f::User> {
+         if self.is_link() && self.deref_links {
+             return match self.link_target_recurse() {
+@@ -586,7 +617,7 @@ impl<'dir> File<'dir> {
+     }
+ 
+     /// The ID of the group that owns this file.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn group(&self) -> Option<f::Group> {
+         if self.is_link() && self.deref_links {
+             return match self.link_target_recurse() {
+@@ -608,7 +639,7 @@ impl<'dir> File<'dir> {
+     ///
+     /// Links will return the size of their target (recursively through other
+     /// links) if dereferencing is enabled, otherwise None.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn size(&self) -> f::Size {
+         if self.deref_links && self.is_link() {
+             match self.link_target() {
+@@ -619,6 +650,25 @@ impl<'dir> File<'dir> {
+             self.recursive_size
+                 .map_or(f::Size::None, |bytes, _| f::Size::Some(bytes))
+         } else if self.is_char_device() || self.is_block_device() {
++            self.device_ids()
++        } else if self.is_file() {
++            f::Size::Some(self.metadata().map_or(0, |md| md.len()))
++        } else {
++            // symlink
++            f::Size::None
++        }
++    }
++
++    /// WASI has no device numbers.
++    #[cfg(target_os = "wasi")]
++    fn device_ids(&self) -> f::Size {
++        f::Size::None
++    }
++
++    /// A device's major and minor numbers.
++    #[cfg(unix)]
++    fn device_ids(&self) -> f::Size {
++        {
+             let device_id = self.metadata().map_or(0, MetadataExt::rdev);
+ 
+             // MacOS and Linux have different arguments and return types for the
+@@ -640,11 +690,6 @@ impl<'dir> File<'dir> {
+                     minor: unsafe { libc::minor(device_id) as u32 },
+                 })
+             }
+-        } else if self.is_file() {
+-            f::Size::Some(self.metadata().map_or(0, std::fs::Metadata::len))
+-        } else {
+-            // symlink
+-            f::Size::None
+         }
+     }
+ 
+@@ -657,14 +702,14 @@ impl<'dir> File<'dir> {
+         if self.is_directory() {
+             f::Size::None
+         } else {
+-            f::Size::Some(self.metadata().map_or(0, std::fs::Metadata::len))
++            f::Size::Some(self.metadata().map_or(0, |md| md.len()))
+         }
+     }
+ 
+     /// Calculate the total directory size recursively.  If not a directory `None`
+     /// will be returned.  The directory size is cached for recursive directory
+     /// listing.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn recursive_directory_size(&self) -> RecursiveSize {
+         if self.is_directory() {
+             let key = (
+@@ -715,7 +760,7 @@ impl<'dir> File<'dir> {
+     #[inline]
+     pub fn length(&self) -> u64 {
+         self.recursive_size
+-            .unwrap_bytes_or(self.metadata().map_or(0, std::fs::Metadata::len))
++            .unwrap_bytes_or(self.metadata().map_or(0, |md| md.len()))
+     }
+ 
+     /// Is the file is using recursive size calculation
+@@ -733,7 +778,7 @@ impl<'dir> File<'dir> {
+     /// it's truly empty. The naive approach used here checks the contents
+     /// directly, as certain filesystems make it difficult to infer emptiness
+     /// based on directory size alone.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn is_empty_dir(&self) -> bool {
+         if self.is_directory() {
+             if self.metadata().map_or(0, MetadataExt::nlink) > 2 {
+@@ -814,7 +859,7 @@ impl<'dir> File<'dir> {
+     }
+ 
+     /// This file’s last changed timestamp, if available on this platform.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn changed_time(&self) -> Option<NaiveDateTime> {
+         if self.is_link() && self.deref_links {
+             return match self.link_target_recurse() {
+@@ -866,7 +911,7 @@ impl<'dir> File<'dir> {
+     /// This is used a the leftmost character of the permissions column.
+     /// The file type can usually be guessed from the colour of the file, but
+     /// ls puts this character there.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn type_char(&self) -> f::Type {
+         if self.is_file() {
+             f::Type::File
+@@ -899,7 +944,7 @@ impl<'dir> File<'dir> {
+     }
+ 
+     /// This file’s permissions, with flags for each bit.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn permissions(&self) -> Option<f::Permissions> {
+         if self.is_link() && self.deref_links {
+             // If the chain of links is broken, we instead fall through and
+@@ -949,7 +994,7 @@ impl<'dir> File<'dir> {
+     }
+ 
+     /// This file’s security context field.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn security_context(&self) -> f::SecurityContext<'_> {
+         let context = match self
+             .extended_attributes()
+@@ -1055,7 +1100,7 @@ impl FileTarget<'_> {
+ 
+ /// More readable aliases for the permission bits exposed by libc.
+ #[allow(trivial_numeric_casts)]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod modes {
+ 
+     // The `libc::mode_t` type’s actual type varies, but the value returned
+@@ -1131,7 +1176,7 @@ mod filename_test {
+     }
+ 
+     #[test]
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn topmost() {
+         assert_eq!("/", File::filename(Path::new("/")));
+     }
+diff --git a/src/fs/filter.rs b/src/fs/filter.rs
+index ea668c9..dc36854 100644
+--- a/src/fs/filter.rs
++++ b/src/fs/filter.rs
+@@ -6,6 +6,8 @@
+ // SPDX-License-Identifier: MIT
+ //! Filtering and sorting the list of files before displaying them.
+ 
++#[cfg(target_os = "wasi")]
++use crate::fs::wasi::MetadataExt;
+ use std::cmp::Ordering;
+ use std::iter::FromIterator;
+ #[cfg(unix)]
+@@ -179,7 +181,7 @@ pub enum SortField {
+ 
+     /// The file’s inode, which usually corresponds to the order in which
+     /// files were created on the filesystem, more or less.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     FileInode,
+ 
+     /// The time the file was modified (the “mtime”).
+@@ -273,7 +275,7 @@ impl SortField {
+ 
+             Self::Size          => a.length().cmp(&b.length()),
+ 
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::FileInode     => {
+                 a.metadata().map_or(0, MetadataExt::ino)
+                     .cmp(&b.metadata().map_or(0, MetadataExt::ino))
+diff --git a/src/fs/mod.rs b/src/fs/mod.rs
+index 4953409..2939c6e 100644
+--- a/src/fs/mod.rs
++++ b/src/fs/mod.rs
+@@ -16,3 +16,5 @@ pub mod fields;
+ pub mod filter;
+ pub mod mounts;
+ pub mod recursive_size;
++#[cfg(target_os = "wasi")]
++pub mod wasi;
+diff --git a/src/fs/wasi.rs b/src/fs/wasi.rs
+new file mode 100644
+index 0000000..4909aac
+--- /dev/null
++++ b/src/fs/wasi.rs
+@@ -0,0 +1,458 @@
++// SPDX-FileCopyrightText: 2026 ai-ecoverse/homescoop
++// SPDX-License-Identifier: EUPL-1.2
++//! slicc WASI preview1 (homescoop's wasi-eza).
++//!
++//! WASI's filestat has no mode, owner or block count, and Rust's
++//! `std::os::wasi::fs` is unstable, so eza's Unix code reads them from
++//! slicc-kernel's own imports instead:
++//!
++//! - `slicc_fs.path_filestat_owner`: the WASI filestat and the owner's
++//!   uid/gid in one call (ENOTSUP when the kernel runs without users; then
++//!   `wasi_snapshot_preview1.path_filestat_get` and the caller's ids, which is
++//!   what the kernel itself reports for a file without an owner);
++//! - `slicc_fs.path_mode`: the permission bits and `S_IFIFO` (ENOSYS on a
++//!   kernel without it: 0755 for directories, 0777 for links, 0644 else);
++//! - `slicc.cred_get`: the process's real and effective ids;
++//! - `slicc_tty.winsize`: the size of the pty on stdout.
++//!
++//! User and group names come from the kernel's `/etc/passwd` and
++//! `/etc/group`, which is what `uzers` (Unix only) reads through libc.
++#![allow(unsafe_code)]
++
++use std::fs;
++use std::io;
++use std::ops::Deref;
++use std::os::fd::{AsRawFd, RawFd};
++use std::os::wasi::ffi::OsStrExt;
++use std::path::Path;
++use std::sync::OnceLock;
++
++#[link(wasm_import_module = "slicc_fs")]
++unsafe extern "C" {
++    fn path_filestat_owner(
++        dirfd: i32,
++        lookup: i32,
++        path: *const u8,
++        len: usize,
++        stat: *mut Filestat,
++        owner: *mut [u32; 2],
++    ) -> i32;
++    fn path_mode(dirfd: i32, path: *const u8, len: usize, flags: i32, out: *mut u32) -> i32;
++}
++
++#[link(wasm_import_module = "wasi_snapshot_preview1")]
++unsafe extern "C" {
++    #[link_name = "path_filestat_get"]
++    fn wasi_path_filestat_get(
++        dirfd: i32,
++        lookup: i32,
++        path: *const u8,
++        len: usize,
++        stat: *mut Filestat,
++    ) -> i32;
++    fn fd_prestat_get(fd: i32, out: *mut [u32; 2]) -> i32;
++    fn fd_prestat_dir_name(fd: i32, path: *mut u8, len: usize) -> i32;
++    fn fd_close(fd: i32) -> i32;
++}
++
++unsafe extern "C" {
++    /// wasi-libc: forget the preopens it has read; it reads them again on
++    /// the next path lookup.
++    fn __wasilibc_reset_preopens();
++}
++
++#[link(wasm_import_module = "slicc")]
++unsafe extern "C" {
++    fn cred_get(out: *mut [u32; 6]) -> i32;
++}
++
++#[link(wasm_import_module = "slicc_tty")]
++unsafe extern "C" {
++    fn winsize(fd: i32, out: *mut [u16; 4]) -> i32;
++}
++
++/// WASI preview1 `filestat` (64 bytes).
++#[repr(C)]
++#[derive(Clone, Copy, Default)]
++struct Filestat {
++    dev: u64,
++    ino: u64,
++    filetype: u8,
++    nlink: u64,
++    size: u64,
++    atim: u64,
++    mtim: u64,
++    ctim: u64,
++}
++
++const LOOKUP_SYMLINK_FOLLOW: i32 = 1;
++const AT_SYMLINK_NOFOLLOW: i32 = 1;
++const ENOSYS: i32 = 52;
++const ENOTSUP: i32 = 58;
++
++const FILETYPE_BLOCK_DEVICE: u8 = 1;
++const FILETYPE_CHARACTER_DEVICE: u8 = 2;
++const FILETYPE_DIRECTORY: u8 = 3;
++const FILETYPE_SOCKET_DGRAM: u8 = 5;
++const FILETYPE_SOCKET_STREAM: u8 = 6;
++const FILETYPE_SYMBOLIC_LINK: u8 = 7;
++
++const S_IFMT: u32 = 0o170_000;
++const S_IFIFO: u32 = 0o010_000;
++
++/// A file's metadata: what `std` has (times, length, type) and what eza's
++/// Unix code reads through `std::os::unix::fs::MetadataExt`.
++pub struct Metadata {
++    std: fs::Metadata,
++    stat: Filestat,
++    mode: u32,
++    uid: u32,
++    gid: u32,
++}
++
++impl Deref for Metadata {
++    type Target = fs::Metadata;
++    fn deref(&self) -> &fs::Metadata {
++        &self.std
++    }
++}
++
++impl Metadata {
++    pub fn is_fifo(&self) -> bool {
++        self.mode & S_IFMT == S_IFIFO
++    }
++    pub fn is_char_device(&self) -> bool {
++        self.stat.filetype == FILETYPE_CHARACTER_DEVICE
++    }
++    pub fn is_block_device(&self) -> bool {
++        self.stat.filetype == FILETYPE_BLOCK_DEVICE
++    }
++    pub fn is_socket(&self) -> bool {
++        matches!(
++            self.stat.filetype,
++            FILETYPE_SOCKET_DGRAM | FILETYPE_SOCKET_STREAM
++        )
++    }
++}
++
++/// The subset of `std::os::unix::fs::MetadataExt` that eza uses.
++pub trait MetadataExt {
++    fn dev(&self) -> u64;
++    fn ino(&self) -> u64;
++    fn nlink(&self) -> u64;
++    fn mode(&self) -> u32;
++    fn uid(&self) -> u32;
++    fn gid(&self) -> u32;
++    fn size(&self) -> u64;
++    /// 512-byte blocks: WASI has no block count, so the size rounded up.
++    fn blocks(&self) -> u64;
++    fn ctime(&self) -> i64;
++    fn ctime_nsec(&self) -> i64;
++}
++
++impl MetadataExt for Metadata {
++    fn dev(&self) -> u64 {
++        self.stat.dev
++    }
++    fn ino(&self) -> u64 {
++        self.stat.ino
++    }
++    fn nlink(&self) -> u64 {
++        self.stat.nlink
++    }
++    fn mode(&self) -> u32 {
++        self.mode
++    }
++    fn uid(&self) -> u32 {
++        self.uid
++    }
++    fn gid(&self) -> u32 {
++        self.gid
++    }
++    fn size(&self) -> u64 {
++        self.stat.size
++    }
++    fn blocks(&self) -> u64 {
++        self.stat.size.div_ceil(512)
++    }
++    fn ctime(&self) -> i64 {
++        (self.stat.ctim / 1_000_000_000) as i64
++    }
++    fn ctime_nsec(&self) -> i64 {
++        (self.stat.ctim % 1_000_000_000) as i64
++    }
++}
++
++/// `std::fs::symlink_metadata`, with mode and owner.
++pub fn symlink_metadata(path: &Path) -> io::Result<Metadata> {
++    let std = fs::symlink_metadata(path)?;
++    stat(path, std, false)
++}
++
++/// `std::fs::metadata`, with mode and owner.
++pub fn metadata(path: &Path) -> io::Result<Metadata> {
++    let std = fs::metadata(path)?;
++    stat(path, std, true)
++}
++
++fn stat(path: &Path, std: fs::Metadata, follow: bool) -> io::Result<Metadata> {
++    at(path, |dirfd, name| {
++        let lookup = if follow { LOOKUP_SYMLINK_FOLLOW } else { 0 };
++        let mut stat = Filestat::default();
++        let mut owner = [0u32; 2];
++        // SAFETY: `name` and both outputs are live for the call.
++        let mut errno = unsafe {
++            path_filestat_owner(
++                dirfd,
++                lookup,
++                name.as_ptr(),
++                name.len(),
++                &raw mut stat,
++                &raw mut owner,
++            )
++        };
++        if errno == ENOTSUP || errno == ENOSYS {
++            // SAFETY: as above.
++            errno = unsafe {
++                wasi_path_filestat_get(dirfd, lookup, name.as_ptr(), name.len(), &raw mut stat)
++            };
++            let ids = creds();
++            owner = [ids[1], ids[4]];
++        }
++        if errno != 0 {
++            return Err(io::Error::from_raw_os_error(errno));
++        }
++        let flags = if follow { 0 } else { AT_SYMLINK_NOFOLLOW };
++        let mut mode = 0u32;
++        // SAFETY: as above.
++        let errno = unsafe { path_mode(dirfd, name.as_ptr(), name.len(), flags, &raw mut mode) };
++        if errno != 0 {
++            mode = match stat.filetype {
++                FILETYPE_DIRECTORY => 0o755,
++                FILETYPE_SYMBOLIC_LINK => 0o777,
++                _ => 0o644,
++            };
++        }
++        Ok(Metadata {
++            std,
++            stat,
++            mode,
++            uid: owner[0],
++            gid: owner[1],
++        })
++    })
++}
++
++/// Start in the working directory slicc-kernel names in `PWD`.
++///
++/// The kernel starts a WASI process with wasi-libc's working directory at
++/// `/` and preopens the real one twice: as `.`, and (with `"preopenRoot":
++/// true`, after `/`) as `./`, so that relative paths, which wasi-libc makes
++/// absolute from `/`, reach it. wasi-libc resolves an absolute path
++/// through the longest preopen name that prefixes it, the last one on a
++/// tie: `/` and `./` both have the empty prefix, so `eza /` listed the
++/// working directory. Once wasi-libc is in `PWD`, relative paths don't
++/// need `./`: close it, so `/` is the root.
++pub fn start() {
++    let Some(pwd) = std::env::var_os("PWD") else {
++        return;
++    };
++    let (mut root, mut twin) = (false, None);
++    for fd in 3.. {
++        let mut prestat = [0u32; 2];
++        // SAFETY: `prestat` is live for the call.
++        if unsafe { fd_prestat_get(fd, &raw mut prestat) } != 0 || prestat[0] != 0 {
++            break;
++        }
++        let mut name = vec![0u8; prestat[1] as usize];
++        // SAFETY: `name` has the length the kernel gave.
++        if unsafe { fd_prestat_dir_name(fd, name.as_mut_ptr(), name.len()) } != 0 {
++            break;
++        }
++        match name.as_slice() {
++            b"/" => root = true,
++            b"./" => twin = Some(fd),
++            _ => {}
++        }
++    }
++    if std::env::set_current_dir(&pwd).is_err() {
++        return;
++    }
++    if let (true, Some(fd)) = (root, twin) {
++        // SAFETY: the twin is a preopen of ours that nothing else holds.
++        unsafe {
++            fd_close(fd);
++            __wasilibc_reset_preopens();
++        }
++        let _ = std::env::set_current_dir(&pwd);
++    }
++}
++
++/// A directory fd and a path for slicc_fs's `*at` calls, resolved as `std`
++/// resolves the path: an absolute path ignores the fd (`AT_FDCWD`), a
++/// relative one is looked up from the working directory, opened once.
++fn at<T>(path: &Path, f: impl FnOnce(RawFd, &[u8]) -> io::Result<T>) -> io::Result<T> {
++    const AT_FDCWD: RawFd = -2;
++    static CWD: OnceLock<Option<fs::File>> = OnceLock::new();
++    let path = path.as_os_str().as_bytes();
++    if path.first() == Some(&b'/') {
++        return f(AT_FDCWD, path);
++    }
++    let cwd = CWD.get_or_init(|| fs::File::open(".").ok());
++    let Some(cwd) = cwd else {
++        return Err(io::Error::from(io::ErrorKind::NotFound));
++    };
++    f(cwd.as_raw_fd(), if path.is_empty() { b"." } else { path })
++}
++
++/// ruid, euid, suid, rgid, egid, sgid (all 0 on a kernel without them).
++fn creds() -> [u32; 6] {
++    let mut ids = [0u32; 6];
++    // SAFETY: `ids` is live for the call.
++    if unsafe { cred_get(&raw mut ids) } != 0 {
++        return [0; 6];
++    }
++    ids
++}
++
++/// The width of the pty on stdout, if it is one.
++pub fn terminal_width() -> Option<usize> {
++    let mut ws = [0u16; 4];
++    // SAFETY: `ws` is live for the call.
++    let errno = unsafe { winsize(1, &raw mut ws) };
++    (errno == 0 && ws[1] > 0).then_some(usize::from(ws[1]))
++}
++
++/// The part of `uzers` that eza's renderers use, over `/etc/passwd` and
++/// `/etc/group`.
++pub mod users {
++    use std::collections::HashMap;
++    use std::ffi::{OsStr, OsString};
++    use std::sync::{Arc, OnceLock};
++
++    #[allow(non_camel_case_types)]
++    pub type uid_t = u32;
++    #[allow(non_camel_case_types)]
++    pub type gid_t = u32;
++
++    #[derive(Clone, Debug)]
++    pub struct User {
++        name: OsString,
++        primary_group: gid_t,
++    }
++
++    impl User {
++        pub fn name(&self) -> &OsStr {
++            &self.name
++        }
++        pub fn primary_group_id(&self) -> gid_t {
++            self.primary_group
++        }
++    }
++
++    #[derive(Clone, Debug)]
++    pub struct Group {
++        gid: gid_t,
++        name: OsString,
++        members: Vec<OsString>,
++    }
++
++    impl Group {
++        pub fn gid(&self) -> gid_t {
++            self.gid
++        }
++        pub fn name(&self) -> &OsStr {
++            &self.name
++        }
++        pub fn members(&self) -> &[OsString] {
++            &self.members
++        }
++    }
++
++    pub trait Users {
++        fn get_user_by_uid(&self, uid: uid_t) -> Option<Arc<User>>;
++        fn get_current_uid(&self) -> uid_t;
++    }
++
++    pub trait Groups {
++        fn get_group_by_gid(&self, gid: gid_t) -> Option<Arc<Group>>;
++    }
++
++    struct Tables {
++        users: HashMap<uid_t, Arc<User>>,
++        groups: HashMap<gid_t, Arc<Group>>,
++    }
++
++    /// Reads `/etc/passwd` and `/etc/group` once, on the first lookup.
++    #[derive(Default)]
++    pub struct UsersCache {
++        tables: OnceLock<Tables>,
++        uid: OnceLock<uid_t>,
++    }
++
++    impl UsersCache {
++        pub fn new() -> Self {
++            Self::default()
++        }
++
++        fn tables(&self) -> &Tables {
++            self.tables.get_or_init(|| {
++                let read = |p| std::fs::read_to_string(p).unwrap_or_default();
++                let mut users = HashMap::new();
++                for line in read("/etc/passwd").lines() {
++                    let f: Vec<&str> = line.split(':').collect();
++                    if let (Some(name), Some(Ok(uid)), Some(Ok(gid))) = (
++                        f.first(),
++                        f.get(2).map(|s| s.parse()),
++                        f.get(3).map(|s| s.parse()),
++                    ) {
++                        users.entry(uid).or_insert_with(|| {
++                            Arc::new(User {
++                                name: (*name).into(),
++                                primary_group: gid,
++                            })
++                        });
++                    }
++                }
++                let mut groups = HashMap::new();
++                for line in read("/etc/group").lines() {
++                    let f: Vec<&str> = line.split(':').collect();
++                    if let (Some(name), Some(Ok(gid))) = (f.first(), f.get(2).map(|s| s.parse())) {
++                        let members = f
++                            .get(3)
++                            .map(|m| {
++                                m.split(',')
++                                    .filter(|m| !m.is_empty())
++                                    .map(OsString::from)
++                                    .collect()
++                            })
++                            .unwrap_or_default();
++                        groups.entry(gid).or_insert_with(|| {
++                            Arc::new(Group {
++                                gid,
++                                name: (*name).into(),
++                                members,
++                            })
++                        });
++                    }
++                }
++                Tables { users, groups }
++            })
++        }
++    }
++
++    impl Users for UsersCache {
++        fn get_user_by_uid(&self, uid: uid_t) -> Option<Arc<User>> {
++            self.tables().users.get(&uid).cloned()
++        }
++        fn get_current_uid(&self) -> uid_t {
++            *self.uid.get_or_init(|| super::creds()[0])
++        }
++    }
++
++    impl Groups for UsersCache {
++        fn get_group_by_gid(&self, gid: gid_t) -> Option<Arc<Group>> {
++            self.tables().groups.get(&gid).cloned()
++        }
++    }
++}
+diff --git a/src/main.rs b/src/main.rs
+index 0620988..78f0cd3 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -41,6 +41,11 @@ fn main() {
+         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+     }
+ 
++    // slicc-kernel starts a WASI process at / with the real working
++    // directory in PWD.
++    #[cfg(target_os = "wasi")]
++    fs::wasi::start();
++
+     logger::configure(env::var_os(vars::EZA_DEBUG).or_else(|| env::var_os(vars::EXA_DEBUG)));
+ 
+     let cli = get_command().get_matches();
+diff --git a/src/options/parser.rs b/src/options/parser.rs
+index 5e8ba7d..c6ab20f 100644
+--- a/src/options/parser.rs
++++ b/src/options/parser.rs
+@@ -237,7 +237,7 @@ impl ValueEnum for SortField {
+             Self::ChangedDate,
+             Self::AccessedDate,
+             Self::CreatedDate,
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::FileInode,
+             Self::FileType,
+             Self::Unsorted,
+@@ -265,7 +265,7 @@ impl ValueEnum for SortField {
+             Self::ChangedDate => PossibleValue::new("changed").alias("ch"),
+             Self::AccessedDate => PossibleValue::new("accessed").alias("acc"),
+             Self::CreatedDate => PossibleValue::new("created").alias("cr"),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::FileInode => PossibleValue::new("inode"),
+             Self::FileType => PossibleValue::new("type"),
+             Self::Unsorted => PossibleValue::new("none"),
+diff --git a/src/output/file_name.rs b/src/output/file_name.rs
+index afa6756..216551c 100644
+--- a/src/output/file_name.rs
++++ b/src/output/file_name.rs
+@@ -446,7 +446,7 @@ impl<C: Colours> FileName<'_, '_, C> {
+ 
+     /// The character to be displayed after a file when classifying is on, if
+     /// the file’s type has one associated with it.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub(crate) fn classify_char(&self, file: &File<'_>) -> Option<&'static str> {
+         if file.is_executable_file() {
+             Some("*")
+@@ -580,16 +580,16 @@ impl<C: Colours> FileName<'_, '_, C> {
+         return match self.file {
+             f if f.is_mount_point()      => self.colours.mount_point(),
+             f if f.is_directory()        => self.colours.directory(),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             f if f.is_executable_file()  => self.colours.executable_file(),
+             f if f.is_link()             => self.colours.symlink(),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             f if f.is_pipe()             => self.colours.pipe(),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             f if f.is_block_device()     => self.colours.block_device(),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             f if f.is_char_device()      => self.colours.char_device(),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             f if f.is_socket()           => self.colours.socket(),
+             f if ! f.is_file()           => self.colours.special(),
+             _                            => self.colours.colour_file(self.file),
+diff --git a/src/output/mod.rs b/src/output/mod.rs
+index c3a87eb..ae9ecc9 100644
+--- a/src/output/mod.rs
++++ b/src/output/mod.rs
+@@ -68,6 +68,9 @@ impl TerminalWidth {
+         #[cfg(unix)]
+         let stdout_term_width =
+             { terminal_size::terminal_size_of(std::io::stdout()).map(|(w, _h)| w.0 as _) };
++        // terminal_size has no WASI backend: ask slicc-kernel for the pty size.
++        #[cfg(target_os = "wasi")]
++        let stdout_term_width = crate::fs::wasi::terminal_width();
+         #[cfg(windows)]
+         let stdout_term_width = {
+             use std::os::windows::io::BorrowedHandle;
+diff --git a/src/output/render/groups.rs b/src/output/render/groups.rs
+index 018eacf..e1e3c46 100644
+--- a/src/output/render/groups.rs
++++ b/src/output/render/groups.rs
+@@ -4,7 +4,10 @@
+ // SPDX-FileCopyrightText: 2023-2024 Christina Sørensen, eza contributors
+ // SPDX-FileCopyrightText: 2014 Benjamin Sago
+ // SPDX-License-Identifier: MIT
++#[cfg(target_os = "wasi")]
++use crate::fs::wasi::users::{Groups, Users};
+ use nu_ansi_term::Style;
++#[cfg(unix)]
+ use uzers::{Groups, Users};
+ 
+ use crate::fs::fields as f;
+@@ -32,6 +35,7 @@ impl Render for Option<f::Group> {
+         group_format: GroupFormat,
+         file_user: Option<User>,
+     ) -> TextCell {
++        #[cfg(unix)]
+         use uzers::os::unix::GroupExt;
+ 
+         let mut style = colours.not_yours();
+diff --git a/src/output/render/links.rs b/src/output/render/links.rs
+index 8a0fbd0..2c3243c 100644
+--- a/src/output/render/links.rs
++++ b/src/output/render/links.rs
+@@ -4,16 +4,16 @@
+ // SPDX-FileCopyrightText: 2023-2024 Christina Sørensen, eza contributors
+ // SPDX-FileCopyrightText: 2014 Benjamin Sago
+ // SPDX-License-Identifier: MIT
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use locale::Numeric as NumericLocale;
+ use nu_ansi_term::Style;
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use crate::fs::fields as f;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use crate::output::cell::TextCell;
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ impl f::Links {
+     pub fn render<C: Colours>(&self, colours: &C, numeric: &NumericLocale) -> TextCell {
+         let style = if self.multiple {
+@@ -35,12 +35,12 @@ pub trait Colours {
+ #[cfg(test)]
+ pub mod test {
+     use super::Colours;
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     use crate::fs::fields as f;
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     use crate::output::cell::{DisplayWidth, TextCell};
+ 
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     use locale;
+     use nu_ansi_term::Color::*;
+     use nu_ansi_term::Style;
+@@ -58,7 +58,7 @@ pub mod test {
+     }
+ 
+     #[test]
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn regular_file() {
+         let stati = f::Links {
+             count: 1,
+@@ -77,7 +77,7 @@ pub mod test {
+     }
+ 
+     #[test]
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn regular_directory() {
+         let stati = f::Links {
+             count: 3005,
+@@ -96,7 +96,7 @@ pub mod test {
+     }
+ 
+     #[test]
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn popular_file() {
+         let stati = f::Links {
+             count: 3005,
+diff --git a/src/output/render/mod.rs b/src/output/render/mod.rs
+index 0e47834..0079049 100644
+--- a/src/output/render/mod.rs
++++ b/src/output/render/mod.rs
+@@ -4,9 +4,9 @@
+ // SPDX-FileCopyrightText: 2023-2024 Christina Sørensen, eza contributors
+ // SPDX-FileCopyrightText: 2014 Benjamin Sago
+ // SPDX-License-Identifier: MIT
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod blocks;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub use self::blocks::Colours as BlocksColours;
+ 
+ mod filetype;
+@@ -16,12 +16,12 @@ mod git;
+ pub use self::git::Colours as GitColours;
+ pub use self::git::RepoColours as GitRepoColours;
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod groups;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub use self::groups::{Colours as GroupColours, Render as GroupRender};
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod inode;
+ // inode uses just one colour
+ 
+@@ -30,7 +30,7 @@ pub use self::links::Colours as LinksColours;
+ 
+ mod permissions;
+ pub use self::permissions::{Colours as PermissionsColours, PermissionsPlusRender};
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod permissions_unix;
+ #[cfg(windows)]
+ mod permissions_windows;
+@@ -42,16 +42,16 @@ mod times;
+ pub use self::times::Render as TimeRender;
+ // times does too
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod users;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub use self::users::Colours as UserColours;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub use self::users::Render as UserRender;
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod octal;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ pub use self::octal::Render as OctalPermissionsRender;
+ // octal uses just one colour
+ 
+diff --git a/src/output/render/permissions_unix.rs b/src/output/render/permissions_unix.rs
+index 60c25e4..863045d 100644
+--- a/src/output/render/permissions_unix.rs
++++ b/src/output/render/permissions_unix.rs
+@@ -142,7 +142,7 @@ pub mod test {
+     }
+ 
+     #[test]
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn negate() {
+         let bits = Some(f::Permissions {
+             user_read: false,
+@@ -175,7 +175,7 @@ pub mod test {
+     }
+ 
+     #[test]
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn affirm() {
+         let bits = Some(f::Permissions {
+             user_read: true,
+diff --git a/src/output/render/users.rs b/src/output/render/users.rs
+index 436df00..6ff3025 100644
+--- a/src/output/render/users.rs
++++ b/src/output/render/users.rs
+@@ -4,7 +4,10 @@
+ // SPDX-FileCopyrightText: 2023-2024 Christina Sørensen, eza contributors
+ // SPDX-FileCopyrightText: 2014 Benjamin Sago
+ // SPDX-License-Identifier: MIT
++#[cfg(target_os = "wasi")]
++use crate::fs::wasi::users::Users;
+ use nu_ansi_term::Style;
++#[cfg(unix)]
+ use uzers::Users;
+ 
+ use crate::fs::fields as f;
+diff --git a/src/output/table.rs b/src/output/table.rs
+index 7b5c25a..8fc5c89 100644
+--- a/src/output/table.rs
++++ b/src/output/table.rs
+@@ -6,11 +6,13 @@
+ // SPDX-License-Identifier: MIT
+ use std::cmp::max;
+ use std::ops::Deref;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use std::sync::{Mutex, MutexGuard};
+ 
+ use chrono::prelude::*;
+ 
++#[cfg(target_os = "wasi")]
++use crate::fs::wasi::users::UsersCache;
+ use log::debug;
+ use std::sync::LazyLock;
+ #[cfg(unix)]
+@@ -23,7 +25,7 @@ use crate::options::parser::CodeContent;
+ use crate::options::vars::EZA_WINDOWS_ATTRIBUTES;
+ use crate::output::cell::TextCell;
+ use crate::output::color_scale::ColorScaleInformation;
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ use crate::output::render::{GroupRender, OctalPermissionsRender, UserRender};
+ use crate::output::render::{PermissionsPlusRender, TimeRender};
+ use crate::output::time::TimeFormat;
+@@ -77,12 +79,12 @@ impl Columns {
+         let mut columns = Vec::with_capacity(4);
+ 
+         if self.inode {
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             columns.push(Column::Inode);
+         }
+ 
+         if self.octal {
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             columns.push(Column::Octal);
+         }
+ 
+@@ -91,7 +93,7 @@ impl Columns {
+         }
+ 
+         if self.links {
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             columns.push(Column::HardLinks);
+         }
+ 
+@@ -112,17 +114,17 @@ impl Columns {
+         }
+ 
+         if self.blocksize {
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             columns.push(Column::Blocksize);
+         }
+ 
+         if self.user {
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             columns.push(Column::User);
+         }
+ 
+         if self.group {
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             columns.push(Column::Group);
+         }
+ 
+@@ -175,21 +177,21 @@ pub enum Column {
+     Language,
+     Loc(CodeContent),
+     Timestamp(TimeType),
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     Blocksize,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     User,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     Group,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     HardLinks,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     Inode,
+     GitStatus,
+     SubdirGitRepo(bool),
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     Octal,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     SecurityContext,
+     FileFlags,
+ }
+@@ -204,7 +206,7 @@ pub enum Alignment {
+ 
+ impl Column {
+     /// Get the alignment this column should use.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     #[must_use]
+     pub fn alignment(self) -> Alignment {
+         #[allow(clippy::wildcard_in_or_patterns)]
+@@ -232,7 +234,7 @@ impl Column {
+     #[must_use]
+     pub fn header(self) -> &'static str {
+         match self {
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::Permissions => "Permissions",
+             #[cfg(windows)]
+             Self::Permissions => "Mode",
+@@ -241,21 +243,21 @@ impl Column {
+             Self::Loc(CodeContent::Percent) => "Code %",
+             Self::Loc(_) => "Code",
+             Self::Timestamp(t) => t.header(),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::Blocksize => "Blocksize",
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::User => "User",
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::Group => "Group",
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::HardLinks => "Links",
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::Inode => "inode",
+             Self::GitStatus => "Git",
+             Self::SubdirGitRepo(_) => "Git Repo",
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::Octal => "Octal",
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Self::SecurityContext => "Security Context",
+             Self::FileFlags => "Flags",
+         }
+@@ -399,12 +401,12 @@ pub struct Environment {
+     numeric: locale::Numeric,
+ 
+     /// Mapping cache of user IDs to usernames.
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     users: Mutex<UsersCache>,
+ }
+ 
+ impl Environment {
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     pub fn lock_users(&self) -> MutexGuard<'_, UsersCache> {
+         self.users.lock().unwrap()
+     }
+@@ -415,13 +417,13 @@ impl Environment {
+         let numeric =
+             locale::Numeric::load_user_locale().unwrap_or_else(|_| locale::Numeric::english());
+ 
+-        #[cfg(unix)]
++        #[cfg(any(unix, target_os = "wasi"))]
+         let users = Mutex::new(UsersCache::new());
+ 
+         Self {
+             time_offset,
+             numeric,
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             users,
+         }
+     }
+@@ -436,9 +438,9 @@ pub struct Table<'a> {
+     widths: TableWidths,
+     time_format: TimeFormat,
+     size_format: SizeFormat,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     user_format: UserFormat,
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     group_format: GroupFormat,
+     flags_format: FlagsFormat,
+     git: Option<&'a GitCache>,
+@@ -475,9 +477,9 @@ impl<'a> Table<'a> {
+             env,
+             time_format: options.time_format.clone(),
+             size_format: options.size_format,
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             user_format: options.user_format,
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             group_format: options.group_format,
+             flags_format: options.flags_format,
+             loc_total: None,
+@@ -525,7 +527,7 @@ impl<'a> Table<'a> {
+         self.widths.add_widths(row);
+     }
+ 
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn permissions_plus(&self, file: &File<'_>, xattrs: bool) -> Option<f::PermissionsPlus> {
+         file.permissions().map(|p| f::PermissionsPlus {
+             file_type: file.type_char(),
+@@ -545,7 +547,7 @@ impl<'a> Table<'a> {
+         })
+     }
+ 
+-    #[cfg(unix)]
++    #[cfg(any(unix, target_os = "wasi"))]
+     fn octal_permissions(&self, file: &File<'_>) -> Option<f::OctalPermissions> {
+         file.permissions()
+             .map(|p| f::OctalPermissions { permissions: p })
+@@ -568,21 +570,21 @@ impl<'a> Table<'a> {
+             ),
+             Column::Language => self.language(file),
+             Column::Loc(content) => self.loc(file, content),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Column::HardLinks => file.links().render(self.theme, &self.env.numeric),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Column::Inode => file.inode().render(self.theme.ui.inode.unwrap_or_default()),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Column::Blocksize => {
+                 file.blocksize()
+                     .render(self.theme, self.size_format, &self.env.numeric)
+             }
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Column::User => {
+                 file.user()
+                     .render(self.theme, &*self.env.lock_users(), self.user_format)
+             }
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Column::Group => file.group().render(
+                 self.theme,
+                 &*self.env.lock_users(),
+@@ -590,14 +592,14 @@ impl<'a> Table<'a> {
+                 self.group_format,
+                 file.user(),
+             ),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Column::SecurityContext => file.security_context().render(self.theme),
+             Column::FileFlags => file
+                 .flags()
+                 .render(self.theme.ui.flags.unwrap_or_default(), self.flags_format),
+             Column::GitStatus => self.git_status(file).render(self.theme),
+             Column::SubdirGitRepo(status) => self.subdir_git_repo(file, status).render(self.theme),
+-            #[cfg(unix)]
++            #[cfg(any(unix, target_os = "wasi"))]
+             Column::Octal => self
+                 .octal_permissions(file)
+                 .render(self.theme.ui.octal.unwrap_or_default()),
+diff --git a/src/theme/mod.rs b/src/theme/mod.rs
+index 6064e84..50af131 100644
+--- a/src/theme/mod.rs
++++ b/src/theme/mod.rs
+@@ -313,7 +313,7 @@ impl FileStyle for FileTypes {
+     }
+ }
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ impl render::BlocksColours for Theme {
+     fn blocksize(&self, prefix: Option<unit_prefix::Prefix>) -> Style {
+         use unit_prefix::Prefix::{Gibi, Giga, Kibi, Kilo, Mebi, Mega};
+@@ -383,7 +383,7 @@ impl render::GitRepoColours for Theme {
+ }
+ 
+ #[rustfmt::skip]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ impl render::GroupColours for Theme {
+     fn yours(&self)      -> Style { self.ui.users.unwrap_or_default().group_yours() }
+     fn not_yours(&self)  -> Style { self.ui.users.unwrap_or_default().group_other() }
+@@ -453,7 +453,7 @@ impl render::SizeColours for Theme {
+ }
+ 
+ #[rustfmt::skip]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ impl render::UserColours for Theme {
+     fn you(&self)           -> Style { self.ui.users.unwrap_or_default().user_you() }
+     fn other(&self)         -> Style { self.ui.users.unwrap_or_default().user_other() }
+@@ -535,7 +535,7 @@ fn apply_overlay(mut base: Style, overlay: Style) -> Style {
+ }
+ 
+ #[cfg(test)]
+-#[cfg(unix)]
++#[cfg(any(unix, target_os = "wasi"))]
+ mod customs_test {
+     use super::*;
+     use crate::theme::ui_styles::UiStyles;
