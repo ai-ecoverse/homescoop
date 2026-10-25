@@ -1,0 +1,131 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -190,14 +190,6 @@
+ [dependencies.itertools]
+ version = "0.14.0"
+ 
+-[dependencies.minus]
+-version = "5.6"
+-features = [
+-    "dynamic_output",
+-    "search",
+-]
+-optional = true
+-
+ [dependencies.nu-ansi-term]
+ version = "0.50.0"
+ 
+@@ -331,6 +323,17 @@
+ [build-dependencies.walkdir]
+ version = "2.5"
+ 
++# homescoop (wasi-bat): minus, the built-in pager, needs crossterm's terminal
++# I/O, which does not build for WASI. On WASI, --pager=builtin falls back to
++# stdout, as bat does when an external pager can't be started.
++[target.'cfg(not(target_os = "wasi"))'.dependencies.minus]
++version = "5.6"
++features = [
++    "dynamic_output",
++    "search",
++]
++optional = true
++
+ [target.'cfg(target_os = "macos")'.dependencies.plist]
+ version = "1.7.0"
+ 
+--- a/src/error.rs
++++ b/src/error.rs
+@@ -28,7 +28,7 @@
+     InvalidPagerValueBat,
+     #[error("{0}")]
+     Msg(String),
+-    #[cfg(feature = "paging")]
++    #[cfg(all(feature = "paging", not(target_os = "wasi")))]
+     #[error(transparent)]
+     MinusError(#[from] ::minus::MinusError),
+     #[cfg(feature = "lessopen")]
+--- a/src/output.rs
++++ b/src/output.rs
+@@ -2,7 +2,7 @@
+ use std::io;
+ #[cfg(feature = "paging")]
+ use std::process::Child;
+-#[cfg(feature = "paging")]
++#[cfg(all(feature = "paging", not(target_os = "wasi")))]
+ use std::thread::{spawn, JoinHandle};
+ 
+ use crate::error::*;
+@@ -13,13 +13,13 @@
+ #[cfg(feature = "paging")]
+ use crate::wrapping::WrappingMode;
+ 
+-#[cfg(feature = "paging")]
++#[cfg(all(feature = "paging", not(target_os = "wasi")))]
+ pub struct BuiltinPager {
+     pager: minus::Pager,
+     handle: Option<JoinHandle<Result<()>>>,
+ }
+ 
+-#[cfg(feature = "paging")]
++#[cfg(all(feature = "paging", not(target_os = "wasi")))]
+ impl BuiltinPager {
+     fn new() -> Self {
+         let pager = minus::Pager::new();
+@@ -33,7 +33,7 @@
+     }
+ }
+ 
+-#[cfg(feature = "paging")]
++#[cfg(all(feature = "paging", not(target_os = "wasi")))]
+ impl std::fmt::Debug for BuiltinPager {
+     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         f.debug_struct("BuiltinPager")
+@@ -54,7 +54,7 @@
+ pub enum OutputType {
+     #[cfg(feature = "paging")]
+     Pager(Child),
+-    #[cfg(feature = "paging")]
++    #[cfg(all(feature = "paging", not(target_os = "wasi")))]
+     BuiltinPager(BuiltinPager),
+     Stdout(io::Stdout),
+ }
+@@ -99,7 +99,10 @@
+         }
+ 
+         if pager.kind == PagerKind::Builtin {
++            #[cfg(not(target_os = "wasi"))]
+             return Ok(OutputType::BuiltinPager(BuiltinPager::new()));
++            #[cfg(target_os = "wasi")]
++            return Ok(OutputType::stdout());
+         }
+ 
+         let resolved_path = match grep_cli::resolve_binary(&pager.bin) {
+@@ -178,7 +181,10 @@
+ 
+     #[cfg(feature = "paging")]
+     pub(crate) fn is_pager(&self) -> bool {
+-        matches!(self, OutputType::Pager(_) | OutputType::BuiltinPager(_))
++        #[cfg(not(target_os = "wasi"))]
++        return matches!(self, OutputType::Pager(_) | OutputType::BuiltinPager(_));
++        #[cfg(target_os = "wasi")]
++        return matches!(self, OutputType::Pager(_));
+     }
+ 
+     #[cfg(not(feature = "paging"))]
+@@ -195,7 +201,7 @@
+                     .as_mut()
+                     .ok_or("Could not open stdin for pager")?,
+             ),
+-            #[cfg(feature = "paging")]
++            #[cfg(all(feature = "paging", not(target_os = "wasi")))]
+             OutputType::BuiltinPager(ref mut pager) => OutputHandle::FmtWrite(&mut pager.pager),
+             OutputType::Stdout(ref mut handle) => OutputHandle::IoWrite(handle),
+         })
+@@ -209,6 +215,7 @@
+             OutputType::Pager(ref mut command) => {
+                 let _ = command.wait();
+             }
++            #[cfg(not(target_os = "wasi"))]
+             OutputType::BuiltinPager(ref mut pager) => {
+                 if pager.handle.is_some() {
+                     let _ = pager.handle.take().unwrap().join().unwrap();

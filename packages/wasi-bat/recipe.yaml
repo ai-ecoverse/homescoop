@@ -1,0 +1,60 @@
+# bat (sharkdp/bat, "a cat(1) clone with wings") for slicc WASI preview1:
+# syntax highlighting, line numbers and Git-free decorations, as the command
+# bat. Module only, no Emscripten glue.
+name: wasi-bat
+builder: host
+reproducible: true
+# renovate: datasource=crate depName=bat
+version: "0.26.1"
+npm: "@ai-ecoverse/wasi-bat"
+summary: "bat, a cat clone with syntax highlighting, for slicc WASI preview1 (command bat)"
+source:
+  url: "https://static.crates.io/crates/bat/bat-{{version}}.crate"
+  sha256: "cf66d0164db6827afe1694b8d4939f36a5507b7186f8d3cc529c66baf03b0d09"
+toolchain:
+  rust: "1.99.1"
+  # C in onig_sys (the Oniguruma regex engine syntect uses, as upstream bat).
+  wasi-sdk: "34.0"
+  wasi_sdk_sha256_linux_x64: "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4"
+  wasi_sdk_sha256_macos_arm64: "9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/sharkdp/bat
+  license: "MIT OR Apache-2.0"
+  notes: |
+    cargo build --release --locked --offline --target wasm32-wasip1
+    --no-default-features --features application from the .crate (its
+    Cargo.lock), dependencies vendored: upstream's default features without
+    git (libgit2, so no Git change markers in the gutter). Syntaxes and
+    themes are bat's own prebuilt assets/*.bin; regexes run on Oniguruma
+    (onig_sys's bundled C, compiled with wasi-sdk 34), as in upstream's
+    release builds. Upstream's release profile (fat LTO, one codegen unit,
+    strip), then wasm-opt. Four patches, all compiled out off WASI:
+      patches/bat-wasi-no-builtin-pager.patch: minus (--pager=builtin)
+        needs crossterm, which has no WASI backend; on WASI minus is not a
+        dependency and --pager=builtin writes to stdout. An external pager
+        can't be spawned from WASI preview1 either, so bat always writes to
+        stdout (its own fallback when a pager fails to start).
+      patches/clircle-wasi.patch (vendored clircle 0.6.1): the Unix
+        implementation on WASI too (device and inode from fd_filestat_get),
+        so `bat f >> f` is refused as on Linux instead of not compiling.
+      patches/console-wasi-winsize.patch (vendored console 0.16.0): the
+        terminal size from slicc-kernel's slicc_tty.winsize (>= 1.48.0;
+        older kernels answer ENOSYS and bat takes 80 columns), so the grid
+        and wrapping fit a pty. bat.wasm's only import outside
+        wasi_snapshot_preview1 (build.sh checks).
+      patches/etcetera-wasi-home.patch (vendored etcetera 0.11.0): the home
+        directory on WASI, where std::env::home_dir() is always None: $HOME,
+        else the passwd entry of $USER or $LOGNAME (homescoop#1895, as
+        libc's fallback), else /; without it bat panics before reading
+        anything.
+    clircle (patched) and path_abs use std::os::wasi (feature wasi_ext),
+    enabled for those two crates only with RUSTC_BOOTSTRAP=path_abs,clircle.
+    GIT_CEILING_DIRECTORIES keeps git-version (bat --version) from reading
+    the build checkout's commit. NOTICE is bat's; THIRD-PARTY-NOTICES.md
+    has every linked crate, Oniguruma, Rust's standard library, wasi-libc
+    and bat's acknowledgements of its bundled syntaxes and themes (the text
+    of bat --acknowledgements).

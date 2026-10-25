@@ -145,6 +145,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-tls-engine`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tls-engine) | [recipe](packages/tls-engine) | Secure (TLS) network connections for slicc. |
 | [`@ai-ecoverse/wasm-tree`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tree) | [recipe](packages/tree) | tree: list the contents of directories as a tree. |
 | [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux text tools (rev, column, hexdump, colrm, look, getopt) and flock. |
+| [`@ai-ecoverse/wasi-bat`](https://www.npmjs.com/package/@ai-ecoverse/wasi-bat) | [recipe](packages/wasi-bat) | bat, a cat clone with syntax highlighting and line numbers, for SLICC. |
 | [`@ai-ecoverse/wasi-biome`](https://www.npmjs.com/package/@ai-ecoverse/wasi-biome) | [recipe](packages/wasi-biome) | Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC. |
 | [`@ai-ecoverse/wasi-buf`](https://www.npmjs.com/package/@ai-ecoverse/wasi-buf) | [recipe](packages/wasi-buf) | buf 1.73 (Protocol Buffers CLI) for slicc WASI preview1 (command buf); buf.wasm built by homescoop from buf v1.73.0 with documented patches |
 | [`@ai-ecoverse/wasi-cargo`](https://www.npmjs.com/package/@ai-ecoverse/wasi-cargo) | [recipe](packages/wasi-cargo) | Cargo, the Rust package manager and build tool, for SLICC. |

@@ -1,0 +1,43 @@
+{
+  "name": "@ai-ecoverse/wasi-bat",
+  "version": "0.26.1-1",
+  "description": "bat, a cat clone with syntax highlighting and line numbers, for SLICC.",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-bat/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-bat",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "bat",
+    "cat",
+    "syntax-highlighting"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-bat",
+    "upstream": "0.26.1"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "bat": {
+        "wasm": "bin/bat.wasm"
+      }
+    }
+  }
+}

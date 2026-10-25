@@ -1,0 +1,32 @@
+--- a/src/wasm_term.rs
++++ b/src/wasm_term.rs
+@@ -30,7 +30,28 @@
+ 
+ #[inline]
+ pub(crate) fn terminal_size(_out: &Term) -> Option<(u16, u16)> {
+-    None
++    // homescoop (wasi-bat): WASI preview1 has no window size call;
++    // slicc-kernel's slicc_tty.winsize answers per descriptor with a Linux
++    // struct winsize (u16 rows, columns, then pixels), or an errno (ENOTTY
++    // on a pipe or file, ENOSYS from a kernel without it).
++    #[cfg(all(target_os = "wasi", target_env = "p1"))]
++    {
++        use std::os::fd::AsRawFd;
++        #[link(wasm_import_module = "slicc_tty")]
++        unsafe extern "C" {
++            fn winsize(fd: u32, out: *mut u16) -> u16;
++        }
++        let mut ws = [0u16; 4];
++        let errno = unsafe { winsize(_out.as_raw_fd() as u32, ws.as_mut_ptr()) };
++        if errno == 0 && ws[0] > 0 && ws[1] > 0 {
++            return Some((ws[0], ws[1]));
++        }
++        None
++    }
++    #[cfg(not(all(target_os = "wasi", target_env = "p1")))]
++    {
++        None
++    }
+ }
+ 
+ pub(crate) fn read_secure() -> io::Result<String> {
