@@ -1,0 +1,44 @@
+# eza (eza-community/eza, a modern replacement for ls) for slicc WASI
+# preview1 (no Emscripten glue).
+name: wasi-eza
+builder: host
+reproducible: true
+# renovate: datasource=crate depName=eza
+version: "0.23.5"
+npm: "@ai-ecoverse/wasi-eza"
+summary: "eza 0.23.5, a modern replacement for ls, for slicc WASI preview1 (command eza)"
+source:
+  url: "https://static.crates.io/crates/eza/eza-{{version}}.crate"
+  sha256: "334199a8059861f81a2d3d888a45f44fa55f82dade2412e752144a404d7ae9af"
+toolchain:
+  rust: "1.99.1"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/eza-community/eza
+  license: "EUPL-1.2 AND MIT"
+  notes: |
+    cargo build --release --locked --offline --no-default-features --target
+    wasm32-wasip1 from the .crate, with its dependencies vendored, then
+    wasm-opt. Upstream's release profile (fat LTO, one codegen unit,
+    panic=abort). No git feature: libgit2 is C, so --git and --git-ignore
+    say eza was built without it. Cargo.lock is not touched.
+    0001-wasi-eza-for-slicc-WASI-preview1.patch: eza's Unix code (the long
+    view's permissions, owners, links, inodes, blocks, --total-size, the
+    inode sort) on target_os = "wasi" too, over a new src/fs/wasi.rs: WASI's
+    filestat plus the mode and owner from slicc-kernel's slicc_fs imports
+    (path_filestat_owner, path_mode), the caller's ids from slicc.cred_get,
+    the pty width from slicc_tty.winsize, and user and group names from
+    /etc/passwd and /etc/group in place of uzers (Unix only). main() starts
+    in $PWD and, as the command sets "preopenRoot": true, closes the ./
+    twin preopen, which wasi-libc would otherwise take for "/" (eza / listed
+    the working directory). WASI has no device numbers or block counts:
+    devices show no size, and blocks are the size rounded up to 512 bytes.
+    0002-stdin-read-file-names-from-stdin-only-with-stdin.patch: names come
+    from stdin only with --stdin (eza#1923). 0.23 reads them whenever stdin
+    isn't a terminal, so `eza` with stdin /dev/null listed nothing
+    (eza#1725) and in a pipeline nobody closes it waited for EOF (eza#1568).
+    The licence is EUPL-1.2 (eza) AND MIT (exa, which most source files
+    carry too); LICENSE has both texts.
