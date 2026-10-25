@@ -9,6 +9,15 @@ summary: "GnuPG 2.4 for slicc WASIX (gpg, gpg-agent, gpgconf)"
 source:
   url: "https://gnupg.org/ftp/gcrypt/gnupg/gnupg-{{version}}.tar.bz2"
   sha256: "dd17ab2e9a04fd79d39d853f599cbc852062ddb9ab52a4ddeb4176fd8b302964"
+toolchain:
+  wasix_sysroot: "2025.9.30-43"
+  wasix_sysroot_sha256: "e5ecaf322715916aa0f2fc5cc873ead73e9258b13b22aac9ffc9660c9a1e3668"
+inputs:
+  - scripts/install-wasixcc.sh
+wasm:
+  initial-memory: 64MiB
+  measured-peak: 49MiB
+  measured-by: "cert/heap.mjs on a measurement link of 2.4.9-17 (wasix-sysroot 2025.9.30-43, the malloc family wrapped by scripts/wasm-refresh-malloc.c, the unsized 8.3 MiB initial memory), slicc-kernel 1.124.1 in Chromium, users enforce, 2 rounds: gpg-agent serving 5 concurrent clients (an ed25519 and an rsa3072 --quick-gen-key, a secret-key --import, a --detach-sign and a --decrypt of 4 MiB) beside 2 --verify, a gpgv and 2 --encrypt of the same file peaked at 48.5 MiB (malloc's highest block end, HOMESCOOP_WASM_PEAK, in the allocating thread; VmSize 48.6 MiB); each gpg process 9.2 MiB VmSize, and its malloc never passed the 12 MiB mark. The agent's own part is 8.3 MiB plus 8 MiB of thread stack per concurrent connection: 13 concurrent clients took it to 112.6 MiB, which grows past the initial heap under the allocator refresh"
 dependencies:
   build: []
   host: []

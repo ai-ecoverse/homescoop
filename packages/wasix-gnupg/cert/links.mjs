@@ -157,11 +157,13 @@ export default async function (ctx) {
     'rm -rf /root/ro /root/rs /srv/sk; mkdir -m 700 /root/ro /root/rs; mkdir -m 755 /srv/sk',
     `${GEN('/root/ro', 'RootOnly <ro@example.org>')} > /dev/null 2>&1; echo "rgen=$?"`,
     'gpg --homedir /root/ro --batch --with-colons -k ro@example.org | while IFS=: read -r t _ _ _ _ _ _ _ _ v _; do [ "$t" = fpr ] && echo "rfpr $v"; done',
+    'printf "signed by RootOnly\\n" > /tmp/ro.txt; gpg --homedir /root/ro --batch --yes -o /tmp/ro.sig --detach-sign /tmp/ro.txt 2>&1; echo "rsig=$?"; chmod 644 /tmp/ro.txt /tmp/ro.sig',
     'gpgconf --homedir /root/ro --kill gpg-agent',
     'cp /root/ro/pubring.kbx /srv/sk/pubring.kbx; gpg --homedir /root/ro --batch --export ro@example.org > /srv/sk/ring.gpg; chmod 600 /srv/sk/pubring.kbx /srv/sk/ring.gpg',
     'for f in pubring.kbx ring.gpg; do echo "sum $f $(cksum < /srv/sk/$f)"; done',
   ].join('\n'));
   assert.match(ro, /^rgen=0$/m, `root generates a RootOnly key:\n${ro}`);
+  assert.match(ro, /^rsig=0$/m, `root signs /tmp/ro.txt with RootOnly:\n${ro}`);
   const rfpr = /^rfpr (\S+)$/m.exec(ro)?.[1];
   const skSums = Object.fromEntries([...ro.matchAll(/^sum (\S+) (.+)$/gm)].map((m) => [m[1], m[2]]));
   assert.ok(rfpr && skSums['pubring.kbx'] && skSums['ring.gpg'], `root's 600 keybox and keyring in /srv/sk:\n${ro}`);
@@ -305,6 +307,33 @@ export default async function (ctx) {
   assert.match(s4scan, /^scanned \d+$/m, `cone scanned ~/s4:\n${s4scan}`);
   assert.doesNotMatch(s4scan, /^leak /m, `no file cone can read in ~/s4 holds root's RootOnly key after root's import into a homedir whose default legacy pubring.gpg cone symlinked to root's 600 keyring (homescoop#1424; 2.4.9-14: ~/s4's keyring holds RootOnly):\n${s4scan}`);
 
+  const SWAP = `ruby -e 'Dir.chdir(ARGV[0]); kbx = File.binread("reg0"); n = 0; e = Hash.new(0); until File.exist?("stop"); begin; File.binwrite("reg", kbx); File.rename("reg", "pubring.kbx"); File.symlink("/srv/sk/pubring.kbx", "lnk"); File.rename("lnk", "pubring.kbx"); rescue SystemCallError => x; e[x.class.to_s] += 1; end; n += 1; end; File.write("swaps", "swaps #{n} #{e.inspect}")'`;
+  const raceArm = await sh('cone', [
+    'rm -rf ~/w; mkdir -m 700 ~/w; gpg --homedir ~/w --batch --import /tmp/l1.asc > /dev/null 2>&1; gpgconf --homedir ~/w --kill gpg-agent; cp ~/w/pubring.kbx ~/w/reg0',
+    `(${SWAP} ~/w > ~/w/swap.log 2>&1 &)`,
+    'n=0; until [ -L ~/w/pubring.kbx ] || [ $n -ge 50 ]; do n=$((n+1)); sleep 0.1; done; [ -L ~/w/pubring.kbx ] && echo "swapping"',
+  ].join('\n'));
+  assert.match(raceArm, /^swapping$/m, `cone's swapper renames a symlink to root's 600 /srv/sk/pubring.kbx and a keybox of its own over ~/w/pubring.kbx in turn:\n${raceArm}`);
+  const race = await sh('root', [
+    'rm -f /tmp/race.out; for i in $(seq 60); do gpgv --keyring /home/cone/w/pubring.kbx /tmp/ro.sig /tmp/ro.txt >> /tmp/race.out 2>&1; done',
+    'good=0; link=0; loop=0; changed=0; other=0',
+    'while IFS= read -r l; do case $l in *"Good signature"*) good=$((good+1));; *"it is a symbolic link"*) link=$((link+1));; *"it became a symbolic link while it was being opened"*) loop=$((loop+1));; *"it changed while it was being opened"*) changed=$((changed+1));; *"keyblock resource"*|*"keydb_search failed"*) other=$((other+1)); echo "other ${l#gpgv: }";; esac; done < /tmp/race.out',
+    'echo "race good=$good link=$link loop=$loop changed=$changed other=$other"',
+    'echo "sum pubring.kbx $(cksum < /srv/sk/pubring.kbx)"; stat -c "ownr %U %a" /srv/sk/pubring.kbx',
+  ].join('\n'));
+  const raceStop = await sh('cone', 'touch ~/w/stop; n=0; until [ -s ~/w/swaps ] || [ $n -ge 100 ]; do n=$((n+1)); sleep 0.1; done; cat ~/w/swaps ~/w/swap.log');
+  const rc = /^race good=(\d+) link=(\d+) loop=(\d+) changed=(\d+) other=(\d+)$/m.exec(race) ?? [];
+  const swaps = Number(/^swaps (\d+)/m.exec(raceStop)?.[1] ?? 0);
+  console.log(`links race: ${swaps} swaps; 60 root gpgv runs: ${rc[2]} refused a symbolic link (fstatat), ${rc[3]} a name that became a symbolic link after fstatat (openat(O_NOFOLLOW) failed with ELOOP), ${rc[4]} a name that changed after fstatat (the st_dev/st_ino check), ${rc[5]} other errors (${[...new Set([...race.matchAll(/^other (.+)$/gm)].map((m) => m[1]))].join('; ')}), ${rc[1]} good signatures`);
+  assert.ok(swaps >= 20, `cone's swapper kept renaming while root's gpgv ran:\n${raceStop}`);
+  assert.ok(Number(rc[2]) >= 1, `root's gpgv met the symlink at least once:\n${race}`);
+  assert.equal(rc[1], '0', `root's gpgv never read root's 600 keybox through the symlink cone renames over ~/w/pubring.kbx (no Good signature from RootOnly): gnupg_wasi_open_file's fstatat(AT_SYMLINK_NOFOLLOW), openat(O_NOFOLLOW) and st_dev/st_ino check (homescoop#1879, #1654):\n${race}`);
+  assert.ok(race.includes(`sum pubring.kbx ${skSums['pubring.kbx']}`), `root's /srv/sk/pubring.kbx is byte-identical after the race:\n${race}`);
+  assert.match(race, /^ownr root 600$/m, `/srv/sk/pubring.kbx stays root 600:\n${race}`);
+  if (process.env.GNUPG_NOFOLLOW === '1') {
+    assert.ok(Number(rc[3]) >= 1, `on slicc-kernel >= 1.146.6, root's gpgv met the name as a symbolic link after its fstatat at least once, and its openat(O_NOFOLLOW) refused it with ELOOP ('it became a symbolic link while it was being opened', 2.4.9-17; 2.4.9-16 logs every refusal in the window as 'it changed while it was being opened') (homescoop#1879):\n${race}`);
+  }
+
   if (process.env.GNUPG_NOFOLLOW === '1') {
     const nf = await sh('root', [
       'rm -rf /srv/nf; mkdir -p /srv/nf; echo target > /srv/nf/t; ln -s /srv/nf/t /srv/nf/l; ln -s /srv/nf/none /srv/nf/d',
@@ -312,6 +341,14 @@ export default async function (ctx) {
     ].join('\n'));
     assert.match(nf, /^l refused Errno::ELOOP$/m, `slicc-kernel refuses a final symlink under O_NOFOLLOW (homescoop#1603; 1.124.1: opens the target):\n${nf}`);
     assert.match(nf, /^d refused Errno::E(LOOP|NOENT)$/m, `a dangling final symlink under O_NOFOLLOW is refused:\n${nf}`);
+    const NF = `ruby -e 'ARGV.each { |p| begin; File.open(p, File::RDONLY | File::NOFOLLOW | File::NONBLOCK) { |f| puts "nf #{p} opened #{f.read.strip}" }; rescue SystemCallError => e; puts "nf #{p} #{e.class}"; end }'`;
+    await sh('cone', 'rm -rf ~/nf; mkdir -m 700 ~/nf; echo mine > ~/nf/t; ln -s /home/cone/nf/t ~/nf/res; ln -s /srv/sk/pubring.kbx ~/nf/sk; ln -s /nonexistent/k ~/nf/dang');
+    for (const user of ['root', 'cone']) {
+      const got = await sh(user, `${NF} /home/cone/nf/res /home/cone/nf/sk /home/cone/nf/dang; cd /home/cone/nf && ${NF} res sk dang`);
+      for (const p of ['/home/cone/nf/res', '/home/cone/nf/sk', '/home/cone/nf/dang', 'res', 'sk', 'dang']) {
+        assert.match(got, new RegExp(`^nf ${p} Errno::ELOOP$`, 'm'), `${user}'s open(${p}, O_RDONLY | O_NOFOLLOW) in cone's 700 ~/nf is ELOOP, the refusal gnupg_wasi_open_file's openat(O_NOFOLLOW) relies on after its fstatat (slicc-kernel >= 1.146.6, homescoop#1879):\n${got}`);
+      }
+    }
   }
-  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; a pubring.kbx or trustdb.gpg that cone symlinks to root's own leaves it byte-identical after root's --delete-key or --import-ownertrust there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602); root's gpg refuses a keybox or gnupg-ring: keyring that cone symlinked to root's 600 files, and no file cone can read holds their content (#1654); root's own symlinks in its 700 directory are still read and edited, and so are cone's regular keybox and trustdb (#1424); root's own symlinked keybox in a root 775 or 777 homedir is refused with a line naming the file, the reason and chmod go-w, and is listed once the directory is 755, and a link that a member of the directory's group plants in a setgid root:root or root:users 2775 directory is refused with nothing of root's leaked (#1674); a default legacy pubring.gpg that cone symlinks to root's 600 keyring leaks nothing to cone (#1424)${process.env.GNUPG_NOFOLLOW === '1' ? '; the kernel refuses a final symlink under O_NOFOLLOW (#1603)' : ''}`);
+  console.log(`links: a pubring.kbx~ or pubring.kbx.tmp that cone symlinks to root's 600 files leaves them byte-identical and root 600 after root's import, a dangling one creates nothing, and cone's keyboxes are regular files of cone's (#1607), and so is a gnupg-ring: keyring root imports into, while a pub.gpg.tmp symlink to a root file leaves it unchanged; a .rev name of a key whose fingerprint cone knows in advance, or an openpgp-revocs.d, that cone symlinks into a root directory makes root create nothing there; a pubring.kbx or trustdb.gpg that cone symlinks to root's own leaves it byte-identical after root's --delete-key or --import-ownertrust there; openpgp-revocs.d and its .rev from root's --quick-gen-key in cone's homedir are cone's and cone removes the homedir (#1602); root's gpg refuses a keybox or gnupg-ring: keyring that cone symlinked to root's 600 files, and no file cone can read holds their content (#1654); root's own symlinks in its 700 directory are still read and edited, and so are cone's regular keybox and trustdb (#1424); root's own symlinked keybox in a root 775 or 777 homedir is refused with a line naming the file, the reason and chmod go-w, and is listed once the directory is 755, and a link that a member of the directory's group plants in a setgid root:root or root:users 2775 directory is refused with nothing of root's leaked (#1674); a default legacy pubring.gpg that cone symlinks to root's 600 keyring leaks nothing to cone (#1424); while cone renames a symlink to root's 600 keybox and a keybox of its own over one name, root's gpgv never reads through the link (#1879)${process.env.GNUPG_NOFOLLOW === '1' ? `; the kernel refuses a final symlink under O_NOFOLLOW (#1603), absolute and relative to the cwd, dangling or not, as root and as cone (#1879)` : ''}`);
 }

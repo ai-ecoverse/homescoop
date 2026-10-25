@@ -22,6 +22,13 @@ git config --global gpg.program gpg && git commit -S -m signed
   when git runs it with its stdio piped. Without a terminal (the agent's
   `bash` tool), use unprotected keys or `--batch --passphrase-fd`.
 
+## 2.4.9-17
+
+- **A sized heap and the allocator refresh** (homescoop#1879, #1287). The five binaries are threaded wasm with a shared memory, and V8 can trap with `memory access out of bounds` when one thread fills or copies into pages another thread's `malloc` has just grown (ai-ecoverse/slicc-kernel#1172). 2.4.9-17 is built on wasix-sysroot 2025.9.30-43: its `malloc` refreshes the thread's view of the memory before it returns a block above it (-39), and it uses the initial memory before growing (-40). Each module now starts with 64 MiB (it was about 8.3 MiB); gpg and gpg-agent add one 64 KiB page at startup for libgcrypt's secure memory. gpg needs about 9 MiB. gpg-agent needs 8.3 MiB plus 8 MiB of thread stack for each client connected at the same time: 5 concurrent clients (key generation, a secret-key import, a signature and a decryption) peaked at 48.5 MiB, so a few clients at a time never grow the memory, and more grow it under the refresh (13 took it to 112.6 MiB). The cert runs both cases concurrently through one agent, with no traps.
+- **The other sysroot changes since -34** (-35 to -43): a signal handler's `sa_mask` is honoured; a ready descriptor wins over a pending signal in `pselect`, which gpg-agent's main loop uses; `S_IF*` file-type bits are Linux's; relative paths go through the cwd descriptor; `gethostname()` reads `/etc/hostname`. gpg doesn't depend on any of them beyond what the cert checks: every existing row passes unchanged.
+- **Root's refusals in the open window say which check fired** (homescoop#1879, homescoop#1603). When root's gpg reads a keybox, keyring or trustdb in a directory another user can write, it checks the name with `fstatat(AT_SYMLINK_NOFOLLOW)` and opens it with `openat(O_NOFOLLOW)` as the same `st_dev`/`st_ino`. `O_NOFOLLOW` only matters if the name changes between those two calls. Up to 2.4.9-16 both refusals in that window logged `it changed while it was being opened`. Now an `ELOOP` from the open logs `it became a symbolic link while it was being opened`, and the `st_dev`/`st_ino` mismatch keeps the old wording. The checks themselves don't change, and both still refuse with `Operation not permitted`.
+- **O_NOFOLLOW rows on slicc-kernel 1.146.6.** slicc-kernel 1.144.1 refuses a final symlink under `O_NOFOLLOW`, and 1.146.3 and 1.146.6 do it in the same step that binds the descriptor, for threaded programs too. The cert shows this on 1.146.6: `O_NOFOLLOW` opens of a dangling link, a link to a file of the user's and a link to root's 600 keybox are `ELOOP`, by absolute path and relative to the cwd, for root and for a user. It also runs a race: a user renames a symlink to root's 600 keybox and a keybox of their own over one name in turn while root's `gpgv` checks a signature against it 60 times. Root never reads through the link. On 1.146.6 the refusals in the window are `ELOOP` from `O_NOFOLLOW` (14 to 16 of 60 runs locally), and on the cert kernel 1.124.1, whose open follows the link, they're the `st_dev`/`st_ino` check (19 to 24 of 60). That's why the check stays.
+
 ## 2.4.9-16
 
 - **Root's refusal of a symlinked keybox says why** (homescoop#1674). Since 2.4.9-15, root's gpg follows a symlinked keybox, keyring or trustdb only in a directory that root owns and that neither its group nor others can write. Elsewhere it refused with `Symbolic link loop`, which read like a filesystem bug. It now says which file it refused, why, and what to do, once per file and run, and the error that follows is `Operation not permitted`:
@@ -136,7 +143,7 @@ tarball checksums ship in `patches/` and `SOURCES.md`.
 
 - Spawns are `posix_spawn` (no fork); `gpg-agent --daemon` detaches by
   starting itself again.
-- Built against wasix-sysroot 2025.9.30-34 (since 2.4.9-10; 2.4.9-7 to -9 used -31/-32, 2.4.9-6 used -28, earlier ones -20): signal
+- Built against wasix-sysroot 2025.9.30-43 (since 2.4.9-17; 2.4.9-10 to -16 used -34, 2.4.9-7 to -9 -31/-32, 2.4.9-6 -28, earlier ones -20), with a 64 MiB initial memory (recipe.yaml `wasm`): signal
   masks are slicc-kernel's (≥ 1.88.0), so gpg-agent's `npth_pselect` with its
   signal mask waits and wakes atomically: SIGHUP re-reads the configuration
   and flushes the cache in place, SIGTERM shuts the agent down (it removes its
