@@ -1,17 +1,39 @@
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -110,6 +110,14 @@
+@@ -110,9 +110,36 @@
  
  /// A convenience function that wraps the [`home_dir`](https://doc.rust-lang.org/std/env/fn.home_dir.html) function from the standard library.
  pub fn home_dir() -> Result<std::path::PathBuf, HomeDirError> {
-+    // homescoop (wasi-bat): std::env::home_dir() is always None on WASI;
-+    // the home directory is $HOME, which the kernel sets for each user.
 +    #[cfg(target_os = "wasi")]
-+    return std::env::var_os("HOME")
-+        .filter(|home| !home.is_empty())
-+        .map(std::path::PathBuf::from)
-+        .ok_or(HomeDirError);
++    return Ok(wasi_home_dir());
 +    #[cfg(not(target_os = "wasi"))]
      std::env::home_dir().ok_or(HomeDirError)
  }
  
++/// homescoop (wasi-bat): std::env::home_dir() is always None on WASI. Take
++/// $HOME, which the kernel sets for each user; without it (unset or empty),
++/// the home field of the passwd entry of $USER or $LOGNAME, as libc's
++/// fallback does for the current user; without either, "/", so a program
++/// that wants a home directory still runs.
++#[cfg(target_os = "wasi")]
++fn wasi_home_dir() -> std::path::PathBuf {
++    let var = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty());
++    if let Some(home) = var("HOME") {
++        return home.into();
++    }
++    let user = var("USER").or_else(|| var("LOGNAME"));
++    let passwd = std::fs::read_to_string("/etc/passwd").unwrap_or_default();
++    if let Some(user) = user.as_ref().and_then(|u| u.to_str()) {
++        for line in passwd.lines() {
++            let fields: Vec<&str> = line.split(':').collect();
++            if fields.len() >= 7 && fields[0] == user && fields[5].starts_with('/') {
++                return fields[5].into();
++            }
++        }
++    }
++    "/".into()
++}
++
+ /// This error occurs when the home directory cannot be located.
+ #[derive(Debug)]
+ pub struct HomeDirError;

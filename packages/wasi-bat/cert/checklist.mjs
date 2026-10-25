@@ -112,6 +112,14 @@ export default async function (ctx) {
   await put('/home/b/other-config', '--style=numbers,header\n--decorations=always\n--color=never\n');
   assert.equal((await bat(['a.json'], { env: { BAT_CONFIG_PATH: '/home/b/other-config' } })).stdout, '     File: a.json\n   1 {"a": [1, true]}\n', 'BAT_CONFIG_PATH');
   await put('/root/.config/bat/config', '');
+  // homescoop#1895: without $HOME (unset or empty), the passwd entry of
+  // $USER, as native bat's libc fallback; with neither, "/". No panic.
+  const nohome = await sh('env -u HOME bat --config-dir; HOME= bat --cache-dir; HOME= bat t.rs');
+  assert.equal(nohome.status, 0, `no HOME: ${out(nohome)}`);
+  assert.equal(nohome.stdout, `/root/.config/bat\n/root/.cache/bat\n${RS}`, `no HOME: ${out(nohome)}`);
+  const bare = await sh('env -i /usr/bin/bat --config-dir; env -i /usr/bin/bat --cache-dir; env -i /usr/bin/bat t.rs');
+  assert.equal(bare.status, 0, `env -i: ${out(bare)}`);
+  assert.equal(bare.stdout, `/.config/bat\n/.cache/bat\n${RS}`, `env -i: ${out(bare)}`);
 
   // build-assets: a custom syntax from ~/.config/bat/syntaxes, cached in ~/.cache/bat.
   await put('/root/.config/bat/syntaxes/Greet.sublime-syntax', [

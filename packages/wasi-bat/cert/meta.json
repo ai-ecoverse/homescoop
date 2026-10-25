@@ -15,17 +15,18 @@
     "patches/clircle-wasi.patch: bat t.rs >> t.rs is refused (IO circle detected, rc 1, the file unchanged); another output file is fine",
     "patches/bat-wasi-no-builtin-pager.patch: --paging=always with the default pager, --pager=builtin, --pager='less -R' and BAT_PAGER=builtin BAT_PAGING=always all write to stdout, rc 0",
     "patches/etcetera-wasi-home.patch: --config-dir and --cache-dir are under $HOME; ~/.config/bat/config is read, --no-config skips it, BAT_CONFIG_PATH replaces it",
+    "homescoop#1895 (patches/etcetera-wasi-home.patch): with $HOME unset or empty, the config and cache dirs come from root's passwd entry ($USER) and bat t.rs prints; under env -i (no HOME, USER or LOGNAME) they are /.config/bat and /.cache/bat, rc 0, no panic",
     "bat cache --build compiles a custom syntax from ~/.config/bat/syntaxes into ~/.cache/bat and highlights with it, --list-languages lists it; bat cache --clear goes back to the built-in assets",
     "--list-languages (more than 150, Rust, Python, Dockerfile, TOML, Markdown, TypeScript, Zig) and --list-themes (Monokai Extended, GitHub, Dracula, Nord, Solarized (dark)); --completion bash",
     "patches/console-wasi-winsize.patch: on a 60- and a 100-column pty, decorations and truecolour are on and the grid is the terminal's width; a long line wraps at 50 columns on a 50-column pty",
     "cert/syntax.mjs: all 196 files of bat 0.26.1's tests/syntax-tests (the recipe's .crate, sha256-checked) highlight byte for byte as upstream's tests/syntax-tests/highlighted",
-    "cert/users.mjs (users enforce): alice can't read bob's 0600 file (Permission denied, nothing printed) while his 0644 file prints; each user's config and cache are under their own $HOME; bob can't build into or clear alice's cache; root reads everything; the IO circle check as a user",
+    "cert/users.mjs (users enforce): alice can't read bob's 0600 file (Permission denied, nothing printed) while his 0644 file prints; each user's config and cache are under their own $HOME, and without $HOME alice still gets hers from her passwd entry (homescoop#1895); bob can't build into or clear alice's cache; root reads everything; the IO circle check as a user",
     "cert/notices.mjs: THIRD-PARTY-NOTICES.md has the Rust 1.99.1 standard library section, exactly one wasi-libc section (wasi-sdk-33), Oniguruma's BSD-2-Clause licence, the patched crates, no git2/minus/crossterm, and bat --acknowledgements verbatim; LICENSE and NOTICE are bat's"
   ],
   "patches": {
     "patches/bat-wasi-no-builtin-pager.patch": "the paging rows of cert/checklist.mjs; without it the build fails (crossterm has no WASI backend, NEGATIVE.md)",
     "patches/clircle-wasi.patch": "the IO circle rows of cert/checklist.mjs and cert/users.mjs; without it the build fails (clircle's compile_error, NEGATIVE.md)",
     "patches/console-wasi-winsize.patch": "the pty rows of cert/checklist.mjs (an 80-column grid on a 60-column pty without it, NEGATIVE.md)",
-    "patches/etcetera-wasi-home.patch": "the config and cache rows of cert/checklist.mjs and cert/users.mjs (bat panics, Could not get home directory, without it, NEGATIVE.md)"
+    "patches/etcetera-wasi-home.patch": "the config, cache and no-$HOME rows of cert/checklist.mjs and cert/users.mjs (bat panics, Could not get home directory, without it; the first version, $HOME only, panics on the no-$HOME rows, NEGATIVE.md)"
   }
 }

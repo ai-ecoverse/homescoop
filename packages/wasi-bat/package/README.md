@@ -36,7 +36,8 @@ The terminal width comes from slicc-kernel's `slicc_tty.winsize`, so bat's
 grid and wrapping fit the terminal. Kernels before 1.48.0 don't have it;
 bat runs there too, at 80 columns (or `--terminal-width`). The config file, custom themes and
 syntaxes (`bat cache --build`) live under `$HOME`, as on Linux:
-`~/.config/bat` and `~/.cache/bat`.
+`~/.config/bat` and `~/.cache/bat`. Without `$HOME`, the home directory
+is the user's `/etc/passwd` entry (from `$USER`), as on Linux.
 
 Certified on slicc-kernel 1.167.1 with users enforced: highlighting, styles,
 line ranges, stdin, errors, the "IO circle" check (`bat f >> f` is refused),

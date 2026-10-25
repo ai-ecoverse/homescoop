@@ -55,6 +55,21 @@ Recorded failures:
   error: could not compile `crossterm` (lib) due to 9 previous errors
   ```
 
+- **With the first `patches/etcetera-wasi-home.patch`, which read only
+  `$HOME`** (homescoop#1895, b4123c9d's build): `checklist.mjs` and
+  `users.mjs` FAIL on the rows without `$HOME`. `env -u HOME bat
+  --config-dir` and `HOME= bat t.rs` panic, where native bat falls back to
+  the passwd entry. The patch now does the same, from `$USER` or `$LOGNAME`,
+  and falls back to `/` without one.
+
+  ```text
+  AssertionError [ERR_ASSERTION]: no HOME: rc=134 stdout="" stderr="
+  thread 'main' (1) panicked at src/bin/bat/directories.rs:51:40:
+  Could not get home directory
+  ...
+  134 !== 0
+  ```
+
 ## Wrong-output cases (in-spec)
 
 `cert/checklist.mjs` asserts exact bytes, taken from native bat 0.26.1

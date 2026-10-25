@@ -47,8 +47,10 @@ about:
         and wrapping fit a pty. bat.wasm's only import outside
         wasi_snapshot_preview1 (build.sh checks).
       patches/etcetera-wasi-home.patch (vendored etcetera 0.11.0): the home
-        directory is $HOME on WASI, where std::env::home_dir() is always
-        None; without it bat panics before reading anything.
+        directory on WASI, where std::env::home_dir() is always None: $HOME,
+        else the passwd entry of $USER or $LOGNAME (homescoop#1895, as
+        libc's fallback), else /; without it bat panics before reading
+        anything.
     clircle (patched) and path_abs use std::os::wasi (feature wasi_ext),
     enabled for those two crates only with RUSTC_BOOTSTRAP=path_abs,clircle.
     GIT_CEILING_DIRECTORIES keeps git-version (bat --version) from reading

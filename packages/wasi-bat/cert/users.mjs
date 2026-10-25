@@ -41,6 +41,9 @@ export default async function (ctx) {
   assert.equal(r.stdout, '/home/bob/.config/bat\n/home/bob/.cache/bat\n', out(r));
   r = await as('alice', 'mkdir -p ~/.config/bat && printf -- "--decorations=always\\n--style=numbers\\n--color=never\\n" > ~/.config/bat/config && bat /home/bob/open.toml');
   assert.equal(r.stdout, '   1 name = "open"\n', `alice's config: ${out(r)}`);
+  // homescoop#1895: without $HOME, alice's passwd entry, so her config.
+  r = await as('alice', 'env -u HOME bat --config-dir; HOME= bat /home/bob/open.toml');
+  assert.equal(r.stdout, '/home/alice/.config/bat\n   1 name = "open"\n', `alice without HOME: ${out(r)}`);
   r = await as('bob', 'bat /home/bob/open.toml');
   assert.equal(r.stdout, 'name = "open"\n', `bob doesn't get alice's config: ${out(r)}`);
 
