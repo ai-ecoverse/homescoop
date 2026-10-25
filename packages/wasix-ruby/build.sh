@@ -720,9 +720,28 @@ conf.write_text(t)
 print(f"rbconfig.rb: {n} build-tree paths now /nonexistent-ruby-build (homescoop#1114)")
 PY
 
-homescoop_stage_license "$SRC/COPYING" "$SRC/BSDL" 2>/dev/null || \
-  homescoop_stage_license "$SRC/COPYING" "$SRC/LEGAL"
-homescoop_notices_begin "bin/ruby statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc)."
+homescoop_stage_licenses "$SRC/COPYING" "$SRC/BSDL"
+cp "$SRC/LEGAL" "$DEST/LEGAL"
+grep -q '^2-clause BSDL (see the file BSDL), or the conditions below:$' "$DEST/LICENSE" \
+  && grep -q '^==> BSDL <==$' "$DEST/LICENSE" \
+  && grep -q '^Copyright (C) 1993-2013 Yukihiro Matsumoto. All rights reserved.$' "$DEST/LICENSE" \
+  && grep -q '^2. Redistributions in binary form must reproduce the above copyright$' "$DEST/LICENSE" \
+  && grep -q '^\[regparse.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[missing/dtoa.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[missing/mt19937.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[st.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[ext/digest/sha2/sha2.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[ext/digest/md5/md5.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[vsnprintf.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[missing/setproctitle.c\]$' "$DEST/LEGAL" \
+  && grep -q '^\[coroutine\]$' "$DEST/LEGAL" \
+  && grep -q '^\[ccan/list/list.h\]$' "$DEST/LEGAL" \
+  && grep -q '^== MIT License$' "$DEST/LEGAL" \
+  && grep -q '^== Old-style BSD license$' "$DEST/LEGAL" \
+  || { echo "ruby-notices: FAIL LICENSE lacks COPYING or BSDL, or LEGAL lacks a bundled-code notice (homescoop#1878)" >&2; exit 1; }
+echo "ruby-notices: PASS LICENSE is COPYING and BSDL, LEGAL ships with the Onigmo, dtoa, mt19937, st.c, vsnprintf, setproctitle, md5, sha2, ccan and coroutine notices"
+homescoop_notices_begin "bin/ruby statically links the following (ext/openssl, ext/zlib, ext/psych, and wasix-libc). It also compiles in third-party code that Ruby's LEGAL lists (Onigmo and the encodings, dtoa, mt19937, st.c, strftime, vsnprintf, setproctitle, memcmp, the md5, rmd160, sha1 and sha2 digests, psych, ccan and the asyncify coroutine); LEGAL is the first section below and also ships as its own file."
+homescoop_notice "Ruby $VER bundled third-party code (upstream LEGAL)" "$DEST/LEGAL" -
 homescoop_notice "OpenSSL 3.5.9 (@ai-ecoverse/wasix-openssl 3.5.9-4), Apache-2.0" "$OPENSSL_PREFIX/LICENSE" -
 homescoop_notice "zlib 1.3.1 (@ai-ecoverse/wasix-zlib 1.3.1-3)" "$ZLIB_PREFIX/LICENSE" -
 homescoop_notice "libyaml $YAML_VER, MIT" "$YAML_SRC/License" -
@@ -953,7 +972,7 @@ pkg = {
     "engines": {"slicc-kernel": ">=1.120.0"},
     "license": "Ruby",
     "repository": {"type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/wasix-ruby/package"},
-    "files": ["README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "bin", "lib", "share", "PRESTAGE.md"],
+    "files": ["README.md", "LICENSE", "LEGAL", "THIRD-PARTY-NOTICES.md", "bin", "lib", "share", "PRESTAGE.md"],
     "publishConfig": {"access": "public"},
     "homescoop": {
         "recipe": "wasix-ruby",
