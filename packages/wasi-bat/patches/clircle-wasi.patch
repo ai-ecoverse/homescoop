@@ -1,0 +1,40 @@
+--- a/src/clircle_unix.rs
++++ b/src/clircle_unix.rs
+@@ -4,8 +4,11 @@
+ use std::fs::File;
+ use std::io::{self, Seek};
+ use std::os::fd::AsRawFd;
++use std::os::fd::{FromRawFd, IntoRawFd, RawFd};
++#[cfg(unix)]
+ use std::os::unix::fs::MetadataExt;
+-use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
++#[cfg(target_os = "wasi")]
++use std::os::wasi::fs::MetadataExt;
+ use std::{cmp, hash, ops};
+ 
+ /// Implementation of `Clircle` for Unix.
+@@ -103,7 +106,7 @@
+         file.metadata().map(|metadata| Self {
+             device: metadata.dev(),
+             inode: metadata.ino(),
+-            size: metadata.size(),
++            size: metadata.len(),
+             is_regular_file: metadata.file_type().is_file(),
+             file: Some(file),
+             owns_fd: true,
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -43,9 +43,12 @@
+ #![deny(clippy::all)]
+ #![deny(missing_docs)]
+ #![warn(clippy::pedantic)]
++// homescoop (wasi-bat): WASI has Unix's file identity (device and inode in
++// fd_filestat_get), reached through std::os::wasi::fs::MetadataExt.
++#![cfg_attr(target_os = "wasi", feature(wasi_ext))]
+ 
+ cfg_if::cfg_if! {
+-    if #[cfg(unix)] {
++    if #[cfg(any(unix, target_os = "wasi"))] {
+         mod clircle_unix;
+         use clircle_unix as imp;
+     } else if #[cfg(windows)] {

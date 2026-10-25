@@ -1,0 +1,17 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -110,6 +110,14 @@
+ 
+ /// A convenience function that wraps the [`home_dir`](https://doc.rust-lang.org/std/env/fn.home_dir.html) function from the standard library.
+ pub fn home_dir() -> Result<std::path::PathBuf, HomeDirError> {
++    // homescoop (wasi-bat): std::env::home_dir() is always None on WASI;
++    // the home directory is $HOME, which the kernel sets for each user.
++    #[cfg(target_os = "wasi")]
++    return std::env::var_os("HOME")
++        .filter(|home| !home.is_empty())
++        .map(std::path::PathBuf::from)
++        .ok_or(HomeDirError);
++    #[cfg(not(target_os = "wasi"))]
+     std::env::home_dir().ok_or(HomeDirError)
+ }
+ 
