@@ -14,7 +14,7 @@ dependencies:
   run: []
 about:
   homepage: https://gitlab.com/procps-ng/procps
-  license: GPL-2.0-or-later
+  license: GPL-2.0-or-later AND LGPL-2.1-or-later
   notes: |
     Host ladder, slicc cli profile (spawn+exec). Built --without-ncurses so
     top/watch/slabtop are omitted (no standalone ncurses package). Needs

@@ -61,9 +61,12 @@ test('wasi-uv (#675) and py-kiwisolver (#569) opt in', () => {
   for (const p of ['wasi-uv', 'py-kiwisolver']) assert.ok(optedIn(recipes.get(p).reproducible), p);
 });
 
-test('qpdf is off the pending list and ladder-build rebuilds and compares it (homescoop#1354, #808)', () => {
-  assert.ok(!Object.hasOwn(pending, 'qpdf'), 'qpdf is still in scripts/reproducible-pending.json');
+test('qpdf (homescoop#1354) and procps (homescoop#1852) are off the pending list and ladder-build rebuilds and compares them (#808)', () => {
   const r = spawnSync(process.execPath, [join(root, 'scripts/classify-touched-packages.mjs'), '--all'], { cwd: root, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  assert.ok(JSON.parse(r.stdout).rebuild.includes('qpdf'), 'classify leaves qpdf out of rebuild');
+  const { rebuild } = JSON.parse(r.stdout);
+  for (const p of ['qpdf', 'procps']) {
+    assert.ok(!Object.hasOwn(pending, p), `${p} is still in scripts/reproducible-pending.json`);
+    assert.ok(rebuild.includes(p), `classify leaves ${p} out of rebuild`);
+  }
 });

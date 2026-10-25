@@ -1,7 +1,8 @@
 # procps PRESTAGE / release gate
 
-**#54 held for publish** — slicc-kernel 1.9.0 is on npm (#66). Clear `blocked`,
-CI browser-cert on 1.9.0, human-cert both tarballs, then `certified=` publish + merge.
+procps first shipped as 4.0.5-1 (#54) once slicc-kernel 1.9.0 put `/proc` on
+npm (#66). Releases now go through ladder-build: it builds the recipe twice and
+compares the packages, certifies the tarball, and publishes it on merge.
 
 ## Command set
 
@@ -20,17 +21,11 @@ Skip `top` / `watch` (`--without-ncurses`).
 Proven green against `slicc-kernel-procfs-ed6d6a1.tgz` (pre-#66 attach).  
 Re-prove against the **released** kernel after #66.
 
-## Release sequence (Lars / thr_b83wwqmt4e)
+## First release (4.0.5-1, done)
 
-1. ~~Wait for slicc-kernel #66~~ → **1.9.0 on npm.**
-2. Clear `cert/meta.json` `"blocked"`; pin `"kernel": "@ai-ecoverse/slicc-kernel@1.9.0"`.
-3. `FORCE=1 bash scripts/host-run.sh procps` → tarball + sha256.
-4. Packaging-only coreutils `9.12.0-2` via
-   `node scripts/packaging-only-coreutils-drop-procps-clashes.mjs`.
-5. ~~Local + CI browser-cert on 1.9.0~~ done; pin now 1.14.0 with published `wasm-coreutils@9.12.0-2` (no overlay script).
-6. Send both tarballs + sha256 to thr_b83wwqmt4e (attached-worker `ps` in browser).
-7. Publish exact artifacts (`certified=<sha256>`), then land #54.
-8. ~~Add `procps` to `scripts/ci-certified.json`~~ done after thr_b83wwqmt4e cert + publish of 4.0.5-1.
+slicc-kernel 1.9.0 shipped `/proc` (#66), the cert ran on it (the pin is now
+1.14.0 or later, see `cert/meta.json`), the packaging-only coreutils 9.12.0-2
+went out in the same window, and procps was published and merged with #54.
 
 ## Alongside first publish: coreutils packaging-only
 
@@ -48,7 +43,7 @@ Overlaps (procps ∩ coreutils `slicc.commands` on `@ai-ecoverse/wasm-coreutils@
 Packaging-only bump `9.12.0-1` → `9.12.0-2`: same `bin/*` bytes, only
 `package.json` differs (same file-by-file rule as wasm-git `-9`).  
 Helper: `scripts/packaging-only-coreutils-drop-procps-clashes.mjs`.  
-Publish that certified tarball in the same window as procps’s first publish.
+It went out in the same window as procps’s first publish.
 
 ## Build
 

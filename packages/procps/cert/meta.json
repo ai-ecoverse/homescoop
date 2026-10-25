@@ -22,7 +22,9 @@
     "attached-worker process visible in terminal ps (human cert on 1.9.0; kernel cosmetics closed in 1.11/1.12)",
     "bash -c pgrep -f <pattern> does not match itself; exec pkill -f kills sleep, not itself (slicc-kernel#99)",
     "cert/users.mjs (4.0.5-3, H1 homescoop#207, slicc-kernel >= 1.44.0): `ps -o user=,comm=` lists 'root ps' as root and 'cone ps' as a kernel.users.add({name:'cone'}) user; root's `ps aux` shows cone's `sleep 3` under USER cone and its own `ps aux` under root. procps now links slicc_pwd's --wrap (getpwuid/getpwnam/getpwent)",
-    "cert/k122/flock.mjs (4.0.7-4, homescoop#947, on slicc-kernel 1.122.0): while a wasix-perl holds LOCK_EX on a pidfile, pgrep -L -F's flock(LOCK_SH|LOCK_NB) fails with EWOULDBLOCK, so pgrep reads the pidfile and prints the holder's pid. Once the holder exits, pgrep -L refuses the pidfile ('Locking check for pidfile failed', rc 1). 4.0.7-3's flock is Emscripten's stub and always succeeds (NEGATIVE.md)"
+    "cert/k122/flock.mjs (4.0.7-4, homescoop#947, on slicc-kernel 1.122.0): while a wasix-perl holds LOCK_EX on a pidfile, pgrep -L -F's flock(LOCK_SH|LOCK_NB) fails with EWOULDBLOCK, so pgrep reads the pidfile and prints the holder's pid. Once the holder exits, pgrep -L refuses the pidfile ('Locking check for pidfile failed', rc 1). 4.0.7-3's flock is Emscripten's stub and always succeeds (NEGATIVE.md)",
+    "licence (homescoop#1878, cert/licence.mjs): the tarball ships LICENSE (procps-ng's COPYING, GPL-2.0) and COPYING.LIB (the GNU Library General Public License text upstream ships for libproc2, which every command links statically), package.json files[] lists both, and README.md says which licence covers what. build.sh prints procps-licences: PASS only when both are there and libproc2's sources are still LGPL-2.1-or-later. The published 4.0.7-5 fails it (NEGATIVE.md)",
+    "reproducible (homescoop#1852, #808): procps is off scripts/reproducible-pending.json, so ladder-build's reproducible job rebuilds it from a second workspace path and compares the two packages"
   ],
   "needsNote": "needsInstall pulls published coreutils 9.12.0-2 (no stub kill/uptime). Kernel pin 1.14.0 (pnpm global command roots); 1.12.0: real VmSize/VmRSS + meminfo used; 1.11.0: USER/whoami = web_user. coreutils 9.12.0-3 + procps 4.0.5-2 are the exec-pid pair (kernel-execve shim), certified together on slicc-kernel 1.17.3.",
   "extra_kernels": [
@@ -35,5 +37,8 @@
       "cert": "k122",
       "users": "enforce"
     }
-  ]
+  ],
+  "patches": {
+    "pgrep-wasm-no-pidfd.patch": "pgrep and pkill without pidfds: pidfd_open, pidfd_send_signal and process_mrelease fail with ENOSYS, so pkill signals with kill()/sigqueue(). cert/checklist.mjs (pkill -f 'sleep 100' rc 0) and cert/exec-pid.mjs (exec pkill -f kills sleep 101, which is then gone) cover it; --mrelease's pidfd_open failure has no spec yet (homescoop#886)"
+  }
 }
