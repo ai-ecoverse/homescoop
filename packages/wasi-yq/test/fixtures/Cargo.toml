@@ -1,0 +1,19 @@
+[package]
+name = "ripgrep"
+version = "15.1.0"
+edition = "2024"
+authors = ["Andrew Gallant <jamslam@gmail.com>"]
+license = "Unlicense OR MIT"
+
+[dependencies]
+anyhow = "1.0.75"
+bstr = "1.7.0"
+serde_json = { version = "1.0.23", optional = true }
+
+[features]
+default = []
+json = ["dep:serde_json"]
+
+[profile.release]
+debug = 1
+lto = true

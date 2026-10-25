@@ -1,0 +1,8 @@
+{
+  "name": "shop-web",
+  "version": "1.4.2",
+  "private": true,
+  "scripts": { "build": "vite build", "test": "vitest run" },
+  "dependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },
+  "devDependencies": { "vite": "^7.1.0", "vitest": "^3.2.4" }
+}

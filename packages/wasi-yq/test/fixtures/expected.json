@@ -1,0 +1,234 @@
+{
+ "version": {
+  "status": 0,
+  "stdout": "yq (https://github.com/mikefarah/yq/) version v4.54.1\n",
+  "stderr": ""
+ },
+ "gha first steps": {
+  "status": 0,
+  "stdout": "uses: actions/checkout@v4 # pinned by tag\nname: Check out\nuses: actions/checkout@v4\nwith:\n  fetch-depth: 0\n",
+  "stderr": ""
+ },
+ "gha job names": {
+  "status": 0,
+  "stdout": "- lint\n- test\n",
+  "stderr": ""
+ },
+ "gha matrix as json": {
+  "status": 0,
+  "stdout": "{\"os\":[\"ubuntu-latest\",\"macos-latest\"],\"node\":[20,22]}\n",
+  "stderr": ""
+ },
+ "gha on from stdin": {
+  "status": 0,
+  "stdout": "push:\n  branches: [main]\npull_request:\n",
+  "stderr": ""
+ },
+ "gha edit in place": {
+  "status": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": "# CI for the web app: lint and test on every push and pull request.\nname: CI\non:\n  push:\n    branches: [main]\n  pull_request:\npermissions:\n  contents: read\n  checks: write\nenv:\n  NODE_OPTIONS: --max-old-space-size=4096 # the test suite is large\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4 # pinned by tag\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci\n      - run: npm run lint\n  test:\n    needs: lint\n    runs-on: ${{ matrix.os }}\n    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, macos-latest]\n        node: [20, 22]\n    steps:\n      - name: Check out\n        uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - uses: actions/setup-node@v4\n        with:\n          node-version: ${{ matrix.node }}\n      - run: npm ci\n      - run: npm test -- --coverage\n        env:\n          CI: \"true\"\n",
+  "left": 0
+ },
+ "k8s images": {
+  "status": 0,
+  "stdout": "ghcr.io/example/web:1.4.2\nghcr.io/example/log-shipper:0.9.0\n",
+  "stderr": ""
+ },
+ "k8s second document": {
+  "status": 0,
+  "stdout": "2\n",
+  "stderr": ""
+ },
+ "k8s names on stdin with -": {
+  "status": 0,
+  "stdout": "ConfigMap/web-config\n---\nDeployment/web\n---\nService/web\n",
+  "stderr": ""
+ },
+ "k8s edit in place": {
+  "status": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": "# web: the front end, three replicas behind a ClusterIP service.\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: web-config\n  namespace: shop\ndata:\n  LOG_LEVEL: info\n  FEATURE_FLAGS: \"checkout,search\"\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: shop\n  labels:\n    app: web\nspec:\n  replicas: 3 # bump for launch\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n        - name: web\n          image: ghcr.io/example/web:1.5.0\n          ports:\n            - containerPort: 8080\n          envFrom:\n            - configMapRef:\n                name: web-config\n          resources:\n            limits:\n              cpu: 500m\n              memory: 256Mi\n        - name: sidecar\n          image: ghcr.io/example/log-shipper:0.9.0\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\n  namespace: shop\nspec:\n  selector:\n    app: web\n  ports:\n    - port: 80\n      targetPort: 8080\n",
+  "left": 0
+ },
+ "front matter extract": {
+  "status": 0,
+  "stdout": "Shipping yq to the browser\n",
+  "stderr": ""
+ },
+ "front matter process": {
+  "status": 0,
+  "stdout": "---\ntitle: Shipping yq to the browser\ndate: 2026-10-25\ntags: [wasm, yaml, browser] # more to come\ndraft: true\n---\n\n# Shipping yq to the browser\n\nFront matter sits between the `---` lines; the Markdown below stays as it is.\n\n---\n\nA horizontal rule above, not front matter.\n",
+  "stderr": ""
+ },
+ "front matter in place": {
+  "status": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": "---\ntitle: Shipping yq to the browser\ndate: 2026-10-25\ntags: [wasm, yaml] # more to come\ndraft: false\n---\n\n# Shipping yq to the browser\n\nFront matter sits between the `---` lines; the Markdown below stays as it is.\n\n---\n\nA horizontal rule above, not front matter.\n",
+  "left": 0
+ },
+ "yaml to json": {
+  "status": 0,
+  "stdout": "{\n  \"name\": \"CI\",\n  \"on\": {\n    \"push\": {\n      \"branches\": [\n        \"main\"\n      ]\n    },\n    \"pull_request\": null\n  },\n  \"permissions\": {\n    \"contents\": \"read\"\n  },\n  \"env\": {\n    \"NODE_OPTIONS\": \"--max-old-space-size=4096\"\n  },\n  \"jobs\": {\n    \"lint\": {\n      \"runs-on\": \"ubuntu-latest\",\n      \"steps\": [\n        {\n          \"uses\": \"actions/checkout@v4\"\n        },\n        {\n          \"uses\": \"actions/setup-node@v4\",\n          \"with\": {\n            \"node-version\": 20,\n            \"cache\": \"npm\"\n          }\n        },\n        {\n          \"run\": \"npm ci\"\n        },\n        {\n          \"run\": \"npm run lint\"\n        }\n      ]\n    },\n    \"test\": {\n      \"needs\": \"lint\",\n      \"runs-on\": \"${{ matrix.os }}\",\n      \"strategy\": {\n        \"fail-fast\": false,\n        \"matrix\": {\n          \"os\": [\n            \"ubuntu-latest\",\n            \"macos-latest\"\n          ],\n          \"node\": [\n            20,\n            22\n          ]\n        }\n      },\n      \"steps\": [\n        {\n          \"name\": \"Check out\",\n          \"uses\": \"actions/checkout@v4\",\n          \"with\": {\n            \"fetch-depth\": 0\n          }\n        },\n        {\n          \"uses\": \"actions/setup-node@v4\",\n          \"with\": {\n            \"node-version\": \"${{ matrix.node }}\"\n          }\n        },\n        {\n          \"run\": \"npm ci\"\n        },\n        {\n          \"run\": \"npm test -- --coverage\",\n          \"env\": {\n            \"CI\": \"true\"\n          }\n        }\n      ]\n    }\n  }\n}\n",
+  "stderr": ""
+ },
+ "json to yaml": {
+  "status": 0,
+  "stdout": "name: shop-web\nversion: 1.4.2\nprivate: true\nscripts:\n  build: vite build\n  test: vitest run\ndependencies:\n  react: ^19.2.0\n  react-dom: ^19.2.0\ndevDependencies:\n  vite: ^7.1.0\n  vitest: ^3.2.4\n",
+  "stderr": ""
+ },
+ "json query": {
+  "status": 0,
+  "stdout": "\"react\"\n\"react-dom\"\n",
+  "stderr": ""
+ },
+ "json edit in place": {
+  "status": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": "{\n  \"name\": \"shop-web\",\n  \"version\": \"1.5.0\",\n  \"private\": true,\n  \"scripts\": {\n    \"build\": \"vite build\",\n    \"test\": \"vitest run\",\n    \"lint\": \"eslint .\"\n  },\n  \"dependencies\": {\n    \"react\": \"^19.2.0\",\n    \"react-dom\": \"^19.2.0\"\n  },\n  \"devDependencies\": {\n    \"vite\": \"^7.1.0\",\n    \"vitest\": \"^3.2.4\"\n  }\n}\n",
+  "left": 0
+ },
+ "toml query": {
+  "status": 0,
+  "stdout": "15.1.0\n",
+  "stderr": ""
+ },
+ "toml to json": {
+  "status": 0,
+  "stdout": "{\n  \"package\": {\n    \"name\": \"ripgrep\",\n    \"version\": \"15.1.0\",\n    \"edition\": \"2024\",\n    \"authors\": [\n      \"Andrew Gallant <jamslam@gmail.com>\"\n    ],\n    \"license\": \"Unlicense OR MIT\"\n  },\n  \"dependencies\": {\n    \"anyhow\": \"1.0.75\",\n    \"bstr\": \"1.7.0\",\n    \"serde_json\": {\n      \"version\": \"1.0.23\",\n      \"optional\": true\n    }\n  },\n  \"features\": {\n    \"default\": [],\n    \"json\": [\n      \"dep:serde_json\"\n    ]\n  },\n  \"profile\": {\n    \"release\": {\n      \"debug\": 1,\n      \"lto\": true\n    }\n  }\n}\n",
+  "stderr": ""
+ },
+ "toml on stdin to yaml": {
+  "status": 0,
+  "stdout": "default: []\njson:\n  - dep:serde_json\n",
+  "stderr": ""
+ },
+ "yaml to toml": {
+  "status": 0,
+  "stdout": "[server]\nport = 8080\nhosts = [\"a.example\"]\n\n[logging]\nlevel = \"info\"\n",
+  "stderr": ""
+ },
+ "toml edit in place": {
+  "status": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": "[package]\nname = \"ripgrep\"\nversion = \"15.2.0\"\nedition = \"2024\"\nauthors = [\"Andrew Gallant <jamslam@gmail.com>\"]\nlicense = \"Unlicense OR MIT\"\n\n[dependencies]\nanyhow = \"1.0.75\"\nbstr = \"1.7.0\"\nserde_json = { version = \"1.0.23\", optional = true }\n\n[features]\ndefault = []\njson = [\"dep:serde_json\"]\n\n[profile.release]\ndebug = 1\nlto = true\n",
+  "left": 0
+ },
+ "xml query": {
+  "status": 0,
+  "stdout": "spring-boot-starter-web\njunit-jupiter\n",
+  "stderr": ""
+ },
+ "xml to json": {
+  "status": 0,
+  "stdout": "{\n  \"+p_xml\": \"version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"\",\n  \"project\": {\n    \"+@xmlns\": \"http://maven.apache.org/POM/4.0.0\",\n    \"modelVersion\": \"4.0.0\",\n    \"groupId\": \"com.example\",\n    \"artifactId\": \"shop-api\",\n    \"version\": \"2.3.0\",\n    \"dependencies\": {\n      \"dependency\": [\n        {\n          \"groupId\": \"org.springframework.boot\",\n          \"artifactId\": \"spring-boot-starter-web\",\n          \"version\": \"3.5.6\"\n        },\n        {\n          \"+@scope\": \"test\",\n          \"groupId\": \"org.junit.jupiter\",\n          \"artifactId\": \"junit-jupiter\",\n          \"version\": \"5.13.4\"\n        }\n      ]\n    }\n  }\n}\n",
+  "stderr": ""
+ },
+ "yaml to xml": {
+  "status": 0,
+  "stdout": "<config>\n  <server>\n    <port>8080</port>\n    <hosts>a.example</hosts>\n  </server>\n  <logging>\n    <level>info</level>\n  </logging>\n</config>\n",
+  "stderr": ""
+ },
+ "xml edit in place": {
+  "status": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>com.example</groupId>\n  <artifactId>shop-api</artifactId>\n  <version>2.4.0</version><!-- runtime dependencies -->\n  <dependencies>\n    <dependency>\n      <groupId>org.springframework.boot</groupId>\n      <artifactId>spring-boot-starter-web</artifactId>\n      <version>3.5.6</version>\n    </dependency>\n    <dependency scope=\"test\">\n      <groupId>org.junit.jupiter</groupId>\n      <artifactId>junit-jupiter</artifactId>\n      <version>5.13.4</version>\n    </dependency>\n  </dependencies>\n</project>\n",
+  "left": 0
+ },
+ "eval-all merge": {
+  "status": 0,
+  "stdout": "server:\n  port: 8080\n  hosts: [b.example, c.example]\nlogging:\n  level: warn # quieter in prod\nreplicas: 3\n",
+  "stderr": ""
+ },
+ "ea file index": {
+  "status": 0,
+  "stdout": "prod.yaml: server,logging,replicas\n",
+  "stderr": ""
+ },
+ "ea collect documents": {
+  "status": 0,
+  "stdout": "- web-config/ConfigMap\n- web/Deployment\n- web/Service\n",
+  "stderr": ""
+ },
+ "env and strenv": {
+  "status": 0,
+  "stdout": "tag: 1.20\ntext: \"1.20\"\nhome: /srv/app\n",
+  "stderr": ""
+ },
+ "strenv in place": {
+  "status": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": "# web: the front end, three replicas behind a ClusterIP service.\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: web-config\n  namespace: shop\ndata:\n  LOG_LEVEL: info\n  FEATURE_FLAGS: \"checkout,search\"\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: shop\n  labels:\n    app: web\nspec:\n  replicas: 2 # bump for launch\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n        - name: web\n          image: ghcr.io/example/web:2.0.0\n          ports:\n            - containerPort: 8080\n          envFrom:\n            - configMapRef:\n                name: web-config\n          resources:\n            limits:\n              cpu: 500m\n              memory: 256Mi\n        - name: sidecar\n          image: ghcr.io/example/log-shipper:0.9.0\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\n  namespace: shop\nspec:\n  selector:\n    app: web\n  ports:\n    - port: 80\n      targetPort: 8080\n",
+  "left": 0
+ },
+ "envsubst": {
+  "status": 0,
+  "stdout": "image: ghcr.io/example/web:1.4.2\n",
+  "stderr": ""
+ },
+ "bad expression": {
+  "status": 1,
+  "stdout": "",
+  "stderr": "Error: bad expression, could not find matching `]`\n"
+ },
+ "bad expression in place": {
+  "status": 1,
+  "stdout": "",
+  "stderr": "Error: 1:9: lexer: invalid input text \"bad(\"\n",
+  "after": "# CI for the web app: lint and test on every push and pull request.\nname: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\npermissions:\n  contents: read\n\nenv:\n  NODE_OPTIONS: --max-old-space-size=4096 # the test suite is large\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4 # pinned by tag\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 20\n          cache: npm\n      - run: npm ci\n      - run: npm run lint\n\n  test:\n    needs: lint\n    runs-on: ${{ matrix.os }}\n    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, macos-latest]\n        node: [20, 22]\n    steps:\n      - name: Check out\n        uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - uses: actions/setup-node@v4\n        with:\n          node-version: ${{ matrix.node }}\n      - run: npm ci\n      - run: npm test -- --coverage\n        env:\n          CI: \"true\"\n",
+  "left": 1
+ },
+ "missing file": {
+  "status": 1,
+  "stdout": "",
+  "stderr": "Error: open missing.yaml: no such file or directory\n"
+ },
+ "bad yaml": {
+  "status": 1,
+  "stdout": "",
+  "stderr": "Error: bad file '-': go-yaml load error in parser (while parsing a flow sequence) at L1.C4-L2.C2: did not find expected ',' or ']'\n"
+ },
+ "exit status": {
+  "status": 1,
+  "stdout": "null\n",
+  "stderr": "Error: no matches found\n"
+ },
+ "large count": {
+  "status": 0,
+  "stdout": "12000\n",
+  "stderr": ""
+ },
+ "large select": {
+  "status": 0,
+  "stdout": "616\n",
+  "stderr": ""
+ },
+ "large to json": {
+  "status": 0,
+  "stdout": {
+   "sha256": "10fb22f60cb9e3aa3cf1048b002405acba756d396d375a76c004c6fcffb5d62e",
+   "bytes": 5918202
+  },
+  "stderr": ""
+ },
+ "large edit in place": {
+  "status": 0,
+  "stdout": {
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "bytes": 0
+  },
+  "stderr": "",
+  "after": {
+   "sha256": "df89d4bfcdd48d744639797341ddfc8b527cf235c3e486184e88945f27375abc",
+   "bytes": 4059150
+  },
+  "left": 0
+ }
+}

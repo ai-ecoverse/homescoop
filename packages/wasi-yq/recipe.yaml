@@ -1,0 +1,37 @@
+name: wasi-yq
+builder: host
+runner: pool
+reproducible: true
+# renovate: datasource=github-tags depName=mikefarah/yq extractVersion=^v(?<version>4\..*)$
+version: "4.54.1"
+npm: "@ai-ecoverse/wasi-yq"
+summary: "yq 4.54.1 for slicc WASI preview1 (command yq)"
+source:
+  url: "https://github.com/mikefarah/yq/archive/504fc38780cc46be8444ea1b72fb55919fc0bfb0.tar.gz"
+  sha256: "1490e343a67aea595fee4870167c0897178a0f9359f98a6f1b07a9fe803a4fc4"
+  commit: "504fc38780cc46be8444ea1b72fb55919fc0bfb0"
+  tree: "f0f36f9fc9efefd35e20e663848bcc29bb5f3f62"
+toolchain:
+  go: "1.27.3"
+  go_sha256_linux_x64: "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
+  go_sha256_macos_arm64: "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/mikefarah/yq
+  license: MIT
+  notes: |
+    yq v4.54.1 (tag v4.54.1, commit 504fc38, Go, MIT). build.sh fetches
+    the pinned source and Go 1.27.3, checks that the tag v<version> still
+    names the pinned commit (so a version-only bump fails closed), vendors
+    the modules (go.sum checked) and builds yq with GOOS=wasip1
+    GOARCH=wasm CGO_ENABLED=0 -trimpath -buildvcs=false -mod=vendor and
+    upstream's release ldflags (-s -w), so the build is reproducible. No
+    patches: every linked module builds for wasip1 as it is (go-isatty has
+    wasip1 code and reports no terminal, so output is never coloured
+    unless -C is given, as native yq into a pipe).
+    build.sh also builds the same tree natively and checks its output on
+    the cases of test/goldens.mjs against test/fixtures/expected.json,
+    which the cert compares the wasm's output with.

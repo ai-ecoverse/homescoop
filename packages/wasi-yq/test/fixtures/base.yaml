@@ -1,0 +1,5 @@
+server:
+  port: 8080
+  hosts: [a.example]
+logging:
+  level: info
