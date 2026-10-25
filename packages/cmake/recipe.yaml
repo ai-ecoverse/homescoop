@@ -12,7 +12,9 @@ inputs:
   - "packages/wasm-emscripten/patches/**"
 dependencies:
   build: []
-  host: []
+  host:
+    - "@ai-ecoverse/wasm-curl@8.22.0-10"
+    - "@ai-ecoverse/wasm-zlib@1.3.1-4"
   run: []
 about:
   homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/cmake
@@ -27,4 +29,7 @@ about:
     since slicc runs the binary as /usr/bin/cmake away from its share tree),
     host-emscripten-is-wasi.patch (CMakeDetermineSystem maps the Emscripten
     host to WASI). Linked against shims/slicc (spawn, select/poll, signals,
-    credentials). PRESTAGE is scripts/smoke-cmake.mjs (not --version).
+    credentials, sockets, WebCrypto entropy), and against wasm-curl's libcurl
+    with Mbed TLS and wasm-zlib instead of the bundled TLS-less cmcurl
+    (CMAKE_USE_SYSTEM_CURL, homescoop#1280). PRESTAGE is scripts/smoke-cmake.mjs
+    (not --version).

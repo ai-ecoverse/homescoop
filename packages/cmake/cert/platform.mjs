@@ -1,13 +1,3 @@
-// What a project sees, and what the package says about what it contains:
-// - homescoop#1278: in slicc the host is WASI (CMAKE_SYSTEM_NAME WASI, WASI=1,
-//   no UNIX), as in 4.4.3-9. slicc-kernel now answers uname with
-//   "Linux 6.0.0-slicc", which host-emscripten-is-wasi.patch now maps too.
-// - homescoop#1280: file(DOWNLOAD) over http works through the kernel's
-//   sockets (slicc_socket.c is linked), with EXPECTED_HASH. https is
-//   refused with curl's "Unsupported protocol": CMake's bundled curl has no
-//   TLS backend in this package (README).
-// - homescoop#1279, #844: THIRD-PARTY-NOTICES.md names the Emscripten runtime
-//   and every bundled library cmake.wasm links.
 export default async function platform(ctx) {
   const { assert } = ctx;
   await ctx.addUser({ name: 'builder' });
@@ -27,8 +17,6 @@ export default async function platform(ctx) {
     'file(DOWNLOAD http://cert.test/missing ${CMAKE_CURRENT_LIST_DIR}/m.txt STATUS m)',
     'list(GET m 0 mcode)',
     'message(STATUS "missing ${mcode}")',
-    'file(DOWNLOAD https://cert.test/f.txt ${CMAKE_CURRENT_LIST_DIR}/g.txt STATUS t)',
-    'message(STATUS "https ${t}")',
     '',
   ].join('\n'));
 
@@ -43,14 +31,16 @@ export default async function platform(ctx) {
   assert.match(dl.stdout, new RegExp(`-- http 0 ${hex}\\n`), `file(DOWNLOAD http://…) (homescoop#1280): ${dl.stdout}`);
   assert.equal(await ctx.read(`${cwd}/f.txt`), body);
   assert.match(dl.stdout, /-- missing 22\n/, `a 404 is curl's 22: ${dl.stdout}`);
-  assert.match(dl.stdout, /-- https 1;"Unsupported protocol"\n/, `https without a TLS backend: ${dl.stdout}`);
 
   const notices = await ctx.read('/node_modules/@ai-ecoverse/wasm-cmake/THIRD-PARTY-NOTICES.md');
   assert.ok(notices, 'THIRD-PARTY-NOTICES.md ships');
-  for (const name of ['Emscripten 6.0.9', 'cmcurl', 'cmlibuv', 'cmlibarchive', 'cmexpat', 'cmjsoncpp', 'cmzstd', 'cmbzip2', 'cmliblzma', 'cmnghttp2', 'cmlibrhash', 'cmzlib', 'cmllpkgc']) {
-    assert.match(notices, new RegExp(`^## ${name}`, 'm'), `THIRD-PARTY-NOTICES.md names ${name} (homescoop#1279, #844)`);
+  for (const name of ['Emscripten 6.0.9', 'cmlibuv', 'cmlibarchive', 'cmexpat', 'cmjsoncpp', 'cmzstd', 'cmbzip2', 'cmliblzma', 'cmlibrhash', 'cmllpkgc', 'curl / libcurl 8\\.22\\.0 \\(@ai-ecoverse/wasm-curl\\)', 'Mbed TLS 3\\.6\\.5', 'zlib 1\\.3\\.1 \\(@ai-ecoverse/wasm-zlib\\)']) {
+    assert.match(notices, new RegExp(`^## ${name}`, 'm'), `THIRD-PARTY-NOTICES.md names ${name} (homescoop#1279, #844, #1280)`);
+  }
+  for (const name of ['cmcurl', 'cmnghttp2', 'cmzlib']) {
+    assert.doesNotMatch(notices, new RegExp(`^## ${name}`, 'm'), `cmake.wasm links wasm-curl and wasm-zlib, not the bundled ${name} (homescoop#1280)`);
   }
   assert.match(notices, /^## homescoop: .*\bslicc shims\b.*Apache-2\.0/m, 'THIRD-PARTY-NOTICES.md has the slicc shims section (homescoop#1533)');
   assert.match(notices.slice(notices.search(/^## homescoop: .*slicc shims/m)), /Apache License\s+Version 2\.0/, 'the slicc shims section carries the Apache-2.0 text (homescoop#1533)');
-  console.log('platform: the host is WASI; file(DOWNLOAD) over http with the right bytes, a 404 is 22, https is "Unsupported protocol"; THIRD-PARTY-NOTICES.md names Emscripten, the 12 bundled libraries and the slicc shims (Apache-2.0)');
+  console.log('platform: the host is WASI; file(DOWNLOAD) over http with the right bytes, a 404 is 22; THIRD-PARTY-NOTICES.md names Emscripten, the 9 bundled libraries, wasm-curl\'s curl and Mbed TLS, wasm-zlib and the slicc shims (Apache-2.0), and no cmcurl, cmnghttp2 or cmzlib');
 }

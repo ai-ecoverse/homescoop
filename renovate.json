@@ -233,13 +233,6 @@
       "automerge": false
     },
     {
-      "description": "cmake: build.sh relinks a prebuilt slicc-emscripten cmake-wasm-build tree that CI does not have, so a Renovate bump can never go green (#30). Off until cmake is CI-buildable.",
-      "matchFileNames": [
-        "packages/cmake/recipe.yaml"
-      ],
-      "enabled": false
-    },
-    {
       "description": "py-* C++ side modules (numpy, pandas, scipy, matplotlib, contourpy, kiwisolver): upstream bumps need a wasix side-module rebuild on the current sysroot runtimes and move the whole numpy C-API stack together; they ride homescoop#211 (py-* C++ stack v2), not single-package Renovate PRs (#31, #32, #38). Re-pins onto a new wasix-python are packaging-only repacks.",
       "matchFileNames": [
         "packages/py-numpy/recipe.yaml",

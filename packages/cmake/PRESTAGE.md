@@ -1,6 +1,6 @@
 # cmake (emscripten ABI)
 
-Built in CI from the cmake 4.4.3 release tarball with emcmake from the patched emscripten 6.0.9 tree (homescoop#859 stage G), then linked against `shims/slicc`. It is not linked against wasix-libc.
+Built in CI from the cmake 4.4.3 release tarball with emcmake from the patched emscripten 6.0.9 tree (homescoop#859 stage G), then linked against `shims/slicc`, and against libcurl (Mbed TLS) from wasm-curl and zlib from wasm-zlib instead of CMake's bundled cmcurl and cmzlib (homescoop#1280). It is not linked against wasix-libc.
 
 ## PRESTAGE
 ```sh
