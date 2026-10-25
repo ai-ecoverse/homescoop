@@ -34,3 +34,7 @@ homescoop's CI now builds qpdf twice and compares the two packages. The build st
 ## 12.4.2-9: reproducible qpdf.wasm (homescoop#1354; 2026-10-23)
 
 qpdf now builds with the patched Emscripten 6.0.9 tree (`scripts/emscripten-tree.sh`, the toolchain cmake, wasm-binaryen and wasm-clang use) instead of emsdk 4.0.23. emsdk 4.0.23's LLVM nested one try/delegate pair in `qpdf.wasm` by heap address, so two builds of the same inputs could differ by 14 bytes. emsdk 6.0.9's LLVM has the fix (llvm-project fd76c9bdf103, in emsdk 6.0.2 and later), and every build now gives the same bytes. The tools behave as in 12.4.2-8: the same qpdf, the same zlib and libjpeg-turbo, the same slicc shims, and still Wasm exceptions in their legacy encoding. The Emscripten runtime in the glue is now 6.0.9, with the 4.0.23 build's `FS.lookupPath` symlink fix (wasm-emscripten's `0014-libfs-symloop.patch`) applied on top.
+
+## 12.4.2-10: licence notices (homescoop#1750; 2026-10-23)
+
+The package now ships qpdf's `NOTICE.md`, which 12.4.2-8 and 12.4.2-9 left out. It credits the SHA-2 code qpdf includes from sphlib 3.0 (Projet RNRT SAPHIR, MIT licence) and the public-domain Rijndael code. `THIRD-PARTY-NOTICES.md` now also carries the sphlib notice from `libqpdf/sha2.c` and the RSA Data Security MD5 notice from `libqpdf/MD5_native.cc`. The tools are unchanged.
