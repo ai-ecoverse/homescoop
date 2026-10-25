@@ -1,0 +1,30 @@
+diff --git a/vendor/github.com/muesli/termenv/termenv_wasip1.go b/vendor/github.com/muesli/termenv/termenv_wasip1.go
+--- /dev/null
++++ b/vendor/github.com/muesli/termenv/termenv_wasip1.go
+@@ -0,0 +1,26 @@
++//go:build wasip1
++
++package termenv
++
++import "io"
++
++func (o Output) ColorProfile() Profile {
++	if !o.isTTY() {
++		return Ascii
++	}
++	return ANSI256
++}
++
++func (o Output) foregroundColor() Color {
++	return ANSIColor(7)
++}
++
++func (o Output) backgroundColor() Color {
++	return ANSIColor(0)
++}
++
++func EnableVirtualTerminalProcessing(w io.Writer) (func() error, error) {
++	return func() error {
++		return nil
++	}, nil
++}
