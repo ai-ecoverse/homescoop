@@ -19,7 +19,7 @@
  gnupg_dirent_t gnupg_readdir (gnupg_dir_t gdir);
 --- a/common/sysutils.c
 +++ b/common/sysutils.c
-@@ -1324,6 +1324,374 @@
+@@ -1324,6 +1324,376 @@
  }
  
  
@@ -249,7 +249,7 @@
 +
 +static void
 +wasi_refuse_note (const char *path, const char *dir, int dok,
-+                  const struct stat *dst, const struct stat *lst)
++                  const struct stat *dst, const struct stat *lst, int loop)
 +{
 +  static char *last;
 +  char what[64], why[64];
@@ -258,7 +258,9 @@
 +    return;
 +  xfree (last);
 +  last = xtrystrdup (path);
-+  if (!lst)
++  if (!lst && loop)
++    strcpy (what, "it became a symbolic link while it was being opened");
++  else if (!lst)
 +    strcpy (what, "it changed while it was being opened");
 +  else if (S_ISLNK (lst->st_mode))
 +    strcpy (what, "it is a symbolic link");
@@ -320,7 +322,7 @@
 +    goto leave;
 +  if (!S_ISREG (lst.st_mode) || lst.st_nlink != 1)
 +    {
-+      wasi_refuse_note (path, dir, dok, &dst, &lst);
++      wasi_refuse_note (path, dir, dok, &dst, &lst, 0);
 +      errno = EPERM;
 +      goto leave;
 +    }
@@ -329,7 +331,7 @@
 +    {
 +      if (errno == ELOOP)
 +        {
-+          wasi_refuse_note (path, dir, dok, &dst, NULL);
++          wasi_refuse_note (path, dir, dok, &dst, NULL, 1);
 +          errno = EPERM;
 +        }
 +      goto leave;
@@ -339,7 +341,7 @@
 +    {
 +      close (fd);
 +      fd = -1;
-+      wasi_refuse_note (path, dir, dok, &dst, NULL);
++      wasi_refuse_note (path, dir, dok, &dst, NULL, 0);
 +      errno = EPERM;
 +    }
 + leave:

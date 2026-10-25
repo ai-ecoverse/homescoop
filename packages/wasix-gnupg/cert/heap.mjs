@@ -108,10 +108,11 @@ export default async function heap(ctx) {
   console.log(`heap: ${traps} wasm traps in ${2 * rounds} rounds`);
   assert.equal(traps, 0, 'no wasm trap (slicc-kernel#1172, homescoop#1879)');
   if (measure) return;
+  const want = initialMiB * 1024 + 64;
   for (const n of NAMES) {
     assert.ok(seen.sized[n] > 0, `sized: ${n}'s VmSize was read from /proc/<pid>/status`);
-    assert.equal(seen.sized[n], initialMiB * 1024, `sized: ${n}'s wasm memory stays at the ${initialMiB} MiB initial heap, so it never calls memory.grow (recipe.yaml wasm, wasix-sysroot -43's malloc uses the initial pages; homescoop#1879, #1287): VmSize peak ${seen.sized[n]} kB`);
+    assert.equal(seen.sized[n], want, `sized: ${n}'s wasm memory is the ${initialMiB} MiB initial heap plus the one 64 KiB page libgcrypt's 32 KiB secure-memory pool maps at startup, before any thread: malloc never calls memory.grow (recipe.yaml wasm, wasix-sysroot -43's malloc uses the initial pages; homescoop#1879, #1287): VmSize peak ${seen.sized[n]} kB`);
   }
-  assert.equal(seen.sized['gpg-agent-end'], initialMiB * 1024, `sized: gpg-agent's VmSize after ${rounds} rounds is the initial heap: ${seen.sized['gpg-agent-end']} kB`);
-  assert.ok(seen.burst['gpg-agent-end'] > initialMiB * 1024, `burst: gpg-agent grows past the initial heap (8 MiB of thread stack per connection), so the rounds ran on grown memory under the allocator refresh: ${seen.burst['gpg-agent-end']} kB`);
+  assert.equal(seen.sized['gpg-agent-end'], want, `sized: gpg-agent's VmSize after ${rounds} rounds is the initial heap and the secure-memory page: ${seen.sized['gpg-agent-end']} kB`);
+  assert.ok(seen.burst['gpg-agent-end'] > want, `burst: gpg-agent grows past the initial heap (8 MiB of thread stack per connection), so the rounds ran on grown memory under the allocator refresh: ${seen.burst['gpg-agent-end']} kB`);
 }

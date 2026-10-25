@@ -45,6 +45,6 @@ export default async function (ctx) {
   assert.equal(alive, false, `gpg-agent ${second} still alive after SIGINT`);
   const readme = await ok('for d in /node_modules /*/node_modules /*/*/node_modules /*/*/*/node_modules; do f=$d/@ai-ecoverse/wasix-gnupg/README.md; if [ -f $f ]; then cat $f; break; fi; done');
   const rec = /^- Built against wasix-sysroot 2025\.9\.30(-\d+)/m.exec(readme)?.[1];
-  assert.equal(rec && `wasix-sysroot ${rec}`, 'wasix-sysroot -34', `toolchain record in README.md: ${rec}`);
+  assert.equal(rec && `wasix-sysroot ${rec}`, 'wasix-sysroot -43', `toolchain record in README.md: ${rec}`);
   console.log(`agent-signals: pid ${first}, HUP reloads in place, TERM exits in ${secs}s, INT exits; wasix-sysroot ${rec}`);
 }
