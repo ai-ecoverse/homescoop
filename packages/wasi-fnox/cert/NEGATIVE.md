@@ -130,3 +130,13 @@ A const_list that is missing or broken fails the build instead. The 1.39.0 serie
 ## 1.40.0-1: a relative plain `file`
 
 `file = "conf/secrets.json"` (`format = "json"`) resolves against the config file's directory: `fnox get` prints the file's value from the project root and from `sub/dir`, with PWD set to each (0004's cwd). 1.39.0-6 fails both, because a `plain` provider with `file` doesn't parse.
+
+## 1.41.0-1: the series on v1.41.0 (2026-10-26)
+
+The published 1.40.0-1 against 1.41.0-1's checklist (slicc-kernel 1.134.3, users kernel default, `run.mjs --soft`): **FAIL, 17 of 149 assertions.** 1.41.0-1 passes all 149.
+- `fnox --version` prints 1.40.0.
+- **gopass:** a `fnox.toml` with a `gopass` provider doesn't parse (`unknown variant 'gopass'`). So `get` of a gopass secret doesn't fail with "provider type 'gopass' is not available in the WASI build of fnox", and `proxy run` with a gopass provider configured fails before it runs the child. 1.41.0-1's 0002 compiles the provider out and reads its `env_dependencies()` (`GNUPGHOME`, `GOPASS_HOMEDIR`, `GOPASS_CONFIG_NOWRAP`) from gopass.rs. None of the three is on `proxy run`'s fixed list (`AMBIENT_CREDENTIAL_ENV_VARS`), so unlike Azure's const_list row this one can show a leak: a 1.41.0-1 build whose gopass.rs `env_dependencies()` returns `&[]` fails the checklist at exactly these 3 assertions (`proxy run handed a configured gopass provider's GNUPGHOME to the child`, and the same for `GOPASS_HOMEDIR` and `GOPASS_CONFIG_NOWRAP`; 146 of 149 pass). A list the reader can't parse fails the build instead, as before.
+- **Templates:** `fnox get STAGE` (`default = "{{ fnox.profile }}"`) prints `{{ fnox.profile }}`, with and without `-P staging`, instead of `default` and `staging`. A `{% raw %}` block isn't unwrapped. `default = "{{ nope }}"` prints itself and exits 0 instead of failing with "default of secret 'BAD'". A plain provider with `file = "conf/{{ fnox.profile }}.json"` fails with `failed to read '/home/v141/conf/{{ fnox.profile }}.json'`. `fnox -P staging exec -- printenv STAGE TPLTOKEN` doesn't print `staging` and `token-for-staging`.
+- **exec and an unused `env = false` secret:** `fnox exec --if-missing error -- printenv LVL`, in a project that also has `UNUSED = { provider = "k8s", value = "app-secret", env = false }`, fails with `Error resolving secret 'UNUSED': ... provider type 'kubernetes' is not available`. 1.40.0's exec resolves every secret in the profile; 1.41.0's resolves only the ones it injects and what they depend on (upstream #984). `UNUSED` stays out of the command's environment on both.
+
+`test/sealed.mjs` passes on 1.41.0-1 (slicc-kernel 1.83.0, macOS arm64).

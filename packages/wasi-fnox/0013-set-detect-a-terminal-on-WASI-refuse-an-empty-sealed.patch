@@ -12,7 +12,7 @@ value on stdin (for example from /dev/null) is now refused before any
 `seal`, with a hint to pipe the value or use the vault dialog.
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index ef24cc37..413a4831 100644
+index 272a19bd..fa02409c 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
 @@ -20,6 +20,17 @@ fn resolve_remote_key_name<'a>(
@@ -33,7 +33,7 @@ index ef24cc37..413a4831 100644
  /// Return whether a loaded secret came from the table this command will update.
  fn secret_belongs_to_target(
      secret: &config::SecretConfig,
-@@ -138,7 +149,7 @@ impl SetCommand {
+@@ -174,7 +185,7 @@ impl SetCommand {
          } else if let Some(ref v) = self.value {
              // Value provided as argument
              Some(v.clone())
@@ -42,7 +42,7 @@ index ef24cc37..413a4831 100644
              // Read from stdin if piped
              tracing::debug!("Reading secret value from stdin");
              let mut buffer = String::new();
-@@ -209,6 +220,11 @@ impl SetCommand {
+@@ -245,6 +256,11 @@ impl SetCommand {
                  "not available in seven: a value on the command line is visible to other processes; pipe it on stdin".to_string(),
              ));
          }

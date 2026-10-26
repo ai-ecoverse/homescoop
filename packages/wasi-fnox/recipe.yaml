@@ -1,5 +1,5 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.40.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.41.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
 # (/dev/sealed and exec tickets).
@@ -12,7 +12,7 @@ summary: "fnox 1.41 for slicc WASI preview1 (command fnox; seven's sealed store)
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "31802536f03c67e699ad48504c76e0b3c9bfa576753db254271e96b354b0639c"
-  epoch: "1792160117"
+  epoch: "1792404064"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.40.0; the patches live here, are not
+    Upstream is jdx/fnox v1.41.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -43,7 +43,10 @@ about:
            from 1.40.0 also the kubernetes and lua providers, a module
            directory (lua/mod.rs), and a list named by a constant (the
            Azure providers' SERVICE_PRINCIPAL_ENV_VARS; azure_shared stays
-           built without its Azure SDK credential code)
+           built without its Azure SDK credential code); from 1.41.0
+           also the gopass provider (the gopass CLI through
+           tokio::process), whose GNUPGHOME, GOPASS_HOMEDIR and
+           GOPASS_CONFIG_NOWRAP proxy run scrubs the same way
       0003 compile out mcp, proxy, tui, daemon, leases, prompts on WASI,
            and from 1.40.0 the plugin command and fnox-core's plugins
       0004 cwd from PWD, HOME from the environment, current_thread; the
@@ -80,7 +83,7 @@ about:
            on PATH the kernel won't execute (homescoop#1129)
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.40.0 commit time (source.epoch, 2026-10-16T14:15:17Z), so the
+    v1.41.0 commit time (source.epoch, 2026-10-19T10:01:04Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -93,4 +96,9 @@ about:
     onto v1.40.0: 0001-0004, 0006, 0007, 0009 and 0013 are refreshed
     (contexts, the new kubernetes and lua providers, plugins,
     azure_shared, set's --from-file order); no patch is dropped, since
-    upstream does none of them itself; 0017 is new.
+    upstream does none of them itself; 0017 is new. 1.41.0-1 rebases
+    the series onto v1.41.0: 0002 also compiles out the new gopass
+    provider; 0006 (the provider list, which gains gopass), 0009 (proxy
+    rules' help text, now on ProxyRulesCommand) and 0016 (exec's plan
+    call, now Roots::Scope) are refreshed; the others need new contexts
+    only; no patch is dropped, since upstream does none of them itself.

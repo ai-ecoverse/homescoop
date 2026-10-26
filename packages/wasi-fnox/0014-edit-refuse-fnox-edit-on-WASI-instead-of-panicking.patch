@@ -11,10 +11,10 @@ with "fnox edit is not available in seven: use fnox set" before any
 configuration is loaded or file written.
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 21692c5..4b12268 100644
+index b8b28c77..2d16a927 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -325,6 +325,11 @@ impl Commands {
+@@ -347,6 +347,11 @@ impl Commands {
              Commands::Check(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::CiRedact(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Doctor(cmd) => cmd.run(cli, self.load_config(cli)?).await,

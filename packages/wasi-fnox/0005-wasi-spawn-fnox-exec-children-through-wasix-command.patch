@@ -11,10 +11,10 @@ homescoop's packages/wasi-fnox/apply.sh copies ai-ecoverse/homescoop
 crates/wasix-command (MIT OR Apache-2.0) into the source tree.
 
 diff --git a/Cargo.lock b/Cargo.lock
-index 6b9c26e..410ac62 100644
+index 5417c1ce..2946d05f 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -2377,6 +2377,7 @@ dependencies = [
+@@ -2485,6 +2485,7 @@ dependencies = [
   "tracing",
   "tracing-subscriber",
   "usage-rs",
@@ -22,7 +22,7 @@ index 6b9c26e..410ac62 100644
   "which",
  ]
  
-@@ -7830,6 +7831,14 @@ dependencies = [
+@@ -8178,6 +8179,14 @@ dependencies = [
   "wit-bindgen",
  ]
  
@@ -38,10 +38,10 @@ index 6b9c26e..410ac62 100644
  name = "wasm-bindgen"
  version = "0.2.129"
 diff --git a/Cargo.toml b/Cargo.toml
-index 26f6f28..8372206 100644
+index 20065dd4..d64dade4 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -178,6 +178,7 @@ which = { workspace = true }
+@@ -183,6 +183,7 @@ which = { workspace = true }
  tokio = { workspace = true, features = ["full"] }
  
  [target.'cfg(target_os = "wasi")'.dependencies]
@@ -50,7 +50,7 @@ index 26f6f28..8372206 100644
  
  [dev-dependencies]
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
-index 7ed42a3..0d965b1 100644
+index 8be180e7..3622a9ad 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
 @@ -2,8 +2,11 @@ use crate::child_env::{self, EnvScope, Roots};
@@ -63,5 +63,5 @@ index 7ed42a3..0d965b1 100644
 +#[cfg(target_os = "wasi")]
 +use wasix_command::Command;
  
- #[derive(Debug, usage_rs::Args)]
- #[usage(alias = "x", alias_hidden = "run")]
+ /// Run a command with secrets in its environment
+ ///

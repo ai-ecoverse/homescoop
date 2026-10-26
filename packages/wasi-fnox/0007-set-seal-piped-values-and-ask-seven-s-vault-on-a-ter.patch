@@ -14,10 +14,10 @@ value given as an argument, which other processes can read from
 /proc, and --key-name are refused for sealed secrets.
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 5dd04d8f..ef24cc37 100644
+index 3224e6d3..272a19bd 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -125,6 +125,8 @@ impl SetCommand {
+@@ -161,6 +161,8 @@ impl SetCommand {
          let has_metadata =
              self.description.is_some() || self.if_missing.is_some() || self.default.is_some();
  
@@ -26,7 +26,7 @@ index 5dd04d8f..ef24cc37 100644
          // Get the secret value if provided
          let secret_value = if let Some(ref path) = self.from_file {
              Some(std::fs::read_to_string(path).map_err(|source| {
-@@ -155,9 +157,10 @@ impl SetCommand {
+@@ -191,9 +193,10 @@ impl SetCommand {
              None
          } else {
              #[cfg(target_os = "wasi")]
@@ -40,7 +40,7 @@ index 5dd04d8f..ef24cc37 100644
              // Interactive terminal - prompt for value
              #[cfg(not(target_os = "wasi"))]
              let value = demand::Input::new("Enter secret value")
-@@ -189,6 +192,35 @@ impl SetCommand {
+@@ -225,6 +228,35 @@ impl SetCommand {
              config.get_default_provider(&write_profile_stack)?
          };
  
@@ -76,7 +76,7 @@ index 5dd04d8f..ef24cc37 100644
          // Check if secret should be base64 encoded
          let secret_value = if self.base64_encode {
              secret_value
-@@ -249,12 +281,16 @@ impl SetCommand {
+@@ -285,12 +317,16 @@ impl SetCommand {
                              provider_name
                          );
  
@@ -99,7 +99,7 @@ index 5dd04d8f..ef24cc37 100644
  
                          if self.dry_run {
                              // In dry-run mode, skip actual remote storage
-@@ -321,6 +357,11 @@ impl SetCommand {
+@@ -357,6 +393,11 @@ impl SetCommand {
              secret_config.set_provider(provider_name_to_use.clone());
          }
  

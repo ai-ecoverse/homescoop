@@ -27,7 +27,7 @@ export falls back to printing the value, as upstream does when the
 file can't be written.
 
 diff --git a/crates/fnox-core/src/temp_file_secrets.rs b/crates/fnox-core/src/temp_file_secrets.rs
-index 75fd08e..dd5501f 100644
+index 75fd08e6..dd5501f6 100644
 --- a/crates/fnox-core/src/temp_file_secrets.rs
 +++ b/crates/fnox-core/src/temp_file_secrets.rs
 @@ -62,6 +62,11 @@ pub fn create_ephemeral_secret_file(key: &str, value: &str) -> Result<NamedTempF
@@ -43,10 +43,10 @@ index 75fd08e..dd5501f 100644
      let temp_dir = env::temp_dir();
      let timestamp = SystemTime::now()
 diff --git a/src/commands/activate.rs b/src/commands/activate.rs
-index c94ce9a..6c4b341 100644
+index 153eaa23..fb5cc434 100644
 --- a/src/commands/activate.rs
 +++ b/src/commands/activate.rs
-@@ -31,8 +31,19 @@ impl ActivateCommand {
+@@ -48,8 +48,19 @@ impl ActivateCommand {
          let exe = std::env::current_exe()
              .or_else(|_| which::which("fnox"))
              .unwrap_or_else(|_| std::path::PathBuf::from("fnox"));
@@ -68,7 +68,7 @@ index c94ce9a..6c4b341 100644
          let opts = ActivateOptions {
              exe,
 diff --git a/src/hook_env.rs b/src/hook_env.rs
-index bc56d41..4a20540 100644
+index bc56d410..4a205404 100644
 --- a/src/hook_env.rs
 +++ b/src/hook_env.rs
 @@ -85,6 +85,12 @@ impl HookEnvSession {
