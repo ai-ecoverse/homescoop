@@ -3,7 +3,7 @@ name: pkgconf
 builder: host
 reproducible: true
 # renovate: datasource=github-tags depName=pkgconf/pkgconf extractVersion=^pkgconf-(?<version>.*)$
-version: "3.0.9"
+version: "3.0.10"
 npm: "@ai-ecoverse/wasm-pkgconf"
 summary: "pkgconf / pkg-config for wasm"
 source:
