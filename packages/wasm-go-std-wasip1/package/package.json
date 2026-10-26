@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-go-std-wasip1",
-  "version": "1.27.2-2",
+  "version": "1.27.3-1",
   "description": "The Go 1.27 standard library, prebuilt for building Go programs in slicc.",
   "license": "BSD-3-Clause",
   "repository": {
@@ -30,12 +30,12 @@
   },
   "homescoop": {
     "recipe": "wasm-go-std-wasip1",
-    "upstream": "1.27.2"
+    "upstream": "1.27.3"
   },
   "slicc": {
     "abi": "wasi",
     "go": {
-      "version": "go1.27.2",
+      "version": "go1.27.3",
       "std": [
         {
           "target": "wasip1/wasm",
