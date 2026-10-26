@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-pkgconf`
 
-[pkgconf](https://github.com/pkgconf/pkgconf) 3.0.9 for slicc's wasm realm,
+[pkgconf](https://github.com/pkgconf/pkgconf) 3.0.10 for slicc's wasm realm,
 as `pkgconf` and `pkg-config`.
 
 ```bash
