@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-impeccable",
-  "version": "0.1.15-6",
+  "version": "0.1.16-1",
   "description": "The Impeccable design engine for SLICC, to check web pages for design problems and run Impeccable's skill commands.",
   "license": "Apache-2.0",
   "repository": {
@@ -28,7 +28,7 @@
   },
   "homescoop": {
     "recipe": "wasi-impeccable",
-    "upstream": "0.1.15"
+    "upstream": "0.1.16"
   },
   "slicc": {
     "abi": "wasi",

@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasi-impeccable`
 
-[Impeccable](https://impeccable.style) engine **0.1.15** for
+[Impeccable](https://impeccable.style) engine **0.1.16** for
 [slicc](https://github.com/ai-ecoverse/slicc)'s WASI preview1 realm
 (`abi: "wasi"`: a module only, no Emscripten glue).
 
@@ -12,7 +12,7 @@ impeccable install --providers=claude -y   # downloads and verifies the signed s
 impeccable check
 impeccable generate-image --prompt "…" --out comps/hero.png   # needs OPENAI_API_KEY
 impeccable concept-seed --scope surface
-impeccable --version   # prints the engine version (e.g. 0.1.15)
+impeccable --version   # prints the engine version (e.g. 0.1.16)
 ```
 
 **Also wired:** `palette`, `doctor`, `ignores`, `pin`, `detect-csp`,
