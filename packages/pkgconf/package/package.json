@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-pkgconf",
-  "version": "3.0.9-5",
+  "version": "3.0.10-1",
   "description": "pkgconf and pkg-config, which give the compiler and linker flags of installed libraries.",
   "license": "ISC",
   "repository": {
@@ -27,7 +27,7 @@
   },
   "homescoop": {
     "recipe": "pkgconf",
-    "upstream": "3.0.9"
+    "upstream": "3.0.10"
   },
   "slicc": {
     "abi": "emscripten",

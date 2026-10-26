@@ -8,7 +8,7 @@ npm: "@ai-ecoverse/wasm-pkgconf"
 summary: "pkgconf / pkg-config for wasm"
 source:
   url: "https://distfiles.ariadne.space/pkgconf/pkgconf-{{version}}.tar.gz"
-  sha256: "642700ab125e6dcb3ceb822469420b0132c26f5585dec88cbe6057134525e57d"
+  sha256: "d01a1b82f0884112d08c6dfad46f43f415d070a6a5a6aaa77ebf2674e973a9b5"
 # 3.0.9-3 is a real build again (THIRD-PARTY-NOTICES.md, homescoop#684);
 # 3.0.9-2 was a packaging-only repack of 3.0.9-1 (README, homescoop#532).
 dependencies:
