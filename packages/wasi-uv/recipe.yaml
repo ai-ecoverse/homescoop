@@ -4,7 +4,7 @@
 name: wasi-uv
 builder: host
 # renovate: datasource=github-releases depName=astral-sh/uv
-version: "0.13.1"
+version: "0.13.2"
 npm: "@ai-ecoverse/wasi-uv"
 summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run against wasix-python)"
 source:
