@@ -16,7 +16,7 @@ feature unification.
 Native targets keep the same dependency set and features.
 
 diff --git a/Cargo.toml b/Cargo.toml
-index 8976d8a6..a6003039 100644
+index 6317f42b..20065dd4 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -16,7 +16,7 @@ rust-version = "1.91.1"

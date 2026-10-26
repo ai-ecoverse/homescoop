@@ -43,7 +43,7 @@ export default async function (ctx) {
 
   const ver = await fnox(['--version']);
   assert.equal(ver.status, 0, `--version: ${ver.stderr}`);
-  assert.match(ver.stdout, /^fnox 1\.40\.0/);
+  assert.match(ver.stdout, /^fnox 1\.41\.0/);
   const help = await fnox(['--help']);
   assert.equal(help.status, 0);
   for (const cmd of ['exec', 'get', 'set', 'proxy']) assert.match(help.stdout, new RegExp(`\\n  ${cmd} `));
@@ -202,6 +202,96 @@ export default async function (ctx) {
   assert.match(scrub140.stdout, /^GITHUB_TOKEN=seven_ph_gh_0001$/m);
   for (const name of Object.keys(k8sCreds)) {
     assert.doesNotMatch(scrub140.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed a configured provider's ${name} to the child (homescoop#401)`);
+  }
+
+  await write('home/v141gp/fnox.toml', '[providers.gp]\ntype = "gopass"\nmount = "company"\n\n[secrets]\nGP = { provider = "gp", value = "apps/db" }\n');
+  const gp = await run(['fnox', 'get', 'GP'], { cwd: '/home/v141gp', env });
+  assert.notEqual(gp.status, 0, '1.41.0 gopass provider must fail in the WASI build');
+  assert.notEqual(gp.status, 134, `1.41.0 gopass provider trapped: ${gp.stderr}`);
+  assert.ok(flat(gp.stderr).includes("provider type 'gopass' is not available in the WASI build of fnox"), `1.41.0 gopass provider: ${gp.stderr}`);
+  assert.doesNotMatch(gp.stderr, /panicked|wasm trap/);
+  await write('home/v141/conf/default.json', '{"TOKEN": "token-for-default"}\n');
+  await write('home/v141/conf/staging.json', '{"TOKEN": "token-for-staging"}\n');
+  await write(
+    'home/v141/fnox.toml',
+    [
+      '[providers.tplfile]', 'type = "plain"', 'file = "conf/{{ fnox.profile }}.json"', 'format = "json"', '',
+      '[secrets]',
+      'STAGE = { default = "{{ fnox.profile }}" }',
+      'RAW = { default = "{% raw %}{{ literal }}{% endraw %}" }',
+      'BAD = { default = "{{ nope }}" }',
+      'TPLTOKEN = { provider = "tplfile", value = "TOKEN" }', '',
+      '[profiles.staging]', '',
+    ].join('\n'),
+  );
+  const v141 = (args) => run(['fnox', ...args], { cwd: '/home/v141', env: { ...env, PWD: '/home/v141' } });
+  for (const [args, want] of [
+    [['get', 'STAGE'], 'default'],
+    [['-P', 'staging', 'get', 'STAGE'], 'staging'],
+    [['get', 'RAW'], '{{ literal }}'],
+    [['get', 'TPLTOKEN'], 'token-for-default'],
+    [['-P', 'staging', 'get', 'TPLTOKEN'], 'token-for-staging'],
+  ]) {
+    const r = await v141(args);
+    assert.equal(r.status, 0, `1.41.0 template, fnox ${args.join(' ')}: ${r.stderr}`);
+    assert.equal(r.stdout.trim(), want, `1.41.0 template, fnox ${args.join(' ')}: ${r.stdout}`);
+  }
+  const bad = await v141(['get', 'BAD']);
+  assert.notEqual(bad.status, 0, '1.41.0 a default with an undefined template variable must fail');
+  assert.notEqual(bad.status, 134, `1.41.0 a bad template trapped: ${bad.stderr}`);
+  assert.ok(flat(bad.stderr).includes("default of secret 'BAD'"), `1.41.0 a bad template names the field: ${bad.stderr}`);
+  assert.doesNotMatch(bad.stderr, /panicked|wasm trap/);
+  await write('home/v141exec/conf/staging.json', '{"TOKEN": "token-for-staging"}\n');
+  await write(
+    'home/v141exec/fnox.toml',
+    [
+      '[providers.tplfile]', 'type = "plain"', 'file = "conf/{{ fnox.profile }}.json"', 'format = "json"', '',
+      '[secrets]',
+      'STAGE = { default = "{{ fnox.profile }}" }',
+      'TPLTOKEN = { provider = "tplfile", value = "TOKEN" }', '',
+      '[profiles.staging]', '',
+    ].join('\n'),
+  );
+  const execTpl = await run(['fnox', '-P', 'staging', 'exec', '--', 'printenv', 'STAGE', 'TPLTOKEN'], { cwd: '/home/v141exec', env: { ...env, PWD: '/home/v141exec' } });
+  assert.equal(execTpl.status, 0, `1.41.0 exec with templated secrets: ${execTpl.stderr}`);
+  assert.equal(execTpl.stdout, 'staging\ntoken-for-staging\n', `1.41.0 exec hands the rendered templates to the command: ${execTpl.stdout}`);
+  assert.doesNotMatch(execTpl.stderr, /panicked|wasm trap/);
+  await write(
+    'home/v141unused/fnox.toml',
+    [
+      '[providers.k8s]', 'type = "kubernetes"', '',
+      '[secrets]',
+      'LVL = { default = "debug" }',
+      'UNUSED = { provider = "k8s", value = "app-secret", env = false }', '',
+    ].join('\n'),
+  );
+  const unusedEnv = { ...env, PWD: '/home/v141unused', UNUSED: 'unused_ambient' };
+  const execUsed = await run(['fnox', 'exec', '--if-missing', 'error', '--', 'printenv', 'LVL'], { cwd: '/home/v141unused', env: unusedEnv });
+  assert.equal(execUsed.status, 0, `1.41.0 exec resolves only what it injects, not an unused env = false secret: ${execUsed.stderr}`);
+  assert.equal(execUsed.stdout, 'debug\n', `1.41.0 exec with an unused env = false secret: ${execUsed.stdout}`);
+  assert.doesNotMatch(execUsed.stderr, /panicked|wasm trap/);
+  const execUnused = await run(['fnox', 'exec', '--', 'printenv', 'UNUSED'], { cwd: '/home/v141unused', env: unusedEnv });
+  assert.notEqual(execUnused.status, 0, `1.41.0 exec still removes an env = false secret's name from the command's environment: ${execUnused.stdout}`);
+  assert.doesNotMatch(execUnused.stdout, /unused_ambient/);
+  await write(
+    'home/v141scrub/fnox.toml',
+    [
+      '[providers.seven]', 'type = "sealed"', '',
+      '[providers.gp]', 'type = "gopass"', '',
+      '[secrets]', 'GH = { provider = "seven", value = "seven_ph_gh_0001" }', '',
+      '[[proxy.rules]]', 'secret = "GH"', 'domain = "api.github.com"', 'header = "authorization"', 'env = "GITHUB_TOKEN"', '',
+    ].join('\n'),
+  );
+  const gopassCreds = {
+    GNUPGHOME: '/home/v141scrub/gnupg',
+    GOPASS_HOMEDIR: '/home/v141scrub/gopass',
+    GOPASS_CONFIG_NOWRAP: 'gopass_nowrap_ambient',
+  };
+  const scrub141 = await run(['fnox', 'proxy', 'run', '--', 'printenv'], { cwd: '/home/v141scrub', env: { ...env, ...gopassCreds } });
+  assert.equal(scrub141.status, 0, `1.41.0 proxy run with a gopass provider: ${scrub141.stderr}`);
+  assert.match(scrub141.stdout, /^GITHUB_TOKEN=seven_ph_gh_0001$/m);
+  for (const name of Object.keys(gopassCreds)) {
+    assert.doesNotMatch(scrub141.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed a configured gopass provider's ${name} to the child (homescoop#401)`);
   }
 
   await write('home/plain/fnox.toml', '[providers.plain]\ntype = "plain"\n\n[secrets]\nLOG_LEVEL = { provider = "plain", value = "debug" }\n');

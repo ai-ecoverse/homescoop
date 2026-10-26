@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # apply.sh <fnox-src-dir> <homescoop-root>
 #
-# Turns an unpacked jdx/fnox v1.40.0 source tree into slicc's fnox: applies
+# Turns an unpacked jdx/fnox v1.41.0 source tree into slicc's fnox: applies
 # packages/wasi-fnox/NNNN-*.patch in filename order (each checked with
 # `git apply --check` first) and copies homescoop's crates/wasix-command
 # into <fnox-src-dir>/crates/wasix-command, the path dependency the patches
@@ -29,7 +29,7 @@ export GIT_CEILING_DIRECTORIES="$(dirname "$SRC")"
 for p in "${series[@]}"; do
   name="$(basename "$p")"
   if ! (cd "$SRC" && git apply --check "$p"); then
-    die "$name does not apply to $SRC (is it jdx/fnox v1.40.0, unpatched?)"
+    die "$name does not apply to $SRC (is it jdx/fnox v1.41.0, unpatched?)"
   fi
   (cd "$SRC" && git apply "$p") || die "$name failed to apply after a clean --check"
   echo "== wasi-fnox: applied $name"

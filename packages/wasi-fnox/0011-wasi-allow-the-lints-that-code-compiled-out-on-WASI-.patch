@@ -7,7 +7,7 @@ Subject: [PATCH 11/13] wasi: allow the lints that code compiled out on WASI
 Gating providers, leases and the local proxy on WASI leaves imports, helpers and early returns that only the native build uses. Both crates allow dead_code, unused_imports, unused_variables, unused_mut and unreachable_code on WASI only, so the WASI build is warning-free and native lints are unchanged.
 
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
-index bd35d8b..2fcb5a3 100644
+index d3803a2c..f39210ed 100644
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
 @@ -8,6 +8,17 @@
@@ -29,7 +29,7 @@ index bd35d8b..2fcb5a3 100644
  pub mod config;
  pub mod config_path;
 diff --git a/src/lib.rs b/src/lib.rs
-index afa9815..f683522 100644
+index d0677de4..2a9e1569 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
 @@ -1,3 +1,14 @@

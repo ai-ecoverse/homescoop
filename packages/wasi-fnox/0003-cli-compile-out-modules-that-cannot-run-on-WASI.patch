@@ -13,7 +13,7 @@ asks for an argument or stdin, `fnox init` writes a minimal
 configuration, and the daemon is never started in the background.
 
 diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_prompt.rs
-index afc0f153..5d82beb3 100644
+index 02115842..6badfbd2 100644
 --- a/crates/fnox-core/src/auth_prompt.rs
 +++ b/crates/fnox-core/src/auth_prompt.rs
 @@ -6,6 +6,7 @@
@@ -22,9 +22,9 @@ index afc0f153..5d82beb3 100644
  use crate::providers::ProviderConfig;
 +#[cfg(not(target_os = "wasi"))]
  use demand::Confirm;
+ use std::borrow::Cow;
  use std::process::Command;
- 
-@@ -38,12 +39,19 @@ pub fn prompt_and_run_auth(
+@@ -40,12 +41,19 @@ pub fn prompt_and_run_auth(
          provider_name, error
      );
  
@@ -94,7 +94,7 @@ index 829fc9ad..06c83806 100644
  
      /// Load the lease ledger from disk, creating an empty one if it doesn't exist.
 diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/src/lease_backends/aws_sts.rs
-index 58585fa6..7742d795 100644
+index 786e820d..9f0eebda 100644
 --- a/crates/fnox-core/src/lease_backends/aws_sts.rs
 +++ b/crates/fnox-core/src/lease_backends/aws_sts.rs
 @@ -1,7 +1,9 @@
@@ -107,7 +107,7 @@ index 58585fa6..7742d795 100644
  use aws_sdk_sts::Client;
  use indexmap::IndexMap;
  use std::time::Duration;
-@@ -54,6 +56,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+@@ -64,6 +66,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      ]
  }
  
@@ -115,7 +115,7 @@ index 58585fa6..7742d795 100644
  pub struct AwsStsBackend {
      region: String,
      profile: Option<String>,
-@@ -61,6 +64,7 @@ pub struct AwsStsBackend {
+@@ -71,6 +74,7 @@ pub struct AwsStsBackend {
      endpoint: Option<String>,
  }
  
@@ -123,7 +123,7 @@ index 58585fa6..7742d795 100644
  impl AwsStsBackend {
      pub fn new(
          region: String,
-@@ -95,6 +99,7 @@ impl AwsStsBackend {
+@@ -105,6 +109,7 @@ impl AwsStsBackend {
      }
  }
  
@@ -131,7 +131,7 @@ index 58585fa6..7742d795 100644
  #[async_trait]
  impl LeaseBackend for AwsStsBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
-@@ -190,6 +195,7 @@ impl LeaseBackend for AwsStsBackend {
+@@ -200,6 +205,7 @@ impl LeaseBackend for AwsStsBackend {
  
  /// Sanitize a string for use as an AWS STS role session name.
  /// Session names must be 2-64 chars, matching [\w+=,.@-]+
@@ -465,7 +465,7 @@ index 7bcf1009..88f642d4 100644
  impl LeaseBackend for VaultBackend {
      async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
-index 49823237..9ec8c1ff 100644
+index e2ad2684..992f8077 100644
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
 @@ -11,14 +11,17 @@
@@ -487,10 +487,10 @@ index 49823237..9ec8c1ff 100644
  pub mod providers;
  pub mod secret_file;
 diff --git a/src/commands/activate.rs b/src/commands/activate.rs
-index 10d70274..c94ce9a2 100644
+index 68212d8f..153eaa23 100644
 --- a/src/commands/activate.rs
 +++ b/src/commands/activate.rs
-@@ -27,9 +27,12 @@ impl ActivateCommand {
+@@ -44,9 +44,12 @@ impl ActivateCommand {
          let shell = shell::get_shell(Some(&shell_name))?;
  
          // Get the current executable path
@@ -504,7 +504,7 @@ index 10d70274..c94ce9a2 100644
          let opts = ActivateOptions {
              exe,
 diff --git a/src/commands/init.rs b/src/commands/init.rs
-index 3983cf47..4b5464df 100644
+index dfa88fac..f8048197 100644
 --- a/src/commands/init.rs
 +++ b/src/commands/init.rs
 @@ -1,8 +1,11 @@
@@ -518,8 +518,8 @@ index 3983cf47..4b5464df 100644
 +#[cfg(not(target_os = "wasi"))]
  use std::collections::HashMap;
  
- #[derive(Debug, usage_rs::Args)]
-@@ -56,6 +59,9 @@ impl InitCommand {
+ /// Create a fnox.toml config file
+@@ -71,6 +74,9 @@ impl InitCommand {
              })?;
          }
  
@@ -529,7 +529,7 @@ index 3983cf47..4b5464df 100644
          let config = if self.skip_wizard || !atty::is(atty::Stream::Stdin) {
              // Non-interactive mode
              Config::new()
-@@ -84,6 +90,7 @@ impl InitCommand {
+@@ -99,6 +105,7 @@ impl InitCommand {
          Ok(())
      }
  
@@ -537,7 +537,7 @@ index 3983cf47..4b5464df 100644
      async fn run_wizard(&self) -> Result<Config> {
          println!("\n🔐 Welcome to fnox setup wizard!\n");
          println!("This will help you configure your first secret provider.\n");
-@@ -163,6 +170,7 @@ impl InitCommand {
+@@ -178,6 +185,7 @@ impl InitCommand {
      }
  
      /// Select a provider category
@@ -545,7 +545,7 @@ index 3983cf47..4b5464df 100644
      fn select_category(&self) -> Result<WizardCategory> {
          let mut select = Select::new("What type of provider do you want to use?")
              .description("Choose a category based on your security and convenience needs")
-@@ -191,6 +199,7 @@ impl InitCommand {
+@@ -206,6 +214,7 @@ impl InitCommand {
      }
  
      /// Select a specific provider from the given list
@@ -553,7 +553,7 @@ index 3983cf47..4b5464df 100644
      fn select_provider(&self, providers: &[&'static WizardInfo]) -> Result<&'static WizardInfo> {
          let mut select = Select::new("Select provider:").filterable(false);
  
-@@ -217,6 +226,7 @@ impl InitCommand {
+@@ -232,6 +241,7 @@ impl InitCommand {
      }
  
      /// Collect field values from the user
@@ -561,7 +561,7 @@ index 3983cf47..4b5464df 100644
      fn collect_fields(&self, info: &WizardInfo) -> Result<HashMap<String, String>> {
          let mut fields = HashMap::new();
  
-@@ -240,6 +250,7 @@ impl InitCommand {
+@@ -255,6 +265,7 @@ impl InitCommand {
      }
  
      /// Get the provider name from the user
@@ -569,7 +569,7 @@ index 3983cf47..4b5464df 100644
      fn get_provider_name(&self, default: &str) -> Result<String> {
          Input::new("Provider name:")
              .placeholder(default)
-@@ -255,6 +266,7 @@ impl InitCommand {
+@@ -270,6 +281,7 @@ impl InitCommand {
      }
  
      /// Test the provider connection and print the result
@@ -578,10 +578,10 @@ index 3983cf47..4b5464df 100644
          &self,
          provider_name: &str,
 diff --git a/src/commands/lease.rs b/src/commands/lease.rs
-index c663af6b..a8c13b74 100644
+index 5473ebf9..1d9868ac 100644
 --- a/src/commands/lease.rs
 +++ b/src/commands/lease.rs
-@@ -254,6 +254,12 @@ impl LeaseCreateCommand {
+@@ -329,6 +329,12 @@ impl LeaseCreateCommand {
                  eprintln!();
                  for (var, description) in &required_vars {
                      if std::env::var(var).is_err() {
@@ -595,7 +595,7 @@ index c663af6b..a8c13b74 100644
                              .placeholder("paste value here")
                              .run()
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index dd6c46c2..b7ad93cf 100644
+index fe322ab5..433564ba 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
 @@ -9,6 +9,7 @@ pub mod check;
@@ -628,43 +628,41 @@ index dd6c46c2..b7ad93cf 100644
  pub mod tui;
  pub mod usage;
  pub mod version;
-@@ -109,6 +114,7 @@ pub enum Commands {
+@@ -147,6 +152,7 @@ pub enum Commands {
+ 
      ConfigFiles(config_files::ConfigFilesCommand),
  
-     /// Manage the per-user daemon
 +    #[cfg(not(target_os = "wasi"))]
      Daemon(daemon::DaemonCommand),
  
-     /// Disable fnox shell integration in the current shell session
-@@ -149,9 +155,11 @@ pub enum Commands {
+     Deactivate(deactivate::DeactivateCommand),
+@@ -175,14 +181,17 @@ pub enum Commands {
+ 
      List(list::ListCommand),
  
-     /// Start an MCP server that brokers secrets to AI agents
 +    #[cfg(not(target_os = "wasi"))]
      Mcp(mcp::McpCommand),
  
-     /// Manage Lua provider plugins
 +    #[cfg(not(target_os = "wasi"))]
      Plugin(plugin::PluginCommand),
  
-     /// List available profiles
-@@ -161,6 +169,7 @@ pub enum Commands {
+     Profiles(profiles::ProfilesCommand),
+ 
      Provider(provider::ProviderCommand),
  
-     /// Broker credentials into destination-scoped HTTPS requests
 +    #[cfg(not(target_os = "wasi"))]
      Proxy(proxy::ProxyCommand),
  
-     /// Re-encrypt secrets with current provider configuration
-@@ -186,6 +195,7 @@ pub enum Commands {
+     Reencrypt(reencrypt::ReencryptCommand),
+@@ -201,6 +210,7 @@ pub enum Commands {
+ 
      Sync(sync::SyncCommand),
  
-     /// Interactive TUI dashboard for managing secrets
 +    #[cfg(not(target_os = "wasi"))]
      Tui(tui::TuiCommand),
  
      /// Generate usage specification
-@@ -301,9 +311,11 @@ impl Commands {
+@@ -315,9 +325,11 @@ impl Commands {
              Commands::Init(cmd) => cmd.run(cli).await,
              Commands::Completion(cmd) => cmd.run(cli).await,
              Commands::ConfigFiles(cmd) => cmd.run(cli).await,
@@ -676,7 +674,7 @@ index dd6c46c2..b7ad93cf 100644
              Commands::Plugin(cmd) => cmd.run(cli).await,
              Commands::Usage(cmd) => cmd.run(cli).await,
              Commands::Activate(cmd) => cmd
-@@ -329,6 +341,7 @@ impl Commands {
+@@ -343,6 +355,7 @@ impl Commands {
              Commands::Import(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Lease(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::List(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -684,7 +682,7 @@ index dd6c46c2..b7ad93cf 100644
              Commands::Mcp(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Profiles(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Provider(cmd)
-@@ -337,6 +350,7 @@ impl Commands {
+@@ -351,6 +364,7 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -692,7 +690,7 @@ index dd6c46c2..b7ad93cf 100644
              Commands::Proxy(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
-@@ -345,6 +359,7 @@ impl Commands {
+@@ -359,6 +373,7 @@ impl Commands {
              Commands::Set(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Sync(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Scan(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -701,10 +699,10 @@ index dd6c46c2..b7ad93cf 100644
          }
      }
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 407eff51..5dd04d8f 100644
+index 4487afa1..3224e6d3 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -154,12 +154,18 @@ impl SetCommand {
+@@ -190,12 +190,18 @@ impl SetCommand {
              // Only metadata is being set, no secret value needed
              None
          } else {

@@ -28,8 +28,13 @@ backend share since 1.40.0, stays built for its environment variable
 list and service_principal_env(); its Azure SDK credential code is
 compiled out.
 
+1.41.0 adds the gopass provider, which runs the gopass CLI through
+tokio::process; it is compiled out on WASI the same way. Its
+env_dependencies() (GNUPGHOME, GOPASS_HOMEDIR, GOPASS_CONFIG_NOWRAP)
+is read from gopass.rs, so `proxy run` keeps them from the child.
+
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
-index b49d2d3c..33da7091 100644
+index f32ecfb7..d9c0fb73 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
 @@ -430,9 +430,19 @@ fn generate_provider_methods(
@@ -256,10 +261,10 @@ index 97368bd2..7eff5146 100644
          let auth_failed = |e: azure_core::Error| FnoxError::ProviderAuthFailed {
              provider: provider.to_string(),
 diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/providers/mod.rs
-index 6fe81c4f..36c6246f 100644
+index 09d663b8..0b35d2bd 100644
 --- a/crates/fnox-core/src/providers/mod.rs
 +++ b/crates/fnox-core/src/providers/mod.rs
-@@ -5,43 +5,85 @@ use std::path::PathBuf;
+@@ -5,44 +5,87 @@ use std::path::PathBuf;
  
  // Provider implementation modules
  pub mod age;
@@ -295,6 +300,8 @@ index 6fe81c4f..36c6246f 100644
  pub mod gcp_kms;
 +#[cfg(not(target_os = "wasi"))]
  pub mod gcp_sm;
++#[cfg(not(target_os = "wasi"))]
+ pub mod gopass;
  pub mod hw_encrypt;
 +#[cfg(not(target_os = "wasi"))]
  pub mod infisical;
@@ -346,7 +353,7 @@ index 6fe81c4f..36c6246f 100644
  pub use resolver::resolve_provider_config;
  pub use secret_ref::{OptionProviderSecretRef, OptionStringOrSecretRef, StringOrSecretRef};
  
-@@ -151,14 +193,17 @@ mod generated {
+@@ -152,14 +195,17 @@ mod generated {
      }
      pub(super) mod providers_instantiate {
          // Need to import provider modules for instantiation
@@ -356,16 +363,16 @@ index 6fe81c4f..36c6246f 100644
 +        #[cfg(not(target_os = "wasi"))]
          use super::super::{
              age, aws_kms, aws_ps, aws_sm, azure_ac, azure_kms, azure_sm, bitwarden, bitwarden_sm,
-             doppler, enpass, foks, gcp_kms, gcp_sm, infisical, keepass, keeper_sm, keychain,
-             kubernetes, lua, onepassword, password_store, passwordstate, plain, proton_pass, vault,
-             yubikey,
+             doppler, enpass, foks, gcp_kms, gcp_sm, gopass, infisical, keepass, keeper_sm,
+             keychain, kubernetes, lua, onepassword, password_store, passwordstate, plain,
+             proton_pass, vault, yubikey,
          };
 +        #[cfg(target_os = "wasi")]
 +        use super::super::{age, plain};
          include!(concat!(
              env!("OUT_DIR"),
              "/generated/providers_instantiate.rs"
-@@ -494,6 +539,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
+@@ -495,6 +541,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
          };
          return get_provider_from_resolved(provider_name, &resolved);
      }
@@ -374,7 +381,7 @@ index 6fe81c4f..36c6246f 100644
          let plugin = if lua::plugin_is_path(plugin) {
              let provider_source = provider_source_path(config, profile, provider_name);
 diff --git a/src/child_env.rs b/src/child_env.rs
-index e53b3a3f..eed1cd34 100644
+index c6eb31d9..2e7dad81 100644
 --- a/src/child_env.rs
 +++ b/src/child_env.rs
 @@ -45,9 +45,15 @@ pub fn scope_purpose(scope: EnvScope) -> Purpose {
@@ -397,10 +404,10 @@ index e53b3a3f..eed1cd34 100644
  }
  
 diff --git a/src/commands/provider/add.rs b/src/commands/provider/add.rs
-index 01e4ffa3..ae5af293 100644
+index 30a9ca9f..f89e1621 100644
 --- a/src/commands/provider/add.rs
 +++ b/src/commands/provider/add.rs
-@@ -217,7 +217,14 @@ impl AddCommand {
+@@ -238,7 +238,14 @@ impl AddCommand {
                  auth_command: None,
                  daemon_cache: None,
              },
@@ -416,7 +423,7 @@ index 01e4ffa3..ae5af293 100644
              ProviderType::Fido2 => {
                  let provider_name = self.provider.clone();
                  let (credential_id_hex, salt_hex, rp_id, _pin) =
-@@ -236,6 +243,7 @@ impl AddCommand {
+@@ -257,6 +264,7 @@ impl AddCommand {
                      daemon_cache: None,
                  }
              }

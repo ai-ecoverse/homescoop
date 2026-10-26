@@ -14,7 +14,7 @@ whose secret is not sealed is refused. Rule validation no longer needs
 reqwest on WASI.
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index b7ad93cf..7ccc8bad 100644
+index 433564ba..b8b28c77 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
 @@ -29,7 +29,6 @@ pub mod mcp;
@@ -25,15 +25,15 @@ index b7ad93cf..7ccc8bad 100644
  pub mod proxy;
  pub mod reencrypt;
  pub mod remove;
-@@ -169,7 +168,6 @@ pub enum Commands {
+@@ -191,7 +190,6 @@ pub enum Commands {
+ 
      Provider(provider::ProviderCommand),
  
-     /// Broker credentials into destination-scoped HTTPS requests
 -    #[cfg(not(target_os = "wasi"))]
      Proxy(proxy::ProxyCommand),
  
-     /// Re-encrypt secrets with current provider configuration
-@@ -350,7 +348,6 @@ impl Commands {
+     Reencrypt(reencrypt::ReencryptCommand),
+@@ -364,7 +362,6 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -42,7 +42,7 @@ index b7ad93cf..7ccc8bad 100644
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
 diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
-index 126492d3..b2814809 100644
+index 6f54330a..92f3ed7c 100644
 --- a/src/commands/proxy.rs
 +++ b/src/commands/proxy.rs
 @@ -1,8 +1,10 @@
@@ -56,28 +56,52 @@ index 126492d3..b2814809 100644
  use std::process::Stdio;
  
  const AMBIENT_CREDENTIAL_ENV_VARS: &[&str] = &[
-@@ -107,12 +109,19 @@ pub struct ProxyCommand {
+@@ -121,23 +123,30 @@ pub struct ProxyCommand {
+ 
  #[derive(Debug, usage_rs::Subcommands)]
  enum ProxySubcommand {
-     /// Show the effective credential proxy rules
+-    /// Print the effective proxy rules
+-    ///
+-    /// Validates the `[proxy]` table and prints its egress mode, audit setting,
+-    /// and each rule's secret, domain, methods, paths, header, and placeholder
+-    /// variable. Secrets are not resolved.
+-    #[usage(
+-        example("fnox proxy rules", header = "Print the rules"),
+-        example(
+-            "fnox -P staging proxy rules",
+-            header = "Print another profile's rules"
+-        ),
+-        after_long_help = "See also:\n- Credential proxy: https://fnox.jdx.dev/guide/proxy"
+-    )]
 -    Rules,
 +    Rules(ProxyRulesCommand),
- 
-     /// Run a command with placeholder credentials through the local proxy
      Run(ProxyRunCommand),
  }
  
++/// Print the effective proxy rules
++///
++/// Validates the `[proxy]` table and prints its egress mode, audit setting,
++/// and each rule's secret, domain, methods, paths, header, and placeholder
++/// variable. Secrets are not resolved.
 +#[derive(Debug, usage_rs::Args)]
++#[usage(
++    example("fnox proxy rules", header = "Print the rules"),
++    example(
++        "fnox -P staging proxy rules",
++        header = "Print another profile's rules"
++    ),
++    after_long_help = "See also:\n- Credential proxy: https://fnox.jdx.dev/guide/proxy"
++)]
 +struct ProxyRulesCommand {
 +    /// Print the [proxy] configuration as JSON
 +    #[usage(long)]
 +    json: bool,
 +}
 +
- #[derive(Debug, usage_rs::Args)]
- struct ProxyRunCommand {
-     /// Command to run
-@@ -132,12 +141,21 @@ impl ProxyCommand {
+ /// Run a command with placeholder credentials behind the proxy
+ ///
+ /// Resolves the secrets that `[[proxy.rules]]` names, plus any secrets their
+@@ -176,12 +185,21 @@ impl ProxyCommand {
              )
          })?;
          match &self.command {
@@ -100,7 +124,7 @@ index 126492d3..b2814809 100644
  fn show_rules(proxy: &ProxyConfig) -> Result<()> {
      crate::proxy::validate_config(proxy)?;
      println!("egress: {:?}", proxy.egress);
-@@ -225,6 +243,89 @@ fn collect_requested_secrets(
+@@ -269,6 +287,89 @@ fn collect_requested_secrets(
  }
  
  impl ProxyRunCommand {

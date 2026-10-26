@@ -18,7 +18,7 @@ so the kernel's binding of path, argv and cwd always matches what fnox
 sent.
 
 diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
-index 9cf8473..3d85bf0 100644
+index 9cf84738..3d85bf08 100644
 --- a/crates/fnox-core/src/sealed.rs
 +++ b/crates/fnox-core/src/sealed.rs
 @@ -222,6 +222,16 @@ pub fn materialize(names: &[String], path: &str, argv: &[String], cwd: &str) ->
@@ -67,10 +67,10 @@ index 9cf8473..3d85bf0 100644
      fn wait_polls_until_done() {
          let (_g, mock) = install();
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
-index e9bcdd6..2786f05 100644
+index 2be53586..5fff7394 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
-@@ -25,6 +25,13 @@ pub struct ExecCommand {
+@@ -58,6 +58,13 @@ pub struct ExecCommand {
      #[usage(long)]
      pub replace: bool,
  
@@ -81,10 +81,10 @@ index e9bcdd6..2786f05 100644
 +    #[usage(long)]
 +    pub shell_grants: bool,
 +
-     /// Command to run
+     /// Command to run, with its arguments
      #[usage(
          arg,
-@@ -122,7 +129,7 @@ impl ExecCommand {
+@@ -148,7 +155,7 @@ impl ExecCommand {
                  .filter(|key| !sealed_names.contains(*key))
                  .map(String::as_str)
                  .collect();
@@ -93,7 +93,7 @@ index e9bcdd6..2786f05 100644
                  eprintln!(
                      "fnox: warning: {} passed as plain values, not through seven's vault",
                      literal.join(", ")
-@@ -130,16 +137,22 @@ impl ExecCommand {
+@@ -156,16 +163,22 @@ impl ExecCommand {
              }
          }
          let mut ticket = None;
@@ -118,7 +118,7 @@ index e9bcdd6..2786f05 100644
                  &cwd,
                  path_var.as_deref(),
              ) {
-@@ -162,10 +175,20 @@ impl ExecCommand {
+@@ -188,10 +201,20 @@ impl ExecCommand {
                      "fnox: {name} keeps its placeholder: seven's policy does not hand it to this command"
                  );
              }
@@ -139,7 +139,7 @@ index e9bcdd6..2786f05 100644
              ticket = Some(prepared.ticket);
          }
  
-@@ -191,6 +214,9 @@ impl ExecCommand {
+@@ -217,6 +240,9 @@ impl ExecCommand {
              _temp_files.push(temp_file);
          }
  
@@ -150,7 +150,7 @@ index e9bcdd6..2786f05 100644
              cmd.env("SLICC_SEALED_TICKET", ticket);
          }
 diff --git a/src/seven.rs b/src/seven.rs
-index eebfb9e..b9e5b94 100644
+index eebfb9e3..b9e5b94c 100644
 --- a/src/seven.rs
 +++ b/src/seven.rs
 @@ -74,11 +74,17 @@ pub struct PreparedExec {

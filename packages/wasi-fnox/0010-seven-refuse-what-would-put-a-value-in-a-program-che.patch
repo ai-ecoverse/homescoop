@@ -13,10 +13,10 @@ check` asks /dev/sealed for each sealed secret's record with
 vault does not know, and warns about records that no rule names yet.
 
 diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
-index 3b505a7..0934c5d 100644
+index 4b4fa339..4fd7cba7 100644
 --- a/crates/fnox-core/src/providers/age.rs
 +++ b/crates/fnox-core/src/providers/age.rs
-@@ -332,6 +332,28 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -350,6 +350,28 @@ impl crate::providers::Provider for AgeEncryptionProvider {
              .collect()
      }
  
@@ -45,7 +45,7 @@ index 3b505a7..0934c5d 100644
      async fn get_secret(&self, value: &str) -> Result<String> {
          if let Some((wrapped_key, ciphertext)) = Self::parse_batch_value(value) {
              let batch_key = self.decrypt_batch_key(wrapped_key).await?;
-@@ -341,6 +363,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -359,6 +381,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
          self.decrypt_age_value(value).await
      }
  
@@ -54,10 +54,10 @@ index 3b505a7..0934c5d 100644
          &self,
          secrets: &[(String, String)],
 diff --git a/src/commands/check.rs b/src/commands/check.rs
-index eba2adb..c710080 100644
+index 64ef71db..74d871b5 100644
 --- a/src/commands/check.rs
 +++ b/src/commands/check.rs
-@@ -103,6 +103,40 @@ impl CheckCommand {
+@@ -133,6 +133,40 @@ impl CheckCommand {
                                  continue;
                              }
  
@@ -99,10 +99,10 @@ index eba2adb..c710080 100644
                              match crate::daemon::resolve_one(
                                  cli,
 diff --git a/src/commands/reencrypt.rs b/src/commands/reencrypt.rs
-index f4cd6af..ad3927c 100644
+index 43e5e6d8..50241015 100644
 --- a/src/commands/reencrypt.rs
 +++ b/src/commands/reencrypt.rs
-@@ -39,6 +39,13 @@ pub struct ReencryptCommand {
+@@ -57,6 +57,13 @@ pub struct ReencryptCommand {
  
  impl ReencryptCommand {
      pub async fn run(&self, cli: &Cli, merged_config: Config) -> Result<()> {
@@ -117,10 +117,10 @@ index f4cd6af..ad3927c 100644
          tracing::debug!(
              "Re-encrypting secrets for profiles '{}'",
 diff --git a/src/commands/sync.rs b/src/commands/sync.rs
-index 506ec31..f5bf862 100644
+index 5203b81d..dad4349a 100644
 --- a/src/commands/sync.rs
 +++ b/src/commands/sync.rs
-@@ -47,6 +47,13 @@ pub struct SyncCommand {
+@@ -77,6 +77,13 @@ pub struct SyncCommand {
  
  impl SyncCommand {
      pub async fn run(&self, cli: &Cli, merged_config: Config) -> Result<()> {
