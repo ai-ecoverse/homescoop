@@ -46,7 +46,7 @@ Limits in seven:
 `uvx` (since 0.13.1-4, homescoop#771) is the same `uv.wasm` with `tool uvx`
 in front, as upstream's `uvx` binary does: `uvx <command>` and
 `uvx --from <package> <command>` run a package's command in a cached tool
-environment, and `uvx --version` prints `uvx 0.13.1`. Only tools that are
+environment, and `uvx --version` prints `uvx 0.13.2`. Only tools that are
 pure Python (or have a `wasi_0_0_0_wasm32` build) run: ruff, for example,
 ships native wheels and a Rust sdist only, so `uvx ruff` can't install it
 (homescoop#1486).
