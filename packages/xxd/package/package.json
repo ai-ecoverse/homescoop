@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-xxd",
-  "version": "9.2.1202-1",
+  "version": "9.2.1209-1",
   "description": "xxd, which makes a hex dump of a file or turns one back into binary.",
   "license": "Vim",
   "repository": {
@@ -28,7 +28,7 @@
   },
   "homescoop": {
     "recipe": "xxd",
-    "upstream": "9.2.1202"
+    "upstream": "9.2.1209"
   },
   "slicc": {
     "abi": "emscripten",
