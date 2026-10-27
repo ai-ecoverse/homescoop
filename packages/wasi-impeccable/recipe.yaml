@@ -46,7 +46,7 @@ about:
     wasm32-wasip1, against the same compiled-in keys; Io's cwd comes from
     PWD (wasi-libc's current_dir() stays /); avoid process::id / thread spawn
     panics; print clear "not available in this build yet" for
-    URL/capture/serve-question; Svelte live sessions (node) refuse. Live
+    URL/--cdp/capture/serve-question; Svelte live sessions (node) refuse. Live
     needs slicc-kernel 1.17.2 or later (#105 clock polls, #106 lookups of
     files other processes create).
     --version prints the crate / engine VERSION (0.1.x). wasm-opt -Oz.
@@ -68,3 +68,12 @@ about:
     module back at the end of wasix.rs); homescoop#825 corrects this note.
     build.sh's wasm cache key covers the vendored crates/wasix-*, so a
     local rebuild after a crate edit reruns cargo (homescoop#642).
+    0.1.16-1: 0001 rebased onto engine-v0.1.16. Upstream moved live's
+    HTTP server core into crates/common (http.rs, now also the decision
+    page's and component review's server, replacing tiny_http, which is a
+    dev-dependency only), so common takes wasix-net for it and live's
+    live_http.rs hunk is gone. New in 0.1.16, detect --cdp <port|url>
+    attaches to a running Chromium-based app's DevTools port; on WASI it
+    refuses like URL scans ("--cdp scans need a browser; not available in
+    this build yet", cert/cdp.mjs). No patch dropped: upstream still has no
+    WASI support.
