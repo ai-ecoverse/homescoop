@@ -89,3 +89,17 @@ The published 0.1.15-4 passes the new stress row's traps check: 6 rounds over 60
 - **homescoop#1364** (is the allocator refresh's realloc slower?): **not reproduced.** In those 12 rounds per version, the median detect is 27.5 s for 0.1.15-4 and 20 s for 0.1.15-5 (both noisy, 17–45 s), and output and traps (0) are the same. The refresh keeps realloc as alloc + copy + free on purpose: libc's realloc copies into a block it may have just taken from memory another thread grew, before the wrapper could refresh the view, and that copy is the trap.
 - **`cert/deep.mjs`** (homescoop#620): upstream behaviour, documented, so -5 passes it too. On -5 here, 1000 and 2000 deep take 1.0 s and 3.8 s (2.1 s and 8.3 s on kernel 1.94.0 in the issue).
 
+
+## 0.1.16-1: `detect --cdp` refuses on WASI (cert/cdp.mjs, 2026-10-27)
+
+0.1.16 adds `detect --cdp <port|url>`, which attaches to a running Chromium-based app through its DevTools port. In this build there's no browser engine, so the patch makes it refuse the way URL scans do. `cert/cdp.mjs` against the published `@ai-ecoverse/wasi-impeccable@0.1.15-6` on slicc-kernel 1.134.3 (users enforce):
+
+```text
+browser-cert: FAIL packages/wasi-impeccable/cert/cdp.mjs
+AssertionError [ERR_ASSERTION]: detect --cdp 9222 stderr="Warning: cannot access 9222\n"
+  expected: /^Error: --cdp scans need a browser; not available in this build yet$/m
+```
+
+0.1.15-6 has no `--cdp`: it drops the flag and scans `9222` as a missing file. The 0.1.16-1 build passes it, with the other specs (checklist, deep, notices, telemetry, stress) and test/e2e on the same kernel. Without the patch's `detect_cdp_scan` it would print upstream's `Error: this build cannot attach to a running app (--cdp)`, which the spec also refuses.
+
+Stress row, re-run for the moved HTTP core: 0.1.16-1 gives 0 traps in 6 rounds (13 s each), and the wasm memory never grows past the 64 MiB initial heap. Linked without `--initial-memory`, 0.1.16-1 peaks at 21 MiB under today's `stress.mjs` (polled once a second), and so does the published 0.1.15-4. recipe.yaml keeps its 64 MiB initial heap and the larger 49 MiB measurement.

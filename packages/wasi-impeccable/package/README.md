@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasi-impeccable`
 
-[Impeccable](https://impeccable.style) engine **0.1.15** for
+[Impeccable](https://impeccable.style) engine **0.1.16** for
 [slicc](https://github.com/ai-ecoverse/slicc)'s WASI preview1 realm
 (`abi: "wasi"`: a module only, no Emscripten glue).
 
@@ -12,7 +12,7 @@ impeccable install --providers=claude -y   # downloads and verifies the signed s
 impeccable check
 impeccable generate-image --prompt "…" --out comps/hero.png   # needs OPENAI_API_KEY
 impeccable concept-seed --scope surface
-impeccable --version   # prints the engine version (e.g. 0.1.15)
+impeccable --version   # prints the engine version (e.g. 0.1.16)
 ```
 
 **Also wired:** `palette`, `doctor`, `ignores`, `pin`, `detect-csp`,
@@ -41,8 +41,8 @@ elements × depth. 1000 nested elements take 1–2 s and 2000 4–8 s,
 but 4000 take about 40 s and 8000 several minutes (a native build: 15 s and
 83 s). Real pages rarely nest past a few hundred; generated markup can.
 
-**Not in this build:** URL / Chrome scans, `serve-question` and the capture
-verbs refuse with `not available in this build yet` instead of
-`Unknown command`. Use upstream
-[`impeccable`](https://www.npmjs.com/package/impeccable) /
+**Not in this build:** URL / Chrome scans, `detect --cdp` (attaching to a
+running app's DevTools port), `serve-question` and the capture verbs refuse
+with `not available in this build yet` instead of `Unknown command`. Use
+upstream [`impeccable`](https://www.npmjs.com/package/impeccable) /
 [pbakaus/impeccable](https://github.com/pbakaus/impeccable) for those.
