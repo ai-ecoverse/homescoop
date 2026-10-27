@@ -4,13 +4,13 @@
 name: wasi-uv
 builder: host
 # renovate: datasource=github-releases depName=astral-sh/uv
-version: "0.13.2"
+version: "0.13.3"
 npm: "@ai-ecoverse/wasi-uv"
 summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run against wasix-python)"
 source:
   url: "https://github.com/astral-sh/uv/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "2261f7d1634871999f91ed7017289e6471bc0810b627ed39216e7599e4030082"
-  epoch: "1792441533"
+  sha256: "2a1ae6f1513f3c53ee9eaa1d010840097a3767659217aed7e3912dd40835c89b"
+  epoch: "1792457197"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#675).
 reproducible: true
 toolchain:
@@ -53,6 +53,9 @@ about:
     and engines.slicc-kernel >= 1.104.1 (a lost kill -9 kept locks, #910).
     0.13.2-1: the series regenerated against 0.13.2 (same changes; 0001
     and 0002 had context drift), cert/compile.mjs for 0.13.2's changes.
+    0.13.3-1: the series applies unchanged; the cert reads uv's version
+    from this recipe (cert/lib/version.mjs), and cert/export.mjs records
+    0.13.3's reverted export fix (#1920, astral-sh/uv#22750).
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means
@@ -62,5 +65,5 @@ about:
     temp_dir and an empty EXE_SUFFIX on WASI.
     C (aws-lc-sys, zstd-sys) with wasi-sdk 34. LTO off, 16 codegen units
     (memory), then wasm-opt -Oz (binaryen 133). SOURCE_DATE_EPOCH is the
-    0.13.2 tag's commit time (source.epoch, 2026-10-19T20:25:33Z). New package →
+    0.13.3 tag's commit time (source.epoch, 2026-10-20T00:46:37Z). New package →
     human cert.

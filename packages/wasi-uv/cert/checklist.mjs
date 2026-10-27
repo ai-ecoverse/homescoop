@@ -8,6 +8,7 @@
  */
 import { createHash } from 'node:crypto';
 import { detached } from './lib/detached.mjs';
+import { recipeVersion, reportsVersion } from './lib/version.mjs';
 
 const FILES = 'https://files.pythonhosted.org/packages';
 const DISTS = [
@@ -29,6 +30,7 @@ const DISTS = [
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
+  const want = recipeVersion();
   const env = { UV_CONFIG_FILE: '/home/uv.toml' };
   // One uv command per call: each page call has to answer within the
   // harness's 120 s, and chains of uv commands came close to it on a loaded
@@ -60,7 +62,7 @@ export default async function (ctx) {
 
   // Astral's uv, built for the kernel.
   const ver = await ok('uv --version');
-  assert.match(ver.stdout, /^uv 0\.13\.2 \((?:.+ )?wasm32-wasip1-threads\)$/m);
+  reportsVersion(assert, 'uv --version', ver.stdout, want);
 
   // Interpreter discovery: wasix-python on PATH, as a WASI platform.
   const find = await ok('uv python find && uv python list --only-installed');
@@ -77,7 +79,7 @@ export default async function (ctx) {
   assert.equal(done.stdout.trim().split('\n').pop(), '2.34.2 /home/u/.venv');
   const cfg = await ok('cat /home/u/.venv/pyvenv.cfg && ls -l /home/u/.venv/bin/python');
   assert.match(cfg.stdout, /^include-system-site-packages = false$/m);
-  assert.match(cfg.stdout, /^uv = 0\.13\.2$/m);
+  reportsVersion(assert, 'pyvenv.cfg', cfg.stdout, want);
   assert.match(cfg.stdout, /python -> \/usr\/bin\/python3?$/m);
   // In the venv only.
   const base = await sh("python -c 'import requests'", '/home/u');
@@ -138,7 +140,7 @@ export default async function (ctx) {
   // uvx (0.13.1-4, homescoop#771): upstream's alias for uv tool run, here
   // the same uv.wasm with `tool uvx` in front. From the find-links only
   // (homescoop#674: nothing asks PyPI).
-  assert.match((await ok('uvx --version')).stdout, /^uvx 0\.13\.2/m);
+  reportsVersion(assert, 'uvx --version', (await ok('uvx --version')).stdout, want);
   const uvx = await ok('uvx --from charset-normalizer normalizer --version');
   assert.match(uvx.stdout, /Charset-Normalizer 3\.5\.2/, `uvx runs a package's command: ${uvx.stdout}`);
   assert.doesNotMatch(uvx.stderr, /pypi\.org/, `uvx resolves from the find-links: ${uvx.stderr}`);

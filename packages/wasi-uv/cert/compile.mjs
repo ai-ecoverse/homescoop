@@ -88,5 +88,5 @@ export default async function (ctx) {
   assert.equal(check.status, 1, `uv pip check -q: rc=${check.status}\nstderr=${check.stderr}`);
   assert.match(check.stderr, /Found 4 incompatibilities/, `uv pip check -q names the problems: ${check.stderr}`);
   assert.match(check.stderr, /The package `requests` requires `idna[^`]*`, but it's not installed/, `uv pip check -q names the problems: ${check.stderr}`);
-  console.log('compile: pip compile, pylock.toml environments (export and install), and pip check -q behave as uv 0.13.2 documents');
+  console.log('compile: pip compile, pylock.toml environments (export and install), and pip check -q behave as documented since uv 0.13.2');
 }
