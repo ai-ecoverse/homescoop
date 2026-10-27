@@ -160,7 +160,7 @@ index f45580b..b64cf7d 100644
          operating_system = {
              "name": operating_system,
 diff --git a/crates/uv-torch/src/backend.rs b/crates/uv-torch/src/backend.rs
-index 5360588..1293be6 100644
+index 5e7423a..f6435f5 100644
 --- a/crates/uv-torch/src/backend.rs
 +++ b/crates/uv-torch/src/backend.rs
 @@ -401,6 +401,7 @@ impl TorchStrategy {

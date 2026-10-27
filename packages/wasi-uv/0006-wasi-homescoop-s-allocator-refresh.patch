@@ -15,7 +15,7 @@ above it is returned. uv's own allocator crate picks nothing on wasm32.
  1 file changed, 9 insertions(+)
 
 diff --git a/crates/uv/src/bin/uv.rs b/crates/uv/src/bin/uv.rs
-index 0000000..0000000 100644
+index 7cef970..c292fe1 100644
 --- a/crates/uv/src/bin/uv.rs
 +++ b/crates/uv/src/bin/uv.rs
 @@ -7,6 +7,15 @@ extern crate uv_performance_memory_allocator;
