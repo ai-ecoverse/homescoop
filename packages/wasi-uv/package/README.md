@@ -43,22 +43,22 @@ Limits in seven:
   kernel drops its locks, so the next uv on that cache or environment goes
   ahead (slicc-kernel ≥ 1.104.1, the package's floor since 0.13.1-4; older
   kernels could lose a `kill -9` and leave a lock held, homescoop#910).
-- **`uv export` can list an extra it shouldn't (uv 0.13.3, homescoop#1920):**
-  upstream's 0.13.3 reverted a `uv export` fix that uv had since 0.13.0
+- **`uv export` can list an extra it shouldn't (homescoop#1920):** uv
+  reverted a `uv export` fix it had since 0.13.0, from 0.13.3 until 0.13.5
   ([astral-sh/uv#22750](https://github.com/astral-sh/uv/pull/22750) undoes
   [#22234](https://github.com/astral-sh/uv/pull/22234) for an export
-  slowdown), so an export can again include an optional dependency
-  that is reached only through an incompatible platform path. In upstream's
-  test for it, which the revert removed, `uv export --extra feature` also
-  prints `leaf-c==1.0.0 ; sys_platform != 'linux'`, which 0.13.2 left out.
+  slowdown, and [#22751](https://github.com/astral-sh/uv/pull/22751) brings
+  it back). An export can then include an optional dependency that is
+  reached only through an incompatible platform path. In upstream's test for
+  it, which the revert removed, `uv export --extra feature` also prints
+  `leaf-c==1.0.0 ; sys_platform != 'linux'`, which uv before 0.13.3 left out.
   Both formats (requirements.txt and `pylock.toml`) have it. Since
   `sys_platform` is `wasi` in the kernel, installing such an export here
   installs that extra package too. `uv sync` doesn't use the export code and
   isn't affected. Workaround: delete the extra line from the export, or
-  install the project with `uv sync`. Upstream restored the fix in 0.13.5
-  ([astral-sh/uv#22751](https://github.com/astral-sh/uv/pull/22751)).
-  `cert/export.mjs` checks upstream's case: at 0.13.3 it expects the extra
-  line, and from 0.13.5 on it expects the line to be gone.
+  install the project with `uv sync`. It is fixed in 0.13.5.
+  `cert/export.mjs` checks upstream's case: it expects the extra line since
+  0.13.3 and until 0.13.5, and no extra line for any other version.
 
 `uvx` (since 0.13.1-4, homescoop#771) is the same `uv.wasm` with `tool uvx`
 in front, as upstream's `uvx` binary does: `uvx <command>` and
