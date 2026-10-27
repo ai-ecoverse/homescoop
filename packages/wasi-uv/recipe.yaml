@@ -10,7 +10,7 @@ summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run ag
 source:
   url: "https://github.com/astral-sh/uv/archive/refs/tags/{{version}}.tar.gz"
   sha256: "2261f7d1634871999f91ed7017289e6471bc0810b627ed39216e7599e4030082"
-  epoch: "1791948226"
+  epoch: "1792441533"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#675).
 reproducible: true
 toolchain:
@@ -22,8 +22,8 @@ inputs:
 # homescoop#1287: the initial heap from the measured peak, with headroom.
 wasm:
   initial-memory: 64MiB
-  measured-peak: 17MiB
-  measured-by: "cert/stress.mjs's uv pip install --no-cache of 41 local wheels (2,400 modules) into a fresh venv, 6 rounds, VmSize polled from /proc/<pid>/status: 17 MiB peak with 0.13.1-2 on slicc-kernel 1.134.3"
+  measured-peak: 8MiB
+  measured-by: "cert/stress.mjs's uv pip install --no-cache of 41 local wheels (2,400 modules) into a fresh venv, 6 rounds, VmSize polled from /proc/<pid>/status: 7,360 kB peak with 0.13.2-1 linked at the default 5 MiB heap on slicc-kernel 1.134.3 (0.13.1-5's source: 7,488 kB); at the 64 MiB initial heap VmSize stays 64 MiB"
 dependencies:
   build: []
   host: []
@@ -51,6 +51,8 @@ about:
            as the global allocator on wasm (#1287)
     0.13.1-4 (no patch): the uvx command (uv.wasm, prefix tool uvx; #771)
     and engines.slicc-kernel >= 1.104.1 (a lost kill -9 kept locks, #910).
+    0.13.2-1: the series regenerated against 0.13.2 (same changes; 0001
+    and 0002 had context drift), cert/compile.mjs for 0.13.2's changes.
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means
@@ -60,5 +62,5 @@ about:
     temp_dir and an empty EXE_SUFFIX on WASI.
     C (aws-lc-sys, zstd-sys) with wasi-sdk 34. LTO off, 16 codegen units
     (memory), then wasm-opt -Oz (binaryen 133). SOURCE_DATE_EPOCH is the
-    0.13.1 tag's commit time (source.epoch, 2026-10-14T03:23:46Z). New package →
+    0.13.2 tag's commit time (source.epoch, 2026-10-19T20:25:33Z). New package →
     human cert.

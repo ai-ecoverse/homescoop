@@ -34,7 +34,7 @@ choices. WASI has no permission bits, file locks or descriptor dup:
  15 files changed, 371 insertions(+), 42 deletions(-)
 
 diff --git a/crates/uv-cache/src/lib.rs b/crates/uv-cache/src/lib.rs
-index 9a017bf..c84f5b4 100644
+index 7123db1..9b85ad9 100644
 --- a/crates/uv-cache/src/lib.rs
 +++ b/crates/uv-cache/src/lib.rs
 @@ -867,7 +867,7 @@ impl Cache {
@@ -65,10 +65,10 @@ index 9a017bf..c84f5b4 100644
          path.as_ref().canonicalize()
      }
 diff --git a/crates/uv-distribution/src/source/mod.rs b/crates/uv-distribution/src/source/mod.rs
-index 1545618..0592752 100644
+index 0fd46a3..1262456 100644
 --- a/crates/uv-distribution/src/source/mod.rs
 +++ b/crates/uv-distribution/src/source/mod.rs
-@@ -2980,7 +2980,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
+@@ -2979,7 +2979,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
              name.to_string()
          } else {
              // Identify the base Python interpreter to use in the cache key.
@@ -77,7 +77,7 @@ index 1545618..0592752 100644
                  self.build_context
                      .interpreter()
                      .await
-@@ -3132,7 +3132,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
+@@ -3131,7 +3131,7 @@ impl<'a, T: BuildContext> SourceDistributionBuilder<'a, T> {
          }
  
          // Identify the base Python interpreter to use in the cache key.
@@ -635,10 +635,10 @@ index 3230ed7..ec563e5 100644
          use std::os::unix::fs::PermissionsExt;
  
 diff --git a/crates/uv-install-wheel/src/wheel.rs b/crates/uv-install-wheel/src/wheel.rs
-index 0cd1a86..a17fcb6 100644
+index c290296..8b109f9 100644
 --- a/crates/uv-install-wheel/src/wheel.rs
 +++ b/crates/uv-install-wheel/src/wheel.rs
-@@ -355,6 +355,8 @@ pub(crate) fn write_script_entrypoints(
+@@ -413,6 +413,8 @@ pub(crate) fn write_script_entrypoints(
                      fs::set_permissions(path, Permissions::from_mode(permissions.mode() | 0o111))?;
                  }
              }
@@ -647,7 +647,7 @@ index 0cd1a86..a17fcb6 100644
          }
      }
      Ok(())
-@@ -611,6 +613,8 @@ fn install_script(
+@@ -681,6 +683,8 @@ fn install_script(
                  )?;
              }
          }
@@ -656,7 +656,7 @@ index 0cd1a86..a17fcb6 100644
  
          Some(size_and_encoded_hash)
      } else {
-@@ -665,6 +669,8 @@ fn install_script(
+@@ -735,6 +739,8 @@ fn install_script(
                  }
                  Err(err) => return Err(Error::Io(err)),
              }
@@ -666,7 +666,7 @@ index 0cd1a86..a17fcb6 100644
  
          None
 diff --git a/crates/uv-python-commands/src/install.rs b/crates/uv-python-commands/src/install.rs
-index fde2c1e..485a3ab 100644
+index 9a5c388..4409030 100644
 --- a/crates/uv-python-commands/src/install.rs
 +++ b/crates/uv-python-commands/src/install.rs
 @@ -1340,7 +1340,7 @@ fn find_matching_bin_link<'a>(
@@ -679,10 +679,10 @@ index fde2c1e..485a3ab 100644
              return None;
          }
 diff --git a/crates/uv-python-managed/src/managed.rs b/crates/uv-python-managed/src/managed.rs
-index 10270aa..cea3f11 100644
+index b799a23..c8b6a93 100644
 --- a/crates/uv-python-managed/src/managed.rs
 +++ b/crates/uv-python-managed/src/managed.rs
-@@ -406,7 +406,7 @@ impl ManagedPythonInstallation {
+@@ -409,7 +409,7 @@ impl ManagedPythonInstallation {
      pub fn executable(&self, windowed: bool) -> PathBuf {
          let version = match self.implementation() {
              ImplementationName::CPython => {
@@ -691,7 +691,7 @@ index 10270aa..cea3f11 100644
                      format!("{}.{}", self.key.major, self.key.minor)
                  } else {
                      String::new()
-@@ -423,7 +423,7 @@ impl ManagedPythonInstallation {
+@@ -426,7 +426,7 @@ impl ManagedPythonInstallation {
          // GraalPy always uses `graalpy.exe` as the main executable
          let variant = if self.implementation() == ImplementationName::GraalPy {
              ""
@@ -700,7 +700,7 @@ index 10270aa..cea3f11 100644
              self.key.variant.executable_suffix()
          } else if cfg!(windows) && windowed {
              // Use windowed Python that doesn't open a terminal.
-@@ -595,7 +595,7 @@ impl ManagedPythonInstallation {
+@@ -598,7 +598,7 @@ impl ManagedPythonInstallation {
  
      /// Ensure that the `sysconfig` data is patched to match the installation path.
      pub async fn ensure_sysconfig_patched(&self) -> Result<(), Error> {
@@ -709,7 +709,7 @@ index 10270aa..cea3f11 100644
              if self.key.os().is_emscripten() {
                  // Emscripten's stdlib is a zip file so we can't update the
                  // sysconfig directly
-@@ -650,7 +650,7 @@ impl ManagedPythonInstallation {
+@@ -653,7 +653,7 @@ impl ManagedPythonInstallation {
      /// Returns `true` if the path is a link to this installation's binary, e.g., as created by
      /// [`create_link_to_executable`].
      pub fn is_bin_link(&self, path: &Path) -> bool {
@@ -718,7 +718,7 @@ index 10270aa..cea3f11 100644
              same_file::is_same_file(path, self.executable(false)).unwrap_or_default()
          } else if cfg!(windows) {
              let Some(launcher) = Launcher::try_from_path(path).unwrap_or_default() else {
-@@ -825,7 +825,7 @@ impl PythonMinorVersionLink {
+@@ -828,7 +828,7 @@ impl PythonMinorVersionLink {
              .expect("Executable should have parent directory");
  
          // The home directory of the Python installation
@@ -727,7 +727,7 @@ index 10270aa..cea3f11 100644
              if parent
                  .components()
                  .next_back()
-@@ -921,7 +921,7 @@ impl PythonMinorVersionLink {
+@@ -924,7 +924,7 @@ impl PythonMinorVersionLink {
          };
  
          cfg_select! {
@@ -736,7 +736,7 @@ index 10270aa..cea3f11 100644
                  self.symlink_directory
                      .symlink_metadata()
                      .is_ok_and(|metadata| metadata.file_type().is_symlink())
-@@ -1010,7 +1010,7 @@ pub fn create_link_to_executable(
+@@ -1013,7 +1013,7 @@ pub fn create_link_to_executable(
      let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
      fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
  
@@ -745,7 +745,7 @@ index 10270aa..cea3f11 100644
          // Note this will never copy on Unix — we use it here to allow compilation on Windows
          match symlink_or_copy_file(executable.path, link) {
              Ok(()) => Ok(()),
-@@ -1047,7 +1047,7 @@ pub fn replace_link_to_executable(
+@@ -1050,7 +1050,7 @@ pub fn replace_link_to_executable(
      let link_parent = link.parent().ok_or(Error::NoExecutableDirectory)?;
      fs_err::create_dir_all(link_parent).map_err(Error::ExecutableDirectory)?;
  
@@ -790,7 +790,7 @@ index bab3c5e..4a521de 100644
                      f,
                      "{} ({})",
 diff --git a/crates/uv-virtualenv/src/virtualenv.rs b/crates/uv-virtualenv/src/virtualenv.rs
-index 1f15549..4fdd865 100644
+index aeaac96..6693ef5 100644
 --- a/crates/uv-virtualenv/src/virtualenv.rs
 +++ b/crates/uv-virtualenv/src/virtualenv.rs
 @@ -199,7 +199,7 @@ pub(crate) fn create(

@@ -60,7 +60,7 @@ export default async function (ctx) {
 
   // Astral's uv, built for the kernel.
   const ver = await ok('uv --version');
-  assert.match(ver.stdout, /^uv 0\.13\.1 \((?:.+ )?wasm32-wasip1-threads\)$/m);
+  assert.match(ver.stdout, /^uv 0\.13\.2 \((?:.+ )?wasm32-wasip1-threads\)$/m);
 
   // Interpreter discovery: wasix-python on PATH, as a WASI platform.
   const find = await ok('uv python find && uv python list --only-installed');
@@ -77,7 +77,7 @@ export default async function (ctx) {
   assert.equal(done.stdout.trim().split('\n').pop(), '2.34.2 /home/u/.venv');
   const cfg = await ok('cat /home/u/.venv/pyvenv.cfg && ls -l /home/u/.venv/bin/python');
   assert.match(cfg.stdout, /^include-system-site-packages = false$/m);
-  assert.match(cfg.stdout, /^uv = 0\.13\.1$/m);
+  assert.match(cfg.stdout, /^uv = 0\.13\.2$/m);
   assert.match(cfg.stdout, /python -> \/usr\/bin\/python3?$/m);
   // In the venv only.
   const base = await sh("python -c 'import requests'", '/home/u');
@@ -138,7 +138,7 @@ export default async function (ctx) {
   // uvx (0.13.1-4, homescoop#771): upstream's alias for uv tool run, here
   // the same uv.wasm with `tool uvx` in front. From the find-links only
   // (homescoop#674: nothing asks PyPI).
-  assert.match((await ok('uvx --version')).stdout, /^uvx 0\.13\.1/m);
+  assert.match((await ok('uvx --version')).stdout, /^uvx 0\.13\.2/m);
   const uvx = await ok('uvx --from charset-normalizer normalizer --version');
   assert.match(uvx.stdout, /Charset-Normalizer 3\.5\.2/, `uvx runs a package's command: ${uvx.stdout}`);
   assert.doesNotMatch(uvx.stderr, /pypi\.org/, `uvx resolves from the find-links: ${uvx.stderr}`);

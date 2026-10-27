@@ -35,7 +35,7 @@ WASIX threads, sockets and processes):
  16 files changed, 74 insertions(+), 22 deletions(-)
 
 diff --git a/Cargo.lock b/Cargo.lock
-index b1a7179..2316116 100644
+index e42d349..b21d7b5 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -277,8 +277,6 @@ dependencies = [
@@ -56,7 +56,7 @@ index b1a7179..2316116 100644
  dependencies = [
   "anyhow",
   "astral-reqwest-middleware",
-@@ -748,8 +744,6 @@ dependencies = [
+@@ -742,8 +738,6 @@ dependencies = [
  [[package]]
  name = "cargo-util"
  version = "0.2.30"
@@ -65,7 +65,7 @@ index b1a7179..2316116 100644
  dependencies = [
   "anyhow",
   "core-foundation 0.10.1",
-@@ -2219,8 +2213,6 @@ dependencies = [
+@@ -2167,8 +2161,6 @@ dependencies = [
  [[package]]
  name = "hyper-util"
  version = "0.1.20"
@@ -74,7 +74,7 @@ index b1a7179..2316116 100644
  dependencies = [
   "base64 0.22.1",
   "bytes",
-@@ -2238,6 +2230,7 @@ dependencies = [
+@@ -2186,6 +2178,7 @@ dependencies = [
   "tokio",
   "tower-service",
   "tracing",
@@ -82,7 +82,7 @@ index b1a7179..2316116 100644
   "windows-registry",
  ]
  
-@@ -2399,6 +2392,7 @@ dependencies = [
+@@ -2347,6 +2340,7 @@ dependencies = [
   "portable-atomic",
   "unicode-width 0.2.2",
   "unit-prefix",
@@ -90,7 +90,7 @@ index b1a7179..2316116 100644
  ]
  
  [[package]]
-@@ -3966,8 +3960,6 @@ dependencies = [
+@@ -3893,8 +3887,6 @@ dependencies = [
  [[package]]
  name = "reqsign-core"
  version = "3.3.1"
@@ -99,7 +99,7 @@ index b1a7179..2316116 100644
  dependencies = [
   "anyhow",
   "base64 0.23.1",
-@@ -4002,8 +3994,6 @@ dependencies = [
+@@ -3929,8 +3921,6 @@ dependencies = [
  [[package]]
  name = "reqsign-google"
  version = "3.1.1"
@@ -108,7 +108,7 @@ index b1a7179..2316116 100644
  dependencies = [
   "bytes",
   "form_urlencoded",
-@@ -4021,8 +4011,6 @@ dependencies = [
+@@ -3948,8 +3938,6 @@ dependencies = [
  [[package]]
  name = "reqsign-http-send-reqwest"
  version = "4.0.6"
@@ -117,7 +117,7 @@ index b1a7179..2316116 100644
  dependencies = [
   "anyhow",
   "bytes",
-@@ -4284,8 +4272,6 @@ dependencies = [
+@@ -4211,8 +4199,6 @@ dependencies = [
  [[package]]
  name = "rustls-native-certs"
  version = "0.8.4"
@@ -126,7 +126,7 @@ index b1a7179..2316116 100644
  dependencies = [
   "openssl-probe",
   "rustls-pki-types",
-@@ -5955,6 +5941,7 @@ dependencies = [
+@@ -5860,6 +5846,7 @@ dependencies = [
   "uv-state",
   "uv-static",
   "uv-warnings",
@@ -134,7 +134,7 @@ index b1a7179..2316116 100644
   "wiremock",
  ]
  
-@@ -6183,6 +6170,7 @@ dependencies = [
+@@ -6093,6 +6080,7 @@ dependencies = [
   "uv-virtualenv",
   "uv-warnings",
   "uv-workspace",
@@ -142,7 +142,7 @@ index b1a7179..2316116 100644
  ]
  
  [[package]]
-@@ -6377,6 +6365,7 @@ dependencies = [
+@@ -6285,6 +6273,7 @@ dependencies = [
   "uv-shell",
   "uv-static",
   "uv-warnings",
@@ -150,7 +150,7 @@ index b1a7179..2316116 100644
  ]
  
  [[package]]
-@@ -6973,6 +6962,7 @@ dependencies = [
+@@ -6881,6 +6870,7 @@ dependencies = [
   "uv-types",
   "uv-warnings",
   "walkdir",
@@ -158,7 +158,7 @@ index b1a7179..2316116 100644
  ]
  
  [[package]]
-@@ -7397,6 +7387,7 @@ dependencies = [
+@@ -7302,6 +7292,7 @@ dependencies = [
   "uv-virtualenv",
   "uv-warnings",
   "uv-workspace",
@@ -166,7 +166,7 @@ index b1a7179..2316116 100644
  ]
  
  [[package]]
-@@ -7644,6 +7635,7 @@ dependencies = [
+@@ -7550,6 +7541,7 @@ dependencies = [
   "uv-python-types",
   "uv-static",
   "uv-trampoline-builder",
@@ -174,7 +174,7 @@ index b1a7179..2316116 100644
   "which",
   "windows",
  ]
-@@ -7992,6 +7984,7 @@ dependencies = [
+@@ -7897,6 +7889,7 @@ dependencies = [
   "tracing",
   "uv-fs",
   "uv-static",
@@ -182,7 +182,7 @@ index b1a7179..2316116 100644
   "windows",
   "windows-registry",
  ]
-@@ -8177,6 +8170,7 @@ dependencies = [
+@@ -8082,6 +8075,7 @@ dependencies = [
   "uv-virtualenv",
   "uv-warnings",
   "uv-workspace",
@@ -190,7 +190,7 @@ index b1a7179..2316116 100644
  ]
  
  [[package]]
-@@ -8424,6 +8418,20 @@ version = "0.11.1+wasi-snapshot-preview1"
+@@ -8328,6 +8322,20 @@ version = "0.11.1+wasi-snapshot-preview1"
  source = "registry+https://github.com/rust-lang/crates.io-index"
  checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
  
@@ -212,20 +212,20 @@ index b1a7179..2316116 100644
  name = "wasm-bindgen"
  version = "0.2.114"
 diff --git a/Cargo.toml b/Cargo.toml
-index 4213611..e517571 100644
+index cb02943..f3f7e08 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -203,7 +203,7 @@ hex = { version = "0.4.3", default-features = false, features = ["std"] }
+@@ -202,7 +202,7 @@ hex = { version = "0.4.3", default-features = false, features = ["std"] }
  http = { version = "1.1.0", default-features = false, features = ["std"] }
  http-content-range = { version = "0.2.4", default-features = false }
  indexmap = { version = "2.5.0", default-features = false, features = ["std"] }
 -indicatif = { version = "0.18.0", default-features = false, features = ["unicode-width"] }
 +indicatif = { version = "0.18.0", default-features = false, features = ["unicode-width", "wasmbind"] }
  indoc = { version = "2.0.5", default-features = false }
+ iri-string = { version = "0.7.10", default-features = false }
  itertools = { version = "0.14.0", default-features = false, features = ["use_std"] }
- jiff = { version = "0.2.0", default-features = false, features = [
-@@ -354,6 +354,8 @@ unscanny = { version = "0.1.0", default-features = false }
- url = { version = "2.5.2", default-features = false, features = ["serde", "std"] }
+@@ -363,6 +363,8 @@ url = { version = "2.5.2", default-features = false, features = ["serde", "std"]
+ uuid = { version = "1.24.0", default-features = false }
  version-ranges = { version = "0.2.2", package = "astral-version-ranges", default-features = false }
  walkdir = { version = "2.5.0", default-features = false }
 +# slicc's kernel: std::process and tokio::process on WASI (homescoop's crate).
@@ -233,7 +233,7 @@ index 4213611..e517571 100644
  webpki-root-certs = { version = "1", default-features = false }
  which = { version = "8.0.0", default-features = false, features = ["real-sys"] }
  windows = { version = "0.61.0", default-features = false, features = [
-@@ -560,3 +562,14 @@ codegen-units = 1
+@@ -569,3 +571,14 @@ codegen-units = 1
  # The profile that 'cargo dist' will build with.
  [profile.dist]
  inherits = "release"
@@ -249,7 +249,7 @@ index 4213611..e517571 100644
 +reqsign-http-send-reqwest = { path = "homescoop-crates/reqsign-http-send-reqwest-4.0.6" }
 +rustls-native-certs = { path = "homescoop-crates/rustls-native-certs-0.8.4" }
 diff --git a/crates/uv-auth/Cargo.toml b/crates/uv-auth/Cargo.toml
-index 710ca33..f9da00f 100644
+index b04a6c1..5ce458f 100644
 --- a/crates/uv-auth/Cargo.toml
 +++ b/crates/uv-auth/Cargo.toml
 @@ -44,6 +44,7 @@ tokio = { workspace = true }
@@ -261,7 +261,7 @@ index 710ca33..f9da00f 100644
  [dev-dependencies]
  insta = { workspace = true }
 diff --git a/crates/uv-build-frontend/Cargo.toml b/crates/uv-build-frontend/Cargo.toml
-index fd18480..3cb1f55 100644
+index 5f1be1d..c2d3646 100644
 --- a/crates/uv-build-frontend/Cargo.toml
 +++ b/crates/uv-build-frontend/Cargo.toml
 @@ -50,6 +50,7 @@ tokio = { workspace = true }
@@ -273,7 +273,7 @@ index fd18480..3cb1f55 100644
  [dev-dependencies]
  insta = { workspace = true }
 diff --git a/crates/uv-command-support/Cargo.toml b/crates/uv-command-support/Cargo.toml
-index 8cc6be7..a5c69c7 100644
+index 42d9148..2a47030 100644
 --- a/crates/uv-command-support/Cargo.toml
 +++ b/crates/uv-command-support/Cargo.toml
 @@ -34,6 +34,7 @@ rustc-hash = { workspace = true }
@@ -310,19 +310,19 @@ index 8ce93a4..3f71adc 100644
  
  #[cfg(test)]
 diff --git a/crates/uv-installer/Cargo.toml b/crates/uv-installer/Cargo.toml
-index 9d71972..d3b22a7 100644
+index 0ff3496..548e2ed 100644
 --- a/crates/uv-installer/Cargo.toml
 +++ b/crates/uv-installer/Cargo.toml
-@@ -54,6 +54,7 @@ tokio = { workspace = true }
+@@ -53,6 +53,7 @@ thiserror = { workspace = true }
+ tokio = { workspace = true }
  tracing = { workspace = true }
- url = { workspace = true }
  walkdir = { workspace = true }
 +wasix-command = { workspace = true }
  
  [dev-dependencies]
  uv-python-types = { workspace = true }
 diff --git a/crates/uv-project-commands/Cargo.toml b/crates/uv-project-commands/Cargo.toml
-index b53476b..20a3788 100644
+index 969682a..d82a4ca 100644
 --- a/crates/uv-project-commands/Cargo.toml
 +++ b/crates/uv-project-commands/Cargo.toml
 @@ -68,7 +68,6 @@ anstream = { workspace = true }
@@ -333,10 +333,10 @@ index b53476b..20a3788 100644
  fs-err = { workspace = true }
  futures = { workspace = true }
  indicatif = { workspace = true }
-@@ -86,3 +85,7 @@ toml = { workspace = true }
+@@ -85,3 +84,7 @@ tokio = { workspace = true }
+ toml = { workspace = true }
  toml_edit = { workspace = true }
  tracing = { workspace = true }
- url = { workspace = true }
 +wasix-command = { workspace = true }
 +
 +[target.'cfg(not(target_os = "wasi"))'.dependencies]
@@ -355,7 +355,7 @@ index 9775d93..3f9738b 100644
              let files = Arc::clone(&files);
              move || {
 diff --git a/crates/uv-python-interpreter/Cargo.toml b/crates/uv-python-interpreter/Cargo.toml
-index 8e735f5..4127f42 100644
+index 8786aef..24d2b06 100644
 --- a/crates/uv-python-interpreter/Cargo.toml
 +++ b/crates/uv-python-interpreter/Cargo.toml
 @@ -43,6 +43,7 @@ tempfile = { workspace = true }
@@ -367,7 +367,7 @@ index 8e735f5..4127f42 100644
  [target.'cfg(target_os = "windows")'.dependencies]
  windows = { workspace = true }
 diff --git a/crates/uv-shell/Cargo.toml b/crates/uv-shell/Cargo.toml
-index 69b5504..d8c76f9 100644
+index d88ebeb..8e6b706 100644
 --- a/crates/uv-shell/Cargo.toml
 +++ b/crates/uv-shell/Cargo.toml
 @@ -24,6 +24,7 @@ fs-err = { workspace = true }
@@ -379,7 +379,7 @@ index 69b5504..d8c76f9 100644
  [target.'cfg(unix)'.dependencies]
  nix = { workspace = true }
 diff --git a/crates/uv-tool-commands/Cargo.toml b/crates/uv-tool-commands/Cargo.toml
-index 30a49b6..4bb15b1 100644
+index 25d174f..b42aead 100644
 --- a/crates/uv-tool-commands/Cargo.toml
 +++ b/crates/uv-tool-commands/Cargo.toml
 @@ -71,6 +71,7 @@ serde_json = { workspace = true }
@@ -391,7 +391,7 @@ index 30a49b6..4bb15b1 100644
  [target.'cfg(windows)'.dependencies]
  self-replace = { workspace = true }
 diff --git a/crates/uv/Cargo.toml b/crates/uv/Cargo.toml
-index d9e0974..2b1f790 100644
+index 4243b34..1065b5b 100644
 --- a/crates/uv/Cargo.toml
 +++ b/crates/uv/Cargo.toml
 @@ -80,7 +80,6 @@ axoupdater = { workspace = true, features = [
@@ -402,7 +402,7 @@ index d9e0974..2b1f790 100644
  etcetera = { workspace = true }
  fs-err = { workspace = true, features = ["tokio"] }
  futures = { workspace = true }
-@@ -102,6 +101,9 @@ url = { workspace = true }
+@@ -101,6 +100,9 @@ tracing-tree = { workspace = true }
  walkdir = { workspace = true }
  which = { workspace = true }
  

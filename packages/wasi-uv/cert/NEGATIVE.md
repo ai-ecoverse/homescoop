@@ -42,3 +42,15 @@ The published 0.13.1-2 passes the new stress row's traps check: 6 rounds of 41 l
 - **The new row, `cert/timeout.mjs`:** a `uv run --no-project python -c '…time.sleep(600)'` runs detached under a 15 s budget. The spec checks that uv is running, that the case fails with `wasi-uv: FAIL … no exit within 15 s`, and that afterwards `/proc/*/stat` lists no `uv` or `python` process.
 - **The old helper fails it** (0.13.1-5, slicc-kernel 1.134.3, users enforce): `a timed-out detached uv leaves no uv or python behind (homescoop#1578): 1017 (uv) S 1 1007 … | 1021 (python) S 1017 1007 …`, so uv (parent now 1) and its python were still there. With the new helper the row passes: uv and python, 2 processes, are gone.
 - **Host test:** `scripts/test/wasi-uv-detached.test.mjs` has a case where the command forks `sleep 30` and waits; after the timeout the sleep must be dead. It fails with the old helper (1 of 7), since only the wrapper died.
+
+## 0.13.2-1: uv 0.13.2 (Renovate #1913, 2026-10-27)
+
+- **The rebase:** 0001 and 0002 no longer applied to 0.13.2 (Cargo.toml's `indicatif` line gained an `iri-string` neighbour; `url` left uv-installer's and uv-project-commands' dependencies; `DisplaySafeUrl` became `SafeUrl` next to keyring.rs's imports; run.rs lost `use url::Url`). Every patch is regenerated against the 0.13.2 tree with the same content; none was dropped, since upstream does none of it. 0.13.2 adds no process spawn site and no `cfg(unix)` branch outside tests (run.rs's new `#[cfg(unix)]` import serves the stdin-script branch 0.13.1 already had), and builds for wasm32-wasip1-threads without new gating.
+- **The existing rows pass** on 0.13.2-1 (slicc-kernel 1.134.3, the kernel's default users mode): checklist, interrupt, locks, stress (6 rounds, 0 traps) and timeout.
+- **The new row, `cert/compile.mjs`,** fails on the published 0.13.1-5 at its first refusal: `uv pip compile requirements.in --python-version 3.14.0.1` panics (`Valid PythonVersions should be valid VersionRequests: InvalidVersionRequest("3.14.0.1")`, `uv: wasm trap in thread 2: unreachable`, rc 134). Probed one by one, 0.13.1-5 fails each of the row's 0.13.2 checks:
+  - `--format pylock.toml -o /` resolves and then panics (`called Option::unwrap() on a None value`, rc 134);
+  - `uv export --format pylock.toml` writes no `environments` line for a project with `tool.uv.environments`;
+  - `uv pip install -r` of a pylock.toml whose `environments` is `sys_platform == 'linux'` installs idna into the wasi environment (rc 0);
+  - `uv pip check -q` exits 1 and prints nothing.
+  0.13.2-1 passes the whole row.
+- **The heap (homescoop#1287):** at the 64 MiB initial heap the stress row's VmSize stays at 64 MiB (65,536 kB) every round for 0.13.2-1, so uv never grows the memory. Linked at the default heap (5 MiB) to see the real peak, the stress row peaks at 7,360 kB with 0.13.2-1 and 7,488 kB with 0.13.1-5's source (6 rounds each, 0 traps). The peak didn't move; the 64 MiB initial heap stays. The 17 MiB in the old `measured-by` was 0.13.1-2's, before 0006.
