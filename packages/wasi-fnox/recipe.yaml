@@ -1,18 +1,18 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.41.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.42.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
 # (/dev/sealed and exec tickets).
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
-version: "1.41.0"
+version: "1.42.0"
 npm: "@ai-ecoverse/wasi-fnox"
-summary: "fnox 1.41 for slicc WASI preview1 (command fnox; seven's sealed store)"
+summary: "fnox 1.42 for slicc WASI preview1 (command fnox; seven's sealed store)"
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
-  sha256: "31802536f03c67e699ad48504c76e0b3c9bfa576753db254271e96b354b0639c"
-  epoch: "1792404064"
+  sha256: "1302d6c5c68a8401f65ef7d84050cb75fb05fd4e53e09fe7bda5c1e1717fda16"
+  epoch: "1792522772"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.41.0; the patches live here, are not
+    Upstream is jdx/fnox v1.42.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -48,7 +48,10 @@ about:
            tokio::process), whose GNUPGHOME, GOPASS_HOMEDIR and
            GOPASS_CONFIG_NOWRAP proxy run scrubs the same way
       0003 compile out mcp, proxy, tui, daemon, leases, prompts on WASI,
-           and from 1.40.0 the plugin command and fnox-core's plugins
+           and from 1.40.0 the plugin command and fnox-core's plugins;
+           from 1.42.0 the azure-token lease's prerequisite check reads
+           its auth setting (azure_shared's AzureAuth, which stays built),
+           and its backend, managed identity included, stays compiled out
       0004 cwd from PWD, HOME from the environment, current_thread; the
            XDG defaults (config, state, and 1.40.0's data dir) as on unix
       0005 spawn `fnox exec` children through wasix-command
@@ -83,7 +86,7 @@ about:
            on PATH the kernel won't execute (homescoop#1129)
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.41.0 commit time (source.epoch, 2026-10-19T10:01:04Z), so the
+    v1.42.0 commit time (source.epoch, 2026-10-20T18:59:32Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -102,3 +105,8 @@ about:
     rules' help text, now on ProxyRulesCommand) and 0016 (exec's plan
     call, now Roots::Scope) are refreshed; the others need new contexts
     only; no patch is dropped, since upstream does none of them itself.
+    1.42.0-1 rebases the series onto v1.42.0: 0003 keeps azure_token.rs's
+    AzureAuth import on WASI, since the lease's check_prerequisites now
+    matches on it; the others need new contexts only; no patch is
+    dropped, since upstream does none of them itself; build.sh's
+    usage-test notice moves to 7.1.0 (the same LICENSE, f68207e9...).

@@ -13,7 +13,7 @@ asks for an argument or stdin, `fnox init` writes a minimal
 configuration, and the daemon is never started in the background.
 
 diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_prompt.rs
-index 02115842..6badfbd2 100644
+index 7db90751..8b1726c2 100644
 --- a/crates/fnox-core/src/auth_prompt.rs
 +++ b/crates/fnox-core/src/auth_prompt.rs
 @@ -6,6 +6,7 @@
@@ -140,22 +140,18 @@ index 786e820d..9f0eebda 100644
      let sanitized: String = name
          .chars()
 diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-core/src/lease_backends/azure_token.rs
-index 4af1f536..9b154434 100644
+index 3bc4a0e1..86cbd916 100644
 --- a/crates/fnox-core/src/lease_backends/azure_token.rs
 +++ b/crates/fnox-core/src/lease_backends/azure_token.rs
-@@ -1,7 +1,10 @@
- use crate::error::{FnoxError, Result};
+@@ -2,6 +2,7 @@ use crate::error::{FnoxError, Result};
  use crate::lease_backends::{Lease, LeaseBackend};
--use crate::providers::azure_shared::{self, AzureAuth};
-+use crate::providers::azure_shared;
-+#[cfg(not(target_os = "wasi"))]
-+use crate::providers::azure_shared::AzureAuth;
+ use crate::providers::azure_shared::{self, AzureAuth};
  use async_trait::async_trait;
 +#[cfg(not(target_os = "wasi"))]
  use azure_core::credentials::TokenCredential;
  use indexmap::IndexMap;
  use std::sync::Arc;
-@@ -16,6 +19,9 @@ pub fn check_prerequisites() -> Option<String> {
+@@ -26,6 +27,9 @@ pub fn check_prerequisites(
      if azure_shared::service_principal_env().is_some() {
          return None;
      }
@@ -165,7 +161,7 @@ index 4af1f536..9b154434 100644
      let has_az = which::which("az").is_ok();
      if has_az {
          None
-@@ -32,11 +38,13 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
+@@ -54,12 +58,14 @@ pub fn required_env_vars(auth: Option<&str>) -> Vec<(&'static str, &'static str)
      ]
  }
  
@@ -173,13 +169,14 @@ index 4af1f536..9b154434 100644
  pub struct AzureTokenBackend {
      scope: String,
      env_var: String,
+     auth: AzureAuth,
  }
  
 +#[cfg(not(target_os = "wasi"))]
  impl AzureTokenBackend {
-     pub fn new(scope: String, env_var: String) -> Self {
-         Self { scope, env_var }
-@@ -47,6 +55,7 @@ impl AzureTokenBackend {
+     pub fn new(
+         scope: String,
+@@ -99,6 +105,7 @@ impl AzureTokenBackend {
      }
  }
  
@@ -417,10 +414,10 @@ index 45fd4168..c6bd4cc3 100644
      #[cfg(target_os = "macos")]
      {
 diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/lease_backends/mod.rs
-index 8da8d034..1211d21c 100644
+index e055d86e..4b996a58 100644
 --- a/crates/fnox-core/src/lease_backends/mod.rs
 +++ b/crates/fnox-core/src/lease_backends/mod.rs
-@@ -325,6 +325,15 @@ impl LeaseBackendConfig {
+@@ -339,6 +339,15 @@ impl LeaseBackendConfig {
      }
  
      /// Create a lease backend instance from this configuration

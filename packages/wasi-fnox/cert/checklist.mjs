@@ -43,7 +43,7 @@ export default async function (ctx) {
 
   const ver = await fnox(['--version']);
   assert.equal(ver.status, 0, `--version: ${ver.stderr}`);
-  assert.match(ver.stdout, /^fnox 1\.41\.0/);
+  assert.match(ver.stdout, /^fnox 1\.42\.0/);
   const help = await fnox(['--help']);
   assert.equal(help.status, 0);
   for (const cmd of ['exec', 'get', 'set', 'proxy']) assert.match(help.stdout, new RegExp(`\\n  ${cmd} `));
@@ -293,6 +293,65 @@ export default async function (ctx) {
   for (const name of Object.keys(gopassCreds)) {
     assert.doesNotMatch(scrub141.stdout, new RegExp(`^${name}=`, 'm'), `proxy run handed a configured gopass provider's ${name} to the child (homescoop#401)`);
   }
+
+  await write(
+    'home/v142exp/fnox.toml',
+    [
+      '[providers.k8s]', 'type = "kubernetes"', '',
+      '[secrets]',
+      'GH = { provider = "seven", value = "seven_ph_gh_0142" }',
+      'LVL = { default = "debug" }',
+      'HOST = { default = "db.internal" }',
+      'URL = { default = "postgres://${HOST}/app" }',
+      'HIDDEN = { default = "hidden-value", env = false }',
+      'GF = { provider = "seven", value = "seven_ph_gf_0142", as_file = true }',
+      'UNUSED = { provider = "k8s", value = "app-secret" }', '',
+    ].join('\n'),
+  );
+  const v142 = (args) => run(['fnox', ...args], { cwd: '/home/v142exp', env: { ...env, PWD: '/home/v142exp' } });
+  const lines = (s) => s.split('\n').filter(Boolean);
+  const expAll = await v142(['export', '--if-missing', 'error']);
+  assert.notEqual(expAll.status, 0, `1.42.0 export without keys still resolves the unresolvable UNUSED: ${expAll.stdout}`);
+  assert.notEqual(expAll.status, 134, `1.42.0 export without keys trapped: ${expAll.stderr}`);
+  const expOne = await v142(['export', '--if-missing', 'error', 'LVL']);
+  assert.equal(expOne.status, 0, `1.42.0 export of a named key resolves only that key, not UNUSED: ${expOne.stderr}`);
+  assert.deepEqual(lines(expOne.stdout), ['LVL=debug'], `1.42.0 export LVL prints only LVL: ${expOne.stdout}`);
+  assert.doesNotMatch(expOne.stderr, /panicked|wasm trap/);
+  const expJson = await v142(['export', '--if-missing', 'error', '--format', 'json', 'URL', 'GH']);
+  assert.equal(expJson.status, 0, `1.42.0 export --format json URL GH: ${expJson.stderr}`);
+  const expJsonSecrets = expJson.status === 0 ? JSON.parse(expJson.stdout).secrets : null;
+  assert.deepEqual(expJsonSecrets, { URL: 'postgres://db.internal/app', GH: 'seven_ph_gh_0142' }, `1.42.0 export of named keys: the interpolated HOST is resolved but not exported, the sealed GH is its placeholder: ${expJson.stdout}`);
+  const expHidden = await v142(['export', '--if-missing', 'error', 'HIDDEN']);
+  assert.equal(expHidden.status, 0, `1.42.0 export of a named env = false key: ${expHidden.stderr}`);
+  assert.deepEqual(lines(expHidden.stdout), ['HIDDEN=hidden-value'], `1.42.0 a named env = false secret is exported: ${expHidden.stdout}`);
+  const expFileNamed = await v142(['export', '--if-missing', 'error', 'GF']);
+  assert.equal(expFileNamed.status, 0, `1.42.0 export of a named sealed as_file key: ${expFileNamed.stderr}`);
+  assert.deepEqual(lines(expFileNamed.stdout), ['GF=seven_ph_gf_0142'], `1.42.0 a named sealed as_file secret exports only its placeholder: ${expFileNamed.stdout}`);
+  const expUnknown = await v142(['export', 'LVX']);
+  assert.notEqual(expUnknown.status, 0, `1.42.0 export of an unknown key must fail: ${expUnknown.stdout}`);
+  assert.notEqual(expUnknown.status, 134, `1.42.0 export of an unknown key trapped: ${expUnknown.stderr}`);
+  assert.ok(flat(expUnknown.stderr).includes("Did you mean 'LVL'?"), `1.42.0 export of an unknown key suggests LVL: ${expUnknown.stderr}`);
+  assert.equal(expUnknown.stdout, '', `1.42.0 export of an unknown key prints nothing: ${expUnknown.stdout}`);
+
+  await write(
+    'home/v142lease/fnox.toml',
+    [
+      '[secrets]', 'LVL = { default = "debug" }', '',
+      '[leases.az]', 'type = "azure-token"', 'scope = "https://ai.azure.com/.default"', 'env_var = "AI_ACCESS_TOKEN"',
+      'auth = "managed-identity"', 'managed_identity_client_id = "00000000-0000-0000-0000-000000000000"', '',
+    ].join('\n'),
+  );
+  for (const args of [['exec', '--', 'printenv', 'LVL'], ['get', 'AI_ACCESS_TOKEN']]) {
+    const r = await run(['fnox', ...args], { cwd: '/home/v142lease', env: { ...env, PWD: '/home/v142lease' } });
+    assert.notEqual(r.status, 0, `1.42.0 azure-token lease with managed identity, fnox ${args.join(' ')}, must fail in the WASI build: ${r.stdout}`);
+    assert.notEqual(r.status, 134, `1.42.0 azure-token managed identity trapped, fnox ${args.join(' ')}: ${r.stderr}`);
+    assert.ok(flat(r.stderr).includes('leases are not available in the WASI build of fnox'), `1.42.0 azure-token managed identity, fnox ${args.join(' ')}: ${r.stderr}`);
+    assert.doesNotMatch(r.stderr, /panicked|wasm trap/);
+    assert.equal(r.stdout, '', `1.42.0 azure-token managed identity, fnox ${args.join(' ')}, prints nothing: ${r.stdout}`);
+  }
+  const syncLocal = await fnox(['sync', '--local-file']);
+  assert.notEqual(syncLocal.status, 0, 'sync --local-file');
+  assert.ok(flat(syncLocal.stderr).includes(REFUSED), `1.42.0 sync --local-file: ${syncLocal.stderr}`);
 
   await write('home/plain/fnox.toml', '[providers.plain]\ntype = "plain"\n\n[secrets]\nLOG_LEVEL = { provider = "plain", value = "debug" }\n');
   const plain = await run(['fnox', 'exec', '--', 'printenv', 'LOG_LEVEL'], { cwd: '/home/plain', env });

@@ -117,7 +117,7 @@ index 43e5e6d8..50241015 100644
          tracing::debug!(
              "Re-encrypting secrets for profiles '{}'",
 diff --git a/src/commands/sync.rs b/src/commands/sync.rs
-index 5203b81d..dad4349a 100644
+index 24246fbe..05081e01 100644
 --- a/src/commands/sync.rs
 +++ b/src/commands/sync.rs
 @@ -77,6 +77,13 @@ pub struct SyncCommand {

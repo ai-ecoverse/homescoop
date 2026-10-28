@@ -34,7 +34,7 @@ env_dependencies() (GNUPGHOME, GOPASS_HOMEDIR, GOPASS_CONFIG_NOWRAP)
 is read from gopass.rs, so `proxy run` keeps them from the child.
 
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
-index f32ecfb7..d9c0fb73 100644
+index bbc48576..071344d4 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
 @@ -430,9 +430,19 @@ fn generate_provider_methods(
@@ -68,7 +68,7 @@ index f32ecfb7..d9c0fb73 100644
          .map(|(_name, provider)| {
              let module = Ident::new(&provider.module, Span::call_site());
              quote! { use super::super::#module; }
-@@ -740,6 +751,85 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
+@@ -741,6 +752,85 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
      }
  }
  
@@ -154,7 +154,7 @@ index f32ecfb7..d9c0fb73 100644
  fn generate_provider_instantiate(
      providers: &[(String, ProviderToml)],
  ) -> Result<String, Box<dyn std::error::Error>> {
-@@ -757,6 +847,18 @@ fn generate_provider_instantiate(
+@@ -758,6 +848,18 @@ fn generate_provider_instantiate(
              vec![]
          };
  
@@ -261,7 +261,7 @@ index 97368bd2..7eff5146 100644
          let auth_failed = |e: azure_core::Error| FnoxError::ProviderAuthFailed {
              provider: provider.to_string(),
 diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/providers/mod.rs
-index 09d663b8..0b35d2bd 100644
+index 770a98bb..fb66d7ae 100644
 --- a/crates/fnox-core/src/providers/mod.rs
 +++ b/crates/fnox-core/src/providers/mod.rs
 @@ -5,44 +5,87 @@ use std::path::PathBuf;
@@ -372,7 +372,7 @@ index 09d663b8..0b35d2bd 100644
          include!(concat!(
              env!("OUT_DIR"),
              "/generated/providers_instantiate.rs"
-@@ -495,6 +541,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
+@@ -502,6 +548,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
          };
          return get_provider_from_resolved(provider_name, &resolved);
      }
