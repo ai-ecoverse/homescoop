@@ -140,3 +140,17 @@ The published 1.40.0-1 against 1.41.0-1's checklist (slicc-kernel 1.134.3, users
 - **exec and an unused `env = false` secret:** `fnox exec --if-missing error -- printenv LVL`, in a project that also has `UNUSED = { provider = "k8s", value = "app-secret", env = false }`, fails with `Error resolving secret 'UNUSED': ... provider type 'kubernetes' is not available`. 1.40.0's exec resolves every secret in the profile; 1.41.0's resolves only the ones it injects and what they depend on (upstream #984). `UNUSED` stays out of the command's environment on both.
 
 `test/sealed.mjs` passes on 1.41.0-1 (slicc-kernel 1.83.0, macOS arm64).
+
+## 1.42.0-1: the series on v1.42.0 (2026-10-28)
+
+The published 1.41.0-1 against 1.42.0-1's checklist (slicc-kernel 1.134.3, users kernel default, `run.mjs --soft`): **FAIL, 10 of 176 assertions.** 1.42.0-1 passes all 176.
+- `fnox --version` prints 1.41.0.
+- **export with named keys** (upstream #1002): `fnox export --if-missing error LVL`, `fnox export --if-missing error --format json URL GH`, `fnox export --if-missing error HIDDEN`, `fnox export --if-missing error GF` and `fnox export LVX` all fail with `error: unexpected argument 'LVL' found` (and the same for `URL`, `HIDDEN`, `GF` and `LVX`), so the row's checks fail: only LVL printed although the unnamed `UNUSED` (a kubernetes secret) can't resolve, URL with its interpolated HOST resolved but not exported and the sealed GH as its placeholder, the named `env = false` HIDDEN exported, the named sealed `as_file` GF exported as its placeholder only, and `Did you mean 'LVL'?` for the unknown key.
+
+Two parts of the new row pass on 1.41.0-1 too. They show that 1.42.0's new code stays gated out on WASI, and they don't fix anything:
+- **azure-token with managed identity** (upstream #1003): `fnox exec -- printenv LVL` and `fnox get AI_ACCESS_TOKEN`, in a project whose azure-token lease sets `auth = "managed-identity"` and `managed_identity_client_id`, fail with "leases are not available in the WASI build of fnox", without a trap, and print nothing. 1.41.0-1 ignores the two new fields and fails the same way. On 1.42.0-1, the lease's `check_prerequisites` now reads its `auth` setting (`AzureAuth`, which azure_shared builds on WASI) and passes, so the refusal comes from 0003's lease ledger, as for every other lease. The managed-identity credential (azure_identity's IMDS client) is never built, because 0003 compiles out `AzureTokenBackend`.
+- **`fnox sync --local-file`** (upstream #1004) is refused with 0010's message, like `fnox sync`. Only `sync` loads a config without the local sync cache, so 1.42.0's `local_source` handling never runs on WASI.
+
+Before the fix in 0003, the series on v1.42.0 didn't build: `git apply` stopped at `crates/fnox-core/src/lease_backends/azure_token.rs:32`. A three-way rebase applied 0003's hunks, but `cargo check --target wasm32-wasip1` then failed with `cannot find type AzureAuth in this scope` (E0433, three times in `check_prerequisites`), because 0003 imported `AzureAuth` only off WASI. 0003 now keeps the import on all targets.
+
+`test/sealed.mjs` passes on 1.42.0-1 (slicc-kernel 1.83.0, macOS arm64).

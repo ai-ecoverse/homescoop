@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wasi-fnox: build fnox (jdx/fnox v1.41.0 plus packages/wasi-fnox/*.patch,
+# wasi-fnox: build fnox (jdx/fnox v1.42.0 plus packages/wasi-fnox/*.patch,
 # applied by apply.sh) for wasm32-wasip1, shrink it with wasm-opt, and stage
 # bin/fnox.wasm with LICENSE and THIRD-PARTY-NOTICES.md.
 set -euo pipefail
@@ -57,7 +57,7 @@ echo "== wasi-fnox: cargo build --bin fnox ($TARGET, Rust $RUST)"
   # /private/tmp/…), so map that spelling too. rust-embed (age's i18n
   # files) stores each file's times, and a file's birth time is when cargo
   # unpacked the crate on this machine (homescoop#364): SOURCE_DATE_EPOCH,
-  # the v1.41.0 tag's commit time, replaces both, so builds are byte-identical.
+  # the v1.42.0 tag's commit time, replaces both, so builds are byte-identical.
   SOURCE_DATE_EPOCH="$(field source.epoch)" \
   RUSTFLAGS="--cfg tokio_unstable -C codegen-units=1 --remap-path-prefix=$SRC_DIR=/fnox --remap-path-prefix=$(pwd -P)=/fnox --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo" \
     "${CARGO[@]}" build --locked --release --bin fnox --target "$TARGET"
@@ -90,7 +90,7 @@ const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]))
 const root = meta.packages.find((p) => p.name === 'fnox' && !p.source)
 // Crates that ship no licence file; their texts follow from pinned
 // upstream URLs below (the whole name@version, so a bump fails loudly).
-const fetched = new Set(['age@0.12.1', 'age-core@0.12.0', 'cookie-factory@0.3.3', 'fluent-langneg@0.13.1', 'intl_pluralrules@7.0.2', 'backtrace-ext@0.2.1', 'usage-test@7.0.2', 'io_tee@0.1.1'])
+const fetched = new Set(['age@0.12.1', 'age-core@0.12.0', 'cookie-factory@0.3.3', 'fluent-langneg@0.13.1', 'intl_pluralrules@7.0.2', 'backtrace-ext@0.2.1', 'usage-test@7.1.0', 'io_tee@0.1.1'])
 const linked = new Set()
 const walk = (id) => {
   for (const dep of nodes.get(id).deps) {
@@ -128,8 +128,8 @@ homescoop_notice "intl_pluralrules 7.0.2 (Apache-2.0/MIT)" \
 homescoop_notice "backtrace-ext 0.2.1 (MIT OR Apache-2.0)" \
   "$GH/gankra/backtrace-ext/fddf332db86efec661464ca5c2c8854679e1adb2/LICENSE-MIT" d73748752e021954f65284717512f6e5814887b6ab1a7f7ded102eb7664bd319 \
   "$GH/gankra/backtrace-ext/fddf332db86efec661464ca5c2c8854679e1adb2/LICENSE-APACHE" a65e5d531cc9c3493edac54367d7c561eb8aa228585e8950632b995628279a6a
-homescoop_notice "usage-test 7.0.2 (MIT)" \
-  "$GH/jdx/usage/v7.0.2/LICENSE" f68207e9c8798c1a64d04ad674e042eddb56d679d5294683e0ae57afff3562d6
+homescoop_notice "usage-test 7.1.0 (MIT)" \
+  "$GH/jdx/usage/v7.1.0/LICENSE" f68207e9c8798c1a64d04ad674e042eddb56d679d5294683e0ae57afff3562d6
 # io_tee publishes no licence text anywhere; Cargo.toml says MIT OR
 # Apache-2.0, so the SPDX texts stand in.
 homescoop_notice "io_tee 0.1.1 (MIT OR Apache-2.0; no licence file published, SPDX texts)" \

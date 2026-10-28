@@ -11,7 +11,7 @@ homescoop's packages/wasi-fnox/apply.sh copies ai-ecoverse/homescoop
 crates/wasix-command (MIT OR Apache-2.0) into the source tree.
 
 diff --git a/Cargo.lock b/Cargo.lock
-index 5417c1ce..2946d05f 100644
+index 9e68c15e..eb9aa8fc 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -2485,6 +2485,7 @@ dependencies = [
@@ -22,7 +22,7 @@ index 5417c1ce..2946d05f 100644
   "which",
  ]
  
-@@ -8178,6 +8179,14 @@ dependencies = [
+@@ -8176,6 +8177,14 @@ dependencies = [
   "wit-bindgen",
  ]
  
@@ -38,7 +38,7 @@ index 5417c1ce..2946d05f 100644
  name = "wasm-bindgen"
  version = "0.2.129"
 diff --git a/Cargo.toml b/Cargo.toml
-index 20065dd4..d64dade4 100644
+index 5ca395d1..d6c0f526 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -183,6 +183,7 @@ which = { workspace = true }
