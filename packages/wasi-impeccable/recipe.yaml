@@ -77,3 +77,8 @@ about:
     refuses like URL scans ("--cdp scans need a browser; not available in
     this build yet", cert/cdp.mjs). No patch dropped: upstream still has no
     WASI support.
+    0.1.17-1: 0001 rebased onto engine-v0.1.17. live gained markup5ever
+    next to the dependencies the patch rewrites, which was the one rejected
+    hunk; the wasm-side dependency change itself is unchanged, and the skill
+    download's new connect and idle timeouts already exist in wasix-ureq.
+    cert/checklist.mjs reads the expected --version from this recipe.

@@ -4,12 +4,17 @@
  * concept-seed) need a network transport this page does not give the kernel;
  * test/e2e/http.test.mjs covers them on the Node entry.
  */
+import { readFileSync } from 'node:fs';
+
+const recipe = readFileSync(new URL('../recipe.yaml', import.meta.url), 'utf8');
+const VERSION = recipe.match(/^version: "([^"]+)"$/m)[1];
+
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
 
   const ver = await run(['impeccable', '--version'], { cwd: '/home' });
   assert.equal(ver.status, 0, `--version stderr=${ver.stderr}`);
-  assert.equal(ver.stdout.trim(), '0.1.16', `version=${JSON.stringify(ver.stdout)}`);
+  assert.equal(ver.stdout.trim(), VERSION, `version=${JSON.stringify(ver.stdout)}`);
 
   const dirty = `<!doctype html>
 <html><head><style>
