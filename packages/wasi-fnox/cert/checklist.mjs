@@ -4,6 +4,8 @@
  * (seal, request, materialize) wait for slicc-kernel's /dev/sealed (KS-2)
  * and materialize tickets (KS-8); see meta.json certPending.
  */
+import { readFileSync } from 'node:fs';
+
 const AGE_RECIPIENT = 'age106n8yr50p0cgudkw03ad2e92nk4fas5m8utmw0t4lm0dlc6pqg4scqmaup';
 // No vault: older kernels have no /dev/sealed; from 1.68.0 the device is
 // there and answers ENOTCONN without the embedder's sealed hook.
@@ -11,6 +13,7 @@ const NO_VAULT = /not running in seven: \/dev\/sealed is missing|ENOTCONN: no va
 const REFUSED = 'not available in seven: the value would be in a program (use a header rule)';
 const AGE = "age secrets aren't supported in seven yet (slicc-vault#2)";
 const flat = (s) => s.replace(/[\s│|]+/g, ' ');
+const VERSION = readFileSync(new URL('../recipe.yaml', import.meta.url), 'utf8').match(/^version: "([^"]+)"$/m)[1];
 
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
@@ -43,7 +46,7 @@ export default async function (ctx) {
 
   const ver = await fnox(['--version']);
   assert.equal(ver.status, 0, `--version: ${ver.stderr}`);
-  assert.match(ver.stdout, /^fnox 1\.42\.0/);
+  assert.ok(ver.stdout.startsWith(`fnox ${VERSION}`), `--version names the recipe's ${VERSION}: ${ver.stdout}`);
   const help = await fnox(['--help']);
   assert.equal(help.status, 0);
   for (const cmd of ['exec', 'get', 'set', 'proxy']) assert.match(help.stdout, new RegExp(`\\n  ${cmd} `));
@@ -428,6 +431,15 @@ export default async function (ctx) {
   assert.equal(bash.status, 0, `activate in bash: ${bash.stderr}`);
   assert.doesNotMatch(bash.stderr, /panicked|wasm trap|RangeError/);
   assert.equal(bash.stdout, 'in=debug\nout=unset\nrc=0 off=unset nosession\n', `activate in bash: ${bash.stderr}`);
+  const gone = await run(
+    [
+      'bash',
+      '-c',
+      'eval "$(/usr/bin/fnox activate bash --no-hook-env)"; rm /tmp/bin/fnox; fnox deactivate; rc=$?; declare -F fnox _fnox_hook; echo "rc=$rc shell=${FNOX_SHELL-unset}"',
+    ],
+    { cwd: '/home/hook', env: { ...env, PATH: '/tmp/bin:/usr/bin:/bin', PWD: '/home/hook' } },
+  );
+  assert.equal(gone.stdout, 'rc=0 shell=unset\n', `1.42.1 fnox deactivate after the binary is gone removes the hooks and the function: ${gone.stdout} ${gone.stderr}`);
   const getFile = await run(['fnox', 'get', 'CERT'], { cwd: '/home/hook', env });
   assert.notEqual(getFile.status, 0, 'get of an as_file secret must fail in seven');
   assert.notEqual(getFile.status, 134, `get as_file trapped: ${getFile.stderr}`);

@@ -1,5 +1,5 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.42.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.42.1; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
 # (/dev/sealed and exec tickets).
@@ -12,7 +12,7 @@ summary: "fnox 1.42 for slicc WASI preview1 (command fnox; seven's sealed store)
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "dbf5428e786625a3d5bc7a2671d9a69672015d07d92a0d6d79a2c5af5cf2454f"
-  epoch: "1792522772"
+  epoch: "1792749669"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.42.0; the patches live here, are not
+    Upstream is jdx/fnox v1.42.1; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -35,7 +35,8 @@ about:
     (a) building for WASI:
       0001 gate non-WASI dependencies (cloud SDKs, reqwest, rustls,
            keyring, TUI, prompts, signals, locks, keepass, and from
-           1.40.0 kube, k8s-openapi and mlua's vendored Lua) by target
+           1.40.0 kube, k8s-openapi and mlua's vendored Lua) by target;
+           1.42.1's rust-embed stays common, since age uses it on WASI too
       0002 build only the age and plain providers on WASI; others keep
            their config variants and fail when used, and keep their
            env_dependencies() (read from the module source at build
@@ -51,7 +52,8 @@ about:
            and from 1.40.0 the plugin command and fnox-core's plugins;
            from 1.42.0 the azure-token lease's prerequisite check reads
            its auth setting (azure_shared's AzureAuth, which stays built),
-           and its backend, managed identity included, stays compiled out
+           and its backend, managed identity included, stays compiled out;
+           from 1.42.1 also activate's invoked_exe (which and current_exe)
       0004 cwd from PWD, HOME from the environment, current_thread; the
            XDG defaults (config, state, and 1.40.0's data dir) as on unix
       0005 spawn `fnox exec` children through wasix-command
@@ -86,7 +88,7 @@ about:
            on PATH the kernel won't execute (homescoop#1129)
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.42.0 commit time (source.epoch, 2026-10-20T18:59:32Z), so the
+    v1.42.1 commit time (source.epoch, 2026-10-23T10:01:09Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -110,3 +112,11 @@ about:
     matches on it; the others need new contexts only; no patch is
     dropped, since upstream does none of them itself; build.sh's
     usage-test notice moves to 7.1.0 (the same LICENSE, f68207e9...).
+    1.42.1-1 rebases the series onto v1.42.1: 0003 also gates upstream's
+    new invoked_exe in activate, so WASI still finds fnox only through
+    0015's PATH walk; 0001, 0015 and 0016 need new contexts only (0001
+    keeps rust-embed common); the others apply as they are; no patch is
+    dropped, since upstream does none of them itself; build.sh's
+    usage-test notice moves to 7.1.1 (the same LICENSE, f68207e9...).
+    Upstream's activate hooks now test the binary before deactivating,
+    so `fnox deactivate` works after fnox is removed; the cert covers it.
