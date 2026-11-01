@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasi-biome
 
-[Biome](https://biomejs.dev) 2.5, the formatter and linter, as a WASI preview1
+[Biome](https://biomejs.dev) 2.6, the formatter and linter, as a WASI preview1
 command for SLICC: `biome`.
 
 ```sh
@@ -10,7 +10,7 @@ biome lint src
 ```
 
 `bin/biome.wasm` is Biome's CLI (`biome_cli`) built by homescoop from
-biomejs/biome 2.5.15 for `wasm32-wasip1-threads`, with the toolchain Biome
+biomejs/biome 2.6.3 for `wasm32-wasip1-threads`, with the toolchain Biome
 pins. `@biomejs/wasm-web` is a library for a JavaScript host, not a CLI, and
 Biome publishes no WASI build.
 
