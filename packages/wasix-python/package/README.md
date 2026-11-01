@@ -49,7 +49,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Since 3.15.0-1
 
-**CPython 3.15.0, a new ABI (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
+**A new ABI since CPython 3.15.0 (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
 - **The py-\* built before 3.15 don't load.** Their extension modules are `cpython-314-wasm32-wasix.so` and their `slicc.python.requires.abi` is `cp314`, so `_slicc_site.discover()` leaves them off `sys.path` (`python -v` names each one) and `import numpy` raises `ModuleNotFoundError`. That covers py-numpy, py-pandas, py-scipy, py-matplotlib, py-contourpy, py-kiwisolver and py-pillow until they're rebuilt for 3.15. The pure-Python py-\* load, except those that, until their next release, depend on wasix-python `<3.14.3`: npm or pnpm gives them their own older python, nested beside this one, and discovery refuses them as built for another python.
 - **UTF-8 mode is the default** (PEP 686): `open()` without an encoding and the filesystem encoding are UTF-8 whatever the locale; `-X utf8=0` or `PYTHONUTF8=0` turns it off.
 - Every CPython patch in `patches/` is regenerated against 3.15.0; none is dropped, since 3.15 has none of the fixes. Bundled `pip` 26.2.1.
