@@ -12,7 +12,7 @@
   "checklist": [
     "biome --version → Version: recipe.yaml's version",
     "project in /home/app whose biome.json extends @ai-ecoverse/slicc-shared-web/biome (its real 1.10.1 config, fixtures/) from node_modules, with .git and .gitignore (dist/, node_modules/)",
-    "clean project: biome check . → exit 0, Checked 4 files, dist/ ignored",
+    "clean project: biome check . → exit 0, empty stdout, Checked 4 files on stderr (the summary is on stderr since 2.6.3, biomejs/biome#12593), dist/ ignored",
     "floating promise across files (type-aware nursery/noFloatingPromises) plus an unformatted file → check exit 1, Found 2 errors, both reported, nothing from dist/ or node_modules",
     "biome format --write . → exit 0, Fixed 1 file, exact single-quoted/semicolon output, ignored file untouched",
     "biome lint src → exit 1 with noFloatingPromises; after `void` the check passes",

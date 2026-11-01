@@ -28,6 +28,8 @@ One patch (`0001-wasi-cli.patch` in the recipe):
 Certified: `check`, `ci`, `format` (files and stdin) and `lint`, including
 type-aware rules across files, `.gitignore`, and configuration errors.
 
+Since 2.6.3 Biome prints the command summary to stderr, not stdout.
+
 2.5.15-1 hangs on `--watch` and `__run_server` (Ctrl-C recovers it);
 2.5.15-2 refuses them with a message.
 
