@@ -16,7 +16,7 @@ feature unification.
 Native targets keep the same dependency set and features.
 
 diff --git a/Cargo.toml b/Cargo.toml
-index 2cce9bf3..5ca395d1 100644
+index fcc5acf9..5541f0f8 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -16,7 +16,7 @@ rust-version = "1.91.1"
@@ -37,7 +37,7 @@ index 2cce9bf3..5ca395d1 100644
  ci_info = "0.14"
  usage-rs = { version = "7", features = ["diagnostics", "completions", "config"] }
  console = "0.16"
-@@ -104,7 +104,7 @@ tempfile = "3"
+@@ -106,7 +106,7 @@ tempfile = "3"
  tera = { version = "2", default-features = false }
  terminal_size = "0.4"
  thiserror = "2"
@@ -46,7 +46,7 @@ index 2cce9bf3..5ca395d1 100644
  tokio-rustls = "0.26"
  toml_edit = { version = "0.25", features = ["serde"] }
  tracing = "0.1"
-@@ -138,7 +138,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
+@@ -140,7 +140,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
  # transitively via fnox-core and are not listed here.
  aho-corasick = { workspace = true }
  anyhow = { workspace = true }
@@ -54,7 +54,7 @@ index 2cce9bf3..5ca395d1 100644
  atty = { workspace = true }
  base64 = { workspace = true }
  blake3 = { workspace = true }
-@@ -146,39 +145,45 @@ chrono = { workspace = true }
+@@ -148,39 +147,45 @@ chrono = { workspace = true }
  ci_info = { workspace = true }
  usage-rs = { workspace = true }
  console = { workspace = true }
@@ -113,10 +113,10 @@ index 2cce9bf3..5ca395d1 100644
  [dev-dependencies]
  tempfile = { workspace = true }
 diff --git a/crates/fnox-core/Cargo.toml b/crates/fnox-core/Cargo.toml
-index 09af130f..24959bba 100644
+index 66d011e0..37b89a0d 100644
 --- a/crates/fnox-core/Cargo.toml
 +++ b/crates/fnox-core/Cargo.toml
-@@ -11,50 +11,25 @@ readme = "../../README.md"
+@@ -11,51 +11,26 @@ readme = "../../README.md"
  
  [dependencies]
  aes-gcm = { workspace = true }
@@ -163,11 +163,12 @@ index 09af130f..24959bba 100644
  regex = { workspace = true }
 -reqwest = { workspace = true }
 -rpassword = { workspace = true }
+ rust-embed = { workspace = true }
 -rusqlite = { workspace = true }
  schemars = { workspace = true }
  serde = { workspace = true }
  serde_json = { workspace = true }
-@@ -68,16 +43,47 @@ strum = { workspace = true }
+@@ -69,16 +44,47 @@ strum = { workspace = true }
  tempfile = { workspace = true }
  tera = { workspace = true }
  thiserror = { workspace = true }

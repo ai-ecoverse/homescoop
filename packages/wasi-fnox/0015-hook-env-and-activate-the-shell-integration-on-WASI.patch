@@ -43,13 +43,13 @@ index 75fd08e6..dd5501f6 100644
      let temp_dir = env::temp_dir();
      let timestamp = SystemTime::now()
 diff --git a/src/commands/activate.rs b/src/commands/activate.rs
-index 153eaa23..fb5cc434 100644
+index 7d1390ac..a866a567 100644
 --- a/src/commands/activate.rs
 +++ b/src/commands/activate.rs
 @@ -48,8 +48,19 @@ impl ActivateCommand {
-         let exe = std::env::current_exe()
-             .or_else(|_| which::which("fnox"))
-             .unwrap_or_else(|_| std::path::PathBuf::from("fnox"));
+             .or_else(|| std::env::current_exe().ok())
+             .or_else(|| which::which("fnox").ok())
+             .unwrap_or_else(|| std::path::PathBuf::from("fnox"));
 +        // std has no current_exe() on WASI, and a bare `fnox` makes the
 +        // shell's fnox() wrapper call itself until the shell's stack runs out:
 +        // find fnox on PATH, as the which fallback above does.
