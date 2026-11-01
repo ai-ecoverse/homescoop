@@ -120,10 +120,42 @@ test("NEGATIVE: once upstream's fix is in (0.13.5), the spurious leaf-c fails th
   checkExport(assert, ran(EXPORTED_BY_0_13_2), FIXED_IN);
 });
 
+test("NEGATIVE: the previous published uv (0.13.4-1) fails the export row at recipe.yaml's version", () => {
+  assert.throws(() => checkExport(assert, ran(EXPORTED_BY_0_13_3), recipeVersion()), /exports no leaf-c/);
+});
+
 test('NEGATIVE: a failing or crashing export fails the row', () => {
   assert.throws(() => checkExport(assert, ran(EXPORTED_BY_0_13_3, 2, 'error: Unable to find lockfile'), '0.13.3'), /rc=2/);
   assert.throws(() => checkExport(assert, ran('', 134, "thread 'main' panicked at crates/uv-lock"), '0.13.3'), /not a crash/);
   assert.throws(() => checkExport(assert, ran(EXPORTED_BY_0_13_3.replace('leaf-b==1.0.0\n', ''), 0), '0.13.3'));
+});
+
+const crateVersions = () => readdirSync(new URL('crates/', dir))
+  .filter((f) => f.endsWith('.patch'))
+  .map((f) => /^(.+)-(\d+\.\d+\.\d+)\.patch$/.exec(f).slice(1));
+const firstPatch = readFileSync(new URL('0001-wasi-build-uv-for-wasm32-wasip1-threads.patch', dir), 'utf8');
+const certMeta = JSON.parse(source('meta.json'));
+
+function checkCrateRefresh (crates, patch, meta) {
+  for (const [name, version] of crates) {
+    assert.ok(patch.includes(`+${name} = { path = "homescoop-crates/${name}-${version}" }`), `0001's [patch.crates-io] names ${name} ${version}`);
+    assert.ok(patch.includes(` name = "${name}"\n version = "${version}"\n-source`), `0001's Cargo.lock hunk names ${name} ${version}`);
+    assert.ok(`crates/${name}-${version}.patch` in meta.patches, `cert/meta.json lists ${name} ${version}`);
+  }
+}
+
+test('every crates/*.patch version matches 0001 and cert/meta.json', () => {
+  assert.equal(crateVersions().length, 8);
+  checkCrateRefresh(crateVersions(), firstPatch, certMeta);
+});
+
+test('NEGATIVE: a half-done crate refresh fails', () => {
+  const crate = [['cargo-util', '0.2.31']];
+  const stale = (text) => text.replaceAll('0.2.31', '0.2.30');
+  assert.throws(() => checkCrateRefresh(crate, stale(firstPatch), certMeta), /0001's \[patch\.crates-io\] names cargo-util 0\.2\.31/);
+  const pathOnly = firstPatch.replace(' name = "cargo-util"\n version = "0.2.31"', ' name = "cargo-util"\n version = "0.2.30"');
+  assert.throws(() => checkCrateRefresh(crate, pathOnly, certMeta), /0001's Cargo\.lock hunk names cargo-util 0\.2\.31/);
+  assert.throws(() => checkCrateRefresh(crate, firstPatch, JSON.parse(stale(JSON.stringify(certMeta)))), /cert\/meta\.json lists cargo-util 0\.2\.31/);
 });
 
 test("timeout.mjs logs the timeout it causes on purpose as expected, not as a 'wasi-uv: FAIL' line", async () => {
