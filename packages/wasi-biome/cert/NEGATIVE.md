@@ -89,3 +89,10 @@ There's no published negative for the trap: the 2.5.15-4 stress probe (3 × biom
 
 The published 2.5.15-5's `package.json` lists `homescoop.patches: ["0001-wasi-cli.patch"]`, while its build applied 0001 and 0002. `scripts/check-package-meta.mjs` now compares the list with the recipe's patches, and fails 2.5.15-5's package.json. The binary doesn't change.
 
+
+## 2.6.3-1: Biome 2.6.3 (Renovate #1934, 2026-11-01)
+
+- **What failed on f1595eff (run 41309172648):** `0001-wasi-cli.patch` did not apply, `Hunk #1 FAILED at 65` in `crates/biome_cli/Cargo.toml`. Biome 2.6 has no `reqwest` in `biome_cli`, takes `self_update` 1.2 (features `github`, `rustls`, `ureq`), and calls `ureq` itself in `commands/upgrade.rs`.
+- **The rebase:** the Cargo.toml hunks move `self_update` and `ureq` to the `cfg(not(target_os = "wasi"))` dependencies. `ureq` alone would still compile for wasm (`cargo check`, Rust 1.98.1), so the move is about the graph: the check's fingerprints for `wasm32-wasip1-threads` have no `ureq`, `self_update`, `rustls` or `ring`, and `upgrade_wasi.rs` needs none of them. The other hunks apply unchanged, with offsets. `0002` applies unchanged.
+- **No version in the spec:** `checklist.mjs` reads the version from recipe.yaml (`recipeVersion`, `reportsVersion`), so a Renovate bump needs no cert edit (as sqlite3 in homescoop#1791, wasi-uv in homescoop#1920).
+- **Negative:** the published 2.5.15-6 fails the new checklist at its first version check, `biome --version names 2.6.3, recipe.yaml's version: Version: 2.5.15` (`browser-cert --spec checklist.mjs`, slicc-kernel 1.134.3).

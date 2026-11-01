@@ -11,6 +11,17 @@ import { readFileSync } from 'node:fs';
 
 const sharedWebBiome = readFileSync(new URL('./fixtures/slicc-shared-web-biome.json', import.meta.url), 'utf8');
 
+export function recipeVersion(text = readFileSync(new URL('../recipe.yaml', import.meta.url), 'utf8')) {
+  const m = /^version: "(\d+\.\d+\.\d+)"$/m.exec(text);
+  if (!m) throw new Error('wasi-biome: recipe.yaml names no X.Y.Z version');
+  return m[1];
+}
+
+export function reportsVersion(assert, text, want = recipeVersion()) {
+  const esc = want.replaceAll('.', '\\.');
+  assert.match(text, new RegExp(`^Version: ${esc}\\n`), `biome --version names ${want}, recipe.yaml's version: ${text}`);
+}
+
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
   const A = 'home/app';
@@ -18,7 +29,7 @@ export default async function (ctx) {
 
   const ver = await run(['biome', '--version']);
   assert.equal(ver.status, 0, `--version stderr=${ver.stderr}`);
-  assert.match(ver.stdout, /^Version: 2\.5\.15\n/);
+  reportsVersion(assert, ver.stdout);
 
   await write(`${A}/package.json`, '{\n  "name": "app",\n  "private": true,\n  "type": "module"\n}\n');
   await write(`${A}/biome.json`, '{\n  "extends": ["@ai-ecoverse/slicc-shared-web/biome"]\n}\n');
