@@ -59,9 +59,9 @@ index e42d349..b21d7b5 100644
 @@ -742,8 +738,6 @@ dependencies = [
  [[package]]
  name = "cargo-util"
- version = "0.2.30"
+ version = "0.2.31"
 -source = "registry+https://github.com/rust-lang/crates.io-index"
--checksum = "5d7123d293f652da25899a771e48756075710465b2eedb0fc35aa3b368e9cf5c"
+-checksum = "218d28c233cdb23a98404ae6d6f8eea19db3c3ab28c34633c7d9facf72f2d2ff"
  dependencies = [
   "anyhow",
   "core-foundation 0.10.1",
@@ -226,7 +226,7 @@ index cb02943..f3f7e08 100644
  itertools = { version = "0.14.0", default-features = false, features = ["use_std"] }
 @@ -363,6 +363,8 @@ url = { version = "2.5.2", default-features = false, features = ["serde", "std"]
  uuid = { version = "1.24.0", default-features = false }
- version-ranges = { version = "0.2.2", package = "astral-version-ranges", default-features = false }
+ version-ranges = { version = "0.2.3", package = "astral-version-ranges", default-features = false }
  walkdir = { version = "2.5.0", default-features = false }
 +# slicc's kernel: std::process and tokio::process on WASI (homescoop's crate).
 +wasix-command = { path = "homescoop-crates/wasix-command", features = ["tokio"] }
@@ -242,7 +242,7 @@ index cb02943..f3f7e08 100644
 +[patch.crates-io]
 +astral-reqwest-middleware = { path = "homescoop-crates/astral-reqwest-middleware-0.5.1" }
 +astral-reqwest-retry = { path = "homescoop-crates/astral-reqwest-retry-0.9.1" }
-+cargo-util = { path = "homescoop-crates/cargo-util-0.2.30" }
++cargo-util = { path = "homescoop-crates/cargo-util-0.2.31" }
 +hyper-util = { path = "homescoop-crates/hyper-util-0.1.20" }
 +reqsign-core = { path = "homescoop-crates/reqsign-core-3.3.1" }
 +reqsign-google = { path = "homescoop-crates/reqsign-google-3.1.1" }
