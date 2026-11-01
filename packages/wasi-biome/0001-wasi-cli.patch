@@ -9,7 +9,7 @@ sockets or a child process does not.
 - --watch on check/format/lint: WASI has no file system events; refuse
   with the same Unsupported diagnostic instead of hanging.
 - `biome upgrade` replaces the binary with an HTTPS download; on WASI it
-  explains that the package manager upgrades it, and reqwest/self_update
+  explains that the package manager upgrades it, and self_update/ureq
   (rustls, ring) are left out of the wasi dependency graph.
 - main: wasi-libc starts every program in "/" (std::env::current_dir()
   is "/" on slicc-kernel); on WASI the working directory is taken from
@@ -27,24 +27,30 @@ Upstream: not filed (Lars decides).
 diff --git a/crates/biome_cli/Cargo.toml b/crates/biome_cli/Cargo.toml
 --- a/crates/biome_cli/Cargo.toml
 +++ b/crates/biome_cli/Cargo.toml
-@@ -65,9 +65,7 @@
- quick-junit              = "0.6.0"
+@@ -70,7 +70,6 @@
  rayon                    = { workspace = true }
  regex                    = { workspace = true }
--reqwest                  = { workspace = true, features = ["blocking", "rustls-tls"] }
  rustc-hash               = { workspace = true }
--self_update              = { version = "0.42.0", default-features = false, features = ["rustls"] }
+-self_update              = { version = "1.2.0", default-features = false, features = ["github", "rustls", "ureq"] }
  serde                    = { workspace = true, features = ["derive"] }
  serde_json               = { workspace = true }
  smallvec                 = { workspace = true }
-@@ -97,6 +95,11 @@
+@@ -89,7 +88,6 @@
+ tracing-appender         = "0.2.4"
+ tracing-subscriber       = { workspace = true, features = ["env-filter", "json"] }
+ tracing-tree             = "0.4.1"
+-ureq                     = { workspace = true }
+ 
+ [dev-dependencies]
+ biome_css_formatter  = { path = "../biome_css_formatter" }
+@@ -107,6 +105,11 @@
  [target.'cfg(all(target_family="unix", not(all(target_arch = "aarch64", target_env = "musl"))))'.dependencies]
  tikv-jemallocator = { workspace = true }
  
 +# `biome upgrade` downloads releases over HTTPS; a WASI build has no sockets.
 +[target.'cfg(not(target_os = "wasi"))'.dependencies]
-+reqwest     = { workspace = true, features = ["blocking", "rustls-tls"] }
-+self_update = { version = "0.42.0", default-features = false, features = ["rustls"] }
++self_update = { version = "1.2.0", default-features = false, features = ["github", "rustls", "ureq"] }
++ureq        = { workspace = true }
 +
  [target."cfg(unix)".dependencies]
  libc  = "0.2.184"

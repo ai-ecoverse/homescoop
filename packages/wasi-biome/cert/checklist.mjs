@@ -11,6 +11,17 @@ import { readFileSync } from 'node:fs';
 
 const sharedWebBiome = readFileSync(new URL('./fixtures/slicc-shared-web-biome.json', import.meta.url), 'utf8');
 
+export function recipeVersion(text = readFileSync(new URL('../recipe.yaml', import.meta.url), 'utf8')) {
+  const m = /^version: "(\d+\.\d+\.\d+)"$/m.exec(text);
+  if (!m) throw new Error('wasi-biome: recipe.yaml names no X.Y.Z version');
+  return m[1];
+}
+
+export function reportsVersion(assert, text, want = recipeVersion()) {
+  const esc = want.replaceAll('.', '\\.');
+  assert.match(text, new RegExp(`^Version: ${esc}\\n`), `biome --version names ${want}, recipe.yaml's version: ${text}`);
+}
+
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
   const A = 'home/app';
@@ -18,7 +29,7 @@ export default async function (ctx) {
 
   const ver = await run(['biome', '--version']);
   assert.equal(ver.status, 0, `--version stderr=${ver.stderr}`);
-  assert.match(ver.stdout, /^Version: 2\.5\.15\n/);
+  reportsVersion(assert, ver.stdout);
 
   await write(`${A}/package.json`, '{\n  "name": "app",\n  "private": true,\n  "type": "module"\n}\n');
   await write(`${A}/biome.json`, '{\n  "extends": ["@ai-ecoverse/slicc-shared-web/biome"]\n}\n');
@@ -34,35 +45,36 @@ export default async function (ctx) {
   // Clean project: package.json, biome.json and two sources; dist/ is ignored.
   const clean = await biome(['check', '.']);
   assert.equal(clean.status, 0, `clean check stdout=${clean.stdout} stderr=${clean.stderr}`);
-  assert.match(clean.stdout, /^Checked 4 files in \d+(\.\d+)?m?s\. No fixes applied\.$/m);
+  assert.equal(clean.stdout, '', 'the summary goes to stderr since 2.6.3');
+  assert.match(clean.stderr, /^Checked 4 files in \d+(\.\d+)?m?s\. No fixes applied\.$/m);
   const ciClean = await biome(['ci', '--colors=off', '.']);
   assert.equal(ciClean.status, 0, `clean ci stdout=${ciClean.stdout} stderr=${ciClean.stderr}`);
-  assert.match(ciClean.stdout, /^Checked 4 files in .*\. No fixes applied\.$/m);
+  assert.match(ciClean.stderr, /^Checked 4 files in .*\. No fixes applied\.$/m);
 
   // A floating promise (type-aware, across files) and an unformatted file.
   await write(`${A}/src/index.ts`, "import { load } from './fetch';\n\nexport function main(): void {\n  load('a');\n}\n");
   await write(`${A}/src/fmt.ts`, 'const greeting = "hi"\nexport const x = {a:1,b:greeting}\n');
   const dirty = await biome(['check', '.']);
-  assert.equal(dirty.status, 1, `dirty check stdout=${dirty.stdout}`);
-  assert.match(dirty.stdout, /Checked 5 files in .*\nFound 2 errors\./);
+  assert.equal(dirty.status, 1, `dirty check stderr=${dirty.stderr}`);
+  assert.match(dirty.stderr, /Checked 5 files in .*\nFound 2 errors\./);
   assert.match(dirty.stderr, /src\/fmt\.ts format/);
   assert.match(dirty.stderr, /src\/index\.ts:4:3 lint\/nursery\/noFloatingPromises/);
   assert.doesNotMatch(dirty.stderr, /dist\/bundle\.js|node_modules/, '.gitignore not honored');
   const ciDirty = await biome(['ci', '--colors=off', '.']);
-  assert.equal(ciDirty.status, 1, `dirty ci stdout=${ciDirty.stdout}`);
-  assert.match(ciDirty.stdout, /Checked 5 files in .*\nFound 2 errors\./);
+  assert.equal(ciDirty.status, 1, `dirty ci stderr=${ciDirty.stderr}`);
+  assert.match(ciDirty.stderr, /Checked 5 files in .*\nFound 2 errors\./);
   assert.match(ciDirty.stderr, /src\/fmt\.ts format/);
   assert.match(ciDirty.stderr, /src\/index\.ts:4:3 lint\/nursery\/noFloatingPromises/);
 
   const fmt = await biome(['format', '--write', '.']);
   assert.equal(fmt.status, 0, `format --write stderr=${fmt.stderr}`);
-  assert.match(fmt.stdout, /^Formatted 5 files in .*\. Fixed 1 file\.$/m);
+  assert.match(fmt.stderr, /^Formatted 5 files in .*\. Fixed 1 file\.$/m);
   assert.equal(await read(`${A}/src/fmt.ts`), "const greeting = 'hi';\nexport const x = { a: 1, b: greeting };\n");
   assert.equal(await read(`${A}/dist/bundle.js`), 'var x = 1 == 2\n', 'ignored file was rewritten');
 
   const lint = await biome(['lint', 'src']);
-  assert.equal(lint.status, 1, `lint stdout=${lint.stdout}`);
-  assert.match(lint.stdout, /Checked 3 files in .*\nFound 1 error\./);
+  assert.equal(lint.status, 1, `lint stderr=${lint.stderr}`);
+  assert.match(lint.stderr, /Checked 3 files in .*\nFound 1 error\./);
   assert.match(lint.stderr, /lint\/nursery\/noFloatingPromises/);
 
   await write(`${A}/src/index.ts`, "import { load } from './fetch';\n\nexport function main(): void {\n  void load('a');\n}\n");

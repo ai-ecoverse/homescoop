@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-biome",
-  "version": "2.5.15-6",
+  "version": "2.6.3-1",
   "description": "Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC.",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -29,7 +29,7 @@
   },
   "homescoop": {
     "recipe": "wasi-biome",
-    "upstream": "2.5.15",
+    "upstream": "2.6.3",
     "patches": [
       "0001-wasi-cli.patch",
       "0002-wasm-refresh-alloc.patch"

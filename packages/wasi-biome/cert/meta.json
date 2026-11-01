@@ -10,9 +10,9 @@
     "@ai-ecoverse/wasm-coreutils"
   ],
   "checklist": [
-    "biome --version → Version: 2.5.15",
+    "biome --version → Version: recipe.yaml's version",
     "project in /home/app whose biome.json extends @ai-ecoverse/slicc-shared-web/biome (its real 1.10.1 config, fixtures/) from node_modules, with .git and .gitignore (dist/, node_modules/)",
-    "clean project: biome check . → exit 0, Checked 4 files, dist/ ignored",
+    "clean project: biome check . → exit 0, empty stdout, Checked 4 files on stderr (the summary is on stderr since 2.6.3, biomejs/biome#12593), dist/ ignored",
     "floating promise across files (type-aware nursery/noFloatingPromises) plus an unformatted file → check exit 1, Found 2 errors, both reported, nothing from dist/ or node_modules",
     "biome format --write . → exit 0, Fixed 1 file, exact single-quoted/semicolon output, ignored file untouched",
     "biome lint src → exit 1 with noFloatingPromises; after `void` the check passes",
@@ -20,11 +20,11 @@
     "biome ci . → exit 0 on the clean project, exit 1 with both errors on the dirty one",
     "refused with a clear message (exit 1, no panic, no hang within 60 s): start, lsp-proxy, __run_server, __print_socket (daemon), check --use-server (no server), check/format/lint --watch (no file system events), upgrade; stop → exit 0, server not running",
     "invalid biome.json → exit 1, indentWidth has an incorrect type",
-    "cert/notices.mjs (2.5.15-4, homescoop#472): THIRD-PARTY-NOTICES.md is installed, has the Rust 1.98.1 standard library section, and exactly one wasi-libc section, headed wasi-sdk-33 (what Rust 1.98.1's dist-various-2 builds wasm32-wasip1-threads from). 2.5.15-3 says wasi-sdk-31 (NEGATIVE.md)",
+    "cert/notices.mjs (2.5.15-4, homescoop#472): THIRD-PARTY-NOTICES.md is installed, has the Rust 1.98.1 standard library section, and exactly one wasi-libc section, headed wasi-sdk-33 (what Rust 1.98.1's dist-various-2 builds wasm32-wasip1-threads from). 2.5.15-3 says wasi-sdk-31 (NEGATIVE.md). Since 2.6.3-1, boa_ast (no licence file: the repository's LICENSE-MIT, pinned in scripts/crate-licences.json) and float16 (texts in a LICENSES directory) each have their section",
     "cert/stress.mjs (2.5.15-5, homescoop#1287): 8 × biome check of a 1500-file TypeScript project under SLICC_WASM_BACKTRACE=1: 0 wasm traps (rc never 134), and the wasm memory (VmSize, /proc/<pid>/status) stays within the 128 MiB initial heap; 0002 (the allocator refresh) and recipe.yaml's wasm.initial-memory"
   ],
   "patches": {
-    "0001-wasi-cli.patch": "service/wasi.rs and the run_server early return → start / lsp-proxy / __run_server / __print_socket / --use-server / stop cases; the runner's --watch refusal → check/format/lint --watch cases; upgrade_wasi.rs and the Cargo.toml move → biome upgrade case (and the build: with reqwest in the graph biome_cli does not compile for wasm); PWD → every case in /home/app (extends from node_modules fails with PWD=/); biome_fs temp_dir → every case, --version included (exit 134 without it)",
+    "0001-wasi-cli.patch": "service/wasi.rs and the run_server early return → start / lsp-proxy / __run_server / __print_socket / --use-server / stop cases; the runner's --watch refusal → check/format/lint --watch cases; upgrade_wasi.rs and the Cargo.toml move → biome upgrade case (self_update and ureq, with rustls and ring, stay out of the wasi dependency graph); PWD → every case in /home/app (extends from node_modules fails with PWD=/); biome_fs temp_dir → every case, --version included (exit 134 without it)",
     "0002-wasm-refresh-alloc.patch": "stress.mjs: biome's threaded check under load gives 0 traps with homescoop's allocator refresh as the global allocator on wasm; build.sh sets HOMESCOOP_WASM_ALLOC_RS"
   }
 }
