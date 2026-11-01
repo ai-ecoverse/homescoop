@@ -5,21 +5,23 @@ and multiprocessing.shared_memory raises ImportError, as on upstream WASI.
 
 --- a/Lib/multiprocessing/context.py
 +++ b/Lib/multiprocessing/context.py
-@@ -328,10 +328,13 @@ if sys.platform != 'win32':
+@@ -338,12 +338,15 @@ if sys.platform != 'win32':
          'spawn': SpawnContext(),
          'forkserver': ForkServerContext(),
      }
 +    if sys.platform == 'wasi' and not hasattr(os, 'fork'):
 +        del _concrete_contexts['fork'], _concrete_contexts['forkserver']
-     # bpo-33725: running arbitrary code after fork() is no longer reliable
-     # on macOS since macOS 10.14 (Mojave). Use spawn by default instead.
-     # gh-84559: We changed everyones default to a thread safeish one in 3.14.
--    if reduction.HAVE_SEND_HANDLE and sys.platform != 'darwin':
-+    if ('forkserver' in _concrete_contexts and reduction.HAVE_SEND_HANDLE
-+            and sys.platform != 'darwin'):
-         _default_context = DefaultContext(_concrete_contexts['forkserver'])
-     else:
-         _default_context = DefaultContext(_concrete_contexts['spawn'])
+ 
+     def _get_platform_default_context():
+         # bpo-33725: running arbitrary code after fork() is no longer reliable
+         # on macOS since macOS 10.14 (Mojave). Use spawn by default instead.
+         # gh-84559: We changed everyones default to a thread safeish one in 3.14.
+-        if reduction.HAVE_SEND_HANDLE and sys.platform != 'darwin':
++        if ('forkserver' in _concrete_contexts and reduction.HAVE_SEND_HANDLE
++                and sys.platform != 'darwin'):
+             # gh-155717: forkserver requires to write temporary files.
+             #
+             # Imported here rather than at the top level as util is costly
 --- a/Lib/multiprocessing/heap.py
 +++ b/Lib/multiprocessing/heap.py
 @@ -98,6 +98,12 @@ else:

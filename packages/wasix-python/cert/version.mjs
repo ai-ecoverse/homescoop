@@ -24,7 +24,7 @@ const PY = PKG.slicc.python;
 const NM = '/node_modules/@ai-ecoverse';
 
 const SCRIPT = String.raw`
-import importlib.machinery as m, io, json, locale, platform, sys, sysconfig
+import importlib.machinery as m, importlib.util as u, io, json, locale, platform, sys, sysconfig
 print(json.dumps({
     "version": platform.python_version(),
     "major_minor": f"{sys.version_info[0]}.{sys.version_info[1]}",
@@ -39,6 +39,7 @@ print(json.dumps({
     "text_encoding": io.text_encoding(None),
     "fs_encoding": sys.getfilesystemencoding(),
     "locale_encoding": locale.getencoding(),
+    "missing": [x for x in ("_multiprocessing", "_posixshmem", "fcntl", "grp", "mmap", "pwd", "resource", "termios") if u.find_spec(x) is None],
 }))
 `;
 
@@ -71,6 +72,7 @@ export default async function (ctx) {
   assert.equal(o.utf8_mode, 1, `PEP 686: UTF-8 mode by default: ${s}`);
   assert.equal(o.text_encoding, 'utf-8', s);
   assert.equal(o.fs_encoding, 'utf-8', s);
+  assert.deepEqual(o.missing, [], `configure marks these n/a on WASI unless cpython-configure-wasix.patch and cpython-multiprocessing-wasix.patch edit the WASI case: ${s}`);
   const off = await py(['-X', 'utf8=0', '-c', 'import sys; print(sys.flags.utf8_mode)']);
   assert.equal(off.stdout.trim(), '0', `-X utf8=0 disables UTF-8 mode: ${off.stdout}${off.stderr}`);
 
