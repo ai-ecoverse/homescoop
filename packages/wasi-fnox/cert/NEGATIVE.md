@@ -154,3 +154,19 @@ Two parts of the new row pass on 1.41.0-1 too. They show that 1.42.0's new code 
 Before the fix in 0003, the series on v1.42.0 didn't build: `git apply` stopped at `crates/fnox-core/src/lease_backends/azure_token.rs:32`. A three-way rebase applied 0003's hunks, but `cargo check --target wasm32-wasip1` then failed with `cannot find type AzureAuth in this scope` (E0433, three times in `check_prerequisites`), because 0003 imported `AzureAuth` only off WASI. 0003 now keeps the import on all targets.
 
 `test/sealed.mjs` passes on 1.42.0-1 (slicc-kernel 1.83.0, macOS arm64).
+
+## 1.42.1-1: the series on v1.42.1 (2026-11-01)
+
+The published 1.42.0-1 against this checklist (slicc-kernel 1.134.3, users kernel default, `run.mjs --soft`): **FAIL, 2 of 177 assertions.** 1.42.1-1 passes all 177.
+- `fnox --version` prints 1.42.0, and the checklist now reads the version from `recipe.yaml`.
+- **`fnox deactivate` after the binary is gone** (upstream #1016): activate names an executable `/tmp/bin/fnox`, which is then removed. 1.42.0-1 still runs it, so `fnox()` stays defined and `FNOX_SHELL` stays set:
+
+```text
+1.42.1 fnox deactivate after the binary is gone removes the hooks and the function: fnox
+rc=0 shell=bash
+ bash: line 14: /tmp/bin/fnox: No such file or directory
+```
+
+Before the rebase, the series didn't apply to v1.42.1: `git apply` stopped 0001 at `crates/fnox-core/Cargo.toml:11`, and 0003, 0015 and 0016 at `src/commands/activate.rs`.
+
+`test/sealed.mjs` passes on 1.42.1-1 (slicc-kernel 1.83.0, macOS arm64).
