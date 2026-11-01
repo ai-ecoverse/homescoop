@@ -2,7 +2,7 @@
 name = "wasix-selftest"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.83"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 description = "Checks wasix-net, wasix-ureq and wasix-command inside slicc's kernel (test/kernel)"
 publish = false
