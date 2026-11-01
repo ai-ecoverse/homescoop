@@ -680,7 +680,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: ['1.83.0', stable]
+        include:
+          - toolchain: '1.83.0'
+            packages: -p wasix-net -p wasix-ureq
+          - toolchain: '1.85.0'
+            packages: --workspace
+            tokio: true
+          - toolchain: stable
+            packages: --workspace
+            tokio: true
     defaults:
       run:
         working-directory: crates
@@ -693,7 +701,12 @@ jobs:
           rustup toolchain install ${{ matrix.toolchain }} --profile minimal --component clippy,rustfmt --target wasm32-wasip1
           rustup override set ${{ matrix.toolchain }}
       - name: tests
-        run: cargo test --locked
+        run: cargo test --locked ${{ matrix.packages }}
+      - name: tests and wasm check with the tokio feature
+        if: matrix.tokio
+        run: |
+          cargo test --locked -p wasix-command --features tokio
+          cargo check --locked -p wasix-command --features tokio --target wasm32-wasip1
       - name: format and lints
         if: matrix.toolchain == 'stable'
         run: |

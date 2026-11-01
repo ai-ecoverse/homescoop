@@ -31,6 +31,15 @@ Things to know:
 - wasix-command never imports `fd_fdflags_set`. The kernel then treats every
   descriptor above 2 as close-on-exec, as std's are on unix.
 
+## Compiler support
+
+`wasix-net` and `wasix-ureq` need Rust 1.83. `wasix-command` needs Rust 1.85,
+because its `tokio` feature uses the workspace's locked Tokio 1.54.1, and
+`wasix-selftest` needs the same because it depends on `wasix-command`.
+`rust-version` can't vary by feature, so 1.85 holds without `tokio` too. CI's
+`crates-host` job runs each crate on its minimum and on stable, and tests
+`wasix-command` with `tokio` on both 1.85 and stable.
+
 ## Using them in a recipe
 
 `build.sh` copies the crates into the source tree before patching:
