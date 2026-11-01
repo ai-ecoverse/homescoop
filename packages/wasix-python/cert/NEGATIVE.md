@@ -1,3 +1,9 @@
+## 3.15.0-6: the old CPython; two configure hunks on the wrong case (3.15.2-1; #1932; 2026-11-01)
+
+`cert/version.mjs` with the published 3.15.0-6 on slicc-kernel 1.125.0 (`run.mjs --spec version.mjs --users enforce`): FAIL at `python_version vs package.json homescoop.upstream`, `'3.15.0' !== '3.15.2'`.
+
+The spec also requires `_multiprocessing`, `_posixshmem`, `fcntl`, `grp`, `mmap`, `pwd`, `resource` and `termios`. All eight are `MODULE_*_STATE: yes` in 3.15.0-6's `_sysconfigdata`. This case was seen on the source, not on a built package: with 3.15.0's patch line numbers on 3.15.2, `git apply -v` lands `cpython-configure-wasix.patch`'s grp/pwd/resource hunk and `cpython-multiprocessing-wasix.patch` at offset 92, in the Emscripten case, instead of 120, in the WASI case, and `patch -F0` accepts it. No package was built that way, so this assertion has no failing run.
+
 ## discovery.mjs's cost bounds catch a start that rescans (3.15.0-6; #1153; 2026-10-22)
 
 `cert/discovery.mjs` now measures discovery against itself without its cache, in the same run, instead of against PYTHONPATH with a 1.1 slack. On npm 3.15.0-5 (slicc-kernel 1.125.0, users enforce, local browser cert) it passes: `a start pays 57 ms for discovery (0.25 of its cost without the cache), 227 ms without its cache`. In earlier local runs the ratio was 0.17 to 0.28.
