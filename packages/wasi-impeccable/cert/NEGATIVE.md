@@ -103,3 +103,15 @@ AssertionError [ERR_ASSERTION]: detect --cdp 9222 stderr="Warning: cannot access
 0.1.15-6 has no `--cdp`: it drops the flag and scans `9222` as a missing file. The 0.1.16-1 build passes it, with the other specs (checklist, deep, notices, telemetry, stress) and test/e2e on the same kernel. Without the patch's `detect_cdp_scan` it would print upstream's `Error: this build cannot attach to a running app (--cdp)`, which the spec also refuses.
 
 Stress row, re-run for the moved HTTP core: 0.1.16-1 gives 0 traps in 6 rounds (13 s each), and the wasm memory never grows past the 64 MiB initial heap. Linked without `--initial-memory`, 0.1.16-1 peaks at 21 MiB under today's `stress.mjs` (polled once a second), and so does the published 0.1.15-4. recipe.yaml keeps its 64 MiB initial heap and the larger 49 MiB measurement.
+
+## 0.1.17-1: `--version` comes from the recipe (cert/checklist.mjs, 2026-11-01)
+
+`cert/checklist.mjs` hard-coded `0.1.16`, so every upstream bump failed it until someone edited the spec. It now reads the expected version from `recipe.yaml`. Against the published `@ai-ecoverse/wasi-impeccable@0.1.16-1` on slicc-kernel 1.134.3 (users enforce):
+
+```text
+browser-cert: FAIL packages/wasi-impeccable/cert/checklist.mjs
+AssertionError [ERR_ASSERTION]: version="0.1.16\n"
+'0.1.16' !== '0.1.17'
+```
+
+The local 0.1.17-1 build passes `checklist.mjs` and `cdp.mjs` on the same kernel.
