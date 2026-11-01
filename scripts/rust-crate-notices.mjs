@@ -25,10 +25,10 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { treeCrates } from './rust-crate-notices-lib.mjs';
+import { licenceFiles, treeCrates } from './rust-crate-notices-lib.mjs';
 
 const scripts = dirname(fileURLToPath(import.meta.url));
 const texts = join(scripts, 'licence-texts');
@@ -46,15 +46,14 @@ const crates = [...want]
   })
   .sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
 
-const LICENCE = /^(LICEN[CS]E|COPYING|NOTICE|UNLICENSE|COPYRIGHT)/i;
 const out = [];
 for (const p of crates) {
   let dir = dirname(p.manifest_path);
-  let files = readdirSync(dir).filter((f) => LICENCE.test(f)).sort();
+  let files = licenceFiles(dir);
   if (!files.length && p.source.startsWith('git+')) {
     const top = p.manifest_path.match(/^(.*\/git\/checkouts\/[^/]+\/[^/]+)\//)?.[1];
     for (let d = dirname(dir); top && d.length >= top.length && !files.length; d = dirname(d)) {
-      const found = readdirSync(d).filter((f) => LICENCE.test(f)).sort();
+      const found = licenceFiles(d);
       if (found.length) {
         dir = d;
         files = found;
