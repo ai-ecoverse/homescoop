@@ -14,19 +14,18 @@ value given as an argument, which other processes can read from
 /proc, and --key-name are refused for sealed secrets.
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 3224e6d3..272a19bd 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -161,6 +161,8 @@ impl SetCommand {
+@@ -190,6 +190,8 @@
          let has_metadata =
              self.description.is_some() || self.if_missing.is_some() || self.default.is_some();
  
 +        #[cfg_attr(not(target_os = "wasi"), allow(unused_mut))]
 +        let mut ask_vault = false;
          // Get the secret value if provided
-         let secret_value = if let Some(ref path) = self.from_file {
-             Some(std::fs::read_to_string(path).map_err(|source| {
-@@ -191,9 +193,10 @@ impl SetCommand {
+         let mut generated: Option<String> = None;
+         let secret_value = if self.generate {
+@@ -228,9 +230,10 @@
              None
          } else {
              #[cfg(target_os = "wasi")]
@@ -40,10 +39,12 @@ index 3224e6d3..272a19bd 100644
              // Interactive terminal - prompt for value
              #[cfg(not(target_os = "wasi"))]
              let value = demand::Input::new("Enter secret value")
-@@ -225,6 +228,35 @@ impl SetCommand {
+@@ -271,6 +274,35 @@
+             // Try to use default provider if available, but it's OK if there isn't one
+             // (will store as plaintext)
              config.get_default_provider(&write_profile_stack)?
-         };
- 
++        };
++
 +        let sealed_provider = match &provider_name_to_use {
 +            Some(name) => config
 +                .get_providers(&write_profile_stack)?
@@ -71,12 +72,10 @@ index 3224e6d3..272a19bd 100644
 +            Some(crate::seven::request_value(&self.key)?)
 +        } else {
 +            None
-+        };
-+
+         };
+ 
          // Check if secret should be base64 encoded
-         let secret_value = if self.base64_encode {
-             secret_value
-@@ -285,12 +317,16 @@ impl SetCommand {
+@@ -333,12 +365,16 @@
                              provider_name
                          );
  
@@ -99,8 +98,8 @@ index 3224e6d3..272a19bd 100644
  
                          if self.dry_run {
                              // In dry-run mode, skip actual remote storage
-@@ -357,6 +393,11 @@ impl SetCommand {
-             secret_config.set_provider(provider_name_to_use.clone());
+@@ -411,6 +447,11 @@
+             secret_config.sync = None;
          }
  
 +        if secret_value.is_none()
@@ -112,20 +111,18 @@ index 3224e6d3..272a19bd 100644
              // Priority order: remote key name, encrypted value, then plaintext
              if let Some(remote_key) = remote_key_name {
 diff --git a/src/lib.rs b/src/lib.rs
-index c4351624..6cd383f1 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -21,6 +21,7 @@ pub mod hook_env;
- pub mod mcp_server;
+@@ -28,6 +28,7 @@
  #[cfg(not(target_os = "wasi"))]
- pub mod proxy;
+ pub mod sandbox;
+ pub mod secret_filter;
 +pub mod seven;
  pub mod shell;
  #[cfg(not(target_os = "wasi"))]
  pub mod tui;
 diff --git a/src/seven.rs b/src/seven.rs
 new file mode 100644
-index 00000000..f05862d4
 --- /dev/null
 +++ b/src/seven.rs
 @@ -0,0 +1,101 @@

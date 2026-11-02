@@ -14,10 +14,9 @@ whose secret is not sealed is refused. Rule validation no longer needs
 reqwest on WASI.
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
-index 433564ba..b8b28c77 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -29,7 +29,6 @@ pub mod mcp;
+@@ -30,7 +30,6 @@
  pub mod plugin;
  pub mod profiles;
  pub mod provider;
@@ -25,7 +24,7 @@ index 433564ba..b8b28c77 100644
  pub mod proxy;
  pub mod reencrypt;
  pub mod remove;
-@@ -191,7 +190,6 @@ pub enum Commands {
+@@ -195,7 +194,6 @@
  
      Provider(provider::ProviderCommand),
  
@@ -33,7 +32,7 @@ index 433564ba..b8b28c77 100644
      Proxy(proxy::ProxyCommand),
  
      Reencrypt(reencrypt::ReencryptCommand),
-@@ -364,7 +362,6 @@ impl Commands {
+@@ -382,7 +380,6 @@
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -42,29 +41,30 @@ index 433564ba..b8b28c77 100644
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
 diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
-index 6f54330a..92f3ed7c 100644
 --- a/src/commands/proxy.rs
 +++ b/src/commands/proxy.rs
-@@ -1,8 +1,10 @@
+@@ -1,9 +1,12 @@
  use crate::commands::Cli;
  use crate::config::{Config, ProxyConfig, SecretConfig};
  use crate::error::{FnoxError, Result};
 +#[cfg(not(target_os = "wasi"))]
- use crate::proxy::{ProxyPlan, RunningProxy};
+ use crate::proxy::{ProxyListener, ProxyPlan, RunningProxy};
++#[cfg(not(target_os = "wasi"))]
+ use crate::sandbox::{Sandbox, SandboxPolicy};
  use indexmap::IndexMap;
 +#[cfg(not(target_os = "wasi"))]
  use std::process::Stdio;
  
  const AMBIENT_CREDENTIAL_ENV_VARS: &[&str] = &[
-@@ -121,23 +123,30 @@ pub struct ProxyCommand {
+@@ -123,21 +126,28 @@
  
  #[derive(Debug, usage_rs::Subcommands)]
  enum ProxySubcommand {
 -    /// Print the effective proxy rules
 -    ///
 -    /// Validates the `[proxy]` table and prints its egress mode, audit setting,
--    /// and each rule's secret, domain, methods, paths, header, and placeholder
--    /// variable. Secrets are not resolved.
+-    /// and each rule's secret, domain, methods, paths, header or query parameter, and
+-    /// placeholder variable. Secrets are not resolved.
 -    #[usage(
 -        example("fnox proxy rules", header = "Print the rules"),
 -        example(
@@ -76,14 +76,14 @@ index 6f54330a..92f3ed7c 100644
 -    Rules,
 +    Rules(ProxyRulesCommand),
      Run(ProxyRunCommand),
- }
- 
++}
++
++#[derive(Debug, usage_rs::Args)]
 +/// Print the effective proxy rules
 +///
 +/// Validates the `[proxy]` table and prints its egress mode, audit setting,
-+/// and each rule's secret, domain, methods, paths, header, and placeholder
-+/// variable. Secrets are not resolved.
-+#[derive(Debug, usage_rs::Args)]
++/// and each rule's secret, domain, methods, paths, header or query parameter, and
++/// placeholder variable. Secrets are not resolved.
 +#[usage(
 +    example("fnox proxy rules", header = "Print the rules"),
 +    example(
@@ -92,16 +92,14 @@ index 6f54330a..92f3ed7c 100644
 +    ),
 +    after_long_help = "See also:\n- Credential proxy: https://fnox.jdx.dev/guide/proxy"
 +)]
++
 +struct ProxyRulesCommand {
-+    /// Print the [proxy] configuration as JSON
 +    #[usage(long)]
 +    json: bool,
-+}
-+
+ }
+ 
  /// Run a command with placeholder credentials behind the proxy
- ///
- /// Resolves the secrets that `[[proxy.rules]]` names, plus any secrets their
-@@ -176,12 +185,21 @@ impl ProxyCommand {
+@@ -195,10 +205,19 @@
              )
          })?;
          match &self.command {
@@ -111,20 +109,18 @@ index 6f54330a..92f3ed7c 100644
              ProxySubcommand::Run(command) => command.run(cli, config).await,
          }
      }
- }
- 
++}
++
 +fn show_rules_json(proxy: &ProxyConfig) -> Result<()> {
 +    crate::proxy::validate_config(proxy)?;
 +    let json = serde_json::to_string_pretty(proxy)
 +        .map_err(|e| FnoxError::Config(format!("Failed to encode proxy rules: {e}")))?;
 +    println!("{json}");
 +    Ok(())
-+}
-+
+ }
+ 
  fn show_rules(proxy: &ProxyConfig) -> Result<()> {
-     crate::proxy::validate_config(proxy)?;
-     println!("egress: {:?}", proxy.egress);
-@@ -269,6 +287,89 @@ fn collect_requested_secrets(
+@@ -294,6 +313,92 @@
  }
  
  impl ProxyRunCommand {
@@ -137,6 +133,9 @@ index 6f54330a..92f3ed7c 100644
 +            .proxy
 +            .as_ref()
 +            .ok_or_else(|| FnoxError::Config("No [proxy] configuration found".to_string()))?;
++        if self.sandbox || (proxy_config.sandbox && !self.no_sandbox) {
++            return Err(FnoxError::Seven("proxy OS sandbox is not available in seven".into()));
++        }
 +        crate::proxy::validate_config(proxy_config)?;
 +        let profile = Config::get_profiles(&cli.profile);
 +        let all_secrets = config.get_secrets(&profile)?;
@@ -211,36 +210,48 @@ index 6f54330a..92f3ed7c 100644
 +    }
 +
 +    #[cfg(not(target_os = "wasi"))]
-     async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
-         if self.command.is_empty() {
-             return Err(FnoxError::CommandNotSpecified);
+     fn sandbox_enabled(&self, proxy: &ProxyConfig) -> bool {
+         self.sandbox || (proxy.sandbox && !self.no_sandbox)
+     }
+@@ -464,6 +569,7 @@
+ }
+ 
+ /// How a command ended.
++#[cfg(not(target_os = "wasi"))]
+ enum Outcome {
+     Exited(std::process::ExitStatus),
+     /// fnox was interrupted by this signal and stopped the command.
+@@ -473,6 +579,7 @@
+ /// Runs `command`, and if fnox is interrupted first, stops it so the caller
+ /// can remove the sandbox's placeholder files. The sandbox starts a session of
+ /// its own, so Ctrl-C reaches fnox and not the command.
++#[cfg(not(target_os = "wasi"))]
+ async fn run_until_interrupted(mut command: tokio::process::Command) -> std::io::Result<Outcome> {
+     #[cfg(unix)]
+     {
 diff --git a/src/lib.rs b/src/lib.rs
-index 6cd383f1..d0677de4 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -19,7 +19,6 @@ pub mod daemon;
+@@ -22,7 +22,6 @@
  pub mod hook_env;
  #[cfg(not(target_os = "wasi"))]
  pub mod mcp_server;
 -#[cfg(not(target_os = "wasi"))]
  pub mod proxy;
- pub mod seven;
- pub mod shell;
+ pub mod redact;
+ #[cfg(not(target_os = "wasi"))]
 diff --git a/src/proxy.rs b/src/proxy.rs
-index b05330ec..35b2c7d7 100644
 --- a/src/proxy.rs
 +++ b/src/proxy.rs
-@@ -1,28 +1,47 @@
--use crate::config::{ProxyConfig, ProxyEgress};
-+use crate::config::ProxyConfig;
-+#[cfg(not(target_os = "wasi"))]
-+use crate::config::ProxyEgress;
+@@ -1,21 +1,33 @@
+ use crate::config::{ProxyConfig, ProxyEgress, ProxyRule};
  use crate::error::{FnoxError, Result};
 +#[cfg(not(target_os = "wasi"))]
  use base64::Engine;
  use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 +#[cfg(not(target_os = "wasi"))]
  use indexmap::IndexMap;
+ use ipnet::IpNet;
 +#[cfg(not(target_os = "wasi"))]
  use rcgen::{BasicConstraints, Certificate, CertificateParams, IsCa, Issuer, KeyPair};
 +#[cfg(not(target_os = "wasi"))]
@@ -249,12 +260,11 @@ index b05330ec..35b2c7d7 100644
  use rustls::ServerConfig;
 +#[cfg(not(target_os = "wasi"))]
  use rustls::pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer};
-+#[cfg(not(target_os = "wasi"))]
  use std::collections::{HashMap, HashSet};
 +#[cfg(not(target_os = "wasi"))]
  use std::io::Write;
-+#[cfg(not(target_os = "wasi"))]
- use std::sync::Arc;
+ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+ use std::sync::{Arc, LazyLock};
 +#[cfg(not(target_os = "wasi"))]
  use tempfile::NamedTempFile;
 +#[cfg(not(target_os = "wasi"))]
@@ -266,20 +276,16 @@ index b05330ec..35b2c7d7 100644
 +#[cfg(not(target_os = "wasi"))]
  use tokio_rustls::TlsAcceptor;
  
-+#[cfg(not(target_os = "wasi"))]
  const MAX_HEADER_BYTES: usize = 64 * 1024;
-+#[cfg(not(target_os = "wasi"))]
- const MAX_BODY_BYTES: usize = 10 * 1024 * 1024;
- 
- fn proxy_error(message: impl Into<String>) -> FnoxError {
-     FnoxError::Config(format!("proxy: {}", message.into()))
+@@ -73,6 +85,7 @@
  }
  
-+#[cfg(not(target_os = "wasi"))]
  #[derive(Debug)]
++#[cfg(not(target_os = "wasi"))]
  struct PreparedRule {
      secret: String,
-@@ -34,6 +53,7 @@ struct PreparedRule {
+     domain: String,
+@@ -83,6 +96,7 @@
      value: String,
  }
  
@@ -287,7 +293,7 @@ index b05330ec..35b2c7d7 100644
  impl PreparedRule {
      fn route_matches(&self, method: &str, path: &str) -> bool {
          (self.methods.is_empty() || self.methods.contains(method))
-@@ -44,6 +64,7 @@ impl PreparedRule {
+@@ -93,6 +107,7 @@
      }
  }
  
@@ -295,22 +301,42 @@ index b05330ec..35b2c7d7 100644
  #[derive(Debug)]
  struct ProxyPolicy {
      egress: ProxyEgress,
-@@ -53,12 +74,14 @@ struct ProxyPolicy {
-     client: reqwest::Client,
- }
+@@ -196,6 +211,7 @@
+ 
+ impl std::error::Error for DestinationError {}
  
 +#[cfg(not(target_os = "wasi"))]
+ impl DestinationPolicy {
+     fn permits(&self, ip: IpAddr) -> bool {
+         let ip = ip.to_canonical();
+@@ -231,8 +247,10 @@
+ }
+ 
+ /// Applies the destination policy to the upstream client's own lookups.
++#[cfg(not(target_os = "wasi"))]
+ struct DestinationResolver(Arc<DestinationPolicy>);
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl reqwest::dns::Resolve for DestinationResolver {
+     fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+         let destinations = self.0.clone();
+@@ -302,6 +320,7 @@
+ }
+ 
  #[derive(Debug)]
++#[cfg(not(target_os = "wasi"))]
  struct Redaction {
      value: Vec<u8>,
      placeholder: Vec<u8>,
+@@ -370,6 +389,7 @@
+     String::from_utf8_lossy(&decoded).into_owned()
  }
  
 +#[cfg(not(target_os = "wasi"))]
  impl ProxyPolicy {
      fn has_domain(&self, domain: &str) -> bool {
-         self.rules.iter().any(|rule| rule.domain == domain)
-@@ -135,6 +158,7 @@ impl ProxyPolicy {
+         self.rules
+@@ -578,6 +598,7 @@
      }
  }
  
@@ -318,7 +344,7 @@ index b05330ec..35b2c7d7 100644
  pub struct ProxyPlan {
      policy: Arc<ProxyPolicy>,
      pub child_env: IndexMap<String, String>,
-@@ -150,6 +174,7 @@ pub fn validate_config(config: &ProxyConfig) -> Result<()> {
+@@ -629,6 +650,7 @@
      Ok(())
  }
  
@@ -326,7 +352,7 @@ index b05330ec..35b2c7d7 100644
  impl ProxyPlan {
      pub fn new(config: &ProxyConfig, values: &IndexMap<String, String>) -> Result<Self> {
          validate_config(config)?;
-@@ -308,6 +333,19 @@ fn validate_rule(rule: &crate::config::ProxyRule) -> Result<()> {
+@@ -837,6 +859,19 @@
          )));
      }
      for method in &rule.methods {
@@ -346,7 +372,7 @@ index b05330ec..35b2c7d7 100644
          Method::from_bytes(method.as_bytes()).map_err(|_| {
              proxy_error(format!(
                  "rule for '{}' has an invalid HTTP method '{method}'",
-@@ -342,6 +380,7 @@ fn compile_paths(paths: &[String]) -> Result<Option<GlobSet>> {
+@@ -871,6 +906,7 @@
      })?))
  }
  
@@ -354,7 +380,7 @@ index b05330ec..35b2c7d7 100644
  fn generated_placeholder(secret: &str) -> String {
      let mut hasher = blake3::Hasher::new();
      hasher.update(secret.as_bytes());
-@@ -356,11 +395,13 @@ fn generated_placeholder(secret: &str) -> String {
+@@ -885,11 +921,13 @@
      format!("fnox_proxy_{}", &hasher.finalize().to_hex()[..24])
  }
  
@@ -368,23 +394,55 @@ index b05330ec..35b2c7d7 100644
  impl CertificateAuthority {
      fn new() -> Result<Self> {
          let mut params = CertificateParams::new(Vec::<String>::new())
-@@ -399,6 +440,7 @@ impl CertificateAuthority {
+@@ -929,6 +967,7 @@
+ }
+ 
+ /// Where the proxy accepts clients.
++#[cfg(not(target_os = "wasi"))]
+ pub enum ProxyListener {
+     /// A random port on `127.0.0.1`.
+     Loopback,
+@@ -940,6 +979,7 @@
+ }
+ 
+ /// Accepts client connections for the proxy, dropping ones it must refuse.
++#[cfg(not(target_os = "wasi"))]
+ trait ProxyAccept: Send + 'static {
+     type Stream: AsyncRead + AsyncWrite + Unpin + Send + 'static;
+ 
+@@ -948,6 +988,7 @@
+     ) -> impl std::future::Future<Output = std::io::Result<Option<Self::Stream>>> + Send;
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl ProxyAccept for TcpListener {
+     type Stream = TcpStream;
+ 
+@@ -970,6 +1011,7 @@
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn serve<L: ProxyAccept>(
+     listener: L,
+     policy: Arc<ProxyPolicy>,
+@@ -1016,6 +1058,7 @@
      }
  }
  
 +#[cfg(not(target_os = "wasi"))]
  pub struct RunningProxy {
-     pub address: std::net::SocketAddr,
-     ca_file: NamedTempFile,
-@@ -406,6 +448,7 @@ pub struct RunningProxy {
+     address: Option<SocketAddr>,
+     /// Held only so its `Drop` removes the socket file.
+@@ -1027,6 +1070,7 @@
      task: tokio::task::JoinHandle<()>,
  }
  
 +#[cfg(not(target_os = "wasi"))]
  impl RunningProxy {
-     pub async fn start(plan: ProxyPlan) -> Result<Self> {
+     pub async fn start(plan: ProxyPlan, listen: ProxyListener) -> Result<Self> {
          let authority = Arc::new(CertificateAuthority::new()?);
-@@ -476,6 +519,7 @@ impl RunningProxy {
+@@ -1113,6 +1157,7 @@
      }
  }
  
@@ -392,7 +450,7 @@ index b05330ec..35b2c7d7 100644
  fn write_trust_bundle(file: &mut impl Write, authority: &Certificate) -> Result<()> {
      let native = rustls_native_certs::load_native_certs();
      if native.certs.is_empty() {
-@@ -499,6 +543,7 @@ fn write_trust_bundle(file: &mut impl Write, authority: &Certificate) -> Result<
+@@ -1136,6 +1181,7 @@
          .map_err(|error| proxy_error(format!("failed to write proxy CA: {error}")))
  }
  
@@ -400,15 +458,30 @@ index b05330ec..35b2c7d7 100644
  fn write_pem_certificate(file: &mut impl Write, der: &[u8]) -> std::io::Result<()> {
      writeln!(file, "-----BEGIN CERTIFICATE-----")?;
      let encoded = base64::engine::general_purpose::STANDARD.encode(der);
-@@ -509,6 +554,7 @@ fn write_pem_certificate(file: &mut impl Write, der: &[u8]) -> std::io::Result<(
-     writeln!(file, "-----END CERTIFICATE-----")
+@@ -1148,12 +1194,14 @@
+ 
+ /// The request line and `Proxy-Authorization` header of a request sent to
+ /// the proxy itself, before any tunnel is established.
++#[cfg(not(target_os = "wasi"))]
+ struct ProxyRequestHead {
+     method: String,
+     target: String,
+     authorization: Option<String>,
  }
  
 +#[cfg(not(target_os = "wasi"))]
- async fn handle_connection(
-     stream: TcpStream,
+ async fn read_proxy_request_head<R>(reader: &mut R) -> Result<ProxyRequestHead>
+ where
+     R: tokio::io::AsyncBufRead + Unpin,
+@@ -1181,6 +1229,7 @@
+     })
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ async fn handle_connection<S>(
+     stream: S,
      policy: Arc<ProxyPolicy>,
-@@ -579,6 +625,7 @@ async fn handle_connection(
+@@ -1310,6 +1359,7 @@
      result
  }
  
@@ -416,7 +489,7 @@ index b05330ec..35b2c7d7 100644
  fn parse_connect_target(target: &str) -> Result<(String, u16)> {
      let (domain, port) = target
          .rsplit_once(':')
-@@ -593,6 +640,7 @@ fn parse_connect_target(target: &str) -> Result<(String, u16)> {
+@@ -1324,6 +1374,7 @@
      Ok((domain, port))
  }
  
@@ -424,7 +497,7 @@ index b05330ec..35b2c7d7 100644
  struct HttpRequest {
      method: String,
      target: String,
-@@ -600,6 +648,7 @@ struct HttpRequest {
+@@ -1331,6 +1382,7 @@
      body: Vec<u8>,
  }
  
@@ -432,7 +505,7 @@ index b05330ec..35b2c7d7 100644
  async fn proxy_http_request<S>(stream: &mut S, domain: &str, policy: &ProxyPolicy) -> Result<()>
  where
      S: AsyncRead + AsyncWrite + Unpin,
-@@ -742,6 +791,7 @@ where
+@@ -1479,6 +1531,7 @@
      Ok(())
  }
  
@@ -440,7 +513,7 @@ index b05330ec..35b2c7d7 100644
  fn has_ambiguous_path_encoding(target: &str) -> bool {
      let path = target
          .split('?')
-@@ -758,6 +808,7 @@ fn has_ambiguous_path_encoding(target: &str) -> bool {
+@@ -1495,6 +1548,7 @@
              .any(|segment| segment == "." || segment == "..")
  }
  
@@ -448,7 +521,7 @@ index b05330ec..35b2c7d7 100644
  async fn read_http_request<S>(stream: &mut S) -> Result<HttpRequest>
  where
      S: AsyncRead + AsyncWrite + Unpin,
-@@ -822,6 +873,7 @@ where
+@@ -1559,6 +1613,7 @@
      })
  }
  
@@ -456,7 +529,7 @@ index b05330ec..35b2c7d7 100644
  async fn read_line_limited<R>(reader: &mut R, remaining: usize) -> Result<String>
  where
      R: tokio::io::AsyncBufRead + Unpin,
-@@ -855,6 +907,7 @@ where
+@@ -1592,6 +1647,7 @@
      String::from_utf8(line).map_err(|_| proxy_error("HTTP request headers are not valid UTF-8"))
  }
  
@@ -464,7 +537,7 @@ index b05330ec..35b2c7d7 100644
  fn is_hop_by_hop_header(name: &str) -> bool {
      matches!(
          name.to_ascii_lowercase().as_str(),
-@@ -872,15 +925,18 @@ fn is_hop_by_hop_header(name: &str) -> bool {
+@@ -1609,15 +1665,18 @@
      )
  }
  
@@ -483,8 +556,16 @@ index b05330ec..35b2c7d7 100644
  fn redact_bytes(input: &[u8], redactions: &[Redaction]) -> Vec<u8> {
      let mut output = Vec::with_capacity(input.len());
      let mut offset = 0;
-@@ -899,6 +955,7 @@ fn redact_bytes(input: &[u8], redactions: &[Redaction]) -> Vec<u8> {
-     output
+@@ -1639,6 +1698,7 @@
+ 
+ /// Challenges the client for proxy credentials. Unless `close` is set, the
+ /// connection stays open so the client can retry on it.
++#[cfg(not(target_os = "wasi"))]
+ async fn write_auth_required<S>(stream: &mut S, close: bool) -> Result<()>
+ where
+     S: AsyncWrite + Unpin,
+@@ -1655,6 +1715,7 @@
+         .map_err(|error| proxy_error(format!("failed to write proxy error: {error}")))
  }
  
 +#[cfg(not(target_os = "wasi"))]

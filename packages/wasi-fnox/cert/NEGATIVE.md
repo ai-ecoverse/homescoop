@@ -170,3 +170,7 @@ rc=0 shell=bash
 Before the rebase, the series didn't apply to v1.42.1: `git apply` stopped 0001 at `crates/fnox-core/Cargo.toml:11`, and 0003, 0015 and 0016 at `src/commands/activate.rs`.
 
 `test/sealed.mjs` passes on 1.42.1-1 (slicc-kernel 1.83.0, macOS arm64).
+
+## 1.43.0-1: exec filtering and WASI refusals
+
+The new `exec-filter.mjs` exercises 1.43.0 `exec --only` and `--except`: an unavailable kubernetes secret must never resolve, an interpolation dependency must resolve without being exported, and excluded ambient secret names must be removed. The previous published 1.42.1-1 does not recognize these flags, so its selected commands fail before printing URL. It also lacks the new explicit WASI refusals for exec redaction and proxy OS sandbox requests. The negative run and head verdict are recorded after CI builds the package.

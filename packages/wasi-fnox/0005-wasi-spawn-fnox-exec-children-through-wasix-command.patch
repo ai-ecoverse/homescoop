@@ -11,22 +11,20 @@ homescoop's packages/wasi-fnox/apply.sh copies ai-ecoverse/homescoop
 crates/wasix-command (MIT OR Apache-2.0) into the source tree.
 
 diff --git a/Cargo.lock b/Cargo.lock
-index 9e68c15e..eb9aa8fc 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -2485,6 +2485,7 @@ dependencies = [
-  "tracing",
+@@ -2489,6 +2489,7 @@
   "tracing-subscriber",
+  "url",
   "usage-rs",
 + "wasix-command",
   "which",
  ]
  
-@@ -8176,6 +8177,14 @@ dependencies = [
-  "wit-bindgen",
+@@ -8197,6 +8198,14 @@
  ]
  
-+[[package]]
+ [[package]]
 +name = "wasix-command"
 +version = "0.1.0"
 +dependencies = [
@@ -34,14 +32,14 @@ index 9e68c15e..eb9aa8fc 100644
 + "tokio",
 +]
 +
- [[package]]
++[[package]]
  name = "wasm-bindgen"
  version = "0.2.129"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
 diff --git a/Cargo.toml b/Cargo.toml
-index 5ca395d1..d6c0f526 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -183,6 +183,7 @@ which = { workspace = true }
+@@ -191,6 +191,7 @@
  tokio = { workspace = true, features = ["full"] }
  
  [target.'cfg(target_os = "wasi")'.dependencies]
@@ -50,18 +48,27 @@ index 5ca395d1..d6c0f526 100644
  
  [dev-dependencies]
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
-index 8be180e7..3622a9ad 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
-@@ -2,8 +2,11 @@ use crate::child_env::{self, EnvScope, Roots};
- use crate::error::{FnoxError, Result};
+@@ -5,7 +5,10 @@
  use crate::temp_file_secrets::create_ephemeral_secret_file;
  use crate::{commands::Cli, config::Config};
+ use std::io::IsTerminal;
 +#[cfg(not(target_os = "wasi"))]
- use std::process::Command;
- use tempfile::NamedTempFile;
+ use std::process::{Command, Stdio};
 +#[cfg(target_os = "wasi")]
-+use wasix_command::Command;
++use wasix_command::{Command, Stdio};
+ use tempfile::NamedTempFile;
  
  /// Run a command with secrets in its environment
- ///
+@@ -135,6 +138,10 @@
+         let filter = SecretFilter::new(&self.only, &self.except)?;
+ 
+         let redact_on = self.redact || (!self.no_redact && config.should_redact_exec());
++        #[cfg(target_os = "wasi")]
++        if redact_on {
++            return Err(FnoxError::Config("exec output redaction is not available in seven".into()));
++        }
+ 
+         #[cfg(unix)]
+         if self.replace {
