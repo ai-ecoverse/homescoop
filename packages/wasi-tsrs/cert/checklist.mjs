@@ -1,16 +1,14 @@
-/**
- * wasi-tsrs: tsrs (TypeScript 7.1's tsc in Rust) type-checks and emits a multi-file
- * project from its tsconfig.json in OPFS, resolves an @types package from
- * node_modules, reports cross-file errors with tsc's exit statuses, and
- * refuses a missing project.
- */
+import { readFileSync } from 'node:fs';
+
+const version = readFileSync(new URL('../recipe.yaml', import.meta.url), 'utf8').match(/^version: "([^"]+)"$/m)[1];
+
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
   const P = 'home/proj';
 
   const ver = await run(['tsrs', '--version']);
   assert.equal(ver.status, 0, `--version stderr=${ver.stderr}`);
-  assert.equal(ver.stdout, 'Version 7.1.0-dev (tsrs 0.18.0-ts7.1.0-dev.20260929, microsoft/TypeScript@b85298b6a81f)\n');
+  assert.match(ver.stdout, new RegExp(`^Version [^\\s]+ \\(tsrs ${version.replaceAll('.', '\\.')}[,-][^\\n]+\\)\n$`));
 
   await write(`${P}/tsconfig.json`, JSON.stringify({
     compilerOptions: {
@@ -56,7 +54,6 @@ export default async function (ctx) {
   assert.match(area, /export interface Rect/);
   assert.ok(await read(`${P}/dist/math.js`), 'dist/math.js not written');
 
-  // A return type changed in one file breaks callers in two others.
   await write(`${P}/src/math.ts`, 'export function add(a: number, b: number): string { return `${a + b}`; }\n');
   const bad = await run(['tsrs', '--noEmit', '-p', '.', '--pretty', 'false'], { cwd: `/${P}` });
   assert.equal(bad.status, 2, `type errors with --noEmit exit 2 (TypeScript 7.1; 7.0 exits 1); stdout=${bad.stdout} stderr=${bad.stderr}`);
