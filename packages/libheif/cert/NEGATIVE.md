@@ -109,3 +109,9 @@ because the checklist expected a literal 1.23.6.
 The host reference generator and pixel comparison diagnostics still name 1.23.6:
 that is the host version which generated the committed reference fixtures, not
 the expected version of the package being certified.
+
+The truncated-file assertion also distinguishes the releases: 1.23.7 defers
+reading the image extent until decoding, so heif-convert reports `Could not
+decode image` with an out-of-bounds extent error and exits 1, while heif-info
+exits 0. Published 1.23.6-8 instead fails while reading the file and exits 1
+from both tools, failing both updated assertions.

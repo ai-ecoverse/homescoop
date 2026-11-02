@@ -117,19 +117,19 @@ export default async function libheif(ctx) {
     await put('garbage.heic', Buffer.concat([Buffer.from('00000018667479706865696300000000', 'hex'), Buffer.from('mif1heicgarbagegarbage')]));
     await put('empty.heic', Buffer.alloc(0));
     const cases = [
-      ['trunc.heic', 1, /Could not read HEIF\/AVIF file: Invalid input: Unexpected end of file/],
+      ['trunc.heic', 1, /Could not decode image: Invalid input: Unexpected end of file: Extent in iloc box references data outside of file bounds/, 0],
       ['garbage.heic', 1, /Could not read HEIF\/AVIF file: Invalid input/],
       ['empty.heic', 1, /Input file does not appear to start with a valid box length|File size too small/],
       ['missing.heic', 10, /Input file does not exist\./],
     ];
-    for (const [f, rc, re] of cases) {
+    for (const [f, rc, re, infoRc = rc] of cases) {
       const r = await run(['heif-convert', f, `${f}.png`]);
       assert.equal(r.status, rc, `heif-convert ${f}: rc ${r.status} ${r.stderr}`);
       assert.match(r.stdout + r.stderr, re, f);
       assert.doesNotMatch(r.stdout + r.stderr, FATAL, f);
       assert.equal(await readB64(`${f}.png`), null, `${f}: no output written`);
       const i = await run(['heif-info', f]);
-      assert.equal(i.status, rc, `heif-info ${f}: rc ${i.status}`);
+      assert.equal(i.status, infoRc, `heif-info ${f}: rc ${i.status}`);
       assert.doesNotMatch(i.stdout + i.stderr, FATAL, f);
     }
     const bad = await run(['heif-convert', '--quiet', 'badmdat.heic', 'badmdat.png']);
