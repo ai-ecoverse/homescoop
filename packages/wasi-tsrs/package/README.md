@@ -9,7 +9,7 @@ tsrs --noEmit -p .   # type-check the project in tsconfig.json
 tsrs -p .            # and emit
 ```
 
-`bin/tsrs.wasm` is native tsrs's `tsc` driver from oxc-project/tsrs `v0.18.0`
+`bin/tsrs.wasm` is native tsrs's `tsc` driver from oxc-project/tsrs `v0.20.0`
 (TypeScript `7.1.0-dev`), built by homescoop for `wasm32-wasip1` with Rust
 1.99.1 and no changes to tsrs: a small command crate runs it over the file
 system. The `lib.*.d.ts` files are embedded, so it needs no
