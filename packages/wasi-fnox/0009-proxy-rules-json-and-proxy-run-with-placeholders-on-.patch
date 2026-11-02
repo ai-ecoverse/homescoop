@@ -592,3 +592,15 @@ diff --git a/src/proxy.rs b/src/proxy.rs
  impl Redaction {
      /// Length of the input prefix that spells this redaction's value, if any.
      fn match_len(&self, input: &[u8]) -> Option<usize> {
+
+diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
+--- a/src/commands/proxy.rs
++++ b/src/commands/proxy.rs
+@@ -403,6 +403,7 @@
+         self.sandbox || (proxy.sandbox && !self.no_sandbox)
+     }
+ 
++    #[cfg(not(target_os = "wasi"))]
+     async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
+         if self.command.is_empty() {
+             return Err(FnoxError::CommandNotSpecified);
