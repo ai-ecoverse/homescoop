@@ -20,6 +20,5 @@
   "wasm-go-std-linux-amd64": 808,
   "wasm-go-std-wasip1": 808,
   "which": 808,
-  "xxd": 808,
-  "zlib": 808
+  "xxd": 808
 }
