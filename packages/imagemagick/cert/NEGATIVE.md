@@ -262,3 +262,11 @@ Against the published `@ai-ecoverse/wasm-imagemagick` 7.1.2-34-9.6 (npm `latest`
   The cause: 9.6's `HomescoopFallbackTemp` used only the first of `$MAGICK_TEMPORARY_PATH`, `$TMPDIR` and `/tmp` that was set. In 9.7 it tries each in turn (skipping unset, empty and repeated ones), and when none takes the file the refusal names each directory and its error: `unable to create temporary file '/tmp/rd/w.png': tried /nonexistent (No such file or directory), /tmp/rd (Permission denied), /tmp (Permission denied)`. The row that makes all three unwritable (as root, `chmod 755 /tmp` for the duration of one command, restored in a `finally`) also checks that the refused file doesn't stop the other files of the same mogrify.
 
 - **Coverage rows (#1209, #1383).** kim's own 0600 file in /tmp/rd keeps `kim kim 600` (9.6 fails it, because `TMPDIR=/tmp/rd` was refused and the next file skipped); a two-frame GIF keeps both frames through mogrify and magick on the copy path; magick keeps kim's group `users` on her own 0640 file, and root's magick leaves it kim's; wasm-check.mjs finds no libheif plugin directory in `bin/magick.wasm`. The last three pass on 9.6 too (parity rows).
+
+## OpenJPEG 2.5.4 (homescoop#1957)
+
+7.1.2-34-9.7 reports JPEG-2000 (2.5.3) in magick -list format. The new assertion requires the linked OpenJPEG version 2.5.4 and rejects that published version.
+
+The recipe pin moves to wasm-openjpeg@2.5.4-1 and the package is rebuilt, so the static link includes the opj_jp2_read_header error check from OpenJPEG 2.5.4.
+
+Checked locally against the previous registry tarball: running its unmodified Emscripten glue under Node produced the output above, and the new cert assertion rejected that captured output. The assertion also accepts output with the required version. CI builds and certifies the replacement package.

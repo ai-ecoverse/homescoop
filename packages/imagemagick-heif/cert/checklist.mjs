@@ -45,6 +45,7 @@ export default async function imagemagickHeif(ctx) {
     assert.match(v.stdout, /Delegates \(built-in\):.*\bheic\b/);
     for (const d of ['freetype', 'webp', 'xml', 'zlib']) assert.match(v.stdout, new RegExp(`Delegates \\(built-in\\):.*\\b${d}\\b`), `default delegate ${d} kept`);
     const f = await ok(['magick', '-list', 'format']);
+    assert.match(f.stdout, /^\s*JP2\*?\s+rw[-+]\s+JPEG-2000 File Format Syntax \(2\.5\.4\)$/m, 'linked OpenJPEG is 2.5.4');
     assert.match(f.stdout, /^\s+HEIC\*?\s+r--\s+High Efficiency Image Format \(1\.23\.6\)$/m);
     assert.match(f.stdout, /^\s+AVIF\*?\s+r--\s+AV1 Image File Format \(1\.23\.6\)$/m);
   }

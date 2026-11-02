@@ -100,3 +100,11 @@ The kits ship 9.6's objects: constitute.o carries write-temp-then-rename.patch's
 ## 7.1.2-34-9.7: the kits follow wasm-imagemagick(-heif) 9.7 (homescoop#1655, #1656; 2026-10-22)
 
 The kits ship 9.7's objects: constitute.o carries write-temp-then-rename.patch's `HomescoopFallbackTemp` that tries each temporary directory, and mogrify.o mogrify-per-file-status.patch. relink-check.mjs checks that each kit's kit.json names this version's `bin/magick.wasm`, so a 9.6 kit can't pass for 9.7. The behaviour negatives are wasm-imagemagick's (NEGATIVE.md there).
+
+## OpenJPEG 2.5.4 (homescoop#1957)
+
+7.1.2-34-9.7 ships libopenjp2.a from wasm-openjpeg@2.5.3-1 in both kits. The new archive equality assertion rejects those bytes against wasm-openjpeg@2.5.4-1 before relinking.
+
+The recipe pin moves to wasm-openjpeg@2.5.4-1 and the package is rebuilt, so the static link includes the opj_jp2_read_header error check from OpenJPEG 2.5.4.
+
+Checked locally by running the new relink-check.mjs against the published 7.1.2-34-9.7 tarball: it fails with `imagemagick: libopenjp2.a differs from wasm-openjpeg@2.5.4-1`, before invoking the linker.
