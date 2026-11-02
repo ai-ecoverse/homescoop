@@ -46,13 +46,37 @@ diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_pro
 diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
 --- a/crates/fnox-core/src/http.rs
 +++ b/crates/fnox-core/src/http.rs
-@@ -26,6 +26,7 @@
+@@ -8,6 +8,7 @@
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn client_builder() -> reqwest::ClientBuilder {
+     let settings = crate::settings::Settings::get();
+     let user_agent = format!("fnox/{}", env!("CARGO_PKG_VERSION"));
+@@ -18,6 +19,7 @@
+     builder
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn build_or_default(builder: reqwest::ClientBuilder) -> reqwest::Client {
+     builder.build().unwrap_or_else(|e| {
+         tracing::warn!("Failed to build HTTP client with timeout: {e}; using default (no timeout)");
+@@ -26,6 +28,7 @@
  }
  
  /// Build an HTTP client with the configured timeout from settings.
 +#[cfg(not(target_os = "wasi"))]
  pub fn http_client() -> reqwest::Client {
      build_or_default(client_builder())
+ }
+@@ -35,6 +38,7 @@
+ /// but forwards custom headers (such as GitLab's `PRIVATE-TOKEN`) and re-sends
+ /// form bodies on 307/308, so a redirect could deliver a secret to a host the
+ /// URL checks never saw.
++#[cfg(not(target_os = "wasi"))]
+ pub fn credential_client() -> reqwest::Client {
+     build_or_default(client_builder().redirect(reqwest::redirect::Policy::none()))
  }
 diff --git a/crates/fnox-core/src/lease.rs b/crates/fnox-core/src/lease.rs
 --- a/crates/fnox-core/src/lease.rs
