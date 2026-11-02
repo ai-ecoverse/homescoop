@@ -4,7 +4,7 @@ name: wasix-zlib
 builder: host
 runner: pool
 # renovate: datasource=github-releases depName=madler/zlib extractVersion=^v(?<version>.*)$
-version: "1.3.1"
+version: "1.3.2"
 npm: "@ai-ecoverse/wasix-zlib"
 summary: "zlib for slicc WASIX: static libz.a (lib/) and PIC (lib-pic/), headers, pkg-config"
 source:
