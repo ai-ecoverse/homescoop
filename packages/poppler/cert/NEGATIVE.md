@@ -66,3 +66,31 @@ That string is POPPLER_DATADIR (CMAKE_INSTALL_FULL_DATADIR/poppler). emcmake had
 The recipe pin moves to wasm-openjpeg@2.5.4-1 and the package is rebuilt, so the static link includes the opj_jp2_read_header error check from OpenJPEG 2.5.4.
 
 Checked locally against the previous registry tarball: running its unmodified Emscripten glue under Node produced the output above, and the new cert assertion rejected that captured output. The assertion also accepts output with the required version. CI builds and certifies the replacement package.
+
+## 26.10.0-9: Poppler version first (homescoop#1962)
+
+The published `@ai-ecoverse/wasm-poppler@26.10.0-8` registry tarball was
+extracted and its unmodified Emscripten glue run under Node with
+`thisProgram` set to each utility and `callMain(['-v'])`. Both commands
+returned 0, but their stderr started with:
+
+```text
+OpenJPEG version 2.5.4
+pdftoppm version 26.10.0
+```
+
+```text
+OpenJPEG version 2.5.4
+pdfinfo version 26.10.0
+```
+
+The new exact first-line assertions reject both captured outputs. Running
+`checklist.mjs` with the captured published stderr also fails at
+`pdftoppm reports Poppler on the first stderr line`. Moving the OpenJPEG
+line after the utility output passes both version checks, including the
+existing runtime OpenJPEG 2.5.4 assertion for each command.
+
+The dispatcher now calls the utility before printing `opj_version()`.
+The upstream 26.10.0 version paths return to the dispatcher, preserving the
+utility's status and its version/copyright output order. CI builds and
+certifies the replacement package.

@@ -115,9 +115,11 @@ export default async function (ctx) {
   await put('b.pdf', makePdf(['Bravo one', 'Bravo two']));
   await put('e.pdf', makePdf(['Secret one', 'Secret two'], { user: 'u', owner: 'o' }));
 
-  const ver = await ok(['pdftoppm', '-v']);
-  assert.match(ver.stderr, /^OpenJPEG version 2\.5\.4$/m, 'linked OpenJPEG is 2.5.4');
-  assert.match(ver.stderr, /^pdftoppm version 26\.10\.0$/m);
+  for (const util of ['pdftoppm', 'pdfinfo']) {
+    const ver = await ok([util, '-v']);
+    assert.equal(ver.stderr.split('\n')[0], `${util} version 26.10.0`, `${util} reports Poppler on the first stderr line`);
+    assert.match(ver.stderr, /^OpenJPEG version 2\.5\.4$/m, 'linked OpenJPEG is 2.5.4');
+  }
 
   // pdfinfo.
   const info = await ok(['pdfinfo', 'a.pdf']);

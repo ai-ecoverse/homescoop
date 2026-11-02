@@ -25,7 +25,7 @@
 +endif()
 --- /dev/null
 +++ b/utils/poppler-multicall.cc
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,53 @@
 +// homescoop: poppler's command-line utilities in one program. The util
 +// runs by the name it was called as (argv[0]), or by the first argument
 +// when called as poppler-multicall. pdftocairo runs pdftoppm.
@@ -52,13 +52,14 @@
 +        }
 +        name = "pdftoppm";
 +    }
++    const bool printOpenJPEG = argc == 2 && !strcmp(argv[1], "-v");
 +#define HS_CASE(n)                                                                                                                                   \
 +    if (!strcmp(name, #n)) {                                                                                                                         \
 +        *rc = n##_main(argc, argv);                                                                                                                  \
++        if (printOpenJPEG) {                                                                                                                          \
++            fprintf(stderr, "OpenJPEG version %s\n", opj_version());                                                                                \
++        }                                                                                                                                           \
 +        return true;                                                                                                                                 \
-+    }
-+    if (argc == 2 && !strcmp(argv[1], "-v")) {
-+        fprintf(stderr, "OpenJPEG version %s\n", opj_version());
 +    }
 +    HS_UTILS(HS_CASE)
 +    return false;
