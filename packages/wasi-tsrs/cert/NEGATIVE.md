@@ -53,3 +53,8 @@ Not a fix: the limit is documented and guarded. 0.18.0-1 type-checks up to about
 
 The recursion is upstream tsrs's (parser and checker), not homescoop's command crate. It runs on V8's native stack for the kernel's worker, not on the 80 MiB wasm shadow stack. Local builds at `-Os` (upstream's), `-O3`, `-Oz` and without wasm-opt reached 815–831 terms and 571–846 parentheses, so frame size isn't the lever. A deeper limit needs either a larger native stack where the kernel runs the process (asked of the Kernel Coordinator), or iterative binary-expression handling upstream. `cert/depth.mjs` passes on 0.18.0-1 too: it pins the current depth and the error, so a regression to a shallower limit or a hang fails.
 
+## 0.20.0-1: upstream system API and recipe-derived version
+
+On 2026-11-02, ladder-build run 41450698783 at ad986fc32bbcbc0a0f4109b4b2ee0524ae1a148a failed both host-build and rebuild with E0425: `sys::osSys` does not exist. Upstream tag v0.20.0 (d197eeea709616d61930c2bd5eac048471e404b8) exports `sys::OsSys`; its native CLI uses that type for the leaked system reference too. The command crate now follows that API.
+
+The version assertion in `cert/checklist.mjs` reads the upstream version from the recipe and requires it in the compiler's version line. The previous published `@ai-ecoverse/wasi-tsrs@0.18.0-2` was downloaded from npm and its actual `tsrs.wasm --version` output was captured through Node WASI. It exited 0 and reported `tsrs 0.18.0-ts7.1.0-dev.20260929`; feeding that result to the committed checklist failed its version assertion (`ERR_ASSERTION`, operator `match`) against this recipe. NEGATIVE: PASS. The remaining project, emit, diagnostic and permission checks still run in CI.

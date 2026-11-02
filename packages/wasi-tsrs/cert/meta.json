@@ -7,7 +7,7 @@
     "@ai-ecoverse/wasm-coreutils"
   ],
   "checklist": [
-    "tsrs --version → Version 7.1.0-dev (tsrs 0.18.0-ts7.1.0-dev.20260929, microsoft/TypeScript@b85298b6a81f)",
+    "tsrs --version → a compiler version line naming recipe.yaml's upstream tsrs version",
     "tsrs --noEmit -p . on a multi-file project (tsconfig.json, nested dir, @types package in node_modules) → exit 0, no output, nothing emitted",
     "tsrs -p . → exit 0; dist/*.js without types and dist/*.d.ts declarations",
     "a return type changed in math.ts → --noEmit exits 2 (TypeScript 7.1's status; wasi-typescript's 7.0 exits 1) with TS2322 in src/index.ts and TS2362 in src/shapes/area.ts (cross-file), none in math.ts",

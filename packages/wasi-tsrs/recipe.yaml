@@ -26,7 +26,7 @@ about:
     No patches to tsrs. tsrs_wasi/ (a bin crate of ours, about 20 lines) is
     copied into the workspace as crates/tsrs_wasi: main() changes to PWD (the
     kernel starts WASI processes at /), then runs tsrs_execute's
-    command_line over native tsrs's osSys, the std::fs file system with the
+    command_line over native tsrs's OsSys, the std::fs file system with the
     embedded lib.*.d.ts. That is crates/tsrs_cli's main without mimalloc,
     the LSP, the API server and the large-stack thread; crates/tsrs_wasm is
     the same driver over a JS host file system. Adding the member may add
