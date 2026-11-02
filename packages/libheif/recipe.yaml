@@ -1,7 +1,7 @@
 name: libheif
 builder: host
 # renovate: datasource=github-releases depName=strukturag/libheif extractVersion=^v(?<version>.*)$
-version: "1.23.6"
+version: "1.23.7"
 npm: "@ai-ecoverse/wasm-libheif"
 summary: "libheif HEIF/HEIC/AVIF decoder (libde265 HEVC, dav1d AV1) with heif-convert and heif-info"
 source:
