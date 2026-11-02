@@ -9,7 +9,7 @@ npm: "@ai-ecoverse/wasm-libjpeg-turbo"
 summary: "libjpeg-turbo JPEG codec"
 source:
   url: "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/{{version}}/libjpeg-turbo-{{version}}.tar.gz"
-  sha256: "8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf"
+  sha256: "6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e"
   # SOURCE_DATE_EPOCH: CMake's BUILD string ("build YYYYMMDD" in libjpeg.a)
   # comes from it, not the build day (#638): the newest file in
   # libjpeg-turbo-3.1.2.tar.gz, 2025-08-27T01:11:07Z.
