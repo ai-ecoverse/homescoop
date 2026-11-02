@@ -58,6 +58,12 @@ const fetch = (spec, dir) => {
 try {
   sh(`tar -xzf '${tarball}' -C '${work}'`);
   const pkg = join(work, 'package');
+  const openjpeg = readFileSync(join(fetch('@ai-ecoverse/wasm-openjpeg@2.5.4-1', 'openjpeg'), 'lib/libopenjp2.a'));
+  for (const r of Object.keys(KITS)) {
+    const archive = readFileSync(join(pkg, 'share', r, 'relink/libopenjp2.a'));
+    if (!archive.equals(openjpeg)) throw new Error(`${r}: libopenjp2.a differs from wasm-openjpeg@2.5.4-1`);
+  }
+  console.log('openjpeg: PASS both kits carry wasm-openjpeg@2.5.4-1 libopenjp2.a');
   const version = json(join(pkg, 'package.json')).version;
   for (const r of Object.keys(KITS)) {
     const v = json(join(root, 'packages', r, 'package/package.json')).version;

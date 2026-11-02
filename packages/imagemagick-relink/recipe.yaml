@@ -20,7 +20,7 @@ dependencies:
     - "@ai-ecoverse/wasm-lcms2@2.19.1-4"
     - "@ai-ecoverse/wasm-libtiff@4.7.2-4"
     - "@ai-ecoverse/wasm-libwebp@1.6.0-4"
-    - "@ai-ecoverse/wasm-openjpeg@2.5.3-1"
+    - "@ai-ecoverse/wasm-openjpeg@2.5.4-1"
     - "@ai-ecoverse/wasm-freetype@2.13.3-4"
     - "@ai-ecoverse/wasm-libxml2@2.15.4-3"
     - "@ai-ecoverse/wasm-libiconv@1.19.0-3"

@@ -58,3 +58,11 @@ That string is POPPLER_DATADIR (CMAKE_INSTALL_FULL_DATADIR/poppler). emcmake had
 ## 26.10.0-7: shim drift (homescoop#1491; 2026-10-20)
 
 26.10.0-7 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 26.10.0-6 in `THIRD-PARTY-NOTICES.md` and `bin/poppler-multicall`, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## OpenJPEG 2.5.4 (homescoop#1957)
+
+26.10.0-7 does not report the linked OpenJPEG version with pdftoppm -v. The new assertion requires OpenJPEG version 2.5.4, obtained from opj_version(), and rejects that published version.
+
+The recipe pin moves to wasm-openjpeg@2.5.4-1 and the package is rebuilt, so the static link includes the opj_jp2_read_header error check from OpenJPEG 2.5.4.
+
+Checked locally against the previous registry tarball: running its unmodified Emscripten glue under Node produced the output above, and the new cert assertion rejected that captured output. The assertion also accepts output with the required version. CI builds and certifies the replacement package.

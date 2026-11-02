@@ -15,6 +15,7 @@ export default async function (ctx) {
   }
 
   const formats = await ok(['magick', '-list', 'format']);
+  assert.match(formats, /^\s*JP2\*?\s+rw[-+]\s+JPEG-2000 File Format Syntax \(2\.5\.4\)$/m, 'linked OpenJPEG is 2.5.4');
   const mode = (name) => (formats.match(new RegExp(`^\\s*${name}\\*?\\s+(\\S+)\\s`, 'm')) ?? [])[1] ?? 'absent';
   assert.match(mode('WEBP'), /^rw/, `WEBP in -list format: ${mode('WEBP')}`);
   assert.match(mode('MSL'), /^r/, `MSL in -list format: ${mode('MSL')}`);

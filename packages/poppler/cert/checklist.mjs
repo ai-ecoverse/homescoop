@@ -116,6 +116,7 @@ export default async function (ctx) {
   await put('e.pdf', makePdf(['Secret one', 'Secret two'], { user: 'u', owner: 'o' }));
 
   const ver = await ok(['pdftoppm', '-v']);
+  assert.match(ver.stderr, /^OpenJPEG version 2\.5\.4$/m, 'linked OpenJPEG is 2.5.4');
   assert.match(ver.stderr, /^pdftoppm version 26\.10\.0$/m);
 
   // pdfinfo.

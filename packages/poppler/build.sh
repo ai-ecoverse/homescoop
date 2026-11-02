@@ -115,8 +115,8 @@ homescoop_notice "Little CMS 2.19.1 (@ai-ecoverse/wasm-lcms2)" \
 homescoop_notice "FreeType 2.13.3 (@ai-ecoverse/wasm-freetype), used under the FreeType License" \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/LICENSE.TXT 2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b \
   https://raw.githubusercontent.com/freetype/freetype/VER-2-13-3/docs/FTL.TXT 08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1
-homescoop_notice "OpenJPEG 2.5.3 (@ai-ecoverse/wasm-openjpeg)" \
-  https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.3/LICENSE a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6
+homescoop_notice "OpenJPEG 2.5.4 (@ai-ecoverse/wasm-openjpeg)" \
+  https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.4/LICENSE a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6
 homescoop_notice "URW base-14 Type1 fonts, gsfonts $GSFONTS_VERSION (share/fonts)" \
   "$FSRC/README" - "$FSRC/COPYING" -
 homescoop_notice_emscripten
