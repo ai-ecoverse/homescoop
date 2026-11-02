@@ -7,6 +7,7 @@ import { exifOrientation, jpegSize } from './lib/jpeg.mjs';
 import { pagePngDigest, pagePut, pageReadB64 } from './lib/page.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const VERSION = /^version: "([^"]+)"$/m.exec(readFileSync(join(here, '../recipe.yaml'), 'utf8'))[1];
 const REF = JSON.parse(readFileSync(join(here, 'fixtures', 'references.json'), 'utf8'));
 const DIR = 'home/heif';
 const CWD = `/${DIR}`;
@@ -27,16 +28,17 @@ export default async function libheif(ctx) {
   {
     const v = await run(['heif-convert', '--version']);
     assert.equal(v.status, 0, v.stderr);
-    assert.match(v.stdout, /^1\.23\.6\nlibheif: 1\.23\.6\nplugin path: plugins are disabled\n/);
+    assert.ok(v.stdout.startsWith(`${VERSION}\nlibheif: ${VERSION}\nplugin path: plugins are disabled\n`), v.stdout);
     const i = await run(['heif-info', '--version']);
     assert.equal(i.status, 0, i.stderr);
-    assert.match(i.stdout, /^1\.23\.6\n/);
+    assert.equal(i.stdout.split('\n')[0], VERSION);
     const d = await run(['heif-convert', '--list-decoders']);
     assert.equal(d.status, 0, d.stderr);
     assert.match(d.stdout, /HEIC decoders:\n- libde265 = libde265 HEVC decoder, version 1\.1\.3\n/);
     assert.match(d.stdout, /AVIF decoders:\n- dav1d = dav1d /);
     const dec = await run(['heif-dec', '--version']);
     assert.equal(dec.status, 0, dec.stderr);
+    assert.ok(dec.stdout.startsWith(`${VERSION}\nlibheif: ${VERSION}\nplugin path: plugins are disabled\n`), dec.stdout);
   }
 
   for (const f of INFO_CASES) {

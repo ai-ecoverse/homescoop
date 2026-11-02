@@ -96,3 +96,16 @@ The published 1.23.6-5 also has 16 occurrence(s) of the CI build directory `/tmp
 ## 1.23.6-8: shim drift (homescoop#1491; 2026-10-20)
 
 1.23.6-8 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 1.23.6-7 in `THIRD-PARTY-NOTICES.md`, `bin/heif-dec`, `bin/heif-info`, `share/libheif/relink/js/slicc-env.js`, `share/libheif/relink/js/slicc-uname.js` and more, so this is a packaging bump. The package's own code is unchanged. `THIRD-PARTY-NOTICES.md` also gains the slicc-shims section that every wasm linking the shims now carries (homescoop#1388). The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 1.23.7-1: recipe version (homescoop#1949)
+
+The checklist reads the upstream version from recipe.yaml and requires it from
+heif-convert, heif-dec and heif-info. The relink check requires that same version
+from the rebuilt heif-info. The previously published 1.23.6-8 reports 1.23.6,
+so it fails these version assertions against the 1.23.7 recipe. Before the fix,
+ladder-build run 41459453509 rejected the new build's correct 1.23.7 output
+because the checklist expected a literal 1.23.6.
+
+The host reference generator and pixel comparison diagnostics still name 1.23.6:
+that is the host version which generated the committed reference fixtures, not
+the expected version of the package being certified.
