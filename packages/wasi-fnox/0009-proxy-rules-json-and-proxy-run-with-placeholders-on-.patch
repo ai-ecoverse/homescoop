@@ -572,3 +572,23 @@ diff --git a/src/proxy.rs b/src/proxy.rs
  async fn write_error<S>(stream: &mut S, status: u16, message: &str) -> Result<()>
  where
      S: AsyncWrite + Unpin,
+
+diff --git a/src/proxy.rs b/src/proxy.rs
+--- a/src/proxy.rs
++++ b/src/proxy.rs
+@@ -293,6 +293,7 @@
+ /// the proxy uses an absolute URL as its target, which can carry a password
+ /// or a secret in the query string, so keep only the scheme, host, port, and
+ /// path. Other targets lose any query string and anything before an `@`.
++#[cfg(not(target_os = "wasi"))]
+ fn loggable_target(target: &str) -> String {
+     if let Ok(url) = reqwest::Url::parse(target)
+         && let Some(host) = url.host_str()
+@@ -330,6 +331,7 @@
+     lenient: bool,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl Redaction {
+     /// Length of the input prefix that spells this redaction's value, if any.
+     fn match_len(&self, input: &[u8]) -> Option<usize> {
