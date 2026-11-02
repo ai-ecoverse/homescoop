@@ -1,18 +1,18 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.42.1; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.43.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
 # (/dev/sealed and exec tickets).
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
-version: "1.42.1"
+version: "1.43.0"
 npm: "@ai-ecoverse/wasi-fnox"
-summary: "fnox 1.42 for slicc WASI preview1 (command fnox; seven's sealed store)"
+summary: "fnox 1.43 for slicc WASI preview1 (command fnox; seven's sealed store)"
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
-  sha256: "dbf5428e786625a3d5bc7a2671d9a69672015d07d92a0d6d79a2c5af5cf2454f"
-  epoch: "1792749669"
+  sha256: "5b687ff68a1f6be864eb60ba4ce4a6f27f9d544ca285c3ce9d24ca6fca8a94ed"
+  epoch: "1793009077"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.42.1; the patches live here, are not
+    Upstream is jdx/fnox v1.43.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -88,7 +88,7 @@ about:
            on PATH the kernel won't execute (homescoop#1129)
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.42.1 commit time (source.epoch, 2026-10-23T10:01:09Z), so the
+    v1.43.0 commit time (source.epoch, 2026-10-26T10:04:37Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -120,3 +120,12 @@ about:
     usage-test notice moves to 7.1.1 (the same LICENSE, f68207e9...).
     Upstream's activate hooks now test the binary before deactivating,
     so `fnox deactivate` works after fnox is removed; the cert covers it.
+    1.43.0-1 rebases all 17 patches. 0003 gates the four new lease
+    backends and the native sandbox module. 0005 refuses exec output
+    redaction on WASI before resolving secrets; it needs helper threads.
+    0009 gates the new native proxy machinery and refuses OS sandbox
+    requests on WASI before spawning. The sealed ticket, provider scrub
+    and existing refusal patches retain their added and removed lines.
+    0016 also captures the child environment before resolution, so a
+    filtered-out interpolation dependency cannot leak through fnox's
+    mutated process environment; original inherited values survive.
