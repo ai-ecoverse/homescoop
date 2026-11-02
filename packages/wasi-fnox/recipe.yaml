@@ -8,10 +8,10 @@ builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
 version: "1.43.0"
 npm: "@ai-ecoverse/wasi-fnox"
-summary: "fnox 1.42 for slicc WASI preview1 (command fnox; seven's sealed store)"
+summary: "fnox 1.43 for slicc WASI preview1 (command fnox; seven's sealed store)"
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
-  sha256: "dbf5428e786625a3d5bc7a2671d9a69672015d07d92a0d6d79a2c5af5cf2454f"
+  sha256: "5b687ff68a1f6be864eb60ba4ce4a6f27f9d544ca285c3ce9d24ca6fca8a94ed"
   epoch: "1792749669"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
