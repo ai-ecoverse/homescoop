@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-libheif`
 
-[libheif](https://github.com/strukturag/libheif) 1.23.6 for
+[libheif](https://github.com/strukturag/libheif) 1.23.7 for
 [slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm: it decodes
 HEIF / HEIC (iPhone photos) and AVIF. It has three commands: `heif-convert`,
 `heif-dec` (the same program under libheif's current name) and `heif-info`.
@@ -52,7 +52,7 @@ heif-convert --list-decoders
 
 | Part | Licence | Where |
 | --- | --- | --- |
-| libheif 1.23.6 (`lib/libheif.a`) | LGPL-3.0-or-later | `LICENSE` |
+| libheif 1.23.7 (`lib/libheif.a`) | LGPL-3.0-or-later | `LICENSE` |
 | libde265 1.1.3 (`lib/libde265.a`) | LGPL-3.0-or-later | `LICENSE` |
 | dav1d 1.5.4 (`lib/libdav1d.a`) | BSD-2-Clause | `LICENSE` |
 | heif-dec, heif-info, heifio (libheif examples) | MIT | `LICENSE` |
@@ -102,9 +102,13 @@ gives `-lheif -lde265 -ldav1d -lz`. Link with `-fexceptions`.
 (an iPhone 13 Pro Max still, and an iPhone 13 Pro portrait with its depth map
 and HDR gain map), libheif's two-image example and an AVIF, odd sizes
 (451x461, 1x1, 1023x769 at 16 bit), a rotated file, and corrupt input. Every
-PNG is compared with Homebrew's libheif 1.23.6 sample by sample. Most outputs
+PNG is compared sample by sample with references generated before this release with Homebrew's libheif 1.23.6. Most outputs
 are bit-identical to the host's. In one, libheif's `example.heic` image 1, 35
 of 3,279,360 samples differ by 1, and the cert allows at most 1 per sample on
 at most 0.01% of samples, with each such sample listed in
 `cert/fixtures/references.json`. Sources and licences of the sample files
 are in `cert/fixtures/fixtures.json`.
+
+Since 1.23.7, `heif-info` can list metadata from a truncated file without
+decoding its image. Use `heif-convert` to validate decoding: the cert requires
+the truncated fixture to fail with an out-of-bounds extent error and no output.

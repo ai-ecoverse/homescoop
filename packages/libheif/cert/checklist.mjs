@@ -7,6 +7,7 @@ import { exifOrientation, jpegSize } from './lib/jpeg.mjs';
 import { pagePngDigest, pagePut, pageReadB64 } from './lib/page.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const VERSION = /^version: "([^"]+)"$/m.exec(readFileSync(join(here, '../recipe.yaml'), 'utf8'))[1];
 const REF = JSON.parse(readFileSync(join(here, 'fixtures', 'references.json'), 'utf8'));
 const DIR = 'home/heif';
 const CWD = `/${DIR}`;
@@ -27,16 +28,17 @@ export default async function libheif(ctx) {
   {
     const v = await run(['heif-convert', '--version']);
     assert.equal(v.status, 0, v.stderr);
-    assert.match(v.stdout, /^1\.23\.6\nlibheif: 1\.23\.6\nplugin path: plugins are disabled\n/);
+    assert.ok(v.stdout.startsWith(`${VERSION}\nlibheif: ${VERSION}\nplugin path: plugins are disabled\n`), v.stdout);
     const i = await run(['heif-info', '--version']);
     assert.equal(i.status, 0, i.stderr);
-    assert.match(i.stdout, /^1\.23\.6\n/);
+    assert.equal(i.stdout.split('\n')[0], VERSION);
     const d = await run(['heif-convert', '--list-decoders']);
     assert.equal(d.status, 0, d.stderr);
     assert.match(d.stdout, /HEIC decoders:\n- libde265 = libde265 HEVC decoder, version 1\.1\.3\n/);
     assert.match(d.stdout, /AVIF decoders:\n- dav1d = dav1d /);
     const dec = await run(['heif-dec', '--version']);
     assert.equal(dec.status, 0, dec.stderr);
+    assert.ok(dec.stdout.startsWith(`${VERSION}\nlibheif: ${VERSION}\nplugin path: plugins are disabled\n`), dec.stdout);
   }
 
   for (const f of INFO_CASES) {
@@ -115,19 +117,19 @@ export default async function libheif(ctx) {
     await put('garbage.heic', Buffer.concat([Buffer.from('00000018667479706865696300000000', 'hex'), Buffer.from('mif1heicgarbagegarbage')]));
     await put('empty.heic', Buffer.alloc(0));
     const cases = [
-      ['trunc.heic', 1, /Could not read HEIF\/AVIF file: Invalid input: Unexpected end of file/],
+      ['trunc.heic', 1, /Could not decode image: Invalid input: Unexpected end of file: Extent in iloc box references data outside of file bounds/, 0],
       ['garbage.heic', 1, /Could not read HEIF\/AVIF file: Invalid input/],
       ['empty.heic', 1, /Input file does not appear to start with a valid box length|File size too small/],
       ['missing.heic', 10, /Input file does not exist\./],
     ];
-    for (const [f, rc, re] of cases) {
+    for (const [f, rc, re, infoRc = rc] of cases) {
       const r = await run(['heif-convert', f, `${f}.png`]);
       assert.equal(r.status, rc, `heif-convert ${f}: rc ${r.status} ${r.stderr}`);
       assert.match(r.stdout + r.stderr, re, f);
       assert.doesNotMatch(r.stdout + r.stderr, FATAL, f);
       assert.equal(await readB64(`${f}.png`), null, `${f}: no output written`);
       const i = await run(['heif-info', f]);
-      assert.equal(i.status, rc, `heif-info ${f}: rc ${i.status}`);
+      assert.equal(i.status, infoRc, `heif-info ${f}: rc ${i.status}`);
       assert.doesNotMatch(i.stdout + i.stderr, FATAL, f);
     }
     const bad = await run(['heif-convert', '--quiet', 'badmdat.heic', 'badmdat.png']);

@@ -8,6 +8,7 @@ import { decodePng, pixelSha } from './png.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../../..');
 const tarball = resolve(process.argv[2] || join(root, '.homescoop-out/package.tgz'));
+const version = /^version: "([^"]+)"$/m.exec(readFileSync(join(here, '../../recipe.yaml'), 'utf8'))[1];
 const ref = JSON.parse(readFileSync(join(here, '../fixtures/references.json'), 'utf8'));
 const work = mkdtempSync(join(tmpdir(), 'libheif-relink-'));
 
@@ -32,7 +33,7 @@ try {
   copyFileSync(join(here, '../fixtures/rainbow-451x461.heic'), join(work, 'rainbow.heic'));
   const run = (tool, args) => sh(`node '${root}/scripts/run-wasm-cli.mjs' '${work}/relinked/${tool}' -- ${args}`, { env: { ...process.env, SMOKE_WORKDIR: work } });
   const v = run('heif-info', '--version');
-  if (!v.startsWith('1.23.6\n')) throw new Error(`relinked heif-info --version: ${v}`);
+  if (!v.startsWith(`${version}\n`)) throw new Error(`relinked heif-info --version: ${v}`);
   run('heif-dec', '--quiet /work/rainbow.heic /work/rainbow.png');
   const got = pixelSha(decodePng(readFileSync(join(work, 'rainbow.png'))));
   if (got !== ref.png['rainbow.png'].sha256) throw new Error(`relinked heif-dec: rainbow.png ${got} != host ${ref.png['rainbow.png'].sha256}`);
