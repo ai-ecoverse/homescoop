@@ -36,7 +36,7 @@ fnox is MIT (see `LICENSE`). `THIRD-PARTY-NOTICES.md` lists the crates, Rust's s
 
 ## WASI support for fnox 1.43
 
-`fnox exec --only` and `--except` retain upstream filtering: excluded providers are not resolved, dependencies are resolved without being exported, and excluded configured values are not injected. Inherited environment variables retain upstream behavior; these flags do not clear the environment. Sealed selections still use the kernel ticket path.
+`fnox exec --only` and `--except` retain upstream filtering: excluded providers are not resolved, dependencies are resolved without being exported, and excluded configured values are not injected. Inherited environment variables retain their original values unless the child plan replaces or removes them; these flags do not clear the environment. The WASI child starts from the environment captured before resolution, so a resolved interpolation dependency cannot enter it through process-environment mutation. Sealed selections still use the kernel ticket path.
 
 Exec output redaction uses helper threads upstream. This WASI build refuses `--redact`, `FNOX_EXEC_REDACT=1`, or `redact_exec = true` before resolving secrets or spawning the child; `--no-redact` overrides the environment and config. Seven retains its kernel handling of sealed output. `proxy run --sandbox` and a configured sandbox are refused before spawning; `--no-sandbox` overrides the config. The OS sandbox, native proxy authentication and private-address enforcement belong to the native proxy, which is compiled out here; seven continues to inject placeholders through its realm proxy.
 

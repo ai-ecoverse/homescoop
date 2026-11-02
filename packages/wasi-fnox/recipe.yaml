@@ -126,3 +126,6 @@ about:
     0009 gates the new native proxy machinery and refuses OS sandbox
     requests on WASI before spawning. The sealed ticket, provider scrub
     and existing refusal patches retain their added and removed lines.
+    0016 also captures the child environment before resolution, so a
+    filtered-out interpolation dependency cannot leak through fnox's
+    mutated process environment; original inherited values survive.

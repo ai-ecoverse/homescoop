@@ -17,6 +17,10 @@ export default async function (ctx) {
   assert.equal(only.status, 0, `exec --only resolves its dependency and skips the unavailable provider: ${only.stderr}`);
   assert.match(only.stdout, /^URL=postgres:\/\/db.internal\/app$/m);
   assert.doesNotMatch(only.stdout, /^(HOST|UNUSED|SEALED)=/m);
+  const inherited = await exec(['--only', 'URL'], { HOST: 'inherited-host' });
+  assert.equal(inherited.status, 0, inherited.stderr);
+  assert.match(inherited.stdout, /^URL=postgres:\/\/db.internal\/app$/m);
+  assert.match(inherited.stdout, /^HOST=inherited-host$/m);
   const except = await exec(['--except', 'UNUSED,SEALED', '--if-missing', 'error']);
   assert.equal(except.status, 0, `exec --except skips the unavailable provider: ${except.stderr}`);
   assert.match(except.stdout, /^HOST=db.internal$/m);
