@@ -107,7 +107,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-less`](https://www.npmjs.com/package/@ai-ecoverse/wasm-less) | [recipe](packages/less) | less, a pager that shows text one screen at a time. |
 | [`@ai-ecoverse/wasm-libheif`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libheif) | [recipe](packages/libheif) | libheif 1.23.7 HEIF/HEIC/AVIF decoder with heif-convert and heif-info for slicc (WASM / emscripten). Optional: contains an HEVC decoder (libde265), and HEVC is patent-encumbered. Static libs and headers included for LGPL relinking. |
 | [`@ai-ecoverse/wasm-libiconv`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libiconv) | [recipe](packages/libiconv) | GNU libiconv 1.19 static library for WebAssembly / emscripten (SLICC homescoop) |
-| [`@ai-ecoverse/wasm-libjpeg-turbo`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libjpeg-turbo) | [recipe](packages/libjpeg-turbo) | libjpeg-turbo JPEG codec (WASM / emscripten, SLICC homescoop ladder) |
+| [`@ai-ecoverse/wasm-libjpeg-turbo`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libjpeg-turbo) | [recipe](packages/libjpeg-turbo) | JPEG image encoding and decoding with libjpeg-turbo. |
 | [`@ai-ecoverse/wasm-libpng`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libpng) | [recipe](packages/libpng) | libpng PNG library (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-libtiff`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libtiff) | [recipe](packages/libtiff) | TIFF library (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-libwebp`](https://www.npmjs.com/package/@ai-ecoverse/wasm-libwebp) | [recipe](packages/libwebp) | WebP codec libraries (WASM / emscripten, SLICC homescoop ladder) |
