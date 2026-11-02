@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-openjpeg",
-  "version": "2.5.3-1",
+  "version": "2.5.4-1",
   "description": "OpenJPEG JPEG 2000 codec (WASM / emscripten, SLICC homescoop ladder)",
   "license": "BSD-2-Clause",
   "repository": {
@@ -27,6 +27,6 @@
   },
   "homescoop": {
     "recipe": "openjpeg",
-    "upstream": "2.5.3"
+    "upstream": "2.5.4"
   }
 }
