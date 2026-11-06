@@ -10,7 +10,7 @@ biome lint src
 ```
 
 `bin/biome.wasm` is Biome's CLI (`biome_cli`) built by homescoop from
-biomejs/biome 2.6.3 for `wasm32-wasip1-threads`, with the toolchain Biome
+biomejs/biome 2.6.4 for `wasm32-wasip1-threads`, with the toolchain Biome
 pins. `@biomejs/wasm-web` is a library for a JavaScript host, not a CLI, and
 Biome publishes no WASI build.
 
