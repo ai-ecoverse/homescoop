@@ -2,7 +2,7 @@ name: libjpeg-turbo
 builder: host
 reproducible: true
 # renovate: datasource=github-releases depName=libjpeg-turbo/libjpeg-turbo
-version: "3.2.0"
+version: "3.2.1"
 npm: "@ai-ecoverse/wasm-libjpeg-turbo"
 summary: "libjpeg-turbo JPEG codec"
 source:
