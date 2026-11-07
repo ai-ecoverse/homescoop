@@ -1,0 +1,80 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Lars Trieloff <lars@trieloff.net>
+Date: Sat, 7 Nov 2026 02:10:00 +0100
+Subject: [PATCH 18/18] files: refuse fnox files and set/get --file on WASI
+
+On WASI, refuse the 1.44/1.45 secret-files commands and flags
+(fnox files, fnox set --file, fnox get --file). Seven has no
+path for writing or editing secret files; use fnox set/get.
+
+diff --git a/src/commands/get.rs b/src/commands/get.rs
+--- a/src/commands/get.rs
++++ b/src/commands/get.rs
+@@ -57,12 +57,22 @@ impl GetCommand {
+ 
+     pub async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
+         if let Some(path) = &self.file {
+-            if self.base64_decode || self.refresh {
+-                return Err(FnoxError::Config(
+-                    "--base64-decode and --refresh do not apply to --file".into(),
++            #[cfg(target_os = "wasi")]
++            {
++                let _ = (cli, config, path);
++                return Err(FnoxError::Seven(
++                    "fnox get --file is not available in seven: use fnox get".to_string(),
+                 ));
+             }
+-            return crate::commands::files::get_file(cli, &config, path).await;
++            #[cfg(not(target_os = "wasi"))]
++            {
++                if self.base64_decode || self.refresh {
++                    return Err(FnoxError::Config(
++                        "--base64-decode and --refresh do not apply to --file".into(),
++                    ));
++                }
++                return crate::commands::files::get_file(cli, &config, path).await;
++            }
+         }
+         if self.key.is_none() {
+             return Err(FnoxError::Config(
+diff --git a/src/commands/mod.rs b/src/commands/mod.rs
+--- a/src/commands/mod.rs
++++ b/src/commands/mod.rs
+@@ -375,6 +375,11 @@ impl Commands {
+             #[cfg(not(target_os = "wasi"))]
+             Commands::Edit(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Export(cmd) => cmd.run(cli, self.load_config(cli)?).await,
++            #[cfg(target_os = "wasi")]
++            Commands::Files(_) => Err(FnoxError::Seven(
++                "fnox files is not available in seven: use fnox set".to_string(),
++            )),
++            #[cfg(not(target_os = "wasi"))]
+             Commands::Files(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Get(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             Commands::Import(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+diff --git a/src/commands/set.rs b/src/commands/set.rs
+--- a/src/commands/set.rs
++++ b/src/commands/set.rs
+@@ -247,6 +247,7 @@ impl SetCommand {
+     }
+ 
+     /// `fnox set --file PATH`
++    #[cfg(not(target_os = "wasi"))]
+     async fn run_file(&self, cli: &Cli, config: &Config, path: &Path) -> Result<()> {
+         let unsupported = [
+             ("VALUE", self.value.is_some()),
+@@ -278,6 +279,14 @@ impl SetCommand {
+ 
+     pub async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
+         if let Some(path) = &self.file {
++            #[cfg(target_os = "wasi")]
++            {
++                let _ = path;
++                return Err(FnoxError::Seven(
++                    "fnox set --file is not available in seven: use fnox set".to_string(),
++                ));
++            }
++            #[cfg(not(target_os = "wasi"))]
+             return self.run_file(cli, &config, path).await;
+         }
+         let target_path = if self.global {

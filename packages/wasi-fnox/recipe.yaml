@@ -1,18 +1,18 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.43.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.45.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
 # (/dev/sealed and exec tickets).
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
-version: "1.43.0"
+version: "1.45.0"
 npm: "@ai-ecoverse/wasi-fnox"
-summary: "fnox 1.43 for slicc WASI preview1 (command fnox; seven's sealed store)"
+summary: "fnox 1.45 for slicc WASI preview1 (command fnox; seven's sealed store)"
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
-  sha256: "5b687ff68a1f6be864eb60ba4ce4a6f27f9d544ca285c3ce9d24ca6fca8a94ed"
-  epoch: "1793009077"
+  sha256: "845f9e8078869c60d67a1a9d14a77e997bca0a7c5640c7ae83ca38fecd4a8340"
+  epoch: "1793301543"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.43.0; the patches live here, are not
+    Upstream is jdx/fnox v1.45.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -48,12 +48,15 @@ about:
            also the gopass provider (the gopass CLI through
            tokio::process), whose GNUPGHOME, GOPASS_HOMEDIR and
            GOPASS_CONFIG_NOWRAP proxy run scrubs the same way
-      0003 compile out mcp, proxy, tui, daemon, leases, prompts on WASI,
-           and from 1.40.0 the plugin command and fnox-core's plugins;
-           from 1.42.0 the azure-token lease's prerequisite check reads
-           its auth setting (azure_shared's AzureAuth, which stays built),
-           and its backend, managed identity included, stays compiled out;
-           from 1.42.1 also activate's invoked_exe (which and current_exe)
+      0003 compile out mcp (including request_secret and the proxy MCP
+           relay), local_http, secret_session, tui, daemon, leases,
+           prompts on WASI, and from 1.40.0 the plugin command and
+           fnox-core's plugins; from 1.42.0 the azure-token lease's
+           prerequisite check reads its auth setting (azure_shared's
+           AzureAuth, which stays built), and its backend, managed
+           identity included, stays compiled out; from 1.42.1 also
+           activate's invoked_exe (which and current_exe); proxy stays
+           as a WASI stub for rules validation (0009)
       0004 cwd from PWD, HOME from the environment, current_thread; the
            XDG defaults (config, state, and 1.40.0's data dir) as on unix
       0005 spawn `fnox exec` children through wasix-command
@@ -67,6 +70,8 @@ about:
       0017 plain: read a `file` provider's secrets file with std::fs on
            WASI (1.40.0's tokio::fs read needs a blocking-pool thread
            and trapped with 134)
+      0018 refuse `fnox files`, `fnox set --file` and `fnox get --file`
+           on WASI (1.44 secret files; seven has no deploy path)
     (b) seven (secrets-tokens-design.md; /dev/sealed is §3.7):
       0006 the sealed provider and fnox_core::sealed, the device client
       0007 set: seal a piped value; on a terminal ask the vault dialog
@@ -88,7 +93,7 @@ about:
            on PATH the kernel won't execute (homescoop#1129)
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.43.0 commit time (source.epoch, 2026-10-26T10:04:37Z), so the
+    v1.45.0 commit time (source.epoch, 2026-10-29T19:19:03Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -129,3 +134,13 @@ about:
     0016 also captures the child environment before resolution, so a
     filtered-out interpolation dependency cannot leak through fnox's
     mutated process environment; original inherited values survive.
+    1.45.0-1 rebases the series onto v1.45.0 (skipping 1.44 as Renovate
+    did): 0003 gates mcp's request_secret page, local_http and
+    secret_session; 0007 uses set's key() accessor; 0009 replaces the
+    single-file proxy.cfg spray with src/proxy/wasi.rs (validate_config
+    and target_label; reserved FNOX_PROXY_MCP* env names); 0010's
+    reencrypt refusal sits above the new files re-encrypt path; 0018
+    refuses fnox files and set/get --file. Security patches 0006, 0008,
+    0010 and 0012 keep the same added and removed lines; 0007 only
+    renames &self.key to self.key(); 0009 gains the WASI stub. build.sh's
+    usage-test notice moves to 7.1.3 (the same LICENSE, f68207e9...).

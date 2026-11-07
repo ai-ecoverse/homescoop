@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
-Date: Mon, 12 Oct 2026 14:38:10 +0200
-Subject: [PATCH 03/13] cli: compile out modules that cannot run on WASI
+Date: Sat, 7 Nov 2026 02:10:00 +0100
+Subject: [PATCH 03/18] cli: compile out modules that cannot run on WASI
 
 On WASI the mcp, proxy, tui, daemon and plugin commands (fnox-core's
 plugins module, which installs Lua plugins with git, since 1.40.0), the lease backend
@@ -23,7 +23,7 @@ diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_pro
  use demand::Confirm;
  use std::borrow::Cow;
  use std::process::Command;
-@@ -40,12 +41,19 @@
+@@ -40,12 +41,19 @@ pub fn prompt_and_run_auth(
          provider_name, error
      );
  
@@ -46,7 +46,7 @@ diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_pro
 diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
 --- a/crates/fnox-core/src/http.rs
 +++ b/crates/fnox-core/src/http.rs
-@@ -8,6 +8,7 @@
+@@ -8,6 +8,7 @@ fn configured_timeout(value: &str) -> Option<Duration> {
      }
  }
  
@@ -54,7 +54,7 @@ diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
  fn client_builder() -> reqwest::ClientBuilder {
      let settings = crate::settings::Settings::get();
      let user_agent = format!("fnox/{}", env!("CARGO_PKG_VERSION"));
-@@ -18,6 +19,7 @@
+@@ -18,6 +19,7 @@ fn client_builder() -> reqwest::ClientBuilder {
      builder
  }
  
@@ -62,7 +62,7 @@ diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
  fn build_or_default(builder: reqwest::ClientBuilder) -> reqwest::Client {
      builder.build().unwrap_or_else(|e| {
          tracing::warn!("Failed to build HTTP client with timeout: {e}; using default (no timeout)");
-@@ -26,6 +28,7 @@
+@@ -26,6 +28,7 @@ fn build_or_default(builder: reqwest::ClientBuilder) -> reqwest::Client {
  }
  
  /// Build an HTTP client with the configured timeout from settings.
@@ -70,7 +70,7 @@ diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
  pub fn http_client() -> reqwest::Client {
      build_or_default(client_builder())
  }
-@@ -35,6 +38,7 @@
+@@ -35,6 +38,7 @@ pub fn http_client() -> reqwest::Client {
  /// but forwards custom headers (such as GitLab's `PRIVATE-TOKEN`) and re-sends
  /// form bodies on 307/308, so a redirect could deliver a secret to a host the
  /// URL checks never saw.
@@ -81,7 +81,7 @@ diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
 diff --git a/crates/fnox-core/src/lease.rs b/crates/fnox-core/src/lease.rs
 --- a/crates/fnox-core/src/lease.rs
 +++ b/crates/fnox-core/src/lease.rs
-@@ -42,6 +42,7 @@
+@@ -42,6 +42,7 @@ pub struct LeaseLedger {
  
  /// RAII guard for the ledger file lock. The lock is released when dropped.
  pub struct LedgerLockGuard {
@@ -89,7 +89,7 @@ diff --git a/crates/fnox-core/src/lease.rs b/crates/fnox-core/src/lease.rs
      _lock: xx::fslock::LockFile,
  }
  
-@@ -96,10 +97,20 @@
+@@ -96,10 +97,20 @@ impl LeaseLedger {
      pub fn lock(project_dir: &Path) -> Result<LedgerLockGuard> {
          let ledger_path = Self::ledger_path(project_dir);
          let lock_path = ledger_path.with_extension("lock");
@@ -127,7 +127,7 @@ diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/s
  use aws_sdk_sts::Client;
  use indexmap::IndexMap;
  use std::time::Duration;
-@@ -64,6 +66,7 @@
+@@ -64,6 +66,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      ]
  }
  
@@ -135,7 +135,7 @@ diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/s
  pub struct AwsStsBackend {
      region: String,
      profile: Option<String>,
-@@ -71,6 +74,7 @@
+@@ -71,6 +74,7 @@ pub struct AwsStsBackend {
      endpoint: Option<String>,
  }
  
@@ -143,7 +143,7 @@ diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/s
  impl AwsStsBackend {
      pub fn new(
          region: String,
-@@ -105,6 +109,7 @@
+@@ -105,6 +109,7 @@ impl AwsStsBackend {
      }
  }
  
@@ -151,7 +151,7 @@ diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/s
  #[async_trait]
  impl LeaseBackend for AwsStsBackend {
      async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
-@@ -200,6 +205,7 @@
+@@ -200,6 +205,7 @@ impl LeaseBackend for AwsStsBackend {
  
  /// Sanitize a string for use as an AWS STS role session name.
  /// Session names must be 2-64 chars, matching [\w+=,.@-]+
@@ -162,7 +162,7 @@ diff --git a/crates/fnox-core/src/lease_backends/aws_sts.rs b/crates/fnox-core/s
 diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-core/src/lease_backends/azure_token.rs
 --- a/crates/fnox-core/src/lease_backends/azure_token.rs
 +++ b/crates/fnox-core/src/lease_backends/azure_token.rs
-@@ -2,6 +2,7 @@
+@@ -2,6 +2,7 @@ use crate::error::{FnoxError, Result};
  use crate::lease_backends::{Lease, LeaseBackend};
  use crate::providers::azure_shared::{self, AzureAuth};
  use async_trait::async_trait;
@@ -170,7 +170,7 @@ diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-co
  use azure_core::credentials::TokenCredential;
  use indexmap::IndexMap;
  use std::sync::Arc;
-@@ -26,6 +27,9 @@
+@@ -26,6 +27,9 @@ pub fn check_prerequisites(
      if azure_shared::service_principal_env().is_some() {
          return None;
      }
@@ -180,7 +180,7 @@ diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-co
      let has_az = which::which("az").is_ok();
      if has_az {
          None
-@@ -54,12 +58,14 @@
+@@ -54,12 +58,14 @@ pub fn required_env_vars(auth: Option<&str>) -> Vec<(&'static str, &'static str)
      ]
  }
  
@@ -195,7 +195,7 @@ diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-co
  impl AzureTokenBackend {
      pub fn new(
          scope: String,
-@@ -99,6 +105,7 @@
+@@ -99,6 +105,7 @@ impl AzureTokenBackend {
      }
  }
  
@@ -206,7 +206,7 @@ diff --git a/crates/fnox-core/src/lease_backends/azure_token.rs b/crates/fnox-co
 diff --git a/crates/fnox-core/src/lease_backends/cloudflare.rs b/crates/fnox-core/src/lease_backends/cloudflare.rs
 --- a/crates/fnox-core/src/lease_backends/cloudflare.rs
 +++ b/crates/fnox-core/src/lease_backends/cloudflare.rs
-@@ -74,6 +74,7 @@
+@@ -74,6 +74,7 @@ pub struct CloudflarePermissionGroup {
      pub name: Option<String>,
  }
  
@@ -214,7 +214,7 @@ diff --git a/crates/fnox-core/src/lease_backends/cloudflare.rs b/crates/fnox-cor
  impl CloudflareBackend {
      pub fn new(
          token_type: CloudflareTokenType,
-@@ -325,6 +326,7 @@
+@@ -325,6 +326,7 @@ impl CloudflareBackend {
      }
  }
  
@@ -225,7 +225,7 @@ diff --git a/crates/fnox-core/src/lease_backends/cloudflare.rs b/crates/fnox-cor
 diff --git a/crates/fnox-core/src/lease_backends/command.rs b/crates/fnox-core/src/lease_backends/command.rs
 --- a/crates/fnox-core/src/lease_backends/command.rs
 +++ b/crates/fnox-core/src/lease_backends/command.rs
-@@ -3,6 +3,7 @@
+@@ -3,6 +3,7 @@ use crate::lease_backends::{Lease, LeaseBackend};
  use async_trait::async_trait;
  use indexmap::IndexMap;
  use std::time::Duration;
@@ -233,7 +233,7 @@ diff --git a/crates/fnox-core/src/lease_backends/command.rs b/crates/fnox-core/s
  use tokio::process::Command;
  
  const URL: &str = "https://fnox.jdx.dev/leases/command";
-@@ -21,12 +22,14 @@
+@@ -21,12 +22,14 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      vec![]
  }
  
@@ -248,7 +248,7 @@ diff --git a/crates/fnox-core/src/lease_backends/command.rs b/crates/fnox-core/s
  impl CommandBackend {
      pub fn new(create_command: String, revoke_command: Option<String>, timeout: Duration) -> Self {
          Self {
-@@ -80,6 +83,7 @@
+@@ -80,6 +83,7 @@ impl CommandBackend {
      }
  }
  
@@ -259,7 +259,7 @@ diff --git a/crates/fnox-core/src/lease_backends/command.rs b/crates/fnox-core/s
 diff --git a/crates/fnox-core/src/lease_backends/gcp_iam.rs b/crates/fnox-core/src/lease_backends/gcp_iam.rs
 --- a/crates/fnox-core/src/lease_backends/gcp_iam.rs
 +++ b/crates/fnox-core/src/lease_backends/gcp_iam.rs
-@@ -33,12 +33,14 @@
+@@ -33,12 +33,14 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      )]
  }
  
@@ -274,7 +274,7 @@ diff --git a/crates/fnox-core/src/lease_backends/gcp_iam.rs b/crates/fnox-core/s
  impl GcpIamBackend {
      pub fn new(service_account_email: String, scopes: Vec<String>, env_var: String) -> Self {
          Self {
-@@ -49,6 +51,7 @@
+@@ -49,6 +51,7 @@ impl GcpIamBackend {
      }
  }
  
@@ -285,7 +285,7 @@ diff --git a/crates/fnox-core/src/lease_backends/gcp_iam.rs b/crates/fnox-core/s
 diff --git a/crates/fnox-core/src/lease_backends/github_app.rs b/crates/fnox-core/src/lease_backends/github_app.rs
 --- a/crates/fnox-core/src/lease_backends/github_app.rs
 +++ b/crates/fnox-core/src/lease_backends/github_app.rs
-@@ -40,6 +40,7 @@
+@@ -40,6 +40,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      vec![]
  }
  
@@ -293,7 +293,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_app.rs b/crates/fnox-cor
  pub struct GitHubAppBackend {
      app_id: String,
      installation_id: String,
-@@ -50,6 +51,7 @@
+@@ -50,6 +51,7 @@ pub struct GitHubAppBackend {
      api_base: Option<String>,
  }
  
@@ -301,7 +301,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_app.rs b/crates/fnox-cor
  impl GitHubAppBackend {
      pub fn new(
          app_id: String,
-@@ -132,6 +134,7 @@
+@@ -132,6 +134,7 @@ impl GitHubAppBackend {
      }
  }
  
@@ -312,7 +312,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_app.rs b/crates/fnox-cor
 diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-core/src/lease_backends/github_oauth.rs
 --- a/crates/fnox-core/src/lease_backends/github_oauth.rs
 +++ b/crates/fnox-core/src/lease_backends/github_oauth.rs
-@@ -2,6 +2,7 @@
+@@ -2,6 +2,7 @@ use crate::error::{FnoxError, Result};
  use crate::lease_backends::{Lease, LeaseBackend};
  use async_trait::async_trait;
  use indexmap::IndexMap;
@@ -320,7 +320,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  use keyring_core::Entry;
  use serde::{Deserialize, Serialize};
  use std::time::Duration;
-@@ -23,6 +24,7 @@
+@@ -23,6 +24,7 @@ pub fn required_env_vars() -> Vec<(&'static str, &'static str)> {
      vec![]
  }
  
@@ -328,7 +328,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  #[derive(Debug, Clone)]
  pub struct GitHubOauthBackend {
      client_id: String,
-@@ -35,6 +37,7 @@
+@@ -35,6 +37,7 @@ pub struct GitHubOauthBackend {
      api_base: String,
  }
  
@@ -336,7 +336,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  #[derive(Debug, Clone, Deserialize)]
  struct DeviceCodeResponse {
      device_code: String,
-@@ -45,6 +48,7 @@
+@@ -45,6 +48,7 @@ struct DeviceCodeResponse {
      interval: u64,
  }
  
@@ -344,7 +344,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  #[derive(Debug, Clone, Deserialize)]
  struct TokenResponse {
      access_token: Option<String>,
-@@ -55,12 +59,14 @@
+@@ -55,12 +59,14 @@ struct TokenResponse {
      error_description: Option<String>,
  }
  
@@ -359,7 +359,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  #[derive(Debug, Clone, Serialize, Deserialize)]
  struct CachedToken {
      access_token: String,
-@@ -73,6 +79,7 @@
+@@ -73,6 +79,7 @@ struct CachedToken {
      login: Option<String>,
  }
  
@@ -367,7 +367,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  impl GitHubOauthBackend {
      #[allow(clippy::too_many_arguments)]
      pub fn new(
-@@ -354,6 +361,7 @@
+@@ -354,6 +361,7 @@ impl GitHubOauthBackend {
      }
  }
  
@@ -375,7 +375,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  #[async_trait]
  impl LeaseBackend for GitHubOauthBackend {
      async fn create_lease(&self, _duration: Duration, _label: &str) -> Result<Lease> {
-@@ -374,10 +382,12 @@
+@@ -374,10 +382,12 @@ impl LeaseBackend for GitHubOauthBackend {
      }
  }
  
@@ -388,7 +388,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  fn invalid_response(details: String) -> FnoxError {
      FnoxError::ProviderInvalidResponse {
          provider: PROVIDER.to_string(),
-@@ -387,6 +397,7 @@
+@@ -387,6 +397,7 @@ fn invalid_response(details: String) -> FnoxError {
      }
  }
  
@@ -396,7 +396,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  fn api_error(details: String) -> FnoxError {
      FnoxError::ProviderApiError {
          provider: PROVIDER.to_string(),
-@@ -396,6 +407,7 @@
+@@ -396,6 +407,7 @@ fn api_error(details: String) -> FnoxError {
      }
  }
  
@@ -404,7 +404,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  fn auth_failed(details: String) -> FnoxError {
      FnoxError::ProviderAuthFailed {
          provider: PROVIDER.to_string(),
-@@ -405,6 +417,7 @@
+@@ -405,6 +417,7 @@ fn auth_failed(details: String) -> FnoxError {
      }
  }
  
@@ -412,7 +412,7 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  fn interactive_auth_required() -> FnoxError {
      FnoxError::ProviderAuthFailed {
          provider: PROVIDER.to_string(),
-@@ -416,12 +429,14 @@
+@@ -416,12 +429,14 @@ fn interactive_auth_required() -> FnoxError {
  
  /// Detach the launcher's stdio so a browser cannot write to, or hold open, the
  /// caller's pipes (`fnox env --json` promises a pure stdout).
@@ -427,10 +427,79 @@ diff --git a/crates/fnox-core/src/lease_backends/github_oauth.rs b/crates/fnox-c
  fn open_browser(url: &str) -> std::io::Result<()> {
      #[cfg(target_os = "macos")]
      {
+diff --git a/crates/fnox-core/src/lease_backends/gitlab.rs b/crates/fnox-core/src/lease_backends/gitlab.rs
+--- a/crates/fnox-core/src/lease_backends/gitlab.rs
++++ b/crates/fnox-core/src/lease_backends/gitlab.rs
+@@ -1,5 +1,7 @@
+ use crate::error::{FnoxError, Result};
+-use crate::lease_backends::{Lease, LeaseBackend, env_credential, require_secure_url};
++use crate::lease_backends::{Lease, LeaseBackend, env_credential};
++#[cfg(not(target_os = "wasi"))]
++use crate::lease_backends::require_secure_url;
+ use async_trait::async_trait;
+ use indexmap::IndexMap;
+ use std::time::Duration;
+@@ -54,6 +56,7 @@ fn access_level_value(name: &str) -> Result<u32> {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl GitLabBackend {
+     pub fn new(
+         url: Option<String>,
+@@ -109,6 +112,7 @@ impl GitLabBackend {
+ 
+ /// GitLab reports errors as `{"message": ...}` or `{"error": ...}`, where
+ /// `message` may be a string or a structure.
++#[cfg(not(target_os = "wasi"))]
+ fn error_text(status: reqwest::StatusCode, body: &str) -> String {
+     let parsed: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+     match (&parsed["message"], &parsed["error"]) {
+@@ -120,6 +124,7 @@ fn error_text(status: reqwest::StatusCode, body: &str) -> String {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for GitLabBackend {
+     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lease_backends/kubernetes.rs b/crates/fnox-core/src/lease_backends/kubernetes.rs
+--- a/crates/fnox-core/src/lease_backends/kubernetes.rs
++++ b/crates/fnox-core/src/lease_backends/kubernetes.rs
+@@ -2,9 +2,13 @@ use crate::error::{FnoxError, Result};
+ use crate::lease_backends::{Lease, LeaseBackend};
+ use async_trait::async_trait;
+ use indexmap::IndexMap;
++#[cfg(not(target_os = "wasi"))]
+ use k8s_openapi::api::authentication::v1::{TokenRequest, TokenRequestSpec};
++#[cfg(not(target_os = "wasi"))]
+ use k8s_openapi::api::core::v1::ServiceAccount;
++#[cfg(not(target_os = "wasi"))]
+ use kube::Api;
++#[cfg(not(target_os = "wasi"))]
+ use kube::api::PostParams;
+ use std::time::Duration;
+ 
+@@ -37,6 +41,7 @@ pub struct KubernetesBackend {
+     env_var: String,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl KubernetesBackend {
+     pub fn new(
+         service_account: String,
+@@ -96,6 +101,7 @@ impl KubernetesBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for KubernetesBackend {
+     async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/lease_backends/mod.rs
 --- a/crates/fnox-core/src/lease_backends/mod.rs
 +++ b/crates/fnox-core/src/lease_backends/mod.rs
-@@ -70,6 +70,7 @@
+@@ -70,6 +70,7 @@ pub(crate) fn env_credential(name: &str) -> Option<String> {
  /// Reject a URL that would send credentials in cleartext. Only https is
  /// accepted, except for loopback hosts, which never leave the machine (local
  /// proxies and test servers).
@@ -438,7 +507,7 @@ diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/l
  pub(crate) fn require_secure_url(backend: &str, field: &str, value: &str) -> Result<()> {
      let url = reqwest::Url::parse(value).map_err(|e| {
          crate::error::FnoxError::Config(format!(
-@@ -519,6 +520,15 @@
+@@ -519,6 +520,15 @@ impl LeaseBackendConfig {
      }
  
      /// Create a lease backend instance from this configuration
@@ -454,10 +523,82 @@ diff --git a/crates/fnox-core/src/lease_backends/mod.rs b/crates/fnox-core/src/l
      pub fn create_backend(&self) -> Result<Box<dyn LeaseBackend>> {
          match self {
              LeaseBackendConfig::AwsSts {
+diff --git a/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs b/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
+--- a/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
++++ b/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
+@@ -1,5 +1,7 @@
+ use crate::error::{FnoxError, Result};
+-use crate::lease_backends::{Lease, LeaseBackend, env_credential, require_secure_url};
++use crate::lease_backends::{Lease, LeaseBackend, env_credential};
++#[cfg(not(target_os = "wasi"))]
++use crate::lease_backends::require_secure_url;
+ use async_trait::async_trait;
+ use indexmap::IndexMap;
+ use serde::{Deserialize, Serialize};
+@@ -57,6 +59,7 @@ pub struct Oauth2ClientCredentialsBackend {
+     revocation_url: Option<String>,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl Oauth2ClientCredentialsBackend {
+     #[allow(clippy::too_many_arguments)]
+     pub fn new(
+@@ -118,6 +121,7 @@ impl Oauth2ClientCredentialsBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn error_text(status: reqwest::StatusCode, body: &serde_json::Value) -> String {
+     match (body["error"].as_str(), body["error_description"].as_str()) {
+         (Some(error), Some(description)) => format!("{error}: {description}"),
+@@ -126,6 +130,7 @@ fn error_text(status: reqwest::StatusCode, body: &serde_json::Value) -> String {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for Oauth2ClientCredentialsBackend {
+     async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
+diff --git a/crates/fnox-core/src/lease_backends/tailscale.rs b/crates/fnox-core/src/lease_backends/tailscale.rs
+--- a/crates/fnox-core/src/lease_backends/tailscale.rs
++++ b/crates/fnox-core/src/lease_backends/tailscale.rs
+@@ -1,5 +1,7 @@
+ use crate::error::{FnoxError, Result};
+-use crate::lease_backends::{Lease, LeaseBackend, env_credential, require_secure_url};
++use crate::lease_backends::{Lease, LeaseBackend, env_credential};
++#[cfg(not(target_os = "wasi"))]
++use crate::lease_backends::require_secure_url;
+ use async_trait::async_trait;
+ use indexmap::IndexMap;
+ use std::time::Duration;
+@@ -69,6 +71,7 @@ pub struct TailscaleBackend {
+     env_var: String,
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ impl TailscaleBackend {
+     pub fn new(
+         tailnet: String,
+@@ -170,6 +173,7 @@ impl TailscaleBackend {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ fn error_text(status: reqwest::StatusCode, body: &str) -> String {
+     let parsed: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+     match parsed["message"]
+@@ -183,6 +187,7 @@ fn error_text(status: reqwest::StatusCode, body: &str) -> String {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
+ #[async_trait]
+ impl LeaseBackend for TailscaleBackend {
+     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
 diff --git a/crates/fnox-core/src/lease_backends/vault.rs b/crates/fnox-core/src/lease_backends/vault.rs
 --- a/crates/fnox-core/src/lease_backends/vault.rs
 +++ b/crates/fnox-core/src/lease_backends/vault.rs
-@@ -64,6 +64,7 @@
+@@ -64,6 +64,7 @@ pub fn required_env_vars(
      vars
  }
  
@@ -465,7 +606,7 @@ diff --git a/crates/fnox-core/src/lease_backends/vault.rs b/crates/fnox-core/src
  pub struct VaultBackend {
      address: String,
      token: Option<String>,
-@@ -74,6 +75,7 @@
+@@ -74,6 +75,7 @@ pub struct VaultBackend {
      method: String,
  }
  
@@ -473,7 +614,7 @@ diff --git a/crates/fnox-core/src/lease_backends/vault.rs b/crates/fnox-core/src
  impl VaultBackend {
      pub fn new(
          address: Option<String>,
-@@ -195,6 +197,7 @@
+@@ -195,6 +197,7 @@ impl VaultBackend {
      }
  }
  
@@ -484,7 +625,7 @@ diff --git a/crates/fnox-core/src/lease_backends/vault.rs b/crates/fnox-core/src
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
-@@ -12,14 +12,17 @@
+@@ -12,15 +12,18 @@ pub mod audit;
  pub mod auth_prompt;
  pub mod config;
  pub mod config_path;
@@ -492,6 +633,7 @@ diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
  pub(crate) mod credential_command;
  pub mod env;
  pub mod error;
+ pub mod files;
  pub mod http;
 +#[cfg(not(target_os = "wasi"))]
  pub(crate) mod keyring_store;
@@ -505,7 +647,7 @@ diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
 diff --git a/src/commands/activate.rs b/src/commands/activate.rs
 --- a/src/commands/activate.rs
 +++ b/src/commands/activate.rs
-@@ -43,10 +43,13 @@
+@@ -43,10 +43,13 @@ impl ActivateCommand {
  
          let shell = shell::get_shell(Some(&shell_name))?;
  
@@ -519,7 +661,7 @@ diff --git a/src/commands/activate.rs b/src/commands/activate.rs
  
          let opts = ActivateOptions {
              exe,
-@@ -67,6 +70,7 @@
+@@ -67,6 +70,7 @@ impl ActivateCommand {
  /// remove that directory on upgrade, while the path used to invoke fnox (for
  /// example `.../installs/fnox/latest/fnox`) keeps working. Returns `None` unless
  /// that path really points at the running binary.
@@ -542,7 +684,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
  use std::collections::HashMap;
  
  /// Create a fnox.toml config file
-@@ -71,6 +74,9 @@
+@@ -71,6 +74,9 @@ impl InitCommand {
              })?;
          }
  
@@ -552,7 +694,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
          let config = if self.skip_wizard || !atty::is(atty::Stream::Stdin) {
              // Non-interactive mode
              Config::new()
-@@ -99,6 +105,7 @@
+@@ -99,6 +105,7 @@ impl InitCommand {
          Ok(())
      }
  
@@ -560,7 +702,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
      async fn run_wizard(&self) -> Result<Config> {
          println!("\n🔐 Welcome to fnox setup wizard!\n");
          println!("This will help you configure your first secret provider.\n");
-@@ -178,6 +185,7 @@
+@@ -178,6 +185,7 @@ impl InitCommand {
      }
  
      /// Select a provider category
@@ -568,7 +710,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
      fn select_category(&self) -> Result<WizardCategory> {
          let mut select = Select::new("What type of provider do you want to use?")
              .description("Choose a category based on your security and convenience needs")
-@@ -206,6 +214,7 @@
+@@ -206,6 +214,7 @@ impl InitCommand {
      }
  
      /// Select a specific provider from the given list
@@ -576,7 +718,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
      fn select_provider(&self, providers: &[&'static WizardInfo]) -> Result<&'static WizardInfo> {
          let mut select = Select::new("Select provider:").filterable(false);
  
-@@ -232,6 +241,7 @@
+@@ -232,6 +241,7 @@ impl InitCommand {
      }
  
      /// Collect field values from the user
@@ -584,7 +726,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
      fn collect_fields(&self, info: &WizardInfo) -> Result<HashMap<String, String>> {
          let mut fields = HashMap::new();
  
-@@ -255,6 +265,7 @@
+@@ -255,6 +265,7 @@ impl InitCommand {
      }
  
      /// Get the provider name from the user
@@ -592,7 +734,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
      fn get_provider_name(&self, default: &str) -> Result<String> {
          Input::new("Provider name:")
              .placeholder(default)
-@@ -270,6 +281,7 @@
+@@ -270,6 +281,7 @@ impl InitCommand {
      }
  
      /// Test the provider connection and print the result
@@ -603,7 +745,7 @@ diff --git a/src/commands/init.rs b/src/commands/init.rs
 diff --git a/src/commands/lease.rs b/src/commands/lease.rs
 --- a/src/commands/lease.rs
 +++ b/src/commands/lease.rs
-@@ -355,6 +355,12 @@
+@@ -355,6 +355,12 @@ impl LeaseCreateCommand {
                  eprintln!();
                  for (var, description) in &required_vars {
                      if std::env::var(var).is_err() {
@@ -619,7 +761,7 @@ diff --git a/src/commands/lease.rs b/src/commands/lease.rs
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -10,6 +10,7 @@
+@@ -10,6 +10,7 @@ pub mod check;
  pub mod ci_redact;
  pub mod completion;
  pub mod config_files;
@@ -627,7 +769,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
  pub mod daemon;
  pub mod deactivate;
  pub mod doctor;
-@@ -23,10 +24,13 @@
+@@ -24,10 +25,13 @@ pub mod import;
  pub mod init;
  pub mod lease;
  pub mod list;
@@ -641,7 +783,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
  pub mod proxy;
  pub mod reencrypt;
  pub mod remove;
-@@ -36,6 +40,7 @@
+@@ -37,6 +41,7 @@ pub mod schema;
  pub mod set;
  pub mod sponsors;
  pub mod sync;
@@ -649,7 +791,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
  pub mod tui;
  pub mod usage;
  pub mod version;
-@@ -151,6 +156,7 @@
+@@ -152,6 +157,7 @@ pub enum Commands {
  
      ConfigFiles(config_files::ConfigFilesCommand),
  
@@ -657,7 +799,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
      Daemon(daemon::DaemonCommand),
  
      Deactivate(deactivate::DeactivateCommand),
-@@ -179,14 +185,17 @@
+@@ -182,14 +188,17 @@ pub enum Commands {
  
      List(list::ListCommand),
  
@@ -675,7 +817,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
      Proxy(proxy::ProxyCommand),
  
      Reencrypt(reencrypt::ReencryptCommand),
-@@ -209,6 +218,7 @@
+@@ -212,6 +221,7 @@ pub enum Commands {
  
      Sync(sync::SyncCommand),
  
@@ -683,7 +825,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
      Tui(tui::TuiCommand),
  
      /// Generate usage specification
-@@ -323,9 +333,11 @@
+@@ -326,9 +336,11 @@ impl Commands {
              Commands::Init(cmd) => cmd.run(cli).await,
              Commands::Completion(cmd) => cmd.run(cli).await,
              Commands::ConfigFiles(cmd) => cmd.run(cli).await,
@@ -695,15 +837,23 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
              Commands::Plugin(cmd) => cmd.run(cli).await,
              Commands::Usage(cmd) => cmd.run(cli).await,
              Commands::Activate(cmd) => cmd
-@@ -361,6 +373,7 @@
-             Commands::Import(cmd) => cmd.run(cli, self.load_config(cli)?).await,
-             Commands::Lease(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+@@ -367,6 +379,7 @@ impl Commands {
              Commands::List(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+             // Inside `fnox proxy run`, the proxy serves the tools; the relay
+             // needs no config, which a sandbox may hide
++            #[cfg(not(target_os = "wasi"))]
+             Commands::Mcp(_) if crate::mcp::relay::requested() => {
+                 crate::mcp::relay::check_flags(
+                     &cli.config,
+@@ -376,6 +389,7 @@ impl Commands {
+                 )?;
+                 crate::mcp::relay::run().await
+             }
 +            #[cfg(not(target_os = "wasi"))]
              Commands::Mcp(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Profiles(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Provider(cmd)
-@@ -369,6 +382,7 @@
+@@ -384,6 +398,7 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -711,7 +861,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
              Commands::Proxy(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Env(cmd) => cmd.run(cli).await,
-@@ -377,6 +391,7 @@
+@@ -392,6 +407,7 @@ impl Commands {
              Commands::Set(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Sync(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Scan(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -722,7 +872,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
 diff --git a/src/commands/set.rs b/src/commands/set.rs
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -227,12 +227,18 @@
+@@ -365,12 +365,18 @@ impl SetCommand {
              // Only metadata is being set, no secret value needed
              None
          } else {
@@ -744,7 +894,7 @@ diff --git a/src/commands/set.rs b/src/commands/set.rs
 diff --git a/src/daemon.rs b/src/daemon.rs
 --- a/src/daemon.rs
 +++ b/src/daemon.rs
-@@ -563,6 +563,15 @@
+@@ -596,6 +596,15 @@ pub async fn start_background(cli: &Cli, config: Option<&Config>) -> Result<bool
      start_background_for_context(&ResolveContext::from_cli(cli), config).await
  }
  
@@ -763,33 +913,36 @@ diff --git a/src/daemon.rs b/src/daemon.rs
 diff --git a/src/lib.rs b/src/lib.rs
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -6,10 +6,13 @@
- // consumers and for our own modules.
+@@ -7,24 +7,33 @@
  
  pub use fnox_core::{
--    auth_prompt, config, config_path, env, error, http, lease, lease_backends, library, plugins,
-+    auth_prompt, config, config_path, env, error, http, lease, lease_backends, library,
-     providers, secret_file, secret_resolver, settings, source_registry, spanned, suggest,
+     auth_prompt, config, config_path, env, error, files, http, lease, lease_backends, library,
+-    plugins, providers, secret_file, secret_resolver, settings, source_registry, spanned, suggest,
++    providers, secret_file, secret_resolver, settings, source_registry, spanned, suggest,
      temp_file_secrets,
  };
-+
+ 
 +#[cfg(not(target_os = "wasi"))]
 +pub use fnox_core::plugins;
- 
++
  // CLI-only modules — depend on fnox-core for everything else.
  pub mod child_env;
-@@ -17,12 +20,16 @@
+ pub mod commands;
  pub mod daemon;
  pub mod generate;
  pub mod hook_env;
 +#[cfg(not(target_os = "wasi"))]
- pub mod mcp_server;
+ pub mod local_http;
++#[cfg(not(target_os = "wasi"))]
+ pub mod mcp;
 +#[cfg(not(target_os = "wasi"))]
  pub mod proxy;
  pub mod redact;
 +#[cfg(not(target_os = "wasi"))]
  pub mod sandbox;
  pub mod secret_filter;
++#[cfg(not(target_os = "wasi"))]
+ pub mod secret_session;
  pub mod shell;
 +#[cfg(not(target_os = "wasi"))]
  pub mod tui;
@@ -798,7 +951,7 @@ diff --git a/src/lib.rs b/src/lib.rs
 diff --git a/src/main.rs b/src/main.rs
 --- a/src/main.rs
 +++ b/src/main.rs
-@@ -39,6 +39,7 @@
+@@ -39,6 +39,7 @@ async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
      }
  
      // Initialize rustls crypto provider for GCP SDKs
@@ -806,144 +959,3 @@ diff --git a/src/main.rs b/src/main.rs
      let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
  
      let (cli, settings_layer) = Cli::parse_with_settings();
-diff --git a/crates/fnox-core/src/lease_backends/gitlab.rs b/crates/fnox-core/src/lease_backends/gitlab.rs
---- a/crates/fnox-core/src/lease_backends/gitlab.rs
-+++ b/crates/fnox-core/src/lease_backends/gitlab.rs
-@@ -1,5 +1,7 @@
- use crate::error::{FnoxError, Result};
--use crate::lease_backends::{Lease, LeaseBackend, env_credential, require_secure_url};
-+use crate::lease_backends::{Lease, LeaseBackend, env_credential};
-+#[cfg(not(target_os = "wasi"))]
-+use crate::lease_backends::require_secure_url;
- use async_trait::async_trait;
- use indexmap::IndexMap;
- use std::time::Duration;
-@@ -54,6 +56,7 @@
-     }
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- impl GitLabBackend {
-     pub fn new(
-         url: Option<String>,
-@@ -109,6 +112,7 @@
- 
- /// GitLab reports errors as `{"message": ...}` or `{"error": ...}`, where
- /// `message` may be a string or a structure.
-+#[cfg(not(target_os = "wasi"))]
- fn error_text(status: reqwest::StatusCode, body: &str) -> String {
-     let parsed: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
-     match (&parsed["message"], &parsed["error"]) {
-@@ -120,6 +124,7 @@
-     }
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- #[async_trait]
- impl LeaseBackend for GitLabBackend {
-     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {
-diff --git a/crates/fnox-core/src/lease_backends/kubernetes.rs b/crates/fnox-core/src/lease_backends/kubernetes.rs
---- a/crates/fnox-core/src/lease_backends/kubernetes.rs
-+++ b/crates/fnox-core/src/lease_backends/kubernetes.rs
-@@ -2,9 +2,13 @@
- use crate::lease_backends::{Lease, LeaseBackend};
- use async_trait::async_trait;
- use indexmap::IndexMap;
-+#[cfg(not(target_os = "wasi"))]
- use k8s_openapi::api::authentication::v1::{TokenRequest, TokenRequestSpec};
-+#[cfg(not(target_os = "wasi"))]
- use k8s_openapi::api::core::v1::ServiceAccount;
-+#[cfg(not(target_os = "wasi"))]
- use kube::Api;
-+#[cfg(not(target_os = "wasi"))]
- use kube::api::PostParams;
- use std::time::Duration;
- 
-@@ -37,6 +41,7 @@
-     env_var: String,
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- impl KubernetesBackend {
-     pub fn new(
-         service_account: String,
-@@ -96,6 +101,7 @@
-     }
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- #[async_trait]
- impl LeaseBackend for KubernetesBackend {
-     async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
-diff --git a/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs b/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
---- a/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
-+++ b/crates/fnox-core/src/lease_backends/oauth2_client_credentials.rs
-@@ -1,5 +1,7 @@
- use crate::error::{FnoxError, Result};
--use crate::lease_backends::{Lease, LeaseBackend, env_credential, require_secure_url};
-+use crate::lease_backends::{Lease, LeaseBackend, env_credential};
-+#[cfg(not(target_os = "wasi"))]
-+use crate::lease_backends::require_secure_url;
- use async_trait::async_trait;
- use indexmap::IndexMap;
- use serde::{Deserialize, Serialize};
-@@ -57,6 +59,7 @@
-     revocation_url: Option<String>,
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- impl Oauth2ClientCredentialsBackend {
-     #[allow(clippy::too_many_arguments)]
-     pub fn new(
-@@ -118,6 +121,7 @@
-     }
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- fn error_text(status: reqwest::StatusCode, body: &serde_json::Value) -> String {
-     match (body["error"].as_str(), body["error_description"].as_str()) {
-         (Some(error), Some(description)) => format!("{error}: {description}"),
-@@ -126,6 +130,7 @@
-     }
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- #[async_trait]
- impl LeaseBackend for Oauth2ClientCredentialsBackend {
-     async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
-diff --git a/crates/fnox-core/src/lease_backends/tailscale.rs b/crates/fnox-core/src/lease_backends/tailscale.rs
---- a/crates/fnox-core/src/lease_backends/tailscale.rs
-+++ b/crates/fnox-core/src/lease_backends/tailscale.rs
-@@ -1,5 +1,7 @@
- use crate::error::{FnoxError, Result};
--use crate::lease_backends::{Lease, LeaseBackend, env_credential, require_secure_url};
-+use crate::lease_backends::{Lease, LeaseBackend, env_credential};
-+#[cfg(not(target_os = "wasi"))]
-+use crate::lease_backends::require_secure_url;
- use async_trait::async_trait;
- use indexmap::IndexMap;
- use std::time::Duration;
-@@ -69,6 +71,7 @@
-     env_var: String,
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- impl TailscaleBackend {
-     pub fn new(
-         tailnet: String,
-@@ -170,6 +173,7 @@
-     }
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- fn error_text(status: reqwest::StatusCode, body: &str) -> String {
-     let parsed: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
-     match parsed["message"]
-@@ -183,6 +187,7 @@
-     }
- }
- 
-+#[cfg(not(target_os = "wasi"))]
- #[async_trait]
- impl LeaseBackend for TailscaleBackend {
-     async fn create_lease(&self, duration: Duration, label: &str) -> Result<Lease> {

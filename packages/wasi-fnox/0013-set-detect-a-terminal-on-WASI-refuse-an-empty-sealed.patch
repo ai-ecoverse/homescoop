@@ -1,7 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
-Date: Tue, 13 Oct 2026 02:12:28 +0200
-Subject: [PATCH 13/13] set: detect a terminal on WASI, refuse an empty sealed
+Date: Sat, 7 Nov 2026 02:10:00 +0100
+Subject: [PATCH 13/18] set: detect a terminal on WASI; refuse an empty sealed value
+
  value
 
 atty reports no terminal on any wasm32 target, so `fnox set NAME` on a
@@ -12,10 +13,9 @@ value on stdin (for example from /dev/null) is now refused before any
 `seal`, with a hint to pipe the value or use the vault dialog.
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
-index 272a19bd..fa02409c 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
-@@ -20,6 +20,17 @@ fn resolve_remote_key_name<'a>(
+@@ -22,6 +22,17 @@ fn resolve_remote_key_name<'a>(
          .unwrap_or(key)
  }
  
@@ -30,10 +30,10 @@ index 272a19bd..fa02409c 100644
 +    std::io::stdin().is_terminal()
 +}
 +
- /// Return whether a loaded secret came from the table this command will update.
- fn secret_belongs_to_target(
-     secret: &config::SecretConfig,
-@@ -174,7 +185,7 @@ impl SetCommand {
+ /// What `SetCommand::store_at` wrote
+ pub(crate) struct Stored {
+     pub write_profile: String,
+@@ -349,7 +360,7 @@ impl SetCommand {
          } else if let Some(ref v) = self.value {
              // Value provided as argument
              Some(v.clone())
@@ -42,7 +42,7 @@ index 272a19bd..fa02409c 100644
              // Read from stdin if piped
              tracing::debug!("Reading secret value from stdin");
              let mut buffer = String::new();
-@@ -245,6 +256,11 @@ impl SetCommand {
+@@ -432,6 +443,11 @@ impl SetCommand {
                  "not available in seven: a value on the command line is visible to other processes; pipe it on stdin".to_string(),
              ));
          }

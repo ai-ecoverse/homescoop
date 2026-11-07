@@ -1,7 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
-Date: Mon, 12 Oct 2026 15:20:29 +0200
-Subject: [PATCH 11/13] wasi: allow the lints that code compiled out on WASI
+Date: Sat, 7 Nov 2026 02:10:00 +0100
+Subject: [PATCH 11/18] wasi: allow the lints that code compiled out on WASI triggers
+
  leaves behind
 
 Gating providers, leases and the local proxy on WASI leaves imports, helpers and early returns that only the native build uses. Both crates allow dead_code, unused_imports, unused_variables, unused_mut and unreachable_code on WASI only, so the WASI build is warning-free and native lints are unchanged.
@@ -9,11 +10,10 @@ Gating providers, leases and the local proxy on WASI leaves imports, helpers and
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
-@@ -7,6 +7,17 @@
- //!
+@@ -8,6 +8,17 @@
  //! The `fnox` binary depends on this crate and adds CLI-shaped bits (commands, MCP
  //! server, TUI, shell integration, hook-env machinery) on top.
-+
+ 
 +#![cfg_attr(
 +    target_os = "wasi",
 +    allow(
@@ -24,9 +24,10 @@ diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
 +        unreachable_code
 +    )
 +)]
- 
++
  pub mod audit;
  pub mod auth_prompt;
+ pub mod config;
 diff --git a/src/lib.rs b/src/lib.rs
 --- a/src/lib.rs
 +++ b/src/lib.rs

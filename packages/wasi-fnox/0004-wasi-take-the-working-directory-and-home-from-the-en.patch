@@ -1,7 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
-Date: Mon, 12 Oct 2026 14:38:52 +0200
-Subject: [PATCH 04/13] wasi: take the working directory and home from the
+Date: Sat, 7 Nov 2026 02:10:00 +0100
+Subject: [PATCH 04/18] wasi: take the working directory and home from the environment
+
  environment
 
 wasi-libc starts every program in "/", so fnox changes to $PWD before
@@ -11,7 +12,6 @@ WASI backend for. XDG-style defaults apply to WASI as on unix
 tokio runtime is current_thread on WASI.
 
 diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
-index 560735a1..38194e43 100644
 --- a/crates/fnox-core/src/env.rs
 +++ b/crates/fnox-core/src/env.rs
 @@ -40,12 +40,18 @@ pub fn remove_var<K: AsRef<OsStr>>(key: K) {
@@ -54,7 +54,6 @@ index 560735a1..38194e43 100644
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
 diff --git a/src/main.rs b/src/main.rs
-index fbc65cbb..a973b032 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -3,6 +3,10 @@ use fnox::settings;
