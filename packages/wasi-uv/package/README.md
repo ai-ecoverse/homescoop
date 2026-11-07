@@ -49,13 +49,13 @@ Limits in seven:
   reverted an export fix, so an export could list an optional dependency
   reached only through an incompatible platform path.
   [#22751](https://github.com/astral-sh/uv/pull/22751) restores the fix in
-  0.13.5, and `cert/export.mjs` checks upstream's case. If you exported with
+  0.13.6, and `cert/export.mjs` checks upstream's case. If you exported with
   0.13.3-1 or 0.13.4-1, export again.
 
 `uvx` (since 0.13.1-4, homescoop#771) is the same `uv.wasm` with `tool uvx`
 in front, as upstream's `uvx` binary does: `uvx <command>` and
 `uvx --from <package> <command>` run a package's command in a cached tool
-environment, and `uvx --version` prints `uvx 0.13.5`. Only tools that are
+environment, and `uvx --version` prints `uvx 0.13.6`. Only tools that are
 pure Python (or have a `wasi_0_0_0_wasm32` build) run: ruff, for example,
 ships native wheels and a Rust sdist only, so `uvx ruff` can't install it
 (homescoop#1486).

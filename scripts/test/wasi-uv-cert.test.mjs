@@ -150,12 +150,27 @@ test('every crates/*.patch version matches 0001 and cert/meta.json', () => {
 });
 
 test('NEGATIVE: a half-done crate refresh fails', () => {
-  const crate = [['cargo-util', '0.2.31']];
-  const stale = (text) => text.replaceAll('0.2.31', '0.2.30');
-  assert.throws(() => checkCrateRefresh(crate, stale(firstPatch), certMeta), /0001's \[patch\.crates-io\] names cargo-util 0\.2\.31/);
-  const pathOnly = firstPatch.replace(' name = "cargo-util"\n version = "0.2.31"', ' name = "cargo-util"\n version = "0.2.30"');
-  assert.throws(() => checkCrateRefresh(crate, pathOnly, certMeta), /0001's Cargo\.lock hunk names cargo-util 0\.2\.31/);
-  assert.throws(() => checkCrateRefresh(crate, firstPatch, JSON.parse(stale(JSON.stringify(certMeta)))), /cert\/meta\.json lists cargo-util 0\.2\.31/);
+  const crate = [['hyper-util', '0.1.21']];
+  const stale = (text) => text.replaceAll('0.1.21', '0.1.20');
+  assert.throws(() => checkCrateRefresh(crate, stale(firstPatch), certMeta), /0001's \[patch\.crates-io\] names hyper-util 0\.1\.21/);
+  const pathOnly = firstPatch.replace(' name = "hyper-util"\n version = "0.1.21"', ' name = "hyper-util"\n version = "0.1.20"');
+  assert.throws(() => checkCrateRefresh(crate, pathOnly, certMeta), /0001's Cargo\.lock hunk names hyper-util 0\.1\.21/);
+  assert.throws(() => checkCrateRefresh(crate, firstPatch, JSON.parse(stale(JSON.stringify(certMeta)))), /cert\/meta\.json lists hyper-util 0\.1\.21/);
+});
+
+const UV_LOCK_WASIX = /"uv-workspace-commands",\n "walkdir",\n\+ "wasix-command",\n "which",\n "wiremock",/;
+
+function checkUvLockOmitsWasix (patch) {
+  assert.doesNotMatch(patch, UV_LOCK_WASIX, "0001 must not add wasix-command to the uv package's Cargo.lock deps (crates/uv has no wasix-command; cargo --locked then fails)");
+}
+
+test("0001's Cargo.lock does not add wasix-command to the uv package", () => {
+  checkUvLockOmitsWasix(firstPatch);
+});
+
+test('NEGATIVE: a 0001 that adds wasix-command to the uv package lock entry fails', () => {
+  const bad = `${firstPatch}\n@@\n "uv-workspace-commands",\n "walkdir",\n+ "wasix-command",\n "which",\n "wiremock",\n`;
+  assert.throws(() => checkUvLockOmitsWasix(bad), /must not add wasix-command to the uv package/);
 });
 
 test("timeout.mjs logs the timeout it causes on purpose as expected, not as a 'wasi-uv: FAIL' line", async () => {
