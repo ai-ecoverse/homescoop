@@ -18,3 +18,4 @@ a   0014-edit-refuse-fnox-edit-on-WASI-instead-of-panicking.patch
 a+b 0015-hook-env-and-activate-the-shell-integration-on-WASI.patch
 b   0016-exec-and-activate-as_file-secrets-and-the-exec-bit-on-WASI.patch
 a   0017-plain-read-the-secrets-file-in-place-on-WASI.patch
+a   0018-files-refuse-fnox-files-and-set-file-on-WASI.patch

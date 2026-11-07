@@ -20,11 +20,11 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
 - **`fnox proxy rules --json`:** prints a project's rules as proposals.
 - **`fnox check`:** asks the vault about each sealed record.
 - **`fnox deactivate`:** removes the shell hooks and the `fnox` function even if the binary is gone (since 1.42.1), as upstream.
-- **Refused:** `as_file` secrets, `sync`, `reencrypt`, and `fnox edit` (use `fnox set`).
+- **Refused:** `as_file` secrets, `sync`, `reencrypt`, `fnox edit`, `fnox files`, and `fnox set|get --file` (use `fnox set` / `fnox get`).
 - **age:** decrypting an age secret isn't supported yet (slicc-vault#2). Encrypting to age recipients works.
 - **Other providers:** only `sealed`, `age` and `plain` are built. Values from `plain` are passed on with a warning.
 - **Templates:** a secret's `default` and a provider's string fields can use `{{ fnox.profile }}` and `{{ fnox.profiles }}` (Tera, since 1.41), as upstream. A sealed secret's `value`, its placeholder, is never rendered.
-- **Not in this build:** leases (including managed identity for `azure-token`), the daemon, the TUI, the MCP server and Lua provider plugins (`fnox plugin`).
+- **Not in this build:** leases (including managed identity for `azure-token`), the daemon, the TUI, the MCP server (including `request_secret`), secret-file write paths, and Lua provider plugins (`fnox plugin`).
 
 It needs slicc-kernel 1.83.0 or later (`engines`): `/dev/sealed` arrived in slicc-kernel 1.68.0 (KS-2), and the exec tickets that `fnox exec` redeems in slicc-kernel 1.83.0 (KS-8).
 
@@ -41,3 +41,5 @@ fnox is MIT (see `LICENSE`). `THIRD-PARTY-NOTICES.md` lists the crates, Rust's s
 Exec output redaction uses helper threads upstream. This WASI build refuses `--redact`, `FNOX_EXEC_REDACT=1`, or `redact_exec = true` before resolving secrets or spawning the child; `--no-redact` overrides the environment and config. Seven retains its kernel handling of sealed output. `proxy run --sandbox` and a configured sandbox are refused before spawning; `--no-sandbox` overrides the config. The OS sandbox, native proxy authentication and private-address enforcement belong to the native proxy, which is compiled out here; seven continues to inject placeholders through its realm proxy.
 
 The new OAuth2, GitLab, Tailscale and Kubernetes lease backends are compiled out with the existing lease backends. `audit`, `scan --values` and `set --generate` retain upstream behavior: audit records names, scan sees sealed placeholders, and generated secrets are created inside fnox before storage (`--show` explicitly prints generated values). Staged scanning and hook installation use native process execution and are unavailable on WASI.
+
+From 1.44/1.45, upstream secret files (`[files]`, `fnox files`, `set|get|edit --file`) and the MCP `request_secret` one-time page need native HTTP, tempfile and editor paths. This build refuses those commands and flags before they run; the MCP module and the native proxy HTTP stack stay compiled out.

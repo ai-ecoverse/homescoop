@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
-Date: Mon, 12 Oct 2026 14:33:14 +0200
-Subject: [PATCH 01/13] build: gate non-WASI dependencies by target
+Date: Sat, 7 Nov 2026 02:10:00 +0100
+Subject: [PATCH 01/18] build: gate non-WASI dependencies by target
 
 Move dependencies that do not build for wasm32-wasip1 (cloud SDKs,
 reqwest, rustls/rcgen with aws-lc, keyring, TUI, prompts, signal
@@ -18,7 +18,7 @@ Native targets keep the same dependency set and features.
 diff --git a/Cargo.toml b/Cargo.toml
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -16,7 +16,7 @@
+@@ -16,7 +16,7 @@ rust-version = "1.91.1"
  
  [workspace.dependencies]
  aes-gcm = "0.11.0-rc.3"
@@ -27,7 +27,7 @@ diff --git a/Cargo.toml b/Cargo.toml
  aho-corasick = "1"
  anyhow = "1"
  arboard = "3"
-@@ -36,7 +36,7 @@
+@@ -36,7 +36,7 @@ azure_security_keyvault_secrets = { version = "1" }
  base64 = "0.23"
  blake3 = "1"
  bytes = "1"
@@ -36,7 +36,7 @@ diff --git a/Cargo.toml b/Cargo.toml
  ci_info = "0.14"
  usage-rs = { version = "7", features = ["diagnostics", "completions", "config"] }
  console = "0.16"
-@@ -107,7 +107,7 @@
+@@ -107,7 +107,7 @@ tempfile = "3"
  tera = { version = "2", default-features = false }
  terminal_size = "0.4"
  thiserror = "2"
@@ -45,7 +45,7 @@ diff --git a/Cargo.toml b/Cargo.toml
  tokio-rustls = "0.26"
  toml_edit = { version = "0.25", features = ["serde"] }
  tracing = "0.1"
-@@ -142,7 +142,6 @@
+@@ -142,7 +142,6 @@ fnox-core = { path = "crates/fnox-core", version = "1" }
  # transitively via fnox-core and are not listed here.
  aho-corasick = { workspace = true }
  anyhow = { workspace = true }
@@ -53,7 +53,7 @@ diff --git a/Cargo.toml b/Cargo.toml
  atty = { workspace = true }
  base64 = { workspace = true }
  blake3 = { workspace = true }
-@@ -150,9 +149,7 @@
+@@ -150,9 +149,7 @@ chrono = { workspace = true }
  ci_info = { workspace = true }
  usage-rs = { workspace = true }
  console = { workspace = true }
@@ -63,7 +63,7 @@ diff --git a/Cargo.toml b/Cargo.toml
  globset = { workspace = true }
  hex = { workspace = true }
  ignore = { workspace = true }
-@@ -161,32 +158,40 @@
+@@ -161,32 +158,40 @@ ipnet = { workspace = true }
  libc = { workspace = true }
  miette = { workspace = true }
  miniz_oxide = { workspace = true }
@@ -115,7 +115,6 @@ diff --git a/Cargo.toml b/Cargo.toml
  [dev-dependencies]
  tempfile = { workspace = true }
 diff --git a/crates/fnox-core/Cargo.toml b/crates/fnox-core/Cargo.toml
-index 66d011e0..37b89a0d 100644
 --- a/crates/fnox-core/Cargo.toml
 +++ b/crates/fnox-core/Cargo.toml
 @@ -11,51 +11,26 @@ readme = "../../README.md"
