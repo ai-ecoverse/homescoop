@@ -1,7 +1,7 @@
 {
   "harness": "host-node",
   "checklist": [
-    "Both libjpeg.a and libturbojpeg.a carry an embedded build YYYYMMDD stamp, and every stamp equals source.epoch formatted in UTC."
+    "Both libjpeg.a and libturbojpeg.a carry an embedded build YYYYMMDD stamp, and every stamp equals the newest regular-file mtime in the SHA-256-verified upstream tarball, formatted in UTC."
   ],
   "ci": [
     "node packages/libjpeg-turbo/cert/build-stamp.mjs --tarball .homescoop-out/package.tgz"
