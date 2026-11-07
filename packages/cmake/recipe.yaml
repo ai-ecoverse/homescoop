@@ -2,7 +2,7 @@ name: cmake
 builder: host
 reproducible: true
 # renovate: datasource=github-releases depName=Kitware/CMake extractVersion=^v(?<version>.*)$
-version: "4.4.3"
+version: "4.4.5"
 npm: "@ai-ecoverse/wasm-cmake"
 summary: "CMake built for slicc (wasm tool)"
 source:
