@@ -42,4 +42,4 @@ Exec output redaction uses helper threads upstream. This WASI build refuses `--r
 
 The new OAuth2, GitLab, Tailscale and Kubernetes lease backends are compiled out with the existing lease backends. `audit`, `scan --values` and `set --generate` retain upstream behavior: audit records names, scan sees sealed placeholders, and generated secrets are created inside fnox before storage (`--show` explicitly prints generated values). Staged scanning and hook installation use native process execution and are unavailable on WASI.
 
-From 1.44/1.45, upstream secret files (`[files]`, `fnox files`, `set|get|edit --file`) and the MCP `request_secret` one-time page need native HTTP, tempfile and editor paths. This build refuses those commands and flags before they run; the MCP module and the native proxy HTTP stack stay compiled out.
+Since 1.45.0, upstream secret files (`[files]`, `fnox files`, `set|get|edit --file`) and the MCP `request_secret` one-time page need native HTTP, tempfile and editor paths. This build refuses those commands and flags before they run; the MCP module and the native proxy HTTP stack stay compiled out.
