@@ -15,7 +15,7 @@
     "@ai-ecoverse/wasm-tls-engine@3.6.7-1"
   ],
   "checklist": [
-    "cmake --version is cmake version 4.4.3; cmake -E echo prints its argument (cert/cmake.mjs, as a non-root user under users enforce)",
+    "cmake --version is 'cmake version <recipe.yaml's version>'; since 4.4.5-1 the spec reads that version from recipe.yaml (cert/lib/version.mjs) instead of naming it, so a Renovate bump needs no cert edit, and scripts/test/cmake-cert-version.test.mjs fails a wrong expected version (an older cmake, 4.4.3 for 4.4.5); cmake -E echo prints its argument (cert/cmake.mjs, as a non-root user under users enforce)",
     "cmake -P runs execute_process(COMMAND bash -c ...) through the kernel's spawn (output and result 0), string(SHA256), file(WRITE), and reports CMAKE_ROOT as the manifest's ${package}/share/cmake-4.4 (cmake-root-env.patch)",
     "a LANGUAGES NONE project configures with -G \"Unix Makefiles\" (configure_file, a cache variable from -D), and cmake --build runs wasm-gmake, whose recipe calls cmake -E copy and echo_append; a second build does nothing; the files it writes belong to the user",
     "cmake.wasm imports slicc_cred_js, slicc_sig_inherited_js and slicc_poll_js: it links today's shims/slicc (credentials #459, inherited ignores #973, libuv's poll in the kernel). 4.4.3-9 imports none of the first two (NEGATIVE.md)",

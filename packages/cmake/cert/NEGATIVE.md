@@ -72,3 +72,10 @@ AssertionError [ERR_ASSERTION]: file(DOWNLOAD https://…) with verification on,
 - **#1280, the cause:** build.sh configured with `-DCMAKE_USE_OPENSSL=OFF`, so the bundled cmcurl had no TLS backend. 4.4.3-14 configures with `-DCMAKE_USE_SYSTEM_CURL=ON` against wasm-curl 8.22.0-10's `libcurl.a` and Mbed TLS archives. That forces `CMAKE_USE_SYSTEM_ZLIB`, so wasm-zlib 1.3.1-4 is linked too. It links `shims/slicc/webcrypto-entropy.c` for Mbed TLS's entropy. The build fails if `Utilities/cmcurl` is still linked.
 - **TLS behaviour** is CMake 4.4.3's own. Verification is on, TLS 1.2 is the minimum, and the CA comes from `TLS_CAINFO`, then `CMAKE_TLS_CAINFO`, then `SSL_CERT_FILE`, then `SSL_CERT_DIR`. The README has the details.
 - All five specs (`cmake.mjs`, `downloads.mjs`, `env-i.mjs`, `https.mjs`, `platform.mjs`) pass on 4.4.3-14 on slicc-kernel 1.110.7. `https.mjs` also passes on 1.166.4, the root devDependency.
+
+## 4.4.5-1: version from recipe.yaml (homescoop#1982; 2026-11-07)
+
+Renovate bumped Kitware/CMake to 4.4.5 (#1981). The build and refresh landed; cert failed first because `cert/cmake.mjs` still asserted `/^cmake version 4\.4\.3\n/`.
+
+- **No version in the spec:** `cmake.mjs` reads cmake's version from recipe.yaml (`cert/lib/version.mjs`) for `cmake --version`, and CMAKE_ROOT's `share/cmake-X.Y` from that version's series, so a Renovate bump needs no cert edit (as sqlite3 did in homescoop#1791 and wasi-uv in #1918). `scripts/test/cmake-cert-version.test.mjs` fails on 4.4.3-14's `cmake.mjs`, which pins `cmake version 4\.4\.3`. In the same test a wrong expected version (4.4.3, 4.4.50, 4.4.5.0, 5.4.5) fails the check, and so does a near miss (`cmake version 4.4.50` for 4.4.5).
+- **NEGATIVE:** the published 4.4.3-14 fails the new row at `cmake --version names cmake version 4.4.5, recipe.yaml's version: cmake version 4.4.3\n…` (slicc-kernel 1.110.7, users enforce). The rest of `cmake.mjs` (echo, -P, configure, build, imports) is unchanged.
