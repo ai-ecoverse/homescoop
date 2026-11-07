@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-fnox",
-  "version": "1.45.0-1",
+  "version": "1.45.0-2",
   "description": "fnox, a secrets manager that keeps values in SLICC's sealed store and hands commands placeholders.",
   "license": "MIT",
   "repository": {
@@ -27,7 +27,7 @@
     "access": "public"
   },
   "engines": {
-    "slicc-kernel": ">=1.83.0"
+    "slicc-kernel": ">=1.175.0"
   },
   "homescoop": {
     "recipe": "wasi-fnox",

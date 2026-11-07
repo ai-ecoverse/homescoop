@@ -1,0 +1,748 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Pi <pi@earendil.works>
+Date: Sat, 7 Nov 2026 12:00:00 +0100
+Subject: [PATCH] set: ask seven's vault with one blocking read, --ask, age and
+ plain
+
+`fnox set NAME` on a terminal sent `request {kind: "value"}` and polled
+`status` every second for up to 300 s. It now writes one `ask {name,
+prompt?, reveal, replace: true}` to /dev/sealed and blocks in a single
+read until the vault answers (`done` with the placeholder, `cancelled`,
+`expired`, or an error). Ctrl-C still cancels: the WASIX signal
+callback marks the read interrupted, fnox closes the descriptor and
+exits 130, and the kernel withdraws the dialog. `replace: true` keeps
+`fnox set` a way to type a new value for a name the vault already has,
+which rotates the record under its placeholder. `--description` is the
+dialog's prompt, clipped to 200 UTF-16 units.
+
+`--ask` opens the dialog when stdin is not a terminal (the agent's
+bash): it never reads stdin, prints the placeholder alone on stdout and
+the status line on stderr. It conflicts with VALUE, --from-file and
+--generate.
+
+A secret with an age or plain provider (or no provider) asks with
+`reveal: true`, and fnox stores what it normally stores for the value
+the user typed: the age ciphertext, or the plaintext. The vault keeps
+its sealed copy, so the value is still scrubbed. Other providers are
+refused before a dialog. The reply buffer and an unused revealed value
+are zeroed. `fnox set --file` refuses --ask like --generate, and edit and
+the secret session build their SetCommand without it.
+
+Signed-off-by: Lars Trieloff <lars@trieloff.net>
+---
+ crates/fnox-core/src/sealed.rs | 301 ++++++++++++++++++++++++++++++++-
+ src/commands/edit.rs           |   1 +
+ src/commands/set.rs            |  84 +++++++--
+ src/secret_session.rs          |   1 +
+ src/seven.rs                   | 118 +++++++++----
+ 5 files changed, 449 insertions(+), 56 deletions(-)
+
+diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
+index 3d85bf0..e995f8f 100644
+--- a/crates/fnox-core/src/sealed.rs
++++ b/crates/fnox-core/src/sealed.rs
+@@ -15,6 +15,11 @@ pub const AGE_UNSUPPORTED: &str = "age secrets aren't supported in seven yet (sl
+ 
+ pub trait Transport: Send + Sync {
+     fn call(&self, request: &[u8]) -> io::Result<Vec<u8>>;
++
++    fn wait(&self, request: &[u8], stop: &dyn Fn() -> bool) -> io::Result<Vec<u8>> {
++        let _ = stop;
++        self.call(request)
++    }
+ }
+ 
+ pub struct Device;
+@@ -27,6 +32,58 @@ impl Transport for Device {
+             .open(Path::new(DEVICE))?;
+         exchange(&mut file, request)
+     }
++
++    fn wait(&self, request: &[u8], stop: &dyn Fn() -> bool) -> io::Result<Vec<u8>> {
++        let mut file = std::fs::OpenOptions::new()
++            .read(true)
++            .write(true)
++            .open(Path::new(DEVICE))?;
++        exchange_until(&mut file, request, stop)
++    }
++}
++
++pub fn exchange_until<F: Read + Write>(
++    file: &mut F,
++    request: &[u8],
++    stop: &dyn Fn() -> bool,
++) -> io::Result<Vec<u8>> {
++    loop {
++        match file.write(request) {
++            Ok(n) if n == request.len() => break,
++            Ok(_) => {
++                return Err(io::Error::new(
++                    io::ErrorKind::WriteZero,
++                    "short write to /dev/sealed",
++                ));
++            }
++            Err(e) if e.kind() == io::ErrorKind::Interrupted && !stop() => continue,
++            Err(e) => return Err(e),
++        }
++    }
++    let mut reply = Vec::new();
++    let mut chunk = [0u8; 4096];
++    loop {
++        match file.read(&mut chunk) {
++            Ok(0) => {
++                wipe(&mut chunk);
++                return Ok(reply);
++            }
++            Ok(n) => reply.extend_from_slice(&chunk[..n]),
++            Err(e) if e.kind() == io::ErrorKind::Interrupted && !stop() => continue,
++            Err(e) => {
++                wipe(&mut chunk);
++                wipe(&mut reply);
++                return Err(e);
++            }
++        }
++    }
++}
++
++pub fn wipe(bytes: &mut [u8]) {
++    for byte in bytes.iter_mut() {
++        unsafe { std::ptr::write_volatile(byte, 0) };
++    }
++    std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+ }
+ 
+ pub fn exchange<F: Read + Write>(file: &mut F, request: &[u8]) -> io::Result<Vec<u8>> {
+@@ -97,6 +154,11 @@ mod libc_errno {
+ }
+ 
+ pub fn call(op: &str, fields: Value) -> Result<Value> {
++    let bytes = encode(op, fields)?;
++    decode(op, transport().call(&bytes))
++}
++
++fn encode(op: &str, fields: Value) -> Result<Vec<u8>> {
+     let mut request = Map::new();
+     request.insert("v".into(), json!(1));
+     request.insert("op".into(), json!(op));
+@@ -110,7 +172,11 @@ pub fn call(op: &str, fields: Value) -> Result<Value> {
+             "seven: {op} request is larger than 64 KiB"
+         )));
+     }
+-    let reply = match transport().call(&bytes) {
++    Ok(bytes)
++}
++
++fn decode(op: &str, reply: io::Result<Vec<u8>>) -> Result<Value> {
++    let mut reply = match reply {
+         Ok(reply) => reply,
+         Err(e) if e.kind() == io::ErrorKind::NotFound => {
+             return Err(FnoxError::Seven(MISSING.to_string()));
+@@ -127,8 +193,10 @@ pub fn call(op: &str, fields: Value) -> Result<Value> {
+             "seven: /dev/sealed gave no reply to {op}"
+         )));
+     }
+-    let reply: Value = serde_json::from_slice(&reply)
+-        .map_err(|e| FnoxError::Seven(format!("seven: unreadable reply to {op}: {e}")))?;
++    let parsed = serde_json::from_slice::<Value>(&reply);
++    wipe(&mut reply);
++    let reply =
++        parsed.map_err(|e| FnoxError::Seven(format!("seven: unreadable reply to {op}: {e}")))?;
+     if let Some(error) = reply.get("error") {
+         let code = error.get("code").and_then(Value::as_str).unwrap_or("EIO");
+         let message = error
+@@ -203,6 +271,81 @@ pub fn cancel(id: &str) -> Result<Request> {
+     parse("cancel", call("cancel", json!({ "id": id }))?)
+ }
+ 
++pub const MAX_PROMPT: usize = 200;
++
++#[derive(Debug, Clone, Copy, Default)]
++pub struct Ask<'a> {
++    pub name: &'a str,
++    pub prompt: Option<&'a str>,
++    pub reveal: bool,
++    pub replace: bool,
++}
++
++#[derive(Clone, Deserialize, PartialEq, Eq)]
++pub struct Answer {
++    pub state: String,
++    #[serde(default)]
++    pub placeholder: Option<String>,
++    #[serde(default)]
++    pub record: Option<String>,
++    #[serde(default)]
++    pub value: Option<String>,
++}
++
++impl std::fmt::Debug for Answer {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("Answer")
++            .field("state", &self.state)
++            .field("placeholder", &self.placeholder)
++            .field("record", &self.record)
++            .field("value", &self.value.as_ref().map(|_| "<redacted>"))
++            .finish()
++    }
++}
++
++impl Drop for Answer {
++    fn drop(&mut self) {
++        if let Some(value) = self.value.take() {
++            let mut bytes = value.into_bytes();
++            wipe(&mut bytes);
++        }
++    }
++}
++
++#[derive(Debug)]
++pub enum Asked {
++    Answered(Answer),
++    Interrupted,
++}
++
++pub fn clip_prompt(prompt: &str) -> String {
++    let mut units = 0;
++    prompt
++        .chars()
++        .take_while(|c| {
++            units += c.len_utf16();
++            units <= MAX_PROMPT
++        })
++        .collect()
++}
++
++pub fn ask(ask: &Ask, stop: &dyn Fn() -> bool) -> Result<Asked> {
++    let mut fields = json!({
++        "name": ask.name,
++        "reveal": ask.reveal,
++        "replace": ask.replace,
++    });
++    if let Some(prompt) = ask.prompt.map(clip_prompt).filter(|p| !p.is_empty()) {
++        fields["prompt"] = json!(prompt);
++    }
++    let bytes = encode("ask", fields)?;
++    let reply = match transport().wait(&bytes, stop) {
++        Err(e) if e.kind() == io::ErrorKind::Interrupted => return Ok(Asked::Interrupted),
++        reply => reply,
++    };
++    Ok(Asked::Answered(parse("ask", decode("ask", reply)?)?))
++}
++
+ #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+ pub struct Ticket {
+     pub ticket: String,
+@@ -605,6 +748,158 @@ mod tests {
+         assert_eq!(err.kind(), io::ErrorKind::WriteZero);
+     }
+ 
++    #[test]
++    fn ask_sends_name_reveal_and_replace_in_one_request() {
++        let (_g, mock) = install();
++        mock.reply(
++            json!({ "v": 1, "state": "done", "placeholder": "seven_ph_1", "record": "inert" }),
++        );
++        let never = || false;
++        let asked = ask(
++            &Ask {
++                name: "API_TOKEN",
++                prompt: None,
++                reveal: false,
++                replace: true,
++            },
++            &never,
++        )
++        .unwrap();
++        match asked {
++            Asked::Answered(answer) => {
++                assert_eq!(answer.state, "done");
++                assert_eq!(answer.placeholder.as_deref(), Some("seven_ph_1"));
++                assert_eq!(answer.value, None);
++            }
++            Asked::Interrupted => panic!("interrupted"),
++        }
++        assert_eq!(
++            mock.requests.lock().unwrap().clone(),
++            vec![
++                json!({ "v": 1, "op": "ask", "name": "API_TOKEN", "reveal": false, "replace": true })
++            ]
++        );
++        set_transport(None);
++    }
++
++    #[test]
++    fn ask_clips_the_prompt_to_200_utf16_units() {
++        let (_g, mock) = install();
++        mock.reply(json!({ "v": 1, "state": "cancelled" }));
++        let long = format!("{}\u{1F511}", "a".repeat(199));
++        let never = || false;
++        ask(
++            &Ask {
++                name: "A",
++                prompt: Some(&long),
++                reveal: true,
++                replace: true,
++            },
++            &never,
++        )
++        .unwrap();
++        let sent = mock.requests.lock().unwrap()[0].clone();
++        assert_eq!(sent["prompt"], json!("a".repeat(199)));
++        assert_eq!(sent["reveal"], json!(true));
++        assert_eq!(clip_prompt(""), "");
++        set_transport(None);
++    }
++
++    #[test]
++    fn ask_returns_the_revealed_value_and_redacts_it_in_debug() {
++        let (_g, mock) = install();
++        mock.reply(json!({ "v": 1, "state": "done", "placeholder": "p", "record": "inert", "value": "typed-value-1" }));
++        let never = || false;
++        let Asked::Answered(answer) = ask(
++            &Ask {
++                name: "A",
++                reveal: true,
++                replace: true,
++                ..Ask::default()
++            },
++            &never,
++        )
++        .unwrap() else {
++            panic!("interrupted")
++        };
++        assert_eq!(answer.value.as_deref(), Some("typed-value-1"));
++        assert!(!format!("{answer:?}").contains("typed-value-1"));
++        set_transport(None);
++    }
++
++    #[test]
++    fn an_interrupted_ask_is_not_an_error() {
++        let (_g, mock) = install();
++        mock.fail(io::Error::from(io::ErrorKind::Interrupted));
++        let never = || false;
++        let asked = ask(
++            &Ask {
++                name: "A",
++                ..Ask::default()
++            },
++            &never,
++        )
++        .unwrap();
++        assert!(matches!(asked, Asked::Interrupted));
++        set_transport(None);
++    }
++
++    #[test]
++    fn ask_errors_carry_code_and_message() {
++        let (_g, mock) = install();
++        mock.reply(json!({ "v": 1, "error": { "code": "EAGAIN", "message": "another request is pending" } }));
++        let never = || false;
++        let err = ask(
++            &Ask {
++                name: "A",
++                ..Ask::default()
++            },
++            &never,
++        )
++        .unwrap_err()
++        .to_string();
++        assert_eq!(err, "seven: ask: EAGAIN: another request is pending");
++        set_transport(None);
++    }
++
++    #[test]
++    fn exchange_until_retries_an_interrupted_read_until_stopped() {
++        let mut dev = Flaky {
++            writes: vec![Ok(0)],
++            reads: vec![
++                Err(io::Error::from(io::ErrorKind::Interrupted)),
++                Ok(b"{\"v\":1}".to_vec()),
++            ],
++            written: Vec::new(),
++        };
++        let never = || false;
++        assert_eq!(
++            exchange_until(&mut dev, b"{}", &never).unwrap(),
++            b"{\"v\":1}"
++        );
++
++        let mut dev = Flaky {
++            writes: vec![Ok(0)],
++            reads: vec![
++                Ok(b"{\"v\":".to_vec()),
++                Err(io::Error::from(io::ErrorKind::Interrupted)),
++                Ok(b"1}".to_vec()),
++            ],
++            written: Vec::new(),
++        };
++        let always = || true;
++        let err = exchange_until(&mut dev, b"{}", &always).unwrap_err();
++        assert_eq!(err.kind(), io::ErrorKind::Interrupted);
++        assert_eq!(dev.reads.len(), 1);
++    }
++
++    #[test]
++    fn wipe_zeroes_the_bytes() {
++        let mut bytes = b"secret".to_vec();
++        wipe(&mut bytes);
++        assert_eq!(bytes, vec![0; 6]);
++    }
++
+     struct SlowMachineAnswer {
+         flag: Arc<std::sync::atomic::AtomicBool>,
+         replies: std::sync::Mutex<Vec<Value>>,
+diff --git a/src/commands/edit.rs b/src/commands/edit.rs
+index 368549b..ffe49a4 100644
+--- a/src/commands/edit.rs
++++ b/src/commands/edit.rs
+@@ -387,6 +387,7 @@ impl EditCommand {
+             force: false,
+             from_file: Some(temp_path),
+             generate: false,
++            ask: false,
+             generate_type: GenerateKind::Password,
+             if_missing: None,
+             length: None,
+diff --git a/src/commands/set.rs b/src/commands/set.rs
+index 3ad7f47..01fcc65 100644
+--- a/src/commands/set.rs
++++ b/src/commands/set.rs
+@@ -38,6 +38,7 @@ pub(crate) struct Stored {
+     pub write_profile: String,
+     pub secret: config::SecretConfig,
+     pub generated: Option<String>,
++    pub placeholder: Option<String>,
+ }
+ 
+ /// The project config file `fnox set` writes to without `--global`.
+@@ -218,6 +219,18 @@ pub struct SetCommand {
+     #[usage(long, conflicts = "value", conflicts = "from_file")]
+     pub generate: bool,
+ 
++    /// Ask for the value in seven's vault dialog, also when stdin is not a terminal
++    ///
++    /// Never reads stdin. Prints the vault's placeholder on stdout and the
++    /// status on stderr.
++    #[usage(
++        long,
++        conflicts = "value",
++        conflicts = "from_file",
++        conflicts = "generate"
++    )]
++    pub ask: bool,
++
+     /// Kind of value `--generate` creates
+     #[usage(long, value_enum, default_value_t = GenerateKind::Password, default = "password", requires = "generate")]
+     pub generate_type: GenerateKind,
+@@ -252,6 +265,7 @@ impl SetCommand {
+         let unsupported = [
+             ("VALUE", self.value.is_some()),
+             ("--generate", self.generate),
++            ("--ask", self.ask),
+             ("--base64-encode", self.base64_encode),
+             ("--default", self.default.is_some()),
+             ("--if-missing", self.if_missing.is_some()),
+@@ -348,7 +362,6 @@ impl SetCommand {
+         let has_metadata =
+             self.description.is_some() || self.if_missing.is_some() || self.default.is_some();
+ 
+-        #[cfg_attr(not(target_os = "wasi"), allow(unused_mut))]
+         let mut ask_vault = false;
+         // Get the secret value if provided
+         let mut generated: Option<String> = None;
+@@ -369,6 +382,9 @@ impl SetCommand {
+         } else if let Some(ref v) = self.value {
+             // Value provided as argument
+             Some(v.clone())
++        } else if self.ask {
++            ask_vault = true;
++            None
+         } else if !stdin_is_terminal() {
+             // Read from stdin if piped
+             tracing::debug!("Reading secret value from stdin");
+@@ -435,17 +451,27 @@ impl SetCommand {
+             )));
+         }
+ 
+-        let sealed_provider = match &provider_name_to_use {
+-            Some(name) => config
+-                .get_providers(&write_profile_stack)?
+-                .get(name)
+-                .is_some_and(|provider| provider.provider_type() == "sealed"),
+-            None => false,
++        let provider_type = match &provider_name_to_use {
++            Some(name) => match config.get_providers(&write_profile_stack)?.get(name) {
++                Some(provider) => Some(provider.provider_type().to_string()),
++                None if ask_vault => {
++                    return Err(FnoxError::Config(format!(
++                        "Provider '{name}' not found in configuration"
++                    )));
++                }
++                None => None,
++            },
++            None => None,
+         };
+-        if ask_vault && !sealed_provider {
+-            return Err(FnoxError::Config(
+-                "no value given: pass it as an argument or pipe it on stdin".to_string(),
+-            ));
++        let sealed_provider = provider_type.as_deref() == Some("sealed");
++        if ask_vault
++            && let Some(other) = provider_type
++                .as_deref()
++                .filter(|t| !matches!(*t, "sealed" | "age" | "plain"))
++        {
++            return Err(FnoxError::Config(format!(
++                "no value given: seven's vault dialog fills in sealed, age and plain secrets, not {other}; pipe the value on stdin"
++            )));
+         }
+         if sealed_provider && self.value.is_some() {
+             return Err(FnoxError::Seven(
+@@ -454,7 +480,7 @@ impl SetCommand {
+         }
+         if sealed_provider && secret_value.as_deref() == Some("") {
+             return Err(FnoxError::Seven(
+-                "seven: no value on stdin; pipe the value, or run `fnox set` on a terminal to use the vault dialog".to_string(),
++                "seven: no value on stdin; pipe the value, or use `fnox set NAME --ask` for the vault dialog".to_string(),
+             ));
+         }
+         if sealed_provider && self.key_name.is_some() {
+@@ -463,11 +489,24 @@ impl SetCommand {
+                     .to_string(),
+             ));
+         }
+-        let vault_placeholder = if ask_vault && !self.dry_run {
+-            Some(crate::seven::request_value(self.key())?)
++        let mut entered = if ask_vault && !self.dry_run {
++            Some(crate::seven::ask_value(
++                self.key(),
++                self.description.as_deref(),
++                !sealed_provider,
++            )?)
+         } else {
+             None
+         };
++        let secret_value = match entered
++            .as_mut()
++            .filter(|_| !sealed_provider)
++            .and_then(|entered| entered.value.take())
++        {
++            Some(value) => Some(value),
++            None => secret_value,
++        };
++        let vault_placeholder = entered.map(|entered| entered.placeholder);
+ 
+         // Check if secret should be base64 encoded
+         let secret_value = if self.base64_encode {
+@@ -672,6 +711,7 @@ impl SetCommand {
+             write_profile,
+             secret: secret_config,
+             generated,
++            placeholder: vault_placeholder,
+         })
+     }
+ 
+@@ -681,6 +721,7 @@ impl SetCommand {
+             write_profile,
+             secret: secret_config,
+             generated,
++            placeholder,
+         } = stored;
+         if self.dry_run {
+             // Show what would be done
+@@ -737,12 +778,19 @@ impl SetCommand {
+             let styled_key = console::style(self.key()).cyan();
+             let styled_profile = console::style(write_profile).magenta();
+             let global_suffix = if self.global { " (global)" } else { "" };
+-            if write_profile == "default" {
+-                println!("{check} Set secret {styled_key}{global_suffix}");
++            let done = if write_profile == "default" {
++                format!("{check} Set secret {styled_key}{global_suffix}")
+             } else {
+-                println!(
++                format!(
+                     "{check} Set secret {styled_key} in profile {styled_profile}{global_suffix}"
+-                );
++                )
++            };
++            match placeholder.as_ref().filter(|_| self.ask) {
++                Some(placeholder) => {
++                    eprintln!("{done}");
++                    println!("{placeholder}");
++                }
++                None => println!("{done}"),
+             }
+             if let Some(value) = generated {
+                 if self.show {
+diff --git a/src/secret_session.rs b/src/secret_session.rs
+index c262bd0..d3daea0 100644
+--- a/src/secret_session.rs
++++ b/src/secret_session.rs
+@@ -426,6 +426,7 @@ impl SecretSession {
+             force: false,
+             from_file: None,
+             generate: false,
++            ask: false,
+             generate_type: GenerateKind::Password,
+             if_missing: None,
+             length: None,
+diff --git a/src/seven.rs b/src/seven.rs
+index b9e5b94..33f8a08 100644
+--- a/src/seven.rs
++++ b/src/seven.rs
+@@ -1,7 +1,6 @@
+ use crate::error::{FnoxError, Result};
+-use fnox_core::sealed::{self, Wait};
++use fnox_core::sealed::{self, Answer, Ask, Asked};
+ use std::sync::atomic::{AtomicBool, Ordering};
+-use std::time::Duration;
+ 
+ static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+ 
+@@ -38,36 +37,56 @@ pub fn interrupted() -> bool {
+     INTERRUPTED.load(Ordering::SeqCst)
+ }
+ 
+-pub fn request_value(name: &str) -> Result<String> {
+-    catch_interrupts();
+-    let request = sealed::request_value(name, Some(&format!("Value for {name}")))?;
+-    if request.state == "done" {
+-        return request
+-            .placeholder
+-            .ok_or_else(|| FnoxError::Seven("seven: request done without a placeholder".into()));
++pub struct Entered {
++    pub placeholder: String,
++    pub value: Option<String>,
++}
++
++impl std::fmt::Debug for Entered {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("Entered")
++            .field("placeholder", &self.placeholder)
++            .field("value", &self.value.as_ref().map(|_| "<redacted>"))
++            .finish()
+     }
+-    let id = request
+-        .id
+-        .ok_or_else(|| FnoxError::Seven("seven: request answered without an id".into()))?;
++}
++
++pub fn ask_value(name: &str, prompt: Option<&str>, reveal: bool) -> Result<Entered> {
++    catch_interrupts();
+     eprintln!("Enter the value for {name} in seven's vault dialog (Ctrl-C cancels).");
+-    match sealed::wait_for(
+-        &id,
+-        Duration::from_secs(1),
+-        Duration::from_secs(300),
+-        &interrupted,
+-    )? {
+-        Wait::Done(done) => done
+-            .placeholder
+-            .ok_or_else(|| FnoxError::Seven("seven: request done without a placeholder".into())),
+-        Wait::Cancelled => {
++    let ask = Ask {
++        name,
++        prompt,
++        reveal,
++        replace: true,
++    };
++    match sealed::ask(&ask, &interrupted)? {
++        Asked::Interrupted => {
+             eprintln!("Cancelled.");
+             std::process::exit(130);
+         }
+-        Wait::Ended(ended) => Err(FnoxError::Seven(format!(
++        Asked::Answered(answer) => entered(name, reveal, answer),
++    }
++}
++
++fn entered(name: &str, reveal: bool, mut answer: Answer) -> Result<Entered> {
++    if answer.state != "done" {
++        return Err(FnoxError::Seven(format!(
+             "seven: the request for {name} ended: {}",
+-            ended.state
+-        ))),
++            answer.state
++        )));
++    }
++    let placeholder = answer
++        .placeholder
++        .take()
++        .ok_or_else(|| FnoxError::Seven("seven: ask done without a placeholder".into()))?;
++    let value = answer.value.take();
++    if reveal && value.is_none() {
++        return Err(FnoxError::Seven(format!(
++            "seven: the vault gave no value for {name}"
++        )));
+     }
++    Ok(Entered { placeholder, value })
+ }
+ 
+ pub struct PreparedExec {
+@@ -365,27 +384,56 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn request_value_returns_the_placeholder_when_done() {
++    fn ask_value_returns_the_placeholder_from_one_ask() {
++        let (_g, mock) = fnox_core::sealed::testing::install();
++        mock.reply(
++            serde_json::json!({ "v": 1, "state": "done", "placeholder": "ph", "record": "inert" }),
++        );
++        let entered = ask_value("TOKEN", Some("CI deploy key"), false).unwrap();
++        assert_eq!(entered.placeholder, "ph");
++        assert!(entered.value.is_none());
++        assert_eq!(
++            mock.requests.lock().unwrap().clone(),
++            vec![
++                serde_json::json!({ "v": 1, "op": "ask", "name": "TOKEN", "prompt": "CI deploy key", "reveal": false, "replace": true })
++            ]
++        );
++        fnox_core::sealed::set_transport(None);
++    }
++
++    #[test]
++    fn ask_value_with_reveal_returns_the_value() {
++        let (_g, mock) = fnox_core::sealed::testing::install();
++        mock.reply(serde_json::json!({ "v": 1, "state": "done", "placeholder": "ph", "record": "inert", "value": "typed-1234" }));
++        let entered = ask_value("TOKEN", None, true).unwrap();
++        assert_eq!(entered.value.as_deref(), Some("typed-1234"));
++        assert_eq!(
++            mock.requests.lock().unwrap()[0]["reveal"],
++            serde_json::json!(true)
++        );
++        fnox_core::sealed::set_transport(None);
++    }
++
++    #[test]
++    fn ask_value_refuses_a_reveal_without_a_value() {
+         let (_g, mock) = fnox_core::sealed::testing::install();
+-        mock.reply(serde_json::json!({ "v": 1, "state": "pending", "id": "rq1" }));
+         mock.reply(
+             serde_json::json!({ "v": 1, "state": "done", "placeholder": "ph", "record": "inert" }),
+         );
+-        assert_eq!(request_value("TOKEN").unwrap(), "ph");
+-        let first = mock.requests.lock().unwrap()[0].clone();
+-        assert_eq!(first["kind"], serde_json::json!("value"));
+-        assert_eq!(first["name"], serde_json::json!("TOKEN"));
+-        assert_eq!(mock.ops(), vec!["request", "status"]);
++        let err = ask_value("TOKEN", None, true).unwrap_err().to_string();
++        assert_eq!(err, "seven: the vault gave no value for TOKEN");
+         fnox_core::sealed::set_transport(None);
+     }
+ 
+     #[test]
+-    fn request_value_reports_a_closed_dialog() {
++    fn ask_value_reports_a_closed_dialog() {
+         let (_g, mock) = fnox_core::sealed::testing::install();
+-        mock.reply(serde_json::json!({ "v": 1, "state": "pending", "id": "rq2" }));
+         mock.reply(serde_json::json!({ "v": 1, "state": "cancelled" }));
+-        let err = request_value("TOKEN").unwrap_err().to_string();
++        let err = ask_value("TOKEN", None, false).unwrap_err().to_string();
+         assert_eq!(err, "seven: the request for TOKEN ended: cancelled");
++        mock.reply(serde_json::json!({ "v": 1, "state": "expired" }));
++        let err = ask_value("TOKEN", None, false).unwrap_err().to_string();
++        assert_eq!(err, "seven: the request for TOKEN ended: expired");
+         fnox_core::sealed::set_transport(None);
+     }
+ }
