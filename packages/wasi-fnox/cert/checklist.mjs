@@ -73,6 +73,18 @@ export default async function (ctx) {
   assert.notEqual(keyName.status, 0);
   assert.match(flat(keyName.stderr), /named after its secret/);
 
+  const NO_ASK = /not running in seven: \/dev\/sealed is missing|ENOTCONN: no vault is connected|\/dev\/sealed refused ask: EINVAL/;
+  for (const args of [['set', 'ASKED', '--ask'], ['set', 'ASKED', '--ask', '--provider', 'plain'], ['set', 'ASKED', '--ask', '--provider', 'team']]) {
+    const asked = await fnox(args, { stdin: 'piped-but-ignored\n' });
+    assert.notEqual(asked.status, 0, args.join(' '));
+    assert.notEqual(asked.status, 134, `${args.join(' ')} trapped`);
+    assert.match(flat(asked.stderr), NO_ASK, `${args.join(' ')} without a vault: ${asked.stderr}`);
+    assert.equal(asked.stdout, '', `${args.join(' ')} printed ${asked.stdout}`);
+  }
+  const askValue = await fnox(['set', 'ASKED', 'throwaway-123', '--ask']);
+  assert.notEqual(askValue.status, 0, 'set --ask with a VALUE');
+  assert.ok(!(await read('home/demo/fnox.toml')).includes('ASKED'), 'set --ask without a vault wrote fnox.toml');
+
   const team = await fnox(['set', 'TEAM_KEY', '--provider', 'team'], { stdin: 'team-throwaway\n' });
   assert.equal(team.status, 0, `age set: ${team.stderr}`);
   const toml = await read('home/demo/fnox.toml');

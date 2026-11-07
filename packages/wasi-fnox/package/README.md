@@ -9,8 +9,10 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
 - **Configuration:** bios points fnox at `/etc/fnox` (`FNOX_CONFIG_DIR`). The default provider there is `seven`, of type `sealed`.
 - **`fnox set NAME`:**
   - with the value on a pipe, it seals the value and stores the placeholder;
-  - on a terminal, it opens the vault's dialog instead of prompting;
+  - on a terminal, it opens the vault's dialog in seven's approvals instead of prompting: one `ask` to `/dev/sealed` with `replace: true`, then one blocking read until you answer. Over a name the vault already has, the dialog takes a new value, which keeps its placeholder. `--description` is shown as the dialog's prompt (up to 200 characters). Ctrl-C exits 130, and the kernel withdraws the dialog. A denied or expired dialog exits 1 and stores nothing;
   - it refuses a value given as an argument.
+- **`fnox set NAME --ask`:** opens the same dialog when stdin isn't a terminal, for example from the agent's bash. It never reads stdin. It prints only the placeholder on stdout, so `PH=$(fnox set NAME --ask)` works, and prints its status on stderr. It can't be combined with a value, `--from-file` or `--generate`.
+- **`fnox set` with an `age` or `plain` provider:** with no value on a pipe (on a terminal, or with `--ask`), it asks the dialog with `reveal: true`. fnox gets the value you type and stores what it normally stores: the age ciphertext, or the plaintext for `plain` (and for a secret with no provider). The vault keeps its own sealed copy, so the value is still scrubbed from what the agent sees. A policy that refuses reveals to the agent (`[reveal] agent = false`) refuses `--ask` from the agent's bash for these providers. Other providers are refused before any dialog opens.
 - **`fnox get`, `export`, `env`, `hook-env`:** print placeholders.
 - **`fnox export`:** prints every secret's value to stdout, as upstream does. A sealed secret's value is its placeholder; a `plain` secret's is the value itself, and so is an `as_file` secret's, since seven can't write it to a file.
 - **`fnox export KEY…`:** exports only the named secrets (since 1.42), as upstream: it resolves what they interpolate without exporting it, includes a named `env = false` secret, and fails on an unknown name.
@@ -26,7 +28,7 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
 - **Templates:** a secret's `default` and a provider's string fields can use `{{ fnox.profile }}` and `{{ fnox.profiles }}` (Tera, since 1.41), as upstream. A sealed secret's `value`, its placeholder, is never rendered.
 - **Not in this build:** leases (including managed identity for `azure-token`), the daemon, the TUI, the MCP server (including `request_secret`), secret-file write paths, and Lua provider plugins (`fnox plugin`).
 
-It needs slicc-kernel 1.83.0 or later (`engines`): `/dev/sealed` arrived in slicc-kernel 1.68.0 (KS-2), and the exec tickets that `fnox exec` redeems in slicc-kernel 1.83.0 (KS-8).
+It needs slicc-kernel 1.175.0 or later (`engines`): `/dev/sealed` arrived in slicc-kernel 1.68.0 (KS-2), the exec tickets that `fnox exec` redeems in slicc-kernel 1.83.0 (KS-8), and the `ask` op that the vault dialog of `fnox set` uses in slicc-kernel 1.175.0. On an older kernel the dialog fails with `seven: /dev/sealed refused ask: EINVAL`, and a piped `fnox set` still works.
 
 Without `/dev/sealed`, every sealed operation fails with `not running in seven: /dev/sealed is missing`.
 

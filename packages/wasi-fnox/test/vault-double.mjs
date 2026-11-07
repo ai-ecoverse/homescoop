@@ -63,6 +63,32 @@ export function vaultDouble () {
         q.state = 'cancelled'
         return { v: 1, state: 'cancelled' }
       }
+      case 'ask': {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(req.name ?? '') || req.name.length > 128) return err('EINVAL', 'bad name')
+        if (req.prompt !== undefined && (typeof req.prompt !== 'string' || req.prompt.length > 200)) return err('EINVAL', 'bad prompt')
+        for (const flag of ['reveal', 'replace']) if (req[flag] !== undefined && typeof req[flag] !== 'boolean') return err('EINVAL', `bad ${flag}`)
+        if ([...requests.values()].some((q) => q.state === 'pending' && q.uid === req.caller.uid)) return err('EAGAIN', 'one request per user')
+        const live = records.get(req.name)?.state !== 'removed' && records.has(req.name)
+        if (live && !req.replace && !req.reveal) return { v: 1, state: 'done', placeholder: records.get(req.name).placeholder, record: records.get(req.name).state }
+        const id = `rq${++n}`
+        const q = { kind: 'ask', mode: live && !req.replace ? 'reveal' : 'enter', state: 'pending', name: req.name, uid: req.caller.uid, reveal: req.reveal === true, replace: req.replace === true }
+        requests.set(id, q)
+        const answer = hook.askAnswer
+        const outcome = await new Promise((res) => {
+          const stop = () => res({ withdrawn: signal.reason ?? 'withdrawn' })
+          if (signal.aborted) return stop()
+          signal.addEventListener('abort', stop, { once: true })
+          if (answer !== undefined) setTimeout(() => { signal.removeEventListener('abort', stop); res(answer) }, hook.askDelayMs ?? 300)
+        })
+        if (outcome.withdrawn) { q.state = 'withdrawn'; q.reason = outcome.withdrawn; return undefined }
+        if (outcome.state !== 'done') { q.state = outcome.state; return { v: 1, state: outcome.state } }
+        let rec = records.get(req.name)
+        if (q.mode === 'enter') {
+          if (rec) { rec.value = outcome.value; rec.state = rec.state === 'removed' ? 'inert' : rec.state; rec.from = 'human' } else { rec = { value: outcome.value, placeholder: ph(req.name), state: 'inert', from: 'human' }; records.set(req.name, rec) }
+        }
+        q.state = 'done'
+        return { v: 1, state: 'done', placeholder: rec.placeholder, record: rec.state, ...(q.reveal ? { value: rec.value } : {}) }
+      }
       case 'materialize': {
         if (!hook.exec) return err('ENOTCONN', 'no exec policy in this double')
         const names = [...(req.names ?? [])]

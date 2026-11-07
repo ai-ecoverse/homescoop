@@ -1,11 +1,11 @@
-// wasi-fnox against slicc-kernel's /dev/sealed (KS-2) and exec tickets
-// (KS-8, slicc-kernel >= 1.83.0) on the headless Node entry, with
+// wasi-fnox against slicc-kernel's /dev/sealed (KS-2), exec tickets
+// (KS-8) and the ask op (slicc-kernel >= 1.175.0) on the headless Node entry, with
 // test/vault-double.mjs as the vault and wasm-bash and wasm-coreutils from npm
 // as the programs fnox runs.
 //
 //   node packages/wasi-fnox/test/sealed.mjs --tarball .homescoop-out/package.tgz
 //
-// Part 1: seal, placeholder, request/status/cancel. Part 2 (users
+// Part 1: seal, placeholder, ask (one blocking read, --ask, age and plain). Part 2 (users
 // 'enforce'): the values exec and exec --shell-grants hand out, what the
 // child exposes, tickets that fail closed, and the interpreter chain.
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
@@ -44,6 +44,7 @@ const toml = async () => dec.decode(await kernel.readFile('/home/demo/fnox.toml'
 const flat = (s) => s.replace(/[\s│|]+/g, ' ')
 const ok = (m) => console.log('ok  ', m)
 const VALUE = 'throwaway-sealed-value-42'
+const AGE_RECIPIENT = 'age106n8yr50p0cgudkw03ad2e92nk4fas5m8utmw0t4lm0dlc6pqg4scqmaup'
 
 // 1. seal from a pipe
 let r = await run(['set', 'API_TOKEN'], { stdin: VALUE + '\n' })
@@ -87,7 +88,7 @@ r = await run(['set', 'HUMAN'], { stdin: 'y\n', user: undefined })
 assert.equal(r.status, 0, 'root may re-seal a human value')
 ok('re-seal by uid 0 over a human-entered value is allowed (the double enforces EEXIST for others)')
 
-// 6. set on a terminal: request → status polling → done
+// 6. set on a terminal: one ask, one blocking read, no request or status
 async function terminal (args, { cancelAfter } = {}) {
   let out = ''
   const term = await kernel.openTerminal(['fnox', ...args], { cwd: '/home/demo', env, onData: (d) => { out += Buffer.from(d).toString() } })
@@ -95,48 +96,104 @@ async function terminal (args, { cancelAfter } = {}) {
   const status = await Promise.race([term.exited, new Promise((res) => setTimeout(() => res('hung'), 20000))])
   return { status, out }
 }
-vault.autoAnswer = 'typed-in-the-vault-dialog'
+const asks = () => vault.log.filter((q) => q.op === 'ask')
+const polled = () => vault.log.filter((q) => q.op === 'request' || q.op === 'status').length
+vault.askAnswer = { state: 'done', value: 'typed-in-the-vault-dialog' }
 let tr = await terminal(['set', 'DIALOG_TOKEN'])
 assert.equal(tr.status, 0, tr.out)
-const req = vault.log.find((q) => q.op === 'request')
-assert.equal(req.kind, 'value'); assert.equal(req.name, 'DIALOG_TOKEN')
-const polls = vault.log.filter((q) => q.op === 'status').length
-assert.ok(polls >= 2, `polls ${polls}`)
-assert.ok((await toml()).includes(vault.records.get('DIALOG_TOKEN').placeholder))
+assert.equal(asks().length, 1)
+const { caller: askCaller, requester: askRequester, ...askSent } = asks()[0]
+assert.deepEqual(askSent, { v: 1, op: 'ask', name: 'DIALOG_TOKEN', reveal: false, replace: true })
+assert.equal(typeof askCaller.pid, 'number')
+assert.deepEqual({ ...askRequester, tty: undefined }, { exe: '/usr/bin/fnox', argv: ['fnox', 'set', 'DIALOG_TOKEN'], cwd: '/home/demo', tty: undefined, stdin: 'tty' })
+assert.match(askRequester.tty, /^\/dev\//)
+assert.equal(polled(), 0, 'no request or status')
+const dialogPh = vault.records.get('DIALOG_TOKEN').placeholder
+assert.ok((await toml()).includes(`value = "${dialogPh}"`))
 assert.ok(!tr.out.includes('typed-in-the-vault-dialog'))
 assert.match(tr.out, /vault dialog/)
-ok(`set on a terminal: request {kind: value}, ${polls} status polls, placeholder stored, no prompt and no value on the terminal`)
+assert.match(tr.out, /Set secret DIALOG_TOKEN/)
+ok('set on a terminal: one ask {name, reveal: false, replace: true}, the kernel\'s requester {exe /usr/bin/fnox, argv, cwd, tty, stdin: tty}, no request/status polling, placeholder stored, no prompt and no value on the terminal')
 
-// 7. ^C during a pending request → cancel, exit 130
-vault.autoAnswer = undefined
+// 6b. a second set on a terminal replaces the value under the same placeholder
+vault.askAnswer = { state: 'done', value: 'rotated-in-the-dialog' }
+tr = await terminal(['set', 'DIALOG_TOKEN'])
+assert.equal(tr.status, 0, tr.out)
+assert.equal(vault.records.get('DIALOG_TOKEN').placeholder, dialogPh)
+assert.equal(vault.records.get('DIALOG_TOKEN').value, 'rotated-in-the-dialog')
+assert.equal([...vault.requests.values()].at(-1).mode, 'enter')
+ok('set over an existing record: replace keeps the enter dialog, the value rotates under its placeholder')
+
+// 6c. --ask from a pipe: stdin is never read, stdout is the placeholder alone
+vault.askAnswer = { state: 'done', value: 'typed-for-the-agent' }
+r = await run(['set', 'AGENT_TOKEN', '--ask', '-d', 'deploy key for CI'], { stdin: 'piped-but-ignored\n' })
+assert.equal(r.status, 0, r.stderr)
+const agentPh = vault.records.get('AGENT_TOKEN').placeholder
+assert.equal(r.stdout, `${agentPh}\n`)
+assert.match(r.stderr, /vault dialog/); assert.match(r.stderr, /Set secret AGENT_TOKEN/)
+assert.equal(asks().at(-1).prompt, 'deploy key for CI'); assert.equal(asks().at(-1).reveal, false)
+assert.equal(asks().at(-1).requester.stdin, 'pipe'); assert.equal(asks().at(-1).requester.tty, null)
+assert.ok(!vault.log.some((q) => q.op === 'seal' && q.name === 'AGENT_TOKEN'), 'the piped value was not sealed')
+assert.ok(![r.stdout, r.stderr, await toml()].some((x) => x.includes('typed-for-the-agent') || x.includes('piped-but-ignored')))
+r = await run(['set', 'AGENT_TOKEN', 'v', '--ask'])
+assert.notEqual(r.status, 0); assert.ok(asks().length === 3, '--ask with a VALUE never asks')
+ok('set --ask with stdin on a pipe: ask {prompt: the description}, stdin ignored, stdout is the placeholder alone, status on stderr; --ask refuses a VALUE')
+
+// 7. ^C while the dialog is open: exit 130, the kernel withdraws the ask
+vault.askAnswer = undefined
 tr = await terminal(['set', 'CANCELLED'], { cancelAfter: 2500 })
-const cancel = vault.log.find((q) => q.op === 'cancel')
-assert.ok(cancel, 'cancel sent'); assert.equal(tr.status, 130, tr.out)
-assert.equal(vault.requests.get(cancel.id).state, 'cancelled')
+assert.equal(tr.status, 130, tr.out); assert.match(tr.out, /Cancelled/)
+const withdrawn = [...vault.requests.values()].find((q) => q.name === 'CANCELLED')
+assert.equal(withdrawn.state, 'withdrawn'); assert.equal(withdrawn.reason, 'withdrawn')
+assert.ok(!vault.log.some((q) => q.op === 'cancel' && q.name === 'CANCELLED'))
 assert.ok(!(await toml()).includes('CANCELLED'))
-ok('^C while the dialog is pending sends cancel {id} and exits 130; nothing stored')
+ok('^C during the blocking read exits 130; the kernel aborts the hook with withdrawn; nothing stored')
 
-// 7b. ^C while a status read waits for a slow machine answer: the read is
-// interrupted, the reply still arrives, then fnox cancels
-vault.slowStatusMs = 4000
-const cancelsBefore = vault.log.filter((q) => q.op === 'cancel').length
-const started = Date.now()
-tr = await terminal(['set', 'SLOW'], { cancelAfter: 1500 })
-vault.slowStatusMs = 0
-const slowCancel = vault.log.filter((q) => q.op === 'cancel').slice(cancelsBefore)
-assert.equal(tr.status, 130, tr.out); assert.equal(slowCancel.length, 1)
-assert.ok(Date.now() - started >= 3500, 'fnox waited for the slow reply before cancelling')
-ok(`^C during a ${4000 / 1000} s machine wait: the reply is read, then cancel {id}, exit 130`)
+// 7b. the user denies, or the dialog expires
+for (const state of ['cancelled', 'expired']) {
+  vault.askAnswer = { state }
+  tr = await terminal(['set', 'DENIED'])
+  assert.equal(tr.status, 1, tr.out); assert.match(flat(tr.out), new RegExp(`the request for DENIED ended: ${state}`))
+}
+assert.ok(!(await toml()).includes('DENIED'))
+ok('a denied or expired dialog exits 1 with the state; nothing stored')
 
 // 8. empty stdin is refused; a second pending request is the vault's EAGAIN
 r = await kernel.run(['fnox', 'set', 'OTHER'], { cwd: '/home/demo', env })
-assert.notEqual(r.status, 0); assert.match(flat(r.stderr), /no value on stdin/)
+assert.notEqual(r.status, 0); assert.match(flat(r.stderr), /no value on stdin; pipe the value, or use `fnox set NAME --ask`/)
 assert.ok(!vault.log.some((q) => q.op === 'seal' && q.name === 'OTHER'))
 vault.requests.set('rqX', { state: 'pending', name: 'X', uid: 0, polls: 0 })
 tr = await terminal(['set', 'BUSY'])
 vault.requests.get('rqX').state = 'cancelled'
-assert.notEqual(tr.status, 0); assert.match(flat(tr.out), /request: EAGAIN: one request per user/)
+assert.notEqual(tr.status, 0); assert.match(flat(tr.out), /ask: EAGAIN: one request per user/)
 ok('empty stdin is refused before any seal; a second pending request reports the vault\'s EAGAIN')
+
+// 8b. age and plain: ask with reveal, store what the provider stores
+await kernel.writeFile('/home/demo/fnox.toml', `[providers.team]\ntype = "age"\nrecipients = ["${AGE_RECIPIENT}"]\n\n[providers.local]\ntype = "plain"\n\n[providers.op]\ntype = "1password"\n\n[secrets]\n`)
+vault.askAnswer = { state: 'done', value: 'plain-typed-value-9' }
+r = await run(['set', 'PLAIN_TOKEN', '--provider', 'local', '--ask'])
+assert.equal(r.status, 0, r.stderr)
+assert.equal(asks().at(-1).reveal, true); assert.equal(asks().at(-1).replace, true)
+assert.match(await toml(), /PLAIN_TOKEN ?= \{[^}]*provider = "local"[^}]*value = "plain-typed-value-9"/)
+assert.equal(r.stdout, `${vault.records.get('PLAIN_TOKEN').placeholder}\n`)
+assert.ok(!r.stderr.includes('plain-typed-value-9'))
+vault.askAnswer = { state: 'done', value: 'age-typed-value-77' }
+tr = await terminal(['set', 'AGE_TOKEN', '--provider', 'team'])
+assert.equal(tr.status, 0, tr.out)
+assert.equal(asks().at(-1).reveal, true)
+t = await toml()
+assert.match(t, /AGE_TOKEN ?= \{[^}]*provider = "team"/); assert.ok(!t.includes('age-typed-value-77') && !tr.out.includes('age-typed-value-77'))
+assert.equal(vault.records.get('AGE_TOKEN').value, 'age-typed-value-77', 'the vault keeps its sealed copy')
+const before8 = asks().length
+r = await run(['set', 'OP_TOKEN', '--provider', 'op', '--ask'])
+assert.notEqual(r.status, 0); assert.match(flat(r.stderr), /fills in sealed, age and plain secrets, not 1password/)
+vault.askAnswer = { state: 'done' }
+r = await run(['set', 'NOVALUE', '--provider', 'local', '--ask'])
+assert.notEqual(r.status, 0); assert.match(flat(r.stderr), /the vault gave no value for NOVALUE/)
+assert.equal(asks().length, before8 + 1, 'no dialog for a provider the dialog cannot fill in')
+assert.ok(!(await toml()).includes('NOVALUE'))
+vault.askAnswer = undefined
+ok('age and plain: ask {reveal: true}; plain stores the typed value, age its ciphertext, the vault keeps a sealed copy; other providers are refused before a dialog; a reveal without a value stores nothing')
 
 // 9. exec with a sealed secret: materialize; without KS-8 the vault refuses, fnox fails closed
 await kernel.writeFile('/home/demo/fnox.toml', (await toml()) + '')

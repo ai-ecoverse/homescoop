@@ -1,8 +1,8 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
 # Upstream is jdx/fnox v1.45.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
-# in-kernel integration needs. Tested on slicc-kernel 1.83.0 and later
-# (/dev/sealed and exec tickets).
+# in-kernel integration needs. Needs slicc-kernel 1.175.0 and later
+# (/dev/sealed, exec tickets and the ask op).
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
@@ -75,7 +75,8 @@ about:
     (b) seven (secrets-tokens-design.md; /dev/sealed is §3.7):
       0006 the sealed provider and fnox_core::sealed, the device client
       0007 set: seal a piped value; on a terminal ask the vault dialog
-           (request/status, cancel on ^C); refuse values in argv
+           (request/status, cancel on ^C; 0019 moves it to ask);
+           refuse values in argv
       0008 exec: materialize, then spawn the resolved path with
            SLICC_SEALED_TICKET; as_file refused; missing command → 127
       0009 proxy rules --json; proxy run passes placeholders on WASI
@@ -91,6 +92,13 @@ about:
       0016 exec leaves an as_file secret unset with a warning instead of
            refusing the command (homescoop#945); activate skips a fnox
            on PATH the kernel won't execute (homescoop#1129)
+      0019 set asks the vault with one `ask` and a blocking read
+           (replace: true, so a second set rotates; ^C exits 130 and
+           the kernel withdraws the dialog) instead of 0007's
+           request/status polling; --ask opens the dialog when stdin
+           isn't a terminal and prints only the placeholder; age and
+           plain secrets ask with reveal: true and store their usual
+           ciphertext or plaintext
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
     v1.45.0 commit time (source.epoch, 2026-10-29T19:19:03Z), so the
@@ -144,3 +152,9 @@ about:
     0010 and 0012 keep the same added and removed lines; 0007 only
     renames &self.key to self.key(); 0009 gains the WASI stub. build.sh's
     usage-test notice moves to 7.1.3 (the same LICENSE, f68207e9...).
+    1.45.0-2 adds 0019: `fnox set` on the `/dev/sealed` `ask` op
+    (secret ask, SPEC.md with its replace amendment), `--ask`, and age
+    and plain values from the vault dialog; `set --file` refuses
+    `--ask`. It needs slicc-kernel 1.175.0 (`ask`, engines) and a
+    slicc-vault with `ask`; the cert and test/sealed.mjs run on
+    slicc-kernel 1.175.0.
