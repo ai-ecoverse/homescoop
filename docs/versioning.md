@@ -48,6 +48,16 @@ Never publish `X.Y-N` — `npm pack` may accept it, but `npm publish` rejects
 it as an invalid version (caught on which 2.23-1). Keep `homescoop.upstream`
 as the true upstream string.
 
+An IANA tz release (`2026f`: a year and a letter, tzdata's recipe) becomes
+`<year>.<n>.0-N`, where `n` is the letter's place in the alphabet, the
+numbering PyPI's tzdata uses: `2026f` is `2026.6.0-1`, and the next year
+starts again at `.1.0`. After `z`, IANA would go on with `za`, `zb`, …; each
+leading `z` adds 26 (`2026za` is `2026.27.0`), so the order holds.
+`homescoop.upstream` stays `2026f`, and the texts name the release as IANA
+does: sync rewrites `2026e` to `2026f` in them, and the drift check calls
+another release of the same year or later stale (`npmify` in
+`scripts/upstream-version-text.mjs`).
+
 `host-run.sh` and the PR build validate the **packed** tarball with
 `sync-package-version.mjs --assert-tarball` so non-semver versions fail in
 CI before certification, not at publish.

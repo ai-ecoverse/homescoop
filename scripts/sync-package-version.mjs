@@ -6,6 +6,7 @@
  *
  * New upstreams always get X.Y.Z-1 (never plain X.Y.Z — see docs/versioning.md).
  * Two-part upstreams (2.23) become X.Y.0-1 — npm rejects X.Y-N (e.g. 2.23-1).
+ * An IANA tz release (2026f) becomes <year>.<letter index>.0-1 (2026.6.0-1).
  *
  *   node scripts/sync-package-version.mjs zlib
  *   node scripts/sync-package-version.mjs zlib --write
@@ -24,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
-import { dashedRevision, isDashedBase, isSpelling, loadAllow, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
+import { dashedRevision, isDashedBase, isSpelling, loadAllow, npmify, rewriteUpstream, summaryLine, versionBase } from './upstream-version-text.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -65,13 +66,6 @@ function refuseUnpublishable(label, version) {
     );
     process.exit(2);
   }
-}
-
-/** Normalize short upstream (668, 2.17) to npm-friendly three-part base. */
-function npmify(v) {
-  if (/^\d+$/.test(v)) return `${v}.0.0`;
-  if (/^\d+\.\d+$/.test(v)) return `${v}.0`;
-  return v;
 }
 
 /**
