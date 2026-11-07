@@ -13,6 +13,9 @@ Perl 5.42 for slicc WASIX (`perl`, `prove`, `pod2man`, `cpan`, `perldoc`).
   exists (-7 to -12 provided a no-op one; -13 links the real DynaLoader). In -6,
   `perl -Mre=debug` died ("Undefined subroutine &re::install") and `getcwd`
   inside a mount returned an empty string.
+- `TZ`: POSIX rules (`EST5EDT,M3.2.0,M11.1.0`) and zone names (`TZ=Europe/Berlin`) when
+  `/usr/share/zoneinfo` has the zone files, which seven links to `@ai-ecoverse/tzdata`;
+  `localtime` and `POSIX::strftime` follow it, with `TZ` unset perl reads `/etc/localtime`
 - File modes on slicc-kernel ≥ 1.35.1: `umask`, `chmod`, `mkdir` modes and
   File::Temp's 600/700 hold, and `stat` reports them (wasix-sysroot
   slicc_fs, since -17); older kernels leave files 644 and directories 755
@@ -186,3 +189,12 @@ scripts themselves (slicc-kernel#762), so `pod2man --help` and
   process credentials (slicc-kernel ≥ 1.44.0, no fallback). Root is uid 0 with
   home `/root`; a `kernel.users.add` user gets its own ids.
 
+## 5.42.0-23: time zones (README only)
+
+`localtime` and `POSIX::strftime('%Z %z', …)` are musl's,
+which reads POSIX `TZ` rules and looks zone names up under
+`/usr/share/zoneinfo`. slicc roots had no zone files, so `TZ=Europe/Berlin`
+(which slicc-kernel ≥ 1.174.2 sets) came out UTC. seven links the
+directory to [`@ai-ecoverse/tzdata`](https://www.npmjs.com/package/@ai-ecoverse/tzdata),
+and the same perl prints CET/CEST (tzdata's cert checks it on 5.42.0-22). A
+packaging-only release: the files are 5.42.0-22's but this README.

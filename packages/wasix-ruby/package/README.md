@@ -35,7 +35,17 @@ Since 3.4.11-8, single-fd waits (`IO#wait_readable`, blocking `TCPSocket.new`,
 rejects an exception set with ENOSYS, so `IO.select` with a third array still
 fails. `io/console` is built, so `irb` and reline work.
 
-`TZ` is ignored: wasix-libc's localtime is UTC only (homescoop#193).
+`TZ` works: POSIX rules (`EST5EDT,M3.2.0,M11.1.0`, from wasix-sysroot -18, homescoop#193) and zone names (`TZ=Europe/Berlin`) when `/usr/share/zoneinfo` has the zone files, which seven links to `@ai-ecoverse/tzdata`. `Time.now`, `Time#localtime` and `strftime('%Z')` follow it; with `TZ` unset ruby reads `/etc/localtime`, and with no zone files a zone name is UTC.
+
+## 3.4.11-26: time zones (README only)
+
+This README said `TZ` was ignored. It isn't: ruby is built on wasix-sysroot
+-40, whose musl reads POSIX `TZ` rules and looks zone names up under
+`/usr/share/zoneinfo`, which slicc roots didn't have. seven links it to
+[`@ai-ecoverse/tzdata`](https://www.npmjs.com/package/@ai-ecoverse/tzdata), so
+`TZ=Europe/Berlin ruby -e 'puts Time.now.strftime("%Z %z")'` prints
+`CET +0100` in winter and `CEST +0200` in summer (tzdata's cert checks it on
+3.4.11-25). A packaging-only release: the files are 3.4.11-25's but this README.
 
 ## 3.4.11-25: all of Ruby's licence files, and a sized heap
 

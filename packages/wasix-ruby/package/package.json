@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-ruby",
-  "version": "3.4.11-25",
+  "version": "3.4.11-26",
   "description": "The Ruby 3.4 programming language, with gem, Bundler, rake, irb, the rdbg debugger and Ruby's other tools.",
   "engines": {
     "slicc-kernel": ">=1.120.0"
