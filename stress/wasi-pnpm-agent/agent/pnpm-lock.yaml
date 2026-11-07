@@ -12,30 +12,26 @@ importers:
   .:
     dependencies:
       '@ai-ecoverse/slicc-agent':
-        specifier: 7.13.1
-        version: 7.13.1(@ai-ecoverse/slicc-kernel@1.172.2)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
+        specifier: 7.20.1
+        version: 7.20.1(@ai-ecoverse/slicc-kernel@1.172.2)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
       '@ai-ecoverse/slicc-kernel':
         specifier: 1.172.2
         version: 1.172.2
 
 packages:
 
-  '@ai-ecoverse/jerk-oauth@1.4.0':
-    resolution: {integrity: sha512-fwDK5WV+6TW6u9Y6KE0PwtSYiAxvfGHLwqQzEKsSyRUVKcYMYuGNQ9d9mvX+B15Wry4sUx96u/56VTQhQVXJYg==}
+  '@ai-ecoverse/jerk-oauth@1.4.2':
+    resolution: {integrity: sha512-XenbL8KPm7uAABy6eNl8COekMwHyWNaT7kGnaDN9VKjWCRvx2qoYgSSWbYy2fqRVqiYFZRbANDlXAEw6DGOuNA==}
 
-  '@ai-ecoverse/slicc-agent@7.13.1':
-    resolution: {integrity: sha512-lGuO+YorI9EyZcj3OYGCytVBmSBee//AIeem4tj4Xgq5bERNNJ9wxGM6wBjGy3A4O6bLqPIP04zpquTEfhXNvg==}
+  '@ai-ecoverse/slicc-agent@7.20.1':
+    resolution: {integrity: sha512-/+yflr80+gWp8YCYKOvpATCdJHLeKM4zUHt1RfUXeiFPipWKE3eHXtfV/r13vhsfm/k9EqgmkC5FQev1/+umwQ==}
     engines: {node: '>=24'}
     peerDependencies:
-      '@ai-ecoverse/slicc-kernel': '>=1.171.0 <2'
-      '@ai-ecoverse/slicc-spectrum': ^1.103.0
+      '@ai-ecoverse/slicc-kernel': '>=1.172.2 <2'
+      '@ai-ecoverse/slicc-spectrum': ^1.112.0 || ^2.0.0
     peerDependenciesMeta:
       '@ai-ecoverse/slicc-spectrum':
         optional: true
-
-  '@ai-ecoverse/slicc-browsers@1.18.21':
-    resolution: {integrity: sha512-hinx7Lvb0IrClsxw1BdQTwLPjUcGkYjISmHOXHE3e4oiZZL6GpxJsvHTGaLk1bM/cX2VIz3C4BAch7HGqiVrWg==}
-    engines: {node: '>=24'}
 
   '@ai-ecoverse/slicc-kernel@1.172.2':
     resolution: {integrity: sha512-TGvjF72UrCx+9904yoAjHqBBckeYJeyrSDn2DHupGE7UhomDAP+dNhIREFHT9BtcfzWMBWti7aTppN1HayMVig==}
@@ -45,8 +41,8 @@ packages:
     resolution: {integrity: sha512-HZ5qVnVez4B2UTP+UrHbYg6GnHJjpT09byt/HHJ8Y0IRk13q5Oj8rFFCme+R0T5h42ZlmwaNVI+n77VtSaCtuA==}
     engines: {node: '>=24'}
 
-  '@ai-ecoverse/slicc-vault@1.21.2':
-    resolution: {integrity: sha512-Yv38AhlA8nffYyc3+nNosK6p+vdvvO0qQLh1dpwrr8CsBgxonKY+wc1B49IogkCuAA8oxEQ4JldEsgFiUhb31A==}
+  '@ai-ecoverse/slicc-vault@1.23.0':
+    resolution: {integrity: sha512-Dbq7qHCywPtIC2VeKeq2MUzHQu2xWY6m1bngUS6KtKLX/SgDndwa4rGIFnmRp62QRDMbG3li9vKIBepzy1fMbg==}
     engines: {node: '>=24'}
 
   '@anthropic-ai/sdk@0.129.0':
@@ -331,13 +327,12 @@ packages:
 
 snapshots:
 
-  '@ai-ecoverse/jerk-oauth@1.4.0': {}
+  '@ai-ecoverse/jerk-oauth@1.4.2': {}
 
-  '@ai-ecoverse/slicc-agent@7.13.1(@ai-ecoverse/slicc-kernel@1.172.2)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)':
+  '@ai-ecoverse/slicc-agent@7.20.1(@ai-ecoverse/slicc-kernel@1.172.2)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)':
     dependencies:
-      '@ai-ecoverse/slicc-browsers': 1.18.21
       '@ai-ecoverse/slicc-kernel': 1.172.2
-      '@ai-ecoverse/slicc-vault': 1.21.2
+      '@ai-ecoverse/slicc-vault': 1.23.0
       '@aws-sdk/middleware-websocket': 3.972.54
       '@earendil-works/chord': 1.5.0
       '@earendil-works/pi-ai': 1.5.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
@@ -359,15 +354,13 @@ snapshots:
       - ws
       - zod
 
-  '@ai-ecoverse/slicc-browsers@1.18.21': {}
-
   '@ai-ecoverse/slicc-kernel@1.172.2': {}
 
   '@ai-ecoverse/slicc-scrub@1.1.0': {}
 
-  '@ai-ecoverse/slicc-vault@1.21.2':
+  '@ai-ecoverse/slicc-vault@1.23.0':
     dependencies:
-      '@ai-ecoverse/jerk-oauth': 1.4.0
+      '@ai-ecoverse/jerk-oauth': 1.4.2
       '@ai-ecoverse/slicc-scrub': 1.1.0
 
   '@anthropic-ai/sdk@0.129.0':
