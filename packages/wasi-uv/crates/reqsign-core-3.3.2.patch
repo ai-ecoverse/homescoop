@@ -25,18 +25,18 @@ std on WASI.
      }
 --- a/src/futures_util.rs
 +++ b/src/futures_util.rs
-@@ -16,27 +16,27 @@
- // under the License.
+@@ -19,27 +19,27 @@
  
- /// BoxedFuture is the type alias of [`futures::future::BoxFuture`].
+ /// An owned dynamically typed [`Future`] for use in cases where you can't statically type your
+ /// result or need to add some indirection.
 -#[cfg(not(target_arch = "wasm32"))]
 +#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
- pub type BoxedFuture<'a, T> = futures::future::BoxFuture<'a, T>;
+ pub type BoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
  
- /// BoxedFuture is the type alias of [`futures::future::LocalBoxFuture`].
+ /// `BoxFuture`, but without the `Send` requirement.
 -#[cfg(target_arch = "wasm32")]
 +#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
- pub type BoxedFuture<'a, T> = futures::future::LocalBoxFuture<'a, T>;
+ pub type BoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
  
  /// MaybeSend is a marker to determine whether a type is `Send` or not.
  ///

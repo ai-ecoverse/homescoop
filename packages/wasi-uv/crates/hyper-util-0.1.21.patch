@@ -5,13 +5,13 @@ a non-WASI dependency; keepalive and bind options do not apply on WASI.
 
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -191,11 +191,14 @@
+@@ -205,11 +205,14 @@
  [dependencies.pin-project-lite]
  version = "0.2.4"
  
 -[dependencies.socket2]
 +[target.'cfg(not(target_os = "wasi"))'.dependencies.socket2]
- version = ">=0.5.9, <0.7"
+ version = "0.6"
  features = ["all"]
  optional = true
  
@@ -19,11 +19,11 @@ a non-WASI dependency; keepalive and bind options do not apply on WASI.
 +version = "0.1"
 +
  [dependencies.tokio]
- version = "1"
+ version = "1.13"
  optional = true
 --- a/src/client/legacy/connect/http.rs
 +++ b/src/client/legacy/connect/http.rs
-@@ -12,8 +12,11 @@
+@@ -11,8 +11,11 @@
  use futures_util::future::Either;
  use http::uri::{Scheme, Uri};
  use pin_project_lite::pin_project;
@@ -36,7 +36,7 @@ a non-WASI dependency; keepalive and bind options do not apply on WASI.
  use tokio::time::Sleep;
  use tracing::{debug, trace, warn};
  
-@@ -99,6 +102,7 @@
+@@ -100,6 +103,7 @@
      retries: Option<u32>,
  }
  
@@ -44,7 +44,7 @@ a non-WASI dependency; keepalive and bind options do not apply on WASI.
  impl TcpKeepaliveConfig {
      /// Converts into a `socket2::TcpKeealive` if there is any keep alive configuration.
      fn into_tcpkeepalive(self) -> Option<TcpKeepalive> {
-@@ -791,6 +795,7 @@
+@@ -810,6 +814,7 @@
      }
  }
  
@@ -52,7 +52,7 @@ a non-WASI dependency; keepalive and bind options do not apply on WASI.
  fn bind_local_address(
      socket: &socket2::Socket,
      dst_addr: &SocketAddr,
-@@ -819,6 +824,34 @@
+@@ -838,6 +843,34 @@
      Ok(())
  }
  

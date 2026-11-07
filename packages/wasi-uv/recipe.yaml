@@ -59,6 +59,9 @@ about:
     0.13.5-1: cargo-util 0.2.31 (crates/ renamed, the patch applies
     unchanged), 0001 refreshed for it and for version-ranges 0.2.3; uv's
     export fix is back (#1920, astral-sh/uv#22751).
+    0.13.6-1: hyper-util 0.1.21 and reqsign-core 3.3.2 /
+    reqsign-google 3.2.0 / reqsign-http-send-reqwest 4.0.7 (crates/
+    renamed and rebased; 0001 refreshed for the new paths and lock).
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means
