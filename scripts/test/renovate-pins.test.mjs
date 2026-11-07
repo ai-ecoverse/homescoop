@@ -78,9 +78,13 @@ const LISTINGS = {
     hrefs: ['freetype-2.13.3.tar.gz', 'freetype-2.13.3.tar.gz.sig', 'freetype-2.15.0.tar.gz', 'freetype-2.15.0.tar.xz', 'freetype-doc-2.15.0.tar.gz', 'ft2demos-2.15.0.tar.gz', 'freetype-old/'],
     want: ['2.13.3', '2.15.0'],
   },
+  tzdata: {
+    hrefs: ['?C=N;O=D', '/time-zones/', 'tz32code2006b.tar.gz', 'tzcode2026f.tar.gz', 'tzdata1996l.tar.gz', 'tzdata2026e.tar.gz', 'tzdata2026e.tar.gz.asc', 'tzdata2026f.tar.gz', 'tzdb-2026f.tar.lz', 'tzdata-latest.tar.gz'],
+    want: ['1996l', '2026e', '2026f'],
+  },
 };
 
-test('binutils, curl and freetype: their extractVersion turns the release directory into versions', () => {
+test('binutils, curl, freetype and tzdata: their extractVersion turns the release directory into versions', () => {
   const byDir = Object.fromEntries(pins().map((p) => [p.dir, p.found[0]]));
   for (const [dir, { hrefs, want }] of Object.entries(LISTINGS)) {
     const g = byDir[dir];

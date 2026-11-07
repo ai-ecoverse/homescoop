@@ -144,6 +144,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-tar`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tar) | [recipe](packages/tar) | GNU tar, which creates and extracts archives, with -z, -j and -J compression. |
 | [`@ai-ecoverse/wasm-tls-engine`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tls-engine) | [recipe](packages/tls-engine) | Secure (TLS) network connections for slicc. |
 | [`@ai-ecoverse/wasm-tree`](https://www.npmjs.com/package/@ai-ecoverse/wasm-tree) | [recipe](packages/tree) | tree: list the contents of directories as a tree. |
+| [`@ai-ecoverse/tzdata`](https://www.npmjs.com/package/@ai-ecoverse/tzdata) | [recipe](packages/tzdata) | The IANA time zone database 2026f as compiled zone files, so TZ=Europe/Berlin works in python, perl and ruby. |
 | [`@ai-ecoverse/wasm-util-linux`](https://www.npmjs.com/package/@ai-ecoverse/wasm-util-linux) | [recipe](packages/util-linux) | util-linux text tools (rev, column, hexdump, colrm, look, getopt) and flock. |
 | [`@ai-ecoverse/wasi-bat`](https://www.npmjs.com/package/@ai-ecoverse/wasi-bat) | [recipe](packages/wasi-bat) | bat, a cat clone with syntax highlighting and line numbers, for SLICC. |
 | [`@ai-ecoverse/wasi-biome`](https://www.npmjs.com/package/@ai-ecoverse/wasi-biome) | [recipe](packages/wasi-biome) | Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC. |
