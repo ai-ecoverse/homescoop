@@ -38,6 +38,6 @@ node packages/libjpeg-turbo/cert/build-stamp.mjs --tarball .homescoop-out/packag
 
 ### NEGATIVE (#1977)
 
-The same cert run against the published `3.2.0-2` tarball fails: that release
-embeds `(build 20260630)` from 3.2.0's newest mtime, while the 3.2.1 source's
-newest mtime expects `20261026`.
+Before 3.2.1-1, the published `3.2.0-2` release embedded `(build 20260630)`
+from that release's newest mtime; since 3.2.1-1 the stamp comes from the
+tarball and expects `20261026`, so the same cert run against `3.2.0-2` fails.
