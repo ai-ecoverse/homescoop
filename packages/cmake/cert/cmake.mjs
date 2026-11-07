@@ -1,10 +1,5 @@
-// CMake in slicc-kernel as a non-root user under users enforce: -E tools,
-// -P scripts with execute_process through the kernel's spawn, and a
-// Unix Makefiles configure, generate and build driven by wasm-gmake, whose
-// recipes call back into cmake -E and the shell. The modules come from the
-// manifest's CMAKE_ROOT (the binary runs as /usr/bin/cmake), and the wasm
-// carries today's shims/slicc: the credential library (homescoop#459) and
-// the inherited-ignore seed (#973).
+import { recipeVersion, reportsVersion, seriesOf } from './lib/version.mjs';
+
 const PKG = '/node_modules/@ai-ecoverse/wasm-cmake';
 const CMAKELISTS = [
   'cmake_minimum_required(VERSION 3.20)',
@@ -21,6 +16,8 @@ const CMAKELISTS = [
 
 export default async function cmake(ctx) {
   const { assert } = ctx;
+  const want = recipeVersion();
+  const series = seriesOf(want);
   await ctx.addUser({ name: 'builder' });
   const cwd = '/home/builder/proj';
   const run = (argv, o = {}) => ctx.run(argv, { cwd, user: 'builder', ...o });
@@ -37,13 +34,13 @@ export default async function cmake(ctx) {
 
   const v = await run(['cmake', '--version']);
   assert.equal(v.status, 0, v.stderr);
-  assert.match(v.stdout, /^cmake version 4\.4\.3\n/);
+  reportsVersion(assert, v.stdout, want);
   const e = await run(['cmake', '-E', 'echo', 'hi']);
   assert.equal(e.stdout, 'hi\n', e.stderr);
 
   const p = await run(['cmake', '-P', 's.cmake']);
   assert.equal(p.status, 0, `cmake -P: ${p.stdout}${p.stderr}`);
-  assert.match(p.stdout, new RegExp(`-- root=${PKG}/share/cmake-4\\.4\\n`), 'CMAKE_ROOT from the manifest');
+  assert.match(p.stdout, new RegExp(`-- root=${PKG}/share/cmake-${series.replaceAll('.', '\\.')}\\n`), 'CMAKE_ROOT from the manifest');
   assert.equal(await ctx.read(`${cwd}/p.out`), 'spawned 42 0 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', 'execute_process runs bash through the kernel');
 
   const cfg = await run(['cmake', '-S', '.', '-B', 'build', '-G', 'Unix Makefiles', '-DMSG=world']);
@@ -61,8 +58,8 @@ export default async function cmake(ctx) {
 
   const wasm = await ctx.readBytes(`${PKG}/bin/cmake.wasm`);
   const names = new Set(WebAssembly.Module.imports(new WebAssembly.Module(wasm)).map((i) => i.name));
-  for (const want of ['slicc_cred_js', 'slicc_sig_inherited_js', 'slicc_poll_js']) {
-    assert.ok(names.has(want), `cmake.wasm does not import ${want} (today's shims/slicc)`);
+  for (const name of ['slicc_cred_js', 'slicc_sig_inherited_js', 'slicc_poll_js']) {
+    assert.ok(names.has(name), `cmake.wasm does not import ${name} (today's shims/slicc)`);
   }
-  console.log('cmake: --version 4.4.3, -E echo, -P with execute_process(bash) and the manifest CMAKE_ROOT, a Unix Makefiles configure + build + no-op rebuild through gmake as builder; cmake.wasm imports slicc_cred_js, slicc_sig_inherited_js, slicc_poll_js');
+  console.log(`cmake: --version ${want}, -E echo, -P with execute_process(bash) and the manifest CMAKE_ROOT, a Unix Makefiles configure + build + no-op rebuild through gmake as builder; cmake.wasm imports slicc_cred_js, slicc_sig_inherited_js, slicc_poll_js`);
 }
