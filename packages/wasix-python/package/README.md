@@ -2,6 +2,12 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.2-1
+
+- **CPython 3.15.2**, with bundled `pip` 26.2.2. The ABI stays `cp315`.
+- **`multiprocessing` still starts with `spawn`.** 3.15.2 chooses the default start method on first use; on WASIX it stays `spawn` in both builds, and the build without fork still offers only `spawn`.
+- **`venv` finds its home the same way.** 3.15.2's getpath also searches from the resolved base executable; `cert/venv.mjs` and `cert/isolated.mjs` cover it.
+
 ## Since 3.15.0-6
 
 - **Under `-I` and `-E`, a caller's environment no longer picks python's home** (homescoop#1572). In 3.15.0-5, a caller could set `SLICC_PYTHONHOME=/somewhere python3 -I`, and python loaded its standard library from `/somewhere`. Now nothing in the environment chooses the home under `-I`/`-E`. The slicc command passes the home in its own argv: every command (`python`, `python3`, `pip`, `pip3`) starts python as `python3 -X slicc_home=<this package>/ …` (`package.json` `args`). A caller can override the command's `env`, but not that argv prefix. `SLICC_PYTHONHOME` is gone. You can see the prefix in `sys.orig_argv` and `sys._xoptions`, and `subprocess` passes it on to child pythons, which is harmless. Without `-I`/`-E`, `PYTHONHOME` works as before.
@@ -43,7 +49,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 ## Since 3.15.0-1
 
-**CPython 3.15.0, a new ABI (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
+**A new ABI since CPython 3.15.0 (homescoop#761).** SOABI `cpython-315-wasm32-wasix`, the stdlib and `site-packages` under `lib/python3.15`, bytecode tag `cpython-315`, `package.json` `slicc.python` `abi` `cp315`.
 - **The py-\* built before 3.15 don't load.** Their extension modules are `cpython-314-wasm32-wasix.so` and their `slicc.python.requires.abi` is `cp314`, so `_slicc_site.discover()` leaves them off `sys.path` (`python -v` names each one) and `import numpy` raises `ModuleNotFoundError`. That covers py-numpy, py-pandas, py-scipy, py-matplotlib, py-contourpy, py-kiwisolver and py-pillow until they're rebuilt for 3.15. The pure-Python py-\* load, except those that, until their next release, depend on wasix-python `<3.14.3`: npm or pnpm gives them their own older python, nested beside this one, and discovery refuses them as built for another python.
 - **UTF-8 mode is the default** (PEP 686): `open()` without an encoding and the filesystem encoding are UTF-8 whatever the locale; `-X utf8=0` or `PYTHONUTF8=0` turns it off.
 - Every CPython patch in `patches/` is regenerated against 3.15.0; none is dropped, since 3.15 has none of the fixes. Bundled `pip` 26.2.1.
