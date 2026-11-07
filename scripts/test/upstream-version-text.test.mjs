@@ -5,7 +5,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { dashedRevision, driftErrors, loadAllow, rewriteUpstream, staleVersions, versionBase } from '../upstream-version-text.mjs';
+import { dashedRevision, driftErrors, loadAllow, npmify, rewriteUpstream, sameVersion, staleVersions, versionBase } from '../upstream-version-text.mjs';
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..');
 const allow = loadAllow();
@@ -145,6 +145,67 @@ test('a dashed upstream (7.1.2-34) takes -1 … -9, then -9.N, in check-package-
   for (const v of ['7.1.2-34-1', '7.1.2-34-9', '7.1.2-34-9.1', '7.1.2-34-9.12']) assert.deepEqual(meta(v), [], v);
   assert.match(meta('7.1.2-34-10').join('\n'), /7\.1\.2-34-10" sorts below 7\.1\.2-34-9 .*-9\.1, -9\.2/);
   assert.match(meta('7.1.2-33-9.1').join('\n'), /is not a packaging revision of recipe version 7\.1\.2-34/);
+});
+
+const tzPkg = (version, upstream, release = upstream) => `{
+  "name": "@ai-ecoverse/tzdata",
+  "version": "${version}",
+  "description": "IANA time zone database ${release}, compiled TZif files",
+  "repository": { "type": "git", "url": "git+https://github.com/ai-ecoverse/homescoop.git", "directory": "packages/tzdata/package" },
+  "homescoop": { "recipe": "tzdata", "upstream": "${upstream}" }
+}
+`;
+
+test('an IANA tz release (2026f) is <year>.<letter index>.0 on npm, as PyPI tzdata numbers it, and keeps sorting past z', () => {
+  assert.equal(npmify('2026a'), '2026.1.0');
+  assert.equal(npmify('2026f'), '2026.6.0');
+  assert.equal(npmify('2026z'), '2026.26.0');
+  assert.equal(npmify('2026za'), '2026.27.0');
+  assert.equal(npmify('2026zz'), '2026.52.0');
+  assert.equal(npmify('2026'), '2026.0.0', 'a bare number pads as before');
+  assert.equal(npmify('10.6p1'), '10.6p1', 'only <year><letters> maps; other letters are left alone');
+  assert.equal(npmify('2026ab'), '2026ab', 'only z may repeat');
+  assert.ok(sameVersion('2026.6.0', '2026f'));
+  assert.ok(!sameVersion('2026.5.0', '2026f'));
+  assert.equal(versionBase('2026.6.0-3'), '2026.6.0');
+  assert.deepEqual(driftErrors({ name: 'tzdata', upstream: '2026f', pkg: { version: '2026.6.0-1', homescoop: { upstream: '2026f' } }, summary: 'tzdata 2026f', readme: '# tzdata 2026f', allow }), []);
+  assert.match(driftErrors({ name: 'tzdata', upstream: '2026f', pkg: { version: '2026.5.0-1', homescoop: { upstream: '2026f' } }, allow }).join('\n'), /not a packaging revision of recipe version 2026f/);
+});
+
+test('an IANA release in text: another one of its year or later is stale, an older year or a historical one is not', () => {
+  const stale = (text) => staleVersions(text, '2026f', { allow, name: 'tzdata' }).map((s) => s.version);
+  assert.deepEqual(stale('IANA 2026f, compiled'), []);
+  assert.deepEqual(stale('IANA 2026e, compiled'), ['2026e']);
+  assert.deepEqual(stale('IANA 2026f; 2027a is next'), ['2027a']);
+  assert.deepEqual(stale('zic has made slim files since 2020b.'), []);
+  assert.deepEqual(stale('Up to 2026e it was fat. Since 2026e, slim.'), ['2026e']);
+  assert.deepEqual(stale('tzdata 2026.5'), ['2026.5']);
+  assert.deepEqual(stale('tzdata 2026.6.0-1'), []);
+});
+
+test('sync --write on a Renovate-shaped IANA bump (2026f → 2026g) gives 2026.7.0-1 and rewrites the release in the texts', () => {
+  const fx = fixture('tzdata', {
+    recipeVersion: '2026g',
+    summary: 'IANA time zone database 2026f for slicc',
+    pkg: tzPkg('2026.6.0-2', '2026f'),
+    readme: '# tzdata\n\nIANA 2026f, first line of tzdata.zi is "# version 2026f".\n',
+  });
+  try {
+    assert.equal(fx.node('check-package-meta.mjs', '--drift', 'tzdata').status, 1);
+    const s = fx.node('sync-package-version.mjs', 'tzdata', '--write');
+    assert.equal(s.status, 0, s.stderr);
+    assert.equal(s.stdout, '2026.7.0-1\n');
+    const after = fx.read();
+    assert.match(after.recipe, /summary: "IANA time zone database 2026g for slicc"/);
+    assert.equal(after.pkg, tzPkg('2026.7.0-1', '2026g'));
+    assert.equal(after.readme, '# tzdata\n\nIANA 2026g, first line of tzdata.zi is "# version 2026g".\n');
+    const c = fx.node('check-package-meta.mjs', '--drift', 'tzdata');
+    assert.equal(c.status, 0, c.stderr);
+    const again = fx.node('sync-package-version.mjs', 'tzdata', '--check');
+    assert.equal(again.status, 0, again.stderr);
+  } finally {
+    fx.cleanup();
+  }
 });
 
 test('a measurement with a unit is not a stale version (#1684): 3.7 GiB in a Python 3.15.0 README', () => {

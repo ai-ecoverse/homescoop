@@ -18,9 +18,20 @@ export function loadAllow(file = join(root, 'scripts/package-meta-versions.json'
   };
 }
 
+/**
+ * An IANA tz release, <year><letter> (2026f), becomes <year>.<n>.0 with the
+ * letter's place in the alphabet, as PyPI's tzdata numbers them (2026f →
+ * 2026.6). After z, upstream would go on with za, zb, …: each leading z adds
+ * 26, so the order holds (2026z → 2026.26, 2026za → 2026.27).
+ */
+const IANA = /^(\d{4})(z*)([a-z])$/;
+export const isIanaRelease = (v) => IANA.test(String(v));
+
 export function npmify(v) {
   if (/^\d+$/.test(v)) return `${v}.0.0`;
   if (/^\d+\.\d+$/.test(v)) return `${v}.0`;
+  const iana = IANA.exec(String(v));
+  if (iana) return `${iana[1]}.${iana[2].length * 26 + iana[3].charCodeAt(0) - 96}.0`;
   return v;
 }
 
@@ -129,9 +140,20 @@ function componentPrefix(tok, upstream) {
 export function staleVersions(text, upstream, { allow, name }) {
   const out = [];
   const up = String(upstream);
-  const major = up.split('.')[0];
+  const major = npmify(up).split('.')[0];
   const ok = [up, ...spellingsFor(allow, name, up)];
   const leads = leadsFor(allow, name);
+  // An IANA upstream (2026f) is no TOKEN: name another release of its year
+  // or later, and that's stale too.
+  if (isIanaRelease(up)) {
+    for (const m of text.matchAll(/(?<![\w.@-])(\d{4}z*[a-z])(?![\w.-])/g)) {
+      const tok = m[1];
+      if (tok === up || Number(tok.slice(0, 4)) < Number(major)) continue;
+      if (ok.includes(tok) || historicalCue(sentenceAt(text, m.index), allow) || afterLead(text, m.index, leads)) continue;
+      const ln = lineAt(text, m.index);
+      out.push({ line: ln.line, version: tok, excerpt: ln.text.trim() });
+    }
+  }
   for (const m of text.matchAll(TOKEN)) {
     const tok = m[2];
     if (tok.split('.')[0] !== major) continue;
