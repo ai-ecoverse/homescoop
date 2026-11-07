@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-lcms2",
-  "version": "2.19.1-4",
+  "version": "2.20.0-1",
   "description": "Little CMS 2 color management (WASM / emscripten, SLICC homescoop ladder)",
   "license": "MIT",
   "repository": {
@@ -27,6 +27,6 @@
   },
   "homescoop": {
     "recipe": "lcms2",
-    "upstream": "2.19.1"
+    "upstream": "2.20"
   }
 }
