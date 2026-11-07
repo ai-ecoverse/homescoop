@@ -125,14 +125,6 @@ diff --git a/Cargo.lock b/Cargo.lock
  dependencies = [
   "openssl-probe",
   "rustls-pki-types",
-@@ -5764,6 +5750,7 @@
-  "uv-workspace",
-  "uv-workspace-commands",
-  "walkdir",
-+ "wasix-command",
-  "which",
-  "wiremock",
- ]
 @@ -5860,6 +5847,7 @@
   "uv-state",
   "uv-static",

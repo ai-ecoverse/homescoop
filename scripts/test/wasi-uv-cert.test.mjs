@@ -158,6 +158,21 @@ test('NEGATIVE: a half-done crate refresh fails', () => {
   assert.throws(() => checkCrateRefresh(crate, firstPatch, JSON.parse(stale(JSON.stringify(certMeta)))), /cert\/meta\.json lists hyper-util 0\.1\.21/);
 });
 
+const UV_LOCK_WASIX = /"uv-workspace-commands",\n "walkdir",\n\+ "wasix-command",\n "which",\n "wiremock",/;
+
+function checkUvLockOmitsWasix (patch) {
+  assert.doesNotMatch(patch, UV_LOCK_WASIX, "0001 must not add wasix-command to the uv package's Cargo.lock deps (crates/uv has no wasix-command; cargo --locked then fails)");
+}
+
+test("0001's Cargo.lock does not add wasix-command to the uv package", () => {
+  checkUvLockOmitsWasix(firstPatch);
+});
+
+test('NEGATIVE: a 0001 that adds wasix-command to the uv package lock entry fails', () => {
+  const bad = `${firstPatch}\n@@\n "uv-workspace-commands",\n "walkdir",\n+ "wasix-command",\n "which",\n "wiremock",\n`;
+  assert.throws(() => checkUvLockOmitsWasix(bad), /must not add wasix-command to the uv package/);
+});
+
 test("timeout.mjs logs the timeout it causes on purpose as expected, not as a 'wasi-uv: FAIL' line", async () => {
   const { expected } = await import('../../packages/wasi-uv/cert/timeout.mjs');
   const line = "wasi-uv: FAIL uv run --no-project python -c 'import time; time.sleep(600)': no exit within 15 s (detached, polled; 16 s)";
