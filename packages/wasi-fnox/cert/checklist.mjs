@@ -376,11 +376,11 @@ export default async function (ctx) {
   assert.notEqual(setFile.status, 0, 'fnox set --file must fail');
   assert.ok(flat(setFile.stderr).includes('fnox set --file is not available in seven: use fnox set'), `fnox set --file: ${setFile.stderr}`);
   assert.doesNotMatch(setFile.stderr, /panicked|wasm trap/);
-  const getFile = await run(['fnox', 'get', '--file', '/home/plain/secret.txt'], { cwd: '/home/plain', env });
-  assert.notEqual(getFile.status, 134, `fnox get --file trapped: ${getFile.stderr}`);
-  assert.notEqual(getFile.status, 0, 'fnox get --file must fail');
-  assert.ok(flat(getFile.stderr).includes('fnox get --file is not available in seven: use fnox get'), `fnox get --file: ${getFile.stderr}`);
-  assert.doesNotMatch(getFile.stderr, /panicked|wasm trap/);
+  const getByFile = await run(['fnox', 'get', '--file', '/home/plain/secret.txt'], { cwd: '/home/plain', env });
+  assert.notEqual(getByFile.status, 134, `fnox get --file trapped: ${getByFile.stderr}`);
+  assert.notEqual(getByFile.status, 0, 'fnox get --file must fail');
+  assert.ok(flat(getByFile.stderr).includes('fnox get --file is not available in seven: use fnox get'), `fnox get --file: ${getByFile.stderr}`);
+  assert.doesNotMatch(getByFile.stderr, /panicked|wasm trap/);
   const missing = await run(['fnox', 'exec', '--', 'no-such-command'], { cwd: '/home/plain', env });
   assert.equal(missing.status, 127, `missing command: ${missing.stderr}`);
 
