@@ -1,0 +1,38 @@
+# The IANA time zone database, compiled with zic, for slicc (slicc-kernel#1767 sets TZ).
+# Data only: no commands, nothing to run. musl in wasix-sysroot
+# (patches/__tz.c) resolves TZ=<Area/City> under /usr/share/zoneinfo/ and
+# reads /etc/localtime with TZ unset; slicc-bios points both at this
+# package's share/zoneinfo (see package/README.md).
+name: tzdata
+builder: host
+# IANA names releases <year><letter> (2026f). Renovate reads the release
+# directory: there's no other datasource for it, and `loose` orders the
+# letter suffix (2026e < 2026f < 2027a). npm gets <year>.<letter index>.0-N
+# (2026f → 2026.6.0-1, PyPI tzdata's numbering; docs/versioning.md).
+# renovate: datasource=custom.tzdata depName=tzdata versioning=loose extractVersion=^tzdata(?<version>\d{4}[a-z]+)\.tar\.gz$
+version: "2026f"
+npm: "@ai-ecoverse/tzdata"
+summary: "The IANA time zone database 2026f as compiled zone files, so TZ=Europe/Berlin works in python, perl and ruby."
+source:
+  url: "https://data.iana.org/time-zones/releases/tzdata{{version}}.tar.gz"
+  sha256: "01b4a91cec5167ed48c11e8ab78f2048cead78ce94b0cafcad0ae8c5a3044d3d"
+sources:
+  # zic itself, from the same release: built for the build machine, run
+  # there, never shipped. Its output format follows its version, so it moves
+  # with the data.
+  tzcode:
+    url: "https://data.iana.org/time-zones/releases/tzcode{{version}}.tar.gz"
+    sha256: "5a18da01393679ef2559214dc687563f7f3d05691f6f58b7fbc0166f3e796cd6"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.iana.org/time-zones
+  license: LicenseRef-Public-Domain
+  notes: |
+    tzdata.zi (main data plus backward) compiled with `zic -b slim`: no
+    right/ or posix/ trees, no backzone. backward's links are copies (npm
+    rejects hard links and symlinks). The build also compiles the source
+    files directly and requires the same tree, so the awk that made
+    tzdata.zi can't change the zones.

@@ -44,6 +44,11 @@
       "defaultRegistryUrlTemplate": "https://download.savannah.gnu.org/releases/freetype/",
       "format": "html"
     },
+    "tzdata": {
+      "description": "IANA time zone database releases (tzdata2026f.tar.gz). IANA's release directory is the source of truth; the tz repo's tags carry no release files. versioning=loose orders 2026e < 2026f < 2027a. A bump also needs the tzdata and tzcode sha256 in packages/tzdata/recipe.yaml (scripts/refresh-recipe-sha.mjs fills both for the new URLs).",
+      "defaultRegistryUrlTemplate": "https://data.iana.org/time-zones/releases/",
+      "format": "html"
+    },
     "curl-cacert": {
       "description": "curl's dated extracts of Mozilla's CA certificate store (cacert-YYYY-MM-DD.pem), for tls-engine's roots.der. A bump also needs the sha256 in packages/tls-engine/recipe.yaml and slicc.tls.roots in its package.json; the build fails closed until both match.",
       "defaultRegistryUrlTemplate": "https://curl.se/docs/caextract.html",

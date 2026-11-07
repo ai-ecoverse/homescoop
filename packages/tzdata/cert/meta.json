@@ -1,0 +1,26 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/wasix-perl",
+    "@ai-ecoverse/wasix-ruby"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15",
+    "@ai-ecoverse/wasix-python@3.15.0-6",
+    "@ai-ecoverse/wasix-perl@5.42.0-22",
+    "@ai-ecoverse/wasix-ruby@3.4.11-25"
+  ],
+  "runTimeoutMs": 300000,
+  "checklist": [
+    "every spec first does what slicc-bios does (cert/lib/zones.mjs linkZoneinfo): /usr/share/zoneinfo → /node_modules/@ai-ecoverse/tzdata/share/zoneinfo and /etc/localtime → /usr/share/zoneinfo/Asia/Kolkata, through bash and coreutils' ln -s; both links must reach a TZif file",
+    "cert/python.mjs: time.strftime('%H:%M %Z %z', time.localtime(t)), checked equal to datetime.fromtimestamp(t, utc).astimezone(), at 2026-01-15, 2026-07-15, 2040-07-01, 1970-07-01 and 1985-07-01 12:00 UTC: TZ=Europe/Berlin is CET/CEST (+0100/+0200), TZ=America/New_York and TZ=US/Eastern (a backward alias) EST/EDT, TZ=:<package>/share/zoneinfo/Asia/Tokyo JST, TZ unset (env -u TZ) reads /etc/localtime (IST +0530), TZ=UTC is UTC; NEGATIVE in-spec: TZ=:/tmp/no-zoneinfo/Europe/Berlin falls back to UTC, so the other cases read the package's files. zoneinfo with no tzdata module installed: /usr/share/zoneinfo is on zoneinfo.TZPATH, Europe/Berlin CEST +0200 and US/Eastern EST -0500 come from it, available_timezones() has Europe/Berlin, America/New_York and UTC",
+    "cert/perl.mjs: the same cases and instants through perl's localtime and POSIX::strftime",
+    "cert/ruby.mjs: the same cases and instants through Time.at(t).strftime (libc localtime_r)",
+    "2040-07-01 is past the slim files' last transition and past 2038: musl takes the POSIX footer (CET-1CEST,M3.5.0,M10.5.0/3) with a 64-bit time_t; 1970 is before Berlin's first DST rule; 1985 is inside the transition table",
+    "test/tzif.test.mjs (host, the test job): share/zoneinfo holds Europe/Berlin (footer CET-1CEST,M3.5.0,M10.5.0/3, CET and CEST types), America/New_York (EST5EDT,M3.2.0,M11.1.0), UTC and Etc/UTC (UTC0, no transitions), the backward aliases US/Eastern, Asia/Calcutta and GB as regular single-link files with their targets' bytes; every zone file parses as TZif v2+ (RFC 9636: both headers, counts, ascending transitions, indices in range, NUL-terminated abbreviations, one-line footer); no right/, posix/, posixrules or localtime; tzdata.zi starts with '# version <homescoop.upstream>' and has the backward links; zone1970.tab, zone.tab, zonenow.tab, iso3166.tab and leapseconds are there; a NEGATIVE case shows the parser rejects a truncated file, a bad magic and a missing footer"
+  ]
+}

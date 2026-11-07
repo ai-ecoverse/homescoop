@@ -1,0 +1,36 @@
+{
+  "name": "@ai-ecoverse/tzdata",
+  "version": "2026.6.0-1",
+  "description": "The IANA time zone database 2026f as compiled zone files, so TZ=Europe/Berlin works in python, perl and ruby.",
+  "license": "LicenseRef-Public-Domain",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/tzdata/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/tzdata",
+  "keywords": [
+    "tzdata",
+    "zoneinfo",
+    "timezone",
+    "iana",
+    "wasix",
+    "slicc",
+    "homescoop"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "share"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "tzdata",
+    "upstream": "2026f"
+  },
+  "slicc": {
+    "zoneinfo": "share/zoneinfo"
+  }
+}
