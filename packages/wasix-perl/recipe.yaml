@@ -21,6 +21,13 @@ wasm:
   initial-memory: 64MiB
   measured-peak: 44MiB
   measured-by: "cert/heap.mjs on 5.42.0-22's first CI build (run 39702590579, wasix-sysroot 2025.9.30-42, 13.3 MiB linked initial memory) on slicc-kernel 1.132.1: VmSize of each perl process polled from /proc/<pid>/status (perl is single-threaded, so that is the allocating thread's view): a 100000-key hash 43.8 MiB, an automake-style parse of 30000 Makefile.am lines 27.5 MiB, loading 14 core modules 21.9 MiB, a fork child's 4 MiB s///g 17.4 MiB. A 4.5 MiB configure-script rewrite peaks at 84 MiB and grows past the initial heap, which the -39 allocator refresh covers"
+# Packaging-only: 5.42.0-23 is 5.42.0-22's bytes with the README's time zone
+# notes (TZ=Europe/Berlin once /usr/share/zoneinfo has @ai-ecoverse/tzdata).
+# Drop this block at the next rebuild.
+repack:
+  from: "5.42.0-22"
+  files:
+    - README.md
 dependencies:
   build: []
   host: []

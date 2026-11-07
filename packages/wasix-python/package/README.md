@@ -2,6 +2,16 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.0-7
+
+- **Time zones by name.** With the zone files at `/usr/share/zoneinfo`
+  (seven links it to `@ai-ecoverse/tzdata`, the IANA database), `TZ=Europe/Berlin`
+  gives CET/CEST in `time.localtime()`, `datetime.now().astimezone()` and
+  `time.strftime('%Z %z')`, and with `TZ` unset python reads `/etc/localtime`.
+  Without the files a zone name is UTC, as before; `TZ=:/path/to/Europe/Berlin`
+  takes any file. Only this README changed: the binaries are 3.15.0-6's
+  (a packaging-only release).
+
 ## Since 3.15.0-6
 
 - **Under `-I` and `-E`, a caller's environment no longer picks python's home** (homescoop#1572). In 3.15.0-5, a caller could set `SLICC_PYTHONHOME=/somewhere python3 -I`, and python loaded its standard library from `/somewhere`. Now nothing in the environment chooses the home under `-I`/`-E`. The slicc command passes the home in its own argv: every command (`python`, `python3`, `pip`, `pip3`) starts python as `python3 -X slicc_home=<this package>/ …` (`package.json` `args`). A caller can override the command's `env`, but not that argv prefix. `SLICC_PYTHONHOME` is gone. You can see the prefix in `sys.orig_argv` and `sys._xoptions`, and `subprocess` passes it on to child pythons, which is harmless. Without `-I`/`-E`, `PYTHONHOME` works as before.
@@ -66,7 +76,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 - `signal.alarm`/`setitimer` and `time.sleep` resuming after a signal (the sysroot's libc patches, `patches/`)
 - Bundled `pip` (26.2.1 since 3.15.0-1); `.pyc` are unchecked-hash
 - Not built: `_uuid`, `curses`, `dbm`, `_zstd`, `tkinter`
-- `TZ` POSIX rules work (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193); `zoneinfo` works with the `tzdata` package
+- `TZ` works: POSIX rules (`EST5EDT,M3.2.0,M11.1.0`; wasix-sysroot -18, homescoop#193), and zone names (`TZ=Europe/Berlin`, which slicc-kernel ≥ 1.174.2 sets) once `/usr/share/zoneinfo` has the zone files: seven links it to [`@ai-ecoverse/tzdata`](https://www.npmjs.com/package/@ai-ecoverse/tzdata). `time.localtime()`, `datetime.now().astimezone()` and `strftime('%Z')` follow it, and `zoneinfo` reads the same tree (`/usr/share/zoneinfo` is on `zoneinfo.TZPATH`), or the `py-tzdata` package where it's installed
 
 Since 3.14.2-12 the package is cross-built from source in CI (`build.sh`); see `THIRD-PARTY-NOTICES.md` for the statically linked libraries.
 
