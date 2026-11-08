@@ -6,7 +6,7 @@ inputs:
   - packages/imagemagick/**
   - packages/imagemagick-heif/**
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
-version: "7.1.2-34"
+version: "7.1.2-35"
 npm: "@ai-ecoverse/wasm-imagemagick-relink"
 summary: "Relink kits (objects, static libraries, relink.sh) for wasm-imagemagick and wasm-imagemagick-heif"
 source:
