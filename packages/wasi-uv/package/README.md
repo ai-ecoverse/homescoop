@@ -22,9 +22,20 @@ scripts), `uv tool install|run|uninstall`, `uv pip compile`, `uv pip check`,
 
 Limits in seven:
 
+- **Catalog:** seven’s optional catalog does not offer this package yet (the
+  old `@ai-ecoverse/wasix-uv-shim` is retired under id `uv`; bios says use
+  `pip` until an attested `@ai-ecoverse/wasi-uv` rebuild returns). npm still
+  publishes this build for direct install.
 - **Wheels:** the interpreter's platform tag is `wasi_0_0_0_wasm32`, which
   PyPI has no wheels for. Pure-Python wheels and sdists install; compiled
-  packages come from homescoop's `@ai-ecoverse/py-*` npm packages.
+  packages come from homescoop's `@ai-ecoverse/py-*` npm packages (seven:
+  Install/Update → **Python data tools** / `pydata`). Until a fail-fast
+  lands with the next catalog return, `uv add` / `uv pip install` /
+  `uv sync` of numpy, scipy, pandas, matplotlib, pillow, contourpy or
+  kiwisolver (including transitive pulls) will try an impossible sdist
+  build — use `pydata` instead. Map and hook design:
+  [`homescoop-pydata-map.json`](../homescoop-pydata-map.json),
+  [`FAILFAST.md`](../FAILFAST.md).
 - **No git dependencies** (uv spawns git through code that cannot spawn on
   WASI yet), no `uv python install`, no `uv self update`.
 - **File locks are record locks** (since 0.13.1-2, homescoop#706): uv's locks
