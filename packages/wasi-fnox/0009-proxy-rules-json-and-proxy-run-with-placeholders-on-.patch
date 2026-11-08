@@ -3,15 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 9/19] proxy: rules --json and proxy run with placeholders on WASI
 
----
- src/commands/mod.rs   |   3 -
- src/commands/proxy.rs | 162 ++++++++++++++++++++++++++---
- src/lib.rs            |   1 -
- src/proxy/mod.rs      |  45 +++++++-
- src/proxy/wasi.rs     | 236 ++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 426 insertions(+), 21 deletions(-)
- create mode 100644 src/proxy/wasi.rs
-
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
 index b171eb6..ccdad2a 100644
 --- a/src/commands/mod.rs
@@ -41,7 +32,7 @@ index b171eb6..ccdad2a 100644
              #[cfg(not(target_os = "wasi"))]
              Commands::Push(cmd) => cmd.run(cli, self.load_config(cli)?).await,
 diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
-index be13286..71b2474 100644
+index be13286..ac1bea0 100644
 --- a/src/commands/proxy.rs
 +++ b/src/commands/proxy.rs
 @@ -2,10 +2,14 @@ use crate::commands::Cli;
@@ -107,15 +98,7 @@ index be13286..71b2474 100644
  /// Run a command with placeholder credentials behind the proxy
  ///
  /// Resolves the secrets that `[[proxy.rules]]` names, the parent credentials of
-@@ -195,6 +207,7 @@ struct ProxyRunCommand {
- }
- 
- impl ProxyCommand {
-+    #[cfg(not(target_os = "wasi"))]
-     pub async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
-         let proxy = config.proxy.as_ref().ok_or_else(|| {
-             FnoxError::Config(
-@@ -202,7 +215,8 @@ impl ProxyCommand {
+@@ -202,7 +214,8 @@ impl ProxyCommand {
              )
          })?;
          match &self.command {
@@ -125,7 +108,7 @@ index be13286..71b2474 100644
                  let leases = config.get_leases(&Config::get_profiles(&cli.profile))?;
                  show_rules(proxy, &leases)
              }
-@@ -211,7 +225,17 @@ impl ProxyCommand {
+@@ -211,7 +224,17 @@ impl ProxyCommand {
      }
  }
  
@@ -143,7 +126,7 @@ index be13286..71b2474 100644
      crate::proxy::validate_config(proxy)?;
      println!("egress: {:?}", proxy.egress);
      println!("audit: {}", proxy.audit);
-@@ -234,11 +258,14 @@ fn show_rules(proxy: &ProxyConfig, leases: &IndexMap<String, LeaseBackendConfig>
+@@ -234,11 +257,14 @@ fn show_rules(proxy: &ProxyConfig, leases: &IndexMap<String, LeaseBackendConfig>
          };
          let (name, credential) = match (&rule.secret, &rule.lease) {
              (Some(secret), _) => (secret.clone(), None),
@@ -158,7 +141,7 @@ index be13286..71b2474 100644
              (None, None) => unreachable!("validate_config requires a secret or a lease"),
          };
          let env = rule
-@@ -260,6 +287,7 @@ fn show_rules(proxy: &ProxyConfig, leases: &IndexMap<String, LeaseBackendConfig>
+@@ -260,6 +286,7 @@ fn show_rules(proxy: &ProxyConfig, leases: &IndexMap<String, LeaseBackendConfig>
  
  /// Serves the MCP tools to each `fnox mcp` relay in the child, sharing this
  /// run's secrets and handing values the user enters to the proxy
@@ -166,7 +149,7 @@ index be13286..71b2474 100644
  fn mcp_service(
      session: std::sync::Arc<SecretSession>,
      mcp_config: crate::config::McpConfig,
-@@ -284,6 +312,7 @@ fn unknown_lease(lease: &str) -> FnoxError {
+@@ -284,6 +311,7 @@ fn unknown_lease(lease: &str) -> FnoxError {
  }
  
  /// The leases the rules name, each once
@@ -174,7 +157,7 @@ index be13286..71b2474 100644
  fn rule_leases<'a>(
      proxy: &ProxyConfig,
      leases: &'a IndexMap<String, LeaseBackendConfig>,
-@@ -301,6 +330,7 @@ fn rule_leases<'a>(
+@@ -301,6 +329,7 @@ fn rule_leases<'a>(
  /// The secrets to resolve: the rules' secrets, the parent credentials of the
  /// rules' leases, and whatever their providers need. Also returns the
  /// secrets the leases read, which they look for in fnox's environment.
@@ -182,7 +165,7 @@ index be13286..71b2474 100644
  fn collect_requested_secrets(
      config: &Config,
      profile: &[String],
-@@ -352,10 +382,107 @@ fn collect_requested_secrets(
+@@ -352,10 +381,107 @@ fn collect_requested_secrets(
  }
  
  impl ProxyRunCommand {
@@ -290,6 +273,14 @@ index be13286..71b2474 100644
      async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
          if self.command.is_empty() {
              return Err(FnoxError::CommandNotSpecified);
+@@ -611,6 +737,7 @@ impl ProxyRunCommand {
+ /// command too, and passing it on would deliver it twice. A `kill -INT` sent
+ /// to fnox alone there can't be told apart from Ctrl-C, so it isn't passed
+ /// on; `SIGTERM` stops the command instead.
++#[cfg(not(target_os = "wasi"))]
+ async fn run_forwarding_signals(mut command: tokio::process::Command) -> std::io::Result<Outcome> {
+     #[cfg(unix)]
+     {
 @@ -663,6 +790,7 @@ fn terminal_interrupts_us() -> bool {
  }
  
@@ -676,4 +667,3 @@ index 0000000..d34ad8e
 +    }
 +    network
 +}
-
