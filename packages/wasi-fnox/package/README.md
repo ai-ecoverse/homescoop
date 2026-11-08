@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasi-fnox
 
-[fnox](https://fnox.jdx.dev) 1.45 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.45.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
+[fnox](https://fnox.jdx.dev) 1.46 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.46.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
 
 ## In seven
 
@@ -36,7 +36,7 @@ Without `/dev/sealed`, every sealed operation fails with `not running in seven: 
 
 fnox is MIT (see `LICENSE`). `THIRD-PARTY-NOTICES.md` lists the crates, Rust's standard library and wasi-libc that `bin/fnox.wasm` links.
 
-## WASI support for fnox 1.45
+## WASI support for fnox 1.46
 
 `fnox exec --only` and `--except` retain upstream filtering: excluded providers are not resolved, dependencies are resolved without being exported, and excluded configured values are not injected. Inherited environment variables retain their original values unless the child plan replaces or removes them; these flags do not clear the environment. The WASI child starts from the environment captured before resolution, so a resolved interpolation dependency cannot enter it through process-environment mutation. Sealed selections still use the kernel ticket path.
 
