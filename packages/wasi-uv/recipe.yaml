@@ -62,6 +62,8 @@ about:
     0.13.6-1: hyper-util 0.1.21 and reqsign-core 3.3.2 /
     reqsign-google 3.2.0 / reqsign-http-send-reqwest 4.0.7 (crates/
     renamed and rebased; 0001 refreshed for the new paths and lock).
+    0.13.6-2: packaging-only — README notes the pydata hang risk and
+    points at homescoop-pydata-map.json / FAILFAST.md (no binary change).
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means

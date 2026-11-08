@@ -10,7 +10,7 @@ work on the same PyPI→catalog map.
 
 | Item | State |
 | --- | --- |
-| Package | `@ai-ecoverse/wasi-uv` 0.13.6-1 (`packages/wasi-uv`), Astral uv for slicc |
+| Package | `@ai-ecoverse/wasi-uv` 0.13.6-2 (`packages/wasi-uv`), Astral uv for slicc |
 | Shim | `@ai-ecoverse/wasix-uv-shim` retired (`builder: retired`); was catalog `uv` |
 | In seven | Not offered: bios optional catalog has no wasi-uv row; README says use pip until attested rebuild |
 | Platform tag | `wasi_0_0_0_wasm32` (patch 0004); PyPI has no such wheels |
@@ -70,9 +70,9 @@ patch’s names drift (same pattern as crate-version checks in
 `scripts/test/wasi-uv-cert.test.mjs`).
 
 Share the **same PyPI keys** with the wasix-python pip fail-fast
-(@thread:thr_tgtt7c3x7k). If pip lands the map under wasix-python stdlib,
-point this JSON at that file or generate both from one list — do not fork the
-names.
+(@thread:thr_tgtt7c3x7k). Pip landed runtime `HOMESCOOP_PIP_NATIVE` in
+`packages/wasix-python/stdlib/_slicc_pip.py` keyed off this JSON; keep both
+in lockstep (`scripts/test/wasi-uv-pydata-map.test.mjs`). Do not fork the names.
 
 ### Out of scope
 
