@@ -87,3 +87,6 @@ about:
     homescoop.relink and the notices name the relink package of exactly
     this version, and the relink package's check binds its kit to this
     version's bin/magick.wasm.
+    7.1.2-35-1: same upstream as wasm-imagemagick; mogrify-format-over-
+    existing.patch dropped (homescoop#624 fixed upstream); OpenJPEG stays
+    2.5.4-1 (homescoop#1957).

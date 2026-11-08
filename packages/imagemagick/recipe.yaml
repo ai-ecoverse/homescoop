@@ -93,3 +93,7 @@ about:
     at exactly this version; wasm-check.mjs checks both. The relink
     package's relink-check fails unless this version's bin/magick.wasm (this
     PR's artifact, else the registry's) is the binary its kit.json names.
+    7.1.2-35-1: upstream 7.1.2-35 (homescoop#624) prefixes the mogrify
+    backup write with -format when the backup name names no format, so
+    mogrify-format-over-existing.patch is dropped; OpenJPEG stays 2.5.4-1
+    (homescoop#1957).

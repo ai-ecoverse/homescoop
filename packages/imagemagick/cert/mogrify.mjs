@@ -15,8 +15,8 @@ export default async function mogrify(ctx) {
   const ls = await run(['magick', 'identify', '-format', '%f\n', '*']);
   assert.deepEqual(ls.stdout.trim().split('\n').sort(), ['a.png', 'b.jpg'], `no stray files: ${ls.stdout}`);
   // homescoop#624: -format over an existing target. mogrify writes to a
-  // "<target>-xxxxxxxx~" backup first, a name with no format, so upstream
-  // encoded the input's format under the new name. The patch makes it explicit.
+  // "<target>-xxxxxxxx~" backup first, a name with no format; until 7.1.2-34
+  // upstream encoded the input's format under the new name. Fixed in 7.1.2-35.
   const MAGIC = { WEBP: (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP', JPEG: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff };
   const mk = await run(['magick', '-size', '100x50', 'xc:red', 's.png']);
   assert.equal(mk.status, 0, mk.stderr);

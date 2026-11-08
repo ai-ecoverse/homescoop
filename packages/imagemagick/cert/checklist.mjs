@@ -1,4 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 const FONT = '/node_modules/@ai-ecoverse/wasm-poppler/share/fonts/n019003l.pfb';
+const VERSION = /^version: "([^"]+)"$/m.exec(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../recipe.yaml'), 'utf8'))[1];
 
 export default async function (ctx) {
   const { run, write, assert } = ctx;
@@ -9,6 +14,7 @@ export default async function (ctx) {
   };
 
   const version = await ok(['magick', '-version']);
+  assert.match(version, new RegExp(`^Version: ImageMagick ${VERSION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} `));
   const builtIn = (version.match(/^Delegates \(built-in\): *(.*)$/m) ?? [])[1]?.trim().split(/\s+/) ?? [];
   for (const d of ['freetype', 'jpeg', 'jp2', 'lcms', 'png', 'tiff', 'webp', 'xml', 'zlib']) {
     assert.ok(builtIn.includes(d), `-version built-in delegates lack ${d}: ${builtIn.join(' ')}`);

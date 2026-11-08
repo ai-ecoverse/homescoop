@@ -295,3 +295,7 @@ Against the published `@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-34-9.6 (npm `la
 The recipe pin moves to wasm-openjpeg@2.5.4-1 and the package is rebuilt, so the static link includes the opj_jp2_read_header error check from OpenJPEG 2.5.4.
 
 Checked locally against the previous registry tarball: running its unmodified Emscripten glue under Node produced the output above, and the new cert assertion rejected that captured output. The assertion also accepts output with the required version. CI builds and certifies the replacement package.
+
+## 7.1.2-35-1: upstream ImageMagick 7.1.2-35
+
+Against the published `@ai-ecoverse/wasm-imagemagick-heif` 7.1.2-34-9.8 (npm `latest`), `checklist.mjs` now reads `recipe.yaml`'s version and requires that exact string in `magick -version`. The published package still reports `Version: ImageMagick 7.1.2-34`, so the assertion fails (until 7.1.2-34-9.8 the checklist hard-coded `7.1.2-34`). Upstream 7.1.2-35 absorbs homescoop#624, so `mogrify-format-over-existing.patch` is dropped with the plain package; the OpenJPEG 2.5.4 pin from #1959 stays.
