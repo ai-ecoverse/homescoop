@@ -1,22 +1,15 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 08/18] exec: let seven's kernel hand sealed values to the command
+Subject: [PATCH 8/19] exec: let seven's kernel hand sealed values to the command
 
- command
-
-When the environment fnox would give a command holds sealed secrets,
-`fnox exec` resolves the command on PATH to a symlink-free path, sends
-`materialize {names, path, argv, cwd}` to /dev/sealed with argv[0] set
-to that path, and spawns exactly that program with argv and cwd,
-every sealed variable set to its placeholder and SLICC_SEALED_TICKET
-set to the ticket. The kernel swaps the placeholders it grants for
-their values at exec; fnox never sees a value, and names the policy
-keeps as placeholders are reported on stderr. On WASI, as_file secrets
-are refused, values from other providers are passed as before with a
-warning, and a command that is not found exits 127.
+---
+ src/commands/exec.rs |  89 +++++++++++++++-
+ src/seven.rs         | 243 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 328 insertions(+), 4 deletions(-)
 
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
+index 1d4fc5a..9173c7a 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
 @@ -195,6 +195,73 @@ impl ExecCommand {
@@ -130,6 +123,7 @@ diff --git a/src/commands/exec.rs b/src/commands/exec.rs
          // Forward SIGINT/SIGTERM to the child so Ctrl-C and `kill` reach it.
          #[cfg(unix)]
 diff --git a/src/seven.rs b/src/seven.rs
+index f05862d..eebfb9e 100644
 --- a/src/seven.rs
 +++ b/src/seven.rs
 @@ -70,10 +70,253 @@ pub fn request_value(name: &str) -> Result<String> {
@@ -386,3 +380,4 @@ diff --git a/src/seven.rs b/src/seven.rs
      #[test]
      fn request_value_returns_the_placeholder_when_done() {
          let (_g, mock) = fnox_core::sealed::testing::install();
+

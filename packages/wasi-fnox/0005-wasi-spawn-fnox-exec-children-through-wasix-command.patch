@@ -1,19 +1,19 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 05/18] wasi: spawn fnox exec children through wasix-command
+Subject: [PATCH 5/19] wasi: spawn fnox exec children through wasix-command
 
-std::process::Command is unsupported on wasm32-wasip1. On WASI, `fnox
-exec` uses wasix_command::Command, which spawns through the WASIX
-proc_spawn3/proc_join calls that slicc-kernel implements, with the
-same Command API. crates/wasix-command is not part of this patch:
-homescoop's packages/wasi-fnox/apply.sh copies ai-ecoverse/homescoop
-crates/wasix-command (MIT OR Apache-2.0) into the source tree.
+---
+ Cargo.lock           | 9 +++++++++
+ Cargo.toml           | 1 +
+ src/commands/exec.rs | 7 +++++++
+ 3 files changed, 17 insertions(+)
 
 diff --git a/Cargo.lock b/Cargo.lock
+index fdcc341..615b7c5 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
-@@ -2489,6 +2489,7 @@ dependencies = [
+@@ -2491,6 +2491,7 @@ dependencies = [
   "tracing-subscriber",
   "url",
   "usage-rs",
@@ -21,7 +21,7 @@ diff --git a/Cargo.lock b/Cargo.lock
   "which",
  ]
  
-@@ -8209,6 +8210,14 @@ dependencies = [
+@@ -8211,6 +8212,14 @@ dependencies = [
   "wit-bindgen",
  ]
  
@@ -37,9 +37,10 @@ diff --git a/Cargo.lock b/Cargo.lock
  name = "wasm-bindgen"
  version = "0.2.129"
 diff --git a/Cargo.toml b/Cargo.toml
+index 500ce23..21c486b 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -191,6 +191,7 @@ which = { workspace = true }
+@@ -192,6 +192,7 @@ which = { workspace = true }
  tokio = { workspace = true, features = ["full"] }
  
  [target.'cfg(target_os = "wasi")'.dependencies]
@@ -48,6 +49,7 @@ diff --git a/Cargo.toml b/Cargo.toml
  
  [dev-dependencies]
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
+index 7637b23..1d4fc5a 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
 @@ -5,7 +5,10 @@ use crate::secret_filter::SecretFilter;
@@ -72,3 +74,4 @@ diff --git a/src/commands/exec.rs b/src/commands/exec.rs
  
          #[cfg(unix)]
          if self.replace {
+

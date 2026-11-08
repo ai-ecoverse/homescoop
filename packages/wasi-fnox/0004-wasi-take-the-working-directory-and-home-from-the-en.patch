@@ -1,17 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 04/18] wasi: take the working directory and home from the environment
-
+Subject: [PATCH 4/19] wasi: take the working directory and home from the environment
  environment
 
-wasi-libc starts every program in "/", so fnox changes to $PWD before
-anything else and reads HOME from the environment, which dirs has no
-WASI backend for. XDG-style defaults apply to WASI as on unix
-(config, state, and the data directory 1.40.0 added for plugins). The
-tokio runtime is current_thread on WASI.
+---
+ crates/fnox-core/src/env.rs | 14 ++++++++++----
+ src/main.rs                 |  7 ++++++-
+ 2 files changed, 16 insertions(+), 5 deletions(-)
 
 diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
+index 3c004d2..2df64f9 100644
 --- a/crates/fnox-core/src/env.rs
 +++ b/crates/fnox-core/src/env.rs
 @@ -40,12 +40,18 @@ pub fn remove_var<K: AsRef<OsStr>>(key: K) {
@@ -54,6 +53,7 @@ diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
 diff --git a/src/main.rs b/src/main.rs
+index fbc65cb..a973b03 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -3,6 +3,10 @@ use fnox::settings;
@@ -77,3 +77,4 @@ diff --git a/src/main.rs b/src/main.rs
  async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
      // Restore the default SIGPIPE handler. Rust inherits SIG_IGN from libc,
      // so writes to a closed pipe return EPIPE and `println!` panics — e.g.
+

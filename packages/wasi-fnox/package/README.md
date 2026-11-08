@@ -22,11 +22,11 @@ Seven's vault holds the secret values, and fnox keeps only placeholders. The vau
 - **`fnox proxy rules --json`:** prints a project's rules as proposals.
 - **`fnox check`:** asks the vault about each sealed record.
 - **`fnox deactivate`:** removes the shell hooks and the `fnox` function even if the binary is gone (since 1.42.1), as upstream.
-- **Refused:** `as_file` secrets, `sync`, `reencrypt`, `fnox edit`, `fnox files`, and `fnox set|get --file` (use `fnox set` / `fnox get`).
+- **Refused:** `as_file` secrets, `sync`, `reencrypt`, `fnox edit`, `fnox files`, `fnox set|get --file` (use `fnox set` / `fnox get`), and since 1.46.0 proxy rules that name a `lease` (native short-lived credentials).
 - **age:** decrypting an age secret isn't supported yet (slicc-vault#2). Encrypting to age recipients works.
 - **Other providers:** only `sealed`, `age` and `plain` are built. Values from `plain` are passed on with a warning.
 - **Templates:** a secret's `default` and a provider's string fields can use `{{ fnox.profile }}` and `{{ fnox.profiles }}` (Tera, since 1.41), as upstream. A sealed secret's `value`, its placeholder, is never rendered.
-- **Not in this build:** leases (including managed identity for `azure-token`), the daemon, the TUI, the MCP server (including `request_secret`), secret-file write paths, and Lua provider plugins (`fnox plugin`).
+- **Not in this build:** leases (including managed identity for `azure-token`), `fnox push` and push targets (since 1.46.0), the daemon, the TUI, the MCP server (including `request_secret`), secret-file write paths, and Lua provider plugins (`fnox plugin`).
 
 It needs slicc-kernel 1.175.0 or later (`engines`): `/dev/sealed` arrived in slicc-kernel 1.68.0 (KS-2), the exec tickets that `fnox exec` redeems in slicc-kernel 1.83.0 (KS-8), and the `ask` op that the vault dialog of `fnox set` uses in slicc-kernel 1.175.0. On an older kernel the dialog fails with `seven: /dev/sealed refused ask: EINVAL`, and a piped `fnox set` still works.
 
@@ -45,3 +45,5 @@ Exec output redaction uses helper threads upstream. This WASI build refuses `--r
 The new OAuth2, GitLab, Tailscale and Kubernetes lease backends are compiled out with the existing lease backends. `audit`, `scan --values` and `set --generate` retain upstream behavior: audit records names, scan sees sealed placeholders, and generated secrets are created inside fnox before storage (`--show` explicitly prints generated values). Staged scanning and hook installation use native process execution and are unavailable on WASI.
 
 Since 1.45.0, upstream secret files (`[files]`, `fnox files`, `set|get|edit --file`) and the MCP `request_secret` one-time page need native HTTP, tempfile and editor paths. This build refuses those commands and flags before they run; the MCP module and the native proxy HTTP stack stay compiled out.
+
+Since 1.46.0, upstream `fnox push` (CI and hosting secret stores), proxy lease credentials, and the `[files]` sync cache need native HTTP, CLIs and helper threads. This build compiles `push` and `push_targets` out, refuses proxy rules that name a `lease`, and keeps `sync` refused; port-specific `allow_private` entries still validate in the WASI proxy stub.

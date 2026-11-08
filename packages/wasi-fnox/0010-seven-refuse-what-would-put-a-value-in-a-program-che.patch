@@ -1,19 +1,18 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 10/18] seven: refuse what would put a value in a program-checked file
+Subject: [PATCH 10/19] seven: refuse what would put a value in a program-checked file
+ file
 
- check placeholders
-
-On WASI, `sync` and `reencrypt` fail with "not available in seven: the
-value would be in a program (use a header rule)", and decrypting an
-age secret fails with "age secrets aren't supported in seven yet
-(slicc-vault#2)"; encrypting to age recipients still works. `fnox
-check` asks /dev/sealed for each sealed secret's record with
-`placeholder {name}` and reports removed records and placeholders the
-vault does not know, and warns about records that no rule names yet.
+---
+ crates/fnox-core/src/providers/age.rs | 23 ++++++++++++++++++
+ src/commands/check.rs                 | 34 +++++++++++++++++++++++++++
+ src/commands/reencrypt.rs             |  7 ++++++
+ src/commands/sync.rs                  |  7 ++++++
+ 4 files changed, 71 insertions(+)
 
 diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
+index 4b4fa33..4fd7cba 100644
 --- a/crates/fnox-core/src/providers/age.rs
 +++ b/crates/fnox-core/src/providers/age.rs
 @@ -350,6 +350,28 @@ impl crate::providers::Provider for AgeEncryptionProvider {
@@ -54,6 +53,7 @@ diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/provid
          &self,
          secrets: &[(String, String)],
 diff --git a/src/commands/check.rs b/src/commands/check.rs
+index 64ef71d..74d871b 100644
 --- a/src/commands/check.rs
 +++ b/src/commands/check.rs
 @@ -133,6 +133,40 @@ impl CheckCommand {
@@ -98,6 +98,7 @@ diff --git a/src/commands/check.rs b/src/commands/check.rs
                              match crate::daemon::resolve_one(
                                  cli,
 diff --git a/src/commands/reencrypt.rs b/src/commands/reencrypt.rs
+index 43905f3..6d570db 100644
 --- a/src/commands/reencrypt.rs
 +++ b/src/commands/reencrypt.rs
 @@ -85,6 +85,13 @@ impl FilesOutcome {
@@ -115,11 +116,12 @@ diff --git a/src/commands/reencrypt.rs b/src/commands/reencrypt.rs
          let files = if self.keys.is_empty() {
              self.reencrypt_files(cli, &merged_config).await?
 diff --git a/src/commands/sync.rs b/src/commands/sync.rs
+index 09a8397..ddc0dbd 100644
 --- a/src/commands/sync.rs
 +++ b/src/commands/sync.rs
-@@ -77,6 +77,13 @@ pub struct SyncCommand {
+@@ -123,6 +123,13 @@ impl SyncCommand {
+     }
  
- impl SyncCommand {
      pub async fn run(&self, cli: &Cli, merged_config: Config) -> Result<()> {
 +        #[cfg(target_os = "wasi")]
 +        {
@@ -131,3 +133,4 @@ diff --git a/src/commands/sync.rs b/src/commands/sync.rs
          let profile = Config::get_profiles(cli.profile.as_slice());
          let write_profile = Config::resolve_write_profile(&profile, cli.write_profile.as_deref())?;
          tracing::debug!("Syncing secrets for profile '{}'", write_profile);
+

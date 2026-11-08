@@ -1,20 +1,19 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 09/18] proxy: rules --json and proxy run with placeholders on WASI
+Subject: [PATCH 9/19] proxy: rules --json and proxy run with placeholders on WASI
 
- placeholders on WASI
-
-`fnox proxy rules --json` prints the validated [proxy] configuration as
-JSON, for tools that turn a project's rules into proposals. On WASI the
-proxy command is built again without the local proxy: `proxy run --
-cmd` gives the command each rule's sealed placeholder under the rule's
-environment name, scrubs the other secrets and ambient credentials as
-upstream does, and leaves injection to seven's realm proxy. A rule
-whose secret is not sealed is refused. Rule validation no longer needs
-reqwest on WASI.
+---
+ src/commands/mod.rs   |   3 -
+ src/commands/proxy.rs | 162 ++++++++++++++++++++++++++---
+ src/lib.rs            |   1 -
+ src/proxy/mod.rs      |  45 +++++++-
+ src/proxy/wasi.rs     | 236 ++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 426 insertions(+), 21 deletions(-)
+ create mode 100644 src/proxy/wasi.rs
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
+index b171eb6..ccdad2a 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
 @@ -31,7 +31,6 @@ pub mod mcp;
@@ -23,31 +22,32 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
  pub mod provider;
 -#[cfg(not(target_os = "wasi"))]
  pub mod proxy;
- pub mod reencrypt;
- pub mod remove;
-@@ -198,7 +197,6 @@ pub enum Commands {
+ #[cfg(not(target_os = "wasi"))]
+ pub mod push;
+@@ -200,7 +199,6 @@ pub enum Commands {
  
      Provider(provider::ProviderCommand),
  
 -    #[cfg(not(target_os = "wasi"))]
      Proxy(proxy::ProxyCommand),
  
-     Reencrypt(reencrypt::ReencryptCommand),
-@@ -398,7 +396,6 @@ impl Commands {
+     #[cfg(not(target_os = "wasi"))]
+@@ -403,7 +401,6 @@ impl Commands {
                  cmd.run(cli, Config::new()).await
              }
              Commands::Provider(cmd) => cmd.run(cli, self.load_config(cli)?).await,
 -            #[cfg(not(target_os = "wasi"))]
              Commands::Proxy(cmd) => cmd.run(cli, self.load_config(cli)?).await,
-             Commands::Reencrypt(cmd) => cmd.run(cli, self.load_config(cli)?).await,
-             Commands::Env(cmd) => cmd.run(cli).await,
+             #[cfg(not(target_os = "wasi"))]
+             Commands::Push(cmd) => cmd.run(cli, self.load_config(cli)?).await,
 diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
+index be13286..71b2474 100644
 --- a/src/commands/proxy.rs
 +++ b/src/commands/proxy.rs
-@@ -1,10 +1,14 @@
- use crate::commands::Cli;
+@@ -2,10 +2,14 @@ use crate::commands::Cli;
  use crate::config::{Config, ProxyConfig, SecretConfig};
  use crate::error::{FnoxError, Result};
+ use crate::lease_backends::LeaseBackendConfig;
 +#[cfg(not(target_os = "wasi"))]
  use crate::proxy::{ProxyListener, ProxyPlan, RunningProxy};
 +#[cfg(not(target_os = "wasi"))]
@@ -59,15 +59,16 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
  use std::process::Stdio;
  
  const AMBIENT_CREDENTIAL_ENV_VARS: &[&str] = &[
-@@ -124,23 +128,30 @@ pub struct ProxyCommand {
+@@ -125,24 +129,32 @@ pub struct ProxyCommand {
  
  #[derive(Debug, usage_rs::Subcommands)]
  enum ProxySubcommand {
 -    /// Print the effective proxy rules
 -    ///
 -    /// Validates the `[proxy]` table and prints its egress mode, audit setting,
--    /// and each rule's secret, domain, methods, paths, header or query parameter, and
--    /// placeholder variable. Secrets are not resolved.
+-    /// and each rule's secret or lease, domain, methods, paths, header or query
+-    /// parameter, and placeholder variable. Secrets are not resolved and no
+-    /// lease is minted.
 -    #[usage(
 -        example("fnox proxy rules", header = "Print the rules"),
 -        example(
@@ -85,15 +86,17 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
 +/// Print the effective proxy rules
 +///
 +/// Validates the `[proxy]` table and prints its egress mode, audit setting,
-+/// and each rule's secret, domain, methods, paths, header or query parameter, and
-+/// placeholder variable. Secrets are not resolved.
++/// and each rule's secret or lease, domain, methods, paths, header or query
++/// parameter, and placeholder variable. Secrets are not resolved and no
++/// lease is minted.
 +#[usage(
 +    example("fnox proxy rules", header = "Print the rules"),
 +    example(
 +        "fnox -P staging proxy rules",
 +        header = "Print another profile's rules"
 +    ),
-+    after_long_help = "See also:\n- Credential proxy: https://fnox.jdx.dev/guide/proxy"
++    after_long_help = "See also:
++- Credential proxy: https://fnox.jdx.dev/guide/proxy"
 +)]
 +
 +struct ProxyRulesCommand {
@@ -103,16 +106,26 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
 +
  /// Run a command with placeholder credentials behind the proxy
  ///
- /// Resolves the secrets that `[[proxy.rules]]` names, plus any secrets their
-@@ -196,12 +207,21 @@ impl ProxyCommand {
+ /// Resolves the secrets that `[[proxy.rules]]` names, the parent credentials of
+@@ -195,6 +207,7 @@ struct ProxyRunCommand {
+ }
+ 
+ impl ProxyCommand {
++    #[cfg(not(target_os = "wasi"))]
+     pub async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
+         let proxy = config.proxy.as_ref().ok_or_else(|| {
+             FnoxError::Config(
+@@ -202,7 +215,8 @@ impl ProxyCommand {
              )
          })?;
          match &self.command {
--            ProxySubcommand::Rules => show_rules(proxy),
+-            ProxySubcommand::Rules => {
 +            ProxySubcommand::Rules(command) if command.json => show_rules_json(proxy),
-+            ProxySubcommand::Rules(_) => show_rules(proxy),
-             ProxySubcommand::Run(command) => command.run(cli, config).await,
-         }
++            ProxySubcommand::Rules(_) => {
+                 let leases = config.get_leases(&Config::get_profiles(&cli.profile))?;
+                 show_rules(proxy, &leases)
+             }
+@@ -211,7 +225,17 @@ impl ProxyCommand {
      }
  }
  
@@ -124,10 +137,28 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
 +    Ok(())
 +}
 +
- fn show_rules(proxy: &ProxyConfig) -> Result<()> {
+ fn show_rules(proxy: &ProxyConfig, leases: &IndexMap<String, LeaseBackendConfig>) -> Result<()> {
++    #[cfg(target_os = "wasi")]
++    let _ = leases;
      crate::proxy::validate_config(proxy)?;
      println!("egress: {:?}", proxy.egress);
-@@ -238,6 +258,7 @@ fn show_rules(proxy: &ProxyConfig) -> Result<()> {
+     println!("audit: {}", proxy.audit);
+@@ -234,11 +258,14 @@ fn show_rules(proxy: &ProxyConfig, leases: &IndexMap<String, LeaseBackendConfig>
+         };
+         let (name, credential) = match (&rule.secret, &rule.lease) {
+             (Some(secret), _) => (secret.clone(), None),
++            #[cfg(not(target_os = "wasi"))]
+             (None, Some(lease)) => {
+                 let config = leases.get(lease).ok_or_else(|| unknown_lease(lease))?;
+                 let credential = crate::proxy::lease_credential(rule, lease, config)?;
+                 (format!("lease:{lease}"), Some(credential))
+             }
++            #[cfg(target_os = "wasi")]
++            (None, Some(lease)) => (format!("lease:{lease}"), None),
+             (None, None) => unreachable!("validate_config requires a secret or a lease"),
+         };
+         let env = rule
+@@ -260,6 +287,7 @@ fn show_rules(proxy: &ProxyConfig, leases: &IndexMap<String, LeaseBackendConfig>
  
  /// Serves the MCP tools to each `fnox mcp` relay in the child, sharing this
  /// run's secrets and handing values the user enters to the proxy
@@ -135,15 +166,23 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
  fn mcp_service(
      session: std::sync::Arc<SecretSession>,
      mcp_config: crate::config::McpConfig,
-@@ -257,6 +278,7 @@ fn mcp_service(
-     })
+@@ -284,6 +312,7 @@ fn unknown_lease(lease: &str) -> FnoxError {
  }
  
+ /// The leases the rules name, each once
++#[cfg(not(target_os = "wasi"))]
+ fn rule_leases<'a>(
+     proxy: &ProxyConfig,
+     leases: &'a IndexMap<String, LeaseBackendConfig>,
+@@ -301,6 +330,7 @@ fn rule_leases<'a>(
+ /// The secrets to resolve: the rules' secrets, the parent credentials of the
+ /// rules' leases, and whatever their providers need. Also returns the
+ /// secrets the leases read, which they look for in fnox's environment.
 +#[cfg(not(target_os = "wasi"))]
  fn collect_requested_secrets(
      config: &Config,
      profile: &[String],
-@@ -278,10 +300,97 @@ fn collect_requested_secrets(
+@@ -352,10 +382,107 @@ fn collect_requested_secrets(
  }
  
  impl ProxyRunCommand {
@@ -165,25 +204,34 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
 +        let sealed = crate::seven::sealed_secret_names(&config, &profile)?;
 +        let mut child_env: IndexMap<String, String> = IndexMap::new();
 +        for rule in &proxy_config.rules {
-+            let secret = all_secrets.get(&rule.secret).ok_or_else(|| {
++            if rule.lease.is_some() {
++                return Err(FnoxError::Seven(format!(
++                    "not available in seven: proxy lease '{}' cannot run on WASI",
++                    rule.name()
++                )));
++            }
++            let secret_name = rule.secret.as_deref().ok_or_else(|| {
 +                FnoxError::Config(format!(
-+                    "Proxy rule references unknown secret '{}'",
-+                    rule.secret
++                    "Proxy rule for domain '{}' needs a secret",
++                    rule.domain
 +                ))
 +            })?;
-+            if !sealed.contains(&rule.secret) {
++            let secret = all_secrets.get(secret_name).ok_or_else(|| {
++                FnoxError::Config(format!(
++                    "Proxy rule references unknown secret '{secret_name}'"
++                ))
++            })?;
++            if !sealed.contains(secret_name) {
 +                return Err(FnoxError::Seven(format!(
-+                    "not available in seven: proxy secret '{}' is not a sealed secret",
-+                    rule.secret
++                    "not available in seven: proxy secret '{secret_name}' is not a sealed secret"
 +                )));
 +            }
 +            let placeholder = secret.value().ok_or_else(|| {
 +                FnoxError::Seven(format!(
-+                    "seven: '{}' has no placeholder; run `fnox set {}`",
-+                    rule.secret, rule.secret
++                    "seven: '{secret_name}' has no placeholder; run `fnox set {secret_name}`"
 +                ))
 +            })?;
-+            let env_name = rule.env.as_deref().unwrap_or(&rule.secret);
++            let env_name = rule.env.as_deref().unwrap_or(secret_name);
 +            if let Some(existing) = child_env.get(env_name)
 +                && existing != placeholder
 +            {
@@ -232,6 +280,7 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
 +        Ok(())
 +    }
 +
++
 +    #[cfg(not(target_os = "wasi"))]
      fn sandbox_enabled(&self, proxy: &ProxyConfig) -> bool {
          self.sandbox || (proxy.sandbox && !self.no_sandbox)
@@ -241,7 +290,7 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
      async fn run(&self, cli: &Cli, config: Config) -> Result<()> {
          if self.command.is_empty() {
              return Err(FnoxError::CommandNotSpecified);
-@@ -465,6 +574,7 @@ impl ProxyRunCommand {
+@@ -663,6 +790,7 @@ fn terminal_interrupts_us() -> bool {
  }
  
  /// How a command ended.
@@ -249,7 +298,7 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
  enum Outcome {
      Exited(std::process::ExitStatus),
      /// fnox was interrupted by this signal and stopped the command.
-@@ -474,6 +584,7 @@ enum Outcome {
+@@ -672,6 +800,7 @@ enum Outcome {
  /// Runs `command`, and if fnox is interrupted first, stops it so the caller
  /// can remove the sandbox's placeholder files. The sandbox starts a session of
  /// its own, so Ctrl-C reaches fnox and not the command.
@@ -257,7 +306,7 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
  async fn run_until_interrupted(mut command: tokio::process::Command) -> std::io::Result<Outcome> {
      #[cfg(unix)]
      {
-@@ -503,6 +614,7 @@ async fn run_until_interrupted(mut command: tokio::process::Command) -> std::io:
+@@ -701,6 +830,7 @@ async fn run_until_interrupted(mut command: tokio::process::Command) -> std::io:
  mod tests {
      use super::*;
  
@@ -266,9 +315,10 @@ diff --git a/src/commands/proxy.rs b/src/commands/proxy.rs
      fn requested_secrets_include_provider_dependencies() {
          let config: Config = toml_edit::de::from_str(
 diff --git a/src/lib.rs b/src/lib.rs
+index 91445ec..1d5b269 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -24,7 +24,6 @@ pub mod hook_env;
+@@ -26,7 +26,6 @@ pub mod hook_env;
  pub mod local_http;
  #[cfg(not(target_os = "wasi"))]
  pub mod mcp;
@@ -277,9 +327,10 @@ diff --git a/src/lib.rs b/src/lib.rs
  pub mod redact;
  #[cfg(not(target_os = "wasi"))]
 diff --git a/src/proxy/mod.rs b/src/proxy/mod.rs
+index 17ac4b0..1de4a7e 100644
 --- a/src/proxy/mod.rs
 +++ b/src/proxy/mod.rs
-@@ -3,56 +3,96 @@
+@@ -3,59 +3,102 @@
  
  use crate::config::{ProxyConfig, ProxyEgress, ProxyRule};
  use crate::error::{FnoxError, Result};
@@ -338,6 +389,8 @@ diff --git a/src/proxy/mod.rs b/src/proxy/mod.rs
 +#[cfg(not(target_os = "wasi"))]
  mod handle;
 +#[cfg(not(target_os = "wasi"))]
+ mod leases;
++#[cfg(not(target_os = "wasi"))]
  mod plan;
 +#[cfg(not(target_os = "wasi"))]
  mod policy;
@@ -358,6 +411,8 @@ diff --git a/src/proxy/mod.rs b/src/proxy/mod.rs
 +#[cfg(not(target_os = "wasi"))]
  use handle::*;
 +#[cfg(not(target_os = "wasi"))]
+ use leases::*;
++#[cfg(not(target_os = "wasi"))]
  use policy::*;
 +#[cfg(not(target_os = "wasi"))]
  use values::*;
@@ -366,6 +421,8 @@ diff --git a/src/proxy/mod.rs b/src/proxy/mod.rs
  pub use handle::{
      ClientStream, MCP_HOST, MCP_RELAY_ENV, MCP_RELAY_PROFILE_ENV, McpService, ProxyHandle, RuleInfo,
  };
++#[cfg(not(target_os = "wasi"))]
+ pub use leases::{LeaseSetup, lease_credential};
 +#[cfg(not(target_os = "wasi"))]
  pub use plan::{ProxyPlan, deny_inspection, validate_config};
 +#[cfg(not(target_os = "wasi"))]
@@ -379,9 +436,10 @@ diff --git a/src/proxy/mod.rs b/src/proxy/mod.rs
      FnoxError::Config(format!("proxy: {}", message.into()))
 diff --git a/src/proxy/wasi.rs b/src/proxy/wasi.rs
 new file mode 100644
+index 0000000..d34ad8e
 --- /dev/null
 +++ b/src/proxy/wasi.rs
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,236 @@
 +use super::*;
 +use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 +use ipnet::IpNet;
@@ -418,7 +476,7 @@ new file mode 100644
 +        }
 +    }
 +    for entry in &config.allow_private {
-+        parse_network(entry)?;
++        parse_allowed(entry)?;
 +    }
 +    Ok(())
 +}
@@ -441,26 +499,72 @@ new file mode 100644
 +}
 +
 +fn validate_rule(rule: &ProxyRule) -> Result<()> {
-+    if rule.secret.trim().is_empty() {
-+        return Err(proxy_error("rule secret cannot be empty"));
++    match (&rule.secret, &rule.lease) {
++        (Some(_), Some(_)) => {
++            return Err(proxy_error(format!(
++                "rule for '{}' sets both secret and lease; choose one",
++                rule.name()
++            )));
++        }
++        (None, None) => {
++            return Err(proxy_error(format!(
++                "rule for domain '{}' needs a secret or a lease",
++                rule.domain
++            )));
++        }
++        (Some(secret), None) if secret.trim().is_empty() => {
++            return Err(proxy_error("rule secret cannot be empty"));
++        }
++        (None, Some(lease)) if lease.trim().is_empty() => {
++            return Err(proxy_error("rule lease cannot be empty"));
++        }
++        (Some(secret), None) if rule.credential.is_some() => {
++            return Err(proxy_error(format!(
++                "rule for '{secret}' sets credential, which only a lease rule can use"
++            )));
++        }
++        (None, Some(lease))
++            if rule
++                .credential
++                .as_deref()
++                .is_some_and(|c| c.trim().is_empty()) =>
++        {
++            return Err(proxy_error(format!(
++                "rule for lease '{lease}' has an empty credential"
++            )));
++        }
++        (None, Some(_)) => {
++            return Err(proxy_error(format!(
++                "rule for lease '{}' is not available in seven",
++                rule.name()
++            )));
++        }
++        _ => {}
 +    }
-+    let env_name = rule.env.as_deref().unwrap_or(&rule.secret);
-+    if [MCP_RELAY_ENV, MCP_RELAY_PROFILE_ENV].contains(&env_name) {
-+        return Err(proxy_error(format!(
-+            "rule for '{}' can't use the environment variable '{env_name}', which fnox reserves",
-+            rule.secret
-+        )));
++    if let Some(env_name) = rule
++        .env
++        .as_deref()
++        .or(rule.secret.as_deref())
++        .or(rule.credential.as_deref())
++    {
++        if [MCP_RELAY_ENV, MCP_RELAY_PROFILE_ENV].contains(&env_name) {
++            return Err(proxy_error(format!(
++                "rule for '{}' can't use the environment variable '{env_name}', which fnox reserves",
++                rule.name()
++            )));
++        }
 +    }
 +    if !is_valid_domain_pattern(&rule.domain) {
 +        return Err(proxy_error(format!(
 +            "rule for '{}' has an invalid domain '{}'",
-+            rule.secret, rule.domain
++            rule.name(),
++            rule.domain
 +        )));
 +    }
 +    if rule.header.is_some() && rule.query.is_some() {
 +        return Err(proxy_error(format!(
 +            "rule for '{}' sets both header and query; choose one",
-+            rule.secret
++            rule.name()
 +        )));
 +    }
 +    if let Some(header) = &rule.header
@@ -471,7 +575,7 @@ new file mode 100644
 +    {
 +        return Err(proxy_error(format!(
 +            "rule for '{}' has an invalid header name",
-+            rule.secret
++            rule.name()
 +        )));
 +    }
 +    if let Some(query) = &rule.query
@@ -479,7 +583,7 @@ new file mode 100644
 +    {
 +        return Err(proxy_error(format!(
 +            "rule for '{}' has an empty query parameter name",
-+            rule.secret
++            rule.name()
 +        )));
 +    }
 +    for method in &rule.methods {
@@ -490,7 +594,7 @@ new file mode 100644
 +        if !valid {
 +            return Err(proxy_error(format!(
 +                "rule for '{}' has an invalid HTTP method '{method}'",
-+                rule.secret
++                rule.name()
 +            )));
 +        }
 +    }
@@ -521,6 +625,34 @@ new file mode 100644
 +    })?))
 +}
 +
++fn parse_allowed(entry: &str) -> Result<()> {
++    let invalid = || {
++        proxy_error(format!(
++            "allow_private entry '{entry}' is not an IP address or CIDR block, optionally with a port"
++        ))
++    };
++    let (network, port) = if let Some(bracketed) = entry.strip_prefix('[') {
++        let (network, rest) = bracketed.split_once(']').ok_or_else(invalid)?;
++        match rest {
++            "" => (network, None),
++            _ => (network, Some(rest.strip_prefix(':').ok_or_else(invalid)?)),
++        }
++    } else if entry.matches(':').count() == 1 {
++        let (network, port) = entry.split_once(':').ok_or_else(invalid)?;
++        (network, Some(port))
++    } else {
++        (entry, None)
++    };
++    if let Some(port) = port {
++        port.parse::<u16>()
++            .ok()
++            .filter(|port| *port != 0)
++            .ok_or_else(invalid)?;
++    }
++    parse_network(network).map_err(|_| invalid())?;
++    Ok(())
++}
++
 +fn parse_network(entry: &str) -> Result<IpNet> {
 +    entry
 +        .parse::<IpNet>()
@@ -544,3 +676,4 @@ new file mode 100644
 +    }
 +    network
 +}
+

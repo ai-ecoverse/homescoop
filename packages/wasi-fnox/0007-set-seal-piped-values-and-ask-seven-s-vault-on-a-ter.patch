@@ -1,20 +1,17 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 07/18] set: seal piped values and ask seven's vault on a terminal
+Subject: [PATCH 7/19] set: seal piped values and ask seven's vault on a terminal
 
- terminal
-
-With a sealed provider, `fnox set NAME` seals a value read from a pipe
-(or --from-file) and stores the placeholder under the secret's own
-name. With stdin on a terminal it never prompts: it sends `request
-{kind: "value"}` so seven's vault dialog takes the value, polls
-`status` every second for up to 300 s, and sends `cancel` on Ctrl-C
-(SIGINT or SIGTERM are caught through the WASIX signal callback). A
-value given as an argument, which other processes can read from
-/proc, and --key-name are refused for sealed secrets.
+---
+ src/commands/set.rs |  59 ++++++++++++++++++++++----
+ src/lib.rs          |   1 +
+ src/seven.rs        | 101 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 152 insertions(+), 9 deletions(-)
+ create mode 100644 src/seven.rs
 
 diff --git a/src/commands/set.rs b/src/commands/set.rs
+index 3a45571..fab8cbf 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
 @@ -328,6 +328,8 @@ impl SetCommand {
@@ -112,9 +109,10 @@ diff --git a/src/commands/set.rs b/src/commands/set.rs
              // Priority order: remote key name, encrypted value, then plaintext
              if let Some(remote_key) = remote_key_name {
 diff --git a/src/lib.rs b/src/lib.rs
+index 44bc527..91445ec 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -30,6 +30,7 @@ pub mod redact;
+@@ -32,6 +32,7 @@ pub mod redact;
  #[cfg(not(target_os = "wasi"))]
  pub mod sandbox;
  pub mod secret_filter;
@@ -124,6 +122,7 @@ diff --git a/src/lib.rs b/src/lib.rs
  pub mod shell;
 diff --git a/src/seven.rs b/src/seven.rs
 new file mode 100644
+index 0000000..f05862d
 --- /dev/null
 +++ b/src/seven.rs
 @@ -0,0 +1,101 @@
@@ -228,3 +227,4 @@ new file mode 100644
 +        fnox_core::sealed::set_transport(None);
 +    }
 +}
+
