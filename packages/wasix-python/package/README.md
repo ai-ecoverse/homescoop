@@ -2,6 +2,20 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.0-8
+
+- **`pip` fails fast on homescoop-native packages.** `pip install` / `pip3 install` /
+  `python -m pip install` of numpy, scipy, pandas, matplotlib, pillow, contourpy or
+  kiwisolver exits at once with a hint to install **Python data tools** (`pydata` /
+  `slicc-py-datatools`) from seven's Install/Update, or `pnpm add -g @ai-ecoverse/py-…`,
+  but only when that distribution is not already installed. Once pydata is present,
+  those names are already satisfied and dependents (e.g. `pip install formulas`)
+  resolve normally. PyPI has no `wasm32-wasix` wheels for those; without the guard
+  pip tried an sdist build that looked hung. Pure-Python packages from PyPI still
+  work (`pip install six`). PyPI keys match
+  `packages/wasi-uv/homescoop-pydata-map.json` (shared with wasi-uv); the runtime
+  table is `_slicc_pip.py`, armed from `_slicc_site.fix()` (`cert/pip-guard.mjs`).
+
 ## Since 3.15.0-7
 
 - **Time zones by name.** With the zone files at `/usr/share/zoneinfo`
@@ -239,7 +253,9 @@ Since 3.14.2-17 (wasix-sysroot -27):
   (which other users cannot write); without a home or a writable cache
   directory there is no cache.
 - `pip` and `pip3` are commands (`python3 -m pip`); `pip install --user`
-  installs into the user's own site-packages.
+  installs into the user's own site-packages. Native pydata packages
+  (numpy, scipy, pandas, matplotlib, pillow, contourpy, kiwisolver) are
+  refused with a catalog hint (`_slicc_pip.py`, since 3.15.0-8).
 - `python -m venv` takes about half as long: ensurepip runs the package's own
   compiled pip instead of pip from the zipped wheel.
 
