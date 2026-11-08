@@ -7,6 +7,7 @@ import { exifOrientation, jpegSize } from '../../libheif/cert/lib/jpeg.mjs';
 import { pagePngDigest, pagePut, pageReadB64 } from '../../libheif/cert/lib/page.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const VERSION = /^version: "([^"]+)"$/m.exec(readFileSync(join(here, '../recipe.yaml'), 'utf8'))[1];
 const REF = JSON.parse(readFileSync(join(here, '../../libheif/cert/fixtures/references.json'), 'utf8'));
 const DIR = 'home/im';
 const CWD = `/${DIR}`;
@@ -41,7 +42,7 @@ export default async function imagemagickHeif(ctx) {
 
   {
     const v = await ok(['magick', '-version']);
-    assert.match(v.stdout, /^Version: ImageMagick 7\.1\.2-34 /);
+    assert.match(v.stdout, new RegExp(`^Version: ImageMagick ${VERSION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} `));
     assert.match(v.stdout, /Delegates \(built-in\):.*\bheic\b/);
     for (const d of ['freetype', 'webp', 'xml', 'zlib']) assert.match(v.stdout, new RegExp(`Delegates \\(built-in\\):.*\\b${d}\\b`), `default delegate ${d} kept`);
     const f = await ok(['magick', '-list', 'format']);

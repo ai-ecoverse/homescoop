@@ -8,12 +8,12 @@ inputs:
   - packages/imagemagick/*.patch
   - packages/imagemagick/type-slicc.xml
 # renovate: datasource=github-releases depName=ImageMagick/ImageMagick versioning=loose
-version: "7.1.2-34"
+version: "7.1.2-35"
 npm: "@ai-ecoverse/wasm-imagemagick-heif"
 summary: "ImageMagick magick CLI with HEIC/HEIF/AVIF through libheif (optional, HEVC)"
 source:
   url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "f5163a573a1c1bff16358d0a592b2fb168ad0fd3b9dc5ff57dc7820eebc5cf79"
+  sha256: "40b6fefa88fe16ca5a4b3d3db5133eaebfb0157f21f98530bde8aec5dd5b0776"
 sources:
   gsfonts:
     version: "8.11"
@@ -87,3 +87,6 @@ about:
     homescoop.relink and the notices name the relink package of exactly
     this version, and the relink package's check binds its kit to this
     version's bin/magick.wasm.
+    7.1.2-35-1: same upstream as wasm-imagemagick; mogrify-format-over-
+    existing.patch dropped (homescoop#624 fixed upstream); OpenJPEG stays
+    2.5.4-1 (homescoop#1957).
