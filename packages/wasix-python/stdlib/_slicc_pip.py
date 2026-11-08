@@ -5,6 +5,10 @@ PyPI has no wasm32-wasix wheels for these; pip falls back to an sdist build
 @ai-ecoverse/py-* packages, exposed in seven as Python data tools (pydata /
 slicc-py-datatools) and discovered via slicc.python.sitePackages.
 
+Source of truth for PyPI keys / npm / catalog membership:
+`packages/wasi-uv/homescoop-pydata-map.json` (shared with wasi-uv). Keep the
+dict below identical; `scripts/test/wasi-uv-pydata-map.test.mjs` checks both.
+
 Pure-Python packages (six, formulas with --no-deps after pydata, …) are not
 in this map and keep working through pip.
 """
@@ -12,18 +16,18 @@ from __future__ import annotations
 
 import sys
 
-# PyPI project name (PEP 503 normalized) → npm package id.
-# Keep in sync with packages/py-* that declare slicc.python.requires
-# (abi/platform): those need the WASIX build. Pure-Python py-* stay off
-# this map so `pip install six` and friends still work from PyPI.
+# PyPI project name (PEP 503 normalized) → {npm, catalog}.
+# catalog "pydata" → seven Install/Update → Python data tools; null → still
+# refuse (matplotlib deps / pulled in with pydata) but hint names the npm id.
+# Keys must match packages/wasi-uv/homescoop-pydata-map.json exactly.
 HOMESCOOP_PIP_NATIVE = {
-    "numpy": "@ai-ecoverse/py-numpy",
-    "scipy": "@ai-ecoverse/py-scipy",
-    "pandas": "@ai-ecoverse/py-pandas",
-    "matplotlib": "@ai-ecoverse/py-matplotlib",
-    "pillow": "@ai-ecoverse/py-pillow",
-    "contourpy": "@ai-ecoverse/py-contourpy",
-    "kiwisolver": "@ai-ecoverse/py-kiwisolver",
+    "numpy": {"npm": "@ai-ecoverse/py-numpy", "catalog": "pydata"},
+    "scipy": {"npm": "@ai-ecoverse/py-scipy", "catalog": "pydata"},
+    "pandas": {"npm": "@ai-ecoverse/py-pandas", "catalog": "pydata"},
+    "matplotlib": {"npm": "@ai-ecoverse/py-matplotlib", "catalog": "pydata"},
+    "pillow": {"npm": "@ai-ecoverse/py-pillow", "catalog": None},
+    "contourpy": {"npm": "@ai-ecoverse/py-contourpy", "catalog": None},
+    "kiwisolver": {"npm": "@ai-ecoverse/py-kiwisolver", "catalog": None},
 }
 
 _CATALOG = "Python data tools"
@@ -35,46 +39,74 @@ def canonicalize(name: str) -> str:
     return name.lower().replace("_", "-").replace(".", "-")
 
 
-def lookup(name: str) -> str | None:
-    """npm id for a PyPI project name, or None if pip may install it."""
+def entry(name: str) -> dict | None:
+    """Map entry for a PyPI project name, or None if pip may install it."""
     if not name:
         return None
     return HOMESCOOP_PIP_NATIVE.get(canonicalize(name.partition("[")[0]))
+
+
+def lookup(name: str) -> str | None:
+    """npm id for a PyPI project name, or None if pip may install it."""
+    e = entry(name)
+    return None if e is None else e["npm"]
 
 
 def hint_message(hits: list[tuple[str, str]]) -> str:
     """User-facing InstallationError text for one or more blocked packages."""
     # Preserve first-seen order; dedupe by normalized PyPI name.
     seen: set[str] = set()
-    ordered: list[tuple[str, str]] = []
-    for pypi, npm in hits:
+    ordered: list[tuple[str, dict]] = []
+    for pypi, _npm in hits:
         key = canonicalize(pypi)
         if key in seen:
             continue
+        e = HOMESCOOP_PIP_NATIVE.get(key)
+        if e is None:
+            continue
         seen.add(key)
-        ordered.append((key, npm))
+        ordered.append((key, e))
+    if not ordered:
+        return "pip cannot install this package on WASIX."
     names = ", ".join(p for p, _ in ordered)
-    npms = " ".join(sorted({n for _, n in ordered}))
+    npms = " ".join(sorted({e["npm"] for _, e in ordered}))
     plural = "these packages" if len(ordered) > 1 else "this package"
-    return (
+    wants_pydata = any(e.get("catalog") == _CATALOG_ID for _, e in ordered)
+    lines = [
         f"pip cannot install {names} on WASIX (no wasm32-wasix wheel; "
-        f"building from an sdist hangs or fails).\n"
-        f"\n"
-        f"Install {_CATALOG} ({_CATALOG_ID}) from seven's Install/Update, or:\n"
-        f"  pnpm add -g {npms}\n"
-        f"\n"
-        f"Pure-Python packages from PyPI still work (e.g. pip install six). "
-        f"After {_CATALOG_ID} is installed, use --no-deps for packages that "
-        f"only need {plural} (e.g. pip install --no-deps formulas)."
+        f"building from an sdist hangs or fails).",
+        "",
+    ]
+    if wants_pydata:
+        lines.append(
+            f"Install {_CATALOG} ({_CATALOG_ID}) from seven's Install/Update, or:"
+        )
+        lines.append(f"  pnpm add -g {npms}")
+    else:
+        # pillow / contourpy / kiwisolver: catalog null in the shared map.
+        lines.append(
+            f"Install {_CATALOG} ({_CATALOG_ID}), which pulls these in via "
+            f"matplotlib, or:"
+        )
+        lines.append(f"  pnpm add -g {npms}")
+    lines.extend(
+        [
+            "",
+            "Pure-Python packages from PyPI still work (e.g. pip install six). "
+            f"After {_CATALOG_ID} is installed, use --no-deps for packages that "
+            f"only need {plural} (e.g. pip install --no-deps formulas).",
+        ]
     )
+    return "\n".join(lines)
 
 
 def refuse(name: str) -> str | None:
     """If `name` is blocked, return the hint message; else None."""
-    npm = lookup(name)
-    if npm is None:
+    e = entry(name)
+    if e is None:
         return None
-    return hint_message([(canonicalize(name.partition("[")[0]), npm)])
+    key = canonicalize(name.partition("[")[0])
+    return hint_message([(key, e["npm"])])
 
 
 _patched = False

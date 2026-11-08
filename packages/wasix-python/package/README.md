@@ -11,8 +11,9 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
   seven's Install/Update, or `pnpm add -g @ai-ecoverse/py-…`. PyPI has no
   `wasm32-wasix` wheels for those; without the guard pip tried an sdist build that
   looked hung. Pure-Python packages from PyPI still work (`pip install six`; after
-  pydata, `pip install --no-deps formulas`). The map lives in `_slicc_pip.py` and is
-  armed from `_slicc_site.fix()` (`cert/pip-guard.mjs`).
+  pydata, `pip install --no-deps formulas`). PyPI keys match
+  `packages/wasi-uv/homescoop-pydata-map.json` (shared with wasi-uv); the runtime
+  table is `_slicc_pip.py`, armed from `_slicc_site.fix()` (`cert/pip-guard.mjs`).
 
 ## Since 3.15.0-7
 

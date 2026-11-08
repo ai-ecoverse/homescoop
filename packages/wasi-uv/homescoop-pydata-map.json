@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "description": "PyPI names that homescoop serves as WASIX natives. pip (wasix-python) and uv (wasi-uv) should share these keys. Pure-Python py-* (six, packaging, …) are intentionally absent: PyPI wheels/sdists still work on wasi_0_0_0_wasm32.",
+  "catalog": {
+    "id": "pydata",
+    "label": "Python data tools",
+    "project": "slicc-py-datatools",
+    "installHint": "Install/Update → Python data tools (pydata)"
+  },
+  "messageTemplate": "error: `{pypi}` has no WASIX wheel on PyPI and cannot be built from source here (platform tag wasi_0_0_0_wasm32).\nInstall {catalogHint}, or: pnpm add -g {npm}\nThen install pure-Python dependents with --no-deps (or uv's equivalent).",
+  "packages": {
+    "numpy": {
+      "npm": "@ai-ecoverse/py-numpy",
+      "catalog": "pydata",
+      "kind": "native"
+    },
+    "scipy": {
+      "npm": "@ai-ecoverse/py-scipy",
+      "catalog": "pydata",
+      "kind": "native"
+    },
+    "pandas": {
+      "npm": "@ai-ecoverse/py-pandas",
+      "catalog": "pydata",
+      "kind": "native"
+    },
+    "matplotlib": {
+      "npm": "@ai-ecoverse/py-matplotlib",
+      "catalog": "pydata",
+      "kind": "native"
+    },
+    "pillow": {
+      "npm": "@ai-ecoverse/py-pillow",
+      "catalog": null,
+      "kind": "native",
+      "note": "matplotlib dependency; not a direct pydata project dep, but ships with it via py-matplotlib"
+    },
+    "contourpy": {
+      "npm": "@ai-ecoverse/py-contourpy",
+      "catalog": null,
+      "kind": "native",
+      "note": "matplotlib dependency"
+    },
+    "kiwisolver": {
+      "npm": "@ai-ecoverse/py-kiwisolver",
+      "catalog": null,
+      "kind": "native",
+      "note": "matplotlib dependency"
+    }
+  }
+}
