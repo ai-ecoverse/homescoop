@@ -1,9 +1,10 @@
 /**
  * wasix-python 3.15.0-8: pip fails fast on homescoop-native packages
- * (numpy/scipy/pandas/matplotlib/pillow/contourpy/kiwisolver) with a
- * Python data tools / pydata hint, instead of attempting an sdist build.
- * Pure-Python installs (six) and a local wheel that only depends on numpy
- * (the formulas shape) still go through the guard; six succeeds.
+ * (numpy/scipy/pandas/matplotlib/pillow/contourpy/kiwisolver) when they are
+ * not already installed, with a Python data tools / pydata hint, instead of
+ * attempting an sdist build. When pydata is present (this cert's needs),
+ * those names are already satisfied and a local wheel that only depends on
+ * numpy installs. Pure-Python (six) still goes through pip.
  */
 import { createHash } from 'node:crypto';
 
@@ -67,7 +68,7 @@ with zipfile.ZipFile(f"/home/pgwheels/{name}-{ver}-py3-none-any.whl", "w") as z:
 `);
   await ok('python3 /home/mkdep.py');
 
-  // Direct installs: pip, pip3, python -m pip; case and extras.
+  // Base has pydata (cert needs): mapped names are already satisfied.
   for (const cmd of [
     'pip install numpy',
     'pip3 install NumPy',
@@ -77,25 +78,43 @@ with zipfile.ZipFile(f"/home/pgwheels/{name}-{ver}-py3-none-any.whl", "w") as z:
     'pip install contourpy',
     'pip install kiwisolver',
   ]) {
-    await fail(cmd);
+    const r = await ok(cmd);
+    const text = `${r.stdout}\n${r.stderr}`;
+    assert.match(text, /Requirement already satisfied/, text);
   }
 
-  // Transitive: a local package that Requires-Dist: numpy.
-  const dep = await fail('pip install hs_needs_numpy');
-  assert.match(dep, /numpy/, dep);
+  // Transitive: Requires-Dist: numpy installs once py-numpy is present.
+  const dep = await ok('pip install --user hs_needs_numpy');
+  assert.match(
+    `${dep.stdout}\n${dep.stderr}`,
+    /Successfully installed .*hs.needs.numpy|Requirement already satisfied: hs-needs-numpy/i,
+    `${dep.stdout}\n${dep.stderr}`,
+  );
+  assert.equal(
+    (await ok("python3 -c 'import hs_needs_numpy; print(hs_needs_numpy.VALUE)'")).stdout.trim(),
+    '1',
+  );
 
-  // Pure-Python still works.
+  // Pure-Python: py-six may already satisfy six on the base interpreter.
   const six = await ok('pip install --user six');
-  assert.match(six.stdout, /Successfully installed .*six/, six.stdout);
+  assert.match(
+    six.stdout,
+    /Successfully installed .*six|Requirement already satisfied: six/,
+    six.stdout,
+  );
   assert.equal(
     (await ok("python3 -c 'import six; print(six.__version__)'")).stdout.trim(),
     '1.17.0',
   );
 
-  // Same guard inside a venv.
+  // Fresh venv without system site-packages: natives missing → refuse; six ok.
   await ok('python3 -m venv /home/pgv');
   await fail('/home/pgv/bin/pip install numpy');
-  await ok('/home/pgv/bin/pip install six');
+  const venvSix = await ok('/home/pgv/bin/pip install six');
+  assert.match(venvSix.stdout, /Successfully installed .*six/, venvSix.stdout);
 
-  console.log('pip-guard: native pydata names fail fast with a catalog hint; six and venv pip still work');
+  console.log(
+    'pip-guard: with pydata present natives are satisfied and deps install; '
+      + 'a plain venv refuses numpy and still installs six',
+  );
 }

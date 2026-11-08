@@ -68,8 +68,33 @@ print(g.refuse("numpy"))
   assert.match(out, /Install\/Update/);
   assert.match(out, /pnpm add -g @ai-ecoverse\/py-numpy/);
   assert.match(out, /pip install six/);
-  assert.match(out, /--no-deps/);
+  assert.match(out, /already satisfied/);
   assert.equal(py('import _slicc_pip as g; print(g.refuse("six"))'), 'None');
+});
+
+test('_slicc_pip: refuse skips names already on importlib.metadata', () => {
+  const out = py(`
+import types, _slicc_pip as g
+
+# Pretend numpy is installed the way py-numpy is.
+class Dist:
+    pass
+meta = types.ModuleType("importlib.metadata")
+def distribution(name):
+    if name == "numpy":
+        return Dist()
+    raise Exception("not found")
+meta.distribution = distribution
+import sys
+sys.modules["importlib.metadata"] = meta
+
+assert g.already_installed("numpy") is True
+assert g.already_installed("scipy") is False
+assert g.refuse("numpy") is None
+assert "pydata" in (g.refuse("scipy") or "")
+print("ok")
+`);
+  assert.equal(out, 'ok');
 });
 
 test('_slicc_pip: install() wraps Factory.find_candidates', () => {
@@ -94,6 +119,13 @@ sys.modules["pip"] = types.ModuleType("pip")
 sys.modules["pip._internal"] = types.ModuleType("pip._internal")
 sys.modules["pip._internal.exceptions"] = exc
 
+# No distributions present → numpy blocked, six allowed.
+meta = types.ModuleType("importlib.metadata")
+def distribution(name):
+    raise Exception("not found")
+meta.distribution = distribution
+sys.modules["importlib.metadata"] = meta
+
 g._patched = False
 g.install()
 f = Factory()
@@ -103,7 +135,16 @@ try:
 except InstallationError as e:
     print("blocked:" + ("pydata" in str(e) and "numpy" in str(e) and "OK" or str(e)))
 print("six:" + f.find_candidates("six")[0])
+
+# With numpy present, find_candidates must not refuse.
+def distribution2(name):
+    if name == "numpy":
+        return object()
+    raise Exception("not found")
+meta.distribution = distribution2
+print("numpy-present:" + f.find_candidates("numpy")[0])
 `);
   assert.match(out, /^blocked:OK$/m);
   assert.match(out, /^six:ok:six$/m);
+  assert.match(out, /^numpy-present:ok:numpy$/m);
 });

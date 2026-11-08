@@ -6,12 +6,13 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
 - **`pip` fails fast on homescoop-native packages.** `pip install` / `pip3 install` /
   `python -m pip install` of numpy, scipy, pandas, matplotlib, pillow, contourpy or
-  kiwisolver (direct or as a dependency, e.g. `pip install formulas`) exits at once
-  with a hint to install **Python data tools** (`pydata` / `slicc-py-datatools`) from
-  seven's Install/Update, or `pnpm add -g @ai-ecoverse/py-…`. PyPI has no
-  `wasm32-wasix` wheels for those; without the guard pip tried an sdist build that
-  looked hung. Pure-Python packages from PyPI still work (`pip install six`; after
-  pydata, `pip install --no-deps formulas`). PyPI keys match
+  kiwisolver exits at once with a hint to install **Python data tools** (`pydata` /
+  `slicc-py-datatools`) from seven's Install/Update, or `pnpm add -g @ai-ecoverse/py-…`,
+  but only when that distribution is not already installed. Once pydata is present,
+  those names are already satisfied and dependents (e.g. `pip install formulas`)
+  resolve normally. PyPI has no `wasm32-wasix` wheels for those; without the guard
+  pip tried an sdist build that looked hung. Pure-Python packages from PyPI still
+  work (`pip install six`). PyPI keys match
   `packages/wasi-uv/homescoop-pydata-map.json` (shared with wasi-uv); the runtime
   table is `_slicc_pip.py`, armed from `_slicc_site.fix()` (`cert/pip-guard.mjs`).
 

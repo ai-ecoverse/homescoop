@@ -9,8 +9,9 @@ Source of truth for PyPI keys / npm / catalog membership:
 `packages/wasi-uv/homescoop-pydata-map.json` (shared with wasi-uv). Keep the
 dict below identical; `scripts/test/wasi-uv-pydata-map.test.mjs` checks both.
 
-Pure-Python packages (six, formulas with --no-deps after pydata, …) are not
-in this map and keep working through pip.
+Pure-Python packages (six, formulas, …) are not in this map and keep working
+through pip. When a mapped name is already installed (pydata / py-*), pip
+treats it as satisfied so dependents can resolve without --no-deps.
 """
 from __future__ import annotations
 
@@ -93,17 +94,32 @@ def hint_message(hits: list[tuple[str, str]]) -> str:
         [
             "",
             "Pure-Python packages from PyPI still work (e.g. pip install six). "
-            f"After {_CATALOG_ID} is installed, use --no-deps for packages that "
-            f"only need {plural} (e.g. pip install --no-deps formulas).",
+            f"After {_CATALOG_ID} is installed, dependents that need {plural} "
+            f"(e.g. formulas) resolve normally — pip sees the py-* copies as "
+            f"already satisfied.",
         ]
     )
     return "\n".join(lines)
 
 
+def already_installed(name: str) -> bool:
+    """True when importlib.metadata can see the distribution (e.g. py-numpy)."""
+    if not name:
+        return False
+    key = canonicalize(name.partition("[")[0])
+    try:
+        from importlib.metadata import distribution
+
+        distribution(key)
+        return True
+    except Exception:
+        return False
+
+
 def refuse(name: str) -> str | None:
-    """If `name` is blocked, return the hint message; else None."""
+    """If `name` is blocked and not already installed, return the hint; else None."""
     e = entry(name)
-    if e is None:
+    if e is None or already_installed(name):
         return None
     key = canonicalize(name.partition("[")[0])
     return hint_message([(key, e["npm"])])
