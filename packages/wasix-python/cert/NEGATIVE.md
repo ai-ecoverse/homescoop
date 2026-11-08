@@ -1,3 +1,7 @@
+## pip-guard.mjs: 3.15.0-7 has no pydata fail-fast (3.15.0-8)
+
+On npm `@ai-ecoverse/wasix-python@3.15.0-7` (no `_slicc_pip.py`), `pip install numpy` with `PIP_NO_INDEX=1` and an empty find-links fails with pip's stock `No matching distribution found for numpy` (or `Could not find a version that satisfies the requirement numpy`). The stderr does not mention `Python data tools`, `pydata`, or `pnpm add -g @ai-ecoverse/py-numpy`. With a network index, the same release starts an sdist build (cmake/ninja) for `wasm32-wasix` and looks hung. 3.15.0-8's `cert/pip-guard.mjs` expects the catalog hint instead.
+
 ## discovery.mjs's cost bounds catch a start that rescans (3.15.0-6; #1153; 2026-10-22)
 
 `cert/discovery.mjs` now measures discovery against itself without its cache, in the same run, instead of against PYTHONPATH with a 1.1 slack. On npm 3.15.0-5 (slicc-kernel 1.125.0, users enforce, local browser cert) it passes: `a start pays 57 ms for discovery (0.25 of its cost without the cache), 227 ms without its cache`. In earlier local runs the ratio was 0.17 to 0.28.

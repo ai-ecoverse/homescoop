@@ -3,7 +3,9 @@
 fix(): WASI stat() has no permission bits, so CPython's PATH search for
 argv[0] (getpath's isxfile) never matches the kernel's /usr/bin commands and
 sys.executable stays '' (python -m venv then refuses to run). fix() fills
-it in from PATH. It runs twice per start, idempotently: from
+it in from PATH. It also arms `_slicc_pip.install()` so pip refuses
+homescoop-native packages (numpy, …) with a pydata catalog hint instead of
+building an sdist. It runs twice per start, idempotently: from
 site-packages/slicc-executable.pth (base interpreter; a sitecustomize on
 PYTHONPATH cannot shadow it) and from the stdlib sitecustomize.py (venvs
 without system site-packages, which skip the base .pth files). A venv's own
@@ -45,6 +47,14 @@ _PY_PKG = "@ai-ecoverse/wasix-python"
 
 
 def fix():
+    # Arm the pip pydata fail-fast guard on every start (.pth and sitecustomize
+    # both call fix()). Import errors here must never break a plain python.
+    try:
+        import _slicc_pip
+
+        _slicc_pip.install()
+    except Exception:
+        pass
     if sys.executable:
         return
     argv0 = sys.orig_argv[0] if sys.orig_argv else ""
