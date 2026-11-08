@@ -1,32 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 15/18] hook-env and activate: the shell integration on WASI
+Subject: [PATCH 15/19] hook-env and activate: the shell integration on WASI
 
-`fnox hook-env`, which `fnox activate`'s prompt hook runs, keys its
-session hashes with std::process::id(). That panics on WASI ("no pids
-on this platform"), so the hook trapped with 134 at every prompt
-(homescoop#400). On WASI the pid now comes from the kernel, through
-wasix-command's process::id().
-
-`fnox activate` names fnox by its path in the hook it prints. WASI's
-std has no current_exe(), so 0003 printed a bare `fnox`. Inside the
-fnox() shell function that wraps the command, a bare `fnox` calls
-that function again, until the shell runs out of stack. Like upstream's
-which::which fallback, activate now looks for fnox on PATH
-(/usr/bin/fnox in seven), and with none on PATH it names /usr/bin/fnox,
-where slicc installs commands, never a bare `fnox` (homescoop#554).
-
-An as_file secret makes hook-env, get and export write its value to a
-file under std's temp_dir(), which also panics on WASI. In seven that
-file would put the value within a program's reach. So on WASI,
-create_persistent_secret_file refuses with the same message as
-`fnox exec` ("not available in seven: the value would be in a program
-(use a header rule)"). hook-env warns and skips the secret; get fails;
-export falls back to printing the value, as upstream does when the
-file can't be written.
+---
+ crates/fnox-core/src/temp_file_secrets.rs |  5 +++++
+ src/commands/activate.rs                  | 13 ++++++++++++-
+ src/hook_env.rs                           |  8 +++++++-
+ 3 files changed, 24 insertions(+), 2 deletions(-)
 
 diff --git a/crates/fnox-core/src/temp_file_secrets.rs b/crates/fnox-core/src/temp_file_secrets.rs
+index 75fd08e..dd5501f 100644
 --- a/crates/fnox-core/src/temp_file_secrets.rs
 +++ b/crates/fnox-core/src/temp_file_secrets.rs
 @@ -62,6 +62,11 @@ pub fn create_ephemeral_secret_file(key: &str, value: &str) -> Result<NamedTempF
@@ -42,6 +26,7 @@ diff --git a/crates/fnox-core/src/temp_file_secrets.rs b/crates/fnox-core/src/te
      let temp_dir = env::temp_dir();
      let timestamp = SystemTime::now()
 diff --git a/src/commands/activate.rs b/src/commands/activate.rs
+index 7d1390a..a866a56 100644
 --- a/src/commands/activate.rs
 +++ b/src/commands/activate.rs
 @@ -48,8 +48,19 @@ impl ActivateCommand {
@@ -66,6 +51,7 @@ diff --git a/src/commands/activate.rs b/src/commands/activate.rs
          let opts = ActivateOptions {
              exe,
 diff --git a/src/hook_env.rs b/src/hook_env.rs
+index bc56d41..4a20540 100644
 --- a/src/hook_env.rs
 +++ b/src/hook_env.rs
 @@ -85,6 +85,12 @@ impl HookEnvSession {
@@ -90,3 +76,4 @@ diff --git a/src/hook_env.rs b/src/hook_env.rs
              .finalize()
              .as_bytes();
  
+

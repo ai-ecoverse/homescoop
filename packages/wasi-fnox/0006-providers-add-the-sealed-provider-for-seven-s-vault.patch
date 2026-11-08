@@ -1,20 +1,25 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 06/18] providers: add the sealed provider for seven's vault
+Subject: [PATCH 6/19] providers: add the sealed provider for seven's vault
 
-A `sealed` provider stores only a placeholder in fnox.toml: `set` sends
-`seal {name, value}` to /dev/sealed and keeps the placeholder it gets
-back, and `get` returns the stored placeholder without asking the
-device. fnox_core::sealed is the device client for the v1 protocol:
-one versioned JSON request per write on a fresh descriptor, the reply
-read back to end of file, interrupted calls retried, framing errnos
-and JSON errors reported, and requests over 64 KiB refused before they
-are sent. Without the device every operation fails with "not running
-in seven: /dev/sealed is missing". The transport is replaceable, and
-the unit tests run against an in-process mock.
+---
+ crates/fnox-core/build/generate_providers.rs |   2 +-
+ crates/fnox-core/providers/sealed.toml       |   9 +
+ crates/fnox-core/src/error.rs                |   4 +
+ crates/fnox-core/src/lib.rs                  |   1 +
+ crates/fnox-core/src/providers/mod.rs        |   5 +-
+ crates/fnox-core/src/providers/sealed.rs     |  67 ++
+ crates/fnox-core/src/sealed.rs               | 624 +++++++++++++++++++
+ src/commands/provider/add.rs                 |   4 +
+ src/commands/provider/mod.rs                 |   3 +
+ 9 files changed, 716 insertions(+), 3 deletions(-)
+ create mode 100644 crates/fnox-core/providers/sealed.toml
+ create mode 100644 crates/fnox-core/src/providers/sealed.rs
+ create mode 100644 crates/fnox-core/src/sealed.rs
 
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
+index 071344d..56c268b 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
 @@ -828,7 +828,7 @@ fn wasi_enabled(module: &str) -> bool {
@@ -28,6 +33,7 @@ diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/bui
  fn generate_provider_instantiate(
 diff --git a/crates/fnox-core/providers/sealed.toml b/crates/fnox-core/providers/sealed.toml
 new file mode 100644
+index 0000000..9756912
 --- /dev/null
 +++ b/crates/fnox-core/providers/sealed.toml
 @@ -0,0 +1,9 @@
@@ -41,6 +47,7 @@ new file mode 100644
 +Only available inside seven (slicc-kernel with /dev/sealed).
 +fnox stores the placeholder; the kernel fills in the value at use."""
 diff --git a/crates/fnox-core/src/error.rs b/crates/fnox-core/src/error.rs
+index bac02b8..202fcb4 100644
 --- a/crates/fnox-core/src/error.rs
 +++ b/crates/fnox-core/src/error.rs
 @@ -119,6 +119,10 @@ pub enum FnoxError {
@@ -55,6 +62,7 @@ diff --git a/crates/fnox-core/src/error.rs b/crates/fnox-core/src/error.rs
      // Plugin Errors
      // ========================================================================
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
+index a237250..1d1bfe5 100644
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
 @@ -26,6 +26,7 @@ pub mod library;
@@ -62,10 +70,11 @@ diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
  pub mod plugins;
  pub mod providers;
 +pub mod sealed;
+ #[cfg(not(target_os = "wasi"))]
+ pub mod push_targets;
  pub mod secret_file;
- pub mod secret_resolver;
- pub mod settings;
 diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/providers/mod.rs
+index fb66d7a..e6e7271 100644
 --- a/crates/fnox-core/src/providers/mod.rs
 +++ b/crates/fnox-core/src/providers/mod.rs
 @@ -62,6 +62,7 @@ pub mod plain;
@@ -91,6 +100,7 @@ diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/provid
              "/generated/providers_instantiate.rs"
 diff --git a/crates/fnox-core/src/providers/sealed.rs b/crates/fnox-core/src/providers/sealed.rs
 new file mode 100644
+index 0000000..a7a2f96
 --- /dev/null
 +++ b/crates/fnox-core/src/providers/sealed.rs
 @@ -0,0 +1,67 @@
@@ -163,6 +173,7 @@ new file mode 100644
 +}
 diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
 new file mode 100644
+index 0000000..9cf8473
 --- /dev/null
 +++ b/crates/fnox-core/src/sealed.rs
 @@ -0,0 +1,624 @@
@@ -791,6 +802,7 @@ new file mode 100644
 +    }
 +}
 diff --git a/src/commands/provider/add.rs b/src/commands/provider/add.rs
+index f89e162..90d869d 100644
 --- a/src/commands/provider/add.rs
 +++ b/src/commands/provider/add.rs
 @@ -372,6 +372,10 @@ impl AddCommand {
@@ -805,6 +817,7 @@ diff --git a/src/commands/provider/add.rs b/src/commands/provider/add.rs
                  vault: self
                      .vault
 diff --git a/src/commands/provider/mod.rs b/src/commands/provider/mod.rs
+index 1219055..ee25d42 100644
 --- a/src/commands/provider/mod.rs
 +++ b/src/commands/provider/mod.rs
 @@ -110,6 +110,9 @@ pub enum ProviderType {
@@ -817,3 +830,4 @@ diff --git a/src/commands/provider/mod.rs b/src/commands/provider/mod.rs
      /// Proton Pass
      #[usage(name = "proton-pass")]
      #[strum(serialize = "proton-pass")]
+

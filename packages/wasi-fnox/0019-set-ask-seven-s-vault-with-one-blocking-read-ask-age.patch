@@ -1,34 +1,9 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Pi <pi@earendil.works>
+From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 12:00:00 +0100
-Subject: [PATCH] set: ask seven's vault with one blocking read, --ask, age and
- plain
+Subject: [PATCH 19/19] set: ask seven's vault with one blocking read, --ask, age and
+ read, --ask, age and
 
-`fnox set NAME` on a terminal sent `request {kind: "value"}` and polled
-`status` every second for up to 300 s. It now writes one `ask {name,
-prompt?, reveal, replace: true}` to /dev/sealed and blocks in a single
-read until the vault answers (`done` with the placeholder, `cancelled`,
-`expired`, or an error). Ctrl-C still cancels: the WASIX signal
-callback marks the read interrupted, fnox closes the descriptor and
-exits 130, and the kernel withdraws the dialog. `replace: true` keeps
-`fnox set` a way to type a new value for a name the vault already has,
-which rotates the record under its placeholder. `--description` is the
-dialog's prompt, clipped to 200 UTF-16 units.
-
-`--ask` opens the dialog when stdin is not a terminal (the agent's
-bash): it never reads stdin, prints the placeholder alone on stdout and
-the status line on stderr. It conflicts with VALUE, --from-file and
---generate.
-
-A secret with an age or plain provider (or no provider) asks with
-`reveal: true`, and fnox stores what it normally stores for the value
-the user typed: the age ciphertext, or the plaintext. The vault keeps
-its sealed copy, so the value is still scrubbed. Other providers are
-refused before a dialog. The reply buffer and an unused revealed value
-are zeroed. `fnox set --file` refuses --ask like --generate, and edit and
-the secret session build their SetCommand without it.
-
-Signed-off-by: Lars Trieloff <lars@trieloff.net>
 ---
  crates/fnox-core/src/sealed.rs | 301 ++++++++++++++++++++++++++++++++-
  src/commands/edit.rs           |   1 +

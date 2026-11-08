@@ -1,18 +1,18 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.45.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.46.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Needs slicc-kernel 1.175.0 and later
 # (/dev/sealed, exec tickets and the ask op).
 name: wasi-fnox
 builder: host
 # renovate: datasource=github-releases depName=jdx/fnox
-version: "1.45.0"
+version: "1.46.0"
 npm: "@ai-ecoverse/wasi-fnox"
-summary: "fnox 1.45 for slicc WASI preview1 (command fnox; seven's sealed store)"
+summary: "fnox 1.46 for slicc WASI preview1 (command fnox; seven's sealed store)"
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
-  sha256: "845f9e8078869c60d67a1a9d14a77e997bca0a7c5640c7ae83ca38fecd4a8340"
-  epoch: "1793301543"
+  sha256: "62b3e7a586cdf4ab4c4c4c3fb1f42ff8de8e4b36e24843720f65682b281677d6"
+  epoch: "1793527273"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.45.0; the patches live here, are not
+    Upstream is jdx/fnox v1.46.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -55,7 +55,8 @@ about:
            prerequisite check reads its auth setting (azure_shared's
            AzureAuth, which stays built), and its backend, managed
            identity included, stays compiled out; from 1.42.1 also
-           activate's invoked_exe (which and current_exe); proxy stays
+           activate's invoked_exe (which and current_exe); from 1.46.0
+           also push and push_targets (CI/hosting writes); proxy stays
            as a WASI stub for rules validation (0009)
       0004 cwd from PWD, HOME from the environment, current_thread; the
            XDG defaults (config, state, and 1.40.0's data dir) as on unix
@@ -79,7 +80,9 @@ about:
            refuse values in argv
       0008 exec: materialize, then spawn the resolved path with
            SLICC_SEALED_TICKET; as_file refused; missing command → 127
-      0009 proxy rules --json; proxy run passes placeholders on WASI
+      0009 proxy rules --json; proxy run passes placeholders on WASI;
+           from 1.46.0 the stub validates port-specific allow_private
+           and refuses lease rules (native proxy leases stay compiled out)
       0010 refuse sync/reencrypt, age decryption (slicc-vault#2); check
            asks the vault for each sealed record
       0012 exec --shell-grants: materialize {shellGrants} (slicc-vault#9)
@@ -101,7 +104,7 @@ about:
            ciphertext or plaintext
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.45.0 commit time (source.epoch, 2026-10-29T19:19:03Z), so the
+    v1.46.0 commit time (source.epoch, 2026-11-01T10:01:13Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -158,3 +161,11 @@ about:
     `--ask`. It needs slicc-kernel 1.175.0 (`ask`, engines) and a
     slicc-vault with `ask`; the cert and test/sealed.mjs run on
     slicc-kernel 1.175.0.
+    1.46.0-1 rebases the series onto v1.46.0: 0001 keeps futures in the
+    common deps and async-trait in dev-dependencies; 0003 also gates
+    push and push_targets; 0009's WASI stub validates port-specific
+    allow_private and refuses lease rules fail-closed; 0010's sync
+    refusal sits above the new files sync-cache path. Security patches
+    0006, 0007, 0008, 0010, 0012, 0013, 0016 and 0019 keep the same
+    added and removed lines. build.sh's usage-test notice moves to
+    7.1.4 (the same LICENSE, f68207e9...).

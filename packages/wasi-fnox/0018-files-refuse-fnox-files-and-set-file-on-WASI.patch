@@ -1,13 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 18/18] files: refuse fnox files and set/get --file on WASI
+Subject: [PATCH 18/19] files: refuse fnox files and set/get --file on WASI
 
-On WASI, refuse the 1.44/1.45 secret-files commands and flags
-(fnox files, fnox set --file, fnox get --file). Seven has no
-path for writing or editing secret files; use fnox set/get.
+---
+ src/commands/get.rs | 18 ++++++++++++++----
+ src/commands/mod.rs |  5 +++++
+ src/commands/set.rs |  9 +++++++++
+ 3 files changed, 28 insertions(+), 4 deletions(-)
 
 diff --git a/src/commands/get.rs b/src/commands/get.rs
+index 8995323..caad8f8 100644
 --- a/src/commands/get.rs
 +++ b/src/commands/get.rs
 @@ -57,12 +57,22 @@ impl GetCommand {
@@ -38,9 +41,10 @@ diff --git a/src/commands/get.rs b/src/commands/get.rs
          if self.key.is_none() {
              return Err(FnoxError::Config(
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
+index cd769de..77f22b6 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -375,6 +375,11 @@ impl Commands {
+@@ -380,6 +380,11 @@ impl Commands {
              #[cfg(not(target_os = "wasi"))]
              Commands::Edit(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Export(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -53,6 +57,7 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
              Commands::Get(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Import(cmd) => cmd.run(cli, self.load_config(cli)?).await,
 diff --git a/src/commands/set.rs b/src/commands/set.rs
+index 9eb662f..3ad7f47 100644
 --- a/src/commands/set.rs
 +++ b/src/commands/set.rs
 @@ -247,6 +247,7 @@ impl SetCommand {
@@ -78,3 +83,4 @@ diff --git a/src/commands/set.rs b/src/commands/set.rs
              return self.run_file(cli, &config, path).await;
          }
          let target_path = if self.global {
+

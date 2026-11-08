@@ -1,19 +1,17 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 14/18] edit: refuse fnox edit on WASI instead of panicking
+Subject: [PATCH 14/19] edit: refuse fnox edit on WASI instead of panicking
 
-`fnox edit` writes its decrypted copy with tempfile, whose
-std::env::temp_dir() panics on wasm32-wasip1, and runs the editor
-through std::process::Command, which is unsupported there; in
-slicc-kernel it trapped with status 134. On WASI the command now fails
-with "fnox edit is not available in seven: use fnox set" before any
-configuration is loaded or file written.
+---
+ src/commands/mod.rs | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
+index ccdad2a..cd769de 100644
 --- a/src/commands/mod.rs
 +++ b/src/commands/mod.rs
-@@ -368,6 +368,11 @@ impl Commands {
+@@ -373,6 +373,11 @@ impl Commands {
              Commands::Check(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::CiRedact(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Doctor(cmd) => cmd.run(cli, self.load_config(cli)?).await,
@@ -25,3 +23,4 @@ diff --git a/src/commands/mod.rs b/src/commands/mod.rs
              Commands::Edit(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Export(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Files(cmd) => cmd.run(cli, self.load_config(cli)?).await,
+

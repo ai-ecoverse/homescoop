@@ -1,13 +1,15 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 11/18] wasi: allow the lints that code compiled out on WASI triggers
+Subject: [PATCH 11/19] wasi: allow the lints that code compiled out on WASI triggers
 
- leaves behind
-
-Gating providers, leases and the local proxy on WASI leaves imports, helpers and early returns that only the native build uses. Both crates allow dead_code, unused_imports, unused_variables, unused_mut and unreachable_code on WASI only, so the WASI build is warning-free and native lints are unchanged.
+---
+ crates/fnox-core/src/lib.rs | 11 +++++++++++
+ src/lib.rs                  | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
 
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
+index 1d1bfe5..179bb07 100644
 --- a/crates/fnox-core/src/lib.rs
 +++ b/crates/fnox-core/src/lib.rs
 @@ -8,6 +8,17 @@
@@ -29,6 +31,7 @@ diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
  pub mod auth_prompt;
  pub mod config;
 diff --git a/src/lib.rs b/src/lib.rs
+index 1d5b269..7c438d0 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
 @@ -1,3 +1,14 @@
@@ -46,3 +49,4 @@ diff --git a/src/lib.rs b/src/lib.rs
  // Library interface for fnox
  //
  // The provider library, config types, and secret resolver live in the `fnox-core`
+

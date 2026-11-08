@@ -1,21 +1,15 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 01/18] build: gate non-WASI dependencies by target
+Subject: [PATCH 1/19] build: gate non-WASI dependencies by target
 
-Move dependencies that do not build for wasm32-wasip1 (cloud SDKs,
-reqwest, rustls/rcgen with aws-lc, keyring, TUI, prompts, signal
-handling, file locking, keepass, enpass, and since 1.40.0 the
-Kubernetes client (kube, k8s-openapi) and the vendored Lua 5.4 of the
-Lua plugin provider (mlua), which would need a C toolchain) under
-cfg(not(target_os = "wasi")). On WASI, age is built with ssh only and
-tokio with rt, macros, sync, time, io-util, fs and io-std. chrono's
-serde feature is now requested directly instead of through
-feature unification.
-
-Native targets keep the same dependency set and features.
+---
+ Cargo.toml                  | 37 ++++++++++++----------
+ crates/fnox-core/Cargo.toml | 62 ++++++++++++++++++++-----------------
+ 2 files changed, 55 insertions(+), 44 deletions(-)
 
 diff --git a/Cargo.toml b/Cargo.toml
+index 5ef1ef8..500ce23 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -16,7 +16,7 @@ rust-version = "1.91.1"
@@ -60,10 +54,10 @@ diff --git a/Cargo.toml b/Cargo.toml
 -crossterm = { workspace = true }
  data-encoding = { workspace = true }
 -demand = { workspace = true }
+ futures = { workspace = true }
  globset = { workspace = true }
  hex = { workspace = true }
- ignore = { workspace = true }
-@@ -161,32 +158,40 @@ ipnet = { workspace = true }
+@@ -162,32 +159,40 @@ ipnet = { workspace = true }
  libc = { workspace = true }
  miette = { workspace = true }
  miniz_oxide = { workspace = true }
@@ -113,8 +107,9 @@ diff --git a/Cargo.toml b/Cargo.toml
 +tokio = { workspace = true, features = ["rt", "macros", "sync", "time", "io-util", "fs", "io-std"] }
  
  [dev-dependencies]
- tempfile = { workspace = true }
+ async-trait = { workspace = true }
 diff --git a/crates/fnox-core/Cargo.toml b/crates/fnox-core/Cargo.toml
+index 66d011e..37b89a0 100644
 --- a/crates/fnox-core/Cargo.toml
 +++ b/crates/fnox-core/Cargo.toml
 @@ -11,51 +11,26 @@ readme = "../../README.md"
@@ -220,3 +215,4 @@ diff --git a/crates/fnox-core/Cargo.toml b/crates/fnox-core/Cargo.toml
  ctap-hid-fido2 = { workspace = true }
  
  [target.'cfg(target_os = "linux")'.dependencies]
+

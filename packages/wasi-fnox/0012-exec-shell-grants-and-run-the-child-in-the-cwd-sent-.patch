@@ -1,24 +1,16 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
-Subject: [PATCH 12/18] exec: shell grants and run the child in the cwd sent by seven
+Subject: [PATCH 12/19] exec: shell grants and run the child in the cwd sent by seven
 
- sent to the vault
-
-`fnox exec --shell-grants -- cmd` sends `materialize {shellGrants: true,
-path, argv, cwd}` (slicc-vault#9) instead of naming this configuration's
-sealed secrets, which then keep their placeholders. Each name the vault
-grants is set in the child's environment to its placeholder, from the
-configuration when it holds the record and from `placeholder {name}`
-otherwise, so the kernel can swap it at exec. The plain-value warning is
-left out in this mode, which the agent's bash hook uses for every
-command.
-
-The child now also gets the cwd that went into the ticket explicitly,
-so the kernel's binding of path, argv and cwd always matches what fnox
-sent.
+---
+ crates/fnox-core/src/sealed.rs | 31 +++++++++++++++++
+ src/commands/exec.rs           | 32 ++++++++++++++++--
+ src/seven.rs                   | 61 ++++++++++++++++++++++++++++++----
+ 3 files changed, 114 insertions(+), 10 deletions(-)
 
 diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
+index 9cf8473..3d85bf0 100644
 --- a/crates/fnox-core/src/sealed.rs
 +++ b/crates/fnox-core/src/sealed.rs
 @@ -222,6 +222,16 @@ pub fn materialize(names: &[String], path: &str, argv: &[String], cwd: &str) ->
@@ -67,6 +59,7 @@ diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
      fn wait_polls_until_done() {
          let (_g, mock) = install();
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
+index 9173c7a..415261d 100644
 --- a/src/commands/exec.rs
 +++ b/src/commands/exec.rs
 @@ -106,6 +106,13 @@ pub struct ExecCommand {
@@ -149,6 +142,7 @@ diff --git a/src/commands/exec.rs b/src/commands/exec.rs
              cmd.env("SLICC_SEALED_TICKET", ticket);
          }
 diff --git a/src/seven.rs b/src/seven.rs
+index eebfb9e..b9e5b94 100644
 --- a/src/seven.rs
 +++ b/src/seven.rs
 @@ -74,11 +74,17 @@ pub struct PreparedExec {
@@ -266,3 +260,4 @@ diff --git a/src/seven.rs b/src/seven.rs
              &root,
              Some(&path),
          ) {
+

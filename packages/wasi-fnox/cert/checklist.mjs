@@ -50,7 +50,7 @@ export default async function (ctx) {
   const help = await fnox(['--help']);
   assert.equal(help.status, 0);
   for (const cmd of ['exec', 'get', 'set', 'proxy']) assert.match(help.stdout, new RegExp(`\\n  ${cmd} `));
-  for (const cmd of ['daemon', 'tui', 'mcp', 'plugin']) assert.doesNotMatch(help.stdout, new RegExp(`\\n  ${cmd} `));
+  for (const cmd of ['daemon', 'tui', 'mcp', 'plugin', 'push']) assert.doesNotMatch(help.stdout, new RegExp(`\\n  ${cmd} `));
   const add = await fnox(['provider', 'add', '--help']);
   assert.equal(add.status, 0, `provider add --help: ${add.stderr}`);
   assert.match(add.stdout, /\bsealed\b/, 'provider add offers sealed on WASI');
@@ -393,6 +393,61 @@ export default async function (ctx) {
   assert.notEqual(getByFile.status, 0, 'fnox get --file must fail');
   assert.ok(flat(getByFile.stderr).includes('fnox get --file is not available in seven: use fnox get'), `fnox get --file: ${getByFile.stderr}`);
   assert.doesNotMatch(getByFile.stderr, /panicked|wasm trap/);
+  const pushCmd = await run(['fnox', 'push'], { cwd: '/home/plain', env });
+  assert.notEqual(pushCmd.status, 134, `fnox push trapped: ${pushCmd.stderr}`);
+  assert.notEqual(pushCmd.status, 0, 'fnox push must fail');
+  assert.match(flat(pushCmd.stderr), /unrecognized subcommand|unexpected argument|no such subcommand|invalid subcommand/i, `fnox push compiled out: ${pushCmd.stderr}`);
+  assert.doesNotMatch(pushCmd.stderr, /panicked|wasm trap/);
+  await write(
+    'home/v146lease/fnox.toml',
+    [
+      '[providers.plain]',
+      'type = "plain"',
+      '',
+      '[leases.forge]',
+      'type = "gitlab"',
+      'url = "https://gitlab.example.com"',
+      'project = "acme/api"',
+      'scopes = ["api"]',
+      'duration = "1h"',
+      '',
+      '[proxy]',
+      '[[proxy.rules]]',
+      'lease = "forge"',
+      'domain = "forge.example.com"',
+      'header = "private-token"',
+      '',
+    ].join('\n'),
+  );
+  const leaseRules = await run(['fnox', 'proxy', 'rules', '--json'], { cwd: '/home/v146lease', env });
+  assert.notEqual(leaseRules.status, 134, `1.46.0 proxy lease rule trapped: ${leaseRules.stderr}`);
+  assert.notEqual(leaseRules.status, 0, '1.46.0 proxy lease rule must fail');
+  assert.ok(
+    flat(leaseRules.stderr).includes("rule for lease 'forge' is not available in seven"),
+    `1.46.0 proxy lease rule refused: ${leaseRules.stderr}`,
+  );
+  assert.doesNotMatch(leaseRules.stderr, /panicked|wasm trap/);
+  await write(
+    'home/v146port/fnox.toml',
+    [
+      '[providers.plain]',
+      'type = "plain"',
+      '',
+      '[secrets]',
+      'GH = { provider = "plain", value = "token" }',
+      '',
+      '[proxy]',
+      'allow_private = ["127.0.0.1:4790"]',
+      '[[proxy.rules]]',
+      'secret = "GH"',
+      'domain = "api.github.com"',
+      'header = "authorization"',
+      '',
+    ].join('\n'),
+  );
+  const portRules = await run(['fnox', 'proxy', 'rules', '--json'], { cwd: '/home/v146port', env });
+  assert.equal(portRules.status, 0, `1.46.0 allow_private with a port: ${portRules.stderr}`);
+  assert.match(portRules.stdout, /127\.0\.0\.1:4790/, `1.46.0 allow_private port kept in rules --json: ${portRules.stdout}`);
   const missing = await run(['fnox', 'exec', '--', 'no-such-command'], { cwd: '/home/plain', env });
   assert.equal(missing.status, 127, `missing command: ${missing.stderr}`);
 
