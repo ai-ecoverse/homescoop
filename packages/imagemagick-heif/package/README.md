@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-imagemagick-heif`
 
-[ImageMagick](https://imagemagick.org/) 7.1.2-34 `magick` CLI for
+[ImageMagick](https://imagemagick.org/) 7.1.2-35 `magick` CLI for
 [slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm, **with HEIC /
 HEIF / AVIF reading** through [libheif](https://github.com/strukturag/libheif)
 1.23.6. It is the same build as `@ai-ecoverse/wasm-imagemagick`, with the same

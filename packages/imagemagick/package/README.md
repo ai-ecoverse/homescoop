@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-imagemagick`
 
-[ImageMagick](https://imagemagick.org/) 7.1.2-34 `magick` CLI for
+[ImageMagick](https://imagemagick.org/) 7.1.2-35 `magick` CLI for
 [slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm. `convert`,
 `identify`, and `mogrify` are argv0 aliases of the same binary.
 
