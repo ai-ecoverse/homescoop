@@ -12,9 +12,19 @@ sockets or a child process does not.
   explains that the package manager upgrades it, and self_update/ureq
   (rustls, ring) are left out of the wasi dependency graph.
 - main: wasi-libc starts every program in "/" (std::env::current_dir()
-  is "/" on slicc-kernel); on WASI the working directory is taken from
-  PWD, which the runtime sets. Without it, `extends` in biome.json does
-  not resolve packages from the project's node_modules.
+  is "/" on slicc-kernel, while relative paths reach the process's
+  working directory through the kernel's `.` preopen), and Biome resolves
+  paths and configuration from current_dir. On WASI main changes into the
+  real working directory: PWD when it names the same directory as `.`
+  (device and inode, as POSIX shells check PWD), otherwise the path
+  getcwd(3)'s walk finds (`..` up to the root, each directory looked up
+  in its parent). A parent can set a child's directory without rewriting
+  PWD (Node's child_process.spawn with `cwd`); taking that stale PWD made
+  Biome resolve relative paths against the parent's directory ("No files
+  were processed in the specified paths"). Without the chdir, `extends`
+  in biome.json does not resolve packages from the project's
+  node_modules. libc, a unix dependency already, is a wasi one too, for
+  stat(2).
 - biome_fs: std::env::temp_dir() panics on WASI ("not supported by WASI
   yet") and ensure_cache_dir() falls back to it, since there is no
   platform cache directory; on WASI it takes TMPDIR, or /tmp.
@@ -43,7 +53,7 @@ diff --git a/crates/biome_cli/Cargo.toml b/crates/biome_cli/Cargo.toml
  
  [dev-dependencies]
  biome_css_formatter  = { path = "../biome_css_formatter" }
-@@ -107,6 +105,11 @@
+@@ -107,6 +105,15 @@
  [target.'cfg(all(target_family="unix", not(all(target_arch = "aarch64", target_env = "musl"))))'.dependencies]
  tikv-jemallocator = { workspace = true }
  
@@ -51,6 +61,10 @@ diff --git a/crates/biome_cli/Cargo.toml b/crates/biome_cli/Cargo.toml
 +[target.'cfg(not(target_os = "wasi"))'.dependencies]
 +self_update = { version = "1.2.0", default-features = false, features = ["github", "rustls", "ureq"] }
 +ureq        = { workspace = true }
++
++# main.rs compares PWD with the working directory by device and inode.
++[target.'cfg(target_os = "wasi")'.dependencies]
++libc = "0.2.184"
 +
  [target."cfg(unix)".dependencies]
  libc  = "0.2.184"
@@ -105,20 +119,81 @@ diff --git a/crates/biome_cli/src/commands/upgrade_wasi.rs b/crates/biome_cli/sr
 diff --git a/crates/biome_cli/src/main.rs b/crates/biome_cli/src/main.rs
 --- a/crates/biome_cli/src/main.rs
 +++ b/crates/biome_cli/src/main.rs
-@@ -36,6 +36,13 @@
+@@ -37,6 +37,13 @@
      setup_panic_handler();
      set_bottom_frame(main as *const () as usize);
  
-+    // wasi-libc starts every program in "/"; the runtime passes the working
-+    // directory in PWD, and Biome resolves paths and configuration from it.
++    // wasi-libc starts every program in "/", whatever the process's working
++    // directory is; Biome resolves paths and configuration from it.
 +    #[cfg(target_os = "wasi")]
-+    if let Some(pwd) = std::env::var_os("PWD") {
-+        let _ = std::env::set_current_dir(pwd);
++    if let Some(dir) = wasi_working_directory() {
++        let _ = std::env::set_current_dir(dir);
 +    }
 +
      let mut console = EnvConsole::default();
      let command = biome_command().fallback_to_usage().run();
  
+@@ -87,3 +94,60 @@
+     let session = CliSession::new(&**workspace, console)?;
+     session.run(command)
+ }
++
++/// The process's working directory, for wasi-libc's, which is always "/" at
++/// start. Relative paths reach the real one (the kernel's `.` preopen), but
++/// nothing gives its path. PWD names it only when it is the same directory
++/// as `.` (device and inode), as POSIX shells check it: a parent can change
++/// a child's directory without rewriting PWD, as Node's `spawn` with `cwd`
++/// does. Otherwise the path is found as getcwd(3) finds it, by walking `..`
++/// up to the root and looking for each directory in its parent. PWD=/ is
++/// never taken: "/" is not a preopen, so before the chdir it reaches `.`.
++#[cfg(target_os = "wasi")]
++fn wasi_working_directory() -> Option<std::path::PathBuf> {
++    use std::ffi::CString;
++    use std::os::wasi::ffi::OsStrExt;
++    use std::path::{Component, Path, PathBuf};
++
++    fn id(path: &Path) -> Option<(libc::dev_t, libc::ino_t)> {
++        let path = CString::new(path.as_os_str().as_bytes()).ok()?;
++        let mut st = std::mem::MaybeUninit::<libc::stat>::uninit();
++        // SAFETY: `path` is NUL-terminated, and `st` is read only after
++        // stat(2) has filled it.
++        let st = unsafe {
++            if libc::stat(path.as_ptr(), st.as_mut_ptr()) != 0 {
++                return None;
++            }
++            st.assume_init()
++        };
++        Some((st.st_dev, st.st_ino))
++    }
++
++    let here = id(Path::new("."))?;
++    if let Some(pwd) = std::env::var_os("PWD").map(PathBuf::from) {
++        let plain = pwd.is_absolute()
++            && pwd.parent().is_some()
++            && pwd
++                .components()
++                .all(|part| matches!(part, Component::RootDir | Component::Normal(_)));
++        if plain && id(&pwd) == Some(here) {
++            return Some(pwd);
++        }
++    }
++    let (mut dir, mut at, mut names) = (PathBuf::from("."), here, Vec::new());
++    loop {
++        let parent = dir.join("..");
++        let up = id(&parent)?;
++        if up == at {
++            break;
++        }
++        let name = std::fs::read_dir(&parent)
++            .ok()?
++            .flatten()
++            .map(|entry| entry.file_name())
++            .find(|name| id(&parent.join(name)) == Some(at))?;
++        names.push(name);
++        (dir, at) = (parent, up);
++    }
++    Some(names.iter().rev().fold(PathBuf::from("/"), |path, name| path.join(name)))
++}
 diff --git a/crates/biome_cli/src/runner/mod.rs b/crates/biome_cli/src/runner/mod.rs
 --- a/crates/biome_cli/src/runner/mod.rs
 +++ b/crates/biome_cli/src/runner/mod.rs

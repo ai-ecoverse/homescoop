@@ -20,15 +20,21 @@ One patch (`0001-wasi-cli.patch` in the recipe):
   processes. `start`, `lsp-proxy` and `--use-server` refuse with a message.
 - `--watch` needs file system events and refuses with a message.
 - `biome upgrade` is not available; upgrade the package instead.
-- The working directory comes from `PWD`, as the kernel sets it, so
-  `extends` resolves shared configs such as
-  `@ai-ecoverse/slicc-shared-web/biome` from the project's `node_modules`.
+- Biome works in the process's working directory, so relative paths and
+  `extends` (shared configs such as `@ai-ecoverse/slicc-shared-web/biome`
+  from the project's `node_modules`) resolve from it. `PWD` names it only
+  when it is that directory; a stale one, as Node's `spawn` with `cwd`
+  leaves it, is ignored.
 - The cache directory is `$TMPDIR` or `/tmp` (WASI has no temp dir).
 
 Certified: `check`, `ci`, `format` (files and stdin) and `lint`, including
 type-aware rules across files, `.gitignore`, and configuration errors.
 
 Since 2.6.3 Biome prints the command summary to stderr, not stdout.
+
+2.6.4-1 and earlier take `PWD` as it is: run with a `cwd` but a stale
+`PWD` (Node's `spawnSync('biome', …, { cwd })`), they look for files in
+`PWD` ("No files were processed in the specified paths"). 2.6.4-2 fixes it.
 
 2.5.15-1 hangs on `--watch` and `__run_server` (Ctrl-C recovers it);
 2.5.15-2 refuses them with a message.
