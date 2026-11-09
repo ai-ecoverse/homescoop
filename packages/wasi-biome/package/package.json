@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-biome",
-  "version": "2.6.4-1",
+  "version": "2.6.4-2",
   "description": "Biome, the formatter and linter for JavaScript, TypeScript, JSON and CSS, for SLICC.",
   "license": "MIT OR Apache-2.0",
   "repository": {
