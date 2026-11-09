@@ -21,9 +21,14 @@ User and group names come from /etc/passwd and /etc/group, which uzers
 (Unix only, through libc) would read. WASI has no device numbers (devices
 show no size) or block counts (blocks are the size rounded up to 512).
 
-main() starts in $PWD (wasi-libc starts at /) and, when the kernel
-preopened both / and ./ (preopenRoot), closes ./: wasi-libc resolves / to
-the last preopen with an empty prefix, which was ./, the working directory.
+main() starts in the process's working directory (wasi-libc starts at /):
+PWD when it is the same directory as . (device and inode, as POSIX shells
+check PWD), otherwise the path found by walking .. up to the root, as
+getcwd(3) does. A parent can set a child's directory without rewriting PWD
+(Node's spawn with cwd); 0.23.5-1 took that stale PWD and listed the
+parent's directory. When the kernel preopened both / and ./ (preopenRoot),
+it then closes ./: wasi-libc resolves / to the last preopen with an empty
+prefix, which was ./, the working directory.
 
 Signed-off-by: Lars Trieloff <lars@trieloff.net>
 ---
@@ -31,7 +36,7 @@ Signed-off-by: Lars Trieloff <lars@trieloff.net>
  src/fs/file.rs                        | 109 ++++--
  src/fs/filter.rs                      |   6 +-
  src/fs/mod.rs                         |   2 +
- src/fs/wasi.rs                        | 458 ++++++++++++++++++++++++++
+ src/fs/wasi.rs                        | 514 ++++++++++++++++++++++++++
  src/main.rs                           |   5 +
  src/options/parser.rs                 |   4 +-
  src/output/file_name.rs               |  12 +-
@@ -43,7 +48,7 @@ Signed-off-by: Lars Trieloff <lars@trieloff.net>
  src/output/render/users.rs            |   3 +
  src/output/table.rs                   |  84 ++---
  src/theme/mod.rs                      |   8 +-
- 16 files changed, 646 insertions(+), 122 deletions(-)
+ 16 files changed, 702 insertions(+), 122 deletions(-)
  create mode 100644 src/fs/wasi.rs
 
 diff --git a/src/fs/fields.rs b/src/fs/fields.rs
@@ -515,7 +520,7 @@ new file mode 100644
 index 0000000..4909aac
 --- /dev/null
 +++ b/src/fs/wasi.rs
-@@ -0,0 +1,458 @@
+@@ -0,0 +1,514 @@
 +// SPDX-FileCopyrightText: 2026 ai-ecoverse/homescoop
 +// SPDX-License-Identifier: EUPL-1.2
 +//! slicc WASI preview1 (homescoop's wasi-eza).
@@ -761,7 +766,7 @@ index 0000000..4909aac
 +    })
 +}
 +
-+/// Start in the working directory slicc-kernel names in `PWD`.
++/// Start in the process's working directory ([`working_directory`]).
 +///
 +/// The kernel starts a WASI process with wasi-libc's working directory at
 +/// `/` and preopens the real one twice: as `.`, and (with `"preopenRoot":
@@ -769,10 +774,10 @@ index 0000000..4909aac
 +/// absolute from `/`, reach it. wasi-libc resolves an absolute path
 +/// through the longest preopen name that prefixes it, the last one on a
 +/// tie: `/` and `./` both have the empty prefix, so `eza /` listed the
-+/// working directory. Once wasi-libc is in `PWD`, relative paths don't
-+/// need `./`: close it, so `/` is the root.
++/// working directory. Once wasi-libc is in it, relative paths don't need
++/// `./`: close it, so `/` is the root.
 +pub fn start() {
-+    let Some(pwd) = std::env::var_os("PWD") else {
++    let Some(pwd) = working_directory() else {
 +        return;
 +    };
 +    let (mut root, mut twin) = (false, None);
@@ -804,6 +809,62 @@ index 0000000..4909aac
 +        }
 +        let _ = std::env::set_current_dir(&pwd);
 +    }
++}
++
++/// The process's working directory, for wasi-libc's, which is always "/" at
++/// start. Relative paths reach the real one (the kernel's `.` preopen), but
++/// nothing gives its path. PWD names it only when it is the same directory
++/// as `.` (device and inode), as POSIX shells check it: a parent can change
++/// a child's directory without rewriting PWD, as Node's `spawn` with `cwd`
++/// does. Otherwise the path is found as getcwd(3) finds it, by walking `..`
++/// up to the root and looking for each directory in its parent. PWD=/ is
++/// never taken: before the chdir, "/" can reach `.` too.
++fn working_directory() -> Option<std::path::PathBuf> {
++    use std::ffi::CString;
++    use std::os::wasi::ffi::OsStrExt;
++    use std::path::{Component, Path, PathBuf};
++
++    fn id(path: &Path) -> Option<(libc::dev_t, libc::ino_t)> {
++        let path = CString::new(path.as_os_str().as_bytes()).ok()?;
++        let mut st = std::mem::MaybeUninit::<libc::stat>::uninit();
++        // SAFETY: `path` is NUL-terminated, and `st` is read only after
++        // stat(2) has filled it.
++        let st = unsafe {
++            if libc::stat(path.as_ptr(), st.as_mut_ptr()) != 0 {
++                return None;
++            }
++            st.assume_init()
++        };
++        Some((st.st_dev, st.st_ino))
++    }
++
++    let here = id(Path::new("."))?;
++    if let Some(pwd) = std::env::var_os("PWD").map(PathBuf::from) {
++        let plain = pwd.is_absolute()
++            && pwd.parent().is_some()
++            && pwd
++                .components()
++                .all(|part| matches!(part, Component::RootDir | Component::Normal(_)));
++        if plain && id(&pwd) == Some(here) {
++            return Some(pwd);
++        }
++    }
++    let (mut dir, mut at, mut names) = (PathBuf::from("."), here, Vec::new());
++    loop {
++        let parent = dir.join("..");
++        let up = id(&parent)?;
++        if up == at {
++            break;
++        }
++        let name = std::fs::read_dir(&parent)
++            .ok()?
++            .flatten()
++            .map(|entry| entry.file_name())
++            .find(|name| id(&parent.join(name)) == Some(at))?;
++        names.push(name);
++        (dir, at) = (parent, up);
++    }
++    Some(names.iter().rev().fold(PathBuf::from("/"), |path, name| path.join(name)))
 +}
 +
 +/// A directory fd and a path for slicc_fs's `*at` calls, resolved as `std`
@@ -982,8 +1043,8 @@ index 0620988..78f0cd3 100644
          libc::signal(libc::SIGPIPE, libc::SIG_DFL);
      }
  
-+    // slicc-kernel starts a WASI process at / with the real working
-+    // directory in PWD.
++    // slicc-kernel starts a WASI process at /; change into the real
++    // working directory.
 +    #[cfg(target_os = "wasi")]
 +    fs::wasi::start();
 +

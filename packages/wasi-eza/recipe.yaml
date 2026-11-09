@@ -32,7 +32,9 @@ about:
     (path_filestat_owner, path_mode), the caller's ids from slicc.cred_get,
     the pty width from slicc_tty.winsize, and user and group names from
     /etc/passwd and /etc/group in place of uzers (Unix only). main() starts
-    in $PWD and, as the command sets "preopenRoot": true, closes the ./
+    in the process's working directory (PWD when it is `.`'s device and
+    inode, else the walk up `..`; 0.23.5-2, cert/cwd.mjs) and, as the
+    command sets "preopenRoot": true, closes the ./
     twin preopen, which wasi-libc would otherwise take for "/" (eza / listed
     the working directory). WASI has no device numbers or block counts:
     devices show no size, and blocks are the size rounded up to 512 bytes.
