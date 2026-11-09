@@ -188,3 +188,9 @@ On 2026-11-06 the published 1.43.0-1 was run against both specs on macOS arm64. 
 ## 1.46.0-1: push compiled out, proxy lease rules refused, port allow_private
 
 The published 1.45.0-2 against this checklist fails the new 1.46.0 rows: it prints version 1.45.0; a `[[proxy.rules]]` entry with `lease = "forge"` does not fail with `rule for lease 'forge' is not available in seven` (1.45.0 has no lease field on proxy rules); and `allow_private = ["127.0.0.1:4790"]` fails config validation in the WASI stub (1.45.0's `parse_network` rejects the port). The head build keeps `fnox push` compiled out, refuses lease rules fail-closed, and accepts port-specific `allow_private` entries in `proxy rules --json`.
+
+## 1.46.0-2: the working directory, not a stale PWD (2026-11-09)
+
+0004 took `PWD` as it was. A parent that sets a child's working directory without rewriting `PWD` (Node's `spawnSync` with `{ cwd }`, on real Node too) made fnox look for `fnox.toml` from the parent's directory. 0004 now changes into `PWD` only when it is absolute, not `/`, has no `..` and is `.`'s device and inode, and otherwise into the path found by walking `..` up to the root, as getcwd(3) does (wasi-libc's `current_dir()` is `/` in every case, measured with a Rust probe on slicc-kernel 1.134.3 and 1.176.2; see homescoop#2012).
+
+The published 1.46.0-1 fails `cert/cwd.mjs` at `PWD=/tmp` (`No configuration file found in /tmp or any parent directory`, `browser-cert --spec cwd.mjs`, slicc-kernel 1.175.0). Run to the end, 10 of its 14 assertions fail: `PWD=/tmp`, `/nonexistent`, `dir` and `/` find no configuration, and with the cwd `/` and `PWD` naming the project fnox reads the project's. The cwd spelt with `..` passes on 1.46.0-1 (the chdir resolves it). 1.46.0-2 passes all 14, the whole cert and `test/sealed.mjs`.

@@ -4,10 +4,20 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 4/19] wasi: take the working directory and home from the environment
  environment
 
+wasi-libc's current_dir() is "/" at start, wherever the process runs;
+relative paths reach the real working directory through the kernel's `.`
+preopen. main() changes into it: PWD when it is the same directory as `.`
+(device and inode, as POSIX shells check PWD), otherwise the path found by
+walking `..` up to the root (getcwd(3)'s way). A parent can set a child's
+directory without rewriting PWD (Node's spawn with `cwd`): 1.46.0-1 took
+that stale PWD and looked for fnox.toml from the parent's directory.
+
+HOME_DIR comes from HOME on WASI.
+
 ---
  crates/fnox-core/src/env.rs | 14 ++++++++++----
- src/main.rs                 |  7 ++++++-
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ src/main.rs                 | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 77 insertions(+), 5 deletions(-)
 
 diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
 index 3c004d2..2df64f9 100644
@@ -53,21 +63,78 @@ index 3c004d2..2df64f9 100644
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
 diff --git a/src/main.rs b/src/main.rs
-index fbc65cb..a973b03 100644
 --- a/src/main.rs
 +++ b/src/main.rs
-@@ -3,6 +3,10 @@ use fnox::settings;
+@@ -2,7 +2,68 @@
+ use fnox::settings;
  use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
  
++/// The process's working directory, for wasi-libc's, which is always "/" at
++/// start. Relative paths reach the real one (the kernel's `.` preopen), but
++/// nothing gives its path. PWD names it only when it is the same directory
++/// as `.` (device and inode), as POSIX shells check it: a parent can change
++/// a child's directory without rewriting PWD, as Node's `spawn` with `cwd`
++/// does. Otherwise the path is found as getcwd(3) finds it, by walking `..`
++/// up to the root and looking for each directory in its parent. PWD=/ is
++/// never taken: before the chdir, "/" can reach `.` too.
++#[cfg(target_os = "wasi")]
++fn wasi_working_directory() -> Option<std::path::PathBuf> {
++    use std::ffi::CString;
++    use std::os::wasi::ffi::OsStrExt;
++    use std::path::{Component, Path, PathBuf};
++
++    fn id(path: &Path) -> Option<(libc::dev_t, libc::ino_t)> {
++        let path = CString::new(path.as_os_str().as_bytes()).ok()?;
++        let mut st = std::mem::MaybeUninit::<libc::stat>::uninit();
++        // SAFETY: `path` is NUL-terminated, and `st` is read only after
++        // stat(2) has filled it.
++        let st = unsafe {
++            if libc::stat(path.as_ptr(), st.as_mut_ptr()) != 0 {
++                return None;
++            }
++            st.assume_init()
++        };
++        Some((st.st_dev, st.st_ino))
++    }
++
++    let here = id(Path::new("."))?;
++    if let Some(pwd) = std::env::var_os("PWD").map(PathBuf::from) {
++        let plain = pwd.is_absolute()
++            && pwd.parent().is_some()
++            && pwd
++                .components()
++                .all(|part| matches!(part, Component::RootDir | Component::Normal(_)));
++        if plain && id(&pwd) == Some(here) {
++            return Some(pwd);
++        }
++    }
++    let (mut dir, mut at, mut names) = (PathBuf::from("."), here, Vec::new());
++    loop {
++        let parent = dir.join("..");
++        let up = id(&parent)?;
++        if up == at {
++            break;
++        }
++        let name = std::fs::read_dir(&parent)
++            .ok()?
++            .flatten()
++            .map(|entry| entry.file_name())
++            .find(|name| id(&parent.join(name)) == Some(at))?;
++        names.push(name);
++        (dir, at) = (parent, up);
++    }
++    Some(names.iter().rev().fold(PathBuf::from("/"), |path, name| path.join(name)))
++}
++
  fn main() -> miette::Result<()> {
 +    #[cfg(target_os = "wasi")]
-+    if let Some(pwd) = std::env::var_os("PWD") {
-+        let _ = std::env::set_current_dir(pwd);
++    if let Some(dir) = wasi_working_directory() {
++        let _ = std::env::set_current_dir(dir);
 +    }
      let argv: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
      if fnox::hook_env::can_exit_before_startup(&argv) {
          return Ok(());
-@@ -10,7 +14,8 @@ fn main() -> miette::Result<()> {
+@@ -10,7 +71,8 @@
      run(argv)
  }
  
