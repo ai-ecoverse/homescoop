@@ -57,3 +57,9 @@ ignored the terminal's width fails them. `cert/users.mjs` compares owners
 and groups by name and number and the "you" style, so names from the wrong
 table, the caller for every file, or a stat that skips the kernel's
 permission checks fail it.
+
+## 0.23.5-2: the working directory, not a stale PWD (2026-11-09)
+
+- **The defect:** 0001's `start()` took `PWD` as it was. A parent that sets a child's working directory without rewriting `PWD` (Node's `spawnSync` with `{ cwd }`, on real Node too) made eza list the parent's directory, and relative names failed (`"inner": No such file or directory`). When `PWD` named no directory, the chdir failed, `start()` left the `./` preopen open, and `eza /` listed the working directory again.
+- **The fix:** `start()` changes into `PWD` only when it is absolute, not `/`, has no `..` and is `.`'s device and inode; otherwise into the path found by walking `..` up to the root, as getcwd(3) does. A Rust probe (wasm32-wasip1 and wasip1-threads, with and without `preopenRoot`, slicc-kernel 1.134.3 and 1.176.2) shows `current_dir()` is `/` in every case, `stat(".")` is the real directory, and before the chdir `stat("/")` is `.`'s too, so `PWD=/` would pass a device and inode check alone.
+- **Negative:** the published 0.23.5-1 fails `cert/cwd.mjs` at `PWD=/tmp` (`eza -1` printed `ezacwd-only-in-tmp.txt`; `browser-cert --spec cwd.mjs`, slicc-kernel 1.176.2, users enforce). Run to the end, 12 of its 38 assertions fail: `PWD=/tmp` and `PWD=/` list the wrong directory and the relative names are not found; `/nonexistent`, `sub` and the cwd spelt with `..` list the cwd for `eza /`; cwd `/` with `PWD` naming sub lists sub. 0.23.5-2 passes all 38, and the whole cert.
