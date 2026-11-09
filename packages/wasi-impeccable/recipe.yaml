@@ -43,8 +43,10 @@ about:
     server is thread-per-connection, ≤48; it self-spawns detached, with pids
     from WASIX proc_id); skill-bundle signatures are verified with
     ed25519-dalek (verify_strict) instead of ring, which does not build for
-    wasm32-wasip1, against the same compiled-in keys; Io's cwd comes from
-    PWD (wasi-libc's current_dir() stays /); avoid process::id / thread spawn
+    wasm32-wasip1, against the same compiled-in keys; Io's cwd is the
+    process's working directory (wasi-libc's current_dir() stays /): PWD
+    when it is `.`'s device and inode, else the walk up `..` (0.1.18-2,
+    not a stale PWD); avoid process::id / thread spawn
     panics; print clear "not available in this build yet" for
     URL/--cdp/capture/serve-question; Svelte live sessions (node) refuse. Live
     needs slicc-kernel 1.17.2 or later (#105 clock polls, #106 lookups of

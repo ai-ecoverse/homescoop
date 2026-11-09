@@ -151,7 +151,7 @@ diff -ruN a/crates/cli/src/main.rs b/crates/cli/src/main.rs
 diff -ruN a/crates/common/Cargo.toml b/crates/common/Cargo.toml
 --- a/crates/common/Cargo.toml	2026-11-01 14:04:24.310321351 +0100
 +++ b/crates/common/Cargo.toml	2026-11-01 14:04:29.522717721 +0100
-@@ -14,6 +14,10 @@
+@@ -14,6 +14,14 @@
  sha2 = { version = "0.10", optional = true }
  getrandom = { version = "0.2", optional = true }
  serde_json = { workspace = true }
@@ -162,6 +162,10 @@ diff -ruN a/crates/common/Cargo.toml b/crates/common/Cargo.toml
  
  [target.'cfg(unix)'.dependencies]
  libc = "0.2"
++
++# process_cwd compares PWD with the working directory by device and inode.
++[target.'cfg(target_os = "wasi")'.dependencies]
++libc = "0.2"
 diff -ruN a/crates/common/src/fsx.rs b/crates/common/src/fsx.rs
 --- a/crates/common/src/fsx.rs	2026-11-01 14:04:24.311422730 +0100
 +++ b/crates/common/src/fsx.rs	2026-11-01 14:04:29.523226806 +0100
@@ -210,21 +214,78 @@ diff -ruN a/crates/common/src/lib.rs b/crates/common/src/lib.rs
              stdin_is_tty: is_stdin_tty(),
          }
      }
-@@ -231,3 +231,22 @@
+@@ -231,3 +231,79 @@
          assert_eq!(io.stdin(), "hello");
      }
  }
 +
-+/// The working directory. On wasm32-wasip1 `current_dir()` is wasi-libc's,
-+/// which stays `/` wherever the host started the program; the host (slicc's
-+/// kernel) puts the real one in `PWD`, and relative paths opened through
-+/// std already resolve against it.
++/// The working directory. On WASI `current_dir()` is wasi-libc's, which
++/// stays `/` wherever the host started the program, while relative paths
++/// opened through std already resolve against the real one: take that
++/// ([`wasi_working_directory`]), not a `PWD` that may be stale.
 +fn process_cwd() -> PathBuf {
-+    #[cfg(target_family = "wasm")]
-+    if let Some(pwd) = std::env::var_os("PWD").map(PathBuf::from).filter(|p| p.is_absolute()) {
-+        return pwd;
++    #[cfg(target_os = "wasi")]
++    if let Some(dir) = wasi_working_directory() {
++        return dir;
 +    }
 +    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
++}
++
++/// The process's working directory, for wasi-libc's, which is always "/" at
++/// start. Relative paths reach the real one (the kernel's `.` preopen), but
++/// nothing gives its path. PWD names it only when it is the same directory
++/// as `.` (device and inode), as POSIX shells check it: a parent can change
++/// a child's directory without rewriting PWD, as Node's `spawn` with `cwd`
++/// does. Otherwise the path is found as getcwd(3) finds it, by walking `..`
++/// up to the root and looking for each directory in its parent. PWD=/ is
++/// never taken: before the chdir, "/" can reach `.` too.
++#[cfg(target_os = "wasi")]
++fn wasi_working_directory() -> Option<std::path::PathBuf> {
++    use std::ffi::CString;
++    use std::os::wasi::ffi::OsStrExt;
++    use std::path::{Component, Path, PathBuf};
++
++    fn id(path: &Path) -> Option<(libc::dev_t, libc::ino_t)> {
++        let path = CString::new(path.as_os_str().as_bytes()).ok()?;
++        let mut st = std::mem::MaybeUninit::<libc::stat>::uninit();
++        // SAFETY: `path` is NUL-terminated, and `st` is read only after
++        // stat(2) has filled it.
++        let st = unsafe {
++            if libc::stat(path.as_ptr(), st.as_mut_ptr()) != 0 {
++                return None;
++            }
++            st.assume_init()
++        };
++        Some((st.st_dev, st.st_ino))
++    }
++
++    let here = id(Path::new("."))?;
++    if let Some(pwd) = std::env::var_os("PWD").map(PathBuf::from) {
++        let plain = pwd.is_absolute()
++            && pwd.parent().is_some()
++            && pwd
++                .components()
++                .all(|part| matches!(part, Component::RootDir | Component::Normal(_)));
++        if plain && id(&pwd) == Some(here) {
++            return Some(pwd);
++        }
++    }
++    let (mut dir, mut at, mut names) = (PathBuf::from("."), here, Vec::new());
++    loop {
++        let parent = dir.join("..");
++        let up = id(&parent)?;
++        if up == at {
++            break;
++        }
++        let name = std::fs::read_dir(&parent)
++            .ok()?
++            .flatten()
++            .map(|entry| entry.file_name())
++            .find(|name| id(&parent.join(name)) == Some(at))?;
++        names.push(name);
++        (dir, at) = (parent, up);
++    }
++    Some(names.iter().rev().fold(PathBuf::from("/"), |path, name| path.join(name)))
 +}
 +
 +/// `std::process::id()` panics on wasm32-wasip1 ("no pids"). Use this for

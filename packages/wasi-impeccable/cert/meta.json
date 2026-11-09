@@ -16,6 +16,7 @@
     "detect clean.html → exit 0",
     "detect /home/site (dirty+clean) → findings name dirty.html only, exit 2",
     "non-root cwd: detect dirty.html from /home/site and generate-image (IMPECCABLE_IMAGE_GEN_FAKE) --out comps/fake.png from /home/site/sub land relative to the cwd, not /",
+    "cert/cwd.mjs (0.1.18-2): detect --json dirty.html from /home/impcwd/site → exit 2, overused-font, the file reported as /home/impcwd/site/dirty.html, with PWD the cwd, /tmp, /nonexistent, site, the cwd spelt with .., and /; with the cwd / and PWD naming the site, Warning: cannot access dirty.html",
     "missing path → exit 1 + Warning: cannot access …",
     "unknown verb → exit 1",
     "ignores add-rule overused-font → that id disappears, others remain",
@@ -33,7 +34,7 @@
     "cert/cdp.mjs (0.1.16-1): 0.1.16's detect --cdp <port|url> (attach to a running Chromium-based app's DevTools port) refuses on WASI like URL scans: detect --cdp 9222 → rc 1 with Error: --cdp scans need a browser; not available in this build yet (not upstream's this build cannot attach, nor a missing-file warning); the flag still parses, so detect --cdp 10.0.0.5:9222 gets upstream's loopback-only refusal. 0.1.15-6 has no --cdp (NEGATIVE.md)"
   ],
   "patches": {
-    "0001-wasi-cli.patch": "cfg(target_family=wasm): ureq → wasix-ureq, std::net → wasix-net, std::process → wasix-command (homescoop crates/, vendored by build.sh); ring Ed25519 → ed25519-dalek verify_strict; Io cwd from PWD; since 0.1.16 the shared HTTP server core (impeccable_common::http, live's, the decision page's and component review's) over wasix-net; HTTP verbs and live mode on (wasm32-wasip1-threads, self-spawned detached server, pid/kill via proc_id/proc_signal, ≤48 connections); Svelte bridge (node) refuses; URL/--cdp/capture/serve-question refuse clearly",
+    "0001-wasi-cli.patch": "cfg(target_family=wasm): ureq → wasix-ureq, std::net → wasix-net, std::process → wasix-command (homescoop crates/, vendored by build.sh); ring Ed25519 → ed25519-dalek verify_strict; Io cwd: the process's working directory (PWD when it is `.`'s device and inode, else the walk up `..`; cert/cwd.mjs); since 0.1.16 the shared HTTP server core (impeccable_common::http, live's, the decision page's and component review's) over wasix-net; HTTP verbs and live mode on (wasm32-wasip1-threads, self-spawned detached server, pid/kill via proc_id/proc_signal, ≤48 connections); Svelte bridge (node) refuses; URL/--cdp/capture/serve-question refuse clearly",
     "0002-wasm-refresh-alloc.patch": "stress.mjs: impeccable's threaded detect under load gives 0 traps with homescoop's allocator refresh as the global allocator on wasm; build.sh sets HOMESCOOP_WASM_ALLOC_RS and keys its cache on it"
   }
 }
