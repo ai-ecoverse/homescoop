@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-uv",
-  "version": "0.13.6-2",
+  "version": "0.13.6-3",
   "description": "Astral's uv for SLICC, with uvx, to manage Python environments and packages.",
   "license": "MIT OR Apache-2.0",
   "repository": {
