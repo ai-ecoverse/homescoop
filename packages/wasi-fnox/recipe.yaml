@@ -58,7 +58,9 @@ about:
            activate's invoked_exe (which and current_exe); from 1.46.0
            also push and push_targets (CI/hosting writes); proxy stays
            as a WASI stub for rules validation (0009)
-      0004 cwd from PWD, HOME from the environment, current_thread; the
+      0004 the working directory (PWD when it is .'s device and inode,
+           else the walk up ..; 1.46.0-2: not a stale PWD), HOME from
+           the environment, current_thread; the
            XDG defaults (config, state, and 1.40.0's data dir) as on unix
       0005 spawn `fnox exec` children through wasix-command
       0011 allow the lints that WASI-gated code leaves behind
