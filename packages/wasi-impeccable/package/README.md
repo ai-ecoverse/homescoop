@@ -25,7 +25,9 @@ impeccable --version   # prints the engine version (e.g. 0.1.18)
 The kernel does the TLS, so this build carries no TLS stack. Skill-bundle
 signatures are verified with `ed25519-dalek` instead of `ring` (which does not
 build for WASI), against the same Ed25519 keys compiled into the engine. Relative
-paths resolve against the directory the command runs in (`PWD`).
+paths resolve against the directory the command runs in; `PWD` names it only
+when it is that directory, so a stale one (as Node's `spawn` with `cwd` leaves
+it) is ignored. 0.1.18-1 and earlier took `PWD` as it was.
 
 **Live mode** (`impeccable live`, `live-poll`, `live-server`, …) runs its
 server detached on the kernel's loopback; the engine is built for

@@ -115,3 +115,9 @@ AssertionError [ERR_ASSERTION]: version="0.1.16\n"
 ```
 
 The local 0.1.17-1 build passes `checklist.mjs` and `cdp.mjs` on the same kernel.
+
+## 0.1.18-2: the working directory, not a stale PWD (2026-11-09)
+
+0001's `process_cwd()` returned `PWD` whenever it was absolute. A parent that sets a child's working directory without rewriting `PWD` (Node's `spawnSync` with `{ cwd }`, on real Node too) made impeccable resolve relative paths against the parent's directory, while std's own relative opens reached the real one. `process_cwd()` now takes `PWD` only when it is absolute, not `/`, has no `..` and is `.`'s device and inode, and otherwise the path found by walking `..` up to the root, as getcwd(3) does (wasi-libc's `current_dir()` is `/` in every case, measured with a Rust probe on slicc-kernel 1.134.3 and 1.176.2; see homescoop#2012).
+
+The published 0.1.18-1 fails `cert/cwd.mjs` at `PWD=/tmp` (`Warning: cannot access dirty.html`, rc 1; `browser-cert --spec cwd.mjs`, slicc-kernel 1.134.3, users enforce). Run to the end, 10 of its 20 assertions fail: `PWD=/tmp` and `/nonexistent` don't find the file; `PWD=site` and `PWD=/` report it as `/dirty.html` (0.1.12-4's bug: a relative `PWD` fell back to `/`); and with the cwd `/` and `PWD` naming the site it reads the site's file. 0.1.18-2 passes all 20, the whole cert, and test/e2e (9 of 9).
