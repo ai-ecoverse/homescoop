@@ -6,7 +6,7 @@ name: wasi-tsrs
 builder: host
 reproducible: true
 # renovate: datasource=github-tags depName=oxc-project/tsrs extractVersion=^v(?<version>.*)$
-version: "0.20.1"
+version: "0.21.0"
 npm: "@ai-ecoverse/wasi-tsrs"
 summary: "tsrs, the Rust port of TypeScript 7's tsc, for slicc WASI preview1 (command tsrs)"
 source:
