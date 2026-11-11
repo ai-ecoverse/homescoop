@@ -4,12 +4,12 @@
 name: wasi-uv
 builder: host
 # renovate: datasource=github-releases depName=astral-sh/uv
-version: "0.13.6"
+version: "0.13.7"
 npm: "@ai-ecoverse/wasi-uv"
 summary: "uv 0.13 for slicc WASI (command uv: venv, pip, add, lock, sync, run against wasix-python)"
 source:
   url: "https://github.com/astral-sh/uv/archive/refs/tags/{{version}}.tar.gz"
-  sha256: "c2e01687fbbcb109277698ec97baca46e1547656ad580abf6d993f9c459af1c7"
+  sha256: "c742acebb931cae69d88c68274d00ba21ae5669ea9fdfaba00c33cf9f86f2727"
   epoch: "1792457197"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#675).
 reproducible: true
@@ -66,6 +66,8 @@ about:
     renamed and rebased; 0001 refreshed for the new paths and lock).
     0.13.6-2: packaging-only — README notes the pydata hang risk and
     points at homescoop-pydata-map.json / FAILFAST.md (no binary change).
+    0.13.7-1: cargo-util 0.2.32 (crates/ renamed, the patch applies
+    unchanged); 0001 refreshed for the new path and lock checksum.
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means

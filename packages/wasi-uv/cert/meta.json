@@ -41,7 +41,7 @@
     "0005-wasi-start-uv-in-slicc-s-kernel.patch": "every case run from a non-root cwd; installs (tokio::fs on the blocking pool)",
     "crates/hyper-util-0.1.21.patch": "PyPI through the kernel proxy (checked by hand: the cert kernel has no network)",
     "crates/rustls-native-certs-0.8.4.patch": "build; TLS to the kernel proxy's CA (by hand)",
-    "crates/cargo-util-0.2.31.patch": "build",
+    "crates/cargo-util-0.2.32.patch": "build",
     "crates/reqsign-core-3.3.2.patch": "build",
     "crates/reqsign-google-3.2.0.patch": "build",
     "crates/reqsign-http-send-reqwest-4.0.7.patch": "build",
