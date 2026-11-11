@@ -10,7 +10,7 @@ npm: "@ai-ecoverse/wasi-biome"
 summary: "Biome 2.6 for slicc WASI preview1 (command biome)"
 source:
   url: "https://github.com/biomejs/biome/archive/refs/tags/@biomejs/biome@{{version}}.tar.gz"
-  sha256: "7d9f013cf8f8f15d38a0a545241bf81b188af8caef78c6d8982cfe8a7b132065"
+  sha256: "0fce71ab77fcc17c4c3966681a90f5d7b8108bdb3d7e091fde57aab7b6386cd1"
 inputs:
   - scripts/rust-wasm-refresh-alloc.rs
 # homescoop#1287: the initial heap from the measured peak, with headroom.
