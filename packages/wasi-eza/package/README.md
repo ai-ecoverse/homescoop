@@ -36,10 +36,18 @@ Not in this build:
 Errors carry WASI's error numbers: `No such file or directory (os error 44)`,
 `Permission denied (os error 2)`.
 
+Relative paths resolve against the directory the command runs in; `PWD`
+names it only when it is that directory, so a stale one (as Node's `spawn`
+with `cwd` leaves it) is ignored.
+
 The theme file is read from `$EZA_CONFIG_DIR/theme.yml`.
 
 Certified: the grid, long and tree views, modes, owners and groups under
 slicc-kernel users, inodes and links, `--total-size`, sorting, colours on a
 terminal, and listing with any stdin.
+
+0.23.5-1 and earlier take `PWD` as it is: run with a `cwd` but a stale
+`PWD` (Node's `spawnSync('eza', …, { cwd })`), they list `PWD` instead of
+the working directory. 0.23.5-2 fixes it.
 
 EUPL-1.2 AND MIT; see `LICENSE` and `THIRD-PARTY-NOTICES.md`.

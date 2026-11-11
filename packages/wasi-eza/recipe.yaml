@@ -33,7 +33,8 @@ about:
     the pty width from slicc_tty.winsize, and user and group names from
     /etc/passwd and /etc/group in place of uzers (Unix only). main() starts
     in the process's working directory (PWD when it is `.`'s device and
-    inode, else the walk up `..`; 0.23.5-2, cert/cwd.mjs) and, as the
+    inode, else the walk up `..`; 0.23.5-2, cert/cwd.mjs; 0.23.5-3 adds
+    node's spawnSync with { cwd } and a stale PWD) and, as the
     command sets "preopenRoot": true, closes the ./
     twin preopen, which wasi-libc would otherwise take for "/" (eza / listed
     the working directory). WASI has no device numbers or block counts:
