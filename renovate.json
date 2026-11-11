@@ -49,6 +49,14 @@
       "defaultRegistryUrlTemplate": "https://data.iana.org/time-zones/releases/",
       "format": "html"
     },
+    "google-cloud-sdk": {
+      "description": "The Google Cloud CLI release on Google's rapid channel: components-2.json, the manifest `gcloud components update` reads, names the current release in its top-level version. The recipe pins components-v<version>.json, Google's manifest for that release, whose sha256 scripts/refresh-recipe-sha.mjs refreshes for the new URL; build.sh checks every component tarball against the sha256 that manifest gives it, so a bump needs no other edit.",
+      "defaultRegistryUrlTemplate": "https://dl.google.com/dl/cloudsdk/channels/rapid/components-2.json",
+      "format": "json",
+      "transformTemplates": [
+        "{\"releases\": [{\"version\": version}], \"homepage\": \"https://cloud.google.com/sdk\"}"
+      ]
+    },
     "curl-cacert": {
       "description": "curl's dated extracts of Mozilla's CA certificate store (cacert-YYYY-MM-DD.pem), for tls-engine's roots.der. A bump also needs the sha256 in packages/tls-engine/recipe.yaml and slicc.tls.roots in its package.json; the build fails closed until both match.",
       "defaultRegistryUrlTemplate": "https://curl.se/docs/caextract.html",

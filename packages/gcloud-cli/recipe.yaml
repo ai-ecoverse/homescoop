@@ -1,0 +1,40 @@
+# The Google Cloud CLI (gcloud and bq) for slicc, on wasix-python (homescoop#2037).
+# Pure Python: Google's platform-neutral component tarballs, staged as they
+# install, with Python launchers in place of the shell ones. Nothing compiles.
+name: gcloud-cli
+builder: host
+# Google's release channel names its version in components-2.json, the
+# manifest `gcloud components update` reads (custom.google-cloud-sdk).
+# renovate: datasource=custom.google-cloud-sdk depName=google-cloud-sdk
+version: "593.0.0"
+npm: "@ai-ecoverse/gcloud-cli"
+summary: "The Google Cloud CLI: gcloud and bq, to manage Google Cloud and query BigQuery from slicc."
+source:
+  # Google's manifest for exactly this release. It names every component
+  # tarball with its sha256; build.sh fetches core, gcloud-deps, bq, alpha
+  # and beta from it and checks each against it, so this pin covers them.
+  url: "https://dl.google.com/dl/cloudsdk/channels/rapid/components-v{{version}}.json"
+  sha256: "0e9b47a0d0fad501ea0ab6a222b5c566aa82484fb290885ceae72d1585574268"
+dependencies:
+  build: []
+  host: []
+  run:
+    - wasix-python
+about:
+  homepage: https://cloud.google.com/sdk
+  license: Apache-2.0
+  notes: |
+    Source: Google's own component tarballs, not conda-forge's
+    google-cloud-sdk. conda-forge repackages Google's per-platform release
+    tarball whole (its linux-64 build carries Google's bundled native CPython
+    in platform/bundledpythonunix and the Go gcloud-crc32c binary), so it
+    would mean downloading 130 MB to delete most of it, from a second
+    packager. The components are the platform-neutral parts that tarball is
+    made of, pinned by Google's per-release manifest.
+    Staged under lib/google-cloud-sdk with no __pycache__ (Google's are
+    cpython-314; the tree is version neutral). The component manager is off
+    (core/config.json disable_updater, as in Google's apt and yum packages),
+    and the installation properties turn off update checks, usage reporting
+    and survey prompts. .install/ is written by the SDK's own
+    InstallationManifest. Not included: gsutil (gcloud storage replaces it),
+    the bundled CPython, gcloud-crc32c, and the *-nix shell launchers.

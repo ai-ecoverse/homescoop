@@ -1,0 +1,24 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-python"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15",
+    "@ai-ecoverse/wasix-python@3.15.0-8"
+  ],
+  "users": "enforce",
+  "runTimeoutMs": 300000,
+  "checklist": [
+    "cert/version.mjs: gcloud version prints exactly 'Google Cloud SDK <homescoop.upstream>' and alpha, beta, bq and core at the versions of their .install/<id>.snapshot.json (Google's manifest for the release), nothing about updates, surveys or usage statistics; bq version prints 'This is BigQuery CLI <platform/bq/VERSION>' and nothing on stderr, also with a user PYTHONWARNINGS, while platform/bq/bq.py run without the launcher prints the RequestsDependencyWarning; gcloud info: python 3.15 (wasix-python), sdk_root and installation properties in /node_modules/@ai-ecoverse/gcloud-cli/lib/google-cloud-sdk",
+    "cert/config.mjs: gcloud config list --format=json is exactly component_manager/disable_update_check True, core/disable_usage_reporting True, survey/disable_prompts True and core/custom_ca_certs_file = $SSL_CERT_FILE; gcloud config set project and core/disable_usage_reporting false land in ~/.config/gcloud/configurations/config_default and win over the installation; without SSL_CERT_FILE the launcher sets no custom_ca_certs_file",
+    "cert/components.mjs: gcloud components install kubectl, update and remove bq exit 1 with Google's 'managed by an external package manager' error and leave .install/ unchanged",
+    "cert/auth.mjs (homescoop#2037): gcloud auth login, with no flag and with --no-launch-browser, prints an accounts.google.com authorize URL for the Cloud SDK client with redirect_uri https://sdk.cloud.google.com/authcode.html, PKCE S256 (a 43-character challenge) and the openid, cloud-platform and compute scopes, never 127.0.0.1 or localhost, then asks for the code; with none it exits 1 and gcloud auth list is empty",
+    "cert/launcher.mjs: gcloud's python path starts with lib/third_party and has no site-packages; CLOUDSDK_PYTHON_SITEPACKAGES=1 puts them back; a .pth in wasix-python's site-packages that reports itself under CLOUDSDK_ROOT_DIR is read by a plain python3 but not by gcloud or bq's child python (-S in CLOUDSDK_PYTHON_ARGS), and is read by bq's child with CLOUDSDK_PYTHON_SITEPACKAGES=1; the launcher run under any other name exits 1",
+    "test/files.test.mjs (host, the test job): VERSION and core/config.json are the recipe release; lib/ has no __pycache__, .pyc, native code or links, and no shell launchers, installers, RELEASE_NOTES, deb/, rpm/, bundled CPython, gsutil or gcloud-crc32c; config.json disable_updater and disable_usage_reporting true and the properties file exactly as build.sh writes it; .install/ holds a snapshot (that component only, the recipe release) and a manifest for alpha, beta, bq, core and gcloud-deps, and every file a manifest lists is shipped; bin/gcloud and bin/bq are src/launcher.py, mode 0755, and the only slicc.commands",
+    "by hand, not in CI (the cert kernel has no network and CI has no Google credentials): on slicc-kernel 1.178.2's Node entry with wasm-tls-engine and a fetch transport, an access token in CLOUDSDK_AUTH_ACCESS_TOKEN: gcloud projects list, gcloud compute zones list, gcloud storage ls gs://gcp-public-data-landsat/, bq ls and bq head on bigquery-public-data:samples, and gcloud components list (online, shows alpha, beta, bq and core Installed); bq query reached BigQuery (an IAM denial for the test account's project, not a transport error)"
+  ]
+}

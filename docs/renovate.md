@@ -91,6 +91,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | diffutils | savannah `diffutils.git` | |
 | freetype | `download.savannah.gnu.org/releases/freetype/` | `custom.freetype` (html listing): tags are `VER-X-Y-Z` |
 | gawk | savannah `gawk.git` | |
+| gcloud-cli | `dl.google.com/dl/cloudsdk/channels/rapid/components-2.json` | `custom.google-cloud-sdk` (json, the release in `version`); the recipe pins `components-v<version>.json`, and build.sh checks each component tarball against it |
 | git | `git/git` | github-releases |
 | gmake | savannah `make.git` | |
 | grep | savannah `grep.git` | |
