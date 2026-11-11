@@ -3,12 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 12/19] exec: shell grants and run the child in the cwd sent by seven
 
----
- crates/fnox-core/src/sealed.rs | 31 +++++++++++++++++
- src/commands/exec.rs           | 32 ++++++++++++++++--
- src/seven.rs                   | 61 ++++++++++++++++++++++++++++++----
- 3 files changed, 114 insertions(+), 10 deletions(-)
-
 diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
 index 9cf8473..3d85bf0 100644
 --- a/crates/fnox-core/src/sealed.rs
@@ -260,4 +254,3 @@ index eebfb9e..b9e5b94 100644
              &root,
              Some(&path),
          ) {
-

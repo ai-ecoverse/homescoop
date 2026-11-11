@@ -4,18 +4,11 @@ Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 10/19] seven: refuse what would put a value in a program-checked file
  file
 
----
- crates/fnox-core/src/providers/age.rs | 23 ++++++++++++++++++
- src/commands/check.rs                 | 34 +++++++++++++++++++++++++++
- src/commands/reencrypt.rs             |  7 ++++++
- src/commands/sync.rs                  |  7 ++++++
- 4 files changed, 71 insertions(+)
-
 diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
-index 4b4fa33..4fd7cba 100644
+index 5f44186..03d331e 100644
 --- a/crates/fnox-core/src/providers/age.rs
 +++ b/crates/fnox-core/src/providers/age.rs
-@@ -350,6 +350,28 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -437,6 +437,28 @@ impl crate::providers::Provider for AgeEncryptionProvider {
              .collect()
      }
  
@@ -44,7 +37,7 @@ index 4b4fa33..4fd7cba 100644
      async fn get_secret(&self, value: &str) -> Result<String> {
          if let Some((wrapped_key, ciphertext)) = Self::parse_batch_value(value) {
              let batch_key = self.decrypt_batch_key(wrapped_key).await?;
-@@ -359,6 +381,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -446,6 +468,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
          self.decrypt_age_value(value).await
      }
  
@@ -116,7 +109,7 @@ index 43905f3..6d570db 100644
          let files = if self.keys.is_empty() {
              self.reencrypt_files(cli, &merged_config).await?
 diff --git a/src/commands/sync.rs b/src/commands/sync.rs
-index 09a8397..ddc0dbd 100644
+index 956bfe6..f6df35c 100644
 --- a/src/commands/sync.rs
 +++ b/src/commands/sync.rs
 @@ -123,6 +123,13 @@ impl SyncCommand {
@@ -133,4 +126,3 @@ index 09a8397..ddc0dbd 100644
          let profile = Config::get_profiles(cli.profile.as_slice());
          let write_profile = Config::resolve_write_profile(&profile, cli.write_profile.as_deref())?;
          tracing::debug!("Syncing secrets for profile '{}'", write_profile);
-

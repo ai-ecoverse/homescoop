@@ -4,14 +4,6 @@ Date: Sat, 7 Nov 2026 12:00:00 +0100
 Subject: [PATCH 19/19] set: ask seven's vault with one blocking read, --ask, age and
  read, --ask, age and
 
----
- crates/fnox-core/src/sealed.rs | 301 ++++++++++++++++++++++++++++++++-
- src/commands/edit.rs           |   1 +
- src/commands/set.rs            |  84 +++++++--
- src/secret_session.rs          |   1 +
- src/seven.rs                   | 118 +++++++++----
- 5 files changed, 449 insertions(+), 56 deletions(-)
-
 diff --git a/crates/fnox-core/src/sealed.rs b/crates/fnox-core/src/sealed.rs
 index 3d85bf0..e995f8f 100644
 --- a/crates/fnox-core/src/sealed.rs

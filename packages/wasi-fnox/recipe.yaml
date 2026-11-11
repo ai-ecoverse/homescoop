@@ -1,5 +1,5 @@
 # fnox (jdx/fnox) for seven's kernel: the secrets tool as a WASI command.
-# Upstream is jdx/fnox v1.46.0; the patches live here (NNNN-*.patch, applied
+# Upstream is jdx/fnox v1.47.0; the patches live here (NNNN-*.patch, applied
 # in filename order by apply.sh) and are only those the WASI build or seven's
 # in-kernel integration needs. Needs slicc-kernel 1.175.0 and later
 # (/dev/sealed, exec tickets and the ask op).
@@ -12,7 +12,7 @@ summary: "fnox 1.47 for slicc WASI preview1 (command fnox; seven's sealed store)
 source:
   url: "https://github.com/jdx/fnox/archive/refs/tags/v{{version}}.tar.gz"
   sha256: "371aa8540f5d701157771c36bca5ac3e564e54d39ca9218d4cd1d9e1122387ef"
-  epoch: "1793527273"
+  epoch: "1793726739"
 # ladder-pr builds it twice and compares the package.tgz sha256 (homescoop#536).
 reproducible: true
 toolchain:
@@ -26,7 +26,7 @@ about:
   homepage: https://fnox.jdx.dev
   license: MIT
   notes: |
-    Upstream is jdx/fnox v1.46.0; the patches live here, are not
+    Upstream is jdx/fnox v1.47.0; the patches live here, are not
     upstreamed (per Lars), and are kept only when (a) the WASI build
     needs them or (b) seven's in-kernel integration does. Host installs
     use upstream fnox as it is. apply.sh checks and applies the series
@@ -56,8 +56,10 @@ about:
            AzureAuth, which stays built), and its backend, managed
            identity included, stays compiled out; from 1.42.1 also
            activate's invoked_exe (which and current_exe); from 1.46.0
-           also push and push_targets (CI/hosting writes); proxy stays
-           as a WASI stub for rules validation (0009)
+           also push and push_targets (CI/hosting writes); from
+           1.47.0-1 Config.targets stays as an opaque map on WASI so a
+           shared fnox.toml with [targets] still loads (homescoop#2009);
+           proxy stays as a WASI stub for rules validation (0009)
       0004 the working directory (PWD when it is .'s device and inode,
            else the walk up ..; 1.46.0-2: not a stale PWD), HOME from
            the environment, current_thread; the
@@ -106,7 +108,7 @@ about:
            ciphertext or plaintext
     cargo build --locked --release --bin fnox --target wasm32-wasip1
     with RUSTFLAGS --cfg tokio_unstable and SOURCE_DATE_EPOCH set to the
-    v1.46.0 commit time (source.epoch, 2026-11-01T10:01:13Z), so the
+    v1.47.0 commit time (source.epoch, 2026-11-03T17:25:39Z), so the
     build is byte-reproducible (homescoop#364), then wasm-opt -Oz
     (binaryen 133). No C toolchain. THIRD-PARTY-NOTICES.md from cargo metadata
     plus Rust's std and wasi-libc licences. 1.39.0-1 is certified and
@@ -171,3 +173,14 @@ about:
     0006, 0007, 0008, 0010, 0012, 0013, 0016 and 0019 keep the same
     added and removed lines. build.sh's usage-test notice moves to
     7.1.4 (the same LICENSE, f68207e9...).
+    1.47.0-1 rebases the series onto v1.47.0: 0001 drops the new age
+    armor feature with the other non-WASI age features; 0002 keeps
+    string_list (named age recipients) and gates passphrase-protected
+    identity decryption off on WASI (rpassword and age armor stay
+    native-only; get of an age secret is still refused); 0003 keeps an
+    opaque IndexMap of targets on WASI so a [targets] table parses and
+    is ignored while push_targets stays compiled out (homescoop#2009);
+    azure-container-apps stays with push_targets. Security patches
+    0006, 0007, 0008, 0010, 0012, 0013, 0016, 0018 and 0019 keep the
+    same added and removed lines. build.sh's usage-test notice moves
+    to 7.1.5 (the same LICENSE, f68207e9...).

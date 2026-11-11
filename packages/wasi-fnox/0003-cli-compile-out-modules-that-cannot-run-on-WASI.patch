@@ -3,35 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 3/19] cli: compile out modules that cannot run on WASI
 
----
- crates/fnox-core/src/auth_prompt.rs           |  8 ++++++++
- crates/fnox-core/src/config.rs                | 19 ++++++++++++++++++-
- crates/fnox-core/src/http.rs                  |  4 ++++
- crates/fnox-core/src/lease.rs                 | 19 +++++++++++++++----
- .../fnox-core/src/lease_backends/aws_sts.rs   |  6 ++++++
- .../src/lease_backends/azure_token.rs         |  7 +++++++
- .../src/lease_backends/cloudflare.rs          |  2 ++
- .../fnox-core/src/lease_backends/command.rs   |  4 ++++
- .../fnox-core/src/lease_backends/gcp_iam.rs   |  3 +++
- .../src/lease_backends/github_app.rs          |  3 +++
- .../src/lease_backends/github_oauth.rs        | 15 +++++++++++++++
- crates/fnox-core/src/lease_backends/gitlab.rs |  7 ++++++-
- .../src/lease_backends/kubernetes.rs          |  6 ++++++
- crates/fnox-core/src/lease_backends/mod.rs    | 10 ++++++++++
- .../oauth2_client_credentials.rs              |  7 ++++++-
- .../fnox-core/src/lease_backends/tailscale.rs |  7 ++++++-
- crates/fnox-core/src/lease_backends/vault.rs  |  3 +++
- crates/fnox-core/src/lib.rs                   |  4 ++++
- src/commands/activate.rs                      |  4 ++++
- src/commands/init.rs                          | 12 ++++++++++++
- src/commands/lease.rs                         |  6 ++++++
- src/commands/mod.rs                           | 19 +++++++++++++++++++
- src/commands/set.rs                           |  6 ++++++
- src/daemon.rs                                 |  9 +++++++++
- src/lib.rs                                    | 15 +++++++++++++--
- src/main.rs                                   |  1 +
- 26 files changed, 196 insertions(+), 10 deletions(-)
-
 diff --git a/crates/fnox-core/src/auth_prompt.rs b/crates/fnox-core/src/auth_prompt.rs
 index 7db9075..8b1726c 100644
 --- a/crates/fnox-core/src/auth_prompt.rs
@@ -64,6 +35,44 @@ index 7db9075..8b1726c 100644
      if !user_confirmed {
          return Ok(false);
      }
+diff --git a/crates/fnox-core/src/config.rs b/crates/fnox-core/src/config.rs
+index 5b6b242..f32039b 100644
+--- a/crates/fnox-core/src/config.rs
++++ b/crates/fnox-core/src/config.rs
+@@ -199,8 +199,12 @@ pub struct Config {
+ 
+     /// Push targets (for default profile): write-only stores that
+     /// `fnox push` copies secret values into
++    #[cfg(not(target_os = "wasi"))]
+     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+     pub targets: IndexMap<String, crate::push_targets::PushTargetConfig>,
++    #[cfg(target_os = "wasi")]
++    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
++    pub targets: IndexMap<String, serde_json::Value>,
+ 
+     /// Lua provider plugins to install, as `name = "<git url>[#ref]"`.
+     /// `owner/repo` is shorthand for a GitHub repository.
+@@ -396,8 +400,12 @@ pub struct ProfileConfig {
+     pub providers: IndexMap<String, ProviderConfig>,
+ 
+     /// Push targets for this profile
++    #[cfg(not(target_os = "wasi"))]
+     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+     pub targets: IndexMap<String, crate::push_targets::PushTargetConfig>,
++    #[cfg(target_os = "wasi")]
++    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
++    pub targets: IndexMap<String, serde_json::Value>,
+ 
+     /// Default provider name for this profile
+     #[serde(default, skip_serializing_if = "Option::is_none")]
+@@ -2236,6 +2244,7 @@ impl Config {
+ 
+     /// Get effective push targets for the active profile stack, with the same
+     /// precedence as [`Self::get_leases`].
++    #[cfg(not(target_os = "wasi"))]
+     pub fn get_targets(
+         &self,
+         profiles: &[String],
 diff --git a/crates/fnox-core/src/http.rs b/crates/fnox-core/src/http.rs
 index 7609edd..fcb228e 100644
 --- a/crates/fnox-core/src/http.rs
@@ -658,101 +667,6 @@ index 7bcf100..88f642d 100644
  #[async_trait]
  impl LeaseBackend for VaultBackend {
      async fn create_lease(&self, duration: Duration, _label: &str) -> Result<Lease> {
-diff --git a/crates/fnox-core/src/config.rs b/crates/fnox-core/src/config.rs
---- a/crates/fnox-core/src/config.rs
-+++ b/crates/fnox-core/src/config.rs
-@@ -199,6 +199,7 @@ pub struct Config {
- 
-     /// Push targets (for default profile): write-only stores that
-     /// `fnox push` copies secret values into
-+    #[cfg(not(target_os = "wasi"))]
-     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-     pub targets: IndexMap<String, crate::push_targets::PushTargetConfig>,
- 
-@@ -396,6 +397,7 @@ pub struct ProfileConfig {
-     pub providers: IndexMap<String, ProviderConfig>,
- 
-     /// Push targets for this profile
-+    #[cfg(not(target_os = "wasi"))]
-     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-     pub targets: IndexMap<String, crate::push_targets::PushTargetConfig>,
- 
-@@ -1025,7 +1027,8 @@ impl Config {
-         profile
-             .providers
-             .extend(std::mem::take(&mut self.providers));
-+        #[cfg(not(target_os = "wasi"))]
-         profile.targets.extend(std::mem::take(&mut self.targets));
-         profile
-             .provider_sources
-             .extend(std::mem::take(&mut self.provider_sources));
-@@ -1072,7 +1075,8 @@ impl Config {
-             profile.lease_sources.extend(overlay.lease_sources);
-             profile.providers.extend(overlay.providers);
-             profile.provider_sources.extend(overlay.provider_sources);
-+            #[cfg(not(target_os = "wasi"))]
-             profile.targets.extend(overlay.targets);
-             profile.secrets.extend(overlay.secrets);
-             profile.files.extend(overlay.files);
-             profile.secret_sources.extend(overlay.secret_sources);
-@@ -1417,6 +1421,7 @@ impl Config {
-         }
- 
-         // Merge push targets (overlay takes precedence)
-+        #[cfg(not(target_os = "wasi"))]
-         for (name, target) in overlay.targets {
-             merged.targets.insert(name, target);
-         }
-@@ -1468,6 +1473,7 @@ impl Config {
-                 for (provider_name, provider) in profile.providers {
-                     existing_profile.providers.insert(provider_name, provider);
-                 }
-+                #[cfg(not(target_os = "wasi"))]
-                 for (target_name, target) in profile.targets {
-                     existing_profile.targets.insert(target_name, target);
-                 }
-@@ -1859,6 +1865,7 @@ impl Config {
-             root: false,
-             leases: IndexMap::new(),
-             providers: IndexMap::new(),
-+            #[cfg(not(target_os = "wasi"))]
-             targets: IndexMap::new(),
-             plugins: IndexMap::new(),
-             default_provider: None,
-@@ -2236,6 +2243,7 @@ impl Config {
- 
-     /// Get effective push targets for the active profile stack, with the same
-     /// precedence as [`Self::get_leases`].
-+    #[cfg(not(target_os = "wasi"))]
-     pub fn get_targets(
-         &self,
-         profiles: &[String],
-@@ -2912,6 +2920,7 @@ impl ProfileConfig {
-             inherits: None,
-             leases: IndexMap::new(),
-             providers: IndexMap::new(),
-+            #[cfg(not(target_os = "wasi"))]
-             targets: IndexMap::new(),
-             default_provider: None,
-             secrets: IndexMap::new(),
-@@ -2928,7 +2937,16 @@ impl ProfileConfig {
-         self.inherits.is_none()
-             && self.leases.is_empty()
-             && self.providers.is_empty()
--            && self.targets.is_empty()
-+            && {
-+                #[cfg(not(target_os = "wasi"))]
-+                {
-+                    self.targets.is_empty()
-+                }
-+                #[cfg(target_os = "wasi")]
-+                {
-+                    true
-+                }
-+            }
-             && self.secrets.is_empty()
-             && self.files.is_empty()
-             && self.default_provider().is_none()
 diff --git a/crates/fnox-core/src/lib.rs b/crates/fnox-core/src/lib.rs
 index 54ca411..a237250 100644
 --- a/crates/fnox-core/src/lib.rs
@@ -1112,4 +1026,3 @@ index 555a249..fbc65cb 100644
      let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
  
      let (cli, settings_layer) = Cli::parse_with_settings();
-

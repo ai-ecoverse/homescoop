@@ -3,11 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 8/19] exec: let seven's kernel hand sealed values to the command
 
----
- src/commands/exec.rs |  89 +++++++++++++++-
- src/seven.rs         | 243 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 328 insertions(+), 4 deletions(-)
-
 diff --git a/src/commands/exec.rs b/src/commands/exec.rs
 index 1d4fc5a..9173c7a 100644
 --- a/src/commands/exec.rs
@@ -380,4 +375,3 @@ index f05862d..eebfb9e 100644
      #[test]
      fn request_value_returns_the_placeholder_when_done() {
          let (_g, mock) = fnox_core::sealed::testing::install();
-

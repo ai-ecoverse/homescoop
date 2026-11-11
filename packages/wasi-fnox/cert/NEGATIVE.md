@@ -194,3 +194,9 @@ The published 1.45.0-2 against this checklist fails the new 1.46.0 rows: it prin
 0004 took `PWD` as it was. A parent that sets a child's working directory without rewriting `PWD` (Node's `spawnSync` with `{ cwd }`, on real Node too) made fnox look for `fnox.toml` from the parent's directory. 0004 now changes into `PWD` only when it is absolute, not `/`, has no `..` and is `.`'s device and inode, and otherwise into the path found by walking `..` up to the root, as getcwd(3) does (wasi-libc's `current_dir()` is `/` in every case, measured with a Rust probe on slicc-kernel 1.134.3 and 1.176.2; see homescoop#2012).
 
 The published 1.46.0-1 fails `cert/cwd.mjs` at `PWD=/tmp` (`No configuration file found in /tmp or any parent directory`, `browser-cert --spec cwd.mjs`, slicc-kernel 1.175.0). Run to the end, 10 of its 14 assertions fail: `PWD=/tmp`, `/nonexistent`, `dir` and `/` find no configuration, and with the cwd `/` and `PWD` naming the project fnox reads the project's. The cwd spelt with `..` passes on 1.46.0-1 (the chdir resolves it). 1.46.0-2 passes all 14, the whole cert and `test/sealed.mjs`.
+
+## 1.47.0-1: [targets] parses and is ignored on WASI (homescoop#2009)
+
+Since 1.46.0-1, 0003 gated `Config.targets` and `ProfileConfig.targets` off on WASI with `push_targets`. Config deserialisation rejects unknown fields, so a project `fnox.toml` with an upstream `[targets.<name>]` table failed to load (`unknown field \`targets\``) and every command failed. 1.47.0-1 keeps an opaque `IndexMap<String, serde_json::Value>` for `targets` on WASI so the table parses and is ignored, and only the code that writes to targets stays compiled out.
+
+The published 1.46.0-2 against the new checklist row fails at `fnox get LVL` in `/home/v147targets` with `unknown field \`targets\`` (status non-zero). The head build's `get` and `exec` succeed with the plain value.

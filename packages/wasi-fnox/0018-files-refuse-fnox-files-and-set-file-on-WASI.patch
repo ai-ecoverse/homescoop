@@ -3,12 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 18/19] files: refuse fnox files and set/get --file on WASI
 
----
- src/commands/get.rs | 18 ++++++++++++++----
- src/commands/mod.rs |  5 +++++
- src/commands/set.rs |  9 +++++++++
- 3 files changed, 28 insertions(+), 4 deletions(-)
-
 diff --git a/src/commands/get.rs b/src/commands/get.rs
 index 8995323..caad8f8 100644
 --- a/src/commands/get.rs
@@ -83,4 +77,3 @@ index 9eb662f..3ad7f47 100644
              return self.run_file(cli, &config, path).await;
          }
          let target_path = if self.global {
-

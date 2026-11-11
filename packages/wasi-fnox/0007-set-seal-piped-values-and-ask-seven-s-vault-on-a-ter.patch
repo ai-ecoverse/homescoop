@@ -3,13 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 7/19] set: seal piped values and ask seven's vault on a terminal
 
----
- src/commands/set.rs |  59 ++++++++++++++++++++++----
- src/lib.rs          |   1 +
- src/seven.rs        | 101 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 152 insertions(+), 9 deletions(-)
- create mode 100644 src/seven.rs
-
 diff --git a/src/commands/set.rs b/src/commands/set.rs
 index 3a45571..fab8cbf 100644
 --- a/src/commands/set.rs
@@ -227,4 +220,3 @@ index 0000000..f05862d
 +        fnox_core::sealed::set_transport(None);
 +    }
 +}
-

@@ -3,20 +3,15 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 1/19] build: gate non-WASI dependencies by target
 
----
- Cargo.toml                  | 37 ++++++++++++----------
- crates/fnox-core/Cargo.toml | 62 ++++++++++++++++++++-----------------
- 2 files changed, 55 insertions(+), 44 deletions(-)
-
 diff --git a/Cargo.toml b/Cargo.toml
-index 5ef1ef8..500ce23 100644
+index cd2d1ec..3e07ab2 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -16,7 +16,7 @@ rust-version = "1.91.1"
  
  [workspace.dependencies]
  aes-gcm = "0.11.0-rc.3"
--age = { version = "0.12", features = ["ssh", "plugin", "cli-common"] }
+-age = { version = "0.12", features = ["armor", "ssh", "plugin", "cli-common"] }
 +age = { version = "0.12" }
  aho-corasick = "1"
  anyhow = "1"
@@ -215,4 +210,3 @@ index 66d011e..37b89a0 100644
  ctap-hid-fido2 = { workspace = true }
  
  [target.'cfg(target_os = "linux")'.dependencies]
-
