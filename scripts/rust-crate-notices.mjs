@@ -13,7 +13,10 @@
  * link). metadata.json (`cargo metadata --format-version 1`, same tree, same
  * vendored sources) gives each crate's licence expression and source
  * directory. Local path crates (the package itself, homescoop's crates/) are
- * skipped. Each crate's licence files come from its unpacked source next to
+ * skipped, except [patch.crates-io] path crates under homescoop-crates/<name>-<version>
+ * (wasi-uv's patched crates.io releases): those are listed under their crates.io
+ * name and version, with licence text from the patched directory. Each crate's
+ * licence files come from its unpacked source next to
  * its Cargo.toml; for a git dependency, also the directories above it up to the
  * checkout root (facebook/react's crates have only the repository's LICENSE).
  * A registry crate that ships none gets the upstream file pinned in
@@ -28,7 +31,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { licenceFiles, treeCrates } from './rust-crate-notices-lib.mjs';
+import { homescoopPatchedCratePath, licenceFiles, treeCrates } from './rust-crate-notices-lib.mjs';
 
 const scripts = dirname(fileURLToPath(import.meta.url));
 const texts = join(scripts, 'licence-texts');
@@ -37,11 +40,19 @@ const [metaPath, treePath] = process.argv.slice(2);
 const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
 
 const want = treeCrates(readFileSync(treePath, 'utf8'));
-const byKey = new Map(meta.packages.filter((p) => p.source).map((p) => [`${p.name} ${p.version}`, p]));
+const byKey = new Map();
+for (const p of meta.packages) {
+  const key = `${p.name} ${p.version}`;
+  if (p.source) {
+    byKey.set(key, p);
+    continue;
+  }
+  if (homescoopPatchedCratePath(p.name, p.version, p.manifest_path)) byKey.set(key, p);
+}
 const crates = [...want]
   .map((k) => {
     const p = byKey.get(k);
-    if (!p) throw new Error(`cargo tree lists ${k}, cargo metadata has no registry/git package for it`);
+    if (!p) throw new Error(`cargo tree lists ${k}, cargo metadata has no registry/git/homescoop-crates package for it`);
     return p;
   })
   .sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
@@ -50,7 +61,7 @@ const out = [];
 for (const p of crates) {
   let dir = dirname(p.manifest_path);
   let files = licenceFiles(dir);
-  if (!files.length && p.source.startsWith('git+')) {
+  if (!files.length && p.source && p.source.startsWith('git+')) {
     const top = p.manifest_path.match(/^(.*\/git\/checkouts\/[^/]+\/[^/]+)\//)?.[1];
     for (let d = dirname(dir); top && d.length >= top.length && !files.length; d = dirname(d)) {
       const found = licenceFiles(d);
@@ -61,7 +72,7 @@ for (const p of crates) {
     }
   }
   out.push(`\n## ${p.name} ${p.version} (${p.license})\n`);
-  if (p.source.startsWith('registry+')) out.push(`\nSource: https://crates.io/crates/${p.name}/${p.version}\n`);
+  if (!p.source || p.source.startsWith('registry+')) out.push(`\nSource: https://crates.io/crates/${p.name}/${p.version}\n`);
   else out.push(`\nSource: ${p.source.replace(/^git\+/, '')}\n`);
   const pin = pinned[`${p.name} ${p.version}`];
   if (!files.length && pin) {

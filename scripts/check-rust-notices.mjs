@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * THIRD-PARTY-NOTICES.md covers exactly the crates the wasm links: the
- * "## name version" headings equal `cargo tree`'s registry/git crates, and
- * every one of them is a package of the build's Cargo.lock.
+ * "## name version" headings equal `cargo tree`'s registry/git crates and
+ * homescoop-crates/<name>-<version> path patches, and every one of them is a
+ * package of the build's Cargo.lock.
  *
  *   node scripts/check-rust-notices.mjs <notices.md> <cargo-tree.txt> <Cargo.lock>
  */
