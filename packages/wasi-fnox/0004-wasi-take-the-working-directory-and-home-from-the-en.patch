@@ -14,13 +14,8 @@ that stale PWD and looked for fnox.toml from the parent's directory.
 
 HOME_DIR comes from HOME on WASI.
 
----
- crates/fnox-core/src/env.rs | 14 ++++++++++----
- src/main.rs                 | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 77 insertions(+), 5 deletions(-)
-
 diff --git a/crates/fnox-core/src/env.rs b/crates/fnox-core/src/env.rs
-index 3c004d2..2df64f9 100644
+index 9f01e4c..afa4919 100644
 --- a/crates/fnox-core/src/env.rs
 +++ b/crates/fnox-core/src/env.rs
 @@ -40,12 +40,18 @@ pub fn remove_var<K: AsRef<OsStr>>(key: K) {
@@ -63,9 +58,10 @@ index 3c004d2..2df64f9 100644
                  #[cfg(windows)]
                  return HOME_DIR.join("AppData").join("Local");
 diff --git a/src/main.rs b/src/main.rs
+index fbc65cb..16690ab 100644
 --- a/src/main.rs
 +++ b/src/main.rs
-@@ -2,7 +2,68 @@
+@@ -2,7 +2,68 @@ use fnox::commands::Cli;
  use fnox::settings;
  use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
  
@@ -134,7 +130,7 @@ diff --git a/src/main.rs b/src/main.rs
      let argv: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
      if fnox::hook_env::can_exit_before_startup(&argv) {
          return Ok(());
-@@ -10,7 +71,8 @@
+@@ -10,7 +71,8 @@ fn main() -> miette::Result<()> {
      run(argv)
  }
  
@@ -144,4 +140,3 @@ diff --git a/src/main.rs b/src/main.rs
  async fn run(argv: Vec<std::ffi::OsString>) -> miette::Result<()> {
      // Restore the default SIGPIPE handler. Rust inherits SIG_IGN from libc,
      // so writes to a closed pipe return EPIPE and `println!` panics — e.g.
-

@@ -3,12 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 15/19] hook-env and activate: the shell integration on WASI
 
----
- crates/fnox-core/src/temp_file_secrets.rs |  5 +++++
- src/commands/activate.rs                  | 13 ++++++++++++-
- src/hook_env.rs                           |  8 +++++++-
- 3 files changed, 24 insertions(+), 2 deletions(-)
-
 diff --git a/crates/fnox-core/src/temp_file_secrets.rs b/crates/fnox-core/src/temp_file_secrets.rs
 index 75fd08e..dd5501f 100644
 --- a/crates/fnox-core/src/temp_file_secrets.rs
@@ -76,4 +70,3 @@ index bc56d41..4a20540 100644
              .finalize()
              .as_bytes();
  
-

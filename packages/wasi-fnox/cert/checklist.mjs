@@ -399,6 +399,30 @@ export default async function (ctx) {
   assert.match(flat(pushCmd.stderr), /unrecognized subcommand|unexpected argument|no such subcommand|invalid subcommand/i, `fnox push compiled out: ${pushCmd.stderr}`);
   assert.doesNotMatch(pushCmd.stderr, /panicked|wasm trap/);
   await write(
+    'home/v147targets/fnox.toml',
+    [
+      '[providers.plain]',
+      'type = "plain"',
+      '',
+      '[targets.gh-prod]',
+      'type = "github-actions"',
+      'repo = "acme/api"',
+      'environment = "production"',
+      '',
+      '[secrets]',
+      'LVL = { provider = "plain", value = "from-targets-toml", push = ["gh-prod"] }',
+      '',
+    ].join('\n'),
+  );
+  const targetsGet = await run(['fnox', 'get', 'LVL'], { cwd: '/home/v147targets', env });
+  assert.equal(targetsGet.status, 0, `1.47.0 [targets] get: ${targetsGet.stderr}`);
+  assert.equal(targetsGet.stdout.trim(), 'from-targets-toml', `1.47.0 [targets] get value: ${targetsGet.stdout}`);
+  assert.doesNotMatch(targetsGet.stderr, /unknown field `targets`|invalid_toml|panicked|wasm trap/);
+  const targetsExec = await run(['fnox', 'exec', '--', 'printenv', 'LVL'], { cwd: '/home/v147targets', env });
+  assert.equal(targetsExec.status, 0, `1.47.0 [targets] exec: ${targetsExec.stderr}`);
+  assert.equal(targetsExec.stdout.trim(), 'from-targets-toml', `1.47.0 [targets] exec value: ${targetsExec.stdout}`);
+  assert.doesNotMatch(targetsExec.stderr, /unknown field `targets`|invalid_toml|panicked|wasm trap/);
+  await write(
     'home/v146lease/fnox.toml',
     [
       '[providers.plain]',

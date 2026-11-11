@@ -3,10 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 14/19] edit: refuse fnox edit on WASI instead of panicking
 
----
- src/commands/mod.rs | 5 +++++
- 1 file changed, 5 insertions(+)
-
 diff --git a/src/commands/mod.rs b/src/commands/mod.rs
 index ccdad2a..cd769de 100644
 --- a/src/commands/mod.rs
@@ -23,4 +19,3 @@ index ccdad2a..cd769de 100644
              Commands::Edit(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Export(cmd) => cmd.run(cli, self.load_config(cli)?).await,
              Commands::Files(cmd) => cmd.run(cli, self.load_config(cli)?).await,
-

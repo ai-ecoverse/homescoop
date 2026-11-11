@@ -3,14 +3,8 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 5/19] wasi: spawn fnox exec children through wasix-command
 
----
- Cargo.lock           | 9 +++++++++
- Cargo.toml           | 1 +
- src/commands/exec.rs | 7 +++++++
- 3 files changed, 17 insertions(+)
-
 diff --git a/Cargo.lock b/Cargo.lock
-index fdcc341..615b7c5 100644
+index 922baa6..af9f450 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -2491,6 +2491,7 @@ dependencies = [
@@ -37,7 +31,7 @@ index fdcc341..615b7c5 100644
  name = "wasm-bindgen"
  version = "0.2.129"
 diff --git a/Cargo.toml b/Cargo.toml
-index 500ce23..21c486b 100644
+index 3e07ab2..5abfa01 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -192,6 +192,7 @@ which = { workspace = true }
@@ -74,4 +68,3 @@ index 7637b23..1d4fc5a 100644
  
          #[cfg(unix)]
          if self.replace {
-

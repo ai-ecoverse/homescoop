@@ -3,10 +3,6 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 13/19] set: detect a terminal on WASI; refuse an empty sealed value
 
----
- src/commands/set.rs | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
-
 diff --git a/src/commands/set.rs b/src/commands/set.rs
 index fab8cbf..9eb662f 100644
 --- a/src/commands/set.rs
@@ -50,4 +46,3 @@ index fab8cbf..9eb662f 100644
          if sealed_provider && self.key_name.is_some() {
              return Err(FnoxError::Seven(
                  "not available in seven: a sealed record is named after its secret (--key-name)"
-

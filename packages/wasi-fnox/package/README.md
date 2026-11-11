@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasi-fnox
 
-[fnox](https://fnox.jdx.dev) 1.46 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.46.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
+[fnox](https://fnox.jdx.dev) 1.47 for [slicc](https://github.com/ai-ecoverse/slicc)'s kernel: a WASI preview1 command, `fnox`, built from upstream jdx/fnox v1.47.0 with [homescoop's patch series](https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fnox) (`NNNN-*.patch`, listed in `recipe.yaml`). The patches are carried by homescoop, not upstreamed.
 
 ## In seven
 
@@ -36,7 +36,7 @@ Without `/dev/sealed`, every sealed operation fails with `not running in seven: 
 
 fnox is MIT (see `LICENSE`). `THIRD-PARTY-NOTICES.md` lists the crates, Rust's standard library and wasi-libc that `bin/fnox.wasm` links.
 
-## WASI support for fnox 1.46
+## WASI support for fnox 1.47
 
 `fnox exec --only` and `--except` retain upstream filtering: excluded providers are not resolved, dependencies are resolved without being exported, and excluded configured values are not injected. Inherited environment variables retain their original values unless the child plan replaces or removes them; these flags do not clear the environment. The WASI child starts from the environment captured before resolution, so a resolved interpolation dependency cannot enter it through process-environment mutation. Sealed selections still use the kernel ticket path.
 
@@ -47,3 +47,5 @@ The new OAuth2, GitLab, Tailscale and Kubernetes lease backends are compiled out
 Since 1.45.0, upstream secret files (`[files]`, `fnox files`, `set|get|edit --file`) and the MCP `request_secret` one-time page need native HTTP, tempfile and editor paths. This build refuses those commands and flags before they run; the MCP module and the native proxy HTTP stack stay compiled out.
 
 Since 1.46.0, upstream `fnox push` (CI and hosting secret stores), proxy lease credentials, and the `[files]` sync cache need native HTTP, CLIs and helper threads. This build compiles `push` and `push_targets` out, refuses proxy rules that name a `lease`, and keeps `sync` refused; port-specific `allow_private` entries still validate in the WASI proxy stub.
+
+Since 1.47.0, upstream adds named and passphrase-protected age identities, named age recipients, and an `azure-container-apps` push target. Passphrase prompts and age plugins stay native-only; this build still refuses age decryption in seven. A project `fnox.toml` with a `[targets]` table (for host `fnox push`) loads in seven: the table is parsed and ignored. Until 1.46.0-1, gating `Config.targets` off made that table an unknown field and every command failed (homescoop#2009).

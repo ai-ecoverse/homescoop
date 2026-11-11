@@ -3,20 +3,11 @@ From: Lars Trieloff <lars@trieloff.net>
 Date: Sat, 7 Nov 2026 02:10:00 +0100
 Subject: [PATCH 2/19] providers: build only age and plain for WASI
 
----
- crates/fnox-core/build/generate_providers.rs  | 108 +++++++++++++++++-
- crates/fnox-core/src/providers/age.rs         |  23 +++-
- .../fnox-core/src/providers/azure_shared.rs   |   4 +
- crates/fnox-core/src/providers/mod.rs         |  51 ++++++++-
- src/child_env.rs                              |  12 +-
- src/commands/provider/add.rs                  |  10 +-
- 6 files changed, 194 insertions(+), 14 deletions(-)
-
 diff --git a/crates/fnox-core/build/generate_providers.rs b/crates/fnox-core/build/generate_providers.rs
-index bbc4857..071344d 100644
+index 3603d20..3494cc7 100644
 --- a/crates/fnox-core/build/generate_providers.rs
 +++ b/crates/fnox-core/build/generate_providers.rs
-@@ -430,9 +430,19 @@ fn generate_provider_methods(
+@@ -446,9 +446,19 @@ fn generate_provider_methods(
              quote! { Self::#variant { .. } => false }
          };
          daemon_cache_arms.push(daemon_cache_arm);
@@ -39,7 +30,7 @@ index bbc4857..071344d 100644
          let interactive = provider.requires_interactive_auth;
          interactive_auth_arms.push(quote! {
              Self::#variant { .. } => #interactive
-@@ -444,6 +454,7 @@ fn generate_provider_methods(
+@@ -460,6 +470,7 @@ fn generate_provider_methods(
      // Build use statements for provider modules
      let module_uses: Vec<TokenStream> = providers
          .iter()
@@ -47,7 +38,7 @@ index bbc4857..071344d 100644
          .map(|(_name, provider)| {
              let module = Ident::new(&provider.module, Span::call_site());
              quote! { use super::super::#module; }
-@@ -741,6 +752,85 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
+@@ -777,6 +788,85 @@ fn generate_from_wizard_fields_body(provider: &ProviderToml) -> TokenStream {
      }
  }
  
@@ -133,7 +124,7 @@ index bbc4857..071344d 100644
  fn generate_provider_instantiate(
      providers: &[(String, ProviderToml)],
  ) -> Result<String, Box<dyn std::error::Error>> {
-@@ -758,6 +848,18 @@ fn generate_provider_instantiate(
+@@ -794,6 +884,18 @@ fn generate_provider_instantiate(
              vec![]
          };
  
@@ -153,10 +144,10 @@ index bbc4857..071344d 100644
              arms.push(quote! {
                  ResolvedProviderConfig::#variant => {
 diff --git a/crates/fnox-core/src/providers/age.rs b/crates/fnox-core/src/providers/age.rs
-index bd858d3..4b4fa33 100644
+index 7cfb45d..5f44186 100644
 --- a/crates/fnox-core/src/providers/age.rs
 +++ b/crates/fnox-core/src/providers/age.rs
-@@ -198,6 +198,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -285,6 +285,7 @@ impl crate::providers::Provider for AgeEncryptionProvider {
  
          // Parse recipients - try SSH, native age, then plugin formats
          let mut parsed_recipients: Vec<Box<dyn age::Recipient + Send + Sync>> = Vec::new();
@@ -164,7 +155,7 @@ index bd858d3..4b4fa33 100644
          let mut plugin_recipients: Vec<age::plugin::Recipient> = Vec::new();
  
          for recipient in &self.recipients {
-@@ -213,7 +214,15 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -300,7 +301,15 @@ impl crate::providers::Provider for AgeEncryptionProvider {
                  continue;
              }
  
@@ -180,7 +171,7 @@ index bd858d3..4b4fa33 100644
              match recipient.parse::<age::plugin::Recipient>() {
                  Ok(plugin_recipient) => plugin_recipients.push(plugin_recipient),
                  Err(e) => {
-@@ -227,10 +236,12 @@ impl crate::providers::Provider for AgeEncryptionProvider {
+@@ -314,10 +323,12 @@ impl crate::providers::Provider for AgeEncryptionProvider {
          // Build one plugin driver per distinct plugin name. RecipientPluginV1
          // filters the recipient list by plugin name internally, so we pass the
          // full list and spawn the matching `age-plugin-*` binary from $PATH.
@@ -193,7 +184,20 @@ index bd858d3..4b4fa33 100644
          for plugin_name in plugin_names {
              let plugin = age::plugin::RecipientPluginV1::new(
                  &plugin_name,
-@@ -507,12 +518,14 @@ impl AgeEncryptionProvider {
+@@ -569,6 +580,12 @@ impl AgeEncryptionProvider {
+                     source: e,
+                 })?;
+ 
++            #[cfg(target_os = "wasi")]
++            let content = String::from_utf8(bytes).map_err(|e| FnoxError::AgeIdentityReadFailed {
++                path: key_file_path.clone(),
++                source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
++            })?;
++            #[cfg(not(target_os = "wasi"))]
+             let content = if is_age_encrypted(&bytes) {
+                 decrypt_identity_file(&key_file_path, &bytes)?
+             } else {
+@@ -602,12 +619,14 @@ impl AgeEncryptionProvider {
                      // identities (e.g. AGE-PLUGIN-YUBIKEY-1...) by driving the
                      // matching `age-plugin-*` binary for PIN/touch prompts.
                      cursor.set_position(0);
@@ -213,6 +217,27 @@ index bd858d3..4b4fa33 100644
                          .map_err(|e| FnoxError::AgeIdentityParseFailed {
                              details: e.to_string(),
                          })?
+@@ -640,6 +659,9 @@ impl AgeEncryptionProvider {
+     }
+ }
+ 
++#[cfg(not(target_os = "wasi"))]
++mod passphrase_identity {
++use super::*;
+ /// Identity files decrypted with a prompted passphrase, so one run asks once per file.
+ /// Keyed by canonical path; the encrypted bytes are kept so an edited file is not served stale.
+ type DecryptedIdentities = HashMap<PathBuf, (Vec<u8>, String)>;
+@@ -712,6 +734,10 @@ fn decrypt_with_passphrase(
+     String::from_utf8(out).map_err(|e| e.to_string())
+ }
+ 
++}
++#[cfg(not(target_os = "wasi"))]
++use passphrase_identity::*;
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
 diff --git a/crates/fnox-core/src/providers/azure_shared.rs b/crates/fnox-core/src/providers/azure_shared.rs
 index 97368bd..7eff514 100644
 --- a/crates/fnox-core/src/providers/azure_shared.rs
@@ -240,10 +265,10 @@ index 97368bd..7eff514 100644
          let auth_failed = |e: azure_core::Error| FnoxError::ProviderAuthFailed {
              provider: provider.to_string(),
 diff --git a/crates/fnox-core/src/providers/mod.rs b/crates/fnox-core/src/providers/mod.rs
-index 770a98b..fb66d7a 100644
+index c3f23ed..6aac4ad 100644
 --- a/crates/fnox-core/src/providers/mod.rs
 +++ b/crates/fnox-core/src/providers/mod.rs
-@@ -5,44 +5,87 @@ use std::path::PathBuf;
+@@ -5,45 +5,88 @@ use std::path::PathBuf;
  
  // Provider implementation modules
  pub mod age;
@@ -306,6 +331,7 @@ index 770a98b..fb66d7a 100644
  pub mod resolved;
  pub mod resolver;
  pub mod secret_ref;
+ pub mod string_list;
 +#[cfg(not(target_os = "wasi"))]
  pub mod vault;
 +#[cfg(not(target_os = "wasi"))]
@@ -330,9 +356,9 @@ index 770a98b..fb66d7a 100644
 +#[cfg(target_os = "wasi")]
 +pub use bitwarden_backend::BitwardenBackend;
  pub use resolver::resolve_provider_config;
- pub use secret_ref::{OptionProviderSecretRef, OptionStringOrSecretRef, StringOrSecretRef};
- 
-@@ -152,14 +195,17 @@ mod generated {
+ pub use secret_ref::{
+     OptionProviderSecretRef, OptionStringOrSecretRef, ResolvedStringOrProviderRef,
+@@ -157,14 +200,17 @@ mod generated {
      }
      pub(super) mod providers_instantiate {
          // Need to import provider modules for instantiation
@@ -351,7 +377,7 @@ index 770a98b..fb66d7a 100644
          include!(concat!(
              env!("OUT_DIR"),
              "/generated/providers_instantiate.rs"
-@@ -502,6 +548,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
+@@ -517,6 +563,7 @@ pub(crate) fn get_provider_from_resolved_with_context_and_identity_cycle_guard(
          };
          return get_provider_from_resolved(provider_name, &resolved);
      }
@@ -383,10 +409,10 @@ index af0663e..cdf5ac7 100644
  }
  
 diff --git a/src/commands/provider/add.rs b/src/commands/provider/add.rs
-index 30a9ca9..f89e162 100644
+index 448f85f..97ec5e0 100644
 --- a/src/commands/provider/add.rs
 +++ b/src/commands/provider/add.rs
-@@ -238,7 +238,14 @@ impl AddCommand {
+@@ -240,7 +240,14 @@ impl AddCommand {
                  auth_command: None,
                  daemon_cache: None,
              },
@@ -402,7 +428,7 @@ index 30a9ca9..f89e162 100644
              ProviderType::Fido2 => {
                  let provider_name = self.provider.clone();
                  let (credential_id_hex, salt_hex, rp_id, _pin) =
-@@ -257,6 +264,7 @@ impl AddCommand {
+@@ -259,6 +266,7 @@ impl AddCommand {
                      daemon_cache: None,
                  }
              }
@@ -410,4 +436,3 @@ index 30a9ca9..f89e162 100644
              ProviderType::Yubikey => {
                  let provider_name = self.provider.clone();
                  let (challenge_hex, slot_str) = tokio::task::spawn_blocking(move || {
-
