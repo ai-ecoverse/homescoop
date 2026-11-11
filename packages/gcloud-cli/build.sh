@@ -78,6 +78,9 @@ find "$STAGE" -type d -name __pycache__ -prune -exec rm -rf {} +
 rm -f "$STAGE"/bin/{gcloud,bq,docker-credential-gcloud,git-credential-gcloud.sh,dev_appserver.py,java_dev_appserver.sh}
 rm -f "$STAGE"/{install.sh,install.bat,completion.bash.inc,completion.zsh.inc,path.bash.inc,path.fish.inc,path.zsh.inc,RELEASE_NOTES}
 rm -rf "$STAGE/deb" "$STAGE/rpm"
+# Names npm never packs (a .gitignore under platform/ext-runtime/nodejs):
+# drop them here, so .install/'s manifests list only what the tarball has.
+find "$STAGE" -type f \( -name .gitignore -o -name .npmignore -o -name .npmrc -o -name .DS_Store -o -name 'npm-debug.log' -o -name '._*' -o -name '.*.swp' \) -print -delete
 
 echo "== gcloud-cli: component manager off, no update checks, no usage reporting, no survey prompts"
 # disable_updater is how Google's own apt and yum packages turn the component
