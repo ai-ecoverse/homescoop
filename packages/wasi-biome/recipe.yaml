@@ -5,7 +5,7 @@ name: wasi-biome
 builder: host
 runner: pool
 # renovate: datasource=github-tags depName=biomejs/biome extractVersion=^@biomejs/biome@(?<version>.*)$
-version: "2.6.4"
+version: "2.6.5"
 npm: "@ai-ecoverse/wasi-biome"
 summary: "Biome 2.6 for slicc WASI preview1 (command biome)"
 source:
