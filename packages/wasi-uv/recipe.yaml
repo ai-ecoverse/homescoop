@@ -68,6 +68,9 @@ about:
     points at homescoop-pydata-map.json / FAILFAST.md (no binary change).
     0.13.7-1: cargo-util 0.2.32 (crates/ renamed, the patch applies
     unchanged); 0001 refreshed for the new path and lock checksum.
+    0.13.7-2: THIRD-PARTY-NOTICES.md includes the eight [patch.crates-io]
+    path crates under homescoop-crates/ (homescoop#2035); the notices
+    generator and check-rust-notices no longer skip them.
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means
