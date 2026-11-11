@@ -24,6 +24,13 @@ export default async function (ctx) {
   const bqVersion = (await ok(ctx, `cat '${SDK}/platform/bq/VERSION'`)).stdout.trim();
   const bq = await ok(ctx, 'bq version');
   assert.equal(bq.stdout.trim(), `This is BigQuery CLI ${bqVersion}`, `bq version:\n${bq.stdout}${bq.stderr}`);
+  // The launcher's PYTHONWARNINGS filter: bq prints nothing on stderr, while
+  // platform/bq/bq.py run without the launcher prints the warning.
+  assert.equal(bq.stderr, '', `bq version stderr:\n${bq.stderr}`);
+  const raw = await ok(ctx, `python3 -S '${SDK}/platform/bq/bq.py' version`);
+  assert.match(raw.stderr, /RequestsDependencyWarning: urllib3 \(/, `bq.py without the launcher: ${raw.stderr}`);
+  const user = await ok(ctx, 'PYTHONWARNINGS=error::DeprecationWarning bq version');
+  assert.equal(user.stderr, '', `bq version with a user PYTHONWARNINGS: ${user.stderr}`);
 
   const info = JSON.parse((await ok(ctx, 'gcloud info --format=json')).stdout);
   assert.match(info.basic.python_version, /^3\.15\./, `python ${info.basic.python_version}`);

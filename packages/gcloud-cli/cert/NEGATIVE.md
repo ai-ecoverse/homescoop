@@ -53,3 +53,15 @@ The kernel's proxy terminates TLS with its own CA. bq's httplib2 trusts only its
 - `launcher.mjs` first shows that its `.pth` probe fires in a plain `python3`, then that the probe doesn't fire under gcloud or bq's child python, and then that it fires again with `CLOUDSDK_PYTHON_SITEPACKAGES=1`.
 - `auth.mjs` parses the authorize URL and checks each parameter separately.
 - `version.mjs` compares the whole `gcloud version` output with the versions in the snapshots.
+
+## bq's RequestsDependencyWarning
+
+The negative: the 593.0.0-1 tarball with the launcher's `QUIET` filter replaced by `ignore:nothing-at-all`.
+
+```
+browser-cert: FAIL packages/gcloud-cli/cert/version.mjs
+AssertionError [ERR_ASSERTION]: bq version stderr:
+…RequestsDependencyWarning: urllib3 (1.26.9) or chardet (None)/charset_normalizer (3.5.2) doesn't match a supported version!
+```
+
+`version.mjs` also runs `platform/bq/bq.py` without the launcher, and that run must print the warning. So the filter, not a change in bq, is what keeps stderr empty.

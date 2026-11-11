@@ -67,9 +67,11 @@ CLOUDSDK_AUTH_ACCESS_TOKEN=… bq ls bigquery-public-data:samples
 - **Commands that need a native extension or binary** (gRPC streaming,
   `kubectl`, the emulators, App Engine's Java tools) aren't available.
 
-`bq` prints a `RequestsDependencyWarning` about urllib3 and charset_normalizer
-on stderr. Upstream prints it too: bq's vendored copies are versions its
-vendored requests doesn't list.
+bq's vendored `requests` warns on every run (`RequestsDependencyWarning`)
+that its vendored urllib3 and charset_normalizer aren't versions it lists;
+Google's install prints it too. The launcher adds one `PYTHONWARNINGS`
+filter that ignores exactly that warning from module `requests`, after any
+filters of yours.
 
 Licensed under the Apache License 2.0 (`LICENSE` is Google's), with the
 third-party libraries under `lib/google-cloud-sdk/lib/third_party` and

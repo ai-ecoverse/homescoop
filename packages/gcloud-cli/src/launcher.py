@@ -24,6 +24,9 @@ What it adds for slicc:
     property that gcloud hands it as --ca_certificates_file. So
     CLOUDSDK_CORE_CUSTOM_CA_CERTS_FILE defaults to SSL_CERT_FILE when that
     file exists.
+  - PYTHONWARNINGS gains one filter, for the RequestsDependencyWarning that
+    bq's vendored requests prints on every run about its own vendored
+    urllib3 and charset_normalizer.
 """
 import os
 import runpy
@@ -35,6 +38,8 @@ TOOLS = {
     "gcloud": ("lib", "gcloud.py"),
     "bq": ("bin", "bootstrapping", "bq.py"),
 }
+# bq's RequestsDependencyWarning (see main), from module requests only.
+QUIET = "ignore:urllib3 (:Warning:requests"
 
 
 def main():
@@ -56,6 +61,13 @@ def main():
         env.setdefault("CLOUDSDK_CORE_CUSTOM_CA_CERTS_FILE", ca)
     env.setdefault("CLOUDSDK_ENCODING", env.get("PYTHONIOENCODING") or "UTF-8")
     env["PYTHONIOENCODING"] = env["CLOUDSDK_ENCODING"]
+    # bq's vendored requests warns on every run that its vendored urllib3 and
+    # charset_normalizer aren't versions it lists (RequestsDependencyWarning;
+    # upstream prints it too). Ignore exactly that warning, from module
+    # requests, in the Pythons gcloud starts. It goes after a user's own
+    # PYTHONWARNINGS, so it wins only for that one warning.
+    if QUIET not in env.get("PYTHONWARNINGS", "").split(","):
+        env["PYTHONWARNINGS"] = ",".join(filter(None, [env.get("PYTHONWARNINGS"), QUIET]))
 
     script = os.path.join(ROOT, *TOOLS[tool])
     sys.argv[0] = script
