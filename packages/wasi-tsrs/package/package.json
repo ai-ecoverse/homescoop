@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-tsrs",
-  "version": "0.20.1-1",
+  "version": "0.21.0-1",
   "description": "tsrs, the Rust port of the TypeScript compiler, to type-check and build TypeScript in SLICC.",
   "license": "Apache-2.0",
   "repository": {
@@ -30,7 +30,7 @@
   },
   "homescoop": {
     "recipe": "wasi-tsrs",
-    "upstream": "0.20.1"
+    "upstream": "0.21.0"
   },
   "slicc": {
     "abi": "wasi",
