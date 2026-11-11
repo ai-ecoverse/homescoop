@@ -95,6 +95,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-findutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-findutils) | [recipe](packages/findutils) | GNU findutils: find, to search for files, and xargs. |
 | [`@ai-ecoverse/wasm-freetype`](https://www.npmjs.com/package/@ai-ecoverse/wasm-freetype) | [recipe](packages/freetype) | FreeType font engine (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-gawk`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gawk) | [recipe](packages/gawk) | GNU awk 5.4: a pattern scanning and text processing language. |
+| [`@ai-ecoverse/gcloud-cli`](https://www.npmjs.com/package/@ai-ecoverse/gcloud-cli) | [recipe](packages/gcloud-cli) | The Google Cloud CLI: gcloud and bq, to manage Google Cloud and query BigQuery from slicc. |
 | [`@ai-ecoverse/wasm-git`](https://www.npmjs.com/package/@ai-ecoverse/wasm-git) | [recipe](packages/git) | Git version control: clone, commit, branch, merge, push and pull. |
 | [`@ai-ecoverse/wasm-gmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gmake) | [recipe](packages/gmake) | GNU make, which builds programs from Makefiles. |
 | [`@ai-ecoverse/wasm-grep`](https://www.npmjs.com/package/@ai-ecoverse/wasm-grep) | [recipe](packages/grep) | GNU grep 3.12: search files for lines that match a pattern, with -P (PCRE2). |

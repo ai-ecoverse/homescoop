@@ -1,0 +1,52 @@
+{
+  "name": "@ai-ecoverse/gcloud-cli",
+  "version": "593.0.0-1",
+  "description": "The Google Cloud CLI: gcloud and bq, to manage Google Cloud and query BigQuery from slicc.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/gcloud-cli/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/gcloud-cli",
+  "keywords": [
+    "gcloud",
+    "bq",
+    "bigquery",
+    "google-cloud",
+    "google-cloud-sdk",
+    "wasix",
+    "slicc",
+    "homescoop"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": "3.15.0-8"
+  },
+  "engines": {
+    "slicc-kernel": ">=1.122.3"
+  },
+  "homescoop": {
+    "recipe": "gcloud-cli",
+    "upstream": "593.0.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "gcloud": {
+        "script": "bin/gcloud"
+      },
+      "bq": {
+        "script": "bin/bq"
+      }
+    }
+  }
+}
