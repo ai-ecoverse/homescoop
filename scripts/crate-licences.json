@@ -60,9 +60,19 @@
     "url": "https://raw.githubusercontent.com/getgrit/gritql/0de0cdbe598e987899cfd153b48610682342edc1/LICENSE",
     "sha256": "d0bed1dabb4f2e1d6828349e690f2137d99575e86ec2c7545c74ae53d8430e43"
   },
+  "grit-pattern-matcher 0.5.2": {
+    "url": "https://raw.githubusercontent.com/getgrit/gritql/b3e9e54fd5f99a4f7c5e4272b8b671c6919062d0/LICENSE",
+    "sha256": "dbc450002a5c7de645e7f35baeffcc1b13f4eced2fd5669d72615303f0ea5825",
+    "note": "The crate ships no licence file. It is MIT; this is the repository's LICENSE at b3e9e54f, the commit it was published from"
+  },
   "grit-util 0.5.1": {
     "url": "https://raw.githubusercontent.com/getgrit/gritql/0de0cdbe598e987899cfd153b48610682342edc1/LICENSE",
     "sha256": "d0bed1dabb4f2e1d6828349e690f2137d99575e86ec2c7545c74ae53d8430e43"
+  },
+  "grit-util 0.5.2": {
+    "url": "https://raw.githubusercontent.com/getgrit/gritql/b3e9e54fd5f99a4f7c5e4272b8b671c6919062d0/LICENSE",
+    "sha256": "dbc450002a5c7de645e7f35baeffcc1b13f4eced2fd5669d72615303f0ea5825",
+    "note": "The crate ships no licence file. It is MIT; this is the repository's LICENSE at b3e9e54f, the commit it was published from"
   },
   "line-index 0.1.2": {
     "url": "https://raw.githubusercontent.com/rust-lang/rust-analyzer/3bda0cc2c07f6330b543be2c12c5e156847ba94e/LICENSE-MIT",
