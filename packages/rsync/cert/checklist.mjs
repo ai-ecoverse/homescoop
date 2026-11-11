@@ -1,8 +1,5 @@
-/**
- * rsync checklist (homescoop#94): local copies. Every case runs a real local
- * rsync, which forks a receiver (and the receiver a generator) that talk to
- * the sender over pipes; outputs are what upstream rsync 3.5.1 prints.
- */
+import { recipeVersion, reportsVersion } from './lib/version.mjs';
+
 export default async function (ctx) {
   const { run, assert } = ctx;
   const cwd = '/home/rs';
@@ -12,7 +9,6 @@ export default async function (ctx) {
     assert.equal(r.status, 0, `${script}: rc=${r.status} stderr=${r.stderr}`);
     return r;
   };
-  // Path, mode, mtime and content hash of every entry under a tree.
   const snap = async (dir) =>
     (
       await ok(
@@ -26,8 +22,9 @@ export default async function (ctx) {
   const mk = await run(['mkdir', '-p', cwd], { cwd: '/home' });
   assert.equal(mk.status, 0, `mkdir stderr=${mk.stderr}`);
 
+  const want = recipeVersion();
   const ver = await ok('rsync --version');
-  assert.match(ver.stdout, /^rsync {2}version 3\.5\.1 {2}protocol version 33$/m);
+  reportsVersion(assert, ver.stdout, want);
 
   // A source tree with nested dirs, modes and old mtimes.
   await ok(
