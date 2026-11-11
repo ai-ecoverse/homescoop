@@ -12,7 +12,7 @@
     "@ai-ecoverse/wasm-procps@4.0.7-1"
   ],
   "checklist": [
-    "rsync --version is 3.5.1, protocol 33",
+    "rsync --version matches recipe.yaml (protocol 33)",
     "rsync -a --itemize-changes on a fresh tree: upstream's lines and order (cd+++++++++ / >f+++++++++)",
     "-a keeps file modes, file and directory mtimes and contents (find/stat/md5sum snapshot equal)",
     "no change → 'Number of regular files transferred: 0'; one changed file → 1, itemized >f.st...... and only that file",

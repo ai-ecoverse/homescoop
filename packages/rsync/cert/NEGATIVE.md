@@ -135,3 +135,10 @@ No behaviour change, so there's no failing negative to show. #969 was a test rac
 ## 3.5.1-7: shim drift (homescoop#1491; 2026-10-20)
 
 3.5.1-7 links the updated `shims/slicc`: a failed posix_spawn `open()` file action returns its errno (#1302), an empty `envp` stays empty, getaddrinfo reads `/etc/hosts` first (#580), `slicc-env.js` builds the environment from the kernel's values only, and on kernels that don't answer uname(2) the node name comes from `/etc/hostname`, `HOSTNAME`, then `slicc`. On #1491, npm-parity found that the build differs from the published 3.5.1-6 in `bin/rsync` and `bin/rsync.wasm`, so this is a packaging bump. The package's own code is unchanged. The behaviour tests are `shims/slicc/test`'s spawn, resolve and uname tests.
+
+## 3.5.2-1: version from recipe.yaml (homescoop#2028; 2026-11-11)
+
+Renovate bumped RsyncProject/rsync to 3.5.2 (#2028). The build and refresh landed; cert failed first because `cert/checklist.mjs` still asserted `/^rsync {2}version 3\.5\.1 {2}protocol version 33$/m`.
+
+- **No version in the spec:** `checklist.mjs` reads rsync's version from recipe.yaml (`cert/lib/version.mjs`) for `rsync --version`, so a Renovate bump needs no cert edit (as sqlite3 did in homescoop#1791, wasi-uv in #1918 and cmake in #1981). `scripts/test/rsync-cert-version.test.mjs` fails on 3.5.1-7's `checklist.mjs`, which pins `rsync {2}version 3\.5\.1`. In the same test a wrong expected version (3.5.1, 3.5.20, 3.5.2.0, 4.5.2) fails the check, and so does a near miss (`rsync  version 3.5.20` for 3.5.2).
+- **NEGATIVE:** the published 3.5.1-7 fails the new row at `rsync --version names rsync version 3.5.2, recipe.yaml's version: rsync  version 3.5.1  protocol version 33\n…` (slicc-kernel 1.92.0, users enforce). The rest of `checklist.mjs` (local copies, signals, --bwlimit) is unchanged.
