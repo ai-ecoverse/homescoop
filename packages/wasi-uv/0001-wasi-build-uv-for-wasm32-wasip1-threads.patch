@@ -58,9 +58,9 @@ diff --git a/Cargo.lock b/Cargo.lock
 @@ -751,8 +747,6 @@
  [[package]]
  name = "cargo-util"
- version = "0.2.31"
+ version = "0.2.32"
 -source = "registry+https://github.com/rust-lang/crates.io-index"
--checksum = "218d28c233cdb23a98404ae6d6f8eea19db3c3ab28c34633c7d9facf72f2d2ff"
+-checksum = "dbe819082beae53247a2c440bece59bc2d1d90736cf5bed6b87f5e5bb53f0d30"
  dependencies = [
   "anyhow",
   "core-foundation 0.10.1",
@@ -240,7 +240,7 @@ diff --git a/Cargo.toml b/Cargo.toml
 +[patch.crates-io]
 +astral-reqwest-middleware = { path = "homescoop-crates/astral-reqwest-middleware-0.5.1" }
 +astral-reqwest-retry = { path = "homescoop-crates/astral-reqwest-retry-0.9.1" }
-+cargo-util = { path = "homescoop-crates/cargo-util-0.2.31" }
++cargo-util = { path = "homescoop-crates/cargo-util-0.2.32" }
 +hyper-util = { path = "homescoop-crates/hyper-util-0.1.21" }
 +reqsign-core = { path = "homescoop-crates/reqsign-core-3.3.2" }
 +reqsign-google = { path = "homescoop-crates/reqsign-google-3.2.0" }

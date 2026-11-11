@@ -150,12 +150,12 @@ test('every crates/*.patch version matches 0001 and cert/meta.json', () => {
 });
 
 test('NEGATIVE: a half-done crate refresh fails', () => {
-  const crate = [['hyper-util', '0.1.21']];
-  const stale = (text) => text.replaceAll('0.1.21', '0.1.20');
-  assert.throws(() => checkCrateRefresh(crate, stale(firstPatch), certMeta), /0001's \[patch\.crates-io\] names hyper-util 0\.1\.21/);
-  const pathOnly = firstPatch.replace(' name = "hyper-util"\n version = "0.1.21"', ' name = "hyper-util"\n version = "0.1.20"');
-  assert.throws(() => checkCrateRefresh(crate, pathOnly, certMeta), /0001's Cargo\.lock hunk names hyper-util 0\.1\.21/);
-  assert.throws(() => checkCrateRefresh(crate, firstPatch, JSON.parse(stale(JSON.stringify(certMeta)))), /cert\/meta\.json lists hyper-util 0\.1\.21/);
+  const crate = [['cargo-util', '0.2.32']];
+  const stale = (text) => text.replaceAll('0.2.32', '0.2.31');
+  assert.throws(() => checkCrateRefresh(crate, stale(firstPatch), certMeta), /0001's \[patch\.crates-io\] names cargo-util 0\.2\.32/);
+  const pathOnly = firstPatch.replace(' name = "cargo-util"\n version = "0.2.32"', ' name = "cargo-util"\n version = "0.2.31"');
+  assert.throws(() => checkCrateRefresh(crate, pathOnly, certMeta), /0001's Cargo\.lock hunk names cargo-util 0\.2\.32/);
+  assert.throws(() => checkCrateRefresh(crate, firstPatch, JSON.parse(stale(JSON.stringify(certMeta)))), /cert\/meta\.json lists cargo-util 0\.2\.32/);
 });
 
 const UV_LOCK_WASIX = /"uv-workspace-commands",\n "walkdir",\n\+ "wasix-command",\n "which",\n "wiremock",/;

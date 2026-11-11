@@ -59,9 +59,9 @@ Limits in seven:
   [astral-sh/uv#22750](https://github.com/astral-sh/uv/pull/22750), which
   reverted an export fix, so an export could list an optional dependency
   reached only through an incompatible platform path.
-  [#22751](https://github.com/astral-sh/uv/pull/22751) restores the fix in
-  0.13.7, and `cert/export.mjs` checks upstream's case. If you exported with
-  0.13.3-1 or 0.13.4-1, export again.
+  [#22751](https://github.com/astral-sh/uv/pull/22751) restores the fix
+  (fixed in 0.13.5), and `cert/export.mjs` checks upstream's case. If you
+  exported with 0.13.3-1 or 0.13.4-1, export again.
 
 `uvx` (since 0.13.1-4, homescoop#771) is the same `uv.wasm` with `tool uvx`
 in front, as upstream's `uvx` binary does: `uvx <command>` and

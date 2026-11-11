@@ -66,6 +66,8 @@ about:
     renamed and rebased; 0001 refreshed for the new paths and lock).
     0.13.6-2: packaging-only — README notes the pydata hang risk and
     points at homescoop-pydata-map.json / FAILFAST.md (no binary change).
+    0.13.7-1: cargo-util 0.2.32 (crates/ renamed, the patch applies
+    unchanged); 0001 refreshed for the new path and lock checksum.
     crates/: hyper-util (dial via wasix-net), rustls-native-certs,
     cargo-util (compile on WASI), reqsign-core/-google/-http-send-reqwest
     and astral-reqwest-middleware/-retry (mechanical: wasm32 means
