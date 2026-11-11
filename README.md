@@ -137,7 +137,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-six`](https://www.npmjs.com/package/@ai-ecoverse/py-six) | [recipe](packages/py-six) | six for slicc WASIX CPython |
 | [`@ai-ecoverse/py-tzdata`](https://www.npmjs.com/package/@ai-ecoverse/py-tzdata) | [recipe](packages/py-tzdata) | tzdata for slicc WASIX CPython |
 | [`@ai-ecoverse/wasm-qpdf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-qpdf) | [recipe](packages/qpdf) | qpdf 12.4: inspect, merge, split, rotate, encrypt, decrypt and linearize PDF files. |
-| [`@ai-ecoverse/wasm-rsync`](https://www.npmjs.com/package/@ai-ecoverse/wasm-rsync) | [recipe](packages/rsync) | rsync 3.5.1, for fast incremental file copies. |
+| [`@ai-ecoverse/wasm-rsync`](https://www.npmjs.com/package/@ai-ecoverse/wasm-rsync) | [recipe](packages/rsync) | rsync 3.5.2, for fast incremental file copies. |
 | [`@ai-ecoverse/wasm-screen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-screen) | [recipe](packages/screen) | GNU screen, a terminal multiplexer: detach and reattach sessions with several windows. |
 | [`@ai-ecoverse/wasm-sed`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sed) | [recipe](packages/sed) | GNU sed, a stream editor that filters and transforms text. |
 | [`@ai-ecoverse/wasm-sqlite3`](https://www.npmjs.com/package/@ai-ecoverse/wasm-sqlite3) | [recipe](packages/sqlite3) | The sqlite3 command-line shell for SQLite databases. |

@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-rsync`
 
-[rsync](https://rsync.samba.org/) 3.5.1 for [slicc](https://github.com/ai-ecoverse/slicc)'s
+[rsync](https://rsync.samba.org/) 3.5.2 for [slicc](https://github.com/ai-ecoverse/slicc)'s
 wasm realm. Local copies only for now:
 
 ```bash

@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasm-rsync",
-  "version": "3.5.1-7",
-  "description": "rsync 3.5.1, for fast incremental file copies.",
+  "version": "3.5.2-1",
+  "description": "rsync 3.5.2, for fast incremental file copies.",
   "license": "GPL-3.0-or-later",
   "engines": {
     "slicc-kernel": ">=1.29.2"
@@ -30,7 +30,7 @@
   },
   "homescoop": {
     "recipe": "rsync",
-    "upstream": "3.5.1"
+    "upstream": "3.5.2"
   },
   "slicc": {
     "abi": "emscripten",
