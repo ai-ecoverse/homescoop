@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasi-eza",
-  "version": "0.23.5-2",
+  "version": "0.23.5-3",
   "description": "eza, a modern replacement for ls, to list files with colours, icons, trees and long views in SLICC.",
   "license": "EUPL-1.2 AND MIT",
   "engines": {
