@@ -9,13 +9,13 @@ tsrs --noEmit -p .   # type-check the project in tsconfig.json
 tsrs -p .            # and emit
 ```
 
-`bin/tsrs.wasm` is native tsrs's `tsc` driver from oxc-project/tsrs `v0.21.0`
+`bin/tsrs.wasm` is native tsrs's `tsc` driver from oxc-project/tsrs `v0.22.0`
 (TypeScript `7.1.0-beta`), built by homescoop for `wasm32-wasip1` with Rust
 1.99.1 and no changes to tsrs: a small command crate runs it over the file
 system. The `lib.*.d.ts` files are embedded, so it needs no
 `node_modules/typescript`; `@types/*` packages resolve from the project's
 `node_modules` as usual. It runs on one thread. The command crate uses `tsrs_execute::sys::OsSys`,
-the system type exported by upstream v0.21.0.
+the system type exported by upstream v0.22.0.
 
 tsrs follows TypeScript 7.1: type errors with `--noEmit` exit with status 2,
 where TypeScript 7.0 (`@ai-ecoverse/wasi-typescript`) exits with 1.

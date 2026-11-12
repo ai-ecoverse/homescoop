@@ -6,12 +6,12 @@ name: wasi-tsrs
 builder: host
 reproducible: true
 # renovate: datasource=github-tags depName=oxc-project/tsrs extractVersion=^v(?<version>.*)$
-version: "0.21.0"
+version: "0.22.0"
 npm: "@ai-ecoverse/wasi-tsrs"
 summary: "tsrs, the Rust port of TypeScript 7's tsc, for slicc WASI preview1 (command tsrs)"
 source:
   url: "https://github.com/oxc-project/tsrs/archive/refs/tags/v{{version}}.tar.gz"
-  sha256: "bbf551fc0a67e1c5adb3ab2ad13ae13c90e3f948d878925d7bbd0891efb3bed0"
+  sha256: "da5911c0dc74a5c1e2c227c495817bec7ab1f043726597abc99d95ff5780aa0e"
 toolchain:
   # rust-toolchain.toml at v0.18.0.
   rust: "1.99.1"
