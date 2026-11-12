@@ -1,7 +1,7 @@
 {
   "name": "@ai-ecoverse/wasix-zlib",
-  "version": "1.3.2-1",
-  "description": "zlib 1.3.2 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config",
+  "version": "1.4.0-1",
+  "description": "zlib 1.4 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config",
   "license": "Zlib",
   "repository": {
     "type": "git",
@@ -18,7 +18,7 @@
   ],
   "homescoop": {
     "recipe": "wasix-zlib",
-    "upstream": "1.3.2"
+    "upstream": "1.4"
   },
   "files": [
     "README.md",

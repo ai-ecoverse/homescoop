@@ -188,7 +188,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasix-ruby`](https://www.npmjs.com/package/@ai-ecoverse/wasix-ruby) | [recipe](packages/wasix-ruby) | The Ruby 3.4 programming language, with gem, Bundler, rake, irb, the rdbg debugger and Ruby's other tools. |
 | [`@ai-ecoverse/wasix-sysroot`](https://www.npmjs.com/package/@ai-ecoverse/wasix-sysroot) | [recipe](packages/wasix-sysroot) | C and C++ system libraries for building WASIX programs that run on slicc. |
 | [`@ai-ecoverse/wasix-websocat`](https://www.npmjs.com/package/@ai-ecoverse/wasix-websocat) | [recipe](packages/wasix-websocat) | websocat, a WebSocket client and server like netcat for ws:// URLs, for SLICC. |
-| [`@ai-ecoverse/wasix-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasix-zlib) | [recipe](packages/wasix-zlib) | zlib 1.3.2 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config |
+| [`@ai-ecoverse/wasix-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasix-zlib) | [recipe](packages/wasix-zlib) | zlib 1.4 for slicc WASIX: static (lib/) and PIC (lib-pic/) libz.a, headers, pkg-config |
 | [`@ai-ecoverse/wasm-binaryen`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binaryen) | [recipe](packages/wasm-binaryen) | Binaryen's wasm-opt and other WebAssembly tools, which Emscripten uses to optimize and finish its output. |
 | [`@ai-ecoverse/wasm-clang`](https://www.npmjs.com/package/@ai-ecoverse/wasm-clang) | [recipe](packages/wasm-clang) | The Clang and LLD 24 compilers, to build C and C++ programs in slicc. |
 | [`@ai-ecoverse/wasm-emscripten`](https://www.npmjs.com/package/@ai-ecoverse/wasm-emscripten) | [recipe](packages/wasm-emscripten) | Emscripten 6.0.9, the C and C++ to WebAssembly compiler (emcc), run on wasix-python. |
@@ -200,7 +200,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-xxd`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xxd) | [recipe](packages/xxd) | xxd, which makes a hex dump of a file or turns one back into binary. |
 | [`@ai-ecoverse/wasm-xz`](https://www.npmjs.com/package/@ai-ecoverse/wasm-xz) | [recipe](packages/xz) | XZ and LZMA compression tools, with xzgrep, xzdiff and xzless. |
 | [`@ai-ecoverse/wasm-zip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zip) | [recipe](packages/zip) | zip, unzip and zipinfo (Info-ZIP), to make, list, test and extract .zip archives. |
-| [`@ai-ecoverse/wasm-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zlib) | [recipe](packages/zlib) | zlib 1.3.2 static library for WebAssembly / emscripten (SLICC homescoop ladder) |
+| [`@ai-ecoverse/wasm-zlib`](https://www.npmjs.com/package/@ai-ecoverse/wasm-zlib) | [recipe](packages/zlib) | zlib 1.4 static library for WebAssembly / emscripten (SLICC homescoop ladder) |
 
 Retired (`builder: retired`; no longer built or published):
 

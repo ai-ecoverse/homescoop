@@ -8,7 +8,7 @@ npm: "@ai-ecoverse/wasm-zlib"
 summary: "zlib compression library"
 source:
   url: "https://zlib.net/fossils/zlib-{{version}}.tar.gz"
-  sha256: "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
+  sha256: "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584"
 dependencies:
   build: []
   host: []
