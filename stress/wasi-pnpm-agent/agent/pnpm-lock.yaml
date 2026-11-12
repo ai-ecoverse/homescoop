@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@ai-ecoverse/slicc-agent':
-        specifier: 7.30.1
-        version: 7.30.1(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
+        specifier: 7.32.0
+        version: 7.32.0(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
       '@ai-ecoverse/slicc-kernel':
         specifier: 1.181.0
         version: 1.181.0
@@ -23,12 +23,12 @@ packages:
   '@ai-ecoverse/jerk-oauth@1.9.1':
     resolution: {integrity: sha512-br/yGRwJr9Ah58B8FMr6RGadIJfYm6y/qbUuHKYDEEmwYoiLXqEX6X8cuyZJwWBjggqdIqr4Im+4zZXlmi2q4Q==}
 
-  '@ai-ecoverse/slicc-agent@7.30.1':
-    resolution: {integrity: sha512-hxE8Z+nRvQQog9qRmA7tnOgrdnU1aONEAAaBI92B9t3z2R30E4oTRfHceQfi/AtHR+fwvEHTvtsRzUTYcglikA==}
+  '@ai-ecoverse/slicc-agent@7.32.0':
+    resolution: {integrity: sha512-EUFWNk4qHm46uGraEUxn/LjpvlTuJXL+JGGuP/7aB7VYzgW1s68Mt7PuIvwYygOAXHpfASNSjv44grNxm8AE3w==}
     engines: {node: '>=24'}
     peerDependencies:
       '@ai-ecoverse/slicc-kernel': '>=1.172.2 <2'
-      '@ai-ecoverse/slicc-spectrum': ^2.4.1
+      '@ai-ecoverse/slicc-spectrum': ^2.14.0
     peerDependenciesMeta:
       '@ai-ecoverse/slicc-spectrum':
         optional: true
@@ -41,8 +41,8 @@ packages:
     resolution: {integrity: sha512-HZ5qVnVez4B2UTP+UrHbYg6GnHJjpT09byt/HHJ8Y0IRk13q5Oj8rFFCme+R0T5h42ZlmwaNVI+n77VtSaCtuA==}
     engines: {node: '>=24'}
 
-  '@ai-ecoverse/slicc-vault@1.25.2':
-    resolution: {integrity: sha512-IoR/ALqnJzdbA6hnQ4CwbPGseqJvtBsjrENGPJ8RniD4Um5wJjfseEpM7rP2ZN+GnjL/PQicfuVKXl9isbe9Lg==}
+  '@ai-ecoverse/slicc-vault@1.25.3':
+    resolution: {integrity: sha512-ZxG6XRVRWLrm3CcTibFIt3OHGs9oO6H/5IS/Sq+ZIoZCuqMKF1hi5PvVK8HCEMyVfFylKusUGFDKnN9NT4iV9g==}
     engines: {node: '>=24'}
 
   '@anthropic-ai/sdk@0.129.0':
@@ -329,10 +329,10 @@ snapshots:
 
   '@ai-ecoverse/jerk-oauth@1.9.1': {}
 
-  '@ai-ecoverse/slicc-agent@7.30.1(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)':
+  '@ai-ecoverse/slicc-agent@7.32.0(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)':
     dependencies:
       '@ai-ecoverse/slicc-kernel': 1.181.0
-      '@ai-ecoverse/slicc-vault': 1.25.2
+      '@ai-ecoverse/slicc-vault': 1.25.3
       '@aws-sdk/middleware-websocket': 3.972.54
       '@earendil-works/chord': 1.5.0
       '@earendil-works/pi-ai': 1.5.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
@@ -358,7 +358,7 @@ snapshots:
 
   '@ai-ecoverse/slicc-scrub@1.1.0': {}
 
-  '@ai-ecoverse/slicc-vault@1.25.2':
+  '@ai-ecoverse/slicc-vault@1.25.3':
     dependencies:
       '@ai-ecoverse/jerk-oauth': 1.9.1
       '@ai-ecoverse/slicc-scrub': 1.1.0
