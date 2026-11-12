@@ -3,7 +3,7 @@ name: zlib
 # Ship on host until in-cone emcc exists; build.jsh kept as slicc flip target.
 builder: host
 # renovate: datasource=github-releases depName=madler/zlib extractVersion=^v(?<version>.*)$
-version: "1.3.2"
+version: "1.4"
 npm: "@ai-ecoverse/wasm-zlib"
 summary: "zlib compression library"
 source:
