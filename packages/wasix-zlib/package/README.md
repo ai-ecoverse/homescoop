@@ -1,6 +1,6 @@
 # @ai-ecoverse/wasix-zlib
 
-[zlib](https://zlib.net) 1.3.2 for [slicc](https://github.com/ai-ecoverse/slicc)
+[zlib](https://zlib.net) 1.4 for [slicc](https://github.com/ai-ecoverse/slicc)
 WASIX programs, built with the pinned wasixcc on wasix-sysroot 2025.9.30-34.
 A build-time package: no commands.
 
@@ -23,5 +23,5 @@ to `zconf.h` before compiling either flavour, then ships that same header.
 Since 1.3.2 those conditions use `#if HAVE_*_H-0`; the build requires both
 configured sections. The cert reads the expected runtime version from the
 recipe, so a previously published library with an older upstream version
-fails the current spec. A local assertion check accepts 1.3.2 probe output
+fails the current spec. A local assertion check accepts 1.4 probe output
 and rejects the previous release's output; CI runs the actual linked probes.
