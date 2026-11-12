@@ -3,7 +3,7 @@ name: poppler
 builder: host
 reproducible: true
 # renovate: datasource=gitlab-tags depName=poppler/poppler extractVersion=^poppler-(?<version>.*)$ registryUrl=https://gitlab.freedesktop.org
-version: "26.10.0"
+version: "26.11.0"
 npm: "@ai-ecoverse/wasm-poppler"
 summary: "poppler PDF utilities for slicc"
 source:
