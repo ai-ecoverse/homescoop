@@ -28,3 +28,26 @@ comments, a different error text or exit status, truncation of a large
 file) fails it. The one allowed difference is Go wasip1's errno text
 (`No such file or directory`, `Permission denied`), listed in
 `test/wasip1.mjs`.
+
+## 4.54.2-1: version from recipe.yaml (homescoop#2061; 2026-11-13)
+
+Renovate bumped mikefarah/yq to 4.54.2 (#2061). The refresh left the
+4.54.1 commit pin; host-build failed closed on the tag check. This
+release pins tag `v4.54.2` (`a433067`), refreshes goldens (failed `-i`
+cleans its temp since 4.54.2; bad-YAML stderr from go-yaml), and moves
+`go-textseg` from v17 to the linked v15 with the bumped module set in
+notices.
+
+- **No version in the spec:** `checklist.mjs` reads yq's version from
+  recipe.yaml (`cert/lib/version.mjs`) for `yq --version`, so a Renovate
+  bump needs no cert edit for that row (as rsync did in homescoop#2028
+  and cmake in #1981). `scripts/test/wasi-yq-cert-version.test.mjs`
+  fails on 4.54.1-1's `checklist.mjs`, which pins
+  `version v4.54.1`. In the same test a wrong expected version (4.54.1,
+  4.54.20, 4.54.2.0, 5.54.2) fails the check.
+- **NEGATIVE:** the published 4.54.1-1 fails the new row at
+  `yq --version names yq version v4.54.2, recipe.yaml's version: yq
+  (https://github.com/mikefarah/yq/) version v4.54.1\n` (slicc-kernel
+  1.167.3, users enforce). It also fails `notices.mjs` (intro line and
+  the bumped module headings) and the goldens for `bad expression in
+  place` (`left` 1→0) and `bad yaml` stderr.

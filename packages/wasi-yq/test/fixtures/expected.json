@@ -1,7 +1,7 @@
 {
  "version": {
   "status": 0,
-  "stdout": "yq (https://github.com/mikefarah/yq/) version v4.54.1\n",
+  "stdout": "yq (https://github.com/mikefarah/yq/) version v4.54.2\n",
   "stderr": ""
  },
  "gha first steps": {
@@ -183,7 +183,7 @@
   "stdout": "",
   "stderr": "Error: 1:9: lexer: invalid input text \"bad(\"\n",
   "after": "# CI for the web app: lint and test on every push and pull request.\nname: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\npermissions:\n  contents: read\n\nenv:\n  NODE_OPTIONS: --max-old-space-size=4096 # the test suite is large\n\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4 # pinned by tag\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 20\n          cache: npm\n      - run: npm ci\n      - run: npm run lint\n\n  test:\n    needs: lint\n    runs-on: ${{ matrix.os }}\n    strategy:\n      fail-fast: false\n      matrix:\n        os: [ubuntu-latest, macos-latest]\n        node: [20, 22]\n    steps:\n      - name: Check out\n        uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n      - uses: actions/setup-node@v4\n        with:\n          node-version: ${{ matrix.node }}\n      - run: npm ci\n      - run: npm test -- --coverage\n        env:\n          CI: \"true\"\n",
-  "left": 1
+  "left": 0
  },
  "missing file": {
   "status": 1,
@@ -193,7 +193,7 @@
  "bad yaml": {
   "status": 1,
   "stdout": "",
-  "stderr": "Error: bad file '-': go-yaml load error in parser (while parsing a flow sequence) at L1.C4-L2.C2: did not find expected ',' or ']'\n"
+  "stderr": "Error: bad file '-': yaml: line 2: did not find expected ',' or ']'\n"
  },
  "exit status": {
   "status": 1,

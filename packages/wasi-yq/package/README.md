@@ -36,15 +36,15 @@ This is the real yq, so expressions, flags and output are upstream's.
 - `-i` writes a temporary file in `$TMPDIR` (or `/tmp`) and moves it over
   the original. Native yq on Linux then gives it the original's owner; on
   wasip1 (as on macOS) there is no chown, so a file root edits in place
-  becomes root's. Mode and content are kept. A failed `-i` (a bad
-  expression, a file it can't write) leaves its temporary file behind, as
-  native yq does.
+  becomes root's. Mode and content are kept. Until 4.54.1 a failed `-i`
+  (a bad expression, a file it can't write) left its temporary file
+  behind; since 4.54.2 upstream cleans that temp up.
 - The `system` operator (off by default, `--security-enable-system-operator`)
   can't start processes on wasip1.
 
 ## Build
 
-`yq.wasm` is yq `4.54.2` (tag `v4.54.2`, commit `504fc38`), built by
+`yq.wasm` is yq `4.54.2` (tag `v4.54.2`, commit `a433067`), built by
 homescoop with Go 1.27.3, `GOOS=wasip1 GOARCH=wasm`, from vendored modules
 (go.sum checked), with upstream's release flags (`-s -w`). No patches: every
 module it links builds for wasip1 as it is. It needs no slicc-kernel imports
