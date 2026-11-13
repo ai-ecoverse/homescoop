@@ -1,5 +1,6 @@
 import { cases, compare, digest, expected, files, observed, stdin, tempFiles } from '../test/goldens.mjs';
 import { wasip1 } from '../test/wasip1.mjs';
+import { recipeVersion, reportsVersion } from './lib/version.mjs';
 
 export default async function (ctx) {
   const { run, write, read, assert } = ctx;
@@ -25,7 +26,7 @@ export default async function (ctx) {
 
   const cwd = '/home/yq/0';
   let r = await run(['yq', '--version'], { cwd });
-  assert.equal(r.stdout, 'yq (https://github.com/mikefarah/yq/) version v4.54.1\n');
+  reportsVersion(assert, r.stdout, recipeVersion());
   r = await run(['yq', '.jobs[', 'ci.yml'], { cwd: '/home/yq/1' });
   assert.equal(r.status, 1, out(r));
   assert.equal(r.stdout, '');

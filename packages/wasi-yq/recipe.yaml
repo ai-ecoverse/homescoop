@@ -3,14 +3,14 @@ builder: host
 runner: pool
 reproducible: true
 # renovate: datasource=github-tags depName=mikefarah/yq extractVersion=^v(?<version>4\..*)$
-version: "4.54.1"
+version: "4.54.2"
 npm: "@ai-ecoverse/wasi-yq"
-summary: "yq 4.54.1 for slicc WASI preview1 (command yq)"
+summary: "yq 4.54.2 for slicc WASI preview1 (command yq)"
 source:
-  url: "https://github.com/mikefarah/yq/archive/504fc38780cc46be8444ea1b72fb55919fc0bfb0.tar.gz"
-  sha256: "1490e343a67aea595fee4870167c0897178a0f9359f98a6f1b07a9fe803a4fc4"
-  commit: "504fc38780cc46be8444ea1b72fb55919fc0bfb0"
-  tree: "f0f36f9fc9efefd35e20e663848bcc29bb5f3f62"
+  url: "https://github.com/mikefarah/yq/archive/a4330671f17776618660a419ab2531e4f4dc48b6.tar.gz"
+  sha256: "4025a5fbe882a4995dcf4ba8b7df4610e4d42b3d7faffb56e30ba9ec1e3e96dc"
+  commit: "a4330671f17776618660a419ab2531e4f4dc48b6"
+  tree: "8efa997feb9653ace712ef7c2cf7bcee85e8075d"
 toolchain:
   go: "1.27.3"
   go_sha256_linux_x64: "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
@@ -23,7 +23,7 @@ about:
   homepage: https://github.com/mikefarah/yq
   license: MIT
   notes: |
-    yq v4.54.1 (tag v4.54.1, commit 504fc38, Go, MIT). build.sh fetches
+    yq v4.54.2 (tag v4.54.2, commit a433067, Go, MIT). build.sh fetches
     the pinned source and Go 1.27.3, checks that the tag v<version> still
     names the pinned commit (so a version-only bump fails closed), vendors
     the modules (go.sum checked) and builds yq with GOOS=wasip1
