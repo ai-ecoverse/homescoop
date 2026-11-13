@@ -65,7 +65,7 @@ cp "$SRC/LICENSE" "$DEST/LICENSE"
   | sort -u > "$WORK/wasi-yq-modules.txt"
 MODS="$WORK/wasi-yq-modules.txt"
 VENDOR="$SRC/vendor"
-NOTICED="github.com/a8m/envsubst github.com/agext/levenshtein github.com/alecthomas/participle/v2 github.com/apparentlymart/go-textseg/v15 github.com/dimchansky/utfbom github.com/elliotchance/orderedmap github.com/fatih/color github.com/go-ini/ini github.com/goccy/go-json github.com/goccy/go-yaml github.com/google/go-cmp github.com/hashicorp/hcl/v2 github.com/jinzhu/copier github.com/magiconair/properties github.com/mattn/go-colorable github.com/mattn/go-isatty github.com/mitchellh/go-wordwrap github.com/pelletier/go-toml/v2 github.com/spf13/cobra github.com/spf13/pflag github.com/yuin/gopher-lua github.com/zclconf/go-cty go.yaml.in/yaml/v4 golang.org/x/net golang.org/x/text"
+NOTICED="github.com/a8m/envsubst github.com/agext/levenshtein github.com/alecthomas/participle/v2 github.com/apparentlymart/go-textseg/v17 github.com/dimchansky/utfbom github.com/elliotchance/orderedmap github.com/fatih/color github.com/go-ini/ini github.com/goccy/go-json github.com/goccy/go-yaml github.com/google/go-cmp github.com/hashicorp/hcl/v2 github.com/jinzhu/copier github.com/magiconair/properties github.com/mattn/go-colorable github.com/mattn/go-isatty github.com/mitchellh/go-wordwrap github.com/pelletier/go-toml/v2 github.com/spf13/cobra github.com/spf13/pflag github.com/yuin/gopher-lua github.com/zclconf/go-cty go.yaml.in/yaml/v4 golang.org/x/net golang.org/x/text"
 LINKED="$(awk '$1 != "github.com/mikefarah/yq/v4" && $2 != "" { print $1 }' "$MODS" | tr '\n' ' ' | sed 's/ $//')"
 if [[ "$LINKED" != "$NOTICED" ]]; then
   echo "homescoop: yq.wasm links '$LINKED', build.sh has notices for '$NOTICED'" >&2
@@ -77,7 +77,7 @@ homescoop_notice "Go $GO_VERSION runtime and standard library (BSD-3-Clause)" "$
 homescoop_notice "github.com/a8m/envsubst $(modver github.com/a8m/envsubst) (MIT)" "$VENDOR/github.com/a8m/envsubst/LICENSE" -
 homescoop_notice "github.com/agext/levenshtein $(modver github.com/agext/levenshtein) (Apache-2.0)" "$VENDOR/github.com/agext/levenshtein/LICENSE" - "$VENDOR/github.com/agext/levenshtein/NOTICE" -
 homescoop_notice "github.com/alecthomas/participle/v2 $(modver github.com/alecthomas/participle/v2) (MIT)" "$VENDOR/github.com/alecthomas/participle/v2/COPYING" -
-homescoop_notice "github.com/apparentlymart/go-textseg/v15 $(modver github.com/apparentlymart/go-textseg/v15) (MIT)" "$VENDOR/github.com/apparentlymart/go-textseg/v15/LICENSE" -
+homescoop_notice "github.com/apparentlymart/go-textseg/v17 $(modver github.com/apparentlymart/go-textseg/v17) (MIT)" "$VENDOR/github.com/apparentlymart/go-textseg/v17/LICENSE" -
 homescoop_notice "github.com/dimchansky/utfbom $(modver github.com/dimchansky/utfbom) (Apache-2.0)" "$VENDOR/github.com/dimchansky/utfbom/LICENSE" -
 homescoop_notice "github.com/elliotchance/orderedmap $(modver github.com/elliotchance/orderedmap) (MIT)" "$VENDOR/github.com/elliotchance/orderedmap/LICENSE" -
 homescoop_notice "github.com/fatih/color $(modver github.com/fatih/color) (MIT)" "$VENDOR/github.com/fatih/color/LICENSE.md" -

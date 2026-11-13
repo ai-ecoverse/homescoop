@@ -18,7 +18,7 @@ export default async function (ctx) {
     '## github.com/a8m/envsubst v1.4.3 (MIT)',
     '## github.com/agext/levenshtein v1.2.1 (Apache-2.0)',
     '## github.com/alecthomas/participle/v2 v2.1.4 (MIT)',
-    '## github.com/apparentlymart/go-textseg/v15 v15.0.0 (MIT)',
+    '## github.com/apparentlymart/go-textseg/v17 v17.0.1 (MIT)',
     '## github.com/dimchansky/utfbom v1.2.0 (Apache-2.0)',
     '## github.com/elliotchance/orderedmap v1.8.0 (MIT)',
     '## github.com/fatih/color v1.19.0 (MIT)',

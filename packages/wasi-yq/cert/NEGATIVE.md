@@ -34,9 +34,10 @@ file) fails it. The one allowed difference is Go wasip1's errno text
 Renovate bumped mikefarah/yq to 4.54.2 (#2061). The refresh left the
 4.54.1 commit pin; host-build failed closed on the tag check. This
 release pins tag `v4.54.2` (`a433067`), refreshes goldens (failed `-i`
-cleans its temp since 4.54.2; bad-YAML stderr from go-yaml), and moves
-`go-textseg` from v17 to the linked v15 with the bumped module set in
-notices.
+cleans its temp since 4.54.2; bad-YAML stderr from go-yaml), and updates
+notices for the modules Go 1.27.3's `go list -deps` links (still
+`go-textseg/v17`; utfbom, go-json, go.yaml.in/yaml/v4, x/net and x/text
+bump).
 
 - **No version in the spec:** `checklist.mjs` reads yq's version from
   recipe.yaml (`cert/lib/version.mjs`) for `yq --version`, so a Renovate
