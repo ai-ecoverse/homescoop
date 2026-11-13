@@ -94,3 +94,24 @@ The dispatcher now calls the utility before printing `opj_version()`.
 The upstream 26.10.0 version paths return to the dispatcher, preserving the
 utility's status and its version/copyright output order. CI builds and
 certifies the replacement package.
+
+## 26.11.0-1: version from recipe.yaml (homescoop#2056; 2026-11-13)
+
+Renovate bumped poppler/poppler to 26.11.0 (#2056). The build and refresh
+landed; cert failed first because `cert/checklist.mjs` still asserted
+`pdftoppm version 26.10.0` on the first stderr line.
+
+- **No version in the spec:** `checklist.mjs` reads poppler's version from
+  recipe.yaml (`cert/lib/version.mjs`) for `pdftoppm -v` and `pdfinfo -v`,
+  so a Renovate bump needs no cert edit (as sqlite3 did in homescoop#1791,
+  wasi-uv in #1918, cmake in #1981 and rsync in #2028).
+  `scripts/test/poppler-cert-version.test.mjs` fails on 26.10.0-9's
+  `checklist.mjs`, which pins `version 26.10.0`. In the same test a wrong
+  expected version (26.10.0, 26.11.00, 26.11.0.0, 27.11.0) fails the check,
+  and so does a near miss (`pdftoppm version 26.11.00` for 26.11.0). The
+  first-stderr-line assertion from #1963 stays; OpenJPEG 2.5.4 still follows
+  the utility output.
+- **NEGATIVE:** the published 26.10.0-9 fails the new row at
+  `pdftoppm reports Poppler on the first stderr line, recipe.yaml's version:
+  pdftoppm version 26.10.0\nOpenJPEG version 2.5.4\nCopyright…` (and the
+  same for `pdfinfo`). The rest of `checklist.mjs` is unchanged.

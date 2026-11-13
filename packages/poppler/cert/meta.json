@@ -16,7 +16,7 @@
     "object-array-rvalue.patch": "compile fix only (libc++ C++23 incomplete type); the build fails without it"
   },
   "checklist": [
-    "pdftoppm -v and pdfinfo -v start stderr with <util> version 26.10.0 and report linked OpenJPEG 2.5.4 afterward; pdfinfo: Pages 3, 200 x 100 pts, PDF 1.4, not encrypted",
+    "pdftoppm -v and pdfinfo -v start stderr with <util> version <recipe.yaml> and report linked OpenJPEG 2.5.4 afterward; pdfinfo: Pages 3, 200 x 100 pts, PDF 1.4, not encrypted",
     "pdftotext default, -raw and -layout -f 2 -l 3 to stdout, and -f 3 -l 3 to a.txt (bytes compared)",
     "pdftoppm -png page 1 at 72 dpi is 200x100 and at 150 dpi 417x209 (PNG IHDR); -f 2 -l 3 writes only p-2.png and p-3.png",
     "bundled base-14 fonts: gray render has text pixels only in the text box and no font warnings; without POPPLER_FONTSDIR, 'No display font' and less ink",
