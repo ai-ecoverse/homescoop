@@ -1,6 +1,6 @@
 # `@ai-ecoverse/wasm-poppler`
 
-[poppler](https://poppler.freedesktop.org/) 26.10.0 utilities for
+[poppler](https://poppler.freedesktop.org/) 26.11.0 utilities for
 [slicc](https://github.com/ai-ecoverse/slicc)'s wasm realm, all in one
 multi-call wasm: `pdftotext`, `pdftoppm`, `pdfinfo`, `pdfimages`,
 `pdffonts`, `pdfseparate`, `pdfunite`, `pdfdetach`, `pdfattach`, `pdftops`

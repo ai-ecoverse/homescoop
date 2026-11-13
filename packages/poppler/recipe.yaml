@@ -8,7 +8,7 @@ npm: "@ai-ecoverse/wasm-poppler"
 summary: "poppler PDF utilities for slicc"
 source:
   url: "https://poppler.freedesktop.org/poppler-{{version}}.tar.xz"
-  sha256: "6792cb7c69205007ad87d2e936cecc5b3a31fac29ab54ffc3175fdb6b2a6ce35"
+  sha256: "41c32680160addf5a8dd7a830e4869c01e9f6bee1abb91e44fabd1ba9d7828fb"
 sources:
   # URW base-35 Type1 fonts (GPL with font exception); base 14 ship.
   gsfonts:

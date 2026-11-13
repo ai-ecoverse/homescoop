@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasm-poppler",
-  "version": "26.10.0-9",
+  "version": "26.11.0-1",
   "description": "Poppler's PDF tools: pdftotext, pdftoppm, pdfinfo, pdfimages and more.",
   "license": "GPL-2.0-only OR GPL-3.0-only",
   "repository": {
@@ -31,7 +31,7 @@
   },
   "homescoop": {
     "recipe": "poppler",
-    "upstream": "26.10.0"
+    "upstream": "26.11.0"
   },
   "slicc": {
     "abi": "emscripten",
