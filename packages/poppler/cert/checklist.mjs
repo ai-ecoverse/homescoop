@@ -7,6 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { recipeVersion, reportsVersion } from './lib/version.mjs';
 
 const PAD = Buffer.from('28bf4e5e4e758a4164004e56fffa01082e2e00b6d0683e802f0ca9fe6453697a', 'hex');
 const md5 = (...parts) => createHash('md5').update(Buffer.concat(parts)).digest();
@@ -115,9 +116,10 @@ export default async function (ctx) {
   await put('b.pdf', makePdf(['Bravo one', 'Bravo two']));
   await put('e.pdf', makePdf(['Secret one', 'Secret two'], { user: 'u', owner: 'o' }));
 
+  const want = recipeVersion();
   for (const util of ['pdftoppm', 'pdfinfo']) {
     const ver = await ok([util, '-v']);
-    assert.equal(ver.stderr.split('\n')[0], `${util} version 26.10.0`, `${util} reports Poppler on the first stderr line`);
+    reportsVersion(assert, ver.stderr, util, want);
     assert.match(ver.stderr, /^OpenJPEG version 2\.5\.4$/m, 'linked OpenJPEG is 2.5.4');
   }
 
