@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@ai-ecoverse/slicc-agent':
-        specifier: 7.32.0
-        version: 7.32.0(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
+        specifier: 7.33.0
+        version: 7.33.0(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)
       '@ai-ecoverse/slicc-kernel':
         specifier: 1.181.0
         version: 1.181.0
@@ -23,8 +23,8 @@ packages:
   '@ai-ecoverse/jerk-oauth@1.9.1':
     resolution: {integrity: sha512-br/yGRwJr9Ah58B8FMr6RGadIJfYm6y/qbUuHKYDEEmwYoiLXqEX6X8cuyZJwWBjggqdIqr4Im+4zZXlmi2q4Q==}
 
-  '@ai-ecoverse/slicc-agent@7.32.0':
-    resolution: {integrity: sha512-EUFWNk4qHm46uGraEUxn/LjpvlTuJXL+JGGuP/7aB7VYzgW1s68Mt7PuIvwYygOAXHpfASNSjv44grNxm8AE3w==}
+  '@ai-ecoverse/slicc-agent@7.33.0':
+    resolution: {integrity: sha512-DupgoU6qeo49h0x5BYiSOTu0FAE2/AY1h5AikOCXIB7c5rFLtsPTw61Dgsy/KO1XEIAJ4vqNFONNf1mo38C22Q==}
     engines: {node: '>=24'}
     peerDependencies:
       '@ai-ecoverse/slicc-kernel': '>=1.172.2 <2'
@@ -329,7 +329,7 @@ snapshots:
 
   '@ai-ecoverse/jerk-oauth@1.9.1': {}
 
-  '@ai-ecoverse/slicc-agent@7.32.0(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)':
+  '@ai-ecoverse/slicc-agent@7.33.0(@ai-ecoverse/slicc-kernel@1.181.0)(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)':
     dependencies:
       '@ai-ecoverse/slicc-kernel': 1.181.0
       '@ai-ecoverse/slicc-vault': 1.25.3
