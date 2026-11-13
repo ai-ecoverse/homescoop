@@ -1,0 +1,156 @@
+Subject: [PATCH] qjs: start in the process's working directory on WASI
+
+wasi-libc starts with a working directory of "/" whatever the process's
+cwd, and makes relative paths absolute from it. The kernel preopens the
+real cwd as "." (and, with "preopenRoot": true, as "./" after "/"), so a
+relative path whose first name is a top-level directory (tmp/f in
+/home/u) reached /tmp/f, and os.getcwd() was "/". Before main(), qjs now
+changes into the real working directory: PWD when it is absolute, not
+"/", has no "." or ".." and is the same directory as "." (device and
+inode), else the path found by walking ".." up to the root. With "/"
+preopened it then closes the "./" twin, so "/" is the root.
+
+--- a/qjs.c
++++ b/qjs.c
+@@ -53,6 +53,131 @@
+ #define emscripten_or_wasi 0
+ #endif
+ 
++#if defined(__wasi__)
++#include <dirent.h>
++#include <sys/stat.h>
++#include <wasi/api.h>
++#include <wasi/libc.h>
++
++static int qjs_wasi_id(const char *path, int follow, dev_t *dev, ino_t *ino)
++{
++    struct stat st;
++
++    if ((follow ? stat(path, &st) : lstat(path, &st)) != 0)
++        return -1;
++    *dev = st.st_dev;
++    *ino = st.st_ino;
++    return 0;
++}
++
++static int qjs_wasi_plain(const char *path)
++{
++    const char *s = path, *e;
++
++    if (s[0] != '/' || s[1] == '\0' || strlen(s) >= PATH_MAX)
++        return 0;
++    while (*s) {
++        while (*s == '/')
++            s++;
++        for (e = s; *e && *e != '/'; e++)
++            ;
++        if ((e - s == 1 && s[0] == '.') ||
++            (e - s == 2 && s[0] == '.' && s[1] == '.'))
++            return 0;
++        s = e;
++    }
++    return 1;
++}
++
++static char *qjs_wasi_walk(dev_t dev, ino_t ino)
++{
++    char dir[PATH_MAX], entry[PATH_MAX], cwd[PATH_MAX], tail[PATH_MAX];
++    dev_t up_dev, e_dev;
++    ino_t up_ino, e_ino;
++    struct dirent *d;
++    DIR *dp;
++    int depth, found;
++
++    strcpy(dir, ".");
++    cwd[0] = '\0';
++    for (depth = 0; depth < 256; depth++) {
++        if (strlen(dir) + 4 >= sizeof(dir))
++            return NULL;
++        strcat(dir, "/..");
++        if (qjs_wasi_id(dir, 1, &up_dev, &up_ino))
++            return NULL;
++        if (up_dev == dev && up_ino == ino)
++            return strdup(cwd[0] ? cwd : "/");
++        dp = opendir(dir);
++        if (!dp)
++            return NULL;
++        found = 0;
++        while ((d = readdir(dp)) != NULL) {
++            if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
++                continue;
++            if (snprintf(entry, sizeof(entry), "%s/%s", dir, d->d_name) >= (int)sizeof(entry))
++                continue;
++            if (qjs_wasi_id(entry, 0, &e_dev, &e_ino) == 0 &&
++                e_dev == dev && e_ino == ino) {
++                if (snprintf(tail, sizeof(tail), "/%s%s", d->d_name, cwd) >= (int)sizeof(tail)) {
++                    closedir(dp);
++                    return NULL;
++                }
++                strcpy(cwd, tail);
++                found = 1;
++                break;
++            }
++        }
++        closedir(dp);
++        if (!found)
++            return NULL;
++        dev = up_dev;
++        ino = up_ino;
++    }
++    return NULL;
++}
++
++static void qjs_wasi_start(void)
++{
++    __wasi_prestat_t ps;
++    char name[PATH_MAX];
++    const char *pwd;
++    char *cwd = NULL;
++    dev_t dev, pdev;
++    ino_t ino, pino;
++    int fd, root = 0, twin = -1;
++
++    if (qjs_wasi_id(".", 1, &dev, &ino))
++        return;
++    pwd = getenv("PWD");
++    if (pwd && qjs_wasi_plain(pwd) && !qjs_wasi_id(pwd, 1, &pdev, &pino) &&
++        pdev == dev && pino == ino)
++        cwd = strdup(pwd);
++    else
++        cwd = qjs_wasi_walk(dev, ino);
++    if (!cwd)
++        return;
++    for (fd = 3; ; fd++) {
++        if (__wasi_fd_prestat_get(fd, &ps) != 0 || ps.tag != __WASI_PREOPENTYPE_DIR)
++            break;
++        if (ps.u.dir.pr_name_len >= sizeof(name) ||
++            __wasi_fd_prestat_dir_name(fd, (uint8_t *)name, ps.u.dir.pr_name_len) != 0)
++            break;
++        name[ps.u.dir.pr_name_len] = '\0';
++        if (!strcmp(name, "/"))
++            root = 1;
++        else if (!strcmp(name, "./"))
++            twin = fd;
++    }
++    if (chdir(cwd) == 0 && root && twin >= 0) {
++        __wasi_fd_close(twin);
++        __wasilibc_reset_preopens();
++        chdir(cwd);
++    }
++    free(cwd);
++}
++#endif
++
+ static int qjs__argc;
+ static char **qjs__argv;
+ 
+@@ -447,6 +572,9 @@
+     int64_t memory_limit = -1;
+     int64_t stack_size = -1;
+ 
++#if defined(__wasi__)
++    qjs_wasi_start();
++#endif
+     /* save for later */
+     qjs__argc = argc;
+     qjs__argv = argv;

@@ -1,0 +1,47 @@
+{
+  "name": "@ai-ecoverse/wasi-quickjs",
+  "version": "0.18.0-1",
+  "description": "QuickJS-NG, a small JavaScript interpreter (qjs).",
+  "license": "MIT",
+  "engines": {
+    "slicc-kernel": ">=1.132.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-quickjs/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-quickjs",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "quickjs",
+    "quickjs-ng",
+    "javascript",
+    "qjs"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-quickjs",
+    "upstream": "0.18.0"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "qjs": {
+        "wasm": "bin/qjs.wasm",
+        "preopenRoot": true
+      }
+    }
+  }
+}

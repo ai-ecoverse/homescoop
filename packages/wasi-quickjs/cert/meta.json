@@ -1,0 +1,54 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/slicc-jsh"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15",
+    "@ai-ecoverse/slicc-jsh@0.64.0"
+  ],
+  "notices": [
+    {
+      "name": "Unicode data",
+      "license": "Unicode-3.0",
+      "text": "UNICODE LICENSE V3"
+    },
+    {
+      "name": "wasi-libc",
+      "license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+    },
+    {
+      "name": "musl libc",
+      "license": "MIT"
+    },
+    {
+      "name": "cloudlibc",
+      "license": "BSD-2-Clause"
+    },
+    {
+      "name": "compiler-rt builtins",
+      "license": "Apache-2.0 WITH LLVM-exception"
+    }
+  ],
+  "ci": [
+    "node packages/wasi-quickjs/test/node-kernel.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "checklist": [
+    "cert/checklist.mjs: qjs -v is 0.18.0 and --help names QuickJS-ng 0.18.0; under bash, qjs -e, qjs --std -e, qjs file.js with scriptArgs, qjs < file.js, cat file.js | qjs, qjs - x < file.js, the caller's stdin, a module on stdin (import detected) and < /dev/null run as scripts (0002); echo piped | qjs line.js reads std.in.getline(), seq 1 20000 | qjs counts every line, a pipe in and out; qjs:std open/puts/close, append, loadFile, writeFile and binary loadFile by relative (out/rel.txt, ./out, ../qjs/out) and absolute (/tmp) paths, checked with cat at the physical paths, os.mkdir/readdir/rename/remove/stat; a missing file is null with ENOENT; std.exit(7) is 7, std.exit(300) is 44, an uncaught exception (from -e and from stdin), an unhandled rejection, a syntax error and a missing script are 1 with upstream's messages; ES modules importing each other by ./, ../ and JSON with { type: 'json' }, from the cwd, by an absolute path from / and by ../main.mjs from mod/util, and dynamic import(); os.setTimeout, os.sleepAsync, os.sleep; BigInt, Unicode case mapping and \\p{L}",
+    "cert/cwd.mjs (homescoop#2013; 0001): in /home/qjscwd/sub, which has its own tmp/ and home/, tmp/where.txt is sub's and /tmp/where.txt the root's, ./, ../ and absolute paths resolve, os.readdir('.') is the cwd and os.readdir('/') the root, os.getcwd() is the cwd and a relative std.open('created.txt', 'w') creates it there (not in / or /tmp), with PWD the cwd, /tmp (stale), /nonexistent, relative, spelt with .., / and another real directory; bash cd then a stale PWD; cwd / with PWD naming sub is /; os.chdir to a relative and an absolute directory moves relative paths",
+    "cert/cwd-node.mjs: node (slicc-jsh 0.64.0) in /tmp: spawnSync('qjs', …, { cwd }) with PWD=/tmp inherited, through sh -c, and without PWD, each reads the cwd's tmp/where.txt and os.getcwd() is the cwd",
+    "cert/limits.mjs (what WASI lacks): os.platform is wasi; std.popen, tmpfile and urlGet and os.exec, getpid, waitpid, pipe, kill, dup, dup2, symlink, readlink, lstat, realpath, ttyGetWinSize, ttySetRaw, mkdtemp, mkstemp, cputime, Worker, SIGQUIT/SIGPIPE/SIGALRM/SIGUSR1/SIGCHLD and WNOHANG are absent while the rest of qjs:std and qjs:os is there; qjs -c is an unknown option and there is no qjsc; os.open/write/close and isatty, std.setenv/getenv/getenviron; --memory-limit 4096 ends a script with InternalError: out of memory (status 1); unbounded recursion is a catchable RangeError (0003's 512 KiB limit; without it the async host traps, status 70) while 1000 levels work; JSON 3000 levels deep round-trips",
+    "cert/repl.mjs: qjs on a pty is the REPL in cooked mode (no raw mode on WASI): 6*7 prints 42, ^D does not end it, os.platform is wasi, .quit exits 0",
+    "cert/notices.mjs: LICENSE is QuickJS-NG's MIT licence; THIRD-PARTY-NOTICES.md has exactly the Unicode data (Unicode-3.0), wasi-libc (wasi-sdk-34), musl, cloudlibc and compiler-rt builtins sections with their licence texts",
+    "test/node-kernel.mjs (the ci command): checklist, cwd, limits and repl on createNodeKernel({ blocking: 'async', emscripten: 'kernel' }), the async process host Cloudflare runs, and all five specs on createNodeKernel(), slicc-kernel 1.185.0 (root package.json), users enforce"
+  ],
+  "patches": {
+    "0001-qjs-start-in-the-working-directory-on-WASI.patch": "cert/cwd.mjs and cert/cwd-node.mjs: without it tmp/where.txt in /home/qjscwd/sub reads /tmp/where.txt, os.getcwd() is / and os.readdir('/') lists the cwd (NEGATIVE.md)",
+    "0002-qjs-run-stdin-as-a-script-when-it-is-not-a-terminal.patch": "the < file.js, pipe, - and caller-stdin rows of cert/checklist.mjs: without it qjs < file.js echoes the script into the REPL and never exits (NEGATIVE.md)",
+    "0003-qjs-a-512-KiB-JS-stack-limit-and-1-MiB-of-C-stack-on-WASI.patch": "the deep-recursion row of cert/limits.mjs on createNodeKernel({ blocking: 'async' }) (test/node-kernel.mjs): without it f(1e7) ends the process with status 70 (the engine's RangeError in wasm) instead of a catchable RangeError (NEGATIVE.md); build.sh's initial-memory gate (19 pages, at most 24)"
+  }
+}

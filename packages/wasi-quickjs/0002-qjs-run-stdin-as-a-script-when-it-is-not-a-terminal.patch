@@ -1,0 +1,73 @@
+Subject: [PATCH] qjs: run stdin as a script when it is not a terminal
+
+With no file argument qjs started the REPL whatever stdin was, so
+`qjs < file.js` and `cmd | qjs` echoed the script into the REPL line
+editor and, at end of input, never exited (the native qjs 0.18.0 does the
+same). qjs now evaluates stdin as a script, module or not as for a file
+(JS_DetectModule), when stdin is not a terminal and -i was not given, as
+node, python and sh do. A file argument of "-" reads stdin too; the
+script's name is "<stdin>".
+
+--- a/qjs.c
++++ b/qjs.c
+@@ -288,13 +288,45 @@
+         js_std_dump_error(ctx);
+ }
+ 
++static uint8_t *load_stdin(JSContext *ctx, size_t *pbuf_len)
++{
++    uint8_t *buf = NULL, *p, tmp[8192];
++    size_t len = 0, n;
++
++    for (;;) {
++        n = fread(tmp, 1, sizeof(tmp), stdin);
++        p = js_realloc(ctx, buf, len + n + 1);
++        if (!p) {
++            js_free(ctx, buf);
++            return NULL;
++        }
++        memcpy(&p[len], tmp, n);
++        buf = p;
++        len += n;
++        buf[len] = '\0';
++        if (n < sizeof(tmp))
++            break;
++    }
++    if (ferror(stdin)) {
++        js_free(ctx, buf);
++        return NULL;
++    }
++    *pbuf_len = len;
++    return buf;
++}
++
+ static int eval_file(JSContext *ctx, const char *filename, int module)
+ {
+     uint8_t *buf;
+     int ret, eval_flags;
+     size_t buf_len;
+ 
+-    buf = js_load_file(ctx, &buf_len, filename);
++    if (!strcmp(filename, "-")) {
++        buf = load_stdin(ctx, &buf_len);
++        filename = "<stdin>";
++    } else {
++        buf = js_load_file(ctx, &buf_len, filename);
++    }
+     if (!buf) {
+         perror(filename);
+         exit(1);
+@@ -835,8 +867,11 @@
+             if (eval_buf(ctx, expr, strlen(expr), "<cmdline>", flags))
+                 goto fail;
+         } else if (optind >= argc) {
+-            /* interactive mode */
+-            interactive = 1;
++            if (interactive || isatty(STDIN_FILENO)) {
++                interactive = 1;
++            } else if (eval_file(ctx, "-", module)) {
++                goto fail;
++            }
+         } else {
+             const char *filename;
+             filename = argv[optind];
