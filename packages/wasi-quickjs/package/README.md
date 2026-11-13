@@ -35,14 +35,15 @@ with three patches:
   REPL on any stdin, so `qjs < f.js` and `cmd | qjs` echoed the script into
   the line editor and never exited. Here stdin is run as a script when it
   isn't a terminal (module or not, as for a file); `qjs -` reads it too.
-- **The stack limit.** The JS stack limit is 512 KiB (upstream: 1 MiB), so
-  that unbounded recursion throws a `RangeError` you can catch in the async
-  process host too, where the wasm engine's own stack is smaller and
-  upstream's limit let it run out first (the process ended). About 1,500
-  nested JS calls fit. `--stack-size <KiB>` sets another limit.
+- **The stack limit.** The JS stack limit is 256 KiB (upstream: 1 MiB), so
+  that unbounded recursion throws a `RangeError` you can catch in a browser
+  and in the async process host too, where the wasm engine's own stack is
+  smaller and upstream's limit let it run out first (the process ended).
+  About 750 nested JS calls fit. `--stack-size <KiB>` sets another limit;
+  above about 400 the process can end instead of throwing.
 
-**Memory.** The module's initial memory is 1.2 MiB (19 wasm pages): the
-linker's minimum, static data plus 1 MiB of C stack. The heap grows as a
+**Memory.** The module's initial memory is 704 KiB (11 wasm pages): the
+linker's minimum, static data plus 512 KiB of C stack. The heap grows as a
 script needs it, with no maximum; `--memory-limit <KiB>` caps it (a script
 over it ends with `InternalError: out of memory`, status 1). On Cloudflare,
 programs share a Dynamic Worker's 64 MiB budget, so qjs takes little of it
@@ -66,9 +67,10 @@ or terminal modes:
 - the REPL's raw mode: on a terminal the REPL reads whole lines, `^D`
   doesn't end it (`.quit` does, or `^C`).
 
-Data nested a few thousand levels deep (`JSON.stringify` of an array 7,000
-levels deep) can still exhaust the wasm engine's stack in the async process
-host, which ends the process rather than throwing; 3,000 levels work.
+Data nested thousands of levels deep (`JSON.stringify` of an array 7,000
+levels deep) can still exhaust the wasm engine's stack in a browser or the
+async process host, which ends the process rather than throwing; 1,000
+levels work.
 
 Certified on slicc-kernel in the browser and on Node, with
 `createNodeKernel()` and `createNodeKernel({ blocking: 'async' })`: `-e`, a

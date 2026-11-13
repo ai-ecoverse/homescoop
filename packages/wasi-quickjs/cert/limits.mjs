@@ -32,10 +32,10 @@ console.log(JSON.stringify({
   r = await run(['qjs', '--memory-limit', '4096', '-e', 'const a = []; for (;;) a.push(new Array(1e5).fill(1));'], { cwd: '/home' });
   assert.equal(r.status, 1, out('--memory-limit', r));
   assert.match(r.stderr, /^InternalError: out of memory\n/, out('--memory-limit', r));
-  r = await run(['qjs', '-e', 'function f(n) { return n ? 1 + f(n - 1) : 0 } try { f(1e7) } catch (e) { console.log(e instanceof RangeError, String(e)) } console.log(f(1000))'], { cwd: '/home' });
+  r = await run(['qjs', '-e', 'function f(n) { return n ? 1 + f(n - 1) : 0 } try { f(1e7) } catch (e) { console.log(e instanceof RangeError, String(e)) } console.log(f(500))'], { cwd: '/home' });
   assert.equal(r.status, 0, out('deep recursion (0003)', r));
-  assert.equal(r.stdout, 'true RangeError: Maximum call stack size exceeded\n1000\n', out('deep recursion (0003)', r));
-  r = await run(['qjs', '-e', 'let o = []; for (let i = 0; i < 3000; i++) o = [o]; const s = JSON.stringify(o); console.log(s.length, JSON.stringify(JSON.parse(s)) === s)'], { cwd: '/home' });
-  assert.equal(r.stdout, '6002 true\n', out('JSON nested 3000 deep', r));
+  assert.equal(r.stdout, 'true RangeError: Maximum call stack size exceeded\n500\n', out('deep recursion (0003)', r));
+  r = await run(['qjs', '-e', 'let o = []; for (let i = 0; i < 1000; i++) o = [o]; const s = JSON.stringify(o); console.log(s.length, JSON.stringify(JSON.parse(s)) === s)'], { cwd: '/home' });
+  assert.equal(r.stdout, '2002 true\n', out('JSON nested 1000 deep', r));
   console.log('limits: qjs:os has no processes, pipes, dup, links, realpath, tty raw mode, temp files, cputime or Worker; std has no popen, tmpfile or urlGet; no -c and no qjsc; --memory-limit and the stack limit throw');
 }

@@ -60,7 +60,7 @@ node -e '
     if (id === 5) { if (leb() !== 1) process.exit(1); const flags = b[i++]; if (flags & 2) { console.error("wasi-quickjs: shared memory"); process.exit(1); } pages = leb(); }
     i = end;
   }
-  if (pages === null || pages > 24) { console.error("wasi-quickjs: initial memory " + pages + " pages (at most 24)"); process.exit(1); }
+  if (pages === null || pages > 16) { console.error("wasi-quickjs: initial memory " + pages + " pages (at most 16)"); process.exit(1); }
   console.log("wasi-quickjs: initial memory " + pages + " pages (" + (pages * 64) + " KiB), imports only wasi_snapshot_preview1");' "$WASM"
 for prefix in "$SRC" "$BUILD" "$WORK" "$SDK" "$HOME" "$ROOT" "/Users/runner" "/home/runner"; do
   if grep -qaF "$prefix" "$WASM"; then

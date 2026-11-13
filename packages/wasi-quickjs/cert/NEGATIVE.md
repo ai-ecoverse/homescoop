@@ -8,8 +8,9 @@ cert specs on `createNodeKernel()` (sync) and on
 `createNodeKernel({ blocking: 'async', emscripten: 'kernel' })` (async),
 users `enforce`, with wasm-bash 5.3.0-23, wasm-coreutils 9.12.0-15 and
 slicc-jsh 0.64.0. The real build (`scripts/host-run.sh wasi-quickjs`,
-`qjs.wasm` sha256 `66a5045c…`, 19 pages of initial memory) passes all
-nine runs. Each defect below was built from the same tarball with the
+`qjs.wasm` sha256 `112609c7…`, 11 pages of initial memory) passes all
+nine runs, and the browser cert (`scripts/browser-cert/run.mjs`, Chrome
+headless shell 1254, the CI pins) passes all six specs. Each defect below was built from the same tarball with the
 same wasi-sdk and packed into the same `package.tgz`. Recorded failures:
 
 - **Upstream's own `qjs-wasi.wasm` 0.18.0** (the release asset homescoop#2070
@@ -40,6 +41,11 @@ same wasi-sdk and packed into the same `package.tgz`. Recorded failures:
 
 - **Without 0003** (0001 and 0002): `limits.mjs` FAIL on the async host at
   the deep-recursion row; the sync host passes it.
+- **0003's first version, a 512 KiB limit and 1 MiB of C stack** (head
+  c8d8ed93 of #2071): the Node runs pass, but `limits.mjs` FAIL in the
+  browser (the PR run's cert job and the reviewers' Chromium, and locally),
+  `deep recursion (0003): rc=70`, as below; Chromium's process worker has
+  less stack than Node's JSPI one. 256 KiB passes everywhere.
 
   ```text
   AssertionError [ERR_ASSERTION]: deep recursion (0003): rc=70

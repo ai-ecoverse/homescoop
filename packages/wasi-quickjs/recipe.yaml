@@ -26,8 +26,8 @@ about:
     target qjs_exe, CMake's default Release (-O3). Upstream's own WASI
     settings otherwise: wasi-libc's emulated signals and process clocks,
     no threads (no os.Worker), no dlopen. The linker's initial memory is
-    its minimum, static data plus the C stack: 19 pages (1.2 MiB) with
-    0003's 1 MiB stack; build.sh fails above 24 pages. llvm-strip
+    its minimum, static data plus the C stack: 11 pages (704 KiB) with
+    0003's 512 KiB stack; build.sh fails above 16 pages. llvm-strip
     --strip-all drops wasi-sdk's debug sections. qjsc is not shipped.
     0001-qjs-start-in-the-working-directory-on-WASI.patch: wasi-libc's
     working directory is "/" at start, so a relative path whose first
@@ -41,11 +41,11 @@ about:
     a pipe into qjs echoed the script into the line editor and never
     exited at end of input. qjs now runs stdin as a script when it is not
     a terminal (and "-" as a file name reads stdin).
-    0003-qjs-a-512-KiB-JS-stack-limit-and-1-MiB-of-C-stack-on-WASI.patch:
+    0003-qjs-a-256-KiB-JS-stack-limit-and-512-KiB-of-C-stack-on-WASI.patch:
     upstream's 1 MiB JS stack limit (inside 2 MiB of C stack) let deep
-    recursion exhaust the wasm engine's own stack first in the async
-    process host (JSPI), which trapped (status 70) instead of throwing a
-    RangeError. The default limit on WASI is 512 KiB (--stack-size sets
-    another) and the C stack 1 MiB.
+    recursion exhaust the wasm engine's own stack first in a browser's
+    process worker and in the async process host (JSPI), which trapped
+    (status 70) instead of throwing a RangeError. The default limit on
+    WASI is 256 KiB (--stack-size sets another) and the C stack 512 KiB.
     THIRD-PARTY-NOTICES.md has wasi-libc (wasi-sdk-34), musl, cloudlibc,
     compiler-rt's builtins and the Unicode data in libunicode-table.h.
