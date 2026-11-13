@@ -5,7 +5,7 @@ reproducible: true
 # renovate: datasource=github-tags depName=mikefarah/yq extractVersion=^v(?<version>4\..*)$
 version: "4.54.2"
 npm: "@ai-ecoverse/wasi-yq"
-summary: "yq 4.54.1 for slicc WASI preview1 (command yq)"
+summary: "yq 4.54.2 for slicc WASI preview1 (command yq)"
 source:
   url: "https://github.com/mikefarah/yq/archive/504fc38780cc46be8444ea1b72fb55919fc0bfb0.tar.gz"
   sha256: "1490e343a67aea595fee4870167c0897178a0f9359f98a6f1b07a9fe803a4fc4"

@@ -44,7 +44,7 @@ This is the real yq, so expressions, flags and output are upstream's.
 
 ## Build
 
-`yq.wasm` is yq `4.54.1` (tag `v4.54.1`, commit `504fc38`), built by
+`yq.wasm` is yq `4.54.2` (tag `v4.54.2`, commit `504fc38`), built by
 homescoop with Go 1.27.3, `GOOS=wasip1 GOARCH=wasm`, from vendored modules
 (go.sum checked), with upstream's release flags (`-s -w`). No patches: every
 module it links builds for wasip1 as it is. It needs no slicc-kernel imports
