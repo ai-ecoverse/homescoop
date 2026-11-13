@@ -825,7 +825,7 @@ jobs:
   pipeline:
     needs: [detect, recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert, shims, emsdk-cache, crates-host, crates-kernel, crates-consumer, group]
     if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
-    uses: ai-ecoverse/slicc-shared-web/.github/workflows/pipeline.yml@v2.14.0
+    uses: ai-ecoverse/slicc-shared-web/.github/workflows/pipeline.yml@v2.14.1
     secrets: inherit
     permissions:
       contents: write
