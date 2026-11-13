@@ -3,7 +3,7 @@ builder: host
 runner: pool
 reproducible: true
 # renovate: datasource=github-tags depName=mikefarah/yq extractVersion=^v(?<version>4\..*)$
-version: "4.54.1"
+version: "4.54.2"
 npm: "@ai-ecoverse/wasi-yq"
 summary: "yq 4.54.1 for slicc WASI preview1 (command yq)"
 source:
