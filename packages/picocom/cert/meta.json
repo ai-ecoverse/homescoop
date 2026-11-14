@@ -1,0 +1,17 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "ci": [
+    "node packages/picocom/test/serial.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "checklist": [
+    "cert/checklist.mjs (browser): picocom --version is 'picocom v2024-07' with HIGH_BAUD and none of USE_FLOCK, LINENOISE, USE_CUSTOM_BAUD or UUCP_LOCK_DIR; --help prints the usage, rc 0; --send-cmd is refused ('Calling external programs is disabled', NO_FORK); with no node, picocom -b 115200 /dev/ttyUSB0 is 'FATAL: cannot open /dev/ttyUSB0: No such file or directory', rc 1, from a pipe and on a pty",
+    "test/serial.mjs (the ci command): createNodeKernel({ users: 'enforce', devices }) with a loopback hook, the root package.json's slicc-kernel, and kernel.devices.add({ path: 'ttyUSB0', owner: 0, group: 'dialout', mode: 0o640, links: ['usb-0403_6001-if00'] })",
+    "test/serial.mjs: sudo picocom -b 115200 /dev/ttyUSB0 on a pty: 'Terminal ready', typed hello-loop\\r comes back through the loopback and is all the port got (C-a never reaches it), the hook's open is O_RDWR as uid 0, one configure { baudRate: 115200, dataBits: 8, parity: 'none', stopBits: 1, flowControl: 'none' }, C-a C-x prints 'Thanks for using picocom', resets the port to 9600 and closes it, rc 0",
+    "test/serial.mjs: C-a C-q prints 'Skipping tty reset' and leaves the one configure at 115200; C-a C-t prints 'DTR: down' and the hook gets setSignals { dataTerminalReady: false } (TIOCMBIC, -DUSE_IOCTL); C-a C-v shows DSR and CTS up from control('signals') (TIOCMGET)",
+    "test/serial.mjs: cone, a dialout member, without sudo: 'FATAL: cannot open /dev/ttyUSB0: Permission denied', rc 1, and the hook is never asked",
+    "test/serial.mjs: picocom on /dev/serial/by-id/usb-0403_6001-if00 opens /dev/ttyUSB0; a second sudo picocom meanwhile is 'Device or resource busy', rc 1, and never configures the port",
+    "test/serial.mjs negatives: /dev/ttyUSB1 (not added) is 'No such file or directory' and opens nothing; the same picocom as cone on a node added 0660 opens it (uid > 0 reaches the hook), so the 0640 mode is what refuses the dialout row; with the hook's loopback off, typed hello-loop\\r reaches the port but never shows, so the echo row's output is the loopback's",
+    "test/serial.mjs: picocom --help and --version run as cone"
+  ]
+}

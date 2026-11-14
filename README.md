@@ -119,6 +119,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-ncurses-utils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-ncurses-utils) | [recipe](packages/ncurses-utils) | ncurses clear, tput, tset and reset, with a terminfo database. |
 | [`@ai-ecoverse/wasm-openjpeg`](https://www.npmjs.com/package/@ai-ecoverse/wasm-openjpeg) | [recipe](packages/openjpeg) | OpenJPEG JPEG 2000 codec (WASM / emscripten, SLICC homescoop ladder) |
 | [`@ai-ecoverse/wasm-patch`](https://www.npmjs.com/package/@ai-ecoverse/wasm-patch) | [recipe](packages/patch) | GNU patch, which applies diffs to files. |
+| [`@ai-ecoverse/wasm-picocom`](https://www.npmjs.com/package/@ai-ecoverse/wasm-picocom) | [recipe](packages/picocom) | picocom, a minimal terminal for serial ports such as /dev/ttyUSB0. |
 | [`@ai-ecoverse/wasm-pkgconf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-pkgconf) | [recipe](packages/pkgconf) | pkgconf and pkg-config, which give the compiler and linker flags of installed libraries. |
 | [`@ai-ecoverse/wasm-poppler`](https://www.npmjs.com/package/@ai-ecoverse/wasm-poppler) | [recipe](packages/poppler) | Poppler's PDF tools: pdftotext, pdftoppm, pdfinfo, pdfimages and more. |
 | [`@ai-ecoverse/wasm-procps`](https://www.npmjs.com/package/@ai-ecoverse/wasm-procps) | [recipe](packages/procps) | procps-ng: ps, free, pgrep, pkill, kill, uptime and pidof. |

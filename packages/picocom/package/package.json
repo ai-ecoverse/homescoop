@@ -1,0 +1,46 @@
+{
+  "name": "@ai-ecoverse/wasm-picocom",
+  "version": "2024.7.0-1",
+  "description": "picocom, a minimal terminal for serial ports such as /dev/ttyUSB0.",
+  "license": "GPL-2.0-or-later",
+  "engines": {
+    "slicc-kernel": ">=1.186.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/picocom/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/picocom",
+  "keywords": [
+    "wasm",
+    "emscripten",
+    "slicc",
+    "homescoop",
+    "picocom",
+    "serial",
+    "tty"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "picocom",
+    "upstream": "2024-07"
+  },
+  "slicc": {
+    "abi": "emscripten",
+    "commands": {
+      "picocom": {
+        "glue": "bin/picocom",
+        "wasm": "bin/picocom.wasm"
+      }
+    }
+  }
+}
