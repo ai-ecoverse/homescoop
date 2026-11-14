@@ -1,6 +1,6 @@
 {
   "name": "@ai-ecoverse/wasix-python",
-  "version": "3.15.0-8",
+  "version": "3.15.0-9",
   "description": "The Python 3.15 programming language, with pip.",
   "license": "PSF-2.0 AND GPL-3.0-or-later",
   "engines": {

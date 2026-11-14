@@ -108,14 +108,15 @@ fi
 "$HOSTPY" -c 'import platform, sys; assert platform.python_version() == sys.argv[1], (sys.version, sys.argv[1])' "$VER"
 
 # --- WASIX toolchain ---------------------------------------------------------
-# Pinned wasixcc + wasix-sysroot: -40 since 3.15.0-5 (-39 in -4, -38 before), through the per-recipe
+# Pinned wasixcc + wasix-sysroot: -44 since 3.15.0-9 (-40 in -5..-8, -39 in -4, -38 before), through the per-recipe
 # override (-37's Linux S_IF* bits, -38's poll, -39's dlmalloc memory-view refresh,
-# -40's malloc in the initial memory, homescoop#1287; install-wasixcc.sh's default
+# -40's malloc in the initial memory, homescoop#1287; -44's serial ioctls through
+# slicc_tty.ioctl, so pyserial reaches /dev/ttyUSB0; install-wasixcc.sh's default
 # is still -34). sysroot-ehpic (legacy EH, PIC) has the setitimer →
 # proc_raise_interval2 and clock_nanosleep EINTR libc patches
 # (patches/README.md); flock, fcntl record locks and lockf are libc's.
-export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-40
-export HOMESCOOP_WASIX_SYSROOT_SHA=9960846c81c78d40a8dfdd58009e66d5ad671a6469947517661b486a4a3d3336
+export HOMESCOOP_WASIX_SYSROOT_VERSION=2025.9.30-44
+export HOMESCOOP_WASIX_SYSROOT_SHA=baccd02c2914f1378889d308eb6d805d60637ee16e693100fcb7d22cddbbf240
 eval "$(bash "$ROOT/scripts/install-wasixcc.sh" "$B/wasixcc")"
 # C++ runtime ABI of the side modules (README "Side modules"): py-*
 # extensions import _Unwind_CallPersonality, __cxa_thread_atexit and a plain
