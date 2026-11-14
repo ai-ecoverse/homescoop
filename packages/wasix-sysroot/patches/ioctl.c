@@ -13,9 +13,58 @@
 #include <termios.h>
 #include "slicc_tty.h"
 
+static int slicc_serial(int fildes, unsigned request, int32_t arg) {
+  int k = __slicc_tty_ioctl(fildes, (int32_t)request, arg);
+  if (k == 0) return 0;
+  errno = k == SLICC_TTY_ENOSYS ? EINVAL : k;
+  return -1;
+}
+
 int ioctl(int fildes, int request, ...) {
-  switch (request) {
+  switch ((unsigned)request) {
+    case SLICC_LINUX_TIOCEXCL:
+    case SLICC_LINUX_TIOCNXCL:
+    case SLICC_LINUX_TIOCSBRK:
+    case SLICC_LINUX_TIOCCBRK:
+      return slicc_serial(fildes, request, 0);
+    case SLICC_LINUX_TCSBRK:
+    case SLICC_LINUX_TCSBRKP:
+    case SLICC_LINUX_TCFLSH: {
+      va_list ap;
+      va_start(ap, request);
+      int value = va_arg(ap, int);
+      va_end(ap);
+      return slicc_serial(fildes, request, value);
+    }
+    case SLICC_LINUX_TIOCMGET:
+    case SLICC_LINUX_TIOCMSET:
+    case SLICC_LINUX_TIOCMBIS:
+    case SLICC_LINUX_TIOCMBIC:
+    case SLICC_LINUX_TIOCOUTQ:
+    case SLICC_LINUX_TCGETS2:
+    case SLICC_LINUX_TCSETS2:
+    case SLICC_LINUX_TCSETSW2:
+    case SLICC_LINUX_TCSETSF2: {
+      va_list ap;
+      va_start(ap, request);
+      void *ptr = va_arg(ap, void *);
+      va_end(ap);
+      return slicc_serial(fildes, request, (int32_t)(uintptr_t)ptr);
+    }
+    case SLICC_LINUX_FIONREAD:
     case FIONREAD: {
+      va_list ap;
+      va_start(ap, request);
+      int *result = va_arg(ap, int *);
+      va_end(ap);
+
+      int k = __slicc_tty_ioctl(fildes, (int32_t)SLICC_LINUX_FIONREAD, (int32_t)(uintptr_t)result);
+      if (k == 0) return 0;
+      if (!__slicc_tty_fallback(k)) {
+        errno = k;
+        return -1;
+      }
+
       // Poll the file descriptor to determine how many bytes can be read.
       __wasi_subscription_t subscriptions[2] = {
           {
@@ -31,12 +80,6 @@ int ioctl(int fildes, int request, ...) {
         errno = error;
         return -1;
       }
-
-      // Location where result should be written.
-      va_list ap;
-      va_start(ap, request);
-      int *result = va_arg(ap, int *);
-      va_end(ap);
 
       // Extract number of bytes for reading from poll results.
       for (size_t i = 0; i < nevents; ++i) {

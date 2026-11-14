@@ -301,10 +301,10 @@ done
 # tcgetattr/tcsetattr carry the whole termios, ioctl TCGETS/TCSETS*/
 # TIOCGWINSZ and isatty answer per fd, tcflush/tcdrain check the fd. ENOSYS
 # (older kernels) keeps the tty_get/tty_set path. See patches/README.md.
-echo "== wasix-sysroot: -21 members (tcgetattr, tcsetattr, tcflush, tcdrain, ioctl, isatty; -23 ioctl: Linux TIOCGWINSZ/TIOCSWINSZ)"
+echo "== wasix-sysroot: -21 members (tcgetattr, tcsetattr, tcflush, tcdrain, ioctl, isatty; -23 ioctl: Linux TIOCGWINSZ/TIOCSWINSZ; -44: tcsendbreak, serial ioctls through slicc_tty.ioctl)"
 R21_OBJ="$WORK/r21"
 rm -rf "$R21_OBJ" && mkdir -p "$R21_OBJ/static" "$R21_OBJ/pic"
-R21_TOP=(tcgetattr tcsetattr tcflush tcdrain)
+R21_TOP=(tcgetattr tcsetattr tcflush tcdrain tcsendbreak)
 R21_BOTTOM=(ioctl isatty)
 for flavour in static pic; do
   extra=()
@@ -318,7 +318,7 @@ for v in "${VARIANTS[@]}"; do
   [[ "$PIC_VARIANTS" == *" $v "* ]] && flavour=pic
   old="$R21_OBJ/old-$v"
   rm -rf "$old" && mkdir -p "$old"
-  (cd "$old" && arx "$lib" tcgetattr.o tcsetattr.o tcflush.o tcdrain.o ioctl.o isatty.o)
+  (cd "$old" && arx "$lib" tcgetattr.o tcsetattr.o tcflush.o tcdrain.o tcsendbreak.o ioctl.o isatty.o)
   for m in "${R21_TOP[@]}" "${R21_BOTTOM[@]}"; do
     missing="$(comm -23 <(defined "$old/$m.o") <(defined "$R21_OBJ/$flavour/$m.o"))"
     if [[ -n "$missing" ]]; then
@@ -328,6 +328,7 @@ for v in "${VARIANTS[@]}"; do
   done
   "$LLVM_AR" r "$lib" $(printf "$R21_OBJ/$flavour/%s.o " "${R21_TOP[@]}" "${R21_BOTTOM[@]}")
   grep -q __slicc_tty_winsize <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_tty imports" >&2; exit 1; }
+  grep -q __slicc_tty_ioctl <<<"$("$LLVM_NM" -u "$lib" 2>/dev/null)" || { echo "homescoop: $lib lacks slicc_tty.ioctl" >&2; exit 1; }
   echo "  $v ($flavour)"
 done
 

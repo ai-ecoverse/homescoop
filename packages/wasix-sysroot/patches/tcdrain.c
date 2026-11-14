@@ -15,9 +15,15 @@ int tcdrain(int fd)
 #ifdef __wasilibc_unmodified_upstream	
 	return syscall_cp(SYS_ioctl, fd, TCSBRK, 1);
 #else
+	int k = __slicc_tty_ioctl(fd, (int32_t)SLICC_LINUX_TCSBRK, 1);
+	if (k == 0) return 0;
+	if (!__slicc_tty_fallback(k)) {
+		errno = k;
+		return -1;
+	}
 	/* homescoop: output is already written; only the fd's validity counts. */
 	struct winsize ws;
-	int k = __slicc_tty_winsize(fd, &ws);
+	k = __slicc_tty_winsize(fd, &ws);
 	if (k == 0 || k == SLICC_TTY_ENOSYS) return 0;
 	errno = k;
 	return -1;

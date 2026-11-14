@@ -21,8 +21,14 @@ int tcflush(int fd, int queue)
 		errno = EINVAL;
 		return -1;
 	}
+	int k = __slicc_tty_ioctl(fd, (int32_t)SLICC_LINUX_TCFLSH, queue);
+	if (k == 0) return 0;
+	if (!__slicc_tty_fallback(k)) {
+		errno = k;
+		return -1;
+	}
 	struct termios tio;
-	int k = __slicc_tty_tcgetattr(fd, &tio);
+	k = __slicc_tty_tcgetattr(fd, &tio);
 	if (k == SLICC_TTY_ENOSYS) return 0;
 	if (k == 0 && queue != TCOFLUSH) k = __slicc_tty_tcsetattr(fd, TCSAFLUSH, &tio);
 	if (k == 0) return 0;
