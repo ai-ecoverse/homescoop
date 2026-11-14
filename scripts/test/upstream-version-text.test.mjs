@@ -182,6 +182,8 @@ test('a year-month release (picocom 2024-07) is <year>.<month>.0 on npm', () => 
   assert.ok(!sameVersion('2024.8.0', '2024-07'));
   assert.deepEqual(driftErrors({ name: 'picocom', upstream: '2024-07', pkg: { version: '2024.7.0-1', homescoop: { upstream: '2024-07' } }, summary: 'picocom 2024-07', readme: '# picocom 2024-07', allow }), []);
   assert.match(driftErrors({ name: 'picocom', upstream: '2024-07', pkg: { version: '2024.6.0-1', homescoop: { upstream: '2024-07' } }, allow }).join('\n'), /not a packaging revision of recipe version 2024-07/);
+  assert.deepEqual(staleVersions('## 2024.7.0-1\n\npicocom 2024-07', '2024-07', { allow, name: 'picocom' }), [], 'its own packaging revisions are not stale');
+  assert.deepEqual(staleVersions('picocom 2024.8.0 is newer', '2024-07', { allow, name: 'picocom' }).map((v) => v.version), ['2024.8.0']);
 });
 
 test('an IANA release in text: another one of its year or later is stale, an older year or a historical one is not', () => {

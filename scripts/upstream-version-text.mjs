@@ -163,7 +163,7 @@ export function staleVersions(text, upstream, { allow, name }) {
     if (tok.split('.')[0] !== major) continue;
     if (ok.some((o) => sameVersion(tok, o))) continue;
     if (componentPrefix(tok, up)) continue;
-    if (PACKAGING_REV.test(tok) && !up.includes('-')) continue;
+    if (PACKAGING_REV.test(tok) && !npmify(up).includes('-')) continue;
     if (UNIT.test(text.slice(m.index + m[0].length))) continue;
     if (historicalCue(sentenceAt(text, m.index), allow)) continue;
     if (afterLead(text, m.index, leads)) continue;
