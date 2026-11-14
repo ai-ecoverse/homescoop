@@ -106,6 +106,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | libxml2 | `GNOME/libxml2` | github-tags |
 | openjpeg | `uclouvain/openjpeg` | github-releases |
 | patch | savannah `patch.git` | |
+| picocom | gitlab `wsakernel/picocom` | gitlab-releases, tags `YYYY-MM`; npm gets `YYYY.M.0-N` (docs/versioning.md) |
 | pkgconf | `pkgconf/pkgconf` | tags `pkgconf-*` |
 | sed | savannah `sed.git` | |
 | sqlite3 | `sqlite/sqlite` | tags `version-X.Y.Z` |
