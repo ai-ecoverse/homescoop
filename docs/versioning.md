@@ -58,6 +58,10 @@ does: sync rewrites `2026e` to `2026f` in them, and the drift check calls
 another release of the same year or later stale (`npmify` in
 `scripts/upstream-version-text.mjs`).
 
+A year-month release (`2024-07`, picocom's recipe) becomes
+`<year>.<month>.0-N`, so `2024-07` is `2024.7.0-1` and its dash never
+reads as the packaging revision's. `homescoop.upstream` stays `2024-07`.
+
 `host-run.sh` and the PR build validate the **packed** tarball with
 `sync-package-version.mjs --assert-tarball` so non-semver versions fail in
 CI before certification, not at publish.

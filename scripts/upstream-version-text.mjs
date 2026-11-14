@@ -27,11 +27,15 @@ export function loadAllow(file = join(root, 'scripts/package-meta-versions.json'
 const IANA = /^(\d{4})(z*)([a-z])$/;
 export const isIanaRelease = (v) => IANA.test(String(v));
 
+const YEAR_MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
 export function npmify(v) {
   if (/^\d+$/.test(v)) return `${v}.0.0`;
   if (/^\d+\.\d+$/.test(v)) return `${v}.0`;
   const iana = IANA.exec(String(v));
   if (iana) return `${iana[1]}.${iana[2].length * 26 + iana[3].charCodeAt(0) - 96}.0`;
+  const ym = YEAR_MONTH.exec(String(v));
+  if (ym) return `${ym[1]}.${Number(ym[2])}.0`;
   return v;
 }
 
@@ -159,7 +163,7 @@ export function staleVersions(text, upstream, { allow, name }) {
     if (tok.split('.')[0] !== major) continue;
     if (ok.some((o) => sameVersion(tok, o))) continue;
     if (componentPrefix(tok, up)) continue;
-    if (PACKAGING_REV.test(tok) && !up.includes('-')) continue;
+    if (PACKAGING_REV.test(tok) && !npmify(up).includes('-')) continue;
     if (UNIT.test(text.slice(m.index + m[0].length))) continue;
     if (historicalCue(sentenceAt(text, m.index), allow)) continue;
     if (afterLead(text, m.index, leads)) continue;
