@@ -172,6 +172,18 @@ test('an IANA tz release (2026f) is <year>.<letter index>.0 on npm, as PyPI tzda
   assert.match(driftErrors({ name: 'tzdata', upstream: '2026f', pkg: { version: '2026.5.0-1', homescoop: { upstream: '2026f' } }, allow }).join('\n'), /not a packaging revision of recipe version 2026f/);
 });
 
+test('a year-month release (picocom 2024-07) is <year>.<month>.0 on npm', () => {
+  assert.equal(npmify('2024-07'), '2024.7.0');
+  assert.equal(npmify('2024-12'), '2024.12.0');
+  assert.equal(npmify('2024-13'), '2024-13', 'only a real month maps');
+  assert.equal(npmify('2024-00'), '2024-00');
+  assert.equal(npmify('24-07'), '24-07', 'only a four-digit year maps');
+  assert.ok(sameVersion('2024.7.0', '2024-07'));
+  assert.ok(!sameVersion('2024.8.0', '2024-07'));
+  assert.deepEqual(driftErrors({ name: 'picocom', upstream: '2024-07', pkg: { version: '2024.7.0-1', homescoop: { upstream: '2024-07' } }, summary: 'picocom 2024-07', readme: '# picocom 2024-07', allow }), []);
+  assert.match(driftErrors({ name: 'picocom', upstream: '2024-07', pkg: { version: '2024.6.0-1', homescoop: { upstream: '2024-07' } }, allow }).join('\n'), /not a packaging revision of recipe version 2024-07/);
+});
+
 test('an IANA release in text: another one of its year or later is stale, an older year or a historical one is not', () => {
   const stale = (text) => staleVersions(text, '2026f', { allow, name: 'tzdata' }).map((s) => s.version);
   assert.deepEqual(stale('IANA 2026f, compiled'), []);
