@@ -1,4 +1,6 @@
 const log = [];
+const HOLD_MS = 400;
+let node;
 
 const loopback = () => {
   let feed;
@@ -9,8 +11,16 @@ const loopback = () => {
     },
   });
   const writable = new WritableStream({
-    write(chunk) {
-      feed.enqueue(new Uint8Array(chunk));
+    async write(chunk) {
+      const bytes = new Uint8Array(chunk);
+      if (new TextDecoder().decode(bytes) === 'gone') {
+        log.push('gone');
+        setTimeout(() => node?.remove(), 0);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, HOLD_MS));
+      log.push(`taken ${bytes.length}`);
+      feed.enqueue(bytes);
     },
   });
   const control = (op, args) => {
@@ -58,7 +68,8 @@ const SERIAL = [
   'TCSBRKP 1: 0',
   'tcsendbreak: 0',
   'write: 5',
-  'tcdrain: 0',
+  'TIOCOUTQ held: 0 5',
+  'tcdrain: 0 waited=1',
   'TIOCOUTQ: 0 0',
   'FIONREAD linux: 5',
   'FIONREAD wasi: 0 5',
@@ -78,6 +89,10 @@ const SERIAL = [
   'TCGETS2: 0 ispeed=115200 ospeed=115200',
   'unknown 0x5432: EINVAL',
   'TIOCNXCL: 0',
+  'write gone: 4',
+  'removed FIONREAD linux: EIO',
+  'removed FIONREAD wasi: EIO',
+  'removed tcdrain: EIO',
   'close: 0',
 ];
 
@@ -96,6 +111,8 @@ const CONTROL = [
   'setSignals {"break":false}',
   'setSignals {"break":true}',
   'setSignals {"break":false}',
+  'taken 5',
+  'taken 3',
   'flush {"input":true,"output":false}',
   'flush {"input":true,"output":true}',
   'flush {"input":false,"output":true}',
@@ -104,6 +121,7 @@ const CONTROL = [
   frame(921600),
   'flush {"input":true,"output":false}',
   frame(115200),
+  'gone',
   'close',
 ];
 
@@ -120,7 +138,7 @@ export default async function (ctx) {
   const { run, pty, kernel, assert } = ctx;
   const serial = typeof kernel.devices?.add === 'function';
   if (process.env.R44_KERNEL === '1') assert.ok(serial, 'R44_KERNEL=1: this kernel has no kernel.devices');
-  if (serial) await kernel.devices.add({ path: 'ttyUSB0', mode: 0o666, links: ['usb-10c4_ea60-if00'] });
+  if (serial) node = await kernel.devices.add({ path: 'ttyUSB0', mode: 0o666, links: ['usb-10c4_ea60-if00'] });
   const r = await run(serial ? ['r44', '/dev/serial/by-id/usb-10c4_ea60-if00'] : ['r44'], { cwd: '/tmp' });
   assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
   assert.deepEqual(r.stdout.trim().split('\n'), [...(serial ? PIPE_NEW : PIPE_OLD), ...(serial ? SERIAL : []), 'r44 done'], r.stdout);
@@ -130,6 +148,6 @@ export default async function (ctx) {
   const ttyLines = t.out.split(/\r?\n/).map((l) => l.replace(/\r/g, '')).filter((l) => l.startsWith('tty '));
   assert.deepEqual(ttyLines, TTY.map((l) => l.replace('ERR', serial ? 'ENOTTY' : 'EINVAL')), t.out);
   console.log(`r44 (${ctx.variant}, slicc-kernel ${ctx.kernelVersion}): ${serial
-    ? 'on a serial node (kernel.devices with a loopback hook) TIOCMGET/TIOCMSET/TIOCMBIS/TIOCMBIC, TIOCSBRK/TIOCCBRK, TCSBRKP, tcsendbreak, tcdrain, TIOCOUTQ, FIONREAD (0x541B and 1), tcflush and TCFLSH, TCGETS2/TCSETS2/TCSETSW2/TCSETSF2 with BOTHER, TIOCEXCL/TIOCNXCL go through slicc_tty.ioctl and reach the hook; pipes answer ENOTTY, a closed fd EBADF'
+    ? 'on a serial node (kernel.devices with a loopback hook) TIOCMGET/TIOCMSET/TIOCMBIS/TIOCMBIC, TIOCSBRK/TIOCCBRK, TCSBRKP, tcsendbreak, tcdrain (waits for a held write), TIOCOUTQ (5 while held), FIONREAD (0x541B and 1; EIO once the node is removed), tcflush and TCFLSH, TCGETS2/TCSETS2/TCSETSW2/TCSETSF2 with BOTHER, TIOCEXCL/TIOCNXCL go through slicc_tty.ioctl and reach the hook; pipes answer ENOTTY, a closed fd EBADF'
     : 'no slicc_tty.ioctl: the serial requests answer EINVAL as before, FIONREAD polls, tcdrain/tcflush keep their -21 answers'}; on a pty tcdrain, tcflush and tcsendbreak still succeed and FIONREAD is 0`);
 }

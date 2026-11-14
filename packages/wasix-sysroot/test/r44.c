@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #define L_TCSBRK 0x5409
@@ -75,6 +76,12 @@ static void modem(int fd, const char *what) {
   else printf("%s: %s\n", what, err(r));
 }
 
+static long now_ms(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+}
+
 static int wait_bytes(int fd, int want) {
   for (int i = 0; i < 400; i++) {
     int n = -1;
@@ -137,9 +144,15 @@ static void serial(const char *path) {
   printf("tcsendbreak: %s\n", err(tcsendbreak(fd, 0)));
 
   printf("write: %zd\n", write(fd, "hello", 5));
-  printf("tcdrain: %s\n", err(tcdrain(fd)));
   int q = -1;
   int r = ioctl(fd, L_TIOCOUTQ, &q);
+  printf("TIOCOUTQ held: %s %d\n", err(r), q);
+  long t0 = now_ms();
+  r = tcdrain(fd);
+  long waited = now_ms() - t0;
+  printf("tcdrain: %s waited=%d\n", err(r), waited >= 250);
+  q = -1;
+  r = ioctl(fd, L_TIOCOUTQ, &q);
   printf("TIOCOUTQ: %s %d\n", err(r), q);
   printf("FIONREAD linux: %d\n", wait_bytes(fd, 5));
   int n = -1;
@@ -183,6 +196,19 @@ static void serial(const char *path) {
   printf("TCGETS2: %s ispeed=%u ospeed=%u\n", err(r), t2.c_ispeed, t2.c_ospeed);
   printf("unknown 0x5432: %s\n", err(ioctl(fd, 0x5432, &n)));
   printf("TIOCNXCL: %s\n", err(ioctl(fd, L_TIOCNXCL)));
+  printf("write gone: %zd\n", write(fd, "gone", 4));
+  tcdrain(fd);
+  for (int i = 0; i < 100; i++) {
+    struct pollfd pf = {.fd = fd, .events = POLLIN};
+    if (poll(&pf, 1, 10) > 0 && (pf.revents & POLLHUP)) break;
+  }
+  n = -1;
+  r = ioctl(fd, L_FIONREAD, &n);
+  printf("removed FIONREAD linux: %s\n", err(r));
+  n = -1;
+  r = ioctl(fd, FIONREAD, &n);
+  printf("removed FIONREAD wasi: %s\n", err(r));
+  printf("removed tcdrain: %s\n", err(tcdrain(fd)));
   printf("close: %d\n", close(fd));
 }
 
