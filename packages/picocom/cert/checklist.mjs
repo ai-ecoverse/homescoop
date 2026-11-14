@@ -4,13 +4,12 @@ export default async function (ctx) {
 
   const v = await run(['picocom', '--version'], { cwd: '/root' });
   assert.equal(v.status, 0, show(v));
-  assert.match(v.stdout, /^picocom v2024-07\n/, show(v));
-  assert.match(v.stdout, /HIGH_BAUD is enabled/);
-  assert.doesNotMatch(v.stdout, /USE_FLOCK|LINENOISE|USE_CUSTOM_BAUD|UUCP_LOCK_DIR/);
+  assert.equal(v.stdout, 'picocom v2024-07\n', show(v));
 
   const h = await run(['picocom', '--help'], { cwd: '/root' });
   assert.equal(h.status, 0, show(h));
-  assert.match(h.stdout, /Usage is: picocom \[options\] <tty port device>/, show(h));
+  assert.match(h.stdout, /^picocom v2024-07\n\nCompiled-in options:\n  TTY_Q_SZ is 0\n  HIGH_BAUD is enabled\n\nUsage is: picocom \[options\] <tty port device>/, show(h));
+  assert.doesNotMatch(h.stdout, /USE_FLOCK|LINENOISE|USE_CUSTOM_BAUD|UUCP_LOCK_DIR/);
   assert.match(h.stdout, /--<b>aud <baudrate>/);
   assert.match(h.stdout, /--<X>it/);
 

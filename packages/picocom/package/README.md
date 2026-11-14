@@ -35,6 +35,8 @@ picocom's own build flags, no patches:
 - No file transfer: picocom is built with `NO_FORK`, so `C-a C-s` and
   `C-a C-r` do nothing and `--send-cmd`/`--receive-cmd` are refused
   (`Calling external programs is disabled`).
+- picocom's `select()` is the shims' `pselect` (`em-select.c`), which
+  waits in the kernel for the terminal or the port.
 - No lock files (`/var/lock`) and no `flock`: the kernel already keeps a
   node exclusive.
 

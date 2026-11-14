@@ -27,4 +27,8 @@ about:
     second), -DNO_CUSTOM_BAUD (the standard speeds B50 to B4000000 with
     HIGH_BAUD; no termios2 BOTHER speeds), and -DUSE_IOCTL so DTR and
     RTS go through TIOCMBIS/TIOCMBIC as on Linux (emscripten does not
-    define __linux__).
+    define __linux__). em-select.c and -Dselect=homescoop_picocom_select
+    send picocom's select() to the shims' pselect, which waits in the
+    kernel: the shims replace pselect and poll but not select, and
+    Emscripten's own select never blocks, so picocom's main loop took the
+    0 for its idle timeout and exited right after 'Terminal ready'.

@@ -123,12 +123,11 @@ const cases = {
   async 'picocom --help and --version run'({ run }) {
     const v = await run(['picocom', '--version'], { user: 'cone', cwd: '/home/cone' });
     assert.equal(v.status, 0, show(v));
-    assert.match(v.stdout, /^picocom v2024-07\n/);
-    assert.match(v.stdout, /HIGH_BAUD is enabled/);
-    assert.doesNotMatch(v.stdout, /USE_FLOCK|LINENOISE|USE_CUSTOM_BAUD|UUCP_LOCK_DIR/);
+    assert.equal(v.stdout, 'picocom v2024-07\n');
     const h = await run(['picocom', '--help'], { user: 'cone', cwd: '/home/cone' });
     assert.equal(h.status, 0, show(h));
-    assert.match(h.stdout, /Usage is: picocom \[options\] <tty port device>/);
+    assert.match(h.stdout, /HIGH_BAUD is enabled\n\nUsage is: picocom \[options\] <tty port device>/);
+    assert.doesNotMatch(h.stdout, /USE_FLOCK|LINENOISE|USE_CUSTOM_BAUD|UUCP_LOCK_DIR/);
     assert.match(h.stdout, /--<b>aud <baudrate>/);
     const s = await run(['picocom', '--send-cmd', 'sz', '/dev/ttyUSB0'], { user: 'cone', cwd: '/home/cone' });
     assert.notEqual(s.status, 0, show(s));

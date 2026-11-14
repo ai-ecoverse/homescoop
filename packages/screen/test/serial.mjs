@@ -13,13 +13,13 @@ const meta = JSON.parse(readFileSync(join(here, '../cert/meta.json'), 'utf8'));
 const show = (r) => `rc=${r.status}${r.failedStep ? ` stuck at ${JSON.stringify(r.failedStep)}` : ''}\n--- out\n${JSON.stringify(r.out).slice(-1500)}`;
 
 const cases = {
-  async 'sudo screen /dev/ttyUSB0 115200 echoes through the loopback and C-a \\ quits'({ pty, devices }) {
+  async 'sudo screen /dev/ttyUSB0 115200 echoes through the loopback and C-a k kills the window'({ pty, devices }) {
     const r = await pty(['sudo', 'screen', '/dev/ttyUSB0', '115200'], {
       steps: [
         { sleepMs: 3000, write: 'screen-loop\r' },
         { expect: 'screen-loop' },
-        { write: '\x01\\' },
-        { expect: 'Really quit' },
+        { write: '\x01k' },
+        { expect: 'Really kill this window' },
         { write: 'y' },
         { expect: 'screen is terminating' },
       ],

@@ -26,6 +26,7 @@ DEFS=(
   -DNO_FORK
   -DNO_CUSTOM_BAUD
   -DUSE_IOCTL
+  -Dselect=homescoop_picocom_select
 )
 OBJS=(picocom term fdio split custbaud termios2 custbaud_bsd)
 
@@ -37,7 +38,8 @@ echo "== picocom: emcc ${DEFS[*]}"
     emcc -O2 -Wall "${DEFS[@]}" -c "$o.c" -o "$o.o"
   done
   read -ra LINK <<<"$CLI_LDFLAGS"
-  emcc -O2 -o picocom.js "${OBJS[@]/%/.o}" "$SLICC_A" "${LINK[@]}"
+  emcc -O2 -Wall -c "$HOMESCOOP_PKG/em-select.c" -o em-select.o
+  emcc -O2 -o picocom.js "${OBJS[@]/%/.o}" em-select.o "$SLICC_A" "${LINK[@]}"
 )
 test -f "$SRC_DIR/picocom.js"
 test -f "$SRC_DIR/picocom.wasm"
