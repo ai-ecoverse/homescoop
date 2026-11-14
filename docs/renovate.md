@@ -112,6 +112,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 | tar | savannah `tar.git` | |
 | tls-engine | `Mbed-TLS/mbedtls` | tags `mbedtls-X.Y.Z` |
 | tzdata | `data.iana.org/time-zones/releases/` | `custom.tzdata` (html listing, `versioning=loose`): releases are `2026f`; npm gets `2026.6.0-N` (docs/versioning.md) |
+| wasi-quickjs | `quickjs-ng/quickjs` | github-releases, tags `vX.Y.Z` (`extractVersion=^v(?<version>.*)$`) |
 | xxd | `vim/vim` | tags `vX.Y.Z` (vim patch level) |
 | zlib | `madler/zlib` | github-releases |
 

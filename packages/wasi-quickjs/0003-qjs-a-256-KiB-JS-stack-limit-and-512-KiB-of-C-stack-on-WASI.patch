@@ -1,0 +1,38 @@
+Subject: [PATCH] qjs: a 256 KiB JS stack limit and 512 KiB of C stack on WASI
+
+QuickJS checks its stack against a limit in linear memory (1 MiB by
+default, inside upstream's 2 MiB WASI stack), but every C frame also takes
+a frame on the wasm engine's own stack, which is much smaller in a
+browser's process worker and on the stack a suspendable (JSPI) call runs
+on in slicc-kernel's async process host. That stack ran out first: deep
+recursion trapped (RangeError in wasm, the process ended with status 70)
+instead of throwing a catchable RangeError. 512 KiB was still too much
+in Chromium; with a 256 KiB default limit it throws in the browser, on
+Node and in the async host. --stack-size still sets any other. The C
+stack keeps upstream's 2:1 ratio to the limit at 512 KiB, which makes
+the initial memory 1.5 MiB smaller.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -173,7 +173,7 @@
+         _WASI_EMULATED_SIGNAL
+     )
+     add_link_options(
+-        -Wl,-z,stack-size=2097152
++        -Wl,-z,stack-size=524288
+         -lwasi-emulated-process-clocks
+         -lwasi-emulated-signal
+     )
+--- a/qjs.c
++++ b/qjs.c
+@@ -798,6 +798,10 @@
+         JS_SetMemoryLimit(rt, (size_t)memory_limit);
+     if (stack_size >= 0)
+         JS_SetMaxStackSize(rt, (size_t)stack_size);
++#if defined(__wasi__)
++    else
++        JS_SetMaxStackSize(rt, 256 * 1024);
++#endif
+     if (dump_flags != 0)
+         JS_SetDumpFlags(rt, dump_flags);
+     js_std_set_worker_new_context_func(JS_NewCustomContext);
