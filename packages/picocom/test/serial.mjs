@@ -64,15 +64,15 @@ const cases = {
         { write: `${CA}\x14` },
         { expect: 'DTR: down' },
         { write: `${CA}\x16` },
-        { expect: 'DTR: down' },
+        { expect: 'mctl: DTR:0 DSR:1 DCD:1 RTS:1 CTS:1 RI:0' },
         { write: `${CA}\x18` },
         { expect: 'Thanks for using picocom' },
       ],
     });
     assert.equal(r.status, 0, show(r));
     assert.match(r.out, /\*\*\* DTR: down/, show(r));
-    assert.match(r.out, /DSR: up/, 'TIOCMGET answered from control("signals")');
-    assert.match(r.out, /CTS: up/);
+    assert.match(r.out, /\*\*\* dtr: down\r\n\*\*\* rts: up/, show(r));
+    assert.match(r.out, /mctl: DTR:0 DSR:1 DCD:1 RTS:1 CTS:1 RI:0/, 'TIOCMGET: DSR, DCD and CTS from control("signals"), DTR as the kernel last set it');
     const sets = devices.ops('setSignals').map((c) => c.args);
     assert.ok(sets.some((s) => s.dataTerminalReady === false), `setSignals: ${JSON.stringify(sets)}`);
   },
@@ -95,7 +95,7 @@ const cases = {
     assert.equal(devices.ops('open')[0].path, '/dev/ttyUSB0', JSON.stringify(devices.ops('open')));
     const second = await run(['sudo', 'picocom', '-b', '9600', '/dev/ttyUSB0']);
     assert.equal(second.status, 1, show(second));
-    assert.match(second.stderr, /FATAL: cannot open \/dev\/ttyUSB0: Device or resource busy/, show(second));
+    assert.match(second.stderr, /FATAL: cannot open \/dev\/ttyUSB0: Resource busy/, show(second));
     assert.equal(devices.ops('open').length, 1);
     t.write(`${CA}\x18`);
     assert.equal(await t.exited, 0, out);

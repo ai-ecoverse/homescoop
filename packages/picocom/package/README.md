@@ -21,7 +21,7 @@ FATAL: cannot open /dev/ttyUSB0: Permission denied
 ```
 
 A node has one open file description at a time, so a second picocom (or
-`screen`, or pyserial) on the same port gets `Device or resource busy`.
+`screen`, or pyserial) on the same port gets `Resource busy` (EBUSY).
 
 ## What is built in
 

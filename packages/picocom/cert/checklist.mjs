@@ -11,7 +11,7 @@ export default async function (ctx) {
   assert.match(h.stdout, /^picocom v2024-07\n\nCompiled-in options:\n  TTY_Q_SZ is 0\n  HIGH_BAUD is enabled\n\nUsage is: picocom \[options\] <tty port device>/, show(h));
   assert.doesNotMatch(h.stdout, /USE_FLOCK|LINENOISE|USE_CUSTOM_BAUD|UUCP_LOCK_DIR/);
   assert.match(h.stdout, /--<b>aud <baudrate>/);
-  assert.match(h.stdout, /--<X>it/);
+  assert.match(h.stdout, /  --e<X>it\n/);
 
   const send = await run(['picocom', '--send-cmd', 'sz', '/dev/ttyUSB0'], { cwd: '/root' });
   assert.notEqual(send.status, 0, show(send));
