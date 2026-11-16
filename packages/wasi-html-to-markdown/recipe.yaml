@@ -9,6 +9,7 @@ summary: "html-to-markdown 2.5.2 (html2markdown) for slicc WASI preview1 (comman
 source:
   url: "https://github.com/JohannesKaufmann/html-to-markdown/archive/290df46a279e3d7d9011dbbb199658dfcb5ec272.tar.gz"
   sha256: "e892b31ec2cbed8f00b5b146f71a6a7b9e43c2c23cdb602dc9f2b5b870f1a56c"
+  tag: "v{{version}}"
   commit: "290df46a279e3d7d9011dbbb199658dfcb5ec272"
   tree: "74e3aec9b7a44225010193bce8056cf46c981114"
 toolchain:

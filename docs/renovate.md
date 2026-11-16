@@ -45,6 +45,32 @@ placeholders so the tarball URL tracks the bump (libxml2's GNOME path is
 versions in `build.sh` — `homescoop_load_recipe` sets them from the
 recipe.
 
+**Commit-pinned sources follow a tag.** A source pinned to a GitHub commit
+archive (`archive/<40-hex>.tar.gz` with `commit:` and `tree:`, such as
+wasi-yq and wasi-html-to-markdown) can't put `{{version}}` in its URL. It
+names the upstream tag instead, as a template:
+
+```yaml
+source:
+  url: "https://github.com/mikefarah/yq/archive/f2944b82….tar.gz"
+  sha256: "…"
+  tag: "v{{version}}"
+  commit: "f2944b82…"
+  tree: "dfe36c54…"
+```
+
+`refresh-recipe-sha.mjs` fetches that tag (`git:`, or the repo in the URL) and,
+when it names another commit than the one pinned, re-pins first: the commit in
+`url:` and `commit:`, `tree:` (the commit's tree) and the short commit in
+`package/README.md`, printing
+`recipe-sha: REPIN <pkg> <tag> <old>→<new>`; the sha256 refresh then sees a
+changed URL and checks the archive against the new tree. So the printed
+refresh command is all a Renovate bump of such a recipe needs (before, each
+one needed the commit re-pinned by hand: #2061, #2088). It re-pins only a
+commit carried over from the base, and only for a new tag: a tag the base
+pinned to another commit has moved upstream, which fails and writes nothing. `--check` re-pins nothing and fails on a stale pin. `about.notes` is
+not rewritten; update its version and commit by hand.
+
 The PR run downloads the expanded URL and checks the PR branch's `sha256`
 (see above), and also refreshes sha256 in the host-build checkout. A bump whose patches no
 longer apply fails at `homescoop_apply_patches` with a patch error, not
