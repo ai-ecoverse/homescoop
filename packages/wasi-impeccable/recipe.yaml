@@ -84,3 +84,10 @@ about:
     hunk; the wasm-side dependency change itself is unchanged, and the skill
     download's new connect and idle timeouts already exist in wasix-ureq.
     cert/checklist.mjs reads the expected --version from this recipe.
+    0.1.21-1: 0001 rebased onto engine-v0.1.21. The verb router moved from
+    the cli's main.rs into its library (router.rs, run with an
+    InstalledPack), so lib.rs gates only its native browser adapters and
+    router.rs the CDP / listening-socket verbs; 0002's allocator include
+    stays in main.rs. The new agents crate (the agents verb) named its temp
+    files after std::process::id(), which panics on wasm32-wasip1; 0001 uses
+    impeccable_common::process_id() there too (cert/agents.mjs).
