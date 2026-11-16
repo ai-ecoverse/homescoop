@@ -61,6 +61,18 @@ export default async function (ctx) {
   assert.equal(api.status, 0, `${api.stderr}${api.stdout}`)
   assert.equal(api.stdout, `token ${TOKEN}\n`)
 
+  // 0003 leaves these out so gh.wasm fits a Cloudflare Dynamic Worker.
+  for (const [argv, message] of [
+    [['attestation', 'verify'], 'unknown command "attestation" for "gh"'],
+    [['codespace', 'list'], 'unknown command "codespace" for "gh"'],
+    [['copilot'], 'unknown command "copilot" for "gh"'],
+    [['release', 'verify', 'v1'], 'unknown command "verify" for "gh release"'],
+  ]) {
+    const gone = await run(['gh', ...argv], { cwd: home, env })
+    assert.equal(gone.status, 1, `gh ${argv.join(' ')}: ${gone.stderr}`)
+    assert.equal(gone.stderr.split('\n')[0], message)
+  }
+
   const redirected = await run(['gh', 'api', 'https://api.github.com/go'], { cwd: home, env })
   assert.equal(redirected.status, 0, `${redirected.stderr}${redirected.stdout}`)
   assert.equal(redirected.stdout, 'no-authorization\n')

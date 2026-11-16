@@ -39,3 +39,7 @@ about:
     @ai-ecoverse/wasm-git can be the git gh runs.
     The command sets "preopenRoot": true (slicc-kernel >= 1.30.0) so gh can
     walk from a repo up to /.
+    patches/0003-wasip1-slim-for-dynamic-workers.patch leaves out attestation,
+    release verify/verify-asset, codespace, copilot, preview and
+    send-telemetry, and build.sh runs wasm-opt -Oz and fails above 62 MiB,
+    so gh.wasm (49.8 MB) fits a Cloudflare Dynamic Worker (64 MiB of code).
