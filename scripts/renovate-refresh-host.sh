@@ -6,12 +6,12 @@
 # checkout, and always runs main's copy of the scripts.
 #
 #   HOMESCOOP_REFRESH_CLONE=<dir>  the clone (default ~/Library/Caches/homescoop-renovate-refresh/homescoop,
-#                                  or $XDG_CACHE_HOME/… elsewhere)
+#                                  or ${XDG_CACHE_HOME:-~/.cache}/… elsewhere)
 #
 # Prints nothing when no Renovate PR needs a refresh.
 set -euo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
-cache="${XDG_CACHE_HOME:-$HOME/Library/Caches}"
+if [[ "$(uname -s)" == Darwin ]]; then cache="${XDG_CACHE_HOME:-$HOME/Library/Caches}"; else cache="${XDG_CACHE_HOME:-$HOME/.cache}"; fi
 clone="${HOMESCOOP_REFRESH_CLONE:-$cache/homescoop-renovate-refresh/homescoop}"
 if [[ ! -d "$clone/.git" ]]; then
   mkdir -p "$(dirname "$clone")"
