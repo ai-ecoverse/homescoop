@@ -1,0 +1,36 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasm-grep",
+    "@ai-ecoverse/wasm-sed"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15",
+    "@ai-ecoverse/wasm-grep@3.12.0-8",
+    "@ai-ecoverse/wasm-sed@4.10.0-6"
+  ],
+  "patches": {
+    "0001-speed-loops-watch-the-clock.patch": "openssl speed's loops also check a CLOCK_MONOTONIC deadline every 16 rounds, since the kernel delivers SIGALRM only at a system call: test/kernel.mjs 'speed ends on its own' and cert/checklist.mjs's speed row"
+  },
+  "ci": [
+    "node packages/wasix-openssl-cli/test/kernel.mjs --tarball .homescoop-out/package.tgz"
+  ],
+  "checklist": [
+    "cert/checklist.mjs (browser, users enforce, as a new user): openssl version -a is 3.5.9 with the pinned 'built on: Tue Sep 29 14:10:08 2026 UTC', platform linux-generic32, OPENSSLDIR /etc/ssl; a P-256 CA and an RSA-2048 leaf from genpkey/req -x509/x509 -req, x509 -text -noout shows issuer, key size and the SAN; verify -CAfile -verify_hostname is OK and another CA is error 20 (rc 2); asn1parse, dgst -sha256 and base64 give the known answers; a Mozilla root verifies from SSL_CERT_DIR (slicc.env) and there are 1xx of them; s_server -rev and s_client on localhost: TLS 1.3 TLS_AES_256_GCM_SHA384, Verify return code 0, the line comes back reversed, both rc 0; s_client -verify_return_error against a CA that signed nothing is 'verify error:num=20'; s_client to 93.184.216.34:443 is 'BIO_connect:Network unreachable' and to example.com 'Name does not resolve', both rc 1 within 15 s; speed -seconds 1 ends (0001); genpkey -aes-256-cbc on a pty prompts twice, doesn't echo, and the key opens with the pass phrase",
+    "test/kernel.mjs (the ci command), each case on createNodeKernel() and on createNodeKernel({ blocking: 'async', emscripten: 'kernel' }) (the runtime a Cloudflare Durable Object runs: no second thread), users enforce, as a new user, slicc-kernel 1.186.0: version -a and list -providers (default active), list -disabled starts with ENGINE and keeps SOCK, TLS1_3, EC, DTLS, OCSP and CMS",
+    "test/kernel.mjs: genpkey (EC P-256, RSA-2048, Ed25519, ML-DSA-65, P-384 with -aes256), req -x509 -addext, x509 -req -CA -extfile, x509 -text -noout (curve, basic constraints, SAN, signature algorithm), -fingerprint -sha256; verify OK, -verify_hostname OK and a wrong name error 62, another CA error 20, both rc 2",
+    "test/kernel.mjs: asn1parse, pkey -pubout/-text, req -text, dgst -sign/-verify (Verified OK, a tampered file 'Verification failure' rc 1), dgst -sha256 -r and -sha3-256 known answers, base64 both ways, enc -aes-256-cbc -pbkdf2 round trip, rand -hex, PEM/DER, pkcs12 -export and back (2 certificates), storeutl, dgst -md4 with the legacy provider",
+    "test/kernel.mjs: every one of the 121 files in etc/ssl/certs is named by the subject hash the built openssl computes (-subject_hash), one per certificate of etc/ssl/cert.pem; a root verifies with the package's SSL_CERT_DIR and is error 18 (self-signed) with SSL_CERT_DIR=/nonexistent",
+    "test/kernel.mjs: speed -seconds 1 sha256 and ecdsap256 end on their own, under 15 s (0001); NEGATIVE.md: without 0001 'timeout 20 openssl speed -seconds 1 -bytes 1024 sha256' is killed at 20 s (rc 124)",
+    "test/kernel.mjs: s_server -naccept 2 -rev on localhost:4433 with s_client -verify_return_error -showcerts (TLS 1.3, the chain, Verify return code 0, the line reversed) and a -tls1_2 client (ECDHE-RSA-AES256-GCM-SHA384), all rc 0 and the server's '2 server accepts that finished'; a CA that signed nothing is 'verify error:num=20' rc 1",
+    "test/kernel.mjs on a pty: genpkey -aes-256-cbc prompts 'Enter PEM pass phrase:' and 'Verifying - \u2026', doesn't echo, the key opens with it and not with another (rc 1); s_client -quiet typed to s_server -www: both verify lines, 'HTTP/1.0 200 ok' and the cipher list",
+    "test/kernel.mjs without a network: s_client to 93.184.216.34:443 is 'BIO_connect:Network unreachable \u2026 calling connect()' and 'connect:errno=', to example.com 'BIO_lookup_ex \u2026 Name does not resolve', both rc 1 within 10 s",
+    "test/kernel.mjs, memory: genpkey RSA-4096, req -x509 with it, x509 -text of cert.pem, crl2pkcs7 of the 121 roots, pkcs7 -print_certs -text, dgst -sha512 of 4 MB and speed aes-256-gcm each keep VmSize at the 16 MiB initial memory (no memory.grow)",
+    "test/kernel.mjs with the uplink: s_client -connect tls.test:443 -servername tls.test -showcerts -verify_return_error: 'Connecting to 93.184.216.34', the chain, Verify return code 0, 'echo:ping' back from the host server, the uplink dialled 93.184.216.34:443 and the server saw SNI tls.test; tls.test:444 is 'Connection refused', 198.51.100.7 (not routed) 'Network unreachable', nothere.test 'Name does not resolve'"
+  ],
+  "network": "No uplink in the browser cert: s_client to an outer address is ENETUNREACH and a public name doesn't resolve, as on an agent's computer in a Durable Object today. test/kernel.mjs adds a kernel whose fakeUplink-shaped uplink resolves tls.test to 93.184.216.34 and dials 93.184.216.34:443 to a Node TLS server on this machine (its key and certificate made by the package in the first kernel); port 444 refuses, other addresses aren't routed."
+}

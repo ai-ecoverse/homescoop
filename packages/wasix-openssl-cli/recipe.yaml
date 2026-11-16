@@ -1,0 +1,57 @@
+# The openssl command for slicc WASIX: OpenSSL's apps/openssl, built from
+# source without threads, engines or dynamic loading, so it runs where the
+# kernel has none of them (a Cloudflare Durable Object's Dynamic Workers).
+# wasix-openssl stays the dev package (static libraries, headers); this one
+# is the command.
+name: wasix-openssl-cli
+builder: host
+# renovate: datasource=github-releases depName=openssl/openssl extractVersion=^openssl-(?<version>3\.5\.\d+)$
+version: "3.5.9"
+npm: "@ai-ecoverse/wasix-openssl-cli"
+summary: "OpenSSL 3.5.9's openssl command for slicc WASIX: x509, req, verify, s_client, s_server and the rest, without threads"
+reproducible: true
+source:
+  url: "https://github.com/openssl/openssl/releases/download/openssl-{{version}}/openssl-{{version}}.tar.gz"
+  sha256: "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
+sources:
+  # Mozilla's root store as curl publishes it, for etc/ssl/cert.pem and the
+  # hashed etc/ssl/certs/ (SSL_CERT_DIR). The same pin as tls-engine's roots.
+  roots:
+# renovate: datasource=custom.curl-cacert depName=curl-cacert versioning=regex:^(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})$ extractVersion=^cacert-(?<version>\d{4}-\d{2}-\d{2})\.pem$
+    version: "2026-09-25"
+    url: "https://curl.se/ca/cacert-{{version}}.pem"
+    sha256: "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505"
+  mpl:
+    version: "3.27.0"
+    url: "https://raw.githubusercontent.com/spdx/license-list-data/v{{version}}/text/MPL-2.0.txt"
+    sha256: "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+notices:
+  not_linked:
+    mpl: "the MPL-2.0 text itself, which THIRD-PARTY-NOTICES.md carries under the roots' section"
+toolchain:
+  wasix_sysroot: "2025.9.30-44"
+  wasix_sysroot_sha256: "baccd02c2914f1378889d308eb6d805d60637ee16e693100fcb7d22cddbbf240"
+wasm:
+  initial-memory: 16MiB
+  measured-peak: 10MiB
+  measured-by: "VmSize of each openssl process polled from /proc/<pid>/status (one thread, so the allocating thread's own view), on a build of 3.5.9-1's configuration linked without --initial-memory (9 MiB, 8 MiB of it the stack), slicc-kernel 1.186.0 on Node: crl2pkcs7 of the 121 roots and pkcs7 -print_certs -text of the result 9.9 MiB, verify -CAfile cert.pem 9.8 MiB, req -x509 with an SLH-DSA-SHA2-256f key 9.6 MiB, req -x509 with an RSA-4096 key 9.5 MiB, genpkey ML-DSA-87 9.4 MiB, genpkey RSA-4096 9.4 MiB, dhparam 2048 9.3 MiB, dgst -sha512 and enc -aes-256-gcm of 4 MB 9.2 MiB, base64 of it and version 9.1 MiB. At 16 MiB, test/kernel.mjs checks that none of its largest jobs grows the memory"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://www.openssl.org/
+  license: Apache-2.0 AND MPL-2.0
+  notes: |
+    Configure linux-generic32 with wasixcc on wasix-sysroot 2025.9.30-44
+    (static-main, no wasm exceptions, no PIC, no asyncify): no-threads
+    no-shared no-dso no-engine no-async no-asm no-secure-memory no-afalgeng
+    no-tests no-docs. -DHAVE_FORK=0 (no speed -multi, no ocsp -multi), and
+    -DNO_RECVMMSG -DNO_RECVMSG so BIO_dgram takes recvfrom (WASIX has no
+    CMSG macros). The module imports no thread_spawn, and its memory is
+    the recipe's 16 MiB. patches/0001: speed's loops also watch the clock,
+    since the kernel delivers SIGALRM only at a system call. The package
+    ships upstream's apps/openssl.cnf (OPENSSL_CONF) and Mozilla's roots
+    from curl's cacert-2026-09-25.pem as one bundle (etc/ssl/cert.pem) and a
+    hashed directory (etc/ssl/certs, SSL_CERT_DIR), so s_client and verify
+    trust public CAs as well as the kernel's SSL_CERT_FILE.

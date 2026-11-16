@@ -1,0 +1,61 @@
+--- a/apps/speed.c
++++ b/apps/speed.c
+@@ -148,6 +148,46 @@
+ 
+ #ifdef SIGALRM
+ 
++#if defined(__wasi__)
++/*
++ * homescoop wasix-openssl-cli: slicc's kernel delivers a signal to a WASIX
++ * program at its next system call, and a benchmark loop makes none, so
++ * SIGALRM alone would never end it. The loops also watch the clock, every
++ * 16 rounds. The rate still comes from app_tminterval, so a loop that ends
++ * a little after the alarm counts its extra rounds.
++ */
++#include <time.h>
++static int speed_armed = 0;
++static struct timespec speed_deadline;
++
++static unsigned int speed_alarm(unsigned int secs)
++{
++    speed_armed = secs != 0;
++    if (speed_armed) {
++        clock_gettime(CLOCK_MONOTONIC, &speed_deadline);
++        speed_deadline.tv_sec += secs;
++    }
++    return alarm(secs);
++}
++
++static int speed_expired(void)
++{
++    struct timespec now;
++
++    if (!speed_armed)
++        return 0;
++    clock_gettime(CLOCK_MONOTONIC, &now);
++    if (now.tv_sec > speed_deadline.tv_sec
++        || (now.tv_sec == speed_deadline.tv_sec
++            && now.tv_nsec >= speed_deadline.tv_nsec))
++        run = 0;
++    return !run;
++}
++
++#define alarm speed_alarm
++#define SPEED_EXPIRED(n) (((n) & 15) == 0 && speed_expired())
++#endif
++
+ static void alarmed(ossl_unused int sig)
+ {
+     signal(SIGALRM, alarmed);
+@@ -588,7 +628,10 @@
+ static char *sigs_algname[MAX_SIG_NUM] = { NULL };
+ static double sigs_results[MAX_SIG_NUM][3]; /* keygen, sign, verify */
+ 
+-#define COND(unused_cond) (run && count < (testmode ? 1 : INT_MAX))
++#ifndef SPEED_EXPIRED
++#define SPEED_EXPIRED(n) 0
++#endif
++#define COND(unused_cond) (run && count < (testmode ? 1 : INT_MAX) && !SPEED_EXPIRED(count))
+ #define COUNT(d) (count)
+ 
+ #define TAG_LEN 16 /* 16 bytes tag length works for all AEAD modes */
