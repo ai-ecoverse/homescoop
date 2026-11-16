@@ -9,6 +9,7 @@ summary: "yq 4.54.3 for slicc WASI preview1 (command yq)"
 source:
   url: "https://github.com/mikefarah/yq/archive/f2944b823f84906a127dbd29e4c2a3e60c4e550e.tar.gz"
   sha256: "785a5fa7a35db485d9769c838c5558fec24db772176d7c897ad48c715f4805a7"
+  tag: "v{{version}}"
   commit: "f2944b823f84906a127dbd29e4c2a3e60c4e550e"
   tree: "dfe36c54e8239e4e733f029982bd0c2c19d46c5e"
 toolchain:
