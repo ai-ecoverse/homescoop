@@ -13,9 +13,9 @@ can reach them, or the wasi-libc malloc Rust links does.
 
 --- a/crates/cli/src/main.rs
 +++ b/crates/cli/src/main.rs
-@@ -14,6 +14,12 @@
- #[cfg(not(target_family = "wasm"))]
- mod font_render;
+@@ -11,6 +11,12 @@
+ 
+ use impeccable_common::Io;
  
 +// homescoop#1287: threaded wasm takes homescoop's allocator refresh
 +// (scripts/rust-wasm-refresh-alloc.rs) against V8's stale per-thread memory
@@ -23,6 +23,6 @@ can reach them, or the wasi-libc malloc Rust links does.
 +#[cfg(target_family = "wasm")]
 +include!(env!("HOMESCOOP_WASM_ALLOC_RS"));
 +
- pub const VERSION: &str = env!("CARGO_PKG_VERSION");
- 
- #[cfg(target_family = "wasm")]
+ fn main() {
+     let args: Vec<String> = std::env::args().skip(1).collect();
+     let mut io = Io::stdio();
