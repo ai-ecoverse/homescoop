@@ -1,0 +1,56 @@
+{
+  "name": "@ai-ecoverse/wasix-openssl-cli",
+  "version": "3.5.9-1",
+  "description": "OpenSSL 3.5.9's openssl command: inspect and make certificates and keys, and talk TLS with s_client and s_server.",
+  "license": "Apache-2.0 AND MPL-2.0",
+  "engines": {
+    "slicc-kernel": ">=1.186.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-openssl-cli/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-openssl-cli",
+  "keywords": [
+    "wasm",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "openssl",
+    "tls",
+    "x509",
+    "s_client"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "SOURCES.md",
+    "bin",
+    "etc",
+    "licenses",
+    "patches"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasix-openssl-cli",
+    "upstream": "3.5.9",
+    "roots": "curl cacert-2026-09-25.pem",
+    "sysroot": "@ai-ecoverse/wasix-sysroot@2025.9.30-44"
+  },
+  "slicc": {
+    "abi": "wasi",
+    "env": {
+      "OPENSSL_CONF": "etc/ssl/openssl.cnf",
+      "SSL_CERT_DIR": "etc/ssl/certs"
+    },
+    "commands": {
+      "openssl": {
+        "wasm": "bin/openssl.wasm"
+      }
+    }
+  }
+}

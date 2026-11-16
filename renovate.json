@@ -58,7 +58,7 @@
       ]
     },
     "curl-cacert": {
-      "description": "curl's dated extracts of Mozilla's CA certificate store (cacert-YYYY-MM-DD.pem), for tls-engine's roots.der. A bump also needs the sha256 in packages/tls-engine/recipe.yaml and slicc.tls.roots in its package.json; the build fails closed until both match.",
+      "description": "curl's dated extracts of Mozilla's CA certificate store (cacert-YYYY-MM-DD.pem), for tls-engine's roots.der and wasix-openssl-cli's etc/ssl. A bump also needs the sha256 in packages/tls-engine/recipe.yaml and slicc.tls.roots in its package.json, and in packages/wasix-openssl-cli/recipe.yaml and homescoop.roots in its package.json (with its next -N); each build fails closed until they match.",
       "defaultRegistryUrlTemplate": "https://curl.se/docs/caextract.html",
       "format": "html"
     }
