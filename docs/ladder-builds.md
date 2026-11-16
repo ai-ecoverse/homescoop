@@ -362,6 +362,11 @@ so a codeload zip URL without an extension works. ladder-build passes the base a
 `RECIPE_SHA_BASE`, not as an argument, because the job runs the branch's own
 script and older ones would take an argument as a package name. It prints `source-tree: PASS|FAIL …`.
 
+A commit-pinned source that follows an upstream tag also pins `tag:` (a
+template, `v{{version}}`); a version bump then re-pins `url:`, `commit:` and
+`tree:` to the tag's commit before the sha256 refresh
+([renovate.md](renovate.md), "Commit-pinned sources follow a tag").
+
 A changed sha256 for an unchanged URL whose archive matches `tree:` is a re-roll.
 GitHub regenerates archives, and it can serve another gzip of the same commit on
 most runs (#1491's llvm-project archive).

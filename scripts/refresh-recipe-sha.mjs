@@ -9,6 +9,9 @@
  *   node scripts/refresh-recipe-sha.mjs py-numpy --verify-repack
  *   node scripts/refresh-recipe-sha.mjs llvm-emscripten --reroll [--base origin/main]
  *
+ * A source with `tag:` (e.g. `v{{version}}`) that pins a commit is re-pinned
+ * to the commit the tag names first, when the version moved (repinTag).
+ *
  * A pin is rewritten only when its resolved URL differs from the one at the
  * merge-base with --base (default origin/main, or RECIPE_SHA_BASE). New bytes
  * for an unchanged URL fail (#1267), unless the source pins `tree:`, the
@@ -299,14 +302,117 @@ function readAllowlist(path) {
   return out;
 }
 
+/** Run git for a tag re-pin (no user/system config, no prompts). */
+const gitEnv = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0' };
+
+/** { commit, tree } that tag names in repo (an annotated tag is peeled), or null when there is no such tag. */
+function resolveTag(repo, tag) {
+  const dir = mkdtempSync(join(tmpdir(), 'homescoop-tag-'));
+  try {
+    const git = (...a) => execFileSync('git', [`--git-dir=${dir}`, ...a], { encoding: 'utf8', env: gitEnv, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    git('init', '-q', '--bare');
+    try {
+      git('fetch', '-q', '--depth=1', '--no-tags', repo, `+refs/tags/${tag}:refs/tags/${tag}`);
+    } catch (e) {
+      const msg = String(e?.stderr || e?.message || e);
+      if (/couldn't find remote ref|not our ref|no such ref/i.test(msg)) return null;
+      throw new Error(`git fetch ${repo} refs/tags/${tag}: ${msg.trim().split('\n').pop()}`);
+    }
+    return { commit: git('rev-parse', `refs/tags/${tag}^{commit}`), tree: git('rev-parse', `refs/tags/${tag}^{tree}`) };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * source.tag (sources.<key>.tag): the upstream tag a commit-pinned source
+ * follows, a template like its url (`v{{version}}`). Renovate bumps only
+ * `version:`, so the url, commit and tree still name the old release's commit
+ * (wasi-yq #2061, #2088). When the tag names another commit, re-pin: the old
+ * commit becomes the tag's in recipe.yaml (url, commit:) and tree: the
+ * commit's tree; in package/README.md, whose version text
+ * sync-package-version.mjs rewrites, its 7-hex short form too (written with
+ * the recipe). about.notes is left alone, like its version text. The sha256
+ * refresh that follows then sees a changed url and checks the archive against
+ * the new tree.
+ *
+ * Only a commit carried over from the base is re-pinned, and only for a new
+ * tag: the same tag naming another commit than the base pinned means it moved
+ * upstream, which fails. With --check (or mismatches) it re-pins nothing.
+ * Returns { text, src, swap } re-pinned, or null when the pin is already the tag's.
+ */
+function repinTag({ name, job, label, src, version, text, check, mismatches }) {
+  if (!src.tag) return null;
+  const tag = expandUrl(src, version, src.tag);
+  const gh = githubArchive(expandUrl(src, version));
+  const repo = String(src.git || gh?.repo || '');
+  const pinned = String(src.commit || gh?.commit || '');
+  if (!repo || !/^[0-9a-f]{40}$/.test(pinned)) {
+    throw new Error(`${label}.tag needs a GitHub archive URL of a commit, or ${label}.git and ${label}.commit`);
+  }
+  if (!String(src.url).includes(pinned)) throw new Error(`${label}.tag needs ${label}.url to name the pinned commit ${pinned}`);
+  const got = resolveTag(repo, tag);
+  if (!got) throw new Error(`${label}.tag ${tag} is not a tag of ${repo}`);
+  if (got.commit === pinned) {
+    console.log(`   tag ${tag}: ${pinned} (pinned)`);
+    return null;
+  }
+  const moved = `${label}.tag ${tag} of ${repo} names ${got.commit}, the recipe pins ${pinned}`;
+  if (mismatches) {
+    mismatches.push(moved);
+    return null;
+  }
+  if (check) throw new Error(`${moved}. Re-pin it with refresh-recipe-sha.mjs ${name}.`);
+  const base = baseRecipe(name, { tip: true });
+  const baseJob = base && sourceJobs(base).find((j) => j.key === job.key);
+  let baseCommit = '';
+  let baseTag = '';
+  if (baseJob) {
+    try {
+      const baseVersion = String(base.version || '');
+      baseCommit = String(baseJob.src.commit || githubArchive(expandUrl(baseJob.src, baseVersion))?.commit || '');
+      baseTag = expandUrl(baseJob.src, baseVersion, baseJob.src.tag || src.tag);
+    } catch {
+      /* a base url or tag that doesn't expand: treated as no base pin */
+    }
+  }
+  if (baseCommit !== pinned) {
+    throw new Error(
+      `${moved}, and this branch set that commit (${baseRef} pins ${baseCommit || '(none)'}). ` +
+        'Only a commit carried over from the base is re-pinned. Nothing was written.'
+    );
+  }
+  if (baseTag === tag) {
+    throw new Error(
+      `${moved}, but ${baseRef} pins ${pinned} for the same tag, so the tag moved upstream. ` +
+        'Nothing was written; find out why before changing the pin.'
+    );
+  }
+  const short = (c) => c.slice(0, 7);
+  const full = (t) => t.split(pinned).join(got.commit);
+  const swap = (t) => full(t).replace(new RegExp(`\\b${short(pinned)}\\b`, 'g'), short(got.commit));
+  let out = full(text);
+  const next = { ...src, url: String(src.url).split(pinned).join(got.commit), commit: src.commit ? got.commit : src.commit };
+  if (src.tree) {
+    const oldTree = String(src.tree);
+    if (!out.includes(oldTree)) throw new Error(`${label}.tree ${oldTree} is not in recipe.yaml`);
+    out = out.split(oldTree).join(got.tree);
+    next.tree = got.tree;
+  }
+  console.log(`   tag ${tag}: re-pin ${pinned} → ${got.commit}${src.tree ? ` (tree ${src.tree} → ${got.tree})` : ''}`);
+  console.log(`recipe-sha: REPIN ${name}${job.key ? `/${job.key}` : ''} ${tag} ${pinned}→${got.commit}`);
+  return { text: out, src: next, swap };
+}
+
 function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {}) {
   const recipe = recipeJson(name);
   const path = join(root, 'packages', name, 'recipe.yaml');
   let text = readFileSync(path, 'utf8');
   const version = String(recipe.version || '');
+  const swaps = [];
 
   for (const job of sourceJobs(recipe)) {
-    const src = job.src;
+    let src = job.src;
     const label = job.key ? `sources.${job.key}` : 'source';
     let url;
     try {
@@ -322,6 +428,13 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
     if (String(src.sha256 || '') === 'skip') {
       console.log(`skip ${name}${job.key ? '/' + job.key : ''}: sha256 skip (prebuilt, not fetched)`);
       continue;
+    }
+    const repinned = repinTag({ name, job, label, src, version, text, check, mismatches });
+    if (repinned) {
+      text = repinned.text;
+      src = repinned.src;
+      url = expandUrl(src, version);
+      swaps.push(repinned.swap);
     }
     console.log(`== ${name}${job.key ? ' sources.' + job.key : ''}: ${url}`);
     const mirrors = mirrorsOf(src, version, label);
@@ -435,7 +548,15 @@ function refreshOne(name, { check = checkOnly, why = '', mismatches = null } = {
     }
   }
 
-  if (!check) writeFileSync(path, text);
+  if (check) return;
+  writeFileSync(path, text);
+  // A re-pin also names the new commit in package/README.md (repinTag).
+  const readme = join(root, 'packages', name, 'package', 'README.md');
+  if (swaps.length && existsSync(readme)) {
+    const was = readFileSync(readme, 'utf8');
+    const now = swaps.reduce((t, swap) => swap(t), was);
+    if (now !== was) writeFileSync(readme, now);
+  }
 }
 
 const allowlist = readAllowlist(join(root, 'scripts/recipe-sha-allowlist.txt'));
