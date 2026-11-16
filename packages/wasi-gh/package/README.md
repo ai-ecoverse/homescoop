@@ -7,13 +7,26 @@ starts the commands it runs. The `gh` command sets `"preopenRoot": true`, so
 the kernel preopens `/` and gh can walk up from a repository to find `.git`.
 
 `bin/gh.wasm` is built by homescoop from gh's source (v2.102.0, commit
-`fc4b137`) with Go 1.27.1 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 -trimpath`)
-and `patches/0001-wasip1-slicc-host.patch` plus
-`patches/0002-wasip1-gh-browser.patch`, so it is not an upstream gh
-release. The patches stub terminals and file locks for wasip1, copy text
-through `pbcopy` or `xclip` when one of those is on `PATH`, and route
-`http.DefaultTransport` (what go-gh uses) and commands started through gh's
-`internal/run` helper to the host module.
+`fc4b137`) with Go 1.27.1 (`GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 -trimpath`),
+`patches/0001-wasip1-slicc-host.patch`,
+`patches/0002-wasip1-gh-browser.patch` and
+`patches/0003-wasip1-slim-for-dynamic-workers.patch`, then `wasm-opt -Oz`,
+so it is not an upstream gh release. The patches stub terminals and file
+locks for wasip1, copy text through `pbcopy` or `xclip` when one of those is
+on `PATH`, route `http.DefaultTransport` (what go-gh uses) and commands
+started through gh's `internal/run` helper to the host module, and leave out
+the commands listed below.
+
+On slicc-kernel's Cloudflare kernel (`createCloudflareKernel`), gh runs in a
+Dynamic Worker, and the kernel calls the host module's `createAsyncImports`,
+whose `gh_host.call` is async, so JSPI suspends gh.wasm while a request is
+answered. That needs slicc-kernel ≥ 1.187.0, which loads imports modules
+in Dynamic Workers.
+A Dynamic Worker takes at most 64 MiB of code; gh.wasm is about 50 MB, and
+`build.sh` fails a build over 62 MiB. HTTP still goes through the kernel's
+network, so the embedder's transport sees every request (and the
+`Authorization: token …` that `GH_TOKEN` gives), and can put a real token in
+place of a placeholder.
 
 In seven, use `GH_TOKEN` from the vault. `gh auth login` stores a
 plain-text token under `GH_CONFIG_DIR`, which is not how seven keeps
@@ -60,7 +73,12 @@ On slicc-kernel, with the host module:
   one-time code after the copy fails.
 - The OS keyring. A successful `gh auth login` stores the token in plain
   text under `GH_CONFIG_DIR`. Pass `GH_TOKEN` to skip login.
-- SSH, codespaces, `gh copilot`, and extensions that are native binaries.
+- SSH, and extensions that are native binaries.
+- Not in this build (`patches/0003`): `gh attestation`, `gh release verify`
+  and `verify-asset`, `gh codespace`, `gh copilot`, `gh preview` and
+  `gh send-telemetry`. They need sigstore and TUF, SSH and gRPC, or a
+  native binary, and without them gh.wasm is 49.8 MB instead of 70.6 MB
+  (after `wasm-opt -Oz`), small enough for a Cloudflare Dynamic Worker.
 - A git credential helper that has to start `gh` again from inside
   `@ai-ecoverse/wasm-git`. Cloning a private repository over HTTPS needs git's
   own credentials, or a public URL.

@@ -55,3 +55,22 @@ vendor/github.com/in-toto/in-toto-golang/in_toto/util_unix.go:9:32: undefined: u
 `0002-wasip1-gh-browser.patch` is not reachable until this build succeeds.
 Without its `internal/authflow` hunk, a piped `gh auth login -w` only prints
 the URL and does not start `GH_BROWSER`.
+
+## Patch removed (`0003-wasip1-slim-for-dynamic-workers.patch`)
+
+**Date:** 2026-11-16
+
+The same build with `0001` and `0002` only. `wasm-opt -Oz` takes gh.wasm from
+78,474,507 to 70,597,114 bytes, and `build.sh` fails its size check, so no
+package is made:
+
+```text
+== wasi-gh: wasm-opt version 132 -Oz --strip-debug --enable-sign-ext --enable-nontrapping-float-to-int --enable-bulk-memory --enable-mutable-globals
+== wasi-gh: wasm-opt 78474507 -> 70597114 bytes
+homescoop: gh.wasm is 70597114 bytes, over 65011712: too large for a Cloudflare Dynamic Worker
+```
+
+That is the limit slicc-kernel's Cloudflare kernel meets. With 2.102.0-2
+(78 MB), its Dynamic Worker fails with `Dynamic Worker code size (78982007
+bytes) exceeds the maximum allowed size of 67108864 bytes.`, in `wrangler dev`
+and deployed. With the patch, gh.wasm is 49,761,975 bytes.
