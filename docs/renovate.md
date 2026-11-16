@@ -28,12 +28,46 @@ head's runs waiting for "Approve and run"). A stale branch fails with one
 machine-readable line per package,
 `recipe-sha: FAIL <pkg>: needs refresh: node scripts/refresh-recipe-sha.mjs <pkg> && node scripts/sync-package-version.mjs <pkg> --write && node scripts/readme-table.mjs --write`,
 plus `recipe-sha: FAIL README.md: needs refresh: node scripts/readme-table.mjs --write`
-when only the root table is stale. For a Renovate PR the homescoop
-coordinator's automation acts on those lines: it runs main's scripts on the
-branch and pushes as a user, so the PR's run starts normally; anyone else runs the
-printed command and pushes. A refreshed PR then carries the new version
-everywhere; `check-package-meta.mjs` fails the build when any text still names
-the old one (docs/versioning.md, "Upstream versions in text").
+when only the root table is stale. Anyone can run the printed command and
+push. A refreshed PR then carries the new version everywhere;
+`check-package-meta.mjs` fails the build when any text still names the old one
+(docs/versioning.md, "Upstream versions in text").
+
+### The refresh
+
+For Renovate PRs no person or agent has to act on those lines:
+[`scripts/renovate-refresh.mjs`](../scripts/renovate-refresh.mjs) does it, run
+by `scripts/renovate-refresh-host.sh` (its own clone, main's scripts) from a bb
+script automation on Lars's host every 15 minutes. It pushes with that host's
+git credentials, so the PR's runs start normally; the Mend-hosted Renovate app
+runs no `postUpgradeTasks`, and a `GITHUB_TOKEN` push starts none. Before it,
+the refresh waited for the coordinator agent, and bumps stalled for days when
+it was down (#2083, #2085 and #2087 in November 2026).
+
+It picks an open PR by Renovate (not a draft, not from a fork, on a
+`renovate/` branch) that changes only `packages/*/recipe.yaml`, whose commits
+are all Renovate's and whose `recipe-sha` check failed on that head. For each,
+in a temporary worktree, it rebases onto main (so the branch's own scripts,
+which the `recipe-sha` job runs, are main's), runs the printed command for each
+touched recipe with `RECIPE_SHA_BASE=origin/main`, and commits only
+`packages/<pkg>/recipe.yaml`, `package/package.json`, `package/README.md` and
+`README.md` as `renovate-refresh@homescoop.invalid` (in `gitIgnoredAuthors`, so
+Renovate keeps rebasing the branch; a Renovate rebase drops the commit and the
+next run writes it again). It pushes with `--force-with-lease` against the head
+it read, so a push that races Renovate or a queued PR is refused and retried
+later.
+
+Anything that isn't mechanical stays with a person or the coordinator: a draft
+(a held bump such as #1932), a head with any commit not by Renovate (hand work
+or an earlier refresh), a rebase conflict, a refresh that fails (patches that no
+longer apply show up later, in host-build; here: a tag that moved, bytes that
+changed under an unchanged URL, a missing download), or a change outside those
+files. A failed refresh gets one PR comment per head
+(`<!-- homescoop:renovate-refresh -->`, the reason and the log's tail) and
+nothing is pushed. Run it by hand with
+`node scripts/renovate-refresh.mjs [--pr <n>] [--dry-run]`;
+`scripts/test/renovate-refresh.test.mjs` covers the choice and a refresh
+against a local origin.
 
 Manual publish of a merged recipe whose push published nothing: `gh workflow run ladder-build.yml -f packages=zlib`.
 
