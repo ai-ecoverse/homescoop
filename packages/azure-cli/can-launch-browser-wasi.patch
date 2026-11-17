@@ -1,0 +1,23 @@
+az login on wasix-python: no browser, so the device code flow (homescoop#2112).
+
+azure-cli-core's can_launch_browser() believes any platform but Linux has a
+browser, and on WASI (platform.system() is 'wasi' in slicc's wasix-python)
+plain `az login` then says "A web browser has been opened", starts MSAL's
+localhost redirect listener and waits for a redirect that never comes.
+Checked like Linux, webbrowser.get() finds no browser there, and az falls
+back to `az login --use-device-code` by itself, as it does on a headless
+Linux. Applied by build.sh to the installed azure-cli-core.
+
+--- a/azure/cli/core/util.py
++++ b/azure/cli/core/util.py
+@@ -844,8 +844,8 @@
+     import webbrowser
+     platform_name, _ = _get_platform_info()
+ 
+-    if platform_name != 'linux':
+-        # Only Linux may have no browser
++    if platform_name not in ('linux', 'wasi'):
++        # Only Linux and WASI (slicc's wasix-python) may have no browser
+         return True
+ 
+     # Using webbrowser to launch a browser is the preferred way.

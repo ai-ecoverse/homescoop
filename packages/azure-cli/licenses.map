@@ -1,0 +1,29 @@
+# License texts for the distributions whose wheel ships none (homescoop#2112).
+# build.sh hands them to src/install.py, which writes each into its own
+# section of THIRD-PARTY-NOTICES.md. The build fails for a distribution in
+# wheels.lock with no license file in its .dist-info and no line here, for a
+# line whose version isn't the lock's (check the text again after a bump), and
+# for a line the lock doesn't need.
+#
+# <distribution> <version> <SPDX license> <text: sources.<key> of recipe.yaml, or tree:<path under lib/azure-cli>>
+antlr4-python3-runtime 4.13.1 BSD-3-Clause sources.license_antlr4
+asn1crypto 0.24.0 MIT sources.license_asn1crypto
+isodate 0.6.1 BSD-3-Clause tree:isodate/__init__.py
+wcwidth 0.1.7 MIT sources.license_wcwidth
+azure-common 1.1.22 MIT sources.license_azure_sdk
+azure-mgmt-advisor 9.0.0 MIT sources.license_azure_sdk
+azure-mgmt-applicationinsights 1.0.0 MIT sources.license_azure_sdk
+azure-mgmt-batchai 7.0.0b1 MIT sources.license_azure_sdk
+azure-mgmt-billing 6.0.0 MIT sources.license_azure_sdk
+azure-mgmt-datalake-nspkg 3.0.1 MIT sources.license_azure_sdk
+azure-mgmt-datamigration 10.0.0 MIT sources.license_azure_sdk
+azure-mgmt-extendedlocation 1.0.0b2 MIT sources.license_azure_sdk
+azure-mgmt-managementgroups 1.0.0 MIT sources.license_azure_sdk
+azure-mgmt-maps 2.0.0 MIT sources.license_azure_sdk
+azure-mgmt-marketplaceordering 1.1.0 MIT sources.license_azure_sdk
+azure-mgmt-nspkg 3.0.2 MIT sources.license_azure_sdk
+azure-mgmt-privatedns 1.0.0 MIT sources.license_azure_sdk
+azure-nspkg 3.0.2 MIT sources.license_azure_sdk
+azure-synapse-accesscontrol 0.5.0 MIT sources.license_azure_sdk
+azure-synapse-managedprivateendpoints 0.4.0 MIT sources.license_azure_sdk
+azure-synapse-spark 0.7.0 MIT sources.license_azure_sdk
