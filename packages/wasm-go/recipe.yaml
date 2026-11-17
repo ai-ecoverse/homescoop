@@ -13,14 +13,14 @@ npm: "@ai-ecoverse/wasm-go"
 summary: "Go 1.27 wasip1 tools (compile/link/asm) for slicc go driver"
 source:
   url: "https://go.dev/dl/go{{version}}.src.tar.gz"
-  sha256: "6e7749035cf360f06b2575d162ea79df9fda8ef671889e5c375f8e50777f26bb"
+  sha256: "73cfb8571aec0c01177687db87163d46aa20e9779672772891aa17654d9a6099"
 sources:
   go_linux_amd64:
     url: "https://go.dev/dl/go{{version}}.linux-amd64.tar.gz"
-    sha256: "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
+    sha256: "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840"
   go_darwin_arm64:
     url: "https://go.dev/dl/go{{version}}.darwin-arm64.tar.gz"
-    sha256: "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"
+    sha256: "91a44a2b8a716600ad94a4f143e156116620db8828086a6e3602291be9bd0bb4"
 dependencies:
   build: []
   host: []
