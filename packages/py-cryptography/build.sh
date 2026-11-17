@@ -145,14 +145,21 @@ find "$SITE/cryptography" -name '__pycache__' -prune -exec rm -rf {} +
 SO="_rust.cpython-315-wasm32-wasix.so"
 cp "$RUSTSO" "$SITE/cryptography/hazmat/bindings/$SO"
 chmod 755 "$SITE/cryptography/hazmat/bindings/$SO"
-# No path of this build in the module (the prebuilt wasix-org std carries its
-# own CI's /Users/runner/.cargo paths in panic locations; those are fixed).
+# No path of this build in the module. The prebuilt wasix-org std carries
+# its own CI's cargo paths in panic locations (/home/runner/.cargo/... for
+# the Linux toolchain, /Users/runner/... for macOS), which can look like
+# ours on a runner; those strings are the toolchain's fixed bytes, so a
+# string that is also in the target's std rlibs is not a leak.
 LEAKS=(-e "$B" -e "$(cd "$B" && pwd -P)" -e "$HOME" -e "${CARGO_HOME:-$HOME/.cargo}")
-if strings "$SITE/cryptography/hazmat/bindings/$SO" | grep -F "${LEAKS[@]}" >/dev/null; then
+strings "$HOMESCOOP_RUST_PYEXT_WR/lib/rustlib/$TARGET/lib/"*.rlib | sort -u >"$B/std-strings.txt"
+strings "$SITE/cryptography/hazmat/bindings/$SO" | grep -F "${LEAKS[@]}" | sort -u >"$B/leaks.txt" || true
+comm -23 "$B/leaks.txt" "$B/std-strings.txt" >"$B/leaks-own.txt"
+if [[ -s "$B/leaks-own.txt" ]]; then
   echo "homescoop py-cryptography: a build path leaked into $SO" >&2
-  strings "$SITE/cryptography/hazmat/bindings/$SO" | grep -F "${LEAKS[@]}" | head >&2
+  head "$B/leaks-own.txt" >&2
   exit 1
 fi
+echo "== py-cryptography: no build path in $SO ($(wc -l <"$B/leaks.txt" | tr -d ' ') toolchain std paths, all in the prebuilt std)"
 DI="$SITE/cryptography-$VERSION.dist-info"
 mkdir -p "$DI/licenses"
 cp "$SRC/PKG-INFO" "$DI/METADATA"
