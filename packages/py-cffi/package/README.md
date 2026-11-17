@@ -47,8 +47,10 @@ homescoop_cffi_host "$B/cffi-host"                  # py-cffi's cffi sdist + py-
 homescoop_cffi_emit "$SRC/src/bindings/build.py:ffi" "$B/gen/_sodium.c" --path "$SRC/src"
 CFFI_WASIX_PYINC="$PYINC" homescoop_cffi_ext \
   "$SITE/nacl/_sodium.cpython-315-wasm32-wasix.so" "$B/gen/_sodium.c" \
-  -I"$SODIUM/include" "$SODIUM/lib/libsodium.a"
+  -I"$SODIUM/include" "$SODIUM/lib-pic/libsodium.a"
 ```
+
+Link a library's PIC build into a side module: wasix-* library packages that ship both have it in `lib-pic/` (`lib/` is for static programs).
 
 - **`homescoop_cffi_host <dir>`** fetches the cffi sdist and pycparser wheel that `packages/py-cffi` and `packages/py-pycparser` pin. So the generated C matches the `_cffi_backend` it will run on.
 - **`homescoop_cffi_emit <script.py>[:<var>] <out.c> [--path <dir>]... [--chdir <dir>]`** runs the ffibuilder script on a host `python3` (`HOMESCOOP_CFFI_HOST_PY`, any CPython ≥ 3.11) through `scripts/cffi-emit.py`, then calls `emit_c_code`.

@@ -30,6 +30,13 @@ inputs:
   - scripts/cffi-emit.py
   - packages/py-pycparser/recipe.yaml
   - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+# 2.1.1-2 changes only the README (the downstream example links lib-pic/,
+# the PIC archive a side module needs): the bytes of 2.1.1-1 plus it.
+# Drop this block at the next rebuild.
+repack:
+  from: "2.1.1-1"
+  files:
+    - README.md
 dependencies:
   build: [wasix-python]
   host: []
