@@ -1,0 +1,57 @@
+Fetch the OpenID Connect metadata only when an SSO token may need it.
+
+Reason: every command that needs a token first fetched
+https://accounts.fastly.com/realms/fastly/.well-known/openid-configuration
+(configureAuth), and failed when that request failed, although the auth
+server it configures is only used to refresh or create an SSO token. With
+FASTLY_API_TOKEN, --token or a stored API token, a command now makes no
+request before its own, so it costs one round trip through slicc's network
+less, and an unreachable accounts endpoint no longer breaks API calls. A
+stored SSO token, or FASTLY_USE_SSO=1 without a token, still fetches it.
+
+Upstream: not filed (homescoop does not file upstream reports).
+removeWhen: upstream configures the auth server lazily.
+
+diff --git a/pkg/app/run.go b/pkg/app/run.go
+--- a/pkg/app/run.go
++++ b/pkg/app/run.go
+@@ -286,7 +286,9 @@
+ 	if commandRequiresToken(command) {
+ 		// NOTE: Checking for nil allows our test suite to mock the server.
+ 		// i.e. it'll be nil whenever the CLI is run by a user but not `go test`.
+-		if data.AuthServer == nil {
++		// The server is only used to refresh or create an SSO token, so its
++		// OpenID Connect metadata is fetched only when that may happen.
++		if data.AuthServer == nil && tokenMayNeedSSO(data) {
+ 			authServer, err := configureAuth(apiEndpoint, data.Args, data.Config, data.HTTPClient, data.Env)
+ 			if err != nil {
+ 				return fmt.Errorf("failed to configure authentication processes: %w", err)
+@@ -772,6 +774,28 @@
+ 	return false
+ }
+ 
++// tokenMayNeedSSO reports whether processToken may refresh or create an SSO
++// token for this command, which needs the auth server. A token from --token,
++// FASTLY_API_TOKEN or a stored API token does not, so those commands make no
++// request to the accounts endpoint before their own.
++func tokenMayNeedSSO(data *global.Data) bool {
++	_, source := data.Token()
++	switch source {
++	case lookup.SourceAuth:
++		name := data.AuthTokenName()
++		if name == "" {
++			return true
++		}
++		at := data.Config.GetAuthToken(name)
++		return at == nil || at.Type == config.AuthTokenTypeSSO
++	case lookup.SourceUndefined:
++		return data.Env.UseSSO == "1"
++	case lookup.SourceEnvironment, lookup.SourceFlag, lookup.SourceDefault, lookup.SourceFile:
++		return false
++	}
++	return true
++}
++
+ // commandRequiresToken determines if the command to be executed is one that
+ // requires an API token.
+ func commandRequiresToken(command argparser.Command) bool {

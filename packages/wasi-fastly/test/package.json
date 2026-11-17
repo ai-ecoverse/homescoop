@@ -1,0 +1,11 @@
+{
+  "name": "wasi-fastly-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node --test 'e2e/*.test.mjs'"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.189.2"
+  }
+}
