@@ -1,0 +1,25 @@
+# pyOpenSSL for slicc WASIX CPython: pure Python on @ai-ecoverse/py-cryptography
+# (its cffi OpenSSL binding). azure-cli's certificate login uses it.
+name: py-pyopenssl
+builder: host
+# renovate: datasource=pypi depName=pyopenssl
+version: "26.4.0"
+npm: "@ai-ecoverse/py-pyopenssl"
+source:
+  url: "https://files.pythonhosted.org/packages/py3/p/pyopenssl/pyopenssl-{{version}}-py3-none-any.whl"
+  sha256: "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c"
+inputs:
+  - scripts/stage-pure-wheel.sh
+summary: "pyOpenSSL 26.4.0 for slicc WASIX CPython (on py-cryptography)"
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/pyca/pyopenssl
+  license: Apache-2.0
+  notes: |
+    Pure-Python wheel staged into the version-neutral lib/python3/site-packages
+    (homescoop#1283), with no .pyc. OpenSSL comes from py-cryptography's
+    _rust (its cffi _openssl binding, OpenSSL 3.5.9 linked in), which it
+    takes as a py-* range (cryptography <51,>=49 in its metadata).

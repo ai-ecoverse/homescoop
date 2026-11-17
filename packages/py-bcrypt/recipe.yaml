@@ -1,0 +1,47 @@
+# pyca/bcrypt for slicc WASIX CPython 3.15: a Rust (pyo3) extension built
+# with scripts/rust-pyext.sh, as py-cryptography is. paramiko (az ssh) needs it.
+name: py-bcrypt
+builder: host
+reproducible: true
+# renovate: datasource=pypi depName=bcrypt
+version: "5.0.0"
+npm: "@ai-ecoverse/py-bcrypt"
+summary: "bcrypt 5.0.0 for slicc WASIX CPython 3.15 (Rust _bcrypt side module)"
+source:
+  url: "https://files.pythonhosted.org/packages/source/b/bcrypt/bcrypt-{{version}}.tar.gz"
+  sha256: "f748f7c2d6fd375cc93d3fba7ef4a9e3a092421b8dbf34d8d4dc06be9492dfdd"
+sources:
+  # The versions src/_bcrypt/Cargo.lock names (its checksums).
+  target_lexicon:
+    url: "https://static.crates.io/crates/target-lexicon/target-lexicon-0.13.3.crate"
+    sha256: "df7f62577c25e07834649fc3b39fafdc597c0a3527dc1c60129201ccfcbaa50c"
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-8.tgz"
+    sha256: "351288012d82e8bfb41317322600deb69defe915f751febd1bc8f14f0c976444"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+inputs:
+  - scripts/rust-pyext/**
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python]
+notices:
+  not_linked:
+    target_lexicon: "pyo3's build script parses the target triple with it on the build host; nothing of it is in the wasm"
+about:
+  homepage: https://github.com/pyca/bcrypt
+  license: Apache-2.0
+  notes: |
+    Cross-built from the PyPI sdist: the Rust crate src/_bcrypt (pyo3 0.26,
+    abi3; bcrypt, bcrypt-pbkdf, getrandom) with cargo for wasix-org/rust's
+    wasm32-wasmer-wasi-dl target, as a dylink.0 side module
+    (bcrypt/_bcrypt.cpython-315-wasm32-wasix.so) that python.wasm loads by
+    dlopen (scripts/rust-pyext.sh). No patches to bcrypt; target-lexicon
+    (pyo3's build script only) gets scripts/rust-pyext/target-lexicon-dl.patch
+    and getrandom 0.3.3 scripts/rust-pyext/getrandom-dl.patch (the WASI
+    preview 1 random_get backend for target_env "dl"). No C, no OpenSSL.
+    The target's std is panic=abort: a Rust panic aborts python instead of
+    raising pyo3's PanicException; bcrypt's input errors (an invalid salt,
+    rounds out of range) are ValueError and TypeError, not panics.

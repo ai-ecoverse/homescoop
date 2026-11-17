@@ -1,0 +1,23 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasix-python"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.15.0-8"
+  ],
+  "users": "enforce",
+  "checklist": [
+    "cert/import.mjs: import bcrypt 5.0.0 from /node_modules/@ai-ecoverse/py-bcrypt, found by discovery without PYTHONPATH, no nested python, importlib.metadata names 5.0.0; its side module bcrypt._bcrypt imports",
+    "cert/bcrypt.mjs: hashpw ($2b$ and $2a$) and kdf (bcrypt-pbkdf, 4 and 50 rounds) give the answers CPython's bcrypt 5.0.0 gives for the same inputs; 20 gensalt() salts are all different (getrandom through WASI random_get, scripts/rust-pyext/getrandom-dl.patch); checkpw true for the password, false for another; a bad salt, rounds 2, prefix 3x, a str password, a string that is no hash and an empty kdf password raise ValueError/TypeError, not a panic=abort trap; 4 Python threads hash and check at once",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md names the wasix-org Rust standard library with its licence text, and (scripts/rust-crate-notices.mjs, checked against cargo tree by check-rust-notices.mjs at build) every crate _bcrypt links, getrandom 0.3.3 among them",
+    "build.sh (scripts/rust-pyext/check-side-module.mjs): _bcrypt has dylink.0, exports PyModExport__bcrypt and the TLS entry points, every env/GOT import is exported by wasix-python 3.15.0-8's python.wasm, no EH instructions; no build path in it",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-8 <3.15.1"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-bcrypt"
+  ],
+  "notices": [
+    { "name": "Rust standard library", "license": "MIT OR Apache-2.0" }
+  ]
+}

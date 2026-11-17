@@ -1,0 +1,41 @@
+{
+  "name": "@ai-ecoverse/py-pyopenssl",
+  "version": "26.4.0-1",
+  "description": "pyOpenSSL, Python's OpenSSL wrapper (certificates, keys, TLS contexts), on py-cryptography.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-pyopenssl/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-pyopenssl",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "openssl"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/py-cryptography": ">=50.0.2-1 <50.0.3"
+  },
+  "homescoop": {
+    "recipe": "py-pyopenssl",
+    "upstream": "26.4.0"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3/site-packages"
+    }
+  }
+}
