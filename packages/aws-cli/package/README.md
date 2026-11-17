@@ -87,8 +87,8 @@ slicc no browser can reach the loopback the CLI listens on.
 - A call takes a few seconds to start in the kernel (about 3 s for
   `aws --version`).
 
-Licensed under the Apache License 2.0 (`LICENSE` is AWS's notice followed by
-the license text). The libraries in `lib/aws-cli` beside the CLI (colorama,
+Licensed under Apache-2.0 (`LICENSE` is AWS's notice followed by the
+license text). The libraries in `lib/aws-cli` beside the CLI (colorama,
 distro, docutils, jmespath, prompt_toolkit, python-dateutil, ruamel.yaml,
 six, urllib3, wcwidth) are under their own licenses, kept in their
 `.dist-info` directories and in `THIRD-PARTY-NOTICES.md`.
