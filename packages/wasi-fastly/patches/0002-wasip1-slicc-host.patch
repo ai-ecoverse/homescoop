@@ -268,17 +268,19 @@ diff --git a/pkg/config/config.go b/pkg/config/config.go
  }
  
  // File represents our application toml configuration.
-@@ -445,6 +454,10 @@
- 	if err := fp.Close(); err != nil {
- 		return fmt.Errorf("error saving config file changes: %w", err)
+@@ -436,6 +445,12 @@
+ 	if err != nil {
+ 		return fmt.Errorf("error creating config file: %w", err)
  	}
-+	// wasip1 open passes no mode; config.toml holds API tokens.
++	// wasip1 open passes no mode; config.toml holds API tokens, so it is
++	// restricted while still empty, before any token is written.
 +	if err := slicchost.Restrict(path, FilePermissions); err != nil {
++		_ = fp.Close()
 +		return fmt.Errorf("error restricting config file permissions: %w", err)
 +	}
- 
- 	return nil
- }
+ 	encoder := toml.NewEncoder(fp)
+ 	// Remove leading spaces from the TOML file.
+ 	encoder.Indentation("")
 diff --git a/pkg/errors/log.go b/pkg/errors/log.go
 --- a/pkg/errors/log.go
 +++ b/pkg/errors/log.go
