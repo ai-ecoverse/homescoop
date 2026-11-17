@@ -1,0 +1,13 @@
+Without <sys/mman.h>, core_loadimage_ps reads the file with read(2), which <unistd.h> declares.
+
+--- a/plugin/core/gvloadimage_core.c
++++ b/plugin/core/gvloadimage_core.c
+@@ -16,6 +16,8 @@
+ #include <sys/types.h>
+ #ifdef HAVE_SYS_MMAN_H
+ #include <sys/mman.h>
++#else
++#include <unistd.h>
+ #endif
+ 
+ #include "core_loadimage_xdot.h"
