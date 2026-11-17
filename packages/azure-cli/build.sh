@@ -113,7 +113,9 @@ sys.path.insert(0, site)
 sys.argv = [trim]
 runpy.run_path(trim, run_name="__main__")
 EOF
-grep -c '^WARNING' "$WORK/azure-cli-trim.log" | xargs -I{} echo "  removed {} folders ($before KiB before, $(du -sk "$STAGE" | awk '{print $1}') KiB after)"
+removed="$(grep -c '^WARNING' "$WORK/azure-cli-trim.log" || true)"
+[[ "$removed" -gt 0 ]] || { echo "azure-cli: trim_sdk.py removed nothing:" >&2; tail -20 "$WORK/azure-cli-trim.log" >&2; exit 1; }
+echo "  removed $removed folders ($before KiB before, $(du -sk "$STAGE" | awk '{print $1}') KiB after)"
 find "$STAGE" -type d -name __pycache__ -prune -exec rm -rf {} +
 
 PKG="$HERE/package"
