@@ -124,6 +124,7 @@ versions are on npm.
 | [`@ai-ecoverse/wasm-pkgconf`](https://www.npmjs.com/package/@ai-ecoverse/wasm-pkgconf) | [recipe](packages/pkgconf) | pkgconf and pkg-config, which give the compiler and linker flags of installed libraries. |
 | [`@ai-ecoverse/wasm-poppler`](https://www.npmjs.com/package/@ai-ecoverse/wasm-poppler) | [recipe](packages/poppler) | Poppler's PDF tools: pdftotext, pdftoppm, pdfinfo, pdfimages and more. |
 | [`@ai-ecoverse/wasm-procps`](https://www.npmjs.com/package/@ai-ecoverse/wasm-procps) | [recipe](packages/procps) | procps-ng: ps, free, pgrep, pkill, kill, uptime and pidof. |
+| [`@ai-ecoverse/py-cffi`](https://www.npmjs.com/package/@ai-ecoverse/py-cffi) | [recipe](packages/py-cffi) | cffi, the C Foreign Function Interface for Python, with its _cffi_backend, for slicc WASIX CPython. |
 | [`@ai-ecoverse/py-contourpy`](https://www.npmjs.com/package/@ai-ecoverse/py-contourpy) | [recipe](packages/py-contourpy) | contourpy, contour calculation for Python (used by matplotlib). |
 | [`@ai-ecoverse/py-cycler`](https://www.npmjs.com/package/@ai-ecoverse/py-cycler) | [recipe](packages/py-cycler) | cycler for slicc WASIX CPython |
 | [`@ai-ecoverse/py-fonttools`](https://www.npmjs.com/package/@ai-ecoverse/py-fonttools) | [recipe](packages/py-fonttools) | fontTools, a library for manipulating fonts in Python. |
@@ -133,6 +134,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-packaging`](https://www.npmjs.com/package/@ai-ecoverse/py-packaging) | [recipe](packages/py-packaging) | packaging for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | pandas, data analysis and manipulation for Python. |
 | [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow, the Python imaging library. |
+| [`@ai-ecoverse/py-pycparser`](https://www.npmjs.com/package/@ai-ecoverse/py-pycparser) | [recipe](packages/py-pycparser) | pycparser, a C parser in pure Python (the parser cffi's cdef uses), for slicc WASIX CPython. |
 | [`@ai-ecoverse/py-pyparsing`](https://www.npmjs.com/package/@ai-ecoverse/py-pyparsing) | [recipe](packages/py-pyparsing) | pyparsing for slicc WASIX CPython |
 | [`@ai-ecoverse/py-python-dateutil`](https://www.npmjs.com/package/@ai-ecoverse/py-python-dateutil) | [recipe](packages/py-python-dateutil) | python-dateutil for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pytz`](https://www.npmjs.com/package/@ai-ecoverse/py-pytz) | [recipe](packages/py-pytz) | pytz for slicc WASIX CPython |

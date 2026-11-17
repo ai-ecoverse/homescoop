@@ -46,6 +46,12 @@
       "catalog": null,
       "kind": "native",
       "note": "matplotlib dependency"
+    },
+    "cffi": {
+      "npm": "@ai-ecoverse/py-cffi",
+      "catalog": null,
+      "kind": "native",
+      "note": "_cffi_backend for PyNaCl, cryptography and other cffi extensions"
     }
   }
 }
