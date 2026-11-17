@@ -77,66 +77,42 @@ SODIUM="$SODEV/package"
 test -f "$SODIUM/include/sodium.h" && test -f "$SODIUM/lib-pic/libsodium.a"
 SODIUM_VER="$(node -p "require('$SODIUM/package.json').homescoop.upstream")"
 
-# cffi + pycparser, pure Python, for the generator only.
-fetch_src cffi
-CFFI="$B/cffi"
-rm -rf "$CFFI" && mkdir -p "$CFFI"
-tar xzf "$SRC_FILE" -C "$CFFI" --strip-components=1
-fetch_src pycparser
-PYCP="$B/pycparser"
-rm -rf "$PYCP" && mkdir -p "$PYCP"
-tar xzf "$SRC_FILE" -C "$PYCP" --strip-components=1
-CFFI_VER="$(sed -n 's/^Version: //p' "$CFFI/PKG-INFO")"
-
 SRC="$B/pynacl-$VERSION"
 rm -rf "$SRC"
 tar xzf "$NACL_TGZ" -C "$B"
 homescoop_apply_patches "$SRC"
 
-# The generator needs a host python with ctypes (cffi's ctypes backend
-# stands in for _cffi_backend, whose C output is the same); the host
-# CPython built above may lack _ctypes, so any python3 with it will do.
-GENPY=""
+# nacl/_sodium.c from PyNaCl's own src/bindings/build.py, by py-cffi's
+# cffi: scripts/cffi-wasix.sh fetches the cffi sdist and pycparser wheel that
+# packages/py-cffi and packages/py-pycparser pin and runs the generator on
+# cffi's ctypes backend, so the C matches the _cffi_backend it runs on. The
+# host CPython built above may lack _ctypes; any python3 with it will do.
 for p in "$HOSTPY" "$(command -v python3 || true)"; do
-  if [[ -n "$p" ]] && "$p" -c 'import ctypes' 2>/dev/null; then GENPY="$p"; break; fi
+  if [[ -n "$p" ]] && "$p" -c 'import ctypes' 2>/dev/null; then export HOMESCOOP_CFFI_HOST_PY="$p"; break; fi
 done
-[[ -n "$GENPY" ]] || { echo "homescoop py-pynacl: no host python with ctypes for cffi's generator" >&2; exit 1; }
-OBJ="$B/obj"
-rm -rf "$OBJ" && mkdir -p "$OBJ"
-echo "== py-pynacl: cffi $CFFI_VER emits nacl/_sodium.c ($("$GENPY" -c 'import sys; print(sys.version.split()[0])'))"
-PYTHONPATH="$CFFI/src:$PYCP" PYTHONDONTWRITEBYTECODE=1 "$GENPY" - "$SRC/src/bindings" "$OBJ/_sodium.c" "$CFFI_VER" <<'PY'
-import sys
-bindings, out, want = sys.argv[1:4]
-# No _cffi_backend on the host: the ctypes backend gives FFI() its types,
-# and the recompiler's output doesn't depend on the backend.
-sys.modules["_cffi_backend"] = None
-import cffi, cffi.api
-from cffi.backend_ctypes import CTypesBackend
-assert cffi.__version__ == want, (cffi.__version__, want)
-_init = cffi.api.FFI.__init__
-cffi.api.FFI.__init__ = lambda self, backend=None: _init(self, backend=CTypesBackend())
-sys.path.insert(0, bindings)
-from build import ffi  # PyNaCl's src/bindings/build.py
-name, source, _, kwds = ffi._assigned_source
-assert name == "_sodium" and kwds == {"libraries": ["sodium"]}, (name, kwds)
-ffi.emit_c_code(out)
-PY
-grep -q 'PyInit__sodium' "$OBJ/_sodium.c"
-grep -q '#include <sodium.h>' "$OBJ/_sodium.c"
+[[ -n "${HOMESCOOP_CFFI_HOST_PY:-}" ]] || { echo "homescoop py-pynacl: no host python with ctypes for cffi's generator" >&2; exit 1; }
+source "$ROOT/scripts/cffi-wasix.sh"
+homescoop_cffi_host "$B/cffi-host"
+CFFI_PIN="$(node -p "require('$DEST/package.json').dependencies['@ai-ecoverse/py-cffi']")"
+[[ "$CFFI_PIN" == ">=$CFFI_HOST_VERSION-"*" <"* ]] \
+  || { echo "homescoop py-pynacl: generated with cffi $CFFI_HOST_VERSION, but the package takes py-cffi $CFFI_PIN" >&2; exit 1; }
+GEN="$B/gen"
+rm -rf "$GEN" && mkdir -p "$GEN"
+homescoop_cffi_emit "$SRC/src/bindings/build.py:ffi" "$GEN/_sodium.c"
+grep -q 'PyInit__sodium' "$GEN/_sodium.c"
+grep -q '#include <sodium.h>' "$GEN/_sodium.c"
 
-echo "== py-pynacl: wasixcc nacl/_sodium.c (libsodium $SODIUM_VER)"
-wasixcc -O2 -DNDEBUG -fPIC -fvisibility=default -matomics -mbulk-memory -mmutable-globals -pthread \
-  -I"$PYINC" -I"$SODIUM/include" -ffile-prefix-map="$B"=. -c "$OBJ/_sodium.c" -o "$OBJ/_sodium.o"
 SITE="$DEST/lib/python3.15/site-packages"
 rm -rf "$DEST/lib"
 mkdir -p "$SITE"
 cp -R "$SRC/src/nacl" "$SITE/nacl"
 find "$SITE/nacl" -name '__pycache__' -prune -exec rm -rf {} +
-EXT=".cpython-315-wasm32-wasix.so"
-SO="$SITE/nacl/_sodium$EXT"
-WASIXCC_MODULE_KIND=shared-library wasixcc -shared -fPIC -fvisibility=default -Wl,--allow-undefined \
-  -o "$SO" "$OBJ/_sodium.o" "$SODIUM/lib-pic/libsodium.a"
-chmod 755 "$SO"
+SO="$SITE/nacl/_sodium.cpython-315-wasm32-wasix.so"
+echo "== py-pynacl: nacl/_sodium side module (libsodium $SODIUM_VER, lib-pic)"
+# PIC, legacy EH, shared-library (python.wasm's variant); the static PIC
+# libsodium goes into the link.
+CFFI_WASIX_PYINC="$PYINC" homescoop_cffi_ext "$SO" "$GEN/_sodium.c" -I"$SODIUM/include" "$SODIUM/lib-pic/libsodium.a"
+rm -f "${SO%.so}.o"
 
 # --allow-undefined leaves every missing symbol to the dynamic linker:
 # each function the side module imports must be one python.wasm exports

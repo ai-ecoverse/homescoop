@@ -58,6 +58,12 @@
       "catalog": null,
       "kind": "native",
       "note": "Rust (pyo3) _rust with OpenSSL; azure-cli, msal, pyOpenSSL, paramiko"
+    },
+    "pynacl": {
+      "npm": "@ai-ecoverse/py-pynacl",
+      "catalog": null,
+      "kind": "native",
+      "note": "libsodium bindings (azure-cli's az webapp/functionapp/logicapp/staticwebapp)"
     }
   }
 }
