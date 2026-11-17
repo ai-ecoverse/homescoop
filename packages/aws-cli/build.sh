@@ -117,26 +117,19 @@ homescoop_fetch "$APACHE_LICENSE_SRC_URL" "$APACHE_LICENSE_SRC_SHA" "$APACHE"
 
 echo "== aws-cli: third-party notices"
 homescoop_notices_begin "lib/aws-cli has the AWS CLI's dependencies beside it, each with its own license, as the wheels ship them (their .dist-info):"
-note() { # <heading> <dist-info dir> <license file>...
-  local heading="$1" dist="$2"
-  shift 2
-  local args=() f
-  for f in "$@"; do args+=("$LIB/$dist/$f" -); done
-  homescoop_notice "$heading" "${args[@]}"
-}
-note "colorama 0.4.6 (BSD-3-Clause)" colorama-0.4.6.dist-info licenses/LICENSE.txt
-note "distro 1.8.0 (Apache-2.0)" distro-1.8.0.dist-info LICENSE
-note "docutils 0.19 (public domain, with BSD-2-Clause and Python 2.1.1 exceptions; LicenseRef-docutils)" docutils-0.19.dist-info COPYING.txt
-note "jmespath 1.0.1 (MIT)" jmespath-1.0.1.dist-info LICENSE.txt
-note "prompt_toolkit 3.0.51 (BSD-3-Clause)" prompt_toolkit-3.0.51.dist-info licenses/LICENSE
+homescoop_notice "colorama 0.4.6 (BSD-3-Clause)" "$LIB/colorama-0.4.6.dist-info/licenses/LICENSE.txt" -
+homescoop_notice "distro 1.8.0 (Apache-2.0)" "$LIB/distro-1.8.0.dist-info/LICENSE" -
+homescoop_notice "docutils 0.19 (public domain, with BSD-2-Clause and Python 2.1.1 exceptions; LicenseRef-docutils)" "$LIB/docutils-0.19.dist-info/COPYING.txt" -
+homescoop_notice "jmespath 1.0.1 (MIT)" "$LIB/jmespath-1.0.1.dist-info/LICENSE.txt" -
+homescoop_notice "prompt_toolkit 3.0.51 (BSD-3-Clause)" "$LIB/prompt_toolkit-3.0.51.dist-info/licenses/LICENSE" -
 # dateutil's LICENSE names the Apache License 2.0 and quotes the BSD one;
 # the license's text follows it (apache.org's LICENSE-2.0.txt, pinned).
-note "python-dateutil 2.9.0 (Apache-2.0 AND BSD-3-Clause)" python_dateutil-2.9.0.dist-info LICENSE
+homescoop_notice "python-dateutil 2.9.0 (Apache-2.0 AND BSD-3-Clause)" "$LIB/python_dateutil-2.9.0.dist-info/LICENSE" -
 homescoop_notice "python-dateutil 2.9.0: the Apache License 2.0 it names (Apache-2.0)" "$APACHE" -
-note "ruamel.yaml 0.19.1 (MIT)" ruamel_yaml-0.19.1.dist-info licenses/LICENSE
-note "six 1.17.0 (MIT)" six-1.17.0.dist-info LICENSE
-note "urllib3 2.6.3 (MIT)" urllib3-2.6.3.dist-info licenses/LICENSE.txt
-note "wcwidth 0.2.14 (MIT)" wcwidth-0.2.14.dist-info licenses/LICENSE
+homescoop_notice "ruamel.yaml 0.19.1 (MIT)" "$LIB/ruamel_yaml-0.19.1.dist-info/licenses/LICENSE" -
+homescoop_notice "six 1.17.0 (MIT)" "$LIB/six-1.17.0.dist-info/LICENSE" -
+homescoop_notice "urllib3 2.6.3 (MIT)" "$LIB/urllib3-2.6.3.dist-info/licenses/LICENSE.txt" -
+homescoop_notice "wcwidth 0.2.14 (MIT)" "$LIB/wcwidth-0.2.14.dist-info/licenses/LICENSE" -
 
 PKG="$HERE/package"
 rm -rf "$PKG/lib" "$PKG/bin"
