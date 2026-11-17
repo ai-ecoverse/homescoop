@@ -1,0 +1,53 @@
+{
+  "name": "@ai-ecoverse/wasi-fastly",
+  "version": "17.1.0-1",
+  "description": "The Fastly CLI 17.1.0 (fastly) for slicc: manage Fastly services, domains, TLS, stores and stats through slicc's network.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasi-fastly/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasi-fastly",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "slicc",
+    "homescoop",
+    "fastly",
+    "cdn"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "bin",
+    "host"
+  ],
+  "engines": {
+    "slicc-kernel": ">=1.187.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homescoop": {
+    "recipe": "wasi-fastly",
+    "upstream": "17.1.0",
+    "source": "fastly/cli@3e9473d248429bad874e848281f0e91ad6f41ea8",
+    "patches": [
+      "0001-wasip1-build.patch",
+      "0002-wasip1-slicc-host.patch",
+      "0003-wasip1-unavailable-commands.patch",
+      "0004-lazy-oidc-metadata.patch"
+    ]
+  },
+  "slicc": {
+    "abi": "wasi",
+    "commands": {
+      "fastly": {
+        "wasm": "bin/fastly.wasm",
+        "imports": "host/fastly-host.mjs"
+      }
+    }
+  }
+}

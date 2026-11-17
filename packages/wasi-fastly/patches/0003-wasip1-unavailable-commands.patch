@@ -1,0 +1,229 @@
+Refuse, on wasip1, the commands the Fastly CLI for slicc cannot run.
+
+Reason: these commands need a native program, a local port, or a new fastly
+binary, and would otherwise fail deep inside with ENOSYS or a missing
+executable. On wasip1 they now stop first with a RemediationError that
+says why and what to do instead:
+- compute build and compute publish (and compute hash-files without
+  --package, in BuildCommand): the language toolchain and wasm-tools;
+  deploy a package built elsewhere with compute deploy --package;
+- compute serve (Viceroy on a local port), compute init (git and post-init
+  scripts), compute install-tools (downloads Viceroy);
+- update and install (they replace the binary; the npm package is the
+  update);
+- SSO (auth login --sso, sso, profile create/update --sso): it waits for
+  the browser's redirect to http://localhost:8080/callback, which a slicc
+  command cannot receive; use FASTLY_API_TOKEN, auth add --api-token or
+  auth login with a pasted token.
+On wasip1 there is also no update check (it would ask Fastly for a wasip1
+binary on every command), no build-data notice (no builds, and the notice
+waits 5 seconds), and the SSO-only commands fetch no OpenID Connect
+metadata first (commandRequiresAuthServer).
+
+Upstream: not for upstream (a slicc build choice).
+removeWhen: these commands can run on slicc.
+
+diff --git a/pkg/app/run.go b/pkg/app/run.go
+--- a/pkg/app/run.go
++++ b/pkg/app/run.go
+@@ -7,6 +7,7 @@
+ 	"io"
+ 	"net/http"
+ 	"os"
++	"runtime"
+ 	"slices"
+ 	"strconv"
+ 	"strings"
+@@ -223,6 +224,10 @@
+ 		return nil
+ 	}
+ 
++	if err := checkAvailable(commandName, data.Args); err != nil {
++		return err
++	}
++
+ 	metadataDisable, _ := strconv.ParseBool(data.Env.WasmMetadataDisable)
+ 	if !slices.Contains(data.Args, "--metadata-disable") && !metadataDisable && !data.Config.CLI.MetadataNoticeDisplayed && commandCollectsData(commandName) && !data.Flags.Quiet && !data.Flags.JSON {
+ 		text.Important(data.Output, "The Fastly CLI is configured to collect data related to Wasm builds (e.g. compilation times, resource usage, and other non-identifying data). To learn more about what data is being collected, why, and how to disable it: https://www.fastly.com/documentation/reference/cli")
+@@ -725,7 +730,9 @@
+ }
+ 
+ func checkForUpdates(av github.AssetVersioner, commandName string) func(io.Writer) {
+-	if av != nil && commandName != "update" && !version.IsPreRelease(revision.AppVersion) {
++	// On wasip1 the CLI comes from npm (@ai-ecoverse/wasi-fastly), and the
++	// check would ask for a wasip1 binary that Fastly does not publish.
++	if av != nil && commandName != "update" && !version.IsPreRelease(revision.AppVersion) && runtime.GOOS != "wasip1" {
+ 		return update.CheckAsync(revision.AppVersion, av)
+ 	}
+ 	return func(_ io.Writer) {
+@@ -736,6 +743,11 @@
+ // commandCollectsData determines if the command to be executed is one that
+ // collects data related to a Wasm binary.
+ func commandCollectsData(command string) bool {
++	// On wasip1 none of these build a Wasm binary (see checkAvailable), so
++	// there is no build data and no notice to wait 5 seconds on.
++	if runtime.GOOS == "wasip1" {
++		return false
++	}
+ 	switch command {
+ 	case "compute build", "compute hash-files", "compute publish", "compute serve":
+ 		return true
+@@ -746,6 +758,11 @@
+ // commandRequiresAuthServer determines if the command to be executed is one that
+ // requires just the authentication server to be running.
+ func commandRequiresAuthServer(command string, args []string) bool {
++	// On wasip1 SSO is refused (checkAvailable, auth.RunSSOWithTokenName),
++	// so these commands need no OpenID Connect metadata.
++	if runtime.GOOS == "wasip1" {
++		return false
++	}
+ 	switch command {
+ 	case "auth login":
+ 		return slices.Contains(args, "--sso")
+diff --git a/pkg/app/slicc.go b/pkg/app/slicc.go
+--- /dev/null
++++ b/pkg/app/slicc.go
+@@ -0,0 +1,66 @@
++package app
++
++import (
++	"fmt"
++	"runtime"
++	"slices"
++
++	authcmd "github.com/fastly/cli/pkg/commands/auth"
++	"github.com/fastly/cli/pkg/commands/compute"
++	fsterr "github.com/fastly/cli/pkg/errors"
++)
++
++// unavailableOnWasip1 names the commands that the Fastly CLI for slicc
++// (GOOS=wasip1, @ai-ecoverse/wasi-fastly) leaves out, and why. Each needs a
++// native program, a local port or a new fastly binary. Building a Compute
++// package (compute build and publish here, compute hash-files without
++// --package in compute.BuildCommand) is refused with compute.BuildUnavailable.
++var unavailableOnWasip1 = map[string][2]string{
++	"compute serve": {
++		"it builds the package and runs it under Viceroy, a native program, on a local port",
++		"Run 'fastly compute serve' where the toolchain and Viceroy are installed.",
++	},
++	"compute init": {
++		"it runs git and the starter kit's post-init scripts, and the project can only be built elsewhere",
++		"Run 'fastly compute init' where the toolchain is installed.",
++	},
++	"compute install-tools": {
++		"it downloads Viceroy, a native program",
++		"Run 'fastly compute install-tools' where Viceroy can run.",
++	},
++	"update": {
++		"it replaces the fastly binary, which here comes from the npm package @ai-ecoverse/wasi-fastly",
++		"Install a newer version of @ai-ecoverse/wasi-fastly.",
++	},
++	"install": {
++		"it replaces the fastly binary, which here comes from the npm package @ai-ecoverse/wasi-fastly",
++		"Install another version of @ai-ecoverse/wasi-fastly.",
++	},
++}
++
++// checkAvailable refuses, on wasip1, a command the Fastly CLI for slicc
++// cannot run, before it does anything.
++func checkAvailable(commandName string, args []string) error {
++	if runtime.GOOS != "wasip1" {
++		return nil
++	}
++	switch commandName {
++	case "sso":
++		return authcmd.SSOUnavailable()
++	case "auth login", "profile create", "profile update":
++		if slices.Contains(args, "--sso") {
++			return authcmd.SSOUnavailable()
++		}
++	}
++	if commandName == "compute build" || commandName == "compute publish" {
++		return compute.BuildUnavailable()
++	}
++	why, ok := unavailableOnWasip1[commandName]
++	if !ok {
++		return nil
++	}
++	return fsterr.RemediationError{
++		Inner:       fmt.Errorf("'fastly %s' is not available in the Fastly CLI for slicc: %s", commandName, why[0]),
++		Remediation: why[1],
++	}
++}
+diff --git a/pkg/commands/auth/slicc.go b/pkg/commands/auth/slicc.go
+--- /dev/null
++++ b/pkg/commands/auth/slicc.go
+@@ -0,0 +1,22 @@
++package auth
++
++import (
++	"errors"
++	"runtime"
++
++	fsterr "github.com/fastly/cli/pkg/errors"
++)
++
++// SSOUnavailable is what SSO answers on wasip1 (the Fastly CLI for slicc,
++// @ai-ecoverse/wasi-fastly): fastly auth login --sso, fastly sso and
++// profile create/update --sso, and a stored SSO token that can no longer be
++// refreshed.
++func SSOUnavailable() error {
++	if runtime.GOOS != "wasip1" {
++		return nil
++	}
++	return fsterr.RemediationError{
++		Inner:       errors.New("SSO is not available in the Fastly CLI for slicc: it waits for the browser to come back to http://localhost:8080/callback, and a slicc command cannot receive that redirect"),
++		Remediation: "Create an API token at https://manage.fastly.com/account/personal/tokens, then set FASTLY_API_TOKEN, or store it with 'fastly auth add <name> --api-token <token>' or 'fastly auth login' (paste the token).",
++	}
++}
+diff --git a/pkg/commands/auth/sso.go b/pkg/commands/auth/sso.go
+--- a/pkg/commands/auth/sso.go
++++ b/pkg/commands/auth/sso.go
+@@ -29,6 +29,9 @@
+ // RunSSOWithTokenName is like RunSSO but accepts an explicit token name
+ // instead of deriving it from the current context.
+ func RunSSOWithTokenName(in io.Reader, out io.Writer, g *global.Data, forceReAuth bool, skipPrompt bool, tokenName string) error {
++	if err := SSOUnavailable(); err != nil {
++		return err
++	}
+ 	if forceReAuth {
+ 		g.AuthServer.SetParam("prompt", "login select_account")
+ 	} else {
+diff --git a/pkg/commands/compute/slicc.go b/pkg/commands/compute/slicc.go
+--- /dev/null
++++ b/pkg/commands/compute/slicc.go
+@@ -0,0 +1,21 @@
++package compute
++
++import (
++	"errors"
++	"runtime"
++
++	fsterr "github.com/fastly/cli/pkg/errors"
++)
++
++// BuildUnavailable is what building a Compute package answers on wasip1
++// (the Fastly CLI for slicc, @ai-ecoverse/wasi-fastly): compute build,
++// compute publish and compute hash-files without --package.
++func BuildUnavailable() error {
++	if runtime.GOOS != "wasip1" {
++		return nil
++	}
++	return fsterr.RemediationError{
++		Inner:       errors.New("building a Compute package is not available in the Fastly CLI for slicc: it runs the project's language toolchain (cargo, npm, go, ...) and wasm-tools, which are native programs"),
++		Remediation: "Build the package where its toolchain is installed ('fastly compute build'), then deploy it from here with 'fastly compute deploy --package pkg/<name>.tar.gz'.",
++	}
++}
+diff --git a/pkg/commands/compute/build.go b/pkg/commands/compute/build.go
+--- a/pkg/commands/compute/build.go
++++ b/pkg/commands/compute/build.go
+@@ -93,6 +93,9 @@
+ 
+ // Exec implements the command interface.
+ func (c *BuildCommand) Exec(in io.Reader, out io.Writer) (err error) {
++	if err := BuildUnavailable(); err != nil {
++		return err
++	}
+ 	// We'll restore this at the end to print a final successful build output.
+ 	originalOut := out
+ 	if c.Globals.Flags.Quiet {
