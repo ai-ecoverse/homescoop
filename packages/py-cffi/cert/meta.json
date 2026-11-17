@@ -25,7 +25,8 @@
     "build.sh, test/side-imports.mjs and test/backend.test.mjs: _cffi_backend imports ffi_call, ffi_prep_cif, ffi_prep_cif_var, ffi_closure_alloc, ffi_closure_free and ffi_prep_closure_loc from env and the ffi_type_* globals through GOT.mem, and defines no ffi_* symbol: the libffi is python.wasm's, the copy _ctypes uses (no second libffi, no second set of closure handlers)",
     "test/backend.test.mjs: the libffi pin (recipe.yaml sources.libffi: url, sha256, commit, tree) is packages/wasix-python's; the side modules' 68 PyMethodDef and 12 PyGetSetDef entries all have the arity CPython calls them with (packages/py-kiwisolver/test/wasm-call-signatures.mjs, also run by build.sh)",
     "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 (built against 3.15.0-1's headers); the specs run on 3.15.0-1 and 3.15.0-8. py-pycparser comes from this run's peer artifact until it is on npm",
-    "2.1.1-1 (homescoop#2119): the first release"
+    "2.1.1-1 (homescoop#2119): the first release",
+    "2.1.1-2: packaging-only repack of 2.1.1-1 (recipe repack:), README.md only: the downstream example links $SODIUM/lib-pic/libsodium.a, the PIC archive a side module needs (lib/ is the non-PIC build); every spec as before"
   ],
   "ci": [
     "node scripts/browser-cert/python-range.mjs py-cffi"
