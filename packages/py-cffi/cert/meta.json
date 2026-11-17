@@ -1,0 +1,39 @@
+{
+  "harness": "slicc-kernel",
+  "users": "enforce",
+  "peers": [
+    "py-pycparser"
+  ],
+  "needs": [
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/py-pycparser"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasix-python@3.15.0-8"
+  ],
+  "needsTarballScripts": [
+    "packages/py-cffi/test/pycparser-tarball.mjs"
+  ],
+  "patches": {
+    "cffi-wasix-closures.patch": "cffi takes libffi's closure allocator (ffi_closure_alloc, ffi_prep_closure_loc) and ffi_prep_cif_var on WASIX, as on Emscripten, instead of malloc_closure.h's RWX pages. Every callback in cert/abi.mjs (st_apply with userdata, st_apply_d, st_point_cb, st_sort, libc qsort, error=-1) and cert/api.mjs (ffi.callback into call_twice, @ffi.def_extern) goes through it; the varargs calls (st_vsum, st_vmix, snprintf) through ffi_prep_cif_var"
+  },
+  "checklist": [
+    "cert/import.mjs: import cffi 2.1.1 and _cffi_backend 2.1.1 from /node_modules/@ai-ecoverse/py-cffi, found by discovery without PYTHONPATH, no nested python; _cffi_backend.cpython-315-wasm32-wasix.so is at the top of site-packages (wheel layout); importlib.metadata.version('cffi') is 2.1.1",
+    "cert/abi.mjs: ABI mode, ffi.cdef + ffi.dlopen of share/py-cffi/selftest/libcffi_selftest.so (a plain C side module): int8/uint16/int64/uint64/float/double/long double; arrays, strings, NULL; structs by value as arguments and returns (nested, one-field), by pointer; sizeof/offsetof; callbacks into C with a handle as userdata, several alive at once, qsort, an exception with error=-1; varargs (int, long long, double); a global read and written; ffi.new, ffi.gc (the C destructor runs on collect), ffi.buffer, ffi.from_buffer; dlopen(None): libc strlen, snprintf (varargs), qsort with a callback, and Py_IsInitialized, all from python.wasm",
+    "cert/api.mjs: API mode, share/py-cffi/selftest/_cffi_selftest.cpython-315-wasm32-wasix.so, built in build.sh by scripts/cffi-wasix.sh from selftest/build_selftest.py (host cffi 2.1.1 on its ctypes backend, then wasixcc against wasix-python 3.15.0-1's headers), the way PyNaCl's _sodium and cryptography's _openssl are built; it imports without the cffi package; #define and static const integers, an enum; a '...' struct laid out by the C compiler, passed and returned by value; a struct with an array; long long and double arrays; ffi.callback passed to C; extern \"Python\" through @ffi.def_extern; errno set in C read through ffi.errno; ffi.gc",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md names libffi (MIT), whose headers _cffi_backend is compiled against, with its licence text",
+    "build.sh, test/side-imports.mjs and test/backend.test.mjs: _cffi_backend imports ffi_call, ffi_prep_cif, ffi_prep_cif_var, ffi_closure_alloc, ffi_closure_free and ffi_prep_closure_loc from env and the ffi_type_* globals through GOT.mem, and defines no ffi_* symbol: the libffi is python.wasm's, the copy _ctypes uses (no second libffi, no second set of closure handlers)",
+    "test/backend.test.mjs: the libffi pin (recipe.yaml sources.libffi: url, sha256, commit, tree) is packages/wasix-python's; the side modules' 68 PyMethodDef and 12 PyGetSetDef entries all have the arity CPython calls them with (packages/py-kiwisolver/test/wasm-call-signatures.mjs, also run by build.sh)",
+    "python-range.mjs (homescoop#702): the tarball takes wasix-python >=3.15.0-1 <3.15.1 (built against 3.15.0-1's headers); the specs run on 3.15.0-1 and 3.15.0-8. py-pycparser comes from this run's peer artifact until it is on npm",
+    "2.1.1-1 (homescoop#2119): the first release"
+  ],
+  "ci": [
+    "node scripts/browser-cert/python-range.mjs py-cffi"
+  ],
+  "notices": [
+    {
+      "name": "libffi",
+      "license": "MIT"
+    }
+  ]
+}
