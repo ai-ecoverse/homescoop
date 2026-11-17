@@ -147,3 +147,20 @@ test('a head that moved since the PR was read is skipped', () => {
     f.cleanup();
   }
 });
+
+test("ladder-build's renovate-refresh job runs main's script with the App's token, outside ci, never on a merge group or a push", () => {
+  const yaml = readFileSync(join(scripts, '..', '.github/workflows/ladder-build.yml'), 'utf8');
+  const jobs = yaml.slice(yaml.indexOf('\njobs:\n')).split(/\n(?= {2}[a-z][a-z0-9-]*:\n)/).slice(1);
+  const job = jobs.find((j) => j.startsWith('  renovate-refresh:\n'));
+  assert.ok(job, 'no renovate-refresh job');
+  const cond = job.match(/^ {4}if: (.+)$/m)[1];
+  assert.match(cond, /github\.event_name == 'pull_request' && needs\.recipe-sha\.result == 'failure' && startsWith\(github\.head_ref, 'renovate\/'\) && github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.doesNotMatch(cond, /merge_group|'push'|workflow_dispatch/);
+  assert.doesNotMatch(job, /id-token|npm publish|oidc-publish|upload-artifact/);
+  assert.match(job, /^ {6}contents: read$/m, 'GITHUB_TOKEN stays read-only');
+  assert.match(job, /uses: actions\/create-github-app-token@/);
+  assert.match(job, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/, "checks out main, never the head");
+  assert.match(job, /run: node scripts\/renovate-refresh\.mjs /);
+  const ci = jobs.find((j) => j.startsWith('  ci:\n'));
+  assert.doesNotMatch(ci.match(/^ {4}needs: (.+)$/m)[1], /renovate-refresh/, 'ci does not wait on the refresh');
+});

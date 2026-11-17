@@ -26,6 +26,7 @@ as a reusable workflow for lint, tests and the dual review.
 pull_request
   detect ── classify-touched-packages.mjs: only the recipes the change touches
   ├─ recipe-sha, host-build, rebuild, reproducible, npm-parity, test, cert   (per touched recipe)
+  │    └─ renovate-refresh  recipe-sha failed on a renovate/ head: push the refresh (docs/renovate.md)
   ├─ shims, emsdk-cache / crates-host, crates-kernel, crates-consumer         (when touched)
   └─ pipeline (slicc-shared-web)  after all of them:
        lint (npm run lint, actionlint) · integration (scripts/test/*.test.mjs, 4 shards)
@@ -37,7 +38,7 @@ merge_group
   detect · group (merge-group-check.mjs) · pipeline (lint, tests; review is green) · ci
 push to main
   detect (list-touched-packages.mjs --publishable) → publish × package (OIDC) · close-listed-issues
-workflow_dispatch (main): publish named packages · issues / hourly: issue-labels
+workflow_dispatch (main): publish named packages · issues / hourly: issue-labels · hourly: renovate-refresh
 daily 05:47 UTC, or workflow_dispatch with agent_loop_rounds: agent-loop (stress/wasi-pnpm-agent)
 ```
 
