@@ -19,6 +19,10 @@ export HOMESCOOP_ROOT="$ROOT"
 source "$ROOT/scripts/build-common.sh"
 homescoop_load_recipe azure-cli
 homescoop_load_recipe azure-cli --source trim
+LICENSE_SOURCES=(license_antlr4 license_asn1crypto license_wcwidth license_azure_sdk)
+for key in "${LICENSE_SOURCES[@]}"; do
+  homescoop_load_recipe azure-cli --source "$key"
+done
 
 PY="${HOMESCOOP_HOST_PYTHON:-python3}"
 LOCK="$HERE/wheels.lock"
@@ -73,6 +77,17 @@ for line in open(reqs, encoding="utf-8"):
 print(f"  {len(rows)} distributions, {len(excluded)} excluded")
 EOF
 
+# The license texts licenses.map names for the distributions whose wheel
+# ships none.
+license_args=()
+for key in "${LICENSE_SOURCES[@]}"; do
+  up="$(printf '%s' "$key" | tr 'a-z' 'A-Z')"
+  url_var="${up}_SRC_URL" sha_var="${up}_SRC_SHA"
+  file="$WORK/azure-cli-$VERSION-$key-$(basename "${!url_var}")"
+  homescoop_fetch "${!url_var}" "${!sha_var}" "$file"
+  license_args+=("$key=$file")
+done
+
 echo "== azure-cli: fetch the closure"
 DL="$WORK/azure-cli-$VERSION-dist"
 mkdir -p "$DL"
@@ -84,7 +99,7 @@ STAGE="$WORK/azure-cli-$VERSION-site"
 rm -rf "$STAGE"
 echo "== azure-cli: install (no deps, no bytecode)"
 NOTICES="$WORK/azure-cli-$VERSION-THIRD-PARTY-NOTICES.md"
-PYTHONDONTWRITEBYTECODE=1 "$PY" -S -B "$HERE/src/install.py" "$STAGE" "$LOCK" "$DL" "$NOTICES"
+PYTHONDONTWRITEBYTECODE=1 "$PY" -S -B "$HERE/src/install.py" "$STAGE" "$LOCK" "$DL" "$NOTICES" "$HERE/licenses.map" "${license_args[@]}"
 
 echo "== azure-cli: patches"
 # can-launch-browser-wasi.patch: plain az login falls back to the device code

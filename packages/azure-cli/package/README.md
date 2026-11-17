@@ -68,6 +68,8 @@ other tools.
   on WASI as it does on Linux, so it falls back to the device code instead of
   waiting for a browser, and the storage SDKs load without `cryptography`,
   which only their client-side encryption needs.
+- **A closed pipe** (`az vm list --help | head`) ends az quietly with status
+  141, as it does a C program, instead of an "unexpected error" traceback.
 - **Speed.** Nothing is precompiled, so each run compiles what it imports:
   about 1–2 s for `az version`, and 3–5 s for `az group list` or a sign-in.
   azure-cli-core's packaged command index means a first run doesn't load
@@ -101,4 +103,7 @@ ERROR: This command needs cryptography (native code: Rust and OpenSSL). @ai-ecov
 
 Licensed under the MIT License (`LICENSE` is upstream's). The Python packages
 under `lib/azure-cli` keep their own licenses. `THIRD-PARTY-NOTICES.md` lists
-each one with its license and where its license text is.
+each one with its license and where its license text is. For the 21 packages
+whose wheel ships no license file, the text is in `THIRD-PARTY-NOTICES.md`
+itself: ANTLR's, isodate's and asn1crypto's, wcwidth's, and the Azure SDK
+for Python's MIT license for the older `azure-*` packages.

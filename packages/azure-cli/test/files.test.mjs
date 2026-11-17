@@ -118,6 +118,17 @@ test('LICENSE is azure-cli\'s, and the notices list every distribution', () => {
   for (const r of rows) {
     for (const f of r[4].matchAll(/`lib\/azure-cli\/([^`]+)`/g)) assert.ok(existsSync(join(site, f[1])), `${r[1]}: ${f[1]}`);
   }
+  // A distribution whose wheel ships no license file has a section with the
+  // text licenses.map names, and licenses.map names no other.
+  const map = readFileSync(join(recipeDir, 'licenses.map'), 'utf8').split('\n').filter((l) => l && !l.startsWith('#')).map((l) => l.split(' '));
+  assert.deepEqual(rows.filter((r) => r[4].trim() === 'below').map((r) => canon(r[1].trim())).sort(), map.map((m) => m[0]).sort());
+  for (const [name, version, spdx] of map) {
+    assert.equal(version, lock.find((e) => e.name === name).version, `licenses.map ${name}`);
+    const sec = notices.split(/^## /m).find((x) => x.startsWith(`${name} ${version} (${spdx})\n`));
+    assert.ok(sec, `no notices section for ${name}`);
+    assert.match(sec, new RegExp(`^License: ${spdx}$`, 'm'));
+    assert.match(sec, spdx === 'MIT' ? /Permission is hereby granted, free of charge/ : /Redistribution and use in source and binary forms[\s\S]*Neither (the )?name of/, name);
+  }
   const yaml = lock.find((e) => e.name === 'pyyaml');
   assert.ok(existsSync(join(site, `pyyaml-${yaml.version}.dist-info/licenses/LICENSE`)), "PyYAML's LICENSE from its sdist");
 });

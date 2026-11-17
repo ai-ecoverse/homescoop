@@ -37,6 +37,11 @@ What it does:
     also an az error, so az prints one ERROR line that names what is missing
     and exits 1, instead of an "unexpected error" traceback. Code that tries
     the import and falls back (PyJWT, az's telemetry) still catches it.
+  - A closed stdout ends az quietly with status 141, as SIGPIPE ends a C
+    program: `az vm list --help | head` printed an "unexpected error"
+    traceback for the BrokenPipeError (upstream does too). Only writes to
+    stdout do this; a socket's EPIPE stays an exception that requests
+    retries.
   - SyntaxWarnings are off: nothing here is precompiled (the tree is the same
     for every Python), so each run compiles what it imports, and some of the
     SDKs' docstrings would warn on every run, not once as with a __pycache__.
@@ -70,6 +75,35 @@ NATIVE = {
     "sshtunnel": "sshtunnel, for SSH (it needs paramiko and cryptography, native code)",
 }
 README = "https://github.com/ai-ecoverse/homescoop/tree/main/packages/azure-cli/package#whats-not-available"
+
+
+class QuietPipe:
+    """sys.stdout, except that a write to a closed pipe exits with 141."""
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+    def _closed(self):
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), self._stream.fileno())
+        except OSError:
+            pass
+        os._exit(141)
+
+    def write(self, text):
+        try:
+            return self._stream.write(text)
+        except BrokenPipeError:
+            self._closed()
+
+    def flush(self):
+        try:
+            return self._stream.flush()
+        except BrokenPipeError:
+            self._closed()
 
 
 class NativeFinder:
@@ -130,6 +164,8 @@ def main():
     env = os.environ
     isolate()
     sys.meta_path.append(NativeFinder)
+    if sys.stdout is not None:
+        sys.stdout = QuietPipe(sys.stdout)
     import warnings
 
     warnings.filterwarnings("ignore", category=SyntaxWarning)

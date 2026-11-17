@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Install the files of wheels.lock into one directory, as pip --no-deps would.
 
-  python3 -S -B install.py <site dir> <wheels.lock> <download dir> <notices.md>
+  python3 -S -B install.py <site dir> <wheels.lock> <download dir> <notices.md> \
+      <licenses.map> [<source key>=<file> ...]
 
 Run at build time by build.sh, with the build machine's python3, after every
 file of the lock is downloaded into <download dir> and checked against the
@@ -18,7 +19,10 @@ lock's sha256. For each entry:
                importlib.metadata sees it as pip would.
 
 Then <notices.md> lists every distribution with its version, its license as
-its metadata gives it, and where in lib/azure-cli its license text is.
+its metadata gives it, and where in lib/azure-cli its license text is. A
+distribution whose wheel ships no license file gets a section of its own with
+the text licenses.map names for it (a recipe source, fetched and checked by
+build.sh, or a file of the staged tree whose header is the license).
 
 A path two distributions both ship must have the same bytes in each (the
 azure-* namespace __init__.py files), or the install fails. Nothing is
@@ -122,7 +126,46 @@ def sdist(site, path, pkgdir, name, version, who):
     site.put(f"{info}/RECORD", ("\n".join(sorted(record)) + "\n").encode(), who)
 
 
-def notices(root, out, version):
+def license_map(path, sources, root, lock):
+    """{canonical name: (version, spdx, text)} from licenses.map."""
+    out = {}
+    for line in open(path, encoding="utf-8"):
+        if line.startswith("#") or not line.strip():
+            continue
+        name, version, spdx, src = line.split()
+        if src.startswith("sources."):
+            key = src.split(".", 1)[1]
+            if key not in sources:
+                die(f"licenses.map: {name}: build.sh passed no file for {src}")
+            file = sources[key]
+        elif src.startswith("tree:"):
+            file = os.path.join(root, safe(src[5:]))
+        else:
+            die(f"licenses.map: {name}: unknown source {src}")
+        if name not in lock:
+            die(f"licenses.map: {name} is not in wheels.lock; drop the line")
+        if lock[name] != version:
+            die(f"licenses.map: {name} {version}, wheels.lock has {lock[name]}: check its license text and update the line")
+        with open(file, encoding="utf-8") as f:
+            text = f.read().strip("\n")
+        if src.startswith("tree:"):
+            # The file's leading comment block, not its code.
+            lines = text.split("\n")
+            n = next((i for i, l in enumerate(lines) if not l.startswith("#")), len(lines))
+            text = "\n".join(lines[:n])
+        if not text:
+            die(f"licenses.map: {name}: {src} is empty")
+        out[name] = (version, spdx, src, text)
+    return out
+
+
+def canon(name):
+    import re
+
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def notices(root, out, version, extra):
     """THIRD-PARTY-NOTICES.md: each distribution, its license, its license files."""
     from email.parser import HeaderParser
 
@@ -143,6 +186,10 @@ def notices(root, out, version):
             for n in names:
                 if n.upper().startswith(("LICEN", "COPYING", "NOTICE", "AUTHORS")):
                     files.append(os.path.relpath(os.path.join(base, n), root))
+        if not files and canon(name) not in extra:
+            die(f"{name} {ver} ships no license file and licenses.map has no text for it")
+        if files and canon(name) in extra:
+            die(f"{name} {ver} ships a license file now; drop its licenses.map line")
         rows.append((name, ver, label, sorted(files)))
     lines = [
         "# Third-party notices",
@@ -151,22 +198,31 @@ def notices(root, out, version):
         "distributions upstream pins for it, unmodified, under `lib/azure-cli`. Each",
         "keeps its own license, as its metadata states it below. The license texts",
         "are the ones each distribution ships, in its `.dist-info` under `lib/azure-cli`;",
-        "the distributions marked \"no license file\" ship none in their wheel.",
+        "a distribution whose wheel ships none has its license text in a section",
+        "of its own below, from licenses.map in the recipe.",
         "",
         "| distribution | version | license | license text |",
         "| --- | --- | --- | --- |",
     ]
     for name, ver, label, files in rows:
-        where = "<br>".join(f"`lib/azure-cli/{f}`" for f in files) or "no license file"
+        where = "<br>".join(f"`lib/azure-cli/{f}`" for f in files) or "below"
         lines.append(f"| {name} | {ver} | {label.replace('|', '/')} | {where} |")
+    for name, ver, label, files in rows:
+        if files:
+            continue
+        _v, spdx, src, text = extra[canon(name)]
+        where = f"the leading comment of `lib/azure-cli/{src[5:]}`" if src.startswith("tree:") else "the project's LICENSE"
+        lines += ["", f"## {name} {ver} ({spdx})", "", f"License: {spdx}", "",
+                  f"Its wheel ships no license file. This is {where}:", "", "```text", text, "```"]
     with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     print(f"install.py: {len(rows)} distributions in {os.path.basename(out)}, "
-          f"{sum(not r[3] for r in rows)} with no license file")
+          f"{sum(not r[3] for r in rows)} with the license text from licenses.map")
 
 
 def main():
-    root, lock, downloads, out = sys.argv[1:]
+    root, lock, downloads, out, lmap, *srcs = sys.argv[1:]
+    sources = dict(s.split("=", 1) for s in srcs)
     os.makedirs(root, exist_ok=True)
     site = Site(root)
     n = 0
@@ -188,7 +244,9 @@ def main():
         n += 1
     print(f"install.py: {n} distributions, {len(site.owner)} files")
     version = next(l.split()[2] for l in open(lock, encoding="utf-8") if l.startswith("# azure-cli "))
-    notices(root, out, version)
+    locked = {l.split()[0]: l.split()[1] for l in open(lock, encoding="utf-8") if l.strip() and not l.startswith("#")}
+    extra = license_map(lmap, sources, root, locked)
+    notices(root, out, version, extra)
 
 
 if __name__ == "__main__":

@@ -40,5 +40,10 @@ export default async function (ctx) {
   assert.match(dbg.stderr, /Using packaged command index for profile 'latest'\./, dbg.stderr.slice(0, 6000));
   assert.match(dbg.stderr, /Modules found from index for 'group': \['azure\.cli\.command_modules\.resource'\]/, dbg.stderr.slice(0, 6000));
   assert.doesNotMatch(dbg.stderr, /SyntaxWarning|[Rr]ebuild|Loading all modules/, dbg.stderr);
-  console.log(`az version: azure-cli ${release}, core and telemetry from their dist-info, nothing on stderr; az --version: CPython 3.15 (wasi); a first az group list took the packaged command index (the resource module only)`);
+  // Help cut short by a closed pipe: no traceback, status 141 (as SIGPIPE).
+  const cut = await sh(ctx, `${cfg} az vm list --help | head -3; echo "status=\${PIPESTATUS[0]}" >&2`);
+  assert.match(cut.stdout, /^Command\n {4}az vm list : /m, cut.stdout);
+  assert.match(cut.stderr, /status=141/, cut.stderr);
+  assert.doesNotMatch(cut.stderr, /Traceback|BrokenPipe|unexpected error/, cut.stderr);
+  console.log(`az version: azure-cli ${release}, core and telemetry from their dist-info, nothing on stderr; az --version: CPython 3.15 (wasi); a first az group list took the packaged command index (the resource module only); az vm list --help | head ends with 141, no traceback`);
 }

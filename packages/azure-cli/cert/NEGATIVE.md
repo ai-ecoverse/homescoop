@@ -91,3 +91,32 @@ AssertionError [ERR_ASSERTION]: … /node_modules/@ai-ecoverse/azure-cli/lib/azu
 - `login.mjs` and `sp.mjs` read the stand-in's request log. The device-code, token and ARM requests must be there, with az's client id, the device code and the Bearer token.
 - `config.mjs` reads each value's source from `az config get`. After `az config set`, the source is the user's file.
 - The stand-in refuses ARM calls without a token it issued, a wrong client secret and blob requests without SharedKey.
+
+## The launcher without QuietPipe
+
+`sys.stdout = QuietPipe(sys.stdout)` removed from `bin/az`.
+
+```
+browser-cert: FAIL packages/azure-cli/cert/version.mjs
+AssertionError [ERR_ASSERTION]: ERROR: The command failed with an unexpected error. Here is the traceback:
+ERROR: [Errno 64] Broken pipe
+Traceback (most recent call last):
+  File "/node_modules/@ai-ecoverse/wasix-python/lib/python3.15/argparse.py", line 2911, in print_help
+```
+
+That's `az vm list --help | head -3`, which upstream az does the same way.
+
+## A license text missing
+
+The tarball's `THIRD-PARTY-NOTICES.md` without its antlr4-python3-runtime section. The antlr4 wheel ships no license file of its own.
+
+```
+browser-cert: FAIL packages/azure-cli/cert/notices.mjs
+AssertionError [ERR_ASSERTION]: THIRD-PARTY-NOTICES.md: antlr4-python3-runtime: no "## " heading names it
+```
+
+The build doesn't get that far. `src/install.py` run with a `licenses.map` that has no antlr4 line stops with:
+
+```
+install.py: antlr4-python3-runtime 4.13.1 ships no license file and licenses.map has no text for it
+```

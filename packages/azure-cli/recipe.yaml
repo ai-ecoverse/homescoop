@@ -21,6 +21,22 @@ sources:
     # no profile uses.
     url: "https://raw.githubusercontent.com/Azure/azure-cli/azure-cli-{{version}}/scripts/trim_sdk.py"
     sha256: "2e6292f5285b4fcedbe8efd77309fade550667d1c502a6ffa078f1aa97942c64"
+  # License texts for the distributions whose wheel ships none
+  # (licenses.map): each project's own LICENSE at the tag of the version in
+  # wheels.lock. The Azure SDK packages are all from azure-sdk-for-python,
+  # whose LICENSE (MIT, Microsoft) is the license their metadata declares.
+  license_antlr4:
+    url: "https://raw.githubusercontent.com/antlr/antlr4/4.13.1/LICENSE.txt"
+    sha256: "3db1fb3ee79a4b4f9918fc4d0f6133bf18a3cf787f126cd22f8aa9b862281c0c"
+  license_asn1crypto:
+    url: "https://raw.githubusercontent.com/wbond/asn1crypto/0.24.0/LICENSE"
+    sha256: "7871ddf1918d53fd549943aad007cd4ad674b0e1da732a9aea4a79e1436d1eb5"
+  license_wcwidth:
+    url: "https://raw.githubusercontent.com/jquast/wcwidth/0.1.7/LICENSE.txt"
+    sha256: "0eddcc52cd3ef5d30798b8d43a14d3f0f1dcf0a6e4c1d0f2e177c44ce85bb69c"
+  license_azure_sdk:
+    url: "https://raw.githubusercontent.com/Azure/azure-sdk-for-python/azure-core_1.39.0/LICENSE"
+    sha256: "7c77a44a8acd9b41fdc209864a8016b3d430b5d0e09309818d5b7444336df744"
 dependencies:
   build: []
   host: []
