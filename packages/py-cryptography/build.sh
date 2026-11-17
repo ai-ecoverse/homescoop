@@ -151,9 +151,9 @@ chmod 755 "$SITE/cryptography/hazmat/bindings/$SO"
 # ours on a runner; those strings are the toolchain's fixed bytes, so a
 # string that is also in the target's std rlibs is not a leak.
 LEAKS=(-e "$B" -e "$(cd "$B" && pwd -P)" -e "$HOME" -e "${CARGO_HOME:-$HOME/.cargo}")
-strings "$HOMESCOOP_RUST_PYEXT_WR/lib/rustlib/$TARGET/lib/"*.rlib | sort -u >"$B/std-strings.txt"
-strings "$SITE/cryptography/hazmat/bindings/$SO" | grep -F "${LEAKS[@]}" | sort -u >"$B/leaks.txt" || true
-comm -23 "$B/leaks.txt" "$B/std-strings.txt" >"$B/leaks-own.txt"
+strings "$HOMESCOOP_RUST_PYEXT_WR/lib/rustlib/$TARGET/lib/"*.rlib | LC_ALL=C sort -u >"$B/std-strings.txt"
+strings "$SITE/cryptography/hazmat/bindings/$SO" | grep -F "${LEAKS[@]}" | LC_ALL=C sort -u >"$B/leaks.txt" || true
+LC_ALL=C comm -23 "$B/leaks.txt" "$B/std-strings.txt" >"$B/leaks-own.txt"
 if [[ -s "$B/leaks-own.txt" ]]; then
   echo "homescoop py-cryptography: a build path leaked into $SO" >&2
   head "$B/leaks-own.txt" >&2
