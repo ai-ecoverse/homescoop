@@ -1,0 +1,36 @@
+{
+  "name": "@ai-ecoverse/wasix-libsodium",
+  "version": "1.0.22-1",
+  "description": "libsodium 1.0.22 for slicc WASIX: static (lib/) and PIC (lib-pic/) libsodium.a, headers, pkg-config",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/wasix-libsodium/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/wasix-libsodium",
+  "keywords": [
+    "wasm",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "libsodium",
+    "nacl",
+    "crypto"
+  ],
+  "homescoop": {
+    "recipe": "wasix-libsodium",
+    "upstream": "1.0.22"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "include",
+    "lib",
+    "lib-pic"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
