@@ -143,6 +143,7 @@ Patches live beside the recipe as `packages/<name>/*.patch` (applied by
 
 | package | upstream | notes |
 | --- | --- | --- |
+| aws-cli | `aws/aws-cli` | github-tags, `2.x` only (renovate.json: the repo tags v1 too); the recipe pins AWS's source distribution, and build.sh checks the recipe's wheels against its `system-sandbox-lock.txt`, so a bump that moves a dependency fails until the wheel `sources:` follow |
 | bash | savannah `bash.git` | tags `bash-X.Y` |
 | cmake | `Kitware/CMake` | github-releases |
 | coreutils | savannah `coreutils.git` | |
