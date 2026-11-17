@@ -98,6 +98,7 @@ versions are on npm.
 | [`@ai-ecoverse/gcloud-cli`](https://www.npmjs.com/package/@ai-ecoverse/gcloud-cli) | [recipe](packages/gcloud-cli) | The Google Cloud CLI: gcloud and bq, to manage Google Cloud and query BigQuery from slicc. |
 | [`@ai-ecoverse/wasm-git`](https://www.npmjs.com/package/@ai-ecoverse/wasm-git) | [recipe](packages/git) | Git version control: clone, commit, branch, merge, push and pull. |
 | [`@ai-ecoverse/wasm-gmake`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gmake) | [recipe](packages/gmake) | GNU make, which builds programs from Makefiles. |
+| [`@ai-ecoverse/wasm-graphviz`](https://www.npmjs.com/package/@ai-ecoverse/wasm-graphviz) | [recipe](packages/graphviz) | Graphviz's dot, the graph layout program, with its layouts and core renderers (svg, json, xdot, dot). |
 | [`@ai-ecoverse/wasm-grep`](https://www.npmjs.com/package/@ai-ecoverse/wasm-grep) | [recipe](packages/grep) | GNU grep 3.12: search files for lines that match a pattern, with -P (PCRE2). |
 | [`@ai-ecoverse/wasm-gzip`](https://www.npmjs.com/package/@ai-ecoverse/wasm-gzip) | [recipe](packages/gzip) | GNU gzip: gzip, gunzip and zcat. |
 | [`@ai-ecoverse/wasm-imagemagick`](https://www.npmjs.com/package/@ai-ecoverse/wasm-imagemagick) | [recipe](packages/imagemagick) | Create, convert and edit images from the command line with ImageMagick: magick, convert, identify and mogrify. |

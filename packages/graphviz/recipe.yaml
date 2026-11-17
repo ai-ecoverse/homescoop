@@ -1,0 +1,28 @@
+# Graphviz's dot (and its layouts neato, fdp, circo, twopi, osage, patchwork) for the slicc wasm realm.
+name: graphviz
+builder: host
+runner: pool
+# renovate: datasource=gitlab-releases depName=graphviz/graphviz
+version: "16.1.1"
+npm: "@ai-ecoverse/wasm-graphviz"
+summary: "Graphviz dot 16.1.1 for slicc: layouts and the core renderers (svg, json, xdot, dot)"
+source:
+  url: "https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/{{version}}/graphviz-{{version}}.tar.xz"
+  sha256: "52e7fb9a57b52b5c67f41dba6504ba3231e118258779421cb8f4f99104de71f6"
+wasm:
+  initial-memory: 32MiB
+dependencies:
+  build: []
+  host: []
+  run: []
+about:
+  homepage: https://github.com/ai-ecoverse/homescoop/tree/main/packages/graphviz
+  license: EPL-2.0
+  notes: |
+    dot_static: --enable-static --disable-shared --disable-ltdl, so the plugins are
+    linked in (core: svg, json, xdot, dot, plain, ...; dot_layout; neato_layout: neato,
+    fdp, circo, twopi, osage, patchwork). No expat (HTML-like labels are read as text),
+    no zlib (no svgz), no cairo, gd or pango (no png), no GTS (so no sfdp, which removes
+    overlaps by its triangulation): a renderer of layouts, not of pictures. Built with -fwasm-exceptions (the kernel's runtime has no JS
+    __cxa_throw) and without <sys/mman.h> (no _munmap_js; usershape images are read,
+    not mapped).
