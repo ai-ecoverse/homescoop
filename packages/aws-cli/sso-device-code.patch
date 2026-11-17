@@ -1,0 +1,22 @@
+diff --git a/awscli/customizations/sso/utils.py b/awscli/customizations/sso/utils.py
+index 97be3b3..883e323 100644
+--- a/awscli/customizations/sso/utils.py
++++ b/awscli/customizations/sso/utils.py
+@@ -70,10 +70,15 @@ LOGIN_ARGS = [
+     {
+         'name': 'use-device-code',
+         'action': 'store_true',
+-        'default': False,
++        # homescoop (slicc): on by default. The Authorization Code flow
++        # redirects the browser to a callback server on 127.0.0.1, and in
++        # slicc no browser can reach the loopback the CLI listens on.
++        'default': True,
+         'help_text': (
+             'Uses the Device Code authorization grant and login flow '
+-            'instead of the Authorization Code flow.'
++            'instead of the Authorization Code flow. In this build (slicc) '
++            'it is the default, since the Authorization Code flow needs a '
++            'callback server on 127.0.0.1 that a browser can reach.'
+         ),
+     },
+     REDIRECT_PORT_ARG,

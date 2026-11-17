@@ -179,6 +179,13 @@
       "allowedVersions": "/^1\\.6\\./"
     },
     {
+      "description": "aws/aws-cli tags both lines in one repo: 2.x is the AWS CLI v2 that packages/aws-cli builds, 1.x the v1 CLI in maintenance. Stay on 2.x.",
+      "matchDepNames": [
+        "aws/aws-cli"
+      ],
+      "allowedVersions": "/^2\\./"
+    },
+    {
       "description": "vim tags move fast; xxd tracks a pinned patch — ignore majors.",
       "matchDepNames": [
         "vim/vim"

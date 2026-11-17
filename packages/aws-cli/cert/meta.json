@@ -1,0 +1,79 @@
+{
+  "harness": "slicc-kernel",
+  "needs": [
+    "@ai-ecoverse/wasm-bash",
+    "@ai-ecoverse/wasm-coreutils",
+    "@ai-ecoverse/wasix-python",
+    "@ai-ecoverse/wasm-tls-engine"
+  ],
+  "needsInstall": [
+    "@ai-ecoverse/wasm-bash@5.3.0-23",
+    "@ai-ecoverse/wasm-coreutils@9.12.0-15",
+    "@ai-ecoverse/wasix-python@3.15.0-8",
+    "@ai-ecoverse/wasm-tls-engine@4.2.0-12"
+  ],
+  "users": "enforce",
+  "runTimeoutMs": 300000,
+  "network": "ctx.serve(cert/lib/fake-aws.mjs) behind the kernel's realm proxy (https_proxy 127.0.0.1:3128): a fake of STS, S3, SSO OIDC and the SSO portal on their real hostnames; wasm-tls-engine lets the proxy terminate CONNECT with the kernel CA, which botocore verifies through AWS_CA_BUNDLE (the launcher's default, SSL_CERT_FILE). The fake logs every request, and the specs check the log in Node: SigV4 signatures and CRCs with Node's own code (cert/lib/sigv4.mjs, cert/lib/crc.mjs)",
+  "patches": {
+    "awscrt-optional.patch": "awscrt is optional, as in standalone botocore (botocore.compat.HAS_CRT), with pure-Python CRC32C, CRC64NVME and CRC combining (botocore/crc.py) and the classic S3 transfer client. Without it every command fails with No module named 'awscrt' (NEGATIVE.md). version.mjs (HAS_CRT False, no awscrt), checksums.mjs (botocore.crc against Node, the checksum classes, the CRC32 default), s3.mjs (CRC32C/CRC64NVME uploads, validated downloads, the combined full-object CRC64NVME of a ranged download, the classic multipart client, XXHASH64 refused), sts.mjs (no md/awscrt in the user agent), crt-only.mjs (SigV4a for an MRAP, aws login, cloudfront sign and cloudtrail validate-logs say they need awscrt, rc 255, send nothing; their help renders), launcher.mjs (a fake awscrt in site-packages is not picked up)",
+    "help-text.patch": "version.mjs: aws help and aws s3 cp help render as text with no groff or mandoc on PATH; without it they fail with Could not find executable named \"groff or mandoc\" (NEGATIVE.md)",
+    "sso-device-code.patch": "sso.mjs: aws sso login takes the device code flow with no flag; without it, it starts the Authorization Code flow with a callback server on 127.0.0.1 and waits for a redirect no browser in slicc can deliver (NEGATIVE.md)"
+  },
+  "notices": [
+    {
+      "name": "colorama",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "distro",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "docutils",
+      "license": "LicenseRef-docutils",
+      "text": "Most of the files included in this project have been placed in the public domain"
+    },
+    {
+      "name": "jmespath",
+      "license": "MIT"
+    },
+    {
+      "name": "prompt_toolkit",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "python-dateutil",
+      "license": "Apache-2.0 AND BSD-3-Clause"
+    },
+    {
+      "name": "ruamel.yaml",
+      "license": "MIT"
+    },
+    {
+      "name": "six",
+      "license": "MIT"
+    },
+    {
+      "name": "urllib3",
+      "license": "MIT"
+    },
+    {
+      "name": "wcwidth",
+      "license": "MIT"
+    }
+  ],
+  "checklist": [
+    "cert/version.mjs: aws --version is aws-cli/<homescoop.upstream> Python/3.15.x, nothing on stderr; in wasix-python, awscrt is not importable and botocore.compat.HAS_CRT is False; aws help and aws s3 cp help print text (Description, the synopsis, \"--checksum-algorithm\" (string), Examples) with no groff or mandoc; aws_completer completes 'aws s3 c', 'aws sts get-caller-i' and '--instance-i' from the generated ac.index",
+    "cert/sts.mjs: aws sts get-caller-identity over https through the kernel proxy returns the fake's identity; the one request is POST https://sts.us-east-1.amazonaws.com/ with Action=GetCallerIdentity, its SigV4 signature verified in Node with the secret key, no md/awscrt in the user agent; --query Account --output text, --output yaml (exactly) and table; --region eu-west-1 goes to sts.eu-west-1; keys written by aws configure set to ~/.aws/credentials sign the call; AccessDenied is rc 254 with the CLI's message; no credentials is rc 253 'Unable to locate credentials'",
+    "cert/s3.mjs: aws s3 ls; aws s3 cp up sends aws-chunked with a CRC32 trailer equal to Node's CRC32, SigV4 verified; s3api put-object --checksum-algorithm CRC32C and CRC64NVME send Node's values (pure Python); XXHASH64 is rc 255 'Missing Dependency: … requires awscrt'; aws s3 cp down asks for the checksum (x-amz-checksum-mode ENABLED), validates the object's CRC64NVME and gets the bytes, and a wrong checksum is rc 1 'did not match calculated checksum'; with 5 MB multipart settings an 11 MiB + 1 upload is CreateMultipartUpload, 3 UploadParts each with Node's CRC32 of its slice, CompleteMultipartUpload; a 6 MiB + 3 CRC64NVME object downloads in 2 ranged GETs whose combined checksum is validated (--debug 'Full object crc64nvme checksum validated'), and a wrong one fails",
+    "cert/checksums.mjs: in wasix-python, botocore.crc gives the CRC-32C and CRC-64/NVME check values, and on 70001 + 130003 random bytes the same CRC32, CRC32C and CRC64NVME as Node (cert/lib/crc.mjs), chained and through combine_*; s3transfer's combine functions are botocore.crc's; botocore's checksum classes are crc32, crc32c, crc64nvme, sha1, sha256 and sha512 (no xxhash), the crc64nvme class matches Node, the default request checksum is CRC32 and HAS_CRT is False",
+    "cert/sso.mjs: with a profile on an sso-session, aws sso login (no flag, --use-device-code, --no-browser) on a pty prints the device verification URL and code, polls CreateToken past one authorization_pending, says 'Successfully logged into Start URL', caches the token in ~/.aws/sso/cache, and names no 127.0.0.1, localhost or oauth/callback; its requests are RegisterClient, StartDeviceAuthorization (the start URL), CreateToken twice; aws sts get-caller-identity --profile cert then gets role credentials from the SSO portal with the bearer token (account, role) and signs STS with them (session token sent, SigV4 verified)",
+    "cert/launcher.mjs: a .pth, a jmespath that raises and a fake awscrt in wasix-python's site-packages, all seen by a plain python3, are ignored by aws (python3 -S) and by python3 bin/aws (site-packages dropped); without SSL_CERT_FILE botocore's own bundle fails with CERTIFICATE_VERIFY_FAILED, AWS_CA_BUNDLE set to the kernel CA works, a user's AWS_CA_BUNDLE wins over the default; on a pty there is no pager by default, and AWS_PAGER='tee <file>' gets the output; the launcher under another name exits 1",
+    "cert/crt-only.mjs: s3api get-object on a multi-region access point ARN (SigV4a), aws login, aws cloudfront sign and aws cloudtrail validate-logs exit 255 with 'Missing Dependency: … requires awscrt, the AWS Common Runtime, which this AWS CLI build does not include.', no traceback and no request sent; aws login help, cloudfront sign help, cloudtrail validate-logs help, ec2-instance-connect open-tunnel help and ec2 get-password-data help render",
+    "cert/notices.mjs: THIRD-PARTY-NOTICES.md has colorama, distro, docutils, jmespath, prompt_toolkit, python-dateutil, ruamel.yaml, six, urllib3 and wcwidth with their licenses' text; LICENSE is AWS's notice followed by the Apache License 2.0",
+    "test/files.test.mjs (host, the test job): lib/aws-cli/awscli is the recipe's release with the three patches applied and no awscrt, no __pycache__, .pyc, native code or links, the wheels' .data and RECORD files left out; every lock dependency but awscrt and ruamel.yaml.clib is there at the lock's version; ac.index is an SQLite database; bin/aws and bin/aws_completer are src/launcher.py, mode 0755, and the only slicc.commands",
+    "test/crc.test.mjs (host): botocore/crc.py from the package, run by the runner's python3, against Node's CRCs on random data, chained and combined",
+    "by hand, not in CI (no AWS credentials in CI): nothing yet against real AWS; the fakes reproduce the wire shapes of STS, S3, SSO OIDC and the SSO portal"
+  ]
+}
