@@ -1,0 +1,33 @@
+target-lexicon: parse the `dl` environment (wasm32-wasmer-wasi-dl).
+
+wasix-org/rust's dynamic-linking WASIX target is wasm32-wasmer-wasi-dl;
+pyo3-build-config parses TARGET with target-lexicon and panics on an
+unknown environment. Environment::Dl as in wasix-org/target-lexicon
+(branch wasix-0.13.2). Applied by scripts/rust-pyext.sh.
+
+--- a/src/targets.rs
++++ b/src/targets.rs
+@@ -841,6 +841,7 @@
+     AmdGiz,
+     Android,
+     Androideabi,
++    Dl,
+     Eabi,
+     Eabihf,
+     Gnu,
+@@ -884,6 +885,7 @@
+             AmdGiz => Cow::Borrowed("amdgiz"),
+             Android => Cow::Borrowed("android"),
+             Androideabi => Cow::Borrowed("androideabi"),
++            Dl => Cow::Borrowed("dl"),
+             Eabi => Cow::Borrowed("eabi"),
+             Eabihf => Cow::Borrowed("eabihf"),
+             Gnu => Cow::Borrowed("gnu"),
+@@ -1677,6 +1679,7 @@
+             "amdgiz" => AmdGiz,
+             "android" => Android,
+             "androideabi" => Androideabi,
++            "dl" => Dl,
+             "eabi" => Eabi,
+             "eabihf" => Eabihf,
+             "gnu" => Gnu,
