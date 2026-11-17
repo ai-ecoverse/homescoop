@@ -1,0 +1,47 @@
+name: py-pynacl
+builder: host
+reproducible: true
+# renovate: datasource=pypi depName=pynacl
+version: "1.6.2"
+npm: "@ai-ecoverse/py-pynacl"
+summary: "PyNaCl for slicc WASIX CPython 3.15"
+source:
+  url: "https://files.pythonhosted.org/packages/source/p/pynacl/pynacl-{{version}}.tar.gz"
+  sha256: "018494d6d696ae03c7e656e5e74cdfd8ea1326962cc401bcf018f1ed8436811c"
+sources:
+  # cffi's pure-Python generator writes nacl/_sodium.c on the host (the
+  # out-of-line API module); the same cffi release py-cffi ships, whose
+  # _cffi_backend the module imports at run time.
+  cffi:
+    url: "https://files.pythonhosted.org/packages/source/c/cffi/cffi-2.1.1.tar.gz"
+    sha256: "dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be"
+  pycparser:
+    url: "https://files.pythonhosted.org/packages/source/p/pycparser/pycparser-3.12.tar.gz"
+    sha256: "f03387877eab82ce01bbdfd0ba7252ee55a90b1c708d5129e2ce915475cf1db6"
+  wasix_libsodium:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-libsodium/-/wasix-libsodium-1.0.22-1.tgz"
+    sha256: ""
+  wasix_python:
+    url: "https://registry.npmjs.org/@ai-ecoverse/wasix-python/-/wasix-python-3.15.0-1.tgz"
+    sha256: "f96dde95f183dbc4b48a46bf70f6f616b823f5b9bafa75fa5e1334d1f96f4481"
+  cpython:
+    url: "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tgz"
+    sha256: "438596cac081036d3c1d532ab7e7335eeb35567bc961749a0d5797176db0db68"
+inputs:
+  - packages/py-kiwisolver/test/wasm-call-signatures.mjs
+dependencies:
+  build: [wasix-python]
+  host: []
+  run: [wasix-python]
+about:
+  license: Apache-2.0
+  notes: |
+    Cross-built from the PyPI sdist (SODIUM_INSTALL=system: the sdist's bundled
+    libsodium is not used) as one dylink.0 side module,
+    nacl/_sodium.cpython-315-wasm32-wasix.so: cffi 2.1.1's recompiler (pure
+    Python, ctypes backend, on the host) emits PyNaCl's src/bindings/build.py
+    module as C, compiled with wasixcc (PIC, legacy wasm EH) against wasix-python
+    3.15.0-1's headers (wasix-sysroot -38) and linked with
+    @ai-ecoverse/wasix-libsodium 1.0.22-1's lib-pic/libsodium.a. At run time
+    the module imports _cffi_backend from @ai-ecoverse/py-cffi. Every import of
+    the side module must be an export of python.wasm (build.sh checks).

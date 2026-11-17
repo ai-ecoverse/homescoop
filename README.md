@@ -138,6 +138,7 @@ versions are on npm.
 | [`@ai-ecoverse/py-pandas`](https://www.npmjs.com/package/@ai-ecoverse/py-pandas) | [recipe](packages/py-pandas) | pandas, data analysis and manipulation for Python. |
 | [`@ai-ecoverse/py-pillow`](https://www.npmjs.com/package/@ai-ecoverse/py-pillow) | [recipe](packages/py-pillow) | Pillow, the Python imaging library. |
 | [`@ai-ecoverse/py-pycparser`](https://www.npmjs.com/package/@ai-ecoverse/py-pycparser) | [recipe](packages/py-pycparser) | pycparser, a C parser in pure Python (the parser cffi's cdef uses), for slicc WASIX CPython. |
+| [`@ai-ecoverse/py-pynacl`](https://www.npmjs.com/package/@ai-ecoverse/py-pynacl) | [recipe](packages/py-pynacl) | PyNaCl, Python bindings to libsodium (public-key and secret-key boxes, sealed boxes, signing, password hashing). |
 | [`@ai-ecoverse/py-pyparsing`](https://www.npmjs.com/package/@ai-ecoverse/py-pyparsing) | [recipe](packages/py-pyparsing) | pyparsing for slicc WASIX CPython |
 | [`@ai-ecoverse/py-python-dateutil`](https://www.npmjs.com/package/@ai-ecoverse/py-python-dateutil) | [recipe](packages/py-python-dateutil) | python-dateutil for slicc WASIX CPython |
 | [`@ai-ecoverse/py-pytz`](https://www.npmjs.com/package/@ai-ecoverse/py-pytz) | [recipe](packages/py-pytz) | pytz for slicc WASIX CPython |
