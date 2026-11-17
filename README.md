@@ -84,6 +84,7 @@ versions are on npm.
 | npm | recipe | description |
 | --- | --- | --- |
 | [`@ai-ecoverse/aws-cli`](https://www.npmjs.com/package/@ai-ecoverse/aws-cli) | [recipe](packages/aws-cli) | The AWS Command Line Interface v2: aws, to manage AWS services from slicc. |
+| [`@ai-ecoverse/azure-cli`](https://www.npmjs.com/package/@ai-ecoverse/azure-cli) | [recipe](packages/azure-cli) | The Azure CLI: az, to manage Azure resources from slicc. |
 | [`@ai-ecoverse/wasm-bash`](https://www.npmjs.com/package/@ai-ecoverse/wasm-bash) | [recipe](packages/bash) | GNU bash 5.3, the shell, with line editing, history, completion and job control. |
 | [`@ai-ecoverse/wasm-binutils`](https://www.npmjs.com/package/@ai-ecoverse/wasm-binutils) | [recipe](packages/binutils) | GNU binutils strings, size and readelf, to inspect object files and binaries. |
 | [`@ai-ecoverse/wasm-bzip2`](https://www.npmjs.com/package/@ai-ecoverse/wasm-bzip2) | [recipe](packages/bzip2) | bzip2, bunzip2, bzcat and bzip2recover, with libbz2. |
