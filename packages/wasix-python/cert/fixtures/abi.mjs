@@ -31,6 +31,12 @@ export const MODULES = {
   'py-pytz': 'pytz',
   'py-six': 'six',
   'py-tzdata': 'tzdata',
+  'py-cffi': '_cffi_backend',
+  'py-pycparser': 'pycparser',
+  'py-cryptography': 'cryptography',
+  'py-pynacl': 'nacl',
+  'py-bcrypt': 'bcrypt',
+  'py-pyopenssl': 'OpenSSL',
 };
 
 export async function abiSplit({ run, read }) {

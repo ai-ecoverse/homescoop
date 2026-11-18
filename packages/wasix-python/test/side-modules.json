@@ -94,6 +94,42 @@
       "version": "2026.4.0-5",
       "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-tzdata/-/py-tzdata-2026.4.0-5.tgz",
       "sha256": "6e3a4cab78cffc16966450944d9234b1fab98472e7b3f1639ba50dc1ebbf4e24"
+    },
+    {
+      "name": "@ai-ecoverse/py-cffi",
+      "version": "2.1.1-2",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cffi/-/py-cffi-2.1.1-2.tgz",
+      "sha256": "cced8d22f63f47463133cdb74a021b5472081ea19803a204b35af81e8687279e"
+    },
+    {
+      "name": "@ai-ecoverse/py-pycparser",
+      "version": "3.12.0-1",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pycparser/-/py-pycparser-3.12.0-1.tgz",
+      "sha256": "1bff73bb5891e7e0ea7b96292c9c4b2f388993032022ede099d534fa66ef186f"
+    },
+    {
+      "name": "@ai-ecoverse/py-cryptography",
+      "version": "50.0.2-1",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-cryptography/-/py-cryptography-50.0.2-1.tgz",
+      "sha256": "57f0b9ed4b26cad86fc8c8eb7ed104b1438b2de673bd07b8720b72d0a1b41fdd"
+    },
+    {
+      "name": "@ai-ecoverse/py-pynacl",
+      "version": "1.6.2-1",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pynacl/-/py-pynacl-1.6.2-1.tgz",
+      "sha256": "035f62a168eeaa0d02f659bb7e0c4dd0dd93b0973d26a869b7980fdb6e259334"
+    },
+    {
+      "name": "@ai-ecoverse/py-bcrypt",
+      "version": "5.0.0-1",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-bcrypt/-/py-bcrypt-5.0.0-1.tgz",
+      "sha256": "78e7b0ca7576921baee946f205d6182890a92312298c97b409321096f03134a4"
+    },
+    {
+      "name": "@ai-ecoverse/py-pyopenssl",
+      "version": "26.4.0-1",
+      "tarball": "https://registry.npmjs.org/@ai-ecoverse/py-pyopenssl/-/py-pyopenssl-26.4.0-1.tgz",
+      "sha256": "79fc09fe13dcaeb23911edd7feb2bcca41e49a92ba07f9ba4913154474b1a65e"
     }
   ]
 }

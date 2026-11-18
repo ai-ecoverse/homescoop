@@ -13,7 +13,8 @@ import { repin } from './fixtures/repin.mjs';
 import { abiSplit, assertRefused } from './fixtures/abi.mjs';
 
 const PKGS = ['py-numpy', 'py-pandas', 'py-scipy', 'py-matplotlib', 'py-contourpy', 'py-kiwisolver', 'py-pillow',
-  'py-fonttools', 'py-cycler', 'py-packaging', 'py-pyparsing', 'py-python-dateutil', 'py-pytz', 'py-six', 'py-tzdata'];
+  'py-fonttools', 'py-cycler', 'py-packaging', 'py-pyparsing', 'py-python-dateutil', 'py-pytz', 'py-six', 'py-tzdata',
+  'py-cffi', 'py-pycparser', 'py-cryptography', 'py-pynacl', 'py-bcrypt', 'py-pyopenssl'];
 
 const BLOCKS = {
   'py-numpy': String.raw`
@@ -60,9 +61,38 @@ import contourpy
 z = np.array([[0.0, 1.0], [1.0, 2.0]]); lines = contourpy.contour_generator(z=z).lines(1.0)
 out["contourpy"] = [len(lines) > 0]
 `,
+  'py-cffi': String.raw`
+import cffi
+ffi = cffi.FFI(); ffi.cdef("size_t strlen(const char *);"); C = ffi.dlopen(None)
+cb = ffi.callback("int(int)", lambda x: x * 3)
+out["cffi"] = [cffi.__version__, C.strlen(b"wasix"), cb(14)]
+`,
+  'py-cryptography': String.raw`
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ed25519
+h = hashes.Hash(hashes.SHA256()); h.update(b"abc")
+k = ed25519.Ed25519PrivateKey.generate(); sig = k.sign(b"m"); k.public_key().verify(sig, b"m")
+out["cryptography"] = [h.finalize().hex()[:16], len(sig)]
+`,
+  'py-pynacl': String.raw`
+import nacl.secret, nacl.utils
+box = nacl.secret.SecretBox(nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE))
+out["pynacl"] = [box.decrypt(box.encrypt(b"sealed"))]
+out["pynacl"][0] = out["pynacl"][0].decode()
+`,
+  'py-bcrypt': String.raw`
+import bcrypt
+pw = bcrypt.hashpw(b"pw", bcrypt.gensalt(rounds=4))
+out["bcrypt"] = [bcrypt.checkpw(b"pw", pw), bcrypt.checkpw(b"no", pw)]
+`,
+  'py-pyopenssl': String.raw`
+from OpenSSL import crypto
+pk = crypto.PKey(); pk.generate_key(crypto.TYPE_RSA, 1024)
+out["pyopenssl"] = [__import__("OpenSSL").__version__, pk.bits()]
+`,
 };
 const PURE = String.raw`
-import fontTools.ttLib, cycler, packaging.version, pyparsing, dateutil.parser, pytz, six, tzdata
+import fontTools.ttLib, cycler, packaging.version, pyparsing, dateutil.parser, pytz, six, tzdata, pycparser
 out["pure"] = [str(packaging.version.Version("1.2.3")), dateutil.parser.isoparse("2026-10-10T12:00:00").year,
                str(pytz.timezone("Europe/Berlin")), six.PY3]
 `;
@@ -100,5 +130,10 @@ export default async function (ctx) {
   if (has('py-pillow')) assert.deepEqual(o.pillow, [[100, 100], [10, 10]]);
   if (has('py-kiwisolver')) assert.deepEqual(o.kiwisolver, ['1.5.1', '1 * a + -3 == 0 | strength = 1.001e+09 (VIOLATED)']);
   if (has('py-contourpy')) assert.deepEqual(o.contourpy, [true]);
+  if (has('py-cffi')) assert.deepEqual(o.cffi, ['2.1.1', 5, 42]);
+  if (has('py-cryptography')) assert.deepEqual(o.cryptography, ['ba7816bf8f01cfea', 64]);
+  if (has('py-pynacl')) assert.deepEqual(o.pynacl, ['sealed']);
+  if (has('py-bcrypt')) assert.deepEqual(o.bcrypt, [true, false]);
+  if (has('py-pyopenssl')) assert.deepEqual(o.pyopenssl, ['26.4.0', 1024]);
   assert.deepEqual(o.pure, ['1.2.3', 2026, 'Europe/Berlin', true]);
 }

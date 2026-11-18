@@ -2,6 +2,12 @@
 
 CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
 
+## Since 3.15.0-10
+
+- **pip knows the native-crypto packages.** `pip install` of cffi, cryptography, PyNaCl or bcrypt stops at once when they aren't installed, with the package to add: `pnpm add -g @ai-ecoverse/py-cryptography` (or `py-cffi`, `py-pynacl`, `py-bcrypt`). It doesn't try to build them from an sdist, which needs a C compiler or Rust and fails slowly. Once they're installed, pip treats them as already satisfied, so `pip install` of a package that requires them (msal, paramiko, azure-identity) installs the rest of what it needs.
+- **The hint for packages outside Python data tools no longer mentions matplotlib.** Before, every package outside the `pydata` catalog got "which pulls these in via matplotlib". That's now only for pillow, contourpy and kiwisolver.
+- **The PyPI→homescoop map** that pip and uv share is now `scripts/homescoop-pydata-map.json` in the homescoop repo (homescoop#2119).
+
 ## Since 3.15.0-9
 
 - **Serial ports work with pyserial** (wasix-sysroot 2025.9.30-44, slicc-kernel ≥ 1.183.0). A serial port the page grants shows up as `/dev/ttyUSB0` or `/dev/ttyACM0`. `pip install pyserial`, then `serial.Serial('/dev/ttyUSB0', 115200)` reads and writes it. `dtr`, `rts`, `cts`, `dsr`, `cd`, `ri`, `in_waiting`, `out_waiting`, `send_break()`, `break_condition`, `reset_input_buffer()`, `reset_output_buffer()`, `flush()`, the standard baud rates, byte size, parity and stop bits all reach the port, and `select` works on it. Before, the libc answered EINVAL to the modem-line, break and queue ioctls, so `s.dtr = False` raised `OSError: [Errno 28]`. `termios` and `fcntl.ioctl` reach the same calls with Linux's request numbers (`TIOCMGET` 0x5415, `TCGETS2` 0x802C542A with `BOTHER` for a custom speed). `sys.platform` is `wasi`, so pyserial's own custom-speed path, which is Linux-only, refuses non-standard rates; `fcntl.ioctl(fd, TCSETS2, …)` sets one. Opening a port for writing needs root (`sudo`) when the node is `root:dialout 0640`.
@@ -19,7 +25,7 @@ CPython 3.15 for slicc WASIX (`commands` `python` / `python3`).
   resolve normally. PyPI has no `wasm32-wasix` wheels for those; without the guard
   pip tried an sdist build that looked hung. Pure-Python packages from PyPI still
   work (`pip install six`). PyPI keys match
-  `packages/wasi-uv/homescoop-pydata-map.json` (shared with wasi-uv); the runtime
+  `scripts/homescoop-pydata-map.json` (shared with wasi-uv); the runtime
   table is `_slicc_pip.py`, armed from `_slicc_site.fix()` (`cert/pip-guard.mjs`).
 
 ## Since 3.15.0-7
