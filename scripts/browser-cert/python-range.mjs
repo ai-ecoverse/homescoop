@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PYTHON, inPythonRange, pythonRange } from '../check-exact-pins.mjs';
+import { PYTHON, inPythonRange, pythonRange, pythonSeries, seriesRange } from '../check-exact-pins.mjs';
 import { readCertMeta } from './cert-meta.mjs';
 import { peerTarball } from '../peer-tarball.mjs';
 
@@ -40,10 +40,28 @@ export function peerTarballs(meta, find = peerTarball) {
   return (meta.peers || []).map((p) => find(p)).filter((t) => t.endsWith('.tgz'));
 }
 
-function lockFor(tgz, python, work, peers = []) {
+export function seriesProbes(spec) {
+  const s = seriesRange(spec);
+  if (!s) return [];
+  const [x, y, z] = s.floor.split('-')[0].split('.').map(Number);
+  return [...new Set([`${x}.${y}.${z + 1}-1`, `${s.last}-1`])];
+}
+
+export function fakePython(version, work) {
+  const dir = mkdtempSync(join(work, 'fake-python-'));
+  mkdirSync(join(dir, 'package'));
+  writeFileSync(join(dir, 'package', 'package.json'), `${JSON.stringify({ name: PYTHON, version, license: 'PSF-2.0' })}\n`);
+  const tgz = join(work, `wasix-python-${version}-${dir.slice(-6)}.tgz`);
+  sh('tar', ['czf', tgz, '-C', dir, 'package']);
+  rmSync(dir, { recursive: true, force: true });
+  return tgz;
+}
+
+export function lockFor(tgz, python, work, peers = [], extra = []) {
   const dir = mkdtempSync(join(work, 'lock-'));
   writeFileSync(join(dir, 'package.json'), '{"name":"python-range-probe","private":true}\n');
-  sh('npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', '--silent', tgz, ...peers, `${PYTHON}@${python}`], { cwd: dir });
+  const want = python.endsWith('.tgz') ? python : `${PYTHON}@${python}`;
+  sh('npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', '--silent', ...extra, tgz, ...peers, want], { cwd: dir });
   const lock = JSON.parse(readFileSync(join(dir, 'package-lock.json'), 'utf8'));
   rmSync(dir, { recursive: true, force: true });
   return lock;
@@ -68,9 +86,11 @@ function main(argv) {
   }
   const repoPj = JSON.parse(readFileSync(join(root, 'packages', pkg, 'package/package.json'), 'utf8'));
   const spec = repoPj.dependencies?.[PYTHON];
-  const range = pythonRange(spec);
+  const range = seriesRange(spec);
   if (!range) {
-    console.error(`::error::packages/${pkg}/package/package.json: ${PYTHON} is ${JSON.stringify(spec)}, not a >=X.Y.Z-N <X.Y.Z+1 range (homescoop#702)`);
+    const patch = pythonRange(spec);
+    const want = patch && pythonSeries(patch.floor);
+    console.error(`::error::packages/${pkg}/package/package.json: ${PYTHON} is ${JSON.stringify(spec)}, not the series range${want ? ` ${JSON.stringify(want)}` : ' pythonSeries(<floor>)'}, which takes every later ${PYTHON} patch release (homescoop#1939)`);
     return 1;
   }
   const meta = readCertMeta(join(root, 'packages', pkg, 'cert/meta.json'), `packages/${pkg}/cert/meta.json`);
@@ -81,8 +101,8 @@ function main(argv) {
   }
   const listed = JSON.parse(sh('npm', ['view', `${PYTHON}@${spec}`, 'version', '--json']));
   const registry = [].concat(listed).pop();
-  console.log(`python-range: ${repoPj.name} takes ${PYTHON} ${spec}; floor ${range.floor}, newest ${newest} (cert/meta.json), newest on npm ${registry}`);
-  if (registry !== newest) console.log(`::warning::${pkg}: npm has ${PYTHON}@${registry} in ${spec}; this cert's newest is ${newest}`);
+  console.log(`python-range: ${repoPj.name} takes ${PYTHON} as the series ${range.floor} through ${range.last}-N; newest ${newest} (cert/meta.json), newest on npm ${registry}`);
+  if (registry !== newest) console.log(`::warning::${pkg}: npm has ${PYTHON}@${registry} in its series range; this cert's newest is ${newest}`);
 
   const base = process.env.RUNNER_TEMP || tmpdir();
   mkdirSync(base, { recursive: true });
@@ -98,6 +118,15 @@ function main(argv) {
         console.error(`python-range: FAIL ${tgz} with ${PYTHON}@${python}:\n  - ${errors.join('\n  - ')}`);
       } else {
         console.log(`python-range: ok, ${tgz} with ${PYTHON}@${python} resolves one python, ${TOP} ${python}`);
+      }
+    }
+    for (const python of seriesProbes(spec)) {
+      const errors = lockErrors(lockFor(tgz, fakePython(python, work), work, peers), python);
+      if (errors.length) {
+        failed++;
+        console.error(`python-range: FAIL ${tgz} with a stand-in ${PYTHON}@${python}, a later patch release in the series:\n  - ${errors.join('\n  - ')}`);
+      } else {
+        console.log(`python-range: ok, ${tgz} with a stand-in ${PYTHON}@${python} resolves one python, ${TOP} ${python}`);
       }
     }
     if (failed || argv.includes('--lock-only')) return failed ? 1 : 0;

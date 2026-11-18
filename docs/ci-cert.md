@@ -81,8 +81,8 @@ CI-certified set (automerge non-majors and `compat.mjs`'s `ci-certified` set, no
 
 ## py-* python range
 
-A py-\* takes wasix-python as a range ([versioning.md](versioning.md#exact-ai-ecoverse-pins),
-#702). Its `cert/meta.json` installs the **newest** python in `needsInstall`
+A py-\* takes wasix-python as the series range ([versioning.md](versioning.md#exact-ai-ecoverse-pins),
+#702, #1939). Its `cert/meta.json` installs the **newest** python in `needsInstall`
 (`@ai-ecoverse/wasix-python@<newest>`), so the `cert` job's browser cert runs on
 it, and declares one `ci` command:
 
@@ -90,15 +90,24 @@ it, and declares one `ci` command:
 node scripts/browser-cert/python-range.mjs <py-pkg> [--tarball .homescoop-out/package.tgz] [--lock-only] [--keep]
 ```
 
-It takes the **floor** from the range in `packages/<py-pkg>/package/package.json`.
-Both pythons must be in the range; it warns when npm has a newer one in the
-range than `needsInstall`.
+It takes the **floor** from the series range in `packages/<py-pkg>/package/package.json`
+and fails when that isn't the canonical `pythonSeries(<floor>)`; it names the
+string to use for a patch-line range. So the next release of a py-\* still on
+the patch-line range (an upstream bump or a rebuild) must carry its series
+re-pin, although `check-exact-pins` only reports it as pending. Both pythons must be in the range; it
+warns when npm has a newer one in the range than `needsInstall`.
 
 1. For the floor and the newest, `npm install --package-lock-only` of the
    tarball with that wasix-python must resolve exactly one python, at the
-   top level, at that version. The exact-pinned release before it nests a
-   second python under the newest, so this is its NEGATIVE.
-2. Without `--lock-only` (every py-\* with C extensions),
+   top level, at that version.
+2. The same for two stand-in pythons, `X.Y.(Z+1)-1` and `X.Y.29-1`: tarballs
+   that hold only a package.json, installed from the file, so npm keeps
+   them at the top level only if the py-\*'s range takes them. A py-\* on the
+   patch-line range makes npm fetch a second python (#1939), so the
+   published releases before the series re-pin are its NEGATIVE.
+   `scripts/test/python-series.test.mjs` runs the same check offline on the
+   published py-numpy 2.5.4-4 manifest.
+3. Without `--lock-only` (every py-\* with C extensions),
    `scripts/cert-review/harness.sh` installs the cert's harness (kernel,
    `needs`, Chromium). The script then moves wasix-python to the floor and
    runs the package's specs again through `run.mjs`.

@@ -141,19 +141,49 @@ whatever is newest on the registry rather than the version this package was
 certified with, and a global add cannot override transitive versions. Pin
 the dependency version that is `latest` on npm **and** certified.
 
-**The one range: a py-\*'s python** ([#702](https://github.com/ai-ecoverse/homescoop/issues/702)).
+**The one range: a py-\*'s python** ([#702](https://github.com/ai-ecoverse/homescoop/issues/702), [#1939](https://github.com/ai-ecoverse/homescoop/issues/1939)).
 An `@ai-ecoverse/py-*` package takes `@ai-ecoverse/wasix-python`, in
-`dependencies` (not as a peer), as `>=X.Y.Z-N <X.Y.Z+1`, e.g.
-`">=3.14.2-16 <3.14.3"`. An exact pin nested a second full python (about
-115 MiB) under every py-\* of a consumer on a newer python, and
-`_slicc_site.discover()` then refused the py-\*, because its python wasn't
-the one running. Our versions are semver prereleases, so the range is the
-3.14.2-N line from the floor up: 3.14.2-15 and 3.14.3-1 don't match, and a
-python patch bump is a deliberate re-pin. The floor is the python the
-package is built against or certified with. A py-\* with C extensions is
-certified on the floor and on the newest python
-([ci-cert.md](ci-cert.md#py-python-range)). A py-\* takes another py-\* the
-same way, e.g. py-python-dateutil's `"@ai-ecoverse/py-six": ">=1.17.0-3 <1.17.1"`
+`dependencies` (not as a peer), as the **series range** of its floor:
+`pythonSeries("3.15.0-1")` in `scripts/check-exact-pins.mjs`, the floor's
+patch line followed by every later patch line of the minor series up to
+`X.Y.29` (`SERIES_LAST`):
+
+```
+>=3.15.0-1 <3.15.1 || >=3.15.1-1 <3.15.2 || >=3.15.2-1 <3.15.3 || … || >=3.15.29-1 <3.15.30
+```
+
+An exact pin nested a second full python (about 115 MiB) under every py-\*
+of a consumer on a newer python, and `_slicc_site.discover()` then refused
+the py-\*, because its python wasn't the one running (#702). The patch-line
+range that replaced it (`>=3.15.0-1 <3.15.1`) did the same on every CPython
+patch release: with wasix-python 3.15.2-1 at `latest`, npm nested a 3.15.0-N
+under each py-\* again (#1939). Our versions are semver prereleases, and npm
+lets a prerelease match only a comparator set that names a prerelease of its
+own `x.y.z`, so a minor-wide `>=3.15.0-1 <3.16.0` (or `~3.15.0-1`,
+`<3.16.0-0`) still refuses 3.15.2-1; only a union of patch lines takes it.
+The series stops at 3.16.0-1, whose `cp316` ABI the py-\* can't load.
+
+The series rests on CPython's ABI promise within a minor release (no struct
+layout or exported symbol of 3.15.0 changes in 3.15.2), and on the gate in
+the one place that changes: a wasix-python release in the series is
+certified with every published py-\* installed by its range (cert/meta.json
+`noRepin: true`, so nothing is stood in) and `test/side-abi.mjs` checks every
+side-module import against the new `python.wasm`. A wasix-python that breaks
+a published py-\* fails its own cert and does not publish. So a CPython
+patch bump needs no py-\* release.
+
+The floor is the python the package is built against or certified with. A
+py-\* with C extensions is certified on the floor and on the newest python,
+and every py-\*'s tarball must resolve one python with stand-ins of the next
+patch line and of `X.Y.29`
+([ci-cert.md](ci-cert.md#py-python-range)). `PYTHON_SERIES_PENDING` lists
+the packages that still take the patch-line range until their series
+re-pin; they are reported, not failed, and an entry that no longer has the
+patch range fails the check. The same series is allowed for wasm-emscripten,
+which runs emcc on wasix-python (`PYTHON_CONSUMERS`), and nowhere else.
+
+A py-\* takes another py-\* as the patch-line range, e.g.
+py-python-dateutil's `"@ai-ecoverse/py-six": ">=1.17.0-3 <1.17.1"`
 (#625, with the #211 wave for the rest), so a newer release of a dependency
 doesn't nest an old copy under each dependent.
 
