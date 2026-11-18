@@ -92,7 +92,9 @@ node scripts/browser-cert/python-range.mjs <py-pkg> [--tarball .homescoop-out/pa
 
 It takes the **floor** from the series range in `packages/<py-pkg>/package/package.json`
 and fails when that isn't the canonical `pythonSeries(<floor>)`; it names the
-string to use for a patch-line range. Both pythons must be in the range; it
+string to use for a patch-line range. So the next release of a py-\* still on
+the patch-line range (an upstream bump or a rebuild) must carry its series
+re-pin, although `check-exact-pins` only reports it as pending. Both pythons must be in the range; it
 warns when npm has a newer one in the range than `needsInstall`.
 
 1. For the floor and the newest, `npm install --package-lock-only` of the
