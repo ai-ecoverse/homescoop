@@ -33,6 +33,12 @@ print(json.dumps({
   "pillow": g.lookup("Pillow"),
   "contourpy": g.lookup("contourpy"),
   "kiwisolver": g.lookup("kiwisolver"),
+  "cffi": g.lookup("CFFI"),
+  "cryptography": g.lookup("cryptography"),
+  "pynacl": g.lookup("PyNaCl"),
+  "bcrypt": g.lookup("bcrypt"),
+  "pyopenssl": g.lookup("pyOpenSSL"),
+  "pycparser": g.lookup("pycparser"),
   "six": g.lookup("six"),
   "formulas": g.lookup("formulas"),
   "packaging": g.lookup("packaging"),
@@ -49,6 +55,12 @@ print(json.dumps({
   assert.equal(m.pillow, '@ai-ecoverse/py-pillow');
   assert.equal(m.contourpy, '@ai-ecoverse/py-contourpy');
   assert.equal(m.kiwisolver, '@ai-ecoverse/py-kiwisolver');
+  assert.equal(m.cffi, '@ai-ecoverse/py-cffi');
+  assert.equal(m.cryptography, '@ai-ecoverse/py-cryptography');
+  assert.equal(m.pynacl, '@ai-ecoverse/py-pynacl');
+  assert.equal(m.bcrypt, '@ai-ecoverse/py-bcrypt');
+  assert.equal(m.pyopenssl, null, 'pyOpenSSL is pure Python');
+  assert.equal(m.pycparser, null, 'pycparser is pure Python');
   assert.equal(m.six, null);
   assert.equal(m.formulas, null);
   assert.equal(m.packaging, null);
@@ -147,4 +159,25 @@ print("numpy-present:" + f.find_candidates("numpy")[0])
   assert.match(out, /^blocked:OK$/m);
   assert.match(out, /^six:ok:six$/m);
   assert.match(out, /^numpy-present:ok:numpy$/m);
+});
+
+test('_slicc_pip: the native-crypto hint names the py-* package, not pydata or matplotlib', () => {
+  const out = py(`
+import _slicc_pip as g
+print(g.hint_message([("cryptography", ""), ("PyNaCl", "")]))
+print("=====")
+print(g.hint_message([("bcrypt", "")]))
+print("=====")
+print(g.hint_message([("kiwisolver", "")]))
+`);
+  const [two, one, kiwi] = out.split('=====\n');
+  assert.match(two, /pip cannot install cryptography, pynacl on WASIX/);
+  assert.match(two, /Install the homescoop builds:\n {2}pnpm add -g @ai-ecoverse\/py-cryptography @ai-ecoverse\/py-pynacl/);
+  assert.match(two, /Once they are installed, dependents/);
+  assert.match(one, /Install the homescoop build:\n {2}pnpm add -g @ai-ecoverse\/py-bcrypt/);
+  assert.match(one, /Once it is installed, dependents/);
+  for (const t of [two, one]) {
+    assert.doesNotMatch(t, /matplotlib|pydata|Python data tools/, t);
+  }
+  assert.match(kiwi, /pulls these in via matplotlib/);
 });

@@ -1,13 +1,15 @@
-"""Refuse pip installs of packages homescoop ships as WASIX natives (pydata).
+"""Refuse pip installs of packages homescoop ships as WASIX natives.
 
 PyPI has no wasm32-wasix wheels for these; pip falls back to an sdist build
-(cmake/ninja/…) that hangs or fails slowly. The working builds are the
-@ai-ecoverse/py-* packages, exposed in seven as Python data tools (pydata /
-slicc-py-datatools) and discovered via slicc.python.sitePackages.
+(cmake/ninja/cargo/…) that hangs or fails slowly. The working builds are the
+@ai-ecoverse/py-* packages, discovered via slicc.python.sitePackages: the
+data tools, exposed in seven as Python data tools (pydata /
+slicc-py-datatools), and the native-crypto chain (cffi, cryptography, PyNaCl,
+bcrypt), installed with pnpm add -g.
 
 Source of truth for PyPI keys / npm / catalog membership:
-`packages/wasi-uv/homescoop-pydata-map.json` (shared with wasi-uv). Keep the
-dict below identical; `scripts/test/wasi-uv-pydata-map.test.mjs` checks both.
+`scripts/homescoop-pydata-map.json` (shared with wasi-uv). Keep the dict below
+identical; `scripts/test/wasi-uv-pydata-map.test.mjs` checks both.
 
 Pure-Python packages (six, formulas, …) are not in this map and keep working
 through pip. When a mapped name is already installed (pydata / py-*), pip
@@ -19,8 +21,9 @@ import sys
 
 # PyPI project name (PEP 503 normalized) → {npm, catalog}.
 # catalog "pydata" → seven Install/Update → Python data tools; null → still
-# refuse (matplotlib deps / pulled in with pydata) but hint names the npm id.
-# Keys must match packages/wasi-uv/homescoop-pydata-map.json exactly.
+# refuse, and the hint names the npm id (matplotlib's dependencies also say
+# that pydata pulls them in, _VIA_MATPLOTLIB).
+# Keys must match scripts/homescoop-pydata-map.json exactly.
 HOMESCOOP_PIP_NATIVE = {
     "numpy": {"npm": "@ai-ecoverse/py-numpy", "catalog": "pydata"},
     "scipy": {"npm": "@ai-ecoverse/py-scipy", "catalog": "pydata"},
@@ -29,7 +32,14 @@ HOMESCOOP_PIP_NATIVE = {
     "pillow": {"npm": "@ai-ecoverse/py-pillow", "catalog": None},
     "contourpy": {"npm": "@ai-ecoverse/py-contourpy", "catalog": None},
     "kiwisolver": {"npm": "@ai-ecoverse/py-kiwisolver", "catalog": None},
+    "cffi": {"npm": "@ai-ecoverse/py-cffi", "catalog": None},
+    "cryptography": {"npm": "@ai-ecoverse/py-cryptography", "catalog": None},
+    "pynacl": {"npm": "@ai-ecoverse/py-pynacl", "catalog": None},
+    "bcrypt": {"npm": "@ai-ecoverse/py-bcrypt", "catalog": None},
 }
+
+# Not in the pydata catalog, but py-matplotlib (and so pydata) brings them.
+_VIA_MATPLOTLIB = frozenset({"pillow", "contourpy", "kiwisolver"})
 
 _CATALOG = "Python data tools"
 _CATALOG_ID = "pydata"
@@ -73,6 +83,7 @@ def hint_message(hits: list[tuple[str, str]]) -> str:
     npms = " ".join(sorted({e["npm"] for _, e in ordered}))
     plural = "these packages" if len(ordered) > 1 else "this package"
     wants_pydata = any(e.get("catalog") == _CATALOG_ID for _, e in ordered)
+    via_matplotlib = all(k in _VIA_MATPLOTLIB for k, _ in ordered)
     lines = [
         f"pip cannot install {names} on WASIX (no wasm32-wasix wheel; "
         f"building from an sdist hangs or fails).",
@@ -82,21 +93,31 @@ def hint_message(hits: list[tuple[str, str]]) -> str:
         lines.append(
             f"Install {_CATALOG} ({_CATALOG_ID}) from seven's Install/Update, or:"
         )
-        lines.append(f"  pnpm add -g {npms}")
-    else:
-        # pillow / contourpy / kiwisolver: catalog null in the shared map.
+    elif via_matplotlib:
+        # pillow / contourpy / kiwisolver: catalog null, but py-matplotlib's.
         lines.append(
             f"Install {_CATALOG} ({_CATALOG_ID}), which pulls these in via "
             f"matplotlib, or:"
         )
-        lines.append(f"  pnpm add -g {npms}")
+    else:
+        # cffi / cryptography / pynacl / bcrypt: in no seven catalog.
+        lines.append(f"Install the homescoop build{'s' if len(ordered) > 1 else ''}:")
+    lines.append(f"  pnpm add -g {npms}")
+    if wants_pydata or via_matplotlib:
+        after = (
+            f"After {_CATALOG_ID} is installed, dependents that need {plural} "
+            f"(e.g. formulas) resolve normally"
+        )
+    else:
+        after = (
+            f"Once {'it is' if len(ordered) == 1 else 'they are'} installed, "
+            f"dependents (e.g. msal, paramiko) resolve normally"
+        )
     lines.extend(
         [
             "",
             "Pure-Python packages from PyPI still work (e.g. pip install six). "
-            f"After {_CATALOG_ID} is installed, dependents that need {plural} "
-            f"(e.g. formulas) resolve normally — pip sees the py-* copies as "
-            f"already satisfied.",
+            f"{after} — pip sees the py-* copies as already satisfied.",
         ]
     )
     return "\n".join(lines)
