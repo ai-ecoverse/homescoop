@@ -83,6 +83,9 @@ LIB="$STAGE/lib/aws-cli"
 rm -rf "$STAGE"
 mkdir -p "$LIB/bin"
 cp -R "$SRC_DIR/awscli" "$LIB/awscli"
+# homescoop's awscrt: awscrt.crypto and awscrt.exceptions only, on
+# cryptography (src/awscrt/__init__.py); botocore.compat.HAS_CRT stays False.
+cp -R "$HERE/src/awscrt" "$LIB/awscrt"
 cp "$SRC_DIR/bin/aws" "$SRC_DIR/bin/aws_completer" "$LIB/bin/"
 for whl in "$WHEELS"/*.whl; do
   "$PY" -S -B - "$whl" "$LIB" <<'EOF'
@@ -97,7 +100,8 @@ done
 find "$LIB" -path '*.dist-info/RECORD' -delete
 
 echo "== aws-cli: autocomplete index (awscli/data/ac.index), as AWS's pep517 backend builds it"
-# Run without site-packages: the patched tree, with no awscrt.
+# Run without site-packages: the patched tree, with homescoop's awscrt.crypto
+# and no cryptography (it is imported on first use only).
 (cd "$WORK" && "$PY" -S -B - "$LIB" <<'EOF'
 import os, sys
 lib = sys.argv[1]
@@ -147,13 +151,14 @@ chmod 755 "$PKG/bin/aws" "$PKG/bin/aws_completer"
 echo "== aws-cli: checks"
 bad="$(find "$PKG/lib" -type f \( -name '*.pyc' -o -name '*.so' -o -name '*.dylib' -o -name '*.dll' -o -name '*.exe' -o -name '*.pyd' \) | head -5)"
 [[ -z "$bad" ]] || { echo "aws-cli: native or bytecode files staged:" >&2; echo "$bad" >&2; exit 1; }
-[[ ! -e "$PKG/lib/aws-cli/awscrt" ]] || { echo "aws-cli: awscrt staged" >&2; exit 1; }
-for f in awscli/clidriver.py awscli/botocore/crc.py awscli/botocore/cacert.pem awscli/data/ac.index \
+# The only awscrt is homescoop's crypto shim (no native _awscrt, no auth, s3...).
+[[ "$(cd "$PKG/lib/aws-cli/awscrt" && ls)" == "$(printf '%s\n' __init__.py crypto.py exceptions.py)" ]] || { echo "aws-cli: lib/aws-cli/awscrt is not src/awscrt" >&2; exit 1; }
+for f in awscli/clidriver.py awscli/botocore/crc.py awscli/botocore/sigv4a.py awscli/botocore/cacert.pem awscli/data/ac.index \
   awscli/botocore/data/sts/2011-06-15/service-2.json awscli/examples/s3/cp.rst bin/aws bin/aws_completer \
   prompt_toolkit-3.0.51.dist-info/METADATA dateutil/zoneinfo/dateutil-zoneinfo.tar.gz six.py; do
   [[ -f "$PKG/lib/aws-cli/$f" ]] || { echo "aws-cli: missing lib/aws-cli/$f" >&2; exit 1; }
 done
-grep -q 'HAS_CRT = ' "$PKG/lib/aws-cli/awscli/botocore/compat.py"
+grep -q '_HOMESCOOP_CRYPTO_ONLY' "$PKG/lib/aws-cli/awscli/botocore/compat.py"
 homescoop_assert_no_package_links "$PKG"
 files="$(find "$PKG/lib" -type f | wc -l | tr -d ' ')"
 echo "== aws-cli $VERSION: $files files, $(du -sh "$PKG/lib" | awk '{print $1}') in lib/"

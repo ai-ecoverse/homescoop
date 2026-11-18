@@ -2,27 +2,37 @@
 // in the cert page (ctx.serve serialises it), so it is self-contained: no
 // imports, no closures. State lives on globalThis:
 //   awsCertLog      every request: { url, method, headers, body (base64), decoded }
-//   awsCertObjects  S3 objects by "bucket/key": { bytes (base64), checksums, type }
+//   awsCertObjects  S3 objects by "bucket/key": { bytes (base64), checksums, type, meta }
 //   awsCertUploads  multipart uploads by id: { bucket, key, parts: { n: base64 } }
 //   awsCertTokens   CreateToken calls, so the first one is authorization_pending
+//   awsCertState    what a spec sets with PUT http://log.cert.test/state (a
+//                   JSON object, merged): passwordData, publicKeys, login;
+//                   its "objects" go into awsCertObjects instead
 // GET http://log.cert.test/ answers the log as JSON; DELETE empties it and
 // starts the device flow over.
 //
 // STS: GetCallerIdentity answers the caller of the access key it was signed
 // with (AccessDenied for AKIADENIEDEXAMPLE0000). S3 (virtual-hosted style):
-// ListBuckets, PutObject (aws-chunked bodies and their trailers decoded),
-// GetObject (Range too), HeadObject, ListObjectsV2, and multipart uploads.
-// An object answers the checksum it was uploaded with, as S3 does when the
-// request asks with x-amz-checksum-mode: ENABLED; a key with "tampered" in it
-// answers a wrong one. SSO OIDC: RegisterClient, StartDeviceAuthorization,
-// CreateToken (pending once, then a token); the SSO portal:
-// GetRoleCredentials for that token.
+// ListBuckets, PutObject (aws-chunked bodies and their trailers decoded,
+// x-amz-meta-* kept), GetObject (Range too), HeadObject, ListObjects(V2),
+// GetBucketLocation, and multipart uploads; a multi-region access point
+// (<alias>.mrap.accesspoint.s3-global.amazonaws.com) the same, but only signed
+// with SigV4a. An object answers the checksum it was uploaded with, as S3
+// does when the request asks with x-amz-checksum-mode: ENABLED; a key with
+// "tampered" in it answers a wrong one. SSO OIDC: RegisterClient,
+// StartDeviceAuthorization, CreateToken (pending once, then a token); the SSO
+// portal: GetRoleCredentials for that token. EC2: GetPasswordData (the
+// state's passwordData) and DescribeInstances (one instance); EC2 Instance
+// Connect: SendSSHPublicKey; CloudTrail: ListPublicKeys (the state's
+// publicKeys); AWS Sign-In: CreateOAuth2Token, for the state's login code and
+// then its refresh tokens.
 export async function awsResponder(req) {
   const g = globalThis;
   g.awsCertLog = g.awsCertLog || [];
   g.awsCertObjects = g.awsCertObjects || {};
   g.awsCertUploads = g.awsCertUploads || {};
   g.awsCertTokens = g.awsCertTokens || 0;
+  g.awsCertState = g.awsCertState || {};
   const u = new URL(req.url);
   const td = new TextDecoder();
   const te = new TextEncoder();
@@ -39,6 +49,13 @@ export async function awsResponder(req) {
   const s3err = (status, code, message) => xml(status, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>${code}</Code><Message>${message}</Message><RequestId>cert</RequestId></Error>`);
 
   if (u.hostname === 'log.cert.test') {
+    if (req.method === 'PUT' && u.pathname === '/state') {
+      // { objects: { "bucket/key": { bytes (base64), meta: [[name, value]] } } } seeds S3.
+      const { objects, ...state } = JSON.parse(new TextDecoder().decode(req.body || new Uint8Array(0)));
+      for (const [id, o] of Object.entries(objects || {})) g.awsCertObjects[id] = { checksums: {}, type: 'FULL_OBJECT', meta: [], ...o };
+      Object.assign(g.awsCertState, state);
+      return json(200, g.awsCertState);
+    }
     if (req.method === 'DELETE') {
       g.awsCertLog = [];
       g.awsCertTokens = 0;
@@ -120,15 +137,65 @@ export async function awsResponder(req) {
     return json(404, { message: 'not found' });
   }
 
-  // S3, virtual-hosted style: <bucket>.s3.<region>.amazonaws.com
-  if (/(^|\.)s3\.[a-z0-9-]+\.amazonaws\.com$/.test(u.hostname)) {
-    if (!/^AWS4-HMAC-SHA256 Credential=/.test(auth)) return s3err(403, 'AccessDenied', 'no SigV4 signature');
-    const bucket = u.hostname.startsWith('s3.') ? '' : u.hostname.split('.s3.')[0];
+  const st = g.awsCertState;
+  const target = hdr('x-amz-target');
+  const q1 = text && /^Action=/.test(text) ? new URLSearchParams(text) : null;
+
+  // EC2 (query protocol)
+  if (/^ec2\.[a-z0-9-]+\.amazonaws\.com$/.test(u.hostname) && q1) {
+    const ns = 'xmlns="http://ec2.amazonaws.com/doc/2016-11-15/"';
+    if (q1.get('Action') === 'GetPasswordData') {
+      return xml(200, `<GetPasswordDataResponse ${ns}><requestId>cert</requestId><instanceId>${q1.get('InstanceId')}</instanceId><timestamp>2013-07-27T18:29:23.000Z</timestamp><passwordData>${st.passwordData || ''}</passwordData></GetPasswordDataResponse>`);
+    }
+    if (q1.get('Action') === 'DescribeInstances') {
+      const id = q1.get('InstanceId.1') || 'i-0123456789abcdef0';
+      return xml(200, `<DescribeInstancesResponse ${ns}><requestId>cert</requestId><reservationSet><item><reservationId>r-cert</reservationId><ownerId>123456789012</ownerId><instancesSet><item><instanceId>${id}</instanceId><privateIpAddress>10.0.0.10</privateIpAddress><ipAddress>203.0.113.10</ipAddress><vpcId>vpc-cert</vpcId><subnetId>subnet-cert</subnetId><instanceState><code>16</code><name>running</name></instanceState></item></instancesSet></item></reservationSet></DescribeInstancesResponse>`);
+    }
+    return xml(400, `<Response><Errors><Error><Code>InvalidAction</Code><Message>${q1.get('Action')}</Message></Error></Errors><RequestID>cert</RequestID></Response>`);
+  }
+  // EC2 Instance Connect, CloudTrail (JSON 1.1)
+  if (/^ec2-instance-connect\./.test(u.hostname) && /\.SendSSHPublicKey$/.test(target)) {
+    return json(200, { RequestId: 'cert-request', Success: true }, [['content-type', 'application/x-amz-json-1.1']]);
+  }
+  if (/^cloudtrail\./.test(u.hostname) && /\.ListPublicKeys$/.test(target)) {
+    return json(200, { PublicKeyList: st.publicKeys || [] }, [['content-type', 'application/x-amz-json-1.1']]);
+  }
+  // AWS Sign-In (aws login): CreateOAuth2Token, rest-json, the body is tokenInput
+  if (/\.signin\.aws\.amazon\.com$/.test(u.hostname) && u.pathname === '/v1/token') {
+    const t = text ? JSON.parse(text) : {};
+    const login = st.login || {};
+    const jwt = (o) => `${btoa(JSON.stringify({ alg: 'none' })).replace(/=+$/, '')}.${btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.sig`;
+    const n = (g.awsCertLoginTokens = (g.awsCertLoginTokens || 0) + 1);
+    const ok = (t.grantType === 'authorization_code' && t.code === login.code)
+      || (t.grantType === 'refresh_token' && t.refreshToken === `cert-refresh-${n - 1}`);
+    if (!ok) return json(400, { error: 'invalid_grant', message: 'invalid grant' }, [['x-amzn-errortype', 'ValidationException']]);
+    return json(200, {
+      accessToken: { accessKeyId: `ASIALOGINCERT${String(n).padStart(7, '0')}`, secretAccessKey: `login-secret-${n}`, sessionToken: `login-session-${n}` },
+      tokenType: 'aws_sigv4',
+      expiresIn: t.grantType === 'authorization_code' ? (login.expiresIn || 900) : 900,
+      refreshToken: `cert-refresh-${n}`,
+      idToken: jwt({ sub: 'arn:aws:sts::123456789012:assumed-role/Admin/cert' }),
+    });
+  }
+
+  // S3, virtual-hosted style: <bucket>.s3.<region>.amazonaws.com, or a
+  // multi-region access point, which takes SigV4a only.
+  const mrap = /^([a-z0-9]+)\.mrap\.accesspoint\.s3-global\.amazonaws\.com$/.exec(u.hostname);
+  if (mrap || /(^|\.)s3\.[a-z0-9-]+\.amazonaws\.com$/.test(u.hostname)) {
+    const algorithm = mrap ? 'AWS4-ECDSA-P256-SHA256' : 'AWS4-HMAC-SHA256';
+    if (!auth.startsWith(`${algorithm} Credential=`) && u.searchParams.get('X-Amz-Algorithm') !== algorithm) {
+      return s3err(403, 'AccessDenied', `no ${algorithm} signature`);
+    }
+    const bucket = mrap ? `mrap-${mrap[1]}` : u.hostname.startsWith('s3.') ? '' : u.hostname.split('.s3.')[0];
     const key = decodeURIComponent(u.pathname.slice(1));
     const id = `${bucket}/${key}`;
     const q = u.searchParams;
     if (!bucket) {
       return xml(200, '<ListAllMyBucketsResult><Owner><ID>cert</ID></Owner><Buckets><Bucket><Name>cert-bucket</Name><CreationDate>2026-01-01T00:00:00.000Z</CreationDate></Bucket></Buckets></ListAllMyBucketsResult>');
+    }
+    const meta = req.headers.filter(([k]) => /^x-amz-meta-/i.test(k)).map(([k, v]) => [k.toLowerCase(), v]);
+    if (req.method === 'GET' && !key && q.has('location')) {
+      return xml(200, '<?xml version="1.0" encoding="UTF-8"?><LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>');
     }
     if (req.method === 'GET' && !key) {
       const keys = Object.keys(g.awsCertObjects).filter((k) => k.startsWith(`${bucket}/${q.get('prefix') || ''}`)).sort();
@@ -159,7 +226,7 @@ export async function awsResponder(req) {
       return xml(200, `<CompleteMultipartUploadResult><Bucket>${bucket}</Bucket><Key>${key}</Key><ETag>"multipart-${nums.length}"</ETag></CompleteMultipartUploadResult>`);
     }
     if (req.method === 'PUT') {
-      g.awsCertObjects[id] = { bytes: b64(body), checksums, type: 'FULL_OBJECT' };
+      g.awsCertObjects[id] = { bytes: b64(body), checksums, type: 'FULL_OBJECT', meta };
       return { status: 200, headers: [['etag', '"etag"'], ...Object.entries(checksums).map(([a, v]) => [`x-amz-checksum-${a}`, v])], body: '' };
     }
     if (req.method === 'GET' || req.method === 'HEAD') {
@@ -167,7 +234,7 @@ export async function awsResponder(req) {
       if (!obj) return req.method === 'HEAD' ? { status: 404, headers: [], body: '' } : s3err(404, 'NoSuchKey', 'The specified key does not exist.');
       let bytes = unb64(obj.bytes);
       const total = bytes.length;
-      const headers = [['etag', '"etag"'], ['last-modified', 'Thu, 01 Jan 2026 00:00:00 GMT'], ['content-type', 'application/octet-stream'], ['accept-ranges', 'bytes']];
+      const headers = [['etag', '"etag"'], ['last-modified', 'Thu, 01 Jan 2026 00:00:00 GMT'], ['content-type', 'application/octet-stream'], ['accept-ranges', 'bytes'], ...(obj.meta || [])];
       let status = 200;
       const range = /^bytes=(\d+)-(\d*)$/.exec(hdr('range'));
       if (range) {

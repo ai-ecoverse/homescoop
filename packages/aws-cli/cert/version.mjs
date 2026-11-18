@@ -1,9 +1,10 @@
 import { LIB, PKG, ok, sh } from './lib/aws.mjs';
 
 // aws --version names the recipe's release and wasix-python's CPython 3.15.
-// The tree has no awscrt, and botocore.compat.HAS_CRT says so
-// (awscrt-optional.patch; NEGATIVE.md: without the patch, every command
-// fails with "No module named 'awscrt'"). aws help renders plain text, as
+// The tree has no awscrt: its awscrt is homescoop's awscrt.crypto on
+// cryptography (src/awscrt), with no native _awscrt and nothing else, and
+// botocore.compat.HAS_CRT says so (awscrt-optional.patch; NEGATIVE.md:
+// without the patch, every command fails with "No module named 'awscrt'"). aws help renders plain text, as
 // there is no groff or mandoc here (help-text.patch), and aws_completer
 // completes from the autocomplete index build.sh generated.
 export default async function (ctx) {
@@ -14,8 +15,8 @@ export default async function (ctx) {
   assert.match(v.stdout, new RegExp(`^aws-cli/${release.replace(/\./g, '\\.')} Python/3\\.15\\.\\d+ \\S+ source/\\S+\\n$`), v.stdout);
   assert.equal(v.stderr, '', v.stderr);
 
-  const crt = await ok(ctx, `python3 -S -c 'import importlib.util, sys; sys.path.insert(0, "${LIB}"); import awscli, botocore.compat as c; print(importlib.util.find_spec("awscrt"), c.HAS_CRT)'`);
-  assert.equal(crt.stdout, 'None False\n', `awscrt in the tree, or HAS_CRT: ${crt.stdout}${crt.stderr}`);
+  const crt = await ok(ctx, `python3 -S -c 'import importlib.util as u, sys; sys.path.insert(0, "${LIB}"); import awscli, awscrt, botocore.compat as c; print(awscrt.__file__, awscrt._HOMESCOOP_CRYPTO_ONLY, [m for m in ("_awscrt", "awscrt.auth", "awscrt.s3", "awscrt.checksums") if u.find_spec(m)], c.HAS_CRT)'`);
+  assert.equal(crt.stdout, `${LIB}/awscrt/__init__.py True [] False\n`, `awscrt in the tree, or HAS_CRT: ${crt.stdout}${crt.stderr}`);
 
   const help = await ok(ctx, 'aws help');
   assert.match(help.stdout, /^Description\n\*{11}\n/m, help.stdout.slice(0, 500));
@@ -31,5 +32,5 @@ export default async function (ctx) {
     assert.equal(c.status, 0, `aws_completer '${line}': ${c.stderr}`);
     assert.match(c.stdout, want, `aws_completer '${line}': ${c.stdout}`);
   }
-  console.log(`aws --version: ${v.stdout.trim()}; no awscrt (HAS_CRT False); aws help and aws s3 cp help as text; aws_completer completes from ac.index`);
+  console.log(`aws --version: ${v.stdout.trim()}; awscrt is the crypto-only shim (HAS_CRT False); aws help and aws s3 cp help as text; aws_completer completes from ac.index`);
 }
