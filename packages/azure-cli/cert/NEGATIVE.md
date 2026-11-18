@@ -4,7 +4,7 @@
 
 ## 2.93.0-2: the native packages from the py-* packages
 
-**Date:** 2026-11-18. slicc-kernel 1.191.2 (the cert kernel), wasix-python 3.15.0-10, py-cffi 2.1.1-2, py-pycparser 3.12.0-1, py-cryptography 50.0.2-1, py-pynacl 1.6.2-1, py-bcrypt 5.0.0-1, py-pyopenssl 26.4.0-1, wasm-tls-engine 4.2.0-12, Chromium through `scripts/browser-cert/run.mjs`, users enforce. The base is a local build of 2.93.0-2 (sha256 `16237ad1…00da`), which passes every spec.
+**Date:** 2026-11-18. slicc-kernel 1.191.2 (the cert kernel), wasix-python 3.15.0-10, py-cffi 2.1.1-2, py-pycparser 3.12.0-1, py-cryptography 50.0.2-1, py-pynacl 1.6.2-1, py-bcrypt 5.0.0-1, py-pyopenssl 26.4.0-1, wasm-tls-engine 4.2.0-12, Chromium through `scripts/browser-cert/run.mjs`, users enforce. The base is a local build of 2.93.0-2 (sha256 `0fb366b4…6377`), which passes every spec.
 
 ### Without the py-* packages: 2.93.0-1
 
@@ -28,7 +28,7 @@ stderr=ERROR: This command needs PyNaCl (native code: libsodium). …
 
 ### The launcher reopened to site-packages
 
-`isolate()` with `sys.path[:] = [SITE] + keep + gone`: every site-packages directory stays (wasix-python's own, then each py-* that discovery found), instead of only az's own py-* packages. That's what letting discovery hand az its native packages would do (sha256 `3525634e…57d7`).
+`isolate()` with `sys.path[:] = [SITE] + keep + gone`: every site-packages directory stays (wasix-python's own, then each py-* that discovery found), instead of only az's own py-* packages. That's what letting discovery hand az its native packages would do (sha256 `cf942eb5…f4d0`).
 
 ```
 browser-cert: FAIL packages/azure-cli/cert/launcher.mjs
@@ -38,11 +38,16 @@ ERROR: The command failed with an unexpected error. Here is the traceback:
 ERROR: No module named 'cryptography.hazmat'
 ```
 
-The fake cryptography in wasix-python's site-packages comes before py-cryptography and wins.
+The fake cryptography in wasix-python's site-packages comes before py-cryptography and wins. `native.mjs` fails too: sys.path has wasix-python's own site-packages, not only az's six.
+
+```
+browser-cert: FAIL packages/azure-cli/cert/native.mjs
++   '/node_modules/@ai-ecoverse/wasix-python/lib/python3.15/site-packages',
+```
 
 ### The launcher without the version check
 
-`own_packages()` with `elif m.get("name") != npm:` in place of the name and version check (sha256 `cbae24a7…83c5`). A py-bcrypt whose package.json says 5.0.0-99 is taken:
+`own_packages()` with `elif m.get("name") != npm:` in place of the name and version check (sha256 `6455ab1e…5949`). A py-bcrypt whose package.json says 5.0.0-99 is taken:
 
 ```
 browser-cert: FAIL packages/azure-cli/cert/launcher.mjs
@@ -65,7 +70,7 @@ py-cryptography is taken without az's py-cffi, and with a nested py-cffi of its 
 
 ### The launcher without its NativeFinder
 
-`sys.meta_path.append(NativeFinder)` removed from `bin/az` (sha256 `f0f704e8…b5e8`). psutil's import in az's `try` is then a plain `No module named 'psutil'`, and the launcher's reason is gone:
+`sys.meta_path.append(NativeFinder)` removed from `bin/az` (sha256 `9f69779c…d3e7`). psutil's import in az's `try` is then a plain `No module named 'psutil'`, and the launcher's reason is gone:
 
 ```
 browser-cert: FAIL packages/azure-cli/cert/launcher.mjs
