@@ -64,6 +64,12 @@
       "catalog": null,
       "kind": "native",
       "note": "libsodium bindings (azure-cli's az webapp/functionapp/logicapp/staticwebapp)"
+    },
+    "bcrypt": {
+      "npm": "@ai-ecoverse/py-bcrypt",
+      "catalog": null,
+      "kind": "native",
+      "note": "Rust (pyo3) _bcrypt; paramiko (az ssh)"
     }
   }
 }

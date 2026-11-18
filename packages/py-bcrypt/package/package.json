@@ -1,0 +1,47 @@
+{
+  "name": "@ai-ecoverse/py-bcrypt",
+  "version": "5.0.0-1",
+  "description": "bcrypt, modern password hashing for Python (used by paramiko).",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ai-ecoverse/homescoop.git",
+    "directory": "packages/py-bcrypt/package"
+  },
+  "homepage": "https://github.com/ai-ecoverse/homescoop/tree/main/packages/py-bcrypt",
+  "keywords": [
+    "wasm",
+    "wasi",
+    "wasix",
+    "slicc",
+    "homescoop",
+    "python",
+    "bcrypt"
+  ],
+  "files": [
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ai-ecoverse/wasix-python": ">=3.15.0-8 <3.15.1"
+  },
+  "homescoop": {
+    "recipe": "py-bcrypt",
+    "upstream": "5.0.0",
+    "platform": "wasix_wasm32"
+  },
+  "slicc": {
+    "python": {
+      "sitePackages": "lib/python3.15/site-packages",
+      "requires": {
+        "abi": "cp315",
+        "platform": "wasix_wasm32"
+      }
+    }
+  }
+}

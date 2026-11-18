@@ -1,0 +1,22 @@
+getrandom: WASI preview 1 random_get on wasm32-wasmer-wasi-dl.
+
+wasix-org/rust's dynamic-linking target has target_os = "wasi" and
+target_env = "dl", which getrandom 0.3 refuses (it knows p1 and p2).
+WASIX is a superset of preview 1, so the p1 backend (random_get from
+wasi_snapshot_preview1) is the right one; wasix-org/getrandom's
+wasix-0.3.3 branch does the same through the wasix crate. Applied by
+scripts/rust-pyext.sh.
+
+--- a/src/backends.rs
++++ b/src/backends.rs
+@@ -133,7 +133,9 @@
+         pub use apple_other::*;
+     } else if #[cfg(all(target_arch = "wasm32", target_os = "wasi"))] {
+         cfg_if! {
+-            if #[cfg(target_env = "p1")] {
++            // homescoop: wasm32-wasmer-wasi-dl (WASIX dynamic linking) has
++            // WASI preview 1's random_get, as wasm32-wasip1 does.
++            if #[cfg(any(target_env = "p1", target_env = "dl"))] {
+                 mod wasi_p1;
+                 pub use wasi_p1::*;
+             } else if #[cfg(target_env = "p2")] {
